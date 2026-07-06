@@ -13,8 +13,9 @@ before changing/renaming/deleting a page; spot their own broken outgoing links),
 **Impact**: GROWI has no link index today — link handling is render-only and client-side. This
 feature introduces a new server-side directed **link graph** (`PageLink`), kept current through
 the existing page-lifecycle event bus and queried under the existing page-grant model. It adds
-storage, one service, one read endpoint, one panel, an index-creation migration, and a background
-backfill job; it changes no existing lifecycle, permission, or Markdown/wiki-link behavior.
+storage, one service, one read endpoint, one panel, and a background backfill job; it changes no
+existing lifecycle, permission, or Markdown/wiki-link behavior. The `PageLink` indexes are created
+by Mongoose `autoIndex` at model registration (new collection — no migration needed).
 
 ### Goals
 
@@ -35,7 +36,8 @@ backfill job; it changes no existing lifecycle, permission, or Markdown/wiki-lin
   contention during backfill) is explicitly deferred.
 - A **blocking boot-time** backfill (a migrate-mongo data migration). Ruled out: it would take
   the wiki offline for the full backfill duration, which scales with page count and is
-  unacceptable for large instances. Only fast index creation runs at boot.
+  unacceptable for large instances. Index creation is not boot-blocking either — `autoIndex`
+  builds the indexes on a new, empty collection at model registration.
 - Indexing attachments or `/share/*` targets (only creatable GROWI pages are indexed).
 
 ## Boundary Commitments
@@ -49,9 +51,9 @@ backfill job; it changes no existing lifecycle, permission, or Markdown/wiki-lin
 - Resolution of a stored `toPath` to a target page `_id` (`toPage` cache), including redirect
   following and direct `_id` resolution when `toPath` is a permalink.
 - Synchronization of `PageLink` rows in response to page-lifecycle events.
-- The one-time backfill: a migrate-mongo migration that creates the `PageLink` indexes, plus a
-  background `CronService` job that populates rows for pre-existing pages without taking the wiki
-  offline.
+- The one-time backfill: a background `CronService` job that populates rows for pre-existing pages
+  without taking the wiki offline. (The `PageLink` indexes themselves are created by `autoIndex`
+  at model registration, not by a migration.)
 - The read API + SWR hook + UI panel that present backlinks and forward-link health.
 
 ### Out of Boundary
@@ -73,7 +75,7 @@ backfill job; it changes no existing lifecycle, permission, or Markdown/wiki-lin
   `relative-links-by-pukiwiki-like-linker`, and `generateCommonOptions`'s plugin set.
 - Mongoose models: `Page` (`findByPath`, `findByIdsAndViewer`), `Revision`, `PageRedirect`.
 - `crowi.events.page` (subscribe only), apiv3 middleware (`accessTokenParser`, `loginRequired`),
-  migrate-mongo + `getModelSafely` + `createBatchStream`, `CronService` (node-cron base) and the
+  `getModelSafely` + `createBatchStream`, `CronService` (node-cron base) and the
   admin Socket.IO channel for backfill scheduling/progress (mirroring the page-bulk-export job).
 - **Constraint**: dependency direction is one-way — backlinks depends on page/render/grant
   subsystems; none of them may import backlinks.
@@ -164,9 +166,8 @@ graph TB
 | Frontend | React + SWR (existing) | Backlinks panel + data hook | New tab in `PageAccessoriesModal`; reuse `PageListItemS`/`PagePathLabel` |
 | Backend / Services | Express apiv3 + a new `PageLinkService` | Read endpoint + event listeners | Listener wired in `crowi` setup like `search.ts` |
 | Rendering | Existing unified remark/rehype plugins | Server-side link extraction | Node-compatible; trimmed processor (link plugins only) |
-| Data / Storage | MongoDB + Mongoose (existing) | `PageLink` collection | New model via `getOrCreateModel` |
+| Data / Storage | MongoDB + Mongoose (existing) | `PageLink` collection + indexes | New model via `getOrCreateModel`; indexes built by `autoIndex` at model registration (new collection — no migration) |
 | Messaging / Events | `crowi.events.page` (Node EventEmitter) | Sync triggers | Subscribe only |
-| Migration | migrate-mongo v11 (existing) | Create `PageLink` indexes (fast, may block boot) | Index creation **only** — never the heavy backfill |
 | Background job | `CronService` / node-cron (existing) | One-time backfill of pre-existing pages | Chunked + resumable + throttled; mirrors page-bulk-export job; admin Socket.IO progress |
 
 ## File Structure Plan
@@ -195,8 +196,8 @@ apps/app/src/features/backlinks/
         ├── BacklinksPanel.tsx          # incoming list + empty state + forward-health section
         └── BacklinkListItem.tsx        # one row (title + path + target-state badge)
 
-apps/app/src/migrations/
-└── YYYYMMDDHHMMSS-create-page-link-indexes.js   # create PageLink indexes only (fast); backfill is the cron job above
+# No migration file: PageLink indexes are created by Mongoose autoIndex at model
+# registration (new collection); the backfill is the cron job above.
 ```
 
 ### Modified Files
@@ -287,7 +288,7 @@ needs no write — derived state reads the restored page's status.
 | 3.2 | Update add/remove → reflected | create/update replace outbound rows | Save flow |
 | 3.3 | Deleted page not an active source | reconcile (permanent: remove rows; trashed: filtered at read) | Delete flow |
 | 3.4 | <~1s at ≥100k pages | indexes `{toPage}`,`{fromPage}`,`{toPath}` | — |
-| 4.1 | One-time backfill | index-creation migration + PageLinkBackfillCron | Backfill flow |
+| 4.1 | One-time backfill | PageLinkBackfillCron (indexes via `autoIndex` at model registration) | Backfill flow |
 | 4.2 | Backfilled == post-enablement | backfill reuses `extractInternalLinks`; emits same rows as the live path | Backfill flow |
 | 4.3 | Re-run / restart produces no duplicates | unique `{fromPage,toPath}` + upsert; resumable progress marker | Backfill flow |
 | 5.1 | Links survive rename/move | resolveToPage redirect-following + `_id`-stable cache | Reconcile notes |
@@ -310,7 +311,6 @@ needs no write — derived state reads the restored page's status.
 | get-page-backlinks route | API | Read endpoint | 1.1,1.7,2.x,6.4 | apiv3 middleware (P0), PageLinkService (P0) | API |
 | useSWRxBacklinks | Client store | Fetch backlinks | 1.1 | apiv3Get (P0) | Service |
 | BacklinksPanel / BacklinkListItem | UI | Render list, empty state, target-state badge | 1.1,1.7,1.8,6.4 | useSWRxBacklinks, PageListItemS (P1) | — |
-| index-creation migration | Batch | Create `PageLink` indexes (fast, boot-time) | 4.1 | migrate-mongo (P0) | Batch |
 | PageLinkBackfillCron | Batch | Populate pre-existing pages (chunked, resumable, throttled, online) | 4.1,4.2,4.3 | CronService (P0), extractInternalLinks (P0), Revision, in-memory path→id map (P0) | Batch, State |
 
 ### Data / Server logic
@@ -495,24 +495,17 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklink[]>;
 
 ### Batch
 
-> **Why two components, not one migrate-mongo migration.** GROWI runs migrate-mongo migrations
-> *synchronously at boot, before the app serves traffic* (`docker-entrypoint.ts:247`). A data
-> migration that parses every page body would therefore make the wiki **offline for the full
-> backfill duration** — minutes on small wikis, but tens of minutes to hours on large-plan
-> instances. So the schema part (index creation) stays in migrate-mongo, and the heavy data part
-> runs **online** as a throttled background job after boot. Backlinks are simply incomplete for
-> pre-existing pages until the job finishes (acceptable per 4.2, which only requires completeness
-> *after* the process completes); newly edited pages index immediately via the event listener.
-
-#### index-creation migration
-
-**Contracts**: Batch [x]
-
-##### Batch / Job Contract
-- Trigger: `pnpm run migrate` (prod, at boot) — fast, safe to block on.
-- Action: create the `PageLink` collection indexes (`{fromPage}`, `{toPath}`, `{toPage}`, unique
-  `{fromPage,toPath}`). No row writes.
-- `down`: drop the `PageLink` collection.
+> **Why the backfill is an online job, not a boot-time migration.** GROWI runs migrate-mongo
+> migrations *synchronously at boot, before the app serves traffic* (`docker-entrypoint.ts:247`).
+> A data migration that parses every page body would therefore make the wiki **offline for the
+> full backfill duration** — minutes on small wikis, but tens of minutes to hours on large-plan
+> instances. So the heavy data part runs **online** as a throttled background job after boot.
+> Nothing schema-related blocks boot either: `PageLink` is a new collection, so its indexes
+> (`{fromPage}`, `{toPath}`, `{toPage}`, unique `{fromPage,toPath}`) are created by Mongoose
+> `autoIndex` at model registration — no migration is involved. Backlinks are simply incomplete
+> for pre-existing pages until the job finishes (acceptable per 4.2, which only requires
+> completeness *after* the process completes); newly edited pages index immediately via the event
+> listener.
 
 #### PageLinkBackfillCron
 
@@ -671,11 +664,12 @@ interface ILinkTarget {
 
 ## Migration Strategy
 
-Two phases: a fast index-creation migration at boot, then an online throttled backfill job.
+No migration: `PageLink` indexes are created by Mongoose `autoIndex` at model registration (new,
+empty collection). The only bulk step is the online throttled backfill job after boot.
 
 ```mermaid
 graph TB
-    Boot[boot: migrate-mongo] --> Idx[create PageLink indexes only]
+    Boot[boot: model registration] --> Idx[autoIndex creates PageLink indexes]
     Idx --> Serve[app serves traffic]
     Serve --> Claim{atomic claim job doc}
     Claim -- not claimed/complete --> Tick[cron tick: process one chunk]
@@ -688,10 +682,10 @@ graph TB
     Done -- yes --> Mark[mark job complete]
 ```
 
-- **No boot downtime** beyond index creation (milliseconds). The wiki is online throughout the
-  backfill; pre-existing backlinks fill in progressively.
+- **No boot downtime**: `autoIndex` on the empty `PageLink` collection is effectively instant. The
+  wiki is online throughout the backfill; pre-existing backlinks fill in progressively.
 - **Estimated backfill wall-clock** (≈5 ms/page CPU; in-memory resolution): ~10 min/100k pages at
   full speed, scaled up by the inverse duty cycle (e.g. ~40 min/100k at 25% duty) and by average
   page size. See `research.md` for the benchmark and the scale/duty-cycle table.
-- Rollback: stop the cron and drop `PageLink` (the `down` migration). Recovery from a crash =
-  resume from the progress marker; idempotent upserts make partial progress safe.
+- Rollback: stop the cron and drop the `PageLink` collection (indexes go with it). Recovery from a
+  crash = resume from the progress marker; idempotent upserts make partial progress safe.

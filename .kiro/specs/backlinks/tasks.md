@@ -23,18 +23,14 @@
     index that enforces "one source listed once"
   - Declare the statics the service will use (replace-outbound, find-backlink-sources,
     reconcile-deleted, re-resolve-by-path) with typed signatures
+  - `PageLink` is a **new** collection, so the four indexes are created from these schema
+    declarations by Mongoose `autoIndex` at model registration — no migrate-mongo migration is
+    needed (same as the `PageTagRelation` precedent, whose unique compound index is schema-declared
+    with no migration). A migration would only be required to *drop/alter* an index later.
   - Done when the model registers and a unit test confirms the unique index rejects a duplicate
     `{fromPage, toPath}` insert
   - _Requirements: 1.5, 3.4_
   - _Depends: 1.1_
-
-- [ ] 1.3 Add the index-creation migration
-  - Create a migrate-mongo migration that creates the `PageLink` collection indexes only (no data
-    writes), with a `down` that drops the collection
-  - This runs at boot regardless of the backfill decision; it must stay fast (no body parsing)
-  - Done when running the migration creates the four indexes and the changelog records it once
-  - _Requirements: 3.4, 4.1_
-  - _Depends: 1.2_
 
 - [ ] 2. Core: link extraction and target resolution (pure logic)
 - [ ] 2.1 (P) Implement internal-link extraction from a page body
