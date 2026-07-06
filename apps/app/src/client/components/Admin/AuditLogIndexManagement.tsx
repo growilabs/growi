@@ -5,7 +5,6 @@ import { useTranslation } from 'next-i18next';
 import { SocketEventName } from '~/interfaces/websocket';
 import { auditLogEnabledAtom } from '~/states/server-configurations';
 
-import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';
 import NormalizeIndicesControls from './ElasticsearchManagement/NormalizeIndicesControls';
 import RebuildIndexControls from './ElasticsearchManagement/RebuildIndexControls';
 import ReconnectControls from './ElasticsearchManagement/ReconnectControls';
@@ -56,15 +55,20 @@ export const AuditLogIndexManagement = (): JSX.Element => {
   });
 
   if (!auditLogEnabled) {
-    return <AuditLogDisableMode />;
+    return (
+      <div
+        className="alert alert-secondary mb-0"
+        data-testid="admin-audit-log-index-disabled"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
+        dangerouslySetInnerHTML={{
+          __html: t('audit_log_management.disable_mode_explanation'),
+        }}
+      />
+    );
   }
 
   return (
     <div data-testid="admin-audit-log-index">
-      <h2 className="mb-4">
-        {t('audit_log_index_management.elasticsearch_management')}
-      </h2>
-
       <div className="row">
         <div className="col-md-12">
           <StatusTable

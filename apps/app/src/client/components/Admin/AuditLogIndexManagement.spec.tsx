@@ -18,10 +18,6 @@ vi.mock('./hooks/useIndexManagement', () => ({
   useIndexManagement: mockUseIndexManagement,
 }));
 
-vi.mock('./AuditLog/AuditLogDisableMode', () => ({
-  AuditLogDisableMode: () => <div data-testid="audit-log-disable-mode" />,
-}));
-
 vi.mock('./ElasticsearchManagement/StatusTable', () => ({
   default: () => <div data-testid="status-table" />,
 }));
@@ -78,10 +74,13 @@ describe('AuditLogIndexManagement', () => {
     );
   });
 
-  it('shows AuditLogDisableMode when audit log is disabled', () => {
+  it('shows a compact disabled placeholder when audit log is disabled', () => {
     mockUseAtomValue.mockReturnValue(false);
     render(<AuditLogIndexManagement />);
-    expect(screen.getByTestId('audit-log-disable-mode')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('admin-audit-log-index-disabled'),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('status-table')).not.toBeInTheDocument();
   });
 
   it('renders index management controls when audit log is enabled', () => {
