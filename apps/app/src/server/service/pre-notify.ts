@@ -20,9 +20,10 @@ export type GeneratePreNotify = (
 ) => PreNotify;
 
 interface IPreNotifyService {
-  generateInitialPreNotifyProps: (PreNotifyProps) => {
-    notificationTargetUsers?: Ref<IUser>[];
-  };
+  // No parameters: the implementation seeds an empty props object. (The prior
+  // `(PreNotifyProps) => …` signature was a type-annotation mistake — it declared
+  // an implicit-any parameter *named* PreNotifyProps, not a typed one.)
+  generateInitialPreNotifyProps: () => PreNotifyProps;
   generatePreNotify: GeneratePreNotify;
 }
 
@@ -40,11 +41,14 @@ class PreNotifyService implements IPreNotifyService {
     const preNotify = async (props: PreNotifyProps) => {
       const { notificationTargetUsers } = props;
 
-      const User = mongoose.model<IUser, { find }>('User');
+      const User = mongoose.model<IUser>('User');
       const actionUser = activity.user;
       const target = activity.target;
+      // `target` is an activity target id (`string | undefined`); a string is a
+      // valid Ref<IPage> (Ref<T> = string | ObjectId | T), so a single cast
+      // widens it — the previous `as unknown as` double cast was unnecessary.
       const subscribedUsers = await Subscription.getSubscription(
-        target as unknown as Ref<IPage>,
+        target as Ref<IPage>,
       );
       // actionUser is absent for system-triggered activities with no acting
       // user; in that case there is no one to exclude from the subscribers.
