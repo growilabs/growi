@@ -3,6 +3,7 @@ import { normalizePath } from '@growi/core/dist/utils/path-utils';
 import type { Nodes } from 'hast';
 import { selectAll } from 'hast-util-select';
 import rehypeRaw from 'rehype-raw';
+import gfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
 import remarkRehype from 'remark-rehype';
 import { unified } from 'unified';
@@ -32,6 +33,7 @@ export const extractInternalLinks = async (
 ): Promise<string[]> => {
   const processor = unified()
     .use(remarkParse)
+    .use(gfm)
     .use(pukiwikiLikeLinker)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeRaw)
