@@ -6,7 +6,8 @@ import { SocketEventName } from '~/interfaces/websocket';
 import { auditLogEnabledAtom } from '~/states/server-configurations';
 
 import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';
-import LabeledProgressBar from './Common/LabeledProgressBar';
+import NormalizeIndicesControls from './ElasticsearchManagement/NormalizeIndicesControls';
+import RebuildIndexControls from './ElasticsearchManagement/RebuildIndexControls';
 import ReconnectControls from './ElasticsearchManagement/ReconnectControls';
 import StatusTable from './ElasticsearchManagement/StatusTable';
 import { useIndexManagement } from './hooks/useIndexManagement';
@@ -58,8 +59,6 @@ export const AuditLogIndexManagement = (): JSX.Element => {
     return <AuditLogDisableMode />;
   }
 
-  const showProgressBar = isRebuildingProcessing || isRebuildingCompleted;
-
   return (
     <div data-testid="admin-audit-log-index">
       <h2 className="mb-4">
@@ -102,28 +101,17 @@ export const AuditLogIndexManagement = (): JSX.Element => {
           {t('audit_log_index_management.normalize')}
         </div>
         <div className="col-md-6">
-          <button
-            type="button"
-            className={`btn ${isNormalizeEnabled ? 'btn-outline-info' : 'btn-outline-secondary'}`}
-            disabled={!isNormalizeEnabled}
-            onClick={() =>
+          <NormalizeIndicesControls
+            isEnabled={isNormalizeEnabled}
+            isProcessing={isNormalizingProcessing}
+            buttonLabel={t('audit_log_index_management.normalize_button')}
+            description={t('audit_log_index_management.normalize_description')}
+            onNormalizingRequested={() =>
               normalizeIndices(
                 t('audit_log_index_management.normalize_success'),
               )
             }
-          >
-            {isNormalizingProcessing && (
-              <span
-                className="spinner-border spinner-border-sm me-2"
-                role="status"
-                aria-hidden="true"
-              />
-            )}
-            {t('audit_log_index_management.normalize_button')}
-          </button>
-          <p className="form-text text-muted">
-            {t('audit_log_index_management.normalize_description')}
-          </p>
+          />
         </div>
       </div>
 
@@ -134,37 +122,27 @@ export const AuditLogIndexManagement = (): JSX.Element => {
           {t('audit_log_index_management.rebuild')}
         </div>
         <div className="col-md-6">
-          {showProgressBar && (
-            <div className="mb-3">
-              <LabeledProgressBar
-                header={
-                  isRebuildingCompleted
-                    ? t('audit_log_index_management.rebuild_progress_completed')
-                    : t(
-                        'audit_log_index_management.rebuild_progress_processing',
-                      )
-                }
-                currentCount={rebuildCurrent}
-                totalCount={rebuildTotal}
-                isInProgress={isRebuildingProcessing}
-              />
-            </div>
-          )}
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!isRebuildEnabled}
-            onClick={() =>
+          <RebuildIndexControls
+            isEnabled={isRebuildEnabled}
+            isRebuildingProcessing={isRebuildingProcessing}
+            isRebuildingCompleted={isRebuildingCompleted}
+            currentCount={rebuildCurrent}
+            totalCount={rebuildTotal}
+            progressHeaderProcessing={t(
+              'audit_log_index_management.rebuild_progress_processing',
+            )}
+            progressHeaderCompleted={t(
+              'audit_log_index_management.rebuild_progress_completed',
+            )}
+            buttonLabel={t('audit_log_index_management.rebuild_button')}
+            descriptionLines={[
+              t('audit_log_index_management.rebuild_description_1'),
+              t('audit_log_index_management.rebuild_description_2'),
+            ]}
+            onRebuildingRequested={() =>
               rebuildIndices(t('audit_log_index_management.rebuild_requested'))
             }
-          >
-            {t('audit_log_index_management.rebuild_button')}
-          </button>
-          <p className="form-text text-muted">
-            {t('audit_log_index_management.rebuild_description_1')}
-            <br />
-            {t('audit_log_index_management.rebuild_description_2')}
-          </p>
+          />
           {hasUnsyncedEvents && (
             <p className="form-text text-warning mt-2 mb-0">
               {t('audit_log_index_management.unsynced_events_warning')}

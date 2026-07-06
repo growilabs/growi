@@ -16,13 +16,18 @@ const ElasticsearchManagement = (): JSX.Element => {
     isConnected,
     isConfigured,
     isReconnectingProcessing,
+    isNormalizingProcessing,
     isRebuildingProcessing,
     isRebuildingCompleted,
     isNormalized,
     indicesData,
     aliasesData,
+    rebuildTotal,
+    rebuildCurrent,
     isErrorOccuredOnSearchService,
     isReconnectBtnEnabled,
+    isNormalizeEnabled,
+    isRebuildEnabled,
     reconnect,
     normalizeIndices,
     rebuildIndices,
@@ -76,8 +81,10 @@ const ElasticsearchManagement = (): JSX.Element => {
         </div>
         <div className="col-md-6">
           <NormalizeIndicesControls
-            isRebuildingProcessing={isRebuildingProcessing}
-            isNormalized={isNormalized}
+            isEnabled={isNormalizeEnabled}
+            isProcessing={isNormalizingProcessing}
+            buttonLabel={t('full_text_search_management.normalize_button')}
+            description={t('full_text_search_management.normalize_description')}
             onNormalizingRequested={() =>
               normalizeIndices('Normalizing has succeeded')
             }
@@ -93,9 +100,18 @@ const ElasticsearchManagement = (): JSX.Element => {
         </div>
         <div className="col-md-6">
           <RebuildIndexControls
+            isEnabled={isRebuildEnabled}
             isRebuildingProcessing={isRebuildingProcessing}
             isRebuildingCompleted={isRebuildingCompleted}
-            isNormalized={isNormalized}
+            currentCount={rebuildCurrent}
+            totalCount={rebuildTotal}
+            progressHeaderProcessing="Processing.."
+            progressHeaderCompleted="Completed"
+            buttonLabel={t('full_text_search_management.rebuild_button')}
+            descriptionLines={[
+              t('full_text_search_management.rebuild_description_1'),
+              t('full_text_search_management.rebuild_description_2'),
+            ]}
             onRebuildingRequested={() =>
               rebuildIndices('Rebuilding is requested')
             }
