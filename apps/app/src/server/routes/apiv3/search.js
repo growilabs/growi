@@ -6,6 +6,7 @@ import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
@@ -343,6 +344,12 @@ module.exports = (crowi) => {
     loginRequired,
     adminRequired,
     async (req, res) => {
+      if (!configManager.getConfig('app:auditLogEnabled')) {
+        const msg = 'AuditLog is not enabled';
+        logger.error(msg);
+        return res.apiv3Err(msg, 405);
+      }
+
       const { searchService } = crowi;
 
       if (!searchService.isConfigured) {
@@ -414,6 +421,12 @@ module.exports = (crowi) => {
     validatorForPutAuditlogIndices,
     apiV3FormValidator,
     async (req, res) => {
+      if (!configManager.getConfig('app:auditLogEnabled')) {
+        const msg = 'AuditLog is not enabled';
+        logger.error(msg);
+        return res.apiv3Err(msg, 405);
+      }
+
       const operation = req.body.operation;
 
       const { searchService } = crowi;
