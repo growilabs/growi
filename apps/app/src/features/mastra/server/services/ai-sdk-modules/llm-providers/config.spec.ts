@@ -335,6 +335,42 @@ describe('getAllowedModels', () => {
     expect(loggerWarn).toHaveBeenCalledTimes(1);
     expect(loggerWarn.mock.calls[0].join(' ')).toContain('ai:allowedModels');
   });
+
+  it('drops entries whose provider is missing / unsupported / non-object, keeping the valid ones', () => {
+    // A hand-edited AI_ALLOWED_MODELS (or a pre-rename value) can carry entries with
+    // no provider or an unknown provider; they bypass the PUT validator. Dropping
+    // them here prevents an "invisible" form row (belongs to no provider panel) that
+    // would 400 every admin save with no row the admin can see or delete.
+    configureConfig({
+      env: {
+        'ai:allowedModels': [
+          { provider: 'openai', modelId: 'gpt-4o', isDefault: true },
+          { modelId: 'no-provider' }, // pre-rename entry, provider missing
+          { provider: 'unknown-vendor', modelId: 'x' }, // unsupported provider
+          'not-an-object',
+          null,
+          { provider: 'anthropic', modelId: 'claude-sonnet' },
+        ],
+      },
+    });
+
+    expect(getAllowedModels()).toEqual([
+      { provider: 'openai', modelId: 'gpt-4o', isDefault: true },
+      { provider: 'anthropic', modelId: 'claude-sonnet' },
+    ]);
+  });
+
+  it('keeps a valid-provider entry with an empty modelId (visible + PUT-validator-caught, not silently dropped)', () => {
+    // Only the provider drives panel visibility, so a valid-provider row is shown
+    // and fixable; the empty modelId is the PUT validator's job, not this accessor's.
+    configureConfig({
+      env: {
+        'ai:allowedModels': [{ provider: 'openai', modelId: '' }],
+      },
+    });
+
+    expect(getAllowedModels()).toEqual([{ provider: 'openai', modelId: '' }]);
+  });
 });
 
 describe('env/db shadowing observability', () => {

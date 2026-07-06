@@ -1,6 +1,9 @@
 import { ConfigSource } from '@growi/core/dist/interfaces';
 
-import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
+import {
+  type AiProvider,
+  isAiProvider,
+} from '~/features/mastra/interfaces/ai-provider';
 import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
 import type { AzureOpenaiConfig } from '~/features/mastra/interfaces/azure-openai-config';
 import type {
@@ -206,23 +209,34 @@ export const requireApiKey = (provider: AiProvider): string => {
   return apiKey;
 };
 
-// The cross-provider allow-list of models the operator permits. Returns it verbatim
-// (falling back to []); never synthesises entries. A malformed (non-array) value is
-// coerced to [] with a dedup'd warn — coerced rather than thrown because this feeds
-// isAiConfigured(), a should-be-pure boolean predicate: a malformed value reads as
-// [] = AI unconfigured (fail soft). The warn replaces the former fail-silent
-// coercion (design "fail-silent の排除").
+// The cross-provider allow-list of models the operator permits. Never synthesises
+// entries. A malformed (non-array) value is coerced to [] with a dedup'd warn —
+// coerced rather than thrown because this feeds isAiConfigured(), a should-be-pure
+// boolean predicate: a malformed value reads as [] = AI unconfigured (fail soft).
+// The warn replaces the former fail-silent coercion (design "fail-silent の排除").
+//
+// Per-entry fail soft: an entry whose `provider` is not a supported AiProvider
+// (missing / typo'd, or a pre-rename value) is dropped. Such an entry is already
+// excluded from chat by getAvailableModels, but the admin GET reads THIS accessor
+// directly, so without the filter it becomes a form row that belongs to no provider
+// panel (invisible, so unfixable) yet is still submitted and 400-rejected — blocking
+// every save. An entry with a valid provider but other problems (e.g. an empty
+// modelId) is kept: it stays visible in its provider panel and the PUT validator
+// flags it, so the admin can fix it.
 export const getAllowedModels = (): AllowedModel[] => {
   reportEnvShadowingIfNeeded('ai:allowedModels');
   const value: unknown = configManager.getConfig('ai:allowedModels');
-  if (Array.isArray(value)) {
-    return value;
+  if (!Array.isArray(value)) {
+    if (value != null) {
+      warnOnce(
+        'ai:allowedModels|malformed',
+        'Config "ai:allowedModels" has an invalid shape (expected an array); treating the allow-list as empty',
+      );
+    }
+    return [];
   }
-  if (value != null) {
-    warnOnce(
-      'ai:allowedModels|malformed',
-      'Config "ai:allowedModels" has an invalid shape (expected an array); treating the allow-list as empty',
-    );
-  }
-  return [];
+  return value.filter(
+    (entry): entry is AllowedModel =>
+      isRecord(entry) && isAiProvider(entry.provider),
+  );
 };
