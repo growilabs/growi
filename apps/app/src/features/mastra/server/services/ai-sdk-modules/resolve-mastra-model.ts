@@ -22,7 +22,16 @@ export const resolveMastraModel = (modelKey?: string): MastraModelConfig => {
   // validation checkpoint; the value returned here is always a built modelKey.
   const effectiveKey = resolveEffectiveModelKey(modelKey);
 
-  // Parse the (provider, modelId) pair from the effective key. Because
+  // Cache keyed by the effective modelKey (Req 4.3): two requests that collapse to
+  // the same effective key share a single build. Checked BEFORE parsing so the
+  // steady-state hit path (every repeat request) is a straight-line lookup with no
+  // redundant parse — a cached key was necessarily parseable when it was stored.
+  const cached = resolvedModelCache.get(effectiveKey);
+  if (cached != null) {
+    return cached;
+  }
+
+  // Cache miss: parse the (provider, modelId) pair from the effective key. Because
   // resolveEffectiveModelKey always returns a key built by buildModelKey, this
   // parse succeeds in practice — the null branch is a defensive guard against a
   // malformed key rather than a reachable path, and it throws (caching nothing)
@@ -33,13 +42,6 @@ export const resolveMastraModel = (modelKey?: string): MastraModelConfig => {
     throw new Error(
       `Cannot resolve the Mastra model: effective modelKey "${effectiveKey}" could not be parsed into a (provider, modelId) pair`,
     );
-  }
-
-  // Cache keyed by the effective modelKey (Req 4.3): two requests that collapse to
-  // the same effective key share a single build.
-  const cached = resolvedModelCache.get(effectiveKey);
-  if (cached != null) {
-    return cached;
   }
 
   // Generic dispatch: the parsed provider's resolver builds its own model from the
