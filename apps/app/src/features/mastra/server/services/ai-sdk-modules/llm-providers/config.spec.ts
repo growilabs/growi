@@ -112,6 +112,108 @@ describe('getProviderSettings', () => {
     expect(warned).toContain('ai:providers');
     expect(warned).not.toContain('openai'); // config value never appears in the message
   });
+
+  it('normalizes non-string azure connection fields to undefined instead of throwing (fail soft)', () => {
+    // The loader casts env JSON unchecked, so a hand-edited AI_PROVIDERS can carry a
+    // number where a string is declared. It must read as "unset" and never crash the
+    // shared availability rule, which calls .trim() on these fields.
+    configureConfig({
+      env: {
+        'ai:providers': {
+          'azure-openai': {
+            enabled: true,
+            azureOpenaiSettings: { resourceName: 123, baseURL: 456 },
+          },
+        },
+      },
+    });
+
+    const azure = getProviderSettings('azure-openai')?.azureOpenaiSettings;
+    expect(azure?.resourceName).toBeUndefined();
+    expect(azure?.baseURL).toBeUndefined();
+  });
+
+  it('normalizes blank / whitespace-only azure endpoint fields to undefined', () => {
+    // '' / '   ' must read as absent so the resolver's `== null` endpoint guard
+    // catches them; otherwise a blank baseURL reaches the SDK and builds an invalid URL.
+    configureConfig({
+      env: {
+        'ai:providers': {
+          'azure-openai': {
+            enabled: true,
+            azureOpenaiSettings: {
+              resourceName: '   ',
+              baseURL: '',
+              apiVersion: '',
+            },
+          },
+        },
+      },
+    });
+
+    const azure = getProviderSettings('azure-openai')?.azureOpenaiSettings;
+    expect(azure?.resourceName).toBeUndefined();
+    expect(azure?.baseURL).toBeUndefined();
+    expect(azure?.apiVersion).toBeUndefined();
+  });
+
+  it('drops a blank endpoint field while keeping a valid sibling (azure "available but Invalid URL" regression)', () => {
+    // resourceName is valid but baseURL is '' from a hand-edited env var. baseURL
+    // must become undefined so the resolver builds from resourceName instead of
+    // forwarding '' to the SDK, which would treat '' as the endpoint and throw an
+    // Invalid URL at request time even though availability reported "available".
+    configureConfig({
+      env: {
+        'ai:providers': {
+          'azure-openai': {
+            enabled: true,
+            azureOpenaiSettings: { resourceName: 'my-res', baseURL: '' },
+          },
+        },
+      },
+    });
+
+    const azure = getProviderSettings('azure-openai')?.azureOpenaiSettings;
+    expect(azure?.resourceName).toBe('my-res');
+    expect(azure?.baseURL).toBeUndefined();
+  });
+
+  it('preserves valid azure connection fields verbatim', () => {
+    configureConfig({
+      env: {
+        'ai:providers': {
+          'azure-openai': {
+            enabled: true,
+            azureOpenaiSettings: {
+              resourceName: 'my-res',
+              apiVersion: '2024-10-01',
+              useEntraId: true,
+            },
+          },
+        },
+      },
+    });
+
+    expect(getProviderSettings('azure-openai')?.azureOpenaiSettings).toEqual({
+      resourceName: 'my-res',
+      apiVersion: '2024-10-01',
+      useEntraId: true,
+    });
+  });
+
+  it('reads a non-boolean enabled flag as unset (disabled)', () => {
+    configureConfig({
+      env: { 'ai:providers': { openai: { enabled: 'true' } } },
+    });
+
+    expect(getProviderSettings('openai')?.enabled).toBeUndefined();
+  });
+
+  it('fails soft to undefined for a provider entry that is not an object', () => {
+    configureConfig({ env: { 'ai:providers': { openai: 'not-an-object' } } });
+
+    expect(getProviderSettings('openai')).toBeUndefined();
+  });
 });
 
 describe('getApiKey', () => {

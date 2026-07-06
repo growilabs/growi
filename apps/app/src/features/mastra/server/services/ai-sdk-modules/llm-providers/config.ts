@@ -2,6 +2,7 @@ import { ConfigSource } from '@growi/core/dist/interfaces';
 
 import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
 import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
+import type { AzureOpenaiConfig } from '~/features/mastra/interfaces/azure-openai-config';
 import type {
   AiProviderApiKeys,
   AiProviderSettings,
@@ -34,6 +35,58 @@ type AiValueConfigKey =
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+// Coerce a config field declared `string` to a non-blank string, or undefined.
+// The loader JSON-parses env vars and casts the result unchecked (see the module
+// header), so a field typed `string` may arrive as a number/blank/whitespace at
+// runtime. Anything that is not a non-blank string reads as "unset" (fail soft),
+// which is what keeps the shared availability rule (isNonBlank -> .trim()) and the
+// resolvers safe from a runtime type violation on a malformed value.
+const asNonBlankString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() !== '' ? value : undefined;
+
+// Coerce a config field declared `boolean` to a boolean, or undefined. A non-boolean
+// runtime value (e.g. the string "true" from a hand-edited env var) reads as unset;
+// every consumer tests these flags with `=== true`, so undefined means "off".
+const asOptionalBoolean = (value: unknown): boolean | undefined =>
+  typeof value === 'boolean' ? value : undefined;
+
+// Normalize the azure-openai connection settings at the config boundary: every
+// string field is coerced (non-string / blank -> undefined) and the boolean is
+// read strictly, so downstream consumers (the availability rule and the azure
+// resolver) always receive a well-typed AzureOpenaiConfig regardless of the raw
+// env/DB shape.
+const normalizeAzureOpenaiSettings = (
+  value: unknown,
+): AzureOpenaiConfig | undefined => {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  return {
+    resourceName: asNonBlankString(value.resourceName),
+    baseURL: asNonBlankString(value.baseURL),
+    apiVersion: asNonBlankString(value.apiVersion),
+    useEntraId: asOptionalBoolean(value.useEntraId),
+  };
+};
+
+// Normalize a single provider entry at the config boundary. A non-object entry
+// (the whole slot is malformed) reads as "unset" (undefined); otherwise `enabled`
+// is read strictly and the azure settings are normalized. This is where the
+// per-provider shape guard lives, so no consumer sees a runtime type violation.
+const normalizeProviderSettings = (
+  value: unknown,
+): AiProviderSettings | undefined => {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  return {
+    enabled: asOptionalBoolean(value.enabled),
+    azureOpenaiSettings: normalizeAzureOpenaiSettings(
+      value.azureOpenaiSettings,
+    ),
+  };
+};
 
 // Whether an env-layer value represents a value the operator actually set (as
 // opposed to the key's default). The env layer is ALWAYS populated by the loader
@@ -95,8 +148,8 @@ const readProvidersConfig = (): AiProvidersConfig | undefined => {
     );
     return undefined;
   }
-  // Guarded to a plain object. Per-provider entry shapes are not validated here;
-  // each resolver guards its own fields.
+  // Guarded to a plain object. Per-provider entry shapes are normalized on read by
+  // getProviderSettings (via normalizeProviderSettings), not here.
   return value as AiProvidersConfig;
 };
 
@@ -118,10 +171,17 @@ const readProviderApiKeys = (): AiProviderApiKeys | undefined => {
   return value as AiProviderApiKeys;
 };
 
-/** The non-secret settings for `provider`, or undefined when it has no entry. */
+/**
+ * The non-secret settings for `provider`, or undefined when it has no entry. The
+ * raw entry is normalized at this boundary (fields declared `string` coerced to
+ * non-blank-string-or-undefined, booleans read strictly), so every consumer
+ * receives a well-typed AiProviderSettings even when the env/DB value violates the
+ * declared shape (fail soft).
+ */
 export const getProviderSettings = (
   provider: AiProvider,
-): AiProviderSettings | undefined => readProvidersConfig()?.[provider];
+): AiProviderSettings | undefined =>
+  normalizeProviderSettings(readProvidersConfig()?.[provider]);
 
 /** The stored API key for `provider`, or undefined when none is set. */
 export const getApiKey = (provider: AiProvider): string | undefined =>
