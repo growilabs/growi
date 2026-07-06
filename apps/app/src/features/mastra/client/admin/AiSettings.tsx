@@ -6,8 +6,11 @@ import { Alert, Button } from 'reactstrap';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
 
-import type { AiProvider } from '../../interfaces/ai-provider';
-import { AI_PROVIDERS } from '../../interfaces/ai-provider';
+import {
+  AI_PROVIDERS,
+  type AiProvider,
+  mapProviders,
+} from '../../interfaces/ai-provider';
 import { AiEnabledToggle } from './AiEnabledToggle';
 import { AllowedModelsField } from './AllowedModelsField';
 import {
@@ -109,13 +112,8 @@ export const AiSettings = (): JSX.Element | null => {
 
   // Per-provider "has a stored key" flags for the tab status dots. The form's
   // apiKey field is write-only and cannot reveal this (R1.8/R1.9), so it comes
-  // from the GET response. AI_PROVIDERS stays the single source of truth; the
-  // `as` narrows the widened fromEntries result to the fixed-slot Record
-  // (sound because every provider is mapped — the sibling idiom in
-  // ai-settings-form-values.ts).
-  const apiKeySetMap = Object.fromEntries(
-    AI_PROVIDERS.map((p) => [p, data.providers[p].isApiKeySet]),
-  ) as Record<AiProvider, boolean>;
+  // from the GET response.
+  const apiKeySetMap = mapProviders((p) => data.providers[p].isApiKeySet);
 
   return (
     <FormProvider {...methods}>

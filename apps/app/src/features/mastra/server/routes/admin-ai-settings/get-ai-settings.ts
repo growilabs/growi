@@ -3,8 +3,8 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 
 import {
-  AI_PROVIDERS,
   type AiProvider,
+  mapProviders,
 } from '~/features/mastra/interfaces/ai-provider';
 import type {
   AiProviderStatus,
@@ -182,9 +182,7 @@ const buildProviderStatus = (provider: AiProvider): AiProviderStatus => {
  */
 export const getAiSettings = (_req: Request, res: ApiV3Response): void => {
   try {
-    const providers = Object.fromEntries(
-      AI_PROVIDERS.map((provider) => [provider, buildProviderStatus(provider)]),
-    ) as Record<AiProvider, AiProviderStatus>;
+    const providers = mapProviders(buildProviderStatus);
 
     const response: AiSettingsResponse = {
       aiEnabled: configManager.getConfig('app:aiEnabled'),

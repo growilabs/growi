@@ -1,5 +1,4 @@
-import type { AiProvider } from '../../interfaces/ai-provider';
-import { AI_PROVIDERS } from '../../interfaces/ai-provider';
+import { type AiProvider, mapProviders } from '../../interfaces/ai-provider';
 import type {
   AiProviderUpdateRequest,
   AiSettingsResponse,
@@ -88,22 +87,14 @@ const toAzureFormSettings = (
 export const toFormValues = (
   data: AiSettingsResponse,
 ): AiSettingsFormValues => {
-  // Object.fromEntries widens to `{ [k: string]: T }`; the `as` narrows it back
-  // to the fixed-slot Record — sound because we iterate the full AI_PROVIDERS set
-  // (matches get-ai-settings.ts). AI_PROVIDERS stays the single source of truth.
-  const providers = Object.fromEntries(
-    AI_PROVIDERS.map((p): [AiProvider, ProviderFormValue] => {
-      const status = data.providers[p];
-      return [
-        p,
-        {
-          enabled: status?.enabled ?? false,
-          apiKey: '',
-          azureOpenaiSettings: toAzureFormSettings(status?.azureOpenaiSettings),
-        },
-      ];
-    }),
-  ) as Record<AiProvider, ProviderFormValue>;
+  const providers = mapProviders((p): ProviderFormValue => {
+    const status = data.providers[p];
+    return {
+      enabled: status?.enabled ?? false,
+      apiKey: '',
+      azureOpenaiSettings: toAzureFormSettings(status?.azureOpenaiSettings),
+    };
+  });
 
   return {
     aiEnabled: data.aiEnabled,
@@ -215,14 +206,9 @@ export const buildUpdateRequest = (
     return allowedModelsSection;
   }
 
-  // See toFormValues: `as` narrows the widened fromEntries result to the
-  // fixed-slot Record; sound because every AI_PROVIDERS entry is mapped.
-  const providers = Object.fromEntries(
-    AI_PROVIDERS.map((p): [AiProvider, AiProviderUpdateRequest] => [
-      p,
-      toProviderUpdate(p, values.providers[p]),
-    ]),
-  ) as Record<AiProvider, AiProviderUpdateRequest>;
+  const providers = mapProviders(
+    (p): AiProviderUpdateRequest => toProviderUpdate(p, values.providers[p]),
+  );
 
   return {
     aiEnabled: values.aiEnabled,
