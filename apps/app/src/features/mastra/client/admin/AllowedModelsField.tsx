@@ -105,24 +105,14 @@ export const AllowedModelsField = (
     [fields, provider],
   );
 
-  // Non-empty model ids already registered under THIS provider (from live
-  // values). Drives the registered-excluded catalog options and the duplicate
-  // detection below — both scoped to the provider so the same id under a
-  // different provider is neither excluded nor flagged (R2.3).
-  const registeredModelIds = useMemo<Set<string>>(() => {
-    const ids = new Set<string>();
-    for (const model of watchedModels) {
-      if (model.provider === provider && model.modelId !== '') {
-        ids.add(model.modelId);
-      }
-    }
-    return ids;
-  }, [watchedModels, provider]);
-
-  // Model ids that appear on 2+ rows of THIS provider — surfaced as a row error
-  // (R2.4). The server is the final authority (R4.1); this is the inline client
-  // signal.
-  const duplicateModelIds = useMemo<Set<string>>(() => {
+  // Non-empty model ids under THIS provider (from live values), derived in ONE
+  // pass over a per-id count map — both scoped to the provider so the same id under
+  // a different provider is neither excluded nor flagged (R2.3):
+  //   - registeredModelIds: every id present (drives the registered-excluded
+  //     catalog options); the count map's distinct keys ARE this set.
+  //   - duplicateModelIds: ids on 2+ rows, surfaced as a row error (R2.4). The
+  //     server is the final authority (R4.1); this is the inline client signal.
+  const { registeredModelIds, duplicateModelIds } = useMemo(() => {
     const counts = new Map<string, number>();
     for (const model of watchedModels) {
       if (model.provider === provider && model.modelId !== '') {
@@ -135,7 +125,10 @@ export const AllowedModelsField = (
         duplicates.add(id);
       }
     }
-    return duplicates;
+    return {
+      registeredModelIds: new Set(counts.keys()),
+      duplicateModelIds: duplicates,
+    };
   }, [watchedModels, provider]);
 
   // Fetch the selectable models for THIS provider once at the field level and
