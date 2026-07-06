@@ -105,13 +105,6 @@ const MenuLabel = ({ menu }: { menu: string }) => {
           {t('audit_log_management.audit_log')}
         </>
       );
-    case 'audit-log-management':
-      return (
-        <>
-          <span className="material-symbols-outlined me-1">manage_search</span>
-          {t('audit_log_index_management.audit_log_index_management')}
-        </>
-      );
     case 'vault':
       return (
         <>
@@ -144,7 +137,7 @@ const MenuLabel = ({ menu }: { menu: string }) => {
       return (
         <>
           <span className="material-symbols-outlined me-1">search</span>
-          {t('full_text_search_management.full_text_search_management')}
+          {t('full_text_search_management.elasticsearch_management')}
         </>
       );
     case 'cloud':
@@ -287,11 +280,6 @@ export const AdminNavigation = (): JSX.Element => {
             isListGroupItems={isListGroupItems}
             isActive={isActiveMenu('/audit-log')}
           />
-          <MenuLink
-            menu="audit-log-management"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/audit-log-management')}
-          />
 
           <hr />
 
@@ -390,9 +378,6 @@ export const AdminNavigation = (): JSX.Element => {
             )}
             {isActiveMenu('/search') && <MenuLabel menu="search" />}
             {isActiveMenu('/audit-log') && <MenuLabel menu="audit-log" />}
-            {isActiveMenu('/audit-log-management') && (
-              <MenuLabel menu="audit-log-management" />
-            )}
             {isActiveMenu('/vault') && <MenuLabel menu="vault" />}
             {isActiveMenu('/plugins') && <MenuLabel menu="plugins" />}
             {isActiveMenu('/data-transfer') && (
