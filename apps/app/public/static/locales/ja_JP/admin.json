@@ -304,10 +304,10 @@
     "reconnect_button": "再接続の試行",
     "reconnect_description": "Elasticsearch への再接続を試みます。",
     "normalize": "正規化",
-    "normalize_button": "インデックスの正規化",
-    "normalize_description": "破損したインデックスを修復します。",
+    "normalize_button": "ページデータインデックスの正規化",
+    "normalize_description": "破損したページデータインデックスを修復します。",
     "rebuild": "リビルド",
-    "rebuild_button": "インデックスのリビルド",
+    "rebuild_button": "ページデータインデックスのリビルド",
     "rebuild_description_1": "全てのページのインデックスを削除し、作り直します。",
     "rebuild_description_2": "この作業には数秒かかります。",
     "rebuild_normalization_timeout": "リビルドは完了しましたが、正規化がタイムアウトしました。手動で正規化してください。"

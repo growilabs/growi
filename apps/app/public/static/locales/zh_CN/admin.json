@@ -304,10 +304,10 @@
     "reconnect_button": "尝试重新连接",
     "reconnect_description": "单击按钮尝试重新连接到Elasticsearch。",
     "normalize": "规范化",
-    "normalize_button": "规范化索引",
-    "normalize_description": "单击按钮修复损坏的索引。",
+    "normalize_button": "规范化页面数据索引",
+    "normalize_description": "单击按钮修复损坏的页面数据索引。",
     "rebuild": "重建",
-    "rebuild_button": "重建索引",
+    "rebuild_button": "重建页面数据索引",
     "rebuild_description_1": "单击按钮以重新生成索引并添加所有页面数据。",
     "rebuild_description_2": "这可能需要一段时间。",
     "rebuild_normalization_timeout": "重建完成，但规范化超时。请手动规范化。"

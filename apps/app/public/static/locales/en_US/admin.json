@@ -295,10 +295,10 @@
     "reconnect_button": "Try to reconnect",
     "reconnect_description": "Click the button to try to reconnect to Elasticsearch.",
     "normalize": "Normalize",
-    "normalize_button": "Normalize indices",
-    "normalize_description": "Click the button to repair broken indices.",
+    "normalize_button": "Normalize page data index",
+    "normalize_description": "Click the button to repair the broken page data index.",
     "rebuild": "Rebuild",
-    "rebuild_button": "Rebuild index",
+    "rebuild_button": "Rebuild page data index",
     "rebuild_description_1": "Click the button to rebuild index and add all page datas.",
     "rebuild_description_2": "This may take a while.",
     "rebuild_normalization_timeout": "Rebuild completed but normalization timed out. Please normalize manually."
