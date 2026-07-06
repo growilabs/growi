@@ -1,6 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 
 import { AuditLogIndexManagement } from './AuditLogIndexManagement';
+import type { IndexManagementStatusResponse } from './hooks/useIndexManagement';
 
 vi.mock('next-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -57,14 +58,20 @@ const defaultHookValues = {
 };
 
 describe('AuditLogIndexManagement', () => {
-  let capturedOnStatusSuccess: ((data: unknown) => void) | undefined;
+  let capturedOnStatusSuccess:
+    | ((data: IndexManagementStatusResponse) => void)
+    | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseAtomValue.mockReturnValue(true);
     capturedOnStatusSuccess = undefined;
     mockUseIndexManagement.mockImplementation(
-      ({ onStatusSuccess }: { onStatusSuccess?: (data: unknown) => void }) => {
+      ({
+        onStatusSuccess,
+      }: {
+        onStatusSuccess?: (data: IndexManagementStatusResponse) => void;
+      }) => {
         capturedOnStatusSuccess = onStatusSuccess;
         return defaultHookValues;
       },
@@ -87,7 +94,10 @@ describe('AuditLogIndexManagement', () => {
     render(<AuditLogIndexManagement />);
 
     act(() => {
-      capturedOnStatusSuccess?.({ auditlogHasUnsyncedEvents: true });
+      capturedOnStatusSuccess?.({
+        info: { isNormalized: true, indices: null, aliases: null },
+        auditlogHasUnsyncedEvents: true,
+      });
     });
 
     expect(

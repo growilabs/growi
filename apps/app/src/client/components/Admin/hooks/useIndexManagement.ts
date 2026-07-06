@@ -6,13 +6,23 @@ import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useAdminSocket } from '~/features/admin/states/socket-io';
 import { isSearchServiceReachableAtom } from '~/states/server-configurations';
 
+// Shape returned by both GET /search/indices and GET /search/auditlog-indices.
+export interface IndexManagementStatusResponse {
+  info: {
+    isNormalized: boolean;
+    indices: unknown;
+    aliases: unknown;
+  };
+  auditlogHasUnsyncedEvents: boolean;
+}
+
 interface UseIndexManagementOptions {
   statusEndpoint: string;
   progressSocketEvent: string;
   finishSocketEvent: string;
   failedSocketEvent: string;
   normalizationTimeoutMessage: string;
-  onStatusSuccess?: (data: unknown) => void;
+  onStatusSuccess?: (data: IndexManagementStatusResponse) => void;
 }
 
 export const useIndexManagement = ({
@@ -35,15 +45,16 @@ export const useIndexManagement = ({
   const [isRebuildingProcessing, setIsRebuildingProcessing] = useState(false);
   const [isRebuildingCompleted, setIsRebuildingCompleted] = useState(false);
   const [isNormalized, setIsNormalized] = useState(false);
-  const [indicesData, setIndicesData] = useState(null);
-  const [aliasesData, setAliasesData] = useState(null);
+  const [indicesData, setIndicesData] = useState<unknown>(null);
+  const [aliasesData, setAliasesData] = useState<unknown>(null);
   const [rebuildTotal, setRebuildTotal] = useState(0);
   const [rebuildCurrent, setRebuildCurrent] = useState(0);
 
   const retrieveStatus = useCallback(
     async (opts?: { silent?: boolean }): Promise<boolean> => {
       try {
-        const { data } = await apiv3Get(statusEndpoint);
+        const { data } =
+          await apiv3Get<IndexManagementStatusResponse>(statusEndpoint);
         const { info } = data;
         setIsConnected(true);
         setIsConfigured(true);

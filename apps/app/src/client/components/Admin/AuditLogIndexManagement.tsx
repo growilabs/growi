@@ -10,18 +10,18 @@ import NormalizeIndicesControls from './ElasticsearchManagement/NormalizeIndices
 import RebuildIndexControls from './ElasticsearchManagement/RebuildIndexControls';
 import ReconnectControls from './ElasticsearchManagement/ReconnectControls';
 import StatusTable from './ElasticsearchManagement/StatusTable';
-import { useIndexManagement } from './hooks/useIndexManagement';
+import {
+  type IndexManagementStatusResponse,
+  useIndexManagement,
+} from './hooks/useIndexManagement';
 
 export const AuditLogIndexManagement = (): JSX.Element => {
   const { t } = useTranslation('admin');
   const auditLogEnabled = useAtomValue(auditLogEnabledAtom);
   const [hasUnsyncedEvents, setHasUnsyncedEvents] = useState(false);
 
-  const onStatusSuccess = useCallback((data: unknown) => {
-    setHasUnsyncedEvents(
-      (data as { auditlogHasUnsyncedEvents?: boolean })
-        .auditlogHasUnsyncedEvents ?? false,
-    );
+  const onStatusSuccess = useCallback((data: IndexManagementStatusResponse) => {
+    setHasUnsyncedEvents(data.auditlogHasUnsyncedEvents);
   }, []);
 
   const {
