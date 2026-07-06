@@ -284,23 +284,25 @@ export const setup = (crowi: Crowi): Router => {
 
         const promises = folders.map(async (folder) => {
           const childFolder = await getBookmarkFolders(userId, folder.id);
-          const populatedBookmarks =
-            folder.bookmarkIds.length > 0
-              ? await prisma.bookmarks.findMany({
-                  where: {
-                    id: {
-                      in: folder.bookmarkIds,
-                    },
-                  },
+          let populatedBookmarks: Awaited<
+            ReturnType<typeof prisma.bookmarks.findMany>
+          > = [];
+          if (folder.bookmarkIds.length > 0) {
+            const fetched = await prisma.bookmarks.findMany({
+              where: { id: { in: folder.bookmarkIds } },
+              include: {
+                page: {
                   include: {
-                    page: {
-                      include: {
-                        lastUpdateUser: true,
-                      },
-                    },
+                    lastUpdateUser: true,
                   },
-                })
-              : [];
+                },
+              },
+            });
+            const bookmarkMap = new Map(fetched.map((b) => [b.id, b]));
+            populatedBookmarks = folder.bookmarkIds
+              .map((id) => bookmarkMap.get(id))
+              .filter((b) => b != null);
+          }
           const bookmarks = populatedBookmarks.map((bookmark) => {
             const serializedBookmark = serializeBookmarkSecurely(bookmark);
             return {
