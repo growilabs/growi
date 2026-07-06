@@ -958,7 +958,8 @@
   "user_group": {
     "select_group": "Groupes autorisés",
     "belonging_to_no_group": "Vous n'appartenez à aucun groupe.",
-    "manage_user_groups": "Gestion des groupes"
+    "manage_user_groups": "Gestion des groupes",
+    "only_yourself": "Vous seulement"
   },
   "fix_page_grant": {
     "modal": {
