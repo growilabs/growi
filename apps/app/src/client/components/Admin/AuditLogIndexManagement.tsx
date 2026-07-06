@@ -45,6 +45,7 @@ export const AuditLogIndexManagement = (): JSX.Element => {
     rebuildIndices,
   } = useIndexManagement({
     statusEndpoint: '/search/auditlog-indices',
+    enabled: auditLogEnabled,
     progressSocketEvent: SocketEventName.AddAuditlogProgress,
     finishSocketEvent: SocketEventName.FinishAddAuditlog,
     failedSocketEvent: SocketEventName.AuditlogRebuildingFailed,

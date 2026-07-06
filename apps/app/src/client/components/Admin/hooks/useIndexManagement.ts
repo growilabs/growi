@@ -23,10 +23,14 @@ interface UseIndexManagementOptions {
   failedSocketEvent: string;
   normalizationTimeoutMessage: string;
   onStatusSuccess?: (data: IndexManagementStatusResponse) => void;
+  // When false, skip the status fetch entirely (e.g. a caller that already
+  // knows the underlying feature is disabled and renders its own placeholder).
+  enabled?: boolean;
 }
 
 export const useIndexManagement = ({
   statusEndpoint,
+  enabled = true,
   progressSocketEvent,
   finishSocketEvent,
   failedSocketEvent,
@@ -52,6 +56,11 @@ export const useIndexManagement = ({
 
   const retrieveStatus = useCallback(
     async (opts?: { silent?: boolean }): Promise<boolean> => {
+      if (!enabled) {
+        setIsInitialized(true);
+        return false;
+      }
+
       try {
         const { data } =
           await apiv3Get<IndexManagementStatusResponse>(statusEndpoint);
@@ -87,7 +96,7 @@ export const useIndexManagement = ({
         setIsInitialized(true);
       }
     },
-    [statusEndpoint, onStatusSuccess],
+    [statusEndpoint, onStatusSuccess, enabled],
   );
 
   useEffect(() => {

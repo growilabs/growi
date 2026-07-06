@@ -83,6 +83,15 @@ describe('AuditLogIndexManagement', () => {
     expect(screen.queryByTestId('status-table')).not.toBeInTheDocument();
   });
 
+  it('tells useIndexManagement it is disabled, so it skips the status fetch', () => {
+    mockUseAtomValue.mockReturnValue(false);
+    render(<AuditLogIndexManagement />);
+
+    expect(mockUseIndexManagement).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
   it('renders index management controls when audit log is enabled', () => {
     render(<AuditLogIndexManagement />);
     expect(screen.getByTestId('status-table')).toBeInTheDocument();

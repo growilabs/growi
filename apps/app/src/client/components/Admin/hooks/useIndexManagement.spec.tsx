@@ -81,6 +81,17 @@ describe('useIndexManagement', () => {
       await waitFor(() => expect(result.current.isInitialized).toBe(true));
       expect(result.current.isConnected).toBe(false);
     });
+
+    it('skips the status fetch entirely when enabled is false', async () => {
+      const { result } = renderHook(
+        () => useIndexManagement({ ...defaultOptions, enabled: false }),
+        { wrapper },
+      );
+      await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+      expect(mockApiv3Get).not.toHaveBeenCalled();
+      expect(mockToastError).not.toHaveBeenCalled();
+    });
   });
 
   describe('isNormalizeEnabled', () => {
