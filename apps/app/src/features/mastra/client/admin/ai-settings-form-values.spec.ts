@@ -6,6 +6,7 @@ import {
   type AiSettingsFormValues,
   type AllowedModelFormValue,
   buildUpdateRequest,
+  hasDirtyField,
   setDefaultAllowedModelAt,
   toFormValues,
 } from './ai-settings-form-values';
@@ -174,7 +175,7 @@ describe('toFormValues', () => {
 describe('buildUpdateRequest (normal mode)', () => {
   it('emits aiEnabled, all four provider entries, and allowedModels', () => {
     // Act
-    const body = buildUpdateRequest(baseValues, false);
+    const body = buildUpdateRequest(baseValues, false, true);
 
     // Assert
     expect(body.aiEnabled).toBe(true);
@@ -204,6 +205,7 @@ describe('buildUpdateRequest (normal mode)', () => {
         },
       },
       false,
+      true,
     );
 
     // Assert
@@ -213,7 +215,7 @@ describe('buildUpdateRequest (normal mode)', () => {
 
   it('attaches azureOpenaiSettings only to the azure-openai entry', () => {
     // Act
-    const body = buildUpdateRequest(baseValues, false);
+    const body = buildUpdateRequest(baseValues, false, true);
 
     // Assert
     expect(body.providers?.openai).not.toHaveProperty('azureOpenaiSettings');
@@ -247,6 +249,7 @@ describe('buildUpdateRequest (normal mode)', () => {
         ],
       },
       false,
+      true,
     );
 
     // Assert: text parsed into the object; empty/whitespace text omits providerOptions (R2.3).
@@ -260,12 +263,28 @@ describe('buildUpdateRequest (normal mode)', () => {
       { provider: 'anthropic', modelId: 'claude-3-5-sonnet', isDefault: false },
     ]);
   });
+
+  it('omits allowedModels (keeping aiEnabled + providers) when the list was not edited', () => {
+    // A provider/apiKey/aiEnabled save must not carry an untouched allow-list, so
+    // an env-seeded list with no default (rejected by the exactly-one-default PUT
+    // rule) can never 400 an unrelated save.
+    const body = buildUpdateRequest(baseValues, false, false);
+
+    expect(body).not.toHaveProperty('allowedModels');
+    expect(body.aiEnabled).toBe(true);
+    expect(Object.keys(body.providers ?? {}).sort()).toEqual([
+      'anthropic',
+      'azure-openai',
+      'google',
+      'openai',
+    ]);
+  });
 });
 
 describe('buildUpdateRequest (env-only mode)', () => {
   it('emits only allowedModels, never providers or aiEnabled (R5.3)', () => {
     // Act
-    const body = buildUpdateRequest(baseValues, true);
+    const body = buildUpdateRequest(baseValues, true, true);
 
     // Assert: matches the server env-only 400 contract — connection settings and
     // the AI toggle must NOT be in the body; only model settings are editable.
@@ -275,6 +294,27 @@ describe('buildUpdateRequest (env-only mode)', () => {
     expect(body.allowedModels).toEqual([
       { provider: 'openai', modelId: 'gpt-4o', isDefault: true },
     ]);
+  });
+
+  it('emits an empty body when the allow-list was not edited (nothing to save)', () => {
+    const body = buildUpdateRequest(baseValues, true, false);
+
+    expect(Object.keys(body)).toEqual([]);
+  });
+});
+
+describe('hasDirtyField', () => {
+  it('is false for an untouched subtree (undefined / empty)', () => {
+    expect(hasDirtyField(undefined)).toBe(false);
+    expect(hasDirtyField([])).toBe(false);
+    expect(hasDirtyField({})).toBe(false);
+  });
+
+  it('is true when any leaf in a nested array/object is dirty', () => {
+    // react-hook-form marks changed leaves `true`, leaving untouched rows sparse.
+    expect(hasDirtyField([undefined, { modelId: true }])).toBe(true);
+    expect(hasDirtyField([{ isDefault: false }])).toBe(false); // false != dirty
+    expect(hasDirtyField({ nested: [{ a: true }] })).toBe(true);
   });
 });
 

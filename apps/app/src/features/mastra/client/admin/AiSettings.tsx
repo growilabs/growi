@@ -13,6 +13,7 @@ import { AllowedModelsField } from './AllowedModelsField';
 import {
   type AiSettingsFormValues,
   buildUpdateRequest,
+  hasDirtyField,
   toFormValues,
 } from './ai-settings-form-values';
 import { DefaultModelSelector } from './DefaultModelSelector';
@@ -61,7 +62,7 @@ export const AiSettings = (): JSX.Element | null => {
   const {
     handleSubmit,
     reset,
-    formState: { isSubmitting },
+    formState: { isSubmitting, dirtyFields },
   } = methods;
 
   // Re-seed the form from the server value on (re)load and after a successful
@@ -78,10 +79,17 @@ export const AiSettings = (): JSX.Element | null => {
     // `useOnlyEnvVars` is a real boolean here (data is non-null past the guard
     // below, which runs before this handler can fire).
     const useOnlyEnvVars = data?.useOnlyEnvVars ?? false;
+    // Only persist the allow-list when the admin actually edited it; otherwise it
+    // is omitted so a provider/apiKey/aiEnabled save is not blocked by an
+    // env-seeded list that lacks a default (valid at runtime, rejected by the PUT
+    // exactly-one-default rule).
+    const allowedModelsDirty = hasDirtyField(dirtyFields.allowedModels);
     try {
       // Pass the mode so env-only sends only allowedModels (R5.3): a request
       // carrying providers/aiEnabled is rejected 400 under env-only.
-      await save(buildUpdateRequest(values, useOnlyEnvVars));
+      await save(
+        buildUpdateRequest(values, useOnlyEnvVars, allowedModelsDirty),
+      );
       toastSuccess(t('ai_settings.save_success'));
     } catch (err) {
       // Keep the form values intact so the admin does not lose input (R6.3).

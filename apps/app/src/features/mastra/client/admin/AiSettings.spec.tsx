@@ -210,7 +210,7 @@ describe('AiSettings', () => {
   });
 
   describe('update request shape', () => {
-    it('normal mode: sends aiEnabled, all four provider entries, and allowedModels', async () => {
+    it('normal mode: sends aiEnabled + all four provider entries, omitting an unedited allow-list', async () => {
       // Arrange
       setData();
 
@@ -224,18 +224,62 @@ describe('AiSettings', () => {
       });
       const body = save.mock.calls[0][0];
       expect(body.aiEnabled).toBe(true);
-      expect(body.allowedModels).toEqual([
-        { provider: 'openai', modelId: 'gpt-4o', isDefault: true },
-      ]);
-      // All four fixed provider slots are present (the server validator requires
-      // the complete set when `providers` is sent).
+      // An untouched allow-list is omitted (PUT "omit = leave unchanged"), so an
+      // unrelated save is never blocked by its validity.
+      expect(body).not.toHaveProperty('allowedModels');
+      // All four fixed provider slots are still sent (the server validator requires
+      // the complete set when `providers` is present).
       expect(Object.keys(body.providers ?? {}).sort()).toEqual(
         [...AI_PROVIDERS].sort(),
       );
       expect(body.providers?.openai.enabled).toBe(true);
     });
 
-    it('env-only mode: sends only allowedModels and keeps the save button enabled', async () => {
+    it('normal mode: includes allowedModels once the list is edited (dirty wiring)', async () => {
+      // Arrange
+      setData();
+      const user = userEvent.setup();
+
+      // Act: edit the seeded openai row so the allow-list becomes dirty.
+      render(<AiSettings />);
+      const modelInput = screen.getByDisplayValue('gpt-4o');
+      await user.clear(modelInput);
+      await user.type(modelInput, 'gpt-4o-mini');
+      await user.click(getSaveButton());
+
+      // Assert: the edited list is now sent.
+      await waitFor(() => {
+        expect(save).toHaveBeenCalledTimes(1);
+      });
+      expect(save.mock.calls[0][0].allowedModels).toEqual([
+        { provider: 'openai', modelId: 'gpt-4o-mini', isDefault: true },
+      ]);
+    });
+
+    it('a provider-toggle save is not blocked by an env-seeded allow-list with no default (issue #4a)', async () => {
+      // The allow-list has an entry but NO default — valid at runtime (first-entry
+      // fallback) yet rejected by the exactly-one-default PUT rule. Toggling a
+      // provider must still save: the untouched list is omitted, so the server
+      // never validates it.
+      setData({ allowedModels: [{ provider: 'openai', modelId: 'gpt-4o' }] });
+      const user = userEvent.setup();
+
+      render(<AiSettings />);
+      await user.click(screen.getByTestId('provider-tab-anthropic'));
+      await user.click(
+        screen.getByLabelText('ai_settings.provider_enabled_label'),
+      );
+      await user.click(getSaveButton());
+
+      await waitFor(() => {
+        expect(save).toHaveBeenCalledTimes(1);
+      });
+      const body = save.mock.calls[0][0];
+      expect(body).not.toHaveProperty('allowedModels');
+      expect(body.providers?.anthropic.enabled).toBe(true);
+    });
+
+    it('env-only mode: keeps the save button enabled and sends an empty body for an unedited save', async () => {
       // Arrange
       setData({ useOnlyEnvVars: true });
 
@@ -249,15 +293,12 @@ describe('AiSettings', () => {
       // Act
       await submitForm();
 
-      // Assert: only allowedModels is sent — no providers/aiEnabled (R5.3).
+      // Assert: nothing was edited and connection settings are env-locked, so the
+      // body is empty (no-op save) — not an unchanged allow-list that could 400.
       await waitFor(() => {
         expect(save).toHaveBeenCalledTimes(1);
       });
-      expect(save.mock.calls[0][0]).toEqual({
-        allowedModels: [
-          { provider: 'openai', modelId: 'gpt-4o', isDefault: true },
-        ],
-      });
+      expect(save.mock.calls[0][0]).toEqual({});
     });
   });
 

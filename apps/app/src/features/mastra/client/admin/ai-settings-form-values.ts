@@ -161,26 +161,54 @@ const toProviderUpdate = (
 });
 
 /**
+ * Whether a react-hook-form `dirtyFields` subtree contains ANY dirty leaf.
+ *
+ * `dirtyFields` mirrors the form shape with `true` at each changed leaf (nested
+ * arrays/objects for array/nested fields); an untouched subtree is `undefined`.
+ * Used to decide whether a whole section (e.g. `allowedModels`) was edited so an
+ * unchanged section can be omitted from the PUT. Errs toward `true` (send) on any
+ * dirty marker — the safe direction, since the server then validates the section.
+ */
+export const hasDirtyField = (dirty: unknown): boolean => {
+  if (Array.isArray(dirty)) {
+    return dirty.some(hasDirtyField);
+  }
+  if (dirty != null && typeof dirty === 'object') {
+    return Object.values(dirty).some(hasDirtyField);
+  }
+  return dirty === true;
+};
+
+/**
  * Map the form values to the PUT request body.
  *
- * In env-only mode (`useOnlyEnvVars === true`) only `allowedModels` is sent —
- * `providers` and `aiEnabled` are deliberately omitted, because the server
- * rejects a request that carries them with 400 under env-only; model settings
- * stay editable (R5.3). This client-side split is the counterpart of that 400
- * contract: without it, Update would always 400 in env-only mode.
+ * `allowedModels` is included ONLY when `allowedModelsDirty` (the admin actually
+ * edited the list). An untouched list is omitted (PUT "omit = leave unchanged")
+ * so an unrelated save (provider toggle / apiKey / aiEnabled) is never blocked by
+ * the list's validity: an env-seeded list with no default is valid at runtime
+ * (first-entry fallback) but fails the exactly-one-default PUT rule (Req 3.2), so
+ * re-sending it unchanged would 400 the whole save.
+ *
+ * In env-only mode (`useOnlyEnvVars === true`) `providers` and `aiEnabled` are
+ * deliberately omitted (the server rejects them with 400 under env-only; model
+ * settings stay editable — R5.3), so the body is just the (possibly omitted)
+ * allowedModels section.
  *
  * In normal mode all 4 provider entries are sent (the server validator requires
  * the complete fixed-slot set when `providers` is present), alongside `aiEnabled`
- * and `allowedModels`.
+ * and the (possibly omitted) allowedModels.
  */
 export const buildUpdateRequest = (
   values: AiSettingsFormValues,
   useOnlyEnvVars: boolean,
+  allowedModelsDirty: boolean,
 ): AiSettingsUpdateRequest => {
-  const allowedModels = values.allowedModels.map(toAllowedModel);
+  const allowedModelsSection = allowedModelsDirty
+    ? { allowedModels: values.allowedModels.map(toAllowedModel) }
+    : {};
 
   if (useOnlyEnvVars) {
-    return { allowedModels };
+    return allowedModelsSection;
   }
 
   // See toFormValues: `as` narrows the widened fromEntries result to the
@@ -195,7 +223,7 @@ export const buildUpdateRequest = (
   return {
     aiEnabled: values.aiEnabled,
     providers,
-    allowedModels,
+    ...allowedModelsSection,
   };
 };
 
