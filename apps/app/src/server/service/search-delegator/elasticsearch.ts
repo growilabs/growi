@@ -354,6 +354,8 @@ class ElasticsearchDelegator
 
     const tmpIndexName = `${indexName}-tmp`;
 
+    let result: { totalCount: number; count: number } | undefined;
+
     try {
       // reindex to tmp index
       const isExistsTmpIndex = await client.indices.exists({
@@ -378,7 +380,7 @@ class ElasticsearchDelegator
         index: indexName,
       });
       await this.createIndex(indexName);
-      await this.addAllPages({ shouldEmitProgress });
+      result = await this.addAllPages({ shouldEmitProgress });
     } catch (error) {
       logger.error({ err: error }, "An error occured while 'rebuildIndex'.");
       logger.error({ body: error?.meta?.body }, 'error.meta.body');
@@ -392,6 +394,13 @@ class ElasticsearchDelegator
     } finally {
       logger.info('Normalize indices.');
       await this.normalizeIndices();
+    }
+
+    // Emitted only after normalizeIndices() above has resolved, so the client's
+    // isNormalized poll (triggered by this event) doesn't race normalization.
+    if (shouldEmitProgress) {
+      const socket = this.socketIoService.getAdminSocket();
+      socket?.emit(SocketEventName.FinishAddPage, result);
     }
   }
 
@@ -754,7 +763,7 @@ class ElasticsearchDelegator
       shouldEmitProgress: false,
       invokeGarbageCollection: false,
     },
-  ): Promise<void> {
+  ): Promise<{ totalCount: number; count: number }> {
     const { shouldEmitProgress, invokeGarbageCollection } = option;
 
     const Page = this.getPageModel();
@@ -853,15 +862,12 @@ class ElasticsearchDelegator
       },
       final(callback) {
         logger.info(`Adding pages has completed: (totalCount=${totalCount})`);
-
-        if (shouldEmitProgress) {
-          socket?.emit(SocketEventName.FinishAddPage, { totalCount, count });
-        }
         callback();
       },
     });
 
-    return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
+    await pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
+    return { totalCount, count };
   }
 
   async searchAuditlogByFuzzyWildcard(

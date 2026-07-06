@@ -504,6 +504,74 @@ describe('ElasticsearchDelegator', () => {
     });
   });
 
+  describe('rebuildIndex()', () => {
+    let mockES8Client: DeepMockProxy<ES8ClientDelegator>;
+    let addAllPagesSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      mockES8Client = mockDeep<ES8ClientDelegator>({ delegatorVersion: 8 });
+      injectClient(delegator, mockES8Client);
+      mockES8Client.indices.exists.mockResolvedValue(false);
+      // addAllPages streams from MongoDB, so it cannot run in a unit test — stub it.
+      addAllPagesSpy = vi
+        .spyOn(delegator, 'addAllPages')
+        .mockResolvedValue({ totalCount: 0, count: 0 });
+    });
+
+    describe('with shouldEmitProgress: true', () => {
+      let mockAdminSocket: MockProxy<Namespace>;
+
+      beforeEach(() => {
+        mockAdminSocket = mock<Namespace>();
+        mockSocketIo.getAdminSocket.mockReturnValue(mockAdminSocket);
+      });
+
+      it('emits FinishAddPage only after normalizeIndices has completed', async () => {
+        addAllPagesSpy.mockResolvedValue({ totalCount: 10, count: 10 });
+        const normalizeSpy = vi.spyOn(delegator, 'normalizeIndices');
+
+        await delegator.rebuildIndex({ shouldEmitProgress: true });
+
+        expect(mockAdminSocket.emit).toHaveBeenCalledOnce();
+        expect(mockAdminSocket.emit).toHaveBeenCalledWith(
+          SocketEventName.FinishAddPage,
+          { totalCount: 10, count: 10 },
+        );
+        // Regression guard: previously FinishAddPage fired from within addAllPages,
+        // racing the client's post-finish isNormalized poll against normalizeIndices.
+        expect(normalizeSpy.mock.invocationCallOrder[0]).toBeLessThan(
+          vi.mocked(mockAdminSocket.emit).mock.invocationCallOrder[0],
+        );
+      });
+
+      it('does not emit FinishAddPage when the rebuild fails', async () => {
+        mockES8Client.reindex.mockRejectedValue(new Error('reindex failed'));
+
+        await expect(
+          delegator.rebuildIndex({ shouldEmitProgress: true }),
+        ).rejects.toThrow('reindex failed');
+
+        expect(mockAdminSocket.emit).toHaveBeenCalledWith(
+          SocketEventName.RebuildingFailed,
+          { error: 'reindex failed' },
+        );
+        expect(mockAdminSocket.emit).not.toHaveBeenCalledWith(
+          SocketEventName.FinishAddPage,
+          expect.anything(),
+        );
+      });
+    });
+
+    it('does not emit any socket event when shouldEmitProgress is false', async () => {
+      const mockAdminSocket = mock<Namespace>();
+      mockSocketIo.getAdminSocket.mockReturnValue(mockAdminSocket);
+
+      await delegator.rebuildIndex({ shouldEmitProgress: false });
+
+      expect(mockAdminSocket.emit).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getAuditlogInfoForAdmin()', () => {
     let mockES8Client: DeepMockProxy<ES8ClientDelegator>;
 
