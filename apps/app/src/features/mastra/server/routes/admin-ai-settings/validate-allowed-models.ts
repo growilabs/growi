@@ -109,7 +109,8 @@ export const isValidNonEmptyAllowedModels = (
  * `value` is `unknown` because the payload is client-supplied JSON: a non-array value
  * (or a non-empty array that breaks a rule, e.g. an unsupported provider) returns
  * `false`, which `apiV3FormValidator` reports as a 400 with the `allowedModels` field
- * flagged (422 is reserved for env-only mode, handled separately in the PUT handler).
+ * flagged. (The env-only-mode rejection is likewise a 400, enforced separately in the
+ * PUT handler; there is no 422 on this route.)
  */
 export const isValidAllowedModelsRequest = (value: unknown): boolean => {
   if (!Array.isArray(value)) {
