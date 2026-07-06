@@ -30,11 +30,11 @@ vi.mock('~/utils/logger', () => ({
 }));
 
 import {
-  clearAvailabilityLogDedup,
   getAvailableModels,
   getAvailableProviders,
   getProviderAvailability,
 } from './provider-availability';
+import { clearAvailabilityLogDedup } from './warn-dedup';
 
 const configure = (opts: {
   providers?: Partial<Record<AiProvider, AiProviderSettings>>;

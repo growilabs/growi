@@ -8,7 +8,7 @@ import type {
 import { evaluateProviderAvailability } from '~/features/mastra/interfaces/provider-availability-rule';
 
 import { getAllowedModels, getApiKey, getProviderSettings } from './config';
-import { clearAvailabilityLogDedup, warnOnce } from './warn-dedup';
+import { warnOnce } from './warn-dedup';
 
 // The single availability predicate for the AI providers. "Available" means the
 // admin turned the provider ON (enabled) AND it is configured (its required
@@ -97,9 +97,3 @@ export const getAvailableModels = (): AllowedModel[] => {
     availableProviders.has(model.provider),
   );
 };
-
-// Re-exported so consumers of this module reset the misconfiguration-warn dedup
-// through one surface. It is the SAME registry the config accessors use (defined
-// in warn-dedup); this is not a second/duplicate reset. Wiring it into
-// put-ai-settings / the s2s configUpdated handler is a later task.
-export { clearAvailabilityLogDedup };
