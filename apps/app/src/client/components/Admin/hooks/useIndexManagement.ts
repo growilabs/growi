@@ -125,20 +125,17 @@ export const useIndexManagement = ({
       await retrieveStatus({ silent: true });
     };
 
-    const onDisconnect = () => {
-      setIsRebuildingProcessing(false);
-    };
-
     socket.on(progressSocketEvent, onProgress);
     socket.on(finishSocketEvent, onFinish);
     socket.on(failedSocketEvent, onFailed);
-    socket.on('disconnect', onDisconnect);
+    // No 'disconnect' handler: the rebuild keeps running server-side and the
+    // finish/failed broadcast still reaches this socket after it auto-reconnects.
+    // Clearing isRebuildingProcessing here would allow a concurrent rebuild.
 
     return () => {
       socket.off(progressSocketEvent, onProgress);
       socket.off(finishSocketEvent, onFinish);
       socket.off(failedSocketEvent, onFailed);
-      socket.off('disconnect', onDisconnect);
     };
   }, [
     retrieveStatus,

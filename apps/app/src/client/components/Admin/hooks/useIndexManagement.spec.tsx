@@ -230,7 +230,7 @@ describe('useIndexManagement', () => {
       expect(mockToastError).toHaveBeenCalledWith(expect.any(Error));
     });
 
-    it('resets isRebuildingProcessing on socket disconnect', async () => {
+    it('keeps isRebuildingProcessing on socket disconnect, since the rebuild continues server-side', async () => {
       const handlers = setupSocket();
       const { result } = renderHook(() => useIndexManagement(defaultOptions), {
         wrapper,
@@ -246,7 +246,7 @@ describe('useIndexManagement', () => {
         handlers['disconnect']?.({});
       });
 
-      expect(result.current.isRebuildingProcessing).toBe(false);
+      expect(result.current.isRebuildingProcessing).toBe(true);
     });
   });
 });
