@@ -1,4 +1,10 @@
-// --- Cross-cutting integration: env-only mode through BOTH handlers ---------
+// --- Cross-cutting: env-only mode through BOTH handlers ---------------------
+//
+// This is a `.spec.ts` (UNIT project), NOT a `.integ.ts`: it is DB-free. The
+// scope is cross-cutting (both handlers + the REAL configManager wiring), but no
+// mongo is touched — the source layer is faked and the Config model is mocked
+// (see Strategy below), so it needs no integration/DB bootstrap. Naming it
+// `.integ.ts` would (wrongly) demand one; keep it `.spec.ts`.
 //
 // Per-task unit tests already cover each handler against a MOCKED configManager
 // (get-ai-settings.spec.ts / put-ai-settings.spec.ts return the
