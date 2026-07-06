@@ -5,9 +5,11 @@ import { type FieldPath, useFormContext, useWatch } from 'react-hook-form';
 import { Alert, Badge, FormGroup, Input, Label } from 'reactstrap';
 
 import type { AiProvider } from '../../interfaces/ai-provider';
-import { evaluateProviderAvailability } from '../../interfaces/provider-availability-rule';
 import { AzureOpenaiSettings } from './AzureOpenaiSettings';
-import type { AiSettingsFormValues } from './ai-settings-form-values';
+import {
+  type AiSettingsFormValues,
+  evaluateFormProviderAvailability,
+} from './ai-settings-form-values';
 import { registerToInputProps } from './register-to-input-props';
 
 export interface ProviderPanelProps {
@@ -77,12 +79,11 @@ export const ProviderPanel = (props: ProviderPanelProps): JSX.Element => {
     name: 'providers',
   });
   const providerFormValue = providers?.[provider];
-  const availability = evaluateProviderAvailability({
+  const availability = evaluateFormProviderAvailability(
     provider,
-    enabled: providerFormValue?.enabled === true,
-    hasApiKey: isApiKeySet || (providerFormValue?.apiKey ?? '').trim() !== '',
-    azureOpenaiSettings: providerFormValue?.azureOpenaiSettings,
-  });
+    providerFormValue,
+    isApiKeySet,
+  );
   // Only enabled-but-misconfigured providers warrant an inline warning; a disabled
   // provider is admin intent, and an available one needs nothing. The narrowed
   // reason (undefined otherwise) drives both the visibility and the message.

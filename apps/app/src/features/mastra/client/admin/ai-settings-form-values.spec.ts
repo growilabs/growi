@@ -6,7 +6,9 @@ import {
   type AiSettingsFormValues,
   type AllowedModelFormValue,
   buildUpdateRequest,
+  evaluateFormProviderAvailability,
   hasDirtyField,
+  type ProviderFormValue,
   setDefaultAllowedModelAt,
   toFormValues,
 } from './ai-settings-form-values';
@@ -393,5 +395,59 @@ describe('setDefaultAllowedModelAt', () => {
 
     // Assert
     expect(result.map((m) => m.isDefault)).toEqual([true, false, false]);
+  });
+});
+
+describe('evaluateFormProviderAvailability', () => {
+  const openaiForm = (
+    overrides: Partial<ProviderFormValue> = {},
+  ): ProviderFormValue => ({
+    enabled: true,
+    apiKey: '',
+    azureOpenaiSettings: emptyAzure,
+    ...overrides,
+  });
+
+  it('is available for an enabled key-based provider whose key is only saved (no typed key)', () => {
+    expect(
+      evaluateFormProviderAvailability('openai', openaiForm(), true).available,
+    ).toBe(true);
+  });
+
+  it('is available when a non-blank key is typed even without a saved key', () => {
+    expect(
+      evaluateFormProviderAvailability(
+        'openai',
+        openaiForm({ apiKey: 'sk-typed' }),
+        false,
+      ).available,
+    ).toBe(true);
+  });
+
+  it('is misconfigured (missing-api-key) with neither a saved nor a non-blank typed key', () => {
+    // A whitespace-only typed key does not count (mirrors the server blankness rule).
+    expect(
+      evaluateFormProviderAvailability(
+        'openai',
+        openaiForm({ apiKey: '   ' }),
+        false,
+      ),
+    ).toEqual({ available: false, reason: 'missing-api-key' });
+  });
+
+  it('is disabled when the provider toggle is off, regardless of key', () => {
+    expect(
+      evaluateFormProviderAvailability(
+        'openai',
+        openaiForm({ enabled: false }),
+        true,
+      ),
+    ).toEqual({ available: false, reason: 'disabled' });
+  });
+
+  it('treats an undefined form value (no slot yet) as disabled', () => {
+    expect(
+      evaluateFormProviderAvailability('openai', undefined, false),
+    ).toEqual({ available: false, reason: 'disabled' });
   });
 });

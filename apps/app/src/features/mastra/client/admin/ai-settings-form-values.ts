@@ -7,6 +7,10 @@ import type {
 } from '../../interfaces/ai-settings';
 import type { AllowedModel } from '../../interfaces/allowed-model';
 import type { AzureOpenaiConfig } from '../../interfaces/azure-openai-config';
+import {
+  evaluateProviderAvailability,
+  type ProviderAvailability,
+} from '../../interfaces/provider-availability-rule';
 
 /**
  * The react-hook-form working copy for a single provider slot.
@@ -245,3 +249,24 @@ export const setDefaultAllowedModelAt = (
     ...model,
     isDefault: index === targetIndex,
   }));
+
+/**
+ * Compute a provider's availability from its LIVE form values plus the saved-key
+ * flag, through the SAME pure rule the server uses (`evaluateProviderAvailability`)
+ * — so the admin UI's status dot (ProviderTabs) and inline misconfiguration warning
+ * (ProviderPanel) cannot drift from what the server would exclude. `hasApiKey` is
+ * the saved-key flag (from the GET response, reflecting the merged DB??env view) OR
+ * a non-empty typed key in the form; this saved-OR-typed composition is the subtle
+ * part, so it lives in ONE place shared by both call sites.
+ */
+export const evaluateFormProviderAvailability = (
+  provider: AiProvider,
+  formValue: ProviderFormValue | undefined,
+  isApiKeySet: boolean,
+): ProviderAvailability =>
+  evaluateProviderAvailability({
+    provider,
+    enabled: formValue?.enabled === true,
+    hasApiKey: isApiKeySet || (formValue?.apiKey ?? '').trim() !== '',
+    azureOpenaiSettings: formValue?.azureOpenaiSettings,
+  });

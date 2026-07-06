@@ -5,8 +5,10 @@ import { Nav, NavItem, NavLink } from 'reactstrap';
 
 import type { AiProvider } from '../../interfaces/ai-provider';
 import { AI_PROVIDERS } from '../../interfaces/ai-provider';
-import { evaluateProviderAvailability } from '../../interfaces/provider-availability-rule';
-import type { AiSettingsFormValues } from './ai-settings-form-values';
+import {
+  type AiSettingsFormValues,
+  evaluateFormProviderAvailability,
+} from './ai-settings-form-values';
 
 export interface ProviderTabsProps {
   /** The provider whose panel is currently shown. */
@@ -57,14 +59,11 @@ export const ProviderTabs = (props: ProviderTabsProps): JSX.Element => {
       {AI_PROVIDERS.map((provider) => {
         const active = provider === activeProvider;
         const providerFormValue = providers?.[provider];
-        const availability = evaluateProviderAvailability({
+        const availability = evaluateFormProviderAvailability(
           provider,
-          enabled: providerFormValue?.enabled === true,
-          hasApiKey:
-            apiKeySet[provider] === true ||
-            (providerFormValue?.apiKey ?? '').trim() !== '',
-          azureOpenaiSettings: providerFormValue?.azureOpenaiSettings,
-        });
+          providerFormValue,
+          apiKeySet[provider],
+        );
 
         const dot = availability.available
           ? {
