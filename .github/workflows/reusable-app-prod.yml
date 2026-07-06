@@ -86,7 +86,6 @@ jobs:
           apps/app/config \
           apps/app/dist \
           apps/app/prisma \
-          apps/app/src/generated/prisma \
           apps/app/bin/dev-esm-resolver.mjs \
           apps/app/public \
           apps/app/resource \

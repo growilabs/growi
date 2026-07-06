@@ -21,6 +21,12 @@ import fs from 'node:fs';
 
 const NODE_UID = 1000;
 const NODE_GID = 1000;
+// Hardcoded entry in @prisma/client's engine search list (resolveEnginePath).
+// It is the only search location that survives Turbopack bundling: __dirname and
+// the baked generator output path are rewritten in the .next SSR bundle, so the
+// bundled Prisma client cannot find the engine via them. Copying the engine here
+// at startup is what lets SSR (getServerSideProps -> prisma.*) locate it.
+const PRISMA_ENGINE_SEARCH_DIR = '/tmp/prisma-engines';
 const CGROUP_V2_PATH = '/sys/fs/cgroup/memory.max';
 const CGROUP_V1_PATH = '/sys/fs/cgroup/memory/memory.limit_in_bytes';
 const CGROUP_V1_UNLIMITED_THRESHOLD = 64 * 1024 * 1024 * 1024; // 64GB
@@ -146,6 +152,53 @@ export function setupDirectories(
 }
 
 /**
+ * Make the Prisma query engine discoverable by the Next.js SSR bundle.
+ *
+ * The engine binaries ship in `dist/generated/prisma` (copied there from
+ * `src/generated/prisma` by bin/postbuild-server.ts). The Express server resolves
+ * them via its own compiled module directory, but the Turbopack-bundled SSR client
+ * cannot: Turbopack rewrites `__dirname` and the baked generator output path, so the
+ * only search location it can still reach at runtime is the hardcoded
+ * `/tmp/prisma-engines`. Copying every shipped engine there lets the SSR consumer
+ * load the one matching the runtime platform (Prisma selects it by filename).
+ *
+ * No-op (with a warning) if the source directory or engines are absent, so a build
+ * that ever stops shipping them degrades to the previous behaviour rather than
+ * crashing the entrypoint.
+ */
+export function setupPrismaEngines(
+  distEngineDir: string,
+  searchDir: string,
+): void {
+  if (!fs.existsSync(distEngineDir)) {
+    console.warn(
+      `[entrypoint] Prisma engine dir not found: ${distEngineDir} (skipping engine setup)`,
+    );
+    return;
+  }
+  const engines = fs
+    .readdirSync(distEngineDir)
+    .filter((f) => f.endsWith('.so.node'));
+  if (engines.length === 0) {
+    console.warn(
+      `[entrypoint] No Prisma engine (.so.node) in ${distEngineDir} (skipping engine setup)`,
+    );
+    return;
+  }
+  fs.mkdirSync(searchDir, { recursive: true });
+  for (const engine of engines) {
+    const dest = `${searchDir}/${engine}`;
+    fs.copyFileSync(`${distEngineDir}/${engine}`, dest);
+    // World-readable so the unprivileged `node` user can dlopen it after the
+    // privilege drop (this copy runs as root).
+    fs.chmodSync(dest, 0o644);
+  }
+  console.log(
+    `[entrypoint] Copied ${engines.length} Prisma engine(s) to ${searchDir}: ${engines.join(', ')}`,
+  );
+}
+
+/**
  * Drop privileges from root to node user.
  * These APIs are POSIX-only and guaranteed to exist in the Docker container (Linux).
  */
@@ -233,6 +286,12 @@ function main(): void {
       '/data/uploads',
       './public/uploads',
       '/tmp/page-bulk-export',
+    );
+
+    // Step 1b: Stage Prisma engines where the SSR bundle can find them (as root).
+    setupPrismaEngines(
+      `${process.cwd()}/dist/generated/prisma`,
+      PRISMA_ENGINE_SEARCH_DIR,
     );
 
     // Step 2: Detect heap size and build flags
