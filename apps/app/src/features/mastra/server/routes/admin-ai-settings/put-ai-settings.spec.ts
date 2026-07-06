@@ -543,7 +543,7 @@ describe('updateAiSettingsValidators', () => {
     });
   });
 
-  // The new rule (design "providers を含むリクエストは 4 プロバイダ全エントリ必須"):
+  // The new rule (design "a providers request must include all 4 provider entries"):
   // a `providers` object, when present, must carry an entry for EVERY supported
   // provider (fixed-slot model). A missing entry is a 400.
   describe('providers (all 4 entries required)', () => {

@@ -161,7 +161,7 @@ const isValidProviderEntryRequest = (value: unknown): boolean => {
 /**
  * True when `value` is a well-formed `providers` payload. The key new rule: a
  * present `providers` object MUST carry an entry for EVERY supported provider
- * (design "providers を含むリクエストは 4 プロバイダ全エントリ必須"). Iterating the
+ * (design "a providers request must include all 4 provider entries"). Iterating the
  * declared `AI_PROVIDERS` set (not a hard-coded list) keeps this in sync with the
  * fixed-slot model — adding a provider needs no change here. Each entry is
  * shape-checked (enabled/apiKey/azureOpenaiSettings types). `value` is `unknown`
@@ -301,7 +301,7 @@ const collectRequestApiKeys = (
 /**
  * Build the config updates from a validated request body.
  *
- * Update semantics (design "PUT セマンティクス"): each top-level section is
+ * Update semantics (design "PUT semantics"): each top-level section is
  * OMIT = DO NOT WRITE THE KEY; a present section is written as a concrete value:
  *   - `app:aiEnabled` — written only when `aiEnabled` is provided (merge: omit keeps it).
  *   - `ai:providers` — written only when `providers` is provided; a full-state

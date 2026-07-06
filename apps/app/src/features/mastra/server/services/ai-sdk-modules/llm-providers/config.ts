@@ -116,8 +116,8 @@ const isMeaningfulEnvValue = (value: unknown): boolean => {
 // exists the env value is inert; this is the observation point for "I changed the
 // env var but nothing happened". Env-only keys under env-only mode resolve to the
 // env value (resolved === the env value by reference), so they are correctly NOT
-// reported here. The value itself is never logged (design "シャドーイングの規則":
-// 値そのものは出力しない).
+// reported here. The value itself is never logged (design "shadowing rule": the
+// value is never emitted).
 const reportEnvShadowingIfNeeded = (key: AiValueConfigKey): void => {
   const dbValue = configManager.getConfig(key, ConfigSource.db);
   if (dbValue == null) {
@@ -213,7 +213,7 @@ export const requireApiKey = (provider: AiProvider): string => {
 // entries. A malformed (non-array) value is coerced to [] with a dedup'd warn —
 // coerced rather than thrown because this feeds isAiConfigured(), a should-be-pure
 // boolean predicate: a malformed value reads as [] = AI unconfigured (fail soft).
-// The warn replaces the former fail-silent coercion (design "fail-silent の排除").
+// The warn replaces the former fail-silent coercion (design "no fail-silent").
 //
 // Per-entry fail soft: an entry whose `provider` is not a supported AiProvider
 // (missing / typo'd, or a pre-rename value) is dropped. Such an entry is already
