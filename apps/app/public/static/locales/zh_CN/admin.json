@@ -290,6 +290,7 @@
   "full_text_search_management": {
     "full_text_search_management": "全文搜索管理",
     "elasticsearch_management": "Elasticsearch管理",
+    "page_data_management": "页面数据管理",
     "connection_status": "连接状态",
     "connection_status_label_unconfigured": "未配置",
     "connection_status_label_connected": "已连接",

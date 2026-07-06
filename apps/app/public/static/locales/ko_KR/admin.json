@@ -281,6 +281,7 @@
   "full_text_search_management": {
     "full_text_search_management": "전체 텍스트 검색 관리",
     "elasticsearch_management": "Elasticsearch 관리",
+    "page_data_management": "페이지 데이터 관리",
     "connection_status": "연결 상태",
     "connection_status_label_unconfigured": "구성되지 않음",
     "connection_status_label_connected": "연결됨",

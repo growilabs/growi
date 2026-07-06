@@ -281,6 +281,7 @@
   "full_text_search_management": {
     "full_text_search_management": "Moteur de recherche",
     "elasticsearch_management": "Configuration Elasticsearch",
+    "page_data_management": "Gestion des données de page",
     "connection_status": "Statut",
     "connection_status_label_unconfigured": "UNCONFIGURED",
     "connection_status_label_connected": "CONNECTED",

@@ -290,6 +290,7 @@
   "full_text_search_management": {
     "full_text_search_management": "全文検索管理",
     "elasticsearch_management": "Elasticsearch 管理",
+    "page_data_management": "ページデータ管理",
     "connection_status": "接続の状態",
     "connection_status_label_unconfigured": "設定されていません",
     "connection_status_label_connected": "接続されています",
