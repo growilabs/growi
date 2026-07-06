@@ -279,7 +279,6 @@
     "not_found_global_notification_triggerid": "전역 알림 ID를 찾을 수 없습니다"
   },
   "full_text_search_management": {
-    "full_text_search_management": "전체 텍스트 검색 관리",
     "elasticsearch_management": "Elasticsearch 관리",
     "page_data_management": "페이지 데이터 관리",
     "connection_status": "연결 상태",
@@ -880,7 +879,6 @@
   },
   "audit_log_index_management": {
     "audit_log_index_management": "감사 로그 인덱스 관리",
-    "elasticsearch_management": "Elasticsearch 관리 (감사 로그)",
     "normalize": "정규화",
     "normalize_button": "감사 로그 인덱스 정규화",
     "normalize_success": "감사 로그 인덱스가 정규화되었습니다.",

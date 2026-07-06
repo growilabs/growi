@@ -288,7 +288,6 @@
     "not_found_global_notification_triggerid": "未找到全局通知 ID"
   },
   "full_text_search_management": {
-    "full_text_search_management": "全文搜索管理",
     "elasticsearch_management": "Elasticsearch管理",
     "page_data_management": "页面数据管理",
     "connection_status": "连接状态",
@@ -889,7 +888,6 @@
   },
   "audit_log_index_management": {
     "audit_log_index_management": "审计日志索引管理",
-    "elasticsearch_management": "Elasticsearch 管理（审计日志）",
     "normalize": "规范化",
     "normalize_button": "规范化审计日志索引",
     "normalize_success": "审计日志索引规范化成功。",

@@ -279,7 +279,6 @@
     "not_found_global_notification_triggerid": "Not found the global notification id"
   },
   "full_text_search_management": {
-    "full_text_search_management": "Full Text Search Management",
     "elasticsearch_management": "Elasticsearch management",
     "page_data_management": "Page Data Management",
     "connection_status": "Connection status",
@@ -305,7 +304,6 @@
   },
   "audit_log_index_management": {
     "audit_log_index_management": "Audit Log Index Management",
-    "elasticsearch_management": "Elasticsearch Management (Audit Log)",
     "normalize": "Normalize",
     "normalize_button": "Normalize audit log index",
     "normalize_success": "Audit log index normalized successfully.",

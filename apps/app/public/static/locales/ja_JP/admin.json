@@ -288,7 +288,6 @@
     "not_found_global_notification_triggerid": "アクセス先の通知設定は見つかりませんでした"
   },
   "full_text_search_management": {
-    "full_text_search_management": "全文検索管理",
     "elasticsearch_management": "Elasticsearch 管理",
     "page_data_management": "ページデータ管理",
     "connection_status": "接続の状態",
@@ -304,19 +303,18 @@
     "reconnect_button": "再接続の試行",
     "reconnect_description": "Elasticsearch への再接続を試みます。",
     "normalize": "正規化",
-    "normalize_button": "ページデータインデックスの正規化",
-    "normalize_description": "破損したページデータインデックスを修復します。",
+    "normalize_button": "ページデータのインデックスの正規化",
+    "normalize_description": "破損したページデータのインデックスを修復します。",
     "rebuild": "リビルド",
-    "rebuild_button": "ページデータインデックスのリビルド",
+    "rebuild_button": "ページデータのインデックスのリビルド",
     "rebuild_description_1": "全てのページのインデックスを削除し、作り直します。",
     "rebuild_description_2": "この作業には数秒かかります。",
     "rebuild_normalization_timeout": "リビルドは完了しましたが、正規化がタイムアウトしました。手動で正規化してください。"
   },
   "audit_log_index_management": {
     "audit_log_index_management": "監査ログ管理",
-    "elasticsearch_management": "Elasticsearch 管理（監査ログ）",
     "normalize": "正規化",
-    "normalize_button": "監査のログのインデックスの正規化",
+    "normalize_button": "監査ログのインデックスの正規化",
     "normalize_success": "監査ログのインデックスを正規化しました。",
     "normalize_description": "破損した監査ログのインデックスを修復します。",
     "rebuild": "リビルド",

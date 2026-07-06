@@ -279,7 +279,6 @@
     "not_found_global_notification_triggerid": "ID global de notification introuvable"
   },
   "full_text_search_management": {
-    "full_text_search_management": "Moteur de recherche",
     "elasticsearch_management": "Configuration Elasticsearch",
     "page_data_management": "Gestion des données de page",
     "connection_status": "Statut",
@@ -879,7 +878,6 @@
   },
   "audit_log_index_management": {
     "audit_log_index_management": "Gestion de l'index des journaux d'audit",
-    "elasticsearch_management": "Configuration Elasticsearch (journaux d'audit)",
     "normalize": "Normaliser",
     "normalize_button": "Normaliser l'index des journaux d'audit",
     "normalize_success": "L'index des journaux d'audit a été normalisé.",
