@@ -237,6 +237,23 @@ describe('getApiKey', () => {
     expect(getApiKey('google')).toBeUndefined();
   });
 
+  it('trims surrounding whitespace off a stored key so it is not injected verbatim into the provider header', () => {
+    // A key pasted with a trailing newline / surrounding spaces (common from a
+    // password manager) reads back as configured; without trimming it would reach
+    // the provider Authorization header verbatim and 401 (or throw invalid-header).
+    configureConfig({
+      db: {
+        'ai:providerApiKeys': {
+          openai: '  sk-openai  ',
+          anthropic: 'sk-anthropic\n',
+        },
+      },
+    });
+
+    expect(getApiKey('openai')).toBe('sk-openai');
+    expect(getApiKey('anthropic')).toBe('sk-anthropic');
+  });
+
   it('returns undefined when ai:providerApiKeys is unset, without warning', () => {
     configureConfig({});
 

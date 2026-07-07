@@ -39,14 +39,20 @@ type AiValueConfigKey =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-// Coerce a config field declared `string` to a non-blank string, or undefined.
-// The loader JSON-parses env vars and casts the result unchecked (see the module
-// header), so a field typed `string` may arrive as a number/blank/whitespace at
-// runtime. Anything that is not a non-blank string reads as "unset" (fail soft),
-// which is what keeps the shared availability rule (isNonBlank -> .trim()) and the
-// resolvers safe from a runtime type violation on a malformed value.
+// Coerce a config field declared `string` to a non-blank, TRIMMED string, or
+// undefined. The loader JSON-parses env vars and casts the result unchecked (see
+// the module header), so a field typed `string` may arrive as a number/blank/
+// whitespace at runtime. Anything that is not a non-blank string reads as "unset"
+// (fail soft), which is what keeps the shared availability rule (isNonBlank ->
+// .trim()) and the resolvers safe from a runtime type violation on a malformed value.
+//
+// The returned value is trimmed: a key/endpoint saved (or env-provided) with
+// surrounding whitespace would otherwise read back as "configured" yet be injected
+// verbatim into a provider Authorization header / base URL, causing a silent 401 or
+// an "invalid header value" throw. Trimming at this single read boundary normalizes
+// every source (DB and env) for every consumer (getApiKey + azure settings).
 const asNonBlankString = (value: unknown): string | undefined =>
-  typeof value === 'string' && value.trim() !== '' ? value : undefined;
+  typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 
 // Coerce a config field declared `boolean` to a boolean, or undefined. A non-boolean
 // runtime value (e.g. the string "true" from a hand-edited env var) reads as unset;

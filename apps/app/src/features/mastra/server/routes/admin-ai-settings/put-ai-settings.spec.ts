@@ -328,6 +328,19 @@ describe('putAiSettings (multi-provider)', () => {
       expect(updates()).not.toHaveProperty('ai:providerApiKeys');
     });
 
+    it('persists a key with surrounding whitespace trimmed (not verbatim)', async () => {
+      // A key pasted with a trailing newline / leading spaces passes the non-empty
+      // check; it must be stored trimmed so it does not read back as configured yet
+      // fail at the provider (401 / invalid-header) with the raw whitespace.
+      await invoke({
+        providers: providersRequest({ openai: { apiKey: '  sk-openai\n' } }),
+      });
+
+      expect(updates()['ai:providerApiKeys']).toMatchObject({
+        openai: 'sk-openai',
+      });
+    });
+
     it('carries other providers keys forward from the merged view when one non-empty key is sent', async () => {
       await invoke(
         { providers: providersRequest({ google: { apiKey: 'sk-google' } }) },
