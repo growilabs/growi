@@ -66,6 +66,21 @@ describe('isValidNonEmptyAllowedModels (Req 2.3, 2.4, 3.2)', () => {
         ]),
       ).toBe(false);
     });
+
+    it('rejects a modelId with surrounding whitespace (would defeat uniqueness + reach the provider padded)', () => {
+      // The UI trims before sending; this guards the direct-API path so " gpt-4o"
+      // cannot coexist with "gpt-4o" (Req 2.4) nor be sent padded to the provider.
+      expect(
+        isValidNonEmptyAllowedModels([
+          { provider: 'openai', modelId: ' gpt-4o', isDefault: true },
+        ]),
+      ).toBe(false);
+      expect(
+        isValidNonEmptyAllowedModels([
+          { provider: 'openai', modelId: 'gpt-4o\n', isDefault: true },
+        ]),
+      ).toBe(false);
+    });
   });
 
   describe('default-count uniqueness on the non-empty list (Req 3.2)', () => {

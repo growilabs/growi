@@ -267,6 +267,30 @@ describe('buildUpdateRequest (normal mode)', () => {
     ]);
   });
 
+  it('trims surrounding whitespace off each modelId so it is stored canonically', () => {
+    // A free-text modelId pasted with surrounding spaces must not ride verbatim
+    // into the modelKey (model-not-found) or read as distinct from its trimmed twin.
+    const body = buildUpdateRequest(
+      {
+        ...baseValues,
+        allowedModels: [
+          {
+            provider: 'azure-openai',
+            modelId: '  my-deployment  ',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      },
+      false,
+      true,
+    );
+
+    expect(body.allowedModels).toEqual([
+      { provider: 'azure-openai', modelId: 'my-deployment', isDefault: true },
+    ]);
+  });
+
   it('omits allowedModels (keeping aiEnabled + providers) when the list was not edited', () => {
     // A provider/apiKey/aiEnabled save must not carry an untouched allow-list, so
     // an env-seeded list with no default (rejected by the exactly-one-default PUT

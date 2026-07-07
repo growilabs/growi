@@ -59,10 +59,15 @@ export const isValidNonEmptyAllowedModels = (
     }
 
     // modelId must be a non-empty string within the defensive length bound (the
-    // same cap the chat modelKey uses — a longer id could never form a valid key).
+    // same cap the chat modelKey uses — a longer id could never form a valid key),
+    // and must carry NO surrounding whitespace. A padded id (" gpt-4o") would ride
+    // inside the modelKey to the provider (model-not-found) and defeat the
+    // same-provider uniqueness check below (" gpt-4o" vs "gpt-4o" read as distinct);
+    // the UI trims before sending, so this rejects only a direct-API payload.
     if (
       typeof entry.modelId !== 'string' ||
       entry.modelId.trim() === '' ||
+      entry.modelId.trim() !== entry.modelId ||
       entry.modelId.length > MAX_MODEL_KEY_LENGTH
     ) {
       return false;

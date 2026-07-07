@@ -130,7 +130,12 @@ const toAllowedModel = (row: AllowedModelFormValue): AllowedModel => {
   const trimmed = row.providerOptionsText.trim();
   const base: AllowedModel = {
     provider: row.provider,
-    modelId: row.modelId,
+    // Trim so a modelId typed (free-text mode) with surrounding whitespace is
+    // stored canonically: an untrimmed id would ride inside the modelKey to the
+    // provider (model-not-found) and defeat the same-provider uniqueness check
+    // (" gpt-4o" vs "gpt-4o" would read as distinct). The server validator also
+    // rejects an untrimmed modelId for the direct-API path.
+    modelId: row.modelId.trim(),
     isDefault: row.isDefault,
   };
   if (trimmed === '') {
