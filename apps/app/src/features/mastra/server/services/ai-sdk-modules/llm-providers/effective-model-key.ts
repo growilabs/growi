@@ -66,17 +66,41 @@ const pickEffectiveDefault = (
 export const getEffectiveDefaultModelKey = (): ModelKey =>
   pickEffectiveDefault(getAvailableModels());
 
+interface ResolveEffectiveModelKeyOptions {
+  /**
+   * The pre-computed available set to resolve against. Omit to compute it via
+   * getAvailableModels(); PASS the set a caller already holds (e.g. the get-models
+   * route, which builds its response from it) so the same request does not run a
+   * second availability sweep.
+   */
+  readonly availableModels?: readonly AllowedModel[];
+  /**
+   * Whether to emit the per-request audit warn when a supplied key is rejected.
+   * Defaults to `true`: the chat POST path resolves UNTRUSTED per-request client
+   * input, worth auditing. Pass `false` when resolving a persisted user preference
+   * (get-models): its staleness (owning provider disabled after save) is an
+   * expected steady state that would otherwise warn on every read.
+   */
+  readonly warnOnReject?: boolean;
+}
+
 /**
- * Request-time single validation checkpoint (Req 4.6). Validates the client-
- * supplied modelKey against the available allow-list (the client value is never
- * trusted):
+ * Request-time single validation checkpoint (Req 4.6). Validates a supplied
+ * modelKey against the available allow-list (the value is never trusted) — the ONE
+ * place this rule lives, shared by the chat POST handler and the get-models initial
+ * selection so the two cannot drift:
  *  - key in the available set              -> returned unchanged (opaque, valid)
  *  - key out of the available set / omitted / unparseable -> effective default
- *    (a rejected non-null key is audited with a warn carrying the KEY VALUE ONLY)
+ *    (a rejected non-null key is audited with a warn carrying the KEY VALUE ONLY,
+ *     unless `warnOnReject` is false)
  *  - 0 available models                    -> throw (ai-ready-guard 501 preempts)
  */
-export const resolveEffectiveModelKey = (modelKey?: string): ModelKey => {
-  const availableModels = getAvailableModels();
+export const resolveEffectiveModelKey = (
+  modelKey?: string,
+  options?: ResolveEffectiveModelKeyOptions,
+): ModelKey => {
+  const availableModels = options?.availableModels ?? getAvailableModels();
+  const warnOnReject = options?.warnOnReject ?? true;
 
   if (availableModels.length === 0) {
     throw new Error(NO_AVAILABLE_MODELS_MESSAGE);
@@ -98,11 +122,13 @@ export const resolveEffectiveModelKey = (modelKey?: string): ModelKey => {
     // JSON.stringify escapes the client-supplied value (newlines, ANSI escapes,
     // quotes) so it cannot forge log lines or inject terminal control sequences
     // into an operator's console — the validator only bounds its length/type.
-    logger.warn(
-      `Requested model ${JSON.stringify(modelKey)} is not in the available allow-list; falling back to the effective default model`,
-    );
+    if (warnOnReject) {
+      logger.warn(
+        `Requested model ${JSON.stringify(modelKey)} is not in the available allow-list; falling back to the effective default model`,
+      );
+    }
   }
 
-  // Reuse the set already computed above — no second availability sweep.
+  // Reuse the set resolved above — no second availability sweep.
   return pickEffectiveDefault(availableModels);
 };

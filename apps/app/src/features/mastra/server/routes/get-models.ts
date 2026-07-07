@@ -3,15 +3,11 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 
-import { isModelInAllowList } from '~/features/mastra/interfaces/allowed-model';
 import type {
   ChatModelEntry,
   ChatModelsResponse,
 } from '~/features/mastra/interfaces/chat-models-response';
-import {
-  buildModelKey,
-  parseModelKey,
-} from '~/features/mastra/interfaces/model-key';
+import { buildModelKey } from '~/features/mastra/interfaces/model-key';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
@@ -19,7 +15,7 @@ import UserUISettings from '~/server/models/user-ui-settings';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
-import { getEffectiveDefaultModelKey } from '../services/ai-sdk-modules/llm-providers/effective-model-key';
+import { resolveEffectiveModelKey } from '../services/ai-sdk-modules/llm-providers/effective-model-key';
 import { getAvailableModels } from '../services/ai-sdk-modules/llm-providers/provider-availability';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:get-models');
@@ -63,24 +59,20 @@ export const getModelsFactory: GetModelsFactory = (crowi) => {
         const userUISettings = await UserUISettings.findOne({
           user: req.user._id,
         }).lean();
-        const saved = userUISettings?.aiChatSelectedModelKey;
-        const parsedSaved = saved != null ? parseModelKey(saved) : null;
-        const isSavedAvailable =
-          parsedSaved != null &&
-          isModelInAllowList(
-            parsedSaved.provider,
-            parsedSaved.modelId,
-            availableModels,
-          );
+        const saved = userUISettings?.aiChatSelectedModelKey ?? undefined;
 
-        // getEffectiveDefaultModelKey throws when the available set is empty. The
-        // ai-ready-guard (501) normally prevents that, but if the set was emptied
-        // after the guard the throw is caught below and fails soft to 500 rather
-        // than returning a response with an undefined selectedModelKey.
-        const selectedModelKey =
-          isSavedAvailable && saved != null
-            ? saved
-            : getEffectiveDefaultModelKey();
+        // Resolve through the SAME single checkpoint the chat POST uses (Req 4.6),
+        // so the initial selection and the model chat actually runs cannot drift.
+        // Reuse the set already computed above (no second availability sweep), and
+        // suppress the reject warn: a stale saved preference is an expected steady
+        // state, not untrusted per-request input worth auditing on every GET.
+        // resolveEffectiveModelKey throws on an empty set — the ai-ready-guard (501)
+        // normally preempts that, but a set emptied after the guard is caught below
+        // and fails soft to 500 rather than returning an undefined selectedModelKey.
+        const selectedModelKey = resolveEffectiveModelKey(saved, {
+          availableModels,
+          warnOnReject: false,
+        });
 
         const response: ChatModelsResponse = { models, selectedModelKey };
         return res.apiv3(response);

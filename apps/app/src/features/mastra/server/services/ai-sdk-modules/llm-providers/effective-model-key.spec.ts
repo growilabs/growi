@@ -175,4 +175,30 @@ describe('resolveEffectiveModelKey (Req 4.6)', () => {
 
     expect(() => resolveEffectiveModelKey('openai/gpt-5')).toThrow();
   });
+
+  describe('options', () => {
+    it('resolves against a passed-in available set WITHOUT computing one (get-models reuse — no sweep)', () => {
+      // The caller (get-models) already holds the available set; passing it must
+      // avoid a second availability sweep entirely.
+      expect(
+        resolveEffectiveModelKey('anthropic/claude-sonnet-5', {
+          availableModels: availableSet,
+        }),
+      ).toBe('anthropic/claude-sonnet-5');
+      expect(getAvailableModels).not.toHaveBeenCalled();
+    });
+
+    it('suppresses the reject warn when warnOnReject is false (saved-preference resolution)', () => {
+      // A stale saved preference (its provider disabled after save) is an expected
+      // steady state, so get-models resolves with warnOnReject:false — the fallback
+      // still happens, but without the per-request audit warn.
+      expect(
+        resolveEffectiveModelKey('google/gemini-2', {
+          availableModels: availableSet,
+          warnOnReject: false,
+        }),
+      ).toBe('openai/gpt-5');
+      expect(loggerWarn).not.toHaveBeenCalled();
+    });
+  });
 });

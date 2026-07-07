@@ -8,13 +8,14 @@
 //   - getAvailableModels (provider-availability): the allow-list already
 //     filtered to enabled ∧ configured providers (Req 4.1 / 6.1). Owned and
 //     tested by ai-sdk-modules; here we treat its return as the given.
-//   - getEffectiveDefaultModelKey (effective-model-key): the server-resolved
-//     fallback selection. Owned and tested by ai-sdk-modules.
 //   - the UserUISettings model: the per-user persisted selection. We stub
 //     findOne(...).lean() so no DB is touched.
-// The pure key helpers (buildModelKey / parseModelKey / isModelInAllowList) are
-// left REAL — they are the observable mapping/membership rules and mocking them
-// would test the mechanism, not the contract.
+// resolveEffectiveModelKey (effective-model-key) is left REAL: the handler
+// delegates the initial-selection rule to that SINGLE checkpoint (Req 4.6), so we
+// exercise the real integrated resolution here rather than re-asserting a mock's
+// return. Its own unit tests live in effective-model-key.spec. The pure key helpers
+// (buildModelKey / parseModelKey / isModelInAllowList) are likewise REAL — they are
+// the observable mapping/membership rules and mocking them would test the mechanism.
 // The handler under test is the last middleware in the factory array (the
 // preceding auth/validator middlewares are mocked out so the factory import is
 // side-effect-free), mirroring post-message-handler.spec.
@@ -34,13 +35,6 @@ vi.mock(
   '../services/ai-sdk-modules/llm-providers/provider-availability',
   () => ({ getAvailableModels }),
 );
-
-const { getEffectiveDefaultModelKey } = vi.hoisted(() => ({
-  getEffectiveDefaultModelKey: vi.fn(),
-}));
-vi.mock('../services/ai-sdk-modules/llm-providers/effective-model-key', () => ({
-  getEffectiveDefaultModelKey,
-}));
 
 // UserUISettings is a default export; the handler reads the user's persisted
 // selection via UserUISettings.findOne(...).lean().
@@ -122,7 +116,6 @@ beforeEach(() => {
 describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
   it('returns only available providers models, each with key/provider/modelId in allow-list order (Req 4.1, 4.2)', async () => {
     getAvailableModels.mockReturnValue(AVAILABLE_MODELS);
-    getEffectiveDefaultModelKey.mockReturnValue('anthropic/claude-3-5-sonnet');
     mockSavedSelection(undefined);
 
     const { req, res } = buildReqRes();
@@ -145,7 +138,6 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
 
   it('never leaks providerOptions on any entry (Security)', async () => {
     getAvailableModels.mockReturnValue(AVAILABLE_MODELS);
-    getEffectiveDefaultModelKey.mockReturnValue('anthropic/claude-3-5-sonnet');
     mockSavedSelection(undefined);
 
     const { req, res } = buildReqRes();
@@ -161,8 +153,8 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
 
   it('uses the persisted selection as selectedModelKey when it is in the available set (Req 4.4)', async () => {
     getAvailableModels.mockReturnValue(AVAILABLE_MODELS);
-    // A DIFFERENT default proves the saved key wins over the fallback.
-    getEffectiveDefaultModelKey.mockReturnValue('anthropic/claude-3-5-sonnet');
+    // The saved key is in the set, so it wins over the (different) effective
+    // default 'anthropic/claude-3-5-sonnet' that the set would otherwise resolve to.
     mockSavedSelection('openai/gpt-4o');
 
     const { req, res } = buildReqRes();
@@ -170,12 +162,10 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
 
     const payload = res.apiv3.mock.calls[0][0];
     expect(payload.selectedModelKey).toBe('openai/gpt-4o');
-    expect(getEffectiveDefaultModelKey).not.toHaveBeenCalled();
   });
 
   it('falls back to the effective default when there is no persisted selection (Req 4.5)', async () => {
     getAvailableModels.mockReturnValue(AVAILABLE_MODELS);
-    getEffectiveDefaultModelKey.mockReturnValue('anthropic/claude-3-5-sonnet');
     mockSavedSelection(undefined);
 
     const { req, res } = buildReqRes();
@@ -187,7 +177,6 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
 
   it('falls back to the effective default when the persisted key is unparseable (Req 4.5)', async () => {
     getAvailableModels.mockReturnValue(AVAILABLE_MODELS);
-    getEffectiveDefaultModelKey.mockReturnValue('anthropic/claude-3-5-sonnet');
     // No '/' separator / unknown provider prefix -> parseModelKey returns null.
     mockSavedSelection('garbage-without-separator');
 
@@ -200,7 +189,6 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
 
   it('falls back to the effective default when the persisted keys provider is no longer available (Req 4.5)', async () => {
     getAvailableModels.mockReturnValue(AVAILABLE_MODELS);
-    getEffectiveDefaultModelKey.mockReturnValue('anthropic/claude-3-5-sonnet');
     // Parses fine, but google is not in the available set (provider disabled),
     // so isModelInAllowList against the available set fails -> default.
     mockSavedSelection('google/gemini-1.5-pro');
@@ -214,13 +202,10 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
 
   it('responds with an error and no undefined selection when the available set is empty (guard TOCTOU)', async () => {
     // aiReadyGuard normally returns 501 before reaching here; this is the rare
-    // TOCTOU where the available set was emptied after the guard.
-    // getEffectiveDefaultModelKey throws on an empty set, which must fail soft
-    // to an error response rather than returning an undefined selectedModelKey.
+    // TOCTOU where the available set was emptied after the guard. Resolving an
+    // empty set throws (real resolveEffectiveModelKey), which must fail soft to an
+    // error response rather than returning an undefined selectedModelKey.
     getAvailableModels.mockReturnValue([]);
-    getEffectiveDefaultModelKey.mockImplementation(() => {
-      throw new Error('No available AI model to resolve');
-    });
     mockSavedSelection(undefined);
 
     const { req, res } = buildReqRes();
