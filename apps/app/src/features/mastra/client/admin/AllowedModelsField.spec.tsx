@@ -138,7 +138,6 @@ const FormHarness = ({
 
 const renderComponent = ({
   provider = 'openai',
-  disabled = false,
   allowedModels = [
     {
       provider: 'openai',
@@ -149,12 +148,11 @@ const renderComponent = ({
   ],
 }: {
   provider?: AiProvider;
-  disabled?: boolean;
   allowedModels?: AllowedModelFormValue[];
 } = {}) =>
   render(
     <FormHarness allowedModels={allowedModels}>
-      <AllowedModelsField provider={provider} disabled={disabled} />
+      <AllowedModelsField provider={provider} />
       <AllowedModelsProbe />
     </FormHarness>,
   );
@@ -692,26 +690,6 @@ describe('AllowedModelsField', () => {
     });
   });
 
-  describe('env-only mode (5.2/5.3)', () => {
-    it('disables every editing control so the locked fields cannot be focused', () => {
-      // Act
-      renderComponent({ disabled: true });
-
-      // Assert
-      expect(getModelInputs()[0]).toBeDisabled();
-      expect(screen.getByRole('radio')).toBeDisabled();
-      expect(
-        screen.getByLabelText('ai_settings.provider_options_label'),
-      ).toBeDisabled();
-      expect(
-        screen.getByRole('button', { name: 'ai_settings.add_model' }),
-      ).toBeDisabled();
-      expect(
-        screen.getByRole('button', { name: 'ai_settings.remove_model' }),
-      ).toBeDisabled();
-    });
-  });
-
   describe('provider-driven label (2.7)', () => {
     it('labels the model field "Model" for a non-Azure provider', () => {
       // Act
@@ -905,7 +883,7 @@ describe('AllowedModelsField', () => {
             },
           ]}
         >
-          <AllowedModelsField provider="openai" disabled={false} />
+          <AllowedModelsField provider="openai" />
           <AllowedModelsProbe />
         </FormHarness>,
       );
@@ -932,7 +910,7 @@ describe('AllowedModelsField', () => {
         ],
       });
 
-      // Not env-only: disabled purely because the catalog is loading.
+      // The modelId control is disabled purely because the catalog is loading.
       expect(screen.getByLabelText('ai_settings.model_label')).toBeDisabled();
     });
   });
@@ -1116,8 +1094,8 @@ describe('AllowedModelsField', () => {
       expect(getRefreshButton()).toBeEnabled();
     });
 
-    it('stays ENABLED in env-only mode — the catalog is a server-side cache, not an AI setting', () => {
-      renderComponent({ disabled: true });
+    it('is always enabled — the catalog is a server-side cache, not gated by the field', () => {
+      renderComponent();
       expect(getRefreshButton()).toBeEnabled();
     });
   });

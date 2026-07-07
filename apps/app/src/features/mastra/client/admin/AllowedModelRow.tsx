@@ -20,7 +20,6 @@ interface AllowedModelRowProps {
   readonly isDefault: boolean;
   readonly labelKey: string;
   readonly radioGroupName: string;
-  readonly disabled: boolean;
   /**
    * Render the modelId control as a select-only dropdown (`true`) when the
    * provider has a non-empty catalog, or as free-text input (`false`) otherwise.
@@ -53,7 +52,6 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
     isDefault,
     labelKey,
     radioGroupName,
-    disabled,
     useSelect,
     selectableModelIds,
     registeredModelIds,
@@ -135,7 +133,7 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
             id={modelInputId}
             type={useSelect ? 'select' : 'text'}
             className="font-monospace flex-grow-1"
-            disabled={disabled || isLoadingModels}
+            disabled={isLoadingModels}
             invalid={isDuplicate}
             {...registerToInputProps(
               register(`allowedModels.${originalIndex}.modelId`),
@@ -166,7 +164,6 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
               role="radio"
               name={radioGroupName}
               checked={isDefault}
-              disabled={disabled}
               onChange={onSelectDefault}
             />
             <Label check for={radioId} className="ms-1">
@@ -179,7 +176,6 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
             className="text-body-secondary p-1"
             aria-label={t('ai_settings.remove_model')}
             title={t('ai_settings.remove_model')}
-            disabled={disabled}
             onClick={onRemove}
           >
             <span className="material-symbols-outlined" aria-hidden="true">
@@ -224,7 +220,6 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
           rows={6}
           className="font-monospace"
           placeholder={placeholder}
-          disabled={disabled}
           invalid={isInvalidJson}
           style={{ backgroundImage: 'none' }}
           {...registerToInputProps(

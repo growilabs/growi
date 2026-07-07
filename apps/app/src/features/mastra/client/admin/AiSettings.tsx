@@ -182,10 +182,9 @@ export const AiSettings = (): JSX.Element | null => {
           isApiKeySet={data.providers[activeProvider].isApiKeySet}
           useOnlyEnvVars={useOnlyEnvVars}
         >
-          {/* Model editing stays active even under env-only (R5.3), so the
-              field is never disabled by this container; the panel leaves the
-              models slot untouched. */}
-          <AllowedModelsField provider={activeProvider} disabled={false} />
+          {/* Model editing stays active even under env-only (R5.3): the field
+              has no disable switch — the panel leaves the models slot untouched. */}
+          <AllowedModelsField provider={activeProvider} />
         </ProviderPanel>
 
         {/* Not disabled under env-only: model edits are still persistable there

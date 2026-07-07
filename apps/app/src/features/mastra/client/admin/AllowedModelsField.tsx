@@ -25,13 +25,6 @@ export interface AllowedModelsFieldProps {
    * changes — this prop is the single source for it.
    */
   readonly provider: AiProvider;
-  /**
-   * Disable every input/control when env-only mode is active (R5.2). `disabled`
-   * (not `readOnly`) so the locked fields are removed from the tab order and
-   * cannot receive focus. Model editing itself is NOT locked by env-only (R5.3);
-   * this prop is driven by the caller for reasons independent of env-only.
-   */
-  readonly disabled: boolean;
 }
 
 /**
@@ -65,7 +58,7 @@ export interface AllowedModelsFieldProps {
 export const AllowedModelsField = (
   props: AllowedModelsFieldProps,
 ): JSX.Element => {
-  const { provider, disabled } = props;
+  const { provider } = props;
   const { t } = useTranslation('admin');
   const { control, setValue, getValues } =
     useFormContext<AiSettingsFormValues>();
@@ -242,7 +235,6 @@ export const AllowedModelsField = (
           isDefault={watchedModels[originalIndex]?.isDefault === true}
           labelKey={modelLabelKey}
           radioGroupName={radioGroupName}
-          disabled={disabled}
           useSelect={useSelect}
           selectableModelIds={selectableModelIds}
           registeredModelIds={registeredModelIds}
@@ -261,7 +253,6 @@ export const AllowedModelsField = (
         outline
         className="w-100 d-flex align-items-center justify-content-center"
         style={{ borderStyle: 'dashed' }}
-        disabled={disabled}
         onClick={addRow}
       >
         <span
