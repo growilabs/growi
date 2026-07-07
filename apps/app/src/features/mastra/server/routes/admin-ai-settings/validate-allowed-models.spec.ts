@@ -156,6 +156,20 @@ describe('isValidAllowedModelsRequest (Req 2.5, 2.8, 3.3)', () => {
     ).toBe(false);
   });
 
+  it('rejects an entry with a non-boolean isDefault (a truthy string would win the runtime default)', () => {
+    // The runtime default pick uses `find(m => m.isDefault === true)`, so a truthy
+    // non-boolean such as the string "false" must be rejected here: otherwise the
+    // list below would validate (the real boolean default is the second entry, so
+    // defaultCount === 1) yet the truthy-string first entry would become the chat
+    // default, diverging from the admin UI's strict `=== true` display.
+    expect(
+      isValidAllowedModelsRequest([
+        { provider: 'openai', modelId: 'gpt-5', isDefault: 'false' },
+        { provider: 'anthropic', modelId: 'claude-4', isDefault: true },
+      ]),
+    ).toBe(false);
+  });
+
   it('rejects an entry carrying an unknown extra property (no verbatim persistence of arbitrary keys)', () => {
     expect(
       isValidAllowedModelsRequest([

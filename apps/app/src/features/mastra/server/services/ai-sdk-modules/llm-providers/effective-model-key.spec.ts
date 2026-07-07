@@ -43,6 +43,20 @@ describe('getEffectiveDefaultModelKey (Req 6.4)', () => {
     expect(getEffectiveDefaultModelKey()).toBe('anthropic/claude-sonnet-5');
   });
 
+  it('ignores a non-boolean isDefault (truthy string) and picks the real boolean default (env-bypass hardening)', () => {
+    // An env-provided allow-list bypasses the PUT validator, so a non-boolean
+    // isDefault (here the truthy string "false") can reach the runtime pick. It
+    // must NOT win over the entry whose isDefault is a real `true`, matching the
+    // admin UI's strict `=== true`. The cast injects the type-violating runtime
+    // shape the guard exists to defend against.
+    getAvailableModels.mockReturnValue([
+      { provider: 'openai', modelId: 'gpt-5', isDefault: 'false' },
+      { provider: 'anthropic', modelId: 'claude-4', isDefault: true },
+    ] as unknown as AllowedModel[]);
+
+    expect(getEffectiveDefaultModelKey()).toBe('anthropic/claude-4');
+  });
+
   it('falls back to the first available entry when the default entry is absent from the available set (deterministic — 6.4)', () => {
     // The saved default belongs to a now-unavailable provider, so provider-
     // availability already filtered it out: none of the available entries carry

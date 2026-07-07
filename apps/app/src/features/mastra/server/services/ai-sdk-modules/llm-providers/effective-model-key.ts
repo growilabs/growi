@@ -43,8 +43,13 @@ const NO_AVAILABLE_MODELS_MESSAGE =
 const pickEffectiveDefault = (
   availableModels: readonly AllowedModel[],
 ): ModelKey => {
+  // Strict `=== true` (not truthy): an env-provided allow-list bypasses the PUT
+  // validator, so a non-boolean isDefault (e.g. the string "false") could reach
+  // here — a truthy `find` would then pick it, diverging from the admin UI's strict
+  // check. Match the UI so the runtime default and the displayed default agree.
   const defaultModel =
-    availableModels.find((model) => model.isDefault) ?? availableModels[0];
+    availableModels.find((model) => model.isDefault === true) ??
+    availableModels[0];
 
   if (defaultModel == null) {
     throw new Error(NO_AVAILABLE_MODELS_MESSAGE);

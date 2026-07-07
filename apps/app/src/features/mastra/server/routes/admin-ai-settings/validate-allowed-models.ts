@@ -88,6 +88,15 @@ export const isValidNonEmptyAllowedModels = (
       return false;
     }
 
+    // isDefault, when present, must be a REAL boolean. The runtime default pick
+    // (`pickEffectiveDefault`) uses a truthy `find`, so a truthy non-boolean (e.g.
+    // the string "false") would win the default at chat time while the admin UI
+    // (strict `=== true`) shows a different entry as default — a silent divergence.
+    // The GROWI form always sends a boolean; this rejects a direct-API payload.
+    if (entry.isDefault != null && typeof entry.isDefault !== 'boolean') {
+      return false;
+    }
+
     if (entry.isDefault === true) {
       defaultCount += 1;
     }
