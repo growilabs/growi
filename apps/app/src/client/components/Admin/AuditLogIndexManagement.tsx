@@ -1,8 +1,9 @@
-import React, { type JSX, useCallback, useState } from 'react';
+import { type JSX, useCallback, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
 import { SocketEventName } from '~/interfaces/websocket';
+import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
 import { auditLogEnabledAtom } from '~/states/server-configurations';
 
 import NormalizeIndicesControls from './ElasticsearchManagement/NormalizeIndicesControls';
@@ -18,6 +19,10 @@ export const AuditLogIndexManagement = (): JSX.Element => {
   const { t } = useTranslation('admin');
   const auditLogEnabled = useAtomValue(auditLogEnabledAtom);
   const [hasUnsyncedEvents, setHasUnsyncedEvents] = useState(false);
+
+  const growiCloudUri = useGrowiCloudUri();
+  const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
+  const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
 
   const onStatusSuccess = useCallback((data: IndexManagementStatusResponse) => {
     setHasUnsyncedEvents(data.auditlogHasUnsyncedEvents);
@@ -60,11 +65,28 @@ export const AuditLogIndexManagement = (): JSX.Element => {
       <div
         className="alert alert-secondary mb-0"
         data-testid="admin-audit-log-index-disabled"
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
-        dangerouslySetInnerHTML={{
-          __html: t('audit_log_management.disable_mode_explanation'),
-        }}
-      />
+      >
+        <p
+          className="mb-0"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
+          dangerouslySetInnerHTML={{
+            __html: t(
+              isCloud
+                ? 'audit_log_management.disable_mode_explanation_cloud'
+                : 'audit_log_management.disable_mode_explanation',
+            ),
+          }}
+        />
+        {isCloud && (
+          <a
+            href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
+            className="btn btn-outline-secondary mt-2"
+          >
+            <span className="material-symbols-outlined me-1">share</span>
+            {t('cloud_setting_management.to_cloud_settings')}
+          </a>
+        )}
+      </div>
     );
   }
 

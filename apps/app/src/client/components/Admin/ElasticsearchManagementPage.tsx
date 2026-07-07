@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import { type JSX, useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { AuditLogIndexManagement } from './AuditLogIndexManagement';
@@ -6,6 +6,15 @@ import ElasticsearchManagement from './ElasticsearchManagement/ElasticsearchMana
 
 export const ElasticsearchManagementPage = (): JSX.Element => {
   const { t } = useTranslation('admin');
+
+  // This page is loaded via next/dynamic({ ssr: false }), so it mounts after
+  // Next.js's own one-shot, non-retrying hash-scroll already ran and found no
+  // matching element. Scroll to the URL hash ourselves once we're in the DOM.
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (hash === '') return;
+    document.getElementById(hash)?.scrollIntoView();
+  }, []);
 
   return (
     <div data-testid="admin-elasticsearch-management">

@@ -13,6 +13,15 @@ vi.mock('jotai', async (importOriginal) => {
   return { ...actual, useAtomValue: mockUseAtomValue };
 });
 
+const mockUseGrowiCloudUri = vi.hoisted(() => vi.fn().mockReturnValue(null));
+const mockUseGrowiAppIdForGrowiCloud = vi.hoisted(() =>
+  vi.fn().mockReturnValue(null),
+);
+vi.mock('~/states/global', () => ({
+  useGrowiCloudUri: mockUseGrowiCloudUri,
+  useGrowiAppIdForGrowiCloud: mockUseGrowiAppIdForGrowiCloud,
+}));
+
 const mockUseIndexManagement = vi.hoisted(() => vi.fn());
 vi.mock('./hooks/useIndexManagement', () => ({
   useIndexManagement: mockUseIndexManagement,
@@ -61,6 +70,8 @@ describe('AuditLogIndexManagement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseAtomValue.mockReturnValue(true);
+    mockUseGrowiCloudUri.mockReturnValue(null);
+    mockUseGrowiAppIdForGrowiCloud.mockReturnValue(null);
     capturedOnStatusSuccess = undefined;
     mockUseIndexManagement.mockImplementation(
       ({
@@ -81,6 +92,37 @@ describe('AuditLogIndexManagement', () => {
       screen.getByTestId('admin-audit-log-index-disabled'),
     ).toBeInTheDocument();
     expect(screen.queryByTestId('status-table')).not.toBeInTheDocument();
+  });
+
+  it('shows the self-hosted explanation, not the cloud one, when not on GROWI.cloud', () => {
+    mockUseAtomValue.mockReturnValue(false);
+    render(<AuditLogIndexManagement />);
+
+    expect(
+      screen.getByText('audit_log_management.disable_mode_explanation'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('audit_log_management.disable_mode_explanation_cloud'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the cloud explanation and a link to cloud settings on GROWI.cloud', () => {
+    mockUseAtomValue.mockReturnValue(false);
+    mockUseGrowiCloudUri.mockReturnValue('https://growi.cloud');
+    mockUseGrowiAppIdForGrowiCloud.mockReturnValue('app-id');
+    render(<AuditLogIndexManagement />);
+
+    expect(
+      screen.getByText('audit_log_management.disable_mode_explanation_cloud'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('audit_log_management.disable_mode_explanation'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', {
+        name: /cloud_setting_management\.to_cloud_settings/,
+      }),
+    ).toHaveAttribute('href', 'https://growi.cloud/my/apps/app-id');
   });
 
   it('tells useIndexManagement it is disabled, so it skips the status fetch', () => {
