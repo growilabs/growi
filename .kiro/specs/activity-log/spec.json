@@ -1,12 +1,12 @@
 {
   "feature_name": "activity-log",
   "created_at": "2026-07-07T09:58:07Z",
-  "updated_at": "2026-07-07T09:58:07Z",
+  "updated_at": "2026-07-07T10:21:53Z",
   "language": "ja",
-  "phase": "initialized",
+  "phase": "requirements-generated",
   "approvals": {
     "requirements": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "design": {
