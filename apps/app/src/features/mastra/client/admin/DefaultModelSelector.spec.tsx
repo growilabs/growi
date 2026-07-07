@@ -84,14 +84,12 @@ const FormHarness = ({
 
 const renderComponent = ({
   allowedModels,
-  disabled = false,
 }: {
   allowedModels: AllowedModelFormValue[];
-  disabled?: boolean;
 }) =>
   render(
     <FormHarness allowedModels={allowedModels}>
-      <DefaultModelSelector disabled={disabled} />
+      <DefaultModelSelector />
       <DefaultFlagsProbe />
     </FormHarness>,
   );

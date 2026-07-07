@@ -22,17 +22,6 @@ import { setDefaultAllowedModelAt } from './ai-settings-form-values';
 // `dp.name + ' · ' + s.def.name`). U+00B7 MIDDLE DOT.
 const TRIGGER_SEPARATOR = ' · ';
 
-export interface DefaultModelSelectorProps {
-  /**
-   * Accepted only for parity with the sibling settings sections. The global
-   * default is part of the allowed-models set, which stays editable even in
-   * env-only mode (R5.3) — so this defaults to `false` and env-only MUST NOT pass
-   * `true`. It exists solely to let a future caller lock the control if a new,
-   * non-env-only reason arises.
-   */
-  readonly disabled?: boolean;
-}
-
 /** An allowed-model row paired with its position in the flat `allowedModels` array. */
 interface IndexedModel {
   readonly model: AllowedModelFormValue;
@@ -62,10 +51,7 @@ interface ProviderGroup {
  * identical single-default rewrite used by the per-row "★" control in
  * `AllowedModelsField`, keeping the invariant consistent across both call sites.
  */
-export const DefaultModelSelector = (
-  props: DefaultModelSelectorProps,
-): JSX.Element => {
-  const { disabled = false } = props;
+export const DefaultModelSelector = (): JSX.Element => {
   const { t } = useTranslation('admin');
   const { control, setValue, getValues } =
     useFormContext<AiSettingsFormValues>();
@@ -136,7 +122,6 @@ export const DefaultModelSelector = (
           caret
           outline
           color="secondary"
-          disabled={disabled}
           data-testid="default-model-toggle"
         >
           {triggerLabel}
