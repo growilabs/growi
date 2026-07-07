@@ -37,6 +37,9 @@ const { getConfig, updateConfigs } = vi.hoisted(() => ({
   getConfig: vi.fn(),
   updateConfigs: vi.fn(),
 }));
+// The logger boundary: the failure path must log the situation WITHOUT the apiKey
+// (Req 1.9), so we capture every logger.error argument and assert no secret leaks.
+const { loggerError } = vi.hoisted(() => ({ loggerError: vi.fn() }));
 const { clearResolvedMastraModelCache } = vi.hoisted(() => ({
   clearResolvedMastraModelCache: vi.fn(),
 }));
@@ -46,6 +49,15 @@ const { clearAvailabilityLogDedup } = vi.hoisted(() => ({
 
 vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig, updateConfigs },
+}));
+
+vi.mock('~/utils/logger', () => ({
+  default: () => ({
+    warn: vi.fn(),
+    info: vi.fn(),
+    error: loggerError,
+    debug: vi.fn(),
+  }),
 }));
 
 vi.mock(
@@ -493,12 +505,19 @@ describe('putAiSettings (multi-provider)', () => {
       const apiv3Err = vi.mocked(res.apiv3Err);
       expect(apiv3Err).toHaveBeenCalledTimes(1);
       expect(res.apiv3).not.toHaveBeenCalled();
-      const errArg = apiv3Err.mock.calls[0][0];
-      const message =
-        typeof errArg === 'string'
-          ? errArg
-          : String((errArg as { message?: unknown })?.message ?? '');
-      expect(message).not.toContain('sk-leak-me-not');
+      // Sweep the WHOLE error response (every argument, serialized), not just
+      // `.message`, so the key cannot hide in a non-message field of the ErrorV3.
+      const serializedErrResponse = JSON.stringify(apiv3Err.mock.calls[0]);
+      expect(serializedErrResponse).not.toContain('sk-leak-me-not');
+      // The catch-path log must never carry the key either (Req 1.9). Assert the
+      // handler logged the failure (so the assertion is real) and sweep every arg.
+      expect(loggerError).toHaveBeenCalled();
+      const serializedLogs = JSON.stringify(
+        loggerError.mock.calls.map((call) =>
+          call.map((arg) => (arg instanceof Error ? arg.message : arg)),
+        ),
+      );
+      expect(serializedLogs).not.toContain('sk-leak-me-not');
       // No side effects on failure.
       expect(emit).not.toHaveBeenCalled();
       expect(clearResolvedMastraModelCache).not.toHaveBeenCalled();

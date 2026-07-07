@@ -143,6 +143,17 @@ describe('ProviderPanel', () => {
   });
 
   describe('API key input (1.8)', () => {
+    it('is a password-masked input so a typed key is never shown in cleartext (1.9)', () => {
+      // Act
+      renderComponent({ provider: 'openai', isApiKeySet: false });
+
+      // Assert: masking the field prevents shoulder-surfing / screen-share capture
+      // of a key as it is typed. Guards against a regression to type="text".
+      expect(
+        screen.getByLabelText('ai_settings.api_key_label'),
+      ).toHaveAttribute('type', 'password');
+    });
+
     it('shows the "(configured)" placeholder when a key is already stored, without exposing any value', () => {
       // Act
       renderComponent({ provider: 'openai', isApiKeySet: true });
