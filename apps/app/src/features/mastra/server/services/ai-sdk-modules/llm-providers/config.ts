@@ -9,7 +9,6 @@ import type { AzureOpenaiConfig } from '~/features/mastra/interfaces/azure-opena
 import type {
   AiProviderApiKeys,
   AiProviderSettings,
-  AiProvidersConfig,
 } from '~/features/mastra/interfaces/provider-settings';
 import { isRecord } from '~/features/mastra/utils/is-record';
 import { configManager } from '~/server/service/config-manager';
@@ -144,8 +143,13 @@ const reportEnvShadowingIfNeeded = (key: AiValueConfigKey): void => {
   }
 };
 
-// Read ai:providers, guarding against a malformed (non-object) value.
-const readProvidersConfig = (): AiProvidersConfig | undefined => {
+// Read ai:providers, guarding against a malformed (non-object) value. Returns a
+// plain record (NOT AiProvidersConfig): the isRecord guard proves it is an object
+// but does NOT prove the per-provider entry shapes, so asserting AiProvidersConfig
+// would claim types that were never validated. The single consumer
+// (getProviderSettings) indexes by provider and normalizes each entry from
+// `unknown` via normalizeProviderSettings, so no assertion is needed.
+const readProvidersConfig = (): Record<string, unknown> | undefined => {
   reportEnvShadowingIfNeeded('ai:providers');
   const value: unknown = configManager.getConfig('ai:providers');
   if (value == null) {
@@ -158,9 +162,7 @@ const readProvidersConfig = (): AiProvidersConfig | undefined => {
     );
     return undefined;
   }
-  // Guarded to a plain object. Per-provider entry shapes are normalized on read by
-  // getProviderSettings (via normalizeProviderSettings), not here.
-  return value as AiProvidersConfig;
+  return value;
 };
 
 // Read ai:providerApiKeys, guarding against a malformed (non-object) value. The
@@ -182,7 +184,18 @@ export const readProviderApiKeys = (): AiProviderApiKeys | undefined => {
     );
     return undefined;
   }
-  return value as AiProviderApiKeys;
+  // Build the typed record from validated entries instead of asserting: keep only
+  // supported-provider keys whose value is a string (the per-value shape guard,
+  // mirroring the object-level isRecord guard). A non-provider key or non-string
+  // value reads as unset — which also stops such junk from being carried forward
+  // into the DB by the PUT merge. getApiKey still trims/blank-checks each value.
+  const keys: AiProviderApiKeys = {};
+  for (const [provider, apiKey] of Object.entries(value)) {
+    if (isAiProvider(provider) && typeof apiKey === 'string') {
+      keys[provider] = apiKey;
+    }
+  }
+  return keys;
 };
 
 /**
