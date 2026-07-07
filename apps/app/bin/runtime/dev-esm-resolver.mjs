@@ -13,7 +13,7 @@
  *
  * Registered synchronously via `module.registerHooks` (no worker-thread round
  * trip). Used by the dev / migrate / repl scripts:
- *   node --import ./bin/dev-esm-resolver.mjs <entry>.ts
+ *   node --import ./bin/runtime/dev-esm-resolver.mjs <entry>.ts
  *
  * Resolution rules (mirrors tsconfig.json `paths` + NodeNext `.js` specifiers):
  *   ~/x        -> <app>/src/x      (.ts/.tsx/.js/index.ts/...)
@@ -38,7 +38,7 @@ import { dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const APP_ROOT = resolvePath(HERE, '..');
+const APP_ROOT = resolvePath(HERE, '..', '..');
 const SRC = resolvePath(APP_ROOT, 'src');
 
 // Candidate extensions, in resolution order (TS sources first).
