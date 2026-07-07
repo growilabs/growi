@@ -1,4 +1,4 @@
-import { SCOPE } from '@growi/core/dist/interfaces';
+import { isNonBlankString, SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { RequestHandler } from 'express';
 import { body, type ValidationChain } from 'express-validator';
@@ -287,11 +287,11 @@ const collectRequestApiKeys = (
   for (const provider of AI_PROVIDERS) {
     const apiKey = providers[provider].apiKey;
     // Treat a blank / whitespace-only value as "not provided" (the merge exception:
-    // keep the stored key), matching the read-side blankness rule in getApiKey.
-    // Persist the TRIMMED value so a key pasted with surrounding whitespace is not
-    // stored verbatim (which would read back as configured yet fail at the provider
-    // with a 401 / invalid-header error). The read side also trims defensively.
-    if (apiKey != null && apiKey.trim() !== '') {
+    // keep the stored key), via the shared `isNonBlankString` (the one blank rule,
+    // matching the read side). Persist the TRIMMED value so a key pasted with
+    // surrounding whitespace is not stored verbatim (which would read back as
+    // configured yet fail at the provider with a 401 / invalid-header error).
+    if (isNonBlankString(apiKey)) {
       keys[provider] = apiKey.trim();
     }
   }

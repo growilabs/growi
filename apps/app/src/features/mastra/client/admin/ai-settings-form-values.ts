@@ -1,3 +1,5 @@
+import { isNonBlankString } from '@growi/core/dist/interfaces';
+
 import { type AiProvider, mapProviders } from '../../interfaces/ai-provider';
 import type {
   AiProviderUpdateRequest,
@@ -169,7 +171,8 @@ export const findFirstInvalidProviderOptionsIndex = (
  * Map a single provider slot to its `AiProviderUpdateRequest` section.
  *
  * `enabled` is always sent (full-state replace). `apiKey` is the merge exception:
- * included ONLY when non-empty, so a blank field keeps the stored key (R1.4).
+ * included ONLY when non-blank (shared `isNonBlankString`), so a blank/whitespace-only
+ * field keeps the stored key (R1.4) and never sends a value the server would drop.
  * `azureOpenaiSettings` is attached only to the 'azure-openai' slot.
  */
 const toProviderUpdate = (
@@ -177,7 +180,7 @@ const toProviderUpdate = (
   fv: ProviderFormValue,
 ): AiProviderUpdateRequest => ({
   enabled: fv.enabled,
-  ...(fv.apiKey !== '' ? { apiKey: fv.apiKey } : {}),
+  ...(isNonBlankString(fv.apiKey) ? { apiKey: fv.apiKey } : {}),
   ...(provider === 'azure-openai'
     ? { azureOpenaiSettings: fv.azureOpenaiSettings }
     : {}),
@@ -270,8 +273,8 @@ export const setDefaultAllowedModelAt = (
  * — so the admin UI's status dot (ProviderTabs) and inline misconfiguration warning
  * (ProviderPanel) cannot drift from what the server would exclude. `hasApiKey` is
  * the saved-key flag (from the GET response, reflecting the merged DB??env view) OR
- * a non-empty typed key in the form; this saved-OR-typed composition is the subtle
- * part, so it lives in ONE place shared by both call sites.
+ * a non-blank typed key in the form (shared `isNonBlankString`); this saved-OR-typed
+ * composition is the subtle part, so it lives in ONE place shared by both call sites.
  */
 export const evaluateFormProviderAvailability = (
   provider: AiProvider,
@@ -281,6 +284,6 @@ export const evaluateFormProviderAvailability = (
   evaluateProviderAvailability({
     provider,
     enabled: formValue?.enabled === true,
-    hasApiKey: isApiKeySet || (formValue?.apiKey ?? '').trim() !== '',
+    hasApiKey: isApiKeySet || isNonBlankString(formValue?.apiKey),
     azureOpenaiSettings: formValue?.azureOpenaiSettings,
   });

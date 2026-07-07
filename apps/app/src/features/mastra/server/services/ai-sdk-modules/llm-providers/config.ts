@@ -1,4 +1,4 @@
-import { ConfigSource } from '@growi/core/dist/interfaces';
+import { ConfigSource, isNonBlankString } from '@growi/core/dist/interfaces';
 
 import {
   type AiProvider,
@@ -48,9 +48,12 @@ type AiValueConfigKey =
 // surrounding whitespace would otherwise read back as "configured" yet be injected
 // verbatim into a provider Authorization header / base URL, causing a silent 401 or
 // an "invalid header value" throw. Trimming at this single read boundary normalizes
-// every source (DB and env) for every consumer (getApiKey + azure settings).
+// every source (DB and env) for every consumer (getApiKey + azure settings). The
+// blank check delegates to the shared `isNonBlankString` (the one blank rule).
 const asNonBlankString = (value: unknown): string | undefined =>
-  typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
+  typeof value === 'string' && isNonBlankString(value)
+    ? value.trim()
+    : undefined;
 
 // Coerce a config field declared `boolean` to a boolean, or undefined. A non-boolean
 // runtime value (e.g. the string "true" from a hand-edited env var) reads as unset;

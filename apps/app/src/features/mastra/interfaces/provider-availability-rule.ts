@@ -1,3 +1,5 @@
+import { isNonBlankString } from '@growi/core/dist/interfaces';
+
 import type { AiProvider } from './ai-provider';
 import type { AzureOpenaiConfig } from './azure-openai-config';
 
@@ -46,8 +48,9 @@ export interface ProviderAvailabilityInput {
 
 // A blank ('' / whitespace / undefined) value counts as "not set". The server reads
 // config values (undefined when unset) and the client reads controlled form fields
-// (which default to ''), so both must treat a blank string the same as absent.
-const isNonBlank = (value?: string): boolean => (value ?? '').trim() !== '';
+// (which default to ''), so both must treat a blank string the same as absent. Uses
+// the shared `isNonBlankString` (the one blank rule) — see also asNonBlankString /
+// collectRequestApiKeys / evaluateFormProviderAvailability.
 
 /**
  * Pure availability rule shared by the server (provider-availability.ts, which
@@ -71,8 +74,8 @@ export const evaluateProviderAvailability = (
 
   if (provider === 'azure-openai') {
     const hasEndpoint =
-      isNonBlank(azureOpenaiSettings?.resourceName) ||
-      isNonBlank(azureOpenaiSettings?.baseURL);
+      isNonBlankString(azureOpenaiSettings?.resourceName) ||
+      isNonBlankString(azureOpenaiSettings?.baseURL);
     if (!hasEndpoint) {
       return { available: false, reason: 'missing-azure-endpoint' };
     }
