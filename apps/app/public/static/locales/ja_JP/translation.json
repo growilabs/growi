@@ -376,6 +376,27 @@
     },
     "exclude_tag": {
       "desc": "{{tag}} というタグを含むページを除外"
+    },
+    "author": {
+      "desc": "{{author}} が作成したページを検索"
+    },
+    "exclude_author": {
+      "desc": "{{author}} が作成したページを除外"
+    },
+    "editor": {
+      "desc": "{{editor}} が最後に編集したページを検索"
+    },
+    "exclude_editor": {
+      "desc": "{{editor}} が編集したページを除外"
+    },
+    "group": {
+      "desc": "{{group}} グループに許可されたページを検索"
+    },
+    "exclude_group": {
+      "desc": "{{group}} グループに許可されたページを除外"
+    },
+    "quoted_value": {
+      "desc": "フィルターの値にスペースが含まれる場合はダブルクォートで囲む（例: グループ名やページパス）"
     }
   },
   "search": {
