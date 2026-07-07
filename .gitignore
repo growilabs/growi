@@ -58,6 +58,3 @@ out
 *.heapsnapshot
 /tmp/memory-profiler/
 /tmp/memory-leak-investigation/
-
-# Local PR review note (not tracked; kept locally for reference)
-/.kiro/specs/mastra-multi-provider/review-pr11394.md
