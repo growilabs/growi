@@ -304,6 +304,8 @@
   },
   "audit_log_index_management": {
     "audit_log_index_management": "Audit Log Index Management",
+    "settings_explanation": "Normalize or rebuild the audit log's index on the following page",
+    "index_management_link": "Go to Elasticsearch management",
     "normalize": "Normalize",
     "normalize_button": "Normalize audit log index",
     "normalize_success": "Audit log index normalized successfully.",

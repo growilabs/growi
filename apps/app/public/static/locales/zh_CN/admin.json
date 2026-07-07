@@ -888,6 +888,8 @@
   },
   "audit_log_index_management": {
     "audit_log_index_management": "审计日志索引管理",
+    "settings_explanation": "审计日志索引的规范化与重建可在以下页面进行",
+    "index_management_link": "前往 Elasticsearch管理",
     "normalize": "规范化",
     "normalize_button": "规范化审计日志索引",
     "normalize_success": "审计日志索引规范化成功。",
