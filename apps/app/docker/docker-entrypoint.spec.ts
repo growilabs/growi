@@ -9,7 +9,6 @@ import {
   detectHeapSize,
   readCgroupLimit,
   setupDirectories,
-  setupPrismaEngines,
 } from './docker-entrypoint';
 
 describe('chownRecursive', () => {
@@ -355,68 +354,5 @@ describe('setupDirectories', () => {
 
     chownSyncSpy.mockRestore();
     lchownSyncSpy.mockRestore();
-  });
-});
-
-describe('setupPrismaEngines', () => {
-  let tmpDir: string;
-  let srcDir: string;
-  let searchDir: string;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'entrypoint-prisma-'));
-    srcDir = path.join(tmpDir, 'dist', 'generated', 'prisma');
-    searchDir = path.join(tmpDir, 'prisma-engines');
-  });
-
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  it('should copy every engine binary into the search dir and skip non-engine files', () => {
-    fs.mkdirSync(srcDir, { recursive: true });
-    const engineA = 'libquery_engine-debian-openssl-3.0.x.so.node';
-    const engineB = 'libquery_engine-linux-arm64-openssl-3.0.x.so.node';
-    fs.writeFileSync(path.join(srcDir, engineA), 'engine-a');
-    fs.writeFileSync(path.join(srcDir, engineB), 'engine-b');
-    fs.writeFileSync(path.join(srcDir, 'client.js'), 'not an engine');
-
-    setupPrismaEngines(srcDir, searchDir);
-
-    expect(fs.readFileSync(path.join(searchDir, engineA), 'utf-8')).toBe(
-      'engine-a',
-    );
-    expect(fs.readFileSync(path.join(searchDir, engineB), 'utf-8')).toBe(
-      'engine-b',
-    );
-    // Non-engine files must not be copied.
-    expect(fs.existsSync(path.join(searchDir, 'client.js'))).toBe(false);
-  });
-
-  it('should make copied engines world-readable (dlopen after privilege drop)', () => {
-    fs.mkdirSync(srcDir, { recursive: true });
-    const engine = 'libquery_engine-debian-openssl-3.0.x.so.node';
-    fs.writeFileSync(path.join(srcDir, engine), 'engine');
-
-    setupPrismaEngines(srcDir, searchDir);
-
-    const mode = fs.statSync(path.join(searchDir, engine)).mode & 0o777;
-    // Others must have the read bit set.
-    expect(mode & 0o004).toBe(0o004);
-  });
-
-  it('should be a no-op when the source directory is absent', () => {
-    // srcDir intentionally not created
-    expect(() => setupPrismaEngines(srcDir, searchDir)).not.toThrow();
-    expect(fs.existsSync(searchDir)).toBe(false);
-  });
-
-  it('should be a no-op when the source has no engine binaries', () => {
-    fs.mkdirSync(srcDir, { recursive: true });
-    fs.writeFileSync(path.join(srcDir, 'client.js'), 'not an engine');
-
-    setupPrismaEngines(srcDir, searchDir);
-
-    expect(fs.existsSync(searchDir)).toBe(false);
   });
 });

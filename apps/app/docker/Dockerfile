@@ -82,6 +82,18 @@ RUN turbo run build --filter @growi/app
 # Produce artifacts
 RUN bash apps/app/bin/assemble-prod.sh
 
+# Point a fixed-name symlink at the Prisma query engine for THIS build's architecture.
+# The release stage references it via a static PRISMA_QUERY_ENGINE_LIBRARY, which
+# @prisma/client honors *before* its internal engine search — the Turbopack-bundled
+# SSR client cannot satisfy that search at runtime (its __dirname / baked output paths
+# are rewritten). CI builds amd64/arm64 natively in separate jobs, so
+# `dpkg --print-architecture` yields the correct target here.
+# NOTE: keep this arch->target mapping in sync with apps/app/prisma/schema.prisma
+# `binaryTargets` and the runtime base image libc (dhi.io/node:24-debian13 = glibc).
+RUN target=$(dpkg --print-architecture | sed 's/amd64/debian-openssl-3.0.x/;s/arm64/linux-arm64-openssl-3.0.x/') \
+ && ln -sf "libquery_engine-${target}.so.node" \
+      apps/app/dist/generated/prisma/libquery_engine-active.so.node
+
 # Stage artifacts into a clean directory for COPY --from
 RUN mkdir -p /tmp/release/apps/app && \
   cp package.json /tmp/release/ && \
@@ -103,6 +115,12 @@ ARG OPT_DIR
 
 ENV NODE_ENV="production"
 ENV appDir="$OPT_DIR/growi"
+
+# Resolve the Prisma query engine via this public, stable env var. @prisma/client
+# returns it directly, before (and instead of) its internal engine search — which the
+# Turbopack-bundled SSR client cannot satisfy at runtime. Points at the per-arch
+# `libquery_engine-active.so.node` symlink staged in the builder stage.
+ENV PRISMA_QUERY_ENGINE_LIBRARY="${appDir}/apps/app/dist/generated/prisma/libquery_engine-active.so.node"
 
 # Copy artifacts from builder (no shell required)
 WORKDIR ${appDir}
