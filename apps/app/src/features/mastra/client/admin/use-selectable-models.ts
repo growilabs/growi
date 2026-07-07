@@ -5,8 +5,9 @@ import useSWRImmutable from 'swr/immutable';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
 
-// Type-only import: the client must not pull the server-only provider module at
-// runtime (it is a plain type union here).
+// Type-only import: this hook needs only the AiProvider type, not the value set.
+// (ai-provider is a client-safe, dependency-free module; other client files import
+// its values freely — this one simply has no runtime use for them.)
 import type { AiProvider } from '../../interfaces/ai-provider';
 import type { SelectableModelsResponse } from '../../interfaces/selectable-models-response';
 

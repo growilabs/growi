@@ -1,5 +1,9 @@
-// Server-only module: the single source of truth for the supported LLM provider
-// set and its per-provider metadata. Do NOT add client imports here.
+// Client-safe, dependency-free module: the single source of truth for the
+// supported LLM provider set and its per-provider metadata. It has NO imports and
+// is imported (as VALUES — AI_PROVIDERS / mapProviders / isAiProvider) from both the
+// Express server and the Next.js client bundle (e.g. AiSettings, ChatSidebar,
+// DefaultModelSelector, ProviderTabs). Keep it dependency-free so it stays importable
+// from both: do NOT add server-only imports (config, logger, etc.) here.
 
 /**
  * Per-provider metadata.
