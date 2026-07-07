@@ -197,7 +197,9 @@ export const updateAiSettingsValidators: ValidationChain[] = [
     .optional()
     .custom((value: unknown) => isValidProvidersRequest(value))
     .withMessage(
-      'providers must be an object with an entry for every supported provider (openai, anthropic, google, azure-openai); each entry may set enabled (boolean), apiKey (string), and azureOpenaiSettings (object)',
+      // Provider list derived from AI_PROVIDERS (the single source) so the message
+      // stays accurate if the supported set changes, rather than hard-coding it.
+      `providers must be an object with an entry for every supported provider (${AI_PROVIDERS.join(', ')}); each entry may set enabled (boolean), apiKey (string), and azureOpenaiSettings (object)`,
     ),
   // allowedModels is validated as a WHOLE array (per-entry + cross-field invariants
   // cannot be expressed by per-field chains). An EMPTY array is accepted (the clear
