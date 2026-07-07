@@ -361,6 +361,15 @@ module.exports = (crowi) => {
           503,
         );
       }
+      if (!searchService.isReachable) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'SearchService is not reachable',
+            'search-service-unreachable',
+          ),
+          503,
+        );
+      }
 
       try {
         const [info, auditlogHasUnsyncedEvents] = await Promise.all([
@@ -463,9 +472,8 @@ module.exports = (crowi) => {
               .status(200)
               .send({ message: 'Operation is successfully processed.' });
           case 'rebuild':
-            // NOT wait the processing is terminated. Completion (including clearing
-            // the unsynced flag and emitting FinishAddAuditlog) is handled entirely
-            // inside rebuildAuditlogIndex, matching the page-side rebuildIndex flow.
+            // NOT wait the processing is terminated; rebuildAuditlogIndex
+            // handles completion (unsynced flag, FinishAddAuditlog) itself.
             searchService
               .rebuildAuditlogIndex({ shouldEmitProgress: true })
               .catch((err) => {
