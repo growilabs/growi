@@ -37,6 +37,12 @@ const { getConfig, updateConfigs } = vi.hoisted(() => ({
   getConfig: vi.fn(),
   updateConfigs: vi.fn(),
 }));
+// The apiKey merge reads the CURRENT keys through the SHAPE-GUARDED accessor
+// (readProviderApiKeys), NOT raw getConfig — so a malformed config reads as unset
+// instead of being spread into junk. Mock it here to drive the merge base.
+const { readProviderApiKeys } = vi.hoisted(() => ({
+  readProviderApiKeys: vi.fn(),
+}));
 // The logger boundary: the failure path must log the situation WITHOUT the apiKey
 // (Req 1.9), so we capture every logger.error argument and assert no secret leaks.
 const { loggerError } = vi.hoisted(() => ({ loggerError: vi.fn() }));
@@ -49,6 +55,10 @@ const { clearAvailabilityLogDedup } = vi.hoisted(() => ({
 
 vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig, updateConfigs },
+}));
+
+vi.mock('../../services/ai-sdk-modules/llm-providers/config', () => ({
+  readProviderApiKeys,
 }));
 
 vi.mock('~/utils/logger', () => ({
@@ -134,11 +144,13 @@ const invoke = async (
 ) => {
   getConfig.mockImplementation((key: string) => {
     if (key === 'env:useOnlyEnvVars:ai') return useOnlyEnvVars;
-    // The CURRENT merged (DB ?? env) view of the per-provider keys — the source
-    // of truth for the apiKey merge, read at save time.
-    if (key === 'ai:providerApiKeys') return currentApiKeys;
     return undefined;
   });
+  // The CURRENT merged (DB ?? env) view of the per-provider keys — the source of
+  // truth for the apiKey merge, read at save time through the shape-guarded accessor.
+  // undefined models "no usable stored keys" (unset OR a malformed value the guard
+  // rejected), which buildUpdates treats as {}.
+  readProviderApiKeys.mockReturnValue(currentApiKeys ?? undefined);
 
   const req = mock<CrowiRequest>();
   // express-validator + apiV3FormValidator run as middleware before this handler,
@@ -371,6 +383,23 @@ describe('putAiSettings (multi-provider)', () => {
         anthropic: 'env-anthropic',
         google: 'sk-google',
       });
+    });
+
+    it('merges over the SHAPE-GUARDED view, not raw getConfig, so a malformed stored value cannot become junk', async () => {
+      // readProviderApiKeys returns undefined for a malformed but valid-JSON config
+      // (e.g. an array/string from a hand-edited AI_PROVIDER_API_KEYS). The merge
+      // must then be over {}, writing ONLY the request key — never index-keyed junk
+      // (e.g. { '0': 's', '1': 'k', ..., openai: '...' }) from spreading a raw value.
+      readProviderApiKeys.mockReturnValue(undefined);
+
+      await invoke({
+        providers: providersRequest({ openai: { apiKey: 'sk-openai' } }),
+      });
+
+      expect(updates()['ai:providerApiKeys']).toEqual({ openai: 'sk-openai' });
+      // The guarded accessor is the read path; raw getConfig is never used for keys.
+      expect(readProviderApiKeys).toHaveBeenCalled();
+      expect(getConfig).not.toHaveBeenCalledWith('ai:providerApiKeys');
     });
 
     it('preserves an unrelated providers stored key when only one provider key is updated (independent update, Req 1.3)', async () => {

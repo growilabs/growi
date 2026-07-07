@@ -294,6 +294,17 @@ describe('getApiKey', () => {
     expect(warned).toContain('ai:providerApiKeys');
     expect(warned).not.toContain('sk-leaked-string-not-an-object');
   });
+
+  it('treats an ARRAY ai:providerApiKeys as unset (guards the index-keyed-junk merge path)', () => {
+    // A hand-edited AI_PROVIDER_API_KEYS='["sk-a"]' is valid JSON but the wrong
+    // shape; isRecord rejects arrays, so every key reads as unset. This is what
+    // keeps the PUT merge from spreading the array into { '0': 'sk-a', ... }.
+    configureConfig({ env: { 'ai:providerApiKeys': ['sk-a', 'sk-b'] } });
+
+    expect(getApiKey('openai')).toBeUndefined();
+    expect(loggerWarn).toHaveBeenCalledTimes(1);
+    expect(loggerWarn.mock.calls[0].join(' ')).not.toContain('sk-a');
+  });
 });
 
 describe('requireApiKey', () => {

@@ -164,7 +164,11 @@ const readProvidersConfig = (): AiProvidersConfig | undefined => {
 
 // Read ai:providerApiKeys, guarding against a malformed (non-object) value. The
 // warn never contains any key material (design R1.9): config key + reason only.
-const readProviderApiKeys = (): AiProviderApiKeys | undefined => {
+// Exported so the PUT handler merges over this SHAPE-GUARDED view (never the raw
+// getConfig value): a malformed but valid-JSON config (e.g. an array/string from a
+// hand-edited AI_PROVIDER_API_KEYS) must read as "unset" here, not be object-spread
+// into index-keyed junk when a new key is saved.
+export const readProviderApiKeys = (): AiProviderApiKeys | undefined => {
   reportEnvShadowingIfNeeded('ai:providerApiKeys');
   const value: unknown = configManager.getConfig('ai:providerApiKeys');
   if (value == null) {

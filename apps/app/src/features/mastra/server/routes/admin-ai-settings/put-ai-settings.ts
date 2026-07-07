@@ -27,6 +27,7 @@ import type {
   AiProviderApiKeys,
   AiProvidersConfig,
 } from '../../../interfaces/provider-settings';
+import { readProviderApiKeys } from '../../services/ai-sdk-modules/llm-providers/config';
 import { clearAvailabilityLogDedup } from '../../services/ai-sdk-modules/llm-providers/warn-dedup';
 import { isValidAllowedModelsRequest } from './validate-allowed-models';
 
@@ -343,7 +344,10 @@ const buildUpdates = (body: AiSettingsUpdateRequest): AiConfigUpdates => {
     // Read the CURRENT merged (DB ?? env) view at SAVE time — the same view GET's
     // isApiKeySet reflects — never a GET snapshot or the request. This preserves
     // keys for providers not in this request (incl. env-derived) and never clears.
-    const current = configManager.getConfig('ai:providerApiKeys') ?? {};
+    // Use the SHAPE-GUARDED accessor (not raw getConfig): a malformed but valid-JSON
+    // config (array/string) reads as unset here instead of being spread into
+    // index-keyed junk and persisted alongside the real keys.
+    const current = readProviderApiKeys() ?? {};
     const merged: AiProviderApiKeys = { ...current, ...requestApiKeys };
     updates['ai:providerApiKeys'] = merged;
   }
