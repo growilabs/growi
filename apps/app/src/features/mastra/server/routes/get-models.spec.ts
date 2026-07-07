@@ -21,7 +21,7 @@
 // side-effect-free), mirroring post-message-handler.spec.
 import type { IUserHasId } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
 import { mock } from 'vitest-mock-extended';
 
 import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
@@ -72,23 +72,21 @@ const getHandler = (): RequestHandler => {
 const buildReqRes = () => {
   const user = mock<IUserHasId>();
   // _id is read for the UserUISettings lookup; a concrete value keeps the query
-  // shape introspectable.
+  // shape introspectable. Typed as a full express Request (+ the handler's `user`)
+  // and ApiV3Response so they satisfy RequestHandler's parameters with no cast.
   user._id = mock<IUserHasId['_id']>();
-  const req = mock<{ user: IUserHasId }>({ user });
+  const req = mock<Request & { user: IUserHasId }>({ user });
   const res = mock<ApiV3Response>();
   return { req, res };
 };
 
-// Invoke the route handler with the typed req/res mocks. The handler is pulled from
-// the factory as a generic express RequestHandler, which erases its real
-// (Req, ApiV3Response) signature; the single cast that bridges the narrow mocks to
-// that signature is confined HERE, so the call sites stay cast-free.
+// Invoke the route handler with the typed req/res mocks. The handler is exposed as
+// a generic express RequestHandler; the mocks are typed to that signature's
+// parameters (Request / Response), so the call needs no cast.
 const invoke = (
   req: ReturnType<typeof buildReqRes>['req'],
   res: ReturnType<typeof buildReqRes>['res'],
-): void | Promise<void> =>
-  // biome-ignore lint/suspicious/noExplicitAny: one confined cast at the invoke boundary
-  getHandler()(req as any, res as any, vi.fn());
+): void | Promise<void> => getHandler()(req, res, vi.fn());
 
 // Set the per-user persisted selection the handler will read (a modelKey).
 const mockSavedSelection = (aiChatSelectedModelKey?: string) => {

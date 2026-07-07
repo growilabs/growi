@@ -65,7 +65,10 @@ import {
   AI_PROVIDERS,
   type AiProvider,
 } from '~/features/mastra/interfaces/ai-provider';
-import type { AiProviderStatus } from '~/features/mastra/interfaces/ai-settings';
+import type {
+  AiProviderStatus,
+  AiSettingsResponse,
+} from '~/features/mastra/interfaces/ai-settings';
 import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
 import type { AiProviderSettings } from '~/features/mastra/interfaces/provider-settings';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
@@ -109,17 +112,18 @@ const invoke = () => {
   return { res };
 };
 
-// Pull the single object the handler handed to res.apiv3().
-const responseBody = (res: ApiV3Response): Record<string, unknown> => {
+// Pull the single object the handler handed to res.apiv3(). Typed as the route's
+// real response DTO so every field access below is typed with no cast (apiv3's
+// parameter is `any`, so the payload flows into AiSettingsResponse implicitly).
+const responseBody = (res: ApiV3Response): AiSettingsResponse => {
   const apiv3 = vi.mocked(res.apiv3);
   expect(apiv3).toHaveBeenCalledTimes(1);
-  return apiv3.mock.calls[0][0] as Record<string, unknown>;
+  return apiv3.mock.calls[0][0];
 };
 
 const providersOf = (
   res: ApiV3Response,
-): Record<AiProvider, AiProviderStatus> =>
-  responseBody(res).providers as Record<AiProvider, AiProviderStatus>;
+): Record<AiProvider, AiProviderStatus> => responseBody(res).providers;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -186,7 +190,7 @@ describe('getAiSettings (Req 1.1, 1.8, 1.9)', () => {
     const { res } = invoke();
 
     const body = responseBody(res);
-    const providers = body.providers as Record<AiProvider, AiProviderStatus>;
+    const providers = body.providers;
     expect(providers.openai.isApiKeySet).toBe(true);
     // The actual secret must not appear under any field of the response.
     expect(JSON.stringify(body)).not.toContain('sk-super-secret-value');

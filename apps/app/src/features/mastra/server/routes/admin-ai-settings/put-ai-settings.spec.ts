@@ -35,7 +35,9 @@
 // side effects, not how a value is persisted.
 const { getConfig, updateConfigs } = vi.hoisted(() => ({
   getConfig: vi.fn(),
-  updateConfigs: vi.fn(),
+  // Typed with its real call shape (the updates map) so mock.calls[i][0] is a
+  // Record with no cast at the read sites.
+  updateConfigs: vi.fn<(updates: Record<string, unknown>) => Promise<void>>(),
 }));
 // The apiKey merge reads the CURRENT keys through the SHAPE-GUARDED accessor
 // (readProviderApiKeys), NOT raw getConfig — so a malformed config reads as unset
@@ -98,10 +100,8 @@ import type {
   AiProviderUpdateRequest,
   AiSettingsUpdateRequest,
 } from '../../../interfaces/ai-settings';
-import type {
-  AiProviderApiKeys,
-  AiProvidersConfig,
-} from '../../../interfaces/provider-settings';
+import type { AiProviderApiKeys } from '../../../interfaces/provider-settings';
+import { isRecord } from '../../../utils/is-record';
 import {
   putAiSettingsFactory,
   updateAiSettingsValidators,
@@ -173,12 +173,26 @@ const invoke = async (
 
 // Pull the `updates` object handed to the nth updateConfigs call.
 const updatesAt = (index = 0): Record<string, unknown> =>
-  updateConfigs.mock.calls[index][0] as Record<string, unknown>;
+  updateConfigs.mock.calls[index][0];
 
 // Convenience for the single-call cases: asserts updateConfigs ran exactly once.
 const updates = (): Record<string, unknown> => {
   expect(updateConfigs).toHaveBeenCalledTimes(1);
   return updatesAt(0);
+};
+
+// The persisted ai:providers value, narrowed to a record for assertions. isRecord
+// both drops the cast AND asserts the handler wrote an object (not undefined), so
+// the per-provider reads below are typed (`unknown`, which `expect().toEqual`
+// accepts) without asserting the full AiProvidersConfig shape.
+const providersUpdateOf = (
+  updates: Record<string, unknown>,
+): Record<string, unknown> => {
+  const value = updates['ai:providers'];
+  if (!isRecord(value)) {
+    throw new Error('expected ai:providers to be written as an object');
+  }
+  return value;
 };
 
 beforeEach(() => {
@@ -306,7 +320,7 @@ describe('putAiSettings (multi-provider)', () => {
         }),
       });
 
-      const providers = updates()['ai:providers'] as AiProvidersConfig;
+      const providers = providersUpdateOf(updates());
       expect(providers['azure-openai']).toEqual({
         enabled: true,
         azureOpenaiSettings: { resourceName: 'my-res' },
@@ -320,7 +334,7 @@ describe('putAiSettings (multi-provider)', () => {
         }),
       });
 
-      const providers = updates()['ai:providers'] as AiProvidersConfig;
+      const providers = providersUpdateOf(updates());
       expect(providers['azure-openai']).toEqual({ enabled: true });
     });
   });
@@ -458,7 +472,7 @@ describe('putAiSettings (multi-provider)', () => {
       );
 
       const saved = updates();
-      const providers = saved['ai:providers'] as AiProvidersConfig;
+      const providers = providersUpdateOf(saved);
       expect(providers['azure-openai']).toEqual({
         enabled: false,
         azureOpenaiSettings: { resourceName: 'my-res' },

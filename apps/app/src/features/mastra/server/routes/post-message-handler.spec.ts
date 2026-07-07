@@ -19,7 +19,7 @@
 //   - chat-error-message: spied (not rewritten) so we can confirm the error path
 //     stays wired to the existing sanitizer (Req 4.5).
 import type { IUserHasId } from '@growi/core';
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
 import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
@@ -122,9 +122,10 @@ const buildReqRes = (modelKey?: string) => {
   user._id = mock<IUserHasId['_id']>();
   user._id.toString = () => 'user-1';
 
-  // The handler reads modelKey via destructuring; mock<Request> would auto-stub
-  // body fields, so we provide a concrete body.
-  const req = mock<{ body: unknown; user: IUserHasId }>({
+  // Typed as a full express Request (+ the handler's `user`) so it satisfies
+  // RequestHandler's parameter with no cast; the handler reads modelKey via
+  // destructuring, so a concrete body is provided (rather than auto-stubbed).
+  const req = mock<Request & { user: IUserHasId }>({
     body: {
       threadId: undefined,
       modelKey,
@@ -136,16 +137,13 @@ const buildReqRes = (modelKey?: string) => {
   return { req, res };
 };
 
-// Invoke the route handler with the typed req/res mocks. The handler is pulled from
-// the factory as a generic express RequestHandler, which erases its real
-// (Req, ApiV3Response) signature; the single cast that bridges the narrow mocks to
-// that signature is confined HERE, so the call sites stay cast-free.
+// Invoke the route handler with the typed req/res mocks. The handler is exposed as
+// a generic express RequestHandler; the mocks are typed to that signature's
+// parameters (Request / Response), so the call needs no cast.
 const invoke = (
   req: ReturnType<typeof buildReqRes>['req'],
   res: ReturnType<typeof buildReqRes>['res'],
-): void | Promise<void> =>
-  // biome-ignore lint/suspicious/noExplicitAny: one confined cast at the invoke boundary
-  getHandler()(req as any, res as any, vi.fn());
+): void | Promise<void> => getHandler()(req, res, vi.fn());
 
 beforeEach(() => {
   vi.clearAllMocks();
