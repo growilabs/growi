@@ -4,9 +4,11 @@ import { useTranslation } from 'next-i18next';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { Badge, Button, FormGroup, Input, Label } from 'reactstrap';
 
-import { isValidProviderOptionsJson } from '../../utils/provider-options-validation';
+import {
+  getProviderOptionsJsonStatus,
+  isValidProviderOptionsJson,
+} from '../../utils/provider-options-validation';
 import type { AiSettingsFormValues } from './ai-settings-form-values';
-import { getProviderOptionsJsonStatus } from './provider-options-json-status';
 import { registerToInputProps } from './register-to-input-props';
 
 interface AllowedModelRowProps {
