@@ -9,7 +9,6 @@ import { AllowedModelRow } from './AllowedModelRow';
 import type { AiSettingsFormValues } from './ai-settings-form-values';
 import { setDefaultAllowedModelAt } from './ai-settings-form-values';
 import { buildInitialProviderOptionsText } from './provider-options-namespace';
-import { RefreshCatalogButton } from './RefreshCatalogButton';
 import { useSWRxSelectableModels } from './use-selectable-models';
 
 // Vercel AI SDK docs describing the provider-namespaced `providerOptions` shape.
@@ -31,8 +30,9 @@ export interface AllowedModelsFieldProps {
  * The provider-scoped allowed-models editor, registered against the shared
  * react-hook-form context owned by `AiSettings`. One instance is mounted per
  * active provider panel (task 6.5 renders `<AllowedModelsField provider={p} />`).
- * Each row is an `AllowedModelRow`; the models-section header carries a
- * `RefreshCatalogButton`.
+ * Each row is an `AllowedModelRow`. (The global "refresh model catalog" action is
+ * NOT here — it lives once at the top of `AiSettings`, since one refresh replaces
+ * the snapshot for every provider at once.)
  *
  * ## index integrity (the load-bearing correctness rule)
  * A SINGLE `useFieldArray` spans the whole flat `allowedModels` array so the
@@ -121,11 +121,8 @@ export const AllowedModelsField = (
   }, [watchedModels, provider]);
 
   // Fetch the selectable models for THIS provider once at the field level and
-  // share the result with every row. `invalidateAllProviders` is provider-
-  // independent (the refresh replaces the whole models.dev snapshot server-side),
-  // so it is handed to the refresh button.
-  const { data, error, invalidateAllProviders } =
-    useSWRxSelectableModels(provider);
+  // share the result with every row.
+  const { data, error } = useSWRxSelectableModels(provider);
 
   // Mode derivation:
   // - `select` only when the catalog resolved to a non-empty list (R2.6).
@@ -210,15 +207,12 @@ export const AllowedModelsField = (
 
   return (
     <FormGroup className="mb-3">
-      <div className="d-flex align-items-center mt-4 mb-1">
-        {/* Tab-panel subsection heading — fs-5 (1.25rem), one step below the
-            "Providers" section (fs-4) and matching the sibling "Azure OpenAI
-            settings" subsection. */}
-        <h3 className="fs-5 fw-bold m-0">
-          {t('ai_settings.models_section_title')}
-        </h3>
-        <RefreshCatalogButton invalidateAllProviders={invalidateAllProviders} />
-      </div>
+      {/* Tab-panel subsection heading — fs-5 (1.25rem), one step below the
+          "Providers" section (fs-4) and matching the sibling "Azure OpenAI
+          settings" subsection. */}
+      <h3 className="fs-5 fw-bold mt-4 mb-1">
+        {t('ai_settings.models_section_title')}
+      </h3>
       <p className="form-text text-muted mt-0 mb-3">
         {t('ai_settings.models_section_desc')}
       </p>

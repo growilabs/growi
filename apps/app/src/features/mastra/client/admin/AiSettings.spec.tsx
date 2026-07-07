@@ -399,4 +399,45 @@ describe('AiSettings', () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  describe('global catalog refresh (single location)', () => {
+    const getRefreshButtons = (): HTMLElement[] =>
+      screen.getAllByRole('button', {
+        name: 'ai_settings.refresh_model_catalog',
+      });
+
+    it('renders the catalog-refresh action exactly once, before the Providers heading', () => {
+      // The refresh is a GLOBAL action (one re-ingest replaces the models.dev
+      // snapshot for every provider), so it must appear once — not per panel.
+      setData();
+
+      render(<AiSettings />);
+
+      const refreshButtons = getRefreshButtons();
+      expect(refreshButtons).toHaveLength(1);
+
+      // Document order proves it is a top-level action, not inside the provider
+      // panel: the panel is rendered AFTER the "Providers" heading, so the button
+      // preceding that heading cannot be within a panel.
+      const providersHeading = screen.getByText(
+        'ai_settings.providers_section_title',
+      );
+      expect(
+        refreshButtons[0].compareDocumentPosition(providersHeading) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it('stays a single instance across provider tab switches', async () => {
+      // Switching the active panel must not add or drop the global action.
+      const user = userEvent.setup();
+      setData();
+
+      render(<AiSettings />);
+      expect(getRefreshButtons()).toHaveLength(1);
+
+      await user.click(screen.getByTestId('provider-tab-azure-openai'));
+      expect(getRefreshButtons()).toHaveLength(1);
+    });
+  });
 });

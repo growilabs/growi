@@ -20,10 +20,12 @@ interface RefreshCatalogButtonProps {
 }
 
 /**
- * The "refresh model catalog" action for the models section header: a link-styled
- * button that opens a confirmation FIRST — the refresh triggers server-side OUTBOUND
- * communication to models.dev, so it runs only after the admin explicitly confirms
- * — then POSTs the re-ingest and invalidates every cached provider list.
+ * The GLOBAL "refresh model catalog" action: a link-styled button that opens a
+ * confirmation FIRST — the refresh triggers server-side OUTBOUND communication to
+ * models.dev, so it runs only after the admin explicitly confirms — then POSTs the
+ * re-ingest and invalidates every cached provider list. Rendered once at the top of
+ * `AiSettings` (not per provider panel) because a single refresh replaces the
+ * snapshot for ALL enumerable providers at once.
  *
  * Intentionally NOT disabled in env-only mode: the catalog is a server-side cache of
  * public model metadata, not an AI setting, and env-only deployments (e.g.
@@ -68,7 +70,7 @@ export const RefreshCatalogButton = (
         type="button"
         color="link"
         size="sm"
-        className="ms-auto p-0 d-inline-flex align-items-center"
+        className="p-0 d-inline-flex align-items-center"
         disabled={isRefreshing}
         onClick={openConfirm}
       >

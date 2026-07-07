@@ -5,7 +5,6 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm, useWatch } from 'react-hook-form';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { mock } from 'vitest-mock-extended';
 
 import type { AiProvider } from '../../interfaces/ai-provider';
 
@@ -20,17 +19,6 @@ vi.mock('./use-selectable-models', () => ({
   useSWRxSelectableModels: vi.fn(),
 }));
 
-// The manual catalog-refresh button POSTs via apiv3Post and reports via toasts;
-// both are mocked so the suite stays network-free and can assert the calls.
-vi.mock('~/client/util/apiv3-client', () => ({ apiv3Post: vi.fn() }));
-vi.mock('~/client/util/toastr', () => ({
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-}));
-
-import { apiv3Post } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-
 import type { SelectableModelsResponse } from '../../interfaces/selectable-models-response';
 import { AllowedModelsField } from './AllowedModelsField';
 import type {
@@ -40,12 +28,11 @@ import type {
 import { useSWRxSelectableModels } from './use-selectable-models';
 
 const mockedUseSelectableModels = vi.mocked(useSWRxSelectableModels);
-const mockedApiv3Post = vi.mocked(apiv3Post);
 
-// Build a minimal hook result for the mock. Only `data`/`error` and the
-// `invalidateAllProviders` util are read by the component; the rest of the
-// SWRResponse surface is filled with inert stubs so the returned value is a
-// real hook result (no type assertion needed).
+// Build a minimal hook result for the mock. Only `data`/`error` are read by the
+// component; the rest of the SWRResponse surface (including the now-global
+// `invalidateAllProviders` util) is filled with inert stubs so the returned value
+// is a real hook result (no type assertion needed).
 const swrResponse = (partial: {
   data?: SelectableModelsResponse;
   error?: Error;
@@ -1013,90 +1000,6 @@ describe('AllowedModelsField', () => {
         'gpt-4o',
         'gpt-4.1',
       ]);
-    });
-  });
-
-  describe('manual catalog refresh (preserved after provider-scoping)', () => {
-    const getRefreshButton = (): HTMLElement =>
-      screen.getByRole('button', {
-        name: 'ai_settings.refresh_model_catalog',
-      });
-    const getConfirmButton = (): HTMLElement =>
-      screen.getByRole('button', {
-        name: 'ai_settings.refresh_model_catalog_confirm',
-      });
-
-    it('POSTs the refresh endpoint only after the admin confirms, revalidates, and toasts success', async () => {
-      const user = userEvent.setup();
-      const hookResult = swrResponse({ data: { modelIds: ['gpt-4o'] } });
-      mockedUseSelectableModels.mockReturnValue(hookResult);
-      mockedApiv3Post.mockResolvedValue(
-        mock<Awaited<ReturnType<typeof apiv3Post>>>(),
-      );
-
-      renderComponent();
-      await user.click(getRefreshButton());
-
-      // The refresh triggers OUTBOUND communication, so the click opens a
-      // confirmation instead of firing the request.
-      expect(mockedApiv3Post).not.toHaveBeenCalled();
-      expect(
-        screen.getByText('ai_settings.refresh_model_catalog_confirmation'),
-      ).toBeInTheDocument();
-
-      await user.click(getConfirmButton());
-
-      await waitFor(() => {
-        expect(mockedApiv3Post).toHaveBeenCalledExactlyOnceWith(
-          '/ai-settings/refresh-model-catalog',
-        );
-      });
-      expect(hookResult.invalidateAllProviders).toHaveBeenCalled();
-      expect(toastSuccess).toHaveBeenCalledWith(
-        'ai_settings.refresh_model_catalog_success',
-      );
-      expect(toastError).not.toHaveBeenCalled();
-    });
-
-    it('does NOT communicate when the admin cancels the confirmation', async () => {
-      const user = userEvent.setup();
-      mockedUseSelectableModels.mockReturnValue(
-        swrResponse({ data: { modelIds: ['gpt-4o'] } }),
-      );
-
-      renderComponent();
-      await user.click(getRefreshButton());
-      await user.click(screen.getByRole('button', { name: 'Cancel' }));
-
-      expect(mockedApiv3Post).not.toHaveBeenCalled();
-      expect(toastSuccess).not.toHaveBeenCalled();
-      expect(toastError).not.toHaveBeenCalled();
-      expect(getRefreshButton()).toBeEnabled();
-    });
-
-    it('toasts the localized failure and does not revalidate when the refresh fails', async () => {
-      const user = userEvent.setup();
-      const hookResult = swrResponse({ data: { modelIds: ['gpt-4o'] } });
-      mockedUseSelectableModels.mockReturnValue(hookResult);
-      mockedApiv3Post.mockRejectedValue(new Error('refresh failed'));
-
-      renderComponent();
-      await user.click(getRefreshButton());
-      await user.click(getConfirmButton());
-
-      await waitFor(() => {
-        expect(toastError).toHaveBeenCalledWith(
-          'ai_settings.refresh_model_catalog_failed',
-        );
-      });
-      expect(hookResult.invalidateAllProviders).not.toHaveBeenCalled();
-      expect(toastSuccess).not.toHaveBeenCalled();
-      expect(getRefreshButton()).toBeEnabled();
-    });
-
-    it('is always enabled — the catalog is a server-side cache, not gated by the field', () => {
-      renderComponent();
-      expect(getRefreshButton()).toBeEnabled();
     });
   });
 });

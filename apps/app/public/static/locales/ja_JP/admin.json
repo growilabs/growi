@@ -478,6 +478,8 @@
     "refresh_model_catalog_confirm": "更新する",
     "refresh_model_catalog_success": "モデルカタログを更新しました。",
     "refresh_model_catalog_failed": "モデルカタログの更新に失敗しました。以前のカタログが引き続き使用されます。",
+    "refresh_model_catalog_label": "モデルカタログ",
+    "refresh_model_catalog_scope": "チャットのモデル選択に表示される候補一覧の元データです。最新のモデルを反映するには更新してください。",
     "set_as_default": "デフォルトにする",
     "default_badge": "デフォルト",
     "add_model": "モデルを追加",

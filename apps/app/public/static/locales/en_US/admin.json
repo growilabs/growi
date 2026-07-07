@@ -469,6 +469,8 @@
     "refresh_model_catalog_confirm": "Refresh",
     "refresh_model_catalog_success": "The model catalog has been refreshed.",
     "refresh_model_catalog_failed": "Failed to refresh the model catalog. The previous catalog remains in effect.",
+    "refresh_model_catalog_label": "Model catalog",
+    "refresh_model_catalog_scope": "The source data for the model list shown in the chat model picker. Refresh it to reflect newly released models.",
     "set_as_default": "Set as default",
     "default_badge": "Default",
     "add_model": "Add model",

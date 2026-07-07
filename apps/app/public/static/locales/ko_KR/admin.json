@@ -469,6 +469,8 @@
     "refresh_model_catalog_confirm": "새로고침",
     "refresh_model_catalog_success": "모델 카탈로그를 새로고침했습니다.",
     "refresh_model_catalog_failed": "모델 카탈로그 새로고침에 실패했습니다. 이전 카탈로그가 계속 사용됩니다.",
+    "refresh_model_catalog_label": "모델 카탈로그",
+    "refresh_model_catalog_scope": "채팅 모델 선택기에 표시되는 후보 목록의 원본 데이터입니다. 최신 모델을 반영하려면 새로 고치세요.",
     "set_as_default": "기본값으로 설정",
     "default_badge": "기본",
     "add_model": "모델 추가",

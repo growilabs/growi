@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { FormProvider, type SubmitHandler, useForm } from 'react-hook-form';
-import { Alert, Button } from 'reactstrap';
+import { Alert, Button, Label } from 'reactstrap';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
 
@@ -24,7 +24,9 @@ import { DefaultModelSelector } from './DefaultModelSelector';
 import { EnvOnlyModeNotice } from './EnvOnlyModeNotice';
 import { ProviderPanel } from './ProviderPanel';
 import { ProviderTabs } from './ProviderTabs';
+import { RefreshCatalogButton } from './RefreshCatalogButton';
 import { useAiSettings } from './use-ai-settings';
+import { useSWRxSelectableModels } from './use-selectable-models';
 
 /**
  * Container for the multi-provider AI settings admin screen.
@@ -56,6 +58,13 @@ export const AiSettings = (): JSX.Element | null => {
   const [activeProvider, setActiveProvider] = useState<AiProvider>(
     AI_PROVIDERS[0],
   );
+
+  // The global catalog-refresh button lives here (not per panel), so its
+  // invalidation is sourced against the ACTIVE provider: this revalidates the
+  // active panel's list IN PLACE (no flicker) and clears the others so they
+  // refetch on next mount. SWR dedupes by key, so this shares the request the
+  // active panel's AllowedModelsField already issues (no double fetch).
+  const { invalidateAllProviders } = useSWRxSelectableModels(activeProvider);
 
   // `onChange` validation preserves the synchronous UX: the providerOptions JSON
   // error surfaces as the admin types, without requiring a submit attempt first.
@@ -157,6 +166,23 @@ export const AiSettings = (): JSX.Element | null => {
 
         {/* Model setting: stays editable even under env-only (R5.3). */}
         <DefaultModelSelector />
+
+        {/* Global "model catalog" block (label + description + button), mirroring
+            DefaultModelSelector so the refresh reads as a proper setting block
+            rather than a floating action. One refresh re-ingests the catalog for
+            every catalog-backed provider. Kept enabled under env-only — the
+            catalog is a server-side cache of public metadata, not an AI setting. */}
+        <div className="mb-4">
+          <Label className="form-label fw-bold mb-1">
+            {t('ai_settings.refresh_model_catalog_label')}
+          </Label>
+          <p className="form-text text-muted mt-0 mb-2">
+            {t('ai_settings.refresh_model_catalog_scope')}
+          </p>
+          <RefreshCatalogButton
+            invalidateAllProviders={invalidateAllProviders}
+          />
+        </div>
 
         {/* Section heading — one level below the page title (h1.fs-2, 2rem):
             fs-4 (1.5rem). The tab panel's subsection headings (Models / Azure
