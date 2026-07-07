@@ -1,4 +1,4 @@
-# 技術設計書: activity-log（snapshot 型付け＋添付削除ログ）
+# 技術設計書: activity-log-snapshot（snapshot 型付け＋添付削除ログ）
 
 ## Overview
 

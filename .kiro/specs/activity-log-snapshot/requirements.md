@@ -2,7 +2,7 @@
 
 ## Project Description (Input)
 
-この spec は、GROWI の activity log（監査ログ／操作履歴）サブシステムを今後メンテナンス・拡張する際に参照するための情報をまとめたものである。activity log 全体を対象とするが、今回は構成要素のうち **snapshot** を詳しく記述し、その他の要素はセクションだけ用意して現時点でわかっていることを記し、詳細は TBD（To Be Done）とする。
+この spec は、GROWI の activity log（監査ログ／操作履歴）サブシステムのうち **snapshot（記録された各 activity が凍結して持つ付随データ）** の型付けと、添付ファイル削除ログを対象とする。activity log サブシステム全体の関心マップ（どの関心をどの spec が持つか）と、記録ゲート・表示・型安全化・TTL などの他要素は flagship の `activity-log` spec が管理する（下記「関連 spec（activity-log ファミリー）」を参照）。
 
 ### (a) 誰が困っているか
 - activity log を保守・拡張する GROWI の開発者。snapshot の型・設計がコードに散らばっていてドキュメント化されておらず、改修のたびにモデル・サービス・画面のコードを読み直す必要がある。
@@ -21,15 +21,15 @@
 - 削除のカスケード連動（ページ完全削除・ゴミ箱を空にする操作で消える添付）も記録対象とする。
 
 ### スコープ（合意済み）
-- **(a) を採用**：今回の対象は **snapshot の型付け（action ベースの判別可能ユニオン）＋ 添付削除ログ** のみとする。
-- `target × targetModel` の全面的な型安全化（discriminated union 化）は別 PR に切り出す。本 spec では「型安全化」セクションに方針メモのみ残し、詳細は TBD とする。
+- 本 spec の対象は **snapshot の型付け（action ベースの判別可能ユニオン）＋ 添付削除ログ** のみ。
+- `target × targetModel` の全面的な型安全化（discriminated union 化）は本 spec のスコープ外（activity-log ファミリーの将来課題。下記参照）。本 spec では `SupportedTargetModel` に `Attachment` を1つ足すのみ。
 
-### この spec に用意するセクション（snapshot 以外は TBD で軽く）
-- snapshot 設計 — **詳述**
-- target / targetModel の型安全化 — TBD（方針のみ）
-- action / action グループと記録対象の制御 — TBD
-- 監査ログ画面の表示（「対象」列の追加方針） — TBD
-- 保持期間・TTL、大量カスケード削除時のボリューム — TBD
+### 関連 spec（activity-log ファミリー）
+activity log サブシステムは責務ごとに次の spec に分割されている。かつてこの spec に「snapshot 以外は TBD セクション」として仮置きしていた要素は、それぞれの spec へ移した。関心マップの管理は flagship `activity-log` が持つ。
+- **`activity-log`（flagship / 記録ゲート）** — 「何を記録するか」。action / action グループと記録対象の制御（対象外 action を保存しない）。サブシステム全体の関心マップもここが持つ。
+- **`activity-log-snapshot`（本 spec）** — snapshot の型付けと添付削除ログ。添付系 action への snapshot capture 拡張もここが継続して所有する。
+- **`activity-log-snapshot-viewer`** — 監査ログ画面での snapshot 表示（生表示＋添付系の整形表示。旧「対象」列の追加方針）。
+- 将来課題（未着手・どの spec にも未割当）: `target × targetModel` の全面的型安全化、保持期間・TTL、大量カスケード削除時のボリューム制御。整理先は flagship `activity-log` の関心マップで管理する。
 
 ## Introduction
 
@@ -42,14 +42,14 @@
   - 直接削除（添付ファイル削除 API）時の添付ファイル情報の snapshot 記録
   - ページ完全削除・ゴミ箱を空にする操作のカスケードで消える添付ファイルの activity 記録と snapshot
 - **Out of scope**:
-  - `target × targetModel` フィールドの全面的な型安全化（別 PR で実施）
-  - action グループの設定変更（`ACTION_ATTACHMENT_REMOVE` を Small グループへ格上げすることや、管理 UI でのトグル追加）
-  - 監査ログ画面への「対象」列の詳細 UI 実装（本 spec では方針のみ; 詳細は TBD）
+  - `target × targetModel` フィールドの全面的な型安全化（activity-log ファミリーの将来課題）
+  - action グループの設定変更・記録対象の制御（対象外 action を保存しないなど）は flagship `activity-log` spec が担当
+  - 監査ログ画面への「対象」列・snapshot 表示 UI は `activity-log-snapshot-viewer` spec が担当
   - 保持期間・TTL の変更
   - 大量カスケード削除時のボリューム制御・スロットリング
 - **Adjacent expectations**:
-  - `ACTION_ATTACHMENT_REMOVE` は現在 MediumActionGroup 以上でのみ記録される（デフォルトは Small）。本機能で追加される snapshot データが実際に保存されるかどうかは、`AUDIT_LOG_ACTION_GROUP_SIZE` または `AUDIT_LOG_ADDITIONAL_ACTIONS` 環境変数の設定に依存する。この設定変更は本 spec のスコープ外。
-  - 記録した snapshot データは、将来の監査ログ画面拡張（「対象」列の追加など）で参照できる構造で保存されなければならない。
+  - `ACTION_ATTACHMENT_REMOVE` は現在 MediumActionGroup 以上でのみ記録される（デフォルトは Small）。本機能で追加される snapshot データが実際に保存されるかどうかは、`AUDIT_LOG_ACTION_GROUP_SIZE` または `AUDIT_LOG_ADDITIONAL_ACTIONS` の設定（＝`activity-log` spec が扱う記録ゲート）に依存する。
+  - 記録した snapshot データは、`activity-log-snapshot-viewer` spec が参照して表示できる後方互換な構造で保存されなければならない。
 
 ## Requirements
 
