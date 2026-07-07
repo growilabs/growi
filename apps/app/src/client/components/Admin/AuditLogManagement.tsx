@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { FC } from 'react';
 import { useCallback, useRef, useState } from 'react';
+import Link from 'next/link';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { format } from 'date-fns/format';
 import { useAtomValue } from 'jotai';
@@ -220,6 +221,14 @@ export const AuditLogManagement: FC = () => {
           </>
         )}
       </button>
+
+      <Link
+        href="/admin/search#audit-log-index-management"
+        className="btn btn-outline-secondary mb-4 ms-2"
+      >
+        <span className="material-symbols-outlined me-1">manage_search</span>
+        {t('audit_log_index_management.audit_log_index_management')}
+      </Link>
 
       {isCloud && (
         <a
