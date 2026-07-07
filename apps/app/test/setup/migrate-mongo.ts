@@ -11,7 +11,7 @@ let migrationsRun = false;
  * This uses the existing dev:migrate:up script (migrate-mongo via plain node +
  * umzug via Node's native TS runner — Node 24 strip-only type stripping (no
  * --experimental-transform-types) + the resolve-only hook in
- * bin/dev-esm-resolver.mjs, no tsx).
+ * bin/runtime/dev-esm-resolver.mjs, no tsx).
  */
 function runMigrations(mongoUri: string): void {
   // Run migrations using the existing script with custom MONGO_URI

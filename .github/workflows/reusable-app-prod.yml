@@ -73,15 +73,14 @@ jobs:
     - name: Archive production files
       id: archive-prod-files
       run: |
-        # apps/app/bin/dev-esm-resolver.mjs is the native TS runner's resolve hook.
-        # It is required at runtime because `migrate:umzug` (run via preserver ->
-        # migrate before the prod server starts) executes prisma/migrate.ts with
-        # `node --import ./bin/dev-esm-resolver.mjs`.
-        # apps/app/bin/env-preload.mjs loads dotenv-flow and is required at runtime
-        # by both the `server` and `migrate:migrate-mongo` scripts
-        # (`node --import ./bin/env-preload.mjs ...`).
-        # These two self-contained files are the only ones needed from bin/
-        # (the rest of bin/ is build-time only).
+        # apps/app/bin/runtime/ holds the self-contained hooks the prod server
+        # and its migration step load via `node --import` at runtime
+        # (dev-esm-resolver.mjs for `migrate:umzug`'s prisma/migrate.ts, and
+        # env-preload.mjs for `server` and `migrate:migrate-mongo`). Ship the
+        # whole directory rather than naming files individually, so adding a
+        # new runtime hook there can't silently go missing from the tarball
+        # the way env-preload.mjs did before. The rest of bin/ is build-time
+        # only and is intentionally excluded.
         tar -zcf production.tar.gz --exclude ./apps/app/.next/cache \
           package.json \
           node_modules \
@@ -90,8 +89,7 @@ jobs:
           apps/app/config \
           apps/app/dist \
           apps/app/prisma \
-          apps/app/bin/dev-esm-resolver.mjs \
-          apps/app/bin/env-preload.mjs \
+          apps/app/bin/runtime \
           apps/app/public \
           apps/app/resource \
           apps/app/tmp \
