@@ -47,13 +47,17 @@ describe('AuditlogEsSyncStatus', () => {
   });
 
   describe('error handling', () => {
-    it('setUnsynced does not throw when prisma throws', async () => {
+    it('setUnsynced rethrows when prisma throws, unlike isUnsynced', async () => {
+      // A write failure has no safe fallback to swallow to (unlike a read, which can
+      // fall back to false); callers decide how to handle/log it. See callers:
+      // rebuildAuditlogIndex catches it to log with rebuild-specific context, and
+      // reconcileInitialSyncState relies on the outer startWithRetry try/catch.
       vi.spyOn(prisma.auditlog_es_sync_status, 'upsert').mockRejectedValueOnce(
         new Error('DB error'),
       );
-      await expect(
-        AuditlogEsSyncStatus.setUnsynced(true),
-      ).resolves.toBeUndefined();
+      await expect(AuditlogEsSyncStatus.setUnsynced(true)).rejects.toThrow(
+        'DB error',
+      );
     });
 
     it('isUnsynced returns false when prisma throws', async () => {
