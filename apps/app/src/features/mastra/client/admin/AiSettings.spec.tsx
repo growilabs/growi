@@ -207,6 +207,29 @@ describe('AiSettings', () => {
       expect(body.providers?.google.enabled).toBe(false);
       expect(body.providers?.['azure-openai'].enabled).toBe(false);
     });
+
+    it('remounts the panel subtree per provider (guards the uncontrolled-input leak)', async () => {
+      // The panel's enable switch + apiKey input are UNCONTROLLED (react-hook-form
+      // register). `key={activeProvider}` forces a remount on every tab switch so
+      // each input re-initialises from its own provider's value; without it React
+      // reuses the same DOM nodes and an input's DOM state (e.g. the switch's
+      // `checked`) leaks from the previously-viewed provider. That leak is a
+      // browser-only symptom (happy-dom re-syncs), so this asserts the STRUCTURAL
+      // guarantee instead: the switch is a NEW element instance after a tab switch.
+      // Deleting `key={activeProvider}` reuses the node → identity is stable → fails.
+      const user = userEvent.setup();
+      render(<AiSettings />);
+
+      const switchOnOpenai = screen.getByLabelText(
+        'ai_settings.provider_enabled_label',
+      );
+      await user.click(screen.getByTestId('provider-tab-anthropic'));
+      const switchOnAnthropic = screen.getByLabelText(
+        'ai_settings.provider_enabled_label',
+      );
+
+      expect(switchOnAnthropic).not.toBe(switchOnOpenai);
+    });
   });
 
   describe('update request shape', () => {
