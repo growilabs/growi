@@ -41,7 +41,7 @@ describe('SearchService test', () => {
     };
 
     dummyAliasOf =
-      'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2';
+      'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2 author:author1 -author:author2 editor:editor1 -editor:editor2 group:group1 -group:group2';
 
     // Check if named queries already exist
     const existingNQ1 = await NamedQuery.findOne({
@@ -61,7 +61,7 @@ describe('SearchService test', () => {
   describe('parseQueryString()', () => {
     it('should parse queryString', async () => {
       const queryString =
-        'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2';
+        'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2 author:author1 -author:author2 editor:editor1 -editor:editor2 group:group1 -group:group2';
       const terms = await searchService.parseQueryString(queryString);
 
       const expected = {
@@ -74,9 +74,52 @@ describe('SearchService test', () => {
         not_prefix: ['/pre2'],
         tag: ['Tag1'],
         not_tag: ['Tag2'],
+        author: ['author1'],
+        not_author: ['author2'],
+        editor: ['editor1'],
+        not_editor: ['editor2'],
+        group: ['group1'],
+        not_group: ['group2'],
       };
 
       expect(terms).toStrictEqual(expected);
+    });
+
+    it('should accumulate multiple values for the same filter', async () => {
+      const queryString =
+        'author:a1 author:a2 -author:a3 editor:e1 editor:e2 group:g1 -group:g2 -group:g3';
+      const terms = await searchService.parseQueryString(queryString);
+
+      expect(terms.author).toStrictEqual(['a1', 'a2']);
+      expect(terms.not_author).toStrictEqual(['a3']);
+      expect(terms.editor).toStrictEqual(['e1', 'e2']);
+      expect(terms.group).toStrictEqual(['g1']);
+      expect(terms.not_group).toStrictEqual(['g2', 'g3']);
+    });
+
+    it('should ignore a new-filter operator that has no value', async () => {
+      const terms = await searchService.parseQueryString(
+        'author: editor: group: -group:',
+      );
+
+      expect(terms.author).toStrictEqual([]);
+      expect(terms.editor).toStrictEqual([]);
+      expect(terms.group).toStrictEqual([]);
+      expect(terms.not_group).toStrictEqual([]);
+      expect(terms.match).toStrictEqual([]);
+      expect(terms.not_match).toStrictEqual([]);
+    });
+
+    it('should not capture a bare word that starts with a filter name', async () => {
+      const terms = await searchService.parseQueryString(
+        'authorname editorx grouped -notauthorname',
+      );
+
+      expect(terms.author).toStrictEqual([]);
+      expect(terms.editor).toStrictEqual([]);
+      expect(terms.group).toStrictEqual([]);
+      expect(terms.match).toStrictEqual(['authorname', 'editorx', 'grouped']);
+      expect(terms.not_match).toStrictEqual(['notauthorname']);
     });
   });
 
@@ -101,6 +144,12 @@ describe('SearchService test', () => {
           not_prefix: [],
           tag: [],
           not_tag: [],
+          author: [],
+          not_author: [],
+          editor: [],
+          not_editor: [],
+          group: [],
+          not_group: [],
         },
       };
 
@@ -125,6 +174,12 @@ describe('SearchService test', () => {
           not_prefix: ['/pre2'],
           tag: ['Tag1'],
           not_tag: ['Tag2'],
+          author: ['author1'],
+          not_author: ['author2'],
+          editor: ['editor1'],
+          not_editor: ['editor2'],
+          group: ['group1'],
+          not_group: ['group2'],
         },
       };
 
@@ -145,6 +200,12 @@ describe('SearchService test', () => {
           not_prefix: ['/pre2'],
           tag: ['Tag1'],
           not_tag: ['Tag2'],
+          author: ['author1'],
+          not_author: ['author2'],
+          editor: ['editor1'],
+          not_editor: ['editor2'],
+          group: ['group1'],
+          not_group: ['group2'],
         },
       };
 
@@ -170,6 +231,12 @@ describe('SearchService test', () => {
           not_prefix: [],
           tag: [],
           not_tag: [],
+          author: [],
+          not_author: [],
+          editor: [],
+          not_editor: [],
+          group: [],
+          not_group: [],
         },
       };
 
