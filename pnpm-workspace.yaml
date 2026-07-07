@@ -59,6 +59,20 @@ packageExtensions:
 patchedDependencies:
   # The patch excludes mathjax-full from the dependency graph of Marp Core.
   '@marp-team/marp-core': packages/presentation/patches/@marp-team__marp-core.patch
+  # Force yjs to a SINGLE module instance on the server. yjs ships dual builds and its
+  # exports split `import` -> dist/yjs.mjs (ESM) and `require` -> dist/yjs.cjs (CJS).
+  # After the ESM migration, apps/app imports yjs as ESM (yjs.mjs) while the CJS-only
+  # `y-websocket/bin/utils` (require('yjs')) loads yjs.cjs — two separate instances of
+  # the same version. Yjs relies on `instanceof`/type identity, so the WSSharedDoc created
+  # by y-websocket (yjs.cjs) is foreign to the app's yjs.mjs: on a 2nd editing session the
+  # persisted doc is reconstructed and client edits no longer merge into it, so typed text
+  # reverts to the loaded state a few seconds later (single user, no action needed).
+  # The patch points `require` at dist/yjs.mjs so require('yjs') resolves to the SAME ESM
+  # instance as `import` (via Node's require(esm)); `import`/`module` are unchanged, so the
+  # client (already ESM-only, single instance) is unaffected. y-websocket v3 dropped
+  # bin/utils and its successor (@y/websocket-server) requires yjs v14, so a package upgrade
+  # is not a drop-in fix while we stay on yjs 13. Re-check this patch on any yjs upgrade.
+  yjs@13.6.19: patches/yjs@13.6.19.patch
 
 # pnpm v11+ unified allowlist: true=run install scripts, false=skip them.
 # Migrated from onlyBuiltDependencies (true) and ignoredBuiltDependencies (false).
