@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { login } from '../utils/Login';
+import { login } from '../utils/login';
 
 test.describe
   .serial('Access to sharelink by guest', () => {

@@ -312,6 +312,27 @@
     },
     "exclude_tag": {
       "desc": "{{tag}} 태그가 있는 페이지 제외"
+    },
+    "author": {
+      "desc": "{{author}}님이 작성한 페이지 검색"
+    },
+    "exclude_author": {
+      "desc": "{{author}}님이 작성한 페이지 제외"
+    },
+    "editor": {
+      "desc": "{{editor}}님이 마지막으로 편집한 페이지 검색"
+    },
+    "exclude_editor": {
+      "desc": "{{editor}}님이 편집한 페이지 제외"
+    },
+    "group": {
+      "desc": "{{group}} 그룹에 권한이 부여된 페이지 검색"
+    },
+    "exclude_group": {
+      "desc": "{{group}} 그룹에 권한이 부여된 페이지 제외"
+    },
+    "quoted_value": {
+      "desc": "필터 값에 공백이 포함된 경우 큰따옴표로 묶기 (예: 그룹 이름이나 페이지 경로)"
     }
   },
   "search": {
