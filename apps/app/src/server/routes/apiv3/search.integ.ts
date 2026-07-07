@@ -53,11 +53,11 @@ vi.mock('~/features/auditlog-es-sync/server', () => ({
 describe('search.js /auditlog-indices routes', () => {
   let app: express.Application;
   let mockSearchService: SearchService;
+  let crowi: Crowi;
 
   beforeEach(async () => {
-    // search.js declares its router at module scope, so a cached module would
-    // reuse the same router across tests and accumulate duplicate route
-    // registrations — reset the module registry to get a fresh router each time.
+    // search.js's router is module-scoped, so reset the module registry to
+    // avoid accumulating duplicate route registrations across tests.
     vi.resetModules();
     vi.clearAllMocks();
     mockGetConfig.mockReturnValue(true); // app:auditLogEnabled = true by default
@@ -74,7 +74,7 @@ describe('search.js /auditlog-indices routes', () => {
         .mockResolvedValue({ totalCount: 0, count: 0 }),
     });
 
-    const crowi = mock<Crowi>({
+    crowi = mock<Crowi>({
       events: { activity: { emit: vi.fn() } },
       searchService: mockSearchService,
     });
@@ -102,9 +102,7 @@ describe('search.js /auditlog-indices routes', () => {
   });
 
   afterEach(() => {
-    // NOT vi.restoreAllMocks(): that resets bare vi.fn() mocks (not vi.spyOn on
-    // a real implementation) to a no-op, which would break the fresh mocks
-    // beforeEach just set up for the *next* test's still-pending assertions.
+    // Not vi.restoreAllMocks(): that would reset bare vi.fn() mocks to a no-op.
     vi.clearAllMocks();
   });
 
@@ -123,6 +121,22 @@ describe('search.js /auditlog-indices routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('info');
+    });
+
+    it('returns 503 when the search service is unreachable, without touching searchService', async () => {
+      const unreachableSearchService = mock<SearchService>({
+        isConfigured: true,
+        isReachable: false,
+        getAuditlogInfoForAdmin: vi.fn(),
+      });
+      crowi.searchService = unreachableSearchService;
+
+      const response = await request(app).get('/auditlog-indices');
+
+      expect(response.status).toBe(503);
+      expect(
+        unreachableSearchService.getAuditlogInfoForAdmin,
+      ).not.toHaveBeenCalled();
     });
   });
 

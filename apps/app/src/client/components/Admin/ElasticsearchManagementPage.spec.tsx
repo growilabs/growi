@@ -26,9 +26,6 @@ describe('ElasticsearchManagementPage', () => {
 
     render(<ElasticsearchManagementPage />);
 
-    // Regression guard: this page is loaded via next/dynamic({ ssr: false }), so
-    // Next.js's own one-shot hash-scroll runs before this component's target
-    // element exists and never retries — the component must scroll itself.
     expect(scrollIntoViewSpy).toHaveBeenCalledOnce();
   });
 

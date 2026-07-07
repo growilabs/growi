@@ -7,9 +7,8 @@ import ElasticsearchManagement from './ElasticsearchManagement/ElasticsearchMana
 export const ElasticsearchManagementPage = (): JSX.Element => {
   const { t } = useTranslation('admin');
 
-  // This page is loaded via next/dynamic({ ssr: false }), so it mounts after
-  // Next.js's own one-shot, non-retrying hash-scroll already ran and found no
-  // matching element. Scroll to the URL hash ourselves once we're in the DOM.
+  // next/dynamic({ ssr: false }) means Next's own one-shot hash-scroll runs
+  // before this mounts, so we scroll to the URL hash ourselves.
   useEffect(() => {
     const hash = window.location.hash.slice(1);
     if (hash === '') return;

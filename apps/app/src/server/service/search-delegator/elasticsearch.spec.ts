@@ -392,9 +392,7 @@ describe('ElasticsearchDelegator', () => {
     it('swaps the alias onto the tmp index while the live index is rebuilt', async () => {
       await delegator.rebuildAuditlogIndex();
 
-      // The alias must move onto tmp before the live index is dropped so it stays attached
-      // to an existing index rather than dangling. (tmp may be incomplete; reindex is
-      // best-effort — see the addAllAuditlogs repopulation below.)
+      // Must happen before the live index is dropped, or the alias would dangle.
       expect(mockES8Client.indices.updateAliases).toHaveBeenNthCalledWith(1, {
         actions: [
           { add: { alias: 'auditlogs-alias', index: 'auditlogs-tmp' } },
