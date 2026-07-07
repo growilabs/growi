@@ -87,13 +87,24 @@ export const getAvailableProviders = (): AiProvider[] =>
   );
 
 /**
- * The allow-list entries whose owning provider is available — implements the Req
- * 6.1 exclusion of misconfigured/disabled providers' models. Always a subset of
- * getAllowedModels(), preserving its order.
+ * The allow-list entries whose owning provider is available AND whose modelId is
+ * usable — implements the Req 6.1 exclusion of misconfigured/disabled providers'
+ * models. Always a subset of getAllowedModels(), preserving its order.
+ *
+ * The modelId guard is deliberate: getAllowedModels() KEEPS a valid-provider entry
+ * whose modelId is missing/blank so the admin GET can surface it as a fixable form
+ * row. But env-provided allow-lists (AI_ALLOWED_MODELS) bypass the PUT validator
+ * entirely, so such an entry would otherwise reach chat, where buildModelKey forms
+ * the literal key `<provider>/undefined` (or `<provider>/`) and sends the string
+ * modelId verbatim to the provider (a 404 on every request). Chat must never offer
+ * one — exclude it here rather than in getAllowedModels, which keeps it visible.
  */
 export const getAvailableModels = (): AllowedModel[] => {
   const availableProviders = new Set(getAvailableProviders());
-  return getAllowedModels().filter((model) =>
-    availableProviders.has(model.provider),
+  return getAllowedModels().filter(
+    (model) =>
+      availableProviders.has(model.provider) &&
+      typeof model.modelId === 'string' &&
+      model.modelId.trim() !== '',
   );
 };

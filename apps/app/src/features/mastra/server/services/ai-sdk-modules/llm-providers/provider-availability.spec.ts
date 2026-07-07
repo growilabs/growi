@@ -333,4 +333,25 @@ describe('getAvailableModels (Req 6.1)', () => {
 
     expect(getAvailableModels()).toEqual(allowedModels);
   });
+
+  it('excludes entries with a missing / blank modelId that bypass the PUT validator (env-seeded)', () => {
+    configure({
+      providers: { openai: { enabled: true } },
+      apiKeys: { openai: 'sk-openai' },
+    });
+    // getAllowedModels keeps valid-provider entries even with an unusable modelId
+    // (admin visibility); an env-provided allow-list can carry such shapes because
+    // it never passes the PUT validator. getAvailableModels must drop them so chat
+    // never forms `openai/undefined` / `openai/`.
+    getAllowedModels.mockReturnValue([
+      { provider: 'openai', modelId: 'gpt-5', isDefault: true },
+      { provider: 'openai' }, // modelId missing entirely (field typo in env JSON)
+      { provider: 'openai', modelId: '' }, // empty
+      { provider: 'openai', modelId: '   ' }, // whitespace-only
+    ]);
+
+    expect(getAvailableModels()).toEqual([
+      { provider: 'openai', modelId: 'gpt-5', isDefault: true },
+    ]);
+  });
 });
