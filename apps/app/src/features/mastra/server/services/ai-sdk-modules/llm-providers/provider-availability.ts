@@ -1,10 +1,7 @@
 import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
 import { AI_PROVIDERS } from '~/features/mastra/interfaces/ai-provider';
 import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
-import type {
-  ProviderAvailability,
-  ProviderUnavailableReason,
-} from '~/features/mastra/interfaces/provider-availability-rule';
+import type { ProviderAvailability } from '~/features/mastra/interfaces/provider-availability-rule';
 import { evaluateProviderAvailability } from '~/features/mastra/interfaces/provider-availability-rule';
 
 import { getAllowedModels, getApiKey, getProviderSettings } from './config';
@@ -28,10 +25,6 @@ import { warnOnce } from './warn-dedup';
 // way round) and only shares the warn-dedup registry with them (design
 // "Allowed Dependencies"). It must NOT import effective-model-key or
 // is-ai-configured — those import IT.
-
-// Re-exported so server consumers/tests can keep importing the availability types
-// from this module; the rule (and its types) now live in the interfaces layer.
-export type { ProviderAvailability, ProviderUnavailableReason };
 
 // Emit the misconfiguration warn for an enabled-but-broken provider, deduplicated
 // per (provider, reason) so a per-request availability check does not flood the log
