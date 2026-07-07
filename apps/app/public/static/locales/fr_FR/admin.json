@@ -477,6 +477,7 @@
     "provider_options_label": "Options du fournisseur (JSON)",
     "provider_options_doc_link": "Comment écrire",
     "provider_options_invalid_json": "JSON non valide",
+    "provider_options_invalid_json_save_blocked": "Un modèle a des options de fournisseur (JSON) non valides. Veuillez les corriger avant d'enregistrer.",
     "provider_options_error_at_line": "(ligne {{line}})",
     "env_only_mode_notice": "Les paramètres IA sont fixés par des variables d'environnement et ne peuvent pas être modifiés ici.",
     "unconfigured_warning": "L'IA est activée mais n'est pas entièrement configurée ; elle ne fonctionnera pas tant que les paramètres ne seront pas complétés.",

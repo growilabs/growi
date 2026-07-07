@@ -486,6 +486,7 @@
     "provider_options_label": "提供商选项 (JSON)",
     "provider_options_doc_link": "写法",
     "provider_options_invalid_json": "无效的 JSON",
+    "provider_options_invalid_json_save_blocked": "某个模型的提供商选项（JSON）无效。请先修正后再保存。",
     "provider_options_error_at_line": "（第 {{line}} 行）",
     "env_only_mode_notice": "AI 设置由环境变量固定，无法在此处编辑。",
     "unconfigured_warning": "AI 已启用但尚未完成配置，在完成设置之前将无法使用。",

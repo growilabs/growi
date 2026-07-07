@@ -477,6 +477,7 @@
     "provider_options_label": "공급자 옵션 (JSON)",
     "provider_options_doc_link": "작성 방법",
     "provider_options_invalid_json": "유효하지 않은 JSON입니다",
+    "provider_options_invalid_json_save_blocked": "제공자 옵션(JSON)이 유효하지 않은 모델이 있습니다. 저장하기 전에 수정해 주세요.",
     "provider_options_error_at_line": "({{line}}번째 줄)",
     "env_only_mode_notice": "AI 설정은 환경 변수로 고정되어 있어 여기에서 편집할 수 없습니다.",
     "unconfigured_warning": "AI가 활성화되었지만 설정이 완료되지 않아 설정을 완료하기 전까지 작동하지 않습니다.",

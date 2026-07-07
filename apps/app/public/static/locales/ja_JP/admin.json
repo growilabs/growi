@@ -486,6 +486,7 @@
     "provider_options_label": "プロバイダーオプション (JSON)",
     "provider_options_doc_link": "書き方",
     "provider_options_invalid_json": "JSON の形式が正しくありません",
+    "provider_options_invalid_json_save_blocked": "プロバイダーオプション（JSON）が正しくないモデルがあります。保存する前に修正してください。",
     "provider_options_error_at_line": "（{{line}} 行目）",
     "env_only_mode_notice": "AI 設定は環境変数で固定されているため、この画面からは編集できません。",
     "unconfigured_warning": "AI は有効になっていますが設定が完了していないため、設定を完了するまで動作しません。",

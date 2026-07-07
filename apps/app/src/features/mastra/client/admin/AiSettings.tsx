@@ -16,6 +16,7 @@ import { AllowedModelsField } from './AllowedModelsField';
 import {
   type AiSettingsFormValues,
   buildUpdateRequest,
+  findFirstInvalidProviderOptionsIndex,
   hasDirtyField,
   toFormValues,
 } from './ai-settings-form-values';
@@ -65,6 +66,7 @@ export const AiSettings = (): JSX.Element | null => {
   const {
     handleSubmit,
     reset,
+    setError,
     formState: { isSubmitting, dirtyFields },
   } = methods;
 
@@ -87,6 +89,30 @@ export const AiSettings = (): JSX.Element | null => {
     // env-seeded list that lacks a default (valid at runtime, rejected by the PUT
     // exactly-one-default rule).
     const allowedModelsDirty = hasDirtyField(dirtyFields.allowedModels);
+
+    // Submit-time safety net for providerOptions JSON. The inline validator only
+    // runs for MOUNTED fields, and only the active provider panel is mounted — so
+    // an invalid value left on an inactive tab escapes it and would otherwise throw
+    // inside JSON.parse during serialization (a cryptic toast referencing a row on
+    // a hidden tab). Re-validate the whole (about-to-be-sent) list here: on the
+    // first offending row, reveal its provider tab so its inline error is visible,
+    // flag the field, and abort the save. Only relevant when the list is dirty —
+    // an untouched list is omitted from the PUT and never serialized.
+    if (allowedModelsDirty) {
+      const invalidIndex = findFirstInvalidProviderOptionsIndex(
+        values.allowedModels,
+      );
+      if (invalidIndex !== -1) {
+        setActiveProvider(values.allowedModels[invalidIndex].provider);
+        setError(`allowedModels.${invalidIndex}.providerOptionsText`, {
+          type: 'validate',
+          message: t('ai_settings.provider_options_invalid_json'),
+        });
+        toastError(t('ai_settings.provider_options_invalid_json_save_blocked'));
+        return;
+      }
+    }
+
     try {
       // Pass the mode so env-only sends only allowedModels (R5.3): a request
       // carrying providers/aiEnabled is rejected 400 under env-only.

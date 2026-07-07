@@ -477,6 +477,7 @@
     "provider_options_label": "Provider Options (JSON)",
     "provider_options_doc_link": "How to write",
     "provider_options_invalid_json": "Invalid JSON",
+    "provider_options_invalid_json_save_blocked": "A model has invalid provider options (JSON). Please fix it before saving.",
     "provider_options_error_at_line": "(line {{line}})",
     "env_only_mode_notice": "AI settings are fixed by environment variables and cannot be edited here.",
     "unconfigured_warning": "AI is enabled but not fully configured, so it will not work until you complete the settings.",

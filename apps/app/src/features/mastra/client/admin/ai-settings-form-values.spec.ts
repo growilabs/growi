@@ -7,6 +7,7 @@ import {
   type AllowedModelFormValue,
   buildUpdateRequest,
   evaluateFormProviderAvailability,
+  findFirstInvalidProviderOptionsIndex,
   hasDirtyField,
   type ProviderFormValue,
   setDefaultAllowedModelAt,
@@ -449,5 +450,49 @@ describe('evaluateFormProviderAvailability', () => {
     expect(
       evaluateFormProviderAvailability('openai', undefined, false),
     ).toEqual({ available: false, reason: 'disabled' });
+  });
+});
+
+describe('findFirstInvalidProviderOptionsIndex', () => {
+  const row = (
+    overrides: Partial<AllowedModelFormValue> = {},
+  ): AllowedModelFormValue => ({
+    provider: 'openai',
+    modelId: 'gpt-4o',
+    providerOptionsText: '',
+    isDefault: false,
+    ...overrides,
+  });
+
+  it('returns -1 when every row is valid (empty and well-formed namespaced JSON)', () => {
+    const models = [
+      row({ providerOptionsText: '' }),
+      row({ modelId: 'b', providerOptionsText: '{ "openai": {} }' }),
+    ];
+    expect(findFirstInvalidProviderOptionsIndex(models)).toBe(-1);
+  });
+
+  it('returns the flat-array index of the first syntactically invalid row', () => {
+    const models = [
+      row({ providerOptionsText: '{ "openai": {} }' }),
+      row({
+        provider: 'anthropic',
+        modelId: 'x',
+        providerOptionsText: '{oops',
+      }),
+    ];
+    // The offending row is the second (index 1) — e.g. left on an inactive tab.
+    expect(findFirstInvalidProviderOptionsIndex(models)).toBe(1);
+  });
+
+  it('flags a wrong-shape (well-formed but non-namespaced) value as invalid', () => {
+    // Valid JSON that the runtime would ignore (a bare array), so it must be
+    // rejected up front rather than parsed and sent.
+    const models = [row({ providerOptionsText: '[]' })];
+    expect(findFirstInvalidProviderOptionsIndex(models)).toBe(0);
+  });
+
+  it('returns -1 for an empty list', () => {
+    expect(findFirstInvalidProviderOptionsIndex([])).toBe(-1);
   });
 });

@@ -10,6 +10,7 @@ import {
   evaluateProviderAvailability,
   type ProviderAvailability,
 } from '../../interfaces/provider-availability-rule';
+import { isValidProviderOptionsJson } from '../../utils/provider-options-validation';
 
 /**
  * The react-hook-form working copy for a single provider slot.
@@ -120,9 +121,10 @@ export const toFormValues = (
  *
  * `provider` and `isDefault` are copied through. `providerOptionsText` is parsed
  * into `providerOptions`; an empty (or whitespace-only) text omits the field so
- * the model is stored as "no options" (R2.3). The text is assumed valid JSON here
- * — the form rejects an invalid value before submit via the inline validator
- * (R2.4).
+ * the model is stored as "no options" (R2.3). The text is assumed valid JSON here:
+ * the inline validator rejects it on the ACTIVE panel, and
+ * `findFirstInvalidProviderOptionsIndex` is the submit-time net that catches an
+ * invalid value left on an INACTIVE (unmounted) tab before this parse runs (R2.4).
  */
 const toAllowedModel = (row: AllowedModelFormValue): AllowedModel => {
   const trimmed = row.providerOptionsText.trim();
@@ -136,6 +138,27 @@ const toAllowedModel = (row: AllowedModelFormValue): AllowedModel => {
   }
   return { ...base, providerOptions: JSON.parse(trimmed) };
 };
+
+/**
+ * The flat-array index of the first allowed-model row whose `providerOptionsText`
+ * is not valid JSON (per the shared FE/BE validator), or `-1` when every row is
+ * valid.
+ *
+ * `buildUpdateRequest` maps EVERY row through `toAllowedModel`, which `JSON.parse`s
+ * the providerOptions text trusting the inline react-hook-form validator to have
+ * rejected bad input. But that validator only runs for MOUNTED fields, and only the
+ * active provider panel is mounted — so an invalid value typed on one tab and left
+ * behind on a tab switch is never re-validated and would throw inside `JSON.parse`
+ * at submit (surfacing as a cryptic parse error, or a wrong-shape value the server
+ * then 400s). This whole-list scan is the submit-time safety net: the container
+ * runs it before serializing, reveals the offending row's tab, and blocks the save.
+ */
+export const findFirstInvalidProviderOptionsIndex = (
+  models: AllowedModelFormValue[],
+): number =>
+  models.findIndex(
+    (row) => !isValidProviderOptionsJson(row.providerOptionsText),
+  );
 
 /**
  * Map a single provider slot to its `AiProviderUpdateRequest` section.
