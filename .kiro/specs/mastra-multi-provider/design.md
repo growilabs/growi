@@ -468,13 +468,14 @@ export interface AiSettingsUpdateRequest {
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
 | GET | /_api/v3/ai-settings | — | AiSettingsResponse | 500 |
-| PUT | /_api/v3/ai-settings | AiSettingsUpdateRequest | AiSettingsResponse 相当 | 400(検証・env-only 違反), 500 |
+| PUT | /_api/v3/ai-settings | AiSettingsUpdateRequest | 空ボディ(`{}`) | 400(検証・env-only 違反), 500 |
 
 - **PUT セマンティクス**: トップレベル 3 フィールド(`aiEnabled` / `providers` / `allowedModels`)は**省略 = その区画を変更しない**。存在する区画は full-state replace(暗黙リセットの解釈余地を契約から排除する — 現行の「省略 = クリア」semantics は引き継がない)。`providers` を含むリクエストは**対応 4 プロバイダの全エントリ必須**(validator で強制 — 固定スロットモデルに整合し、省略エントリの暗黙リセットという解釈余地を契約から排除する)。`allowedModels` の**空配列は「許可モデルなし」として受理し、DB に `[]` を保存**する(キー削除による env フォールバックへの暗黙リセットはしない — シャドーイング規則と一貫。0 件状態の可用性は 6.3 の「AI 未設定」に合流し、段階的セットアップ・全モデル撤去を可能にする = 3.3)。各プロバイダの `apiKey` のみ merge 例外(非空のみ更新、消去操作なし)。`ai:providerApiKeys` は「現在値 + 今回の非空キー」で再構成する(1.3, 1.4)。merge の「現在値」の読取ソースは **`getConfig('ai:providerApiKeys')` のマージ後ビュー(DB ?? env)** とする — `isApiKeySet` と同じビューなので、管理画面で「設定済み」と見えているキーは env 由来であっても保存後に必ず維持され(1.4)、稼働中の構成が UI 保存で壊れない。副作用として env 由来キーが DB へ複製され以後その env 変更は効かなくなるが、これはシャドーイング規則(config-definition 節)どおりの標準挙動。さらに**非空の `apiKey` を 1 つも含まないリクエストでは `ai:providerApiKeys` を updates に含めない**(書かない = DB 値を作らない)— トグルや許可モデルだけの保存で env 運用中のキーが DB に複製・固定化されることを防ぐ。
 - **並行更新(lost update)の扱い**: PUT は last-write-wins とし、楽観ロック等の並行制御は導入しない(現行 AiSettings と同じ特性。管理画面の同時編集の直列化は保証しない — R1.3 の「独立」は、1 リクエストが他プロバイダの保存値を意図的に変更しないことを指す)。ただし `apiKey` merge の「現在値」は**保存処理内で読み取ることを必須とする**(GET 時点のスナップショットやフォーム由来の値から Record を再構成してはならない)。キー値は応答に含まれず「空 = 維持」のため、フォームの古い状態からキー素材が巻き戻ることは構造的に起きず、他プロバイダのキー(例: ローテーション直後の新キー)が旧値へ戻り得るのは同時 PUT のハンドラ内 read→write 間の短い窓のみに限定される(マルチインスタンス構成では、他インスタンスの直前の保存が s2s `configUpdated` で自インスタンスの config キャッシュに反映されるまでの伝搬遅延分だけ窓が延びる)。`ai:providers`(トグル・Azure 設定)はフォーム全量置換のため同時編集では後勝ちが先の変更を上書きし得るが、これは管理画面上で可視であり再設定で回復可能。
 - **env-only 分割(5.2/5.3)**: `env:useOnlyEnvVars:ai` 有効時、`providers` または `aiEnabled` を含むリクエストは 400(明示拒否)。`allowedModels` のみのリクエストは通常どおり検証・保存(5.4: validate-allowed-models は経路共通)。この 400 契約と対になるクライアント側の送出分岐(env-only 時は `allowedModels` のみの body を構成する)は管理画面の `buildUpdateRequest` が担う(client / 管理画面 節参照)— 分岐がないと env-only 時に Update が常に 400 になり R5.3 を満たせない。
 - **validate-allowed-models**: 各エントリ = `isAiProvider(provider)`(2.5)∧ modelId 非空 ∧ (provider, modelId) 一意(2.3, 2.4)∧ providerOptions namespace 形式 ∧ isDefault ちょうど 1 つ(3.2 — **非空リストのみに適用**。空配列は「許可モデルなし」として受理する = 3.3)。所属プロバイダの構成状態は検証しない(2.9)。
-- **秘匿規律(1.9)**: catch でも request body を stringify しない(現行パターン)。保存成功後 `clearResolvedMastraModelCache()` + availability ログ dedup リセット。
+- **PUT 応答形**: 成功応答は**空ボディ(`res.apiv3({})`)**とし、更新後の設定を返さない。クライアント(`useAiSettings`)は保存成功後に SWR `mutate()` で GET を再取得してフォームを再シードする(秘匿規律とも整合: 応答にキー素材を一切載せない)。
+- **秘匿規律(1.9)**: catch でも request body を stringify しない。エラーログ(`logger.error`)にも apiKey を載せない(現行パターン)。保存成功後 `clearResolvedMastraModelCache()` + availability ログ dedup リセット。
 
 ### routes / chat API(get-models・post-message)
 
@@ -528,7 +529,7 @@ export interface AiSettingsFormValues {
 }
 ```
 
-- **buildUpdateRequest(フォーム → 更新リクエスト)**: 通常時は `{ aiEnabled, providers(4 エントリすべて), allowedModels }` を送出。**env-only 時(`useOnlyEnvVars: true`)は `{ allowedModels }` のみを送出**し、`providers` / `aiEnabled` を body に含めない(PUT の env-only 400 契約に対応するクライアント側責務 — 5.3)。
+- **buildUpdateRequest(フォーム → 更新リクエスト)**: 通常時は `{ aiEnabled, providers(4 エントリすべて) }` を送出。**env-only 時(`useOnlyEnvVars: true`)は `providers` / `aiEnabled` を body に含めない**(PUT の env-only 400 契約に対応するクライアント側責務 — 5.3)。`allowedModels` は**リストが dirty(react-hook-form 上で実際に編集された)ときのみ送出**し、未編集なら省略する(PUT の「省略 = 変更なし」に委ねる)。理由: env シードの許可モデルリストは既定なし(0 件既定)でも実行時は先頭フォールバックで有効だが、PUT の「ちょうど 1 つの既定」検証(3.2)では弾かれる。未編集リストを毎回そのまま送ると、プロバイダトグル/apiKey/aiEnabled だけの無関係な保存まで 400 になるため、dirty 時のみ送る。結果として env-only かつリスト未編集の保存は空 body(`{}`)になり得る(サーバは全区画省略として何も変更しない)。
 - **AiSettings.tsx**: AI 有効トグル → DefaultModelSelector → ProviderTabs(アクティブタブ state)→ ProviderPanel(アクティブのみ mount)→ Update。
 - **DefaultModelSelector**: `allowedModels` を provider でグループ表示し、選択 = 対象行の `isDefault` を true・他を false(3.1)。ProviderPanel 行内の★と同一の書き換え(共有ヘルパ)。
 - **ProviderPanel**: 有効トグル(1.5)・API キー入力(設定済みは `(configured)` placeholder、1.8)・「API key set / not set」チップ・AllowedModelsField(provider prop)・azure のみ AzureOpenaiSettings。env-only 時は接続設定系フィールドを disabled(5.2)、モデル編集は活性のまま(5.3)。
