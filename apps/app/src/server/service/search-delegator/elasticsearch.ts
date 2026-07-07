@@ -559,9 +559,8 @@ class ElasticsearchDelegator
       .cursor();
     const batchStream = createBatchStream(bulkSize);
 
-    // Counts activities read from the cursor, not documents actually bulk-indexed:
-    // activities without a snapshot.username are skipped by prepareBodyForAuditlog,
-    // so counting only indexed items would leave count permanently short of totalCount.
+    // Counts activities read, not documents indexed — some are skipped by
+    // prepareBodyForAuditlog, which would leave count short of totalCount.
     let count = 0;
     const writeStream = new Writable({
       objectMode: true,
@@ -743,6 +742,8 @@ class ElasticsearchDelegator
     body.push(command);
   }
 
+  // FinishAddPage is emitted by rebuildIndex (this method's only caller), not
+  // here — don't call this with shouldEmitProgress:true from elsewhere.
   addAllPages(option: AddAllPagesOption = { shouldEmitProgress: false }) {
     const { shouldEmitProgress } = option;
     const Page = this.getPageModel();
