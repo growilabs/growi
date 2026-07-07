@@ -62,14 +62,28 @@
 
 ## 7. 実装アプローチ
 
-前提: いずれも既存構造の **Extend**。差は「対象外行を作らない(A)」か「作って消す(B)」か。
+### 前提: UNSETTLED 行の3分類と fail-safe（重要）
+middleware がルート本体の**前**（apiv3 認証チェーン内）で無条件に UNSETTLED を作るのは、**「危険な処理を実行する前に、API call が起きた事実（誰・いつ・どのエンドポイント・IP）を最低限焼き付ける fail-safe」** と読める。ルート／サービスが例外を投げても、あるいはミューテーション成功後 settle 直前にプロセスが落ちても、「操作が試みられた」痕跡が残る。監査・コンプライアンス機能としては、この「失敗・中断した試行の記録」自体に価値がある。
+
+UNSETTLED 行は起源が3種類あり、混同してはいけない:
+
+| 起源 | emit | 現状 | 位置づけ |
+|---|---|---|---|
+| ① 対象内 action | あり | 実 action に settle | 正常・保持 |
+| ② **対象外 action** | あり | UNSETTLED のまま残る | **要件が消したい「ノイズ」** |
+| ③ 例外／no-op で emit せず | なし | UNSETTLED のまま残る | **fail-safe の試行記録（残す価値あり）** |
+
+要件「対象外を save しない」が指すのは **② のみ**（emit は来たが記録可否で弾かれたもの）。② は必ず emit が来るので settle 時に判定して落とせる。③（fail-safe）は emit が来ないので settle 起点の処理では触れない。**② と ③ を分けて考えることが、方式選定の肝**。
+
+前提: いずれも既存構造の **Extend**。差は「対象外行を作らない(A)」「作って消す(B)」「失敗時だけ後から作る(C)」。
 
 ### Option A — defer-create（middleware は id 採番のみ、settle 時に対象内だけ create）
 - **要改修**:
   1. `add-activity.ts`: DB 書込みをやめ、ObjectId を採番して `res.locals.activity = { _id }` を残す（**109 箇所の `res.locals.activity._id` と `update-page.ts:125` の `getIdStringForRef` を無改修で温存**）。
   2. update リスナー: 対象内なら `updateByParameters` の代わりに **create（id 指定）**。既存 `createActivity`（gated-create, `:256-270`）と同型で流用可。`createByParameters` は `_id` 指定 create を受け付ける（activity-log-snapshot 設計の記載）。
   3. 第2作成源 `page/index.ts:2819` の自前 create も遅延化。
-- **未 settle**: 構造的に解決（作らない）。**書き込み回数自体が減る**（負荷軽減の狙いに合致）。
+- **未 settle**: 構造的に「作らない」。ただし②だけでなく**③の fail-safe も丸ごと失う**（クラッシュ耐性ゼロ＝例外・中断時の試行記録が残らない）。監査観点では劣化。
+- **書き込み**: ②＋③のリクエスト分は減る。ただし①（大多数の正常操作）は結局1回 create するので、write 削減効果は「②＋③の比率」次第で限定的なこともある。
 - **凝集度(R3)**: settle が create に変わるのを機に `settleActivity()` 抽出が自然。contribution は activityId 非依存（3）で分離容易。
 - **リスク**: 広く使われ 109 箇所が `res.locals.activity` の形に依存 → 採番変種で回避可だが要検証。`add-activity.spec.ts:44-62`（無条件作成の契約）と `activity.spec.ts:247-267`（block 時非更新）の**テスト契約を改訂**。`updateByParameters` を復元/連動系で使い続けるか整理要。
 - **Effort: M（3–7日）／ Risk: Medium**（依存箇所は多いが回避策明確・単一情報源は既存）。
@@ -78,28 +92,45 @@
 - **要改修**:
   1. **activity extension に delete メソッドを新設**（現状 `deleteBy*`/`deleteMany` 無し）。
   2. リスナーの `if (!shoudUpdate)` 分岐で該当行を delete（contribution は `:124-145` で先行確定済み・4 より常に settle される行なので実害小）。
-- **未 settle**: **未解決**（emit が来ない仮行は消えない＝TTL 頼み）。一覧混入（6）も emit 済み対象外行のみ解消。
-- **書き込み**: write→delete で**回数は減らない**（保管量は減る）。
-- **凝集度(R3)**: 同リスナーに削除責務が増え肥大化。
-- **リスク**: 既存 read/emit を温存でき**低リスク**。ただし目的の達成度が (A) に劣る。
+- **未 settle（③）**: 意図的に**残す**（emit が来ない仮行は消えない）。②（emit 済み対象外）だけを削除するので、「対象外は消す／試行記録は残す」という fail-safe 意図に最も素直。クラッシュ耐性あり。
+- **書き込み**: write→delete で**回数は減らない**（保管量＝②の行数だけ減る）。負荷が write-IOPS なら効果薄、stored-size なら効く。
+- **凝集度(R3)**: 同リスナーに削除責務が増え肥大化 → 責務分離（後述）と併せると良い。
+- **リスク**: 既存 read/emit を温存でき**低リスク**。fail-safe を保つ点は (A) より監査上優れる。
 - **Effort: S–M（2–5日）／ Risk: Low–Medium**。
 
-### 併せて検討（両案共通・R3）
+### Option C — lazy fail-safe（先には作らず、①は settle 時 create・③は例外時のみ create）
+- **要改修**: middleware は事前作成せず（(A) 同様 id 採番のみ）。①は settle 時に create（対象内のみ）。② は何もしない。**③はエラーハンドラ（Express error middleware / finish フック）で UNSETTLED を後から create**。
+- **未 settle（③）**: 「正常に失敗した試行」は残る。ただし **pre-execution ではないためクラッシュ（プロセス即死・エラーハンドラ未到達）は取りこぼす**（(B) との差）。
+- **書き込み**: ②を書かず、①は1回、③はエラー時のみ → **write 削減と失敗監査を両立**。
+- **凝集度(R3)**: 記録ライフサイクルを1ユニットに集約しやすい。ただしエラーハンドラという新たな結合点が増える。
+- **リスク**: エラー経路の網羅・二重作成防止（settle と error の両立ち回避）の設計が要る。**Risk: Medium**（新経路）。
+- **Effort: M（3–7日）／ Risk: Medium**。
+
+### 併せて検討（全案共通・R3）
 - update リスナーの責務分離（contribution / 記録ライフサイクル / 通知）。記録可否の責務を薄いユニットに抽出すると R3（凝集度・不要な責務依存の排除）を満たしやすい。**Effort: S–M**。
 - 一覧 where の UNSETTLED 明示除外（6）。**Effort: S**。
 
 ## 8. design フェーズへの申し送り
 
-**推奨の初期姿勢**: 目的「対象外を永続化しない＋未 settle 残骸も出さない＋書き込み削減」を最も満たすのは **(A)**。contribution が activityId 非依存（3・4）と判明したため、要件段階で懸念した (A) の主障害は「middleware を採番のみにする変種」で回避できる。(B) は低リスクだが未 settle 残骸を残し delete メソッド新設が要る。design で書き込み回数・実装リスク・復元/連動経路（第2作成源）の扱いを計測・比較して確定する。
+**方式選定は「pre-execution の fail-safe（③＝失敗・中断した操作の試行記録、クラッシュ含む）をどれだけ重視するか」で決まる**（当初 (A) 寄りとしていたが、③の監査価値を踏まえ中立に修正）:
+- クラッシュ含めて試行記録を残したい → **(B)**（保管量だけ減る／write は減らない）。要件「対象外を消す」に最も素直で低リスク。
+- 「正常な失敗」までで十分・write も減らしたい → **(C)**（クラッシュは取りこぼす）。
+- 試行記録は不要・とにかく write 最小 → **(A)**（fail-safe を全放棄）。
+- contribution は activityId 非依存（3・4）なので、(A)(C) で行を遅延させても貢献度は壊れない。
+
+**まず決めるべき前提（要件レベルに昇格しうる）**: 「失敗・中断した操作（③）の試行記録を監査として残すか」。**残す＝要件化するなら (A) は不可**となり (B)/(C) に絞られる。ここは product/コンプライアンス判断なのでユーザー確認が要る（下記で確認中）。
 
 **Research Needed（design で決める）**:
-1. (A) vs (B) の最終決定（書き込み回数への効果を含めて）。
-2. 一覧 where の UNSETTLED 除外を本 spec と viewer spec のどちらが持つか。
-3. 第2作成源（`page/index.ts:2819` 復元フロー）の統一的な扱い。
-4. (A) 採用時: `res.locals.activity` 消費者が特定2種以外に無いことの最終確認、`updateByParameters` を復元/連動系で継続使用するかの整理。
-5. update リスナーの責務分離をどこまで design に含めるか（R3 の担保方法）。
+1. ③（fail-safe 試行記録）を残すか。→ (A) の可否が決まる。
+2. 「負荷」の主眼が write-IOPS か stored-size か。→ (B)（size減）と (A)/(C)（write減）の選択に効く。
+3. (A) vs (B) vs (C) の最終決定。
+4. 一覧 where の UNSETTLED 除外を本 spec と viewer spec のどちらが持つか。
+5. 第2作成源（`page/index.ts:2819` 復元フロー）の統一的な扱い。
+6. (A)/(C) 採用時: `res.locals.activity` 消費者が特定2種以外に無いことの最終確認、`updateByParameters` を復元/連動系で継続使用するかの整理。
+7. update リスナーの責務分離をどこまで design に含めるか（R3 の担保方法）。
 
 ## 9. Effort / Risk サマリ
-- Option A: **M / Medium** — 依存 109 箇所は採番変種で回避、単一情報源は既存流用、未 settle を構造解決。テスト契約改訂が必要。
-- Option B: **S–M / Low–Medium** — 既存温存で低リスクだが delete 新設要・未 settle 未解決。
+- Option A（defer-create）: **M / Medium** — write 削減は②③分のみ・単一情報源は既存流用。ただし fail-safe(③)を全放棄。テスト契約改訂が必要。
+- Option B（delete-at-settle）: **S–M / Low–Medium** — 既存温存・低リスク・fail-safe 維持。delete メソッド新設要・write は減らない（size のみ減）。
+- Option C（lazy fail-safe）: **M / Medium** — write 削減と失敗監査を両立だがクラッシュ取りこぼし・エラー経路の新結合点。
 - 共通改善（責務分離・一覧除外）: **S–M / Low**。
