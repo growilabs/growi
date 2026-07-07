@@ -22,6 +22,18 @@ overrides:
   # fixed in 6.10.3. Without this, transitive consumers (@uiw/*, codemirror) keep
   # pulling 6.8.0 alongside our direct 6.10.3.
   '@codemirror/commands': ^6.10.3
+  # Dedupe @babel/core to a single patch so Turbopack's build-time
+  # .next/node_modules/<pkg>-<hash> symlinks survive `pnpm deploy --prod`.
+  # next@16 declares @babel/core as an optional peer, and pnpm bakes the resolved
+  # peer version into next's (and next-i18next's, which embeds next's) virtual-store
+  # dir name. The full dev install deduped it to 7.29.7, but `pnpm deploy --prod`
+  # re-resolved the prod-only graph to 7.29.0 — a different .pnpm dir name — so the
+  # symlinks Turbopack baked at build time dangled in the prod tarball
+  # (check-next-symlinks.sh failure). Both are patch-equal and babel is an unused
+  # optional peer here (GROWI builds with Turbopack/SWC), so pinning the higher patch
+  # is safe and keeps the dev build hash unchanged.
+  # See apps/app/.claude/rules/package-dependencies.md.
+  '@babel/core': 7.29.7
 
 packageExtensions:
   # @orval/core bundles @stoplight/json-ref-resolver which requires lodash/get at runtime,

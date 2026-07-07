@@ -39,9 +39,7 @@ export async function up(db) {
     .updateMany({}, [{ $set: { page: '$pageId' } }, { $unset: ['pageId'] }]);
 
   // Create index
-  const collection = mongoose.connection.collection(
-    'vectorstorefilerelations',
-  );
+  const collection = mongoose.connection.collection('vectorstorefilerelations');
   await collection.createIndex(
     { vectorStoreRelationId: 1, page: 1 },
     { unique: true },

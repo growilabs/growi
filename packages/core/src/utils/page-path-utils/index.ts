@@ -111,7 +111,7 @@ const restrictedPatternsToCreate: Array<RegExp> = [
   /^(\.\.)$/, // see: https://github.com/growilabs/growi/issues/3582
   /(\/\.\.)\/?/, // see: https://github.com/growilabs/growi/issues/3582
   /\\/, // see: https://github.com/growilabs/growi/issues/7241
-  /^\/(_search|_private-legacy-pages)(\/.*|$)/,
+  /^\/(_search|_private-legacy-pages|_news)(\/.*|$)/,
   /^\/(installer|register|login|logout|admin|me|files|trash|paste|comments|tags|share|attachment)(\/.*|$)/,
   /^\/user(?:\/[^/]+)?$/, // https://regex101.com/r/9Eh2S1/1
   /^(\/.+){130,}$/, // avoid deep layer path. see: https://regex101.com/r/L0kzOD/1

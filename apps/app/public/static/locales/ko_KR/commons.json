@@ -62,7 +62,8 @@
     "news": "공지사항",
     "notifications": "알림",
     "filter_all": "전체",
-    "no_news": "공지사항이 없습니다"
+    "no_news": "공지사항이 없습니다",
+    "view_detail": "자세히 보기"
   },
   "personal_dropdown": {
     "home": "홈",

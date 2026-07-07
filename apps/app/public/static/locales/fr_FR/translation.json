@@ -543,10 +543,20 @@
   "ai_sidebar": {
     "new_chat": "Nouvelle discussion",
     "recent_threads": "Éléments récents",
+    "sources": "{{count}} pages référencées",
+    "sources_one": "{{count}} page référencée",
+    "sources_other": "{{count}} pages référencées",
     "error": {
       "title": "Une erreur s'est produite",
       "retry": "Réessayer",
       "dismiss": "Fermer"
+    },
+    "incomplete": {
+      "length": "La réponse s'est arrêtée car elle a atteint la longueur maximale.",
+      "tool_calls": "La réponse s'est arrêtée après avoir atteint la limite d'étapes de traitement.",
+      "content_filter": "La réponse a été arrêtée par la politique de contenu.",
+      "error": "La réponse s'est arrêtée en raison d'une erreur.",
+      "unknown": "La réponse s'est arrêtée avant d'être terminée."
     },
     "toaster": {
       "thread_deleted_success": "Discussion supprimée",

@@ -1,11 +1,13 @@
 generator client {
-  provider            = "prisma-client"
-  output              = "../src/generated/prisma"
-  // ESM output to match the NodeNext server build (esm-migration task 3.6).
-  // importFileExtension makes the generated relative imports carry explicit
-  // `.js` extensions, which Node's ESM loader requires at runtime.
-  moduleFormat        = "esm"
-  importFileExtension = "js"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  // ESM output to match the project's module format. importFileExtension is
+  // intentionally left unset: Prisma then detects moduleResolution "Bundler"
+  // from tsconfig.json and emits extensionless relative imports, matching the
+  // no-extension import convention (see .claude/rules/import-convention.md).
+  // An explicit "js" here breaks Turbopack, which cannot rewrite a relative
+  // `.js` specifier to the actual `.ts` file.
+  moduleFormat = "esm"
 }
 
 datasource db {
@@ -51,11 +53,14 @@ model activities {
   id          String             @id @default(auto()) @map("_id") @db.ObjectId
   v           Int                @map("__v")
   action      String
-  createdAt   DateTime           @db.Date
-  endpoint    String
+  createdAt   DateTime           @default(now())
+  // ip/endpoint are optional as a safeguard: the legacy Mongoose schema never
+  // required them, and some write paths still omit them today, so documents
+  // without either field are expected, not corrupt.
+  endpoint    String?
   event       String?            @db.ObjectId
   eventModel  String?
-  ip          String
+  ip          String?
   snapshot    ActivitiesSnapshot
   target      String?            @db.ObjectId
   targetModel String?
@@ -80,9 +85,9 @@ model attachments {
   fileSize              Int       @default(0)
   originalName          String?
   temporaryUrlCached    String?
-  temporaryUrlExpiredAt DateTime? @db.Date
+  temporaryUrlExpiredAt DateTime?
   attachmentType        String
-  createdAt             DateTime  @default(now()) @db.Date
+  createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   creator              users?  @relation("CreatedAttachments", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -102,15 +107,20 @@ model bookmarkfolders {
 }
 
 model bookmarks {
-  id   String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  page Json?
-  /// Field referred in an index, but found no data to define the type.
-  user Json?
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  v         Int      @default(0) @map("__v")
+  createdAt DateTime @default(now())
+  // optional: pages are left orphaned (not deleted) on page complete-deletion
+  // (see deleteCompletelyOperation), so the referenced page may not exist
+  pageId    String?  @map("page") @db.ObjectId
+  userId    String   @map("user") @db.ObjectId
 
-  @@unique([page, user], map: "page_1_user_1")
-  @@index([page], map: "page_1")
-  @@index([user], map: "user_1")
+  page pages? @relation(fields: [pageId], references: [id])
+  user users  @relation(fields: [userId], references: [id])
+
+  @@unique([pageId, userId], map: "page_1_user_1")
+  @@index([pageId], map: "page_1")
+  @@index([userId], map: "user_1")
 }
 
 model comments {
@@ -125,9 +135,9 @@ model comments {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  page     pages      @relation(fields: [pageId], references: [id])
-  creator  users?     @relation(fields: [creatorId], references: [id])
-  revision revisions? @relation(fields: [revisionId], references: [id])
+  page     pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  creator  users?     @relation(fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  revision revisions? @relation(fields: [revisionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   replyTo  comments?  @relation("CommentToReply", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   replies  comments[] @relation("CommentToReply")
 
@@ -139,9 +149,9 @@ model comments {
 model configs {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   v         Int?     @map("__v")
-  createdAt DateTime @db.Date
+  createdAt DateTime @default(now())
   key       String   @unique(map: "key_1")
-  updatedAt DateTime @db.Date
+  updatedAt DateTime @updatedAt
   value     String
 }
 
@@ -155,9 +165,9 @@ model externalaccounts {
   accountId    String
   createdAt    DateTime @default(now())
   providerType String
-  userId       String?  @map("user") @db.ObjectId
+  userId       String   @map("user") @db.ObjectId
 
-  user users? @relation(fields: [userId], references: [id])
+  user users @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([providerType, accountId], map: "providerType_1_accountId_1")
 }
@@ -182,9 +192,8 @@ model externalusergroups {
 }
 
 model failedemails {
-  id        String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  createdAt Json?
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt DateTime @default(now())
 
   @@index([createdAt], map: "createdAt_1")
 }
@@ -201,7 +210,7 @@ model inappnotifications {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   action      String
   activities  String[]
-  createdAt   DateTime @db.Date
+  createdAt   DateTime @default(now())
   snapshot    String
   status      String
   target      String   @db.ObjectId
@@ -218,9 +227,29 @@ model inappnotificationsettings {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 }
 
+model mastrarefreshedmodelcatalogs {
+  // Singleton: always at most one document with the fixed string id 'singleton'
+  // (NOT an ObjectId). Holds the models.dev snapshot persisted by the opt-in
+  // runtime catalog refresh; deleting the document falls back to the bundled
+  // model-catalog-data.json asset.
+  id                           String   @id @map("_id")
+  v                            Int      @default(0) @map("__v")
+  /// provider -> selectable model ids (validated by buildModelCatalog before every write)
+  models                       Json
+  fetchedAt                    DateTime
+  /// _generatedAt of the bundled asset that was current when this snapshot was
+  /// fetched. The newer-wins resolution compares this against the CURRENT
+  /// bundled _generatedAt so both operands come from the vendoring machine's
+  /// clock (see effective-model-catalog.ts) - never the server's wall clock.
+  supersededBundledGeneratedAt DateTime
+  source                       String
+
+  @@map("mastra_refreshed_model_catalog")
+}
+
 model migrations {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  appliedAt DateTime @db.Date
+  appliedAt DateTime
   fileName  String
 }
 
@@ -300,36 +329,39 @@ model pageredirects {
 model pages {
   id                       String    @id @default(auto()) @map("_id") @db.ObjectId
   v                        Int       @map("__v")
-  commentCount             Int
-  createdAt                DateTime  @db.Date
+  commentCount             Int       @default(0)
+  createdAt                DateTime  @default(now())
   creatorId                String?   @map("creator") @db.ObjectId
-  descendantCount          Int
-  grant                    Int
+  deletedAt                DateTime?
+  deleteUserId             String?   @map("deleteUser") @db.ObjectId
+  descendantCount          Int       @default(0)
+  expandContentWidth       Boolean?
+  grant                    Int       @default(1)
   /// Nested objects had no data in the sample dataset to introspect a nested type.
   grantedGroups            Json?
-  /// Could not determine type: the field only had null or empty values in the sample set.
-  grantedUsers             Json?
-  isEmpty                  Boolean
+  grantedUsers             String[]
+  isEmpty                  Boolean   @default(false)
   lastUpdateUserId         String?   @map("lastUpdateUser") @db.ObjectId
   latestRevisionBodyLength Int?
-  /// Could not determine type: the field only had null or empty values in the sample set.
-  liker                    Json?
+  liker                    String[]
   parentId                 String?   @map("parent") @db.ObjectId
   path                     String
   revisionId               String?   @map("revision") @db.ObjectId
   seenUsers                String[]
-  status                   String
-  ttlTimestamp             DateTime? @db.Date
-  updatedAt                DateTime  @db.Date
+  status                   String    @default("published")
+  ttlTimestamp             DateTime?
+  updatedAt                DateTime  @default(now())
   wip                      Boolean?
 
   creator        users?        @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   lastUpdateUser users?        @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   parent         pages?        @relation("ParentChild", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children       pages[]       @relation("ParentChild")
+  deleteUser     users?        @relation("DeletedPages", fields: [deleteUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   revisions      revisions[]
   comments       comments[]
   attachments    attachments[]
+  bookmarks      bookmarks[]
 
   @@index([parentId], map: "parent_1")
   @@index([path], map: "path_1")
@@ -367,7 +399,7 @@ model revisions {
   v             Int      @map("__v")
   authorId      String   @map("author") @db.ObjectId
   body          String
-  createdAt     DateTime @db.Date
+  createdAt     DateTime @default(now())
   hasDiffToPrev Boolean?
   format        String
   origin        String?
@@ -392,7 +424,7 @@ model rlflx {
 
 model sessions {
   id      String   @id @map("_id")
-  expires DateTime @db.Date
+  expires DateTime
   session String
 
   @@index([expires], map: "expires_1")
@@ -453,7 +485,7 @@ model updateposts {
 model usergrouprelations {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   v            Int      @map("__v")
-  createdAt    DateTime @db.Date
+  createdAt    DateTime @default(now())
   relatedGroup String   @db.ObjectId
   relatedUser  String   @db.ObjectId
 }
@@ -461,12 +493,12 @@ model usergrouprelations {
 model usergroups {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   v           Int      @map("__v")
-  createdAt   DateTime @db.Date
+  createdAt   DateTime @default(now())
   description String
   name        String   @unique(map: "name_1")
   /// Could not determine type: the field only had null or empty values in the sample set.
   parent      Json?
-  updatedAt   DateTime @db.Date
+  updatedAt   DateTime @updatedAt
 
   @@index([parent], map: "parent_1")
 }
@@ -496,21 +528,23 @@ model users {
   apiToken                String?   @unique(map: "apiToken_1")
   lang                    Lang      @default(en_US)
   status                  Int       @default(2)
-  lastLoginAt             DateTime? @db.Date
+  lastLoginAt             DateTime?
   admin                   Boolean   @default(false)
   readOnly                Boolean   @default(false)
   isInvitationEmailSended Boolean   @default(false)
-  createdAt               DateTime  @default(now()) @db.Date
-  updatedAt               DateTime  @updatedAt @db.Date
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   activities         activities[]
   comments           comments[]
   revisions          revisions[]
   createdPages       pages[]            @relation("CreatedPages")
+  deletedPages       pages[]            @relation("DeletedPages")
   lastUpdatedPages   pages[]            @relation("LastUpdatedPages")
   imageAttachment    attachments?       @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
   createdAttachments attachments[]      @relation("CreatedAttachments")
   externalaccounts   externalaccounts[]
+  bookmarks          bookmarks[]
 
   @@index([name], map: "name_1")
   @@index([status], map: "status_1")

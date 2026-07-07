@@ -65,7 +65,8 @@
     "news": "公告",
     "notifications": "通知",
     "filter_all": "全部",
-    "no_news": "暂无公告"
+    "no_news": "暂无公告",
+    "view_detail": "查看详情"
   },
   "personal_dropdown": {
     "home": "家",

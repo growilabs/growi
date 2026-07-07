@@ -1,4 +1,8 @@
-import { CONFIG_DEFINITIONS, CONFIG_KEYS } from './config-definition';
+import {
+  CONFIG_DEFINITIONS,
+  CONFIG_KEYS,
+  ENV_ONLY_GROUPS,
+} from './config-definition';
 
 describe('config-definition resilience keys', () => {
   describe('CONFIG_KEYS array', () => {
@@ -277,12 +281,16 @@ describe('config-definition multi-llm-provider keys', () => {
       expect(CONFIG_KEYS).toContain('ai:apiKey');
     });
 
-    it('contains ai:model', () => {
-      expect(CONFIG_KEYS).toContain('ai:model');
+    it('contains ai:allowedModels', () => {
+      expect(CONFIG_KEYS).toContain('ai:allowedModels');
     });
 
-    it('contains ai:providerOptions', () => {
-      expect(CONFIG_KEYS).toContain('ai:providerOptions');
+    it('does not contain the removed ai:model key', () => {
+      expect(CONFIG_KEYS).not.toContain('ai:model');
+    });
+
+    it('does not contain the removed ai:providerOptions key', () => {
+      expect(CONFIG_KEYS).not.toContain('ai:providerOptions');
     });
   });
 
@@ -317,36 +325,49 @@ describe('config-definition multi-llm-provider keys', () => {
       });
     });
 
-    describe('ai:model', () => {
-      it('has envVarName AI_MODEL', () => {
-        expect(CONFIG_DEFINITIONS['ai:model'].envVarName).toBe('AI_MODEL');
+    describe('ai:allowedModels', () => {
+      it('has envVarName AI_ALLOWED_MODELS', () => {
+        expect(CONFIG_DEFINITIONS['ai:allowedModels'].envVarName).toBe(
+          'AI_ALLOWED_MODELS',
+        );
       });
 
-      it('has no default value (model is required)', () => {
-        expect(CONFIG_DEFINITIONS['ai:model'].defaultValue).toBe(undefined);
+      // An array default makes the loader treat env/DB values as JSON
+      // (typeof defaultValue === 'object'), and getConfig falls back to [].
+      it('has a default value of an empty array', () => {
+        expect(CONFIG_DEFINITIONS['ai:allowedModels'].defaultValue).toEqual([]);
       });
 
       it('is not marked as secret', () => {
-        expect(CONFIG_DEFINITIONS['ai:model'].isSecret).toBeFalsy();
+        expect(CONFIG_DEFINITIONS['ai:allowedModels'].isSecret).toBeFalsy();
       });
     });
 
-    describe('ai:providerOptions', () => {
-      it('has envVarName AI_PROVIDER_OPTIONS', () => {
-        expect(CONFIG_DEFINITIONS['ai:providerOptions'].envVarName).toBe(
-          'AI_PROVIDER_OPTIONS',
-        );
-      });
+    it('no longer defines the removed ai:model key', () => {
+      expect(CONFIG_DEFINITIONS).not.toHaveProperty('ai:model');
+    });
 
-      it('has no default value (unset means no provider options)', () => {
-        expect(CONFIG_DEFINITIONS['ai:providerOptions'].defaultValue).toBe(
-          undefined,
-        );
-      });
+    it('no longer defines the removed ai:providerOptions key', () => {
+      expect(CONFIG_DEFINITIONS).not.toHaveProperty('ai:providerOptions');
+    });
+  });
 
-      it('is not marked as secret', () => {
-        expect(CONFIG_DEFINITIONS['ai:providerOptions'].isSecret).toBeFalsy();
-      });
+  describe('env-only group env:useOnlyEnvVars:ai', () => {
+    const aiGroup = ENV_ONLY_GROUPS.find(
+      (group) => group.controlKey === 'env:useOnlyEnvVars:ai',
+    );
+
+    it('is defined', () => {
+      expect(aiGroup).toBeDefined();
+    });
+
+    it('targets ai:allowedModels', () => {
+      expect(aiGroup?.targetKeys).toContain('ai:allowedModels');
+    });
+
+    it('no longer targets the removed ai:model / ai:providerOptions keys', () => {
+      expect(aiGroup?.targetKeys).not.toContain('ai:model');
+      expect(aiGroup?.targetKeys).not.toContain('ai:providerOptions');
     });
   });
 });

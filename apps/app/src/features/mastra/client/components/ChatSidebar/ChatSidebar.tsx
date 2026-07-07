@@ -1,11 +1,19 @@
 // ref: https://elements.ai-sdk.dev/examples/chatbot
 
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useChat } from '@ai-sdk/react';
 import { CopyIcon, RefreshCcwIcon, XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { v7 as uuid } from 'uuid';
 
+import { scheduleToPut } from '~/client/services/user-ui-settings';
 import { Action, Actions } from '~/components/ai-elements/actions';
 import {
   Conversation,
@@ -19,6 +27,11 @@ import {
   PromptInputBody,
   PromptInputFooter,
   type PromptInputMessage,
+  PromptInputModelSelect,
+  PromptInputModelSelectContent,
+  PromptInputModelSelectItem,
+  PromptInputModelSelectTrigger,
+  PromptInputModelSelectValue,
   PromptInputSubmit,
 } from '~/components/ai-elements/prompt-input';
 import {
@@ -27,26 +40,25 @@ import {
   ReasoningTrigger,
 } from '~/components/ai-elements/reasoning';
 import { Response } from '~/components/ai-elements/response';
-import {
-  Source,
-  Sources,
-  SourcesContent,
-  SourcesTrigger,
-} from '~/components/ai-elements/sources';
 import { Button } from '~/components/ui/button';
 import { PageMentionInput } from '~/features/mastra/client/components/PageMentionInput';
+import type { CustomUIMessage } from '~/features/mastra/interfaces/chat-message';
 
 import {
   useChatSidebarActions,
   useChatSidebarStatus,
 } from '../../status/chat-sidebar';
 import { useSWRxMessages } from '../../stores/message';
+import { useSWRxChatModels } from '../../stores/models';
 import { useSWRINFxRecentThreads } from '../../stores/thread';
 import {
   createMastraChatTransport,
   resolveChatErrorDetail,
   resolveChatHeaderLabel,
 } from './chat-sidebar-helpers';
+import { IncompleteResponseNotice } from './IncompleteResponseNotice';
+import { PageSources } from './PageSources';
+import { extractPageSources } from './page-sources';
 
 import styles from './ChatSidebar.module.scss';
 
@@ -71,19 +83,56 @@ export const ChatSidebar = (): JSX.Element => {
   const swrInfiniteThreads = useSWRINFxRecentThreads();
   const { data: threadPages, mutate: mutateRecentThreads } = swrInfiniteThreads;
 
+  // Allowed models + the server-validated initial selection (Req 3.1/3.2/3.7).
+  const { data: chatModels } = useSWRxChatModels();
+  const modelIds = chatModels?.modelIds;
+
+  // Live model selection. Feature-local state only — no dedicated atom, no SSR
+  // hydration (design: read via /mastra/models, write via shared scheduleToPut).
+  // The server already rounds an out-of-allowlist / absent saved value to the
+  // default, so `selectedModelId` is trusted as-is for the initial value.
+  const [modelId, setModelId] = useState<string | undefined>(
+    () => chatModels?.selectedModelId,
+  );
+
+  // `selectedModelId` may arrive after the first render (SWR resolves async).
+  // Seed the local selection once it lands and the user has not picked yet.
+  useEffect(() => {
+    if (modelId == null && chatModels?.selectedModelId != null) {
+      setModelId(chatModels.selectedModelId);
+    }
+  }, [modelId, chatModels?.selectedModelId]);
+
+  const handleModelChange = (nextModelId: string) => {
+    setModelId(nextModelId);
+    // Persist as the user's selection for next visit (debounced DB write, Req
+    // 3.6). The shared service owns the debounce + PUT; we only schedule it.
+    scheduleToPut({ aiChatSelectedModelId: nextModelId });
+  };
+
   const headerLabel = resolveChatHeaderLabel(
     chatThreadId,
     threadPages?.flatMap((page) => page.threads) ?? [],
     t('ai_sidebar.new_chat'),
   );
 
-  // Memoized so a stable transport instance survives re-renders (chatThreadId is
-  // fixed for this session), instead of allocating a new one on every render.
-  // The factory pins the threadId on the transport body so EVERY request — incl.
-  // regenerate(), which sends no per-call body — carries it (see the factory).
+  // The transport reads the current model through this ref at request time.
+  // `useChat` captures the transport when its internal Chat is created and only
+  // re-creates that Chat when the chat `id` changes (NOT when the transport
+  // instance changes), so re-creating the transport on a model change would have
+  // no effect. A ref lets the (stable) transport always see the live selection.
+  const modelRef = useRef(modelId);
+  modelRef.current = modelId;
+
+  // Stable getter that reads the live selection from the ref on each request.
+  const getModelId = useCallback(() => modelRef.current, []);
+
+  // Stable for the session (chatThreadId is fixed). The factory attaches the
+  // threadId and the live modelId (via the getter) to EVERY request — incl.
+  // regenerate(), which sends no per-call body (Critical Issue 1, Req 3.3/3.4).
   const transport = useMemo(
-    () => createMastraChatTransport(chatThreadId),
-    [chatThreadId],
+    () => createMastraChatTransport(chatThreadId, getModelId),
+    [chatThreadId, getModelId],
   );
 
   const {
@@ -94,7 +143,7 @@ export const ChatSidebar = (): JSX.Element => {
     setMessages,
     error,
     clearError,
-  } = useChat({
+  } = useChat<CustomUIMessage>({
     id: chatThreadId,
     transport,
     // Refresh the thread list after the assistant finishes streaming.
@@ -176,32 +225,9 @@ export const ChatSidebar = (): JSX.Element => {
             <ConversationContent>
               {messages.map((message) => (
                 <div key={message.id}>
-                  {message.role === 'assistant' &&
-                    message.parts.filter((part) => part.type === 'source-url')
-                      .length > 0 && (
-                      <Sources>
-                        <SourcesTrigger
-                          count={
-                            message.parts.filter(
-                              (part) => part.type === 'source-url',
-                            ).length
-                          }
-                        />
-                        {message.parts
-                          .filter((part) => part.type === 'source-url')
-                          .map((_part, i) => (
-                            // biome-ignore lint/suspicious/noArrayIndexKey: the source parts have no stable ID, but the index is sufficient for this static list
-                            <SourcesContent key={`${message.id}-${i}`}>
-                              <Source
-                                // biome-ignore lint/suspicious/noArrayIndexKey: the source parts have no stable ID, but the index is sufficient for this static list
-                                key={`${message.id}-${i}`}
-                                // href={part.url}
-                                // title={part.url}
-                              />
-                            </SourcesContent>
-                          ))}
-                      </Sources>
-                    )}
+                  {message.role === 'assistant' && (
+                    <PageSources sources={extractPageSources(message.parts)} />
+                  )}
                   {message.parts.map((part, i) => {
                     switch (part.type) {
                       case 'text':
@@ -264,6 +290,11 @@ export const ChatSidebar = (): JSX.Element => {
                         return null;
                     }
                   })}
+                  {message.role === 'assistant' && (
+                    <IncompleteResponseNotice
+                      finishReason={message.metadata?.finishReason}
+                    />
+                  )}
                 </div>
               ))}
               {(() => {
@@ -338,7 +369,40 @@ export const ChatSidebar = (): JSX.Element => {
                   placeholder={t('pageMention.placeholder')}
                 />
               </PromptInputBody>
-              <PromptInputFooter className="tw:justify-end">
+              <PromptInputFooter>
+                <PromptInputModelSelect
+                  value={modelId ?? ''}
+                  onValueChange={handleModelChange}
+                  disabled={modelIds == null}
+                >
+                  <PromptInputModelSelectTrigger>
+                    <PromptInputModelSelectValue />
+                  </PromptInputModelSelectTrigger>
+                  {/*
+                    The Radix Select dropdown is portaled to document.body — a
+                    sibling of this position-fixed sidebar in the root stacking
+                    context. The vendored content defaults to `tw:z-50`, which
+                    sits below the chat sidebar (`.grw-chat-sidebar` =
+                    `$zindex-fixed + 2` = 1032), so the menu opens behind the
+                    opaque panel and looks empty. Lift it to Bootstrap's popover
+                    tier (`$zindex-popover` = 1070) so it paints above the
+                    sidebar. (prefix-aware tailwind-merge makes this override the
+                    baked-in `tw:z-50`.)
+
+                    `tw:border-border`: the vendored SelectContent uses a bare
+                    `tw:border` (width only, no color), so its border falls back to
+                    `currentColor` (the dark popover text color) and looks too
+                    heavy. Pin it to the theme border token (`--border` =
+                    `--bs-border-color`, the light gray used elsewhere in GROWI).
+                  */}
+                  <PromptInputModelSelectContent className="tw:z-[1070] tw:border-border">
+                    {modelIds?.map((id) => (
+                      <PromptInputModelSelectItem key={id} value={id}>
+                        {id}
+                      </PromptInputModelSelectItem>
+                    ))}
+                  </PromptInputModelSelectContent>
+                </PromptInputModelSelect>
                 <PromptInputSubmit
                   disabled={!input && !status}
                   status={status}

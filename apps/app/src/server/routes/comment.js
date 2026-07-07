@@ -157,19 +157,13 @@ export const setup = (crowi, _app) => {
       ApiResponse.success({
         comments: comments.map((comment) => ({
           ...comment,
-          _id: comment.id,
-          __v: comment.v,
           page: comment.pageId,
           creator:
             comment.creator != null
               ? serializeUserSecurely(comment.creator)
-              : comment.creator,
+              : comment.creatorId,
           revision: comment.revisionId,
-          comment: comment.comment,
-          commentPosition: comment.commentPosition,
           replyTo: comment.replyToId,
-          createdAt: comment.createdAt,
-          updatedAt: comment.updatedAt,
         })),
       }),
     );
@@ -328,7 +322,17 @@ export const setup = (crowi, _app) => {
       getAdditionalTargetUsers,
     );
 
-    res.json(ApiResponse.success({ comment: createdComment }));
+    res.json(
+      ApiResponse.success({
+        comment: {
+          ...createdComment,
+          page: createdComment.pageId,
+          creator: createdComment.creatorId,
+          revision: createdComment.revisionId,
+          replyTo: createdComment.replyToId,
+        },
+      }),
+    );
 
     // global notification
     try {
@@ -487,7 +491,17 @@ export const setup = (crowi, _app) => {
     const parameters = { action: SupportedAction.ACTION_COMMENT_UPDATE };
     activityEvent.emit('update', res.locals.activity._id, parameters);
 
-    res.json(ApiResponse.success({ comment: updatedComment }));
+    res.json(
+      ApiResponse.success({
+        comment: {
+          ...updatedComment,
+          page: createdComment.pageId,
+          creator: createdComment.creatorId,
+          revision: createdComment.revisionId,
+          replyTo: createdComment.replyToId,
+        },
+      }),
+    );
 
     // process notification if needed
   };

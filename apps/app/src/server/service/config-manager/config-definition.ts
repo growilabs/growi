@@ -7,6 +7,7 @@ import type {
 import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
 
 import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
+import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
 import type { AzureOpenaiConfig } from '~/features/mastra/interfaces/azure-openai-config';
 import { ActionGroupSize } from '~/interfaces/activity';
 import { AttachmentMethodType } from '~/interfaces/attachment';
@@ -69,6 +70,7 @@ export const CONFIG_KEYS = [
   'app:minPasswordLength',
   'app:auditLogEnabled',
   'app:activityExpirationSeconds',
+  'app:revisionDiffMaxLookbackSeconds',
   'app:auditLogActionGroupSize',
   'app:auditLogAdditionalActions',
   'app:auditLogExcludeActions',
@@ -296,11 +298,16 @@ export const CONFIG_KEYS = [
   // Mastra LLM Settings (provider-agnostic: one provider per app)
   'ai:provider',
   'ai:apiKey',
-  'ai:model',
-  'ai:providerOptions',
+  // Allow-list of selectable models (modelId + per-model providerOptions + isDefault
+  // flag), stored as a single JSON array. Replaces the former single ai:model /
+  // ai:providerOptions keys.
+  'ai:allowedModels',
   // Azure OpenAI-only connection config (ai:provider='azure-openai'), stored as
   // a single JSON object (consolidated from the former four ai:azureOpenaiSettings* keys)
   'ai:azureOpenaiSettings',
+  // Opt-in refresh paths for the vendored model catalog (both default OFF)
+  'ai:modelCatalogRefreshOnStartup',
+  'ai:modelCatalogRefreshCronSchedule',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -517,6 +524,13 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:activityExpirationSeconds': defineConfig<number>({
     envVarName: 'ACTIVITY_EXPIRATION_SECONDS',
+    defaultValue: 2592000,
+  }),
+  // Changes Index API: how far back (seconds from now) a request may look. Each cursor
+  // page recomputes runs over the window, so this bounds the worst-case scan. Finite by
+  // default (30 days); operators may tune it via the env var.
+  'app:revisionDiffMaxLookbackSeconds': defineConfig<number>({
+    envVarName: 'REVISION_DIFF_MAX_LOOKBACK_SECONDS',
     defaultValue: 2592000,
   }),
   'app:auditLogActionGroupSize': defineConfig<ActionGroupSize>({
@@ -1274,10 +1288,11 @@ export const CONFIG_DEFINITIONS = {
 
   // AI chat (Mastra) Settings — provider-agnostic, one provider per app.
   // Single set of keys regardless of provider — the resolver reads `ai:provider`
-  // to pick the provider client, then injects `ai:apiKey` / `ai:model`.
-  // No defaultValue on purpose: provider / apiKey / model are required, so an
+  // to pick the provider client, then injects `ai:apiKey` and resolves the model
+  // from `ai:allowedModels`.
+  // No defaultValue on purpose for provider / apiKey: they are required, so an
   // unset value surfaces as a clear error at resolve time rather than silently
-  // defaulting to a particular provider/model. `ai:provider` is typed with the
+  // defaulting to a particular provider. `ai:provider` is typed with the
   // shared `AiProvider` (type-only import — erased at runtime, dependency-free
   // leaf, no cycle); the type aids DX but is not runtime-enforced for env-loaded
   // values, so the resolver still validates with `isAiProvider`.
@@ -1290,47 +1305,44 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
     isSecret: true,
   }),
-  // Required (no default). For the azure-openai provider this is the Azure
-  // *deployment name*, not an OpenAI model id.
-  'ai:model': defineConfig<string | undefined>({
-    envVarName: 'AI_MODEL',
-    defaultValue: undefined,
-  }),
-  // Raw AI SDK `providerOptions` JSON (provider-namespaced), applied to the
-  // chat stream call. Typed as a raw JSON string (not object) so a malformed
-  // override fails soft in the resolver (parse + fallback) rather than crashing
-  // config load. No default: unset means no provider options. Operators set
-  // their own provider namespace, e.g.
-  // {"openai":{"reasoningEffort":"low","reasoningSummary":"auto"}} or
-  // {"anthropic":{"thinking":{"type":"enabled"}}}.
-  'ai:providerOptions': defineConfig<string | undefined>({
-    envVarName: 'AI_PROVIDER_OPTIONS',
-    defaultValue: undefined,
+  // Allow-list of selectable models. Each entry bundles the model id (the Azure
+  // *deployment name* for the azure-openai provider), optional per-model AI SDK
+  // `providerOptions` (provider-namespaced), and an `isDefault` flag marking the
+  // default model. Replaces the former single ai:model / ai:providerOptions keys
+  // (no auto-migration: operators reconfigure via ai:allowedModels).
+  //
+  // Stored/loaded as JSON: the DB value is the serialized array, and the
+  // AI_ALLOWED_MODELS env var is a JSON string. defaultValue is an array ([]) so
+  // the loader treats env/DB values as JSON (typeof defaultValue === 'object')
+  // and getConfig falls back to [] when unset (= AI not configured).
+  'ai:allowedModels': defineConfig<AllowedModel[] | undefined>({
+    envVarName: 'AI_ALLOWED_MODELS',
+    defaultValue: [],
   }),
 
   // Azure OpenAI-only connection config (ai:provider='azure-openai'),
   // consolidated into a SINGLE JSON object key (was four flat keys:
   // ai:azureOpenai{ResourceName,BaseUrl,ApiVersion,UseEntraId}). Azure is reached
-  // via a resource-specific endpoint, so { apiKey, model } alone is not enough.
+  // via a resource-specific endpoint, so { apiKey, modelId } alone is not enough.
   // Set exactly one of resourceName / baseURL: resourceName builds the standard
   // https://<name>.openai.azure.com/... URL; baseURL is the
   // escape hatch for Azure Government / sovereign clouds / API Management
   // gateways / custom domains. apiVersion is optional (the AI SDK defaults it).
   // useEntraId selects Microsoft Entra ID (managed identity / DefaultAzureCredential)
-  // auth instead of an API key (then AI_API_KEY is not required). For Azure,
-  // AI_MODEL is the *deployment name*, not an OpenAI model id. This key is ignored
-  // by the other providers and is not secret (only ai:apiKey is). See
-  // AzureOpenaiConfig for field semantics.
+  // auth instead of an API key (then AI_API_KEY is not required). For Azure, an
+  // allowed model's `modelId` is the *deployment name*, not an OpenAI model id. This
+  // key is ignored by the other providers and is not secret (only ai:apiKey is).
+  // See AzureOpenaiConfig for field semantics.
   //
   // Stored/loaded as JSON: the DB value is the serialized object, and the
   // AI_AZURE_OPENAI_SETTINGS env var is a JSON string. defaultValue is an object ({}) so
   // the loader parses the env var as JSON (a malformed env var fails soft to null;
   // consumers read it defensively with `?? {}`).
-  // The type includes `| undefined` because this is a CLEARABLE key like ai:model /
-  // ai:providerOptions: the admin PUT handler sets it to undefined when the admin
-  // clears every field, so updateConfigs({ removeIfUndefined }) deletes it and the
-  // value falls back to the env default. The runtime default stays `{}` (not
-  // undefined) so the env JSON-parse branch is selected.
+  // The type includes `| undefined` because this is a CLEARABLE key: the admin PUT
+  // handler sets it to undefined when the admin clears every field, so
+  // updateConfigs({ removeIfUndefined }) deletes it and the value falls back to the
+  // env default. The runtime default stays `{}` (not undefined) so the env
+  // JSON-parse branch is selected.
   'ai:azureOpenaiSettings': defineConfig<AzureOpenaiConfig | undefined>({
     envVarName: 'AI_AZURE_OPENAI_SETTINGS',
     defaultValue: {},
@@ -1366,6 +1378,25 @@ export const CONFIG_DEFINITIONS = {
   'aiTools:suggestPathAgenticTimeoutMs': defineConfig<number>({
     envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS',
     defaultValue: 60_000,
+  }),
+
+  // Refresh paths for the vendored model catalog (Req 9). These are deployment
+  // options (env-driven), not admin-form settings, so they are intentionally NOT
+  // part of the env:useOnlyEnvVars:ai target keys. The refresh jobs run ONLY when
+  // the AI feature itself is enabled (app:aiEnabled) — since that defaults OFF, a
+  // default GROWI install still performs zero external communication (the bundled
+  // catalog is the baseline; air-gapped installs are unaffected).
+  'ai:modelCatalogRefreshOnStartup': defineConfig<boolean>({
+    envVarName: 'AI_MODEL_CATALOG_REFRESH_ON_STARTUP',
+    defaultValue: false,
+  }),
+  // node-cron schedule expression. Defaults to a daily refresh so that once an
+  // admin enables AI the catalog stays fresh automatically; set the env var to an
+  // empty string to opt back out (e.g. air-gapped AI deployments). Gated by
+  // app:aiEnabled, so this default never fires in a default (AI-off) install.
+  'ai:modelCatalogRefreshCronSchedule': defineConfig<string>({
+    envVarName: 'AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE',
+    defaultValue: '0 4 * * *',
   }),
 
   // OpenTelemetry Settings
@@ -1627,16 +1658,16 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
     ],
   },
   {
-    // AI settings: provider-common (4) + the Azure OpenAI-only object key + the
-    // enable toggle. app:aiEnabled uses the app: prefix but is fixed together
-    // with the ai:* keys as a single AI configuration unit.
+    // AI settings: provider-common keys (provider, apiKey, allowed models) + the
+    // Azure OpenAI-only object key + the enable toggle. app:aiEnabled uses the
+    // app: prefix but is fixed together with the ai:* keys as a single AI
+    // configuration unit.
     controlKey: 'env:useOnlyEnvVars:ai',
     targetKeys: [
       'app:aiEnabled',
       'ai:provider',
       'ai:apiKey',
-      'ai:model',
-      'ai:providerOptions',
+      'ai:allowedModels',
       'ai:azureOpenaiSettings',
     ],
   },
