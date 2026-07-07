@@ -1,5 +1,7 @@
 # Technical Design: suggest-path-agentic
 
+> **実態追従改訂（2026-07-06）**: 実装完了・A/B 受け入れ後に、support/mastra マージによる provider-agnostic AI レイヤ移行（`getOpenaiProvider` → `resolveMastraModel`、コミット 70bde80571 / c4a58793bf）、listChildren tool の追加（#185213）、instructions チューニング（302d974819 / 066d1776de）を本文へ反映した。要判断として残る 2 点は Config Keys の DEAD KEY 注記と reasoningEffort の provider 名前空間注記を参照。
+
 ## Overview
 
 **Purpose**: 本機能は suggest-path API のパス提案エンジンを、ワンショット検索構成（キーワード抽出 → ES 検索 1 回 → LLM 候補評価）から、Mastra Agent による agentic search（検索結果を元文書と照らして検索語・条件を変えながら複数回探索する挙動）に換装可能にする。最初の検索が語彙ミスマッチで外れても API 単体で妥当な保存先候補に辿り着けるようにし、MCP クライアント側の検索肩代わりを不要にする（Redmine #184610）。
@@ -44,10 +46,11 @@
 
 ### Allowed Dependencies
 
-- `features/mastra` の mastra-modules（`fullTextSearchTool` / `getPageContentTool` / `MastraRequestContextShape` / Mastra インスタンスレジストリ）— **依存方向は ai-tools → mastra の一方向のみ**。mastra 側ファイルが suggest-path の型・モジュールを import することは禁止
+- `features/mastra` の mastra-modules（`fullTextSearchTool` / `getPageContentTool` / `listChildrenTool` / `MastraRequestContextShape` / Mastra インスタンスレジストリ）— **依存方向は ai-tools → mastra の一方向のみ**。mastra 側ファイルが suggest-path の型・モジュールを import することは禁止
+- `features/mastra` の AI レイヤ `resolveMastraModel`（support/mastra 所有。アプリ全体設定 `ai:provider` / `ai:apiKey` / `ai:model` / `ai:providerOptions` / `ai:azureOpenaiSettings` に依拠）— 2026-06 マージで `getOpenaiProvider` から置換
 - suggest-path のエンジン非依存共通基盤: `generate-memo-suggestion` / `resolve-parent-grant` / `suggest-path-types` / API ルート（Requirement 5.5 の許容範囲）
 - `configManager`（設定読み出し）、`@growi/logger`（pino）
-- `SearchService.searchKeyword` / `Page.findByIdAndViewer`（tool 経由の間接利用。権限フィルタはこれらに委譲）
+- `SearchService.searchKeyword` / `Page.findByIdAndViewer` / `pageListingService.findChildrenByParentPathOrIdAndViewer`（tool 経由の間接利用。権限フィルタはこれらに委譲）
 - #183964 / #183967 / #183968 の評価器・ユースケース・ベースライン測定値
 
 **禁止依存**: agentic エンジンからワンショット固有 4 サービスへの import（Requirement 5.5。旧エンジン単独削除可能性の保証）
@@ -90,9 +93,11 @@ graph TB
     OneshotEng --> Grant
     Agent --> Limited[limited search tool]
     Agent --> PageTool[getPageContentTool]
+    Agent --> ListChildren[listChildrenTool]
     Limited --> FullText[fullTextSearchTool]
     FullText --> ES[SearchService]
     PageTool --> Mongo[Page model]
+    ListChildren --> PageListing[pageListingService]
 
     subgraph aitools [features ai-tools suggest-path]
         Route
@@ -114,6 +119,7 @@ graph TB
         Limited
         FullText
         PageTool
+        ListChildren
     end
 ```
 
@@ -136,8 +142,8 @@ features/ai-tools/suggest-path → features/mastra（一方向。逆方向 impor
 
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
-| Agent runtime | `@mastra/core` 1.41.0（installed。宣言 `^1.32.1`） | agent ループ・structured output・requestContext | brief の viability check と同一バージョン。`generateVNext` は使用しない（mastra-ai/mastra#7662） |
-| LLM provider | `@ai-sdk/openai` ^3.0.63 + `getOpenaiProvider()` | suggestPathAgent のモデル解決 | OpenAI 系モデル限定（brief 制約）。モデル ID は config から per-request 解決。**Azure OpenAI 構成（`openai:serviceType: 'azure-openai'`）では利用不可**（下記 Error Handling 参照） |
+| Agent runtime | `@mastra/core` 1.45.0（installed。宣言 `^1.32.1`。設計・スパイク時は 1.41.0） | agent ループ・structured output・requestContext | `generateVNext` は使用しない（mastra-ai/mastra#7662）。スパイク結論（steps/usage 形状・p-map ESM 回避）は 1.41.0 時点の確認であり 1.45.0 での再検証は未実施 |
+| LLM provider | provider 非依存の `resolveMastraModel()`（support/mastra の AI レイヤ。openai / anthropic / google / azure-openai に対応） | suggestPathAgent のモデル解決 | 2026-06 の support/mastra マージで `getOpenaiProvider()` から置換（コミット c4a58793bf）。モデルはアプリ全体設定 `ai:provider` / `ai:model` で決まり、memoize + AI 設定保存時の cache clear で再起動なし反映。**suggestPath 専用のモデル選択は廃止**（下記 Config Keys 参照） |
 | Schema / validation | JSON Schema 直接記述 + 手書き型ガード | structured output の契約 | Zod 自動変換は OpenAI strict mode 非互換のため不使用（mastra-ai/mastra#16383）。tool 入力は既存どおり zod ^4.1.9 |
 | Search / Data | `SearchService`（Elasticsearch）、`Page` model（MongoDB） | 検索・本文参照・grant 解決 | すべて既存共有 tool / サービス経由。権限フィルタは委譲 |
 | Config | `configManager`（config-definition.ts） | エンジン・上限・タイムアウト・モデルの設定化 | 新キー 4 つ。per-request 読み出しで再起動なし反映 |
@@ -156,6 +162,7 @@ apps/app/src/features/ai-tools/suggest-path/
     │   └── index.ts                           # 変更: optional engine パラメータの validation + 受け渡し
     └── services/
         ├── generate-suggestions.ts            # 変更: オーケストレータ化（memo + dispatch + fallback）
+        ├── generate-suggestions-orchestration.spec.ts  # 追加: オーケストレーションのテスト
         ├── engines/
         │   ├── index.ts                       # barrel: runEngine のみ再エクスポート（ロジックを持たない）
         │   ├── dispatcher.ts                  # runEngine 実装（engine id → 実装の static map 解決）
@@ -163,24 +170,34 @@ apps/app/src/features/ai-tools/suggest-path/
         │   ├── engine-types.ts                # SuggestPathEngine / SuggestPathEngineInput（server 専用型）
         │   ├── oneshot-engine.ts              # 既存 4 サービスのオーケストレーション（挙動維持の薄い wrapper）
         │   ├── oneshot-engine.spec.ts
-        │   ├── agentic-engine.ts              # agent 呼び出し・タイムアウト・出力マッピング・grant・トレースログ
+        │   ├── agentic-engine.ts              # agent 呼び出し・タイムアウト・出力マッピング・grant
         │   ├── agentic-engine.spec.ts
+        │   ├── agentic-trace-log.ts           # 追加: トレースログ整形（agentic-engine から抽出）
+        │   ├── agentic-trace-log.spec.ts
         │   ├── agentic-output-schema.ts       # JSON Schema 定数 + AgenticEngineOutput 型 + 型ガード
         │   └── agentic-output-schema.spec.ts
         └── （analyze-content / retrieve-search-candidates / evaluate-candidates /
              generate-category-suggestion / generate-memo-suggestion / resolve-parent-grant
-             / call-llm-for-json: すべて無改変）
+             / call-llm-for-json: すべて無改変。call-llm-for-json.spec.ts のみテスト追加）
+
+apps/app/src/features/ai-tools/suggest-path/server/integration-tests/   # 追加: 統合テスト置き場
+├── suggest-path-integration.spec.ts
+├── suggest-path-route-integration.spec.ts
+└── suggest-path-agentic-integration.spec.ts
 
 apps/app/src/features/mastra/server/services/mastra-modules/
 ├── index.ts                                   # 変更: Mastra インスタンスに suggestPathAgent を登録（1 行 additive）
+├── tools/
+│   ├── list-children-tool.ts                  # 追加(#185213): 子ページ一覧 tool（childListingBudget 執行・pageListingService 委譲）
+│   └── list-children-tool.spec.ts             #   ※共有 tools/ 配下だが実質 suggest-path 専用（配置は要再考の余地あり）
 └── agents/suggest-path/
     ├── index.ts                               # barrel: suggestPathAgent と SuggestPathRequestContextShape のみ公開
-    ├── suggest-path-agent.ts                  # Agent 定義（dynamic model・tools 構成・memory なし）
+    ├── suggest-path-agent.ts                  # Agent 定義（resolveMastraModel・tools 3 構成・memory なし）
     ├── suggest-path-agent.spec.ts
     ├── instructions.ts                        # agent instructions（フロー/ストック判定・探索戦略・提案ルール）
     ├── limited-search-tool.ts                 # budget 執行 wrapper tool（fullTextSearchTool へ委譲）
     ├── limited-search-tool.spec.ts
-    └── request-context.ts                     # SuggestPathRequestContextShape / SearchBudget 型
+    └── request-context.ts                     # SuggestPathRequestContextShape / SearchBudget / ChildListingBudget 型
 ```
 
 ### Modified Files
@@ -204,6 +221,7 @@ sequenceDiagram
     participant Agent as suggestPathAgent
     participant Search as limited search tool
     participant Page as getPageContentTool
+    participant Children as listChildrenTool
 
     Client->>Route: POST body engine
     Route->>Orch: user body userGroups engine
@@ -219,6 +237,10 @@ sequenceDiagram
             Agent->>Page: 候補ページ参照
             Page-->>Agent: outline または content
         end
+        opt 配置先の兄弟確認が必要なとき
+            Agent->>Children: 候補親の子ページ一覧
+            Children-->>Agent: children または limit_exceeded
+        end
     end
     Agent-->>Eng: structured output と steps usage
     Eng->>Eng: 型ガード検証 path 正規化 grant 解決
@@ -231,7 +253,7 @@ sequenceDiagram
 **フローレベルの決定**:
 
 - **フォールバック（4.5）**: agentic エンジンの例外・タイムアウト（`AbortController` による中断）はオーケストレータが捕捉し、memo 提案のみの 200 レスポンスを返す。**oneshot エンジンには適用しない**（現行は予期しない例外が 500 になる挙動であり、5.3 の挙動維持のため現状のまま）
-- **budget 手仕舞い（3.2）**: 上限到達時、limited search tool が `limit_exceeded` を**値で**返し（throw しない）、instructions の指示によりエージェントは収集済み情報から提案を確定する。ループ暴走への多層防御として `maxSteps = 2 × searchLimit + 4` とタイムアウトを併用する
+- **budget 手仕舞い（3.2）**: 上限到達時、limited search tool が `limit_exceeded` を**値で**返し（throw しない）、instructions の指示によりエージェントは収集済み情報から提案を確定する。listChildren tool も独立した budget（childListingBudget）で同じ手仕舞い規約に従う（#185213）。ループ暴走への多層防御として `maxSteps = 2 × searchLimit + 2 × childListingLimit + 4` とタイムアウトを併用する
 - **memo 提案（4.3）**: エンジン選択・成否にかかわらずオーケストレータが常に先頭に含める
 
 ## Requirements Traceability
@@ -250,7 +272,7 @@ sequenceDiagram
 | 3.1 | 検索回数上限 | LimitedSearchTool, SuggestPathRequestContext | `SearchBudget` | System Flows の budget 確認 |
 | 3.2 | 上限到達時は収集済み情報で提案 | LimitedSearchTool（limit_exceeded）, SuggestPathAgent（instructions） | tool 出力 union | System Flows |
 | 3.3 | 上限の設定変更反映 | Config Keys, AgenticEngine（per-request 読み出し） | `aiTools:suggestPathAgenticSearchLimit` | — |
-| 3.4 | モデルの設定変更反映 | Config Keys, SuggestPathAgent（dynamic model） | `openai:assistantModel:suggestPathAgent` | — |
+| 3.4 | モデルの設定変更反映 | SuggestPathAgent（`resolveMastraModel`。アプリ全体設定・memoize + cache clear で再起動なし反映） | `ai:provider` / `ai:model`（support/mastra 所有） | — |
 | 3.5 | 推論強度の設定変更反映 | Config Keys, AgenticEngine（per-request 読み出し → providerOptions） | `openai:reasoningEffort:suggestPathAgent`, `generate` の `providerOptions.openai.reasoningEffort` | — |
 | 3.6 | 推論強度未指定時は既定挙動 | AgenticEngine（空文字列なら providerOptions に渡さない） | `generate` 呼び出し契約（条件付き providerOptions） | — |
 | 4.1 | エンドポイント・リクエスト形式・認証の維持 | Route（validator は additive のみ） | API Contract | — |
@@ -278,8 +300,9 @@ sequenceDiagram
 | OneshotEngine | ai-tools / service | 既存パイプラインの挙動維持 wrapper | 5.3, 5.5 | 既存 4 サービス (P0) | Service |
 | AgenticEngine | ai-tools / service | agent 呼び出し・出力マッピング・観測 | 1.1, 1.4, 2.3, 3.3, 4.2, 4.4, 4.5, 6.2, 6.3 | SuggestPathAgent (P0), resolveParentGrant (P0), configManager (P0) | Service |
 | AgenticOutputSchema | ai-tools / service | structured output の契約と検証 | 1.4, 2.1, 4.2 | — | State |
-| SuggestPathAgent | mastra / agent | 探索の実行主体（instructions + tools） | 1.1, 1.2, 1.3, 2.1, 2.2, 3.2, 3.4 | LimitedSearchTool (P0), getPageContentTool (P0), getOpenaiProvider (P0) | Service |
+| SuggestPathAgent | mastra / agent | 探索の実行主体（instructions + tools） | 1.1, 1.2, 1.3, 2.1, 2.2, 3.2, 3.4 | LimitedSearchTool (P0), getPageContentTool (P0), ListChildrenTool (P0), resolveMastraModel (P0) | Service |
 | LimitedSearchTool | mastra / tool | 検索回数 budget の執行 + 委譲 | 1.5, 2.4, 3.1, 3.2 | fullTextSearchTool (P0), SuggestPathRequestContext (P0) | Service |
+| ListChildrenTool | mastra / tool | 子ページ一覧 budget の執行 + 委譲（#185213 で追加） | 1.5, 2.4 | pageListingService (P0), SuggestPathRequestContext (P0) | Service |
 | SuggestPathRequestContext | mastra / types | per-request の user・budget 伝搬 | 1.5, 3.1 | MastraRequestContextShape (P0) | State |
 | Route (modified) | ai-tools / route | optional engine の validation | 4.1, 5.2, 6.1 | SuggestPathOrchestrator (P0) | API |
 | Config Keys | infra / config | 運用パラメータの設定化 | 3.3, 3.4, 5.2, 5.6 | config-definition (P0) | State |
@@ -389,8 +412,8 @@ declare function runEngine(
 
 **Responsibilities & Constraints**
 
-- config（searchLimit / timeoutMs / reasoningEffort）を**リクエスト毎に** `configManager.getConfig()` で読む（3.3, 3.5）。`reasoningEffort` は空文字列なら未指定として扱う（3.6）
-- per-request の `RequestContext<SuggestPathRequestContextShape>` を構築（user / searchService / searchBudget）。module-scope 共有は禁止（並行リクエストの user 漏れ防止）
+- config（searchLimit / childListingLimit / timeoutMs / reasoningEffort）を**リクエスト毎に** `configManager.getConfig()` で読む（3.3, 3.5）。`reasoningEffort` は空文字列なら未指定として扱う（3.6）
+- per-request の `RequestContext<SuggestPathRequestContextShape>` を構築（user / searchService / searchBudget / childListingBudget）。module-scope 共有は禁止（並行リクエストの user 漏れ防止）
 - `AbortController` + `setTimeout(timeoutMs)` で `abortSignal` を渡し、中断時は例外として reject（オーケストレータの memo フォールバックへ）
 - agent 呼び出し契約:
 
@@ -398,12 +421,13 @@ declare function runEngine(
 const reasoningEffort = configManager.getConfig('openai:reasoningEffort:suggestPathAgent');
 const result = await suggestPathAgent.generate(buildUserPrompt(body), {
   structuredOutput: { schema: AGENTIC_OUTPUT_JSON_SCHEMA },
-  maxSteps: 2 * searchLimit + 4,
+  maxSteps: 2 * searchLimit + 2 * childListingLimit + 4,
   abortSignal: controller.signal,
   requestContext,
   // Pass reasoning effort only when configured; an empty value leaves the
-  // model's default behavior unchanged (3.6). Shape follows the existing
-  // chat-side precedent (features/mastra/.../post-message.ts).
+  // model's default behavior unchanged (3.6). NOTE: the `openai` namespace
+  // is hard-coded here — under the provider-agnostic layer this option is
+  // silently ignored when `ai:provider` selects a non-OpenAI provider.
   ...(reasoningEffort !== ''
     ? { providerOptions: { openai: { reasoningEffort } } }
     : {}),
@@ -431,17 +455,17 @@ const result = await suggestPathAgent.generate(buildUserPrompt(body), {
 
 ##### State Management（観測ログ）
 
-- logger: `growi:ai-tools:suggest-path:agentic-engine`
-- **サマリ（info、リクエスト毎 1 行）**: `{ durationMs, searchCount, pageReadCount, stopReason, informationType, suggestionCount, tokenUsage }`（6.2）
+- logger: `growi:ai-tools:suggest-path:agentic-engine`（整形ロジックは `agentic-trace-log.ts` に抽出）
+- **サマリ（info、リクエスト毎 1 行）**: `{ durationMs, searchCount, listChildrenCount, pageReadCount, stopReason, informationType, suggestionCount, tokenUsage }`（6.2。`listChildrenCount` は #185213 で追加、childListingBudget から集計）
   - `pageReadCount` は `result.steps` 中の getPageContent 呼び出し数から集計（レイテンシ分析用の観測値。要件上の上限はなし）
-  - `tokenUsage` は入力・出力・合計トークン。**フィールド名は @mastra/core 1.41.0 の `result.usage` 実形状にスパイクで合わせて確定する**（AI SDK v5 系は `inputTokens` / `outputTokens` 命名であり、v4 系の `promptTokens` / `completionTokens` と異なる点に注意）
+  - `tokenUsage` は入力・出力・合計トークン。**フィールド名はスパイク（1.41.0 時点）で確定済み**: AI SDK v5 命名（`inputTokens` / `outputTokens`）の `totalUsage` を採用（research.md「Spike Results」参照）
   - `stopReason` の判定規則: `timeout` = AbortSignal による中断、`budget_exhausted` = 正常完了かつ `searchBudget.used >= limit`、`error` = その他の例外・structured output 検証不合格、`completed` = 上記以外の正常完了。reject 経路（timeout / error）はエンジン内で catch してサマリログを出力してから rethrow する
-- **詳細（debug）**: 実行した検索クエリ列（budget の記録）と各ヒット概要、`result.steps` から再構成した tool 呼び出しシーケンス（2.4, 6.3）
+- **詳細（debug）**: 実行した検索クエリ列（budget の記録）と各ヒット概要、一覧参照した親パス列（`listedPaths`、childListingBudget の記録）、`result.steps` から再構成した tool 呼び出しシーケンス（2.4, 6.3）
 - プライバシー制約: 文書本文・検索クエリ（本文由来）は debug レベルのみに出力。info レベルには件数・時間・トークンなどメタ情報のみ
 
 **Implementation Notes**
 
-- Integration: `result.steps` / usage の形状は @mastra/core 1.41.0 の generate 戻り値に依存。スパイクタスクで実形状を確認してからログ整形を確定する
+- Integration: `result.steps` / usage の形状は @mastra/core の generate 戻り値に依存。スパイク（1.41.0）で実形状を確認しログ整形を確定済み。installed が 1.45.0 に上がったため形状変化がないかは Mastra バージョン変動時の再確認対象（Revalidation Triggers）
 - Validation: 型ガードのユニットテストで JSON Schema と TS 型の乖離を防ぐ
 - Risks: tool 併用 + structured output の両立（mastra-ai/mastra#3139 系統）→ 実装フェーズ最初のスパイクで実機確認。壊れる場合は `structuredOutput.model` に同一モデルを明示指定して structuring パスを分離する（research.md の Mitigation）
 - Open Question: `buildUserPrompt` に渡す本文の長さの扱い。validator 上限（100,000 文字）の本文がそのまま渡ると入力トークンが過大になり得る。トリミング戦略（要約・先頭優先等）の要否は、スパイクと A/B 測定のトークン実測（6.2）を踏まえて検証フェーズで確定する
@@ -490,12 +514,13 @@ export const suggestPathAgent = new Agent({
   id: 'suggestPathAgent',
   name: 'Suggest Path Agent',
   instructions: SUGGEST_PATH_INSTRUCTIONS,
-  model: () => getOpenaiProvider()(
-    configManager.getConfig('openai:assistantModel:suggestPathAgent'),
-  ), // DynamicArgument: per-request 解決（3.4）
+  // Provider-agnostic model resolution (support/mastra AI layer).
+  // Lazily resolved; memoized and cleared on AI-settings save (3.4).
+  model: () => resolveMastraModel(),
   tools: {
     fullTextSearch: limitedSearchTool,
     getPageContent: getPageContentTool,
+    listChildren: listChildrenTool, // peer-placement verification (#185213)
   },
   // memory は接続しない（ステートレス。スレッド永続化が不要なため）
 });
@@ -509,18 +534,24 @@ export const suggestPathAgent = new Agent({
   5. **本文参照（1.3）**: パス・スニペットで判断できないときは getPageContent で候補ページの内容を確認する
   6. **budget 手仕舞い（3.2）**: 検索 tool が `limit_exceeded` を返したら、それ以上検索せず収集済み情報から提案を確定する
   7. **出力ルール**: 提案は最大 20 件（確からしい順）。それぞれ既存ページ木に整合する親ディレクトリパス（新設パスも可）・簡潔な label・提案理由 description。label / description は文書の言語に合わせる
+- **実装後の拡張**（チューニングラウンド 302d974819 / 066d1776de + #185213。現行 instructions.ts に反映済み）:
+  - **grep 型クエリ生成**: topic の言い換えではなく path スラッグ・日付・コード識別子など低頻度の具体トークンを優先して撃つ。言語切替（日英）の明示指導を含む（4 の探索戦略の強化）
+  - **listChildren 検証プロトコル**: 候補親を提案する前に子ページ一覧で兄弟の実在・命名を確認する（peer-placement verification）。専用 budget の手仕舞い規則も 6 と同型
+  - **peer-vs-sub 配置ドクトリン**: 「PARENT DIRECTORY」表現がリーフページ配下の提案を妨げていた A/B 測定の敗因（4/60）への修正。既存リーフの配下（sub）か兄弟（peer）かを内容関係で判断する
+  - **出力の下限目標**: 確からしい候補を最低 5 件目指す（7 の補強）
 - スキーマ（structured output）は Agent 定義に持たせず、AgenticEngine が generate 呼び出し時に渡す（依存方向: mastra 側が suggest-path の型を知らないため）
 
 **Dependencies**
 
 - Outbound: LimitedSearchTool — 検索（P0）
 - Outbound: getPageContentTool — 本文参照（P0・既存共有 tool 無改変）
-- External: `getOpenaiProvider` + configManager — モデル解決（P0）
+- Outbound: ListChildrenTool — 子ページ一覧（P0・#185213 で追加。`mastra-modules/tools/` 配下だが実質 suggest-path 専用）
+- External: `resolveMastraModel`（support/mastra AI レイヤ）— モデル解決（P0。旧 `getOpenaiProvider` + configManager から置換）
 
 **Implementation Notes**
 
 - Integration: `mastra-modules/index.ts` の Mastra インスタンスに登録（logger / observability の恩恵を受ける）。AgenticEngine からの取得は **`mastra.getAgent('suggestPathAgent')` に統一する**（Agent インスタンスの直接 import は不可。registry 経由に統一することでプラットフォーム設定の一貫性を保証し、チャット側ハンドラと同じ取得パターンに揃える）
-- Validation: dynamic model（関数指定）が generate 毎に評価されることをスパイクで確認
+- Validation: モデル解決が lazy（import 時に resolver を呼ばない）であること・resolver のモデルをそのまま転送することをユニットテストで検証（provider-agnostic 化後の形。当初のスパイクでは dynamic model の per-generate 評価を確認していた）
 - Risks: instructions の品質が命中率を左右する → A/B 測定（6.1〜6.4）+ 探索過程ログ（2.4）で反復改善
 
 #### LimitedSearchTool（`agents/suggest-path/limited-search-tool.ts`）
@@ -572,8 +603,16 @@ export type SearchBudget = {
   readonly queries: string[]; // 実行クエリの記録（2.4 のトレース用）
 };
 
+// #185213 で追加: listChildren tool 用の第二 budget（SearchBudget と同じ規約）
+export type ChildListingBudget = {
+  readonly limit: number;
+  used: number;
+  readonly paths: string[];  // 一覧参照した親パスの記録（トレース用）
+};
+
 export type SuggestPathRequestContextShape = MastraRequestContextShape & {
   searchBudget: SearchBudget;
+  childListingBudget: ChildListingBudget;
 };
 ```
 
@@ -618,11 +657,13 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 | `aiTools:suggestPathEngine` | `'oneshot' \| 'agentic'` | `'oneshot'` | `AI_TOOLS_SUGGEST_PATH_ENGINE` | 既定エンジン（5.2, 5.6。検証完了まで 'oneshot' 固定が既定） |
 | `aiTools:suggestPathAgenticSearchLimit` | `number` | `5` | `AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT` | 1 リクエストの検索回数上限（3.1, 3.3。合意レンジ 3〜5 の上限を初期値とし、A/B 実測で確定） |
 | `aiTools:suggestPathAgenticTimeoutMs` | `number` | `60000` | `AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS` | agentic エンジンの総時間セーフティネット（4.5。暫定値。A/B 実測とレスポンス時間上限の別途合意を経て確定） |
-| `openai:assistantModel:suggestPathAgent` | `string` | `'gpt-4.1-mini'` | `OPENAI_SUGGEST_PATH_AGENT_MODEL` | agentic エンジンのモデル（3.4。既存 `openai:assistantModel:mastraAgent` の命名規約に整合） |
+| `aiTools:suggestPathAgenticChildListingLimit` | `number` | `5` | `AI_TOOLS_SUGGEST_PATH_AGENTIC_CHILD_LISTING_LIMIT` | listChildren tool の 1 リクエスト呼び出し上限（#185213 で追加。検索 budget とは独立の第二 budget） |
+| `openai:assistantModel:suggestPathAgent` | `string` | `'gpt-4.1-mini'` | `OPENAI_SUGGEST_PATH_AGENT_MODEL` | **DEAD KEY（2026-06 support/mastra マージ以降）**: 定義は残存するが読み出す実装が存在せず、変更しても何も起きない。モデルはアプリ全体設定 `ai:provider` / `ai:model`（`resolveMastraModel` 経由・memoize + AI 設定保存時 cache clear）で決まる。削除 or 再配線は未決（要判断） |
 | `openai:reasoningEffort:suggestPathAgent` | `string` | `''`（空＝未指定） | `OPENAI_SUGGEST_PATH_AGENT_REASONING_EFFORT` | agentic エンジンの推論強度（3.5, 3.6）。空文字列は「未指定」を表し、`providerOptions` に reasoning effort を渡さない（モデル既定挙動）。非空時のみ後述の `providerOptions.openai.reasoningEffort` に渡す。値の妥当性（対応モデル・許容値 `minimal`/`low`/`medium`/`high`）はモデル側が判定し、本キーは文字列をそのまま透過する |
 
-- すべて利用箇所で per-request に `configManager.getConfig()` を呼ぶことで、再起動なしの変更反映（3.3, 3.4, 3.5）を保証する
-- `openai:reasoningEffort:suggestPathAgent` は空文字列を既定とすることで、設定しない限り現行挙動（reasoning effort 未指定）を変えない（3.6）。型は `string`（enum 化しない）— GPT-5 系のみ `minimal` を許容する等のモデル別制約を config 層に固定化せず、対応値の解釈はモデル／プロバイダ側に委ねる
+- searchLimit / childListingLimit / timeoutMs / reasoningEffort は利用箇所で per-request に `configManager.getConfig()` を呼ぶことで、再起動なしの変更反映（3.3, 3.5）を保証する
+- モデル（3.4）の再起動なし反映は per-request 読みではなく、`resolveMastraModel` の memoize + AI 設定保存（および s2s メッセージ）時の `clearResolvedMastraModelCache()` で実現される（support/mastra レイヤの機構。設計当初の DynamicArgument per-request 解決から変更）
+- `openai:reasoningEffort:suggestPathAgent` は空文字列を既定とすることで、設定しない限り現行挙動（reasoning effort 未指定）を変えない（3.6）。型は `string`（enum 化しない）— GPT-5 系のみ `minimal` を許容する等のモデル別制約を config 層に固定化せず、対応値の解釈はモデル／プロバイダ側に委ねる。**注意（provider-agnostic 化後の制約）**: この値は `providerOptions.openai.*` 名前空間に固定で渡るため、`ai:provider` が OpenAI 系以外のときはサイレントに無効。キー名の `openai:` プレフィックスも含め、chat 側の `ai:providerOptions` パターンへの移行 or 「OpenAI 限定」の明文化が要判断
 
 ## Data Models
 
@@ -681,7 +722,7 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 | Route（4xx） | 未認証 / AI scope なし / AI 機能無効 | 401 / 403（既存ミドルウェア、無変更） | 4.1 |
 | Tool 層 | 検索失敗・ページ不可視・コンテキスト欠落・budget 超過 | discriminated union を**値で**返す（throw 禁止）。エージェントは再検索（1.2）または手仕舞い（3.2）で回復 | 1.2, 3.2 |
 | AgenticEngine | agent 例外・structured output 検証不合格・タイムアウト（AbortController） | reject → オーケストレータが捕捉 | 4.5 |
-| AgenticEngine | Azure OpenAI 構成（`openai:serviceType: 'azure-openai'`）で agentic が選択された | provider 初期化失敗として reject → memo フォールバック。**Azure 構成では agentic エンジンは実質利用不可**（`getOpenaiProvider` が OpenAI 直結のため。chat 用 growiAgent と共通のプラットフォーム制約であり、Azure 対応は Mastra 基盤側の対応に追従する） | 4.5 |
+| AgenticEngine | `ai:provider` / `ai:model` の誤設定・未設定で agentic が選択された | `resolveMastraModel` がリクエスト時に throw → reject → memo フォールバック。（2026-06 の provider-agnostic 化により旧記述「Azure OpenAI 構成では利用不可」は解消: azure-openai は一級プロバイダとして解決される） | 4.5 |
 | Orchestrator | agentic エンジンの reject | **memo 提案のみの 200 レスポンス**（5xx にしない） | 4.3, 4.5 |
 | Orchestrator | oneshot エンジンの例外 | 現行どおり伝播（route で 500）。挙動変更しない | 5.3 |
 | Route（5xx） | 上記以外の予期しない例外（memo 生成失敗等） | 500 + 汎用メッセージ（現行パターン） | — |
@@ -701,7 +742,7 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 2. **limited-search-tool**: budget 残あり → 委譲 + used 増加 + query 記録 / ちょうど上限 → `limit_exceeded` / searchBudget 欠落 → `context_error`。いずれも throw しないこと
 3. **agentic-engine**: Agent モック（`mock<T>()`）で (a) 正常出力 → path 正規化・dedupe・20 件制限・grant 付与・informationType 付与、(b) 不正出力 → reject、(c) タイムアウト → reject、(d) searchLimit / timeoutMs が config から per-request に読まれること
 4. **engine dispatcher / orchestrator**: engine 未指定 → config 既定（'oneshot'）/ リクエスト指定が優先 / agentic reject → memo のみ返却 / memo が常に先頭
-5. **suggest-path-agent**: tools 構成（fullTextSearch = limited wrapper, getPageContent）と memory 不接続、model が関数（DynamicArgument）であること
+5. **suggest-path-agent**: tools 構成（fullTextSearch = limited wrapper, getPageContent, listChildren）と memory 不接続、model が `resolveMastraModel` を lazy に転送すること
 
 ### Integration Tests
 

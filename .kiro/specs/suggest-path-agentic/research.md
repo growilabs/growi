@@ -224,3 +224,13 @@
 
 - **pnpm override `@mastra/core>p-map: 4.0.0`（pnpm-workspace.yaml）の影響**: @mastra/core の **ESM ビルドは import 不可**（p-map@4 に `pMapSkip` named export がなく module link エラー）。CJS ビルド（GROWI サーバが実際にロードする側）は pMapSkip を参照せず正常動作する。vitest（unit / integration いずれのプロジェクトでも）から `@mastra/core/agent` を**実体 import するとこのエラーで落ちる**ため、suggest-path-agent のユニットテストは既存 `growi-agent.spec.ts` と同じく `vi.mock('@mastra/core/agent', ...)`（StubAgent パターン）を踏襲すること。`@mastra/core/request-context` / `@mastra/core/tools` は p-map を参照せず vitest からも import 可能（既存・スパイク両方の integ テストで実証済み）
 - 参考実測値: 検索 2 回 + 構造化出力の 1 generate で約 4.2 秒 / 計 1,415 tokens（gpt-4.1-mini、canned tool + 実 LLM。実 ES 検索や getPageContent を含まない下限値）
+
+## Reconcile Notes (2026-07-06 実態追従)
+
+実装完了・受け入れ後の変化により、上記の記録のうち以下は**当時の事実であって現状とは異なる**。原文は当時の調査記録として温存し、supersede をここに集約する（現状の正は design.md 2026-07-06 改訂版）。
+
+- **@mastra/core のバージョン**: 本文・Spike Results の `1.41.0` は設計〜スパイク時点の installed。support/mastra 上流マージを経て現在は **1.45.0**（宣言 `^1.32.1` は不変）。design 自身の Revalidation Trigger（Mastra バージョン変動）が発火した状態であり、スパイク結論（steps/usage 形状・structuredOutput 挙動・p-map ESM 回避）の 1.45.0 での再検証は未実施
+- **モデル解決方式（「Mastra 基盤の統合パターン」「Spike 項目 3」「設定 4 キー」Decision）**: `getOpenaiProvider()` と `openai:assistantModel:mastraAgent` キーは support/mastra の provider-agnostic 化（コミット 70bde80571 / c4a58793bf）で**消滅**。suggestPathAgent・growiAgent とも `model: () => resolveMastraModel()`（lazy・memoize・AI 設定保存時 cache clear）に統一され、「growiAgent は構築時解決（再起動必要）」の記述も過去のもの。Requirement 3.4 の再起動なし反映は DynamicArgument の per-generate 評価ではなく **memoize + cache clear** で実現されている
+- **設定キー**: 「4 キーを新設」Decision はその後 2 キー増えて 6 キー相当に: reasoning effort キー（タスク 8.x）と `aiTools:suggestPathAgenticChildListingLimit`（#185213、listChildren tool の第二 budget）。一方 `openai:assistantModel:suggestPathAgent` は**読み手のいない dead key**（モデルはアプリ全体設定 `ai:provider` / `ai:model` で決まる。扱い要判断）
+- **tool 構成**: 設計時の 2 tool（limited fullTextSearch + getPageContent）に **listChildren tool** が追加され 3 tool 構成（#185213、peer-placement verification。`mastra-modules/tools/list-children-tool.ts`）
+- **p-map ESM 回避（副次的発見）**: StubAgent パターンは現行テストでも継続使用中（host で green 実証済み）。ただし 1.45.0 での「実体 import が落ちる」挙動自体の再確認はしていない
