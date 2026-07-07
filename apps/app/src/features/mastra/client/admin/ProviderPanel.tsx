@@ -2,7 +2,7 @@ import type { JSX, ReactNode } from 'react';
 import { useId } from 'react';
 import { useTranslation } from 'next-i18next';
 import { type FieldPath, useFormContext, useWatch } from 'react-hook-form';
-import { Alert, Badge, FormGroup, Input, Label } from 'reactstrap';
+import { Alert, FormGroup, Input, Label } from 'reactstrap';
 
 import type { AiProvider } from '../../interfaces/ai-provider';
 import { AzureOpenaiSettings } from './AzureOpenaiSettings';
@@ -123,25 +123,18 @@ export const ProviderPanel = (props: ProviderPanelProps): JSX.Element => {
       )}
 
       <FormGroup className="mb-3">
-        <div className="d-flex align-items-center gap-2 mb-1">
-          <Label for={apiKeyId} className="mb-0 fw-bold">
-            {t('ai_settings.api_key_label')}
-          </Label>
-          {isApiKeySet ? (
-            <Badge color="success" pill data-testid="provider-api-key-status">
-              {t('ai_settings.api_key_set_chip')}
-            </Badge>
-          ) : (
-            <Badge color="secondary" pill data-testid="provider-api-key-status">
-              {t('ai_settings.api_key_not_set_chip')}
-            </Badge>
-          )}
-        </div>
+        <Label for={apiKeyId} className="fw-bold mb-1">
+          {t('ai_settings.api_key_label')}
+        </Label>
         {/* Help text sits directly under the label (above the input), matching
             the Models / Default model sections' description placement. */}
         <p className="form-text text-muted mt-0 mb-2">
           {t('ai_settings.api_key_help')}
         </p>
+        {/* "Key set / not set" is conveyed by the placeholder ("(configured)" when
+            a key is stored, so a blank field keeps it) — no separate status chip.
+            Provider availability (incl. Azure's Entra-ID key exemption) is shown by
+            the tab dot + the misconfigured warning, not here. */}
         <Input
           id={apiKeyId}
           type="password"

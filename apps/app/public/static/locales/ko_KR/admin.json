@@ -453,8 +453,6 @@
     "api_key_label": "API 키",
     "api_key_help": "AI 공급자 인증에 사용되는 API 키입니다.",
     "api_key_set_placeholder": "(설정됨)",
-    "api_key_set_chip": "API 키 설정됨",
-    "api_key_not_set_chip": "API 키 미설정",
     "models_section_title": "Models",
     "models_section_desc": "등록한 모델 중 하나를 기본값으로 선택합니다. 기본 모델은 채팅에서 사용자에게 처음 선택되어 있는 모델입니다.",
     "default_model_label": "기본 모델",

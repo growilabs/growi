@@ -453,8 +453,6 @@
     "api_key_label": "API Key",
     "api_key_help": "The API key used to authenticate with the AI provider.",
     "api_key_set_placeholder": "(configured)",
-    "api_key_set_chip": "API key set",
-    "api_key_not_set_chip": "API key not set",
     "models_section_title": "Models",
     "models_section_desc": "Choose one of your registered models as the default. The default is the model initially selected for users in chat.",
     "default_model_label": "Default model",

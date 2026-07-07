@@ -462,8 +462,6 @@
     "api_key_label": "API 密钥",
     "api_key_help": "用于向 AI 提供商进行身份验证的 API 密钥。",
     "api_key_set_placeholder": "(已配置)",
-    "api_key_set_chip": "已设置 API 密钥",
-    "api_key_not_set_chip": "未设置 API 密钥",
     "models_section_title": "Models",
     "models_section_desc": "从已注册的模型中选择一个作为默认模型。默认模型是聊天中最初为用户选中的模型。",
     "default_model_label": "默认模型",

@@ -462,8 +462,6 @@
     "api_key_label": "API キー",
     "api_key_help": "AI プロバイダーの認証に使用する API キーです。",
     "api_key_set_placeholder": "(設定済み)",
-    "api_key_set_chip": "API キー設定済み",
-    "api_key_not_set_chip": "API キー未設定",
     "models_section_title": "Models",
     "models_section_desc": "登録したモデルから 1 つをデフォルトとして選びます。デフォルトは、チャットで最初に選択されているモデルです。",
     "default_model_label": "デフォルトモデル",

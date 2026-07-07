@@ -453,8 +453,6 @@
     "api_key_label": "Clé API",
     "api_key_help": "La clé API utilisée pour s'authentifier auprès du fournisseur d'IA.",
     "api_key_set_placeholder": "(configurée)",
-    "api_key_set_chip": "Clé API définie",
-    "api_key_not_set_chip": "Clé API non définie",
     "models_section_title": "Models",
     "models_section_desc": "Choisissez l'un de vos modèles enregistrés comme modèle par défaut. Le modèle par défaut est celui sélectionné au départ pour les utilisateurs dans la conversation.",
     "default_model_label": "Modèle par défaut",

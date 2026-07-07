@@ -7,7 +7,7 @@ import { FormProvider, useForm, useWatch } from 'react-hook-form';
 import { describe, expect, it, vi } from 'vitest';
 
 // Render i18n keys verbatim; assertions target the observable DOM contract
-// (toggle checked/disabled, placeholder text, chip state, azure fields).
+// (toggle checked/disabled, placeholder text, misconfigured warning, azure fields).
 vi.mock('next-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -175,34 +175,6 @@ describe('ProviderPanel', () => {
       expect(
         screen.getByLabelText('ai_settings.api_key_label'),
       ).toHaveAttribute('placeholder', '');
-    });
-  });
-
-  describe('key-status chip (1.8)', () => {
-    it('shows the "set" chip when a key is stored', () => {
-      // Act
-      renderComponent({ isApiKeySet: true });
-
-      // Assert
-      expect(
-        screen.getByText('ai_settings.api_key_set_chip'),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText('ai_settings.api_key_not_set_chip'),
-      ).not.toBeInTheDocument();
-    });
-
-    it('shows the "not set" chip when no key is stored', () => {
-      // Act
-      renderComponent({ isApiKeySet: false });
-
-      // Assert
-      expect(
-        screen.getByText('ai_settings.api_key_not_set_chip'),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText('ai_settings.api_key_set_chip'),
-      ).not.toBeInTheDocument();
     });
   });
 
