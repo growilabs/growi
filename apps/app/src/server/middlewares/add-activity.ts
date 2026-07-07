@@ -2,8 +2,8 @@ import type { IUserHasId } from '@growi/core';
 import type { NextFunction, Request, Response } from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
-import Activity from '~/server/models/activity';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 const logger = loggerFactory('growi:middlewares:add-activity');
 
@@ -35,7 +35,7 @@ export const generateAddActivityMiddleware = () =>
     };
 
     try {
-      const activity = await Activity.createByParameters(parameter);
+      const activity = await prisma.activities.createByParameters(parameter);
       res.locals.activity = activity;
     } catch (err) {
       logger.error('Create activity failed', err);

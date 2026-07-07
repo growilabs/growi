@@ -1,9 +1,21 @@
 import type { NextFunction, Request, Response } from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
-import Activity from '~/server/models/activity';
 
 import { generateAddActivityMiddleware } from './add-activity';
+
+// vi.hoisted ensures the variable is initialized before vi.mock's hoisted factory runs.
+const mockCreateByParameters = vi.hoisted(() => vi.fn());
+
+// Mock the prisma client so createByParameters is a controllable vi.fn().
+// The real prisma client connects to a DB which is not available in unit tests.
+vi.mock('~/utils/prisma', () => ({
+  prisma: {
+    activities: {
+      createByParameters: mockCreateByParameters,
+    },
+  },
+}));
 
 const buildReq = (overrides: Partial<Request> = {}): Request =>
   ({
@@ -17,8 +29,8 @@ const buildReq = (overrides: Partial<Request> = {}): Request =>
 const buildRes = (): Response => ({ locals: {} }) as unknown as Response;
 
 describe('generateAddActivityMiddleware', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
   // Why the action must start as ACTION_UNSETTLED (Contribution Graph):
@@ -34,9 +46,7 @@ describe('generateAddActivityMiddleware', () => {
       _id: 'activity-1',
       action: SupportedAction.ACTION_UNSETTLED,
     };
-    const createByParametersSpy = vi
-      .spyOn(Activity, 'createByParameters')
-      .mockResolvedValue(createdActivity as never);
+    mockCreateByParameters.mockResolvedValue(createdActivity);
 
     const req = buildReq();
     const res = buildRes();
@@ -44,7 +54,7 @@ describe('generateAddActivityMiddleware', () => {
 
     await generateAddActivityMiddleware()(req, res, next as NextFunction);
 
-    expect(createByParametersSpy).toHaveBeenCalledWith(
+    expect(mockCreateByParameters).toHaveBeenCalledWith(
       expect.objectContaining({ action: SupportedAction.ACTION_UNSETTLED }),
     );
     expect(res.locals.activity).toBe(createdActivity);
@@ -52,15 +62,13 @@ describe('generateAddActivityMiddleware', () => {
   });
 
   it('does not create an activity for GET requests', async () => {
-    const createByParametersSpy = vi.spyOn(Activity, 'createByParameters');
-
     const req = buildReq({ method: 'GET' });
     const res = buildRes();
     const next = vi.fn();
 
     await generateAddActivityMiddleware()(req, res, next as NextFunction);
 
-    expect(createByParametersSpy).not.toHaveBeenCalled();
+    expect(mockCreateByParameters).not.toHaveBeenCalled();
     expect(res.locals.activity).toBeUndefined();
     expect(next).toHaveBeenCalledOnce();
   });
