@@ -44,8 +44,11 @@ const provisionUser = async (
  * storageState file for each, so specs can act as them via
  * `browser.newContext({ storageState })`.
  *
- * Runs in the `setup` project (matched by `*.setup.ts`), which every browser
- * test project depends on, so the auth files exist before the specs run.
+ * Runs in the dedicated `users` project, which every browser test project
+ * depends on, so the auth files exist before the specs run. It must NOT live in
+ * the generic `setup` project: that one is a dependency of the installer project
+ * and runs against a fresh, uninstalled DB, where the admin login this performs
+ * would time out.
  * Idempotent: re-runs reuse existing accounts and just refresh their auth files.
  */
 setup('provision filter test users', async ({ page, browser }) => {
