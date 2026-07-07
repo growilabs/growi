@@ -341,6 +341,27 @@
     },
     "exclude_tag": {
       "desc": "Exclude pages with {{tag}} tag"
+    },
+    "author": {
+      "desc": "Search for pages created by {{author}}"
+    },
+    "exclude_author": {
+      "desc": "Exclude pages created by {{author}}"
+    },
+    "editor": {
+      "desc": "Search for pages last edited by {{editor}}"
+    },
+    "exclude_editor": {
+      "desc": "Exclude pages edited by {{editor}}"
+    },
+    "group": {
+      "desc": "Search for pages granted to group {{group}}"
+    },
+    "exclude_group": {
+      "desc": "Exclude pages granted to group {{group}}"
+    },
+    "quoted_value": {
+      "desc": "Wrap any filter value in double quotes when it contains a space (e.g. a group name or page path)"
     }
   },
   "search": {
