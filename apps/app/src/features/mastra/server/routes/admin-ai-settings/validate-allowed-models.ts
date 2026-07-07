@@ -1,6 +1,7 @@
 import { isAiProvider } from '../../../interfaces/ai-provider';
 import type { AllowedModel } from '../../../interfaces/allowed-model';
 import { MAX_MODEL_KEY_LENGTH } from '../../../interfaces/model-key';
+import { isRecord } from '../../../utils/is-record';
 import { isProviderNamespacedObject } from '../../../utils/provider-options-validation';
 
 // The only properties an allow-list entry may carry. Any other property is
@@ -42,10 +43,10 @@ export const isValidNonEmptyAllowedModels = (
   let defaultCount = 0;
 
   for (const entry of models) {
-    // The runtime value is client-supplied JSON, so reject a non-object entry
-    // (null / primitive) before reading its fields, and reject any unknown extra
-    // property so nothing outside the declared shape is persisted verbatim.
-    if (entry == null || typeof entry !== 'object') {
+    // The runtime value is client-supplied JSON, so reject a non-record entry
+    // (null / primitive / array) before reading its fields, and reject any unknown
+    // extra property so nothing outside the declared shape is persisted verbatim.
+    if (!isRecord(entry)) {
       return false;
     }
     if (Object.keys(entry).some((key) => !ALLOWED_ENTRY_KEYS.has(key))) {

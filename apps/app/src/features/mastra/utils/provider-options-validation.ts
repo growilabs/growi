@@ -1,3 +1,5 @@
+import { isRecord } from './is-record';
+
 /**
  * True when `value` is a provider-namespaced options object: a non-null, non-array
  * object whose every top-level value is itself a non-null, non-array object — the
@@ -8,13 +10,11 @@
  * as-is and applied verbatim at chat time, never silently dropped.
  */
 export const isProviderNamespacedObject = (value: unknown): boolean => {
-  if (typeof value !== 'object' || value == null || Array.isArray(value)) {
+  if (!isRecord(value)) {
     return false;
   }
   // Each top-level entry must itself be a (non-array) option object.
-  return Object.values(value).every(
-    (v) => typeof v === 'object' && v != null && !Array.isArray(v),
-  );
+  return Object.values(value).every((v) => isRecord(v));
 };
 
 /**

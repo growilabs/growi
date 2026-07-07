@@ -11,6 +11,7 @@ import type {
   AiProviderSettings,
   AiProvidersConfig,
 } from '~/features/mastra/interfaces/provider-settings';
+import { isRecord } from '~/features/mastra/utils/is-record';
 import { configManager } from '~/server/service/config-manager';
 
 import { infoOnce, warnOnce } from './warn-dedup';
@@ -35,9 +36,6 @@ type AiValueConfigKey =
   | 'ai:providers'
   | 'ai:providerApiKeys'
   | 'ai:allowedModels';
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 // Coerce a config field declared `string` to a non-blank, TRIMMED string, or
 // undefined. The loader JSON-parses env vars and casts the result unchecked (see

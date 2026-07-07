@@ -6,6 +6,7 @@ import { body, type ValidationChain } from 'express-validator';
 import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
 import { AI_PROVIDERS } from '~/features/mastra/interfaces/ai-provider';
 import { clearResolvedMastraModelCache } from '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model';
+import { isRecord } from '~/features/mastra/utils/is-record';
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
@@ -114,9 +115,6 @@ const logger = loggerFactory(
  *                 type: boolean
  *                 description: Marks the default entry. Exactly one entry must set this true.
  */
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 // The Azure connection strings are optional strings; a non-string is rejected.
 const isOptionalString = (value: unknown): boolean =>
