@@ -44,8 +44,11 @@ import {
 import { Response } from '~/components/ai-elements/response';
 import { Button } from '~/components/ui/button';
 import { PageMentionInput } from '~/features/mastra/client/components/PageMentionInput';
-import { AI_PROVIDERS } from '~/features/mastra/interfaces/ai-provider';
 import type { CustomUIMessage } from '~/features/mastra/interfaces/chat-message';
+import {
+  formatModelLabel,
+  groupModelsByProvider,
+} from '~/features/mastra/utils/model-display';
 
 import {
   useChatSidebarActions,
@@ -66,12 +69,6 @@ import { extractPageSources } from './page-sources';
 import styles from './ChatSidebar.module.scss';
 
 const moduleClass = styles['grw-chat-sidebar'] ?? '';
-
-// Separator between the provider and the modelId in the closed trigger label,
-// matching the admin default-model selector ("provider · modelId"). U+00B7
-// MIDDLE DOT. Naming the selected model with its provider keeps the same modelId
-// under different providers distinguishable when the menu is closed (Req 4.2).
-const TRIGGER_SEPARATOR = ' · ';
 
 export const ChatSidebar = (): JSX.Element => {
   const { t } = useTranslation();
@@ -125,13 +122,9 @@ export const ChatSidebar = (): JSX.Element => {
 
   // Group the available models by owning provider in fixed slot order, keeping
   // allow-list order within each group and dropping providers that own no model
-  // (Req 4.1/4.2). Mirrors the admin selector's grouping.
+  // (Req 4.1/4.2). Shares the grouping rule with the admin selector.
   const providerGroups = useMemo(
-    () =>
-      AI_PROVIDERS.map((provider) => ({
-        provider,
-        entries: (models ?? []).filter((entry) => entry.provider === provider),
-      })).filter((group) => group.entries.length > 0),
+    () => groupModelsByProvider(models ?? [], (entry) => entry.provider),
     [models],
   );
 
@@ -414,7 +407,10 @@ export const ChatSidebar = (): JSX.Element => {
                       (Req 4.2).
                     */}
                     {selectedEntry != null ? (
-                      `${selectedEntry.provider}${TRIGGER_SEPARATOR}${selectedEntry.modelId}`
+                      formatModelLabel(
+                        selectedEntry.provider,
+                        selectedEntry.modelId,
+                      )
                     ) : (
                       <PromptInputModelSelectValue />
                     )}

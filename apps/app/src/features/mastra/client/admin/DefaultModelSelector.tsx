@@ -11,27 +11,12 @@ import {
   Label,
 } from 'reactstrap';
 
-import { AI_PROVIDERS } from '../../interfaces/ai-provider';
-import type {
-  AiSettingsFormValues,
-  AllowedModelFormValue,
-} from './ai-settings-form-values';
+import {
+  formatModelLabel,
+  groupModelsByProvider,
+} from '../../utils/model-display';
+import type { AiSettingsFormValues } from './ai-settings-form-values';
 import { setDefaultAllowedModelAt } from './ai-settings-form-values';
-
-// Separator between the provider and the model id in the trigger label (mock:
-// `dp.name + ' · ' + s.def.name`). U+00B7 MIDDLE DOT.
-const TRIGGER_SEPARATOR = ' · ';
-
-/** An allowed-model row paired with its position in the flat `allowedModels` array. */
-interface IndexedModel {
-  readonly model: AllowedModelFormValue;
-  readonly index: number;
-}
-
-interface ProviderGroup {
-  readonly provider: (typeof AI_PROVIDERS)[number];
-  readonly entries: readonly IndexedModel[];
-}
 
 /**
  * The global default-model selector (R3.1): a cross-provider dropdown over the
@@ -67,21 +52,19 @@ export const DefaultModelSelector = (): JSX.Element => {
   // Group by owning provider in fixed-slot order, keeping allow-list order within
   // each group; drop providers that own no model. Each entry retains its original
   // flat index so a pick maps back to the single global `useFieldArray` position.
-  const groups = useMemo<ProviderGroup[]>(() => {
-    const indexed: IndexedModel[] = models.map((model, index) => ({
-      model,
-      index,
-    }));
-    return AI_PROVIDERS.map((provider) => ({
-      provider,
-      entries: indexed.filter((e) => e.model.provider === provider),
-    })).filter((group) => group.entries.length > 0);
-  }, [models]);
+  const groups = useMemo(
+    () =>
+      groupModelsByProvider(
+        models.map((model, index) => ({ model, index })),
+        (e) => e.model.provider,
+      ),
+    [models],
+  );
 
   const defaultModel = models.find((m) => m.isDefault === true);
   const triggerLabel =
     defaultModel != null
-      ? `${defaultModel.provider}${TRIGGER_SEPARATOR}${defaultModel.modelId}`
+      ? formatModelLabel(defaultModel.provider, defaultModel.modelId)
       : t('ai_settings.default_model_placeholder');
 
   const [isOpen, setIsOpen] = useState(false);
