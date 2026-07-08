@@ -6,7 +6,7 @@
 
 ### 記録フロー（更新系＝非 GET）
 - `apps/app/src/server/middlewares/add-activity.ts:22-39` — 非 GET で**無条件に** `ACTION_UNSETTLED` の仮行を `prisma.activities.createByParameters` で作成し、`res.locals.activity` に格納。action 判定なし。
-- 各ルートが `activityEvent.emit('update', activityId, parameters, …)` を発火（**109 箇所 / 37 ファイル**、`.spec`/`.integ` 除く）。第1引数は実質すべて `res.locals.activity._id`（唯一 `apiv3/logout.js:39` が変数経由だが元は `:37` の `res.locals.activity._id`）。
+- 各ルートが `activityEvent.emit('update', activityId, parameters, …)` を発火（**37 箇所 / 19 ファイル**、`.spec`/`.integ` 除く）。第1引数は実質すべて `res.locals.activity._id`（唯一 `apiv3/logout.js:39` が変数経由だが元は `:37` の `res.locals.activity._id`）。
 - update リスナー `apps/app/src/server/service/activity.ts:101-179` が `shoudUpdateActivity(action)` で判定。対象内なら `updateByParameters` で実 action へ更新し `updated` を emit、**対象外なら何もせず UNSETTLED のまま残す**。
 - GET 経路は `createActivity`（`activity.ts:256-270`）が保存前に判定し、対象外なら作らない（＝既に要望どおり）。
 
@@ -134,3 +134,49 @@ UNSETTLED 行は起源が3種類あり、混同してはいけない:
 - Option B（delete-at-settle）: **S–M / Low–Medium** — 既存温存・低リスク・fail-safe 維持。delete メソッド新設要・write は減らない（size のみ減）。
 - Option C（lazy fail-safe）: **M / Medium** — write 削減と失敗監査を両立だがクラッシュ取りこぼし・エラー経路の新結合点。
 - 共通改善（責務分離・一覧除外）: **S–M / Low**。
+
+---
+
+## 10. Design 決定（design フェーズ / 2026-07-07）
+
+`/kiro-spec-design` で Research Needed を解決した結果。実コードを再確認したうえでの確定事項。
+
+### Decision 1: 方式は Option B（delete-at-settle）に確定（Research Needed #2, #3 を解決）
+
+- **選定**: **Option B**。事前作成した `ACTION_UNSETTLED` 行は温存し、`update` リスナーで「記録可否が確定して対象外（②）」の行だけを削除する。
+- **根拠**: 要件 4（例外・**中断（クラッシュ含む）**で確定しなかった操作の試行記録を残す）が、リクエスト本体の実行**前**に行を焼き付ける現行の事前書き込みを事実上必須にする。
+  - (A) defer-create は事前書き込みをやめるため ③（試行記録）を全放棄 → 要件 4 と両立不可（既に除外済み）。
+  - (C) lazy fail-safe はエラーハンドラ到達時のみ ③ を作るため、**プロセス即死などエラーハンドラ未到達のクラッシュを取りこぼす** → 要件 4.1 の「中断」に対して弱い。
+  - (B) は事前書き込みをそのまま残すので、例外・中断・クラッシュのいずれでも ③ が確実に残る。
+- **副次的な利点（重要）**: ② を削除することで、残存する `ACTION_UNSETTLED` 行から「確定して対象外だった②」が除かれる。残るのは ③（失敗・中断・クラッシュした試行）と、加えて emit が来ない no-op（`shouldGenerateUpdate=false` で更新自体は成功したが記録を抑制したケース）である。これにより要件 4.2（未確定の行を「確定して対象外だった操作＝②」と区別する）が構造的に満たされる。**注意**: 「残存 UNSETTLED＝失敗した試行」ではない（成功した抑制更新を含む）。この点は viewer spec への申し送り（design.md Revalidation Triggers）に明記した。validate-design（2026-07-07）で `update-page.ts:140` の no-emit 経路を実コード確認して補正。
+- **トレードオフ（受容済み）**: B は create→delete なので**書き込み回数（write-IOPS）は減らない**。減るのは**保管量（stored document 数）**のみ。要件 1 の目的（MongoDB 負荷軽減）のうち保管量には効き、write-IOPS には効かない。ユーザー判断（§8）で「(B) 中心・write も削りたい場合のみ (C)」と合意済みであり、要件 4 が加わったことで B が確定。write-IOPS 削減を優先したくなった場合の逃げ道は (C) だが、その場合クラッシュ時の試行記録を諦めることになる（本 spec では採らない）。
+
+### Decision 2: 第2作成源（復元フロー）は追加改修不要（Research Needed #5 を解決）
+
+- `service/page/index.ts` の `revertDeletedPage`（現行 L2830 付近）は middleware を通らず自前で `createByParameters` で `ACTION_UNSETTLED` を作るが、**その id で同じ `activityEvent.emit('update', ...)` を発火する**（L2847 / 2912 / 2990）。
+- B は削除判定を `update` リスナー1箇所に集約するため、復元フローの ②（対象外確定）も同じリスナーで削除される。③（emit 前に throw）は事前作成行が残る＝middleware 経路と同じ fail-safe 挙動。**復元フロー側のコードは変更不要**。
+- なお復元の action（`ACTION_PAGE_REVERT` / `ACTION_PAGE_RECURSIVELY_REVERT`）は essential かつ contribution action なので実効ゲート上は常に対象内（§4）。つまり復元行が②になるケースは現行設定意味論では発生しないが、リスナーが単一情報源で判定する以上、特別扱いは不要（要件 3.3）。
+
+### Decision 3: 一覧 where の `ACTION_UNSETTLED` 除外は本 spec の対象外（Research Needed #4 を解決）
+
+- B 適用後、残存する `ACTION_UNSETTLED` 行は要件 4 が保持を求める「試行記録」である。要件 4.1 は監査ログに**残す**ことを求めており、一覧のデフォルト表示から機械的に隠すのは監査意図に反しうる。
+- 「一覧・画面でどう見せるか（隠す／整形する）」は**表示の責務＝`activity-log-snapshot-viewer` の担当**。本 spec（記録ゲート）は「どの行が DB に残るか」だけを決める。→ `build-activity-list-where.ts` は**変更しない**。viewer spec へ申し送る（design.md の Revalidation Triggers 参照）。
+
+### Decision 4: R3 の担保 — 記録ライフサイクルの薄い抽出（Research Needed #7 を解決）
+
+- 現行 `update` リスナーは contribution／settle（更新）／notify を1関数に同居。B で「削除」分岐が増えるため、**記録ライフサイクル（対象内なら更新・対象外なら削除）を薄い純関数 `settleActivityRecord` に抽出**する。
+- この関数は記録可否の判断結果（`shouldPersist: boolean`）を**引数で受け取り**（`getAvailableActions`/`shoudUpdateActivity` という単一情報源を自分で複製しない）、contribution・notification の内部詳細に一切依存しない。これで要件 3.1/3.2 のシームが明示される。過剰な抽象化は避け、1関数・1ファイル（既存 `service/activity/` に同居）に留める。
+
+### 実コード再確認で確定した事実
+- **Prisma extension に delete メソッドは未実装**（`models/activity.ts`）。ただし snapshot spec の設計コメントが既に「（updateByParameters の改修・**直接削除の保存口**）」と予約済み。本 spec で `deleteById(activityId)` を新設し、この予約を実体化する。テストの後始末で使う `prisma.activities.deleteMany` は Prisma ネイティブで別物。
+- **contribution は行の存在に非依存**（Research Needed #6 の残り）: `resolveContributor` は `contributor?._id != null` で即 return（`contribution-migration-service.ts:86-88`）。contribution は別コレクション `Contribution` に記録されるため、activity 行を削除しても集計は不変（要件 2.4 安全）。
+- `add-activity` middleware は非 GET で `ip / endpoint / user / action=UNSETTLED / snapshot.username` を書く（要件 4.1 の「操作者・時刻・エンドポイント・IP」を満たす。時刻は `createdAt` 自動）。B ではこの middleware を**変更しない** → 既存の契約テスト `add-activity.spec.ts` はグリーンのまま（A なら要改訂だった差分）。
+- 二重 settle の懸念なし（各 activity は emit 1回）。ただし `deleteById` は冪等（`deleteMany` 相当で not-found でも throw しない）、`updateByParameters` は P2025→null で、二重発火や行消失にも頑健。
+
+### 改訂が必要な既存テスト契約
+- `service/activity.spec.ts` の「skips prisma and does not emit "updated" when gate blocks」（L247-267）: 現状は「update を呼ばない」を主張。B では**「対象外 → `deleteById` を呼ぶ・`updated` は emit しない」**へ契約を更新する。
+- `add-activity.spec.ts`: **変更不要**（middleware 温存）。
+
+### 残課題（実装フェーズで確認）
+- `settleActivityRecord` の抽出時、`update` リスナーの「contribution 先行 → settle → 対象内かつ行ありのときのみ notify」という**順序と notify 条件を厳密に保存**する（要件 2.3/2.4 の回帰防止）。
+- delete 失敗時（DB エラー）は現行の update 失敗時と同様に logger.error して notify せず、リクエスト本体を止めない（記録は best-effort な副系）。
