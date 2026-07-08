@@ -17,7 +17,7 @@
   - _Requirements: 1.2, 2.6, 4.1_
   - _Boundary: ActivityExtension.createByParameters_
 
-- [ ] 1.2 `activityId → リクエスト文脈` のプロセスローカルマップを新設
+- [x] 1.2 `activityId → リクエスト文脈` のプロセスローカルマップを新設
   - `service/activity/pending-activity-context.ts` を作り、`set(id, ctx)` / `take(id)`（get+delete・同期）/ `clear(id)` を提供する。文脈は `{ ip, endpoint, userId, username, createdAt }`（`createdAt` は到着時刻＝Issue 3）。バレル `service/activity`（`index.ts`）に re-export を追加する。
   - 掃除はイベント駆動のみ（呼び出し側の `take`／`clear`）で、**time-based TTL 掃引や最古 eviction のような live エントリを消す機構は持たせない**（数分かかる in-flight を落とさない・要件 2.6 非回帰）。
   - RED→GREEN: unit で「`set`→`take` で文脈（`createdAt` 含む）が返り `take` 後は空」「存在しない id の `take` は undefined」「`clear` は冪等」を確認する。
@@ -126,3 +126,8 @@
   - _Requirements: 1.3, 2.4, 2.5_
   - _Boundary: ActivityService 記録ゲート結合試験（同一 integ ファイル・並列不可）_
   - _Depends: 5_
+
+## Implementation Notes
+
+- 1.1: この worktree のローカル Prisma 生成クライアント（`src/generated/prisma`・gitignore 済み）が schema.prisma より古いと、無関係の integ テストまで失敗する。integ 実行前に `pnpm run prisma:generate` で再生成すると解消（tracked 差分なし）。
+- 1.2: `service/activity.ts`（ActivityService 本体）がディレクトリを覆い隠すため、素の `~/server/service/activity` はバレルに解決されない。バレル（`pendingActivityContext` 等）を import する側は `~/server/service/activity/index` か相対 `./index` を使うこと（design.md L541 の表記どおりには書けない）。
