@@ -1,6 +1,8 @@
+import type { IUser } from '@growi/core';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import type { Model } from 'mongoose';
+import { Types } from 'mongoose';
 import request from 'supertest';
 
 import { getInstance } from '^/test/setup/crowi';
@@ -39,13 +41,7 @@ vi.mock('~/server/middlewares/login-required', () => ({
 describe('GET /usernames', () => {
   let app: express.Application;
   let crowi: Crowi;
-  let User: Model<{
-    name: string;
-    username: string;
-    email: string;
-    status?: number;
-    admin?: boolean;
-  }>;
+  let User: Model<IUser>;
 
   beforeAll(async () => {
     crowi = await getInstance();
@@ -140,6 +136,8 @@ describe('GET /usernames', () => {
     });
     await Activity.create({
       action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
+      // Avoids collisions on the {user, target, action, createdAt} unique index.
+      target: new Types.ObjectId(),
       snapshot: { username: 'ghost-user' },
     });
 
@@ -169,6 +167,8 @@ describe('GET /usernames', () => {
     });
     await Activity.create({
       action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
+      // Avoids collisions on the {user, target, action, createdAt} unique index.
+      target: new Types.ObjectId(),
       snapshot: { username: 'ghost-user' },
     });
 
