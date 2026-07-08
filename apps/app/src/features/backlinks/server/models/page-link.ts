@@ -1,4 +1,4 @@
-import type { ObjectId } from 'mongodb';
+import type { ObjectId } from 'mongoose';
 import { Schema } from 'mongoose';
 
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
@@ -67,22 +67,6 @@ pageLinkSchema.statics.findBacklinkSources = async function (
   toPageId: ObjectId,
 ): Promise<ObjectId[]> {
   return await this.distinct('fromPage', { toPage: toPageId });
-};
-
-/**
- * Delete links from permanently deleted pages and set links linking there to broken.
- */
-pageLinkSchema.statics.reconcileDeletedPages = async function (
-  pageIds: ObjectId[],
-): Promise<void> {
-  await this.updateMany(
-    { toPage: { $in: pageIds } },
-    { $set: { toPage: null } },
-  );
-
-  await this.deleteMany({
-    fromPage: { $in: pageIds },
-  });
 };
 
 export default getOrCreateModel<PageLinkDocument, PageLinkModel>(
