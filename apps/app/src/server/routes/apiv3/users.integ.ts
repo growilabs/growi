@@ -11,7 +11,6 @@ import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import Activity from '~/server/models/activity';
 import { UserStatus } from '~/server/models/user/conts';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
 interface TestRequest extends Request {
   user?: unknown;
@@ -53,20 +52,21 @@ describe('GET /usernames', () => {
     // crowi.models.User is typed Model<any> (ModelsMapDependentOnCrowi);
     // retrieve it through mongoose.model to keep this Model<IUser>-typed.
     User = mongoose.model<IUser>('User');
+    // Patches express.response.apiv3/apiv3Err with the real implementation
+    // (same call production makes in apiv3/index.js) instead of a hand-rolled
+    // stub, so error-shape assertions here would match production behavior.
+    const responseModule = await import('./response');
+    const addCustomFunctionToResponse =
+      'default' in responseModule ? responseModule.default : responseModule;
+    if (typeof addCustomFunctionToResponse !== 'function') {
+      throw new Error('Module does not export a function');
+    }
+    addCustomFunctionToResponse(express);
   });
 
   beforeEach(async () => {
     app = express();
     app.use(express.json());
-
-    app.use((_req, res: ApiV3Response, next) => {
-      res.apiv3 = (data: unknown) => res.json(data);
-      res.apiv3Err = (error: unknown, statusCode?: number) => {
-        const status = statusCode ?? (Array.isArray(error) ? 400 : 500);
-        return res.status(status).json({ error: String(error) });
-      };
-      next();
-    });
 
     app.use((req: TestRequest, _res, next) => {
       req.crowi = crowi;

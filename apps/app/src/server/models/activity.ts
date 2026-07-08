@@ -139,6 +139,8 @@ const buildSnapshotUsernameRegexConditions = (q: string) => ({
 // path (.sort()) and the $facet sub-pipeline (raw stage object) can't diverge.
 const SNAPSHOT_USERNAME_SORT = { _id: 1 } as const;
 
+// Intentionally unbounded: a prior cap ran before `.match()`, silently
+// hiding real matches outside that window.
 const groupSnapshotUsernames = (
   model: ActivityModel,
   conditions: ReturnType<typeof buildSnapshotUsernameRegexConditions>,

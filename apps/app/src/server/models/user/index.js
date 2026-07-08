@@ -830,11 +830,10 @@ const factory = (crowi) => {
       status: { $in: status },
     };
 
-    // username is unique, so countDocuments equals counting distinct usernames
-    const [users, totalCount] = await Promise.all([
-      this.find(conditions).sort(sortOpt).skip(offset).limit(limit),
-      this.countDocuments(conditions),
-    ]);
+    const { docs: users, totalDocs: totalCount } = await this.paginate(
+      conditions,
+      { sort: sortOpt, offset, limit },
+    );
 
     return { users, totalCount };
   };

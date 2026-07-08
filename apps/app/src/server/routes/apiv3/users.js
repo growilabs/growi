@@ -1564,6 +1564,9 @@ module.exports = (crowi) => {
         }
 
         if (options.isIncludeInactiveUser) {
+          // Including STATUS_DELETED here doesn't surface deleted users by
+          // their original name: statusDelete() also rewrites `username` to
+          // `deleted_at_*`, so this regex can never match it.
           const inactiveUserData =
             await User.findUserByUsernameRegexWithTotalCount(
               q,
