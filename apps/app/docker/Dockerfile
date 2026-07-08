@@ -95,6 +95,23 @@ RUN mkdir -p /tmp/release/apps/app && \
 
 
 ##
+## jemalloc — provides libjemalloc2 for the hardened runtime (which has no
+## package manager). debian:13 matches the release image's distro so the
+## library is built against the same glibc generation. Its only runtime deps
+## (libc/libm/libstdc++/libgcc) are already present in any Node.js image.
+##
+FROM debian:13-slim AS jemalloc
+
+# Normalize the multiarch path (x86_64-linux-gnu / aarch64-linux-gnu) to one
+# canonical location so the release-stage COPY needs no wildcard-rename.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libjemalloc2 \
+  && rm -rf /var/lib/apt/lists/* \
+  && mkdir -p /jemalloc \
+  && cp /usr/lib/*-linux-gnu/libjemalloc.so.2 /jemalloc/libjemalloc.so.2
+
+
+##
 ## release — DHI runtime (no shell, no additional binaries)
 ##
 FROM dhi.io/node:24-debian13 AS release
@@ -110,6 +127,10 @@ COPY --from=builder --chown=node:node /tmp/release/ ${appDir}/
 
 # Copy TypeScript entrypoint
 COPY --chown=node:node apps/app/docker/docker-entrypoint.ts /docker-entrypoint.ts
+
+# jemalloc for the opt-in allocator (JEMALLOC_ENABLED=true — see
+# docker-entrypoint.ts).
+COPY --from=jemalloc /jemalloc/libjemalloc.so.2 /usr/local/lib/libjemalloc.so.2
 
 # Switch back to root for entrypoint (it handles privilege drop)
 USER root
