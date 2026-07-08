@@ -127,7 +127,9 @@ activitySchema.statics.updateByParameters = async function (
   return activity;
 };
 
-// Prefix-anchored to match the ES path's `${escaped}*` wildcard.
+// Prefix-only, unlike the ES path (elasticsearch.ts#searchAuditlogByFuzzyWildcard),
+// which also matches via `fuzzy: { fuzziness: 'AUTO' }` — this MongoDB fallback
+// does not tolerate typos.
 // Note: the case-insensitive regex cannot use a bounded prefix seek on the
 // snapshot.username index; MongoDB scans the whole index (covered scan).
 const buildSnapshotUsernameRegexConditions = (q: string) => ({
