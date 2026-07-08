@@ -11,6 +11,7 @@ const SCOPE_SEED_ADMIN = {
   admin: {
     top: {},
     app: {},
+    ai: {},
     security: {},
     markdown: {},
     customize: {},
@@ -24,7 +25,6 @@ const SCOPE_SEED_ADMIN = {
     user_group_management: {},
     audit_log: {},
     plugin: {},
-    ai_integration: {},
     full_text_search: {},
   },
 } as const;
@@ -42,7 +42,7 @@ const SCOPE_SEED_USER = {
     other: {},
   },
   features: {
-    ai_assistant: {},
+    ai: {},
     page: {},
     share_link: {},
     bookmark: {},
@@ -88,6 +88,7 @@ const SCOPE_SEED_WITH_ACTION = Object.values(ACTION).reduce(
 type ReadAdminScope =
   | 'read:admin:top'
   | 'read:admin:app'
+  | 'read:admin:ai'
   | 'read:admin:security'
   | 'read:admin:markdown'
   | 'read:admin:customize'
@@ -101,7 +102,6 @@ type ReadAdminScope =
   | 'read:admin:user_group_management'
   | 'read:admin:audit_log'
   | 'read:admin:plugin'
-  | 'read:admin:ai_integration'
   | 'read:admin:full_text_search'
   | 'read:admin:*';
 
@@ -119,7 +119,7 @@ type ReadUserSettingsScope =
 
 // Read scopes - Features
 type ReadFeaturesScope =
-  | 'read:features:ai_assistant'
+  | 'read:features:ai'
   | 'read:features:page'
   | 'read:features:share_link'
   | 'read:features:bookmark'
@@ -132,6 +132,7 @@ type ReadFeaturesScope =
 type WriteAdminScope =
   | 'write:admin:top'
   | 'write:admin:app'
+  | 'write:admin:ai'
   | 'write:admin:security'
   | 'write:admin:markdown'
   | 'write:admin:customize'
@@ -145,7 +146,6 @@ type WriteAdminScope =
   | 'write:admin:user_group_management'
   | 'write:admin:audit_log'
   | 'write:admin:plugin'
-  | 'write:admin:ai_integration'
   | 'write:admin:full_text_search'
   | 'write:admin:*';
 
@@ -163,7 +163,7 @@ type WriteUserSettingsScope =
 
 // Write scopes - Features
 type WriteFeaturesScope =
-  | 'write:features:ai_assistant'
+  | 'write:features:ai'
   | 'write:features:page'
   | 'write:features:share_link'
   | 'write:features:bookmark'

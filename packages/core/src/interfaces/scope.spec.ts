@@ -1,4 +1,4 @@
-import { SCOPE, type Scope } from './scope';
+import { SCOPE, type Scope } from './scope.js';
 
 /**
  * Helper to extract all scope strings from the SCOPE constant
@@ -33,6 +33,7 @@ describe('Scope type', () => {
     // Verify admin scopes
     expect(SCOPE.READ.ADMIN).toBeDefined();
     expect(SCOPE.READ.ADMIN.TOP).toBe('read:admin:top');
+    expect(SCOPE.READ.ADMIN.AI).toBe('read:admin:ai');
     expect(SCOPE.READ.ADMIN.PLUGIN).toBe('read:admin:plugin');
     expect(SCOPE.READ.ADMIN.ALL).toBe('read:admin:*');
 
@@ -50,10 +51,11 @@ describe('Scope type', () => {
     // Verify features scopes
     expect(SCOPE.READ.FEATURES).toBeDefined();
     expect(SCOPE.READ.FEATURES.PAGE).toBe('read:features:page');
-    expect(SCOPE.READ.FEATURES.AI_ASSISTANT).toBe('read:features:ai_assistant');
+    expect(SCOPE.READ.FEATURES.AI).toBe('read:features:ai');
 
     // Verify write scopes
     expect(SCOPE.WRITE.ADMIN.TOP).toBe('write:admin:top');
+    expect(SCOPE.WRITE.ADMIN.AI).toBe('write:admin:ai');
     expect(SCOPE.WRITE.FEATURES.PAGE).toBe('write:features:page');
   });
 
@@ -61,7 +63,7 @@ describe('Scope type', () => {
     const allRuntimeScopes = extractAllScopeStrings(SCOPE);
 
     // Expected count based on the SCOPE_SEED structure:
-    // Admin: 17 leaf scopes + 1 wildcard = 18
+    // Admin: 18 leaf scopes + 1 wildcard = 19
     // User Settings: 6 leaf + 2 nested (api) + 2 wildcards = 10
     // Features: 7 leaf scopes + 1 wildcard = 8
     // Total per action: 36

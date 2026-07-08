@@ -6,7 +6,7 @@ import {
   isTopPage,
   isUsersProtectedPages,
   omitDuplicateAreaPathFromPaths,
-} from './index';
+} from './index.js';
 
 describe.concurrent('isMovablePage test', () => {
   test('should decide movable or not', () => {

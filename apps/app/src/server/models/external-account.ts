@@ -1,9 +1,10 @@
 import type { IUser, IUserHasId } from '@growi/core/dist/interfaces';
 import type { HydratedDocument, Model } from 'mongoose';
-import mongoose, { model, Schema } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
 
 import { Prisma } from '~/generated/prisma/client';
 import { NullUsernameToBeRegisteredError } from '~/server/models/errors';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 import type { prisma } from '~/utils/prisma';
 
@@ -13,18 +14,13 @@ const logger = loggerFactory('growi:models:external-account');
 
 // TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
 // Until then, use mongoose to automatically create collections and indexes when connected.
-const schema = new Schema(
-  {
-    providerType: { type: String, required: true },
-    accountId: { type: String, required: true },
-    user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  },
-  {
-    timestamps: { createdAt: true, updatedAt: false },
-  },
-);
+const schema = new Schema({
+  providerType: { type: String, required: true },
+  accountId: { type: String, required: true },
+  user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+});
 schema.index({ providerType: 1, accountId: 1 }, { unique: true });
-model('ExternalAccount', schema);
+getOrCreateModel('ExternalAccount', schema);
 
 /**
  * limit items num for pagination
@@ -52,6 +48,24 @@ class DuplicatedUsernameException {
 
 export const extension = Prisma.defineExtension((client) => {
   return client.$extends({
+    result: {
+      externalaccounts: {
+        // for backward compatibility with mongoose
+        _id: {
+          needs: { id: true },
+          compute(model) {
+            return model.id;
+          },
+        },
+        // for backward compatibility with mongoose
+        __v: {
+          needs: { v: true },
+          compute(model) {
+            return model.v;
+          },
+        },
+      },
+    },
     model: {
       externalaccounts: {
         /**
@@ -174,32 +188,16 @@ export const extension = Prisma.defineExtension((client) => {
         }) {
           const context =
             Prisma.getExtensionContext<typeof prisma.externalaccounts>(this);
-          const [externalAccounts, count] = await client.$transaction([
-            context.findMany({
-              take: limit,
-              skip: (page - 1) * limit,
-              orderBy: sort,
-              include: {
-                user: true,
-              },
-            }),
-            context.count(),
-          ]);
-          const totalPages = Math.ceil(count / limit);
-          const hasPrevPage = page > 1;
-          const hasNextPage = page < totalPages;
-          return {
-            docs: externalAccounts,
-            totalDocs: count,
-            limit,
-            totalPages,
+          const result = await context.paginate({
             page,
-            pagingCounter: (page - 1) * limit + 1,
-            hasPrevPage,
-            hasNextPage,
-            prevPage: hasPrevPage ? page - 1 : null,
-            nextPage: hasNextPage ? page + 1 : null,
-          };
+            limit,
+            orderBy: sort,
+            include: {
+              user: true,
+            },
+          });
+
+          return result;
         },
       },
     },

@@ -15,14 +15,14 @@
  * All write operations use the session established by initInstaller().
  *
  * Smoke-test entry point:
- *   tsx bin/memory-profiler/load-driver.ts --smoke
+ *   node bin/memory-profiler/load-driver.ts --smoke
  */
 
 import {
   createHttpClient,
   createInstallerDriver,
   createYjsSession,
-} from './lib';
+} from './lib/index.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -279,7 +279,7 @@ export function createLoadDriver(baseUrl: string): LoadDriver {
  * that all endpoints are reachable and return non-error responses.
  *
  * Observable completion condition (Req 2.2, 7.1):
- *   tsx bin/memory-profiler/load-driver.ts --smoke
+ *   node bin/memory-profiler/load-driver.ts --smoke
  */
 if (process.argv.includes('--smoke')) {
   const BASE_URL = process.env.GROWI_BASE_URL ?? 'http://localhost:3000';

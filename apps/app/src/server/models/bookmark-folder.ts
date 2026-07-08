@@ -1,12 +1,12 @@
-import type { IPageHasId } from '@growi/core';
 import { objectIdUtils } from '@growi/core/dist/utils';
 import type { Document, Model, Types } from 'mongoose';
-import monggoose, { Schema } from 'mongoose';
+import { Schema } from 'mongoose';
 
 import type {
   BookmarkFolderItems,
   IBookmarkFolder,
 } from '~/interfaces/bookmark-info';
+import { prisma } from '~/utils/prisma';
 
 import loggerFactory from '../../utils/logger';
 import { getOrCreateModel } from '../util/mongoose-utils';
@@ -17,7 +17,6 @@ import {
 } from './errors';
 
 const logger = loggerFactory('growi:models:bookmark-folder');
-const Bookmark = monggoose.model('Bookmark');
 
 export interface BookmarkFolderDocument extends Document {
   _id: Types.ObjectId;
@@ -41,7 +40,7 @@ export interface BookmarkFolderModel extends Model<BookmarkFolderDocument> {
     childFolder: BookmarkFolderItems[],
   ): Promise<BookmarkFolderDocument>;
   insertOrUpdateBookmarkedPage(
-    pageId: IPageHasId,
+    pageId: Types.ObjectId | string,
     userId: Types.ObjectId | string,
     folderId: string | null,
   ): Promise<BookmarkFolderDocument | null>;
@@ -137,7 +136,13 @@ bookmarkFolderSchema.statics.deleteFolderAndChildren = async function (
     // Delete Bookmarks
     const bookmarks = bookmarkFolder?.bookmarks;
     if (bookmarks && bookmarks.length > 0) {
-      await Bookmark.deleteMany({ _id: { $in: bookmarks } });
+      await prisma.bookmarks.deleteMany({
+        where: {
+          id: {
+            in: bookmarks.map((bookmarkId) => bookmarkId.toString()),
+          },
+        },
+      });
     }
     // Delete all child recursively and update deleted count
     const childFolders = await this.find({ parent: bookmarkFolder._id });
@@ -195,15 +200,19 @@ bookmarkFolderSchema.statics.updateBookmarkFolder = async function (
 };
 
 bookmarkFolderSchema.statics.insertOrUpdateBookmarkedPage = async function (
-  pageId: IPageHasId,
+  pageId: Types.ObjectId | string,
   userId: Types.ObjectId | string,
   folderId: string | null,
 ): Promise<BookmarkFolderDocument | null> {
   // Find bookmark
-  const bookmarkedPage = await Bookmark.findOne(
-    { page: pageId, user: userId },
-    { new: true, upsert: true },
-  );
+  const bookmarkedPage = await prisma.bookmarks.findUnique({
+    where: {
+      pageId_userId: {
+        pageId: pageId.toString(),
+        userId: userId.toString(),
+      },
+    },
+  });
 
   // Remove existing bookmark in bookmark folder
   await this.updateMany(
@@ -231,9 +240,13 @@ bookmarkFolderSchema.statics.updateBookmark = async function (
 ): Promise<BookmarkFolderDocument | null> {
   // If isBookmarked
   if (status) {
-    const bookmarkedPage = await Bookmark.findOne({
-      page: pageId,
-      user: userId,
+    const bookmarkedPage = await prisma.bookmarks.findUnique({
+      where: {
+        pageId_userId: {
+          pageId: pageId.toString(),
+          userId: userId.toString(),
+        },
+      },
     });
     const bookmarkFolder = await this.findOne({
       owner: userId,
@@ -247,12 +260,21 @@ bookmarkFolderSchema.statics.updateBookmark = async function (
     }
 
     if (bookmarkedPage) {
-      await bookmarkedPage.delete();
+      await prisma.bookmarks.delete({
+        where: {
+          id: bookmarkedPage.id,
+        },
+      });
     }
     return bookmarkFolder;
   }
   // else , Add bookmark
-  await Bookmark.create({ page: pageId, user: userId });
+  await prisma.bookmarks.create({
+    data: {
+      pageId: pageId.toString(),
+      userId: userId.toString(),
+    },
+  });
   return null;
 };
 export default getOrCreateModel<BookmarkFolderDocument, BookmarkFolderModel>(

@@ -9,7 +9,7 @@
  * Design: Req 2.1 (3-phase ordering), Req 2.5 (reproducibility — const export
  * is the single source of truth for the idle duration).
  */
-import type { LoadDriver } from '../load-driver';
+import type { LoadDriver } from '../load-driver.ts';
 
 /**
  * Duration of the baseline idle phase in seconds.

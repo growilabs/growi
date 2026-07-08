@@ -1,4 +1,8 @@
-import { isAuditlogSuggestionField, SupportedAction } from './activity';
+import {
+  AllSupportedActions,
+  isAuditlogSuggestionField,
+  SupportedAction,
+} from './activity';
 
 describe('isAuditlogSuggestionField()', () => {
   it('should return true for "username"', () => {
@@ -119,5 +123,17 @@ describe('SupportedAction - GROWI Vault resilience constants', () => {
       k.startsWith('ACTION_VAULT_RESILIENCE_'),
     );
     expect(resilienceKeys).toHaveLength(15);
+  });
+});
+
+describe('SupportedAction - admin AI setting update action', () => {
+  it('exports ACTION_ADMIN_AI_SETTING_UPDATE with the expected value', () => {
+    expect(SupportedAction.ACTION_ADMIN_AI_SETTING_UPDATE).toBe(
+      'ADMIN_AI_SETTING_UPDATE',
+    );
+  });
+
+  it('includes the AI setting update action in AllSupportedActions', () => {
+    expect(AllSupportedActions).toContain('ADMIN_AI_SETTING_UPDATE');
   });
 });

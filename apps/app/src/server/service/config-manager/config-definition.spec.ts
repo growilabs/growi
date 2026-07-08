@@ -1,4 +1,8 @@
-import { CONFIG_DEFINITIONS, CONFIG_KEYS } from './config-definition';
+import {
+  CONFIG_DEFINITIONS,
+  CONFIG_KEYS,
+  ENV_ONLY_GROUPS,
+} from './config-definition';
 
 describe('config-definition resilience keys', () => {
   describe('CONFIG_KEYS array', () => {
@@ -180,6 +184,107 @@ describe('config-definition resilience keys', () => {
           CONFIG_DEFINITIONS['app:vaultDriftDetectionDisabled'].envVarName,
         ).toBe('VAULT_DRIFT_DETECTION_DISABLED');
       });
+    });
+  });
+});
+
+describe('config-definition multi-llm-provider keys', () => {
+  describe('CONFIG_KEYS array', () => {
+    it('contains ai:provider', () => {
+      expect(CONFIG_KEYS).toContain('ai:provider');
+    });
+
+    it('contains ai:apiKey', () => {
+      expect(CONFIG_KEYS).toContain('ai:apiKey');
+    });
+
+    it('contains ai:allowedModels', () => {
+      expect(CONFIG_KEYS).toContain('ai:allowedModels');
+    });
+
+    it('does not contain the removed ai:model key', () => {
+      expect(CONFIG_KEYS).not.toContain('ai:model');
+    });
+
+    it('does not contain the removed ai:providerOptions key', () => {
+      expect(CONFIG_KEYS).not.toContain('ai:providerOptions');
+    });
+  });
+
+  describe('CONFIG_DEFINITIONS', () => {
+    describe('ai:provider', () => {
+      it('has envVarName AI_PROVIDER', () => {
+        expect(CONFIG_DEFINITIONS['ai:provider'].envVarName).toBe(
+          'AI_PROVIDER',
+        );
+      });
+
+      it('has no default value (provider is required)', () => {
+        expect(CONFIG_DEFINITIONS['ai:provider'].defaultValue).toBe(undefined);
+      });
+
+      it('is not marked as secret', () => {
+        expect(CONFIG_DEFINITIONS['ai:provider'].isSecret).toBeFalsy();
+      });
+    });
+
+    describe('ai:apiKey', () => {
+      it('has envVarName AI_API_KEY', () => {
+        expect(CONFIG_DEFINITIONS['ai:apiKey'].envVarName).toBe('AI_API_KEY');
+      });
+
+      it('has default value of undefined', () => {
+        expect(CONFIG_DEFINITIONS['ai:apiKey'].defaultValue).toBe(undefined);
+      });
+
+      it('is marked as secret', () => {
+        expect(CONFIG_DEFINITIONS['ai:apiKey'].isSecret).toBe(true);
+      });
+    });
+
+    describe('ai:allowedModels', () => {
+      it('has envVarName AI_ALLOWED_MODELS', () => {
+        expect(CONFIG_DEFINITIONS['ai:allowedModels'].envVarName).toBe(
+          'AI_ALLOWED_MODELS',
+        );
+      });
+
+      // An array default makes the loader treat env/DB values as JSON
+      // (typeof defaultValue === 'object'), and getConfig falls back to [].
+      it('has a default value of an empty array', () => {
+        expect(CONFIG_DEFINITIONS['ai:allowedModels'].defaultValue).toEqual([]);
+      });
+
+      it('is not marked as secret', () => {
+        expect(CONFIG_DEFINITIONS['ai:allowedModels'].isSecret).toBeFalsy();
+      });
+    });
+
+    it('no longer defines the removed ai:model key', () => {
+      expect(CONFIG_DEFINITIONS).not.toHaveProperty('ai:model');
+    });
+
+    it('no longer defines the removed ai:providerOptions key', () => {
+      expect(CONFIG_DEFINITIONS).not.toHaveProperty('ai:providerOptions');
+    });
+  });
+
+  describe('env-only group env:useOnlyEnvVars:ai', () => {
+    const aiGroup = ENV_ONLY_GROUPS.find(
+      (group) => group.controlKey === 'env:useOnlyEnvVars:ai',
+    );
+
+    it('is defined', () => {
+      expect(aiGroup).toBeDefined();
+    });
+
+    it('targets ai:allowedModels', () => {
+      expect(aiGroup?.targetKeys).toContain('ai:allowedModels');
+    });
+
+    it('no longer targets the removed ai:model / ai:providerOptions keys', () => {
+      expect(aiGroup?.targetKeys).not.toContain('ai:model');
+      expect(aiGroup?.targetKeys).not.toContain('ai:providerOptions');
     });
   });
 });

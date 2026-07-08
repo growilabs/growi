@@ -17,9 +17,17 @@
       "!.vscode",
       "!.claude",
       "!tsconfig.base.json",
+      "!apps/app/src/styles/prebuilt",
+      "!apps/app/src/styles/tailwind.css",
+      "!apps/app/next-env.d.ts",
+      "!apps/app/tmp",
+      "!apps/pdf-converter/specs",
+      "!apps/slackbot-proxy/src/public/bootstrap",
       "!apps/app/src/generated",
       "!packages/pdf-converter-client/src/index.ts",
       "!packages/pdf-converter-client/specs",
+      "!apps/app/src/migrations",
+      "!apps/app/config/logger",
       "!apps/app/tmp"
     ]
   },
@@ -153,7 +161,10 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "axios": "Please use src/utils/axios instead."
+                  "axios": "Please use src/utils/axios instead.",
+                  "^/config/migrate-mongo-config": "Use ^/config/migrate-mongo-config.cjs (CJS-isolated file, extension required).",
+                  "^/config/next-i18next.config": "Use ^/config/next-i18next.config.cjs (CJS-isolated file, extension required).",
+                  "^/config/i18next.config": "Use ^/config/i18next.config.cjs (CJS-isolated file, extension required)."
                 }
               }
             }
@@ -182,8 +193,17 @@
                 },
                 "patterns": [
                   {
-                    "group": ["~/client/**", "**/client/**", "client/**"],
+                    "group": [
+                      "~/client/**",
+                      "**/client/**",
+                      "client/**",
+                      "!@prisma/client/**"
+                    ],
                     "message": "Importing from client/ directories is restricted."
+                  },
+                  {
+                    "group": ["~/migrations/**", "**/src/migrations/**"],
+                    "message": "Importing from src/migrations/ in server code is forbidden. Migrations run independently via migrate-mongo CLI and must remain CJS-isolated."
                   }
                 ]
               }

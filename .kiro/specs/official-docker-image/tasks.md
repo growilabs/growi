@@ -79,7 +79,7 @@
 - [x] 5. Dockerfile reconstruction (current 3-stage pattern + DHI)
 - [x] 5.1 (P) Build the base stage
   - Set the DHI dev image as the base and update the syntax directive to auto-follow the latest stable version
-  - Install pnpm via wget standalone script (eliminate hardcoded versions)
+  - Enable pnpm via `corepack enable`, version-pinned by the workspace `packageManager` field (superseded the original wget standalone install — see Requirement 1 decision update)
   - Install turbo globally
   - Install packages required for building with `--no-install-recommends` and apply apt cache mounts
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 3.3, 4.4_
