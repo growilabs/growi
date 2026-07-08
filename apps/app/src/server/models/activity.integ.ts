@@ -5,17 +5,24 @@ import { SupportedAction } from '~/interfaces/activity';
 import Activity from './activity';
 
 describe('Activity.findSnapshotUsernamesByUsernameRegex', () => {
+  // Deleting only what this suite created (not deleteMany({})) avoids wiping
+  // fixtures other integ files are relying on when CI runs them against a
+  // single shared MongoDB instance.
+  const createdIds: Types.ObjectId[] = [];
+
   afterEach(async () => {
-    await Activity.deleteMany({});
+    await Activity.deleteMany({ _id: { $in: createdIds } });
+    createdIds.length = 0;
   });
 
   const createSnapshot = async (username: string) => {
-    await Activity.create({
+    const activity = await Activity.create({
       action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
       // avoids collisions on the {user, target, action, createdAt} unique index
       target: new Types.ObjectId(),
       snapshot: { username },
     });
+    createdIds.push(activity._id);
   };
 
   it('matches usernames by prefix', async () => {
@@ -78,26 +85,29 @@ describe('Activity.findSnapshotUsernamesByUsernameRegex', () => {
 });
 
 describe('Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount', () => {
+  // Deleting only what this suite created (not deleteMany({})) avoids wiping
+  // fixtures other integ files are relying on when CI runs them against a
+  // single shared MongoDB instance.
+  const createdIds: Types.ObjectId[] = [];
+
   afterEach(async () => {
-    await Activity.deleteMany({});
+    await Activity.deleteMany({ _id: { $in: createdIds } });
+    createdIds.length = 0;
   });
 
+  const createSnapshot = async (username: string) => {
+    const activity = await Activity.create({
+      action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
+      target: new Types.ObjectId(),
+      snapshot: { username },
+    });
+    createdIds.push(activity._id);
+  };
+
   it('returns matching usernames alongside a distinct total count', async () => {
-    await Activity.create({
-      action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
-      target: new Types.ObjectId(),
-      snapshot: { username: 'johnson' },
-    });
-    await Activity.create({
-      action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
-      target: new Types.ObjectId(),
-      snapshot: { username: 'johnny' },
-    });
-    await Activity.create({
-      action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
-      target: new Types.ObjectId(),
-      snapshot: { username: 'alice' },
-    });
+    await createSnapshot('johnson');
+    await createSnapshot('johnny');
+    await createSnapshot('alice');
 
     const result =
       await Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount(
@@ -110,16 +120,8 @@ describe('Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount', () => {
   });
 
   it('counts all distinct matches even when the page is limited', async () => {
-    await Activity.create({
-      action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
-      target: new Types.ObjectId(),
-      snapshot: { username: 'johnson' },
-    });
-    await Activity.create({
-      action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
-      target: new Types.ObjectId(),
-      snapshot: { username: 'johnny' },
-    });
+    await createSnapshot('johnson');
+    await createSnapshot('johnny');
 
     const result =
       await Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount(
@@ -132,11 +134,7 @@ describe('Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount', () => {
   });
 
   it('returns an empty page and zero totalCount when nothing matches', async () => {
-    await Activity.create({
-      action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
-      target: new Types.ObjectId(),
-      snapshot: { username: 'alice' },
-    });
+    await createSnapshot('alice');
 
     const result =
       await Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount(
