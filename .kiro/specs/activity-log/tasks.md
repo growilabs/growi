@@ -9,7 +9,7 @@
 > **進め方**: TDD（RED→GREEN）。記録ゲートの中核（対象外の行が実際に作られない／試行記録が実際に残る／記録行が IP・エンドポイントを保持する）は、モック単体でなく **実 DB（レプリカセット rs0）を読み直す結合試験**で合否を判定する。結合試験の設定（記録対象/対象外・`auditLogEnabled`）は明示注入し、`process.env` を直接書き換えない。テスト分離は per-worker。型安全モック（型アサーションを避け `mock<T>()`）。
 
 - [ ] 1. 採番 id での作成に対応し、文脈マップを新設（基盤）
-- [ ] 1.1 `createByParameters` を採番 id で作成できるようにする
+- [x] 1.1 `createByParameters` を採番 id で作成できるようにする
   - `IActivityParameters` に `id?: string` を追加し、呼び出し側が採番した ObjectId 文字列で行を作れるようにする（`_id` で渡された場合は `id` にマップ）。Prisma unchecked create は明示 id を通すため、型の追加とマッピングが主変更。スキーマ変更はしない。
   - `createdAt?: Date` は `IActivityParameters` が既に受け付ける（Issue 3＝到着時刻の保持に model 変更は不要）。この事実を確認するにとどめる。
   - RED→GREEN: integ で「採番した id を渡して作成 → その id で読み直せる」「id 未指定なら従来どおり自動採番」を実 DB で確認する。

@@ -158,3 +158,111 @@ describe('createByParameters — snapshot persistence (read back from DB)', () =
     expect(persisted?.snapshot.fileSize).toBeNull();
   });
 });
+
+/**
+ * Integration tests — createByParameters accepts a caller-minted id
+ * (activity-log record gate, spec `.kiro/specs/activity-log`).
+ *
+ * Contract under test (design.md "Data / 保存口 > ActivityExtension.
+ * createByParameters（変更）"): the record gate mints an ObjectId in the
+ * middleware and creates the row only at settle/finalizer time, so the save
+ * gate must persist a row under an id the CALLER chose. Every assertion
+ * reads the row back from the real DB by that id — never the return value.
+ *
+ *   - req 1.2: an in-scope action settles into a persisted row (created here
+ *     with the pre-minted id instead of pre-created).
+ *   - req 2.6: the operation context (ip / endpoint / user) and the request
+ *     ARRIVAL time (`createdAt`) reach the persisted row unchanged.
+ *   - req 4.1: the fail-safe finalizer holds the minted id as
+ *     `res.locals.activity._id`, so a Mongoose-style `_id` key must map to
+ *     `id` as well.
+ *   - Backward compatibility: with no id provided, Prisma auto-generates one
+ *     exactly as before (non-breaking extension — design.md Contracts).
+ *
+ * Requirements: 1.2, 2.6, 4.1
+ * Design: Data / 保存口 > ActivityExtension.createByParameters（変更）, Data Models
+ */
+describe('createByParameters — caller-minted id (read back from DB)', () => {
+  // Own sentinel so cleanup never interferes with the snapshot suite above.
+  const MINTED_TEST_IP = '10.0.0.74';
+  const MINTED_TEST_ENDPOINT = '/test/create-by-parameters/minted-id';
+
+  beforeEach(async () => {
+    await prisma.activities.deleteMany({ where: { ip: MINTED_TEST_IP } });
+  });
+
+  afterAll(async () => {
+    await prisma.activities.deleteMany({ where: { ip: MINTED_TEST_IP } });
+  });
+
+  it('req 1.2/2.6 — persists the row under the pre-minted id with context and arrival-time createdAt', async () => {
+    // Arrange: the middleware mints the id and stamps the arrival time;
+    // creation happens later (settle), so createdAt must NOT be "now"
+    const mintedId = new Types.ObjectId().toString();
+    const userId = new Types.ObjectId().toHexString();
+    const arrivalTime = new Date(Date.now() - 60_000);
+
+    // Act: create through the save gate with the caller-minted id
+    await prisma.activities.createByParameters({
+      id: mintedId,
+      action: SupportedAction.ACTION_PAGE_UPDATE,
+      ip: MINTED_TEST_IP,
+      endpoint: MINTED_TEST_ENDPOINT,
+      user: userId,
+      createdAt: arrivalTime,
+      snapshot: { username: 'dave' },
+    });
+
+    // Assert: read the row back BY THE MINTED ID from the real DB
+    const persisted = await prisma.activities.findUnique({
+      where: { id: mintedId },
+    });
+    expect(persisted).not.toBeNull();
+    expect(persisted?.action).toBe(SupportedAction.ACTION_PAGE_UPDATE);
+    // req 2.6 — operation context is carried unchanged
+    expect(persisted?.ip).toBe(MINTED_TEST_IP);
+    expect(persisted?.endpoint).toBe(MINTED_TEST_ENDPOINT);
+    expect(persisted?.userId).toBe(userId);
+    expect(persisted?.snapshot.username).toBe('dave');
+    // Issue 3 — createdAt is the caller-provided arrival time, not create time
+    expect(persisted?.createdAt.getTime()).toBe(arrivalTime.getTime());
+  });
+
+  it('req 4.1 — accepts a Mongoose-style `_id` key and maps it to `id`', async () => {
+    // Arrange: finalizer callers hold the minted id as res.locals.activity._id
+    const mintedId = new Types.ObjectId().toString();
+
+    // Act
+    await prisma.activities.createByParameters({
+      _id: mintedId,
+      action: SupportedAction.ACTION_UNSETTLED,
+      ip: MINTED_TEST_IP,
+      endpoint: MINTED_TEST_ENDPOINT,
+      user: new Types.ObjectId().toHexString(),
+    });
+
+    // Assert: the row exists under the minted id (mapped from `_id`)
+    const persisted = await prisma.activities.findUnique({
+      where: { id: mintedId },
+    });
+    expect(persisted).not.toBeNull();
+    expect(persisted?.action).toBe(SupportedAction.ACTION_UNSETTLED);
+  });
+
+  it('backward compat — auto-generates an id when none is provided', async () => {
+    // Act: the pre-existing caller shape (no id at all)
+    await prisma.activities.createByParameters({
+      action: SupportedAction.ACTION_PAGE_LIKE,
+      ip: MINTED_TEST_IP,
+      endpoint: MINTED_TEST_ENDPOINT,
+      user: new Types.ObjectId().toHexString(),
+    });
+
+    // Assert: read back — a valid ObjectId was assigned by the DB layer
+    const persisted = await prisma.activities.findFirst({
+      where: { ip: MINTED_TEST_IP, action: SupportedAction.ACTION_PAGE_LIKE },
+    });
+    expect(persisted).not.toBeNull();
+    expect(persisted?.id).toMatch(/^[0-9a-f]{24}$/);
+  });
+});
