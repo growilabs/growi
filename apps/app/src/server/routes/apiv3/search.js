@@ -5,8 +5,8 @@ import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
+import auditLogEnabledRequired from '~/server/middlewares/audit-log-enabled-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
@@ -129,9 +129,6 @@ module.exports = (crowi) => {
    *                    type: object
    *                    description: Status of indices
    *                    $ref: '#/components/schemas/Indices'
-   *                  auditlogHasUnsyncedEvents:
-   *                    type: boolean
-   *                    description: Whether auditlog events failed to sync to Elasticsearch (rebuild needed)
    */
   router.get(
     '/indices',
@@ -156,9 +153,7 @@ module.exports = (crowi) => {
 
       try {
         const info = await searchService.getInfoForAdmin();
-        const auditlogHasUnsyncedEvents =
-          await AuditlogEsSyncStatus.isUnsynced();
-        return res.status(200).send({ info, auditlogHasUnsyncedEvents });
+        return res.status(200).send({ info });
       } catch (err) {
         logger.error(err);
         return res.apiv3Err(err, 503);
@@ -343,13 +338,8 @@ module.exports = (crowi) => {
     }),
     loginRequired,
     adminRequired,
+    auditLogEnabledRequired,
     async (req, res) => {
-      if (!configManager.getConfig('app:auditLogEnabled')) {
-        const msg = 'AuditLog is not enabled';
-        logger.error(msg);
-        return res.apiv3Err(msg, 405);
-      }
-
       const { searchService } = crowi;
 
       if (!searchService.isConfigured) {
@@ -426,16 +416,11 @@ module.exports = (crowi) => {
     }),
     loginRequired,
     adminRequired,
+    auditLogEnabledRequired,
     addActivity,
     validatorForPutAuditlogIndices,
     apiV3FormValidator,
     async (req, res) => {
-      if (!configManager.getConfig('app:auditLogEnabled')) {
-        const msg = 'AuditLog is not enabled';
-        logger.error(msg);
-        return res.apiv3Err(msg, 405);
-      }
-
       const operation = req.body.operation;
 
       const { searchService } = crowi;

@@ -7,13 +7,14 @@ import { useAdminSocket } from '~/features/admin/states/socket-io';
 import { isSearchServiceReachableAtom } from '~/states/server-configurations';
 
 // Shape returned by both GET /search/indices and GET /search/auditlog-indices.
+// auditlogHasUnsyncedEvents is only present on the latter.
 export interface IndexManagementStatusResponse {
   info: {
     isNormalized: boolean;
     indices: unknown;
     aliases: unknown;
   };
-  auditlogHasUnsyncedEvents: boolean;
+  auditlogHasUnsyncedEvents?: boolean;
 }
 
 interface UseIndexManagementOptions {
