@@ -20,7 +20,6 @@ import type {
   ISearchResult,
 } from '~/interfaces/search';
 import {
-  INACTIVE_USER_STATUSES,
   USER_FIELDS_EXCEPT_CONFIDENTIAL,
   UserStatus,
 } from '~/server/models/user/conts';
@@ -396,13 +395,19 @@ class SearchService implements SearchQueryParser, SearchResolver {
               .select('username status')
               .lean();
 
-      response.username = {
-        activeUsernames: users
+      const activeUsernames = new Set(
+        users
           .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
           .map((u) => u.username),
-        inactiveUsernames: users
-          .filter((u) => INACTIVE_USER_STATUSES.includes(u.status))
-          .map((u) => u.username),
+      );
+
+      // A username with no live User match (e.g. deleted -- statusDelete()
+      // renames the User doc's username to `deleted_at_*`) must still be
+      // searchable in the audit trail, so anything not proven active is
+      // treated as inactive rather than silently dropped.
+      response.username = {
+        activeUsernames: usernames.filter((u) => activeUsernames.has(u)),
+        inactiveUsernames: usernames.filter((u) => !activeUsernames.has(u)),
       };
     }
 

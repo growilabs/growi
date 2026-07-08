@@ -154,7 +154,10 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     ).toHaveBeenCalledWith('username', 'ali', 10);
   });
 
-  it('should exclude usernames not found in MongoDB', async () => {
+  it('should classify a username with no matching User doc as inactive, not drop it', async () => {
+    // statusDelete() renames the User doc's username to `deleted_at_*`, so a
+    // deleted user's original username (still recorded in past activity) has
+    // no live User match at all -- it must stay searchable as inactive.
     vi.mocked(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
     ).mockResolvedValue(['alice', 'ghost']);
@@ -169,7 +172,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     );
 
     expect(result.username?.activeUsernames).toEqual(['alice']);
-    expect(result.username?.inactiveUsernames).toEqual([]);
+    expect(result.username?.inactiveUsernames).toEqual(['ghost']);
     // Guard the $in narrowing: Mongo queried only for ES-returned names, else leaks others.
     expect(mockUserModel.find).toHaveBeenCalledWith({
       username: { $in: sameStringSet(['alice', 'ghost']) },
