@@ -55,7 +55,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Requirements: 1.5, 3.4_
   - _Depends: B1.1_
 
-- [ ] B1.3 Implement internal-link extraction from a page body — all link forms
+- [x] B1.3 Implement internal-link extraction from a page body — all link forms
   - Build a pure function that takes a Markdown body, the page's path, and the wiki's site URL, and
     returns a deduplicated list of resolved internal page paths, reusing the existing remark/rehype
     link plugins (pukiwiki + relative-links) in a trimmed server processor

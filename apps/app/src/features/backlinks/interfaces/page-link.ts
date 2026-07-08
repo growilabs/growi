@@ -1,5 +1,4 @@
-import type { Document, ObjectId } from 'mongodb';
-import type { Model } from 'mongoose';
+import type { Document, Model, ObjectId } from 'mongoose';
 
 export type LinkTargetState = 'normal' | 'trashed' | 'broken';
 
@@ -22,7 +21,13 @@ export interface IPageLink {
 
 export interface PageLinkDocument extends IPageLink, Document {}
 export interface PageLinkModel extends Model<PageLinkDocument> {
-  replaceOutboundLinks(fromPageId: ObjectId, resolvedRows: IPageLink[]): void;
-  findBacklinkSources(toPageId: ObjectId): ObjectId[];
-  reconcileDeletedPages(pageIds: ObjectId[]): void;
+  replaceOutboundLinks(
+    fromPageId: ObjectId,
+    resolvedRows: IPageLink[],
+  ): Promise<void>;
+  findBacklinkSources(toPageId: ObjectId): Promise<ObjectId[]>;
+  // Declared here for downstream stories; implemented later (re-resolve-by-path in B4,
+  // reconcile-deleted in B5) — not implemented in B1.
+  reResolveByToPath(toPath: string): Promise<void>;
+  reconcileDeletedPages(pageIds: ObjectId[]): Promise<void>;
 }
