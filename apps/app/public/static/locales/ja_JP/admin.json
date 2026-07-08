@@ -312,7 +312,7 @@
     "rebuild_normalization_timeout": "リビルドは完了しましたが、正規化がタイムアウトしました。手動で正規化してください。"
   },
   "audit_log_index_management": {
-    "audit_log_index_management": "監査ログ管理",
+    "audit_log_index_management": "監査ログのインデックス管理",
     "settings_explanation": "監査ログのインデックスの正規化・リビルドは、以下のページで行えます",
     "index_management_link": "{{destination}}ページに移動",
     "normalize": "正規化",
