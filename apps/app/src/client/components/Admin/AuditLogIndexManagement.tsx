@@ -6,10 +6,7 @@ import { SocketEventName } from '~/interfaces/websocket';
 import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
 import { auditLogEnabledAtom } from '~/states/server-configurations';
 
-import NormalizeIndicesControls from './ElasticsearchManagement/NormalizeIndicesControls';
-import RebuildIndexControls from './ElasticsearchManagement/RebuildIndexControls';
-import ReconnectControls from './ElasticsearchManagement/ReconnectControls';
-import StatusTable from './ElasticsearchManagement/StatusTable';
+import { IndexManagementSection } from './ElasticsearchManagement/IndexManagementSection';
 import {
   type IndexManagementStatusResponse,
   useIndexManagement,
@@ -25,7 +22,7 @@ export const AuditLogIndexManagement = (): JSX.Element => {
   const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
 
   const onStatusSuccess = useCallback((data: IndexManagementStatusResponse) => {
-    setHasUnsyncedEvents(data.auditlogHasUnsyncedEvents);
+    setHasUnsyncedEvents(data.auditlogHasUnsyncedEvents ?? false);
   }, []);
 
   const {
@@ -92,91 +89,60 @@ export const AuditLogIndexManagement = (): JSX.Element => {
 
   return (
     <div data-testid="admin-audit-log-index">
-      <div className="row">
-        <div className="col-md-12">
-          <StatusTable
-            isInitialized={isInitialized}
-            isErrorOccuredOnSearchService={isErrorOccuredOnSearchService}
-            isConnected={isConnected}
-            isConfigured={isConfigured}
-            isNormalized={isNormalized}
-            indicesData={indicesData}
-            aliasesData={aliasesData}
-          />
-        </div>
-      </div>
-
-      <hr />
-
-      <div className="row">
-        <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('audit_log_index_management.reconnect')}
-        </div>
-        <div className="col-md-6">
-          <ReconnectControls
-            isEnabled={isReconnectBtnEnabled}
-            isProcessing={isReconnectingProcessing}
-            onReconnectingRequested={reconnect}
-          />
-        </div>
-      </div>
-
-      <hr />
-
-      <div className="row">
-        <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('audit_log_index_management.normalize')}
-        </div>
-        <div className="col-md-6">
-          <NormalizeIndicesControls
-            isEnabled={isNormalizeEnabled}
-            isProcessing={isNormalizingProcessing}
-            buttonLabel={t('audit_log_index_management.normalize_button')}
-            description={t('audit_log_index_management.normalize_description')}
-            onNormalizingRequested={() =>
-              normalizeIndices(
-                t('audit_log_index_management.normalize_success'),
-              )
-            }
-          />
-        </div>
-      </div>
-
-      <hr />
-
-      <div className="row">
-        <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('audit_log_index_management.rebuild')}
-        </div>
-        <div className="col-md-6">
-          <RebuildIndexControls
-            isEnabled={isRebuildEnabled}
-            isRebuildingProcessing={isRebuildingProcessing}
-            isRebuildingCompleted={isRebuildingCompleted}
-            currentCount={rebuildCurrent}
-            totalCount={rebuildTotal}
-            progressHeaderProcessing={t(
-              'audit_log_index_management.rebuild_progress_processing',
-            )}
-            progressHeaderCompleted={t(
-              'audit_log_index_management.rebuild_progress_completed',
-            )}
-            buttonLabel={t('audit_log_index_management.rebuild_button')}
-            descriptionLines={[
-              t('audit_log_index_management.rebuild_description_1'),
-              t('audit_log_index_management.rebuild_description_2'),
-            ]}
-            onRebuildingRequested={() =>
-              rebuildIndices(t('audit_log_index_management.rebuild_requested'))
-            }
-          />
-          {hasUnsyncedEvents && (
+      <IndexManagementSection
+        statusTable={{
+          isInitialized,
+          isErrorOccuredOnSearchService,
+          isConnected,
+          isConfigured,
+          isNormalized,
+          indicesData,
+          aliasesData,
+        }}
+        reconnect={{
+          label: t('audit_log_index_management.reconnect'),
+          isEnabled: isReconnectBtnEnabled,
+          isProcessing: isReconnectingProcessing,
+          onRequested: reconnect,
+        }}
+        normalize={{
+          label: t('audit_log_index_management.normalize'),
+          buttonLabel: t('audit_log_index_management.normalize_button'),
+          description: t('audit_log_index_management.normalize_description'),
+          isEnabled: isNormalizeEnabled,
+          isProcessing: isNormalizingProcessing,
+          onRequested: () =>
+            normalizeIndices(t('audit_log_index_management.normalize_success')),
+        }}
+        rebuild={{
+          label: t('audit_log_index_management.rebuild'),
+          buttonLabel: t('audit_log_index_management.rebuild_button'),
+          descriptionLines: [
+            t('audit_log_index_management.rebuild_description_1'),
+            t('audit_log_index_management.rebuild_description_2'),
+          ],
+          progressHeaderProcessing: t(
+            'audit_log_index_management.rebuild_progress_processing',
+          ),
+          progressHeaderCompleted: t(
+            'audit_log_index_management.rebuild_progress_completed',
+          ),
+          isEnabled: isRebuildEnabled,
+          isProcessing: isRebuildingProcessing,
+          isCompleted: isRebuildingCompleted,
+          currentCount: rebuildCurrent,
+          totalCount: rebuildTotal,
+          onRequested: () =>
+            rebuildIndices(t('audit_log_index_management.rebuild_requested')),
+        }}
+        extraContent={
+          hasUnsyncedEvents && (
             <p className="form-text text-warning mt-2 mb-0">
               {t('audit_log_index_management.unsynced_events_warning')}
             </p>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
     </div>
   );
 };

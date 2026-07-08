@@ -3,10 +3,7 @@ import { useTranslation } from 'next-i18next';
 import { SocketEventName } from '~/interfaces/websocket';
 
 import { useIndexManagement } from '../hooks/useIndexManagement';
-import NormalizeIndicesControls from './NormalizeIndicesControls';
-import RebuildIndexControls from './RebuildIndexControls';
-import ReconnectControls from './ReconnectControls';
-import StatusTable from './StatusTable';
+import { IndexManagementSection } from './IndexManagementSection';
 
 const ElasticsearchManagement = (): JSX.Element => {
   const { t } = useTranslation('admin');
@@ -42,83 +39,53 @@ const ElasticsearchManagement = (): JSX.Element => {
   });
 
   return (
-    <>
-      <div className="row">
-        <div className="col-md-12">
-          <StatusTable
-            isInitialized={isInitialized}
-            isErrorOccuredOnSearchService={isErrorOccuredOnSearchService}
-            isConnected={isConnected}
-            isConfigured={isConfigured}
-            isNormalized={isNormalized}
-            indicesData={indicesData}
-            aliasesData={aliasesData}
-          />
-        </div>
-      </div>
-
-      <hr />
-
-      {/* Controls */}
-      <div className="row">
-        <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('page_data_index_management.reconnect')}
-        </div>
-        <div className="col-md-6">
-          <ReconnectControls
-            isEnabled={isReconnectBtnEnabled}
-            isProcessing={isReconnectingProcessing}
-            onReconnectingRequested={reconnect}
-          />
-        </div>
-      </div>
-
-      <hr />
-
-      <div className="row">
-        <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('page_data_index_management.normalize')}
-        </div>
-        <div className="col-md-6">
-          <NormalizeIndicesControls
-            isEnabled={isNormalizeEnabled}
-            isProcessing={isNormalizingProcessing}
-            buttonLabel={t('page_data_index_management.normalize_button')}
-            description={t('page_data_index_management.normalize_description')}
-            onNormalizingRequested={() =>
-              normalizeIndices('Normalizing has succeeded')
-            }
-          />
-        </div>
-      </div>
-
-      <hr />
-
-      <div className="row">
-        <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('page_data_index_management.rebuild')}
-        </div>
-        <div className="col-md-6">
-          <RebuildIndexControls
-            isEnabled={isRebuildEnabled}
-            isRebuildingProcessing={isRebuildingProcessing}
-            isRebuildingCompleted={isRebuildingCompleted}
-            currentCount={rebuildCurrent}
-            totalCount={rebuildTotal}
-            progressHeaderProcessing="Processing.."
-            progressHeaderCompleted="Completed"
-            buttonLabel={t('page_data_index_management.rebuild_button')}
-            descriptionLines={[
-              t('page_data_index_management.rebuild_description_1'),
-              t('page_data_index_management.rebuild_description_2'),
-            ]}
-            onRebuildingRequested={() =>
-              rebuildIndices('Rebuilding is requested')
-            }
-          />
-        </div>
-      </div>
-    </>
+    <IndexManagementSection
+      statusTable={{
+        isInitialized,
+        isErrorOccuredOnSearchService,
+        isConnected,
+        isConfigured,
+        isNormalized,
+        indicesData,
+        aliasesData,
+      }}
+      reconnect={{
+        label: t('page_data_index_management.reconnect'),
+        isEnabled: isReconnectBtnEnabled,
+        isProcessing: isReconnectingProcessing,
+        onRequested: reconnect,
+      }}
+      normalize={{
+        label: t('page_data_index_management.normalize'),
+        buttonLabel: t('page_data_index_management.normalize_button'),
+        description: t('page_data_index_management.normalize_description'),
+        isEnabled: isNormalizeEnabled,
+        isProcessing: isNormalizingProcessing,
+        onRequested: () =>
+          normalizeIndices(t('page_data_index_management.normalize_success')),
+      }}
+      rebuild={{
+        label: t('page_data_index_management.rebuild'),
+        buttonLabel: t('page_data_index_management.rebuild_button'),
+        descriptionLines: [
+          t('page_data_index_management.rebuild_description_1'),
+          t('page_data_index_management.rebuild_description_2'),
+        ],
+        progressHeaderProcessing: t(
+          'page_data_index_management.rebuild_progress_processing',
+        ),
+        progressHeaderCompleted: t(
+          'page_data_index_management.rebuild_progress_completed',
+        ),
+        isEnabled: isRebuildEnabled,
+        isProcessing: isRebuildingProcessing,
+        isCompleted: isRebuildingCompleted,
+        currentCount: rebuildCurrent,
+        totalCount: rebuildTotal,
+        onRequested: () =>
+          rebuildIndices(t('page_data_index_management.rebuild_requested')),
+      }}
+    />
   );
 };
 
