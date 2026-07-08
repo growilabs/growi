@@ -15,7 +15,7 @@ import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import Activity from '~/server/models/activity';
 import { serializePageSecurely } from '~/server/models/serializers';
-import { UserStatus } from '~/server/models/user/conts';
+import { INACTIVE_USER_STATUSES, UserStatus } from '~/server/models/user/conts';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
@@ -1564,15 +1564,10 @@ module.exports = (crowi) => {
         }
 
         if (options.isIncludeInactiveUser) {
-          const inactiveUserStates = [
-            UserStatus.STATUS_REGISTERED,
-            UserStatus.STATUS_SUSPENDED,
-            UserStatus.STATUS_INVITED,
-          ];
           const inactiveUserData =
             await User.findUserByUsernameRegexWithTotalCount(
               q,
-              inactiveUserStates,
+              INACTIVE_USER_STATUSES,
               { offset, limit },
             );
           const inactiveUsernames = inactiveUserData.users.map(

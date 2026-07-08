@@ -20,6 +20,7 @@ import type {
   ISearchResult,
 } from '~/interfaces/search';
 import {
+  INACTIVE_USER_STATUSES,
   USER_FIELDS_EXCEPT_CONFIDENTIAL,
   UserStatus,
 } from '~/server/models/user/conts';
@@ -400,7 +401,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
           .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
           .map((u) => u.username),
         inactiveUsernames: users
-          .filter((u) => u.status !== UserStatus.STATUS_ACTIVE)
+          .filter((u) => INACTIVE_USER_STATUSES.includes(u.status))
           .map((u) => u.username),
       };
     }
