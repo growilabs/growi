@@ -17,6 +17,7 @@
 - 記録対象の判定を既存の単一の情報源（`getAvailableActions` / `shoudUpdateActivity`）に一本化したまま再利用し、判定ルールを二重に定義しない。
 - 失敗・中断（エラー応答 4xx/5xx・クライアント中断）で記録可否が確定しなかった操作の試行記録（操作者・時刻・エンドポイント・IP）を、記録対象内で正常記録された操作と区別できる形で保持する。
 - 記録される行が従来どおり操作文脈（IP・エンドポイント・操作者・操作者名）を保持する（事前作成廃止で記録行のフィールドを欠損させない）。
+- 記録行の作成時刻（`createdAt`）を、行を作る settle/finalizer 時点ではなく**リクエスト到着時刻**に保つ（事前作成廃止で監査時刻を後ろ倒しにしない。文脈に到着時刻を含めて `createByParameters` に渡す＝Issue 3）。
 - 記録ゲートの責務（記録可否の判断・記録ライフサイクルの確定）を、貢献度グラフ・通知・snapshot 内容・ルート固有ペイロードから独立させる。
 
 ### Non-Goals
@@ -35,7 +36,7 @@
 ### This Spec Owns
 
 - **記録ライフサイクルの確定判定**: 更新系の settle 経路で、確定した action が記録対象なら**作成**し、対象外なら何もしない、という「行を作るか作らないか」の決定。
-- **リクエスト文脈の突き合わせ機構**: middleware で分かる文脈（IP・エンドポイント・操作者・操作者名）を、後から emit で確定する action と突き合わせて1行にまとめる仕組み（`activityId → 文脈` のプロセスローカルマップ）。事前作成を廃止した結果、この突き合わせを自前で持つ必要が生じた（要件 2.6）。
+- **リクエスト文脈の突き合わせ機構**: middleware で分かる文脈（IP・エンドポイント・操作者・操作者名・**到着時刻**）を、後から emit で確定する action と突き合わせて1行にまとめる仕組み（`activityId → 文脈` のプロセスローカルマップ）。事前作成を廃止した結果、この突き合わせ（と、記録行が到着時刻を保つこと＝Issue 3）を自前で持つ必要が生じた（要件 2.6）。マップの掃除はイベント駆動で確定的に行い、live エントリを時間・サイズで消さない。
 - **失敗・中断時の fail-safe 試行記録**: リクエストがエラー応答（4xx/5xx）またはクライアント中断で終わった場合に、`ACTION_UNSETTLED` の試行記録を1件だけ作る finalizer。二重作成防止付き。
 - **記録可否判定の単一情報源の維持**: 既存の `getAvailableActions` / `shoudUpdateActivity` を記録ゲートの唯一の判定として使い続けること（複製・分岐を作らない）。
 - **未確定行の意味の確定（C 版）**: 本変更後、残存する `ACTION_UNSETTLED` 行は finalizer が作るものだけ、すなわち**「失敗・中断した試行」に限定される**という不変条件。記録対象外だった操作（②）はそもそも作られないため、残存 UNSETTLED に混ざらない。
@@ -120,7 +121,7 @@ graph TB
     LIS -.updated.-> Notify[通知 pre-notify - 不変]
     LIS -.先行.-> Contrib[contribution - 不変]
     FIN -->|status>=400 / 中断| RFA
-    RFA -->|id で未作成なら| CRE
+    RFA -->|create＋dup-key吸収| CRE
     RFA -.後始末.-> MAP
 ```
 
@@ -141,7 +142,7 @@ graph TB
 | Backend / Middleware | Express（既存の Node v24 native ESM ランタイム） | 事前作成廃止・id 採番・文脈 stash・`res` finalizer 登録 | `mongoose` の `Types.ObjectId` を利用 |
 | Backend / Services | Express `activityEvent` リスナー | settle 時の gated-create、contribution・通知の orchestration | 新規依存なし |
 | Data / Storage | MongoDB（レプリカセット rs0） + Prisma activities extension | `activities` の create（採番 id 指定）。update/delete は本経路で使わない | スキーマ変更なし。`IActivityParameters` に `id?` 追加 |
-| In-process state | プロセスローカル `Map`（新規モジュール） | `activityId → リクエスト文脈` の突き合わせ | 単一プロセス内で完結。leak 対策に有界化／掃引を検討 |
+| In-process state | プロセスローカル `Map`（新規モジュール） | `activityId → リクエスト文脈` の突き合わせ | 単一プロセス内で完結。掃除はイベント駆動で確定的（middleware=`res` close/finish、復元=emit 経路の error ハンドラ）。時間・サイズによる live エントリの追い出しはしない（数分かかる処理でも誤 sweep しない） |
 | Messaging / Events | `activityEvent`（既存 EventEmitter、`update` / `updated`） | settle の起点と通知の送出 | 契約変更なし（対象内で更新→作成に変わる内部挙動のみ） |
 
 ## File Structure Plan
@@ -151,16 +152,18 @@ graph TB
 ```
 apps/app/src/server/
 ├── middlewares/
-│   └── add-activity.ts               # 変更: DB書き込み廃止。id採番＋文脈stash＋finalizer登録
+│   └── add-activity.ts               # 変更: DB書き込み廃止。薄いアダプタ（beginActivity + registerFailsafeFinalizer を呼ぶ）
 ├── models/
 │   └── activity.ts                   # 変更: IActivityParameters に id? を追加（createByParameters が採番idで作成可能に）
 ├── service/
 │   ├── activity.ts                   # 変更: update リスナーを settle-create に組み替え（文脈を同期take）
 │   └── activity/
 │       ├── index.ts                  # 変更: 新規モジュールを re-export
-│       ├── pending-activity-context.ts   # 新規: activityId→リクエスト文脈 のプロセスローカルマップ
+│       ├── pending-activity-context.ts   # 新規: activityId→リクエスト文脈 のマップ（掃除の所有者・イベント駆動）
+│       ├── begin-activity.ts         # 新規: id採番＋文脈stash の共有ヘルパ（middleware/復元 共用）
+│       ├── register-failsafe-finalizer.ts # 新規: 失敗判定＋res配線＋clear を middleware から分離
 │       ├── settle-activity-record.ts # 新規: 対象内なら作成・対象外なら null の薄い純関数
-│       ├── record-failsafe-attempt.ts# 新規: 失敗・中断時に UNSETTLED を作る finalizer 本体（二重作成防止）
+│       ├── record-failsafe-attempt.ts# 新規: UNSETTLED を作る（create＋duplicate-key吸収・事前readなし）
 │       └── update-activity-logic.ts  # 変更なし（shouldGenerateUpdate は既存のまま）
 └── service/page/
     └── index.ts                      # 変更: revertDeletedPage の自前 pre-create を id採番＋stash＋emit に畳む
@@ -168,14 +171,14 @@ apps/app/src/server/
 
 ### Modified Files
 
-- `apps/app/src/server/models/activity.ts` — `IActivityParameters` に `id?: string` を追加し、`createByParameters` が呼び出し側で採番した id で行を作れるようにする（Prisma unchecked create は明示 id を通す。本体の `...rest` 展開で既に流れるため、型に足すのが主変更）。`_id` で渡された場合は `id` にマップする。
-- `apps/app/src/server/middlewares/add-activity.ts` — 非 GET で DB に書かない。`new Types.ObjectId().toString()` で id を採番し、`res.locals.activity = { _id }` に格納（37 箇所の emit を無改修で温存）。同 id で文脈（IP・エンドポイント・user・snapshot.username）を `pendingActivityContext.set` する。`res.on('finish')`（`statusCode >= 400`）と `res.on('close')`（`writableFinished === false`）に finalizer を登録し、`recordFailsafeAttempt` を呼ぶ。どの経路でも最後にマップエントリを掃除する。
-- `apps/app/src/server/service/activity/pending-activity-context.ts` — **新規**。`activityId → { ip, endpoint, userId, username }` のプロセスローカル `Map`。`set(id, ctx)` / `take(id)`（get + delete・同期）/ `clear(id)`。leak 対策として有界化／掃引を検討（実装フェーズ）。
+- `apps/app/src/server/models/activity.ts` — `IActivityParameters` に `id?: string` を追加し、`createByParameters` が呼び出し側で採番した id で行を作れるようにする（Prisma unchecked create は明示 id を通す。本体の `...rest` 展開で既に流れるため、型に足すのが主変更）。`_id` で渡された場合は `id` にマップする。（**`createdAt?: Date` は既に受け付けるため、Issue 3＝到着時刻の保持に models 変更は不要**。）
+- `apps/app/src/server/middlewares/add-activity.ts` — 非 GET で DB に書かない**薄いアダプタ**にする。文脈（IP・エンドポイント・user・snapshot.username・**到着時刻 createdAt**）を1つ組み立て、`beginActivity(context)` で id 採番＋stash（共有ヘルパ）し、`res.locals.activity = { _id: activityId }`（37 箇所の emit を無改修で温存）、`registerFailsafeFinalizer(res, activityId, context)` を呼ぶ。失敗判定（`statusCode >= 400` / `writableFinished === false`）と `res.on` 配線・`clear` は `registerFailsafeFinalizer` の責務で、middleware は判断ロジックを持たない。beginActivity と registerFailsafeFinalizer は隣接する同期呼び出しで間に throw が無いため、掃除役の付かない窓は生じない。
+- `apps/app/src/server/service/activity/pending-activity-context.ts` — **新規**。`activityId → { ip, endpoint, userId, username, createdAt }` のプロセスローカル `Map`。`set(id, ctx)` / `take(id)`（get + delete・同期）/ `clear(id)`。**掃除の所有者**だが、掃除は時間・サイズでなく**イベント駆動**で確定的に行う（middleware=`res` close/finish、復元=emit 経路の error ハンドラ）。time-based TTL 掃引や insertion-order eviction のような **live エントリを誤って消す仕組みは持たない**（数分かかる処理でも in-flight のまま安全に保持される・要件 2.6 非回帰。根拠は §Error Handling の実測）。map サイズは in-flight 分で自然に有界。掃除漏れ（＝バグ）の観測手段（例: サイズ高水位で warning ログ）は実装裁量で、追い出しはしない。
 - `apps/app/src/server/service/activity/settle-activity-record.ts` — **新規**。`shouldPersist` と、リスナーがマップから取り出した文脈＋emit パラメータを引数で受け取り、真なら `createByParameters`（採番 id 指定・文脈と action をマージ）、偽なら `null`（何もしない）を返す薄い純関数。contribution・通知・snapshot・ルート固有データ・記録可否判断に依存しない（要件 3.1/3.2）。
-- `apps/app/src/server/service/activity/record-failsafe-attempt.ts` — **新規**。採番済み id・文脈を受け取り、その id の行が未作成なら `ACTION_UNSETTLED` を `createByParameters` で1件作る。既に settle が作っていれば作らない（id で DB 探索、または duplicate-key を良性として握りつぶす）。best-effort（例外は logger で握りつぶし、リクエスト本体を止めない）。
+- `apps/app/src/server/service/activity/record-failsafe-attempt.ts` — **新規**。採番済み id・文脈を受け取り、`ACTION_UNSETTLED` を `createByParameters`（採番 id 指定）で1件作る。**事前 read はしない**: 二重作成防止は「採番 id は主キーなので、settle が既に作っていれば create が duplicate-key で弾かれる。それを良性として握りつぶす」だけで担保する（Issue 1 の確定。失敗経路に read を足さず現行と同等の 1 write に保つ）。best-effort（duplicate-key 以外の例外は logger で握りつぶし、リクエスト本体を止めない）。
 - `apps/app/src/server/service/activity.ts` — `update` リスナーを組み替える。「(1) `activityId` の文脈をマップから**同期 take**（await より前）→ (2) `contributor` 分離 → (3) contribution 先行（不変）→ (4) `shouldPersist = shoudUpdateActivity(action)` を算出 → (5) `settleActivityRecord({ activityId, shouldPersist, context, activityParameters })` で作成 or 何もしない → (6) 戻り値が非 null（＝対象内かつ作成成功）のときのみ従来どおり `updated` を emit」。対象外分岐がこれまでの no-op のまま（ただし残す行がないので実害は元からない）。
 - `apps/app/src/server/service/activity/index.ts` — バレルに新規3モジュールの re-export を追加（親 `service/activity.ts` と `add-activity.ts` はバレル経由で import する）。
-- `apps/app/src/server/service/page/index.ts` — `revertDeletedPage` の自前 pre-create（現行 L2830 付近）を廃止。`new Types.ObjectId().toString()` で id 採番、文脈を `pendingActivityContext.set`、その id で `emit('update', ...)`（L2847 / 2912 / 2990）。`revertRecursivelyMainOperation` へは `activity` オブジェクトでなく id 文字列を渡す。
+- `apps/app/src/server/service/page/index.ts` — `revertDeletedPage` の自前 pre-create（現行 L2830 付近）を廃止。`beginActivity(context)`（文脈は ip/endpoint/user/username＋**到着時刻 createdAt**）で id 採番＋stash し、その id で `emit('update', ...)`（L2847 / 2912 / 2990）。`revertRecursivelyMainOperation` へは `activity` オブジェクトでなく id 文字列を渡す。**掃除は emit を含む async スコープの error ハンドラでのみ `pendingActivityContext.clear(activityId)`**（emit 前 throw の孤児を確定的に消す。同期 emit 経路と、切り離し実行される再帰経路の catch の両方に置く。middleware と違い `res` finalizer を持たないため）。emit が飛べば listener の同期 `take` が消すので正常時は何もしない。
 
 ### 変更しないファイル（意図的に対象外）
 
@@ -229,7 +232,7 @@ sequenceDiagram
     participant RFA as recordFailsafeAttempt
     participant Ext as activities extension
 
-    MW->>Res: on finish / on close を登録（文脈は closure で保持）
+    MW->>Res: registerFailsafeFinalizer が on finish / on close を登録（文脈は closure で保持）
     Note over MW,Res: 正常/失敗どちらでも発火する
     alt エラー応答 finish かつ statusCode>=400
         Res->>RFA: recordFailsafeAttempt(activityId, 文脈)
@@ -238,9 +241,9 @@ sequenceDiagram
     else 正常完了 finish かつ statusCode<400
         Note over Res: 何もしない（成功時は試行記録を作らない）
     end
-    RFA->>Ext: id の行が未作成なら createByParameters(UNSETTLED + 文脈)
-    Note over RFA,Ext: settle が既に作っていれば作らない（二重作成防止 / duplicate-key は良性）
-    RFA-->>Res: 常にマップエントリを掃除
+    RFA->>Ext: createByParameters(採番id + UNSETTLED + 文脈) を実行（事前 read なし）
+    Note over RFA,Ext: settle が既に作っていれば主キー重複 → duplicate-key を良性として握りつぶす
+    RFA-->>Res: registerFailsafeFinalizer が全経路で clear
 ```
 
 ### `ACTION_UNSETTLED` 行のライフサイクル（C 版の帰結）
@@ -278,7 +281,7 @@ stateDiagram-v2
 | 3.1 | 記録可否は action のみで判断（ペイロード非依存） | `shoudUpdateActivity`, `settleActivityRecord`（結果を引数で受領） | — |
 | 3.2 | ゲート責務を記録可否に限定（貢献度・通知に非依存） | `settleActivityRecord`（分離された薄い純関数） | — |
 | 3.3 | 新 action / 新経路は単一情報源で決まる（分岐追加不要） | ゲートのデータ駆動維持 + 復元フローの共通リスナー | settle シーケンス（共通経路） |
-| 4.1 | 失敗・中断時の試行記録を保持 | `recordFailsafeAttempt`（finalizer）, `add-activity`（res フック） | finalizer シーケンス（status>=400 / 中断） |
+| 4.1 | 失敗・中断時の試行記録を保持 | `registerFailsafeFinalizer`（失敗判定＋res フック）, `recordFailsafeAttempt`（create＋dup-key吸収） | finalizer シーケンス（status>=400 / 中断） |
 | 4.2 | 未確定の試行記録を「確定して対象外」と区別 | ②はそもそも作られないため、残存 UNSETTLED は finalizer 由来の失敗・中断に限られ、②と自然に区別される | UNSETTLED ライフサイクル |
 | 4.3 | 未確定であることを区別できる形で保持 | `ACTION_UNSETTLED` を行に保持（finalizer が付与） | UNSETTLED ライフサイクル |
 | 4.4 | プロセス即死時の試行記録は対象外 | finalizer は `res` イベント依存のため即死では発火しない（受容済み） | UNSETTLED ライフサイクル（Lost 分岐） |
@@ -288,8 +291,10 @@ stateDiagram-v2
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
 | pendingActivityContext | Service / in-process state | middleware の文脈とリスナーの action を activityId で突き合わせる | 2.6 | なし（純 Map） | Service |
-| add-activity middleware | Middleware / 事前作成廃止 | id 採番・文脈 stash・finalizer 登録（DB に書かない） | 2.6, 4.1 | pendingActivityContext (P0), recordFailsafeAttempt (P0), Types.ObjectId (P0) | Service |
-| recordFailsafeAttempt | Service / fail-safe | 失敗・中断時に UNSETTLED を1件作る（二重作成防止） | 4.1, 4.2, 4.3 | createByParameters (P0) | Service |
+| add-activity middleware | Middleware / 事前作成廃止 | 薄いアダプタ: beginActivity と registerFailsafeFinalizer を呼ぶだけ（DB に書かない・判断ロジックなし） | 2.6, 4.1 | beginActivity (P0), registerFailsafeFinalizer (P0) | Service |
+| beginActivity | Service / 記録開始 | id 採番＋文脈 stash の共有ヘルパ（middleware と復元フローが共用） | 2.6 | pendingActivityContext.set (P0), Types.ObjectId (P0) | Service |
+| registerFailsafeFinalizer | Service / fail-safe | 失敗判定（statusCode/writableFinished）と res 配線＋clear を集約（middleware から分離） | 4.1 | recordFailsafeAttempt (P0), pendingActivityContext.clear (P0) | Service |
+| recordFailsafeAttempt | Service / fail-safe | 失敗・中断時に UNSETTLED を1件作る（create＋duplicate-key吸収・事前readなし） | 4.1, 4.2, 4.3 | createByParameters (P0) | Service |
 | settleActivityRecord | Service / 記録ライフサイクル | 対象内なら作成・対象外なら null | 1.1, 1.2, 2.6, 3.1, 3.2 | createByParameters (P0) | Service |
 | ActivityService update listener | Service / orchestrator | 文脈 take → ゲート判定 → contribution → settle → 通知 | 1.1, 1.2, 1.4, 2.1, 2.3, 2.4, 3.3 | pendingActivityContext (P0), shoudUpdateActivity (P0), settleActivityRecord (P0) | Event |
 | ActivityExtension.createByParameters | Data / 保存口 | 採番 id 指定で activity 行を作成 | 1.2, 2.6, 4.1 | Prisma client (P0) | Service |
@@ -308,10 +313,12 @@ stateDiagram-v2
 
 **Responsibilities & Constraints**
 
-- `activityId → { ip, endpoint, userId, username }` のプロセスローカル `Map`。事前作成を廃止した結果、記録行に IP・エンドポイントを載せるための唯一の合流点になる。
-- `take(id)` は get と delete を**同期的に**行う。リスナーは await の前に `take` を呼び、finalizer の後始末との競合を避ける。
+- `activityId → { ip, endpoint, userId, username, createdAt }` のプロセスローカル `Map`。事前作成を廃止した結果、記録行に IP・エンドポイント・到着時刻を載せるための唯一の合流点になる。
+- `take(id)` は get と delete を**同期的に**行う。リスナーは await の前に `take` を呼び、掃除との競合を避ける。
 - あるリクエストの middleware とリスナーは同一プロセスで動くため、プロセスローカルで十分（クラスタ構成でも問題ない）。
-- leak 防止: emit が飛ばない経路（成功・no-emit / emit 前 throw）で残るエントリは finalizer が `clear` する。加えて有界化／掃引を検討（実装フェーズ）。
+- **掃除はイベント駆動で確定的**（時間・サイズに依存しない）: middleware 経路は `res` の `'close'`／`'finish'` で `clear` する。復元経路は emit を含む async スコープの **error ハンドラでのみ** `clear`（emit 済みは listener の同期 `take` が消す）。**time-based TTL 掃引や「最古を追い出す」eviction は採用しない**——"遅いが生きているエントリ"（数分かかる処理で emit 前の in-flight）を誤って消し、記録行の文脈欠損（要件 2.6 回帰）を招くため。
+- **この方式の根拠（実測で検証済み）**: `res` の終了イベントは応答の**実終了時**に発火するので、処理が何分かかっても途中で消えず、終了時に1回だけ `clear` される（詳細な実測値と GROWI のサーバ設定は §Error Handling を参照）。中断は `writableFinished===false` で判別でき fail-safe が記録する。
+- map サイズは in-flight 分で自然に有界。掃除漏れ（＝コードのバグ）を疑うときの観測手段（例: サイズ高水位で warning ログ）は実装裁量。live エントリの追い出しはしない。
 
 **Dependencies**: なし（純データ構造）。
 
@@ -326,6 +333,7 @@ export type PendingActivityContext = {
   endpoint?: string;
   userId?: string;   // req.user?._id
   username?: string; // req.user?.username → snapshot.username
+  createdAt: Date;   // request-arrival time; carried to the created row (Issue 3)
 };
 
 /** Stash request-time context, keyed by the pre-minted activity id. */
@@ -334,7 +342,12 @@ export function set(activityId: string, context: PendingActivityContext): void;
 /** Get-and-delete synchronously. Call BEFORE any await in the listener. */
 export function take(activityId: string): PendingActivityContext | undefined;
 
-/** Idempotent cleanup for orphaned entries (finalizer). */
+/**
+ * Idempotent cleanup. Called by the event-driven cleaners:
+ *  - middleware path: res 'finish'/'close' (fires regardless of request duration)
+ *  - revert path: the error handler of the emit-owning async scope
+ * There is deliberately NO time/size-based eviction of live entries.
+ */
 export function clear(activityId: string): void;
 ```
 
@@ -348,20 +361,20 @@ export function clear(activityId: string): void;
 
 | Field | Detail |
 |-------|--------|
-| Intent | 非 GET で id を採番し文脈を stash、finalizer を登録する（DB には書かない） |
+| Intent | 非 GET で文脈を組み立て、beginActivity と registerFailsafeFinalizer を呼ぶ薄いアダプタ（DB には書かない） |
 | Requirements | 2.6, 4.1 |
 
 **Responsibilities & Constraints**
 
-- 非 GET リクエストで `const activityId = new Types.ObjectId().toString()` を採番し、`res.locals.activity = { _id: activityId }` に格納（37 箇所の emit と `getIdStringForRef` を無改修で温存）。
-- 同 id で `pendingActivityContext.set(activityId, { ip, endpoint, userId, username })` する。値は `req.ip` / `req.originalUrl` / `req.user?._id` / `req.user?.username`（Passport で同期的に確定済み）。
-- `res.on('finish', ...)`（`res.statusCode >= 400` のとき）と `res.on('close', ...)`（`res.writableFinished === false` のとき）に finalizer を登録し、`recordFailsafeAttempt(activityId, context)` を呼ぶ。どの分岐でも最後に `pendingActivityContext.clear(activityId)`。
+- 非 GET リクエストで文脈 `{ ip: req.ip, endpoint: req.originalUrl, userId: req.user?._id, username: req.user?.username, createdAt: new Date() }` を1つ組み立てる（`req.user` は Passport で同期的に確定済み。`createdAt` は到着時刻＝Issue 3）。
+- `const { activityId } = beginActivity(context)` で id 採番＋stash（共有ヘルパ。復元フローと同じ）。`res.locals.activity = { _id: activityId }`（37 箇所の emit と `getIdStringForRef` を無改修で温存）。
+- `registerFailsafeFinalizer(res, activityId, context)` を呼ぶ。失敗判定（`statusCode >= 400`／中断は `writableFinished === false`）と `res.on('finish'|'close')` 配線・`clear` はこのモジュールが持ち、**middleware は判断ロジックを持たない**。beginActivity と registerFailsafeFinalizer は隣接する同期呼び出しで間に throw が無いため、掃除役の付かない窓は生じない。
 - **DB には書かない**（事前作成廃止）。ここが現行との最大差分。
 
 **Dependencies**
 
-- Outbound: `pendingActivityContext.set/clear`（P0）, `recordFailsafeAttempt`（P0）, `Types.ObjectId`（P0）
-- 依存してはならない: 記録可否ゲート（middleware は action を知らないまま id だけ配る）
+- Outbound: `beginActivity`（P0）, `registerFailsafeFinalizer`（P0）
+- 依存してはならない: 記録可否ゲート（middleware は action を知らないまま id だけ配る）, `pendingActivityContext`／`recordFailsafeAttempt` を直接（beginActivity / registerFailsafeFinalizer 経由にする）
 
 **Contracts**: Service [x]
 
@@ -369,7 +382,51 @@ export function clear(activityId: string): void;
 - Postconditions: `res.locals.activity._id` に採番 id、マップに文脈、`res` に finalizer。DB 変更なし。
 - Invariants: 記録可否の判断をしない。middleware は best-effort で、失敗してもリクエスト本体を止めない。
 
+### Service / 記録開始
+
+#### beginActivity（新規）
+
+| Field | Detail |
+|-------|--------|
+| Intent | id を採番し、リクエスト文脈を pending map に stash する（採番＋stash の唯一の実装） |
+| Requirements | 2.6 |
+
+**Responsibilities & Constraints**
+
+- `new Types.ObjectId().toString()` で `activityId` を採番し、`pendingActivityContext.set(activityId, context)` して `{ activityId }` を返す。
+- middleware と復元フロー（`revertDeletedPage`）の**両方がこれを呼ぶ**。採番＋stash をそれぞれで再実装させない（重複の解消・要件 3.3）。将来 middleware を通らない記録経路が増えてもこれを呼ぶだけで済む。
+- 記録可否・失敗判定・`res`・通知・貢献度に依存しない。
+
+**Dependencies**: `pendingActivityContext.set`（P0）, `Types.ObjectId`（P0）
+
+**Contracts**: Service [x]
+
+- Preconditions: `context` に到着時刻 `createdAt` を含む（Issue 3）。
+- Postconditions: map に文脈が入り、採番 id を返す。
+- Invariants: DB・`res` に触れない。
+
 ### Service / fail-safe
+
+#### registerFailsafeFinalizer（新規）
+
+| Field | Detail |
+|-------|--------|
+| Intent | 「何を失敗・中断とみなすか」の判定と `res` 配線・`clear` を1か所に集約する（middleware から分離） |
+| Requirements | 4.1 |
+
+**Responsibilities & Constraints**
+
+- `res.on('finish')` で `res.statusCode >= 400` のとき、`res.on('close')` で `res.writableFinished === false`（真の中断）のときだけ `recordFailsafeAttempt(activityId, context)` を呼ぶ。
+- どちらのイベントでも最後に `pendingActivityContext.clear(activityId)`（middleware 経路の**確定的な掃除**。`'close'` は処理時間に関わらず必ず1回発火するので、数分かかる処理でも途中で消えない）。`clear` は idempotent。
+- 失敗判定ロジックはここが唯一の持ち主で、middleware・複数経路に散らさない。
+
+**Dependencies**: `recordFailsafeAttempt`（P0）, `pendingActivityContext.clear`（P0）
+
+**Contracts**: Service [x]
+
+- Preconditions: `activityId` は採番済み。`context` は middleware が組み立て済み（closure で保持）。
+- Postconditions: 失敗・中断時のみ試行記録を1件（recordFailsafeAttempt 経由）。全経路で map エントリを `clear`。
+- Invariants: 成功完了時（status<400 かつ writableFinished）は試行記録を作らない。
 
 #### recordFailsafeAttempt
 
@@ -380,21 +437,21 @@ export function clear(activityId: string): void;
 
 **Responsibilities & Constraints**
 
-- 採番済み `activityId` と文脈を受け取り、その id の行が**未作成**なら `createByParameters({ id, action: ACTION_UNSETTLED, ...文脈 })` で作る。
-- 二重作成防止: id で DB を探索して既存なら作らない（settle が対象内で既に作っている場合）。加えて `createByParameters` の duplicate-key（unique index / 同一 id）を良性として握りつぶす（settle と competing した稀な競合）。
-- 呼ばれるのは**失敗・中断時のみ**（finalizer 側で status>=400 / 中断を判定済み）。成功完了時は呼ばれない。
-- best-effort: 例外は logger.error して握りつぶす（リクエストは既に終了処理中で、記録失敗が本体に影響してはならない）。
+- 採番済み `activityId` と文脈（到着時刻 `createdAt` を含む）を受け取り、`createByParameters({ id: activityId, action: ACTION_UNSETTLED, createdAt, ...文脈 })` で1件作る。
+- 二重作成防止（**事前 read なし**・Issue 1）: 採番 id は主キーなので、settle が対象内で既に作っていれば create が duplicate-key（同一 id）で弾かれる。それを**良性として握りつぶす**だけで守る。`findFirst` 等の先読みはしない（失敗経路に read を足さない）。この稀な競合（emit 済み・settle in-flight・かつ失敗応答）で実 action の代わりに UNSETTLED が残るのは受容（失敗応答時のため実害小）。
+- 呼ばれるのは**失敗・中断時のみ**（`registerFailsafeFinalizer` が status>=400 / 中断を判定済み）。成功完了時は呼ばれない。
+- best-effort: duplicate-key 以外の例外は logger.error して握りつぶす（リクエストは既に終了処理中で、記録失敗が本体に影響してはならない）。
 
 **Dependencies**
 
-- Outbound: `createByParameters`（採番 id 指定・P0）, `prisma.activities.findFirst`（存在確認・P0）
+- Outbound: `createByParameters`（採番 id 指定・P0）。**`findFirst` 等の事前存在確認は使わない**（duplicate-key 吸収で代替・Issue 1）。
 - 依存してはならない: 記録可否ゲート（失敗時は action 未確定なので UNSETTLED 固定）, 通知, 貢献度
 
 **Contracts**: Service [x]
 
-- Preconditions: finalizer が失敗・中断を判定済み。`activityId` は採番済み。
-- Postconditions: 未作成なら UNSETTLED を1件作成。作成済みなら何もしない。例外は投げない。
-- Invariants: 作るのは高々1件。action は常に `ACTION_UNSETTLED`。
+- Preconditions: `registerFailsafeFinalizer` が失敗・中断を判定済み。`activityId` は採番済み。
+- Postconditions: UNSETTLED を高々1件作成（既存 id との競合は duplicate-key として握りつぶす）。例外は投げない。
+- Invariants: 作るのは高々1件。action は常に `ACTION_UNSETTLED`。事前 read しない。
 
 ### Service / 記録ライフサイクル
 
@@ -408,7 +465,7 @@ export function clear(activityId: string): void;
 **Responsibilities & Constraints**
 
 - 記録可否の**判断は行わない**。判断結果 `shouldPersist: boolean`（`= ActivityService.shoudUpdateActivity(action)`）を**引数で受け取る**（単一情報源を複製しない・要件 1.4/3.1）。
-- リスナーがマップから取り出した**文脈**（IP・エンドポイント・user・username）と emit パラメータ（action・target・snapshot 等）を受け取り、`shouldPersist=true` のとき両者をマージして `createByParameters({ id: activityId, ...文脈, ...activityParameters })` を呼び、作成された activity を返す。`shouldPersist=false` のとき **`null` を返し何もしない**（対象外の write を発生させない・要件 1.1）。
+- リスナーがマップから取り出した**文脈**（IP・エンドポイント・user・username・**到着時刻 createdAt**）と emit パラメータ（action・target・snapshot 等）を受け取り、`shouldPersist=true` のとき両者をマージして `createByParameters({ id: activityId, ...文脈, ...activityParameters })` を呼び、作成された activity を返す（`createdAt` は文脈経由で到着時刻が入る＝Issue 3）。`shouldPersist=false` のとき **`null` を返し何もしない**（対象外の write を発生させない・要件 1.1）。
 - 通知の送出・contribution 処理・文脈の取得（`take`）は**呼び出し側（listener）に残す**。この関数の戻り値（activity or null）で「通知すべきか」を呼び出し側が判断できる。
 
 **Dependencies**
@@ -521,9 +578,10 @@ export function settleActivityRecord(
 - **作成の DB エラー（System 5xx 相当）**: `settleActivityRecord` は想定外エラーを伝播し、listener が try/catch で `logger.error` して通知せず return（現行の update 失敗時挙動と同じ）。リクエスト本体は継続。
 - **記録対象外**: `settleActivityRecord` は `null` を返すだけ（作成なし）。listener は非 null 時のみ通知するため、通知なしで正常終了。write は発生しない。
 - **finalizer の作成失敗**: `recordFailsafeAttempt` は例外を握りつぶし logger.error する（リクエストは既に終了処理中）。試行記録を1件作れなくても本体に影響しない。
-- **二重作成の競合（稀）**: 「emit 済み・対象内 settle が in-flight・かつ status>=400」だと finalizer と settle が競合しうる。finalizer は「id で DB 探索 → 無ければ作成、duplicate-key は良性として握りつぶす」で守る。この稀な競合で実 action の代わりに UNSETTLED が残ることは受容する（失敗応答時のため実害小）。
+- **二重作成の競合（稀）**: 「emit 済み・対象内 settle が in-flight・かつ status>=400」だと finalizer と settle が競合しうる。`recordFailsafeAttempt` は**事前 read せず**、採番 id（主キー）による create の duplicate-key を良性として握りつぶすことで守る（Issue 1）。この稀な競合で実 action の代わりに UNSETTLED が残ることは受容する（失敗応答時のため実害小）。
+- **長時間リクエストの誤 sweep（設計上あってはならない）**: 数分かかる処理は emit も activity 作成も終盤までされないが、その間 map エントリは in-flight として保持される。掃除はイベント駆動（`res` close/finish）でのみ起きるため、処理中に消えることはない（time-based TTL や最古 eviction を採用しない理由・要件 2.6 の非回帰）。**根拠（実測で検証済み）**: (1) GROWI は server timeout を設定せず `http.createServer` の既定に委ねる（`crowi/index.ts:636`）。既定 `requestTimeout`（5分）は"リクエストの受信"の制限であって受信後のサーバ処理時間には効かないため、数分かかる処理でリクエストが途中で切られることはない。(2) Node 24（実測 v24.17.0）では `res` の `finish`/`close` は応答の**実終了時**に発火する（300ms 処理の正常応答で `finish`/`close` とも約 304ms＝処理完了時に発火し、タイマーで早期発火しない・`writableFinished=true`／クライアント中断では `close` のみ `writableFinished=false` で発火し `finish` は出ない）。よって掃除は「リクエストの実際の終了時に1回」だけ走る。結合試験（Task 7.3）で実挙動を再確認する。
 - **プロセス即時終了（SIGKILL / OOM）**: finalizer（`res` イベント）に到達しないため試行記録は残らない（要件 4.4・対象外）。
-- **文脈欠損**: `take` が `undefined`（emit 前にマップが掃除された等の異常）なら、記録行の一部フィールドが欠けうる。同期 take の規律でこの窓を最小化する。
+- **文脈欠損**: `take` が `undefined`（emit 前にマップが掃除された等の異常）なら、記録行の一部フィールドが欠けうる。同期 take の規律と、掃除をイベント駆動に限る設計（live エントリを時間・サイズで消さない）でこの窓を無くす。
 
 ### Monitoring
 
@@ -538,10 +596,10 @@ export function settleActivityRecord(
 - `pendingActivityContext`: `set` → `take` で文脈が返り、`take` 後は空になる（get+delete の同期性）。存在しない id の `take` は `undefined`。(2.6)
 - `settleActivityRecord`（`shouldPersist=false`）: `createByParameters` を呼ばず `null` を返す。(1.1)
 - `settleActivityRecord`（`shouldPersist=true`）: `createByParameters` を「採番 id ＋文脈＋action をマージした引数」で呼び、作成 activity を返す。(1.2, 2.6)
-- `recordFailsafeAttempt`: 未作成の id → `ACTION_UNSETTLED` を1件作る。作成済みの id → 作らない（DB 探索 or duplicate-key 握りつぶし）。作成失敗時は例外を投げず logger.error。(4.1, 4.2)
+- `recordFailsafeAttempt`: `ACTION_UNSETTLED` を採番 id で1件作る。settle が既に作った id → create が duplicate-key で弾かれ、それを良性として握りつぶす（**事前 read しない**・Issue 1）。作成失敗時は例外を投げず logger.error。(4.1, 4.2)
 - update listener（対象外・非 essential かつ `auditLogEnabled=false`）: `createByParameters` を呼ばず、行を作らず、`updated` を emit しない（既存 `activity.spec.ts` L247-267 の契約を「skips update」から「creates nothing」へ改訂）。(1.1)
 - update listener（essential action）: 文脈を `take` し、`createByParameters` を呼んで `updated` を emit（不変）。contribution 先行・通知条件も保存。(1.2, 2.1, 2.3, 2.4, 2.6)
-- add-activity middleware: DB に書かず、id を採番して `res.locals.activity._id` に格納し、文脈を `set` し、`res` に finalizer を登録する（既存 `add-activity.spec.ts` の「無条件 create」契約を改訂）。(2.6, 4.1)
+- add-activity middleware: DB に書かず、`beginActivity` で id 採番＋文脈 stash（`createdAt` に到着時刻）、`res.locals.activity._id` に格納し、`registerFailsafeFinalizer` を呼ぶ（既存 `add-activity.spec.ts` の「無条件 create」契約を改訂。失敗判定は middleware でなく registerFailsafeFinalizer 側でテスト）。(2.6, 4.1)
 
 ### Integration Tests
 
@@ -566,7 +624,7 @@ export function settleActivityRecord(
   - 失敗・中断: finalizer が **1 create**（稀）。
   - 既定 Small では記録対象外が多数を占めるため、削減効果は大きい。加えて事前作成をホットパスから外すことで、全更新系リクエストの**遅延も減る**。
 - **保管量**は主眼ではない（残骸は従来どおり TTL で回収）。本方式は保管量も同時に減らすが、それは副次効果。
-- **新しいコスト**: プロセスローカルマップ（メモリは in-flight リクエスト分のみ・finalizer で掃除）と、失敗・中断時の DB 探索 1 回（finalizer）。いずれも軽量で、正常系の主流には載らない。
+- **新しいコスト**: プロセスローカルマップ（メモリは in-flight リクエスト分のみ・イベント駆動で確定的に掃除。時間/サイズによる live 追い出しなし＝数分かかる処理でも誤 sweep しない）と、`res` リスナー2本／リクエスト（使い捨て `res` に付くので蓄積しない）。**失敗・中断経路は事前 read を持たない**（Issue 1: create＋duplicate-key 吸収）ので、失敗時も現行と同等の 1 write のまま。いずれも軽量で、正常系の主流には載らない。
 - 大量カスケード削除時のボリューム制御・スロットリングは将来課題（flagship の関心マップ参照）で本スペックの対象外。
 
 ## Migration Strategy
