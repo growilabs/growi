@@ -305,10 +305,14 @@
     "normalize": "正規化",
     "normalize_button": "ページデータのインデックスの正規化",
     "normalize_description": "破損したページデータのインデックスを修復します。",
+    "normalize_success": "ページデータのインデックスを正規化しました。",
     "rebuild": "リビルド",
     "rebuild_button": "ページデータのインデックスのリビルド",
+    "rebuild_requested": "ページデータのインデックスのリビルドをリクエストしました。",
     "rebuild_description_1": "全てのページのインデックスを削除し、作り直します。",
     "rebuild_description_2": "この作業には数秒かかります。",
+    "rebuild_progress_processing": "処理中..",
+    "rebuild_progress_completed": "完了",
     "rebuild_normalization_timeout": "リビルドは完了しましたが、正規化がタイムアウトしました。手動で正規化してください。"
   },
   "audit_log_index_management": {
