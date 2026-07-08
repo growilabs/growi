@@ -31,7 +31,7 @@ vi.mock('~/features/mastra/server/services/is-ai-configured', () => ({
   isAiConfigured,
 }));
 vi.mock(
-  '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model',
+  '~/features/mastra/server/services/ai-sdk-modules/resolved-model-cache',
   () => ({ clearResolvedMastraModelCache }),
 );
 // updateConfigs dynamically imports '../../models/config' (relative to

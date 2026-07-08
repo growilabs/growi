@@ -44,7 +44,7 @@ vi.mock('~/server/service/config-manager', () => ({
 }));
 
 vi.mock(
-  '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model',
+  '~/features/mastra/server/services/ai-sdk-modules/resolved-model-cache',
   () => ({
     clearResolvedMastraModelCache,
   }),

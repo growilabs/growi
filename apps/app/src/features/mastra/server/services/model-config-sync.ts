@@ -1,7 +1,7 @@
 import type S2sMessage from '~/server/models/vo/s2s-message';
 import type { S2sMessageHandlable } from '~/server/service/s2s-messaging/handlable';
 
-import { clearResolvedMastraModelCache } from './ai-sdk-modules/resolve-mastra-model';
+import { clearResolvedMastraModelCache } from './ai-sdk-modules/resolved-model-cache';
 
 // Subscribes to the `configUpdated` s2s message so that a settings update on
 // another instance discards this instance's memoized Mastra model, giving

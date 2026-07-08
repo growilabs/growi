@@ -10,7 +10,7 @@ const { clearResolvedMastraModelCache } = vi.hoisted(() => ({
   clearResolvedMastraModelCache: vi.fn(),
 }));
 
-vi.mock('./ai-sdk-modules/resolve-mastra-model', () => ({
+vi.mock('./ai-sdk-modules/resolved-model-cache', () => ({
   clearResolvedMastraModelCache,
 }));
 

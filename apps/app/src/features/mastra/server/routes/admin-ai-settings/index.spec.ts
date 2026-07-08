@@ -64,7 +64,7 @@ vi.mock('~/features/mastra/server/services/is-ai-configured', () => ({
   isAiConfigured: vi.fn(() => false),
 }));
 vi.mock(
-  '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model',
+  '~/features/mastra/server/services/ai-sdk-modules/resolved-model-cache',
   () => ({ clearResolvedMastraModelCache: vi.fn() }),
 );
 // No refreshed catalog persisted (getSingleton → null): the REAL
