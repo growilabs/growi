@@ -1,9 +1,9 @@
 {
   "feature_name": "activity-log",
   "created_at": "2026-07-07T09:58:07Z",
-  "updated_at": "2026-07-08T00:00:00Z",
+  "updated_at": "2026-07-08T12:30:00Z",
   "language": "ja",
-  "phase": "tasks-generated",
+  "phase": "tasks-approved",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -11,12 +11,12 @@
     },
     "design": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "tasks": {
       "generated": true,
-      "approved": false
+      "approved": true
     }
   },
-  "ready_for_implementation": false
+  "ready_for_implementation": true
 }
