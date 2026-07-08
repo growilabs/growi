@@ -278,8 +278,8 @@
     "toggle_notification": "Paramètres mis à jour pour {{path}}",
     "not_found_global_notification_triggerid": "ID global de notification introuvable"
   },
-  "full_text_search_management": {
-    "elasticsearch_management": "Configuration Elasticsearch",
+  "elasticsearch_management": "Configuration Elasticsearch",
+  "page_data_index_management": {
     "page_data_management": "Gestion des données de page",
     "connection_status": "Statut",
     "connection_status_label_unconfigured": "UNCONFIGURED",
@@ -879,7 +879,7 @@
   "audit_log_index_management": {
     "audit_log_index_management": "Gestion de l'index des journaux d'audit",
     "settings_explanation": "Vous pouvez normaliser ou reconstruire l'index des journaux d'audit sur la page suivante",
-    "index_management_link": "Aller à la configuration Elasticsearch",
+    "index_management_link": "Aller à {{destination}}",
     "normalize": "Normaliser",
     "normalize_button": "Normaliser l'index des journaux d'audit",
     "normalize_success": "L'index des journaux d'audit a été normalisé.",

@@ -37,7 +37,7 @@ const ElasticsearchManagement = (): JSX.Element => {
     finishSocketEvent: SocketEventName.FinishAddPage,
     failedSocketEvent: SocketEventName.RebuildingFailed,
     normalizationTimeoutMessage: t(
-      'full_text_search_management.rebuild_normalization_timeout',
+      'page_data_index_management.rebuild_normalization_timeout',
     ),
   });
 
@@ -62,7 +62,7 @@ const ElasticsearchManagement = (): JSX.Element => {
       {/* Controls */}
       <div className="row">
         <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('full_text_search_management.reconnect')}
+          {t('page_data_index_management.reconnect')}
         </div>
         <div className="col-md-6">
           <ReconnectControls
@@ -77,14 +77,14 @@ const ElasticsearchManagement = (): JSX.Element => {
 
       <div className="row">
         <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('full_text_search_management.normalize')}
+          {t('page_data_index_management.normalize')}
         </div>
         <div className="col-md-6">
           <NormalizeIndicesControls
             isEnabled={isNormalizeEnabled}
             isProcessing={isNormalizingProcessing}
-            buttonLabel={t('full_text_search_management.normalize_button')}
-            description={t('full_text_search_management.normalize_description')}
+            buttonLabel={t('page_data_index_management.normalize_button')}
+            description={t('page_data_index_management.normalize_description')}
             onNormalizingRequested={() =>
               normalizeIndices('Normalizing has succeeded')
             }
@@ -96,7 +96,7 @@ const ElasticsearchManagement = (): JSX.Element => {
 
       <div className="row">
         <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('full_text_search_management.rebuild')}
+          {t('page_data_index_management.rebuild')}
         </div>
         <div className="col-md-6">
           <RebuildIndexControls
@@ -107,10 +107,10 @@ const ElasticsearchManagement = (): JSX.Element => {
             totalCount={rebuildTotal}
             progressHeaderProcessing="Processing.."
             progressHeaderCompleted="Completed"
-            buttonLabel={t('full_text_search_management.rebuild_button')}
+            buttonLabel={t('page_data_index_management.rebuild_button')}
             descriptionLines={[
-              t('full_text_search_management.rebuild_description_1'),
-              t('full_text_search_management.rebuild_description_2'),
+              t('page_data_index_management.rebuild_description_1'),
+              t('page_data_index_management.rebuild_description_2'),
             ]}
             onRebuildingRequested={() =>
               rebuildIndices('Rebuilding is requested')

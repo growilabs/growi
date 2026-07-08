@@ -278,8 +278,8 @@
     "toggle_notification": "{{path}} 설정 업데이트",
     "not_found_global_notification_triggerid": "전역 알림 ID를 찾을 수 없습니다"
   },
-  "full_text_search_management": {
-    "elasticsearch_management": "Elasticsearch 관리",
+  "elasticsearch_management": "Elasticsearch 관리",
+  "page_data_index_management": {
     "page_data_management": "페이지 데이터 관리",
     "connection_status": "연결 상태",
     "connection_status_label_unconfigured": "구성되지 않음",
@@ -880,7 +880,7 @@
   "audit_log_index_management": {
     "audit_log_index_management": "감사 로그 인덱스 관리",
     "settings_explanation": "감사 로그 인덱스의 정규화 및 재구성은 다음 페이지에서 할 수 있습니다",
-    "index_management_link": "Elasticsearch 관리로 이동",
+    "index_management_link": "{{destination}}로 이동",
     "normalize": "정규화",
     "normalize_button": "감사 로그 인덱스 정규화",
     "normalize_success": "감사 로그 인덱스가 정규화되었습니다.",

@@ -101,8 +101,10 @@ export const AuditLogSettings: FC = () => {
           href="/admin/search#audit-log-index-management"
           className="btn btn-link p-0"
         >
-          <span className="material-symbols-outlined me-1">manage_search</span>
-          {t('admin:audit_log_index_management.index_management_link')}
+          <span className="material-symbols-outlined me-1">search</span>
+          {t('admin:audit_log_index_management.index_management_link', {
+            destination: t('admin:elasticsearch_management'),
+          })}
         </Link>
       </p>
     </>

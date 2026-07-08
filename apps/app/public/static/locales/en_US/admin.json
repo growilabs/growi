@@ -278,8 +278,8 @@
     "toggle_notification": "Updated setting of {{path}}",
     "not_found_global_notification_triggerid": "Not found the global notification id"
   },
-  "full_text_search_management": {
-    "elasticsearch_management": "Elasticsearch management",
+  "elasticsearch_management": "Elasticsearch management",
+  "page_data_index_management": {
     "page_data_management": "Page Data Management",
     "connection_status": "Connection status",
     "connection_status_label_unconfigured": "UNCONFIGURED",
@@ -305,7 +305,7 @@
   "audit_log_index_management": {
     "audit_log_index_management": "Audit Log Index Management",
     "settings_explanation": "Normalize or rebuild the audit log's index on the following page",
-    "index_management_link": "Go to Elasticsearch management",
+    "index_management_link": "Go to {{destination}}",
     "normalize": "Normalize",
     "normalize_button": "Normalize audit log index",
     "normalize_success": "Audit log index normalized successfully.",

@@ -62,7 +62,7 @@ const AdminElasticsearchManagementPage: NextPageWithLayout<Props> = (
 };
 
 AdminElasticsearchManagementPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('full_text_search_management.elasticsearch_management'),
+  title: (_p, t) => t('elasticsearch_management'),
 });
 
 export const getServerSideProps: GetServerSideProps<Props> = async (

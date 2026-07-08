@@ -18,7 +18,7 @@ export const ElasticsearchManagementPage = (): JSX.Element => {
   return (
     <div data-testid="admin-elasticsearch-management">
       <h3 className="mb-4">
-        {t('full_text_search_management.page_data_management')}
+        {t('page_data_index_management.page_data_management')}
       </h3>
       <ElasticsearchManagement />
 

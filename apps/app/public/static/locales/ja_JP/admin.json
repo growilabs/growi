@@ -287,8 +287,8 @@
     "toggle_notification": "{{path}}の通知設定を変更しました",
     "not_found_global_notification_triggerid": "アクセス先の通知設定は見つかりませんでした"
   },
-  "full_text_search_management": {
-    "elasticsearch_management": "Elasticsearch 管理",
+  "elasticsearch_management": "Elasticsearch 管理",
+  "page_data_index_management": {
     "page_data_management": "ページデータ管理",
     "connection_status": "接続の状態",
     "connection_status_label_unconfigured": "設定されていません",
@@ -314,7 +314,7 @@
   "audit_log_index_management": {
     "audit_log_index_management": "監査ログ管理",
     "settings_explanation": "監査ログのインデックスの正規化・リビルドは、以下のページで行えます",
-    "index_management_link": "Elasticsearch管理ページに移動",
+    "index_management_link": "{{destination}}ページに移動",
     "normalize": "正規化",
     "normalize_button": "監査ログのインデックスの正規化",
     "normalize_success": "監査ログのインデックスを正規化しました。",
