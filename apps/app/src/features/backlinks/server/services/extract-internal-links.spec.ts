@@ -94,6 +94,15 @@ describe('extractInternalLinks()', () => {
     expect(links).toStrictEqual([]);
   });
 
+  it('does not extract an absolute URL when siteUrl is unset', async () => {
+    const pageString = 'https://test.com/folders/doc';
+    const pagePath = '/page/test';
+
+    const links = await extractInternalLinks(pageString, pagePath);
+
+    expect(links).toStrictEqual([]);
+  });
+
   it('does not extract anchor link', async () => {
     const pageString = '[jump to 5](#section-5)';
     const pagePath = '/page/test';

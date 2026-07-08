@@ -12,18 +12,10 @@ import { relativeLinks } from '~/services/renderer/rehype-plugins/relative-links
 import { relativeLinksByPukiwikiLikeLinker } from '~/services/renderer/rehype-plugins/relative-links-by-pukiwiki-like-linker';
 import { pukiwikiLikeLinker } from '~/services/renderer/remark-plugins/pukiwiki-like-linker';
 
-const isAnchorLink = (href: string): boolean => {
-  return href.toString().length > 0 && href[0] === '#';
-};
+const RELATIVE_BASE = new URL('https://relative.invalid');
 
-const isExternalLink = (href: string, siteUrl?: string) => {
-  try {
-    const baseUrl = new URL(siteUrl ?? 'https://example.com');
-    const hrefUrl = new URL(href, baseUrl);
-    return baseUrl.host !== hrefUrl.host;
-  } catch {
-    return false;
-  }
+const isAnchorLink = (href: string): boolean => {
+  return href.length > 0 && href[0] === '#';
 };
 
 export const extractInternalLinks = async (
@@ -44,26 +36,38 @@ export const extractInternalLinks = async (
   const runTree = await processor.run(hastTree);
 
   const anchors = selectAll('a[href]', runTree as Nodes);
-  const base = new URL(siteUrl ?? 'https://example.com');
+
+  let siteHost: string | null = null;
+  if (siteUrl != null) {
+    try {
+      siteHost = new URL(siteUrl).host;
+    } catch {
+      siteHost = null;
+    }
+  }
+
   const normalizedSelf = normalizePath(pagePath);
   const linkSet = new Set<string>();
 
   for (const a of anchors) {
     const href = a.properties.href;
 
-    if (
-      typeof href !== 'string' ||
-      isAnchorLink(href) ||
-      isExternalLink(href, siteUrl)
-    )
-      continue;
+    if (typeof href !== 'string' || isAnchorLink(href)) continue;
 
-    let path: string;
+    let url: URL;
     try {
-      path = normalizePath(decodeURIComponent(new URL(href, base).pathname));
+      url = new URL(href, RELATIVE_BASE);
     } catch {
       continue;
     }
+
+    // Relative hrefs resolve to RELATIVE_BASE's host (internal by construction);
+    // absolute hrefs are internal only when their host matches the site host.
+    const isRelative = url.host === RELATIVE_BASE.host;
+    const isInternalAbsolute = siteHost != null && url.host === siteHost;
+    if (!isRelative && !isInternalAbsolute) continue;
+
+    const path = normalizePath(decodeURIComponent(url.pathname));
 
     if (!pagePathUtils.isCreatablePage(path) || path === normalizedSelf)
       continue;
