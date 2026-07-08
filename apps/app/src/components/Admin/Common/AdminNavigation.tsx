@@ -137,7 +137,7 @@ const MenuLabel = ({ menu }: { menu: string }) => {
       return (
         <>
           <span className="material-symbols-outlined me-1">search</span>
-          {t('full_text_search_management.elasticsearch_management')}
+          {t('elasticsearch_management')}
         </>
       );
     case 'cloud':
