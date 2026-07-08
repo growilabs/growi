@@ -82,17 +82,32 @@ RUN turbo run build --filter @growi/app
 # Produce artifacts
 RUN bash apps/app/bin/assemble-prod.sh
 
-# Point a fixed-name symlink at the Prisma query engine for THIS build's architecture.
-# The release stage references it via a static PRISMA_QUERY_ENGINE_LIBRARY, which
-# @prisma/client honors *before* its internal engine search — the Turbopack-bundled
-# SSR client cannot satisfy that search at runtime (its __dirname / baked output paths
-# are rewritten). CI builds amd64/arm64 natively in separate jobs, so
-# `dpkg --print-architecture` yields the correct target here.
+# Point a fixed-name symlink at the Prisma query engine for THIS image's target
+# architecture. The release stage references it via a static PRISMA_QUERY_ENGINE_LIBRARY,
+# which @prisma/client returns verbatim — WITHOUT an existence check and skipping its
+# internal engine search, which the Turbopack-bundled SSR client cannot satisfy at
+# runtime (its __dirname / baked output paths are rewritten). A wrong or dangling target
+# would therefore only surface at runtime as a prod-only 500, so this step is
+# deliberately fail-fast:
+#   - arch comes from BuildKit's TARGETARCH, not `dpkg`/`uname`: it is independent of the
+#     builder base image and of future `--platform`/buildx multi-arch builds. Non-BuildKit
+#     builders leave it empty, which is intentionally unsupported (-> exit 1); CI enables
+#     BuildKit via DOCKER_BUILDKIT=1 (apps/app/docker/codebuild/buildspec.yml).
+#   - an unknown/unset arch exits 1 (no silent `sed` passthrough)
+#   - the real engine must exist (`test -f`) before the symlink is created (no dangling link)
 # NOTE: keep this arch->target mapping in sync with apps/app/prisma/schema.prisma
 # `binaryTargets` and the runtime base image libc (dhi.io/node:24-debian13 = glibc).
-RUN target=$(dpkg --print-architecture | sed 's/amd64/debian-openssl-3.0.x/;s/arm64/linux-arm64-openssl-3.0.x/') \
- && ln -sf "libquery_engine-${target}.so.node" \
-      apps/app/dist/generated/prisma/libquery_engine-active.so.node
+ARG TARGETARCH
+RUN set -eu; \
+  case "$TARGETARCH" in \
+    amd64) target=debian-openssl-3.0.x ;; \
+    arm64) target=linux-arm64-openssl-3.0.x ;; \
+    *) echo "unsupported/unset TARGETARCH='$TARGETARCH' — enable BuildKit (DOCKER_BUILDKIT=1) or use docker buildx" >&2; exit 1 ;; \
+  esac; \
+  dir=apps/app/dist/generated/prisma; \
+  test -f "$dir/libquery_engine-${target}.so.node" \
+    || { echo "prisma engine missing: libquery_engine-${target}.so.node" >&2; exit 1; }; \
+  ln -sfn "libquery_engine-${target}.so.node" "$dir/libquery_engine-active.so.node"
 
 # Stage artifacts into a clean directory for COPY --from
 RUN mkdir -p /tmp/release/apps/app && \
