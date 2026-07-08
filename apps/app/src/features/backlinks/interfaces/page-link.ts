@@ -1,5 +1,4 @@
-import type { Document, ObjectId } from 'mongodb';
-import type { Model } from 'mongoose';
+import type { Document, Model, ObjectId } from 'mongoose';
 
 export type LinkTargetState = 'normal' | 'trashed' | 'broken';
 
@@ -22,7 +21,10 @@ export interface IPageLink {
 
 export interface PageLinkDocument extends IPageLink, Document {}
 export interface PageLinkModel extends Model<PageLinkDocument> {
-  replaceOutboundLinks(fromPageId: ObjectId, resolvedRows: IPageLink[]): void;
-  findBacklinkSources(toPageId: ObjectId): ObjectId[];
-  reconcileDeletedPages(pageIds: ObjectId[]): void;
+  replaceOutboundLinks(
+    fromPageId: ObjectId,
+    resolvedRows: IPageLink[],
+  ): Promise<void>;
+  findBacklinkSources(toPageId: ObjectId): Promise<ObjectId[]>;
+  reconcileDeletedPages(pageIds: ObjectId[]): Promise<void>;
 }
