@@ -42,6 +42,11 @@ describe('GET /usernames', () => {
   let app: express.Application;
   let crowi: Crowi;
   let User: Model<IUser>;
+  // Deleting only what this suite created (not deleteMany({})) avoids wiping
+  // fixtures other integ files are relying on when CI runs them against a
+  // single shared MongoDB instance.
+  const createdUserIds: Types.ObjectId[] = [];
+  const createdActivityIds: Types.ObjectId[] = [];
 
   beforeAll(async () => {
     crowi = await getInstance();
@@ -78,21 +83,29 @@ describe('GET /usernames', () => {
 
   afterEach(async () => {
     currentUser.value = null;
-    await Promise.all([User.deleteMany({}), Activity.deleteMany({})]);
+    await Promise.all([
+      User.deleteMany({ _id: { $in: createdUserIds } }),
+      Activity.deleteMany({ _id: { $in: createdActivityIds } }),
+    ]);
+    createdUserIds.length = 0;
+    createdActivityIds.length = 0;
   });
 
   it('returns active users matching the query by default', async () => {
-    currentUser.value = await User.create({
+    const requester = await User.create({
       name: 'Requester',
       username: 'requester',
       email: 'requester@example.com',
     });
-    await User.create({
+    currentUser.value = requester;
+    createdUserIds.push(requester._id);
+    const alice = await User.create({
       name: 'Alice',
       username: 'alice',
       email: 'alice@example.com',
       status: UserStatus.STATUS_ACTIVE,
     });
+    createdUserIds.push(alice._id);
 
     const response = await request(app).get('/usernames').query({ q: 'ali' });
 
@@ -101,17 +114,20 @@ describe('GET /usernames', () => {
   });
 
   it('returns inactive users when isIncludeInactiveUser is requested', async () => {
-    currentUser.value = await User.create({
+    const requester = await User.create({
       name: 'Requester',
       username: 'requester2',
       email: 'requester2@example.com',
     });
-    await User.create({
+    currentUser.value = requester;
+    createdUserIds.push(requester._id);
+    const bob = await User.create({
       name: 'Bob',
       username: 'bob',
       email: 'bob@example.com',
       status: UserStatus.STATUS_SUSPENDED,
     });
+    createdUserIds.push(bob._id);
 
     const response = await request(app)
       .get('/usernames')
@@ -127,19 +143,52 @@ describe('GET /usernames', () => {
     expect(response.body.inactiveUser.usernames).toContain('bob');
   });
 
+  it('classifies a deleted user as inactive rather than dropping them', async () => {
+    const requester = await User.create({
+      name: 'Requester',
+      username: 'requester3',
+      email: 'requester3@example.com',
+    });
+    currentUser.value = requester;
+    createdUserIds.push(requester._id);
+    const carol = await User.create({
+      name: 'Carol',
+      username: 'carol',
+      email: 'carol@example.com',
+      status: UserStatus.STATUS_DELETED,
+    });
+    createdUserIds.push(carol._id);
+
+    const response = await request(app)
+      .get('/usernames')
+      .query({
+        q: 'carol',
+        options: JSON.stringify({
+          isIncludeActiveUser: false,
+          isIncludeInactiveUser: true,
+        }),
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.inactiveUser.usernames).toContain('carol');
+  });
+
   it('returns activity snapshot usernames for admins', async () => {
-    currentUser.value = await User.create({
+    const admin = await User.create({
       name: 'Admin',
       username: 'admin-user',
       email: 'admin@example.com',
       admin: true,
     });
-    await Activity.create({
+    currentUser.value = admin;
+    createdUserIds.push(admin._id);
+    const activity = await Activity.create({
       action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
       // Avoids collisions on the {user, target, action, createdAt} unique index.
       target: new Types.ObjectId(),
       snapshot: { username: 'ghost-user' },
     });
+    createdActivityIds.push(activity._id);
 
     const response = await request(app)
       .get('/usernames')
@@ -159,18 +208,21 @@ describe('GET /usernames', () => {
   });
 
   it('does not include activity snapshot usernames for non-admins even when requested', async () => {
-    currentUser.value = await User.create({
+    const regular = await User.create({
       name: 'Regular',
       username: 'regular-user',
       email: 'regular@example.com',
       admin: false,
     });
-    await Activity.create({
+    currentUser.value = regular;
+    createdUserIds.push(regular._id);
+    const activity = await Activity.create({
       action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
       // Avoids collisions on the {user, target, action, createdAt} unique index.
       target: new Types.ObjectId(),
       snapshot: { username: 'ghost-user' },
     });
+    createdActivityIds.push(activity._id);
 
     const response = await request(app)
       .get('/usernames')
