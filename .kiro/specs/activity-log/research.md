@@ -137,46 +137,73 @@ UNSETTLED 行は起源が3種類あり、混同してはいけない:
 
 ---
 
-## 10. Design 決定（design フェーズ / 2026-07-07）
+## 10. Design 決定（design フェーズ）
 
-`/kiro-spec-design` で Research Needed を解決した結果。実コードを再確認したうえでの確定事項。
+`/kiro-spec-design` と `/kiro-validate-design` で Research Needed を解決した結果。実コードを再確認したうえでの確定事項。
 
-### Decision 1: 方式は Option B（delete-at-settle）に確定（Research Needed #2, #3 を解決）
+> **方式の変遷（重要）**: 2026-07-07 の初回 design ではいったん **Option B（delete-at-settle）** に確定していた。しかし 2026-07-08 の validate-design で、ユーザーから「保管量の削減は TTL があるので重要でない。むしろ B は create に delete が加わって GROWI app・MongoDB 双方の負荷が上がるのがネック。一方でクラッシュ時の試行記録は大事」という指摘を受け、方式を **Option C（lazy fail-safe）** に切り替えた。以下は C 版の確定事項。B 版の記述は履歴として末尾（§10-旧）に残す。
 
-- **選定**: **Option B**。事前作成した `ACTION_UNSETTLED` 行は温存し、`update` リスナーで「記録可否が確定して対象外（②）」の行だけを削除する。
-- **根拠**: 要件 4（例外・**中断（クラッシュ含む）**で確定しなかった操作の試行記録を残す）が、リクエスト本体の実行**前**に行を焼き付ける現行の事前書き込みを事実上必須にする。
-  - (A) defer-create は事前書き込みをやめるため ③（試行記録）を全放棄 → 要件 4 と両立不可（既に除外済み）。
-  - (C) lazy fail-safe はエラーハンドラ到達時のみ ③ を作るため、**プロセス即死などエラーハンドラ未到達のクラッシュを取りこぼす** → 要件 4.1 の「中断」に対して弱い。
-  - (B) は事前書き込みをそのまま残すので、例外・中断・クラッシュのいずれでも ③ が確実に残る。
-- **副次的な利点（重要）**: ② を削除することで、残存する `ACTION_UNSETTLED` 行から「確定して対象外だった②」が除かれる。残るのは ③（失敗・中断・クラッシュした試行）と、加えて emit が来ない no-op（`shouldGenerateUpdate=false` で更新自体は成功したが記録を抑制したケース）である。これにより要件 4.2（未確定の行を「確定して対象外だった操作＝②」と区別する）が構造的に満たされる。**注意**: 「残存 UNSETTLED＝失敗した試行」ではない（成功した抑制更新を含む）。この点は viewer spec への申し送り（design.md Revalidation Triggers）に明記した。validate-design（2026-07-07）で `update-page.ts:140` の no-emit 経路を実コード確認して補正。
-- **トレードオフ（受容済み）**: B は create→delete なので**書き込み回数（write-IOPS）は減らない**。減るのは**保管量（stored document 数）**のみ。要件 1 の目的（MongoDB 負荷軽減）のうち保管量には効き、write-IOPS には効かない。ユーザー判断（§8）で「(B) 中心・write も削りたい場合のみ (C)」と合意済みであり、要件 4 が加わったことで B が確定。write-IOPS 削減を優先したくなった場合の逃げ道は (C) だが、その場合クラッシュ時の試行記録を諦めることになる（本 spec では採らない）。
+### Decision 1: 方式は Option C（lazy fail-safe）に確定（2026-07-08 反転）
 
-### Decision 2: 第2作成源（復元フロー）は追加改修不要（Research Needed #5 を解決）
+- **選定**: **Option C**。事前作成（middleware の無条件書き込み）を**廃止**する。middleware は DB に書かず、ObjectId を採番して `res.locals.activity = { _id }` に格納するだけにする。行は必要になったときだけ作る:
+  - **記録対象内**と確定した操作 → `update` リスナーが settle 時に**作成**（採番済み id で create）。
+  - **記録対象外**の操作 → 何も作らない（＝その分の書き込みが発生しない。②の除去が「削除」ではなく「そもそも書かない」で実現される）。
+  - **失敗・中断**した操作 → リクエスト終了時の finalizer が `ACTION_UNSETTLED` の試行記録を作成する。
+- **根拠（B からの反転理由）**:
+  - 保管量削減は主眼でない（残骸は TTL で回収される）。B が減らすのは保管量だけで、**write-IOPS はむしろ増える**（create に delete が加わる）。これがユーザーの主要な不満だった。
+  - C は「対象外を書かない・対象内も settle 時 1 回だけ create（現行は create+update の 2 回）」なので、**更新系の書き込み回数を実際に減らす**。既定 Small では②が多数を占めるため削減効果は大きい。事前作成をホットパスから外すことで**リクエスト遅延も減る**。
+  - クラッシュ時の試行記録: C はハンドラ／finalizer 到達時のみ試行記録を作るため、**プロセス即時終了（SIGKILL / OOM）は取りこぼす**。この一点は要件 4.4 で明示的に対象外とすることでユーザーと合意した（2026-07-08）。エラー応答（4xx/5xx）とクライアント中断は finalizer で確実に残せる。
+- **副次的な利点（B より良い点）**: C では残存 `ACTION_UNSETTLED` 行は finalizer が作るものだけ＝**「失敗・中断した試行」に限定**される。B の「残存＝失敗の試行 or 成功したが抑制された更新（no-op）の混在」より意味がクリーンで、viewer 側は残存 UNSETTLED を素直に「失敗・中断した試行」として扱える。
 
-- `service/page/index.ts` の `revertDeletedPage`（現行 L2830 付近）は middleware を通らず自前で `createByParameters` で `ACTION_UNSETTLED` を作るが、**その id で同じ `activityEvent.emit('update', ...)` を発火する**（L2847 / 2912 / 2990）。
-- B は削除判定を `update` リスナー1箇所に集約するため、復元フローの ②（対象外確定）も同じリスナーで削除される。③（emit 前に throw）は事前作成行が残る＝middleware 経路と同じ fail-safe 挙動。**復元フロー側のコードは変更不要**。
-- なお復元の action（`ACTION_PAGE_REVERT` / `ACTION_PAGE_RECURSIVELY_REVERT`）は essential かつ contribution action なので実効ゲート上は常に対象内（§4）。つまり復元行が②になるケースは現行設定意味論では発生しないが、リスナーが単一情報源で判定する以上、特別扱いは不要（要件 3.3）。
+### Decision 1-補: 事前作成は fail-safe だけでなく「文脈の突き合わせ」も兼ねていた（C の設計の要）
 
-### Decision 3: 一覧 where の `ACTION_UNSETTLED` 除外は本 spec の対象外（Research Needed #4 を解決）
+- validate-design（2026-07-08）の実コード確認で判明: 記録される activity 1 行は、**middleware 側で分かる文脈（ip / endpoint / user / snapshot.username）** と、**後から emit で確定する情報（action / target）** の合流でできている。現行は事前作成した行を settle 時に `updateByParameters` で上書きし、この行を合流点にしている（`updateByParameters` は既存行の ip/endpoint を保持したまま action だけ更新する。`models/activity.ts:307-347`）。
+- ところが settle する `update` リスナーは **`req`/`res` を持たず `activityId` しか受け取らない**（`service/activity.ts:103-110`）。emit のパラメータにも ip/endpoint/user は載っていない。
+- したがって事前作成を廃止すると、ip/endpoint を記録行に載せる手段が失われる（要件 2.6 の非回帰）。**C はこの突き合わせを自前で用意する必要がある**:
+  1. **プロセス内の `activityId → リクエスト文脈` マップ**（新規モジュール）。middleware が `set`、リスナーが settle 時に**同期的に**（await より前に）`take`（get + delete）して create に混ぜ、finalizer が残りを後始末する。同期読みにすることで「finalizer の後始末」と「非同期リスナーの読み取り」の競合を避ける。
+  2. **失敗・中断時の fail-safe finalizer**（middleware 内で `res` に登録）。`res.on('finish')` で `res.statusCode >= 400` のとき、`res.on('close')` で `res.writableFinished === false`（真の中断）のときだけ、採番済み id で `ACTION_UNSETTLED` を create する。二重作成防止（settle が既に作っていれば作らない・duplicate-key は良性として握りつぶす）。
 
-- B 適用後、残存する `ACTION_UNSETTLED` 行は要件 4 が保持を求める「試行記録」である。要件 4.1 は監査ログに**残す**ことを求めており、一覧のデフォルト表示から機械的に隠すのは監査意図に反しうる。
-- 「一覧・画面でどう見せるか（隠す／整形する）」は**表示の責務＝`activity-log-snapshot-viewer` の担当**。本 spec（記録ゲート）は「どの行が DB に残るか」だけを決める。→ `build-activity-list-where.ts` は**変更しない**。viewer spec へ申し送る（design.md の Revalidation Triggers 参照）。
+### Decision 2: 第2作成源（復元フロー）は改修が必要（Research Needed #5 を C 向けに再解決）
 
-### Decision 4: R3 の担保 — 記録ライフサイクルの薄い抽出（Research Needed #7 を解決）
+- `service/page/index.ts` の `revertDeletedPage`（現行 L2830 付近）は middleware を通らず自前で `createByParameters(ACTION_UNSETTLED)` を作り、その id で `emit('update', ...)` する（L2847 / 2912 / 2990）。
+- **C では B と違い、この自前 pre-create を畳む必要がある**（さもないと settle 時の create-with-id と二重になり duplicate-key）。修正: pre-create をやめ、`new Types.ObjectId().toString()` で id を採番、文脈をマップに `set`、その id で emit する。`revertRecursivelyMainOperation` へは `activity` オブジェクトの代わりに id 文字列を通す（signature L2967 付近）。
+- 復元 action（`ACTION_PAGE_REVERT` / `ACTION_PAGE_RECURSIVELY_REVERT`）は essential かつ contribution action なので実効ゲート上は常に対象内（§4）。よって復元行は常に settle で作成される（②にならない）。復元には専用 finalizer は不要（emit が常に飛ぶ前提。emit 前 throw でマップにゴミが残りうるが、マップは有界化／掃引で対処可能・実装フェーズで確認）。
 
-- 現行 `update` リスナーは contribution／settle（更新）／notify を1関数に同居。B で「削除」分岐が増えるため、**記録ライフサイクル（対象内なら更新・対象外なら削除）を薄い純関数 `settleActivityRecord` に抽出**する。
-- この関数は記録可否の判断結果（`shouldPersist: boolean`）を**引数で受け取り**（`getAvailableActions`/`shoudUpdateActivity` という単一情報源を自分で複製しない）、contribution・notification の内部詳細に一切依存しない。これで要件 3.1/3.2 のシームが明示される。過剰な抽象化は避け、1関数・1ファイル（既存 `service/activity/` に同居）に留める。
+### Decision 3: 一覧 where の `ACTION_UNSETTLED` 除外は本 spec の対象外（変更なし）
 
-### 実コード再確認で確定した事実
-- **Prisma extension に delete メソッドは未実装**（`models/activity.ts`）。ただし snapshot spec の設計コメントが既に「（updateByParameters の改修・**直接削除の保存口**）」と予約済み。本 spec で `deleteById(activityId)` を新設し、この予約を実体化する。テストの後始末で使う `prisma.activities.deleteMany` は Prisma ネイティブで別物。
-- **contribution は行の存在に非依存**（Research Needed #6 の残り）: `resolveContributor` は `contributor?._id != null` で即 return（`contribution-migration-service.ts:86-88`）。contribution は別コレクション `Contribution` に記録されるため、activity 行を削除しても集計は不変（要件 2.4 安全）。
-- `add-activity` middleware は非 GET で `ip / endpoint / user / action=UNSETTLED / snapshot.username` を書く（要件 4.1 の「操作者・時刻・エンドポイント・IP」を満たす。時刻は `createdAt` 自動）。B ではこの middleware を**変更しない** → 既存の契約テスト `add-activity.spec.ts` はグリーンのまま（A なら要改訂だった差分）。
-- 二重 settle の懸念なし（各 activity は emit 1回）。ただし `deleteById` は冪等（`deleteMany` 相当で not-found でも throw しない）、`updateByParameters` は P2025→null で、二重発火や行消失にも頑健。
+- C 適用後、残存する `ACTION_UNSETTLED` 行は要件 4 が保持を求める「失敗・中断した試行記録」に限られる。一覧のデフォルト表示から機械的に隠すのは監査意図に反しうる。
+- 「一覧・画面でどう見せるか（隠す／整形する）」は**表示の責務＝`activity-log-snapshot-viewer` の担当**。本 spec は `build-activity-list-where.ts` を**変更しない**。viewer spec へ申し送る（残存 UNSETTLED＝失敗・中断した試行、という C 版のクリーンな意味も伝える。design.md の Revalidation Triggers 参照）。
 
-### 改訂が必要な既存テスト契約
-- `service/activity.spec.ts` の「skips prisma and does not emit "updated" when gate blocks」（L247-267）: 現状は「update を呼ばない」を主張。B では**「対象外 → `deleteById` を呼ぶ・`updated` は emit しない」**へ契約を更新する。
-- `add-activity.spec.ts`: **変更不要**（middleware 温存）。
+### Decision 4: R3 の担保 — 記録ライフサイクルの薄い抽出（C 向けに更新）
+
+- C で `update` リスナーは「対象内 → 作成 / 対象外 → 何もしない」に変わる。記録ライフサイクルを薄い純関数 `settleActivityRecord` に抽出する: 記録可否の結果 `shouldPersist` と、文脈マップから取り出した文脈＋emit パラメータを**引数で受け取り**、真なら create（採番 id 指定）、偽なら null（何もしない）を返す。
+- この関数は記録可否の判断（`getAvailableActions`/`shoudUpdateActivity`）を複製せず、contribution・notification・文脈マップの取得ロジックにも依存しない（マップからの `take` はリスナー側で行い、結果だけ渡す）。要件 3.1/3.2 のシームを明示する。過剰な抽象化は避け、1関数・1ファイルに留める。
+
+### 実コード再確認で確定した事実（C 版）
+- **ObjectId の採番**: `new Types.ObjectId().toString()`（mongoose。`models/activity.ts` で既に使用。snapshot の sub-id 採番と同じ手）。middleware は現状 `prisma` のみ import なので `Types` の import を足す。
+- **`createByParameters` は採番 id を受け付けられる**（`models/activity.ts:368-416`）: 本体は `...rest` を `Prisma.activitiesUncheckedCreateInput` に展開しており、unchecked create は明示 `id` を通す。`IActivityParameters`（`:195-206`）に `id?: string` を足す（`_id` を渡す場合は `id` にマップ）だけでよい。`id` はスキーマ上 `String @db.ObjectId`（24桁 hex）で、採番値は妥当。unique index `@@unique([userId, target, action, createdAt])` は id 事前採番で変わらない。
+- **37 箇所の emit は `res.locals.activity._id` しか読まない**（唯一 `update-page.ts:125` が `getIdStringForRef(res.locals.activity)` だが、`{ _id }` の plain object に対しても `._id` を返すので動く）。→ **採番した `{ _id }` を stash すれば 37 箇所は無改修**。
+- **失敗時フックの土台がある**: global error handler は `crowi/index.ts:733` → `http-error-handler.ts` でエラー応答を送る。加えて apiv3 の多くは内部で `res.apiv3Err(...)` を返す。いずれも `res.on('finish')` を `status >= 400` で発火させるので、**status ベースの finalizer が throw / catch の両経路を一様に捕捉できる**。`res.on('close')` は現代 Node では正常完了時にも発火するため、真の中断は `res.writableFinished === false` で判定する。
+- **contribution は行の存在に非依存**（Research Needed #6）: `resolveContributor` は `contributor?._id != null` で即 return（`contribution-migration-service.ts:86-88`）。別コレクション `Contribution` に記録されるため、行を遅延作成しても集計は不変（要件 2.4 安全）。contribution 処理は settle より前に走る（`activity.ts:124-145`）ので、create-at-settle でも順序は保たれる。
+- **`deleteById` は不要になった**: C は「削除」しない（そもそも書かない）ので、B で新設予定だった削除の保存口は作らない。snapshot spec の設計が予約していた「直接削除の保存口」は本 spec では実体化しない（将来課題として残る）。
+
+### 改訂が必要な既存テスト契約（C 版）
+- `service/activity.spec.ts` の「skips prisma and does not emit "updated" when gate blocks」（L247-267）: 現状は「`updateByParameters` を呼ばない」を主張。C では**「対象外 → `createByParameters` を呼ばない・行を作らない・`updated` を emit しない」**へ契約を更新する（対象内は update ではなく create を呼ぶことも別ケースで固定）。
+- `add-activity.spec.ts`: **改訂が必要**（B では不要だった差分）。middleware が「無条件に create する」契約から「DB に書かず id 採番＋文脈 stash＋finalizer 登録する」契約へ変わる。
 
 ### 残課題（実装フェーズで確認）
-- `settleActivityRecord` の抽出時、`update` リスナーの「contribution 先行 → settle → 対象内かつ行ありのときのみ notify」という**順序と notify 条件を厳密に保存**する（要件 2.3/2.4 の回帰防止）。
-- delete 失敗時（DB エラー）は現行の update 失敗時と同様に logger.error して notify せず、リクエスト本体を止めない（記録は best-effort な副系）。
+- `settleActivityRecord` の抽出時、`update` リスナーの「contribution 先行 → settle → 対象内かつ作成成功時のみ notify」という**順序と notify 条件を厳密に保存**する（要件 2.3/2.4 の回帰防止）。
+- 文脈マップは**リスナーが await より前に同期 `take`** する規律を守る（finalizer の後始末との競合回避）。emit が飛ばない経路（成功・no-emit / emit 前 throw）で残るエントリは finalizer が掃除する。多重プロセス構成でも、あるリクエストの middleware とリスナーは同一プロセスで動くためマップはプロセスローカルで十分。leak 対策として有界化／掃引も検討。
+- finalizer の fail-safe create 失敗（DB エラー）は logger.error して握りつぶし、リクエスト本体を止めない（記録は best-effort な副系）。settle 失敗も現行の update 失敗時と同様に logger.error して notify せず return。
+- 二重作成の競合: 稀に「emit 済み・在庫内で settle が in-flight・かつ status≥400」だと finalizer と settle が競合しうる。finalizer は「id で DB 探索 → 無ければ create、duplicate-key は良性として握りつぶす」で守る。この稀な競合で real action の代わりに UNSETTLED が残ることは受容する（失敗応答時のため実害小）。
+
+---
+
+## §10-旧: Option B（delete-at-settle）版の決定（2026-07-07・履歴）
+
+> 2026-07-08 に Option C へ反転したため無効。当時の判断を履歴として残す。
+
+- **Decision 1（旧）**: Option B（delete-at-settle）。事前作成を温存し、`update` リスナーで「確定して対象外（②）」の行だけを `deleteById` で削除する。要件 4 の「クラッシュ含む試行記録」を満たすため事前書き込みを残す、という論拠だった。トレードオフとして write-IOPS は減らず保管量のみ減る、と受容していた。→ **反転理由**: 保管量削減は TTL があり主眼でなく、delete 追加で負荷がむしろ増える点が問題視された（§10 Decision 1 冒頭の変遷を参照）。
+- **Decision 2（旧）**: 復元フローは B では**改修不要**だった（同じリスナーで削除されるため）。→ C では改修が必要（Decision 2 参照）。
+- **Decision 4（旧）**: `settleActivityRecord` は「対象内→更新 / 対象外→削除」の抽出だった。→ C では「対象内→作成 / 対象外→何もしない」に変わる。
+- **旧テスト契約**: `activity.spec.ts` L247-267 は「対象外→`deleteById` を呼ぶ」に更新予定だった（C では「作らない」に変更）。`add-activity.spec.ts` は B では変更不要だった（C では要改訂）。
