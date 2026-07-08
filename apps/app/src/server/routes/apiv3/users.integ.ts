@@ -2,7 +2,7 @@ import type { IUser } from '@growi/core';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import type { Model } from 'mongoose';
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import request from 'supertest';
 
 import { getInstance } from '^/test/setup/crowi';
@@ -50,7 +50,9 @@ describe('GET /usernames', () => {
 
   beforeAll(async () => {
     crowi = await getInstance();
-    User = crowi.models.User;
+    // crowi.models.User is typed Model<any> (ModelsMapDependentOnCrowi);
+    // retrieve it through mongoose.model to keep this Model<IUser>-typed.
+    User = mongoose.model<IUser>('User');
   });
 
   beforeEach(async () => {
