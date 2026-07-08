@@ -25,7 +25,7 @@
   - _Requirements: 2.6_
   - _Boundary: pendingActivityContext（service/activity/pending-activity-context.ts, service/activity/index.ts）_
 
-- [ ] 1.3 `beginActivity` 共有ヘルパを新設
+- [x] 1.3 `beginActivity` 共有ヘルパを新設
   - `service/activity/begin-activity.ts` を作り、`beginActivity(context)` が `new Types.ObjectId().toString()` で id を採番し `pendingActivityContext.set(id, context)` して `{ activityId }` を返すようにする。middleware と復元フローが共用し、採番＋stash を重複実装させない（要件 3.3）。バレルに re-export を追加する。
   - RED→GREEN: unit で「呼ぶと採番 id を返し、その id で `take` すると渡した文脈が返る」を確認する。
   - Observable: `beginActivity` の unit がグリーンで、採番 id と stash が期待どおり。
