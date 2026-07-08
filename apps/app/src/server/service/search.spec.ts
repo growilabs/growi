@@ -195,6 +195,9 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
       },
     });
     expect(mockUserModel.find).not.toHaveBeenCalled();
+    expect(
+      Activity.findSnapshotUsernamesByUsernameRegex,
+    ).not.toHaveBeenCalled();
   });
 
   it('should classify active and inactive usernames from the MongoDB fallback when ES is not configured', async () => {
