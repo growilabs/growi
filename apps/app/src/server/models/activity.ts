@@ -136,16 +136,22 @@ const buildSnapshotUsernameRegexConditions = (q: string) => ({
   'snapshot.username': buildUsernamePrefixRegexQuery(q),
 });
 
+// Sort "snapshot.username" in ascending order; shared so the plain-aggregate
+// path (.sort()) and the $facet sub-pipeline (raw stage object) can't diverge.
+const SNAPSHOT_USERNAME_SORT = { _id: 1 } as const;
+
+const groupSnapshotUsernames = (
+  model: ActivityModel,
+  conditions: ReturnType<typeof buildSnapshotUsernameRegexConditions>,
+) => model.aggregate().match(conditions).group({ _id: '$snapshot.username' });
+
 const aggregateSnapshotUsernames = async (
   model: ActivityModel,
   conditions: ReturnType<typeof buildSnapshotUsernameRegexConditions>,
   { offset, limit }: { offset: number; limit: number },
 ): Promise<string[]> => {
-  const usernames = await model
-    .aggregate()
-    .match(conditions)
-    .group({ _id: '$snapshot.username' })
-    .sort({ _id: 1 }) // Sort "snapshot.username" in ascending order
+  const usernames = await groupSnapshotUsernames(model, conditions)
+    .sort(SNAPSHOT_USERNAME_SORT)
     .skip(offset)
     .limit(limit)
     .allowDiskUse(true);
@@ -172,16 +178,16 @@ activitySchema.statics.findSnapshotUsernamesByUsernameRegexWithTotalCount =
     option: { offset: number; limit: number },
   ): Promise<{ usernames: string[]; totalCount: number }> {
     const opt = option || {};
+    const offset = opt.offset || 0;
+    const limit = opt.limit || 10;
     const conditions = buildSnapshotUsernameRegexConditions(q);
 
-    const [result] = await this.aggregate()
-      .match(conditions)
-      .group({ _id: '$snapshot.username' })
+    const [result] = await groupSnapshotUsernames(this, conditions)
       .facet({
         usernames: [
-          { $sort: { _id: 1 } },
-          { $skip: opt.offset || 0 },
-          { $limit: opt.limit || 10 },
+          { $sort: SNAPSHOT_USERNAME_SORT },
+          { $skip: offset },
+          { $limit: limit },
         ],
         totalCount: [{ $count: 'count' }],
       })
