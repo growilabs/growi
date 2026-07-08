@@ -1,7 +1,8 @@
-import type { IPage } from '@growi/core';
 import { isPermalink } from '@growi/core/dist/utils/page-path-utils';
-import type { ObjectId } from 'mongodb';
+import type { Types } from 'mongoose';
 import mongoose from 'mongoose';
+
+import type { PageDocument, PageModel } from '~/server/models/page';
 
 /**
  * Resolves and returns ID for a page from its path.
@@ -9,25 +10,19 @@ import mongoose from 'mongoose';
  * @param path - Extracted absolute path or permalink eg. '/docs/new' or '/6a4c8be9b698d2b7ab35cd6e'.
  * @returns - Resolved ID for page.
  */
-export const resolveToPage = async (path: string): Promise<ObjectId | null> => {
-  const Page = mongoose.model<IPage>('Page');
+export const resolveToPage = async (
+  path: string,
+): Promise<Types.ObjectId | null> => {
+  const Page = mongoose.model<PageDocument, PageModel>('Page');
 
   if (isPermalink(path)) {
     const id = path.slice(1);
     const page = await Page.findById(id);
 
-    if (page == null) {
-      return null;
-    }
-
-    return page._id;
+    return page?._id ?? null;
   }
 
-  const page = await Page.findOne({ path });
+  const page = await Page.findByPath(path);
 
-  if (page == null) {
-    return null;
-  }
-
-  return page._id;
+  return page?._id ?? null;
 };

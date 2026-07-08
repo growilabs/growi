@@ -2,14 +2,14 @@ import { resolveToPage } from './target-page-resolution';
 
 const mocks = vi.hoisted(() => ({
   findById: vi.fn(),
-  findOne: vi.fn(),
+  findByPath: vi.fn(),
 }));
 
 vi.mock('mongoose', () => ({
   default: {
     model: () => ({
       findById: mocks.findById,
-      findOne: mocks.findOne,
+      findByPath: mocks.findByPath,
     }),
   },
 }));
@@ -20,16 +20,13 @@ describe('resolveToPage()', () => {
   });
 
   it('resolves page id from path', async () => {
-    mocks.findById.mockResolvedValue({
-      _id: 'permalink-hit',
-      path: '/6a4c8be9b698d2b7ab35cd6e',
-    });
-    mocks.findOne.mockResolvedValue({ _id: 'path-hit', path: '/docs/v2' });
+    mocks.findByPath.mockResolvedValue({ _id: 'path-hit', path: '/docs/v2' });
 
-    const path = '/docs/v2';
-    const id = await resolveToPage(path);
+    const id = await resolveToPage('/docs/v2');
 
     expect(id).toBe('path-hit');
+    // path branch must not touch the permalink lookup
+    expect(mocks.findById).not.toHaveBeenCalled();
   });
 
   it('resolves page id from permalink path', async () => {
@@ -37,19 +34,18 @@ describe('resolveToPage()', () => {
       _id: 'permalink-hit',
       path: '/6a4c8be9b698d2b7ab35cd6e',
     });
-    mocks.findOne.mockResolvedValue({ _id: 'path-hit', path: '/docs/v2' });
 
-    const path = '/6a4c8be9b698d2b7ab35cd6e';
-    const id = await resolveToPage(path);
+    const id = await resolveToPage('/6a4c8be9b698d2b7ab35cd6e');
 
     expect(id).toBe('permalink-hit');
+    // permalink branch must not touch the path lookup
+    expect(mocks.findByPath).not.toHaveBeenCalled();
   });
 
   it('returns null when path is not found', async () => {
-    mocks.findOne.mockResolvedValue(null);
+    mocks.findByPath.mockResolvedValue(null);
 
-    const path = '/docs/v2';
-    const id = await resolveToPage(path);
+    const id = await resolveToPage('/docs/v2');
 
     expect(id).toBe(null);
   });
@@ -57,8 +53,7 @@ describe('resolveToPage()', () => {
   it('returns null when no page exist for the permalink id', async () => {
     mocks.findById.mockResolvedValue(null);
 
-    const path = '/6a4c8be9b698d2b7ab35cd6e';
-    const id = await resolveToPage(path);
+    const id = await resolveToPage('/6a4c8be9b698d2b7ab35cd6e');
 
     expect(id).toBe(null);
   });
