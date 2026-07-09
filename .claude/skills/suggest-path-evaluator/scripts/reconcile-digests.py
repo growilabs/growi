@@ -33,7 +33,7 @@ Bodies are read from --bodies-dir as `<id>.md` (one file per document).
 Usage:
     python reconcile-digests.py digests.json --bodies-dir ./bodies
     python reconcile-digests.py < digests.json --bodies-dir ./bodies
-    python reconcile-digests.py digests.json --bodies-dir ./bodies --threshold 0.5
+    python reconcile-digests.py digests.json --bodies-dir ./bodies --threshold 0.5  # tolerate partial digests
 
 Output: a PASS line per document plus a final summary. Exit code is non-zero when any
 document fails — wire it into the batch so a swap blocks aggregation until re-judged.
@@ -57,8 +57,14 @@ def normalize(s: str) -> str:
 
 
 def explode(term: str):
-    """Split a compound key term into atoms; keep atoms of length >= 2."""
-    return [a.strip() for a in SEPARATORS.split(term) if len(a.strip()) >= 2]
+    """Split a compound key term into atoms; keep atoms of length >= 2.
+
+    An atom is also dropped when it normalizes to the empty string (e.g. a
+    symbol-only atom like "--" or "（）"): `"" in body` is always True, so such an
+    atom would count as a spurious hit and let a body swap slip through the gate.
+    """
+    return [a.strip() for a in SEPARATORS.split(term)
+            if len(a.strip()) >= 2 and normalize(a)]
 
 
 def reconcile_one(digest: dict, body: str) -> dict:
@@ -82,8 +88,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("digests", nargs="?", help="JSON file of per-document digests (default: stdin)")
     ap.add_argument("--bodies-dir", required=True, help="directory holding <id>.md body files")
-    ap.add_argument("--threshold", type=float, default=0.5,
-                    help="minimum fraction of key-term atoms that must appear in the body (default 0.5)")
+    ap.add_argument("--threshold", type=float, default=1.0,
+                    help="minimum fraction of key-term atoms that must appear in the body "
+                         "(default 1.0 — every atom must appear, matching the SKILL.md gate; "
+                         "lower it explicitly to tolerate partial digests)")
     args = ap.parse_args()
 
     raw = Path(args.digests).read_text(encoding="utf-8") if args.digests else sys.stdin.read()
