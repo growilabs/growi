@@ -71,6 +71,8 @@ Modernize and optimize the GROWI official Docker image's Dockerfile (`apps/app/d
 
 **Summary**: Entrypoint rewritten in TypeScript (`docker-entrypoint.ts`) executed via Node.js 24 native type stripping. Handles: directory setup (`/data/uploads`, `/tmp/page-bulk-export`), heap size calculation (3-tier fallback), privilege drop (`process.setgid` + `process.setuid`), migration execution (`execFileSync`), app process spawn with signal forwarding. Always includes `--expose_gc`. Logs applied flags to stdout.
 
+**Prisma query engine resolution is intentionally NOT an entrypoint responsibility.** The Turbopack-bundled Next.js SSR client cannot resolve the native query engine through `@prisma/client`'s internal search at runtime, so the engine is pinned at **build time** via the public `PRISMA_QUERY_ENGINE_LIBRARY` env var (set per-arch in the release stage — see design.md "Prisma Query Engine Resolution"). The entrypoint does not copy, discover, or otherwise touch the engine.
+
 ### Requirement 7: Backward Compatibility
 
 **Objective:** As an existing Docker image user, I want existing operations to not break when migrating to the new Dockerfile, so that the risk during upgrades is minimized
