@@ -57,3 +57,38 @@ export const useSWRxNewsUnreadCount = (
     config,
   );
 };
+
+type NewsPageKey = [string, number, number, boolean] | null;
+
+/**
+ * SWR hook for a single paginated page of news items. Used by the /_news feed
+ * page (page-by-page navigation), as opposed to `useSWRINFxNews` which is used
+ * by the sidebar (infinite scroll).
+ *
+ * Fetching a specific page instead of walking pages via infinite scroll avoids
+ * loading N-1 pages just to reach an anchored item near the bottom of a long
+ * feed.
+ */
+export const useSWRxNewsPage = (
+  page: number,
+  limit: number = NEWS_PER_PAGE,
+  options?: { onlyUnread?: boolean },
+  config?: SWRConfiguration,
+): SWRResponse<PaginateResult<INewsItemWithReadStatus>, Error> => {
+  const onlyUnread = options?.onlyUnread ?? false;
+  const offset = Math.max(0, page - 1) * limit;
+
+  return useSWR<PaginateResult<INewsItemWithReadStatus>, Error>(
+    ['/news/list', limit, offset, onlyUnread] as NewsPageKey,
+    ([endpoint, limit, offset, onlyUnread]) =>
+      apiv3Get<PaginateResult<INewsItemWithReadStatus>>(endpoint, {
+        limit,
+        offset,
+        onlyUnread,
+      }).then((response) => response.data),
+    {
+      keepPreviousData: true,
+      ...config,
+    },
+  );
+};

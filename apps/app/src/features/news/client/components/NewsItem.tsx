@@ -16,10 +16,17 @@ const DEFAULT_EMOJI = '📢';
 
 type Props = {
   item: INewsItemWithReadStatus;
+  /**
+   * 0-based index of the sidebar SWRInfinite page this item is rendered from.
+   * Used to construct the `/_news?page=N` query so that clicking a news item
+   * lands on the corresponding page of the full feed without loading N-1
+   * prior pages.
+   */
+  pageIndex: number;
   onReadMutate: () => void;
 };
 
-const NewsItemInner: FC<Props> = ({ item, onReadMutate }) => {
+const NewsItemInner: FC<Props> = ({ item, pageIndex, onReadMutate }) => {
   const { i18n } = useTranslation();
   const router = useRouter();
   const locale = i18n.language;
@@ -44,8 +51,16 @@ const NewsItemInner: FC<Props> = ({ item, onReadMutate }) => {
     } catch {
       // silently ignore mark-read failures
     }
-    router.push(`${NEWS_FEED_PATH}#${newsItemAnchorId(id)}`);
-  }, [item._id, onReadMutate, router]);
+    // `?page=N` sends the caller to the specific page of the full feed so
+    // /_news doesn't need to walk N-1 pages to reach the anchored item.
+    // `scroll: false` prevents Next.js from resetting scroll on navigation;
+    // NewsFeed handles anchor scroll itself in a useEffect.
+    router.push(
+      `${NEWS_FEED_PATH}?page=${pageIndex + 1}#${newsItemAnchorId(id)}`,
+      undefined,
+      { scroll: false },
+    );
+  }, [item._id, pageIndex, onReadMutate, router]);
 
   return (
     <button

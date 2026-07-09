@@ -54,13 +54,17 @@ describe('NewsItem', () => {
   describe('emoji display', () => {
     test('should display emoji when provided', () => {
       const item = makeNewsItem({ emoji: '🚀' });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
       expect(screen.getByText('🚀')).toBeTruthy();
     });
 
     test('should display 📢 fallback when emoji is not set', () => {
       const item = makeNewsItem({ emoji: undefined });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
       expect(screen.getByText('📢')).toBeTruthy();
     });
   });
@@ -71,7 +75,9 @@ describe('NewsItem', () => {
       const item = makeNewsItem({
         title: { ja_JP: '日本語タイトル', en_US: 'English Title' },
       });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
       expect(screen.getByText('日本語タイトル')).toBeTruthy();
     });
 
@@ -80,21 +86,27 @@ describe('NewsItem', () => {
       const item = makeNewsItem({
         title: { ja_JP: '日本語タイトル', en_US: 'English Title' },
       });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
       expect(screen.getByText('日本語タイトル')).toBeTruthy();
     });
 
     test('should fallback to en_US when ja_JP is not available', () => {
       mocks.i18nLanguage.current = 'de_DE';
       const item = makeNewsItem({ title: { en_US: 'English Only' } });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
       expect(screen.getByText('English Only')).toBeTruthy();
     });
 
     test('should fallback to first available key when neither ja_JP nor en_US', () => {
       mocks.i18nLanguage.current = 'de_DE';
       const item = makeNewsItem({ title: { fr_FR: 'Titre Français' } });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
       expect(screen.getByText('Titre Français')).toBeTruthy();
     });
   });
@@ -103,7 +115,7 @@ describe('NewsItem', () => {
     test('should apply fw-bold class for unread items', () => {
       const item = makeNewsItem({ isRead: false });
       const { container } = render(
-        <NewsItem item={item} onReadMutate={onReadMutate} />,
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
       );
       // Title should have fw-bold
       const title = container.querySelector('.fw-bold');
@@ -113,7 +125,7 @@ describe('NewsItem', () => {
     test('should apply fw-normal class for read items', () => {
       const item = makeNewsItem({ isRead: true });
       const { container } = render(
-        <NewsItem item={item} onReadMutate={onReadMutate} />,
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
       );
       const title = container.querySelector('.fw-normal');
       expect(title).not.toBeNull();
@@ -122,7 +134,7 @@ describe('NewsItem', () => {
     test('should show unread dot for unread items', () => {
       const item = makeNewsItem({ isRead: false });
       const { container } = render(
-        <NewsItem item={item} onReadMutate={onReadMutate} />,
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
       );
       const dot = container.querySelector('.bg-primary.rounded-circle');
       expect(dot).not.toBeNull();
@@ -132,7 +144,9 @@ describe('NewsItem', () => {
   describe('click handling', () => {
     test('should call mark-read API when clicked', async () => {
       const item = makeNewsItem({ isRead: false });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
 
       const element = screen.getByRole('button');
       fireEvent.click(element);
@@ -148,33 +162,43 @@ describe('NewsItem', () => {
 
     test('should navigate to the news feed page anchored to the clicked item', async () => {
       const item = makeNewsItem({ isRead: false });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
 
       fireEvent.click(screen.getByRole('button'));
 
       await vi.waitFor(() => {
         expect(mocks.routerPush).toHaveBeenCalledWith(
-          `/_news#news-${item._id.toString()}`,
+          `/_news?page=1#news-${item._id.toString()}`,
+          undefined,
+          { scroll: false },
         );
       });
     });
 
     test('should navigate even when url is not set', async () => {
       const item = makeNewsItem({ url: undefined, isRead: false });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
 
       fireEvent.click(screen.getByRole('button'));
 
       await vi.waitFor(() => {
         expect(mocks.routerPush).toHaveBeenCalledWith(
-          `/_news#news-${item._id.toString()}`,
+          `/_news?page=1#news-${item._id.toString()}`,
+          undefined,
+          { scroll: false },
         );
       });
     });
 
     test('should call onReadMutate after marking as read', async () => {
       const item = makeNewsItem({ isRead: false });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+      render(
+        <NewsItem item={item} pageIndex={0} onReadMutate={onReadMutate} />,
+      );
 
       fireEvent.click(screen.getByRole('button'));
 
