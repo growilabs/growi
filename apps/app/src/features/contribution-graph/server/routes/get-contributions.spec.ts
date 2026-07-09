@@ -1,12 +1,13 @@
 import type { IUser } from '@growi/core';
 import type { Request } from 'express';
-import { MongoMemoryServer } from 'mongodb-memory-server-core';
+import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 import { mockClear, mockDeep } from 'vitest-mock-extended';
 
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { configManager } from '~/server/service/config-manager';
 
+import { createMongoTestServer } from '../../../../../test/setup/mongo/utils';
 import { ensureUserHasMigrated } from '../services/contribution-migration-service';
 import * as ContributionService from '../services/contribution-service';
 import { getContributionsHandler } from './get-contributions';
@@ -36,17 +37,18 @@ describe('getContributionsHandler', () => {
   const mockRes = mockDeep<ApiV3Response>();
   const targetUserId = new mongoose.Types.ObjectId();
 
-  let mongod: MongoMemoryServer;
+  let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
-    mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri());
+    const { mongoUri, mongoServer } = await createMongoTestServer();
+    mongod = mongoServer;
+    await mongoose.connect(mongoUri);
   });
 
   afterAll(async () => {
     await mongoose.connection.dropDatabase();
     await mongoose.connection.close();
-    await mongod.stop();
+    await mongod?.stop();
   });
 
   beforeEach(async () => {

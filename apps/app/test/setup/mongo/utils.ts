@@ -1,5 +1,8 @@
 import ConnectionString from 'mongodb-connection-string-url';
-import type { MongoBinary } from 'mongodb-memory-server-core';
+import {
+  type MongoBinary,
+  MongoMemoryServer,
+} from 'mongodb-memory-server-core';
 
 export const MONGOMS_BINARY_OPTS: Parameters<typeof MongoBinary.getPath>[0] = {
   version: process.env.VITE_MONGOMS_VERSION,
@@ -38,4 +41,22 @@ export function getTestDbConfig(): {
     : null;
 
   return { workerId, dbName, mongoUri };
+}
+
+export async function createMongoTestServer(): Promise<{
+  mongoUri: string;
+  mongoServer?: MongoMemoryServer;
+}> {
+  const { mongoUri } = getTestDbConfig();
+
+  if (mongoUri != null) {
+    return { mongoUri };
+  }
+
+  const mongoServer = await MongoMemoryServer.create();
+
+  return {
+    mongoUri: mongoServer.getUri(),
+    mongoServer,
+  };
 }

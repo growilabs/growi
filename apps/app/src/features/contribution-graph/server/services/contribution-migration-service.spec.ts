@@ -1,5 +1,5 @@
 import type { IUser } from '@growi/core';
-import { MongoMemoryServer } from 'mongodb-memory-server-core';
+import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 
 import { ContributionGraphActions } from '~/features/contribution-graph/interfaces/supported-actions';
@@ -8,6 +8,7 @@ import { SupportedAction } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 
+import { createMongoTestServer } from '../../../../../test/setup/mongo/utils';
 import Contribution from '../models/contribution-model';
 import {
   ensureUserHasMigrated,
@@ -33,17 +34,18 @@ const User: mongoose.Model<{ contributionsMigratedAt?: Date }> =
   mongoose.model<IUser>('User');
 
 // A single in-memory MongoDB instance is shared across every suite in this file.
-let mongod: MongoMemoryServer;
+let mongod: MongoMemoryServer | undefined;
 
 beforeAll(async () => {
-  mongod = await MongoMemoryServer.create();
-  await mongoose.connect(mongod.getUri());
+  const { mongoUri, mongoServer } = await createMongoTestServer();
+  mongod = mongoServer;
+  await mongoose.connect(mongoUri);
 });
 
 afterAll(async () => {
   await mongoose.connection.dropDatabase();
   await mongoose.connection.close();
-  await mongod.stop();
+  await mongod?.stop();
 });
 
 // Suites below enable fake timers per-test; always restore real timers afterward

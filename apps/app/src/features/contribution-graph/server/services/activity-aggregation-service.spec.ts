@@ -1,23 +1,26 @@
-import { MongoMemoryServer } from 'mongodb-memory-server-core';
+import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 
+import { createMongoTestServer } from '../../../../../test/setup/mongo/utils';
 import { getContributionActivities } from './activity-aggregation-service';
 
 describe('getContributionActivities', () => {
-  let mongoServer: MongoMemoryServer;
+  let mongoServer: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
-    await mongoose.connect(mongoServer.getUri());
+    const { mongoUri, mongoServer: createdMongoServer } =
+      await createMongoTestServer();
+    mongoServer = createdMongoServer;
+    await mongoose.connect(mongoUri);
   });
 
   afterAll(async () => {
     await mongoose.disconnect();
-    await mongoServer.stop();
+    await mongoServer?.stop();
   });
 
   beforeEach(async () => {

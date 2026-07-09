@@ -1,14 +1,15 @@
-import { MongoMemoryServer } from 'mongodb-memory-server-core';
+import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 
 import { SupportedAction } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 import { Revision } from '~/server/models/revision';
 
+import { createMongoTestServer } from '../../../../test/setup/mongo/utils';
 import { shouldGenerateUpdate } from './update-activity-logic';
 
 describe('shouldGenerateUpdate()', () => {
-  let mongoServer: MongoMemoryServer;
+  let mongoServer: MongoMemoryServer | undefined;
 
   let date = new Date();
   const TWO_HOURS = 2 * 60 * 60 * 1000;
@@ -27,13 +28,15 @@ describe('shouldGenerateUpdate()', () => {
   let currentActivityIdStr: string;
 
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
-    await mongoose.connect(mongoServer.getUri());
+    const { mongoUri, mongoServer: createdMongoServer } =
+      await createMongoTestServer();
+    mongoServer = createdMongoServer;
+    await mongoose.connect(mongoUri);
   });
 
   afterAll(async () => {
     await mongoose.disconnect();
-    await mongoServer.stop();
+    await mongoServer?.stop();
   });
 
   beforeEach(async () => {

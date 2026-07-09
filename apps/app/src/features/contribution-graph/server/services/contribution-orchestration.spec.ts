@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import type { IUser } from '@growi/core';
-import { MongoMemoryServer } from 'mongodb-memory-server-core';
+import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 
 import {
@@ -11,6 +11,7 @@ import Activity from '~/server/models/activity';
 import ActivityService from '~/server/service/activity';
 import { configManager } from '~/server/service/config-manager';
 
+import { createMongoTestServer } from '../../../../../test/setup/mongo/utils';
 import Contribution from '../models/contribution-model';
 
 // Set the Activity TTL to the 30-day default
@@ -59,17 +60,18 @@ describe('ActivityService contribution orchestration', () => {
   const userId = new mongoose.Types.ObjectId();
   const pageId = new mongoose.Types.ObjectId();
 
-  let mongod: MongoMemoryServer;
+  let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
-    mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri());
+    const { mongoUri, mongoServer } = await createMongoTestServer();
+    mongod = mongoServer;
+    await mongoose.connect(mongoUri);
   });
 
   afterAll(async () => {
     await mongoose.connection.dropDatabase();
     await mongoose.connection.close();
-    await mongod.stop();
+    await mongod?.stop();
   });
 
   beforeEach(async () => {
