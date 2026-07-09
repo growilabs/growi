@@ -66,19 +66,19 @@ vi.mock('../memory', () => ({
 
 // The resolver is the single seam this module depends on for model supply.
 // A hoisted mutable holder lets each test choose the resolution that
-// `resolveMastraModel(modelId?)` returns, while the mock itself stays declared
-// once. The mock mirrors the real signature (`modelId?: string`) so the spec
-// can assert which model id the agent forwarded.
+// `resolveMastraModel(modelKey?)` returns, while the mock itself stays declared
+// once. The mock mirrors the real signature (`modelKey?: string`) so the spec
+// can assert which modelKey the agent forwarded.
 // Because growi-agent.ts resolves the model lazily inside its `model()`
 // function (not at import time), changing this return value between tests is
 // enough to vary behavior — no module reset / re-import is required (and
 // re-importing would re-register transitive Mongoose models and throw).
 const resolverMock = vi.hoisted(() => ({
-  fn: vi.fn<(modelId?: string) => MastraModelConfig>(),
+  fn: vi.fn<(modelKey?: string) => MastraModelConfig>(),
 }));
 
 vi.mock('../../ai-sdk-modules/resolve-mastra-model', () => ({
-  resolveMastraModel: (modelId?: string) => resolverMock.fn(modelId),
+  resolveMastraModel: (modelKey?: string) => resolverMock.fn(modelKey),
 }));
 
 // A sentinel model. The agent must hand back exactly this object from its
@@ -120,12 +120,12 @@ const getModelFn = (): ModelFn => {
 };
 
 // Build the `{ requestContext }` argument the agent's model function expects,
-// with `requestContext.get('modelId')` returning the supplied value. A typed
+// with `requestContext.get('modelKey')` returning the supplied value. A typed
 // stub (no `as any`) keeps the fake aligned with RequestContext's surface; only
 // `get` is exercised by the model function.
-const makeModelFnArg = (modelId?: string): ModelFnArg => {
+const makeModelFnArg = (modelKey?: string): ModelFnArg => {
   const requestContext = {
-    get: (key: string): unknown => (key === 'modelId' ? modelId : undefined),
+    get: (key: string): unknown => (key === 'modelKey' ? modelKey : undefined),
   } as unknown as RequestContext<MastraRequestContextShape>;
   return { requestContext };
 };
@@ -158,27 +158,27 @@ describe('growiAgent', () => {
   });
 
   describe('per-request model selection (requirements 4.1, 4.3)', () => {
-    it('forwards the requestContext modelId to the resolver', () => {
+    it('forwards the requestContext modelKey to the resolver', () => {
       resolverMock.fn.mockReturnValue(sentinelModel);
 
       const modelFn = getModelFn();
-      modelFn(makeModelFnArg('gpt-4o-mini'));
+      modelFn(makeModelFnArg('openai/gpt-4o-mini'));
 
-      // The observable contract: the model id selected for this request
-      // (carried on requestContext) is the id the resolver is asked to
+      // The observable contract: the modelKey selected for this request
+      // (carried on requestContext) is the key the resolver is asked to
       // resolve — so a per-request selection actually reaches model
-      // resolution (Req 4.1).
-      expect(resolverMock.fn).toHaveBeenCalledWith('gpt-4o-mini');
+      // resolution (Req 4.1, 4.3).
+      expect(resolverMock.fn).toHaveBeenCalledWith('openai/gpt-4o-mini');
     });
 
-    it('passes undefined to the resolver when no modelId is set, so the default is used', () => {
+    it('passes undefined to the resolver when no modelKey is set, so the default is used', () => {
       resolverMock.fn.mockReturnValue(sentinelModel);
 
       const modelFn = getModelFn();
       modelFn(makeModelFnArg());
 
-      // When the request carries no modelId the resolver is invoked with
-      // undefined, which it resolves to the configured default (Req 4.3).
+      // When the request carries no modelKey the resolver is invoked with
+      // undefined, which it resolves to the effective default (Req 4.3).
       expect(resolverMock.fn).toHaveBeenCalledWith(undefined);
     });
   });

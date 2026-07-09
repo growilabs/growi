@@ -1,7 +1,7 @@
 import type { Request } from 'express';
 import { validationResult } from 'express-validator';
 
-import { MAX_MODEL_ID_LENGTH } from '~/features/mastra/interfaces/allowed-model';
+import { MAX_MODEL_KEY_LENGTH } from '~/features/mastra/interfaces/model-key';
 
 import { buildPostMessageValidator } from './post-message-validator';
 
@@ -70,44 +70,44 @@ describe('buildPostMessageValidator', () => {
     });
   });
 
-  describe('modelId (Req 3.3, 4.x)', () => {
-    it('accepts a string modelId', async () => {
+  describe('modelKey (Req 4.3, 4.6)', () => {
+    it('accepts a string modelKey', async () => {
       const { hasErrors } = await runValidators({
-        modelId: 'gpt-4o',
+        modelKey: 'openai/gpt-4o',
         messages: VALID_MESSAGES,
       });
       expect(hasErrors).toBe(false);
     });
 
-    it('accepts an omitted modelId (optional — the server rounds to the default)', async () => {
+    it('accepts an omitted modelKey (optional — the server rounds to the default)', async () => {
       const { hasErrors } = await runValidators({ messages: VALID_MESSAGES });
       expect(hasErrors).toBe(false);
     });
 
-    it('rejects a non-string modelId', async () => {
+    it('rejects a non-string modelKey', async () => {
       const { hasErrors, failedFields } = await runValidators({
-        modelId: 123,
+        modelKey: 123,
         messages: VALID_MESSAGES,
       });
       expect(hasErrors).toBe(true);
-      expect(failedFields).toContain('modelId');
+      expect(failedFields).toContain('modelKey');
     });
 
-    it('accepts a modelId at the maximum length', async () => {
+    it('accepts a modelKey at the maximum length', async () => {
       const { hasErrors } = await runValidators({
-        modelId: 'a'.repeat(MAX_MODEL_ID_LENGTH),
+        modelKey: 'a'.repeat(MAX_MODEL_KEY_LENGTH),
         messages: VALID_MESSAGES,
       });
       expect(hasErrors).toBe(false);
     });
 
-    it('rejects an over-length modelId (defensive cap so an unbounded value is not logged verbatim)', async () => {
+    it('rejects an over-length modelKey (defensive cap so an unbounded value is not logged verbatim)', async () => {
       const { hasErrors, failedFields } = await runValidators({
-        modelId: 'a'.repeat(MAX_MODEL_ID_LENGTH + 1),
+        modelKey: 'a'.repeat(MAX_MODEL_KEY_LENGTH + 1),
         messages: VALID_MESSAGES,
       });
       expect(hasErrors).toBe(true);
-      expect(failedFields).toContain('modelId');
+      expect(failedFields).toContain('modelKey');
     });
   });
 
