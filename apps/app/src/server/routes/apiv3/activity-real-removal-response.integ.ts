@@ -136,9 +136,16 @@ describe('GET /api/v3/activity — response for activities produced by the real 
 
   /**
    * Run the REAL removal flow (addActivity middleware → api.remove →
-   * activityEvent 'update' listener) and wait until the middleware-created
-   * row settles as ATTACHMENT_REMOVE in the real DB. The update handler
-   * runs asynchronously after the HTTP response, so poll.
+   * activityEvent 'update' listener) and wait until the row appears in the
+   * real DB, settled as ACTION_ATTACHMENT_REMOVE.
+   *
+   * Under lazy fail-safe (Option C — activity-log spec Task 4/5), the
+   * add-activity middleware no longer eagerly pre-creates an ACTION_UNSETTLED
+   * row; the row is created asynchronously by the 'update' listener AFTER the
+   * HTTP response, already as the real ACTION_ATTACHMENT_REMOVE action. So we
+   * poll for the row to APPEAR (reading immediately after the response would
+   * race the listener). Only this suite's sentinel ip+endpoint matches, and
+   * beforeEach wipes it, so exactly one row appears.
    */
   async function removeViaRealFlowAndWaitForSettle(attachmentId: string) {
     const res = await request(removalApp)
@@ -148,15 +155,10 @@ describe('GET /api/v3/activity — response for activities produced by the real 
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
 
-    // Exactly one flow-created row exists at this point: beforeEach wipes
-    // the sentinel ip and legacy rows are seeded only after this settles.
-    const unsettled = await prisma.activities.findFirstOrThrow({
-      where: { ip: TEST_IP, endpoint: REMOVE_ENDPOINT },
-    });
     return await vi.waitFor(
       async () => {
-        const row = await prisma.activities.findUniqueOrThrow({
-          where: { id: unsettled.id },
+        const row = await prisma.activities.findFirstOrThrow({
+          where: { ip: TEST_IP, endpoint: REMOVE_ENDPOINT },
         });
         expect(row.action).toBe(SupportedAction.ACTION_ATTACHMENT_REMOVE);
         return row;
