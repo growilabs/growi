@@ -1347,10 +1347,6 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'AI_AZURE_OPENAI_SETTINGS',
     defaultValue: {},
   }),
-  'openai:assistantModel:suggestPathAgent': defineConfig<string>({
-    envVarName: 'OPENAI_SUGGEST_PATH_AGENT_MODEL',
-    defaultValue: 'gpt-4.1-mini',
-  }),
   // Empty string means "unset": the engine passes no reasoning effort to the
   // provider, leaving the model's default behavior unchanged. A non-empty
   // value (e.g. 'minimal' | 'low' | 'medium' | 'high') is forwarded verbatim;

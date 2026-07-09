@@ -202,71 +202,41 @@ describe('config-definition suggest-path agentic keys', () => {
       expect(CONFIG_KEYS).toContain('aiTools:suggestPathAgenticTimeoutMs');
     });
 
-    it('contains openai:assistantModel:suggestPathAgent', () => {
-      expect(CONFIG_KEYS).toContain('openai:assistantModel:suggestPathAgent');
+    it('contains aiTools:suggestPathAgenticChildListingLimit', () => {
+      expect(CONFIG_KEYS).toContain(
+        'aiTools:suggestPathAgenticChildListingLimit',
+      );
+    });
+
+    it('contains openai:reasoningEffort:suggestPathAgent', () => {
+      expect(CONFIG_KEYS).toContain('openai:reasoningEffort:suggestPathAgent');
     });
   });
 
-  describe('CONFIG_DEFINITIONS defaults', () => {
-    describe('aiTools:suggestPathEngine', () => {
-      it("has default value of 'oneshot'", () => {
-        expect(
-          CONFIG_DEFINITIONS['aiTools:suggestPathEngine'].defaultValue,
-        ).toBe('oneshot');
-      });
-
-      it('has envVarName AI_TOOLS_SUGGEST_PATH_ENGINE', () => {
-        expect(CONFIG_DEFINITIONS['aiTools:suggestPathEngine'].envVarName).toBe(
-          'AI_TOOLS_SUGGEST_PATH_ENGINE',
-        );
-      });
-    });
-
-    describe('aiTools:suggestPathAgenticSearchLimit', () => {
-      it('has default value of 5', () => {
-        expect(
-          CONFIG_DEFINITIONS['aiTools:suggestPathAgenticSearchLimit']
-            .defaultValue,
-        ).toBe(5);
-      });
-
-      it('has envVarName AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT', () => {
-        expect(
-          CONFIG_DEFINITIONS['aiTools:suggestPathAgenticSearchLimit']
-            .envVarName,
-        ).toBe('AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT');
-      });
-    });
-
-    describe('aiTools:suggestPathAgenticTimeoutMs', () => {
-      it('has default value of 60000', () => {
-        expect(
-          CONFIG_DEFINITIONS['aiTools:suggestPathAgenticTimeoutMs']
-            .defaultValue,
-        ).toBe(60_000);
-      });
-
-      it('has envVarName AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS', () => {
-        expect(
-          CONFIG_DEFINITIONS['aiTools:suggestPathAgenticTimeoutMs'].envVarName,
-        ).toBe('AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS');
-      });
-    });
-
-    describe('openai:assistantModel:suggestPathAgent', () => {
-      it("has default value of 'gpt-4.1-mini'", () => {
-        expect(
-          CONFIG_DEFINITIONS['openai:assistantModel:suggestPathAgent']
-            .defaultValue,
-        ).toBe('gpt-4.1-mini');
-      });
-
-      it('has envVarName OPENAI_SUGGEST_PATH_AGENT_MODEL', () => {
-        expect(
-          CONFIG_DEFINITIONS['openai:assistantModel:suggestPathAgent']
-            .envVarName,
-        ).toBe('OPENAI_SUGGEST_PATH_AGENT_MODEL');
-      });
+  // envVarName is the externally documented operator contract for each key;
+  // default values are deliberately NOT asserted here (they are tuning
+  // constants, and mirroring them in tests only creates change-detectors).
+  describe('CONFIG_DEFINITIONS env var names', () => {
+    it.each([
+      ['aiTools:suggestPathEngine', 'AI_TOOLS_SUGGEST_PATH_ENGINE'],
+      [
+        'aiTools:suggestPathAgenticSearchLimit',
+        'AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT',
+      ],
+      [
+        'aiTools:suggestPathAgenticChildListingLimit',
+        'AI_TOOLS_SUGGEST_PATH_AGENTIC_CHILD_LISTING_LIMIT',
+      ],
+      [
+        'aiTools:suggestPathAgenticTimeoutMs',
+        'AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS',
+      ],
+      [
+        'openai:reasoningEffort:suggestPathAgent',
+        'OPENAI_SUGGEST_PATH_AGENT_REASONING_EFFORT',
+      ],
+    ] as const)('%s has envVarName %s', (key, envVarName) => {
+      expect(CONFIG_DEFINITIONS[key].envVarName).toBe(envVarName);
     });
   });
 });
