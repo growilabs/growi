@@ -286,7 +286,6 @@ export const CONFIG_KEYS = [
   // OpenAI Settings
   'openai:serviceType',
   'openai:apiKey',
-  'openai:assistantModel:suggestPathAgent',
   'openai:reasoningEffort:suggestPathAgent',
 
   // AI Tools Settings
