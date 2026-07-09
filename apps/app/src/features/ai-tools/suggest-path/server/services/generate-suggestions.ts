@@ -7,9 +7,9 @@ import loggerFactory from '~/utils/logger';
 import type {
   PathSuggestion,
   SearchService,
+  SuggestPathEngineId,
 } from '../../interfaces/suggest-path-types';
-import { SuggestPathEngineId } from '../../interfaces/suggest-path-types';
-import { runEngine } from './engines';
+import { getEngineRecord } from './engines';
 import { generateMemoSuggestion } from './generate-memo-suggestion';
 
 const logger = loggerFactory(
@@ -42,22 +42,38 @@ export const generateSuggestions = async (
   const engineId =
     options?.engine ?? configManager.getConfig('aiTools:suggestPathEngine');
 
+  // The env-sourced config value is not runtime-validated by the config
+  // layer, so an operator typo (e.g. 'onshot') reaches this point. An unknown
+  // id degrades to the guaranteed memo-only response instead of crashing the
+  // request with an HTTP 500 (request-supplied ids are already rejected by
+  // the route validator).
+  const engineRecord = getEngineRecord(engineId);
+  if (engineRecord == null) {
+    logger.error(
+      `Unknown suggest-path engine "${engineId}" (check aiTools:suggestPathEngine / AI_TOOLS_SUGGEST_PATH_ENGINE); falling back to memo only`,
+    );
+    return [memoSuggestion];
+  }
+
   const input = { user, body, userGroups, searchService };
 
-  // Asymmetric fallback policy (Requirements 4.5, 5.3): the agentic engine's
-  // rejections (exceptions, timeouts) degrade to a memo-only response, while
-  // oneshot engine exceptions keep the pre-existing contract and propagate
-  // to the route (HTTP 500).
-  if (engineId === SuggestPathEngineId.AGENTIC) {
+  // Asymmetric fallback policy (Requirements 4.5, 5.3), declared by each
+  // engine record: engines with degradeToMemoOnFailure absorb their
+  // rejections (exceptions, timeouts) into a memo-only response, the others
+  // keep the pre-existing contract and propagate to the route (HTTP 500).
+  if (engineRecord.degradeToMemoOnFailure) {
     try {
-      const engineSuggestions = await runEngine(engineId, input);
+      const engineSuggestions = await engineRecord.run(input);
       return [memoSuggestion, ...engineSuggestions];
     } catch (err) {
-      logger.error('Agentic engine failed, falling back to memo only:', err);
+      logger.error(
+        `Suggest-path engine "${engineId}" failed, falling back to memo only:`,
+        err,
+      );
       return [memoSuggestion];
     }
   }
 
-  const engineSuggestions = await runEngine(engineId, input);
+  const engineSuggestions = await engineRecord.run(input);
   return [memoSuggestion, ...engineSuggestions];
 };

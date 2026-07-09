@@ -1,14 +1,3 @@
-import type { IUserHasId } from '@growi/core/dist/interfaces';
-import { mock } from 'vitest-mock-extended';
-
-import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
-
-import type {
-  PathSuggestion,
-  SearchService,
-} from '../../../interfaces/suggest-path-types';
-import type { SuggestPathEngineInput } from './engine-types';
-
 const mocks = vi.hoisted(() => {
   return {
     oneshotEngineMock: vi.fn(),
@@ -24,85 +13,54 @@ vi.mock('./agentic-engine', () => ({
   agenticEngine: mocks.agenticEngineMock,
 }));
 
-const mockInput: SuggestPathEngineInput = {
-  user: mock<IUserHasId>({ username: 'alice' }),
-  body: 'Some page content',
-  userGroups: ['group1', 'group2'] as ObjectIdLike[],
-  searchService: mock<SearchService>(),
-};
-
-const oneshotSuggestions: PathSuggestion[] = [
-  {
-    type: 'search',
-    path: '/tech/React/',
-    label: 'Save near related pages',
-    description: 'This area contains React documentation.',
-    grant: 1,
-    informationType: 'stock',
-  },
-];
-
-const agenticSuggestions: PathSuggestion[] = [
-  {
-    type: 'category',
-    path: '/tech/',
-    label: 'Save under category',
-    description: 'Top-level category: tech',
-    grant: 1,
-  },
-];
-
-describe('runEngine', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-  });
-
-  const callRunEngine = async (engineId: 'oneshot' | 'agentic') => {
-    const { runEngine } = await import('./index');
-    return runEngine(engineId, mockInput);
-  };
-
+describe('getEngineRecord', () => {
   describe("when engine id is 'oneshot'", () => {
-    it('should invoke the oneshot engine with the given input and return its result unaltered', async () => {
-      mocks.oneshotEngineMock.mockResolvedValue(oneshotSuggestions);
+    it('should resolve the oneshot engine with propagate-on-failure semantics', async () => {
+      const { getEngineRecord } = await import('./index');
 
-      const result = await callRunEngine('oneshot');
+      const record = getEngineRecord('oneshot');
 
-      expect(mocks.oneshotEngineMock).toHaveBeenCalledTimes(1);
-      expect(mocks.oneshotEngineMock).toHaveBeenCalledWith(mockInput);
-      expect(result).toBe(oneshotSuggestions);
-      expect(mocks.agenticEngineMock).not.toHaveBeenCalled();
+      expect(record?.run).toBe(mocks.oneshotEngineMock);
+      expect(record?.degradeToMemoOnFailure).toBe(false);
     });
   });
 
   describe("when engine id is 'agentic'", () => {
-    it('should invoke the agentic engine with the given input and return its result unaltered', async () => {
-      mocks.agenticEngineMock.mockResolvedValue(agenticSuggestions);
+    it('should resolve the agentic engine with degrade-to-memo semantics', async () => {
+      const { getEngineRecord } = await import('./index');
 
-      const result = await callRunEngine('agentic');
+      const record = getEngineRecord('agentic');
 
-      expect(mocks.agenticEngineMock).toHaveBeenCalledTimes(1);
-      expect(mocks.agenticEngineMock).toHaveBeenCalledWith(mockInput);
-      expect(result).toBe(agenticSuggestions);
-      expect(mocks.oneshotEngineMock).not.toHaveBeenCalled();
+      expect(record?.run).toBe(mocks.agenticEngineMock);
+      expect(record?.degradeToMemoOnFailure).toBe(true);
     });
   });
 
-  describe('when the resolved engine rejects', () => {
-    it('should propagate the rejection unaltered (fallback is the orchestrator responsibility)', async () => {
-      const engineError = new Error('agent execution failed');
-      mocks.agenticEngineMock.mockRejectedValue(engineError);
+  describe('when engine id is unknown (invalid config value)', () => {
+    it.each([
+      'onshot', // operator typo
+      '',
+      'AGENTIC', // case must match exactly
+    ])('should return undefined for %j', async (engineId) => {
+      const { getEngineRecord } = await import('./index');
 
-      await expect(callRunEngine('agentic')).rejects.toBe(engineError);
+      expect(getEngineRecord(engineId)).toBeUndefined();
+    });
+
+    it('should not resolve via Object.prototype members', async () => {
+      const { getEngineRecord } = await import('./index');
+
+      expect(getEngineRecord('constructor')).toBeUndefined();
+      expect(getEngineRecord('toString')).toBeUndefined();
     });
   });
 });
 
 describe('engines barrel (index.ts)', () => {
-  it('should expose runEngine as its only runtime export', async () => {
+  it('should expose getEngineRecord as its only runtime export', async () => {
     const barrel = await import('./index');
 
-    expect(Object.keys(barrel)).toEqual(['runEngine']);
-    expect(typeof barrel.runEngine).toBe('function');
+    expect(Object.keys(barrel)).toEqual(['getEngineRecord']);
+    expect(typeof barrel.getEngineRecord).toBe('function');
   });
 });

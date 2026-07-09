@@ -1,1 +1,1 @@
-export { runEngine } from './dispatcher';
+export { getEngineRecord } from './dispatcher';

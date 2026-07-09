@@ -1,4 +1,7 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
+import { mock } from 'vitest-mock-extended';
+
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 
 import type {
   ContentAnalysis,
@@ -16,6 +19,8 @@ const mocks = vi.hoisted(() => {
     evaluateCandidatesMock: vi.fn(),
     generateCategorySuggestionMock: vi.fn(),
     resolveParentGrantMock: vi.fn(),
+    agenticEngineMock: vi.fn(),
+    getConfigMock: vi.fn(),
     loggerErrorMock: vi.fn(),
   };
 });
@@ -52,15 +57,16 @@ vi.mock('./resolve-parent-grant', () => ({
 // (module-scope config reads, ESM/CJS interop). Stubbing it keeps the real
 // dispatcher + real oneshot engine in the graph, which these tests exercise.
 vi.mock('./engines/agentic-engine', () => ({
-  agenticEngine: vi.fn(),
+  agenticEngine: mocks.agenticEngineMock,
 }));
 
 // The orchestrator resolves the default engine id from config when the
 // caller does not specify one; the real configManager throws
-// 'Config is not loaded' in unit tests. A plain function (not vi.fn) is
-// used so `vi.resetAllMocks()` in beforeEach cannot wipe the value.
+// 'Config is not loaded' in unit tests. The mock is re-primed to 'oneshot'
+// in beforeEach (after resetAllMocks) and overridden per test to exercise
+// the invalid-config path.
 vi.mock('~/server/service/config-manager', () => ({
-  configManager: { getConfig: () => 'oneshot' },
+  configManager: { getConfig: mocks.getConfigMock },
 }));
 
 vi.mock('~/utils/logger', () => ({
@@ -69,19 +75,11 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
-const mockUser = {
-  _id: 'user123',
-  username: 'alice',
-} as unknown as IUserHasId;
+const mockUser = mock<IUserHasId>({ _id: 'user123', username: 'alice' });
 
-const mockUserGroups = [
-  'group1',
-  'group2',
-] as unknown as import('~/server/interfaces/mongoose-utils').ObjectIdLike[];
+const mockUserGroups: ObjectIdLike[] = ['group1', 'group2'];
 
-const mockSearchService = {
-  searchKeyword: vi.fn(),
-} as unknown as SearchService;
+const mockSearchService = mock<SearchService>();
 
 const memoSuggestion: PathSuggestion = {
   type: 'memo',
@@ -131,6 +129,7 @@ describe('generateSuggestions', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.generateMemoSuggestionMock.mockResolvedValue(memoSuggestion);
+    mocks.getConfigMock.mockReturnValue('oneshot');
   });
 
   const callGenerateSuggestions = async () => {
@@ -368,35 +367,57 @@ describe('generateSuggestions', () => {
     });
   });
 
-  describe('parallel execution', () => {
-    it('should run evaluate pipeline and category generation independently', async () => {
-      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
-      mocks.retrieveSearchCandidatesMock.mockResolvedValue(mockCandidates);
-      mocks.evaluateCandidatesMock.mockRejectedValue(
-        new Error('Evaluate failed'),
-      );
-      mocks.generateCategorySuggestionMock.mockResolvedValue(
-        categorySuggestion,
-      );
+  describe('engine selection and fallback policy', () => {
+    const agenticSuggestion: PathSuggestion = {
+      type: 'search',
+      path: '/tech/React/',
+      label: 'Save near related pages',
+      description: 'Found by iterative exploration.',
+      grant: 1,
+      informationType: 'stock',
+    };
 
-      const result = await callGenerateSuggestions();
+    const callWithEngine = async (engine: 'oneshot' | 'agentic') => {
+      const { generateSuggestions } = await import('./generate-suggestions');
+      return generateSuggestions(
+        mockUser,
+        'Some page content',
+        mockUserGroups,
+        mockSearchService,
+        { engine },
+      );
+    };
 
-      expect(result).toEqual([memoSuggestion, categorySuggestion]);
+    it('should return memo + agentic suggestions when the agentic engine succeeds', async () => {
+      mocks.agenticEngineMock.mockResolvedValue([agenticSuggestion]);
+
+      const result = await callWithEngine('agentic');
+
+      expect(result).toEqual([memoSuggestion, agenticSuggestion]);
     });
 
-    it('should return search suggestions even when category fails', async () => {
-      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
-      mocks.retrieveSearchCandidatesMock.mockResolvedValue(mockCandidates);
-      mocks.evaluateCandidatesMock.mockResolvedValue(mockEvaluated);
-      mocks.resolveParentGrantMock.mockResolvedValue(1);
-      mocks.generateCategorySuggestionMock.mockRejectedValue(
-        new Error('Category failed'),
+    it('should degrade to memo only (not throw) when the agentic engine rejects', async () => {
+      mocks.agenticEngineMock.mockRejectedValue(
+        new Error('agent execution failed'),
       );
+
+      const result = await callWithEngine('agentic');
+
+      expect(result).toEqual([memoSuggestion]);
+      expect(mocks.loggerErrorMock).toHaveBeenCalled();
+    });
+
+    it('should fall back to memo only (not throw) when the configured engine id is invalid', async () => {
+      // Operator typo in AI_TOOLS_SUGGEST_PATH_ENGINE: the config layer does
+      // not runtime-validate env values, so the orchestrator must degrade
+      // instead of calling undefined as a function (HTTP 500 for every
+      // request).
+      mocks.getConfigMock.mockReturnValue('onshot');
 
       const result = await callGenerateSuggestions();
 
-      const searchSuggestions = result.filter((s) => s.type === 'search');
-      expect(searchSuggestions).toHaveLength(2);
+      expect(result).toEqual([memoSuggestion]);
+      expect(mocks.loggerErrorMock).toHaveBeenCalled();
     });
   });
 });
