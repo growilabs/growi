@@ -33,7 +33,7 @@
   - _Boundary: beginActivity（service/activity/begin-activity.ts, service/activity/index.ts）_
   - _Depends: 1.2_
 
-- [ ] 2. 記録ライフサイクルを確定する `settleActivityRecord` を抽出
+- [x] 2. 記録ライフサイクルを確定する `settleActivityRecord` を抽出
   - 記録可否の判断結果 `shouldPersist`（真偽）と、リスナーがマップから取り出した**文脈**・emit パラメータを**引数で受け取り**、真なら採番 id ＋文脈＋action をマージして作成の保存口を呼び、偽なら `null` を返して何もしない薄い純関数にする。戻り値は activity（対象内かつ作成成功）または null（対象外／作成失敗）。
   - 記録可否の判断を内部で行わない（単一情報源 `getAvailableActions`/`shoudUpdateActivity` を複製しない）。貢献度・通知・snapshot・ルート固有ペイロード・マップ取得に依存しない（文脈は引数で受領）。
   - バレルに re-export を追加する。
@@ -131,3 +131,5 @@
 
 - 1.1: この worktree のローカル Prisma 生成クライアント（`src/generated/prisma`・gitignore 済み）が schema.prisma より古いと、無関係の integ テストまで失敗する。integ 実行前に `pnpm run prisma:generate` で再生成すると解消（tracked 差分なし）。
 - 1.2: `service/activity.ts`（ActivityService 本体）がディレクトリを覆い隠すため、素の `~/server/service/activity` はバレルに解決されない。バレル（`pendingActivityContext` 等）を import する側は `~/server/service/activity/index` か相対 `./index` を使うこと（design.md L541 の表記どおりには書けない）。
+- 2: 文脈は `createByParameters` が実際に消費する形へ**マッピング**して渡す（design 擬似コードの raw spread `{...context}` は不可）。操作者 id は `user`（→ `normalizeToId(user)` で `data.userId` を算出。top-level `userId` は無視される）、操作者名は `snapshot.username`（`activities` に top-level `username` 列は無く、stray な top-level `username` は Prisma create が Unknown argument で throw する）、到着時刻は `createdAt`。middleware（Task 4）・復元フロー（Task 6）で文脈を組み立てる際も、この「userId/username を top-level で持つ context」→「user/snapshot.username で作成」の対応を守ること。
+- 2→5: `createByParameters` は `include: { user: true }` を付けない＝返り値に `user` リレーションが populate されない（`updateByParameters` は付ける・Key Decision 5）。通知経路 `toGeneratePreNotifyActivity`（service/activity.ts）/`generatePreNotify`（pre-notify.ts）は `activity.user` を読んで操作者を通知対象から除外する（null なら除外せず＝クラッシュはしないが操作者が自分の操作通知を受ける挙動差）。Task 5 で settle の作成行をそのまま通知に渡すと `user` 欠落で要件 2.3 の挙動差になる。listener が保持する `context.userId` から `user` を付与する等で補い、7.x（または 5 のテスト）で「操作者が自分の操作通知から除外される」ことを検証すること。
