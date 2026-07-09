@@ -177,6 +177,44 @@ describe('NewsItem', () => {
       });
     });
 
+    // Guards the `page = pageIndex + 1` contract with a non-zero index:
+    // an implementation that hardcodes `?page=1` or drops the `+1` would
+    // still pass the pageIndex=0 tests above.
+    test('should navigate to the page derived from a non-zero pageIndex', async () => {
+      const item = makeNewsItem({ isRead: false });
+      render(
+        <NewsItem item={item} pageIndex={2} onReadMutate={onReadMutate} />,
+      );
+
+      fireEvent.click(screen.getByRole('button'));
+
+      await vi.waitFor(() => {
+        expect(mocks.routerPush).toHaveBeenCalledWith(
+          `/_news?page=3#news-${item._id.toString()}`,
+          undefined,
+          { scroll: false },
+        );
+      });
+    });
+
+    // When no valid page mapping exists (e.g. the sidebar unread-only filter
+    // is active), the `?page` query must be omitted instead of pointing at a
+    // possibly wrong page.
+    test('should navigate without a page query when pageIndex is not provided', async () => {
+      const item = makeNewsItem({ isRead: false });
+      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+
+      fireEvent.click(screen.getByRole('button'));
+
+      await vi.waitFor(() => {
+        expect(mocks.routerPush).toHaveBeenCalledWith(
+          `/_news#news-${item._id.toString()}`,
+          undefined,
+          { scroll: false },
+        );
+      });
+    });
+
     test('should navigate even when url is not set', async () => {
       const item = makeNewsItem({ url: undefined, isRead: false });
       render(
