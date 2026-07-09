@@ -6,11 +6,11 @@ import { mock } from 'vitest-mock-extended';
 import type { IPageForTreeItem } from '~/interfaces/page';
 import { pageListingService } from '~/server/service/page-listing';
 
+import { listChildrenTool } from './list-children-tool';
 import type {
   ChildListingBudget,
   SuggestPathRequestContextShape,
-} from '../agents/suggest-path/request-context';
-import { listChildrenTool } from './list-children-tool';
+} from './request-context';
 
 // Suppress logger noise from the tool under test (mirrors the sibling specs:
 // every level is a no-op).

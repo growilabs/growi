@@ -2,9 +2,9 @@ import { Agent } from '@mastra/core/agent';
 
 import { resolveMastraModel } from '../../../ai-sdk-modules/resolve-mastra-model';
 import { getPageContentTool } from '../../tools/get-page-content-tool';
-import { listChildrenTool } from '../../tools/list-children-tool';
 import { SUGGEST_PATH_INSTRUCTIONS } from './instructions';
 import { limitedSearchTool } from './limited-search-tool';
+import { listChildrenTool } from './list-children-tool';
 
 /**
  * Save-location exploration agent for suggestPath (design.md "SuggestPathAgent").

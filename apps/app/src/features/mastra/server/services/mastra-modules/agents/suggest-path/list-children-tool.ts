@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { pageListingService } from '~/server/service/page-listing';
 import loggerFactory from '~/utils/logger';
 
-import type { SuggestPathRequestContextShape } from '../agents/suggest-path/request-context';
+import type { SuggestPathRequestContextShape } from './request-context';
 
 const logger = loggerFactory('growi:tools:list-children-tool');
 

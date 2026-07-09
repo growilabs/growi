@@ -107,9 +107,9 @@ resolverMock.fn.mockImplementation(() => {
 });
 
 import { getPageContentTool } from '../../tools/get-page-content-tool';
-import { listChildrenTool } from '../../tools/list-children-tool';
 import { SUGGEST_PATH_INSTRUCTIONS } from './instructions';
 import { limitedSearchTool } from './limited-search-tool';
+import { listChildrenTool } from './list-children-tool';
 import { suggestPathAgent } from './suggest-path-agent';
 
 // Snapshot whether the resolver was touched during the import above.
