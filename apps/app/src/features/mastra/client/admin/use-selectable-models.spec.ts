@@ -28,6 +28,19 @@ const buildResponse = <T>(data: T): AxiosResponse<T> => ({
   config: {} as AxiosResponse['config'],
 });
 
+// A promise whose resolution is controlled by the test, to hold a fetch in
+// flight and observe the in-flight render deterministically.
+const deferred = <T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+};
+
 // Fresh SWR cache per render so subscriptions never leak between tests.
 const wrapper = ({ children }: { children: ReactNode }) =>
   createElement(
@@ -187,5 +200,55 @@ describe('invalidateAllProviders', () => {
     // The unrelated key was neither cleared nor refetched.
     expect(result.current.unrelated.data).toBe('unrelated-data');
     expect(unrelatedFetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the active provider data present while its refresh refetch is in flight (no flicker)', async () => {
+    // The mounted provider's model control is a <select> only while its catalog
+    // data is present; if a refresh cleared that data to undefined the control
+    // would swap to free-text and back — a flicker that is visible in the browser
+    // because the available-models refetch has real network latency. Hold the
+    // refetch pending here to observe that in-flight state deterministically.
+    mockedApiv3Get.mockResolvedValue(
+      buildResponse({ modelIds: ['old-model'] }),
+    );
+    const { result } = renderHook(
+      ({ provider }: { provider: AiProvider }) =>
+        useSWRxSelectableModels(provider),
+      { wrapper, initialProps: { provider: 'anthropic' as AiProvider } },
+    );
+    await waitFor(() => {
+      expect(result.current.data).toEqual({ modelIds: ['old-model'] });
+    });
+
+    // Hold the refresh revalidation's fetch pending so the in-flight state is
+    // observable (a mocked instant fetch would let React batch the transient
+    // undefined away — the very reason this must be tested with a pending fetch).
+    expect(mockedApiv3Get).toHaveBeenCalledTimes(1); // the initial mount fetch
+    const pending = deferred<AxiosResponse<SelectableModelsResponse>>();
+    mockedApiv3Get.mockReturnValueOnce(pending.promise);
+
+    let invalidatePromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      invalidatePromise = result.current.invalidateAllProviders();
+    });
+
+    // Wait until the active provider's refetch has actually been dispatched.
+    await waitFor(() => {
+      expect(mockedApiv3Get).toHaveBeenCalledTimes(2);
+    });
+
+    // Refetch still in flight: the active provider's data must NOT be cleared to
+    // undefined (a blanket clear would show undefined here → flicker). It is kept
+    // in place while the refreshed list loads.
+    expect(result.current.data).toEqual({ modelIds: ['old-model'] });
+
+    // Completing the refetch swaps the list in place — old → new, no undefined.
+    await act(async () => {
+      pending.resolve(buildResponse({ modelIds: ['new-model'] }));
+      await invalidatePromise;
+    });
+    await waitFor(() => {
+      expect(result.current.data).toEqual({ modelIds: ['new-model'] });
+    });
   });
 });

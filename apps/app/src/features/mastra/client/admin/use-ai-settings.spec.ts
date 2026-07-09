@@ -30,10 +30,17 @@ const buildResponse = <T>(data: T): AxiosResponse<T> => ({
 
 const baseSettings: AiSettingsResponse = {
   aiEnabled: true,
-  provider: 'openai',
-  allowedModels: [{ modelId: 'gpt-4o', isDefault: true }],
-  azureOpenaiSettings: {},
-  isApiKeySet: true,
+  providers: {
+    openai: { enabled: true, isApiKeySet: true },
+    anthropic: { enabled: false, isApiKeySet: false },
+    google: { enabled: false, isApiKeySet: false },
+    'azure-openai': {
+      enabled: false,
+      isApiKeySet: false,
+      azureOpenaiSettings: {},
+    },
+  },
+  allowedModels: [{ provider: 'openai', modelId: 'gpt-4o', isDefault: true }],
   useOnlyEnvVars: false,
   isConfigured: true,
 };
@@ -78,8 +85,13 @@ describe('useAiSettings', () => {
       });
       const body: AiSettingsUpdateRequest = {
         aiEnabled: true,
-        provider: 'anthropic',
-        allowedModels: [{ modelId: 'claude-3-5-sonnet', isDefault: true }],
+        allowedModels: [
+          {
+            provider: 'anthropic',
+            modelId: 'claude-3-5-sonnet',
+            isDefault: true,
+          },
+        ],
       };
 
       // Act
@@ -103,8 +115,9 @@ describe('useAiSettings', () => {
       // should surface that updated state through the hook's data.
       const updatedSettings: AiSettingsResponse = {
         ...baseSettings,
-        provider: 'google',
-        allowedModels: [{ modelId: 'gemini-1.5-pro', isDefault: true }],
+        allowedModels: [
+          { provider: 'google', modelId: 'gemini-1.5-pro', isDefault: true },
+        ],
       };
       mockedApiv3Get.mockResolvedValue(buildResponse(updatedSettings));
 
@@ -112,7 +125,11 @@ describe('useAiSettings', () => {
 
       // Act
       await act(async () => {
-        await result.current.save({ provider: 'google' });
+        await result.current.save({
+          allowedModels: [
+            { provider: 'google', modelId: 'gemini-1.5-pro', isDefault: true },
+          ],
+        });
       });
 
       // Assert: revalidation re-fetches and the hook reflects the new data

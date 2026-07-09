@@ -1,16 +1,17 @@
 // --- Mock boundary ---------------------------------------------------------
 //
 // These tests exercise the post-message ROUTE HANDLER's observable contract for
-// model selection (task 3.1 / Req 3.3, 4.1–4.5): what it forwards to the model
-// resolver and to growiAgent.stream, NOT how the model is actually resolved
-// (resolve-provider-options / resolve-mastra-model own that, tested separately).
+// model selection (Req 4.3, 4.6): what it forwards to the model resolver and to
+// growiAgent.stream, NOT how the model is actually resolved (effective-model-key /
+// resolve-provider-options own that, tested separately).
 //
 // We mock every module boundary the handler reaches so no real LLM is called:
-//   - config.resolveEffectiveModelId: the single allow-list rounding checkpoint —
-//     assert the route resolves the request's modelId through it EXACTLY once and
-//     threads the resolved id to both requestContext and the options lookup.
+//   - effective-model-key.resolveEffectiveModelKey: the single allow-list rounding
+//     checkpoint — assert the route resolves the request's modelKey through it
+//     EXACTLY once and threads the resolved key to both requestContext and the
+//     options lookup (an out-of-available-set key is rounded to the default).
 //   - resolve-provider-options.getProviderOptionsForModel: assert the route looks
-//     up options for the RESOLVED id and passes them straight through to stream.
+//     up options for the RESOLVED key and passes them straight through to stream.
 //   - mastra-modules: a stub growiAgent whose stream() records its options arg.
 //   - get-or-create-thread: a fixed thread (thread plumbing is out of scope here).
 //   - the `ai` package + @mastra/ai-sdk: stubbed so the handler can run to the
@@ -18,20 +19,20 @@
 //   - chat-error-message: spied (not rewritten) so we can confirm the error path
 //     stays wired to the existing sanitizer (Req 4.5).
 import type { IUserHasId } from '@growi/core';
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
 import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
-const { resolveEffectiveModelId, getProviderOptionsForModel } = vi.hoisted(
+const { resolveEffectiveModelKey, getProviderOptionsForModel } = vi.hoisted(
   () => ({
-    resolveEffectiveModelId: vi.fn(),
+    resolveEffectiveModelKey: vi.fn(),
     getProviderOptionsForModel: vi.fn(),
   }),
 );
-vi.mock('../services/ai-sdk-modules/llm-providers/config', () => ({
-  resolveEffectiveModelId,
+vi.mock('../services/ai-sdk-modules/llm-providers/effective-model-key', () => ({
+  resolveEffectiveModelKey,
 }));
 vi.mock('../services/ai-sdk-modules/resolve-provider-options', () => ({
   getProviderOptionsForModel,
@@ -116,17 +117,18 @@ const getHandler = (): RequestHandler => {
   return handlers[handlers.length - 1];
 };
 
-const buildReqRes = (modelId?: string) => {
+const buildReqRes = (modelKey?: string) => {
   const user = mock<IUserHasId>();
   user._id = mock<IUserHasId['_id']>();
   user._id.toString = () => 'user-1';
 
-  // The handler reads modelId via destructuring; mock<Request> would auto-stub
-  // body fields, so we provide a concrete body.
-  const req = mock<{ body: unknown; user: IUserHasId }>({
+  // Typed as a full express Request (+ the handler's `user`) so it satisfies
+  // RequestHandler's parameter with no cast; the handler reads modelKey via
+  // destructuring, so a concrete body is provided (rather than auto-stubbed).
+  const req = mock<Request & { user: IUserHasId }>({
     body: {
       threadId: undefined,
-      modelId,
+      modelKey,
       messages: [{ id: '1', role: 'user', parts: [] }],
     },
     user,
@@ -134,6 +136,14 @@ const buildReqRes = (modelId?: string) => {
   const res = mock<ApiV3Response>();
   return { req, res };
 };
+
+// Invoke the route handler with the typed req/res mocks. The handler is exposed as
+// a generic express RequestHandler; the mocks are typed to that signature's
+// parameters (Request / Response), so the call needs no cast.
+const invoke = (
+  req: ReturnType<typeof buildReqRes>['req'],
+  res: ReturnType<typeof buildReqRes>['res'],
+): void | Promise<void> => getHandler()(req, res, vi.fn());
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -145,58 +155,79 @@ beforeEach(() => {
   });
 });
 
-describe('post-message handler — model selection (Req 3.3, 4.1, 4.3, 4.4)', () => {
-  it('resolves an in-allowlist modelId once and threads the resolved id to both requestContext and the options lookup (Req 4.1, 4.4)', async () => {
+describe('post-message handler — model selection (Req 4.3, 4.6)', () => {
+  it('resolves an in-set modelKey once and threads the resolved key to both requestContext and the options lookup (Req 4.3, 4.6)', async () => {
     const options = { openai: { reasoningEffort: 'low' } };
-    resolveEffectiveModelId.mockReturnValue('o3');
+    // The resolver returns a sentinel distinct from the request value, so the test
+    // proves BOTH sinks receive exactly the resolver's output (single-resolution
+    // propagation) — not the raw request value nor two independent resolutions.
+    const EFFECTIVE_KEY = 'openai/o3';
+    resolveEffectiveModelKey.mockReturnValue(EFFECTIVE_KEY);
     getProviderOptionsForModel.mockReturnValue(options);
 
-    const { req, res } = buildReqRes('o3');
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    const { req, res } = buildReqRes('openai/o3');
+    await invoke(req, res);
 
-    // The route rounds the request's modelId through resolveEffectiveModelId exactly
-    // once (the single checkpoint), then threads the resolved id everywhere.
-    expect(resolveEffectiveModelId).toHaveBeenCalledTimes(1);
-    expect(resolveEffectiveModelId).toHaveBeenCalledWith('o3');
-    expect(getProviderOptionsForModel).toHaveBeenCalledWith('o3');
+    // The route rounds the request's modelKey through resolveEffectiveModelKey
+    // exactly once (the single checkpoint), then threads the resolved key everywhere.
+    expect(resolveEffectiveModelKey).toHaveBeenCalledTimes(1);
+    expect(resolveEffectiveModelKey).toHaveBeenCalledWith('openai/o3');
+    expect(getProviderOptionsForModel).toHaveBeenCalledWith(EFFECTIVE_KEY);
 
     expect(stream).toHaveBeenCalledTimes(1);
     const streamOptions = stream.mock.calls[0][1];
-    // requestContext carries the RESOLVED model id for the agent's dynamic model fn.
+    // requestContext carries the RESOLVED model key for the agent's dynamic model fn.
     expect(streamOptions.requestContext).toBeInstanceOf(RequestContext);
-    expect(streamOptions.requestContext.get('modelId')).toBe('o3');
+    expect(streamOptions.requestContext.get('modelKey')).toBe(EFFECTIVE_KEY);
     // providerOptions forwarded verbatim from the lookup (effective model's options).
     expect(streamOptions.providerOptions).toBe(options);
   });
 
-  it('rounds an omitted modelId to the default and threads the resolved default id (Req 4.3)', async () => {
+  it('rounds an out-of-set modelKey to the effective default and propagates only the resolved default (Req 4.6)', async () => {
     const defaultOptions = { openai: { reasoningEffort: 'high' } };
-    // resolveEffectiveModelId collapses an undefined modelId to the default id.
-    resolveEffectiveModelId.mockReturnValue('gpt-4o');
+    // resolveEffectiveModelKey collapses an out-of-available-set key to the default.
+    const DEFAULT_KEY = 'openai/gpt-4o';
+    resolveEffectiveModelKey.mockReturnValue(DEFAULT_KEY);
+    getProviderOptionsForModel.mockReturnValue(defaultOptions);
+
+    const { req, res } = buildReqRes('anthropic/not-allowed');
+    await invoke(req, res);
+
+    expect(resolveEffectiveModelKey).toHaveBeenCalledWith(
+      'anthropic/not-allowed',
+    );
+    // The RESOLVED default key (not the raw client value) is what reaches both
+    // sinks, so the agent model fn never re-rounds (no second warning).
+    expect(getProviderOptionsForModel).toHaveBeenCalledWith(DEFAULT_KEY);
+
+    const streamOptions = stream.mock.calls[0][1];
+    expect(streamOptions.requestContext.get('modelKey')).toBe(DEFAULT_KEY);
+    expect(streamOptions.providerOptions).toBe(defaultOptions);
+  });
+
+  it('rounds an omitted modelKey to the default and threads the resolved default key (Req 4.6)', async () => {
+    const defaultOptions = { openai: { reasoningEffort: 'high' } };
+    const DEFAULT_KEY = 'openai/gpt-4o';
+    resolveEffectiveModelKey.mockReturnValue(DEFAULT_KEY);
     getProviderOptionsForModel.mockReturnValue(defaultOptions);
 
     const { req, res } = buildReqRes(undefined);
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    await invoke(req, res);
 
-    expect(resolveEffectiveModelId).toHaveBeenCalledWith(undefined);
-    // The RESOLVED default id (not undefined) is threaded downstream, so the agent
-    // model fn never re-rounds (no second warning).
-    expect(getProviderOptionsForModel).toHaveBeenCalledWith('gpt-4o');
+    expect(resolveEffectiveModelKey).toHaveBeenCalledWith(undefined);
+    expect(getProviderOptionsForModel).toHaveBeenCalledWith(DEFAULT_KEY);
 
     const streamOptions = stream.mock.calls[0][1];
-    expect(streamOptions.requestContext.get('modelId')).toBe('gpt-4o');
+    expect(streamOptions.requestContext.get('modelKey')).toBe(DEFAULT_KEY);
     expect(streamOptions.providerOptions).toBe(defaultOptions);
   });
 
   it('keeps the existing error sanitizer wired so provider errors yield a safe message (Req 4.5)', async () => {
-    resolveEffectiveModelId.mockReturnValue('o3');
+    resolveEffectiveModelKey.mockReturnValue('openai/o3');
     getProviderOptionsForModel.mockReturnValue({});
 
-    const { req, res } = buildReqRes('o3');
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    const { req, res } = buildReqRes('openai/o3');
+    await invoke(req, res);
 
     // createUIMessageStream receives an onError hook; the handler must route it
     // through resolveChatErrorMessage (the existing, unchanged sanitizer).
