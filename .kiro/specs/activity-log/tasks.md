@@ -88,11 +88,11 @@
   - _Boundary: revertDeletedPage（service/page/index.ts）_
   - _Depends: 5, 1.3_
 
-- [ ] 7. 記録ゲート挙動の結合検証（本 spec の受け入れ条件）
+- [x] 7. 記録ゲート挙動の結合検証（本 spec の受け入れ条件）
   - 実 DB を読み直す結合試験で記録ゲートの中核挙動と非回帰を確認する。設定は明示注入（`process.env` を直接書き換えない）、per-worker 分離。
   - 7.1–7.4 は共有セットアップ（per-worker DB・設定注入ヘルパ）のため**同一の integ ファイル**に置き、並列（P）にはしない。観察成果物は各子タスクが持つ。
 
-- [ ] 7.1 対象外は作らない／対象内・essential は作る、を実 DB で検証
+- [x] 7.1 対象外は作らない／対象内・essential は作る、を実 DB で検証
   - 非 GET・対象外 action を settle → その id の行が `activities` に**存在しない**ことを実 DB の読み直しで確認する（②が作られない＝write なし。R1.1 の権威ある証拠）。
   - 非 GET・対象内 action を settle → 実 action の行が永続化されることを確認する。
   - `auditLogEnabled=false` → essential のみ作成、非 essential は作られないことを確認する。
@@ -101,14 +101,14 @@
   - _Boundary: ActivityService 記録ゲート結合試験（同一 integ ファイル・並列不可）_
   - _Depends: 5_
 
-- [ ] 7.2 記録行が操作文脈（IP・エンドポイント・操作者・到着時刻）を保持することを検証
+- [x] 7.2 記録行が操作文脈（IP・エンドポイント・操作者・到着時刻）を保持することを検証
   - 非 GET・対象内 action を settle → 作成された行が、middleware が焼き付けていた IP・エンドポイント・操作者・操作者名を従来どおり保持し、かつ `createdAt` が settle 時刻でなく**リクエスト到着時刻**であることを実 DB の読み直しで確認する（事前作成廃止で欠損・時刻ずれを起こさない。R2.6／Issue 3 の権威ある証拠）。
   - Observable: 作成行の ip / endpoint / user / snapshot.username が期待値どおりで、`createdAt` が到着時刻に一致する。
   - _Requirements: 2.6_
   - _Boundary: ActivityService 記録ゲート結合試験（同一 integ ファイル・並列不可）_
   - _Depends: 5_
 
-- [ ] 7.3 fail-safe（試行記録）の保持・②との区別・掃除の確定性を実 DB で検証
+- [x] 7.3 fail-safe（試行記録）の保持・②との区別・掃除の確定性を実 DB で検証
   - 非 GET・ルートがエラー応答（status>=400）で終了 → 当該 id の `ACTION_UNSETTLED` 行が実 DB に残ることを確認する（`registerFailsafeFinalizer` → `recordFailsafeAttempt` が試行記録を作成。R4.1 の権威ある証拠）。成功完了（status<400）では残らないことも確認する。
   - クライアント中断（`writableFinished=false` の close）→ `ACTION_UNSETTLED` 行が残ることを確認する。
   - 対象外だった②の行は作られない一方、失敗・中断の UNSETTLED は残る、という差（R4.2/4.3 の区別）を確認する。
@@ -118,7 +118,7 @@
   - _Boundary: ActivityService 記録ゲート結合試験（同一 integ ファイル・並列不可）_
   - _Depends: 4, 5_
 
-- [ ] 7.4 既存挙動の非回帰を検証（貢献度・GET 経路・グループ構成）
+- [x] 7.4 既存挙動の非回帰を検証（貢献度・GET 経路・グループ構成）
   - 貢献度 action（例: `ACTION_PAGE_CREATE`）で、変更前後の貢献度集計が不変であることを確認する（別コレクション・行の存在に非依存・contribution は settle 前に先行）。
   - GET 経路の記録挙動（対象のみ作成）が変わっていないことを確認する（`createActivity` を無改修）。
   - action グループ／essential の構成が変わっていないことを確認する（`interfaces/activity.ts` を無改修）。
