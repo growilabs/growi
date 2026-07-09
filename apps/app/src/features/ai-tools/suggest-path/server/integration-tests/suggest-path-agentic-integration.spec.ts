@@ -101,8 +101,19 @@ vi.mock('~/server/service/config-manager', () => ({
           return 'oneshot';
         case 'aiTools:suggestPathAgenticSearchLimit':
           return mocks.SEARCH_LIMIT;
+        case 'aiTools:suggestPathAgenticChildListingLimit':
+          return 5;
         case 'aiTools:suggestPathAgenticTimeoutMs':
           return 60_000;
+        // Read by the agentic engine's provider-options resolution (the
+        // REAL resolveEffectiveModelId / getProviderOptionsForModel modules
+        // run against this mock, so the allow-list must be non-empty).
+        case 'openai:reasoningEffort:suggestPathAgent':
+          return '';
+        case 'ai:allowedModels':
+          return [{ modelId: 'test-model', isDefault: true }];
+        case 'ai:provider':
+          return 'openai';
         default:
           return undefined;
       }
