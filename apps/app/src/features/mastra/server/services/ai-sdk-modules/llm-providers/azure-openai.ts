@@ -5,9 +5,7 @@ import {
 } from '@azure/identity';
 import type { MastraModelConfig } from '@mastra/core/llm';
 
-import { configManager } from '~/server/service/config-manager';
-
-import { getApiKey } from './config';
+import { getApiKey, getProviderSettings } from './config';
 
 // Microsoft Entra ID token scope for Azure Cognitive Services (matches the
 // existing AzureOpenaiClientDelegator in features/openai).
@@ -20,19 +18,24 @@ const ENTRA_ID_SCOPE = 'https://cognitiveservices.azure.com/.default';
 // authenticate via either an API key or Microsoft Entra ID. All of that stays
 // inside this resolver — the shared dispatch never sees it. The `modelId` here is
 // the Azure *deployment name*, not an OpenAI model id, and is passed in by the
-// caller (resolveMastraModel resolves the effective model against the allow-list).
+// caller (resolveMastraModel parses the effective modelKey and dispatches the bare
+// modelId here).
 //
-// The object field is `baseURL`, matching the AI SDK's createAzure option (and
-// the API/form use the same name end-to-end), so it passes straight through here.
+// Connection settings live inside THIS provider's entry of `ai:providers`
+// (getProviderSettings('azure-openai')?.azureOpenaiSettings; env var AI_PROVIDERS),
+// and the API key comes from `getApiKey('azure-openai')` (env var
+// AI_PROVIDER_API_KEYS). The object field is `baseURL`, matching the AI SDK's
+// createAzure option (and the API/form use the same name end-to-end), so it passes
+// straight through here.
 export const resolveAzureOpenaiModel = (modelId: string): MastraModelConfig => {
-  // Connection config is a single JSON object (ai:azureOpenaiSettings). `?? {}` guards a
-  // malformed AI_AZURE_OPENAI_SETTINGS env var, which the loader fails soft to null.
+  // `?? {}` guards a missing azure-openai entry / malformed settings value (the
+  // config accessor already fails soft to undefined on a malformed shape).
   const {
     resourceName,
     baseURL,
     apiVersion,
     useEntraId: useEntraIdRaw,
-  } = configManager.getConfig('ai:azureOpenaiSettings') ?? {};
+  } = getProviderSettings('azure-openai')?.azureOpenaiSettings ?? {};
   const useEntraId = useEntraIdRaw === true;
 
   // Endpoint is required regardless of the auth method. resourceName and baseURL
@@ -40,10 +43,10 @@ export const resolveAzureOpenaiModel = (modelId: string): MastraModelConfig => {
   // resourceName and uses baseURL — so passing both straight through is safe; we
   // only guard that at least one is present. apiVersion is likewise forwarded
   // as-is (undefined falls back to the SDK default). The throw names the missing
-  // JSON fields only — never an apiKey value.
+  // fields / the env var only — never an apiKey value.
   if (resourceName == null && baseURL == null) {
     throw new Error(
-      'Azure OpenAI requires resourceName or baseURL to be set in AI_AZURE_OPENAI_SETTINGS',
+      'Azure OpenAI requires resourceName or baseURL to be set (via the admin AI settings or the AI_PROVIDERS environment variable)',
     );
   }
 
@@ -60,10 +63,10 @@ export const resolveAzureOpenaiModel = (modelId: string): MastraModelConfig => {
   }
 
   // API-key auth: the key must be injected explicitly.
-  const apiKey = getApiKey();
+  const apiKey = getApiKey('azure-openai');
   if (apiKey == null) {
     throw new Error(
-      'Azure OpenAI requires AI_API_KEY, or set "useEntraId": true in AI_AZURE_OPENAI_SETTINGS to authenticate with Microsoft Entra ID',
+      'Azure OpenAI requires an API key (set it via the admin AI settings or the AI_PROVIDER_API_KEYS environment variable), or set "useEntraId": true to authenticate with Microsoft Entra ID',
     );
   }
   return createAzure({ apiKey, resourceName, baseURL, apiVersion })(modelId);

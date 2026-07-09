@@ -8,6 +8,20 @@ generator client {
   // An explicit "js" here breaks Turbopack, which cannot rewrite a relative
   // `.js` specifier to the actual `.ts` file.
   moduleFormat = "esm"
+
+  // Query-engine binaries that must exist in the generated output regardless of
+  // which machine runs `prisma generate`. Without this, only `native` is emitted
+  // (the build host's engine), so a container built on / turbo-cached from one
+  // architecture ships an engine the runtime cannot load (issue: prod boot fails
+  // with `Prisma Client could not locate the Query Engine for runtime
+  // "debian-openssl-3.0.x"`).
+  //   - native                     -> local dev on any OS/arch
+  //   - debian-openssl-3.0.x       -> linux/amd64 glibc (DHI node:debian runtime)
+  //   - linux-arm64-openssl-3.0.x  -> linux/arm64 glibc
+  // Declaring every runtime engine also makes the turbo `prisma:generate` cache
+  // architecture-safe: the cached output carries all engines, so a cache entry
+  // populated on one arch is still valid on another.
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
 }
 
 datasource db {

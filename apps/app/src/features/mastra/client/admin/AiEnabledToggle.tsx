@@ -35,7 +35,7 @@ export const AiEnabledToggle = (props: AiEnabledToggleProps): JSX.Element => {
         disabled={disabled}
         {...registerToInputProps(register('aiEnabled'))}
       />
-      <Label htmlFor={inputId} className="ms-2">
+      <Label htmlFor={inputId} className="ms-2 fw-bold">
         {t('ai_settings.ai_enabled_label')}
       </Label>
     </FormGroup>
