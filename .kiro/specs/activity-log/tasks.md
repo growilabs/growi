@@ -61,7 +61,7 @@
   - _Boundary: registerFailsafeFinalizer（service/activity/register-failsafe-finalizer.ts, service/activity/index.ts）_
   - _Depends: 1.2, 3.1_
 
-- [ ] 4. `add-activity` middleware を「事前作成廃止」の薄いアダプタに組み替え
+- [x] 4. `add-activity` middleware を「事前作成廃止」の薄いアダプタに組み替え
   - 非 GET で DB に書かない。文脈 `{ ip: req.ip, endpoint: req.originalUrl, userId: req.user?._id, username: req.user?.username, createdAt: new Date() }`（`createdAt`＝到着時刻・Issue 3）を1つ組み立て、`beginActivity(context)` で id 採番＋stash、`res.locals.activity = { _id: activityId }`（37 箇所の emit と `getIdStringForRef` を無改修で温存）、`registerFailsafeFinalizer(res, activityId, context)` を呼ぶ。失敗判定と `res` 配線は middleware に持たせない（`registerFailsafeFinalizer` の責務）。
   - RED→GREEN: 既存 `add-activity.spec.ts` の「無条件に create する」契約を「**DB に書かず・`beginActivity` で採番 id を `res.locals.activity._id` に格納・文脈（createdAt 含む）を stash・`registerFailsafeFinalizer` を呼ぶ**」へ改訂する（失敗判定の網羅は 3.2 のテストで担保し、ここでは重複させない）。
   - Observable: 改訂した `add-activity.spec.ts` がグリーン（DB 書き込みなし・`res.locals.activity._id` に採番 id・マップに文脈・`registerFailsafeFinalizer` が呼ばれる）。
