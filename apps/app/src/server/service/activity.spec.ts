@@ -1,23 +1,39 @@
 /**
- * Unit tests for ActivityService create/update routing (Task 3.2).
+ * Unit tests for ActivityService's GET-path createActivity gate (unchanged)
+ * and the "update" listener's lazy fail-safe record lifecycle (Task 5).
  *
- * Observable contracts:
- *   1. createActivity calls prisma.activities.createByParameters with params
- *      when shoudUpdateActivity gate passes.
- *   2. createActivity returns null and does not call prisma when gate blocks
- *      (action not in available actions).
- *   3. activityEvent 'update' handler calls prisma.activities.updateByParameters
- *      when gate passes (essential action).
- *   4. activityEvent 'update' handler skips prisma when gate blocks (non-essential
- *      action), and does NOT emit 'updated'.
- *   5. createTtlIndex still calls Activity.createIndexes (Mongoose, stays intact).
+ * Observable contracts for the "update" listener (design.md: Service /
+ * orchestrator > ActivityService update listener; tasks.md Task 5):
+ *   1. The pending context is taken from `pendingActivityContext`
+ *      SYNCHRONOUSLY -- before any `await` in the handler (Requirement 2.6).
+ *      Taking it late would race registerFailsafeFinalizer's cleanup and
+ *      drop the IP/endpoint/username/createdAt the settled row needs.
+ *   2. Contribution processing runs BEFORE settle, unconditionally of
+ *      record-eligibility (Requirement 2.4).
+ *   3. `shouldPersist` is computed via the single-source gate
+ *      `shoudUpdateActivity` and injected into `settleActivityRecord` --
+ *      the gate is never re-derived inside settle (Requirement 1.4/3.1).
+ *   4. `updated` is emitted ONLY when settleActivityRecord returns non-null
+ *      (in-gate AND created). An out-of-gate action (null, no write) or a
+ *      settle failure both skip the emit (Requirement 1.1/2.3). The
+ *      `generatePreNotify` branch split is preserved.
+ *   5. The notify-construction input carries the acting user's id (from the
+ *      taken context) as `user`, so the actor is excluded from a
+ *      notification about their own action (Requirement 2.3; tasks.md
+ *      Implementation Note "2→5"). The emitted `updated` activity itself
+ *      stays the original settle result (no injected `user`).
+ *   6. createTtlIndex still calls Activity.createIndexes (Mongoose, stays intact).
  *
- * Gate behaviour recap:
- *   - shoudUpdateActivity calls getAvailableActions().includes(action).
- *   - When auditLogEnabled=false, getAvailableActions returns AllEssentialActions.
- *   - AllEssentialActions includes ACTION_PAGE_CREATE / ACTION_PAGE_UPDATE.
- *   - An action outside AllEssentialActions (e.g. ACTION_USER_PERSONAL_SETTINGS_UPDATE)
- *     will be blocked when auditLogEnabled=false.
+ * Mocking strategy: `settleActivityRecord` and `pendingActivityContext.take`
+ * are mocked at the module boundary -- the listener's contract with its
+ * collaborators, which already have their own unit tests
+ * (settle-activity-record.spec.ts, pending-activity-context.spec.ts).
+ * `shoudUpdateActivity` is spied on the constructed instance so each test
+ * controls record-eligibility directly, independent of the real
+ * action-group configuration (that gate is covered by
+ * ActivityService.createActivity's tests and getAvailableActions).
+ * Contribution helpers are mocked so the contribution block never touches a
+ * real DB; only their relative call order matters here.
  *
  * IMPORTANT: vi.mock is hoisted to the top of the file by Vitest's transform.
  * Variables declared with const/let outside the factory are NOT available inside
@@ -34,26 +50,62 @@ import Activity from '~/server/models/activity';
 
 // ---------------------------------------------------------------------------
 // Declare mock functions with vi.hoisted() so they are available inside the
-// vi.mock factory (which is hoisted above all imports by Vitest).
+// vi.mock factories (which are hoisted above all imports by Vitest).
 // ---------------------------------------------------------------------------
 
-const { mockCreateByParameters, mockUpdateByParameters } = vi.hoisted(() => ({
+const {
+  mockCreateByParameters,
+  mockTake,
+  mockSettleActivityRecord,
+  mockResolveContributor,
+  mockEnsureUserHasMigrated,
+  mockAddContribution,
+} = vi.hoisted(() => ({
   mockCreateByParameters: vi.fn(),
-  mockUpdateByParameters: vi.fn(),
+  mockTake: vi.fn(),
+  mockSettleActivityRecord: vi.fn(),
+  mockResolveContributor: vi.fn(),
+  mockEnsureUserHasMigrated: vi.fn(),
+  mockAddContribution: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
-// Module-level mock: ~/utils/prisma
+// Module-level mocks
 // ---------------------------------------------------------------------------
 
 vi.mock('~/utils/prisma', () => ({
   prisma: {
     activities: {
       createByParameters: mockCreateByParameters,
-      updateByParameters: mockUpdateByParameters,
     },
   },
 }));
+
+// Barrel the listener imports settleActivityRecord/pendingActivityContext
+// from (Implementation Note 1.2: the sibling `service/activity.ts` file
+// shadows the `service/activity/` directory, so the real source imports via
+// `~/server/service/activity/index`, not the bare `~/server/service/activity`
+// -- the mock specifier below must match that exactly for Vitest to intercept
+// the real import).
+vi.mock('~/server/service/activity/index', () => ({
+  pendingActivityContext: { take: mockTake },
+  settleActivityRecord: mockSettleActivityRecord,
+}));
+
+vi.mock(
+  '~/features/contribution-graph/server/services/contribution-migration-service',
+  () => ({
+    resolveContributor: mockResolveContributor,
+    ensureUserHasMigrated: mockEnsureUserHasMigrated,
+  }),
+);
+
+vi.mock(
+  '~/features/contribution-graph/server/services/contribution-service',
+  () => ({
+    addContribution: mockAddContribution,
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Import ActivityService AFTER mock declarations (still runs before tests).
@@ -115,6 +167,11 @@ function makeCrowi(opts: { auditLogEnabled?: boolean } = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default: no valid contributor found, so the contribution block's "warn"
+  // branch runs instead of throwing on an unmocked user shape. Individual
+  // tests only care that resolveContributor was *called* (ordering), not
+  // its resolution.
+  mockResolveContributor.mockResolvedValue(null);
 });
 
 describe('ActivityService.createActivity', () => {
@@ -204,23 +261,32 @@ describe('ActivityService.createActivity', () => {
 });
 
 describe('ActivityService activityEvent("update") handler', () => {
-  it('calls prisma.activities.updateByParameters and emits "updated" when gate passes (essential action)', async () => {
+  it('takes the pending context synchronously (before any await), settles with the injected shouldPersist=true, runs contribution before settle, and emits "updated" on a non-null settle result (in-gate)', async () => {
+    const fakeContext = {
+      ip: '1.2.3.4',
+      endpoint: '/test',
+      userId: 'actor-user-id',
+      username: 'alice',
+      createdAt: new Date('2026-07-08T00:00:00.000Z'),
+    };
     const fakeActivity = {
       _id: 'id-2',
       action: SupportedAction.ACTION_PAGE_UPDATE,
     };
-    mockUpdateByParameters.mockResolvedValueOnce(fakeActivity);
+    mockTake.mockReturnValue(fakeContext);
+    mockSettleActivityRecord.mockResolvedValue(fakeActivity);
 
     const { crowi, activityEmitter } = makeCrowi();
-    // Service constructor registers the listener on activityEmitter as a side effect.
-    // The variable is prefixed with _ because we only need the construction side-effect.
-    const _service = new ActivityService(crowi);
+    const service = new ActivityService(crowi);
+    // Deterministic control over record-eligibility -- the gate itself
+    // (getAvailableActions/shoudUpdateActivity) is covered elsewhere.
+    vi.spyOn(service, 'shoudUpdateActivity').mockReturnValue(true);
 
     const updatedHandler = vi.fn();
     activityEmitter.on('updated', updatedHandler);
 
     const activityId = 'some-activity-id';
-    // contributor is destructured out before calling updateByParameters
+    // contributor is destructured out before calling settleActivityRecord
     const parameters = {
       action: SupportedAction.ACTION_PAGE_UPDATE,
       contributor: 'user-1',
@@ -229,31 +295,50 @@ describe('ActivityService activityEvent("update") handler', () => {
 
     activityEmitter.emit('update', activityId, parameters, target);
 
+    // take() is the very first statement in the handler, before any `await`
+    // -- so by the time emit() returns control (still fully synchronous),
+    // it must already have fired. If a regression moved the take() call
+    // after the contribution await, this assertion would fail here (before
+    // the listener has had any chance to resume from a microtask).
+    expect(mockTake).toHaveBeenCalledWith(activityId);
+
     // Wait for the async listener to settle
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     const { contributor: _contributor, ...activityParameters } = parameters;
 
-    expect(mockUpdateByParameters).toHaveBeenCalledTimes(1);
-    expect(mockUpdateByParameters).toHaveBeenCalledWith(
+    expect(mockSettleActivityRecord).toHaveBeenCalledTimes(1);
+    expect(mockSettleActivityRecord).toHaveBeenCalledWith({
       activityId,
+      shouldPersist: true,
+      context: fakeContext,
       activityParameters,
+    });
+
+    // Contribution (resolveContributor) must run BEFORE settle (Req 2.4).
+    expect(mockResolveContributor).toHaveBeenCalledWith(activityId, 'user-1');
+    expect(mockResolveContributor.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSettleActivityRecord.mock.invocationCallOrder[0],
     );
 
     expect(updatedHandler).toHaveBeenCalledTimes(1);
     expect(updatedHandler).toHaveBeenCalledWith(fakeActivity, target);
   });
 
-  it('skips prisma and does not emit "updated" when gate blocks (non-essential action)', async () => {
+  it('creates nothing and does not emit "updated" when settleActivityRecord returns null (out-of-gate: no row-creating side effect)', async () => {
+    mockTake.mockReturnValue(undefined);
+    mockSettleActivityRecord.mockResolvedValue(null);
+
     const { crowi, activityEmitter } = makeCrowi(); // auditLogEnabled=false → only essential
-    // _service: only needed for side-effect (registering the event listener)
-    const _service = new ActivityService(crowi);
+    const service = new ActivityService(crowi);
+    vi.spyOn(service, 'shoudUpdateActivity').mockReturnValue(false);
 
     const updatedHandler = vi.fn();
     activityEmitter.on('updated', updatedHandler);
 
     const activityId = 'blocked-activity-id';
-    // Non-essential action → gate blocks it
+    // Non-essential, non-contribution action → gate blocks it and no
+    // contribution processing is expected either.
     const parameters = {
       action: SupportedAction.ACTION_USER_PERSONAL_SETTINGS_UPDATE,
     };
@@ -262,8 +347,93 @@ describe('ActivityService activityEvent("update") handler', () => {
     activityEmitter.emit('update', activityId, parameters, target);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(mockUpdateByParameters).not.toHaveBeenCalled();
+    expect(mockSettleActivityRecord).toHaveBeenCalledTimes(1);
+    expect(mockSettleActivityRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ shouldPersist: false }),
+    );
+    expect(mockCreateByParameters).not.toHaveBeenCalled();
     expect(updatedHandler).not.toHaveBeenCalled();
+  });
+
+  it('does not emit "updated" when settleActivityRecord throws (record failure must not stop the flow, and must not notify)', async () => {
+    mockTake.mockReturnValue(undefined);
+    mockSettleActivityRecord.mockRejectedValue(new Error('DB error'));
+
+    const { crowi, activityEmitter } = makeCrowi();
+    const service = new ActivityService(crowi);
+    vi.spyOn(service, 'shoudUpdateActivity').mockReturnValue(true);
+
+    const updatedHandler = vi.fn();
+    activityEmitter.on('updated', updatedHandler);
+
+    const activityId = 'errored-activity-id';
+    const parameters = { action: SupportedAction.ACTION_PAGE_UPDATE };
+    const target = { _id: 'page-id' };
+
+    // Must not throw/crash the emitter -- the error is swallowed.
+    expect(() =>
+      activityEmitter.emit('update', activityId, parameters, target),
+    ).not.toThrow();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(updatedHandler).not.toHaveBeenCalled();
+  });
+
+  it('passes the actor id from the taken context as `user` to the notify construction, while the emitted "updated" activity keeps the original settle result (actor-exclusion wiring — Req 2.3)', async () => {
+    const fakeContext = {
+      ip: '1.2.3.4',
+      endpoint: '/test',
+      userId: 'actor-user-id',
+      username: 'alice',
+      createdAt: new Date('2026-07-08T00:00:00.000Z'),
+    };
+    const fakeActivity = {
+      _id: 'id-3',
+      action: SupportedAction.ACTION_PAGE_CREATE,
+      targetModel: 'Page',
+      target: 'page-id',
+    };
+    mockTake.mockReturnValue(fakeContext);
+    mockSettleActivityRecord.mockResolvedValue(fakeActivity);
+
+    const { crowi, activityEmitter } = makeCrowi();
+    const service = new ActivityService(crowi);
+    vi.spyOn(service, 'shoudUpdateActivity').mockReturnValue(true);
+
+    const innerPreNotify = vi.fn();
+    const generatePreNotify = vi.fn().mockReturnValue(innerPreNotify);
+    const updatedHandler = vi.fn();
+    activityEmitter.on('updated', updatedHandler);
+
+    const activityId = 'some-activity-id';
+    const parameters = { action: SupportedAction.ACTION_PAGE_CREATE };
+    const target = { _id: 'page-id' };
+
+    activityEmitter.emit(
+      'update',
+      activityId,
+      parameters,
+      target,
+      generatePreNotify,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // The notify-construction input is the settle result with the actor id
+    // attached as `user` (so pre-notify's getIdForRef(actionUser) still
+    // excludes the actor -- Implementation Note "2→5").
+    expect(generatePreNotify).toHaveBeenCalledWith(
+      { ...fakeActivity, user: 'actor-user-id' },
+      undefined,
+    );
+
+    // The object actually emitted on 'updated' is the ORIGINAL settle
+    // result -- untouched, no injected `user` -- since the in-app-notification
+    // consumer never reads `.user` off it (only _id/action/targetModel/target/snapshot).
+    expect(updatedHandler).toHaveBeenCalledWith(
+      fakeActivity,
+      target,
+      innerPreNotify,
+    );
   });
 });
 

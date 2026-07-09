@@ -69,7 +69,7 @@
   - _Boundary: add-activity middleware_
   - _Depends: 1.3, 3.2_
 
-- [ ] 5. `update` リスナーを lazy fail-safe に組み替え
+- [x] 5. `update` リスナーを lazy fail-safe に組み替え
   - 「`activityId` の文脈をマップから**同期 take**（await より前）→ `contributor` 分離 → 貢献度を先行処理（不変）→ `shouldPersist` を単一情報源で算出 → `settleActivityRecord` に文脈と結果を渡して委譲 → 戻り値が非 null のときだけ従来どおり `updated` を emit（`generatePreNotify` 有無の分岐も保存）」の順に組む。
   - 対象内分岐を現行の「更新」から「作成」に変える。対象外分岐は何もしない（残す行がない）。settle 呼び出しをエラー境界（try/catch＋`logger.error`）で囲み、記録の失敗がリクエスト本体を止めないようにする。
   - RED→GREEN: 既存 `activity.spec.ts` の「対象外 → 更新しない・`updated` を emit しない」契約を「**対象外 → 作成口を呼ばない・行を作らない・`updated` を emit しない**」に改訂する。essential では文脈 take ＋作成＋`updated` emit、貢献度の先行処理が保存されることも確認する。
@@ -132,5 +132,5 @@
 - 1.1: この worktree のローカル Prisma 生成クライアント（`src/generated/prisma`・gitignore 済み）が schema.prisma より古いと、無関係の integ テストまで失敗する。integ 実行前に `pnpm run prisma:generate` で再生成すると解消（tracked 差分なし）。
 - 1.2: `service/activity.ts`（ActivityService 本体）がディレクトリを覆い隠すため、素の `~/server/service/activity` はバレルに解決されない。バレル（`pendingActivityContext` 等）を import する側は `~/server/service/activity/index` か相対 `./index` を使うこと（design.md L541 の表記どおりには書けない）。
 - 2: 文脈は `createByParameters` が実際に消費する形へ**マッピング**して渡す（design 擬似コードの raw spread `{...context}` は不可）。操作者 id は `user`（→ `normalizeToId(user)` で `data.userId` を算出。top-level `userId` は無視される）、操作者名は `snapshot.username`（`activities` に top-level `username` 列は無く、stray な top-level `username` は Prisma create が Unknown argument で throw する）、到着時刻は `createdAt`。middleware（Task 4）・復元フロー（Task 6）で文脈を組み立てる際も、この「userId/username を top-level で持つ context」→「user/snapshot.username で作成」の対応を守ること。
-- 2→5: `createByParameters` は `include: { user: true }` を付けない＝返り値に `user` リレーションが populate されない（`updateByParameters` は付ける・Key Decision 5）。通知経路 `toGeneratePreNotifyActivity`（service/activity.ts）/`generatePreNotify`（pre-notify.ts）は `activity.user` を読んで操作者を通知対象から除外する（null なら除外せず＝クラッシュはしないが操作者が自分の操作通知を受ける挙動差）。Task 5 で settle の作成行をそのまま通知に渡すと `user` 欠落で要件 2.3 の挙動差になる。listener が保持する `context.userId` から `user` を付与する等で補い、7.x（または 5 のテスト）で「操作者が自分の操作通知から除外される」ことを検証すること。
+- 2→5: `createByParameters` は `include: { user: true }` を付けない＝返り値に `user` リレーションが populate されない（`updateByParameters` は付ける・Key Decision 5）。通知経路 `toGeneratePreNotifyActivity`（service/activity.ts）/`generatePreNotify`（pre-notify.ts）は `activity.user` を読んで操作者を通知対象から除外する（null なら除外せず＝クラッシュはしないが操作者が自分の操作通知を受ける挙動差）。Task 5 で settle の作成行をそのまま通知に渡すと `user` 欠落で要件 2.3 の挙動差になる。listener が保持する `context.userId` から `user` を付与する等で補い、7.x（または 5 のテスト）で「操作者が自分の操作通知から除外される」ことを検証すること。**（Task 5 で解決済み: listener が `toGeneratePreNotifyActivity(activity, context?.userId)` で actor id を notify 経路にだけ補填し、`updated` には原型を emit。配線は activity.spec.ts の「actor-exclusion wiring」テストで検証。pre-notify.ts の除外ロジック自体は不変。）**
 - 3.1: 採番 id の主キー重複は Prisma の `P2002`（constraint 名 `_id_`・実 DB で確認済み）で surface する。dup-key の良性握りつぶし判定は `err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'`（`Prisma` は `~/generated/prisma/client` から import）。復元フロー等で同種の二重作成を吸収する場合も同じ判定を使う。
