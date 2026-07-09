@@ -58,30 +58,28 @@ async function dropIndexIfExists(db, collectionName, indexName) {
   }
 }
 
-module.exports = {
-  async up() {
-    logger.info('Apply migration');
+export async function up() {
+  logger.info('Apply migration');
 
-    await mongoose.connect(getMongoUri(), mongoOptions);
+  await mongoose.connect(getMongoUri(), mongoOptions);
 
-    // createIndex creates the collection if absent and is a no-op when the same index
-    // already exists, so this is safe whether or not the index was provisioned elsewhere.
-    await Promise.all(
-      COLLECTION_NAMES.map(async (name) => {
-        const collection = mongoose.connection.collection(name);
-        await dedupeByKey(collection);
-        await collection.createIndex({ key: 1 }, { unique: true });
-      }),
-    );
-  },
+  // createIndex creates the collection if absent and is a no-op when the same index
+  // already exists, so this is safe whether or not the index was provisioned elsewhere.
+  await Promise.all(
+    COLLECTION_NAMES.map(async (name) => {
+      const collection = mongoose.connection.collection(name);
+      await dedupeByKey(collection);
+      await collection.createIndex({ key: 1 }, { unique: true });
+    }),
+  );
+}
 
-  async down(db) {
-    logger.info('Rollback migration');
+export async function down(db) {
+  logger.info('Rollback migration');
 
-    await mongoose.connect(getMongoUri(), mongoOptions);
+  await mongoose.connect(getMongoUri(), mongoOptions);
 
-    await Promise.all(
-      COLLECTION_NAMES.map((name) => dropIndexIfExists(db, name, INDEX_NAME)),
-    );
-  },
-};
+  await Promise.all(
+    COLLECTION_NAMES.map((name) => dropIndexIfExists(db, name, INDEX_NAME)),
+  );
+}
