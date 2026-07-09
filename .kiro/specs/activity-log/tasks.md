@@ -45,7 +45,7 @@
 
 - [ ] 3. 失敗・中断時の記録経路（`recordFailsafeAttempt` ＋ `registerFailsafeFinalizer`）を新設
 
-- [ ] 3.1 `recordFailsafeAttempt` を新設（事前 read なし・duplicate-key 吸収）
+- [x] 3.1 `recordFailsafeAttempt` を新設（事前 read なし・duplicate-key 吸収）
   - 採番済み id・文脈（`createdAt` 含む）を受け取り、`ACTION_UNSETTLED` を採番 id 指定で1件作る。**事前 read はしない**: settle が既に作っていれば主キー重複で create が弾かれるので、duplicate-key を良性として握りつぶすことで二重作成を防ぐ（Issue 1・失敗経路に read を足さない）。duplicate-key 以外の作成失敗は例外を投げず logger.error（best-effort）。バレルに re-export を追加する。
   - RED→GREEN: unit/integ で「未作成の id → UNSETTLED を1件作る」「settle 済みの id → duplicate-key を握りつぶし二重作成しない」「作成失敗しても throw しない」「`findFirst` 等の事前存在確認を呼ばない」を確認する。
   - Observable: `recordFailsafeAttempt` のテストがグリーンで、1件作成・二重作成なし・例外を投げない・事前 read を発行しない。
@@ -133,3 +133,4 @@
 - 1.2: `service/activity.ts`（ActivityService 本体）がディレクトリを覆い隠すため、素の `~/server/service/activity` はバレルに解決されない。バレル（`pendingActivityContext` 等）を import する側は `~/server/service/activity/index` か相対 `./index` を使うこと（design.md L541 の表記どおりには書けない）。
 - 2: 文脈は `createByParameters` が実際に消費する形へ**マッピング**して渡す（design 擬似コードの raw spread `{...context}` は不可）。操作者 id は `user`（→ `normalizeToId(user)` で `data.userId` を算出。top-level `userId` は無視される）、操作者名は `snapshot.username`（`activities` に top-level `username` 列は無く、stray な top-level `username` は Prisma create が Unknown argument で throw する）、到着時刻は `createdAt`。middleware（Task 4）・復元フロー（Task 6）で文脈を組み立てる際も、この「userId/username を top-level で持つ context」→「user/snapshot.username で作成」の対応を守ること。
 - 2→5: `createByParameters` は `include: { user: true }` を付けない＝返り値に `user` リレーションが populate されない（`updateByParameters` は付ける・Key Decision 5）。通知経路 `toGeneratePreNotifyActivity`（service/activity.ts）/`generatePreNotify`（pre-notify.ts）は `activity.user` を読んで操作者を通知対象から除外する（null なら除外せず＝クラッシュはしないが操作者が自分の操作通知を受ける挙動差）。Task 5 で settle の作成行をそのまま通知に渡すと `user` 欠落で要件 2.3 の挙動差になる。listener が保持する `context.userId` から `user` を付与する等で補い、7.x（または 5 のテスト）で「操作者が自分の操作通知から除外される」ことを検証すること。
+- 3.1: 採番 id の主キー重複は Prisma の `P2002`（constraint 名 `_id_`・実 DB で確認済み）で surface する。dup-key の良性握りつぶし判定は `err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'`（`Prisma` は `~/generated/prisma/client` から import）。復元フロー等で同種の二重作成を吸収する場合も同じ判定を使う。
