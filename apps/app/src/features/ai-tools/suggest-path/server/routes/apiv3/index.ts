@@ -71,7 +71,12 @@ const logger = loggerFactory('growi:features:suggest-path:routes');
 type ReqBody = {
   body: string;
   // Internal parameter for verification and operational switching; not
-  // exposed to the MCP tool input schema (see design "API Contract")
+  // exposed to the MCP tool input schema (see design "API Contract").
+  // Deliberately NOT role-gated: any authenticated user who discovers it can
+  // select an engine, but every engine operates strictly within the
+  // requester's own grants, so the only effect of forcing the non-default
+  // engine is spending the requester's own budget/latency (accepted while
+  // the two engines coexist for A/B verification).
   engine?: SuggestPathEngineId;
 };
 
@@ -125,7 +130,7 @@ const validator = [
  *               body:
  *                 type: string
  *                 description: The page content to analyze for path suggestions
- *                 maxLength: 50000
+ *                 maxLength: 100000
  *     responses:
  *       200:
  *         description: Path suggestions generated successfully

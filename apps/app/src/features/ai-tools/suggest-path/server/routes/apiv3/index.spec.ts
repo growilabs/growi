@@ -1,6 +1,7 @@
 import type { Request, RequestHandler } from 'express';
 import { type ValidationChain, validationResult } from 'express-validator';
 import type { Mock } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
@@ -54,10 +55,10 @@ vi.mock(
 );
 
 describe('suggestPathHandlersFactory', () => {
-  const mockSearchService = { searchKeyword: vi.fn() };
-  const mockCrowi = {
-    searchService: mockSearchService,
-  } as unknown as Crowi;
+  const mockCrowi = mock<Crowi>({
+    searchService: { searchKeyword: vi.fn() },
+  });
+  const mockSearchService = mockCrowi.searchService;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -67,17 +68,25 @@ describe('suggestPathHandlersFactory', () => {
   });
 
   describe('middleware chain', () => {
-    it('should return an array of request handlers', async () => {
+    // Exact count: accessTokenParser + loginRequired + certifyAiService
+    // + 2 validator chains (body, engine) + apiV3FormValidator + the main
+    // handler. A dropped security middleware must fail this, not slip
+    // under a loose >= bound.
+    it('should return exactly the 7 expected handlers', async () => {
       const { suggestPathHandlersFactory } = await import('.');
       const handlers = suggestPathHandlersFactory(mockCrowi);
-      expect(Array.isArray(handlers)).toBe(true);
-      expect(handlers.length).toBeGreaterThanOrEqual(5);
+      expect(handlers).toHaveLength(7);
     });
 
-    it('should include certifyAiService in the middleware chain', async () => {
+    it('should include certifyAiService and the login-required middleware in the chain', async () => {
+      const loginRequiredMiddleware = vi.fn();
+      mocks.loginRequiredFactoryMock.mockReturnValue(loginRequiredMiddleware);
+
       const { suggestPathHandlersFactory } = await import('.');
       const handlers = suggestPathHandlersFactory(mockCrowi);
+
       expect(handlers).toContain(mocks.certifyAiServiceMock);
+      expect(handlers).toContain(loginRequiredMiddleware);
     });
   });
 
