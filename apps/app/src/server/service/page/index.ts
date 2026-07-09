@@ -31,7 +31,11 @@ import { pipeline } from 'stream/promises';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import {
+  type IActivityHasId,
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity';
 import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
 import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
 import type { IPageDeleteConfigValueToProcessValidation } from '~/interfaces/page-delete-config';
@@ -49,7 +53,6 @@ import {
 } from '~/interfaces/websocket';
 import type { CurrentPageYjsData } from '~/interfaces/yjs';
 import type Crowi from '~/server/crowi';
-import Activity, { type ActivityDocument } from '~/server/models/activity';
 import type { CreateMethod } from '~/server/models/page';
 import {
   type PageDocument,
@@ -68,7 +71,6 @@ import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
 import { prisma } from '~/utils/prisma';
 
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
-import { Attachment } from '../../models/attachment';
 import { PathAlreadyExistsError } from '../../models/errors';
 import type { PageOperationDocument } from '../../models/page-operation';
 import PageOperation from '../../models/page-operation';
@@ -76,16 +78,17 @@ import PageRedirect from '../../models/page-redirect';
 import type { IRevisionDocument } from '../../models/revision';
 import { Revision } from '../../models/revision';
 import { serializePageSecurely } from '../../models/serializers/page-serializer';
-import ShareLink from '../../models/share-link';
 import Subscription from '../../models/subscription';
 import UserGroupRelation from '../../models/user-group-relation';
 import { V5ConversionError } from '../../models/vo/v5-conversion-error';
 import { divideByType } from '../../util/granted-group';
+import type { ActivityActor } from '../activity/attachment-removal-snapshot';
 import { configManager } from '../config-manager';
 import type { IPageGrantService } from '../page-grant';
 import { preNotifyService } from '../pre-notify';
 import { getYjsService } from '../yjs';
 import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
+import { deleteCompletelyOperation as deleteCompletelyOperationImpl } from './delete-completely-operation';
 import { onSeen } from './events/seen';
 import type { IPageService } from './page-service';
 import { shouldUseV4Process } from './should-use-v4-process';
@@ -2372,44 +2375,14 @@ class PageService implements IPageService {
     return nDeletedNonEmptyPages;
   }
 
-  async deleteCompletelyOperation(pageIds, pagePaths): Promise<void> {
-    // Delete Attachments, Revisions, Pages and emit delete
-    const Page = mongoose.model<IPage, PageModel>('Page');
-
-    const { attachmentService } = this.crowi;
-    const attachments = await Attachment.find({ page: { $in: pageIds } });
-
-    await Promise.all([
-      prisma.$transaction([
-        prisma.comments.deleteMany({
-          where: {
-            pageId: {
-              in: pageIds,
-            },
-            replyToId: {
-              not: null,
-            },
-          },
-        }),
-        prisma.comments.deleteMany({
-          where: {
-            pageId: {
-              in: pageIds,
-            },
-          },
-        }),
-      ]),
-      PageTagRelation.deleteMany({ relatedPage: { $in: pageIds } }),
-      ShareLink.deleteMany({ relatedPage: { $in: pageIds } }),
-      Revision.deleteMany({ pageId: { $in: pageIds } }),
-      Page.deleteMany({ _id: { $in: pageIds } }),
-      PageRedirect.deleteMany({
-        $or: [{ fromPath: { $in: pagePaths } }, { toPath: { $in: pagePaths } }],
-      }),
-      attachmentService.removeAllAttachments(attachments),
-
-      // Leave bookmarks without deleting -- 2024.05.17 Yuki Takei
-    ]);
+  deleteCompletelyOperation(
+    pageIds,
+    pagePaths,
+    actor: ActivityActor | null,
+  ): Promise<void> {
+    // Thin delegator: the operation body lives in delete-completely-operation.ts
+    // (extracted to keep this file focused). Collaborators are injected via crowi.
+    return deleteCompletelyOperationImpl(this.crowi, pageIds, pagePaths, actor);
   }
 
   // delete multiple pages
@@ -2419,7 +2392,17 @@ class PageService implements IPageService {
 
     logger.debug({ paths }, 'Deleting completely');
 
-    await this.deleteCompletelyOperation(ids, paths);
+    // Every recursive complete-deletion, empty-trash and group-deletion path
+    // converges on this method, so building the actor from the `user` this
+    // method already receives covers them all without touching their
+    // signatures (design: actor の受け渡し設計). ip/endpoint are not available
+    // here — an accepted degradation. `user` is undefined only on the system
+    // deletion path (deleteCompletelyUserHomeBySystem).
+    await this.deleteCompletelyOperation(
+      ids,
+      paths,
+      user != null ? { user } : null,
+    );
 
     this.pageEvent.emit('syncDescendantsDelete', pages, user); // update as renamed page
     return;
@@ -2512,7 +2495,11 @@ class PageService implements IPageService {
       );
     }
     // 2. then delete target completely
-    await this.deleteCompletelyOperation(ids, paths);
+    await this.deleteCompletelyOperation(ids, paths, {
+      user,
+      ip: activityParameters.ip,
+      endpoint: activityParameters.endpoint,
+    });
 
     // delete leaf empty pages
     await Page.removeLeafEmptyPagesRecursively(page.parent);
@@ -2611,7 +2598,8 @@ class PageService implements IPageService {
 
     logger.debug({ paths }, 'Deleting completely');
 
-    await this.deleteCompletelyOperation(ids, paths);
+    // The v4 path has no activityParameters — actor degrades to user only.
+    await this.deleteCompletelyOperation(ids, paths, { user });
 
     if (isRecursively) {
       this.deleteCompletelyDescendantsWithStream(page, user, options);
@@ -2837,9 +2825,11 @@ class PageService implements IPageService {
       },
     };
 
-    let activity: ActivityDocument | null = null;
+    let activity: IActivityHasId | null = null;
     try {
-      activity = await Activity.createByParameters(parameters);
+      activity = (await prisma.activities.createByParameters(
+        parameters,
+      )) as IActivityHasId;
     } catch (err) {
       logger.error('Create activity failed', err);
     }
@@ -2980,7 +2970,7 @@ class PageService implements IPageService {
     options,
     pageOpId: ObjectIdLike,
     resolvedAction,
-    activity: ActivityDocument | null,
+    activity: IActivityHasId | null,
   ): Promise<void> {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
