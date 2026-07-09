@@ -53,7 +53,7 @@
   - _Boundary: recordFailsafeAttempt（service/activity/record-failsafe-attempt.ts, service/activity/index.ts）_
   - _Depends: 1.1_
 
-- [ ] 3.2 `registerFailsafeFinalizer` を新設（失敗判定＋res 配線＋掃除の分離）
+- [x] 3.2 `registerFailsafeFinalizer` を新設（失敗判定＋res 配線＋掃除の分離）
   - `service/activity/register-failsafe-finalizer.ts` を作り、`registerFailsafeFinalizer(res, activityId, context)` が `res.on('finish')`（`statusCode >= 400`）と `res.on('close')`（`writableFinished === false`＝真の中断）で `recordFailsafeAttempt` を呼び、どちらのイベントでも最後に `pendingActivityContext.clear(activityId)` するようにする。失敗判定ロジックはここが唯一の持ち主にする（middleware に持たせない）。バレルに re-export を追加する。
   - RED→GREEN: unit で「status>=400 の finish → `recordFailsafeAttempt` を呼ぶ」「status<400 の finish → 呼ばない」「`writableFinished=false` の close → 呼ぶ」「正常完了 → 呼ばない」「全経路で `clear` が呼ばれる」を確認する（`res` は fake の EventEmitter、`recordFailsafeAttempt`/`clear` は型安全モック）。
   - Observable: `registerFailsafeFinalizer` の unit がグリーンで、失敗・中断時のみ試行記録を呼び、全経路で clear する。
