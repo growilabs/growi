@@ -43,15 +43,20 @@ export const InAppNotificationContent = (
 
   // Map each news item id to its SWRInfinite page index. This lets NewsItem
   // navigate directly to `/_news?page=N#news-<id>` without walking pages.
+  // Under the unread-only filter the sidebar stream is a different (filtered)
+  // sequence, so its page boundaries do not match the full /_news feed — no
+  // valid mapping exists. Leave the map empty so NewsItem receives
+  // `pageIndex: undefined` and navigates without a `?page` query.
   const newsPageIndexById = useMemo(() => {
     const map = new Map<string, number>();
+    if (isUnopendNotificationsVisible) return map;
     newsResponse.data?.forEach((page, pageIdx) => {
       for (const item of page.docs) {
         map.set(item._id.toString(), pageIdx);
       }
     });
     return map;
-  }, [newsResponse.data]);
+  }, [newsResponse.data, isUnopendNotificationsVisible]);
 
   if (activeFilter === 'news') {
     if (allNewsItems.length === 0 && !newsResponse.isValidating) {
@@ -69,7 +74,7 @@ export const InAppNotificationContent = (
               <NewsItem
                 key={item._id.toString()}
                 item={item}
-                pageIndex={newsPageIndexById.get(item._id.toString()) ?? 0}
+                pageIndex={newsPageIndexById.get(item._id.toString())}
                 onReadMutate={handleReadMutate}
               />
             ))}
@@ -133,7 +138,7 @@ export const InAppNotificationContent = (
                 <NewsItem
                   key={`news-${newsId}`}
                   item={entry.item}
-                  pageIndex={newsPageIndexById.get(newsId) ?? 0}
+                  pageIndex={newsPageIndexById.get(newsId)}
                   onReadMutate={handleReadMutate}
                 />
               );
