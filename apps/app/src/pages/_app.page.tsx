@@ -21,7 +21,7 @@ import { swrGlobalConfiguration } from '~/utils/swr-utils';
 
 import type { CommonEachProps, CommonInitialProps } from './common-props';
 import { isCommonInitialProps } from './common-props';
-import { getLocaleAtServerSide } from './utils/locale';
+import { getUserLocaleForApp } from './utils/locale';
 import { useNextjsRoutingPageRegister } from './utils/nextjs-routing-utils';
 import { registerTransformerForObjectId } from './utils/objectid-transformer';
 import { deserializeSuperJSONProps } from './utils/superjson-ssr';
@@ -54,7 +54,7 @@ type CombinedCommonProps =
   | (CommonEachProps & CommonInitialProps);
 type GrowiAppProps = AppProps<CombinedCommonProps> & {
   Component: NextPageWithLayout<CombinedCommonProps>;
-  userLocale: Locale;
+  userLocale: Locale | undefined;
 };
 
 const GrowiAppSubstance = ({
@@ -79,7 +79,10 @@ const GrowiAppSubstance = ({
 
   useEffect(() => {
     const updateLangAttribute = () => {
-      if (document.documentElement.getAttribute('lang') !== userLocale) {
+      if (
+        userLocale != null &&
+        document.documentElement.getAttribute('lang') !== userLocale
+      ) {
         document.documentElement.setAttribute('lang', userLocale);
       }
     };
@@ -113,8 +116,8 @@ function GrowiApp(props: GrowiAppProps): JSX.Element {
 // inject userLocale by context
 GrowiApp.getInitialProps = async (appContext: AppContext) => {
   const appProps = await App.getInitialProps(appContext);
-  const userLocale = getLocaleAtServerSide(
-    appContext.ctx.req as unknown as CrowiRequest,
+  const userLocale = getUserLocaleForApp(
+    appContext.ctx.req as unknown as CrowiRequest | undefined,
   );
 
   return { ...appProps, userLocale };
