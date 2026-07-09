@@ -2,6 +2,7 @@ import type { IUserHasId } from '@growi/core/dist/interfaces';
 import type { RequestContext } from '@mastra/core/request-context';
 import { mock } from 'vitest-mock-extended';
 
+import type { ModelProviderOptions } from '~/features/mastra/interfaces/allowed-model';
 import type { SuggestPathRequestContextShape } from '~/features/mastra/server/services/mastra-modules/agents/suggest-path';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 
@@ -60,6 +61,8 @@ const SEARCH_LIMIT_KEY = 'aiTools:suggestPathAgenticSearchLimit';
 const CHILD_LISTING_LIMIT_KEY = 'aiTools:suggestPathAgenticChildListingLimit';
 const TIMEOUT_KEY = 'aiTools:suggestPathAgenticTimeoutMs';
 const REASONING_EFFORT_KEY = 'openai:reasoningEffort:suggestPathAgent';
+const ALLOWED_MODELS_KEY = 'ai:allowedModels';
+const PROVIDER_KEY = 'ai:provider';
 
 const mockUser = mock<IUserHasId>({ username: 'alice' });
 const mockUserGroups: ObjectIdLike[] = ['group1'];
@@ -72,9 +75,9 @@ type CapturedGenerateOptions = {
   maxSteps: number;
   abortSignal: AbortSignal;
   requestContext: RequestContext<SuggestPathRequestContextShape>;
-  // Present only when a non-empty reasoning effort is configured; absent
-  // otherwise so the model's default behavior is left unchanged.
-  providerOptions?: { openai: { reasoningEffort: string } };
+  // Always present: the catalog-declared options of the effective model,
+  // overlaid with the suggest-path reasoning effort when configured.
+  providerOptions: ModelProviderOptions;
 };
 
 const getGenerateCall = (
@@ -189,6 +192,13 @@ beforeEach(() => {
   mocks.configValues.set(TIMEOUT_KEY, 60_000);
   // Default to unset reasoning effort; the dedicated tests override this.
   mocks.configValues.set(REASONING_EFFORT_KEY, '');
+  // The provider-options resolver runs the REAL allow-list modules
+  // (resolveEffectiveModelId / getProviderOptionsForModel) against the
+  // mocked configManager, so the allow-list and provider must be present.
+  mocks.configValues.set(ALLOWED_MODELS_KEY, [
+    { modelId: 'test-model', isDefault: true },
+  ]);
+  mocks.configValues.set(PROVIDER_KEY, 'openai');
   mocks.getConfigMock.mockClear();
   mocks.generateMock.mockReset();
   mocks.getAgentMock.mockReset();
@@ -222,8 +232,9 @@ describe('agenticEngine', () => {
 
       const { options } = getGenerateCall();
       expect(options.structuredOutput.schema).toBe(AGENTIC_OUTPUT_JSON_SCHEMA);
-      // 2 * searchLimit(5) + 2 * childListingLimit(5) + 4
-      expect(options.maxSteps).toBe(24);
+      // 2 * searchLimit(5) + 2 * childListingLimit(5)
+      //   + 2 * searchLimit(5) page-read allowance + 4
+      expect(options.maxSteps).toBe(34);
       expect(options.abortSignal).toBeInstanceOf(AbortSignal);
     });
 
@@ -472,7 +483,7 @@ describe('agenticEngine', () => {
 
       await callEngine();
       const first = getGenerateCall(0);
-      expect(first.options.maxSteps).toBe(24); // 2 * 5 + 2 * 5 + 4
+      expect(first.options.maxSteps).toBe(34); // 2*5 + 2*5 + 2*5 + 4
       expect(first.options.requestContext.get('searchBudget')).toEqual({
         limit: 5,
         used: 0,
@@ -483,7 +494,7 @@ describe('agenticEngine', () => {
 
       await callEngine();
       const second = getGenerateCall(1);
-      expect(second.options.maxSteps).toBe(20); // 2 * 3 + 2 * 5 + 4
+      expect(second.options.maxSteps).toBe(26); // 2*3 + 2*5 + 2*3 + 4
       expect(second.options.requestContext.get('searchBudget')).toEqual({
         limit: 3,
         used: 0,
@@ -527,21 +538,60 @@ describe('agenticEngine', () => {
       });
     });
 
-    it('omits providerOptions when the reasoning effort is unset (empty), leaving the model default unchanged', async () => {
+    it('passes the catalog-declared providerOptions of the effective model through unchanged when the reasoning effort is unset', async () => {
       primeGenerate(outputWith([]));
-      // beforeEach already sets the key to '' (unset); assert the engine
-      // passes no providerOptions so the provider applies its own default.
+      mocks.configValues.set(ALLOWED_MODELS_KEY, [
+        {
+          modelId: 'test-model',
+          isDefault: true,
+          providerOptions: { openai: { textVerbosity: 'low' } },
+        },
+      ]);
+      // beforeEach already sets the reasoning-effort key to '' (unset).
 
       await callEngine();
 
-      expect(getGenerateCall(0).options.providerOptions).toBeUndefined();
+      expect(getGenerateCall(0).options.providerOptions).toEqual({
+        openai: { textVerbosity: 'low' },
+      });
+    });
+
+    it('overlays the reasoning effort onto the catalog-declared options without dropping them', async () => {
+      primeGenerate(outputWith([]));
+      mocks.configValues.set(ALLOWED_MODELS_KEY, [
+        {
+          modelId: 'test-model',
+          isDefault: true,
+          providerOptions: { openai: { textVerbosity: 'low' } },
+        },
+      ]);
+      mocks.configValues.set(REASONING_EFFORT_KEY, 'minimal');
+
+      await callEngine();
+
+      expect(getGenerateCall(0).options.providerOptions).toEqual({
+        openai: { textVerbosity: 'low', reasoningEffort: 'minimal' },
+      });
+    });
+
+    it('skips the reasoning effort WITH a warning when the active provider is not OpenAI-compatible', async () => {
+      primeGenerate(outputWith([]));
+      mocks.configValues.set(PROVIDER_KEY, 'anthropic');
+      mocks.configValues.set(REASONING_EFFORT_KEY, 'minimal');
+
+      await callEngine();
+
+      expect(getGenerateCall(0).options.providerOptions).toEqual({});
+      expect(mocks.loggerWarnMock).toHaveBeenCalledWith(
+        expect.stringContaining('anthropic'),
+      );
     });
 
     it('re-reads the reasoning effort per request: a config change is reflected without restart', async () => {
       primeGenerate(outputWith([]));
 
       await callEngine();
-      expect(getGenerateCall(0).options.providerOptions).toBeUndefined();
+      expect(getGenerateCall(0).options.providerOptions).toEqual({});
 
       mocks.configValues.set(REASONING_EFFORT_KEY, 'low');
 

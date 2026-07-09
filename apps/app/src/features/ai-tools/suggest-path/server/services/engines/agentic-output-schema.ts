@@ -1,25 +1,60 @@
+import { z } from 'zod';
+
 /**
  * Structured output contract for the agentic suggest-path engine.
  *
- * The JSON Schema is hand-written rather than converted from Zod: OpenAI
- * structured-output strict mode requires `additionalProperties: false` and an
- * exhaustive `required` list at every object level, and Zod-to-JSON-Schema
- * conversion does not guarantee this (mastra-ai/mastra#16383).
+ * The contract exists in two representations:
+ *
+ * - `agenticEngineOutputSchema` (zod) — the single source for the TS type
+ *   (`z.infer`) and the engine-side re-validation (`isAgenticEngineOutput`).
+ * - `AGENTIC_OUTPUT_JSON_SCHEMA` — hand-written rather than converted from
+ *   Zod: OpenAI structured-output strict mode requires
+ *   `additionalProperties: false` and an exhaustive `required` list at every
+ *   object level, and Zod-to-JSON-Schema conversion does not guarantee this
+ *   (mastra-ai/mastra#16383).
+ *
+ * The two are kept in sync by the co-located spec, which asserts the JSON
+ * Schema's required/enum values against the shapes the zod schema accepts.
  *
  * Validation is intentionally doubled (defense in depth): Mastra's
- * structuring pass enforces this schema, and `isAgenticEngineOutput`
+ * structuring pass enforces the JSON Schema, and `isAgenticEngineOutput`
  * re-validates the result on the engine side.
  */
 
-export type AgenticEngineOutput = {
-  readonly informationType: 'flow' | 'stock';
-  readonly suggestions: ReadonlyArray<{
-    /** Parent directory path with trailing slash */
-    readonly path: string;
-    readonly label: string;
-    readonly description: string;
-  }>;
-};
+/**
+ * Maximum number of suggestions surfaced to the API. Shared by the JSON
+ * Schema (`maxItems`, advisory for the model) and the engine adapter, which
+ * enforces the cap itself (design.md AgenticEngine output-mapping rules).
+ */
+export const SUGGESTION_CAP = 20;
+
+const suggestionEntrySchema = z.strictObject({
+  /** Parent directory path with trailing slash */
+  path: z.string(),
+  label: z.string(),
+  description: z.string(),
+});
+
+/**
+ * Engine-side re-validation schema. Strict objects give excess-property
+ * rejection at both levels (strict-mode parity with the JSON Schema).
+ *
+ * Deliberately NOT enforced here: the item cap (`SUGGESTION_CAP`) and the
+ * trailing-slash path form — the engine adapter truncates and normalizes
+ * those (design: AgenticEngine output mapping rules); this schema validates
+ * structure only.
+ */
+export const agenticEngineOutputSchema = z.strictObject({
+  informationType: z.enum(['flow', 'stock']),
+  suggestions: z.array(suggestionEntrySchema),
+});
+
+export type AgenticEngineOutput = z.infer<typeof agenticEngineOutputSchema>;
+
+export const isAgenticEngineOutput = (
+  value: unknown,
+): value is AgenticEngineOutput =>
+  agenticEngineOutputSchema.safeParse(value).success;
 
 /**
  * Exact-shape type for AGENTIC_OUTPUT_JSON_SCHEMA.
@@ -27,10 +62,10 @@ export type AgenticEngineOutput = {
  * `JSONSchema7` (@types/json-schema) is not a direct dependency of apps/app
  * (it is only reachable transitively through @mastra/core), so the constant
  * is pinned with this local literal type instead. The literal tuples lock
- * the schema's `required` / `enum` values against drift from
- * `AgenticEngineOutput` at compile time, and the shape stays structurally
- * assignable to the `JSONSchema7` that Mastra's `structuredOutput.schema`
- * option expects (mutable tuples, no readonly arrays).
+ * the schema's `required` / `enum` values at compile time, and the shape
+ * stays structurally assignable to the `JSONSchema7` that Mastra's
+ * `structuredOutput.schema` option expects (mutable tuples, no readonly
+ * arrays).
  */
 type AgenticOutputJsonSchema = {
   readonly type: 'object';
@@ -44,7 +79,7 @@ type AgenticOutputJsonSchema = {
     };
     readonly suggestions: {
       readonly type: 'array';
-      readonly maxItems: 20;
+      readonly maxItems: typeof SUGGESTION_CAP;
       readonly items: {
         readonly type: 'object';
         readonly additionalProperties: false;
@@ -75,7 +110,7 @@ export const AGENTIC_OUTPUT_JSON_SCHEMA: AgenticOutputJsonSchema = {
     },
     suggestions: {
       type: 'array',
-      maxItems: 20,
+      maxItems: SUGGESTION_CAP,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -91,66 +126,4 @@ export const AGENTIC_OUTPUT_JSON_SCHEMA: AgenticOutputJsonSchema = {
       },
     },
   },
-};
-
-// In strict mode every property is required, so the schema's `required`
-// arrays double as the exhaustive key allowlists for excess-property checks.
-// Deriving them (and the enum) from the schema constant keeps the guard and
-// the schema a single definition that cannot drift apart.
-const TOP_LEVEL_KEYS: readonly string[] = AGENTIC_OUTPUT_JSON_SCHEMA.required;
-const SUGGESTION_KEYS: readonly string[] =
-  AGENTIC_OUTPUT_JSON_SCHEMA.properties.suggestions.items.required;
-const INFORMATION_TYPE_VALUES: readonly unknown[] =
-  AGENTIC_OUTPUT_JSON_SCHEMA.properties.informationType.enum;
-
-const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-};
-
-const hasOnlyKeys = (
-  record: Record<string, unknown>,
-  allowedKeys: readonly string[],
-): boolean => {
-  return Object.keys(record).every((key) => allowedKeys.includes(key));
-};
-
-const isSuggestionEntry = (value: unknown): boolean => {
-  if (!isPlainRecord(value)) {
-    return false;
-  }
-  if (!hasOnlyKeys(value, SUGGESTION_KEYS)) {
-    return false;
-  }
-  return (
-    typeof value.path === 'string' &&
-    typeof value.label === 'string' &&
-    typeof value.description === 'string'
-  );
-};
-
-/**
- * Engine-side re-validation of the agent's structured output.
- * Strict-mode parity: unknown keys at either level are rejected.
- *
- * Deliberately NOT enforced here: the 20-item cap (`maxItems`) and the
- * trailing-slash path form — the engine adapter truncates and normalizes
- * those (design: AgenticEngine output mapping rules); the guard validates
- * structure only.
- */
-export const isAgenticEngineOutput = (
-  value: unknown,
-): value is AgenticEngineOutput => {
-  if (!isPlainRecord(value)) {
-    return false;
-  }
-  if (!hasOnlyKeys(value, TOP_LEVEL_KEYS)) {
-    return false;
-  }
-  if (!INFORMATION_TYPE_VALUES.includes(value.informationType)) {
-    return false;
-  }
-  if (!Array.isArray(value.suggestions)) {
-    return false;
-  }
-  return value.suggestions.every(isSuggestionEntry);
 };

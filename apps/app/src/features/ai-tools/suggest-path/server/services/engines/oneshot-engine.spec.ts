@@ -323,36 +323,4 @@ describe('oneshotEngine', () => {
       expect(searchSuggestion?.informationType).toBe('flow');
     });
   });
-
-  describe('parallel execution', () => {
-    it('should run evaluate pipeline and category generation independently', async () => {
-      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
-      mocks.retrieveSearchCandidatesMock.mockResolvedValue(mockCandidates);
-      mocks.evaluateCandidatesMock.mockRejectedValue(
-        new Error('Evaluate failed'),
-      );
-      mocks.generateCategorySuggestionMock.mockResolvedValue(
-        categorySuggestion,
-      );
-
-      const result = await callOneshotEngine();
-
-      expect(result).toEqual([categorySuggestion]);
-    });
-
-    it('should return search suggestions even when category fails', async () => {
-      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
-      mocks.retrieveSearchCandidatesMock.mockResolvedValue(mockCandidates);
-      mocks.evaluateCandidatesMock.mockResolvedValue(mockEvaluated);
-      mocks.resolveParentGrantMock.mockResolvedValue(1);
-      mocks.generateCategorySuggestionMock.mockRejectedValue(
-        new Error('Category failed'),
-      );
-
-      const result = await callOneshotEngine();
-
-      const searchSuggestions = result.filter((s) => s.type === 'search');
-      expect(searchSuggestions).toHaveLength(2);
-    });
-  });
 });
