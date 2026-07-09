@@ -130,6 +130,8 @@ export interface PageModel extends Model<PageDocument> {
     userGroups?,
     includeEmpty?: boolean,
     includeAnyoneWithTheLink?: boolean,
+    showPagesRestrictedByOwner?: boolean,
+    showPagesRestrictedByGroup?: boolean,
   ): Promise<HydratedDocument<PageDocument>[]>;
   findByPath(
     path: string,
@@ -811,6 +813,8 @@ schema.statics.findByIdsAndViewer = async function (
   userGroups?,
   includeEmpty?: boolean,
   includeAnyoneWithTheLink?: boolean,
+  showPagesRestrictedByOwner?: boolean,
+  showPagesRestrictedByGroup?: boolean,
 ): Promise<PageDocument[]> {
   const baseQuery = this.find({ _id: { $in: pageIds } });
   const queryBuilder = new PageQueryBuilder(baseQuery, includeEmpty);
@@ -819,6 +823,8 @@ schema.statics.findByIdsAndViewer = async function (
     user,
     userGroups,
     includeAnyoneWithTheLink,
+    showPagesRestrictedByOwner,
+    showPagesRestrictedByGroup,
   );
 
   return queryBuilder.query.exec();

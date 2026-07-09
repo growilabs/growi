@@ -91,31 +91,28 @@ bookmarkFolderSchema.statics.createByParameters = async function (
   params: IBookmarkFolder,
 ): Promise<BookmarkFolderDocument> {
   const { name, owner, parent } = params;
-  let bookmarkFolder: BookmarkFolderDocument;
 
   if (parent == null) {
-    bookmarkFolder = await this.create({ name, owner });
-  } else {
-    // Check if parent folder id is valid and parent folder exists
-    const isParentFolderIdValid = objectIdUtils.isValidObjectId(
-      parent as string,
-    );
-
-    if (!isParentFolderIdValid) {
-      throw new InvalidParentBookmarkFolderError('Parent folder id is invalid');
-    }
-    const parentFolder = await this.findById(parent);
-    if (parentFolder == null) {
-      throw new InvalidParentBookmarkFolderError('Parent folder not found');
-    }
-    bookmarkFolder = await this.create({
-      name,
-      owner,
-      parent: parentFolder._id,
-    });
+    return this.create({ name, owner });
   }
 
-  return bookmarkFolder;
+  // Check if parent folder id is valid and parent folder exists
+  const isParentFolderIdValid = objectIdUtils.isValidObjectId(parent as string);
+  if (!isParentFolderIdValid) {
+    throw new InvalidParentBookmarkFolderError('Parent folder id is invalid');
+  }
+
+  const parentFolder = await this.findById(parent);
+  if (parentFolder == null) {
+    throw new InvalidParentBookmarkFolderError('Parent folder not found');
+  }
+
+  // A user must not create a folder under another user's folder
+  if (parentFolder.owner.toString() !== owner.toString()) {
+    throw new BookmarkFolderForbiddenError('forbidden');
+  }
+
+  return this.create({ name, owner, parent: parentFolder._id });
 };
 
 bookmarkFolderSchema.statics.deleteFolderAndChildren = async function (
