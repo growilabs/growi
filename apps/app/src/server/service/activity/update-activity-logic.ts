@@ -3,7 +3,7 @@ import { getIdStringForRef } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { SupportedAction } from '~/interfaces/activity';
-import Activity from '~/server/models/activity';
+import { prisma } from '~/utils/prisma';
 
 type GenerateUpdatePayload = {
   currentUserId: string | undefined;
@@ -22,20 +22,23 @@ export const shouldGenerateUpdate = async (payload: GenerateUpdatePayload) => {
   }
 
   // Get most recent update or create activity on the page
-  const lastContentActivity = await Activity.findOne({
-    target: targetPageId,
-    action: {
-      $in: [
-        SupportedAction.ACTION_PAGE_CREATE,
-        SupportedAction.ACTION_PAGE_UPDATE,
-      ],
+  const lastContentActivity = await prisma.activities.findFirst({
+    where: {
+      target: targetPageId,
+      action: {
+        in: [
+          SupportedAction.ACTION_PAGE_CREATE,
+          SupportedAction.ACTION_PAGE_UPDATE,
+        ],
+      },
+      id: { not: currentActivityId },
     },
-    _id: { $ne: currentActivityId },
-  }).sort({ createdAt: -1 });
+    orderBy: { createdAt: 'desc' },
+  });
 
   const isLastActivityByMe =
     lastContentActivity != null &&
-    getIdStringForRef(lastContentActivity?.user) === currentUserId;
+    getIdStringForRef(lastContentActivity.userId as string) === currentUserId;
   const lastActivityTime = lastContentActivity?.createdAt?.getTime?.() ?? 0;
   const timeSinceLastActivityMs = Date.now() - lastActivityTime;
 

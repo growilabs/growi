@@ -1,15 +1,36 @@
+/**
+ * Integration tests — full contribution orchestration via the real ActivityService
+ * 'update' handler (Prisma read + write path).
+ *
+ * The handler resolves the contributor (`prisma.activities.findUnique`), runs the
+ * migration/contribution sequence, then settles the activity
+ * (`prisma.activities.updateByParameters`, migrated in Phase 1). Activities are
+ * therefore seeded and read back via Prisma into the same per-worker test DB the
+ * integration `prisma` setup (`test/setup/prisma.ts`) binds the client to;
+ * Mongoose (`User` / `Contribution`) is connected to that SAME DB by the
+ * integration mongo setup. Observable contracts (contribution counts, settled
+ * action) are unchanged from the Mongoose implementation.
+ *
+ * Requires a real MongoDB connection (wired by vitest.workspace.mts integ setup).
+ * These tests CANNOT run locally (no mongod binary / egress 403).
+ * The local bar is: type-checks cleanly; CI (external MONGO_URI) exercises actual DB.
+ *
+ * Requirements: 3.1
+ * Design: aggregate-contributions executor; contribution-migration-service
+ *   findById→findUnique; "既存の integ テスト … は insertMany→createMany／find→executor へ追随".
+ */
+
 import { EventEmitter } from 'node:events';
 import type { IUser } from '@growi/core';
-import { MongoMemoryServer } from 'mongodb-memory-server-core';
-import mongoose from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 
 import {
   SupportedAction,
   type SupportedActionType,
 } from '~/interfaces/activity';
-import Activity from '~/server/models/activity';
 import ActivityService from '~/server/service/activity';
 import { configManager } from '~/server/service/config-manager';
+import { prisma } from '~/utils/prisma';
 
 import Contribution from '../models/contribution-model';
 
@@ -19,15 +40,49 @@ vi.mock('~/server/service/config-manager', () => ({
 }));
 vi.mocked(configManager.getConfig).mockReturnValue(2592000);
 
-// Minimal User schema (only the field the migration logic reads). Guarded
-// against duplicate registration across specs in the same process.
+// Minimal User schema (the fields the migration logic reads, plus `username`
+// and timestamps) -- required because ActivityExtension.updateByParameters
+// always does `include: { user: true }` [Key Decision 5], and the real
+// `users` Prisma model declares `username`/`createdAt`/`updatedAt`
+// non-nullable; a seeded User missing any of them makes the settle-update's
+// relation fetch throw P2032. Guarded against duplicate registration across
+// specs in the same process.
 if (mongoose.models.User == null) {
   mongoose.model(
     'User',
-    new mongoose.Schema({ contributionsMigratedAt: { type: Date } }),
+    new mongoose.Schema(
+      {
+        username: { type: String },
+        contributionsMigratedAt: { type: Date },
+      },
+      { timestamps: true },
+    ),
   );
 }
 const User = mongoose.model<IUser>('User');
+
+// A sentinel ip value so cleanup deletes only this suite's seeded activities.
+const TEST_IP = '10.0.0.57';
+
+/** Build a minimal activities record for seeding via Prisma. */
+function makeActivityData(overrides: {
+  id?: string;
+  userId?: string;
+  target?: string;
+  action: string;
+}) {
+  return {
+    id: overrides.id ?? new Types.ObjectId().toHexString(),
+    v: 0,
+    action: overrides.action,
+    createdAt: new Date(),
+    endpoint: '/test/contribution-orchestration',
+    ip: TEST_IP,
+    snapshot: { id: new Types.ObjectId().toHexString(), username: 'testuser' },
+    userId: overrides.userId,
+    target: overrides.target,
+  };
+}
 
 /**
  * Builds a real ActivityService wired to a bare EventEmitter, mirroring how
@@ -56,24 +111,17 @@ const buildUpdateListener = () => {
 };
 
 describe('ActivityService contribution orchestration', () => {
-  const userId = new mongoose.Types.ObjectId();
-  const pageId = new mongoose.Types.ObjectId();
+  const userId = new Types.ObjectId();
+  const pageId = new Types.ObjectId();
 
-  let mongod: MongoMemoryServer;
-
-  beforeAll(async () => {
-    mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri());
+  beforeEach(async () => {
+    await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
+    await Contribution.deleteMany({});
+    await User.deleteMany({});
   });
 
   afterAll(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-    await mongod.stop();
-  });
-
-  beforeEach(async () => {
-    await Activity.deleteMany({});
+    await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
     await Contribution.deleteMany({});
     await User.deleteMany({});
   });
@@ -87,23 +135,27 @@ describe('ActivityService contribution orchestration', () => {
    */
   const settleViaUpdateListener = async (
     action: SupportedActionType,
-  ): Promise<mongoose.Types.ObjectId> => {
-    await User.create({ _id: userId }); // un-migrated user
+  ): Promise<string> => {
+    await User.create({ _id: userId, username: 'testuser' }); // un-migrated user
 
-    const unsettledActivity = await Activity.create({
-      user: userId,
-      target: pageId,
-      action: SupportedAction.ACTION_UNSETTLED,
+    const activityId = new Types.ObjectId().toHexString();
+    await prisma.activities.create({
+      data: makeActivityData({
+        id: activityId,
+        userId: userId.toHexString(),
+        target: pageId.toHexString(),
+        action: SupportedAction.ACTION_UNSETTLED,
+      }),
     });
 
     const updateListener = buildUpdateListener();
     await updateListener(
-      unsettledActivity._id.toString(),
+      activityId,
       { action, target: pageId, contributor: { _id: userId } },
       { _id: pageId },
     );
 
-    return unsettledActivity._id;
+    return activityId;
   };
 
   const totalContributionCount = async (): Promise<number> => {
@@ -118,7 +170,9 @@ describe('ActivityService contribution orchestration', () => {
 
     expect(await totalContributionCount()).toBe(1);
 
-    const settled = await Activity.findById(activityId);
+    const settled = await prisma.activities.findFirst({
+      where: { id: activityId },
+    });
     expect(settled?.action).toBe(SupportedAction.ACTION_PAGE_CREATE);
   });
 
@@ -129,7 +183,9 @@ describe('ActivityService contribution orchestration', () => {
 
     expect(await totalContributionCount()).toBe(1);
 
-    const settled = await Activity.findById(activityId);
+    const settled = await prisma.activities.findFirst({
+      where: { id: activityId },
+    });
     expect(settled?.action).toBe(SupportedAction.ACTION_PAGE_REVERT);
   });
 
@@ -140,7 +196,9 @@ describe('ActivityService contribution orchestration', () => {
 
     expect(await totalContributionCount()).toBe(0);
 
-    const settled = await Activity.findById(activityId);
+    const settled = await prisma.activities.findFirst({
+      where: { id: activityId },
+    });
     expect(settled?.action).toBe(
       SupportedAction.ACTION_PAGE_RECURSIVELY_REVERT,
     );

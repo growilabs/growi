@@ -16,8 +16,13 @@ datasource db {
 }
 
 type ActivitiesSnapshot {
-  id       String @map("_id") @db.ObjectId
-  username String
+  id           String  @map("_id") @db.ObjectId
+  // username is optional as a safeguard for deletion paths without a user
+  username     String?
+  originalName String?
+  pagePath     String?
+  pageId       String? @db.ObjectId
+  fileSize     Int?
 }
 
 type PageoperationsExPage {
@@ -66,7 +71,7 @@ model activities {
   targetModel String?
   userId      String?            @map("user") @db.ObjectId
 
-  user users? @relation(fields: [userId], references: [id])
+  user users? @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([userId, target, action, createdAt], map: "user_1_target_1_action_1_createdAt_1")
   @@index([userId], map: "user_1")
