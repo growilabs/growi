@@ -1,5 +1,6 @@
-import { SupportedAction } from '~/interfaces/activity';
+import { MODEL_ATTACHMENT, SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
+import { buildAttachmentRemoveSnapshot } from '~/server/service/activity/attachment-removal-snapshot';
 import loggerFactory from '~/utils/logger';
 
 import { Attachment } from '../../models/attachment';
@@ -155,6 +156,42 @@ export const routesFactory = (crowi) => {
     }
 
     return await Page.isAccessiblePageByViewer(attachment.page, user);
+  }
+
+  /**
+   * Resolve the path of the page the attachment belongs to,
+   * for the activity snapshot of an attachment removal.
+   *
+   * Returns undefined with a warning log when the page cannot be resolved,
+   * so that the snapshot is recorded without pagePath (requirement 2.3).
+   *
+   * @param {Attachment} attachment
+   * @returns {Promise<string | undefined>}
+   */
+  async function resolvePagePathForRemovalSnapshot(attachment) {
+    if (attachment.page == null) {
+      // profile image attachments have no related page
+      return undefined;
+    }
+
+    try {
+      const page = await Page.findById(attachment.page);
+      if (page != null) {
+        return page.path;
+      }
+      // Context goes first (pino convention) so it lands as structured fields;
+      // a string-first call would silently discard the context object.
+      logger.warn(
+        { attachmentId: attachment._id, pageId: attachment.page },
+        'The page of the attachment to remove was not found. The activity snapshot will be recorded without pagePath.',
+      );
+    } catch (err) {
+      logger.warn(
+        { err, attachmentId: attachment._id, pageId: attachment.page },
+        'Failed to find the page of the attachment to remove. The activity snapshot will be recorded without pagePath.',
+      );
+    }
+    return undefined;
   }
 
   const actions = {};
@@ -328,6 +365,23 @@ export const routesFactory = (crowi) => {
       );
     }
 
+    // Build the activity snapshot BEFORE removeAttachment,
+    // because the attachment document is deleted afterwards (requirements 2.1, 2.2).
+    const pagePath = await resolvePagePathForRemovalSnapshot(attachment);
+    const snapshot = buildAttachmentRemoveSnapshot(
+      {
+        _id: attachment._id.toString(),
+        originalName: attachment.originalName,
+        fileSize: attachment.fileSize,
+        // the Mongoose attachment holds the page reference as `page` (ObjectId);
+        // the builder expects it as `pageId` (see AttachmentLike NOTE)
+        pageId:
+          attachment.page != null ? attachment.page.toString() : undefined,
+      },
+      pagePath,
+      req.user.username,
+    );
+
     try {
       await attachmentService.removeAttachment(attachment);
     } catch (err) {
@@ -339,6 +393,9 @@ export const routesFactory = (crowi) => {
 
     activityEvent.emit('update', res.locals.activity._id, {
       action: SupportedAction.ACTION_ATTACHMENT_REMOVE,
+      target: attachment._id,
+      targetModel: MODEL_ATTACHMENT,
+      snapshot,
     });
 
     return res.json(ApiResponse.success({}));
