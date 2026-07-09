@@ -11,3 +11,5 @@
 | Umbrella spec | Status | Sub-spec roadmap |
 |---|---|---|
 | [growi-vault](../specs/growi-vault/) | resilience / reconcile 完了、ha は brief 段階 | [.kiro/specs/growi-vault/roadmap.md](../specs/growi-vault/roadmap.md) |
+| [enhanced-guest](../specs/enhanced-guest/) | 全 sub-spec が brief 段階（granular-page-permissions から着手） | [.kiro/specs/enhanced-guest/roadmap.md](../specs/enhanced-guest/roadmap.md) |
+| [access-control](../specs/access-control/) | 横断的な認可基盤。全 sub-spec が brief 段階（authorization-core から着手）。`enhanced-guest` が依存 | [.kiro/specs/access-control/roadmap.md](../specs/access-control/roadmap.md) |
