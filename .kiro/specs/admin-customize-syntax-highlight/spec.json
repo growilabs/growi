@@ -1,0 +1,22 @@
+{
+  "feature_name": "admin-customize-syntax-highlight",
+  "created_at": "2026-07-03T07:59:12Z",
+  "updated_at": "2026-07-10T00:00:00Z",
+  "language": "ja",
+  "phase": "implemented",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": true
+}
