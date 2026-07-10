@@ -31,11 +31,7 @@ import { pipeline } from 'stream/promises';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import {
-  type IActivityHasId,
-  SupportedAction,
-  SupportedTargetModel,
-} from '~/interfaces/activity';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
 import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
 import type { IPageDeleteConfigValueToProcessValidation } from '~/interfaces/page-delete-config';
@@ -63,12 +59,15 @@ import {
 import type { PageTagRelationDocument } from '~/server/models/page-tag-relation';
 import PageTagRelation from '~/server/models/page-tag-relation';
 import type { UserGroupDocument } from '~/server/models/user-group';
+import {
+  beginActivity,
+  pendingActivityContext,
+} from '~/server/service/activity/index';
 import { createBatchStream } from '~/server/util/batch-stream';
 import { collectAncestorPaths } from '~/server/util/collect-ancestor-paths';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
 import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
-import { prisma } from '~/utils/prisma';
 
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { PathAlreadyExistsError } from '../../models/errors';
@@ -2813,155 +2812,159 @@ class PageService implements IPageService {
       contributor: user,
     };
 
-    const parameters = {
-      ip: activityParameters.ip,
-      endpoint: activityParameters.endpoint,
-      action: SupportedAction.ACTION_UNSETTLED,
-      user,
-      target: page,
-      targetModel: SupportedTargetModel.MODEL_PAGE,
-      snapshot: {
-        username: user.username,
-      },
-    };
+    // This flow bypasses the add-activity middleware entirely (it is the
+    // "second creation source" noted in design.md), so it must mint its own
+    // id and stash its own request-time context via the SAME shared helper
+    // the middleware uses (requirement 3.3 -- no duplicated mint+stash).
+    const { activityId } = beginActivity({
+      ip: activityParameters?.ip,
+      endpoint: activityParameters?.endpoint,
+      userId: user._id?.toString(),
+      username: user.username,
+      createdAt: new Date(),
+    });
 
-    let activity: IActivityHasId | null = null;
     try {
-      activity = (await prisma.activities.createByParameters(
-        parameters,
-      )) as IActivityHasId;
-    } catch (err) {
-      logger.error('Create activity failed', err);
-    }
+      // 1. Separate v4 & v5 process
+      const shouldUseV4Process = this.shouldUseV4ProcessForRevert(page);
+      if (shouldUseV4Process) {
+        const reverted = await this.revertDeletedPageV4(
+          page,
+          user,
+          options,
+          isRecursively,
+        );
+        this.activityEvent.emit('update', activityId, activityUpdateParameters);
+        return reverted;
+      }
 
-    // 1. Separate v4 & v5 process
-    const shouldUseV4Process = this.shouldUseV4ProcessForRevert(page);
-    if (shouldUseV4Process) {
-      const reverted = await this.revertDeletedPageV4(
-        page,
-        user,
-        options,
+      const newPath = Page.getRevertDeletedPageName(page.path);
+
+      const canOperate = await this.crowi.pageOperationService.canOperate(
         isRecursively,
+        page.path,
+        newPath,
       );
-      if (activity != null) {
-        this.activityEvent.emit(
-          'update',
-          activity._id,
-          activityUpdateParameters,
+      if (!canOperate) {
+        throw Error(
+          `Cannot operate revert from path "${page.path}" right now.`,
         );
       }
-      return reverted;
-    }
 
-    const newPath = Page.getRevertDeletedPageName(page.path);
+      const includeEmpty = true;
+      const originPage = await Page.findByPath(newPath, includeEmpty);
 
-    const canOperate = await this.crowi.pageOperationService.canOperate(
-      isRecursively,
-      page.path,
-      newPath,
-    );
-    if (!canOperate) {
-      throw Error(`Cannot operate revert from path "${page.path}" right now.`);
-    }
+      // throw if any page already exists when recursively operation
+      if (originPage != null && (!originPage.isEmpty || isRecursively)) {
+        throw new PathAlreadyExistsError('already_exists', originPage.path);
+      }
 
-    const includeEmpty = true;
-    const originPage = await Page.findByPath(newPath, includeEmpty);
-
-    // throw if any page already exists when recursively operation
-    if (originPage != null && (!originPage.isEmpty || isRecursively)) {
-      throw new PathAlreadyExistsError('already_exists', originPage.path);
-    }
-
-    // 2. Revert target
-    const parent = await this.getParentAndFillAncestorsByUser(user, newPath);
-    const shouldReplace = originPage != null && originPage.isEmpty;
-    let updatedPage = await Page.findByIdAndUpdate(
-      page._id,
-      {
-        $set: {
-          path: newPath,
-          status: Page.STATUS_PUBLISHED,
-          lastUpdateUser: user._id,
-          deleteUser: null,
-          deletedAt: null,
-          parent: parent._id,
-          descendantCount: shouldReplace ? originPage.descendantCount : 0,
+      // 2. Revert target
+      const parent = await this.getParentAndFillAncestorsByUser(user, newPath);
+      const shouldReplace = originPage != null && originPage.isEmpty;
+      let updatedPage = await Page.findByIdAndUpdate(
+        page._id,
+        {
+          $set: {
+            path: newPath,
+            status: Page.STATUS_PUBLISHED,
+            lastUpdateUser: user._id,
+            deleteUser: null,
+            deletedAt: null,
+            parent: parent._id,
+            descendantCount: shouldReplace ? originPage.descendantCount : 0,
+          },
         },
-      },
-      { new: true },
-    );
-
-    if (shouldReplace) {
-      updatedPage = await Page.replaceTargetWithPage(
-        originPage,
-        updatedPage,
-        true,
+        { new: true },
       );
-    }
 
-    await PageTagRelation.updateMany(
-      { relatedPage: page._id },
-      { $set: { isPageTrashed: false } },
-    );
+      if (shouldReplace) {
+        updatedPage = await Page.replaceTargetWithPage(
+          originPage,
+          updatedPage,
+          true,
+        );
+      }
 
-    this.pageEvent.emit('revert', page, updatedPage, user);
+      await PageTagRelation.updateMany(
+        { relatedPage: page._id },
+        { $set: { isPageTrashed: false } },
+      );
 
-    if (!isRecursively) {
-      await this.updateDescendantCountOfAncestors(parent._id, 1, true);
-      if (activity != null) {
+      this.pageEvent.emit('revert', page, updatedPage, user);
+
+      if (!isRecursively) {
+        await this.updateDescendantCountOfAncestors(parent._id, 1, true);
         this.activityEvent.emit(
           'update',
-          activity._id,
+          activityId,
           activityUpdateParameters,
           page,
           preNotifyService.generatePreNotify,
         );
-      }
-    } else {
-      let pageOp: PageOperationDocument;
-      try {
-        pageOp = await PageOperation.create({
-          actionType: PageActionType.Revert,
-          actionStage: PageActionStage.Main,
-          page,
-          user,
-          fromPath: page.path,
-          toPath: newPath,
-          options,
-        });
-      } catch (err) {
-        logger.error('Failed to create PageOperation document.', err);
-        throw err;
-      }
-      /*
-       * Resumable Operation
-       */
-      (async () => {
+      } else {
+        let pageOp: PageOperationDocument;
         try {
-          await this.revertRecursivelyMainOperation(
+          pageOp = await PageOperation.create({
+            actionType: PageActionType.Revert,
+            actionStage: PageActionStage.Main,
             page,
             user,
+            fromPath: page.path,
+            toPath: newPath,
             options,
-            pageOp._id,
-            resolvedAction,
-            activity,
-          );
-          this.pageEvent.emit('syncDescendantsUpdate', updatedPage, user);
+          });
         } catch (err) {
-          logger.error(
-            'Error occurred while running revertRecursivelyMainOperation.',
-            err,
-          );
-
-          // cleanup
-          await PageOperation.deleteOne({ _id: pageOp._id });
-
+          logger.error('Failed to create PageOperation document.', err);
           throw err;
         }
-      })();
-    }
+        /*
+         * Resumable Operation
+         */
+        (async () => {
+          try {
+            await this.revertRecursivelyMainOperation(
+              page,
+              user,
+              options,
+              pageOp._id,
+              resolvedAction,
+              activityId,
+            );
+            this.pageEvent.emit('syncDescendantsUpdate', updatedPage, user);
+          } catch (err) {
+            logger.error(
+              'Error occurred while running revertRecursivelyMainOperation.',
+              err,
+            );
 
-    return updatedPage;
+            // cleanup
+            await PageOperation.deleteOne({ _id: pageOp._id });
+            // This detached scope owns the emit at the bottom of
+            // revertRecursivelyMainOperation; a throw before that emit would
+            // otherwise orphan the pending context forever (no `res`
+            // finalizer exists on this flow to clear it -- design.md:
+            // revertDeletedPage). `clear` is idempotent, so this is a no-op
+            // if the emit already fired and the listener already `take`n it.
+            pendingActivityContext.clear(activityId);
+
+            throw err;
+          }
+        })();
+      }
+
+      return updatedPage;
+    } catch (err) {
+      // Every throw above happens BEFORE any of the `activityEvent.emit`
+      // calls in this synchronous body (the emits are the only hand-off
+      // points to the listener's synchronous `take`, which owns cleanup from
+      // then on). Without this, a throw here (e.g. PathAlreadyExistsError,
+      // a failed canOperate check, or a rejected DB call) would leave the
+      // context minted by beginActivity above stashed forever -- there is no
+      // `res` finalizer on this flow to clear it, unlike the middleware path.
+      pendingActivityContext.clear(activityId);
+      throw err;
+    }
   }
 
   async revertRecursivelyMainOperation(
@@ -2970,7 +2973,7 @@ class PageService implements IPageService {
     options,
     pageOpId: ObjectIdLike,
     resolvedAction,
-    activity: IActivityHasId | null,
+    activityId: string,
   ): Promise<void> {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
@@ -2986,21 +2989,19 @@ class PageService implements IPageService {
       descendantsSubscribedSets,
     ) as Ref<IUser>[];
 
-    if (activity != null) {
-      this.activityEvent.emit(
-        'update',
-        activity._id,
-        {
-          action: resolvedAction,
-          target: page,
-          targetModel: SupportedTargetModel.MODEL_PAGE,
-          contributor: user,
-        },
-        page,
-        preNotifyService.generatePreNotify,
-        async () => descendantsSubscribedUsers,
-      );
-    }
+    this.activityEvent.emit(
+      'update',
+      activityId,
+      {
+        action: resolvedAction,
+        target: page,
+        targetModel: SupportedTargetModel.MODEL_PAGE,
+        contributor: user,
+      },
+      page,
+      preNotifyService.generatePreNotify,
+      async () => descendantsSubscribedUsers,
+    );
 
     const newPath = Page.getRevertDeletedPageName(page.path);
     // normalize parent of descendant pages
