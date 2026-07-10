@@ -4,11 +4,11 @@ import {
   getProviderLabel,
 } from '../interfaces/ai-provider';
 
-// Separator between the provider and the modelId in a closed selector trigger
-// ("provider · modelId"). U+00B7 MIDDLE DOT. Naming the selected model with its
-// provider keeps the same modelId under different providers distinguishable when
-// the menu is closed (Req 4.2). Shared so the admin default-model selector and the
-// chat model selector render the label identically.
+// Separator between the provider and the model's display name in a closed
+// selector trigger ("Provider · name"). U+00B7 MIDDLE DOT. Naming the selected
+// model with its provider keeps a same-named model under different providers
+// distinguishable when the menu is closed (Req 4.2). Shared so the admin
+// default-model selector and the chat model selector render the label identically.
 const MODEL_LABEL_SEPARATOR = ' · ';
 
 /** A provider slot paired with the items it owns, in the input's original order. */
@@ -34,11 +34,14 @@ export const groupModelsByProvider = <T>(
   })).filter((group) => group.entries.length > 0);
 
 /**
- * The closed-trigger label for a selected model: "Provider · modelId" (Req 4.2).
+ * The closed-trigger label for a selected model: "Provider · name" (Req 4.2).
  * The provider is rendered as its official display name (`getProviderLabel`),
- * never the raw provider key.
+ * never the raw provider key; `displayName` is the model's official display name
+ * (already id-fallback-resolved by the caller — the bare id for catalog-less
+ * providers / free-text / removed ids).
  */
 export const formatModelLabel = (
   provider: AiProvider,
-  modelId: string,
-): string => `${getProviderLabel(provider)}${MODEL_LABEL_SEPARATOR}${modelId}`;
+  displayName: string,
+): string =>
+  `${getProviderLabel(provider)}${MODEL_LABEL_SEPARATOR}${displayName}`;
