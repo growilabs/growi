@@ -1,17 +1,24 @@
 // --- Mock boundary ---------------------------------------------------------
 //
-// modelConfigSync is a thin S2sMessageHandlable adapter over a single
-// collaborator: clearResolvedMastraModelCache(). The observable contract is
+// modelConfigSync is a thin S2sMessageHandlable adapter over two collaborators:
+// clearResolvedMastraModelCache() and clearAvailabilityLogDedup(). The observable
+// contract is
 //   - shouldHandleS2sMessage: true iff eventName === 'configUpdated'
-//   - handleS2sMessage: invokes clearResolvedMastraModelCache()
-// We mock that collaborator so the test exercises only this module's routing
-// behavior, not how the cache is actually cleared.
-const { clearResolvedMastraModelCache } = vi.hoisted(() => ({
-  clearResolvedMastraModelCache: vi.fn(),
-}));
+//   - handleS2sMessage: invokes BOTH resets (mirroring the local PUT-handler path)
+// We mock those collaborators so the test exercises only this module's routing
+// behavior, not how the cache / dedup registry are actually reset.
+const { clearResolvedMastraModelCache, clearAvailabilityLogDedup } = vi.hoisted(
+  () => ({
+    clearResolvedMastraModelCache: vi.fn(),
+    clearAvailabilityLogDedup: vi.fn(),
+  }),
+);
 
 vi.mock('./ai-sdk-modules/resolved-model-cache', () => ({
   clearResolvedMastraModelCache,
+}));
+vi.mock('./ai-sdk-modules/llm-providers/warn-dedup', () => ({
+  clearAvailabilityLogDedup,
 }));
 
 import { mock } from 'vitest-mock-extended';
@@ -50,10 +57,18 @@ describe('modelConfigSync.shouldHandleS2sMessage (Req 2.4)', () => {
   });
 });
 
-describe('modelConfigSync.handleS2sMessage (Req 2.4)', () => {
+describe('modelConfigSync.handleS2sMessage (Req 2.4, 6.1)', () => {
   it('clears the resolved Mastra model cache', async () => {
     await modelConfigSync.handleS2sMessage();
 
     expect(clearResolvedMastraModelCache).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets the availability/malformed-config log dedup so a remote config change re-notifies (Req 6.1)', async () => {
+    // Without this, a non-publishing instance keeps its dedup registry and never
+    // re-emits a still-present misconfiguration warn after a cluster config change.
+    await modelConfigSync.handleS2sMessage();
+
+    expect(clearAvailabilityLogDedup).toHaveBeenCalledTimes(1);
   });
 });

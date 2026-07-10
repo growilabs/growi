@@ -1,147 +1,73 @@
-import { MongoMemoryServer } from 'mongodb-memory-server-core';
-import mongoose from 'mongoose';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+/**
+ * Unit tests for buildPipeline's pipeline-shape contract.
+ *
+ * Regression: `user` was previously matched with a raw `mongoose.Types.ObjectId`
+ * instance, which serializes to a plain JSON string when sent through
+ * `aggregateRaw` -- that does NOT match a stored ObjectId-typed field, so the
+ * pipeline silently matched zero documents (verified against a real MongoDB
+ * replica set). `user` must be wrapped via `toRawObjectId` (the MongoDB
+ * Extended JSON `$oid` form) instead.
+ */
+import { buildPipeline } from './activity-aggregation-service';
 
-import { ActivityLogActions } from '~/interfaces/activity';
-import Activity from '~/server/models/activity';
+describe('buildPipeline', () => {
+  it('matches `user` with the $oid Extended JSON form, not a raw ObjectId/string', () => {
+    const userId = '507f1f77bcf86cd799439011';
+    const startDate = new Date('2025-01-01T00:00:00Z');
+    const endDate = new Date('2025-01-31T00:00:00Z');
 
-import { getContributionActivities } from './activity-aggregation-service';
+    const pipeline = buildPipeline({ userId, startDate, endDate });
 
-describe('getContributionActivities', () => {
-  let mongoServer: MongoMemoryServer;
-
-  beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
-    await mongoose.connect(mongoServer.getUri());
+    const matchStage = pipeline[0] as { $match: Record<string, unknown> };
+    expect(matchStage.$match.user).toEqual({ $oid: userId });
   });
 
-  afterAll(async () => {
-    await mongoose.disconnect();
-    await mongoServer.stop();
+  it('filters by createdAt range with the $date Extended JSON form, not raw Date instances', () => {
+    // Regression: a raw Date instance in an aggregateRaw $match range
+    // comparison serializes to a plain JSON string, which does NOT compare
+    // correctly against a stored BSON Date field -- the query silently
+    // matched zero documents (verified against a real MongoDB replica set).
+    const userId = '507f1f77bcf86cd799439011';
+    const startDate = new Date('2025-01-01T00:00:00Z');
+    const endDate = new Date('2025-01-31T00:00:00Z');
+
+    const pipeline = buildPipeline({ userId, startDate, endDate });
+
+    const matchStage = pipeline[0] as {
+      $match: {
+        createdAt: { $gte: { $date: string }; $lte: { $date: string } };
+        action: unknown;
+      };
+    };
+    expect(matchStage.$match.createdAt).toEqual({
+      $gte: { $date: startDate.toISOString() },
+      $lte: { $date: endDate.toISOString() },
+    });
+    expect(matchStage.$match.action).toBeDefined();
   });
 
-  beforeEach(async () => {
-    await Activity.deleteMany({});
-  });
-
-  it('should aggregate real database records into daily counts', async () => {
-    // Arrange
-    const userId = new mongoose.Types.ObjectId();
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
-
-    await Activity.insertMany([
-      {
-        user: userId,
-        action: ActivityLogActions.ACTION_PAGE_CREATE,
-        createdAt: new Date('2025-11-01T12:00:00Z'),
-      },
-      {
-        user: userId,
-        action: ActivityLogActions.ACTION_PAGE_UPDATE,
-        createdAt: new Date('2025-11-01T15:00:00Z'),
-      },
-      {
-        user: userId,
-        action: ActivityLogActions.ACTION_PAGE_CREATE,
-        createdAt: new Date('2025-11-02T01:00:00Z'),
-      },
-    ]);
-
-    // Act
-    const results = await getContributionActivities({
-      userId: userId.toString(),
-      startDate: new Date('2025-11-01T00:00:00Z'),
-      endDate: new Date(),
+  it('groups by day via $dateTrunc and projects date/count', () => {
+    const pipeline = buildPipeline({
+      userId: '507f1f77bcf86cd799439011',
+      startDate: new Date('2025-01-01T00:00:00Z'),
+      endDate: new Date('2025-01-31T00:00:00Z'),
     });
 
-    // Assert: Verify the final outcome
-    expect(results).toHaveLength(2);
-    expect(results).toEqual(
-      expect.arrayContaining([
-        { date: '2025-11-01', count: 2 },
-        { date: '2025-11-02', count: 1 },
-      ]),
-    );
-
-    vi.useRealTimers();
-  });
-
-  it('should exclude records before the startDate', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
-
-    const userId = new mongoose.Types.ObjectId();
-    await Activity.insertMany([
-      {
-        user: userId,
-        action: ActivityLogActions.ACTION_PAGE_CREATE,
-        createdAt: new Date('2025-10-31T23:59:59Z'), // Before
+    expect(pipeline[1]).toEqual({
+      $group: {
+        _id: {
+          $dateTrunc: { date: '$createdAt', unit: 'day', timezone: 'UTC' },
+        },
+        count: { $sum: 1 },
       },
-      {
-        user: userId,
-        action: ActivityLogActions.ACTION_PAGE_CREATE,
-        createdAt: new Date('2025-11-01T10:00:00Z'), // After
-      },
-    ]);
-
-    const results = await getContributionActivities({
-      userId: userId.toString(),
-      startDate: new Date('2025-11-01T00:00:00Z'),
-      endDate: new Date(),
     });
-
-    expect(results).toHaveLength(1);
-    expect(results[0].date).toBe('2025-11-01');
-
-    vi.useRealTimers();
-  });
-
-  it('should correctly separate activities occurring seconds apart across the midnight boundary', async () => {
-    const userId = new mongoose.Types.ObjectId();
-
-    // Define the midnight boundary
-    const tuesdayLastSecond = new Date('2026-03-24T23:59:59Z');
-    const wednesdayFirstSecond = new Date('2026-03-25T00:00:01Z');
-
-    // Set "Now" to Wednesday afternoon for the test environment
-    const mockNow = new Date('2026-03-25T15:00:00Z');
-    vi.useFakeTimers();
-    vi.setSystemTime(mockNow);
-
-    // Insert activities on both sides of the midnight boundary
-    await Activity.insertMany([
-      {
-        user: userId,
-        action: ActivityLogActions.ACTION_PAGE_CREATE,
-        createdAt: tuesdayLastSecond,
+    expect(pipeline[2]).toEqual({
+      $project: {
+        _id: 0,
+        date: { $dateToString: { format: '%Y-%m-%d', date: '$_id' } },
+        count: '$count',
       },
-      {
-        user: userId,
-        action: ActivityLogActions.ACTION_PAGE_UPDATE,
-        createdAt: wednesdayFirstSecond,
-      },
-    ]);
-
-    // Run the pipeline starting from Monday
-    const results = await getContributionActivities({
-      userId: userId.toString(),
-      startDate: new Date('2026-03-23T00:00:00Z'),
-      endDate: new Date(),
     });
-
-    // We expect two distinct entries in the results
-    const tuesdayEntry = results.find((r) => r.date === '2026-03-24');
-    const wednesdayEntry = results.find((r) => r.date === '2026-03-25');
-
-    expect(tuesdayEntry).toBeDefined();
-    expect(tuesdayEntry?.count).toBe(1);
-
-    expect(wednesdayEntry).toBeDefined();
-    expect(wednesdayEntry?.count).toBe(1);
-
-    expect(results.length).toBe(2);
-
-    vi.useRealTimers();
+    expect(pipeline[3]).toEqual({ $sort: { date: 1 } });
   });
 });

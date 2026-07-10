@@ -1,11 +1,12 @@
 import { AI_PROVIDERS } from '~/features/mastra/interfaces/ai-provider';
 
 // Each provider creator returns a "provider function" that, when called with a
-// model id, yields a Mastra-compatible model. We mock the @ai-sdk/* + config
-// boundaries so we can observe (a) the apiKey the creator is constructed with and
-// (b) the model id applied. The model id now arrives as the resolver argument
-// (not from config). azure-openai resolves its own (richer) config, so it is
-// mocked here and covered by azure-openai.spec.ts.
+// model id, yields a Mastra-compatible model. We mock the @ai-sdk/* boundaries and
+// the per-provider config accessor `requireApiKey` so we can observe (a) that each
+// resolver reads ITS OWN provider key (requireApiKey('openai') etc.) and (b) the
+// model id applied. The model id arrives as the resolver argument (not from
+// config). azure-openai resolves its own (richer) config, so it is mocked here and
+// covered by azure-openai.spec.ts.
 const {
   createOpenAI,
   createAnthropic,
@@ -13,7 +14,7 @@ const {
   openaiProviderFn,
   anthropicProviderFn,
   googleProviderFn,
-  getConfig,
+  requireApiKey,
   resolveAzureOpenaiModel,
 } = vi.hoisted(() => {
   const openaiProviderFn = vi.fn((modelId: string) => ({
@@ -37,7 +38,9 @@ const {
     createGoogleGenerativeAI: vi.fn(
       (_opts: { apiKey: string }) => googleProviderFn,
     ),
-    getConfig: vi.fn(),
+    // Returns a per-provider key so each resolver's provider argument is observable
+    // in the apiKey passed to its creator.
+    requireApiKey: vi.fn((provider: string) => `key-for-${provider}`),
     resolveAzureOpenaiModel: vi.fn((modelId: string) => ({
       tag: 'azure-model',
       modelId,
@@ -48,9 +51,7 @@ const {
 vi.mock('@ai-sdk/openai', () => ({ createOpenAI }));
 vi.mock('@ai-sdk/anthropic', () => ({ createAnthropic }));
 vi.mock('@ai-sdk/google', () => ({ createGoogleGenerativeAI }));
-vi.mock('~/server/service/config-manager', () => ({
-  configManager: { getConfig },
-}));
+vi.mock('./config', () => ({ requireApiKey }));
 vi.mock('./azure-openai', () => ({ resolveAzureOpenaiModel }));
 
 import { resolveAnthropicModel } from './anthropic';
@@ -58,74 +59,59 @@ import { resolveGoogleModel } from './google';
 import { modelResolvers } from './index';
 import { resolveOpenaiModel } from './openai';
 
-// Only the api key comes from config now; the model id is the resolver argument.
-const setApiKey = (apiKey: string | undefined): void => {
-  getConfig.mockImplementation((key: string) =>
-    key === 'ai:apiKey' ? apiKey : undefined,
-  );
-};
-
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe('key-based provider resolvers', () => {
-  it('resolveOpenaiModel constructs OpenAI with the config apiKey + the model argument', () => {
-    setApiKey('sk-openai-123');
-
+  it('resolveOpenaiModel reads its OWN provider key and constructs OpenAI with it + the model argument', () => {
     const result = resolveOpenaiModel('gpt-test');
 
-    expect(createOpenAI).toHaveBeenCalledWith({ apiKey: 'sk-openai-123' });
+    expect(requireApiKey).toHaveBeenCalledWith('openai');
+    expect(createOpenAI).toHaveBeenCalledWith({ apiKey: 'key-for-openai' });
     expect(openaiProviderFn).toHaveBeenCalledWith('gpt-test');
     expect(result).toEqual({ tag: 'openai-model', modelId: 'gpt-test' });
   });
 
-  it('resolveAnthropicModel constructs Anthropic with the config apiKey + the model argument', () => {
-    setApiKey('sk-anthropic-456');
-
+  it('resolveAnthropicModel reads its OWN provider key and constructs Anthropic with it + the model argument', () => {
     const result = resolveAnthropicModel('claude-test');
 
+    expect(requireApiKey).toHaveBeenCalledWith('anthropic');
     expect(createAnthropic).toHaveBeenCalledWith({
-      apiKey: 'sk-anthropic-456',
+      apiKey: 'key-for-anthropic',
     });
     expect(anthropicProviderFn).toHaveBeenCalledWith('claude-test');
     expect(result).toEqual({ tag: 'anthropic-model', modelId: 'claude-test' });
   });
 
-  it('resolveGoogleModel constructs Google with the config apiKey + the model argument', () => {
-    setApiKey('sk-google-789');
-
+  it('resolveGoogleModel reads its OWN provider key and constructs Google with it + the model argument', () => {
     const result = resolveGoogleModel('gemini-test');
 
+    expect(requireApiKey).toHaveBeenCalledWith('google');
     expect(createGoogleGenerativeAI).toHaveBeenCalledWith({
-      apiKey: 'sk-google-789',
+      apiKey: 'key-for-google',
     });
     expect(googleProviderFn).toHaveBeenCalledWith('gemini-test');
     expect(result).toEqual({ tag: 'google-model', modelId: 'gemini-test' });
   });
 
-  it('throws (naming AI_API_KEY) when the api key is missing', () => {
-    setApiKey(undefined);
+  it('propagates the requireApiKey throw (missing key) without constructing the provider', () => {
+    requireApiKey.mockImplementationOnce((provider: string) => {
+      throw new Error(`API key for provider "${provider}" is not configured`);
+    });
 
-    expect(() => resolveOpenaiModel('gpt-test')).toThrow(/AI_API_KEY/);
+    expect(() => resolveOpenaiModel('gpt-test')).toThrow(/not configured/);
     expect(createOpenAI).not.toHaveBeenCalled();
   });
 
-  it('injects the config apiKey explicitly (never the provider env var)', () => {
-    const original = process.env.OPENAI_API_KEY;
-    process.env.OPENAI_API_KEY = 'env-should-not-be-used';
-    try {
-      setApiKey('sk-explicit');
-      resolveOpenaiModel('gpt-test');
-      // The creator receives the config key, never the provider's env var.
-      expect(createOpenAI).toHaveBeenCalledWith({ apiKey: 'sk-explicit' });
-    } finally {
-      if (original == null) {
-        delete process.env.OPENAI_API_KEY;
-      } else {
-        process.env.OPENAI_API_KEY = original;
-      }
-    }
+  it('always injects an explicit apiKey option (never relies on the provider env var auto-detection)', () => {
+    resolveOpenaiModel('gpt-test');
+
+    // The creator ALWAYS receives an explicit apiKey option, so the resolver never
+    // falls back to the @ai-sdk provider's own process.env auto-detection.
+    expect(createOpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({ apiKey: expect.any(String) }),
+    );
   });
 });
 
@@ -136,25 +122,23 @@ describe('modelResolvers', () => {
     );
   });
 
-  it('routes each provider key to its own resolver, forwarding the model argument', () => {
-    setApiKey('sk');
-
+  it('routes each provider key to its own resolver, forwarding the model argument and reading that provider key', () => {
     expect(modelResolvers.openai('m-openai')).toMatchObject({
       modelId: 'm-openai',
     });
-    expect(createOpenAI).toHaveBeenCalledWith({ apiKey: 'sk' });
+    expect(requireApiKey).toHaveBeenCalledWith('openai');
     expect(openaiProviderFn).toHaveBeenCalledWith('m-openai');
 
     expect(modelResolvers.anthropic('m-anthropic')).toMatchObject({
       modelId: 'm-anthropic',
     });
-    expect(createAnthropic).toHaveBeenCalledWith({ apiKey: 'sk' });
+    expect(requireApiKey).toHaveBeenCalledWith('anthropic');
     expect(anthropicProviderFn).toHaveBeenCalledWith('m-anthropic');
 
     expect(modelResolvers.google('m-google')).toMatchObject({
       modelId: 'm-google',
     });
-    expect(createGoogleGenerativeAI).toHaveBeenCalledWith({ apiKey: 'sk' });
+    expect(requireApiKey).toHaveBeenCalledWith('google');
     expect(googleProviderFn).toHaveBeenCalledWith('m-google');
 
     const azureResult = modelResolvers['azure-openai']('m-azure');

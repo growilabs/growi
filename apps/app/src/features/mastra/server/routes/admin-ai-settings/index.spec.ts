@@ -186,9 +186,12 @@ describe('admin-ai-settings router factory', () => {
       const res = await request(buildApp(admin)).get('/_api/v3/ai-settings/');
       // Real getAiSettings → res.apiv3(response); admins reach the handler.
       // Status 200 is the access-control signal; the response carries the
-      // settings shape (isApiKeySet is always a boolean, so it survives JSON).
+      // multi-provider settings shape (a fixed-slot `providers` record whose
+      // entries each expose an isApiKeySet boolean — the key value is never
+      // returned).
       expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty('isApiKeySet');
+      expect(res.body).toHaveProperty('providers');
+      expect(typeof res.body.providers.openai.isApiKeySet).toBe('boolean');
     });
 
     it('reaches the PUT handler (success response)', async () => {

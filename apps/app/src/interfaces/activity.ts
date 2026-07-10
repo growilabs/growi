@@ -8,6 +8,7 @@ const MODEL_USER = 'User';
 const MODEL_COMMENT = 'Comment';
 const MODEL_PAGE_BULK_EXPORT_JOB = 'PageBulkExportJob';
 const MODEL_AUDIT_LOG_BULK_EXPORT_JOB = 'AuditLogBulkExportJob';
+export const MODEL_ATTACHMENT = 'Attachment';
 
 // Action
 const ACTION_UNSETTLED = 'UNSETTLED';
@@ -247,6 +248,7 @@ export const SupportedTargetModel = {
   MODEL_USER,
   MODEL_PAGE_BULK_EXPORT_JOB,
   MODEL_AUDIT_LOG_BULK_EXPORT_JOB,
+  MODEL_ATTACHMENT,
 } as const;
 
 export const SupportedEventModel = {
@@ -743,7 +745,30 @@ export type SupportedActionCategoryType =
   (typeof SupportedActionCategory)[keyof typeof SupportedActionCategory];
 export type SupportedActivityActionType =
   (typeof ActivityLogActions)[keyof typeof ActivityLogActions];
-export type ISnapshot = Partial<Pick<IUser, 'username'>>;
+/**
+ * Catch-all snapshot variant for every action without action-specific fields.
+ * Keeps the pre-union `{ username?: string }` shape for backward compatibility.
+ */
+export type DefaultSnapshot = Partial<Pick<IUser, 'username'>>;
+
+/**
+ * Snapshot variant for ACTION_ATTACHMENT_REMOVE activities.
+ * Every field is optional: snapshot builders omit fields they cannot resolve.
+ */
+export type AttachmentRemoveSnapshot = {
+  username?: string;
+  originalName?: string;
+  pagePath?: string;
+  pageId?: string;
+  fileSize?: number;
+};
+
+/**
+ * Discriminated union of snapshot shapes. The discriminant is the activity's
+ * existing `action` field (see isAttachmentRemoveActivity); snapshots carry
+ * no discriminator field of their own.
+ */
+export type ISnapshot = DefaultSnapshot | AttachmentRemoveSnapshot;
 
 export type IActivity = {
   user?: Ref<IUser>;
@@ -757,6 +782,17 @@ export type IActivity = {
   createdAt: Date;
   snapshot?: ISnapshot;
 };
+
+/**
+ * Narrows an activity's snapshot to AttachmentRemoveSnapshot.
+ * The existing required `action` field is the sole discriminant —
+ * no discriminator field is added to the snapshot itself.
+ */
+export const isAttachmentRemoveActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: AttachmentRemoveSnapshot;
+} => activity.action === SupportedAction.ACTION_ATTACHMENT_REMOVE;
 
 export type IActivityHasId = IActivity & HasObjectId;
 
