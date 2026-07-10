@@ -275,6 +275,37 @@ describe('buildUpdateRequest (normal mode)', () => {
     ]);
   });
 
+  it('drops the display-only displayName from every mapped row', () => {
+    // displayName is display-only form state (seeded from the GET response,
+    // synced on pick). The server's PUT validator rejects any entry carrying a
+    // key outside its allow-list (validate-allowed-models ALLOWED_ENTRY_KEYS),
+    // so a leaked displayName would 400 EVERY allow-list save. This pins
+    // toAllowedModel's explicit field picks against a refactor to `...row`.
+    const body = buildUpdateRequest(
+      {
+        ...baseValues,
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+            displayName: 'GPT-4o',
+          },
+        ],
+      },
+      false,
+      true,
+    );
+
+    // Exact match: toEqual fails on any extra (defined) property, so this
+    // catches displayName — or any future form-only field — leaking into the
+    // wire entry.
+    expect(body.allowedModels).toEqual([
+      { provider: 'openai', modelId: 'gpt-4o', isDefault: true },
+    ]);
+  });
+
   it('trims surrounding whitespace off each modelId so it is stored canonically', () => {
     // A free-text modelId pasted with surrounding spaces must not ride verbatim
     // into the modelKey (model-not-found) or read as distinct from its trimmed twin.
