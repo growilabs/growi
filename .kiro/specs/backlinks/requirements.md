@@ -111,6 +111,7 @@ order of delivery is tracked separately in the implementation backlog.
 2. When a page is updated to add or remove a link, the Backlinks feature shall reflect that change in the affected pages' backlinks.
 3. When a page is deleted, the Backlinks feature shall no longer present that page as an active source of backlinks.
 4. The Backlinks feature shall retrieve and display a page's backlinks in interactive time (under approximately one second) on wikis containing at least 100,000 pages.
+5. While multiple pages are being saved within a short period, the Backlinks feature shall bound the impact of link extraction on server responsiveness — coalescing repeated saves of the same page into a single extraction run, and pacing extraction across concurrent saves — so that a burst of saves does not block live requests. (Extraction remains eventually consistent: the index may trail the save by the pacing window.)
 
 ### Requirement 4: Complete backlinks for pre-existing pages
 **Objective:** As an administrator, I want backlinks to cover content that existed before the feature was enabled, so that backlinks are complete rather than only reflecting recent edits.

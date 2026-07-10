@@ -146,6 +146,33 @@
   re-run. Listeners run after the operation, so the DB reflects the final state.
 - **Trade-offs**: One existence check per affected page; avoids brittle event-type branching.
 
+### Decision: coalesce live extraction through an in-process dirty-set drained on a paced tick
+
+- **Context**: Requirement 3.5. Extraction is CPU-bound (~120–140 ms per 60 KB body) and runs on
+  the single JS thread. Without control, a burst of saves runs full-body parses back-to-back and
+  blocks the event loop, degrading live request latency.
+- **Trace evidence** (how saves actually reach the `update` event):
+  - The `update`/`create` events fire only from an **explicit save** (`PageService.updatePage`
+    `apiv3Put('/page')`), triggered by the Save button or Ctrl-S. There is **no client autosave**
+    interval; the editor's only debounce (100 ms) drives the *preview*, not saving.
+  - Under Yjs, co-editors share a **single** server-side document; continuous edits persist to the
+    `yjs_writings` collection (not a Page revision) and do **not** emit `update`. So N users editing
+    one large doc produce **one** `update` event per explicit save, not N concurrent extractions.
+- **Selected Approach**: `create`/`update` handlers enqueue `pageId` into an in-memory `Set` instead
+  of extracting inline; a paced tick drains a bounded number of ids per cycle, re-reading each
+  page's latest body at drain time and running the existing upsert handler.
+  - Same-page saves coalesce for free (the `Set` dedupes); the bounded per-tick drain paces parses
+    for the many-distinct-pages case, yielding the loop between them.
+  - A `delete`-family event removes the id from the set and routes to `reconcileDeletedPages`, so a
+    stale upsert cannot re-create rows for a deleted page.
+- **Rationale**: The upsert is idempotent last-writer-wins, so intermediate saves carry no
+  information and collapsing them loses nothing. Pacing (not parallelism) is the right lever for
+  CPU-bound work on one thread. Reuses the backfill's duty-cycle intuition.
+- **Trade-offs**: Index trails the save by up to (tick interval × queue depth) — consistent with the
+  already-async listener. The set is best-effort/in-memory: a restart drops pending work (self-heals
+  on next edit or backfill), and coalescing is per-instance in multi-container deployments (safe
+  because idempotent, but less dedup). A durable queue / off-thread parsing stays deferred.
+
 ### Decision: resolve `toPage` through `PageRedirect`; rename needs no write-time work
 
 - **Context**: Requirement 5 (links survive rename/move, including descendants).
@@ -270,7 +297,13 @@
 ## Risks & Mitigations
 
 - **Index lag after save** (listener is async, not awaited) — Mitigation: acceptable for v1
-  and identical to search indexing; document the window. Queue/worker deferred.
+  and identical to search indexing; document the window. Durable queue / off-thread parsing deferred
+  (the in-process coalescing drain below is not that).
+- **Write-side CPU burst** (many saves close together parse full bodies back-to-back on the single
+  JS thread) — Mitigation: coalesce via an in-process `Set<pageId>` drained a bounded number per
+  paced tick; same-page saves collapse, distinct-page parses are spread over time. Naturally
+  low-pressure given no autosave and one-event-per-shared-Yjs-doc. See the coalescing decision above
+  (requirement 3.5).
 - **`findByIdsAndViewer` may include trashed pages on the source side** — Mitigation: add an
   explicit non-trashed status filter to the backlink-source query; verify during implementation.
 - **Backfill on very large wikis** — Mitigation: online throttled `CronService` job (not a
@@ -296,6 +329,10 @@
   `20211227060705-revision-path-to-page-id-schema-migration--fixed-8998.js`
 - `apps/app/docker/docker-entrypoint.ts:247` — migrations run synchronously at boot (blocking)
 - `apps/app/src/server/service/cron.ts` — `CronService` base (node-cron) for background jobs
+- `apps/app/src/server/service/page/index.ts` — `updatePage` emits `create`/`update` (explicit save only)
+- `apps/app/src/client/components/PageEditor/PageEditor.tsx` — save triggers (Save/Ctrl-S); no autosave
+- `apps/app/src/server/service/yjs/create-mongodb-persistence.ts` — Yjs state persists to
+  `yjs_writings`, not a Page revision (collaborative typing does not emit `update`)
 - `apps/app/src/features/page-bulk-export/server/service/page-bulk-export-job-cron/` — background
   job precedent (CronService + progress marker + in-progress check)
 - `apps/app/src/server/service/search-delegator/elasticsearch.ts:602-643` — streaming bulk job

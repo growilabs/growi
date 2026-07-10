@@ -203,10 +203,10 @@ extraction and resolution for all of them as one unit; there is no separable "na
 
 ---
 
-## Story B2 — Backlinks retrieval at scale (perf validation)
+## Story B2 — Backlinks retrieval and sync at scale (perf)
 
-**Nature:** Validation-only. No new production code — it exercises the B1 read path against a large
-dataset. Depends only on B1.
+**Nature:** Read-side validation (B2.1) plus one small write-side production change (B2.2) that
+grafts a coalescing queue onto the B1 walking-skeleton listener. Depends only on B1.
 
 - [ ] B2.1 Performance check for backlinks retrieval at scale
   - Verify a heavily-linked page's backlinks return in interactive time (<~1s) on a large
@@ -214,6 +214,23 @@ dataset. Depends only on B1.
   - Done when a measured retrieval against the large dataset meets the latency target
   - _Requirements: 3.4_
   - _Depends: B1.12, B1.13_
+
+- [ ] B2.2 Coalesce and pace live extraction (write-side burst control)
+  - Replace the B1.6/B1.12 inline per-event extraction with an in-process coalescing queue: the
+    `create`/`update` handlers mark the page dirty (`Set<pageId>`); a paced tick drains a bounded
+    number of ids per cycle, re-reads each page's latest body at drain time, and runs the existing
+    upsert handler once per page. `handlePageUpsert` stays the per-page unit — the queue is the seam.
+  - A `delete`-family event removes the id from the dirty set and routes to `reconcileDeletedPages`
+    (delete supersedes a pending upsert), so a stale upsert never re-creates rows for a gone page.
+  - Best-effort/in-memory by design: a restart drops pending work (self-heals on next edit/backfill);
+    the set is per-instance in multi-container deployments (safe because upserts are idempotent).
+  - Done when: repeated saves of the same page within the tick window produce exactly one extraction
+    (asserted via a spy/count on the upsert handler); a burst of distinct-page saves is drained over
+    multiple ticks rather than in one synchronous spree; a delete during a pending upsert results in
+    reconcile, not a re-created row.
+  - _Requirements: 3.5_
+  - _Boundary: PageLinkService_
+  - _Depends: B1.6, B1.12_
 
 ---
 
