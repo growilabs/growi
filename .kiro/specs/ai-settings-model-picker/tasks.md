@@ -2,9 +2,9 @@
 
 - [ ] 1. 基盤: 共有コントラクトと i18n
 - [x] 1.1 選択可能モデル一覧の応答コントラクトを定義する
-  - server/client 共有の応答型 `SelectableModelsResponse`（`modelIds: string[]` のみ）を interfaces に追加する
-  - providerOptions/apiKey などの秘匿情報をフィールドに含めない（modelId 情報のみ）
-  - 完了状態: 型が server ルートと client フックの双方から import 可能で、`modelIds: string[]` 以外のフィールドを持たない
+  - server/client 共有の応答型 `SelectableModelsResponse`（`models: SelectableModel[]` のみ。`SelectableModel = {id,name}`）を interfaces に追加する
+  - providerOptions/apiKey などの秘匿情報をフィールドに含めない（id と公式表示名のみ）
+  - 完了状態: 型が server ルートと client フックの双方から import 可能で、`models: SelectableModel[]` 以外のフィールドを持たない
   - _Requirements: 1.1, 7.1_
 
 - [x] 1.2 (P) モデル選択 UI 文言を全ロケールに追加する
@@ -22,18 +22,18 @@
   - _Boundary: chat-model-filter_
 
 - [x] 2.2 models.dev から取り込む vendoring スクリプトとコミット成果物を作成する
-  - `pnpm vendor:models` で `https://models.dev/api.json` を fetch（**取り込みステップ＝リリース前段でのみ／ビルド工程・実行時では fetch しない**）→ 対象プロバイダ選択 → `isSelectableModel` で**生成時フィルタ** → **id のみ**を `models.<provider> = string[]` に整形し、`{ _source(MIT帰属), _generatedAt, models }` の形（ヘッダとデータを分離）で決定的（ソート）に `model-catalog-data.json` を書き出す
+  - `pnpm vendor:models` で `https://models.dev/api.json` を fetch（**取り込みステップ＝リリース前段でのみ／ビルド工程・実行時では fetch しない**）→ 対象プロバイダ選択 → `isSelectableModel` で**生成時フィルタ** → **`{id,name}`**（id と公式表示名。`name` 欠落時は id フォールバック）を `models.<provider> = {id,name}[]` に整形し、`{ _source(MIT帰属), _generatedAt, models }` の形（ヘッダとデータを分離）で決定的（id でソート）に `model-catalog-data.json` を書き出す
   - cross-platform（Node の fetch/fs のみ、curl/rm 不使用）。fetch 失敗時は非ゼロ終了し既存成果物を保持
   - **生成時サニティチェック（Issue 2）**: 取得 JSON を境界で最小スキーマ検証（`providers`/`models` 構造・`tool_call`/`modalities.output` の型）し、**各対象プロバイダ（openai/anthropic/google）で選択可能1件以上**を assert。違反（想定外の形・空結果）なら**非ゼロ終了して既存成果物を保持**（上書きしない）＝スキーマドリフトによる「無言の空カタログ」出荷を防止。欠落内容（プロバイダ名・件数）をログ出力
   - 初回生成した `model-catalog-data.json` をコミットする
-  - 完了状態: `pnpm vendor:models` 実行で、chat＋tool 対応の id のみを含む3プロバイダ分の JSON が生成・コミットされ、fixture の api.json を入力にした変換テストが期待どおり（`tool_call:false` 系が含まれない）green。加えて、想定外スキーマ／いずれかの対象プロバイダが0件になる fixture で**非ゼロ終了し既存成果物を上書きしない**ことを確認できる
+  - 完了状態: `pnpm vendor:models` 実行で、chat＋tool 対応の `{id,name}` を含む3プロバイダ分の JSON が生成・コミットされ、fixture の api.json を入力にした変換テストが期待どおり（`tool_call:false` 系が含まれない・`name` 欠落時は id フォールバック）green。加えて、想定外スキーマ／いずれかの対象プロバイダが0件になる fixture で**非ゼロ終了し既存成果物を上書きしない**ことを確認できる
   - _Requirements: 1.1, 2.1, 2.2, 2.3, 6.1_
   - _Depends: 2.1_
   - _Boundary: vendor-model-catalog, model-catalog-data.json_
 
 - [ ] 3. サーバ実行時の読み取りとエンドポイント
 - [x] 3.1 コミット成果物からモデル一覧を返す読み取りサービスを実装する
-  - `getSelectableModelIds(provider)` がコミット済み `model-catalog-data.json` を静的 read し `provider` の配列を返す。**ネットワーク I/O なし**、カタログ非対応プロバイダは空配列
+  - `getSelectableModels(provider)` がコミット済み `model-catalog-data.json` を静的 read し `provider` の `{id,name}[]` を返す。**ネットワーク I/O なし**、カタログ非対応プロバイダは空配列
   - 完了状態: コミット成果物をもとに openai が非空・azure-openai が空を返し、実行時にネットワーク呼び出しが発生しないことを単体テストで確認できる
   - _Requirements: 1.1, 2.1, 2.2, 2.3, 3.1_
   - _Depends: 2.2_
@@ -41,8 +41,8 @@
 
 - [x] 3.2 available-models エンドポイントを公開し admin ルータに接続する
   - 管理者認可チェーン（read:admin:ai スコープ + login + admin）配下で、プロバイダをクエリに取り選択可能モデル一覧を返すエンドポイントを追加し admin ルータに mount する
-  - プロバイダ値を allow-list 検証し不正なら 400、未収録プロバイダは空一覧、応答は modelId のみ（秘匿情報なし）
-  - 完了状態: 非管理者は 401/403、`?provider=openai` は非空 modelIds、`?provider=azure-openai` は空、不正 provider は 400、応答に apiKey/providerOptions を含まないことを統合テストで確認できる
+  - プロバイダ値を allow-list 検証し不正なら 400、未収録プロバイダは空一覧、応答は id と公式表示名のみ（秘匿情報なし）
+  - 完了状態: 非管理者は 401/403、`?provider=openai` は非空 `models`（各要素 `{id,name}`）、`?provider=azure-openai` は空、不正 provider は 400、応答に apiKey/providerOptions を含まないことを統合テストで確認できる
   - _Requirements: 1.1, 3.1, 7.1, 7.2_
   - _Depends: 3.1, 1.1_
   - _Boundary: get-available-models, admin-ai-settings router_
@@ -106,7 +106,7 @@
   - _Requirements: 6.1, 9.1_
   - _Boundary: build-model-catalog, vendor-model-catalog_
 - [x] 9.2 更新済みカタログの永続化と effective read を実装する
-  - `RefreshedModelCatalog` singleton collection（`{ models, fetchedAt, source }`）と `getEffectiveSelectableModelIds(provider)`（更新済み／同梱の**新しい方**を採用。同梱が厳密に新しい場合のみ同梱優先＝イメージ更新後の stale スナップショット覆い隠し防止。無ければ同梱、9.5）を追加し、`get-available-models` を effective read に切替える
+  - `RefreshedModelCatalog` singleton collection（`{ models, fetchedAt, source }`。`models` は `provider→{id,name}[]`）と `getEffectiveSelectableModels(provider)`（更新済み／同梱の**新しい方**を採用。同梱が厳密に新しい場合のみ同梱優先＝イメージ更新後の stale スナップショット覆い隠し防止。無ければ同梱、9.5）を追加し、`get-available-models` を effective read に切替える
   - 完了状態: 更新済みが新しければそれを返し、同梱が新しければ同梱を返し、なしで同梱へフォールバック、azure は `[]`、read パスに外部通信がないことを単体テストで確認できる
   - _Requirements: 9.4, 9.5, 2.1, 3.1_
   - _Boundary: refreshed-model-catalog, effective-model-catalog, get-available-models_
