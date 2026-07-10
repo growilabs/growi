@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><style>.pp-fld{margin-top:16px}.pp-fld:first-child{margin-top:0}.pp-lbl{display:block;font-size:13.5px;font-weight:600;color:#3a3f44;margin-bottom:6px}.pp-inp{width:100%;border:1px solid #ced2d6;border-radius:6px;padding:9px 11px;font-size:14px;color:#22262a;background:#fff;box-sizing:border-box;font-family:inherit}.pp-help{font-size:12.5px;color:#7b828a;line-height:1.5;margin-top:6px}.pp-mcard{border:1px solid #e6e9eb;border-radius:8px;background:#fbfcfd;overflow:hidden;margin-top:10px}.pp-mtop{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer}.pp-mtop:hover{background:#f5f7f8}.pp-mname{flex:1;font-size:14px;color:#22262a}.pp-badge{font-size:10.5px;font-weight:700;color:#fff;background:#2f89c4;padding:2px 8px;border-radius:999px;letter-spacing:.02em}.pp-ib{width:30px;height:30px;border-radius:6px;border:1px solid transparent;background:transparent;display:flex;align-items:center;justify-content:center;color:#9aa0a7;cursor:pointer;flex:none}.pp-ib:hover{background:#eef1f2;color:#5b626a}.pp-mchev{color:#9aa0a7;flex:none;transition:transform .2s}.pp-mchev.open{transform:rotate(90deg)}.pp-star{color:#c9ced3}.pp-star.on{color:#eab308}.pp-mjson{border-top:1px solid #edf0f1;padding:12px 13px;background:#fff}.pp-jhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.pp-ta{width:100%;min-height:96px;border:1px solid #cdd3d8;border-radius:6px;padding:10px;font-size:12.5px;line-height:1.6;color:#3a3f44;background:#fff;box-sizing:border-box;resize:vertical;font-family:ui-monospace,'SF Mono',Menlo,monospace}.pp-ta:focus{outline:none;border-color:#147bab;box-shadow:0 0 0 3px rgba(20,123,171,.12)}.pp-ta.err{border-color:#dd6b55;box-shadow:0 0 0 3px rgba(221,107,85,.12)}.pp-jfoot{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px}.pp-ok{color:#2f9e6f;font-weight:600;display:flex;align-items:center;gap:5px}.pp-bad{color:#c1462e;font-weight:600;display:flex;align-items:center;gap:5px}.pp-reset{margin-left:auto;color:#7b828a;text-decoration:none;font-weight:600;cursor:pointer}.pp-reset:hover{color:#147bab}.pp-link{font-size:12.5px;color:#147bab;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px}.pp-add{margin-top:12px;width:100%;background:#f5f7f8;border:1px dashed #cfd4d8;color:#51565b;border-radius:8px;padding:11px;font-size:13.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}.pp-add:hover{background:#eef1f3}.pp-empty{margin-top:10px;border:1px dashed #e0e3e6;border-radius:8px;padding:16px;text-align:center;font-size:13px;color:#9aa0a7}.pp-azh{font-size:16px;font-weight:700;color:#1c2024;margin:26px 0 2px;padding-top:20px;border-top:1px solid #eceef0}.pp-tog{width:38px;height:22px;border-radius:999px;background:#cfd4d8;position:relative;flex:none;cursor:pointer}.pp-tog.on{background:#2b7fe0}.pp-knob{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s}.pp-tog.on .pp-knob{left:19px}.pp-code{font-family:ui-monospace,'SF Mono',Menlo,monospace}.pp-picker{margin-top:12px;border:1px solid #bfdcf0;background:#f4fafe;border-radius:9px;padding:15px}.pp-pkh{font-size:13.5px;font-weight:700;color:#12557a;margin-bottom:12px;display:flex;align-items:center;gap:7px}.pp-sel{width:100%;border:1px solid #ced2d6;border-radius:6px;padding:9px 11px;font-size:14px;background:#fff;color:#22262a;font-family:inherit;box-sizing:border-box}.pp-actions{display:flex;gap:9px;margin-top:14px}.pp-badd{background:#147bab;color:#fff;border:none;border-radius:6px;padding:9px 20px;font-size:13.5px;font-weight:600;cursor:pointer}.pp-badd:disabled{background:#b8c2ca;cursor:default}.pp-bcancel{background:#fff;border:1px solid #ced2d6;color:#51565b;border-radius:6px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer}.pp-new{border-color:#bfe1c9;background:#f3fbf5}</style></helmet><div class="pp-fld"><label class="pp-lbl">API Key</label><input class="pp-inp" value="{{ provider.apiKeyDisplay }}" placeholder="Enter API key" readonly><div class="pp-help">The API key used to authenticate with the AI provider.</div></div><div class="pp-fld"><label class="pp-lbl">{{ provider.modelsLabel }}</label><div class="pp-help">{{ modelsHelp }}</div><sc-for list="{{ models }}" as="m" hint-placeholder-count="2"><div class="pp-mcard {{ m.newClass }}"><div class="pp-mtop" onClick="{{ m.onToggleJson }}"><svg class="pp-mchev {{ m.chevClass }}" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg><span class="pp-mname pp-code">{{ m.name }}</span><sc-if value="{{ m.subLabel }}" hint-placeholder-val=""><span class="pp-help" style="margin:0">{{ m.subLabel }}</span></sc-if><sc-if value="{{ m.isDefault }}" hint-placeholder-val="{{ false }}"><span class="pp-badge">Default</span></sc-if><button class="pp-ib pp-star {{ m.starClass }}" title="Set as default" onClick="{{ m.onStar }}"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 3l2.6 5.7 6.2.6-4.7 4.1 1.4 6.1L12 17.3 6.5 20.6l1.4-6.1L3.2 9.9l6.2-.6z"/></svg></button><button class="pp-ib" title="Remove" onClick="{{ m.onRemove }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button></div><sc-if value="{{ m.open }}" hint-placeholder-val="{{ false }}"><div class="pp-mjson"><div class="pp-jhead"><span class="pp-lbl" style="margin:0">Provider Options (JSON)</span><a class="pp-link" href="#">How to write <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4l-8 8M18 13v6H5V6h6"/></svg></a></div><textarea class="pp-ta {{ m.errClass }}" value="{{ m.optionsJson }}" onChange="{{ m.onEditJson }}" spellcheck="false"></textarea><div class="pp-jfoot"><sc-if value="{{ m.valid }}" hint-placeholder-val="{{ true }}"><span class="pp-ok"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg>Valid JSON</span></sc-if><sc-if value="{{ m.invalid }}" hint-placeholder-val="{{ false }}"><span class="pp-bad"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 8v5M12 16v.5M10.3 3.9L2.7 17a2 2 0 001.7 3h15.2a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>Invalid JSON — check syntax</span></sc-if><a class="pp-reset" onClick="{{ m.onReset }}">Reset to default</a></div></div></sc-if></div></sc-for><sc-if value="{{ noModels }}" hint-placeholder-val="{{ false }}"><div class="pp-empty">No {{ nounPlural }} registered yet.</div></sc-if><sc-if value="{{ adding }}" hint-placeholder-val="{{ false }}"><div class="pp-picker"><div class="pp-pkh"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>{{ provider.addLabel }}</div><sc-if value="{{ provider.azure }}" hint-placeholder-val="{{ false }}"><label class="pp-lbl">Deployment name</label><input class="pp-sel" value="{{ depName }}" onInput="{{ setDep }}" placeholder="e.g. my-gpt4o-deployment"><div class="pp-help">Free text — must match the deployment name you created in Azure.</div></sc-if><sc-if value="{{ notAzure }}" hint-placeholder-val="{{ true }}"><label class="pp-lbl">Model</label><select class="pp-sel" value="{{ sel }}" onChange="{{ setSel }}"><option value="">Select a model…</option><sc-for list="{{ options }}" as="o" hint-placeholder-count="3"><option value="{{ o }}">{{ o }}</option></sc-for></select><div class="pp-help">Choose from the models available for this provider.</div></sc-if><div class="pp-actions"><button class="pp-badd" disabled="{{ addDisabled }}" onClick="{{ confirmAdd }}">Add</button><button class="pp-bcancel" onClick="{{ cancelAdd }}">Cancel</button></div></div></sc-if><sc-if value="{{ notAdding }}" hint-placeholder-val="{{ true }}"><button class="pp-add" onClick="{{ openAdd }}"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>{{ provider.addLabel }}</button></sc-if><sc-if value="{{ provider.azure }}" hint-placeholder-val="{{ false }}"><div class="pp-azh">Azure OpenAI settings</div><div class="pp-fld"><label class="pp-lbl">Azure resource name</label><input class="pp-inp" placeholder=""><div class="pp-help">Builds the standard endpoint https://&lt;resource-name&gt;.openai.azure.com. Use this for the global Azure cloud. If the base URL is also set, the base URL takes precedence.</div></div><div class="pp-fld"><label class="pp-lbl">Azure base URL</label><input class="pp-inp" placeholder=""><div class="pp-help">Use instead of the resource name for sovereign clouds, API Management gateways, or proxies. Takes precedence over the resource name when both are set.</div></div><div class="pp-fld"><label class="pp-lbl">Azure API version</label><input class="pp-inp" placeholder=""><div class="pp-help">Optional. Leave empty to use the default. Set only when a specific deployment requires a particular API version.</div></div><div class="pp-fld"><div class="fx ac gap10"><span class="pp-tog"><span class="pp-knob"></span></span><span class="pp-lbl" style="margin:0">Use Microsoft Entra ID</span></div></div></sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:720,&quot;height&quot;:460},&quot;provider&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;any&quot;}}">
+class Component extends DCLogic {
+  state = { adding: false, sel: '', dep: '', added: [], jsonEdits: {}, openMap: {} };
+
+  componentDidUpdate(prev) {
+    if (prev.provider && this.props.provider && prev.provider.id !== this.props.provider.id) {
+      this.setState({ adding: false, sel: '', dep: '', added: [], jsonEdits: {}, openMap: {} });
+    }
+  }
+
+  optionsTemplate() {
+    const id = this.props.provider.id;
+    const key = id === 'anthropic' ? 'anthropic' : id === 'google' ? 'google' : 'openai';
+    return '{\n  "' + key + '": {}\n}';
+  }
+
+  isValid(txt) {
+    try { JSON.parse(txt); return true; } catch (e) { return false; }
+  }
+
+  build(name, def, extra) {
+    const s = this.state;
+    const edited = s.jsonEdits[name];
+    const val = edited !== undefined ? edited : def;
+    const open = s.openMap[name] !== undefined ? s.openMap[name] : !!(extra && extra.open);
+    const valid = this.isValid(val);
+    const isDef = this.props.defaultName === name;
+    return {
+      name,
+      optionsJson: val,
+      open,
+      chevClass: open ? 'open' : '',
+      valid, invalid: !valid,
+      errClass: valid ? '' : 'err',
+      isDefault: isDef,
+      starClass: isDef ? 'on' : '',
+      subLabel: (extra && extra.subLabel) || '',
+      newClass: (extra && extra.newClass) || '',
+      onStar: (e) => { if (e && e.stopPropagation) e.stopPropagation(); if (this.props.onSetDefault) this.props.onSetDefault(name); },
+      onRemove: (e) => { if (e && e.stopPropagation) e.stopPropagation(); },
+      onToggleJson: () => this.setState((st) => ({ openMap: { ...st.openMap, [name]: !(st.openMap[name] !== undefined ? st.openMap[name] : !!(extra && extra.open)) } })),
+      onEditJson: (e) => { const v = e.target.value; this.setState((st) => ({ jsonEdits: { ...st.jsonEdits, [name]: v } })); },
+      onReset: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState((st) => { const j = { ...st.jsonEdits }; delete j[name]; return { jsonEdits: j }; }); }
+    };
+  }
+
+  renderVals() {
+    const p = this.props.provider || {};
+    const s = this.state;
+
+    const base = (p.models || []).map((m) => this.build(m.name, m.optionsJson, { open: m.open, isDefault: m.isDefault, starClass: m.starClass }));
+    const added = s.added.map((a, i) => {
+      const card = this.build(a.name, this.optionsTemplate(), { newClass: 'pp-new', subLabel: a.subLabel || '' });
+      card.onRemove = (e) => { if (e && e.stopPropagation) e.stopPropagation(); this.setState((st) => ({ added: st.added.filter((_, j) => j !== i) })); };
+      return card;
+    });
+    const models = base.concat(added);
+
+    const usedNames = models.map((m) => m.name);
+    const options = (p.availableModels || []).filter((o) => p.azure ? true : usedNames.indexOf(o) === -1);
+    const noun = p.azure ? 'deployment' : 'model';
+    const addDisabled = p.azure ? !s.dep.trim() : !s.sel;
+
+    return {
+      models,
+      noModels: models.length === 0,
+      nounPlural: noun + 's',
+      modelsHelp: p.azure
+        ? 'Deployments registered for this Azure resource. Click a row to edit its Provider Options. Star one to use it as the app default in chat.'
+        : 'Registered models for this provider. Click a row to edit its Provider Options. Star one to use it as the app default in chat.',
+      adding: s.adding,
+      notAdding: !s.adding,
+      notAzure: !p.azure,
+      options,
+      sel: s.sel,
+      depName: s.dep,
+      addDisabled,
+      openAdd: () => this.setState({ adding: true, sel: '', dep: '' }),
+      cancelAdd: () => this.setState({ adding: false, sel: '', dep: '' }),
+      setSel: (e) => this.setState({ sel: e.target.value }),
+      setDep: (e) => this.setState({ dep: e.target.value }),
+      confirmAdd: () => this.setState((st) => {
+        if (p.azure) {
+          if (!st.dep.trim()) return {};
+          return { added: st.added.concat([{ name: st.dep.trim() }]), adding: false, sel: '', dep: '' };
+        }
+        if (!st.sel) return {};
+        return { added: st.added.concat([{ name: st.sel }]), adding: false, sel: '', dep: '' };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,15 +1,20 @@
 import type { AzureOpenaiConfig } from '~/features/mastra/interfaces/azure-openai-config';
-import type { ConfigKey } from '~/server/service/config-manager/config-definition';
 
-// Mock the @ai-sdk/azure + @azure/identity boundaries and config-manager so the
-// resolver is exercised deterministically (no real credential chain, no I/O).
+// Mock the @ai-sdk/azure + @azure/identity boundaries and the per-provider config
+// accessors so the resolver is exercised deterministically (no real credential
+// chain, no I/O). Azure connection settings now come from
+// `getProviderSettings('azure-openai')?.azureOpenaiSettings` (env var AI_PROVIDERS)
+// and the key from `getApiKey('azure-openai')` (env var AI_PROVIDER_API_KEYS) —
+// both read for the azure-openai provider only. The deployment name (model) is the
+// resolver argument, not read from config.
 const {
   createAzure,
   azureProviderFn,
   DefaultAzureCredential,
   getBearerTokenProvider,
   tokenProviderSentinel,
-  getConfig,
+  getApiKey,
+  getProviderSettings,
 } = vi.hoisted(() => {
   const azureProviderFn = vi.fn((modelId: string) => ({
     tag: 'azure-model',
@@ -33,7 +38,8 @@ const {
     ),
     DefaultAzureCredential: vi.fn(),
     getBearerTokenProvider: vi.fn(() => tokenProviderSentinel),
-    getConfig: vi.fn(),
+    getApiKey: vi.fn(),
+    getProviderSettings: vi.fn(),
   };
 });
 
@@ -42,22 +48,25 @@ vi.mock('@azure/identity', () => ({
   DefaultAzureCredential,
   getBearerTokenProvider,
 }));
-vi.mock('~/server/service/config-manager', () => ({
-  configManager: { getConfig },
-}));
+vi.mock('./config', () => ({ getApiKey, getProviderSettings }));
 
 import { resolveAzureOpenaiModel } from './azure-openai';
 
-// Azure connection config is one JSON object under ai:azureOpenaiSettings; ai:apiKey
-// remains a flat key. The deployment name (model) is now the resolver argument,
-// no longer read from config.
-type ConfigFixture = Partial<
-  Record<ConfigKey, string | boolean | AzureOpenaiConfig | undefined>
->;
-
-const applyConfig = (fixture: ConfigFixture): void => {
-  getConfig.mockImplementation((key: ConfigKey) =>
-    key in fixture ? fixture[key] : undefined,
+// Set the azure-openai provider's stored key and connection settings. Both
+// accessors are provider-scoped, so they return their value only for
+// 'azure-openai' and undefined otherwise (proving the resolver reads its own
+// provider entry).
+const setAzureConfig = (opts: {
+  apiKey?: string;
+  azureOpenaiSettings?: AzureOpenaiConfig;
+}): void => {
+  getApiKey.mockImplementation((provider: string) =>
+    provider === 'azure-openai' ? opts.apiKey : undefined,
+  );
+  getProviderSettings.mockImplementation((provider: string) =>
+    provider === 'azure-openai'
+      ? { enabled: true, azureOpenaiSettings: opts.azureOpenaiSettings }
+      : undefined,
   );
 };
 
@@ -66,14 +75,16 @@ beforeEach(() => {
 });
 
 describe('resolveAzureOpenaiModel', () => {
-  it('builds with resourceName and applies the model argument as the deployment name', () => {
-    applyConfig({
-      'ai:apiKey': 'az-key',
-      'ai:azureOpenaiSettings': { resourceName: 'my-resource' },
+  it("reads its own provider's key + settings and applies the model argument as the deployment name", () => {
+    setAzureConfig({
+      apiKey: 'az-key',
+      azureOpenaiSettings: { resourceName: 'my-resource' },
     });
 
     const result = resolveAzureOpenaiModel('my-deployment');
 
+    expect(getProviderSettings).toHaveBeenCalledWith('azure-openai');
+    expect(getApiKey).toHaveBeenCalledWith('azure-openai');
     expect(createAzure).toHaveBeenCalledWith({
       apiKey: 'az-key',
       resourceName: 'my-resource',
@@ -83,9 +94,9 @@ describe('resolveAzureOpenaiModel', () => {
   });
 
   it('builds with baseURL when given', () => {
-    applyConfig({
-      'ai:apiKey': 'az-key',
-      'ai:azureOpenaiSettings': {
+    setAzureConfig({
+      apiKey: 'az-key',
+      azureOpenaiSettings: {
         baseURL: 'https://gw.example.com/openai/deployments',
       },
     });
@@ -99,9 +110,9 @@ describe('resolveAzureOpenaiModel', () => {
   });
 
   it('forwards both resourceName and baseURL when both are set (AI SDK ignores resourceName)', () => {
-    applyConfig({
-      'ai:apiKey': 'az-key',
-      'ai:azureOpenaiSettings': {
+    setAzureConfig({
+      apiKey: 'az-key',
+      azureOpenaiSettings: {
         resourceName: 'res-ignored-by-sdk',
         baseURL: 'https://gw.example.com',
       },
@@ -119,9 +130,9 @@ describe('resolveAzureOpenaiModel', () => {
   });
 
   it('forwards apiVersion only when set', () => {
-    applyConfig({
-      'ai:apiKey': 'az-key',
-      'ai:azureOpenaiSettings': {
+    setAzureConfig({
+      apiKey: 'az-key',
+      azureOpenaiSettings: {
         resourceName: 'res',
         apiVersion: '2024-10-01-preview',
       },
@@ -137,9 +148,9 @@ describe('resolveAzureOpenaiModel', () => {
   });
 
   it('authenticates via Microsoft Entra ID (tokenProvider) instead of an apiKey when useEntraId is set', () => {
-    applyConfig({
-      // no ai:apiKey in Entra ID mode
-      'ai:azureOpenaiSettings': {
+    setAzureConfig({
+      // no api key in Entra ID mode
+      azureOpenaiSettings: {
         resourceName: 'my-resource',
         useEntraId: true,
       },
@@ -159,15 +170,17 @@ describe('resolveAzureOpenaiModel', () => {
     expect(createAzure).not.toHaveBeenCalledWith(
       expect.objectContaining({ apiKey: expect.anything() }),
     );
+    // The Entra ID path never consults the API key accessor.
+    expect(getApiKey).not.toHaveBeenCalled();
     expect(result).toEqual({ tag: 'azure-model', modelId: 'my-deployment' });
   });
 
-  it('throws (naming the missing endpoint fields, never the key) when neither resourceName nor baseURL is set', () => {
+  it('throws (naming the missing endpoint fields / AI_PROVIDERS, never the key) when neither resourceName nor baseURL is set', () => {
     const secret = 'az-super-secret';
-    applyConfig({ 'ai:apiKey': secret });
+    setAzureConfig({ apiKey: secret });
 
     expect(() => resolveAzureOpenaiModel('dep')).toThrow(
-      /resourceName|baseURL|AI_AZURE_OPENAI_SETTINGS/,
+      /resourceName|baseURL|AI_PROVIDERS/,
     );
     expect(createAzure).not.toHaveBeenCalled();
 
@@ -178,13 +191,13 @@ describe('resolveAzureOpenaiModel', () => {
     }
   });
 
-  it('throws when neither an apiKey nor Entra ID is configured (endpoint present)', () => {
-    applyConfig({
-      'ai:azureOpenaiSettings': { resourceName: 'my-resource' },
+  it('throws (naming AI_PROVIDER_API_KEYS / useEntraId) when neither an apiKey nor Entra ID is configured (endpoint present)', () => {
+    setAzureConfig({
+      azureOpenaiSettings: { resourceName: 'my-resource' },
     });
 
     expect(() => resolveAzureOpenaiModel('dep')).toThrow(
-      /AI_API_KEY|useEntraId/,
+      /AI_PROVIDER_API_KEYS|useEntraId/,
     );
     expect(createAzure).not.toHaveBeenCalled();
   });

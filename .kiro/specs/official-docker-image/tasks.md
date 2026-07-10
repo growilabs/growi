@@ -192,6 +192,18 @@
   - Describe the 3-tier heap size fallback behavior (env var → cgroup auto-calculation → V8 default)
   - _Requirements: 5.1_
 
+## Phase 5: Prisma query engine resolution for SSR
+
+> The Turbopack-bundled Next.js SSR client cannot resolve the native Prisma query engine via `@prisma/client`'s internal search at runtime (rewritten `__dirname` / baked output path). Pin the engine at build time with the public `PRISMA_QUERY_ENGINE_LIBRARY` env var instead of relying on undocumented internal search paths.
+
+- [x] 11. Wire per-arch `PRISMA_QUERY_ENGINE_LIBRARY` and drop the entrypoint engine copy
+  - builder stage: create a fixed-name symlink `dist/generated/prisma/libquery_engine-active.so.node` → the arch's engine, with `<target>` mapped from BuildKit's `TARGETARCH` ARG (amd64 → `debian-openssl-3.0.x`, arm64 → `linux-arm64-openssl-3.0.x`); **fail-fast**: unknown/unset `TARGETARCH` exits 1 (non-BuildKit intentionally unsupported), and `test -f` the target engine before symlinking (no dangling link)
+  - release stage: set `ENV PRISMA_QUERY_ENGINE_LIBRARY` to the absolute path of that symlink (single static string, resolves per-arch)
+  - Keep `apps/app/prisma/schema.prisma` `binaryTargets = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]` so both engines land in `dist` regardless of build host (and the turbo `prisma:generate` cache stays architecture-safe)
+  - Remove `setupPrismaEngines()`, the `PRISMA_ENGINE_SEARCH_DIR` constant, and the `/tmp/prisma-engines` copy from the entrypoint and its unit tests (no longer needed)
+  - Add a Dockerfile comment noting the `arch → Prisma target` mapping must stay in sync with `schema.prisma` `binaryTargets` and the runtime base-image libc
+  - _Requirements: 6_
+
 ## Phase 6: Opt-in jemalloc native allocator
 
 > Follow-on increment (PR #11411). The memory-leak investigation located the native-side RSS retention (~+366 MiB) in glibc malloc's main arena — freed-but-unreturned memory that fragmentation prevents from being trimmed. Ship the remedy as an opt-in allocator swap to jemalloc; the default stays glibc so GROWI.cloud can soak it per-app (CPU/latency) before any default flip. See research.md "Native Allocator Retention" for the A/B measurement.

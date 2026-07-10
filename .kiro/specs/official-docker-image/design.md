@@ -131,6 +131,7 @@ flowchart TD
 - Migration is invoked directly via `child_process.execFileSync` calling node (no `npm run`, no shell needed)
 - App startup uses `child_process.spawn` + signal forwarding to fulfill PID 1 responsibilities
 - The allocator is resolved after logging flags and before privilege drop; when opted in, `LD_PRELOAD` is set on the spawned **app process only** (not the migration child) — see "Native Allocator Resolution (opt-in jemalloc)"
+- The Prisma query engine is **not** part of this flow — it is resolved at build time via `PRISMA_QUERY_ENGINE_LIBRARY` (see "Prisma Query Engine Resolution"); the entrypoint neither copies nor discovers it
 
 ### Docker Build Flow
 
@@ -176,7 +177,7 @@ flowchart LR
 
 | Component | Domain/Layer | Intent | Key Dependencies |
 |-----------|-------------|--------|-----------------|
-| Dockerfile | Infrastructure | 6-stage Docker image build definition (5-stage build chain + independent `jemalloc` provider); opt-in jemalloc `.so` for the runtime | DHI images, turbo, pnpm, debian:13-slim (jemalloc) |
+| Dockerfile | Infrastructure | 6-stage Docker image build definition (5-stage build chain + independent `jemalloc` provider); per-arch Prisma engine wiring via `PRISMA_QUERY_ENGINE_LIBRARY`; opt-in jemalloc `.so` for the runtime | DHI images, turbo, pnpm, debian:13-slim (jemalloc) |
 | docker-entrypoint.ts | Infrastructure | Container startup initialization (TypeScript); resolves the opt-in jemalloc `LD_PRELOAD` for the app process | Node.js fs/child_process, cgroup fs |
 | docker-entrypoint.spec.ts | Infrastructure | Unit tests for entrypoint | vitest |
 | Dockerfile.dockerignore | Infrastructure | Build context filter | — |
@@ -194,9 +195,23 @@ flowchart LR
 - **base**: DHI dev image + `corepack enable` (pnpm, version-pinned) + turbo (no extra apt packages needed for the package manager)
 - **pruner**: `COPY . .` + `turbo prune @growi/app --docker`
 - **deps**: COPY json/lockfile from pruner + `pnpm install --frozen-lockfile` + node-gyp
-- **builder**: COPY full source from pruner + `turbo run build` + `pnpm deploy` + artifact packaging
+- **builder**: COPY full source from pruner + `turbo run build` + `pnpm deploy` + artifact packaging + per-arch Prisma engine symlink (`libquery_engine-active.so.node` → the BuildKit `TARGETARCH` target, fail-fast; see "Prisma Query Engine Resolution")
 - **jemalloc**: `debian:13-slim` (matches the release image's distro/glibc generation) + `apt-get install --no-install-recommends libjemalloc2` in a single RUN layer + normalize the multiarch path (`/usr/lib/*-linux-gnu/libjemalloc.so.2`) to a single `/jemalloc/libjemalloc.so.2`. Independent of the build chain; exists only because the DHI runtime has no package manager
-- **release**: DHI runtime (no shell) + `COPY --from=builder` artifacts + entrypoint + `COPY --from=jemalloc` the single `libjemalloc.so.2` to `/usr/local/lib/` (opt-in allocator) + OCI labels + EXPOSE/VOLUME
+- **release**: DHI runtime (no shell) + `COPY --from=builder` artifacts + entrypoint + `COPY --from=jemalloc` the single `libjemalloc.so.2` to `/usr/local/lib/` (opt-in allocator) + `ENV PRISMA_QUERY_ENGINE_LIBRARY` (per-arch engine symlink) + OCI labels + EXPOSE/VOLUME
+
+### Prisma Query Engine Resolution
+
+**Problem**: `@prisma/client` (the `prisma-client` generator) loads a native query engine (`.so.node`, architecture-specific: `debian-openssl-3.0.x` for amd64, `linux-arm64-openssl-3.0.x` for arm64). GROWI has two server-side consumers, built by different toolchains:
+- **Express server** (`dist/server`, compiled by `tsc`) resolves the engine next to its own compiled module dir (`dist/generated/prisma/`, populated by `bin/postbuild-server.ts`) — this always worked.
+- **Next.js SSR** (`getServerSideProps`), **bundled by Turbopack** into `.next/server/...`. At runtime it cannot resolve the engine through `@prisma/client`'s internal `resolveEnginePath` search: Turbopack rewrites `__dirname` and the baked generator `output.value`, so none of the search locations (`[dirname, resolve(dirname,".."), output.value, ".../.prisma/client", "/tmp/prisma-engines", cwd]`) point at the shipped engine. This surfaces as `PrismaClientInitializationError: could not locate the Query Engine` (HTTP 500) on any SSR page that runs a Prisma query (e.g. `prisma.bookmarks.count()` on page view).
+
+**Resolution (build time, per-arch)**: `resolveEnginePath` reads the public, stable env var `PRISMA_QUERY_ENGINE_LIBRARY` *before* its internal search and, if set, returns it directly (skipping the search entirely). It does **not** verify the path exists — so a wrong or dangling value fails only at runtime (prod-only 500), which is why the builder step below is deliberately fail-fast. The Dockerfile wires it declaratively:
+- **builder stage** (has a shell): creates a fixed-name symlink `dist/generated/prisma/libquery_engine-active.so.node` → `libquery_engine-<target>.so.node`, where `<target>` is mapped from BuildKit's predefined `TARGETARCH` ARG (`amd64` → `debian-openssl-3.0.x`, `arm64` → `linux-arm64-openssl-3.0.x`). `TARGETARCH` is used rather than `dpkg`/`uname` because it is independent of the builder base image and of future `--platform`/buildx multi-arch builds. The step is **fail-fast**: an unknown/unset `TARGETARCH` exits 1 (non-BuildKit builders leave it empty and are intentionally unsupported — CI enables BuildKit via `DOCKER_BUILDKIT=1`), and the target engine must exist (`test -f`) before the symlink is created (no dangling link). This turns what would be a runtime-only prod 500 into a build failure.
+- **release stage** (no shell): `ENV PRISMA_QUERY_ENGINE_LIBRARY="${appDir}/apps/app/dist/generated/prisma/libquery_engine-active.so.node"` — one static string that resolves per-arch through the symlink.
+
+`apps/app/prisma/schema.prisma` declares `binaryTargets = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]` so both runtime engines are always generated into `dist` regardless of the build host (this also keeps the turbo `prisma:generate` cache architecture-safe). Operators can still override `PRISMA_QUERY_ENGINE_LIBRARY` via compose `environment:` (container env wins over image ENV).
+
+**Why the env var, not the entrypoint**: `PRISMA_QUERY_ENGINE_LIBRARY` is a public, documented Prisma API and is declarative (visible via `docker inspect`). Relying instead on the hardcoded `/tmp/prisma-engines` entry of the internal search list — e.g. by copying the engine there in the entrypoint — is a maintenance hazard: it is undocumented, and a future Prisma release dropping that entry would silently return SSR to 500 while the entrypoint still exits successfully. Engine resolution is therefore a build-time Dockerfile concern; the entrypoint does not touch it. **Coupling to note**: the Dockerfile now owns the `arch → Prisma target name` mapping, which must stay in sync with `schema.prisma` `binaryTargets` and the runtime base-image libc (currently `dhi.io/node:24-debian13` = glibc) — a comment in the Dockerfile flags this.
 
 ### Native Allocator Resolution (opt-in jemalloc)
 

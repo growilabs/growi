@@ -1,6 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
-import { AllSupportedActions, SupportedAction } from './activity';
+import type {
+  AttachmentRemoveSnapshot,
+  DefaultSnapshot,
+  IActivity,
+  ISnapshot,
+} from './activity';
+import {
+  AllSupportedActions,
+  isAttachmentRemoveActivity,
+  MODEL_ATTACHMENT,
+  SupportedAction,
+  SupportedTargetModel,
+} from './activity';
 
 describe('SupportedAction - GROWI Vault resilience constants', () => {
   it('exports ACTION_VAULT_RESILIENCE_BOOTSTRAP_STARTED', () => {
@@ -111,5 +123,116 @@ describe('SupportedAction - admin AI setting update action', () => {
 
   it('includes the AI setting update action in AllSupportedActions', () => {
     expect(AllSupportedActions).toContain('ADMIN_AI_SETTING_UPDATE');
+  });
+});
+
+describe('SupportedTargetModel', () => {
+  it('includes Attachment while preserving the existing four models', () => {
+    expect(SupportedTargetModel).toEqual({
+      MODEL_PAGE: 'Page',
+      MODEL_USER: 'User',
+      MODEL_PAGE_BULK_EXPORT_JOB: 'PageBulkExportJob',
+      MODEL_AUDIT_LOG_BULK_EXPORT_JOB: 'AuditLogBulkExportJob',
+      MODEL_ATTACHMENT: 'Attachment',
+    });
+  });
+
+  it('exports MODEL_ATTACHMENT as the Attachment model literal', () => {
+    expect(MODEL_ATTACHMENT).toBe('Attachment');
+  });
+});
+
+describe('isAttachmentRemoveActivity', () => {
+  it('narrows an ATTACHMENT_REMOVE activity so attachment fields are readable', () => {
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_REMOVE,
+      snapshot: {
+        username: 'alice',
+        originalName: 'diagram.png',
+        pagePath: '/Sandbox',
+        pageId: '65a000000000000000000001',
+        fileSize: 4096,
+      },
+    };
+
+    if (isAttachmentRemoveActivity(activity)) {
+      // Compile-time proof: attachment-specific fields are accessible after narrowing
+      expectTypeOf(activity.snapshot?.originalName).toEqualTypeOf<
+        string | undefined
+      >();
+      expectTypeOf(activity.snapshot?.fileSize).toEqualTypeOf<
+        number | undefined
+      >();
+
+      expect(activity.snapshot?.username).toBe('alice');
+      expect(activity.snapshot?.originalName).toBe('diagram.png');
+      expect(activity.snapshot?.pagePath).toBe('/Sandbox');
+      expect(activity.snapshot?.pageId).toBe('65a000000000000000000001');
+      expect(activity.snapshot?.fileSize).toBe(4096);
+    } else {
+      expect.unreachable('guard must accept ACTION_ATTACHMENT_REMOVE');
+    }
+  });
+
+  it('accepts an ATTACHMENT_REMOVE activity without snapshot (action is the sole discriminant)', () => {
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_REMOVE,
+    };
+
+    expect(isAttachmentRemoveActivity(activity)).toBe(true);
+  });
+
+  it('rejects the neighboring ATTACHMENT_ADD action', () => {
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_ADD,
+      snapshot: { username: 'alice' },
+    };
+
+    expect(isAttachmentRemoveActivity(activity)).toBe(false);
+  });
+
+  it('rejects other actions even when the snapshot carries attachment-shaped fields', () => {
+    // The union is not correlated with action at construction time,
+    // so this object is representable; the guard must still say no.
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_PAGE_UPDATE,
+      snapshot: { username: 'alice', originalName: 'stale.png' },
+    };
+
+    expect(isAttachmentRemoveActivity(activity)).toBe(false);
+  });
+});
+
+describe('ISnapshot union', () => {
+  it('keeps username readable on both variants without narrowing (backward compat)', () => {
+    const defaultSnapshot: ISnapshot = { username: 'alice' };
+    const attachmentSnapshot: ISnapshot = {
+      username: 'bob',
+      originalName: 'photo.jpg',
+      pagePath: '/album',
+      pageId: '65a000000000000000000002',
+      fileSize: 123,
+    };
+
+    // Reading `.username` on the unnarrowed union must compile for both variants
+    expect(defaultSnapshot.username).toBe('alice');
+    expect(attachmentSnapshot.username).toBe('bob');
+  });
+
+  it('treats the catch-all variant as the existing { username?: string } shape', () => {
+    expectTypeOf<DefaultSnapshot>().toEqualTypeOf<{ username?: string }>();
+  });
+
+  it('does not expose attachment-specific fields on the unnarrowed union', () => {
+    expectTypeOf<ISnapshot>().not.toHaveProperty('originalName');
+    expectTypeOf<ISnapshot>().not.toHaveProperty('pagePath');
+    expectTypeOf<ISnapshot>().not.toHaveProperty('pageId');
+    expectTypeOf<ISnapshot>().not.toHaveProperty('fileSize');
+  });
+
+  it('types fileSize as a number on the attachment variant', () => {
+    expectTypeOf<AttachmentRemoveSnapshot['fileSize']>().toEqualTypeOf<
+      number | undefined
+    >();
   });
 });

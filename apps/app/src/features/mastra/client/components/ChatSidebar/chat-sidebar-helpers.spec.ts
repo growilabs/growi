@@ -21,19 +21,19 @@ const makeThread = (id: string, title?: string): StorageThreadType =>
   });
 
 describe('buildMessageRequestBody', () => {
-  it('carries the threadId and the modelId', () => {
-    const body = buildMessageRequestBody('thread-abc', 'gpt-4o');
+  it('carries the threadId and the modelKey', () => {
+    const body = buildMessageRequestBody('thread-abc', 'openai/gpt-4o');
 
-    expect(body).toEqual({ threadId: 'thread-abc', modelId: 'gpt-4o' });
+    expect(body).toEqual({ threadId: 'thread-abc', modelKey: 'openai/gpt-4o' });
   });
 
   it('does not include aiAssistantId', () => {
-    const body = buildMessageRequestBody('thread-abc', 'gpt-4o');
+    const body = buildMessageRequestBody('thread-abc', 'openai/gpt-4o');
 
     expect(body).not.toHaveProperty('aiAssistantId');
   });
 
-  it('omits modelId when no model is given (server rounds to default)', () => {
+  it('omits modelKey when no model is given (server rounds to default)', () => {
     const body = buildMessageRequestBody('thread-abc');
 
     expect(body).toEqual({ threadId: 'thread-abc' });
@@ -161,22 +161,23 @@ describe('createMastraChatTransport', () => {
   };
 
   // Guards the thread-duplication regression (#185056) AND Critical Issue 1: the
-  // threadId + modelId must ride on EVERY request, including regenerate() (the
+  // threadId + modelKey must ride on EVERY request, including regenerate() (the
   // retry on error), which sends no per-call body. We exercise the REAL transport
   // with the regenerate trigger and a mocked fetch (the request boundary).
-  it('sends the threadId and the current modelId in the POST body for the regenerate trigger (no per-call body)', async () => {
+  it('sends the threadId and the current modelKey in the POST body for the regenerate trigger (no per-call body)', async () => {
     const fetchMock = stubFetch();
 
-    await createMastraChatTransport('thread-xyz', () => 'gpt-4o').sendMessages(
-      REGEN,
-    );
+    await createMastraChatTransport(
+      'thread-xyz',
+      () => 'openai/gpt-4o',
+    ).sendMessages(REGEN);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('/_api/v3/mastra/message');
     expect(JSON.parse(init.body)).toMatchObject({
       threadId: 'thread-xyz',
-      modelId: 'gpt-4o',
+      modelKey: 'openai/gpt-4o',
       trigger: 'regenerate-message',
     });
   });
@@ -186,24 +187,29 @@ describe('createMastraChatTransport', () => {
   // under @ai-sdk/react's useChat: useChat captures the transport when it creates
   // its internal Chat and only re-creates that Chat on a chat-id change — it
   // ignores a re-created transport. So a model switch (or a late /mastra/models
-  // load) must reach the server on the next send WITHOUT a new transport.
+  // load) must reach the server on the next send WITHOUT a new transport. A
+  // cross-provider switch (openai → anthropic) is preserved just the same (4.7).
   it('reads the current model from the getter on each request, so a model change applies without a new transport', async () => {
     const fetchMock = stubFetch();
-    let currentModel: string | undefined = 'gpt-4o';
+    let currentModelKey: string | undefined = 'openai/gpt-4o';
     const transport = createMastraChatTransport(
       'thread-xyz',
-      () => currentModel,
+      () => currentModelKey,
     );
 
     await transport.sendMessages(REGEN);
-    currentModel = 'o3';
+    currentModelKey = 'anthropic/claude-sonnet-4';
     await transport.sendMessages(REGEN);
 
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).modelId).toBe('gpt-4o');
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body).modelId).toBe('o3');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).modelKey).toBe(
+      'openai/gpt-4o',
+    );
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).modelKey).toBe(
+      'anthropic/claude-sonnet-4',
+    );
   });
 
-  it('omits modelId when the getter returns undefined (server rounds to default)', async () => {
+  it('omits modelKey when the getter returns undefined (server rounds to default)', async () => {
     const fetchMock = stubFetch();
 
     await createMastraChatTransport('thread-xyz', () => undefined).sendMessages(
@@ -212,6 +218,6 @@ describe('createMastraChatTransport', () => {
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body).toMatchObject({ threadId: 'thread-xyz' });
-    expect(body).not.toHaveProperty('modelId');
+    expect(body).not.toHaveProperty('modelKey');
   });
 });
