@@ -185,7 +185,7 @@
   - 観察可能な完了条件: 上記を assert する結合テストが green
   - _Requirements: 6.1, 6.2, 6.3_
   - _Depends: 10.1_
-- [ ] 13.2 (P) ダウンロードの結合テスト
+- [x] 13.2 (P) ダウンロードの結合テスト
   - ダウンロード実行後、記録を実 DB から読み直し、snapshot に originalName/pageId/fileSize＋pagePath（引き当て成功）、target/targetModel を確認する。認証時は username あり・guest 時は username 省略の両ケース。記録失敗を注入してもダウンロード応答が壊れないことを確認する
   - 観察可能な完了条件: 両ケース＋best-effort を assert する結合テストが green
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
@@ -202,6 +202,7 @@
 - 10.1: ADD の記録は既存の「middleware が UNSETTLED を先に作り emit('update') で更新」経路。1 リクエスト1更新で unique index 衝突なし。`attachment.page`(ObjectId)→`pageId`(string) の読み替えは型で捕まらない（REMOVE で踏んだ罠）。
 - 11.1: DOWNLOAD は createActivity 直接呼びの fire-and-forget。snapshot 構築の `await` を応答前に置かない（design 増分「実行順序（重要）」）。pino は context-first（`logger.warn({ attachmentId, pageId }, 'msg')`）。unique index は target=添付 _id で従来より衝突しにくいが、同一ユーザー・同一添付・同一 ms の二重 DL 衝突は best-effort で握りつぶす。
 - 9.1: REMOVE ビルダー／pagePath 解決の共有化は挙動不変の refactor。記録単位・target 設計は変えない。既存 REMOVE のユニット・結合テストが green のままであることを完了条件に含める。
+- 13.2 の学び: DOWNLOAD integ は実 `downloadRouterFactory` を mount（login-required のみ passthrough stub）。guest ケースは `retrieveAttachmentFromIdParam` が `user != null` ガードで権限チェックを skip する本番相当経路。失敗注入は `createActivity` の `mockRejectedValueOnce`（route 側 try/catch＝11.1 保護層を通す）＋`finally` で `mockRestore`。番兵 IP 使用済みに 10.0.0.80 を追加。
 - 13.1 の学び: ADD ルート駆動の integ は auth middleware のみ stub（activity.integ.ts と同じ割り切り）で、multer・validators・addActivity・handler・GridFS（`setUpFileUpload(true)`）・settle listener は実物を通す。handler が `page.revision` を serialize するため arrange するページに revision ref が必須。番兵 IP 使用済みに 10.0.0.79 を追加。activity の遅延 settle は `vi.waitFor` で prisma 読み直しを polling する。
 - 12.1 の学び: 監査ログ API の `searchFilter.actions` は `getAvailableActions()`（記録ゲート設定）と intersect するため、ゲート未注入のテストで actions フィルタを使うと ADD/DOWNLOAD（Medium 群）は 0 件になる。12.1 のテストは意図的に actions フィルタ不使用（username フィルタ／一意 originalName マーカーで特定）。13.3 でゲート注入込みの経路を検証する。
 - 11.1 完了時の実装形: 記録は download.ts の module-level `recordDownloadActivity(crowi, attachment, actor)`（全体 try/catch・await なし呼び出し・304 でも従来どおり発火）。13.2 の失敗注入はこの関数経由の経路（`buildAttachmentDownloadSnapshot` や `createActivity` の失敗）を対象にできる。DOWNLOAD の warn logger 名前空間は download.ts 側。
