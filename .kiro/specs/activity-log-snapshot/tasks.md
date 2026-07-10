@@ -190,7 +190,7 @@
   - 観察可能な完了条件: 両ケース＋best-effort を assert する結合テストが green
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
   - _Depends: 11.1_
-- [ ] 13.3 (P) 監査ログ API 応答の結合テスト
+- [x] 13.3 (P) 監査ログ API 応答の結合テスト
   - 監査ログ API 応答に ADD/DOWNLOAD の snapshot フィールドが乗ること、ADD には target（添付 _id）＋targetModel（Attachment）が乗ること（要件8.2）、`action` で区別できること、username のみの旧 activity も後方互換に返ることを実データで確認する
   - 観察可能な完了条件: 応答内容（snapshot＋ADD の target/targetModel＋後方互換）を assert する結合テストが green
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
@@ -202,6 +202,7 @@
 - 10.1: ADD の記録は既存の「middleware が UNSETTLED を先に作り emit('update') で更新」経路。1 リクエスト1更新で unique index 衝突なし。`attachment.page`(ObjectId)→`pageId`(string) の読み替えは型で捕まらない（REMOVE で踏んだ罠）。
 - 11.1: DOWNLOAD は createActivity 直接呼びの fire-and-forget。snapshot 構築の `await` を応答前に置かない（design 増分「実行順序（重要）」）。pino は context-first（`logger.warn({ attachmentId, pageId }, 'msg')`）。unique index は target=添付 _id で従来より衝突しにくいが、同一ユーザー・同一添付・同一 ms の二重 DL 衝突は best-effort で握りつぶす。
 - 9.1: REMOVE ビルダー／pagePath 解決の共有化は挙動不変の refactor。記録単位・target 設計は変えない。既存 REMOVE のユニット・結合テストが green のままであることを完了条件に含める。
+- 13.3 の学び: e2e 応答テストは ADD/DOWNLOAD/REMOVE の3実経路を1ファイルで駆動し、単一の監査ログ API 呼び出しで突き合わせる（activity-real-add-download-response.integ.ts）。旧 username-only 行のみ手播き（実経路でもう生成されない形のため・7.4 と同じ理由）。番兵 IP 使用済みに 10.0.0.81 を追加。
 - 13.2 の学び: DOWNLOAD integ は実 `downloadRouterFactory` を mount（login-required のみ passthrough stub）。guest ケースは `retrieveAttachmentFromIdParam` が `user != null` ガードで権限チェックを skip する本番相当経路。失敗注入は `createActivity` の `mockRejectedValueOnce`（route 側 try/catch＝11.1 保護層を通す）＋`finally` で `mockRestore`。番兵 IP 使用済みに 10.0.0.80 を追加。
 - 13.1 の学び: ADD ルート駆動の integ は auth middleware のみ stub（activity.integ.ts と同じ割り切り）で、multer・validators・addActivity・handler・GridFS（`setUpFileUpload(true)`）・settle listener は実物を通す。handler が `page.revision` を serialize するため arrange するページに revision ref が必須。番兵 IP 使用済みに 10.0.0.79 を追加。activity の遅延 settle は `vi.waitFor` で prisma 読み直しを polling する。
 - 12.1 の学び: 監査ログ API の `searchFilter.actions` は `getAvailableActions()`（記録ゲート設定）と intersect するため、ゲート未注入のテストで actions フィルタを使うと ADD/DOWNLOAD（Medium 群）は 0 件になる。12.1 のテストは意図的に actions フィルタ不使用（username フィルタ／一意 originalName マーカーで特定）。13.3 でゲート注入込みの経路を検証する。
