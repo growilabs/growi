@@ -2,14 +2,15 @@
 //
 // buildModelDisplayNameResolver joins the operator allow-list (ids only) with the
 // EFFECTIVE catalog (id + name) to produce display names. Its one collaborator is
-// getEffectiveSelectableModels(provider); we mock it so the test drives the
+// getEffectiveModelPicker(): it resolves the effective catalog ONCE and returns a
+// synchronous (provider) → entries accessor. We mock it so the test drives the
 // resolver's join/fallback/dedup contract without touching MongoDB or the bundled
-// asset. The effective catalog's own resolution is covered by
-// effective-model-catalog.spec.
-const { getEffectiveSelectableModels } = vi.hoisted(() => ({
-  getEffectiveSelectableModels: vi.fn(),
+// asset. The effective catalog's own resolution (newer-wins, fail-soft) is
+// covered by effective-model-catalog.spec.
+const { getEffectiveModelPicker } = vi.hoisted(() => ({
+  getEffectiveModelPicker: vi.fn(),
 }));
-vi.mock('./effective-model-catalog', () => ({ getEffectiveSelectableModels }));
+vi.mock('./effective-model-catalog', () => ({ getEffectiveModelPicker }));
 
 import type { AiProvider } from '../../../interfaces/ai-provider';
 import { buildModelDisplayNameResolver } from './resolve-model-display-name';
@@ -23,11 +24,15 @@ const catalogs: Partial<Record<AiProvider, { id: string; name: string }[]>> = {
   // azure-openai deliberately absent → the effective read yields [] for it.
 };
 
+// The picker the mocked getEffectiveModelPicker resolves to: a synchronous
+// per-provider lookup over `catalogs`. Re-created per test so its call count is
+// clean.
+const buildPick = () =>
+  vi.fn((provider: AiProvider) => catalogs[provider] ?? []);
+
 beforeEach(() => {
   vi.clearAllMocks();
-  getEffectiveSelectableModels.mockImplementation(
-    async (provider: AiProvider) => catalogs[provider] ?? [],
-  );
+  getEffectiveModelPicker.mockResolvedValue(buildPick());
 });
 
 describe('buildModelDisplayNameResolver', () => {
@@ -56,7 +61,10 @@ describe('buildModelDisplayNameResolver', () => {
     );
   });
 
-  it('reads each distinct provider only once, regardless of duplicate/interleaved input', async () => {
+  it('reads the effective catalog ONCE and resolves each distinct provider once, regardless of duplicate/interleaved input', async () => {
+    const pick = buildPick();
+    getEffectiveModelPicker.mockResolvedValue(pick);
+
     const resolve = await buildModelDisplayNameResolver([
       'openai',
       'anthropic',
@@ -64,7 +72,11 @@ describe('buildModelDisplayNameResolver', () => {
       'anthropic',
     ]);
 
-    expect(getEffectiveSelectableModels).toHaveBeenCalledTimes(2);
+    // The persisted singleton is read a SINGLE time (one picker acquisition)
+    // for the whole allow-list — not once per provider.
+    expect(getEffectiveModelPicker).toHaveBeenCalledTimes(1);
+    // The synchronous accessor is then invoked once per DISTINCT provider.
+    expect(pick).toHaveBeenCalledTimes(2);
     // Both providers still resolve correctly after the dedup.
     expect(resolve('openai', 'gpt-4o')).toBe('GPT-4o');
     expect(resolve('anthropic', 'claude-opus-4-5')).toBe(
