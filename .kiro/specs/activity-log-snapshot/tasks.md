@@ -150,7 +150,7 @@
   - _Depends: 9.1_
 
 - [ ] 10. 統合: 添付追加（ADD）の記録
-- [ ] 10.1 (P) 添付追加 API の記録に snapshot を載せる
+- [x] 10.1 (P) 添付追加 API の記録に snapshot を載せる
   - 添付追加の記録イベント（既存の更新経路）に、対象＝添付・対象モデル＝Attachment・snapshot を追加する（現状は action のみ）
   - 記録時点で既に読み込み済みの所属ページから pagePath を無コストで渡し、添付の page 参照は文字列化して pageId として渡す（読み替え漏れで pageId/pagePath が黙って欠落するのを防ぐ）。追加のページ引き当ては行わない
   - 観察可能な完了条件: 添付追加後、対象 activity の snapshot に4フィールド＋username が乗り、target/targetModel が添付・Attachment になる（実 DB 検証は 13.1）
