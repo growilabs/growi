@@ -191,3 +191,15 @@
   - Include variable name, type, default value, and description for each: `V8_MAX_HEAP_SIZE`, `V8_OPTIMIZE_FOR_SIZE`, `V8_LITE_MODE`
   - Describe the 3-tier heap size fallback behavior (env var → cgroup auto-calculation → V8 default)
   - _Requirements: 5.1_
+
+## Phase 6: Opt-in jemalloc native allocator
+
+> Follow-on increment (PR #11411). The memory-leak investigation located the native-side RSS retention (~+366 MiB) in glibc malloc's main arena — freed-but-unreturned memory that fragmentation prevents from being trimmed. Ship the remedy as an opt-in allocator swap to jemalloc; the default stays glibc so GROWI.cloud can soak it per-app (CPU/latency) before any default flip. See research.md "Native Allocator Retention" for the A/B measurement.
+
+- [x] 12. Add opt-in jemalloc allocator (`JEMALLOC_ENABLED`)
+  - Dockerfile: add an independent `jemalloc` stage (`debian:13-slim`, matching the release image's distro/glibc generation) that installs `libjemalloc2` in a single RUN layer and normalizes the multiarch path (`/usr/lib/*-linux-gnu/libjemalloc.so.2`) to one canonical `/jemalloc/libjemalloc.so.2`; the release stage copies that single `.so` to `/usr/local/lib/libjemalloc.so.2` (the DHI runtime has no package manager to install it)
+  - Entrypoint: add `resolveJemallocPreload(env, libPath, exists)` — returns `undefined` unless `env.JEMALLOC_ENABLED === 'true'`; on enable, returns the library path (prepended to any operator-supplied `LD_PRELOAD`), or logs an error and falls back to glibc when the library file is absent. `env` and the existence check are injected as parameters (unit-testable without mutating `process.env` or touching the filesystem)
+  - Entrypoint: apply the resolved `LD_PRELOAD` to the **app process only** in `spawnApp` — the short-lived migration child (`execFileSync`) keeps glibc (swapping its allocator buys nothing and only widens the opt-in's blast radius)
+  - Entrypoint: log the active allocator at startup (`jemalloc (LD_PRELOAD=…)` or `glibc malloc (default)`)
+  - Unit tests: 6 cases for `resolveJemallocPreload` (unset gate, non-`"true"` values, enabled+present, enabled+missing fallback with error log, `LD_PRELOAD` composition, empty `LD_PRELOAD` treated as absent)
+  - _Requirements: 9, 2_

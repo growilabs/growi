@@ -6,13 +6,14 @@
 
 **Users**: Infrastructure administrators (build/deploy), GROWI operators (memory tuning), and Docker image end users (usage via docker-compose).
 
-**Impact**: Redesign the existing 3-stage Dockerfile into a 5-stage configuration. Migrate the base image to Docker Hardened Images (DHI). Change the entrypoint from a shell script to TypeScript (using Node.js 24 native TypeScript execution), achieving a fully hardened configuration that requires no shell.
+**Impact**: Redesign the existing 3-stage Dockerfile into a 6-stage configuration (a 5-stage build chain plus an independent `jemalloc` library-provider stage). Migrate the base image to Docker Hardened Images (DHI). Change the entrypoint from a shell script to TypeScript (using Node.js 24 native TypeScript execution), achieving a fully hardened configuration that requires no shell.
 
 ### Goals
 
 - Up to 95% CVE reduction through DHI base image adoption
 - **Fully shell-free TypeScript entrypoint** — Node.js 24 native TypeScript execution (type stripping), maintaining the minimized attack surface of the DHI runtime as-is
 - Memory management via 3-tier fallback: `V8_MAX_HEAP_SIZE` / cgroup auto-calculation / V8 default
+- Opt-in native allocator swap to jemalloc (`JEMALLOC_ENABLED=true`) to release glibc's retained main-arena memory under load — default stays glibc
 - Environment variable names aligned with V8 option names (`V8_MAX_HEAP_SIZE`, `V8_OPTIMIZE_FOR_SIZE`, `V8_LITE_MODE`)
 - Improved build cache efficiency through the `turbo prune --docker` pattern
 - Privilege drop via gosu → `process.setuid/setgid` (Node.js native)
@@ -55,6 +56,7 @@ graph TB
         pruner[pruner stage<br>turbo prune --docker]
         deps[deps stage<br>dependency install]
         builder[builder stage<br>build + artifacts]
+        jemalloc[jemalloc stage<br>debian:13-slim → libjemalloc.so.2]
     end
 
     subgraph ReleasePhase
@@ -65,6 +67,7 @@ graph TB
     pruner --> deps
     deps --> builder
     builder -->|artifacts| release
+    jemalloc -->|libjemalloc.so.2| release
 
     subgraph RuntimeFiles
         entrypoint[docker-entrypoint.ts<br>TypeScript entrypoint]
@@ -77,7 +80,7 @@ graph TB
 - Selected pattern: Multi-stage build with dependency caching separation
 - Domain boundaries: Build concerns (stages 1-4) vs Runtime concerns (stage 5 + entrypoint)
 - Existing patterns preserved: Production dependency extraction via pnpm deploy, tar.gz artifact transfer
-- New components: pruner stage (turbo prune), TypeScript entrypoint
+- New components: pruner stage (turbo prune), TypeScript entrypoint, independent `jemalloc` library-provider stage (opt-in allocator)
 - **Key change**: gosu + shell script → TypeScript entrypoint (`process.setuid/setgid` + `fs` module + `child_process.execFileSync/spawn`). Eliminates the need for copying busybox/bash, maintaining the minimized attack surface of the DHI runtime as-is. Executes `.ts` directly via Node.js 24 type stripping
 - Steering compliance: Maintains Debian base (glibc performance), maintains monorepo build pattern
 
@@ -91,6 +94,7 @@ graph TB
 | Privilege Drop | `process.setuid/setgid` (Node.js) | root → node user switch | No external binaries needed |
 | Build Tool | `turbo prune --docker` | Monorepo minimization | Official Turborepo recommendation |
 | Package Manager | pnpm via `corepack enable` | Dependency management | Version pinned by workspace `packageManager`. A wget standalone install was tried first but caused recurring build issues — see Requirement 1 decision update |
+| Native Allocator (opt-in) | jemalloc via `LD_PRELOAD` | Return freed memory to the OS under load | Provided by an independent `debian:13-slim` stage (glibc-generation match); enabled only when `JEMALLOC_ENABLED=true`; app process only; default glibc |
 
 > For the rationale behind adopting the TypeScript entrypoint and comparison with busybox-static/setpriv, see `research.md`.
 
@@ -110,7 +114,11 @@ flowchart TD
     AutoCalc --> OptFlags
     NoFlag --> OptFlags
     OptFlags --> LogFlags[console.log applied flags]
-    LogFlags --> DropPriv[Drop privileges<br>process.setgid + setuid]
+    LogFlags --> ResolveAlloc{JEMALLOC_ENABLED<br>= true?}
+    ResolveAlloc -->|Yes, lib present| Jemalloc[LD_PRELOAD=libjemalloc.so.2<br>app process only]
+    ResolveAlloc -->|No / lib missing| Glibc[glibc malloc default]
+    Jemalloc --> DropPriv[Drop privileges<br>process.setgid + setuid]
+    Glibc --> DropPriv
     DropPriv --> Migration[Run migration<br>execFileSync node migrate-mongo]
     Migration --> SpawnApp[Spawn app process<br>node --max-heap-size=X ... app.js]
     SpawnApp --> SignalFwd[Forward SIGTERM/SIGINT<br>to child process]
@@ -122,6 +130,7 @@ flowchart TD
 - `--max-heap-size` is passed to the spawned child process (the application itself), not the entrypoint process
 - Migration is invoked directly via `child_process.execFileSync` calling node (no `npm run`, no shell needed)
 - App startup uses `child_process.spawn` + signal forwarding to fulfill PID 1 responsibilities
+- The allocator is resolved after logging flags and before privilege drop; when opted in, `LD_PRELOAD` is set on the spawned **app process only** (not the migration child) — see "Native Allocator Resolution (opt-in jemalloc)"
 
 ### Docker Build Flow
 
@@ -147,6 +156,11 @@ flowchart LR
         S4C[pnpm deploy + tar.gz]
     end
 
+    subgraph StageJ[jemalloc]
+        SJA[debian:13-slim]
+        SJB[apt install libjemalloc2<br>normalize multiarch → libjemalloc.so.2]
+    end
+
     subgraph Stage5[release]
         S5A[DHI runtime<br>no additional binaries]
         S5B[Extract artifacts]
@@ -155,14 +169,15 @@ flowchart LR
 
     Stage1 --> Stage2 --> Stage3 --> Stage4
     Stage4 -->|tar.gz| Stage5
+    StageJ -->|libjemalloc.so.2| Stage5
 ```
 
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Key Dependencies |
 |-----------|-------------|--------|-----------------|
-| Dockerfile | Infrastructure | 5-stage Docker image build definition | DHI images, turbo, pnpm |
-| docker-entrypoint.ts | Infrastructure | Container startup initialization (TypeScript) | Node.js fs/child_process, cgroup fs |
+| Dockerfile | Infrastructure | 6-stage Docker image build definition (5-stage build chain + independent `jemalloc` provider); opt-in jemalloc `.so` for the runtime | DHI images, turbo, pnpm, debian:13-slim (jemalloc) |
+| docker-entrypoint.ts | Infrastructure | Container startup initialization (TypeScript); resolves the opt-in jemalloc `LD_PRELOAD` for the app process | Node.js fs/child_process, cgroup fs |
 | docker-entrypoint.spec.ts | Infrastructure | Unit tests for entrypoint | vitest |
 | Dockerfile.dockerignore | Infrastructure | Build context filter | — |
 | README.md | Documentation | Docker Hub image documentation | — |
@@ -171,7 +186,7 @@ flowchart LR
 ### Dockerfile
 
 **Responsibilities & Constraints**
-- 5-stage configuration: `base` → `pruner` → `deps` → `builder` → `release`
+- 6-stage configuration: a 5-stage build chain `base` → `pruner` → `deps` → `builder` → `release`, plus an independent `jemalloc` stage that only provides `libjemalloc.so.2` to `release`
 - Use of DHI base images (`dhi.io/node:24-debian13-dev` / `dhi.io/node:24-debian13`)
 - **No shell or additional binary copying in runtime** (everything is handled by the Node.js entrypoint)
 
@@ -180,7 +195,25 @@ flowchart LR
 - **pruner**: `COPY . .` + `turbo prune @growi/app --docker`
 - **deps**: COPY json/lockfile from pruner + `pnpm install --frozen-lockfile` + node-gyp
 - **builder**: COPY full source from pruner + `turbo run build` + `pnpm deploy` + artifact packaging
-- **release**: DHI runtime (no shell) + `COPY --from=builder` artifacts + entrypoint + OCI labels + EXPOSE/VOLUME
+- **jemalloc**: `debian:13-slim` (matches the release image's distro/glibc generation) + `apt-get install --no-install-recommends libjemalloc2` in a single RUN layer + normalize the multiarch path (`/usr/lib/*-linux-gnu/libjemalloc.so.2`) to a single `/jemalloc/libjemalloc.so.2`. Independent of the build chain; exists only because the DHI runtime has no package manager
+- **release**: DHI runtime (no shell) + `COPY --from=builder` artifacts + entrypoint + `COPY --from=jemalloc` the single `libjemalloc.so.2` to `/usr/local/lib/` (opt-in allocator) + OCI labels + EXPOSE/VOLUME
+
+### Native Allocator Resolution (opt-in jemalloc)
+
+**Problem**: Under GROWI's sustained-load profile, glibc malloc retains hundreds of MiB of freed memory in its **main arena** — the `[heap]` (sbrk) segment grew 25 → 407 MiB in an smaps diff while the V8 heap, `external` Buffers, anonymous mmaps, and the Prisma engine stayed flat. This is freed-but-unreturned memory (fragmentation prevents glibc from trimming the heap), not a native leak and not arena proliferation (`MALLOC_ARENA_MAX=2` measured no effect). The container's working set stays inflated indefinitely. See research.md "Native Allocator Retention" for the full A/B table.
+
+**Resolution (opt-in, app process only)**: jemalloc returns freed memory to the OS via time-based decay; the same scenario measured drain-phase RSS retention of +468 MiB on glibc vs +142 MiB with jemalloc (−70%). Because the DHI runtime ships no package manager, an independent `jemalloc` build stage (`debian:13-slim`, chosen to match the release image's distro so the library is built against the same glibc generation) installs `libjemalloc2` and normalizes the multiarch path to `/jemalloc/libjemalloc.so.2`; the release stage copies that single `.so` to `/usr/local/lib/libjemalloc.so.2`. jemalloc's own runtime deps (libc/libm/libstdc++/libgcc) are already present in any Node.js image.
+
+The entrypoint's `resolveJemallocPreload(env, libPath, exists)` decides the `LD_PRELOAD`:
+- Returns `undefined` (keep glibc) unless `env.JEMALLOC_ENABLED === 'true'` — the swap is strictly opt-in.
+- If enabled but the library file is absent, it logs an error and returns `undefined` (boots normally on glibc — a missing library never blocks startup).
+- If enabled and present, it returns the library path, **prepended** to any operator-supplied `LD_PRELOAD` (`${lib}:${existing}`) so the operator's value is preserved and jemalloc wins symbol interposition.
+
+`spawnApp` applies the resolved value to the **app process only**. The migration child (`execFileSync`) is short-lived, so swapping its allocator buys nothing and would only widen the opt-in's blast radius. The entrypoint logs the active allocator at startup. `env` and the filesystem-existence check are **injected as parameters** so the decision logic is unit-tested without mutating `process.env` or touching the real filesystem.
+
+**Why opt-in, not default**: the payoff grows with load (jemalloc adds ~12 MiB of metadata at idle), and CPU/latency under jemalloc must be validated before a default flip. Keeping glibc the default lets GROWI.cloud soak jemalloc per-app first.
+
+**Known limitation**: the fallback guards only against the library *file* being absent (`fs.existsSync`). If the file exists but fails to load at runtime (transitive-dep or symbol-version mismatch), the dynamic linker aborts the app process — there is no graceful glibc fallback for that case. The deliberate `debian:13`/`debian13` glibc-generation match makes this unlikely, and the feature is opt-in and soak-tested per-app.
 
 ### docker-entrypoint.ts
 
@@ -191,6 +224,7 @@ flowchart LR
 - Privilege drop via `process.setgid()` + `process.setuid()`
 - Migration execution via `child_process.execFileSync` (direct node invocation, no shell)
 - App process startup via `child_process.spawn` with signal forwarding (PID 1 responsibilities)
+- Opt-in jemalloc allocator resolution (`resolveJemallocPreload`) — sets `LD_PRELOAD` on the app process only when `JEMALLOC_ENABLED=true` and the library is present
 - No external binary dependencies
 
 **Environment Variable Interface**
@@ -200,6 +234,7 @@ flowchart LR
 | `V8_MAX_HEAP_SIZE` | int (MB) | (unset) | Explicitly specify the --max-heap-size value for Node.js |
 | `V8_OPTIMIZE_FOR_SIZE` | `"true"` / (unset) | (unset) | Enable the --optimize-for-size flag |
 | `V8_LITE_MODE` | `"true"` / (unset) | (unset) | Enable the --lite-mode flag |
+| `JEMALLOC_ENABLED` | `"true"` / (unset) | (unset) | Opt-in: preload jemalloc (`LD_PRELOAD`) for the app process. Missing library → error log + glibc fallback. See "Native Allocator Resolution" |
 
 > **Naming Convention**: Environment variable names are aligned with their corresponding V8 option names (`--max-heap-size`, `--optimize-for-size`, `--lite-mode`) prefixed with `V8_`. This improves discoverability and self-documentation compared to the previous `GROWI_`-prefixed names.
 
@@ -225,6 +260,7 @@ flowchart LR
 | Directory creation/permission failure | System | `process.exit(1)` — check volume mount configuration |
 | Migration failure | Business Logic | `execFileSync` throws → `process.exit(1)` — Docker/k8s restarts |
 | App process abnormal exit | System | Propagate child process exit code |
+| jemalloc library missing (`JEMALLOC_ENABLED=true`) | System | Log an error and boot normally on glibc malloc (never blocks startup) |
 
 ## Performance & Scalability
 
