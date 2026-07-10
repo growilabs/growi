@@ -484,3 +484,277 @@ type ActivitiesSnapshot {
 ## Security Considerations
 - snapshot は監査証跡であり、削除済みファイルの `originalName` / `pagePath` を保持する。これらは元々その activity を閲覧できる管理者向け監査ログの範囲内の情報であり、新たな機密の露出は増やさない。
 - 監査ログ API は既存の認可（管理者向け）をそのまま使う。本スペックは認可ロジックを追加・変更しない。
+
+---
+
+# 増分（2026-07-10）: 添付系 action 全般への snapshot capture 拡張（ADD / DOWNLOAD）
+
+対象 requirements: **Requirement 5〜8**。REMOVE（要件1〜4）は実装完了済み（PR #11393）で、本増分はそれを作り直さず同じ流儀で ADD・DOWNLOAD を加える。Discovery type: **Light（Extension）**。Discovery / Synthesis の詳細は research.md「増分（2026-07-10）」節を参照。
+
+## Overview（増分）
+
+添付カテゴリの action は `ACTION_ATTACHMENT_ADD`（追加）/ `ACTION_ATTACHMENT_REMOVE`（削除・完了済み）/ `ACTION_ATTACHMENT_DOWNLOAD`（ダウンロード）の3つで全て。本増分は残る ADD と DOWNLOAD の記録時に、REMOVE と同一形の snapshot（`originalName` / `pagePath` / `pageId` / `fileSize`（+ `username`）、添付識別子は `target`/`targetModel`）を保存し、監査ログ API に露出する。3 action の snapshot 形は同一であり、記録・保存経路・Prisma composite type は REMOVE 増分で整備済みのものをそのまま再利用する。
+
+### Goals（増分）
+- ADD 記録時に添付情報 snapshot を保存する（pagePath は既ロードのページから無コスト取得）。
+- DOWNLOAD 記録時に添付情報 snapshot を保存する（pagePath は追加引き当て。ただし非ブロッキング）。
+- ADD/DOWNLOAD snapshot を監査ログ API に露出し、下流 viewer が ADD の DL リンク生成・REMOVE との区別ができる状態にする。
+
+### Non-Goals（増分）
+- REMOVE（要件1〜4）の再実装・仕様変更。
+- 記録可否ゲート（`activity-log` spec 管轄）・監査ログ画面の表示 UI（`activity-log-snapshot-viewer` spec 管轄）。
+- schema.prisma / 保存経路（createByParameters・updateByParameters・settleActivityRecord）の新設。
+
+## Boundary Commitments（増分）
+
+### This Spec Owns
+- `ACTION_ATTACHMENT_ADD` / `ACTION_ATTACHMENT_DOWNLOAD` 記録時の snapshot 構築と emit/record への差し込み。
+- 添付 snapshot 型の正準化（`AttachmentSnapshot`）と action 別 type guard の追加。
+- ADD/DOWNLOAD 添付の pagePath 解決ロジックの単一化（共有 resolver への集約）。
+- 監査ログ API の OpenAPI に ADD/DOWNLOAD の snapshot フィールドを記述（応答整形は既存の `...rest` 素通しを流用）。
+
+### Out of Boundary
+- 記録可否の判定（`shoudUpdateActivity` / action group 設定 = `activity-log` spec）。
+- snapshot の**表示・整形描画**（`activity-log-snapshot-viewer` spec）。本増分は「表示に足るデータを保存・API 露出する」ところまで。
+- REMOVE のカスケード recorder の記録単位・target 設計（完了済み・変更しない）。
+
+### Allowed Dependencies
+- 型・保存: `interfaces/activity.ts`（snapshot 型・guard・`SupportedTargetModel`）、`models/activity.ts`（`createByParameters`/`updateByParameters`/`IActivityParameters`）、`service/activity/settle-activity-record.ts`。
+- 既存パターン: `service/activity/attachment-removal-snapshot.ts`（REMOVE の builder/recorder。共有ロジックの抽出元）。
+- ページ取得: `Page.findById`（pagePath 解決）。
+- 依存方向: **Types → Service（attachment-snapshot）→ Routes（add / download）→ Audit Log API**。上位（Routes）は下位（Types/Service）にのみ依存し、逆流しない。
+
+### Revalidation Triggers
+- `IActivityParameters` / `ISnapshot` / `settleActivityRecord` の snapshot 取り扱い契約が変わったとき。
+- 添付追加・ダウンロードのルート（`apiv3/attachment.js` の emit / `attachment/download.ts` の createActivity）の記録経路が変わったとき。
+- 下流 `activity-log-snapshot-viewer` が ADD の DL リンク生成に必要とするフィールド（添付識別子・ファイル名・サイズ・pagePath）が変わったとき。
+
+## Architecture（増分）
+
+### 既存アーキテクチャとの整合
+本増分は REMOVE で確立した3層（Types → Service builder → Route 統合）をそのまま踏襲する。新規の構造は持ち込まず、REMOVE 固有だった builder / pagePath resolver を **action 非依存の共有モジュールに一般化**して ADD/DOWNLOAD が再利用する。
+
+### Architecture Pattern & Boundary Map
+
+```mermaid
+graph TB
+    Types[interfaces activity AttachmentSnapshot と guards]
+    Builder[service attachment-snapshot 共有 builder と pagePath resolver]
+    RemoveRec[service attachment-removal-snapshot REMOVE cascade recorder 既存]
+    AddRoute[route apiv3 attachment ADD emit update]
+    DownloadRoute[route attachment download createActivity fire-and-forget]
+    SavePort[models activity createByParameters と updateByParameters 既存]
+    Api[route apiv3 activity 監査ログ API 素通し]
+
+    Types --> Builder
+    Builder --> RemoveRec
+    Builder --> AddRoute
+    Builder --> DownloadRoute
+    AddRoute --> SavePort
+    DownloadRoute --> SavePort
+    RemoveRec --> SavePort
+    SavePort --> Api
+```
+
+### Dependency Direction
+Types → Service（attachment-snapshot）→ Routes（ADD / DOWNLOAD）→ 保存口 → 監査ログ API。Route は Service/Types のみに依存する。
+
+### Technology Stack（増分の差分のみ）
+- 新規依存なし。TypeScript 判別ユニオン＋ type guard（言語標準）と既存の Mongoose `Page.findById` のみ。
+
+## File Structure Plan（増分）
+
+### New Files
+| ファイル | 責務 |
+|---------|------|
+| `apps/app/src/server/service/activity/attachment-snapshot.ts` | **添付 snapshot 構築の凝集した単一の家**。`buildAttachmentSnapshot`（純粋関数・action 非依存。REMOVE builder を一般化）、`resolveAttachmentPagePath`（page ref → `Page.findById` → path、失敗時 warn＋undefined。REMOVE のルート内ロジックを抽出・単一化）、`buildAttachmentDownloadSnapshot`（解決＋組み立ての薄い async ラッパ）を持つ。`AttachmentLike`/`ActivityActor` 型を再エクスポート。 |
+| `apps/app/src/server/service/activity/attachment-snapshot.spec.ts` | 上記 builder / resolver / guard のユニットテスト（純粋関数・欠損系）。 |
+
+### Modified Files
+| ファイル | 変更 |
+|---------|------|
+| `apps/app/src/interfaces/activity.ts` | 正準型 `AttachmentSnapshot`（現 `AttachmentRemoveSnapshot` と同一形）を定義し、`AttachmentRemoveSnapshot` をその別名として残す（後方互換・viewer 用）。`ISnapshot` union は形が同一のためフィールド追加なし。guard `isAttachmentAddActivity` / `isAttachmentDownloadActivity` を追加（既存 `isAttachmentRemoveActivity` と同じ流儀、`action` を唯一の判別子とする）。任意で一般 guard `isAttachmentActivity`。 |
+| `apps/app/src/server/routes/apiv3/attachment.js` | ADD の POST ハンドラで、既ロードの `page`（`page.path`）・`attachment`（originalName/fileSize/page）・`req.user` から共有 builder で snapshot を組み、`emit('update')` に `target: attachment._id` / `targetModel: MODEL_ATTACHMENT` / `snapshot` を追加（現状 `{ action }` のみ）。`Page.findById` の追加フェッチは行わない。 |
+| `apps/app/src/server/routes/attachment/download.ts` | DOWNLOAD の記録で、`buildAttachmentDownloadSnapshot(attachment, actor)` を **fire-and-forget の記録クロージャ内**で呼び（pagePath 解決もこの中）、`createActivity` に型付き `IActivityParameters`（target/targetModel/snapshot 付き）を渡す。ダウンロード応答はブロックせず、記録・解決失敗でも応答を壊さない。 |
+| `apps/app/src/server/routes/apiv3/activity.ts`（OpenAPI） | snapshot の添付4フィールド（既記載）に、ADD/DOWNLOAD でも用いる旨を記述で補足。応答整形の変更なし（`...rest` 素通し）。 |
+| `apps/app/src/server/routes/attachment/api.js`（任意・behavior-preserving） | REMOVE 直接削除の pagePath 解決を、抽出した共有 `resolveAttachmentPagePath` に差し替え（重複解消。挙動不変・既存テスト green 維持が条件）。 |
+
+### 変更しないもの（明示）
+- `apps/app/prisma/schema.prisma` の `ActivitiesSnapshot` composite type — 添付4フィールドは REMOVE 増分で追加済み。ADD/DOWNLOAD は同フィールドのため**変更不要**。
+- `models/activity.ts` の保存口・`settle-activity-record.ts` — REMOVE 増分で `ISnapshot` 対応済み。**変更不要**。
+
+## System Flows（増分）
+
+### ADD（要件6）— emit('update') 更新経路（REMOVE 直接削除と同型・pagePath 無コスト）
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant AddRoute as apiv3 attachment POST
+    participant Mw as addActivity middleware
+    participant Builder as attachment-snapshot
+    participant Save as activity updateByParameters
+
+    Client->>AddRoute: 添付アップロード
+    Mw-->>AddRoute: UNSETTLED activity を先に作成
+    AddRoute->>AddRoute: page は既に Page.findOne 済み
+    AddRoute->>Builder: buildAttachmentSnapshot(attachment, page.path, username)
+    Builder-->>AddRoute: AttachmentSnapshot
+    AddRoute->>Save: emit update に target と targetModel と snapshot を付与
+    Save-->>AddRoute: snapshot 永続化 既存 _id と username 保持
+```
+
+### DOWNLOAD（要件7）— createActivity 新規作成・fire-and-forget（pagePath は非ブロッキングで解決）
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant DlRoute as attachment download
+    participant Builder as attachment-snapshot
+    participant Page as Page findById
+    participant Save as activity createByParameters
+
+    Client->>DlRoute: ダウンロード要求
+    DlRoute->>Client: ファイル応答 getAction を await 応答は即返す
+    Note over DlRoute,Save: 以降は await しない記録クロージャ 応答をブロックしない
+    DlRoute->>Builder: buildAttachmentDownloadSnapshot(attachment, actor)
+    Builder->>Page: pagePath 解決 findById
+    Page-->>Builder: path または undefined
+    Builder-->>DlRoute: AttachmentSnapshot username は guest 時省略
+    DlRoute->>Save: createActivity target と targetModel と snapshot
+    Note over DlRoute,Save: 記録失敗や解決失敗は握りつぶす best-effort
+```
+
+## Requirements Traceability（増分）
+
+| Requirement | Summary | Components | Interfaces | Flows |
+|---|---|---|---|---|
+| 5.1, 5.2, 5.3, 5.4 | 添付系 action の判別ユニオン拡張・action 別 guard・全 optional・後方互換 | Types & Guards | `AttachmentSnapshot` 型、`isAttachmentAddActivity`/`isAttachmentDownloadActivity` guard | — |
+| 6.1, 6.2, 6.3, 6.4 | ADD の snapshot 記録（4フィールド＋username＋添付識別子）、欠損 graceful | ADD Capture、Builder | `buildAttachmentSnapshot`、emit('update') に target/targetModel/snapshot | ADD flow |
+| 7.1, 7.2, 7.3, 7.4 | DOWNLOAD の snapshot 記録（取得可分＋pagePath 引き当て）、guest username 省略、best-effort | DOWNLOAD Capture、Builder、Page-Path Resolver | `buildAttachmentDownloadSnapshot`、`resolveAttachmentPagePath` | DOWNLOAD flow |
+| 8.1, 8.2, 8.3, 8.4 | API 露出・viewer が DL リンク生成/action 区別・後方互換 | Audit Log API | 既存 `...rest` 素通し＋ OpenAPI 記述、`target`=添付 `_id` | 両 flow |
+
+## Components and Interfaces（増分）
+
+| Component | Domain | Intent | Requirements | Dependencies |
+|---|---|---|---|---|
+| Types & Guards | Types | 添付 snapshot の正準型と action 別 narrowing | 5.1–5.4 | (external) IUser |
+| Attachment Snapshot Builder & Page-Path Resolver | Service | snapshot 構築の単一の家。pagePath 解決を集約 | 6.1–6.4, 7.1–7.4 | Types, Page(Outbound) |
+| ADD Capture Integration | Routes | 既ロード page から snapshot を組み emit 更新 | 6.1–6.4 | Builder(Inbound), 保存口 |
+| DOWNLOAD Capture Integration | Routes | 非ブロッキングで pagePath 解決＋記録 | 7.1–7.4 | Builder(Inbound), 保存口 |
+| Audit Log API | Routes | ADD/DOWNLOAD snapshot を応答に露出 | 8.1–8.4 | 保存口(Inbound) |
+
+### Types & Guards
+
+##### Service Interface（型契約）
+```typescript
+// interfaces/activity.ts
+// 正準型（REMOVE/ADD/DOWNLOAD 共有。形は AttachmentRemoveSnapshot と同一）
+export type AttachmentSnapshot = {
+  username?: string;
+  originalName?: string;
+  pagePath?: string;
+  pageId?: string;
+  fileSize?: number;
+};
+// 後方互換の別名（viewer が import 済み）
+export type AttachmentRemoveSnapshot = AttachmentSnapshot;
+
+export type ISnapshot = DefaultSnapshot | AttachmentSnapshot; // フィールド追加なし
+
+// action を唯一の判別子とする guard 群（snapshot に判別フィールドを足さない）
+export const isAttachmentAddActivity: (a: Pick<IActivity, 'action' | 'snapshot'>)
+  => a is Pick<IActivity, 'action' | 'snapshot'> & { snapshot?: AttachmentSnapshot };
+export const isAttachmentDownloadActivity: (a: Pick<IActivity, 'action' | 'snapshot'>)
+  => a is Pick<IActivity, 'action' | 'snapshot'> & { snapshot?: AttachmentSnapshot };
+// isAttachmentRemoveActivity は既存のまま維持
+```
+- 要件5.1（`action` のみ判別子）/ 5.3（全 optional）/ 5.4（後方互換：`DefaultSnapshot` と混在可）を型で担保。`any` を使わない。
+
+### Attachment Snapshot Builder & Page-Path Resolver
+
+##### Service Interface
+```typescript
+// service/activity/attachment-snapshot.ts
+// page 参照ID（Mongoose の ObjectId か、その文字列表現）
+type ObjectIdLike = import('mongoose').Types.ObjectId | string;
+
+export const buildAttachmentSnapshot: (
+  attachment: AttachmentLike,        // { _id; originalName?; fileSize?; pageId? }
+  pagePath: string | undefined,
+  username: string | undefined,
+) => AttachmentSnapshot;             // 純粋・入力を mutate しない・Page を引かない
+
+export const resolveAttachmentPagePath: (
+  pageRef: string | ObjectIdLike | undefined,
+) => Promise<string | undefined>;    // Page.findById → path、見つからねば warn＋undefined
+
+export const buildAttachmentDownloadSnapshot: (
+  attachment: AttachmentLike & { page?: ObjectIdLike },
+  actor: ActivityActor,              // { user?; ip?; endpoint? }（DOWNLOAD は user optional）
+) => Promise<AttachmentSnapshot>;    // resolveAttachmentPagePath を内部で呼ぶ薄い async ラッパ
+```
+- **凝集/責務分離（利用者制約）**: 「データ解決（resolver）」「snapshot 組み立て（builder）」「記録の emit/create（Route）」を分離。pagePath 解決の実装は本モジュールの1箇所のみ（REMOVE も採用可）。
+- 要件6.4 / 7.3: 取得できないフィールドは省略（graceful degradation）。resolver は失敗時 warn（pino context-first: `logger.warn({ attachmentId, pageId }, 'msg')`）。
+
+##### Implementation Notes
+- **Integration**: ADD は `buildAttachmentSnapshot`（同期・pagePath は呼び出し側が `page.path` を渡す）、DOWNLOAD は `buildAttachmentDownloadSnapshot`（async・pagePath 内部解決）を使う。REMOVE の既存 builder はこの共有 builder に委譲するよう behavior-preserving に寄せる。
+- **Validation**: ユニットテストで正常系・pagePath 欠損・username 欠損（guest）を検証。
+- **Risks**: `attachment.page`（ObjectId）→ `pageId`(string) の読み替え漏れは型で捕まらず `pageId`/`pagePath` が silently 欠落する（REMOVE と同じ落とし穴）→ テストで固定。
+
+### ADD Capture Integration
+
+##### Event Contract（emit('update')）
+- Trigger: 添付追加 API 成功時（既存の `addActivity` が作った UNSETTLED activity を更新）。
+- Payload 追加: `target = attachment._id`、`targetModel = MODEL_ATTACHMENT`、`snapshot = AttachmentSnapshot`。
+- 読み替え: `attachment.page`(ObjectId) は string 化して builder の `pageId` へ渡す（読み替え漏れは型で捕まらず `pageId`/`pagePath` が silently 欠落する。REMOVE で踏んだ落とし穴）。pagePath は既ロードの `page.path` をそのまま渡す（追加フェッチなし）。
+- Idempotency: 1リクエスト＝1更新（emit 更新経路）。unique index 衝突なし。
+- 要件6.1/6.2（4フィールド＋username）、6.3（添付識別子は `target` に置く＝viewer の DL リンク用）、6.4（欠損許容）。
+
+### DOWNLOAD Capture Integration
+
+##### Event Contract（createActivity）
+- Trigger: ダウンロード成功処理に付随（`getAction` の後、応答を待たせない fire-and-forget）。
+- Payload: `action = ACTION_ATTACHMENT_DOWNLOAD`、`user = req.user?._id`、`ip/endpoint`、`target = attachment._id`、`targetModel = MODEL_ATTACHMENT`、`snapshot = await buildAttachmentDownloadSnapshot(...)`。
+- Delivery/Idempotency: best-effort（要件7.4）。記録失敗・pagePath 解決失敗・重複キー（同一ユーザーが同一添付を同一 ms に二重 DL）は握りつぶし、**ダウンロード応答を壊さない**。
+- 実行順序（重要）: `buildAttachmentDownloadSnapshot` の `await`（pagePath の `Page.findById` を含む）は、**ファイル応答を返した後の fire-and-forget な記録クロージャの内側**で行う。応答を返す前に await しない（ダウンロード応答のレイテンシを増やさないため。research.md I-4 決定1）。
+- 型: 呼び出し口の parameters は緩いが、snapshot を型付き builder 経由で構築し `IActivityParameters` 形で渡す（`any` を増やさない・決定3）。
+- 要件7.1（取得可分＋添付識別子）、7.2（authed=username 記録 / guest=省略）、7.3（pagePath 引き当て or 省略）、7.4（best-effort）。
+
+### Audit Log API
+
+##### API Contract
+- 既存 GET `/activity` は snapshot を `...rest` で素通し → ADD/DOWNLOAD snapshot は保存されれば自動的に応答に乗る。
+- OpenAPI に「添付4フィールドは REMOVE に加え ADD/DOWNLOAD にも現れる」旨を記述。
+- 要件8.1（応答に snapshot フィールド）、8.2（ADD の添付識別子＝`target` から DL リンク生成可）、8.3（`action` で DL リンク可否＝ADD/REMOVE を区別）、8.4（後方互換）。
+
+## Data Models（増分）
+- **変更なし**。`ActivitiesSnapshot` composite（`originalName`/`pagePath`/`pageId`/`fileSize`/`username`）は REMOVE 増分で整備済み。ADD/DOWNLOAD は同フィールドを用いる。判別ユニオンへのフィールド追加もなし（正準型を共有）。
+
+## Error Handling（増分）
+- **Graceful degradation**: snapshot の各フィールドは取得できなければ省略（要件6.4/7.3）。resolver は Page 不在で warn＋undefined。
+- **DOWNLOAD best-effort**: 記録経路の例外はダウンロード応答に伝播させない（要件7.4）。既存の fire-and-forget を維持し、内部を try/catch で保護。
+- **Monitoring**: pagePath 解決失敗の warn に `attachmentId`/`pageId` を構造化フィールドで載せる（pino context-first）。
+
+## Testing Strategy（増分）
+受け入れ基準からの導出。結合テストは per-worker DB 分離＋番兵 IP、ゲートは `AUDIT_LOG_ACTION_GROUP_SIZE = Medium` を明示注入（process.env 非改変）。
+
+### Unit
+- guard: ADD/DOWNLOAD action で `AttachmentSnapshot` に narrow、非添付 action は catch-all、username のみの旧形式も型が通る（要件5）。
+- `buildAttachmentSnapshot`: 4フィールド＋username を詰める／pagePath・pageId 欠損時に当該省略（要件6.4/7.3）。
+- `resolveAttachmentPagePath`: Page ヒット時 path、不在時 undefined＋warn。
+
+### Integration（実 DB 読み直し）
+- **ADD**（要件6）: 添付追加後、対象 activity を実 DB から読み直し、snapshot に `originalName`/`pagePath`/`pageId`/`fileSize`＋`username`、`target`=添付 `_id`／`targetModel`=`Attachment` を確認。pagePath が埋まる（page 既ロード）ことを assert。
+- **DOWNLOAD**（要件7）: ダウンロード後、記録を読み直し snapshot に取得可フィールド＋**pagePath が引き当てで埋まる**ことを確認。認証時 username 記録／guest 時 username 省略の両ケース。記録失敗を注入してもダウンロード応答（status/本体）が壊れないことを assert（best-effort）。
+- **API**（要件8）: ADD/DOWNLOAD activity の API 応答に snapshot フィールドが乗る／`action` で ADD と REMOVE を区別できる／username のみの旧 activity も後方互換に返る。
+
+## Migration Strategy（増分）
+- データ移行なし（composite type は既存・後方互換）。既存の ADD/DOWNLOAD レコード（snapshot 無し or username のみ）はそのまま有効。
+
+## Open Questions / Risks（増分）
+- DOWNLOAD の unique index 衝突は「同一ユーザー・同一添付・同一ミリ秒の二重 DL」時のみで、target=添付 `_id` により従来より衝突しにくい。best-effort で握りつぶす（research.md I-5）。
+- 大量ダウンロードによる activity 増加は記録ゲート設定（Medium 以上時のみ記録）に依存。ボリューム制御はスコープ外（既存 Open Question と同じ扱い）。
+
+## Security Considerations（増分）
+- 追加露出は「追加/ダウンロードされた添付のファイル名・サイズ・所属ページ」で、いずれも当該 activity を閲覧できる管理者の監査範囲内。新たな機密露出は増やさない。認可は既存のまま（変更しない）。

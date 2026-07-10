@@ -66,9 +66,19 @@ const validator = {
  *                     example: "/_api/pages.remove"
  *                   targetModel:
  *                     type: string
+ *                     description: >-
+ *                       Model name of the activity target. For attachment
+ *                       activities (ATTACHMENT_ADD / ATTACHMENT_REMOVE /
+ *                       ATTACHMENT_DOWNLOAD) this is "Attachment".
  *                     example: "Page"
  *                   target:
  *                     type: string
+ *                     description: >-
+ *                       ID of the activity target. For attachment activities
+ *                       this is the attachment ID; combined with the snapshot
+ *                       fields it lets consumers build a download link for
+ *                       attachments that still exist (ATTACHMENT_ADD /
+ *                       ATTACHMENT_DOWNLOAD, distinguished by `action`).
  *                     example: "675547e97f208f8050a361d4"
  *                   action:
  *                     type: string
@@ -78,6 +88,10 @@ const validator = {
  *                     properties:
  *                       username:
  *                         type: string
+ *                         description: >-
+ *                           Username of the operator. Omitted when the activity
+ *                           was recorded without an authenticated user (e.g.
+ *                           guest ATTACHMENT_DOWNLOAD).
  *                         example: "growi"
  *                       _id:
  *                         type: string
@@ -85,26 +99,31 @@ const validator = {
  *                       originalName:
  *                         type: string
  *                         description: >-
- *                           Original file name of the removed attachment.
- *                           Present on ATTACHMENT_REMOVE activities.
+ *                           Original file name of the attachment.
+ *                           Present on attachment activities (ATTACHMENT_ADD /
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD).
  *                         example: "design-v2.pdf"
  *                       pagePath:
  *                         type: string
  *                         description: >-
- *                           Path of the page the removed attachment belonged to.
- *                           Present on ATTACHMENT_REMOVE activities.
+ *                           Path of the page the attachment belongs or belonged
+ *                           to. Present on attachment activities (ATTACHMENT_ADD /
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD) when it
+ *                           could be resolved at capture time.
  *                         example: "/Sandbox/attachments"
  *                       pageId:
  *                         type: string
  *                         description: >-
- *                           ID of the page the removed attachment belonged to.
- *                           Present on ATTACHMENT_REMOVE activities.
+ *                           ID of the page the attachment belongs or belonged
+ *                           to. Present on attachment activities (ATTACHMENT_ADD /
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD).
  *                         example: "675547e97f208f8050a361d4"
  *                       fileSize:
  *                         type: integer
  *                         description: >-
- *                           File size in bytes of the removed attachment.
- *                           Present on ATTACHMENT_REMOVE activities.
+ *                           File size in bytes of the attachment.
+ *                           Present on attachment activities (ATTACHMENT_ADD /
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD).
  *                         example: 12345
  *                   createdAt:
  *                     type: string
