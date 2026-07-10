@@ -22,8 +22,8 @@
  *   - REMOVE:   real addActivity middleware → real POST
  *               /_api/attachments.remove handler (attachment/api.js) → real
  *               activityEvent 'update' listener → real
- *               prisma.activities.updateByParameters (snapshot update
- *               envelope). Included because req 8.3's actual purpose is
+ *               prisma.activities.createByParameters (lazy settle).
+ *               Included because req 8.3's actual purpose is
  *               "can the downstream viewer tell an entity-preserved
  *               attachment (ADD/DOWNLOAD) from an entity-gone one (REMOVE)
  *               apart by `action`" — arranging it costs only one more
