@@ -140,7 +140,7 @@
   - _Requirements: 6.4, 7.3_
   - _Boundary: Attachment Snapshot Builder & Page-Path Resolver（attachment-snapshot.ts）。委譲差し替えのため REMOVE 側 attachment-removal-snapshot.ts（任意で attachment/api.js の pagePath 解決）も触るが挙動不変・記録単位/target は変えない_
   - _Depends: 8.1_
-- [ ] 9.2 DOWNLOAD 用の「解決＋組み立て」薄いラッパ
+- [x] 9.2 DOWNLOAD 用の「解決＋組み立て」薄いラッパ
   - ダウンロード記録用に、添付と操作者から pagePath 解決を内部で行い添付 snapshot を返す async ラッパを共有モジュールに追加する（ルートを薄く保つための委譲先）
   - 操作者が認証済みなら username を含め、guest（操作者なし）なら username を省略する
   - 先にユニットテストを書く: authed→username あり／guest→username 省略／page 引き当て成功で pagePath／失敗で pagePath 省略
@@ -202,4 +202,5 @@
 - 10.1: ADD の記録は既存の「middleware が UNSETTLED を先に作り emit('update') で更新」経路。1 リクエスト1更新で unique index 衝突なし。`attachment.page`(ObjectId)→`pageId`(string) の読み替えは型で捕まらない（REMOVE で踏んだ罠）。
 - 11.1: DOWNLOAD は createActivity 直接呼びの fire-and-forget。snapshot 構築の `await` を応答前に置かない（design 増分「実行順序（重要）」）。pino は context-first（`logger.warn({ attachmentId, pageId }, 'msg')`）。unique index は target=添付 _id で従来より衝突しにくいが、同一ユーザー・同一添付・同一 ms の二重 DL 衝突は best-effort で握りつぶす。
 - 9.1: REMOVE ビルダー／pagePath 解決の共有化は挙動不変の refactor。記録単位・target 設計は変えない。既存 REMOVE のユニット・結合テストが green のままであることを完了条件に含める。
+- 9.2 完了時の実装形: DOWNLOAD の操作者型は `DownloadActor`（`Omit<ActivityActor,'user'> & { user?: IUserHasId }`・attachment-snapshot.ts から export）。カスケード用 `ActivityActor` の user 必須契約は不変。11.1 はルートから `buildAttachmentDownloadSnapshot(attachment, actor)` を呼ぶだけでよい（pagePath 解決・警告はラッパ内部）。
 - 9.1 完了時の実装形: `AttachmentLike`/`ActivityActor` の正準定義は attachment-snapshot.ts へ移動（attachment-removal-snapshot.ts は再エクスポートで旧 import path 維持）。`resolveAttachmentPagePath(pageRef, context?)` は optional 第2引数 `{ attachmentId }` を持つ（warn の構造化フィールド用・design の1引数呼びと互換）。page 参照なし（プロフィール画像）は警告なしで undefined。resolver の warn logger 名前空間は `growi:service:activity:attachment-snapshot`（api-remove-activity.integ.ts が spy で pin 済み — 移設時は追随が要る）。

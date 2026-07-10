@@ -66,6 +66,18 @@ export const buildAttachmentSnapshot = (
 });
 
 /**
+ * Operator of an attachment download. Same shape as ActivityActor except
+ * `user` is optional: the download route can be reached unauthenticated when
+ * guest (anonymous) access is allowed, and the snapshot then simply omits
+ * `username` (requirement 7.2). Declared as a separate type so that
+ * ActivityActor keeps `user` required — a deliberate contract for the
+ * removal-cascade path, which always has an operating user.
+ */
+export type DownloadActor = Omit<ActivityActor, 'user'> & {
+  user?: IUserHasId;
+};
+
+/**
  * Resolves the path of the page an attachment belongs to, for an activity
  * snapshot.
  *
@@ -105,4 +117,40 @@ export const resolveAttachmentPagePath = async (
     );
   }
   return undefined;
+};
+
+/**
+ * Builds the snapshot for an ACTION_ATTACHMENT_DOWNLOAD activity: resolves
+ * the attachment's page reference into pagePath via
+ * resolveAttachmentPagePath (which already warns on a miss — no extra
+ * warning here), then delegates to buildAttachmentSnapshot. A thin async
+ * wrapper so the download route stays a one-line call (requirements
+ * 7.1-7.3).
+ *
+ * The Mongoose attachment holds its page reference as `page` (ObjectId or
+ * string); it is stringified here into the builder's `pageId` — a missed
+ * conversion would silently drop pageId/pagePath (the REMOVE-era pitfall;
+ * the co-located spec pins it). An already-mapped `pageId` is preserved
+ * when no `page` reference is present. Fields are read explicitly (never
+ * spread) so Mongoose documents, whose schema fields live on the prototype
+ * as getters, resolve correctly. Inputs are never mutated.
+ */
+export const buildAttachmentDownloadSnapshot = async (
+  attachment: AttachmentLike & { page?: ObjectIdLike },
+  actor: DownloadActor,
+): Promise<AttachmentSnapshot> => {
+  const pagePath = await resolveAttachmentPagePath(attachment.page, {
+    attachmentId: attachment._id,
+  });
+
+  return buildAttachmentSnapshot(
+    {
+      _id: attachment._id,
+      originalName: attachment.originalName,
+      fileSize: attachment.fileSize,
+      pageId: attachment.page?.toString() ?? attachment.pageId,
+    },
+    pagePath,
+    actor.user?.username,
+  );
 };
