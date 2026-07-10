@@ -1,25 +1,25 @@
 // --- Mock boundary ---------------------------------------------------------
 //
 // getAvailableModels is a read handler over one collaborator:
-//   - getEffectiveSelectableModelIds(provider): the local catalog lookup
+//   - getEffectiveSelectableModels(provider): the local catalog lookup
 //     (persisted refreshed catalog ?? bundled asset — Req 9.5) that returns the
-//     bare model-id array for a provider ([] for a catalog-less provider).
+//     { id, name } array for a provider ([] for a catalog-less provider).
 // Provider validation now lives in the middleware chain (getAvailableModelsValidators
 // + apiV3FormValidator), NOT in the handler, so the handler trusts `provider` and
 // this unit test asserts only its map-to-response contract:
-//   - a valid provider → res.apiv3({ modelIds }) with the looked-up ids (1.1, 3.1)
-//   - a catalog-less-but-valid provider (azure-openai) → 200 { modelIds: [] } (3.1)
-//   - the response object carries ONLY `modelIds` — never a secret (Req 7.1)
+//   - a valid provider → res.apiv3({ models }) with the looked-up id+name list (1.1, 3.1)
+//   - a catalog-less-but-valid provider (azure-openai) → 200 { models: [] } (3.1)
+//   - the response object carries ONLY `models` — never a secret (Req 7.1)
 // The invalid/missing-provider → 400 path (validators + apiV3FormValidator) is
 // exercised end-to-end against the real middleware chain in index.spec.ts.
 // We mock the catalog collaborator so the test exercises only this handler's
 // map logic, not how the catalog is resolved.
-const { getEffectiveSelectableModelIds } = vi.hoisted(() => ({
-  getEffectiveSelectableModelIds: vi.fn(),
+const { getEffectiveSelectableModels } = vi.hoisted(() => ({
+  getEffectiveSelectableModels: vi.fn(),
 }));
 
 vi.mock('../../services/ai-sdk-modules/effective-model-catalog', () => ({
-  getEffectiveSelectableModelIds,
+  getEffectiveSelectableModels,
 }));
 
 import { mock } from 'vitest-mock-extended';
@@ -53,44 +53,51 @@ beforeEach(() => {
 });
 
 describe('getAvailableModels (Req 1.1, 3.1, 7.1)', () => {
-  it('returns the catalog ids for a valid provider (Req 1.1)', async () => {
-    getEffectiveSelectableModelIds.mockResolvedValue(['gpt-4o']);
+  it('returns the catalog models for a valid provider (Req 1.1)', async () => {
+    getEffectiveSelectableModels.mockResolvedValue([
+      { id: 'gpt-4o', name: 'GPT-4o' },
+    ]);
 
     const { res } = await invoke({ provider: 'openai' });
 
-    expect(getEffectiveSelectableModelIds).toHaveBeenCalledExactlyOnceWith(
+    expect(getEffectiveSelectableModels).toHaveBeenCalledExactlyOnceWith(
       'openai',
     );
-    expect(responseBody(res)).toEqual({ modelIds: ['gpt-4o'] });
+    expect(responseBody(res)).toEqual({
+      models: [{ id: 'gpt-4o', name: 'GPT-4o' }],
+    });
     expect(res.apiv3Err).not.toHaveBeenCalled();
   });
 
-  it('returns { modelIds: [] } with 200 semantics for a valid but catalog-less provider (Req 3.1)', async () => {
+  it('returns { models: [] } with 200 semantics for a valid but catalog-less provider (Req 3.1)', async () => {
     // azure-openai is a valid provider absent from the catalog → the effective
     // lookup yields [], which must surface as a 200 empty list, NOT an error.
-    getEffectiveSelectableModelIds.mockResolvedValue([]);
+    getEffectiveSelectableModels.mockResolvedValue([]);
 
     const { res } = await invoke({ provider: 'azure-openai' });
 
-    expect(getEffectiveSelectableModelIds).toHaveBeenCalledExactlyOnceWith(
+    expect(getEffectiveSelectableModels).toHaveBeenCalledExactlyOnceWith(
       'azure-openai',
     );
-    expect(responseBody(res)).toEqual({ modelIds: [] });
+    expect(responseBody(res)).toEqual({ models: [] });
     expect(res.apiv3Err).not.toHaveBeenCalled();
   });
 
-  it('returns ONLY modelIds — no apiKey/providerOptions/credentials (Req 7.1)', async () => {
-    getEffectiveSelectableModelIds.mockResolvedValue(['gpt-4o', 'gpt-4o-mini']);
+  it('returns ONLY models — no apiKey/providerOptions/credentials (Req 7.1)', async () => {
+    getEffectiveSelectableModels.mockResolvedValue([
+      { id: 'gpt-4o', name: 'GPT-4o' },
+      { id: 'gpt-4o-mini', name: 'GPT-4o mini' },
+    ]);
 
     const { res } = await invoke({ provider: 'openai' });
 
     // The response contract is a single key. Asserting the exact key set catches
     // any accidental leak of a secret-bearing field into the wire response.
-    expect(Object.keys(responseBody(res))).toEqual(['modelIds']);
+    expect(Object.keys(responseBody(res))).toEqual(['models']);
   });
 
   it('responds with a generic 500 when the catalog read fails (no internal leak)', async () => {
-    getEffectiveSelectableModelIds.mockRejectedValue(
+    getEffectiveSelectableModels.mockRejectedValue(
       new Error('boom: mongo down at 10.0.0.1'),
     );
 

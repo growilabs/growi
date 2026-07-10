@@ -48,6 +48,14 @@ vi.mock(
   '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model',
   () => ({ clearResolvedMastraModelCache }),
 );
+// GET now resolves display names from the effective catalog; mock the resolver so
+// this env-only-wiring test touches no catalog/DB. Echoes the id as the name.
+const { buildModelDisplayNameResolver } = vi.hoisted(() => ({
+  buildModelDisplayNameResolver: vi.fn(),
+}));
+vi.mock('../../services/ai-sdk-modules/resolve-model-display-name', () => ({
+  buildModelDisplayNameResolver,
+}));
 // updateConfigs dynamically imports '../../models/config' (relative to
 // config-manager.ts) — mock it so the real updateConfigs path runs without a DB.
 vi.mock('~/server/models/config', () => ({ Config: ConfigMock }));
@@ -121,10 +129,10 @@ const ENV = (useOnlyEnvVars: boolean): Partial<TestConfigData> => ({
   'env:useOnlyEnvVars:ai': { value: useOnlyEnvVars },
 });
 
-const invokeGet = (): AiSettingsResponse => {
+const invokeGet = async (): Promise<AiSettingsResponse> => {
   const req = mock<Request>();
   const res = mock<ApiV3Response>();
-  getAiSettings(req, res);
+  await getAiSettings(req, res);
   const apiv3 = vi.mocked(res.apiv3);
   expect(res.apiv3Err).not.toHaveBeenCalled();
   expect(apiv3).toHaveBeenCalledTimes(1);
@@ -157,6 +165,9 @@ const invokePut = async (body: AiSettingsUpdateRequest) => {
 beforeEach(() => {
   vi.clearAllMocks();
   isAiConfigured.mockReturnValue(true);
+  buildModelDisplayNameResolver.mockResolvedValue(
+    (_provider: string, modelId: string) => modelId,
+  );
   ConfigMock.bulkWrite.mockResolvedValue(undefined);
   // The real updateConfigs reloads db config after writing; keep that a no-op so
   // it does not overwrite the injected dbConfig with a real DB read.
@@ -171,8 +182,8 @@ describe('admin-ai-settings env-only mode end-to-end (Req 5.2, 5.3, 5.4)', () =>
       setSources(DB, ENV(true));
     });
 
-    it('GET reports useOnlyEnvVars=true AND resolves connection settings to env, ignoring DB (Req 5.2)', () => {
-      const body = invokeGet();
+    it('GET reports useOnlyEnvVars=true AND resolves connection settings to env, ignoring DB (Req 5.2)', async () => {
+      const body = await invokeGet();
 
       // The flag is surfaced for the UI to lock connection-setting editing...
       expect(body.useOnlyEnvVars).toBe(true);
@@ -186,9 +197,15 @@ describe('admin-ai-settings env-only mode end-to-end (Req 5.2, 5.3, 5.4)', () =>
       expect(body.providers.anthropic.isApiKeySet).toBe(true);
       expect(body.providers.openai.isApiKeySet).toBe(false);
       // The allow-list is NOT env-locked: it resolves DB-first even under env-only
-      // (Req 5.3 — model settings stay DB-editable).
+      // (Req 5.3 — model settings stay DB-editable). Each entry carries the
+      // resolved display name (the echo resolver returns the modelId here).
       expect(body.allowedModels).toEqual([
-        { provider: 'openai', modelId: 'db-model', isDefault: true },
+        {
+          provider: 'openai',
+          modelId: 'db-model',
+          isDefault: true,
+          displayName: 'db-model',
+        },
       ]);
       // No API key VALUE is ever returned, only presence.
       expect(JSON.stringify(body)).not.toContain('secret-key');
@@ -239,8 +256,8 @@ describe('admin-ai-settings env-only mode end-to-end (Req 5.2, 5.3, 5.4)', () =>
       setSources(DB, ENV(false));
     });
 
-    it('GET reports useOnlyEnvVars=false AND resolves connection settings DB-first (Req 5.2 inverse)', () => {
-      const body = invokeGet();
+    it('GET reports useOnlyEnvVars=false AND resolves connection settings DB-first (Req 5.2 inverse)', async () => {
+      const body = await invokeGet();
 
       expect(body.useOnlyEnvVars).toBe(false);
       // Same flag off -> DB values win, proving the wiring is consistent.
@@ -250,7 +267,12 @@ describe('admin-ai-settings env-only mode end-to-end (Req 5.2, 5.3, 5.4)', () =>
       expect(body.providers.openai.isApiKeySet).toBe(true); // DB key
       expect(body.providers.anthropic.isApiKeySet).toBe(false);
       expect(body.allowedModels).toEqual([
-        { provider: 'openai', modelId: 'db-model', isDefault: true },
+        {
+          provider: 'openai',
+          modelId: 'db-model',
+          isDefault: true,
+          displayName: 'db-model',
+        },
       ]);
     });
 

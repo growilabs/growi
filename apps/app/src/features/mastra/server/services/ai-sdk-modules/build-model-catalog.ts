@@ -19,8 +19,28 @@ export const MODELS_DEV_SOURCE_ATTRIBUTION = `${MODELS_DEV_URL} (MIT)`;
 
 // ─── Output contract ─────────────────────────────────────────────────────────
 
-/** provider → generation-time-filtered selectable model ids (bare ids, sorted). */
-export type ModelCatalog = Record<CatalogProvider, string[]>;
+/**
+ * One selectable model in the catalog: its bare id (the AI SDK model id, also the
+ * models.dev map key) paired with the official display `name` from models.dev.
+ *
+ * The name is captured HERE, at the same moment as the id, from the same
+ * models.dev snapshot — so the two can never drift (models.dev removes/renames
+ * models over time, and a separate later lookup could miss an id it once had).
+ * When models.dev carries no name for an entry, the id is stored as the name so
+ * the display always has a value (fallback resolved at generation time, not on
+ * every read).
+ */
+// A `type` (not `interface`) on purpose: the persisted snapshot is spread into a
+// Prisma `Json` (InputJsonValue) column, and only a type alias is assignable to
+// Json's `{ [k: string]: ... }` index signature — an interface is not (it can be
+// augmented, so TS withholds the implicit index signature).
+export type ModelCatalogEntry = {
+  readonly id: string;
+  readonly name: string;
+};
+
+/** provider → generation-time-filtered selectable models (sorted by id). */
+export type ModelCatalog = Record<CatalogProvider, ModelCatalogEntry[]>;
 
 /** The committed file shape: header (attribution / timestamp) separated from data. */
 export interface ModelCatalogFile {
@@ -41,7 +61,7 @@ export interface ModelCatalogFile {
 
 export const persistedModelCatalogSchema = z.record(
   z.enum(CATALOG_PROVIDERS),
-  z.array(z.string()),
+  z.array(z.object({ id: z.string(), name: z.string() })),
 );
 
 // ─── Catalog accessors (shared by every read/report site) ───────────────────
@@ -55,15 +75,15 @@ export const persistedModelCatalogSchema = z.record(
  * asset or the stored snapshot. Single source for BOTH read paths (the bundled
  * model-catalog.ts and the refreshed effective-model-catalog.ts).
  */
-export const pickSelectableModelIds = (
+export const pickSelectableModels = (
   models: ModelCatalog,
   provider: AiProvider,
-): string[] => {
-  const widened: Record<string, readonly string[]> = models;
+): ModelCatalogEntry[] => {
+  const widened: Record<string, readonly ModelCatalogEntry[]> = models;
   return [...(widened[provider] ?? [])];
 };
 
-/** provider → number of selectable ids (refresh response + log summaries). */
+/** provider → number of selectable models (refresh response + log summaries). */
 export const deriveProviderCounts = (
   models: ModelCatalog,
 ): Record<string, number> => {
@@ -99,6 +119,11 @@ const modelEntrySchema = z.looseObject({
   modalities: z.looseObject({
     output: z.array(z.string()),
   }),
+  // Official display name. Optional (not part of the drift contract): models.dev
+  // populates it on every current entry, but a missing name is not a schema
+  // change we must fail on — it degrades to the id (see the transform). Only
+  // `tool_call`/`modalities.output` are treated as required drift signals above.
+  name: z.string().optional(),
 });
 
 const providerSchema = z.looseObject({
@@ -146,16 +171,20 @@ export const buildModelCatalog = (
     // The bare model id is the map key (mirrored on `entry.id` in real data);
     // use the validated key set so we don't depend on the optional `id` field.
     // `parsed.models` entries carry the two authoritative fields validated
-    // above; pass each to the shared filter (single source of truth).
-    const selectableIds = Object.entries(parsed.models)
+    // above; pass each to the shared filter (single source of truth). The
+    // display `name` is captured here from the same entry (id fallback when
+    // models.dev omits it) so id and name come from one snapshot and never drift.
+    const selectableEntries = Object.entries(parsed.models)
       .filter(([, entry]) => isSelectableModel(entry as ModelsDevModel))
-      .map(([id]) => id);
+      .map(([id, entry]) => ({ id, name: entry.name ?? id }));
 
-    // Sort by code point (locale-independent) to keep the emitted file
+    // Sort by id code point (locale-independent) to keep the emitted file
     // deterministic across environments. A bare `localeCompare()` collates per the
     // runner's default ICU locale and would reorder ids such as `gpt-5.1-chat-latest`
     // under e.g. a Czech locale, breaking the same-input⇒same-output guarantee.
-    const sorted = selectableIds.toSorted();
+    const sorted = selectableEntries.toSorted((a, b) =>
+      a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+    );
 
     if (sorted.length === 0) {
       emptyProviders.push(provider);

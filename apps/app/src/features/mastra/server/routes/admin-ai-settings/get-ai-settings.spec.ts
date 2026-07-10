@@ -58,6 +58,18 @@ vi.mock('~/features/mastra/server/services/is-ai-configured', () => ({
   isAiConfigured,
 }));
 
+// buildModelDisplayNameResolver joins the allow-list with the effective catalog
+// to attach official display names. Mocked at its boundary so this handler test
+// stays a pure mapping test (no catalog/DB); the resolver just echoes the id so
+// the allow-list assertions stay readable. Its own resolution is unit-tested in
+// resolve-model-display-name.spec.
+const { buildModelDisplayNameResolver } = vi.hoisted(() => ({
+  buildModelDisplayNameResolver: vi.fn(),
+}));
+vi.mock('../../services/ai-sdk-modules/resolve-model-display-name', () => ({
+  buildModelDisplayNameResolver,
+}));
+
 import type { Request } from 'express';
 import { mock } from 'vitest-mock-extended';
 
@@ -105,10 +117,10 @@ const setAllowedModels = (models: AllowedModel[]): void => {
   getAllowedModels.mockReturnValue(models);
 };
 
-const invoke = () => {
+const invoke = async () => {
   const req = mock<Request>();
   const res = mock<ApiV3Response>();
-  getAiSettings(req, res);
+  await getAiSettings(req, res);
   return { res };
 };
 
@@ -132,11 +144,16 @@ beforeEach(() => {
   setProviderSettings({});
   setApiKeys({});
   setAllowedModels([]);
+  // Echo resolver: displayName === modelId. Keeps the allow-list assertions
+  // focused on the handler's mapping, not on catalog name resolution.
+  buildModelDisplayNameResolver.mockResolvedValue(
+    (_provider: string, modelId: string) => modelId,
+  );
 });
 
 describe('getAiSettings (Req 1.1, 1.8, 1.9)', () => {
-  it('returns a fixed slot for every supported provider, each with enabled + isApiKeySet booleans (Req 1.1)', () => {
-    const { res } = invoke();
+  it('returns a fixed slot for every supported provider, each with enabled + isApiKeySet booleans (Req 1.1)', async () => {
+    const { res } = await invoke();
 
     const providers = providersOf(res);
     // Exactly the declared provider set — no more, no fewer (fixed slots).
@@ -148,14 +165,14 @@ describe('getAiSettings (Req 1.1, 1.8, 1.9)', () => {
     }
   });
 
-  it('reports each provider enabled flag from getProviderSettings(provider)?.enabled (Req 1.1)', () => {
+  it('reports each provider enabled flag from getProviderSettings(provider)?.enabled (Req 1.1)', async () => {
     setProviderSettings({
       openai: { enabled: true },
       anthropic: { enabled: false },
       // google / azure-openai: no entry at all -> disabled
     });
 
-    const providers = providersOf(invoke().res);
+    const providers = providersOf((await invoke()).res);
 
     expect(providers.openai.enabled).toBe(true);
     expect(providers.anthropic.enabled).toBe(false);
@@ -163,7 +180,7 @@ describe('getAiSettings (Req 1.1, 1.8, 1.9)', () => {
     expect(providers['azure-openai'].enabled).toBe(false);
   });
 
-  it("carries azureOpenaiSettings only on the 'azure-openai' entry (Req 1.1)", () => {
+  it("carries azureOpenaiSettings only on the 'azure-openai' entry (Req 1.1)", async () => {
     setProviderSettings({
       openai: { enabled: true },
       'azure-openai': {
@@ -172,7 +189,7 @@ describe('getAiSettings (Req 1.1, 1.8, 1.9)', () => {
       },
     });
 
-    const providers = providersOf(invoke().res);
+    const providers = providersOf((await invoke()).res);
 
     expect(providers['azure-openai'].azureOpenaiSettings).toEqual({
       resourceName: 'my-resource',
@@ -184,10 +201,10 @@ describe('getAiSettings (Req 1.1, 1.8, 1.9)', () => {
     }
   });
 
-  it('reports isApiKeySet=true and never exposes the key value when a provider key is set (Req 1.8, 1.9)', () => {
+  it('reports isApiKeySet=true and never exposes the key value when a provider key is set (Req 1.8, 1.9)', async () => {
     setApiKeys({ openai: 'sk-super-secret-value' });
 
-    const { res } = invoke();
+    const { res } = await invoke();
 
     const body = responseBody(res);
     const providers = body.providers;
@@ -197,18 +214,18 @@ describe('getAiSettings (Req 1.1, 1.8, 1.9)', () => {
     expect(providers.openai).not.toHaveProperty('apiKey');
   });
 
-  it('reports isApiKeySet=false when a provider has no usable key (Req 1.8)', () => {
+  it('reports isApiKeySet=false when a provider has no usable key (Req 1.8)', async () => {
     // getApiKey is the single blankness authority: it normalizes an unset / blank /
     // whitespace-only stored key to undefined, so the admin GET only ever sees a
     // usable key or undefined, and isApiKeySet simply mirrors that presence.
     setApiKeys({ openai: undefined });
 
-    const providers = providersOf(invoke().res);
+    const providers = providersOf((await invoke()).res);
 
     expect(providers.openai.isApiKeySet).toBe(false);
   });
 
-  it('returns the allowedModels allow-list verbatim incl. provider, providerOptions and isDefault (Req 1.1)', () => {
+  it('returns the allowedModels allow-list incl. provider, providerOptions, isDefault, and the resolved displayName (Req 1.1)', async () => {
     const models: AllowedModel[] = [
       {
         provider: 'openai',
@@ -220,55 +237,59 @@ describe('getAiSettings (Req 1.1, 1.8, 1.9)', () => {
     ];
     setAllowedModels(models);
 
-    expect(responseBody(invoke().res).allowedModels).toEqual(models);
+    // Each entry is carried through verbatim, plus a display-only `displayName`
+    // resolved from the catalog (the echo resolver returns the modelId here).
+    expect(responseBody((await invoke()).res).allowedModels).toEqual(
+      models.map((m) => ({ ...m, displayName: m.modelId })),
+    );
   });
 
-  it('returns allowedModels as an array (empty when none configured, Req 1.1)', () => {
+  it('returns allowedModels as an array (empty when none configured, Req 1.1)', async () => {
     setAllowedModels([]);
 
-    const body = responseBody(invoke().res);
+    const body = responseBody((await invoke()).res);
     expect(Array.isArray(body.allowedModels)).toBe(true);
     expect(body.allowedModels).toEqual([]);
   });
 
-  it('returns aiEnabled from app:aiEnabled', () => {
+  it('returns aiEnabled from app:aiEnabled', async () => {
     setConfig({ 'app:aiEnabled': true });
 
-    expect(responseBody(invoke().res).aiEnabled).toBe(true);
+    expect(responseBody((await invoke()).res).aiEnabled).toBe(true);
   });
 
-  it('returns useOnlyEnvVars from env:useOnlyEnvVars:ai', () => {
+  it('returns useOnlyEnvVars from env:useOnlyEnvVars:ai', async () => {
     setConfig({ 'env:useOnlyEnvVars:ai': true });
-    expect(responseBody(invoke().res).useOnlyEnvVars).toBe(true);
+    expect(responseBody((await invoke()).res).useOnlyEnvVars).toBe(true);
 
     setConfig({ 'env:useOnlyEnvVars:ai': false });
-    expect(responseBody(invoke().res).useOnlyEnvVars).toBe(false);
+    expect(responseBody((await invoke()).res).useOnlyEnvVars).toBe(false);
   });
 
-  it('returns isConfigured from isAiConfigured()', () => {
+  it('returns isConfigured from isAiConfigured()', async () => {
     isAiConfigured.mockReturnValue(true);
 
-    const { res } = invoke();
+    const { res } = await invoke();
 
     expect(responseBody(res).isConfigured).toBe(true);
     expect(isAiConfigured).toHaveBeenCalledTimes(1);
   });
 
-  it('does not surface the removed single-provider top-level fields', () => {
-    const body = responseBody(invoke().res);
+  it('does not surface the removed single-provider top-level fields', async () => {
+    const body = responseBody((await invoke()).res);
     // These moved into the per-provider `providers` Record.
     expect(body).not.toHaveProperty('provider');
     expect(body).not.toHaveProperty('isApiKeySet');
     expect(body).not.toHaveProperty('azureOpenaiSettings');
   });
 
-  it('responds with apiv3Err and does not leak a key value when a collaborator throws (Req 1.9)', () => {
+  it('responds with apiv3Err and does not leak a key value when a collaborator throws (Req 1.9)', async () => {
     setApiKeys({ openai: 'sk-leak-me-not' });
     isAiConfigured.mockImplementation(() => {
       throw new Error('boom while computing configured state');
     });
 
-    const { res } = invoke();
+    const { res } = await invoke();
 
     const apiv3Err = vi.mocked(res.apiv3Err);
     expect(apiv3Err).toHaveBeenCalledTimes(1);

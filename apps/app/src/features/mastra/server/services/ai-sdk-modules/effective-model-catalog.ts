@@ -2,10 +2,13 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import type { AiProvider } from '../../../interfaces/ai-provider';
-import { pickSelectableModelIds } from './build-model-catalog';
+import {
+  type ModelCatalogEntry,
+  pickSelectableModels,
+} from './build-model-catalog';
 import {
   BUNDLED_CATALOG_GENERATED_AT,
-  getSelectableModelIds,
+  getSelectableModels,
 } from './model-catalog';
 
 const logger = loggerFactory(
@@ -13,7 +16,8 @@ const logger = loggerFactory(
 );
 
 /**
- * Resolve the selectable model ids for a provider from the EFFECTIVE catalog:
+ * Resolve the selectable models (id + display name) for a provider from the
+ * EFFECTIVE catalog:
  * the NEWER of the persisted refreshed catalog (Req 9) and the bundled
  * committed asset (Req 9.5). Concretely:
  *
@@ -34,9 +38,9 @@ const logger = loggerFactory(
  * Kept separate from model-catalog.ts so the bundled read stays a pure,
  * I/O-free module.
  */
-export const getEffectiveSelectableModelIds = async (
+export const getEffectiveSelectableModels = async (
   provider: AiProvider,
-): Promise<string[]> => {
+): Promise<ModelCatalogEntry[]> => {
   try {
     const refreshed = await prisma.mastrarefreshedmodelcatalogs.getSingleton();
 
@@ -53,7 +57,7 @@ export const getEffectiveSelectableModelIds = async (
       if (!bundledIsNewer) {
         // Shared accessor (same as the bundled read): catalog-less providers
         // (e.g. 'azure-openai') fail soft to [] (Req 3.1).
-        return pickSelectableModelIds(refreshed.models, provider);
+        return pickSelectableModels(refreshed.models, provider);
       }
     }
   } catch (err) {
@@ -68,5 +72,5 @@ export const getEffectiveSelectableModelIds = async (
     );
   }
 
-  return getSelectableModelIds(provider);
+  return getSelectableModels(provider);
 };

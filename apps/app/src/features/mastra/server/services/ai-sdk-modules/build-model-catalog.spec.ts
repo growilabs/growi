@@ -3,7 +3,7 @@ import {
   deriveProviderCounts,
   formatProviderCounts,
   persistedModelCatalogSchema,
-  pickSelectableModelIds,
+  pickSelectableModels,
 } from './build-model-catalog';
 
 /**
@@ -91,20 +91,47 @@ const happyFixture = (): unknown => ({
 });
 
 describe('buildModelCatalog', () => {
-  it('keeps only selectable (tool_call && text-output) ids, sorted, per provider', () => {
+  it('keeps only selectable (tool_call && text-output) models with id + name, sorted, per provider', () => {
     const catalog = buildModelCatalog(happyFixture());
 
-    // openai: only the two selectable ids survive, sorted; non-selectable absent
-    expect(catalog.openai).toEqual(['gpt-4.1', 'gpt-4o']);
-    expect(catalog.openai).not.toContain('text-only-no-tools'); // tool_call:false excluded (6.1)
-    expect(catalog.openai).not.toContain('dall-e-3'); // non-text output excluded (6.1)
-    expect(catalog.openai).not.toContain('text-embedding-3-large'); // embedding excluded (6.1)
+    // openai: only the two selectable models survive, sorted by id; each entry
+    // carries its display name (the fixtures name each model after its id).
+    expect(catalog.openai).toEqual([
+      { id: 'gpt-4.1', name: 'gpt-4.1' },
+      { id: 'gpt-4o', name: 'gpt-4o' },
+    ]);
+    const openaiIds = catalog.openai.map((m) => m.id);
+    expect(openaiIds).not.toContain('text-only-no-tools'); // tool_call:false excluded (6.1)
+    expect(openaiIds).not.toContain('dall-e-3'); // non-text output excluded (6.1)
+    expect(openaiIds).not.toContain('text-embedding-3-large'); // embedding excluded (6.1)
 
     expect(catalog.anthropic).toEqual([
-      'claude-3-5-haiku',
-      'claude-3-7-sonnet',
+      { id: 'claude-3-5-haiku', name: 'claude-3-5-haiku' },
+      { id: 'claude-3-7-sonnet', name: 'claude-3-7-sonnet' },
     ]);
-    expect(catalog.google).toEqual(['gemini-2.5-pro']);
+    expect(catalog.google).toEqual([
+      { id: 'gemini-2.5-pro', name: 'gemini-2.5-pro' },
+    ]);
+  });
+
+  it('falls back to the id as the display name when models.dev omits name', () => {
+    // A selectable entry with no `name` — the transform must store the id as the
+    // name so the display always has a value (name is not part of the drift
+    // contract, unlike tool_call/modalities).
+    const noName = {
+      id: 'gpt-4o',
+      tool_call: true,
+      modalities: { input: ['text'], output: ['text'] },
+    };
+    const fixture = {
+      openai: provider('openai', [noName]),
+      anthropic: provider('anthropic', [selectable('claude')]),
+      google: provider('google', [selectable('gemini-2.5-pro')]),
+    };
+
+    const catalog = buildModelCatalog(fixture as unknown);
+
+    expect(catalog.openai).toEqual([{ id: 'gpt-4o', name: 'gpt-4o' }]);
   });
 
   it('does not include untargeted providers (e.g. azure)', () => {
@@ -204,12 +231,12 @@ describe('buildModelCatalog', () => {
 
 describe('persistedModelCatalogSchema (read-side validation)', () => {
   const validCatalog = {
-    openai: ['gpt-4o'],
-    anthropic: ['claude-sonnet-4'],
-    google: ['gemini-2.5-pro'],
+    openai: [{ id: 'gpt-4o', name: 'GPT-4o' }],
+    anthropic: [{ id: 'claude-sonnet-4', name: 'Claude Sonnet 4' }],
+    google: [{ id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' }],
   };
 
-  it('accepts what buildModelCatalog writes (every provider → string array)', () => {
+  it('accepts what buildModelCatalog writes (every provider → {id,name} array)', () => {
     const parsed = persistedModelCatalogSchema.safeParse(validCatalog);
 
     expect(parsed.success).toBe(true);
@@ -218,19 +245,29 @@ describe('persistedModelCatalogSchema (read-side validation)', () => {
 
   // Each rejection below represents a document a DIFFERENT code version (or an
   // operator) wrote: the reader must treat it as absent (bundled fallback),
-  // never crash on it. Note a string value would not even throw at the read
-  // site (`[...'text']` spreads into characters), so the schema is the only
-  // guard against silently serving garbage.
+  // never crash on it. This includes the PRE-name shape (bare id strings) a
+  // rolling-upgrade predecessor may have written — it must degrade, not crash.
   it.each([
     ['a non-array provider value', { ...validCatalog, openai: 'gpt-4o' }],
     ['a non-iterable provider value', { ...validCatalog, openai: 42 }],
     [
+      'the pre-name shape (bare id strings)',
+      { ...validCatalog, openai: ['gpt-4o'] },
+    ],
+    [
+      'an entry missing its name',
+      { ...validCatalog, openai: [{ id: 'gpt-4o' }] },
+    ],
+    [
       'an unknown provider key (newer version wrote it)',
-      { ...validCatalog, mistral: ['m'] },
+      { ...validCatalog, mistral: [{ id: 'm', name: 'M' }] },
     ],
     [
       'a missing provider key (older version wrote it)',
-      { openai: ['gpt-4o'], anthropic: ['claude'] },
+      {
+        openai: [{ id: 'gpt-4o', name: 'GPT-4o' }],
+        anthropic: [{ id: 'claude', name: 'Claude' }],
+      },
     ],
     ['a null document field', null],
     ['a non-object value', 'catalog'],
@@ -241,30 +278,33 @@ describe('persistedModelCatalogSchema (read-side validation)', () => {
 
 describe('catalog accessors', () => {
   const catalog = {
-    openai: ['gpt-4.1', 'gpt-4o'],
-    anthropic: ['claude-3-7-sonnet'],
-    google: ['gemini-2.5-pro'],
+    openai: [
+      { id: 'gpt-4.1', name: 'GPT-4.1' },
+      { id: 'gpt-4o', name: 'GPT-4o' },
+    ],
+    anthropic: [{ id: 'claude-3-7-sonnet', name: 'Claude 3.7 Sonnet' }],
+    google: [{ id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' }],
   };
 
-  describe('pickSelectableModelIds', () => {
-    it('returns the ids for a catalog-backed provider', () => {
-      expect(pickSelectableModelIds(catalog, 'openai')).toEqual([
-        'gpt-4.1',
-        'gpt-4o',
+  describe('pickSelectableModels', () => {
+    it('returns the models for a catalog-backed provider', () => {
+      expect(pickSelectableModels(catalog, 'openai')).toEqual([
+        { id: 'gpt-4.1', name: 'GPT-4.1' },
+        { id: 'gpt-4o', name: 'GPT-4o' },
       ]);
     });
 
     it('fails soft to [] for a catalog-less provider (Req 3.1)', () => {
-      expect(pickSelectableModelIds(catalog, 'azure-openai')).toEqual([]);
+      expect(pickSelectableModels(catalog, 'azure-openai')).toEqual([]);
     });
 
     it('returns a fresh copy so callers cannot mutate the catalog', () => {
-      const first = pickSelectableModelIds(catalog, 'openai');
-      first.push('__mutated__');
+      const first = pickSelectableModels(catalog, 'openai');
+      first.push({ id: '__mutated__', name: '__mutated__' });
 
-      expect(pickSelectableModelIds(catalog, 'openai')).toEqual([
-        'gpt-4.1',
-        'gpt-4o',
+      expect(pickSelectableModels(catalog, 'openai')).toEqual([
+        { id: 'gpt-4.1', name: 'GPT-4.1' },
+        { id: 'gpt-4o', name: 'GPT-4o' },
       ]);
     });
   });

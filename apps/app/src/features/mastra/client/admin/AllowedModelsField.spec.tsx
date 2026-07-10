@@ -717,7 +717,13 @@ describe('AllowedModelsField', () => {
       // Arrange: openai has a catalog; the first row already registered gpt-4o.
       mockedUseSelectableModels.mockReturnValue(
         swrResponse({
-          data: { modelIds: ['gpt-4o', 'gpt-4.1', 'gpt-4o-mini'] },
+          data: {
+            models: [
+              { id: 'gpt-4o', name: 'GPT-4o' },
+              { id: 'gpt-4.1', name: 'GPT-4.1' },
+              { id: 'gpt-4o-mini', name: 'GPT-4o mini' },
+            ],
+          },
         }),
       );
 
@@ -742,7 +748,8 @@ describe('AllowedModelsField', () => {
 
       // Assert: both controls are <select>s. The empty row's options exclude the
       // gpt-4o already registered by the first row (registered-excluded), leaving
-      // the placeholder + the still-available ids.
+      // the placeholder + the still-available models — labelled by display NAME
+      // (the option value stays the bare id).
       const selects = getModelSelects();
       expect(selects).toHaveLength(2);
       const emptyRowOptions = within(selects[1])
@@ -750,15 +757,20 @@ describe('AllowedModelsField', () => {
         .map((o) => o.textContent);
       expect(emptyRowOptions).toEqual([
         'ai_settings.model_placeholder',
-        'gpt-4.1',
-        'gpt-4o-mini',
+        'GPT-4.1',
+        'GPT-4o mini',
       ]);
+      // The option VALUES remain the bare ids (what gets stored/sent).
+      const emptyRowValues = within(selects[1])
+        .getAllByRole<HTMLOptionElement>('option')
+        .map((o) => o.value);
+      expect(emptyRowValues).toEqual(['', 'gpt-4.1', 'gpt-4o-mini']);
     });
 
     it('renders a free-text input for a catalog-less provider (Azure)', () => {
       // Arrange: azure-openai resolves to an empty catalog.
       mockedUseSelectableModels.mockReturnValue(
-        swrResponse({ data: { modelIds: [] } }),
+        swrResponse({ data: { models: [] } }),
       );
 
       // Act
@@ -812,7 +824,7 @@ describe('AllowedModelsField', () => {
     it('keeps a saved modelId absent from the current catalog as its own selected option (2.6)', () => {
       // Arrange
       mockedUseSelectableModels.mockReturnValue(
-        swrResponse({ data: { modelIds: ['gpt-4o'] } }),
+        swrResponse({ data: { models: [{ id: 'gpt-4o', name: 'GPT-4o' }] } }),
       );
 
       // Act
@@ -857,7 +869,14 @@ describe('AllowedModelsField', () => {
       });
 
       mockedUseSelectableModels.mockReturnValue(
-        swrResponse({ data: { modelIds: ['gpt-4o', 'gpt-4.1'] } }),
+        swrResponse({
+          data: {
+            models: [
+              { id: 'gpt-4o', name: 'GPT-4o' },
+              { id: 'gpt-4.1', name: 'GPT-4.1' },
+            ],
+          },
+        }),
       );
       rerender(
         <FormHarness
@@ -906,7 +925,13 @@ describe('AllowedModelsField', () => {
     beforeEach(() => {
       mockedUseSelectableModels.mockReturnValue(
         swrResponse({
-          data: { modelIds: ['gpt-4o', 'gpt-4.1', 'gpt-4o-mini'] },
+          data: {
+            models: [
+              { id: 'gpt-4o', name: 'GPT-4o' },
+              { id: 'gpt-4.1', name: 'GPT-4.1' },
+              { id: 'gpt-4o-mini', name: 'GPT-4o mini' },
+            ],
+          },
         }),
       );
     });

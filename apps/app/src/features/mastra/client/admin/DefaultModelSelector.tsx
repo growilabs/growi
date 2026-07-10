@@ -65,7 +65,10 @@ export const DefaultModelSelector = (): JSX.Element => {
   const defaultModel = models.find((m) => m.isDefault === true);
   const triggerLabel =
     defaultModel != null
-      ? formatModelLabel(defaultModel.provider, defaultModel.modelId)
+      ? formatModelLabel(
+          defaultModel.provider,
+          defaultModel.displayName ?? defaultModel.modelId,
+        )
       : t('ai_settings.default_model_placeholder');
 
   const [isOpen, setIsOpen] = useState(false);
@@ -124,11 +127,11 @@ export const DefaultModelSelector = (): JSX.Element => {
                   <DropdownItem
                     key={entry.index}
                     active={entry.model.isDefault === true}
-                    className="font-monospace py-2"
+                    className="py-2"
                     data-testid={`default-model-item-${entry.index}`}
                     onClick={() => selectDefault(entry.index)}
                   >
-                    {entry.model.modelId}
+                    {entry.model.displayName ?? entry.model.modelId}
                   </DropdownItem>
                 ))}
               </Fragment>
