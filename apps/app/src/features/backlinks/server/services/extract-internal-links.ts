@@ -67,7 +67,14 @@ export const extractInternalLinks = async (
     const isInternalAbsolute = siteHost != null && url.host === siteHost;
     if (!isRelative && !isInternalAbsolute) continue;
 
-    const path = normalizePath(decodeURIComponent(url.pathname));
+    // Skip links with malformed path.
+    let decodedPath: string;
+    try {
+      decodedPath = decodeURIComponent(url.pathname);
+    } catch {
+      continue;
+    }
+    const path = normalizePath(decodedPath);
 
     if (!pagePathUtils.isCreatablePage(path) || path === normalizedSelf)
       continue;
