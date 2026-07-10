@@ -129,7 +129,7 @@ describe('buildModelCatalog', () => {
       google: provider('google', [selectable('gemini-2.5-pro')]),
     };
 
-    const catalog = buildModelCatalog(fixture as unknown);
+    const catalog = buildModelCatalog(fixture);
 
     expect(catalog.openai).toEqual([{ id: 'gpt-4o', name: 'gpt-4o' }]);
   });
@@ -153,7 +153,7 @@ describe('buildModelCatalog', () => {
     const entries = Object.entries(scrambled.openai.models).reverse();
     scrambled.openai.models = Object.fromEntries(entries);
 
-    const rebuilt = buildModelCatalog(scrambled as unknown);
+    const rebuilt = buildModelCatalog(scrambled);
     expect(rebuilt).toEqual(base);
   });
 
@@ -168,7 +168,7 @@ describe('buildModelCatalog', () => {
         models: [{ id: 'gemini', tool_call: true }],
       },
     };
-    expect(() => buildModelCatalog(malformed as unknown)).toThrow();
+    expect(() => buildModelCatalog(malformed)).toThrow();
   });
 
   it('throws when a target-provider entry omits tool_call/modalities (schema drift)', () => {
@@ -185,7 +185,7 @@ describe('buildModelCatalog', () => {
       google: provider('google', [selectable('gemini-2.5-pro')]),
     };
 
-    expect(() => buildModelCatalog(withMissingFields as unknown)).toThrow();
+    expect(() => buildModelCatalog(withMissingFields)).toThrow();
   });
 
   it('throws when tool_call has the wrong type (schema drift)', () => {
@@ -204,7 +204,7 @@ describe('buildModelCatalog', () => {
         },
       },
     };
-    expect(() => buildModelCatalog(malformed as unknown)).toThrow();
+    expect(() => buildModelCatalog(malformed)).toThrow();
   });
 
   it('throws naming the empty provider when a target provider has zero selectable models', () => {
@@ -217,7 +217,7 @@ describe('buildModelCatalog', () => {
         notToolCall('gemini-embed'),
       ]),
     };
-    expect(() => buildModelCatalog(emptyGoogle as unknown)).toThrow(/google/);
+    expect(() => buildModelCatalog(emptyGoogle)).toThrow(/google/);
   });
 
   it('throws when a target provider is missing entirely', () => {
@@ -225,7 +225,7 @@ describe('buildModelCatalog', () => {
       openai: provider('openai', [selectable('gpt-4o')]),
       anthropic: provider('anthropic', [selectable('claude')]),
     };
-    expect(() => buildModelCatalog(missingGoogle as unknown)).toThrow();
+    expect(() => buildModelCatalog(missingGoogle)).toThrow();
   });
 });
 
