@@ -2,12 +2,15 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import type {
   AttachmentRemoveSnapshot,
+  AttachmentSnapshot,
   DefaultSnapshot,
   IActivity,
   ISnapshot,
 } from './activity';
 import {
   AllSupportedActions,
+  isAttachmentAddActivity,
+  isAttachmentDownloadActivity,
   isAttachmentRemoveActivity,
   MODEL_ATTACHMENT,
   SupportedAction,
@@ -200,6 +203,221 @@ describe('isAttachmentRemoveActivity', () => {
     };
 
     expect(isAttachmentRemoveActivity(activity)).toBe(false);
+  });
+});
+
+describe('isAttachmentAddActivity', () => {
+  it('narrows an ATTACHMENT_ADD activity so attachment fields are readable', () => {
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_ADD,
+      snapshot: {
+        username: 'alice',
+        originalName: 'diagram.png',
+        pagePath: '/Sandbox',
+        pageId: '65a000000000000000000001',
+        fileSize: 4096,
+      },
+    };
+
+    if (isAttachmentAddActivity(activity)) {
+      // Compile-time proof: attachment-specific fields are accessible after narrowing
+      expectTypeOf(activity.snapshot?.originalName).toEqualTypeOf<
+        string | undefined
+      >();
+      expectTypeOf(activity.snapshot?.fileSize).toEqualTypeOf<
+        number | undefined
+      >();
+
+      expect(activity.snapshot?.username).toBe('alice');
+      expect(activity.snapshot?.originalName).toBe('diagram.png');
+      expect(activity.snapshot?.pagePath).toBe('/Sandbox');
+      expect(activity.snapshot?.pageId).toBe('65a000000000000000000001');
+      expect(activity.snapshot?.fileSize).toBe(4096);
+    } else {
+      expect.unreachable('guard must accept ACTION_ATTACHMENT_ADD');
+    }
+  });
+
+  it('accepts a legacy username-only snapshot recorded before this increment', () => {
+    // Pre-increment ADD records carry the catch-all { username? } shape;
+    // they must pass through the guard without a type error (req 5.4).
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_ADD,
+      snapshot: { username: 'alice' },
+    };
+
+    if (isAttachmentAddActivity(activity)) {
+      expect(activity.snapshot?.username).toBe('alice');
+      expect(activity.snapshot?.originalName).toBeUndefined();
+    } else {
+      expect.unreachable('guard must accept a legacy username-only snapshot');
+    }
+  });
+
+  it('accepts an ATTACHMENT_ADD activity without snapshot (action is the sole discriminant)', () => {
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_ADD,
+    };
+
+    expect(isAttachmentAddActivity(activity)).toBe(true);
+  });
+
+  it('rejects the sibling attachment actions (REMOVE / DOWNLOAD)', () => {
+    const remove: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_REMOVE,
+      snapshot: { username: 'alice' },
+    };
+    const download: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_DOWNLOAD,
+      snapshot: { username: 'alice' },
+    };
+
+    expect(isAttachmentAddActivity(remove)).toBe(false);
+    expect(isAttachmentAddActivity(download)).toBe(false);
+  });
+
+  it('rejects non-attachment actions even when the snapshot carries attachment-shaped fields', () => {
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_PAGE_UPDATE,
+      snapshot: { username: 'alice', originalName: 'stale.png' },
+    };
+
+    expect(isAttachmentAddActivity(activity)).toBe(false);
+  });
+});
+
+describe('isAttachmentDownloadActivity', () => {
+  it('narrows an ATTACHMENT_DOWNLOAD activity so attachment fields are readable', () => {
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_DOWNLOAD,
+      snapshot: {
+        username: 'alice',
+        originalName: 'report.pdf',
+        pagePath: '/Reports',
+        pageId: '65a000000000000000000003',
+        fileSize: 8192,
+      },
+    };
+
+    if (isAttachmentDownloadActivity(activity)) {
+      // Compile-time proof: attachment-specific fields are accessible after narrowing
+      expectTypeOf(activity.snapshot?.originalName).toEqualTypeOf<
+        string | undefined
+      >();
+      expectTypeOf(activity.snapshot?.fileSize).toEqualTypeOf<
+        number | undefined
+      >();
+
+      expect(activity.snapshot?.username).toBe('alice');
+      expect(activity.snapshot?.originalName).toBe('report.pdf');
+      expect(activity.snapshot?.pagePath).toBe('/Reports');
+      expect(activity.snapshot?.pageId).toBe('65a000000000000000000003');
+      expect(activity.snapshot?.fileSize).toBe(8192);
+    } else {
+      expect.unreachable('guard must accept ACTION_ATTACHMENT_DOWNLOAD');
+    }
+  });
+
+  it('accepts a guest download whose snapshot omits username (all fields optional)', () => {
+    // Guest (anonymous) downloads have no req.user, so username may be absent (req 5.3).
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_DOWNLOAD,
+      snapshot: { originalName: 'report.pdf', fileSize: 8192 },
+    };
+
+    if (isAttachmentDownloadActivity(activity)) {
+      expect(activity.snapshot?.username).toBeUndefined();
+      expect(activity.snapshot?.originalName).toBe('report.pdf');
+    } else {
+      expect.unreachable('guard must accept a username-less snapshot');
+    }
+  });
+
+  it('accepts an ATTACHMENT_DOWNLOAD activity without snapshot (action is the sole discriminant)', () => {
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_DOWNLOAD,
+    };
+
+    expect(isAttachmentDownloadActivity(activity)).toBe(true);
+  });
+
+  it('rejects the sibling attachment actions (ADD / REMOVE)', () => {
+    const add: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_ADD,
+      snapshot: { username: 'alice' },
+    };
+    const remove: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_REMOVE,
+      snapshot: { username: 'alice' },
+    };
+
+    expect(isAttachmentDownloadActivity(add)).toBe(false);
+    expect(isAttachmentDownloadActivity(remove)).toBe(false);
+  });
+
+  it('rejects non-attachment actions even when the snapshot carries attachment-shaped fields', () => {
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_PAGE_UPDATE,
+      snapshot: { username: 'alice', originalName: 'stale.png' },
+    };
+
+    expect(isAttachmentDownloadActivity(activity)).toBe(false);
+  });
+});
+
+describe('attachment guards coexistence', () => {
+  it('matches each attachment action with exactly its own guard', () => {
+    const add: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_ADD,
+    };
+    const remove: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_REMOVE,
+    };
+    const download: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_DOWNLOAD,
+    };
+
+    expect(isAttachmentAddActivity(add)).toBe(true);
+    expect(isAttachmentRemoveActivity(add)).toBe(false);
+    expect(isAttachmentDownloadActivity(add)).toBe(false);
+
+    expect(isAttachmentAddActivity(remove)).toBe(false);
+    expect(isAttachmentRemoveActivity(remove)).toBe(true);
+    expect(isAttachmentDownloadActivity(remove)).toBe(false);
+
+    expect(isAttachmentAddActivity(download)).toBe(false);
+    expect(isAttachmentRemoveActivity(download)).toBe(false);
+    expect(isAttachmentDownloadActivity(download)).toBe(true);
+  });
+});
+
+describe('AttachmentSnapshot canonical type', () => {
+  it('keeps AttachmentRemoveSnapshot as an alias of the canonical type (backward compat)', () => {
+    expectTypeOf<AttachmentRemoveSnapshot>().toEqualTypeOf<AttachmentSnapshot>();
+  });
+
+  it('keeps every field optional so partial capture stays representable (graceful degradation)', () => {
+    expectTypeOf<AttachmentSnapshot>().toEqualTypeOf<{
+      username?: string;
+      originalName?: string;
+      pagePath?: string;
+      pageId?: string;
+      fileSize?: number;
+    }>();
+
+    // An entirely empty snapshot is a valid value of the canonical type
+    const empty: AttachmentSnapshot = {};
+    expect(empty).toEqual({});
+  });
+
+  it('remains a member of the ISnapshot union without extra fields', () => {
+    const snapshot: AttachmentSnapshot = {
+      originalName: 'photo.jpg',
+      fileSize: 123,
+    };
+    const asUnion: ISnapshot = snapshot;
+
+    expect(asUnion).toBe(snapshot);
   });
 });
 

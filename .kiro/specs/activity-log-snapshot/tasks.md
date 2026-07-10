@@ -123,7 +123,7 @@
 > 開発方針は上記と同じ（新規変更は TDD・テストは essential-test-design / essential-test-patterns に従う・型は `any` / `as any` で迂回しない）。要件5〜8 に対応。REMOVE（要件1〜4・タスク1〜7）は完了済みで作り直さない。
 
 - [ ] 8. 基盤: 添付 snapshot 型と action 別判別ガードの拡張
-- [ ] 8.1 添付 snapshot の正準型化と ADD/DOWNLOAD の type guard 追加
+- [x] 8.1 添付 snapshot の正準型化と ADD/DOWNLOAD の type guard 追加
   - 添付 snapshot の正準型を1つに定め、REMOVE 用の既存型はその別名として残す（viewer の既存 import を壊さない）。ADD・DOWNLOAD それぞれの activity を、`action` を唯一の判別子として添付 snapshot に narrow する type guard を追加する（snapshot 内に判別専用フィールドを足さない）
   - snapshot は全フィールド optional のまま。3 action で形が同一なので判別ユニオンにフィールドは増やさない
   - 先にユニットテストを書く（red→green）: ADD/DOWNLOAD action で添付 variant に narrow、非添付 action は catch-all、username のみの旧形式も型エラーなく通る、既存の添付削除 guard と併存する
