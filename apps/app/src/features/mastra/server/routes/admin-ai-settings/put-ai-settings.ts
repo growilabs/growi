@@ -5,7 +5,7 @@ import { body, type ValidationChain } from 'express-validator';
 
 import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
 import { AI_PROVIDERS } from '~/features/mastra/interfaces/ai-provider';
-import { clearResolvedMastraModelCache } from '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model';
+import { clearResolvedMastraModelCache } from '~/features/mastra/server/services/ai-sdk-modules/resolved-model-cache';
 import { isRecord } from '~/features/mastra/utils/is-record';
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
