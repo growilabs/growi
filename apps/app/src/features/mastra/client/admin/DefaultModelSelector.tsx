@@ -11,6 +11,7 @@ import {
   Label,
 } from 'reactstrap';
 
+import { getProviderLabel } from '../../interfaces/ai-provider';
 import {
   formatModelLabel,
   groupModelsByProvider,
@@ -117,7 +118,7 @@ export const DefaultModelSelector = (): JSX.Element => {
                   header
                   data-testid={`default-model-group-${group.provider}`}
                 >
-                  {group.provider}
+                  {getProviderLabel(group.provider)}
                 </DropdownItem>
                 {group.entries.map((entry) => (
                   <DropdownItem

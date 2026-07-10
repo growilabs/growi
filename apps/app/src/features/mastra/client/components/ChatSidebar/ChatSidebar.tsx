@@ -44,6 +44,7 @@ import {
 import { Response } from '~/components/ai-elements/response';
 import { Button } from '~/components/ui/button';
 import { PageMentionInput } from '~/features/mastra/client/components/PageMentionInput';
+import { getProviderLabel } from '~/features/mastra/interfaces/ai-provider';
 import type { CustomUIMessage } from '~/features/mastra/interfaces/chat-message';
 import {
   formatModelLabel,
@@ -436,7 +437,7 @@ export const ChatSidebar = (): JSX.Element => {
                     {providerGroups.map((group) => (
                       <PromptInputModelSelectGroup key={group.provider}>
                         <PromptInputModelSelectLabel>
-                          {group.provider}
+                          {getProviderLabel(group.provider)}
                         </PromptInputModelSelectLabel>
                         {group.entries.map((entry) => (
                           <PromptInputModelSelectItem

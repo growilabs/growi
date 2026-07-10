@@ -36,7 +36,13 @@ describe('groupModelsByProvider', () => {
 });
 
 describe('formatModelLabel', () => {
-  it('joins provider and modelId with a middle dot', () => {
-    expect(formatModelLabel('openai', 'gpt-4o')).toBe('openai · gpt-4o');
+  it('joins the provider display name and modelId with a middle dot', () => {
+    expect(formatModelLabel('openai', 'gpt-4o')).toBe('OpenAI · gpt-4o');
+  });
+
+  it('uses the provider display name, not the raw provider key', () => {
+    expect(formatModelLabel('azure-openai', 'my-deployment')).toBe(
+      'Azure OpenAI · my-deployment',
+    );
   });
 });

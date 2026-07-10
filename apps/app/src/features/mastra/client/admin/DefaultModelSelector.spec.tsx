@@ -125,10 +125,10 @@ describe('DefaultModelSelector', () => {
         .getAllByTestId(/^default-model-(group|item)-/)
         .map((el) => el.textContent);
       expect(entries).toEqual([
-        'openai',
+        'OpenAI',
         'gpt-5',
         'gpt-5-mini',
-        'anthropic',
+        'Anthropic',
         'claude-sonnet-5',
       ]);
     });
@@ -148,7 +148,7 @@ describe('DefaultModelSelector', () => {
     // modelId under different providers is still distinguishable (4.2-style).
     // `waitFor` also flushes react-popper's post-mount effects inside act(...).
     await waitFor(() => {
-      expect(getToggle()).toHaveTextContent('openai · gpt-5');
+      expect(getToggle()).toHaveTextContent('OpenAI · gpt-5');
     });
   });
 
@@ -171,7 +171,7 @@ describe('DefaultModelSelector', () => {
     expect(getAllFlags().filter((v) => v === 'true')).toHaveLength(1);
 
     // The trigger follows the new default.
-    expect(getToggle()).toHaveTextContent('anthropic · claude-sonnet-5');
+    expect(getToggle()).toHaveTextContent('Anthropic · claude-sonnet-5');
   });
 
   it('shows a neutral placeholder in the trigger when the allow-list is empty', async () => {

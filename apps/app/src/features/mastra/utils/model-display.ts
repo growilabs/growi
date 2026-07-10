@@ -1,4 +1,8 @@
-import { AI_PROVIDERS, type AiProvider } from '../interfaces/ai-provider';
+import {
+  AI_PROVIDERS,
+  type AiProvider,
+  getProviderLabel,
+} from '../interfaces/ai-provider';
 
 // Separator between the provider and the modelId in a closed selector trigger
 // ("provider · modelId"). U+00B7 MIDDLE DOT. Naming the selected model with its
@@ -30,9 +34,11 @@ export const groupModelsByProvider = <T>(
   })).filter((group) => group.entries.length > 0);
 
 /**
- * The closed-trigger label for a selected model: "provider · modelId" (Req 4.2).
+ * The closed-trigger label for a selected model: "Provider · modelId" (Req 4.2).
+ * The provider is rendered as its official display name (`getProviderLabel`),
+ * never the raw provider key.
  */
 export const formatModelLabel = (
   provider: AiProvider,
   modelId: string,
-): string => `${provider}${MODEL_LABEL_SEPARATOR}${modelId}`;
+): string => `${getProviderLabel(provider)}${MODEL_LABEL_SEPARATOR}${modelId}`;
