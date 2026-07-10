@@ -3,9 +3,10 @@
  * 'update' handler (Prisma read + write path).
  *
  * The handler resolves the contributor (`prisma.activities.findUnique`), runs the
- * migration/contribution sequence, then settles the activity
- * (`prisma.activities.updateByParameters`, migrated in Phase 1). Activities are
- * therefore seeded and read back via Prisma into the same per-worker test DB the
+ * migration/contribution sequence, then settles the activity by CREATING it
+ * lazily (`settleActivityRecord` -> `prisma.activities.createByParameters`,
+ * Option C / lazy fail-safe) using the id `beginActivity` pre-mints. Activities
+ * are therefore read back via Prisma from the same per-worker test DB the
  * integration `prisma` setup (`test/setup/prisma.ts`) binds the client to;
  * Mongoose (`User` / `Contribution`) is connected to that SAME DB by the
  * integration mongo setup. Observable contracts (contribution counts, settled
@@ -29,6 +30,7 @@ import {
   type SupportedActionType,
 } from '~/interfaces/activity';
 import ActivityService from '~/server/service/activity';
+import { beginActivity } from '~/server/service/activity/index';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
@@ -64,26 +66,6 @@ const User = mongoose.model<IUser>('User');
 // A sentinel ip value so cleanup deletes only this suite's seeded activities.
 const TEST_IP = '10.0.0.57';
 
-/** Build a minimal activities record for seeding via Prisma. */
-function makeActivityData(overrides: {
-  id?: string;
-  userId?: string;
-  target?: string;
-  action: string;
-}) {
-  return {
-    id: overrides.id ?? new Types.ObjectId().toHexString(),
-    v: 0,
-    action: overrides.action,
-    createdAt: new Date(),
-    endpoint: '/test/contribution-orchestration',
-    ip: TEST_IP,
-    snapshot: { id: new Types.ObjectId().toHexString(), username: 'testuser' },
-    userId: overrides.userId,
-    target: overrides.target,
-  };
-}
-
 /**
  * Builds a real ActivityService wired to a bare EventEmitter, mirroring how
  * crowi.events.activity is an EventEmitter at runtime. Returns the registered
@@ -96,7 +78,7 @@ const buildUpdateListener = () => {
     events: { activity: activityEvent },
     // auditLogEnabled falsy -> getAvailableActions() returns AllEssentialActions
     // (which includes ACTION_PAGE_CREATE), so shoudUpdate is true and
-    // updateByParameters runs to settle the activity.
+    // settleActivityRecord's createByParameters runs to settle the activity.
     configManager: { getConfig: vi.fn().mockReturnValue(undefined) },
   };
 
@@ -127,25 +109,30 @@ describe('ActivityService contribution orchestration', () => {
   });
 
   /**
-   * Arrange an un-migrated user + a still-unsettled Activity, then drive the real
-   * 'update' handler with the given action. The handler runs the full
-   * resolveContributor -> ensureUserHasMigrated -> addContribution sequence and
-   * then settles the activity via updateByParameters. Returns the activity id so
-   * callers can assert on the settled action.
+   * Arrange an un-migrated user, then drive the real 'update' handler with
+   * the given action. Under Option C (lazy fail-safe) the listener CREATES
+   * the Activity row itself (settleActivityRecord -> createByParameters)
+   * using the id `beginActivity` pre-mints -- it must NOT be pre-created by
+   * the test, or the listener's create collides on the same id (P2002),
+   * which the listener's generic catch swallows (logs and returns), leaving
+   * no settled row at all. `beginActivity` also stashes the request-time
+   * context that the listener's synchronous `pendingActivityContext.take()`
+   * reads back. The handler runs the full resolveContributor ->
+   * ensureUserHasMigrated -> addContribution sequence and then settles
+   * (creates) the activity. Returns the activity id so callers can assert
+   * on the settled action.
    */
   const settleViaUpdateListener = async (
     action: SupportedActionType,
   ): Promise<string> => {
     await User.create({ _id: userId, username: 'testuser' }); // un-migrated user
 
-    const activityId = new Types.ObjectId().toHexString();
-    await prisma.activities.create({
-      data: makeActivityData({
-        id: activityId,
-        userId: userId.toHexString(),
-        target: pageId.toHexString(),
-        action: SupportedAction.ACTION_UNSETTLED,
-      }),
+    const { activityId } = beginActivity({
+      ip: TEST_IP,
+      endpoint: '/test/contribution-orchestration',
+      userId: userId.toHexString(),
+      username: 'testuser',
+      createdAt: new Date(),
     });
 
     const updateListener = buildUpdateListener();

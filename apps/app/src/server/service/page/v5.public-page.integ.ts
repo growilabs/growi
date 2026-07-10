@@ -3014,14 +3014,19 @@ describe('PageService page operations with only public pages', () => {
           dummyUser1._id.toString(),
         );
 
-        // The emitted activity id must correspond to a persisted Activity.
-        // We assert the linkage only, not the intermediate action state: whether
-        // the activity is created unsettled-then-settled is an implementation
-        // detail of the listener, covered behaviorally in
-        // contribution-orchestration.spec.ts.
+        // Under lazy fail-safe (Option C), the Activity row for this id is
+        // created lazily by the real `update` listener when it processes
+        // this very emit (settleActivityRecord) -- there is no more
+        // self-pre-create in revertDeletedPage. This test suppresses that
+        // listener via the mocked `emit` above so the assertions on
+        // `parameters` stay deterministic, which means the row is
+        // deliberately NOT persisted at this point. The real, end-to-end,
+        // real-DB "the row IS persisted with the right fields" contract is
+        // covered by revert-cascade-activity.integ.ts, which does not mock
+        // `emit` and lets the real listener settle the row.
         const Activity = mongoose.model('Activity');
         const activity = await Activity.findById(activityId);
-        expect(activity).toBeTruthy();
+        expect(activity).toBeNull();
       } finally {
         emitSpy.mockRestore();
       }

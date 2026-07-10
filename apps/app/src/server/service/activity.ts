@@ -1,4 +1,4 @@
-import type { IPage, IUser, Ref } from '@growi/core';
+import type { IPage } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { ContributionGraphActions } from '~/features/contribution-graph/interfaces/supported-actions';
@@ -7,12 +7,7 @@ import {
   resolveContributor,
 } from '~/features/contribution-graph/server/services/contribution-migration-service';
 import { addContribution } from '~/features/contribution-graph/server/services/contribution-service';
-import type {
-  IActivity,
-  SupportedActionType,
-  SupportedEventModelType,
-  SupportedTargetModelType,
-} from '~/interfaces/activity';
+import type { IActivity, SupportedActionType } from '~/interfaces/activity';
 import {
   ActionGroupSize,
   AllEssentialActions,
@@ -21,7 +16,11 @@ import {
   AllSmallGroupActions,
   AllSupportedActions,
 } from '~/interfaces/activity';
-import Activity, { type ActivityWithUser } from '~/server/models/activity';
+import Activity from '~/server/models/activity';
+import {
+  pendingActivityContext,
+  settleActivityRecord,
+} from '~/server/service/activity/index';
 import { prisma } from '~/utils/prisma';
 
 import loggerFactory from '../../utils/logger';
@@ -42,45 +41,33 @@ const parseActionString = (actionsString: string): SupportedActionType[] => {
 };
 
 /**
- * Converts a Prisma `activities` row (updateByParameters's result, populated
- * via `include: { user: true }`) to the `IActivity` shape `GeneratePreNotify`
- * expects. Prisma's scalar reference fields (`user`, `target`, `event`, ...)
- * are `| null` when unset; `IActivity`'s are `| undefined` (no `null`). The
- * populated `users` row also has nullable fields (e.g. `name: string | null`)
- * where `IUser` requires non-nullable -- at runtime they map to the same
- * MongoDB document (same cast pattern as apiv3/activity.ts's
- * serializeUserSecurely call). Tier-2 rationale: the cast is confined to this
- * single conversion, not spread across call sites.
+ * Builds the `IActivity` that `GeneratePreNotify` reads to exclude the
+ * acting user from a notification about their own action (pre-notify.ts:
+ * `getIdForRef(actionUser)` on `activity.user`).
+ *
+ * `settleActivityRecord` creates the row via `createByParameters`, which
+ * does NOT `include: { user: true }` (only `updateByParameters` does --
+ * models/activity.ts Key Decision 5), so the settled row's `user` is always
+ * absent. Re-attach the acting user's id from the context this listener
+ * already `take`s from `pendingActivityContext` (`context.userId`), so the
+ * notify path can still identify -- and exclude -- the actor. A bare id
+ * string is a valid `Ref<IUser>` (`Ref<T> = string | ObjectId | T`), so no
+ * cast is needed. Without this, the actor would receive a notification
+ * about their own action (Requirement 2.3 regression; tasks.md
+ * Implementation Note "2→5").
+ *
+ * Only this notify-construction input carries the injected `user` -- the
+ * `updated` event itself is emitted with the original settle result. The
+ * in-app-notification consumer (service/in-app-notification.ts) only reads
+ * `_id`/`action`/`targetModel`/`target`/`snapshot` off that activity, never
+ * `.user`, so it is unaffected either way.
  */
 const toGeneratePreNotifyActivity = (
-  activity: ActivityWithUser,
+  activity: IActivity,
+  actorId: string | undefined,
 ): IActivity => ({
   ...activity,
-  action: activity.action as SupportedActionType,
-  // ip/endpoint are nullable in schema.prisma (legacy documents may lack
-  // them); IActivity models absence as `undefined`, so coerce null per field.
-  ip: activity.ip ?? undefined,
-  endpoint: activity.endpoint ?? undefined,
-  user: (activity.user ?? undefined) as Ref<IUser> | undefined,
-  target: activity.target ?? undefined,
-  targetModel: (activity.targetModel ?? undefined) as
-    | SupportedTargetModelType
-    | undefined,
-  event: activity.event ?? undefined,
-  eventModel: (activity.eventModel ?? undefined) as
-    | SupportedEventModelType
-    | undefined,
-  // The ActivitiesSnapshot composite fields are optional in schema.prisma,
-  // so Prisma materializes absent fields as `null`; ISnapshot models absence
-  // as `undefined` (missing field), so coerce null -> undefined per field.
-  snapshot: {
-    ...activity.snapshot,
-    username: activity.snapshot.username ?? undefined,
-    originalName: activity.snapshot.originalName ?? undefined,
-    pagePath: activity.snapshot.pagePath ?? undefined,
-    pageId: activity.snapshot.pageId ?? undefined,
-    fileSize: activity.snapshot.fileSize ?? undefined,
-  },
+  user: actorId,
 });
 
 class ActivityService {
@@ -108,19 +95,26 @@ class ActivityService {
         generatePreNotify?: GeneratePreNotify,
         getAdditionalTargetUsers?: GetAdditionalTargetUsers,
       ) => {
-        let activity: Awaited<
-          ReturnType<typeof prisma.activities.updateByParameters>
-        >;
+        // Take the pending context SYNCHRONOUSLY, before any `await` below
+        // (Requirement 2.6). Taking it after an await would race
+        // registerFailsafeFinalizer's `res` 'close'/'finish' cleanup, which
+        // clears the same map entry -- a race could drop the IP/endpoint/
+        // username/createdAt this listener needs to settle the row (design.md:
+        // ActivityService update listener > Risks).
+        const context = pendingActivityContext.take(activityId);
+
         const { contributor, ...activityParameters } = parameters;
-        const shoudUpdate = this.shoudUpdateActivity(parameters.action);
         const shouldGenerateContribution = this.shouldGenerateContribution(
           parameters.action,
         );
 
-        // Contribution handling MUST run before updateByParameters: the Activity is
-        // still ACTION_UNSETTLED at this point, so the migration aggregation does not count it.
-        // addContribution's $inc accounts for this event; settling the action afterward avoids
-        // a double count on a user's first contribution.
+        // Contribution handling MUST run before settle: the Activity row does
+        // not exist yet at this point (lazy fail-safe creates it only inside
+        // settleActivityRecord, below), so the migration aggregation does not
+        // count it. addContribution's $inc accounts for this event; settling
+        // the action afterward avoids a double count on a user's first
+        // contribution. This must run regardless of record-eligibility
+        // (Requirement 2.4: contribution is unaffected by the record gate).
         if (shouldGenerateContribution) {
           try {
             const contributorUser = await resolveContributor(
@@ -144,37 +138,44 @@ class ActivityService {
           }
         }
 
-        if (shoudUpdate) {
-          try {
-            activity = await prisma.activities.updateByParameters(
-              activityId,
-              activityParameters,
-            );
-          } catch (err) {
-            logger.error('Update activity failed', err);
-            return;
-          }
+        // Single source of truth for record-eligibility (Requirement 1.4/3.1)
+        // -- settleActivityRecord never re-derives this itself, it only
+        // consumes the injected result.
+        const shouldPersist = this.shoudUpdateActivity(parameters.action);
 
-          // updateByParameters returns null when activityId matches no row
-          // (C1 not-found semantics, e.g. P2025) -- nothing was updated, so
-          // there is nothing to notify about.
-          if (activity == null) {
-            return;
-          }
-
-          if (generatePreNotify != null) {
-            const preNotify = generatePreNotify(
-              toGeneratePreNotifyActivity(activity),
-              getAdditionalTargetUsers,
-            );
-
-            this.activityEvent.emit('updated', activity, target, preNotify);
-
-            return;
-          }
-
-          this.activityEvent.emit('updated', activity, target);
+        let activity: IActivity | null;
+        try {
+          activity = await settleActivityRecord({
+            activityId,
+            shouldPersist,
+            context,
+            activityParameters,
+          });
+        } catch (err) {
+          logger.error('Settle activity failed', err);
+          return;
         }
+
+        // Notify ONLY when the row was actually created (in-gate AND
+        // persisted -- Requirement 1.1/2.3). Both the out-of-gate branch
+        // (settleActivityRecord returns null without writing) and a settle
+        // failure (caught above) surface as "nothing to notify about".
+        if (activity == null) {
+          return;
+        }
+
+        if (generatePreNotify != null) {
+          const preNotify = generatePreNotify(
+            toGeneratePreNotifyActivity(activity, context?.userId),
+            getAdditionalTargetUsers,
+          );
+
+          this.activityEvent.emit('updated', activity, target, preNotify);
+
+          return;
+        }
+
+        this.activityEvent.emit('updated', activity, target);
       },
     );
   }
