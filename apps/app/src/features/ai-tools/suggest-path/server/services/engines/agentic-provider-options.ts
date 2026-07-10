@@ -1,5 +1,6 @@
 import type { ModelProviderOptions } from '~/features/mastra/interfaces/allowed-model';
-import { resolveEffectiveModelId } from '~/features/mastra/server/services/ai-sdk-modules/llm-providers/config';
+import { parseModelKey } from '~/features/mastra/interfaces/model-key';
+import { getEffectiveDefaultModelKey } from '~/features/mastra/server/services/ai-sdk-modules/llm-providers/effective-model-key';
 import { getProviderOptionsForModel } from '~/features/mastra/server/services/ai-sdk-modules/resolve-provider-options';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
@@ -21,8 +22,8 @@ const OPENAI_FAMILY_PROVIDERS: ReadonlySet<string> = new Set([
  *
  * Base: the catalog-declared providerOptions of the effective model — the
  * same per-model source the chat route uses (getProviderOptionsForModel).
- * The agent resolves its model with `resolveMastraModel()` (no explicit id),
- * so the effective id here is the allow-list default; both lookups go
+ * The agent resolves its model with `resolveMastraModel()` (no explicit key),
+ * so the effective key here is the allow-list default; both lookups go
  * through the same allow-list checkpoint and cannot diverge.
  *
  * Overlay: the suggest-path-specific reasoning effort
@@ -30,13 +31,13 @@ const OPENAI_FAMILY_PROVIDERS: ReadonlySet<string> = new Set([
  * change takes effect without a server restart. Empty means "unset": the
  * catalog options pass through unchanged. The knob is OpenAI-specific (its
  * config key / env var name say so, and other providers express reasoning
- * controls with different option shapes), so when the active provider is not
- * in the OpenAI family the configured value is skipped WITH a warning —
- * never silently ignored.
+ * controls with different option shapes), so when the effective model's owning
+ * provider is not in the OpenAI family the configured value is skipped WITH a
+ * warning — never silently ignored.
  */
 export const resolveAgentProviderOptions = (): ModelProviderOptions => {
-  const effectiveModelId = resolveEffectiveModelId();
-  const baseOptions = getProviderOptionsForModel(effectiveModelId);
+  const effectiveModelKey = getEffectiveDefaultModelKey();
+  const baseOptions = getProviderOptionsForModel(effectiveModelKey);
 
   const reasoningEffort = configManager.getConfig(
     'openai:reasoningEffort:suggestPathAgent',
@@ -45,10 +46,10 @@ export const resolveAgentProviderOptions = (): ModelProviderOptions => {
     return baseOptions;
   }
 
-  const provider = configManager.getConfig('ai:provider');
-  if (typeof provider !== 'string' || !OPENAI_FAMILY_PROVIDERS.has(provider)) {
+  const provider = parseModelKey(effectiveModelKey)?.provider;
+  if (provider == null || !OPENAI_FAMILY_PROVIDERS.has(provider)) {
     logger.warn(
-      `openai:reasoningEffort:suggestPathAgent is configured but the active AI provider "${provider}" is not OpenAI-compatible; the setting is ignored`,
+      `openai:reasoningEffort:suggestPathAgent is configured but the effective model's provider "${provider}" is not OpenAI-compatible; the setting is ignored`,
     );
     return baseOptions;
   }

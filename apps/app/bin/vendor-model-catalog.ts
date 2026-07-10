@@ -13,7 +13,7 @@
  *
  * cross-platform: uses only Node's built-in `fetch` and `node:fs` — no curl/rm.
  *
- * NOTE: run via `pnpm vendor:models` (which registers bin/dev-esm-resolver.mjs)
+ * NOTE: run via `pnpm vendor:models` (which registers bin/runtime/dev-esm-resolver.mjs)
  * — the imported src modules use the app's path-alias/extensionless import
  * convention, which plain `node bin/...` cannot resolve.
  */

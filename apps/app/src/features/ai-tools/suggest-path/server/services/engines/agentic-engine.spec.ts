@@ -62,7 +62,8 @@ const CHILD_LISTING_LIMIT_KEY = 'aiTools:suggestPathAgenticChildListingLimit';
 const TIMEOUT_KEY = 'aiTools:suggestPathAgenticTimeoutMs';
 const REASONING_EFFORT_KEY = 'openai:reasoningEffort:suggestPathAgent';
 const ALLOWED_MODELS_KEY = 'ai:allowedModels';
-const PROVIDER_KEY = 'ai:provider';
+const PROVIDERS_KEY = 'ai:providers';
+const PROVIDER_API_KEYS_KEY = 'ai:providerApiKeys';
 
 const mockUser = mock<IUserHasId>({ username: 'alice' });
 const mockUserGroups: ObjectIdLike[] = ['group1'];
@@ -193,12 +194,15 @@ beforeEach(() => {
   // Default to unset reasoning effort; the dedicated tests override this.
   mocks.configValues.set(REASONING_EFFORT_KEY, '');
   // The provider-options resolver runs the REAL allow-list modules
-  // (resolveEffectiveModelId / getProviderOptionsForModel) against the
-  // mocked configManager, so the allow-list and provider must be present.
+  // (getEffectiveDefaultModelKey / getProviderOptionsForModel) against the
+  // mocked configManager. The effective model is resolved from the AVAILABLE
+  // set (allow-list ∧ enabled ∧ configured provider), so the provider must be
+  // both enabled and hold an API key or the resolver finds nothing to run on.
   mocks.configValues.set(ALLOWED_MODELS_KEY, [
-    { modelId: 'test-model', isDefault: true },
+    { provider: 'openai', modelId: 'test-model', isDefault: true },
   ]);
-  mocks.configValues.set(PROVIDER_KEY, 'openai');
+  mocks.configValues.set(PROVIDERS_KEY, { openai: { enabled: true } });
+  mocks.configValues.set(PROVIDER_API_KEYS_KEY, { openai: 'test-api-key' });
   mocks.getConfigMock.mockClear();
   mocks.generateMock.mockReset();
   mocks.getAgentMock.mockReset();
@@ -542,6 +546,7 @@ describe('agenticEngine', () => {
       primeGenerate(outputWith([]));
       mocks.configValues.set(ALLOWED_MODELS_KEY, [
         {
+          provider: 'openai',
           modelId: 'test-model',
           isDefault: true,
           providerOptions: { openai: { textVerbosity: 'low' } },
@@ -560,6 +565,7 @@ describe('agenticEngine', () => {
       primeGenerate(outputWith([]));
       mocks.configValues.set(ALLOWED_MODELS_KEY, [
         {
+          provider: 'openai',
           modelId: 'test-model',
           isDefault: true,
           providerOptions: { openai: { textVerbosity: 'low' } },
@@ -574,9 +580,17 @@ describe('agenticEngine', () => {
       });
     });
 
-    it('skips the reasoning effort WITH a warning when the active provider is not OpenAI-compatible', async () => {
+    it("skips the reasoning effort WITH a warning when the effective model's provider is not OpenAI-compatible", async () => {
       primeGenerate(outputWith([]));
-      mocks.configValues.set(PROVIDER_KEY, 'anthropic');
+      // The provider is read off the effective model's key, so make the sole
+      // available model an anthropic one.
+      mocks.configValues.set(ALLOWED_MODELS_KEY, [
+        { provider: 'anthropic', modelId: 'test-model', isDefault: true },
+      ]);
+      mocks.configValues.set(PROVIDERS_KEY, { anthropic: { enabled: true } });
+      mocks.configValues.set(PROVIDER_API_KEYS_KEY, {
+        anthropic: 'test-api-key',
+      });
       mocks.configValues.set(REASONING_EFFORT_KEY, 'minimal');
 
       await callEngine();

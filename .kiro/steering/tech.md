@@ -8,8 +8,8 @@ The tech-stack overview lives in `AGENTS.md` / `apps/app/AGENTS.md` (auto-loaded
 
 Since the ESM migration (2026-06), the workspace root, `apps/app`, and the 17 shared `@growi/*` packages under `packages/*` all declare `"type": "module"`. `apps/app`'s Express server emits native ESM under `dist/`, and **the runtime path contains no `ts-node` / `tsx`** — TypeScript runs via Node v24's built-in type stripping:
 
-- **Production**: `node --import dotenv-flow/config.js dist/server/app.js` (`server:ci` adds `--ci` for load-only smoke)
-- **Dev**: `nodemon` → Node v24 native TS + an in-thread resolve-only hook (`apps/app/bin/dev-esm-resolver.mjs`) that maps `~/`/`^/` aliases and `.js`→`.ts`
+- **Production**: `node --import ./bin/runtime/env-preload.mjs dist/server/app.js` (`server:ci` adds `--ci` for load-only smoke); `bin/runtime/` holds the self-contained runtime hooks and is the only `bin/` subset shipped in the production tarball
+- **Dev**: `nodemon` → Node v24 native TS + an in-thread resolve-only hook (`apps/app/bin/runtime/dev-esm-resolver.mjs`) that maps `~/`/`^/` aliases and `.js`→`.ts`
 
 Node 24's `require(esm)` lets residual CommonJS consumers (e.g. third-party `@lykmapipo/common`) load ESM-only transitive deps, **but it returns a module *namespace* object, not the CJS default export**. Packages that read members off the default (e.g. `mime.getType`) still need a CJS pin; packages that use named members (e.g. `flat.flatten`) work natively. This is why `pnpm-workspace.yaml` keeps the `@lykmapipo/common>mime` pin but no longer needs the `flat` / `parse-json` pins (esm-migration Phase 5).
 

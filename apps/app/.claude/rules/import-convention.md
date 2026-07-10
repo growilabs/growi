@@ -61,7 +61,7 @@ Instead, **`.js` lives only in the build output, not in source**:
   points to an existing file (replaces the NodeNext compile-time guarantee with an
   exhaustive artifact check — stronger, since it also covers lazy/conditional imports).
 - Turbopack (client), `tsgo --noEmit` (Bundler), vitest, and the dev resolver
-  (`bin/dev-esm-resolver.mjs`) all resolve extensionless source natively — no change.
+  (`bin/runtime/dev-esm-resolver.mjs`) all resolve extensionless source natively — no change.
 
 > Server-side native-ESM resolution is proven by `bin/verify-dist-resolution.ts` over
 > the emitted `dist/` (exhaustive, decision-free), **not** by source type-checking: the

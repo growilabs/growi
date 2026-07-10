@@ -241,61 +241,69 @@ describe('config-definition suggest-path agentic keys', () => {
   });
 });
 
-describe('config-definition multi-llm-provider keys', () => {
+describe('config-definition multi-provider ai keys', () => {
   describe('CONFIG_KEYS array', () => {
-    it('contains ai:provider', () => {
-      expect(CONFIG_KEYS).toContain('ai:provider');
+    it('contains ai:providers', () => {
+      expect(CONFIG_KEYS).toContain('ai:providers');
     });
 
-    it('contains ai:apiKey', () => {
-      expect(CONFIG_KEYS).toContain('ai:apiKey');
+    it('contains ai:providerApiKeys', () => {
+      expect(CONFIG_KEYS).toContain('ai:providerApiKeys');
     });
 
     it('contains ai:allowedModels', () => {
       expect(CONFIG_KEYS).toContain('ai:allowedModels');
     });
 
-    it('does not contain the removed ai:model key', () => {
-      expect(CONFIG_KEYS).not.toContain('ai:model');
-    });
-
-    it('does not contain the removed ai:providerOptions key', () => {
-      expect(CONFIG_KEYS).not.toContain('ai:providerOptions');
+    // R7.1: the former single-provider keys are replaced (no migration — R7.2)
+    it('does not contain the removed single-provider keys', () => {
+      expect(CONFIG_KEYS).not.toContain('ai:provider');
+      expect(CONFIG_KEYS).not.toContain('ai:apiKey');
+      expect(CONFIG_KEYS).not.toContain('ai:azureOpenaiSettings');
     });
   });
 
   describe('CONFIG_DEFINITIONS', () => {
-    describe('ai:provider', () => {
-      it('has envVarName AI_PROVIDER', () => {
-        expect(CONFIG_DEFINITIONS['ai:provider'].envVarName).toBe(
-          'AI_PROVIDER',
+    describe('ai:providers', () => {
+      it('has envVarName AI_PROVIDERS', () => {
+        expect(CONFIG_DEFINITIONS['ai:providers'].envVarName).toBe(
+          'AI_PROVIDERS',
         );
       });
 
-      it('has no default value (provider is required)', () => {
-        expect(CONFIG_DEFINITIONS['ai:provider'].defaultValue).toBe(undefined);
+      // A null default keeps "never configured" observable (R7.3: an install
+      // that only has old-format values resolves to null = AI not configured)
+      // while still selecting the loader's JSON-parse branch for the env var
+      // (typeof null === 'object').
+      it('has a default value of null', () => {
+        expect(CONFIG_DEFINITIONS['ai:providers'].defaultValue).toBeNull();
       });
 
       it('is not marked as secret', () => {
-        expect(CONFIG_DEFINITIONS['ai:provider'].isSecret).toBeFalsy();
+        expect(CONFIG_DEFINITIONS['ai:providers'].isSecret).toBeFalsy();
       });
     });
 
-    describe('ai:apiKey', () => {
-      it('has envVarName AI_API_KEY', () => {
-        expect(CONFIG_DEFINITIONS['ai:apiKey'].envVarName).toBe('AI_API_KEY');
+    describe('ai:providerApiKeys', () => {
+      it('has envVarName AI_PROVIDER_API_KEYS', () => {
+        expect(CONFIG_DEFINITIONS['ai:providerApiKeys'].envVarName).toBe(
+          'AI_PROVIDER_API_KEYS',
+        );
       });
 
-      it('has default value of undefined', () => {
-        expect(CONFIG_DEFINITIONS['ai:apiKey'].defaultValue).toBe(undefined);
+      it('has a default value of null', () => {
+        expect(
+          CONFIG_DEFINITIONS['ai:providerApiKeys'].defaultValue,
+        ).toBeNull();
       });
 
+      // R1.9: API keys are secret material — must be masked in managed env vars
       it('is marked as secret', () => {
-        expect(CONFIG_DEFINITIONS['ai:apiKey'].isSecret).toBe(true);
+        expect(CONFIG_DEFINITIONS['ai:providerApiKeys'].isSecret).toBe(true);
       });
     });
 
-    describe('ai:allowedModels', () => {
+    describe('ai:allowedModels (kept)', () => {
       it('has envVarName AI_ALLOWED_MODELS', () => {
         expect(CONFIG_DEFINITIONS['ai:allowedModels'].envVarName).toBe(
           'AI_ALLOWED_MODELS',
@@ -313,12 +321,32 @@ describe('config-definition multi-llm-provider keys', () => {
       });
     });
 
-    it('no longer defines the removed ai:model key', () => {
-      expect(CONFIG_DEFINITIONS).not.toHaveProperty('ai:model');
+    it('no longer defines the removed single-provider keys', () => {
+      expect(CONFIG_DEFINITIONS).not.toHaveProperty('ai:provider');
+      expect(CONFIG_DEFINITIONS).not.toHaveProperty('ai:apiKey');
+      expect(CONFIG_DEFINITIONS).not.toHaveProperty('ai:azureOpenaiSettings');
     });
 
-    it('no longer defines the removed ai:providerOptions key', () => {
-      expect(CONFIG_DEFINITIONS).not.toHaveProperty('ai:providerOptions');
+    // Picker-owned catalog refresh keys share the ai:* prefix but are out of
+    // this spec's boundary — guard them against an accidental ai:* sweep.
+    describe('model catalog refresh keys (picker-owned, preserved)', () => {
+      it('keeps ai:modelCatalogRefreshOnStartup unchanged', () => {
+        expect(
+          CONFIG_DEFINITIONS['ai:modelCatalogRefreshOnStartup'].envVarName,
+        ).toBe('AI_MODEL_CATALOG_REFRESH_ON_STARTUP');
+        expect(
+          CONFIG_DEFINITIONS['ai:modelCatalogRefreshOnStartup'].defaultValue,
+        ).toBe(false);
+      });
+
+      it('keeps ai:modelCatalogRefreshCronSchedule unchanged', () => {
+        expect(
+          CONFIG_DEFINITIONS['ai:modelCatalogRefreshCronSchedule'].envVarName,
+        ).toBe('AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE');
+        expect(
+          CONFIG_DEFINITIONS['ai:modelCatalogRefreshCronSchedule'].defaultValue,
+        ).toBe('0 4 * * *');
+      });
     });
   });
 
@@ -331,13 +359,19 @@ describe('config-definition multi-llm-provider keys', () => {
       expect(aiGroup).toBeDefined();
     });
 
-    it('targets ai:allowedModels', () => {
-      expect(aiGroup?.targetKeys).toContain('ai:allowedModels');
+    // R5.2: env-only mode locks exactly the enable toggle + the two provider
+    // connection keys. R5.3: ai:allowedModels stays OUT of the group so model
+    // settings remain editable from the admin UI in env-only mode.
+    it('targets exactly the enable toggle and the two provider connection keys', () => {
+      expect(aiGroup?.targetKeys).toEqual([
+        'app:aiEnabled',
+        'ai:providers',
+        'ai:providerApiKeys',
+      ]);
     });
 
-    it('no longer targets the removed ai:model / ai:providerOptions keys', () => {
-      expect(aiGroup?.targetKeys).not.toContain('ai:model');
-      expect(aiGroup?.targetKeys).not.toContain('ai:providerOptions');
+    it('does not target ai:allowedModels (model settings stay UI-editable)', () => {
+      expect(aiGroup?.targetKeys).not.toContain('ai:allowedModels');
     });
   });
 });

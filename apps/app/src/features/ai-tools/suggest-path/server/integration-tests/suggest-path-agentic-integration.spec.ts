@@ -105,15 +105,20 @@ vi.mock('~/server/service/config-manager', () => ({
           return 5;
         case 'aiTools:suggestPathAgenticTimeoutMs':
           return 60_000;
-        // Read by the agentic engine's provider-options resolution (the
-        // REAL resolveEffectiveModelId / getProviderOptionsForModel modules
-        // run against this mock, so the allow-list must be non-empty).
+        // Read by the agentic engine's provider-options resolution (the REAL
+        // getEffectiveDefaultModelKey / getProviderOptionsForModel modules run
+        // against this mock). The effective model comes from the AVAILABLE set,
+        // so the provider must be enabled and hold an API key as well.
         case 'openai:reasoningEffort:suggestPathAgent':
           return '';
         case 'ai:allowedModels':
-          return [{ modelId: 'test-model', isDefault: true }];
-        case 'ai:provider':
-          return 'openai';
+          return [
+            { provider: 'openai', modelId: 'test-model', isDefault: true },
+          ];
+        case 'ai:providers':
+          return { openai: { enabled: true } };
+        case 'ai:providerApiKeys':
+          return { openai: 'test-api-key' };
         default:
           return undefined;
       }
