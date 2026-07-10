@@ -73,8 +73,9 @@ interface AuthorizedRequest extends Request {
 
 /**
  * Narrows the first warn() argument to the structured context object the
- * route is expected to log (pino convention: context object FIRST — a
- * string-first call would silently discard the context fields).
+ * shared page-path resolver is expected to log (pino convention: context
+ * object FIRST — a string-first call would silently discard the context
+ * fields).
  */
 const isRemovalWarnContext = (
   value: unknown,
@@ -274,9 +275,13 @@ describe('POST /_api/attachments.remove — activity settled with attachment sna
       fileSize: 42,
     });
 
-    // The route logger is cached per namespace, so this is the very
-    // instance ./api.js logs through.
-    const warnSpy = vi.spyOn(loggerFactory('growi:routes:attachment'), 'warn');
+    // Loggers are cached per namespace, so this is the very instance the
+    // shared resolveAttachmentPagePath (service/activity/attachment-snapshot,
+    // which ./api.js delegates to) logs through.
+    const warnSpy = vi.spyOn(
+      loggerFactory('growi:service:activity:attachment-snapshot'),
+      'warn',
+    );
 
     try {
       // Act
