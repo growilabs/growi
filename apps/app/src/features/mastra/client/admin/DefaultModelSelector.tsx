@@ -24,12 +24,14 @@ import { setDefaultAllowedModelAt } from './ai-settings-form-values';
  * whole `allowedModels` set. Reads/writes the shared react-hook-form context
  * owned by `AiSettings` (no form data via props).
  *
- * Options are grouped by owning provider — group headers name the provider, and
- * only providers that own at least one allowed model contribute a group (mock:
+ * Options are grouped by owning provider — group headers name the provider by
+ * its official display name (`getProviderLabel`), and only providers that own at
+ * least one allowed model contribute a group (mock:
  * `groups = P.filter(p => p.models.length > 0)`). Group order follows the fixed
  * provider slot order (`AI_PROVIDERS`); within a group, models keep their
- * allow-list order. The closed trigger names the current default as
- * "provider · modelId" so the same modelId under different providers stays
+ * allow-list order, each labelled by its official `displayName` (modelId
+ * fallback). The closed trigger names the current default as "Provider · name"
+ * (`formatModelLabel`) so a same-named model under different providers stays
  * distinguishable; with no default (empty list) it shows a neutral placeholder.
  *
  * Selecting a model rewrites the whole list via the shared `setDefaultAllowedModelAt`

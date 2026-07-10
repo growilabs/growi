@@ -50,8 +50,9 @@ interface AllowedModelRowProps {
  * when the provider has a catalog, otherwise free-text id input) + "default"
  * badge/radio + remove trash icon + providerOptions JSON with a live valid/invalid
  * indicator, a format link, and a docs link. Extracted so each card owns its own
- * field ids and watches only its own fields (isDefault + modelId + displayName +
- * providerOptions value). All register/watch paths are keyed on `originalIndex`
+ * field ids and watches only its own value fields (modelId + providerOptions;
+ * `isDefault` arrives as a prop, and `displayName` is only WRITTEN here on a
+ * pick, never watched). All register/watch paths are keyed on `originalIndex`
  * (the flat-array position).
  */
 export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
@@ -150,8 +151,9 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
                 // Keep the display name in sync with the chosen model id: the
                 // picked catalog option's name (select mode) or the typed id
                 // itself (free-text / azure deployment name). Display-only — the
-                // PUT drops displayName; this only drives the DefaultModelSelector
-                // and the row's own rendering before a reload re-seeds from GET.
+                // PUT drops displayName; its sole consumer is the
+                // DefaultModelSelector, until a reload re-seeds it from GET (the
+                // row's own select labels options from the catalog directly).
                 onChange: (e) => {
                   const value = e.target.value;
                   const name = selectableModels.find(
