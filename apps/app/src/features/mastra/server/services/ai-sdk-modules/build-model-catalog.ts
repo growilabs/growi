@@ -88,7 +88,10 @@ export const deriveProviderCounts = (
   models: ModelCatalog,
 ): Record<string, number> => {
   return Object.fromEntries(
-    Object.entries(models).map(([provider, ids]) => [provider, ids.length]),
+    Object.entries(models).map(([provider, entries]) => [
+      provider,
+      entries.length,
+    ]),
   );
 };
 
