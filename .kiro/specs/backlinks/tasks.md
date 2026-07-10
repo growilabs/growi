@@ -97,7 +97,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: page-link-sync, PageLink_
   - _Depends: B1.2, B1.3, B1.4_
 
-- [ ] B1.6 Implement the create/update lifecycle handlers in the backlinks service
+- [x] B1.6 Implement the create/update lifecycle handlers in the backlinks service
   - Implement the service handlers for create and update: re-extract the body and replace the source
     page's outbound rows via B1.5. The service reads the configured site URL and passes it into
     extraction (so same-wiki absolute URLs are recognized), keeping the extractor itself config-free.
@@ -159,7 +159,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: BacklinksPanel_
   - _Depends: B1.9, B1.10_
 
-- [ ] B1.12 Subscribe the service to create/update lifecycle events
+- [x] B1.12 Subscribe the service to create/update lifecycle events
   - Instantiate and initialize the backlinks service in the server setup phase (mirroring the search
     service), subscribing its handlers to create/update only; do not modify the page service
   - **B1 scope:** skip the delete-family subscriptions (delete/deleteCompletely/
