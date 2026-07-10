@@ -46,11 +46,13 @@ interface AllowedModelRowProps {
 }
 
 /**
- * One allowed-model card: model id (monospace) + "default" badge/radio + remove
- * trash icon + providerOptions JSON with a live valid/invalid indicator, a format
- * link, and a docs link. Extracted so each card owns its own field ids and
- * watches only its own fields (isDefault + modelId + providerOptions value). All
- * register/watch paths are keyed on `originalIndex` (the flat-array position).
+ * One allowed-model card: the model control (a select of official display names
+ * when the provider has a catalog, otherwise free-text id input) + "default"
+ * badge/radio + remove trash icon + providerOptions JSON with a live valid/invalid
+ * indicator, a format link, and a docs link. Extracted so each card owns its own
+ * field ids and watches only its own fields (isDefault + modelId + displayName +
+ * providerOptions value). All register/watch paths are keyed on `originalIndex`
+ * (the flat-array position).
  */
 export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
   const {
