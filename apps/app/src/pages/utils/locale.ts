@@ -33,19 +33,3 @@ export const getLangAtServerSide = (req: CrowiRequest): Lang => {
 export const getLocaleAtServerSide = (req: CrowiRequest): Locale => {
   return langMap[getLangAtServerSide(req)];
 };
-
-/**
- * Resolve the locale for _app's getInitialProps.
- *
- * `req` is undefined when Next.js re-invokes `_app`'s getInitialProps purely
- * on the client (e.g. when it falls back to rendering the built-in error
- * page after an uncaught client-side render exception, whose ctx omits
- * req/res). Calling getLocaleAtServerSide with no req would throw and make
- * that fallback render fail too, leaving a blank page. Return undefined in
- * that case so the caller can skip updating the locale instead of crashing.
- */
-export const getUserLocaleForApp = (
-  req: CrowiRequest | undefined,
-): Locale | undefined => {
-  return req == null ? undefined : getLocaleAtServerSide(req);
-};

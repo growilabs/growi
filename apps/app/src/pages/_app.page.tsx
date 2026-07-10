@@ -21,7 +21,7 @@ import { swrGlobalConfiguration } from '~/utils/swr-utils';
 
 import type { CommonEachProps, CommonInitialProps } from './common-props';
 import { isCommonInitialProps } from './common-props';
-import { getUserLocaleForApp } from './utils/locale';
+import { getLocaleAtServerSide } from './utils/locale';
 import { useNextjsRoutingPageRegister } from './utils/nextjs-routing-utils';
 import { registerTransformerForObjectId } from './utils/objectid-transformer';
 import { deserializeSuperJSONProps } from './utils/superjson-ssr';
@@ -116,9 +116,13 @@ function GrowiApp(props: GrowiAppProps): JSX.Element {
 // inject userLocale by context
 GrowiApp.getInitialProps = async (appContext: AppContext) => {
   const appProps = await App.getInitialProps(appContext);
-  const userLocale = getUserLocaleForApp(
-    appContext.ctx.req as unknown as CrowiRequest | undefined,
-  );
+
+  // `ctx.req` is undefined when Next.js re-invokes _app's getInitialProps
+  // purely on the client (e.g. its error-page fallback after an uncaught
+  // client-side render exception). getLocaleAtServerSide would throw on a
+  // missing req and make that fallback render fail too, leaving a blank page.
+  const req = appContext.ctx.req as unknown as CrowiRequest | undefined;
+  const userLocale = req != null ? getLocaleAtServerSide(req) : undefined;
 
   return { ...appProps, userLocale };
 };
