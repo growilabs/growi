@@ -180,7 +180,7 @@
 
 - [ ] 13. 検証: 実 DB に対する結合テスト（読み直し方式）
   - 全体前提: 記録ゲートを通すため ADD/DOWNLOAD を記録対象にする設定（Medium 以上）を明示 API で注入する（process.env 非改変）。結合試験は per-worker 分離で実行し、未使用の番兵 IP を使う
-- [ ] 13.1 (P) 添付追加の結合テスト
+- [x] 13.1 (P) 添付追加の結合テスト
   - 添付追加 API 実行後、対象 activity を実 DB から読み直し、snapshot に4フィールド＋username、target=添付の _id、targetModel=Attachment、pagePath が埋まる（ページ既ロード）ことを確認する
   - 観察可能な完了条件: 上記を assert する結合テストが green
   - _Requirements: 6.1, 6.2, 6.3_
@@ -202,6 +202,7 @@
 - 10.1: ADD の記録は既存の「middleware が UNSETTLED を先に作り emit('update') で更新」経路。1 リクエスト1更新で unique index 衝突なし。`attachment.page`(ObjectId)→`pageId`(string) の読み替えは型で捕まらない（REMOVE で踏んだ罠）。
 - 11.1: DOWNLOAD は createActivity 直接呼びの fire-and-forget。snapshot 構築の `await` を応答前に置かない（design 増分「実行順序（重要）」）。pino は context-first（`logger.warn({ attachmentId, pageId }, 'msg')`）。unique index は target=添付 _id で従来より衝突しにくいが、同一ユーザー・同一添付・同一 ms の二重 DL 衝突は best-effort で握りつぶす。
 - 9.1: REMOVE ビルダー／pagePath 解決の共有化は挙動不変の refactor。記録単位・target 設計は変えない。既存 REMOVE のユニット・結合テストが green のままであることを完了条件に含める。
+- 13.1 の学び: ADD ルート駆動の integ は auth middleware のみ stub（activity.integ.ts と同じ割り切り）で、multer・validators・addActivity・handler・GridFS（`setUpFileUpload(true)`）・settle listener は実物を通す。handler が `page.revision` を serialize するため arrange するページに revision ref が必須。番兵 IP 使用済みに 10.0.0.79 を追加。activity の遅延 settle は `vi.waitFor` で prisma 読み直しを polling する。
 - 12.1 の学び: 監査ログ API の `searchFilter.actions` は `getAvailableActions()`（記録ゲート設定）と intersect するため、ゲート未注入のテストで actions フィルタを使うと ADD/DOWNLOAD（Medium 群）は 0 件になる。12.1 のテストは意図的に actions フィルタ不使用（username フィルタ／一意 originalName マーカーで特定）。13.3 でゲート注入込みの経路を検証する。
 - 11.1 完了時の実装形: 記録は download.ts の module-level `recordDownloadActivity(crowi, attachment, actor)`（全体 try/catch・await なし呼び出し・304 でも従来どおり発火）。13.2 の失敗注入はこの関数経由の経路（`buildAttachmentDownloadSnapshot` や `createActivity` の失敗）を対象にできる。DOWNLOAD の warn logger 名前空間は download.ts 側。
 - 9.2 完了時の実装形: DOWNLOAD の操作者型は `DownloadActor`（`Omit<ActivityActor,'user'> & { user?: IUserHasId }`・attachment-snapshot.ts から export）。カスケード用 `ActivityActor` の user 必須契約は不変。11.1 はルートから `buildAttachmentDownloadSnapshot(attachment, actor)` を呼ぶだけでよい（pagePath 解決・警告はラッパ内部）。
