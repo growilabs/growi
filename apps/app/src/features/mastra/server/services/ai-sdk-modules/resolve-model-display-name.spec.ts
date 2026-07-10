@@ -90,4 +90,15 @@ describe('buildModelDisplayNameResolver', () => {
     // anthropic was never fetched, so even a real anthropic id has no name map.
     expect(resolve('anthropic', 'claude-opus-4-5')).toBe('claude-opus-4-5');
   });
+
+  it('skips the effective-catalog read entirely for an empty provider set (id-echo resolver)', async () => {
+    const resolve = await buildModelDisplayNameResolver([]);
+
+    // Nothing to join → the persisted-singleton read must not happen at all
+    // (get-ai-settings builds a resolver on every load, even when the
+    // allow-list is empty on an unconfigured install); every lookup then
+    // falls back to the id.
+    expect(getEffectiveModelPicker).not.toHaveBeenCalled();
+    expect(resolve('openai', 'gpt-4o')).toBe('gpt-4o');
+  });
 });

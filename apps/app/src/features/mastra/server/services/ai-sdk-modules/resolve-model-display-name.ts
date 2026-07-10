@@ -27,6 +27,14 @@ export const buildModelDisplayNameResolver = async (
 ): Promise<ModelDisplayNameResolver> => {
   const distinctProviders = [...new Set(providers)];
 
+  // An empty provider set has nothing to join: skip the effective-catalog read
+  // (a persisted-singleton DB access) and echo the id for every lookup. This
+  // keeps callers with an empty allow-list — e.g. the admin GET on an
+  // unconfigured install — entirely DB-free on this path.
+  if (distinctProviders.length === 0) {
+    return (_provider, modelId) => modelId;
+  }
+
   // One effective-catalog read for the whole allow-list; the returned picker
   // then resolves each provider synchronously from that single result.
   const pick = await getEffectiveModelPicker();
