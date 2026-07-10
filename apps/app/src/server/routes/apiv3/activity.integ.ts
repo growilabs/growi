@@ -18,6 +18,16 @@
  *  - ATTACHMENT_REMOVE activities surface all four attachment snapshot fields
  *    (originalName / pagePath / pageId / fileSize) in the response
  *  - legacy username-only snapshots keep working (backward compat)
+ *
+ * activity-log-snapshot increment coverage (Requirements 8.1, 8.2, 8.3, 8.4):
+ *  - ATTACHMENT_ADD / ATTACHMENT_DOWNLOAD activities surface the same four
+ *    attachment snapshot fields in the response (8.1; DOWNLOAD may omit
+ *    username for guest downloads)
+ *  - ATTACHMENT_ADD responses include target (attachment _id) and
+ *    targetModel 'Attachment' for downstream viewer DL-link generation (8.2)
+ *  - ADD and REMOVE are distinguishable by `action` alone (8.3)
+ *  - legacy ADD/DOWNLOAD records with username-only snapshots keep
+ *    working (8.4)
  */
 
 import type { NextFunction, Request, Response } from 'express';
@@ -55,8 +65,9 @@ vi.mock('~/server/middlewares/admin-required', () => ({
 
 /** Build a minimal activities record for seeding */
 function makeActivityData(overrides: {
-  userId: string;
-  username: string;
+  /** Omit both userId and username to seed a guest-shaped activity */
+  userId?: string;
+  username?: string;
   action: string;
   ip?: string;
   endpoint?: string;
@@ -68,6 +79,9 @@ function makeActivityData(overrides: {
     pageId?: string;
     fileSize?: number;
   };
+  /** Attachment identifier exposure (activity-log-snapshot req 8.2) */
+  target?: string;
+  targetModel?: string;
 }) {
   const snapshotId = new Types.ObjectId().toHexString();
   return {
@@ -83,6 +97,8 @@ function makeActivityData(overrides: {
       ...overrides.snapshotExtras,
     },
     userId: overrides.userId,
+    target: overrides.target,
+    targetModel: overrides.targetModel,
   };
 }
 
@@ -383,6 +399,231 @@ describe('GET /api/v3/activity', () => {
       expect(doc.snapshot.pagePath ?? null).toBeNull();
       expect(doc.snapshot.pageId ?? null).toBeNull();
       expect(doc.snapshot.fileSize ?? null).toBeNull();
+    });
+  });
+
+  describe('activity-log-snapshot req 8.1–8.4 — ADD/DOWNLOAD snapshot exposure', () => {
+    // NOTE: these tests deliberately avoid the `actions` search filter.
+    // The route intersects submitted actions with
+    // activityService.getAvailableActions(), which depends on the audit-log
+    // action-group gate (ATTACHMENT_ADD/DOWNLOAD are Medium; the default gate
+    // is Small) — filtering by username / scanning docs keeps this suite
+    // independent of gate configuration (end-to-end gate coverage is 13.3).
+
+    it('surfaces all four snapshot fields with username on an ATTACHMENT_ADD activity (req 8.1)', async () => {
+      const pageId = new Types.ObjectId().toHexString();
+      await prisma.activities.createMany({
+        data: [
+          makeActivityData({
+            userId: userId1,
+            username: 'attachment-uploader',
+            action: 'ATTACHMENT_ADD',
+            snapshotExtras: {
+              originalName: 'spec-v1.pdf',
+              pagePath: '/Sandbox/uploads',
+              pageId,
+              fileSize: 2048,
+            },
+          }),
+        ],
+      });
+
+      const searchFilter = JSON.stringify({
+        usernames: ['attachment-uploader'],
+      });
+      const res = await request(app)
+        .get('/api/v3/activity')
+        // offset=0: do not let the offset||1 quirk skip the single record
+        .query({ limit: 10, offset: 0, searchFilter });
+
+      expect(res.status).toBe(200);
+      const { docs } = res.body.data.serializedPaginationResult;
+      expect(docs).toHaveLength(1);
+
+      const doc = docs[0];
+      expect(doc.action).toBe('ATTACHMENT_ADD');
+      expect(doc.snapshot).toMatchObject({
+        username: 'attachment-uploader',
+        originalName: 'spec-v1.pdf',
+        pagePath: '/Sandbox/uploads',
+        pageId,
+        fileSize: 2048,
+      });
+    });
+
+    it('includes target (attachment _id) and targetModel "Attachment" on an ATTACHMENT_ADD activity (req 8.2)', async () => {
+      const attachmentId = new Types.ObjectId().toHexString();
+      const pageId = new Types.ObjectId().toHexString();
+      await prisma.activities.createMany({
+        data: [
+          makeActivityData({
+            userId: userId1,
+            username: 'attachment-uploader',
+            action: 'ATTACHMENT_ADD',
+            target: attachmentId,
+            targetModel: 'Attachment',
+            snapshotExtras: {
+              originalName: 'spec-v1.pdf',
+              pagePath: '/Sandbox/uploads',
+              pageId,
+              fileSize: 2048,
+            },
+          }),
+        ],
+      });
+
+      const searchFilter = JSON.stringify({
+        usernames: ['attachment-uploader'],
+      });
+      const res = await request(app)
+        .get('/api/v3/activity')
+        .query({ limit: 10, offset: 0, searchFilter });
+
+      expect(res.status).toBe(200);
+      const { docs } = res.body.data.serializedPaginationResult;
+      expect(docs).toHaveLength(1);
+
+      // req 8.2: the downstream viewer builds a download link for ADD
+      // attachments from target (the attachment _id) + targetModel.
+      const doc = docs[0];
+      expect(doc.target).toBe(attachmentId);
+      expect(doc.targetModel).toBe('Attachment');
+    });
+
+    it('surfaces snapshot fields on a guest ATTACHMENT_DOWNLOAD activity; username omitted (req 8.1)', async () => {
+      const attachmentId = new Types.ObjectId().toHexString();
+      const pageId = new Types.ObjectId().toHexString();
+      // Guest download: recorded without user, so no userId and no
+      // snapshot.username (see requirement 7.2).
+      await prisma.activities.createMany({
+        data: [
+          makeActivityData({
+            action: 'ATTACHMENT_DOWNLOAD',
+            target: attachmentId,
+            targetModel: 'Attachment',
+            snapshotExtras: {
+              originalName: 'guest-download-report.pdf',
+              pagePath: '/Sandbox/reports',
+              pageId,
+              fileSize: 4096,
+            },
+          }),
+        ],
+      });
+
+      // No username to filter on (guest): fetch unfiltered and locate the
+      // seeded doc by its unique originalName marker.
+      const res = await request(app)
+        .get('/api/v3/activity')
+        .query({ limit: 100, offset: 0, searchFilter: JSON.stringify({}) });
+
+      expect(res.status).toBe(200);
+      const { docs } = res.body.data.serializedPaginationResult;
+      const doc = docs.find(
+        (d: { action: string; snapshot?: { originalName?: string } }) =>
+          d.action === 'ATTACHMENT_DOWNLOAD' &&
+          d.snapshot?.originalName === 'guest-download-report.pdf',
+      );
+
+      expect(doc).toBeDefined();
+      expect(doc.snapshot).toMatchObject({
+        originalName: 'guest-download-report.pdf',
+        pagePath: '/Sandbox/reports',
+        pageId,
+        fileSize: 4096,
+      });
+      // Guest: username is omitted (absent or read back as null by Prisma)
+      expect(doc.snapshot.username ?? null).toBeNull();
+      // Attachment identifier still exposed for the viewer
+      expect(doc.target).toBe(attachmentId);
+      expect(doc.targetModel).toBe('Attachment');
+    });
+
+    it('lets consumers distinguish ADD from REMOVE by the action field (req 8.3)', async () => {
+      const pageId = new Types.ObjectId().toHexString();
+      const now = Date.now();
+      const snapshotExtras = {
+        originalName: 'lifecycle.pdf',
+        pagePath: '/Sandbox/lifecycle',
+        pageId,
+        fileSize: 512,
+      };
+      await prisma.activities.createMany({
+        data: [
+          makeActivityData({
+            userId: userId1,
+            username: 'attachment-actor',
+            action: 'ATTACHMENT_ADD',
+            createdAt: new Date(now - 1000),
+            snapshotExtras,
+          }),
+          makeActivityData({
+            userId: userId1,
+            username: 'attachment-actor',
+            action: 'ATTACHMENT_REMOVE',
+            createdAt: new Date(now),
+            snapshotExtras,
+          }),
+        ],
+      });
+
+      const searchFilter = JSON.stringify({ usernames: ['attachment-actor'] });
+      const res = await request(app)
+        .get('/api/v3/activity')
+        .query({ limit: 10, offset: 0, searchFilter });
+
+      expect(res.status).toBe(200);
+      const { docs } = res.body.data.serializedPaginationResult;
+      expect(docs).toHaveLength(2);
+
+      // req 8.3: with identical snapshot shapes, `action` alone tells the
+      // viewer which record may carry a download link (ADD) and which must
+      // not (REMOVE — the file is gone).
+      const actions = docs.map((d: { action: string }) => d.action).sort();
+      expect(actions).toEqual(['ATTACHMENT_ADD', 'ATTACHMENT_REMOVE']);
+    });
+
+    it('returns legacy ADD/DOWNLOAD activities with username-only snapshots unchanged (req 8.4)', async () => {
+      // Records written before this increment: catch-all `{ username }`
+      // snapshot, no attachment fields, no target/targetModel.
+      const now = Date.now();
+      await prisma.activities.createMany({
+        data: [
+          makeActivityData({
+            userId: userId2,
+            username: 'legacy-uploader',
+            action: 'ATTACHMENT_ADD',
+            createdAt: new Date(now - 1000),
+          }),
+          makeActivityData({
+            userId: userId2,
+            username: 'legacy-uploader',
+            action: 'ATTACHMENT_DOWNLOAD',
+            createdAt: new Date(now),
+          }),
+        ],
+      });
+
+      const searchFilter = JSON.stringify({ usernames: ['legacy-uploader'] });
+      const res = await request(app)
+        .get('/api/v3/activity')
+        .query({ limit: 10, offset: 0, searchFilter });
+
+      expect(res.status).toBe(200);
+      const { docs } = res.body.data.serializedPaginationResult;
+      expect(docs).toHaveLength(2);
+
+      for (const doc of docs) {
+        expect(doc.snapshot.username).toBe('legacy-uploader');
+        // Attachment fields were never persisted: they must come back
+        // absent (undefined) or null, never fabricated.
+        expect(doc.snapshot.originalName ?? null).toBeNull();
+        expect(doc.snapshot.pagePath ?? null).toBeNull();
+        expect(doc.snapshot.pageId ?? null).toBeNull();
+        expect(doc.snapshot.fileSize ?? null).toBeNull();
+        expect(doc.target ?? null).toBeNull();
+        expect(doc.targetModel ?? null).toBeNull();
+      }
     });
   });
 

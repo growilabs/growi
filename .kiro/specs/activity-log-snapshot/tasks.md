@@ -169,7 +169,7 @@
   - _Depends: 9.2, 8.1_
 
 - [ ] 12. 統合: 監査ログ API での ADD/DOWNLOAD snapshot 露出
-- [ ] 12.1 OpenAPI 追記と応答露出の担保
+- [x] 12.1 OpenAPI 追記と応答露出の担保
   - 監査ログ API の OpenAPI に、添付4フィールドが ADD/DOWNLOAD でも現れる旨を追記する（応答整形は既存の素通しのため変更不要）
   - テストで、ADD/DOWNLOAD activity の応答に snapshot フィールドが欠落なく乗り、`action` で ADD と REMOVE を区別でき、username のみの旧 activity も後方互換に返ることを確認する
   - あわせて ADD の応答が snapshot 4フィールドに加え target（添付 _id）＋targetModel（Attachment）を含むこと（下流 viewer の DL リンク生成に必要）を確認する
@@ -202,6 +202,7 @@
 - 10.1: ADD の記録は既存の「middleware が UNSETTLED を先に作り emit('update') で更新」経路。1 リクエスト1更新で unique index 衝突なし。`attachment.page`(ObjectId)→`pageId`(string) の読み替えは型で捕まらない（REMOVE で踏んだ罠）。
 - 11.1: DOWNLOAD は createActivity 直接呼びの fire-and-forget。snapshot 構築の `await` を応答前に置かない（design 増分「実行順序（重要）」）。pino は context-first（`logger.warn({ attachmentId, pageId }, 'msg')`）。unique index は target=添付 _id で従来より衝突しにくいが、同一ユーザー・同一添付・同一 ms の二重 DL 衝突は best-effort で握りつぶす。
 - 9.1: REMOVE ビルダー／pagePath 解決の共有化は挙動不変の refactor。記録単位・target 設計は変えない。既存 REMOVE のユニット・結合テストが green のままであることを完了条件に含める。
+- 12.1 の学び: 監査ログ API の `searchFilter.actions` は `getAvailableActions()`（記録ゲート設定）と intersect するため、ゲート未注入のテストで actions フィルタを使うと ADD/DOWNLOAD（Medium 群）は 0 件になる。12.1 のテストは意図的に actions フィルタ不使用（username フィルタ／一意 originalName マーカーで特定）。13.3 でゲート注入込みの経路を検証する。
 - 11.1 完了時の実装形: 記録は download.ts の module-level `recordDownloadActivity(crowi, attachment, actor)`（全体 try/catch・await なし呼び出し・304 でも従来どおり発火）。13.2 の失敗注入はこの関数経由の経路（`buildAttachmentDownloadSnapshot` や `createActivity` の失敗）を対象にできる。DOWNLOAD の warn logger 名前空間は download.ts 側。
 - 9.2 完了時の実装形: DOWNLOAD の操作者型は `DownloadActor`（`Omit<ActivityActor,'user'> & { user?: IUserHasId }`・attachment-snapshot.ts から export）。カスケード用 `ActivityActor` の user 必須契約は不変。11.1 はルートから `buildAttachmentDownloadSnapshot(attachment, actor)` を呼ぶだけでよい（pagePath 解決・警告はラッパ内部）。
 - 9.1 完了時の実装形: `AttachmentLike`/`ActivityActor` の正準定義は attachment-snapshot.ts へ移動（attachment-removal-snapshot.ts は再エクスポートで旧 import path 維持）。`resolveAttachmentPagePath(pageRef, context?)` は optional 第2引数 `{ attachmentId }` を持つ（warn の構造化フィールド用・design の1引数呼びと互換）。page 参照なし（プロフィール画像）は警告なしで undefined。resolver の warn logger 名前空間は `growi:service:activity:attachment-snapshot`（api-remove-activity.integ.ts が spy で pin 済み — 移設時は追随が要る）。
