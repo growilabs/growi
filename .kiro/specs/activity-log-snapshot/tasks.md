@@ -197,6 +197,7 @@
   - _Depends: 12.1_
 
 ## Implementation Notes（増分）
+- 最終検証（2026-07-10）の横断知見: 記録ゲート spec の lazy fail-safe 化以降、`emit('update')` の実行時経路は常に `settleActivityRecord` → `createByParameters` であり、`updateByParameters`＋`buildSnapshotUpdateEnvelope` は本番経路から到達不能（テストのみが呼ぶ）。design 本文（REMOVE 増分）の「updateByParameters が直接削除の保存口」という記述はこの兄弟 spec の変更で上書きされている。emit 呼び出し元の契約（素の `ISnapshot` を渡す）は create/update どちらの経路でも不変。
 - ゲート注入の前例（REMOVE 7.x と同じ口）: `configManager.updateConfigs({ 'app:auditLogEnabled': true, 'app:auditLogActionGroupSize': ActionGroupSize.Medium })`＋afterAll で `removeIfUndefined: true` により撤去。ADD/DOWNLOAD はいずれも MediumActionGroup（既定 Small では記録されない）。
 - 番兵 IP: 新規テストは未使用 IP を選ぶ前に `grep -rn "10\.0\.0\." apps/app/src` で使用済みを確認する（REMOVE 7.x の使用済み一覧参照）。
 - 10.1: ADD の記録は既存の「middleware が UNSETTLED を先に作り emit('update') で更新」経路。1 リクエスト1更新で unique index 衝突なし。`attachment.page`(ObjectId)→`pageId`(string) の読み替えは型で捕まらない（REMOVE で踏んだ罠）。
