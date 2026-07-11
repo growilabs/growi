@@ -212,3 +212,53 @@ activitySchema.index({ user: 1, target: 1, action: 1, createdAt: 1 }, { unique: 
 
 - **大量カスケード時の activity 件数**: 再帰的な完全削除で数千の添付があると同数の activity が作られる。要件ではボリューム制御を TBD/スコープ外としているため本スペックでは制御しないが、運用上の注意として design に記載する。
 - **username が無い削除経路**: 直接削除・ゴミ箱空・完全削除はいずれも user を持つため username は常に取得できる見込み。万一 user 無しの削除経路があれば `ActivitiesSnapshot.username` を optional にして対応する（本スペックで optional 化しておくと安全）。
+
+---
+
+# 増分（2026-07-10）: ADD/DOWNLOAD capture 拡張の Discovery と Synthesis
+
+対象 requirements: Requirement 5〜8（添付系 action 全般への snapshot capture 拡張）。REMOVE（要件1〜4）は実装完了済み（PR #11393）。本増分はその実装を作り直さず、同じ流儀で ADD と DOWNLOAD へ広げる。Discovery type: **Light（Extension）**。
+
+## I-1. 記録経路の実測（capture 箇所）
+
+| action | capture 箇所 | 記録経路 | pagePath 取得 | username |
+|--------|------------|---------|--------------|----------|
+| **ADD** | `apps/app/src/server/routes/apiv3/attachment.js` POST `/`（emit L421-423、現状 `{ action }` のみ） | `addActivity` middleware が UNSETTLED を先に作り `emit('update')` で更新（REMOVE 直接削除と同型） | **無コスト**（同ハンドラで `Page.findOne` 済みの `page` doc から `page.path`。追加フェッチ不要） | `loginRequiredStrictly` で確定・常に取得可 |
+| **DOWNLOAD** | `apps/app/src/server/routes/attachment/download.ts`（L44-51、現状 snapshot は `{ username }` のみ） | `createActivity` 直接呼び・**fire-and-forget（await していない, L51）** | **要追加フェッチ**（`attachment.page` は ObjectId 参照のみ。アクセス権チェック `Page.isAccessiblePageByViewer` は boolean を返し Page doc を保持しない → `Page.findById` が別途必要） | `loginRequired(crowi, true)` = **guest 許可**のため未認証 DL で欠損しうる |
+| REMOVE（済・参考） | `attachment/api.js`（直接）/ `service/page/*`（カスケード） | 直接=emit更新／カスケード=添付ごと create | ルート側で `resolvePagePathForRemovalSnapshot`（`Page.findById`）を実行 | 常に取得可 |
+
+## I-2. 保存経路・型は REMOVE 増分で拡張済み（再利用可）
+
+- `IActivityParameters.snapshot` は既に `ISnapshot` union（`models/activity.ts`）。`createByParameters`（新規作成）は snapshot 4フィールドを明示的に永続化、`updateByParameters`（emit更新）は `buildSnapshotUpdateEnvelope` で `{ update }` 変換し既存 `_id`/username を保持。`settleActivityRecord` は action 固有フィールドをスプレッド保持し username のみ context 補完。→ **ADD の emit・DOWNLOAD の createActivity に snapshot を積めばそのまま保存される**。
+- Prisma composite `ActivitiesSnapshot` は既に `originalName/pagePath/pageId/fileSize` を保持（REMOVE 増分 task 1.2）。**ADD/DOWNLOAD は同じフィールドなので schema.prisma 変更は不要**。
+- `MODEL_ATTACHMENT = 'Attachment'` は `SupportedTargetModel` に登録済み。REMOVE と同じく target=添付 `_id`／targetModel=`Attachment` を使える。
+
+## I-3. Synthesis（一般化 / Build-vs-Adopt / 簡素化）
+
+- **一般化**: ADD/DOWNLOAD/REMOVE の snapshot は `originalName/pagePath/pageId/fileSize(+username)` で**完全に同一形**であり、添付識別子はいずれも snapshot 外（`target`/`targetModel`）に置く既存流儀に揃う。→ 3つの別々な型を作らず、**単一の正準型 `AttachmentSnapshot`** を共有し、action 別の narrowing は type guard 群で行う。`AttachmentRemoveSnapshot` は後方互換のため `AttachmentSnapshot` の別名として残す（viewer が import 済み）。要件5の「action 別 variant＋guard」は、guard を action 単位で提供することで満たす（型の実体を共有するのは HOW の判断）。
+- **Build vs Adopt**: 新ライブラリを入れない。REMOVE の純粋関数 builder（`buildAttachmentRemoveSnapshot`）とルート側 pagePath resolver（`resolvePagePathForRemovalSnapshot`）という既存パターンを一般化して再利用する。
+- **簡素化**: schema.prisma 変更なし・保存経路の新設なし・判別ユニオンへのフィールド追加なし（形が同一のため）。新規ロジックは「共有 builder＋pagePath resolver の抽出」と「2ルートへの capture 差し込み」に収束する。
+
+## I-4. 確定した設計判断（key decisions）
+
+### 決定1: DOWNLOAD は option a（pagePath も DB 引き当てで記録）。ただし記録は非ブロッキング経路に載せる
+
+利用者判断（AskUserQuestion）で **option a**（DOWNLOAD でも pagePath を引き当てる）を採用。あわせて「実装箇所の**モジュール凝集度・責務分離**に注意（汚いコードにしない）」という制約が付いた。これを次の2点で担保する:
+
+1. **pagePath 解決を単一の共有関数に集約**する。REMOVE がルート内に持つ `resolvePagePathForRemovalSnapshot`（page ref → `Page.findById` → path、失敗時 warn＋undefined）を、activity service 層の共有関数 `resolveAttachmentPagePath` として切り出し、DOWNLOAD が再利用する（REMOVE も behavior-preserving に採用可）。pagePath 解決の実装を2箇所に重複させない。
+2. **ホットパスにブロッキングを足さない**。DOWNLOAD の記録は既に fire-and-forget。pagePath の追加 `Page.findById` は**この detached（非同期・await しない）記録クロージャの内側**で行う。→ ダウンロード応答のレイテンシは増えない。増えるのは「ダウンロードごとの非同期 DB 読み1回」の負荷のみで、これは option a の受容済みコスト。記録経路の失敗（lookup 失敗・記録失敗）はダウンロード応答を壊さない（要件7.4、best-effort 維持）。
+
+### 決定2: ルートハンドラは薄く保ち、snapshot 構築は凝集モジュールへ委譲
+
+- ADD ルート・DOWNLOAD ルートに `Page.findById` やオブジェクト手組みを直書きしない。snapshot 構築（＋DOWNLOAD の pagePath 解決）は `service/activity/attachment-snapshot.ts`（新規・共有）の関数に委譲し、ルートは「手元のデータを渡して結果を emit/record するだけ」にする。
+- 純粋 builder（`buildAttachmentSnapshot`）は Page を引かず引数の pagePath を受けるだけ、という REMOVE の分離（「データ解決」と「snapshot 組み立て」を分ける）を維持する。DOWNLOAD 用は「解決＋組み立て」をまとめる薄い async ラッパ（`buildAttachmentDownloadSnapshot`）を同モジュールに置く。
+
+### 決定3: DOWNLOAD の createActivity 呼び出しは型付き parameters を渡す
+
+現状の `download.ts` の `createActivity` 呼び出し先 parameters は実質未型付け（`any` 相当）。本増分では snapshot を型付き builder（`AttachmentSnapshot` を返す）経由で構築し、`IActivityParameters` の形で渡すことで、呼び出し口が緩くても最終的に `createByParameters` の型で検査される状態にする（`any` を新たに増やさない）。
+
+## I-5. Open Questions / Risks（増分）
+
+- **DOWNLOAD の unique index 衝突（軽微）**: 複合 unique `{ userId, target, action, createdAt }`。同一ユーザーが同一添付を同一ミリ秒に二重ダウンロードした場合のみ衝突しうる。target に添付 `_id` を入れることで従来（target 無し）より**衝突しにくくなる**。衝突時は fire-and-forget の best-effort で握りつぶす（ダウンロードは成功）。
+- **guest DOWNLOAD**: username は optional で欠損吸収（要件7.2）。target=添付 `_id` は guest でも記録できる。
+- **記録ゲート依存**: ADD/DOWNLOAD は `MediumActionGroup`。既定 Small では記録されない。動作確認・結合テストは REMOVE と同じく `AUDIT_LOG_ACTION_GROUP_SIZE`（Medium 以上）を明示注入した前提で行う（ゲート設定自体は `activity-log` spec 管轄）。

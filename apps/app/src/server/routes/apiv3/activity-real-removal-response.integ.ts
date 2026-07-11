@@ -11,7 +11,8 @@
  *   real POST /_api/attachments.remove handler →
  *   real activityEvent 'update' listener (registered by
  *   crowi.setupActivityService in the test crowi instance) →
- *   real prisma.activities.updateByParameters (snapshot update envelope).
+ *   real prisma.activities.createByParameters (lazy settle via
+ *   settleActivityRecord).
  * Then the REAL GET /api/v3/activity router (supertest) must return that
  * row with all four attachment snapshot fields + username exactly as the
  * persistence path wrote them, along with target / targetModel.

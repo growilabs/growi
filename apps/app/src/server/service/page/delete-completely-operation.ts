@@ -14,7 +14,7 @@ import ShareLink from '../../models/share-link';
 import {
   type ActivityActor,
   recordCascadeAttachmentRemovals,
-} from '../activity/attachment-removal-snapshot';
+} from '../attachment/attachment-removal-snapshot';
 import {
   buildPageIdToPathMap,
   toAttachmentLikes,
