@@ -12,7 +12,7 @@
   - _Requirements: 6.1, 7.2, 7.3_
   - _Boundary: pageMarkdownUrl_
 
-- [ ] 1.2 (P) Markdown リクエストの意図解釈（純関数）
+- [x] 1.2 (P) Markdown リクエストの意図解釈（純関数）
   - リクエストを `none` / `permalink` / `path` に分類し、`explicit`（`Accept: text/markdown` または `?format=md`）か `.md` サフィックスかを表すフラグを返す純関数を、テスト先行で実装する。
   - permalink 判定は `isPermalink` / `isValidObjectId`。**元のパスは加工せず**そのまま返し、`explicit=false`（サフィックス）時の「literal→base」への落とし込みは 2.2 が担う（ここでは strip しない＝passthrough 用の元パスを失わない）。
   - Done: サフィックス／`Accept`／`?format=md`／permalink／`.md.md` を網羅するテーブルテストが green。
