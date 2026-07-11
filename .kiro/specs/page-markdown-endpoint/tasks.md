@@ -19,7 +19,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 2.2, 2.4_
   - _Boundary: parseMarkdownRequest_
 
-- [ ] 1.3 Markdown 本文＋footer 組立（純関数）
+- [x] 1.3 Markdown 本文＋footer 組立（純関数）
   - 本文に近傍ナビゲーション footer（正規 URL・permalink・親・直下子リンク＋直下子総数・子孫合計 descendantCount・兄弟・更新日時／更新者）を連結する純関数と、403/404 用の案内 Markdown を返す関数を、テスト先行で実装する。footer の列挙上限定数 `MARKDOWN_FOOTER_MAX_LINKS` を定義する。
   - ページ一覧 API 案内を件数不問で常に含め、上限超過時は総数と残数を明記。ルートでは親・兄弟を省略。空ページは本文の代わりに「本文なし」の一文＋footer。
   - Done: footer 各要素と 4.6／4.7／4.8／5.1–5.3／3.5（エラー本文の案内）をユニットテストで検証。
