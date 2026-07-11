@@ -26,7 +26,7 @@
   - _Depends: 1.1_
 
 - [ ] 3. Core: 宣言的ディスパッチ
-- [ ] 3.1 レンダラレジストリと defineRenderer ファクトリ
+- [x] 3.1 レンダラレジストリと defineRenderer ファクトリ
   - `defineRenderer(guard, Component)` を実装（型ガードの絞り込み型を Component の props 型へ結合。唯一の widening cast を factory 内 1 箇所に閉じ込め、`any` は使わない）
   - レジストリに添付削除を `defineRenderer(isAttachmentRemoveActivity, AttachmentRemoveSnapshotDetail)` の 1 エントリで登録。判定は `action` を判別子とし互いに排他（1 action = 1 エントリ）
   - 型検査ゲート: `isAttachmentRemoveActivity`（引数 `Pick<IActivity,'action'|'snapshot'>`・述語で snapshot を絞る）を factory のジェネリックが受理することを確認。噛み合わなければ制約調整か明示型引数で対応（上流の型ガード定義は変更しない）。guard と Component の action 取り違えは型エラーになることを確認
@@ -73,3 +73,8 @@
   - 完了状態: 4 ロケールの `admin.json` に該当キーが全て存在し、各 UI 言語で翻訳ラベルが表示される
   - _Requirements: 4.1, 4.3_
   - _Depends: 1.1_
+
+## Implementation Notes
+
+- 3.1: design の参照実装（`T extends IActivityHasId`）は実在の型ガード（`Pick<IActivity,'action'|'snapshot'>` ベース）と単一の `T` では両立しないため、design が明記する代替案どおり制約を `T extends Pick<IActivity,'action'|'snapshot'>` に調整し、Component props は `IActivityHasId & T` とした（上流は無変更）。
+- 3.1: snapshot 型が全フィールド optional ＋ `FC` の呼び出しシグネチャが bivariant なため、「余分な必須フィールドを要求する Component」の誤登録は型エラーにならない。durable に検出できる誤ペアは「同名フィールドの型が矛盾する」場合のみで、負のゲートは `@ts-expect-error`（`fileSize: string` の dummy）として `snapshot-detail-renderers.spec.tsx` に常設。この directive の下の行がエラーでなくなると typecheck 自体が落ちる（TS2578）。
