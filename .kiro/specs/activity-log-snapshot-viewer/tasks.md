@@ -10,7 +10,7 @@
   - _Requirements: 4.1, 4.2_
 
 - [ ] 2. Core: snapshot 詳細レンダラ
-- [ ] 2.1 (P) 汎用 raw snapshot ビューア（RawSnapshotDetail）
+- [x] 2.1 (P) 汎用 raw snapshot ビューア（RawSnapshotDetail）
   - 先に失敗するコンポーネント spec を書く（red）: (a) 複数フィールドを持つ snapshot → 全フィールドが key-value で描画される、(b) `undefined`／空 snapshot → 「詳細なし」プレースホルダが出て例外を投げない
   - 実装で green にする: `snapshot` の全フィールドを列挙して key-value 描画（透過される `_id`/`id` 含む）、値はテキスト化（object/array は安全に文字列化）、空/不在は `no_detail` プレースホルダ
   - 完了状態: spec が green。空・欠損 snapshot でもレンダリングエラーを起こさずプレースホルダを描画する
