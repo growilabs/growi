@@ -34,7 +34,7 @@
   - _Requirements: 1.2_
   - _Boundary: snapshot-detail-renderers_
   - _Depends: 2.2_
-- [ ] 3.2 ディスパッチャ（ActivitySnapshotDetail）と barrel 公開
+- [x] 3.2 ディスパッチャ（ActivitySnapshotDetail）と barrel 公開
   - 先に失敗する spec を書く（red）: (a) `action=ATTACHMENT_REMOVE` → 既定で整形（ファイル名等）が現れ、raw タブへ切り替えると全フィールドの key-value が現れる（整形が raw を置き換えない）、(b) 未登録 action → タブ無しで raw のみ、(c) `username` のみの snapshot → 整形もタブも現れず raw のみ
   - 実装で green にする: レジストリを先頭一致（`find`）で選ぶ。一致すれば「整形／raw」タブで見せる（既定タブ=整形、raw タブは常に `RawSnapshotDetail` の全フィールド、アクティブタブはローカル state、タブ部品はプロジェクト標準を利用）。一致が無ければ `RawSnapshotDetail` のみ（タブ chrome 無し）。`snapshot-detail/index.ts` は `ActivitySnapshotDetail` のみを公開
   - 完了状態: spec が green。整形対象 action でも raw タブで全フィールドが失われず参照でき、未対応 action は raw のみ。barrel からは `ActivitySnapshotDetail` のみ import 可能
@@ -77,4 +77,5 @@
 ## Implementation Notes
 
 - 3.1: design の参照実装（`T extends IActivityHasId`）は実在の型ガード（`Pick<IActivity,'action'|'snapshot'>` ベース）と単一の `T` では両立しないため、design が明記する代替案どおり制約を `T extends Pick<IActivity,'action'|'snapshot'>` に調整し、Component props は `IActivityHasId & T` とした（上流は無変更）。
+- 3.2: タブ見出し「Formatted」「Raw」は英語ハードコード（design の i18n 契約はフィールドラベル 8 キーのみでタブ見出しキーを定義していないため）。i18n キー化するなら admin.json を境界に含むタスク 4.2 で `audit_log_snapshot.tab_formatted` / `tab_raw` 等の追加を判断する。
 - 3.1: snapshot 型が全フィールド optional ＋ `FC` の呼び出しシグネチャが bivariant なため、「余分な必須フィールドを要求する Component」の誤登録は型エラーにならない。durable に検出できる誤ペアは「同名フィールドの型が矛盾する」場合のみで、負のゲートは `@ts-expect-error`（`fileSize: string` の dummy）として `snapshot-detail-renderers.spec.tsx` に常設。この directive の下の行がエラーでなくなると typecheck 自体が落ちる（TS2578）。
