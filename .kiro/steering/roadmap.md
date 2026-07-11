@@ -20,9 +20,9 @@ activity log サブシステムを責務ごとに分割したファミリー。f
 
 ### Specs（依存順）
 
-- [x] `activity-log-snapshot` — snapshot の型付け＋添付削除ログ（実装済み / PR #11393。旧 `activity-log` を改名）。**次の増分**: 添付系 action 全て（ADD 等）への snapshot capture 拡張 → `/kiro-spec-requirements activity-log-snapshot`。依存: なし
+- [x] `activity-log-snapshot` — snapshot の型付け＋添付削除ログ（REMOVE: PR #11393）＋添付系 action（ADD/DOWNLOAD）への capture 拡張（PR #11433）。旧 `activity-log` を改名。残: 配置リファクタ（タスク14: builder/recorder を `service/attachment/` へ移動・挙動不変。配置ポリシーは flagship の関心マップを参照）。依存: なし
 - [ ] `activity-log`（flagship / 記録ゲート） — 対象外 action を今後保存しない。直し方（defer-create / delete-at-settle）は design で比較。既存残骸の掃除は対象外。依存: なし（並行可）
-- [ ] `activity-log-snapshot-viewer` — 監査ログ画面での snapshot 表示（生表示＋添付系整形）。依存: `activity-log-snapshot`（添付 ADD 整形は capture 拡張後）
+- [ ] `activity-log-snapshot-viewer` — 監査ログ画面での snapshot 表示（生表示＋添付系整形）。依存: `activity-log-snapshot`（capture 拡張は PR #11433 で完了済み → 着手可能）
 
 ### 将来課題（未割当）
 
