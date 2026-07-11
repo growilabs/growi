@@ -3,7 +3,7 @@
 > 方針: 新規コンポーネントは **TDD（テスト先行・red→green）** で進める（essential-test-design=観察可能な契約をテスト / essential-test-patterns=Vitest・RTL・型安全モック `mock<T>()` に従う）。i18n の非英語翻訳（タスク 6）はコード実装（1〜5）の完成条件ではなく、疎結合な後続タスクとして切り出す（未実施の間は i18next フォールバックで英語表示、要件 4.3）。型・API・記録側（`~/interfaces/activity` の型/型ガード、`apiv3/activity`）は変更せず read/UI のみを追加する。
 
 - [ ] 1. Foundation: 追加ラベル（英語）の土台
-- [ ] 1.1 監査ログ snapshot 詳細ラベルを en_US に追加
+- [x] 1.1 監査ログ snapshot 詳細ラベルを en_US に追加
   - `en_US/admin.json` に詳細列見出し `audit_log_management.detail` と `audit_log_snapshot.{file_name, file_size, page, no_detail, unknown_file_name, page_unavailable, unknown_size}` を追加する
   - 既存キーは変更しない（追加のみ）
   - 完了状態: `en_US/admin.json` に上記キーが全て存在し、`t('admin:audit_log_snapshot.file_name')` 等がキー文字列ではなく英語ラベルを返す
