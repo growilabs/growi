@@ -17,7 +17,7 @@
   - _Requirements: 1.1, 1.3, 3.4_
   - _Boundary: RawSnapshotDetail_
   - _Depends: 1.1_
-- [ ] 2.2 (P) 添付削除の整形レンダラ（AttachmentRemoveSnapshotDetail）
+- [x] 2.2 (P) 添付削除の整形レンダラ（AttachmentRemoveSnapshotDetail）
   - 先に失敗する spec を書く（red）: (a) 全フィールド有り → ファイル名・人間可読サイズ・所属ページリンクが描画され、ダウンロードリンクは描画されない、(b) `originalName` 欠損 → 不明ラベル、(c) `pagePath` 欠損 → リンク要素が無く参照先なしラベル、(d) `fileSize` 欠損 → サイズ欠損ラベル
   - 実装で green にする: 絞り込み済み型（`snapshot?: AttachmentRemoveSnapshot`）を受け取り、各フィールドを独立にフォールバック判定。サイズは `pretty-bytes`、ページは `PagePathHierarchicalLink` + `LinkedPagePath`。ダウンロードリンクは一切出さない
   - 完了状態: spec が green。各欠損ケースでフォールバック文言が出て、リンクの有無（page あり=リンク / 削除実体=DLなし）が仕様どおり
