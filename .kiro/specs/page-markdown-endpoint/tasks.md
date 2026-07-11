@@ -5,7 +5,7 @@
 > ベース: 実装ブランチは `origin/dev/8.0.x` から切る（master ではない）。dev/8.0.x 固有の前提として、(1) `routes/index.js` は ESM 化済み（`export const setup`、子ルーターは `import { setup as … }`、catch-all は `:402`/`:403`、手前に `/vault.git`）→ 新ルートも名前付き export ＋ `import` で組む、(2) `findPageAndMetaDataByViewer` が bookmark 集計を Prisma で行う（認可契約は不変）→ この finder を通る結合テストは bootstrap で Prisma 初期化が要る。詳細は research.md「dev/8.0.x 再ベース」節。
 
 - [ ] 1. Foundation: 共有の純関数ユーティリティ（テスト先行）
-- [ ] 1.1 (P) `.md` URL 生成ユーティリティ
+- [x] 1.1 (P) `.md` URL 生成ユーティリティ
   - permalink 形（`/{pageId}.md`）とパス形（`{path}.md`）を生成する純関数を、先にユニットテストを書いてから実装する。
   - パス形はクエリ／ハッシュがある場合その**前**に `.md` を挿入する。
   - Done: `(pageId または path, origin)` を与えると期待どおりの `.md` URL を返し、クエリ/ハッシュ付きの端ケースもテストが green。
