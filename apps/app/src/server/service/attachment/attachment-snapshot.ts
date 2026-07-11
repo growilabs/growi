@@ -5,7 +5,7 @@ import type { AttachmentSnapshot } from '~/interfaces/activity';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
-const logger = loggerFactory('growi:service:activity:attachment-snapshot');
+const logger = loggerFactory('growi:service:attachment:attachment-snapshot');
 
 /** A page reference id: a Mongoose ObjectId or its string representation. */
 type ObjectIdLike = mongoose.Types.ObjectId | string;

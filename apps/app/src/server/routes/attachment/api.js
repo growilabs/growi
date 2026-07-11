@@ -1,7 +1,7 @@
 import { MODEL_ATTACHMENT, SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
-import { buildAttachmentRemoveSnapshot } from '~/server/service/activity/attachment-removal-snapshot';
-import { resolveAttachmentPagePath } from '~/server/service/activity/attachment-snapshot';
+import { buildAttachmentRemoveSnapshot } from '~/server/service/attachment/attachment-removal-snapshot';
+import { resolveAttachmentPagePath } from '~/server/service/attachment/attachment-snapshot';
 import loggerFactory from '~/utils/logger';
 
 import { Attachment } from '../../models/attachment';

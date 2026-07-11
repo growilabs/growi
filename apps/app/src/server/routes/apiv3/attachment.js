@@ -14,7 +14,7 @@ import {
   serializePageSecurely,
   serializeRevisionSecurely,
 } from '~/server/models/serializers';
-import { buildAttachmentSnapshot } from '~/server/service/activity/attachment-snapshot';
+import { buildAttachmentSnapshot } from '~/server/service/attachment/attachment-snapshot';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
