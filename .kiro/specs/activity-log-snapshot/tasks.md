@@ -196,6 +196,17 @@
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
   - _Depends: 12.1_
 
+- [x] 14. 配置リファクタ: 添付 snapshot モジュールをドメインへ移動（挙動不変）
+- [x] 14.1 attachment-snapshot / attachment-removal-snapshot を `server/service/attachment/` へ移動し、`service/activity` を機構のみに収束させる
+  - 配置ポリシー（flagship `activity-log` の関心マップ「配置ポリシー: snapshot 実装の置き場所（2026-07-11 合意）」）に従い、`service/activity/` の `attachment-snapshot.ts`・`attachment-removal-snapshot.ts`（co-located spec 含む4ファイル）を新設 `server/service/attachment/` へ移動する
+  - barrel（index.ts）は置かない: `~/server/service/attachment` は既存の legacy サービス `attachment.ts`（ファイル）に解決されるため、ディレクトリ barrel は到達不能になる。import は具体ファイルパス（`~/server/service/attachment/attachment-snapshot` 等）で行う
+  - logger 名前空間を新パスに合わせて更新し（`growi:service:activity:attachment-snapshot` → `growi:service:attachment:attachment-snapshot` 等）、名前空間を spy で pin している integ テストを追随させる
+  - import 元（routes/attachment の api.js・download.ts、apiv3/attachment.js、page 削除サービス等 — grep で全数確認）を新パスへ更新する。`interfaces/activity.ts` の型・guard、`service/activity` の機構（settle・failsafe 等）、schema.prisma は変更しない
+  - design.md の File Structure Plan 等の現在地記述を新パスへ更新する
+  - 観察可能な完了条件: 挙動不変 — 既存ユニット・結合テストが（名前空間 pin の追随以外は無変更で）green、typecheck・biome・route/import lint 通過
+  - _Requirements: なし（挙動不変の配置 refactor。要件変更を伴わない）_
+  - _Boundary: server/service/attachment（新設）・server/service/activity（当該4ファイルの削除のみ）・import 追随（routes/attachment, routes/apiv3, service/page）・design.md_
+
 ## Implementation Notes（増分）
 - 最終検証（2026-07-10）の横断知見: 記録ゲート spec の lazy fail-safe 化以降、`emit('update')` の実行時経路は常に `settleActivityRecord` → `createByParameters` であり、`updateByParameters`＋`buildSnapshotUpdateEnvelope` は本番経路から到達不能（テストのみが呼ぶ）。design 本文（REMOVE 増分）の「updateByParameters が直接削除の保存口」という記述はこの兄弟 spec の変更で上書きされている。emit 呼び出し元の契約（素の `ISnapshot` を渡す）は create/update どちらの経路でも不変。
 - ゲート注入の前例（REMOVE 7.x と同じ口）: `configManager.updateConfigs({ 'app:auditLogEnabled': true, 'app:auditLogActionGroupSize': ActionGroupSize.Medium })`＋afterAll で `removeIfUndefined: true` により撤去。ADD/DOWNLOAD はいずれも MediumActionGroup（既定 Small では記録されない）。

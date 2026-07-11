@@ -81,7 +81,7 @@ import Subscription from '../../models/subscription';
 import UserGroupRelation from '../../models/user-group-relation';
 import { V5ConversionError } from '../../models/vo/v5-conversion-error';
 import { divideByType } from '../../util/granted-group';
-import type { ActivityActor } from '../activity/attachment-removal-snapshot';
+import type { ActivityActor } from '../attachment/attachment-removal-snapshot';
 import { configManager } from '../config-manager';
 import type { IPageGrantService } from '../page-grant';
 import { preNotifyService } from '../pre-notify';
