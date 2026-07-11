@@ -3,7 +3,7 @@ import { getIdStringForRef } from '@growi/core';
 
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 
-import type { AttachmentLike } from '../activity/attachment-removal-snapshot';
+import type { AttachmentLike } from '../attachment/attachment-removal-snapshot';
 
 /**
  * Pure builders that prepare the inputs of recordCascadeAttachmentRemovals

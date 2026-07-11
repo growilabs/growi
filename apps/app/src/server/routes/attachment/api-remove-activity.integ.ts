@@ -276,10 +276,10 @@ describe('POST /_api/attachments.remove — activity settled with attachment sna
     });
 
     // Loggers are cached per namespace, so this is the very instance the
-    // shared resolveAttachmentPagePath (service/activity/attachment-snapshot,
+    // shared resolveAttachmentPagePath (service/attachment/attachment-snapshot,
     // which ./api.js delegates to) logs through.
     const warnSpy = vi.spyOn(
-      loggerFactory('growi:service:activity:attachment-snapshot'),
+      loggerFactory('growi:service:attachment:attachment-snapshot'),
       'warn',
     );
 

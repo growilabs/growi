@@ -8,7 +8,7 @@ import type { IActivityParameters } from '~/server/models/activity';
 import {
   buildAttachmentDownloadSnapshot,
   type DownloadActor,
-} from '~/server/service/activity/attachment-snapshot';
+} from '~/server/service/attachment/attachment-snapshot';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';

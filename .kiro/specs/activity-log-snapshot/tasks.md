@@ -196,8 +196,8 @@
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
   - _Depends: 12.1_
 
-- [ ] 14. 配置リファクタ: 添付 snapshot モジュールをドメインへ移動（挙動不変）
-- [ ] 14.1 attachment-snapshot / attachment-removal-snapshot を `server/service/attachment/` へ移動し、`service/activity` を機構のみに収束させる
+- [x] 14. 配置リファクタ: 添付 snapshot モジュールをドメインへ移動（挙動不変）
+- [x] 14.1 attachment-snapshot / attachment-removal-snapshot を `server/service/attachment/` へ移動し、`service/activity` を機構のみに収束させる
   - 配置ポリシー（flagship `activity-log` の関心マップ「配置ポリシー: snapshot 実装の置き場所（2026-07-11 合意）」）に従い、`service/activity/` の `attachment-snapshot.ts`・`attachment-removal-snapshot.ts`（co-located spec 含む4ファイル）を新設 `server/service/attachment/` へ移動する
   - barrel（index.ts）は置かない: `~/server/service/attachment` は既存の legacy サービス `attachment.ts`（ファイル）に解決されるため、ディレクトリ barrel は到達不能になる。import は具体ファイルパス（`~/server/service/attachment/attachment-snapshot` 等）で行う
   - logger 名前空間を新パスに合わせて更新し（`growi:service:activity:attachment-snapshot` → `growi:service:attachment:attachment-snapshot` 等）、名前空間を spy で pin している integ テストを追随させる

@@ -14,7 +14,7 @@ import {
 } from './attachment-snapshot';
 
 const logger = loggerFactory(
-  'growi:service:activity:attachment-removal-snapshot',
+  'growi:service:attachment:attachment-removal-snapshot',
 );
 
 // Keep the historical import path working: these types now live in the
