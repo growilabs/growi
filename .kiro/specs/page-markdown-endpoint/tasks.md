@@ -67,7 +67,7 @@
   - _Boundary: CopyDropdown_
 
 - [ ] 4. Validation: 結合と回帰
-- [ ] 4.1 エンドツーエンド結合と回帰検証
+- [x] 4.1 エンドツーエンド結合と回帰検証
   - 3 つの URL 形態、ゲスト／PAT 経路、空（コンテナ）ページのナビ中心 Markdown、populate 回帰（本文＋更新者名が含まれる）、footer の直下子総数と子孫合計 descendantCount の併記＋上限超過時の残数明記、メモリ非全件（子は最大 N 件ロード・総数は正確）、interception 登録順序による通常 HTML 配信への非干渉、を通しで検証する。
   - Done: 上記シナリオがすべて green。
   - _Depends: 3.1, 3.2, 3.3_

@@ -1,4 +1,5 @@
 import type { IUser } from '@growi/core';
+import { SCOPE } from '@growi/core/dist/interfaces';
 import express from 'express';
 import mongoose, { type HydratedDocument, type Model } from 'mongoose';
 import request from 'supertest';
@@ -7,9 +8,11 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
+import { AccessToken } from '~/server/models/access-token';
 import type { PageDocument, PageModel } from '~/server/models/page';
 
 import { pageMarkdownRouteFactory } from '.';
+import { MARKDOWN_FOOTER_MAX_LINKS } from './constants';
 
 // Route-level integration test for the page-markdown interception route.
 //
@@ -54,12 +57,40 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
 
   let docId: string; // public page at `${BASE}/doc`
   let secretId: string; // GRANT_OWNER page owned by otherUser (forbidden to testUser)
+  let bigId: string; // public root-like page with more than the footer link cap of children
+
+  // Real Personal Access Tokens for testUser: one with the page-read scope the
+  // route requires, one deliberately scoped elsewhere (used to prove the scope
+  // gate actually rejects). These flow through the genuine accessTokenParser
+  // mounted by the factory — nothing in the token path is mocked.
+  let patToken: string;
+  let patWrongScopeToken: string;
 
   const bodyDoc = 'DOC-BODY-CONTENT-VERBATIM';
   const bodySecret = 'SECRET-BODY-DO-NOT-LEAK';
   const bodyLiteral = 'LITERAL-MD-PAGE-BODY';
+  const bodyBig = 'BIG-PARENT-BODY';
 
-  const seededPaths = [`${BASE}/doc`, `${BASE}/secret`, `${BASE}/literal.md`];
+  // Over-limit fixture: seed MORE direct children than the footer cap so the
+  // response must truncate the link list, state the exact total and remainder
+  // (Requirement 4.7), and load at most the cap into memory (Requirement 4.3).
+  const OVER_LIMIT_CHILD_COUNT = MARKDOWN_FOOTER_MAX_LINKS + 5;
+  // Distinct from the direct-child count so the footer's separate descendant
+  // total can be proven to not be conflated with it (Requirement 4.3).
+  const BIG_DESCENDANT_COUNT = MARKDOWN_FOOTER_MAX_LINKS + 10;
+  const bigParentPath = `${BASE}/big`;
+  const bigChildPaths = Array.from(
+    { length: OVER_LIMIT_CHILD_COUNT },
+    (_, i) => `${bigParentPath}/c${String(i).padStart(2, '0')}`,
+  );
+
+  const seededPaths = [
+    `${BASE}/doc`,
+    `${BASE}/secret`,
+    `${BASE}/literal.md`,
+    bigParentPath,
+    ...bigChildPaths,
+  ];
 
   beforeAll(async () => {
     crowi = await getInstance();
@@ -110,6 +141,26 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
       lastUpdateUser: testUser._id,
       descendantCount: 0,
     });
+    // Root-like public hub with more direct children than the footer link cap.
+    // Its descendantCount is deliberately larger still, so the footer's
+    // direct-child total and descendant total are visibly different numbers.
+    const big = await Page.create({
+      path: bigParentPath,
+      grant: Page.GRANT_PUBLIC,
+      creator: testUser._id,
+      lastUpdateUser: testUser._id,
+      descendantCount: BIG_DESCENDANT_COUNT,
+    });
+    await Page.insertMany(
+      bigChildPaths.map((path) => ({
+        path,
+        parent: big._id,
+        grant: Page.GRANT_PUBLIC,
+        creator: testUser._id,
+        lastUpdateUser: testUser._id,
+        descendantCount: 0,
+      })),
+    );
 
     const revisions = await Revision.insertMany([
       {
@@ -130,16 +181,40 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
         format: 'markdown',
         author: testUser._id,
       },
+      {
+        pageId: big._id,
+        body: bodyBig,
+        format: 'markdown',
+        author: testUser._id,
+      },
     ]);
     doc.revision = revisions[0]._id;
     secret.revision = revisions[1]._id;
     literal.revision = revisions[2]._id;
+    big.revision = revisions[3]._id;
     await doc.save();
     await secret.save();
     await literal.save();
+    await big.save();
 
     docId = String(doc._id);
     secretId = String(secret._id);
+    bigId = String(big._id);
+
+    // Seed real access tokens. generateToken + the route's accessTokenParser
+    // both normalize scopes identically, so the required-scope token satisfies
+    // the route's [READ.FEATURES.PAGE] check while the other one does not.
+    const oneDayLater = new Date(Date.now() + 1000 * 60 * 60 * 24);
+    patToken = (
+      await AccessToken.generateToken(testUser._id, oneDayLater, [
+        SCOPE.READ.FEATURES.PAGE,
+      ])
+    ).token;
+    patWrongScopeToken = (
+      await AccessToken.generateToken(testUser._id, oneDayLater, [
+        SCOPE.READ.USER_SETTINGS.INFO,
+      ])
+    ).token;
 
     // Build the app once: express.json ensures req.body is defined (production
     // mounts body parsers upstream of the catch-all); the injector emulates
@@ -161,6 +236,11 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
   afterAll(async () => {
     try {
       await Page.deleteMany({ path: { $in: seededPaths } });
+    } catch {
+      // ignore
+    }
+    try {
+      await AccessToken.deleteAllTokensByUserId(testUser?._id);
     } catch {
       // ignore
     }
@@ -305,6 +385,72 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
 
       const res = await request(app).get(`/${docId}.md`).redirects(0);
 
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toBe('/login');
+    });
+  });
+
+  describe('over-limit footer (Requirement 4.3, 4.7)', () => {
+    it('caps child links at MARKDOWN_FOOTER_MAX_LINKS while stating the exact total, the omitted remainder, and a separate descendant total', async () => {
+      currentUser = testUser;
+
+      const res = await request(app).get(`/${bigId}.md`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/markdown');
+
+      // Overflow is stated explicitly, never silently truncated: the exact
+      // direct-child total and the omitted remainder both appear (4.7).
+      expect(res.text).toContain(
+        `Children: ${MARKDOWN_FOOTER_MAX_LINKS} of ${OVER_LIMIT_CHILD_COUNT} total`,
+      );
+      const remainder = OVER_LIMIT_CHILD_COUNT - MARKDOWN_FOOTER_MAX_LINKS;
+      expect(res.text).toContain(`${remainder} more not shown`);
+
+      // descendantCount is reported separately from the direct-child count and
+      // the two seeded values differ, proving they are not conflated (4.3).
+      expect(res.text).toContain(`Total descendants: ${BIG_DESCENDANT_COUNT}`);
+
+      // Memory-bounded rendering: at most MARKDOWN_FOOTER_MAX_LINKS child links
+      // are emitted even though more children exist. For this root-like page
+      // there are no parent/sibling sections, so the indented list items are
+      // exactly the child links — counting them is unambiguous.
+      const childLinkLines = res.text
+        .split('\n')
+        .filter((line) => /^ {2}- \[/.test(line));
+      expect(childLinkLines).toHaveLength(MARKDOWN_FOOTER_MAX_LINKS);
+    });
+  });
+
+  describe('PAT (Personal Access Token) authentication (Requirement 3.1)', () => {
+    it('authenticates a markdown request via a real Bearer token through the genuine accessTokenParser, even when guest read is disallowed', async () => {
+      currentUser = undefined; // no session; the token is the ONLY credential
+      vi.spyOn(crowi.aclService, 'isGuestAllowedToRead').mockReturnValue(false);
+
+      const res = await request(app)
+        .get(`/${docId}.md`)
+        .set('Authorization', `Bearer ${patToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/markdown');
+      // populate regression across the full route round-trip: the finder does
+      // not populate, so both the verbatim body and the updater username must be
+      // reconstituted by the helper and present in the HTTP response (1.4, 4.5).
+      expect(res.text).toContain(bodyDoc);
+      expect(res.text).toContain(testUser.username);
+    });
+
+    it('does not authenticate a token lacking the required page-read scope, deferring to loginRequired (redirect to /login)', async () => {
+      currentUser = undefined;
+      vi.spyOn(crowi.aclService, 'isGuestAllowedToRead').mockReturnValue(false);
+
+      const res = await request(app)
+        .get(`/${docId}.md`)
+        .set('Authorization', `Bearer ${patWrongScopeToken}`)
+        .redirects(0);
+
+      // The token is valid but out of scope, so no user is resolved and the
+      // request follows the same guest-disallowed path as a tokenless one.
       expect(res.status).toBe(302);
       expect(res.headers.location).toBe('/login');
     });
