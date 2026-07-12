@@ -50,7 +50,7 @@
   - _Requirements: 1.4, 5.3_
   - _Boundary: ActivityTableRow_
   - _Depends: 3.2_
-- [ ] 4.2 ActivityTable への詳細列追加と行委譲
+- [x] 4.2 ActivityTable への詳細列追加と行委譲
   - `<thead>` に詳細列見出し（`admin:audit_log_management.detail`）を追加し、行生成を `ActivityTableRow` へ委譲する薄いコンテナにする
   - 既存の列順・`data-testid`・action 名の i18n 表示（`admin:audit_log_action.<action>`）・user セルの username 描画は不変に保つ
   - 完了状態: 監査ログ画面で全 activity 行に disclosure が出て、展開すると snapshot 詳細（添付削除は整形、他は raw）が表示される。既存 5 列と action 名表示は従来どおり
