@@ -52,7 +52,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 2.1, 2.3, 2.4, 3.1, 3.2, 3.3, 3.4, 3.5_
   - _Boundary: PageMarkdownRoute, routes/index.js_
 
-- [ ] 3.2 (P) 機械向け発見リンク（alternate link ＋ Link ヘッダ）
+- [x] 3.2 (P) 機械向け発見リンク（alternate link ＋ Link ヘッダ）
   - `[[...path]]` の `<Head>` に `<link rel="alternate" type="text/markdown">` を追加。`pageId` があれば permalink 形、無ければ（空ページ等で props に `_id` が無い）`currentPathname` から path 形にフォールバック。`Link` ヘッダは GSSP で、空ページの早期 return より前のスコープの `_id` を使って設定。
   - Done: ページ HTML の `<head>` に Markdown 版 alternate が出力され、空ページでは path 形になり、`Link` ヘッダも（本文 CSR ページ含め）付与される。
   - _Depends: 1.1_
