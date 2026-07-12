@@ -35,7 +35,7 @@
   - _Requirements: 4.3, 4.7_
   - _Boundary: page-listing service_
 
-- [ ] 2.2 respond-with-page-markdown レスポンスヘルパ
+- [x] 2.2 respond-with-page-markdown レスポンスヘルパ
   - 意図（1.2）に従い解決する（permalink は id、path は literal→base の順に `findPageAndMetaDataByViewer` を使用。literal→base の判定はここが所有）。
   - finder は populate しないため `initLatestRevisionField()`＋`populateDataToShowRevision(false)` で本文・更新者を populate し、`page.parent` から親を追加クエリで解決。子・兄弟は 2.1 を `limit=MARKDOWN_FOOTER_MAX_LINKS` で呼び、兄弟は自分を除外。更新者は `serializeUserSecurely` を通す。
   - 結果を `ok` / `forbidden` / `notFound` / `passthrough`（literal `.md` 実在ページ）で返し、`buildPageMarkdown` で本文を組み立てる。
@@ -72,3 +72,8 @@
   - Done: 上記シナリオがすべて green。
   - _Depends: 3.1, 3.2, 3.3_
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 5.1, 5.2, 5.3, 6.1, 6.2, 6.3, 7.1, 7.2, 7.3, 7.4_
+
+## Implementation Notes
+
+- 2.1: page-listing の新メソッドは `findLimitedChildrenByParentIdAndViewer(parentId: string, user, limit)` / `countChildrenByParentIdAndViewer(parentId: string, user)`（parentId は string、ObjectId は `.toString()` して渡す）。
+- 2.2: `respondWithPageMarkdown(crowi, input)` は finder を `basicOnly: true` で呼ぶ（認可・forbidden/notFound 判定は非 basicOnly と同一とレビューで実証済み。bookmark 集計をスキップするため、この経路は Prisma に到達しない）。input.user は `HydratedDocument<IUser> | undefined`（route は `req.user` をそのまま渡せる）。helper 単位の integ は respond-with-page-markdown.integ.ts（File Structure Plan への承認済み追加）。forbidden-literal passthrough と guest-forbidden の route 検証は 3.1 の supertest が所有。
