@@ -28,7 +28,7 @@
   - _Boundary: buildPageMarkdown_
 
 - [ ] 2. Core: サーバ側データ取得とレスポンス組立
-- [ ] 2.1 (P) page-listing にメモリ非全件の子取得＋viewer-aware count を追加
+- [x] 2.1 (P) page-listing にメモリ非全件の子取得＋viewer-aware count を追加
   - `limit` を引数で受け取り最大 `limit` 件の viewer フィルタ済み直下子を返す取得と、`addViewerCondition` を共有した `countDocuments({ parent: id })` による正確な直下子総数を、統合テスト先行で追加する（既存の全件返しは本用途に使わない）。
   - Task 1 のユーティリティに依存しない（page-listing サービス境界のみ）ため foundation と並行実行可能。
   - Done: 統合テストで、返る子が `limit` 件に制限され、かつ総数が閲覧不可ページを除いた正確な件数になることを確認。
