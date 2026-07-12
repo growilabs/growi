@@ -48,12 +48,12 @@ export interface PageMarkdownInput {
 
 const EMPTY_PAGE_NOTICE = 'This page has no content yet.';
 
-const ERROR_GUIDANCE = [
-  'If you believe this page exists and you have access to it, retry with an',
-  'authenticated request (a logged-in session or a Personal Access Token),',
-  'or use the GROWI MCP server, which can fetch this page on your behalf',
-  'using your own credentials.',
-].join('\n');
+// Template literal (not .join) so the initializer stays on the
+// route-top-level-guard allowlist (no top-level call expressions).
+const ERROR_GUIDANCE = `If you believe this page exists and you have access to it, retry with an
+authenticated request (a logged-in session or a Personal Access Token),
+or use the GROWI MCP server, which can fetch this page on your behalf
+using your own credentials.`;
 
 function renderLinkListItem(link: FooterLink): string {
   return `  - [${link.title}](${link.mdUrl})`;

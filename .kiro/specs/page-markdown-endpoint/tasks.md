@@ -76,4 +76,5 @@
 ## Implementation Notes
 
 - 2.1: page-listing の新メソッドは `findLimitedChildrenByParentIdAndViewer(parentId: string, user, limit)` / `countChildrenByParentIdAndViewer(parentId: string, user)`（parentId は string、ObjectId は `.toString()` して渡す）。
+- 検証(4.1後): `src/server/routes/**` にはカスタム lint `route-top-level-guard` があり、トップレベルの呼び出し初期化（例: `[...].join('\n')`）を禁止する（ESM ブート順序対策）。route 配下へファイルを足すタスクは `pnpm run lint`（biome/tsgo だけでなく）まで回すこと。build-page-markdown.ts の ERROR_GUIDANCE を template literal に修正済み。
 - 2.2: `respondWithPageMarkdown(crowi, input)` は finder を `basicOnly: true` で呼ぶ（認可・forbidden/notFound 判定は非 basicOnly と同一とレビューで実証済み。bookmark 集計をスキップするため、この経路は Prisma に到達しない）。input.user は `HydratedDocument<IUser> | undefined`（route は `req.user` をそのまま渡せる）。helper 単位の integ は respond-with-page-markdown.integ.ts（File Structure Plan への承認済み追加）。forbidden-literal passthrough と guest-forbidden の route 検証は 3.1 の supertest が所有。
