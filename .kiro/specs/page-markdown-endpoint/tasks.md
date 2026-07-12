@@ -45,7 +45,7 @@
   - _Boundary: respondWithPageMarkdown_
 
 - [ ] 3. Integration: HTTP ルート・発見リンク・UI
-- [ ] 3.1 page-markdown ルートを catch-all 直前に登録
+- [x] 3.1 page-markdown ルートを catch-all 直前に登録
   - GET のみ対象、`parseMarkdownRequest` が `none` なら即 `next()`。`accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true })`＋`loginRequired`（ゲスト許可）を合成し `respondWithPageMarkdown` を呼ぶ。`text/markdown; charset=utf-8` で 200/403/404、`passthrough` は `next()`。`Accept` はメディアタイプ明示一致のみで判定（`req.accepts` の `*/*` 誤爆を避ける）。`routes/index.js`（ESM 化済み。名前付き export を `import` して `setup` 内で `app.use`）の `:402`/`:403` catch-all の直前に登録。
   - Done: `/{pageId}.md`・`{path}.md`・`Accept` 付き平文 URL が 200 Markdown、権限外 403、非存在 404、ゲスト許可時は匿名 200・不許可時はログイン挙動、literal `.md` は HTML passthrough、通常ページの HTML 配信が維持されることを supertest 統合テストで確認。
   - _Depends: 2.2_
