@@ -43,7 +43,7 @@
   - _Depends: 3.1, 2.1_
 
 - [ ] 4. Integration: 監査ログテーブルへの組み込み
-- [ ] 4.1 行コンポーネント（ActivityTableRow）の新規作成と展開 UI
+- [x] 4.1 行コンポーネント（ActivityTableRow）の新規作成と展開 UI
   - 先に失敗する spec を書く（red）: (a) disclosure トグルで詳細サブ行が現れ、再度で閉じる、(b) 既存 5 セル（user/date/action/ip/url）の描画が保たれる、(c) トグルに `aria-expanded` が付く
   - 実装で green にする: 1 activity を 1 行で描画する新規コンポーネントを作り、行ローカルの展開 state を持たせる。先頭に disclosure セルを追加、展開時のみ `ActivitySnapshotDetail` の全幅サブ行を mount。既存 `data-testid="activity-table"` を維持し、詳細サブ行に別 testid を付す
   - 完了状態: spec が green。未展開時は詳細を mount せず、展開でのみ snapshot 詳細が現れる
@@ -77,5 +77,6 @@
 ## Implementation Notes
 
 - 3.1: design の参照実装（`T extends IActivityHasId`）は実在の型ガード（`Pick<IActivity,'action'|'snapshot'>` ベース）と単一の `T` では両立しないため、design が明記する代替案どおり制約を `T extends Pick<IActivity,'action'|'snapshot'>` に調整し、Component props は `IActivityHasId & T` とした（上流は無変更）。
+- 4.1: 「copied!」tooltip の開閉 state はテーブル共有から行ローカルへ移した（挙動は行単位で不変）。`formatDate` が ActivityTable と ActivityTableRow に重複しており、4.2 で ActivityTable を薄いコンテナへ変える際に解消すること。
 - 3.2: タブ見出し「Formatted」「Raw」は英語ハードコード（design の i18n 契約はフィールドラベル 8 キーのみでタブ見出しキーを定義していないため）。i18n キー化するなら admin.json を境界に含むタスク 4.2 で `audit_log_snapshot.tab_formatted` / `tab_raw` 等の追加を判断する。
 - 3.1: snapshot 型が全フィールド optional ＋ `FC` の呼び出しシグネチャが bivariant なため、「余分な必須フィールドを要求する Component」の誤登録は型エラーにならない。durable に検出できる誤ペアは「同名フィールドの型が矛盾する」場合のみで、負のゲートは `@ts-expect-error`（`fileSize: string` の dummy）として `snapshot-detail-renderers.spec.tsx` に常設。この directive の下の行がエラーでなくなると typecheck 自体が落ちる（TS2578）。
