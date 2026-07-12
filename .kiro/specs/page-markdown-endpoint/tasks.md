@@ -59,7 +59,7 @@
   - _Requirements: 6.1, 6.2, 6.3_
   - _Boundary: Page Head, page-data-props_
 
-- [ ] 3.3 (P) CopyDropdown に「Markdown URL (.md)」項目＋英語ロケール
+- [x] 3.3 (P) CopyDropdown に「Markdown URL (.md)」項目＋英語ロケール
   - 既存 CopyDropdown に項目を追加し、値は `{path}.md`（無条件に `.md` を付与し解決はサーバに委ねる）。共有リンク表示モードでは非表示。`en_US` の `commons.json` に `copy_to_clipboard."Markdown URL"` を追加（他 4 言語の翻訳は英語ファースト方針により後続）。
   - Done: 通常ページで項目が表示され `{path}.md` をコピーでき、共有リンクモードでは非表示になることをコンポーネントテストで確認。
   - _Depends: 1.1_
