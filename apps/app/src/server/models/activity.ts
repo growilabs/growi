@@ -188,11 +188,21 @@ function normalizeUpdateIdField(
  * caller interface.  `user` and `target` may be either a bare ID string or a
  * Mongoose document / plain object (normalization is done inside the method).
  *
+ * `id` lets the caller pre-mint the row's ObjectId (activity-log record
+ * gate: the middleware mints the id up front and the row is created only at
+ * settle/finalizer time — design.md: Data / 保存口 >
+ * ActivityExtension.createByParameters). `_id` is accepted as a
+ * Mongoose-style alias (callers hold the minted id as
+ * `res.locals.activity._id`) and is mapped to `id` inside the method; when
+ * both are set, `id` wins. Omitting both keeps Prisma's auto-generation.
+ *
  * `snapshot` accepts the full ISnapshot union so action-specific variants
  * (e.g. AttachmentRemoveSnapshot) reach the persisted composite without any
  * type bypass (design.md: Boundary Commitments > 書き込み口のパラメータ型の拡張).
  */
 export type IActivityParameters = {
+  id?: string;
+  _id?: string;
   user?: unknown;
   target?: unknown;
   targetModel?: string;
@@ -361,6 +371,8 @@ export const extension = Prisma.defineExtension((client) => {
          * silently dropped them).
          *
          * Defaults:
+         *   id       = auto-generated ObjectId — callers may pre-mint one
+         *              via `id` (or the Mongoose-style `_id` alias)
          *   v        = 0  (Mongoose initialises __v to 0 on create)
          *   createdAt = now  (Mongoose timestamps: { createdAt: true })
          *   snapshot.id = new ObjectId string (composite type requires it)
@@ -371,7 +383,7 @@ export const extension = Prisma.defineExtension((client) => {
           const context =
             Prisma.getExtensionContext<typeof prisma.activities>(this);
 
-          const { user, target, event, snapshot, createdAt, ...rest } =
+          const { id, _id, user, target, event, snapshot, createdAt, ...rest } =
             parameters;
 
           // Every ISnapshot variant is structurally assignable to
@@ -401,6 +413,10 @@ export const extension = Prisma.defineExtension((client) => {
 
           const data: Prisma.activitiesUncheckedCreateInput = {
             ...rest,
+            // Caller-minted id; `_id` is the Mongoose-style alias mapped
+            // here. `undefined` keeps Prisma's id auto-generation, so
+            // existing callers are unaffected (see IActivityParameters).
+            id: id ?? _id,
             v: 0,
             createdAt: createdAt ?? new Date(),
             ip: rest.ip ?? '',

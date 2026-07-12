@@ -45,7 +45,7 @@ vi.mock('~/features/mastra/server/services/is-ai-configured', () => ({
   isAiConfigured,
 }));
 vi.mock(
-  '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model',
+  '~/features/mastra/server/services/ai-sdk-modules/resolved-model-cache',
   () => ({ clearResolvedMastraModelCache }),
 );
 // GET now resolves display names from the effective catalog; mock the resolver so

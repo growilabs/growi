@@ -45,11 +45,19 @@ vi.mock('./llm-providers/effective-model-key', () => ({
 }));
 
 // Load a FRESH copy so the module-level cache starts empty in every test.
+// The cache storage lives in './resolved-model-cache' (kept import-light so
+// boot-path consumers can clear it without pulling the provider graph); load
+// both from the same fresh registry so resolver and cache stay paired.
 const loadResolver = async (): Promise<
-  typeof import('./resolve-mastra-model')
+  typeof import('./resolve-mastra-model') &
+    typeof import('./resolved-model-cache')
 > => {
   vi.resetModules();
-  return await import('./resolve-mastra-model');
+  const [resolver, cache] = await Promise.all([
+    import('./resolve-mastra-model'),
+    import('./resolved-model-cache'),
+  ]);
+  return { ...resolver, ...cache };
 };
 
 beforeEach(() => {
