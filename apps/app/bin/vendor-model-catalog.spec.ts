@@ -146,7 +146,10 @@ describe('main (fetch → validate → write wrapper)', () => {
     expect(exitSpy).not.toHaveBeenCalled();
     expect(writeFileSyncMock).toHaveBeenCalledTimes(1);
     const contents = writeFileSyncMock.mock.calls[0][1];
-    expect(JSON.parse(contents).models.openai).toContain('gpt-4o');
+    expect(JSON.parse(contents).models.openai).toContainEqual({
+      id: 'gpt-4o',
+      name: 'gpt-4o',
+    });
 
     // Regression guard: the ingest fetch must be time-bounded (shared
     // acquisition pipeline). An unbounded fetch would let a slow-drip upstream

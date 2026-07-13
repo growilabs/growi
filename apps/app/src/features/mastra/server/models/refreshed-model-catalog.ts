@@ -32,7 +32,7 @@ const SINGLETON_ID = 'singleton';
  * (@@map("mastra_refreshed_model_catalog")).
  */
 export interface IRefreshedModelCatalog {
-  /** provider → selectable model ids (same shape/filter as the bundled catalog). */
+  /** provider → selectable models (id + display name; same shape/filter as the bundled catalog). */
   models: ModelCatalog;
   /** When the snapshot was fetched from models.dev (server clock; informational). */
   fetchedAt: Date;
