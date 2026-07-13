@@ -100,6 +100,7 @@ const AllowedModelsProbe = (): JSX.Element => {
           data-provider={m.provider}
           data-modelid={m.modelId}
           data-default={String(m.isDefault === true)}
+          data-displayname={m.displayName ?? ''}
           data-provideroptions={m.providerOptionsText}
         />
       ))}
@@ -790,7 +791,13 @@ describe('AllowedModelsField', () => {
       // Arrange: openai has a catalog; the first row already registered gpt-4o.
       mockedUseSelectableModels.mockReturnValue(
         swrResponse({
-          data: { modelIds: ['gpt-4o', 'gpt-4.1', 'gpt-4o-mini'] },
+          data: {
+            models: [
+              { id: 'gpt-4o', name: 'GPT-4o' },
+              { id: 'gpt-4.1', name: 'GPT-4.1' },
+              { id: 'gpt-4o-mini', name: 'GPT-4o mini' },
+            ],
+          },
         }),
       );
 
@@ -815,7 +822,8 @@ describe('AllowedModelsField', () => {
 
       // Assert: both controls are <select>s. The empty row's options exclude the
       // gpt-4o already registered by the first row (registered-excluded), leaving
-      // the placeholder + the still-available ids.
+      // the placeholder + the still-available models — labelled by display NAME
+      // (the option value stays the bare id).
       const selects = getModelSelects();
       expect(selects).toHaveLength(2);
       const emptyRowOptions = within(selects[1])
@@ -823,15 +831,20 @@ describe('AllowedModelsField', () => {
         .map((o) => o.textContent);
       expect(emptyRowOptions).toEqual([
         'ai_settings.model_placeholder',
-        'gpt-4.1',
-        'gpt-4o-mini',
+        'GPT-4.1',
+        'GPT-4o mini',
       ]);
+      // The option VALUES remain the bare ids (what gets stored/sent).
+      const emptyRowValues = within(selects[1])
+        .getAllByRole<HTMLOptionElement>('option')
+        .map((o) => o.value);
+      expect(emptyRowValues).toEqual(['', 'gpt-4.1', 'gpt-4o-mini']);
     });
 
     it('renders a free-text input for a catalog-less provider (Azure)', () => {
       // Arrange: azure-openai resolves to an empty catalog.
       mockedUseSelectableModels.mockReturnValue(
-        swrResponse({ data: { modelIds: [] } }),
+        swrResponse({ data: { models: [] } }),
       );
 
       // Act
@@ -885,7 +898,7 @@ describe('AllowedModelsField', () => {
     it('keeps a saved modelId absent from the current catalog as its own selected option (2.6)', () => {
       // Arrange
       mockedUseSelectableModels.mockReturnValue(
-        swrResponse({ data: { modelIds: ['gpt-4o'] } }),
+        swrResponse({ data: { models: [{ id: 'gpt-4o', name: 'GPT-4o' }] } }),
       );
 
       // Act
@@ -930,7 +943,14 @@ describe('AllowedModelsField', () => {
       });
 
       mockedUseSelectableModels.mockReturnValue(
-        swrResponse({ data: { modelIds: ['gpt-4o', 'gpt-4.1'] } }),
+        swrResponse({
+          data: {
+            models: [
+              { id: 'gpt-4o', name: 'GPT-4o' },
+              { id: 'gpt-4.1', name: 'GPT-4.1' },
+            ],
+          },
+        }),
       );
       rerender(
         <FormHarness
@@ -979,7 +999,13 @@ describe('AllowedModelsField', () => {
     beforeEach(() => {
       mockedUseSelectableModels.mockReturnValue(
         swrResponse({
-          data: { modelIds: ['gpt-4o', 'gpt-4.1', 'gpt-4o-mini'] },
+          data: {
+            models: [
+              { id: 'gpt-4o', name: 'GPT-4o' },
+              { id: 'gpt-4.1', name: 'GPT-4.1' },
+              { id: 'gpt-4o-mini', name: 'GPT-4o mini' },
+            ],
+          },
         }),
       );
     });
@@ -1070,6 +1096,85 @@ describe('AllowedModelsField', () => {
         'gpt-4o',
         'gpt-4.1',
       ]);
+    });
+  });
+
+  // Picking a model keeps a display-only `displayName` in sync with the chosen
+  // id: the option's official name in select mode, or the typed id in free-text
+  // mode. It is never PUT (toAllowedModel drops it) — it is what the global
+  // DefaultModelSelector renders as the default model's label before a reload
+  // re-seeds from GET. The probe reads it from the live form state, exactly the
+  // value DefaultModelSelector consumes.
+  describe('displayName sync on model pick (drives DefaultModelSelector)', () => {
+    it('syncs the row displayName to the selected option name, keeping modelId the bare id (select mode)', async () => {
+      const user = userEvent.setup();
+      mockedUseSelectableModels.mockReturnValue(
+        swrResponse({
+          data: {
+            models: [
+              { id: 'gpt-4o', name: 'GPT-4o' },
+              { id: 'gpt-4.1', name: 'GPT-4.1' },
+            ],
+          },
+        }),
+      );
+      // An empty openai row → select mode with the placeholder selected.
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: '',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      });
+
+      // Pick GPT-4.1 (the option value is the bare id, its label the name).
+      await user.selectOptions(getModelSelects()[0], 'gpt-4.1');
+
+      // The form now carries the official NAME as the row's displayName (what
+      // DefaultModelSelector shows), while modelId stays the bare id (what is
+      // stored/sent).
+      await waitFor(() => {
+        expect(
+          findProbeRow('openai', 'gpt-4.1')?.getAttribute('data-displayname'),
+        ).toBe('GPT-4.1');
+      });
+    });
+
+    it('syncs the row displayName to the typed id in free-text mode (catalog-less provider)', async () => {
+      const user = userEvent.setup();
+      // Azure resolves to an empty catalog → free-text; a deployment name has no
+      // catalog name, so the typed id is its own display name.
+      mockedUseSelectableModels.mockReturnValue(
+        swrResponse({ data: { models: [] } }),
+      );
+      renderComponent({
+        provider: 'azure-openai',
+        allowedModels: [
+          {
+            provider: 'azure-openai',
+            modelId: '',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      });
+
+      const input = screen.getByLabelText(
+        'ai_settings.azure_model_deployment_label',
+      );
+      await user.type(input, 'my-deployment');
+
+      await waitFor(() => {
+        expect(
+          findProbeRow('azure-openai', 'my-deployment')?.getAttribute(
+            'data-displayname',
+          ),
+        ).toBe('my-deployment');
+      });
     });
   });
 });

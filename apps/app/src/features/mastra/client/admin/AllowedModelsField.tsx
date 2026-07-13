@@ -133,15 +133,15 @@ export const AllowedModelsField = (
   // does not yet exist (loading, empty list), the value is lost and the field
   // shows the placeholder even after options arrive later. Mounting the select
   // only when its options already exist keeps the saved value displayed on reload.
-  const selectableModelIds = data?.modelIds ?? [];
+  const selectableModels = data?.models ?? [];
   const isResolved = data != null;
   // A request is in flight only until data or error arrives; the modelId control
   // is disabled during that window. `provider` is always a real provider here (a
   // required prop), so the hook always issues a request.
   const isLoadingModels = !isResolved && error == null;
-  // `selectableModelIds` is [] until the catalog resolves (data?.modelIds ?? []),
+  // `selectableModels` is [] until the catalog resolves (data?.models ?? []),
   // so a non-empty list already implies "resolved" — no separate isResolved guard.
-  const useSelect = selectableModelIds.length > 0;
+  const useSelect = selectableModels.length > 0;
 
   // Azure OpenAI stores the *deployment name* in `modelId`, so the label changes
   // by provider (data-driven on the prop, no provider-specific branch elsewhere).
@@ -247,7 +247,7 @@ export const AllowedModelsField = (
           isDefault={watchedModels[originalIndex]?.isDefault === true}
           labelKey={modelLabelKey}
           useSelect={useSelect}
-          selectableModelIds={selectableModelIds}
+          selectableModels={selectableModels}
           registeredModelIds={registeredModelIds}
           duplicateModelIds={duplicateModelIds}
           isLoadingModels={isLoadingModels}

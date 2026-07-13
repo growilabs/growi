@@ -4,7 +4,7 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { Nav, NavItem, NavLink } from 'reactstrap';
 
 import type { AiProvider } from '../../interfaces/ai-provider';
-import { AI_PROVIDERS } from '../../interfaces/ai-provider';
+import { AI_PROVIDERS, getProviderLabel } from '../../interfaces/ai-provider';
 import {
   type AiSettingsFormValues,
   evaluateFormProviderAvailability,
@@ -25,9 +25,9 @@ export interface ProviderTabsProps {
 
 /**
  * The fixed provider tab bar (R1.1): always exactly the four supported providers,
- * never a dynamic add/remove. Each tab shows the provider name (rendered as the
- * raw provider key, matching the DefaultModelSelector/AllowedModelsField
- * convention) and a status dot that reflects the provider's *availability*.
+ * never a dynamic add/remove. Each tab shows the provider's official display name
+ * (`getProviderLabel`, matching the DefaultModelSelector/ChatSidebar convention)
+ * and a status dot that reflects the provider's *availability*.
  *
  * Availability is computed from live form values through the SAME pure rule the
  * server uses (`evaluateProviderAvailability`), so the dot reacts to unsaved edits
@@ -94,7 +94,7 @@ export const ProviderTabs = (props: ProviderTabsProps): JSX.Element => {
               data-testid={`provider-tab-${provider}`}
               onClick={() => onSelectProvider(provider)}
             >
-              <span>{provider}</span>
+              <span>{getProviderLabel(provider)}</span>
               <span
                 aria-hidden="true"
                 data-testid={`provider-tab-dot-${provider}`}

@@ -4,6 +4,7 @@ import { useTranslation } from 'next-i18next';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { Badge, Button, FormGroup, Input, Label } from 'reactstrap';
 
+import type { SelectableModel } from '../../interfaces/selectable-models-response';
 import {
   getProviderOptionsJsonStatus,
   isValidProviderOptionsJson,
@@ -30,8 +31,11 @@ interface AllowedModelRowProps {
    * provider has a non-empty catalog, or as free-text input (`false`) otherwise.
    */
   readonly useSelect: boolean;
-  /** The catalog model ids offered as dropdown options (empty in free-text mode). */
-  readonly selectableModelIds: readonly string[];
+  /**
+   * The catalog models offered as dropdown options (id = option value, name =
+   * option label). Empty in free-text mode.
+   */
+  readonly selectableModels: readonly SelectableModel[];
   /** Non-empty model ids already registered under this provider (any row). */
   readonly registeredModelIds: ReadonlySet<string>;
   /** Model ids duplicated within this provider — drives the row-level error. */
@@ -45,12 +49,14 @@ interface AllowedModelRowProps {
 }
 
 /**
- * One allowed-model card: model id (monospace) + "default" badge / set-as-default
- * action + remove trash icon + providerOptions JSON with a live valid/invalid
- * indicator, a format link, and a docs link. Extracted so each card owns its own
- * field ids and watches only its own fields (isDefault + modelId + providerOptions
- * value). All register/watch paths are keyed on `originalIndex` (the flat-array
- * position).
+ * One allowed-model card: the model control (a select of official display names
+ * when the provider has a catalog, otherwise free-text id input) + "default"
+ * badge / set-as-default action + remove trash icon + providerOptions JSON with
+ * a live valid/invalid indicator, a format link, and a docs link. Extracted so
+ * each card owns its own field ids and watches only its own value fields
+ * (modelId + providerOptions; `isDefault` arrives as a prop, and `displayName`
+ * is only WRITTEN here on a pick, never watched). All register/watch paths are
+ * keyed on `originalIndex` (the flat-array position).
  */
 export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
   const {
@@ -58,7 +64,7 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
     isDefault,
     labelKey,
     useSelect,
-    selectableModelIds,
+    selectableModels,
     registeredModelIds,
     duplicateModelIds,
     isLoadingModels,
@@ -68,7 +74,8 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
     onRemove,
   } = props;
   const { t } = useTranslation('admin');
-  const { control, register } = useFormContext<AiSettingsFormValues>();
+  const { control, register, setValue } =
+    useFormContext<AiSettingsFormValues>();
 
   const modelInputId = useId();
   const providerOptionsId = useId();
@@ -84,17 +91,18 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
   const currentModelId =
     useWatch({ control, name: `allowedModels.${originalIndex}.modelId` }) ?? '';
 
-  // Registered-excluded options (R2.6): offer catalog ids NOT already registered
+  // Registered-excluded options (R2.6): offer catalog models NOT already registered
   // by another row of this provider, but always keep this row's OWN current value
   // selectable (so switching this row's model is possible and its saved value is
   // never dropped).
-  const availableModelIds = selectableModelIds.filter(
-    (id) => id === currentModelId || !registeredModelIds.has(id),
+  const availableModels = selectableModels.filter(
+    (m) => m.id === currentModelId || !registeredModelIds.has(m.id),
   );
   // A saved value absent from the current catalog is preserved as its own option
   // so it is neither reset nor silently changed.
   const hasOutOfListValue =
-    currentModelId !== '' && !selectableModelIds.includes(currentModelId);
+    currentModelId !== '' &&
+    !selectableModels.some((m) => m.id === currentModelId);
 
   // Same-provider duplicate (R2.4): flagged when this row's non-empty id collides
   // with another row of the same provider.
@@ -114,8 +122,8 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
       className="rounded p-3 mb-2 border"
       data-testid="allowed-model-row"
     >
-      {/* The label/badge sit on their own line; the input, default radio, and
-          remove icon share one center-aligned row below. */}
+      {/* The label/badge sit on their own line; the input, set-as-default
+          action, and remove icon share one center-aligned row below. */}
       <div className="mb-2">
         <div className="d-flex align-items-center gap-2 mb-1">
           <Label for={modelInputId} className="form-label small mb-0">
@@ -136,23 +144,41 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
           <Input
             id={modelInputId}
             type={useSelect ? 'select' : 'text'}
-            className="font-monospace flex-grow-1"
+            className="flex-grow-1"
             disabled={isLoadingModels}
             invalid={isDuplicate}
             {...registerToInputProps(
-              register(`allowedModels.${originalIndex}.modelId`),
+              register(`allowedModels.${originalIndex}.modelId`, {
+                // Keep the display name in sync with the chosen model id: the
+                // picked catalog option's name (select mode) or the typed id
+                // itself (free-text / azure deployment name). Display-only — the
+                // PUT drops displayName; its sole consumer is the
+                // DefaultModelSelector, until a reload re-seeds it from GET (the
+                // row's own select labels options from the catalog directly).
+                onChange: (e) => {
+                  const value = e.target.value;
+                  const name = selectableModels.find(
+                    (m) => m.id === value,
+                  )?.name;
+                  setValue(
+                    `allowedModels.${originalIndex}.displayName`,
+                    name ?? value,
+                  );
+                },
+              }),
             )}
           >
             {/* Options only exist in select mode. Free-text mode must pass
                 `undefined` (NOT `false`): a text <input> is a void element, and
                 React rejects any non-null child — reactstrap only strips a
-                *truthy* child, so `false` would crash. */}
+                *truthy* child, so `false` would crash. The option value is the
+                bare id (what is stored/sent); the label is the official name. */}
             {useSelect ? (
               <>
                 <option value="">{t('ai_settings.model_placeholder')}</option>
-                {availableModelIds.map((id) => (
-                  <option key={id} value={id}>
-                    {id}
+                {availableModels.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
                   </option>
                 ))}
                 {hasOutOfListValue && (
