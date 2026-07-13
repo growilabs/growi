@@ -11,6 +11,7 @@ import {
   Label,
 } from 'reactstrap';
 
+import { getProviderLabel } from '../../interfaces/ai-provider';
 import {
   formatModelLabel,
   groupModelsByProvider,
@@ -23,12 +24,14 @@ import { setDefaultAllowedModelAt } from './ai-settings-form-values';
  * whole `allowedModels` set. Reads/writes the shared react-hook-form context
  * owned by `AiSettings` (no form data via props).
  *
- * Options are grouped by owning provider — group headers name the provider, and
- * only providers that own at least one allowed model contribute a group (mock:
+ * Options are grouped by owning provider — group headers name the provider by
+ * its official display name (`getProviderLabel`), and only providers that own at
+ * least one allowed model contribute a group (mock:
  * `groups = P.filter(p => p.models.length > 0)`). Group order follows the fixed
  * provider slot order (`AI_PROVIDERS`); within a group, models keep their
- * allow-list order. The closed trigger names the current default as
- * "provider · modelId" so the same modelId under different providers stays
+ * allow-list order, each labelled by its official `displayName` (modelId
+ * fallback). The closed trigger names the current default as "Provider · name"
+ * (`formatModelLabel`) so a same-named model under different providers stays
  * distinguishable; with no default (empty list) it shows a neutral placeholder.
  *
  * Selecting a model rewrites the whole list via the shared `setDefaultAllowedModelAt`
@@ -64,7 +67,10 @@ export const DefaultModelSelector = (): JSX.Element => {
   const defaultModel = models.find((m) => m.isDefault === true);
   const triggerLabel =
     defaultModel != null
-      ? formatModelLabel(defaultModel.provider, defaultModel.modelId)
+      ? formatModelLabel(
+          defaultModel.provider,
+          defaultModel.displayName ?? defaultModel.modelId,
+        )
       : t('ai_settings.default_model_placeholder');
 
   const [isOpen, setIsOpen] = useState(false);
@@ -117,17 +123,17 @@ export const DefaultModelSelector = (): JSX.Element => {
                   header
                   data-testid={`default-model-group-${group.provider}`}
                 >
-                  {group.provider}
+                  {getProviderLabel(group.provider)}
                 </DropdownItem>
                 {group.entries.map((entry) => (
                   <DropdownItem
                     key={entry.index}
                     active={entry.model.isDefault === true}
-                    className="font-monospace py-2"
+                    className="py-2"
                     data-testid={`default-model-item-${entry.index}`}
                     onClick={() => selectDefault(entry.index)}
                   >
-                    {entry.model.modelId}
+                    {entry.model.displayName ?? entry.model.modelId}
                   </DropdownItem>
                 ))}
               </Fragment>

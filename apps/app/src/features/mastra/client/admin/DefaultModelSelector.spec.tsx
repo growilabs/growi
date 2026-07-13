@@ -125,10 +125,10 @@ describe('DefaultModelSelector', () => {
         .getAllByTestId(/^default-model-(group|item)-/)
         .map((el) => el.textContent);
       expect(entries).toEqual([
-        'openai',
+        'OpenAI',
         'gpt-5',
         'gpt-5-mini',
-        'anthropic',
+        'Anthropic',
         'claude-sonnet-5',
       ]);
     });
@@ -140,7 +140,7 @@ describe('DefaultModelSelector', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows the current default as "provider · modelId" in the trigger', async () => {
+  it('shows the provider-qualified default in the trigger (modelId fallback when rows carry no displayName)', async () => {
     // Arrange / Act
     renderComponent({ allowedModels: multiProviderModels });
 
@@ -148,7 +148,62 @@ describe('DefaultModelSelector', () => {
     // modelId under different providers is still distinguishable (4.2-style).
     // `waitFor` also flushes react-popper's post-mount effects inside act(...).
     await waitFor(() => {
-      expect(getToggle()).toHaveTextContent('openai · gpt-5');
+      expect(getToggle()).toHaveTextContent('OpenAI · gpt-5');
+    });
+  });
+
+  it('labels items and the trigger by displayName where present, falling back to modelId per row', async () => {
+    // displayName is the official catalog name seeded from the GET response and
+    // synced on pick by AllowedModelsField; a row added but never picked (or a
+    // free-text/azure row) carries none. The selector must prefer the official
+    // name wherever a model is named, per row — never the bare id when a name
+    // exists, never a blank when one doesn't.
+    const user = userEvent.setup();
+    const withDisplayNames: AllowedModelFormValue[] = [
+      {
+        provider: 'openai',
+        modelId: 'gpt-5',
+        providerOptionsText: '',
+        isDefault: true,
+        displayName: 'GPT-5',
+      },
+      // No displayName → the bare modelId is this row's label.
+      {
+        provider: 'openai',
+        modelId: 'gpt-5-mini',
+        providerOptionsText: '',
+        isDefault: false,
+      },
+      {
+        provider: 'anthropic',
+        modelId: 'claude-sonnet-5',
+        providerOptionsText: '',
+        isDefault: false,
+        displayName: 'Claude Sonnet 5',
+      },
+    ];
+    renderComponent({ allowedModels: withDisplayNames });
+
+    // The closed trigger names the default by its official name.
+    await waitFor(() => {
+      expect(getToggle()).toHaveTextContent('OpenAI · GPT-5');
+    });
+
+    // One ordered read over group headers + items (same shape as the grouping
+    // test): official names where present, the bare id for the unnamed row.
+    await user.click(getToggle());
+    const menu = screen.getByRole('menu');
+    await waitFor(() => {
+      const entries = within(menu)
+        .getAllByTestId(/^default-model-(group|item)-/)
+        .map((el) => el.textContent);
+      expect(entries).toEqual([
+        'OpenAI',
+        'GPT-5',
+        'gpt-5-mini',
+        'Anthropic',
+        'Claude Sonnet 5',
+      ]);
     });
   });
 
@@ -171,7 +226,7 @@ describe('DefaultModelSelector', () => {
     expect(getAllFlags().filter((v) => v === 'true')).toHaveLength(1);
 
     // The trigger follows the new default.
-    expect(getToggle()).toHaveTextContent('anthropic · claude-sonnet-5');
+    expect(getToggle()).toHaveTextContent('Anthropic · claude-sonnet-5');
   });
 
   it('shows a neutral placeholder in the trigger when the allow-list is empty', async () => {
