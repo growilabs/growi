@@ -59,7 +59,9 @@ const renderUseSelectableModels = (provider: AiProvider | '' | undefined) =>
 describe('useSWRxSelectableModels', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedApiv3Get.mockResolvedValue(buildResponse({ modelIds: ['gpt-4o'] }));
+    mockedApiv3Get.mockResolvedValue(
+      buildResponse({ models: [{ id: 'gpt-4o', name: 'GPT-4o' }] }),
+    );
   });
 
   it('does not fetch while the provider is unset (Req 5.2)', async () => {
@@ -89,7 +91,9 @@ describe('useSWRxSelectableModels', () => {
 
   it('fetches for the selected provider and returns the response body (Req 1.1, 3.2)', async () => {
     // Arrange
-    const response: SelectableModelsResponse = { modelIds: ['gpt-4o'] };
+    const response: SelectableModelsResponse = {
+      models: [{ id: 'gpt-4o', name: 'GPT-4o' }],
+    };
     mockedApiv3Get.mockResolvedValue(buildResponse(response));
 
     // Act
@@ -150,7 +154,7 @@ describe('invalidateAllProviders', () => {
     // its pre-refresh list from cache forever. An unrelated SWR key acts as
     // the control probe for over-invalidation.
     mockedApiv3Get.mockResolvedValue(
-      buildResponse({ modelIds: ['old-model'] }),
+      buildResponse({ models: [{ id: 'old-model', name: 'Old Model' }] }),
     );
     const unrelatedFetcher = vi.fn(async () => 'unrelated-data');
 
@@ -165,19 +169,23 @@ describe('invalidateAllProviders', () => {
 
     // openai visited and cached with the pre-refresh list...
     await waitFor(() => {
-      expect(result.current.models.data).toEqual({ modelIds: ['old-model'] });
+      expect(result.current.models.data).toEqual({
+        models: [{ id: 'old-model', name: 'Old Model' }],
+      });
     });
     // ...then the admin switches to anthropic (openai's hook unmounts).
     rerender({ provider: 'anthropic' });
     await waitFor(() => {
-      expect(result.current.models.data).toEqual({ modelIds: ['old-model'] });
+      expect(result.current.models.data).toEqual({
+        models: [{ id: 'old-model', name: 'Old Model' }],
+      });
     });
     expect(result.current.unrelated.data).toBe('unrelated-data');
 
     // The server-side snapshot changes — a catalog refresh replaces it for ALL
     // providers at once.
     mockedApiv3Get.mockResolvedValue(
-      buildResponse({ modelIds: ['new-model'] }),
+      buildResponse({ models: [{ id: 'new-model', name: 'New Model' }] }),
     );
 
     // Act: refresh while anthropic is the mounted provider.
@@ -187,14 +195,18 @@ describe('invalidateAllProviders', () => {
 
     // Assert: the mounted provider refetches immediately...
     await waitFor(() => {
-      expect(result.current.models.data).toEqual({ modelIds: ['new-model'] });
+      expect(result.current.models.data).toEqual({
+        models: [{ id: 'new-model', name: 'New Model' }],
+      });
     });
 
     // ...and switching back to the previously visited openai refetches too
     // (its cache entry was cleared), instead of serving the pre-refresh list.
     rerender({ provider: 'openai' });
     await waitFor(() => {
-      expect(result.current.models.data).toEqual({ modelIds: ['new-model'] });
+      expect(result.current.models.data).toEqual({
+        models: [{ id: 'new-model', name: 'New Model' }],
+      });
     });
 
     // The unrelated key was neither cleared nor refetched.
@@ -209,7 +221,7 @@ describe('invalidateAllProviders', () => {
     // because the available-models refetch has real network latency. Hold the
     // refetch pending here to observe that in-flight state deterministically.
     mockedApiv3Get.mockResolvedValue(
-      buildResponse({ modelIds: ['old-model'] }),
+      buildResponse({ models: [{ id: 'old-model', name: 'Old Model' }] }),
     );
     const { result } = renderHook(
       ({ provider }: { provider: AiProvider }) =>
@@ -217,7 +229,9 @@ describe('invalidateAllProviders', () => {
       { wrapper, initialProps: { provider: 'anthropic' as AiProvider } },
     );
     await waitFor(() => {
-      expect(result.current.data).toEqual({ modelIds: ['old-model'] });
+      expect(result.current.data).toEqual({
+        models: [{ id: 'old-model', name: 'Old Model' }],
+      });
     });
 
     // Hold the refresh revalidation's fetch pending so the in-flight state is
@@ -240,15 +254,21 @@ describe('invalidateAllProviders', () => {
     // Refetch still in flight: the active provider's data must NOT be cleared to
     // undefined (a blanket clear would show undefined here → flicker). It is kept
     // in place while the refreshed list loads.
-    expect(result.current.data).toEqual({ modelIds: ['old-model'] });
+    expect(result.current.data).toEqual({
+      models: [{ id: 'old-model', name: 'Old Model' }],
+    });
 
     // Completing the refetch swaps the list in place — old → new, no undefined.
     await act(async () => {
-      pending.resolve(buildResponse({ modelIds: ['new-model'] }));
+      pending.resolve(
+        buildResponse({ models: [{ id: 'new-model', name: 'New Model' }] }),
+      );
       await invalidatePromise;
     });
     await waitFor(() => {
-      expect(result.current.data).toEqual({ modelIds: ['new-model'] });
+      expect(result.current.data).toEqual({
+        models: [{ id: 'new-model', name: 'New Model' }],
+      });
     });
   });
 });

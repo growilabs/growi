@@ -44,6 +44,7 @@ const baseResponse: AiSettingsResponse = {
       modelId: 'gpt-4o',
       providerOptions: { openai: {} },
       isDefault: true,
+      displayName: 'GPT-4o',
     },
   ],
   useOnlyEnvVars: false,
@@ -136,14 +137,19 @@ describe('toFormValues', () => {
           modelId: 'gpt-4o',
           providerOptions: { openai: { reasoningEffort: 'low' } },
           isDefault: true,
+          displayName: 'GPT-4o',
         },
-        { provider: 'anthropic', modelId: 'claude-3-5-sonnet' },
+        {
+          provider: 'anthropic',
+          modelId: 'claude-3-5-sonnet',
+          displayName: 'Claude 3.5 Sonnet',
+        },
       ],
     });
 
     // Assert: the object is serialized to pretty-printed (2-space) JSON so it
-    // re-seeds as readable multi-line text; the owning provider is preserved;
-    // an absent providerOptions => '' and an absent isDefault => false.
+    // re-seeds as readable multi-line text; the owning provider and display name
+    // are preserved; an absent providerOptions => '' and an absent isDefault => false.
     expect(values.allowedModels).toEqual([
       {
         provider: 'openai',
@@ -151,12 +157,14 @@ describe('toFormValues', () => {
         providerOptionsText:
           '{\n  "openai": {\n    "reasoningEffort": "low"\n  }\n}',
         isDefault: true,
+        displayName: 'GPT-4o',
       },
       {
         provider: 'anthropic',
         modelId: 'claude-3-5-sonnet',
         providerOptionsText: '',
         isDefault: false,
+        displayName: 'Claude 3.5 Sonnet',
       },
     ]);
   });
@@ -264,6 +272,37 @@ describe('buildUpdateRequest (normal mode)', () => {
         isDefault: true,
       },
       { provider: 'anthropic', modelId: 'claude-3-5-sonnet', isDefault: false },
+    ]);
+  });
+
+  it('drops the display-only displayName from every mapped row', () => {
+    // displayName is display-only form state (seeded from the GET response,
+    // synced on pick). The server's PUT validator rejects any entry carrying a
+    // key outside its allow-list (validate-allowed-models ALLOWED_ENTRY_KEYS),
+    // so a leaked displayName would 400 EVERY allow-list save. This pins
+    // toAllowedModel's explicit field picks against a refactor to `...row`.
+    const body = buildUpdateRequest(
+      {
+        ...baseValues,
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+            displayName: 'GPT-4o',
+          },
+        ],
+      },
+      false,
+      true,
+    );
+
+    // Exact match: toEqual fails on any extra (defined) property, so this
+    // catches displayName — or any future form-only field — leaking into the
+    // wire entry.
+    expect(body.allowedModels).toEqual([
+      { provider: 'openai', modelId: 'gpt-4o', isDefault: true },
     ]);
   });
 

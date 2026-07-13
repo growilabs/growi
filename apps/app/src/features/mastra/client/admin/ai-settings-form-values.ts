@@ -44,6 +44,11 @@ export interface AllowedModelFormValue {
   modelId: string;
   providerOptionsText: string; // raw JSON text while editing
   isDefault: boolean;
+  // Official display name for the UI (seeded from the GET response, kept in sync
+  // when a model is picked from the catalog dropdown). Display-only: never sent
+  // in the PUT (toAllowedModel drops it). Optional so newly-added rows and older
+  // constructions can omit it; consumers fall back to `modelId`.
+  displayName?: string;
 }
 
 /**
@@ -114,6 +119,8 @@ export const toFormValues = (
           ? JSON.stringify(m.providerOptions, null, 2)
           : '',
       isDefault: m.isDefault ?? false,
+      // Server-resolved official name (id fallback already applied server-side).
+      displayName: m.displayName,
     })),
   };
 };
