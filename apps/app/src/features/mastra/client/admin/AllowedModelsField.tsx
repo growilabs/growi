@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { useCallback, useId, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 import { Button, FormGroup } from 'reactstrap';
@@ -67,11 +67,6 @@ export const AllowedModelsField = (
     AiSettingsFormValues,
     'allowedModels'
   >({ control, name: 'allowedModels' });
-
-  // The radios share one group name so only one is checkable at the DOM level;
-  // useId() guarantees uniqueness if multiple instances ever co-exist. (Used as a
-  // `name` attribute — safe; never passed to a reactstrap `target` prop.)
-  const radioGroupName = useId();
 
   // Subscribe to the whole flat list. This is deliberately a field-level watch
   // (not row-local): the same-provider duplicate check and the registered-id
@@ -228,7 +223,6 @@ export const AllowedModelsField = (
           // an array-root replacement, whereas the whole-array watch does.
           isDefault={watchedModels[originalIndex]?.isDefault === true}
           labelKey={modelLabelKey}
-          radioGroupName={radioGroupName}
           useSelect={useSelect}
           selectableModelIds={selectableModelIds}
           registeredModelIds={registeredModelIds}
