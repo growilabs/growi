@@ -1,0 +1,22 @@
+{
+  "feature_name": "admin-permission-delegation",
+  "created_at": "2026-07-10T07:55:25Z",
+  "updated_at": "2026-07-10T08:02:00Z",
+  "language": "ja",
+  "phase": "design-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": false
+    },
+    "tasks": {
+      "generated": false,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": false
+}
