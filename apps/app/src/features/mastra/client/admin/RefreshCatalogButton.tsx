@@ -84,6 +84,11 @@ export const RefreshCatalogButton = (
       </Button>
       <ConfirmModal
         isModalOpen={isConfirmOpen}
+        // Not the default text-danger: this action only re-fetches public
+        // model metadata (an outbound request; the last-good catalog survives
+        // a failure) — nothing destructive or irreversible happens, so a
+        // warning tone is the honest severity.
+        headerClassName="text-warning"
         warningMessage={t('ai_settings.refresh_model_catalog_confirmation')}
         supplymentaryMessage={null}
         confirmButtonTitle={t('ai_settings.refresh_model_catalog_confirm')}
