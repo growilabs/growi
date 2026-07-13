@@ -6,7 +6,10 @@ import type {
 } from '@growi/core/dist/interfaces';
 import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
 
-import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
+import type {
+  AllowedModel,
+  ModelProviderOptions,
+} from '~/features/mastra/interfaces/allowed-model';
 import type {
   AiProviderApiKeys,
   AiProvidersConfig,
@@ -288,7 +291,6 @@ export const CONFIG_KEYS = [
   // OpenAI Settings
   'openai:serviceType',
   'openai:apiKey',
-  'openai:reasoningEffort:suggestPathAgent',
 
   // AI Tools Settings
   'aiTools:suggestPathEngine',
@@ -307,6 +309,9 @@ export const CONFIG_KEYS = [
   // Allow-list of selectable models (provider + modelId + per-model
   // providerOptions + isDefault flag), stored as a single JSON array.
   'ai:allowedModels',
+  // Suggest-path-specific providerOptions overlay (provider-agnostic),
+  // deep-merged onto the effective model's catalog-declared providerOptions.
+  'ai:providerOptions:suggestPathAgent',
   // Opt-in refresh paths for the vendored model catalog (both default OFF)
   'ai:modelCatalogRefreshOnStartup',
   'ai:modelCatalogRefreshCronSchedule',
@@ -1332,14 +1337,21 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: [],
   }),
 
-  // Empty string means "unset": the engine passes no reasoning effort to the
-  // provider, leaving the model's default behavior unchanged. A non-empty
-  // value (e.g. 'minimal' | 'low' | 'medium' | 'high') is forwarded verbatim;
-  // value validity per model is left to the provider, not pinned here.
-  'openai:reasoningEffort:suggestPathAgent': defineConfig<string>({
-    envVarName: 'OPENAI_SUGGEST_PATH_AGENT_REASONING_EFFORT',
-    defaultValue: '',
-  }),
+  // Suggest-path-specific providerOptions overlay. Same provider-namespaced
+  // ModelProviderOptions shape as ai:allowedModels[].providerOptions (e.g.
+  // {"openai":{"reasoningEffort":"minimal"}}); the agentic engine deep-merges
+  // it (per provider namespace) onto the effective model's catalog-declared
+  // options. null means "unset": catalog options pass through unchanged.
+  // Option validity per model is left to the provider, not pinned here.
+  //
+  // Stored/loaded as JSON: the DB value is the serialized Record, and the env
+  // var is a JSON string. typeof null is 'object', so the loader still
+  // selects its JSON-parse branch for the env var.
+  'ai:providerOptions:suggestPathAgent':
+    defineConfig<ModelProviderOptions | null>({
+      envVarName: 'AI_SUGGEST_PATH_AGENT_PROVIDER_OPTIONS',
+      defaultValue: null,
+    }),
 
   // AI Tools Settings
   // The default engine stays 'oneshot' until the agentic engine passes

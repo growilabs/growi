@@ -60,7 +60,7 @@ import { agenticEngine } from './agentic-engine';
 const SEARCH_LIMIT_KEY = 'aiTools:suggestPathAgenticSearchLimit';
 const CHILD_LISTING_LIMIT_KEY = 'aiTools:suggestPathAgenticChildListingLimit';
 const TIMEOUT_KEY = 'aiTools:suggestPathAgenticTimeoutMs';
-const REASONING_EFFORT_KEY = 'openai:reasoningEffort:suggestPathAgent';
+const AGENT_PROVIDER_OPTIONS_KEY = 'ai:providerOptions:suggestPathAgent';
 const ALLOWED_MODELS_KEY = 'ai:allowedModels';
 const PROVIDERS_KEY = 'ai:providers';
 const PROVIDER_API_KEYS_KEY = 'ai:providerApiKeys';
@@ -77,7 +77,7 @@ type CapturedGenerateOptions = {
   abortSignal: AbortSignal;
   requestContext: RequestContext<SuggestPathRequestContextShape>;
   // Always present: the catalog-declared options of the effective model,
-  // overlaid with the suggest-path reasoning effort when configured.
+  // deep-merged with the suggest-path providerOptions overlay when configured.
   providerOptions: ModelProviderOptions;
 };
 
@@ -191,8 +191,9 @@ beforeEach(() => {
   mocks.configValues.set(SEARCH_LIMIT_KEY, 5);
   mocks.configValues.set(CHILD_LISTING_LIMIT_KEY, 5);
   mocks.configValues.set(TIMEOUT_KEY, 60_000);
-  // Default to unset reasoning effort; the dedicated tests override this.
-  mocks.configValues.set(REASONING_EFFORT_KEY, '');
+  // Default to an unset providerOptions overlay; the dedicated tests
+  // override this.
+  mocks.configValues.set(AGENT_PROVIDER_OPTIONS_KEY, null);
   // The provider-options resolver runs the REAL allow-list modules
   // (getEffectiveDefaultModelKey / getProviderOptionsForModel) against the
   // mocked configManager. The effective model is resolved from the AVAILABLE
@@ -531,9 +532,11 @@ describe('agenticEngine', () => {
       await secondRejection;
     });
 
-    it('forwards a configured reasoning effort to the provider via providerOptions', async () => {
+    it('forwards the configured providerOptions overlay to the provider', async () => {
       primeGenerate(outputWith([]));
-      mocks.configValues.set(REASONING_EFFORT_KEY, 'minimal');
+      mocks.configValues.set(AGENT_PROVIDER_OPTIONS_KEY, {
+        openai: { reasoningEffort: 'minimal' },
+      });
 
       await callEngine();
 
@@ -542,7 +545,7 @@ describe('agenticEngine', () => {
       });
     });
 
-    it('passes the catalog-declared providerOptions of the effective model through unchanged when the reasoning effort is unset', async () => {
+    it('passes the catalog-declared providerOptions of the effective model through unchanged when the overlay is unset', async () => {
       primeGenerate(outputWith([]));
       mocks.configValues.set(ALLOWED_MODELS_KEY, [
         {
@@ -552,7 +555,7 @@ describe('agenticEngine', () => {
           providerOptions: { openai: { textVerbosity: 'low' } },
         },
       ]);
-      // beforeEach already sets the reasoning-effort key to '' (unset).
+      // beforeEach already sets the overlay key to null (unset).
 
       await callEngine();
 
@@ -561,7 +564,7 @@ describe('agenticEngine', () => {
       });
     });
 
-    it('overlays the reasoning effort onto the catalog-declared options without dropping them', async () => {
+    it('deep-merges the overlay onto the catalog-declared options without dropping sibling options in the same namespace', async () => {
       primeGenerate(outputWith([]));
       mocks.configValues.set(ALLOWED_MODELS_KEY, [
         {
@@ -571,7 +574,9 @@ describe('agenticEngine', () => {
           providerOptions: { openai: { textVerbosity: 'low' } },
         },
       ]);
-      mocks.configValues.set(REASONING_EFFORT_KEY, 'minimal');
+      mocks.configValues.set(AGENT_PROVIDER_OPTIONS_KEY, {
+        openai: { reasoningEffort: 'minimal' },
+      });
 
       await callEngine();
 
@@ -580,9 +585,9 @@ describe('agenticEngine', () => {
       });
     });
 
-    it("skips the reasoning effort WITH a warning when the effective model's provider is not OpenAI-compatible", async () => {
+    it('applies the overlay for a non-OpenAI provider too — the key is provider-agnostic', async () => {
       primeGenerate(outputWith([]));
-      // The provider is read off the effective model's key, so make the sole
+      // The effective model is resolved off the allow-list, so make the sole
       // available model an anthropic one.
       mocks.configValues.set(ALLOWED_MODELS_KEY, [
         { provider: 'anthropic', modelId: 'test-model', isDefault: true },
@@ -591,23 +596,26 @@ describe('agenticEngine', () => {
       mocks.configValues.set(PROVIDER_API_KEYS_KEY, {
         anthropic: 'test-api-key',
       });
-      mocks.configValues.set(REASONING_EFFORT_KEY, 'minimal');
+      mocks.configValues.set(AGENT_PROVIDER_OPTIONS_KEY, {
+        anthropic: { thinking: { type: 'enabled', budgetTokens: 1024 } },
+      });
 
       await callEngine();
 
-      expect(getGenerateCall(0).options.providerOptions).toEqual({});
-      expect(mocks.loggerWarnMock).toHaveBeenCalledWith(
-        expect.stringContaining('anthropic'),
-      );
+      expect(getGenerateCall(0).options.providerOptions).toEqual({
+        anthropic: { thinking: { type: 'enabled', budgetTokens: 1024 } },
+      });
     });
 
-    it('re-reads the reasoning effort per request: a config change is reflected without restart', async () => {
+    it('re-reads the providerOptions overlay per request: a config change is reflected without restart', async () => {
       primeGenerate(outputWith([]));
 
       await callEngine();
       expect(getGenerateCall(0).options.providerOptions).toEqual({});
 
-      mocks.configValues.set(REASONING_EFFORT_KEY, 'low');
+      mocks.configValues.set(AGENT_PROVIDER_OPTIONS_KEY, {
+        openai: { reasoningEffort: 'low' },
+      });
 
       await callEngine();
       expect(getGenerateCall(1).options.providerOptions).toEqual({

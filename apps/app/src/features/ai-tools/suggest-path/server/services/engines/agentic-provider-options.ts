@@ -1,21 +1,26 @@
 import type { ModelProviderOptions } from '~/features/mastra/interfaces/allowed-model';
-import { parseModelKey } from '~/features/mastra/interfaces/model-key';
 import { getEffectiveDefaultModelKey } from '~/features/mastra/server/services/ai-sdk-modules/llm-providers/effective-model-key';
 import { getProviderOptionsForModel } from '~/features/mastra/server/services/ai-sdk-modules/resolve-provider-options';
 import { configManager } from '~/server/service/config-manager';
-import loggerFactory from '~/utils/logger';
 
-const logger = loggerFactory(
-  'growi:ai-tools:suggest-path:agentic-provider-options',
-);
-
-// Providers whose AI SDK language models read the `openai` providerOptions
-// namespace: @ai-sdk/azure reuses the OpenAI language-model implementation,
-// so both accept `openai.reasoningEffort`.
-const OPENAI_FAMILY_PROVIDERS: ReadonlySet<string> = new Set([
-  'openai',
-  'azure-openai',
-]);
+/**
+ * Merge two providerOptions records namespace by namespace — a depth-2 merge
+ * matching the declared shape of ModelProviderOptions (provider namespace ->
+ * option name -> value). Within a namespace the overlay wins per option;
+ * option VALUES are replaced whole, never merged deeper: a provider option
+ * (e.g. anthropic's `thinking` object) is one self-contained setting, and
+ * merging inside it could produce fragments no provider accepts.
+ */
+const mergeProviderOptions = (
+  base: ModelProviderOptions,
+  overlay: ModelProviderOptions,
+): ModelProviderOptions => {
+  const merged = { ...base };
+  for (const [namespace, options] of Object.entries(overlay)) {
+    merged[namespace] = { ...merged[namespace], ...options };
+  }
+  return merged;
+};
 
 /**
  * Resolve the providerOptions for the suggestPathAgent generate call.
@@ -26,39 +31,32 @@ const OPENAI_FAMILY_PROVIDERS: ReadonlySet<string> = new Set([
  * so the effective key here is the allow-list default; both lookups go
  * through the same allow-list checkpoint and cannot diverge.
  *
- * Overlay: the suggest-path-specific reasoning effort
- * (`openai:reasoningEffort:suggestPathAgent`), read per request so a config
- * change takes effect without a server restart. Empty means "unset": the
- * catalog options pass through unchanged. The knob is OpenAI-specific (its
- * config key / env var name say so, and other providers express reasoning
- * controls with different option shapes), so when the effective model's owning
- * provider is not in the OpenAI family the configured value is skipped WITH a
- * warning — never silently ignored.
+ * Overlay: the suggest-path-specific providerOptions
+ * (`ai:providerOptions:suggestPathAgent`), read per request so a config
+ * change takes effect without a server restart. null means "unset": the
+ * catalog options pass through unchanged. The overlay is provider-agnostic —
+ * the same provider-namespaced shape as the catalog — because reasoning
+ * controls differ per provider (`openai.reasoningEffort`,
+ * `anthropic.thinking`, `google.thinkingConfig`); operators express the
+ * override under the matching provider namespace. Namespaces other than the
+ * effective model's owning provider pass through and are ignored by the AI
+ * SDK, exactly like catalog-declared options, so overrides for several
+ * providers may be pre-declared and survive a model switch.
+ *
+ * Option validity per model is the provider's concern, not enforced here —
+ * an unsupported combination surfaces as a provider error and is absorbed by
+ * the orchestrator's memo fallback (design.md AgenticEngine, 3.5/3.6).
  */
 export const resolveAgentProviderOptions = (): ModelProviderOptions => {
   const effectiveModelKey = getEffectiveDefaultModelKey();
   const baseOptions = getProviderOptionsForModel(effectiveModelKey);
 
-  const reasoningEffort = configManager.getConfig(
-    'openai:reasoningEffort:suggestPathAgent',
+  const overlay = configManager.getConfig(
+    'ai:providerOptions:suggestPathAgent',
   );
-  if (reasoningEffort === '') {
+  if (overlay == null) {
     return baseOptions;
   }
 
-  const provider = parseModelKey(effectiveModelKey)?.provider;
-  if (provider == null || !OPENAI_FAMILY_PROVIDERS.has(provider)) {
-    logger.warn(
-      `openai:reasoningEffort:suggestPathAgent is configured but the effective model's provider "${provider}" is not OpenAI-compatible; the setting is ignored`,
-    );
-    return baseOptions;
-  }
-
-  // Value validity per model is the provider's concern, not enforced here —
-  // an unsupported combination surfaces as a provider error and is absorbed
-  // by the orchestrator's memo fallback (design.md AgenticEngine, 3.5/3.6).
-  return {
-    ...baseOptions,
-    openai: { ...baseOptions.openai, reasoningEffort },
-  };
+  return mergeProviderOptions(baseOptions, overlay);
 };

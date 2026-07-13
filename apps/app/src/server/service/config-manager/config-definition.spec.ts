@@ -208,8 +208,8 @@ describe('config-definition suggest-path agentic keys', () => {
       );
     });
 
-    it('contains openai:reasoningEffort:suggestPathAgent', () => {
-      expect(CONFIG_KEYS).toContain('openai:reasoningEffort:suggestPathAgent');
+    it('contains ai:providerOptions:suggestPathAgent', () => {
+      expect(CONFIG_KEYS).toContain('ai:providerOptions:suggestPathAgent');
     });
   });
 
@@ -232,8 +232,8 @@ describe('config-definition suggest-path agentic keys', () => {
         'AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS',
       ],
       [
-        'openai:reasoningEffort:suggestPathAgent',
-        'OPENAI_SUGGEST_PATH_AGENT_REASONING_EFFORT',
+        'ai:providerOptions:suggestPathAgent',
+        'AI_SUGGEST_PATH_AGENT_PROVIDER_OPTIONS',
       ],
     ] as const)('%s has envVarName %s', (key, envVarName) => {
       expect(CONFIG_DEFINITIONS[key].envVarName).toBe(envVarName);

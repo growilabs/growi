@@ -83,8 +83,8 @@ vi.mock('~/server/service/config-manager', () => ({
         // getEffectiveDefaultModelKey / getProviderOptionsForModel modules run
         // against this mock). The effective model comes from the AVAILABLE set,
         // so the provider must be enabled and hold an API key as well.
-        case 'openai:reasoningEffort:suggestPathAgent':
-          return '';
+        case 'ai:providerOptions:suggestPathAgent':
+          return null;
         case 'ai:allowedModels':
           return [
             { provider: 'openai', modelId: 'test-model', isDefault: true },
