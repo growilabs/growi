@@ -1,6 +1,8 @@
 # Technical Design: suggest-path-agentic
 
-> **実態追従改訂（2026-07-06）**: 実装完了・A/B 受け入れ後に、support/mastra マージによる provider-agnostic AI レイヤ移行（`getOpenaiProvider` → `resolveMastraModel`、コミット 70bde80571 / c4a58793bf）、listChildren tool の追加（#185213）、instructions チューニング（302d974819 / 066d1776de）を本文へ反映した。要判断として残る 2 点は Config Keys の DEAD KEY 注記と reasoningEffort の provider 名前空間注記を参照。
+> **実態追従改訂（2026-07-06）**: 実装完了・A/B 受け入れ後に、support/mastra マージによる provider-agnostic AI レイヤ移行（`getOpenaiProvider` → `resolveMastraModel`、コミット 70bde80571 / c4a58793bf）、listChildren tool の追加（#185213）、instructions チューニング（302d974819 / 066d1776de）を本文へ反映した。
+>
+> **要判断 2 点の解決（2026-07-13）**: PR #11293 レビュー対応で確定。① dead key `openai:assistantModel:suggestPathAgent` は削除済み（9c970a6bbe / 57a10f334b）。② 推論強度キーは provider 汎用の `ai:providerOptions:suggestPathAgent`（`ModelProviderOptions` 型 overlay を catalog options に deep merge）へ移行し、旧 `openai:reasoningEffort:suggestPathAgent` は廃止（再レビュー B-1・案 A 採用）。Config Keys 参照。
 
 ## Overview
 
@@ -273,8 +275,8 @@ sequenceDiagram
 | 3.2 | 上限到達時は収集済み情報で提案 | LimitedSearchTool（limit_exceeded）, SuggestPathAgent（instructions） | tool 出力 union | System Flows |
 | 3.3 | 上限の設定変更反映 | Config Keys, AgenticEngine（per-request 読み出し） | `aiTools:suggestPathAgenticSearchLimit` | — |
 | 3.4 | モデルの設定変更反映 | SuggestPathAgent（`resolveMastraModel`。アプリ全体設定・memoize + cache clear で再起動なし反映） | `ai:provider` / `ai:model`（support/mastra 所有） | — |
-| 3.5 | 推論強度の設定変更反映 | Config Keys, AgenticEngine（per-request 読み出し → providerOptions） | `openai:reasoningEffort:suggestPathAgent`, `generate` の `providerOptions.openai.reasoningEffort` | — |
-| 3.6 | 推論強度未指定時は既定挙動 | AgenticEngine（空文字列なら providerOptions に渡さない） | `generate` 呼び出し契約（条件付き providerOptions） | — |
+| 3.5 | 推論強度の設定変更反映 | Config Keys, AgenticEngine（per-request 読み出し → providerOptions） | `ai:providerOptions:suggestPathAgent`, `generate` の `providerOptions`（catalog options への deep merge） | — |
+| 3.6 | 推論強度未指定時は既定挙動 | AgenticEngine（null なら catalog options のみ透過） | `generate` 呼び出し契約 | — |
 | 4.1 | エンドポイント・リクエスト形式・認証の維持 | Route（validator は additive のみ） | API Contract | — |
 | 4.2 | レスポンス形状と trailing-slash 親パス | AgenticEngine（正規化・検証）, AgenticOutputSchema | `PathSuggestion` | — |
 | 4.3 | memo 提案を常に含める | SuggestPathOrchestrator | `generateSuggestions` | System Flows |
@@ -412,29 +414,29 @@ declare function runEngine(
 
 **Responsibilities & Constraints**
 
-- config（searchLimit / childListingLimit / timeoutMs / reasoningEffort）を**リクエスト毎に** `configManager.getConfig()` で読む（3.3, 3.5）。`reasoningEffort` は空文字列なら未指定として扱う（3.6）
+- config（searchLimit / childListingLimit / timeoutMs / providerOptions overlay）を**リクエスト毎に** `configManager.getConfig()` で読む（3.3, 3.5）。`ai:providerOptions:suggestPathAgent` は null なら未指定として扱う（3.6）
 - per-request の `RequestContext<SuggestPathRequestContextShape>` を構築（user / searchService / searchBudget / childListingBudget）。module-scope 共有は禁止（並行リクエストの user 漏れ防止）
 - `AbortController` + `setTimeout(timeoutMs)` で `abortSignal` を渡し、中断時は例外として reject（オーケストレータの memo フォールバックへ）
 - agent 呼び出し契約:
 
 ```typescript
-const reasoningEffort = configManager.getConfig('openai:reasoningEffort:suggestPathAgent');
 const result = await suggestPathAgent.generate(buildUserPrompt(body), {
   structuredOutput: { schema: AGENTIC_OUTPUT_JSON_SCHEMA },
-  maxSteps: 2 * searchLimit + 2 * childListingLimit + 4,
+  // 2 * searchLimit + 2 * childListingLimit + 2 * searchLimit (page-read
+  // allowance: one getPageContent per search hit) + 4
+  maxSteps,
   abortSignal: controller.signal,
   requestContext,
-  // Pass reasoning effort only when configured; an empty value leaves the
-  // model's default behavior unchanged (3.6). NOTE: the `openai` namespace
-  // is hard-coded here — under the provider-agnostic layer this option is
-  // silently ignored when `ai:provider` selects a non-OpenAI provider.
-  ...(reasoningEffort !== ''
-    ? { providerOptions: { openai: { reasoningEffort } } }
-    : {}),
+  // Always present: the effective model's catalog-declared providerOptions
+  // (getProviderOptionsForModel — the same per-model source the chat route
+  // uses), deep-merged per provider namespace with the suggest-path overlay
+  // `ai:providerOptions:suggestPathAgent` when it is set (3.5, 3.6).
+  // Resolution lives in engines/agentic-provider-options.ts.
+  providerOptions: resolveAgentProviderOptions(),
 });
 ```
 
-- `reasoningEffort` の値検証はエンジン層では行わない（3.5）。空判定のみ行い、非空ならプロバイダにそのまま透過する。未対応モデル × 非対応値の組み合わせはプロバイダ側のエラーとして表面化し、既存のエンジン失敗フォールバック（4.5）が memo 提案で受け止める
+- overlay の値検証はエンジン層では行わない（3.5）。null 判定のみ行い、非 null なら名前空間単位で deep merge してプロバイダにそのまま透過する。未対応モデル × 非対応値の組み合わせはプロバイダ側のエラーとして表面化し、既存のエンジン失敗フォールバック（4.5）が memo 提案で受け止める
 
 - 出力マッピング規則（4.2）:
   1. `result.object` を型ガード `isAgenticEngineOutput` で検証。不合格は例外（memo フォールバック）
@@ -658,12 +660,12 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 | `aiTools:suggestPathAgenticSearchLimit` | `number` | `5` | `AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT` | 1 リクエストの検索回数上限（3.1, 3.3。合意レンジ 3〜5 の上限を初期値とし、A/B 実測で確定） |
 | `aiTools:suggestPathAgenticTimeoutMs` | `number` | `60000` | `AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS` | agentic エンジンの総時間セーフティネット（4.5。暫定値。A/B 実測とレスポンス時間上限の別途合意を経て確定） |
 | `aiTools:suggestPathAgenticChildListingLimit` | `number` | `5` | `AI_TOOLS_SUGGEST_PATH_AGENTIC_CHILD_LISTING_LIMIT` | listChildren tool の 1 リクエスト呼び出し上限（#185213 で追加。検索 budget とは独立の第二 budget） |
-| `openai:assistantModel:suggestPathAgent` | `string` | `'gpt-4.1-mini'` | `OPENAI_SUGGEST_PATH_AGENT_MODEL` | **DEAD KEY（2026-06 support/mastra マージ以降）**: 定義は残存するが読み出す実装が存在せず、変更しても何も起きない。モデルはアプリ全体設定 `ai:provider` / `ai:model`（`resolveMastraModel` 経由・memoize + AI 設定保存時 cache clear）で決まる。削除 or 再配線は未決（要判断） |
-| `openai:reasoningEffort:suggestPathAgent` | `string` | `''`（空＝未指定） | `OPENAI_SUGGEST_PATH_AGENT_REASONING_EFFORT` | agentic エンジンの推論強度（3.5, 3.6）。空文字列は「未指定」を表し、`providerOptions` に reasoning effort を渡さない（モデル既定挙動）。非空時のみ後述の `providerOptions.openai.reasoningEffort` に渡す。値の妥当性（対応モデル・許容値 `minimal`/`low`/`medium`/`high`）はモデル側が判定し、本キーは文字列をそのまま透過する |
+| `ai:providerOptions:suggestPathAgent` | `ModelProviderOptions \| null`（JSON Record） | `null`（未指定） | `AI_SUGGEST_PATH_AGENT_PROVIDER_OPTIONS` | agentic エンジン専用の providerOptions 上書き（3.5, 3.6）。`ai:allowedModels[].providerOptions` と同じ provider 名前空間付き Record（例 `{"openai":{"reasoningEffort":"minimal"}}`）で、有効モデルの catalog 宣言 options に名前空間単位で deep merge される。null は「未指定」＝ catalog options のみ透過。値の妥当性（対応モデル・許容値）はプロバイダ側が判定し、本キーは Record をそのまま透過する |
 
-- searchLimit / childListingLimit / timeoutMs / reasoningEffort は利用箇所で per-request に `configManager.getConfig()` を呼ぶことで、再起動なしの変更反映（3.3, 3.5）を保証する
+- searchLimit / childListingLimit / timeoutMs / providerOptions overlay は利用箇所で per-request に `configManager.getConfig()` を呼ぶことで、再起動なしの変更反映（3.3, 3.5）を保証する
 - モデル（3.4）の再起動なし反映は per-request 読みではなく、`resolveMastraModel` の memoize + AI 設定保存（および s2s メッセージ）時の `clearResolvedMastraModelCache()` で実現される（support/mastra レイヤの機構。設計当初の DynamicArgument per-request 解決から変更）
-- `openai:reasoningEffort:suggestPathAgent` は空文字列を既定とすることで、設定しない限り現行挙動（reasoning effort 未指定）を変えない（3.6）。型は `string`（enum 化しない）— GPT-5 系のみ `minimal` を許容する等のモデル別制約を config 層に固定化せず、対応値の解釈はモデル／プロバイダ側に委ねる。**注意（provider-agnostic 化後の制約）**: この値は `providerOptions.openai.*` 名前空間に固定で渡るため、`ai:provider` が OpenAI 系以外のときはサイレントに無効。キー名の `openai:` プレフィックスも含め、chat 側の `ai:providerOptions` パターンへの移行 or 「OpenAI 限定」の明文化が要判断
+- `ai:providerOptions:suggestPathAgent` は null を既定とすることで、設定しない限り現行挙動（catalog options のみ）を変えない（3.6）。provider 名前空間付き Record にしたのは、reasoning 制御の表現がプロバイダごとに異なるため（`openai.reasoningEffort` 文字列 / `anthropic.thinking` オブジェクト / `google.thinkingConfig` オブジェクト）— 文字列 1 個のキーでは汎用化できない。有効モデルの provider と異なる名前空間は catalog options と同じ扱いで AI SDK 側が無視するため、複数 provider 分を先行宣言してモデル切替に耐えられる。merge は `ModelProviderOptions` の宣言形（provider 名前空間 → option 名 → 値）に一致する深さ 2: 名前空間内は option 単位で overlay が勝ち、option の値自体は丸ごと置換（`thinking` のような自己完結オブジェクトの内部を merge して断片を作らない）
+- **キー変遷**: 初版の `openai:reasoningEffort:suggestPathAgent`（`string`、OpenAI 名前空間固定・非 OpenAI provider では warn 付き無視）は、PR #11293 再レビュー B-1（案 A）により本キーへ移行し廃止（2026-07-13）。dead key `openai:assistantModel:suggestPathAgent` も削除済み（2026-07-09、9c970a6bbe / 57a10f334b。モデルはアプリ全体設定で決まり読み手が存在しなかった）
 
 ## Data Models
 
