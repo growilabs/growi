@@ -461,7 +461,7 @@
     "provider_warning_missing_azure_endpoint": "此提供商已启用，但尚未设置终结点（资源名称或基础 URL），因此其模型不会提供给用户。",
     "api_key_label": "API 密钥",
     "api_key_help": "用于向 AI 提供商进行身份验证的 API 密钥。",
-    "api_key_set_placeholder": "(已配置)",
+    "api_key_set_placeholder": "（已配置）",
     "models_section_title": "Models",
     "models_section_desc": "从已注册的模型中选择一个作为默认模型。默认模型是聊天中最初为用户选中的模型。",
     "default_model_label": "默认模型",
