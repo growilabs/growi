@@ -14,7 +14,9 @@ type ConfirmModalProps = {
   cancelButtonTitle?: string;
   headerClassName?: string;
   iconName?: string;
-  onConfirm?: () => Promise<void>;
+  // The modal ignores the return value, so sync handlers are fine too —
+  // demanding a Promise would force callers into no-await async functions.
+  onConfirm?: () => void | Promise<void>;
   onCancel?: () => void;
 };
 

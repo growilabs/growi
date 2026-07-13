@@ -175,8 +175,10 @@ const getProviderOptionsTextareas = (): HTMLTextAreaElement[] =>
 const getRenderedRows = (): HTMLElement[] =>
   screen.queryAllByTestId('allowed-model-row');
 
-// Removal is immediate (no confirmation dialog): the trash icon removes the card
-// from the list directly (the change only persists on save).
+// Removing a FILLED row opens a confirmation modal first (the change only
+// persists on save, but a filled row may carry hand-written providerOptions
+// JSON); a still-blank row is removed immediately. This helper confirms the
+// modal when it appears, so callers express "remove row N" either way.
 const removeAt = async (
   user: ReturnType<typeof userEvent.setup>,
   index: number,
@@ -185,6 +187,12 @@ const removeAt = async (
     name: 'ai_settings.remove_model',
   });
   await user.click(trashButtons[index]);
+  const confirmButton = screen.queryByRole('button', {
+    name: 'ai_settings.remove_model_confirm',
+  });
+  if (confirmButton != null) {
+    await user.click(confirmButton);
+  }
 };
 
 // Probe readers over the GLOBAL array (all providers).
@@ -563,6 +571,62 @@ describe('AllowedModelsField', () => {
       // Assert: the default stays on gpt-4o-mini (not shifted to the new first row).
       expect(isRowDefault('openai', 'gpt-4o-mini')).toBe(true);
       expect(countGlobalDefaults()).toBe(1);
+    });
+  });
+
+  describe('remove confirmation', () => {
+    it('asks for confirmation before removing a filled row, and keeps the row when cancelled', async () => {
+      // Arrange
+      const user = userEvent.setup();
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      });
+
+      // Act: click the trash icon, then CANCEL in the confirmation modal.
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.remove_model' }),
+      );
+      expect(
+        screen.getByRole('button', {
+          name: 'ai_settings.remove_model_confirm',
+        }),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      // Assert: nothing was removed.
+      expect(findProbeRow('openai', 'gpt-4o')).toBeDefined();
+      expect(getRenderedRows()).toHaveLength(1);
+    });
+
+    it('removes a still-blank row immediately, without a confirmation modal', async () => {
+      // Arrange: add a fresh (blank) row.
+      const user = userEvent.setup();
+      renderComponent({ provider: 'openai', allowedModels: [] });
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.add_model' }),
+      );
+      expect(getRenderedRows()).toHaveLength(1);
+
+      // Act: delete it via the trash icon alone.
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.remove_model' }),
+      );
+
+      // Assert: the row is gone and no confirmation was shown.
+      expect(getRenderedRows()).toHaveLength(0);
+      expect(
+        screen.queryByRole('button', {
+          name: 'ai_settings.remove_model_confirm',
+        }),
+      ).not.toBeInTheDocument();
     });
   });
 

@@ -11,6 +11,10 @@ import {
 import type { AiSettingsFormValues } from './ai-settings-form-values';
 import { registerToInputProps } from './register-to-input-props';
 
+import styles from './AllowedModelRow.module.scss';
+
+const removeButtonClass = styles['grw-allowed-model-remove'] ?? '';
+
 interface AllowedModelRowProps {
   /** Position of this row in the flat `allowedModels` array (NOT the display index). */
   readonly originalIndex: number;
@@ -178,10 +182,13 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
           >
             {t('ai_settings.set_as_default')}
           </Button>
+          {/* No text-body-secondary here: that utility pins the color with
+              !important, which would defeat the module's hover-to-danger
+              override (the rest color is supplied by the module instead). */}
           <Button
             type="button"
             color="link"
-            className="text-body-secondary p-0"
+            className={`p-0 ${removeButtonClass}`}
             aria-label={t('ai_settings.remove_model')}
             title={t('ai_settings.remove_model')}
             onClick={onRemove}

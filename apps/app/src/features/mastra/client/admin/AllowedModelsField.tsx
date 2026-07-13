@@ -1,8 +1,10 @@
 import type { JSX } from 'react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 import { Button, FormGroup } from 'reactstrap';
+
+import { ConfirmModal } from '~/client/components/Admin/App/ConfirmModal';
 
 import type { AiProvider } from '../../interfaces/ai-provider';
 import { AllowedModelRow } from './AllowedModelRow';
@@ -187,6 +189,27 @@ export const AllowedModelsField = (
     [getValues, remove, setValue],
   );
 
+  // Deleting a filled row discards its saved values (possibly hand-written
+  // providerOptions JSON), so it asks for confirmation first. A still-blank row
+  // (no modelId) carries nothing worth protecting and is removed immediately —
+  // discarding an accidentally-added row shouldn't pay the modal friction.
+  const [pendingRemoval, setPendingRemoval] = useState<{
+    originalIndex: number;
+    modelId: string;
+  } | null>(null);
+
+  const requestRemoveRow = useCallback(
+    (originalIndex: number): void => {
+      const modelId = getValues('allowedModels')[originalIndex]?.modelId ?? '';
+      if (modelId.trim() === '') {
+        removeRow(originalIndex);
+        return;
+      }
+      setPendingRemoval({ originalIndex, modelId });
+    },
+    [getValues, removeRow],
+  );
+
   // Append a new row OWNED by this provider (R2.2), seeded with the provider's
   // empty providerOptions namespace. The first model added to an EMPTY global
   // list is the default so the single-default invariant holds from the start
@@ -231,7 +254,7 @@ export const AllowedModelsField = (
           docUrl={PROVIDER_OPTIONS_DOC_URL}
           placeholder={buildInitialProviderOptionsText(provider)}
           onSelectDefault={() => selectDefault(originalIndex)}
-          onRemove={() => removeRow(originalIndex)}
+          onRemove={() => requestRemoveRow(originalIndex)}
         />
       ))}
 
@@ -251,6 +274,27 @@ export const AllowedModelsField = (
         </span>
         {t(addLabelKey)}
       </Button>
+
+      <ConfirmModal
+        isModalOpen={pendingRemoval != null}
+        // text-warning (not the default text-danger): the removal is only
+        // staged on the form and takes effect on save, so nothing destructive
+        // has happened yet — the same severity rationale as the
+        // catalog-refresh modal.
+        headerClassName="text-warning"
+        warningMessage={t('ai_settings.remove_model_confirmation', {
+          modelId: pendingRemoval?.modelId ?? '',
+        })}
+        supplymentaryMessage={null}
+        confirmButtonTitle={t('ai_settings.remove_model_confirm')}
+        onConfirm={() => {
+          if (pendingRemoval != null) {
+            removeRow(pendingRemoval.originalIndex);
+          }
+          setPendingRemoval(null);
+        }}
+        onCancel={() => setPendingRemoval(null)}
+      />
     </FormGroup>
   );
 };

@@ -483,6 +483,8 @@
     "add_model": "添加模型",
     "azure_add_deployment": "添加部署",
     "remove_model": "删除",
+    "remove_model_confirmation": "确定要从列表中删除模型“{{modelId}}”吗？",
+    "remove_model_confirm": "删除模型",
     "provider_options_label": "提供商选项 (JSON)",
     "provider_options_doc_link": "写法",
     "provider_options_invalid_json": "无效的 JSON",
