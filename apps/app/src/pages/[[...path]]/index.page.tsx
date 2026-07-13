@@ -29,6 +29,7 @@ import {
 } from '~/states/socket-io';
 import { useSetEditingMarkdown } from '~/states/ui/editor';
 import { useSWRxPageInfo } from '~/stores/page';
+import { selectAlternateMdUrl } from '~/utils/page-markdown-alternate';
 
 import type { NextPageWithLayout } from '../_app.page';
 import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate';
@@ -155,10 +156,19 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
 
   const title = useCustomTitleForPage(pagePath);
 
+  // Machine-facing discovery of the Markdown alternate (Requirement 6.1/6.3):
+  // rendered unconditionally in the server-rendered <head> so it is present
+  // even when the body is fetched client-side (skipSSR). Prefers the permalink
+  // form; empty (container) pages without an entity _id fall back to path form.
+  const mdAlternateUrl = selectAlternateMdUrl(currentPage?._id, pagePath);
+
   return (
     <>
       <Head>
         <title>{title}</title>
+        {mdAlternateUrl != null && (
+          <link rel="alternate" type="text/markdown" href={mdAlternateUrl} />
+        )}
       </Head>
       <div className="dynamic-layout-root justify-content-between">
         <GrowiContextualSubNavigation currentPage={currentPage} />
