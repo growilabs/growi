@@ -17,6 +17,7 @@ import loggerFactory from '~/utils/logger';
 
 import { resolveEffectiveModelKey } from '../services/ai-sdk-modules/llm-providers/effective-model-key';
 import { getAvailableModels } from '../services/ai-sdk-modules/llm-providers/provider-availability';
+import { buildModelDisplayNameResolver } from '../services/ai-sdk-modules/resolve-model-display-name';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:get-models');
 
@@ -41,13 +42,21 @@ export const getModelsFactory: GetModelsFactory = (crowi) => {
         // include disabled/misconfigured providers' models, so it is NOT used.
         const availableModels = getAvailableModels();
 
-        // Each option carries its owning provider (Req 4.2). providerOptions are
-        // server-only and MUST NOT be sent (Security), so they are dropped here.
-        // Order is preserved = allow-list order.
+        // Resolve official display names from the effective catalog (id fallback
+        // for catalog-less providers / free-text / removed ids). Fetched once per
+        // distinct provider in the available set.
+        const resolveDisplayName = await buildModelDisplayNameResolver(
+          availableModels.map((m) => m.provider),
+        );
+
+        // Each option carries its owning provider and display name (Req 4.2).
+        // providerOptions are server-only and MUST NOT be sent (Security), so they
+        // are dropped here. Order is preserved = allow-list order.
         const models: ChatModelEntry[] = availableModels.map((m) => ({
           key: buildModelKey(m.provider, m.modelId),
           provider: m.provider,
           modelId: m.modelId,
+          displayName: resolveDisplayName(m.provider, m.modelId),
         }));
 
         // The user's persisted selection (a modelKey). Never trusted as-is: it is

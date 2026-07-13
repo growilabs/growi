@@ -29,11 +29,17 @@ describe('useSWRxChatModels', () => {
   it('fetches /mastra/models and returns { models, selectedModelKey }', async () => {
     const data: ChatModelsResponse = {
       models: [
-        { key: 'openai/gpt-4o', provider: 'openai', modelId: 'gpt-4o' },
+        {
+          key: 'openai/gpt-4o',
+          provider: 'openai',
+          modelId: 'gpt-4o',
+          displayName: 'GPT-4o',
+        },
         {
           key: 'anthropic/claude-sonnet-4',
           provider: 'anthropic',
           modelId: 'claude-sonnet-4',
+          displayName: 'Claude Sonnet 4',
         },
       ],
       selectedModelKey: 'anthropic/claude-sonnet-4',
@@ -50,7 +56,14 @@ describe('useSWRxChatModels', () => {
 
   it('exposes the single allowed model when only one is configured', async () => {
     const data: ChatModelsResponse = {
-      models: [{ key: 'openai/gpt-4o', provider: 'openai', modelId: 'gpt-4o' }],
+      models: [
+        {
+          key: 'openai/gpt-4o',
+          provider: 'openai',
+          modelId: 'gpt-4o',
+          displayName: 'GPT-4o',
+        },
+      ],
       selectedModelKey: 'openai/gpt-4o',
     };
     apiv3Get.mockResolvedValue({ data });

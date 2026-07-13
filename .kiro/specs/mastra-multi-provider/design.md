@@ -47,7 +47,7 @@
 
 - config-manager 基盤(`defineConfig` / `ENV_ONLY_GROUPS` / s2s `configUpdated`)
 - `@ai-sdk/{openai,anthropic,google,azure}` ^3 の provider factory、`@mastra/core` ^1.32 の動的モデル関数と `RequestContext`
-- picker 資産: `get-available-models` ルート(provider 引数 → `getEffectiveSelectableModelIds(provider)` で**実効カタログ** = DB リフレッシュ済みカタログ ?? 同梱資産 を返す現行契約のまま)・`use-selectable-models` フック・AllowedModelsField 内の手動カタログリフレッシュ導線(POST `/ai-settings/refresh-model-catalog`)
+- picker 資産: `get-available-models` ルート(provider 引数 → `getEffectiveSelectableModels(provider)` で**実効カタログ** = DB リフレッシュ済みカタログ ?? 同梱資産 の `{id,name}[]` を返す現行契約のまま)・`use-selectable-models` フック・AllowedModelsField 内の手動カタログリフレッシュ導線(POST `/ai-settings/refresh-model-catalog`)
 - `~/components/ui/select`(SelectGroup / SelectLabel)と `ai-elements/prompt-input` のベンダリング部品
 - UserUISettings 基盤(mongoose モデル・PUT ルート・`scheduleToPut`)
 
@@ -67,7 +67,7 @@
 
 現行(mastra-multi-model-chat + ai-settings-model-picker 実装済み)は「グローバル単一 `ai:provider` + 共用 `ai:apiKey`」を前提に、`modelResolvers: Record<AiProvider, (modelId) => MastraModelConfig>` で resolver をディスパッチする。温存するパターン:
 
-- **メタデータ駆動のプロバイダ宣言**(`AI_PROVIDER_DEFS`)と Record ディスパッチ
+- **メタデータ駆動のプロバイダ宣言**(`AI_PROVIDER_DEFS`。各 provider は `enumerable` に加え公式表示名 `label` を持ち、UI は `getProviderLabel(provider)` で表示 — 生キーは出さない)と Record ディスパッチ
 - **動的モデル関数**: `growiAgent` の `model: ({ requestContext }) => resolveMastraModel(...)`
 - **解決キャッシュ + 無効化**: `resolvedModelCache`(Map)+ `clearResolvedMastraModelCache()`(設定保存時 + s2s `configUpdated`)
 - **サーバ検証 = 認可境界**: クライアント値を信用せず allow-list へ丸める
@@ -448,7 +448,7 @@ export interface AiProviderStatus {
 export interface AiSettingsResponse {
   aiEnabled: boolean;
   providers: Record<AiProvider, AiProviderStatus>; // 4 種すべて常に返す (固定スロット)
-  allowedModels: AllowedModel[];
+  allowedModels: AllowedModelForDisplay[]; // AllowedModel & { displayName } — displayName は表示専用でカタログから解決 (PUT では送らない)
   useOnlyEnvVars: boolean;
   isConfigured: boolean;
 }
@@ -488,8 +488,9 @@ export interface AiSettingsUpdateRequest {
 // features/mastra/interfaces/chat-models-response.ts
 export interface ChatModelEntry {
   key: ModelKey;         // クライアントが送信・保存に使う不透明キー
-  provider: AiProvider;  // 表示用 (グループ見出し)
-  modelId: string;       // 表示用
+  provider: AiProvider;  // 表示用 (グループ見出し。getProviderLabel でラベル表示)
+  modelId: string;       // 識別子 (同名モデルの曖昧性解消・キー生成用)
+  displayName: string;   // 表示用 (カタログ由来の公式表示名。id フォールバック)
 }
 export interface ChatModelsResponse {
   models: ChatModelEntry[];      // 有効なプロバイダのモデルのみ・許可リスト順
@@ -538,7 +539,7 @@ export interface AiSettingsFormValues {
 
 ### client / ChatSidebar セレクタ
 
-Summary-only。`useSWRxChatModels` の新型に追従し、`models` を provider でグループ化して `PromptInputModelSelectGroup` + `PromptInputModelSelectLabel`(新設ラッパ、実体は `ui/select` の SelectGroup/SelectLabel)で表示(4.1, 4.2)。選択状態は `modelKey`(feature ローカル useState + ライブ getter — 機構不変、4.7)。変更時 `scheduleToPut({ aiChatSelectedModelKey })`(4.4)。トリガ表示は「provider · modelId」(モックの既定モデルセレクタと同一形式。プロバイダ間で同名 modelId が共存しても閉状態で判別可能 — 4.2)。
+Summary-only。`useSWRxChatModels` の新型に追従し、`models` を provider でグループ化して `PromptInputModelSelectGroup` + `PromptInputModelSelectLabel`(新設ラッパ、実体は `ui/select` の SelectGroup/SelectLabel)で表示(4.1, 4.2)。グループ見出しは `getProviderLabel(group.provider)`(例「OpenAI」)、各項目は `entry.displayName`(公式表示名)を表示。選択状態は `modelKey`(feature ローカル useState + ライブ getter — 機構不変、4.7)。変更時 `scheduleToPut({ aiChatSelectedModelKey })`(4.4)。トリガ表示は `formatModelLabel(provider, displayName)` = 「\<プロバイダー表示名\> · \<displayName\>」(例「OpenAI · GPT-4o」。プロバイダ間で同名モデルが共存しても閉状態で判別可能 — 4.2)。
 
 ## Data Models
 
