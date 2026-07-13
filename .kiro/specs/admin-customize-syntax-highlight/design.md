@@ -180,9 +180,10 @@ export interface AdminCodeEditorProps {
 
 **Implementation Notes**
 - Integration: 言語マップ `const LANGUAGE_EXTENSIONS: Record<CodeEditorLanguage, () => Extension> = { javascript: () => javascript(), css: () => css(), html: () => html() }`。`extensions={[LANGUAGE_EXTENSIONS[language]()]}`。
-- Theme: `const { resolvedTheme } = useNextThemes(); theme={resolvedTheme === 'dark' ? 'dark' : 'light'}`。テーマ切替時は再レンダリングで prop が変わり追従（3.3）。
+- Theme: `const { isDarkMode } = useNextThemes(); theme={isDarkMode ? 'dark' : 'light'}`（`isDarkMode === (resolvedTheme === 'dark')` で機能的に等価）。テーマ切替時は再レンダリングで prop が変わり追従（3.3）。
 - basicSetup: `basicSetup={{ autocompletion: false }}`（未指定キーは既定 true のまま＝行番号・bracketMatching・closeBrackets 有効）。
-- 見た目: `<textarea rows={8}>` 相当の高さを保つため `minHeight`（例: `200px`）を指定し、`form-control` 相当の枠線・角丸を外側 `div`（クラス）で付与。
+- 見た目: `<textarea rows={8}>` 相当の高さを保つため `minHeight`（例: `200px`）と、際限なく伸びるのを防ぐ `maxHeight`（例: `400px`、超過分はスクロール）を指定し、`form-control` 相当の枠線・角丸を外側 `div`（クラス）で付与。
+- Accessibility: `aria-label` は `@uiw/react-codemirror` のトップレベル prop（外側ラッパー `div` に付与される）ではなく、`EditorView.contentAttributes` 拡張経由でフォーカス対象の `.cm-content`（contenteditable）へ付与する。
 - Risks: 制御値でのカーソル維持（@uiw が value 差分を内部処理）。`reset()` による外部更新と入力の競合を単体テストで確認。
 
 #### CustomizeScriptSetting / CustomizeCssSetting / CustomizeNoscriptSetting（Summary-only）

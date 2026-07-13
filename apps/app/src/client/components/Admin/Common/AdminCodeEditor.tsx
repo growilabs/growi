@@ -3,6 +3,7 @@ import { css } from '@codemirror/lang-css';
 import { html } from '@codemirror/lang-html';
 import { javascript } from '@codemirror/lang-javascript';
 import type { Extension } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
 import ReactCodeMirror from '@uiw/react-codemirror';
 
 import { useNextThemes } from '~/stores-universal/use-next-themes';
@@ -50,13 +51,19 @@ export const AdminCodeEditor = (props: AdminCodeEditorProps): JSX.Element => {
 
   const { isDarkMode } = useNextThemes();
 
-  // Memoize so the editor reconfigures only when the language actually changes,
-  // not on every keystroke-driven re-render (a new array reference would make
-  // @uiw/react-codemirror re-dispatch a reconfigure effect every render).
-  const extensions = useMemo(
-    () => [LANGUAGE_EXTENSIONS[language]()],
-    [language],
-  );
+  // Memoize so the editor reconfigures only when the language (or label) actually
+  // changes, not on every keystroke-driven re-render (a new array reference would
+  // make @uiw/react-codemirror re-dispatch a reconfigure effect every render).
+  const extensions = useMemo(() => {
+    const exts: Extension[] = [LANGUAGE_EXTENSIONS[language]()];
+    // Route the label onto the contenteditable `.cm-content` (what screen
+    // readers focus) via an extension. A top-level `aria-label` prop would land
+    // on the non-interactive outer wrapper <div> and never be announced.
+    if (ariaLabel != null) {
+      exts.push(EditorView.contentAttributes.of({ 'aria-label': ariaLabel }));
+    }
+    return exts;
+  }, [language, ariaLabel]);
 
   return (
     <div className="form-control p-0 mb-2 overflow-hidden">
@@ -69,7 +76,6 @@ export const AdminCodeEditor = (props: AdminCodeEditorProps): JSX.Element => {
         basicSetup={BASIC_SETUP}
         minHeight="200px"
         maxHeight="400px"
-        aria-label={ariaLabel}
       />
     </div>
   );

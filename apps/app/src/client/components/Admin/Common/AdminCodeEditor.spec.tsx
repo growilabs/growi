@@ -22,13 +22,27 @@ describe('AdminCodeEditor', () => {
   });
 
   describe('rendering per language', () => {
-    it.each<{ language: CodeEditorLanguage; code: string }>([
-      { language: 'javascript', code: 'const x = 42;' },
-      { language: 'css', code: '.a { color: red; }' },
-      { language: 'html', code: '<div class="x">hi</div>' },
+    // `distinctiveToken` is a token that ONLY the correct language's parser wraps
+    // in a highlight <span>: the JS number literal `42`, the CSS value keyword
+    // `red`, the HTML comment. Asserting on it (rather than merely "some span
+    // exists") catches a mis-wired LANGUAGE_EXTENSIONS entry — e.g. css -> js() —
+    // which the earlier span-count check would have silently passed.
+    it.each<{
+      language: CodeEditorLanguage;
+      code: string;
+      distinctiveToken: string;
+    }>([
+      { language: 'javascript', code: 'const x = 42;', distinctiveToken: '42' },
+      { language: 'css', code: 'a { color: red; }', distinctiveToken: 'red' },
+      {
+        language: 'html',
+        code: '<!-- note -->',
+        distinctiveToken: '<!-- note -->',
+      },
     ])('applies $language syntax highlighting to the value', ({
       language,
       code,
+      distinctiveToken,
     }) => {
       const { container } = render(
         <AdminCodeEditor language={language} value={code} onChange={vi.fn()} />,
@@ -37,11 +51,14 @@ describe('AdminCodeEditor', () => {
       const content = container.querySelector('.cm-content');
       // The document text is rendered.
       expect(content?.textContent).toContain(code);
-      // Highlighting is actually applied: the language extension wraps tokens in
-      // <span> elements. A plain textarea, or an editor without a language
-      // extension, renders the text with no token spans — this is exactly the
-      // regression this feature fixes.
-      expect(content?.querySelectorAll('span').length ?? 0).toBeGreaterThan(0);
+      // The correct language extension is wired: it wraps its own characteristic
+      // token in a highlight <span>. A plain textarea, an editor without a
+      // language extension, or one wired to the wrong language would not produce
+      // this token — this is exactly the regression this feature fixes.
+      const tokenTexts = Array.from(
+        content?.querySelectorAll('span') ?? [],
+      ).map((span) => span.textContent);
+      expect(tokenTexts).toContain(distinctiveToken);
     });
 
     it('renders an empty editor without error when value is empty', () => {
@@ -79,6 +96,28 @@ describe('AdminCodeEditor', () => {
 
       expect(container.querySelector('.cm-theme-dark')).not.toBeNull();
       expect(container.querySelector('.cm-theme-light')).toBeNull();
+    });
+  });
+
+  describe('accessible label', () => {
+    it('puts aria-label on the focusable content region, not the outer wrapper', () => {
+      const { container } = render(
+        <AdminCodeEditor
+          language="javascript"
+          value=""
+          onChange={vi.fn()}
+          aria-label="Custom Script"
+        />,
+      );
+
+      // The label must be announced on `.cm-content` (the contenteditable a
+      // screen reader focuses), not on the non-interactive outer wrapper.
+      expect(
+        container.querySelector('.cm-content')?.getAttribute('aria-label'),
+      ).toBe('Custom Script');
+      expect(
+        container.firstElementChild?.getAttribute('aria-label'),
+      ).toBeNull();
     });
   });
 
