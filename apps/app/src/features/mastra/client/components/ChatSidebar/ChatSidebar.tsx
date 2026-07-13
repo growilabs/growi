@@ -456,6 +456,16 @@ export const ChatSidebar = (): JSX.Element => {
                 />
               </PromptInputFooter>
             </PromptInput>
+            {/* Persistent accuracy disclaimer, placed under the input like
+                other AI chat products so it reads as a notice covering the
+                whole conversation and never scrolls out of view.
+                Spaced with PADDING, not margin: tailwind.css pins `.tw-root p`
+                margins to 0 with an UNLAYERED rule that outranks the
+                @layer-ed tw: margin utilities, so tw:mt-* can never win on a
+                <p> here — tw:pt-* is untouched by that rule. */}
+            <p className="tw:pt-2 tw:text-center tw:text-xs tw:text-muted-foreground/60">
+              {t('ai_sidebar.accuracy_notice')}
+            </p>
           </div>
         </div>
       </div>

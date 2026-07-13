@@ -518,6 +518,7 @@
   "ai_sidebar": {
     "new_chat": "새 채팅",
     "recent_threads": "최근 항목",
+    "accuracy_notice": "정보가 정확한지 출처를 확인하세요.",
     "sources": "참고한 페이지 {{count}}건",
     "error": {
       "title": "오류가 발생했습니다",
