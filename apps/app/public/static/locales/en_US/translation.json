@@ -1064,7 +1064,7 @@
     }
   },
   "pageMention": {
-    "placeholder": "Type a message... ( @ to mention a page )",
+    "placeholder": "Type a message... (@ to mention a page)",
     "hint": "Type a page name to search",
     "searching": "Searching...",
     "noResults": "No pages found",

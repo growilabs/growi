@@ -1057,7 +1057,7 @@
     }
   },
   "pageMention": {
-    "placeholder": "Saisissez un message... ( @ pour mentionner une page )",
+    "placeholder": "Saisissez un message... (@ pour mentionner une page)",
     "hint": "Saisissez un nom de page pour rechercher",
     "searching": "Recherche en cours...",
     "noResults": "Aucune page trouvée",

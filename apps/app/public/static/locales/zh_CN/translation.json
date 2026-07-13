@@ -1068,7 +1068,7 @@
     }
   },
   "pageMention": {
-    "placeholder": "输入消息...（ 输入 @ 提及页面 ）",
+    "placeholder": "输入消息...（输入 @ 提及页面）",
     "hint": "输入页面名称进行搜索",
     "searching": "搜索中...",
     "noResults": "未找到页面",
