@@ -282,16 +282,23 @@ beforeEach(() => {
   modelsState.current = {
     data: {
       models: [
-        { key: 'openai/gpt-4o', provider: 'openai', modelId: 'gpt-4o' },
+        {
+          key: 'openai/gpt-4o',
+          provider: 'openai',
+          modelId: 'gpt-4o',
+          displayName: 'GPT-4o',
+        },
         {
           key: 'openai/gpt-4o-mini',
           provider: 'openai',
           modelId: 'gpt-4o-mini',
+          displayName: 'GPT-4o mini',
         },
         {
           key: 'anthropic/claude-sonnet-4',
           provider: 'anthropic',
           modelId: 'claude-sonnet-4',
+          displayName: 'Claude Sonnet 4',
         },
       ],
       selectedModelKey: 'openai/gpt-4o-mini',
@@ -496,7 +503,7 @@ describe('ChatSidebar — cross-provider model selector (4.1/4.2/4.4/4.7)', () =
     // A provider group heading per provider that owns a model, in fixed slot
     // order; providers that own no model contribute no group (google/azure-openai
     // are absent from the fixture).
-    expect(providerGroupLabels(container)).toEqual(['openai', 'anthropic']);
+    expect(providerGroupLabels(container)).toEqual(['OpenAI', 'Anthropic']);
 
     // Options span BOTH providers and each carries its modelKey as the value the
     // client sends back (4.1/4.2).
@@ -508,10 +515,11 @@ describe('ChatSidebar — cross-provider model selector (4.1/4.2/4.4/4.7)', () =
       'openai/gpt-4o-mini',
       'anthropic/claude-sonnet-4',
     ]);
+    // Options are labelled by the official display name (the value stays the key).
     expect(options.map((o) => o.textContent)).toEqual([
-      'gpt-4o',
-      'gpt-4o-mini',
-      'claude-sonnet-4',
+      'GPT-4o',
+      'GPT-4o mini',
+      'Claude Sonnet 4',
     ]);
   });
 
@@ -526,7 +534,7 @@ describe('ChatSidebar — cross-provider model selector (4.1/4.2/4.4/4.7)', () =
 
     // The trigger names the provider so the same modelId under different
     // providers stays distinguishable when the menu is closed.
-    expect(modelTrigger()).toHaveTextContent('openai · gpt-4o-mini');
+    expect(modelTrigger()).toHaveTextContent('OpenAI · GPT-4o mini');
   });
 
   // The getter passed to the transport factory (2nd arg of the last call).
@@ -572,7 +580,7 @@ describe('ChatSidebar — cross-provider model selector (4.1/4.2/4.4/4.7)', () =
     expect(getModelKey()).toBe('anthropic/claude-sonnet-4');
     expect(modelSelect().value).toBe('anthropic/claude-sonnet-4');
     // The trigger follows the new selection, still provider-qualified.
-    expect(modelTrigger()).toHaveTextContent('anthropic · claude-sonnet-4');
+    expect(modelTrigger()).toHaveTextContent('Anthropic · Claude Sonnet 4');
   });
 
   it('shows the single allowed model as selected (4.1)', () => {
@@ -583,6 +591,7 @@ describe('ChatSidebar — cross-provider model selector (4.1/4.2/4.4/4.7)', () =
             key: 'openai/only-model',
             provider: 'openai',
             modelId: 'only-model',
+            displayName: 'Only Model',
           },
         ],
         selectedModelKey: 'openai/only-model',
@@ -592,7 +601,7 @@ describe('ChatSidebar — cross-provider model selector (4.1/4.2/4.4/4.7)', () =
 
     expect(modelSelect().value).toBe('openai/only-model');
     expect(modelSelect().options).toHaveLength(1);
-    expect(modelTrigger()).toHaveTextContent('openai · only-model');
+    expect(modelTrigger()).toHaveTextContent('OpenAI · Only Model');
   });
 
   it('disables the selector until the models resolve', () => {

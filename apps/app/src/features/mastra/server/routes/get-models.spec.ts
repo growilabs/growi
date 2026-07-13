@@ -36,6 +36,19 @@ vi.mock(
   () => ({ getAvailableModels }),
 );
 
+// buildModelDisplayNameResolver joins the allow-list with the effective catalog
+// to attach official display names. Mocked at its module boundary (like
+// getAvailableModels) so this handler test stays a pure map-contract test and
+// touches no catalog/DB; its own resolution is unit-tested in
+// resolve-model-display-name.spec. The mock returns a deterministic resolver so
+// the assertions can pin the exact displayName the handler emits.
+const { buildModelDisplayNameResolver } = vi.hoisted(() => ({
+  buildModelDisplayNameResolver: vi.fn(),
+}));
+vi.mock('../services/ai-sdk-modules/resolve-model-display-name', () => ({
+  buildModelDisplayNameResolver,
+}));
+
 // UserUISettings is a default export; the handler reads the user's persisted
 // selection via UserUISettings.findOne(...).lean().
 const { findOne, lean } = vi.hoisted(() => ({
@@ -109,10 +122,15 @@ const AVAILABLE_MODELS: AllowedModel[] = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Deterministic display-name resolver: "Name of <modelId>". Reset per test so a
+  // test that never sets getAvailableModels still has a valid resolver.
+  buildModelDisplayNameResolver.mockResolvedValue(
+    (_provider: string, modelId: string) => `Name of ${modelId}`,
+  );
 });
 
 describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
-  it('returns only available providers models, each with key/provider/modelId in allow-list order (Req 4.1, 4.2)', async () => {
+  it('returns only available providers models, each with key/provider/modelId/displayName in allow-list order (Req 4.1, 4.2)', async () => {
     getAvailableModels.mockReturnValue(AVAILABLE_MODELS);
     mockSavedSelection(undefined);
 
@@ -122,11 +140,17 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
     expect(res.apiv3).toHaveBeenCalledTimes(1);
     const payload = res.apiv3.mock.calls[0][0];
     expect(payload.models).toEqual([
-      { key: 'openai/gpt-4o', provider: 'openai', modelId: 'gpt-4o' },
+      {
+        key: 'openai/gpt-4o',
+        provider: 'openai',
+        modelId: 'gpt-4o',
+        displayName: 'Name of gpt-4o',
+      },
       {
         key: 'anthropic/claude-3-5-sonnet',
         provider: 'anthropic',
         modelId: 'claude-3-5-sonnet',
+        displayName: 'Name of claude-3-5-sonnet',
       },
     ]);
     // A provider absent from the available set (e.g. disabled google) never
