@@ -11,10 +11,7 @@ import type {
 import type { HydratedDocument, Types } from 'mongoose';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
-import type {
-  IActivityHasId,
-  SupportedActionType,
-} from '~/interfaces/activity';
+import type { SupportedActionType } from '~/interfaces/activity';
 import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
@@ -23,7 +20,7 @@ import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageDocument } from '~/server/models/page';
 import type { PageOperationDocument } from '~/server/models/page-operation';
 import type { UserGroupDocument } from '~/server/models/user-group';
-import type { ActivityActor } from '~/server/service/activity/attachment-removal-snapshot';
+import type { ActivityActor } from '~/server/service/attachment/attachment-removal-snapshot';
 
 export interface IPageService {
   // Page event emitter
@@ -119,7 +116,7 @@ export interface IPageService {
     options,
     pageOpId: ObjectIdLike,
     resolvedAction: SupportedActionType,
-    activity: IActivityHasId | null,
+    activityId: string,
   ): Promise<void>;
   revertDeletedPage(
     page,

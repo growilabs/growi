@@ -4,12 +4,14 @@
  *
  * Route under test: POST /_api/attachments.remove (api.remove in ./api.js).
  * The request runs through the REAL chain as far as practical:
- *   real addActivity middleware (creates the ACTION_UNSETTLED activity via
- *   prisma.activities.createByParameters) → real api.remove handler → real
- *   AttachmentService.removeAttachment (gridfs uploader; deleteFile no-ops
- *   for a file that is not in GridFS) → real activityEvent 'update' listener
- *   registered by the real ActivityService (crowi.setupActivityService) →
- *   real prisma.activities.updateByParameters.
+ *   real addActivity middleware (Option C / lazy fail-safe: mints an id +
+ *   stashes request context in pendingActivityContext; no DB write here) →
+ *   real api.remove handler → real AttachmentService.removeAttachment
+ *   (gridfs uploader; deleteFile no-ops for a file that is not in GridFS) →
+ *   real activityEvent 'update' listener registered by the real
+ *   ActivityService (crowi.setupActivityService) → real
+ *   prisma.activities.createByParameters, which lazily CREATES the row
+ *   using the id the middleware pre-minted.
  * Only auth middlewares (accessTokenParser / loginRequired / excludeReadOnly)
  * are replaced by a req.user-injecting stub — the same fidelity trade-off as
  * the apiv3 activity.integ.ts precedent.
@@ -71,8 +73,9 @@ interface AuthorizedRequest extends Request {
 
 /**
  * Narrows the first warn() argument to the structured context object the
- * route is expected to log (pino convention: context object FIRST — a
- * string-first call would silently discard the context fields).
+ * shared page-path resolver is expected to log (pino convention: context
+ * object FIRST — a string-first call would silently discard the context
+ * fields).
  */
 const isRemovalWarnContext = (
   value: unknown,
@@ -124,21 +127,27 @@ describe('POST /_api/attachments.remove — activity settled with attachment sna
   }
 
   /**
-   * Read the settled activity back from the real DB. The 'update' event
-   * handler runs asynchronously after the HTTP response, so poll until the
-   * middleware-created row leaves ACTION_UNSETTLED.
+   * Read the settled activity back from the real DB.
+   *
+   * Under Option C (lazy fail-safe), addActivity no longer pre-creates the
+   * row: it only mints an id and stashes context. The row is created by the
+   * ActivityService 'update' listener asynchronously, after the HTTP
+   * response is sent. Poll for the row to APPEAR (it may not exist at all
+   * yet) and to settle to the real action -- both checks live inside the
+   * same `vi.waitFor` retry loop so an early poll that finds nothing, or
+   * finds the row still mid-settle, is retried rather than failing outright.
    */
   async function readBackSettledActivity() {
     // Exactly one row exists per test: beforeEach wipes the sentinel ip and
     // each test issues a single request through the addActivity middleware.
-    const unsettled = await prisma.activities.findFirstOrThrow({
-      where: { ip: TEST_IP },
-    });
     return await vi.waitFor(
       async () => {
-        const row = await prisma.activities.findUniqueOrThrow({
-          where: { id: unsettled.id },
+        const row = await prisma.activities.findFirst({
+          where: { ip: TEST_IP },
         });
+        if (row == null) {
+          throw new Error('activity row not yet created for this test');
+        }
         expect(row.action).toBe(SupportedAction.ACTION_ATTACHMENT_REMOVE);
         return row;
       },
@@ -247,8 +256,8 @@ describe('POST /_api/attachments.remove — activity settled with attachment sna
     // The middleware-written composite id survives the settle
     expect(settled.snapshot.id.length).toBeGreaterThan(0);
 
-    // Direct removal UPDATES the pre-created activity — no second row is
-    // created for this request (design: 既存 activity の更新経路).
+    // The listener settles (creates) exactly once per request — no second
+    // row is created for this request.
     expect(await prisma.activities.count({ where: { ip: TEST_IP } })).toBe(1);
 
     // The real deletion path actually ran (not stubbed): the doc is gone.
@@ -266,9 +275,13 @@ describe('POST /_api/attachments.remove — activity settled with attachment sna
       fileSize: 42,
     });
 
-    // The route logger is cached per namespace, so this is the very
-    // instance ./api.js logs through.
-    const warnSpy = vi.spyOn(loggerFactory('growi:routes:attachment'), 'warn');
+    // Loggers are cached per namespace, so this is the very instance the
+    // shared resolveAttachmentPagePath (service/attachment/attachment-snapshot,
+    // which ./api.js delegates to) logs through.
+    const warnSpy = vi.spyOn(
+      loggerFactory('growi:service:attachment:attachment-snapshot'),
+      'warn',
+    );
 
     try {
       // Act

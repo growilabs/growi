@@ -8,6 +8,7 @@ import {
   chownRecursive,
   detectHeapSize,
   readCgroupLimit,
+  resolveJemallocPreload,
   setupDirectories,
 } from './docker-entrypoint';
 
@@ -270,6 +271,60 @@ describe('buildNodeFlags', () => {
   it('should not use --max_old_space_size', () => {
     const flags = buildNodeFlags(512);
     expect(flags.some((f) => f.includes('max_old_space_size'))).toBe(false);
+  });
+});
+
+describe('resolveJemallocPreload', () => {
+  const LIB = '/usr/local/lib/libjemalloc.so.2';
+  const present = () => true;
+  const absent = () => false;
+
+  it('returns undefined when JEMALLOC_ENABLED is not set', () => {
+    expect(resolveJemallocPreload({}, LIB, present)).toBeUndefined();
+  });
+
+  it('returns undefined when JEMALLOC_ENABLED is not exactly "true"', () => {
+    expect(
+      resolveJemallocPreload({ JEMALLOC_ENABLED: 'false' }, LIB, present),
+    ).toBeUndefined();
+    expect(
+      resolveJemallocPreload({ JEMALLOC_ENABLED: '1' }, LIB, present),
+    ).toBeUndefined();
+  });
+
+  it('returns the library path when enabled and the library exists', () => {
+    expect(
+      resolveJemallocPreload({ JEMALLOC_ENABLED: 'true' }, LIB, present),
+    ).toBe(LIB);
+  });
+
+  it('returns undefined (and keeps booting) when enabled but the library is missing', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(
+      resolveJemallocPreload({ JEMALLOC_ENABLED: 'true' }, LIB, absent),
+    ).toBeUndefined();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it('prepends the library to an operator-supplied LD_PRELOAD', () => {
+    expect(
+      resolveJemallocPreload(
+        { JEMALLOC_ENABLED: 'true', LD_PRELOAD: '/opt/other.so' },
+        LIB,
+        present,
+      ),
+    ).toBe(`${LIB}:/opt/other.so`);
+  });
+
+  it('treats an empty LD_PRELOAD as absent', () => {
+    expect(
+      resolveJemallocPreload(
+        { JEMALLOC_ENABLED: 'true', LD_PRELOAD: '' },
+        LIB,
+        present,
+      ),
+    ).toBe(LIB);
   });
 });
 

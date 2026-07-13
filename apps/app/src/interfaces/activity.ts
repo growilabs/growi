@@ -752,10 +752,12 @@ export type SupportedActivityActionType =
 export type DefaultSnapshot = Partial<Pick<IUser, 'username'>>;
 
 /**
- * Snapshot variant for ACTION_ATTACHMENT_REMOVE activities.
- * Every field is optional: snapshot builders omit fields they cannot resolve.
+ * Canonical snapshot variant shared by every attachment activity
+ * (ACTION_ATTACHMENT_ADD / ACTION_ATTACHMENT_REMOVE / ACTION_ATTACHMENT_DOWNLOAD).
+ * Every field is optional: snapshot builders omit fields they cannot resolve
+ * (e.g. pagePath when the page is gone, username on guest downloads).
  */
-export type AttachmentRemoveSnapshot = {
+export type AttachmentSnapshot = {
   username?: string;
   originalName?: string;
   pagePath?: string;
@@ -764,11 +766,17 @@ export type AttachmentRemoveSnapshot = {
 };
 
 /**
- * Discriminated union of snapshot shapes. The discriminant is the activity's
- * existing `action` field (see isAttachmentRemoveActivity); snapshots carry
- * no discriminator field of their own.
+ * Backward-compatible alias kept for existing importers
+ * (snapshot-viewer and the REMOVE builder predate the canonical name).
  */
-export type ISnapshot = DefaultSnapshot | AttachmentRemoveSnapshot;
+export type AttachmentRemoveSnapshot = AttachmentSnapshot;
+
+/**
+ * Discriminated union of snapshot shapes. The discriminant is the activity's
+ * existing `action` field (see the isAttachment*Activity guards); snapshots
+ * carry no discriminator field of their own.
+ */
+export type ISnapshot = DefaultSnapshot | AttachmentSnapshot;
 
 export type IActivity = {
   user?: Ref<IUser>;
@@ -793,6 +801,26 @@ export const isAttachmentRemoveActivity = (
 ): activity is Pick<IActivity, 'action' | 'snapshot'> & {
   snapshot?: AttachmentRemoveSnapshot;
 } => activity.action === SupportedAction.ACTION_ATTACHMENT_REMOVE;
+
+/**
+ * Narrows an ATTACHMENT_ADD activity's snapshot to AttachmentSnapshot.
+ * Same pattern as isAttachmentRemoveActivity: `action` is the sole discriminant.
+ */
+export const isAttachmentAddActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: AttachmentSnapshot;
+} => activity.action === SupportedAction.ACTION_ATTACHMENT_ADD;
+
+/**
+ * Narrows an ATTACHMENT_DOWNLOAD activity's snapshot to AttachmentSnapshot.
+ * Same pattern as isAttachmentRemoveActivity: `action` is the sole discriminant.
+ */
+export const isAttachmentDownloadActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: AttachmentSnapshot;
+} => activity.action === SupportedAction.ACTION_ATTACHMENT_DOWNLOAD;
 
 export type IActivityHasId = IActivity & HasObjectId;
 

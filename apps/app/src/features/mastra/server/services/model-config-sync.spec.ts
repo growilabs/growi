@@ -14,7 +14,7 @@ const { clearResolvedMastraModelCache, clearAvailabilityLogDedup } = vi.hoisted(
   }),
 );
 
-vi.mock('./ai-sdk-modules/resolve-mastra-model', () => ({
+vi.mock('./ai-sdk-modules/resolved-model-cache', () => ({
   clearResolvedMastraModelCache,
 }));
 vi.mock('./ai-sdk-modules/llm-providers/warn-dedup', () => ({

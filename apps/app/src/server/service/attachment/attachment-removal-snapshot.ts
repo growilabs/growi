@@ -1,5 +1,3 @@
-import type { IUserHasId } from '@growi/core';
-
 import {
   type AttachmentRemoveSnapshot,
   type IActivity,
@@ -9,60 +7,36 @@ import {
 import type { IActivityParameters } from '~/server/models/activity';
 import loggerFactory from '~/utils/logger';
 
+import {
+  type ActivityActor,
+  type AttachmentLike,
+  buildAttachmentSnapshot,
+} from './attachment-snapshot';
+
 const logger = loggerFactory(
-  'growi:service:activity:attachment-removal-snapshot',
+  'growi:service:attachment:attachment-removal-snapshot',
 );
 
-/**
- * Input shape accepted by buildAttachmentRemoveSnapshot.
- *
- * NOTE: `pageId` is the Prisma alias for the Mongoose attachment's `page` field.
- * Callers holding a Mongoose attachment doc must map `page` -> `pageId` first.
- * Because `pageId` is optional, a forgotten mapping is not caught by the type
- * checker — `pageId` (and the `pagePath` resolved from it) would silently end
- * up `undefined` in the snapshot. The co-located spec pins this contract.
- */
-export type AttachmentLike = {
-  _id: string;
-  originalName?: string;
-  fileSize?: number;
-  pageId?: string;
-};
+// Keep the historical import path working: these types now live in the
+// canonical shared module (./attachment-snapshot), where all attachment
+// snapshot construction is homed.
+export type { ActivityActor, AttachmentLike } from './attachment-snapshot';
 
 /**
  * Builds an AttachmentRemoveSnapshot from an attachment about to be removed,
- * the path of the page it belongs to, and the operator's username.
+ * the path of the page it belongs to, and the operator's username
+ * (requirements 2.1, 2.2, 3.3; unresolvable inputs stay `undefined` per
+ * requirement 2.3).
  *
- * Pure function shared by the direct-removal route and the cascade recorder
- * (requirements 2.1, 2.2, 3.3). Unresolvable inputs stay `undefined` in the
- * returned snapshot (requirement 2.3); no key stripping is needed because
- * both save ports (createByParameters / updateByParameters) read each field
- * explicitly and Prisma omits `undefined` values on persistence. Inputs are
- * never mutated — a new object is returned.
+ * Thin REMOVE-named delegate to the shared action-agnostic builder — kept so
+ * existing REMOVE call sites keep an intention-revealing name and import path.
  */
 export const buildAttachmentRemoveSnapshot = (
   attachment: AttachmentLike,
   pagePath: string | undefined,
   username: string | undefined,
-): AttachmentRemoveSnapshot => ({
-  username,
-  originalName: attachment.originalName,
-  pagePath,
-  pageId: attachment.pageId,
-  fileSize: attachment.fileSize,
-});
-
-/**
- * Operator of a (cascade) deletion. Shared with deleteCompletelyOperation's
- * actor Parameter Object (task 5.1 imports this type). `user` is required;
- * `ip`/`endpoint` are optional because the cascade / empty-trash paths reach
- * deleteCompletelyOperation with only a user (design: ip/endpoint degradation).
- */
-export type ActivityActor = {
-  user: IUserHasId;
-  ip?: string;
-  endpoint?: string;
-};
+): AttachmentRemoveSnapshot =>
+  buildAttachmentSnapshot(attachment, pagePath, username);
 
 /**
  * Minimal structural surface of ActivityService that the recorder depends on

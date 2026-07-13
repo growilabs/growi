@@ -2,90 +2,87 @@
 
 ## Project Description (Input)
 
-この spec は、GROWI の activity log（監査ログ／操作履歴）サブシステムを今後メンテナンス・拡張する際に参照するための情報をまとめたものである。activity log 全体を対象とするが、今回は構成要素のうち **snapshot** を詳しく記述し、その他の要素はセクションだけ用意して現時点でわかっていることを記し、詳細は TBD（To Be Done）とする。
+この spec は activity log サブシステムの flagship（最も基本的な spec）であり、「**何を記録するか＝記録対象の制御（記録ゲート）**」を担う。加えて、activity log サブシステム全体の関心マップ（どの関心をどの spec が持つか）をここで管理する。詳細な背景・方針は `brief.md` を参照。
 
 ### (a) 誰が困っているか
-- activity log を保守・拡張する GROWI の開発者。snapshot の型・設計がコードに散らばっていてドキュメント化されておらず、改修のたびにモデル・サービス・画面のコードを読み直す必要がある。
-- 直近の利用者課題として、管理者が監査ログ画面で「どのページのどの添付ファイルが削除されたか」を追えない。
+- GROWI.cloud のようなマルチテナントの運用者。監査ログの記録対象を設定（`app:auditLogActionGroupSize`、既定 `Small`）で絞っているつもりでも、対象外 action の行が MongoDB に書き込まれ・溜まり続けるため、書き込み・保管量の負荷になる。
 
 ### (b) 現状
-- Activity モデルの `target` は `refPath: 'targetModel'` による polymorphic 参照で、`targetModel` は Page / User / PageBulkExportJob / AuditLogBulkExportJob の 4 種。
-- `snapshot` は現状 `{ username?: string }` のみの型付きサブスキーマで、削除済みユーザーでも操作者名を残す用途に使われている。
-- 添付ファイルの直接削除（`/_api/attachments.remove`）は `addActivity` middleware ＋ `activityEvent.emit('update', ..., { action: ACTION_ATTACHMENT_REMOVE })` で「誰が消したか」は記録されるが、`target` / `snapshot` を渡していないため対象（ページ・ファイル）が残らない。
-- `ACTION_ATTACHMENT_REMOVE` は MediumActionGroup 以上にのみ含まれ、既定の Small では記録されない。記録対象の制御は環境変数のみ（`AUDIT_LOG_ACTION_GROUP_SIZE` / `AUDIT_LOG_ADDITIONAL_ACTIONS`）で、管理 UI のトグルはない。
-- 監査ログ画面のテーブルは user / date / action / ip / endpoint のみで「対象」列がない。
+- 記録の可否判定そのものは存在する（監査ログ設定＝グループサイズ／追加／除外／essential から記録対象集合を算出し、確定した action がその集合に含まれるかで判定する）。
+- **GET 経路**は保存前に判定し、対象外なら行を作らない（要望どおり）。
+- **更新系（非 GET）経路**（問題）: middleware が action 判定なしに「未確定（`ACTION_UNSETTLED`）」の仮行を無条件で1件作る。その後、各ルートが確定（settle）イベントを送出して実 action に確定させる。確定時に対象内なら本来の action へ更新、**対象外なら更新されず未確定の仮行が残る**。
+- 残った未確定行を明示的に掃除する処理はなく、TTL（既定 30 日）で消えるだけ。
+- 根本原因: 実 action は更新系リクエストの処理後半まで確定しないため、行を先に作って後から確定させる二段構えになっている。
 
-### (c) どう変えたいか（今回の焦点 = snapshot）
-- **snapshot を詳述する。** snapshot の形は「対象のモデル（targetModel）」ではなく「**action 種別**」で決まる、という設計方針を文書化する（同じ Page でも RENAME と DELETE で必要な凍結データが異なるため）。型としては action で絞り込める判別可能ユニオン（特別な snapshot を持つ action だけ列挙し、残りは共通の `{ username? }` に畳む catch-all）を採用する。`snapshotTargetModel` のような別フィールドは追加しない（判別子は既存の必須フィールド `action` を流用する）。
-- 最初の適用例として、添付ファイル削除時に削除直前の情報（originalName, pagePath, pageId, fileSize など）を snapshot に残し、管理画面の監査ログで参照できるようにする。
-- 削除のカスケード連動（ページ完全削除・ゴミ箱を空にする操作で消える添付）も記録対象とする。
-
-### スコープ（合意済み）
-- **(a) を採用**：今回の対象は **snapshot の型付け（action ベースの判別可能ユニオン）＋ 添付削除ログ** のみとする。
-- `target × targetModel` の全面的な型安全化（discriminated union 化）は別 PR に切り出す。本 spec では「型安全化」セクションに方針メモのみ残し、詳細は TBD とする。
-
-### この spec に用意するセクション（snapshot 以外は TBD で軽く）
-- snapshot 設計 — **詳述**
-- target / targetModel の型安全化 — TBD（方針のみ）
-- action / action グループと記録対象の制御 — TBD
-- 監査ログ画面の表示（「対象」列の追加方針） — TBD
-- 保持期間・TTL、大量カスケード削除時のボリューム — TBD
+### (c) どう変えたいか
+- 記録対象外の action を、今後 DB に永続化しない（対象外の残骸行を残さない）。
+- 記録対象の判定は既存の単一の情報源を再利用し、判定ルールを二重に定義しない。
+- 直し方の候補（書き込み自体を減らす方式 / 確定後に残骸を消す方式）と、確定イベントが送出されないケースの扱いは design で計測・比較して決める（本 spec の要件はどちらの方式でも満たせるよう、観察可能な結末で記述する）。
 
 ## Introduction
 
-このドキュメントは、GROWI の activity log（監査ログ・操作履歴）サブシステムにおける snapshot 設計の形式化と添付ファイル削除ログの改善に関する要件を定義する。snapshot の型を action 種別に基づいた判別可能ユニオンとして形式化し、添付ファイル削除時に削除直前の情報を snapshot に記録することで、管理者が「誰がどのファイルをいつ削除したか」を監査ログで追跡できるようにすることと、GROWI 開発者が snapshot の型を action 種別ごとに安全に扱えるようにすることを目的とする。
+このドキュメントは、activity log（監査ログ）の**記録ゲート**、すなわち「どの操作を activity レコードとして永続化するか」の制御に関する要件を定義する。目的は、記録対象外の action が更新系（非 GET）経路で DB に残る現状を解消し、記録対象外の操作を今後永続化しない（＝その分の書き込み自体を発生させない）ことである。ただし、更新系の操作が失敗・中断で記録可否が確定しないまま終わった場合は、「操作が試みられた」という試行記録を fail-safe として残す（記録可否が確定して対象外だった操作とは区別する）。ここでの「失敗・中断」は、サーバがエラー応答（4xx/5xx）を返した場合とクライアントが接続を中断した場合を指し、プロセスの即時終了（SIGKILL / OOM など、後始末処理にすら到達しない停止）は対象外とする（下記 Adjacent expectations 参照）。activity log は GROWI 全体（通知・貢献度グラフ・監査／コンプライアンス）で広く使われるため、記録抑制の変更は既存の記録・通知・集計の観察可能な挙動を壊してはならない。
 
 ## Boundary Context
 
 - **In scope**:
-  - snapshot 型の action ベース判別可能ユニオン化
-  - 直接削除（添付ファイル削除 API）時の添付ファイル情報の snapshot 記録
-  - ページ完全削除・ゴミ箱を空にする操作のカスケードで消える添付ファイルの activity 記録と snapshot
+  - 更新系（非 GET）経路で、記録対象外と確定した action を今後永続化しないようにする。
+  - 記録対象の判定に、既存の記録可否判定と同一の単一の情報源（監査ログ設定から算出される記録対象集合）を再利用する。
+  - 例外・中断で記録可否が確定しなかった操作について、「試行された」事実（操作者・時刻・エンドポイント・IP）を fail-safe として保持する。
 - **Out of scope**:
-  - `target × targetModel` フィールドの全面的な型安全化（別 PR で実施）
-  - action グループの設定変更（`ACTION_ATTACHMENT_REMOVE` を Small グループへ格上げすることや、管理 UI でのトグル追加）
-  - 監査ログ画面への「対象」列の詳細 UI 実装（本 spec では方針のみ; 詳細は TBD）
-  - 保持期間・TTL の変更
-  - 大量カスケード削除時のボリューム制御・スロットリング
+  - 既に DB に溜まっている未確定／対象外の残骸行の遡及的な掃除・移行（今回は今後分のみ。既存分は TTL 任せ）。
+  - action グループの構成変更（どの action がどのグループ／essential に属するか、特定 action の格上げ等）。
+  - 管理画面での記録対象トグルの追加。
+  - snapshot の型・中身（`activity-log-snapshot` が担当）。
+  - 監査ログ画面での表示（`activity-log-snapshot-viewer` が担当）。
+  - TTL・保持期間の値そのものの変更。
+  - GET 経路の記録挙動の変更（既に対象外を作らない。維持のみ）。
 - **Adjacent expectations**:
-  - `ACTION_ATTACHMENT_REMOVE` は現在 MediumActionGroup 以上でのみ記録される（デフォルトは Small）。本機能で追加される snapshot データが実際に保存されるかどうかは、`AUDIT_LOG_ACTION_GROUP_SIZE` または `AUDIT_LOG_ADDITIONAL_ACTIONS` 環境変数の設定に依存する。この設定変更は本 spec のスコープ外。
-  - 記録した snapshot データは、将来の監査ログ画面拡張（「対象」列の追加など）で参照できる構造で保存されなければならない。
+  - 記録抑制の「方式」は design で **Option C（lazy fail-safe）** に確定した（2026-07-08・ユーザー判断。`research.md` §10 Decision 1）。事前作成（無条件の仮行書き込み）を廃止し、記録対象内と確定した操作は確定時に作成、記録対象外は何も作らない（＝その分の書き込みが発生しない）。失敗・中断した操作だけ、リクエスト終了時に試行記録を作成する。これにより、当初の「先に作って対象外だけ削除する（delete-at-settle）」案が抱えていた「削除オペレーションが増えて GROWI app・MongoDB の負荷がむしろ上がる」問題を避け、書き込み負荷を実際に減らせる。
+  - 保管量の削減は本要件の主眼ではない（残骸行は従来どおり TTL で消えるため）。主眼は更新系の**書き込み回数（および事前作成をホットパスから外すことによる遅延）**の削減である。
+  - fail-safe が捕捉するのは「エラー応答（4xx/5xx）で終わった操作」と「クライアント中断で終わった操作」であり、プロセス即時終了（SIGKILL / OOM）で後始末に到達しなかったケースは取りこぼす（受容済みトレードオフ）。この結果、本変更後に残る `ACTION_UNSETTLED` 行は「失敗・中断した試行」に限られる（記録対象外だった操作＝Requirement 1 で永続化しないものは、そもそも作られない）。
+  - 貢献度グラフ・通知は activity の記録に相乗りしている既存機能である。記録ゲートは「どの行が残るか」を決めるだけで、これらの観察可能な挙動を変えない。
+  - 記録された行の表示は `activity-log-snapshot-viewer`、行が持つ snapshot の中身は `activity-log-snapshot` が担当する。
 
 ## Requirements
 
-### Requirement 1: Snapshot 型の action ベース判別可能ユニオン化
+### Requirement 1: 記録対象外の action を永続化しない
 
-**Objective**: GROWI 開発者として、snapshot の型が action 種別ごとに明確に定義されていることを知りたい。改修のたびにモデル・サービス・画面のコードを読み直す必要をなくし、型安全に snapshot を操作できるようにするため。
-
-#### Acceptance Criteria
-1. The Activity Log System shall define the snapshot type as a discriminated union keyed by the `action` field, not by the `targetModel` field.
-2. When an action has snapshot fields specific to that action (e.g., 添付ファイル削除に特有のファイル情報フィールド), the Activity Log System shall represent that action's snapshot as a named variant in the discriminated union.
-3. The Activity Log System shall include a catch-all variant in the union that preserves the existing `{ username?: string }` shape for all actions not explicitly listed, maintaining backward compatibility with existing activity data.
-4. The Activity Log System shall use the existing `action` field as the sole discriminant for the snapshot union, without adding a new field (e.g., `snapshotTargetModel`) to the activity record.
-
-### Requirement 2: 添付ファイル直接削除時の snapshot 記録
-
-**Objective**: GROWI 管理者として、監査ログで「どのページのどの添付ファイルが削除されたか」を追跡したい。削除された対象ファイルを事後に特定できるようにするため。
+**Objective:** GROWI.cloud のようなマルチテナントの運用者として、記録対象外の action が activity レコードとして DB に書き込まれないようにしたい。監査ログ由来の更新系書き込み（write 回数と、事前作成がリクエストのホットパスに載ることによる遅延。特に MongoDB 負荷）を減らすため。保管量は TTL で回収されるため主眼ではない。
 
 #### Acceptance Criteria
-1. When ユーザーが添付ファイル削除 API を通じて単個の添付ファイルを削除した場合, the Activity Log System shall 削除直前の時点で次のフィールドを snapshot に記録する：元のファイル名（`originalName`）、添付ファイルが属するページのパス（`pagePath`）、そのページの ID（`pageId`）、ファイルサイズ（`fileSize`）。
-2. When 添付ファイルの直接削除 activity を記録する際, the Activity Log System shall 既存の動作と同様に操作者の username を snapshot に含める。
-3. If snapshot データの取得時点で添付ファイルのレコードが既に存在しない場合, the Activity Log System shall 取得できたフィールドのみで activity を記録し、警告レベルのログを出力する。
+1. When 更新系（非 GET）リクエストの操作が記録対象外の action として確定した場合, the Activity Log System shall その操作を activity レコードとして永続化しない（対象外の行を新たに作らず、その分の書き込みを発生させない）。
+2. When 更新系（非 GET）リクエストの操作が記録対象の action として確定した場合, the Activity Log System shall 従来どおりその action の activity レコードを永続化する。
+3. The Activity Log System shall GET 経路の既存の記録挙動（記録対象のみ作成）を変更しない。
+4. The Activity Log System shall 同一の監査ログ設定に対して、記録対象とする action 集合が既存の記録可否判定と一致するようにし、記録対象ルールを新たに複製・分岐しない。
 
-### Requirement 3: カスケード削除時の添付ファイル activity 記録
+### Requirement 2: 広く使われる既存の記録挙動の維持
 
-**Objective**: GROWI 管理者として、ページの完全削除やゴミ箱の空操作に伴って削除される添付ファイルを監査ログで追跡したい。ページ削除操作に含まれた個々の添付ファイルを事後に特定できるようにするため。
-
-#### Acceptance Criteria
-1. When ページが完全削除（削除後に復元できない操作）され、その添付ファイルがカスケードで削除される場合, the Activity Log System shall 削除される各添付ファイルに対して `ACTION_ATTACHMENT_REMOVE` の activity を個別に作成し、snapshot を記録する。
-2. When ゴミ箱を空にする操作により添付ファイルがカスケードで削除される場合, the Activity Log System shall 削除される各添付ファイルに対して `ACTION_ATTACHMENT_REMOVE` の activity を個別に作成し、snapshot を記録する。
-3. When カスケード削除の添付 activity を記録する際, the Activity Log System shall 直接削除と同じ snapshot フィールドを記録する：`originalName`、`pagePath`、`pageId`、`fileSize`。
-4. While カスケード削除処理が進行中の場合, the Activity Log System shall 各添付ファイルが実際のストレージから削除される前に snapshot データを取得する。
-
-### Requirement 4: 監査ログ API での snapshot データ参照
-
-**Objective**: GROWI 管理者として、監査ログの管理画面または API を通じて添付ファイル削除の詳細情報（削除されたファイル名・所属ページ）を参照したい。監査・コンプライアンス対応のため。
+**Objective:** activity log は GROWI 全体（通知・貢献度グラフ・監査／コンプライアンス）で広く使われるため、GROWI 管理者・利用者として、記録抑制の変更で既存の記録・通知・集計が壊れないことを保証したい。
 
 #### Acceptance Criteria
-1. When 管理者が `ACTION_ATTACHMENT_REMOVE` の activity レコードを監査ログ API 経由で取得した場合, the Activity Log System shall 応答に添付ファイルの snapshot フィールド（`originalName`、`pagePath`、`pageId`、`fileSize`）を含める。
-2. The Activity Log System shall 既存の activity レコードの構造に後方互換な形式で snapshot を保存し、既存データの破壊的な移行を必要としない。
+1. The Activity Log System shall essential（通知に必須の）action を、action グループ設定に関わらず常に永続化する。
+2. Where `app:auditLogEnabled` が false に設定されている場合, the Activity Log System shall essential action のみを永続化する（既存挙動の維持）。
+3. When 記録対象の action が確定した場合, the Activity Log System shall その activity に紐づく既存の通知を従来どおり送出する。
+4. The Activity Log System shall 記録対象の action に対する貢献度（contribution）の集計結果を、本変更の前後で変化させない。
+5. The Activity Log System shall どの action がどのグループ／essential に属するかの構成を、本変更で変更しない。
+6. When 記録対象の action の activity レコードを作成する場合, the Activity Log System shall 従来 middleware が焼き付けていた操作文脈（IP・エンドポイント・操作者・操作者名）を、当該レコードに従来どおり保持する（事前作成を廃止しても記録行のフィールドを欠損させない）。
+
+### Requirement 3: 記録ゲートの責務分離（凝集度）
+
+**Objective:** activity log を保守する GROWI 開発者として、記録対象の制御ロジックが、本来知らなくてよい他の責務（snapshot の中身、個々のルート固有のデータ、貢献度グラフや通知の内部）に依存しないようにしたい。凝集度を保ち、他機能の変更が記録ゲートへ（またはその逆へ）波及しないようにするため。
+
+#### Acceptance Criteria
+1. The Activity Log System shall 記録対象の判定を、対象操作の action 種別（記録可否）のみに基づいて行い、その操作固有のデータ（snapshot の中身・ルート固有のペイロード）に依存しない。
+2. The Activity Log System shall 記録ゲートの責務を記録可否の判断に限定し、貢献度グラフや通知の内部詳細に依存しない。
+3. When activity log に新しい action や新しい記録経路が将来追加された場合, the Activity Log System shall 記録可否の単一の情報源のみでその可否が決まるようにし、記録ゲート側に action 固有の分岐追加を必要としない。
+
+### Requirement 4: 失敗・中断した操作の試行記録の保持（fail-safe 監査）
+
+**Objective:** 監査・コンプライアンス対応を行う GROWI 管理者として、更新系操作が失敗・中断で記録可否が確定しないまま終わった場合でも、「その操作が試みられた」記録（操作者・時刻・エンドポイント・IP）を監査ログに残したい。失敗・中断した操作を事後に追跡できるようにするため。
+
+#### Acceptance Criteria
+1. When 更新系（非 GET）リクエストの操作が、記録可否が確定しないまま失敗・中断で終了した場合（サーバがエラー応答 4xx/5xx を返した、またはクライアントが接続を中断した）, the Activity Log System shall その操作の試行記録（操作者・時刻・エンドポイント・IP）を監査ログに保持する。
+2. The Activity Log System shall 記録可否が確定しないまま残る試行記録を、記録可否が確定して対象外と判定された操作（Requirement 1 でそもそも作られないもの）とは区別して扱う。
+3. While 記録可否が確定していない試行記録が保持されている場合, the Activity Log System shall それが未確定（どの操作か特定されていない）であることを区別できる形で保持する。
+4. Where プロセスが即時終了（SIGKILL / OOM など、リクエスト終了時の後始末処理にすら到達しない停止）した場合, the Activity Log System shall その操作の試行記録を保持しなくてよい（受容済みトレードオフであり、fail-safe の対象外とする）。
