@@ -1,14 +1,14 @@
 import type { JSX } from 'react';
-import { Fragment, useCallback, useMemo, useState } from 'react';
+import { Fragment, useCallback, useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useFormContext, useWatch } from 'react-hook-form';
 import {
-  Dropdown,
   DropdownItem,
   DropdownMenu,
   DropdownToggle,
   FormGroup,
   Label,
+  UncontrolledDropdown,
 } from 'reactstrap';
 
 import {
@@ -67,9 +67,6 @@ export const DefaultModelSelector = (): JSX.Element => {
       ? formatModelLabel(defaultModel.provider, defaultModel.modelId)
       : t('ai_settings.default_model_placeholder');
 
-  const [isOpen, setIsOpen] = useState(false);
-  const toggle = useCallback(() => setIsOpen((open) => !open), []);
-
   // Read the list at click time (not from the render-time closure) so a pick
   // always rewrites the latest values, mirroring AllowedModelsField's approach.
   const selectDefault = useCallback(
@@ -96,7 +93,7 @@ export const DefaultModelSelector = (): JSX.Element => {
       <p className="form-text text-muted mt-0 mb-2">
         {t('ai_settings.default_model_help')}
       </p>
-      <Dropdown isOpen={isOpen} toggle={toggle}>
+      <UncontrolledDropdown>
         {/* `outline-secondary` (not `light`): a solid light button keeps a white
             background under the dark admin theme and reads as out of place. The
             outline variant is theme-adaptive — transparent background + a neutral
@@ -138,7 +135,7 @@ export const DefaultModelSelector = (): JSX.Element => {
             </DropdownItem>
           )}
         </DropdownMenu>
-      </Dropdown>
+      </UncontrolledDropdown>
     </FormGroup>
   );
 };
