@@ -483,7 +483,7 @@
     "add_model": "モデルを追加",
     "azure_add_deployment": "デプロイメントを追加",
     "remove_model": "削除",
-    "remove_model_confirmation": "モデル「{{modelId}}」を一覧から削除します。よろしいですか？",
+    "remove_model_confirmation": "モデル「{{modelName}}」を一覧から削除します。よろしいですか？",
     "remove_model_confirm": "削除する",
     "provider_options_label": "プロバイダーオプション (JSON)",
     "provider_options_doc_link": "書き方",

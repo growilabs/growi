@@ -474,7 +474,7 @@
     "add_model": "Add model",
     "azure_add_deployment": "Add deployment",
     "remove_model": "Remove",
-    "remove_model_confirmation": "Are you sure you want to remove \"{{modelId}}\" from the list?",
+    "remove_model_confirmation": "Are you sure you want to remove \"{{modelName}}\" from the list?",
     "remove_model_confirm": "Remove model",
     "provider_options_label": "Provider Options (JSON)",
     "provider_options_doc_link": "How to write",

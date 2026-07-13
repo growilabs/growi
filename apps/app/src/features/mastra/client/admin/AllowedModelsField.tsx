@@ -195,17 +195,25 @@ export const AllowedModelsField = (
   // discarding an accidentally-added row shouldn't pay the modal friction.
   const [pendingRemoval, setPendingRemoval] = useState<{
     originalIndex: number;
-    modelId: string;
+    /** Named by the official display name; falls back to the raw model id. */
+    modelName: string;
   } | null>(null);
 
   const requestRemoveRow = useCallback(
     (originalIndex: number): void => {
-      const modelId = getValues('allowedModels')[originalIndex]?.modelId ?? '';
+      const row = getValues('allowedModels')[originalIndex];
+      const modelId = row?.modelId ?? '';
       if (modelId.trim() === '') {
         removeRow(originalIndex);
         return;
       }
-      setPendingRemoval({ originalIndex, modelId });
+      // Confirm with the human-readable name; `displayName` is optional
+      // (out-of-catalog or legacy rows), so fall back to the id.
+      const displayName = row?.displayName ?? '';
+      setPendingRemoval({
+        originalIndex,
+        modelName: displayName.trim() !== '' ? displayName : modelId,
+      });
     },
     [getValues, removeRow],
   );
@@ -283,7 +291,7 @@ export const AllowedModelsField = (
         // catalog-refresh modal.
         headerClassName="text-warning"
         warningMessage={t('ai_settings.remove_model_confirmation', {
-          modelId: pendingRemoval?.modelId ?? '',
+          modelName: pendingRemoval?.modelName ?? '',
         })}
         supplymentaryMessage={null}
         confirmButtonTitle={t('ai_settings.remove_model_confirm')}

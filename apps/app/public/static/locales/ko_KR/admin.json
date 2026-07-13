@@ -474,7 +474,7 @@
     "add_model": "모델 추가",
     "azure_add_deployment": "배포 추가",
     "remove_model": "삭제",
-    "remove_model_confirmation": "\"{{modelId}}\" 모델을 목록에서 삭제하시겠습니까?",
+    "remove_model_confirmation": "\"{{modelName}}\" 모델을 목록에서 삭제하시겠습니까?",
     "remove_model_confirm": "모델 삭제",
     "provider_options_label": "공급자 옵션 (JSON)",
     "provider_options_doc_link": "작성 방법",
