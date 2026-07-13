@@ -1,6 +1,6 @@
 // --- Mock boundary ---------------------------------------------------------
 //
-// getEffectiveSelectableModelIds resolves the NEWER of the refreshed
+// getEffectiveSelectableModels resolves the NEWER of the refreshed
 // (persisted) and bundled catalogs, comparing bundled _generatedAt values on
 // both sides (Req 9.5). The persistence singleton
 // (prisma.mastrarefreshedmodelcatalogs) is mocked to drive the branches; the
@@ -14,18 +14,20 @@ vi.mock('~/utils/prisma', () => ({
   prisma: { mastrarefreshedmodelcatalogs: { getSingleton } },
 }));
 
-import { getEffectiveSelectableModelIds } from './effective-model-catalog';
+import { getEffectiveSelectableModels } from './effective-model-catalog';
 import { BUNDLED_CATALOG_GENERATED_AT } from './model-catalog';
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
+describe('getEffectiveSelectableModels (Req 9.5)', () => {
   describe('when the snapshot was refreshed against the CURRENT bundled generation (same image)', () => {
     beforeEach(() => {
       getSingleton.mockResolvedValue({
-        models: { openai: ['refreshed-model'] },
+        models: {
+          openai: [{ id: 'refreshed-model', name: 'Refreshed Model' }],
+        },
         fetchedAt: new Date(),
         // Refresh ran while THIS bundled asset was deployed — the normal case,
         // and a timestamp tie: bundled wins only when STRICTLY newer.
@@ -37,23 +39,25 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
     });
 
     it('serves the refreshed catalog instead of the bundled one', async () => {
-      await expect(getEffectiveSelectableModelIds('openai')).resolves.toEqual([
-        'refreshed-model',
+      await expect(getEffectiveSelectableModels('openai')).resolves.toEqual([
+        { id: 'refreshed-model', name: 'Refreshed Model' },
       ]);
     });
 
     it('fails soft to [] for a provider absent from the refreshed catalog (Req 3.1)', async () => {
       await expect(
-        getEffectiveSelectableModelIds('azure-openai'),
+        getEffectiveSelectableModels('azure-openai'),
       ).resolves.toEqual([]);
     });
 
     it('returns a fresh copy so callers cannot mutate the stored catalog', async () => {
-      const first = await getEffectiveSelectableModelIds('openai');
-      first.push('__mutated__');
+      const first = await getEffectiveSelectableModels('openai');
+      first.push({ id: '__mutated__', name: '__mutated__' });
 
-      const second = await getEffectiveSelectableModelIds('openai');
-      expect(second).toEqual(['refreshed-model']);
+      const second = await getEffectiveSelectableModels('openai');
+      expect(second).toEqual([
+        { id: 'refreshed-model', name: 'Refreshed Model' },
+      ]);
     });
 
     it('is NOT shadowed by a lagging server clock (fetchedAt older than the bundled _generatedAt)', async () => {
@@ -62,7 +66,9 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
       // the CI-clock _generatedAt, a lagging server clock would silently
       // shadow a just-persisted refresh while the admin sees a success toast.
       getSingleton.mockResolvedValue({
-        models: { openai: ['refreshed-model'] },
+        models: {
+          openai: [{ id: 'refreshed-model', name: 'Refreshed Model' }],
+        },
         fetchedAt: new Date(0), // server clock hopelessly behind the CI clock
         supersededBundledGeneratedAt: new Date(
           BUNDLED_CATALOG_GENERATED_AT.getTime(),
@@ -70,8 +76,8 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
         source: 'https://models.dev/api.json (MIT)',
       });
 
-      await expect(getEffectiveSelectableModelIds('openai')).resolves.toEqual([
-        'refreshed-model',
+      await expect(getEffectiveSelectableModels('openai')).resolves.toEqual([
+        { id: 'refreshed-model', name: 'Refreshed Model' },
       ]);
     });
   });
@@ -79,7 +85,9 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
   describe('when the image now bundles a NEWER catalog generation (image updated after the refresh)', () => {
     beforeEach(() => {
       getSingleton.mockResolvedValue({
-        models: { openai: ['stale-refreshed-model'] },
+        models: {
+          openai: [{ id: 'stale-refreshed-model', name: 'Stale Refreshed' }],
+        },
         fetchedAt: new Date(),
         // Refresh ran against an OLDER bundled generation than the current one.
         supersededBundledGeneratedAt: new Date(0),
@@ -88,15 +96,15 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
     });
 
     it('serves the bundled catalog instead of the stale snapshot (Req 9.5)', async () => {
-      const ids = await getEffectiveSelectableModelIds('openai');
+      const models = await getEffectiveSelectableModels('openai');
 
-      expect(ids).not.toContain('stale-refreshed-model');
-      expect(ids.length).toBeGreaterThan(0); // the real bundled openai list
+      expect(models.map((m) => m.id)).not.toContain('stale-refreshed-model');
+      expect(models.length).toBeGreaterThan(0); // the real bundled openai list
     });
 
     it('keeps the bundled behavior for catalog-less providers (azure → [])', async () => {
       await expect(
-        getEffectiveSelectableModelIds('azure-openai'),
+        getEffectiveSelectableModels('azure-openai'),
       ).resolves.toEqual([]);
     });
   });
@@ -104,7 +112,9 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
   describe('when the image was ROLLED BACK to an older bundled generation after the refresh', () => {
     it('keeps serving the refreshed snapshot (it holds live-fetched data)', async () => {
       getSingleton.mockResolvedValue({
-        models: { openai: ['refreshed-model'] },
+        models: {
+          openai: [{ id: 'refreshed-model', name: 'Refreshed Model' }],
+        },
         fetchedAt: new Date(),
         // The refresh ran on a NEWER image than the one now deployed.
         supersededBundledGeneratedAt: new Date(
@@ -113,8 +123,8 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
         source: 'https://models.dev/api.json (MIT)',
       });
 
-      await expect(getEffectiveSelectableModelIds('openai')).resolves.toEqual([
-        'refreshed-model',
+      await expect(getEffectiveSelectableModels('openai')).resolves.toEqual([
+        { id: 'refreshed-model', name: 'Refreshed Model' },
       ]);
     });
   });
@@ -128,7 +138,7 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
         new Error('P2032: missing required field'),
       );
 
-      const ids = await getEffectiveSelectableModelIds('openai');
+      const ids = await getEffectiveSelectableModels('openai');
       expect(ids.length).toBeGreaterThan(0); // the real bundled openai list
     });
 
@@ -144,7 +154,7 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
         source: 'https://models.dev/api.json (MIT)',
       });
 
-      const ids = await getEffectiveSelectableModelIds('openai');
+      const ids = await getEffectiveSelectableModels('openai');
       expect(ids.length).toBeGreaterThan(0); // the real bundled openai list
     });
   });
@@ -155,20 +165,20 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
     });
 
     it('falls back to the bundled committed catalog (openai non-empty)', async () => {
-      const ids = await getEffectiveSelectableModelIds('openai');
+      const ids = await getEffectiveSelectableModels('openai');
       expect(ids.length).toBeGreaterThan(0);
     });
 
     it('keeps the bundled behavior for catalog-less providers (azure → [])', async () => {
       await expect(
-        getEffectiveSelectableModelIds('azure-openai'),
+        getEffectiveSelectableModels('azure-openai'),
       ).resolves.toEqual([]);
     });
 
     it('performs no external communication (Req 2.1)', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
-      await getEffectiveSelectableModelIds('openai');
+      await getEffectiveSelectableModels('openai');
 
       expect(fetchSpy).not.toHaveBeenCalled();
     });

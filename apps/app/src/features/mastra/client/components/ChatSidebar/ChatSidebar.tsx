@@ -44,6 +44,7 @@ import {
 import { Response } from '~/components/ai-elements/response';
 import { Button } from '~/components/ui/button';
 import { PageMentionInput } from '~/features/mastra/client/components/PageMentionInput';
+import { getProviderLabel } from '~/features/mastra/interfaces/ai-provider';
 import type { CustomUIMessage } from '~/features/mastra/interfaces/chat-message';
 import {
   formatModelLabel,
@@ -399,17 +400,17 @@ export const ChatSidebar = (): JSX.Element => {
                 >
                   <PromptInputModelSelectTrigger>
                     {/*
-                      The grouped items render only the modelId, so the default
-                      <SelectValue/> would show a bare modelId — ambiguous when
-                      the same modelId exists under two providers. Render the
-                      selected entry as "provider · modelId" instead; fall back to
+                      The grouped items render only the display name, so the
+                      default <SelectValue/> would show a bare name — ambiguous
+                      when two providers expose a same-named model. Render the
+                      selected entry as "Provider · name" instead; fall back to
                       the empty placeholder value before a selection resolves
                       (Req 4.2).
                     */}
                     {selectedEntry != null ? (
                       formatModelLabel(
                         selectedEntry.provider,
-                        selectedEntry.modelId,
+                        selectedEntry.displayName,
                       )
                     ) : (
                       <PromptInputModelSelectValue />
@@ -436,14 +437,14 @@ export const ChatSidebar = (): JSX.Element => {
                     {providerGroups.map((group) => (
                       <PromptInputModelSelectGroup key={group.provider}>
                         <PromptInputModelSelectLabel>
-                          {group.provider}
+                          {getProviderLabel(group.provider)}
                         </PromptInputModelSelectLabel>
                         {group.entries.map((entry) => (
                           <PromptInputModelSelectItem
                             key={entry.key}
                             value={entry.key}
                           >
-                            {entry.modelId}
+                            {entry.displayName}
                           </PromptInputModelSelectItem>
                         ))}
                       </PromptInputModelSelectGroup>

@@ -52,11 +52,11 @@
 - 既存 admin 認可チェーン（`accessTokenParser([SCOPE.READ.ADMIN.AI])`／書き込みは `[SCOPE.WRITE.ADMIN.AI]` → `loginRequiredFactory` → `adminRequiredFactory`）。
 - 既存 client 資産（`apiv3-client`、`useSWRImmutable`、reactstrap `Input`/`Button`、react-hook-form `register`、`toastr`）。
 - `interfaces/ai-provider` — サーバ（route）は runtime の `isAiProvider` で query を検証し、**client は型のみ `import type { AiProvider }`** を参照する（ビルド時に erase されるため server-only モジュールへの実行時結合は生じない。同モジュール冒頭の「Do NOT add client imports here」は"モジュール内へ client 依存を持ち込むな"の意で、型の被参照は禁じていない）。`interfaces/allowed-model`。
-- **制約**: カタログ（同梱 JSON・更新済み collection）はサーバ側のみで read し、client には `string[]`（と refresh メタデータ）のみ返す。**一覧提供（read パス）のネットワーク I/O は禁止**（外部通信は Req 9 のリフレッシュ操作に限る）。
+- **制約**: カタログ（同梱 JSON・更新済み collection）はサーバ側のみで read し、client には `SelectableModel[]`（`{id,name}`）（と refresh メタデータ）のみ返す。**一覧提供（read パス）のネットワーク I/O は禁止**（外部通信は Req 9 のリフレッシュ操作に限る）。
 
 ### Revalidation Triggers
 - `SelectableModelsResponse` の形状変更 → client フック／UI の再検証。
-- vendored 成果物のスキーマ（`provider → string[]`）変更 → model-catalog／取り込みスクリプトの再確認。
+- vendored 成果物のスキーマ（`provider → {id,name}[]`）変更 → model-catalog／取り込みスクリプトの再確認。
 - 生成時フィルタ条件（`tool_call && text 出力`）変更 → 提示一覧が変わるため UX/テスト再確認。
 - models.dev api.json のスキーマ変更（`tool_call`/`modalities` フィールド） → 取り込みスクリプトの再確認。
 - リリースパイプラインへの vendoring ステップ配置変更 → 鮮度運用の再確認。
@@ -123,7 +123,7 @@ graph TB
 | Frontend data | SWR (`useSWRImmutable`) | provider キーの一覧取得 | 静的データゆえ immutable |
 | Backend (runtime) | Express apiv3 (admin router) + 静的 JSON import | provider スコープの一覧エンドポイント（通信なし） | 既存認可チェーン踏襲 |
 | Vendoring (ingest step) | Node script（`fetch` 組込み）+ models.dev api.json (MIT) + zod `^4.1.9`（境界検証） | api.json を fetch → 境界を zod 検証 → 生成時フィルタ → コミット JSON 生成 | **実行時・ビルド工程ではなく取り込みステップ（リリース前段）**。`pnpm vendor:models`。zod は既存 dep（mastra feature で使用実績） |
-| Data asset | committed `model-catalog-data.json` | `provider → string[]`（chat＋tool 対応 id） | git 管理・PR レビュー・リリースで一様配布 |
+| Data asset | committed `model-catalog-data.json` | `provider → {id,name}[]`（chat＋tool 対応モデル。id と公式表示名） | git 管理・PR レビュー・リリースで一様配布 |
 
 ## File Structure Plan
 
@@ -134,19 +134,19 @@ apps/app/
 │   ├── vendor-model-catalog.ts                 # ingest step (pre-release, not build): fetch api.json → filter → write committed JSON to resource/
 │   └── vendor-model-catalog.spec.ts            # fixture api.json → 期待する成果物 shape を検証
 ├── resource/
-│   └── model-catalog-data.json                 # vendored 成果物（コミット・Docker で本番同梱）: { _source, _generatedAt, models: { openai:[], anthropic:[], google:[] } }
+│   └── model-catalog-data.json                 # vendored 成果物（コミット・Docker で本番同梱）: { _source, _generatedAt, models: { openai:[{id,name}], anthropic:[{id,name}], google:[{id,name}] } }
 └── src/features/mastra/
     ├── interfaces/
-    │   └── selectable-models-response.ts       # DTO: SelectableModelsResponse { modelIds: string[] }
+    │   └── selectable-models-response.ts       # DTO: SelectableModelsResponse { models: SelectableModel[] }（SelectableModel = {id,name}）
     ├── server/services/ai-sdk-modules/
     │   ├── chat-model-filter.ts                # pure: 対象provider定義 + isSelectableModel(tool_call && output⊇text)
     │   ├── chat-model-filter.spec.ts
     │   ├── build-model-catalog.ts              # pure 共有変換（追補 R）: api.json → zod 境界検証 → フィルタ → ModelCatalog。ingest script と refresh サービスの単一ソース
     │   ├── build-model-catalog.spec.ts
     │   ├── fetch-model-catalog.ts              # 共有取得（追補 R）: fetch models.dev（固定URL・timeout 付き）→ 共有変換。ingest script と refresh サービスの単一取得経路
-    │   ├── model-catalog.ts                    # runtime: getSelectableModelIds(provider) = `^/resource/model-catalog-data.json` を static import して read（通信なし）
+    │   ├── model-catalog.ts                    # runtime: getSelectableModels(provider) = `^/resource/model-catalog-data.json` を static import して read（通信なし）
     │   ├── model-catalog.spec.ts
-    │   ├── effective-model-catalog.ts          # runtime（追補 R）: getEffectiveSelectableModelIds = 更新済み（RefreshedModelCatalog）／同梱の新しい方（9.5、同梱世代同士の比較）
+    │   ├── effective-model-catalog.ts          # runtime（追補 R）: getEffectiveSelectableModels = 更新済み（RefreshedModelCatalog）／同梱の新しい方（9.5、同梱世代同士の比較）
     │   ├── effective-model-catalog.spec.ts
     │   ├── refresh-model-catalog.ts            # runtime（追補 R）: リフレッシュ = 共有取得（fetch-model-catalog）→ 永続化（失敗時は何も書かない、9.4）
     │   └── refresh-model-catalog.spec.ts
@@ -201,11 +201,11 @@ sequenceDiagram
     else provider あり
         Hook->>API: apiv3Get(?provider=...)
         API->>API: isAiProvider 検証（不正=400）
-        API->>Cat: getSelectableModelIds(provider)
+        API->>Cat: getSelectableModels(provider)
         Cat->>Repo: 成果物を static read（通信なし）
-        Cat-->>API: string[]（azure 等は []）
-        API-->>Hook: { modelIds }
-        alt modelIds 非空
+        Cat-->>API: {id,name}[]（azure 等は []）
+        API-->>Hook: { models }
+        alt models 非空
             Hook-->>Field: <select> で選択のみ (1.4)
         else 空 or error
             Hook-->>Field: 自由入力にフォールバック (3.1/3.2)
@@ -275,7 +275,7 @@ export const isSelectableModel: (entry: ModelsDevModel) => boolean; // tool_call
 | Requirements | 2.1, 2.2, 2.3, 6.1 |
 
 **Responsibilities & Constraints**
-- `fetch('https://models.dev/api.json')`（**取り込みステップ＝リリース前段でのみ／ビルド工程では実行しない**）→ `CATALOG_PROVIDERS` を選択 → `isSelectableModel` で生成時フィルタ → **id のみ**を `models.<provider> = string[]` に整形し、`{ _source（MIT 帰属）, _generatedAt, models }` の形（ヘッダとデータを分離）で `model-catalog-data.json` を**決定的（ソート）**に書き出す。
+- `fetch('https://models.dev/api.json')`（**取り込みステップ＝リリース前段でのみ／ビルド工程では実行しない**）→ `CATALOG_PROVIDERS` を選択 → `isSelectableModel` で生成時フィルタ → **`{id,name}`**（id と models.dev の公式表示名。`name` 欠落時は id をフォールバック）を `models.<provider> = {id,name}[]` に整形し、`{ _source（MIT 帰属）, _generatedAt, models }` の形（ヘッダとデータを分離）で `model-catalog-data.json` を**決定的（id でソート）**に書き出す。
 - cross-platform（Node の fetch/fs のみ、curl/rm 不使用）。
 - **生成時サニティチェック（Issue 2）**: 取得した api.json を境界で **zod** による最小スキーマ検証（**読む分のみ**＝対象プロバイダの全エントリで `tool_call`・`modalities.output` の存在と型を検証し、他フィールド/他プロバイダは passthrough で寛容に）し、**各対象プロバイダ（openai/anthropic/google）で `isSelectableModel` 通過が1件以上**であることを assert する。スキーマドリフト（`models` が map でない／`tool_call`・`modalities.output` の**欠落または型不正**）または空結果のときは**非ゼロ終了して既存のコミット成果物を保持**し上書きしない（models.dev のスキーマ変更で「無言の空／劣化カタログ」が出荷されるのを防ぐ）。**fail-loud を選ぶ理由**: 欠落を許容すると、上流が一部エントリだけ再構造化した場合に正当な chat モデルが無言で選択肢から消え、選択のみ UI がシグナルなく劣化する。失敗時は last-good（コミット成果物／永続 or 同梱カタログ）が維持されるため、fail-loud のコストは鮮度であって可用性ではない（Req 9.4）。
 - 実行は `pnpm vendor:models`。**スクリプトは生成（fetch＋フィルタ＋ファイル write）のみで git 操作はしない**（純ジェネレータ・副作用なし）。**コミットは別ステップの責務**（手動＝開発者が diff 確認して PR ／ 本番リリース＝`release.yml` の pre-release step が差分時にリリース commit へ同梱）。リリースビルド（prod・無人 RC とも）はコミット済み成果物を read するのみ（build 工程に fetch/commit を融合しない）。
@@ -295,14 +295,14 @@ export const isSelectableModel: (entry: ModelsDevModel) => boolean; // tool_call
 #### model-catalog
 | Field | Detail |
 |-------|--------|
-| Intent | コミット成果物から provider スコープの選択可能モデル id を返す（通信なし） |
+| Intent | コミット成果物から provider スコープの選択可能モデル（id＋表示名）を返す（通信なし） |
 | Requirements | 1.1, 2.1–2.3, 7.1 |
 
 **Contracts**: Service [x]
 ```typescript
-export const getSelectableModelIds: (provider: AiProvider) => string[];
+export const getSelectableModels: (provider: AiProvider) => ModelCatalogEntry[];
 ```
-- `import catalog from '^/resource/model-catalog-data.json' with { type: 'json' }`（ネイティブ ESM 必須・`growi-version.ts` 準拠、`resolveJsonModule` で自動型付け＝アサーション不要）で read し、`catalog.models[provider] ?? []` を返す（ヘッダ分離済みの `models` を `Record<string, readonly string[]>` として引く。`provider: AiProvider`、azure 等は `[]`）。**ネットワーク I/O なし**、フィルタは既に生成時に完了しているため実行時ロジックは最小。
+- `import catalog from '^/resource/model-catalog-data.json' with { type: 'json' }`（ネイティブ ESM 必須・`growi-version.ts` 準拠、`resolveJsonModule` で自動型付け＝アサーション不要）で read し、`catalog.models[provider] ?? []` を返す（ヘッダ分離済みの `models` を `Record<string, readonly ModelCatalogEntry[]>` として引く。`provider: AiProvider`、azure 等は `[]`）。**ネットワーク I/O なし**、フィルタは既に生成時に完了しているため実行時ロジックは最小。
 
 #### get-available-models（API）
 | Field | Detail |
@@ -312,14 +312,14 @@ export const getSelectableModelIds: (provider: AiProvider) => string[];
 
 **Responsibilities & Constraints**
 - 認可チェーン: `accessTokenParser([SCOPE.READ.ADMIN.AI], { acceptLegacy: true })` → `loginRequiredFactory(crowi)` → `adminRequiredFactory(crowi)` → handler（[get-ai-settings.ts:169-179](../../../apps/app/src/features/mastra/server/routes/admin-ai-settings/get-ai-settings.ts#L169-L179) と同型）。aiReadyGuard は付けない。
-- `req.query.provider` を `isAiProvider` で検証（不正→400）。応答は `modelIds` のみ（7.1）。
+- `req.query.provider` を `isAiProvider` で検証（不正→400）。応答は `models`（`{id,name}[]`）のみ（7.1）。
 
 **Contracts**: API [x]
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
 | GET | `/_api/v3/ai-settings/available-models` | query `provider: AiProvider` | `SelectableModelsResponse` | 400 (invalid provider), 401/403 (auth), 500 |
 
-- provider 有効だがカタログ非対応（azure-openai）→ `200 { modelIds: [] }`。
+- provider 有効だがカタログ非対応（azure-openai）→ `200 { models: [] }`。
 
 ### Client
 
@@ -346,13 +346,13 @@ export const useSWRxSelectableModels: (
 
 **Responsibilities & Constraints**
 - `provider = watch('provider')` で `useSWRxSelectableModels(provider)` を1回呼び、導出:
-  - `mode = 'freetext'` if `provider===''` or error（3.2）or（解決済みかつ `modelIds.length===0`）（3.1）。
-  - `mode = 'select'` if 解決済みかつ `modelIds.length>0`（1.4）。ロード中は modelId コントロールを disabled。
-- 各行の modelId 入力は `register('allowedModels.${index}.modelId')` のまま。`mode==='select'` は reactstrap `<Input type="select">`（options = `modelIds`（＝生成時に絞られた選択可能集合）+ 現在値が一覧外なら補完 option（1.5）+ 空プレースホルダ）。`mode==='freetext'` は現行 `<Input type="text">`。
+  - `mode = 'freetext'` if `provider===''` or error（3.2）or（解決済みかつ `models.length===0`）（3.1）。
+  - `mode = 'select'` if 解決済みかつ `models.length>0`（1.4）。ロード中は modelId コントロールを disabled。
+- 各行の modelId 入力は `register('allowedModels.${index}.modelId')` のまま。`mode==='select'` は reactstrap `<Input type="select">`（options = `models`（＝生成時に絞られた `{id,name}` 集合。`<option value={id}>{name}</option>` で id を保持値・name を表示ラベルとする）+ 現在値が一覧外なら補完 option（1.5）+ 空プレースホルダ）。選択時に行の表示専用 `displayName` を選んだ option の name に同期する。`mode==='freetext'` は現行 `<Input type="text">`。
 - 既存の `disabled`（env-only, 7.3）・行ラベル分岐・isDefault ラジオ・providerOptions・削除・追加ボタンは不変（4.2）。
 
 **Implementation Notes**
-- Integration: フィールド単位で1回 fetch し、`AllowedModelRow` に `mode` と `selectableModelIds` を渡す。
+- Integration: フィールド単位で1回 fetch し、`AllowedModelRow` に `mode` と `selectableModels`（`{id,name}[]`）を渡す。
 - Validation: select は生成時に絞られた集合しか選べないため typo が消える。自由入力時の検証は現行踏襲。
 
 ## Data Models
@@ -361,9 +361,13 @@ export const useSWRxSelectableModels: (
 ```typescript
 // interfaces/selectable-models-response.ts
 // GET /_api/v3/ai-settings/available-models の応答。server/client 共有。
-// modelIds は生成時に chat＋tool へ絞られた bare id 配列（azure 等は空）。秘匿情報は含めない（7.1）。
+// models は生成時に chat＋tool へ絞られた {id,name} 配列（azure 等は空）。秘匿情報は含めない（7.1）。
+export interface SelectableModel {
+  id: string;
+  name: string;
+}
 export interface SelectableModelsResponse {
-  modelIds: string[];
+  models: SelectableModel[];
 }
 ```
 ```jsonc
@@ -372,18 +376,19 @@ export interface SelectableModelsResponse {
   "_source": "https://models.dev/api.json (MIT)",
   "_generatedAt": "<ISO date>",
   "models": {
-    "openai":    ["gpt-4o", "gpt-4.1", "o3", "..."],   // tool_call && text 出力のみ
-    "anthropic": ["..."],
-    "google":    ["..."]
+    "openai":    [{ "id": "gpt-4o", "name": "GPT-4o" }, { "id": "gpt-4.1", "name": "GPT-4.1" }],   // tool_call && text 出力のみ
+    "anthropic": [{ "id": "...", "name": "..." }],
+    "google":    [{ "id": "...", "name": "..." }]
   }
 }
 ```
 ```typescript
 // vendored 成果物の型。server 限定（client は SelectableModelsResponse のみ）。ヘッダとデータを分離（(a) ネスト）。
-export type ModelCatalog = Partial<Record<AiProvider, readonly string[]>>;               // provider → 選択可能 id
+export type ModelCatalogEntry = { readonly id: string; readonly name: string };          // id と公式表示名
+export type ModelCatalog = Record<CatalogProvider, ModelCatalogEntry[]>;                   // provider → 選択可能 {id,name}
 export type ModelCatalogFile = { _source: string; _generatedAt: string; models: ModelCatalog };
 ```
-- 消費側 `model-catalog.ts` は `import catalog from '^/resource/model-catalog-data.json' with { type: 'json' }`（ネイティブ ESM 必須・前例 `growi-version.ts`）で read。`resolveJsonModule: true` により **import 時に自動で型が付く（アサーション不要）**。`getSelectableModelIds(provider)` は、ヘッダを分離した `catalog.models`（provider→`string[]` のみなので `Record<string, readonly string[]>` として健全に扱える）から `catalog.models[provider] ?? []` を返す（`provider: AiProvider`、azure 等は `[]`＝自由入力）。runtime parse は不要（自前生成・生成時 zod 検証済み）／成果物が `ModelCatalogFile` に適合することは1本のテストで担保。
+- 消費側 `model-catalog.ts` は `import catalog from '^/resource/model-catalog-data.json' with { type: 'json' }`（ネイティブ ESM 必須・前例 `growi-version.ts`）で read。`resolveJsonModule: true` により **import 時に自動で型が付く（アサーション不要）**。`getSelectableModels(provider)` は、ヘッダを分離した `catalog.models`（provider→`ModelCatalogEntry[]` なので `Record<string, readonly ModelCatalogEntry[]>` として健全に扱える）から `catalog.models[provider] ?? []` を返す（`provider: AiProvider`、azure 等は `[]`＝自由入力）。runtime parse は不要（自前生成・生成時 zod 検証済み）／成果物が `ModelCatalogFile` に適合することは1本のテストで担保。
 - 既存 `AllowedModel` / `AiSettingsResponse` / `AiSettingsUpdateRequest` は変更しない（4.x）。
 
 ## Error Handling
@@ -392,29 +397,29 @@ export type ModelCatalogFile = { _source: string; _generatedAt: string; models: 
 - **取り込みステップ（リリース前段）のスキーマドリフト／空結果（Issue 2）**: 取得 JSON が想定形でない、またはいずれかの対象プロバイダで選択可能モデルが0件になった場合、`vendor-model-catalog` は**非ゼロ終了して既存成果物を保持**する（「無言の空カタログ」出荷を防止）。何が欠けたか（プロバイダ名・件数）をログに出し、refresh の PR/CI で検知させる。
 - **400 invalid provider**: `isAiProvider` 不合格 query → `ErrorV3` で 400。
 - **実行時のサーバ 5xx / 取得失敗**: フックの `error` → UI は自由入力にフォールバックし保存をブロックしない（3.2）。`res.apiv3Err(new ErrorV3(...), 500)`、秘匿を載せない。
-- **空一覧（azure 等）**: エラーではなく `{ modelIds: [] }`。UI は自由入力（3.1）。
+- **空一覧（azure 等）**: エラーではなく `{ models: [] }`。UI は自由入力（3.1）。
 - **成果物欠損/破損**: `model-catalog` は `catalog[provider] ?? []` でフェイルソフト（例外を投げない）。
 
 ## Testing Strategy
 
 ### Unit Tests
 - `chat-model-filter.isSelectableModel`: `tool_call:true & output:['text']` を通し、`tool_call:false` や `output:['image']`（embedding/image/audio 相当）を除外（6.1/6.2）。`CATALOG_PROVIDERS` に azure-openai を含めない。
-- `vendor-model-catalog`: fixture の api.json（openai/anthropic/google + 非chat混在）から、**chat＋tool の id のみ**の `provider→string[]` 成果物が決定的に生成される（2.x/6.1）。fetch 失敗時に既存成果物を保持し非ゼロ終了。**サニティチェック（Issue 2）: 想定外スキーマの fixture／いずれかの対象プロバイダが0件になる fixture で、非ゼロ終了かつ既存成果物を上書きしない**ことを検証。
-- `model-catalog.getSelectableModelIds`: コミット成果物を read し `openai` 非空・`azure-openai` は `[]`・**ネットワーク呼び出しなし**（1.1/2.x/3.1）。
+- `vendor-model-catalog`: fixture の api.json（openai/anthropic/google + 非chat混在）から、**chat＋tool の `{id,name}` のみ**の `provider→{id,name}[]` 成果物が決定的に生成される（`name` 欠落時は id フォールバック）（2.x/6.1）。fetch 失敗時に既存成果物を保持し非ゼロ終了。**サニティチェック（Issue 2）: 想定外スキーマの fixture／いずれかの対象プロバイダが0件になる fixture で、非ゼロ終了かつ既存成果物を上書きしない**ことを検証。
+- `model-catalog.getSelectableModels`: コミット成果物を read し `openai` 非空・`azure-openai` は `[]`・**ネットワーク呼び出しなし**（1.1/2.x/3.1）。
 - `useSWRxSelectableModels`: `provider===''` で fetch しない、provider 変更で再 fetch（5.1/5.2）。
 
 ### Integration Tests
-- `get-available-models` ルート: 非 admin → 401/403（7.2）、`?provider=openai` → `{ modelIds }` 非空、`?provider=azure-openai` → `{ modelIds: [] }`、不正 provider → 400、応答に apiKey/providerOptions を含まない（7.1）。
+- `get-available-models` ルート: 非 admin → 401/403（7.2）、`?provider=openai` → `{ models }` 非空（各要素 `{id,name}`）、`?provider=azure-openai` → `{ models: [] }`、不正 provider → 400、応答に apiKey/providerOptions を含まない（7.1）。
 
 ### Component (UI) Tests
-- `AllowedModelsField`: openai で `<select>`（options=フックの modelIds）、azure で自由入力（3.1）、フック error 時に自由入力へフォールバック（3.2）、保存済みだが一覧外の modelId が選択済み option として保持（1.5）、env-only（`disabled`）で編集不可（7.3）。
+- `AllowedModelsField`: openai で `<select>`（options=フックの models。表示は name・値は id）、azure で自由入力（3.1）、フック error 時に自由入力へフォールバック（3.2）、保存済みだが一覧外の modelId が選択済み option として保持（1.5）、env-only（`disabled`）で編集不可（7.3）。
 
 ### Regression（不変性の担保, 4.x）
 - `put-ai-settings` の単一 isDefault 不変条件・providerOptions JSON 検証、`resolveEffectiveModelId` の allow-list 検証、`get-models`（chat 側）応答が不変。
 
 ## Security Considerations
 - **一覧提供（read パス）の外部通信ゼロ**: 提供はローカル保存済みカタログ（committed 成果物 / RefreshedModelCatalog）の read のみ（2.x）。models.dev への fetch は取り込みスクリプトと refresh サービス（Req 9・AI 有効時のリフレッシュ時のみ）に限定。
-- **秘匿非漏洩**: 応答は `modelIds: string[]`（一覧）／`{ fetchedAt, counts }`（refresh メタデータ）のみ（7.1、[get-models.ts](../../../apps/app/src/features/mastra/server/routes/get-models.ts) の modelId-only 前例に準拠）。
+- **秘匿非漏洩**: 応答は `models: {id,name}[]`（一覧。id と公式表示名のみ）／`{ fetchedAt, counts }`（refresh メタデータ）のみ（7.1）。
 - **認可**: 一覧は `SCOPE.READ.ADMIN.AI`、リフレッシュは `SCOPE.WRITE.ADMIN.AI`、いずれも + `adminRequired`（7.2/9.7）。
 - **入力検証**: query `provider` は `isAiProvider` で allow-list 検証。リフレッシュの取得先はビルトイン定数（要求から指定不可、9.7）。
 - **ライセンス**: models.dev は MIT。成果物ヘッダ・RefreshedModelCatalog.source に帰属を記載。
@@ -450,7 +455,7 @@ graph LR
 | build-model-catalog | 共有 (pure) | api.json → zod 境界検証 → chat＋tool フィルタ → `ModelCatalog`。ingest script と refresh サービスの**単一ソース**（同一フィルタ・同一サニティチェック） | 6.x, 9.1 |
 | refresh-model-catalog | Server (runtime) | 固定 URL fetch（30s timeout）→ 共有変換 → `RefreshedModelCatalog.upsertSingleton`。**失敗時は永続化前に throw**（last-good 維持） | 9.1, 9.4, 9.7 |
 | RefreshedModelCatalog | Server (model) | `{ _id:'singleton', models, fetchedAt, supersededBundledGeneratedAt, source }` の専用 collection（`mastra_refreshed_model_catalog`）。**Prisma-first**（schema.prisma の `mastrarefreshedmodelcatalogs` + `@@map`、`getSingleton`/`upsertSingleton` は Prisma extension。新規 collection のため Mongoose schema は持たない）。多インスタンス共有・再起動耐性。config-manager には置かない（設定ではなくキャッシュ） | 9.1, 9.5 |
-| effective-model-catalog | Server (runtime) | `getEffectiveSelectableModelIds(provider)` = 更新済み／同梱の**新しい方**（比較は**同梱 `_generatedAt` 同士**: refresh 時点で同梱されていた世代 `supersededBundledGeneratedAt` vs 現在の同梱 `_generatedAt`。両辺とも vendoring 実行機のクロック由来なので、サーバ時計の遅れが成功した refresh を同梱で覆い隠すことがない。同梱世代が**厳密に**新しい場合のみ同梱＝イメージ更新後の古いスナップショットの覆い隠しを防止。tie（同一イメージ上での refresh）・タイムスタンプ不正・ロールバックは更新済み優先。無ければ同梱。`?? []` フェイルソフトは従来どおり）。get-available-models はこれを await する | 9.5, 2.x, 3.1 |
+| effective-model-catalog | Server (runtime) | `getEffectiveSelectableModels(provider)` = 更新済み／同梱の**新しい方**（比較は**同梱 `_generatedAt` 同士**: refresh 時点で同梱されていた世代 `supersededBundledGeneratedAt` vs 現在の同梱 `_generatedAt`。両辺とも vendoring 実行機のクロック由来なので、サーバ時計の遅れが成功した refresh を同梱で覆い隠すことがない。同梱世代が**厳密に**新しい場合のみ同梱＝イメージ更新後の古いスナップショットの覆い隠しを防止。tie（同一イメージ上での refresh）・タイムスタンプ不正・ロールバックは更新済み優先。無ければ同梱。`?? []` フェイルソフトは従来どおり）。get-available-models はこれを await する | 9.5, 2.x, 3.1 |
 | post-refresh-model-catalog | Server (route) | `POST /_api/v3/ai-settings/refresh-model-catalog`。`[accessTokenParser([SCOPE.WRITE.ADMIN.AI]) → login → admin]`。成功 200 `{ fetchedAt, counts }`／失敗は generic 500（内部情報を漏らさない） | 9.1, 9.7, 7.1 |
 | model-catalog-refresh-jobs | Server (boot) | `startModelCatalogRefreshCronIfEnabled()`（**AI 無効なら no-op**、schedule 未設定/空でも no-op、invalid でも boot を壊さない）＋ `triggerModelCatalogRefreshOnStartupIfEnabled()`（**AI 無効なら no-op**、fire-and-forget）。両者とも先頭で `isAiEnabled()` をチェック（Req 9.6）。crowi の `setupCron()` / `asyncAfterExpressServerReady()` から呼ぶ | 9.2, 9.3, 9.4, 9.6 |
 | AllowedModelsField 更新ボタン | Client (UI) | Models セクション見出しの「カタログを更新」→ **確認モーダル（ConfirmModal 再利用。外部サービス models.dev への通信が発生する旨を明示し、確認後にのみ実行 — 9.6）** → apiv3Post → 成功で全 provider キャッシュ invalidate＋toast。**env-only モードでも有効**（カタログは設定ではなく公開メタデータのサーバ側キャッシュであり、env-only 運用の GROWI.cloud がこの機能の主対象のため） | 9.1 |

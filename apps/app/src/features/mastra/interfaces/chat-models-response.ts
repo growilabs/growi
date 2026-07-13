@@ -4,14 +4,16 @@ import type { ModelKey } from './model-key';
 /**
  * One selectable model in the chat selector. `key` is the opaque composite
  * identifier the client sends back (POST message) and persists
- * (`UserUISettings.aiChatSelectedModelKey`); `provider` and `modelId` are for
- * display only (the selector groups entries by provider — Req 4.2 — and shows
- * the raw modelId, which has no friendly name).
+ * (`UserUISettings.aiChatSelectedModelKey`); `provider`, `modelId`, and
+ * `displayName` are for display only. The selector groups entries by provider
+ * (Req 4.2) and shows the official `displayName` resolved from the catalog
+ * (falling back to `modelId` for catalog-less providers / free-text / removed ids).
  */
 export interface ChatModelEntry {
   key: ModelKey;
   provider: AiProvider;
   modelId: string;
+  displayName: string;
 }
 
 /**
