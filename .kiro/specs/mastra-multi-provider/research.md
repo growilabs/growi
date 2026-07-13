@@ -246,7 +246,7 @@ Claude Design プロジェクト「GROWI AI機能設定UI改善」(https://claud
 4. **D4 既定モデル**: `isDefault` フラグ維持(グローバル 1)。実行時の実効既定 = 既定エントリが有効ならそれ、無効なら「有効なエントリの先頭」(決定的、R6.4)。
 5. **D5 UserUISettings**: `aiChatSelectedModelId` → `aiChatSelectedModelKey` へ改名(値が modelKey になり意味が変わるため。プレリリース、旧フィールドは放置)。PUT ルートのハードコード allow-list 拡張が必須。
 6. **D6 env-only PUT 分割**: env-only 時、PUT は `allowedModels` のみ受理。`providers` / `aiEnabled` を含むリクエストは 400(暗黙無視より明示的、R5.2)。
-7. **D7 チャット API**: `ChatModelsResponse = { models: Array<{ key, provider, modelId }>, selectedModelKey }`(クライアントは parse せず構造化データを使用)。post-message body は `modelKey` に改名。
+7. **D7 チャット API**: `ChatModelsResponse = { models: Array<{ key, provider, modelId, displayName }>, selectedModelKey }`(クライアントは parse せず構造化データを使用。`displayName` はカタログ由来の公式表示名で id フォールバック)。post-message body は `modelKey` に改名。
 8. **D8 管理 UI**: モック準拠の 3 新コンポーネント(DefaultModelSelector / ProviderTabs / ProviderPanel)+ AllowedModelsField を provider スコープ化。ProviderCommonSettings は削除。フォーム値は `providers: Record<AiProvider, ProviderFormValue>` + フラットな `allowedModels[]`(グローバル既定検証のため単一配列)。
 
 ### Risks & Mitigations

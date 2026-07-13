@@ -36,7 +36,14 @@ describe('groupModelsByProvider', () => {
 });
 
 describe('formatModelLabel', () => {
-  it('joins provider and modelId with a middle dot', () => {
-    expect(formatModelLabel('openai', 'gpt-4o')).toBe('openai · gpt-4o');
+  it('joins the provider display name and the model display name with a middle dot', () => {
+    expect(formatModelLabel('openai', 'GPT-4o')).toBe('OpenAI · GPT-4o');
+  });
+
+  it('uses the provider display name, not the raw provider key', () => {
+    // Azure has no catalog, so its display name is the deployment name itself.
+    expect(formatModelLabel('azure-openai', 'my-deployment')).toBe(
+      'Azure OpenAI · my-deployment',
+    );
   });
 });

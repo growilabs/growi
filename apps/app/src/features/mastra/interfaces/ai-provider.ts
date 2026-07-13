@@ -13,20 +13,28 @@
  * `false`: its model IDs are operator-defined deployment names that cannot be
  * enumerated, so it stays free-input.
  *
- * Declaring the flag alongside the provider (rather than in a separate list)
+ * `label` — the provider's official display name, shown wherever a provider is
+ * named in the UI (admin tabs/selectors, chat model selector). The raw provider
+ * KEY (`openai`, `azure-openai`) is an internal identifier and is never shown to
+ * users. Kept in this dependency-free map (not sourced from models.dev) so it
+ * covers every provider — including `azure-openai`, which has no models.dev
+ * catalog — and stays available on both server and client without a fetch.
+ *
+ * Declaring the flags alongside the provider (rather than in separate lists)
  * makes adding a provider a single, unforgettable decision: `CATALOG_PROVIDERS`
  * (chat-model-filter.ts) is derived from this map, so it can never silently
  * drift out of sync with the provider set.
  */
 interface AiProviderMeta {
   readonly enumerable: boolean;
+  readonly label: string;
 }
 
 export const AI_PROVIDER_DEFS = {
-  openai: { enumerable: true },
-  anthropic: { enumerable: true },
-  google: { enumerable: true },
-  'azure-openai': { enumerable: false },
+  openai: { enumerable: true, label: 'OpenAI' },
+  anthropic: { enumerable: true, label: 'Anthropic' },
+  google: { enumerable: true, label: 'Google' },
+  'azure-openai': { enumerable: false, label: 'Azure OpenAI' },
 } as const satisfies Record<string, AiProviderMeta>;
 
 export type AiProvider = keyof typeof AI_PROVIDER_DEFS;
@@ -40,6 +48,14 @@ export const AI_PROVIDERS: readonly AiProvider[] = Object.keys(
 export const isAiProvider = (value: unknown): value is AiProvider =>
   typeof value === 'string' &&
   (AI_PROVIDERS as readonly string[]).includes(value);
+
+/**
+ * The provider's official display name (`AI_PROVIDER_DEFS[provider].label`).
+ * The single accessor every UI site uses to render a provider name, so the raw
+ * provider key never leaks to users and the four labels stay defined in one place.
+ */
+export const getProviderLabel = (provider: AiProvider): string =>
+  AI_PROVIDER_DEFS[provider].label;
 
 /**
  * Build a fixed-slot Record over ALL supported providers by mapping each one.
