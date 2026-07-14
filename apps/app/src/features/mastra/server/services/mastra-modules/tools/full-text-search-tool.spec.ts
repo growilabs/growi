@@ -1,6 +1,7 @@
-import type { IUserHasId } from '@growi/core';
+import type { IPageHasId, IUserHasId } from '@growi/core';
 import { RequestContext } from '@mastra/core/request-context';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type MockProxy, mock } from 'vitest-mock-extended';
 
 import type { ISearchResult } from '~/interfaces/search';
 import type SearchService from '~/server/service/search';
@@ -60,30 +61,22 @@ const buildMockUser = (): IUserHasId =>
     username: 'test-user',
   }) as unknown as IUserHasId;
 
-type MockSearchService = {
-  isElasticsearchEnabled: boolean;
-  searchKeyword: ReturnType<typeof vi.fn>;
-  formatSearchResult: ReturnType<typeof vi.fn>;
-};
-
-// Build a SearchService-typed mock. The cast inside this builder isolates
-// the boundary where the mock satisfies the SearchService interface — the
-// tool only reads `isElasticsearchEnabled`, `searchKeyword` and
-// `formatSearchResult`, so a partial stub typed as the real class is
-// sufficient. Call sites stay cast-free. `formatSearchResult` defaults to an
-// empty formatted result so argument-forwarding tests need not restate it.
+// Build a type-safe SearchService mock (vitest-mock-extended): every member
+// is auto-stubbed and typed against the real class, so configuring
+// `searchKeyword` / `formatSearchResult` at call sites is compile-checked and
+// needs no cast. `formatSearchResult` defaults to an empty formatted result
+// so argument-forwarding tests need not restate it.
 const buildMockSearchService = (
-  overrides: Partial<MockSearchService> = {},
-): MockSearchService & SearchService => {
-  const mock: MockSearchService = {
-    isElasticsearchEnabled: true,
-    searchKeyword: vi.fn(),
-    formatSearchResult: vi
-      .fn()
-      .mockResolvedValue({ data: [], meta: { total: 0, hitsCount: 0 } }),
-    ...overrides,
-  };
-  return mock as unknown as MockSearchService & SearchService;
+  overrides: { isElasticsearchEnabled?: boolean } = {},
+): MockProxy<SearchService> => {
+  const searchService = mock<SearchService>({
+    isElasticsearchEnabled: overrides.isElasticsearchEnabled ?? true,
+  });
+  searchService.formatSearchResult.mockResolvedValue({
+    data: [],
+    meta: { total: 0, hitsCount: 0 },
+  });
+  return searchService;
 };
 
 // Discriminated union mirroring the tool's outputSchema. Defined locally so
@@ -288,11 +281,18 @@ describe('fullTextSearchTool', () => {
       // formatSearchResult returns IFormattedSearchResult: each entry has the
       // full page document under `.data` and the snippet under
       // `.meta.elasticSearchResult.snippet`. `body` is included on `.data` to
-      // prove the tool projects only _id / path (requirement 6.5).
+      // prove the tool projects only _id / path (requirement 6.5). The cast is
+      // scoped to this fixture: it deliberately carries the extra `body` key,
+      // and a full IPageHasId literal would only add noise.
+      const pageDocWithBody = {
+        _id: 'abc',
+        path: '/p1',
+        body: 'HIDDEN_BODY',
+      } as unknown as IPageHasId;
       mockSearchService.formatSearchResult.mockResolvedValue({
         data: [
           {
-            data: { _id: 'abc', path: '/p1', body: 'HIDDEN_BODY' },
+            data: pageDocWithBody,
             meta: {
               elasticSearchResult: { snippet: 'snip', highlightedPath: null },
             },
@@ -353,10 +353,16 @@ describe('fullTextSearchTool', () => {
       ]);
       // snippet: null is what canShowSnippet produces for a page the caller
       // cannot view — the tool must omit the key entirely (not emit "").
+      // Cast scoped to the fixture: only _id / path matter for this
+      // projection test; a full IPageHasId literal would only add noise.
+      const unviewablePageDoc = {
+        _id: 'noSnippet',
+        path: '/p2',
+      } as unknown as IPageHasId;
       mockSearchService.formatSearchResult.mockResolvedValue({
         data: [
           {
-            data: { _id: 'noSnippet', path: '/p2' },
+            data: unviewablePageDoc,
             meta: {
               elasticSearchResult: { snippet: null, highlightedPath: null },
             },
