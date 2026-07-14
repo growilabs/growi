@@ -498,6 +498,27 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount',
     expect(firstCallArgs.options).toEqual({ maxTimeMS: 5000 });
   });
 
+  it('trims surrounding whitespace out of q before anchoring the regex', async () => {
+    // Arrange
+    const { client, aggregateRawSpy } = buildAggregateClient();
+    aggregateRawSpy.mockResolvedValueOnce([] as never);
+    aggregateRawSpy.mockResolvedValueOnce([{ total: 0 }] as never);
+
+    // Act
+    await client.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+      '  ali  ',
+      { sortOpt: 1, offset: 0, limit: 10 },
+    );
+
+    // Assert: the leading/trailing spaces are not part of the anchored prefix
+    const firstCallArgs = aggregateRawSpy.mock.calls[0]?.[0] as {
+      pipeline: unknown[];
+    };
+    expect(firstCallArgs.pipeline[0]).toEqual({
+      $match: { 'snapshot.username': { $regex: '^ali', $options: 'i' } },
+    });
+  });
+
   it('totalCount pipeline uses $match, $group, $count to reproduce distinct count', async () => {
     // Arrange
     const { client, aggregateRawSpy } = buildAggregateClient();
@@ -653,6 +674,23 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegex', () => {
       { $limit: 15 },
     ]);
     expect(callArgs.options).toEqual({ maxTimeMS: 5000 });
+  });
+
+  it('trims surrounding whitespace out of q before anchoring the regex', async () => {
+    const { client, aggregateRawSpy } = buildAggregateClient();
+    aggregateRawSpy.mockResolvedValueOnce([] as never);
+
+    await client.activities.findSnapshotUsernamesByUsernameRegex('  ali  ', {
+      offset: 0,
+      limit: 10,
+    });
+
+    const callArgs = aggregateRawSpy.mock.calls[0]?.[0] as {
+      pipeline: unknown[];
+    };
+    expect(callArgs.pipeline[0]).toEqual({
+      $match: { 'snapshot.username': { $regex: '^ali', $options: 'i' } },
+    });
   });
 
   it.each([

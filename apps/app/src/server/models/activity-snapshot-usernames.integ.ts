@@ -385,4 +385,20 @@ describe('findSnapshotUsernamesByUsernameRegex', () => {
 
     expect(result).toEqual(['aaaaaaaaaa']);
   });
+
+  it('matches by prefix even with incidental surrounding whitespace in q', async () => {
+    await prisma.activities.createMany({
+      data: [
+        makeActivityData({ username: 'alice' }),
+        makeActivityData({ username: 'notalice' }),
+      ],
+    });
+
+    const result = await prisma.activities.findSnapshotUsernamesByUsernameRegex(
+      '  ali  ',
+      { offset: 0, limit: 10 },
+    );
+
+    expect(result).toEqual(['alice']);
+  });
 });

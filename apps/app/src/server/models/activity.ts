@@ -276,11 +276,13 @@ function buildSnapshotUpdateEnvelope(
 }
 
 // escapeStringForMongoRegex, not RegExp.escape (mongodb-regex rule — PCRE2
-// rejects RegExp.escape's \uXXXX output).
+// rejects RegExp.escape's \uXXXX output). Trims `q` so the match stays
+// consistent with isQueryTooShort's trimmed-length check below (untrimmed
+// would anchor to a leading/trailing space instead of the intended prefix).
 const buildSnapshotUsernameMatchStage = (q: string) => ({
   $match: {
     'snapshot.username': {
-      $regex: `^${escapeStringForMongoRegex(q)}`,
+      $regex: `^${escapeStringForMongoRegex(q.trim())}`,
       $options: 'i',
     },
   },
