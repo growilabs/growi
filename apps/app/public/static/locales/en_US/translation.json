@@ -811,6 +811,9 @@
     "filter_editor": "Editor",
     "filter_by_editor": "Filter by editor",
     "filter_tag": "Tag",
+    "filter_group": "Group",
+    "filter_group_select": "Select groups",
+    "filter_group_none": "No groups available",
     "sort_axis": {
       "relationScore": "Sort by relevance",
       "createdAt": "Creation date",

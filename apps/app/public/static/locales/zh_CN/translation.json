@@ -816,6 +816,9 @@
     "filter_editor": "编辑者",
     "filter_by_editor": "按编辑者筛选",
     "filter_tag": "标签",
+    "filter_group": "用户组",
+    "filter_group_select": "选择用户组",
+    "filter_group_none": "没有可用的用户组",
     "sort_axis": {
       "relationScore": "按相关性排序",
       "createdAt": "按创建日期排序",

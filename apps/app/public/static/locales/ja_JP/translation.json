@@ -844,6 +844,9 @@
     "filter_editor": "更新者",
     "filter_by_editor": "更新者で絞り込む",
     "filter_tag": "タグ",
+    "filter_group": "グループ",
+    "filter_group_select": "グループを選択",
+    "filter_group_none": "所属グループがありません",
     "sort_axis": {
       "relationScore": "関連度順",
       "createdAt": "作成日時",

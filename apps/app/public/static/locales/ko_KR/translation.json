@@ -771,6 +771,9 @@
     "filter_editor": "편집자",
     "filter_by_editor": "편집자로 필터링",
     "filter_tag": "태그",
+    "filter_group": "그룹",
+    "filter_group_select": "그룹 선택",
+    "filter_group_none": "사용 가능한 그룹이 없습니다",
     "sort_axis": {
       "relationScore": "관련성별 정렬",
       "createdAt": "생성일",

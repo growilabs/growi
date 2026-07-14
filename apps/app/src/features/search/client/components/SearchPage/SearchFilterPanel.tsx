@@ -1,8 +1,10 @@
-import { type JSX, type ReactNode, useCallback, useId } from 'react';
+import { type JSX, type ReactNode, useCallback, useId, useState } from 'react';
 import { useTranslation } from 'next-i18next';
+import { Dropdown, DropdownMenu, DropdownToggle } from 'reactstrap';
 
 import { SearchUsernameTypeahead } from '~/client/components/Admin/AuditLog/SearchUsernameTypeahead';
 import { TagsInput } from '~/client/components/PageTags/TagEditModal/TagsInput';
+import { useSWRxUserRelatedGroups } from '~/stores/user';
 
 import type { SearchFilterState } from '../../utils/search-query';
 
@@ -54,6 +56,80 @@ const UsernameFilterField = (props: UsernameFilterFieldProps): JSX.Element => {
   );
 };
 
+type GroupFilterFieldProps = {
+  label: string;
+  selected: string[];
+  onChange: (groups: string[]) => void;
+};
+
+/**
+ * Groups are a finite per-user set, so this is a checklist dropdown rather than a
+ * typeahead. The stored value is the group NAME, not the id: the server resolves
+ * `group:` terms by name (see resolveFilterData in server/service/search.ts).
+ */
+const GroupFilterField = (props: GroupFilterFieldProps): JSX.Element => {
+  const { label, selected, onChange } = props;
+  const { t } = useTranslation();
+  const { data } = useSWRxUserRelatedGroups();
+  const [isOpen, setIsOpen] = useState(false);
+  const baseId = useId();
+
+  const groups = data?.relatedGroups ?? [];
+
+  const toggleGroup = useCallback(
+    (name: string, checked: boolean) => {
+      onChange(
+        checked ? [...selected, name] : selected.filter((n) => n !== name),
+      );
+    },
+    [onChange, selected],
+  );
+
+  return (
+    <FilterFieldCell label={label}>
+      <Dropdown isOpen={isOpen} toggle={() => setIsOpen((v) => !v)}>
+        <DropdownToggle
+          caret
+          color="outline-secondary"
+          disabled={groups.length === 0}
+          className="w-100 d-flex align-items-center justify-content-between"
+        >
+          <span>{t('search_result.filter_group_select', 'Select groups')}</span>
+          {selected.length > 0 && (
+            <span className="badge bg-primary ms-2">{selected.length}</span>
+          )}
+        </DropdownToggle>
+        <DropdownMenu className="w-100 px-2">
+          {groups.length === 0 ? (
+            <span className="text-muted px-2">
+              {t('search_result.filter_group_none', 'No groups available')}
+            </span>
+          ) : (
+            groups.map((group, index) => {
+              const name = group.item.name;
+              const checkboxId = `${baseId}-${index}`;
+              return (
+                <div className="form-check py-1" key={String(group.item._id)}>
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id={checkboxId}
+                    checked={selected.includes(name)}
+                    onChange={(e) => toggleGroup(name, e.target.checked)}
+                  />
+                  <label className="form-check-label" htmlFor={checkboxId}>
+                    {name}
+                  </label>
+                </div>
+              );
+            })
+          )}
+        </DropdownMenu>
+      </Dropdown>
+    </FilterFieldCell>
+  );
+};
+
 /**
  * Controlled: the parent (`SearchControl`) owns `SearchFilterState` and merges it
  * into the query at request time, so widgets here only map their value in/out.
@@ -83,6 +159,13 @@ export const SearchFilterPanel = (props: Props): JSX.Element => {
     [filters, onChange],
   );
 
+  const groupsChangeHandler = useCallback(
+    (groups: string[]) => {
+      onChange({ ...filters, groups });
+    },
+    [filters, onChange],
+  );
+
   return (
     <div className="p-3">
       <div className="row g-3">
@@ -105,6 +188,11 @@ export const SearchFilterPanel = (props: Props): JSX.Element => {
             onTagsUpdated={tagsChangeHandler}
           />
         </FilterFieldCell>
+        <GroupFilterField
+          label={t('search_result.filter_group', 'Group')}
+          selected={filters.groups}
+          onChange={groupsChangeHandler}
+        />
       </div>
     </div>
   );

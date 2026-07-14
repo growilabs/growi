@@ -806,6 +806,9 @@
     "filter_editor": "Éditeur",
     "filter_by_editor": "Filtrer par éditeur",
     "filter_tag": "Étiquette",
+    "filter_group": "Groupe",
+    "filter_group_select": "Sélectionner des groupes",
+    "filter_group_none": "Aucun groupe disponible",
     "sort_axis": {
       "relationScore": "Trier par pertinence",
       "createdAt": "Date de création",
