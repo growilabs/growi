@@ -900,8 +900,9 @@ export const growiAgent = new Agent({
 2. `requestContext.get('user')` が `undefined` のとき `result: 'context_error'` を返す（6.6, 3.2）
 3. `requestContext.get('searchService')` が `undefined` のとき `result: 'context_error'` を返す（6.6）
 4. `searchService.isElasticsearchEnabled === false` のとき `result: 'error', reason: 'elasticsearch_not_configured'` を返し、`searchKeyword` は呼ばれない（要件 6.1 / OSS デプロイ対応）
-5. `searchService.searchKeyword` をモックして結果配列を `{ pageId, pagePath, snippet }` 形にマップ（6.2, 6.3, 6.4）
-6. SearchService の戻り値に `body` が含まれていても tool 出力には含めないこと（6.5）
+5. `searchKeyword` の生結果と `delegatorName` / `user` / `userGroups` が `formatSearchResult` へそのまま転送され、その出力（`IFormattedSearchResult`）が `{ pageId, pagePath, snippet }` 形にマップされる（`searchKeyword` / `formatSearchResult` を mock、6.2, 6.3, 6.4）
+5b. `formatSearchResult` が `snippet: null`（`canShowSnippet` ゲート相当）を返したとき、`snippet` キー自体を省略する（空文字を出さない）（6.4, 6.5）
+6. `formatSearchResult` が返すページドキュメント（`data[i].data`）に `body` が含まれていても tool 出力には含めないこと（6.5）
 7. SearchService が reject された場合に `result: 'error'` を返し execute が throw しないこと（6.8）
 8. `requestContext` 経由の `user: IUserHasId` がそのまま `SearchService.searchKeyword` の第 3 引数に渡ること（合成オブジェクトでなく `req.user` の参照同一性が保たれること、6.7）
 9. **クエリ構文の素通し**: `query` に `prefix:/docs -draft tag:meeting "release notes"` 等の演算子を含む文字列を渡したとき、tool 層で文字列が改変されず `SearchService.searchKeyword` の第 1 引数にそのまま渡ること（サニタイザ不在の保証、本 spec の Plan A 採用根拠）
@@ -937,7 +938,7 @@ export const growiAgent = new Agent({
 
 > 単なる引数フォワーディング / 出力マッピング / 例外処理 / `userGroups` 解決 / `sort`・`order` 素通しは `searchKeyword` / `formatSearchResult` を mock する unit test (`full-text-search-tool.spec.ts`) が担う。integ test は **実 ES でしか検証できない振る舞い**に絞る。
 
-**インデックス分離**: `app-integration` は複数 fork で並列実行され、`elasticsearch.integ.ts` は共有 `growi` インデックスを rebuild（delete + recreate）する。衝突を避けるため、本 suite は `app:elasticsearchUri` を worker 専用インデックスに上書きし（DB config が env を上書きする getConfig の性質を利用、DB は worker 毎）、afterAll で復元する。トークンは英字のみ・worker/run 毎にユニーク（ES tokenizer が英数境界で分割するため数字を含めない）。
+**インデックス分離**: `app-integration` は複数 fork で並列実行され、`elasticsearch.integ.ts` は共有 `growi` インデックスを rebuild（delete + recreate）する。衝突を避けるため、本 suite は環境変数 `ELASTICSEARCH_URI` のインデックス名部分だけを worker 専用（`growi_ftstool_{workerId}`）に書き換えて `configManager.loadConfigs()` で再読込し、afterAll で復元する（host は環境提供の URI を引き継ぐ — devcontainer は `elasticsearch:9200`、CI は `localhost:9200`。なお `getConfig` は DB 値優先だが、worker 毎のテスト DB に `app:elasticsearchUri` の DB 値は存在しないため env 上書きが有効になる）。トークンは英字のみ・worker/run 毎にユニーク（ES tokenizer が英数境界で分割するため数字を含めない）。
 
 実 MongoDB に Revision 付きページ（`aggregatePipelineToIndex` が revision を `$unwind` するため revision 必須）を seed → `syncPageUpdated` で ES に投入 → ES refresh をポーリング待機し、以下を確認:
 
