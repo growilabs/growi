@@ -55,7 +55,7 @@
     4. **ES disabled**: `searchService.isElasticsearchEnabled === false` → `result: 'error', reason: 'elasticsearch_not_configured'`、**`searchKeyword` が呼ばれないことを assert**
     5. **SearchService 例外**: `searchKeyword.mockRejectedValue(...)` → `result: 'error'`、execute が throw しない
   - 成功ケース: `searchKeyword.mockResolvedValue([searchResult, 'delegator'])` かつ `formatSearchResult.mockResolvedValue({ data: [{ data: { _id, path }, meta: { elasticSearchResult: { snippet } } }], meta: { total } })` で、tool が生結果を `formatSearchResult` に転送し（`searchResult` / `delegatorName` / `user` / `userGroups` を forward）、その出力を `hits` にマップすることを assert
-  - 戻り値マッピングで `body`（ページドキュメント側に混入させても）が出力に現れないこと、`pagePath` / `pageId` / `snippet` が正しく抽出されること、`snippet: null`（`canShowSnippet` ゲート相当）のとき `snippet` キーが省略されることを assert
+  - 戻り値マッピングで `body`（ページドキュメント側に混入させても）が出力に現れないこと、`pagePath` / `pageId` / `snippet` が正しく抽出されること、`snippet: null`（`canShowSnippet` ゲート相当）および空文字 `""` のとき `snippet` キーが省略されることを assert
   - **`user` 参照同一性の assert**: `requestContext.set('user', mockUser)` でセットした `mockUser` オブジェクトが、`searchKeyword.mock.calls[0][2]` と `===` で一致すること（合成 user に組み替えていない、`User.findById` でも置き換えていない）を確認（design.md test #8、要件 6.7 / Issue 1 C 案の回帰防止）
   - **クエリ構文の素通し**: `query` に `prefix:/docs -draft tag:meeting "release notes"` 等の演算子を含む文字列を渡した場合に、tool 層で文字列が改変されず `searchKeyword` の第 1 引数にそのまま渡ることを assert（サニタイザ不在の保証、Plan A 採用根拠の回帰防止）
   - 観察可能完了: `pnpm vitest run full-text-search-tool.spec` が緑、上記すべての挙動が assert される

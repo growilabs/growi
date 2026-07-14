@@ -390,6 +390,51 @@ describe('fullTextSearchTool', () => {
       // No snippet field when the gate drops it (must be omitted, not "").
       expect(Object.hasOwn(result.hits[0], 'snippet')).toBe(false);
     });
+
+    it('omits snippet when formatSearchResult yields an empty-string snippet', async () => {
+      const requestContext = buildRequestContext();
+      const mockUser = buildMockUser();
+      const mockSearchService = buildMockSearchService();
+      mockSearchService.searchKeyword.mockResolvedValue([
+        { data: [], meta: { total: 1, hitsCount: 1 } },
+        SearchDelegatorName.DEFAULT,
+      ]);
+      // An empty-string snippet carries no information for the agent — the
+      // tool must omit the key just like the null case (spec: "null / 空文字
+      // は省略"). Cast scoped to the fixture as above.
+      const pageDoc = {
+        _id: 'emptySnippet',
+        path: '/p3',
+      } as unknown as IPageHasId;
+      mockSearchService.formatSearchResult.mockResolvedValue({
+        data: [
+          {
+            data: pageDoc,
+            meta: {
+              elasticSearchResult: { snippet: '', highlightedPath: null },
+            },
+          },
+        ],
+        meta: { total: 1, hitsCount: 1 },
+      });
+      requestContext.set('user', mockUser);
+      requestContext.set('searchService', mockSearchService);
+
+      const result = await invokeExecute(
+        { query: 'hello', limit: 5 },
+        requestContext,
+      );
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      expect(result.result).toBe('ok');
+      if (result.result !== 'ok') return;
+      expect(result.hits[0]).toEqual({
+        pageId: 'emptySnippet',
+        pagePath: '/p3',
+      });
+      expect(Object.hasOwn(result.hits[0], 'snippet')).toBe(false);
+    });
   });
 
   describe('user reference identity (requirement 6.7 / Issue 1 Plan C regression guard)', () => {
