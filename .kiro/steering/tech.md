@@ -1,12 +1,27 @@
 # Technology Stack
 
-See: `.claude/skills/tech-stack/SKILL.md` (auto-loaded by Claude Code)
+The tech-stack overview lives in `AGENTS.md` / `apps/app/AGENTS.md` (auto-loaded via `CLAUDE.md`). This file records cc-sdd-specific build/runtime decisions.
 
 ## cc-sdd Specific Notes
+
+### Module System (native ESM)
+
+Since the ESM migration (2026-06), the workspace root, `apps/app`, and the 17 shared `@growi/*` packages under `packages/*` all declare `"type": "module"`. `apps/app`'s Express server emits native ESM under `dist/`, and **the runtime path contains no `ts-node` / `tsx`** — TypeScript runs via Node v24's built-in type stripping:
+
+- **Production**: `node --import ./bin/runtime/env-preload.mjs dist/server/app.js` (`server:ci` adds `--ci` for load-only smoke); `bin/runtime/` holds the self-contained runtime hooks and is the only `bin/` subset shipped in the production tarball
+- **Dev**: `nodemon` → Node v24 native TS + an in-thread resolve-only hook (`apps/app/bin/runtime/dev-esm-resolver.mjs`) that maps `~/`/`^/` aliases and `.js`→`.ts`
+
+Node 24's `require(esm)` lets residual CommonJS consumers (e.g. third-party `@lykmapipo/common`) load ESM-only transitive deps, **but it returns a module *namespace* object, not the CJS default export**. Packages that read members off the default (e.g. `mime.getType`) still need a CJS pin; packages that use named members (e.g. `flat.flatten`) work natively. This is why `pnpm-workspace.yaml` keeps the `@lykmapipo/common>mime` pin but no longer needs the `flat` / `parse-json` pins (esm-migration Phase 5).
+
+### apps/app Import Convention (esm-import-convention, 2026-06)
+
+`apps/app/src` uses a **single no-extension import convention** (local → relative `./X` / `../X`, cross-module → `~/X`; never `.js`/`.jsx` in source). The `.js` is added only at server-build emit by `bin/add-js-extensions.ts` and verified by `bin/verify-dist-resolution.ts` (both run directly via Node native type stripping) — this replaced the former dual-notation (`~/X.js` for NodeNext-program files vs extensionless relative) from esm-migration. The full developer rule lives in **`apps/app/.claude/rules/import-convention.md`** (app-scoped); this note records only the build/runtime decision behind it.
 
 ### Bundler Strategy (Project-Wide Decision)
 
 GROWI uses **Turbopack** (Next.js 16 default) for **both development and production builds** (`next build` without flags). Webpack fallback is available via `USE_WEBPACK=1` environment variable for debugging only. All custom webpack loaders/plugins have been migrated to Turbopack equivalents (`turbopack.rules`, `turbopack.resolveAlias`). See `apps/app/.claude/skills/build-optimization/SKILL.md` for details.
+
+`transpilePackages` is now **empty**: once `apps/app` became native ESM, Turbopack resolves the ESM-only unified/remark/rehype ecosystem (and superjson) natively, so the former 40 hardcoded + 6 prefix-group entries were all removed during the migration (Phase 4). See `apps/app/next.config.ts` for the rationale comment.
 
 ### Import Optimization Principles
 
@@ -29,7 +44,7 @@ Turbopack externalises such packages to `.next/node_modules/` (symlinks into the
 2. Replace the runtime dependency with a static asset (e.g., extract data to a committed JSON file), **or**
 3. Change the import to a dynamic `import()` inside a `useEffect` (browser-only execution).
 
-**Packages justified to stay in `dependencies`** (SSR-reachable static imports as of v7.5):
+**Packages justified to stay in `dependencies`** (SSR-reachable static imports as of v8):
 - `react-toastify` — `toastr.ts` static `{ toast }` import reachable from SSR pages; async refactor would break API surface
 - `bootstrap` — still externalised despite `useEffect`-guarded `import()` in `_app.page.tsx`; Turbopack traces call sites statically
 - `diff2html` — still externalised despite `ssr: false` on `RevisionDiff`; static import analysis reaches it
@@ -43,7 +58,7 @@ Turbopack externalises such packages to `.next/node_modules/` (symlinks into the
 `assemble-prod.sh` produces the release artifact via **workspace-root staging** (not `apps/app/` staging):
 
 ```
-pnpm deploy out --prod --legacy   → self-contained out/node_modules/ (pnpm v10)
+pnpm deploy out --prod --legacy   → self-contained out/node_modules/ (pnpm v11)
 rm -rf node_modules
 mv out/node_modules node_modules  → workspace root is now prod-only
 ln -sfn ../../node_modules apps/app/node_modules  → compatibility symlink
@@ -59,5 +74,45 @@ For apps/app-specific build optimization details (webpack config, null-loader ru
 
 The monorepo uses **pino** (via `@growi/logger`) as the standard logging library. Legacy bunyan usage has been migrated.
 
+`@growi/logger` is a **universal** package (server + browser). Two constraints follow from that, both learned the hard way (esm-migration):
+
+- **No static `import … from 'node:*'` that a browser code path can reach.** Builtins like `node:module` have no browser polyfill and break the Turbopack client build. Acquire them at runtime inside a server-only branch via `process.getBuiltinModule('node:module')` (not an import statement → never enters the browser graph).
+- **pino transport targets must be ABSOLUTE PATHS, not bare specifiers,** because pino loads transports in a worker thread that resolves a bare specifier relative to the caller — and when the logger is **bundled** (Next.js SSR via Turbopack) that resolution fails with `unable to determine transport target for "pino-pretty"`, 500-ing every SSR page when `FORMAT_NODE_LOG` is truthy. `transport-factory.ts` resolves both the dev (`bunyan-format`) and prod (`pino-pretty`) targets to absolute paths for this reason.
+
+### External Plugin Distribution Contract (orthogonal to the internal module system)
+
+Third-party plugins published at **https://growi.org/plugins** reach a running GROWI by a
+path that is deliberately decoupled from how `apps/app`'s own source is authored or built.
+This decoupling is a **system-wide invariant to protect and verify, not an assumption to
+lean on** — it is easy to silently break from inside an unrelated refactor (such as the ESM
+migration).
+
+How an installed plugin actually flows (`features/growi-plugin/server`):
+
+- **Install** downloads the plugin repo as a GitHub archive zip, unzips it, validates the
+  `growiPlugin` directive in its `package.json` (`schemaVersion >= 4`), and saves metadata.
+  GROWI **never builds, bundles, `require()`s, or `import()`s the plugin's own code.** It
+  relies on the plugin shipping a **prebuilt `dist/` with a Vite manifest**
+  (`dist/.vite/manifest.json`, or the Vite 4 `dist/manifest.json` — both are read).
+- **script / theme** plugins are served as **static files** (`express.static` at
+  `/static/plugins`) and loaded by the **browser as native ESM** —
+  `<script type="module">` / `<link rel="stylesheet">` injected by `_document.page.tsx`.
+  These assets are served raw; they do **not** pass through Turbopack or the server build.
+- **template** plugins are read server-side as markdown (scanned via `@growi/pluginkit`).
+- The only server-side use of plugin packaging is reading the manifest + `package.json`
+  directive, done through GROWI's own **`@growi/pluginkit` `.cjs`** build (published dual
+  CJS/ESM).
+
+**Consequence:** GROWI's internal CJS→ESM module-system choice is structurally orthogonal
+to the external plugin contract — existing prebuilt plugins keep working because their code
+is never re-processed by GROWI's build. **But the surfaces that carry this contract can
+still regress** — the plugin install route factory, the `/static/plugins` serving, the
+`_document` script/stylesheet injection, the Vite-manifest reader, and the published
+`@growi/pluginkit` format. Any change touching those (the ESM migration touched several)
+must re-run the **plugin-install smoke** — install one officially-released *script*, one
+*theme*, and one *template* plugin and confirm each is served/loaded — because build/boot
+checks do not exercise this path. (See `.kiro/specs/esm-migration/` Requirement 6 /
+`phase6-gate-evidence/`.)
+
 ---
-_Updated: 2026-04-16. Added pino logging note._
+_Updated: 2026-06-17. Added "External Plugin Distribution Contract" as a system-wide invariant (external plugins are prebuilt assets loaded as browser ESM / scanned server-side; orthogonal to the internal module system but must be smoke-verified on changes). Prior: 2026-06-16 Module System (native ESM) + transpilePackages-empty (esm-migration Phase 5.5)._

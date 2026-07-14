@@ -1,29 +1,29 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
-import { addMinutes } from 'date-fns/addMinutes';
 import { isValid } from 'date-fns/isValid';
 import { parseISO } from 'date-fns/parseISO';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
 
+import type { Prisma } from '~/generated/prisma/client';
 import {
   AUDITLOG_SUGGESTION_FIELDS,
   type AuditlogSuggestionField,
   type AuditlogSuggestionsResponse,
-  type IActivity,
   type ISearchFilter,
   isAuditlogSuggestionField,
 } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import { buildActivityListWhere } from './build-activity-list-where';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
@@ -101,9 +101,19 @@ const validator = {
  *                     example: "/_api/pages.remove"
  *                   targetModel:
  *                     type: string
+ *                     description: >-
+ *                       Model name of the activity target. For attachment
+ *                       activities (ATTACHMENT_ADD / ATTACHMENT_REMOVE /
+ *                       ATTACHMENT_DOWNLOAD) this is "Attachment".
  *                     example: "Page"
  *                   target:
  *                     type: string
+ *                     description: >-
+ *                       ID of the activity target. For attachment activities
+ *                       this is the attachment ID; combined with the snapshot
+ *                       fields it lets consumers build a download link for
+ *                       attachments that still exist (ATTACHMENT_ADD /
+ *                       ATTACHMENT_DOWNLOAD, distinguished by `action`).
  *                     example: "675547e97f208f8050a361d4"
  *                   action:
  *                     type: string
@@ -113,10 +123,43 @@ const validator = {
  *                     properties:
  *                       username:
  *                         type: string
+ *                         description: >-
+ *                           Username of the operator. Omitted when the activity
+ *                           was recorded without an authenticated user (e.g.
+ *                           guest ATTACHMENT_DOWNLOAD).
  *                         example: "growi"
  *                       _id:
  *                         type: string
  *                         example: "67e33da5d97e8d3b53e99f96"
+ *                       originalName:
+ *                         type: string
+ *                         description: >-
+ *                           Original file name of the attachment.
+ *                           Present on attachment activities (ATTACHMENT_ADD /
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD).
+ *                         example: "design-v2.pdf"
+ *                       pagePath:
+ *                         type: string
+ *                         description: >-
+ *                           Path of the page the attachment belongs or belonged
+ *                           to. Present on attachment activities (ATTACHMENT_ADD /
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD) when it
+ *                           could be resolved at capture time.
+ *                         example: "/Sandbox/attachments"
+ *                       pageId:
+ *                         type: string
+ *                         description: >-
+ *                           ID of the page the attachment belongs or belonged
+ *                           to. Present on attachment activities (ATTACHMENT_ADD /
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD).
+ *                         example: "675547e97f208f8050a361d4"
+ *                       fileSize:
+ *                         type: integer
+ *                         description: >-
+ *                           File size in bytes of the attachment.
+ *                           Present on attachment activities (ATTACHMENT_ADD /
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD).
+ *                         example: 12345
  *                   createdAt:
  *                     type: string
  *                     format: date-time
@@ -212,7 +255,7 @@ const validator = {
  *               example: null
  */
 
-module.exports = (crowi: Crowi): Router => {
+export const setup = (crowi: Crowi): Router => {
   const adminRequired = adminRequiredFactory(crowi);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
@@ -271,74 +314,78 @@ module.exports = (crowi: Crowi): Router => {
       const limit =
         req.query.limit ||
         configManager.getConfig('customize:showPageLimitationS');
+      // Preserve the existing offset || 1 quirk exactly (pure migration, req 2.1):
+      // When the frontend sends offset=0 for page 1, it is falsy and becomes 1,
+      // skipping the first record. This behaviour is intentional to maintain
+      // observational parity before a separate fix is landed.
       const offset = req.query.offset || 1;
 
-      const query = {};
+      let where: ReturnType<typeof buildActivityListWhere> = {};
 
       try {
         const parsedSearchFilter = JSON.parse(
           req.query.searchFilter as string,
         ) as ISearchFilter;
 
-        // add username to query
-        const canContainUsernameFilterToQuery =
-          parsedSearchFilter.usernames != null &&
-          parsedSearchFilter.usernames.length > 0 &&
-          parsedSearchFilter.usernames.every((u) => typeof u === 'string');
-        if (canContainUsernameFilterToQuery) {
-          Object.assign(query, {
-            'snapshot.username': parsedSearchFilter.usernames,
-          });
-        }
-
-        // add action to query
+        // resolve action filter: only include actions that are actually available
+        let searchableActions: string[] | undefined;
         if (parsedSearchFilter.actions != null) {
           const availableActions =
             crowi.activityService.getAvailableActions(false);
-          const searchableActions = parsedSearchFilter.actions.filter(
-            (action) => availableActions.includes(action),
+          searchableActions = parsedSearchFilter.actions.filter((action) =>
+            availableActions.includes(action),
           );
-          Object.assign(query, { action: searchableActions });
         }
 
-        // add date to query
+        // parse date range
         const startDate = parseISO(parsedSearchFilter?.dates?.startDate || '');
         const endDate = parseISO(parsedSearchFilter?.dates?.endDate || '');
-        if (isValid(startDate) && isValid(endDate)) {
-          Object.assign(query, {
-            createdAt: {
-              $gte: startDate,
-              // + 23 hours 59 minutes
-              $lt: addMinutes(endDate, 1439),
-            },
-          });
-        } else if (isValid(startDate) && !isValid(endDate)) {
-          Object.assign(query, {
-            createdAt: {
-              $gte: startDate,
-              // + 23 hours 59 minutes
-              $lt: addMinutes(startDate, 1439),
-            },
-          });
-        }
+
+        where = buildActivityListWhere({
+          usernames: parsedSearchFilter.usernames,
+          actions: searchableActions,
+          startDate: isValid(startDate) ? startDate : undefined,
+          endDate: isValid(endDate) ? endDate : undefined,
+        });
       } catch (err) {
         logger.error('Invalid value', err);
         return res.apiv3Err(err, 400);
       }
 
       try {
-        const paginateResult = await Activity.paginate(query, {
-          lean: true,
-          limit,
-          offset,
-          sort: { createdAt: -1 },
-          populate: 'user',
+        const paginateResult = await prisma.activities.paginate({
+          where,
+          orderBy: { createdAt: 'desc' },
+          offset: offset as number,
+          limit: limit as number,
+          include: { user: true },
         });
 
-        const serializedDocs = paginateResult.docs.map((doc: IActivity) => {
-          const { user, ...rest } = doc;
+        // Remap each doc to match the old Mongoose response shape (req 2.3):
+        // - drop `userId` (not present in old Mongoose docs)
+        // - keep serialized `user` (populated relation, same as Mongoose populate)
+        // - keep _id/__v (computed fields) and all other scalar fields
+        //
+        // Type note: the `paginate` generic resolves via PaginateOptions<…> which
+        // does not propagate `include` into the result type, so `docs` is typed as
+        // the base scalar shape (no `user` property). We route through `unknown`
+        // to reach the correct payload type — this is the Tier-2 cast rationale:
+        // the cast is confined to the map boundary; the underlying runtime value
+        // is correct because `include: { user: true }` was passed to `paginate`.
+        type ActivityWithUser = Prisma.activitiesGetPayload<{
+          include: { user: true };
+        }>;
+        const serializedDocs = (
+          paginateResult.docs as unknown as ActivityWithUser[]
+        ).map((doc) => {
+          const { user, userId, ...rest } = doc;
           return {
-            user: serializeUserSecurely(user),
+            // The Prisma `users` type has nullable fields (e.g. name: string|null)
+            // while `IUser` requires non-nullable. At runtime they map to the same
+            // MongoDB document. Cast to Ref<IUser> so serializeUserSecurely resolves.
+            // Tier-2 rationale: cast is confined to this single field expression.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            user: serializeUserSecurely(user as any),
             ...rest,
           };
         });

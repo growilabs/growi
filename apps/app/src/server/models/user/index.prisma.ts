@@ -11,6 +11,20 @@ export const extension = Prisma.defineExtension((client) => {
   return client.$extends({
     result: {
       users: {
+        // for backward compatibility with mongoose
+        _id: {
+          needs: { id: true },
+          compute(model) {
+            return model.id;
+          },
+        },
+        // for backward compatibility with mongoose
+        __v: {
+          needs: { v: true },
+          compute(model) {
+            return model.v;
+          },
+        },
         updateLastLoginAt: {
           needs: { id: true },
           compute(user) {
@@ -32,6 +46,20 @@ export const extension = Prisma.defineExtension((client) => {
                 return callback(err, null);
               }
             };
+          },
+        },
+        serializeSecurely: {
+          needs: {
+            password: true,
+            apiToken: true,
+            email: true,
+            isEmailPublished: true,
+          },
+          compute({ password, apiToken, email, ...user }) {
+            return () => ({
+              ...user,
+              email: user.isEmailPublished ? email : undefined,
+            });
           },
         },
       },

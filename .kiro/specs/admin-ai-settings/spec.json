@@ -1,0 +1,22 @@
+{
+  "feature_name": "admin-ai-settings",
+  "created_at": "2026-06-12T15:08:03Z",
+  "updated_at": "2026-06-12T17:20:00Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

@@ -1,5 +1,7 @@
 import { getIdStringForRef } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import { body, validationResult } from 'express-validator';
+import mongoose from 'mongoose';
 
 import { CommentEvent, commentEvent } from '~/features/comment/server';
 import {
@@ -12,6 +14,7 @@ import { prisma } from '~/utils/prisma';
 
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
 import { preNotifyService } from '../service/pre-notify';
+import ApiResponse from '../util/apiResponse';
 
 /**
  * @swagger
@@ -59,18 +62,15 @@ import { preNotifyService } from '../service/pre-notify';
  */
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi, _app) => {
+export const setup = (crowi, _app) => {
   const logger = loggerFactory('growi:routes:comment');
   const { Page } = crowi.models;
-  const ApiResponse = require('../util/apiResponse');
 
   const activityEvent = crowi.events.activity;
 
   const globalNotificationService = crowi.globalNotificationService;
   const userNotificationService = crowi.userNotificationService;
 
-  const { body } = require('express-validator');
-  const mongoose = require('mongoose');
   const ObjectId = mongoose.Types.ObjectId;
 
   const actions = {};
@@ -157,19 +157,13 @@ module.exports = (crowi, _app) => {
       ApiResponse.success({
         comments: comments.map((comment) => ({
           ...comment,
-          _id: comment.id,
-          __v: comment.v,
           page: comment.pageId,
           creator:
             comment.creator != null
               ? serializeUserSecurely(comment.creator)
-              : comment.creator,
+              : comment.creatorId,
           revision: comment.revisionId,
-          comment: comment.comment,
-          commentPosition: comment.commentPosition,
           replyTo: comment.replyToId,
-          createdAt: comment.createdAt,
-          updatedAt: comment.updatedAt,
         })),
       }),
     );
@@ -253,7 +247,6 @@ module.exports = (crowi, _app) => {
    */
   api.add = async (req, res) => {
     const { commentForm, slackNotificationForm } = req.body;
-    const { validationResult } = require('express-validator');
 
     const errors = validationResult(req.body);
     if (!errors.isEmpty()) {
@@ -308,6 +301,7 @@ module.exports = (crowi, _app) => {
       eventModel: SupportedEventModel.MODEL_COMMENT,
       event: createdComment.id,
       action: SupportedAction.ACTION_COMMENT_CREATE,
+      contributor: req.user,
     };
 
     /** @type {import('../service/pre-notify').GetAdditionalTargetUsers} */
@@ -328,7 +322,17 @@ module.exports = (crowi, _app) => {
       getAdditionalTargetUsers,
     );
 
-    res.json(ApiResponse.success({ comment: createdComment }));
+    res.json(
+      ApiResponse.success({
+        comment: {
+          ...createdComment,
+          page: createdComment.pageId,
+          creator: createdComment.creatorId,
+          revision: createdComment.revisionId,
+          replyTo: createdComment.replyToId,
+        },
+      }),
+    );
 
     // global notification
     try {
@@ -487,7 +491,17 @@ module.exports = (crowi, _app) => {
     const parameters = { action: SupportedAction.ACTION_COMMENT_UPDATE };
     activityEvent.emit('update', res.locals.activity._id, parameters);
 
-    res.json(ApiResponse.success({ comment: updatedComment }));
+    res.json(
+      ApiResponse.success({
+        comment: {
+          ...updatedComment,
+          page: createdComment.pageId,
+          creator: createdComment.creatorId,
+          revision: createdComment.revisionId,
+          replyTo: createdComment.replyToId,
+        },
+      }),
+    );
 
     // process notification if needed
   };

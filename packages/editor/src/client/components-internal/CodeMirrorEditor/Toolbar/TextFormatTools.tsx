@@ -2,8 +2,8 @@ import { type JSX, useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Collapse, UncontrolledTooltip } from 'reactstrap';
 
-import type { GlobalCodeMirrorEditorKey } from '../../../../consts';
-import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
+import type { GlobalCodeMirrorEditorKey } from '../../../../consts/index.js';
+import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor.js';
 
 import styles from './TextFormatTools.module.scss';
 

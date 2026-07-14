@@ -6,26 +6,24 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:update-theme-color-for-dark');
 
-module.exports = {
-  async up(db, client) {
-    logger.info('Apply migration');
-    await mongoose.connect(getMongoUri(), mongoOptions);
+export async function up(db, client) {
+  logger.info('Apply migration');
+  await mongoose.connect(getMongoUri(), mongoOptions);
 
-    await Promise.all([
-      await Config.findOneAndUpdate(
-        { key: 'customize:theme', value: JSON.stringify('default-dark') },
-        { value: JSON.stringify('default') },
-      ), // update default-dark
-      await Config.findOneAndUpdate(
-        { key: 'customize:theme', value: JSON.stringify('blue-night') },
-        { value: JSON.stringify('mono-blue') },
-      ), // update blue-night
-    ]);
+  await Promise.all([
+    await Config.findOneAndUpdate(
+      { key: 'customize:theme', value: JSON.stringify('default-dark') },
+      { value: JSON.stringify('default') },
+    ), // update default-dark
+    await Config.findOneAndUpdate(
+      { key: 'customize:theme', value: JSON.stringify('blue-night') },
+      { value: JSON.stringify('mono-blue') },
+    ), // update blue-night
+  ]);
 
-    logger.info('Migration has successfully applied');
-  },
+  logger.info('Migration has successfully applied');
+}
 
-  async down(db, client) {
-    // do not rollback
-  },
-};
+export async function down(db, client) {
+  // do not rollback
+}

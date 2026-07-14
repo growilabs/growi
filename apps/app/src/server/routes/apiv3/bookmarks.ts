@@ -1,32 +1,32 @@
-import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
-import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import {
   isUserPage,
   isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
+import type { bookmarks } from '~/generated/prisma/client';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IBookmarkInfo } from '~/interfaces/bookmark-info';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
 import { configManager } from '~/server/service/config-manager';
 import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import BookmarkFolder from '../../models/bookmark-folder';
 
 const logger = loggerFactory('growi:routes:apiv3:bookmarks');
 
-const express = require('express');
-const { body, query, param } = require('express-validator');
+import type { Router } from 'express';
+import express from 'express';
+import { body, param, query } from 'express-validator';
 
 const router = express.Router();
 
@@ -94,12 +94,13 @@ const router = express.Router();
  *            items:
  *              $ref: '#/components/schemas/User'
  */
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const loginRequired = loginRequiredFactory(crowi, true);
   const addActivity = generateAddActivityMiddleware();
 
   const activityEvent = crowi.events.activity;
+  const bookmarkEvent = crowi.events.bookmark;
 
   const validator = {
     bookmarks: [body('pageId').isString(), body('bool').isBoolean()],
@@ -153,22 +154,17 @@ module.exports = (crowi: Crowi) => {
         pageId: '',
       };
 
-      const Bookmark: BookmarkModel = mongoose.model<
-        HydratedDocument<BookmarkDocument>,
-        BookmarkModel
-      >('Bookmark');
-
       try {
-        const bookmarks = await Bookmark.find({
-          page: { $eq: pageId },
-        }).populate<{
-          user: IUserHasId;
-        }>('user');
+        const bookmarks = await prisma.bookmarks.findMany({
+          where: { pageId: pageId },
+          include: { user: true },
+        });
         const users = bookmarks.map((bookmark) =>
-          serializeUserSecurely(bookmark.user),
+          bookmark.user.serializeSecurely(),
         );
         responsesParams.sumOfBookmarks = bookmarks.length;
-        responsesParams.bookmarkedUsers = users;
+        responsesParams.bookmarkedUsers =
+          users as IBookmarkInfo['bookmarkedUsers'];
         responsesParams.pageId = pageId;
       } catch (err) {
         logger.error('get-bookmark-document-failed', err);
@@ -181,7 +177,10 @@ module.exports = (crowi: Crowi) => {
       }
 
       try {
-        const bookmark = await Bookmark.findByPageIdAndUserId(pageId, user._id);
+        const bookmark = await prisma.bookmarks.findByPageIdAndUserId(
+          pageId,
+          user._id,
+        );
         responsesParams.isBookmarked = bookmark != null;
         return res.apiv3(responsesParams);
       } catch (err) {
@@ -228,30 +227,25 @@ module.exports = (crowi: Crowi) => {
         return res.apiv3Err('User id is not found or forbidden', 400);
       }
 
-      const Bookmark: BookmarkModel = mongoose.model<
-        HydratedDocument<BookmarkDocument>,
-        BookmarkModel
-      >('Bookmark');
-
       try {
         const bookmarkIdsInFolders = await BookmarkFolder.distinct(
           'bookmarks',
           { owner: userId },
         );
 
-        const userRootBookmarks = await Bookmark.find({
-          _id: { $nin: bookmarkIdsInFolders },
-          user: userId,
-        })
-          .populate<{ page: PageDocument | null }>({
-            path: 'page',
-            model: 'Page',
-            populate: {
-              path: 'lastUpdateUser',
-              model: 'User',
+        const userRootBookmarks = await prisma.bookmarks.findMany({
+          where: {
+            id: { notIn: bookmarkIdsInFolders.map((id) => id.toString()) },
+            userId,
+          },
+          include: {
+            page: {
+              include: {
+                lastUpdateUser: true,
+              },
             },
-          })
-          .exec();
+          },
+        });
 
         const disabledUserPage = configManager.getConfig(
           'security:disableUserPages',
@@ -271,7 +265,24 @@ module.exports = (crowi: Crowi) => {
           serializeBookmarkSecurely(bookmark),
         );
 
-        return res.apiv3({ userRootBookmarks: serializedUserRootBookmarks });
+        return res.apiv3({
+          // page is null when the bookmarked page has been completely
+          // deleted -- bookmarks are intentionally left orphaned in that case
+          userRootBookmarks: serializedUserRootBookmarks.map((bookmark) => ({
+            ...bookmark,
+            user: bookmark.userId,
+            page:
+              bookmark.page == null
+                ? null
+                : {
+                    ...bookmark.page,
+                    creator: bookmark.page.creatorId,
+                    deleteUser: bookmark.page.deleteUserId,
+                    revision: bookmark.page.revisionId,
+                    parent: bookmark.page.parentId,
+                  },
+          })),
+        });
       } catch (err) {
         logger.error('get-bookmark-failed', err);
         return res.apiv3Err(err, 500);
@@ -322,24 +333,24 @@ module.exports = (crowi: Crowi) => {
         HydratedDocument<PageDocument>,
         PageModel
       >('Page');
-      const Bookmark: BookmarkModel = mongoose.model<
-        HydratedDocument<BookmarkDocument>,
-        BookmarkModel
-      >('Bookmark');
 
       let page: HydratedDocument<PageDocument> | null;
-      let bookmark: HydratedDocument<BookmarkDocument> | null;
+      let bookmark: bookmarks | null;
       try {
         page = await Page.findByIdAndViewer(pageId, req.user, undefined, true);
         if (page == null) {
           return res.apiv3Err(`Page '${pageId}' is not found or forbidden`);
         }
 
-        bookmark = await Bookmark.findByPageIdAndUserId(page._id, req.user._id);
+        bookmark = await prisma.bookmarks.findByPageIdAndUserId(
+          page._id,
+          req.user._id,
+        );
 
         if (bookmark == null) {
           if (bool) {
-            bookmark = await Bookmark.add(page._id, req.user);
+            bookmark = await prisma.bookmarks.add(page._id, req.user._id);
+            bookmarkEvent.emit('create', pageId);
           } else {
             logger.warn(
               `Removing the bookmark for ${page._id} by ${req.user._id} failed because the bookmark does not exist.`,
@@ -351,17 +362,16 @@ module.exports = (crowi: Crowi) => {
               `Adding the bookmark for ${page._id} by ${req.user._id} failed because the bookmark has already exist.`,
             );
           } else {
-            bookmark = await Bookmark.removeBookmark(page._id, req.user);
+            bookmark = await prisma.bookmarks.removeBookmark(
+              page._id,
+              req.user._id,
+            );
+            bookmarkEvent.emit('delete', pageId);
           }
         }
       } catch (err) {
         logger.error('update-bookmark-failed', err);
         return res.apiv3Err(err, 500);
-      }
-
-      if (bookmark != null) {
-        bookmark.depopulate('page');
-        bookmark.depopulate('user');
       }
 
       const parameters = {
@@ -380,7 +390,15 @@ module.exports = (crowi: Crowi) => {
         preNotifyService.generatePreNotify,
       );
 
-      return res.apiv3({ bookmark });
+      return res.apiv3({
+        bookmark: bookmark
+          ? {
+              ...bookmark,
+              page: bookmark.pageId,
+              user: bookmark.userId,
+            }
+          : null,
+      });
     },
   );
 

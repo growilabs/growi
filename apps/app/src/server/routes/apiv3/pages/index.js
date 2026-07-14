@@ -38,8 +38,11 @@ const router = express.Router();
 const LIMIT_FOR_LIST = 10;
 const LIMIT_FOR_MULTIPLE_PAGE_OP = 20;
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequired = loginRequiredFactory(crowi, true);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
@@ -848,6 +851,7 @@ module.exports = (crowi) => {
         targetModel: SupportedTargetModel.MODEL_PAGE,
         target: page,
         action: SupportedAction.ACTION_PAGE_DUPLICATE,
+        contributor: req.user,
       };
 
       activityEvent.emit(

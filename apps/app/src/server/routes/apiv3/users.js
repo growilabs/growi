@@ -5,15 +5,17 @@ import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import { userHomepagePath } from '@growi/core/dist/utils/page-path-utils';
 import express from 'express';
 import { body, query } from 'express-validator';
-import { isEmail } from 'validator';
+// `validator`'s named exports are not statically detectable by cjs-module-lexer
+// (its module.exports is a built object), so a named ESM import fails. Import
+// the per-function module's default export instead (also avoids colliding with
+// the local `validator` middleware map below).
+import isEmail from 'validator/lib/isEmail.js';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { deleteUserAiAssistant } from '~/features/openai/server/services/delete-ai-assistant';
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import Activity from '~/server/models/activity';
 import { serializePageSecurely } from '~/server/models/serializers';
 import { UserStatus } from '~/server/models/user/conts';
 import UserGroupRelation from '~/server/models/user-group-relation';
@@ -110,8 +112,11 @@ const validator = {};
  *            example: 0
  */
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequired = loginRequiredFactory(crowi, true);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
@@ -1007,8 +1012,6 @@ module.exports = (crowi) => {
           },
         });
 
-        deleteUserAiAssistant(user);
-
         const serializedUser = serializeUserSecurely(user);
 
         activityEvent.emit('update', res.locals.activity._id, {
@@ -1064,10 +1067,13 @@ module.exports = (crowi) => {
     adminRequired,
     async (req, res) => {
       const page = parseInt(req.query.page) || 1;
+      const limit = 50; // DEFAULT_LIMIT in external-account.ts
+      const offset = (page - 1) * limit;
       try {
         const paginateResult =
           await prisma.externalaccounts.findAllWithPagination({
-            page,
+            offset,
+            limit,
           });
         return res.apiv3({ paginateResult });
       } catch (err) {
@@ -1588,7 +1594,7 @@ module.exports = (crowi) => {
 
         if (options.isIncludeActivitySnapshotUser && req.user.admin) {
           const activitySnapshotUserData =
-            await Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+            await prisma.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
               q,
               { offset, limit },
             );

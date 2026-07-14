@@ -79,14 +79,15 @@ The following items are **not supported** in the current MVP:
 
 ## Docker image (DHI multi-stage build)
 
-The `apps/growi-vault-manager/Dockerfile` has been refactored to align with `apps/app/docker/Dockerfile`. The new build is a **5-stage multi-stage build** (`base` → `pruner` → `deps` → `builder` → `release`) on top of [Docker Hardened Images](https://hub.docker.com/u/dhi) (`dhi.io/node:24-debian13-dev`). Because `vault-manager` spawns `git upload-pack` at runtime (see Requirement 10.3), the runtime stage retains a `git` binary (v2.30+).
+The `apps/growi-vault-manager/docker/Dockerfile` has been refactored to align with `apps/app/docker/Dockerfile`. The new build is a **5-stage multi-stage build** (`base` → `pruner` → `deps` → `builder` → `release`). The build stages run on the official `node:24-bookworm` image, and only the `release` stage runs on a [Docker Hardened Image](https://hub.docker.com/u/dhi) (`dhi.io/node:24-debian13-dev`). Because `vault-manager` spawns `git upload-pack` at runtime (see Requirement 10.3), the runtime stage uses the DHI **dev** variant so it retains a `git` binary (v2.30+). (Build stages stay on the official image because `corepack`'s global `pnpm` shim is not executable on the DHI dev image.)
 
 Highlights of the refactor:
 
 - `base` / `pruner` / `deps` / `builder` / `release` stages, with `turbo prune @growi/vault-manager --docker` driving the monorepo subset.
-- `pnpm` installed via the standalone install script and a cache-mounted `pnpm` store (`--mount=type=cache,target=$PNPM_HOME/store,sharing=locked`).
+- `pnpm` activated via `corepack enable` (version pinned by the workspace `packageManager` field), with a cache-mounted `pnpm` store (`--mount=type=cache,id=pnpm,target=/pnpm/store`) — same approach as `apps/app/docker/Dockerfile`.
 - A dedicated `Dockerfile.dockerignore` to shrink the build context.
 - OCI standard labels (`org.opencontainers.image.source`, `title`, `description`, `vendor`, `authors`) on the release stage.
+- **Non-root runtime**: `docker/docker-entrypoint.ts` (run via Node 24 type stripping) creates and chowns the bare repo on the shared `/data` volume as root, then drops to the `node` user (uid/gid 1000) via native `process.setuid/setgid` before exec'ing the app. This keeps `vault-manager` and `apps/app` on a single uid so they can share the `/data` volume (Requirement 10.3); no `gosu`/`setpriv` binary is needed.
 
 ### Cross-repository impact: `growi-docker-compose`
 
@@ -110,7 +111,7 @@ Until `docker build` is wired into CI, the DHI-based image is verified manually.
 1. **Build the image** from the repository root:
 
    ```bash
-   docker build -f apps/growi-vault-manager/Dockerfile -t growi-vault-manager:local .
+   docker build -f apps/growi-vault-manager/docker/Dockerfile -t growi-vault-manager:local .
    ```
 
 2. **Confirm the runtime has `git` v2.30+**:
