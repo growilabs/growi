@@ -214,10 +214,16 @@ describe.skipIf(!hasElasticsearch)(
 
       // Point the search delegator at a dedicated per-worker index so a parallel
       // elasticsearch.integ.ts rebuild of the shared `growi` index cannot delete
-      // these documents mid-test. DB config overrides the env value in
-      // configManager.getConfig, and the DB is per-worker, so this is isolated.
+      // these documents mid-test. Reuse the HOST from the environment-provided
+      // URI (elasticsearch:9200 in the devcontainer, localhost:9200 in CI) and
+      // swap ONLY the index name — hardcoding the host breaks CI DNS.
       originalEsUri = process.env.ELASTICSEARCH_URI;
-      process.env.ELASTICSEARCH_URI = `http://elasticsearch:9200/growi_ftstool_${WORKER_ID}`;
+      if (originalEsUri == null) {
+        throw new Error('ELASTICSEARCH_URI must be set to run this suite');
+      }
+      const dedicatedUri = new URL(originalEsUri);
+      dedicatedUri.pathname = `/growi_ftstool_${WORKER_ID}`;
+      process.env.ELASTICSEARCH_URI = dedicatedUri.href;
       await configManager.loadConfigs();
 
       searchService = await SearchService.create(crowi);
