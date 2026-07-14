@@ -68,7 +68,7 @@
 - `Page.findByIdAndViewer` または `Page.findByPathAndViewer` のシグネチャ・戻り値仕様変更
 - `RequestContext` ジェネリクスを共有する他コンポーネントの追加 / 型変更（key 衝突発生時）
 - `@mastra/core` の `createTool` / `Agent.stream()` API の破壊的変更
-- `SearchService.searchKeyword()` のシグネチャ・戻り値スキーマ変更（特に ES delegator の `result.data[i]._id` / `_source.path` / `_highlight.body` の整合）
+- `SearchService.searchKeyword()` / `SearchService.formatSearchResult()` のシグネチャ・戻り値スキーマ変更（特に `IFormattedSearchResult.data[i].data._id` / `.data.path` / `.meta.elasticSearchResult.snippet` の整合。tool は生の `_highlight` ではなく `formatSearchResult` の出力を消費する）
 - 既存 `growiAgent.instructions` の英語ベース構造を逸脱する変更（多言語応答ルールの再検証要）
 - `@mastra/core` の `RequestContext` 実装が AsyncLocalStorage 等のリクエスト隔離機構に変わった場合（本 spec のリクエストスコープ化が冗長になる）
 
@@ -279,7 +279,8 @@ flowchart TD
     CheckES -- false --> EsDisabled[return result error reason elasticsearch_not_configured]
     CheckES -- true --> CallSearch[searchService.searchKeyword query user limit]
     CallSearch -- throws --> Err[return result error reason exception]
-    CallSearch -- ok --> Map[map result.data to pageId pagePath snippet]
+    CallSearch -- ok --> Format[searchService.formatSearchResult searchResult delegatorName user userGroups]
+    Format --> Map[map formatted.data to pageId pagePath snippet]
     Map --> Ret[return result ok hits totalCount]
 ```
 
@@ -395,7 +396,7 @@ export type MastraRequestContextShape = {
 - **`searchService.isElasticsearchEnabled === false` のとき early return**: `result: 'error', reason: 'elasticsearch_not_configured'` を返し、SearchService を呼ばない（要件 6.8 の例外抑制と同じ戻り値型に統合）
 - 取得した `user: IUserHasId` をそのまま `searchService.searchKeyword(query, null, user, null, options)` に渡す（合成 user の組み立ては行わない — ES delegator 内部参照フィールドの確定的な根拠が現時点で limit されており、安全側に倒して `req.user` を全体引き渡し）
 - 入力の `sort` / `order` は zod default で必ず値が入った状態で `searchOpts: { limit, sort, order }` に詰めて `searchKeyword` に forward する（tool 層で別名・サニタイズなし、要件 6.9）
-- 検索結果から `pagePath` / `pageId` / `snippet` を抽出した配列にマップ
+- `searchKeyword` の結果を `formatSearchResult(searchResult, delegatorName, user, userGroups)` に通してから、`formatted.data` を `pagePath` / `pageId` / `snippet` の配列にマップ（snippet フィールド名整合 + `canShowSnippet` 可視性ゲートのため）
 - ページ本文（`body`）は **返さない**（責務分離）
 - 戻り値の discriminated union 整形（`'ok' | 'error' | 'context_error'`）
 - **grant 判定の自前実装をしない**（SearchService 経由のみ）
@@ -550,21 +551,24 @@ export const fullTextSearchTool: Tool<
 
 - **Preconditions**: `requestContext` に `user: IUserHasId` と `searchService` の両方がセットされている。`searchService` が `isElasticsearchEnabled === true` の場合のみ検索を実行する
 - **Postconditions**: 戻り値は必ず `fullTextSearchOutputSchema` を満たす。例外は throw されない
-- **Invariants**: 閲覧権限のないページが `hits` 配列に決して現れない（SearchService の `filterPagesByViewer` に委譲、二重実装なし）
+- **Invariants**: 閲覧権限のないページが `hits` 配列に決して現れない（SearchService の `filterPagesByViewer` に委譲、二重実装なし）。加えて、`snippet` は `SearchService.formatSearchResult` 経由でのみ生成され、その内部 `canShowSnippet` ゲートにより「呼び出しユーザーが閲覧できないページの本文断片」は `snippet` が落ちる（`/_api/search` ルートと同一の可視性判定）
 
 **Implementation Notes**
 - **`user` / `searchService` の取得**: execute 内で `const ctx = context.requestContext as RequestContext<MastraRequestContextShape>; const user = ctx.get('user'); const searchService = ctx.get('searchService');` の形で **共有型経由で型付き取得**（`growi-agent.ts` モジュールから `crowi` を import しない方針）。Post-Message Handler 側の `req.user` / `crowi.searchService` 参照を tool まで `RequestContext` 経由で持ち回ることで、`growi-agent.ts` の module-level export を保ったまま条件分岐を tool 層に閉じ込められる。`user` または `searchService` が `undefined` の場合は `result: 'context_error'`（共有型上は必須キーだが、Mastra ランタイムの動的取得である以上、防御的に型ガードを残す）
-- Integration: `searchService.searchKeyword(keyword, nqName, user, userGroups, searchOpts)` を呼ぶ。`nqName: null`、`userGroups` は tool 内で `UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)` + `ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(user)` を await して解決する（`SearchService` 自身は user から内部解決しない — 既存の `server/routes/search.ts:143-151` と同じパターン）、`searchOpts` には `{ limit, sort, order }` を渡す（`sort` / `order` は `inputSchema` の zod default 経由で常に値が入る）。tool 層で別名やサニタイズは行わず、`SORT_AXIS` / `SORT_ORDER` の値をそのまま forward し、ES フィールド名への変換は `ElasticsearchDelegator.appendSortOrder` に委ねる。**戻り値は `Promise<[ISearchResult<unknown>, string | null]>` のタプル** であり、`const [result, _delegatorName] = await searchService.searchKeyword(...)` の形で分解する。
-- マッピング規則（[elasticsearch.ts:470-484](apps/app/src/server/service/search-delegator/elasticsearch.ts#L470-L484) の ES index 投入ロジックと [elasticsearch.ts:736-750](apps/app/src/server/service/search-delegator/elasticsearch.ts#L736-L750) の delegator 戻り値を根拠）:
+- Integration: `searchService.searchKeyword(keyword, nqName, user, userGroups, searchOpts)` を呼ぶ。`nqName: null`、`userGroups` は tool 内で `UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)` + `ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(user)` を await して解決する（`SearchService` 自身は user から内部解決しない — 既存の `server/routes/search.ts:143-151` と同じパターン）、`searchOpts` には `{ limit, sort, order }` を渡す（`sort` / `order` は `inputSchema` の zod default 経由で常に値が入る）。tool 層で別名やサニタイズは行わず、`SORT_AXIS` / `SORT_ORDER` の値をそのまま forward し、ES フィールド名への変換は `ElasticsearchDelegator.appendSortOrder` に委ねる。**戻り値は `Promise<[ISearchResult<unknown>, string | null]>` のタプル** であり、`const [searchResult, delegatorName] = await searchService.searchKeyword(...)` の形で分解する。`delegatorName` は破棄せず次段の `formatSearchResult` に渡す。
+- **`formatSearchResult` を必ず経由する**: `searchKeyword` の生結果を直接マップせず、`/_api/search` ルート（[search.ts:182-193](apps/app/src/server/routes/search.ts#L182-L193)）と同一に `const formatted = await searchService.formatSearchResult(searchResult, delegatorName, user, userGroups)` を通す。理由は 2 点:
+  - **snippet のフィールド名整合**: ES の highlight は通常キーワード（`match`）マッチでは `body.ja` / `body.en`（および `comments.*`）に載り、無サフィックスの `body` はフレーズ（`"..."`）マッチ時のみ。`formatSearchResult` は `body || body.en || body.ja || comments || ...` のフォールバック（[search.ts:602-609](apps/app/src/server/service/search.ts#L602-L609)）で全バリアントを拾い、`filterXss` も適用する。tool 側で `_highlight.body` だけを読むと大半のキーワード検索で snippet が欠落する（本 spec 実装当初の不具合）。
+  - **snippet 可視性ゲート**: `formatSearchResult` 内の `canShowSnippet`（[search.ts:644-671](apps/app/src/server/service/search.ts#L644-L671)）が、`filterPagesByViewer` を通過したヒットのうち呼び出しユーザーが閲覧できないもの（`GRANT_OWNER` 本人以外 / `GRANT_USER_GROUP` 非メンバー / `GRANT_RESTRICTED`）の snippet を落とす。tool で生結果を読むとこのゲートを迂回して本文断片が漏れる。
+- マッピング規則（`formatSearchResult` の戻り値 `IFormattedSearchResult`（`{ data: IPageWithSearchMeta[]; meta }`）を根拠）:
 
   | tool 出力 | 取り出し元 |
   |---|---|
-  | `pageId` | `result.data[i]._id`（ES document ID = `page._id` の文字列） |
-  | `pagePath` | `result.data[i]._source.path` |
-  | `snippet` | `result.data[i]._highlight?.body?.[0]`（ES highlight 結果の先頭） |
-  | `totalCount` | `result.meta.total` |
+  | `pageId` | `formatted.data[i].data._id`（解決済みページドキュメントの ID） |
+  | `pagePath` | `formatted.data[i].data.path`（解決済みページドキュメントの path。`_source.path` ではない） |
+  | `snippet` | `formatted.data[i].meta?.elasticSearchResult?.snippet`（`null` / 空文字のときは省略） |
+  | `totalCount` | `formatted.meta.total` |
 
-- **`_source` を spread しないこと**: ES に index されたドキュメントには `body`（page revision の Markdown 全文）が含まれる（[elasticsearch.ts:472](apps/app/src/server/service/search-delegator/elasticsearch.ts#L472)）。`{ pageId, ...data[i]._source }` のような無造作な spread は要件 6.5 と本 spec の役割分離（`getPageContentTool` との責務境界）を破壊するため禁止。必要なフィールドのみを明示的に取り出すこと
+- **ページドキュメントを spread しないこと**: `formatted.data[i].data` は `IPageHasId`（ページドキュメント一式）。無造作な spread は要件 6.5 と本 spec の役割分離（`getPageContentTool` との責務境界）を破壊するため禁止。`pageId` / `pagePath` のみを明示的に取り出すこと
 - Validation: zod 入力で `query.min(1)` を強制し、空クエリで SearchService を呼ばない
 - **クエリ構文の素通し**: `query` の中身に対して `prefix:` / `tag:` / `"..."` / `-` 等の演算子検出や除去は行わない。文字列を `SearchService.searchKeyword(query, ...)` にそのまま渡し、`parseQueryString` に解釈させる（[search.ts:448-520](apps/app/src/server/service/search.ts#L448-L520)）。サニタイザを設けると `parseQueryString` の二重実装になり保守コストが増えるため避ける
 - Risks: ES がダウンしている場合、SearchService が例外を投げる可能性。tool 内 try/catch で `result: 'error'` に変換し agent ループ継続を保証

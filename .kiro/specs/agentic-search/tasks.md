@@ -37,8 +37,9 @@
     - `searchService.isElasticsearchEnabled === false` → `result: 'error', reason: 'elasticsearch_not_configured'`（`searchKeyword` は呼ばない）
   - ガード通過後、**`requestContext.get('user')` の戻り値（`IUserHasId`）をそのまま** `searchService.searchKeyword(query, null, user, null, { limit })` に渡す。合成 user (`{ _id: ObjectId }`) の組み立て、`User.findById` での再解決は行わない（design.md 「Implementation Notes」記載の方針）
   - **`query` を tool 層でサニタイズ・改変しない**: `prefix:` / `tag:` / `"..."` / `-` 等の演算子はそのまま `searchService.searchKeyword` の第 1 引数に渡し、`parseQueryString` に解釈させる（Plan A: design.md「サポートするクエリ構文」参照）
-  - 戻り値は **タプル `[ISearchResult, delegatorName]`** として分解し、`result.data[i]` から以下のマッピングで `hits` を組み立てる: `pageId ← _id` / `pagePath ← _source.path` / `snippet ← _highlight?.body?.[0]` / `totalCount ← result.meta.total`
-  - **`_source` を spread しない**: ES に index 済みの `body`（Markdown 本文）が混入しないよう、必要フィールドだけを明示的に取り出す（要件 6.5 と役割分離の維持）
+  - 戻り値は **タプル `[searchResult, delegatorName]`** として分解し、`delegatorName` を破棄せず `formatSearchResult(searchResult, delegatorName, user, userGroups)` に渡す（`/_api/search` ルートと同一経路）。返る `IFormattedSearchResult` から以下のマッピングで `hits` を組み立てる: `pageId ← data[i].data._id` / `pagePath ← data[i].data.path` / `snippet ← data[i].meta?.elasticSearchResult?.snippet`（`null`/空文字は省略）/ `totalCount ← meta.total`
+  - **`formatSearchResult` を必ず経由する**（生の `_highlight` を tool で読まない）。理由: (1) ES highlight は通常キーワードでは `body.ja`/`body.en`（無サフィックス `body` はフレーズ時のみ）に載り、`formatSearchResult` の `body||body.en||body.ja||comments...` フォールバックでないと大半のケースで snippet が欠落する、(2) `canShowSnippet` ゲートで閲覧不可ページの本文断片を落とす。詳細は design.md「Implementation Notes」参照
+  - **ページドキュメントを spread しない**: `data[i].data` は `IPageHasId` 一式。`body` 等が混入しないよう `pageId` / `pagePath` だけを明示的に取り出す（要件 6.5 と役割分離の維持）
   - execute からは例外を throw せず、try/catch で SearchService 例外を `result: 'error'` に変換
   - 観察可能完了: 5 ケース（空クエリ拒否 / context 欠如 / ES disabled / SearchService 成功 / SearchService 例外）すべてで対応する `result` 値が返り、`ok` 時の `hits` 配列に `pagePath` が含まれ、`body` を含むキーが一切現れない
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 3.2_
@@ -46,15 +47,15 @@
   - _Depends: 1.0_
 
 - [x] 2.2 (P) ES 全文検索 tool の unit test
-  - **モック構造**: `requestContext` に `user` (`IUserHasId` 形状の最小 mock) / `searchService` (object) を任意に set/未 set できるテストハーネスを用意。`searchService` は `{ isElasticsearchEnabled: boolean, searchKeyword: vi.fn() }` の最小形を持つ
+  - **モック構造**: `requestContext` に `user` (`IUserHasId` 形状の最小 mock) / `searchService` (object) を任意に set/未 set できるテストハーネスを用意。`searchService` は `{ isElasticsearchEnabled: boolean, searchKeyword: vi.fn(), formatSearchResult: vi.fn() }` の最小形を持つ（`formatSearchResult` は空結果をデフォルト解決）
   - 以下 5 種の result を網羅:
     1. **空クエリ拒否**: `query: ''` で zod 段階拒否（execute 未到達）
     2. **context 欠如 (user)**: `user` 未 set → `result: 'context_error'`
     3. **context 欠如 (searchService)**: `searchService` 未 set → `result: 'context_error'`
     4. **ES disabled**: `searchService.isElasticsearchEnabled === false` → `result: 'error', reason: 'elasticsearch_not_configured'`、**`searchKeyword` が呼ばれないことを assert**
     5. **SearchService 例外**: `searchKeyword.mockRejectedValue(...)` → `result: 'error'`、execute が throw しない
-  - 成功ケース: `searchKeyword.mockResolvedValue([{ data: [...], meta: { total } }, 'delegator'])` で戻り値マッピングを assert
-  - 戻り値マッピングで `body` が削除されること、`pagePath` / `pageId` / `snippet` が正しく抽出されることを assert
+  - 成功ケース: `searchKeyword.mockResolvedValue([searchResult, 'delegator'])` かつ `formatSearchResult.mockResolvedValue({ data: [{ data: { _id, path }, meta: { elasticSearchResult: { snippet } } }], meta: { total } })` で、tool が生結果を `formatSearchResult` に転送し（`searchResult` / `delegatorName` / `user` / `userGroups` を forward）、その出力を `hits` にマップすることを assert
+  - 戻り値マッピングで `body`（ページドキュメント側に混入させても）が出力に現れないこと、`pagePath` / `pageId` / `snippet` が正しく抽出されること、`snippet: null`（`canShowSnippet` ゲート相当）のとき `snippet` キーが省略されることを assert
   - **`user` 参照同一性の assert**: `requestContext.set('user', mockUser)` でセットした `mockUser` オブジェクトが、`searchKeyword.mock.calls[0][2]` と `===` で一致すること（合成 user に組み替えていない、`User.findById` でも置き換えていない）を確認（design.md test #8、要件 6.7 / Issue 1 C 案の回帰防止）
   - **クエリ構文の素通し**: `query` に `prefix:/docs -draft tag:meeting "release notes"` 等の演算子を含む文字列を渡した場合に、tool 層で文字列が改変されず `searchKeyword` の第 1 引数にそのまま渡ることを assert（サニタイザ不在の保証、Plan A 採用根拠の回帰防止）
   - 観察可能完了: `pnpm vitest run full-text-search-tool.spec` が緑、上記すべての挙動が assert される
