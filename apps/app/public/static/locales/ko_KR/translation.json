@@ -770,6 +770,7 @@
     "filter_by_author": "생성자로 필터링",
     "filter_editor": "편집자",
     "filter_by_editor": "편집자로 필터링",
+    "filter_tag": "태그",
     "sort_axis": {
       "relationScore": "관련성별 정렬",
       "createdAt": "생성일",

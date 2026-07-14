@@ -810,6 +810,7 @@
     "filter_by_author": "Filter by author",
     "filter_editor": "Editor",
     "filter_by_editor": "Filter by editor",
+    "filter_tag": "Tag",
     "sort_axis": {
       "relationScore": "Sort by relevance",
       "createdAt": "Creation date",

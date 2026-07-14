@@ -805,6 +805,7 @@
     "filter_by_author": "Filtrer par auteur",
     "filter_editor": "Éditeur",
     "filter_by_editor": "Filtrer par éditeur",
+    "filter_tag": "Étiquette",
     "sort_axis": {
       "relationScore": "Trier par pertinence",
       "createdAt": "Date de création",

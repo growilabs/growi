@@ -843,6 +843,7 @@
     "filter_by_author": "作成者で絞り込む",
     "filter_editor": "更新者",
     "filter_by_editor": "更新者で絞り込む",
+    "filter_tag": "タグ",
     "sort_axis": {
       "relationScore": "関連度順",
       "createdAt": "作成日時",
