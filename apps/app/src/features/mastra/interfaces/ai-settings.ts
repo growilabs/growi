@@ -14,6 +14,18 @@ export interface AiProviderStatus {
 }
 
 /**
+ * An allow-list entry enriched for display with the official model name resolved
+ * from the effective catalog (the `modelId` itself when the provider is
+ * catalog-less, the id is free-text, or models.dev has since removed it). Used
+ * ONLY by the admin GET response so the settings UI can render names without a
+ * second lookup. Display-only: `displayName` is NEVER persisted or sent back in
+ * the PUT request (which uses the bare {@link AllowedModel}).
+ */
+export interface AllowedModelForDisplay extends AllowedModel {
+  displayName: string;
+}
+
+/**
  * GET /_api/v3/ai-settings response.
  *
  * Exposes the currently effective AI configuration to the admin UI.
@@ -26,7 +38,7 @@ export interface AiProviderStatus {
 export interface AiSettingsResponse {
   aiEnabled: boolean; // state of app:aiEnabled
   providers: Record<AiProvider, AiProviderStatus>; // all 4 providers, always present (fixed slots)
-  allowedModels: AllowedModel[]; // cross-provider allow-list incl. isDefault; always an array
+  allowedModels: AllowedModelForDisplay[]; // cross-provider allow-list incl. isDefault + display name; always an array
   useOnlyEnvVars: boolean; // when env:useOnlyEnvVars:ai is on, provider connection settings are read-only (5.2)
   isConfigured: boolean; // result of isAiConfigured(), used for the "enabled but not configured" warning
 }

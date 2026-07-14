@@ -63,7 +63,7 @@ const mockedUseSelectableModels = vi.mocked(useSWRxSelectableModels);
 // A minimal, resolved (empty-catalog) hook result. No type assertion: the object
 // structurally matches the real hook return, so it type-checks as-is.
 const emptyCatalogResult = (): ReturnType<typeof useSWRxSelectableModels> => ({
-  data: { modelIds: [] },
+  data: { models: [] },
   error: undefined,
   isLoading: false,
   isValidating: false,
@@ -87,7 +87,14 @@ const baseSettings: AiSettingsResponse = {
       azureOpenaiSettings: {},
     },
   },
-  allowedModels: [{ provider: 'openai', modelId: 'gpt-4o', isDefault: true }],
+  allowedModels: [
+    {
+      provider: 'openai',
+      modelId: 'gpt-4o',
+      isDefault: true,
+      displayName: 'GPT-4o',
+    },
+  ],
   useOnlyEnvVars: false,
   isConfigured: true,
 };
@@ -284,7 +291,11 @@ describe('AiSettings', () => {
       // fallback) yet rejected by the exactly-one-default PUT rule. Toggling a
       // provider must still save: the untouched list is omitted, so the server
       // never validates it.
-      setData({ allowedModels: [{ provider: 'openai', modelId: 'gpt-4o' }] });
+      setData({
+        allowedModels: [
+          { provider: 'openai', modelId: 'gpt-4o', displayName: 'GPT-4o' },
+        ],
+      });
       const user = userEvent.setup();
 
       render(<AiSettings />);
