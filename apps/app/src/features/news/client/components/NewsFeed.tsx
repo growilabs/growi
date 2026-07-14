@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { format } from 'date-fns';
@@ -9,13 +9,13 @@ import unreadDotStyles from '~/client/components/InAppNotification/UnreadDot.mod
 import PaginationWrapper from '~/client/components/PaginationWrapper';
 import { getLocale } from '~/utils/locale-utils';
 
-import { newsItemAnchorId } from '../consts';
+import { NEWS_PER_PAGE, newsItemAnchorId } from '../consts';
 import { useSWRxNewsPage } from '../hooks/use-news';
+import { parsePageQuery } from '../utils/parse-page-query';
 import { resolveLocaleText } from '../utils/resolve-locale-text';
 
 import styles from './NewsFeed.module.scss';
 
-const NEWS_PER_PAGE = 10;
 const DEFAULT_EMOJI = '📢';
 
 /**
@@ -25,16 +25,6 @@ const DEFAULT_EMOJI = '📢';
  * to block `javascript:`, `data:`, and similar XSS vectors.
  */
 const isSafeHttpUrl = (url: string): boolean => /^https?:\/\//i.test(url);
-
-/**
- * Parse a `?page=N` query into a positive integer page number. Falls back to 1
- * for missing / non-numeric / non-positive input to keep URL manipulation safe.
- */
-const parsePageQuery = (value: string | string[] | undefined): number => {
-  const raw = Array.isArray(value) ? value[0] : value;
-  const n = Number(raw);
-  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
-};
 
 /**
  * Full-page news feed with pagination. Sidebar's infinite-scroll variant walks
@@ -78,19 +68,24 @@ export const NewsFeed = (): JSX.Element => {
     [router],
   );
 
-  // Anchor scroll: try to focus the hash target after the page's DOM settles.
-  // No infinite-scan needed anymore because the caller (sidebar) sends the
-  // correct `?page=N` and the target item is expected to be on this page.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: items.length is an intentional trigger — re-check the anchor when the page contents load
+  // Anchor scroll: focus the hash target once per navigation (asPath).
+  // With `keepPreviousData` the previous page's DOM is still shown when
+  // asPath changes, so the first run may not find the target; `data` in the
+  // dependency array re-fires the effect when the new page arrives. The ref
+  // guards against re-scrolling on background revalidations (which also
+  // change the `data` reference) after the target has been focused.
+  const scrolledForPathRef = useRef<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `data` is an intentional trigger — re-check the anchor when the page contents arrive
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (scrolledForPathRef.current === router.asPath) return;
     const hash = decodeURIComponent(window.location.hash.replace(/^#/, ''));
     if (hash === '') return;
     const el = document.getElementById(hash);
     if (el != null) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrolledForPathRef.current = router.asPath;
     }
-  }, [items.length, router.asPath]);
+  }, [data, router.asPath]);
 
   if (isValidating && items.length === 0) {
     return (
