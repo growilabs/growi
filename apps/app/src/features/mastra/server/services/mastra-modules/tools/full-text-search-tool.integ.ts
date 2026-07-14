@@ -134,6 +134,7 @@ describe.skipIf(!hasElasticsearch)(
     let restrictedSeed: Seeded;
 
     let originalEsUri: string | undefined;
+    let dedicatedIndexUrl: string | undefined;
 
     const buildRequestContext = (
       user: IUserHasId,
@@ -192,21 +193,47 @@ describe.skipIf(!hasElasticsearch)(
     const isHit = (result: FullTextSearchResult): boolean =>
       result.result === 'ok' && result.hits.length > 0;
 
+    // Count how many of the three seeded documents are visible in the
+    // dedicated index, through a channel independent of the grant-filtered
+    // tool. This is what makes the GRANT_RESTRICTED absence test non-vacuous:
+    // that page is invisible to every user by design, so it can never be
+    // polled through the tool — without this check its test could pass while
+    // the document is still pending refresh, proving nothing about grant
+    // filtering.
+    const countSeededDocs = async (): Promise<number> => {
+      if (dedicatedIndexUrl == null) {
+        throw new Error('dedicatedIndexUrl must be set by beforeAll');
+      }
+      const res = await fetch(`${dedicatedIndexUrl}/_count`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          query: {
+            ids: { values: [publicSeed.id, ownerSeed.id, restrictedSeed.id] },
+          },
+        }),
+      });
+      if (!res.ok) {
+        return 0; // the index itself may not exist yet
+      }
+      const body = (await res.json()) as { count: number };
+      return body.count;
+    };
+
     // Elasticsearch refreshes newly-indexed documents asynchronously (~1s),
     // and the three seeds are indexed sequentially — a refresh can land
     // between them, making an earlier document searchable while a later one is
-    // still pending. Poll until BOTH the public page (as userA) and the owner
-    // page (as its owner userB) are visible. The restricted page cannot be
-    // polled through the tool (invisible to everyone by design), but its test
-    // asserts absence, which a pending refresh cannot turn into a false
-    // failure.
+    // still pending. Poll until the public page (as userA) and the owner page
+    // (as its owner userB) are visible through the tool AND all three
+    // documents — including the restricted one — are countable in the index.
     const waitUntilSearchable = async (): Promise<void> => {
       for (let attempt = 0; attempt < 40; attempt++) {
         // Sequential by design: each poll must observe the result of the last.
         // biome-ignore lint: intentional polling loop
         const publicResult = await runTool(PUBLIC_TOKEN, userA);
         const ownerResult = await runTool(OWNER_TOKEN, userB);
-        if (isHit(publicResult) && isHit(ownerResult)) {
+        const seededCount = await countSeededDocs();
+        if (isHit(publicResult) && isHit(ownerResult) && seededCount === 3) {
           return;
         }
         await sleep(500);
@@ -231,6 +258,7 @@ describe.skipIf(!hasElasticsearch)(
       const dedicatedUri = new URL(originalEsUri);
       dedicatedUri.pathname = `/growi_ftstool_${WORKER_ID}`;
       process.env.ELASTICSEARCH_URI = dedicatedUri.href;
+      dedicatedIndexUrl = dedicatedUri.href;
       await configManager.loadConfigs();
 
       searchService = await SearchService.create(crowi);
@@ -358,8 +386,9 @@ describe.skipIf(!hasElasticsearch)(
       const result = await runTool(RESTRICTED_TOKEN, userA);
 
       assertOk(result);
-      // The page is indexed the same way as the ones found above, so an empty
-      // result is due to grant filtering, not an indexing miss.
+      // beforeAll's waitUntilSearchable counted this document in the index via
+      // a direct (grant-unfiltered) ES query, so an empty result here is due
+      // to grant filtering, not an indexing miss or a pending refresh.
       expect(result.hits.some((h) => h.pageId === restrictedSeed.id)).toBe(
         false,
       );
