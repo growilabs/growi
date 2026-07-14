@@ -3,6 +3,7 @@ import { RequestContext } from '@mastra/core/request-context';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type MockProxy, mock } from 'vitest-mock-extended';
 
+import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult } from '~/interfaces/search';
 import type SearchService from '~/server/service/search';
 
@@ -276,7 +277,7 @@ describe('fullTextSearchTool', () => {
       };
       mockSearchService.searchKeyword.mockResolvedValue([
         searchResult,
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       ]);
       // formatSearchResult returns IFormattedSearchResult: each entry has the
       // full page document under `.data` and the snippet under
@@ -315,7 +316,7 @@ describe('fullTextSearchTool', () => {
         searchResult,
       );
       expect(mockSearchService.formatSearchResult.mock.calls[0][1]).toBe(
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       );
       expect(mockSearchService.formatSearchResult.mock.calls[0][2]).toBe(
         mockUser,
@@ -349,7 +350,7 @@ describe('fullTextSearchTool', () => {
       const mockSearchService = buildMockSearchService();
       mockSearchService.searchKeyword.mockResolvedValue([
         { data: [], meta: { total: 1, hitsCount: 1 } },
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       ]);
       // snippet: null is what canShowSnippet produces for a page the caller
       // cannot view — the tool must omit the key entirely (not emit "").
@@ -402,7 +403,7 @@ describe('fullTextSearchTool', () => {
       };
       mockSearchService.searchKeyword.mockResolvedValue([
         searchResult,
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       ]);
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);
@@ -427,7 +428,7 @@ describe('fullTextSearchTool', () => {
       };
       mockSearchService.searchKeyword.mockResolvedValue([
         searchResult,
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       ]);
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);
@@ -460,7 +461,7 @@ describe('fullTextSearchTool', () => {
       };
       mockSearchService.searchKeyword.mockResolvedValue([
         searchResult,
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       ]);
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);
@@ -526,7 +527,7 @@ describe('fullTextSearchTool', () => {
       };
       mockSearchService.searchKeyword.mockResolvedValue([
         searchResult,
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       ]);
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);
@@ -562,7 +563,7 @@ describe('fullTextSearchTool', () => {
       };
       mockSearchService.searchKeyword.mockResolvedValue([
         searchResult,
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       ]);
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);
