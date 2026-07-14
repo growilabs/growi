@@ -149,7 +149,7 @@
   - _Requirements: 4.2_
   - _Boundary: prompt-input_
 - [x] 7.2 チャットのモデル選択をプロバイダ横断にする
-  - モデル一覧の新応答形に追従し、プロバイダ別グループで選択肢を表示する。トリガは「provider · modelId」表示
+  - モデル一覧の新応答形に追従し、プロバイダ別グループ(見出しは `getProviderLabel`)で選択肢を表示する(各項目は `displayName`)。トリガは `formatModelLabel(provider, displayName)` = 「\<プロバイダー表示名\> · \<displayName\>」表示
   - 選択状態をモデルキーで保持し、送信・再生成の body に毎回ライブ注入する(機構不変)。変更時に新フィールドで個人設定へ永続化する
   - 完了条件: グループ表示・選択変更での永続化呼び出し・送信 body へのキー包含のコンポーネントテストがグリーン
   - _Requirements: 4.1, 4.2, 4.4, 4.7_
