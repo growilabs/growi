@@ -14,7 +14,7 @@
 > - `prisma.activities.createByParameters(params)` — `user`/`target` がオブジェクトで渡ってきた場合の ID への変換は拡張の内部で行う
 > - `prisma.activities.updateByParameters(id, parameters)` — `include: { user: true }` 済みで返る。対象が見つからない場合は例外を投げず `null` を返す（Mongoose 版の `findOneAndUpdate(..., {new:true})` と同じ挙動）
 > - `prisma.activities.paginate({ where, orderBy, offset, limit, include })` — **offset 指定のみを受け付ける**（`page` 指定は廃止済み。共有ヘルパ `~/utils/prisma` の `paginate` も同様に offset 統一済み）
-> - `prisma.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(...)` — `aggregateRaw` を使う実装に置き換え済み
+> - `prisma.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(...)` — `aggregateRaw` を使う実装に置き換え済み（その後の改修内容は Allowed Dependencies 参照）
 > - `where: { snapshot: { is: { username: { in: [...] } } } }` という composite type への絞り込みは、実 MongoDB に対して意図通り効くことを確認済み（`aggregateRaw` への生クエリ回避は不要だった）
 > - `create` / `createMany` は明示的な `_id`（ObjectId 文字列）を指定しても受け付けることを確認済み
 >
@@ -57,6 +57,7 @@
 
 ### Allowed Dependencies
 - 移行済み `activities` Prisma モデルと拡張（`ActivityExtension` の `createByParameters` / `updateByParameters` / `paginate` / `findSnapshotUsernamesByUsernameRegexWithTotalCount`）。`~/utils/prisma` の `prisma` クライアント。**移行は 2026-07-01 に完了済み**（詳細は Overview の囲み参照）。ただし `createByParameters` は snapshot 添付フィールドを保存するため本スペックで改修する（上記 This Spec Owns 参照。依存ではなく所有に格上げ）。
+- `findSnapshotUsernamesByUsernameRegexWithTotalCount` は、監査ログ fuzzy 検索フォールバックの改修（本スペック範囲外の別修正）で挙動が追随修正されている： `$match` 前段にあった `$limit(10000)` を撤去し `maxTimeMS: 5000` で実行時間を制限、`q` に `escapeStringForMongoRegex` と前方一致（`^`）アンカーを適用。同修正で件数なし版 `findSnapshotUsernamesByUsernameRegex(q, { offset, limit })` が新設された（`search.ts` の ES フォールバック専用、`q.trim().length < 2` を短絡）。`WithTotalCount` 側は `/usernames` 管理APIが空 `q` で全件一致する仕様のため、この短絡ガードの対象外。シグネチャ自体は変更していない。
 - `attachments` Prisma モデル（`originalName` / `fileSize` / `pageId`）と `pages` モデル（`path` の引き当て）。
 - `attachmentService.removeAttachment` / `removeAllAttachments`（削除実体）。
 - `ActivityService.createActivity` / `shoudUpdateActivity` と `activityEvent`、`addActivity` middleware が用意する `res.locals.activity`。
@@ -65,7 +66,7 @@
 - `ISnapshot` ユニオンの shape 変更、`AttachmentRemoveSnapshot` のフィールド増減。
 - `SupportedTargetModel` への値追加・変更。
 - `ActivitiesSnapshot` composite type のフィールド変更。
-- 移行済みの `ActivityExtension`（`activities-prisma-migration`）が `createByParameters` / `updateByParameters` / `paginate` のシグネチャを変えた場合。
+- 移行済みの `ActivityExtension`（`activities-prisma-migration`）が `createByParameters` / `updateByParameters` / `paginate` / `findSnapshotUsernamesByUsernameRegex(WithTotalCount)` のシグネチャを変えた場合。
 - 複合 unique index `{ userId, target, action, createdAt }` の定義変更（本スペックは変更しない前提で設計している）。
 - `activityEvent.emit('update', ...)` の呼び出し元が新たに `snapshot` を渡し始めた場合（`updateByParameters` は素の `ISnapshot` を受けて内部で envelope 化する前提のため、envelope 形で渡すと二重ラップになる）。
 
