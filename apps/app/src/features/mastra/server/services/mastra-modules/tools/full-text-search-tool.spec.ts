@@ -261,6 +261,28 @@ describe('fullTextSearchTool', () => {
         expect(result.reason).toBe('boom-detail');
       }
     });
+
+    it("converts formatSearchResult rejections into result: 'error' without throwing out of execute", async () => {
+      const requestContext = buildRequestContext();
+      const mockUser = buildMockUser();
+      const mockSearchService = buildMockSearchService();
+      // searchKeyword succeeds; the failure happens at the second await point
+      // inside the try block (the formatter), which must be caught the same
+      // way (requirement 6.8).
+      mockSearchService.searchKeyword.mockResolvedValue([
+        { data: [], meta: { total: 0, hitsCount: 0 } },
+        SearchDelegatorName.DEFAULT,
+      ]);
+      mockSearchService.formatSearchResult.mockRejectedValue(
+        new Error('format-boom'),
+      );
+      requestContext.set('user', mockUser);
+      requestContext.set('searchService', mockSearchService);
+
+      await expect(
+        invokeExecute({ query: 'anything', limit: 5 }, requestContext),
+      ).resolves.toMatchObject({ result: 'error', reason: 'format-boom' });
+    });
   });
 
   describe('success mapping', () => {

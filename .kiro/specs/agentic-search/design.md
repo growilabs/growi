@@ -884,7 +884,7 @@ export const growiAgent = new Agent({
 | Input validation | （zod `min(1)` で空クエリ拒否）| `query` が空文字列 | Mastra ランタイムが zod 検証段階で弾く（tool execute に到達しない） |
 | Context missing | `result: 'context_error'` | `requestContext` から `user` または `searchService` を取り出せない | 防御的判定、運用上は到達しない |
 | Elasticsearch disabled | `result: 'error', reason: 'elasticsearch_not_configured'` | `searchService.isElasticsearchEnabled === false` | OSS デプロイで ES URI 未設定の場合に発生。agent は LLM 標準挙動で他の応答方針に切り替える |
-| Search exception | `result: 'error', reason: <message>` | `searchService.searchKeyword(...)` が reject | `logger.error` で記録、agent には `'error'` で返す（要件 6.8） |
+| Search exception | `result: 'error', reason: <message>` | `searchService.searchKeyword(...)` / `searchService.formatSearchResult(...)` が reject | `logger.error` で記録、agent には `'error'` で返す（要件 6.8） |
 
 ### Monitoring
 
@@ -903,7 +903,7 @@ export const growiAgent = new Agent({
 5. `searchKeyword` の生結果と `delegatorName` / `user` / `userGroups` が `formatSearchResult` へそのまま転送され、その出力（`IFormattedSearchResult`）が `{ pageId, pagePath, snippet }` 形にマップされる（`searchKeyword` / `formatSearchResult` を mock、6.2, 6.3, 6.4）
 5b. `formatSearchResult` が `snippet: null`（`canShowSnippet` ゲート相当）または空文字 `""` を返したとき、`snippet` キー自体を省略する（空文字を出さない）（6.4, 6.5）
 6. `formatSearchResult` が返すページドキュメント（`data[i].data`）に `body` が含まれていても tool 出力には含めないこと（6.5）
-7. SearchService が reject された場合に `result: 'error'` を返し execute が throw しないこと（6.8）
+7. SearchService が reject された場合（`searchKeyword` / `formatSearchResult` のいずれの reject でも）に `result: 'error'` を返し execute が throw しないこと（6.8）
 8. `requestContext` 経由の `user: IUserHasId` がそのまま `SearchService.searchKeyword` の第 3 引数に渡ること（合成オブジェクトでなく `req.user` の参照同一性が保たれること、6.7）
 9. **クエリ構文の素通し**: `query` に `prefix:/docs -draft tag:meeting "release notes"` 等の演算子を含む文字列を渡したとき、tool 層で文字列が改変されず `SearchService.searchKeyword` の第 1 引数にそのまま渡ること（サニタイザ不在の保証、本 spec の Plan A 採用根拠）
 10. **`sort` / `order` 入力の素通し**: `sort: 'updatedAt', order: 'asc'` を指定したとき `searchKeyword` の第 5 引数 `searchOpts` に `{ limit, sort: 'updatedAt', order: 'asc' }` がそのまま渡ること（要件 6.9）
