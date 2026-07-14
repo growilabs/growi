@@ -10,7 +10,7 @@
   - _Requirements: 5.1_
   - _Boundary: slash-command-types_
 
-- [ ] 1.2 ブロック要素の挿入内容を生成する純粋ビルダーを実装
+- [x] 1.2 ブロック要素の挿入内容を生成する純粋ビルダーを実装
   - 行頭マーカー（見出し H1–H3 / 箇条書き / 番号付き / タスク / 引用）、空コードブロック、2 列の空 Markdown テーブル（ヘッダ + 区切り + 1 ボディ行）の挿入テキストとカーソル位置を生成する
   - `from` が行頭か行の途中（先行する非空白テキストあり）かを判定し、行の途中なら要素種別に応じた区切りを前置して新しい行に挿入する（先行テキストを壊さない）。区切りは描画規則に従い、テーブル/コードブロックは空行（`\n\n`）、見出し/リスト/引用は単一改行（`\n`）
   - 副作用を持たない（エディタへ直接 dispatch しない）
@@ -71,3 +71,6 @@
   - 観測: 上記シナリオが手動スモークで再現し、`turbo run lint/test/build --filter @growi/app` 相当が green
   - _Requirements: 1.1, 2.1, 3.2, 3.3, 3.6, 4.1, 6.2, 6.3_
   - _Depends: 3.2_
+
+## Implementation Notes
+- 1.2: insertion-builders decide line-start vs mid-line purely from **same-line** preceding non-whitespace text (Req 3.6 wording). The design's cross-line nuance (table on a fresh empty line directly below a non-empty paragraph → also needs a blank line) is intentionally NOT handled by the builders — the typical `/` trigger hits the mid-line path. Revisit in the 4.1 smoke if a paragraph-then-newline-then-`/table` case renders wrong.

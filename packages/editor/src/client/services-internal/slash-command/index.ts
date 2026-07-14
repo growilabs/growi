@@ -1,3 +1,8 @@
+export {
+  codeBlockInsertion,
+  lineMarkerInsertion,
+  tableInsertion,
+} from './insertion-builders.js';
 export type {
   ResolvedSlashCommand,
   SlashCommand,
