@@ -200,7 +200,6 @@ describe.skipIf(!hasElasticsearch)(
         if (result.result === 'ok' && result.hits.length > 0) {
           return;
         }
-        // biome-ignore lint: intentional polling backoff
         await sleep(500);
       }
       throw new Error(
