@@ -902,6 +902,7 @@ export const growiAgent = new Agent({
 4. `searchService.isElasticsearchEnabled === false` のとき `result: 'error', reason: 'elasticsearch_not_configured'` を返し、`searchKeyword` は呼ばれない（要件 6.1 / OSS デプロイ対応）
 5. `searchKeyword` の生結果と `delegatorName` / `user` / `userGroups` が `formatSearchResult` へそのまま転送され、その出力（`IFormattedSearchResult`）が `{ pageId, pagePath, snippet }` 形にマップされる（`searchKeyword` / `formatSearchResult` を mock、6.2, 6.3, 6.4）
 5b. `formatSearchResult` が `snippet: null`（`canShowSnippet` ゲート相当）または空文字 `""` を返したとき、`snippet` キー自体を省略する（空文字を出さない）（6.4, 6.5）
+5c. `totalCount` は `formatted.meta.total` 由来であること（`searchKeyword` 生結果の `meta` や `hits.length` ではない。formatter は Mongo 側で削除済みのページを drop するため `hits.length < totalCount` が正当な状態として存在する）（6.2）
 6. `formatSearchResult` が返すページドキュメント（`data[i].data`）に `body` が含まれていても tool 出力には含めないこと（6.5）
 7. SearchService が reject された場合（`searchKeyword` / `formatSearchResult` のいずれの reject でも）に `result: 'error'` を返し execute が throw しないこと（6.8）
 8. `requestContext` 経由の `user: IUserHasId` がそのまま `SearchService.searchKeyword` の第 3 引数に渡ること（合成オブジェクトでなく `req.user` の参照同一性が保たれること、6.7）

@@ -366,6 +366,50 @@ describe('fullTextSearchTool', () => {
       expect(serialized).not.toContain('"body"');
     });
 
+    it('takes totalCount from formatted.meta.total, not from the raw result or hits.length', async () => {
+      const requestContext = buildRequestContext();
+      const mockUser = buildMockUser();
+      const mockSearchService = buildMockSearchService();
+      // The formatter can drop entries (findPageListByIds skips pages deleted
+      // from Mongo but still in the ES index) while passing meta through, so
+      // hits.length < totalCount is a legitimate state. The raw result's meta
+      // is set to a sentinel to prove the tool does not read it.
+      mockSearchService.searchKeyword.mockResolvedValue([
+        { data: [], meta: { total: 999, hitsCount: 999 } },
+        SearchDelegatorName.DEFAULT,
+      ]);
+      // Cast scoped to the fixture: only _id / path matter here.
+      const pageDoc = {
+        _id: 'survivor',
+        path: '/p4',
+      } as unknown as IPageHasId;
+      mockSearchService.formatSearchResult.mockResolvedValue({
+        data: [
+          {
+            data: pageDoc,
+            meta: {
+              elasticSearchResult: { snippet: null, highlightedPath: null },
+            },
+          },
+        ],
+        meta: { total: 42, hitsCount: 42 },
+      });
+      requestContext.set('user', mockUser);
+      requestContext.set('searchService', mockSearchService);
+
+      const result = await invokeExecute(
+        { query: 'hello', limit: 5 },
+        requestContext,
+      );
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      expect(result.result).toBe('ok');
+      if (result.result !== 'ok') return;
+      expect(result.hits).toHaveLength(1);
+      expect(result.totalCount).toBe(42);
+    });
+
     it('omits snippet when formatSearchResult yields a null snippet (canShowSnippet gate)', async () => {
       const requestContext = buildRequestContext();
       const mockUser = buildMockUser();
