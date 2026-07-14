@@ -573,6 +573,25 @@ describe('ElasticsearchDelegator', () => {
         );
       });
 
+      it('still emits FinishAddPage when normalizeIndices fails after a successful rebuild', async () => {
+        addAllPagesSpy.mockResolvedValue({ totalCount: 10, count: 10 });
+        vi.spyOn(delegator, 'normalizeIndices').mockRejectedValue(
+          new Error('normalize failed'),
+        );
+
+        // Regression guard: previously an unswallowed normalize failure in the
+        // `finally` block masked a successful rebuild, rejecting rebuildIndex
+        // and leaving the client stuck (no FinishAddPage, no RebuildingFailed).
+        await expect(
+          delegator.rebuildIndex({ shouldEmitProgress: true }),
+        ).resolves.toBeUndefined();
+
+        expect(mockAdminSocket.emit).toHaveBeenCalledWith(
+          SocketEventName.FinishAddPage,
+          { totalCount: 10, count: 10 },
+        );
+      });
+
       it('does not emit FinishAddPage when the rebuild fails', async () => {
         mockES8Client.reindex.mockRejectedValue(new Error('reindex failed'));
 
