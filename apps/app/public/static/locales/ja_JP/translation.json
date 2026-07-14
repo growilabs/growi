@@ -1101,5 +1101,43 @@
     "searching": "検索中...",
     "noResults": "該当するページがありません",
     "candidatesLabel": "ページ候補"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "見出し1",
+      "description": "大見出しを挿入します"
+    },
+    "heading2": {
+      "label": "見出し2",
+      "description": "中見出しを挿入します"
+    },
+    "heading3": {
+      "label": "見出し3",
+      "description": "小見出しを挿入します"
+    },
+    "bulletList": {
+      "label": "箇条書きリスト",
+      "description": "箇条書きのリストを作成します"
+    },
+    "numberedList": {
+      "label": "番号付きリスト",
+      "description": "番号付きのリストを作成します"
+    },
+    "taskList": {
+      "label": "タスクリスト",
+      "description": "チェックリストでタスクを管理します"
+    },
+    "quote": {
+      "label": "引用",
+      "description": "引用文を挿入します"
+    },
+    "codeBlock": {
+      "label": "コードブロック",
+      "description": "コードブロックを挿入します"
+    },
+    "table": {
+      "label": "テーブル",
+      "description": "テーブルを挿入します"
+    }
   }
 }
