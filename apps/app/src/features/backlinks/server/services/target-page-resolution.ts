@@ -1,4 +1,5 @@
 import { isPermalink } from '@growi/core/dist/utils/page-path-utils';
+import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import type { Types } from 'mongoose';
 import mongoose from 'mongoose';
 
@@ -16,7 +17,7 @@ export const resolveToPage = async (
   const Page = mongoose.model<PageDocument, PageModel>('Page');
 
   if (isPermalink(path)) {
-    const id = path.slice(1);
+    const id = removeHeadingSlash(path);
     const page = await Page.findById(id);
 
     return page?._id ?? null;
