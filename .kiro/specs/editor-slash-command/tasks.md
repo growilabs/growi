@@ -73,4 +73,5 @@
   - _Depends: 3.2_
 
 ## Implementation Notes
+- 3.2: `appendExtensions(args)` wraps EVERY top-level element of `args` with the SAME `Compartment` (`services/.../utils/append-extensions.ts`), and a Compartment can wrap only one extension. So the default set MUST be passed as a single nested element (`[[...all]]`); a flat multi-element array throws `RangeError: Duplicate use of compartment in extensions` at runtime (only surfaced when the editor mounts — build/typecheck/unit pass). Encoded via `buildDefaultExtensionsArg` + regression test. Found during 4.1 smoke.
 - 1.2: insertion-builders decide line-start vs mid-line purely from **same-line** preceding non-whitespace text (Req 3.6 wording). The design's cross-line nuance (table on a fresh empty line directly below a non-empty paragraph → also needs a blank line) is intentionally NOT handled by the builders — the typical `/` trigger hits the mid-line path. Revisit in the 4.1 smoke if a paragraph-then-newline-then-`/table` case renders wrong.

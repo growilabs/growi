@@ -78,6 +78,19 @@ export const createEditorCompletionExtension = (t: TFunction): Extension =>
     icons: false,
   });
 
+/**
+ * Build the argument passed to `appendExtensions` for the whole default set.
+ *
+ * It MUST be a single-element array whose sole element nests the full extension
+ * set: `appendExtensions` wraps every top-level array element with the SAME
+ * Compartment, and a Compartment can wrap only one extension — a flat
+ * multi-element array throws "Duplicate use of compartment in extensions" at
+ * runtime. Keeping the outer array length 1 keeps it one compartment for the set.
+ */
+export const buildDefaultExtensionsArg = (
+  completionExtension: Extension,
+): Extension[] => [[...staticExtensions, completionExtension]];
+
 export const useDefaultExtensions = (
   codeMirrorEditor?: UseCodeMirrorEditor,
 ): void => {
@@ -101,10 +114,12 @@ export const useDefaultExtensions = (
     // Register once when the view becomes available. `appendExtensions` creates a
     // fresh Compartment per call, so we MUST reconfigure it back to [] on cleanup;
     // otherwise a language-driven re-register would stack duplicate compartments.
-    const cleanup = appendExtensions([
-      ...staticExtensions,
-      completionExtension,
-    ]);
+    //
+    // The whole set MUST be passed as a SINGLE element (see buildDefaultExtensionsArg):
+    // a flat multi-element array throws "Duplicate use of compartment in extensions".
+    const cleanup = appendExtensions(
+      buildDefaultExtensionsArg(completionExtension),
+    );
     return cleanup;
   }, [view, appendExtensions, completionExtension]);
 };
