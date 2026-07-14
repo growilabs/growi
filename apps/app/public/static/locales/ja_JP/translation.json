@@ -838,6 +838,9 @@
     "number_of_list_to_display": "表示件数",
     "page_number_unit": "件",
     "hit_number_unit": "件",
+    "filter": "フィルター",
+    "filter_author": "作成者",
+    "filter_by_author": "作成者で絞り込む",
     "sort_axis": {
       "relationScore": "関連度順",
       "createdAt": "作成日時",

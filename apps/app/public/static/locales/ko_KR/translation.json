@@ -765,6 +765,9 @@
     "number_of_list_to_display": "표시",
     "page_number_unit": "페이지",
     "hit_number_unit": "개",
+    "filter": "필터",
+    "filter_author": "생성자",
+    "filter_by_author": "생성자로 필터링",
     "sort_axis": {
       "relationScore": "관련성별 정렬",
       "createdAt": "생성일",

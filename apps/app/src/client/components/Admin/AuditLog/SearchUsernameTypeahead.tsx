@@ -30,13 +30,16 @@ type UserDataType = {
 type Props = {
   onChange: (text: string[]) => void;
   initialUsernames?: string[];
+  // Callers outside the admin pages must supply their own placeholder: the
+  // default key lives in the `admin` i18n namespace, which those pages don't load.
+  placeholder?: string;
 };
 
 const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   IClearable,
   Props
 > = (props: Props, ref) => {
-  const { onChange, initialUsernames } = props;
+  const { onChange, initialUsernames, placeholder } = props;
   const { t } = useTranslation();
 
   const typeaheadRef = useRef<TypeaheadRef>(null);
@@ -155,7 +158,7 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
         multiple
         delay={400}
         minLength={0}
-        placeholder={t('admin:audit_log_management.username')}
+        placeholder={placeholder ?? t('admin:audit_log_management.username')}
         isLoading={isLoading}
         options={allUser}
         selected={selectedItems}

@@ -800,6 +800,9 @@
     "number_of_list_to_display": "Afficher",
     "page_number_unit": "pages",
     "hit_number_unit": "trouvé",
+    "filter": "Filtres",
+    "filter_author": "Auteur",
+    "filter_by_author": "Filtrer par auteur",
     "sort_axis": {
       "relationScore": "Trier par pertinence",
       "createdAt": "Date de création",

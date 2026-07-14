@@ -810,6 +810,9 @@
     "number_of_list_to_display": "显示器的数量",
     "page_number_unit": "例",
     "hit_number_unit": "例",
+    "filter": "筛选",
+    "filter_author": "创建者",
+    "filter_by_author": "按创建者筛选",
     "sort_axis": {
       "relationScore": "按相关性排序",
       "createdAt": "按创建日期排序",

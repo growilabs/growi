@@ -805,6 +805,9 @@
     "number_of_list_to_display": "Display",
     "page_number_unit": "pages",
     "hit_number_unit": "hit",
+    "filter": "Filters",
+    "filter_author": "Author",
+    "filter_by_author": "Filter by author",
     "sort_axis": {
       "relationScore": "Sort by relevance",
       "createdAt": "Creation date",

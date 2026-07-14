@@ -37,6 +37,10 @@ export const SearchFilterPanel = (props: Props): JSX.Element => {
           <SearchUsernameTypeahead
             onChange={authorsChangeHandler}
             initialUsernames={filters.authors}
+            placeholder={t(
+              'search_result.filter_by_author',
+              'Filter by author',
+            )}
           />
         </div>
       </div>
