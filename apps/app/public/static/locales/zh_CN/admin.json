@@ -39,6 +39,7 @@
     "in_this_case": "；在这种情况下，只有growi.org网站域将能够注册，所有其他用户将被拒绝。",
     "insert_single": "请每行插入一个电子邮件地址。",
     "page_list_and_search_results": "页面列表/搜索结果",
+    "page_list_and_search_results_desc": "这些设置仅影响无页面访问权限的用户。有权查看页面的用户（例如通过“仅组内”限制的所属组成员）即使设置为“总是隐藏”，也始终能在列表和搜索中看到该页面。",
     "page_listing_1": "页面列表/搜索<br>受“仅限我”限制",
     "page_listing_1_desc": "列出/搜索时显示受“仅限我”选项限制的页面",
     "page_listing_2": "页面列表/搜索<br>受用户组限制",

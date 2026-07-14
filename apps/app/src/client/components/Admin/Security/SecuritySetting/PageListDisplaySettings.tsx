@@ -16,6 +16,9 @@ export const PageListDisplaySettings: React.FC<Props> = ({
       <h4 className="alert-anchor">
         {t('security_settings.page_list_and_search_results')}
       </h4>
+      <p className="form-text text-muted small">
+        {t('security_settings.page_list_and_search_results_desc')}
+      </p>
       <div className="row mb-4">
         <div className="col-md-10">
           <div className="row">
