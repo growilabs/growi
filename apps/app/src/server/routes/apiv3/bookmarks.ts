@@ -246,20 +246,16 @@ module.exports = (crowi: Crowi) => {
         const userRootBookmarks = await Bookmark.find({
           _id: { $nin: bookmarkIdsInFolders },
           user: userId,
-        })
-          .populate<{ page: PageDocument | null }>({
-            path: 'page',
-            model: 'Page',
-            populate: {
-              path: 'lastUpdateUser',
-              model: 'User',
-            },
-          })
-          .exec();
+        }).exec();
 
         const bookmarkedPageIds = userRootBookmarks
           .map((b) => b.page?._id)
           .filter((id): id is Types.ObjectId => id != null);
+
+        // "Anyone with the link" pages are never listed anywhere, so the bookmark is
+        // often the owner's only path back to them: keep them visible on the owner's
+        // own list, but hide them from other users' bookmark listings.
+        const isOwnList = req.user?._id.toString() === userId;
 
         const hideRestrictedByOwner = configManager.getConfig(
           'security:list-policy:hideRestrictedByOwner',
@@ -267,10 +263,6 @@ module.exports = (crowi: Crowi) => {
         const hideRestrictedByGroup = configManager.getConfig(
           'security:list-policy:hideRestrictedByGroup',
         );
-        // "Anyone with the link" pages are never listed anywhere, so the bookmark is
-        // often the owner's only path back to them: keep them visible on the owner's
-        // own list, but hide them from other users' bookmark listings.
-        const isOwnList = req.user?._id.toString() === userId;
 
         const viewablePages = await Page.findByIdsAndViewer(
           bookmarkedPageIds,
@@ -281,30 +273,42 @@ module.exports = (crowi: Crowi) => {
           !hideRestrictedByOwner,
           !hideRestrictedByGroup,
         );
-        const viewableIdSet = new Set(
-          viewablePages.map((p) => p._id.toString()),
+
+        const viewablePageById = new Map(
+          viewablePages.map((p) => [p._id.toString(), p]),
         );
 
         const disabledUserPage = configManager.getConfig(
           'security:disableUserPages',
         );
 
-        const filteredBookmarks = userRootBookmarks.filter((bookmark) => {
-          if (bookmark.page == null) return false;
-          if (bookmark.page._id == null) return false;
-          if (!viewableIdSet.has(bookmark.page._id.toString())) return false;
+        // Pair each surviving bookmark with its viewable page in a single pass
+        const viewableBookmarks = userRootBookmarks.flatMap((bookmark) => {
+          const page =
+            bookmark.page && viewablePageById.get(bookmark.page.toString());
+          if (page == null) return [];
           if (
             disabledUserPage &&
-            (isUserPage(bookmark.page.path) ||
-              isUsersTopPage(bookmark.page.path))
-          )
-            return false;
-          return true;
+            (isUserPage(page.path) || isUsersTopPage(page.path))
+          ) {
+            return [];
+          }
+          return [{ bookmark, page }];
         });
 
+        // Populate lastUpdateUser only for the viewable pages.
+        await Page.populate(
+          viewableBookmarks.map((b) => b.page),
+          { path: 'lastUpdateUser', model: 'User' },
+        );
+
         // serialize Bookmark
-        const serializedUserRootBookmarks = filteredBookmarks.map((bookmark) =>
-          serializeBookmarkSecurely(bookmark),
+        const serializedUserRootBookmarks = viewableBookmarks.map(
+          ({ bookmark, page }) => {
+            const obj = bookmark.toObject();
+            obj.page = page;
+            return serializeBookmarkSecurely(obj);
+          },
         );
 
         return res.apiv3({ userRootBookmarks: serializedUserRootBookmarks });
