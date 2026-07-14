@@ -56,7 +56,6 @@ const defaultHookValues = {
   isReconnectBtnEnabled: false,
   isNormalizeEnabled: false,
   isRebuildEnabled: true,
-  retrieveStatus: vi.fn(),
   reconnect: vi.fn(),
   normalizeIndices: vi.fn(),
   rebuildIndices: vi.fn(),

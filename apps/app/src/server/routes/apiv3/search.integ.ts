@@ -91,13 +91,8 @@ describe('search.js /auditlog-indices routes', () => {
       next();
     });
 
-    const searchModule = await import('./search');
-    const factoryCandidate =
-      'default' in searchModule ? searchModule.default : searchModule;
-    if (typeof factoryCandidate !== 'function') {
-      throw new Error('Module does not export a router factory function');
-    }
-    const searchRouter = factoryCandidate(crowi);
+    const { setup } = await import('./search');
+    const searchRouter = setup(crowi);
     app.use('/', searchRouter);
   });
 
@@ -107,12 +102,12 @@ describe('search.js /auditlog-indices routes', () => {
   });
 
   describe('GET /auditlog-indices', () => {
-    it('returns 405 when AUDIT_LOG_ENABLED is false, without touching searchService', async () => {
+    it('returns 403 when AUDIT_LOG_ENABLED is false, without touching searchService', async () => {
       mockGetConfig.mockReturnValue(false);
 
       const response = await request(app).get('/auditlog-indices');
 
-      expect(response.status).toBe(405);
+      expect(response.status).toBe(403);
       expect(mockSearchService.getAuditlogInfoForAdmin).not.toHaveBeenCalled();
     });
 
@@ -141,14 +136,14 @@ describe('search.js /auditlog-indices routes', () => {
   });
 
   describe('PUT /auditlog-indices', () => {
-    it('returns 405 when AUDIT_LOG_ENABLED is false, without touching searchService', async () => {
+    it('returns 403 when AUDIT_LOG_ENABLED is false, without touching searchService', async () => {
       mockGetConfig.mockReturnValue(false);
 
       const response = await request(app)
         .put('/auditlog-indices')
         .send({ operation: 'rebuild' });
 
-      expect(response.status).toBe(405);
+      expect(response.status).toBe(403);
       expect(mockSearchService.rebuildAuditlogIndex).not.toHaveBeenCalled();
     });
 

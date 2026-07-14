@@ -239,7 +239,6 @@ export const useIndexManagement = ({
     isReconnectBtnEnabled,
     isNormalizeEnabled,
     isRebuildEnabled,
-    retrieveStatus,
     reconnect,
     normalizeIndices,
     rebuildIndices,

@@ -411,12 +411,20 @@ class ElasticsearchDelegator
 
       throw error;
     } finally {
+      // Swallow its error so a normalization failure cannot mask the error
+      // rethrown above, nor prevent FinishAddPage from being emitted below
+      // on the success path (mirrors rebuildAuditlogIndex).
       logger.info('Normalize indices.');
-      await this.normalizeIndices();
+      try {
+        await this.normalizeIndices();
+      } catch (normalizeErr) {
+        logger.error('Failed to normalize indices', normalizeErr);
+      }
     }
 
-    // Emitted only after normalizeIndices() above has resolved, so the client's
-    // isNormalized poll (triggered by this event) doesn't race normalization.
+    // Emitted only after normalizeIndices() above has resolved (or failed
+    // without masking success), so the client's isNormalized poll (triggered
+    // by this event) doesn't race normalization.
     if (shouldEmitProgress) {
       const socket = this.socketIoService.getAdminSocket();
       socket?.emit(SocketEventName.FinishAddPage, result);

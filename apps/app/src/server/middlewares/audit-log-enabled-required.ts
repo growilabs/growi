@@ -14,7 +14,7 @@ const auditLogEnabledRequired = (
   if (!configManager.getConfig('app:auditLogEnabled')) {
     const msg = 'AuditLog is not enabled';
     logger.error(msg);
-    res.apiv3Err(msg, 405);
+    res.apiv3Err(msg, 403);
     return;
   }
 
