@@ -5,6 +5,7 @@ import { apiGet } from '~/client/util/apiv1-client';
 import {
   buildSearchQuery,
   createEmptyFilterState,
+  isFilterStateEmpty,
   type SearchFilterState,
 } from '~/features/search/client/utils/search-query';
 import type { IFormattedSearchResult } from '~/interfaces/search';
@@ -93,10 +94,14 @@ export const useSWRxSearch = (
     fixedConfigurations.includeUserPages,
   );
 
-  const isKeywordValid = keyword != null && keyword.length > 0;
+  const hasKeyword = keyword != null && keyword.length > 0;
+  // A filter-only query (author/editor/group/tag with no keyword) is still a
+  // valid search, so run it whenever the keyword OR any filter is present.
+  const shouldSearch =
+    hasKeyword || !isFilterStateEmpty(fixedConfigurations.filters);
 
   const swrResult = useSWR(
-    isKeywordValid ? ['/search', keyword, fixedConfigurations] : null,
+    shouldSearch ? ['/search', keyword, fixedConfigurations] : null,
     ([endpoint, , fixedConfigurations]) => {
       const { limit, offset, sort, order } = fixedConfigurations;
 

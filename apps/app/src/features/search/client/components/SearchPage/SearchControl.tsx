@@ -62,6 +62,9 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
     initialSearchConditions.filters ?? createEmptyFilterState(),
   );
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  // Defer mounting the filter panel (and its data fetches) until first opened, so
+  // an unopened panel adds no work to the search-results page load.
+  const [hasOpenedFilterPanel, setHasOpenedFilterPanel] = useState(false);
   const [isFileterOptionModalShown, setIsFileterOptionModalShown] =
     useState(false);
 
@@ -248,7 +251,10 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
                   isFilterPanelOpen ? 'active' : ''
                 }`}
                 aria-expanded={isFilterPanelOpen}
-                onClick={() => setIsFilterPanelOpen((prev) => !prev)}
+                onClick={() => {
+                  setHasOpenedFilterPanel(true);
+                  setIsFilterPanelOpen((prev) => !prev);
+                }}
               >
                 <span className="material-symbols-outlined fs-5 me-1">
                   tune
@@ -265,10 +271,12 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
       {isEnableFilter && (
         <Collapse isOpen={isFilterPanelOpen}>
           <div className="border-bottom border-gray">
-            <SearchFilterPanel
-              filters={filters}
-              onChange={changeFiltersHandler}
-            />
+            {hasOpenedFilterPanel && (
+              <SearchFilterPanel
+                filters={filters}
+                onChange={changeFiltersHandler}
+              />
+            )}
           </div>
         </Collapse>
       )}
