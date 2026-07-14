@@ -3,11 +3,7 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import {
-  type ISearchResultData,
-  SORT_AXIS,
-  SORT_ORDER,
-} from '~/interfaces/search';
+import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import loggerFactory from '~/utils/logger';
 
@@ -155,7 +151,7 @@ export const fullTextSearchTool = createTool({
       // (relationScore -> _score, createdAt -> created_at, updatedAt ->
       // updated_at) via ES_SORT_AXIS, so the tool layer does not translate or
       // alias them.
-      const [searchResult, _delegatorName] = await searchService.searchKeyword(
+      const [searchResult, delegatorName] = await searchService.searchKeyword(
         query,
         null,
         user,
@@ -163,19 +159,29 @@ export const fullTextSearchTool = createTool({
         { limit, sort, order },
       );
 
-      // searchResult is typed as ISearchResult<unknown> at the SearchService
-      // boundary; narrow each entry to ISearchResultData to access _id /
-      // _source.path / _highlight.body indexed by the ES delegator.
-      const rawData = searchResult.data as ISearchResultData[];
-      const hits: FullTextSearchHit[] = rawData.map((data) => {
-        // Pick only the fields needed for the agent. Never spread `_source`:
-        // it contains `body` (full Markdown), which must not leak from this
-        // tool (requirement 6.5 — body retrieval belongs to getPageContentTool).
+      // Route the raw ES result through the same formatter the /_api/search
+      // route uses (server/routes/search.ts). formatSearchResult applies the
+      // canShowSnippet() visibility gate and the body / body.ja / body.en /
+      // comments highlight fallback (server/service/search.ts:602-609), so the
+      // snippet matches the standard search path exactly. Re-deriving it here
+      // was both under-keyed (only `_highlight.body`, missing the `.ja` / `.en`
+      // variants produced by plain keyword matches) and skipped the grant gate.
+      const formatted = await searchService.formatSearchResult(
+        searchResult,
+        delegatorName,
+        user,
+        userGroups,
+      );
+
+      // Project to the minimal agent-facing shape. Never return `item.data`
+      // wholesale: it is the full page document. Expose only pageId / pagePath
+      // (requirement 6.5 — body retrieval belongs to getPageContentTool).
+      const hits: FullTextSearchHit[] = formatted.data.map((item) => {
         const hit: FullTextSearchHit = {
-          pageId: String(data._id),
-          pagePath: data._source?.path,
+          pageId: String(item.data._id),
+          pagePath: item.data.path,
         };
-        const snippet = data._highlight?.body?.[0];
+        const snippet = item.meta?.elasticSearchResult?.snippet;
         if (typeof snippet === 'string' && snippet.length > 0) {
           hit.snippet = snippet;
         }
@@ -185,7 +191,7 @@ export const fullTextSearchTool = createTool({
       return {
         result: 'ok' as const,
         hits,
-        totalCount: searchResult.meta.total,
+        totalCount: formatted.meta.total,
       };
     } catch (err) {
       // Never throw out of execute (requirement 6.8): convert exceptions into

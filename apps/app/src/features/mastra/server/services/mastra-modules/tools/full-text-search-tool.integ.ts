@@ -7,6 +7,7 @@ import { getInstance } from '^/test/setup/crowi';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import type Crowi from '~/server/crowi';
 import type { QueryTerms, SearchDelegator } from '~/server/interfaces/search';
+import type { PageDocument, PageModel } from '~/server/models/page';
 import SearchService from '~/server/service/search';
 
 import type { MastraRequestContextShape } from '../types/request-context';
@@ -28,15 +29,25 @@ import { fullTextSearchTool } from './full-text-search-tool';
 //      return-value mapping".
 //
 // What is intentionally NOT tested here:
-//   - Grant enforcement on a real ES index (covered by the layers above).
+//   - `filterPagesByViewer` result-visibility grant enforcement on a real ES
+//     index (covered by the layers above). The dummy delegator returns hits
+//     verbatim, so a page appears in `searchResult.data` regardless of grant —
+//     which is exactly what lets us assert the snippet-visibility gate below.
 //   - ES query DSL assembly (same).
 //
 // What is still tested:
 //   - The tool calls `SearchService.searchKeyword` with the correct
 //     positional arguments (query / null / user / userGroups / searchOpts).
 //   - `userGroups` is resolved from real MongoDB via `UserGroupRelation`.
-//   - Dummy delegator hits are mapped to `{ pageId, pagePath, snippet }`
-//     without leaking the page body.
+//   - Hits are routed through `SearchService.formatSearchResult` and mapped to
+//     `{ pageId, pagePath, snippet }` against a real page document, without
+//     leaking the page body.
+//   - The snippet is taken from the `formatSearchResult` output, so the
+//     `body.ja` / `body.en` highlight keys produced by plain keyword matches
+//     (not just the phrase-only `body` key) reach the agent.
+//   - The `canShowSnippet` visibility gate drops the snippet for a page the
+//     caller cannot view (GRANT_OWNER owned by another user) while still
+//     returning the hit.
 //   - Delegator exceptions become `{ result: 'error' }` without rethrowing.
 
 // Suppress logger noise from the tool body itself.
@@ -143,9 +154,17 @@ describe('fullTextSearchTool (integration, dummy delegator)', () => {
     relatedGroup: mongoose.Types.ObjectId;
     relatedUser: mongoose.Types.ObjectId;
   }>;
+  let Page: PageModel;
 
   let userA: IUserHasId;
+  let userB: IUserHasId;
   let groupG: { _id: mongoose.Types.ObjectId };
+
+  // A GRANT_PUBLIC page — snippet is visible to any caller.
+  let publicPage: { _id: mongoose.Types.ObjectId; path: string };
+  // A GRANT_OWNER page owned by userB — visible in dummy-delegator hits, but
+  // its snippet must be dropped for userA by the canShowSnippet gate.
+  let ownedByOtherPage: { _id: mongoose.Types.ObjectId; path: string };
 
   beforeAll(async () => {
     crowi = await getInstance();
@@ -176,17 +195,25 @@ describe('fullTextSearchTool (integration, dummy delegator)', () => {
     UserGroup = mongoose.model<{ name: string }>('UserGroup');
     UserGroupRelation =
       mongoose.model<UserGroupRelationDoc>('UserGroupRelation');
+    Page = mongoose.model<PageDocument, PageModel>('Page');
 
     const userAName = `agentic-search-integ-userA-${WORKER_ID}`;
-    await User.deleteMany({ username: userAName });
+    const userBName = `agentic-search-integ-userB-${WORKER_ID}`;
+    await User.deleteMany({ username: { $in: [userAName, userBName] } });
     const insertedUsers = await User.insertMany([
       {
         name: userAName,
         username: userAName,
         email: `${userAName}@example.com`,
       },
+      {
+        name: userBName,
+        username: userBName,
+        email: `${userBName}@example.com`,
+      },
     ]);
     userA = insertedUsers[0];
+    userB = insertedUsers[1];
 
     // Group containing user A — used by the userGroups-resolution test below
     // to verify the tool calls UserGroupRelation.findAllUserGroupIdsRelatedToUser
@@ -202,15 +229,43 @@ describe('fullTextSearchTool (integration, dummy delegator)', () => {
       relatedGroup: groupG._id,
       relatedUser: userA._id,
     });
+
+    // Real page documents. formatSearchResult resolves hits back to these via
+    // findPageListByIds (Page.find by _id), then canShowSnippet reads their
+    // grant / grantedUsers to decide snippet visibility — so the dummy
+    // delegator's hit _ids must reference documents that actually exist.
+    const publicPath = `/agentic-search-integ/${WORKER_ID}/public`;
+    const ownedByOtherPath = `/agentic-search-integ/${WORKER_ID}/owned-by-other`;
+    await Page.deleteMany({ path: { $in: [publicPath, ownedByOtherPath] } });
+    const insertedPages = await Page.insertMany([
+      {
+        path: publicPath,
+        grant: Page.GRANT_PUBLIC,
+        creator: userA,
+        lastUpdateUser: userA,
+      },
+      {
+        path: ownedByOtherPath,
+        grant: Page.GRANT_OWNER,
+        creator: userB,
+        lastUpdateUser: userB,
+        grantedUsers: [userB._id],
+      },
+    ]);
+    publicPage = { _id: insertedPages[0]._id, path: publicPath };
+    ownedByOtherPage = { _id: insertedPages[1]._id, path: ownedByOtherPath };
   });
 
   afterAll(async () => {
     // Best-effort cleanup of the Mongo fixtures created above. Tolerate
     // failures so cleanup never masks assertion failures.
     try {
+      await Page.deleteMany({
+        _id: { $in: [publicPage?._id, ownedByOtherPage?._id] },
+      });
       await UserGroupRelation.deleteMany({ relatedGroup: groupG?._id });
       await UserGroup.deleteMany({ _id: groupG?._id });
-      await User.deleteMany({ _id: userA?._id });
+      await User.deleteMany({ _id: { $in: [userA?._id, userB?._id] } });
     } catch {
       // ignore
     }
@@ -237,12 +292,16 @@ describe('fullTextSearchTool (integration, dummy delegator)', () => {
 
   describe('mapping: hit shape', () => {
     it('maps delegator hits to { pageId, pagePath, snippet } without leaking body', async () => {
-      const pageId = new mongoose.Types.ObjectId().toString();
-      const pagePath = `/agentic-search-integ/${WORKER_ID}/mapped`;
+      const pageId = publicPage._id.toString();
+      // The highlight is keyed under `body.ja` — the key ES emits for a plain
+      // keyword match (multi_match over body.ja / body.en). The previous
+      // implementation only read `_highlight.body` (the phrase-only key) and
+      // therefore dropped this snippet; this asserts the regression is fixed.
       const snippet = '<em>match</em> highlighted body';
-      // `body` is intentionally included in `_source` to verify the tool
-      // strips it before returning — see requirement 6.5 (body retrieval
-      // belongs to getPageContentTool, not this tool).
+      // `body` is intentionally included in `_source` to verify it is not
+      // surfaced (formatSearchResult only reads tag_names / bookmark_count from
+      // _source; the returned page document carries no body) — requirement 6.5
+      // (body retrieval belongs to getPageContentTool, not this tool).
       const delegator = buildDummyFullTextDelegator(() =>
         Promise.resolve({
           data: [
@@ -250,10 +309,10 @@ describe('fullTextSearchTool (integration, dummy delegator)', () => {
               _id: pageId,
               _score: 1,
               _source: {
-                path: pagePath,
+                path: publicPage.path,
                 body: 'FULL_BODY_THAT_MUST_NOT_LEAK',
               },
-              _highlight: { body: [snippet] },
+              _highlight: { 'body.ja': [snippet] },
             },
           ],
           meta: { total: 1, hitsCount: 1 },
@@ -270,12 +329,56 @@ describe('fullTextSearchTool (integration, dummy delegator)', () => {
       expect(result.totalCount).toBe(1);
       expect(result.hits).toHaveLength(1);
       // Strict equality on the hit shape — no extra keys (`body`, `_source`,
-      // `_score`, ...) must leak through.
-      expect(result.hits[0]).toStrictEqual({ pageId, pagePath, snippet });
+      // `_score`, ...) must leak through. pagePath comes from the resolved
+      // page document, not the delegator's _source.
+      expect(result.hits[0]).toStrictEqual({
+        pageId,
+        pagePath: publicPage.path,
+        snippet,
+      });
       // Defence in depth: scan the serialised result for the body marker.
       expect(JSON.stringify(result)).not.toContain(
         'FULL_BODY_THAT_MUST_NOT_LEAK',
       );
+    });
+
+    it('drops the snippet (canShowSnippet gate) for a page the caller cannot view but still returns the hit', async () => {
+      // ownedByOtherPage is GRANT_OWNER owned by userB. The dummy delegator
+      // returns it verbatim (no filterPagesByViewer), so it reaches
+      // formatSearchResult, where canShowSnippet returns false for userA and
+      // nulls the snippet — the hit is kept, the body fragment is not exposed.
+      const pageId = ownedByOtherPage._id.toString();
+      const delegator = buildDummyFullTextDelegator(() =>
+        Promise.resolve({
+          data: [
+            {
+              _id: pageId,
+              _score: 1,
+              _source: {
+                path: ownedByOtherPage.path,
+                body: 'FULL_BODY_THAT_MUST_NOT_LEAK',
+              },
+              _highlight: { 'body.ja': ['<em>secret</em> fragment'] },
+            },
+          ],
+          meta: { total: 1, hitsCount: 1 },
+        }),
+      );
+      installDelegator(delegator);
+
+      const result = await invokeExecute(
+        { query: 'anything', limit: 20 },
+        buildRequestContext(userA),
+      );
+
+      assertOk(result);
+      expect(result.hits).toHaveLength(1);
+      expect(result.hits[0]).toStrictEqual({
+        pageId,
+        pagePath: ownedByOtherPage.path,
+      });
+      expect(result.hits[0].snippet).toBeUndefined();
+      expect(JSON.stringify(result)).not.toContain('secret');
     });
 
     it("returns { result: 'ok', hits: [], totalCount: 0 } when delegator returns no hits", async () => {

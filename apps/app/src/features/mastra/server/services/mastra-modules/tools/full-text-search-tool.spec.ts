@@ -63,18 +63,24 @@ const buildMockUser = (): IUserHasId =>
 type MockSearchService = {
   isElasticsearchEnabled: boolean;
   searchKeyword: ReturnType<typeof vi.fn>;
+  formatSearchResult: ReturnType<typeof vi.fn>;
 };
 
 // Build a SearchService-typed mock. The cast inside this builder isolates
 // the boundary where the mock satisfies the SearchService interface — the
-// tool only reads `isElasticsearchEnabled` and `searchKeyword`, so a partial
-// stub typed as the real class is sufficient. Call sites stay cast-free.
+// tool only reads `isElasticsearchEnabled`, `searchKeyword` and
+// `formatSearchResult`, so a partial stub typed as the real class is
+// sufficient. Call sites stay cast-free. `formatSearchResult` defaults to an
+// empty formatted result so argument-forwarding tests need not restate it.
 const buildMockSearchService = (
   overrides: Partial<MockSearchService> = {},
 ): MockSearchService & SearchService => {
   const mock: MockSearchService = {
     isElasticsearchEnabled: true,
     searchKeyword: vi.fn(),
+    formatSearchResult: vi
+      .fn()
+      .mockResolvedValue({ data: [], meta: { total: 0, hitsCount: 0 } }),
     ...overrides,
   };
   return mock as unknown as MockSearchService & SearchService;
@@ -264,25 +270,36 @@ describe('fullTextSearchTool', () => {
   });
 
   describe('success mapping', () => {
-    it('maps SearchService results to { pageId, pagePath, snippet } and never leaks body', async () => {
+    it('routes the raw result through formatSearchResult and maps its output to { pageId, pagePath, snippet } without leaking body', async () => {
       const requestContext = buildRequestContext();
       const mockUser = buildMockUser();
       const mockSearchService = buildMockSearchService();
+      // The tool no longer reads `_highlight` itself — it hands the raw result
+      // to formatSearchResult, which owns the highlight-key fallback and the
+      // canShowSnippet gate. Here we only verify the wiring + output mapping.
       const searchResult: ISearchResult<unknown> = {
-        data: [
-          {
-            _id: 'abc',
-            _score: 1,
-            _source: { path: '/p1', body: 'HIDDEN_BODY' },
-            _highlight: { body: ['snip'] },
-          },
-        ],
+        data: [],
         meta: { total: 1, hitsCount: 1 },
       };
       mockSearchService.searchKeyword.mockResolvedValue([
         searchResult,
         'es-delegator',
       ]);
+      // formatSearchResult returns IFormattedSearchResult: each entry has the
+      // full page document under `.data` and the snippet under
+      // `.meta.elasticSearchResult.snippet`. `body` is included on `.data` to
+      // prove the tool projects only _id / path (requirement 6.5).
+      mockSearchService.formatSearchResult.mockResolvedValue({
+        data: [
+          {
+            data: { _id: 'abc', path: '/p1', body: 'HIDDEN_BODY' },
+            meta: {
+              elasticSearchResult: { snippet: 'snip', highlightedPath: null },
+            },
+          },
+        ],
+        meta: { total: 1, hitsCount: 1 },
+      });
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);
 
@@ -290,6 +307,20 @@ describe('fullTextSearchTool', () => {
         { query: 'hello', limit: 5 },
         requestContext,
       );
+
+      // The raw result and the searchKeyword-returned delegatorName must be
+      // forwarded to formatSearchResult, along with user + resolved userGroups.
+      expect(mockSearchService.formatSearchResult).toHaveBeenCalledTimes(1);
+      expect(mockSearchService.formatSearchResult.mock.calls[0][0]).toBe(
+        searchResult,
+      );
+      expect(mockSearchService.formatSearchResult.mock.calls[0][1]).toBe(
+        'es-delegator',
+      );
+      expect(mockSearchService.formatSearchResult.mock.calls[0][2]).toBe(
+        mockUser,
+      );
+      expect(mockSearchService.formatSearchResult.mock.calls[0][3]).toEqual([]);
 
       expect(isValidationFailure(result)).toBe(false);
       if (isValidationFailure(result)) return;
@@ -312,25 +343,27 @@ describe('fullTextSearchTool', () => {
       expect(serialized).not.toContain('"body"');
     });
 
-    it('omits snippet when the highlight is absent', async () => {
+    it('omits snippet when formatSearchResult yields a null snippet (canShowSnippet gate)', async () => {
       const requestContext = buildRequestContext();
       const mockUser = buildMockUser();
       const mockSearchService = buildMockSearchService();
-      const searchResult: ISearchResult<unknown> = {
+      mockSearchService.searchKeyword.mockResolvedValue([
+        { data: [], meta: { total: 1, hitsCount: 1 } },
+        'es-delegator',
+      ]);
+      // snippet: null is what canShowSnippet produces for a page the caller
+      // cannot view — the tool must omit the key entirely (not emit "").
+      mockSearchService.formatSearchResult.mockResolvedValue({
         data: [
           {
-            _id: 'noHighlight',
-            _score: 1,
-            _source: { path: '/p2' },
-            _highlight: undefined,
+            data: { _id: 'noSnippet', path: '/p2' },
+            meta: {
+              elasticSearchResult: { snippet: null, highlightedPath: null },
+            },
           },
         ],
         meta: { total: 1, hitsCount: 1 },
-      };
-      mockSearchService.searchKeyword.mockResolvedValue([
-        searchResult,
-        'es-delegator',
-      ]);
+      });
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);
 
@@ -344,10 +377,10 @@ describe('fullTextSearchTool', () => {
       expect(result.result).toBe('ok');
       if (result.result !== 'ok') return;
       expect(result.hits[0]).toEqual({
-        pageId: 'noHighlight',
+        pageId: 'noSnippet',
         pagePath: '/p2',
       });
-      // No snippet field when highlight is absent (must be omitted, not "").
+      // No snippet field when the gate drops it (must be omitted, not "").
       expect(Object.hasOwn(result.hits[0], 'snippet')).toBe(false);
     });
   });

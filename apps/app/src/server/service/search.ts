@@ -522,10 +522,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
   // TODO: optimize the way to check isFormattable e.g. check data schema of searchResult
   // So far, it determines by delegatorName passed by searchService.searchKeyword
-  checkIsFormattable(
-    searchResult,
-    delegatorName: SearchDelegatorName,
-  ): boolean {
+  checkIsFormattable(searchResult, delegatorName: string | null): boolean {
     return delegatorName === SearchDelegatorName.DEFAULT;
   }
 
@@ -534,7 +531,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
    */
   async formatSearchResult(
     searchResult: ISearchResult<any>,
-    delegatorName: SearchDelegatorName,
+    delegatorName: string | null,
     user,
     userGroups,
   ): Promise<IFormattedSearchResult> {
