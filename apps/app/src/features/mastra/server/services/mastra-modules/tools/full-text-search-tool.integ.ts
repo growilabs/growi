@@ -127,8 +127,8 @@ describe.skipIf(!hasElasticsearch)(
     let userB: IUserHasId;
 
     // `id` is captured from the generated ObjectId (always defined), avoiding
-    // PageDocument._id's `possibly undefined` type; `page` is kept for ES cleanup.
-    type Seeded = { page: PageDocument; id: string; path: string };
+    // PageDocument._id's `possibly undefined` type.
+    type Seeded = { id: string; path: string };
     let publicSeed: Seeded;
     let ownerSeed: Seeded;
     let restrictedSeed: Seeded;
@@ -187,7 +187,7 @@ describe.skipIf(!hasElasticsearch)(
         page,
         creator,
       );
-      return { page, id: pageId.toString(), path };
+      return { id: pageId.toString(), path };
     };
 
     const isHit = (result: FullTextSearchResult): boolean =>
@@ -321,15 +321,19 @@ describe.skipIf(!hasElasticsearch)(
 
     afterAll(async () => {
       // Best-effort cleanup. Tolerate failures so cleanup never masks assertions.
+      // Drop the whole dedicated per-worker index rather than deleting the
+      // seeded documents one by one: the index exists only for this suite, and
+      // dropping it also clears leftovers from crashed prior runs on a
+      // persistent (devcontainer) ES.
+      if (dedicatedIndexUrl != null) {
+        try {
+          await fetch(dedicatedIndexUrl, { method: 'DELETE' });
+        } catch {
+          // ignore
+        }
+      }
       const seeds = [publicSeed, ownerSeed, restrictedSeed].filter(Boolean);
       const seedIds = seeds.map((s) => s.id);
-      try {
-        await searchService?.fullTextSearchDelegator?.deletePages(
-          seeds.map((s) => s.page),
-        );
-      } catch {
-        // ignore
-      }
       try {
         await Page?.deleteMany({ _id: { $in: seedIds } });
         await Revision?.deleteMany({ pageId: { $in: seedIds } });
