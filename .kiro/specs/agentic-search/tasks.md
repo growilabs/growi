@@ -35,7 +35,7 @@
   - 取得した値で以下のガードを順に評価し、いずれかに該当したら早期 return:
     - `user` または `searchService` が `undefined` → `result: 'context_error'`
     - `searchService.isElasticsearchEnabled === false` → `result: 'error', reason: 'elasticsearch_not_configured'`（`searchKeyword` は呼ばない）
-  - ガード通過後、**`requestContext.get('user')` の戻り値（`IUserHasId`）をそのまま** `searchService.searchKeyword(query, null, user, null, { limit })` に渡す。合成 user (`{ _id: ObjectId }`) の組み立て、`User.findById` での再解決は行わない（design.md 「Implementation Notes」記載の方針）
+  - ガード通過後、**`requestContext.get('user')` の戻り値（`IUserHasId`）をそのまま** `searchService.searchKeyword(query, null, user, userGroups, { limit, sort, order })` に渡す。`userGroups` は tool 内で `UserGroupRelation` + `ExternalUserGroupRelation` から解決する（Implementation Notes 参照）。合成 user (`{ _id: ObjectId }`) の組み立て、`User.findById` での再解決は行わない（design.md 「Implementation Notes」記載の方針）
   - **`query` を tool 層でサニタイズ・改変しない**: `prefix:` / `tag:` / `"..."` / `-` 等の演算子はそのまま `searchService.searchKeyword` の第 1 引数に渡し、`parseQueryString` に解釈させる（Plan A: design.md「サポートするクエリ構文」参照）
   - 戻り値は **タプル `[searchResult, delegatorName]`** として分解し、`delegatorName` を破棄せず `formatSearchResult(searchResult, delegatorName, user, userGroups)` に渡す（`/_api/search` ルートと同一経路）。返る `IFormattedSearchResult` から以下のマッピングで `hits` を組み立てる: `pageId ← data[i].data._id` / `pagePath ← data[i].data.path` / `snippet ← data[i].meta?.elasticSearchResult?.snippet`（`null`/空文字は省略）/ `totalCount ← meta.total`
   - **`formatSearchResult` を必ず経由する**（生の `_highlight` を tool で読まない）。理由: (1) ES highlight は通常キーワードでは `body.ja`/`body.en`（無サフィックス `body` はフレーズ時のみ）に載り、`formatSearchResult` の `body||body.en||body.ja||comments...` フォールバックでないと大半のケースで snippet が欠落する、(2) `canShowSnippet` ゲートで閲覧不可ページの本文断片を落とす。詳細は design.md「Implementation Notes」参照
