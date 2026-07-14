@@ -5,6 +5,11 @@ import { Collapse } from 'reactstrap';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 import type { ISearchConditions, ISearchConfigurations } from '~/stores/search';
 
+import {
+  createEmptyFilterState,
+  type SearchFilterState,
+} from '../../utils/search-query';
+import { SearchFilterPanel } from './SearchFilterPanel';
 import { SearchModalTriggerinput } from './SearchModalTriggerinput';
 import { SearchOptionModalLazyLoaded } from './SearchOptionModal';
 import SortControl from './SortControl';
@@ -53,6 +58,10 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
   const [includeTrashPages, setIncludeTrashPages] = useState(
     initialSearchConditions.includeTrashPages ?? false,
   );
+  const [filters, setFilters] = useState<SearchFilterState>(
+    initialSearchConditions.filters ?? createEmptyFilterState(),
+  );
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isFileterOptionModalShown, setIsFileterOptionModalShown] =
     useState(false);
 
@@ -67,9 +76,17 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
         order,
         includeUserPages,
         includeTrashPages,
+        filters,
       });
     },
-    [includeTrashPages, includeUserPages, onSearchInvoked, order, sort],
+    [
+      filters,
+      includeTrashPages,
+      includeUserPages,
+      onSearchInvoked,
+      order,
+      sort,
+    ],
   );
 
   const changeSortHandler = useCallback(
@@ -82,9 +99,10 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
         order: nextOrder,
         includeUserPages,
         includeTrashPages,
+        filters,
       });
     },
-    [includeTrashPages, includeUserPages, keyword, onSearchInvoked],
+    [filters, includeTrashPages, includeUserPages, keyword, onSearchInvoked],
   );
 
   const changeIncludeUserPagesHandler = useCallback(
@@ -96,9 +114,10 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
         order,
         includeUserPages: include,
         includeTrashPages,
+        filters,
       });
     },
-    [includeTrashPages, keyword, onSearchInvoked, order, sort],
+    [filters, includeTrashPages, keyword, onSearchInvoked, order, sort],
   );
 
   const changeIncludeTrashPagesHandler = useCallback(
@@ -110,9 +129,32 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
         order,
         includeUserPages,
         includeTrashPages: include,
+        filters,
       });
     },
-    [includeUserPages, keyword, onSearchInvoked, order, sort],
+    [filters, includeUserPages, keyword, onSearchInvoked, order, sort],
+  );
+
+  const changeFiltersHandler = useCallback(
+    (newFilters: SearchFilterState) => {
+      setFilters(newFilters);
+
+      onSearchInvoked?.(keyword, {
+        sort,
+        order,
+        includeUserPages,
+        includeTrashPages,
+        filters: newFilters,
+      });
+    },
+    [
+      includeTrashPages,
+      includeUserPages,
+      keyword,
+      onSearchInvoked,
+      order,
+      sort,
+    ],
   );
 
   useEffect(() => {
@@ -199,11 +241,37 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
                 </div>
               </div>
             </div>
+            <div className="d-none d-lg-block ms-2">
+              <button
+                type="button"
+                className={`btn btn-outline-secondary d-flex align-items-center ${
+                  isFilterPanelOpen ? 'active' : ''
+                }`}
+                aria-expanded={isFilterPanelOpen}
+                onClick={() => setIsFilterPanelOpen((prev) => !prev)}
+              >
+                <span className="material-symbols-outlined fs-5 me-1">
+                  tune
+                </span>
+                {t('search_result.filter', 'Filters')}
+              </button>
+            </div>
           </>
         )}
 
         {extraControls}
       </div>
+
+      {isEnableFilter && (
+        <Collapse isOpen={isFilterPanelOpen}>
+          <div className="border-bottom border-gray">
+            <SearchFilterPanel
+              filters={filters}
+              onChange={changeFiltersHandler}
+            />
+          </div>
+        </Collapse>
+      )}
 
       {collapseContents != null && (
         <Collapse isOpen={isCollapsed}>{collapseContents}</Collapse>
