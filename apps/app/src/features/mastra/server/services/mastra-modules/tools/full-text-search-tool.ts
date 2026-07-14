@@ -176,7 +176,16 @@ export const fullTextSearchTool = createTool({
       // Project to the minimal agent-facing shape. Never return `item.data`
       // wholesale: it is the full page document. Expose only pageId / pagePath
       // (requirement 6.5 — body retrieval belongs to getPageContentTool).
-      const hits: FullTextSearchHit[] = formatted.data.map((item) => {
+      const hits: FullTextSearchHit[] = formatted.data.flatMap((item) => {
+        // With nqName: null this tool always resolves the DEFAULT delegator,
+        // so formatSearchResult takes its formattable path and `item.data` is
+        // a resolved page document. On the non-formattable path (non-DEFAULT
+        // delegator) `item.data` would be the raw delegator hit, whose `path`
+        // is undefined — emitting it would violate outputSchema
+        // (`pagePath: z.string()`), so drop such hits defensively.
+        if (typeof item.data.path !== 'string') {
+          return [];
+        }
         const hit: FullTextSearchHit = {
           pageId: String(item.data._id),
           pagePath: item.data.path,
@@ -185,7 +194,7 @@ export const fullTextSearchTool = createTool({
         if (typeof snippet === 'string' && snippet.length > 0) {
           hit.snippet = snippet;
         }
-        return hit;
+        return [hit];
       });
 
       return {
