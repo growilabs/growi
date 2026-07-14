@@ -64,7 +64,6 @@ const RUN_TOKEN = digitsToAlpha(`${WORKER_ID}${Date.now()}`);
 const PUBLIC_TOKEN = `zzprobepublic${RUN_TOKEN}`;
 const OWNER_TOKEN = `zzprobeowner${RUN_TOKEN}`;
 const RESTRICTED_TOKEN = `zzproberestricted${RUN_TOKEN}`;
-const MISSING_TOKEN = `zzprobemissing${RUN_TOKEN}`;
 
 type FullTextSearchOkResult = {
   result: 'ok';
@@ -356,14 +355,6 @@ describe.skipIf(!hasElasticsearch)(
       expect(result.hits.some((h) => h.pageId === restrictedSeed.id)).toBe(
         false,
       );
-    }, 30_000);
-
-    it('returns an empty hit list when nothing matches', async () => {
-      const result = await runTool(MISSING_TOKEN, userA);
-
-      assertOk(result);
-      expect(result.hits).toEqual([]);
-      expect(result.totalCount).toBe(0);
     }, 30_000);
   },
 );

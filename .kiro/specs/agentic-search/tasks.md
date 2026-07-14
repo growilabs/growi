@@ -69,8 +69,8 @@
   - GRANT_PUBLIC ページの本文キーワード検索で `body.ja`/`body.en` ハイライト由来の snippet が返ること（中心的回帰ガード）を assert
   - 他ユーザー所有 GRANT_OWNER ページはヒットに出るが `canShowSnippet` で snippet が落ち、本文断片が漏れないことを assert（重大 #1 回帰防止）
   - GRANT_RESTRICTED ページが `filterPagesByViewer` で結果から除外されることを assert
-  - ヒットなしクエリで `result: 'ok'` / `hits: []` / `totalCount: 0` を確認
-  - 観察可能完了: `pnpm vitest run full-text-search-tool.integ` が緑（実 ES 接続）、snippet 生成・snippet ゲート・grant 除外が ES 経由で確認される
+  - 実 ES テストは回帰ガード + セキュリティに限定。ヒットなし・引数フォワーディング・出力マッピング・例外・`userGroups` 解決・`sort`/`order` 素通しは unit test の責務（実 ES 固有の価値がないため実 ES では重複検証しない）
+  - 観察可能完了: `pnpm vitest run full-text-search-tool.integ` が緑（実 ES 接続・3 ケース）、snippet 生成・snippet ゲート・grant 除外が ES 経由で確認される
   - _Requirements: 6.1, 6.4, 6.5, 6.7_
   - _Boundary: FullTextSearchTool_
   - _Depends: 2.1_

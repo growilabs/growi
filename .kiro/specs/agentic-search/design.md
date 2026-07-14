@@ -944,11 +944,12 @@ export const growiAgent = new Agent({
 1. **snippet 返却（本 spec の中心的回帰ガード）**: GRANT_PUBLIC ページの本文キーワードで検索すると、`body.ja` / `body.en` ハイライトから生成された snippet（`<em>` を含む断片）がヒットに載ること。旧実装は `_highlight.body` のみを読んで snippet を落としていた
 2. **`canShowSnippet` ゲート**: 他ユーザー所有の GRANT_OWNER ページ（デフォルト list-policy では `filterPagesByViewer` を通過する）はヒットには出るが snippet が落ち、本文断片が payload に一切漏れないこと（要件 6.5 / 重大 #1 の回帰防止）
 3. **`filterPagesByViewer` の grant 除外**: GRANT_RESTRICTED ページが結果に出ないこと（他ページと同じ経路で index 済みのため、空結果は index 漏れではなく grant 除外に起因）
-4. ヒットなしクエリで `result: 'ok'` / `hits: []` / `totalCount: 0` を返すこと（要件 6.1）
+
+実 ES テストは上記の **回帰ガード + セキュリティ** に絞る。ヒットなしクエリ・引数フォワーディング・出力マッピング・例外処理・`userGroups` 解決・`sort`/`order` 素通しといった **tool 層のロジックは unit test (`full-text-search-tool.spec.ts`)** が `searchKeyword` / `formatSearchResult` を mock して担い、実 ES では重複検証しない。
 
 **意図的に NOT 対象**:
+- ヒットなしクエリ・出力マッピング・引数フォワーディングの網羅: unit test の責務（実 ES 固有の検証価値がない）
 - ES の query DSL 組み立て / `sort`・`order` の実 ES 上の並び順: `ElasticsearchDelegator` の責務
-- 引数フォワーディング・出力マッピングの網羅: unit test の責務
 
 ### Integration Tests (`get-page-content-tool.integ.ts`)
 
