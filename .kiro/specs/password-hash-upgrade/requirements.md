@@ -35,7 +35,8 @@
 1. When レガシー SHA-256 ハッシュパスワードを持つユーザーがログイン情報を送信する, the GROWI authentication system shall レガシー SHA-256+PASSWORD_SEED 方式で送信されたパスワードを検証する。
 2. When ユーザーがレガシー SHA-256 検証パスで認証に成功する, the GROWI authentication system shall 同一のログイントランザクション内で自動的に新しい適応型 KDF でパスワードを再ハッシュし、保存済みハッシュを置き換える。
 3. While レガシーフォーマットと新フォーマットのハッシュを持つユーザーがシステムに共存する, the GROWI authentication system shall ユーザー側の操作を必要とせず両フォーマットを透過的に処理する。
-4. If 保存済みパスワードのハッシュフォーマットを判別できない, the GROWI authentication system shall ログイン試行を拒否し、ユーザー識別子を含む構造化ログエントリを WARNING レベルで出力する。
+4. If 保存済みハッシュフィールドは存在するがその内容が既知フォーマット（bcrypt `$2b$…` または SHA-256 hex）のいずれにも一致しない（データ破損等の異常系）, the GROWI authentication system shall ログイン試行を拒否し、ユーザー識別子を含む構造化ログエントリを WARNING レベルで出力する。
+5. When ユーザーがパスワード未設定（`password`・`bcryptPassword` の両フィールドとも不在。外部認証専用ユーザーや未有効化ユーザーの正常状態）でローカルログインを試行する, the GROWI authentication system shall ログイン試行を拒否するが、これは正常系であるため WARNING ログを出力しない（デュアルフィールド設計ではフィールド存在によりフォーマットが一意に決まるため、フィールド不在は「判別不能」ではなく「未設定」を意味する）。
 
 ### Requirement 3: マイグレーションスクリプト
 

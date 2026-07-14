@@ -15,10 +15,11 @@
   - `verify(plaintext, bcryptHash, legacyHash, passwordSeed)` を実装:
     - `bcryptHash` あり → `bcrypt.compare()` で検証（`needsRehash: false`）
     - `bcryptHash` なし・`legacyHash` あり → `SHA-256(SEED + plaintext)` で検証（`needsRehash: true`）
-    - 両フィールドなし → `isValid: false` を返し WARNING ログを出力（ユーザー識別子含む）
+    - 両フィールドなし（パスワード未設定 = 正常系）→ `isValid: false` を返す。**WARNING ログは出力しない**（外部認証専用・未有効化ユーザーの正常状態。Req 2.5）
+    - フィールドは存在するが内容が既知フォーマット（bcrypt `$2b$…` / SHA-256 hex）に一致しない（異常系）→ `isValid: false` を返し WARNING ログを出力（ユーザー識別子含む。Req 2.4）
   - `VerifyResult` インターフェース（`isValid: boolean; needsRehash: boolean`）をエクスポートする
   - `hash()` 呼び出しで `$2b$` プレフィックスの bcrypt ハッシュが返ってくることが確認できる
-  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.3, 2.4_
+  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.3, 2.4, 2.5_
   - _Boundary: PasswordHashService_
 
 - [ ] 1.3 PasswordHashService のユニットテストを作成する
@@ -27,12 +28,13 @@
   - `verify()`: bcrypt パス → `{ isValid: true, needsRehash: false }` を確認する
   - `verify()`: SHA-256 legacy パス（`legacyHash` あり）→ `{ isValid: true, needsRehash: true }` を確認する
   - `verify()`: 無効な認証情報 → `{ isValid: false }` を確認する
-  - `verify()`: 両フィールドなし → `{ isValid: false }` かつ WARNING ログ出力を確認する
+  - `verify()`: 両フィールドなし（パスワード未設定）→ `{ isValid: false }` かつ **WARNING ログが出力されない**ことを確認する（Req 2.5）
+  - `verify()`: フィールド内容が既知フォーマットに一致しない異常系 → `{ isValid: false }` かつ WARNING ログ出力を確認する（Req 2.4）
   - `pnpm vitest run password-hash.spec` が全 PASS することが確認できる
-  - _Requirements: 1.1, 1.2, 1.4, 2.1, 2.2, 2.3, 2.4_
+  - _Requirements: 1.1, 1.2, 1.4, 2.1, 2.2, 2.3, 2.4, 2.5_
   - _Boundary: PasswordHashService_
 
-- [ ] 2. User モデルのパスワード処理刷新
+- [ ] 2. User モデルとパスワード関連呼び出し元の刷新
 - [ ] 2.1 User schema に bcryptPassword フィールドを追加し isPasswordSet を更新する
   - Mongoose スキーマ定義に `bcryptPassword: { type: String }` フィールドを追加する
   - `isPasswordSet()` を `!!(this.bcryptPassword || this.password)` に更新して両フィールドを確認するようにする
@@ -42,19 +44,68 @@
   - _Boundary: User Model_
 
 - [ ] 2.2 isPasswordValid、setPassword、updatePassword を async 化し PasswordHashService に委譲する
-  - `isPasswordValid(password)` を async 化: `PasswordHashService.verify(password, this.bcryptPassword, this.password, SEED)` を呼び出す
+  - `isPasswordValid(password)` を async 化: `PasswordHashService.verify(password, this.bcryptPassword, this.password, SEED)` を呼び出し `VerifyResult` を返す
   - `setPassword(password)` を async 化: `this.bcryptPassword = await PasswordHashService.hash(password)` のみ設定し、`password`（SHA-256）フィールドは変更しない（ダウングレード安全のため保持）
-  - `updatePassword`、`createUserByEmailAndPasswordAndStatus`、`resetPasswordByRandomString` 内の `setPassword` 呼び出しをすべて `await` 付きに更新する
-  - `setPassword()` 後に `bcryptPassword` が設定されており、`password` フィールドが変更されておらず、3 つの呼び出し元すべてが TypeScript コンパイルエラーなく動作することが確認できる
+  - `setPassword` を呼ぶ **実在 5 メソッドすべて**の呼び出しを `await` 付きに更新する（未 await のまま `save()` すると bcryptPassword 未設定で保存されログイン不能になるため）:
+    - `updatePassword`（line ~208）
+    - `activateInvitedUser`（line ~277）— 招待ユーザー有効化。**欠落すると当該ユーザーがログイン不能**
+    - `resetPasswordByRandomString`（line ~575）
+    - `createUserByEmail`（line ~591）— メール招待ユーザー作成。**欠落すると当該ユーザーがログイン不能**
+    - `createUserByEmailAndPasswordAndStatus`（line ~683）
+  - `setPassword()` 後に `bcryptPassword` が設定されており、`password` フィールドが変更されておらず、5 つの呼び出し元すべてが TypeScript コンパイルエラーなく動作することが確認できる
   - _Requirements: 1.1, 1.3, 2.1, 2.2_
   - _Boundary: User Model_
 
-- [ ] 2.3 findUserByEmailAndPassword を fetch-then-compare パターンに変更する
-  - `findUserByEmailAndPassword(email, password)` の DB クエリから `password` フィールドを除去して `{ email }` のみで検索するように変更する
-  - ユーザー取得後に `await user.isPasswordValid(password)` で検証するように変更する
-  - メソッドを async 化して `await` を使用する
-  - DB クエリに `password` フィールドが含まれなくなっており、bcrypt ユーザーでも正しく検証できることが確認できる
+- [ ] 2.3 findUserByEmailAndPassword（デッドコード）を削除する
+  - `findUserByEmailAndPassword(email, password)` はリポジトリ全体で呼び出し元が存在しないデッドコードのため削除する（`grep -rn findUserByEmailAndPassword apps/app/src packages` で呼び出し元ゼロを確認済み）
+  - DB を password hash でクエリするこのメソッドは bcrypt 移行後に動作不能だが、呼び出し元がないため fetch-then-compare リファクタではなく削除が適切（実装工数の無駄を避ける）
+  - 万一、削除前の再 grep で呼び出し元が発見された場合に限り、`{ email }` 検索 + `await user.isPasswordValid()` の fetch-then-compare にリファクタする
+  - メソッド定義が削除され、TypeScript コンパイル・既存テストが通ることが確認できる
   - _Requirements: 2.1, 2.3_
+  - _Boundary: User Model_
+
+- [ ] 2.4 bcryptPassword の API レスポンス漏洩を防止する（@growi/core）
+  - `packages/core/src/models/serializers/user-serializer.ts` の `omitInsecureAttributes()` の omit リストに `bcryptPassword` を追加する（現状は `password`/`apiToken`/`email` のみ除外しており新フィールドが漏洩する）
+  - `packages/core/src/interfaces/user.ts` の `IUser` に `bcryptPassword?: string` を追加する
+  - `@growi/core` は published package のため `npx changeset` で patch bump を作成する
+  - シリアライズ後のユーザーオブジェクトに `bcryptPassword` が含まれないこと、および `IUser` 型で `bcryptPassword` が参照できることが確認できる
+  - _Requirements: 1.1, 2.2_
+  - _Boundary: User Model_
+
+- [ ] 2.5 isPasswordValid の外部呼び出し元（personal-setting）を async 化する
+  - `apps/app/src/server/routes/apiv3/personal-setting/index.js`（line ~432）の
+    `if (user.isPasswordSet() && !user.isPasswordValid(oldPassword)) {` を
+    `if (user.isPasswordSet() && !(await user.isPasswordValid(oldPassword)).isValid) {` に置換する
+  - **CRITICAL**: `isPasswordValid` が `Promise<VerifyResult>` を返すため、`!Promise` は常に `false` となり旧パスワード検証がスキップされる（= 現在のパスワードを知らなくても新パスワードに変更できる認証バイパス）。必ず `await` + `.isValid` 参照にする
+  - 当該ハンドラが async であること、および旧パスワードが誤っている場合に変更が拒否されることが確認できる
+  - _Requirements: 2.1, 2.2_
+  - _Depends: 2.2_
+  - _Boundary: User Model_
+
+- [ ] 2.6 password == null 代用のパスワード設定判定を isPasswordSet() に置換する
+  - bcrypt-only ユーザー（`password` unset、`bcryptPassword` set）を誤判定するため、以下 3 箇所を `isPasswordSet()` ベースに置換する:
+    - `apps/app/src/server/routes/login.js`（line ~145）: `userData.password == null` → `!userData.isPasswordSet()`（全 bcrypt-only ユーザーが毎回 `/me#password_settings` へ誤リダイレクトされるのを防ぐ）
+    - `apps/app/src/server/routes/apiv3/personal-setting/index.js`（line ~702）: `user.password == null && count <= 1` → `!user.isPasswordSet() && count <= 1`（LDAP アカウント切り離しの誤ブロックを防ぐ）
+    - `apps/app/src/server/routes/apiv3/user-activation.ts`（line ~278）: `userData.password != null` → `userData.isPasswordSet()`（リダイレクト先の誤判定を防ぐ）
+  - 各判定が `isPasswordSet()` に置換され、bcrypt-only ユーザーで誤リダイレクト・誤ブロックが発生しないことが確認できる
+  - _Requirements: 2.2, 2.3_
+  - _Depends: 2.1_
+  - _Boundary: User Model_
+
+- [ ] 2.7 statusDelete で bcryptPassword を消去する
+  - `statusDelete()`（`apps/app/src/server/models/user/index.js` line ~349）に `this.bcryptPassword = undefined;` を追加し、削除ユーザーが有効な bcrypt 認証情報ハッシュを保持しないようにする（既存の `this.password = ''` と同じ意図）
+  - `''` ではなく `undefined`（unset）にする理由: verify() が `noPassword`（正常系）として扱い、フォーマット不一致の Req 2.4 WARNING を誤発火させないため
+  - 既存の統合テスト `user.integ.ts`（削除ユーザーの属性検証、`password` の空文字を確認している箇所）に `bcryptPassword` が unset されている検証を追加する
+  - 削除後のユーザードキュメントに有効な `bcryptPassword` が残らないことが確認できる
+  - _Requirements: 1.1, 2.2_
+  - _Boundary: User Model_
+
+- [ ] 2.8 パスワード変更フローの認証バイパス回帰テストを作成する
+  - 旧パスワードが正しい場合のみパスワード変更が成功し、誤っている/未指定の場合は拒否されることを確認する（task 2.5 の回帰防止）
+  - bcrypt-only ユーザーのログイン後に `/me#password_settings` へ誤リダイレクトされないことを確認する（task 2.6 の回帰防止）
+  - `pnpm vitest run` で当該テストが全 PASS することが確認できる
+  - _Requirements: 2.1, 2.2, 2.3_
+  - _Depends: 2.5, 2.6_
   - _Boundary: User Model_
 
 - [ ] 3. (P) Passport LocalStrategy の async 化と lazy migration 統合
@@ -73,9 +124,9 @@
   - legacy SHA-256 ユーザーのログイン成功 + lazy migration 後に `bcryptPassword` が DB に書き込まれることを確認する
   - bcrypt ユーザーのログイン成功 + rehash が発生しないことを確認する
   - 無効な認証情報でのログイン失敗を確認する
-  - 両フィールドなしのユーザーでのログイン失敗と WARNING ログ出力を確認する
+  - パスワード未設定（両フィールドなし）ユーザーのローカルログイン失敗を確認し、**WARNING ログが出力されない**ことを確認する（Req 2.5）
   - `pnpm vitest run` で統合テストが全 PASS することが確認できる
-  - _Requirements: 2.1, 2.2, 2.3, 2.4_
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
   - _Boundary: Passport LocalStrategy_
 
 - [ ] 4. (P) マイグレーションスクリプトの実装
@@ -105,8 +156,9 @@
   - スクリプト内でダウングレード後にログイン不可になるユーザー数（`bcryptPassword` あり・`password` なし）を集計してログ出力する（Req 4.1）
   - 環境変数 `SEND_RESET_EMAILS` が `'true'` の場合:
     - 対象ユーザーごとに `PasswordResetOrder` を作成して既存メールサービスでリセットメールを送信する（Req 4.2）
-    - **メール送信成功を確認してから**、成功したユーザーのみ `bcryptPassword` を `null` に設定してログイン不可化する（Req 4.3）
-    - 送信失敗ユーザーは `bcryptPassword` を null 化しない（次回再実行でリトライ可能）
+    - **メール送信成功を確認してから**、成功したユーザーのみ `bcryptPassword` を `$unset`（フィールドごと削除）してログイン不可化する（Req 4.3）
+    - **CRITICAL**: `null` 代入ではなく `$unset` を使う。`$exists` ベースの分類（status/cleanup）では `null` 値もフィールド「存在」扱いとなり、当該ユーザーが `bcryptOnly` に残留してカウント不正確化・再実行時の二重メール送信を招くため
+    - 送信失敗ユーザーは unset しない（次回再実行でリトライ可能）
     - 成功・失敗件数を INFO/WARNING でそれぞれログ出力する
   - `SEND_RESET_EMAILS` 未設定時に集計カウントのみ出力されて DB が変更されないことが確認できる
   - _Requirements: 4.1, 4.2, 4.3_
@@ -131,7 +183,8 @@
 - [ ] 5.3 (P) Downgrade prep standalone script の統合テストを作成する
   - `SEND_RESET_EMAILS` 未設定時に DB が変更されずカウントのみ出力されることを確認する
   - `SEND_RESET_EMAILS=true` 時に対象ユーザーの `PasswordResetOrder` が作成されることを確認する
-  - `SEND_RESET_EMAILS=true` 時にメール送信成功ユーザーのみ `bcryptPassword` が `null` になり、送信失敗ユーザーの `bcryptPassword` が変更されないことを確認する
+  - `SEND_RESET_EMAILS=true` 時にメール送信成功ユーザーのみ `bcryptPassword` が `$unset`（フィールド不在）になり、送信失敗ユーザーの `bcryptPassword` が変更されないことを確認する
+  - `$unset` 後のユーザーが status migration で `noPassword` に分類され `bcryptOnly` に残留しないことを確認する（二重メール送信の回帰防止）
   - 統合テストが PASS することが確認できる
   - _Requirements: 4.1, 4.2, 4.3_
   - _Boundary: Downgrade prep migration script_
