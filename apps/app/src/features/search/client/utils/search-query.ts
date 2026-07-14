@@ -15,7 +15,9 @@
  *     deep-equals { keyword, filters }
  *
  * This holds when the keyword is normalized (trimmed, single-spaced) and free of
- * operator tokens, and the filter values are non-empty. A keyword that itself
+ * operator tokens, and the filter values are non-empty and free of double-quotes
+ * (which `buildSearchQuery` strips, since the grammar cannot escape them, so a
+ * value like `a"b` round-trips to its quote-free form `ab`). A keyword that itself
  * contains operator syntax (`author:foo`, a quoted phrase, …) is intentionally
  * NOT round-trip stable: on parse it is reinterpreted as a filter, since a
  * hand-typed operator is meant to hydrate the corresponding chip.
@@ -63,6 +65,13 @@ export const createEmptyFilterState = (): SearchFilterState => ({
   tags: [],
 });
 
+/** True when no filter field holds any value. */
+export const isFilterStateEmpty = (filters: SearchFilterState): boolean =>
+  filters.authors.length === 0 &&
+  filters.editors.length === 0 &&
+  filters.groups.length === 0 &&
+  filters.tags.length === 0;
+
 const normalizeKeyword = (keyword: string): string =>
   keyword.trim().replace(/\s+/g, ' ');
 
@@ -87,11 +96,14 @@ export const buildSearchQuery = (
 
   for (const [field, prefix] of FIELD_PREFIXES) {
     for (const value of filters[field]) {
-      const trimmed = value.trim();
-      if (trimmed === '') {
+      // Strip embedded double-quotes: the grammar has no way to escape them, and
+      // the server strips quotes too, so emitting one would corrupt the query
+      // (the value could be truncated or partly reinterpreted as free text).
+      const cleaned = value.replace(/"/g, '').trim();
+      if (cleaned === '') {
         continue;
       }
-      parts.push(`${prefix}${quoteIfNeeded(trimmed)}`);
+      parts.push(`${prefix}${quoteIfNeeded(cleaned)}`);
     }
   }
 

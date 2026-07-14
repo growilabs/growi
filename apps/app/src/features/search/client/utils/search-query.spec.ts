@@ -1,6 +1,7 @@
 import {
   buildSearchQuery,
   createEmptyFilterState,
+  isFilterStateEmpty,
   parseSearchQuery,
   type SearchFilterState,
 } from './search-query';
@@ -56,6 +57,12 @@ describe('buildSearchQuery', () => {
     expect(
       buildSearchQuery('', filterState({ authors: ['', '   ', 'alice'] })),
     ).toBe('author:alice');
+  });
+
+  it('strips embedded double-quotes from a value (the grammar cannot escape them)', () => {
+    expect(buildSearchQuery('', filterState({ groups: ['a"b'] }))).toBe(
+      'group:ab',
+    );
   });
 
   it('trims and collapses whitespace in the keyword', () => {
@@ -182,5 +189,18 @@ describe('round-trip', () => {
     const parsed = parseSearchQuery(canonical);
     const rebuilt = buildSearchQuery(parsed.keyword, parsed.filters);
     expect(rebuilt).toBe(canonical);
+  });
+});
+
+describe('isFilterStateEmpty', () => {
+  it('is true for a freshly created empty filter state', () => {
+    expect(isFilterStateEmpty(createEmptyFilterState())).toBe(true);
+  });
+
+  it('is false when any field holds a value', () => {
+    expect(isFilterStateEmpty(filterState({ tags: ['wiki'] }))).toBe(false);
+    expect(isFilterStateEmpty(filterState({ authors: ['alice'] }))).toBe(false);
+    expect(isFilterStateEmpty(filterState({ editors: ['bob'] }))).toBe(false);
+    expect(isFilterStateEmpty(filterState({ groups: ['Docs'] }))).toBe(false);
   });
 });
