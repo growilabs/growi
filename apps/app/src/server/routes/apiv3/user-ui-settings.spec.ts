@@ -1,11 +1,12 @@
 // --- Mock boundary ---------------------------------------------------------
 //
 // These tests exercise the PUT /user-ui-settings ROUTE HANDLER's observable
-// contract (Req 3.6 / 3.2 / 3.7): which fields it forwards into the persisted
-// UserUISettings update. The handler is the final layer of the Express Router
-// built by setup(); the preceding validator + apiV3FormValidator middlewares are
-// not part of the contract under test, so we read the handler off the route
-// stack and invoke it directly (mirroring get-models.spec / post-message-handler.spec).
+// contract (Req 4.4 for the selected-model-key field): which fields it forwards
+// into the persisted UserUISettings update. The handler is the final layer of the
+// Express Router built by setup(); the preceding validator + apiV3FormValidator
+// middlewares are not part of the contract under test, so we read the handler off
+// the route stack and invoke it directly (mirroring get-models.spec /
+// post-message-handler.spec).
 //
 // We mock the single module boundary the handler reaches:
 //   - the UserUISettings model (default export): we stub findOneAndUpdate so no DB
@@ -15,7 +16,7 @@ import type { Request, RequestHandler } from 'express';
 import { validationResult } from 'express-validator';
 import { mock } from 'vitest-mock-extended';
 
-import { MAX_MODEL_ID_LENGTH } from '~/features/mastra/interfaces/allowed-model';
+import { MAX_MODEL_KEY_LENGTH } from '~/features/mastra/interfaces/model-key';
 
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
@@ -69,20 +70,24 @@ beforeEach(() => {
 });
 
 describe('PUT /user-ui-settings handler', () => {
-  it('persists aiChatSelectedModelId into the $set (Req 3.6 / 3.2)', async () => {
-    const { req, res } = buildReqRes({ aiChatSelectedModelId: 'gpt-4o' });
+  it('persists aiChatSelectedModelKey into the $set (Req 4.4)', async () => {
+    const { req, res } = buildReqRes({
+      aiChatSelectedModelKey: 'openai/gpt-4o',
+    });
 
     // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
     await getHandler()(req as any, res as any, vi.fn());
 
     expect(findOneAndUpdate).toHaveBeenCalledTimes(1);
     const update = findOneAndUpdate.mock.calls[0][1];
+    // Guards the hard-coded updateData allow-list: if that line were left on the
+    // old field, the renamed key would never reach the $set and this fails.
     expect(update.$set).toEqual(
-      expect.objectContaining({ aiChatSelectedModelId: 'gpt-4o' }),
+      expect.objectContaining({ aiChatSelectedModelKey: 'openai/gpt-4o' }),
     );
   });
 
-  it('does NOT write aiChatSelectedModelId when it is omitted (no accidental clear)', async () => {
+  it('does NOT write aiChatSelectedModelKey when it is omitted (no accidental clear)', async () => {
     const { req, res } = buildReqRes({ currentSidebarContents: 'recent' });
 
     // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
@@ -90,7 +95,7 @@ describe('PUT /user-ui-settings handler', () => {
 
     expect(findOneAndUpdate).toHaveBeenCalledTimes(1);
     const update = findOneAndUpdate.mock.calls[0][1];
-    expect(update.$set).not.toHaveProperty('aiChatSelectedModelId');
+    expect(update.$set).not.toHaveProperty('aiChatSelectedModelKey');
   });
 
   it('still forwards the original three fields unchanged', async () => {
@@ -113,8 +118,8 @@ describe('PUT /user-ui-settings handler', () => {
     );
   });
 
-  it('persists aiChatSelectedModelId for logged-out users into the session', async () => {
-    const { req, res } = buildReqRes({ aiChatSelectedModelId: 'o3' });
+  it('persists aiChatSelectedModelKey for logged-out users into the session', async () => {
+    const { req, res } = buildReqRes({ aiChatSelectedModelKey: 'openai/o3' });
     // logged-out: no user; the handler writes into req.session.uiSettings instead
     // of the DB.
     // biome-ignore lint/suspicious/noExplicitAny: overriding the mocked req for the logged-out branch
@@ -124,7 +129,9 @@ describe('PUT /user-ui-settings handler', () => {
     await getHandler()(loggedOutReq, res as any, vi.fn());
 
     expect(findOneAndUpdate).not.toHaveBeenCalled();
-    expect(loggedOutReq.session.uiSettings.aiChatSelectedModelId).toBe('o3');
+    expect(loggedOutReq.session.uiSettings.aiChatSelectedModelKey).toBe(
+      'openai/o3',
+    );
   });
 });
 
@@ -153,23 +160,23 @@ const runPutValidators = async (
 };
 
 describe('validatorForPutUserUISettings', () => {
-  describe('aiChatSelectedModelId', () => {
+  describe('aiChatSelectedModelKey', () => {
     it('accepts a string at the maximum length', async () => {
       const { hasErrors } = await runPutValidators({
-        aiChatSelectedModelId: 'a'.repeat(MAX_MODEL_ID_LENGTH),
+        aiChatSelectedModelKey: 'a'.repeat(MAX_MODEL_KEY_LENGTH),
       });
       expect(hasErrors).toBe(false);
     });
 
     it('rejects an over-length value (defensive cap on the persisted selection)', async () => {
       const { hasErrors, failedFields } = await runPutValidators({
-        aiChatSelectedModelId: 'a'.repeat(MAX_MODEL_ID_LENGTH + 1),
+        aiChatSelectedModelKey: 'a'.repeat(MAX_MODEL_KEY_LENGTH + 1),
       });
       expect(hasErrors).toBe(true);
-      expect(failedFields).toContain('settings.aiChatSelectedModelId');
+      expect(failedFields).toContain('settings.aiChatSelectedModelKey');
     });
 
-    it('accepts an omitted aiChatSelectedModelId (optional)', async () => {
+    it('accepts an omitted aiChatSelectedModelKey (optional)', async () => {
       const { hasErrors } = await runPutValidators({
         currentSidebarContents: 'recent',
       });

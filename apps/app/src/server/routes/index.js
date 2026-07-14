@@ -37,6 +37,7 @@ import { setup as setupLoginPassport } from './login-passport';
 import nextFactory from './next';
 import { setup as setupOgp } from './ogp';
 import { setup as setupPage } from './page';
+import { pageMarkdownRouteFactory } from './page-markdown';
 import { setup as setupSearch } from './search';
 import { setup as setupTag } from './tag';
 import * as userActivation from './user-activation';
@@ -398,6 +399,11 @@ export const setup = (crowi, app) => {
         ogp.renderOgp,
       ),
   );
+
+  // Page Markdown endpoint (.md suffix / Accept: text/markdown / ?format=md).
+  // Must be registered immediately before the catch-all so it can intercept
+  // markdown requests; non-markdown requests fall through to the HTML delegate.
+  app.use(pageMarkdownRouteFactory(crowi));
 
   app.get('/*/$', loginRequired, next.delegateToNext);
   app.get('/*', loginRequired, autoReconnectToSearch, next.delegateToNext);

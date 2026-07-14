@@ -16,7 +16,7 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import type { SelectableModelsResponse } from '../../../interfaces/selectable-models-response';
-import { getEffectiveSelectableModelIds } from '../../services/ai-sdk-modules/effective-model-catalog';
+import { getEffectiveSelectableModels } from '../../services/ai-sdk-modules/effective-model-catalog';
 
 const logger = loggerFactory(
   'growi:features:mastra:routes:admin-ai-settings:get-available-models',
@@ -29,20 +29,28 @@ const logger = loggerFactory(
  *   schemas:
  *     SelectableModelsResponse:
  *       description: >-
- *         The selectable model ids for a provider, narrowed to chat + tool-capable
+ *         The selectable models for a provider, narrowed to chat + tool-capable
  *         models by the catalog filter (applied identically at vendoring time and on
- *         a runtime refresh). Carries model-id information only — never an API key,
- *         provider credentials, or providerOptions (Req 7.1).
+ *         a runtime refresh). Carries model id + display-name information only —
+ *         never an API key, provider credentials, or providerOptions (Req 7.1).
  *       type: object
- *       required: [modelIds]
+ *       required: [models]
  *       properties:
- *         modelIds:
+ *         models:
  *           type: array
  *           description: >-
- *             The bare model ids offered for selection. An empty array for a valid
- *             but catalog-less provider (e.g. azure-openai).
+ *             The models offered for selection. An empty array for a valid but
+ *             catalog-less provider (e.g. azure-openai).
  *           items:
- *             type: string
+ *             type: object
+ *             required: [id, name]
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 description: The bare model id (the AI SDK model id).
+ *               name:
+ *                 type: string
+ *                 description: The official display name (the id itself when models.dev has no name).
  */
 
 /**
@@ -57,9 +65,10 @@ const logger = loggerFactory(
  *          - accessTokenHeaderAuth: []
  *        summary: /ai-settings/available-models
  *        description: >-
- *          Get the selectable model ids for a provider from the effective catalog
- *          (the runtime-refreshed snapshot when newer, otherwise the committed
- *          offline catalog). The response carries model-id information only (no secrets).
+ *          Get the selectable models (id + display name) for a provider from the
+ *          effective catalog (the runtime-refreshed snapshot when newer, otherwise
+ *          the committed offline catalog). The response carries model id/display-name
+ *          information only (no secrets).
  *        parameters:
  *          - name: provider
  *            in: query
@@ -112,14 +121,14 @@ export interface GetAvailableModelsRequest extends Request {
 /**
  * GET /_api/v3/ai-settings/available-models handler.
  *
- * Returns the selectable model ids for `provider` from the EFFECTIVE catalog:
- * the persisted refreshed catalog when a runtime refresh has succeeded (Req 9.5),
- * otherwise the committed bundled asset. The lookup consults local storage only
- * (no external communication — Req 2), so a valid but catalog-less provider
- * (e.g. `azure-openai`) naturally yields `{ modelIds: [] }` with 200 semantics —
- * no special case (Req 3.1).
+ * Returns the selectable models (id + display name) for `provider` from the
+ * EFFECTIVE catalog: the persisted refreshed catalog when a runtime refresh has
+ * succeeded (Req 9.5), otherwise the committed bundled asset. The lookup consults
+ * local storage only (no external communication — Req 2), so a valid but
+ * catalog-less provider (e.g. `azure-openai`) naturally yields `{ models: [] }`
+ * with 200 semantics — no special case (Req 3.1).
  *
- * The response carries ONLY `modelIds` — never an API key, provider credentials,
+ * The response carries ONLY `models` (id + name) — never an API key, provider credentials,
  * or providerOptions (Req 7.1). Input validation lives in the middleware chain
  * (`getAvailableModelsValidators` + `apiV3FormValidator`), so an invalid/missing
  * provider is a 400 before this runs; scope + login + adminRequired are composed
@@ -133,8 +142,9 @@ export const getAvailableModels = async (
   const { provider } = req.query;
 
   try {
-    const modelIds = await getEffectiveSelectableModelIds(provider);
-    const response: SelectableModelsResponse = { modelIds };
+    // ModelCatalogEntry[] is structurally { id, name }[] = SelectableModel[].
+    const models = await getEffectiveSelectableModels(provider);
+    const response: SelectableModelsResponse = { models };
     res.apiv3(response);
   } catch (err) {
     // The local catalog read is the only failure source; surface a generic

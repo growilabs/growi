@@ -1,226 +1,311 @@
 // --- Mock boundary ---------------------------------------------------------
 //
-// getAiSettings is a read handler over two collaborators:
-//   - configManager.getConfig(key): the currently effective value of each AI
-//     config key (already honors env-only mode internally).
-//   - isAiConfigured(): provider + required-field validity used for the 7.6
-//     "enabled but not configured" warning.
-// The observable contract is the SHAPE of the response object passed to
-// res.apiv3():
-//   - the ai:apiKey VALUE is never present; only isApiKeySet (Req 5.2)
-//   - isApiKeySet reflects whether ai:apiKey is non-empty
-//   - useOnlyEnvVars / aiEnabled / isConfigured reflect their sources (Req 4.2, 7.1, 7.6)
-//   - provider / allowedModels / azure fields pass through (Req 1.1, 1.3, 1.4)
-//   - on a collaborator failure the handler answers apiv3Err WITHOUT leaking the key (Req 5.3)
-// We mock both collaborators so the test exercises only this handler's mapping,
-// not how a value is resolved or how "configured" is computed.
+// getAiSettings is a read handler that assembles the multi-provider AI settings
+// for the admin UI. Its observable contract is the SHAPE of the response object
+// passed to res.apiv3():
+//   - providers: ALL 4 supported providers are ALWAYS present (fixed slots,
+//     Req 1.1), each carrying `enabled` + `isApiKeySet` booleans; only the
+//     'azure-openai' entry carries `azureOpenaiSettings`.
+//   - the stored API key VALUE is never present anywhere in the body; only the
+//     per-provider `isApiKeySet` flag exposes its presence (Req 1.8, 1.9).
+//   - allowedModels is the cross-provider allow-list, always an array (Req 1.1).
+//   - aiEnabled / useOnlyEnvVars / isConfigured reflect their sources.
+//   - on a collaborator failure the handler answers apiv3Err WITHOUT leaking a
+//     key value into the error (Req 1.9).
+// We mock every collaborator so the test exercises only this handler's mapping:
+//   - configManager.getConfig(key): the AI enable toggle + env-only flag.
+//   - the per-provider accessors (getProviderSettings / getApiKey) and the
+//     allow-list accessor (getAllowedModels): owned by ai-sdk-modules and tested
+//     there — they already apply masking/defensive guards.
+//   - isAiConfigured(): the "enabled but not configured" verdict.
+// AI_PROVIDERS (the declared provider set) is imported for real so the fixed-slot
+// assertion tracks the single source of truth rather than a hard-coded list.
 const { getConfig } = vi.hoisted(() => ({
   getConfig: vi.fn(),
+}));
+const { getProviderSettings, getApiKey, getAllowedModels } = vi.hoisted(() => ({
+  getProviderSettings: vi.fn(),
+  getApiKey: vi.fn(),
+  getAllowedModels: vi.fn(),
 }));
 const { isAiConfigured } = vi.hoisted(() => ({
   isAiConfigured: vi.fn(),
 }));
+// The logger boundary: the failure path must log the situation WITHOUT the apiKey
+// (Req 1.9), so we capture every logger.error argument and assert no secret leaks.
+const { loggerError } = vi.hoisted(() => ({ loggerError: vi.fn() }));
 
 vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig },
+}));
+
+vi.mock('~/utils/logger', () => ({
+  default: () => ({
+    warn: vi.fn(),
+    info: vi.fn(),
+    error: loggerError,
+    debug: vi.fn(),
+  }),
+}));
+
+vi.mock('../../services/ai-sdk-modules/llm-providers/config', () => ({
+  getProviderSettings,
+  getApiKey,
+  getAllowedModels,
 }));
 
 vi.mock('~/features/mastra/server/services/is-ai-configured', () => ({
   isAiConfigured,
 }));
 
+// buildModelDisplayNameResolver joins the allow-list with the effective catalog
+// to attach official display names. Mocked at its boundary so this handler test
+// stays a pure mapping test (no catalog/DB); the resolver just echoes the id so
+// the allow-list assertions stay readable. Its own resolution is unit-tested in
+// resolve-model-display-name.spec.
+const { buildModelDisplayNameResolver } = vi.hoisted(() => ({
+  buildModelDisplayNameResolver: vi.fn(),
+}));
+vi.mock('../../services/ai-sdk-modules/resolve-model-display-name', () => ({
+  buildModelDisplayNameResolver,
+}));
+
 import type { Request } from 'express';
 import { mock } from 'vitest-mock-extended';
 
+import {
+  AI_PROVIDERS,
+  type AiProvider,
+} from '~/features/mastra/interfaces/ai-provider';
+import type {
+  AiProviderStatus,
+  AiSettingsResponse,
+} from '~/features/mastra/interfaces/ai-settings';
+import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
+import type { AiProviderSettings } from '~/features/mastra/interfaces/provider-settings';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
 import { getAiSettings } from './get-ai-settings';
 
-// The full set of stored values the handler reads, keyed by config key. Tests
-// override only the fields they assert on; everything else stays at this baseline.
 type ConfigStub = Record<string, unknown>;
 
+// The handler reads only the AI enable toggle + env-only flag directly from
+// config; everything else comes through the accessors. Tests override only the
+// fields they assert on; the rest stay at this baseline.
 const setConfig = (overrides: ConfigStub = {}): void => {
   const base: ConfigStub = {
     'app:aiEnabled': false,
-    'ai:provider': undefined,
-    'ai:apiKey': undefined,
-    // The per-model allow-list. Absent here so the handler's `?? []` is exercised.
-    'ai:allowedModels': undefined,
-    // Azure connection config is one JSON object, exposed as-is under
-    // azureOpenaiSettings in the response.
-    'ai:azureOpenaiSettings': {},
     'env:useOnlyEnvVars:ai': false,
     ...overrides,
   };
   getConfig.mockImplementation((key: string) => base[key]);
 };
 
-const invoke = () => {
+const setProviderSettings = (
+  map: Partial<Record<AiProvider, AiProviderSettings>>,
+): void => {
+  getProviderSettings.mockImplementation(
+    (provider: AiProvider) => map[provider],
+  );
+};
+
+const setApiKeys = (map: Partial<Record<AiProvider, string>>): void => {
+  getApiKey.mockImplementation((provider: AiProvider) => map[provider]);
+};
+
+const setAllowedModels = (models: AllowedModel[]): void => {
+  getAllowedModels.mockReturnValue(models);
+};
+
+const invoke = async () => {
   const req = mock<Request>();
   const res = mock<ApiV3Response>();
-  getAiSettings(req, res);
+  await getAiSettings(req, res);
   return { res };
 };
 
-// Pull the single object the handler handed to res.apiv3().
-const responseBody = (res: ApiV3Response): Record<string, unknown> => {
+// Pull the single object the handler handed to res.apiv3(). Typed as the route's
+// real response DTO so every field access below is typed with no cast (apiv3's
+// parameter is `any`, so the payload flows into AiSettingsResponse implicitly).
+const responseBody = (res: ApiV3Response): AiSettingsResponse => {
   const apiv3 = vi.mocked(res.apiv3);
   expect(apiv3).toHaveBeenCalledTimes(1);
-  return apiv3.mock.calls[0][0] as Record<string, unknown>;
+  return apiv3.mock.calls[0][0];
 };
+
+const providersOf = (
+  res: ApiV3Response,
+): Record<AiProvider, AiProviderStatus> => responseBody(res).providers;
 
 beforeEach(() => {
   vi.clearAllMocks();
   isAiConfigured.mockReturnValue(false);
   setConfig();
+  setProviderSettings({});
+  setApiKeys({});
+  setAllowedModels([]);
+  // Echo resolver: displayName === modelId. Keeps the allow-list assertions
+  // focused on the handler's mapping, not on catalog name resolution.
+  buildModelDisplayNameResolver.mockResolvedValue(
+    (_provider: string, modelId: string) => modelId,
+  );
 });
 
-describe('getAiSettings (Req 1.4, 4.2, 5.2, 5.3, 7.1, 7.6)', () => {
-  it('never exposes the ai:apiKey value, surfacing only isApiKeySet (Req 5.2)', () => {
-    setConfig({ 'ai:apiKey': 'sk-super-secret-value' });
+describe('getAiSettings (Req 1.1, 1.8, 1.9)', () => {
+  it('returns a fixed slot for every supported provider, each with enabled + isApiKeySet booleans (Req 1.1)', async () => {
+    const { res } = await invoke();
 
-    const { res } = invoke();
+    const providers = providersOf(res);
+    // Exactly the declared provider set — no more, no fewer (fixed slots).
+    expect(Object.keys(providers).sort()).toEqual([...AI_PROVIDERS].sort());
+    for (const provider of AI_PROVIDERS) {
+      expect(providers).toHaveProperty(provider);
+      expect(typeof providers[provider].enabled).toBe('boolean');
+      expect(typeof providers[provider].isApiKeySet).toBe('boolean');
+    }
+  });
+
+  it('reports each provider enabled flag from getProviderSettings(provider)?.enabled (Req 1.1)', async () => {
+    setProviderSettings({
+      openai: { enabled: true },
+      anthropic: { enabled: false },
+      // google / azure-openai: no entry at all -> disabled
+    });
+
+    const providers = providersOf((await invoke()).res);
+
+    expect(providers.openai.enabled).toBe(true);
+    expect(providers.anthropic.enabled).toBe(false);
+    expect(providers.google.enabled).toBe(false);
+    expect(providers['azure-openai'].enabled).toBe(false);
+  });
+
+  it("carries azureOpenaiSettings only on the 'azure-openai' entry (Req 1.1)", async () => {
+    setProviderSettings({
+      openai: { enabled: true },
+      'azure-openai': {
+        enabled: true,
+        azureOpenaiSettings: { resourceName: 'my-resource', useEntraId: true },
+      },
+    });
+
+    const providers = providersOf((await invoke()).res);
+
+    expect(providers['azure-openai'].azureOpenaiSettings).toEqual({
+      resourceName: 'my-resource',
+      useEntraId: true,
+    });
+    for (const provider of AI_PROVIDERS) {
+      if (provider === 'azure-openai') continue;
+      expect(providers[provider]).not.toHaveProperty('azureOpenaiSettings');
+    }
+  });
+
+  it('reports isApiKeySet=true and never exposes the key value when a provider key is set (Req 1.8, 1.9)', async () => {
+    setApiKeys({ openai: 'sk-super-secret-value' });
+
+    const { res } = await invoke();
 
     const body = responseBody(res);
-    expect(body.isApiKeySet).toBe(true);
+    const providers = body.providers;
+    expect(providers.openai.isApiKeySet).toBe(true);
     // The actual secret must not appear under any field of the response.
     expect(JSON.stringify(body)).not.toContain('sk-super-secret-value');
-    expect(body).not.toHaveProperty('apiKey');
+    expect(providers.openai).not.toHaveProperty('apiKey');
   });
 
-  it('reports isApiKeySet=false when ai:apiKey is unset (Req 5.2)', () => {
-    setConfig({ 'ai:apiKey': undefined });
+  it('reports isApiKeySet=false when a provider has no usable key (Req 1.8)', async () => {
+    // getApiKey is the single blankness authority: it normalizes an unset / blank /
+    // whitespace-only stored key to undefined, so the admin GET only ever sees a
+    // usable key or undefined, and isApiKeySet simply mirrors that presence.
+    setApiKeys({ openai: undefined });
 
-    const { res } = invoke();
+    const providers = providersOf((await invoke()).res);
 
-    expect(responseBody(res).isApiKeySet).toBe(false);
+    expect(providers.openai.isApiKeySet).toBe(false);
   });
 
-  it('reports isApiKeySet=false when ai:apiKey is an empty string (Req 5.2)', () => {
-    setConfig({ 'ai:apiKey': '' });
+  it('returns the allowedModels allow-list incl. provider, providerOptions, isDefault, and the resolved displayName (Req 1.1)', async () => {
+    const models: AllowedModel[] = [
+      {
+        provider: 'openai',
+        modelId: 'gpt-4o',
+        isDefault: true,
+        providerOptions: { openai: { temperature: 0.2 } },
+      },
+      { provider: 'anthropic', modelId: 'claude-3-5-sonnet' },
+    ];
+    setAllowedModels(models);
 
-    const { res } = invoke();
-
-    expect(responseBody(res).isApiKeySet).toBe(false);
+    // Each entry is carried through verbatim, plus a display-only `displayName`
+    // resolved from the catalog (the echo resolver returns the modelId here).
+    expect(responseBody((await invoke()).res).allowedModels).toEqual(
+      models.map((m) => ({ ...m, displayName: m.modelId })),
+    );
   });
 
-  it('returns aiEnabled from app:aiEnabled (Req 7.1)', () => {
+  it('returns allowedModels as an array (empty when none configured, Req 1.1)', async () => {
+    setAllowedModels([]);
+
+    const body = responseBody((await invoke()).res);
+    expect(Array.isArray(body.allowedModels)).toBe(true);
+    expect(body.allowedModels).toEqual([]);
+  });
+
+  it('returns aiEnabled from app:aiEnabled', async () => {
     setConfig({ 'app:aiEnabled': true });
 
-    const { res } = invoke();
-
-    expect(responseBody(res).aiEnabled).toBe(true);
+    expect(responseBody((await invoke()).res).aiEnabled).toBe(true);
   });
 
-  it('returns useOnlyEnvVars from env:useOnlyEnvVars:ai (Req 4.2)', () => {
+  it('returns useOnlyEnvVars from env:useOnlyEnvVars:ai', async () => {
     setConfig({ 'env:useOnlyEnvVars:ai': true });
+    expect(responseBody((await invoke()).res).useOnlyEnvVars).toBe(true);
 
-    const { res } = invoke();
-
-    expect(responseBody(res).useOnlyEnvVars).toBe(true);
-  });
-
-  it('returns useOnlyEnvVars=false when env:useOnlyEnvVars:ai is not enabled (Req 4.2)', () => {
     setConfig({ 'env:useOnlyEnvVars:ai': false });
-
-    const { res } = invoke();
-
-    expect(responseBody(res).useOnlyEnvVars).toBe(false);
+    expect(responseBody((await invoke()).res).useOnlyEnvVars).toBe(false);
   });
 
-  it('returns isConfigured from isAiConfigured() (Req 7.6)', () => {
+  it('returns isConfigured from isAiConfigured()', async () => {
     isAiConfigured.mockReturnValue(true);
 
-    const { res } = invoke();
+    const { res } = await invoke();
 
     expect(responseBody(res).isConfigured).toBe(true);
     expect(isAiConfigured).toHaveBeenCalledTimes(1);
   });
 
-  it('passes through the non-secret effective values incl. the allowedModels allow-list (Req 1.1, 1.3, 1.4)', () => {
-    setConfig({
-      'ai:provider': 'azure-openai',
-      // The per-model allow-list is returned verbatim, incl. isDefault and
-      // providerOptions (the admin UI is trusted) — Req 1.1, 1.3.
-      'ai:allowedModels': [
-        {
-          modelId: 'gpt-4o',
-          isDefault: true,
-          providerOptions: { openai: { temperature: 0.2 } },
-        },
-        { modelId: 'gpt-4o-mini' },
-      ],
-      'ai:azureOpenaiSettings': {
-        resourceName: 'my-resource',
-        baseURL: 'https://example.openai.azure.com',
-        apiVersion: '2024-02-01',
-        useEntraId: true,
-      },
-    });
-
-    const { res } = invoke();
-
-    // The stored ai:azureOpenaiSettings object is exposed as-is under
-    // azureOpenaiSettings (one canonical type end-to-end, Req 1.4).
-    expect(responseBody(res)).toMatchObject({
-      provider: 'azure-openai',
-      allowedModels: [
-        {
-          modelId: 'gpt-4o',
-          isDefault: true,
-          providerOptions: { openai: { temperature: 0.2 } },
-        },
-        { modelId: 'gpt-4o-mini' },
-      ],
-      azureOpenaiSettings: {
-        resourceName: 'my-resource',
-        baseURL: 'https://example.openai.azure.com',
-        apiVersion: '2024-02-01',
-        useEntraId: true,
-      },
-    });
+  it('does not surface the removed single-provider top-level fields', async () => {
+    const body = responseBody((await invoke()).res);
+    // These moved into the per-provider `providers` Record.
+    expect(body).not.toHaveProperty('provider');
+    expect(body).not.toHaveProperty('isApiKeySet');
+    expect(body).not.toHaveProperty('azureOpenaiSettings');
   });
 
-  it('returns allowedModels as [] when ai:allowedModels is absent (the ?? [] default, Req 1.1)', () => {
-    setConfig({ 'ai:allowedModels': undefined });
-
-    const { res } = invoke();
-
-    expect(responseBody(res).allowedModels).toEqual([]);
-    // The legacy single-model fields are gone from the response.
-    expect(responseBody(res)).not.toHaveProperty('model');
-    expect(responseBody(res)).not.toHaveProperty('providerOptions');
-  });
-
-  it('passes the azureOpenaiSettings object through verbatim (no normalization)', () => {
-    setConfig({ 'ai:azureOpenaiSettings': { resourceName: 'my-resource' } });
-
-    const { res } = invoke();
-
-    // The handler does not fill defaults; useEntraId is simply absent here (the
-    // form applies the `?? false` default when seeding its inputs).
-    expect(responseBody(res).azureOpenaiSettings).toEqual({
-      resourceName: 'my-resource',
-    });
-  });
-
-  it('responds with apiv3Err and does not leak the apiKey when a collaborator throws (Req 5.3)', () => {
-    setConfig({ 'ai:apiKey': 'sk-leak-me-not' });
+  it('responds with apiv3Err and does not leak a key value when a collaborator throws (Req 1.9)', async () => {
+    setApiKeys({ openai: 'sk-leak-me-not' });
     isAiConfigured.mockImplementation(() => {
       throw new Error('boom while computing configured state');
     });
 
-    const { res } = invoke();
+    const { res } = await invoke();
 
     const apiv3Err = vi.mocked(res.apiv3Err);
     expect(apiv3Err).toHaveBeenCalledTimes(1);
     expect(res.apiv3).not.toHaveBeenCalled();
-    const errArg = apiv3Err.mock.calls[0][0];
-    const message =
-      typeof errArg === 'string'
-        ? errArg
-        : String((errArg as { message?: unknown })?.message ?? '');
-    expect(message).not.toContain('sk-leak-me-not');
+    // Sweep the WHOLE error response (every argument, serialized), not just
+    // `.message`, so the key cannot hide in a non-message field of the ErrorV3.
+    const serializedErrResponse = JSON.stringify(apiv3Err.mock.calls[0]);
+    expect(serializedErrResponse).not.toContain('sk-leak-me-not');
+    // The catch-path log must never carry the key either (Req 1.9). Assert the
+    // handler logged the failure (so the assertion is real) and sweep every arg.
+    expect(loggerError).toHaveBeenCalled();
+    const serializedLogs = JSON.stringify(
+      loggerError.mock.calls.map((call) =>
+        call.map((arg) => (arg instanceof Error ? arg.message : arg)),
+      ),
+    );
+    expect(serializedLogs).not.toContain('sk-leak-me-not');
   });
 });

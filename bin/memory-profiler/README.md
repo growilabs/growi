@@ -91,8 +91,10 @@ Deep paths such as `@growi/bin/memory-profiler/load-driver` or `@growi/bin/memor
 
 ## Running the scenario
 
-All commands below are run from `apps/app` so that `pnpm run ts-node` picks up
-the correct `tsconfig-paths` and `dotenv-flow` configuration.
+All commands below are run from `apps/app` so that the dev server picks up the
+correct `dotenv-flow` configuration. The scenario runner itself uses only
+relative `.ts` imports, so it runs directly on Node.js native type stripping —
+no ts-node / tsconfig-paths involved (both were removed in the ESM migration).
 
 ### Quick-start: after-fixes run
 
@@ -100,13 +102,13 @@ the correct `tsconfig-paths` and `dotenv-flow` configuration.
 cd apps/app
 
 # 1. Start the dev server with CDP inspector
-NODE_ENV=development pnpm run ts-node --inspect=0.0.0.0:9229 src/server/app.ts &
+NODE_ENV=development pnpm run tsrun --inspect=0.0.0.0:9229 src/server/app.ts &
 
 # Wait for "GROWI is ready" in logs (~20 s), then:
 
 # 2. Run the scenario (shortened idle for CI; use default 300 s for full investigation)
 BASELINE_IDLE_SECONDS=60 DRAIN_IDLE_SECONDS=60 \
-  pnpm run ts-node ../../bin/memory-profiler/run-scenario.ts \
+  node ../../bin/memory-profiler/run-scenario.ts \
     --baseUrl http://localhost:3000 \
     --inspector http://127.0.0.1:9229 \
     --outputDir tmp/memory-profiler/runs/after
@@ -114,6 +116,12 @@ BASELINE_IDLE_SECONDS=60 DRAIN_IDLE_SECONDS=60 \
 # 3. Stop the server
 kill %1
 ```
+
+To profile the production build instead (as the memory-leak-investigation
+Phase 6 runs did), start `node --inspect=127.0.0.1:9229 dist/server/app.js`
+with `NODE_ENV=production` and the target `MONGO_URI`, then run step 2
+unchanged. Note the load driver calls the installer endpoint, so the target
+DB must be a FRESH (not yet installed) GROWI database.
 
 ### Before/after comparison
 
