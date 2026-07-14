@@ -189,15 +189,24 @@ describe.skipIf(!hasElasticsearch)(
       return { page, id: pageId.toString(), path };
     };
 
-    // Elasticsearch refreshes newly-indexed documents asynchronously (~1s). Poll
-    // through the tool until the public page becomes searchable so that every
-    // test below observes a fully-refreshed index.
+    const isHit = (result: FullTextSearchResult): boolean =>
+      result.result === 'ok' && result.hits.length > 0;
+
+    // Elasticsearch refreshes newly-indexed documents asynchronously (~1s),
+    // and the three seeds are indexed sequentially — a refresh can land
+    // between them, making an earlier document searchable while a later one is
+    // still pending. Poll until BOTH the public page (as userA) and the owner
+    // page (as its owner userB) are visible. The restricted page cannot be
+    // polled through the tool (invisible to everyone by design), but its test
+    // asserts absence, which a pending refresh cannot turn into a false
+    // failure.
     const waitUntilSearchable = async (): Promise<void> => {
       for (let attempt = 0; attempt < 40; attempt++) {
         // Sequential by design: each poll must observe the result of the last.
         // biome-ignore lint: intentional polling loop
-        const result = await runTool(PUBLIC_TOKEN, userA);
-        if (result.result === 'ok' && result.hits.length > 0) {
+        const publicResult = await runTool(PUBLIC_TOKEN, userA);
+        const ownerResult = await runTool(OWNER_TOKEN, userB);
+        if (isHit(publicResult) && isHit(ownerResult)) {
           return;
         }
         await sleep(500);
