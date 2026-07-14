@@ -8,6 +8,8 @@ import { useSWRxUserRelatedGroups } from '~/stores/user';
 
 import type { SearchFilterState } from '../../utils/search-query';
 
+import styles from './SearchFilterPanel.module.scss';
+
 type Props = {
   filters: SearchFilterState;
   onChange: (filters: SearchFilterState) => void;
@@ -15,6 +17,7 @@ type Props = {
 
 type FilterFieldCellProps = {
   label: string;
+  className?: string;
   children: ReactNode;
 };
 
@@ -24,9 +27,11 @@ type FilterFieldCellProps = {
  * single native input to bind to; proper a11y association is the a11y step.
  */
 const FilterFieldCell = (props: FilterFieldCellProps): JSX.Element => {
-  const { label, children } = props;
+  const { label, className, children } = props;
   return (
-    <div className="col-12 col-lg-6">
+    <div
+      className={`col-12 col-lg-6${className != null ? ` ${className}` : ''}`}
+    >
       <div className="form-label text-secondary mb-1">{label}</div>
       {children}
     </div>
@@ -45,7 +50,7 @@ const UsernameFilterField = (props: UsernameFilterFieldProps): JSX.Element => {
   // Self-generated so each rendered field gets a unique, SSR-stable typeahead id.
   const id = useId();
   return (
-    <FilterFieldCell label={label}>
+    <FilterFieldCell label={label} className={styles['username-filter']}>
       <SearchUsernameTypeahead
         id={id}
         onChange={onChange}

@@ -1,0 +1,52 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+// The reused username typeahead renders react-bootstrap-typeahead's default
+// tokens, whose bright background and low-contrast remove button clash with the
+// GROWI theme. Re-tint them with theme-aware primary colors so the selected
+// user and its remove (x) button stay legible in both light and dark modes.
+.username-filter {
+  :global(.rbt-token) {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+@include bs.color-mode(light) {
+  .username-filter {
+    :global(.rbt-token) {
+      background-color: var(--grw-primary-100);
+
+      :global(.rbt-token-label) {
+        color: var(--grw-primary-500);
+      }
+
+      :global(.rbt-token-remove-button) {
+        color: var(--grw-primary-500);
+      }
+    }
+
+    :global(.rbt-token-active) {
+      background-color: var(--grw-primary-200);
+    }
+  }
+}
+
+@include bs.color-mode(dark) {
+  .username-filter {
+    :global(.rbt-token) {
+      background-color: var(--grw-primary-800);
+
+      :global(.rbt-token-label) {
+        color: var(--grw-primary-200);
+      }
+
+      :global(.rbt-token-remove-button) {
+        color: var(--grw-primary-200);
+      }
+    }
+
+    :global(.rbt-token-active) {
+      background-color: var(--grw-primary-700);
+    }
+  }
+}
