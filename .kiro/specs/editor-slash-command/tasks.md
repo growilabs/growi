@@ -2,7 +2,7 @@
 
 - [ ] 1. 基盤: 型とコマンド定義
 
-- [ ] 1.1 コマンドと挿入内容を表す共通型の基盤を整備
+- [x] 1.1 コマンドと挿入内容を表す共通型の基盤を整備
   - スラッシュコマンドと、解決済みコマンド、挿入内容（`/query` を置換するテキスト + `from` 相対カーソルオフセット）を表す型を定義する
   - コマンドのアクションを判別共用体 `SlashCommandAction = SlashInsertAction { kind:'insert'; buildInsertion } | SlashRunAction { kind:'run'; run }` で定義し、`SlashCommand` は `action` を持つ。MVP の全コマンドは `insert`。`run`（副作用起動）は子スペック `editor-slash-extended-elements`（drawio/lsx モーダル）が用いる共有 seam
   - 挿入は絶対位置を持たず「テキスト + カーソルオフセット」だけで表現できることを型で保証する
