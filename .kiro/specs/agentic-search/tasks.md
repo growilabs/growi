@@ -64,11 +64,14 @@
   - _Depends: 2.1_
 
 - [x] 2.3 (P) ES 全文検索 tool の integration test
-  - 実 MongoDB + Elasticsearch + SearchService で、`GRANT_PUBLIC` / `GRANT_OWNER` / `GRANT_USER_GROUP` の各 grant パターンを setup
-  - 各パターンで認可ユーザー・非認可ユーザー（実 User ドキュメント）から tool を呼び、hits に含まれる/含まれないが期待通りであることを assert
+  - **実 Elasticsearch** + 実 MongoDB + 実 SearchService。`describe.skipIf(!ELASTICSEARCH_URI)` で ES 未設定環境は skip（CI の `ci-app-test-integration` は ES 8/9 を起動するため実行される）
+  - worker 専用インデックスに `app:elasticsearchUri` を上書き（並列 fork の共有インデックス rebuild との衝突回避）、Revision 付きページを seed → `syncPageUpdated` で index → refresh をポーリング待機
+  - GRANT_PUBLIC ページの本文キーワード検索で `body.ja`/`body.en` ハイライト由来の snippet が返ること（中心的回帰ガード）を assert
+  - 他ユーザー所有 GRANT_OWNER ページはヒットに出るが `canShowSnippet` で snippet が落ち、本文断片が漏れないことを assert（重大 #1 回帰防止）
+  - GRANT_RESTRICTED ページが `filterPagesByViewer` で結果から除外されることを assert
   - ヒットなしクエリで `result: 'ok'` / `hits: []` / `totalCount: 0` を確認
-  - 観察可能完了: `pnpm vitest run full-text-search-tool.integ` が緑、grant 反映が ES 経由で確認される
-  - _Requirements: 6.1, 6.7_
+  - 観察可能完了: `pnpm vitest run full-text-search-tool.integ` が緑（実 ES 接続）、snippet 生成・snippet ゲート・grant 除外が ES 経由で確認される
+  - _Requirements: 6.1, 6.4, 6.5, 6.7_
   - _Boundary: FullTextSearchTool_
   - _Depends: 2.1_
 
@@ -206,6 +209,6 @@
 ## Implementation Notes
 
 - Task 2.3 (integ test) detected a real bug in Task 2.1's call to `searchService.searchKeyword`: passing `null` for `userGroups` caused `GRANT_USER_GROUP` pages to be invisible to members. `SearchService` does NOT auto-resolve groups (despite the original design.md line 504 claim). Fix: resolve `userGroups` inside `fullTextSearchTool.execute` via `UserGroupRelation.findAllUserGroupIdsRelatedToUser` + `ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser`, matching the canonical pattern at `apps/app/src/server/routes/search.ts:143-151`. `getPageContentTool` (Task 3.1) does NOT need this — `Page.findByIdAndViewer` takes only `user`.
-- Task 2.3 の integ test は post-impl で **dummy `SearchDelegator` パターン** に切り替えた (commit 9c7e2665f2)。理由は GitHub Actions の通常 test workflow に `elasticsearch` service が無く (定義されているのは `reusable-app-prod.yml` の production build/launch のみ)、リポジトリ初の real ES integ test を CI に導入するコストに見合わなかったため。既存の `apps/app/src/server/service/search/search-service.integ.ts` と同じ慣例 (`searchService.nqDelegators[DEFAULT]` を dummy で override) に揃えた。実 ES での grant 反映や query DSL 検証は本 spec の責任範囲外 (`SearchService` / `ElasticsearchDelegator` の責務)。詳細は `full-text-search-tool.integ.ts` ヘッダーと design.md の Testing Strategy 節を参照。
+- Task 2.3 の integ test は post-impl で一度 **dummy `SearchDelegator` パターン** に切り替えた (commit 9c7e2665f2) が、後に **実 Elasticsearch 版へ戻した** (issue 187244)。当時「通常 test workflow に `elasticsearch` service が無い」と判断したが、これは誤りだった: `ci-app.yml` の `ci-app-test-integration` job が ES 8 / 9 を起動して `test:integ` を回しているため、実 ES 版は CI でも実行される。dummy 版は `_highlight.body` だけを読む tool の snippet 欠落バグ（および `body.ja`/`body.en` ハイライト・`filterPagesByViewer`・`canShowSnippet` の実挙動）を一切検証できていなかった。現行は `describe.skipIf(!ELASTICSEARCH_URI)` + worker 専用インデックス + Revision 付きページ seed + `syncPageUpdated` 投入 + refresh ポーリングで、実 ES 上の snippet 生成・snippet 可視性ゲート・grant 除外を検証する。単なる引数フォワーディング / マッピング / 例外処理 / `userGroups` 解決 / `sort`・`order` 素通しは unit test (`full-text-search-tool.spec.ts`) が `searchKeyword` / `formatSearchResult` を mock して担う。詳細は `full-text-search-tool.integ.ts` ヘッダーと design.md の Testing Strategy 節を参照。
 - PR #11204 の review FB を受けて `getPageContentTool` を **行ベース pagination + outline** に拡張する方針を採用 (Plan A)。`Page.findByIdAndViewer` / `populateDataToShowRevision` 経路は不変、`String.split('\n')` → `Array.slice` および `mdast-util-from-markdown` ベースの outline 抽出 (ATX / Setext 両対応、コードブロック・HTML block 内 `#` の誤認なし。front matter は extension 無しで実施するため内部の `#` 抽出を許容) を **tool execute 内 (メモリ上)** で行う。実装は Task 3.4 / 3.5 / 3.6 / 4.2 として追加 (本 PR 内の follow-up commit で対応)。
 - **outline/content 分離 redesign (Task 3.4-4.2 実装後の方針転換)**: Plan A の初期実装 (content + outline を初回に同時返却) は PR #11204 の token 計測で **ドリルダウン時に初回 200 行が無駄になり token を削減できない** ことが判明した。そこで「初回 (`offset` 省略) は outline のみ / ドリルダウン (`offset` 指定) は content のみ / 小ページ (`totalLines <= limit`) のみ初回に outline + content 両方」へ再設計し、`includeOutline` パラメータを廃止した (outline が欲しいなら offset を省略するという単一の自然な呼び出し規約に統一)。これにより長ページは「outline → 該当 heading の line を offset 指定 → そのセクションの content」という 2 段階フローになり、初回に本文を取得しない分の token を節約する。詳細は requirements.md AC 2.8-2.11 と design.md GetPageContentTool セクション (モード選択 `isFirstCall` / `fitsInOnePage` / `includeOutline` / `includeContent`) を参照。`get-page-content-tool.ts` / `growi-agent.ts` / spec / integ / `growi-agent.spec.ts` がこの redesign に追従済み。

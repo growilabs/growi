@@ -933,26 +933,22 @@ export const growiAgent = new Agent({
 
 ### Integration Tests (`full-text-search-tool.integ.ts`)
 
-**実 Elasticsearch には接続しない**。理由:
+**実 Elasticsearch に接続する**。`ci-app.yml` の `ci-app-test-integration` job が ES 8 / 9 を起動して `test:integ` を回すため、実 ES 版が CI でも実行される（`VITE_ELASTICSEARCH_URI` → `ELASTICSEARCH_URI` は `test/setup/elasticsearch.ts` が map、`app-integration` プロジェクトが setupFile に登録済み）。ES 未設定のローカル環境では `describe.skipIf(!process.env.ELASTICSEARCH_URI)` で graceful に skip する。前例は [`apps/app/src/server/service/search-delegator/elasticsearch.integ.ts`](apps/app/src/server/service/search-delegator/elasticsearch.integ.ts)。
 
-1. 既存の [`apps/app/src/server/service/search/search-service.integ.ts`](apps/app/src/server/service/search/search-service.integ.ts) が `dummyFullTextSearchDelegator` を `searchService.nqDelegators` に注入する慣例を採っており、本 spec もそれに倣う
-2. GitHub Actions の通常 test job (`pnpm run test` を回す workflow) には `services.elasticsearch` が定義されていない (定義されているのは `reusable-app-prod.yml` の production build/launch のみ)。リポジトリ初の real ES integ test を導入する CI 改修コストに見合わない
-3. ES query DSL / `filterPagesByViewer` の grant 適用ロジックは `SearchService` / `ElasticsearchDelegator` の責務であり本 spec の対象外
+> 単なる引数フォワーディング / 出力マッピング / 例外処理 / `userGroups` 解決 / `sort`・`order` 素通しは `searchKeyword` / `formatSearchResult` を mock する unit test (`full-text-search-tool.spec.ts`) が担う。integ test は **実 ES でしか検証できない振る舞い**に絞る。
 
-ファイル冒頭のヘッダーコメントにも同じ意思決定を明記する (`full-text-search-tool.integ.ts` L15-40)。
+**インデックス分離**: `app-integration` は複数 fork で並列実行され、`elasticsearch.integ.ts` は共有 `growi` インデックスを rebuild（delete + recreate）する。衝突を避けるため、本 suite は `app:elasticsearchUri` を worker 専用インデックスに上書きし（DB config が env を上書きする getConfig の性質を利用、DB は worker 毎）、afterAll で復元する。トークンは英字のみ・worker/run 毎にユニーク（ES tokenizer が英数境界で分割するため数字を含めない）。
 
-実 MongoDB + dummy `SearchDelegator` (search を `vi.fn()` 化) + 実 SearchService dispatch path で以下を確認:
+実 MongoDB に Revision 付きページ（`aggregatePipelineToIndex` が revision を `$unwind` するため revision 必須）を seed → `syncPageUpdated` で ES に投入 → ES refresh をポーリング待機し、以下を確認:
 
-1. dummy delegator が返す合成 hit 配列を、tool が `{ pageId, pagePath, snippet }` 形に正しく mapping し、`_source.body` 等の余計なフィールドが出力に混入しないこと（要件 6.5）
-2. ヒットなしクエリで `result: 'ok'` / `hits: []` / `totalCount: 0` を返すこと（要件 6.1）
-3. 実 MongoDB 上の User / UserGroup / UserGroupRelation を経由して、tool が `userGroups` を解決し dummy delegator の `search` 第 3 引数に渡すこと、また第 2 引数 `user` が `requestContext.set` で渡した実 User document と参照同一であること（要件 6.7 / Issue 1 Plan C の回帰防止）
-4. dummy delegator の `search` が reject した場合に `result: 'error'` を返し execute が throw しないこと（要件 6.8）
-5. **`sort` / `order` の素通し**: 入力で `sort: 'updatedAt'` / `order: 'desc'` を渡したとき、dummy delegator の `search` 第 4 引数 `searchOpts` に `sort` / `order` がそのまま届くこと（要件 6.9。実 ES 上での `updated_at` ソート挙動は `ElasticsearchDelegator` の責務）
+1. **snippet 返却（本 spec の中心的回帰ガード）**: GRANT_PUBLIC ページの本文キーワードで検索すると、`body.ja` / `body.en` ハイライトから生成された snippet（`<em>` を含む断片）がヒットに載ること。旧実装は `_highlight.body` のみを読んで snippet を落としていた
+2. **`canShowSnippet` ゲート**: 他ユーザー所有の GRANT_OWNER ページ（デフォルト list-policy では `filterPagesByViewer` を通過する）はヒットには出るが snippet が落ち、本文断片が payload に一切漏れないこと（要件 6.5 / 重大 #1 の回帰防止）
+3. **`filterPagesByViewer` の grant 除外**: GRANT_RESTRICTED ページが結果に出ないこと（他ページと同じ経路で index 済みのため、空結果は index 漏れではなく grant 除外に起因）
+4. ヒットなしクエリで `result: 'ok'` / `hits: []` / `totalCount: 0` を返すこと（要件 6.1）
 
-**意図的に NOT 対象** (上位 layer の責務):
-- GRANT_PUBLIC / GRANT_OWNER / GRANT_USER_GROUP の **実 ES 上での grant 反映**: `ElasticsearchDelegator.filterPagesByViewer` の責務（別途 `ElasticsearchDelegator` 側の integ test で確認すべきだが、これは本 spec の範囲外）
-- ES の query DSL 組み立て: 同上
-- `sort` / `order` の **実 ES 上での実際の並び順**: 同上（tool 層で素通しされていることまでが本 spec の範囲）
+**意図的に NOT 対象**:
+- ES の query DSL 組み立て / `sort`・`order` の実 ES 上の並び順: `ElasticsearchDelegator` の責務
+- 引数フォワーディング・出力マッピングの網羅: unit test の責務
 
 ### Integration Tests (`get-page-content-tool.integ.ts`)
 
