@@ -808,6 +808,8 @@
     "filter": "Filters",
     "filter_author": "Author",
     "filter_by_author": "Filter by author",
+    "filter_editor": "Editor",
+    "filter_by_editor": "Filter by editor",
     "sort_axis": {
       "relationScore": "Sort by relevance",
       "createdAt": "Creation date",

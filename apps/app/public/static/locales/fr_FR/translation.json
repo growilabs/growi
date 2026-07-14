@@ -803,6 +803,8 @@
     "filter": "Filtres",
     "filter_author": "Auteur",
     "filter_by_author": "Filtrer par auteur",
+    "filter_editor": "Éditeur",
+    "filter_by_editor": "Filtrer par éditeur",
     "sort_axis": {
       "relationScore": "Trier par pertinence",
       "createdAt": "Date de création",

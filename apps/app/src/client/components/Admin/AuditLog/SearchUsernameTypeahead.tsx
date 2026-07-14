@@ -33,13 +33,16 @@ type Props = {
   // Callers outside the admin pages must supply their own placeholder: the
   // default key lives in the `admin` i18n namespace, which those pages don't load.
   placeholder?: string;
+  // Must be unique per instance: rendering this typeahead more than once on a
+  // page (e.g. author + editor filters) would otherwise duplicate the DOM id.
+  id?: string;
 };
 
 const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   IClearable,
   Props
 > = (props: Props, ref) => {
-  const { onChange, initialUsernames, placeholder } = props;
+  const { onChange, initialUsernames, placeholder, id } = props;
   const { t } = useTranslation();
 
   const typeaheadRef = useRef<TypeaheadRef>(null);
@@ -154,7 +157,7 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
       </span>
       <AsyncTypeahead
         ref={typeaheadRef}
-        id="search-username-typeahead-asynctypeahead"
+        id={id ?? 'search-username-typeahead-asynctypeahead'}
         multiple
         delay={400}
         minLength={0}
