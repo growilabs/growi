@@ -73,9 +73,8 @@ export const isFilterStateEmpty = (filters: SearchFilterState): boolean =>
   filters.tags.length === 0;
 
 /**
- * Order-sensitive value equality across all fields. Used to decide whether an
- * incoming (e.g. URL-derived) filter state actually differs from the current one,
- * so a re-seed can no-op instead of clobbering identical state on every render.
+ * Order-sensitive value equality. Lets a re-seed skip identical state instead of
+ * clobbering it when the URL round-trips back the values already shown.
  */
 export const isSameFilterState = (
   a: SearchFilterState,
@@ -94,8 +93,25 @@ export const isSameFilterState = (
   );
 };
 
-const normalizeKeyword = (keyword: string): string =>
+export const normalizeKeyword = (keyword: string): string =>
   keyword.trim().replace(/\s+/g, ' ');
+
+/**
+ * Strip embedded double-quotes — the one character the inline grammar (and the
+ * server) drop. Committing them unstripped would show `a"b` in a chip while the
+ * URL/search use `ab`, so sanitizing keeps state, URL, and search in agreement.
+ */
+export const sanitizeFilterState = (
+  filters: SearchFilterState,
+): SearchFilterState => {
+  const strip = (values: string[]) => values.map((v) => v.replace(/"/g, ''));
+  return {
+    authors: strip(filters.authors),
+    editors: strip(filters.editors),
+    groups: strip(filters.groups),
+    tags: strip(filters.tags),
+  };
+};
 
 const quoteIfNeeded = (value: string): string =>
   /\s/.test(value) ? `"${value}"` : value;

@@ -51,9 +51,8 @@ export const useKeywordManager = (): void => {
 };
 
 type SetSearchKeywordOptions = {
-  // Use router.replace instead of push. For updates that should not add a
-  // history entry — e.g. live filter/sort tweaks on the search page, where
-  // pushing per change would flood back/forward with intermediate states.
+  // router.replace instead of push — for updates that should not add a history
+  // entry, e.g. live filter/sort tweaks that would otherwise flood back/forward.
   replace?: boolean;
 };
 

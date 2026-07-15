@@ -5,6 +5,7 @@ import {
   isSameFilterState,
   parseSearchQuery,
   type SearchFilterState,
+  sanitizeFilterState,
 } from './search-query';
 
 const filterState = (
@@ -203,6 +204,24 @@ describe('isFilterStateEmpty', () => {
     expect(isFilterStateEmpty(filterState({ authors: ['alice'] }))).toBe(false);
     expect(isFilterStateEmpty(filterState({ editors: ['bob'] }))).toBe(false);
     expect(isFilterStateEmpty(filterState({ groups: ['Docs'] }))).toBe(false);
+  });
+});
+
+describe('sanitizeFilterState', () => {
+  it('strips embedded double-quotes so state matches the built query', () => {
+    const sanitized = sanitizeFilterState(
+      filterState({ groups: ['a"b'], authors: ['alice'] }),
+    );
+    expect(sanitized.groups).toEqual(['ab']);
+    // The sanitized value round-trips losslessly (no further rewrite on reload).
+    expect(parseSearchQuery(buildSearchQuery('', sanitized)).filters).toEqual(
+      sanitized,
+    );
+  });
+
+  it('leaves quote-free values untouched', () => {
+    const input = filterState({ tags: ['wiki', 'dev docs'] });
+    expect(sanitizeFilterState(input)).toEqual(input);
   });
 });
 
