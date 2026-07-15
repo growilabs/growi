@@ -136,8 +136,8 @@ describe('parseSearchQuery', () => {
   it('reinterprets operator syntax typed into the keyword as a filter', () => {
     // Documents the intentional non-round-trip case: a hand-typed operator
     // hydrates the matching chip rather than staying free text.
-    expect(parseSearchQuery('author:alice')).toEqual({
-      keyword: '',
+    expect(parseSearchQuery('hello author:alice')).toEqual({
+      keyword: 'hello',
       filters: filterState({ authors: ['alice'] }),
     });
   });
