@@ -5,8 +5,8 @@ import {
 import { toPermalinkMdUrl } from './page-markdown-url';
 
 describe('selectAlternateMdUrl', () => {
-  test('returns the permalink-form ".md" URL when a pageId is given', () => {
-    const result = selectAlternateMdUrl('507f1f77bcf86cd799439011', '/foo/bar');
+  test('returns the permalink-form ".md" URL when only a pageId is given', () => {
+    const result = selectAlternateMdUrl('507f1f77bcf86cd799439011', undefined);
     expect(result).toBe('/507f1f77bcf86cd799439011.md');
   });
 

@@ -572,10 +572,11 @@ describe('page-markdown route (integration)', () => {
       // Memory-bounded rendering: at most MARKDOWN_FOOTER_MAX_LINKS child links
       // are emitted even though more children exist. For this root-like page
       // there are no parent/sibling sections, so the indented list items are
-      // exactly the child links — counting them is unambiguous.
+      // exactly the child links — counting them is unambiguous. Indentation
+      // width is a formatting detail, so any leading whitespace is accepted.
       const childLinkLines = res.text
         .split('\n')
-        .filter((line) => /^ {2}- \[/.test(line));
+        .filter((line) => /^\s+- \[/.test(line));
       expect(childLinkLines).toHaveLength(MARKDOWN_FOOTER_MAX_LINKS);
     });
   });

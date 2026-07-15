@@ -62,6 +62,13 @@ describe('parseMarkdownRequest', () => {
         expected: { kind: 'none' },
       },
       {
+        name: '?format=MD (uppercase) does not trigger a markdown request (the value is matched case-sensitively)',
+        reqPath: '/foo/bar',
+        accept: undefined,
+        formatQuery: 'MD',
+        expected: { kind: 'none' },
+      },
+      {
         name: 'empty Accept header behaves like no Accept header',
         reqPath: '/foo/bar',
         accept: '',
@@ -130,6 +137,17 @@ describe('parseMarkdownRequest', () => {
         name: 'Accept header with quality parameter (;q=0.9) still matches explicitly',
         reqPath: '/foo/bar',
         accept: 'text/markdown;q=0.9',
+        formatQuery: undefined,
+        expected: { kind: 'path', path: '/foo/bar', explicit: true },
+      },
+      {
+        // Deliberate simplification: quality parameters are ignored, so even
+        // q=0 ("not acceptable" in strict HTTP semantics) counts as an
+        // explicit markdown signal. Listing text/markdown with q=0 is not a
+        // realistic client behavior; full q-value negotiation is out of scope.
+        name: 'Accept header with q=0 is still treated as an explicit signal (quality params are ignored by design)',
+        reqPath: '/foo/bar',
+        accept: 'text/markdown;q=0',
         formatQuery: undefined,
         expected: { kind: 'path', path: '/foo/bar', explicit: true },
       },

@@ -18,7 +18,7 @@ import {
   buildPageMarkdown,
   type FooterLink,
 } from './build-page-markdown';
-import { MARKDOWN_FOOTER_MAX_LINKS } from './constants';
+import { MARKDOWN_FOOTER_MAX_LINKS, MARKDOWN_SUFFIX } from './constants';
 import { parseMarkdownRequest } from './parse-markdown-request';
 
 const { encodeSpaces } = pagePathUtils;
@@ -26,8 +26,6 @@ const { encodeSpaces } = pagePathUtils;
 const logger = loggerFactory(
   'growi:features:page-markdown:respond-with-page-markdown',
 );
-
-const MARKDOWN_SUFFIX = '.md';
 
 /**
  * The outcome of resolving a markdown request into a response.

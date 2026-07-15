@@ -1,5 +1,7 @@
 import { isPermalink } from '@growi/core/dist/utils/page-path-utils';
 
+import { MARKDOWN_SUFFIX } from './constants';
+
 /**
  * The caller's interpretation of a request as a markdown-format request.
  *
@@ -23,7 +25,6 @@ export type MarkdownRequestIntent =
   | { kind: 'path'; path: string; explicit: boolean };
 
 const MARKDOWN_MEDIA_TYPE = 'text/markdown';
-const MARKDOWN_SUFFIX = '.md';
 
 /**
  * Decode a percent-encoded request path into the page-path form stored in the

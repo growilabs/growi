@@ -114,9 +114,13 @@ function buildFooter(input: PageMarkdownInput): string {
     lines.push(...renderSiblingsSection(input));
   }
 
-  lines.push(
-    `- Last updated: ${input.updatedAt} by ${input.updatedByUsername}`,
-  );
+  // Empty container pages have no revision and thus no update info; omit the
+  // line entirely rather than render a dangling "Last updated:  by ".
+  if (input.updatedAt !== '' || input.updatedByUsername !== '') {
+    lines.push(
+      `- Last updated: ${input.updatedAt} by ${input.updatedByUsername}`,
+    );
+  }
   lines.push(
     `- Full page listing (all children regardless of count): ${input.pageListApiHint}`,
   );
