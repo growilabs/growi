@@ -209,6 +209,18 @@ export type OpenAICompatibleConfig =
 **決定**: GROWI のエンタープライズ/自己ホスト前提（models.dev への runtime 依存は受け入れ難い）と既存 native 実装との一貫性から **Approach A**。+2 依存は server-only import（`features/mastra/server/...`）ゆえ `dependencies` 分類で吸収可（package-dependencies ルールの Turbopack 検証手順を実施）。
 → provider factory 関数・明示キー option（research §3）: `createOpenAI({apiKey})` / `createAnthropic({apiKey})` / `createGoogleGenerativeAI({apiKey})`。
 
+> **注記（`ai-settings-model-picker` との関係）**
+>
+> 別スペック `ai-settings-model-picker` が models.dev を利用するが、D-2/D-3 の決定と**矛盾しない**。両者は目的も通信特性も異なる別経路である。
+>
+> 1. **runtime fetch 不採用は不変**: models.dev の **runtime fetch**（Mastra model router / Approach B のゲートウェイ経由の解決）は引き続き**不採用**。推論経路は native `@ai-sdk/*`（Approach A）のままであり、本 D-2/D-3 の決定は不変。
+> 2. **vendored 静的 read は別物**: `ai-settings-model-picker` が採用した「models.dev を**取り込みステップ（リリース前段）**で vendoring し、chat＋tool 対応に絞って**コミットした静的カタログ**を実行時に read する」経路は、D-2 の runtime fetch とは**別物**。相違点は以下:
+>    - **取得タイミング**: 実行時ではなく**リリース前段の取り込みステップのみ** models.dev を fetch する。
+>    - **実行時**: 一覧提供（read パス）はローカル保存済みカタログ（コミット済み成果物、またはリフレッシュで永続化された更新済みカタログ）を read するのみ＝**外部通信ゼロ**（自己ホスト／エアギャップ環境でも既定のまま機能）。カタログリフレッシュ〔管理画面手動／起動時／定期。起動時・定期は AI 機能が有効（`app:aiEnabled`）な場合のみ作動し、定期は既定で日次〕が実行された場合に限り models.dev へ fetch する（推論経路には関与しない）。
+>    - **用途**: **管理画面の許可モデル選択肢**の提示に限る。**推論経路は一切変えない**（native `@ai-sdk/*` のまま）。
+>    - つまり D-2/D-3 が退けた「models.dev への runtime 依存を持つモデルルーター」と、この「オフラインの vendored 静的 read」は目的も通信特性も異なるため、本決定を退行させるものではない。
+>    - Cross-reference: 詳細は `.kiro/specs/ai-settings-model-picker`。
+
 ## D-4. Generalization / Simplification
 
 - **Generalization**: R1–R5 は「ベンダーに依存しない LLM モデル解決」という単一問題の変奏。`vendor → LanguageModel` を返す**純関数リゾルバ 1 つ**にデータ駆動（`AI_PROVIDERS` 配列＋ per-vendor factory map）で集約し、consumer（agent/route）はベンダー名で分岐しない（coding-style の data-driven 原則）。

@@ -1,4 +1,4 @@
-import { AI_PROVIDERS, isAiProvider } from './ai-provider';
+import { AI_PROVIDERS, getProviderLabel, isAiProvider } from './ai-provider';
 
 describe('llm-provider', () => {
   describe('AI_PROVIDERS', () => {
@@ -43,6 +43,17 @@ describe('llm-provider', () => {
       ['a boolean', true],
     ])('returns false for non-string input (%s)', (_label, value) => {
       expect(isAiProvider(value)).toBe(false);
+    });
+  });
+
+  describe('getProviderLabel', () => {
+    it.each([
+      ['openai', 'OpenAI'],
+      ['anthropic', 'Anthropic'],
+      ['google', 'Google'],
+      ['azure-openai', 'Azure OpenAI'],
+    ] as const)('returns the official display name "%s" -> "%s"', (provider, label) => {
+      expect(getProviderLabel(provider)).toBe(label);
     });
   });
 });

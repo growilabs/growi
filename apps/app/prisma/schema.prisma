@@ -8,6 +8,20 @@ generator client {
   // An explicit "js" here breaks Turbopack, which cannot rewrite a relative
   // `.js` specifier to the actual `.ts` file.
   moduleFormat = "esm"
+
+  // Query-engine binaries that must exist in the generated output regardless of
+  // which machine runs `prisma generate`. Without this, only `native` is emitted
+  // (the build host's engine), so a container built on / turbo-cached from one
+  // architecture ships an engine the runtime cannot load (issue: prod boot fails
+  // with `Prisma Client could not locate the Query Engine for runtime
+  // "debian-openssl-3.0.x"`).
+  //   - native                     -> local dev on any OS/arch
+  //   - debian-openssl-3.0.x       -> linux/amd64 glibc (DHI node:debian runtime)
+  //   - linux-arm64-openssl-3.0.x  -> linux/arm64 glibc
+  // Declaring every runtime engine also makes the turbo `prisma:generate` cache
+  // architecture-safe: the cached output carries all engines, so a cache entry
+  // populated on one arch is still valid on another.
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
 }
 
 datasource db {
@@ -16,8 +30,13 @@ datasource db {
 }
 
 type ActivitiesSnapshot {
-  id       String @map("_id") @db.ObjectId
-  username String
+  id           String  @map("_id") @db.ObjectId
+  // username is optional as a safeguard for deletion paths without a user
+  username     String?
+  originalName String?
+  pagePath     String?
+  pageId       String? @db.ObjectId
+  fileSize     Int?
 }
 
 type PageoperationsExPage {
@@ -54,16 +73,19 @@ model activities {
   v           Int                @map("__v")
   action      String
   createdAt   DateTime           @default(now())
-  endpoint    String
+  // ip/endpoint are optional as a safeguard: the legacy Mongoose schema never
+  // required them, and some write paths still omit them today, so documents
+  // without either field are expected, not corrupt.
+  endpoint    String?
   event       String?            @db.ObjectId
   eventModel  String?
-  ip          String
+  ip          String?
   snapshot    ActivitiesSnapshot
   target      String?            @db.ObjectId
   targetModel String?
   userId      String?            @map("user") @db.ObjectId
 
-  user users? @relation(fields: [userId], references: [id])
+  user users? @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([userId, target, action, createdAt], map: "user_1_target_1_action_1_createdAt_1")
   @@index([userId], map: "user_1")
@@ -222,6 +244,26 @@ model inappnotifications {
 
 model inappnotificationsettings {
   id String @id @default(auto()) @map("_id") @db.ObjectId
+}
+
+model mastrarefreshedmodelcatalogs {
+  // Singleton: always at most one document with the fixed string id 'singleton'
+  // (NOT an ObjectId). Holds the models.dev snapshot persisted by the opt-in
+  // runtime catalog refresh; deleting the document falls back to the bundled
+  // model-catalog-data.json asset.
+  id                           String   @id @map("_id")
+  v                            Int      @default(0) @map("__v")
+  /// provider -> selectable models ({ id, name }; validated by buildModelCatalog before every write)
+  models                       Json
+  fetchedAt                    DateTime
+  /// _generatedAt of the bundled asset that was current when this snapshot was
+  /// fetched. The newer-wins resolution compares this against the CURRENT
+  /// bundled _generatedAt so both operands come from the vendoring machine's
+  /// clock (see effective-model-catalog.ts) - never the server's wall clock.
+  supersededBundledGeneratedAt DateTime
+  source                       String
+
+  @@map("mastra_refreshed_model_catalog")
 }
 
 model migrations {

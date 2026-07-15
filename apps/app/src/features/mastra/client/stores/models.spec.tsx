@@ -4,6 +4,8 @@ import type { PropsWithChildren } from 'react';
 import { renderHook, waitFor } from '@testing-library/react';
 import { SWRConfig } from 'swr';
 
+import type { ChatModelsResponse } from '~/features/mastra/interfaces/chat-models-response';
+
 import { useSWRxChatModels } from './models';
 
 // Mock the API boundary. The hook's contract is "GET /mastra/models, return
@@ -24,10 +26,23 @@ beforeEach(() => {
 });
 
 describe('useSWRxChatModels', () => {
-  it('fetches /mastra/models and returns { modelIds, selectedModelId }', async () => {
-    const data = {
-      modelIds: ['gpt-4o', 'gpt-4o-mini'],
-      selectedModelId: 'gpt-4o-mini',
+  it('fetches /mastra/models and returns { models, selectedModelKey }', async () => {
+    const data: ChatModelsResponse = {
+      models: [
+        {
+          key: 'openai/gpt-4o',
+          provider: 'openai',
+          modelId: 'gpt-4o',
+          displayName: 'GPT-4o',
+        },
+        {
+          key: 'anthropic/claude-sonnet-4',
+          provider: 'anthropic',
+          modelId: 'claude-sonnet-4',
+          displayName: 'Claude Sonnet 4',
+        },
+      ],
+      selectedModelKey: 'anthropic/claude-sonnet-4',
     };
     apiv3Get.mockResolvedValue({ data });
 
@@ -40,17 +55,24 @@ describe('useSWRxChatModels', () => {
   });
 
   it('exposes the single allowed model when only one is configured', async () => {
-    const data = {
-      modelIds: ['gpt-4o'],
-      selectedModelId: 'gpt-4o',
+    const data: ChatModelsResponse = {
+      models: [
+        {
+          key: 'openai/gpt-4o',
+          provider: 'openai',
+          modelId: 'gpt-4o',
+          displayName: 'GPT-4o',
+        },
+      ],
+      selectedModelKey: 'openai/gpt-4o',
     };
     apiv3Get.mockResolvedValue({ data });
 
     const { result } = renderHook(() => useSWRxChatModels(), { wrapper });
 
     await waitFor(() => {
-      expect(result.current.data?.modelIds).toHaveLength(1);
+      expect(result.current.data?.models).toHaveLength(1);
     });
-    expect(result.current.data?.selectedModelId).toBe('gpt-4o');
+    expect(result.current.data?.selectedModelKey).toBe('openai/gpt-4o');
   });
 });

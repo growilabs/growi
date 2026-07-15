@@ -17,18 +17,19 @@ import type SearchService from '~/server/service/search';
  *   `SearchService.searchKeyword` accept the whole user object and read
  *   the fields they need internally.
  *
- * Notes on `modelId`:
- * - `modelId` is the per-request model for the chat client's selection. The
- *   post-message handler resolves the client value through `resolveEffectiveModelId`
- *   (the single allow-list rounding checkpoint — an out-of-allowlist / omitted
- *   value is collapsed to the default) and sets the ALREADY-RESOLVED id here.
- *   `growiAgent`'s dynamic model function passes it to `resolveMastraModel`, whose
- *   own allow-list check is then an idempotent defense-in-depth re-validation
- *   rather than the first rounding pass. It stays optional only for the type's
- *   sake; the handler always sets a concrete resolved id when AI is configured.
+ * Notes on `modelKey`:
+ * - `modelKey` is the per-request model for the chat client's selection, as the
+ *   composite `${provider}/${modelId}` key. The post-message handler resolves the
+ *   client value through `resolveEffectiveModelKey` (the single allow-list rounding
+ *   checkpoint — an out-of-allowlist / omitted key is collapsed to the effective
+ *   default) and sets the ALREADY-RESOLVED key here. `growiAgent`'s dynamic model
+ *   function passes it to `resolveMastraModel`, whose own allow-list check is then
+ *   an idempotent defense-in-depth re-validation rather than the first rounding
+ *   pass. It stays optional only for the type's sake; the handler always sets a
+ *   concrete resolved key when AI is configured.
  */
 export type MastraRequestContextShape = {
   user: IUserHasId;
   searchService: SearchService;
-  modelId?: string;
+  modelKey?: string;
 };

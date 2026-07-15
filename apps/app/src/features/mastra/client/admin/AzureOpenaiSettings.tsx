@@ -8,21 +8,24 @@ import type { AiSettingsFormValues } from './ai-settings-form-values';
 import { registerToInputProps } from './register-to-input-props';
 
 export interface AzureOpenaiSettingsProps {
-  /** Disable the inputs when env-only mode is active (4.2). */
+  /** Disable the inputs when env-only mode is active (5.2). */
   readonly disabled: boolean;
 }
 
 /**
- * Register-based form for the Azure OpenAI connection settings (3.1).
+ * Register-based form for the Azure OpenAI connection settings (1.10).
  *
- * Reads/writes the shared react-hook-form context owned by `AiSettings`. Renders
- * nothing unless the watched `provider === 'azure-openai'` (3.2). This section now
- * holds only the Azure *connection* settings (resource name / base URL / API
- * version / Entra ID); the deployment-name field moved into the shared
- * `AllowedModelsField` (hosted by `ProviderCommonSettings`), which labels it as
- * the deployment name for this provider. When `azureOpenaiSettings.useEntraId` is
- * on, surfaces a note that the apiKey is not used (3.3) — the apiKey field itself
- * lives in `ProviderCommonSettings`.
+ * Reads/writes the shared react-hook-form context owned by `AiSettings`, binding
+ * every field under the azure-openai provider slot
+ * (`providers.azure-openai.azureOpenaiSettings.*`). It renders unconditionally:
+ * the caller (`ProviderPanel`) mounts it ONLY inside the azure-openai panel, so
+ * the section no longer self-gates on a global `provider` (that field no longer
+ * exists on the multi-provider form). This section holds only the Azure
+ * *connection* settings (resource name / base URL / API version / Entra ID); the
+ * deployment-name field lives in the shared `AllowedModelsField`, which labels it
+ * as the deployment name for this provider. When `useEntraId` is on, surfaces a
+ * note that the apiKey is not used (1.10) — the apiKey field itself lives in
+ * `ProviderPanel`.
  *
  * Azure is the most configuration-heavy provider (resource name vs. base URL,
  * optional API version, two auth methods), so each field carries inline help and
@@ -31,7 +34,7 @@ export interface AzureOpenaiSettingsProps {
  */
 export const AzureOpenaiSettings = (
   props: AzureOpenaiSettingsProps,
-): JSX.Element | null => {
+): JSX.Element => {
   const { disabled } = props;
   const { t } = useTranslation('admin');
   const { register, watch } = useFormContext<AiSettingsFormValues>();
@@ -41,20 +44,21 @@ export const AzureOpenaiSettings = (
   const apiVersionId = useId();
   const useEntraIdId = useId();
 
-  if (watch('provider') !== 'azure-openai') {
-    return null;
-  }
-
-  const useEntraId = watch('azureOpenaiSettings.useEntraId');
+  const useEntraId = watch(
+    'providers.azure-openai.azureOpenaiSettings.useEntraId',
+  );
 
   return (
     <div>
-      <h2 className="border-bottom my-4 admin-setting-header">
+      {/* Tab-panel subsection heading — same level as the "Models" section, so it
+          uses the identical fs-5 fw-bold. Was an <h2>.admin-setting-header, which
+          rendered at the <h2> size (~2rem) and clashed with the page title. */}
+      <h3 className="fs-5 fw-bold mt-4 mb-2">
         {t('ai_settings.azure_section_title')}
-      </h2>
+      </h3>
 
       <FormGroup className="mb-3">
-        <Label for={resourceNameId}>
+        <Label for={resourceNameId} className="fw-bold">
           {t('ai_settings.azure_resource_name_label')}
         </Label>
         <Input
@@ -62,32 +66,38 @@ export const AzureOpenaiSettings = (
           type="text"
           disabled={disabled}
           {...registerToInputProps(
-            register('azureOpenaiSettings.resourceName'),
+            register('providers.azure-openai.azureOpenaiSettings.resourceName'),
           )}
         />
         <FormText>{t('ai_settings.azure_resource_name_help')}</FormText>
       </FormGroup>
 
       <FormGroup className="mb-3">
-        <Label for={baseUrlId}>{t('ai_settings.azure_base_url_label')}</Label>
+        <Label for={baseUrlId} className="fw-bold">
+          {t('ai_settings.azure_base_url_label')}
+        </Label>
         <Input
           id={baseUrlId}
           type="text"
           disabled={disabled}
-          {...registerToInputProps(register('azureOpenaiSettings.baseURL'))}
+          {...registerToInputProps(
+            register('providers.azure-openai.azureOpenaiSettings.baseURL'),
+          )}
         />
         <FormText>{t('ai_settings.azure_base_url_help')}</FormText>
       </FormGroup>
 
       <FormGroup className="mb-3">
-        <Label for={apiVersionId}>
+        <Label for={apiVersionId} className="fw-bold">
           {t('ai_settings.azure_api_version_label')}
         </Label>
         <Input
           id={apiVersionId}
           type="text"
           disabled={disabled}
-          {...registerToInputProps(register('azureOpenaiSettings.apiVersion'))}
+          {...registerToInputProps(
+            register('providers.azure-openai.azureOpenaiSettings.apiVersion'),
+          )}
         />
         <FormText>{t('ai_settings.azure_api_version_help')}</FormText>
       </FormGroup>
@@ -98,9 +108,11 @@ export const AzureOpenaiSettings = (
           type="switch"
           role="switch"
           disabled={disabled}
-          {...registerToInputProps(register('azureOpenaiSettings.useEntraId'))}
+          {...registerToInputProps(
+            register('providers.azure-openai.azureOpenaiSettings.useEntraId'),
+          )}
         />
-        <Label htmlFor={useEntraIdId} className="ms-2">
+        <Label htmlFor={useEntraIdId} className="ms-2 fw-bold">
           {t('ai_settings.azure_use_entra_id_label')}
         </Label>
       </FormGroup>

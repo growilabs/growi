@@ -1,0 +1,13 @@
+diff --git a/package.json b/package.json
+index 3452ac1674b65854b80c4b9286aa22dc4d62df47..99f24ab5c4a3b75c80d21743968b3f8be5aa43b8 100644
+--- a/package.json
++++ b/package.json
+@@ -30,7 +30,7 @@
+       "types": "./dist/src/index.d.ts",
+       "module": "./dist/yjs.mjs",
+       "import": "./dist/yjs.mjs",
+-      "require": "./dist/yjs.cjs"
++      "require": "./dist/yjs.mjs"
+     },
+     "./src/index.js": "./src/index.js",
+     "./tests/testHelper.js": "./tests/testHelper.js",

@@ -8,6 +8,7 @@ const MODEL_USER = 'User';
 const MODEL_COMMENT = 'Comment';
 const MODEL_PAGE_BULK_EXPORT_JOB = 'PageBulkExportJob';
 const MODEL_AUDIT_LOG_BULK_EXPORT_JOB = 'AuditLogBulkExportJob';
+export const MODEL_ATTACHMENT = 'Attachment';
 
 // Action
 const ACTION_UNSETTLED = 'UNSETTLED';
@@ -89,6 +90,7 @@ const ACTION_SEARCH_PAGE = 'SEARCH_PAGE';
 const ACTION_SEARCH_PAGE_VIEW = 'SEARCH_PAGE_VIEW';
 const ACTION_ADMIN_APP_SETTINGS_UPDATE = 'ADMIN_APP_SETTING_UPDATE';
 const ACTION_ADMIN_AI_SETTING_UPDATE = 'ADMIN_AI_SETTING_UPDATE';
+const ACTION_ADMIN_AI_MODEL_CATALOG_REFRESH = 'ADMIN_AI_MODEL_CATALOG_REFRESH';
 const ACTION_ADMIN_SITE_URL_UPDATE = 'ADMIN_SITE_URL_UPDATE';
 const ACTION_ADMIN_MAIL_SMTP_UPDATE = 'ADMIN_MAIL_SMTP_UPDATE';
 const ACTION_ADMIN_MAIL_SES_UPDATE = 'ADMIN_MAIL_SES_UPDATE';
@@ -246,6 +248,7 @@ export const SupportedTargetModel = {
   MODEL_USER,
   MODEL_PAGE_BULK_EXPORT_JOB,
   MODEL_AUDIT_LOG_BULK_EXPORT_JOB,
+  MODEL_ATTACHMENT,
 } as const;
 
 export const SupportedEventModel = {
@@ -330,6 +333,7 @@ export const SupportedAction = {
   ACTION_SEARCH_PAGE_VIEW,
   ACTION_ADMIN_APP_SETTINGS_UPDATE,
   ACTION_ADMIN_AI_SETTING_UPDATE,
+  ACTION_ADMIN_AI_MODEL_CATALOG_REFRESH,
   ACTION_ADMIN_SITE_URL_UPDATE,
   ACTION_ADMIN_MAIL_SMTP_UPDATE,
   ACTION_ADMIN_MAIL_SES_UPDATE,
@@ -558,6 +562,8 @@ export const LargeActionGroup = {
   ...MediumActionGroup,
   ACTION_SHARE_LINK_ALL_DELETE,
   ACTION_ADMIN_APP_SETTINGS_UPDATE,
+  ACTION_ADMIN_AI_SETTING_UPDATE,
+  ACTION_ADMIN_AI_MODEL_CATALOG_REFRESH,
   ACTION_ADMIN_SITE_URL_UPDATE,
   ACTION_ADMIN_MAIL_SMTP_UPDATE,
   ACTION_ADMIN_MAIL_SES_UPDATE,
@@ -739,7 +745,38 @@ export type SupportedActionCategoryType =
   (typeof SupportedActionCategory)[keyof typeof SupportedActionCategory];
 export type SupportedActivityActionType =
   (typeof ActivityLogActions)[keyof typeof ActivityLogActions];
-export type ISnapshot = Partial<Pick<IUser, 'username'>>;
+/**
+ * Catch-all snapshot variant for every action without action-specific fields.
+ * Keeps the pre-union `{ username?: string }` shape for backward compatibility.
+ */
+export type DefaultSnapshot = Partial<Pick<IUser, 'username'>>;
+
+/**
+ * Canonical snapshot variant shared by every attachment activity
+ * (ACTION_ATTACHMENT_ADD / ACTION_ATTACHMENT_REMOVE / ACTION_ATTACHMENT_DOWNLOAD).
+ * Every field is optional: snapshot builders omit fields they cannot resolve
+ * (e.g. pagePath when the page is gone, username on guest downloads).
+ */
+export type AttachmentSnapshot = {
+  username?: string;
+  originalName?: string;
+  pagePath?: string;
+  pageId?: string;
+  fileSize?: number;
+};
+
+/**
+ * Backward-compatible alias kept for existing importers
+ * (snapshot-viewer and the REMOVE builder predate the canonical name).
+ */
+export type AttachmentRemoveSnapshot = AttachmentSnapshot;
+
+/**
+ * Discriminated union of snapshot shapes. The discriminant is the activity's
+ * existing `action` field (see the isAttachment*Activity guards); snapshots
+ * carry no discriminator field of their own.
+ */
+export type ISnapshot = DefaultSnapshot | AttachmentSnapshot;
 
 export type IActivity = {
   user?: Ref<IUser>;
@@ -753,6 +790,37 @@ export type IActivity = {
   createdAt: Date;
   snapshot?: ISnapshot;
 };
+
+/**
+ * Narrows an activity's snapshot to AttachmentRemoveSnapshot.
+ * The existing required `action` field is the sole discriminant —
+ * no discriminator field is added to the snapshot itself.
+ */
+export const isAttachmentRemoveActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: AttachmentRemoveSnapshot;
+} => activity.action === SupportedAction.ACTION_ATTACHMENT_REMOVE;
+
+/**
+ * Narrows an ATTACHMENT_ADD activity's snapshot to AttachmentSnapshot.
+ * Same pattern as isAttachmentRemoveActivity: `action` is the sole discriminant.
+ */
+export const isAttachmentAddActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: AttachmentSnapshot;
+} => activity.action === SupportedAction.ACTION_ATTACHMENT_ADD;
+
+/**
+ * Narrows an ATTACHMENT_DOWNLOAD activity's snapshot to AttachmentSnapshot.
+ * Same pattern as isAttachmentRemoveActivity: `action` is the sole discriminant.
+ */
+export const isAttachmentDownloadActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: AttachmentSnapshot;
+} => activity.action === SupportedAction.ACTION_ATTACHMENT_DOWNLOAD;
 
 export type IActivityHasId = IActivity & HasObjectId;
 
