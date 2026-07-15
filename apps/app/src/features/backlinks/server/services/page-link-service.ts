@@ -8,19 +8,19 @@ const logger = loggerFactory('growi:features:backlinks:page-link-service');
 
 export class PageLinkService {
   constructor(private crowi: Crowi) {}
-  static create(crowi: Crowi) {
+  static create(crowi: Crowi): PageLinkService {
     const pageLinkService = new PageLinkService(crowi);
     pageLinkService.registerEvents();
     return pageLinkService;
   }
 
-  private registerEvents() {
+  private registerEvents(): void {
     const pageEvent = this.crowi.events.page;
     pageEvent.on('create', (page: PageDocument) => this.onUpsert(page));
     pageEvent.on('update', (page: PageDocument) => this.onUpsert(page));
   }
 
-  private async onUpsert(page: PageDocument) {
+  private async onUpsert(page: PageDocument): Promise<void> {
     try {
       const siteUrl = this.crowi.configManager.getConfig('app:siteUrl');
 
