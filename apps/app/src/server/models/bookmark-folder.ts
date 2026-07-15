@@ -124,7 +124,7 @@ export const extension = Prisma.defineExtension((client) => {
           let deletedCount = 0;
           if (bookmarkFolder != null) {
             if (bookmarkFolder.bookmarkIds.length > 0) {
-              await context.deleteMany({
+              await prisma.bookmarks.deleteMany({
                 where: { id: { in: bookmarkFolder.bookmarkIds } },
               });
             }
