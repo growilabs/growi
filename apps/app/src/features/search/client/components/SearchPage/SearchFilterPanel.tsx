@@ -96,7 +96,6 @@ const GroupFilterField = (props: GroupFilterFieldProps): JSX.Element => {
         <DropdownToggle
           caret
           color="outline-secondary"
-          disabled={groups.length === 0}
           className="w-100 d-flex align-items-center justify-content-between"
         >
           <span>{t('search_result.filter_group_select', 'Select groups')}</span>
