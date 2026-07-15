@@ -811,6 +811,7 @@
     "page_number_unit": "例",
     "hit_number_unit": "例",
     "filter": "筛选",
+    "search_option": "搜索选项",
     "filter_author": "创建者",
     "filter_by_author": "按创建者筛选",
     "filter_editor": "编辑者",

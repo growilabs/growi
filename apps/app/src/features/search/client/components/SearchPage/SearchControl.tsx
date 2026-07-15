@@ -275,8 +275,11 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
         disableUserPages={disableUserPages}
         includeUserPages={includeUserPages}
         includeTrashPages={includeTrashPages}
-        onIncludeUserPagesSwitched={setIncludeUserPages}
-        onIncludeTrashPagesSwitched={setIncludeTrashPages}
+        onIncludeUserPagesSwitched={changeIncludeUserPagesHandler}
+        onIncludeTrashPagesSwitched={changeIncludeTrashPagesHandler}
+        isEnableFilter={isEnableFilter}
+        filters={filters}
+        onFiltersChange={changeFiltersHandler}
       />
     </div>
   );
