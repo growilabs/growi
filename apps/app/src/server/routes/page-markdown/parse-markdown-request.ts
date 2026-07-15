@@ -11,9 +11,11 @@ import { isPermalink } from '@growi/core/dist/utils/page-path-utils';
  * - true:  Accept: text/markdown (explicit media type) or ?format=md
  * - false: bare `.md` suffix (sugar)
  *
- * When explicit=false and kind='path', `path` is returned UNMODIFIED (still
- * carrying its trailing `.md`, if any) -- literal-vs-base resolution is owned
- * by the caller (respondWithPageMarkdown), not by this pure classifier.
+ * The returned `path` / `pageId` are PERCENT-DECODED (the form page paths are
+ * stored in), since Express's req.path arrives still encoded. Apart from
+ * decoding, when explicit=false and kind='path' the `path` is unmodified
+ * (still carrying its trailing `.md`, if any) -- literal-vs-base resolution is
+ * owned by the caller (respondWithPageMarkdown), not by this pure classifier.
  */
 export type MarkdownRequestIntent =
   | { kind: 'none' }
@@ -22,6 +24,25 @@ export type MarkdownRequestIntent =
 
 const MARKDOWN_MEDIA_TYPE = 'text/markdown';
 const MARKDOWN_SUFFIX = '.md';
+
+/**
+ * Decode a percent-encoded request path into the page-path form stored in the
+ * database. Express's `req.path` is NOT percent-decoded (a request for
+ * "/foo bar.md" arrives as "/foo%20bar.md"), while GROWI stores page paths
+ * decoded, so classification and resolution must operate on the decoded form
+ * or every space-/non-ASCII-containing path resolves to a false 404.
+ *
+ * Malformed escape sequences fall back to the raw path. (In practice Express
+ * itself rejects those with a 400 while matching the `/*` wildcard, before
+ * any handler runs -- the fallback is defense for direct helper callers.)
+ */
+function decodeRequestPath(reqPath: string): string {
+  try {
+    return decodeURIComponent(reqPath);
+  } catch {
+    return reqPath;
+  }
+}
 
 /**
  * Whether the Accept header explicitly lists text/markdown as a media type.
@@ -70,22 +91,25 @@ export function parseMarkdownRequest(
   accept: string | undefined,
   formatQuery: string | undefined,
 ): MarkdownRequestIntent {
+  // All classification and the returned `path` operate on the DECODED form,
+  // matching how page paths are stored (see decodeRequestPath).
+  const path = decodeRequestPath(reqPath);
   const explicit = hasExplicitMarkdownAccept(accept) || formatQuery === 'md';
 
   if (explicit) {
-    return classifyPath(reqPath, true);
+    return classifyPath(path, true);
   }
 
-  if (!reqPath.endsWith(MARKDOWN_SUFFIX)) {
+  if (!path.endsWith(MARKDOWN_SUFFIX)) {
     return { kind: 'none' };
   }
 
-  const base = reqPath.slice(0, -MARKDOWN_SUFFIX.length);
+  const base = path.slice(0, -MARKDOWN_SUFFIX.length);
   if (isPermalink(base)) {
     return { kind: 'permalink', pageId: base.substring(1), explicit: false };
   }
 
   // Not a permalink: keep the ORIGINAL (still `.md`-suffixed) path. The
   // caller owns literal-vs-base resolution (task 2.2).
-  return { kind: 'path', path: reqPath, explicit: false };
+  return { kind: 'path', path, explicit: false };
 }

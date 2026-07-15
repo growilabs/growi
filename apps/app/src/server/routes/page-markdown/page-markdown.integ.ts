@@ -70,6 +70,15 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
   const bodySecret = 'SECRET-BODY-DO-NOT-LEAK';
   const bodyLiteral = 'LITERAL-MD-PAGE-BODY';
   const bodyBig = 'BIG-PARENT-BODY';
+  const bodySpace = 'SPACE-PATH-BODY';
+  const bodyJp = 'JP-PATH-BODY';
+
+  // Pages whose paths arrive percent-encoded on the wire: DB paths are stored
+  // decoded ("/space page"), but clients request "/space%20page.md" (browsers
+  // and HTTP libraries always percent-encode), and Express's req.path keeps
+  // that encoding. These fixtures prove the route resolves the decoded page.
+  const spacePath = `${BASE}/space page`;
+  const jpPath = `${BASE}/日本語ページ`;
 
   // Over-limit fixture: seed MORE direct children than the footer cap so the
   // response must truncate the link list, state the exact total and remainder
@@ -90,6 +99,8 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
     `${BASE}/literal.md`,
     bigParentPath,
     ...bigChildPaths,
+    spacePath,
+    jpPath,
   ];
 
   beforeAll(async () => {
@@ -161,6 +172,20 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
         descendantCount: 0,
       })),
     );
+    const spacePage = await Page.create({
+      path: spacePath,
+      grant: Page.GRANT_PUBLIC,
+      creator: testUser._id,
+      lastUpdateUser: testUser._id,
+      descendantCount: 0,
+    });
+    const jpPage = await Page.create({
+      path: jpPath,
+      grant: Page.GRANT_PUBLIC,
+      creator: testUser._id,
+      lastUpdateUser: testUser._id,
+      descendantCount: 0,
+    });
 
     const revisions = await Revision.insertMany([
       {
@@ -187,15 +212,31 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
         format: 'markdown',
         author: testUser._id,
       },
+      {
+        pageId: spacePage._id,
+        body: bodySpace,
+        format: 'markdown',
+        author: testUser._id,
+      },
+      {
+        pageId: jpPage._id,
+        body: bodyJp,
+        format: 'markdown',
+        author: testUser._id,
+      },
     ]);
     doc.revision = revisions[0]._id;
     secret.revision = revisions[1]._id;
     literal.revision = revisions[2]._id;
     big.revision = revisions[3]._id;
+    spacePage.revision = revisions[4]._id;
+    jpPage.revision = revisions[5]._id;
     await doc.save();
     await secret.save();
     await literal.save();
     await big.save();
+    await spacePage.save();
+    await jpPage.save();
 
     docId = String(doc._id);
     secretId = String(secret._id);
@@ -303,6 +344,48 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
       expect(res.status).toBe(200);
       expect(res.headers['content-type']).toContain('text/markdown');
       expect(res.text).toContain(bodyDoc);
+    });
+  });
+
+  describe('percent-encoded request paths (Requirement 1.2, 1.3, 7.2)', () => {
+    it('serves {path}.md for a path containing a space, requested in the percent-encoded form clients actually send', async () => {
+      currentUser = testUser;
+
+      const res = await request(app).get(`${encodeURI(spacePath)}.md`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/markdown');
+      expect(res.text).toContain(bodySpace);
+    });
+
+    it('serves {path}.md for a non-ASCII (Japanese) path requested percent-encoded', async () => {
+      currentUser = testUser;
+
+      const res = await request(app).get(`${encodeURI(jpPath)}.md`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/markdown');
+      expect(res.text).toContain(bodyJp);
+    });
+
+    it('serves a percent-encoded plain URL with Accept: text/markdown', async () => {
+      currentUser = testUser;
+
+      const res = await request(app)
+        .get(encodeURI(jpPath))
+        .set('Accept', 'text/markdown');
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/markdown');
+      expect(res.text).toContain(bodyJp);
+    });
+
+    it('yields the platform-level 400 for a malformed percent-escape (Express rejects it before any route handler, same as the HTML catch-all)', async () => {
+      currentUser = testUser;
+
+      const res = await request(app).get(`${BASE}/broken%zz.md`);
+
+      expect(res.status).toBe(400);
     });
   });
 

@@ -187,4 +187,47 @@ describe('parseMarkdownRequest', () => {
       );
     });
   });
+
+  describe('percent-encoded request paths are decoded before classification', () => {
+    // Express's req.path is NOT percent-decoded (a request for "/foo bar.md"
+    // arrives as "/foo%20bar.md"), while GROWI stores page paths decoded.
+    // The classifier must therefore return the DECODED page path so the
+    // resolver's exact-match DB lookup can succeed.
+    const cases: Case[] = [
+      {
+        name: 'percent-encoded space in a .md-suffixed path is decoded (still-suffixed form preserved)',
+        reqPath: '/foo/space%20page.md',
+        accept: undefined,
+        formatQuery: undefined,
+        expected: { kind: 'path', path: '/foo/space page.md', explicit: false },
+      },
+      {
+        name: 'percent-encoded non-ASCII (Japanese) .md-suffixed path is decoded',
+        reqPath: '/%E6%97%A5%E6%9C%AC%E8%AA%9E.md',
+        accept: undefined,
+        formatQuery: undefined,
+        expected: { kind: 'path', path: '/日本語.md', explicit: false },
+      },
+      {
+        name: 'percent-encoded plain path with explicit Accept is decoded',
+        reqPath: '/%E6%97%A5%E6%9C%AC%E8%AA%9E',
+        accept: 'text/markdown',
+        formatQuery: undefined,
+        expected: { kind: 'path', path: '/日本語', explicit: true },
+      },
+      {
+        name: 'malformed percent-escape falls back to the raw path instead of throwing',
+        reqPath: '/foo/broken%zz.md',
+        accept: undefined,
+        formatQuery: undefined,
+        expected: { kind: 'path', path: '/foo/broken%zz.md', explicit: false },
+      },
+    ];
+
+    it.each(cases)('$name', ({ reqPath, accept, formatQuery, expected }) => {
+      expect(parseMarkdownRequest(reqPath, accept, formatQuery)).toStrictEqual(
+        expected,
+      );
+    });
+  });
 });
