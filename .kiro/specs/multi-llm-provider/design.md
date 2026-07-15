@@ -110,7 +110,7 @@ graph TB
 ```
 apps/app/src/features/mastra/
 ├── interfaces/
-│   └── ai-provider.ts                         # AiProvider 型, AI_PROVIDERS, isAiProvider ガード
+│   └── ai-provider.ts                         # AI_PROVIDER_DEFS(源泉メタデータ), AiProvider 型, AI_PROVIDERS(導出), isAiProvider ガード
 └── server/services/
     ├── ai-sdk-modules/
     │   ├── llm-providers/
@@ -132,7 +132,7 @@ apps/app/src/features/mastra/
 - `apps/app/src/server/service/config-manager/config-definition.ts` — `CONFIG_KEYS` / `CONFIG_DEFINITIONS` に `ai:provider`（`AiProvider` 型・type-only import）/ `ai:apiKey`（secret）/ `ai:model` を追加し、未使用化した `openai:assistantModel:mastraAgent`（＋ `openai` 型 import）を削除（`ConfigKey`/`ConfigValues` は自動導出。`ENV_ONLY_GROUPS` には追加しない）。**Scope Expansion**: さらに Azure 固有の接続設定を単一のオブジェクトキー `ai:azureOpenaiSettings`（型 `AzureOpenaiConfig` = `{ resourceName?, baseURL?, apiVersion?, useEntraId? }`・JSON オブジェクト・default `{}`・env `AI_AZURE_OPENAI_SETTINGS`（JSON 文字列）・非 secret）として追加（4 つの論理設定を 1 つの JSON オブジェクト／単一 env にまとめて永続化）。
 - `apps/app/src/features/mastra/server/services/mastra-modules/agents/growi-agent.ts` — `getOpenaiProvider()(model)` を `model: () => resolveMastraModel()` の dynamic function へ置換。
 - `apps/app/src/features/mastra/server/routes/post-message.ts` — ハードコードの `providerOptions: { openai: {...} }` を `providerOptions: resolveProviderOptions()` に置換。
-- `apps/app/src/features/mastra/interfaces/ai-provider.ts` — **Scope Expansion**: `AI_PROVIDERS` に `'azure-openai'` を追加（型・ガードは自動拡張。識別子は既存 `openai:serviceType` の `'azure-openai'` と表記統一）。
+- `apps/app/src/features/mastra/interfaces/ai-provider.ts` — **Scope Expansion**: `'azure-openai'` をベンダー集合に追加（型・ガードは導出で自動拡張。識別子は既存 `openai:serviceType` の `'azure-openai'` と表記統一）。現行は `AI_PROVIDER_DEFS` のエントリ `'azure-openai': { enumerable: false }`（models.dev 非収録）として保持（ai-settings-model-picker）。
 - `apps/app/src/features/mastra/server/services/ai-sdk-modules/llm-providers/index.ts` — barrel。`modelResolvers: Record<AiProvider, () => MastraModelConfig>`（provider → 自己解決関数のマップ）を組み立てて export するのみ。
 - `apps/app/src/features/mastra/server/services/ai-sdk-modules/llm-providers/config.ts` — **新規**。共有アクセサ `requireApiKey()` / `getApiKey()` / `getModel()`（apiKey/model は全 provider 共通なのでここに集約）。
 - `apps/app/src/features/mastra/server/services/ai-sdk-modules/llm-providers/{openai,anthropic,google}.ts` — 各 `resolve<Provider>Model(): MastraModelConfig`（config を読み `create*({apiKey:requireApiKey()})(getModel())`）。
@@ -225,12 +225,21 @@ sequenceDiagram
 **Contracts**: State [x]
 
 ```typescript
-export const AI_PROVIDERS = ['openai', 'anthropic', 'google'] as const;
-export type AiProvider = (typeof AI_PROVIDERS)[number];
+export const AI_PROVIDER_DEFS = {
+  openai: { enumerable: true },
+  anthropic: { enumerable: true },
+  google: { enumerable: true },
+  'azure-openai': { enumerable: false },
+} as const satisfies Record<string, { readonly enumerable: boolean }>;
+
+export type AiProvider = keyof typeof AI_PROVIDER_DEFS;
+export const AI_PROVIDERS: readonly AiProvider[] = Object.keys(AI_PROVIDER_DEFS) as AiProvider[];
 
 export const isAiProvider = (value: unknown): value is AiProvider =>
   typeof value === 'string' && (AI_PROVIDERS as readonly string[]).includes(value);
 ```
+
+> 本実装に整合（ai-settings-model-picker）: 当初は基本設計として `['openai','anthropic','google'] as const` のフラット配列で定義し、azure-openai は本 spec の Scope Expansion で追加した。その後 `ai-settings-model-picker` が provider ごとの `enumerable` メタデータマップ `AI_PROVIDER_DEFS` を導入し、`AI_PROVIDERS`/`AiProvider` をそこから導出する形へリファインした（`enumerable` は models.dev 由来カタログの列挙可否＝`CATALOG_PROVIDERS` の単一ソース）。メンバー集合と `isAiProvider` の振る舞いは不変。
 
 **Implementation Notes**
 - Integration: `resolve-mastra-model` が参照。client からは import しない（server-only 利用）。

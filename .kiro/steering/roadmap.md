@@ -12,3 +12,19 @@
 |---|---|---|
 | [growi-vault](../specs/growi-vault/) | resilience / reconcile 完了、ha は brief 段階 | [.kiro/specs/growi-vault/roadmap.md](../specs/growi-vault/roadmap.md) |
 | [editor-commands](../specs/editor-commands/) | spec 整備中（slash-command は tasks 生成済み、extended-elements / selection-palette は WIP） | [.kiro/specs/editor-commands/roadmap.md](../specs/editor-commands/roadmap.md) |
+
+## Spec Family: activity log（監査ログ改善）
+
+activity log サブシステムを責務ごとに分割したファミリー。flagship の `activity-log` が「何を記録するか（記録ゲート）」と全体の関心マップを持つ。`activity-log`（≒監査ログ）という最も本流の名前は、最も基本的な概念である記録ゲートに充てている。
+
+分割の経緯: 旧 `activity-log` spec は snapshot を対象とした保守用 spec だった。名前と実体を一致させるため、その中身を `activity-log-snapshot` へ改名移設し、`activity-log` の名前を記録ゲート（flagship）に明け渡した。
+
+### Specs（依存順）
+
+- [x] `activity-log-snapshot` — snapshot の型付け＋添付削除ログ（REMOVE: PR #11393）＋添付系 action（ADD/DOWNLOAD）への capture 拡張（PR #11433）。旧 `activity-log` を改名。残: 配置リファクタ（タスク14: builder/recorder を `service/attachment/` へ移動・挙動不変。配置ポリシーは flagship の関心マップを参照）。依存: なし
+- [ ] `activity-log`（flagship / 記録ゲート） — 対象外 action を今後保存しない。直し方（defer-create / delete-at-settle）は design で比較。既存残骸の掃除は対象外。依存: なし（並行可）
+- [ ] `activity-log-snapshot-viewer` — 監査ログ画面での snapshot 表示（生表示＋添付系整形）。依存: `activity-log-snapshot`（capture 拡張は PR #11433 で完了済み → 着手可能）
+
+### 将来課題（未割当）
+
+`target × targetModel` の全面的型安全化 / 保持期間・TTL / 大量カスケード削除時のボリューム制御。整理先は flagship `activity-log` の関心マップ（`.kiro/specs/activity-log/brief.md`）で管理する。

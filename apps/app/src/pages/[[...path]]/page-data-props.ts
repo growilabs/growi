@@ -24,6 +24,8 @@ import type {
   PageRedirectModel,
 } from '~/server/models/page-redirect';
 import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
+import { toMarkdownAlternateLinkHeader } from '~/utils/page-markdown-alternate';
+import { toPermalinkMdUrl } from '~/utils/page-markdown-url';
 
 import type { CommonEachProps } from '../common-props';
 import type {
@@ -202,6 +204,27 @@ export async function getPageDataForInitial(
 
     // type assertion
     assert(isIPageInfo(meta), 'meta should be IPageInfo when data is not null');
+
+    // Requirement 6.2/6.3: advertise the Markdown alternate via the `Link`
+    // response header. Set it here, before the empty-page early return below,
+    // using the still-in-scope entity `_id`, so empty (container) pages,
+    // CSR-fallback pages (skipSSR), and normal pages all carry the pageId-form
+    // Link header. Append rather than overwrite to preserve any existing header.
+    const mdLinkHeader = toMarkdownAlternateLinkHeader(
+      toPermalinkMdUrl(page._id.toString()),
+    );
+    const existingLink = context.res.getHeader('Link');
+    context.res.setHeader(
+      'Link',
+      existingLink == null
+        ? mdLinkHeader
+        : [
+            ...(Array.isArray(existingLink)
+              ? existingLink
+              : [String(existingLink)]),
+            mdLinkHeader,
+          ],
+    );
 
     // Handle empty pages - return as not found to avoid serialization issues
     if (page.isEmpty) {
