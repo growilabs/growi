@@ -21,6 +21,11 @@ import {
   useSWRxSearch,
 } from '~/stores/search';
 
+import {
+  buildSearchQuery,
+  createEmptyFilterState,
+  parseSearchQuery,
+} from '../../utils/search-query';
 import { OperateAllControl } from './OperateAllControl';
 import SearchControl from './SearchControl';
 import type { IReturnSelectedPageIds } from './SearchPageBase';
@@ -106,7 +111,12 @@ export const SearchPage = (): JSX.Element => {
   const { t } = useTranslation();
   const showPageLimitationL = useAtomValue(showPageLimitationLAtom);
 
+  // The URL `?q=` is the single source of truth: it carries free text AND the
+  // inline filter operators. Parse it to hydrate the keyword box (free text only)
+  // and the filter chips/panel (structured filters) — see searchInvokedHandler
+  // for the reverse (serialize) direction.
   const keyword = useSearchKeyword();
+  const parsedQuery = useMemo(() => parseSearchQuery(keyword ?? ''), [keyword]);
   const setSearchKeyword = useSetSearchKeyword();
 
   const disableUserPages = useAtomValue(disableUserPagesAtom);
@@ -128,8 +138,11 @@ export const SearchPage = (): JSX.Element => {
     (ISelectableAll & IReturnSelectedPageIds) | null
   >(null);
 
+  // `keyword` already encodes the filter operators, so the structured `filters`
+  // must be empty here — passing both would serialize each operator twice.
   const { data, conditions, mutate } = useSWRxSearch(keyword ?? '', null, {
     ...configurationsByControl,
+    filters: createEmptyFilterState(),
     offset,
     limit,
   });
@@ -139,11 +152,19 @@ export const SearchPage = (): JSX.Element => {
       setOffset(0);
       setConfigurationsByControl(newConfigurations);
 
-      setSearchKeyword(newKeyword);
+      // Serialize free text + filters into the single `?q=` string. A new keyword
+      // is a fresh search (push, so back/forward steps through searches); a change
+      // to only filters/sort reuses the current entry (replace, no history spam).
+      const q = buildSearchQuery(
+        newKeyword,
+        newConfigurations.filters ?? createEmptyFilterState(),
+      );
+      const isNewKeyword = newKeyword.trim() !== parsedQuery.keyword;
+      setSearchKeyword(q, { replace: !isNewKeyword });
 
       mutate();
     },
-    [mutate, setSearchKeyword],
+    [mutate, setSearchKeyword, parsedQuery.keyword],
   );
 
   const selectAllCheckboxChangedHandler = useCallback((isChecked: boolean) => {
@@ -205,10 +226,12 @@ export const SearchPage = (): JSX.Element => {
 
   const initialSearchConditions: Partial<ISearchConditions> = useMemo(() => {
     return {
-      keyword,
+      // Box shows free text only; the panel/chips hydrate from the parsed filters.
+      keyword: parsedQuery.keyword,
+      filters: parsedQuery.filters,
       limit: INITIAL_PAGIONG_SIZE,
     };
-  }, [keyword]);
+  }, [parsedQuery]);
 
   // for bulk deletion
   const deleteAllButtonClickedHandler = usePageDeleteModalForBulkDeletion(
@@ -345,7 +368,7 @@ export const SearchPage = (): JSX.Element => {
       className={styles['search-page']}
       ref={searchPageBaseRef}
       pages={data?.data}
-      searchingKeyword={keyword}
+      searchingKeyword={parsedQuery.keyword}
       onSelectedPagesByCheckboxesChanged={
         selectedPagesByCheckboxesChangedHandler
       }

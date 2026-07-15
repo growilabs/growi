@@ -13,6 +13,7 @@ import type { ISearchConditions, ISearchConfigurations } from '~/stores/search';
 
 import {
   createEmptyFilterState,
+  isSameFilterState,
   type SearchFilterState,
 } from '../../utils/search-query';
 import { SearchFilterChips } from './SearchFilterChips';
@@ -147,6 +148,15 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
   useEffect(() => {
     setKeyword(keywordOnInit);
   }, [keywordOnInit]);
+
+  // Re-seed filters when the incoming URL-derived state changes (reload, back/
+  // forward, a hand-typed operator parsed into a chip). Guarded to the actual
+  // values so the new-object churn from our own onChange round-trip is a no-op.
+  const filtersOnInit = initialSearchConditions.filters;
+  useEffect(() => {
+    const next = filtersOnInit ?? createEmptyFilterState();
+    setFilters((prev) => (isSameFilterState(prev, next) ? prev : next));
+  }, [filtersOnInit]);
 
   return (
     <div className="shadow-sm">

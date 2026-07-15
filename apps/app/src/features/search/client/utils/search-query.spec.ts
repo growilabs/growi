@@ -2,6 +2,7 @@ import {
   buildSearchQuery,
   createEmptyFilterState,
   isFilterStateEmpty,
+  isSameFilterState,
   parseSearchQuery,
   type SearchFilterState,
 } from './search-query';
@@ -202,5 +203,30 @@ describe('isFilterStateEmpty', () => {
     expect(isFilterStateEmpty(filterState({ authors: ['alice'] }))).toBe(false);
     expect(isFilterStateEmpty(filterState({ editors: ['bob'] }))).toBe(false);
     expect(isFilterStateEmpty(filterState({ groups: ['Docs'] }))).toBe(false);
+  });
+});
+
+describe('isSameFilterState', () => {
+  it('is true for equal values across all fields', () => {
+    const a = filterState({ authors: ['alice'], tags: ['wiki', 'docs'] });
+    const b = filterState({ authors: ['alice'], tags: ['wiki', 'docs'] });
+    // Different object identities, same values — the round-trip re-seed case.
+    expect(isSameFilterState(a, b)).toBe(true);
+  });
+
+  it('is false when a value differs, is added, or is reordered', () => {
+    const base = filterState({ tags: ['wiki', 'docs'] });
+    expect(isSameFilterState(base, filterState({ tags: ['wiki'] }))).toBe(
+      false,
+    );
+    expect(
+      isSameFilterState(base, filterState({ tags: ['docs', 'wiki'] })),
+    ).toBe(false);
+    expect(
+      isSameFilterState(
+        base,
+        filterState({ tags: ['wiki', 'docs'], authors: ['a'] }),
+      ),
+    ).toBe(false);
   });
 });

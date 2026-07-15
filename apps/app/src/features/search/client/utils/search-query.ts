@@ -72,6 +72,28 @@ export const isFilterStateEmpty = (filters: SearchFilterState): boolean =>
   filters.groups.length === 0 &&
   filters.tags.length === 0;
 
+/**
+ * Order-sensitive value equality across all fields. Used to decide whether an
+ * incoming (e.g. URL-derived) filter state actually differs from the current one,
+ * so a re-seed can no-op instead of clobbering identical state on every render.
+ */
+export const isSameFilterState = (
+  a: SearchFilterState,
+  b: SearchFilterState,
+): boolean => {
+  const fields: (keyof SearchFilterState)[] = [
+    'authors',
+    'editors',
+    'groups',
+    'tags',
+  ];
+  return fields.every(
+    (field) =>
+      a[field].length === b[field].length &&
+      a[field].every((value, i) => value === b[field][i]),
+  );
+};
+
 const normalizeKeyword = (keyword: string): string =>
   keyword.trim().replace(/\s+/g, ' ');
 
