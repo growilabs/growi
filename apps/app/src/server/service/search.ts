@@ -417,7 +417,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     user,
     userGroups,
     searchOpts,
-  ): Promise<[ISearchResult<unknown>, string | null]> {
+  ): Promise<[ISearchResult<unknown>, SearchDelegatorName | null]> {
     let parsedQuery: ParsedQuery;
     // parse
     try {
@@ -524,7 +524,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
   // So far, it determines by delegatorName passed by searchService.searchKeyword
   checkIsFormattable(
     searchResult,
-    delegatorName: SearchDelegatorName,
+    delegatorName: SearchDelegatorName | null,
   ): boolean {
     return delegatorName === SearchDelegatorName.DEFAULT;
   }
@@ -534,7 +534,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
    */
   async formatSearchResult(
     searchResult: ISearchResult<any>,
-    delegatorName: SearchDelegatorName,
+    delegatorName: SearchDelegatorName | null,
     user,
     userGroups,
   ): Promise<IFormattedSearchResult> {
