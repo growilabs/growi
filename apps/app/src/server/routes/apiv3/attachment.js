@@ -5,7 +5,7 @@ import express from 'express';
 import multer from 'multer';
 import autoReap from 'multer-autoreap';
 
-import { SupportedAction } from '~/interfaces/activity';
+import { MODEL_ATTACHMENT, SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
@@ -14,6 +14,7 @@ import {
   serializePageSecurely,
   serializeRevisionSecurely,
 } from '~/server/models/serializers';
+import { buildAttachmentSnapshot } from '~/server/service/attachment/attachment-snapshot';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
@@ -418,8 +419,27 @@ export const setup = (crowi) => {
           attachment: attachment.toObject({ virtuals: true }),
         };
 
+        // The page is already loaded in this route; pass page.path directly
+        // instead of re-fetching it (requirement 6.1, no extra page lookup).
+        const snapshot = buildAttachmentSnapshot(
+          {
+            _id: attachment._id.toString(),
+            originalName: attachment.originalName,
+            fileSize: attachment.fileSize,
+            // the Mongoose attachment holds the page reference as `page` (ObjectId);
+            // the builder expects it as `pageId` (see AttachmentLike NOTE)
+            pageId:
+              attachment.page != null ? attachment.page.toString() : undefined,
+          },
+          page.path,
+          req.user.username,
+        );
+
         activityEvent.emit('update', res.locals.activity._id, {
           action: SupportedAction.ACTION_ATTACHMENT_ADD,
+          target: attachment._id,
+          targetModel: MODEL_ATTACHMENT,
+          snapshot,
         });
 
         res.apiv3(result);

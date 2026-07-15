@@ -3,7 +3,7 @@ import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
-import { MAX_MODEL_ID_LENGTH } from '~/features/mastra/interfaces/allowed-model';
+import { MAX_MODEL_KEY_LENGTH } from '~/features/mastra/interfaces/model-key';
 import { AllSidebarContentsType } from '~/interfaces/ui';
 import loggerFactory from '~/utils/logger';
 
@@ -28,11 +28,11 @@ export const validatorForPutUserUISettings = [
   body('settings.preferCollapsedModeByUser').optional().isBoolean(),
   // Defensive length cap: the stored selection is never trusted (get-models rounds it
   // against the allow-list), so the only risk of an unbounded value is document bloat
-  // in UserUISettings. Real model ids are far shorter (MAX_MODEL_ID_LENGTH).
-  body('settings.aiChatSelectedModelId')
+  // in UserUISettings. Real modelKeys are far shorter (MAX_MODEL_KEY_LENGTH).
+  body('settings.aiChatSelectedModelKey')
     .optional()
     .isString()
-    .isLength({ max: MAX_MODEL_ID_LENGTH }),
+    .isLength({ max: MAX_MODEL_KEY_LENGTH }),
 ];
 
 export const setup = (): Router => {
@@ -62,7 +62,7 @@ export const setup = (): Router => {
    *                     type: number
    *                   preferCollapsedModeByUser:
    *                     type: boolean
-   *                   aiChatSelectedModelId:
+   *                   aiChatSelectedModelKey:
    *                     type: string
    *     responses:
    *       200:
@@ -82,7 +82,7 @@ export const setup = (): Router => {
    *                   type: string
    *                 preferCollapsedModeByUser:
    *                   type: boolean
-   *                 aiChatSelectedModelId:
+   *                 aiChatSelectedModelKey:
    *                   type: string
    */
   router.put(
@@ -98,7 +98,7 @@ export const setup = (): Router => {
         currentSidebarContents: settings.currentSidebarContents,
         currentProductNavWidth: settings.currentProductNavWidth,
         preferCollapsedModeByUser: settings.preferCollapsedModeByUser,
-        aiChatSelectedModelId: settings.aiChatSelectedModelId,
+        aiChatSelectedModelKey: settings.aiChatSelectedModelKey,
       };
 
       if (user == null) {

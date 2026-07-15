@@ -3,9 +3,10 @@
 import type { JSX, ReactNode } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { FormProvider, useForm } from 'react-hook-form';
+import { FormProvider, useForm, useWatch } from 'react-hook-form';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { mock } from 'vitest-mock-extended';
+
+import type { AiProvider } from '../../interfaces/ai-provider';
 
 vi.mock('next-i18next', () => ({
   useTranslation: () => ({
@@ -18,32 +19,20 @@ vi.mock('./use-selectable-models', () => ({
   useSWRxSelectableModels: vi.fn(),
 }));
 
-// The manual catalog-refresh button POSTs via apiv3Post and reports via toasts;
-// both are mocked so the suite stays network-free and can assert the calls.
-vi.mock('~/client/util/apiv3-client', () => ({ apiv3Post: vi.fn() }));
-vi.mock('~/client/util/toastr', () => ({
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
-}));
-
-import { apiv3Post } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-
 import type { SelectableModelsResponse } from '../../interfaces/selectable-models-response';
 import { AllowedModelsField } from './AllowedModelsField';
-import type { AiSettingsFormValues } from './ai-settings-form-values';
+import type {
+  AiSettingsFormValues,
+  AllowedModelFormValue,
+} from './ai-settings-form-values';
 import { useSWRxSelectableModels } from './use-selectable-models';
 
 const mockedUseSelectableModels = vi.mocked(useSWRxSelectableModels);
-const mockedApiv3Post = vi.mocked(apiv3Post);
 
-// Build a minimal hook result for the mock. Only `data`/`error` and the
-// `invalidateAllProviders` util are read by the component; the rest of the
-// SWRResponse surface is filled with inert stubs so the returned value is a
-// real hook result (no type assertion needed). The cache-wide breadth of
-// `invalidateAllProviders` itself is the hook's contract, covered in
-// use-selectable-models.spec.ts — here tests only assert the refresh flow
-// calls it.
+// Build a minimal hook result for the mock. Only `data`/`error` are read by the
+// component; the rest of the SWRResponse surface (including the now-global
+// `invalidateAllProviders` util) is filled with inert stubs so the returned value
+// is a real hook result (no type assertion needed).
 const swrResponse = (partial: {
   data?: SelectableModelsResponse;
   error?: Error;
@@ -56,70 +45,126 @@ const swrResponse = (partial: {
   invalidateAllProviders: vi.fn(),
 });
 
-const defaultFormValues: AiSettingsFormValues = {
-  aiEnabled: true,
-  provider: 'openai',
-  apiKey: '',
-  allowedModels: [
-    { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-  ],
-  azureOpenaiSettings: {
-    resourceName: '',
-    baseURL: '',
-    apiVersion: '',
-    useEntraId: false,
+// A multi-provider fixture whose FILTERED (display) index differs from the
+// GLOBAL (original) index for the openai rows: anthropic sits at global index 0
+// and is the default, openai owns global indexes 1 and 2, azure owns global
+// index 3. A filtered-index bug (operating on the display position rather than
+// the original position) would therefore hit the WRONG global row — every
+// cross-provider isolation test below relies on this offset to expose it.
+const multiProviderModels: AllowedModelFormValue[] = [
+  {
+    provider: 'anthropic',
+    modelId: 'claude-sonnet-5',
+    providerOptionsText: '',
+    isDefault: true,
   },
+  {
+    provider: 'openai',
+    modelId: 'gpt-4o',
+    providerOptionsText: '',
+    isDefault: false,
+  },
+  {
+    provider: 'openai',
+    modelId: 'gpt-4o-mini',
+    providerOptionsText: '',
+    isDefault: false,
+  },
+  {
+    provider: 'azure-openai',
+    modelId: 'my-deployment',
+    providerOptionsText: '',
+    isDefault: false,
+  },
+];
+
+/**
+ * Read-only probe rendered alongside the component: it mirrors the WHOLE flat
+ * `allowedModels` array (all providers) into the DOM so a test can assert the
+ * global form state after an operation — including rows the panel does not even
+ * render. This is how the cross-provider isolation tests observe that an op in
+ * the openai panel left the anthropic/azure rows intact.
+ */
+const AllowedModelsProbe = (): JSX.Element => {
+  const models =
+    useWatch<AiSettingsFormValues, 'allowedModels'>({
+      name: 'allowedModels',
+    }) ?? [];
+  return (
+    <ul data-testid="probe">
+      {models.map((m, index) => (
+        <li
+          // biome-ignore lint/suspicious/noArrayIndexKey: passive mirror; rows may transiently share (provider, modelId) (the duplicate test), so the index is the only collision-free key. Identity is read from data-* attrs, never the key.
+          key={index}
+          data-testid="probe-row"
+          data-provider={m.provider}
+          data-modelid={m.modelId}
+          data-default={String(m.isDefault === true)}
+          data-displayname={m.displayName ?? ''}
+          data-provideroptions={m.providerOptionsText}
+        />
+      ))}
+    </ul>
+  );
 };
 
 const FormHarness = ({
-  defaultValues,
+  allowedModels,
   children,
 }: {
-  defaultValues?: Partial<AiSettingsFormValues>;
+  allowedModels: AllowedModelFormValue[];
   children: ReactNode;
 }): JSX.Element => {
-  // Mirror the container's `onChange` validation mode so the providerOptions
-  // JSON error surfaces as the field changes (matching production behavior).
+  // `onChange` mode so the providerOptions JSON error surfaces as the field
+  // changes (matching production behavior).
   const methods = useForm<AiSettingsFormValues>({
     mode: 'onChange',
-    defaultValues: { ...defaultFormValues, ...defaultValues },
+    defaultValues: { allowedModels },
   });
   return <FormProvider {...methods}>{children}</FormProvider>;
 };
 
 const renderComponent = ({
-  disabled = false,
-  defaultValues,
+  provider = 'openai',
+  allowedModels = [
+    {
+      provider: 'openai',
+      modelId: 'gpt-4o',
+      providerOptionsText: '',
+      isDefault: true,
+    },
+  ],
 }: {
-  disabled?: boolean;
-  defaultValues?: Partial<AiSettingsFormValues>;
+  provider?: AiProvider;
+  allowedModels?: AllowedModelFormValue[];
 } = {}) =>
   render(
-    <FormHarness defaultValues={defaultValues}>
-      <AllowedModelsField disabled={disabled} />
+    <FormHarness allowedModels={allowedModels}>
+      <AllowedModelsField provider={provider} />
+      <AllowedModelsProbe />
     </FormHarness>,
   );
 
-// Each card exposes its model-id text input via the model label; counting them
-// is the observable proxy for "how many cards are rendered".
+// Each rendered card exposes its model-id text input via the model label (Azure
+// uses its own label); counting them is the observable proxy for "how many cards
+// are rendered".
 const getModelInputs = (): HTMLInputElement[] =>
   screen
     .getAllByLabelText('ai_settings.model_label')
     .filter((el): el is HTMLInputElement => el instanceof HTMLInputElement);
 
-// In select mode the model control is a <select> (HTMLSelectElement), so it does
-// not match getModelInputs()'s HTMLInputElement filter — count/read it here.
 const getModelSelects = (): HTMLSelectElement[] =>
   screen
     .getAllByLabelText('ai_settings.model_label')
     .filter((el): el is HTMLSelectElement => el instanceof HTMLSelectElement);
 
-// The "set as default" radios (one per card). Narrow via a type guard — not an
-// `as` cast — so reading `.checked` stays type-safe.
-const getDefaultRadios = (): HTMLInputElement[] =>
+// The set-as-default control is an inline button on EVERY displayed row (kept
+// mounted for layout stability); on the default row it is disabled and the
+// badge conveys the state. Indexes therefore follow the display row order.
+const getSetDefaultButtons = (): HTMLButtonElement[] =>
   screen
-    .getAllByRole('radio')
-    .filter((el): el is HTMLInputElement => el instanceof HTMLInputElement);
+    .queryAllByRole('button', { name: 'ai_settings.set_as_default' })
+    .filter((el): el is HTMLButtonElement => el instanceof HTMLButtonElement);
 
 const getProviderOptionsTextareas = (): HTMLTextAreaElement[] =>
   screen
@@ -128,8 +173,13 @@ const getProviderOptionsTextareas = (): HTMLTextAreaElement[] =>
       (el): el is HTMLTextAreaElement => el instanceof HTMLTextAreaElement,
     );
 
-// Removal is immediate (no confirmation dialog): the change only persists on
-// save, so the trash icon removes the card from the list directly.
+const getRenderedRows = (): HTMLElement[] =>
+  screen.queryAllByTestId('allowed-model-row');
+
+// Removing a FILLED row opens a confirmation modal first (the change only
+// persists on save, but a filled row may carry hand-written providerOptions
+// JSON); a still-blank row is removed immediately. This helper confirms the
+// modal when it appears, so callers express "remove row N" either way.
 const removeAt = async (
   user: ReturnType<typeof userEvent.setup>,
   index: number,
@@ -138,161 +188,541 @@ const removeAt = async (
     name: 'ai_settings.remove_model',
   });
   await user.click(trashButtons[index]);
+  const confirmButton = screen.queryByRole('button', {
+    name: 'ai_settings.remove_model_confirm',
+  });
+  if (confirmButton != null) {
+    await user.click(confirmButton);
+  }
 };
+
+// Probe readers over the GLOBAL array (all providers).
+const getProbeRows = (): HTMLElement[] => screen.queryAllByTestId('probe-row');
+const findProbeRow = (
+  provider: string,
+  modelId: string,
+): HTMLElement | undefined =>
+  getProbeRows().find(
+    (el) =>
+      el.getAttribute('data-provider') === provider &&
+      el.getAttribute('data-modelid') === modelId,
+  );
+const isRowDefault = (provider: string, modelId: string): boolean =>
+  findProbeRow(provider, modelId)?.getAttribute('data-default') === 'true';
+const countGlobalDefaults = (): number =>
+  getProbeRows().filter((el) => el.getAttribute('data-default') === 'true')
+    .length;
 
 describe('AllowedModelsField', () => {
   // Default the hook to a free-text-inducing state (fetch failure) so the modelId
-  // control stays a text input for the provider-agnostic behavior suites below
-  // (add/remove, default radio, providerOptions, env-only). The select-mode suites
-  // override this per test. This keeps `getModelInputs()` (HTMLInputElement filter)
-  // matching the model control in every pre-existing test.
+  // control stays a text input for the provider-agnostic behavior suites below.
+  // The select-mode suites override this per test.
   beforeEach(() => {
+    vi.clearAllMocks();
     mockedUseSelectableModels.mockReturnValue(
       swrResponse({ error: new Error('default: force free-text') }),
     );
   });
 
-  describe('add / remove cards', () => {
-    it('adds a new card when the add button is clicked', async () => {
-      // Arrange
-      const user = userEvent.setup();
+  describe('provider-scoped display (2.2)', () => {
+    it('renders ONLY the rows owned by the panel provider, not other providers', () => {
+      // Act: an openai panel over a multi-provider list.
       renderComponent({
-        defaultValues: {
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-          ],
-        },
+        provider: 'openai',
+        allowedModels: multiProviderModels,
       });
-      expect(getModelInputs()).toHaveLength(1);
 
-      // Act
-      await user.click(
-        screen.getByRole('button', { name: 'ai_settings.add_model' }),
-      );
-
-      // Assert
-      expect(getModelInputs()).toHaveLength(2);
+      // Assert: exactly the two openai rows are rendered; the anthropic and azure
+      // rows exist in the global form (the probe sees all four) but are NOT shown
+      // in this panel.
+      expect(getRenderedRows()).toHaveLength(2);
+      expect(getModelInputs().map((i) => i.value)).toEqual([
+        'gpt-4o',
+        'gpt-4o-mini',
+      ]);
+      expect(getProbeRows()).toHaveLength(4);
+      expect(screen.queryByDisplayValue('claude-sonnet-5')).toBeNull();
+      expect(screen.queryByDisplayValue('my-deployment')).toBeNull();
     });
 
-    it('seeds a newly added card with the current provider namespace', async () => {
-      // Arrange: provider is openai.
-      const user = userEvent.setup();
-      renderComponent({ defaultValues: { provider: 'anthropic' } });
-
+    it('renders ONLY the anthropic row for an anthropic panel', () => {
       // Act
-      await user.click(
-        screen.getByRole('button', { name: 'ai_settings.add_model' }),
-      );
-
-      // Assert: the new card's providerOptions starts from the provider's empty
-      // namespace (anthropic here), not a hard-coded openai example.
-      const textareas = getProviderOptionsTextareas();
-      expect(JSON.parse(textareas[1].value)).toEqual({ anthropic: {} });
-    });
-
-    it('removes a card when its trash icon is clicked', async () => {
-      // Arrange
-      const user = userEvent.setup();
       renderComponent({
-        defaultValues: {
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-            {
-              modelId: 'gpt-4o-mini',
-              providerOptionsText: '',
-              isDefault: false,
-            },
-          ],
-        },
+        provider: 'anthropic',
+        allowedModels: multiProviderModels,
       });
-      expect(getModelInputs()).toHaveLength(2);
 
-      // Act: remove the second card (no confirmation dialog — persists on save).
-      await removeAt(user, 1);
-
-      // Assert
-      const inputs = getModelInputs();
-      expect(inputs).toHaveLength(1);
-      expect(inputs[0].value).toBe('gpt-4o');
+      // Assert: one row, the anthropic one.
+      expect(getRenderedRows()).toHaveLength(1);
+      expect(getModelInputs().map((i) => i.value)).toEqual(['claude-sonnet-5']);
     });
   });
 
-  describe('default selection (single-select)', () => {
-    it('checks exactly one card by default and unchecks the previous when another is selected', async () => {
+  describe('cross-provider isolation via original-index mapping (load-bearing)', () => {
+    it('removing an openai row leaves every anthropic/azure row untouched', async () => {
+      // Arrange: gpt-4o is NOT the default (anthropic is), so this is a pure
+      // isolation check with no default reassignment.
+      const user = userEvent.setup();
+      renderComponent({
+        provider: 'openai',
+        allowedModels: multiProviderModels,
+      });
+
+      // Act: remove the FIRST displayed openai row (display index 0 → global
+      // index 1). A filtered-index bug would remove global index 0 (anthropic).
+      await removeAt(user, 0);
+
+      // Assert: gpt-4o is gone; the sibling openai row and BOTH other-provider
+      // rows survive with their values (and the anthropic default) intact.
+      expect(findProbeRow('openai', 'gpt-4o')).toBeUndefined();
+      expect(findProbeRow('openai', 'gpt-4o-mini')).toBeDefined();
+      expect(findProbeRow('anthropic', 'claude-sonnet-5')).toBeDefined();
+      expect(findProbeRow('azure-openai', 'my-deployment')).toBeDefined();
+      expect(isRowDefault('anthropic', 'claude-sonnet-5')).toBe(true);
+    });
+
+    it('editing an openai row modelId does not overwrite any other-provider row', async () => {
       // Arrange
       const user = userEvent.setup();
       renderComponent({
-        defaultValues: {
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-            {
-              modelId: 'gpt-4o-mini',
-              providerOptionsText: '',
-              isDefault: false,
-            },
-          ],
-        },
+        provider: 'openai',
+        allowedModels: multiProviderModels,
       });
 
-      const radios = getDefaultRadios();
-      expect(radios[0].checked).toBe(true);
-      expect(radios[1].checked).toBe(false);
+      // Act: edit the FIRST displayed openai row (display index 0 → global index
+      // 1). A filtered-index register path would write to global index 0
+      // (anthropic) instead.
+      const firstOpenaiInput = getModelInputs()[0];
+      await user.clear(firstOpenaiInput);
+      await user.type(firstOpenaiInput, 'gpt-4o-edited');
 
-      // Act: choose card B as the default.
-      await user.click(radios[1]);
+      // Assert: the openai row took the edit; the anthropic/azure rows still read
+      // their original ids (they were not the register target).
+      expect(findProbeRow('openai', 'gpt-4o-edited')).toBeDefined();
+      expect(findProbeRow('openai', 'gpt-4o')).toBeUndefined();
+      expect(findProbeRow('anthropic', 'claude-sonnet-5')).toBeDefined();
+      expect(findProbeRow('anthropic', 'gpt-4o-edited')).toBeUndefined();
+      expect(findProbeRow('azure-openai', 'my-deployment')).toBeDefined();
+    });
 
-      // Assert: selecting B unsets A — exactly one default at all times.
-      expect(radios[0].checked).toBe(false);
-      expect(radios[1].checked).toBe(true);
+    it('starring an openai row makes exactly that row the single global default, clearing all others across providers', async () => {
+      // Arrange
+      const user = userEvent.setup();
+      renderComponent({
+        provider: 'openai',
+        allowedModels: multiProviderModels,
+      });
+
+      // Act: promote the SECOND displayed openai row (display index 1 → global
+      // index 2 = gpt-4o-mini). Neither openai row is the default, so both offer
+      // the set-as-default action. A filtered-index bug would set the default at
+      // global index 1 (gpt-4o) instead.
+      await user.click(getSetDefaultButtons()[1]);
+
+      // Assert: gpt-4o-mini is the only default; the previous default (anthropic),
+      // the sibling openai row, and azure are all cleared — exactly one default.
+      expect(isRowDefault('openai', 'gpt-4o-mini')).toBe(true);
+      expect(isRowDefault('openai', 'gpt-4o')).toBe(false);
+      expect(isRowDefault('anthropic', 'claude-sonnet-5')).toBe(false);
+      expect(isRowDefault('azure-openai', 'my-deployment')).toBe(false);
+      expect(countGlobalDefaults()).toBe(1);
+    });
+  });
+
+  describe('add (2.2)', () => {
+    it('appends a row owning the panel provider, seeded with that provider namespace', async () => {
+      // Arrange: an openai panel with one existing openai row.
+      const user = userEvent.setup();
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      });
+      expect(getRenderedRows()).toHaveLength(1);
+
+      // Act
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.add_model' }),
+      );
+
+      // Assert: a second openai row appears, owning `provider: 'openai'` and
+      // pre-seeded with the openai providerOptions namespace.
+      expect(getRenderedRows()).toHaveLength(2);
+      const newRow = findProbeRow('openai', '');
+      expect(newRow).toBeDefined();
+      expect(
+        JSON.parse(newRow?.getAttribute('data-provideroptions') ?? '{}'),
+      ).toEqual({ openai: {} });
+    });
+
+    it('adds an anthropic-owned row seeded with the anthropic namespace for an anthropic panel', async () => {
+      // Arrange
+      const user = userEvent.setup();
+      renderComponent({ provider: 'anthropic', allowedModels: [] });
+
+      // Act
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.add_model' }),
+      );
+
+      // Assert: the seeded namespace follows the PANEL provider, not a hard-coded
+      // openai example.
+      const textareas = getProviderOptionsTextareas();
+      expect(JSON.parse(textareas[0].value)).toEqual({ anthropic: {} });
+      expect(findProbeRow('anthropic', '')).toBeDefined();
+    });
+
+    it('marks the first model added to an EMPTY global list as the default (3.1/3.3)', async () => {
+      // Arrange: no models at all.
+      const user = userEvent.setup();
+      renderComponent({ provider: 'openai', allowedModels: [] });
+
+      // Act
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.add_model' }),
+      );
+
+      // Assert: the sole row is the default so the single-default invariant holds
+      // from the first add.
+      expect(countGlobalDefaults()).toBe(1);
+      expect(isRowDefault('openai', '')).toBe(true);
+    });
+
+    it('does NOT auto-default a row added while the global list is already non-empty', async () => {
+      // Arrange: another provider already owns the default.
+      const user = userEvent.setup();
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'anthropic',
+            modelId: 'claude-sonnet-5',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      });
+
+      // Act: add an openai row.
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.add_model' }),
+      );
+
+      // Assert: the existing anthropic default is preserved; the new row is not
+      // the default (still exactly one default globally).
+      expect(isRowDefault('anthropic', 'claude-sonnet-5')).toBe(true);
+      expect(isRowDefault('openai', '')).toBe(false);
+      expect(countGlobalDefaults()).toBe(1);
+    });
+  });
+
+  describe('default selection via shared helper (3.1)', () => {
+    it('disables the set-as-default action on the default card only and moves the single default when picked', async () => {
+      // Arrange: two openai rows, first is default.
+      const user = userEvent.setup();
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o-mini',
+            providerOptionsText: '',
+            isDefault: false,
+          },
+        ],
+      });
+      // Both rows keep the action mounted; only the default row's is disabled.
+      expect(isRowDefault('openai', 'gpt-4o')).toBe(true);
+      expect(getSetDefaultButtons()).toHaveLength(2);
+      expect(getSetDefaultButtons()[0]).toBeDisabled();
+      expect(getSetDefaultButtons()[1]).toBeEnabled();
+
+      // Act: promote the non-default row via its inline action.
+      await user.click(getSetDefaultButtons()[1]);
+
+      // Assert: exactly one default, now the second row — and the disabled
+      // state swapped rows (re-query: the switch rewrites the whole array and
+      // re-renders, staling prior references).
+      expect(isRowDefault('openai', 'gpt-4o-mini')).toBe(true);
+      expect(isRowDefault('openai', 'gpt-4o')).toBe(false);
+      expect(countGlobalDefaults()).toBe(1);
+      expect(getSetDefaultButtons()[0]).toBeEnabled();
+      expect(getSetDefaultButtons()[1]).toBeDisabled();
     });
 
     it('marks only the default card with the "default" badge', () => {
       // Arrange / Act
       renderComponent({
-        defaultValues: {
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-            {
-              modelId: 'gpt-4o-mini',
-              providerOptionsText: '',
-              isDefault: false,
-            },
-          ],
-        },
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o-mini',
+            providerOptionsText: '',
+            isDefault: false,
+          },
+        ],
       });
 
-      // Assert: exactly one default badge across the two cards.
+      // Assert
       expect(screen.getAllByText('ai_settings.default_badge')).toHaveLength(1);
-    });
-
-    it('re-assigns the default to the first remaining card when the default card is removed', async () => {
-      // Arrange: the default is the first card.
-      const user = userEvent.setup();
-      renderComponent({
-        defaultValues: {
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-            {
-              modelId: 'gpt-4o-mini',
-              providerOptionsText: '',
-              isDefault: false,
-            },
-          ],
-        },
-      });
-
-      // Act: remove the default (first) card.
-      await removeAt(user, 0);
-
-      // Assert: the now-first (formerly second) card becomes the default.
-      const radios = getDefaultRadios();
-      expect(radios).toHaveLength(1);
-      expect(radios[0].checked).toBe(true);
-      expect(getModelInputs()[0].value).toBe('gpt-4o-mini');
     });
   });
 
-  describe('providerOptions JSON validation', () => {
+  describe('default-row delete reassignment (3.1/3.3)', () => {
+    it('reassigns the default to the first remaining GLOBAL row (even another provider) when the default row is deleted', async () => {
+      // Arrange: anthropic sits at global index 0 (NOT default); the openai row
+      // is the default. Deleting it must move the default to global index 0 —
+      // which belongs to a DIFFERENT provider (the default is global).
+      const user = userEvent.setup();
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'anthropic',
+            modelId: 'claude-sonnet-5',
+            providerOptionsText: '',
+            isDefault: false,
+          },
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      });
+
+      // Act: delete the sole (default) openai row from this panel.
+      await removeAt(user, 0);
+
+      // Assert: the openai row is gone; the anthropic row (global index 0) is now
+      // the default — still exactly one default overall.
+      expect(findProbeRow('openai', 'gpt-4o')).toBeUndefined();
+      expect(isRowDefault('anthropic', 'claude-sonnet-5')).toBe(true);
+      expect(countGlobalDefaults()).toBe(1);
+    });
+
+    it('leaves NO default when the last remaining row is deleted', async () => {
+      // Arrange: a single (default) openai row.
+      const user = userEvent.setup();
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      });
+
+      // Act: delete it — the global list becomes empty.
+      await removeAt(user, 0);
+
+      // Assert: no rows, no default (empty list is a valid state — 3.3).
+      expect(getRenderedRows()).toHaveLength(0);
+      expect(getProbeRows()).toHaveLength(0);
+      expect(countGlobalDefaults()).toBe(0);
+    });
+
+    it('does NOT reassign the default when a non-default row is deleted', async () => {
+      // Arrange: two openai rows, the SECOND is the default.
+      const user = userEvent.setup();
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: false,
+          },
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o-mini',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      });
+
+      // Act: remove the first (non-default) row.
+      await removeAt(user, 0);
+
+      // Assert: the default stays on gpt-4o-mini (not shifted to the new first row).
+      expect(isRowDefault('openai', 'gpt-4o-mini')).toBe(true);
+      expect(countGlobalDefaults()).toBe(1);
+    });
+  });
+
+  describe('remove confirmation', () => {
+    it('asks for confirmation before removing a filled row, and keeps the row when cancelled', async () => {
+      // Arrange
+      const user = userEvent.setup();
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      });
+
+      // Act: click the trash icon, then CANCEL in the confirmation modal.
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.remove_model' }),
+      );
+      expect(
+        screen.getByRole('button', {
+          name: 'ai_settings.remove_model_confirm',
+        }),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      // Assert: nothing was removed.
+      expect(findProbeRow('openai', 'gpt-4o')).toBeDefined();
+      expect(getRenderedRows()).toHaveLength(1);
+    });
+
+    it('removes a still-blank row immediately, without a confirmation modal', async () => {
+      // Arrange: add a fresh (blank) row.
+      const user = userEvent.setup();
+      renderComponent({ provider: 'openai', allowedModels: [] });
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.add_model' }),
+      );
+      expect(getRenderedRows()).toHaveLength(1);
+
+      // Act: delete it via the trash icon alone.
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.remove_model' }),
+      );
+
+      // Assert: the row is gone and no confirmation was shown.
+      expect(getRenderedRows()).toHaveLength(0);
+      expect(
+        screen.queryByRole('button', {
+          name: 'ai_settings.remove_model_confirm',
+        }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('same-provider duplicate error (2.4)', () => {
+    it('shows a row error when two rows of the SAME provider share a modelId', () => {
+      // Arrange / Act: two openai rows both "gpt-4o".
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: false,
+          },
+        ],
+      });
+
+      // Assert: the duplicate error is surfaced (one per offending row).
+      expect(
+        screen.getAllByText('ai_settings.model_duplicate_error'),
+      ).toHaveLength(2);
+    });
+
+    it('does NOT flag the same modelId under DIFFERENT providers (2.3)', () => {
+      // Arrange / Act: openai and anthropic both own "gpt-4o" — allowed to
+      // co-exist. The openai panel shows only the openai row, which is unique
+      // within its provider.
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+          {
+            provider: 'anthropic',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: false,
+          },
+        ],
+      });
+
+      // Assert: no duplicate error.
+      expect(
+        screen.queryByText('ai_settings.model_duplicate_error'),
+      ).toBeNull();
+    });
+
+    it('surfaces the duplicate error live as a second row is typed into a colliding id', async () => {
+      // Arrange: two openai rows; the second is empty (no collision yet).
+      const user = userEvent.setup();
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+          {
+            provider: 'openai',
+            modelId: '',
+            providerOptionsText: '',
+            isDefault: false,
+          },
+        ],
+      });
+      expect(
+        screen.queryByText('ai_settings.model_duplicate_error'),
+      ).toBeNull();
+
+      // Act: type the same id into the second row.
+      await user.type(getModelInputs()[1], 'gpt-4o');
+
+      // Assert: the collision is now flagged.
+      await waitFor(() => {
+        expect(
+          screen.getAllByText('ai_settings.model_duplicate_error').length,
+        ).toBeGreaterThanOrEqual(1);
+      });
+    });
+  });
+
+  describe('providerOptions JSON validation (2.8)', () => {
     it('shows an inline error for invalid, non-empty JSON', async () => {
       // Arrange
       const user = userEvent.setup();
@@ -310,65 +740,21 @@ describe('AllowedModelsField', () => {
       ).toBeInTheDocument();
     });
 
-    it('shows no error for a provider-namespaced object', async () => {
-      // Arrange
-      const user = userEvent.setup();
-      renderComponent();
-      const textarea = screen.getByLabelText(
-        'ai_settings.provider_options_label',
-      );
-
-      // Act: types `{"openai":{"temperature":0.7}}`.
-      await user.type(textarea, '{{"openai":{{"temperature":0.7}}');
-
-      // Assert: a valid value is accepted silently (no error indicator).
-      expect(
-        screen.queryByText('ai_settings.provider_options_invalid_json'),
-      ).not.toBeInTheDocument();
-    });
-
     it('shows no error when the providerOptions are empty', () => {
-      // Arrange
-      renderComponent({
-        defaultValues: {
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-          ],
-        },
-      });
+      // Arrange / Act
+      renderComponent();
 
       // Assert
       expect(
         screen.queryByText('ai_settings.provider_options_invalid_json'),
-      ).not.toBeInTheDocument();
+      ).toBeNull();
     });
   });
 
-  describe('env-only mode', () => {
-    it('disables every input so the locked fields cannot be focused', () => {
+  describe('provider-driven label (2.7)', () => {
+    it('labels the model field "Model" for a non-Azure provider', () => {
       // Act
-      renderComponent({ disabled: true });
-
-      // Assert: model input, default radio, providerOptions textarea, and the
-      // add/remove buttons are all disabled (removed from the tab order).
-      expect(getModelInputs()[0]).toBeDisabled();
-      expect(screen.getByRole('radio')).toBeDisabled();
-      expect(
-        screen.getByLabelText('ai_settings.provider_options_label'),
-      ).toBeDisabled();
-      expect(
-        screen.getByRole('button', { name: 'ai_settings.add_model' }),
-      ).toBeDisabled();
-      expect(
-        screen.getByRole('button', { name: 'ai_settings.remove_model' }),
-      ).toBeDisabled();
-    });
-  });
-
-  describe('provider-driven label', () => {
-    it('labels the model field "Model" for non-Azure providers', () => {
-      // Act
-      renderComponent({ defaultValues: { provider: 'openai' } });
+      renderComponent({ provider: 'openai' });
 
       // Assert
       expect(
@@ -378,7 +764,17 @@ describe('AllowedModelsField', () => {
 
     it('labels the model field "Deployment name" for Azure OpenAI', () => {
       // Act
-      renderComponent({ defaultValues: { provider: 'azure-openai' } });
+      renderComponent({
+        provider: 'azure-openai',
+        allowedModels: [
+          {
+            provider: 'azure-openai',
+            modelId: 'my-deployment',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      });
 
       // Assert
       expect(
@@ -390,85 +786,81 @@ describe('AllowedModelsField', () => {
     });
   });
 
-  describe('card composition', () => {
-    it('renders each card with its own model input and default radio', () => {
-      // Arrange / Act
-      renderComponent({
-        defaultValues: {
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-            {
-              modelId: 'gpt-4o-mini',
-              providerOptionsText: '',
-              isDefault: false,
-            },
-          ],
-        },
-      });
-
-      // Assert: each rendered group exposes one model input and one radio.
-      const groups = screen.getAllByRole('group');
-      const modelCards = groups.filter(
-        (g) => within(g).queryByRole('radio') != null,
-      );
-      expect(modelCards).toHaveLength(2);
-    });
-  });
-
-  describe('modelId input: select vs free-text', () => {
-    it('renders a dropdown of the catalog models for a catalog provider (1.4)', () => {
-      // Arrange: openai has a catalog of selectable models.
+  describe('modelId input: catalog select vs free-text (2.6/2.7)', () => {
+    it('renders a catalog dropdown for a catalog provider, excluding already-registered ids from OTHER rows', () => {
+      // Arrange: openai has a catalog; the first row already registered gpt-4o.
       mockedUseSelectableModels.mockReturnValue(
-        swrResponse({ data: { modelIds: ['gpt-4o', 'gpt-4.1'] } }),
+        swrResponse({
+          data: {
+            models: [
+              { id: 'gpt-4o', name: 'GPT-4o' },
+              { id: 'gpt-4.1', name: 'GPT-4.1' },
+              { id: 'gpt-4o-mini', name: 'GPT-4o mini' },
+            ],
+          },
+        }),
       );
 
-      // Act
+      // Act: a SECOND, empty openai row.
       renderComponent({
-        defaultValues: {
-          provider: 'openai',
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-          ],
-        },
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+          {
+            provider: 'openai',
+            modelId: '',
+            providerOptionsText: '',
+            isDefault: false,
+          },
+        ],
       });
 
-      // Assert: the model control is a <select> (not a free-text input) whose
-      // options are exactly the placeholder + the catalog ids — free typing of an
-      // out-of-list value is impossible (select-only).
-      const modelControl = screen.getByLabelText('ai_settings.model_label');
-      expect(modelControl.tagName).toBe('SELECT');
-      const optionLabels = within(modelControl)
+      // Assert: both controls are <select>s. The empty row's options exclude the
+      // gpt-4o already registered by the first row (registered-excluded), leaving
+      // the placeholder + the still-available models — labelled by display NAME
+      // (the option value stays the bare id).
+      const selects = getModelSelects();
+      expect(selects).toHaveLength(2);
+      const emptyRowOptions = within(selects[1])
         .getAllByRole('option')
         .map((o) => o.textContent);
-      expect(optionLabels).toEqual([
+      expect(emptyRowOptions).toEqual([
         'ai_settings.model_placeholder',
-        'gpt-4o',
-        'gpt-4.1',
+        'GPT-4.1',
+        'GPT-4o mini',
       ]);
+      // The option VALUES remain the bare ids (what gets stored/sent).
+      const emptyRowValues = within(selects[1])
+        .getAllByRole<HTMLOptionElement>('option')
+        .map((o) => o.value);
+      expect(emptyRowValues).toEqual(['', 'gpt-4.1', 'gpt-4o-mini']);
     });
 
-    it('renders a free-text input when the catalog provider returns no models, e.g. Azure (3.1)', () => {
-      // Arrange: azure-openai is catalog-less → resolved but empty.
+    it('renders a free-text input for a catalog-less provider (Azure)', () => {
+      // Arrange: azure-openai resolves to an empty catalog.
       mockedUseSelectableModels.mockReturnValue(
-        swrResponse({ data: { modelIds: [] } }),
+        swrResponse({ data: { models: [] } }),
       );
 
       // Act
       renderComponent({
-        defaultValues: {
-          provider: 'azure-openai',
-          allowedModels: [
-            {
-              modelId: 'my-deployment',
-              providerOptionsText: '',
-              isDefault: true,
-            },
-          ],
-        },
+        provider: 'azure-openai',
+        allowedModels: [
+          {
+            provider: 'azure-openai',
+            modelId: 'my-deployment',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
       });
 
-      // Assert: free input remains (a text input, not a select) so a deployment
-      // name can be typed. Azure uses its own label key.
+      // Assert: free-text input (a deployment name can be typed).
       const modelControl = screen.getByLabelText(
         'ai_settings.azure_model_deployment_label',
       );
@@ -476,8 +868,8 @@ describe('AllowedModelsField', () => {
       expect((modelControl as HTMLInputElement).type).toBe('text');
     });
 
-    it('falls back to a free-text input when the model list cannot be fetched, without blocking editing (3.2)', async () => {
-      // Arrange: the fetch failed (error surfaced by the hook).
+    it('falls back to a free-text input when the catalog fetch fails, without blocking editing (2.6)', async () => {
+      // Arrange
       const user = userEvent.setup();
       mockedUseSelectableModels.mockReturnValue(
         swrResponse({ error: new Error('boom') }),
@@ -485,44 +877,44 @@ describe('AllowedModelsField', () => {
 
       // Act
       renderComponent({
-        defaultValues: {
-          provider: 'openai',
-          allowedModels: [
-            { modelId: '', providerOptionsText: '', isDefault: true },
-          ],
-        },
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: '',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
       });
 
-      // Assert: a text input is rendered and remains editable (save is not blocked
-      // by the fetch failure — the admin can still type a model id).
+      // Assert
       const modelControl = screen.getByLabelText('ai_settings.model_label');
       expect(modelControl).toBeInstanceOf(HTMLInputElement);
       await user.type(modelControl, 'gpt-4o');
       expect((modelControl as HTMLInputElement).value).toBe('gpt-4o');
     });
 
-    it('keeps a saved modelId that is not in the current catalog as the selected value (1.5)', () => {
-      // Arrange: the saved value predates / is absent from the current catalog.
+    it('keeps a saved modelId absent from the current catalog as its own selected option (2.6)', () => {
+      // Arrange
       mockedUseSelectableModels.mockReturnValue(
-        swrResponse({ data: { modelIds: ['gpt-4o'] } }),
+        swrResponse({ data: { models: [{ id: 'gpt-4o', name: 'GPT-4o' }] } }),
       );
 
       // Act
       renderComponent({
-        defaultValues: {
-          provider: 'openai',
-          allowedModels: [
-            {
-              modelId: 'legacy-custom-id',
-              providerOptionsText: '',
-              isDefault: true,
-            },
-          ],
-        },
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'legacy-custom-id',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
       });
 
-      // Assert: the <select> retains the out-of-list value as a selected option —
-      // it is neither reset to empty nor silently changed.
+      // Assert
       const modelControl = screen.getByLabelText('ai_settings.model_label');
       expect(modelControl.tagName).toBe('SELECT');
       expect((modelControl as HTMLSelectElement).value).toBe(
@@ -534,35 +926,45 @@ describe('AllowedModelsField', () => {
     });
 
     it('shows the saved model id (not the placeholder) after the catalog resolves on reload', async () => {
-      // Repro of the reload bug: on page (re)load the catalog fetch is initially
-      // in flight (data undefined), then resolves to a list that INCLUDES the
-      // saved model id. The <select> must end up displaying the saved id, not the
-      // empty "Select a model" placeholder.
+      // Repro of the reload bug: fetch in flight → resolves to a list including
+      // the saved id. The <select> must display the saved id afterwards.
       mockedUseSelectableModels.mockReturnValue(swrResponse({})); // loading
 
       const { rerender } = renderComponent({
-        defaultValues: {
-          provider: 'openai',
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-          ],
-        },
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
       });
 
-      // The catalog resolves; gpt-4o is a valid, in-catalog model.
       mockedUseSelectableModels.mockReturnValue(
-        swrResponse({ data: { modelIds: ['gpt-4o', 'gpt-4.1'] } }),
+        swrResponse({
+          data: {
+            models: [
+              { id: 'gpt-4o', name: 'GPT-4o' },
+              { id: 'gpt-4.1', name: 'GPT-4.1' },
+            ],
+          },
+        }),
       );
       rerender(
         <FormHarness
-          defaultValues={{
-            provider: 'openai',
-            allowedModels: [
-              { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-            ],
-          }}
+          allowedModels={[
+            {
+              provider: 'openai',
+              modelId: 'gpt-4o',
+              providerOptionsText: '',
+              isDefault: true,
+            },
+          ]}
         >
-          <AllowedModelsField disabled={false} />
+          <AllowedModelsField provider="openai" />
+          <AllowedModelsProbe />
         </FormHarness>,
       );
 
@@ -572,53 +974,54 @@ describe('AllowedModelsField', () => {
       });
     });
 
-    it('disables the dropdown in env-only mode so it cannot be edited (7.3)', () => {
-      // Arrange: select mode + env-only (disabled).
-      mockedUseSelectableModels.mockReturnValue(
-        swrResponse({ data: { modelIds: ['gpt-4o', 'gpt-4.1'] } }),
-      );
+    it('disables the control while the catalog is loading so an out-of-catalog id cannot be typed (2.6)', () => {
+      // A request is in flight: neither data nor error has arrived.
+      mockedUseSelectableModels.mockReturnValue(swrResponse({}));
 
-      // Act
       renderComponent({
-        disabled: true,
-        defaultValues: {
-          provider: 'openai',
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-          ],
-        },
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
       });
 
-      // Assert: the dropdown is disabled (removed from the tab order, non-editable).
-      const modelControl = screen.getByLabelText('ai_settings.model_label');
-      expect(modelControl.tagName).toBe('SELECT');
-      expect(modelControl).toBeDisabled();
+      // The modelId control is disabled purely because the catalog is loading.
+      expect(screen.getByLabelText('ai_settings.model_label')).toBeDisabled();
     });
   });
 
-  // The interaction suites above run in free-text mode (the outer beforeEach forces
-  // a fetch error). openai/anthropic/google admins use SELECT mode, where the modelId
-  // control is a <select> and react-hook-form applies the saved value to the
-  // uncontrolled element once at mount — a fragile path for add/remove re-indexing and
-  // default toggling. Cover those same interactions in select mode here.
   describe('add / remove / default in select mode', () => {
     beforeEach(() => {
       mockedUseSelectableModels.mockReturnValue(
         swrResponse({
-          data: { modelIds: ['gpt-4o', 'gpt-4.1', 'gpt-4o-mini'] },
+          data: {
+            models: [
+              { id: 'gpt-4o', name: 'GPT-4o' },
+              { id: 'gpt-4.1', name: 'GPT-4.1' },
+              { id: 'gpt-4o-mini', name: 'GPT-4o mini' },
+            ],
+          },
         }),
       );
     });
 
-    it('appends a select card showing the placeholder when add is clicked', async () => {
+    it('appends a select card on the empty placeholder when add is clicked', async () => {
       const user = userEvent.setup();
       renderComponent({
-        defaultValues: {
-          provider: 'openai',
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-          ],
-        },
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
       });
       expect(getModelSelects()).toHaveLength(1);
 
@@ -626,8 +1029,6 @@ describe('AllowedModelsField', () => {
         screen.getByRole('button', { name: 'ai_settings.add_model' }),
       );
 
-      // The new card is also a <select> (not a stray text input) and starts on the
-      // empty placeholder since its modelId is blank.
       const selects = getModelSelects();
       expect(selects).toHaveLength(2);
       expect(selects[1].value).toBe('');
@@ -636,50 +1037,61 @@ describe('AllowedModelsField', () => {
     it('keeps the remaining card value after the first card is removed (re-indexing)', async () => {
       const user = userEvent.setup();
       renderComponent({
-        defaultValues: {
-          provider: 'openai',
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-            { modelId: 'gpt-4.1', providerOptionsText: '', isDefault: false },
-          ],
-        },
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+          {
+            provider: 'openai',
+            modelId: 'gpt-4.1',
+            providerOptionsText: '',
+            isDefault: false,
+          },
+        ],
       });
       expect(getModelSelects().map((s) => s.value)).toEqual([
         'gpt-4o',
         'gpt-4.1',
       ]);
 
-      // Remove the first (default) card.
       await removeAt(user, 0);
 
-      // The formerly-second card survives with its own value intact (not the
-      // placeholder, not the removed card's value) and becomes the new default.
       const remaining = getModelSelects();
       expect(remaining).toHaveLength(1);
       expect(remaining[0].value).toBe('gpt-4.1');
-      expect(getDefaultRadios()[0].checked).toBe(true);
+      expect(isRowDefault('openai', 'gpt-4.1')).toBe(true);
     });
 
-    it('preserves both select values when the default radio is switched', async () => {
+    it('preserves both select values when the default is switched via the set-as-default action', async () => {
       const user = userEvent.setup();
       renderComponent({
-        defaultValues: {
-          provider: 'openai',
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-            { modelId: 'gpt-4.1', providerOptionsText: '', isDefault: false },
-          ],
-        },
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+          {
+            provider: 'openai',
+            modelId: 'gpt-4.1',
+            providerOptionsText: '',
+            isDefault: false,
+          },
+        ],
       });
-      const radios = getDefaultRadios();
+      // Buttons follow display order: [1] is the non-default gpt-4.1 row.
+      await user.click(getSetDefaultButtons()[1]);
 
-      // Switch the default from card A to card B.
-      await user.click(radios[1]);
-
-      // Selecting a different default flips only isDefault (via setValue); the model
-      // <select> values must be left untouched.
-      expect(radios[0].checked).toBe(false);
-      expect(radios[1].checked).toBe(true);
+      expect(isRowDefault('openai', 'gpt-4.1')).toBe(true);
+      expect(isRowDefault('openai', 'gpt-4o')).toBe(false);
+      // The single-default switch flips only isDefault; the model <select> values
+      // are preserved (the shared helper keeps modelId/providerOptions).
       expect(getModelSelects().map((s) => s.value)).toEqual([
         'gpt-4o',
         'gpt-4.1',
@@ -687,117 +1099,82 @@ describe('AllowedModelsField', () => {
     });
   });
 
-  describe('modelId control while the catalog is loading', () => {
-    it('disables the control during the fetch so an out-of-catalog id cannot be typed (1.4)', () => {
-      // A catalog request is in flight: neither data nor error has arrived yet.
-      mockedUseSelectableModels.mockReturnValue(swrResponse({}));
-
-      renderComponent({
-        defaultValues: {
-          provider: 'openai',
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-          ],
-        },
-      });
-
-      // Not env-only (disabled=false): the control is disabled purely because the
-      // catalog is loading, so the select-only guarantee also holds during the
-      // initial-load window instead of briefly exposing an editable free-text input.
-      expect(screen.getByLabelText('ai_settings.model_label')).toBeDisabled();
-    });
-  });
-
-  describe('manual catalog refresh (Req 9.1)', () => {
-    const getRefreshButton = (): HTMLElement =>
-      screen.getByRole('button', {
-        name: 'ai_settings.refresh_model_catalog',
-      });
-    const getConfirmButton = (): HTMLElement =>
-      screen.getByRole('button', {
-        name: 'ai_settings.refresh_model_catalog_confirm',
-      });
-
-    it('POSTs the refresh endpoint only after the admin confirms, revalidates the list, and toasts success', async () => {
-      const user = userEvent.setup();
-      const hookResult = swrResponse({ data: { modelIds: ['gpt-4o'] } });
-      mockedUseSelectableModels.mockReturnValue(hookResult);
-      mockedApiv3Post.mockResolvedValue(
-        // Only resolution matters to the component (the body is not read);
-        // mock<T>() keeps the stub type-checked without an assertion.
-        mock<Awaited<ReturnType<typeof apiv3Post>>>(),
-      );
-
-      renderComponent();
-      await user.click(getRefreshButton());
-
-      // The refresh triggers OUTBOUND communication (models.dev), so the click
-      // opens a confirmation instead of firing the request (Req 9.6).
-      expect(mockedApiv3Post).not.toHaveBeenCalled();
-      expect(
-        screen.getByText('ai_settings.refresh_model_catalog_confirmation'),
-      ).toBeInTheDocument();
-
-      await user.click(getConfirmButton());
-
-      await waitFor(() => {
-        expect(mockedApiv3Post).toHaveBeenCalledExactlyOnceWith(
-          '/ai-settings/refresh-model-catalog',
-        );
-      });
-      // EVERY cached provider list is invalidated (not just the current one):
-      // the server-side snapshot is replaced for all providers at once.
-      expect(hookResult.invalidateAllProviders).toHaveBeenCalled();
-      expect(toastSuccess).toHaveBeenCalledWith(
-        'ai_settings.refresh_model_catalog_success',
-      );
-      expect(toastError).not.toHaveBeenCalled();
-    });
-
-    it('does NOT communicate when the admin cancels the confirmation', async () => {
+  // Picking a model keeps a display-only `displayName` in sync with the chosen
+  // id: the option's official name in select mode, or the typed id in free-text
+  // mode. It is never PUT (toAllowedModel drops it) — it is what the global
+  // DefaultModelSelector renders as the default model's label before a reload
+  // re-seeds from GET. The probe reads it from the live form state, exactly the
+  // value DefaultModelSelector consumes.
+  describe('displayName sync on model pick (drives DefaultModelSelector)', () => {
+    it('syncs the row displayName to the selected option name, keeping modelId the bare id (select mode)', async () => {
       const user = userEvent.setup();
       mockedUseSelectableModels.mockReturnValue(
-        swrResponse({ data: { modelIds: ['gpt-4o'] } }),
+        swrResponse({
+          data: {
+            models: [
+              { id: 'gpt-4o', name: 'GPT-4o' },
+              { id: 'gpt-4.1', name: 'GPT-4.1' },
+            ],
+          },
+        }),
       );
+      // An empty openai row → select mode with the placeholder selected.
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: '',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      });
 
-      renderComponent();
-      await user.click(getRefreshButton());
-      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      // Pick GPT-4.1 (the option value is the bare id, its label the name).
+      await user.selectOptions(getModelSelects()[0], 'gpt-4.1');
 
-      expect(mockedApiv3Post).not.toHaveBeenCalled();
-      expect(toastSuccess).not.toHaveBeenCalled();
-      expect(toastError).not.toHaveBeenCalled();
-      // The trigger stays available for another attempt.
-      expect(getRefreshButton()).toBeEnabled();
+      // The form now carries the official NAME as the row's displayName (what
+      // DefaultModelSelector shows), while modelId stays the bare id (what is
+      // stored/sent).
+      await waitFor(() => {
+        expect(
+          findProbeRow('openai', 'gpt-4.1')?.getAttribute('data-displayname'),
+        ).toBe('GPT-4.1');
+      });
     });
 
-    it('toasts the localized failure message and does not revalidate when the refresh fails (Req 9.4)', async () => {
+    it('syncs the row displayName to the typed id in free-text mode (catalog-less provider)', async () => {
       const user = userEvent.setup();
-      const hookResult = swrResponse({ data: { modelIds: ['gpt-4o'] } });
-      mockedUseSelectableModels.mockReturnValue(hookResult);
-      mockedApiv3Post.mockRejectedValue(new Error('refresh failed'));
+      // Azure resolves to an empty catalog → free-text; a deployment name has no
+      // catalog name, so the typed id is its own display name.
+      mockedUseSelectableModels.mockReturnValue(
+        swrResponse({ data: { models: [] } }),
+      );
+      renderComponent({
+        provider: 'azure-openai',
+        allowedModels: [
+          {
+            provider: 'azure-openai',
+            modelId: '',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      });
 
-      renderComponent();
-      await user.click(getRefreshButton());
-      await user.click(getConfirmButton());
+      const input = screen.getByLabelText(
+        'ai_settings.azure_model_deployment_label',
+      );
+      await user.type(input, 'my-deployment');
 
       await waitFor(() => {
-        expect(toastError).toHaveBeenCalledWith(
-          'ai_settings.refresh_model_catalog_failed',
-        );
+        expect(
+          findProbeRow('azure-openai', 'my-deployment')?.getAttribute(
+            'data-displayname',
+          ),
+        ).toBe('my-deployment');
       });
-      expect(hookResult.invalidateAllProviders).not.toHaveBeenCalled();
-      expect(toastSuccess).not.toHaveBeenCalled();
-      // The button recovers so the admin can retry.
-      expect(getRefreshButton()).toBeEnabled();
-    });
-
-    it('stays ENABLED in env-only mode — the catalog is a server-side cache, not an AI setting', () => {
-      // env-only deployments (e.g. GROWI.cloud) fix the SETTINGS via env vars but
-      // must still be able to refresh the catalog (the very audience of Req 9.1).
-      renderComponent({ disabled: true });
-
-      expect(getRefreshButton()).toBeEnabled();
     });
   });
 });

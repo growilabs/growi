@@ -6,6 +6,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ChatStatus } from 'ai';
 import { mock } from 'vitest-mock-extended';
 
+import type { ChatModelsResponse } from '~/features/mastra/interfaces/chat-models-response';
 import type {
   IFormattedSearchResult,
   IPageWithSearchMeta,
@@ -60,16 +61,12 @@ vi.mock('../../stores/thread', () => ({
 }));
 
 // Chat model list / selection: controllable so a test can vary the allowed
-// models, the server-validated initial selection, and the loading state.
+// models (cross-provider), the server-validated initial selection, and the
+// loading state. The wire shape is the shared ChatModelsResponse.
 const { modelsState } = vi.hoisted(() => ({
   modelsState: {
     current: {
-      data: undefined as
-        | {
-            modelIds: string[];
-            selectedModelId: string;
-          }
-        | undefined,
+      data: undefined as ChatModelsResponse | undefined,
     },
   },
 }));
@@ -78,19 +75,19 @@ vi.mock('../../stores/models', () => ({
 }));
 
 // Persisted selection write boundary. The contract is "a model change calls
-// scheduleToPut({ aiChatSelectedModelId })"; the debounce + HTTP PUT live in the
-// shared service (reused unchanged), so the spy is the right boundary (3.6).
+// scheduleToPut({ aiChatSelectedModelKey })"; the debounce + HTTP PUT live in the
+// shared service (reused unchanged), so the spy is the right boundary (Req 4.4).
 const scheduleToPut = vi.fn();
 vi.mock('~/client/services/user-ui-settings', () => ({
   scheduleToPut: (...args: unknown[]) => scheduleToPut(...args),
 }));
 
 // Spy on the transport factory while keeping the pure label/error helpers real.
-// The factory receives a live getModelId() (not a fixed model), so the observable
+// The factory receives a live getModelKey() (not a fixed model), so the observable
 // proof of the wiring is that the captured getter reflects the current selection
 // — useChat ignores a re-created transport, so the model must be read live.
 const createMastraChatTransport = vi.fn(
-  (_threadId: string, _getModelId: () => string | undefined) => ({}),
+  (_threadId: string, _getModelKey: () => string | undefined) => ({}),
 );
 vi.mock('./chat-sidebar-helpers', async (importOriginal) => {
   const actual =
@@ -99,15 +96,24 @@ vi.mock('./chat-sidebar-helpers', async (importOriginal) => {
     ...actual,
     createMastraChatTransport: (
       threadId: string,
-      getModelId: () => string | undefined,
-    ) => createMastraChatTransport(threadId, getModelId),
+      getModelKey: () => string | undefined,
+    ) => createMastraChatTransport(threadId, getModelKey),
   };
 });
 
 // Replace the vendored Radix-based PromptInputModelSelect* with a controllable
 // native <select> test double. We assert the same value/onValueChange contract
 // the real components expose (the Radix portal is not reliably drivable under
-// happy-dom). The vendored file itself is reused unchanged in production.
+// happy-dom). The vendored file itself is reused unchanged in production, and its
+// real grouped rendering is covered by prompt-input's own spec (task 7.1).
+//
+// Grouping is modelled with native <optgroup> elements: each provider group
+// renders an <optgroup label={provider}> heading and its models render as
+// <option value={modelKey}>. Keeping the <option>s as direct <select> children
+// makes the value / change contract behave exactly like a real native select,
+// while the optgroup labels expose the per-provider headings for assertion
+// (4.1/4.2). The trigger is wrapped so its computed "provider · modelId" label
+// is queryable (4.2).
 vi.mock('~/components/ai-elements/prompt-input', async (importOriginal) => {
   const actual =
     await importOriginal<
@@ -137,11 +143,17 @@ vi.mock('~/components/ai-elements/prompt-input', async (importOriginal) => {
       </select>
     ),
     PromptInputModelSelectTrigger: ({ children }: { children?: ReactNode }) => (
-      <>{children}</>
+      <span data-testid="model-trigger">{children}</span>
     ),
     PromptInputModelSelectValue: () => null,
     PromptInputModelSelectContent: ({ children }: { children?: ReactNode }) => (
       <>{children}</>
+    ),
+    PromptInputModelSelectGroup: ({ children }: { children?: ReactNode }) => (
+      <>{children}</>
+    ),
+    PromptInputModelSelectLabel: ({ children }: { children?: ReactNode }) => (
+      <optgroup label={typeof children === 'string' ? children : undefined} />
     ),
     PromptInputModelSelectItem: ({
       value,
@@ -265,11 +277,31 @@ beforeEach(() => {
   searchState.current = { data: undefined, isLoading: false };
   chatState.status = undefined;
   chatState.error = undefined;
-  // Default: models resolved with two options, server-validated selection set.
+  // Default: models resolved across TWO providers (openai + anthropic), with a
+  // server-validated cross-provider selection set (Req 4.1/4.2/4.4).
   modelsState.current = {
     data: {
-      modelIds: ['gpt-4o', 'gpt-4o-mini'],
-      selectedModelId: 'gpt-4o-mini',
+      models: [
+        {
+          key: 'openai/gpt-4o',
+          provider: 'openai',
+          modelId: 'gpt-4o',
+          displayName: 'GPT-4o',
+        },
+        {
+          key: 'openai/gpt-4o-mini',
+          provider: 'openai',
+          modelId: 'gpt-4o-mini',
+          displayName: 'GPT-4o mini',
+        },
+        {
+          key: 'anthropic/claude-sonnet-4',
+          provider: 'anthropic',
+          modelId: 'claude-sonnet-4',
+          displayName: 'Claude Sonnet 4',
+        },
+      ],
+      selectedModelKey: 'openai/gpt-4o-mini',
     },
   };
 
@@ -452,14 +484,57 @@ describe('ChatSidebar — server error display', () => {
   });
 });
 
-describe('ChatSidebar — model selector wiring (3.2/3.3/3.4/3.5/3.6)', () => {
+describe('ChatSidebar — cross-provider model selector (4.1/4.2/4.4/4.7)', () => {
   const modelSelect = (): HTMLSelectElement =>
     screen.getByLabelText<HTMLSelectElement>('model-select');
 
-  it('initialises the selector with the server-validated selectedModelId (3.2)', () => {
+  const modelTrigger = (): HTMLElement => screen.getByTestId('model-trigger');
+
+  // The provider group headings the selector renders, in DOM order (modelled as
+  // native <optgroup label> in the test double — see the prompt-input mock).
+  const providerGroupLabels = (container: HTMLElement): (string | null)[] =>
+    Array.from(container.querySelectorAll('optgroup')).map((g) =>
+      g.getAttribute('label'),
+    );
+
+  it('presents allowed models of every provider, grouped by provider, in one selector (4.1/4.2)', () => {
+    const { container } = render(<ChatSidebar />);
+
+    // A provider group heading per provider that owns a model, in fixed slot
+    // order; providers that own no model contribute no group (google/azure-openai
+    // are absent from the fixture).
+    expect(providerGroupLabels(container)).toEqual(['OpenAI', 'Anthropic']);
+
+    // Options span BOTH providers and each carries its modelKey as the value the
+    // client sends back (4.1/4.2).
+    const options = Array.from(
+      modelSelect().querySelectorAll<HTMLOptionElement>('option'),
+    );
+    expect(options.map((o) => o.value)).toEqual([
+      'openai/gpt-4o',
+      'openai/gpt-4o-mini',
+      'anthropic/claude-sonnet-4',
+    ]);
+    // Options are labelled by the official display name (the value stays the key).
+    expect(options.map((o) => o.textContent)).toEqual([
+      'GPT-4o',
+      'GPT-4o mini',
+      'Claude Sonnet 4',
+    ]);
+  });
+
+  it('initialises the selector on the server-validated selectedModelKey (4.4)', () => {
     render(<ChatSidebar />);
 
-    expect(modelSelect().value).toBe('gpt-4o-mini');
+    expect(modelSelect().value).toBe('openai/gpt-4o-mini');
+  });
+
+  it('shows the selected entry as "provider · modelId" in the closed trigger (4.2)', () => {
+    render(<ChatSidebar />);
+
+    // The trigger names the provider so the same modelId under different
+    // providers stays distinguishable when the menu is closed.
+    expect(modelTrigger()).toHaveTextContent('OpenAI · GPT-4o mini');
   });
 
   // The getter passed to the transport factory (2nd arg of the last call).
@@ -468,52 +543,65 @@ describe('ChatSidebar — model selector wiring (3.2/3.3/3.4/3.5/3.6)', () => {
     return calls[calls.length - 1][1];
   };
 
-  it('builds the transport with a live getter that reports the initial selectedModelId (3.3/3.4)', () => {
+  it('builds the transport with a live getter that reports the initial selectedModelKey (4.7)', () => {
     render(<ChatSidebar />);
 
     // The factory gets a getter (not a fixed model); reading it now yields the
     // server-validated initial selection. The transport reads it live per
-    // request, so sendMessage AND regenerate() both send the current model.
+    // request, so sendMessage AND regenerate() both send the current modelKey.
     expect(createMastraChatTransport).toHaveBeenLastCalledWith(
       expect.any(String),
       expect.any(Function),
     );
-    expect(lastModelGetter()()).toBe('gpt-4o-mini');
+    expect(lastModelGetter()()).toBe('openai/gpt-4o-mini');
   });
 
-  it('on selection change: persists via scheduleToPut and the live getter reflects the new model WITHOUT re-creating the transport (3.3/3.6)', () => {
+  it('on cross-provider selection change: persists the modelKey via scheduleToPut and the live getter reflects it WITHOUT re-creating the transport (4.4/4.7)', () => {
     render(<ChatSidebar />);
 
-    const getModelId = lastModelGetter();
+    const getModelKey = lastModelGetter();
     createMastraChatTransport.mockClear();
 
     act(() => {
-      fireEvent.change(modelSelect(), { target: { value: 'gpt-4o' } });
+      fireEvent.change(modelSelect(), {
+        target: { value: 'anthropic/claude-sonnet-4' },
+      });
     });
 
-    // Persisted as the user's selection for next visit (3.6).
+    // Persisted (uniquely, down to the provider) as the user's selection for the
+    // next visit (4.4).
     expect(scheduleToPut).toHaveBeenCalledWith({
-      aiChatSelectedModelId: 'gpt-4o',
+      aiChatSelectedModelKey: 'anthropic/claude-sonnet-4',
     });
     // The transport is NOT re-created on a model change (useChat would ignore a
-    // new instance anyway); the same live getter now reports the new model, so
-    // the next send/regenerate carries it (Critical Issue 1 — 3.3/3.4).
+    // new instance anyway); the same live getter now reports the new modelKey, so
+    // the next send/regenerate carries it — mid-thread cross-provider switch (4.7).
     expect(createMastraChatTransport).not.toHaveBeenCalled();
-    expect(getModelId()).toBe('gpt-4o');
-    expect(modelSelect().value).toBe('gpt-4o');
+    expect(getModelKey()).toBe('anthropic/claude-sonnet-4');
+    expect(modelSelect().value).toBe('anthropic/claude-sonnet-4');
+    // The trigger follows the new selection, still provider-qualified.
+    expect(modelTrigger()).toHaveTextContent('Anthropic · Claude Sonnet 4');
   });
 
-  it('shows the single allowed model as selected (3.5)', () => {
+  it('shows the single allowed model as selected (4.1)', () => {
     modelsState.current = {
       data: {
-        modelIds: ['only-model'],
-        selectedModelId: 'only-model',
+        models: [
+          {
+            key: 'openai/only-model',
+            provider: 'openai',
+            modelId: 'only-model',
+            displayName: 'Only Model',
+          },
+        ],
+        selectedModelKey: 'openai/only-model',
       },
     };
     render(<ChatSidebar />);
 
-    expect(modelSelect().value).toBe('only-model');
+    expect(modelSelect().value).toBe('openai/only-model');
     expect(modelSelect().options).toHaveLength(1);
+    expect(modelTrigger()).toHaveTextContent('OpenAI · Only Model');
   });
 
   it('disables the selector until the models resolve', () => {

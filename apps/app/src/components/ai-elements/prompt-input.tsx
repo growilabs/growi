@@ -66,7 +66,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select';
@@ -1249,6 +1251,31 @@ export const PromptInputModelSelectValue = ({
   ...props
 }: PromptInputModelSelectValueProps): JSX.Element => (
   <SelectValue className={cn(className)} {...props} />
+);
+
+export type PromptInputModelSelectGroupProps = ComponentProps<
+  typeof SelectGroup
+>;
+
+export const PromptInputModelSelectGroup = ({
+  className,
+  ...props
+}: PromptInputModelSelectGroupProps): JSX.Element => (
+  <SelectGroup className={cn(className)} {...props} />
+);
+
+export type PromptInputModelSelectLabelProps = ComponentProps<
+  typeof SelectLabel
+>;
+
+// Passes through to ui/select's SelectLabel, which already applies the
+// group-heading styling; the wrapper only forwards className/props to stay
+// consistent with the other thin PromptInputModelSelect* wrappers.
+export const PromptInputModelSelectLabel = ({
+  className,
+  ...props
+}: PromptInputModelSelectLabelProps): JSX.Element => (
+  <SelectLabel className={cn(className)} {...props} />
 );
 
 export type PromptInputHoverCardProps = ComponentProps<typeof HoverCard>;

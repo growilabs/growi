@@ -64,7 +64,7 @@ vi.mock('~/features/mastra/server/services/is-ai-configured', () => ({
   isAiConfigured: vi.fn(() => false),
 }));
 vi.mock(
-  '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model',
+  '~/features/mastra/server/services/ai-sdk-modules/resolved-model-cache',
   () => ({ clearResolvedMastraModelCache: vi.fn() }),
 );
 // No refreshed catalog persisted (getSingleton → null): the REAL
@@ -186,9 +186,12 @@ describe('admin-ai-settings router factory', () => {
       const res = await request(buildApp(admin)).get('/_api/v3/ai-settings/');
       // Real getAiSettings → res.apiv3(response); admins reach the handler.
       // Status 200 is the access-control signal; the response carries the
-      // settings shape (isApiKeySet is always a boolean, so it survives JSON).
+      // multi-provider settings shape (a fixed-slot `providers` record whose
+      // entries each expose an isApiKeySet boolean — the key value is never
+      // returned).
       expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty('isApiKeySet');
+      expect(res.body).toHaveProperty('providers');
+      expect(typeof res.body.providers.openai.isApiKeySet).toBe('boolean');
     });
 
     it('reaches the PUT handler (success response)', async () => {
@@ -247,24 +250,28 @@ describe('admin-ai-settings router factory', () => {
       });
     });
 
-    it('returns a non-empty modelIds list for an admin with ?provider=openai (Req 1.1)', async () => {
+    it('returns a non-empty models list (id + name) for an admin with ?provider=openai (Req 1.1)', async () => {
       const res = await request(buildApp(admin)).get(
         '/_api/v3/ai-settings/available-models?provider=openai',
       );
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body.modelIds)).toBe(true);
-      expect(res.body.modelIds.length).toBeGreaterThan(0);
-      // The response carries only model-id info — no secret-bearing fields (Req 7.1).
+      expect(Array.isArray(res.body.models)).toBe(true);
+      expect(res.body.models.length).toBeGreaterThan(0);
+      // Each entry carries id + name (no secret-bearing fields — Req 7.1).
+      expect(res.body.models[0]).toEqual({
+        id: expect.any(String),
+        name: expect.any(String),
+      });
       expect(res.body).not.toHaveProperty('apiKey');
       expect(res.body).not.toHaveProperty('providerOptions');
     });
 
-    it('returns { modelIds: [] } for an admin with ?provider=azure-openai (Req 3.1)', async () => {
+    it('returns { models: [] } for an admin with ?provider=azure-openai (Req 3.1)', async () => {
       const res = await request(buildApp(admin)).get(
         '/_api/v3/ai-settings/available-models?provider=azure-openai',
       );
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ modelIds: [] });
+      expect(res.body).toEqual({ models: [] });
     });
 
     it('rejects an invalid provider with 400 (Req input validation)', async () => {
@@ -272,7 +279,7 @@ describe('admin-ai-settings router factory', () => {
         '/_api/v3/ai-settings/available-models?provider=bogus',
       );
       expect(res.status).toBe(400);
-      expect(res.body).not.toHaveProperty('modelIds');
+      expect(res.body).not.toHaveProperty('models');
     });
 
     it('rejects a missing provider with 400 (Req input validation)', async () => {
@@ -280,7 +287,7 @@ describe('admin-ai-settings router factory', () => {
         '/_api/v3/ai-settings/available-models',
       );
       expect(res.status).toBe(400);
-      expect(res.body).not.toHaveProperty('modelIds');
+      expect(res.body).not.toHaveProperty('models');
     });
 
     it('rejects a logged-in non-admin before the handler runs (Req 7.2)', async () => {
@@ -289,7 +296,7 @@ describe('admin-ai-settings router factory', () => {
       );
       // adminRequired blocks the non-admin: never the success shape.
       expect(res.status).not.toBe(200);
-      expect(res.body).not.toHaveProperty('modelIds');
+      expect(res.body).not.toHaveProperty('models');
     });
 
     it('rejects an unauthenticated request with 403 (API path), handler not reached (Req 7.2)', async () => {
@@ -297,7 +304,7 @@ describe('admin-ai-settings router factory', () => {
         '/_api/v3/ai-settings/available-models?provider=openai',
       );
       expect(res.status).toBe(403);
-      expect(res.body).not.toHaveProperty('modelIds');
+      expect(res.body).not.toHaveProperty('models');
     });
   });
 
