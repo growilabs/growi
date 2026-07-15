@@ -93,8 +93,6 @@ vi.mock('~/server/service/config-manager', () => ({
       switch (key) {
         case 'app:aiEnabled':
           return true;
-        case 'openai:serviceType':
-          return 'openai';
         case 'security:disableUserPages':
           return false;
         case 'aiTools:suggestPathEngine':

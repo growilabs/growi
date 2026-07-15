@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => {
   return {
     generateSuggestionsMock: vi.fn(),
     loginRequiredFactoryMock: vi.fn(),
-    certifyAiServiceMock: vi.fn(),
+    aiReadyGuardMock: vi.fn(),
     findAllUserGroupIdsMock: vi.fn(),
     findAllExternalUserGroupIdsMock: vi.fn(),
   };
@@ -24,12 +24,9 @@ vi.mock('~/server/middlewares/login-required', () => ({
   default: mocks.loginRequiredFactoryMock,
 }));
 
-vi.mock(
-  '~/features/openai/server/routes/middlewares/certify-ai-service',
-  () => ({
-    certifyAiService: mocks.certifyAiServiceMock,
-  }),
-);
+vi.mock('~/features/mastra/server/routes/ai-ready-guard', () => ({
+  aiReadyGuard: mocks.aiReadyGuardMock,
+}));
 
 vi.mock('~/server/middlewares/access-token-parser', () => ({
   accessTokenParser: vi.fn(() => vi.fn()),
@@ -68,7 +65,7 @@ describe('suggestPathHandlersFactory', () => {
   });
 
   describe('middleware chain', () => {
-    // Exact count: accessTokenParser + loginRequired + certifyAiService
+    // Exact count: accessTokenParser + loginRequired + aiReadyGuard
     // + 2 validator chains (body, engine) + apiV3FormValidator + the main
     // handler. A dropped security middleware must fail this, not slip
     // under a loose >= bound.
@@ -78,14 +75,14 @@ describe('suggestPathHandlersFactory', () => {
       expect(handlers).toHaveLength(7);
     });
 
-    it('should include certifyAiService and the login-required middleware in the chain', async () => {
+    it('should include aiReadyGuard and the login-required middleware in the chain', async () => {
       const loginRequiredMiddleware = vi.fn();
       mocks.loginRequiredFactoryMock.mockReturnValue(loginRequiredMiddleware);
 
       const { suggestPathHandlersFactory } = await import('.');
       const handlers = suggestPathHandlersFactory(mockCrowi);
 
-      expect(handlers).toContain(mocks.certifyAiServiceMock);
+      expect(handlers).toContain(mocks.aiReadyGuardMock);
       expect(handlers).toContain(loginRequiredMiddleware);
     });
   });

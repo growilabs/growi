@@ -10,7 +10,7 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 const testState = vi.hoisted(() => ({
   authenticateUser: true,
   aiEnabled: true,
-  openaiServiceType: 'openai' as string | null,
+  aiConfigured: true,
   disableUserPages: false,
   // Phase 2 - content analysis
   contentAnalysis: null as {
@@ -69,15 +69,14 @@ vi.mock('~/server/middlewares/login-required', () => ({
   },
 }));
 
-// Mock config manager — certifyAiService and generateMemoSuggestion read from this
+// Mock config manager — aiReadyGuard (via isAiEnabled) and
+// generateMemoSuggestion read from this
 vi.mock('~/server/service/config-manager', () => ({
   configManager: {
     getConfig: (key: string) => {
       switch (key) {
         case 'app:aiEnabled':
           return testState.aiEnabled;
-        case 'openai:serviceType':
-          return testState.openaiServiceType;
         case 'security:disableUserPages':
           return testState.disableUserPages;
         // The orchestrator resolves the default engine id from config; the
@@ -90,6 +89,15 @@ vi.mock('~/server/service/config-manager', () => ({
       }
     },
   },
+}));
+
+// Mock the configured-side collaborator of aiReadyGuard (the real guard stays
+// in the chain; isAiEnabled is driven through the config-manager mock above).
+// The real isAiConfigured derives from the multi-provider catalog config,
+// which is out of scope for this suite.
+vi.mock('~/features/mastra/server/services/is-ai-configured', () => ({
+  isAiConfigured: () => testState.aiConfigured,
+  isAiReady: () => testState.aiEnabled && testState.aiConfigured,
 }));
 
 // Mock user group relations — needed for user group resolution in handler
@@ -176,7 +184,7 @@ describe('POST /suggest-path integration', () => {
     // Reset test state to defaults
     testState.authenticateUser = true;
     testState.aiEnabled = true;
-    testState.openaiServiceType = 'openai';
+    testState.aiConfigured = true;
     testState.disableUserPages = false;
     testState.contentAnalysis = null;
     testState.contentAnalysisError = null;
@@ -298,22 +306,22 @@ describe('POST /suggest-path integration', () => {
     });
 
     describe('AI service gating', () => {
-      it('should return 403 when AI is not enabled', async () => {
+      it('should return 501 when AI is not enabled', async () => {
         testState.aiEnabled = false;
 
         await request(app)
           .post('/suggest-path')
           .send({ body: 'Some page content' })
-          .expect(403);
+          .expect(501);
       });
 
-      it('should return 403 when openai service type is not configured', async () => {
-        testState.openaiServiceType = null;
+      it('should return 501 when AI is not configured', async () => {
+        testState.aiConfigured = false;
 
         await request(app)
           .post('/suggest-path')
           .send({ body: 'Some page content' })
-          .expect(403);
+          .expect(501);
       });
     });
   });

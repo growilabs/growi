@@ -1,6 +1,6 @@
 import express from 'express';
 
-import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service';
+import { aiReadyGuard } from '~/features/mastra/server/routes/ai-ready-guard';
 import type Crowi from '~/server/crowi';
 
 // Import and wire the terminal handlers. Called lazily (see factory below):
@@ -23,9 +23,9 @@ export const factory = (crowi: Crowi): express.Router => {
 
   // Reject before touching the heavy stack, so instances with AI disabled
   // never load it. The same middleware also runs inside the handler chain
-  // (whose per-route contract is unchanged); it is a pure config read, so
-  // the double check is harmless.
-  router.use(certifyAiService);
+  // (whose per-route contract is unchanged); it only reads config-derived
+  // state, so the double check is harmless.
+  router.use(aiReadyGuard);
 
   // The terminal handlers are loaded by the FIRST request that passes the
   // guard, then reused. A failed load is retried on the next request instead

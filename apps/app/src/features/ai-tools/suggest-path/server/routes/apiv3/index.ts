@@ -6,7 +6,7 @@ import type { Request, RequestHandler } from 'express';
 import { body } from 'express-validator';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service';
+import { aiReadyGuard } from '~/features/mastra/server/routes/ai-ready-guard';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
@@ -149,7 +149,7 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
-    certifyAiService,
+    aiReadyGuard,
     ...validator,
     apiV3FormValidator,
     async (req: SuggestPathReq, res: ApiV3Response) => {
