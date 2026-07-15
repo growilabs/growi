@@ -1,28 +1,54 @@
 import { isPermalink } from '@growi/core/dist/utils/page-path-utils';
+import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import type { Types } from 'mongoose';
 import mongoose from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
 
 /**
- * Resolves and returns ID for a page from its path.
+ * Resolves page IDs for a batch of paths using at most two database calls.
  *
- * @param path - Extracted absolute path or permalink eg. '/docs/new' or '/6a4c8be9b698d2b7ab35cd6e'.
- * @returns - Resolved ID for page.
+ * Inputs are split into permalinks (eg. '/6a4c8be9b698d2b7ab35cd6e') and
+ * regular paths (eg. '/docs/new'), each resolved with a single `$in` query.
+ * The two queries run concurrently.
+ *
+ * @param paths - Extracted absolute paths and/or permalinks.
+ * @returns - Map from the original input string to its resolved page ID.
+ *            Inputs with no matching page are absent from the map.
  */
-export const resolveToPage = async (
-  path: string,
-): Promise<Types.ObjectId | null> => {
+export const resolveToPages = async (
+  paths: string[],
+): Promise<Map<string, Types.ObjectId>> => {
   const Page = mongoose.model<PageDocument, PageModel>('Page');
 
-  if (isPermalink(path)) {
-    const id = path.slice(1);
-    const page = await Page.findById(id);
+  const permalinkIds: string[] = [];
+  const normalPaths: string[] = [];
 
-    return page?._id ?? null;
+  for (const path of paths) {
+    if (isPermalink(path)) {
+      permalinkIds.push(removeHeadingSlash(path));
+    } else {
+      normalPaths.push(path);
+    }
   }
 
-  const page = await Page.findByPath(path);
+  const [byId, byPath] = await Promise.all([
+    permalinkIds.length
+      ? Page.find({ _id: { $in: permalinkIds } }).select('_id')
+      : [],
+    normalPaths.length
+      ? // Match findByPath: exclude empty pages ({ isEmpty: null } for v4 compat).
+        Page.find({
+          path: { $in: normalPaths },
+          $or: [{ isEmpty: false }, { isEmpty: null }],
+        }).select('_id path')
+      : [],
+  ]);
 
-  return page?._id ?? null;
+  const result = new Map<string, Types.ObjectId>();
+
+  for (const p of byId) result.set(`/${p._id.toString()}`, p._id);
+  for (const p of byPath) result.set(p.path, p._id);
+
+  return result;
 };

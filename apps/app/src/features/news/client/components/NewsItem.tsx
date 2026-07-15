@@ -16,7 +16,7 @@ const DEFAULT_EMOJI = '📢';
 
 type Props = {
   item: INewsItemWithReadStatus;
-  onReadMutate: () => void;
+  onReadMutate: (newsItemId: string) => void;
 };
 
 const NewsItemInner: FC<Props> = ({ item, onReadMutate }) => {
@@ -40,7 +40,7 @@ const NewsItemInner: FC<Props> = ({ item, onReadMutate }) => {
     const id = item._id.toString();
     try {
       await apiv3Post('/news/mark-read', { newsItemId: id });
-      onReadMutate();
+      onReadMutate(id);
     } catch {
       // silently ignore mark-read failures
     }
