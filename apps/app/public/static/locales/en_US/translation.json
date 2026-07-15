@@ -341,6 +341,27 @@
     },
     "exclude_tag": {
       "desc": "Exclude pages with {{tag}} tag"
+    },
+    "author": {
+      "desc": "Search for pages created by {{author}}"
+    },
+    "exclude_author": {
+      "desc": "Exclude pages created by {{author}}"
+    },
+    "editor": {
+      "desc": "Search for pages last edited by {{editor}}"
+    },
+    "exclude_editor": {
+      "desc": "Exclude pages edited by {{editor}}"
+    },
+    "group": {
+      "desc": "Search for pages granted to group {{group}}"
+    },
+    "exclude_group": {
+      "desc": "Exclude pages granted to group {{group}}"
+    },
+    "quoted_value": {
+      "desc": "Wrap any filter value in double quotes when it contains a space (e.g. a group name or page path)"
     }
   },
   "search": {
@@ -392,7 +413,8 @@
     "no_user_found": "No user found",
     "reply": "Reply",
     "delete_comment": "Delete comment?",
-    "comment_management_is_not_allowed": "Comment management is not allowed."
+    "comment_management_is_not_allowed": "Comment management is not allowed.",
+    "no_comments": "There are no comments yet."
   },
   "page_api_error": {
     "notfound_or_forbidden": "Original page is not found or forbidden.",
@@ -881,7 +903,7 @@
     "sign_in_failure": "Sign in failure.",
     "aws_sttings_required": "AWS settings required to use this function. Please ask the administrator.",
     "application_already_installed": "Application already installed.",
-    "email_address_could_not_be_used": "This email address could not be used. (Make sure the allowed email address)",
+    "email_address_could_not_be_used": "This email address cannot be used on this wiki. Please contact your administrator.",
     "user_id_is_not_available": "This User ID is not available.",
     "username_should_not_be_null": "Username should not be null. Please check Authentication Mechanism Settings on admin page",
     "email_address_is_already_registered": "This email address is already registered.",
@@ -963,7 +985,8 @@
   "user_group": {
     "select_group": "Select group",
     "belonging_to_no_group": "Could not find the groups you belong to.",
-    "manage_user_groups": "Manage user groups"
+    "manage_user_groups": "Manage user groups",
+    "only_yourself": "Only you"
   },
   "fix_page_grant": {
     "modal": {

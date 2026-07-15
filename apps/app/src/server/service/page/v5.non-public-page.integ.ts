@@ -13,6 +13,7 @@ import { getInstance } from '^/test/setup/crowi';
 import { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { PageActionType } from '~/interfaces/page-operation';
 import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
 import type Crowi from '~/server/crowi';
@@ -30,6 +31,12 @@ import Tag from '~/server/models/tag';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { generalXssFilter } from '~/services/general-xss-filter';
+
+type EmittedActivityParams = {
+  action: string;
+  targetModel: string;
+  contributor: { _id: { toString(): string } };
+};
 
 describe('PageService page operations with non-public pages', () => {
   // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
@@ -1059,6 +1066,33 @@ describe('PageService page operations with non-public pages', () => {
         relatedPage: pageIdRevert2,
         relatedTag: tagIdRevert2,
         isPageTrashed: true,
+      },
+    ]);
+
+    /*
+     * Revert - dedicated GRANT_RESTRICTED page for the v4-process activity
+     * assertion. A restricted page forces shouldUseV4ProcessForRevert -> true,
+     * exercising the revertDeletedPageV4 branch and its activity event emit.
+     */
+    const pageIdRevertActivityV4 = new mongoose.Types.ObjectId();
+    const revisionIdRevertActivityV4 = new mongoose.Types.ObjectId();
+    await Page.insertMany([
+      {
+        _id: pageIdRevertActivityV4,
+        path: '/trash/np_revert_activity_v4',
+        grant: Page.GRANT_RESTRICTED,
+        revision: revisionIdRevertActivityV4,
+        status: Page.STATUS_DELETED,
+        descendantCount: 0,
+      },
+    ]);
+    await Revision.insertMany([
+      {
+        _id: revisionIdRevertActivityV4,
+        pageId: pageIdRevertActivityV4,
+        body: 'np_revert_activity_v4',
+        format: 'markdown',
+        author: npDummyUser1,
       },
     ]);
   });
@@ -2379,6 +2413,47 @@ describe('PageService page operations with non-public pages', () => {
         { item: externalGroupIdB, type: GroupType.externalUserGroup },
       ]);
       expect(newlyCreatedPage?.grant).toBe(Page.GRANT_PUBLIC);
+    });
+
+    it('emits an update activity event with ACTION_PAGE_REVERT after a v4-process (GRANT_RESTRICTED) revert', async () => {
+      const trashedPage = await Page.findOne({
+        path: '/trash/np_revert_activity_v4',
+        status: Page.STATUS_DELETED,
+        grant: Page.GRANT_RESTRICTED,
+      });
+      expect(trashedPage).toBeTruthy();
+
+      // Suppress the async activity listener so the assertion stays deterministic.
+      // Verify the v4 revert branch emits the correct event.
+      const emitSpy = vi
+        .spyOn(crowi.events.activity, 'emit')
+        .mockImplementation(() => true);
+
+      try {
+        await revertDeletedPage(trashedPage, dummyUser1, {}, false, {
+          ip: '::ffff:127.0.0.1',
+          endpoint: '/_api/v3/pages/revert',
+        });
+
+        const revertedPage = await Page.findOne({
+          path: '/np_revert_activity_v4',
+        });
+        expect(revertedPage?.status).toBe(Page.STATUS_PUBLISHED);
+
+        const updateCall = emitSpy.mock.calls.find(
+          (call) => call[0] === 'update',
+        );
+        expect(updateCall).toBeDefined();
+
+        const parameters = updateCall?.[2] as EmittedActivityParams;
+        expect(parameters.action).toBe(SupportedAction.ACTION_PAGE_REVERT);
+        expect(parameters.targetModel).toBe(SupportedTargetModel.MODEL_PAGE);
+        expect(parameters.contributor._id.toString()).toBe(
+          dummyUser1._id.toString(),
+        );
+      } finally {
+        emitSpy.mockRestore();
+      }
     });
   });
 });

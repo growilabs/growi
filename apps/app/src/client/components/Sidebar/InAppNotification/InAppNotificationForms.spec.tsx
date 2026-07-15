@@ -14,6 +14,8 @@ describe('InAppNotificationForms', () => {
     onChangeUnopendNotificationsVisible: vi.fn(),
     activeFilter: 'all' as const,
     onChangeFilter: vi.fn(),
+    onMarkAllRead: vi.fn(),
+    isMarkAllReadDisabled: false,
   };
 
   beforeEach(() => {
@@ -93,5 +95,52 @@ describe('InAppNotificationForms', () => {
       .getByText('in_app_notification.filter_all')
       .closest('button');
     expect(allBtn?.classList.contains('btn-outline-secondary')).toBe(true);
+  });
+
+  describe('mark-all-as-read button', () => {
+    test('should render the mark-all-as-read button', () => {
+      render(<InAppNotificationForms {...defaultProps} />);
+      expect(
+        screen.getByText('in_app_notification.mark_all_as_read'),
+      ).toBeTruthy();
+    });
+
+    test('should call onMarkAllRead when clicked', () => {
+      const onMarkAllRead = vi.fn();
+      render(
+        <InAppNotificationForms
+          {...defaultProps}
+          onMarkAllRead={onMarkAllRead}
+        />,
+      );
+      fireEvent.click(screen.getByText('in_app_notification.mark_all_as_read'));
+      expect(onMarkAllRead).toHaveBeenCalled();
+    });
+
+    test('should be disabled when isMarkAllReadDisabled is true', () => {
+      render(
+        <InAppNotificationForms
+          {...defaultProps}
+          isMarkAllReadDisabled={true}
+        />,
+      );
+      const button = screen
+        .getByText('in_app_notification.mark_all_as_read')
+        .closest('button');
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    test('should not call onMarkAllRead when disabled and clicked', () => {
+      const onMarkAllRead = vi.fn();
+      render(
+        <InAppNotificationForms
+          {...defaultProps}
+          onMarkAllRead={onMarkAllRead}
+          isMarkAllReadDisabled={true}
+        />,
+      );
+      fireEvent.click(screen.getByText('in_app_notification.mark_all_as_read'));
+      expect(onMarkAllRead).not.toHaveBeenCalled();
+    });
   });
 });

@@ -172,14 +172,14 @@ describe('NewsItem', () => {
       });
     });
 
-    test('should call onReadMutate after marking as read', async () => {
+    test('should call onReadMutate with the news item id after marking as read', async () => {
       const item = makeNewsItem({ isRead: false });
       render(<NewsItem item={item} onReadMutate={onReadMutate} />);
 
       fireEvent.click(screen.getByRole('button'));
 
       await vi.waitFor(() => {
-        expect(onReadMutate).toHaveBeenCalled();
+        expect(onReadMutate).toHaveBeenCalledWith(item._id.toString());
       });
     });
   });

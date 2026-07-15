@@ -22,7 +22,7 @@ export const getRelatedGroupsHandlerFactory = (
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   return [
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }),
+    accessTokenParser([SCOPE.READ.FEATURES.USER_GROUP], { acceptLegacy: true }),
     loginRequiredStrictly,
     async (req: Req, res: ApiV3Response) => {
       try {

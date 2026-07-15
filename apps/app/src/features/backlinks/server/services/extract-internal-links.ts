@@ -18,6 +18,14 @@ const isAnchorLink = (href: string): boolean => {
   return href.length > 0 && href[0] === '#';
 };
 
+/**
+ * Extract internal page links from a page revision's markdown body.
+ *
+ * Resolves each link to a page path, dropping external, anchor, self, and
+ * non-creatable links, and deduplicates the result.
+ *
+ * @returns Resolved internal page paths the body links to.
+ */
 export const extractInternalLinks = async (
   markdown: string,
   pagePath: string,
@@ -67,7 +75,14 @@ export const extractInternalLinks = async (
     const isInternalAbsolute = siteHost != null && url.host === siteHost;
     if (!isRelative && !isInternalAbsolute) continue;
 
-    const path = normalizePath(decodeURIComponent(url.pathname));
+    // Skip links with malformed path.
+    let decodedPath: string;
+    try {
+      decodedPath = decodeURIComponent(url.pathname);
+    } catch {
+      continue;
+    }
+    const path = normalizePath(decodedPath);
 
     if (!pagePathUtils.isCreatablePage(path) || path === normalizedSelf)
       continue;
