@@ -402,6 +402,41 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
     });
   });
 
+  describe('content-negotiation response headers', () => {
+    // The same URL serves either HTML or markdown depending on Accept, and
+    // markdown bodies are viewer-specific. Without Vary + an explicit
+    // Cache-Control, a shared cache (reverse proxy / CDN) may store the
+    // markdown variant and serve it to a browser expecting HTML.
+    it('marks a 200 markdown response as Accept-varying and non-cacheable', async () => {
+      currentUser = testUser;
+
+      const res = await request(app).get(`/${docId}.md`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.vary).toContain('Accept');
+      expect(res.headers['cache-control']).toContain('no-store');
+    });
+
+    it('marks a 404 markdown response as Accept-varying and non-cacheable too', async () => {
+      currentUser = testUser;
+
+      const res = await request(app).get(`${BASE}/no-such-page-xyz.md`);
+
+      expect(res.status).toBe(404);
+      expect(res.headers.vary).toContain('Accept');
+      expect(res.headers['cache-control']).toContain('no-store');
+    });
+
+    it('does not add the markdown headers to a passthrough (HTML) response', async () => {
+      currentUser = testUser;
+
+      const res = await request(app).get(`${BASE}/literal.md`);
+
+      expect(res.text).toBe(SENTINEL);
+      expect(res.headers['cache-control']).toBeUndefined();
+    });
+  });
+
   describe('not found (Requirement 1.5, 2.3, 3.5)', () => {
     it('returns 404 text/markdown guidance when neither the path nor its base exists', async () => {
       currentUser = testUser;

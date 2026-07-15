@@ -99,19 +99,29 @@ export const pageMarkdownRouteFactory = (crowi: Crowi): Router => {
           origin: resolveOrigin(req),
         });
 
+        if (resolution.type === 'passthrough') {
+          // A literal `.md` page exists (Requirement 2.1): defer to the
+          // existing HTML delivery by falling through to the catch-all.
+          return next();
+        }
+
+        // The same URL serves either HTML or markdown depending on Accept,
+        // and markdown bodies are viewer-specific: mark the response
+        // Accept-varying and non-cacheable so shared caches (reverse proxy /
+        // CDN) never store a markdown variant and hand it to a browser.
+        res.vary('Accept');
+        res.set(
+          'Cache-Control',
+          'private, no-cache, no-store, max-age=0, must-revalidate',
+        );
+        res.type(MARKDOWN_CONTENT_TYPE);
+
         switch (resolution.type) {
-          case 'passthrough':
-            // A literal `.md` page exists (Requirement 2.1): defer to the
-            // existing HTML delivery by falling through to the catch-all.
-            return next();
           case 'ok':
-            res.type(MARKDOWN_CONTENT_TYPE);
             return res.status(200).send(resolution.markdown);
           case 'forbidden':
-            res.type(MARKDOWN_CONTENT_TYPE);
             return res.status(403).send(resolution.markdown);
           case 'notFound':
-            res.type(MARKDOWN_CONTENT_TYPE);
             return res.status(404).send(resolution.markdown);
         }
       } catch (err) {

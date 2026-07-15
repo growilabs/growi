@@ -292,6 +292,7 @@ function buildErrorMarkdown(kind: 'forbidden' | 'notFound'): string; // 3.5
 **Implementation Notes**
 - Integration: `routes/index.js` の catch-all（dev/8.0.x では `:402`/`:403`）直前に登録し、API・静的・`_next`・admin・attachment・ogp・share・`/`・`/vault.git` 等の既存ルートより後段に置く（それらは先に解決される）。ESM 化済みのため名前付き export ＋ `import` で組み込む。
 - Content negotiation: `Accept` は**メディアタイプの明示一致のみ**で判定（`req.accepts('text/markdown')` は `*/*`＝curl 既定にも一致するため使わない）。`.md` サフィックスは末尾が厳密に `.md` のときのみ（`.mdx` 等は対象外）。
+- Cache safety: markdown 応答（200/403/404）には `Vary: Accept` と `Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate` を付与する。同一 URL が Accept 次第で HTML にも markdown にもなるため、共有キャッシュ（reverse proxy / CDN）が markdown 表現を保存してブラウザに返す取り違えを防ぐ（応答キャッシュ層の導入自体は引き続き Non-Goal）。passthrough には付与しない。
 - Listing: 子・兄弟は id 指定で呼び MongoDB regex を生成しない（`escapeStringForMongoRegex` を不要にする）。
 - Validation: permalink は `isValidObjectId` で 24-hex を検証。
 - Known limitation: トップページ `/` は専用ルート（`routes/index.js:84`）が interception より先に解決するため、`/` への `Accept`/`?format=md` は md 化されない（`/{pageId}.md` permalink 形では取得可能）。
