@@ -278,11 +278,32 @@ function buildSnapshotUpdateEnvelope(
 // escapeStringForMongoRegex, not RegExp.escape (mongodb-regex rule — PCRE2
 // rejects RegExp.escape's \uXXXX output). Trims `q` so the match stays
 // consistent with isQueryTooShort's trimmed-length check below (untrimmed
-// would anchor to a leading/trailing space instead of the intended prefix).
-const buildSnapshotUsernameMatchStage = (q: string) => ({
+// would leave stray leading/trailing space characters in the pattern).
+const escapeSnapshotUsernameQuery = (q: string): string =>
+  escapeStringForMongoRegex(q.trim());
+
+// Substring match — used by findSnapshotUsernamesByUsernameRegexWithTotalCount,
+// whose only production caller is the `/usernames` admin listing API. This
+// preserves that API's pre-existing substring-match behavior (the pre-Prisma
+// Mongoose implementation was also substring, unanchored); do not anchor this
+// to a prefix, or the admin listing's search semantics silently change.
+const buildSnapshotUsernameSubstringMatchStage = (q: string) => ({
   $match: {
     'snapshot.username': {
-      $regex: `^${escapeStringForMongoRegex(q.trim())}`,
+      $regex: escapeSnapshotUsernameQuery(q),
+      $options: 'i',
+    },
+  },
+});
+
+// Prefix-only match — used by findSnapshotUsernamesByUsernameRegex, the plain
+// (no-total-count) MongoDB fallback for when Elasticsearch is unreachable/
+// unconfigured. Prefix-only, unlike ES's `fuzziness: 'AUTO'`: MongoDB has no
+// native fuzzy match.
+const buildSnapshotUsernamePrefixMatchStage = (q: string) => ({
+  $match: {
+    'snapshot.username': {
+      $regex: `^${escapeSnapshotUsernameQuery(q)}`,
       $options: 'i',
     },
   },
@@ -462,8 +483,10 @@ export const extension = Prisma.defineExtension((client) => {
 
         /**
          * Find snapshot usernames matching a case-insensitive prefix, unbounded
-         * (no total count). Mirrors the pre-Prisma Mongoose static of the same
-         * name — used by the MongoDB fallback path (ES unreachable/unconfigured).
+         * (no total count). Used by the MongoDB fallback path (ES unreachable/
+         * unconfigured) — intentionally prefix-only, unlike the substring match
+         * used by the WithTotalCount variant below (see
+         * buildSnapshotUsernamePrefixMatchStage).
          *
          * Requirements: 3.4 — design.md: ActivityExtension Contracts (findSnapshotUsernames).
          */
@@ -481,7 +504,7 @@ export const extension = Prisma.defineExtension((client) => {
           const limit = opt.limit || 10;
 
           const pipeline = [
-            buildSnapshotUsernameMatchStage(q),
+            buildSnapshotUsernamePrefixMatchStage(q),
             SNAPSHOT_USERNAME_GROUP_STAGE,
             { $sort: { _id: 1 } },
             { $skip: offset },
@@ -500,9 +523,11 @@ export const extension = Prisma.defineExtension((client) => {
         },
 
         /**
-         * Find snapshot usernames matching a case-insensitive prefix, with a
-         * distinct total count. Shares $match/$group stages with the plain
-         * variant above.
+         * Find snapshot usernames matching a case-insensitive substring, with a
+         * distinct total count. Its only production caller is the `/usernames`
+         * admin listing API (`apiv3/users.js`), so this stays substring-matching
+         * — matching the pre-Prisma Mongoose behavior — rather than the
+         * prefix-only match used by the plain (ES-fallback) variant below.
          *
          * Unbounded by design — no `$limit` before `$match` (a prior cap there
          * silently hid matches beyond it); `maxTimeMS` bounds runtime instead.
@@ -526,7 +551,7 @@ export const extension = Prisma.defineExtension((client) => {
           const limit = opt.limit || 10;
 
           const usernamesPipeline = [
-            buildSnapshotUsernameMatchStage(q),
+            buildSnapshotUsernameSubstringMatchStage(q),
             SNAPSHOT_USERNAME_GROUP_STAGE,
             { $sort: { _id: sortOpt } },
             { $skip: offset },
@@ -534,7 +559,7 @@ export const extension = Prisma.defineExtension((client) => {
           ];
 
           const totalCountPipeline = [
-            buildSnapshotUsernameMatchStage(q),
+            buildSnapshotUsernameSubstringMatchStage(q),
             SNAPSHOT_USERNAME_GROUP_STAGE,
             { $count: 'total' },
           ];

@@ -414,7 +414,11 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount',
    *   - Usernames pipeline stages in order: $match(regex), $group, $sort, $skip, $limit
    *     (unbounded — no cap before $match; maxTimeMS bounds runtime instead)
    *   - TotalCount pipeline: $match(regex), $group, $count('total') → distinct count
-   *   - `q` is escaped (escapeStringForMongoRegex) and anchored to a prefix (`^`)
+   *   - `q` is escaped (escapeStringForMongoRegex) and matched as a substring
+   *     (NOT prefix-anchored — this is the only production caller, the
+   *     `/usernames` admin listing API, and must keep its pre-Prisma Mongoose
+   *     substring-match behavior; prefix-only matching is exclusive to the
+   *     plain findSnapshotUsernamesByUsernameRegex variant below)
    *   - Both aggregateRaw calls pass `options: { maxTimeMS: 5000 }`
    *   - Empty aggregateRaw results → { usernames: [], totalCount: 0 }
    *   - No MIN_QUERY_LENGTH short-circuit — an empty `q` legitimately matches
@@ -455,7 +459,7 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount',
     expect(result).toEqual({ usernames: ['alice', 'bob'], totalCount: 5 });
   });
 
-  it('usernames pipeline contains correct stages in order with an escaped, prefix-anchored regex', async () => {
+  it('usernames pipeline contains correct stages in order with an escaped substring regex (no prefix anchor)', async () => {
     // Arrange
     const { client, aggregateRawSpy } = buildAggregateClient();
     aggregateRawSpy.mockResolvedValueOnce([{ _id: 'charlie' }] as never);
@@ -468,37 +472,39 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount',
       { sortOpt: -1, offset: 5, limit: 20 },
     );
 
-    // Assert: first aggregateRaw call = usernames pipeline
+    // Assert: first aggregateRaw call = usernames pipeline. One full-shape
+    // comparison (not one expect() per stage) so this stays a single "this is
+    // the query sent to Mongo" contract rather than inviting more granular,
+    // implementation-coupled assertions over time.
     expect(aggregateRawSpy).toHaveBeenCalledTimes(2);
     const firstCallArgs = aggregateRawSpy.mock.calls[0]?.[0] as {
       pipeline: unknown[];
       options: { maxTimeMS: number };
     };
-    expect(firstCallArgs).toBeDefined();
-    const pipeline = firstCallArgs.pipeline;
-    expect(pipeline).toHaveLength(5);
-    // Stage 0: $match, regex metacharacters escaped and anchored to a prefix
-    expect(pipeline[0]).toEqual({
-      $match: {
-        'snapshot.username': {
-          $regex: '^char\\.\\*\\[special',
-          $options: 'i',
+    expect(firstCallArgs).toEqual({
+      pipeline: [
+        {
+          $match: {
+            'snapshot.username': {
+              // No `^` anchor — substring match, matching the pre-Prisma
+              // Mongoose behavior of this method's only production caller
+              // (the `/usernames` admin listing API).
+              $regex: 'char\\.\\*\\[special',
+              $options: 'i',
+            },
+          },
         },
-      },
+        { $group: { _id: '$snapshot.username' } },
+        { $sort: { _id: -1 } },
+        { $skip: 5 },
+        { $limit: 20 },
+      ],
+      // Runtime is bounded instead of a pre-match row cap.
+      options: { maxTimeMS: 5000 },
     });
-    // Stage 1: $group by snapshot.username
-    expect(pipeline[1]).toEqual({ $group: { _id: '$snapshot.username' } });
-    // Stage 2: $sort with provided sortOpt
-    expect(pipeline[2]).toEqual({ $sort: { _id: -1 } });
-    // Stage 3: $skip with provided offset
-    expect(pipeline[3]).toEqual({ $skip: 5 });
-    // Stage 4: $limit with provided limit
-    expect(pipeline[4]).toEqual({ $limit: 20 });
-    // Runtime is bounded instead of a pre-match row cap
-    expect(firstCallArgs.options).toEqual({ maxTimeMS: 5000 });
   });
 
-  it('trims surrounding whitespace out of q before anchoring the regex', async () => {
+  it('trims surrounding whitespace out of q before matching', async () => {
     // Arrange
     const { client, aggregateRawSpy } = buildAggregateClient();
     aggregateRawSpy.mockResolvedValueOnce([] as never);
@@ -510,12 +516,12 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount',
       { sortOpt: 1, offset: 0, limit: 10 },
     );
 
-    // Assert: the leading/trailing spaces are not part of the anchored prefix
+    // Assert: the leading/trailing spaces are not part of the substring match
     const firstCallArgs = aggregateRawSpy.mock.calls[0]?.[0] as {
       pipeline: unknown[];
     };
     expect(firstCallArgs.pipeline[0]).toEqual({
-      $match: { 'snapshot.username': { $regex: '^ali', $options: 'i' } },
+      $match: { 'snapshot.username': { $regex: 'ali', $options: 'i' } },
     });
   });
 
@@ -531,20 +537,20 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount',
       { sortOpt: 1, offset: 0, limit: 10 },
     );
 
-    // Assert: second aggregateRaw call = totalCount pipeline
+    // Assert: second aggregateRaw call = totalCount pipeline (one full-shape
+    // comparison, as above)
     const secondCallArgs = aggregateRawSpy.mock.calls[1]?.[0] as {
       pipeline: unknown[];
       options: { maxTimeMS: number };
     };
-    expect(secondCallArgs).toBeDefined();
-    const totalPipeline = secondCallArgs.pipeline;
-    expect(totalPipeline).toHaveLength(3);
-    expect(totalPipeline[0]).toEqual({
-      $match: { 'snapshot.username': { $regex: '^dave', $options: 'i' } },
+    expect(secondCallArgs).toEqual({
+      pipeline: [
+        { $match: { 'snapshot.username': { $regex: 'dave', $options: 'i' } } },
+        { $group: { _id: '$snapshot.username' } },
+        { $count: 'total' },
+      ],
+      options: { maxTimeMS: 5000 },
     });
-    expect(totalPipeline[1]).toEqual({ $group: { _id: '$snapshot.username' } });
-    expect(totalPipeline[2]).toEqual({ $count: 'total' });
-    expect(secondCallArgs.options).toEqual({ maxTimeMS: 5000 });
     await expect(aggregateRawSpy.mock.results[1]?.value).resolves.toEqual([
       { total: 42 },
     ]);
@@ -601,13 +607,12 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount',
     const firstCallArgs = aggregateRawSpy.mock.calls[0]?.[0] as {
       pipeline: unknown[];
     };
-    const pipeline = firstCallArgs.pipeline;
-    // Default sortOpt = 1
-    expect(pipeline[2]).toEqual({ $sort: { _id: 1 } });
-    // Default limit = 10
-    expect(pipeline[4]).toEqual({ $limit: 10 });
-    // offset = 0 (the || default is also 0, so same result)
-    expect(pipeline[3]).toEqual({ $skip: 0 });
+    // Defaults: sortOpt=1, offset=0 (same as the falsy input), limit=10
+    expect(firstCallArgs.pipeline.slice(2)).toEqual([
+      { $sort: { _id: 1 } },
+      { $skip: 0 },
+      { $limit: 10 },
+    ]);
   });
 });
 
@@ -615,8 +620,11 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegex', () => {
   /**
    * Plain (no total count) variant used by the MongoDB fallback path
    * (SearchService.searchAuditlogUsernames — invoked only when Elasticsearch
-   * is unreachable/unconfigured). Same $match/$group shape as the
-   * WithTotalCount variant's usernames pipeline, but additionally
+   * is unreachable/unconfigured). Shares the $group stage with the
+   * WithTotalCount variant's usernames pipeline, but matches by prefix
+   * (`^`-anchored) rather than substring — WithTotalCount's substring match is
+   * specific to its own production caller (the `/usernames` admin API) and
+   * must not leak here or vice versa. Also additionally
    * short-circuits below MIN_QUERY_LENGTH so a whitespace/single-char query
    * never reaches MongoDB (design.md; req 3.4).
    */
@@ -662,18 +670,20 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegex', () => {
       pipeline: unknown[];
       options: { maxTimeMS: number };
     };
-    expect(callArgs.pipeline).toEqual([
-      {
-        $match: {
-          'snapshot.username': { $regex: '^a\\.b', $options: 'i' },
+    expect(callArgs).toEqual({
+      pipeline: [
+        {
+          $match: {
+            'snapshot.username': { $regex: '^a\\.b', $options: 'i' },
+          },
         },
-      },
-      { $group: { _id: '$snapshot.username' } },
-      { $sort: { _id: 1 } },
-      { $skip: 3 },
-      { $limit: 15 },
-    ]);
-    expect(callArgs.options).toEqual({ maxTimeMS: 5000 });
+        { $group: { _id: '$snapshot.username' } },
+        { $sort: { _id: 1 } },
+        { $skip: 3 },
+        { $limit: 15 },
+      ],
+      options: { maxTimeMS: 5000 },
+    });
   });
 
   it('trims surrounding whitespace out of q before anchoring the regex', async () => {

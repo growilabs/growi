@@ -16,10 +16,12 @@
  *   - Descending sort order (sortOpt: -1) is respected.
  *   - Offset/limit pagination on the returned `usernames` slice works correctly.
  *   - The regex is case-insensitive ($options: 'i') — matches regardless of case.
- *   - `q` is escaped (escapeStringForMongoRegex) and anchored to a prefix (`^`):
- *     a pattern like 'ali' matches 'alice'/'Alice' (case-insensitive prefix)
- *     but NOT 'notalice' (no longer a substring match — this is the yuki-takei
- *     PR #11377 review fix, previously R6/scope-out).
+ *   - `q` is escaped (escapeStringForMongoRegex). `WithTotalCount`'s only
+ *     production caller is the `/usernames` admin listing API, so it stays a
+ *     substring match (matching the pre-Prisma Mongoose behavior): 'ali'
+ *     matches both 'alice' and 'notalice'. The plain (no-total-count) variant
+ *     tested further below is prefix-only (`^`-anchored) instead, since it
+ *     backs the Elasticsearch fallback path — see its own describe block.
  *   - Returns empty result when no usernames match the query.
  *   - Usernames are deduplicated: multiple activities with the same snapshot.username
  *     are counted/returned only once.
@@ -250,8 +252,13 @@ describe('findSnapshotUsernamesByUsernameRegexWithTotalCount', () => {
     expect(result.usernames).toEqual(['repeated_user']);
   });
 
-  it('matches only a prefix, not any substring (yuki-takei PR #11377 review fix)', async () => {
-    // Arrange: 'notalice' contains 'ali' as a substring but does not start with it
+  it('matches substrings, not only prefixes (parity with the `/usernames` admin API pre-Prisma behavior)', async () => {
+    // Arrange: 'notalice' contains 'ali' as a substring but does not start with it.
+    // This method must keep matching it — its only production caller is the
+    // `/usernames` admin listing API, which relied on substring matching before
+    // the Prisma migration. (Prefix-only matching is exclusive to the plain
+    // findSnapshotUsernamesByUsernameRegex variant tested in the next describe
+    // block, which backs the Elasticsearch fallback path instead.)
     await prisma.activities.createMany({
       data: [
         makeActivityData({ username: 'alice' }),
@@ -266,9 +273,11 @@ describe('findSnapshotUsernamesByUsernameRegexWithTotalCount', () => {
         { sortOpt: 1, offset: 0, limit: 10 },
       );
 
-    // Assert: prefix match only
-    expect(result.usernames).toEqual(['alice']);
-    expect(result.totalCount).toBe(1);
+    // Assert: substring match — both usernames matched
+    expect(result.usernames).toEqual(
+      expect.arrayContaining(['alice', 'notalice']),
+    );
+    expect(result.totalCount).toBe(2);
   });
 });
 
