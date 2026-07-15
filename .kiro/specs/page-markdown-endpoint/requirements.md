@@ -58,7 +58,7 @@ GROWI の URL だけを AI（対話エージェント）や検索エンジンに
 1. When リクエストパス R が `.md` で終わり、かつ R そのものに対応する実在ページがあるとき, the GROWI サーバー shall 従来どおりそのページの通常（HTML）表示を返し、`.md` をフォーマット指定として解釈しない。
 2. When リクエストパス R が `.md` で終わり、R に対応する実在ページが無く、末尾 `.md` を除いた base に対応する実在ページがあるとき, the Markdown エンドポイント shall base ページの Markdown を返す。
 3. If リクエストパス R が `.md` で終わり、R にも base にも対応するページが無いとき, then the GROWI サーバー shall HTTP 404 を返す。
-4. When クライアントが `Accept: text/markdown` または `?format=md` を明示したとき, the Markdown エンドポイント shall 要求されたパスそのものに対応するページの解決を最優先し、該当ページが存在すればその Markdown を返す（存在するが閲覧権限が無い場合は 403 とし、base へのフォールバックは行わない）。
+4. When クライアントが `Accept: text/markdown` または `?format=md` を明示したとき, the Markdown エンドポイント shall 要求されたパスそのものに対応するページの解決を最優先し、該当ページが存在すればその Markdown を返す（存在するが閲覧権限が無い場合は 403 とし、base へのフォールバックは行わない）。なお permalink 形（`/{pageId}.md`）は、`.md` 終端パスがページとして通常作成できない（予約済みである）ことを根拠に、literal 実在確認を省略して id 解決に直行してよい。
 5. If 明示指定（`Accept: text/markdown` または `?format=md`）されたパスが `.md` で終わり、そのパスそのものに対応するページが無いとき, then the Markdown エンドポイント shall 末尾 `.md` を除いた形での解決にフォールバックする（除去後が permalink 形であれば該当ページ、そうでなければ base パスのページの Markdown を返す）。footer 等が配る permalink 形 `.md` URL に明示シグナルを重ねた取得はこの規則で成立する。
 
 ### Requirement 3: アクセス制御（既存のページ閲覧認可の踏襲）
@@ -79,7 +79,7 @@ GROWI の URL だけを AI（対話エージェント）や検索エンジンに
 2. When 対象ページに親ページがあるとき, the Markdown エンドポイント shall footer に親ページへの `/{pageId}.md` 形式のリンクを含める。
 3. When 対象ページに子ページがあるとき, the Markdown エンドポイント shall footer に子ページへの `/{pageId}.md` 形式のリンクと直下子ページ総数を含め、あわせて子孫合計（descendantCount）を直下子数とは別に併記する。
 4. When 対象ページに兄弟ページがあるとき, the Markdown エンドポイント shall footer に兄弟ページへの `/{pageId}.md` 形式のリンクを含める。
-5. The Markdown エンドポイント shall footer に対象ページの最終更新日時と更新者を含める。
+5. The Markdown エンドポイント shall footer に対象ページの最終更新日時と更新者を含める。ただし更新情報を持たないページ（リビジョンの無い空コンテナ等）では、欠けた行を出さず行ごと省略する。
 6. The Markdown エンドポイント shall 子ページ数の多寡に関わらず、全件を取得できる既存のページ一覧取得手段（ページ一覧 API）への案内を footer に常に含める。
 7. If footer に列挙する子ページまたは兄弟ページの件数が上限を超えるとき, then the Markdown エンドポイント shall 総数と省略された残数を明記する（黙って切り詰めない）。
 8. Where 対象ページが階層のルートで親を持たない場合, the Markdown エンドポイント shall footer の親リンクを省略する。

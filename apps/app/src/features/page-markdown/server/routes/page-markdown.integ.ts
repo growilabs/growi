@@ -473,6 +473,9 @@ describe('page-markdown route (integration)', () => {
       expect(res.headers['content-type']).toContain('text/markdown');
       expect(res.text).toContain('403');
       expect(res.text).not.toContain(bodySecret);
+      // 403 shares the content-negotiation headers with 200/404
+      expect(res.headers.vary).toContain('Accept');
+      expect(res.headers['cache-control']).toContain('no-store');
     });
   });
 
