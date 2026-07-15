@@ -581,7 +581,7 @@
   "ai_sidebar": {
     "new_chat": "新規チャット",
     "recent_threads": "最近の項目",
-    "accuracy_notice": "情報が正しいか出典を確認しましょう。",
+    "accuracy_notice": "情報が正しいか参照ページを確認しましょう。",
     "sources": "参照したページ {{count}} 件",
     "error": {
       "title": "エラーが発生しました",

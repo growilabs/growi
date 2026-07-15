@@ -547,7 +547,7 @@
   "ai_sidebar": {
     "new_chat": "New Chat",
     "recent_threads": "Recent Items",
-    "accuracy_notice": "Check the sources to verify the information.",
+    "accuracy_notice": "Check the referenced pages to verify the information.",
     "sources": "{{count}} pages referenced",
     "sources_one": "{{count}} page referenced",
     "sources_other": "{{count}} pages referenced",
