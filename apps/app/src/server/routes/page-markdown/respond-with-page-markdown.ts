@@ -277,27 +277,24 @@ export async function respondWithPageMarkdown(
     );
   }
 
-  // intent.kind === 'path'
-  if (intent.explicit) {
-    // Explicit (Accept / ?format=md): resolve the requested path AS-IS -- never
-    // strip a trailing `.md` (Requirement 2.4).
-    return buildFromResult(
-      await resolvePage(crowi, { pageId: null, path: intent.path }, user),
-      user,
-      origin,
-    );
-  }
-
-  // `.md` suffix sugar (literal-wins, owned here). First resolve the ORIGINAL
-  // path R; if a real page exists there -- viewable OR forbidden -- hand off to
-  // the existing HTML flow (Requirement 2.1). Otherwise strip the trailing `.md`
-  // and resolve the base path (Requirement 2.2 / 2.3).
+  // intent.kind === 'path': resolve the ORIGINAL (unstripped) path first.
+  // The literal outcome decides the branch (literal-wins, owned here):
+  // - literal exists (viewable OR forbidden) + explicit -> serve THAT page's
+  //   markdown / 403; a forbidden literal never falls back to the base
+  //   (existence wins -- Requirement 2.4).
+  // - literal exists + suffix sugar -> hand off to the existing HTML flow
+  //   (Requirement 2.1).
+  // - literal absent + `.md` suffix -> strip and resolve the base path
+  //   (Requirement 2.2 / 2.3 for sugar, 2.5 for explicit).
   const literal = await resolvePage(
     crowi,
     { pageId: null, path: intent.path },
     user,
   );
   if (pageExists(literal)) {
+    if (intent.explicit) {
+      return buildFromResult(literal, user, origin);
+    }
     logger.debug(
       { reqPath },
       'markdown resolution: passthrough (literal .md page exists)',
@@ -305,9 +302,12 @@ export async function respondWithPageMarkdown(
     return { type: 'passthrough' };
   }
 
-  const base = intent.path.endsWith(MARKDOWN_SUFFIX)
-    ? intent.path.slice(0, -MARKDOWN_SUFFIX.length)
-    : intent.path;
+  if (!intent.path.endsWith(MARKDOWN_SUFFIX)) {
+    // Explicit request for a plain path that simply does not resolve.
+    return buildFromResult(literal, user, origin);
+  }
+
+  const base = intent.path.slice(0, -MARKDOWN_SUFFIX.length);
   if (base.length === 0) {
     // Path was exactly the suffix -> nothing to resolve.
     logger.debug({ reqPath }, 'markdown resolution: notFound (empty base)');

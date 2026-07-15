@@ -58,7 +58,8 @@ GROWI の URL だけを AI（対話エージェント）や検索エンジンに
 1. When リクエストパス R が `.md` で終わり、かつ R そのものに対応する実在ページがあるとき, the GROWI サーバー shall 従来どおりそのページの通常（HTML）表示を返し、`.md` をフォーマット指定として解釈しない。
 2. When リクエストパス R が `.md` で終わり、R に対応する実在ページが無く、末尾 `.md` を除いた base に対応する実在ページがあるとき, the Markdown エンドポイント shall base ページの Markdown を返す。
 3. If リクエストパス R が `.md` で終わり、R にも base にも対応するページが無いとき, then the GROWI サーバー shall HTTP 404 を返す。
-4. When クライアントが `Accept: text/markdown` または `?format=md` を明示したとき, the Markdown エンドポイント shall 末尾 `.md` の除去を行わず、要求されたパスそのものに対応するページの Markdown を返す。
+4. When クライアントが `Accept: text/markdown` または `?format=md` を明示したとき, the Markdown エンドポイント shall 要求されたパスそのものに対応するページの解決を最優先し、該当ページが存在すればその Markdown を返す（存在するが閲覧権限が無い場合は 403 とし、base へのフォールバックは行わない）。
+5. If 明示指定（`Accept: text/markdown` または `?format=md`）されたパスが `.md` で終わり、そのパスそのものに対応するページが無いとき, then the Markdown エンドポイント shall 末尾 `.md` を除いた形での解決にフォールバックする（除去後が permalink 形であれば該当ページ、そうでなければ base パスのページの Markdown を返す）。footer 等が配る permalink 形 `.md` URL に明示シグナルを重ねた取得はこの規則で成立する。
 
 ### Requirement 3: アクセス制御（既存のページ閲覧認可の踏襲）
 **Objective:** As a GROWI 管理者, I want Markdown 取得が通常のページ閲覧と同じ権限で保護されること, so that 非公開情報が新しい経路から漏れない

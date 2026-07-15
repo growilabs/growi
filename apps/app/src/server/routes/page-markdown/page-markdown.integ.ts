@@ -448,6 +448,32 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
       expect(res.headers['content-type']).toContain('text/markdown');
       expect(res.text).toContain(bodyLiteral);
     });
+
+    it('falls back to the base page when Accept: text/markdown is sent to a sugar-form {path}.md URL (Requirement 2.5)', async () => {
+      currentUser = testUser;
+
+      // Agents handed a sugar-form ".md" URL routinely add an explicit Accept
+      // header; that combination must not turn a working URL into a 404.
+      const res = await request(app)
+        .get(`${BASE}/doc.md`)
+        .set('Accept', 'text/markdown');
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/markdown');
+      expect(res.text).toContain(bodyDoc);
+    });
+
+    it('resolves a permalink .md URL sent with Accept: text/markdown (Requirement 2.5)', async () => {
+      currentUser = testUser;
+
+      const res = await request(app)
+        .get(`/${docId}.md`)
+        .set('Accept', 'text/markdown');
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain('text/markdown');
+      expect(res.text).toContain(bodyDoc);
+    });
   });
 
   describe('guest access (Requirement 3.3, 3.4)', () => {

@@ -136,13 +136,13 @@ apps/app/src/
 flowchart TD
     A[GET request reaches md interception] --> B{md request?}
     B -->|no accept, no format, path not end with md| Z[next to existing HTML delegate]
-    B -->|yes| C[parseMarkdownRequest]
-    C --> D{explicit accept or format?}
-    D -->|yes| E[target equals requested path or id, no strip]
-    D -->|no, md suffix| F{literal page at R exists for viewer?}
-    F -->|yes, legacy| Z
-    F -->|no| G[strip trailing md then target equals base]
-    E --> H[findPageAndMetaDataByViewer]
+    B -->|yes| C[parseMarkdownRequest decodes percent-encoding and classifies]
+    C -->|permalink incl explicit pageId.md| H[findPageAndMetaDataByViewer]
+    C -->|path| F{literal page at R exists for viewer?}
+    F -->|yes, explicit| E[serve the literal page itself as markdown 200 or 403]
+    F -->|yes, suffix sugar| Z
+    F -->|no, R ends with md| G[strip trailing md then target equals base]
+    F -->|no, R without md suffix| K
     G --> H
     H --> I{result}
     I -->|forbidden| J[403 text markdown with guidance]
@@ -152,8 +152,9 @@ flowchart TD
     M --> N[200 text markdown]
 ```
 
-- 判定順: `Accept: text/markdown` または `?format=md`（明示）が最優先で、この場合は末尾 `.md` を除去しない。次に `.md` サフィックス（糖衣）で、literal-wins（実在すれば HTML へフォールスルー、なければ base へ）。
-- permalink 形（`/{pageId}.md`）は path の実在チェック不要（id 解決）。path 形のみ literal→base の二段解決。
+- 判定順: `Accept: text/markdown` または `?format=md`（明示）が最優先。明示時は**要求パスそのものの解決を最優先**し、literal が実在すればそのページの Markdown（権限が無ければ 403。base へは流れない＝存在が勝つ）、literal 不在で `.md` 終端なら base へフォールバックする（2.4/2.5。footer が配る `.md` URL に明示シグナルを重ねても 404 にならない）。次に `.md` サフィックス（糖衣）で、literal-wins（実在すれば HTML へフォールスルー、なければ base へ）。
+- permalink 形（`/{pageId}.md`）は明示・糖衣のどちらでも id 解決に直行する（`/{24hex}.md` は `isCreatablePage` の `.md` 予約により実ページとして作成できないため、literal 実在チェックは不要）。path 形のみ literal→base の二段解決。
+- 分類・解決は **decode 済みパス**で行う。Express の `req.path` は percent-encoding を解除せずに渡すが、ページパスは decode 済みで保存されるため、`parseMarkdownRequest` の入口で `decodeURIComponent`（malformed escape は raw フォールバック。実際には Express 自身が `/*` マッチ時に 400 を返す）を通す。空白・日本語を含むパスの取得はこれで成立する。
 
 ## Requirements Traceability
 
@@ -165,7 +166,8 @@ flowchart TD
 | 2.1 | literal `.md` 実在ページは HTML 表示 | Route, Responder | Passthrough branch |
 | 2.2 | base 実在なら base の md | Responder, parseMarkdownRequest | Resolution flow |
 | 2.3 | R も base も無ければ 404 | Route, Responder | Resolution flow |
-| 2.4 | `Accept`/`?format=md` は除去せず要求パスの md | parseMarkdownRequest | Explicit branch |
+| 2.4 | `Accept`/`?format=md` は要求パス最優先（literal 実在ならそのページ／403、base へ流れない） | parseMarkdownRequest, Responder | Explicit branch |
+| 2.5 | 明示＋`.md` 終端で literal 不在なら base（permalink 形は id）へフォールバック | parseMarkdownRequest, Responder | Explicit branch |
 | 3.1, 3.2 | 既存認可踏襲・権限外 403 | Authz middleware, Responder | 既存 viewer ファインダ |
 | 3.3, 3.4 | ゲスト設定＋grant に従う匿名可否 | Authz middleware | `loginRequired` ゲスト許可 |
 | 3.5 | 403/404 に認証/MCP 案内 | Route, buildPageMarkdown | Error bodies |
@@ -200,7 +202,7 @@ flowchart TD
 | Requirements | 1.1–1.5, 2.1–2.4, 4.1–4.8, 5.1–5.3 |
 
 **Responsibilities & Constraints**
-- `parseMarkdownRequest` の意図に従い、permalink は id、path は literal→base の順で `findPageAndMetaDataByViewer` を用いて解決。
+- `parseMarkdownRequest` の意図に従い、permalink は id、path は literal→base の順で `findPageAndMetaDataByViewer` を用いて解決。literal が実在するとき、明示（explicit）ならそのページ自身を Markdown で返し（権限外は 403。base へフォールバックしない＝存在が勝つ）、糖衣なら HTML へ passthrough する。
 - forbidden / not-found は既存ファインダの判定をそのまま反映（独自判定を作らない）。
 - ok の場合、**finder は populate しない**ため `page.initLatestRevisionField()` ＋ `page.populateDataToShowRevision(false)` で本文（`revision.body`）と更新者を populate し、`page.parent`（ObjectId）から親を**追加クエリ**で path/title 解決する（`respond-with-single-page.ts:78-81` と同じ役割を route 層で担う）。
 - 子・兄弟は page-listing サービスの **id 指定・limit 付き取得**でリンク用に最大 `MARKDOWN_FOOTER_MAX_LINKS + 1` 件だけロードし、直下子の**正確な総数**は `addViewerCondition` を重ねた `countDocuments({ parent: id })` で得る（`addViewerCondition` を find と count で**共有**＝grant ロジックを二重実装せず drift を避ける）。子孫合計 `page.descendantCount` は別途併記。兄弟も対象の `parent` id で同様に取得し自分を除外。`parent == null`（ルート）は親・兄弟を省略。メモリは最大 N+1 件に固定（全件ロード・cursor は不要）。
@@ -235,11 +237,12 @@ type MarkdownRequestIntent =
   | { kind: 'none' } // not a markdown request → caller does next()
   | { kind: 'permalink'; pageId: string; explicit: boolean }
   | { kind: 'path'; path: string; explicit: boolean };
-// explicit=true: Accept/​?format=md（末尾 .md を除去しない）
+// explicit=true: Accept/​?format=md（path は unstripped のまま返す。ただし /{pageId}.md は permalink として認識）
 // explicit=false: .md サフィックス（path の場合は literal→base）
 function parseMarkdownRequest(reqPath: string, accept: string | undefined, formatQuery: string | undefined): MarkdownRequestIntent;
 ```
 - 判定順は System Flows のとおり（明示 > `.md` サフィックス）。permalink 判定は `isPermalink`/`isValidObjectId`。
+- 返す `path`/`pageId` は **percent-decode 済み**（`req.path` は encode されたまま届くが、ページパスは decode 済みで保存されるため）。malformed escape は raw フォールバック。
 
 #### buildPageMarkdown（pure）
 ```typescript

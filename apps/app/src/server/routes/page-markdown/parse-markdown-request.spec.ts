@@ -179,6 +179,24 @@ describe('parseMarkdownRequest', () => {
         formatQuery: undefined,
         expected: { kind: 'path', path: '/foo/README.md', explicit: true },
       },
+      {
+        name: '?format=md does not strip a trailing .md suffix from an ordinary path either (req 2.4)',
+        reqPath: '/foo/README.md',
+        accept: undefined,
+        formatQuery: 'md',
+        expected: { kind: 'path', path: '/foo/README.md', explicit: true },
+      },
+      {
+        name: 'explicit intent on a permalink carrying the .md sugar suffix resolves as permalink (/{24hex}.md can never be a real page path)',
+        reqPath: `/${VALID_OBJECT_ID}.md`,
+        accept: 'text/markdown',
+        formatQuery: undefined,
+        expected: {
+          kind: 'permalink',
+          pageId: VALID_OBJECT_ID,
+          explicit: true,
+        },
+      },
     ];
 
     it.each(cases)('$name', ({ reqPath, accept, formatQuery, expected }) => {

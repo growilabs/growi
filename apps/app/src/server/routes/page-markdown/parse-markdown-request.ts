@@ -80,7 +80,9 @@ function classifyPath(path: string, explicit: boolean): MarkdownRequestIntent {
  *
  * Judgment order (see design.md System Flows):
  * 1. Explicit intent (Accept: text/markdown or ?format=md) takes top
- *    priority and never strips a trailing `.md` from the path.
+ *    priority. The path is kept unstripped, EXCEPT that `/{pageId}.md` is
+ *    recognized as a permalink (such a literal page path cannot exist);
+ *    literal-first/base-fallback resolution is deferred to the caller.
  * 2. Otherwise, a `.md` suffix (exact, case-sensitive -- `.mdx` does not
  *    count) is treated as sugar; literal-vs-base resolution is deferred to
  *    the caller.
@@ -97,6 +99,20 @@ export function parseMarkdownRequest(
   const explicit = hasExplicitMarkdownAccept(accept) || formatQuery === 'md';
 
   if (explicit) {
+    // A permalink carrying the `.md` sugar suffix: `/{24hex}.md` can never be
+    // a real page path (isCreatablePage reserves trailing `.md`), so treating
+    // it as a permalink loses nothing and keeps footer-distributed `.md`
+    // permalinks working for clients that also send an explicit signal.
+    if (path.endsWith(MARKDOWN_SUFFIX)) {
+      const stripped = path.slice(0, -MARKDOWN_SUFFIX.length);
+      if (isPermalink(stripped)) {
+        return {
+          kind: 'permalink',
+          pageId: stripped.substring(1),
+          explicit: true,
+        };
+      }
+    }
     return classifyPath(path, true);
   }
 
