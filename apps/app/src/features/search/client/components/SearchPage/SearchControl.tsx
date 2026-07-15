@@ -1,4 +1,10 @@
-import React, { type JSX, useCallback, useEffect, useState } from 'react';
+import React, {
+  type JSX,
+  useCallback,
+  useEffect,
+  useId,
+  useState,
+} from 'react';
 import { useTranslation } from 'next-i18next';
 import { Collapse } from 'reactstrap';
 
@@ -67,19 +73,23 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
   const [hasOpenedFilterPanel, setHasOpenedFilterPanel] = useState(false);
   const [isFileterOptionModalShown, setIsFileterOptionModalShown] =
     useState(false);
+  const filterPanelId = useId();
 
   const { t } = useTranslation('');
 
-  const searchBySearchControlHandler = useCallback(
-    (newKeyword: string) => {
-      setKeyword(newKeyword);
-
-      onSearchInvoked?.(newKeyword, {
+  // Every control change re-runs the search with the full configuration. This
+  // helper assembles that payload from current state so each handler only passes
+  // the field it changed. The changed value must be passed as an override rather
+  // than read back from state, since the state setter has not applied yet.
+  const invokeSearch = useCallback(
+    (nextKeyword: string, overrides?: Partial<ISearchConfigurations>) => {
+      onSearchInvoked?.(nextKeyword, {
         sort,
         order,
         includeUserPages,
         includeTrashPages,
         filters,
+        ...overrides,
       });
     },
     [
@@ -92,72 +102,45 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
     ],
   );
 
+  const searchBySearchControlHandler = useCallback(
+    (newKeyword: string) => {
+      setKeyword(newKeyword);
+      invokeSearch(newKeyword);
+    },
+    [invokeSearch],
+  );
+
   const changeSortHandler = useCallback(
     (nextSort: SORT_AXIS, nextOrder: SORT_ORDER) => {
       setSort(nextSort);
       setOrder(nextOrder);
-
-      onSearchInvoked?.(keyword, {
-        sort: nextSort,
-        order: nextOrder,
-        includeUserPages,
-        includeTrashPages,
-        filters,
-      });
+      invokeSearch(keyword, { sort: nextSort, order: nextOrder });
     },
-    [filters, includeTrashPages, includeUserPages, keyword, onSearchInvoked],
+    [invokeSearch, keyword],
   );
 
   const changeIncludeUserPagesHandler = useCallback(
     (include: boolean) => {
       setIncludeUserPages(include);
-
-      onSearchInvoked?.(keyword, {
-        sort,
-        order,
-        includeUserPages: include,
-        includeTrashPages,
-        filters,
-      });
+      invokeSearch(keyword, { includeUserPages: include });
     },
-    [filters, includeTrashPages, keyword, onSearchInvoked, order, sort],
+    [invokeSearch, keyword],
   );
 
   const changeIncludeTrashPagesHandler = useCallback(
     (include: boolean) => {
       setIncludeTrashPages(include);
-
-      onSearchInvoked?.(keyword, {
-        sort,
-        order,
-        includeUserPages,
-        includeTrashPages: include,
-        filters,
-      });
+      invokeSearch(keyword, { includeTrashPages: include });
     },
-    [filters, includeUserPages, keyword, onSearchInvoked, order, sort],
+    [invokeSearch, keyword],
   );
 
   const changeFiltersHandler = useCallback(
     (newFilters: SearchFilterState) => {
       setFilters(newFilters);
-
-      onSearchInvoked?.(keyword, {
-        sort,
-        order,
-        includeUserPages,
-        includeTrashPages,
-        filters: newFilters,
-      });
+      invokeSearch(keyword, { filters: newFilters });
     },
-    [
-      includeTrashPages,
-      includeUserPages,
-      keyword,
-      onSearchInvoked,
-      order,
-      sort,
-    ],
+    [invokeSearch, keyword],
   );
 
   useEffect(() => {
@@ -251,6 +234,7 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
                   isFilterPanelOpen ? 'active' : ''
                 }`}
                 aria-expanded={isFilterPanelOpen}
+                aria-controls={filterPanelId}
                 onClick={() => {
                   setHasOpenedFilterPanel(true);
                   setIsFilterPanelOpen((prev) => !prev);
@@ -270,7 +254,7 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
 
       {isEnableFilter && (
         <Collapse isOpen={isFilterPanelOpen}>
-          <div className="border-bottom border-gray">
+          <div id={filterPanelId} className="border-bottom border-gray">
             {hasOpenedFilterPanel && (
               <SearchFilterPanel
                 filters={filters}
