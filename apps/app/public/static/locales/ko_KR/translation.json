@@ -1038,5 +1038,43 @@
     "searching": "검색 중...",
     "noResults": "페이지를 찾을 수 없습니다",
     "candidatesLabel": "페이지 후보"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "제목 1",
+      "description": "큰 섹션 제목"
+    },
+    "heading2": {
+      "label": "제목 2",
+      "description": "중간 섹션 제목"
+    },
+    "heading3": {
+      "label": "제목 3",
+      "description": "작은 섹션 제목"
+    },
+    "bulletList": {
+      "label": "글머리 기호 목록",
+      "description": "간단한 글머리 기호 목록을 만듭니다"
+    },
+    "numberedList": {
+      "label": "번호 매기기 목록",
+      "description": "번호가 매겨진 목록을 만듭니다"
+    },
+    "taskList": {
+      "label": "작업 목록",
+      "description": "체크리스트로 작업을 관리합니다"
+    },
+    "quote": {
+      "label": "인용",
+      "description": "인용문을 삽입합니다"
+    },
+    "codeBlock": {
+      "label": "코드 블록",
+      "description": "코드 블록을 삽입합니다"
+    },
+    "table": {
+      "label": "표",
+      "description": "표를 삽입합니다"
+    }
   }
 }

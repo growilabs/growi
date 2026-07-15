@@ -29,8 +29,8 @@
 
 - [x] 2.1 (P) コマンドラベルの多言語解決とロケールキー整備
   - i18n キーを表示文字列（ラベル・説明）に解決する純粋関数を実装する
-  - `en_US` / `ja_JP` のロケールに `slash_command.*` キーを追加し、未対応言語は既定言語へフォールバックする
-  - 観測: 解決後に各コマンドへ label/description が付与され、未知キーで既定言語が返るテストが green
+  - GROWI がサポートする全ロケール（`en_US` / `ja_JP` / `fr_FR` / `ko_KR` / `zh_CN`）に `slash_command.*` キーを追加し、未対応言語は既定言語へフォールバックする
+  - 観測: 解決後に各コマンドへ label/description が付与され、未知キーで既定言語が返るテストが green。全ロケールで 9 コマンド分の label/description が揃っている
   - _Requirements: 1.3, 7.1, 7.2_
   - _Boundary: resolve-slash-commands, locale files_
   - _Depends: 1.3_

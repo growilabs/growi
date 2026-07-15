@@ -119,8 +119,7 @@ packages/editor/src/client/services-internal/slash-command/
 - `packages/editor/src/client/stores/use-default-extensions.ts` — `useTranslation` でラベル解決し、`createSlashCommandSource(resolveSlashCommands(t))` と emoji ソースを 1 つの `autocompletion({ override: [slashSource, emojiSource], addToOptions: [emojiRender], icons: false })` に統合して登録する。
 - `packages/editor/src/client/services-internal/extensions/index.ts` — emoji source/render の再エクスポート調整。
 - `packages/editor/src/client/services-internal/index.ts` — `slash-command` barrel を公開。
-- `apps/app/public/static/locales/en_US/translation.json` — `slash_command.*` キー追加。
-- `apps/app/public/static/locales/ja_JP/translation.json` — `slash_command.*` キー追加。
+- `apps/app/public/static/locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/translation.json` — `slash_command.*` キー追加（GROWI がサポートする全ロケール）。
 
 ## System Flows
 
