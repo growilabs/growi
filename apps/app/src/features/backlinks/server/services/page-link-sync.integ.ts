@@ -18,6 +18,16 @@ describe('syncOutboundLinks (integration)', () => {
       .sort({ toPath: 1 })
       .lean();
 
+  // Capture the persisted _id per toPath so churn (delete + re-insert) can be
+  // detected: an in-place update keeps the same _id, a re-insert changes it.
+  const outboundIds = async () => {
+    const rows = await PageLink.find({ fromPage })
+      .select('toPath')
+      .sort({ toPath: 1 })
+      .lean();
+    return rows.map((row) => ({ toPath: row.toPath, id: row._id.toString() }));
+  };
+
   it('is idempotent — running twice with the same set yields identical rows', async () => {
     const targetA = new Types.ObjectId();
     const rows: IPageLink[] = [
@@ -34,15 +44,20 @@ describe('syncOutboundLinks (integration)', () => {
 
     await syncOutboundLinks(fromPage, rows);
     const afterFirst = await outboundRows();
+    const idsAfterFirst = await outboundIds();
 
     await syncOutboundLinks(fromPage, rows);
     const afterSecond = await outboundRows();
+    const idsAfterSecond = await outboundIds();
 
     // Content is correct after the first run...
     expect(afterFirst).toEqual(expected);
     // ...and the second run changes nothing: no duplicate insert on the
-    // { fromPage, toPath } upsert filter, no deletion+reinsert churn.
+    // { fromPage, toPath } upsert filter.
     expect(afterSecond).toEqual(expected);
+    // Every row keeps its original _id across runs, proving the rows are
+    // updated in place — no deletion+reinsert churn.
+    expect(idsAfterSecond).toEqual(idsAfterFirst);
   });
 
   it('replaces the previous set — removes dropped links, adds new ones, keeps unchanged', async () => {
