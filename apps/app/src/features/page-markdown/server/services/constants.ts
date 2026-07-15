@@ -9,3 +9,11 @@
  * links are loaded, not in the pure Markdown builder.
  */
 export const MARKDOWN_FOOTER_MAX_LINKS = 50;
+
+/**
+ * The ".md" suffix that marks the sugar form of a markdown request. Shared by
+ * the request classifier (detection) and the responder (literal-vs-base
+ * stripping) so the two can never drift apart. URL CONSTRUCTION does not use
+ * this constant -- that is owned by ../../utils/page-markdown-url.
+ */
+export const MARKDOWN_SUFFIX = '.md';

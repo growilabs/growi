@@ -62,6 +62,13 @@ describe('parseMarkdownRequest', () => {
         expected: { kind: 'none' },
       },
       {
+        name: '?format=MD (uppercase) does not trigger a markdown request (the value is matched case-sensitively)',
+        reqPath: '/foo/bar',
+        accept: undefined,
+        formatQuery: 'MD',
+        expected: { kind: 'none' },
+      },
+      {
         name: 'empty Accept header behaves like no Accept header',
         reqPath: '/foo/bar',
         accept: '',
@@ -134,6 +141,17 @@ describe('parseMarkdownRequest', () => {
         expected: { kind: 'path', path: '/foo/bar', explicit: true },
       },
       {
+        // Deliberate simplification: quality parameters are ignored, so even
+        // q=0 ("not acceptable" in strict HTTP semantics) counts as an
+        // explicit markdown signal. Listing text/markdown with q=0 is not a
+        // realistic client behavior; full q-value negotiation is out of scope.
+        name: 'Accept header with q=0 is still treated as an explicit signal (quality params are ignored by design)',
+        reqPath: '/foo/bar',
+        accept: 'text/markdown;q=0',
+        formatQuery: undefined,
+        expected: { kind: 'path', path: '/foo/bar', explicit: true },
+      },
+      {
         name: 'comma-separated Accept list containing text/markdown matches explicitly',
         reqPath: '/foo/bar',
         accept: 'text/html, text/markdown',
@@ -178,6 +196,67 @@ describe('parseMarkdownRequest', () => {
         accept: 'text/markdown',
         formatQuery: undefined,
         expected: { kind: 'path', path: '/foo/README.md', explicit: true },
+      },
+      {
+        name: '?format=md does not strip a trailing .md suffix from an ordinary path either (req 2.4)',
+        reqPath: '/foo/README.md',
+        accept: undefined,
+        formatQuery: 'md',
+        expected: { kind: 'path', path: '/foo/README.md', explicit: true },
+      },
+      {
+        name: 'explicit intent on a permalink carrying the .md sugar suffix resolves as permalink (/{24hex}.md can never be a real page path)',
+        reqPath: `/${VALID_OBJECT_ID}.md`,
+        accept: 'text/markdown',
+        formatQuery: undefined,
+        expected: {
+          kind: 'permalink',
+          pageId: VALID_OBJECT_ID,
+          explicit: true,
+        },
+      },
+    ];
+
+    it.each(cases)('$name', ({ reqPath, accept, formatQuery, expected }) => {
+      expect(parseMarkdownRequest(reqPath, accept, formatQuery)).toStrictEqual(
+        expected,
+      );
+    });
+  });
+
+  describe('percent-encoded request paths are decoded before classification', () => {
+    // Express's req.path is NOT percent-decoded (a request for "/foo bar.md"
+    // arrives as "/foo%20bar.md"), while GROWI stores page paths decoded.
+    // The classifier must therefore return the DECODED page path so the
+    // resolver's exact-match DB lookup can succeed.
+    const cases: Case[] = [
+      {
+        name: 'percent-encoded space in a .md-suffixed path is decoded (still-suffixed form preserved)',
+        reqPath: '/foo/space%20page.md',
+        accept: undefined,
+        formatQuery: undefined,
+        expected: { kind: 'path', path: '/foo/space page.md', explicit: false },
+      },
+      {
+        name: 'percent-encoded non-ASCII (Japanese) .md-suffixed path is decoded',
+        reqPath: '/%E6%97%A5%E6%9C%AC%E8%AA%9E.md',
+        accept: undefined,
+        formatQuery: undefined,
+        expected: { kind: 'path', path: '/日本語.md', explicit: false },
+      },
+      {
+        name: 'percent-encoded plain path with explicit Accept is decoded',
+        reqPath: '/%E6%97%A5%E6%9C%AC%E8%AA%9E',
+        accept: 'text/markdown',
+        formatQuery: undefined,
+        expected: { kind: 'path', path: '/日本語', explicit: true },
+      },
+      {
+        name: 'malformed percent-escape falls back to the raw path instead of throwing',
+        reqPath: '/foo/broken%zz.md',
+        accept: undefined,
+        formatQuery: undefined,
+        expected: { kind: 'path', path: '/foo/broken%zz.md', explicit: false },
       },
     ];
 

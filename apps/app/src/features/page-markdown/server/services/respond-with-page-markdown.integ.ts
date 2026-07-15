@@ -65,6 +65,8 @@ describe('respondWithPageMarkdown (integration)', () => {
   const bodySecret = 'SECRET-BODY-DO-NOT-LEAK';
   const bodyLiteral = 'LITERAL-MD-PAGE-BODY';
   const bodyDoc = 'BASE-DOC-BODY';
+  const bodyGuardedBase = 'GUARDED-BASE-BODY';
+  const bodyGuardedLiteral = 'GUARDED-LITERAL-BODY-DO-NOT-LEAK';
 
   const HUB_DESCENDANT_COUNT = 5;
 
@@ -98,6 +100,8 @@ describe('respondWithPageMarkdown (integration)', () => {
       `${BASE}/literal.md`,
       `${BASE}/doc`,
       `${BASE}/empty`,
+      `${BASE}/guarded`,
+      `${BASE}/guarded.md`,
     ];
     await Page.deleteMany({ path: { $in: seededPaths } });
 
@@ -149,6 +153,24 @@ describe('respondWithPageMarkdown (integration)', () => {
       lastUpdateUser: testUser._id,
       descendantCount: 0,
     });
+    // A public base page shadowed by a FORBIDDEN literal `.md` page: an
+    // explicit request for the `.md` path must yield forbidden (existence
+    // wins) and never fall back to the public base.
+    const guardedBase = await Page.create({
+      path: `${BASE}/guarded`,
+      grant: Page.GRANT_PUBLIC,
+      creator: testUser._id,
+      lastUpdateUser: testUser._id,
+      descendantCount: 0,
+    });
+    const guardedLiteral = await Page.create({
+      path: `${BASE}/guarded.md`,
+      grant: Page.GRANT_OWNER,
+      grantedUsers: [otherUser._id],
+      creator: otherUser._id,
+      lastUpdateUser: otherUser._id,
+      descendantCount: 0,
+    });
     // Empty container page: no revision, no lastUpdateUser (mirrors the empty
     // container in page-listing.integ.ts). The footer must still render.
     const empty = await Page.create({
@@ -196,6 +218,18 @@ describe('respondWithPageMarkdown (integration)', () => {
         format: 'markdown',
         author: testUser._id,
       },
+      {
+        pageId: guardedBase._id,
+        body: bodyGuardedBase,
+        format: 'markdown',
+        author: testUser._id,
+      },
+      {
+        pageId: guardedLiteral._id,
+        body: bodyGuardedLiteral,
+        format: 'markdown',
+        author: otherUser._id,
+      },
     ]);
 
     hub.revision = revisions[0]._id;
@@ -204,12 +238,16 @@ describe('respondWithPageMarkdown (integration)', () => {
     secret.revision = revisions[3]._id;
     literal.revision = revisions[4]._id;
     doc.revision = revisions[5]._id;
+    guardedBase.revision = revisions[6]._id;
+    guardedLiteral.revision = revisions[7]._id;
     await hub.save();
     await aaa.save();
     await bbb.save();
     await secret.save();
     await literal.save();
     await doc.save();
+    await guardedBase.save();
+    await guardedLiteral.save();
 
     hubId = String(hub._id);
     aaaId = String(aaa._id);
@@ -230,6 +268,8 @@ describe('respondWithPageMarkdown (integration)', () => {
             `${BASE}/literal.md`,
             `${BASE}/doc`,
             `${BASE}/empty`,
+            `${BASE}/guarded`,
+            `${BASE}/guarded.md`,
           ],
         },
       });
@@ -358,6 +398,26 @@ describe('respondWithPageMarkdown (integration)', () => {
 
       expect(res.type).toBe('ok');
       expect(markdownOf(res)).toContain(bodyDoc);
+    });
+
+    it('falls back to the base page when the request is explicit and no literal page exists (Requirement 2.5)', async () => {
+      const res = await call(`${BASE}/doc.md`, testUser, {
+        accept: 'text/markdown',
+      });
+
+      expect(res.type).toBe('ok');
+      expect(markdownOf(res)).toContain(bodyDoc);
+    });
+
+    it('returns forbidden for an explicit request when the literal .md page exists but is not viewable -- existence wins, no fallback to the public base', async () => {
+      const res = await call(`${BASE}/guarded.md`, testUser, {
+        accept: 'text/markdown',
+      });
+
+      expect(res.type).toBe('forbidden');
+      const md = markdownOf(res);
+      expect(md).not.toContain(bodyGuardedLiteral);
+      expect(md).not.toContain(bodyGuardedBase);
     });
   });
 

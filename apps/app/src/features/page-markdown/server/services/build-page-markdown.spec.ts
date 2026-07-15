@@ -121,6 +121,18 @@ describe('buildPageMarkdown', () => {
     expect(result).toContain(baseInput.updatedByUsername);
   });
 
+  it('omits the last-updated line entirely when no update info exists (empty container page), instead of rendering a dangling "Last updated:  by "', () => {
+    const result = buildPageMarkdown({
+      ...baseInput,
+      isEmpty: true,
+      body: '',
+      updatedAt: '',
+      updatedByUsername: '',
+    });
+
+    expect(result).not.toContain('Last updated');
+  });
+
   it('always includes the page-list API hint, even when there are zero children (4.6)', () => {
     const noChildrenInput: PageMarkdownInput = {
       ...baseInput,
@@ -151,8 +163,11 @@ describe('buildPageMarkdown', () => {
       childrenTotal: total,
     });
 
-    expect(result).toContain(`${total}`);
-    expect(result).toContain('7 more');
+    // Assert the whole summary line so the totals cannot pass by appearing
+    // in an unrelated section of the document.
+    expect(result).toContain(
+      `Children: ${MARKDOWN_FOOTER_MAX_LINKS} of ${total} total (7 more not shown`,
+    );
   });
 
   it('states the total and the omitted remainder when siblings exceed the footer limit, instead of silently truncating (4.7)', () => {
@@ -167,8 +182,9 @@ describe('buildPageMarkdown', () => {
       siblingsTotal: total,
     });
 
-    expect(result).toContain(`${total}`);
-    expect(result).toContain('3 more');
+    expect(result).toContain(
+      `Siblings: ${MARKDOWN_FOOTER_MAX_LINKS} of ${total} total (3 more not shown`,
+    );
   });
 
   it('does not state a remainder when the shown count exactly matches the total (no false truncation notice)', () => {

@@ -48,8 +48,6 @@ export interface PageMarkdownInput {
 
 const EMPTY_PAGE_NOTICE = 'This page has no content yet.';
 
-// Template literal (not .join) so the initializer stays on the
-// route-top-level-guard allowlist (no top-level call expressions).
 const ERROR_GUIDANCE = `If you believe this page exists and you have access to it, retry with an
 authenticated request (a logged-in session or a Personal Access Token),
 or use the GROWI MCP server, which can fetch this page on your behalf
@@ -116,9 +114,13 @@ function buildFooter(input: PageMarkdownInput): string {
     lines.push(...renderSiblingsSection(input));
   }
 
-  lines.push(
-    `- Last updated: ${input.updatedAt} by ${input.updatedByUsername}`,
-  );
+  // Empty container pages have no revision and thus no update info; omit the
+  // line entirely rather than render a dangling "Last updated:  by ".
+  if (input.updatedAt !== '' || input.updatedByUsername !== '') {
+    lines.push(
+      `- Last updated: ${input.updatedAt} by ${input.updatedByUsername}`,
+    );
+  }
   lines.push(
     `- Full page listing (all children regardless of count): ${input.pageListApiHint}`,
   );

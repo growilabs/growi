@@ -4,6 +4,7 @@ import multer from 'multer';
 import autoReap from 'multer-autoreap';
 
 import { createVaultGatewayRouterWithDeps } from '~/features/growi-vault/server';
+import { createPageMarkdownHandlers } from '~/features/page-markdown/server';
 import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter';
 import { createApiRouter } from '~/server/util/createApiRouter';
 
@@ -37,7 +38,6 @@ import { setup as setupLoginPassport } from './login-passport';
 import nextFactory from './next';
 import { setup as setupOgp } from './ogp';
 import { setup as setupPage } from './page';
-import { pageMarkdownRouteFactory } from './page-markdown';
 import { setup as setupSearch } from './search';
 import { setup as setupTag } from './tag';
 import * as userActivation from './user-activation';
@@ -401,9 +401,17 @@ export const setup = (crowi, app) => {
   );
 
   // Page Markdown endpoint (.md suffix / Accept: text/markdown / ?format=md).
-  // Must be registered immediately before the catch-all so it can intercept
-  // markdown requests; non-markdown requests fall through to the HTML delegate.
-  app.use(pageMarkdownRouteFactory(crowi));
+  // Registered immediately before the catch-alls: the gate exits via
+  // next('route') for non-markdown GETs, so authz below runs only for
+  // markdown requests and everything else falls through to the HTML delegate.
+  const pageMarkdown = createPageMarkdownHandlers(crowi);
+  app.get(
+    '/*',
+    pageMarkdown.skipUnlessMarkdownRequest,
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    loginRequired,
+    pageMarkdown.respond,
+  );
 
   app.get('/*/$', loginRequired, next.delegateToNext);
   app.get('/*', loginRequired, autoReconnectToSearch, next.delegateToNext);
