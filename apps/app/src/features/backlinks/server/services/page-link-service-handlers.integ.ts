@@ -7,11 +7,11 @@ import { Revision } from '~/server/models/revision';
 import PageLink from '../models/page-link';
 import { handlePageUpsert } from './page-link-service-handlers';
 
-// resolveToPage has its own coverage (target-page-resolution.spec.ts); mock it so this test
+// resolveToPages has its own coverage (target-page-resolution.spec.ts); mock it so this test
 // isolates the handler's contract against the real PageLink collection.
-const mocks = vi.hoisted(() => ({ resolveToPage: vi.fn() }));
+const mocks = vi.hoisted(() => ({ resolveToPages: vi.fn() }));
 vi.mock('./target-page-resolution', () => ({
-  resolveToPage: mocks.resolveToPage,
+  resolveToPages: mocks.resolveToPages,
 }));
 
 describe('handlePageUpsert (integration)', () => {
@@ -23,9 +23,16 @@ describe('handlePageUpsert (integration)', () => {
     await PageLink.deleteMany({ fromPage });
     await Revision.deleteMany({ pageId: fromPage });
     idByPath.clear();
-    mocks.resolveToPage.mockImplementation(
-      async (path: string) => idByPath.get(path) ?? null,
-    );
+    // Mirror the real batch contract: return a Map of only the paths that resolve;
+    // unresolved paths are absent (the handler reads them back as null).
+    mocks.resolveToPages.mockImplementation((paths: string[]) => {
+      const result = new Map<string, Types.ObjectId>();
+      for (const path of paths) {
+        const id = idByPath.get(path);
+        if (id != null) result.set(path, id);
+      }
+      return Promise.resolve(result);
+    });
   });
 
   const outboundRows = () =>
