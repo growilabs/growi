@@ -543,7 +543,7 @@
   "ai_sidebar": {
     "new_chat": "Nouvelle discussion",
     "recent_threads": "Éléments récents",
-    "accuracy_notice": "Vérifiez les sources pour vous assurer de l'exactitude des informations.",
+    "accuracy_notice": "Vérifiez les pages référencées pour vous assurer de l'exactitude des informations.",
     "sources": "{{count}} pages référencées",
     "sources_one": "{{count}} page référencée",
     "sources_other": "{{count}} pages référencées",
