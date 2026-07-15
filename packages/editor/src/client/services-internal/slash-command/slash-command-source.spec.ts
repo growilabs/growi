@@ -5,6 +5,7 @@ import type {
 } from '@codemirror/autocomplete';
 import { CompletionContext } from '@codemirror/autocomplete';
 import { history, undo } from '@codemirror/commands';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -68,6 +69,27 @@ const queryAt = (
   });
   const result = source(new CompletionContext(state, pos, false));
   // The source is synchronous; narrow the CompletionSource union.
+  if (result instanceof Promise) {
+    throw new Error('source must be synchronous');
+  }
+  return result;
+};
+
+/**
+ * Query the source against a Markdown-parsed state so the syntax tree carries
+ * code nodes (FencedCode / InlineCode), letting the source detect code context.
+ */
+const queryAtInMarkdown = (
+  source: CompletionSource,
+  doc: string,
+  pos: number,
+): CompletionResult | null => {
+  const state = EditorState.create({
+    doc,
+    selection: EditorSelection.cursor(pos),
+    extensions: [markdown({ base: markdownLanguage })],
+  });
+  const result = source(new CompletionContext(state, pos, false));
   if (result instanceof Promise) {
     throw new Error('source must be synchronous');
   }
@@ -264,5 +286,34 @@ describe('createSlashCommandSource - apply (run)', () => {
     expect(view.state.doc.toString()).toBe('a ');
     expect(run).toHaveBeenCalledTimes(1);
     expect(run).toHaveBeenCalledWith(view, 2);
+  });
+});
+
+describe('createSlashCommandSource - code context suppression', () => {
+  const source = createSlashCommandSource(INSERT_COMMANDS);
+
+  it('does not fire inside a fenced code block (slash at line start)', () => {
+    const doc = '```\n/h1\n```';
+    const pos = doc.indexOf('/h1') + 3; // cursor after "/h1" inside the block
+    expect(queryAtInMarkdown(source, doc, pos)).toBeNull();
+  });
+
+  it('does not fire inside a fenced code block after whitespace', () => {
+    const doc = '```\nfoo /h1\n```';
+    const pos = doc.indexOf('/h1') + 3;
+    expect(queryAtInMarkdown(source, doc, pos)).toBeNull();
+  });
+
+  it('does not fire inside inline code (slash after a space)', () => {
+    const doc = '`a /h1`';
+    const pos = doc.indexOf('/h1') + 3;
+    expect(queryAtInMarkdown(source, doc, pos)).toBeNull();
+  });
+
+  it('still fires in normal Markdown prose (control)', () => {
+    const doc = '/h1';
+    const result = queryAtInMarkdown(source, doc, 3);
+    expect(result).not.toBeNull();
+    expect(result?.options.length).toBeGreaterThan(0);
   });
 });

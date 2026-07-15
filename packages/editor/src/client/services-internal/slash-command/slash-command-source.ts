@@ -3,6 +3,7 @@ import type {
   CompletionResult,
   CompletionSource,
 } from '@codemirror/autocomplete';
+import { syntaxTree } from '@codemirror/language';
 import type { EditorState } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 
@@ -38,6 +39,30 @@ interface SlashTrigger {
  * does NOT fire in the middle of a word, e.g. `foo/` (Req 1.1, 1.2). Returns
  * `null` when not triggered.
  */
+/**
+ * lezer-markdown node names that denote a code context. Slash commands must not
+ * fire here — inside a fenced/indented block or inline code the user is typing
+ * code (paths, regexes, etc.), where a `/` menu would be a false trigger.
+ */
+const CODE_CONTEXT_NODE_NAMES = new Set([
+  'FencedCode',
+  'CodeBlock',
+  'CodeText',
+  'InlineCode',
+]);
+
+/** Whether `pos` sits inside a Markdown code context (fenced/indented/inline). */
+const isInCodeContext = (state: EditorState, pos: number): boolean => {
+  let node: ReturnType<typeof syntaxTree>['topNode'] | null = syntaxTree(
+    state,
+  ).resolveInner(pos, -1);
+  while (node != null) {
+    if (CODE_CONTEXT_NODE_NAMES.has(node.name)) return true;
+    node = node.parent;
+  }
+  return false;
+};
+
 const detectSlashTrigger = (
   state: EditorState,
   pos: number,
@@ -128,6 +153,9 @@ export const createSlashCommandSource = (
   return (context): CompletionResult | null => {
     const trigger = detectSlashTrigger(context.state, context.pos);
     if (trigger == null) return null;
+
+    // Suppress the menu when the cursor is inside code (fenced/indented/inline).
+    if (isInCodeContext(context.state, context.pos)) return null;
 
     const options = entries
       .filter(({ command }) => matchesQuery(command, trigger.query))
