@@ -1,4 +1,6 @@
-import type { Code, Root } from 'mdast';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
+import { visit } from 'unist-util-visit';
 import { describe, expect, it, vi } from 'vitest';
 
 import { remarkPlugin } from './plantuml';
@@ -16,23 +18,25 @@ describe('remarkPlugin', () => {
     ['dark', true],
   ])('does not prepend theme metadata to the plantuml source in %s mode', (_modeLabel, isDarkMode) => {
     const userDiagram = 'A -> B: hello';
-    const codeNode: Code = {
-      type: 'code',
-      lang: 'plantuml',
-      value: userDiagram,
-    };
-    const tree: Root = { type: 'root', children: [codeNode] };
+    const markdown = ['```plantuml', userDiagram, '```', ''].join('\n');
 
-    const transformer = remarkPlugin({
+    const processor = unified().use(remarkParse).use(remarkPlugin, {
       plantumlUri: 'https://plantuml.example.com',
       isDarkMode,
     });
-    transformer(tree, { data: {} } as Parameters<typeof transformer>[1]);
+
+    const tree = processor.parse(markdown);
+    processor.runSync(tree);
+
+    let codeValue: string | undefined;
+    visit(tree, 'code', (node) => {
+      codeValue = node.value;
+    });
 
     // The theme is still prepended, but must never carry a YAML front matter
     // block into the source sent to the PlantUML server.
-    expect(codeNode.value).not.toMatch(/^\s*---/);
-    expect(codeNode.value).not.toContain('---\n');
-    expect(codeNode.value).toContain(userDiagram);
+    expect(codeValue).not.toMatch(/^\s*---/);
+    expect(codeValue).not.toContain('---\n');
+    expect(codeValue).toContain(userDiagram);
   });
 });
