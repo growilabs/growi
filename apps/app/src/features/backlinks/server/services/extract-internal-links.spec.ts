@@ -139,6 +139,15 @@ describe('extractInternalLinks()', () => {
     expect(links).toStrictEqual(['/docs/v2']);
   });
 
+  it('skips a link with invalid percent-encoding without dropping valid ones', async () => {
+    const pageString = '[bad](/deals/50%off) [good](/docs/v2)';
+    const pagePath = '/page/test';
+
+    const links = await extractInternalLinks(pageString, pagePath);
+
+    expect(links).toStrictEqual(['/docs/v2']);
+  });
+
   it('strips hash and query from internal link', async () => {
     const pageString = '[a](/docs/v2#section?x=1)';
     const pagePath = '/page/test';

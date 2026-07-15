@@ -41,23 +41,27 @@ pageLinkSchema.statics.replaceOutboundLinks = async function (
 ): Promise<void> {
   const toPaths = resolvedRows.map((r) => r.toPath);
 
-  if (resolvedRows.length > 0) {
-    await this.bulkWrite(
-      resolvedRows.map((r) => ({
+  // One ordered bulkWrite (not two awaited calls, not a transaction): keeps the
+  // replace in a single command and stays standalone-MongoDB compatible. The index
+  // is a derived cache and concurrent same-page upserts are idempotent, so strict
+  // atomicity isn't required.
+  await this.bulkWrite(
+    [
+      ...resolvedRows.map((r) => ({
         updateOne: {
           filter: { fromPage: fromPageId, toPath: r.toPath },
           update: { $set: { toPage: r.toPage } },
           upsert: true,
         },
       })),
-      { ordered: false },
-    );
-  }
-
-  await this.deleteMany({
-    fromPage: fromPageId,
-    toPath: { $nin: toPaths },
-  });
+      {
+        deleteMany: {
+          filter: { fromPage: fromPageId, toPath: { $nin: toPaths } },
+        },
+      },
+    ],
+    { ordered: true },
+  );
 };
 
 /**

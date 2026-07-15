@@ -3,7 +3,10 @@ import type { IUser } from '@growi/core';
 import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 
-import { SupportedAction } from '~/interfaces/activity';
+import {
+  SupportedAction,
+  type SupportedActionType,
+} from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 import ActivityService from '~/server/service/activity';
 import { configManager } from '~/server/service/config-manager';
@@ -75,11 +78,18 @@ describe('ActivityService contribution orchestration', () => {
     await User.deleteMany({});
   });
 
-  it("counts a user's first contribution exactly once (count is 1, not 2)", async () => {
-    // Arrange
-    await User.create({ _id: userId }); // Un-migrated user
+  /**
+   * Arrange an un-migrated user + a still-unsettled Activity, then drive the real
+   * 'update' handler with the given action. The handler runs the full
+   * resolveContributor -> ensureUserHasMigrated -> addContribution sequence and
+   * then settles the activity via updateByParameters. Returns the activity id so
+   * callers can assert on the settled action.
+   */
+  const settleViaUpdateListener = async (
+    action: SupportedActionType,
+  ): Promise<mongoose.Types.ObjectId> => {
+    await User.create({ _id: userId }); // un-migrated user
 
-    // Still-unsettled Activity for the current event
     const unsettledActivity = await Activity.create({
       user: userId,
       target: pageId,
@@ -87,29 +97,52 @@ describe('ActivityService contribution orchestration', () => {
     });
 
     const updateListener = buildUpdateListener();
-
-    // Act: invoke the 'update' handler directly. It runs the real
-    // resolveContributor -> ensureUserHasMigrated -> addContribution sequence,
-    // then updateByParameters which settles the activity.
     await updateListener(
       unsettledActivity._id.toString(),
-      {
-        action: SupportedAction.ACTION_PAGE_CREATE,
-        target: pageId,
-        contributor: { _id: userId },
-      },
+      { action, target: pageId, contributor: { _id: userId } },
       { _id: pageId },
     );
 
-    // Assert the contract: the event is counted once. Summing across documents
-    // (rather than reading a single day) keeps the assertion robust even if a
-    // regression splits the double count across two date keys.
-    const contributions = await Contribution.find({ user: userId });
-    const totalCount = contributions.reduce((sum, c) => sum + c.count, 0);
-    expect(totalCount).toBe(1);
+    return unsettledActivity._id;
+  };
 
-    // The activity must end up settled to its real contribution action.
-    const settled = await Activity.findById(unsettledActivity._id);
+  const totalContributionCount = async (): Promise<number> => {
+    const contributions = await Contribution.find({ user: userId });
+    return contributions.reduce((sum, c) => sum + c.count, 0);
+  };
+
+  it("counts a user's first contribution exactly once (count is 1, not 2)", async () => {
+    const activityId = await settleViaUpdateListener(
+      SupportedAction.ACTION_PAGE_CREATE,
+    );
+
+    expect(await totalContributionCount()).toBe(1);
+
+    const settled = await Activity.findById(activityId);
     expect(settled?.action).toBe(SupportedAction.ACTION_PAGE_CREATE);
+  });
+
+  it('counts a single-page revert as a contribution and settles the action', async () => {
+    const activityId = await settleViaUpdateListener(
+      SupportedAction.ACTION_PAGE_REVERT,
+    );
+
+    expect(await totalContributionCount()).toBe(1);
+
+    const settled = await Activity.findById(activityId);
+    expect(settled?.action).toBe(SupportedAction.ACTION_PAGE_REVERT);
+  });
+
+  it('does NOT count a recursive revert as a contribution, but still settles the action', async () => {
+    const activityId = await settleViaUpdateListener(
+      SupportedAction.ACTION_PAGE_RECURSIVELY_REVERT,
+    );
+
+    expect(await totalContributionCount()).toBe(0);
+
+    const settled = await Activity.findById(activityId);
+    expect(settled?.action).toBe(
+      SupportedAction.ACTION_PAGE_RECURSIVELY_REVERT,
+    );
   });
 });
