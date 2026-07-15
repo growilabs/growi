@@ -308,13 +308,16 @@ export const setup = (crowi: Crowi): Router => {
             return {
               ...serializedBookmark,
               user: serializedBookmark.userId,
-              page: {
-                ...serializedBookmark.page,
-                creator: serializedBookmark.page.creatorId,
-                deleteUser: serializedBookmark.page.deleteUserId,
-                parent: serializedBookmark.page.parentId,
-                revision: serializedBookmark.page.revisionId,
-              },
+              page:
+                serializedBookmark.page == null
+                  ? null
+                  : {
+                      ...serializedBookmark.page,
+                      creator: serializedBookmark.page.creatorId,
+                      deleteUser: serializedBookmark.page.deleteUserId,
+                      parent: serializedBookmark.page.parentId,
+                      revision: serializedBookmark.page.revisionId,
+                    },
             };
           });
           return {
