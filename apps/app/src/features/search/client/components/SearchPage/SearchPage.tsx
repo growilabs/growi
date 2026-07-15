@@ -24,6 +24,7 @@ import {
 import {
   buildSearchQuery,
   createEmptyFilterState,
+  normalizeKeyword,
   parseSearchQuery,
 } from '../../utils/search-query';
 import { OperateAllControl } from './OperateAllControl';
@@ -38,6 +39,10 @@ import styles from './SearchPage.module.scss';
 
 // TODO: replace with "customize:showPageLimitationS"
 const INITIAL_PAGIONG_SIZE = 20;
+
+// The search runs off the raw `?q=` (which already carries the operators), so the
+// structured filters are always empty here. Shared to keep the SWR key stable.
+const EMPTY_FILTER_STATE = createEmptyFilterState();
 
 /**
  * SearchResultListHead
@@ -111,12 +116,11 @@ export const SearchPage = (): JSX.Element => {
   const { t } = useTranslation();
   const showPageLimitationL = useAtomValue(showPageLimitationLAtom);
 
-  // The URL `?q=` is the single source of truth: it carries free text AND the
-  // inline filter operators. Parse it to hydrate the keyword box (free text only)
-  // and the filter chips/panel (structured filters) — see searchInvokedHandler
-  // for the reverse (serialize) direction.
+  // The URL `?q=` is the single source of truth (free text + inline operators).
+  // Parse it to hydrate the keyword box and the filter chips/panel;
+  // searchInvokedHandler does the reverse.
   const keyword = useSearchKeyword();
-  const parsedQuery = useMemo(() => parseSearchQuery(keyword ?? ''), [keyword]);
+  const parsedQuery = useMemo(() => parseSearchQuery(keyword), [keyword]);
   const setSearchKeyword = useSetSearchKeyword();
 
   const disableUserPages = useAtomValue(disableUserPagesAtom);
@@ -138,11 +142,9 @@ export const SearchPage = (): JSX.Element => {
     (ISelectableAll & IReturnSelectedPageIds) | null
   >(null);
 
-  // `keyword` already encodes the filter operators, so the structured `filters`
-  // must be empty here — passing both would serialize each operator twice.
-  const { data, conditions, mutate } = useSWRxSearch(keyword ?? '', null, {
+  const { data, conditions, mutate } = useSWRxSearch(keyword, null, {
     ...configurationsByControl,
-    filters: createEmptyFilterState(),
+    filters: EMPTY_FILTER_STATE,
     offset,
     limit,
   });
@@ -152,14 +154,15 @@ export const SearchPage = (): JSX.Element => {
       setOffset(0);
       setConfigurationsByControl(newConfigurations);
 
-      // Serialize free text + filters into the single `?q=` string. A new keyword
-      // is a fresh search (push, so back/forward steps through searches); a change
-      // to only filters/sort reuses the current entry (replace, no history spam).
+      // Serialize free text + filters into `?q=`. A new keyword pushes (a fresh
+      // search in history); a filter/sort-only change replaces (no history spam).
       const q = buildSearchQuery(
         newKeyword,
         newConfigurations.filters ?? createEmptyFilterState(),
       );
-      const isNewKeyword = newKeyword.trim() !== parsedQuery.keyword;
+      // Normalize both sides so an internal-whitespace-only difference is not
+      // misread as a new keyword.
+      const isNewKeyword = normalizeKeyword(newKeyword) !== parsedQuery.keyword;
       setSearchKeyword(q, { replace: !isNewKeyword });
 
       mutate();
