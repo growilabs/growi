@@ -513,4 +513,97 @@ describe('activity-log record gate — feature-level integration (Task 7.1–7.4
       }
     });
   });
+
+  // ---------------------------------------------------------------------
+  // 7.5 — 'updated' event propagation to real listeners (no mocked emit).
+  // in-app-notification.ts's activityEvent.on('updated', ...) listener reads
+  // `target` and `preNotify` off this event to build notifications, so this
+  // contract needs its own coverage (previously exercised by the now-removed
+  // "'update' event handling" block in service/activity.integ.ts, retired
+  // because it pre-dated the lazy-fail-safe settle design).
+  // ---------------------------------------------------------------------
+  describe("7.5 — 'updated' event propagation (real listener, no mocked emit)", () => {
+    it("emits 'updated' with the settled activity, target, and the preNotify built by generatePreNotify", async () => {
+      const context = buildContext(testUserId.toHexString());
+      const { activityId } = beginActivity(context);
+      const target = new Types.ObjectId();
+      const preNotifySentinel = vi.fn();
+      const generatePreNotify = vi.fn().mockReturnValue(preNotifySentinel);
+
+      const updatedListener = vi.fn();
+      crowi.events.activity.once('updated', updatedListener);
+
+      crowi.events.activity.emit(
+        'update',
+        activityId,
+        { action: SupportedAction.ACTION_PAGE_EMPTY_TRASH },
+        target,
+        generatePreNotify,
+      );
+
+      await vi.waitFor(() => expect(updatedListener).toHaveBeenCalled());
+
+      // generatePreNotify must receive the settled (persisted) activity, not
+      // the pre-settle parameters -- this is what real 'updated' subscribers
+      // rely on.
+      expect(generatePreNotify).toHaveBeenCalledWith(
+        expect.objectContaining({ _id: activityId }),
+        undefined,
+      );
+      expect(updatedListener).toHaveBeenCalledWith(
+        expect.objectContaining({ _id: activityId }),
+        target,
+        preNotifySentinel,
+      );
+    });
+
+    it("emits 'updated' with just the activity and target (no preNotify arg) when generatePreNotify is not provided", async () => {
+      const context = buildContext(testUserId.toHexString());
+      const { activityId } = beginActivity(context);
+      const target = new Types.ObjectId();
+
+      const updatedListener = vi.fn();
+      crowi.events.activity.once('updated', updatedListener);
+
+      crowi.events.activity.emit(
+        'update',
+        activityId,
+        { action: SupportedAction.ACTION_PAGE_EMPTY_TRASH },
+        target,
+      );
+
+      await vi.waitFor(() => expect(updatedListener).toHaveBeenCalled());
+
+      expect(updatedListener).toHaveBeenCalledWith(
+        expect.objectContaining({ _id: activityId }),
+        target,
+      );
+    });
+
+    it("does not emit 'updated' for an out-of-gate action that never settles a row", async () => {
+      const outContext = buildContext(testUserId.toHexString());
+      const { activityId: outOfGateId } = beginActivity(outContext);
+      const updatedListener = vi.fn();
+      crowi.events.activity.on('updated', updatedListener);
+
+      crowi.events.activity.emit('update', outOfGateId, {
+        action: SupportedAction.ACTION_ADMIN_APP_SETTINGS_UPDATE, // Large-only, not essential
+      });
+
+      // Causal-ordering proof of absence (see file header): wait for an
+      // in-gate companion's real settle before asserting the negative.
+      const companionContext = buildContext(testUserId.toHexString());
+      const { activityId: companionId } = beginActivity(companionContext);
+      crowi.events.activity.emit('update', companionId, {
+        action: SupportedAction.ACTION_PAGE_EMPTY_TRASH,
+      });
+      await waitForActivityRows({ id: companionId });
+
+      crowi.events.activity.off('updated', updatedListener);
+      const calledForOutOfGate = updatedListener.mock.calls.some(
+        (args) => (args[0] as { _id?: string })?._id === outOfGateId,
+      );
+      expect(calledForOutOfGate).toBe(false);
+    });
+  });
 });
