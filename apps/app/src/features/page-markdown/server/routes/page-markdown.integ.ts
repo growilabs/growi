@@ -8,25 +8,29 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { AccessToken } from '~/server/models/access-token';
 import type { PageDocument, PageModel } from '~/server/models/page';
 
-import { pageMarkdownRouteFactory } from '.';
-import { MARKDOWN_FOOTER_MAX_LINKS } from './constants';
+import { MARKDOWN_FOOTER_MAX_LINKS } from '../services/constants';
+import { createPageMarkdownHandlers } from './page-markdown';
 
 // Route-level integration test for the page-markdown interception route.
 //
 // Approach: real MongoDB + real Page / Revision / User models, the real
-// grant-aware finder, and the REAL authorization middlewares composed by the
-// factory (accessTokenParser + loginRequired). Nothing in the auth path is
-// mocked; instead an upstream middleware optionally injects `req.user` (the
-// job normally done by session/PAT resolution) so authenticated scenarios can
-// be exercised, and guest scenarios run through the genuine loginRequired
-// middleware whose ACL answer is controlled per-test via a spy.
+// grant-aware finder, and the REAL authorization middlewares composed exactly
+// as routes/index.js composes them (gate -> accessTokenParser -> guest-allowed
+// loginRequired -> responder). Nothing in the auth path is mocked; instead an
+// upstream middleware optionally injects `req.user` (the job normally done by
+// session/PAT resolution) so authenticated scenarios can be exercised, and
+// guest scenarios run through the genuine loginRequired middleware whose ACL
+// answer is controlled per-test via a spy.
 //
-// A sentinel fallback handler is mounted AFTER the factory to observe
-// next()/passthrough: any request the factory lets through lands on the
-// sentinel, mirroring how the production catch-all delegates to the HTML flow.
+// A sentinel fallback handler is mounted AFTER the route to observe
+// next()/next('route')/passthrough: any request the route lets through lands
+// on the sentinel, mirroring how the production catch-all delegates to the
+// HTML flow.
 //
 // Bootstrap mirrors respond-with-page-markdown.integ.ts (real Page/Revision seeding).
 
@@ -42,7 +46,7 @@ type RevisionDoc = {
   author: mongoose.Types.ObjectId;
 };
 
-describe('pageMarkdownRouteFactory (route integration)', () => {
+describe('page-markdown route (integration)', () => {
   let crowi: Crowi;
   let app: express.Application;
   let Page: PageModel;
@@ -260,6 +264,10 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
     // Build the app once: express.json ensures req.body is defined (production
     // mounts body parsers upstream of the catch-all); the injector emulates
     // session/PAT user resolution; the sentinel observes fall-through.
+    // The route registration mirrors routes/index.js verbatim: the gate exits
+    // via next('route') for non-markdown GETs, so authz runs only for markdown
+    // requests, and the catch-all (here: the sentinel) takes over.
+    const pageMarkdown = createPageMarkdownHandlers(crowi);
     app = express();
     app.use(express.json());
     app.use((req: CrowiRequest, _res, next) => {
@@ -268,7 +276,13 @@ describe('pageMarkdownRouteFactory (route integration)', () => {
       }
       next();
     });
-    app.use(pageMarkdownRouteFactory(crowi));
+    app.get(
+      '/*',
+      pageMarkdown.skipUnlessMarkdownRequest,
+      accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+      loginRequiredFactory(crowi, true),
+      pageMarkdown.respond,
+    );
     app.use((_req, res) => {
       res.status(200).type('text/html').send(SENTINEL);
     });

@@ -11,8 +11,8 @@ import type { PageDocument, PageModel } from '~/server/models/page';
 import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
 import { pageListingService } from '~/server/service/page-listing';
 import loggerFactory from '~/utils/logger';
-import { toPermalinkMdUrl } from '~/utils/page-markdown-url';
 
+import { toPermalinkMdUrl } from '../../utils/page-markdown-url';
 import {
   buildErrorMarkdown,
   buildPageMarkdown,
@@ -24,7 +24,7 @@ import { parseMarkdownRequest } from './parse-markdown-request';
 const { encodeSpaces } = pagePathUtils;
 
 const logger = loggerFactory(
-  'growi:routes:page-markdown:respond-with-page-markdown',
+  'growi:features:page-markdown:respond-with-page-markdown',
 );
 
 const MARKDOWN_SUFFIX = '.md';

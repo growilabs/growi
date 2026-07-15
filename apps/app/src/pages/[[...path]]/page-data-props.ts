@@ -17,6 +17,10 @@ import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import assert from 'assert';
 import type { HydratedDocument, model } from 'mongoose';
 
+import {
+  toMarkdownAlternateLinkHeader,
+  toPermalinkMdUrl,
+} from '~/features/page-markdown';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
@@ -24,8 +28,6 @@ import type {
   PageRedirectModel,
 } from '~/server/models/page-redirect';
 import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
-import { toMarkdownAlternateLinkHeader } from '~/utils/page-markdown-alternate';
-import { toPermalinkMdUrl } from '~/utils/page-markdown-url';
 
 import type { CommonEachProps } from '../common-props';
 import type {
