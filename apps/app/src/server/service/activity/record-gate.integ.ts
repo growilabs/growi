@@ -545,10 +545,11 @@ describe('activity-log record gate — feature-level integration (Task 7.1–7.4
 
       // generatePreNotify must receive the settled (persisted) activity, not
       // the pre-settle parameters -- this is what real 'updated' subscribers
-      // rely on.
-      expect(generatePreNotify).toHaveBeenCalledWith(
+      // rely on. Only checking the first arg here (not the full call
+      // signature): whether a caller omits an absent getAdditionalTargetUsers
+      // or passes it as explicit `undefined` is not part of the contract.
+      expect(generatePreNotify.mock.calls[0]?.[0]).toEqual(
         expect.objectContaining({ _id: activityId }),
-        undefined,
       );
       expect(updatedListener).toHaveBeenCalledWith(
         expect.objectContaining({ _id: activityId }),
