@@ -3,7 +3,12 @@ import type {
   CompletionResult,
   CompletionSource,
 } from '@codemirror/autocomplete';
-import { CompletionContext } from '@codemirror/autocomplete';
+import {
+  autocompletion,
+  CompletionContext,
+  currentCompletions,
+  startCompletion,
+} from '@codemirror/autocomplete';
 import { history, undo } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorSelection, EditorState } from '@codemirror/state';
@@ -204,6 +209,48 @@ describe('createSlashCommandSource - filtering', () => {
     expect(result?.options.map((o) => o.label)).toEqual(['Heading 1']);
   });
 
+  it('matches the English id by prefix even when the label is localized (ja), and ignores mid-word keyword hits', () => {
+    // Localized labels (ja) that do NOT start with the romaji query, so the match
+    // must come from the English `id`. "quote" carries the keyword "citation"
+    // whose "ta" is mid-word and must NOT match.
+    const localizedSource = createSlashCommandSource([
+      resolvedCommand({
+        id: 'table',
+        label: 'テーブル',
+        keywords: ['grid'],
+        action: insertAction(''),
+      }),
+      resolvedCommand({
+        id: 'taskList',
+        label: 'タスクリスト',
+        keywords: ['todo'],
+        action: insertAction(''),
+      }),
+      resolvedCommand({
+        id: 'quote',
+        label: '引用',
+        keywords: ['blockquote', 'citation'],
+        action: insertAction(''),
+      }),
+    ]);
+
+    // English id prefix: "/ta" offers id "table"/"taskList"; "quote" must NOT
+    // appear despite its keyword "citation" containing "ta" mid-word.
+    expect(
+      queryAt(localizedSource, '/ta', 3)?.options.map((o) => o.label),
+    ).toEqual(['テーブル', 'タスクリスト']);
+
+    // Full English name via id ("/table").
+    expect(
+      queryAt(localizedSource, '/table', 6)?.options.map((o) => o.label),
+    ).toEqual(['テーブル']);
+
+    // Localized (Japanese) label prefix ("/テ") is accepted too.
+    expect(
+      queryAt(localizedSource, '/テ', 2)?.options.map((o) => o.label),
+    ).toEqual(['テーブル']);
+  });
+
   it('returns empty options (menu closes, doc unchanged) when nothing matches', () => {
     const result = queryAt(source, '/zzz', 4);
 
@@ -315,5 +362,62 @@ describe('createSlashCommandSource - code context suppression', () => {
     const result = queryAtInMarkdown(source, doc, 3);
     expect(result).not.toBeNull();
     expect(result?.options.length).toBeGreaterThan(0);
+  });
+});
+
+// Integration: drive the real @codemirror/autocomplete plugin so the live
+// re-query behaviour is exercised — a unit call to the source cannot catch a
+// stale-menu regression (e.g. re-introducing `validFor` with `filter: false`).
+describe('createSlashCommandSource - live narrowing via the autocomplete plugin', () => {
+  const openMenuAndType = async (): Promise<{
+    all: string[];
+    narrowed: string[];
+  }> => {
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: '',
+        extensions: [
+          autocompletion({
+            override: [createSlashCommandSource(INSERT_COMMANDS)],
+          }),
+        ],
+      }),
+      parent: document.body,
+    });
+    createdViews.push(view);
+
+    // Type "/" and open the menu (empty query offers every command).
+    view.dispatch({
+      changes: { from: 0, insert: '/' },
+      selection: EditorSelection.cursor(1),
+      userEvent: 'input.type',
+    });
+    startCompletion(view);
+    await vi.advanceTimersByTimeAsync(100);
+    const all = currentCompletions(view.state).map((c) => c.label);
+
+    // Type "quote"; the menu must NARROW to the single matching command.
+    view.dispatch({
+      changes: { from: 1, insert: 'quote' },
+      selection: EditorSelection.cursor(6),
+      userEvent: 'input.type',
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    const narrowed = currentCompletions(view.state).map((c) => c.label);
+
+    return { all, narrowed };
+  };
+
+  it('narrows the offered options as the query grows (no stale full list)', async () => {
+    vi.useFakeTimers();
+    try {
+      const { all, narrowed } = await openMenuAndType();
+      // Empty query offered every command...
+      expect(all).toHaveLength(INSERT_COMMANDS.length);
+      // ...and typing "quote" narrowed the live menu down to just "Quote".
+      expect(narrowed).toEqual(['Quote']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -17,13 +17,6 @@ import type { ResolvedSlashCommand } from './slash-command-types.js';
  */
 const SLASH_TOKEN_REGEX = /\/(\S*)$/;
 
-/**
- * `validFor` regex: while the range text (from the `/`) keeps matching this,
- * CodeMirror re-filters without re-invoking the source. It stops matching as
- * soon as whitespace is typed, which closes the menu.
- */
-const SLASH_QUERY_REGEX = /^\/\S*$/;
-
 interface SlashTrigger {
   /** Absolute position of the `/`. */
   readonly from: number;
@@ -81,8 +74,18 @@ const detectSlashTrigger = (
 };
 
 /**
- * Whether `command` matches `query` case-insensitively against its label or any
- * of its keywords. An empty query matches everything (Req 2.1, 2.2).
+ * Whether `command` matches `query` case-insensitively against its `id`, its
+ * localized `label`, or any of its keywords. An empty query matches everything
+ * (Req 2.1, 2.2).
+ *
+ * Matching is PREFIX-based (`startsWith`), not substring: typing `/ta` must offer
+ * "Table"/"Task list" but not "Quote" (whose keyword "citation" contains "ta"
+ * mid-word). Prefix matching keeps the menu predictable — the query is the start
+ * of a command name or keyword, as in Notion/Slack-style slash commands.
+ *
+ * The stable `id` (the English command name, e.g. `table`, `taskList`) is matched
+ * too, so the English name works regardless of the display language — otherwise a
+ * non-English label (e.g. ja "テーブル") would make `/ta` match nothing.
  */
 const matchesQuery = (
   command: ResolvedSlashCommand,
@@ -90,9 +93,10 @@ const matchesQuery = (
 ): boolean => {
   if (query === '') return true;
   const needle = query.toLowerCase();
-  if (command.label.toLowerCase().includes(needle)) return true;
-  return command.keywords.some((keyword) =>
-    keyword.toLowerCase().includes(needle),
+  return (
+    command.id.toLowerCase().startsWith(needle) ||
+    command.label.toLowerCase().startsWith(needle) ||
+    command.keywords.some((keyword) => keyword.toLowerCase().startsWith(needle))
   );
 };
 
@@ -165,9 +169,13 @@ export const createSlashCommandSource = (
       from: trigger.from,
       to: context.pos,
       options,
-      // Source-side matching (matchesQuery); disable CodeMirror's own filtering.
+      // Source-side matching (matchesQuery over label + keywords); disable
+      // CodeMirror's own filtering. Deliberately NO `validFor`: with `filter:
+      // false`, a `validFor` that still matched the growing `/query` would make
+      // CodeMirror keep the initial option set without re-querying this source,
+      // so the menu would never narrow as the user types. Omitting it forces a
+      // re-query per keystroke, which re-runs matchesQuery and narrows correctly.
       filter: false,
-      validFor: SLASH_QUERY_REGEX,
     };
   };
 };
