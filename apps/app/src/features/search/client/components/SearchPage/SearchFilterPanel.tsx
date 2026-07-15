@@ -146,6 +146,9 @@ const GroupFilterField = (props: GroupFilterFieldProps): JSX.Element => {
 export const SearchFilterPanel = (props: Props): JSX.Element => {
   const { filters, onChange } = props;
   const { t } = useTranslation();
+  // Self-generated so this panel's tag input gets a unique, SSR-stable id even
+  // when the panel is mounted more than once (desktop inline + mobile modal).
+  const tagsInputId = useId();
 
   const authorsChangeHandler = useCallback(
     (authors: string[]) => {
@@ -192,6 +195,7 @@ export const SearchFilterPanel = (props: Props): JSX.Element => {
         />
         <FilterFieldCell label={t('search_result.filter_tag', 'Tag')}>
           <TagsInput
+            id={tagsInputId}
             tags={filters.tags}
             autoFocus={false}
             onTagsUpdated={tagsChangeHandler}

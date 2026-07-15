@@ -12,11 +12,16 @@ type Props = {
   tags: string[];
   autoFocus: boolean;
   onTagsUpdated: (tags: string[]) => void;
+  // Must be unique per instance: rendering this input more than once on a page
+  // (e.g. the desktop and mobile search filter panels) would otherwise duplicate
+  // the DOM id and the derived `${id}-item-N` menu ids. Defaults to a static id
+  // that E2E selectors depend on for the single-instance TagEditModal usage.
+  id?: string;
 };
 
 export const TagsInput: FC<Props> = (props: Props) => {
   const { t } = useTranslation();
-  const { tags, autoFocus, onTagsUpdated } = props;
+  const { tags, autoFocus, onTagsUpdated, id } = props;
 
   const tagsInputRef = useRef<TypeaheadRef>(null);
   const [resultTags, setResultTags] = useState<string[]>([]);
@@ -66,7 +71,7 @@ export const TagsInput: FC<Props> = (props: Props) => {
   return (
     <div className={`${styles['tags-input']}`}>
       <AsyncTypeahead
-        id="tag-typeahead-asynctypeahead"
+        id={id ?? 'tag-typeahead-asynctypeahead'}
         ref={tagsInputRef}
         // Controlled: `tags` is owned by the parent, so external changes (a
         // chips-bar clear, or TagEditModal's redirect reset) are reflected.
