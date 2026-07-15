@@ -539,6 +539,7 @@
   "ai_sidebar": {
     "new_chat": "新建对话",
     "recent_threads": "最近的项目",
+    "accuracy_notice": "请核对来源以确认信息是否准确。",
     "sources": "已参考 {{count}} 个页面",
     "error": {
       "title": "发生错误",
@@ -1068,7 +1069,7 @@
     }
   },
   "pageMention": {
-    "placeholder": "输入消息...（ 输入 @ 提及页面 ）",
+    "placeholder": "输入消息...（输入 @ 提及页面）",
     "hint": "输入页面名称进行搜索",
     "searching": "搜索中...",
     "noResults": "未找到页面",

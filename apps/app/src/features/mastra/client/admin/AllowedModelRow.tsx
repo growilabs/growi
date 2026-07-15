@@ -12,6 +12,10 @@ import {
 import type { AiSettingsFormValues } from './ai-settings-form-values';
 import { registerToInputProps } from './register-to-input-props';
 
+import styles from './AllowedModelRow.module.scss';
+
+const removeButtonClass = styles['grw-allowed-model-remove'] ?? '';
+
 interface AllowedModelRowProps {
   /** Position of this row in the flat `allowedModels` array (NOT the display index). */
   readonly originalIndex: number;
@@ -22,7 +26,6 @@ interface AllowedModelRowProps {
    */
   readonly isDefault: boolean;
   readonly labelKey: string;
-  readonly radioGroupName: string;
   /**
    * Render the modelId control as a select-only dropdown (`true`) when the
    * provider has a non-empty catalog, or as free-text input (`false`) otherwise.
@@ -48,19 +51,18 @@ interface AllowedModelRowProps {
 /**
  * One allowed-model card: the model control (a select of official display names
  * when the provider has a catalog, otherwise free-text id input) + "default"
- * badge/radio + remove trash icon + providerOptions JSON with a live valid/invalid
- * indicator, a format link, and a docs link. Extracted so each card owns its own
- * field ids and watches only its own value fields (modelId + providerOptions;
- * `isDefault` arrives as a prop, and `displayName` is only WRITTEN here on a
- * pick, never watched). All register/watch paths are keyed on `originalIndex`
- * (the flat-array position).
+ * badge / set-as-default action + remove trash icon + providerOptions JSON with
+ * a live valid/invalid indicator, a format link, and a docs link. Extracted so
+ * each card owns its own field ids and watches only its own value fields
+ * (modelId + providerOptions; `isDefault` arrives as a prop, and `displayName`
+ * is only WRITTEN here on a pick, never watched). All register/watch paths are
+ * keyed on `originalIndex` (the flat-array position).
  */
 export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
   const {
     originalIndex,
     isDefault,
     labelKey,
-    radioGroupName,
     useSelect,
     selectableModels,
     registeredModelIds,
@@ -77,7 +79,6 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
 
   const modelInputId = useId();
   const providerOptionsId = useId();
-  const radioId = useId();
 
   // Watch only this card's own value fields (modelId + providerOptions) so
   // editing a row re-renders just that row. `isDefault` comes from the parent
@@ -121,8 +122,8 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
       className="rounded p-3 mb-2 border"
       data-testid="allowed-model-row"
     >
-      {/* The label/badge sit on their own line; the input, default radio, and
-          remove icon share one center-aligned row below. */}
+      {/* The label/badge sit on their own line; the input, set-as-default
+          action, and remove icon share one center-aligned row below. */}
       <div className="mb-2">
         <div className="d-flex align-items-center gap-2 mb-1">
           <Label for={modelInputId} className="form-label small mb-0">
@@ -186,23 +187,34 @@ export const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
               </>
             ) : undefined}
           </Input>
-          <FormGroup check className="mb-0 text-nowrap">
-            <Input
-              id={radioId}
-              type="radio"
-              role="radio"
-              name={radioGroupName}
-              checked={isDefault}
-              onChange={onSelectDefault}
-            />
-            <Label check for={radioId} className="ms-1">
-              {t('ai_settings.set_as_default')}
-            </Label>
-          </FormGroup>
+          {/* An unobtrusive inline action rather than a radio: the single
+              default spans provider tabs, so a DOM radio group would imply
+              co-visible alternatives that actually live in other tabs. The
+              effective state is conveyed by the "default" badge. The button
+              stays mounted on the default row (merely disabled) so the flex
+              row keeps a constant width — unmounting it would let the
+              flex-grown model control resize whenever the default moves. */}
+          {/* p-0 on both buttons: the visual spacing between the three
+              controls is owned solely by the row's `gap-3` — per-button
+              padding would add to it unevenly (text button vs icon button)
+              and break the equal rhythm. */}
           <Button
             type="button"
             color="link"
-            className="text-body-secondary p-1"
+            size="sm"
+            className="text-body-secondary text-decoration-none p-0 text-nowrap"
+            disabled={isDefault}
+            onClick={onSelectDefault}
+          >
+            {t('ai_settings.set_as_default')}
+          </Button>
+          {/* No text-body-secondary here: that utility pins the color with
+              !important, which would defeat the module's hover-to-danger
+              override (the rest color is supplied by the module instead). */}
+          <Button
+            type="button"
+            color="link"
+            className={`p-0 ${removeButtonClass}`}
             aria-label={t('ai_settings.remove_model')}
             title={t('ai_settings.remove_model')}
             onClick={onRemove}
