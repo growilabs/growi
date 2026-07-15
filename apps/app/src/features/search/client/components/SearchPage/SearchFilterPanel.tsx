@@ -71,6 +71,11 @@ type GroupFilterFieldProps = {
  * Groups are a finite per-user set, so this is a checklist dropdown rather than a
  * typeahead. The stored value is the group NAME, not the id: the server resolves
  * `group:` terms by name (see resolveFilterData in server/service/search.ts).
+ *
+ * Because selection is name-based, groups that share a name (a UserGroup and an
+ * ExternalUserGroup can collide) are one selection unit by design: they toggle
+ * together and count once in the badge. This mirrors the server, which resolves a
+ * name to every matching group id, so the filter intentionally spans all of them.
  */
 const GroupFilterField = (props: GroupFilterFieldProps): JSX.Element => {
   const { label, selected, onChange } = props;
