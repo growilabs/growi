@@ -802,6 +802,8 @@
     "hit_number_unit": "trouvé",
     "filter": "Filtres",
     "search_option": "Options de recherche",
+    "filter_remove": "Supprimer",
+    "filter_clear": "Tout effacer",
     "filter_author": "Auteur",
     "filter_by_author": "Filtrer par auteur",
     "filter_editor": "Éditeur",

@@ -807,6 +807,8 @@
     "hit_number_unit": "hit",
     "filter": "Filters",
     "search_option": "Search Options",
+    "filter_remove": "Remove",
+    "filter_clear": "Clear all",
     "filter_author": "Author",
     "filter_by_author": "Filter by author",
     "filter_editor": "Editor",

@@ -15,6 +15,7 @@ import {
   createEmptyFilterState,
   type SearchFilterState,
 } from '../../utils/search-query';
+import { SearchFilterChips } from './SearchFilterChips';
 import { SearchFilterPanel } from './SearchFilterPanel';
 import { SearchModalTriggerinput } from './SearchModalTriggerinput';
 import { SearchOptionModalLazyLoaded } from './SearchOptionModal';
@@ -251,6 +252,10 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
 
         {extraControls}
       </div>
+
+      {isEnableFilter && (
+        <SearchFilterChips filters={filters} onChange={changeFiltersHandler} />
+      )}
 
       {isEnableFilter && (
         <Collapse isOpen={isFilterPanelOpen}>
