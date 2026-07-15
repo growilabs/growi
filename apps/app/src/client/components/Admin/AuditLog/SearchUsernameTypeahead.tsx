@@ -3,6 +3,7 @@ import React, {
   Fragment,
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -27,6 +28,13 @@ type UserDataType = {
   category: CategoryType;
 };
 
+// Selection only tracks usernames, so the category of a re-hydrated item is
+// unknown; activeUser is a harmless default (category is not shown on tokens).
+const toUserDataItem = (username: string): UserDataType => ({
+  username,
+  category: Categories.activeUser,
+});
+
 type Props = {
   onChange: (text: string[]) => void;
   initialUsernames?: string[];
@@ -47,11 +55,6 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
 
   const typeaheadRef = useRef<TypeaheadRef>(null);
 
-  const toUserDataItem = (username: string): UserDataType => ({
-    username,
-    category: Categories.activeUser,
-  });
-
   /*
    * State
    */
@@ -59,6 +62,21 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   const [selectedItems, setSelectedItems] = useState<UserDataType[]>(() =>
     (initialUsernames ?? []).map(toUserDataItem),
   );
+
+  // Reflect external `initialUsernames` changes (e.g. a chips-bar clear or URL
+  // rehydrate) into the shown selection. Guarded to the actual username set so
+  // the fresh-array reference produced by our own onChange round-trip does not
+  // needlessly rebuild the tokens.
+  useEffect(() => {
+    setSelectedItems((prev) => {
+      const next = initialUsernames ?? [];
+      const prevNames = prev.map((item) => item.username);
+      const isSame =
+        prevNames.length === next.length &&
+        prevNames.every((name, i) => name === next[i]);
+      return isSame ? prev : next.map(toUserDataItem);
+    });
+  }, [initialUsernames]);
 
   /*
    * Fetch

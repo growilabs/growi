@@ -68,7 +68,9 @@ export const TagsInput: FC<Props> = (props: Props) => {
       <AsyncTypeahead
         id="tag-typeahead-asynctypeahead"
         ref={tagsInputRef}
-        defaultSelected={tags}
+        // Controlled: `tags` is owned by the parent, so external changes (a
+        // chips-bar clear, or TagEditModal's redirect reset) are reflected.
+        selected={tags}
         isLoading={isLoading}
         minLength={1}
         multiple
