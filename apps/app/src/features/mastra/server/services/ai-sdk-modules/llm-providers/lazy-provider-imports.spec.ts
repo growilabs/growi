@@ -22,7 +22,9 @@ import {
 // are skipped (erased at build).
 
 // The lazily-loaded provider SDKs that must never appear in the static graph.
-const LAZY_ONLY_PACKAGE = /^(@ai-sdk\/|@azure\/identity$)/;
+// `(\/|$)` matches subpath imports (`@azure/identity/…`) as well as the bare
+// package, without matching other `@azure/identity-*` packages.
+const LAZY_ONLY_PACKAGE = /^(@ai-sdk\/|@azure\/identity(\/|$))/;
 
 // Entrypoints whose static graph must stay free of the provider SDKs: the
 // providers barrel, the dispatcher, and the Mastra instance module (the agent
