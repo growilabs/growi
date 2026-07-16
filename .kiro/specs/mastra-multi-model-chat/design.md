@@ -128,7 +128,7 @@ apps/app/src/features/mastra/
 - `apps/app/src/features/mastra/interfaces/ai-settings.ts` — `AiSettingsResponse`/`AiSettingsUpdateRequest` から `model`/`providerOptions` を除去し `allowedModels` 追加。`AI_SETTING_KEYS` を `[app:aiEnabled, ai:provider, ai:apiKey, ai:allowedModels, ai:azureOpenaiSettings]` に。
 - `ai-sdk-modules/llm-providers/config.ts` — `requireModel()` を撤去し `getAllowedModels()` / `getDefaultModelId()` / `resolveEffectiveModelId(modelId?)` を提供。
 - `ai-sdk-modules/llm-providers/{index,openai,anthropic,google,azure-openai}.ts` — resolver を `(modelId: string) => Promise<MastraModelConfig>` に（modelId を引数受け取り）。**実装後の最適化**: 各 resolver は `@ai-sdk/*`（azure は `@azure/identity`）を関数内 `await import()` で遅延ロードし、未使用 provider の SDK を読み込まない。
-- `ai-sdk-modules/resolve-mastra-model.ts` — `resolveMastraModel(modelId?)` + `Map` キャッシュ（resolver 非同期化に伴い async）。
+- `ai-sdk-modules/resolve-mastra-model.ts` — `resolveMastraModel(modelId?)` + `Map` キャッシュ（resolver 非同期化に伴い async。キャッシュは in-flight の Promise を保持する single-flight）。
 - `ai-sdk-modules/resolve-provider-options.ts` — `getProviderOptionsForModel(effectiveModelId)`（解決済み実効モデルのエントリから providerOptions を引く純粋ルックアップ。丸め・検証は行わない）。
 - `mastra-modules/agents/growi-agent.ts` — `model: ({ requestContext }) => resolveMastraModel(requestContext.get('modelId'))`。
 - `mastra-modules/types/request-context.ts` — `MastraRequestContextShape` に `modelId?: string`。
@@ -294,9 +294,9 @@ export const getProviderOptionsForModel = (effectiveModelId: string): ModelProvi
 export const modelResolvers: Record<AiProvider, (modelId: string) => Promise<MastraModelConfig>>;
 
 // resolve-mastra-model.ts
-/** 実効モデルを解決し provider 別 resolver で構築。Map キャッシュ key=`${provider}:${effective}`。resolver が非同期（provider SDK を遅延 import）のため async。キャッシュヒット経路は await 無しの直線。 */
+/** 実効モデルを解決し provider 別 resolver で構築。Map キャッシュ key=`${provider}:${effective}`。resolver が非同期（provider SDK を遅延 import）のため async。キャッシュヒット経路は await 無しの直線。キャッシュは in-flight の Promise を保持する single-flight（await より前に同期登録）: 同時ミスは 1 ビルドを共有し、ビルド中の clear 後に旧設定のモデルが再収載されることはなく、reject したビルドは（当該エントリが現行のままの場合のみ）キャッシュから退避される。 */
 export const resolveMastraModel = (modelId?: string): Promise<MastraModelConfig>;
-export const clearResolvedMastraModelCache = (): void; // Map 全消去
+export const clearResolvedMastraModelCache = (): void; // Map 全消去（in-flight のビルドも破棄）
 ```
 - Preconditions: `ai:provider` が有効（既存 `isAiProvider` 検証を維持）。
 - Postconditions: 返る `MastraModelConfig` は実効モデルに対応。Azure+Entra のトークンキャッシュはキャッシュ済みオブジェクト内に保持。
@@ -430,7 +430,7 @@ export interface AiSettingsFormValues {
 - `getDefaultModelId`: `isDefault` 要素 / 無指定→先頭 / 空→undefined（1.3）。
 - `getAllowedModels`: `ai:allowedModels` 有→そのまま / 空・非配列→`[]`（`Array.isArray` 防御。自動移行・合成なし）。
 - `getProviderOptionsForModel(effectiveModelId)`: 該当エントリの options / 無し→`{}`（純粋ルックアップ。丸め・warn なし）（2.2/2.5）。
-- `resolveMastraModel`: Map キャッシュキー（同 model は 1 回構築）/ `clearResolvedMastraModelCache` で再構築。resolver 非同期化後は各テストを `await`（成功=resolve / 誤設定=reject）。
+- `resolveMastraModel`: Map キャッシュキー（同 model は 1 回構築）/ `clearResolvedMastraModelCache` で再構築。resolver 非同期化後は各テストを `await`（成功=resolve / 誤設定=reject）。並行契約（single-flight）: 同時ミスが 1 ビルドを共有すること / ビルド中に clear された build がキャッシュを再収載しないこと / 破棄済み build の遅延 reject が新エントリを退避しないこと。
 - provider SDK 遅延ロード契約（実装後の最適化）: barrel（`llm-providers/index.ts`）・dispatcher（`resolve-mastra-model.ts`）・Mastra インスタンス（`mastra-modules/index.ts`。agent 構築の根で、growi-agent と tools/memory のグラフを包含）の静的 import グラフが `@ai-sdk/*`・`@azure/identity` に到達しないこと（`lazy-provider-imports.spec.ts`。到達すると barrel import 時に全 provider が載り最適化が無効化されるため、静的 import での再混入を回帰ガード）。
 - `isAiConfigured`: provider+接続必須項目+非空 allowedModels（フォールバック含む）で true / それ以外 false。azure-openai はエンドポイント必須（`resourceName`/`baseURL` 双方欠落→false）。Azure+Entra ID（`useEntraId=true`）はエンドポイントあれば apiKey 欠落でも true（6.1）。
 - put-ai-settings バリデータ: 配列・重複・空・`isDefault` ちょうど 1・不正 providerOptions JSON（1.4/1.5/2.4）。

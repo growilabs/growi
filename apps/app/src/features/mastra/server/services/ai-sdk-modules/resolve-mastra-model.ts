@@ -44,11 +44,23 @@ export const resolveMastraModel = async (
   // BARE modelId + its own config. Dispatching by the parsed provider (not by the
   // modelId) is what lets the same modelId coexist under different providers (Req
   // 2.3, 4.3). The resolver is async because it dynamically imports only its own
-  // `@ai-sdk/*` SDK (so the unused providers' graphs never load); the await is
-  // paid once per distinct effective key (cache miss) and never on the hot cached
-  // path above. The chosen resolver rejects on its own misconfiguration — nothing
-  // is cached in that case, so a config fix takes effect on the next call.
-  const model = await modelResolvers[parsed.provider](parsed.modelId);
-  addResolvedModelToCache(effectiveKey, model);
-  return model;
+  // `@ai-sdk/*` SDK (so the unused providers' graphs never load); that build cost
+  // is paid once per distinct effective key (cache miss) and never on the hot
+  // cached path above.
+  //
+  // The IN-FLIGHT Promise is what gets cached, and it is registered while this
+  // function is still executing synchronously (no await sits between the cache
+  // check above and this set). That makes the build single-flight: concurrent
+  // misses on the same key share one build instead of each constructing a model,
+  // and a clearResolvedMastraModelCache() while the build is pending discards
+  // the pending entry — a model built from pre-save config can never repopulate
+  // the cache after a settings save. A rejected build (provider
+  // misconfiguration) is evicted by the cache itself, so nothing stays cached
+  // and a config fix takes effect on the next call.
+  const modelPromise = modelResolvers[parsed.provider](parsed.modelId);
+  addResolvedModelToCache(effectiveKey, modelPromise);
+  // `await` (rather than returning the Promise raw) keeps this frame on the
+  // rejection stack trace; the registration above already happened, so the
+  // single-flight guarantee is unaffected.
+  return await modelPromise;
 };
