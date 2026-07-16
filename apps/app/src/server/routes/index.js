@@ -4,6 +4,7 @@ import multer from 'multer';
 import autoReap from 'multer-autoreap';
 
 import { createVaultGatewayRouterWithDeps } from '~/features/growi-vault/server';
+import { createPageMarkdownHandlers } from '~/features/page-markdown/server';
 import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter';
 import { createApiRouter } from '~/server/util/createApiRouter';
 
@@ -397,6 +398,19 @@ export const setup = (crowi, app) => {
         ogp.ogpValidator,
         ogp.renderOgp,
       ),
+  );
+
+  // Page Markdown endpoint (.md suffix / Accept: text/markdown / ?format=md).
+  // Registered immediately before the catch-alls: the gate exits via
+  // next('route') for non-markdown GETs, so authz below runs only for
+  // markdown requests and everything else falls through to the HTML delegate.
+  const pageMarkdown = createPageMarkdownHandlers(crowi);
+  app.get(
+    '/*',
+    pageMarkdown.skipUnlessMarkdownRequest,
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    loginRequired,
+    pageMarkdown.respond,
   );
 
   app.get('/*/$', loginRequired, next.delegateToNext);

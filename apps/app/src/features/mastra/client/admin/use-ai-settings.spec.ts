@@ -40,7 +40,14 @@ const baseSettings: AiSettingsResponse = {
       azureOpenaiSettings: {},
     },
   },
-  allowedModels: [{ provider: 'openai', modelId: 'gpt-4o', isDefault: true }],
+  allowedModels: [
+    {
+      provider: 'openai',
+      modelId: 'gpt-4o',
+      isDefault: true,
+      displayName: 'GPT-4o',
+    },
+  ],
   useOnlyEnvVars: false,
   isConfigured: true,
 };
@@ -116,7 +123,12 @@ describe('useAiSettings', () => {
       const updatedSettings: AiSettingsResponse = {
         ...baseSettings,
         allowedModels: [
-          { provider: 'google', modelId: 'gemini-1.5-pro', isDefault: true },
+          {
+            provider: 'google',
+            modelId: 'gemini-1.5-pro',
+            isDefault: true,
+            displayName: 'Gemini 1.5 Pro',
+          },
         ],
       };
       mockedApiv3Get.mockResolvedValue(buildResponse(updatedSettings));

@@ -24,6 +24,7 @@ import {
   getApiKey,
   getProviderSettings,
 } from '../../services/ai-sdk-modules/llm-providers/config';
+import { buildModelDisplayNameResolver } from '../../services/ai-sdk-modules/resolve-model-display-name';
 
 const logger = loggerFactory(
   'growi:features:mastra:routes:admin-ai-settings:get-ai-settings',
@@ -90,7 +91,7 @@ const logger = loggerFactory(
  *             entry is the default). Always an array (empty when no models are configured).
  *           items:
  *             type: object
- *             required: [provider, modelId]
+ *             required: [provider, modelId, displayName]
  *             properties:
  *               provider:
  *                 type: string
@@ -99,6 +100,12 @@ const logger = loggerFactory(
  *               modelId:
  *                 type: string
  *                 description: The model id (or, for Azure OpenAI, the deployment name).
+ *               displayName:
+ *                 type: string
+ *                 description: >-
+ *                   The official display name resolved from the catalog (the modelId
+ *                   itself for catalog-less providers / free-text / removed ids).
+ *                   Display-only — never sent back in the PUT request.
  *               providerOptions:
  *                 type: object
  *                 description: Provider-namespaced options (e.g. {"openai":{...}}).
@@ -180,18 +187,33 @@ const buildProviderStatus = (provider: AiProvider): AiProviderStatus => {
  * Middleware (scope + login + adminRequired) is composed in `getAiSettingsFactory`
  * below, so this is a plain terminal handler that reads config and shapes the response.
  */
-export const getAiSettings = (_req: Request, res: ApiV3Response): void => {
+export const getAiSettings = async (
+  _req: Request,
+  res: ApiV3Response,
+): Promise<void> => {
   try {
     const providers = mapProviders(buildProviderStatus);
+
+    // The cross-provider allow-list (incl. isDefault and providerOptions).
+    // getAllowedModels() always returns an array (Req 1.1). The admin UI is
+    // trusted, so providerOptions ARE exposed here (unlike the chat /models
+    // endpoint, which omits them).
+    const allowedModels = getAllowedModels();
+
+    // Enrich each entry with its official display name from the effective
+    // catalog (id fallback), so the settings UI can render names without a
+    // second lookup. Display-only: the PUT request never carries displayName.
+    const resolveDisplayName = await buildModelDisplayNameResolver(
+      allowedModels.map((m) => m.provider),
+    );
 
     const response: AiSettingsResponse = {
       aiEnabled: configManager.getConfig('app:aiEnabled'),
       providers,
-      // The cross-provider allow-list (incl. isDefault and providerOptions).
-      // getAllowedModels() always returns an array (Req 1.1). The admin UI is
-      // trusted, so providerOptions ARE exposed here (unlike the chat /models
-      // endpoint, which omits them).
-      allowedModels: getAllowedModels(),
+      allowedModels: allowedModels.map((m) => ({
+        ...m,
+        displayName: resolveDisplayName(m.provider, m.modelId),
+      })),
       useOnlyEnvVars: configManager.getConfig('env:useOnlyEnvVars:ai') === true,
       isConfigured: isAiConfigured(),
     };

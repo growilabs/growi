@@ -96,9 +96,12 @@ describe('refreshModelCatalog (Req 9.1, 9.4, 9.7)', () => {
     expect(upsertSingleton).toHaveBeenCalledTimes(1);
     expect(upsertSingleton).toHaveBeenCalledWith({
       models: {
-        openai: ['gpt-4.1', 'gpt-4o'],
-        anthropic: ['claude-3-7-sonnet'],
-        google: ['gemini-2.5-pro'],
+        openai: [
+          { id: 'gpt-4.1', name: 'gpt-4.1' },
+          { id: 'gpt-4o', name: 'gpt-4o' },
+        ],
+        anthropic: [{ id: 'claude-3-7-sonnet', name: 'claude-3-7-sonnet' }],
+        google: [{ id: 'gemini-2.5-pro', name: 'gemini-2.5-pro' }],
       },
       fetchedAt: result.fetchedAt,
       supersededBundledGeneratedAt: BUNDLED_CATALOG_GENERATED_AT,

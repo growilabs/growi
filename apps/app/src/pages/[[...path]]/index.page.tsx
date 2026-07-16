@@ -19,6 +19,7 @@ import { TemplateModalLazyLoaded } from '~/client/components/TemplateModal';
 import { BasicLayout } from '~/components/Layout/BasicLayout';
 import { PageView } from '~/components/PageView/PageView';
 import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript';
+import { selectAlternateMdUrl } from '~/features/page-markdown';
 import { useEditorModeClassName } from '~/services/layout/use-editor-mode-class-name';
 import { useCurrentPageData, useCurrentPagePath } from '~/states/page';
 import { useHydratePageAtoms } from '~/states/page/hydrate';
@@ -155,10 +156,19 @@ const Page: NextPageWithLayout<Props> = (props: Props) => {
 
   const title = useCustomTitleForPage(pagePath);
 
+  // Machine-facing discovery of the Markdown alternate (Requirement 6.1/6.3):
+  // rendered unconditionally in the server-rendered <head> so it is present
+  // even when the body is fetched client-side (skipSSR). Prefers the permalink
+  // form; empty (container) pages without an entity _id fall back to path form.
+  const mdAlternateUrl = selectAlternateMdUrl(currentPage?._id, pagePath);
+
   return (
     <>
       <Head>
         <title>{title}</title>
+        {mdAlternateUrl != null && (
+          <link rel="alternate" type="text/markdown" href={mdAlternateUrl} />
+        )}
       </Head>
       <div className="dynamic-layout-root justify-content-between">
         <GrowiContextualSubNavigation currentPage={currentPage} />

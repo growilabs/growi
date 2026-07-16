@@ -1,5 +1,6 @@
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { SupportedAction } from '~/interfaces/activity';
+import type { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
   IFormattedSearchResult,
   ISearchResult,
@@ -156,8 +157,7 @@ export const setup = (crowi: Crowi, app) => {
     };
 
     let searchResult: ISearchResult<unknown>;
-    // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
-    let delegatorName;
+    let delegatorName: SearchDelegatorName | null;
     try {
       const query = decodeURIComponent(q);
       const nqName = nq ?? decodeURIComponent(nq);

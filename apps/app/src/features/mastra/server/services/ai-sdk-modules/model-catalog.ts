@@ -5,7 +5,10 @@
 import catalog from '^/resource/model-catalog-data.json' with { type: 'json' };
 
 import type { AiProvider } from '../../../interfaces/ai-provider';
-import { pickSelectableModelIds } from './build-model-catalog';
+import {
+  type ModelCatalogEntry,
+  pickSelectableModels,
+} from './build-model-catalog';
 
 /**
  * When the bundled asset was generated (its `_generatedAt` header). Used by the
@@ -16,13 +19,15 @@ import { pickSelectableModelIds } from './build-model-catalog';
 export const BUNDLED_CATALOG_GENERATED_AT = new Date(catalog._generatedAt);
 
 /**
- * Return the selectable model ids for the given provider from the committed
- * catalog. Synchronous and offline: performs no network or filesystem I/O.
- * Providers absent from the catalog (e.g. 'azure-openai') fail soft with an
- * empty array (Error Handling: missing/corrupt artifact → `?? []`).
+ * Return the selectable models (id + display name) for the given provider from
+ * the committed catalog. Synchronous and offline: performs no network or
+ * filesystem I/O. Providers absent from the catalog (e.g. 'azure-openai') fail
+ * soft with an empty array (Error Handling: missing/corrupt artifact → `?? []`).
  */
-export const getSelectableModelIds = (provider: AiProvider): string[] => {
+export const getSelectableModels = (
+  provider: AiProvider,
+): ModelCatalogEntry[] => {
   // Shared accessor: widening for non-catalog providers, `?? []` fail-soft,
-  // and the defensive copy all live in pickSelectableModelIds.
-  return pickSelectableModelIds(catalog.models, provider);
+  // and the defensive copy all live in pickSelectableModels.
+  return pickSelectableModels(catalog.models, provider);
 };
