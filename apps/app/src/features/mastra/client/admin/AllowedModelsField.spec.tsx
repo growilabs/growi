@@ -158,10 +158,13 @@ const getModelSelects = (): HTMLSelectElement[] =>
     .getAllByLabelText('ai_settings.model_label')
     .filter((el): el is HTMLSelectElement => el instanceof HTMLSelectElement);
 
-const getDefaultRadios = (): HTMLInputElement[] =>
+// The set-as-default control is an inline button on EVERY displayed row (kept
+// mounted for layout stability); on the default row it is disabled and the
+// badge conveys the state. Indexes therefore follow the display row order.
+const getSetDefaultButtons = (): HTMLButtonElement[] =>
   screen
-    .getAllByRole('radio')
-    .filter((el): el is HTMLInputElement => el instanceof HTMLInputElement);
+    .queryAllByRole('button', { name: 'ai_settings.set_as_default' })
+    .filter((el): el is HTMLButtonElement => el instanceof HTMLButtonElement);
 
 const getProviderOptionsTextareas = (): HTMLTextAreaElement[] =>
   screen
@@ -173,8 +176,10 @@ const getProviderOptionsTextareas = (): HTMLTextAreaElement[] =>
 const getRenderedRows = (): HTMLElement[] =>
   screen.queryAllByTestId('allowed-model-row');
 
-// Removal is immediate (no confirmation dialog): the trash icon removes the card
-// from the list directly (the change only persists on save).
+// Removing a FILLED row opens a confirmation modal first (the change only
+// persists on save, but a filled row may carry hand-written providerOptions
+// JSON); a still-blank row is removed immediately. This helper confirms the
+// modal when it appears, so callers express "remove row N" either way.
 const removeAt = async (
   user: ReturnType<typeof userEvent.setup>,
   index: number,
@@ -183,6 +188,12 @@ const removeAt = async (
     name: 'ai_settings.remove_model',
   });
   await user.click(trashButtons[index]);
+  const confirmButton = screen.queryByRole('button', {
+    name: 'ai_settings.remove_model_confirm',
+  });
+  if (confirmButton != null) {
+    await user.click(confirmButton);
+  }
 };
 
 // Probe readers over the GLOBAL array (all providers).
@@ -302,10 +313,11 @@ describe('AllowedModelsField', () => {
         allowedModels: multiProviderModels,
       });
 
-      // Act: star the SECOND displayed openai row (display index 1 → global index
-      // 2 = gpt-4o-mini). A filtered-index bug would set the default at global
-      // index 1 (gpt-4o) instead.
-      await user.click(getDefaultRadios()[1]);
+      // Act: promote the SECOND displayed openai row (display index 1 → global
+      // index 2 = gpt-4o-mini). Neither openai row is the default, so both offer
+      // the set-as-default action. A filtered-index bug would set the default at
+      // global index 1 (gpt-4o) instead.
+      await user.click(getSetDefaultButtons()[1]);
 
       // Assert: gpt-4o-mini is the only default; the previous default (anthropic),
       // the sibling openai row, and azure are all cleared — exactly one default.
@@ -379,7 +391,7 @@ describe('AllowedModelsField', () => {
       // Assert: the sole row is the default so the single-default invariant holds
       // from the first add.
       expect(countGlobalDefaults()).toBe(1);
-      expect(getDefaultRadios()[0].checked).toBe(true);
+      expect(isRowDefault('openai', '')).toBe(true);
     });
 
     it('does NOT auto-default a row added while the global list is already non-empty', async () => {
@@ -411,7 +423,7 @@ describe('AllowedModelsField', () => {
   });
 
   describe('default selection via shared helper (3.1)', () => {
-    it('checks exactly one card by default and moves the single default when another is picked', async () => {
+    it('disables the set-as-default action on the default card only and moves the single default when picked', async () => {
       // Arrange: two openai rows, first is default.
       const user = userEvent.setup();
       renderComponent({
@@ -431,18 +443,23 @@ describe('AllowedModelsField', () => {
           },
         ],
       });
-      expect(getDefaultRadios()[0].checked).toBe(true);
-      expect(getDefaultRadios()[1].checked).toBe(false);
+      // Both rows keep the action mounted; only the default row's is disabled.
+      expect(isRowDefault('openai', 'gpt-4o')).toBe(true);
+      expect(getSetDefaultButtons()).toHaveLength(2);
+      expect(getSetDefaultButtons()[0]).toBeDisabled();
+      expect(getSetDefaultButtons()[1]).toBeEnabled();
 
-      // Act
-      await user.click(getDefaultRadios()[1]);
+      // Act: promote the non-default row via its inline action.
+      await user.click(getSetDefaultButtons()[1]);
 
-      // Assert: exactly one default, now the second row. Re-query the radios: the
-      // switch rewrites the whole array and re-renders, staling prior references.
-      const radios = getDefaultRadios();
-      expect(radios[0].checked).toBe(false);
-      expect(radios[1].checked).toBe(true);
+      // Assert: exactly one default, now the second row — and the disabled
+      // state swapped rows (re-query: the switch rewrites the whole array and
+      // re-renders, staling prior references).
+      expect(isRowDefault('openai', 'gpt-4o-mini')).toBe(true);
+      expect(isRowDefault('openai', 'gpt-4o')).toBe(false);
       expect(countGlobalDefaults()).toBe(1);
+      expect(getSetDefaultButtons()[0]).toBeEnabled();
+      expect(getSetDefaultButtons()[1]).toBeDisabled();
     });
 
     it('marks only the default card with the "default" badge', () => {
@@ -555,6 +572,62 @@ describe('AllowedModelsField', () => {
       // Assert: the default stays on gpt-4o-mini (not shifted to the new first row).
       expect(isRowDefault('openai', 'gpt-4o-mini')).toBe(true);
       expect(countGlobalDefaults()).toBe(1);
+    });
+  });
+
+  describe('remove confirmation', () => {
+    it('asks for confirmation before removing a filled row, and keeps the row when cancelled', async () => {
+      // Arrange
+      const user = userEvent.setup();
+      renderComponent({
+        provider: 'openai',
+        allowedModels: [
+          {
+            provider: 'openai',
+            modelId: 'gpt-4o',
+            providerOptionsText: '',
+            isDefault: true,
+          },
+        ],
+      });
+
+      // Act: click the trash icon, then CANCEL in the confirmation modal.
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.remove_model' }),
+      );
+      expect(
+        screen.getByRole('button', {
+          name: 'ai_settings.remove_model_confirm',
+        }),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      // Assert: nothing was removed.
+      expect(findProbeRow('openai', 'gpt-4o')).toBeDefined();
+      expect(getRenderedRows()).toHaveLength(1);
+    });
+
+    it('removes a still-blank row immediately, without a confirmation modal', async () => {
+      // Arrange: add a fresh (blank) row.
+      const user = userEvent.setup();
+      renderComponent({ provider: 'openai', allowedModels: [] });
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.add_model' }),
+      );
+      expect(getRenderedRows()).toHaveLength(1);
+
+      // Act: delete it via the trash icon alone.
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.remove_model' }),
+      );
+
+      // Assert: the row is gone and no confirmation was shown.
+      expect(getRenderedRows()).toHaveLength(0);
+      expect(
+        screen.queryByRole('button', {
+          name: 'ai_settings.remove_model_confirm',
+        }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -990,10 +1063,10 @@ describe('AllowedModelsField', () => {
       const remaining = getModelSelects();
       expect(remaining).toHaveLength(1);
       expect(remaining[0].value).toBe('gpt-4.1');
-      expect(getDefaultRadios()[0].checked).toBe(true);
+      expect(isRowDefault('openai', 'gpt-4.1')).toBe(true);
     });
 
-    it('preserves both select values when the default radio is switched', async () => {
+    it('preserves both select values when the default is switched via the set-as-default action', async () => {
       const user = userEvent.setup();
       renderComponent({
         provider: 'openai',
@@ -1012,14 +1085,11 @@ describe('AllowedModelsField', () => {
           },
         ],
       });
-      await user.click(getDefaultRadios()[1]);
+      // Buttons follow display order: [1] is the non-default gpt-4.1 row.
+      await user.click(getSetDefaultButtons()[1]);
 
-      // Re-query after the interaction: switching the default rewrites the whole
-      // array (via the shared helper) and re-renders the rows, so a reference
-      // captured before the click can go stale — read the live radios instead.
-      const radios = getDefaultRadios();
-      expect(radios[0].checked).toBe(false);
-      expect(radios[1].checked).toBe(true);
+      expect(isRowDefault('openai', 'gpt-4.1')).toBe(true);
+      expect(isRowDefault('openai', 'gpt-4o')).toBe(false);
       // The single-default switch flips only isDefault; the model <select> values
       // are preserved (the shared helper keeps modelId/providerOptions).
       expect(getModelSelects().map((s) => s.value)).toEqual([

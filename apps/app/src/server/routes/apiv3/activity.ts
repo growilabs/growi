@@ -1,12 +1,8 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
-import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
-import { isValid } from 'date-fns/isValid';
-import { parseISO } from 'date-fns/parseISO';
-import type { Request, Router } from 'express';
+import type { NextFunction, Request, Router } from 'express';
 import express from 'express';
-import { query } from 'express-validator';
+import { body, query } from 'express-validator';
 
-import type { Prisma } from '~/generated/prisma/client';
 import {
   AUDITLOG_SUGGESTION_FIELDS,
   type AuditlogSuggestionField,
@@ -19,11 +15,13 @@ import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
-import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import { buildActivityListWhere } from './build-activity-list-where';
+import {
+  paginateAndSerializeActivities,
+  resolveActivityListWhere,
+} from './fetch-activity-list';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
@@ -68,6 +66,19 @@ const validator = {
       .isInt({ min: 1, max: 100 })
       .toInt()
       .withMessage('limit must be a number less than or equal to 100'),
+  ],
+  // POST /activity/list carries the same parameters in the request body so the
+  // searchFilter (which lists every selected action) never bloats the URL.
+  listByPost: [
+    body('limit')
+      .optional()
+      .isInt({ max: 100 })
+      .withMessage('limit must be a number less than or equal to 100'),
+    body('offset').optional().isInt().withMessage('offset must be a number'),
+    body('searchFilter')
+      .optional()
+      .isObject()
+      .withMessage('searchFilter must be an object'),
   ],
 };
 
@@ -261,6 +272,21 @@ export const setup = (crowi: Crowi): Router => {
 
   const router = express.Router();
 
+  // Shared gate for every list transport: 405 when the audit log is disabled.
+  // Kept as one middleware so the GET and POST routes cannot drift apart.
+  const ensureAuditLogEnabled = (
+    _req: Request,
+    res: ApiV3Response,
+    next: NextFunction,
+  ) => {
+    if (!configManager.getConfig('app:auditLogEnabled')) {
+      const msg = 'AuditLog is not enabled';
+      logger.error(msg);
+      return res.apiv3Err(msg, 405);
+    }
+    next();
+  };
+
   /**
    * @swagger
    *
@@ -303,98 +329,141 @@ export const setup = (crowi: Crowi): Router => {
     adminRequired,
     validator.list,
     apiV3FormValidator,
+    ensureAuditLogEnabled,
     async (req: Request, res: ApiV3Response) => {
-      const auditLogEnabled = configManager.getConfig('app:auditLogEnabled');
-      if (!auditLogEnabled) {
-        const msg = 'AuditLog is not enabled';
-        logger.error(msg);
-        return res.apiv3Err(msg, 405);
-      }
-
       const limit =
         req.query.limit ||
         configManager.getConfig('customize:showPageLimitationS');
       // Preserve the existing offset || 1 quirk exactly (pure migration, req 2.1):
-      // When the frontend sends offset=0 for page 1, it is falsy and becomes 1,
-      // skipping the first record. This behaviour is intentional to maintain
-      // observational parity before a separate fix is landed.
+      // an absent offset is falsy and becomes 1, skipping the first record. This
+      // behaviour is intentional to maintain observational parity before a
+      // separate fix is landed. Note: a query string turns an explicit offset=0
+      // into the truthy "0", so page 1 (offset=0) is NOT skipped here — only a
+      // fully absent offset is. The POST route below must reproduce that.
       const offset = req.query.offset || 1;
 
-      let where: ReturnType<typeof buildActivityListWhere> = {};
-
+      let where: ReturnType<typeof resolveActivityListWhere> = {};
       try {
         const parsedSearchFilter = JSON.parse(
           req.query.searchFilter as string,
         ) as ISearchFilter;
-
-        // resolve action filter: only include actions that are actually available
-        let searchableActions: string[] | undefined;
-        if (parsedSearchFilter.actions != null) {
-          const availableActions =
-            crowi.activityService.getAvailableActions(false);
-          searchableActions = parsedSearchFilter.actions.filter((action) =>
-            availableActions.includes(action),
-          );
-        }
-
-        // parse date range
-        const startDate = parseISO(parsedSearchFilter?.dates?.startDate || '');
-        const endDate = parseISO(parsedSearchFilter?.dates?.endDate || '');
-
-        where = buildActivityListWhere({
-          usernames: parsedSearchFilter.usernames,
-          actions: searchableActions,
-          startDate: isValid(startDate) ? startDate : undefined,
-          endDate: isValid(endDate) ? endDate : undefined,
-        });
+        where = resolveActivityListWhere(
+          crowi.activityService.getAvailableActions(false),
+          parsedSearchFilter,
+        );
       } catch (err) {
         logger.error('Invalid value', err);
         return res.apiv3Err(err, 400);
       }
 
       try {
-        const paginateResult = await prisma.activities.paginate({
+        const serializedPaginationResult = await paginateAndSerializeActivities(
           where,
-          orderBy: { createdAt: 'desc' },
-          offset: offset as number,
-          limit: limit as number,
-          include: { user: true },
-        });
+          limit as number,
+          offset as number,
+        );
+        return res.apiv3({ serializedPaginationResult });
+      } catch (err) {
+        logger.error('Failed to get paginated activity', err);
+        return res.apiv3Err(err, 500);
+      }
+    },
+  );
 
-        // Remap each doc to match the old Mongoose response shape (req 2.3):
-        // - drop `userId` (not present in old Mongoose docs)
-        // - keep serialized `user` (populated relation, same as Mongoose populate)
-        // - keep _id/__v (computed fields) and all other scalar fields
-        //
-        // Type note: the `paginate` generic resolves via PaginateOptions<…> which
-        // does not propagate `include` into the result type, so `docs` is typed as
-        // the base scalar shape (no `user` property). We route through `unknown`
-        // to reach the correct payload type — this is the Tier-2 cast rationale:
-        // the cast is confined to the map boundary; the underlying runtime value
-        // is correct because `include: { user: true }` was passed to `paginate`.
-        type ActivityWithUser = Prisma.activitiesGetPayload<{
-          include: { user: true };
-        }>;
-        const serializedDocs = (
-          paginateResult.docs as unknown as ActivityWithUser[]
-        ).map((doc) => {
-          const { user, userId, ...rest } = doc;
-          return {
-            // The Prisma `users` type has nullable fields (e.g. name: string|null)
-            // while `IUser` requires non-nullable. At runtime they map to the same
-            // MongoDB document. Cast to Ref<IUser> so serializeUserSecurely resolves.
-            // Tier-2 rationale: cast is confined to this single field expression.
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            user: serializeUserSecurely(user as any),
-            ...rest,
-          };
-        });
+  /**
+   * @swagger
+   *
+   * /activity/list:
+   *   post:
+   *     summary: /activity/list
+   *     description: >-
+   *       Same as `GET /activity` but takes limit / offset / searchFilter in the
+   *       request body. The audit-log UI uses this so the searchFilter (which
+   *       lists every selected action) never bloats the query string and hits a
+   *       URL-length limit for large action-group configurations.
+   *     tags: [Activity]
+   *     security:
+   *       - bearer: []
+   *       - accessTokenInQuery: []
+   *       - accessTokenHeaderAuth: []
+   *     requestBody:
+   *       required: false
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               limit:
+   *                 type: integer
+   *               offset:
+   *                 type: integer
+   *               searchFilter:
+   *                 type: object
+   *                 properties:
+   *                   usernames:
+   *                     type: array
+   *                     items:
+   *                       type: string
+   *                   actions:
+   *                     type: array
+   *                     description: >-
+   *                       Omit this field to match every activity. Send it only
+   *                       to restrict the result to the listed actions.
+   *                     items:
+   *                       type: string
+   *                   dates:
+   *                     type: object
+   *                     properties:
+   *                       startDate:
+   *                         type: string
+   *                         nullable: true
+   *                       endDate:
+   *                         type: string
+   *                         nullable: true
+   *     responses:
+   *       200:
+   *         description: Activity fetched successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ActivityResponse'
+   */
+  router.post(
+    '/list',
+    accessTokenParser([SCOPE.READ.ADMIN.AUDIT_LOG], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    adminRequired,
+    validator.listByPost,
+    apiV3FormValidator,
+    ensureAuditLogEnabled,
+    async (req: Request, res: ApiV3Response) => {
+      const limit =
+        req.body.limit ||
+        configManager.getConfig('customize:showPageLimitationS');
+      // The body carries a real numeric offset, so 0 MUST mean "no skip" (page 1
+      // shows the newest record). The GET route's `offset || 1` quirk only
+      // survives there because the query string turns 0 into the truthy "0";
+      // applying `|| 1` to a numeric 0 here would wrongly skip the newest record.
+      const offset = req.body.offset ?? 0;
+      const parsedSearchFilter = (req.body.searchFilter ?? {}) as ISearchFilter;
 
-        const serializedPaginationResult = {
-          ...paginateResult,
-          docs: serializedDocs,
-        };
+      let where: ReturnType<typeof resolveActivityListWhere>;
+      try {
+        where = resolveActivityListWhere(
+          crowi.activityService.getAvailableActions(false),
+          parsedSearchFilter,
+        );
+      } catch (err) {
+        logger.error('Invalid value', err);
+        return res.apiv3Err(err, 400);
+      }
 
+      try {
+        const serializedPaginationResult = await paginateAndSerializeActivities(
+          where,
+          limit as number,
+          offset as number,
+        );
         return res.apiv3({ serializedPaginationResult });
       } catch (err) {
         logger.error('Failed to get paginated activity', err);

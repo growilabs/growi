@@ -16,7 +16,7 @@ import {
   Tooltip,
 } from 'reactstrap';
 
-import { toPathMdUrl } from '~/utils/page-markdown-url';
+import { toPathMdUrl } from '~/features/page-markdown';
 
 import styles from './CopyDropdown.module.scss';
 

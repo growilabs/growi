@@ -665,4 +665,137 @@ describe('GET /api/v3/activity', () => {
       expect(docs[1].action).toBe('PAGE_CREATE');
     });
   });
+
+  // POST /api/v3/activity/list carries the same filter in the request body so a
+  // fully-selected action list never bloats the query string. Behaviour must
+  // match GET, EXCEPT the offset handling: the body carries a real numeric
+  // offset, so 0 means "no skip" (there is no query-string "0" truthiness).
+  describe('POST /api/v3/activity/list — body-carried filter', () => {
+    it('returns the same-shape paginated response (no userId, user present, _id/__v)', async () => {
+      await prisma.activities.createMany({
+        data: [
+          makeActivityData({
+            userId: userId1,
+            username: 'alice',
+            action: 'PAGE_CREATE',
+          }),
+        ],
+      });
+
+      const res = await request(app)
+        .post('/api/v3/activity/list')
+        .send({ limit: 10, offset: 0, searchFilter: { usernames: ['alice'] } });
+
+      expect(res.status).toBe(200);
+      const { docs } = res.body.data.serializedPaginationResult;
+      expect(docs).toHaveLength(1);
+
+      const doc = docs[0];
+      expect(doc).not.toHaveProperty('userId');
+      expect(doc).toHaveProperty('user');
+      expect(doc).toHaveProperty('_id');
+      expect(doc).toHaveProperty('__v');
+    });
+
+    it('treats offset 0 as no-skip: page 1 returns the newest record first', async () => {
+      const now = Date.now();
+      await prisma.activities.createMany({
+        data: [
+          makeActivityData({
+            userId: userId1,
+            username: 'alice',
+            action: 'PAGE_CREATE',
+            createdAt: new Date(now),
+          }),
+          makeActivityData({
+            userId: userId1,
+            username: 'alice',
+            action: 'PAGE_UPDATE',
+            createdAt: new Date(now - 1000),
+          }),
+          makeActivityData({
+            userId: userId1,
+            username: 'alice',
+            action: 'PAGE_DELETE',
+            createdAt: new Date(now - 2000),
+          }),
+        ],
+      });
+
+      const res = await request(app)
+        .post('/api/v3/activity/list')
+        .send({ limit: 10, offset: 0, searchFilter: { usernames: ['alice'] } });
+
+      expect(res.status).toBe(200);
+      const { docs } = res.body.data.serializedPaginationResult;
+      // Unlike GET's `offset || 1` quirk (which only skips on an ABSENT offset),
+      // numeric offset 0 must NOT skip: all 3 records return, newest first.
+      expect(docs).toHaveLength(3);
+      expect(docs[0].action).toBe('PAGE_CREATE');
+    });
+
+    it('filters by action supplied in the body searchFilter', async () => {
+      await prisma.activities.createMany({
+        data: [
+          makeActivityData({
+            userId: userId1,
+            username: 'alice',
+            action: 'PAGE_CREATE',
+          }),
+          makeActivityData({
+            userId: userId2,
+            username: 'bob',
+            action: 'PAGE_DELETE',
+          }),
+        ],
+      });
+
+      const res = await request(app)
+        .post('/api/v3/activity/list')
+        .send({
+          limit: 10,
+          offset: 0,
+          searchFilter: { actions: ['PAGE_DELETE'] },
+        });
+
+      expect(res.status).toBe(200);
+      const { docs } = res.body.data.serializedPaginationResult;
+      expect(docs.length).toBeGreaterThan(0);
+      for (const doc of docs) {
+        expect(doc.action).toBe('PAGE_DELETE');
+      }
+    });
+
+    it('returns all matching rows when the body omits searchFilter entirely (all-selected path)', async () => {
+      // The UI omits `actions` (and may omit the whole searchFilter) when every
+      // available action is selected; the server must then match every activity.
+      await prisma.activities.createMany({
+        data: [
+          makeActivityData({
+            userId: userId1,
+            username: 'alice',
+            action: 'PAGE_CREATE',
+          }),
+          makeActivityData({
+            userId: userId1,
+            username: 'alice',
+            action: 'PAGE_UPDATE',
+          }),
+          makeActivityData({
+            userId: userId2,
+            username: 'bob',
+            action: 'PAGE_DELETE',
+          }),
+        ],
+      });
+
+      const res = await request(app)
+        .post('/api/v3/activity/list')
+        .send({ limit: 100, offset: 0 });
+
+      expect(res.status).toBe(200);
+      const { totalDocs } = res.body.data.serializedPaginationResult;
+      expect(totalDocs).toBeGreaterThanOrEqual(3);
+    });
+  });
 });
