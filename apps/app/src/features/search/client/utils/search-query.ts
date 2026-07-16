@@ -97,19 +97,23 @@ export const normalizeKeyword = (keyword: string): string =>
   keyword.trim().replace(/\s+/g, ' ');
 
 /**
- * Strip embedded double-quotes — the one character the inline grammar (and the
- * server) drop. Committing them unstripped would show `a"b` in a chip while the
- * URL/search use `ab`, so sanitizing keeps state, URL, and search in agreement.
+ * Clean each filter value the same way `buildSearchQuery` does before it emits
+ * one: strip embedded double-quotes (the one character the inline grammar and the
+ * server drop), trim surrounding whitespace, and drop values left empty. Applying
+ * the identical rules here keeps the chip state, the URL, and the executed search
+ * in agreement — otherwise a value like `a"b` or ` x ` would render in a chip
+ * while the URL/search used `ab` / `x`.
  */
 export const sanitizeFilterState = (
   filters: SearchFilterState,
 ): SearchFilterState => {
-  const strip = (values: string[]) => values.map((v) => v.replace(/"/g, ''));
+  const clean = (values: string[]) =>
+    values.map((v) => v.replace(/"/g, '').trim()).filter((v) => v !== '');
   return {
-    authors: strip(filters.authors),
-    editors: strip(filters.editors),
-    groups: strip(filters.groups),
-    tags: strip(filters.tags),
+    authors: clean(filters.authors),
+    editors: clean(filters.editors),
+    groups: clean(filters.groups),
+    tags: clean(filters.tags),
   };
 };
 

@@ -223,6 +223,23 @@ describe('sanitizeFilterState', () => {
     const input = filterState({ tags: ['wiki', 'dev docs'] });
     expect(sanitizeFilterState(input)).toEqual(input);
   });
+
+  it('trims surrounding whitespace so state matches the built query', () => {
+    // buildSearchQuery trims values; sanitize must too, or the chip would show
+    // ` x ` while the URL/search used `x`.
+    const sanitized = sanitizeFilterState(
+      filterState({ authors: ['  alice '] }),
+    );
+    expect(sanitized.authors).toEqual(['alice']);
+  });
+
+  it('drops values that are empty after cleaning', () => {
+    const sanitized = sanitizeFilterState(
+      filterState({ authors: ['alice', '   ', '""'], tags: [''] }),
+    );
+    expect(sanitized.authors).toEqual(['alice']);
+    expect(sanitized.tags).toEqual([]);
+  });
 });
 
 describe('isSameFilterState', () => {
