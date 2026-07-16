@@ -25,10 +25,14 @@ import {
 const LAZY_ONLY_PACKAGE = /^(@ai-sdk\/|@azure\/identity$)/;
 
 // Entrypoints whose static graph must stay free of the provider SDKs: the
-// providers barrel (imported when the agent is constructed) and the dispatcher.
+// providers barrel, the dispatcher, and the Mastra instance module (the agent
+// construction root — its graph covers growi-agent and the agents' tools and
+// memory, so a stray provider import anywhere in the agent graph is caught,
+// not only one inside llm-providers).
 const ENTRYPOINTS = [
   'features/mastra/server/services/ai-sdk-modules/llm-providers/index.ts',
   'features/mastra/server/services/ai-sdk-modules/resolve-mastra-model.ts',
+  'features/mastra/server/services/mastra-modules/index.ts',
 ];
 
 describe('lazy-loaded provider SDKs stay out of the static import graph', () => {
