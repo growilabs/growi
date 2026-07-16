@@ -179,8 +179,12 @@ describe('resolveAzureOpenaiModel', () => {
     const secret = 'az-super-secret';
     setAzureConfig({ apiKey: secret });
 
-    // Endpoint validation runs before any dynamic import, so this rejects without
-    // loading @ai-sdk/azure (createAzure, its exported creator, is untouched).
+    // Observable here: the missing endpoint rejects before the provider is
+    // constructed (createAzure, its exported creator, is never called). The
+    // stronger "SDK not even loaded" property comes from the validation running
+    // BEFORE the resolver's `await import()` — module loading is not observable
+    // under vi.mock, and the import structure is guarded by
+    // lazy-provider-imports.spec.ts.
     await expect(resolveAzureOpenaiModel('dep')).rejects.toThrow(
       /resourceName|baseURL|AI_PROVIDERS/,
     );

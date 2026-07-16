@@ -95,13 +95,16 @@ describe('key-based provider resolvers', () => {
     expect(result).toEqual({ tag: 'google-model', modelId: 'gemini-test' });
   });
 
-  it('propagates the requireApiKey throw (missing key) without loading or constructing the provider', async () => {
+  it('propagates the requireApiKey throw (missing key) without constructing the provider', async () => {
     requireApiKey.mockImplementationOnce((provider: string) => {
       throw new Error(`API key for provider "${provider}" is not configured`);
     });
 
-    // The key is read before the dynamic import, so a missing key rejects without
-    // ever loading @ai-sdk/openai (createOpenAI, its exported creator, is untouched).
+    // Observable here: a missing key rejects before the provider is constructed
+    // (createOpenAI, its exported creator, is never called). The stronger "SDK
+    // not even loaded" property comes from the resolver reading the key BEFORE
+    // its `await import()` — module loading is not observable under vi.mock, and
+    // the import structure is guarded by lazy-provider-imports.spec.ts.
     await expect(resolveOpenaiModel('gpt-test')).rejects.toThrow(
       /not configured/,
     );
