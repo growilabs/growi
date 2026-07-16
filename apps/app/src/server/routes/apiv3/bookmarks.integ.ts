@@ -2,13 +2,14 @@ import { type IUser, PageGrant } from '@growi/core';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import mongoose, { type HydratedDocument, type Types } from 'mongoose';
-import request from 'supertest';
+import type request from 'supertest';
 
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
 import type { PageDocument, PageModel } from '~/server/models/page';
+import { configManager } from '~/server/service/config-manager';
 
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
@@ -57,6 +58,32 @@ const seedBookmark = (
   >('Bookmark');
   return Bookmark.create({ user: user._id, page: page._id });
 };
+
+const seedGroup = async (
+  name: string,
+): Promise<HydratedDocument<{ name: string }>> => {
+  const UserGroup = mongoose.model<{ name: string }>('UserGroup');
+  const [group] = await UserGroup.insertMany([{ name }]);
+  return group;
+};
+
+const addUserToGroup = async (
+  group: HydratedDocument<{ name: string }>,
+  user: HydratedDocument<IUser>,
+): Promise<void> => {
+  const UserGroupRelation = mongoose.model<{
+    relatedGroup: Types.ObjectId;
+    relatedUser: Types.ObjectId;
+  }>('UserGroupRelation');
+  await UserGroupRelation.insertMany([
+    { relatedGroup: group._id, relatedUser: user._id },
+  ]);
+};
+
+// Extract the page ids present in the API response (deleted/filtered pages are
+// dropped by the handler, so a missing id means "not visible to this viewer").
+const bookmarkedPageIds = (res: request.Response): string[] =>
+  res.body.userRootBookmarks.map((b: { page: { _id: string } }) => b.page._id);
 
 interface TestRequest extends Request {
   user?: HydratedDocument<IUser>;
