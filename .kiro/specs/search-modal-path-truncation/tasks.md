@@ -9,7 +9,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 5.3_
   - _Boundary: formatTruncatedPagePath_
 
-- [ ] 2. パス表示コンポーネントと 1 行安全網 CSS を実装しコンポーネントテストを追加する
+- [x] 2. パス表示コンポーネントと 1 行安全網 CSS を実装しコンポーネントテストを追加する
   - 純粋関数の結果を、先頭 `/` + `/` 区切りのパーツ列として 1 行描画する。ページ名は太字（`strong`）、省略記号 `…` は中間省略と分かる独立の muted 要素、ルートは `/` を表示
   - ルート要素に `title={フルパス}` を常時付与する
   - 同居の CSS module で 1 行固定（`white-space: nowrap; overflow: hidden`）+ 各セグメントの `text-overflow: ellipsis; min-width: 0` を適用。`flex-shrink` の優先度で祖先セグメントを先に縮め、ページ名は最後に縮める。区切り `/` と `…` は縮小・折り返し不可にする
