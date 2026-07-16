@@ -187,9 +187,9 @@ describe('ActivityTable (feature-level, mixed legacy/new records)', () => {
     // pageId has no formatted field, so it is not shown on the formatted tab
     expect(within(detailRow).queryByText('pageId')).not.toBeInTheDocument();
 
-    // Tabs are reachable by role, Formatted is selected
+    // Tabs are reachable by role, Info is selected
     expect(
-      within(detailRow).getByRole('tab', { name: 'Formatted' }),
+      within(detailRow).getByRole('tab', { name: 'Info' }),
     ).toHaveAttribute('aria-selected', 'true');
     expect(within(detailRow).getByRole('tab', { name: 'Raw' })).toHaveAttribute(
       'aria-selected',

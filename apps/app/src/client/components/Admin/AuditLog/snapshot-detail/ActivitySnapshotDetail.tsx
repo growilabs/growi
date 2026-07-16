@@ -24,7 +24,7 @@ const TABS: { id: SnapshotDetailTab; caption: string }[] = [
  * Dispatcher for an activity's snapshot detail. Picks the FIRST registry entry
  * whose guard accepts the activity (`action` is the sole discriminant — this
  * component never branches on the snapshot's contents):
- * - match    → tabbed view: "Formatted" (default) + "Raw". The raw tab always
+ * - match    → tabbed view: "Info" (default) + "Raw". The raw tab always
  *              renders RawSnapshotDetail with the full snapshot, so formatting
  *              augments the raw view and never replaces it.
  * - no match → RawSnapshotDetail alone, without any tab chrome.

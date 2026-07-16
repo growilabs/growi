@@ -72,8 +72,8 @@ describe('ActivitySnapshotDetail', () => {
       // Raw-only content (pageId has no formatted field) is not shown yet
       expect(screen.queryByText('pageId')).not.toBeInTheDocument();
 
-      // Both tabs are reachable by role, and Formatted is the selected one
-      expect(screen.getByRole('tab', { name: 'Formatted' })).toHaveAttribute(
+      // Both tabs are reachable by role, and Info is the selected one
+      expect(screen.getByRole('tab', { name: 'Info' })).toHaveAttribute(
         'aria-selected',
         'true',
       );
@@ -102,7 +102,7 @@ describe('ActivitySnapshotDetail', () => {
       expect(screen.getByText('123456')).toBeInTheDocument();
 
       // Switching back restores the formatted view (local tab state, two-way)
-      await user.click(screen.getByRole('tab', { name: 'Formatted' }));
+      await user.click(screen.getByRole('tab', { name: 'Info' }));
       expect(
         screen.getByText('admin:audit_log_snapshot.file_name'),
       ).toBeInTheDocument();
