@@ -73,13 +73,8 @@ describe('GET /usernames', () => {
       next();
     });
 
-    const usersModule = await import('./users');
-    const factoryCandidate =
-      'default' in usersModule ? usersModule.default : usersModule;
-    if (typeof factoryCandidate !== 'function') {
-      throw new Error('Module does not export a router factory function');
-    }
-    const usersRouter = factoryCandidate(crowi);
+    const { setup } = await import('./users');
+    const usersRouter = setup(crowi);
     app.use('/', usersRouter);
   });
 
