@@ -7,39 +7,64 @@ import {
 } from '~/interfaces/activity';
 
 import { AttachmentRemoveSnapshotDetail } from './AttachmentRemoveSnapshotDetail';
+import { LiveAttachmentSnapshotDetail } from './LiveAttachmentSnapshotDetail';
 import {
   defineRenderer,
   snapshotDetailRenderers,
 } from './snapshot-detail-renderers';
 
-// This spec is primarily a TYPE-LEVEL gate: the `@ts-expect-error` below fails
+// This spec is partly a TYPE-LEVEL gate: the `@ts-expect-error` below fails
 // `tsgo --noEmit` (as "Unused '@ts-expect-error' directive") if the mismatched
 // pairing ever stops being a compile error, so it durably proves property (a) of
 // defineRenderer. The runtime `it`s document the registry's observable contract.
 
+const buildActivity = (action: IActivityHasId['action']): IActivityHasId => ({
+  _id: `activity-id-${action}`,
+  action,
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  snapshot: { originalName: 'photo.png' },
+});
+
+// The registered Component is widened to FC<{ activity: IActivityHasId }> by
+// defineRenderer, so returning `unknown` here lets the identity assertions
+// compare against the concrete component without fighting the widening.
+const componentFor = (activity: IActivityHasId): unknown =>
+  snapshotDetailRenderers.find((r) => r.canRender(activity))?.Component;
+
 describe('snapshot-detail-renderers', () => {
-  it('registers exactly one entry (the ATTACHMENT_REMOVE renderer)', () => {
-    expect(snapshotDetailRenderers).toHaveLength(1);
+  it('registers one entry per attachment action (REMOVE, ADD, DOWNLOAD)', () => {
+    expect(snapshotDetailRenderers).toHaveLength(3);
   });
 
-  it('discriminates the registered entry purely by action', () => {
-    const [entry] = snapshotDetailRenderers;
+  it('routes each attachment action to its renderer purely by action', () => {
+    // ADD and DOWNLOAD share the live-attachment renderer; REMOVE has its own.
+    expect(
+      componentFor(buildActivity(SupportedAction.ACTION_ATTACHMENT_ADD)),
+    ).toBe(LiveAttachmentSnapshotDetail);
+    expect(
+      componentFor(buildActivity(SupportedAction.ACTION_ATTACHMENT_DOWNLOAD)),
+    ).toBe(LiveAttachmentSnapshotDetail);
+    expect(
+      componentFor(buildActivity(SupportedAction.ACTION_ATTACHMENT_REMOVE)),
+    ).toBe(AttachmentRemoveSnapshotDetail);
+  });
 
-    const removeActivity: IActivityHasId = {
-      _id: 'activity-id-remove',
-      action: SupportedAction.ACTION_ATTACHMENT_REMOVE,
-      createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      snapshot: { originalName: 'photo.png' },
-    };
-    const otherActivity: IActivityHasId = {
-      _id: 'activity-id-other',
-      action: SupportedAction.ACTION_PAGE_CREATE,
-      createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      snapshot: { username: 'alice' },
-    };
+  it('matches no entry for an unrelated action (raw fallback territory)', () => {
+    const other = buildActivity(SupportedAction.ACTION_PAGE_CREATE);
+    expect(snapshotDetailRenderers.some((r) => r.canRender(other))).toBe(false);
+  });
 
-    expect(entry.canRender(removeActivity)).toBe(true);
-    expect(entry.canRender(otherActivity)).toBe(false);
+  it('keeps the entries mutually exclusive (each action matches exactly one)', () => {
+    for (const action of [
+      SupportedAction.ACTION_ATTACHMENT_ADD,
+      SupportedAction.ACTION_ATTACHMENT_REMOVE,
+      SupportedAction.ACTION_ATTACHMENT_DOWNLOAD,
+    ]) {
+      const matches = snapshotDetailRenderers.filter((r) =>
+        r.canRender(buildActivity(action)),
+      );
+      expect(matches).toHaveLength(1);
+    }
   });
 
   it('accepts a guard paired with its matching component (compiles)', () => {
@@ -70,6 +95,6 @@ describe('snapshot-detail-renderers', () => {
     // requiring fileSize: string is not an assignable pairing.
     defineRenderer(isAttachmentRemoveActivity, MismatchedComponent);
 
-    expect(snapshotDetailRenderers).toHaveLength(1);
+    expect(snapshotDetailRenderers).toHaveLength(3);
   });
 });

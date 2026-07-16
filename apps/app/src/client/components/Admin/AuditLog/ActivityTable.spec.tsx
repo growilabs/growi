@@ -103,10 +103,64 @@ const attachmentRemoveActivity = buildActivity({
   },
 });
 
+// New record: ATTACHMENT_ADD with a full attachment snapshot. The file still
+// exists, so `target` (the attachment id) drives a download link.
+const attachmentAddActivity = buildActivity({
+  _id: 'activity-id-new-d',
+  action: SupportedAction.ACTION_ATTACHMENT_ADD,
+  ip: '10.0.0.4',
+  endpoint: '/attachment-add',
+  target: 'attachment-id-add',
+  user: mock<IUserHasId>({ _id: 'user-id-d', username: 'dave' }),
+  snapshot: {
+    username: 'dave',
+    originalName: 'diagram.png',
+    pagePath: '/design',
+    pageId: 'page-id-2',
+    fileSize: 2048,
+  },
+});
+
+// New record: ATTACHMENT_DOWNLOAD with a full attachment snapshot. Shares the
+// live-attachment renderer with ADD (same shape, file still exists).
+const attachmentDownloadActivity = buildActivity({
+  _id: 'activity-id-new-e',
+  action: SupportedAction.ACTION_ATTACHMENT_DOWNLOAD,
+  ip: '10.0.0.5',
+  endpoint: '/attachment-download',
+  target: 'attachment-id-dl',
+  user: mock<IUserHasId>({ _id: 'user-id-e', username: 'erin' }),
+  snapshot: {
+    username: 'erin',
+    originalName: 'manual.pdf',
+    pagePath: '/docs',
+    pageId: 'page-id-3',
+    fileSize: 4096,
+  },
+});
+
+// Backward-compat record: an ATTACHMENT_ADD recorded before the attachment
+// snapshot capture existed — its snapshot has only `username` (no attachment
+// fields), but the activity still carries `target` (a core activity field that
+// predates the snapshot increment). The live renderer must fall back per field
+// yet still offer the download link (Requirement 8.1).
+const legacyAttachmentAddActivity = buildActivity({
+  _id: 'activity-id-legacy-add',
+  action: SupportedAction.ACTION_ATTACHMENT_ADD,
+  ip: '10.0.0.6',
+  endpoint: '/attachment-add-legacy',
+  target: 'attachment-id-legacy-add',
+  user: mock<IUserHasId>({ _id: 'user-id-f', username: 'frank' }),
+  snapshot: { username: 'frank' },
+});
+
 const mixedActivityList: IActivityHasId[] = [
   legacyUsernameOnlyActivity,
   legacyNoSnapshotActivity,
   attachmentRemoveActivity,
+  attachmentAddActivity,
+  attachmentDownloadActivity,
+  legacyAttachmentAddActivity,
 ];
 
 // Each fixture's `ip` is unique, so it identifies the fixture's own <tr> even
@@ -131,13 +185,13 @@ const expandRowByIp = async (
 };
 
 describe('ActivityTable (feature-level, mixed legacy/new records)', () => {
-  it('renders all three rows without throwing, keeping the existing user/action display for legacy rows (Requirements 1.2, 5.1, 5.3)', () => {
+  it('renders every row without throwing, keeping the existing user/action display for legacy rows (Requirements 1.2, 5.1, 5.3)', () => {
     expect(() =>
       render(<ActivityTable activityList={mixedActivityList} />),
     ).not.toThrow();
 
-    // 3 main rows, one per activity
-    expect(screen.getAllByTestId('activity-table')).toHaveLength(3);
+    // One main row per activity
+    expect(screen.getAllByTestId('activity-table')).toHaveLength(6);
 
     // Legacy record A: username-only snapshot renders the username as before
     expect(screen.getByText('legacy-user-a')).toBeInTheDocument();
@@ -221,6 +275,89 @@ describe('ActivityTable (feature-level, mixed legacy/new records)', () => {
     for (const anchor of detailRow.querySelectorAll('a')) {
       expect(anchor.getAttribute('href')).not.toMatch(/download/i);
     }
+  });
+
+  it('expanding the ATTACHMENT_ADD row shows the formatted view with a download link to /download/{target}, and the raw tab still reveals every field (Requirements 6.1, 6.2, 7.1)', async () => {
+    const user = userEvent.setup();
+    render(<ActivityTable activityList={mixedActivityList} />);
+
+    await expandRowByIp(user, '10.0.0.4');
+
+    const detailRow = screen.getByTestId('activity-snapshot-detail');
+
+    // Formatted view is the default
+    expect(
+      within(detailRow).getByText('admin:audit_log_snapshot.file_name'),
+    ).toBeInTheDocument();
+    expect(within(detailRow).getByText('diagram.png')).toBeInTheDocument();
+    expect(within(detailRow).getByText(prettyBytes(2048))).toBeInTheDocument();
+    expect(
+      within(detailRow).getByRole('link', { name: 'design' }),
+    ).toHaveAttribute('href', '/design');
+
+    // A still-existing attachment shows a download link built from `target`
+    expect(
+      within(detailRow).getByRole('link', {
+        name: 'admin:audit_log_snapshot.download',
+      }),
+    ).toHaveAttribute('href', '/download/attachment-id-add');
+
+    // Info is selected, Raw is reachable
+    expect(
+      within(detailRow).getByRole('tab', { name: 'Info' }),
+    ).toHaveAttribute('aria-selected', 'true');
+
+    // Raw tab reveals all fields, including pageId (formatting augments raw)
+    await user.click(within(detailRow).getByRole('tab', { name: 'Raw' }));
+    expect(within(detailRow).getByText('pageId')).toBeInTheDocument();
+    expect(within(detailRow).getByText('page-id-2')).toBeInTheDocument();
+  });
+
+  it('expanding the ATTACHMENT_DOWNLOAD row shows the same formatted view with a download link (shared renderer with ADD) (Requirements 6.1, 7.1)', async () => {
+    const user = userEvent.setup();
+    render(<ActivityTable activityList={mixedActivityList} />);
+
+    await expandRowByIp(user, '10.0.0.5');
+
+    const detailRow = screen.getByTestId('activity-snapshot-detail');
+
+    expect(within(detailRow).getByText('manual.pdf')).toBeInTheDocument();
+    expect(within(detailRow).getByText(prettyBytes(4096))).toBeInTheDocument();
+    expect(
+      within(detailRow).getByRole('link', { name: 'docs' }),
+    ).toHaveAttribute('href', '/docs');
+    expect(
+      within(detailRow).getByRole('link', {
+        name: 'admin:audit_log_snapshot.download',
+      }),
+    ).toHaveAttribute('href', '/download/attachment-id-dl');
+  });
+
+  it('expanding a legacy ATTACHMENT_ADD row (no attachment fields) falls back per field yet still shows the download link from target (Requirements 8.1, 7.1)', async () => {
+    const user = userEvent.setup();
+    render(<ActivityTable activityList={mixedActivityList} />);
+
+    await expandRowByIp(user, '10.0.0.6');
+
+    const detailRow = screen.getByTestId('activity-snapshot-detail');
+
+    // Attachment fields are missing → per-field fallbacks, no throw
+    expect(
+      within(detailRow).getByText('admin:audit_log_snapshot.unknown_file_name'),
+    ).toBeInTheDocument();
+    expect(
+      within(detailRow).getByText('admin:audit_log_snapshot.unknown_size'),
+    ).toBeInTheDocument();
+    expect(
+      within(detailRow).getByText('admin:audit_log_snapshot.page_unavailable'),
+    ).toBeInTheDocument();
+
+    // The download link still appears because `target` is present
+    expect(
+      within(detailRow).getByRole('link', {
+        name: 'admin:audit_log_snapshot.download',
+      }),
+    ).toHaveAttribute('href', '/download/attachment-id-legacy-add');
   });
 
   it('expanding a legacy username-only row shows raw only (no tab chrome), with the username field visible as key-value (Requirements 1.2, 5.1)', async () => {
