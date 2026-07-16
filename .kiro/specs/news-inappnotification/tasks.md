@@ -185,3 +185,46 @@
   - 未読ドットのインラインスタイルを `UnreadDot.module.scss` の共通 CSS Module に抽出し、`NewsItem.tsx` と `InAppNotificationElm.tsx` の両者から参照して見た目を統一
   - `browserLanguage` prop を廃止し、テストも i18n モックへ合わせて更新
   - _Requirements: 品質改善_
+
+- [x] 14. 管理画面からの配信トグルと取込の堅牢化（実装済み・タスク後追い記録。requirements/design は反映済みだった範囲）
+- [x] 14.1 配信トグルを実装する
+  - `news:isDeliveryEnabled`（`defaultValue: true`、envVarName なし）を config-definition に追加し、cron 発火時に false ならスキップする
+  - admin 用エンドポイント（GET は READ scope）と `/admin/app` の UI トグルを実装する
+  - フィード URL を env 設定からコード内蔵（ハードコード）へ変更する
+  - _Requirements: 9.1–9.7_
+- [x] 14.2 フィード取込を堅牢化する
+  - フィード JSON を zod で検証する（アイテム単位の fail-soft、http(s) 以外の url を ingest 時に排除）
+  - フィード応答サイズを 5 MiB、list API の limit を 100 に制限する
+  - フィードから外れたアイテムを DB から削除する
+  - upsert を `bulkWrite`（ordered: false）にバッチ化し、取得を夜間 5 時間ウィンドウにランダム分散する
+  - アクセストークン scope `features.in_app_notification` を導入する
+  - _Requirements: 1.2, 1.3, 1.4, 2.1_
+
+- [x] 15. ニュース一覧ページ /_news を実装する（マージ済み: PR #11317, #11373 ほか）
+- [x] 15.1 NewsFeed ページを実装する
+  - 予約システムパス `/_news` に一覧ページを追加する（emoji/タイトル/日付/body/「詳細を見る」）
+  - body はプレーンテキスト + `pre-wrap` で描画し、url は `isSafeHttpUrl` で描画時再検証する
+  - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.7, 10.8_
+- [x] 15.2 サイドバー NewsItem のクリック挙動を変更する
+  - 「詳細 URL を新タブで開く」を「既読化して `/_news#news-<id>` へ遷移」に置き換える（Requirement 5.6 改訂）
+  - _Requirements: 5.6, 5.7, 10.6_
+- [x] 15.3 アンカーの sticky ヘッダーオフセットを実装する
+  - `scroll-margin-top: $grw-scroll-margin-top-in-view` を news-item セクションに適用する
+  - _Requirements: 10.6_
+
+- [x] 16. /_news をページネーションに置き換える（PR #11416、レビュー中）
+- [x] 16.1 単一ページ取得とページャを実装する
+  - `useSWRxNewsPage`（`keepPreviousData`）+ `PaginationWrapper` で無限スクロールを置換する
+  - `parsePageQuery` を純関数として抽出し境界テストを併設する
+  - `NEWS_PER_PAGE` を `consts.ts` に集約し3箇所（サイドバー news ストリーム / NewsFeed / use-news）で共有する
+  - _Requirements: 11.1, 11.2, 11.3, 11.6_
+- [x] 16.2 サイドバーからのページ直接遷移を実装する
+  - news id → SWRInfinite ページ index マップから `?page=N` を導出して遷移する
+  - 未読フィルタ ON 時はページ対応が成立しないため `?page` を省略する（レビュー指摘 High の対応）
+  - _Requirements: 11.4, 11.7_
+- [x] 16.3 アンカースクロールを once-per-navigation 化する
+  - トリガーを `data` 参照 + `asPath` にし、`scrolledForPathRef` でナビゲーションごと 1 回を保証する（`keepPreviousData` 下で新旧ページ同数のとき再発火しない退行の修正）
+  - _Requirements: 11.5_
+- [x] 16.4 テストを整備する
+  - `NewsFeed.spec.tsx`（9件、アンカー退行ガードは旧実装で fail することを実証）、`parse-page-query.spec.ts`（10件）、`NewsItem.spec.tsx` へ非ゼロ pageIndex / pageIndex 未指定ケースを追加
+  - _Requirements: 10.7, 10.8, 11.1–11.7_
