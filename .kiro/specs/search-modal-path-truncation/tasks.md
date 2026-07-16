@@ -40,3 +40,4 @@
 ## Implementation Notes
 - `normalizePath` は `@growi/core/dist/utils` の barrel からは export されていない。`@growi/core/dist/utils/path-utils` から import する（apps/app の既存慣例）。`DevidedPagePath` は `@growi/core/dist/models`。
 - `DevidedPagePath` の日付束ね（`evalDatePath`）は「日付より前に祖先 2 セグメント以上」でのみ発動する（正規表現 `(.+\/[^/]+)\/(date)$` の group1 が 2 セグメント以上を要求するため）。`/notes/2024/01/01` は束ねられずページ名 `01`、`/team/notes/2024/01/01` は束ねられページ名 `2024/01/01`。requirements/design の例示をこの実挙動に合わせて修正済み。
+- タスク4（実機ビジュアル検証）: runtime smoke boot は PASS（`turbo run dev` でアプリ起動・コンパイル成功、クライアント変更による crash なし）。ただし当 devcontainer は全文検索が無効（ELASTICSEARCH_URI 未設定）・root 302・Playwright ブラウザ未キャッシュのため、実データでの検索モーダル目視（1行表示・ライト/ダーク・ホバー・クリック遷移）はこの環境では実施不可。ES 有効＋深いパスをシードした実インスタンスでユーザーが目視確認する必要がある。→ 目視部分は未完了のためチェックボックスは未チェックのまま。
