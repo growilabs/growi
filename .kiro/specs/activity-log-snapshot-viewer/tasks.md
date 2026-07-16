@@ -80,3 +80,50 @@
 - 4.1: 「copied!」tooltip の開閉 state はテーブル共有から行ローカルへ移した（挙動は行単位で不変）。`formatDate` が ActivityTable と ActivityTableRow に重複しており、4.2 で ActivityTable を薄いコンテナへ変える際に解消すること。
 - 3.2: タブ見出し「Info」「Raw」は英語ハードコード（design の i18n 契約はフィールドラベル 8 キーのみでタブ見出しキーを定義していないため）。i18n キー化するなら admin.json を境界に含むタスク 4.2 で `audit_log_snapshot.tab_info` / `tab_raw` 等の追加を判断する。
 - 3.1: snapshot 型が全フィールド optional ＋ `FC` の呼び出しシグネチャが bivariant なため、「余分な必須フィールドを要求する Component」の誤登録は型エラーにならない。durable に検出できる誤ペアは「同名フィールドの型が矛盾する」場合のみで、負のゲートは `@ts-expect-error`（`fileSize: string` の dummy）として `snapshot-detail-renderers.spec.tsx` に常設。この directive の下の行がエラーでなくなると typecheck 自体が落ちる（TS2578）。
+
+## 増分（2026-07-16）: 添付追加/ダウンロード（ADD/DOWNLOAD）の整形表示
+
+> **位置づけ**: タスク 1〜5（raw ビューア＋REMOVE 整形）は実装完了（PR #11440）。本増分は作り直さず、宣言的レジストリに ADD/DOWNLOAD の整形 renderer を追記する。上流 `activity-log-snapshot` の ADD/DOWNLOAD capture は PR #11433 で完了済みで、着手条件は満たされている。dispatcher・テーブル・型定義・API は変更しない（read-only 消費のまま）。実装は各コンポーネント単位で先に失敗するテストを書いてから通す（red→green）。
+
+- [x] 7. Foundation: ダウンロードリンクのラベル（英語）追加
+- [x] 7.1 ダウンロードラベルを en_US に追加
+  - `apps/app/public/static/locales/en_US/admin.json` の `audit_log_snapshot` に `download`（値: "Download"）を追加する。ファイル名・サイズ・ページ等のラベルは既存キーを再利用する。
+  - ja/ko/zh/fr の翻訳は**追加しない**。既存の翻訳タスク（タスク 6.1）の対象キーに本キーを含める（後続・英語ファースト）。
+  - 完了状態: en_US に `audit_log_snapshot.download` が存在し、未翻訳ロケールでは i18next フォールバックで英語表示になる。
+  - _Requirements: 4.1, 4.3_
+
+- [x] 8. Core: 実体が残る添付の整形レンダラ（ADD/DOWNLOAD 共有）
+- [x] 8.1 (P) 共有フィールド部品 `AttachmentSnapshotFields` を抽出し、REMOVE 整形を置き換える（挙動不変）
+  - `AttachmentRemoveSnapshotDetail` のファイル名・人間可読サイズ・所属ページリンクの描画を、presentational な `AttachmentSnapshotFields`（`snapshot-detail/` 内の内部コンポーネント。barrel には公開しない）へ抽出する。`AttachmentRemoveSnapshotDetail` はこの共有部品を使う薄いラッパにする（ダウンロードリンクは足さない＝要件 2.4/7.3）。
+  - 先に既存 `AttachmentRemoveSnapshotDetail.spec.tsx` が green のまま（抽出前後で観察可能な出力が不変）であることを確認する回帰テストにする。フォールバック（`originalName`/`pagePath`/`fileSize` 各欠損）の断言を共有部品側でも担保する。
+  - 完了状態: REMOVE の描画が抽出前と同一（ダウンロードリンクは依然出ない）。共有部品の unit spec が green。
+  - _Requirements: 2.1-2.4, 3.1-3.4, 7.3_
+
+- [x] 8.2 (P) `LiveAttachmentSnapshotDetail`（ADD/DOWNLOAD 共有）を新規追加
+  - 先に失敗する unit spec を書く（red）→ green: `AttachmentSnapshotFields`（ファイル名/サイズ/ページ）に**ダウンロードリンク行**を1つ足したコンポーネント。`activity.target != null` のとき `href={/download/${activity.target}}` のリンクを、ラベル `audit_log_snapshot.download` で描画する。`target` 欠損時はリンク行を出さず、他フィールドは描画を継続する。
+  - props は `defineRenderer` が要求する絞り込み型 `IActivityHasId & { snapshot?: AttachmentSnapshot }` を受け取り、renderer 内で再 narrow しない。`target` は `IActivityHasId` 側のフィールドから読む。
+  - unit spec の断言（観察可能な出力のみ）: (a) 全フィールド＋`target` 有り→ファイル名・整形サイズ・ページリンク・`/download/{target}` の href リンク、(b) `target` 欠損→ダウンロードリンクが**無い**が他は出る、(c) 各フィールド欠損→対応フォールバック文言。
+  - 完了状態: 上記 spec が green。REMOVE の spec は影響を受けない。
+  - _Requirements: 6.1, 6.3, 7.1, 7.2, 7.4, 8.1_
+  - _Depends: 7.1, 8.1_
+
+- [x] 9. Core: レジストリへ ADD/DOWNLOAD を追記
+- [x] 9.1 `snapshot-detail-renderers` に ADD/DOWNLOAD の2エントリを追記
+  - `defineRenderer(isAttachmentAddActivity, LiveAttachmentSnapshotDetail)` と `defineRenderer(isAttachmentDownloadActivity, LiveAttachmentSnapshotDetail)` を配列に追記する（REMOVE エントリは不変。dispatcher・テーブルは触らない）。
+  - 既存 `snapshot-detail-renderers.spec.tsx` を拡張: `action=ATTACHMENT_ADD` / `=ATTACHMENT_DOWNLOAD` が `LiveAttachmentSnapshotDetail` に、`=ATTACHMENT_REMOVE` が `AttachmentRemoveSnapshotDetail` に解決されること（`canRender` の排他性）を断言する。既存の負ゲート（`@ts-expect-error` の誤ペア検出）は維持する。
+  - 完了状態: レジストリ 3 エントリ、既存＋新規の解決テストが green。dispatcher/テーブルの差分が無い。
+  - _Requirements: 6.1, 6.2_
+  - _Depends: 8.2_
+
+- [x] 10. Validation: 混在レンダリングの結合テスト拡張
+- [x] 10.1 (P) 混在一覧に ADD/DOWNLOAD 行を追加して検証
+  - 既存の混在結合テスト（`ActivityTable.spec.tsx`）の `activityList` に、ADD 行・DOWNLOAD 行（添付フィールド有り、`target` 有り）と、後方互換確認用の「添付フィールド無し ADD 行」を加える。
+  - 展開時: ADD/DOWNLOAD は既定タブで整形（ファイル名・サイズ・ページ・**ダウンロードリンク**）が出て、raw タブで全フィールドへ到達できる。REMOVE 行は従来どおりダウンロードリンク無し。旧レコード（snapshot 無し/username のみ）は破綻しない。
+  - 完了状態: 拡張した混在 spec が green。既存の REMOVE/旧レコードの断言は不変。
+  - _Requirements: 6.1, 6.2, 7.1, 7.3, 8.1_
+  - _Depends: 9.1_
+
+## Implementation Notes（増分）
+
+- ダウンロード URL は attachment モデルの `downloadPathProxied`（`/download/{_id}`）に一致させる。`activity.target` が attachment ID であること・API 応答に載ること・URL 形は、design の「増分の Boundary / Security」節に実測根拠を記載済み。inline 表示用の `/attachment/{_id}`（`filePathProxied`）ではなく、監査用途に合う強制ダウンロードの `/download/{_id}` を採用する。
+- サムネイル表示は本増分の対象外（snapshot も `target` も MIME/画像判定情報を持たないため）。将来課題として flagship `activity-log` の関心マップで管理する。
