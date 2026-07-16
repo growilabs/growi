@@ -16,8 +16,9 @@
 > satisfies, the **Boundary** (the symbol/module it lands in — see design.md § File Structure Plan),
 > and its dependencies. Tasks with no dependency between them can be done in any order.
 >
-> **Story independence:** B2 (perf), B3 (backfill), B4 (rename/move), and B5 (delete/broken) are all
-> independent of one another — each depends only on B1. Do them in whatever order you like after B1.
+> **Story independence:** B2 (scale — read-path perf + write-path burst control), B3 (backfill),
+> B4 (rename/move), and B5 (delete/broken) are all independent of one another — each depends only on
+> B1. Do them in whatever order you like after B1.
 
 ---
 
@@ -203,19 +204,49 @@ extraction and resolution for all of them as one unit; there is no separable "na
 
 ---
 
-## Story B2 — Backlinks retrieval and sync at scale (perf)
+## Story B2 — Backlinks at scale (read-path perf + write-path burst control)
 
-**Nature:** Read-side validation (B2.1) plus one small write-side production change (B2.2) that
-grafts a coalescing queue onto the B1 walking-skeleton listener. Depends only on B1.
+**Nature:** Two independent slices cleaved along the read/write seam, each depending only on B1:
+**B2.1** is a read-path validation — a pure benchmark proving the `{toPage}` index and viewer filter
+return backlinks in interactive time on a static ~100k-page dataset (no production code change
+expected). **B2.2** is a write-path production change — grafting an in-process coalescing + pacing
+queue onto the B1 walking-skeleton listener so bursts of saves don't storm MongoDB or block live
+reads. Read-side query latency is independent of write pacing, so the two share no dependency.
 
-- [ ] B2.1 Performance check for backlinks retrieval at scale
-  - Verify a heavily-linked page's backlinks return in interactive time (<~1s) on a large
-    (~100k-page) dataset, exercising the `{toPage}` index and the viewer filter
-  - Done when a measured retrieval against the large dataset meets the latency target
+**Recommended sequence: B2.2 before B2.1.** B2.2 ships real production behavior that protects the
+write path today; B2.1 is a read-only benchmark on static data that can run at any time and mainly
+confirms B1's index choice. (Not a hard dependency — either order is correct.)
+
+- [ ] B2.1 Performance check for backlinks retrieval at scale (read-path)
+  - A measurement exercise, not a feature build: prove Req 3.4's target and locate any bottleneck
+    while it is still a cheap, pre-merge index fix. Pure read benchmark on a statically seeded
+    dataset — independent of B2.2's write pacing.
+  - **Seed** ~100k pages with realistic internal linking, deliberately including a **heavily-linked
+    hub page** (thousands of inbound sources) — the worst case for the read path and the page you
+    actually measure. Use a throwaway/fixture seeding script, **not** the B3 backfill job.
+  - **Confirm the indexes exist** on the seeded collection (created by B1.2 `autoIndex`) — a check,
+    not new work: `{toPage}` in particular.
+  - **Measure the real read path** for the hub page **as a viewer**: the full `findBacklinks` →
+    `findBacklinkSources` (`distinct` on `{toPage}`) → permission/viewer filter path, not the raw
+    Mongo query alone. Confirm it returns in interactive time (<~1s).
+  - **Inspect the query plan** (`explain()`) on the `distinct` and the viewer-filter query to confirm
+    they use an index rather than collection-scanning — this is what tells you *why* the number is
+    what it is, and *where* to fix it if it is slow.
+  - **Confirm the no-rescan guarantee** by inspection/a targeted check: a single create/edit rewrites
+    only that page's rows (the `replaceOutboundLinks` bulkWrite) and never walks all pages.
+  - If the target is missed, the `explain()` output points at the fix (usually a missing/compound
+    index or a filter restructure); that fix — an index/query change only — is then part of this task.
+  - **Decision to make before starting:** keep this as a permanent CI integ test, or run it as a
+    one-off/manual (or separately-gated) benchmark? Seeding 100k pages on every CI run is expensive,
+    so it is usually run manually with the result recorded rather than left in the normal test suite.
+    This changes how the measurement step is written (timed integ test vs. standalone script).
+  - Done when a measured retrieval against the ~100k-page dataset meets the <~1s target, the
+    `explain()` evidence shows the query is index-backed, and the no-rescan guarantee is confirmed
+    (plus any surfaced index/query fix is applied)
   - _Requirements: 3.4_
   - _Depends: B1.12, B1.13_
 
-- [ ] B2.2 Coalesce and pace live extraction (write-side burst control)
+- [ ] B2.2 Coalesce and pace live extraction (write-path burst control)
   - Replace the B1.6/B1.12 inline per-event extraction with an in-process coalescing queue: the
     `create`/`update` handlers mark the page dirty (`Set<pageId>`); a paced tick drains a bounded
     number of ids per cycle, re-reads each page's latest body at drain time, and runs the existing
@@ -224,10 +255,27 @@ grafts a coalescing queue onto the B1 walking-skeleton listener. Depends only on
     (delete supersedes a pending upsert), so a stale upsert never re-creates rows for a gone page.
   - Best-effort/in-memory by design: a restart drops pending work (self-heals on next edit/backfill);
     the set is per-instance in multi-container deployments (safe because upserts are idempotent).
+  - **Why (MongoDB impact):** every save runs `PageLink.replaceOutboundLinks`, a single `bulkWrite`
+    that upserts one row per extracted link and issues a `deleteMany` for links no longer present —
+    each component write maintaining all four `pagelinks` indexes (`{fromPage}`, `{toPath}`,
+    `{toPage}`, unique `{fromPage, toPath}`). Without coalescing, N rapid saves of one page = N full
+    `bulkWrite` replaces of which N−1 are immediately obsolete, yet each still re-upserts every row,
+    re-scans for the `deleteMany`, rewrites all four index B-trees, and (under the `rs0` replica set)
+    emits oplog entries that replicate to secondaries. A burst across distinct pages runs these
+    `bulkWrite`s concurrently, contending for write tickets and collection locks with the
+    latency-sensitive backlinks read (`findBacklinkSources`, a `distinct` on `{toPage}`) — so the
+    write storm is what actually slows reader queries at the storage-engine level. Coalescing
+    collapses same-page saves to **one** `bulkWrite` reflecting only the final link set (safe because
+    `replaceOutboundLinks` is idempotent), cutting write volume, index maintenance, and oplog/
+    replication traffic from N to 1; pacing then caps distinct-page `bulkWrite`s per tick, converting
+    an unbounded write spike into steady, bounded write QPS that coexists with reads. Delete must
+    supersede a pending upsert because the upsert path uses `upsert: true` — running a stale upsert
+    for a since-deleted page would re-create `pagelinks` rows for a non-existent source (orphan rows
+    a reader could surface as phantom backlinks).
   - Done when: repeated saves of the same page within the tick window produce exactly one extraction
-    (asserted via a spy/count on the upsert handler); a burst of distinct-page saves is drained over
-    multiple ticks rather than in one synchronous spree; a delete during a pending upsert results in
-    reconcile, not a re-created row.
+    / one `replaceOutboundLinks` `bulkWrite` (asserted via a spy/count on the upsert handler); a burst
+    of distinct-page saves is drained over multiple ticks rather than in one synchronous spree; a
+    delete during a pending upsert results in reconcile, not a re-created row.
   - _Requirements: 3.5_
   - _Boundary: PageLinkService_
   - _Depends: B1.6, B1.12_
