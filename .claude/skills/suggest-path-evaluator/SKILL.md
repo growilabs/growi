@@ -197,7 +197,7 @@ actually appears in the body you read. If a term you "remember" isn't in the tex
 summarised a different document — discard, re-read this body, redo Phase A. This catches the
 most damaging batch error: **filing the right reasoning under the wrong document**. It needs
 only the body (no answer key), so it works on any wiki and leaks no ground truth.
-`scripts/reconcile-digests.mjs` runs this check mechanically over a batch (see Batch mode).
+`scripts/reconcile-digests.ts` runs this check mechanically over a batch (see Batch mode).
 
 ### Phase B — drilldown to the document's ideal home (always run)
 
@@ -261,10 +261,10 @@ A single document is the core unit. For a batch, run the flow per document, then
 **Batches are where bodies get swapped — gate every document** (Phase A's self-consistency gate
 is mandatory in batch mode; a body that fails reconciliation is a suspected swap: re-judge it in
 isolation before it enters the aggregate; reconciliation is a deterministic string check, not
-another LLM pass). `scripts/reconcile-digests.mjs` runs this gate over a directory of bodies and
+another LLM pass). `scripts/reconcile-digests.ts` runs this gate over a directory of bodies and
 exits non-zero on a suspected swap, so it can block aggregation.
 
-Aggregate from the ○/△/× marks (`scripts/aggregate.mjs` turns per-document verdicts into the
+Aggregate from the ○/△/× marks (`scripts/aggregate.ts` turns per-document verdicts into the
 per-domain table):
 
 - **usable-rate (case-level)** — fraction of documents with ≥1 usable (○ or △) candidate. This
@@ -302,10 +302,10 @@ that:
 - `references/tree-source.md` — how to source the wiki tree **and page content** today (the
   current adapter and the Vault-interface boundary to preserve). Phase A (box-identity reads)
   and Phase B (beam descent) both go through it.
-- `scripts/reconcile-digests.mjs` — deterministic self-consistency gate for batch mode (every
+- `scripts/reconcile-digests.ts` — deterministic self-consistency gate for batch mode (every
   key term in a document's digest must appear in that document's body; exits non-zero on a
   suspected body-swap).
-- `scripts/aggregate.mjs` — aggregates per-document ○/△/× verdicts into the per-domain table
+- `scripts/aggregate.ts` — aggregates per-document ○/△/× verdicts into the per-domain table
   (usable-rate, per-candidate ○/△/× rates, recall-miss rate from Phase B, and an ×-by-reason
   breakdown). Input is a JSON list of per-document records (`candidates` + an optional
   `recommended_home_in_candidates` recall flag); see the script's header for the shape.

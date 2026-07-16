@@ -18,7 +18,7 @@
  *     "x"   not-usable      — clear mis-placement / axis-mismatch / personal-area / vague
  *
  *   per document (recall signal, from Phase B)
- *     recommended_home_in_candidates : bool
+ *     recommended_home_in_candidates : boolean
  *         true  if Phase B's recommended home equals one of suggest-path's proposals
  *         false if suggest-path never proposed the place the drilldown judged best
  *               (= a recall miss: a better home existed that suggest-path didn't offer)
@@ -45,15 +45,39 @@
  * use one of the SKILL.md principle tags (clear-misplacement / axis-mismatch / personal-area
  * / vague-catch-all / too-deep). Unknown/blank reasons fall into "(unspecified)".
  *
- * Usage:
- *     node aggregate.mjs verdicts.json            # read a file
- *     node aggregate.mjs < verdicts.json          # read stdin
+ * Usage (Node >= 23.6 runs TypeScript natively; on 22.6+ add --experimental-strip-types):
+ *     node aggregate.ts verdicts.json            # read a file
+ *     node aggregate.ts < verdicts.json          # read stdin
  *
  * Output: a per-domain table (usable-rate, o/△/x candidate rates, recall-miss rate) plus an
  * overall row, then an x-by-reason breakdown. No absolute scoring anywhere.
  */
 
 import { readFileSync } from 'node:fs';
+
+interface Candidate {
+  verdict?: string;
+  reason?: string;
+}
+
+interface DocumentRecord {
+  label?: string;
+  domain?: string;
+  candidates: Candidate[];
+  recommended_home_in_candidates?: boolean;
+}
+
+interface GroupStats {
+  documents: number;
+  usable_rate: number;
+  candidates: number;
+  o_rate: number;
+  tri_rate: number;
+  x_rate: number;
+  recall_miss_rate: number | null;
+}
+
+type Row = GroupStats & { domain: string };
 
 const O = 'o';
 const TRIANGLE = '△';
@@ -64,32 +88,34 @@ const VALID_VERDICTS = new Set([O, TRIANGLE, X]);
 // Canonical x reasons (SKILL.md principles). Free-form is tolerated; these just order the table.
 const X_REASONS = ['clear-misplacement', 'axis-mismatch', 'personal-area', 'vague-catch-all', 'too-deep'];
 
-function loadRecords(path) {
+function loadRecords(path: string | undefined): DocumentRecord[] {
   // fd 0 = stdin; works on Windows too
   const raw = readFileSync(path ?? 0, 'utf-8');
   const data = JSON.parse(raw);
   if (!Array.isArray(data)) {
     throw new Error('input must be a JSON list of per-document records');
   }
-  return data;
+  // shape is enforced by validate() before any aggregation
+  return data as DocumentRecord[];
 }
 
-function normalizeVerdict(v) {
+function normalizeVerdict(v: string | undefined): string | undefined {
   // accept ASCII fallbacks so a sheet typed without the triangle glyph still parses
+  if (v === undefined) return v;
   if (['△', 'tri', 'triangle', 'delta'].includes(v)) return TRIANGLE;
   if (['o', 'O', '○', '0'].includes(v)) return O; // '○' full-width and stray '0' both mean usable
   if (['x', 'X', '×'].includes(v)) return X;
   return v;
 }
 
-function validate(rec, index) {
+function validate(rec: DocumentRecord, index: number): void {
   const cands = rec.candidates;
   if (!Array.isArray(cands)) {
     throw new Error(`record ${index}: 'candidates' must be a list, got ${JSON.stringify(cands)}`);
   }
   cands.forEach((c, j) => {
     const v = normalizeVerdict(c.verdict);
-    if (!VALID_VERDICTS.has(v)) {
+    if (v === undefined || !VALID_VERDICTS.has(v)) {
       throw new Error(
         `record ${index} candidate ${j}: verdict must be one of o/△/x, got ${JSON.stringify(c.verdict)}`,
       );
@@ -98,12 +124,14 @@ function validate(rec, index) {
 }
 
 /** Return a stats object for one group of per-document records. */
-function summarize(records) {
+function summarize(records: DocumentRecord[]): GroupStats {
   const docs = records.length;
   const allCands = records.flatMap((r) => r.candidates.map((c) => normalizeVerdict(c.verdict)));
   const nCands = allCands.length;
 
-  const docHasUsable = (r) => r.candidates.some((c) => USABLE.has(normalizeVerdict(c.verdict)));
+  const docHasUsable = (r: DocumentRecord): boolean => (
+    r.candidates.some((c) => USABLE.has(normalizeVerdict(c.verdict) ?? ''))
+  );
   const usableDocs = records.filter(docHasUsable).length;
 
   // recall miss: Phase B's recommended home was NOT among the proposals.
@@ -111,8 +139,8 @@ function summarize(records) {
   const recallDocs = records.filter((r) => 'recommended_home_in_candidates' in r);
   const recallMisses = recallDocs.filter((r) => !r.recommended_home_in_candidates).length;
 
-  const rate = (n, d) => (d ? n / d : 0);
-  const count = (verdict) => allCands.filter((v) => v === verdict).length;
+  const rate = (n: number, d: number): number => (d ? n / d : 0);
+  const count = (verdict: string): number => allCands.filter((v) => v === verdict).length;
 
   return {
     documents: docs,
@@ -125,8 +153,8 @@ function summarize(records) {
   };
 }
 
-function xReasonCounts(records) {
-  const counts = new Map();
+function xReasonCounts(records: DocumentRecord[]): Map<string, number> {
+  const counts = new Map<string, number>();
   for (const r of records) {
     for (const c of r.candidates) {
       if (normalizeVerdict(c.verdict) === X) {
@@ -139,7 +167,13 @@ function xReasonCounts(records) {
 }
 
 // Column kinds drive formatting: 'rate' renders as a percentage, everything else verbatim.
-const COLUMNS = [
+interface Column {
+  key: keyof Row;
+  header: string;
+  kind: 'str' | 'int' | 'rate';
+}
+
+const COLUMNS: Column[] = [
   { key: 'domain', header: 'domain', kind: 'str' },
   { key: 'documents', header: 'docs', kind: 'int' },
   { key: 'usable_rate', header: 'usable', kind: 'rate' }, // precision-side: >=1 o/△
@@ -150,21 +184,21 @@ const COLUMNS = [
   { key: 'recall_miss_rate', header: 'recall-miss', kind: 'rate' },
 ];
 
-function fmt(value, kind) {
+function fmt(value: string | number | null, kind: Column['kind']): string {
   if (value == null) {
     // ASCII placeholder: a Windows cp932 console cannot encode an em-dash.
     return 'n/a';
   }
-  if (kind === 'rate') {
+  if (kind === 'rate' && typeof value === 'number') {
     return `${Math.round(value * 100)}%`;
   }
   return String(value);
 }
 
-function main() {
+function main(): void {
   const argv = process.argv.slice(2);
   if (argv.includes('-h') || argv.includes('--help')) {
-    console.log('usage: node aggregate.mjs [verdicts.json]   (default: stdin)');
+    console.log('usage: node aggregate.ts [verdicts.json]   (default: stdin)');
     console.log('See the header comment of this file for the input shape.');
     return;
   }
@@ -173,27 +207,29 @@ function main() {
   const records = loadRecords(path);
   records.forEach((r, i) => validate(r, i));
 
-  const groups = new Map();
+  const groups = new Map<string, DocumentRecord[]>();
   for (const r of records) {
     const domain = r.domain ?? '(no domain)';
-    if (!groups.has(domain)) groups.set(domain, []);
-    groups.get(domain).push(r);
+    const group = groups.get(domain) ?? [];
+    group.push(r);
+    groups.set(domain, group);
   }
 
-  const rows = [];
+  const rows: Row[] = [];
   for (const domain of [...groups.keys()].sort()) {
-    rows.push({ ...summarize(groups.get(domain)), domain });
+    rows.push({ ...summarize(groups.get(domain) ?? []), domain });
   }
   rows.push({ ...summarize(records), domain: 'ALL' });
 
-  const widths = {};
+  const widths = new Map<string, number>();
   for (const { key, header, kind } of COLUMNS) {
-    widths[key] = Math.max(header.length, ...rows.map((r) => fmt(r[key], kind).length));
+    widths.set(key, Math.max(header.length, ...rows.map((r) => fmt(r[key], kind).length)));
   }
-  console.log(COLUMNS.map(({ key, header }) => header.padEnd(widths[key])).join('  '));
-  console.log(COLUMNS.map(({ key }) => '-'.repeat(widths[key])).join('  '));
+  const width = (key: string): number => widths.get(key) ?? 0;
+  console.log(COLUMNS.map(({ key, header }) => header.padEnd(width(key))).join('  '));
+  console.log(COLUMNS.map(({ key }) => '-'.repeat(width(key))).join('  '));
   for (const r of rows) {
-    console.log(COLUMNS.map(({ key, kind }) => fmt(r[key], kind).padEnd(widths[key])).join('  '));
+    console.log(COLUMNS.map(({ key, kind }) => fmt(r[key], kind).padEnd(width(key))).join('  '));
   }
 
   // x-by-reason: which principle is sending candidates to x (where to fix suggest-path).

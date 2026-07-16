@@ -31,10 +31,10 @@
  *
  * Bodies are read from --bodies-dir as `<id>.md` (one file per document).
  *
- * Usage:
- *     node reconcile-digests.mjs digests.json --bodies-dir ./bodies
- *     node reconcile-digests.mjs < digests.json --bodies-dir ./bodies
- *     node reconcile-digests.mjs digests.json --bodies-dir ./bodies --threshold 0.5  # tolerate partial digests
+ * Usage (Node >= 23.6 runs TypeScript natively; on 22.6+ add --experimental-strip-types):
+ *     node reconcile-digests.ts digests.json --bodies-dir ./bodies
+ *     node reconcile-digests.ts < digests.json --bodies-dir ./bodies
+ *     node reconcile-digests.ts digests.json --bodies-dir ./bodies --threshold 0.5  # tolerate partial digests
  *
  * Output: a PASS line per document plus a final summary. Exit code is non-zero when any
  * document fails — wire it into the batch so a swap blocks aggregation until re-judged.
@@ -44,13 +44,34 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+interface Digest {
+  id: string;
+  subject?: string;
+  key_terms?: string[];
+}
+
+interface ReconcileResult {
+  id: string;
+  ratio: number | null;
+  hits: number;
+  atoms: number;
+  missing: string[];
+  error?: string;
+}
+
+interface CliArgs {
+  digests: string | null;
+  bodiesDir: string;
+  threshold: number;
+}
+
 const SEPARATORS = /[/()（）・]/;
 // strip whitespace and a few punctuation marks so "smtp.gmail.com" vs "SMTP" style
 // spacing/casing differences don't cause spurious misses; comparison is lowercase.
 const NOISE = /[\s（）()・,、。-]/g;
 
-function normalize(s) {
-  return (s ?? '').toLowerCase().replace(NOISE, '');
+function normalize(s: string): string {
+  return s.toLowerCase().replace(NOISE, '');
 }
 
 /**
@@ -60,14 +81,14 @@ function normalize(s) {
  * symbol-only atom like "--" or "（）"): `body.includes('')` is always true, so such an
  * atom would count as a spurious hit and let a body swap slip through the gate.
  */
-function explode(term) {
+function explode(term: string): string[] {
   return term
     .split(SEPARATORS)
     .map((a) => a.trim())
-    .filter((a) => a.length >= 2 && normalize(a));
+    .filter((a) => a.length >= 2 && normalize(a).length > 0);
 }
 
-function reconcileOne(digest, body) {
+function reconcileOne(digest: Digest, body: string): ReconcileResult {
   const bodyN = normalize(body);
   const atoms = (digest.key_terms ?? []).flatMap((t) => explode(t));
   if (atoms.length === 0) {
@@ -85,13 +106,15 @@ function reconcileOne(digest, body) {
   };
 }
 
-function printUsage() {
-  console.log('usage: node reconcile-digests.mjs [digests.json] --bodies-dir <dir> [--threshold <0..1>]');
+function printUsage(): void {
+  console.log('usage: node reconcile-digests.ts [digests.json] --bodies-dir <dir> [--threshold <0..1>]');
   console.log('  digests.json defaults to stdin. See the header comment of this file for the input shape.');
 }
 
-function parseArgs(argv) {
-  const args = { digests: null, bodiesDir: null, threshold: 1.0 };
+function parseArgs(argv: string[]): CliArgs {
+  let digests: string | null = null;
+  let bodiesDir: string | null = null;
+  let threshold = 1.0;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '-h' || a === '--help') {
@@ -99,41 +122,41 @@ function parseArgs(argv) {
       process.exit(0);
     }
     else if (a === '--bodies-dir') {
-      args.bodiesDir = argv[++i];
+      bodiesDir = argv[++i];
     }
     else if (a.startsWith('--bodies-dir=')) {
-      args.bodiesDir = a.slice('--bodies-dir='.length);
+      bodiesDir = a.slice('--bodies-dir='.length);
     }
     else if (a === '--threshold') {
-      args.threshold = Number(argv[++i]);
+      threshold = Number(argv[++i]);
     }
     else if (a.startsWith('--threshold=')) {
-      args.threshold = Number(a.slice('--threshold='.length));
+      threshold = Number(a.slice('--threshold='.length));
     }
     else {
-      args.digests = a;
+      digests = a;
     }
   }
-  if (!args.bodiesDir) {
+  if (bodiesDir == null) {
     console.error('error: --bodies-dir is required');
     printUsage();
     process.exit(2);
   }
-  if (Number.isNaN(args.threshold)) {
+  if (Number.isNaN(threshold)) {
     console.error('error: --threshold must be a number');
     process.exit(2);
   }
-  return args;
+  return { digests, bodiesDir, threshold };
 }
 
-function main() {
+function main(): void {
   const args = parseArgs(process.argv.slice(2));
 
   // fd 0 = stdin; works on Windows too
   const raw = readFileSync(args.digests ?? 0, 'utf-8');
-  const digests = JSON.parse(raw);
+  const digests = JSON.parse(raw) as Digest[];
 
-  const results = [];
+  const results: ReconcileResult[] = [];
   for (const d of digests) {
     const bodyPath = join(args.bodiesDir, `${d.id}.md`);
     if (!existsSync(bodyPath)) {
@@ -153,16 +176,17 @@ function main() {
     return (a.ratio ?? -1) - (b.ratio ?? -1);
   });
 
-  const failed = [];
+  const failed: string[] = [];
   for (const r of results) {
-    if (r.error) {
+    if (r.error != null) {
       console.log(`ERROR  ${r.id}: ${r.error}`);
       failed.push(r.id);
       continue;
     }
-    const ok = r.ratio >= args.threshold;
+    const ratio = r.ratio ?? 0;
+    const ok = ratio >= args.threshold;
     const tag = ok ? 'PASS ' : 'FAIL ';
-    let line = `${tag} ${r.id}  ${r.hits}/${r.atoms} (${Math.round(r.ratio * 100)}%)`;
+    let line = `${tag} ${r.id}  ${r.hits}/${r.atoms} (${Math.round(ratio * 100)}%)`;
     if (!ok) {
       line += `  missing: ${r.missing.slice(0, 6).join(', ')}`;
       failed.push(r.id);
