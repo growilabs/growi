@@ -966,6 +966,15 @@
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
   },
+  "audit_log_snapshot": {
+    "file_name": "File name",
+    "file_size": "File size",
+    "page": "Page",
+    "no_detail": "No snapshot detail available",
+    "unknown_file_name": "Unknown file name",
+    "page_unavailable": "Page unavailable",
+    "unknown_size": "Unknown size"
+  },
   "g2g_data_transfer": {
     "transfer_data_to_another_growi": "Transfer data from this GROWI to another GROWI",
     "advanced_options": "Advanced options",
