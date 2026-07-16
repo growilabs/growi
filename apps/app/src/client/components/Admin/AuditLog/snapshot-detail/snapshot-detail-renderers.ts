@@ -1,9 +1,14 @@
 import type { FC } from 'react';
 
 import type { IActivity, IActivityHasId } from '~/interfaces/activity';
-import { isAttachmentRemoveActivity } from '~/interfaces/activity';
+import {
+  isAttachmentAddActivity,
+  isAttachmentDownloadActivity,
+  isAttachmentRemoveActivity,
+} from '~/interfaces/activity';
 
 import { AttachmentRemoveSnapshotDetail } from './AttachmentRemoveSnapshotDetail';
+import { LiveAttachmentSnapshotDetail } from './LiveAttachmentSnapshotDetail';
 
 /**
  * A per-action formatted renderer. The dispatcher (ActivitySnapshotDetail) picks
@@ -57,10 +62,13 @@ export const defineRenderer = <
  *   mutually exclusive (1 action = 1 entry).
  * - The dispatcher picks the FIRST match, so array order is precedence order.
  *
- * Adding a formatted renderer for another action is a one-line append here (e.g.
- * `defineRenderer(isAttachmentAddActivity, AttachmentAddSnapshotDetail)` once the
- * upstream ADD capture and guard exist); the dispatcher and table are untouched.
+ * Adding a formatted renderer for another action is a one-line append here; the
+ * dispatcher and table are untouched. ADD and DOWNLOAD share one renderer
+ * (LiveAttachmentSnapshotDetail): their snapshots have the same shape and both
+ * files still exist, so both get the same formatted view plus a download link.
  */
 export const snapshotDetailRenderers: SnapshotDetailRenderer[] = [
   defineRenderer(isAttachmentRemoveActivity, AttachmentRemoveSnapshotDetail),
+  defineRenderer(isAttachmentAddActivity, LiveAttachmentSnapshotDetail),
+  defineRenderer(isAttachmentDownloadActivity, LiveAttachmentSnapshotDetail),
 ];
