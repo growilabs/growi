@@ -75,13 +75,13 @@ beforeEach(() => {
 });
 
 describe('resolveAzureOpenaiModel', () => {
-  it("reads its own provider's key + settings and applies the model argument as the deployment name", () => {
+  it("reads its own provider's key + settings and applies the model argument as the deployment name", async () => {
     setAzureConfig({
       apiKey: 'az-key',
       azureOpenaiSettings: { resourceName: 'my-resource' },
     });
 
-    const result = resolveAzureOpenaiModel('my-deployment');
+    const result = await resolveAzureOpenaiModel('my-deployment');
 
     expect(getProviderSettings).toHaveBeenCalledWith('azure-openai');
     expect(getApiKey).toHaveBeenCalledWith('azure-openai');
@@ -93,7 +93,7 @@ describe('resolveAzureOpenaiModel', () => {
     expect(result).toEqual({ tag: 'azure-model', modelId: 'my-deployment' });
   });
 
-  it('builds with baseURL when given', () => {
+  it('builds with baseURL when given', async () => {
     setAzureConfig({
       apiKey: 'az-key',
       azureOpenaiSettings: {
@@ -101,7 +101,7 @@ describe('resolveAzureOpenaiModel', () => {
       },
     });
 
-    resolveAzureOpenaiModel('dep');
+    await resolveAzureOpenaiModel('dep');
 
     expect(createAzure).toHaveBeenCalledWith({
       apiKey: 'az-key',
@@ -109,7 +109,7 @@ describe('resolveAzureOpenaiModel', () => {
     });
   });
 
-  it('forwards both resourceName and baseURL when both are set (AI SDK ignores resourceName)', () => {
+  it('forwards both resourceName and baseURL when both are set (AI SDK ignores resourceName)', async () => {
     setAzureConfig({
       apiKey: 'az-key',
       azureOpenaiSettings: {
@@ -118,7 +118,7 @@ describe('resolveAzureOpenaiModel', () => {
       },
     });
 
-    resolveAzureOpenaiModel('dep');
+    await resolveAzureOpenaiModel('dep');
 
     // Both are passed straight through; the AI SDK is responsible for ignoring
     // resourceName when baseURL is present, so the resolver no longer pre-selects.
@@ -129,7 +129,7 @@ describe('resolveAzureOpenaiModel', () => {
     });
   });
 
-  it('forwards apiVersion only when set', () => {
+  it('forwards apiVersion only when set', async () => {
     setAzureConfig({
       apiKey: 'az-key',
       azureOpenaiSettings: {
@@ -138,7 +138,7 @@ describe('resolveAzureOpenaiModel', () => {
       },
     });
 
-    resolveAzureOpenaiModel('dep');
+    await resolveAzureOpenaiModel('dep');
 
     expect(createAzure).toHaveBeenCalledWith({
       apiKey: 'az-key',
@@ -147,7 +147,7 @@ describe('resolveAzureOpenaiModel', () => {
     });
   });
 
-  it('authenticates via Microsoft Entra ID (tokenProvider) instead of an apiKey when useEntraId is set', () => {
+  it('authenticates via Microsoft Entra ID (tokenProvider) instead of an apiKey when useEntraId is set', async () => {
     setAzureConfig({
       // no api key in Entra ID mode
       azureOpenaiSettings: {
@@ -156,7 +156,7 @@ describe('resolveAzureOpenaiModel', () => {
       },
     });
 
-    const result = resolveAzureOpenaiModel('my-deployment');
+    const result = await resolveAzureOpenaiModel('my-deployment');
 
     expect(getBearerTokenProvider).toHaveBeenCalledWith(
       expect.anything(),
@@ -175,28 +175,28 @@ describe('resolveAzureOpenaiModel', () => {
     expect(result).toEqual({ tag: 'azure-model', modelId: 'my-deployment' });
   });
 
-  it('throws (naming the missing endpoint fields / AI_PROVIDERS, never the key) when neither resourceName nor baseURL is set', () => {
+  it('rejects (naming the missing endpoint fields / AI_PROVIDERS, never the key) when neither resourceName nor baseURL is set', async () => {
     const secret = 'az-super-secret';
     setAzureConfig({ apiKey: secret });
 
-    expect(() => resolveAzureOpenaiModel('dep')).toThrow(
+    // Endpoint validation runs before any dynamic import, so this rejects without
+    // loading @ai-sdk/azure (createAzure, its exported creator, is untouched).
+    await expect(resolveAzureOpenaiModel('dep')).rejects.toThrow(
       /resourceName|baseURL|AI_PROVIDERS/,
     );
     expect(createAzure).not.toHaveBeenCalled();
 
-    try {
-      resolveAzureOpenaiModel('dep');
-    } catch (e) {
-      expect((e as Error).message).not.toContain(secret);
-    }
+    const err = await resolveAzureOpenaiModel('dep').catch((e: Error) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).not.toContain(secret);
   });
 
-  it('throws (naming AI_PROVIDER_API_KEYS / useEntraId) when neither an apiKey nor Entra ID is configured (endpoint present)', () => {
+  it('rejects (naming AI_PROVIDER_API_KEYS / useEntraId) when neither an apiKey nor Entra ID is configured (endpoint present)', async () => {
     setAzureConfig({
       azureOpenaiSettings: { resourceName: 'my-resource' },
     });
 
-    expect(() => resolveAzureOpenaiModel('dep')).toThrow(
+    await expect(resolveAzureOpenaiModel('dep')).rejects.toThrow(
       /AI_PROVIDER_API_KEYS|useEntraId/,
     );
     expect(createAzure).not.toHaveBeenCalled();

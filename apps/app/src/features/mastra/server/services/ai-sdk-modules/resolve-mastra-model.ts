@@ -9,7 +9,9 @@ import {
   getResolvedModelFromCache,
 } from './resolved-model-cache';
 
-export const resolveMastraModel = (modelKey?: string): MastraModelConfig => {
+export const resolveMastraModel = async (
+  modelKey?: string,
+): Promise<MastraModelConfig> => {
   // Resolve (and allow-list validate) the effective modelKey first. The client
   // value is never trusted: out-of-allowlist / omitted keys fall back to the
   // effective default; an empty available set throws (Req 4.6). This is the single
@@ -41,9 +43,12 @@ export const resolveMastraModel = (modelKey?: string): MastraModelConfig => {
   // Generic dispatch: the parsed provider's resolver builds its own model from the
   // BARE modelId + its own config. Dispatching by the parsed provider (not by the
   // modelId) is what lets the same modelId coexist under different providers (Req
-  // 2.3, 4.3). The chosen resolver throws on its own misconfiguration — nothing is
-  // cached in that case, so a config fix takes effect on the next call.
-  const model = modelResolvers[parsed.provider](parsed.modelId);
+  // 2.3, 4.3). The resolver is async because it dynamically imports only its own
+  // `@ai-sdk/*` SDK (so the unused providers' graphs never load); the await is
+  // paid once per distinct effective key (cache miss) and never on the hot cached
+  // path above. The chosen resolver rejects on its own misconfiguration — nothing
+  // is cached in that case, so a config fix takes effect on the next call.
+  const model = await modelResolvers[parsed.provider](parsed.modelId);
   addResolvedModelToCache(effectiveKey, model);
   return model;
 };

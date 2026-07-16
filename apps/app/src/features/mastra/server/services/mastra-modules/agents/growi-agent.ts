@@ -29,10 +29,13 @@ export const growiAgent = new Agent({
   // already stored the EFFECTIVE (allow-list-resolved) key; resolveMastraModel
   // re-validates it against the allow-list, which for that already-resolved key is
   // an idempotent defense-in-depth pass (the client value was rounded upstream, so
-  // it is never trusted here either). On misconfiguration resolveMastraModel()
-  // throws; the throw surfaces at request time and is handled by the post-message
-  // route's existing try/catch (Req 4.3). Its message carries only the provider
-  // name / missing-var name — never the API key (Req 1.9).
+  // it is never trusted here either). resolveMastraModel is async (it lazily
+  // imports only the selected provider's `@ai-sdk/*` SDK), and DynamicArgument
+  // permits a Promise return, so the Promise is handed straight through. On
+  // misconfiguration it rejects; the rejection surfaces at request time when the
+  // agent awaits the model and is handled by the post-message route's existing
+  // try/catch (Req 4.3). Its message carries only the provider name / missing-var
+  // name — never the API key (Req 1.9).
   //
   // The parameter is annotated with the shared shape so `get('modelKey')` is
   // typed as `string | undefined` (the agent is constructed without an explicit

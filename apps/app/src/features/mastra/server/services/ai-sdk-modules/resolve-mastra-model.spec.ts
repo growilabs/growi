@@ -79,7 +79,7 @@ describe('resolveMastraModel', () => {
       resolveEffectiveModelKey.mockReturnValue(key);
       const { resolveMastraModel } = await loadResolver();
 
-      const result = resolveMastraModel('requested-key');
+      const result = await resolveMastraModel('requested-key');
 
       // The client-supplied key goes through the effective-key checkpoint; the
       // provider resolver receives the *bare* modelId parsed from the effective
@@ -94,9 +94,9 @@ describe('resolveMastraModel', () => {
       const { resolveMastraModel } = await loadResolver();
 
       resolveEffectiveModelKey.mockReturnValueOnce('openai/gpt-5');
-      const openaiResult = resolveMastraModel('openai/gpt-5');
+      const openaiResult = await resolveMastraModel('openai/gpt-5');
       resolveEffectiveModelKey.mockReturnValueOnce('anthropic/gpt-5');
-      const anthropicResult = resolveMastraModel('anthropic/gpt-5');
+      const anthropicResult = await resolveMastraModel('anthropic/gpt-5');
 
       // Same modelId ('gpt-5'), different provider prefix → different resolvers.
       // Keying dispatch on modelId alone (the old single-provider behavior) would
@@ -111,7 +111,7 @@ describe('resolveMastraModel', () => {
       resolveEffectiveModelKey.mockReturnValue('openai/gpt-5');
       const { resolveMastraModel } = await loadResolver();
 
-      resolveMastraModel();
+      await resolveMastraModel();
 
       expect(resolveEffectiveModelKey).toHaveBeenCalledWith(undefined);
     });
@@ -120,7 +120,7 @@ describe('resolveMastraModel', () => {
       resolveEffectiveModelKey.mockReturnValue('openai/org/model-x');
       const { resolveMastraModel } = await loadResolver();
 
-      resolveMastraModel('openai/org/model-x');
+      await resolveMastraModel('openai/org/model-x');
 
       expect(openaiResolver).toHaveBeenCalledWith('org/model-x');
     });
@@ -133,7 +133,7 @@ describe('resolveMastraModel', () => {
       resolveEffectiveModelKey.mockReturnValue('no-separator');
       const { resolveMastraModel } = await loadResolver();
 
-      expect(() => resolveMastraModel('x')).toThrow();
+      await expect(resolveMastraModel('x')).rejects.toThrow();
       expect(openaiResolver).not.toHaveBeenCalled();
       expect(anthropicResolver).not.toHaveBeenCalled();
       expect(googleResolver).not.toHaveBeenCalled();
@@ -146,8 +146,8 @@ describe('resolveMastraModel', () => {
       resolveEffectiveModelKey.mockReturnValue('openai/gpt-4');
       const { resolveMastraModel } = await loadResolver();
 
-      const first = resolveMastraModel('openai/gpt-4');
-      const second = resolveMastraModel('openai/gpt-4');
+      const first = await resolveMastraModel('openai/gpt-4');
+      const second = await resolveMastraModel('openai/gpt-4');
 
       expect(second).toBe(first);
       expect(openaiResolver).toHaveBeenCalledTimes(1);
@@ -157,10 +157,10 @@ describe('resolveMastraModel', () => {
       // Identity mapping (beforeEach): each requested key is its own effective key.
       const { resolveMastraModel } = await loadResolver();
 
-      const a1 = resolveMastraModel('openai/gpt-4');
-      const b1 = resolveMastraModel('anthropic/claude');
-      const a2 = resolveMastraModel('openai/gpt-4');
-      const b2 = resolveMastraModel('anthropic/claude');
+      const a1 = await resolveMastraModel('openai/gpt-4');
+      const b1 = await resolveMastraModel('anthropic/claude');
+      const a2 = await resolveMastraModel('openai/gpt-4');
+      const b2 = await resolveMastraModel('anthropic/claude');
 
       expect(a2).toBe(a1);
       expect(b2).toBe(b1);
@@ -175,8 +175,8 @@ describe('resolveMastraModel', () => {
       resolveEffectiveModelKey.mockReturnValue('openai/gpt-4');
       const { resolveMastraModel } = await loadResolver();
 
-      const fromBogus = resolveMastraModel('openai/bogus');
-      const fromOmitted = resolveMastraModel();
+      const fromBogus = await resolveMastraModel('openai/bogus');
+      const fromOmitted = await resolveMastraModel();
 
       expect(fromOmitted).toBe(fromBogus);
       expect(openaiResolver).toHaveBeenCalledTimes(1);
@@ -190,11 +190,11 @@ describe('resolveMastraModel', () => {
       openaiResolver.mockImplementationOnce(() => {
         throw new Error('missing key');
       });
-      expect(() => resolveMastraModel('openai/gpt-4')).toThrow();
+      await expect(resolveMastraModel('openai/gpt-4')).rejects.toThrow();
 
       // After the operator fixes config, the next call rebuilds (nothing cached)
       // without a module restart.
-      const rebuilt = resolveMastraModel('openai/gpt-4');
+      const rebuilt = await resolveMastraModel('openai/gpt-4');
       expect(rebuilt).toMatchObject({ tag: 'openai-model' });
       expect(openaiResolver).toHaveBeenCalledTimes(2);
     });
@@ -205,7 +205,9 @@ describe('resolveMastraModel', () => {
       });
       const { resolveMastraModel } = await loadResolver();
 
-      expect(() => resolveMastraModel('openai/gpt-4')).toThrow(/No available/);
+      await expect(resolveMastraModel('openai/gpt-4')).rejects.toThrow(
+        /No available/,
+      );
       expect(openaiResolver).not.toHaveBeenCalled();
     });
   });
@@ -216,13 +218,13 @@ describe('resolveMastraModel', () => {
       const { resolveMastraModel, clearResolvedMastraModelCache } =
         await loadResolver();
 
-      const first = resolveMastraModel('openai/gpt-4');
-      expect(resolveMastraModel('openai/gpt-4')).toBe(first);
+      const first = await resolveMastraModel('openai/gpt-4');
+      expect(await resolveMastraModel('openai/gpt-4')).toBe(first);
       expect(openaiResolver).toHaveBeenCalledTimes(1);
 
       // Operator saves new settings; clearing forces a fresh build.
       clearResolvedMastraModelCache();
-      const rebuilt = resolveMastraModel('openai/gpt-4');
+      const rebuilt = await resolveMastraModel('openai/gpt-4');
 
       expect(rebuilt).not.toBe(first);
       expect(openaiResolver).toHaveBeenCalledTimes(2);
@@ -232,15 +234,15 @@ describe('resolveMastraModel', () => {
       const { resolveMastraModel, clearResolvedMastraModelCache } =
         await loadResolver();
 
-      resolveMastraModel('openai/gpt-4');
-      resolveMastraModel('anthropic/claude');
+      await resolveMastraModel('openai/gpt-4');
+      await resolveMastraModel('anthropic/claude');
       expect(openaiResolver).toHaveBeenCalledTimes(1);
       expect(anthropicResolver).toHaveBeenCalledTimes(1);
 
       clearResolvedMastraModelCache();
 
-      resolveMastraModel('openai/gpt-4');
-      resolveMastraModel('anthropic/claude');
+      await resolveMastraModel('openai/gpt-4');
+      await resolveMastraModel('anthropic/claude');
       // Both previously-cached keys are rebuilt.
       expect(openaiResolver).toHaveBeenCalledTimes(2);
       expect(anthropicResolver).toHaveBeenCalledTimes(2);
@@ -257,8 +259,8 @@ describe('resolveMastraModel', () => {
         await loadResolver();
 
       clearResolvedMastraModelCache();
-      const first = resolveMastraModel('openai/gpt-4');
-      const second = resolveMastraModel('openai/gpt-4');
+      const first = await resolveMastraModel('openai/gpt-4');
+      const second = await resolveMastraModel('openai/gpt-4');
 
       expect(openaiResolver).toHaveBeenCalledTimes(1);
       expect(second).toBe(first);
