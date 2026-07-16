@@ -10,13 +10,13 @@ type ActivitySnapshotDetailProps = {
   activity: IActivityHasId;
 };
 
-type SnapshotDetailTab = 'formatted' | 'raw';
+type SnapshotDetailTab = 'info' | 'raw';
 
 // Tab captions are intentionally plain strings: the i18n contract of this spec
 // scopes the admin.json keys to the snapshot field labels, and locale files are
 // owned by the integration task. Swap for t() keys once those keys exist.
 const TABS: { id: SnapshotDetailTab; caption: string }[] = [
-  { id: 'formatted', caption: 'Formatted' },
+  { id: 'info', caption: 'Info' },
   { id: 'raw', caption: 'Raw' },
 ];
 
@@ -37,7 +37,7 @@ export const ActivitySnapshotDetail: FC<ActivitySnapshotDetailProps> = (
 ) => {
   const { activity } = props;
 
-  const [activeTab, setActiveTab] = useState<SnapshotDetailTab>('formatted');
+  const [activeTab, setActiveTab] = useState<SnapshotDetailTab>('info');
 
   const renderer = snapshotDetailRenderers.find((r) => r.canRender(activity));
 
@@ -65,10 +65,8 @@ export const ActivitySnapshotDetail: FC<ActivitySnapshotDetailProps> = (
       </Nav>
       <TabContent activeTab={activeTab}>
         {/* Mount only the active pane; the inactive pane is unmounted on switch */}
-        <TabPane tabId="formatted" role="tabpanel">
-          {activeTab === 'formatted' && (
-            <renderer.Component activity={activity} />
-          )}
+        <TabPane tabId="info" role="tabpanel">
+          {activeTab === 'info' && <renderer.Component activity={activity} />}
         </TabPane>
         <TabPane tabId="raw" role="tabpanel">
           {activeTab === 'raw' && (

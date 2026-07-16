@@ -136,9 +136,9 @@ snapshot 詳細の描画ディスパッチ（行展開時）:
 ```mermaid
 flowchart TD
     Start[Row expanded ActivitySnapshotDetail activity] --> Find{renderer matches action}
-    Find -->|match AttachmentRemove| Tabs[Tabbed view default Formatted plus Raw tab]
+    Find -->|match AttachmentRemove| Tabs[Tabbed view default Info plus Raw tab]
     Find -->|no match| RawOnly[Raw only no tabs]
-    Tabs -->|Formatted tab default| Fmt[AttachmentRemoveSnapshotDetail]
+    Tabs -->|Info tab default| Fmt[AttachmentRemoveSnapshotDetail]
     Tabs -->|Raw tab| Raw[RawSnapshotDetail all fields]
     RawOnly --> Raw
     Fmt --> F1{originalName present}
@@ -222,14 +222,14 @@ flowchart TD
 type ActivitySnapshotDetailProps = {
   activity: IActivityHasId;
 };
-// State: 整形 renderer がある場合のみ、アクティブタブ（'formatted' | 'raw'、既定 'formatted'）をローカルに保持。
+// State: 整形 renderer がある場合のみ、アクティブタブ（'info' | 'raw'、既定 'info'）をローカルに保持。
 
 // 実装イメージ（HOW ではなく契約の明示）
 // const renderer = snapshotDetailRenderers.find(r => r.canRender(activity));
 // if (renderer == null) return <RawSnapshotDetail snapshot={activity.snapshot} />;   // raw のみ
 // return (
-//   <Tabs default="formatted">
-//     <Tab id="formatted"><renderer.Component activity={activity} /></Tab>
+//   <Tabs default="info">
+//     <Tab id="info"><renderer.Component activity={activity} /></Tab>
 //     <Tab id="raw"><RawSnapshotDetail snapshot={activity.snapshot} /></Tab>   // 常に到達可能
 //   </Tabs>
 // );

@@ -17,7 +17,7 @@ export const ActivityTable: FC<Props> = (props: Props) => {
       <table className="table table-default table-bordered table-user-list">
         <thead>
           <tr>
-            <th scope="col">{t('admin:audit_log_management.detail')}</th>
+            <th scope="col"></th>
             <th scope="col">{t('admin:audit_log_management.user')}</th>
             <th scope="col">{t('admin:audit_log_management.date')}</th>
             <th scope="col">{t('admin:audit_log_management.action')}</th>

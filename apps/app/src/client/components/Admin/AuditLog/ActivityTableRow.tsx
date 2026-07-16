@@ -52,11 +52,11 @@ export const ActivityTableRow: FC<Props> = (props) => {
 
   return (
     <>
-      <tr data-testid="activity-table">
+      <tr data-testid="activity-table" className="align-middle">
         <td>
           <button
             type="button"
-            className="btn btn-outline-secondary border-0"
+            className="btn btn-sm btn-outline-secondary border-0"
             aria-expanded={isExpanded}
             aria-label="Toggle snapshot detail"
             onClick={toggleExpand}
@@ -72,7 +72,7 @@ export const ActivityTableRow: FC<Props> = (props) => {
         <td>
           {activity.user != null && (
             <>
-              <UserPicture user={activity.user} />
+              <UserPicture user={activity.user} size="sm" />
               <a
                 className="ms-2"
                 href={
@@ -86,7 +86,7 @@ export const ActivityTableRow: FC<Props> = (props) => {
             </>
           )}
         </td>
-        <td>{formatDate(activity.createdAt)}</td>
+        <td className="small text-nowrap">{formatDate(activity.createdAt)}</td>
         <td>{t(`admin:audit_log_action.${activity.action}`)}</td>
         <td>{activity.ip}</td>
         <td className="audit-log-url-cell">
@@ -97,7 +97,7 @@ export const ActivityTableRow: FC<Props> = (props) => {
             <CopyToClipboard text={activity.endpoint} onCopy={showToolTip}>
               <button
                 type="button"
-                className="btn btn-outline-secondary border-0 ms-2"
+                className="btn btn-sm btn-outline-secondary border-0 ms-2"
                 id={`tooltipTarget-${activity._id}`}
               >
                 <span className="material-symbols-outlined" aria-hidden="true">
