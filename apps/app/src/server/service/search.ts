@@ -10,6 +10,10 @@ import {
   removeAiMenthion,
 } from '~/features/search/utils/ai';
 import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
+import {
+  FILTER_FIELDS,
+  SEARCH_FILTER_PREFIXES,
+} from '~/features/search/utils/filter-fields';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
   IFormattedSearchResult,
@@ -53,22 +57,16 @@ const filterXssOptions = {
 
 const filterXss = new FilterXSS(filterXssOptions);
 
-const FILTER_PREFIXES = [
-  'prefix:',
-  'tag:',
-  'author:',
-  'editor:',
-  'group:',
-] as const;
+// The shared UI operators plus the server-only `prefix:` path filter.
+const FILTER_PREFIXES = ['prefix:', ...SEARCH_FILTER_PREFIXES] as const;
 
 // New-filter operators (author/editor/group) typed with no value (e.g. `author:`,
-// `-group:`) are ignored. They must not be captured as
-// full-text match terms. prefix:/tag: keep their existing behavior.
-const VALUELESS_IGNORED_PREFIXES: readonly string[] = [
-  'author:',
-  'editor:',
-  'group:',
-];
+// `-group:`) are ignored rather than captured as full-text match terms. `tag:` is
+// excluded because prefix:/tag: keep their legacy behavior. Filtered by field name
+// so a prefix-string rename in the shared vocabulary propagates automatically.
+const VALUELESS_IGNORED_PREFIXES: readonly string[] = FILTER_FIELDS.filter(
+  ([field]) => field !== 'tags',
+).map(([, prefix]) => prefix);
 
 // https://regex101.com/r/pN9XfK/2
 const NEGATIVE_TERM_REGEXP = new RegExp(
