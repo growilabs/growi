@@ -973,7 +973,8 @@
     "no_detail": "No snapshot detail available",
     "unknown_file_name": "Unknown file name",
     "page_unavailable": "Page unavailable",
-    "unknown_size": "Unknown size"
+    "unknown_size": "Unknown size",
+    "download": "Download"
   },
   "g2g_data_transfer": {
     "transfer_data_to_another_growi": "Transfer data from this GROWI to another GROWI",

@@ -437,3 +437,98 @@ const isAttachmentRemoveActivity = (
 
 - 監査ログは 1 ページ最大 100 行。詳細サブ行は**展開時のみ mount**するため、既定表示のコストは disclosure セル追加分のみ。
 - レジストリ走査は `find`（O(エントリ数)=実質 O(1)）。追加のネットワーク往復は無し（`useSWRxActivity` の既存取得データを描画）。
+
+## 増分（2026-07-16）: 添付追加/ダウンロード（ADD/DOWNLOAD）の整形表示
+
+> **設計の位置づけ**: 初回設計（要件 1〜5）はレジストリ + dispatcher の宣言的パターンで「action 追加＝レジストリへ1エントリ追記」を拡張点として用意済み。本増分はその拡張点をそのまま使い、ADD/DOWNLOAD の整形 renderer を登録するだけで、dispatcher・テーブル・既存 renderer・型定義は一切変更しない。上流 `activity-log-snapshot` の ADD/DOWNLOAD capture 完了（PR #11433）により、下記 Revalidation Trigger が満たされたことがトリガ。
+
+### 増分による Boundary の更新
+
+- 初回の Out of Boundary「添付追加 ADD の整形（上流の ADD capture 完了後の将来増分）」は、本増分で **In Boundary** へ移る（ADD に加え DOWNLOAD も対象）。
+- 初回の Revalidation Trigger「上流の ADD capture／ADD 型ガードが提供される（→ レジストリに ADD エントリを追記する将来作業のトリガ。既存挙動には非破壊）」は **満たされた**（PR #11433 で `isAttachmentAddActivity` / `isAttachmentDownloadActivity` と capture が提供済み）。本増分がその「将来作業」に当たる。
+- Allowed Dependencies に以下を追加（いずれも既存・read-only 消費）:
+  - `~/interfaces/activity` の `isAttachmentAddActivity` / `isAttachmentDownloadActivity` / `AttachmentSnapshot`（型・型ガードの consume。定義は上流所有・不変）。
+  - `IActivityHasId.target`（attachment ID。ダウンロード URL 構築のため read-only 参照）。
+- Out of Boundary（増分でも維持）: サムネイル表示（snapshot も `target` も MIME/画像判定情報を持たない）、上流の capture・型・API 契約の変更。
+
+### 追加コンポーネント設計
+
+#### LiveAttachmentSnapshotDetail（new）— ADD/DOWNLOAD 共有の整形レンダラ
+
+| Field | Detail |
+|-------|--------|
+| Intent | 実体が残る添付（`ACTION_ATTACHMENT_ADD` / `ACTION_ATTACHMENT_DOWNLOAD`）の snapshot を整形表示し、`activity.target` からダウンロードリンクを添える |
+| Requirements | 6.1–6.3, 7.1, 7.2, 7.4, 8.1 |
+
+**命名の意図**: 「Live（＝ファイルの実体がまだ存在する）」で REMOVE（削除済み）と対比する。ADD と DOWNLOAD はどちらも実体が残り、snapshot 形状もダウンロードリンクの可否も同じなので、action ごとに別コンポーネントを作らず**1つの共有 renderer** を両 action に登録する（coding-style: data-driven / 消費側でモード分岐しない）。
+
+**Responsibilities & Constraints**
+- `defineRenderer` 経由で登録されるため、props の `activity` は `snapshot?: AttachmentSnapshot` へ絞り込み済みで受け取る（再 narrow 不要）。ダウンロード URL に使う `target` は `IActivityHasId` 側のフィールドなので、`IActivityHasId & { snapshot?: AttachmentSnapshot }` から参照できる。
+- フィールド表示（ファイル名・人間可読サイズ・所属ページリンク）は REMOVE と同一仕様・同一フォールバック（要件 3.1–3.4）。**REMOVE と共通のフィールド描画は共有の presentational 部品 `AttachmentSnapshotFields` に抽出**し、REMOVE 側もそれを使うよう置き換える（挙動不変のリファクタ。重複と将来のドリフトを防ぐ）。`LiveAttachmentSnapshotDetail` はその共有部品に**ダウンロードリンク行**を1つ足したもの。
+- ダウンロードリンクは `activity.target != null` のときだけ描画（`href={/download/${activity.target}}`）。`target` 欠損時はリンク行を出さず、他フィールドの描画は継続（要件 7.2）。
+- REMOVE の整形（`AttachmentRemoveSnapshotDetail`）は**ダウンロードリンクを出さない**まま（要件 2.4 / 7.3）。差は「共有部品にダウンロード行を足すか否か」だけで、REMOVE 側の観察可能な挙動は変えない。
+
+**Dependencies**
+- External: `pretty-bytes`（サイズ整形, P1）、`PagePathHierarchicalLink` + `LinkedPagePath`（ページリンク, P1）
+- Inbound: `snapshot-detail-renderers`（`defineRenderer` で ADD/DOWNLOAD の2エントリとして登録, P0）
+
+**Contracts**: State [x]
+
+##### Props
+```typescript
+// isAttachmentAddActivity / isAttachmentDownloadActivity が絞り込む型。
+// defineRenderer がこの型を props 型として要求するため、renderer は narrow 済みで受け取る。
+type LiveAttachmentSnapshotDetailProps = {
+  activity: IActivityHasId & { snapshot?: AttachmentSnapshot };
+};
+```
+- Preconditions: dispatcher により `action === ACTION_ATTACHMENT_ADD | ACTION_ATTACHMENT_DOWNLOAD` が担保。
+- Postconditions: name/size/page をそれぞれの有無に応じ値またはフォールバック描画。`target` があればダウンロードリンクを描画、無ければ出さない。
+- Invariants: 値はテキストとして描画（React 自動エスケープ）。ダウンロード href は `/download/${target}` のみ（`target` はサーバ生成の ObjectId 文字列）。
+
+#### snapshot-detail-renderers（レジストリ更新）
+
+初回の1エントリに ADD/DOWNLOAD の2エントリを**追記するのみ**。dispatcher・テーブルは不変。
+
+```typescript
+export const snapshotDetailRenderers: SnapshotDetailRenderer[] = [
+  defineRenderer(isAttachmentRemoveActivity, AttachmentRemoveSnapshotDetail),
+  defineRenderer(isAttachmentAddActivity, LiveAttachmentSnapshotDetail),
+  defineRenderer(isAttachmentDownloadActivity, LiveAttachmentSnapshotDetail),
+];
+```
+- 3 エントリは `action` で互いに排他（各 action に高々1つ）＝先頭一致の不変条件を維持。
+- 同じ `LiveAttachmentSnapshotDetail` を2つの guard に割り当てるのは意図的（ADD/DOWNLOAD は同一整形）。`defineRenderer` の型検査により、両 guard の絞り込み型（`AttachmentSnapshot`）と renderer の props 型が一致することがコンパイル時に担保される。
+
+### 増分の Requirements Traceability
+
+| Requirement | Summary | Components | Interfaces | Flows |
+|-------------|---------|------------|------------|-------|
+| 6.1 | ADD/DOWNLOAD の整形（ファイル名/サイズ/ページ） | LiveAttachmentSnapshotDetail, AttachmentSnapshotFields | `AttachmentSnapshot` 消費 | dispatch match→Fmt |
+| 6.2 | 整形があっても raw をタブで常時参照 | ActivitySnapshotDetail（不変） | tab state | dispatch match→Tabs |
+| 6.3 | 欠損フィールドの独立フォールバック | AttachmentSnapshotFields | i18n label | Fmt→Fb* |
+| 7.1 | target があればダウンロードリンク | LiveAttachmentSnapshotDetail | `IActivityHasId.target` | Fmt→DL |
+| 7.2 | target 欠損時はリンク無し・他は継続 | LiveAttachmentSnapshotDetail | — | Fmt→(DL 省略) |
+| 7.3 | REMOVE の整形は不変（DL なし） | AttachmentRemoveSnapshotDetail | — | Fmt（DL 描画なし） |
+| 7.4 | リンクに独自認可を持たせない | LiveAttachmentSnapshotDetail | `/download` 既存経路 | — |
+| 8.1 | 旧 ADD/DOWNLOAD レコードもフォールバック描画 | LiveAttachmentSnapshotDetail, RawSnapshotDetail | — | 全フォールバック分岐 |
+| 8.2 | データ移行不要 | （型が全 optional・後方互換） | — | — |
+
+### 増分の i18n
+
+- ダウンロードリンクのラベル（例 `audit_log_snapshot.download` = "Download"）を **en_US/admin.json に追加**する。ファイル名・サイズ・ページのラベルは初回追加分（`file_name` / `file_size` / `page` / `unknown_*` / `page_unavailable`）を再利用する。
+- ja/ko/zh/fr の翻訳は初回と同じ方針で**後続タスク**（要件 4.1 の翻訳タスク）に畳む。未了の間は i18next の欠落時フォールバックで英語表示となり機能は成立する。
+
+### 増分の Test Strategy
+
+`essential-test-design`（観察可能な契約をテスト）と `essential-test-patterns`（Vitest / RTL / `mock<T>()`）に従う。
+
+- **LiveAttachmentSnapshotDetail（unit）**: (a) 全フィールド＋`target` 有り → ファイル名・整形サイズ・ページリンク・**ダウンロードリンク（`/download/{target}` の href）**が現れる（6.1, 7.1）。(b) `target` 欠損 → ダウンロードリンクが**現れない**が他フィールドは描画される（7.2）。(c) `originalName` / `pagePath` / `fileSize` 各欠損 → 対応するフォールバック文言（6.3）。
+- **snapshot-detail-renderers（既存 spec を拡張）**: `action=ATTACHMENT_ADD` と `=ATTACHMENT_DOWNLOAD` が `LiveAttachmentSnapshotDetail` に、`=ATTACHMENT_REMOVE` が `AttachmentRemoveSnapshotDetail` に解決される。既存の負ゲート（`@ts-expect-error` による誤ペア検出）は維持。
+- **AttachmentRemoveSnapshotDetail（回帰）**: 共有部品抽出後もダウンロードリンクが**出ない**ことを再確認（7.3）。
+- **Integration（`ActivityTable.spec.tsx` の混在テストを拡張）**: 既存の旧/新 REMOVE 行に加え ADD/DOWNLOAD 行を混在させ、展開で既定=整形（ADD/DOWNLOAD はダウンロードリンク表示、REMOVE はリンク無し）、raw タブで全フィールド到達、旧レコード非破壊を1つの一覧で検証（6.1, 6.2, 7.1, 7.3, 8.1）。
+
+### 増分の Security Considerations
+
+- **ダウンロードリンクの妥当性**: href は `/download/${activity.target}` のみを組み立てる。`target` は上流がサーバ生成した attachment の ObjectId 文字列で、ユーザ自由入力ではない。リンク先の実体アクセス可否は `/download` 経路がサーバ側で権限判定する既存契約に委ね、本 spec はクライアントで認可判定を再実装しない（要件 7.4）。監査ログ画面自体が admin 限定ルートでガード済みという前提も初回設計から不変。
+- **XSS**: 追加分も `dangerouslySetInnerHTML` を使わず、値はテキストとして描画する。
