@@ -20,7 +20,7 @@
   - _Boundary: SearchResultPagePath, SearchResultPagePath.module.scss_
   - _Depends: 1_
 
-- [ ] 3. 検索モーダルの結果行に新パス表示を統合する
+- [x] 3. 検索モーダルの結果行に新パス表示を統合する
   - `SearchResultMenuItem` の既存パス表示（`text-break text-wrap` の span + `PagePathLabel`）を新コンポーネントに差し替え、不要になった `PagePathLabel` の import を削除する
   - 行が正しく縮むよう flex を調整する（パス要素に `flex-grow` + `min-width: 0`、footprint〈既読数〉に縮小防止を付与）
   - 統合の非破壊を可観測にする: 結果を描画したとき新パス表示が使われ、footprint（既読数）が現行どおり表示され、行クリックの遷移導線（`getItemProps`）が現行どおり働くことを RTL で確認する
