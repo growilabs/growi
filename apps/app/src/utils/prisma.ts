@@ -8,7 +8,8 @@ import { extension as ActivityExtension } from '~/server/models/activity';
 import { extension as BookmarkExtension } from '~/server/models/bookmark';
 import { extension as BookmarkFolderExtension } from '~/server/models/bookmark-folder';
 import { extension as ExternalAccountExtension } from '~/server/models/external-account';
-import { extension as UserExtension } from '~/server/models/user/index.prisma';
+import { extension as UserExtension } from '~/server/models/tag';
+import { extension as TagExtension } from '~/server/models/user/index.prisma';
 
 export interface PaginateOptions<TWhere, TOrderBy, TInclude, TSelect> {
   offset?: number;
@@ -215,7 +216,8 @@ export const createPrisma = (datasourceUrl?: string) =>
     .$extends(CommentExtension)
     .$extends(ExternalAccountExtension)
     .$extends(MastraRefreshedModelCatalogExtension)
-    .$extends(UserExtension);
+    .$extends(UserExtension)
+    .$extends(TagExtension);
 
 export const prisma = createPrisma();
 
