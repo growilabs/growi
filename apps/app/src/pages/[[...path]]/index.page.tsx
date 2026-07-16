@@ -19,6 +19,7 @@ import { TemplateModalLazyLoaded } from '~/client/components/TemplateModal';
 import { BasicLayout } from '~/components/Layout/BasicLayout';
 import { PageView } from '~/components/PageView/PageView';
 import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript';
+import { selectAlternateMdUrl } from '~/features/page-markdown';
 import { useEditorModeClassName } from '~/services/layout/use-editor-mode-class-name';
 import { useCurrentPageData, useCurrentPagePath } from '~/states/page';
 import { useHydratePageAtoms } from '~/states/page/hydrate';
@@ -29,7 +30,6 @@ import {
 } from '~/states/socket-io';
 import { useSetEditingMarkdown } from '~/states/ui/editor';
 import { useSWRxPageInfo } from '~/stores/page';
-import { selectAlternateMdUrl } from '~/utils/page-markdown-alternate';
 
 import type { NextPageWithLayout } from '../_app.page';
 import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate';

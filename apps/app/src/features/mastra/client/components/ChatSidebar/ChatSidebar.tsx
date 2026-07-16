@@ -228,9 +228,9 @@ export const ChatSidebar = (): JSX.Element => {
     <div
       className={`tw-root position-fixed top-0 end-0 h-100 border-start bg-body shadow-sm overflow-hidden ${moduleClass}`}
     >
-      <div className="tw:max-w-4xl tw:mx-auto tw:py-6 tw:relative tw:size-full twh-screen">
+      <div className="tw:max-w-4xl tw:mx-auto tw:py-3 tw:relative tw:size-full">
         <div className="tw:flex tw:flex-col tw:h-full">
-          <div className="tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:px-6 tw:pb-2 tw:border-b tw:border-border">
+          <div className="tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:px-3 tw:pb-2 tw:border-b tw:border-border">
             <span className="growi-custom-icons fs-4">ai_chat</span>
             <span className="tw:flex-1 tw:font-semibold tw:truncate">
               {headerLabel}
@@ -457,6 +457,16 @@ export const ChatSidebar = (): JSX.Element => {
                 />
               </PromptInputFooter>
             </PromptInput>
+            {/* Persistent accuracy disclaimer, placed under the input like
+                other AI chat products so it reads as a notice covering the
+                whole conversation and never scrolls out of view.
+                Spaced with PADDING, not margin: tailwind.css pins `.tw-root p`
+                margins to 0 with an UNLAYERED rule that outranks the
+                @layer-ed tw: margin utilities, so tw:mt-* can never win on a
+                <p> here — tw:pt-* is untouched by that rule. */}
+            <p className="tw:pt-2 tw:text-center tw:text-xs tw:text-muted-foreground/60">
+              {t('ai_sidebar.accuracy_notice')}
+            </p>
           </div>
         </div>
       </div>

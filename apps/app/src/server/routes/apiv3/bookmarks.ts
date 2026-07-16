@@ -20,7 +20,6 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import BookmarkFolder from '../../models/bookmark-folder';
 
 const logger = loggerFactory('growi:routes:apiv3:bookmarks');
 
@@ -228,10 +227,12 @@ export const setup = (crowi: Crowi): Router => {
       }
 
       try {
-        const bookmarkIdsInFolders = await BookmarkFolder.distinct(
-          'bookmarks',
-          { owner: userId },
-        );
+        const userFolders = await prisma.bookmarkfolders.findMany({
+          where: { ownerId: userId },
+        });
+        const bookmarkIdsInFolders = [
+          ...new Set(userFolders.flatMap((f) => f.bookmarkIds)),
+        ];
 
         const userRootBookmarks = await prisma.bookmarks.findMany({
           where: {
