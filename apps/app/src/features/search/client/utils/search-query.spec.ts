@@ -133,6 +133,19 @@ describe('parseSearchQuery', () => {
     });
   });
 
+  it('drops a quotes-only operator instead of committing a blank value', () => {
+    // `author:""` / `author:"` reduce to an empty value after quote-stripping;
+    // an empty filter must not become a blank chip nor an empty-value search.
+    expect(parseSearchQuery('author:""')).toEqual({
+      keyword: '',
+      filters: filterState(),
+    });
+    expect(parseSearchQuery('report author:" tag:wiki')).toEqual({
+      keyword: 'report',
+      filters: filterState({ tags: ['wiki'] }),
+    });
+  });
+
   it('reinterprets operator syntax typed into the keyword as a filter', () => {
     // Documents the intentional non-round-trip case: a hand-typed operator
     // hydrates the matching chip rather than staying free text.

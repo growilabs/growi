@@ -121,7 +121,11 @@ export const parseSearchQuery = (queryString: string): ParsedSearchQuery => {
       // Strip quotes: unwraps a quoted value, no-op for a bare one, and cleans a
       // stray quote from a malformed `author:"x` (matching the server).
       const value = rawValue.replace(/"/g, '');
-      filters[FIELD_BY_PREFIX[prefix]].push(value);
+      // A quotes-only operator (`author:""`, `author:"`) carries no value; drop
+      // it instead of committing a blank chip and running an empty-value filter.
+      if (value !== '') {
+        filters[FIELD_BY_PREFIX[prefix]].push(value);
+      }
       // Preserve the leading whitespace so neighbouring tokens stay separated.
       return lead;
     },
