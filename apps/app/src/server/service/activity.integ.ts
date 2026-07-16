@@ -7,6 +7,7 @@ import type Crowi from '~/server/crowi';
 import Activity from '~/server/models/activity';
 import ActivityService from '~/server/service/activity';
 import type { ConfigValues } from '~/server/service/config-manager/config-definition';
+import { prisma } from '~/utils/prisma';
 
 vi.mock('~/utils/logger', () => ({
   default: vi.fn(() => ({
@@ -40,14 +41,7 @@ describe('ActivityService', () => {
   });
 
   describe('createActivity()', () => {
-    let createdListener: ReturnType<typeof vi.fn>;
-
-    beforeEach(() => {
-      createdListener = vi.fn();
-      activityEvent.on('created', createdListener);
-    });
-
-    it('should save the activity and notify "created" subscribers', async () => {
+    it('should save the activity', async () => {
       const result = await activityService.createActivity({
         action: SupportedAction.ACTION_PAGE_CREATE,
       });
@@ -59,31 +53,33 @@ describe('ActivityService', () => {
         action: SupportedAction.ACTION_PAGE_CREATE,
       });
       expect(saved).not.toBeNull();
-      expect(createdListener).toHaveBeenCalledWith(
-        expect.objectContaining({ action: SupportedAction.ACTION_PAGE_CREATE }),
-      );
     });
 
-    it('should return null without notifying when the action is not available', async () => {
+    it('should return null when the action is not available', async () => {
       const result = await activityService.createActivity({
         action: SupportedAction.ACTION_PAGE_SUBSCRIBE,
       });
 
       expect(result).toBeNull();
-      expect(createdListener).not.toHaveBeenCalled();
     });
 
-    it('should return null without notifying when Activity creation throws', async () => {
-      vi.spyOn(Activity, 'createByParameters').mockRejectedValue(
-        new Error('DB error'),
-      );
+    it('should return null when Activity creation throws', async () => {
+      // mockRestore/restoreAllMocks leaves this Prisma extension method as
+      // `undefined` instead of restoring it (verified) — save/restore manually.
+      const original = prisma.activities.createByParameters;
+      prisma.activities.createByParameters = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('DB error'));
 
-      const result = await activityService.createActivity({
-        action: SupportedAction.ACTION_PAGE_CREATE,
-      });
+      try {
+        const result = await activityService.createActivity({
+          action: SupportedAction.ACTION_PAGE_CREATE,
+        });
 
-      expect(result).toBeNull();
-      expect(createdListener).not.toHaveBeenCalled();
+        expect(result).toBeNull();
+      } finally {
+        prisma.activities.createByParameters = original;
+      }
     });
 
     describe('when audit log is enabled', () => {
@@ -114,7 +110,6 @@ describe('ActivityService', () => {
         const result = await activityService.createActivity({ action });
 
         expect(result).toMatchObject({ action });
-        expect(createdListener).toHaveBeenCalledTimes(1);
       });
 
       it('should save an action added via additionalActions even if it is outside the group', async () => {
@@ -132,7 +127,6 @@ describe('ActivityService', () => {
         expect(result).toMatchObject({
           action: SupportedAction.ACTION_PAGE_SUBSCRIBE,
         });
-        expect(createdListener).toHaveBeenCalledTimes(1);
       });
 
       it('should return null for an action removed via excludeActions', async () => {
@@ -148,87 +142,14 @@ describe('ActivityService', () => {
         });
 
         expect(result).toBeNull();
-        expect(createdListener).not.toHaveBeenCalled();
       });
     });
   });
 
-  // Activity updates and TTL-driven deletions reach Elasticsearch through the
-  // change stream, so the update path and the TTL index are covered here too.
-  describe("'update' event handling", () => {
-    let updatedListener: ReturnType<typeof vi.fn>;
-
-    beforeEach(() => {
-      updatedListener = vi.fn();
-      activityEvent.on('updated', updatedListener);
-    });
-
-    it('should apply the update and notify "updated" subscribers for an available action', async () => {
-      const activity = await Activity.createByParameters({
-        action: SupportedAction.ACTION_PAGE_CREATE,
-      });
-      const target = new mongoose.Types.ObjectId();
-
-      activityEvent.emit(
-        'update',
-        activity._id.toString(),
-        { action: SupportedAction.ACTION_PAGE_CREATE, endpoint: '/updated' },
-        target,
-      );
-
-      await vi.waitFor(() => expect(updatedListener).toHaveBeenCalled());
-
-      const saved = await Activity.findById(activity._id);
-      expect(saved?.endpoint).toBe('/updated');
-      expect(updatedListener).toHaveBeenCalledWith(
-        expect.objectContaining({ endpoint: '/updated' }),
-        target,
-      );
-    });
-
-    it('should pass the generated preNotify to "updated" subscribers', async () => {
-      const activity = await Activity.createByParameters({
-        action: SupportedAction.ACTION_PAGE_CREATE,
-      });
-      const target = new mongoose.Types.ObjectId();
-      const preNotify = { notified: true };
-      const generatePreNotify = vi.fn().mockReturnValue(preNotify);
-
-      activityEvent.emit(
-        'update',
-        activity._id.toString(),
-        { action: SupportedAction.ACTION_PAGE_CREATE },
-        target,
-        generatePreNotify,
-      );
-
-      await vi.waitFor(() => expect(updatedListener).toHaveBeenCalled());
-
-      expect(updatedListener).toHaveBeenCalledWith(
-        expect.objectContaining({ action: SupportedAction.ACTION_PAGE_CREATE }),
-        target,
-        preNotify,
-      );
-    });
-
-    it('should neither update nor notify when the action is not available', async () => {
-      const activity = await Activity.createByParameters({
-        action: SupportedAction.ACTION_PAGE_CREATE,
-      });
-
-      activityEvent.emit('update', activity._id.toString(), {
-        action: SupportedAction.ACTION_PAGE_SUBSCRIBE,
-        endpoint: '/updated',
-      });
-
-      // Flush the event loop so any handler path — sync or async — has settled.
-      await new Promise(setImmediate);
-
-      const saved = await Activity.findById(activity._id);
-      expect(saved?.endpoint).toBeUndefined();
-      expect(updatedListener).not.toHaveBeenCalled();
-    });
-  });
+  // 'update' event handling is covered by record-gate.integ.ts (Task 7.1-7.4)
+  // via the real beginActivity() -> emit('update', ...) path. The old tests
+  // here pre-created a row then emitted 'update' with the same id, which under
+  // the lazy-fail-safe design just forces a duplicate-key settle failure.
 
   describe('createTtlIndex()', () => {
     const getCreatedAtIndex = async () => {

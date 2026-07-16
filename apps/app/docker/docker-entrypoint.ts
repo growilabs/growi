@@ -25,6 +25,9 @@ const CGROUP_V2_PATH = '/sys/fs/cgroup/memory.max';
 const CGROUP_V1_PATH = '/sys/fs/cgroup/memory/memory.limit_in_bytes';
 const CGROUP_V1_UNLIMITED_THRESHOLD = 64 * 1024 * 1024 * 1024; // 64GB
 const HEAP_RATIO = 0.6;
+// Arch-independent canonical path: the Dockerfile's jemalloc stage copies the
+// distro library here, absorbing the multiarch triplet (x86_64/aarch64).
+const JEMALLOC_LIB_PATH = '/usr/local/lib/libjemalloc.so.2';
 
 // -- Exported utility functions --
 
@@ -122,6 +125,38 @@ export function buildNodeFlags(heapSize: number | undefined): string[] {
 }
 
 /**
+ * Resolve the LD_PRELOAD value for the app process when the operator opts in
+ * to jemalloc with JEMALLOC_ENABLED=true.
+ *
+ * glibc malloc retains hundreds of MiB of freed memory in its main arena
+ * under GROWI's load profile (fragmentation prevents trimming; measured
+ * drain-phase retention −70% with jemalloc). jemalloc returns freed memory
+ * to the OS via time-based decay, so the container's working set tracks
+ * actual usage much more closely.
+ *
+ * Returns undefined (= keep glibc malloc) unless explicitly enabled; a
+ * missing library logs an error but never blocks boot.
+ */
+export function resolveJemallocPreload(
+  env: NodeJS.ProcessEnv,
+  libPath: string,
+  exists: (path: string) => boolean,
+): string | undefined {
+  if (env.JEMALLOC_ENABLED !== 'true') {
+    return undefined;
+  }
+  if (!exists(libPath)) {
+    console.error(
+      `[entrypoint] JEMALLOC_ENABLED=true but ${libPath} is not found, falling back to glibc malloc`,
+    );
+    return undefined;
+  }
+  return env.LD_PRELOAD != null && env.LD_PRELOAD !== ''
+    ? `${libPath}:${env.LD_PRELOAD}`
+    : libPath;
+}
+
+/**
  * Setup required directories (as root).
  * - /data/uploads with symlink to ./public/uploads
  * - /tmp/page-bulk-export with mode 700
@@ -178,7 +213,7 @@ function logFlags(heapSize: number | undefined, flags: string[]): void {
 
 /**
  * Run database migration via execFileSync (no shell needed).
- * Equivalent to: node -r dotenv-flow/config node_modules/migrate-mongo/bin/migrate-mongo up -f config/migrate-mongo-config.js
+ * Equivalent to: node -r dotenv-flow/config node_modules/migrate-mongo/bin/migrate-mongo up -f config/migrate-mongo-config.cjs
  */
 function runMigration(): void {
   console.log('[entrypoint] Running migration...');
@@ -190,7 +225,7 @@ function runMigration(): void {
       'node_modules/migrate-mongo/bin/migrate-mongo',
       'up',
       '-f',
-      'config/migrate-mongo-config.js',
+      'config/migrate-mongo-config.cjs',
     ],
     {
       stdio: 'inherit',
@@ -202,14 +237,22 @@ function runMigration(): void {
 
 /**
  * Spawn the application process and forward signals.
+ *
+ * The optional ldPreload applies to the app process only — the migration
+ * child (execFileSync above) is short-lived, so swapping its allocator buys
+ * nothing and would only widen the blast radius of the opt-in.
  */
-function spawnApp(nodeFlags: string[]): void {
+function spawnApp(nodeFlags: string[], ldPreload: string | undefined): void {
+  const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'production' };
+  if (ldPreload != null) {
+    env.LD_PRELOAD = ldPreload;
+  }
   const child = spawn(
     process.execPath,
     [...nodeFlags, '-r', 'dotenv-flow/config', 'dist/server/app.js'],
     {
       stdio: 'inherit',
-      env: { ...process.env, NODE_ENV: 'production' },
+      env,
     },
   );
 
@@ -240,6 +283,16 @@ function main(): void {
     const nodeFlags = buildNodeFlags(heapSize);
     logFlags(heapSize, nodeFlags);
 
+    // Step 2.5: Resolve allocator (opt-in jemalloc via JEMALLOC_ENABLED=true)
+    const ldPreload = resolveJemallocPreload(
+      process.env,
+      JEMALLOC_LIB_PATH,
+      fs.existsSync,
+    );
+    console.log(
+      `[entrypoint] Allocator: ${ldPreload != null ? `jemalloc (LD_PRELOAD=${ldPreload})` : 'glibc malloc (default)'}`,
+    );
+
     // Step 3: Drop privileges (root → node)
     dropPrivileges();
 
@@ -247,7 +300,7 @@ function main(): void {
     runMigration();
 
     // Step 5: Start application
-    spawnApp(nodeFlags);
+    spawnApp(nodeFlags, ldPreload);
   } catch (err) {
     console.error('[entrypoint] Fatal error:', err);
     process.exit(1);

@@ -42,6 +42,27 @@ const MenuLabel = ({ menu }: { menu: string }) => {
           {t('customize_settings.customize_settings')}
         </>
       );
+    case 'ai':
+      return (
+        <>
+          {/* fs-6: .growi-custom-icons defaults to font-size 0.8em, too small
+              next to the sibling .material-symbols-outlined icons (1.5em).
+              width: material glyphs are square (1.5em font-size × 1em advance
+              = a 1.5rem box) while growi_ai is narrower, which would make it
+              sit left of the other icons — the fixed 1.5rem-wide centered box
+              gives it the same footprint so icon centers and label starts
+              line up. top: the growi_ai glyph hangs lower on the baseline
+              than the material glyphs, so nudge it up to optically align
+              with the label text. */}
+          <span
+            className="growi-custom-icons fs-6 align-middle me-1 d-inline-block text-center position-relative"
+            style={{ width: '1.5rem', top: '-0.1em' }}
+          >
+            growi_ai
+          </span>
+          {t('ai_settings.ai_settings')}
+        </>
+      );
     case 'importer':
       return (
         <>
@@ -119,20 +140,6 @@ const MenuLabel = ({ menu }: { menu: string }) => {
           {t('plugins.plugins')}
         </>
       );
-    // Temporarily hiding
-    // case 'ai-integration':           return (
-    //   <>{/* TODO: unify sizing of growi-custom-icons so that simplify code -- 2024.10.09 Yuki Takei */}
-    //     <span
-    //       className="growi-custom-icons d-inline-block me-1"
-    //       style={{
-    //         fontSize: '18px', width: '24px', height: '24px', lineHeight: '24px', verticalAlign: 'bottom', paddingLeft: '2px',
-    //       }}
-    //     >
-    //       growi_ai
-    //     </span>
-    //     {t('ai_integration.ai_integration')}
-    //   </>
-    // );
     case 'search':
       return (
         <>
@@ -259,6 +266,11 @@ export const AdminNavigation = (): JSX.Element => {
             isListGroupItems={isListGroupItems}
             isActive={isActiveMenu('/plugins')}
           />
+          <MenuLink
+            menu="ai"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/ai')}
+          />
 
           <hr />
 
@@ -332,8 +344,6 @@ export const AdminNavigation = (): JSX.Element => {
             isListGroupItems={isListGroupItems}
             isActive={isActiveMenu('/slack-integration-legacy')}
           />
-          {/* Temporarily hiding */}
-          {/* <MenuLink menu="ai-integration" isListGroupItems={isListGroupItems} isActive={isActiveMenu('/aai-integration')} /> */}
         </>
       );
     },
@@ -364,6 +374,7 @@ export const AdminNavigation = (): JSX.Element => {
             {isActiveMenu('/security') && <MenuLabel menu="security" />}
             {isActiveMenu('/markdown') && <MenuLabel menu="markdown" />}
             {isActiveMenu('/customize') && <MenuLabel menu="customize" />}
+            {isActiveMenu('/ai') && <MenuLabel menu="ai" />}
             {isActiveMenu('/importer') && <MenuLabel menu="importer" />}
             {isActiveMenu('/export') && <MenuLabel menu="export" />}
             {isActiveMenu(['/notification', '/global-notification']) && (
@@ -383,8 +394,6 @@ export const AdminNavigation = (): JSX.Element => {
             {isActiveMenu('/data-transfer') && (
               <MenuLabel menu="data-transfer" />
             )}
-            {/* Temporarily hiding */}
-            {/* {isActiveMenu('/ai-integration')                && <MenuLabel menu="ai-integration" />} */}
           </span>
         </button>
         <div

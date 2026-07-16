@@ -16,6 +16,8 @@ import {
   Tooltip,
 } from 'reactstrap';
 
+import { toPathMdUrl } from '~/features/page-markdown';
+
 import styles from './CopyDropdown.module.scss';
 
 const { encodeSpaces } = pagePathUtils;
@@ -82,6 +84,14 @@ export const CopyDropdown: React.FC<CopyDropdownProps> = (props) => {
     const { origin } = window.location;
     return `${origin}${encodeSpaces(pagePathWithParams)}`;
   }, [pagePathWithParams]);
+
+  // ".md" is appended unconditionally, even when pagePathUrl already ends
+  // with ".md" (e.g. "/README.md" -> ".../README.md.md"); resolving that
+  // collision against real pages is the server's responsibility
+  // (Requirement 2 / 7.3).
+  const markdownUrl = useMemo(() => {
+    return toPathMdUrl(pagePathUrl);
+  }, [pagePathUrl]);
 
   const permalink = useMemo(() => {
     const { origin } = window.location;
@@ -207,6 +217,21 @@ export const CopyDropdown: React.FC<CopyDropdownProps> = (props) => {
               />
             </DropdownItem>
           </CopyToClipboard>
+          <DropdownItem divider className="my-0"></DropdownItem>
+
+          {/* Markdown URL (.md) */}
+          {!isShareLinkMode && (
+            <CopyToClipboard text={markdownUrl} onCopy={showToolTip}>
+              <DropdownItem className="px-3">
+                <DropdownItemContents
+                  title={t('copy_to_clipboard.Markdown URL')}
+                  contents={markdownUrl}
+                  className="text-truncate d-block"
+                />
+              </DropdownItem>
+            </CopyToClipboard>
+          )}
+
           <DropdownItem divider className="my-0"></DropdownItem>
 
           {/* Permanent Link */}

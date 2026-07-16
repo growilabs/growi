@@ -4,10 +4,6 @@ import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
 import { CommentEvent, commentEvent } from '~/features/comment/server';
-import {
-  isIncludeAiMenthion,
-  removeAiMenthion,
-} from '~/features/search/utils/ai';
 import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
 import type {
   AuditlogSuggestionField,
@@ -24,6 +20,7 @@ import {
   UserStatus,
 } from '~/server/models/user/conts';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../crowi';
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
@@ -35,7 +32,6 @@ import type {
   SearchQueryParser,
   SearchResolver,
 } from '../interfaces/search';
-import Activity from '../models/activity';
 import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
@@ -59,8 +55,7 @@ const filterXssOptions = {
 const filterXss = new FilterXSS(filterXssOptions);
 
 const normalizeQueryString = (_queryString: string): string => {
-  let queryString = _queryString.trim();
-  queryString = removeAiMenthion(queryString).replace(/\s+/g, ' ');
+  const queryString = _queryString.trim().replace(/\s+/g, ' ');
 
   return queryString;
 };
@@ -369,7 +364,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
         );
       }
     }
-    return Activity.findSnapshotUsernamesByUsernameRegex(q, {
+    return prisma.activities.findSnapshotUsernamesByUsernameRegex(q, {
       offset: 0,
       limit,
     });
@@ -501,7 +496,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     user,
     userGroups,
     searchOpts,
-  ): Promise<[ISearchResult<unknown>, string | null]> {
+  ): Promise<[ISearchResult<unknown>, SearchDelegatorName | null]> {
     let parsedQuery: ParsedQuery;
     // parse
     try {
@@ -509,10 +504,6 @@ class SearchService implements SearchQueryParser, SearchResolver {
     } catch (err) {
       logger.error('Error occurred while parseSearchQuery', err);
       throw err;
-    }
-
-    if (isIncludeAiMenthion(keyword)) {
-      searchOpts.vector = true;
     }
 
     let delegator: SearchDelegator;
@@ -612,7 +603,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
   // So far, it determines by delegatorName passed by searchService.searchKeyword
   checkIsFormattable(
     searchResult,
-    delegatorName: SearchDelegatorName,
+    delegatorName: SearchDelegatorName | null,
   ): boolean {
     return delegatorName === SearchDelegatorName.DEFAULT;
   }
@@ -622,7 +613,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
    */
   async formatSearchResult(
     searchResult: ISearchResult<any>,
-    delegatorName: SearchDelegatorName,
+    delegatorName: SearchDelegatorName | null,
     user,
     userGroups,
   ): Promise<IFormattedSearchResult> {

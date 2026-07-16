@@ -4,9 +4,9 @@ import { EditorView } from '@codemirror/view';
 import { yCollab } from 'y-codemirror.next';
 import * as Y from 'yjs';
 
-import type { EditingClient } from '../../../../interfaces';
-import { yRichCursors } from './index';
-import { YRichCursorsPluginValue } from './plugin';
+import type { EditingClient } from '../../../../interfaces/index.js';
+import { yRichCursors } from './index.js';
+import { YRichCursorsPluginValue } from './plugin.js';
 
 /**
  * Integration tests for collaborative awareness flow.

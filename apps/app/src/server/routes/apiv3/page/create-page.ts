@@ -18,7 +18,6 @@ import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { isAiEnabled } from '~/features/openai/server/services';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
 import { subscribeRuleNames } from '~/interfaces/in-app-notification';
@@ -223,6 +222,7 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       targetModel: SupportedTargetModel.MODEL_PAGE,
       target: createdPage,
       action: SupportedAction.ACTION_PAGE_CREATE,
+      contributor: req.user,
     };
     const activityEvent = crowi.events.activity;
     activityEvent.emit('update', res.locals.activity._id, parameters);
@@ -267,19 +267,6 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       );
     } catch (err) {
       logger.error('Failed to create subscription document', err);
-    }
-
-    // Rebuild vector store file
-    if (isAiEnabled()) {
-      const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai'
-      );
-      try {
-        const openaiService = getOpenaiService();
-        await openaiService?.createVectorStoreFileOnPageCreate([createdPage]);
-      } catch (err) {
-        logger.error('Rebuild vector store failed', err);
-      }
     }
   }
 

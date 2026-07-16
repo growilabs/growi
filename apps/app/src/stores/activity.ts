@@ -2,7 +2,7 @@ import { useAtomValue } from 'jotai';
 import type { SWRResponse } from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
+import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
 import type {
   AuditlogSuggestionField,
   AuditlogSuggestionsResponse,
@@ -32,16 +32,23 @@ export const useSWRxActivity = (
 ): SWRResponse<PaginateResult<IActivityHasId>, Error> => {
   const auditLogEnabled = useAtomValue(auditLogEnabledAtom);
 
+  // POST the filter in the request body instead of a GET query string: the
+  // searchFilter lists every selected action, which for large action-group
+  // configurations pushed the URL past common proxy header limits.
+  // The SWR key still uses the stringified filter for stable cache identity.
   const stringifiedSearchFilter = JSON.stringify(searchFilter);
   return useSWRImmutable(
     auditLogEnabled
-      ? ['/activity', limit, offset, stringifiedSearchFilter]
+      ? ['/activity/list', limit, offset, stringifiedSearchFilter]
       : null,
     ([endpoint, limit, offset, stringifiedSearchFilter]) =>
-      apiv3Get(endpoint, {
+      apiv3Post(endpoint, {
         limit,
         offset,
-        searchFilter: stringifiedSearchFilter,
+        searchFilter:
+          stringifiedSearchFilter != null
+            ? JSON.parse(stringifiedSearchFilter)
+            : undefined,
       }).then((result) => result.data.serializedPaginationResult),
   );
 };

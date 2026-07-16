@@ -34,6 +34,17 @@ jobs:
         pnpm add turbo --global
         pnpm install --frozen-lockfile
 
+    - name: Refresh vendored model catalog (pre-release ingest step)
+      working-directory: ./apps/app
+      # Ingest step: fetch models.dev and regenerate the committed catalog so the
+      # release tag bundles the freshest chat+tool model list. On fetch/schema/empty
+      # failure vendor:models exits non-zero and preserves the existing committed
+      # artifact, so the release proceeds with the last-good catalog (design Error
+      # Handling: the release can continue with the previous catalog). The subsequent
+      # build reads only the committed JSON (no fetch/commit added to the build workflow).
+      continue-on-error: true
+      run: pnpm vendor:models
+
     - name: Bump versions
       run: |
         turbo run version:patch --filter=@growi/app
@@ -104,7 +115,7 @@ jobs:
   build-app-image:
     needs: create-github-release
 
-    uses: growilabs/growi/.github/workflows/reusable-app-build-image.yml@master
+    uses: ./.github/workflows/reusable-app-build-image.yml
     with:
       source-version: refs/tags/v${{ needs.create-github-release.outputs.RELEASED_VERSION }}
       image-name: growilabs/growi
@@ -115,7 +126,7 @@ jobs:
   publish-app-image:
     needs: [determine-tags, build-app-image]
 
-    uses: growilabs/growi/.github/workflows/reusable-app-create-manifests.yml@master
+    uses: ./.github/workflows/reusable-app-create-manifests.yml
     with:
       tags: ${{ needs.determine-tags.outputs.TAGS }}
       registry: docker.io

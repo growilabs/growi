@@ -2,8 +2,8 @@ import { type JSX, useCallback, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
 
-import { useTemplateModalActions } from '../../../../states/modal/template';
-import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
+import { useTemplateModalActions } from '../../../../states/modal/template.js';
+import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor.js';
 
 type Props = {
   editorKey: string;

@@ -67,10 +67,6 @@ async function registerCrowiBoundModels(): Promise<void> {
   const UserModelFactory = (await import('~/server/models/user')).default;
   UserModelFactory(null);
 
-  // Bookmark and global-notification factories require a real Crowi.events
-  // emitter — give them the stub.
-  const BookmarkFactory = (await import('~/server/models/bookmark')).default;
-  BookmarkFactory(stubCrowi);
   const GlobalNotificationSettingFactory = (
     await import('~/server/models/GlobalNotificationSetting')
   ).default;

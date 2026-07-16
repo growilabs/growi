@@ -1,4 +1,8 @@
-import { CONFIG_DEFINITIONS, CONFIG_KEYS } from './config-definition';
+import {
+  CONFIG_DEFINITIONS,
+  CONFIG_KEYS,
+  ENV_ONLY_GROUPS,
+} from './config-definition';
 
 describe('config-definition resilience keys', () => {
   describe('CONFIG_KEYS array', () => {
@@ -180,6 +184,141 @@ describe('config-definition resilience keys', () => {
           CONFIG_DEFINITIONS['app:vaultDriftDetectionDisabled'].envVarName,
         ).toBe('VAULT_DRIFT_DETECTION_DISABLED');
       });
+    });
+  });
+});
+
+describe('config-definition multi-provider ai keys', () => {
+  describe('CONFIG_KEYS array', () => {
+    it('contains ai:providers', () => {
+      expect(CONFIG_KEYS).toContain('ai:providers');
+    });
+
+    it('contains ai:providerApiKeys', () => {
+      expect(CONFIG_KEYS).toContain('ai:providerApiKeys');
+    });
+
+    it('contains ai:allowedModels', () => {
+      expect(CONFIG_KEYS).toContain('ai:allowedModels');
+    });
+
+    // R7.1: the former single-provider keys are replaced (no migration — R7.2)
+    it('does not contain the removed single-provider keys', () => {
+      expect(CONFIG_KEYS).not.toContain('ai:provider');
+      expect(CONFIG_KEYS).not.toContain('ai:apiKey');
+      expect(CONFIG_KEYS).not.toContain('ai:azureOpenaiSettings');
+    });
+  });
+
+  describe('CONFIG_DEFINITIONS', () => {
+    describe('ai:providers', () => {
+      it('has envVarName AI_PROVIDERS', () => {
+        expect(CONFIG_DEFINITIONS['ai:providers'].envVarName).toBe(
+          'AI_PROVIDERS',
+        );
+      });
+
+      // A null default keeps "never configured" observable (R7.3: an install
+      // that only has old-format values resolves to null = AI not configured)
+      // while still selecting the loader's JSON-parse branch for the env var
+      // (typeof null === 'object').
+      it('has a default value of null', () => {
+        expect(CONFIG_DEFINITIONS['ai:providers'].defaultValue).toBeNull();
+      });
+
+      it('is not marked as secret', () => {
+        expect(CONFIG_DEFINITIONS['ai:providers'].isSecret).toBeFalsy();
+      });
+    });
+
+    describe('ai:providerApiKeys', () => {
+      it('has envVarName AI_PROVIDER_API_KEYS', () => {
+        expect(CONFIG_DEFINITIONS['ai:providerApiKeys'].envVarName).toBe(
+          'AI_PROVIDER_API_KEYS',
+        );
+      });
+
+      it('has a default value of null', () => {
+        expect(
+          CONFIG_DEFINITIONS['ai:providerApiKeys'].defaultValue,
+        ).toBeNull();
+      });
+
+      // R1.9: API keys are secret material — must be masked in managed env vars
+      it('is marked as secret', () => {
+        expect(CONFIG_DEFINITIONS['ai:providerApiKeys'].isSecret).toBe(true);
+      });
+    });
+
+    describe('ai:allowedModels (kept)', () => {
+      it('has envVarName AI_ALLOWED_MODELS', () => {
+        expect(CONFIG_DEFINITIONS['ai:allowedModels'].envVarName).toBe(
+          'AI_ALLOWED_MODELS',
+        );
+      });
+
+      // An array default makes the loader treat env/DB values as JSON
+      // (typeof defaultValue === 'object'), and getConfig falls back to [].
+      it('has a default value of an empty array', () => {
+        expect(CONFIG_DEFINITIONS['ai:allowedModels'].defaultValue).toEqual([]);
+      });
+
+      it('is not marked as secret', () => {
+        expect(CONFIG_DEFINITIONS['ai:allowedModels'].isSecret).toBeFalsy();
+      });
+    });
+
+    it('no longer defines the removed single-provider keys', () => {
+      expect(CONFIG_DEFINITIONS).not.toHaveProperty('ai:provider');
+      expect(CONFIG_DEFINITIONS).not.toHaveProperty('ai:apiKey');
+      expect(CONFIG_DEFINITIONS).not.toHaveProperty('ai:azureOpenaiSettings');
+    });
+
+    // Picker-owned catalog refresh keys share the ai:* prefix but are out of
+    // this spec's boundary — guard them against an accidental ai:* sweep.
+    describe('model catalog refresh keys (picker-owned, preserved)', () => {
+      it('keeps ai:modelCatalogRefreshOnStartup unchanged', () => {
+        expect(
+          CONFIG_DEFINITIONS['ai:modelCatalogRefreshOnStartup'].envVarName,
+        ).toBe('AI_MODEL_CATALOG_REFRESH_ON_STARTUP');
+        expect(
+          CONFIG_DEFINITIONS['ai:modelCatalogRefreshOnStartup'].defaultValue,
+        ).toBe(false);
+      });
+
+      it('keeps ai:modelCatalogRefreshCronSchedule unchanged', () => {
+        expect(
+          CONFIG_DEFINITIONS['ai:modelCatalogRefreshCronSchedule'].envVarName,
+        ).toBe('AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE');
+        expect(
+          CONFIG_DEFINITIONS['ai:modelCatalogRefreshCronSchedule'].defaultValue,
+        ).toBe('0 4 * * *');
+      });
+    });
+  });
+
+  describe('env-only group env:useOnlyEnvVars:ai', () => {
+    const aiGroup = ENV_ONLY_GROUPS.find(
+      (group) => group.controlKey === 'env:useOnlyEnvVars:ai',
+    );
+
+    it('is defined', () => {
+      expect(aiGroup).toBeDefined();
+    });
+
+    // R5.2: env-only mode locks exactly the enable toggle + the two provider
+    // connection keys. R5.3: ai:allowedModels stays OUT of the group so model
+    // settings remain editable from the admin UI in env-only mode.
+    it('targets exactly the enable toggle and the two provider connection keys', () => {
+      expect(aiGroup?.targetKeys).toEqual([
+        'app:aiEnabled',
+        'ai:providers',
+        'ai:providerApiKeys',
+      ]);
+    });
+
+    it('does not target ai:allowedModels (model settings stay UI-editable)', () => {
+      expect(aiGroup?.targetKeys).not.toContain('ai:allowedModels');
     });
   });
 });

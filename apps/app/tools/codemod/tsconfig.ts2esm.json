@@ -1,0 +1,34 @@
+{
+  // Dedicated project file for the ts2esm extension-completion pass
+  // (esm-migration task 3.4). Run via `pnpm run codemod:ts2esm`.
+  //
+  // Why this file lives in tools/codemod/ and does NOT extend tsconfig.json:
+  // - "include" confines ts2esm file writes to src/server/** only.
+  // - No "paths" on purpose: ts2esm would otherwise resolve `~/` / `^/` alias
+  //   specifiers and append extensions to them. Alias completion is deferred
+  //   to the NodeNext switch (task 3.6); this pass is relative-imports only.
+  //   Without "paths", alias and bare-package specifiers fail ts2esm's
+  //   node_modules existence probe (tools/codemod/ has no node_modules)
+  //   and are left untouched.
+  // - module/moduleResolution are already ESM-style so that ts2esm's
+  //   convertTSConfig step is a no-op (no interactive prompt, no mutation of
+  //   this file). The real server build config stays CommonJS until task 3.6.
+  // - ts2esm also tries to add "type": "module" to the package.json next to
+  //   this file; tools/codemod/ has none, so apps/app/package.json is safe
+  //   (that declaration is deferred to task 3.7.b).
+  //
+  // Known quirk: ts2esm appends `with { type: 'json' }` to ANY .json-suffixed
+  // specifier (even alias ones like '^/package.json') without checking the
+  // module system. That syntax is invalid under the current CommonJS server
+  // build (tsconfig.build.server.json), so re-runs must revert such lines
+  // (task 3.4 reverted one in service/growi-info/growi-info.integ.ts).
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "allowJs": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["../../src/server/**/*"]
+}

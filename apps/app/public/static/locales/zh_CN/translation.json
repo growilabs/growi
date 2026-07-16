@@ -158,9 +158,7 @@
   "Page Tree": "页面树",
   "Bookmarks": "书签",
   "In-App Notification": "通知",
-  "AI Assistant": "AI助手",
-  "Knowledge Assistant": "知识助手 (测试版)",
-  "Editor Assistant": "编辑助理 (测试版)",
+  "GROWI AI": "GROWI AI",
   "original_path": "Original path",
   "new_path": "New path",
   "duplicated_path": "Duplicated path",
@@ -365,7 +363,6 @@
       "file": "仅文件"
     },
     "editor_config": "编辑器配置",
-    "editor_assistant": "编辑助手",
     "Show active line": "显示活动行",
     "auto_format_table": "自动格式化表格",
     "overwrite_scopes": "{{operation}和覆盖所有子体的作用域",
@@ -534,145 +531,31 @@
     "latest_revision": "最新页面正文",
     "selected_editable_revision": "选定的可编辑页面正文"
   },
-  "sidebar_ai_assistant": {
-    "reference_pages_label": "参考页面",
-    "recent_chat": "最近聊天",
-    "no_recent_chat": "最近没有聊天",
-    "knowledge_assistant_placeholder": "问我任何问题。",
-    "editor_assistant_placeholder": "有什么需要帮忙的吗？",
-    "summary_mode_label": "摘要模式",
-    "summary_mode_help": "简洁回答在2-3句话内",
-    "extended_thinking_mode_label": "延伸思考模式",
-    "extended_thinking_mode_help": "启用后，AI 将花更多时间思考并提供更全面的回答。",
-    "caution_against_hallucination": "请核实信息并检查来源。",
-    "progress_label": "生成答案中",
-    "failed_to_create_or_retrieve_thread": "创建或获取线程失败",
-    "budget_exceeded": "您已达到 OpenAI API 的使用上限。要再次使用知识助手，请从 OpenAI 账单页面添加点数。",
-    "budget_exceeded_for_growi_cloud": "您已达到 OpenAI API 使用上限。如需再次使用知识助手，请从GROWI.cloud管理页面为托管用户添加点数，或从OpenAI计费页面为自有用户添加点数。",
-    "error_message": "错误",
-    "show_error_detail": "显示详情",
-    "editor_assistant_long_context_warn_with_unit_line": "文本过长，编辑助理将参考大约第 {{startPosition}} 行到第 {{endPosition}} 行来响应",
-    "editor_assistant_long_context_warn_with_unit_char": "文本过长，编辑助理将参考第 {{startPosition}} 个字符到第 {{endPosition}} 个字符来响应",
-    "discard": "丢弃",
-    "accept": "接受",
-    "use_assistant": "使用助手",
-    "remove_assistant": "取消选定的助手",
-    "text_generation_by_editor_assistant_label": "编辑助理正在生成文本",
-    "preset_menu": {
-      "summarize": {
-        "title": "为此文章创建摘要",
-        "prompt": "请总结这个 markdown 内容"
-      },
-      "correct": {
-        "title": "修正文本中的错误",
-        "prompt": "请修正 markdown 中的文本错误"
-      }
-    }
+  "ai_unavailable": {
+    "open_admin_settings_to_enable": "请在管理界面中配置 AI 设置以启用 AI 集成",
+    "to_admin_ai_settings": "前往 AI 设置管理界面",
+    "contact_admin_to_enable": "AI 集成尚未启用。请联系您的管理员。"
   },
-  "modal_ai_assistant": {
-    "header": {
-      "update_assistant": "更新助手",
-      "add_new_assistant": "添加新助手"
-    },
-    "assistant_name_placeholder": "输入助手名称",
-    "page_count": "{{count}} 页",
-    "memo": {
-      "title": "助手备忘录",
-      "optional": "可选",
-      "placeholder": "您可以显示关于内容和用途的备注",
-      "description": "备忘录的内容不会影响助手的处理。"
-    },
-    "submit_button": {
-      "update_assistant": "更新助手",
-      "create_assistant": "创建助手"
-    },
-    "toaster": {
-      "create_success": "助手已创建",
-      "update_success": "助手已更新",
-      "create_failed": "创建助手失败",
-      "update_failed": "更新助手失败"
-    },
-    "select_source_pages": "选择助手要参考的页面",
-    "search_reference_pages_by_keyword": "按关键词搜索助手参考的页面",
-    "search_by_keyword": "按关键词搜索",
-    "max_items_space_separated_hint": "请输入最多5个项目，用空格分隔",
-    "select_assistant_reference_pages": "请选择助手参考的页面",
-    "enter_keywords": "输入关键词",
-    "reference_pages": "参考页面",
-    "no_pages_selected": "未选择任何页面",
-    "can_add_later": "稍后也可以添加",
-    "next": "下一步",
-    "select_from_page_tree": "从页面树选择",
-    "edit_page_description": "编辑助手可以参考的页面。<br> 助手可以参考最多 {{limitLearnablePageCountPerAssistant}} 个页面，包括子页面。",
-    "default_instruction": "您是这个Wiki的知识助手。\n\n## 多语言支持：\n请使用用户输入中使用的相同语言进行回复。\n",
-    "add_page_button": "添加页面",
-    "page_mode_title": {
-      "share": "助理共享",
-      "pages": "参考页面",
-      "instruction": "助理指示"
-    },
-    "share_assistant": "共享助手",
-    "page_access_permission": "页面访问权限",
-    "access_scope": {
-      "owner": "{{username}} 可访问的所有页面",
-      "groups": "指定群组",
-      "publicOnly": "仅公开页面"
-    },
-    "share_scope": {
-      "title": "助手共享范围",
-      "owner": {
-        "label": "仅 {{ username }}"
-      },
-      "publicOnly": {
-        "label": "公开",
-        "desc": "与所有用户共享"
-      },
-      "groups": {
-        "label": "指定群组",
-        "desc": "仅与选定组的成员共享"
-      },
-      "sameAsAccessScope": {
-        "label": "与页面访问范围相同",
-        "desc": "与页面访问范围相同的范围共享"
-      }
-    },
-    "instructions": {
-      "description": "您可以设置决定助手行为的指令。<br>助手将根据这些指令进行回答和分析。",
-      "reset_to_default": "恢复默认设置"
-    }
-  },
-  "share_scope_warning_modal": {
-    "header_title": "确认共享范围",
-    "warning_message": "此助手包含访问受限的页面。<br>使用当前设置，这些页面的信息可能通过助手超出其原始访问权限范围进行共享。",
-    "selected_pages_label": "已选择的页面路径",
-    "confirmation_message": "如果继续，请确认您了解这些页面的内容可能会在助手的公开范围内共享。",
-    "button": {
-      "review": "重新检查设置",
-      "proceed": "了解并继续"
-    }
-  },
-  "default_ai_assistant": {
-    "not_set": "未设置默认助手",
-    "open_cloud_settings_to_enable": "请查看 GROWI.cloud 管理界面以启用 AI 集成",
-    "to_cloud_settings": "前往 GROWI.cloud 管理界面"
-  },
-  "ai_assistant_substance": {
-    "add_assistant": "添加助手",
-    "my_assistants": "我的助手",
-    "team_assistants": "团队助手",
-    "thread_does_not_exist": "暂无会话",
+  "ai_sidebar": {
+    "new_chat": "新建对话",
     "recent_threads": "最近的项目",
-    "toaster": {
-      "ai_assistant_deleted_success": "已删除助手",
-      "ai_assistant_deleted_failed": "删除助手失败",
-      "thread_deleted_success": "已删除会话",
-      "thread_deleted_failed": "删除会话失败",
-      "ai_assistant_set_default_success": "已成功设置默认助手",
-      "ai_assistant_set_default_failed": "设置默认助手失败"
+    "accuracy_notice": "请查看参考页面以确认信息是否准确。",
+    "sources": "已参考 {{count}} 个页面",
+    "error": {
+      "title": "发生错误",
+      "retry": "重试",
+      "dismiss": "关闭"
     },
-    "delete_modal": {
-      "title": "删除助手",
-      "confirm_message": "确定要删除此助手吗？"
+    "incomplete": {
+      "length": "回答因达到最大长度而中途停止。",
+      "tool_calls": "因达到处理步骤上限，回答中途停止。",
+      "content_filter": "回答因内容策略而被停止。",
+      "error": "因发生错误，回答中途停止。",
+      "unknown": "回答在完成前停止。"
+    },
+    "toaster": {
+      "thread_deleted_success": "已删除会话",
+      "thread_deleted_failed": "删除会话失败"
     }
   },
   "link_edit": {
@@ -1017,6 +900,8 @@
   },
   "user_home_page": {
     "bookmarks": "书签",
+    "contribution_graph": "贡献图",
+    "contribution_migration_in_progress": "正在准备您的贡献数据。请稍后刷新查看。",
     "recently_created": "最近创建页面",
     "recent_activity": "最近动态",
     "unknown_action": "进行了未指明的更改",
@@ -1176,12 +1061,18 @@
       "badge": "徽章",
       "text_color": "文本颜色",
       "back_color": "背景颜色",
-
       "placeholder": "此处显示文本内容",
       "docs_title": "Bootstrap 5 官方文档",
       "docs_badge": "了解更多关于徽章的信息",
       "docs_color": "了解更多关于颜色的信息",
       "docs_alert": "了解更多关于警告框的信息"
     }
+  },
+  "pageMention": {
+    "placeholder": "输入消息...（输入 @ 提及页面）",
+    "hint": "输入页面名称进行搜索",
+    "searching": "搜索中...",
+    "noResults": "未找到页面",
+    "candidatesLabel": "页面候选"
   }
 }

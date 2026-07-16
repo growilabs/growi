@@ -5,7 +5,6 @@ import { type MockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type Crowi from '~/server/crowi';
-import Activity from '~/server/models/activity';
 import { UserStatus } from '~/server/models/user/conts';
 import { configManager } from '~/server/service/config-manager/config-manager';
 
@@ -13,12 +12,21 @@ import type { SearchDelegator } from '../interfaces/search';
 import SearchService from './search';
 import type ElasticsearchDelegator from './search-delegator/elasticsearch';
 
+const { mockFindSnapshotUsernamesByUsernameRegex } = vi.hoisted(() => ({
+  mockFindSnapshotUsernamesByUsernameRegex: vi.fn(),
+}));
+
 vi.mock('~/server/models/named-query', () => ({
   default: { findOne: vi.fn() },
 }));
 
-vi.mock('~/server/models/activity', () => ({
-  default: { findSnapshotUsernamesByUsernameRegex: vi.fn() },
+vi.mock('~/utils/prisma', () => ({
+  prisma: {
+    activities: {
+      findSnapshotUsernamesByUsernameRegex:
+        mockFindSnapshotUsernamesByUsernameRegex,
+    },
+  },
 }));
 
 vi.mock('~/server/service/config-manager/config-manager', () => ({
@@ -198,14 +206,12 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
       },
     });
     expect(mockUserModel.find).not.toHaveBeenCalled();
-    expect(
-      Activity.findSnapshotUsernamesByUsernameRegex,
-    ).not.toHaveBeenCalled();
+    expect(mockFindSnapshotUsernamesByUsernameRegex).not.toHaveBeenCalled();
   });
 
   it('should classify active and inactive usernames from the MongoDB fallback when ES is not configured', async () => {
     searchService.isConfiguredOverride = false;
-    vi.mocked(Activity.findSnapshotUsernamesByUsernameRegex).mockResolvedValue([
+    mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValue([
       'alice',
       'bob',
     ]);
@@ -226,7 +232,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
         inactiveUsernames: ['bob'],
       },
     });
-    expect(Activity.findSnapshotUsernamesByUsernameRegex).toHaveBeenCalledWith(
+    expect(mockFindSnapshotUsernamesByUsernameRegex).toHaveBeenCalledWith(
       'ali',
       { offset: 0, limit: 10 },
     );
@@ -239,9 +245,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     vi.mocked(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
     ).mockRejectedValue(new Error('ES is down'));
-    vi.mocked(Activity.findSnapshotUsernamesByUsernameRegex).mockResolvedValue([
-      'alice',
-    ]);
+    mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValue(['alice']);
     setupUserModelMock(mockUserModel, [
       { username: 'alice', status: UserStatus.STATUS_ACTIVE },
     ]);
@@ -255,7 +259,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     expect(result).toEqual({
       username: { activeUsernames: ['alice'], inactiveUsernames: [] },
     });
-    expect(Activity.findSnapshotUsernamesByUsernameRegex).toHaveBeenCalledWith(
+    expect(mockFindSnapshotUsernamesByUsernameRegex).toHaveBeenCalledWith(
       'ali',
       { offset: 0, limit: 10 },
     );
@@ -263,9 +267,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
 
   it('should use the MongoDB fallback when ES is configured but unreachable', async () => {
     searchService.isErrorOccuredOnHealthcheck = true;
-    vi.mocked(Activity.findSnapshotUsernamesByUsernameRegex).mockResolvedValue([
-      'alice',
-    ]);
+    mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValue(['alice']);
     setupUserModelMock(mockUserModel, [
       { username: 'alice', status: UserStatus.STATUS_ACTIVE },
     ]);
