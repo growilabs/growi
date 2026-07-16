@@ -22,7 +22,8 @@
   - _Requirements: 4.1, 4.2, 4.3, 1.3_
   - _Boundary: ai-sdk-modules_
 - [x] 2.2 provider resolver の modelId 引数化と Map キャッシュ
-  - `modelResolvers` を `Record<AiProvider, (modelId: string) => MastraModelConfig>` に変更、各 provider resolver（openai/anthropic/google/azure-openai）を modelId 引数受け取りに。`resolveMastraModel(modelId?)` を `${provider}:${effective}` キーの Map キャッシュに、`clearResolvedMastraModelCache()` は Map 全消去
+  - `modelResolvers` を `Record<AiProvider, (modelId: string) => Promise<MastraModelConfig>>` に変更、各 provider resolver（openai/anthropic/google/azure-openai）を modelId 引数受け取りに。`resolveMastraModel(modelId?)` を `${provider}:${effective}` キーの Map キャッシュに（resolver 非同期化に伴い async）、`clearResolvedMastraModelCache()` は Map 全消去
+  - 実装後の最適化: 各 resolver は `@ai-sdk/*`（azure は `@azure/identity`）を関数内 `await import()` で遅延ロードし、未使用 provider の SDK を読み込まない。API キー/エンドポイント検証は import より前に置き未設定なら fail-fast。`lazy-provider-imports.spec.ts` で barrel/dispatcher の静的 import グラフに provider SDK が混入しないことをガード
   - 完了状態: 同一 modelId は 1 回だけ構築（キャッシュ）され、cache clear で再構築。Azure+Entra のトークンプロバイダがモデルごとに保持される
   - _Requirements: 4.1, 1.2_
   - _Boundary: ai-sdk-modules_
