@@ -1,29 +1,22 @@
 import type { JSX } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
+import { LoadingSpinner } from '@growi/ui/dist/components';
 import { format } from 'date-fns';
 import { useTranslation } from 'next-i18next';
 
 import unreadDotStyles from '~/client/components/InAppNotification/UnreadDot.module.scss';
-import InfiniteScroll from '~/client/components/InfiniteScroll';
+import PaginationWrapper from '~/client/components/PaginationWrapper';
 import { getLocale } from '~/utils/locale-utils';
 
-import { newsItemAnchorId } from '../consts';
-import { useSWRINFxNews } from '../hooks/use-news';
+import { NEWS_PER_PAGE, newsItemAnchorId } from '../consts';
+import { useSWRxNewsPage } from '../hooks/use-news';
+import { parsePageQuery } from '../utils/parse-page-query';
 import { resolveLocaleText } from '../utils/resolve-locale-text';
 
 import styles from './NewsFeed.module.scss';
 
-const NEWS_PER_PAGE = 10;
 const DEFAULT_EMOJI = '📢';
-
-/**
- * Maximum number of additional pages to pull while searching for an anchor
- * target. Caps the worst-case workload when the URL hash points at a deleted
- * or otherwise unreachable news item — without this guard the lookup walks
- * the entire history before giving up.
- */
-const MAX_ANCHOR_SCAN_PAGES = 5;
 
 /**
  * Defense-in-depth: even though `feed-parser` rejects non-http(s) URLs at
@@ -34,75 +27,75 @@ const MAX_ANCHOR_SCAN_PAGES = 5;
 const isSafeHttpUrl = (url: string): boolean => /^https?:\/\//i.test(url);
 
 /**
- * Full-page news feed. Reuses the same SWRInfinite stream as the notification
- * panel and renders each item with its body as plain text (React escapes the
- * string, so external feed content cannot inject markup).
+ * Full-page news feed with pagination. Sidebar's infinite-scroll variant walks
+ * pages sequentially; here we fetch a single page directly so that an anchor
+ * near the bottom of a long feed does not require loading every prior page.
  *
- * Anchor handling: the browser cannot jump to `#news-<id>` when the target is
- * on a not-yet-loaded page. So on mount we read the hash and keep advancing the
- * infinite stream until the element exists, then scroll to it.
+ * Anchor handling: after the requested page loads, if the URL has a
+ * `#news-<id>` hash and that element is present on the current page, scroll
+ * to it. `scroll-margin-top` on the `<section>` (see `NewsFeed.module.scss`)
+ * offsets it below the sticky header.
  */
 export const NewsFeed = (): JSX.Element => {
   const { t, i18n } = useTranslation('commons');
   const locale = i18n.language;
   const router = useRouter();
 
-  const swrResponse = useSWRINFxNews(NEWS_PER_PAGE);
-  const { data, setSize, isValidating } = swrResponse;
+  const currentPage = parsePageQuery(router.query.page);
+  const { data, isValidating } = useSWRxNewsPage(currentPage, NEWS_PER_PAGE);
 
-  const items = (data ?? []).flatMap((page) => page.docs);
-  const lastPage = data != null ? data[data.length - 1] : undefined;
-  const isReachingEnd = lastPage != null && lastPage.hasNextPage === false;
+  const items = data?.docs ?? [];
+  const totalItemsCount = data?.totalDocs ?? 0;
 
-  // Pending anchor to scroll to. Empty string means "nothing to do".
-  // Captures the initial hash at mount; subsequent hash changes (e.g. when the
-  // user clicks another news item while /_news is already open) refresh it.
-  const [scrollTargetHash, setScrollTargetHash] = useState<string>(() =>
-    typeof window === 'undefined'
-      ? ''
-      : decodeURIComponent(window.location.hash.replace(/^#/, '')),
+  const changePage = useCallback(
+    (nextPage: number) => {
+      // Preserve the current hash so a page change from a browser bookmark
+      // still lands on its anchor if the target item happens to be on the new
+      // page. `scroll: false` prevents Next.js from resetting scroll; anchor
+      // scroll is handled by the effect below.
+      router.push(
+        {
+          pathname: router.pathname,
+          query: { ...router.query, page: nextPage },
+          hash: router.asPath.includes('#')
+            ? router.asPath.slice(router.asPath.indexOf('#') + 1)
+            : undefined,
+        },
+        undefined,
+        { scroll: false },
+      );
+    },
+    [router],
   );
-  const scanAttemptsRef = useRef(0);
 
-  // Reset the scroll target whenever the URL hash changes while the page is
-  // already mounted. Without this the second click from the sidebar would not
-  // scroll because the component is not remounted.
+  // Anchor scroll: focus the hash target once per navigation (asPath).
+  // With `keepPreviousData` the previous page's DOM is still shown when
+  // asPath changes, so the first run may not find the target; `data` in the
+  // dependency array re-fires the effect when the new page arrives. The ref
+  // guards against re-scrolling on background revalidations (which also
+  // change the `data` reference) after the target has been focused.
+  const scrolledForPathRef = useRef<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `data` is an intentional trigger — re-check the anchor when the page contents arrive
   useEffect(() => {
-    const handleHashChange = (url: string) => {
-      const hashIndex = url.indexOf('#');
-      const hash =
-        hashIndex >= 0 ? decodeURIComponent(url.slice(hashIndex + 1)) : '';
-      scanAttemptsRef.current = 0;
-      setScrollTargetHash(hash);
-    };
-    router.events.on('hashChangeComplete', handleHashChange);
-    return () => router.events.off('hashChangeComplete', handleHashChange);
-  }, [router.events]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: items.length is an intentional trigger — re-run to re-check the anchor element each time a new page loads
-  useEffect(() => {
-    if (scrollTargetHash === '') return;
-
-    const el = document.getElementById(scrollTargetHash);
+    if (scrolledForPathRef.current === router.asPath) return;
+    const hash = decodeURIComponent(window.location.hash.replace(/^#/, ''));
+    if (hash === '') return;
+    const el = document.getElementById(hash);
     if (el != null) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setScrollTargetHash('');
-      return;
+      scrolledForPathRef.current = router.asPath;
     }
+  }, [data, router.asPath]);
 
-    // Give up if there are no more pages, we've already scanned the maximum,
-    // or a fetch is in flight (next render will retry).
-    if (isReachingEnd || scanAttemptsRef.current >= MAX_ANCHOR_SCAN_PAGES) {
-      setScrollTargetHash('');
-      return;
-    }
-    if (!isValidating) {
-      scanAttemptsRef.current += 1;
-      setSize((size) => size + 1);
-    }
-  }, [scrollTargetHash, items.length, isReachingEnd, isValidating, setSize]);
+  if (isValidating && items.length === 0) {
+    return (
+      <div className="text-muted text-center py-5">
+        <LoadingSpinner className="fs-3" />
+      </div>
+    );
+  }
 
-  if (items.length === 0 && !isValidating) {
+  if (items.length === 0) {
     return (
       <div className="text-muted text-center py-5">
         {t('in_app_notification.no_news')}
@@ -111,10 +104,7 @@ export const NewsFeed = (): JSX.Element => {
   }
 
   return (
-    <InfiniteScroll
-      swrInifiniteResponse={swrResponse}
-      isReachingEnd={isReachingEnd}
-    >
+    <>
       <div className="list-group list-group-flush">
         {items.map((item) => {
           const id = item._id.toString();
@@ -175,6 +165,19 @@ export const NewsFeed = (): JSX.Element => {
           );
         })}
       </div>
-    </InfiniteScroll>
+
+      {totalItemsCount > NEWS_PER_PAGE && (
+        <div className="mt-4">
+          <PaginationWrapper
+            activePage={currentPage}
+            changePage={changePage}
+            totalItemsCount={totalItemsCount}
+            pagingLimit={NEWS_PER_PAGE}
+            align="center"
+            size="sm"
+          />
+        </div>
+      )}
+    </>
   );
 };
