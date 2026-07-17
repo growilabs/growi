@@ -445,7 +445,9 @@ function resolveToPage(toPath: string): Promise<ObjectId | null>;
 - Ordering/delivery: listeners run asynchronously after the lifecycle op (fire-and-forget, like
   search indexing); the index trails the HTTP response by that window. No cross-event ordering
   assumptions; handlers are idempotent.
-- Write-side coalescing (requirement 3.5): `create`/`update` do **not** extract inline in the event
+- Write-side coalescing (requirement 3.5): _Implementation status — as of B1 the upsert runs inline in
+  the event callback; the coalescing queue described here is the B2.2 target and is not yet implemented._
+  `create`/`update` do **not** extract inline in the event
   callback. They mark the page dirty (`Set<pageId>`) and a paced tick drains it, running the upsert
   handler once per page with the **latest** body (re-read at drain time). This is safe because the
   upsert is idempotent last-writer-wins, so intermediate saves carry no information. Properties:
