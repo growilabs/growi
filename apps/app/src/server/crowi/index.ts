@@ -543,6 +543,10 @@ class Crowi {
     // this hub module; loading it at import time would surface the cycle
     const { default: MailService } = await import('~/server/service/mail');
     this.mailService = new MailService(this);
+    // initialize() is async because it lazy-loads the configured transport
+    // (smtp/ses/oauth2) via dynamic import(), so it can no longer run inside
+    // the constructor; await it explicitly before the mailer is used.
+    await this.mailService.initialize();
 
     // add as a message handler
     if (this.s2sMessagingService != null) {
