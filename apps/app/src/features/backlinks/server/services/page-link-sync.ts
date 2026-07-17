@@ -12,6 +12,12 @@ export const dropSelfLinks = (
   );
 };
 
+/**
+ * Entry point for keeping a page's outbound links in sync (create/update event
+ * handlers call this). Drops self-links, then delegates the write to the
+ * `PageLink.replaceOutboundLinks` model primitive — always go through here so
+ * self-links never get persisted.
+ */
 export const syncOutboundLinks = async (
   fromPageId: Types.ObjectId,
   resolvedRows: IPageLink[],

@@ -34,6 +34,11 @@ pageLinkSchema.index({ fromPage: 1, toPath: 1 }, { unique: true });
 /**
  * Replace a page's outbound links with the freshly extracted set:
  * insert new links, refresh existing ones, and delete links no longer present.
+ *
+ * Low-level primitive: writes exactly the rows it is given, with no filtering.
+ * Callers must go through the `syncOutboundLinks` service instead, which drops
+ * self-links before delegating here — do NOT call this static directly from
+ * event handlers.
  */
 pageLinkSchema.statics.replaceOutboundLinks = async function (
   fromPageId: Types.ObjectId,
