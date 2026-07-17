@@ -39,6 +39,122 @@ describe('MailService', () => {
     mailService = new MailService(mockCrowi);
   });
 
+  describe('initialize', () => {
+    it('leaves the mailer unset up when mail:from is not configured', async () => {
+      mockConfigManager.getConfig.mockReturnValue(undefined);
+
+      await mailService.initialize();
+
+      expect(mailService.isMailerSetup).toBe(false);
+      expect(mailService.mailer).toBeNull();
+    });
+
+    it('leaves the mailer unset up when the transmission method is unrecognized', async () => {
+      mockConfigManager.getConfig.mockImplementation((key: string) => {
+        if (key === 'mail:from') return 'noreply@example.com';
+        if (key === 'mail:transmissionMethod') return undefined;
+        return undefined;
+      });
+
+      await mailService.initialize();
+
+      expect(mailService.isMailerSetup).toBe(false);
+      expect(mailService.mailer).toBeNull();
+    });
+
+    it('sets up an SMTP mailer when the transmission method is smtp', async () => {
+      mockConfigManager.getConfig.mockImplementation((key: string) => {
+        if (key === 'mail:from') return 'noreply@example.com';
+        if (key === 'mail:transmissionMethod') return 'smtp';
+        if (key === 'mail:smtpHost') return 'smtp.example.com';
+        if (key === 'mail:smtpPort') return 587;
+        return undefined;
+      });
+
+      await mailService.initialize();
+
+      expect(mailService.isMailerSetup).toBe(true);
+      expect(mailService.mailer).not.toBeNull();
+      expect(mailService.mailer.options).toMatchObject({
+        host: 'smtp.example.com',
+        port: 587,
+      });
+    });
+
+    it('sets up an SES mailer when the transmission method is ses', async () => {
+      mockConfigManager.getConfig.mockImplementation((key: string) => {
+        if (key === 'mail:from') return 'noreply@example.com';
+        if (key === 'mail:transmissionMethod') return 'ses';
+        if (key === 'mail:sesAccessKeyId') return 'AKIAIOSFODNN7EXAMPLE';
+        if (key === 'mail:sesSecretAccessKey') {
+          return 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
+        }
+        return undefined;
+      });
+
+      await mailService.initialize();
+
+      expect(mailService.isMailerSetup).toBe(true);
+      expect(mailService.mailer).not.toBeNull();
+    });
+
+    it('sets up an OAuth2 mailer when the transmission method is oauth2', async () => {
+      mockConfigManager.getConfig.mockImplementation((key: string) => {
+        if (key === 'mail:from') return 'noreply@example.com';
+        if (key === 'mail:transmissionMethod') return 'oauth2';
+        if (key === 'mail:oauth2ClientId') {
+          return 'client-id.apps.googleusercontent.com';
+        }
+        if (key === 'mail:oauth2ClientSecret') return 'client-secret-value';
+        if (key === 'mail:oauth2RefreshToken') return 'refresh-token-value';
+        if (key === 'mail:oauth2User') return 'user@gmail.com';
+        return undefined;
+      });
+
+      await mailService.initialize();
+
+      expect(mailService.isMailerSetup).toBe(true);
+      expect(mailService.mailer).not.toBeNull();
+    });
+
+    it('leaves the mailer unset up when the smtp transport factory returns null', async () => {
+      mockConfigManager.getConfig.mockImplementation((key: string) => {
+        if (key === 'mail:from') return 'noreply@example.com';
+        if (key === 'mail:transmissionMethod') return 'smtp';
+        // smtpHost/smtpPort intentionally omitted -> createSMTPClient returns null
+        return undefined;
+      });
+
+      await mailService.initialize();
+
+      expect(mailService.isMailerSetup).toBe(false);
+      expect(mailService.mailer).toBeNull();
+    });
+  });
+
+  describe('send', () => {
+    it('rejects with a setup-guidance error when the mailer has not been initialized', async () => {
+      // mailService here was constructed but initialize() was never awaited,
+      // matching the state between construction and setup during boot.
+      await expect(
+        mailService.send({ to: 'recipient@example.com' }),
+      ).rejects.toThrow(
+        'Mailer is not completed to set up. Please set up SMTP, SES, or OAuth 2.0 setting.',
+      );
+    });
+
+    it('rejects with the same setup-guidance error after initialize() finds no usable transport', async () => {
+      mockConfigManager.getConfig.mockReturnValue(undefined);
+      await mailService.initialize();
+
+      await expect(
+        mailService.send({ to: 'recipient@example.com' }),
+      ).rejects.toThrow(
+        'Mailer is not completed to set up. Please set up SMTP, SES, or OAuth 2.0 setting.',
+      );
+    });
+  });
+
   describe('exponentialBackoff', () => {
     beforeEach(() => {
       vi.useFakeTimers();
