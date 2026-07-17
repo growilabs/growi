@@ -23,31 +23,27 @@
  * hand-typed operator is meant to hydrate the corresponding chip.
  */
 
-/** The four filter fields the UI owns; each maps to one query operator. */
-export type SearchFilterState = {
-  authors: string[];
-  editors: string[];
-  groups: string[];
-  tags: string[];
-};
+import {
+  FILTER_FIELDS,
+  SEARCH_FILTER_PREFIXES,
+  type SearchFilterField,
+  type SearchFilterState,
+} from '../../utils/filter-fields';
+
+// Re-exported so existing consumers can keep importing the type from here.
+export type { SearchFilterState };
 
 export type ParsedSearchQuery = {
   keyword: string;
   filters: SearchFilterState;
 };
 
-// Order is fixed so serialization is deterministic — stable URLs and snapshots.
-const FIELD_PREFIXES = [
-  ['authors', 'author:'],
-  ['editors', 'editor:'],
-  ['groups', 'group:'],
-  ['tags', 'tag:'],
-] as const satisfies ReadonlyArray<readonly [keyof SearchFilterState, string]>;
+const PREFIX_ALTERNATION = SEARCH_FILTER_PREFIXES.join('|');
 
-const PREFIX_ALTERNATION = FIELD_PREFIXES.map(([, prefix]) => prefix).join('|');
-
-const FIELD_BY_PREFIX: Record<string, keyof SearchFilterState> =
-  Object.fromEntries(FIELD_PREFIXES.map(([field, prefix]) => [prefix, field]));
+// Reverse lookup (operator prefix -> state field) for parsing.
+const FIELD_BY_PREFIX: Record<string, SearchFilterField> = Object.fromEntries(
+  FILTER_FIELDS.map(([field, prefix]) => [prefix, field]),
+);
 
 // Matches one operator with a quoted (space-bearing) or bare value. Run as a
 // single left-to-right replace, it keeps a field's values in source order even
@@ -136,7 +132,7 @@ export const buildSearchQuery = (
     parts.push(normalizedKeyword);
   }
 
-  for (const [field, prefix] of FIELD_PREFIXES) {
+  for (const [field, prefix] of FILTER_FIELDS) {
     for (const value of filters[field]) {
       // Strip embedded double-quotes: the grammar has no way to escape them, and
       // the server strips quotes too, so emitting one would corrupt the query
@@ -167,7 +163,11 @@ export const parseSearchQuery = (queryString: string): ParsedSearchQuery => {
       // Strip quotes: unwraps a quoted value, no-op for a bare one, and cleans a
       // stray quote from a malformed `author:"x` (matching the server).
       const value = rawValue.replace(/"/g, '');
-      filters[FIELD_BY_PREFIX[prefix]].push(value);
+      // A quotes-only operator (`author:""`, `author:"`) carries no value; drop
+      // it instead of committing a blank chip and running an empty-value filter.
+      if (value !== '') {
+        filters[FIELD_BY_PREFIX[prefix]].push(value);
+      }
       // Preserve the leading whitespace so neighbouring tokens stay separated.
       return lead;
     },

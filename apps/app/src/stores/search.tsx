@@ -122,10 +122,10 @@ export const useSWRxSearch = (
 
   return {
     ...swrResult,
-    // With nothing to search (no keyword and no filters) the SWR key is null, and
-    // `keepPreviousData` would otherwise retain the last results — leaving the list
-    // out of sync with the now-empty filters (e.g. after clearing all filter
-    // chips). Drop the retained data so results always reflect the current query.
+    // When there is nothing to search the SWR key is null; `keepPreviousData`
+    // would otherwise retain the last results, leaving the list out of sync with
+    // the now-empty query (a cleared keyword, or cleared filter chips). Drop the
+    // retained data so results always reflect the current query.
     data: shouldSearch ? swrResult.data : undefined,
     conditions: {
       keyword,

@@ -1,4 +1,6 @@
+import { useRef, useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import {
   createEmptyFilterState,
@@ -19,6 +21,28 @@ const filtersOf = (
   ...createEmptyFilterState(),
   ...overrides,
 });
+
+// Controlled harness so an onChange that empties the filters actually re-renders
+// and unmounts the chip bar — the condition under which focus must hand off to
+// the fallback element. A no-op onChange would keep the bar mounted and hide the bug.
+const ControlledChips = ({
+  initialFilters,
+}: {
+  initialFilters: SearchFilterState;
+}) => {
+  const [filters, setFilters] = useState(initialFilters);
+  const fallbackRef = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input ref={fallbackRef} data-testid="fallback" readOnly />
+      <SearchFilterChips
+        filters={filters}
+        onChange={setFilters}
+        fallbackFocusRef={fallbackRef}
+      />
+    </>
+  );
+};
 
 describe('SearchFilterChips', () => {
   it('renders a chip for every active filter value', () => {
@@ -108,5 +132,34 @@ describe('SearchFilterChips', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
 
     expect(onChange).toHaveBeenCalledWith(createEmptyFilterState());
+  });
+
+  it('hands focus to the fallback element when removing the last chip unmounts the bar', async () => {
+    const user = userEvent.setup();
+    render(<ControlledChips initialFilters={filtersOf({ tags: ['help'] })} />);
+
+    await user.click(screen.getByRole('button', { name: 'Remove Tag: help' }));
+
+    // The bar unmounts once no filter remains, so focus must not fall to <body>.
+    expect(
+      screen.queryByRole('button', { name: 'Clear all' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('fallback')).toHaveFocus();
+  });
+
+  it('hands focus to the fallback element when "clear all" unmounts the bar', async () => {
+    const user = userEvent.setup();
+    render(
+      <ControlledChips
+        initialFilters={filtersOf({ authors: ['alice'], tags: ['help'] })}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Clear all' }));
+
+    expect(
+      screen.queryByRole('group', { name: 'Filters' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('fallback')).toHaveFocus();
   });
 });

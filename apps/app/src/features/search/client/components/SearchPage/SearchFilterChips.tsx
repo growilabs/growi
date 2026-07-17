@@ -1,4 +1,4 @@
-import { type JSX, useRef } from 'react';
+import React, { type JSX, useRef } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import {
@@ -11,6 +11,7 @@ import styles from './SearchFilterChips.module.scss';
 
 type Props = {
   filters: SearchFilterState;
+  fallbackFocusRef?: React.RefObject<HTMLElement | null>;
   onChange: (filters: SearchFilterState) => void;
 };
 
@@ -47,13 +48,14 @@ const CHIP_FIELDS = [
  * in the panel adds a chip here. Renders nothing when no filter is set.
  */
 export const SearchFilterChips = (props: Props): JSX.Element | null => {
-  const { filters, onChange } = props;
+  const { filters, onChange, fallbackFocusRef } = props;
   const { t } = useTranslation();
 
   // Removing a chip unmounts its button, which would drop focus to <body>. Move
   // focus to the always-present "clear all" button so keyboard users keep their
-  // place in the bar. (When the last chip goes, the bar unmounts entirely — that
-  // focus hand-off is the parent's concern, not this component's.)
+  // place in the bar. When the removal empties the filters, the whole bar (clear
+  // all included) unmounts, so we instead move focus to the parent-provided
+  // fallback (the search input) — see `fallbackFocusRef`.
   const clearAllRef = useRef<HTMLButtonElement>(null);
 
   if (isFilterStateEmpty(filters)) {
@@ -61,15 +63,23 @@ export const SearchFilterChips = (props: Props): JSX.Element | null => {
   }
 
   const removeValue = (field: keyof SearchFilterState, value: string) => {
-    onChange({
+    const next = {
       ...filters,
       [field]: filters[field].filter((v) => v !== value),
-    });
-    clearAllRef.current?.focus();
+    };
+    onChange(next);
+
+    if (isFilterStateEmpty(next)) {
+      fallbackFocusRef?.current?.focus();
+    } else {
+      clearAllRef.current?.focus();
+    }
   };
 
   const clearAll = () => {
     onChange(createEmptyFilterState());
+    // The bar unmounts once filters are empty, so hand focus to the fallback.
+    fallbackFocusRef?.current?.focus();
   };
 
   return (
