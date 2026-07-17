@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import {
@@ -91,7 +91,8 @@ describe('SearchFilterChips', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('removes only the clicked value, keeping the rest of the field', () => {
+  it('removes only the clicked value, keeping the rest of the field', async () => {
+    const user = userEvent.setup();
     const onChange = vi.fn();
     render(
       <SearchFilterChips
@@ -100,14 +101,15 @@ describe('SearchFilterChips', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Tag: help' }));
+    await user.click(screen.getByRole('button', { name: 'Remove Tag: help' }));
 
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ tags: ['guide'] }),
     );
   });
 
-  it('moves focus to the clear-all button after removing a chip', () => {
+  it('moves focus to the clear-all button after removing a chip', async () => {
+    const user = userEvent.setup();
     render(
       <SearchFilterChips
         filters={filtersOf({ tags: ['help', 'guide'] })}
@@ -115,12 +117,13 @@ describe('SearchFilterChips', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Tag: help' }));
+    await user.click(screen.getByRole('button', { name: 'Remove Tag: help' }));
 
     expect(screen.getByRole('button', { name: 'Clear all' })).toHaveFocus();
   });
 
-  it('clears every field when "clear all" is clicked', () => {
+  it('clears every field when "clear all" is clicked', async () => {
+    const user = userEvent.setup();
     const onChange = vi.fn();
     render(
       <SearchFilterChips
@@ -129,7 +132,7 @@ describe('SearchFilterChips', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
+    await user.click(screen.getByRole('button', { name: 'Clear all' }));
 
     expect(onChange).toHaveBeenCalledWith(createEmptyFilterState());
   });
