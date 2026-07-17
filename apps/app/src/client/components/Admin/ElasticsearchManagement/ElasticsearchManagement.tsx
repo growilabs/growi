@@ -1,304 +1,91 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useAdminSocket } from '~/features/admin/states/socket-io';
 import { SocketEventName } from '~/interfaces/websocket';
-import { isSearchServiceReachableAtom } from '~/states/server-configurations';
 
-import NormalizeIndicesControls from './NormalizeIndicesControls';
-import RebuildIndexControls from './RebuildIndexControls';
-import ReconnectControls from './ReconnectControls';
-import StatusTable from './StatusTable';
+import { useIndexManagement } from '../hooks/useIndexManagement';
+import { IndexManagementSection } from './IndexManagementSection';
 
 const ElasticsearchManagement = (): JSX.Element => {
   const { t } = useTranslation('admin');
-  // Get search service reachable flag from atom
-  const isSearchServiceReachable = useAtomValue(isSearchServiceReachableAtom);
-  const socket = useAdminSocket();
 
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConfigured, setIsConfigured] = useState(false);
-  const [isReconnectingProcessing, setIsReconnectingProcessing] =
-    useState(false);
-  const [isRebuildingProcessing, setIsRebuildingProcessing] = useState(false);
-  const [isRebuildingCompleted, setIsRebuildingCompleted] = useState(false);
-  const [isAuditlogRebuildingProcessing, setIsAuditlogRebuildingProcessing] =
-    useState(false);
-  const [isAuditlogNormalizingProcessing, setIsAuditlogNormalizingProcessing] =
-    useState(false);
-
-  const [isNormalized, setIsNormalized] = useState(false);
-  const [indicesData, setIndicesData] = useState(null);
-  const [aliasesData, setAliasesData] = useState(null);
-
-  const retrieveIndicesStatus = useCallback(async () => {
-    try {
-      const { data } = await apiv3Get('/search/indices');
-      const { info } = data;
-
-      setIsConnected(true);
-      setIsConfigured(true);
-
-      setIndicesData(info.indices);
-      setAliasesData(info.aliases);
-      setIsNormalized(info.isNormalized);
-
-      return info.isNormalized;
-    } catch (errors: unknown) {
-      setIsConnected(false);
-
-      // evaluate whether configured or not
-      if (Array.isArray(errors)) {
-        for (const error of errors) {
-          if (error.code === 'search-service-unconfigured') {
-            setIsConfigured(false);
-          }
-        }
-        toastError(errors as Error[]);
-      } else {
-        toastError(errors as Error);
-      }
-
-      return false;
-    } finally {
-      setIsInitialized(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    retrieveIndicesStatus();
-  }, [retrieveIndicesStatus]);
-
-  useEffect(() => {
-    if (socket == null) {
-      return;
-    }
-    socket.on(SocketEventName.AddPageProgress, () => {
-      setIsRebuildingProcessing(true);
-    });
-
-    socket.on(SocketEventName.FinishAddPage, async (data) => {
-      let retryCount = 0;
-      const maxRetries = 5;
-      const retryDelay = 500;
-
-      const retrieveIndicesStatusWithRetry = async () => {
-        const isNormalizedResult = await retrieveIndicesStatus();
-        if (!isNormalizedResult && retryCount < maxRetries) {
-          retryCount++;
-          setTimeout(retrieveIndicesStatusWithRetry, retryDelay);
-        }
-      };
-
-      await retrieveIndicesStatusWithRetry();
-      setIsRebuildingProcessing(false);
-      setIsRebuildingCompleted(true);
-    });
-
-    socket.on(SocketEventName.RebuildingFailed, (data) => {
-      toastError(new Error(data.error));
-    });
-
-    return () => {
-      socket.off(SocketEventName.AddPageProgress);
-      socket.off(SocketEventName.FinishAddPage);
-      socket.off(SocketEventName.RebuildingFailed);
-    };
-  }, [retrieveIndicesStatus, socket]);
-
-  const reconnect = async () => {
-    setIsReconnectingProcessing(true);
-
-    try {
-      await apiv3Post('/search/connection');
-    } catch (e) {
-      toastError(e);
-      return;
-    }
-
-    // reload
-    window.location.reload();
-  };
-
-  const normalizeIndices = async () => {
-    try {
-      await apiv3Put('/search/indices', { operation: 'normalize' });
-    } catch (e) {
-      toastError(e);
-    }
-
-    await retrieveIndicesStatus();
-
-    toastSuccess('Normalizing has succeeded');
-  };
-
-  const rebuildIndices = async () => {
-    setIsRebuildingProcessing(true);
-
-    try {
-      await apiv3Put('/search/indices', { operation: 'rebuild' });
-      toastSuccess('Rebuilding is requested');
-    } catch (e) {
-      toastError(e);
-    }
-
-    await retrieveIndicesStatus();
-  };
-
-  const normalizeAuditlogIndices = async () => {
-    setIsAuditlogNormalizingProcessing(true);
-
-    try {
-      await apiv3Put('/search/auditlog-indices', { operation: 'normalize' });
-      toastSuccess('Normalizing audit log index has succeeded');
-    } catch (e) {
-      toastError(e);
-    } finally {
-      setIsAuditlogNormalizingProcessing(false);
-    }
-  };
-
-  const rebuildAuditlogIndices = async () => {
-    setIsAuditlogRebuildingProcessing(true);
-
-    try {
-      await apiv3Put('/search/auditlog-indices', { operation: 'rebuild' });
-      toastSuccess('Rebuilding audit log index is requested');
-    } catch (e) {
-      toastError(e);
-    } finally {
-      setIsAuditlogRebuildingProcessing(false);
-    }
-  };
-
-  const isErrorOccuredOnSearchService = !isSearchServiceReachable;
-
-  const isReconnectBtnEnabled =
-    !isReconnectingProcessing &&
-    (!isInitialized || !isConnected || isErrorOccuredOnSearchService);
+  const {
+    isInitialized,
+    isConnected,
+    isConfigured,
+    isReconnectingProcessing,
+    isNormalizingProcessing,
+    isRebuildingProcessing,
+    isRebuildingCompleted,
+    isNormalized,
+    indicesData,
+    aliasesData,
+    rebuildTotal,
+    rebuildCurrent,
+    isErrorOccuredOnSearchService,
+    isReconnectBtnEnabled,
+    isNormalizeEnabled,
+    isRebuildEnabled,
+    reconnect,
+    normalizeIndices,
+    rebuildIndices,
+  } = useIndexManagement({
+    statusEndpoint: '/search/indices',
+    progressSocketEvent: SocketEventName.AddPageProgress,
+    finishSocketEvent: SocketEventName.FinishAddPage,
+    failedSocketEvent: SocketEventName.RebuildingFailed,
+    normalizationTimeoutMessage: t(
+      'page_data_index_management.rebuild_normalization_timeout',
+    ),
+  });
 
   return (
-    <>
-      <div className="row">
-        <div className="col-md-12">
-          <StatusTable
-            isInitialized={isInitialized}
-            isErrorOccuredOnSearchService={isErrorOccuredOnSearchService}
-            isConnected={isConnected}
-            isConfigured={isConfigured}
-            isNormalized={isNormalized}
-            indicesData={indicesData}
-            aliasesData={aliasesData}
-          />
-        </div>
-      </div>
-
-      <hr />
-
-      {/* Controls */}
-      <div className="row">
-        <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('full_text_search_management.reconnect')}
-        </div>
-        <div className="col-md-6">
-          <ReconnectControls
-            isEnabled={isReconnectBtnEnabled}
-            isProcessing={isReconnectingProcessing}
-            onReconnectingRequested={reconnect}
-          />
-        </div>
-      </div>
-
-      <hr />
-
-      <div className="row">
-        <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('full_text_search_management.normalize')}
-        </div>
-        <div className="col-md-6">
-          <NormalizeIndicesControls
-            isRebuildingProcessing={isRebuildingProcessing}
-            isNormalized={isNormalized}
-            onNormalizingRequested={normalizeIndices}
-          />
-        </div>
-      </div>
-
-      <hr />
-
-      <div className="row">
-        <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('full_text_search_management.rebuild')}
-        </div>
-        <div className="col-md-6">
-          <RebuildIndexControls
-            isRebuildingProcessing={isRebuildingProcessing}
-            isRebuildingCompleted={isRebuildingCompleted}
-            isNormalized={isNormalized}
-            onRebuildingRequested={rebuildIndices}
-          />
-        </div>
-      </div>
-
-      <hr />
-
-      <div className="row">
-        <div className="col-md-3 col-form-label text-start text-md-end">
-          Normalize Audit Log Index
-        </div>
-        <div className="col-md-6">
-          <button
-            type="button"
-            className="btn btn-outline-secondary"
-            disabled={
-              isAuditlogRebuildingProcessing || isAuditlogNormalizingProcessing
-            }
-            onClick={normalizeAuditlogIndices}
-          >
-            {isAuditlogNormalizingProcessing && (
-              <span
-                className="spinner-border spinner-border-sm me-2"
-                role="status"
-                aria-hidden="true"
-              />
-            )}
-            Normalize audit log index
-          </button>
-        </div>
-      </div>
-
-      <hr />
-
-      <div className="row">
-        <div className="col-md-3 col-form-label text-start text-md-end">
-          Rebuild Audit Log Index
-        </div>
-        <div className="col-md-6">
-          <button
-            type="button"
-            className="btn btn-outline-secondary"
-            disabled={
-              isAuditlogRebuildingProcessing || isAuditlogNormalizingProcessing
-            }
-            onClick={rebuildAuditlogIndices}
-          >
-            {isAuditlogRebuildingProcessing && (
-              <span
-                className="spinner-border spinner-border-sm me-2"
-                role="status"
-                aria-hidden="true"
-              />
-            )}
-            Rebuild audit log index
-          </button>
-        </div>
-      </div>
-    </>
+    <IndexManagementSection
+      statusTable={{
+        isInitialized,
+        isErrorOccuredOnSearchService,
+        isConnected,
+        isConfigured,
+        isNormalized,
+        indicesData,
+        aliasesData,
+      }}
+      reconnect={{
+        label: t('page_data_index_management.reconnect'),
+        isEnabled: isReconnectBtnEnabled,
+        isProcessing: isReconnectingProcessing,
+        onRequested: reconnect,
+      }}
+      normalize={{
+        label: t('page_data_index_management.normalize'),
+        buttonLabel: t('page_data_index_management.normalize_button'),
+        description: t('page_data_index_management.normalize_description'),
+        isEnabled: isNormalizeEnabled,
+        isProcessing: isNormalizingProcessing,
+        onRequested: () =>
+          normalizeIndices(t('page_data_index_management.normalize_success')),
+      }}
+      rebuild={{
+        label: t('page_data_index_management.rebuild'),
+        buttonLabel: t('page_data_index_management.rebuild_button'),
+        descriptionLines: [
+          t('page_data_index_management.rebuild_description_1'),
+          t('page_data_index_management.rebuild_description_2'),
+        ],
+        progressHeaderProcessing: t(
+          'page_data_index_management.rebuild_progress_processing',
+        ),
+        progressHeaderCompleted: t(
+          'page_data_index_management.rebuild_progress_completed',
+        ),
+        isEnabled: isRebuildEnabled,
+        isProcessing: isRebuildingProcessing,
+        isCompleted: isRebuildingCompleted,
+        currentCount: rebuildCurrent,
+        totalCount: rebuildTotal,
+        onRequested: () =>
+          rebuildIndices(t('page_data_index_management.rebuild_requested')),
+      }}
+    />
   );
 };
 

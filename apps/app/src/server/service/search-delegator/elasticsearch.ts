@@ -7,6 +7,7 @@ import { Transform, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { URL } from 'url';
 
+import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
 import type { AuditlogSuggestionField } from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
@@ -293,7 +294,10 @@ class ElasticsearchDelegator
   /**
    * Return information for Admin Full Text Search Management page
    */
-  async getInfoForAdmin(): Promise<{
+  private async getIndexInfoForAdmin(
+    indexName: string,
+    aliasName: string,
+  ): Promise<{
     indices:
       | Awaited<
           ReturnType<ElasticsearchClientDelegator['indices']['stats']>
@@ -304,32 +308,21 @@ class ElasticsearchDelegator
       | never[];
     isNormalized: boolean;
   }> {
-    const { client, indexName, aliasName } = this;
+    const { client } = this;
 
     const tmpIndexName = `${indexName}-tmp`;
 
-    // check existence
     const isExistsMainIndex = await client.indices.exists({ index: indexName });
     const isExistsTmpIndex = await client.indices.exists({
       index: tmpIndexName,
     });
 
-    // create indices name list
     const existingIndices: string[] = [];
-    if (isExistsMainIndex) {
-      existingIndices.push(indexName);
-    }
-    if (isExistsTmpIndex) {
-      existingIndices.push(tmpIndexName);
-    }
+    if (isExistsMainIndex) existingIndices.push(indexName);
+    if (isExistsTmpIndex) existingIndices.push(tmpIndexName);
 
-    // results when there is no indices
     if (existingIndices.length === 0) {
-      return {
-        indices: [],
-        aliases: [],
-        isNormalized: false,
-      };
+      return { indices: [], aliases: [], isNormalized: false };
     }
 
     const indicesStats = await client.indices.stats({
@@ -342,12 +335,12 @@ class ElasticsearchDelegator
 
     const isMainIndexHasAlias =
       isExistsMainIndex &&
-      aliases[indexName].aliases != null &&
-      aliases[indexName].aliases[aliasName] != null;
+      aliases[indexName]?.aliases != null &&
+      aliases[indexName]?.aliases[aliasName] != null;
     const isTmpIndexHasAlias =
       isExistsTmpIndex &&
-      aliases[tmpIndexName].aliases != null &&
-      aliases[tmpIndexName].aliases[aliasName] != null;
+      aliases[tmpIndexName]?.aliases != null &&
+      aliases[tmpIndexName]?.aliases[aliasName] != null;
 
     const isNormalized =
       isExistsMainIndex &&
@@ -355,11 +348,18 @@ class ElasticsearchDelegator
       !isExistsTmpIndex &&
       !isTmpIndexHasAlias;
 
-    return {
-      indices,
-      aliases,
-      isNormalized,
-    };
+    return { indices, aliases, isNormalized };
+  }
+
+  async getInfoForAdmin() {
+    return this.getIndexInfoForAdmin(this.indexName, this.aliasName);
+  }
+
+  async getAuditlogInfoForAdmin() {
+    return this.getIndexInfoForAdmin(
+      this.auditlogIndexName,
+      this.auditlogAliasName,
+    );
   }
 
   /**
@@ -372,6 +372,8 @@ class ElasticsearchDelegator
     const { shouldEmitProgress } = option;
 
     const tmpIndexName = `${indexName}-tmp`;
+
+    let result: { totalCount: number; count: number } | undefined;
 
     try {
       // reindex to tmp index
@@ -397,7 +399,7 @@ class ElasticsearchDelegator
         index: indexName,
       });
       await this.createIndex(indexName);
-      await this.addAllPages({ shouldEmitProgress });
+      result = await this.addAllPages({ shouldEmitProgress });
     } catch (error) {
       logger.error({ err: error }, "An error occured while 'rebuildIndex'.");
       logger.error({ body: error?.meta?.body }, 'error.meta.body');
@@ -409,18 +411,43 @@ class ElasticsearchDelegator
 
       throw error;
     } finally {
+      // Swallow its error so a normalization failure cannot mask the error
+      // rethrown above, nor prevent FinishAddPage from being emitted below
+      // on the success path (mirrors rebuildAuditlogIndex).
       logger.info('Normalize indices.');
-      await this.normalizeIndices();
+      try {
+        await this.normalizeIndices();
+      } catch (normalizeErr) {
+        logger.error('Failed to normalize indices', normalizeErr);
+      }
+    }
+
+    // Emitted only after normalizeIndices() above has resolved (or failed
+    // without masking success), so the client's isNormalized poll (triggered
+    // by this event) doesn't race normalization.
+    if (shouldEmitProgress) {
+      const socket = this.socketIoService.getAdminSocket();
+      socket?.emit(SocketEventName.FinishAddPage, result);
     }
   }
 
-  async rebuildAuditlogIndex(): Promise<void> {
+  async rebuildAuditlogIndex({
+    shouldEmitProgress = false,
+  }: {
+    shouldEmitProgress?: boolean;
+  } = {}): Promise<{ totalCount: number; count: number }> {
     const {
       client,
       auditlogIndexName: indexName,
       auditlogAliasName: aliasName,
     } = this;
     const tmpIndexName = `${indexName}-tmp`;
+
+    let totalCount = 0;
+    let count = 0;
+    const socket = shouldEmitProgress
+      ? this.socketIoService.getAdminSocket()
+      : null;
 
     try {
       // Drop any leftover tmp index, then reindex the live index into a fresh tmp.
@@ -446,7 +473,9 @@ class ElasticsearchDelegator
       // flush index
       await client.indices.delete({ index: indexName });
       await this.createAuditlogIndex(indexName);
-      await this.addAllAuditlogs();
+      ({ totalCount, count } = await this.addAllAuditlogs({
+        shouldEmitProgress,
+      }));
 
       // Swap the alias back atomically so it never resolves to nothing mid-rebuild;
       // the now-unaliased tmp is dropped by normalizeAuditlogIndices in the finally.
@@ -461,6 +490,11 @@ class ElasticsearchDelegator
         { err: error, body: error?.meta?.body },
         "An error occurred while 'rebuildAuditlogIndex'.",
       );
+      if (socket != null) {
+        socket.emit(SocketEventName.AuditlogRebuildingFailed, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
       throw error;
     } finally {
       // Runs on both paths (cleanup after success, recovery after failure). Swallow its
@@ -471,14 +505,27 @@ class ElasticsearchDelegator
         logger.error('Failed to normalize auditlog indices', normalizeErr);
       }
     }
+
+    try {
+      await AuditlogEsSyncStatus.setUnsynced(false);
+    } catch (err) {
+      logger.error('Failed to clear auditlog unsynced flag after rebuild', err);
+      // Non-critical: the ES rebuild itself succeeded, so still notify the client
+      // below rather than leaving it stuck in a processing state.
+    }
+    socket?.emit(SocketEventName.FinishAddAuditlog, { totalCount, count });
+
+    return { totalCount, count };
   }
 
-  async normalizeIndices(): Promise<void> {
-    const { client, indexName, aliasName } = this;
-
+  private async normalizeIndexSet(
+    indexName: string,
+    aliasName: string,
+    createFn: () => Promise<unknown>,
+  ): Promise<void> {
+    const { client } = this;
     const tmpIndexName = `${indexName}-tmp`;
 
-    // remove tmp index
     const isExistsTmpIndex = await client.indices.exists({
       index: tmpIndexName,
     });
@@ -486,61 +533,39 @@ class ElasticsearchDelegator
       await client.indices.delete({ index: tmpIndexName });
     }
 
-    // create index
     const isExistsIndex = await client.indices.exists({ index: indexName });
     if (!isExistsIndex) {
-      await this.createIndex(indexName);
+      await createFn();
     }
 
-    // create alias
+    // re-attaches alias if a failed rebuild left it detached
     const isExistsAlias = await client.indices.existsAlias({
       name: aliasName,
       index: indexName,
-    });
-    if (!isExistsAlias) {
-      await client.indices.putAlias({
-        name: aliasName,
-        index: indexName,
-      });
-    }
-  }
-
-  async normalizeAuditlogIndices(): Promise<void> {
-    const {
-      client,
-      auditlogIndexName: indexName,
-      auditlogAliasName: aliasName,
-    } = this;
-
-    const tmpIndexName = `${indexName}-tmp`;
-
-    // remove tmp index
-    const isExistsAuditlogTmpIndex = await client.indices.exists({
-      index: tmpIndexName,
-    });
-    if (isExistsAuditlogTmpIndex) {
-      await client.indices.delete({ index: tmpIndexName });
-    }
-
-    // create index
-    const isExistsAuditlogIndex = await client.indices.exists({
-      index: indexName,
-    });
-    if (!isExistsAuditlogIndex) {
-      await this.createAuditlogIndex(indexName);
-    }
-
-    // create alias — re-attaches it if a failed rebuild left the alias detached
-    const isExistsAlias = await client.indices.existsAlias({
-      index: indexName,
-      name: aliasName,
     });
     if (!isExistsAlias) {
       await client.indices.putAlias({ name: aliasName, index: indexName });
     }
   }
 
-  async addAllAuditlogs(): Promise<void> {
+  async normalizeIndices(): Promise<void> {
+    await this.normalizeIndexSet(this.indexName, this.aliasName, () =>
+      this.createIndex(this.indexName),
+    );
+  }
+
+  async normalizeAuditlogIndices(): Promise<void> {
+    await this.normalizeIndexSet(
+      this.auditlogIndexName,
+      this.auditlogAliasName,
+      () => this.createAuditlogIndex(this.auditlogIndexName),
+    );
+  }
+
+  async addAllAuditlogs(
+    option: { shouldEmitProgress?: boolean } = {},
+  ): Promise<{ totalCount: number; count: number }> {
+    const { shouldEmitProgress = false } = option;
     const Activity = mongoose.model('Activity');
     const bulkWrite = this.client.bulk.bind(this.client);
     const prepareBodyForAuditlog = this.prepareBodyForAuditlog.bind(this);
@@ -549,21 +574,34 @@ class ElasticsearchDelegator
       'app:elasticsearchReindexBulkSize',
     );
 
+    const socket = shouldEmitProgress
+      ? this.socketIoService.getAdminSocket()
+      : undefined;
+    const totalCount = shouldEmitProgress ? await Activity.countDocuments() : 0;
+
     const readStream = Activity.find()
       .select('snapshot.username')
       .lean()
       .cursor();
     const batchStream = createBatchStream(bulkSize);
 
+    // Counts activities read, not documents indexed — some are skipped by
+    // prepareBodyForAuditlog, which would leave count short of totalCount.
     let count = 0;
     const writeStream = new Writable({
       objectMode: true,
       async write(batch, _encoding, callback) {
+        count += batch.length;
+
         const body = batch.flatMap((activity) =>
           prepareBodyForAuditlog(activity),
         );
 
         if (body.length === 0) {
+          socket?.emit(SocketEventName.AddAuditlogProgress, {
+            totalCount,
+            count,
+          });
           callback();
           return;
         }
@@ -578,10 +616,14 @@ class ElasticsearchDelegator
             return;
           }
 
-          count += (bulkResponse.items || []).length;
           logger.info(
             `Adding auditlogs progressing: (count=${count}, took=${bulkResponse.took}ms)`,
           );
+
+          socket?.emit(SocketEventName.AddAuditlogProgress, {
+            totalCount,
+            count,
+          });
         } catch (err) {
           logger.error('Adding auditlogs bulk indexing failed.', err);
           callback(err);
@@ -597,6 +639,7 @@ class ElasticsearchDelegator
     });
 
     await pipeline(readStream, batchStream, writeStream);
+    return { totalCount, count };
   }
 
   async createIndex(
@@ -730,6 +773,8 @@ class ElasticsearchDelegator
     body.push(command);
   }
 
+  // FinishAddPage is emitted by rebuildIndex (this method's only caller), not
+  // here — don't call this with shouldEmitProgress:true from elsewhere.
   addAllPages(option: AddAllPagesOption = { shouldEmitProgress: false }) {
     const { shouldEmitProgress } = option;
     const Page = this.getPageModel();
@@ -761,7 +806,7 @@ class ElasticsearchDelegator
       shouldEmitProgress: false,
       invokeGarbageCollection: false,
     },
-  ): Promise<void> {
+  ): Promise<{ totalCount: number; count: number }> {
     const { shouldEmitProgress, invokeGarbageCollection } = option;
 
     const Page = this.getPageModel();
@@ -860,15 +905,12 @@ class ElasticsearchDelegator
       },
       final(callback) {
         logger.info(`Adding pages has completed: (totalCount=${totalCount})`);
-
-        if (shouldEmitProgress) {
-          socket?.emit(SocketEventName.FinishAddPage, { totalCount, count });
-        }
         callback();
       },
     });
 
-    return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
+    await pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
+    return { totalCount, count };
   }
 
   async searchAuditlogByFuzzyWildcard(

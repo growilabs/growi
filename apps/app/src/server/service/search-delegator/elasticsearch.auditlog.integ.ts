@@ -118,6 +118,22 @@ describe('ElasticsearchDelegator.addAllAuditlogs()', () => {
     });
   });
 
+  it('counts every read activity toward progress, not just successfully indexed ones', async () => {
+    await insertActivities([
+      { _id: new mongoose.Types.ObjectId(), username: 'alice' },
+      { _id: new mongoose.Types.ObjectId(), username: null },
+      { _id: new mongoose.Types.ObjectId(), username: '' },
+    ]);
+
+    const result = await delegator.addAllAuditlogs({
+      shouldEmitProgress: true,
+    });
+
+    // count must reach totalCount so the client-side progress bar completes,
+    // even though only 1 of the 3 activities was actually bulk-indexed.
+    expect(result).toEqual({ totalCount: 3, count: 3 });
+  });
+
   it('throws when the bulk response reports indexing errors', async () => {
     await insertActivities([
       { _id: new mongoose.Types.ObjectId(), username: 'alice' },

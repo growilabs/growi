@@ -5,6 +5,7 @@ import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
+import auditLogEnabledRequired from '~/server/middlewares/audit-log-enabled-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
@@ -131,9 +132,6 @@ export const setup = (crowi) => {
    *                    type: object
    *                    description: Status of indices
    *                    $ref: '#/components/schemas/Indices'
-   *                  auditlogHasUnsyncedEvents:
-   *                    type: boolean
-   *                    description: Whether auditlog events failed to sync to Elasticsearch (rebuild needed)
    */
   router.get(
     '/indices',
@@ -158,9 +156,7 @@ export const setup = (crowi) => {
 
       try {
         const info = await searchService.getInfoForAdmin();
-        const auditlogHasUnsyncedEvents =
-          await AuditlogEsSyncStatus.isUnsynced();
-        return res.status(200).send({ info, auditlogHasUnsyncedEvents });
+        return res.status(200).send({ info });
       } catch (err) {
         logger.error(err);
         return res.apiv3Err(err, 503);
@@ -316,6 +312,71 @@ export const setup = (crowi) => {
     },
   );
 
+  /**
+   * @swagger
+   *
+   *  /search/auditlog-indices:
+   *    get:
+   *      tags: [FullTextSearch Management]
+   *      summary: Get auditlog indices status
+   *      responses:
+   *        200:
+   *          description: Status of auditlog indices
+   *          content:
+   *            application/json:
+   *              schema:
+   *                properties:
+   *                  info:
+   *                    type: object
+   *                    description: Status of auditlog indices
+   *                  auditlogHasUnsyncedEvents:
+   *                    type: boolean
+   *                    description: Whether auditlog events failed to sync to Elasticsearch (rebuild needed)
+   */
+  router.get(
+    '/auditlog-indices',
+    noCache(),
+    accessTokenParser([SCOPE.READ.ADMIN.FULL_TEXT_SEARCH], {
+      acceptLegacy: true,
+    }),
+    loginRequired,
+    adminRequired,
+    auditLogEnabledRequired,
+    async (req, res) => {
+      const { searchService } = crowi;
+
+      if (!searchService.isConfigured) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'SearchService is not configured',
+            'search-service-unconfigured',
+          ),
+          503,
+        );
+      }
+      if (!searchService.isReachable) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'SearchService is not reachable',
+            'search-service-unreachable',
+          ),
+          503,
+        );
+      }
+
+      try {
+        const [info, auditlogHasUnsyncedEvents] = await Promise.all([
+          searchService.getAuditlogInfoForAdmin(),
+          AuditlogEsSyncStatus.isUnsynced(),
+        ]);
+        return res.status(200).send({ info, auditlogHasUnsyncedEvents });
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(err, 503);
+      }
+    },
+  );
+
   const validatorForPutAuditlogIndices = [
     body('operation').isString().isIn(['rebuild', 'normalize']),
   ];
@@ -358,6 +419,7 @@ export const setup = (crowi) => {
     }),
     loginRequired,
     adminRequired,
+    auditLogEnabledRequired,
     addActivity,
     validatorForPutAuditlogIndices,
     apiV3FormValidator,
@@ -398,10 +460,10 @@ export const setup = (crowi) => {
               .status(200)
               .send({ message: 'Operation is successfully processed.' });
           case 'rebuild':
-            // NOT wait the processing is terminated
+            // NOT wait the processing is terminated; rebuildAuditlogIndex
+            // handles completion (unsynced flag, FinishAddAuditlog) itself.
             searchService
-              .rebuildAuditlogIndex()
-              .then(() => AuditlogEsSyncStatus.setUnsynced(false))
+              .rebuildAuditlogIndex({ shouldEmitProgress: true })
               .catch((err) => {
                 logger.error('Rebuild auditlog index failed', err);
               });

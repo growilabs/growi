@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Collapse } from 'reactstrap';
@@ -88,6 +89,24 @@ export const AuditLogSettings: FC = () => {
           ))}
         </ul>
       </Collapse>
+
+      <h4 className="mt-4">
+        {t('admin:audit_log_index_management.audit_log_index_management')}
+      </h4>
+      <p className="form-text text-muted">
+        {t('admin:audit_log_index_management.settings_explanation')}
+      </p>
+      <p className="mt-1">
+        <Link
+          href="/admin/search#audit-log-index-management"
+          className="btn btn-link p-0"
+        >
+          <span className="material-symbols-outlined me-1">link</span>
+          {t('admin:audit_log_index_management.index_management_link', {
+            destination: t('admin:elasticsearch_management'),
+          })}
+        </Link>
+      </p>
     </>
   );
 };
