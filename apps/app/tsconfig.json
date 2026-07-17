@@ -29,17 +29,9 @@
 
     // Enforce erasable-only TS (no enum / parameter properties / namespaces) so
     // the server runs under Node's native type stripping with no
-    // --experimental-transform-types (esm-migration task 3.7.c). tsgo --noEmit
+    // --experimental-transform-types (esm-migration task 3.7.c). tsc --noEmit
     // (CI lint) fails if a non-erasable construct is reintroduced.
-    "erasableSyntaxOnly": true,
-
-    // Note: To transform paths for both the output .js and .d.ts files, you need both of the below entries
-    "plugins": [
-      // Transform paths in output .js files
-      { "transform": "typescript-transform-paths" },
-      // Transform paths in output .d.ts files (Include this line if you output declarations files)
-      { "transform": "typescript-transform-paths", "afterDeclarations": true }
-    ]
+    "erasableSyntaxOnly": true
   },
   "include": ["next-env.d.ts", "config", "prisma", "src"],
   "exclude": ["src/**/*.vendor-styles.*"]

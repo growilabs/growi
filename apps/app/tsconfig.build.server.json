@@ -4,18 +4,23 @@
   "compilerOptions": {
     // Use Preserve/Bundler resolution so that extensionless relative specifiers
     // are accepted during type-checking. The server build emits real Node ESM
-    // by running add-js-extensions (C1) in postbuild after tspc finishes.
+    // by running add-js-extensions (C1) in postbuild after tsc finishes —
+    // postbuild also rewrites `~/` and `^/` aliases to relative form (formerly
+    // done at emit time by typescript-transform-paths via tspc).
     // NodeNext shims (server-build-shims/) are no longer needed because Bundler
     // resolution uses esModuleInterop-style default imports natively.
     "module": "Preserve",
     "moduleResolution": "Bundler",
     "outDir": "transpiled",
-    "declaration": true,
+    // The server dist has no declaration consumers; skipping d.ts emit also
+    // avoids alias rewriting in declarations (postbuild covers .js only).
+    "declaration": false,
     "noResolve": false,
     "preserveConstEnums": true,
     "sourceMap": false,
     "noEmit": false,
-    "baseUrl": ".",
+    // No baseUrl: removed in TypeScript 7 (TS5102); paths resolve relative to
+    // this tsconfig's directory.
     "paths": {
       "~/*": ["./src/*"],
       "^/*": ["./*"]

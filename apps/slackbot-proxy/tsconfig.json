@@ -2,6 +2,10 @@
   "$schema": "http://json.schemastore.org/tsconfig",
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    // This app stays on the JS-based TypeScript 6 line (tsc6): its CommonJS +
+    // node10 resolution and baseUrl are removed in TypeScript 7. Silence the
+    // 6.x deprecation errors until the app is modernized.
+    "ignoreDeprecations": "6.0",
     "module": "CommonJS",
     "moduleResolution": "Node",
 
@@ -21,15 +25,11 @@
     "strictNullChecks": true,
     "strictBindCallApply": true,
     "noImplicitAny": false,
-    "noImplicitOverride": true,
+    "noImplicitOverride": true
 
-    // Note: To transform paths for both the output .js and .d.ts files, you need both of the below entries
-    "plugins": [
-      // Transform paths in output .js files
-      { "transform": "typescript-transform-paths" },
-      // Transform paths in output .d.ts files (Include this line if you output declarations files)
-      { "transform": "typescript-transform-paths", "afterDeclarations": true }
-    ]
+    /* Path aliases in build output (.js and .d.ts) are rewritten to relative
+       form by tsc-alias in the build script (formerly typescript-transform-paths
+       via tspc). */
   },
   "include": ["src"],
   "exclude": [

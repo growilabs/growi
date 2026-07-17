@@ -4,7 +4,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "build": "tspc -p tsconfig.build.json",
+    "build": "tsc6 -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "clean": "rimraf dist",
     "cp:public": "cp -RT ./src/public ./dist/public",
     "cp:views": "cp -RT ./src/views ./dist/views",
@@ -18,7 +18,7 @@
     "predev": "pnpm run cp:bootstrap:dev",
     "lint:biome": "biome check",
     "lint:styles": "stylelint --allow-empty-input \"src/**/*.scss\" \"src/**/*.css\"",
-    "lint:typecheck": "tsc --noEmit",
+    "lint:typecheck": "tsc6 --noEmit",
     "lint": "run-p lint:*",
     "ts-node": "node -r ts-node/register/transpile-only -r tsconfig-paths/register -r dotenv-flow/config",
     "version:patch": "pnpm version patch --no-git-tag-version --no-git-checks",
@@ -75,6 +75,7 @@
     "@tsed/json-mapper": "=6.43.0",
     "bootstrap": "^5.3.8",
     "ts-node": "^10.9.2",
+    "tsc-alias": "^1.9.1",
     "tsconfig-paths": "^4.2.0"
   }
 }

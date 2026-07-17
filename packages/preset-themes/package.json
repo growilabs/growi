@@ -32,7 +32,7 @@
     "watch:themes": "pnpm run dev:themes -w --emptyOutDir=false",
     "lint:biome": "biome check",
     "lint:styles": "stylelint \"src/**/*.scss\"",
-    "lint:typecheck": "tsgo --noEmit",
+    "lint:typecheck": "tsc --noEmit",
     "lint": "run-p lint:*",
     "preview": "vite preview"
   },
