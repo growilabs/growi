@@ -27,6 +27,7 @@ import { startCron as startAccessTokenCron } from '~/server/service/access-token
 import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
+import { connectPrismaAtBoot } from '~/utils/prisma-connect';
 
 import ActivityEvent from '../events/activity';
 import AdminEvent from '../events/admin';
@@ -262,6 +263,11 @@ class Crowi {
 
   async init(): Promise<void> {
     await this.setupDatabase();
+    // Warm up the Prisma connection right after mongoose connects, so a
+    // Prisma connection problem aborts boot the same way a mongoose failure
+    // does, and the native query engine's memory cost is paid at boot time
+    // instead of being invisible until the first request (see prisma-connect.ts).
+    await connectPrismaAtBoot();
     this.models = await setupModelsDependentOnCrowi(this);
     await this.setupConfigManager();
     await this.setupSessionConfig();
