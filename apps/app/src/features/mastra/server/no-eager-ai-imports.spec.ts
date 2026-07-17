@@ -34,10 +34,16 @@ const SRC_ROOT = path.resolve(
   '../../..',
 );
 
-const HEAVY_PACKAGE = /^(@mastra\/|@ai-sdk\/|ai$|tokenlens)/;
+// `openai` and `@azure/identity` (+25 / +28 MiB RSS each, measured) were
+// boot-loaded through the legacy features/openai client-delegator until its
+// removal in #11293; banning them here keeps them from being reintroduced.
+// Their legitimate remaining uses are all behind dynamic import() boundaries
+// (the mastra azure resolver, the lazily-loaded file-uploader/azure).
+const HEAVY_PACKAGE =
+  /^(@mastra\/|@ai-sdk\/|ai$|tokenlens|openai(\/|$)|@azure\/identity(\/|$))/;
 
 describe('boot-time import boundary for heavy AI packages', () => {
-  it('has no static import chain from a boot entrypoint to @mastra / @ai-sdk / ai / tokenlens', () => {
+  it('has no static import chain from a boot entrypoint to @mastra / @ai-sdk / ai / tokenlens / openai / @azure/identity', () => {
     const violations = traceStaticImportChains({
       srcRoot: SRC_ROOT,
       entrypoints: BOOT_ENTRYPOINTS,

@@ -49,11 +49,13 @@ Guard / Drift Specs section of the `essential-test-design` skill.
 
 | Spec | Banned from the static graph |
 |---|---|
-| `features/mastra/server/no-eager-ai-imports.spec.ts` | `@mastra/*`, `@ai-sdk/*`, `ai`, `tokenlens` (from boot) |
+| `features/mastra/server/no-eager-ai-imports.spec.ts` | `@mastra/*`, `@ai-sdk/*`, `ai`, `tokenlens`, `openai`, `@azure/identity` (from boot) |
 | `server/service/mail/no-eager-transport-imports.spec.ts` | `nodemailer`, `nodemailer-ses-transport`, `aws-sdk` |
 | `server/service/no-eager-passport-strategy-imports.spec.ts` | `openid-client`, `passport-ldapauth`, `ldapjs`, `passport-saml`, `passport-github`, `passport-google-oauth20` |
 | `.../llm-providers/no-eager-provider-imports.spec.ts` | `@ai-sdk/*`, `@azure/identity` (from the mastra provider graph) |
 
-Known gap: the `openai` SDK and `@azure/identity` are still boot-loaded through
-the legacy `features/openai` client-delegator (via suggest-path) and are not yet
-boot-banned; that closes with the agentic suggest-path migration (#11293).
+History: the `openai` SDK and `@azure/identity` used to be boot-loaded through
+the legacy `features/openai` client-delegator until #11293 (agentic
+suggest-path) removed that feature; both are boot-banned since then. The
+`openai` package still sits in `dependencies` with zero imports left —
+removing it (and its lockfile weight) is an open cleanup candidate.
