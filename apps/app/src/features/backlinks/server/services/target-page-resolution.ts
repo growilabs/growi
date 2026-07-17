@@ -12,7 +12,7 @@ import type { PageDocument, PageModel } from '~/server/models/page';
  * regular paths (eg. '/docs/new'), each resolved with a single `$in` query.
  * The two queries run concurrently.
  *
- * @param paths - Extracted absolute paths and/or permalinks.
+ * @param paths - Extracted deduped absolute paths and/or permalinks.
  * @returns - Map from the original input string to its resolved page ID.
  *            Inputs with no matching page are absent from the map.
  */
@@ -34,14 +34,18 @@ export const resolveToPages = async (
 
   const [byId, byPath] = await Promise.all([
     permalinkIds.length
-      ? Page.find({ _id: { $in: permalinkIds } }).select('_id')
+      ? Page.find({ _id: { $in: permalinkIds } })
+          .select('_id')
+          .lean()
       : [],
     normalPaths.length
       ? // Match findByPath: exclude empty pages ({ isEmpty: null } for v4 compat).
         Page.find({
           path: { $in: normalPaths },
           $or: [{ isEmpty: false }, { isEmpty: null }],
-        }).select('_id path')
+        })
+          .select('_id path')
+          .lean()
       : [],
   ]);
 

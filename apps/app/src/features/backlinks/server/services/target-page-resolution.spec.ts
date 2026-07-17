@@ -25,7 +25,7 @@ vi.mock('mongoose', async (importOriginal) => {
 const mockFind = (opts: { byId?: unknown[]; byPath?: unknown[] } = {}) => {
   mocks.find.mockImplementation((query) => {
     const docs = '_id' in query ? (opts.byId ?? []) : (opts.byPath ?? []);
-    return { select: () => Promise.resolve(docs) };
+    return { select: () => ({ lean: () => Promise.resolve(docs) }) };
   });
 };
 
