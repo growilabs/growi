@@ -6,6 +6,11 @@
 
     "paths": {},
 
+    // TypeScript 6/7 default to `types: []` (no automatic @types inclusion);
+    // css-modules provides the ambient `*.css` / `*.scss` module declarations
+    // that reveal.js style imports and CSS Modules rely on.
+    "types": ["css-modules"],
+
     /* TODO: remove below flags for strict checking */
     "noImplicitAny": false
   },

@@ -4,6 +4,10 @@
   "compilerOptions": {
     "jsx": "react-jsx",
 
+    // TypeScript 6/7 default to `types: []` (no automatic @types inclusion);
+    // node provides the Buffer type used in src/utils/embed.ts.
+    "types": ["node"],
+
     /* TODO: remove below flags for strict checking */
     "strict": false,
     "strictNullChecks": true,
