@@ -46,8 +46,11 @@
     "master"
   ],
 
-  "typescript.tsdk": "node_modules/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true,
+  // No `typescript.tsdk`: the workspace `typescript` is the @typescript/typescript6
+  // wrapper, whose lib/ does not expose `tsserver.js`, and TypeScript 7
+  // (@typescript/native) speaks LSP rather than shipping tsserver. Let VS Code use
+  // its bundled TypeScript for the editor language service; the CLI type-check runs
+  // on TypeScript 7 via `pnpm run lint:typecheck`.
   "typescript.preferences.autoImportFileExcludePatterns": ["node_modules/*"],
   "typescript.validate.enable": true,
 
