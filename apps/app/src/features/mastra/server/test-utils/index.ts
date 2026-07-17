@@ -1,4 +1,3 @@
-export type { StaticImportTraceInput } from './trace-static-import-chains';
 export {
   listMissingEntrypoints,
   traceForbiddenPackageChains,
