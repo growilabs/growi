@@ -34,7 +34,7 @@ turbo run build --filter @growi/app
 #    boots the server against a FRESH database, waits for HTTP ready,
 #    idles 30 s, creates an admin via POST /_api/v3/installer, issues one
 #    SSR request, idles 90 s, then shuts down.
-bash bin/startup-memory-ab/measure.sh \
+bash bin/memory-startup-ab/measure.sh \
   <label> <appdir> <db-name> <port> <inspect-port> <outdir> \
   --import ./bin/runtime/env-preload.mjs     # loader flags for THIS build's era
 #  -r dotenv-flow/config                     # (v7.5-era CJS builds instead)
@@ -52,7 +52,7 @@ via CDP), `modules.txt` (sorted unique loaded-module URLs), `server.log`.
 ## Comparing two runs
 
 ```bash
-node bin/startup-memory-ab/analyze-modules.mjs \
+node bin/memory-startup-ab/analyze-modules.mjs \
   runA/modules.txt runB/modules.txt labelA labelB
 ```
 
@@ -65,7 +65,7 @@ concrete dependencies.
 ```bash
 # Copy into the target app dir first: bare specifiers resolve relative to the
 # SCRIPT's location, not the cwd.
-cp bin/startup-memory-ab/import-cost.mjs apps/app/tmp/
+cp bin/memory-startup-ab/import-cost.mjs apps/app/tmp/
 cd apps/app && node --expose-gc tmp/import-cost.mjs <package-name>
 ```
 
