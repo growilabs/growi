@@ -32,8 +32,10 @@ import type { AgenticEngineOutput } from '../services/engines/agentic-output-sch
  *   `limitedSearchTool.execute` with the requestContext the engine passed,
  *   consuming the real budget until it observes `limit_exceeded`, then
  *   resolving the structured output (the Requirement 3.2 wrap-up behavior)
- * - `searchService.searchKeyword` (Elasticsearch boundary) on the Crowi mock
- *   — the inner seam the REAL fullTextSearchTool delegates to
+ * - `searchService.searchKeyword` / `searchService.formatSearchResult`
+ *   (Elasticsearch boundary) on the Crowi mock — the inner seams the REAL
+ *   fullTextSearchTool delegates to; the formatter mock reproduces the
+ *   raw-hit -> formatted-item projection the real formatter performs
  * - resolveParentGrant and the user-group models (mongoose-backed)
  * - the oneshot pipeline services (harness parity with the 6.1 spec; the
  *   agentic path must leave them untouched, which 6.1 already asserts)
@@ -57,8 +59,9 @@ const mocks = vi.hoisted(() => ({
   // Agent seam
   getAgentMock: vi.fn(),
   agentGenerateMock: vi.fn(),
-  // Inner search seam: the REAL fullTextSearchTool.execute delegates here
+  // Inner search seams: the REAL fullTextSearchTool.execute delegates here
   searchKeywordMock: vi.fn(),
+  formatSearchResultMock: vi.fn(),
   // Per-request search budget limit served by the config mock
   SEARCH_LIMIT: 2,
 }));
@@ -314,6 +317,25 @@ describe('POST /suggest-path agentic path integration — budget exhaustion and 
       ])
       .mockResolvedValue([{ data: [], meta: { total: 0 } }, 'elasticsearch']);
 
+    // Formatter seam: reproduces the raw-hit -> formatted-item projection the
+    // real SearchService.formatSearchResult performs (resolved page doc plus
+    // ES snippet meta), so the REAL fullTextSearchTool's hit mapping runs
+    // against the same shapes it sees in production.
+    mocks.formatSearchResultMock.mockImplementation(
+      async (searchResult: {
+        data: typeof searchResultPages;
+        meta: { total: number };
+      }) => ({
+        data: searchResult.data.map((page) => ({
+          data: { _id: page._id, path: page._source.path },
+          meta: {
+            elasticSearchResult: { snippet: page._highlight?.body?.[0] },
+          },
+        })),
+        meta: searchResult.meta,
+      }),
+    );
+
     // Setup express app with ApiV3Response methods
     app = express();
     app.use(express.json());
@@ -336,6 +358,7 @@ describe('POST /suggest-path agentic path integration — budget exhaustion and 
     const crowi = mock<Crowi>({
       searchService: {
         searchKeyword: mocks.searchKeywordMock,
+        formatSearchResult: mocks.formatSearchResultMock,
         isElasticsearchEnabled: true,
       },
     });
