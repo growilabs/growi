@@ -73,7 +73,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: extractInternalLinks_
   - _Depends: B1.1 (independent of B1.2)_
 
-- [ ] B1.4 Implement target-page resolution — direct path + permalink only
+- [x] B1.4 Implement target-page resolution — direct path + permalink only
   - Build the live-path resolver: a **permalink** path (`/{id}`) resolves directly to that page id
     with no path lookup or redirect-following; otherwise a path resolves by direct path lookup, else
     null. A permalink to a non-existent id also resolves to null
