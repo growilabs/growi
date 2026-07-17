@@ -28,13 +28,9 @@ const hasPrecedingText = (view: EditorView, from: number): boolean => {
   return before.trim() !== '';
 };
 
-/** Position-free description of a block element to insert. */
 interface BlockSpec {
-  /** The element text as inserted at line start (no separator prefix). */
   readonly body: string;
-  /** Cursor offset within `body` (relative to the start of `body`). */
   readonly bodyCursorOffset: number;
-  /** Separator prefixed when the element is inserted mid-line. */
   readonly separator: BlockSeparator;
 }
 
@@ -85,7 +81,6 @@ export const lineMarkerInsertion =
       separator: '\n',
     });
 
-/** Empty fenced code block; the cursor lands on the empty content line. */
 export const codeBlockInsertion: SlashInsertAction['buildInsertion'] = (
   view,
   from,

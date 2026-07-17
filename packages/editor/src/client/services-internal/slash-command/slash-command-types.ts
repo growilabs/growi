@@ -10,9 +10,7 @@ import type { EditorView } from '@codemirror/view';
  * ChangeSpec, overlap/conflict with the deletion range cannot occur by construction.
  */
 export interface SlashInsertion {
-  /** The full text that replaces the `[from, to]` range. */
   readonly insert: string;
-  /** Post-insertion cursor position, as an offset relative to `from`. */
   readonly cursorOffset: number;
 }
 
@@ -28,35 +26,24 @@ export interface SlashInsertion {
  */
 export interface SlashInsertAction {
   readonly kind: 'insert';
-  /** Builds the insertion content (text + cursor offset); pure, no side effects. */
   readonly buildInsertion: (view: EditorView, from: number) => SlashInsertion;
 }
 
 export interface SlashRunAction {
   readonly kind: 'run';
-  /**
-   * Side-effect handler invoked after `/query` has been deleted. The actual text
-   * insertion is handled by `run` itself or by a subsequent modal.
-   */
   readonly run: (view: EditorView, from: number) => void;
 }
 
 export type SlashCommandAction = SlashInsertAction | SlashRunAction;
 
-/** A command definition (holds i18n keys; display strings are attached on resolution). */
 export interface SlashCommand {
-  /** Stable id, e.g. 'heading1'. */
   readonly id: string;
-  /** i18n key, e.g. 'slash_command.heading1.label'. */
   readonly labelKey: string;
   readonly descriptionKey: string;
-  /** Additional match terms, e.g. ['h1', 'title']. */
   readonly keywords: readonly string[];
-  /** The action (insert: static insertion / run: side-effect launch). */
   readonly action: SlashCommandAction;
 }
 
-/** A command whose display strings have been resolved. */
 export interface ResolvedSlashCommand extends SlashCommand {
   readonly label: string;
   readonly description: string;

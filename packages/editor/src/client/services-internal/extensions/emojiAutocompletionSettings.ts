@@ -37,7 +37,6 @@ export const emojiCompletionSource: CompletionSource = (context) => {
   };
 };
 
-// Render addToOption that shows the native emoji glyph in the icon slot.
 export const emojiRenderOption: AddToOption = {
   render: (completion) => {
     const emojiName = completion.type ?? '';

@@ -18,9 +18,7 @@ import type { ResolvedSlashCommand } from './slash-command-types.js';
 const SLASH_TOKEN_REGEX = /\/(\S*)$/;
 
 interface SlashTrigger {
-  /** Absolute position of the `/`. */
   readonly from: number;
-  /** Text typed after the `/` (may be empty). */
   readonly query: string;
 }
 
@@ -158,7 +156,6 @@ export const createSlashCommandSource = (
     const trigger = detectSlashTrigger(context.state, context.pos);
     if (trigger == null) return null;
 
-    // Suppress the menu when the cursor is inside code (fenced/indented/inline).
     if (isInCodeContext(context.state, context.pos)) return null;
 
     const options = entries
