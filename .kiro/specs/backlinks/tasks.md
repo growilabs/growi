@@ -86,7 +86,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: resolveToPage_
   - _Depends: B1.1 (independent of B1.2, B1.3)_
 
-- [ ] B1.5 Implement the index synchronization operations — replace-outbound + self-drop only
+- [x] B1.5 Implement the index synchronization operations — replace-outbound + self-drop only
   - Implement the row operation on top of the model: replace a source page's outbound rows from a
     freshly extracted+resolved set, **dropping any resolved row whose target is the source page
     itself** (covers a page linking to its own permalink, and any alias that resolves back to the
