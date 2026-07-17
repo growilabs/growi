@@ -17,6 +17,19 @@ Node 24's `require(esm)` lets residual CommonJS consumers (e.g. third-party `@ly
 
 `apps/app/src` uses a **single no-extension import convention** (local → relative `./X` / `../X`, cross-module → `~/X`; never `.js`/`.jsx` in source). The `.js` is added only at server-build emit by `bin/add-js-extensions.ts` and verified by `bin/verify-dist-resolution.ts` (both run directly via Node native type stripping) — this replaced the former dual-notation (`~/X.js` for NodeNext-program files vs extensionless relative) from esm-migration. The full developer rule lives in **`apps/app/.claude/rules/import-convention.md`** (app-scoped); this note records only the build/runtime decision behind it.
 
+### TypeScript Toolchain (TS7 native + typescript6 alias, 2026-07)
+
+The compiler is **TypeScript 7** (the native Go port). Two npm aliases split the two things TS7 does *not* do:
+
+- Root `typescript` → `npm:@typescript/typescript6` — the JS-based compiler line that still ships the **programmatic API** (bin `tsc6`). TS7 has no JS API until 7.1, and several tools consume it: **Next.js** build-time type checking (verified: `next build` runs `Running TypeScript…` green), **vite-plugin-dts** (`.d.ts` emit for all `@growi/*` packages), and the one test that parses source with `ts.createSourceFile`.
+- Root `@typescript/native` → `npm:typescript@7` — the native compiler (bin `tsc`), used by every `lint:typecheck` (`tsc --noEmit`) and the `apps/app` server build.
+
+Consequences to keep in mind when touching the build:
+
+- **TS7 has no custom-transformer hook.** The former `ts-patch` / `tspc` + `typescript-transform-paths` pipeline is gone. `apps/app`'s server build (`tsc -p tsconfig.build.server.json`, Bundler resolution) emits specifiers **as authored** — `bin/add-js-extensions.ts` (postbuild) now rewrites `~/`/`^/` aliases to relative form *and* adds `.js`; `bin/verify-dist-resolution.ts` also fails on any residual alias.
+- **`apps/slackbot-proxy` stays on the JS line** (`tsc6 -p … && tsc-alias`): its CommonJS + `node10` resolution + `baseUrl` are all removed in TS7. `ignoreDeprecations: "6.0"` silences the 6.x deprecation errors.
+- **TS6/7 default `types: []` and no longer infer `rootDir` from the common source dir.** Packages needing ambient `@types` must name them explicitly (`types: ["node"]` / `["css-modules"]`), and each `vite-plugin-dts` call pins `compilerOptions.rootDir: 'src'` so declarations land at `dist/` (not `dist/src/`).
+
 ### Bundler Strategy (Project-Wide Decision)
 
 GROWI uses **Turbopack** (Next.js 16 default) for **both development and production builds** (`next build` without flags). Webpack fallback is available via `USE_WEBPACK=1` environment variable for debugging only. All custom webpack loaders/plugins have been migrated to Turbopack equivalents (`turbopack.rules`, `turbopack.resolveAlias`). See `apps/app/.claude/skills/build-optimization/SKILL.md` for details.
@@ -115,4 +128,4 @@ checks do not exercise this path. (See `.kiro/specs/esm-migration/` Requirement 
 `phase6-gate-evidence/`.)
 
 ---
-_Updated: 2026-06-17. Added "External Plugin Distribution Contract" as a system-wide invariant (external plugins are prebuilt assets loaded as browser ESM / scanned server-side; orthogonal to the internal module system but must be smoke-verified on changes). Prior: 2026-06-16 Module System (native ESM) + transpilePackages-empty (esm-migration Phase 5.5)._
+_Updated: 2026-07-17. Added "TypeScript Toolchain" section (TS7 native adopted; typescript6 npm alias retained for JS-API consumers — Next.js, vite-plugin-dts; ts-patch/tspc/typescript-transform-paths removed, alias rewriting moved into add-js-extensions postbuild). Prior: 2026-06-17 External Plugin Distribution Contract; 2026-06-16 Module System (native ESM) + transpilePackages-empty (esm-migration Phase 5.5)._
