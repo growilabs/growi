@@ -1,17 +1,17 @@
 {
   "feature_name": "password-hash-upgrade",
   "created_at": "2026-05-14T00:00:00.000Z",
-  "updated_at": "2026-07-14T00:00:00.000Z",
+  "updated_at": "2026-07-17T00:00:00.000Z",
   "language": "ja",
   "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": true
+      "approved": false
     },
     "design": {
       "generated": true,
-      "approved": true
+      "approved": false
     },
     "tasks": {
       "generated": true,

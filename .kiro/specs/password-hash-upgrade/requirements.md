@@ -5,7 +5,7 @@
 
 ## Introduction
 
-現行の GROWI ローカル認証は `SHA-256(PASSWORD_SEED + plaintext)` でパスワードを保存しており、ユーザー単位のソルトを持たない。CodeQL はこれをパスワードストレージ用の弱い暗号ハッシュとして検出する。本フィーチャーでは、適応型 KDF（bcrypt または Argon2id）への移行、既存インストール済みシステムへの後方互換性維持（遅延マイグレーション）、マイグレーションスクリプト、およびダウングレードシナリオへの対応を実現する。
+現行の GROWI ローカル認証は `SHA-256(PASSWORD_SEED + plaintext)` でパスワードを保存しており、ユーザー単位のソルトを持たない。CodeQL はこれをパスワードストレージ用の弱い暗号ハッシュとして検出する。本フィーチャーでは、メモリ困難な適応型 KDF（`node:crypto` の scrypt）への移行、既存インストール済みシステムへの後方互換性維持（遅延マイグレーション）、マイグレーションスクリプト、およびダウングレードシナリオへの対応を実現する。
 
 ## Boundary Context
 
@@ -21,8 +21,8 @@
 
 #### Acceptance Criteria
 
-1. When ユーザーがパスワードを設定または変更する, the GROWI authentication system shall 適応型 KDF（bcrypt cost factor ≥ 12 または Argon2id）とユーザー単位のランダムソルトを使用してパスワードをハッシュする。
-2. The GROWI authentication system shall アルゴリズム識別子とパラメータを埋め込んだ自己記述形式（例: bcrypt の `$2b$12$…` プレフィックス）でハッシュを保存し、外部メタデータなしでアルゴリズムを検出できるようにする。
+1. When ユーザーがパスワードを設定または変更する, the GROWI authentication system shall メモリ困難な適応型 KDF（`node:crypto` の scrypt、OWASP 推奨パラメータ以上）とユーザー単位のランダムソルトを使用してパスワードをハッシュする。
+2. The GROWI authentication system shall アルゴリズム識別子とパラメータ（N/r/p）とソルトを埋め込んだ自己記述形式（例: `scrypt$N$r$p$<salt>$<hash>`）でハッシュを保存し、外部メタデータなしでアルゴリズムとパラメータを検出できるようにする。
 3. When 新しいパスワードが設定される, the GROWI authentication system shall レガシー SHA-256+PASSWORD_SEED 方式をハッシュの保存に使用しない。
 4. The GROWI authentication system shall ユーザー単位のランダムソルトにより、同一の平文パスワードから異なるハッシュが生成されることを保証する。
 
@@ -35,8 +35,8 @@
 1. When レガシー SHA-256 ハッシュパスワードを持つユーザーがログイン情報を送信する, the GROWI authentication system shall レガシー SHA-256+PASSWORD_SEED 方式で送信されたパスワードを検証する。
 2. When ユーザーがレガシー SHA-256 検証パスで認証に成功する, the GROWI authentication system shall 同一のログイントランザクション内で自動的に新しい適応型 KDF でパスワードを再ハッシュし、保存済みハッシュを置き換える。
 3. While レガシーフォーマットと新フォーマットのハッシュを持つユーザーがシステムに共存する, the GROWI authentication system shall ユーザー側の操作を必要とせず両フォーマットを透過的に処理する。
-4. If 保存済みハッシュフィールドは存在するがその内容が既知フォーマット（bcrypt `$2b$…` または SHA-256 hex）のいずれにも一致しない（データ破損等の異常系）, the GROWI authentication system shall ログイン試行を拒否し、ユーザー識別子を含む構造化ログエントリを WARNING レベルで出力する。
-5. When ユーザーがパスワード未設定（`password`・`bcryptPassword` の両フィールドとも不在。外部認証専用ユーザーや未有効化ユーザーの正常状態）でローカルログインを試行する, the GROWI authentication system shall ログイン試行を拒否するが、これは正常系であるため WARNING ログを出力しない（デュアルフィールド設計ではフィールド存在によりフォーマットが一意に決まるため、フィールド不在は「判別不能」ではなく「未設定」を意味する）。
+4. If 保存済みハッシュフィールドは存在するがその内容が既知フォーマット（`scrypt$…` プレフィックス または SHA-256 hex）のいずれにも一致しない（データ破損等の異常系）, the GROWI authentication system shall ログイン試行を拒否し、ユーザー識別子を含む構造化ログエントリを WARNING レベルで出力する。
+5. When ユーザーがパスワード未設定（`password`・`passwordHash` の両フィールドとも不在。外部認証専用ユーザーや未有効化ユーザーの正常状態）でローカルログインを試行する, the GROWI authentication system shall ログイン試行を拒否するが、これは正常系であるため WARNING ログを出力しない（デュアルフィールド設計ではフィールド存在によりフォーマットが一意に決まるため、フィールド不在は「判別不能」ではなく「未設定」を意味する）。
 
 ### Requirement 3: マイグレーションスクリプト
 
