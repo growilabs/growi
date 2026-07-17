@@ -48,7 +48,11 @@ export const defineRenderer = <
   canRender: (
     activity: Pick<IActivity, 'action' | 'snapshot'>,
   ) => activity is T,
-  Component: FC<{ activity: IActivityHasId & T }>,
+  // NoInfer pins T's inference to the guard argument. Without it, TypeScript 7
+  // also infers T from the component and silently accepts a guard/component
+  // pair whose snapshot field types conflict — the registration-site rejection
+  // asserted in the spec's compile-time negative test would be lost.
+  Component: FC<{ activity: IActivityHasId & NoInfer<T> }>,
 ): SnapshotDetailRenderer => ({
   canRender,
   Component: Component as FC<{ activity: IActivityHasId }>,
