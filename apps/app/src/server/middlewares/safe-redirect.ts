@@ -8,79 +8,57 @@ import type { NextFunction, Request, Response } from 'express';
 
 import loggerFactory from '~/utils/logger';
 
+import { configManager } from '../service/config-manager';
+import {
+  resolveSafeRedirect,
+  type SafeRedirectContext,
+} from './safe-redirect-target';
+
 const logger = loggerFactory('growi:middleware:safe-redirect');
-
-/**
- * Check whether the redirect url host is in specified whitelist
- */
-function isInWhitelist(
-  whitelistOfHosts: string[],
-  redirectToFqdn: string,
-): boolean {
-  if (whitelistOfHosts == null || whitelistOfHosts.length === 0) {
-    return false;
-  }
-
-  try {
-    const redirectUrl = new URL(redirectToFqdn);
-    return (
-      whitelistOfHosts.includes(redirectUrl.hostname) ||
-      whitelistOfHosts.includes(redirectUrl.host)
-    );
-  } catch (err) {
-    logger.warn(err);
-    return false;
-  }
-}
 
 export type ResWithSafeRedirect = Response & {
   safeRedirect: (redirectTo?: string) => void;
+};
+
+/**
+ * app:siteUrl is preferred when building the redirect target so the emitted URL keeps
+ * the correct scheme/host/port behind a TLS-terminating reverse proxy (where
+ * req.protocol would be http). configManager throws until the config store is loaded
+ * (very early boot); fall back to undefined — the request-derived origin — in that
+ * window. See issue #11248.
+ */
+const getConfiguredSiteUrl = (): string | undefined => {
+  try {
+    return configManager.getConfig('app:siteUrl');
+  } catch {
+    return undefined;
+  }
 };
 
 const factory = (whitelistOfHosts: string[]) => {
   return (req: Request, res: ResWithSafeRedirect, next: NextFunction): void => {
     // extend res object
     res.safeRedirect = (redirectTo?: string) => {
-      if (redirectTo == null) {
-        return res.redirect('/');
-      }
+      const ctx: SafeRedirectContext = {
+        reqProtocol: req.protocol,
+        reqHost: req.get('host') ?? '',
+        reqHostname: req.hostname,
+        appSiteUrl: getConfiguredSiteUrl(),
+        whitelistOfHosts,
+      };
+      const { target, disposition } = resolveSafeRedirect(redirectTo, ctx);
 
-      try {
-        // check inner redirect
-        const redirectUrl = new URL(
-          redirectTo,
-          `${req.protocol}://${req.get('host')}`,
-        );
-        if (redirectUrl.hostname === req.hostname) {
-          logger.debug(`Requested redirect URL (${redirectTo}) is local.`);
-          return res.redirect(redirectUrl.href);
-        }
-        logger.debug(`Requested redirect URL (${redirectTo}) is NOT local.`);
-
-        // check whitelisted redirect
-        const isWhitelisted = isInWhitelist(whitelistOfHosts, redirectTo);
-        if (isWhitelisted) {
-          logger.debug(
-            { whitelist: whitelistOfHosts },
-            `Requested redirect URL (${redirectTo}) is in whitelist.`,
-          );
-          return res.redirect(redirectTo);
-        }
-        logger.debug(
-          { whitelist: whitelistOfHosts },
-          `Requested redirect URL (${redirectTo}) is NOT in whitelist.`,
-        );
-      } catch (err) {
+      if (disposition === 'blocked' || disposition === 'invalid') {
         logger.warn(
-          { err },
-          `Requested redirect URL (${redirectTo}) is invalid.`,
+          `Requested redirect URL (${redirectTo}) is unsafe (${disposition}), redirecting to root page.`,
+        );
+      } else {
+        logger.debug(
+          `Redirecting (${disposition}): ${redirectTo} -> ${target}`,
         );
       }
 
-      logger.warn(
-        `Requested redirect URL (${redirectTo}) is UNSAFE, redirecting to root page.`,
-      );
-      return res.redirect('/');
+      return res.redirect(target);
     };
 
     next();
