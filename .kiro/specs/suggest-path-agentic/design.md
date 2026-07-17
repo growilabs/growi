@@ -4,7 +4,13 @@
 >
 > **要判断 2 点の解決（2026-07-13）**: PR #11293 レビュー対応で確定。① dead key `openai:assistantModel:suggestPathAgent` は削除済み（9c970a6bbe / 57a10f334b）。② 推論強度キーは provider 汎用の `ai:providerOptions:suggestPathAgent`（`ModelProviderOptions` 型 overlay を catalog options に deep merge）へ移行し、旧 `openai:reasoningEffort:suggestPathAgent` は廃止（再レビュー B-1・案 A 採用）。Config Keys 参照。
 >
-> **改訂（2026-07-17）**: PR #11293 レビュー（yuki-takei）を受け、エンジン選択を「明示切り替え（リクエスト `engine` フィールド + 設定キー `aiTools:suggestPathEngine`、oneshot 既定）」から**可用性ベースの自動フォールバック**へ変更（requirements.md Requirement 5 改訂）。判定順: Mastra AI 設定済み（`isAiConfigured()`）→ agentic / 全文検索到達可（`searchService.isReachable`）→ oneshot / いずれも不可 → memo のみ。`engine` フィールド・`aiTools:suggestPathEngine` キー・`SuggestPathEngineId` 型は削除、`dispatcher.ts`（id → 実装の map）は `select-engine.ts`（可用性 → record の選択）へ改組、route ガードは `isAiEnabled` のみの `aiEnabledGuard` に差し替え（Mastra 未設定は 501 ではなく縮退）。本文の該当セクション（EngineSelection・Route・Config Keys・Testing Strategy）は改訂済み。A/B 測定関連の記述は実施当時（明示切り替え方式）の記録として維持。
+> **現状（2026-07-17 時点・実装完了 / PR #11293）**: 本設計は当初「ワンショットと agentic の 2 エンジン並存」を前提に書かれ、その後 2 段階で改訂された。**この冒頭ノート・後述の Boundary Commitments・末尾「将来のロードマップ」節が現状の正であり、本文中の 2 エンジン並存を前提とした記述（Architecture 図、EngineSelection/OneshotEngine の節、Requirements 5 のトレーサビリティ、Testing Strategy の oneshot 経路など）は撤去前の設計履歴として残している。**
+>
+> 改訂の経緯:
+> - **第1段（可用性ベース化）**: エンジン選択を「明示切り替え（リクエスト `engine` フィールド + 設定キー `aiTools:suggestPathEngine`、oneshot 既定）」から可用性ベースの自動選択へ変更。`engine` フィールド・`aiTools:suggestPathEngine`・`SuggestPathEngineId`・`dispatcher.ts` を廃止し `select-engine.ts`（可用性 → record の選択）へ改組。
+> - **第2段（oneshot 撤去・`features/openai` 全廃）**: ワンショットは「AIなし・ES のみ」ではなく `features/openai` の LLM（キーワード抽出・候補評価）に依存するパイプラインだったため、`features/openai` を全廃する方針に伴い撤去した（`analyze-content` / `evaluate-candidates` / `call-llm-for-json` / `oneshot-engine` を削除。マスタートグル `isAiEnabled` は `features/mastra` へ移設）。**現在のエンジン選択は「Mastra AI 設定済み（`isAiConfigured()`）→ agentic / 未設定 → memo のみ」の 2 分岐。** ルートガードは `aiReadyGuard`（enabled かつ configured。未設定は 501）に統一し、マウント側との不整合バグを解消した。
+> - **温存資産と将来計画**: AI に依存しない `retrieve-search-candidates` / `generate-category-suggestion` / `resolve-parent-grant` は削除せず残してある。これらを土台に「AIなし・Elasticsearch のみのフォールバックエンジン」を将来整備する（末尾「将来のロードマップ」節・tasks.md F.1〜F.4。本 PR スコープ外）。
+> - A/B 測定関連の記述は実施当時（明示切り替え方式）の記録として維持する。
 
 ## Overview
 
@@ -42,21 +48,24 @@
 
 - チャット向け `growiAgent` の挙動（agentic-search spec が所有）
 - 共有 tool（`fullTextSearchTool` / `getPageContentTool`）の本体改修
-- ワンショットエンジンを構成する 4 サービス（`analyze-content` / `retrieve-search-candidates` / `evaluate-candidates` / `generate-category-suggestion`）の内部変更
-- ワンショットエンジンの削除、既定エンジンの本番切り替え判断
+- 温存した非AIサービス（`retrieve-search-candidates` / `generate-category-suggestion`）の内部変更 — 将来の Elasticsearch-only エンジン用に据え置き、本 PR では呼び出さない
+- **AIなし・Elasticsearch のみのフォールバックエンジンの新規実装**（将来タスク F.1〜F.4。末尾「将来のロードマップ」節）
 - 評価環境そのもの（#183968 の成果物を利用するのみ）
 - 既存 suggest-path spec の記録の書き換え
+
+> 注: 当初 Out of Boundary としていた「ワンショットエンジンの削除・既定エンジンの本番切り替え判断」は、`features/openai` 全廃方針（2026-07-17）を受けて **本 PR で実施済み**（冒頭ノート第2段）。ワンショットは撤去され、可用性ベース選択は agentic / memo の 2 分岐に縮小した。
 
 ### Allowed Dependencies
 
 - `features/mastra` の mastra-modules（`fullTextSearchTool` / `getPageContentTool` / `listChildrenTool` / `MastraRequestContextShape` / Mastra インスタンスレジストリ）— **依存方向は ai-tools → mastra の一方向のみ**。mastra 側ファイルが suggest-path の型・モジュールを import することは禁止
-- `features/mastra` の AI レイヤ `resolveMastraModel`（support/mastra 所有。アプリ全体設定 `ai:provider` / `ai:apiKey` / `ai:model` / `ai:providerOptions` / `ai:azureOpenaiSettings` に依拠）— 2026-06 マージで `getOpenaiProvider` から置換
-- suggest-path のエンジン非依存共通基盤: `generate-memo-suggestion` / `resolve-parent-grant` / `suggest-path-types` / API ルート（Requirement 5.5 の許容範囲）
+- `features/mastra` の AI レイヤ `resolveMastraModel`（support/mastra 所有。マルチプロバイダ設定 `ai:providers` / `ai:providerApiKeys` / `ai:allowedModels` に依拠。旧単一プロバイダ設定 `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings` は廃止済み）
+- `features/mastra` の可用性判定 `isAiConfigured` と、そこへ移設したマスタートグル `isAiEnabled`（`app:aiEnabled` を読む。`features/openai` 全廃に伴い 2026-07-17 に `features/mastra/server/services/is-ai-enabled.ts` へ移動）
+- suggest-path のエンジン非依存共通基盤: `generate-memo-suggestion` / `resolve-parent-grant` / `suggest-path-types` / API ルート
 - `configManager`（設定読み出し）、`@growi/logger`（pino）
 - `SearchService.searchKeyword` / `Page.findByIdAndViewer` / `pageListingService.findChildrenByParentPathOrIdAndViewer`（tool 経由の間接利用。権限フィルタはこれらに委譲）
 - #183964 / #183967 / #183968 の評価器・ユースケース・ベースライン測定値
 
-**禁止依存**: agentic エンジンからワンショット固有 4 サービスへの import（Requirement 5.5。旧エンジン単独削除可能性の保証）
+**禁止依存**: mastra 側から ai-tools/suggest-path への逆 import（一方向依存の維持）。温存した非AIサービスは agentic エンジンから import しない（将来の Elasticsearch-only エンジンが利用する）。
 
 ### Revalidation Triggers
 
@@ -65,7 +74,8 @@
 - `PathSuggestion` / `SuggestPathResponse` 型の形状変更（API 契約変更）
 - エンドポイント・リクエスト形式（`body` フィールド）・認証要件の変更
 - `MastraRequestContextShape` の形状変更、または `fullTextSearchTool` / `getPageContentTool` の入出力スキーマ変更（support/mastra 側の変動を含む）
-- エンジン可用性の判定基準（`isAiConfigured` / `searchService.isReachable`）の意味変更
+- エンジン可用性の判定基準（`isAiConfigured`）またはルートガード（`aiReadyGuard` = enabled かつ configured）の意味変更
+- `isAiEnabled` の実装・所在の変更（現在 `features/mastra/server/services/is-ai-enabled.ts`。mastra ガード・model-catalog-refresh・suggest-path ルートが依存）
 - support/mastra ブランチの rebase / 上流マージによる Mastra バージョン変動（既知バグ回避方針の再確認が必要）
 
 ## Architecture
@@ -634,8 +644,8 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 
 **Responsibilities & Constraints**
 
-- ミドルウェアチェーン: accessTokenParser AI scope → loginRequiredStrictly → aiEnabledGuard → validator → apiV3FormValidator → handler（4.1）
-- `aiEnabledGuard` は `isAiEnabled()`（`app:aiEnabled`）のみを 501 の条件とする。Mastra 設定状態（`isAiConfigured`）はエンジン選択の分岐であって拒否理由ではない（旧 aiReadyGuard から変更。AI スタック未設定でも oneshot / memo-only の縮退レスポンスを返す）
+- ミドルウェアチェーン: accessTokenParser AI scope → loginRequiredStrictly → aiReadyGuard → validator → apiV3FormValidator → handler（4.1）
+- ガードは `aiReadyGuard`（`isAiEnabled()` かつ `isAiConfigured()`）で統一。未設定（未 configured）は 501 を返す。マウント側 (`features/ai-tools/server/routes/apiv3/index.ts`) も同じ `aiReadyGuard` を適用し、両層の整合を取る（oneshot 撤去前は「未設定でも縮退レスポンス」を狙って `aiEnabledGuard`（enabled のみ）に緩めていたが、縮退先の oneshot が無くなったため 501 へ統一。冒頭ノート第2段）
 - ハンドラは `generateSuggestions` を既存 4 引数で呼ぶのみ
 
 ##### API Contract
