@@ -161,7 +161,7 @@ export const diffRouteHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   const loginRequired = loginRequiredFactory(crowi, false);
 
   return [
-    // biome-ignore lint/suspicious/noTsIgnore: Scope type causes "Type instantiation is excessively deep" with tsgo
+    // biome-ignore lint/suspicious/noTsIgnore: Scope type causes "Type instantiation is excessively deep" with tsc
     // @ts-ignore
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
     loginRequired,

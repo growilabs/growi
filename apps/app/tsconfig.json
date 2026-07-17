@@ -10,9 +10,9 @@
     // TypeScript's `.js` -> `.ts` extension substitution, so the
     // `.js`-suffixed alias specifiers required by the NodeNext server build
     // are mapped back to their extensionless form, which every pipeline
-    // (Turbopack, tsgo, vite-tsconfig-paths) resolves with normal extension
-    // searching. Keep the targets extensionless: typescript-go panics on
-    // suffix patterns with extensioned targets.
+    // (Turbopack, tsc, vite-tsconfig-paths) resolves with normal extension
+    // searching. Keep the targets extensionless: the native TypeScript
+    // compiler (typescript-go) panics on suffix patterns with extensioned targets.
     "paths": {
       "~/*.js": ["./src/*"],
       "^/*.js": ["./*"],
