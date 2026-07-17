@@ -97,11 +97,3 @@ allowBuilds:
   # (e.g. @img/sharp-linux-x64, @img/sharp-libvips-linux-x64), so its install
   # script (which would build libvips from source as a fallback) is not needed.
   sharp: false
-  # @parcel/watcher (transitive via sass) ships platform-specific prebuilt binaries
-  # via optional dependencies (@parcel/watcher-linux-arm64-glibc, etc.), so its
-  # `install: build-from-source` script is a redundant fallback — same as sharp/esbuild.
-  '@parcel/watcher': false
-  # @scarf/scarf's postinstall only reports install analytics to scarf.sh; skip it.
-  '@scarf/scarf': false
-  # aws-sdk v2's postinstall only prints a maintenance-mode notice (warn-maintenance-mode.js).
-  aws-sdk: false
