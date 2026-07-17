@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useEffect,
   useId,
+  useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'next-i18next';
@@ -75,6 +76,12 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
   const [isFileterOptionModalShown, setIsFileterOptionModalShown] =
     useState(false);
   const filterPanelId = useId();
+
+  // Stable, always-visible target used to catch keyboard focus when the filter
+  // chip bar removes its last chip and unmounts (which would otherwise drop
+  // focus to <body>). The search trigger input is present on every viewport, so
+  // it works regardless of input modality — unlike the desktop-only Filters button.
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { t } = useTranslation('');
 
@@ -153,6 +160,7 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
       <div className="grw-search-page-nav d-flex py-3 align-items-center">
         <div className="flex-grow-1 mx-4">
           <SearchModalTriggerinput
+            ref={searchInputRef}
             keywordOnInit={keyword}
             onSearchInvoked={searchBySearchControlHandler}
           />
@@ -254,7 +262,11 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
       </div>
 
       {isEnableFilter && (
-        <SearchFilterChips filters={filters} onChange={changeFiltersHandler} />
+        <SearchFilterChips
+          filters={filters}
+          onChange={changeFiltersHandler}
+          fallbackFocusRef={searchInputRef}
+        />
       )}
 
       {isEnableFilter && (
