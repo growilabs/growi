@@ -238,3 +238,44 @@ describe('strategy setup — lazy SDK loading contract', () => {
     });
   });
 });
+
+describe('setupStrategyById — dispatch and unknown-id boundary', () => {
+  let crowiMock: Crowi;
+  let passportService: PassportService;
+  let useSpy: MockInstance<typeof passport.use>;
+
+  beforeEach(() => {
+    crowiMock = mock<Crowi>({ configManager });
+    passportService = new PassportService(crowiMock);
+    useSpy = vi.spyOn(passport, 'use').mockReturnValue(passport);
+    vi.spyOn(passport, 'unuse').mockReturnValue(passport);
+    // every "...:isEnabled" lookup resolves falsy -> no strategy registered
+    vi.spyOn(configManager, 'getConfig').mockReturnValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('dispatches a known id through the method table and records lastLoadedAt', async () => {
+    await expect(
+      passportService.setupStrategyById('github'),
+    ).resolves.toBeUndefined();
+
+    // github is disabled above, so nothing is registered, but the happy path
+    // ran to completion and stamped lastLoadedAt.
+    expect(useSpy).not.toHaveBeenCalled();
+    expect(passportService.lastLoadedAt).toBeInstanceOf(Date);
+  });
+
+  it('skips an unknown id without throwing, registering, or recording lastLoadedAt', async () => {
+    // Before the typed guard an unknown id crashed on a missing dispatch entry
+    // (a TypeError that escaped the un-awaited S2s path); now it is skipped.
+    await expect(
+      passportService.setupStrategyById('nonexistent'),
+    ).resolves.toBeUndefined();
+
+    expect(useSpy).not.toHaveBeenCalled();
+    expect(passportService.lastLoadedAt).toBeUndefined();
+  });
+});
