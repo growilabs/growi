@@ -9,8 +9,20 @@
     "sourceMap": false,
     "noEmit": false,
     "baseUrl": "./src",
+    // This config overrides `paths` (so tsc-alias sees `~/*` → `./*` relative
+    // to the ./src baseUrl for the emit). Overriding drops the @tsed
+    // local-node_modules workaround inherited from tsconfig.json, so it must be
+    // re-declared here — otherwise @tsed resolves to the wrong hoisted version
+    // and Server.ts / index.ts fail to type-check (pnpm issue #7158). Targets
+    // are `../node_modules` because baseUrl is ./src, not the app root.
     "paths": {
-      "~/*": ["./*"]
+      "~/*": ["./*"],
+      "@tsed/core": ["../node_modules/@tsed/core"],
+      "@tsed/schema": ["../node_modules/@tsed/schema"],
+      "@tsed/exceptions": ["../node_modules/@tsed/exceptions"],
+      "@tsed/common": ["../node_modules/@tsed/common"],
+      "@tsed/di": ["../node_modules/@tsed/di"],
+      "@tsed/logger": ["../node_modules/@tsed/logger"]
     }
   }
 }
