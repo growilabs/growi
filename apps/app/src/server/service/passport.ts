@@ -1,19 +1,14 @@
 import axiosRetry from 'axios-retry';
 import type { IncomingMessage } from 'http';
 import luceneQueryParser from 'lucene-query-parser';
-import {
-  custom,
-  Issuer as OIDCIssuer,
-  Strategy as OidcStrategy,
-} from 'openid-client';
+// Only the `Issuer` type is needed at module scope (for the getOIDCIssuerInstance
+// return annotation); the value bindings (custom / Issuer / Strategy) are loaded
+// lazily inside the setup methods. See the lazy `import('openid-client')` calls.
+import type { Issuer } from 'openid-client';
 import pRetry from 'p-retry';
 import passport from 'passport';
-import { Strategy as GitHubStrategy } from 'passport-github';
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import LdapStrategy from 'passport-ldapauth';
 import { Strategy as LocalStrategy } from 'passport-local';
 import type { Profile, VerifiedCallback } from 'passport-saml';
-import { Strategy as SamlStrategy } from 'passport-saml';
 import urljoin from 'url-join';
 
 import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
@@ -311,7 +306,7 @@ class PassportService implements S2sMessageHandlable {
    *
    * @memberof PassportService
    */
-  setupLdapStrategy() {
+  async setupLdapStrategy(): Promise<void> {
     this.resetLdapStrategy();
 
     const config = this.crowi.config;
@@ -327,6 +322,11 @@ class PassportService implements S2sMessageHandlable {
     }
 
     logger.debug('LdapStrategy: setting up..');
+
+    // Lazy-load the strategy SDK only when LDAP is enabled, to keep
+    // passport-ldapauth (and its heavy ldapjs dependency, ~18 MiB RSS) out of
+    // the boot module graph. passport-ldapauth is a CJS default export.
+    const LdapStrategy = (await import('passport-ldapauth')).default;
 
     passport.use(
       new LdapStrategy(
@@ -508,7 +508,7 @@ class PassportService implements S2sMessageHandlable {
    *
    * @memberof PassportService
    */
-  setupGoogleStrategy() {
+  async setupGoogleStrategy(): Promise<void> {
     this.resetGoogleStrategy();
 
     const isGoogleEnabled = configManager.getConfig(
@@ -521,6 +521,13 @@ class PassportService implements S2sMessageHandlable {
     }
 
     logger.debug('GoogleStrategy: setting up..');
+
+    // Lazy-load the strategy SDK only when Google auth is enabled
+    // (see setupLdapStrategy for rationale).
+    const { Strategy: GoogleStrategy } = await import(
+      'passport-google-oauth20'
+    );
+
     passport.use(
       new GoogleStrategy(
         {
@@ -566,7 +573,7 @@ class PassportService implements S2sMessageHandlable {
     this.isGoogleStrategySetup = false;
   }
 
-  setupGitHubStrategy() {
+  async setupGitHubStrategy(): Promise<void> {
     this.resetGitHubStrategy();
 
     const isGitHubEnabled = configManager.getConfig(
@@ -579,6 +586,11 @@ class PassportService implements S2sMessageHandlable {
     }
 
     logger.debug('GitHubStrategy: setting up..');
+
+    // Lazy-load the strategy SDK only when GitHub auth is enabled
+    // (see setupLdapStrategy for rationale).
+    const { Strategy: GitHubStrategy } = await import('passport-github');
+
     passport.use(
       new GitHubStrategy(
         {
@@ -637,6 +649,15 @@ class PassportService implements S2sMessageHandlable {
     }
 
     logger.debug('OidcStrategy: setting up..');
+
+    // Lazy-load the strategy SDK only when OIDC is enabled, to keep
+    // openid-client (and its jose dependency) out of the boot module graph
+    // (see setupLdapStrategy for rationale).
+    const {
+      custom,
+      Issuer: OIDCIssuer,
+      Strategy: OidcStrategy,
+    } = await import('openid-client');
 
     // setup client
     // extend oidc request timeouts
@@ -839,7 +860,11 @@ class PassportService implements S2sMessageHandlable {
    */
   async getOIDCIssuerInstance(
     issuerHost: string | undefined,
-  ): Promise<void | OIDCIssuer> {
+  ): Promise<void | Issuer> {
+    // Lazy-load the strategy SDK only when OIDC is enabled (this method is
+    // only reached from setupOidcStrategy, after its enabled check).
+    const { custom, Issuer: OIDCIssuer } = await import('openid-client');
+
     const OIDC_TIMEOUT_MULTIPLIER = configManager.getConfig(
       'security:passport-oidc:timeoutMultiplier',
     );
@@ -885,7 +910,7 @@ class PassportService implements S2sMessageHandlable {
     return oidcIssuer;
   }
 
-  setupSamlStrategy(): void {
+  async setupSamlStrategy(): Promise<void> {
     this.resetSamlStrategy();
 
     const isSamlEnabled = configManager.getConfig(
@@ -904,6 +929,10 @@ class PassportService implements S2sMessageHandlable {
       logger.warn('SamlStrategy: cert is not set. setup is skipped.');
       return;
     }
+
+    // Lazy-load the strategy SDK only when SAML is enabled and configured
+    // (see setupLdapStrategy for rationale).
+    const { Strategy: SamlStrategy } = await import('passport-saml');
 
     passport.use(
       new SamlStrategy(
