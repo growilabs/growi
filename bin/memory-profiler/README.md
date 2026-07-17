@@ -3,6 +3,10 @@
 This directory contains tooling for server-side memory profiling of GROWI.
 See [design.md](../../.kiro/specs/memory-profiler/design.md) for the tool's architecture and stable contract.
 
+> For a lightweight startup-focused comparison instead (boot RSS + loaded-module
+> diff between two production builds), see [`../startup-memory-ab/`](../startup-memory-ab/README.md).
+> This directory hosts the full baseline → load → drain scenario tooling.
+
 ## Stable Contract
 
 This section defines the **stable public surface** of the memory-profiler tool.
