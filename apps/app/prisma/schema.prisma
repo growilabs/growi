@@ -118,11 +118,18 @@ model attachments {
 }
 
 model bookmarkfolders {
-  id    String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  owner Json?
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  v           Int      @default(0) @map("__v")
+  name        String?
+  ownerId     String?  @map("owner") @db.ObjectId
+  parentId    String?  @map("parent") @db.ObjectId
+  bookmarkIds String[] @map("bookmarks") @db.ObjectId
 
-  @@index([owner], map: "owner_1")
+  owner    users?            @relation(fields: [ownerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  parent   bookmarkfolders?  @relation("BookmarkFolderParentChild", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children bookmarkfolders[] @relation("BookmarkFolderParentChild")
+
+  @@index([ownerId], map: "owner_1")
 }
 
 model bookmarks {
@@ -253,7 +260,7 @@ model mastrarefreshedmodelcatalogs {
   // model-catalog-data.json asset.
   id                           String   @id @map("_id")
   v                            Int      @default(0) @map("__v")
-  /// provider -> selectable model ids (validated by buildModelCatalog before every write)
+  /// provider -> selectable models ({ id, name }; validated by buildModelCatalog before every write)
   models                       Json
   fetchedAt                    DateTime
   /// _generatedAt of the bundled asset that was current when this snapshot was
@@ -564,6 +571,7 @@ model users {
   createdAttachments attachments[]      @relation("CreatedAttachments")
   externalaccounts   externalaccounts[]
   bookmarks          bookmarks[]
+  bookmarkfolders    bookmarkfolders[]
 
   @@index([name], map: "name_1")
   @@index([status], map: "status_1")

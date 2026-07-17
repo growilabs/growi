@@ -44,6 +44,7 @@ import {
 import { Response } from '~/components/ai-elements/response';
 import { Button } from '~/components/ui/button';
 import { PageMentionInput } from '~/features/mastra/client/components/PageMentionInput';
+import { getProviderLabel } from '~/features/mastra/interfaces/ai-provider';
 import type { CustomUIMessage } from '~/features/mastra/interfaces/chat-message';
 import {
   formatModelLabel,
@@ -227,9 +228,9 @@ export const ChatSidebar = (): JSX.Element => {
     <div
       className={`tw-root position-fixed top-0 end-0 h-100 border-start bg-body shadow-sm overflow-hidden ${moduleClass}`}
     >
-      <div className="tw:max-w-4xl tw:mx-auto tw:py-6 tw:relative tw:size-full twh-screen">
+      <div className="tw:max-w-4xl tw:mx-auto tw:py-3 tw:relative tw:size-full">
         <div className="tw:flex tw:flex-col tw:h-full">
-          <div className="tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:px-6 tw:pb-2 tw:border-b tw:border-border">
+          <div className="tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:px-3 tw:pb-2 tw:border-b tw:border-border">
             <span className="growi-custom-icons fs-4">ai_chat</span>
             <span className="tw:flex-1 tw:font-semibold tw:truncate">
               {headerLabel}
@@ -399,17 +400,17 @@ export const ChatSidebar = (): JSX.Element => {
                 >
                   <PromptInputModelSelectTrigger>
                     {/*
-                      The grouped items render only the modelId, so the default
-                      <SelectValue/> would show a bare modelId — ambiguous when
-                      the same modelId exists under two providers. Render the
-                      selected entry as "provider · modelId" instead; fall back to
+                      The grouped items render only the display name, so the
+                      default <SelectValue/> would show a bare name — ambiguous
+                      when two providers expose a same-named model. Render the
+                      selected entry as "Provider · name" instead; fall back to
                       the empty placeholder value before a selection resolves
                       (Req 4.2).
                     */}
                     {selectedEntry != null ? (
                       formatModelLabel(
                         selectedEntry.provider,
-                        selectedEntry.modelId,
+                        selectedEntry.displayName,
                       )
                     ) : (
                       <PromptInputModelSelectValue />
@@ -436,14 +437,14 @@ export const ChatSidebar = (): JSX.Element => {
                     {providerGroups.map((group) => (
                       <PromptInputModelSelectGroup key={group.provider}>
                         <PromptInputModelSelectLabel>
-                          {group.provider}
+                          {getProviderLabel(group.provider)}
                         </PromptInputModelSelectLabel>
                         {group.entries.map((entry) => (
                           <PromptInputModelSelectItem
                             key={entry.key}
                             value={entry.key}
                           >
-                            {entry.modelId}
+                            {entry.displayName}
                           </PromptInputModelSelectItem>
                         ))}
                       </PromptInputModelSelectGroup>
@@ -456,6 +457,16 @@ export const ChatSidebar = (): JSX.Element => {
                 />
               </PromptInputFooter>
             </PromptInput>
+            {/* Persistent accuracy disclaimer, placed under the input like
+                other AI chat products so it reads as a notice covering the
+                whole conversation and never scrolls out of view.
+                Spaced with PADDING, not margin: tailwind.css pins `.tw-root p`
+                margins to 0 with an UNLAYERED rule that outranks the
+                @layer-ed tw: margin utilities, so tw:mt-* can never win on a
+                <p> here — tw:pt-* is untouched by that rule. */}
+            <p className="tw:pt-2 tw:text-center tw:text-xs tw:text-muted-foreground/60">
+              {t('ai_sidebar.accuracy_notice')}
+            </p>
           </div>
         </div>
       </div>

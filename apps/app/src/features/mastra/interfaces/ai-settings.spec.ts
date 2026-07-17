@@ -31,9 +31,14 @@ describe('ai-settings interfaces', () => {
             modelId: 'gpt-4o',
             providerOptions: { openai: { temperature: 0.2 } },
             isDefault: true,
+            displayName: 'GPT-4o',
           },
           // Cross-provider coexistence of the same modelId (Req 2.3)
-          { provider: 'azure-openai', modelId: 'gpt-4o' },
+          {
+            provider: 'azure-openai',
+            modelId: 'gpt-4o',
+            displayName: 'gpt-4o',
+          },
         ],
         useOnlyEnvVars: false,
         isConfigured: true,

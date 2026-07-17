@@ -1,8 +1,10 @@
 import type { JSX } from 'react';
-import { useCallback, useId, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 import { Button, FormGroup } from 'reactstrap';
+
+import { ConfirmModal } from '~/client/components/Admin/App/ConfirmModal';
 
 import type { AiProvider } from '../../interfaces/ai-provider';
 import { AllowedModelRow } from './AllowedModelRow';
@@ -68,11 +70,6 @@ export const AllowedModelsField = (
     'allowedModels'
   >({ control, name: 'allowedModels' });
 
-  // The radios share one group name so only one is checkable at the DOM level;
-  // useId() guarantees uniqueness if multiple instances ever co-exist. (Used as a
-  // `name` attribute — safe; never passed to a reactstrap `target` prop.)
-  const radioGroupName = useId();
-
   // Subscribe to the whole flat list. This is deliberately a field-level watch
   // (not row-local): the same-provider duplicate check and the registered-id
   // exclusion are inherently cross-row, so the field must observe every row's
@@ -136,15 +133,15 @@ export const AllowedModelsField = (
   // does not yet exist (loading, empty list), the value is lost and the field
   // shows the placeholder even after options arrive later. Mounting the select
   // only when its options already exist keeps the saved value displayed on reload.
-  const selectableModelIds = data?.modelIds ?? [];
+  const selectableModels = data?.models ?? [];
   const isResolved = data != null;
   // A request is in flight only until data or error arrives; the modelId control
   // is disabled during that window. `provider` is always a real provider here (a
   // required prop), so the hook always issues a request.
   const isLoadingModels = !isResolved && error == null;
-  // `selectableModelIds` is [] until the catalog resolves (data?.modelIds ?? []),
+  // `selectableModels` is [] until the catalog resolves (data?.models ?? []),
   // so a non-empty list already implies "resolved" — no separate isResolved guard.
-  const useSelect = selectableModelIds.length > 0;
+  const useSelect = selectableModels.length > 0;
 
   // Azure OpenAI stores the *deployment name* in `modelId`, so the label changes
   // by provider (data-driven on the prop, no provider-specific branch elsewhere).
@@ -192,6 +189,35 @@ export const AllowedModelsField = (
     [getValues, remove, setValue],
   );
 
+  // Deleting a filled row discards its saved values (possibly hand-written
+  // providerOptions JSON), so it asks for confirmation first. A still-blank row
+  // (no modelId) carries nothing worth protecting and is removed immediately —
+  // discarding an accidentally-added row shouldn't pay the modal friction.
+  const [pendingRemoval, setPendingRemoval] = useState<{
+    originalIndex: number;
+    /** Named by the official display name; falls back to the raw model id. */
+    modelName: string;
+  } | null>(null);
+
+  const requestRemoveRow = useCallback(
+    (originalIndex: number): void => {
+      const row = getValues('allowedModels')[originalIndex];
+      const modelId = row?.modelId ?? '';
+      if (modelId.trim() === '') {
+        removeRow(originalIndex);
+        return;
+      }
+      // Confirm with the human-readable name; `displayName` is optional
+      // (out-of-catalog or legacy rows), so fall back to the id.
+      const displayName = row?.displayName ?? '';
+      setPendingRemoval({
+        originalIndex,
+        modelName: displayName.trim() !== '' ? displayName : modelId,
+      });
+    },
+    [getValues, removeRow],
+  );
+
   // Append a new row OWNED by this provider (R2.2), seeded with the provider's
   // empty providerOptions namespace. The first model added to an EMPTY global
   // list is the default so the single-default invariant holds from the start
@@ -228,16 +254,15 @@ export const AllowedModelsField = (
           // an array-root replacement, whereas the whole-array watch does.
           isDefault={watchedModels[originalIndex]?.isDefault === true}
           labelKey={modelLabelKey}
-          radioGroupName={radioGroupName}
           useSelect={useSelect}
-          selectableModelIds={selectableModelIds}
+          selectableModels={selectableModels}
           registeredModelIds={registeredModelIds}
           duplicateModelIds={duplicateModelIds}
           isLoadingModels={isLoadingModels}
           docUrl={PROVIDER_OPTIONS_DOC_URL}
           placeholder={buildInitialProviderOptionsText(provider)}
           onSelectDefault={() => selectDefault(originalIndex)}
-          onRemove={() => removeRow(originalIndex)}
+          onRemove={() => requestRemoveRow(originalIndex)}
         />
       ))}
 
@@ -257,6 +282,27 @@ export const AllowedModelsField = (
         </span>
         {t(addLabelKey)}
       </Button>
+
+      <ConfirmModal
+        isModalOpen={pendingRemoval != null}
+        // text-warning (not the default text-danger): the removal is only
+        // staged on the form and takes effect on save, so nothing destructive
+        // has happened yet — the same severity rationale as the
+        // catalog-refresh modal.
+        headerClassName="text-warning"
+        warningMessage={t('ai_settings.remove_model_confirmation', {
+          modelName: pendingRemoval?.modelName ?? '',
+        })}
+        supplymentaryMessage={null}
+        confirmButtonTitle={t('ai_settings.remove_model_confirm')}
+        onConfirm={() => {
+          if (pendingRemoval != null) {
+            removeRow(pendingRemoval.originalIndex);
+          }
+          setPendingRemoval(null);
+        }}
+        onCancel={() => setPendingRemoval(null)}
+      />
     </FormGroup>
   );
 };

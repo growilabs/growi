@@ -45,7 +45,21 @@ const MenuLabel = ({ menu }: { menu: string }) => {
     case 'ai':
       return (
         <>
-          <span className="material-symbols-outlined me-1">smart_toy</span>
+          {/* fs-6: .growi-custom-icons defaults to font-size 0.8em, too small
+              next to the sibling .material-symbols-outlined icons (1.5em).
+              width: material glyphs are square (1.5em font-size × 1em advance
+              = a 1.5rem box) while growi_ai is narrower, which would make it
+              sit left of the other icons — the fixed 1.5rem-wide centered box
+              gives it the same footprint so icon centers and label starts
+              line up. top: the growi_ai glyph hangs lower on the baseline
+              than the material glyphs, so nudge it up to optically align
+              with the label text. */}
+          <span
+            className="growi-custom-icons fs-6 align-middle me-1 d-inline-block text-center position-relative"
+            style={{ width: '1.5rem', top: '-0.1em' }}
+          >
+            growi_ai
+          </span>
           {t('ai_settings.ai_settings')}
         </>
       );

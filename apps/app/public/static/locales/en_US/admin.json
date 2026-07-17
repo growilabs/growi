@@ -474,6 +474,8 @@
     "add_model": "Add model",
     "azure_add_deployment": "Add deployment",
     "remove_model": "Remove",
+    "remove_model_confirmation": "Are you sure you want to remove \"{{modelName}}\" from the list?",
+    "remove_model_confirm": "Remove model",
     "provider_options_label": "Provider Options (JSON)",
     "provider_options_doc_link": "How to write",
     "provider_options_invalid_json": "Invalid JSON",
@@ -963,6 +965,16 @@
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
+  },
+  "audit_log_snapshot": {
+    "file_name": "File name",
+    "file_size": "File size",
+    "page": "Page",
+    "no_detail": "No snapshot detail available",
+    "unknown_file_name": "Unknown file name",
+    "page_unavailable": "Page unavailable",
+    "unknown_size": "Unknown size",
+    "download": "Download"
   },
   "g2g_data_transfer": {
     "transfer_data_to_another_growi": "Transfer data from this GROWI to another GROWI",
