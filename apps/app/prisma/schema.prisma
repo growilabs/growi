@@ -422,20 +422,21 @@ model passwordresetorders {
 
 model revisions {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  v             Int      @map("__v")
-  authorId      String   @map("author") @db.ObjectId
+  v             Int      @default(0) @map("__v")
+  authorId      String?  @map("author") @db.ObjectId
   body          String
   createdAt     DateTime @default(now())
   hasDiffToPrev Boolean?
-  format        String
+  format        String   @default("markdown")
   origin        String?
   pageId        String   @db.ObjectId
 
-  author   users      @relation(fields: [authorId], references: [id])
-  page     pages      @relation(fields: [pageId], references: [id])
+  author   users?     @relation(fields: [authorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  page     pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   comments comments[]
 
   @@index([pageId], map: "pageId_1")
+  @@index([authorId, createdAt(sort: Desc)], map: "author_1_createdAt_-1")
 }
 
 model rlflx {
