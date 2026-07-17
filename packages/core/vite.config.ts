@@ -8,6 +8,14 @@ export default defineConfig({
   plugins: [
     dts({
       copyDtsFiles: true,
+      // TypeScript 6/7 no longer infers rootDir as the common source dir, so
+      // declarations would emit under dist/src/ (breaking the `types` entry).
+      // Scope the dts program to src (tsconfig also includes test/) and pin
+      // rootDir so declarations stay at dist/.
+      include: ['src/**/*.ts'],
+      compilerOptions: {
+        rootDir: 'src',
+      },
     }),
     {
       ...nodeExternals({

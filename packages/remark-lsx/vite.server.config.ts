@@ -8,6 +8,10 @@ export default defineConfig({
     dts({
       entryRoot: 'src/server',
       copyDtsFiles: true,
+      include: ['src/server'],
+      compilerOptions: {
+        rootDir: 'src/server',
+      },
     }),
     {
       ...nodeExternals({

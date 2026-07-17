@@ -9,7 +9,7 @@ import dts from 'vite-plugin-dts';
 export default defineConfig({
   plugins: [
     react(),
-    dts({ copyDtsFiles: true }),
+    dts({ copyDtsFiles: true, compilerOptions: { rootDir: 'src' } }),
     {
       ...nodeExternals({
         devDeps: true,

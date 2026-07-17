@@ -11,6 +11,9 @@ export default defineConfig({
     react(),
     dts({
       copyDtsFiles: true,
+      compilerOptions: {
+        rootDir: 'src',
+      },
     }),
     {
       ...nodeExternals({

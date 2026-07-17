@@ -8,6 +8,9 @@ export default defineConfig({
   plugins: [
     dts({
       copyDtsFiles: true,
+      compilerOptions: {
+        rootDir: 'src',
+      },
     }),
     {
       ...nodeExternals({

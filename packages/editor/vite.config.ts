@@ -65,6 +65,9 @@ export default defineConfig({
       // Pinning paths here forces vite-plugin-dts to resolve these packages
       // to a single location regardless of the import origin.
       compilerOptions: {
+        // TypeScript 6/7 no longer infers rootDir as the common source dir, so
+        // declarations would emit under dist/src/. Pin it to keep them at dist/.
+        rootDir: 'src',
         paths: {
           '@codemirror/state': [
             path.resolve(__dirname, 'node_modules/@codemirror/state'),
