@@ -434,10 +434,12 @@ function resolveToPage(toPath: string): Promise<ObjectId | null>;
 
 ##### Event Contract
 - Subscribed events (wired in `crowi` setup like `search.ts`):
-  - `create (page, user)` → extract `page.revision.body` → `replaceOutboundLinks` →
+  - `create (page, user)` → extract `page.revision.body` → `syncOutboundLinks` →
     `reResolveByToPath(page.path)` (correct stale caches from a prior occupant — match on
     `toPath`, not `toPage:null`).
-  - `update (page, user)` → re-extract → `replaceOutboundLinks`.
+  - `update (page, user)` → re-extract → `syncOutboundLinks`.
+  - Note: handlers call the `syncOutboundLinks` **service** (drops self-links, then
+    persists), never the raw `PageLink.replaceOutboundLinks` model static directly.
   - `delete (targetPage, deletedPage, user)`, `deleteCompletely (page, user)`,
     `syncDescendantsDelete (pages[], user)` → `reconcileDeletedPages(ids)`.
 - Ordering/delivery: listeners run asynchronously after the lifecycle op (fire-and-forget, like

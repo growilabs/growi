@@ -27,6 +27,15 @@ describe('dropSelfLinks', () => {
     expect(result).toEqual([]);
   });
 
+  it('drops a self-link when the target is a distinct ObjectId instance with the same value', () => {
+    const fromPageId = new Types.ObjectId();
+    const target = new Types.ObjectId(fromPageId.toHexString());
+
+    expect(
+      dropSelfLinks(fromPageId, [row(target, '/self-by-permalink')]),
+    ).toEqual([]);
+  });
+
   it('keeps an unresolved (broken) row — toPage null is not a self-link', () => {
     const fromPageId = new Types.ObjectId();
     const brokenRow = row(null, '/does-not-exist');
