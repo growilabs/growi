@@ -41,7 +41,7 @@ const {
     // Returns a per-provider key so each resolver's provider argument is observable
     // in the apiKey passed to its creator.
     requireApiKey: vi.fn((provider: string) => `key-for-${provider}`),
-    resolveAzureOpenaiModel: vi.fn((modelId: string) => ({
+    resolveAzureOpenaiModel: vi.fn(async (modelId: string) => ({
       tag: 'azure-model',
       modelId,
     })),
