@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
     generateSuggestionsMock: vi.fn(),
     loginRequiredFactoryMock: vi.fn(),
     isAiEnabledMock: vi.fn(),
+    isAiConfiguredMock: vi.fn(),
     findAllUserGroupIdsMock: vi.fn(),
     findAllExternalUserGroupIdsMock: vi.fn(),
   };
@@ -24,8 +25,14 @@ vi.mock('~/server/middlewares/login-required', () => ({
   default: mocks.loginRequiredFactoryMock,
 }));
 
-vi.mock('~/features/openai/server/services', () => ({
+// The route gates on aiReadyGuard, which reads isAiEnabled + isAiConfigured.
+// Mock those two seams so the real guard runs against controllable state.
+vi.mock('~/features/mastra/server/services/is-ai-enabled', () => ({
   isAiEnabled: mocks.isAiEnabledMock,
+}));
+
+vi.mock('~/features/mastra/server/services/is-ai-configured', () => ({
+  isAiConfigured: mocks.isAiConfiguredMock,
 }));
 
 vi.mock('~/utils/logger', () => ({
@@ -86,6 +93,7 @@ describe('suggestPathHandlersFactory', () => {
       (_req: unknown, _res: unknown, next: () => void) => next(),
     );
     mocks.isAiEnabledMock.mockReturnValue(true);
+    mocks.isAiConfiguredMock.mockReturnValue(true);
     mocks.findAllUserGroupIdsMock.mockResolvedValue(['group1']);
     mocks.findAllExternalUserGroupIdsMock.mockResolvedValue(['extGroup1']);
   });
@@ -112,7 +120,7 @@ describe('suggestPathHandlersFactory', () => {
   };
 
   describe('middleware chain', () => {
-    // Exact count: accessTokenParser + loginRequired + aiEnabledGuard
+    // Exact count: accessTokenParser + loginRequired + aiReadyGuard
     // + 1 validator chain (body) + apiV3FormValidator + the main handler.
     // A dropped security middleware must fail this, not slip under a loose
     // >= bound.
@@ -133,7 +141,7 @@ describe('suggestPathHandlersFactory', () => {
     });
   });
 
-  describe('AI enabled gate', () => {
+  describe('AI ready gate', () => {
     it('should respond 501 and stop before the main handler when AI is disabled', async () => {
       mocks.isAiEnabledMock.mockReturnValue(false);
       mocks.generateSuggestionsMock.mockResolvedValue([]);
@@ -145,8 +153,21 @@ describe('suggestPathHandlersFactory', () => {
       expect(mocks.generateSuggestionsMock).not.toHaveBeenCalled();
     });
 
-    it('should pass the request through to the main handler when AI is enabled', async () => {
+    it('should respond 501 and stop before the main handler when AI is enabled but not configured', async () => {
       mocks.isAiEnabledMock.mockReturnValue(true);
+      mocks.isAiConfiguredMock.mockReturnValue(false);
+      mocks.generateSuggestionsMock.mockResolvedValue([]);
+
+      const { req, res } = createMockReqRes();
+      await runChain(req, res);
+
+      expect(res.apiv3Err).toHaveBeenCalledWith(expect.anything(), 501);
+      expect(mocks.generateSuggestionsMock).not.toHaveBeenCalled();
+    });
+
+    it('should pass the request through to the main handler when AI is enabled and configured', async () => {
+      mocks.isAiEnabledMock.mockReturnValue(true);
+      mocks.isAiConfiguredMock.mockReturnValue(true);
       mocks.generateSuggestionsMock.mockResolvedValue([]);
 
       const { req, res } = createMockReqRes();

@@ -37,8 +37,6 @@ import type { AgenticEngineOutput } from '../services/engines/agentic-output-sch
  *   fullTextSearchTool delegates to; the formatter mock reproduces the
  *   raw-hit -> formatted-item projection the real formatter performs
  * - resolveParentGrant and the user-group models (mongoose-backed)
- * - the oneshot pipeline services (harness parity with the 6.1 spec; the
- *   agentic path must leave them untouched, which 6.1 already asserts)
  *
  * NOTE: `limitedSearchTool` is imported DIRECTLY from its module — NOT via
  * the `agents/suggest-path` barrel, which also loads suggest-path-agent.ts
@@ -48,12 +46,6 @@ import type { AgenticEngineOutput } from '../services/engines/agentic-output-sch
  */
 
 const mocks = vi.hoisted(() => ({
-  // Oneshot pipeline seams — must stay idle on the agentic path; mocked so
-  // the module graph never loads the real LLM-calling services.
-  analyzeContentMock: vi.fn(),
-  retrieveSearchCandidatesMock: vi.fn(),
-  evaluateCandidatesMock: vi.fn(),
-  generateCategorySuggestionMock: vi.fn(),
   // Grant resolution seam (mongoose-backed)
   resolveParentGrantMock: vi.fn(),
   // Agent seam
@@ -80,7 +72,7 @@ vi.mock('~/server/middlewares/access-token-parser', () => ({
 }));
 
 // Mock login required — always authenticate as the fixture user
-// (authentication enforcement itself is covered by suggest-path-integration.spec.ts)
+// (authentication enforcement itself is covered by the route handler spec)
 vi.mock('~/server/middlewares/login-required', () => ({
   default: () => (req: Request, _res: Response, next: NextFunction) => {
     Object.assign(req, { user: mockUser });
@@ -144,22 +136,6 @@ vi.mock(
     },
   }),
 );
-
-vi.mock('../services/analyze-content', () => ({
-  analyzeContent: mocks.analyzeContentMock,
-}));
-
-vi.mock('../services/retrieve-search-candidates', () => ({
-  retrieveSearchCandidates: mocks.retrieveSearchCandidatesMock,
-}));
-
-vi.mock('../services/evaluate-candidates', () => ({
-  evaluateCandidates: mocks.evaluateCandidatesMock,
-}));
-
-vi.mock('../services/generate-category-suggestion', () => ({
-  generateCategorySuggestion: mocks.generateCategorySuggestionMock,
-}));
 
 vi.mock('../services/resolve-parent-grant', () => ({
   resolveParentGrant: mocks.resolveParentGrantMock,

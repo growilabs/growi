@@ -9,19 +9,20 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import type { AgenticEngineOutput } from '../services/engines/agentic-output-schema';
 
 /**
- * Route integration for engine selection (task 6.1): requests travel through
- * the real middleware chain (validator + apiV3FormValidator + handler), the
- * real orchestrator + availability-based engine selection, and the REAL
+ * Route integration for engine selection: requests travel through the real
+ * middleware chain (aiReadyGuard + validator + apiV3FormValidator + handler),
+ * the real orchestrator + availability-based engine selection, and the REAL
  * agentic engine adapter.
  *
- * The engine is selected by runtime availability: agentic when the Mastra AI
- * stack has at least one available model, oneshot when only full-text search
- * is reachable, memo-only when neither is available. Each describe block
+ * Engine selection is by runtime availability: agentic when the Mastra AI
+ * stack has at least one available model. When the stack is NOT configured the
+ * aiReadyGuard rejects the request with 501 before any engine runs — there is
+ * no legacy fallback engine (the Elasticsearch-only fallback is planned; see
+ * the roadmap in the suggest-path-agentic spec). Each describe block
  * reproduces one availability state through the config seam (`ai:providers`
- * etc.) and the search service's isReachable flag.
+ * etc.).
  *
  * Only process-external seams are mocked:
- * - the oneshot pipeline services (same seams as suggest-path-integration.spec.ts)
  * - resolveParentGrant (mongoose-backed)
  * - the Mastra registry: its transitive `@mastra/core/agent` import cannot
  *   load under vitest (pnpm `@mastra/core>p-map` override — see tasks.md
@@ -31,12 +32,7 @@ import type { AgenticEngineOutput } from '../services/engines/agentic-output-sch
  */
 
 const mocks = vi.hoisted(() => ({
-  // Oneshot pipeline seams
-  analyzeContentMock: vi.fn(),
-  retrieveSearchCandidatesMock: vi.fn(),
-  evaluateCandidatesMock: vi.fn(),
-  generateCategorySuggestionMock: vi.fn(),
-  // Grant resolution seam (shared by both engines)
+  // Grant resolution seam (mongoose-backed)
   resolveParentGrantMock: vi.fn(),
   // Agent seam
   getAgentMock: vi.fn(),
@@ -64,7 +60,7 @@ vi.mock('~/server/middlewares/access-token-parser', () => ({
 }));
 
 // Mock login required — always authenticate as the fixture user
-// (authentication enforcement itself is covered by suggest-path-integration.spec.ts)
+// (authentication enforcement itself is covered by the route handler spec)
 vi.mock('~/server/middlewares/login-required', () => ({
   default: () => (req: Request, _res: Response, next: NextFunction) => {
     Object.assign(req, { user: mockUser });
@@ -131,22 +127,6 @@ vi.mock(
   }),
 );
 
-vi.mock('../services/analyze-content', () => ({
-  analyzeContent: mocks.analyzeContentMock,
-}));
-
-vi.mock('../services/retrieve-search-candidates', () => ({
-  retrieveSearchCandidates: mocks.retrieveSearchCandidatesMock,
-}));
-
-vi.mock('../services/evaluate-candidates', () => ({
-  evaluateCandidates: mocks.evaluateCandidatesMock,
-}));
-
-vi.mock('../services/generate-category-suggestion', () => ({
-  generateCategorySuggestion: mocks.generateCategorySuggestionMock,
-}));
-
 vi.mock('../services/resolve-parent-grant', () => ({
   resolveParentGrant: mocks.resolveParentGrantMock,
 }));
@@ -167,37 +147,6 @@ vi.mock('~/utils/logger', () => ({
 }));
 
 // --- Fixtures --------------------------------------------------------------
-
-// Oneshot pipeline outputs. Values are distinct from the agentic fixture so
-// the provenance of each response (which engine produced it) is unambiguous.
-const oneshotAnalysis = {
-  keywords: ['React', 'hooks'],
-  informationType: 'stock' as const,
-};
-
-const oneshotCandidates = [
-  {
-    pagePath: '/tech-notes/React/hooks-guide',
-    snippet: 'React hooks overview',
-    score: 10,
-  },
-];
-
-const oneshotEvaluated = [
-  {
-    path: '/tech-notes/React/',
-    label: 'Save near related pages',
-    description: 'Oneshot-evaluated destination for React content.',
-  },
-];
-
-const oneshotCategory = {
-  type: 'category',
-  path: '/tech-notes/',
-  label: 'Save under category',
-  description: 'Top-level category: tech-notes',
-  grant: 1,
-};
 
 // Structured output the fake agent resolves — consumed by the real agentic
 // engine (type-guard validation, path normalization, grant resolution).
@@ -226,11 +175,7 @@ const expectedMemoSuggestion = {
 };
 
 describe('POST /suggest-path route integration — engine selection', () => {
-  const buildApp = async ({
-    searchReachable,
-  }: {
-    searchReachable: boolean;
-  }): Promise<express.Application> => {
+  const buildApp = async (): Promise<express.Application> => {
     const app = express();
     app.use(express.json());
     app.use((_req: Request, res: Response, next: NextFunction) => {
@@ -246,9 +191,10 @@ describe('POST /suggest-path route integration — engine selection', () => {
     });
 
     // Import and mount the handler factory with the real middleware chain
+    // (aiReadyGuard included), so the not-configured -> 501 gate is exercised.
     const { suggestPathHandlersFactory } = await import('../routes/apiv3');
     const crowi = mock<Crowi>({
-      searchService: { searchKeyword: vi.fn(), isReachable: searchReachable },
+      searchService: { searchKeyword: vi.fn() },
     });
     app.post('/suggest-path', suggestPathHandlersFactory(crowi));
     return app;
@@ -265,11 +211,6 @@ describe('POST /suggest-path route integration — engine selection', () => {
     vi.resetAllMocks();
     configState.overrides = {};
 
-    // Oneshot pipeline defaults — full success
-    mocks.analyzeContentMock.mockResolvedValue(oneshotAnalysis);
-    mocks.retrieveSearchCandidatesMock.mockResolvedValue(oneshotCandidates);
-    mocks.evaluateCandidatesMock.mockResolvedValue(oneshotEvaluated);
-    mocks.generateCategorySuggestionMock.mockResolvedValue(oneshotCategory);
     mocks.resolveParentGrantMock.mockResolvedValue(1);
 
     // Agent seam default — the registry returns a fake agent whose generate
@@ -280,7 +221,7 @@ describe('POST /suggest-path route integration — engine selection', () => {
 
   describe('Mastra AI configured (agentic engine selected, agent mocked)', () => {
     it('should return 200 with memo first and contract-conformant agentic search suggestions', async () => {
-      const app = await buildApp({ searchReachable: true });
+      const app = await buildApp();
 
       const response = await request(app)
         .post('/suggest-path')
@@ -312,7 +253,7 @@ describe('POST /suggest-path route integration — engine selection', () => {
       mocks.resolveParentGrantMock
         .mockResolvedValueOnce(1)
         .mockResolvedValueOnce(4);
-      const app = await buildApp({ searchReachable: true });
+      const app = await buildApp();
 
       const response = await request(app)
         .post('/suggest-path')
@@ -346,7 +287,7 @@ describe('POST /suggest-path route integration — engine selection', () => {
           ],
         } satisfies AgenticEngineOutput,
       });
-      const app = await buildApp({ searchReachable: true });
+      const app = await buildApp();
 
       const response = await request(app)
         .post('/suggest-path')
@@ -372,7 +313,7 @@ describe('POST /suggest-path route integration — engine selection', () => {
           ],
         } satisfies AgenticEngineOutput,
       });
-      const app = await buildApp({ searchReachable: true });
+      const app = await buildApp();
 
       const response = await request(app)
         .post('/suggest-path')
@@ -384,8 +325,8 @@ describe('POST /suggest-path route integration — engine selection', () => {
       expect(memoSuggestion).not.toHaveProperty('informationType');
     });
 
-    it('should retrieve the suggestPathAgent from the registry and not run the oneshot pipeline', async () => {
-      const app = await buildApp({ searchReachable: true });
+    it('should retrieve the suggestPathAgent from the registry', async () => {
+      const app = await buildApp();
 
       await request(app)
         .post('/suggest-path')
@@ -394,26 +335,10 @@ describe('POST /suggest-path route integration — engine selection', () => {
 
       expect(mocks.getAgentMock).toHaveBeenCalledWith('suggestPathAgent');
       expect(mocks.agentGenerateMock).toHaveBeenCalledTimes(1);
-      expect(mocks.analyzeContentMock).not.toHaveBeenCalled();
-      expect(mocks.retrieveSearchCandidatesMock).not.toHaveBeenCalled();
-      expect(mocks.evaluateCandidatesMock).not.toHaveBeenCalled();
-      expect(mocks.generateCategorySuggestionMock).not.toHaveBeenCalled();
-    });
-
-    it('should still select the agentic engine when full-text search is not reachable', async () => {
-      const app = await buildApp({ searchReachable: false });
-
-      await request(app)
-        .post('/suggest-path')
-        .send({ body: 'Document content' })
-        .expect(200);
-
-      expect(mocks.agentGenerateMock).toHaveBeenCalledTimes(1);
-      expect(mocks.analyzeContentMock).not.toHaveBeenCalled();
     });
 
     it('should ignore the removed engine field sent by legacy clients', async () => {
-      const app = await buildApp({ searchReachable: true });
+      const app = await buildApp();
 
       const response = await request(app)
         .post('/suggest-path')
@@ -423,77 +348,22 @@ describe('POST /suggest-path route integration — engine selection', () => {
       // Availability decides (agentic here); the legacy field neither
       // selects an engine nor fails validation.
       expect(mocks.agentGenerateMock).toHaveBeenCalledTimes(1);
-      expect(mocks.analyzeContentMock).not.toHaveBeenCalled();
       expect(response.body.suggestions[0]).toEqual(expectedMemoSuggestion);
     });
   });
 
-  describe('Mastra AI not configured (oneshot engine selected)', () => {
-    it('should serve the request through the oneshot pipeline', async () => {
+  describe('Mastra AI not configured', () => {
+    it('should reject with 501 before any engine runs', async () => {
       unconfigureMastraAi();
-      const app = await buildApp({ searchReachable: true });
-
-      const response = await request(app)
-        .post('/suggest-path')
-        .send({ body: 'Content about React hooks' })
-        .expect(200);
-
-      expect(mocks.analyzeContentMock).toHaveBeenCalledWith(
-        'Content about React hooks',
-      );
-      expect(response.body.suggestions).toEqual([
-        expectedMemoSuggestion,
-        {
-          type: 'search',
-          path: '/tech-notes/React/',
-          label: 'Save near related pages',
-          description: 'Oneshot-evaluated destination for React content.',
-          grant: 1,
-          informationType: 'stock',
-        },
-        oneshotCategory,
-      ]);
-    });
-
-    it('should not invoke the agentic engine', async () => {
-      unconfigureMastraAi();
-      const app = await buildApp({ searchReachable: true });
-
-      await request(app)
-        .post('/suggest-path')
-        .send({ body: 'Content about React hooks' })
-        .expect(200);
-
-      expect(mocks.getAgentMock).not.toHaveBeenCalled();
-      expect(mocks.agentGenerateMock).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('neither Mastra AI nor full-text search available', () => {
-    it('should return 200 with the memo suggestion only', async () => {
-      unconfigureMastraAi();
-      const app = await buildApp({ searchReachable: false });
-
-      const response = await request(app)
-        .post('/suggest-path')
-        .send({ body: 'Document content' })
-        .expect(200);
-
-      expect(response.body.suggestions).toEqual([expectedMemoSuggestion]);
-    });
-
-    it('should not invoke any engine', async () => {
-      unconfigureMastraAi();
-      const app = await buildApp({ searchReachable: false });
+      const app = await buildApp();
 
       await request(app)
         .post('/suggest-path')
         .send({ body: 'Document content' })
-        .expect(200);
+        .expect(501);
 
       expect(mocks.getAgentMock).not.toHaveBeenCalled();
       expect(mocks.agentGenerateMock).not.toHaveBeenCalled();
-      expect(mocks.analyzeContentMock).not.toHaveBeenCalled();
     });
   });
 });

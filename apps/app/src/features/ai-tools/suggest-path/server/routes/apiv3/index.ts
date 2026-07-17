@@ -2,11 +2,11 @@ import assert from 'node:assert';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
-import type { NextFunction, Request, RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
 import { body } from 'express-validator';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { isAiEnabled } from '~/features/openai/server/services';
+import { aiReadyGuard } from '~/features/mastra/server/routes/ai-ready-guard';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
@@ -88,29 +88,13 @@ const validator = [
     .withMessage(`body must not exceed ${MAX_BODY_LENGTH} characters`),
 ];
 
-// Feature master switch only (unlike aiReadyGuard, deliberately NOT gated on
-// isAiConfigured): with the AI stack unconfigured this route still serves
-// degraded suggestions (oneshot / memo-only), so configuration state is an
-// engine-selection concern, not a request-rejection concern.
-const aiEnabledGuard = (
-  _req: Request,
-  res: ApiV3Response,
-  next: NextFunction,
-): void => {
-  if (!isAiEnabled()) {
-    res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
-    return;
-  }
-  next();
-};
-
 /**
  * @swagger
  *
  * /ai-tools/suggest-path:
  *   post:
  *     summary: Suggest page paths based on content
- *     description: Analyzes the given content and suggests appropriate page paths using keyword extraction, search, and AI evaluation.
+ *     description: Analyzes the given content and suggests appropriate page paths using an agentic search over the wiki.
  *     tags: [AI Tools]
  *     security:
  *       - bearer: []
@@ -147,7 +131,7 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
-    aiEnabledGuard,
+    aiReadyGuard,
     ...validator,
     apiV3FormValidator,
     async (req: SuggestPathReq, res: ApiV3Response) => {
