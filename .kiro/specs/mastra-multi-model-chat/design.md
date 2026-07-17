@@ -431,7 +431,7 @@ export interface AiSettingsFormValues {
 - `getAllowedModels`: `ai:allowedModels` 有→そのまま / 空・非配列→`[]`（`Array.isArray` 防御。自動移行・合成なし）。
 - `getProviderOptionsForModel(effectiveModelId)`: 該当エントリの options / 無し→`{}`（純粋ルックアップ。丸め・warn なし）（2.2/2.5）。
 - `resolveMastraModel`: Map キャッシュキー（同 model は 1 回構築）/ `clearResolvedMastraModelCache` で再構築。resolver 非同期化後は各テストを `await`（成功=resolve / 誤設定=reject）。並行契約（single-flight）: 同時ミスが 1 ビルドを共有すること / ビルド中に clear された build がキャッシュを再収載しないこと / 破棄済み build の遅延 reject が新エントリを退避しないこと。
-- provider SDK 遅延ロード契約（実装後の最適化）: barrel（`llm-providers/index.ts`）・dispatcher（`resolve-mastra-model.ts`）・Mastra インスタンス（`mastra-modules/index.ts`。agent 構築の根で、growi-agent と tools/memory のグラフを包含）の静的 import グラフが `@ai-sdk/*`・`@azure/identity` に到達しないこと（`lazy-provider-imports.spec.ts`。到達すると barrel import 時に全 provider が載り最適化が無効化されるため、静的 import での再混入を回帰ガード）。
+- provider SDK 遅延ロード契約（実装後の最適化）: barrel（`llm-providers/index.ts`）・dispatcher（`resolve-mastra-model.ts`）・Mastra インスタンス（`mastra-modules/index.ts`。agent 構築の根で、growi-agent と tools/memory のグラフを包含）の静的 import グラフが `@ai-sdk/*`・`@azure/identity` に到達しないこと（`no-eager-provider-imports.spec.ts`。到達すると barrel import 時に全 provider が載り最適化が無効化されるため、静的 import での再混入を回帰ガード）。
 - `isAiConfigured`: provider+接続必須項目+非空 allowedModels（フォールバック含む）で true / それ以外 false。azure-openai はエンドポイント必須（`resourceName`/`baseURL` 双方欠落→false）。Azure+Entra ID（`useEntraId=true`）はエンドポイントあれば apiKey 欠落でも true（6.1）。
 - put-ai-settings バリデータ: 配列・重複・空・`isDefault` ちょうど 1・不正 providerOptions JSON（1.4/1.5/2.4）。
 

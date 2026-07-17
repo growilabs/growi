@@ -184,7 +184,7 @@ describe('resolveAzureOpenaiModel', () => {
     // stronger "SDK not even loaded" property comes from the validation running
     // BEFORE the resolver's `await import()` — module loading is not observable
     // under vi.mock, and the import structure is guarded by
-    // lazy-provider-imports.spec.ts.
+    // no-eager-provider-imports.spec.ts.
     await expect(resolveAzureOpenaiModel('dep')).rejects.toThrow(
       /resourceName|baseURL|AI_PROVIDERS/,
     );

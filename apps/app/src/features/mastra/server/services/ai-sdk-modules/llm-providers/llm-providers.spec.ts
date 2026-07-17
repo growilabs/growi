@@ -104,7 +104,7 @@ describe('key-based provider resolvers', () => {
     // (createOpenAI, its exported creator, is never called). The stronger "SDK
     // not even loaded" property comes from the resolver reading the key BEFORE
     // its `await import()` — module loading is not observable under vi.mock, and
-    // the import structure is guarded by lazy-provider-imports.spec.ts.
+    // the import structure is guarded by no-eager-provider-imports.spec.ts.
     await expect(resolveOpenaiModel('gpt-test')).rejects.toThrow(
       /not configured/,
     );
