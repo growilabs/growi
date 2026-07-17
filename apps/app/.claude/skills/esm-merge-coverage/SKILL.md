@@ -160,7 +160,7 @@ cd apps/app
 pnpm run lint:no-cjs                 # residual require/module.exports in src/server
 pnpm run lint:import-convention      # any .js/.jsx left in relative/~ specifiers
 pnpm run lint:route-guard            # central-router top-level invariant
-pnpm run build:server                # Bundler type-check of extensionless source (tsgo/tspc)
+pnpm run build:server                # Bundler type-check + emit of extensionless source (tsc, TypeScript 7)
 pnpm run postbuild:server            # add-js-extensions over dist
 node bin/verify-dist-resolution.ts dist   # exhaustive: every dist import points to a real file
 pnpm run server:ci                   # boot smoke — loads every module (catches init-time cycles)

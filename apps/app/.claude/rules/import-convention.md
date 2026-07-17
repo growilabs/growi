@@ -32,9 +32,9 @@ import { ctx } from '~/states/context';
 | External packages, `^/`, `.json`, `.cjs`, `.scss` | Unchanged |
 
 **Only the no-extension rule is enforced.** Extensionless `~/` aliases and extensionless
-relative paths resolve identically in every pipeline (server build, Turbopack, `tsgo`,
-vitest, dev resolver), so the alias-vs-relative choice is a readability matter, not a
-correctness one, and the lint does **not** police it.
+relative paths resolve identically in every pipeline (server build, Turbopack, `tsc`
+`--noEmit`, vitest, dev resolver), so the alias-vs-relative choice is a readability matter,
+not a correctness one, and the lint does **not** police it.
 
 The codebase follows the **natural convention**: a nearby reference (same area of `src/`)
 uses a relative path (`./Sibling`, `../Near`), and a distant / cross-area reference uses
@@ -46,27 +46,33 @@ workaround unnecessary. New code should follow the same natural convention by ha
 ## Why no `.js` in source
 
 The friction this convention removes: the server production build runs
-`tspc -p tsconfig.build.server.json`, whose program pulls in ~1142 `src` files (client
-`.tsx` included, via the import graph). Native ESM requires `.js` on relative imports,
-but Turbopack cannot rewrite a relative `.js`→`.ts`, so previously "dual-pipeline" files
-needed `~/...js` aliases to satisfy both — and which form to use depended on the file's
-(invisible) NodeNext-program membership.
+`tsc -p tsconfig.build.server.json` (TypeScript 7 native), whose program pulls in ~1142
+`src` files (client `.tsx` included, via the import graph). Native ESM requires `.js` on
+relative imports, but Turbopack cannot rewrite a relative `.js`→`.ts`, so previously
+"dual-pipeline" files needed `~/...js` aliases to satisfy both — and which form to use
+depended on the file's (invisible) NodeNext-program membership.
 
 Instead, **`.js` lives only in the build output, not in source**:
 - The server build uses `module: Preserve` / `moduleResolution: Bundler`, so it
-  type-checks extensionless source.
-- Post-build `bin/add-js-extensions.ts` resolves each relative specifier against the
-  real `dist/` filesystem and appends the correct form (`.js`, `/index.js`, `.jsx`).
-- CI runs `bin/verify-dist-resolution.ts` to confirm every relative import in `dist/`
-  points to an existing file (replaces the NodeNext compile-time guarantee with an
-  exhaustive artifact check — stronger, since it also covers lazy/conditional imports).
-- Turbopack (client), `tsgo --noEmit` (Bundler), vitest, and the dev resolver
+  type-checks extensionless source. `tsc` emits specifiers exactly as authored — aliases
+  are **not** resolved (TypeScript 7 native has no custom-transformer hook; the former
+  `typescript-transform-paths` plugin, which ran under `tspc`, is gone).
+- Post-build `bin/add-js-extensions.ts` does both rewrites in one pass: it converts `~/`
+  and `^/` alias specifiers to importer-relative form (the alias table is passed in by
+  `bin/postbuild-server.ts`, mirroring `tsconfig.build.server.json`'s `paths`), then
+  resolves each relative specifier against the real `dist/` filesystem and appends the
+  correct form (`.js`, `/index.js`, `.jsx`).
+- CI runs `bin/verify-dist-resolution.ts` to confirm every import in `dist/` points to an
+  existing file — and that no `~/`/`^/` alias survived the postbuild rewrite (replaces the
+  NodeNext compile-time guarantee with an exhaustive artifact check — stronger, since it
+  also covers lazy/conditional imports).
+- Turbopack (client), `tsc --noEmit` (Bundler), vitest, and the dev resolver
   (`bin/runtime/dev-esm-resolver.mjs`) all resolve extensionless source natively — no change.
 
 > Server-side native-ESM resolution is proven by `bin/verify-dist-resolution.ts` over
 > the emitted `dist/` (exhaustive, decision-free), **not** by source type-checking: the
-> server build (`tspc`, Bundler) and `tsgo` both accept extensionless source and neither
-> proves the emitted `.js` graph resolves.
+> server build (`tsc`, Bundler) accepts extensionless source and does not prove the
+> emitted `.js` graph resolves.
 
 ## Tooling
 
