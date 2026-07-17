@@ -7,8 +7,7 @@ import type { MastraModelConfig } from '@mastra/core/llm';
 
 import { getApiKey, getProviderSettings } from './config';
 
-// Microsoft Entra ID token scope for Azure Cognitive Services (matches the
-// existing AzureOpenaiClientDelegator in features/openai).
+// Microsoft Entra ID token scope for Azure Cognitive Services.
 const ENTRA_ID_SCOPE = 'https://cognitiveservices.azure.com/.default';
 
 // Azure OpenAI is the one non-uniform provider: it is reached via a
