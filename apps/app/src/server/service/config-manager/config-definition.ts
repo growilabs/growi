@@ -293,7 +293,6 @@ export const CONFIG_KEYS = [
   'openai:apiKey',
 
   // AI Tools Settings
-  'aiTools:suggestPathEngine',
   'aiTools:suggestPathAgenticSearchLimit',
   'aiTools:suggestPathAgenticChildListingLimit',
   'aiTools:suggestPathAgenticTimeoutMs',
@@ -1354,12 +1353,6 @@ export const CONFIG_DEFINITIONS = {
     }),
 
   // AI Tools Settings
-  // The default engine stays 'oneshot' until the agentic engine passes
-  // A/B validation (suggest-path-agentic spec, Requirement 5.6).
-  'aiTools:suggestPathEngine': defineConfig<'oneshot' | 'agentic'>({
-    envVarName: 'AI_TOOLS_SUGGEST_PATH_ENGINE',
-    defaultValue: 'oneshot',
-  }),
   'aiTools:suggestPathAgenticSearchLimit': defineConfig<number>({
     envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT',
     defaultValue: 5,

@@ -23,12 +23,13 @@ export type SuggestPathEngine = (
 ) => Promise<PathSuggestion[]>;
 
 /**
- * Engine registration record: the implementation plus the fallback policy the
- * engine declares for itself. `degradeToMemoOnFailure` = true means the
- * orchestrator absorbs the engine's rejections into a memo-only response;
- * false keeps the propagate-to-route (HTTP 500) contract.
+ * Engine record: the implementation plus the fallback policy the engine
+ * declares for itself. `degradeToMemoOnFailure` = true means the orchestrator
+ * absorbs the engine's rejections into a memo-only response; false keeps the
+ * propagate-to-route (HTTP 500) contract. `id` identifies the engine in logs.
  */
 export interface SuggestPathEngineRecord {
+  readonly id: string;
   readonly run: SuggestPathEngine;
   readonly degradeToMemoOnFailure: boolean;
 }

@@ -2,11 +2,11 @@ import assert from 'node:assert';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
-import type { Request, RequestHandler } from 'express';
+import type { NextFunction, Request, RequestHandler } from 'express';
 import { body } from 'express-validator';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { aiReadyGuard } from '~/features/mastra/server/routes/ai-ready-guard';
+import { isAiEnabled } from '~/features/openai/server/services';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
@@ -16,11 +16,7 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import type { SearchService } from '../../../interfaces/suggest-path-types';
-import { SuggestPathEngineId } from '../../../interfaces/suggest-path-types';
-import {
-  type GenerateSuggestionsOptions,
-  generateSuggestions,
-} from '../../services/generate-suggestions';
+import { generateSuggestions } from '../../services/generate-suggestions';
 
 const logger = loggerFactory('growi:features:suggest-path:routes');
 
@@ -70,14 +66,6 @@ const logger = loggerFactory('growi:features:suggest-path:routes');
 
 type ReqBody = {
   body: string;
-  // Internal parameter for verification and operational switching; not
-  // exposed to the MCP tool input schema (see design "API Contract").
-  // Deliberately NOT role-gated: any authenticated user who discovers it can
-  // select an engine, but every engine operates strictly within the
-  // requester's own grants, so the only effect of forcing the non-default
-  // engine is spending the requester's own budget/latency (accepted while
-  // the two engines coexist for A/B verification).
-  engine?: SuggestPathEngineId;
 };
 
 type SuggestPathReq = Request<
@@ -98,13 +86,23 @@ const validator = [
     .withMessage('body must not be empty')
     .isLength({ max: MAX_BODY_LENGTH })
     .withMessage(`body must not exceed ${MAX_BODY_LENGTH} characters`),
-  body('engine')
-    .optional()
-    .isIn(Object.values(SuggestPathEngineId))
-    .withMessage(
-      `engine must be one of: ${Object.values(SuggestPathEngineId).join(', ')}`,
-    ),
 ];
+
+// Feature master switch only (unlike aiReadyGuard, deliberately NOT gated on
+// isAiConfigured): with the AI stack unconfigured this route still serves
+// degraded suggestions (oneshot / memo-only), so configuration state is an
+// engine-selection concern, not a request-rejection concern.
+const aiEnabledGuard = (
+  _req: Request,
+  res: ApiV3Response,
+  next: NextFunction,
+): void => {
+  if (!isAiEnabled()) {
+    res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
+    return;
+  }
+  next();
+};
 
 /**
  * @swagger
@@ -149,7 +147,7 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
-    aiReadyGuard,
+    aiEnabledGuard,
     ...validator,
     apiV3FormValidator,
     async (req: SuggestPathReq, res: ApiV3Response) => {
@@ -176,17 +174,11 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
           )),
         ];
 
-        // The conditional spread keeps the call 4-ary when engine is absent,
-        // preserving the pre-existing call contract exactly (Requirement 4.1)
-        const { engine } = req.body;
-        const engineOptions: [GenerateSuggestionsOptions] | [] =
-          engine != null ? [{ engine }] : [];
         const suggestions = await generateSuggestions(
           user,
           req.body.body,
           userGroups,
           typedSearchService,
-          ...engineOptions,
         );
         return res.apiv3({ suggestions });
       } catch (err) {

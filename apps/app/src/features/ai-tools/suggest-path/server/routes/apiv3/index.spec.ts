@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => {
   return {
     generateSuggestionsMock: vi.fn(),
     loginRequiredFactoryMock: vi.fn(),
-    aiReadyGuardMock: vi.fn(),
+    isAiEnabledMock: vi.fn(),
     findAllUserGroupIdsMock: vi.fn(),
     findAllExternalUserGroupIdsMock: vi.fn(),
   };
@@ -24,16 +24,25 @@ vi.mock('~/server/middlewares/login-required', () => ({
   default: mocks.loginRequiredFactoryMock,
 }));
 
-vi.mock('~/features/mastra/server/routes/ai-ready-guard', () => ({
-  aiReadyGuard: mocks.aiReadyGuardMock,
+vi.mock('~/features/openai/server/services', () => ({
+  isAiEnabled: mocks.isAiEnabledMock,
 }));
 
+vi.mock('~/utils/logger', () => ({
+  default: () => ({ error: vi.fn() }),
+}));
+
+// The pass-through mocks call next() so the full-chain tests can drive a
+// request through the real middleware order.
 vi.mock('~/server/middlewares/access-token-parser', () => ({
-  accessTokenParser: vi.fn(() => vi.fn()),
+  accessTokenParser: vi.fn(
+    () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  ),
 }));
 
 vi.mock('~/server/middlewares/apiv3-form-validator', () => ({
-  apiV3FormValidator: vi.fn(),
+  apiV3FormValidator: (_req: unknown, _res: unknown, next: () => void) =>
+    next(),
 }));
 
 vi.mock('~/server/models/user-group-relation', () => ({
@@ -57,37 +66,98 @@ describe('suggestPathHandlersFactory', () => {
   });
   const mockSearchService = mockCrowi.searchService;
 
+  const createMockReqRes = () => {
+    const req = {
+      user: { _id: 'user123', username: 'alice' },
+      body: { body: 'Some page content' },
+    } as unknown as Request;
+
+    const res = {
+      apiv3: vi.fn(),
+      apiv3Err: vi.fn(),
+    } as unknown as ApiV3Response;
+
+    return { req, res };
+  };
+
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.loginRequiredFactoryMock.mockReturnValue(vi.fn());
+    mocks.loginRequiredFactoryMock.mockReturnValue(
+      (_req: unknown, _res: unknown, next: () => void) => next(),
+    );
+    mocks.isAiEnabledMock.mockReturnValue(true);
     mocks.findAllUserGroupIdsMock.mockResolvedValue(['group1']);
     mocks.findAllExternalUserGroupIdsMock.mockResolvedValue(['extGroup1']);
   });
 
+  // Drives a request through the handlers in their real order, honoring a
+  // middleware that ends the response without calling next() (the guard
+  // contract). Validation chains are executed via their run() API — they
+  // only record errors; apiV3FormValidator is the component that would map
+  // them to a 400.
+  const runChain = async (req: Request, res: ApiV3Response) => {
+    const { suggestPathHandlersFactory } = await import('.');
+    const handlers = suggestPathHandlersFactory(mockCrowi);
+    for (const handler of handlers) {
+      if ('run' in handler) {
+        await (handler as ValidationChain).run(req);
+        continue;
+      }
+      let nextCalled = false;
+      await (handler as RequestHandler)(req, res, () => {
+        nextCalled = true;
+      });
+      if (!nextCalled) return;
+    }
+  };
+
   describe('middleware chain', () => {
-    // Exact count: accessTokenParser + loginRequired + aiReadyGuard
-    // + 2 validator chains (body, engine) + apiV3FormValidator + the main
-    // handler. A dropped security middleware must fail this, not slip
-    // under a loose >= bound.
-    it('should return exactly the 7 expected handlers', async () => {
+    // Exact count: accessTokenParser + loginRequired + aiEnabledGuard
+    // + 1 validator chain (body) + apiV3FormValidator + the main handler.
+    // A dropped security middleware must fail this, not slip under a loose
+    // >= bound.
+    it('should return exactly the 6 expected handlers', async () => {
       const { suggestPathHandlersFactory } = await import('.');
       const handlers = suggestPathHandlersFactory(mockCrowi);
-      expect(handlers).toHaveLength(7);
+      expect(handlers).toHaveLength(6);
     });
 
-    it('should include aiReadyGuard and the login-required middleware in the chain', async () => {
+    it('should include the login-required middleware in the chain', async () => {
       const loginRequiredMiddleware = vi.fn();
       mocks.loginRequiredFactoryMock.mockReturnValue(loginRequiredMiddleware);
 
       const { suggestPathHandlersFactory } = await import('.');
       const handlers = suggestPathHandlersFactory(mockCrowi);
 
-      expect(handlers).toContain(mocks.aiReadyGuardMock);
       expect(handlers).toContain(loginRequiredMiddleware);
     });
   });
 
-  describe('engine parameter validation', () => {
+  describe('AI enabled gate', () => {
+    it('should respond 501 and stop before the main handler when AI is disabled', async () => {
+      mocks.isAiEnabledMock.mockReturnValue(false);
+      mocks.generateSuggestionsMock.mockResolvedValue([]);
+
+      const { req, res } = createMockReqRes();
+      await runChain(req, res);
+
+      expect(res.apiv3Err).toHaveBeenCalledWith(expect.anything(), 501);
+      expect(mocks.generateSuggestionsMock).not.toHaveBeenCalled();
+    });
+
+    it('should pass the request through to the main handler when AI is enabled', async () => {
+      mocks.isAiEnabledMock.mockReturnValue(true);
+      mocks.generateSuggestionsMock.mockResolvedValue([]);
+
+      const { req, res } = createMockReqRes();
+      await runChain(req, res);
+
+      expect(mocks.generateSuggestionsMock).toHaveBeenCalled();
+      expect(res.apiv3).toHaveBeenCalled();
+    });
+  });
+
+  describe('body validation', () => {
     // Runs the real express-validator chains contained in the middleware
     // chain against a bare request body and returns the validation result
     // (which apiV3FormValidator maps to a 400 response in the real pipeline)
@@ -102,30 +172,24 @@ describe('suggestPathHandlersFactory', () => {
       return validationResult(req);
     };
 
-    it('should produce a validation error for an invalid engine value', async () => {
-      const result = await runValidation({
-        body: 'Some page content',
-        engine: 'invalid-engine',
-      });
-
-      expect(result.isEmpty()).toBe(false);
-      // express-validator v6 error shape: the offending field is in `param`
-      expect(result.array().some((err) => err.param === 'engine')).toBe(true);
-    });
-
-    it('should accept a request without engine (backward compatibility)', async () => {
+    it('should accept a valid body', async () => {
       const result = await runValidation({ body: 'Some page content' });
 
       expect(result.isEmpty()).toBe(true);
     });
 
-    it.each([
-      'oneshot',
-      'agentic',
-    ])('should accept engine=%s', async (engine) => {
+    it('should produce a validation error for an empty body', async () => {
+      const result = await runValidation({ body: '' });
+
+      expect(result.isEmpty()).toBe(false);
+    });
+
+    it('should ignore the removed engine field (backward compatibility)', async () => {
+      // Clients built against the two-engine era may still send `engine`;
+      // it must be ignored, not rejected.
       const result = await runValidation({
         body: 'Some page content',
-        engine,
+        engine: 'agentic',
       });
 
       expect(result.isEmpty()).toBe(true);
@@ -133,20 +197,6 @@ describe('suggestPathHandlersFactory', () => {
   });
 
   describe('handler', () => {
-    const createMockReqRes = () => {
-      const req = {
-        user: { _id: 'user123', username: 'alice' },
-        body: { body: 'Some page content' },
-      } as unknown as Request;
-
-      const res = {
-        apiv3: vi.fn(),
-        apiv3Err: vi.fn(),
-      } as unknown as ApiV3Response;
-
-      return { req, res };
-    };
-
     it('should call generateSuggestions with user, body, userGroups, and searchService', async () => {
       const suggestions = [
         {
@@ -231,10 +281,7 @@ describe('suggestPathHandlersFactory', () => {
       expect(call[2]).toEqual(['g1', 'g2', 'eg1']);
     });
 
-    it.each([
-      'oneshot',
-      'agentic',
-    ])('should forward engine=%s to generateSuggestions options', async (engine) => {
+    it('should ignore a legacy engine field in the request body', async () => {
       mocks.generateSuggestionsMock.mockResolvedValue([]);
 
       const { suggestPathHandlersFactory } = await import('.');
@@ -242,30 +289,17 @@ describe('suggestPathHandlersFactory', () => {
       const handler = handlers[handlers.length - 1] as RequestHandler;
 
       const { req, res } = createMockReqRes();
-      req.body.engine = engine;
+      (req.body as Record<string, unknown>).engine = 'agentic';
       await handler(req, res, vi.fn());
 
+      // Exactly the 4 positional arguments — no engine option is derived
+      // from the request body.
       expect(mocks.generateSuggestionsMock).toHaveBeenCalledWith(
         { _id: 'user123', username: 'alice' },
         'Some page content',
         ['group1', 'extGroup1'],
         mockSearchService,
-        { engine },
       );
-    });
-
-    it('should not pass an engine option when engine is omitted', async () => {
-      mocks.generateSuggestionsMock.mockResolvedValue([]);
-
-      const { suggestPathHandlersFactory } = await import('.');
-      const handlers = suggestPathHandlersFactory(mockCrowi);
-      const handler = handlers[handlers.length - 1] as RequestHandler;
-
-      const { req, res } = createMockReqRes();
-      await handler(req, res, vi.fn());
-
-      const options = mocks.generateSuggestionsMock.mock.calls[0][4];
-      expect(options?.engine).toBeUndefined();
     });
   });
 });

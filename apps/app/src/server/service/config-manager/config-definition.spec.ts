@@ -190,10 +190,6 @@ describe('config-definition resilience keys', () => {
 
 describe('config-definition suggest-path agentic keys', () => {
   describe('CONFIG_KEYS array', () => {
-    it('contains aiTools:suggestPathEngine', () => {
-      expect(CONFIG_KEYS).toContain('aiTools:suggestPathEngine');
-    });
-
     it('contains aiTools:suggestPathAgenticSearchLimit', () => {
       expect(CONFIG_KEYS).toContain('aiTools:suggestPathAgenticSearchLimit');
     });
@@ -218,7 +214,6 @@ describe('config-definition suggest-path agentic keys', () => {
   // constants, and mirroring them in tests only creates change-detectors).
   describe('CONFIG_DEFINITIONS env var names', () => {
     it.each([
-      ['aiTools:suggestPathEngine', 'AI_TOOLS_SUGGEST_PATH_ENGINE'],
       [
         'aiTools:suggestPathAgenticSearchLimit',
         'AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT',

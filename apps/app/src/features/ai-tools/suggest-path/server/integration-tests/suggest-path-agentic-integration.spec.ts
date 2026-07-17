@@ -18,10 +18,12 @@ import type { AgenticEngineOutput } from '../services/engines/agentic-output-sch
  * response carries the memo suggestion plus informationType-bearing search
  * suggestions.
  *
- * What runs for REAL: route middleware chain, orchestrator + dispatcher,
- * agentic engine (per-request RequestContext + searchBudget built from
- * config), limitedSearchTool (budget enforcement), and fullTextSearchTool
- * (delegation target). Only process-external seams are mocked:
+ * What runs for REAL: route middleware chain, orchestrator +
+ * availability-based engine selection (the configured AI provider below is
+ * what selects the agentic engine), agentic engine (per-request
+ * RequestContext + searchBudget built from config), limitedSearchTool
+ * (budget enforcement), and fullTextSearchTool (delegation target). Only
+ * process-external seams are mocked:
  *
  * - the Mastra registry barrel (its transitive `@mastra/core/agent` import
  *   cannot load under vitest — pnpm `@mastra/core>p-map` override, see
@@ -95,8 +97,6 @@ vi.mock('~/server/service/config-manager', () => ({
           return true;
         case 'security:disableUserPages':
           return false;
-        case 'aiTools:suggestPathEngine':
-          return 'oneshot';
         case 'aiTools:suggestPathAgenticSearchLimit':
           return mocks.SEARCH_LIMIT;
         case 'aiTools:suggestPathAgenticChildListingLimit':
@@ -164,6 +164,17 @@ vi.mock('../services/resolve-parent-grant', () => ({
 
 vi.mock('~/features/mastra/server/services/mastra-modules', () => ({
   mastra: { getAgent: mocks.getAgentMock },
+}));
+
+// Inert logger: keeps the suite runnable where @growi/logger has no build
+// output (nothing asserts on logging here).
+vi.mock('~/utils/logger', () => ({
+  default: () => ({
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  }),
 }));
 
 // --- Fixtures --------------------------------------------------------------
@@ -334,7 +345,7 @@ describe('POST /suggest-path agentic path integration — budget exhaustion and 
   it('returns memo first plus informationType-bearing search suggestions after the agent wraps up on limit_exceeded', async () => {
     const response = await request(app)
       .post('/suggest-path')
-      .send({ body: 'Daily standup log for the sprint', engine: 'agentic' })
+      .send({ body: 'Daily standup log for the sprint' })
       .expect(200);
 
     // The wrap-up signal was actually delivered to the agent in THIS request
@@ -373,7 +384,7 @@ describe('POST /suggest-path agentic path integration — budget exhaustion and 
   it('lets the real budget gate delegation: limit ok results, then limit_exceeded without another search', async () => {
     await request(app)
       .post('/suggest-path')
-      .send({ body: 'Daily standup log for the sprint', engine: 'agentic' })
+      .send({ body: 'Daily standup log for the sprint' })
       .expect(200);
 
     // The agent observed exactly SEARCH_LIMIT real search results (delegated
@@ -431,7 +442,7 @@ describe('POST /suggest-path agentic path integration — budget exhaustion and 
   it('builds the per-request budget from config and records only executed queries', async () => {
     await request(app)
       .post('/suggest-path')
-      .send({ body: 'Daily standup log for the sprint', engine: 'agentic' })
+      .send({ body: 'Daily standup log for the sprint' })
       .expect(200);
 
     // The budget object the engine built is observable through the

@@ -11,7 +11,14 @@ import type { AgenticEngineOutput } from '../services/engines/agentic-output-sch
 /**
  * Route integration for engine selection (task 6.1): requests travel through
  * the real middleware chain (validator + apiV3FormValidator + handler), the
- * real orchestrator + dispatcher, and the REAL agentic engine adapter.
+ * real orchestrator + availability-based engine selection, and the REAL
+ * agentic engine adapter.
+ *
+ * The engine is selected by runtime availability: agentic when the Mastra AI
+ * stack has at least one available model, oneshot when only full-text search
+ * is reachable, memo-only when neither is available. Each describe block
+ * reproduces one availability state through the config seam (`ai:providers`
+ * etc.) and the search service's isReachable flag.
  *
  * Only process-external seams are mocked:
  * - the oneshot pipeline services (same seams as suggest-path-integration.spec.ts)
@@ -36,6 +43,13 @@ const mocks = vi.hoisted(() => ({
   agentGenerateMock: vi.fn(),
 }));
 
+// Per-test config overrides layered over the fixed defaults below; reset in
+// beforeEach. Clearing the AI provider settings is how a test reproduces the
+// "Mastra AI not configured" availability state.
+const configState = vi.hoisted(() => ({
+  overrides: {} as Record<string, unknown>,
+}));
+
 const mockUser = {
   _id: 'user123',
   username: 'alice',
@@ -58,26 +72,28 @@ vi.mock('~/server/middlewares/login-required', () => ({
   },
 }));
 
-// Fixed config: AI enabled, 'oneshot' as the configured default engine
-// (mirrors the real config-definition defaults), plus the agentic engine's
-// operational settings read per request.
+// Fixed config defaults: AI enabled with an available provider/model (so the
+// REAL is-ai-configured module reads the Mastra AI stack as configured),
+// plus the agentic engine's operational settings read per request.
 vi.mock('~/server/service/config-manager', () => ({
   configManager: {
     getConfig: (key: string) => {
+      if (key in configState.overrides) {
+        return configState.overrides[key];
+      }
       switch (key) {
         case 'app:aiEnabled':
           return true;
         case 'security:disableUserPages':
           return false;
-        case 'aiTools:suggestPathEngine':
-          return 'oneshot';
         case 'aiTools:suggestPathAgenticSearchLimit':
           return 5;
         case 'aiTools:suggestPathAgenticChildListingLimit':
           return 5;
         case 'aiTools:suggestPathAgenticTimeoutMs':
           return 60_000;
-        // Read by the agentic engine's provider-options resolution (the REAL
+        // Read by the availability check (is-ai-configured) and the agentic
+        // engine's provider-options resolution (the REAL
         // getEffectiveDefaultModelKey / getProviderOptionsForModel modules run
         // against this mock). The effective model comes from the AVAILABLE set,
         // so the provider must be enabled and hold an API key as well.
@@ -137,6 +153,17 @@ vi.mock('../services/resolve-parent-grant', () => ({
 
 vi.mock('~/features/mastra/server/services/mastra-modules', () => ({
   mastra: { getAgent: mocks.getAgentMock },
+}));
+
+// Inert logger: keeps the suite runnable where @growi/logger has no build
+// output (nothing asserts on logging here).
+vi.mock('~/utils/logger', () => ({
+  default: () => ({
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  }),
 }));
 
 // --- Fixtures --------------------------------------------------------------
@@ -199,25 +226,12 @@ const expectedMemoSuggestion = {
 };
 
 describe('POST /suggest-path route integration — engine selection', () => {
-  let app: express.Application;
-
-  beforeEach(async () => {
-    vi.resetAllMocks();
-
-    // Oneshot pipeline defaults — full success
-    mocks.analyzeContentMock.mockResolvedValue(oneshotAnalysis);
-    mocks.retrieveSearchCandidatesMock.mockResolvedValue(oneshotCandidates);
-    mocks.evaluateCandidatesMock.mockResolvedValue(oneshotEvaluated);
-    mocks.generateCategorySuggestionMock.mockResolvedValue(oneshotCategory);
-    mocks.resolveParentGrantMock.mockResolvedValue(1);
-
-    // Agent seam default — the registry returns a fake agent whose generate
-    // resolves the fixed structured output
-    mocks.getAgentMock.mockReturnValue({ generate: mocks.agentGenerateMock });
-    mocks.agentGenerateMock.mockResolvedValue({ object: agenticOutput });
-
-    // Setup express app with ApiV3Response methods
-    app = express();
+  const buildApp = async ({
+    searchReachable,
+  }: {
+    searchReachable: boolean;
+  }): Promise<express.Application> => {
+    const app = express();
     app.use(express.json());
     app.use((_req: Request, res: Response, next: NextFunction) => {
       const apiRes = res as ApiV3Response;
@@ -234,16 +248,43 @@ describe('POST /suggest-path route integration — engine selection', () => {
     // Import and mount the handler factory with the real middleware chain
     const { suggestPathHandlersFactory } = await import('../routes/apiv3');
     const crowi = mock<Crowi>({
-      searchService: { searchKeyword: vi.fn() },
+      searchService: { searchKeyword: vi.fn(), isReachable: searchReachable },
     });
     app.post('/suggest-path', suggestPathHandlersFactory(crowi));
+    return app;
+  };
+
+  // Reproduces the "Mastra AI not configured" availability state: no enabled
+  // provider and no API key -> the available model set is empty.
+  const unconfigureMastraAi = () => {
+    configState.overrides['ai:providers'] = {};
+    configState.overrides['ai:providerApiKeys'] = {};
+  };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    configState.overrides = {};
+
+    // Oneshot pipeline defaults — full success
+    mocks.analyzeContentMock.mockResolvedValue(oneshotAnalysis);
+    mocks.retrieveSearchCandidatesMock.mockResolvedValue(oneshotCandidates);
+    mocks.evaluateCandidatesMock.mockResolvedValue(oneshotEvaluated);
+    mocks.generateCategorySuggestionMock.mockResolvedValue(oneshotCategory);
+    mocks.resolveParentGrantMock.mockResolvedValue(1);
+
+    // Agent seam default — the registry returns a fake agent whose generate
+    // resolves the fixed structured output
+    mocks.getAgentMock.mockReturnValue({ generate: mocks.agentGenerateMock });
+    mocks.agentGenerateMock.mockResolvedValue({ object: agenticOutput });
   });
 
-  describe("engine: 'agentic' specified (agent mocked)", () => {
+  describe('Mastra AI configured (agentic engine selected, agent mocked)', () => {
     it('should return 200 with memo first and contract-conformant agentic search suggestions', async () => {
+      const app = await buildApp({ searchReachable: true });
+
       const response = await request(app)
         .post('/suggest-path')
-        .send({ body: 'Document content to explore', engine: 'agentic' })
+        .send({ body: 'Document content to explore' })
         .expect(200);
 
       expect(response.body.suggestions).toEqual([
@@ -271,10 +312,11 @@ describe('POST /suggest-path route integration — engine selection', () => {
       mocks.resolveParentGrantMock
         .mockResolvedValueOnce(1)
         .mockResolvedValueOnce(4);
+      const app = await buildApp({ searchReachable: true });
 
       const response = await request(app)
         .post('/suggest-path')
-        .send({ body: 'Document content', engine: 'agentic' })
+        .send({ body: 'Document content' })
         .expect(200);
 
       expect(mocks.resolveParentGrantMock).toHaveBeenCalledWith(
@@ -304,10 +346,11 @@ describe('POST /suggest-path route integration — engine selection', () => {
           ],
         } satisfies AgenticEngineOutput,
       });
+      const app = await buildApp({ searchReachable: true });
 
       const response = await request(app)
         .post('/suggest-path')
-        .send({ body: 'Document content', engine: 'agentic' })
+        .send({ body: 'Document content' })
         .expect(200);
 
       const searchSuggestion = response.body.suggestions.find(
@@ -329,10 +372,11 @@ describe('POST /suggest-path route integration — engine selection', () => {
           ],
         } satisfies AgenticEngineOutput,
       });
+      const app = await buildApp({ searchReachable: true });
 
       const response = await request(app)
         .post('/suggest-path')
-        .send({ body: 'Meeting log content', engine: 'agentic' })
+        .send({ body: 'Meeting log content' })
         .expect(200);
 
       const [memoSuggestion, searchSuggestion] = response.body.suggestions;
@@ -341,9 +385,11 @@ describe('POST /suggest-path route integration — engine selection', () => {
     });
 
     it('should retrieve the suggestPathAgent from the registry and not run the oneshot pipeline', async () => {
+      const app = await buildApp({ searchReachable: true });
+
       await request(app)
         .post('/suggest-path')
-        .send({ body: 'Document content', engine: 'agentic' })
+        .send({ body: 'Document content' })
         .expect(200);
 
       expect(mocks.getAgentMock).toHaveBeenCalledWith('suggestPathAgent');
@@ -353,33 +399,40 @@ describe('POST /suggest-path route integration — engine selection', () => {
       expect(mocks.evaluateCandidatesMock).not.toHaveBeenCalled();
       expect(mocks.generateCategorySuggestionMock).not.toHaveBeenCalled();
     });
-  });
 
-  describe('engine: invalid value', () => {
-    it('should return 400 with validation errors', async () => {
-      const response = await request(app)
-        .post('/suggest-path')
-        .send({ body: 'Document content', engine: 'invalid-engine' })
-        .expect(400);
+    it('should still select the agentic engine when full-text search is not reachable', async () => {
+      const app = await buildApp({ searchReachable: false });
 
-      expect(response.body.errors).toBeDefined();
-      expect(response.body.errors.length).toBeGreaterThan(0);
-    });
-
-    it('should not execute any engine when the engine value is rejected', async () => {
       await request(app)
         .post('/suggest-path')
-        .send({ body: 'Document content', engine: 'invalid-engine' })
-        .expect(400);
+        .send({ body: 'Document content' })
+        .expect(200);
 
-      expect(mocks.getAgentMock).not.toHaveBeenCalled();
-      expect(mocks.agentGenerateMock).not.toHaveBeenCalled();
+      expect(mocks.agentGenerateMock).toHaveBeenCalledTimes(1);
       expect(mocks.analyzeContentMock).not.toHaveBeenCalled();
+    });
+
+    it('should ignore the removed engine field sent by legacy clients', async () => {
+      const app = await buildApp({ searchReachable: true });
+
+      const response = await request(app)
+        .post('/suggest-path')
+        .send({ body: 'Document content', engine: 'oneshot' })
+        .expect(200);
+
+      // Availability decides (agentic here); the legacy field neither
+      // selects an engine nor fails validation.
+      expect(mocks.agentGenerateMock).toHaveBeenCalledTimes(1);
+      expect(mocks.analyzeContentMock).not.toHaveBeenCalled();
+      expect(response.body.suggestions[0]).toEqual(expectedMemoSuggestion);
     });
   });
 
-  describe('engine unspecified', () => {
-    it('should serve the request through the oneshot pipeline (configured default)', async () => {
+  describe('Mastra AI not configured (oneshot engine selected)', () => {
+    it('should serve the request through the oneshot pipeline', async () => {
+      unconfigureMastraAi();
+      const app = await buildApp({ searchReachable: true });
+
       const response = await request(app)
         .post('/suggest-path')
         .send({ body: 'Content about React hooks' })
@@ -402,7 +455,10 @@ describe('POST /suggest-path route integration — engine selection', () => {
       ]);
     });
 
-    it('should not invoke the agentic engine when engine is unspecified', async () => {
+    it('should not invoke the agentic engine', async () => {
+      unconfigureMastraAi();
+      const app = await buildApp({ searchReachable: true });
+
       await request(app)
         .post('/suggest-path')
         .send({ body: 'Content about React hooks' })
@@ -410,6 +466,34 @@ describe('POST /suggest-path route integration — engine selection', () => {
 
       expect(mocks.getAgentMock).not.toHaveBeenCalled();
       expect(mocks.agentGenerateMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('neither Mastra AI nor full-text search available', () => {
+    it('should return 200 with the memo suggestion only', async () => {
+      unconfigureMastraAi();
+      const app = await buildApp({ searchReachable: false });
+
+      const response = await request(app)
+        .post('/suggest-path')
+        .send({ body: 'Document content' })
+        .expect(200);
+
+      expect(response.body.suggestions).toEqual([expectedMemoSuggestion]);
+    });
+
+    it('should not invoke any engine', async () => {
+      unconfigureMastraAi();
+      const app = await buildApp({ searchReachable: false });
+
+      await request(app)
+        .post('/suggest-path')
+        .send({ body: 'Document content' })
+        .expect(200);
+
+      expect(mocks.getAgentMock).not.toHaveBeenCalled();
+      expect(mocks.agentGenerateMock).not.toHaveBeenCalled();
+      expect(mocks.analyzeContentMock).not.toHaveBeenCalled();
     });
   });
 });

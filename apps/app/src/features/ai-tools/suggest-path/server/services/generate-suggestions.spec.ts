@@ -20,8 +20,9 @@ const mocks = vi.hoisted(() => {
     generateCategorySuggestionMock: vi.fn(),
     resolveParentGrantMock: vi.fn(),
     agenticEngineMock: vi.fn(),
-    getConfigMock: vi.fn(),
+    isAiConfiguredMock: vi.fn(),
     loggerErrorMock: vi.fn(),
+    loggerInfoMock: vi.fn(),
   };
 });
 
@@ -49,29 +50,25 @@ vi.mock('./resolve-parent-grant', () => ({
   resolveParentGrant: mocks.resolveParentGrantMock,
 }));
 
-// Mock wiring only for the orchestrator's new import graph (task 5.1);
-// every pre-existing mock, test, and assertion in this file is unchanged.
-//
-// The engines dispatcher statically imports the agentic engine, whose
+// The engine selection statically imports the agentic engine, whose
 // transitive imports (mastra-modules) cannot load in the unit-test process
 // (module-scope config reads, ESM/CJS interop). Stubbing it keeps the real
-// dispatcher + real oneshot engine in the graph, which these tests exercise.
+// selection + real oneshot engine in the graph, which these tests exercise.
 vi.mock('./engines/agentic-engine', () => ({
   agenticEngine: mocks.agenticEngineMock,
 }));
 
-// The orchestrator resolves the default engine id from config when the
-// caller does not specify one; the real configManager throws
-// 'Config is not loaded' in unit tests. The mock is re-primed to 'oneshot'
-// in beforeEach (after resetAllMocks) and overridden per test to exercise
-// the invalid-config path.
-vi.mock('~/server/service/config-manager', () => ({
-  configManager: { getConfig: mocks.getConfigMock },
+// Availability signal for the engine selection: primed to false in
+// beforeEach so the tests exercise the oneshot path, overridden per test to
+// exercise the agentic path.
+vi.mock('~/features/mastra/server/services/is-ai-configured', () => ({
+  isAiConfigured: mocks.isAiConfiguredMock,
 }));
 
 vi.mock('~/utils/logger', () => ({
   default: () => ({
     error: mocks.loggerErrorMock,
+    info: mocks.loggerInfoMock,
   }),
 }));
 
@@ -79,7 +76,7 @@ const mockUser = mock<IUserHasId>({ _id: 'user123', username: 'alice' });
 
 const mockUserGroups: ObjectIdLike[] = ['group1', 'group2'];
 
-const mockSearchService = mock<SearchService>();
+const mockSearchService = mock<SearchService>({ isReachable: true });
 
 const memoSuggestion: PathSuggestion = {
   type: 'memo',
@@ -129,7 +126,9 @@ describe('generateSuggestions', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.generateMemoSuggestionMock.mockResolvedValue(memoSuggestion);
-    mocks.getConfigMock.mockReturnValue('oneshot');
+    // Mastra AI unconfigured -> the selection falls back to the oneshot
+    // engine (mockSearchService declares isReachable: true).
+    mocks.isAiConfiguredMock.mockReturnValue(false);
   });
 
   const callGenerateSuggestions = async () => {
@@ -377,47 +376,43 @@ describe('generateSuggestions', () => {
       informationType: 'stock',
     };
 
-    const callWithEngine = async (engine: 'oneshot' | 'agentic') => {
-      const { generateSuggestions } = await import('./generate-suggestions');
-      return generateSuggestions(
-        mockUser,
-        'Some page content',
-        mockUserGroups,
-        mockSearchService,
-        { engine },
-      );
-    };
-
-    it('should return memo + agentic suggestions when the agentic engine succeeds', async () => {
+    it('should return memo + agentic suggestions when Mastra AI is configured and the agentic engine succeeds', async () => {
+      mocks.isAiConfiguredMock.mockReturnValue(true);
       mocks.agenticEngineMock.mockResolvedValue([agenticSuggestion]);
 
-      const result = await callWithEngine('agentic');
+      const result = await callGenerateSuggestions();
 
       expect(result).toEqual([memoSuggestion, agenticSuggestion]);
     });
 
     it('should degrade to memo only (not throw) when the agentic engine rejects', async () => {
+      mocks.isAiConfiguredMock.mockReturnValue(true);
       mocks.agenticEngineMock.mockRejectedValue(
         new Error('agent execution failed'),
       );
-
-      const result = await callWithEngine('agentic');
-
-      expect(result).toEqual([memoSuggestion]);
-      expect(mocks.loggerErrorMock).toHaveBeenCalled();
-    });
-
-    it('should fall back to memo only (not throw) when the configured engine id is invalid', async () => {
-      // Operator typo in AI_TOOLS_SUGGEST_PATH_ENGINE: the config layer does
-      // not runtime-validate env values, so the orchestrator must degrade
-      // instead of calling undefined as a function (HTTP 500 for every
-      // request).
-      mocks.getConfigMock.mockReturnValue('onshot');
 
       const result = await callGenerateSuggestions();
 
       expect(result).toEqual([memoSuggestion]);
       expect(mocks.loggerErrorMock).toHaveBeenCalled();
+    });
+
+    it('should return memo only (not throw) when neither Mastra AI nor full-text search is available', async () => {
+      const unreachableSearchService = mock<SearchService>({
+        isReachable: false,
+      });
+      const { generateSuggestions } = await import('./generate-suggestions');
+
+      const result = await generateSuggestions(
+        mockUser,
+        'Some page content',
+        mockUserGroups,
+        unreachableSearchService,
+      );
+
+      expect(result).toEqual([memoSuggestion]);
+      expect(mocks.agenticEngineMock).not.toHaveBeenCalled();
+      expect(mocks.analyzeContentMock).not.toHaveBeenCalled();
     });
   });
 });

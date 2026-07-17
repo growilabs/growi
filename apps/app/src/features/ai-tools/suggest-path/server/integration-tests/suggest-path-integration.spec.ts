@@ -10,7 +10,10 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 const testState = vi.hoisted(() => ({
   authenticateUser: true,
   aiEnabled: true,
-  aiConfigured: true,
+  // Mastra AI availability drives the engine selection: false (the default
+  // here) selects the oneshot pipeline this suite exercises, true would
+  // select the agentic engine (covered by the route-integration suite).
+  aiConfigured: false,
   disableUserPages: false,
   // Phase 2 - content analysis
   contentAnalysis: null as {
@@ -69,7 +72,7 @@ vi.mock('~/server/middlewares/login-required', () => ({
   },
 }));
 
-// Mock config manager — aiReadyGuard (via isAiEnabled) and
+// Mock config manager — the route's aiEnabledGuard (via isAiEnabled) and
 // generateMemoSuggestion read from this
 vi.mock('~/server/service/config-manager', () => ({
   configManager: {
@@ -79,11 +82,6 @@ vi.mock('~/server/service/config-manager', () => ({
           return testState.aiEnabled;
         case 'security:disableUserPages':
           return testState.disableUserPages;
-        // The orchestrator resolves the default engine id from config; the
-        // real configManager never returns undefined for this key
-        // (defaultValue: 'oneshot' in config-definition).
-        case 'aiTools:suggestPathEngine':
-          return 'oneshot';
         default:
           return undefined;
       }
@@ -91,10 +89,9 @@ vi.mock('~/server/service/config-manager', () => ({
   },
 }));
 
-// Mock the configured-side collaborator of aiReadyGuard (the real guard stays
-// in the chain; isAiEnabled is driven through the config-manager mock above).
-// The real isAiConfigured derives from the multi-provider catalog config,
-// which is out of scope for this suite.
+// Mock the Mastra availability signal read by the engine selection. The real
+// isAiConfigured derives from the multi-provider catalog config, which is
+// out of scope for this suite.
 vi.mock('~/features/mastra/server/services/is-ai-configured', () => ({
   isAiConfigured: () => testState.aiConfigured,
   isAiReady: () => testState.aiEnabled && testState.aiConfigured,
@@ -166,25 +163,34 @@ vi.mock('../services/resolve-parent-grant', () => ({
   }),
 }));
 
-// Mock wiring only for the orchestrator's import graph (task 5.1); every
-// pre-existing mock, test, and assertion in this file is unchanged.
-// The engines dispatcher statically imports the agentic engine, whose
+// The engine selection statically imports the agentic engine, whose
 // transitive imports (mastra-modules) cannot load in the unit-test process
 // (module-scope config reads, ESM/CJS interop). Stubbing it keeps the real
-// orchestrator + dispatcher + oneshot engine in the graph, which these
+// orchestrator + engine selection + oneshot engine in the graph, which these
 // tests exercise.
 vi.mock('../services/engines/agentic-engine', () => ({
   agenticEngine: vi.fn(),
+}));
+
+// Inert logger: keeps the suite runnable where @growi/logger has no build
+// output (nothing asserts on logging here).
+vi.mock('~/utils/logger', () => ({
+  default: () => ({
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  }),
 }));
 
 describe('POST /suggest-path integration', () => {
   let app: express.Application;
 
   beforeEach(async () => {
-    // Reset test state to defaults
+    // Reset test state to defaults (aiConfigured=false -> oneshot engine)
     testState.authenticateUser = true;
     testState.aiEnabled = true;
-    testState.aiConfigured = true;
+    testState.aiConfigured = false;
     testState.disableUserPages = false;
     testState.contentAnalysis = null;
     testState.contentAnalysisError = null;
@@ -211,10 +217,12 @@ describe('POST /suggest-path integration', () => {
       next();
     });
 
-    // Import and mount the handler factory with real middleware chain
+    // Import and mount the handler factory with real middleware chain.
+    // isReachable: true keeps the oneshot engine selectable while Mastra AI
+    // is unconfigured.
     const { suggestPathHandlersFactory } = await import('../routes/apiv3');
     const mockCrowi = {
-      searchService: { searchKeyword: vi.fn() },
+      searchService: { searchKeyword: vi.fn(), isReachable: true },
     } as unknown as Crowi;
     app.post('/suggest-path', suggestPathHandlersFactory(mockCrowi));
   });
@@ -315,13 +323,18 @@ describe('POST /suggest-path integration', () => {
           .expect(501);
       });
 
-      it('should return 501 when AI is not configured', async () => {
+      it('should serve the request (not 501) when Mastra AI is not configured', async () => {
+        // Unlike the former aiReadyGuard behavior, an unconfigured Mastra AI
+        // stack no longer rejects the request: the engine selection degrades
+        // to the oneshot pipeline instead.
         testState.aiConfigured = false;
 
-        await request(app)
+        const response = await request(app)
           .post('/suggest-path')
           .send({ body: 'Some page content' })
-          .expect(501);
+          .expect(200);
+
+        expect(response.body.suggestions).toBeDefined();
       });
     });
   });

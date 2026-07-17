@@ -11,14 +11,6 @@ export const SuggestionType = {
 export type SuggestionType =
   (typeof SuggestionType)[keyof typeof SuggestionType];
 
-export const SuggestPathEngineId = {
-  ONESHOT: 'oneshot',
-  AGENTIC: 'agentic',
-} as const;
-
-export type SuggestPathEngineId =
-  (typeof SuggestPathEngineId)[keyof typeof SuggestPathEngineId];
-
 export type PathSuggestion = {
   type: SuggestionType;
   path: string;
@@ -60,6 +52,9 @@ export type SearchResultItem = {
 };
 
 export type SearchService = {
+  // Availability signal (configured AND healthy) used by the engine
+  // selection; mirrors the getter on the real SearchService instance.
+  readonly isReachable: boolean;
   searchKeyword(
     keyword: string,
     nqName: string | null,
