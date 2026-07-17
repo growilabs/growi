@@ -161,3 +161,13 @@
 - 2: dynamic model 解決関数は 1 generate あたり約 2 回評価される — 副作用なし・軽量に保つこと
 - 5.1: design の「既存テスト無修正 green」は **additive-mock-wiring の意味で充足**（アサーション・既存行は byte-identical、追加は vi.mock 配線のみ 19+/0− と 16+/0−）。engines barrel → agentic-engine → mastra-modules の静的 import チェーンが app-unit vitest でロード不能（p-map ESM）なため、`./engines/agentic-engine` のスタブ mock 追加が必須だった。レビューで HEAD spec の import 時 fail を再現済み = モック方式起因の証明。6.3 はこの解釈を前提に再検証すること（再揉めしない）
 - 6.3: devcontainer（HEAD 526c3d3694）で suggest-path 17 files/297 tests + mastra-modules 7 files/83 tests 全 green。lint/test/build の非ゼロ exit はすべて feature 起因でないことを証明済み: (a) `post-message.ts` TS2769 は baseline byte-identical の pre-existing（support/mastra 系譜・chat 側 = spec 境界外。**リリース前に要修正**）、(b) full-suite の 13 fail 中 12 は負荷起因（分離再実行 green）、(c) `update-activity.spec` は mongod バイナリ SIGSEGV（コンテナ環境問題）。build:client は exit 0。devcontainer の `@growi/core` dist が stale だったため `pnpm exec turbo run build --filter "@growi/app^..."` を実施（環境修復）
+
+## 将来タスク（本PRスコープ外）: 非AI・ES のみ oneshot フォールバックの整備
+
+2026-07-17 の方針転換（`features/openai` 全廃）で旧 oneshot（LLM 依存）を撤去した。最終形として、Mastra 未設定環境向けに AIなし・Elasticsearch のみの oneshot フォールバックを別タスクで整備する。設計は design.md「将来のロードマップ」を参照。
+
+- [ ] F.1 非AIキーワード抽出の実装（旧 analyze-content の LLM 呼び出しを非AI手段に置換）
+  - _温存資産: retrieve-search-candidates / generate-category-suggestion / resolve-parent-grant_
+- [ ] F.2 非AI oneshot エンジンを `engines/` に追加し、`select-engine` に記録を1件追加（Mastra 未設定だが ES 到達可→非AI oneshot）
+- [ ] F.3 ルートガードの見直し（未設定時に非AI oneshot を通す。`@mastra` 遅延ロードと両立）
+- [ ] F.4 品質・レスポンスの測定と許容ライン合意（非AI版は旧 oneshot=miss 14% よりさらに落ちる可能性）

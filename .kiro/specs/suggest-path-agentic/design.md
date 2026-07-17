@@ -781,3 +781,36 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 - **制御ノブ**: searchLimit（3〜5）・モデル（既定 gpt-4.1-mini）・timeoutMs。すべて設定で運用調整可能。既定値は A/B 測定の実測（6.2）を経て確定し、レスポンス時間上限の別途合意（Redmine #184610）に反映する
 - **エンジンは可用性で自動選択**（2026-07-17 改訂）: Mastra AI が設定済みの環境では agentic が常用となる。レスポンス時間・コストは検索 budget・maxSteps・timeoutMs で制御し、AI 未設定環境は oneshot / memo-only に縮退するため影響を受けない
 - **トークンコスト**: サマリログで毎リクエスト記録（6.2）。A/B でワンショット比のコスト増を定量化する
+
+## 将来のロードマップ: Elasticsearch のみ（AIなし）フォールバックエンジン（本PRスコープ外）
+
+### 背景（2026-07-17 の方針転換）
+
+`features/openai`（旧 OpenAI 連携）への依存を全廃する方針に伴い、本PRで旧 oneshot エンジンを撤去した。旧 oneshot は「AIなし・ES のみ」の実装ではなく、キーワード抽出（analyze-content）と候補評価（evaluate-candidates）で `features/openai` の LLM を呼ぶパイプラインであり、ES は候補取得の1ステップだけだった。したがって `features/openai` を消すと旧 oneshot は成立しないため、`analyze-content` / `evaluate-candidates` / `call-llm-for-json` / `oneshot-engine` を削除した。
+
+現状のエンジン選択は「Mastra AI が設定済み→agentic／未設定→memo のみ（ルートの `aiReadyGuard` が未設定を 501 で弾く）」に縮小している。
+
+### 最終形の目標
+
+Mastra AI が使えない環境向けに、**LLM を一切使わず Elasticsearch だけで動く oneshot フォールバックエンジン**を整備する。これにより「AI 未設定でも、全文検索が使えれば保存先候補を返せる」状態を取り戻す。
+
+### 温存した再利用資産（本PRで削除していない）
+
+将来の非AI oneshot の土台として、AI に依存しない以下のサービスを残してある。
+
+- `retrieve-search-candidates.ts` — Elasticsearch 全文検索で候補ページを取得（AIなし）
+- `generate-category-suggestion.ts` — ES 候補の上位パスからカテゴリ提案を導出（AIなし）
+- `resolve-parent-grant.ts` — MongoDB で親ページの grant を解決（AIなし。agentic 側でも使用中）
+
+### 実装方針（将来タスク）
+
+1. **キーワード抽出の非AI化**: 旧 `analyze-content` の LLM 呼び出しを、非AI手段に置き換える（例: ページ本文・タイトル・見出しからの素朴なキーワード抽出、または本文をそのまま ES 全文検索に投げる）。flow/stock 分類が必要なら簡易ヒューリスティックで代替するか、この段では省く。
+2. **評価の非AI化**: 旧 `evaluate-candidates` の LLM ランキングを撤去し、ES スコア順＋カテゴリ導出でパスを提案する。
+3. **エンジン再結線**: 新しい非AI oneshot を `engines/` に追加し、`select-engine` を「Mastra 設定済み→agentic／未設定だが ES 到達可→非AI oneshot／どちらも不可→memo」に拡張する（`SuggestPathEngineRecord` と非対称フォールバック方針は撤去せず残してあるため、記録を1件追加するだけで済む構造）。
+4. **ガードの扱い**: 未設定時に非AI oneshot を通すには、ルートのガードを見直す必要がある。現状は `aiReadyGuard`（`isAiConfigured` 必須）で未設定を 501 にしているため、`isAiEnabled` のみ要求する形へ緩めるか、ES 到達性で分岐する。あわせて、重い `@mastra` スタックを未設定環境で読み込まない遅延ロード導線（現状の lazy import）と両立させること。
+
+### 未確定事項
+
+- 非AIキーワード抽出の品質（旧 oneshot は miss 14%。非AI版はさらに落ちる可能性があり、許容ラインの合意が必要）
+- flow/stock 分類を非AIでどこまで行うか（省略も選択肢）
+- ガードを緩める場合の副作用（未設定環境で ES のみのフォールバックを本当に提供するかのプロダクト判断）
