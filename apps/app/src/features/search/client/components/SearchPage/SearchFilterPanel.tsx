@@ -1,4 +1,5 @@
 import { type JSX, type ReactNode, useCallback, useId, useState } from 'react';
+import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import { Dropdown, DropdownMenu, DropdownToggle } from 'reactstrap';
 
@@ -51,6 +52,11 @@ const UsernameFilterField = (props: UsernameFilterFieldProps): JSX.Element => {
   const id = useId();
   return (
     <FilterFieldCell label={label} className={styles['username-filter']}>
+      {/*
+        Semi-controlled via `initialUsernames`, not `selected`: the typeahead
+        keeps each item's `category` internally, which this panel (usernames
+        only) can't supply — unlike the fully-controlled TagsInput below.
+      */}
       <SearchUsernameTypeahead
         id={id}
         onChange={onChange}
@@ -84,6 +90,9 @@ const GroupFilterField = (props: GroupFilterFieldProps): JSX.Element => {
   const [isOpen, setIsOpen] = useState(false);
   const baseId = useId();
 
+  // A nullish `data` is still loading; only an empty relatedGroups array is a
+  // real "no groups". Distinguish them so the empty message doesn't flash first.
+  const isLoading = data == null;
   const groups = data?.relatedGroups ?? [];
 
   const toggleGroup = useCallback(
@@ -109,7 +118,11 @@ const GroupFilterField = (props: GroupFilterFieldProps): JSX.Element => {
           )}
         </DropdownToggle>
         <DropdownMenu className="w-100 px-2">
-          {groups.length === 0 ? (
+          {isLoading ? (
+            <span className="text-muted px-2">
+              <LoadingSpinner className="me-1" />
+            </span>
+          ) : groups.length === 0 ? (
             <span className="text-muted px-2">
               {t('search_result.filter_group_none', 'No groups available')}
             </span>

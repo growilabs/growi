@@ -1,57 +1,80 @@
-import type { ReactNode } from 'react';
-import { renderHook, waitFor } from '@testing-library/react';
-import { SWRConfig } from 'swr';
+import { renderHook } from '@testing-library/react';
 
-import { createEmptyFilterState } from '~/features/search/client/utils/search-query';
+import {
+  createEmptyFilterState,
+  type SearchFilterState,
+} from '~/features/search/client/utils/search-query';
 
-const { apiGetMock } = vi.hoisted(() => ({ apiGetMock: vi.fn() }));
+// SWR fires a request for a non-null key and stays idle for a null one, so the
+// key is the observable proxy for "does a search run?" — assert on it rather
+// than on the internal shouldSearch/isFilterStateEmpty helpers.
+const useSWRMock = vi.fn((..._args: unknown[]) => ({
+  data: undefined,
+  error: undefined,
+  isLoading: false,
+  isValidating: false,
+  mutate: vi.fn(),
+}));
 
-vi.mock('~/client/util/apiv1-client', () => ({
-  apiGet: apiGetMock,
+vi.mock('swr', () => ({
+  default: (...args: unknown[]) => useSWRMock(...args),
+  mutate: vi.fn(),
 }));
 
 import { useSWRxSearch } from './search';
 
-const mockResult = { meta: { total: 1, hitsCount: 1 }, data: [] };
+const baseConfig = { limit: 20 };
 
-// Fresh SWR cache per render so cases do not leak retained data into each other.
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
-    {children}
-  </SWRConfig>
-);
+const withFilters = (
+  overrides: Partial<SearchFilterState>,
+): SearchFilterState => ({ ...createEmptyFilterState(), ...overrides });
+
+const swrKeyFor = (
+  keyword: string | null,
+  filters?: SearchFilterState,
+): unknown => {
+  useSWRMock.mockClear();
+  renderHook(() => useSWRxSearch(keyword, null, { ...baseConfig, filters }));
+  return useSWRMock.mock.calls[0]?.[0];
+};
 
 describe('useSWRxSearch', () => {
   beforeEach(() => {
-    apiGetMock.mockResolvedValue(mockResult);
+    vi.clearAllMocks();
   });
 
-  it('does not search and exposes no data when there is no keyword and no filters', () => {
-    const { result } = renderHook(
-      () =>
-        useSWRxSearch('', null, {
-          limit: 10,
-          filters: createEmptyFilterState(),
-        }),
-      { wrapper },
-    );
+  describe('runs a search (non-null SWR key)', () => {
+    it('when a keyword is present and no filter is set', () => {
+      expect(swrKeyFor('hello')).not.toBeNull();
+    });
 
-    // Nothing to search: no request, and no stale data retained from a prior run.
-    expect(apiGetMock).not.toHaveBeenCalled();
-    expect(result.current.data).toBeUndefined();
+    it.each<[string, SearchFilterState]>([
+      ['author', withFilters({ authors: ['alice'] })],
+      ['editor', withFilters({ editors: ['bob'] })],
+      ['group', withFilters({ groups: ['engineering'] })],
+      ['tag', withFilters({ tags: ['release'] })],
+    ])('when the keyword is empty but a %s filter is set (filter-only search)', (_field, filters) => {
+      expect(swrKeyFor('', filters)).not.toBeNull();
+    });
+
+    it('when the keyword is null but a filter is set (filter-only search)', () => {
+      expect(
+        swrKeyFor(null, withFilters({ authors: ['alice'] })),
+      ).not.toBeNull();
+    });
   });
 
-  it('runs a filter-only search (no keyword) and returns its data', async () => {
-    const { result } = renderHook(
-      () =>
-        useSWRxSearch('', null, {
-          limit: 10,
-          filters: { ...createEmptyFilterState(), authors: ['alice'] },
-        }),
-      { wrapper },
-    );
+  describe('does not run a search (null SWR key)', () => {
+    it('when the keyword is an empty string and no filter is set', () => {
+      expect(swrKeyFor('')).toBeNull();
+    });
 
-    await waitFor(() => expect(result.current.data).toEqual(mockResult));
-    expect(apiGetMock).toHaveBeenCalled();
+    it('when the keyword is null and no filter is set', () => {
+      expect(swrKeyFor(null)).toBeNull();
+    });
+
+    it('when the keyword is empty and every filter field is empty', () => {
+      expect(swrKeyFor('', createEmptyFilterState())).toBeNull();
+    });
   });
 });
