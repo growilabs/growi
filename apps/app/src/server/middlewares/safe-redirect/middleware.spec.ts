@@ -1,8 +1,9 @@
 import type { Request } from 'express';
 
-import registerSafeRedirectFactory, {
+import {
   type ResWithSafeRedirect,
-} from './safe-redirect';
+  registerSafeRedirectFactory,
+} from './middleware';
 
 describe('safeRedirect', () => {
   const whitelistOfHosts = ['white1.example.com:8080', 'white2.example.com'];
