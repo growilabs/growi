@@ -61,6 +61,10 @@ export const createEmptyFilterState = (): SearchFilterState => ({
   tags: [],
 });
 
+const cleanFilterValue = (value: string) => {
+  return value.replace(/"/g, '').trim();
+};
+
 /** True when no filter field holds any value. */
 export const isFilterStateEmpty = (filters: SearchFilterState): boolean =>
   filters.authors.length === 0 &&
@@ -104,7 +108,7 @@ export const sanitizeFilterState = (
   filters: SearchFilterState,
 ): SearchFilterState => {
   const clean = (values: string[]) =>
-    values.map((v) => v.replace(/"/g, '').trim()).filter((v) => v !== '');
+    values.map((v) => cleanFilterValue(v)).filter((v) => v !== '');
   return {
     authors: clean(filters.authors),
     editors: clean(filters.editors),
@@ -137,7 +141,7 @@ export const buildSearchQuery = (
       // Strip embedded double-quotes: the grammar has no way to escape them, and
       // the server strips quotes too, so emitting one would corrupt the query
       // (the value could be truncated or partly reinterpreted as free text).
-      const cleaned = value.replace(/"/g, '').trim();
+      const cleaned = cleanFilterValue(value);
       if (cleaned === '') {
         continue;
       }
@@ -162,7 +166,7 @@ export const parseSearchQuery = (queryString: string): ParsedSearchQuery => {
     (_match, lead: string, prefix: string, rawValue: string) => {
       // Strip quotes: unwraps a quoted value, no-op for a bare one, and cleans a
       // stray quote from a malformed `author:"x` (matching the server).
-      const value = rawValue.replace(/"/g, '');
+      const value = cleanFilterValue(rawValue);
       // A quotes-only operator (`author:""`, `author:"`) carries no value; drop
       // it instead of committing a blank chip and running an empty-value filter.
       if (value !== '') {
