@@ -1,8 +1,3 @@
-import { createAzure } from '@ai-sdk/azure';
-import {
-  DefaultAzureCredential,
-  getBearerTokenProvider,
-} from '@azure/identity';
 import type { MastraModelConfig } from '@mastra/core/llm';
 
 import { getApiKey, getProviderSettings } from './config';
@@ -27,7 +22,16 @@ const ENTRA_ID_SCOPE = 'https://cognitiveservices.azure.com/.default';
 // AI_PROVIDER_API_KEYS). The object field is `baseURL`, matching the AI SDK's
 // createAzure option (and the API/form use the same name end-to-end), so it passes
 // straight through here.
-export const resolveAzureOpenaiModel = (modelId: string): MastraModelConfig => {
+//
+// `@ai-sdk/azure` (and, only in the Entra ID path, `@azure/identity`) are loaded
+// via dynamic import() so their module graphs are pulled ONLY when an Azure model
+// is actually resolved — an instance configured for a different provider never pays
+// that memory cost (see llm-providers/index.ts). Config validation runs BEFORE the
+// imports so a misconfigured provider fails fast without loading either SDK, and
+// `@azure/identity` is never loaded when API-key auth is used.
+export const resolveAzureOpenaiModel = async (
+  modelId: string,
+): Promise<MastraModelConfig> => {
   // `?? {}` guards a missing azure-openai entry / malformed settings value (the
   // config accessor already fails soft to undefined on a malformed shape).
   const {
@@ -53,6 +57,11 @@ export const resolveAzureOpenaiModel = (modelId: string): MastraModelConfig => {
   if (useEntraId) {
     // Microsoft Entra ID (managed identity): resolve a bearer token from the
     // ambient Azure environment via DefaultAzureCredential. No API key is used.
+    // `@azure/identity` is loaded only on this path.
+    const [
+      { createAzure },
+      { DefaultAzureCredential, getBearerTokenProvider },
+    ] = await Promise.all([import('@ai-sdk/azure'), import('@azure/identity')]);
     const tokenProvider = getBearerTokenProvider(
       new DefaultAzureCredential(),
       ENTRA_ID_SCOPE,
@@ -69,5 +78,6 @@ export const resolveAzureOpenaiModel = (modelId: string): MastraModelConfig => {
       'Azure OpenAI requires an API key (set it via the admin AI settings or the AI_PROVIDER_API_KEYS environment variable), or set "useEntraId": true to authenticate with Microsoft Entra ID',
     );
   }
+  const { createAzure } = await import('@ai-sdk/azure');
   return createAzure({ apiKey, resourceName, baseURL, apiVersion })(modelId);
 };
