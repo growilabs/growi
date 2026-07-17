@@ -17,11 +17,8 @@ const logger = loggerFactory(
 /**
  * Orchestrator: always generates the memo suggestion first, dispatches to
  * the engine selected by runtime availability (agentic when the Mastra AI
- * stack is configured, oneshot when only full-text search is usable,
- * memo-only when neither is available), and applies the asymmetric fallback
- * policy.
- *
- * The one-shot pipeline itself lives in `engines/oneshot-engine.ts`.
+ * stack is configured, memo-only otherwise), and applies the asymmetric
+ * fallback policy declared by the selected engine.
  */
 export const generateSuggestions = async (
   user: IUserHasId,
@@ -33,10 +30,10 @@ export const generateSuggestions = async (
 
   // Availability is evaluated per request so a configuration change takes
   // effect without a server restart.
-  const engineRecord = selectEngine(searchService);
+  const engineRecord = selectEngine();
   if (engineRecord == null) {
     logger.info(
-      'No suggest-path engine is available (Mastra AI is not configured and full-text search is not reachable); returning the memo suggestion only',
+      'No suggest-path engine is available (Mastra AI is not configured); returning the memo suggestion only',
     );
     return [memoSuggestion];
   }

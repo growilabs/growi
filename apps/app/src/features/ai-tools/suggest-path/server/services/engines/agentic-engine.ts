@@ -66,9 +66,10 @@ const buildUserPrompt = (body: string): string => {
  * settling (design.md "AgenticEngine > State Management"; Requirements 2.4,
  * 6.2, 6.3).
  *
- * Requirement 5.5: this engine must not import any of the oneshot-specific
- * services (analyze-content / retrieve-search-candidates /
- * evaluate-candidates / generate-category-suggestion).
+ * This engine stays independent of the legacy candidate-retrieval / category
+ * services (retrieve-search-candidates / generate-category-suggestion), which
+ * are retained only as building blocks for the planned Elasticsearch-only
+ * (AI-free) fallback engine, not consumed here.
  */
 export const agenticEngine: SuggestPathEngine = async (
   input,

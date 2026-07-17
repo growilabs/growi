@@ -97,20 +97,20 @@ describe('generateSuggestions (orchestration)', () => {
   // by select-engine.spec.
   const stubSelectedEngine = (degradeToMemoOnFailure: boolean) => {
     mocks.selectEngineMock.mockReturnValue({
-      id: degradeToMemoOnFailure ? 'agentic' : 'oneshot',
+      id: degradeToMemoOnFailure ? 'agentic' : 'non-degrading',
       run: mocks.runEngineMock,
       degradeToMemoOnFailure,
     });
   };
 
   describe('engine dispatch', () => {
-    it('should run the engine selected from the search service with the request input', async () => {
+    it('should run the engine selected from runtime availability with the request input', async () => {
       stubSelectedEngine(true);
       mocks.runEngineMock.mockResolvedValue([]);
 
       await callGenerateSuggestions();
 
-      expect(mocks.selectEngineMock).toHaveBeenCalledWith(mockSearchService);
+      expect(mocks.selectEngineMock).toHaveBeenCalledWith();
       expect(mocks.runEngineMock).toHaveBeenCalledTimes(1);
       expect(mocks.runEngineMock).toHaveBeenCalledWith(expectedEngineInput);
     });
@@ -166,7 +166,7 @@ describe('generateSuggestions (orchestration)', () => {
     });
 
     it('should propagate non-degrading engine exceptions unchanged', async () => {
-      const engineError = new Error('unexpected oneshot failure');
+      const engineError = new Error('unexpected engine failure');
       stubSelectedEngine(false);
       mocks.runEngineMock.mockRejectedValue(engineError);
 
@@ -176,9 +176,8 @@ describe('generateSuggestions (orchestration)', () => {
 
   describe('no engine available', () => {
     it('should return memo-only (not throw) when no engine is available', async () => {
-      // Mastra AI unconfigured AND full-text search unreachable: the
-      // selection resolves to undefined and the orchestrator degrades to the
-      // guaranteed memo-only response.
+      // Mastra AI unconfigured: the selection resolves to undefined and the
+      // orchestrator degrades to the guaranteed memo-only response.
       mocks.selectEngineMock.mockReturnValue(undefined);
 
       const result = await callGenerateSuggestions();
