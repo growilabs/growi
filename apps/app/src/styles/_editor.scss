@@ -8,21 +8,6 @@
   --grw-codemirror-editor-content-font-family: var(--font-family-monospace);
 }
 
-// Slash-command / emoji completion menu (CodeMirror autocomplete).
-// Fixed dark (black-based) tones, not the theme-adaptive *-color vars, so the
-// text never resolves to a washed-out light color on the menu's light surface.
-// Both stay legible without hover; the description is a lighter gray than the
-// label so the label reads as the title.
-.cm-tooltip-autocomplete {
-  .cm-completionLabel {
-    color: var(--bs-gray-800);
-  }
-
-  .cm-completionDetail {
-    color: var(--bs-gray-600);
-  }
-}
-
 // global imported
 .layout-root.editing {
   overflow: hidden !important;

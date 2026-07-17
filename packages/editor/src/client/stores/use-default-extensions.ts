@@ -42,9 +42,15 @@ const markdownHighlighting = HighlightStyle.define([
   { tag: tags.heading6, class: 'cm-header-6 cm-header' },
 ]);
 
-// Static extensions that do not depend on the current language. The unified
-// autocompletion (which resolves slash-command labels via `t`) is composed in at
-// registration time; see `createEditorCompletionExtension`.
+const completionMenuTheme = EditorView.baseTheme({
+  '.cm-tooltip-autocomplete .cm-completionLabel': {
+    color: 'var(--bs-gray-800)',
+  },
+  '.cm-tooltip-autocomplete .cm-completionDetail': {
+    color: 'var(--bs-gray-600)',
+  },
+});
+
 const staticExtensions: Extension[] = [
   EditorView.lineWrapping,
   markdown({
@@ -57,17 +63,11 @@ const staticExtensions: Extension[] = [
   Prec.lowest(keymap.of(defaultKeymap)),
   syntaxHighlighting(markdownHighlighting),
   Prec.lowest(syntaxHighlighting(defaultHighlightStyle)),
+  completionMenuTheme,
 ];
 
-/**
- * Build the single unified completion extension that serves BOTH the slash-command
- * source (`/`) and the emoji source (`:`) from one `autocompletion()` instance
- * (Req 6.2). Slash-command labels are resolved once via `resolveSlashCommands(t)`,
- * and the emoji glyph renderer is preserved unchanged via `emojiRenderOption`.
- *
- * Pure function of `t`: no `/` keybinding is registered — the slash menu fires
- * purely from typed input through the completion source (Req 6.4).
- */
+// No `/` keybinding is registered — the slash menu fires from typed input via the
+// completion source, so the global `/` (page search) is preserved (Req 6.4).
 export const createEditorCompletionExtension = (t: TFunction): Extension =>
   autocompletion({
     override: [
@@ -96,10 +96,6 @@ export const useDefaultExtensions = (
 ): void => {
   const { t } = useTranslation('translation');
 
-  // MVP simplification (design §use-default-extensions): resolve labels once at the
-  // initial mount language. `t` is stable within a mount under the i18n provider,
-  // so memoizing on `[t]` keeps the extension set referentially stable and prevents
-  // per-render re-registration.
   const completionExtension = useMemo(
     () => createEditorCompletionExtension(t),
     [t],
@@ -111,12 +107,8 @@ export const useDefaultExtensions = (
   useEffect(() => {
     if (view == null || appendExtensions == null) return;
 
-    // Register once when the view becomes available. `appendExtensions` creates a
-    // fresh Compartment per call, so we MUST reconfigure it back to [] on cleanup;
-    // otherwise a language-driven re-register would stack duplicate compartments.
-    //
-    // The whole set MUST be passed as a SINGLE element (see buildDefaultExtensionsArg):
-    // a flat multi-element array throws "Duplicate use of compartment in extensions".
+    // Return the cleanup so a re-register (e.g. language change) tears down the
+    // previous compartment first, instead of stacking duplicates.
     const cleanup = appendExtensions(
       buildDefaultExtensionsArg(completionExtension),
     );
