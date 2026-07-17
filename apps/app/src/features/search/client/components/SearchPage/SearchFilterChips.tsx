@@ -101,7 +101,10 @@ export const SearchFilterChips = (props: Props): JSX.Element | null => {
             className={`badge d-inline-flex align-items-center mw-100 ${styles.chip}`}
           >
             <span className={styles['chip-label']}>{label}:</span>
-            <span className={`text-truncate ${styles['chip-value']}`}>
+            <span
+              className={`text-truncate ${styles['chip-value']}`}
+              title={value}
+            >
               {value}
             </span>
             <button
