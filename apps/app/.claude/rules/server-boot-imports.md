@@ -56,6 +56,5 @@ Guard / Drift Specs section of the `essential-test-design` skill.
 
 History: the `openai` SDK and `@azure/identity` used to be boot-loaded through
 the legacy `features/openai` client-delegator until #11293 (agentic
-suggest-path) removed that feature; both are boot-banned since then. The
-`openai` package still sits in `dependencies` with zero imports left —
-removing it (and its lockfile weight) is an open cleanup candidate.
+suggest-path) removed that feature; both are boot-banned since then, and the
+now-unreferenced `openai` package has been dropped from `dependencies`.
