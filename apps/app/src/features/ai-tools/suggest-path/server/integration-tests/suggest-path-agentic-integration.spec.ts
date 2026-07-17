@@ -166,18 +166,12 @@ vi.mock('~/features/mastra/server/services/mastra-modules', () => ({
   mastra: { getAgent: mocks.getAgentMock },
 }));
 
-// TEMPORARY CI DIAGNOSTICS (to be reverted): route error/warn logs to the
-// test output so the real stack behind the CI-only failure is visible.
+// Inert logger: keeps the suite runnable where @growi/logger has no build
+// output (nothing asserts on logging here).
 vi.mock('~/utils/logger', () => ({
   default: () => ({
-    error: (...args: unknown[]) => {
-      // biome-ignore lint/suspicious/noConsole: temporary CI diagnostics
-      console.error('[DEBUG logger.error]', ...args);
-    },
-    warn: (...args: unknown[]) => {
-      // biome-ignore lint/suspicious/noConsole: temporary CI diagnostics
-      console.error('[DEBUG logger.warn]', ...args);
-    },
+    error: vi.fn(),
+    warn: vi.fn(),
     info: vi.fn(),
     debug: vi.fn(),
   }),
@@ -306,25 +300,19 @@ describe('POST /suggest-path agentic path integration — budget exhaustion and 
       },
     );
 
-    // Inner search seam: each delegated search returns one distinct hit.
-    // TEMPORARY CI DIAGNOSTICS (to be reverted): implementation-based instead
-    // of the Once-queue so exhaustion is impossible, and every call logs its
-    // arguments and return so the CI-only failure mode is observable.
-    mocks.searchKeywordMock.mockImplementation(async (...args: unknown[]) => {
-      const callIndex = mocks.searchKeywordMock.mock.calls.length;
-      const page = searchResultPages[callIndex - 1];
-      // biome-ignore lint/suspicious/noConsole: temporary CI diagnostics
-      console.error(
-        `[DEBUG searchKeyword] call#${callIndex} query=${JSON.stringify(args[0])} -> ${page != null ? String(page._id) : 'empty'}`,
-      );
-      return [
-        {
-          data: page != null ? [page] : [],
-          meta: { total: page != null ? 1 : 0 },
-        },
+    // Inner search seam: each delegated search returns one distinct hit. The
+    // trailing default is defensive only — with correct budget enforcement a
+    // third search never reaches the search service.
+    mocks.searchKeywordMock
+      .mockResolvedValueOnce([
+        { data: [searchResultPages[0]], meta: { total: 1 } },
         'elasticsearch',
-      ];
-    });
+      ])
+      .mockResolvedValueOnce([
+        { data: [searchResultPages[1]], meta: { total: 1 } },
+        'elasticsearch',
+      ])
+      .mockResolvedValue([{ data: [], meta: { total: 0 } }, 'elasticsearch']);
 
     // Setup express app with ApiV3Response methods
     app = express();
