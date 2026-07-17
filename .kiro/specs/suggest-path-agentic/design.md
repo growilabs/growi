@@ -1,37 +1,27 @@
 # Technical Design: suggest-path-agentic
 
-> **実態追従改訂（2026-07-06）**: 実装完了・A/B 受け入れ後に、support/mastra マージによる provider-agnostic AI レイヤ移行（`getOpenaiProvider` → `resolveMastraModel`、コミット 70bde80571 / c4a58793bf）、listChildren tool の追加（#185213）、instructions チューニング（302d974819 / 066d1776de）を本文へ反映した。
->
-> **要判断 2 点の解決（2026-07-13）**: PR #11293 レビュー対応で確定。① dead key `openai:assistantModel:suggestPathAgent` は削除済み（9c970a6bbe / 57a10f334b）。② 推論強度キーは provider 汎用の `ai:providerOptions:suggestPathAgent`（`ModelProviderOptions` 型 overlay を catalog options に deep merge）へ移行し、旧 `openai:reasoningEffort:suggestPathAgent` は廃止（再レビュー B-1・案 A 採用）。Config Keys 参照。
->
-> **現状（2026-07-17 時点・実装完了 / PR #11293）**: 本設計は当初「ワンショットと agentic の 2 エンジン並存」を前提に書かれ、その後 2 段階で改訂された。**この冒頭ノート・後述の Boundary Commitments・末尾「将来のロードマップ」節が現状の正であり、本文中の 2 エンジン並存を前提とした記述（Architecture 図、EngineSelection/OneshotEngine の節、Requirements 5 のトレーサビリティ、Testing Strategy の oneshot 経路など）は撤去前の設計履歴として残している。**
->
-> 改訂の経緯:
-> - **第1段（可用性ベース化）**: エンジン選択を「明示切り替え（リクエスト `engine` フィールド + 設定キー `aiTools:suggestPathEngine`、oneshot 既定）」から可用性ベースの自動選択へ変更。`engine` フィールド・`aiTools:suggestPathEngine`・`SuggestPathEngineId`・`dispatcher.ts` を廃止し `select-engine.ts`（可用性 → record の選択）へ改組。
-> - **第2段（oneshot 撤去・`features/openai` 全廃）**: ワンショットは「AIなし・ES のみ」ではなく `features/openai` の LLM（キーワード抽出・候補評価）に依存するパイプラインだったため、`features/openai` を全廃する方針に伴い撤去した（`analyze-content` / `evaluate-candidates` / `call-llm-for-json` / `oneshot-engine` を削除。マスタートグル `isAiEnabled` は `features/mastra` へ移設）。**現在のエンジン選択は「Mastra AI 設定済み（`isAiConfigured()`）→ agentic / 未設定 → memo のみ」の 2 分岐。** ルートガードは `aiReadyGuard`（enabled かつ configured。未設定は 501）に統一し、マウント側との不整合バグを解消した。
-> - **温存資産と将来計画**: AI に依存しない `retrieve-search-candidates` / `generate-category-suggestion` / `resolve-parent-grant` は削除せず残してある。これらを土台に「AIなし・Elasticsearch のみのフォールバックエンジン」を将来整備する（末尾「将来のロードマップ」節・tasks.md F.1〜F.4。本 PR スコープ外）。
-> - A/B 測定関連の記述は実施当時（明示切り替え方式）の記録として維持する。
+> **アーキテクチャの現状（実装完了 / PR #11293）**: パス提案エンジンは Mastra Agent による agentic search 単一。`generateSuggestions` は「memo 生成 → 可用性ベースのエンジン選択 → フォールバック」のオーケストレータで、エンジン選択は **Mastra AI 設定済み（`isAiConfigured()`）→ agentic / 未設定 → memo のみ** の 2 分岐（ルートガード `aiReadyGuard` が未設定を 501 で弾く）。モデルは provider 非依存の `resolveMastraModel()`（support/mastra の AI レイヤ、openai / anthropic / google / azure-openai 対応）で解決し、推論強度は provider 汎用の `ai:providerOptions:suggestPathAgent` overlay で制御する。AI を使わず Elasticsearch だけで動くフォールバックエンジンは将来計画（末尾「将来のロードマップ」節・tasks.md F.1〜F.4）。
 
 ## Overview
 
-**Purpose**: 本機能は suggest-path API のパス提案エンジンを、ワンショット検索構成（キーワード抽出 → ES 検索 1 回 → LLM 候補評価）から、Mastra Agent による agentic search（検索結果を元文書と照らして検索語・条件を変えながら複数回探索する挙動）に換装可能にする。最初の検索が語彙ミスマッチで外れても API 単体で妥当な保存先候補に辿り着けるようにし、MCP クライアント側の検索肩代わりを不要にする（Redmine #184610）。
+**Purpose**: suggest-path API のパス提案を、Mastra Agent による agentic search（検索結果を元文書と照らして検索語・条件を変えながら複数回探索する挙動）で生成する。最初の検索が語彙ミスマッチで外れても API 単体で妥当な保存先候補に辿り着けるようにし、MCP クライアント側の検索肩代わりを不要にする（Redmine #184610）。
 
-**Users**: MCP クライアント（GROWI MCP の suggestPath ツール利用者）は従来通りの API 契約で改善された提案を受け取る。運用者は設定（検索回数上限・モデル・タイムアウト・推論強度）でレスポンス時間と精度のトレードオフを制御する。エンジンは実行環境の可用性で自動選択される（開発チーム・検証者による A/B 測定は、明示切り替え方式だった時期に実施・完了済み）。
+**Users**: MCP クライアント（GROWI MCP の suggestPath ツール利用者）は従来通りの API 契約で改善された提案を受け取る。運用者は設定（検索回数上限・モデル・タイムアウト・推論強度）でレスポンス時間と精度のトレードオフを制御する。エンジンは実行環境の可用性で自動選択される。
 
-**Impact**: 既存の `generate-suggestions.ts` をオーケストレータ（memo 生成 + 可用性ベースのエンジン選択 + フォールバック）に再構成し、ワンショットパイプラインと新設の agentic エンジンを並存させる。既存ワンショット 4 サービス（analyze / retrieve / evaluate / category）は無改変。API の外部契約（エンドポイント・リクエスト形式・レスポンス型・認証）は維持する。
+**Impact**: `generate-suggestions.ts` は「memo 生成 + 可用性ベースのエンジン選択 + フォールバック」のオーケストレータ。パス提案の実体は agentic エンジンで、Mastra AI 未設定時は memo のみに縮退する。API の外部契約（エンドポイント・リクエスト形式・レスポンス型・認証）は維持する。
 
 ### Goals
 
-- agentic search エンジンの新設: 複数回検索 + 候補ページ本文参照による試行錯誤で保存先提案を生成する
+- agentic search エンジン: 複数回検索 + 候補ページ本文参照による試行錯誤で保存先提案を生成する
 - フロー/ストック判定を探索の誘導（候補妥当性判断・再検索の方向付け）に反映する
 - 検索回数上限・タイムアウト・モデルを設定で制御可能にする
-- 新旧エンジンの並存と可用性ベースの自動フォールバック（Mastra AI → agentic / 全文検索のみ → oneshot / いずれも不可 → memo のみ）。A/B 測定（ベースライン 41/60 との比較）は明示切り替え方式の時期に完了済み
+- 可用性ベースのエンジン選択（Mastra AI 設定済み → agentic / 未設定 → memo のみ）。A/B 測定（ベースライン 41/60 との比較）は完了済み
 
 ### Non-Goals
 
 - HTC によるリランク（別ストーリー）、セマンティック検索の導入
 - MCP クライアント側の挙動変更、チャット機能・`growiAgent` の改修
-- ワンショットエンジンの削除（検証結果を踏まえ別途判断）
+- AI なし・Elasticsearch のみのフォールバックエンジンの実装（将来計画。末尾「将来のロードマップ」節）
 - `fullTextSearchTool` / `getPageContentTool` の機能改修（必要が生じた場合は agentic-search spec のフォローアップ）
 
 ## Boundary Commitments
@@ -52,8 +42,6 @@
 - **AIなし・Elasticsearch のみのフォールバックエンジンの新規実装**（将来タスク F.1〜F.4。末尾「将来のロードマップ」節）
 - 評価環境そのもの（#183968 の成果物を利用するのみ）
 - 既存 suggest-path spec の記録の書き換え
-
-> 注: 当初 Out of Boundary としていた「ワンショットエンジンの削除・既定エンジンの本番切り替え判断」は、`features/openai` 全廃方針（2026-07-17）を受けて **本 PR で実施済み**（冒頭ノート第2段）。ワンショットは撤去され、可用性ベース選択は agentic / memo の 2 分岐に縮小した。
 
 ### Allowed Dependencies
 
@@ -80,10 +68,10 @@
 
 ## Architecture
 
-### Existing Architecture Analysis
+### Architecture Analysis
 
-- 現行 `generateSuggestions` は「memo 生成 → analyzeContent → retrieveSearchCandidates → 並列 [evaluateCandidates + grant 解決, generateCategorySuggestion]」のワンショットパイプライン。memo 生成と grant 解決はエンジン非依存、残り 4 サービスはワンショット固有
-- graceful degradation（analyze/retrieve 失敗時に memo のみ返却）は `generateSuggestions` 内に実装済み — この構造をオーケストレータのフォールバックポリシーとして引き継ぐ
+- `generateSuggestions` はエンジン非依存の責務（memo 生成・可用性ベースのエンジン選択・フォールバック）を持つオーケストレータ。memo 生成（`generateMemoSuggestion`）と grant 解決（`resolveParentGrant`）はエンジンに依存しない共通基盤
+- graceful degradation（提案生成が不能なら memo のみ返却）はオーケストレータのフォールバックポリシーとして実装。agentic の失敗・タイムアウトは memo に縮退し、API は常に 200 + memo を保証する
 - Mastra 基盤（support/mastra）には per-request `RequestContext` パターン・「tool は throw せず discriminated union を値で返す」規約・権限フィルタの `SearchService` / `Page` モデル委譲が確立済み（agentic-search spec）。本設計はこれらをすべて踏襲する
 
 ### Architecture Pattern & Boundary Map
@@ -93,17 +81,11 @@ graph TB
     Client[MCP Client] --> Route[suggest-path route]
     Route --> Orch[generateSuggestions orchestrator]
     Orch --> Memo[generateMemoSuggestion]
-    Orch --> Disp[engine selection]
-    Disp --> OneshotEng[oneshot engine]
-    Disp --> AgenticEng[agentic engine]
-    OneshotEng --> Analyze[analyzeContent]
-    OneshotEng --> Retrieve[retrieveSearchCandidates]
-    OneshotEng --> Evaluate[evaluateCandidates]
-    OneshotEng --> Category[generateCategorySuggestion]
+    Orch --> Sel[selectEngine 可用性選択]
+    Sel --> AgenticEng[agentic engine]
     AgenticEng --> Schema[agentic output schema]
     AgenticEng --> Agent[suggestPathAgent]
     AgenticEng --> Grant[resolveParentGrant]
-    OneshotEng --> Grant
     Agent --> Limited[limited search tool]
     Agent --> PageTool[getPageContentTool]
     Agent --> ListChildren[listChildrenTool]
@@ -116,15 +98,10 @@ graph TB
         Route
         Orch
         Memo
-        Disp
-        OneshotEng
+        Sel
         AgenticEng
         Schema
         Grant
-        Analyze
-        Retrieve
-        Evaluate
-        Category
     end
 
     subgraph mastra [features mastra mastra-modules]
@@ -138,10 +115,10 @@ graph TB
 
 **Architecture Integration**:
 
-- **Selected pattern**: オーケストレータ層エンジンディスパッチ。`generateSuggestions` がエンジン非依存の責務（memo・エンジン選択・フォールバック）を持ち、`SuggestPathEngine` インターフェースの 2 実装（oneshot / agentic）が提案生成を担う
+- **Selected pattern**: オーケストレータ + 可用性ベースのエンジン選択。`generateSuggestions` がエンジン非依存の責務（memo・エンジン選択・フォールバック）を持ち、`SuggestPathEngine` インターフェースを実装する agentic エンジンが提案生成を担う。`SuggestPathEngineRecord` と非対称フォールバックポリシーは複数エンジンを想定した汎用構造で、将来の Elasticsearch-only エンジンを記録 1 件の追加で受けられる
 - **Domain boundaries**: agent 定義と tool は `features/mastra/.../agents/suggest-path/`（Mastra プラットフォーム層）、エンジンアダプタと出力スキーマは `features/ai-tools/suggest-path/.../engines/`（feature 層）。structured output スキーマを feature 層に置くことで mastra 側は suggest-path の型を知らない
-- **Existing patterns preserved**: per-request RequestContext、tool の discriminated union 返却（throw 禁止）、権限フィルタ委譲、configManager キー命名（`openai:assistantModel:*`）、pino logger
-- **New components rationale**: budget 付き wrapper tool は「検索回数の正確なカウント + 上限到達時の graceful 手仕舞い」（Requirement 3.1/3.2）を共有 tool 無改変で実現する唯一の位置。エンジンディスパッチはワンショット固有モジュール非依存（5.5）を物理境界で保証する
+- **Existing patterns preserved**: per-request RequestContext、tool の discriminated union 返却（throw 禁止）、権限フィルタ委譲、pino logger
+- **New components rationale**: budget 付き wrapper tool は「検索回数の正確なカウント + 上限到達時の graceful 手仕舞い」（Requirement 3.1/3.2）を共有 tool 無改変で実現する唯一の位置
 - **Steering compliance**: server-side のみの変更（server-client 境界に影響なし）、barrel による module public surface 最小化、pino logger 使用
 
 **依存方向**（違反はエラーとして扱う）:
@@ -156,7 +133,7 @@ features/ai-tools/suggest-path → features/mastra（一方向。逆方向 impor
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
 | Agent runtime | `@mastra/core` 1.45.0（installed。宣言 `^1.32.1`。設計・スパイク時は 1.41.0） | agent ループ・structured output・requestContext | `generateVNext` は使用しない（mastra-ai/mastra#7662）。スパイク結論（steps/usage 形状・p-map ESM 回避）は 1.41.0 時点の確認であり 1.45.0 での再検証は未実施 |
-| LLM provider | provider 非依存の `resolveMastraModel()`（support/mastra の AI レイヤ。openai / anthropic / google / azure-openai に対応） | suggestPathAgent のモデル解決 | 2026-06 の support/mastra マージで `getOpenaiProvider()` から置換（コミット c4a58793bf）。モデルはアプリ全体設定 `ai:provider` / `ai:model` で決まり、memoize + AI 設定保存時の cache clear で再起動なし反映。**suggestPath 専用のモデル選択は廃止**（下記 Config Keys 参照） |
+| LLM provider | provider 非依存の `resolveMastraModel()`（support/mastra の AI レイヤ。openai / anthropic / google / azure-openai に対応） | suggestPathAgent のモデル解決 | モデルはアプリ全体のマルチプロバイダ設定（`ai:providers` / `ai:allowedModels`）の既定モデルで決まり、memoize + AI 設定保存時の cache clear で再起動なし反映。suggestPath 専用のモデル選択は持たない（下記 Config Keys 参照） |
 | Schema / validation | JSON Schema 直接記述 + 手書き型ガード | structured output の契約 | Zod 自動変換は OpenAI strict mode 非互換のため不使用（mastra-ai/mastra#16383）。tool 入力は既存どおり zod ^4.1.9 |
 | Search / Data | `SearchService`（Elasticsearch）、`Page` model（MongoDB） | 検索・本文参照・grant 解決 | すべて既存共有 tool / サービス経由。権限フィルタは委譲 |
 | Config | `configManager`（config-definition.ts） | エンジン・上限・タイムアウト・モデルの設定化 | 新キー 4 つ。per-request 読み出しで再起動なし反映 |
@@ -169,32 +146,31 @@ features/ai-tools/suggest-path → features/mastra（一方向。逆方向 impor
 ```
 apps/app/src/features/ai-tools/suggest-path/
 ├── interfaces/
-│   └── suggest-path-types.ts                  # 変更: SearchService に isReachable（可用性シグナル）追加（client-safe）
+│   └── suggest-path-types.ts                  # SearchService に isReachable（可用性シグナル、client-safe）。現状は未使用で将来の ES-only エンジン用に据え置き
 └── server/
     ├── routes/apiv3/
-    │   └── index.ts                           # 変更: aiEnabledGuard（isAiEnabled のみの 501 ガード）へ差し替え
+    │   └── index.ts                           # ガードは aiReadyGuard（enabled かつ configured。未設定は 501）
     └── services/
-        ├── generate-suggestions.ts            # 変更: オーケストレータ化（memo + 可用性選択 + fallback）
-        ├── generate-suggestions-orchestration.spec.ts  # 追加: オーケストレーションのテスト
+        ├── generate-suggestions.ts            # オーケストレータ（memo + 可用性選択 + fallback）
+        ├── generate-suggestions-orchestration.spec.ts
         ├── engines/
         │   ├── index.ts                       # barrel: selectEngine のみ再エクスポート（ロジックを持たない）
-        │   ├── select-engine.ts               # selectEngine 実装（可用性 → engine record の解決）
+        │   ├── select-engine.ts               # selectEngine 実装（可用性 → engine record の解決。現状 agentic / undefined の 2 択）
         │   ├── select-engine.spec.ts
-        │   ├── engine-types.ts                # SuggestPathEngine / SuggestPathEngineInput（server 専用型）
-        │   ├── oneshot-engine.ts              # 既存 4 サービスのオーケストレーション（挙動維持の薄い wrapper）
-        │   ├── oneshot-engine.spec.ts
+        │   ├── engine-types.ts                # SuggestPathEngine / SuggestPathEngineInput / SuggestPathEngineRecord（server 専用型）
         │   ├── agentic-engine.ts              # agent 呼び出し・タイムアウト・出力マッピング・grant
         │   ├── agentic-engine.spec.ts
-        │   ├── agentic-trace-log.ts           # 追加: トレースログ整形（agentic-engine から抽出）
+        │   ├── agentic-trace-log.ts           # トレースログ整形（agentic-engine から抽出）
         │   ├── agentic-trace-log.spec.ts
         │   ├── agentic-output-schema.ts       # JSON Schema 定数 + AgenticEngineOutput 型 + 型ガード
-        │   └── agentic-output-schema.spec.ts
-        └── （analyze-content / retrieve-search-candidates / evaluate-candidates /
-             generate-category-suggestion / generate-memo-suggestion / resolve-parent-grant
-             / call-llm-for-json: すべて無改変。call-llm-for-json.spec.ts のみテスト追加）
+        │   ├── agentic-output-schema.spec.ts
+        │   ├── agentic-provider-options.ts    # providerOptions overlay の解決（catalog options への deep merge）
+        │   ├── agentic-request-context.ts     # per-request RequestContext + budget 構築
+        │   └── agentic-suggestion-mapper.ts   # 出力の正規化・dedupe・cap・grant 付与
+        └── （generate-memo-suggestion / resolve-parent-grant: エンジン非依存の共通基盤。
+             retrieve-search-candidates / generate-category-suggestion: AI 非依存。現状 agentic からは未使用で、将来の ES-only エンジン用に据え置き）
 
-apps/app/src/features/ai-tools/suggest-path/server/integration-tests/   # 追加: 統合テスト置き場
-├── suggest-path-integration.spec.ts
+apps/app/src/features/ai-tools/suggest-path/server/integration-tests/
 ├── suggest-path-route-integration.spec.ts
 └── suggest-path-agentic-integration.spec.ts
 
@@ -215,9 +191,9 @@ apps/app/src/features/mastra/server/services/mastra-modules/
 
 ### Modified Files
 
-- `apps/app/src/features/ai-tools/suggest-path/server/services/generate-suggestions.ts` — ワンショットパイプライン部分を `engines/oneshot-engine.ts` へ移し、memo 生成 + 可用性ベースのエンジン選択 + agentic フォールバックポリシーに再構成
-- `apps/app/src/features/ai-tools/suggest-path/server/routes/apiv3/index.ts` — ガードを `aiEnabledGuard`（`isAiEnabled` のみ）に差し替え。リクエストは `{ body }` のみ（旧 `engine` フィールドは削除、送られても無視）。レスポンス形式は無変更
-- `apps/app/src/features/ai-tools/suggest-path/interfaces/suggest-path-types.ts` — `SearchService` に `isReachable`（可用性シグナル）を追加
+- `apps/app/src/features/ai-tools/suggest-path/server/services/generate-suggestions.ts` — memo 生成 + 可用性ベースのエンジン選択 + agentic フォールバックポリシーのオーケストレータ
+- `apps/app/src/features/ai-tools/suggest-path/server/routes/apiv3/index.ts` — ガードは `aiReadyGuard`（enabled かつ configured。未設定は 501）。リクエストは `{ body }` のみ（旧 `engine` フィールドは送られても無視）。レスポンス形式は無変更
+- `apps/app/src/features/ai-tools/suggest-path/interfaces/suggest-path-types.ts` — `SearchService` に `isReachable`（可用性シグナル）を追加（現状未使用・将来の ES-only エンジン用）
 - `apps/app/src/features/mastra/server/services/mastra-modules/index.ts` — `agents` マップに `suggestPathAgent` を追加（additive のみ）
 - `apps/app/src/server/service/config-manager/config-definition.ts` — 新設定キーを追加（下記 Config Keys 参照）
 
@@ -265,8 +241,8 @@ sequenceDiagram
 
 **フローレベルの決定**:
 
-- **フォールバック（4.5）**: agentic エンジンの例外・タイムアウト（`AbortController` による中断）はオーケストレータが捕捉し、memo 提案のみの 200 レスポンスを返す。**oneshot エンジンには適用しない**（現行は予期しない例外が 500 になる挙動であり、5.2 の挙動維持のため現状のまま）
-- **budget 手仕舞い（3.2）**: 上限到達時、limited search tool が `limit_exceeded` を**値で**返し（throw しない）、instructions の指示によりエージェントは収集済み情報から提案を確定する。listChildren tool も独立した budget（childListingBudget）で同じ手仕舞い規約に従う（#185213）。ループ暴走への多層防御として `maxSteps = 2 × searchLimit + 2 × childListingLimit + 4` とタイムアウトを併用する
+- **フォールバック（4.5）**: エンジン record の `degradeToMemoOnFailure` に従う非対称ポリシー。true を宣言するエンジン（agentic）の例外・タイムアウト（`AbortController` による中断）はオーケストレータが捕捉して memo 提案のみの 200 レスポンスを返す。false のエンジンの例外は route まで伝播（500）する。現状 agentic のみ（true）で、false 側は将来の Elasticsearch-only エンジン用に予約
+- **budget 手仕舞い（3.2）**: 上限到達時、limited search tool が `limit_exceeded` を**値で**返し（throw しない）、instructions の指示によりエージェントは収集済み情報から提案を確定する。listChildren tool も独立した budget（childListingBudget）で同じ手仕舞い規約に従う（#185213）。ループ暴走への多層防御として `maxSteps`（searchLimit / childListingLimit から算出）とタイムアウトを併用する
 - **memo 提案（4.3）**: エンジン選択・成否にかかわらずオーケストレータが常に先頭に含める
 
 ## Requirements Traceability
@@ -293,11 +269,10 @@ sequenceDiagram
 | 4.3 | memo 提案を常に含める | SuggestPathOrchestrator | `generateSuggestions` | System Flows |
 | 4.4 | grant に親ページ grant 値 | AgenticEngine → resolveParentGrant（既存） | `resolveParentGrant` | — |
 | 4.5 | エンジン失敗・タイムアウト時は memo のみ | SuggestPathOrchestrator（フォールバック）, AgenticEngine（AbortController） | フォールバックポリシー | フローレベルの決定 |
-| 5.1 | Mastra AI 利用可能時は agentic | EngineSelection（isAiConfigured）, AgenticEngine | `selectEngine` | System Flows |
-| 5.2 | Mastra 不可・全文検索可用時は oneshot（挙動不変） | EngineSelection（isReachable）, OneshotEngine（薄い wrapper） | `selectEngine`, 既存 4 サービス契約（無改変） | — |
-| 5.3 | いずれも不可なら memo のみ | SuggestPathOrchestrator（selectEngine undefined 時の縮退） | `selectEngine` | — |
-| 5.4 | リクエスト毎の可用性評価・再起動なし反映 | EngineSelection（per-request 判定） | `selectEngine` | — |
-| 5.5 | ワンショット固有モジュール非依存 | AgenticEngine（import 制約）, File Structure Plan | 依存方向規則 | — |
+| 5.1 | AI 有効かつ Mastra 設定済み時は agentic | EngineSelection（isAiConfigured）, AgenticEngine | `selectEngine` | System Flows |
+| 5.2 | AI 無効・未設定時は 501 | Route（aiReadyGuard） | `aiReadyGuard` | — |
+| 5.3 | リクエスト毎の可用性評価・再起動なし反映 | EngineSelection（per-request 判定） | `selectEngine` | — |
+| 5.4 | 温存した非AIサービスに非依存 | AgenticEngine（import 制約）, File Structure Plan | 依存方向規則 | — |
 | 6.1 | 同一条件での A/B 測定（実施済み。当時の `engine` override は 2026-07-17 に削除） | 検証ワークフロー | — | Testing Strategy |
 | 6.2 | レスポンス時間・検索回数・トークン記録 | AgenticEngine（サマリログ） | トレースログスキーマ | — |
 | 6.3 | フロー/ストック誘導の反映確認 | AgenticEngine（トレースログ詳細） | トレースログスキーマ | — |
@@ -307,16 +282,15 @@ sequenceDiagram
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
-| SuggestPathOrchestrator | ai-tools / service | memo + エンジン実行 + フォールバック | 4.3, 4.5, 5.3 | EngineSelection (P0), generateMemoSuggestion (P0) | Service |
-| EngineSelection | ai-tools / service | 可用性 → engine record の解決 | 5.1, 5.2, 5.3, 5.4 | OneshotEngine (P0), AgenticEngine (P0), is-ai-configured (P0) | Service |
-| OneshotEngine | ai-tools / service | 既存パイプラインの挙動維持 wrapper | 5.2, 5.5 | 既存 4 サービス (P0) | Service |
-| AgenticEngine | ai-tools / service | agent 呼び出し・出力マッピング・観測 | 1.1, 1.4, 2.3, 3.3, 4.2, 4.4, 4.5, 6.2, 6.3 | SuggestPathAgent (P0), resolveParentGrant (P0), configManager (P0) | Service |
+| SuggestPathOrchestrator | ai-tools / service | memo + エンジン実行 + フォールバック | 4.3, 4.5 | EngineSelection (P0), generateMemoSuggestion (P0) | Service |
+| EngineSelection | ai-tools / service | 可用性 → engine record の解決 | 5.1, 5.3 | AgenticEngine (P0), is-ai-configured (P0) | Service |
+| AgenticEngine | ai-tools / service | agent 呼び出し・出力マッピング・観測 | 1.1, 1.4, 2.3, 3.3, 4.2, 4.4, 4.5, 5.4, 6.2, 6.3 | SuggestPathAgent (P0), resolveParentGrant (P0), configManager (P0) | Service |
 | AgenticOutputSchema | ai-tools / service | structured output の契約と検証 | 1.4, 2.1, 4.2 | — | State |
 | SuggestPathAgent | mastra / agent | 探索の実行主体（instructions + tools） | 1.1, 1.2, 1.3, 2.1, 2.2, 3.2, 3.4 | LimitedSearchTool (P0), getPageContentTool (P0), ListChildrenTool (P0), resolveMastraModel (P0) | Service |
 | LimitedSearchTool | mastra / tool | 検索回数 budget の執行 + 委譲 | 1.5, 2.4, 3.1, 3.2 | fullTextSearchTool (P0), SuggestPathRequestContext (P0) | Service |
 | ListChildrenTool | mastra / tool | 子ページ一覧 budget の執行 + 委譲（#185213 で追加） | 1.5, 2.4 | pageListingService (P0), SuggestPathRequestContext (P0) | Service |
 | SuggestPathRequestContext | mastra / types | per-request の user・budget 伝搬 | 1.5, 3.1 | MastraRequestContextShape (P0) | State |
-| Route (modified) | ai-tools / route | aiEnabledGuard（AI 機能フラグのみの 501） | 4.1 | SuggestPathOrchestrator (P0) | API |
+| Route | ai-tools / route | aiReadyGuard（enabled かつ configured。未設定は 501） | 4.1, 5.2 | SuggestPathOrchestrator (P0) | API |
 | Config Keys | infra / config | 運用パラメータの設定化 | 3.3, 3.4, 3.5, 3.6 | config-definition (P0) | State |
 
 ### ai-tools / suggest-path サービス層
@@ -331,9 +305,9 @@ sequenceDiagram
 **Responsibilities & Constraints**
 
 - memo 提案の生成（既存 `generateMemoSuggestion` を呼ぶ）を常に実行し、レスポンス先頭に含める
-- エンジンの決定: `selectEngine(searchService)`（可用性評価。リクエスト毎に呼ぶ）。undefined なら memo のみ返す（5.3）
-- **フォールバックポリシーの非対称性**: record が `degradeToMemoOnFailure: true` を宣言するエンジン（agentic）の reject（例外・タイムアウト）は捕捉して memo のみ返す（4.5）。false のエンジン（oneshot）の例外は現行同様に伝播させる（5.2 の挙動維持。現行は route の try/catch で 500 になる）。オーケストレータは engine id で分岐しない
-- 公開シグネチャは既存引数列 4 つ（旧 optional engine オプションは削除）
+- エンジンの決定: `selectEngine()`（可用性評価。リクエスト毎に呼ぶ）。undefined なら memo のみ返す（HTTP 経路では未設定を `aiReadyGuard` が先に 501 で弾くため、この縮退は防御的経路）
+- **フォールバックポリシーの非対称性**: record が `degradeToMemoOnFailure: true` を宣言するエンジン（agentic）の reject（例外・タイムアウト）は捕捉して memo のみ返す（4.5）。false を宣言するエンジンの例外は route まで伝播（500）させる。オーケストレータは engine id で分岐しない。現状 agentic のみ（true）で、false 側は将来の Elasticsearch-only エンジン用に予約
+- 公開シグネチャは既存引数列 4 つ
 
 ##### Service Interface
 
@@ -352,19 +326,18 @@ declare function generateSuggestions(
 
 - Preconditions: `body` は validator 検証済み（非空・100,000 文字以下）。`user` は認証済み
 - Postconditions: 戻り値の先頭は常に `type: 'memo'` の提案。agentic エンジン失敗時・エンジン不在時は memo のみの配列
-- Invariants: エンジン選択にかかわらず memo 提案の生成ロジックは共通（5.5 の許容依存）
+- Invariants: エンジン選択にかかわらず memo 提案の生成ロジックは共通（エンジン非依存の共通基盤）
 
 #### EngineSelection（`engines/index.ts`）
 
 | Field | Detail |
 |-------|--------|
 | Intent | 実行環境の可用性から engine record を解決する唯一の窓口（barrel） |
-| Requirements | 5.1, 5.2, 5.3, 5.4 |
+| Requirements | 5.1, 5.3 |
 
 **Responsibilities & Constraints**
 
-- 判定順（`select-engine.ts` に実装）: `isAiConfigured()`（Mastra AI に利用可能なモデルが 1 つ以上）→ agentic / `searchService.isReachable`（全文検索が設定済みかつ健全）→ oneshot / いずれも false → undefined（オーケストレータが memo のみ返却）。レジストリ等の拡張機構は作らない
-- agentic は検索到達性で追加ゲートしない: 検索 tool は実行中に値で縮退し、エンジンレベルの失敗は memo フォールバック（4.5）が吸収する
+- 判定（`select-engine.ts` に実装）: `isAiConfigured()`（Mastra AI に利用可能なモデルが 1 つ以上）→ agentic record / それ以外 → undefined（オーケストレータが memo のみ返却）。レジストリ等の拡張機構は作らない。**将来の Elasticsearch-only エンジンは、この分岐に「未設定だが検索到達可 → ES-only record」を 1 段追加するだけで足りる構造**（record と非対称フォールバックポリシーは残してある）
 - record は各エンジンの縮退ポリシー（`degradeToMemoOnFailure`）と id（ログ用）を自己申告する
 - barrel（`index.ts`）は `selectEngine` のみ再エクスポートする（ロジックを持たない）。エンジン実装ファイルへの直接 import を禁じる
 
@@ -392,37 +365,17 @@ interface SuggestPathEngineRecord {
 }
 
 // select-engine.ts（barrel index.ts から再エクスポート）
-declare function selectEngine(
-  searchService: SearchService,
-): SuggestPathEngineRecord | undefined;
+declare function selectEngine(): SuggestPathEngineRecord | undefined;
 ```
 
-- Postconditions: 各エンジンの戻り値は `type: 'search' | 'category'` の提案のみ（memo はオーケストレータの責務）。全提案の `grant` は解決済み、`path` は末尾スラッシュ付き
-
-#### OneshotEngine（`engines/oneshot-engine.ts`）
-
-| Field | Detail |
-|-------|--------|
-| Intent | 既存ワンショットパイプラインを `SuggestPathEngine` 契約に適合させる挙動維持 wrapper |
-| Requirements | 5.2, 5.5 |
-
-**Responsibilities & Constraints**
-
-- 現行 `generateSuggestions` 内のパイプライン部分（analyzeContent → retrieveSearchCandidates → 並列 [evaluateCandidates + grant, generateCategorySuggestion]）を**ロジック変更なしで**移設したオーケストレーションのみを持つ
-- 既存の内部 degradation を維持: analyze / retrieve 失敗時は空配列を返す（オーケストレータが memo を補うため、最終レスポンスは現行と同一）
-- 既存 4 サービスファイルは無改変。本ファイルは import して順序立てるだけ
-
-**Implementation Notes**
-
-- Integration: 既存 `generate-suggestions.spec.ts` および統合テストが**無修正で green** であることが挙動維持（5.3）の受け入れ証拠
-- Risks: 移設時の暗黙挙動（Promise.allSettled の部分失敗処理）の取りこぼし → 既存テストで検出
+- Postconditions: エンジンの戻り値は `type: 'search'` の提案のみ（memo はオーケストレータの責務）。全提案の `grant` は解決済み、`path` は末尾スラッシュ付き
 
 #### AgenticEngine（`engines/agentic-engine.ts`）
 
 | Field | Detail |
 |-------|--------|
 | Intent | suggestPathAgent の呼び出し・タイムアウト制御・structured output の検証とマッピング・grant 解決・観測ログ |
-| Requirements | 1.1, 1.4, 2.3, 3.3, 3.5, 3.6, 4.2, 4.4, 4.5, 6.2, 6.3 |
+| Requirements | 1.1, 1.4, 2.3, 3.3, 3.5, 3.6, 4.2, 4.4, 4.5, 5.4, 6.2, 6.3 |
 
 **Responsibilities & Constraints**
 
@@ -457,11 +410,11 @@ const result = await suggestPathAgent.generate(buildUserPrompt(body), {
   4. 各 path に `resolveParentGrant` を並列適用して `grant` を付与（4.4）
   5. `type: 'search'`、`informationType` は structured output のトップレベル値を全 search 提案に付与（2.3）
 - **category 提案は生成しない**（設計決定。浅い親が妥当な場合はエージェントが search 提案として出せるため機能的に包含。research.md 参照）
-- ワンショット固有 4 サービスへの import 禁止（5.5）
+- 温存した非AIサービス（`retrieve-search-candidates` / `generate-category-suggestion`）への import 禁止（5.4。将来の Elasticsearch-only エンジンが利用する）
 
 ##### Service Interface
 
-`SuggestPathEngine` 型に適合（EngineDispatcher 参照）。
+`SuggestPathEngine` 型に適合（EngineSelection 参照）。
 
 - Preconditions: `aiTools:suggestPathAgenticSearchLimit` / `aiTools:suggestPathAgenticTimeoutMs` が定義済み（既定値あり）
 - Postconditions: 成功時は 0〜20 件の `type: 'search'` 提案（grant 解決済み・informationType 付き）。失敗・タイムアウト時は reject
@@ -639,8 +592,8 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 
 | Field | Detail |
 |-------|--------|
-| Intent | ガードを `aiEnabledGuard`（AI 機能フラグのみの 501）へ差し替え。既存契約は不変 |
-| Requirements | 4.1 |
+| Intent | ガードは `aiReadyGuard`（enabled かつ configured。未設定は 501）。既存契約は不変 |
+| Requirements | 4.1, 5.2 |
 
 **Responsibilities & Constraints**
 
@@ -676,7 +629,7 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 - searchLimit / childListingLimit / timeoutMs / providerOptions overlay は利用箇所で per-request に `configManager.getConfig()` を呼ぶことで、再起動なしの変更反映（3.3, 3.5）を保証する
 - モデル（3.4）の再起動なし反映は per-request 読みではなく、`resolveMastraModel` の memoize + AI 設定保存（および s2s メッセージ）時の `clearResolvedMastraModelCache()` で実現される（support/mastra レイヤの機構。設計当初の DynamicArgument per-request 解決から変更）
 - `ai:providerOptions:suggestPathAgent` は null を既定とすることで、設定しない限り現行挙動（catalog options のみ）を変えない（3.6）。provider 名前空間付き Record にしたのは、reasoning 制御の表現がプロバイダごとに異なるため（`openai.reasoningEffort` 文字列 / `anthropic.thinking` オブジェクト / `google.thinkingConfig` オブジェクト）— 文字列 1 個のキーでは汎用化できない。有効モデルの provider と異なる名前空間は catalog options と同じ扱いで AI SDK 側が無視するため、複数 provider 分を先行宣言してモデル切替に耐えられる。merge は `ModelProviderOptions` の宣言形（provider 名前空間 → option 名 → 値）に一致する深さ 2: 名前空間内は option 単位で overlay が勝ち、option の値自体は丸ごと置換（`thinking` のような自己完結オブジェクトの内部を merge して断片を作らない）
-- **キー変遷**: 初版の `openai:reasoningEffort:suggestPathAgent`（`string`、OpenAI 名前空間固定・非 OpenAI provider では warn 付き無視）は、PR #11293 再レビュー B-1（案 A）により本キーへ移行し廃止（2026-07-13）。dead key `openai:assistantModel:suggestPathAgent` も削除済み（2026-07-09、9c970a6bbe / 57a10f334b。モデルはアプリ全体設定で決まり読み手が存在しなかった）。`aiTools:suggestPathEngine`（既定エンジン、'oneshot' 既定）は可用性フォールバック化により削除（2026-07-17、冒頭の改訂ノート参照）
+- **撤去済みキー（再追加しないこと）**: `openai:reasoningEffort:suggestPathAgent`（provider 固定の文字列。provider 汎用の `ai:providerOptions:suggestPathAgent` へ移行）／`openai:assistantModel:suggestPathAgent`（読み手が存在しない dead key）／`aiTools:suggestPathEngine`（明示エンジン切り替え。可用性ベース化で不要）
 
 ## Data Models
 
@@ -731,13 +684,13 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 
 | 層 | エラー | 振る舞い | Requirement |
 |----|--------|----------|-------------|
-| Route（4xx） | `body` 欠落・空・100k 超過、`engine` 不正値 | 400（express-validator、現行パターン） | 4.1 |
-| Route（4xx） | 未認証 / AI scope なし / AI 機能無効 | 401 / 403（既存ミドルウェア、無変更） | 4.1 |
+| Route（4xx） | `body` 欠落・空・100k 超過 | 400（express-validator、現行パターン） | 4.1 |
+| Route | 未認証 / AI scope なし | 401 / 403（既存ミドルウェア、無変更）。AI 無効・未設定は 501（`aiReadyGuard`） | 4.1, 5.2 |
 | Tool 層 | 検索失敗・ページ不可視・コンテキスト欠落・budget 超過 | discriminated union を**値で**返す（throw 禁止）。エージェントは再検索（1.2）または手仕舞い（3.2）で回復 | 1.2, 3.2 |
 | AgenticEngine | agent 例外・structured output 検証不合格・タイムアウト（AbortController） | reject → オーケストレータが捕捉 | 4.5 |
 | AgenticEngine | `ai:provider` / `ai:model` の誤設定・未設定で agentic が選択された | `resolveMastraModel` がリクエスト時に throw → reject → memo フォールバック。（2026-06 の provider-agnostic 化により旧記述「Azure OpenAI 構成では利用不可」は解消: azure-openai は一級プロバイダとして解決される） | 4.5 |
 | Orchestrator | agentic エンジンの reject | **memo 提案のみの 200 レスポンス**（5xx にしない） | 4.3, 4.5 |
-| Orchestrator | oneshot エンジンの例外 | 現行どおり伝播（route で 500）。挙動変更しない | 5.3 |
+| Orchestrator | 非 degrade エンジン（`degradeToMemoOnFailure: false`）の例外 | route まで伝播（500）。現状 agentic（true）のみで該当エンジンなし。将来の Elasticsearch-only 用に予約 | — |
 | Route（5xx） | 上記以外の予期しない例外（memo 生成失敗等） | 500 + 汎用メッセージ（現行パターン） | — |
 
 ### Monitoring
@@ -754,15 +707,13 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 1. **agentic-output-schema**: 型ガードの正常系 / informationType 不正 / path 欠落 / 余剰プロパティ拒否。JSON Schema 定数と TS 型の整合（required・enum 値）
 2. **limited-search-tool**: budget 残あり → 委譲 + used 増加 + query 記録 / ちょうど上限 → `limit_exceeded` / searchBudget 欠落 → `context_error`。いずれも throw しないこと
 3. **agentic-engine**: Agent モック（`mock<T>()`）で (a) 正常出力 → path 正規化・dedupe・20 件制限・grant 付与・informationType 付与、(b) 不正出力 → reject、(c) タイムアウト → reject、(d) searchLimit / timeoutMs が config から per-request に読まれること
-4. **engine selection / orchestrator**: Mastra AI 設定済み → agentic（検索到達性は不問）/ 未設定かつ全文検索到達可 → oneshot / いずれも不可 → memo のみ / agentic reject → memo のみ返却 / oneshot reject → 伝播 / memo が常に先頭
+4. **engine selection / orchestrator**: Mastra AI 設定済み → agentic / 未設定 → selectEngine が undefined → memo のみ返却（防御的経路）/ agentic reject → memo のみ返却 / memo が常に先頭
 5. **suggest-path-agent**: tools 構成（fullTextSearch = limited wrapper, getPageContent, listChildren）と memory 不接続、model が `resolveMastraModel` を lazy に転送すること
 
 ### Integration Tests
 
-1. **既存テストの無修正 green**（エンジン分離実装時の受け入れ証拠。旧 5.3）: `generate-suggestions.spec.ts` / `suggest-path-integration.spec.ts` / 既存 4 サービスの spec が一切変更なしで通ること
-   - ※ 2026-07-17 の可用性フォールバック化で、エンジン選択に関わる spec は改訂済み（可用性状態の priming が前提に加わった）。ワンショットパイプライン自体のアサーションは不変
-2. **route**: 可用性状態の再現（AI provider config seam + `searchService.isReachable`）で agentic / oneshot / memo-only の 3 経路がそれぞれ 200 + 契約準拠レスポンスを返すこと / 旧 `engine` フィールドは無視されること
-3. **agentic 経路の統合**: モック agent が limit_exceeded を経て出力するシナリオで、レスポンスに informationType 付き search 提案 + memo が含まれること
+1. **route**（`suggest-path-route-integration.spec.ts`）: 実 `factory`（`aiReadyGuard` 込み）＋実 orchestrator ＋実 agentic アダプタ（agent はモック）で、Mastra 設定済み → agentic 経路が 200 + 契約準拠レスポンス、未設定 → 501 を返すこと / 旧 `engine` フィールドは無視されること
+2. **agentic 経路の統合**（`suggest-path-agentic-integration.spec.ts`）: モック agent が limit_exceeded を経て出力するシナリオで、レスポンスに informationType 付き search 提案 + memo が含まれること
 
 ### 実機検証（実装フェーズ冒頭のスパイク）
 
@@ -779,7 +730,7 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 
 ## Security Considerations
 
-- **認証・認可**: ミドルウェアチェーン（AI scope の accessTokenParser + loginRequiredStrictly + aiEnabledGuard）を維持（4.1）。ガードは AI 機能フラグのみを判定し、Mastra 設定状態はエンジン選択の分岐に降格（2026-07-17）
+- **認証・認可**: ミドルウェアチェーン（AI scope の accessTokenParser + loginRequiredStrictly + aiReadyGuard）を維持（4.1）。`aiReadyGuard` は AI 機能有効かつ Mastra 設定済みを要求し、未設定は 501（マウント側とハンドラ側の両層で同一ガードを適用）
 - **権限スコープ（1.5）**: 検索・本文参照はリクエストユーザーの `IUserHasId` を per-request RequestContext で伝搬し、`SearchService.searchKeyword` / `Page.findByIdAndViewer` の既存権限フィルタに委譲。tool 側での再実装はしない（agentic-search spec の確立済み決定の踏襲）。RequestContext の module-scope 共有禁止により並行リクエスト間の user 漏れを防ぐ
 - **プロンプトインジェクション**: 文書本文は信頼できない入力としてエージェントに渡る。エージェントが持つ tool は**読み取り専用かつ要求ユーザーの権限内**に限定されており、本文の細工による権限昇格・書き込みは構造的に不可能。出力は JSON Schema + 型ガード + path 正規化で検証され、任意文字列がレスポンス契約を壊すことはない
 - **ログのプライバシー**: 本文・本文由来の検索クエリは debug レベル限定。info サマリはメタ情報（件数・時間・トークン）のみ
@@ -787,10 +738,10 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 
 ## Performance & Scalability
 
-- **応答時間の構造**: agentic エンジンは LLM ステップ × (検索 ≤ searchLimit + 本文参照 + 最終整形) で、ワンショット（LLM 2 回・数秒）より大幅に長い（searchLimit=5 で p50 15〜40 秒を想定）。これは精度とのトレードオフとして要件上合意済み（3 系・brief）。絶対上限は `aiTools:suggestPathAgenticTimeoutMs`（既定 60s）で保証し、超過時は memo フォールバック（4.5）
-- **制御ノブ**: searchLimit（3〜5）・モデル（既定 gpt-4.1-mini）・timeoutMs。すべて設定で運用調整可能。既定値は A/B 測定の実測（6.2）を経て確定し、レスポンス時間上限の別途合意（Redmine #184610）に反映する
-- **エンジンは可用性で自動選択**（2026-07-17 改訂）: Mastra AI が設定済みの環境では agentic が常用となる。レスポンス時間・コストは検索 budget・maxSteps・timeoutMs で制御し、AI 未設定環境は oneshot / memo-only に縮退するため影響を受けない
-- **トークンコスト**: サマリログで毎リクエスト記録（6.2）。A/B でワンショット比のコスト増を定量化する
+- **応答時間の構造**: agentic エンジンは LLM ステップ × (検索 ≤ searchLimit + 本文参照 + 最終整形) で、単発 LLM 呼び出し（数秒）と比べ大幅に長い（searchLimit=5 で p50 15〜40 秒を想定）。これは精度とのトレードオフとして要件上合意済み（3 系・brief）。絶対上限は `aiTools:suggestPathAgenticTimeoutMs`（既定 60s）で保証し、超過時は memo フォールバック（4.5）
+- **制御ノブ**: searchLimit（3〜5）・モデル・timeoutMs。すべて設定で運用調整可能。既定値は A/B 測定の実測（6.2）を経て確定し、レスポンス時間上限の別途合意（Redmine #184610）に反映する
+- **エンジンは可用性で自動選択**: Mastra AI が設定済みの環境では agentic が常用。レスポンス時間・コストは検索 budget・maxSteps・timeoutMs で制御する。AI 未設定環境は route の `aiReadyGuard` が 501 で弾くため、agentic のコストは発生しない
+- **トークンコスト**: サマリログで毎リクエスト記録（6.2）
 
 ## 将来のロードマップ: Elasticsearch のみ（AIなし）フォールバックエンジン（本PRスコープ外）
 

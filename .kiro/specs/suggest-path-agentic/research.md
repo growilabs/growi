@@ -1,5 +1,7 @@
 # Research & Design Decisions: suggest-path-agentic
 
+> **現況注記**: 本ドキュメントは discovery 時点の検討記録。当時「ワンショットと agentic の 2 エンジン並存」を採用したが、その判断は後に見直され、`features/openai` 全廃に伴い旧 oneshot は撤去された。現在のアーキテクチャ（agentic 単一 + memo フォールバック）は design.md を、AI なし ES-only フォールバックの将来計画は design.md「将来のロードマップ」を参照。以下は決定に至った経緯として保持している。
+
 ## Summary
 
 - **Feature**: `suggest-path-agentic`
