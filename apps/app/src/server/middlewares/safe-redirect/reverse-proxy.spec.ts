@@ -1,13 +1,14 @@
 import express from 'express';
 import request from 'supertest';
 
-import registerSafeRedirectFactory, {
+import {
   type ResWithSafeRedirect,
-} from './safe-redirect';
+  registerSafeRedirectFactory,
+} from './middleware';
 
 // Control app:siteUrl without loading the real config store.
 const { getConfigMock } = vi.hoisted(() => ({ getConfigMock: vi.fn() }));
-vi.mock('../service/config-manager', () => ({
+vi.mock('../../service/config-manager', () => ({
   configManager: { getConfig: getConfigMock },
 }));
 

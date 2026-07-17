@@ -1,7 +1,4 @@
-import {
-  resolveSafeRedirect,
-  type SafeRedirectContext,
-} from './safe-redirect-target';
+import { resolveSafeRedirect, type SafeRedirectContext } from './target';
 
 /**
  * Contract of resolveSafeRedirect: given a requested redirect and the request/site

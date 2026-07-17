@@ -1,18 +1,15 @@
 /**
  * Redirect with prevention from Open Redirect
  *
- * Usage: app.use(require('middlewares/safe-redirect')(['example.com', 'some.example.com:8080']))
+ * Usage: app.use(registerSafeRedirectFactory(['example.com', 'some.example.com:8080']))
  */
 
 import type { NextFunction, Request, Response } from 'express';
 
 import loggerFactory from '~/utils/logger';
 
-import { configManager } from '../service/config-manager';
-import {
-  resolveSafeRedirect,
-  type SafeRedirectContext,
-} from './safe-redirect-target';
+import { configManager } from '../../service/config-manager';
+import { resolveSafeRedirect, type SafeRedirectContext } from './target';
 
 const logger = loggerFactory('growi:middleware:safe-redirect');
 
@@ -35,7 +32,7 @@ const getConfiguredSiteUrl = (): string | undefined => {
   }
 };
 
-const factory = (whitelistOfHosts: string[]) => {
+export const registerSafeRedirectFactory = (whitelistOfHosts: string[]) => {
   return (req: Request, res: ResWithSafeRedirect, next: NextFunction): void => {
     // extend res object
     res.safeRedirect = (redirectTo?: string) => {
@@ -64,5 +61,3 @@ const factory = (whitelistOfHosts: string[]) => {
     next();
   };
 };
-
-export default factory;
