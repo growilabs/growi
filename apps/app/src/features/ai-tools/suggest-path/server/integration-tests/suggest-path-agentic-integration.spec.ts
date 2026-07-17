@@ -291,6 +291,33 @@ describe('POST /suggest-path agentic path integration — budget exhaustion and 
         options: { requestContext: SuggestPathRequestContext },
       ) => {
         capturedRequestContext = options.requestContext;
+        // TEMPORARY CI DIAGNOSTICS (to be reverted): verify identity of the
+        // searchService the engine placed into the requestContext and probe a
+        // direct call so the value the delegate would receive is observable.
+        {
+          const ctxSearchService = options.requestContext.get('searchService');
+          // biome-ignore lint/suspicious/noConsole: temporary CI diagnostics
+          console.error(
+            '[DEBUG ctx] searchKeyword===mock:',
+            ctxSearchService?.searchKeyword === mocks.searchKeywordMock,
+            'typeof:',
+            typeof ctxSearchService?.searchKeyword,
+          );
+          try {
+            const probe = await ctxSearchService?.searchKeyword(
+              'probe-query',
+              null,
+              mockUser,
+              [],
+              {},
+            );
+            // biome-ignore lint/suspicious/noConsole: temporary CI diagnostics
+            console.error('[DEBUG ctx] probe result:', JSON.stringify(probe));
+          } catch (probeErr) {
+            // biome-ignore lint/suspicious/noConsole: temporary CI diagnostics
+            console.error('[DEBUG ctx] probe threw:', probeErr);
+          }
+        }
         for (let attempt = 1; attempt <= MAX_SEARCH_ATTEMPTS; attempt++) {
           // biome-ignore lint/performance/noAwaitInLoops: the agent loop is sequential by contract — each search consumes budget and the loop stops on limit_exceeded
           const output = await invokeLimitedSearch(
