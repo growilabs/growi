@@ -6,7 +6,10 @@ import type {
 } from '@growi/core/dist/interfaces';
 import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
 
-import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
+import type {
+  AllowedModel,
+  ModelProviderOptions,
+} from '~/features/mastra/interfaces/allowed-model';
 import type {
   AiProviderApiKeys,
   AiProvidersConfig,
@@ -289,6 +292,11 @@ export const CONFIG_KEYS = [
   'openai:serviceType',
   'openai:apiKey',
 
+  // AI Tools Settings
+  'aiTools:suggestPathAgenticSearchLimit',
+  'aiTools:suggestPathAgenticChildListingLimit',
+  'aiTools:suggestPathAgenticTimeoutMs',
+
   // Mastra LLM Settings (multi-provider: several providers configurable at once).
   // Non-secret per-provider settings (enable flag + Azure connection settings),
   // stored as a single JSON Record keyed by provider. Replaces the former
@@ -300,6 +308,9 @@ export const CONFIG_KEYS = [
   // Allow-list of selectable models (provider + modelId + per-model
   // providerOptions + isDefault flag), stored as a single JSON array.
   'ai:allowedModels',
+  // Suggest-path-specific providerOptions overlay (provider-agnostic),
+  // deep-merged onto the effective model's catalog-declared providerOptions.
+  'ai:providerOptions:suggestPathAgent',
   // Opt-in refresh paths for the vendored model catalog (both default OFF)
   'ai:modelCatalogRefreshOnStartup',
   'ai:modelCatalogRefreshCronSchedule',
@@ -1323,6 +1334,36 @@ export const CONFIG_DEFINITIONS = {
   'ai:allowedModels': defineConfig<AllowedModel[] | undefined>({
     envVarName: 'AI_ALLOWED_MODELS',
     defaultValue: [],
+  }),
+
+  // Suggest-path-specific providerOptions overlay. Same provider-namespaced
+  // ModelProviderOptions shape as ai:allowedModels[].providerOptions (e.g.
+  // {"openai":{"reasoningEffort":"minimal"}}); the agentic engine deep-merges
+  // it (per provider namespace) onto the effective model's catalog-declared
+  // options. null means "unset": catalog options pass through unchanged.
+  // Option validity per model is left to the provider, not pinned here.
+  //
+  // Stored/loaded as JSON: the DB value is the serialized Record, and the env
+  // var is a JSON string. typeof null is 'object', so the loader still
+  // selects its JSON-parse branch for the env var.
+  'ai:providerOptions:suggestPathAgent':
+    defineConfig<ModelProviderOptions | null>({
+      envVarName: 'AI_SUGGEST_PATH_AGENT_PROVIDER_OPTIONS',
+      defaultValue: null,
+    }),
+
+  // AI Tools Settings
+  'aiTools:suggestPathAgenticSearchLimit': defineConfig<number>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT',
+    defaultValue: 5,
+  }),
+  'aiTools:suggestPathAgenticChildListingLimit': defineConfig<number>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_CHILD_LISTING_LIMIT',
+    defaultValue: 5,
+  }),
+  'aiTools:suggestPathAgenticTimeoutMs': defineConfig<number>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS',
+    defaultValue: 60_000,
   }),
 
   // Refresh paths for the vendored model catalog (Req 9). These are deployment

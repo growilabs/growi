@@ -17,7 +17,7 @@ const { isAiEnabled, isAiConfigured } = vi.hoisted(() => ({
   isAiConfigured: vi.fn(),
 }));
 
-vi.mock('~/features/openai/server/services', () => ({
+vi.mock('../services/is-ai-enabled', () => ({
   isAiEnabled,
 }));
 
