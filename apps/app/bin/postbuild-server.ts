@@ -1,7 +1,7 @@
 /**
  * Post-build script for server compilation.
  *
- * tspc compiles both `src/` and `config/` (TypeScript files under config/),
+ * tsc compiles both `src/` and `config/` (TypeScript files under config/),
  * so the output directory (`transpiled/`) mirrors the source tree structure
  * (e.g. `transpiled/src/`, `transpiled/config/`).
  *
@@ -17,7 +17,7 @@
  * The config copy intentionally skips `.mjs` / `.cjs` (and their `.d.mts` /
  * `.d.cts` declarations): those config files are authored directly as native
  * ESM / CJS, are imported from `dist/` as-is at runtime (no transpilation
- * needed), and tspc only re-emits a reformatted copy of them. Copying that copy
+ * needed), and tsc only re-emits a reformatted copy of them. Copying that copy
  * back would overwrite the authored source with build-tool formatting.
  */
 import { cpSync, existsSync, readdirSync, renameSync, rmSync } from 'node:fs';
@@ -57,10 +57,11 @@ if (existsSync(CONFIG_SUBDIR)) {
 // Remove leftover transpiled directory
 rmSync(TRANSPILED_DIR, { recursive: true, force: true });
 
-// Add .js extensions to extensionless relative specifiers in dist.
-// tspc (Bundler resolution) emits extensionless relative imports; Node native
-// ESM requires explicit extensions. add-js-extensions resolves each specifier
-// against the real dist filesystem and rewrites it in place.
+// Rewrite path-alias specifiers (~/, ^/) to relative form and add .js
+// extensions to extensionless relative specifiers in dist. tsc (Bundler
+// resolution) emits specifiers exactly as authored — aliases unrewritten and
+// extensionless; Node native ESM resolves neither. add-js-extensions resolves
+// each specifier against the real dist filesystem and rewrites it in place.
 {
   // Explicit .ts specifier: postbuild-server.ts runs via `node bin/postbuild-server.ts`
   // (native type stripping), whose ESM resolution performs no extension search.
@@ -69,7 +70,13 @@ rmSync(TRANSPILED_DIR, { recursive: true, force: true });
   const distRoot = resolve(DIST_DIR);
   // biome-ignore lint/suspicious/noConsole: This is a build script, console output is expected.
   console.log(`[postbuild] Running add-js-extensions on ${distRoot}...`);
-  const result = addJsExtensions(distRoot);
+  // Alias table = tsconfig.build.server.json `paths` projected onto the dist
+  // layout: `~/*` → ./src/* (moved to dist/), `^/*` → ./* (the app root,
+  // where transpiled/config/ was copied to config/ alongside dist/).
+  const result = addJsExtensions(distRoot, [
+    { prefix: '~/', targetDir: distRoot },
+    { prefix: '^/', targetDir: resolve(distRoot, '..') },
+  ]);
   // biome-ignore lint/suspicious/noConsole: This is a build script, console output is expected.
   console.log(
     `[postbuild] add-js-extensions: rewrote ${result.rewritten} specifier(s), unresolved: ${result.unresolved.length}`,
@@ -87,7 +94,7 @@ rmSync(TRANSPILED_DIR, { recursive: true, force: true });
 }
 
 // Copy Prisma native engine binaries from src to dist.
-// tspc only compiles TypeScript files, so .so.node engine files must be copied manually.
+// tsc only compiles TypeScript files, so .so.node engine files must be copied manually.
 if (existsSync(PRISMA_SRC_DIR)) {
   // biome-ignore lint/suspicious/noConsole: This is a build script, console output is expected.
   console.log(

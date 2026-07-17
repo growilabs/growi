@@ -176,6 +176,44 @@ describe('verify-dist-resolution: dead .jsx emit — no false positive', () => {
   });
 });
 
+describe('verify-dist-resolution: residual path-alias specifiers', () => {
+  /**
+   * After the tspc → tsc migration, alias-to-relative rewriting happens in
+   * postbuild (add-js-extensions). A `~/` or `^/` specifier remaining in dist
+   * means the rewrite step was skipped or failed — Node cannot resolve it at
+   * runtime, so it must be reported as unresolved.
+   */
+  it('reports a residual ~/ specifier as unresolved', () => {
+    writeFile('a.js', `import { foo } from '~/lib/b';`);
+    writeFile('lib/b.js', `export const foo = 1;`);
+
+    const result = verifyDistResolution(tmpDir);
+
+    expect(result.unresolved).toHaveLength(1);
+    expect(result.unresolved[0]).toContain('~/lib/b');
+  });
+
+  it('reports a residual ^/ specifier as unresolved (dynamic import too)', () => {
+    writeFile('a.js', `const m = await import('^/config/app.mjs');`);
+
+    const result = verifyDistResolution(tmpDir);
+
+    expect(result.unresolved).toHaveLength(1);
+    expect(result.unresolved[0]).toContain('^/config/app.mjs');
+  });
+
+  it('does not flag alias-looking strings inside comment lines', () => {
+    writeFile(
+      'a.js',
+      [`// example: import('~/lib/b')`, `export const ok = 1;`].join('\n'),
+    );
+
+    const result = verifyDistResolution(tmpDir);
+
+    expect(result.unresolved).toHaveLength(0);
+  });
+});
+
 describe('verify-dist-resolution: return contract', () => {
   it('returns { checked: number, unresolved: string[] }', () => {
     writeFile('a.js', `import { foo } from './b.js';`);

@@ -27,13 +27,13 @@ export type VerifyDistResolutionResult = {
 };
 
 /**
- * Regex to capture relative import specifiers from both static and dynamic imports.
- * Only matches strings that start with ./ or ../.
+ * Regex to capture relative import specifiers (./ or ../) and residual
+ * path-alias specifiers (~/ or ^/) from both static and dynamic imports.
  * Captures:
  *   group 1: the specifier string (without quotes)
  */
 const RELATIVE_IMPORT_RE =
-  /\b(?:from|import)\s*\(\s*['"](\.[^'"]+)['"]\s*(?:with\s*\{[^}]*\})?\s*\)|\bfrom\s*['"](\.[^'"]+)['"]\s*(?:with\s*\{[^}]*\})?/g;
+  /\b(?:from|import)\s*\(\s*['"](\.[^'"]+|[~^]\/[^'"]*)['"]\s*(?:with\s*\{[^}]*\})?\s*\)|\bfrom\s*['"](\.[^'"]+|[~^]\/[^'"]*)['"]\s*(?:with\s*\{[^}]*\})?/g;
 
 /**
  * Regex to detect whether a line is purely a comment line (should be skipped).
@@ -92,6 +92,16 @@ export function verifyDistResolution(
         if (!spec) continue;
 
         checked += 1;
+
+        // A residual path alias means postbuild alias rewriting was skipped
+        // or failed — Node cannot resolve it at runtime.
+        if (spec.startsWith('~/') || spec.startsWith('^/')) {
+          const location = `${file}: '${spec}' (residual path alias)`;
+          unresolved.push(location);
+          // biome-ignore lint/suspicious/noConsole: build script diagnostic
+          console.warn(`[verify-dist-resolution] unresolved: ${location}`);
+          continue;
+        }
 
         // Resolve the specifier to an absolute path
         const target = resolve(importerDir, spec);

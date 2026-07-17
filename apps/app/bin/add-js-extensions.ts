@@ -1,17 +1,29 @@
 /**
  * Post-build tool: add-js-extensions (C1, esm-import-convention task 2.2).
  *
- * Rewrites extensionless relative import specifiers in emitted .js files so that
- * Node native ESM can resolve them. Called from postbuild-server.ts after
- * typescript-transform-paths has converted alias paths to relative form.
+ * Rewrites import specifiers in emitted .js files so that Node native ESM can
+ * resolve them. Called from postbuild-server.ts. Two rewrites are performed in
+ * a single pass:
  *
- * Resolution rules (importer-dir-relative, only mutates extensionless relatives):
+ *   1. Path-alias specifiers (`~/`, `^/`) → importer-relative form. This
+ *      replaces the emit-time transform previously done by
+ *      typescript-transform-paths via tspc; plain tsc (TypeScript 7 native)
+ *      has no custom-transformer hook, so alias rewriting moved here. The
+ *      alias table is passed by the caller (postbuild-server.ts) and mirrors
+ *      the `paths` mapping of tsconfig.build.server.json projected onto the
+ *      dist layout.
+ *   2. Extensionless relative specifiers → explicit-extension form.
+ *
+ * Resolution rules (importer-dir-relative):
+ *   ~/X   → <relative to aliased target> then extension resolution as below
+ *   ^/X.mjs → <relative to aliased target> (existing extension preserved)
  *   ./X   → ./X.js        when dist/X.js exists
  *   ./X   → ./X.jsx       when dist/X.jsx exists (dead client emit from .tsx)
  *   ./dir → ./dir/index.js  when dist/dir/index.js exists
  *   ./dir → ./dir/index.jsx when dist/dir/index.jsx exists
- *   Already-extensioned (.js/.jsx/.cjs/.mjs/.json) → unchanged (idempotent)
- *   External (no leading ./ or ../) → unchanged
+ *   Already-extensioned relative (.js/.jsx/.cjs/.mjs/.json) → unchanged (idempotent)
+ *   External (no leading ./, ../, ~/, ^/) → unchanged
+ *   Alias without a configured mapping → unchanged
  *   Unresolvable → unchanged + warning (reported in unresolved[])
  *
  * Authored in TypeScript and executed directly by Node's native type stripping
@@ -26,11 +38,20 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 
 export type AddJsExtensionsResult = {
   rewritten: number;
   unresolved: string[];
+};
+
+/**
+ * Maps an alias prefix (e.g. '~/') to the absolute directory its remainder
+ * resolves against (e.g. the dist root).
+ */
+export type AliasMapping = {
+  readonly prefix: string;
+  readonly targetDir: string;
 };
 
 /**
@@ -45,9 +66,10 @@ export type AddJsExtensionsResult = {
  *
  * Applied only to non-comment lines — see processLine() below.
  */
-// Matches relative specifiers: ./X, ../X, and also bare '.' or '..' (current/parent dir).
+// Matches relative specifiers (./X, ../X, bare '.' or '..') and path-alias
+// specifiers (~/X, ^/X).
 const IMPORT_SPEC_RE =
-  /(\bfrom\s*['"]|\bimport\(\s*['"]|\bimport\s*['"])(\.\.?(?:\/[^'"]*)?)((?:'\s*(?:with\s*\{[^}]*\})?)|(?:"\s*(?:with\s*\{[^}]*\})?))/g;
+  /(\bfrom\s*['"]|\bimport\(\s*['"]|\bimport\s*['"])(\.\.?(?:\/[^'"]*)?|[~^]\/[^'"]*)((?:'\s*(?:with\s*\{[^}]*\})?)|(?:"\s*(?:with\s*\{[^}]*\})?))/g;
 
 /**
  * Regex to detect whether a line is purely a comment line (should be skipped).
@@ -123,12 +145,39 @@ function walkJs(dir: string, acc: string[] = []): string[] {
 }
 
 /**
+ * Convert an alias specifier to importer-relative form using `aliases`.
+ * Returns null when no mapping matches the specifier's prefix.
+ */
+function relativizeAlias(
+  importerDir: string,
+  spec: string,
+  aliases: readonly AliasMapping[],
+): { relativeSpec: string; absTarget: string } | null {
+  const alias = aliases.find((a) => spec.startsWith(a.prefix));
+  if (alias == null) {
+    return null;
+  }
+  const absTarget = resolve(alias.targetDir, spec.slice(alias.prefix.length));
+  // Emit POSIX separators regardless of host platform
+  let relativeSpec = relative(importerDir, absTarget).split(sep).join('/');
+  if (!relativeSpec.startsWith('.')) {
+    relativeSpec = `./${relativeSpec}`;
+  }
+  return { relativeSpec, absTarget };
+}
+
+/**
  * Main entry point. Processes all .js files under `distRoot`, rewriting
- * extensionless relative import specifiers to the resolved form.
+ * path-alias specifiers to relative form and extensionless relative import
+ * specifiers to the resolved form.
  *
  * @param distRoot  absolute path to the dist directory
+ * @param aliases   alias prefix → target directory mappings (default: none)
  */
-export function addJsExtensions(distRoot: string): AddJsExtensionsResult {
+export function addJsExtensions(
+  distRoot: string,
+  aliases: readonly AliasMapping[] = [],
+): AddJsExtensionsResult {
   let rewritten = 0;
   const unresolved: string[] = [];
 
@@ -149,12 +198,33 @@ export function addJsExtensions(distRoot: string): AddJsExtensionsResult {
       return line.replace(
         IMPORT_SPEC_RE,
         (match: string, prefix: string, spec: string, suffix: string) => {
-          // Already extensioned — leave untouched
-          if (hasExtension(spec)) {
+          let effectiveSpec = spec;
+
+          if (spec.startsWith('~/') || spec.startsWith('^/')) {
+            const aliased = relativizeAlias(importerDir, spec, aliases);
+            if (aliased == null) {
+              // No mapping configured for this prefix — leave untouched
+              return match;
+            }
+            if (hasExtension(aliased.relativeSpec)) {
+              // e.g. ^/config/*.mjs — rewrite the alias, keep the extension
+              if (!existsSync(aliased.absTarget)) {
+                const location = `${file}: '${spec}'`;
+                unresolved.push(location);
+                // biome-ignore lint/suspicious/noConsole: build script diagnostic
+                console.warn(`[add-js-extensions] unresolvable: ${location}`);
+                return match;
+              }
+              rewritten += 1;
+              return prefix + aliased.relativeSpec + suffix;
+            }
+            effectiveSpec = aliased.relativeSpec;
+          } else if (hasExtension(spec)) {
+            // Already-extensioned relative specifier — leave untouched
             return match;
           }
 
-          const resolved = resolveSpec(importerDir, spec);
+          const resolved = resolveSpec(importerDir, effectiveSpec);
           if (resolved == null) {
             const location = `${file}: '${spec}'`;
             unresolved.push(location);

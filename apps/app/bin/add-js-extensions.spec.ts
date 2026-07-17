@@ -22,6 +22,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const { addJsExtensions } = await import('./add-js-extensions');
 
+import type { AliasMapping } from './add-js-extensions';
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────────────────────────
@@ -225,6 +227,113 @@ describe('add-js-extensions: unresolvable specifiers', () => {
     expect(readFile('a.js')).toBe(`import mongoose from 'mongoose';`);
     expect(result.rewritten).toBe(0);
     expect(result.unresolved).toHaveLength(0);
+  });
+});
+
+describe('add-js-extensions: path-alias specifiers (~/, ^/) → relative', () => {
+  /**
+   * Alias rewriting replaces the emit-time transform previously done by
+   * typescript-transform-paths (via tspc). Contract: an alias specifier is
+   * rewritten to an importer-relative specifier pointing at the mapped target,
+   * with the extension resolved against the real filesystem.
+   */
+  const distAliases = (): readonly AliasMapping[] => [
+    { prefix: '~/', targetDir: tmpDir },
+  ];
+
+  it('rewrites ~/X to a relative specifier with .js from a nested importer', () => {
+    writeFile('sub/a.js', `import { foo } from '~/lib/b';`);
+    writeFile('lib/b.js', `export const foo = 1;`);
+
+    const result = addJsExtensions(tmpDir, distAliases());
+
+    expect(readFile('sub/a.js')).toContain(`from '../lib/b.js'`);
+    expect(result.rewritten).toBe(1);
+    expect(result.unresolved).toHaveLength(0);
+  });
+
+  it('rewrites ~/X to ./X.js when importer sits at dist root (leading ./ added)', () => {
+    writeFile('a.js', `import { foo } from '~/b';`);
+    writeFile('b.js', `export const foo = 1;`);
+
+    addJsExtensions(tmpDir, distAliases());
+
+    expect(readFile('a.js')).toContain(`from './b.js'`);
+  });
+
+  it('computes multi-level ../ for deeply nested importers', () => {
+    writeFile('a/b/c.js', `import { foo } from '~/d/e';`);
+    writeFile('d/e.js', `export const foo = 1;`);
+
+    addJsExtensions(tmpDir, distAliases());
+
+    expect(readFile('a/b/c.js')).toContain(`from '../../d/e.js'`);
+  });
+
+  it('rewrites ~/dir to a relative /index.js barrel', () => {
+    writeFile('sub/a.js', `import { foo } from '~/lib';`);
+    writeFile('lib/index.js', `export const foo = 1;`);
+
+    addJsExtensions(tmpDir, distAliases());
+
+    expect(readFile('sub/a.js')).toContain(`from '../lib/index.js'`);
+  });
+
+  it('rewrites alias in dynamic import() expressions', () => {
+    writeFile('sub/a.js', `const m = await import('~/lib/b');`);
+    writeFile('lib/b.js', `export const foo = 1;`);
+
+    addJsExtensions(tmpDir, distAliases());
+
+    expect(readFile('sub/a.js')).toContain(`import('../lib/b.js')`);
+  });
+
+  it('rewrites an already-extensioned alias specifier keeping its extension', () => {
+    // Real case: server code imports ^/config/*.mjs — the alias maps outside
+    // the dist tree and the .mjs extension must be preserved as-is.
+    writeFile('dist/sub/a.js', `import cfg from '^/config/app.mjs';`);
+    writeFile('config/app.mjs', `export default {};`);
+
+    const result = addJsExtensions(join(tmpDir, 'dist'), [
+      { prefix: '^/', targetDir: tmpDir },
+    ]);
+
+    expect(readFile('dist/sub/a.js')).toContain(`from '../../config/app.mjs'`);
+    expect(result.rewritten).toBe(1);
+    expect(result.unresolved).toHaveLength(0);
+  });
+
+  it('reports an unresolvable alias target and leaves it unchanged', () => {
+    writeFile('a.js', `import { x } from '~/missing/mod';`);
+
+    const result = addJsExtensions(tmpDir, distAliases());
+
+    expect(readFile('a.js')).toBe(`import { x } from '~/missing/mod';`);
+    expect(result.unresolved).toHaveLength(1);
+    expect(result.unresolved[0]).toContain('~/missing/mod');
+  });
+
+  it('leaves alias specifiers untouched when no alias mapping is given', () => {
+    writeFile('a.js', `import { foo } from '~/b';`);
+    writeFile('b.js', `export const foo = 1;`);
+
+    const result = addJsExtensions(tmpDir);
+
+    expect(readFile('a.js')).toBe(`import { foo } from '~/b';`);
+    expect(result.rewritten).toBe(0);
+    expect(result.unresolved).toHaveLength(0);
+  });
+
+  it('is idempotent — a second run leaves alias-rewritten output unchanged', () => {
+    writeFile('sub/a.js', `import { foo } from '~/lib/b';`);
+    writeFile('lib/b.js', `export const foo = 1;`);
+
+    addJsExtensions(tmpDir, distAliases());
+    const afterFirst = readFile('sub/a.js');
+    addJsExtensions(tmpDir, distAliases());
+    const afterSecond = readFile('sub/a.js');
+
+    expect(afterFirst).toBe(afterSecond);
   });
 });
 
