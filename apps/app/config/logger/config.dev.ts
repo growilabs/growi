@@ -32,6 +32,7 @@ const config: LoggerConfig = {
   'growi-plugin:*': 'debug',
   'growi:service:search-delegator:elasticsearch': 'debug',
   'growi:service:g2g-transfer': 'debug',
+  'growi:ai-tools:suggest-path:*': 'debug',
 
   'growi:migration:add-installed-date-to-config': 'debug',
   'growi:events:page:seen': 'debug',
