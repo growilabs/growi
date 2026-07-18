@@ -287,9 +287,9 @@
     "toggle_notification": "{{path}}の通知設定を変更しました",
     "not_found_global_notification_triggerid": "アクセス先の通知設定は見つかりませんでした"
   },
-  "full_text_search_management": {
-    "full_text_search_management": "全文検索管理",
-    "elasticsearch_management": "Elasticsearch 管理",
+  "elasticsearch_management": "Elasticsearch 管理",
+  "page_data_index_management": {
+    "page_data_management": "ページデータ管理",
     "connection_status": "接続の状態",
     "connection_status_label_unconfigured": "設定されていません",
     "connection_status_label_connected": "接続されています",
@@ -303,12 +303,36 @@
     "reconnect_button": "再接続の試行",
     "reconnect_description": "Elasticsearch への再接続を試みます。",
     "normalize": "正規化",
-    "normalize_button": "インデックスの正規化",
-    "normalize_description": "破損したインデックスを修復します。",
+    "normalize_button": "ページデータのインデックスの正規化",
+    "normalize_description": "破損したページデータのインデックスを修復します。",
+    "normalize_success": "ページデータのインデックスを正規化しました。",
     "rebuild": "リビルド",
-    "rebuild_button": "インデックスのリビルド",
+    "rebuild_button": "ページデータのインデックスのリビルド",
+    "rebuild_requested": "ページデータのインデックスのリビルドをリクエストしました。",
     "rebuild_description_1": "全てのページのインデックスを削除し、作り直します。",
-    "rebuild_description_2": "この作業には数秒かかります。"
+    "rebuild_description_2": "この作業には数秒かかります。",
+    "rebuild_progress_processing": "処理中..",
+    "rebuild_progress_completed": "完了",
+    "rebuild_normalization_timeout": "リビルドは完了しましたが、正規化がタイムアウトしました。手動で正規化してください。"
+  },
+  "audit_log_index_management": {
+    "audit_log_index_management": "監査ログのインデックス管理",
+    "settings_explanation": "監査ログのインデックスの正規化・リビルドは、以下のページで行えます",
+    "index_management_link": "{{destination}}ページに移動",
+    "normalize": "正規化",
+    "normalize_button": "監査ログのインデックスの正規化",
+    "normalize_success": "監査ログのインデックスを正規化しました。",
+    "normalize_description": "破損した監査ログのインデックスを修復します。",
+    "rebuild": "リビルド",
+    "rebuild_button": "監査ログのインデックスのリビルド",
+    "rebuild_requested": "監査ログのインデックスのリビルドをリクエストしました。",
+    "rebuild_description_1": "全ての監査ログのインデックスを削除し、作り直します。",
+    "rebuild_description_2": "この作業には数秒かかります。",
+    "unsynced_events_warning": "Elasticsearch に同期できなかった監査ログがあります。リビルドして整合性を回復してください。",
+    "rebuild_progress_processing": "処理中..",
+    "rebuild_progress_completed": "完了",
+    "rebuild_normalization_timeout": "リビルドは完了しましたが、正規化がタイムアウトしました。手動で正規化してください。",
+    "reconnect": "再接続"
   },
   "mailer_setup_required": "送信するには <a href='/admin/app'>メールの設定</a> が必要です。",
   "admin_top": {
