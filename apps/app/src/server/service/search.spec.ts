@@ -37,6 +37,10 @@ vi.mock('~/server/service/config-manager/config-manager', () => ({
 class TestSearchService extends SearchService {
   // isConfigured is normally derived from fullTextSearchDelegator; tests flip this
   // directly to exercise both the ES path and the MongoDB fallback path.
+  // Two distinct knobs model two distinct failure modes: this one is "ES was
+  // never configured for this instance" (isReachable short-circuits before any
+  // ES call is attempted), whereas isErrorOccuredOnHealthcheck below models
+  // "ES is configured but the periodic healthcheck has marked it unreachable."
   isConfiguredOverride = true;
 
   // biome-ignore lint/complexity/noUselessConstructor: widens the protected base ctor (factory pattern) to public so the test can instantiate and wire mocks
