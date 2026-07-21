@@ -42,6 +42,9 @@ module.exports = (crowi, app) => {
   const loginRequired = loginRequiredFactory(crowi, true);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
+  const certifySharedPage = require('../middlewares/certify-shared-page')(
+    crowi,
+  );
 
   const uploads = multer({ dest: `${crowi.tmpDir}uploads` });
   const page = require('./page')(crowi, app);
@@ -263,6 +266,13 @@ module.exports = (crowi, app) => {
   apiV1Router.get(
     '/comments.get',
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    // Validate ids (MongoId) and short-circuit malformed input BEFORE
+    // certifySharedPage, so injection (e.g. `page_id[$gt]=`) never reaches the
+    // share-link DB query, and certifySharedPage must run before loginRequired
+    // (the guest-pass depends on req.isSharedPage).
+    comment.api.validators.get(),
+    apiV1FormValidator,
+    certifySharedPage,
     loginRequired,
     comment.api.get,
   );

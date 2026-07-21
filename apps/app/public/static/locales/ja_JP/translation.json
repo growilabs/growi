@@ -376,6 +376,27 @@
     },
     "exclude_tag": {
       "desc": "{{tag}} というタグを含むページを除外"
+    },
+    "author": {
+      "desc": "{{author}} が作成したページを検索"
+    },
+    "exclude_author": {
+      "desc": "{{author}} が作成したページを除外"
+    },
+    "editor": {
+      "desc": "{{editor}} が最後に編集したページを検索"
+    },
+    "exclude_editor": {
+      "desc": "{{editor}} が編集したページを除外"
+    },
+    "group": {
+      "desc": "{{group}} グループに許可されたページを検索"
+    },
+    "exclude_group": {
+      "desc": "{{group}} グループに許可されたページを除外"
+    },
+    "quoted_value": {
+      "desc": "フィルターの値にスペースが含まれる場合はダブルクォートで囲む（例: グループ名やページパス）"
     }
   },
   "search": {
@@ -426,7 +447,8 @@
     "no_user_found": "ユーザー名が見つかりません",
     "reply": "返信",
     "delete_comment": "コメントを削除しますか？",
-    "comment_management_is_not_allowed": "コメントの操作が許可されていません。"
+    "comment_management_is_not_allowed": "コメントの操作が許可されていません。",
+    "no_comments": "コメントはありません。"
   },
   "page_api_error": {
     "notfound_or_forbidden": "元のページが見つからないか、アクセス権がありません。",
@@ -914,7 +936,7 @@
     "sign_in_failure": "ログインに失敗しました。",
     "aws_sttings_required": "この機能にはAWS設定が必要です。管理者に訪ねて下さい。",
     "application_already_installed": "アプリケーションのインストールが完了しました。",
-    "email_address_could_not_be_used": "このメールアドレスは使用できません。(許可されたメールアドレスを確認してください。)",
+    "email_address_could_not_be_used": "このメールアドレスはこの Wiki では使用できません。管理者にお問い合わせください。",
     "user_id_is_not_available": "このユーザーIDは使用できません。",
     "username_should_not_be_null": "Username が null になっています 管理画面の認証機構設定にて設定の確認をしてください",
     "email_address_is_already_registered": "このメールアドレスは既に登録されています。",
@@ -996,7 +1018,8 @@
   "user_group": {
     "select_group": "グループを選ぶ",
     "belonging_to_no_group": "所属しているグループが見つかりませんでした。",
-    "manage_user_groups": "グループ管理"
+    "manage_user_groups": "グループ管理",
+    "only_yourself": "自分のみ"
   },
   "fix_page_grant": {
     "modal": {
