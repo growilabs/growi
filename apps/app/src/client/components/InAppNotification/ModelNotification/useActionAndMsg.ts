@@ -68,6 +68,10 @@ export const useActionMsgAndIconForModelNotification = (
       actionMsg = 'commented on';
       actionIcon = 'comment';
       break;
+    case SupportedAction.ACTION_COMMENT_MENTION:
+      actionMsg = 'mentioned on';
+      actionIcon = 'alternate_email';
+      break;
     case SupportedAction.ACTION_USER_REGISTRATION_APPROVAL_REQUEST:
       actionMsg = 'requested registration approval';
       actionIcon = 'add_comment';

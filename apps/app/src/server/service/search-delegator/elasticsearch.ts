@@ -17,6 +17,7 @@ import type {
   ESQueryTerms,
   ESTermsKey,
   QueryTerms,
+  ResolvedFilterData,
   SearchableData,
   SearchDelegator,
   UnavailableTermsKey,
@@ -73,6 +74,12 @@ const AVAILABLE_KEYS = [
   'not_prefix',
   'tag',
   'not_tag',
+  'author',
+  'not_author',
+  'editor',
+  'not_editor',
+  'group',
+  'not_group',
 ];
 
 type Data = any;
@@ -475,6 +482,7 @@ class ElasticsearchDelegator
       body: page.revision.body,
       body_embedded: page.revisionBodyEmbedded,
       username: page.creator?.username,
+      last_update_username: page.lastUpdateUser?.username,
       comments: page.commentsCount > 0 ? page.comments : undefined,
       comment_count: page.commentsCount,
       bookmark_count: page.bookmarksCount,
@@ -947,6 +955,66 @@ class ElasticsearchDelegator
       });
       query.body.query.bool.filter.push({ bool: { must_not: queries } });
     }
+
+    if (parsedKeywords.author.length > 0) {
+      const queries = parsedKeywords.author.map((author) => {
+        return { term: { username: author } };
+      });
+      query.body.query.bool.filter.push({ bool: { should: queries } });
+    }
+
+    if (parsedKeywords.not_author.length > 0) {
+      const queries = parsedKeywords.not_author.map((author) => {
+        return { term: { username: author } };
+      });
+      query.body.query.bool.filter.push({ bool: { must_not: queries } });
+    }
+
+    if (parsedKeywords.editor.length > 0) {
+      const queries = parsedKeywords.editor.map((editor) => {
+        return { term: { last_update_username: editor } };
+      });
+      query.body.query.bool.filter.push({ bool: { should: queries } });
+    }
+
+    if (parsedKeywords.not_editor.length > 0) {
+      const queries = parsedKeywords.not_editor.map((editor) => {
+        return { term: { last_update_username: editor } };
+      });
+      query.body.query.bool.filter.push({ bool: { must_not: queries } });
+    }
+  }
+
+  appendCriteriaForGroupFilter(
+    query: SearchQuery,
+    parsedKeywords: ESQueryTerms,
+    resolvedFilterData?: ResolvedFilterData,
+  ): void {
+    if (resolvedFilterData == null) return;
+    const { groupIds, notGroupIds } = resolvedFilterData;
+
+    // biome-ignore lint/style/noParameterAssign: ignore
+    query = this.initializeBoolQuery(query);
+    if (
+      query.body?.query?.bool?.filter == null ||
+      !Array.isArray(query.body.query.bool.filter) ||
+      !Array.isArray(query.body.query.bool.must_not)
+    ) {
+      throw new Error('query.body.query.bool is not initialized');
+    }
+
+    // Gate on whether the user typed group:, NOT on whether resolution produced ids.
+    if (parsedKeywords.group.length > 0) {
+      query.body.query.bool.filter.push({
+        terms: { granted_groups: groupIds },
+      });
+    }
+
+    if (parsedKeywords.not_group.length > 0) {
+      query.body.query.bool.must_not.push({
+        terms: { granted_groups: notGroupIds },
+      });
+    }
   }
 
   filterPagesByViewer(query: SearchQuery, user, userGroups): void {
@@ -1085,6 +1153,7 @@ class ElasticsearchDelegator
     const query = this.createSearchQuery();
 
     this.appendCriteriaForQueryString(query, terms);
+    this.appendCriteriaForGroupFilter(query, terms, data.resolvedFilterData);
     this.filterPagesByViewer(query, user, userGroups);
     await this.appendFunctionScore(query, queryString);
 

@@ -310,6 +310,27 @@
     },
     "exclude_tag": {
       "desc": "{{tag}} 태그가 있는 페이지 제외"
+    },
+    "author": {
+      "desc": "{{author}}님이 작성한 페이지 검색"
+    },
+    "exclude_author": {
+      "desc": "{{author}}님이 작성한 페이지 제외"
+    },
+    "editor": {
+      "desc": "{{editor}}님이 마지막으로 편집한 페이지 검색"
+    },
+    "exclude_editor": {
+      "desc": "{{editor}}님이 편집한 페이지 제외"
+    },
+    "group": {
+      "desc": "{{group}} 그룹에 권한이 부여된 페이지 검색"
+    },
+    "exclude_group": {
+      "desc": "{{group}} 그룹에 권한이 부여된 페이지 제외"
+    },
+    "quoted_value": {
+      "desc": "필터 값에 공백이 포함된 경우 큰따옴표로 묶기 (예: 그룹 이름이나 페이지 경로)"
     }
   },
   "search": {
@@ -360,7 +381,8 @@
     "no_user_found": "사용자를 찾을 수 없습니다.",
     "reply": "답글",
     "delete_comment": "댓글 삭제?",
-    "comment_management_is_not_allowed": "댓글 관리가 허용되지 않습니다."
+    "comment_management_is_not_allowed": "댓글 관리가 허용되지 않습니다.",
+    "no_comments": "댓글이 없습니다."
   },
   "page_api_error": {
     "notfound_or_forbidden": "원본 페이지를 찾을 수 없거나 접근이 금지되었습니다.",
@@ -734,7 +756,7 @@
     "sign_in_failure": "로그인 실패.",
     "aws_sttings_required": "이 기능을 사용하려면 AWS 설정이 필요합니다. 관리자에게 문의하십시오.",
     "application_already_installed": "애플리케이션이 이미 설치되었습니다.",
-    "email_address_could_not_be_used": "이 이메일 주소는 사용할 수 없습니다. (허용된 이메일 주소를 확인하십시오.)",
+    "email_address_could_not_be_used": "이 이메일 주소는 이 위키에서 사용할 수 없습니다. 관리자에게 문의하십시오.",
     "user_id_is_not_available": "이 사용자 ID는 사용할 수 없습니다.",
     "username_should_not_be_null": "사용자 이름은 null이 아니어야 합니다. 관리 페이지에서 인증 메커니즘 설정을 확인하십시오.",
     "email_address_is_already_registered": "이 이메일 주소는 이미 등록되었습니다.",
@@ -816,7 +838,8 @@
   "user_group": {
     "select_group": "그룹 선택",
     "belonging_to_no_group": "속한 그룹을 찾을 수 없습니다.",
-    "manage_user_groups": "사용자 그룹 관리"
+    "manage_user_groups": "사용자 그룹 관리",
+    "only_yourself": "본인만"
   },
   "fix_page_grant": {
     "modal": {

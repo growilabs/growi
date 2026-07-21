@@ -8,7 +8,27 @@ export const setup = (crowi) => {
   // Named function so the route-middleware snapshot tool can identify this
   // handler in the apiv3 auth chain.
   return async function certifySharedPage(req, res, next) {
-    const pageId = req.query.pageId || req.body.pageId || null;
+    // Accept both `pageId` (camelCase, used by /revisions, /page/info) and
+    // `page_id` (snake_case, used by /comments.get) so this single shared
+    // middleware can certify either route.
+    const camelPageId = req.query.pageId || req.body.pageId || null;
+    const snakePageId = req.query.page_id || null;
+
+    // CRITICAL: reject ambiguous requests where BOTH id params are present but
+    // disagree. The middleware verifies one id while the downstream handler may
+    // fetch by the other; if they differ, that verify/fetch split is an IDOR
+    // (e.g. a valid share link for page A + `page_id=B` would bypass access to
+    // B). Legitimate callers send only one of the two, so refusing to certify
+    // the ambiguous case is safe and closes the split on every route.
+    if (
+      camelPageId != null &&
+      snakePageId != null &&
+      String(camelPageId) !== String(snakePageId)
+    ) {
+      return next();
+    }
+
+    const pageId = camelPageId ?? snakePageId;
     const shareLinkId = req.query.shareLinkId || req.body.shareLinkId || null;
     if (pageId == null || shareLinkId == null) {
       return next();

@@ -174,7 +174,9 @@
         "bookmark": "Grants permission to view bookmark features.",
         "attachment": "Grants permission to view attachment features.",
         "page_bulk_export": "Grants permission to view page bulk export features.",
-        "in_app_notification": "Grants permission to view in-app notification features."
+        "in_app_notification": "Grants permission to view in-app notification features.",
+        "user": "Grants permission to view user information features.",
+        "user_group": "Grants permission to view user group member features."
       }
     },
     "write": {
@@ -220,7 +222,9 @@
         "bookmark": "Grants permission to edit bookmark features.",
         "attachment": "Grants permission to edit attachment features.",
         "page_bulk_export": "Grants permission to edit page bulk export features.",
-        "in_app_notification": "Grants permission to edit in-app notification features."
+        "in_app_notification": "Grants permission to edit in-app notification features.",
+        "user": "Grants permission to edit user information features.",
+        "user_group": "Grants permission to edit user group member features."
       }
     }
   },

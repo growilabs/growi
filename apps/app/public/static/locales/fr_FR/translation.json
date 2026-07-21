@@ -341,6 +341,27 @@
     },
     "exclude_tag": {
       "desc": "Pages n'ayant pas l'étiquette {{tag}}"
+    },
+    "author": {
+      "desc": "Rechercher les pages créées par {{author}}"
+    },
+    "exclude_author": {
+      "desc": "Exclure les pages créées par {{author}}"
+    },
+    "editor": {
+      "desc": "Rechercher les pages dernièrement modifiées par {{editor}}"
+    },
+    "exclude_editor": {
+      "desc": "Exclure les pages modifiées par {{editor}}"
+    },
+    "group": {
+      "desc": "Rechercher les pages accordées au groupe {{group}}"
+    },
+    "exclude_group": {
+      "desc": "Exclure les pages accordées au groupe {{group}}"
+    },
+    "quoted_value": {
+      "desc": "Entourez toute valeur de filtre de guillemets doubles si elle contient un espace (par ex. un nom de groupe ou un chemin de page)"
     }
   },
   "search": {
@@ -391,7 +412,8 @@
     "no_user_found": "Aucun utilisateur trouvé",
     "reply": "Répondre",
     "delete_comment": "Supprimer?",
-    "comment_management_is_not_allowed": "La gestion des commentaires n'est pas autorisée."
+    "comment_management_is_not_allowed": "La gestion des commentaires n'est pas autorisée.",
+    "no_comments": "Il n'y a aucun commentaire."
   },
   "page_api_error": {
     "notfound_or_forbidden": "Page originale introuvable ou accès restreint.",
@@ -761,7 +783,7 @@
     "sign_in_failure": "Échec de la connexion.",
     "aws_sttings_required": "La configuration AWS est requise pour utiliser cette fonctionnalité.",
     "application_already_installed": "Application déja installée.",
-    "email_address_could_not_be_used": "Cette adresse courriel n'est pas autorisée",
+    "email_address_could_not_be_used": "Cette adresse e-mail ne peut pas être utilisée sur ce wiki. Veuillez contacter votre administrateur.",
     "user_id_is_not_available": "Cet identifiant utilisateur est indisponible.",
     "username_should_not_be_null": "Le nom d'utilisateur est requis",
     "email_address_is_already_registered": "Cette adresse courriel est indisponible.",
@@ -843,7 +865,8 @@
   "user_group": {
     "select_group": "Groupes autorisés",
     "belonging_to_no_group": "Vous n'appartenez à aucun groupe.",
-    "manage_user_groups": "Gestion des groupes"
+    "manage_user_groups": "Gestion des groupes",
+    "only_yourself": "Vous seulement"
   },
   "fix_page_grant": {
     "modal": {
