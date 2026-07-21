@@ -1,8 +1,28 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.5.6...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.5.7...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.5.7](https://github.com/growilabs/compare/v7.5.6...v7.5.7) - 2026-07-21
+
+### 💎 Features
+
+* feat: Display comments at the share link (#11401) @mariko-h
+* feat: Filter by author, editor and group in the search results (#11368) @arvid-e
+* feat: User group member visibility (#11320) @Ryosei-Fukushima
+
+### 🚀 Improvement
+
+* imprv: Email white list (#11314) @mariko-h
+
+### 🐛 Bug Fixes
+
+* fix(plantuml): Stop deprecation warning painted onto carbon-gray diagrams (#11475) @yuki-takei
+* fix(plantuml): Stop leaking PlantUML theme YAML front matter into diagram source (#11461) @yuki-takei
+* fix(import): Harden admin data import (re-enable button on failure, await import) (#11474) @yuki-takei
+* fix: Prevent blank screen when Next.js falls back to the error page (#11423) @yuki-takei
+* fix: Prevent PageSelectModal infinite render loop (#11422) (#11428) @yuki-takei
 
 ## [v7.5.6](https://github.com/growilabs/compare/v7.5.5...v7.5.6) - 2026-06-25
 
