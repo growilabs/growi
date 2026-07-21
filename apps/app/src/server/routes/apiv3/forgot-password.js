@@ -193,9 +193,16 @@ module.exports = (crowi) => {
 
         return res.apiv3();
       } catch (err) {
-        const msg = 'Error occurred during password reset request procedure.';
-        logger.error(err);
-        return res.apiv3Err(`${msg} Cause: ${err}`);
+        // The token creation / mail send path is only reached for a registered
+        // active user. Surfacing this error to the client would reveal that the
+        // submitted email is registered (account enumeration). Log it for
+        // operators, but return the same neutral response as the unknown-email
+        // case so both are indistinguishable to the client.
+        logger.error(
+          { err },
+          'Error occurred during password reset request procedure.',
+        );
+        return res.apiv3();
       }
     },
   );

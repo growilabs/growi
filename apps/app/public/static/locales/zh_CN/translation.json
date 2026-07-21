@@ -963,7 +963,7 @@
     "new_password": "新密码",
     "confirm_new_password": "确认新密码",
     "email_is_required": "电子邮件是必需的",
-    "success_to_send_email": "我发了一封电子邮件",
+    "email_sent_if_account_exists": "如果该邮箱地址对应的账户存在，重置密码的邮件已发送。",
     "feature_is_unavailable": "此功能不可用",
     "incorrect_token_or_expired_url": "令牌不正确或 URL 已过期。 请通过以下链接重新发送密码重置请求",
     "password_and_confirm_password_does_not_match": "密码和确认密码不匹配",

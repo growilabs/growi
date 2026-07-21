@@ -991,7 +991,7 @@
     "new_password": "新しいパスワード",
     "confirm_new_password": "新しいパスワードの確認",
     "email_is_required": "メールを入力してください",
-    "success_to_send_email": "メールを送信しました",
+    "email_sent_if_account_exists": "そのメールアドレスのアカウントが存在する場合、パスワードリセット用のメールを送信しました。",
     "feature_is_unavailable": "この機能を利用することはできません。",
     "incorrect_token_or_expired_url": "トークンが正しくないか、URLの有効期限が切れています。 以下のリンクからパスワードリセットリクエストを再送信してください。",
     "password_and_confirm_password_does_not_match": "パスワードと確認パスワードが一致しません",

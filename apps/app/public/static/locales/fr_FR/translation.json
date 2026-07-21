@@ -953,7 +953,7 @@
     "new_password": "Nouveau mot de passe",
     "confirm_new_password": "Confirmer le nouveau mot de passe",
     "email_is_required": "Adresse courriel requise",
-    "success_to_send_email": "Courriel envoyé",
+    "email_sent_if_account_exists": "Si un compte associé à cette adresse e-mail existe, un e-mail de réinitialisation du mot de passe a été envoyé.",
     "feature_is_unavailable": "Fonctionnalité indisponible.",
     "incorrect_token_or_expired_url": "Le jeton est invalide ou l'URL est expirée. Effectuer une nouvelle réinitialisation via le lien ci-dessous.",
     "password_and_confirm_password_does_not_match": "Le mot de passe ne correspond pas",
