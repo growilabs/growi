@@ -14,6 +14,8 @@ import { useTranslation } from 'react-i18next';
 import type { IClearable } from '~/client/interfaces/clearable';
 import { useSWRxAuditlogSuggestions } from '~/stores/activity';
 
+import { shouldShowUsernameSuggestion } from './should-show-username-suggestion';
+
 const Categories = {
   activeUser: 'Active User',
   inactiveUser: 'Inactive User',
@@ -93,9 +95,14 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   }, []);
 
   const filterBy = useCallback(
-    (option: UserDataType) =>
-      !selectedItems.some((s) => s.username === option.username),
-    [selectedItems],
+    (option: UserDataType, { text }: { text: string }) =>
+      shouldShowUsernameSuggestion({
+        option,
+        currentText: text,
+        fetchedForKeyword: searchKeyword,
+        selectedUsernames: selectedItems.map((s) => s.username),
+      }),
+    [searchKeyword, selectedItems],
   );
 
   const renderMenu = useCallback((allUser: UserDataType[], menuProps) => {

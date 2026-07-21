@@ -1548,16 +1548,39 @@ export const setup = (crowi) => {
         const options = JSON.parse(req.query.options || '{}');
         const data = {};
 
-        if (
-          options.isIncludeActiveUser == null ||
-          options.isIncludeActiveUser
-        ) {
-          const activeUserData =
-            await User.findUserByUsernameRegexWithTotalCount(
-              q,
-              [UserStatus.STATUS_ACTIVE],
-              { offset, limit },
-            );
+        const wantsActiveUser =
+          options.isIncludeActiveUser == null || options.isIncludeActiveUser;
+        const wantsInactiveUser = options.isIncludeInactiveUser === true;
+        const wantsActivitySnapshotUser =
+          options.isIncludeActivitySnapshotUser === true && req.user.admin;
+
+        // The three lookups below are independent of each other, so run them
+        // concurrently instead of paying their latency sequentially.
+        const [activeUserData, inactiveUserData, activitySnapshotUserData] =
+          await Promise.all([
+            wantsActiveUser
+              ? User.findUserByUsernameRegexWithTotalCount(
+                  q,
+                  [UserStatus.STATUS_ACTIVE],
+                  { offset, limit },
+                )
+              : null,
+            wantsInactiveUser
+              ? User.findUserByUsernameRegexWithTotalCount(
+                  q,
+                  INACTIVE_USER_STATUSES,
+                  { offset, limit },
+                )
+              : null,
+            wantsActivitySnapshotUser
+              ? prisma.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+                  q,
+                  { offset, limit },
+                )
+              : null,
+          ]);
+
+        if (activeUserData != null) {
           const activeUsernames = activeUserData.users.map(
             (user) => user.username,
           );
@@ -1569,16 +1592,10 @@ export const setup = (crowi) => {
           });
         }
 
-        if (options.isIncludeInactiveUser) {
+        if (inactiveUserData != null) {
           // Including STATUS_DELETED here doesn't surface deleted users by
           // their original name: statusDelete() also rewrites `username` to
           // `deleted_at_*`, so this regex can never match it.
-          const inactiveUserData =
-            await User.findUserByUsernameRegexWithTotalCount(
-              q,
-              INACTIVE_USER_STATUSES,
-              { offset, limit },
-            );
           const inactiveUsernames = inactiveUserData.users.map(
             (user) => user.username,
           );
@@ -1590,12 +1607,7 @@ export const setup = (crowi) => {
           });
         }
 
-        if (options.isIncludeActivitySnapshotUser && req.user.admin) {
-          const activitySnapshotUserData =
-            await prisma.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
-              q,
-              { offset, limit },
-            );
+        if (activitySnapshotUserData != null) {
           Object.assign(data, {
             activitySnapshotUser: activitySnapshotUserData,
           });
@@ -1606,9 +1618,11 @@ export const setup = (crowi) => {
           (options.isIncludeMixedUsernames &&
             !options.isIncludeActivitySnapshotUser);
         if (canIncludeMixedUsernames) {
-          // activeUser/inactiveUser (User.findUserByUsernameRegexWithTotalCount) and
-          // activitySnapshotUser (Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount)
-          // both match by prefix now, so this merge is consistent across sources.
+          // activeUser/inactiveUser (User.findUserByUsernameRegexWithTotalCount) match
+          // by prefix, but activitySnapshotUser (Activity's WithTotalCount) stays
+          // substring-matched on purpose to preserve this route's pre-existing
+          // behavior (see activity.ts). This merge therefore mixes prefix- and
+          // substring-matched results across sources, not a like-for-like union.
           const allUsernames = [
             ...(data.activeUser?.usernames || []),
             ...(data.inactiveUser?.usernames || []),
