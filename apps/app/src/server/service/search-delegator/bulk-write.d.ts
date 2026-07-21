@@ -28,7 +28,6 @@ export type AggregatedPage = Pick<
 export type BulkWriteCommand = {
   index: {
     _index: string;
-    _type: '_doc' | undefined;
     _id: string;
   };
 };
