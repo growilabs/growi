@@ -548,7 +548,7 @@
     "custom_title_detail_placeholder2": "<code>&#123;&#123;pagename&#125;&#125;</code> - The page name of the current page.",
     "custom_title_detail_placeholder3": "<code>&#123;&#123;pagepath&#125;&#125;</code> - The page path of the current page.",
     "custom_noscript": "Custom Noscript",
-    "custom_noscript_detail": "You can customize Noscript code that applies all pages. Your custom Noscript will be inserted into the <code>&lt;noscript&gt;</code> tag that is located as the first element of body.<br>Relaod page to see changes.",
+    "custom_noscript_detail": "You can customize Noscript code that applies all pages. Your custom Noscript will be inserted into the <code>&lt;noscript&gt;</code> tag that is located as the first element of body.<br>You need to reload the page to reflect the change.",
     "custom_css": "Custom CSS",
     "write_css": "You can write CSS that is applied to whole system.",
     "ctrl_space": "Ctrl+Space to autocomplete",
