@@ -25,6 +25,7 @@
 
 import {
   FILTER_FIELDS,
+  SEARCH_FILTER_FIELDS,
   SEARCH_FILTER_PREFIXES,
   type SearchFilterField,
   type SearchFilterState,
@@ -67,10 +68,7 @@ const cleanFilterValue = (value: string) => {
 
 /** True when no filter field holds any value. */
 export const isFilterStateEmpty = (filters: SearchFilterState): boolean =>
-  filters.authors.length === 0 &&
-  filters.editors.length === 0 &&
-  filters.groups.length === 0 &&
-  filters.tags.length === 0;
+  SEARCH_FILTER_FIELDS.every((field) => filters[field].length === 0);
 
 /**
  * Order-sensitive value equality. Lets a re-seed skip identical state instead of
@@ -80,13 +78,7 @@ export const isSameFilterState = (
   a: SearchFilterState,
   b: SearchFilterState,
 ): boolean => {
-  const fields: (keyof SearchFilterState)[] = [
-    'authors',
-    'editors',
-    'groups',
-    'tags',
-  ];
-  return fields.every(
+  return SEARCH_FILTER_FIELDS.every(
     (field) =>
       a[field].length === b[field].length &&
       a[field].every((value, i) => value === b[field][i]),
