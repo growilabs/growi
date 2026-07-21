@@ -30,7 +30,7 @@ Requirements
 
 ### Optional Dependencies
 
-* ElasticSearch (>= 7.17)
+* ElasticSearch (>= 8.0)
     * Japanese (kuromoji) Analysis plugin
     * ICU Analysis Plugin
 

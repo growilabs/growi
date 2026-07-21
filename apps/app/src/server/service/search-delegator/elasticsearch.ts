@@ -38,11 +38,9 @@ import type {
 } from './bulk-write';
 import {
   type ElasticsearchClientDelegator,
-  type ES7SearchQuery,
   type ES8SearchQuery,
   type ES9SearchQuery,
   getClient,
-  isES7ClientDelegator,
   isES8ClientDelegator,
   isES9ClientDelegator,
   type SearchQuery,
@@ -86,12 +84,9 @@ class ElasticsearchDelegator
 
   private socketIoService!: SocketIoService;
 
-  // TODO: https://redmine.weseek.co.jp/issues/168446
-  private isElasticsearchV7: boolean;
-
   private isElasticsearchReindexOnBoot: boolean;
 
-  private elasticsearchVersion: 7 | 8 | 9;
+  private elasticsearchVersion: 8 | 9;
 
   private client: ElasticsearchClientDelegator;
 
@@ -109,17 +104,11 @@ class ElasticsearchDelegator
       'app:elasticsearchVersion',
     );
 
-    if (
-      elasticsearchVersion !== 7 &&
-      elasticsearchVersion !== 8 &&
-      elasticsearchVersion !== 9
-    ) {
+    if (elasticsearchVersion !== 8 && elasticsearchVersion !== 9) {
       throw new Error(
         "Unsupported Elasticsearch version. Please specify a valid number to 'ELASTICSEARCH_VERSION'",
       );
     }
-
-    this.isElasticsearchV7 = elasticsearchVersion === 7;
 
     this.elasticsearchVersion = elasticsearchVersion;
 
@@ -173,10 +162,6 @@ class ElasticsearchDelegator
       rejectUnauthorized,
     });
     this.indexName = indexName;
-  }
-
-  getType(): '_doc' | undefined {
-    return this.isElasticsearchV7 ? '_doc' : undefined;
   }
 
   /**
@@ -438,17 +423,6 @@ class ElasticsearchDelegator
     | Awaited<ReturnType<ElasticsearchClientDelegator['indices']['create']>>
     | undefined
   > {
-    // TODO: https://redmine.weseek.co.jp/issues/168446
-    if (isES7ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-es7');
-      return this.client.indices.create({
-        index,
-        body: {
-          ...mappings,
-        },
-      });
-    }
-
     if (isES8ClientDelegator(this.client)) {
       const { mappings } = await import('./mappings/mappings-es8');
       return this.client.indices.create({
@@ -492,7 +466,6 @@ class ElasticsearchDelegator
     const command = {
       index: {
         _index: this.indexName,
-        _type: this.getType(),
         _id: page._id.toString(),
       },
     };
@@ -524,7 +497,6 @@ class ElasticsearchDelegator
     const command = {
       delete: {
         _index: this.indexName,
-        _type: this.getType(),
         _id: page._id.toString(),
       },
     };
@@ -700,17 +672,6 @@ class ElasticsearchDelegator
       logger.debug({ query }, 'query');
 
       const validateQueryResponse = await (async () => {
-        if (isES7ClientDelegator(this.client)) {
-          const es7SearchQuery = query as ES7SearchQuery;
-          return await this.client.indices.validateQuery({
-            explain: true,
-            index: es7SearchQuery.index,
-            body: {
-              query: es7SearchQuery.body?.query,
-            },
-          });
-        }
-
         if (isES8ClientDelegator(this.client)) {
           const es8SearchQuery = query as ES8SearchQuery;
           return await this.client.indices.validateQuery({
@@ -737,10 +698,6 @@ class ElasticsearchDelegator
     }
 
     const searchResponse = await (async () => {
-      if (isES7ClientDelegator(this.client)) {
-        return await this.client.search(query as ES7SearchQuery);
-      }
-
       if (isES8ClientDelegator(this.client)) {
         return await this.client.search(query as ES8SearchQuery);
       }
@@ -772,10 +729,13 @@ class ElasticsearchDelegator
         took: searchResponse.took,
         hitsCount: searchResponse.hits.hits.length,
       },
-      data: searchResponse.hits.hits.map((elm) => {
+      // The ES client types mark _id and _score as optional, but every document
+      // hit from these queries carries an _id; _score is null only when results
+      // are sorted by a field instead of relevance.
+      data: searchResponse.hits.hits.map((elm): ISearchResultData => {
         return {
-          _id: elm._id,
-          _score: elm._score,
+          _id: elm._id ?? '',
+          _score: elm._score ?? 0,
           _source: elm._source,
           _highlight: elm.highlight,
         };
