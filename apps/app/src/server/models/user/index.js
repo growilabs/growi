@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
 import { omitInsecureAttributes } from '@growi/core/dist/models/serializers';
-import { pagePathUtils } from '@growi/core/dist/utils';
+import {
+  escapeStringForMongoRegex,
+  pagePathUtils,
+} from '@growi/core/dist/utils';
 import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
@@ -33,7 +36,6 @@ import { generateGravatarSrc } from '~/utils/gravatar';
 import loggerFactory from '~/utils/logger';
 
 import { getModelSafely } from '../../util/mongoose-utils';
-import { buildUsernamePrefixRegexQuery } from '../../util/username-prefix-regex';
 import { Attachment } from '../attachment';
 import { UserStatus } from './conts';
 
@@ -851,7 +853,10 @@ const factory = (crowi) => {
     const limit = opt.limit || 10;
 
     const conditions = {
-      username: buildUsernamePrefixRegexQuery(username),
+      username: {
+        $regex: escapeStringForMongoRegex(username),
+        $options: 'i',
+      },
       status: { $in: status },
     };
 

@@ -1467,13 +1467,13 @@ export const setup = (crowi) => {
    *        get:
    *          tags: [Users]
    *          summary: /users/usernames
-   *          description: Get list of usernames. The query matches usernames by case-insensitive prefix (formerly substring; changed in v8.0).
+   *          description: Get list of usernames. The query matches usernames by case-insensitive substring.
    *          parameters:
    *            - in: query
    *              name: q
    *              schema:
    *                type: string
-   *                description: query string to search usernames by prefix
+   *                description: query string to search usernames
    *                example: alice
    *            - in: query
    *              name: offset
@@ -1618,11 +1618,11 @@ export const setup = (crowi) => {
           (options.isIncludeMixedUsernames &&
             !options.isIncludeActivitySnapshotUser);
         if (canIncludeMixedUsernames) {
-          // activeUser/inactiveUser (User.findUserByUsernameRegexWithTotalCount) match
-          // by prefix, but activitySnapshotUser (Activity's WithTotalCount) stays
-          // substring-matched on purpose to preserve this route's pre-existing
-          // behavior (see activity.ts). This merge therefore mixes prefix- and
-          // substring-matched results across sources, not a like-for-like union.
+          // activeUser/inactiveUser (User.findUserByUsernameRegexWithTotalCount) and
+          // activitySnapshotUser (Activity's WithTotalCount) both match by substring,
+          // so this merge is consistent across sources.
+          // No caller in this repo currently requests isIncludeMixedUsernames (the
+          // only past consumer, useSWRxUsernames, was removed).
           const allUsernames = [
             ...(data.activeUser?.usernames || []),
             ...(data.inactiveUser?.usernames || []),

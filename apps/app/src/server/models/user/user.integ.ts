@@ -197,7 +197,7 @@ describe('User', () => {
       expect(totalCount).toBe(1);
     });
 
-    test('does not match a mid-string occurrence', async () => {
+    test('matches a mid-string occurrence', async () => {
       await User.create({
         name: 'Regex Test',
         username: 'regexTestJohnson',
@@ -213,7 +213,9 @@ describe('User', () => {
         { offset: 0, limit: 10 },
       );
 
-      expect(users).toEqual([]);
+      expect(users.map((u: { username: string }) => u.username)).toEqual([
+        'regexTestJohnson',
+      ]);
     });
 
     test('treats regex metacharacters in the query as literal characters', async () => {

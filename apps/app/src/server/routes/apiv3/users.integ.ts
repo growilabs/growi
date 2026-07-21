@@ -235,12 +235,13 @@ describe('GET /usernames', () => {
     expect(response.body.activitySnapshotUser).toBeUndefined();
   });
 
-  it('includes an activitySnapshotUser match in mixedUsernames that would not have matched active/inactive users by prefix', async () => {
+  it('matches activeUser and activitySnapshotUser consistently by substring in mixedUsernames', async () => {
     const admin = await User.create({
       name: 'Admin2',
-      username: 'admin-user2',
+      username: 'thejohnson',
       email: 'admin2@example.com',
       admin: true,
+      status: UserStatus.STATUS_ACTIVE,
     });
     currentUser.value = admin;
     createdUserIds.push(admin._id);
@@ -248,7 +249,7 @@ describe('GET /usernames', () => {
       action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
       // Avoids collisions on the {user, target, action, createdAt} unique index.
       target: new Types.ObjectId(),
-      snapshot: { username: 'johnson' },
+      snapshot: { username: 'somejohnson' },
     });
     createdActivityIds.push(activity._id);
 
@@ -264,17 +265,16 @@ describe('GET /usernames', () => {
       });
 
     expect(response.status).toBe(200);
-    // activeUser matches by prefix -- "hn" is not a prefix of any username
-    // here, so it returns no hit.
-    expect(response.body.activeUser.usernames).toEqual([]);
-    // activitySnapshotUser intentionally stays substring-matched (see the
-    // isIncludeMixedUsernames comment in users.js), so it matches "johnson"
-    // on "hn" where activeUser/inactiveUser would not have.
-    expect(response.body.activitySnapshotUser.usernames).toEqual(['johnson']);
-    // mixedUsernames merges both sources as-is, so this substring-only match
-    // surfaces here even though the same query returns nothing from
-    // activeUser/inactiveUser -- documents the intentional prefix/substring
-    // mismatch rather than a like-for-like union.
-    expect(response.body.mixedUsernames).toEqual(['johnson']);
+    // "hn" is a mid-string occurrence in both usernames (not a prefix), and
+    // activeUser/inactiveUser and activitySnapshotUser both match by
+    // substring, so both sources hit and mixedUsernames merges them as a
+    // like-for-like union.
+    expect(response.body.activeUser.usernames).toEqual(['thejohnson']);
+    expect(response.body.activitySnapshotUser.usernames).toEqual([
+      'somejohnson',
+    ]);
+    expect(new Set(response.body.mixedUsernames)).toEqual(
+      new Set(['thejohnson', 'somejohnson']),
+    );
   });
 });
