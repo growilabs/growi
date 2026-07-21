@@ -35,6 +35,7 @@
     "insert_single": "Insérer une entrée par ligne.",
     "whitelist_invalid_format": "Format invalide. Utilisez @example.com pour un domaine exact, @*.example.com pour les sous-domaines, ou user@example.com pour une adresse exacte.",
     "page_list_and_search_results": "Affichage des pages",
+    "page_list_and_search_results_desc": "Ces paramètres n'affectent que les utilisateurs sans accès à une page. Les utilisateurs pouvant voir une page (par ex. les membres d'un groupe auquel elle est restreinte via « Utilisateurs du groupe ») la voient toujours dans les listes et la recherche, même en cas de réglage sur « Toujours caché ».",
     "page_listing_1": "Liste et recherche de pages<br>restreint à 'Seulement moi'",
     "page_listing_1_desc": "Voir les pages restreintes à 'Seulement moi' lors de la recherche",
     "page_listing_2": "Liste et recherche de pages<br>restreint au groupe utilisateur",

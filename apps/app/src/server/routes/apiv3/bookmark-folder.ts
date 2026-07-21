@@ -1,8 +1,13 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import {
+  isUserPage,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
 import { body } from 'express-validator';
-import type { Types } from 'mongoose';
+import mongoose, { type Types } from 'mongoose';
 
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -13,7 +18,10 @@ import {
   BookmarkFolderNotFoundError,
   InvalidParentBookmarkFolderError,
 } from '~/server/models/errors';
+import type { PageModel } from '~/server/models/page';
 import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
+import UserGroupRelation from '~/server/models/user-group-relation';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import BookmarkFolder from '../../models/bookmark-folder';
@@ -197,6 +205,9 @@ module.exports = (crowi: Crowi) => {
         return res.apiv3({ bookmarkFolder });
       } catch (err) {
         logger.error(err);
+        if (err instanceof BookmarkFolderForbiddenError) {
+          return res.apiv3Err('forbidden', 403);
+        }
         if (err instanceof InvalidParentBookmarkFolderError) {
           return res.apiv3Err(
             new ErrorV3(err.message, 'failed_to_create_bookmark_folder'),
@@ -245,6 +256,34 @@ module.exports = (crowi: Crowi) => {
     loginRequiredStrictly,
     async (req, res) => {
       const { userId } = req.params;
+      const Page = mongoose.model<InstanceType<PageModel>, PageModel>('Page');
+
+      const hideRestrictedByOwner = configManager.getConfig(
+        'security:list-policy:hideRestrictedByOwner',
+      );
+      const hideRestrictedByGroup = configManager.getConfig(
+        'security:list-policy:hideRestrictedByGroup',
+      );
+      const disableUserPages = configManager.getConfig(
+        'security:disableUserPages',
+      );
+      // "Anyone with the link" pages are never listed elsewhere, so a bookmark may
+      // be the owner's only way back: keep them on the owner's own list, hide from others.
+      const isOwnList = req.user?._id.toString() === userId;
+
+      // Resolve the viewer's groups once here; addViewerCondition would otherwise
+      // re-resolve them on every per-folder findByIdsAndViewer call below.
+      const userGroups =
+        req.user != null
+          ? [
+              ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(
+                req.user,
+              )),
+              ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
+                req.user,
+              )),
+            ]
+          : null;
 
       const getBookmarkFolders = async (
         userId: Types.ObjectId | string,
@@ -274,11 +313,43 @@ module.exports = (crowi: Crowi) => {
         const promises = folders.map(async (folder: BookmarkFolderItems) => {
           const childFolder = await getBookmarkFolders(userId, folder._id);
 
+          const bookmarkedPageIds = folder.bookmarks
+            .map((bookmark) => bookmark.page?._id?.toString())
+            .filter((id): id is string => id != null);
+
+          const viewablePages = await Page.findByIdsAndViewer(
+            bookmarkedPageIds,
+            req.user,
+            userGroups,
+            false,
+            isOwnList,
+            !hideRestrictedByOwner,
+            !hideRestrictedByGroup,
+          );
+          // When user pages are disabled, exclude them from the listing as
+          // page-listing does, so bookmarked user pages don't leak into the list.
+          const viewableIdSet = new Set(
+            viewablePages
+              .filter(
+                (page) =>
+                  !disableUserPages ||
+                  (!isUserPage(page.path) && !isUsersTopPage(page.path)),
+              )
+              .map((page) => page._id.toString()),
+          );
+
+          // Drop bookmarks the viewer cannot access, and orphaned ones (null page):
+          // they carry no path/title and the client renders them as nothing anyway.
+          //
           // !! DO NOT THIS SERIALIZING OUTSIDE OF PROMISES !! -- 05.23.2023 ryoji-s
           // Serializing outside of promises will cause not populated.
-          const bookmarks = folder.bookmarks.map((bookmark) =>
-            serializeBookmarkSecurely(bookmark),
-          );
+          const bookmarks = folder.bookmarks
+            .filter(
+              (bookmark) =>
+                bookmark.page?._id != null &&
+                viewableIdSet.has(bookmark.page._id.toString()),
+            )
+            .map((bookmark) => serializeBookmarkSecurely(bookmark));
 
           const res = {
             _id: folder._id.toString(),
@@ -415,9 +486,27 @@ module.exports = (crowi: Crowi) => {
     accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
     loginRequiredStrictly,
     validator.bookmarkFolder,
+    apiV3FormValidator,
     async (req, res) => {
       const { bookmarkFolderId, name, parent, childFolder } = req.body;
       try {
+        const folder = await BookmarkFolder.findById(bookmarkFolderId);
+        if (folder == null) {
+          return res.apiv3Err('bookmark_folder_not_found', 404);
+        }
+        if (folder.owner.toString() !== req.user._id.toString()) {
+          return res.apiv3Err('forbidden', 403);
+        }
+        // A user must not move a folder under another user's folder
+        if (parent != null) {
+          const parentFolder = await BookmarkFolder.findById(parent);
+          if (parentFolder == null) {
+            return res.apiv3Err('bookmark_folder_not_found', 404);
+          }
+          if (parentFolder.owner.toString() !== req.user._id.toString()) {
+            return res.apiv3Err('forbidden', 403);
+          }
+        }
         const bookmarkFolder = await BookmarkFolder.updateBookmarkFolder(
           bookmarkFolderId,
           name,
@@ -479,6 +568,15 @@ module.exports = (crowi: Crowi) => {
       const { pageId, folderId } = req.body;
 
       try {
+        if (folderId != null) {
+          const folder = await BookmarkFolder.findById(folderId);
+          if (folder == null) {
+            return res.apiv3Err('bookmark_folder_not_found', 404);
+          }
+          if (folder.owner.toString() !== userId.toString()) {
+            return res.apiv3Err('forbidden', 403);
+          }
+        }
         const bookmarkFolder =
           await BookmarkFolder.insertOrUpdateBookmarkedPage(
             pageId,
