@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { login } from '../utils/Login';
+import { login } from '../utils/login';
 
 test.describe
   .serial('Access to sharelink by guest', () => {
@@ -39,6 +39,14 @@ test.describe
       // Access sharelink
       await page.goto(`/share/${createdSharelink}`);
       await expect(page.locator('.page-meta')).toBeVisible();
+
+      // Comments are shown read-only on the share link page:
+      // - the comments area is rendered
+      // - no comment posting form is offered to the guest (read-only)
+      // - with no comments, an empty-state message is shown (not a bare heading)
+      await expect(page.locator('.page-comments-row')).toBeVisible();
+      await expect(page.locator('#page-comment-write')).toHaveCount(0);
+      await expect(page.getByTestId('comments-empty-state')).toBeVisible();
 
       await login(page);
     });

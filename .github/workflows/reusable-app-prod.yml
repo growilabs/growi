@@ -260,6 +260,15 @@ jobs:
       run: |
         pnpm install --frozen-lockfile
 
+    # Playwright test files import runtime values from @growi/core (e.g. PageGrant),
+    # so packages/core/dist must exist before `pnpm playwright test` resolves them.
+    # This job runs playwright directly instead of through `turbo run test`, so the
+    # `^build` that builds workspace deps for the unit/integration suites never runs
+    # here. Build @growi/core explicitly to fill that gap.
+    - name: Build @growi/core (required by Playwright test files)
+      run: |
+        pnpm --filter @growi/core build
+
     # Browsers are pre-populated by `prime-playwright-cache`. Always a cache hit;
     # restore-keys provides a partial fallback if the keyed cache was evicted.
     - name: Restore Playwright browser cache

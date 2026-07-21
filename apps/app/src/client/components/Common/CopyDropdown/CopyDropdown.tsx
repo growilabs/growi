@@ -211,7 +211,7 @@ export const CopyDropdown: React.FC<CopyDropdownProps> = (props) => {
 
           {/* Permanent Link */}
           {pageId && (
-            <CopyToClipboard text={permalink} onCopy={showToolTip}>
+            <CopyToClipboard text={permalink ?? ''} onCopy={showToolTip}>
               <DropdownItem className="px-3">
                 <DropdownItemContents
                   title={t('copy_to_clipboard.Permanent link')}
