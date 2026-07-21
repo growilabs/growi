@@ -490,13 +490,22 @@ module.exports = (crowi: Crowi) => {
     async (req, res) => {
       const { bookmarkFolderId, name, parent, childFolder } = req.body;
       try {
+        if (
+          typeof bookmarkFolderId !== 'string' ||
+          !mongoose.isValidObjectId(bookmarkFolderId)
+        ) {
+          return res.apiv3Err(new ErrorV3('invalid bookmarkFolderId'), 400);
+        }
+
         const folder = await BookmarkFolder.findById(bookmarkFolderId);
         if (folder == null) {
           return res.apiv3Err('bookmark_folder_not_found', 404);
         }
+
         if (folder.owner.toString() !== req.user._id.toString()) {
           return res.apiv3Err('forbidden', 403);
         }
+
         // A user must not move a folder under another user's folder
         if (parent != null) {
           const parentFolder = await BookmarkFolder.findById(parent);
@@ -507,6 +516,7 @@ module.exports = (crowi: Crowi) => {
             return res.apiv3Err('forbidden', 403);
           }
         }
+
         const bookmarkFolder = await BookmarkFolder.updateBookmarkFolder(
           bookmarkFolderId,
           name,
