@@ -34,6 +34,10 @@ by Mongoose `autoIndex` at model registration (new collection — no migration n
   v1 uses the event-listener seam for live updates and an in-process `CronService` job for
   backfill. Moving Markdown parsing off the main thread (the only way to fully remove CPU
   contention during backfill) is explicitly deferred.
+  - **Not excluded**: the lightweight *in-process* coalescing queue the live listener uses (a
+    `Set<pageId>` drained on a paced tick — see PageLinkService / Performance & Scalability). It is
+    plain in-memory state on the same thread, not a durable queue, worker, or separate process, so
+    it is consistent with this non-goal.
 - A **blocking boot-time** backfill (a migrate-mongo data migration). Ruled out: it would take
   the wiki offline for the full backfill duration, which scales with page count and is
   unacceptable for large instances. Index creation is not boot-blocking either — `autoIndex`
@@ -288,6 +292,7 @@ needs no write — derived state reads the restored page's status.
 | 3.2 | Update add/remove → reflected | create/update replace outbound rows | Save flow |
 | 3.3 | Deleted page not an active source | reconcile (permanent: remove rows; trashed: filtered at read) | Delete flow |
 | 3.4 | <~1s at ≥100k pages | indexes `{toPage}`,`{fromPage}`,`{toPath}` | — |
+| 3.5 | Bound extraction impact under save bursts | PageLinkService coalescing queue (`Set<pageId>` + paced drain) | Save flow |
 | 4.1 | One-time backfill | PageLinkBackfillCron (indexes via `autoIndex` at model registration) | Backfill flow |
 | 4.2 | Backfilled == post-enablement | backfill reuses `extractInternalLinks`; emits same rows as the live path | Backfill flow |
 | 4.3 | Re-run / restart produces no duplicates | unique `{fromPage,toPath}` + upsert; resumable progress marker | Backfill flow |
@@ -440,6 +445,21 @@ function resolveToPage(toPath: string): Promise<ObjectId | null>;
 - Ordering/delivery: listeners run asynchronously after the lifecycle op (fire-and-forget, like
   search indexing); the index trails the HTTP response by that window. No cross-event ordering
   assumptions; handlers are idempotent.
+- Write-side coalescing (requirement 3.5): _Implementation status — as of B1 the upsert runs inline in
+  the event callback; the coalescing queue described here is the B2.2 target and is not yet implemented._
+  `create`/`update` do **not** extract inline in the event
+  callback. They mark the page dirty (`Set<pageId>`) and a paced tick drains it, running the upsert
+  handler once per page with the **latest** body (re-read at drain time). This is safe because the
+  upsert is idempotent last-writer-wins, so intermediate saves carry no information. Properties:
+  - **Same page saved repeatedly** → the `Set` collapses it to one extraction run.
+  - **Many distinct pages saved at once** → the tick processes a bounded number per cycle, so a
+    burst of full-body parses is spread over time instead of blocking the single JS thread back-to-back.
+  - **Delete supersedes a pending upsert**: a `delete`-family event for a page removes it from the
+    dirty set and routes to `reconcileDeletedPages(ids)` instead, so a stale upsert never re-creates
+    rows for a gone page.
+  - **Best-effort, per-instance**: the set is in-memory. A restart drops pending work (that page
+    self-heals on its next edit or via backfill); in multi-instance deployments the set is
+    per-instance, which is safe (idempotent) but only coalesces per instance.
 
 ##### Service Interface
 ```typescript
@@ -658,7 +678,21 @@ interface ILinkTarget {
 - Reads are two indexed queries (`{toPage}` lookup, then `_id`-`$in` viewer filter); no
   per-request body parsing. Target: <~1s at ≥100k pages (3.4).
 - Writes happen off the response path via the event listener; extraction uses a trimmed
-  processor (link plugins only) to bound per-save cost.
+  processor (link plugins only) to bound per-save cost (~120–140 ms for a 60 KB body).
+- **Write-side burst control** (requirement 3.5). Extraction is CPU-bound and runs on the single JS
+  thread, so N saves landing together would otherwise block the event loop for N × per-parse cost
+  back-to-back. Two scenarios, one mechanism:
+  - *Same page, rapid saves* (e.g. a shared collaborative doc saved several times in a window) — a
+    `Set<pageId>` coalesces them to one run. Naturally low-pressure: a Yjs document is shared, so
+    N co-editors produce **one** `update` event per explicit save, not N, and there is no autosave —
+    the event fires only on an explicit save (`updatePage`).
+  - *Many distinct pages saved at once* — the coalescing queue is drained a **bounded number per
+    tick**, so parses are paced (with the event loop yielding between them) rather than run in one
+    blocking spree. The tick cadence / batch size is the duty-cycle lever, mirroring the backfill job.
+  - The pacing is about spreading work over time (yielding between parses), not parallelism —
+    concurrency buys nothing for CPU-bound work on one thread.
+  - Trade-off: the index trails the save by up to (tick interval × queue depth) — acceptable, since
+    the listener is already fire-and-forget and eventually consistent.
 - **Backfill** is the only bulk-CPU operation. It runs online but on the single JS thread, so its
   cron cadence/chunk size (duty cycle) bounds latency impact on live traffic; the in-memory
   `{path→_id}` map keeps it CPU-bound (parsing), not round-trip-bound. Measured ~5 ms/page;

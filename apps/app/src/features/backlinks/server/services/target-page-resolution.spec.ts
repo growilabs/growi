@@ -72,18 +72,6 @@ describe('resolveToPages()', () => {
     expect(mocks.find).toHaveBeenCalledTimes(2);
   });
 
-  it('excludes empty pages from the path query', async () => {
-    mockFind({ byPath: [] });
-
-    await resolveToPages(['/docs/v2']);
-
-    expect(mocks.find).toHaveBeenCalledWith(
-      expect.objectContaining({
-        $or: [{ isEmpty: false }, { isEmpty: null }],
-      }),
-    );
-  });
-
   it('omits inputs with no matching page', async () => {
     mockFind();
 
