@@ -135,7 +135,7 @@
     "axios": "^1.16.0",
     "axios-retry": "^3.2.4",
     "babel-plugin-superjson-next": "^0.4.2",
-    "body-parser": "^1.20.3",
+    "body-parser": "^1.20.6",
     "bootstrap": "^5.3.8",
     "bson-objectid": "^2.0.4",
     "cm6-theme-basic-light": "^0.2.0",
