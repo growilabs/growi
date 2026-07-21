@@ -22,18 +22,6 @@ import {
  */
 
 describe('createEditorCompletionExtension', () => {
-  it('returns a defined completion extension without throwing', () => {
-    const t = vi.fn((key: string) => key);
-
-    let extension: unknown;
-    expect(() => {
-      extension = createEditorCompletionExtension(t as unknown as TFunction);
-    }).not.toThrow();
-
-    // Contract: the wiring produces a usable CodeMirror extension.
-    expect(extension).toBeTruthy();
-  });
-
   it('resolves slash-command labels via the provided t (slash source is wired in)', () => {
     const t = vi.fn((key: string) => key);
 

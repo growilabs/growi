@@ -23,14 +23,6 @@ interface SlashTrigger {
 }
 
 /**
- * Detect a slash-command trigger ending at `pos`.
- *
- * Fires only when the `/` is at line start (nothing but leading whitespace
- * precedes it on the line) or immediately follows a whitespace character; it
- * does NOT fire in the middle of a word, e.g. `foo/` (Req 1.1, 1.2). Returns
- * `null` when not triggered.
- */
-/**
  * lezer-markdown node names that denote a code context. Slash commands must not
  * fire here — inside a fenced/indented block or inline code the user is typing
  * code (paths, regexes, etc.), where a `/` menu would be a false trigger.
@@ -54,6 +46,14 @@ const isInCodeContext = (state: EditorState, pos: number): boolean => {
   return false;
 };
 
+/**
+ * Detect a slash-command trigger ending at `pos`.
+ *
+ * Fires only when the `/` is at line start (nothing but leading whitespace
+ * precedes it on the line) or immediately follows a whitespace character; it
+ * does NOT fire in the middle of a word, e.g. `foo/` (Req 1.1, 1.2). Returns
+ * `null` when not triggered.
+ */
 const detectSlashTrigger = (
   state: EditorState,
   pos: number,

@@ -55,4 +55,12 @@ describe('slash-command-definitions', () => {
       expect(command.keywords.length).toBeGreaterThan(0);
     }
   });
+
+  it('gives every list command a "list" keyword so a "/list" prefix query surfaces them', () => {
+    const listCommandIds = ['bulletList', 'numberedList', 'taskList'];
+    for (const id of listCommandIds) {
+      const command = SLASH_COMMANDS.find((c) => c.id === id);
+      expect(command?.keywords).toContain('list');
+    }
+  });
 });

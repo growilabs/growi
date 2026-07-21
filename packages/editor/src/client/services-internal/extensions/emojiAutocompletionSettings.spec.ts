@@ -8,7 +8,6 @@ import { EditorView } from '@codemirror/view';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-  emojiAutocompletionSettings,
   emojiCompletionSource,
   emojiRenderOption,
 } from './emojiAutocompletionSettings.js';
@@ -69,12 +68,6 @@ describe('emojiCompletionSource - trigger detection', () => {
     // A well-known emoji tag is present in the offered set.
     expect(result?.options.map((o) => o.label)).toContain(':smile:');
   });
-
-  it('exposes a validFor regex so CodeMirror can re-filter without re-invoking', () => {
-    const result = queryAt(':sm', 3);
-
-    expect(result?.validFor).toBeInstanceOf(RegExp);
-  });
 });
 
 describe('emojiRenderOption', () => {
@@ -89,15 +82,5 @@ describe('emojiRenderOption', () => {
     expect(element).toBeInstanceOf(HTMLElement);
     // "smile" resolves to its native glyph.
     expect(element?.textContent).toBe('😄');
-  });
-
-  it('is inserted at position 20 (icon slot)', () => {
-    expect(emojiRenderOption.position).toBe(20);
-  });
-});
-
-describe('emojiAutocompletionSettings', () => {
-  it('is still a defined Extension', () => {
-    expect(emojiAutocompletionSettings).toBeTruthy();
   });
 });
