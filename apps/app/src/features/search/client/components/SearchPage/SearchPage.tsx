@@ -152,7 +152,10 @@ export const SearchPage = (): JSX.Element => {
   const searchInvokedHandler = useCallback(
     (newKeyword: string, newConfigurations: Partial<ISearchConfigurations>) => {
       setOffset(0);
-      setConfigurationsByControl(newConfigurations);
+      // Filters travel via the URL (`?q=`), not this filters config — the SWR call always
+      // sources them from the parsed query, so we don't retain them here.
+      const { filters: _filters, ...configWithoutFilters } = newConfigurations;
+      setConfigurationsByControl(configWithoutFilters);
 
       // Serialize free text + filters into `?q=`. A new keyword pushes (a fresh
       // search in history); a filter/sort-only change replaces (no history spam).
