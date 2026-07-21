@@ -55,12 +55,13 @@ const FILTER_REGEXP = new RegExp(
   'g',
 );
 
-export const createEmptyFilterState = (): SearchFilterState => ({
-  authors: [],
-  editors: [],
-  groups: [],
-  tags: [],
-});
+export const createEmptyFilterState = (): SearchFilterState => {
+  const state = {} as SearchFilterState;
+  for (const field of SEARCH_FILTER_FIELDS) {
+    state[field] = [];
+  }
+  return state;
+};
 
 const cleanFilterValue = (value: string) => {
   return value.replace(/"/g, '').trim();
@@ -101,12 +102,11 @@ export const sanitizeFilterState = (
 ): SearchFilterState => {
   const clean = (values: string[]) =>
     values.map((v) => cleanFilterValue(v)).filter((v) => v !== '');
-  return {
-    authors: clean(filters.authors),
-    editors: clean(filters.editors),
-    groups: clean(filters.groups),
-    tags: clean(filters.tags),
-  };
+  const state = {} as SearchFilterState;
+  for (const field of SEARCH_FILTER_FIELDS) {
+    state[field] = clean(filters[field]);
+  }
+  return state;
 };
 
 const quoteIfNeeded = (value: string): string =>
