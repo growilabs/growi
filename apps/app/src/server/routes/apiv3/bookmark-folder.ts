@@ -146,6 +146,9 @@ const validator = {
   ],
 };
 
+const isValidObjectString = (v: unknown): v is string =>
+  typeof v === 'string' && mongoose.isValidObjectId(v);
+
 module.exports = (crowi: Crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
@@ -490,11 +493,14 @@ module.exports = (crowi: Crowi) => {
     async (req, res) => {
       const { bookmarkFolderId, name, parent, childFolder } = req.body;
       try {
-        if (
-          typeof bookmarkFolderId !== 'string' ||
-          !mongoose.isValidObjectId(bookmarkFolderId)
-        ) {
-          return res.apiv3Err(new ErrorV3('invalid bookmarkFolderId'), 400);
+        if (!isValidObjectString(bookmarkFolderId)) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'bookmarkFolderId must be a valid object id',
+              'invalid_bookmark_folder_id',
+            ),
+            400,
+          );
         }
 
         const folder = await BookmarkFolder.findById(bookmarkFolderId);
@@ -506,18 +512,21 @@ module.exports = (crowi: Crowi) => {
           return res.apiv3Err('forbidden', 403);
         }
 
-        // A user must not move a folder under another user's folder
         if (parent != null) {
-          if (
-            typeof parent !== 'string' ||
-            !mongoose.Types.ObjectId.isValid(parent)
-          ) {
-            return res.apiv3Err(new InvalidParentBookmarkFolderError(), 400);
+          if (!isValidObjectString(parent)) {
+            return res.apiv3Err(
+              new ErrorV3(
+                'parent must be a valid object id',
+                'invalid_parent_bookmark_folder_id',
+              ),
+              400,
+            );
           }
           const parentFolder = await BookmarkFolder.findById(parent);
           if (parentFolder == null) {
             return res.apiv3Err('bookmark_folder_not_found', 404);
           }
+          // A user must not move a folder under another user's folder
           if (parentFolder.owner.toString() !== req.user._id.toString()) {
             return res.apiv3Err('forbidden', 403);
           }
@@ -585,20 +594,25 @@ module.exports = (crowi: Crowi) => {
 
       try {
         if (folderId != null) {
-          if (
-            typeof folderId !== 'string' ||
-            !mongoose.Types.ObjectId.isValid(folderId)
-          ) {
-            return res.apiv3Err('invalid_folder_id', 400);
+          if (!isValidObjectString(folderId)) {
+            return res.apiv3Err(
+              new ErrorV3(
+                'folderId must be a valid object id',
+                'invalid_folder_id',
+              ),
+              400,
+            );
           }
           const folder = await BookmarkFolder.findById(folderId);
           if (folder == null) {
             return res.apiv3Err('bookmark_folder_not_found', 404);
           }
+          // A user must not add a bookmark under another user's folder
           if (folder.owner.toString() !== userId.toString()) {
             return res.apiv3Err('forbidden', 403);
           }
         }
+
         const bookmarkFolder =
           await BookmarkFolder.insertOrUpdateBookmarkedPage(
             pageId,
