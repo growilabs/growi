@@ -1,4 +1,4 @@
-import type { IUserHasId } from '@growi/core';
+import type { IUser, IUserHasId } from '@growi/core';
 import type { HydratedDocument, Types } from 'mongoose';
 import mongoose from 'mongoose';
 
@@ -43,7 +43,7 @@ export class PageLinkService {
 
   async findBacklinks(
     toPageId: Types.ObjectId,
-    user: IUserHasId | null,
+    user: IUser | null,
   ): Promise<IBacklink[]> {
     const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
       'Page',
