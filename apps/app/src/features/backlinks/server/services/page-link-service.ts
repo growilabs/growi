@@ -1,4 +1,4 @@
-import type { IUser, IUserHasId } from '@growi/core';
+import type { IUser } from '@growi/core';
 import type { HydratedDocument, Types } from 'mongoose';
 import mongoose from 'mongoose';
 
@@ -13,6 +13,7 @@ import { handlePageUpsert } from './page-link-service-handlers';
 
 const logger = loggerFactory('growi:features:backlinks:page-link-service');
 
+// Read-path scale for heavily-linked hub pages (bounding/index/interactive-time) is handled in B2.1; intentionally unbounded here.
 type BacklinkSource = {
   _id: Types.ObjectId;
   path: string;
