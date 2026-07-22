@@ -3,8 +3,8 @@ import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import { Dropdown, DropdownMenu, DropdownToggle } from 'reactstrap';
 
-import { SearchUsernameTypeahead } from '~/client/components/Admin/AuditLog/SearchUsernameTypeahead';
 import { TagsInput } from '~/client/components/PageTags/TagEditModal/TagsInput';
+import { SearchUsernameTypeahead } from '~/client/components/SearchUsernameTypeahead';
 import { useSWRxUserRelatedGroups } from '~/stores/user';
 
 import type { SearchFilterState } from '../../utils/search-query';
