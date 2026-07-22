@@ -149,7 +149,15 @@ module.exports = (crowi, app) => {
 
   router.use('/search', require('./search')(crowi));
 
-  router.use('/page', require('./page')(crowi));
+  {
+    const pageRouter = require('./page')(crowi);
+    const {
+      getBacklinksHandlerFactory,
+    } = require('~/features/backlinks/server/routes/backlinks');
+    pageRouter.get('/backlinks', getBacklinksHandlerFactory(crowi));
+    router.use('/page', pageRouter);
+  }
+
   router.use('/pages', require('./pages')(crowi));
   {
     const revisionsRouter = require('./revisions')(crowi);
