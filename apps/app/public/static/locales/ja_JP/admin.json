@@ -319,6 +319,9 @@
     "audit_log_index_management": "監査ログのインデックス管理",
     "settings_explanation": "監査ログのインデックスの正規化・リビルドは、以下のページで行えます",
     "index_management_link": "{{destination}}ページに移動",
+    "docs_url": {
+      "top": "https://docs.growi.org/ja/admin-guide/management-cookbook/setup-search-system.html"
+    },
     "normalize": "正規化",
     "normalize_button": "監査ログのインデックスの正規化",
     "normalize_success": "監査ログのインデックスを正規化しました。",

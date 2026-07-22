@@ -943,6 +943,9 @@
     "audit_log_index_management": "Gestion de l'index des journaux d'audit",
     "settings_explanation": "Vous pouvez normaliser ou reconstruire l'index des journaux d'audit sur la page suivante",
     "index_management_link": "Aller à {{destination}}",
+    "docs_url": {
+      "top": "https://docs.growi.org/en/admin-guide/management-cookbook/setup-search-system.html"
+    },
     "normalize": "Normaliser",
     "normalize_button": "Normaliser l'index des journaux d'audit",
     "normalize_success": "L'index des journaux d'audit a été normalisé.",
