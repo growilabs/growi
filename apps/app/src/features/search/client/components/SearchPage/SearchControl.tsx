@@ -14,7 +14,9 @@ import type { ISearchConditions, ISearchConfigurations } from '~/stores/search';
 
 import {
   createEmptyFilterState,
+  isSameFilterState,
   type SearchFilterState,
+  sanitizeFilterState,
 } from '../../utils/search-query';
 import { SearchFilterChips } from './SearchFilterChips';
 import { SearchFilterPanel } from './SearchFilterPanel';
@@ -145,8 +147,9 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
 
   const changeFiltersHandler = useCallback(
     (newFilters: SearchFilterState) => {
-      setFilters(newFilters);
-      invokeSearch(keyword, { filters: newFilters });
+      const sanitized = sanitizeFilterState(newFilters);
+      setFilters(sanitized);
+      invokeSearch(keyword, { filters: sanitized });
     },
     [invokeSearch, keyword],
   );
@@ -154,6 +157,15 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
   useEffect(() => {
     setKeyword(keywordOnInit);
   }, [keywordOnInit]);
+
+  // Re-seed filters when the URL-derived state changes (reload, back/forward, a
+  // hand-typed operator). Guarded so our own round-trip — which re-parses to the
+  // same values — is a no-op rather than a loop.
+  const filtersOnInit = initialSearchConditions.filters;
+  useEffect(() => {
+    const next = filtersOnInit ?? createEmptyFilterState();
+    setFilters((prev) => (isSameFilterState(prev, next) ? prev : next));
+  }, [filtersOnInit]);
 
   return (
     <div className="shadow-sm">

@@ -25,6 +25,7 @@
 
 import {
   FILTER_FIELDS,
+  SEARCH_FILTER_FIELDS,
   SEARCH_FILTER_PREFIXES,
   type SearchFilterField,
   type SearchFilterState,
@@ -54,22 +55,59 @@ const FILTER_REGEXP = new RegExp(
   'g',
 );
 
-export const createEmptyFilterState = (): SearchFilterState => ({
-  authors: [],
-  editors: [],
-  groups: [],
-  tags: [],
-});
+export const createEmptyFilterState = (): SearchFilterState => {
+  const state = {} as SearchFilterState;
+  for (const field of SEARCH_FILTER_FIELDS) {
+    state[field] = [];
+  }
+  return state;
+};
+
+const cleanFilterValue = (value: string) => {
+  return value.replace(/"/g, '').trim();
+};
 
 /** True when no filter field holds any value. */
 export const isFilterStateEmpty = (filters: SearchFilterState): boolean =>
-  filters.authors.length === 0 &&
-  filters.editors.length === 0 &&
-  filters.groups.length === 0 &&
-  filters.tags.length === 0;
+  SEARCH_FILTER_FIELDS.every((field) => filters[field].length === 0);
 
-const normalizeKeyword = (keyword: string): string =>
+/**
+ * Order-sensitive value equality. Lets a re-seed skip identical state instead of
+ * clobbering it when the URL round-trips back the values already shown.
+ */
+export const isSameFilterState = (
+  a: SearchFilterState,
+  b: SearchFilterState,
+): boolean => {
+  return SEARCH_FILTER_FIELDS.every(
+    (field) =>
+      a[field].length === b[field].length &&
+      a[field].every((value, i) => value === b[field][i]),
+  );
+};
+
+export const normalizeKeyword = (keyword: string): string =>
   keyword.trim().replace(/\s+/g, ' ');
+
+/**
+ * Clean each filter value the same way `buildSearchQuery` does before it emits
+ * one: strip embedded double-quotes (the one character the inline grammar and the
+ * server drop), trim surrounding whitespace, and drop values left empty. Applying
+ * the identical rules here keeps the chip state, the URL, and the executed search
+ * in agreement — otherwise a value like `a"b` or ` x ` would render in a chip
+ * while the URL/search used `ab` / `x`.
+ */
+export const sanitizeFilterState = (
+  filters: SearchFilterState,
+): SearchFilterState => {
+  const clean = (values: string[]) =>
+    values.map((v) => cleanFilterValue(v)).filter((v) => v !== '');
+  const state = {} as SearchFilterState;
+  for (const field of SEARCH_FILTER_FIELDS) {
+    state[field] = clean(filters[field]);
+  }
+  return state;
+};
 
 const quoteIfNeeded = (value: string): string =>
   /\s/.test(value) ? `"${value}"` : value;
@@ -95,7 +133,7 @@ export const buildSearchQuery = (
       // Strip embedded double-quotes: the grammar has no way to escape them, and
       // the server strips quotes too, so emitting one would corrupt the query
       // (the value could be truncated or partly reinterpreted as free text).
-      const cleaned = value.replace(/"/g, '').trim();
+      const cleaned = cleanFilterValue(value);
       if (cleaned === '') {
         continue;
       }
@@ -120,7 +158,7 @@ export const parseSearchQuery = (queryString: string): ParsedSearchQuery => {
     (_match, lead: string, prefix: string, rawValue: string) => {
       // Strip quotes: unwraps a quoted value, no-op for a bare one, and cleans a
       // stray quote from a malformed `author:"x` (matching the server).
-      const value = rawValue.replace(/"/g, '');
+      const value = cleanFilterValue(rawValue);
       // A quotes-only operator (`author:""`, `author:"`) carries no value; drop
       // it instead of committing a blank chip and running an empty-value filter.
       if (value !== '') {
