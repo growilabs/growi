@@ -114,7 +114,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: PageLinkService_
   - _Depends: B1.5_
 
-- [ ] B1.7 Implement the permission-filtered read query — findBacklinks only
+- [x] B1.7 Implement the permission-filtered read query — findBacklinks only
   - Implement `findBacklinks` (sources pointing at a page, filtered to readable, non-trashed pages
     via the shared viewer/grant filter, mapped to `IBacklink`)
   - Never return unfiltered paths; any count is derived only from the filtered set
@@ -125,7 +125,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: PageLinkService_
   - _Depends: B1.2_
 
-- [ ] B1.8 Add the backlinks read endpoint
+- [x] B1.8 Add the backlinks read endpoint
   - Add an authenticated apiv3 GET route that validates a page id, resolves the viewer from the
     request, and returns the permission-filtered backlinks for that page
   - Done when the endpoint returns backlinks for a readable page and 400/403 for invalid id /
@@ -171,7 +171,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: crowi setup, PageLinkService_
   - _Depends: B1.6_
 
-- [ ] B1.13 Register the backlinks endpoint
+- [x] B1.13 Register the backlinks endpoint
   - Register the read route in the apiv3 router
   - Done when the endpoint is reachable over HTTP and returns backlinks for a seeded page
   - _Requirements: 1.1_
