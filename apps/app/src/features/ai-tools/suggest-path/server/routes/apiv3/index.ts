@@ -6,7 +6,7 @@ import type { Request, RequestHandler } from 'express';
 import { body } from 'express-validator';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service';
+import { aiReadyGuard } from '~/features/mastra/server/routes/ai-ready-guard';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
@@ -94,7 +94,7 @@ const validator = [
  * /ai-tools/suggest-path:
  *   post:
  *     summary: Suggest page paths based on content
- *     description: Analyzes the given content and suggests appropriate page paths using keyword extraction, search, and AI evaluation.
+ *     description: Analyzes the given content and suggests appropriate page paths using an agentic search over the wiki.
  *     tags: [AI Tools]
  *     security:
  *       - bearer: []
@@ -112,7 +112,7 @@ const validator = [
  *               body:
  *                 type: string
  *                 description: The page content to analyze for path suggestions
- *                 maxLength: 50000
+ *                 maxLength: 100000
  *     responses:
  *       200:
  *         description: Path suggestions generated successfully
@@ -131,7 +131,7 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
-    certifyAiService,
+    aiReadyGuard,
     ...validator,
     apiV3FormValidator,
     async (req: SuggestPathReq, res: ApiV3Response) => {

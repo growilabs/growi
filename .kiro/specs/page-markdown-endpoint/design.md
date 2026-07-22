@@ -86,10 +86,10 @@ graph LR
 - Domain/feature boundaries: HTTP 関心（検出・認可合成・Content-Type・ステータス）と、解決・populate・親子兄弟ロード・組立オーケストレーションは **route 層のレスポンスヘルパ**（既存 `respond-with-single-page.ts` と同じ層。読み取りページの populate は route 層で行うのが GROWI の慣習）。純ロジック（リクエスト解釈・footer・`.md` URL）は pure util に分離。
 - Existing patterns preserved: TS factory ルート（`getBrandLogoRouterFactory` 型）、`accessTokenParser`+`loginRequired` 合成、viewer 付きファインダ、`serializeUserSecurely`。
 - New components rationale: 既存ファイルを肥大化させず、footer・URL 生成を純関数化してテスト可能にするため。
-- Steering compliance: server/client 境界を守り、`.md` URL util は client 安全な `src/utils/` に置く。`any` を使わず discriminated union で結果を表現。
+- Steering compliance: feature-based 構成（`features/page-markdown/`）に集約し、server/client 境界を守る。`.md` URL / alternate util は client 安全な `utils/` に置き feature 直下の barrel から公開、server 面は `./server` barrel のみ。`any` を使わず discriminated union で結果を表現。
 
 ### Dependency Direction
-`page-markdown-url (pure)` / `parseMarkdownRequest (pure)` / `buildPageMarkdown (pure)` → `respond-with-page-markdown (route helper)` → `page-markdown route factory` → `routes/index.js`。UI（CopyDropdown）と SSR head は `page-markdown-url` のみを参照。各層は左の層のみ import し、上位へは import しない。
+`utils（page-markdown-url / page-markdown-alternate, pure）` / `parseMarkdownRequest (pure)` / `buildPageMarkdown (pure)` → `respond-with-page-markdown (server service)` → `page-markdown handlers factory (server/routes)` → `routes/index.js`。UI（CopyDropdown）と SSR（head / GSSP）は feature 直下の client 安全 barrel（utils のみ再輸出）だけを参照。各層は左の層のみ import し、上位へは import しない。
 
 ### Technology Stack
 
@@ -106,24 +106,34 @@ graph LR
 ## File Structure Plan
 
 ### New Files
+
+> 実装後リファクタ（PR #11439 レビュー反映）で feature-based 構成（`features/page-markdown/`）へ集約した。client 安全な純関数は feature 直下の barrel から、server 面は `./server` barrel からのみ公開する。
+
 ```
-apps/app/src/
+apps/app/src/features/page-markdown/
+├── index.ts                            # client安全 barrel: toPermalinkMdUrl / toPathMdUrl / selectAlternateMdUrl / toMarkdownAlternateLinkHeader
 ├── utils/
 │   ├── page-markdown-url.ts            # pure: pageId/path/origin → .md URL（permalink形/パス形）。client安全・server/client共用
-│   └── page-markdown-url.spec.ts
-└── server/routes/page-markdown/
-    ├── index.ts                        # factory(crowi): RequestHandler。md検出→認可合成→responder呼出→next()フォールスルー
-    ├── respond-with-page-markdown.ts   # route層ヘルパ: 解決(literal-wins)→finder→initLatestRevisionField+populateDataToShowRevision(false)→親解決→子/兄弟(listing)→buildPageMarkdown→res。respond-with-single-page.ts と同じ層で populate を担う
-    ├── parse-markdown-request.ts       # pure: (path, headers, query) → MarkdownRequestIntent
-    ├── parse-markdown-request.spec.ts
-    ├── build-page-markdown.ts          # pure: (PageMarkdownInput) → markdown文字列（本文＋footer）
-    ├── build-page-markdown.spec.ts
-    ├── constants.ts                    # MARKDOWN_FOOTER_MAX_LINKS 等
-    └── page-markdown.integ.ts          # supertest 統合テスト
+│   ├── page-markdown-url.spec.ts
+│   ├── page-markdown-alternate.ts      # pure: alternate URL の選択（permalink優先/path形フォールバック）と RFC 8288 Link 値の整形
+│   └── page-markdown-alternate.spec.ts
+└── server/
+    ├── index.ts                        # server barrel: createPageMarkdownHandlers
+    ├── routes/
+    │   ├── page-markdown.ts            # handlers factory: gate(skipUnlessMarkdownRequest)＋respond。認可 middleware は routes/index.js 側で合成
+    │   └── page-markdown.integ.ts      # supertest 統合テスト（本番と同じ合成をミラー）
+    └── services/
+        ├── respond-with-page-markdown.ts   # 解決(literal-wins)→finder→initLatestRevisionField+populateDataToShowRevision(false)→親解決→子/兄弟(listing)→buildPageMarkdown。Express 非依存
+        ├── respond-with-page-markdown.integ.ts
+        ├── parse-markdown-request.ts       # pure: (path, headers, query) → MarkdownRequestIntent（percent-decode 含む）
+        ├── parse-markdown-request.spec.ts
+        ├── build-page-markdown.ts          # pure: (PageMarkdownInput) → markdown文字列（本文＋footer）
+        ├── build-page-markdown.spec.ts
+        └── constants.ts                    # MARKDOWN_FOOTER_MAX_LINKS / MARKDOWN_SUFFIX
 ```
 
 ### Modified Files
-- `apps/app/src/server/routes/index.js` — `page-markdown` ルートを catch-all（dev/8.0.x では `:402` `/*/$` と `:403` `/*`）の**直前**に登録。このモジュールは ESM のため、TS factory を名前付き export（`getBrandLogoRouterFactory` と同型）にして `import` し、`setup` 内で `app.use(...)` する（CJS の `require(...)` は使わない）。
+- `apps/app/src/server/routes/index.js` — `page-markdown` ルートを catch-all（dev/8.0.x では `/*/$` と `/*`）の**直前**に、このファイルの慣習であるルート表形式で登録する: `app.get('/*', gate, accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }), loginRequired, respond)`。gate は非 markdown 要求を `next('route')` で抜けさせるため、認可 middleware は markdown 要求のみが通る。middleware は index.js が他ルート用に持つ共有インスタンスを再利用する（feature 側で並行合成しない）。handlers は `~/features/page-markdown/server` から `import`。
 - `apps/app/src/server/service/page-listing/page-listing.ts` — footer 用に **limit 付きの子取得** と **viewer-aware な直下子カウント**（`countDocuments({ parent: id })` ＋ `addViewerCondition`）のメソッドを追加。既存の全件返し `findChildrenByParentPathOrIdAndViewer` はメモリ観点で本用途に使わない。
 - `apps/app/src/pages/[[...path]]/index.page.tsx` — `<Head>` に `<link rel="alternate" type="text/markdown" href={mdUrl}>` を追加。`mdUrl` は `pageId` があれば `/{pageId}.md`、無ければ（空ページ等で props に `_id` が無いケース）`currentPathname` から `{path}.md` にフォールバックする。
 - `apps/app/src/pages/[[...path]]/page-data-props.ts` — GSSP の `context.res` に `Link` ヘッダを設定。空ページの早期 return（`data:null` 化）**より前**に、スコープに残る実体の `_id` を使って `</{pageId}.md>; rel="alternate"; type="text/markdown"` を付ける（空ページでも pageId 形の Link を出せる）。
@@ -136,13 +146,13 @@ apps/app/src/
 flowchart TD
     A[GET request reaches md interception] --> B{md request?}
     B -->|no accept, no format, path not end with md| Z[next to existing HTML delegate]
-    B -->|yes| C[parseMarkdownRequest]
-    C --> D{explicit accept or format?}
-    D -->|yes| E[target equals requested path or id, no strip]
-    D -->|no, md suffix| F{literal page at R exists for viewer?}
-    F -->|yes, legacy| Z
-    F -->|no| G[strip trailing md then target equals base]
-    E --> H[findPageAndMetaDataByViewer]
+    B -->|yes| C[parseMarkdownRequest decodes percent-encoding and classifies]
+    C -->|permalink incl explicit pageId.md| H[findPageAndMetaDataByViewer]
+    C -->|path| F{literal page at R exists for viewer?}
+    F -->|yes, explicit| E[serve the literal page itself as markdown 200 or 403]
+    F -->|yes, suffix sugar| Z
+    F -->|no, R ends with md| G[strip trailing md then target equals base]
+    F -->|no, R without md suffix| K
     G --> H
     H --> I{result}
     I -->|forbidden| J[403 text markdown with guidance]
@@ -152,8 +162,9 @@ flowchart TD
     M --> N[200 text markdown]
 ```
 
-- 判定順: `Accept: text/markdown` または `?format=md`（明示）が最優先で、この場合は末尾 `.md` を除去しない。次に `.md` サフィックス（糖衣）で、literal-wins（実在すれば HTML へフォールスルー、なければ base へ）。
-- permalink 形（`/{pageId}.md`）は path の実在チェック不要（id 解決）。path 形のみ literal→base の二段解決。
+- 判定順: `Accept: text/markdown` または `?format=md`（明示）が最優先。明示時は**要求パスそのものの解決を最優先**し、literal が実在すればそのページの Markdown（権限が無ければ 403。base へは流れない＝存在が勝つ）、literal 不在で `.md` 終端なら base へフォールバックする（2.4/2.5。footer が配る `.md` URL に明示シグナルを重ねても 404 にならない）。次に `.md` サフィックス（糖衣）で、literal-wins（実在すれば HTML へフォールスルー、なければ base へ）。
+- permalink 形（`/{pageId}.md`）は明示・糖衣のどちらでも id 解決に直行する（`/{24hex}.md` は `isCreatablePage` の `.md` 予約により実ページとして作成できないため、literal 実在チェックは不要）。path 形のみ literal→base の二段解決。
+- 分類・解決は **decode 済みパス**で行う。Express の `req.path` は percent-encoding を解除せずに渡すが、ページパスは decode 済みで保存されるため、`parseMarkdownRequest` の入口で `decodeURIComponent`（malformed escape は raw フォールバック。実際には Express 自身が `/*` マッチ時に 400 を返す）を通す。空白・日本語を含むパスの取得はこれで成立する。
 
 ## Requirements Traceability
 
@@ -165,7 +176,8 @@ flowchart TD
 | 2.1 | literal `.md` 実在ページは HTML 表示 | Route, Responder | Passthrough branch |
 | 2.2 | base 実在なら base の md | Responder, parseMarkdownRequest | Resolution flow |
 | 2.3 | R も base も無ければ 404 | Route, Responder | Resolution flow |
-| 2.4 | `Accept`/`?format=md` は除去せず要求パスの md | parseMarkdownRequest | Explicit branch |
+| 2.4 | `Accept`/`?format=md` は要求パス最優先（literal 実在ならそのページ／403、base へ流れない） | parseMarkdownRequest, Responder | Explicit branch |
+| 2.5 | 明示＋`.md` 終端で literal 不在なら base（permalink 形は id）へフォールバック | parseMarkdownRequest, Responder | Explicit branch |
 | 3.1, 3.2 | 既存認可踏襲・権限外 403 | Authz middleware, Responder | 既存 viewer ファインダ |
 | 3.3, 3.4 | ゲスト設定＋grant に従う匿名可否 | Authz middleware | `loginRequired` ゲスト許可 |
 | 3.5 | 403/404 に認証/MCP 案内 | Route, buildPageMarkdown | Error bodies |
@@ -185,7 +197,7 @@ flowchart TD
 | PageMarkdownRoute | server/route | md 検出・認可合成・Content-Type/status・フォールスルー | 1.x, 2.x, 3.x, 5.x | respondWithPageMarkdown (P0), authz middleware (P0) | API |
 | respondWithPageMarkdown | server/route (helper) | 解決(literal-wins)＋populate＋親子兄弟ロード＋組立 | 1.x, 2.x, 4.x, 5.x | viewer finders (P0), populate methods (P0), pageListingService (P0), buildPageMarkdown (P0) | Service |
 | parseMarkdownRequest | server/pure | リクエスト→取得意図の解釈 | 1.1-1.3, 2.2, 2.4 | なし | Service |
-| buildPageMarkdown | server/pure | 本文＋footer の文字列生成 | 3.5, 4.x, 5.x | page-markdown-url (P0), serializeUserSecurely (P1) | Service |
+| buildPageMarkdown | server/pure | 本文＋footer の文字列生成 | 3.5, 4.x, 5.x | なし（`.md` URL・serialize 済み更新者は呼び出し側が FooterLink / username として事前解決して渡す） | Service |
 | pageMarkdownUrl | shared/pure | `.md` URL 生成（唯一の情報源） | 4.2-4.4, 6.1, 7.2, 7.3 | `@growi/core` encodeSpaces (P1) | Service |
 | CopyDropdown (拡張) | client/UI | `.md` URL コピー項目 | 7.1-7.4 | pageMarkdownUrl (P0) | State |
 | Page Head (拡張) | client/SSR | alternate link ＋ Link ヘッダ | 6.1-6.3 | pageMarkdownUrl (P0) | State |
@@ -200,7 +212,7 @@ flowchart TD
 | Requirements | 1.1–1.5, 2.1–2.4, 4.1–4.8, 5.1–5.3 |
 
 **Responsibilities & Constraints**
-- `parseMarkdownRequest` の意図に従い、permalink は id、path は literal→base の順で `findPageAndMetaDataByViewer` を用いて解決。
+- `parseMarkdownRequest` の意図に従い、permalink は id、path は literal→base の順で `findPageAndMetaDataByViewer` を用いて解決。literal が実在するとき、明示（explicit）ならそのページ自身を Markdown で返し（権限外は 403。base へフォールバックしない＝存在が勝つ）、糖衣なら HTML へ passthrough する。
 - forbidden / not-found は既存ファインダの判定をそのまま反映（独自判定を作らない）。
 - ok の場合、**finder は populate しない**ため `page.initLatestRevisionField()` ＋ `page.populateDataToShowRevision(false)` で本文（`revision.body`）と更新者を populate し、`page.parent`（ObjectId）から親を**追加クエリ**で path/title 解決する（`respond-with-single-page.ts:78-81` と同じ役割を route 層で担う）。
 - 子・兄弟は page-listing サービスの **id 指定・limit 付き取得**でリンク用に最大 `MARKDOWN_FOOTER_MAX_LINKS + 1` 件だけロードし、直下子の**正確な総数**は `addViewerCondition` を重ねた `countDocuments({ parent: id })` で得る（`addViewerCondition` を find と count で**共有**＝grant ロジックを二重実装せず drift を避ける）。子孫合計 `page.descendantCount` は別途併記。兄弟も対象の `parent` id で同様に取得し自分を除外。`parent == null`（ルート）は親・兄弟を省略。メモリは最大 N+1 件に固定（全件ロード・cursor は不要）。
@@ -235,11 +247,12 @@ type MarkdownRequestIntent =
   | { kind: 'none' } // not a markdown request → caller does next()
   | { kind: 'permalink'; pageId: string; explicit: boolean }
   | { kind: 'path'; path: string; explicit: boolean };
-// explicit=true: Accept/​?format=md（末尾 .md を除去しない）
+// explicit=true: Accept/​?format=md（path は unstripped のまま返す。ただし /{pageId}.md は permalink として認識）
 // explicit=false: .md サフィックス（path の場合は literal→base）
 function parseMarkdownRequest(reqPath: string, accept: string | undefined, formatQuery: string | undefined): MarkdownRequestIntent;
 ```
 - 判定順は System Flows のとおり（明示 > `.md` サフィックス）。permalink 判定は `isPermalink`/`isValidObjectId`。
+- 返す `path`/`pageId` は **percent-decode 済み**（`req.path` は encode されたまま届くが、ページパスは decode 済みで保存されるため）。malformed escape は raw フォールバック。
 
 #### buildPageMarkdown（pure）
 ```typescript
@@ -265,6 +278,7 @@ function buildPageMarkdown(input: PageMarkdownInput): string;
 function buildErrorMarkdown(kind: 'forbidden' | 'notFound'): string; // 3.5
 ```
 - 上限は `MARKDOWN_FOOTER_MAX_LINKS`。footer には直下子総数と子孫合計 `descendantCount` を別個に載せ、超過時は総数と残数を明記（4.7）。空ページは本文の代わりに「本文なし」の一文＋footer（5.1-5.3）。
+- 更新情報が存在しない場合（空コンテナページ等、日時・更新者とも空）は Last updated 行を**行ごと省略**する（`Last updated:  by ` のような欠けた行を出さない）。
 
 #### PageMarkdownRoute (route factory)
 | Field | Detail |
@@ -289,6 +303,7 @@ function buildErrorMarkdown(kind: 'forbidden' | 'notFound'): string; // 3.5
 **Implementation Notes**
 - Integration: `routes/index.js` の catch-all（dev/8.0.x では `:402`/`:403`）直前に登録し、API・静的・`_next`・admin・attachment・ogp・share・`/`・`/vault.git` 等の既存ルートより後段に置く（それらは先に解決される）。ESM 化済みのため名前付き export ＋ `import` で組み込む。
 - Content negotiation: `Accept` は**メディアタイプの明示一致のみ**で判定（`req.accepts('text/markdown')` は `*/*`＝curl 既定にも一致するため使わない）。`.md` サフィックスは末尾が厳密に `.md` のときのみ（`.mdx` 等は対象外）。
+- Cache safety: markdown 応答（200/403/404）には `Vary: Accept` と `Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate` を付与する。同一 URL が Accept 次第で HTML にも markdown にもなるため、共有キャッシュ（reverse proxy / CDN）が markdown 表現を保存してブラウザに返す取り違えを防ぐ（応答キャッシュ層の導入自体は引き続き Non-Goal）。passthrough には付与しない。
 - Listing: 子・兄弟は id 指定で呼び MongoDB regex を生成しない（`escapeStringForMongoRegex` を不要にする）。
 - Validation: permalink は `isValidObjectId` で 24-hex を検証。
 - Known limitation: トップページ `/` は専用ルート（`routes/index.js:84`）が interception より先に解決するため、`/` への `Accept`/`?format=md` は md 化されない（`/{pageId}.md` permalink 形では取得可能）。

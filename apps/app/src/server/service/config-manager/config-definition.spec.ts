@@ -188,6 +188,54 @@ describe('config-definition resilience keys', () => {
   });
 });
 
+describe('config-definition suggest-path agentic keys', () => {
+  describe('CONFIG_KEYS array', () => {
+    it('contains aiTools:suggestPathAgenticSearchLimit', () => {
+      expect(CONFIG_KEYS).toContain('aiTools:suggestPathAgenticSearchLimit');
+    });
+
+    it('contains aiTools:suggestPathAgenticTimeoutMs', () => {
+      expect(CONFIG_KEYS).toContain('aiTools:suggestPathAgenticTimeoutMs');
+    });
+
+    it('contains aiTools:suggestPathAgenticChildListingLimit', () => {
+      expect(CONFIG_KEYS).toContain(
+        'aiTools:suggestPathAgenticChildListingLimit',
+      );
+    });
+
+    it('contains ai:providerOptions:suggestPathAgent', () => {
+      expect(CONFIG_KEYS).toContain('ai:providerOptions:suggestPathAgent');
+    });
+  });
+
+  // envVarName is the externally documented operator contract for each key;
+  // default values are deliberately NOT asserted here (they are tuning
+  // constants, and mirroring them in tests only creates change-detectors).
+  describe('CONFIG_DEFINITIONS env var names', () => {
+    it.each([
+      [
+        'aiTools:suggestPathAgenticSearchLimit',
+        'AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT',
+      ],
+      [
+        'aiTools:suggestPathAgenticChildListingLimit',
+        'AI_TOOLS_SUGGEST_PATH_AGENTIC_CHILD_LISTING_LIMIT',
+      ],
+      [
+        'aiTools:suggestPathAgenticTimeoutMs',
+        'AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS',
+      ],
+      [
+        'ai:providerOptions:suggestPathAgent',
+        'AI_SUGGEST_PATH_AGENT_PROVIDER_OPTIONS',
+      ],
+    ] as const)('%s has envVarName %s', (key, envVarName) => {
+      expect(CONFIG_DEFINITIONS[key].envVarName).toBe(envVarName);
+    });
+  });
+});
+
 describe('config-definition multi-provider ai keys', () => {
   describe('CONFIG_KEYS array', () => {
     it('contains ai:providers', () => {

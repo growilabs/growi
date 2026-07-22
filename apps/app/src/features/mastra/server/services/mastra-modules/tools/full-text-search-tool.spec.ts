@@ -1,7 +1,9 @@
-import type { IUserHasId } from '@growi/core';
+import type { IPageHasId, IUserHasId } from '@growi/core';
 import { RequestContext } from '@mastra/core/request-context';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type MockProxy, mock } from 'vitest-mock-extended';
 
+import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult } from '~/interfaces/search';
 import type SearchService from '~/server/service/search';
 
@@ -60,24 +62,22 @@ const buildMockUser = (): IUserHasId =>
     username: 'test-user',
   }) as unknown as IUserHasId;
 
-type MockSearchService = {
-  isElasticsearchEnabled: boolean;
-  searchKeyword: ReturnType<typeof vi.fn>;
-};
-
-// Build a SearchService-typed mock. The cast inside this builder isolates
-// the boundary where the mock satisfies the SearchService interface — the
-// tool only reads `isElasticsearchEnabled` and `searchKeyword`, so a partial
-// stub typed as the real class is sufficient. Call sites stay cast-free.
+// Build a type-safe SearchService mock (vitest-mock-extended): every member
+// is auto-stubbed and typed against the real class, so configuring
+// `searchKeyword` / `formatSearchResult` at call sites is compile-checked and
+// needs no cast. `formatSearchResult` defaults to an empty formatted result
+// so argument-forwarding tests need not restate it.
 const buildMockSearchService = (
-  overrides: Partial<MockSearchService> = {},
-): MockSearchService & SearchService => {
-  const mock: MockSearchService = {
-    isElasticsearchEnabled: true,
-    searchKeyword: vi.fn(),
-    ...overrides,
-  };
-  return mock as unknown as MockSearchService & SearchService;
+  overrides: { isElasticsearchEnabled?: boolean } = {},
+): MockProxy<SearchService> => {
+  const searchService = mock<SearchService>({
+    isElasticsearchEnabled: overrides.isElasticsearchEnabled ?? true,
+  });
+  searchService.formatSearchResult.mockResolvedValue({
+    data: [],
+    meta: { total: 0, hitsCount: 0 },
+  });
+  return searchService;
 };
 
 // Discriminated union mirroring the tool's outputSchema. Defined locally so
@@ -261,28 +261,68 @@ describe('fullTextSearchTool', () => {
         expect(result.reason).toBe('boom-detail');
       }
     });
-  });
 
-  describe('success mapping', () => {
-    it('maps SearchService results to { pageId, pagePath, snippet } and never leaks body', async () => {
+    it("converts formatSearchResult rejections into result: 'error' without throwing out of execute", async () => {
       const requestContext = buildRequestContext();
       const mockUser = buildMockUser();
       const mockSearchService = buildMockSearchService();
+      // searchKeyword succeeds; the failure happens at the second await point
+      // inside the try block (the formatter), which must be caught the same
+      // way (requirement 6.8).
+      mockSearchService.searchKeyword.mockResolvedValue([
+        { data: [], meta: { total: 0, hitsCount: 0 } },
+        SearchDelegatorName.DEFAULT,
+      ]);
+      mockSearchService.formatSearchResult.mockRejectedValue(
+        new Error('format-boom'),
+      );
+      requestContext.set('user', mockUser);
+      requestContext.set('searchService', mockSearchService);
+
+      await expect(
+        invokeExecute({ query: 'anything', limit: 5 }, requestContext),
+      ).resolves.toMatchObject({ result: 'error', reason: 'format-boom' });
+    });
+  });
+
+  describe('success mapping', () => {
+    it('routes the raw result through formatSearchResult and maps its output to { pageId, pagePath, snippet } without leaking body', async () => {
+      const requestContext = buildRequestContext();
+      const mockUser = buildMockUser();
+      const mockSearchService = buildMockSearchService();
+      // The tool no longer reads `_highlight` itself — it hands the raw result
+      // to formatSearchResult, which owns the highlight-key fallback and the
+      // canShowSnippet gate. Here we only verify the wiring + output mapping.
       const searchResult: ISearchResult<unknown> = {
-        data: [
-          {
-            _id: 'abc',
-            _score: 1,
-            _source: { path: '/p1', body: 'HIDDEN_BODY' },
-            _highlight: { body: ['snip'] },
-          },
-        ],
+        data: [],
         meta: { total: 1, hitsCount: 1 },
       };
       mockSearchService.searchKeyword.mockResolvedValue([
         searchResult,
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       ]);
+      // formatSearchResult returns IFormattedSearchResult: each entry has the
+      // full page document under `.data` and the snippet under
+      // `.meta.elasticSearchResult.snippet`. `body` is included on `.data` to
+      // prove the tool projects only _id / path (requirement 6.5). The cast is
+      // scoped to this fixture: it deliberately carries the extra `body` key,
+      // and a full IPageHasId literal would only add noise.
+      const pageDocWithBody = {
+        _id: 'abc',
+        path: '/p1',
+        body: 'HIDDEN_BODY',
+      } as unknown as IPageHasId;
+      mockSearchService.formatSearchResult.mockResolvedValue({
+        data: [
+          {
+            data: pageDocWithBody,
+            meta: {
+              elasticSearchResult: { snippet: 'snip', highlightedPath: null },
+            },
+          },
+        ],
+        meta: { total: 1, hitsCount: 1 },
+      });
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);
 
@@ -290,6 +330,20 @@ describe('fullTextSearchTool', () => {
         { query: 'hello', limit: 5 },
         requestContext,
       );
+
+      // The raw result and the searchKeyword-returned delegatorName must be
+      // forwarded to formatSearchResult, along with user + resolved userGroups.
+      expect(mockSearchService.formatSearchResult).toHaveBeenCalledTimes(1);
+      expect(mockSearchService.formatSearchResult.mock.calls[0][0]).toBe(
+        searchResult,
+      );
+      expect(mockSearchService.formatSearchResult.mock.calls[0][1]).toBe(
+        SearchDelegatorName.DEFAULT,
+      );
+      expect(mockSearchService.formatSearchResult.mock.calls[0][2]).toBe(
+        mockUser,
+      );
+      expect(mockSearchService.formatSearchResult.mock.calls[0][3]).toEqual([]);
 
       expect(isValidationFailure(result)).toBe(false);
       if (isValidationFailure(result)) return;
@@ -312,25 +366,77 @@ describe('fullTextSearchTool', () => {
       expect(serialized).not.toContain('"body"');
     });
 
-    it('omits snippet when the highlight is absent', async () => {
+    it('takes totalCount from formatted.meta.total, not from the raw result or hits.length', async () => {
       const requestContext = buildRequestContext();
       const mockUser = buildMockUser();
       const mockSearchService = buildMockSearchService();
-      const searchResult: ISearchResult<unknown> = {
+      // The formatter can drop entries (findPageListByIds skips pages deleted
+      // from Mongo but still in the ES index) while passing meta through, so
+      // hits.length < totalCount is a legitimate state. The raw result's meta
+      // is set to a sentinel to prove the tool does not read it.
+      mockSearchService.searchKeyword.mockResolvedValue([
+        { data: [], meta: { total: 999, hitsCount: 999 } },
+        SearchDelegatorName.DEFAULT,
+      ]);
+      // Cast scoped to the fixture: only _id / path matter here.
+      const pageDoc = {
+        _id: 'survivor',
+        path: '/p4',
+      } as unknown as IPageHasId;
+      mockSearchService.formatSearchResult.mockResolvedValue({
         data: [
           {
-            _id: 'noHighlight',
-            _score: 1,
-            _source: { path: '/p2' },
-            _highlight: undefined,
+            data: pageDoc,
+            meta: {
+              elasticSearchResult: { snippet: null, highlightedPath: null },
+            },
+          },
+        ],
+        meta: { total: 42, hitsCount: 42 },
+      });
+      requestContext.set('user', mockUser);
+      requestContext.set('searchService', mockSearchService);
+
+      const result = await invokeExecute(
+        { query: 'hello', limit: 5 },
+        requestContext,
+      );
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      expect(result.result).toBe('ok');
+      if (result.result !== 'ok') return;
+      expect(result.hits).toHaveLength(1);
+      expect(result.totalCount).toBe(42);
+    });
+
+    it('omits snippet when formatSearchResult yields a null snippet (canShowSnippet gate)', async () => {
+      const requestContext = buildRequestContext();
+      const mockUser = buildMockUser();
+      const mockSearchService = buildMockSearchService();
+      mockSearchService.searchKeyword.mockResolvedValue([
+        { data: [], meta: { total: 1, hitsCount: 1 } },
+        SearchDelegatorName.DEFAULT,
+      ]);
+      // snippet: null is what canShowSnippet produces for a page the caller
+      // cannot view — the tool must omit the key entirely (not emit "").
+      // Cast scoped to the fixture: only _id / path matter for this
+      // projection test; a full IPageHasId literal would only add noise.
+      const unviewablePageDoc = {
+        _id: 'noSnippet',
+        path: '/p2',
+      } as unknown as IPageHasId;
+      mockSearchService.formatSearchResult.mockResolvedValue({
+        data: [
+          {
+            data: unviewablePageDoc,
+            meta: {
+              elasticSearchResult: { snippet: null, highlightedPath: null },
+            },
           },
         ],
         meta: { total: 1, hitsCount: 1 },
-      };
-      mockSearchService.searchKeyword.mockResolvedValue([
-        searchResult,
-        'es-delegator',
-      ]);
+      });
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);
 
@@ -344,10 +450,55 @@ describe('fullTextSearchTool', () => {
       expect(result.result).toBe('ok');
       if (result.result !== 'ok') return;
       expect(result.hits[0]).toEqual({
-        pageId: 'noHighlight',
+        pageId: 'noSnippet',
         pagePath: '/p2',
       });
-      // No snippet field when highlight is absent (must be omitted, not "").
+      // No snippet field when the gate drops it (must be omitted, not "").
+      expect(Object.hasOwn(result.hits[0], 'snippet')).toBe(false);
+    });
+
+    it('omits snippet when formatSearchResult yields an empty-string snippet', async () => {
+      const requestContext = buildRequestContext();
+      const mockUser = buildMockUser();
+      const mockSearchService = buildMockSearchService();
+      mockSearchService.searchKeyword.mockResolvedValue([
+        { data: [], meta: { total: 1, hitsCount: 1 } },
+        SearchDelegatorName.DEFAULT,
+      ]);
+      // An empty-string snippet carries no information for the agent — the
+      // tool must omit the key just like the null case (spec: "null / 空文字
+      // は省略"). Cast scoped to the fixture as above.
+      const pageDoc = {
+        _id: 'emptySnippet',
+        path: '/p3',
+      } as unknown as IPageHasId;
+      mockSearchService.formatSearchResult.mockResolvedValue({
+        data: [
+          {
+            data: pageDoc,
+            meta: {
+              elasticSearchResult: { snippet: '', highlightedPath: null },
+            },
+          },
+        ],
+        meta: { total: 1, hitsCount: 1 },
+      });
+      requestContext.set('user', mockUser);
+      requestContext.set('searchService', mockSearchService);
+
+      const result = await invokeExecute(
+        { query: 'hello', limit: 5 },
+        requestContext,
+      );
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      expect(result.result).toBe('ok');
+      if (result.result !== 'ok') return;
+      expect(result.hits[0]).toEqual({
+        pageId: 'emptySnippet',
+        pagePath: '/p3',
+      });
       expect(Object.hasOwn(result.hits[0], 'snippet')).toBe(false);
     });
   });
@@ -363,7 +514,7 @@ describe('fullTextSearchTool', () => {
       };
       mockSearchService.searchKeyword.mockResolvedValue([
         searchResult,
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       ]);
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);
@@ -388,7 +539,7 @@ describe('fullTextSearchTool', () => {
       };
       mockSearchService.searchKeyword.mockResolvedValue([
         searchResult,
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       ]);
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);
@@ -421,7 +572,7 @@ describe('fullTextSearchTool', () => {
       };
       mockSearchService.searchKeyword.mockResolvedValue([
         searchResult,
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       ]);
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);
@@ -487,7 +638,7 @@ describe('fullTextSearchTool', () => {
       };
       mockSearchService.searchKeyword.mockResolvedValue([
         searchResult,
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       ]);
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);
@@ -523,7 +674,7 @@ describe('fullTextSearchTool', () => {
       };
       mockSearchService.searchKeyword.mockResolvedValue([
         searchResult,
-        'es-delegator',
+        SearchDelegatorName.DEFAULT,
       ]);
       requestContext.set('user', mockUser);
       requestContext.set('searchService', mockSearchService);

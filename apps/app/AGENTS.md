@@ -6,7 +6,7 @@ The main GROWI wiki application - a full-stack Next.js application with Express.
 
 | Layer | Technology |
 |-------|------------|
-| **Frontend** | Next.js 14 (Pages Router), React 18 |
+| **Frontend** | Next.js 16 (Pages Router), React 18 |
 | **Backend** | Express.js with custom server |
 | **Database** | MongoDB with Mongoose ^6.13.6 |
 | **State** | Jotai (UI state) + SWR (server state) |
@@ -168,3 +168,4 @@ The following rules in `.claude/rules/` are always applied when working in this 
 |------|-------------|
 | **package-dependencies** | Turbopack dependency classification — when to use `dependencies` vs `devDependencies`, verification procedure |
 | **import-convention** | Single no-extension import convention for `apps/app/src` (local → relative, cross-module → `~/`; `.js` added only at build emit) |
+| **server-boot-imports** | Lazy-load conventions for config-gated heavy SDKs vs boot warmup for universal costs; required `no-eager-*-imports` drift specs (shared static-import-graph walker, two-root walk) |

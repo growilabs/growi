@@ -1,10 +1,15 @@
 import { differenceInSeconds } from 'date-fns/differenceInSeconds';
 import { format } from 'date-fns/format';
 import { formatDistanceStrict } from 'date-fns/formatDistanceStrict';
+import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 import { UncontrolledTooltip } from 'reactstrap';
 
+import { getLocale } from '~/utils/locale-utils';
+
 const FormattedDistanceDate = (props) => {
+  const { i18n } = useTranslation();
+
   // cast to date if string
   const date =
     typeof props.date === 'string' ? new Date(props.date) : props.date;
@@ -22,7 +27,11 @@ const FormattedDistanceDate = (props) => {
 
   return (
     <>
-      <span id={elemId}>{formatDistanceStrict(date, baseDate)}</span>
+      <span id={elemId}>
+        {formatDistanceStrict(date, baseDate, {
+          locale: getLocale(i18n.language),
+        })}
+      </span>
       {props.isShowTooltip && (
         <UncontrolledTooltip placement="bottom" fade={false} target={elemId}>
           {dateFormatted}

@@ -2,7 +2,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { NextFunction, Request } from 'express';
 
 import { isAiConfigured } from '~/features/mastra/server/services/is-ai-configured';
-import { isAiEnabled } from '~/features/openai/server/services';
+import { isAiEnabled } from '~/features/mastra/server/services/is-ai-enabled';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
 // Per-request availability gate for the mastra AI routes.
