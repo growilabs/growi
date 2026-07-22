@@ -31,45 +31,6 @@ export const useSWRxUsersList = (
   );
 };
 
-type usernameRequestOptions = {
-  isIncludeActiveUser?: boolean;
-  isIncludeInactiveUser?: boolean;
-  isIncludeActivitySnapshotUser?: boolean;
-  isIncludeMixedUsernames?: boolean;
-};
-
-type userData = {
-  usernames: string[];
-  totalCount: number;
-};
-
-type usernameResult = {
-  activeUser?: userData;
-  inactiveUser?: userData;
-  activitySnapshotUser?: userData;
-  mixedUsernames?: string[];
-};
-
-export const useSWRxUsernames = (
-  q: string,
-  offset?: number,
-  limit?: number,
-  options?: usernameRequestOptions,
-): SWRResponse<usernameResult, Error> => {
-  return useSWRImmutable(
-    q != null && q.trim() !== ''
-      ? ['/users/usernames', q, offset, limit, JSON.stringify(options)]
-      : null,
-    ([endpoint, q, offset, limit, options]) =>
-      apiv3Get(endpoint, {
-        q,
-        offset,
-        limit,
-        options,
-      }).then((result) => result.data),
-  );
-};
-
 type RelatedGroupsResponse = {
   relatedGroups: PopulatedGrantedGroup[];
 };

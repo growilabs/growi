@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
 import { omitInsecureAttributes } from '@growi/core/dist/models/serializers';
-import { pagePathUtils } from '@growi/core/dist/utils';
+import {
+  escapeStringForMongoRegex,
+  pagePathUtils,
+} from '@growi/core/dist/utils';
 import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
@@ -850,17 +853,17 @@ const factory = (crowi) => {
     const limit = opt.limit || 10;
 
     const conditions = {
-      username: { $regex: username, $options: 'i' },
+      username: {
+        $regex: escapeStringForMongoRegex(username),
+        $options: 'i',
+      },
       status: { $in: status },
     };
 
-    const users = await this.find(conditions)
-      .sort(sortOpt)
-      .skip(offset)
-      .limit(limit);
-
-    const totalCount = (await this.find(conditions).distinct('username'))
-      .length;
+    const { docs: users, totalDocs: totalCount } = await this.paginate(
+      conditions,
+      { sort: sortOpt, offset, limit },
+    );
 
     return { users, totalCount };
   };

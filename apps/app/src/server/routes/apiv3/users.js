@@ -17,7 +17,7 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { serializePageSecurely } from '~/server/models/serializers';
-import { UserStatus } from '~/server/models/user/conts';
+import { INACTIVE_USER_STATUSES, UserStatus } from '~/server/models/user/conts';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
@@ -1467,7 +1467,7 @@ export const setup = (crowi) => {
    *        get:
    *          tags: [Users]
    *          summary: /users/usernames
-   *          description: Get list of usernames
+   *          description: Get list of usernames. The query matches usernames by case-insensitive substring.
    *          parameters:
    *            - in: query
    *              name: q
@@ -1548,16 +1548,39 @@ export const setup = (crowi) => {
         const options = JSON.parse(req.query.options || '{}');
         const data = {};
 
-        if (
-          options.isIncludeActiveUser == null ||
-          options.isIncludeActiveUser
-        ) {
-          const activeUserData =
-            await User.findUserByUsernameRegexWithTotalCount(
-              q,
-              [UserStatus.STATUS_ACTIVE],
-              { offset, limit },
-            );
+        const wantsActiveUser =
+          options.isIncludeActiveUser == null || options.isIncludeActiveUser;
+        const wantsInactiveUser = options.isIncludeInactiveUser === true;
+        const wantsActivitySnapshotUser =
+          options.isIncludeActivitySnapshotUser === true && req.user.admin;
+
+        // The three lookups below are independent of each other, so run them
+        // concurrently instead of paying their latency sequentially.
+        const [activeUserData, inactiveUserData, activitySnapshotUserData] =
+          await Promise.all([
+            wantsActiveUser
+              ? User.findUserByUsernameRegexWithTotalCount(
+                  q,
+                  [UserStatus.STATUS_ACTIVE],
+                  { offset, limit },
+                )
+              : null,
+            wantsInactiveUser
+              ? User.findUserByUsernameRegexWithTotalCount(
+                  q,
+                  INACTIVE_USER_STATUSES,
+                  { offset, limit },
+                )
+              : null,
+            wantsActivitySnapshotUser
+              ? prisma.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+                  q,
+                  { offset, limit },
+                )
+              : null,
+          ]);
+
+        if (activeUserData != null) {
           const activeUsernames = activeUserData.users.map(
             (user) => user.username,
           );
@@ -1569,18 +1592,10 @@ export const setup = (crowi) => {
           });
         }
 
-        if (options.isIncludeInactiveUser) {
-          const inactiveUserStates = [
-            UserStatus.STATUS_REGISTERED,
-            UserStatus.STATUS_SUSPENDED,
-            UserStatus.STATUS_INVITED,
-          ];
-          const inactiveUserData =
-            await User.findUserByUsernameRegexWithTotalCount(
-              q,
-              inactiveUserStates,
-              { offset, limit },
-            );
+        if (inactiveUserData != null) {
+          // Including STATUS_DELETED here doesn't surface deleted users by
+          // their original name: statusDelete() also rewrites `username` to
+          // `deleted_at_*`, so this regex can never match it.
           const inactiveUsernames = inactiveUserData.users.map(
             (user) => user.username,
           );
@@ -1592,12 +1607,7 @@ export const setup = (crowi) => {
           });
         }
 
-        if (options.isIncludeActivitySnapshotUser && req.user.admin) {
-          const activitySnapshotUserData =
-            await prisma.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
-              q,
-              { offset, limit },
-            );
+        if (activitySnapshotUserData != null) {
           Object.assign(data, {
             activitySnapshotUser: activitySnapshotUserData,
           });
@@ -1608,6 +1618,11 @@ export const setup = (crowi) => {
           (options.isIncludeMixedUsernames &&
             !options.isIncludeActivitySnapshotUser);
         if (canIncludeMixedUsernames) {
+          // activeUser/inactiveUser (User.findUserByUsernameRegexWithTotalCount) and
+          // activitySnapshotUser (Activity's WithTotalCount) both match by substring,
+          // so this merge is consistent across sources.
+          // No caller in this repo currently requests isIncludeMixedUsernames (the
+          // only past consumer, useSWRxUsernames, was removed).
           const allUsernames = [
             ...(data.activeUser?.usernames || []),
             ...(data.inactiveUser?.usernames || []),

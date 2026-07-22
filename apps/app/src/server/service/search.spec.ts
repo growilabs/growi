@@ -12,8 +12,21 @@ import type { SearchDelegator } from '../interfaces/search';
 import SearchService from './search';
 import type ElasticsearchDelegator from './search-delegator/elasticsearch';
 
+const { mockFindSnapshotUsernamesByUsernameRegex } = vi.hoisted(() => ({
+  mockFindSnapshotUsernamesByUsernameRegex: vi.fn(),
+}));
+
 vi.mock('~/server/models/named-query', () => ({
   default: { findOne: vi.fn() },
+}));
+
+vi.mock('~/utils/prisma', () => ({
+  prisma: {
+    activities: {
+      findSnapshotUsernamesByUsernameRegex:
+        mockFindSnapshotUsernamesByUsernameRegex,
+    },
+  },
 }));
 
 vi.mock('~/server/service/config-manager/config-manager', () => ({
@@ -22,6 +35,14 @@ vi.mock('~/server/service/config-manager/config-manager', () => ({
 }));
 
 class TestSearchService extends SearchService {
+  // isConfigured is normally derived from fullTextSearchDelegator; tests flip this
+  // directly to exercise both the ES path and the MongoDB fallback path.
+  // Two distinct knobs model two distinct failure modes: this one is "ES was
+  // never configured for this instance" (isReachable short-circuits before any
+  // ES call is attempted), whereas isErrorOccuredOnHealthcheck below models
+  // "ES is configured but the periodic healthcheck has marked it unreachable."
+  isConfiguredOverride = true;
+
   // biome-ignore lint/complexity/noUselessConstructor: widens the protected base ctor (factory pattern) to public so the test can instantiate and wire mocks
   public constructor() {
     super();
@@ -43,7 +64,7 @@ class TestSearchService extends SearchService {
   override registerUpdateEvent(): void {}
 
   override get isConfigured(): boolean {
-    return false;
+    return this.isConfiguredOverride;
   }
 }
 
@@ -81,7 +102,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     mockCrowi.configManager = configManager;
     // SearchService now uses a protected ctor + async create() factory (dev/8.0.x).
     // create() hardcodes `new SearchService()`, ignoring our subclass override, so wire
-    // the mocked delegator manually here (isConfigured=false skips the real init block).
+    // the mocked delegator manually here instead of calling create().
     searchService = new TestSearchService();
     searchService.crowi = mockCrowi;
     searchService.fullTextSearchDelegator =
@@ -145,7 +166,10 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     ).toHaveBeenCalledWith('username', 'ali', 10);
   });
 
-  it('should exclude usernames not found in MongoDB', async () => {
+  it('should classify a username with no matching User doc as inactive, not drop it', async () => {
+    // statusDelete() renames the User doc's username to `deleted_at_*`, so a
+    // deleted user's original username (still recorded in past activity) has
+    // no live User match at all -- it must stay searchable as inactive.
     vi.mocked(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
     ).mockResolvedValue(['alice', 'ghost']);
@@ -160,14 +184,14 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     );
 
     expect(result.username?.activeUsernames).toEqual(['alice']);
-    expect(result.username?.inactiveUsernames).toEqual([]);
+    expect(result.username?.inactiveUsernames).toEqual(['ghost']);
     // Guard the $in narrowing: Mongo queried only for ES-returned names, else leaks others.
     expect(mockUserModel.find).toHaveBeenCalledWith({
       username: { $in: sameStringSet(['alice', 'ghost']) },
     });
   });
 
-  it('should return empty arrays when ES returns []', async () => {
+  it('should return empty arrays without querying MongoDB when ES returns []', async () => {
     vi.mocked(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
     ).mockResolvedValue([]);
@@ -185,5 +209,84 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
         inactiveUsernames: [],
       },
     });
+    expect(mockUserModel.find).not.toHaveBeenCalled();
+    expect(mockFindSnapshotUsernamesByUsernameRegex).not.toHaveBeenCalled();
+  });
+
+  it('should classify active and inactive usernames from the MongoDB fallback when ES is not configured', async () => {
+    searchService.isConfiguredOverride = false;
+    mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValue([
+      'alice',
+      'bob',
+    ]);
+    setupUserModelMock(mockUserModel, [
+      { username: 'alice', status: UserStatus.STATUS_ACTIVE },
+      { username: 'bob', status: UserStatus.STATUS_SUSPENDED },
+    ]);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['username'],
+      'ali',
+      10,
+    );
+
+    expect(result).toEqual({
+      username: {
+        activeUsernames: ['alice'],
+        inactiveUsernames: ['bob'],
+      },
+    });
+    expect(mockFindSnapshotUsernamesByUsernameRegex).toHaveBeenCalledWith(
+      'ali',
+      { offset: 0, limit: 10 },
+    );
+    expect(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('should fall back to MongoDB when the ES search fails', async () => {
+    vi.mocked(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).mockRejectedValue(new Error('ES is down'));
+    mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValue(['alice']);
+    setupUserModelMock(mockUserModel, [
+      { username: 'alice', status: UserStatus.STATUS_ACTIVE },
+    ]);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['username'],
+      'ali',
+      10,
+    );
+
+    expect(result).toEqual({
+      username: { activeUsernames: ['alice'], inactiveUsernames: [] },
+    });
+    expect(mockFindSnapshotUsernamesByUsernameRegex).toHaveBeenCalledWith(
+      'ali',
+      { offset: 0, limit: 10 },
+    );
+  });
+
+  it('should use the MongoDB fallback when ES is configured but unreachable', async () => {
+    searchService.isErrorOccuredOnHealthcheck = true;
+    mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValue(['alice']);
+    setupUserModelMock(mockUserModel, [
+      { username: 'alice', status: UserStatus.STATUS_ACTIVE },
+    ]);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['username'],
+      'ali',
+      10,
+    );
+
+    expect(result).toEqual({
+      username: { activeUsernames: ['alice'], inactiveUsernames: [] },
+    });
+    expect(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).not.toHaveBeenCalled();
   });
 });

@@ -20,6 +20,7 @@ import {
   UserStatus,
 } from '~/server/models/user/conts';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../crowi';
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
@@ -347,6 +348,30 @@ class SearchService implements SearchQueryParser, SearchResolver {
     return this.fullTextSearchDelegator.rebuildAuditlogIndex(option);
   }
 
+  private async searchAuditlogUsernames(
+    q: string,
+    limit: number,
+  ): Promise<string[]> {
+    if (this.isReachable) {
+      try {
+        return await this.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
+          'username',
+          q,
+          limit,
+        );
+      } catch (err) {
+        logger.error(
+          'Failed to search auditlog suggestions on Elasticsearch. Falling back to MongoDB.',
+          err,
+        );
+      }
+    }
+    return prisma.activities.findSnapshotUsernamesByUsernameRegex(q, {
+      offset: 0,
+      limit,
+    });
+  }
+
   async searchAuditlogSuggestions(
     fields: AuditlogSuggestionField[],
     q: string,
@@ -357,23 +382,29 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const response: AuditlogSuggestionsResponse = {};
 
     if (fields.includes('username')) {
-      const usernames =
-        await this.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
-          'username',
-          q,
-          limit,
-        );
+      const usernames = await this.searchAuditlogUsernames(q, limit);
+
       const User = mongoose.model<IUser>('User');
-      const users = await User.find({ username: { $in: usernames } })
-        .select('username status')
-        .lean();
-      response.username = {
-        activeUsernames: users
+      const users =
+        usernames.length === 0
+          ? []
+          : await User.find({ username: { $in: usernames } })
+              .select('username status')
+              .lean();
+
+      const activeUsernames = new Set(
+        users
           .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
           .map((u) => u.username),
-        inactiveUsernames: users
-          .filter((u) => u.status !== UserStatus.STATUS_ACTIVE)
-          .map((u) => u.username),
+      );
+
+      // A username with no live User match (e.g. deleted -- statusDelete()
+      // renames the User doc's username to `deleted_at_*`) must still be
+      // searchable in the audit trail, so anything not proven active is
+      // treated as inactive rather than silently dropped.
+      response.username = {
+        activeUsernames: usernames.filter((u) => activeUsernames.has(u)),
+        inactiveUsernames: usernames.filter((u) => !activeUsernames.has(u)),
       };
     }
 
