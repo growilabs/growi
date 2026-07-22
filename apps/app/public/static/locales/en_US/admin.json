@@ -310,6 +310,9 @@
     "audit_log_index_management": "Audit Log Index Management",
     "settings_explanation": "Normalize or rebuild the audit log's index on the following page",
     "index_management_link": "Go to {{destination}}",
+    "docs_url": {
+      "top": "https://docs.growi.org/en/admin-guide/management-cookbook/setup-search-system.html"
+    },
     "normalize": "Normalize",
     "normalize_button": "Normalize audit log index",
     "normalize_success": "Audit log index normalized successfully.",

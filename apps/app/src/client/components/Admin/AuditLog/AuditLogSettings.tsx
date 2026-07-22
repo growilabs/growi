@@ -54,12 +54,12 @@ export const AuditLogSettings: FC = () => {
           href={t('admin:audit_log_management.docs_url.log_type')}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Help"
+          aria-label={t('Help')}
         >
           <span className="material-symbols-outlined" aria-hidden="true">
             help
           </span>
-          <span className="visually-hidden">Help</span>
+          <span className="visually-hidden">{t('Help')}</span>
         </a>
       </h4>
       <p className="form-text text-muted">
@@ -92,6 +92,18 @@ export const AuditLogSettings: FC = () => {
 
       <h4 className="mt-4">
         {t('admin:audit_log_index_management.audit_log_index_management')}
+        <a
+          className="ms-2"
+          href={t('admin:audit_log_index_management.docs_url.top')}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={t('Help')}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true">
+            help
+          </span>
+          <span className="visually-hidden">{t('Help')}</span>
+        </a>
       </h4>
       <p className="form-text text-muted">
         {t('admin:audit_log_index_management.settings_explanation')}
