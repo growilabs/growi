@@ -25,10 +25,15 @@
     "The whitelist of registration permission E-mail address": "The whitelist of registration permission E-mail address",
     "users_without_account": "Users without account is not accessible",
     "example": "Example",
-    "restrict_emails": "You can restrict email registration to your wiki by writing an email domain (beginning with @). ",
-    "for_example": " For example, if you would like to restrict registration to users within the growi.org domain, you can write ",
-    "in_this_case": "; in this case, only users within the growi.org domain would be able to register, and all other users would be rejected.",
-    "insert_single": "Please insert single e-mail address per line.",
+    "restrict_emails": "You can restrict email registration by domain or by exact address.",
+    "whitelist_domain_desc": " To allow only addresses from an exact domain, write ",
+    "whitelist_domain_suffix": " (only addresses with exactly that domain will be allowed).",
+    "whitelist_subdomain_desc": " To also allow subdomains, write ",
+    "whitelist_subdomain_suffix": " (any address at a subdomain of that domain will be allowed).",
+    "whitelist_exact_desc": " To allow only a specific address, write a full address like ",
+    "whitelist_exact_suffix": ".",
+    "insert_single": "Please insert one entry per line.",
+    "whitelist_invalid_format": "Invalid format. Use @example.com for exact domain, @*.example.com for subdomains, or user@example.com for exact address.",
     "page_list_and_search_results": "Page list / Search results",
     "page_listing_1": "Page listing/searching<br>restricted by 'Only me'",
     "page_listing_1_desc": "Show pages that are restricted by 'Only me' option when listing/searching",
@@ -836,6 +841,8 @@
       "send_temporary_password": "If you have not sent an invitation email, copy the temporary password on this screen and contact the inviter.",
       "send_email": "You can also send or resend the invitation email from the drop-down in the users table.",
       "existing_email": "The following emails already exist",
+      "whitelist_violation": "The following email addresses are not allowed by the whitelist:",
+      "reason_email_not_in_whitelist": "Not included in whitelist",
       "issue": "Issue"
     },
     "user_table": {
@@ -965,6 +972,16 @@
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
+  },
+  "audit_log_snapshot": {
+    "file_name": "File name",
+    "file_size": "File size",
+    "page": "Page",
+    "no_detail": "No snapshot detail available",
+    "unknown_file_name": "Unknown file name",
+    "page_unavailable": "Page unavailable",
+    "unknown_size": "Unknown size",
+    "download": "Download"
   },
   "g2g_data_transfer": {
     "transfer_data_to_another_growi": "Transfer data from this GROWI to another GROWI",

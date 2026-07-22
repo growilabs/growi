@@ -1,19 +1,11 @@
-import type {
+import {
   autocompletion,
-  Completion,
-  CompletionSource,
+  type Completion,
+  type CompletionContext,
 } from '@codemirror/autocomplete';
+import { markdownLanguage } from '@codemirror/lang-markdown';
 import { syntaxTree } from '@codemirror/language';
 import nativeLookup from '@growi/emoji-mart-data';
-
-/**
- * A single `addToOptions` entry as accepted by {@link autocompletion}. Derived
- * from the (non-exported) config type so the render signature stays in sync with
- * `@codemirror/autocomplete` without a type assertion.
- */
-type AddToOption = NonNullable<
-  NonNullable<Parameters<typeof autocompletion>[0]>['addToOptions']
->[number];
 
 const emojiOptions: Completion[] = Object.keys(nativeLookup).map((tag) => ({
   label: `:${tag}:`,
@@ -22,8 +14,8 @@ const emojiOptions: Completion[] = Object.keys(nativeLookup).map((tag) => ({
 
 const TWO_OR_MORE_WORD_CHARACTERS_REGEX = /:\w{2,}$/;
 
-// EmojiCompletionSource is activated when two characters are entered into the editor.
-export const emojiCompletionSource: CompletionSource = (context) => {
+// EmojiAutocompletion is activated when two characters are entered into the editor.
+export const emojiCompletionSource = (context: CompletionContext) => {
   const nodeBefore = syntaxTree(context.state).resolveInner(context.pos, -1);
   const textBefore = context.state.sliceDoc(nodeBefore.from, context.pos);
   const emojiBefore = TWO_OR_MORE_WORD_CHARACTERS_REGEX.exec(textBefore);
@@ -37,14 +29,21 @@ export const emojiCompletionSource: CompletionSource = (context) => {
   };
 };
 
-export const emojiRenderOption: AddToOption = {
-  render: (completion) => {
-    const emojiName = completion.type ?? '';
-    const emoji = nativeLookup[emojiName]?.skins[0].native ?? '';
+export const emojiAutocompletionSettings = [
+  autocompletion({
+    addToOptions: [
+      {
+        render: (completion: Completion) => {
+          const emojiName = completion.type ?? '';
+          const emoji = nativeLookup[emojiName]?.skins[0].native ?? '';
 
-    const element = document.createElement('span');
-    element.innerHTML = emoji;
-    return element;
-  },
-  position: 20,
-};
+          const element = document.createElement('span');
+          element.innerHTML = emoji;
+          return element;
+        },
+        position: 20,
+      },
+    ],
+  }),
+  markdownLanguage.data.of({ autocomplete: emojiCompletionSource }),
+];

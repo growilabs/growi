@@ -4,6 +4,7 @@ import multer from 'multer';
 import autoReap from 'multer-autoreap';
 
 import { createVaultGatewayRouterWithDeps } from '~/features/growi-vault/server';
+import { createPageMarkdownHandlers } from '~/features/page-markdown/server';
 import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter';
 import { createApiRouter } from '~/server/util/createApiRouter';
 
@@ -14,6 +15,7 @@ import apiV1FormValidator from '../middlewares/apiv1-form-validator';
 import { setup as setupApplicationInstalled } from '../middlewares/application-installed';
 import * as applicationNotInstalled from '../middlewares/application-not-installed';
 import { setup as setupAutoReconnectToSearch } from '../middlewares/auto-reconnect-to-search';
+import { setup as setupCertifySharedPage } from '../middlewares/certify-shared-page';
 import {
   excludeReadOnlyUser,
   excludeReadOnlyUserIfCommentNotAllowed,
@@ -37,7 +39,6 @@ import { setup as setupLoginPassport } from './login-passport';
 import nextFactory from './next';
 import { setup as setupOgp } from './ogp';
 import { setup as setupPage } from './page';
-import { pageMarkdownRouteFactory } from './page-markdown';
 import { setup as setupSearch } from './search';
 import { setup as setupTag } from './tag';
 import * as userActivation from './user-activation';
@@ -52,6 +53,7 @@ export const setup = (crowi, app) => {
   const loginRequired = loginRequiredFactory(crowi, true);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
+  const certifySharedPage = setupCertifySharedPage(crowi);
 
   const uploads = multer({ dest: `${crowi.tmpDir}uploads` });
   const page = setupPage(crowi, app);
@@ -275,6 +277,13 @@ export const setup = (crowi, app) => {
   apiV1Router.get(
     '/comments.get',
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    // Validate ids (MongoId) and short-circuit malformed input BEFORE
+    // certifySharedPage, so injection (e.g. `page_id[$gt]=`) never reaches the
+    // share-link DB query, and certifySharedPage must run before loginRequired
+    // (the guest-pass depends on req.isSharedPage).
+    comment.api.validators.get(),
+    apiV1FormValidator,
+    certifySharedPage,
     loginRequired,
     comment.api.get,
   );
@@ -401,9 +410,17 @@ export const setup = (crowi, app) => {
   );
 
   // Page Markdown endpoint (.md suffix / Accept: text/markdown / ?format=md).
-  // Must be registered immediately before the catch-all so it can intercept
-  // markdown requests; non-markdown requests fall through to the HTML delegate.
-  app.use(pageMarkdownRouteFactory(crowi));
+  // Registered immediately before the catch-alls: the gate exits via
+  // next('route') for non-markdown GETs, so authz below runs only for
+  // markdown requests and everything else falls through to the HTML delegate.
+  const pageMarkdown = createPageMarkdownHandlers(crowi);
+  app.get(
+    '/*',
+    pageMarkdown.skipUnlessMarkdownRequest,
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    loginRequired,
+    pageMarkdown.respond,
+  );
 
   app.get('/*/$', loginRequired, next.delegateToNext);
   app.get('/*', loginRequired, autoReconnectToSearch, next.delegateToNext);

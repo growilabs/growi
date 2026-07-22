@@ -29,6 +29,7 @@ export function getAclService() {
   return _aclService;
 }
 
+import { isEmailMatchedByEntry } from '~/utils/email-whitelist';
 import { generateGravatarSrc } from '~/utils/gravatar';
 import loggerFactory from '~/utils/logger';
 
@@ -395,21 +396,18 @@ const factory = (crowi) => {
     return userStatus;
   };
 
-  userSchema.statics.isEmailValid = (email, callback) => {
+  userSchema.statics.isEmailValid = (email) => {
     validateCrowi();
 
     const whitelist = getConfigManager().getConfig(
       'security:registrationWhitelist',
     );
 
-    if (Array.isArray(whitelist) && whitelist.length > 0) {
-      return whitelist.some((allowedEmail) => {
-        const re = new RegExp(`${allowedEmail}$`);
-        return re.test(email);
-      });
+    if (!Array.isArray(whitelist) || whitelist.length === 0) {
+      return true;
     }
 
-    return true;
+    return whitelist.some((entry) => isEmailMatchedByEntry(email, entry));
   };
 
   userSchema.statics.findUsers = function (options, callback) {

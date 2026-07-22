@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildDefaultExtensionsArg,
-  createEditorCompletionExtension,
+  createSlashCommandExtension,
 } from './use-default-extensions.js';
 
 /**
@@ -21,11 +21,11 @@ import {
  * call site so the spy stays typed for assertions.
  */
 
-describe('createEditorCompletionExtension', () => {
+describe('createSlashCommandExtension', () => {
   it('resolves slash-command labels via the provided t (slash source is wired in)', () => {
     const t = vi.fn((key: string) => key);
 
-    createEditorCompletionExtension(t as unknown as TFunction);
+    createSlashCommandExtension(t as unknown as TFunction);
 
     // The unified completion must resolve slash-command display strings through t;
     // this proves the slash source is composed in alongside the emoji source, so a
@@ -47,7 +47,7 @@ describe('buildDefaultExtensionsArg (Compartment-safe registration shape)', () =
     return view;
   };
 
-  const completionExtension = createEditorCompletionExtension(
+  const completionExtension = createSlashCommandExtension(
     vi.fn((key: string) => key) as unknown as TFunction,
   );
 

@@ -22,8 +22,7 @@ import { useTranslation } from 'react-i18next';
 import type { UseCodeMirrorEditor } from '../services/index.js';
 import {
   createSlashCommandSource,
-  emojiCompletionSource,
-  emojiRenderOption,
+  emojiAutocompletionSettings,
   resolveSlashCommands,
 } from '../services-internal/index.js';
 
@@ -51,7 +50,9 @@ const completionMenuTheme = EditorView.baseTheme({
   },
 });
 
-const staticExtensions: Extension[] = [
+// The defaults MINUS feature-specific extensions (emoji) — keeps the shared facility.
+// Exported so a regression test can prove mention works on this base without emoji.
+export const baseExtensions: Extension[] = [
   EditorView.lineWrapping,
   markdown({
     base: markdownLanguage,
@@ -63,19 +64,26 @@ const staticExtensions: Extension[] = [
   Prec.lowest(keymap.of(defaultKeymap)),
   syntaxHighlighting(markdownHighlighting),
   Prec.lowest(syntaxHighlighting(defaultHighlightStyle)),
+  // Shared facility, not owned by any feature. Emoji also adds addToOptions via its own
+  // autocompletion() call; CodeMirror dedups the core and merges the configs.
+  autocompletion({ icons: false }),
   completionMenuTheme,
 ];
 
-// No `/` keybinding is registered — the slash menu fires from typed input via the
-// completion source, so the global `/` (page search) is preserved (Req 6.4).
-export const createEditorCompletionExtension = (t: TFunction): Extension =>
-  autocompletion({
-    override: [
-      createSlashCommandSource(resolveSlashCommands(t)),
-      emojiCompletionSource,
-    ],
-    addToOptions: [emojiRenderOption],
-    icons: false,
+const defaultExtensions: Extension[] = [
+  ...baseExtensions,
+  emojiAutocompletionSettings,
+];
+
+// Slash commands register their source the same way as emoji/mention — as a
+// Markdown language-data autocomplete source — so all three coexist in the shared
+// autocompletion() facility (an `override` would replace the language-data sources
+// and break mention). Labels are resolved via `t`; no `/` keybinding is added, so
+// the slash menu fires from typed input and the global `/` (page search) is
+// preserved (Req 6.4).
+export const createSlashCommandExtension = (t: TFunction): Extension =>
+  markdownLanguage.data.of({
+    autocomplete: createSlashCommandSource(resolveSlashCommands(t)),
   });
 
 /**
@@ -88,16 +96,16 @@ export const createEditorCompletionExtension = (t: TFunction): Extension =>
  * runtime. Keeping the outer array length 1 keeps it one compartment for the set.
  */
 export const buildDefaultExtensionsArg = (
-  completionExtension: Extension,
-): Extension[] => [[...staticExtensions, completionExtension]];
+  slashCommandExtension: Extension,
+): Extension[] => [[...defaultExtensions, slashCommandExtension]];
 
 export const useDefaultExtensions = (
   codeMirrorEditor?: UseCodeMirrorEditor,
 ): void => {
   const { t } = useTranslation('translation');
 
-  const completionExtension = useMemo(
-    () => createEditorCompletionExtension(t),
+  const slashCommandExtension = useMemo(
+    () => createSlashCommandExtension(t),
     [t],
   );
 
@@ -110,8 +118,8 @@ export const useDefaultExtensions = (
     // Return the cleanup so a re-register (e.g. language change) tears down the
     // previous compartment first, instead of stacking duplicates.
     const cleanup = appendExtensions(
-      buildDefaultExtensionsArg(completionExtension),
+      buildDefaultExtensionsArg(slashCommandExtension),
     );
     return cleanup;
-  }, [view, appendExtensions, completionExtension]);
+  }, [view, appendExtensions, slashCommandExtension]);
 };

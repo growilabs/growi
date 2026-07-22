@@ -37,3 +37,12 @@ main().catch(console.error);
 The development server **can always be started** in the devcontainer for smoke and integration verification. Never claim the runtime environment is unavailable.
 
 See `apps/app/.claude/skills/app-commands/SKILL.md` → **Smoke Testing** section for the full workflow.
+
+## Do Not Run pnpm Commands Concurrently
+
+Never run `pnpm install` in parallel with any `turbo run` / `pnpm run` /
+`pnpm vitest` invocation — even in a different worktree. pnpm's
+dependency-status check (`runDepsStatusCheck`) spawns an internal
+`pnpm install`; two installs contend on the shared store lock and both fail
+with `Command was killed with SIGINT`. When orchestrating parallel subagents,
+serialize installs against any agent's build/test runs.

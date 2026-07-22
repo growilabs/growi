@@ -1,86 +1,125 @@
-// @vitest-environment jsdom
 import {
   CompletionContext,
-  type CompletionResult,
+  type CompletionSource,
 } from '@codemirror/autocomplete';
-import { EditorSelection, EditorState } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
-import { afterEach, describe, expect, it } from 'vitest';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
+import {
+  LanguageDescription,
+  LanguageSupport,
+  StreamLanguage,
+} from '@codemirror/language';
+import { EditorState } from '@codemirror/state';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  createMentionCompletionSource,
+  type UserSuggestion,
+} from '../../services/mentionAutocompletionSettings';
+import {
+  emojiAutocompletionSettings,
   emojiCompletionSource,
-  emojiRenderOption,
-} from './emojiAutocompletionSettings.js';
+} from './emojiAutocompletionSettings';
 
-/** Query the emoji source against a throwaway state at `pos`. */
-const queryAt = (
+const mockUser = (username: string, name = ''): UserSuggestion => ({
+  username,
+  name,
+});
+
+// The emoji source reads syntaxTree(context.state) and context.state.sliceDoc(),
+// so it requires a real EditorState-backed CompletionContext (the markdown
+// language itself is not required for a direct call).
+const createContext = (
   doc: string,
-  pos: number,
+  pos?: number,
   explicit = false,
-): CompletionResult | null => {
-  const state = EditorState.create({
-    doc,
-    selection: EditorSelection.cursor(pos),
-  });
-  const result = emojiCompletionSource(
-    new CompletionContext(state, pos, explicit),
-  );
-  // The source is synchronous; narrow the CompletionSource union.
-  if (result instanceof Promise) {
-    throw new Error('source must be synchronous');
-  }
-  return result;
+): CompletionContext => {
+  const state = EditorState.create({ doc });
+  return new CompletionContext(state, pos ?? doc.length, explicit);
 };
 
-// Real EditorViews schedule a layout measure on requestAnimationFrame that jsdom
-// cannot service; destroy them after each test to cancel the pending measure.
-const createdViews: EditorView[] = [];
-afterEach(() => {
-  for (const view of createdViews.splice(0)) {
-    view.destroy();
-  }
-});
+describe('emoji / mention source decoupling (Requirement 4)', () => {
+  // AC 4.4 — emoji and mention are independent additive sources. This checks each
+  // returns a result on its own; it does NOT assert coexistence on one shared facility.
+  describe('AC 4.4: each source returns a result independently', () => {
+    let mockFetchUsers: ReturnType<typeof vi.fn>;
 
-const createView = (): EditorView => {
-  const view = new EditorView({ state: EditorState.create({ doc: '' }) });
-  createdViews.push(view);
-  return view;
-};
+    beforeEach(() => {
+      mockFetchUsers = vi.fn();
+      vi.useFakeTimers();
+    });
 
-describe('emojiCompletionSource - trigger detection', () => {
-  it('returns null when there is no ":xx" trigger and completion is not explicit', () => {
-    expect(queryAt('', 0)).toBeNull();
-    expect(queryAt('foo', 3)).toBeNull();
-    // A single word character after ":" is below the two-character threshold.
-    expect(queryAt(':s', 2)).toBeNull();
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('emoji source returns options for ":smi" and mention source returns a result for "@ab" (each invoked independently)', async () => {
+      // Emoji source is synchronous. Omitting the explicit flag means the ":smi"
+      // trigger regex is actually exercised (with explicit:true it returns regardless).
+      const emojiResult = emojiCompletionSource(createContext(':smi'));
+      expect(emojiResult).not.toBeNull();
+      expect(emojiResult?.options.length).toBeGreaterThan(0);
+
+      // Mention source: debounced (300ms) + async. Drive with fake timers and a
+      // mock returning at least one user (an empty array resolves to null).
+      mockFetchUsers.mockResolvedValue([mockUser('abc', 'Abc')]);
+      const mentionSource = createMentionCompletionSource(mockFetchUsers);
+      const mentionState = EditorState.create({ doc: '@ab' });
+      const mentionPromise = mentionSource(
+        new CompletionContext(mentionState, 3, false),
+      );
+      vi.runAllTimers();
+      const mentionResult = await mentionPromise;
+      expect(mentionResult).not.toBeNull();
+    });
   });
 
-  it('offers emoji options with ":tag:" labels once ":xx" precedes the cursor', () => {
-    const result = queryAt(':sm', 3);
+  // AC 4.6 — the emoji source is scoped to the markdown language, so it is NOT
+  // active inside fenced code blocks but IS active in normal markdown text.
+  describe('AC 4.6: code-block scoping', () => {
+    it('scopes emoji source to markdown language — not active inside fenced code blocks', () => {
+      // A synchronously-loaded stub sublanguage so the ```js region actually
+      // nests in a unit test. codeLanguages: languages (from
+      // @codemirror/language-data) loads ASYNC and would NOT nest here, which
+      // would make the .not.toContain assertion falsely pass/fail.
+      const stubParser = StreamLanguage.define({
+        token: (s) => {
+          s.next();
+          return null;
+        },
+      });
+      const jsDesc = LanguageDescription.of({
+        name: 'javascript',
+        alias: ['js'],
+        support: new LanguageSupport(stubParser),
+      });
 
-    expect(result).not.toBeNull();
-    expect(result?.from).toBe(0);
-    // Source offers the whole set; CodeMirror narrows via validFor/filtering.
-    expect(result?.options.length).toBeGreaterThan(0);
-    for (const option of result?.options ?? []) {
-      expect(option.label).toMatch(/^:.+:$/);
-    }
-    // A well-known emoji tag is present in the offered set.
-    expect(result?.options.map((o) => o.label)).toContain(':smile:');
-  });
-});
+      const doc = '```js\n:smi\n```\n\n:smi';
+      const state = EditorState.create({
+        doc,
+        extensions: [
+          markdown({ base: markdownLanguage, codeLanguages: [jsDesc] }),
+          emojiAutocompletionSettings,
+        ],
+      });
 
-describe('emojiRenderOption', () => {
-  it('renders the native emoji for a known completion.type into an HTMLElement', () => {
-    const view = createView();
-    const element = emojiRenderOption.render(
-      { label: ':smile:', type: 'smile' },
-      view.state,
-      view,
-    );
+      const posInBlock = doc.indexOf(':smi') + 1; // cursor inside the ```js block
+      const posOutside = doc.lastIndexOf(':smi') + 1; // cursor in normal markdown
 
-    expect(element).toBeInstanceOf(HTMLElement);
-    // "smile" resolves to its native glyph.
-    expect(element?.textContent).toBe('😄');
+      // state.languageDataAt(name, pos) returns language-data values for the
+      // active language at pos. Inside the fenced block the active language is
+      // the stub, so markdown's emoji source is not returned there.
+      const sourcesInBlock = state.languageDataAt<CompletionSource>(
+        'autocomplete',
+        posInBlock,
+      );
+      const sourcesOutside = state.languageDataAt<CompletionSource>(
+        'autocomplete',
+        posOutside,
+      );
+
+      expect(sourcesInBlock).not.toContain(emojiCompletionSource);
+      expect(sourcesOutside).toContain(emojiCompletionSource);
+    });
   });
 });
