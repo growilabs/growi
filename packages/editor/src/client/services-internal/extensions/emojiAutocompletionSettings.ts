@@ -1,7 +1,7 @@
-import {
+import type {
   autocompletion,
-  type Completion,
-  type CompletionSource,
+  Completion,
+  CompletionSource,
 } from '@codemirror/autocomplete';
 import { syntaxTree } from '@codemirror/language';
 import nativeLookup from '@growi/emoji-mart-data';
@@ -48,9 +48,3 @@ export const emojiRenderOption: AddToOption = {
   },
   position: 20,
 };
-
-export const emojiAutocompletionSettings = autocompletion({
-  addToOptions: [emojiRenderOption],
-  icons: false,
-  override: [emojiCompletionSource],
-});
