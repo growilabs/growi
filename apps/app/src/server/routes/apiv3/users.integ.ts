@@ -127,15 +127,16 @@ describe('POST /invite', () => {
     vi.resetModules();
 
     // Import and mount the users router.
-    // users.js is an untyped CommonJS module (`module.exports = (crowi) => router`).
-    // TypeScript types the dynamic-import namespace without a call signature or a
-    // `.default`, so a cast to the real factory shape is required here — no usable
-    // type exists for the JS module. The cast still type-checks the call site:
-    // `crowiMock` is verified against `Crowi`.
+    // users.js is an untyped JS module exposing a named `setup` factory
+    // (`export const setup = (crowi) => router`). TypeScript types the
+    // dynamic-import namespace without a call signature, so a cast to the real
+    // factory shape is required here — no usable type exists for the JS module.
+    // The cast still type-checks the call site: `crowiMock` is verified against
+    // `Crowi`.
     const usersModule = (await import('./users')) as unknown as {
-      default: (crowi: Crowi) => express.Router;
+      setup: (crowi: Crowi) => express.Router;
     };
-    app.use('/', usersModule.default(crowiMock));
+    app.use('/', usersModule.setup(crowiMock));
   });
 
   afterEach(() => {
