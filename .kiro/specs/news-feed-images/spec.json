@@ -1,0 +1,22 @@
+{
+  "feature_name": "news-feed-images",
+  "created_at": "2026-07-23T04:25:36Z",
+  "updated_at": "2026-07-23T04:58:48Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

@@ -419,6 +419,45 @@ describe('NewsService', () => {
       await service.upsertNewsItems([]);
       expect(mocks.newsItemBulkWrite).not.toHaveBeenCalled();
     });
+
+    test('should $set image when the input carries one', async () => {
+      mocks.newsItemBulkWrite.mockResolvedValue({ upsertedCount: 1 });
+      const image = {
+        url: 'https://growilabs.github.io/growi-news-feed/images/x.png',
+        alt: { ja_JP: '代替' },
+      };
+
+      await service.upsertNewsItems([
+        {
+          id: 'ext-img',
+          title: { ja_JP: 'Test' },
+          publishedAt: '2026-01-01T00:00:00Z',
+          image,
+        },
+      ]);
+
+      const [ops] = mocks.newsItemBulkWrite.mock.calls[0];
+      expect(ops[0].updateOne.update.$set.image).toEqual(image);
+      expect(ops[0].updateOne.update.$unset).toBeUndefined();
+    });
+
+    test('should $unset image when the input has none (stale image removal)', async () => {
+      mocks.newsItemBulkWrite.mockResolvedValue({ upsertedCount: 1 });
+
+      await service.upsertNewsItems([
+        {
+          id: 'ext-no-img',
+          title: { ja_JP: 'Test' },
+          publishedAt: '2026-01-01T00:00:00Z',
+        },
+      ]);
+
+      // $set with undefined is dropped by the driver, so removing an image
+      // from the feed must translate into an explicit $unset on re-ingest
+      const [ops] = mocks.newsItemBulkWrite.mock.calls[0];
+      expect(ops[0].updateOne.update.$set.image).toBeUndefined();
+      expect(ops[0].updateOne.update.$unset).toEqual({ image: '' });
+    });
   });
 
   describe('deleteItemsNotInFeed', () => {

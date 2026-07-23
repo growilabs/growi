@@ -44,7 +44,11 @@ vi.stubGlobal('fetch', mocks.mockFetch);
 // Mock Math.random for deterministic sleep (zero sleep)
 vi.spyOn(Math, 'random').mockReturnValue(0);
 
+// Spy mode: real implementation by default, overridable per test
+vi.mock('./resolve-image-url', { spy: true });
+
 import { NewsCronService } from './news-cron-service';
+import { resolveNewsImageUrl } from './resolve-image-url';
 
 const VALID_FEED = {
   version: '1.0',
@@ -314,6 +318,71 @@ describe('NewsCronService', () => {
       await service.executeJob();
 
       expect(mocks.upsertNewsItems).not.toHaveBeenCalled();
+    });
+
+    describe('image ingestion', () => {
+      test('should resolve a valid image path into an absolute URL', async () => {
+        const feed = {
+          version: '1.0',
+          items: [
+            {
+              id: 'with-image',
+              title: { ja_JP: '画像つき' },
+              publishedAt: '2026-01-01T00:00:00Z',
+              image: {
+                path: 'images/release.png',
+                alt: { ja_JP: 'リリース画像' },
+              },
+            },
+          ],
+        };
+        mocks.mockFetch.mockResolvedValue(mockResponse(feed));
+
+        await service.executeJob();
+
+        const [inputs] = mocks.upsertNewsItems.mock.calls[0];
+        expect(inputs[0].image).toEqual({
+          url: 'https://growilabs.github.io/growi-news-feed/images/release.png',
+          alt: { ja_JP: 'リリース画像' },
+        });
+      });
+
+      test('should ingest the item without image when containment validation rejects it', async () => {
+        // Any path that passes the zod grammar also resolves safely, so the
+        // resolve-layer rejection branch is reachable only when the two layers
+        // disagree (defense-in-depth) — force that with a spy returning null.
+        vi.mocked(resolveNewsImageUrl).mockReturnValueOnce(null);
+        const feed = {
+          version: '1.0',
+          items: [
+            {
+              id: 'rejected-image',
+              title: { ja_JP: '不正画像' },
+              publishedAt: '2026-01-01T00:00:00Z',
+              image: { path: 'images/valid-looking.png' },
+            },
+          ],
+        };
+        mocks.mockFetch.mockResolvedValue(mockResponse(feed));
+
+        await service.executeJob();
+
+        const [inputs] = mocks.upsertNewsItems.mock.calls[0];
+        expect(inputs).toHaveLength(1);
+        expect(inputs[0].id).toBe('rejected-image');
+        expect(inputs[0].image).toBeUndefined();
+      });
+
+      test('should leave image undefined for items without one', async () => {
+        mocks.mockFetch.mockResolvedValue(mockResponse(VALID_FEED));
+
+        await service.executeJob();
+
+        const [inputs] = mocks.upsertNewsItems.mock.calls[0];
+        for (const input of inputs) {
+          expect(input.image).toBeUndefined();
+        }
+      });
     });
   });
 });

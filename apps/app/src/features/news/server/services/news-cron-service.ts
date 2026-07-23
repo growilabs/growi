@@ -6,6 +6,7 @@ import loggerFactory from '~/utils/logger';
 import type { INewsItemInput } from '../../interfaces/news-item';
 import { type FeedItem, parseFeedJson } from './feed-parser';
 import { NewsService } from './news-service';
+import { resolveNewsImageUrl } from './resolve-image-url';
 
 const logger = loggerFactory('growi:feature:news:cron');
 
@@ -113,19 +114,38 @@ export class NewsCronService extends CronService {
     );
 
     // Convert FeedItem to INewsItemInput (reuse id as externalId)
-    const newsItemInputs: INewsItemInput[] = filteredItems.map((item) => ({
-      id: item.id,
-      title: item.title,
-      body: item.body,
-      emoji: item.emoji,
-      url: item.url,
-      publishedAt: item.publishedAt,
-      conditions: item.conditions
-        ? {
-            targetRoles: item.conditions.targetRoles,
-          }
-        : undefined,
-    }));
+    const newsItemInputs: INewsItemInput[] = filteredItems.map((item) => {
+      // Resolve the feed-relative image path into an absolute URL, enforcing
+      // https + containment inside the feed's images/ directory. A rejected
+      // image never blocks the item itself (Requirement 1.4 fail-soft).
+      const imageUrl =
+        item.image != null
+          ? resolveNewsImageUrl(item.image.path, FEED_URL)
+          : null;
+      if (item.image != null && imageUrl == null) {
+        logger.warn(
+          `News image rejected by containment validation, ingesting item without image: ${item.image.path} (item: ${item.id})`,
+        );
+      }
+
+      return {
+        id: item.id,
+        title: item.title,
+        body: item.body,
+        emoji: item.emoji,
+        url: item.url,
+        image:
+          imageUrl != null
+            ? { url: imageUrl, alt: item.image?.alt }
+            : undefined,
+        publishedAt: item.publishedAt,
+        conditions: item.conditions
+          ? {
+              targetRoles: item.conditions.targetRoles,
+            }
+          : undefined,
+      };
+    });
 
     // Pass the full set of feed externalIds so the service can delete any DB
     // item that is no longer present in the feed (Requirement 1.3). Includes

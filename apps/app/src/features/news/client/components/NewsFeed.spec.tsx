@@ -125,6 +125,68 @@ describe('NewsFeed', () => {
     });
   });
 
+  describe('image slot', () => {
+    const IMAGE_URL =
+      'https://growilabs.github.io/growi-news-feed/images/x.png';
+
+    test('should render the image slot for an item with an image', () => {
+      const items = [
+        makeNewsItem({
+          image: { url: IMAGE_URL, alt: { en_US: 'release banner' } },
+        }),
+      ];
+      mocks.useSWRxNewsPage.mockReturnValue(swrResponse(makePage(items)));
+
+      render(<NewsFeed />);
+
+      const img = screen.getByRole('img');
+      expect(img.getAttribute('src')).toBe(IMAGE_URL);
+      expect(img.getAttribute('alt')).toBe('release banner');
+    });
+
+    test('should not render an image slot for items without an image', () => {
+      const items = [makeNewsItem(), makeNewsItem()];
+      mocks.useSWRxNewsPage.mockReturnValue(swrResponse(makePage(items)));
+
+      const { container } = render(<NewsFeed />);
+
+      expect(container.querySelector('img')).toBeNull();
+    });
+
+    // Caller-contract guard: NewsFeed must render NewsImage with key={url}.
+    // Without it, React reuses the component instance when an item's image
+    // URL changes, and a stale onError state would keep the NEW image hidden.
+    test('should show a new image after the previous URL errored (remount via key)', () => {
+      // Two generations differing only in image URL while the item identity
+      // (_id) stays the same — exactly the case key={url} exists for
+      const item = makeNewsItem();
+      const deadUrl =
+        'https://growilabs.github.io/growi-news-feed/images/dead.png';
+      const aliveUrl =
+        'https://growilabs.github.io/growi-news-feed/images/alive.png';
+
+      mocks.useSWRxNewsPage.mockReturnValue(
+        swrResponse(makePage([{ ...item, image: { url: deadUrl } }])),
+      );
+      const { container, rerender } = render(<NewsFeed />);
+
+      const img = container.querySelector('img');
+      expect(img).not.toBeNull();
+      if (img == null) throw new Error('unreachable');
+      fireEvent.error(img);
+      expect(container.querySelector('img')).toBeNull();
+
+      mocks.useSWRxNewsPage.mockReturnValue(
+        swrResponse(makePage([{ ...item, image: { url: aliveUrl } }])),
+      );
+      rerender(<NewsFeed />);
+
+      expect(container.querySelector('img')?.getAttribute('src')).toBe(
+        aliveUrl,
+      );
+    });
+  });
+
   describe('pagination', () => {
     test('should not show the pager when all items fit on one page', () => {
       const items = [makeNewsItem(), makeNewsItem()];

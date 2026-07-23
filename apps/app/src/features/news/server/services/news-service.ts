@@ -148,24 +148,31 @@ export class NewsService {
     const now = new Date();
 
     await NewsItem.bulkWrite(
-      items.map((item) => ({
-        updateOne: {
-          filter: { externalId: item.id },
-          update: {
-            $set: {
-              externalId: item.id,
-              title: item.title,
-              body: item.body,
-              emoji: item.emoji,
-              url: item.url,
-              publishedAt: new Date(item.publishedAt),
-              fetchedAt: now,
-              conditions: item.conditions,
-            },
+      items.map((item) => {
+        const baseFields = {
+          externalId: item.id,
+          title: item.title,
+          body: item.body,
+          emoji: item.emoji,
+          url: item.url,
+          publishedAt: new Date(item.publishedAt),
+          fetchedAt: now,
+          conditions: item.conditions,
+        };
+        return {
+          updateOne: {
+            filter: { externalId: item.id },
+            // $set with an undefined value is dropped by the driver, which
+            // would leave a stale image on re-ingest after the feed removes
+            // it — so an absent image must be an explicit $unset.
+            update:
+              item.image != null
+                ? { $set: { ...baseFields, image: item.image } }
+                : { $set: baseFields, $unset: { image: '' } },
+            upsert: true,
           },
-          upsert: true,
-        },
-      })),
+        };
+      }),
       { ordered: false },
     );
   }

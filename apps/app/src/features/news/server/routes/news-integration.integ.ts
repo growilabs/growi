@@ -91,6 +91,54 @@ describe('News API Integration', () => {
       expect(res.status).toBe(200);
       expect(res.body.docs).toHaveLength(2);
     });
+
+    // Round-trip guard: `image.alt` is a Mongoose Map on the model but the
+    // client contract is a plain Record<string, string> after lean() + JSON
+    // serialization. A serialization change returning a native Map (→ {})
+    // would silently blank localized alt text without this test.
+    test('should serialize image url and localized alt through the API', async () => {
+      const now = new Date();
+      const imageUrl =
+        'https://growilabs.github.io/growi-news-feed/images/release.png';
+      await NewsItem.create({
+        externalId: 'with-image',
+        title: { ja_JP: '画像つき' },
+        publishedAt: now,
+        fetchedAt: now,
+        image: {
+          url: imageUrl,
+          alt: { ja_JP: 'リリース画像', en_US: 'release image' },
+        },
+      });
+
+      const { app } = buildApp();
+      const res = await request(app).get('/apiv3/news/list');
+
+      expect(res.status).toBe(200);
+      expect(res.body.docs).toHaveLength(1);
+      expect(res.body.docs[0].image.url).toBe(imageUrl);
+      expect(res.body.docs[0].image.alt).toEqual({
+        ja_JP: 'リリース画像',
+        en_US: 'release image',
+      });
+    });
+
+    test('should not include an image field for items without one', async () => {
+      const now = new Date();
+      await NewsItem.create({
+        externalId: 'no-image',
+        title: { ja_JP: '画像なし' },
+        publishedAt: now,
+        fetchedAt: now,
+      });
+
+      const { app } = buildApp();
+      const res = await request(app).get('/apiv3/news/list');
+
+      expect(res.status).toBe(200);
+      // `default: undefined` on the nested schema must prevent an empty {}
+      expect(res.body.docs[0].image).toBeUndefined();
+    });
   });
 
   describe('POST /apiv3/news/mark-read', () => {

@@ -11,20 +11,14 @@ import { getLocale } from '~/utils/locale-utils';
 
 import { NEWS_PER_PAGE, newsItemAnchorId } from '../consts';
 import { useSWRxNewsPage } from '../hooks/use-news';
+import { isSafeHttpUrl } from '../utils/is-safe-http-url';
 import { parsePageQuery } from '../utils/parse-page-query';
 import { resolveLocaleText } from '../utils/resolve-locale-text';
+import { NewsImage } from './NewsImage';
 
 import styles from './NewsFeed.module.scss';
 
 const DEFAULT_EMOJI = '📢';
-
-/**
- * Defense-in-depth: even though `feed-parser` rejects non-http(s) URLs at
- * ingest time, the rendered href is exposed to whatever happens to be in the
- * DB (e.g. a row inserted before the validator existed). Re-check at render
- * to block `javascript:`, `data:`, and similar XSS vectors.
- */
-const isSafeHttpUrl = (url: string): boolean => /^https?:\/\//i.test(url);
 
 /**
  * Full-page news feed with pagination. Sidebar's infinite-scroll variant walks
@@ -143,6 +137,18 @@ export const NewsFeed = (): JSX.Element => {
               {body !== '' && (
                 <div className="ms-5" style={{ whiteSpace: 'pre-wrap' }}>
                   {body}
+                </div>
+              )}
+
+              {item.image != null && (
+                <div className="ms-5 mt-3">
+                  {/* key={url} remounts NewsImage when the URL changes so a
+                      previous load-error state cannot hide a new image */}
+                  <NewsImage
+                    key={item.image.url}
+                    url={item.image.url}
+                    alt={item.image.alt}
+                  />
                 </div>
               )}
 

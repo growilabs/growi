@@ -8,6 +8,21 @@ const logger = loggerFactory('growi:feature:news:feed-parser');
 // Items with disallowed schemes fail per-item validation and are dropped at parse time.
 const HTTP_URL_PATTERN = /^https?:\/\//i;
 
+/**
+ * Image path grammar: fixed "images/" prefix, then a single filename of
+ * [A-Za-z0-9._-] with an allowed raster extension. This syntactically rules
+ * out traversal (`..` needs a `/` or a leading dot chain), percent-encoding,
+ * query/hash, backslashes, absolute and protocol-relative URLs. SVG is
+ * deliberately excluded (unneeded attack surface for vendor images).
+ * Directory containment of the RESOLVED URL is enforced separately at ingest
+ * (see resolve-image-url.ts) — this pattern is the grammar layer only.
+ */
+const IMAGE_PATH_PATTERN =
+  /^images\/[A-Za-z0-9][A-Za-z0-9._-]*\.(png|jpe?g|webp)$/;
+
+const IMAGE_PATH_MAX_LENGTH = 200;
+const IMAGE_ALT_MAX_LENGTH = 500;
+
 const FeedItemSchema = z.object({
   id: z.string().min(1),
   type: z.string().optional(),
@@ -16,6 +31,22 @@ const FeedItemSchema = z.object({
   body: z.record(z.string()).optional(),
   url: z.string().regex(HTTP_URL_PATTERN).optional(),
   publishedAt: z.string().min(1),
+  // Field-level fail-soft: an invalid image must not reject the whole item
+  // (the news itself is still valuable without its picture), so `.catch`
+  // drops just this field with a warn log instead of failing the item.
+  image: z
+    .object({
+      path: z.string().max(IMAGE_PATH_MAX_LENGTH).regex(IMAGE_PATH_PATTERN),
+      alt: z.record(z.string().max(IMAGE_ALT_MAX_LENGTH)).optional(),
+    })
+    .optional()
+    .catch((ctx) => {
+      logger.warn(
+        { issues: ctx.error.issues },
+        'News feed item image failed validation, ingesting item without image',
+      );
+      return undefined;
+    }),
   conditions: z
     .object({
       targetRoles: z.array(z.string()).optional(),

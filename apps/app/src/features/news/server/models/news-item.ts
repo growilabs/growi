@@ -35,6 +35,19 @@ const NewsItemSchema = new Schema<NewsItemDocument, NewsItemModel>({
   url: {
     type: String,
   },
+  image: {
+    // Single nested schema: `_id: false` prevents an unwanted subdocument _id,
+    // `default: undefined` prevents Mongoose from materializing an empty {}
+    // on items that have no image.
+    type: new Schema(
+      {
+        url: { type: String, required: true },
+        alt: { type: Map, of: String },
+      },
+      { _id: false },
+    ),
+    default: undefined,
+  },
   publishedAt: {
     type: Date,
     required: true,
