@@ -4,19 +4,18 @@ import type { Router } from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
-import { generateOverwriteParams } from '~/server/service/import/overwrite-params';
 import type { ZipFileStat } from '~/server/service/interfaces/export';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { executeImport } from './import-executor';
+import { buildImportSettingsMap } from './import-settings-builder';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:import');
@@ -340,28 +339,18 @@ export default function route(crowi: Crowi): Router {
       }
 
       // generate maps of ImportSettings to import
-      // Use the Map for a potential fix for the code scanning alert no. 895: Prototype-polluting assignment
-      const importSettingsMap = new Map<string, ImportSettings>();
-      fileStatsToImport.forEach(({ fileName, collectionName }) => {
-        // instanciate GrowiArchiveImportOption
-        const option: GrowiArchiveImportOption = options.find(
-          (opt) => opt.collectionName === collectionName,
+      let importSettingsMap: Map<string, ImportSettings>;
+      try {
+        importSettingsMap = buildImportSettingsMap(
+          fileStatsToImport,
+          options,
+          user._id.toString(),
         );
-
-        // generate options
-        const importSettings = {
-          mode: option.mode,
-          jsonFileName: fileName,
-          overwriteParams: generateOverwriteParams(
-            collectionName,
-            // consumers reconstruct via `new ObjectId(...)`, so the hex string is equivalent
-            user._id.toString(),
-            option,
-          ),
-        } satisfies ImportSettings;
-
-        importSettingsMap.set(collectionName, importSettings);
-      });
+      } catch (err) {
+        logger.error(err);
+        adminEvent.emit('onErrorForImport', { message: err.message });
+        return;
+      }
 
       /*
        * import
