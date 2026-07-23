@@ -875,14 +875,13 @@ class Crowi {
     await growiPluginService.downloadNotExistPluginRepositories();
   }
 
-  async setupPageService(): Promise<void> {
+  setupPageService(): void {
     if (this.pageGrantService == null) {
       this.pageGrantService = new PageGrantService(this);
     }
     // initialize after pageGrantService since pageService uses pageGrantService in constructor
     if (this.pageService == null) {
       this.pageService = new PageService(this);
-      await this.pageService.createTtlIndex();
     }
     this.pageOperationService = instanciatePageOperationService(this);
   }

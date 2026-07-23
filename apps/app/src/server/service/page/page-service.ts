@@ -205,8 +205,6 @@ export interface IPageService {
 
   isUsersHomepageOwnerAbsent(path: string): Promise<boolean>;
 
-  createTtlIndex(): Promise<void>;
-
   // Normalize parent operations
   getParentAndFillAncestorsByUser(
     user,

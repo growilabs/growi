@@ -258,7 +258,7 @@ const schema = new Schema<PageDocument, PageModel>(
     commentCount: { type: Number, default: 0 },
     expandContentWidth: { type: Boolean },
     wip: { type: Boolean },
-    ttlTimestamp: { type: Date },
+    wipExpiredAt: { type: Date },
     updatedAt: { type: Date, default: Date.now }, // Do not use timetamps for updatedAt because it breaks 'updateMetadata: false' option
     deleteUser: { type: Schema.Types.ObjectId, ref: 'User' },
     deletedAt: { type: Date },
@@ -272,6 +272,7 @@ const schema = new Schema<PageDocument, PageModel>(
 // indexes
 schema.index({ createdAt: 1 });
 schema.index({ updatedAt: 1 });
+schema.index({ wipExpiredAt: 1 });
 // apply plugins
 schema.plugin(mongoosePaginate);
 schema.plugin(uniqueValidator);
@@ -1463,19 +1464,22 @@ schema.methods.calculateAndUpdateLatestRevisionBodyLength = async function (
 
 schema.methods.publish = function () {
   this.wip = undefined;
-  this.ttlTimestamp = undefined;
+  this.wipExpiredAt = undefined;
 };
 
 schema.methods.unpublish = function () {
   this.wip = true;
-  this.ttlTimestamp = undefined;
+  this.wipExpiredAt = undefined;
 };
 
-schema.methods.makeWip = function (disableTtl: boolean) {
+schema.methods.makeWip = function (
+  disableTtl: boolean,
+  wipExpirationSeconds: number,
+) {
   this.wip = true;
 
   if (!disableTtl) {
-    this.ttlTimestamp = new Date();
+    this.wipExpiredAt = new Date(Date.now() + wipExpirationSeconds * 1000);
   }
 };
 
