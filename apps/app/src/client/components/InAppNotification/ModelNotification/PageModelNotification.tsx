@@ -18,7 +18,12 @@ export const usePageModelNotification = (
     useActionMsgAndIconForModelNotification(notification);
 
   const getActionUsers = useCallback(() => {
-    const latestActionUsers = notification.actionUsers.slice(0, 3);
+    // actionUsers may contain null when the action was performed by a
+    // since-deleted user (population yields null). Exclude those before
+    // reading `.name`, otherwise a single null crashes the whole
+    // notification list (and, via the error boundary, the entire page).
+    const actionUsers = notification.actionUsers.filter((user) => user != null);
+    const latestActionUsers = actionUsers.slice(0, 3);
     const latestUsers = latestActionUsers.map((user) => {
       return `@${user.name}`;
     });
@@ -27,8 +32,8 @@ export const usePageModelNotification = (
     const latestUsersCount = latestUsers.length;
     if (latestUsersCount === 1) {
       actionedUsers = latestUsers[0];
-    } else if (notification.actionUsers.length >= 4) {
-      actionedUsers = `${latestUsers.slice(0, 2).join(', ')} and ${notification.actionUsers.length - 2} others`;
+    } else if (actionUsers.length >= 4) {
+      actionedUsers = `${latestUsers.slice(0, 2).join(', ')} and ${actionUsers.length - 2} others`;
     } else {
       actionedUsers = latestUsers.join(', ');
     }
