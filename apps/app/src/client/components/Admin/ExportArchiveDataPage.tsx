@@ -2,67 +2,55 @@ import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { apiDelete } from '~/client/util/apiv1-client';
-import { apiv3Get } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useAdminSocket } from '~/features/admin/states/socket-io';
+import {
+  useSWRxExportCollections,
+  useSWRxExportStatus,
+} from '~/stores/admin/export';
 
 import LabeledProgressBar from './Common/LabeledProgressBar';
 import ArchiveFilesTable from './ExportArchiveData/ArchiveFilesTable';
 import SelectCollectionsModal from './ExportArchiveData/SelectCollectionsModal';
 
-const IGNORED_COLLECTION_NAMES = [
-  'sessions',
-  'rlflx',
-  'yjs-writings',
-  'transferkeys',
-];
-
 const ExportArchiveDataPage = (): JSX.Element => {
   const socket = useAdminSocket();
   const { t } = useTranslation('admin');
 
-  const [collections, setCollections] = useState<any[]>([]);
-  const [zipFileStats, setZipFileStats] = useState<any[]>([]);
+  const { data: collections } = useSWRxExportCollections();
+  const { data: exportStatus, mutate: mutateExportStatus } =
+    useSWRxExportStatus();
+
+  // The exported-archive list is server state (derived from the filesystem by
+  // GET /export/status), so it is read straight from SWR — never mirrored or
+  // accumulated on the client. This is what makes duplicate rows impossible
+  // (#11509): a completion event only revalidates, and the server stays the
+  // single source of truth for how many archives exist.
+  const zipFileStats = exportStatus?.zipFileStats ?? [];
+
+  // Transient, high-frequency progress state driven by socket events. Seeded
+  // from the persisted status so an export already running when the page opens
+  // is reflected immediately.
   const [progressList, setProgressList] = useState<any[]>([]);
   const [isExportModalOpen, setExportModalOpen] = useState(false);
   const [isExporting, setExporting] = useState(false);
   const [isZipping, setZipping] = useState(false);
   const [isExported, setExported] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    const [{ data: collectionsData }, { data: statusData }] = await Promise.all(
-      [
-        apiv3Get<{ collections: any[] }>('/mongo/collections', {}),
-        apiv3Get<{
-          status: {
-            zipFileStats: any[];
-            isExporting: boolean;
-            progressList: any[];
-          };
-        }>('/export/status', {}),
-      ],
-    );
-
-    // filter only not ignored collection names
-    const filteredCollections = collectionsData.collections.filter(
-      (collectionName) => {
-        return !IGNORED_COLLECTION_NAMES.includes(collectionName);
-      },
-    );
-
-    const { zipFileStats, isExporting, progressList } = statusData.status;
-    setCollections(filteredCollections);
-    setZipFileStats(zipFileStats);
-    setExporting(isExporting);
-    setProgressList(progressList);
-  }, []);
+  useEffect(() => {
+    if (exportStatus == null) {
+      return;
+    }
+    setExporting(exportStatus.isExporting);
+    setProgressList(exportStatus.progressList ?? []);
+  }, [exportStatus]);
 
   const setupWebsocketEventHandler = useCallback(() => {
     if (socket == null) {
       return () => {};
     }
 
-    const onProgress = ({ currentCount, totalCount, progressList }) => {
+    const onProgress = ({ progressList }) => {
       setExporting(true);
       setProgressList(progressList);
     };
@@ -75,9 +63,19 @@ const ExportArchiveDataPage = (): JSX.Element => {
       setExporting(false);
       setZipping(false);
       setExported(true);
-      setZipFileStats((prev) => prev.concat([addedZipFileStat]));
 
-      toastSuccess(`New Archive Data '${addedZipFileStat.fileName}' is added`);
+      // Revalidate against the server (the filesystem) instead of appending the
+      // event payload locally. mutate() is idempotent, so the same completion
+      // event processed more than once can never produce duplicate rows.
+      mutateExportStatus();
+
+      // A broken zip makes the server emit a null stat; guard the toast so the
+      // listener never throws on it.
+      if (addedZipFileStat != null) {
+        toastSuccess(
+          `New Archive Data '${addedZipFileStat.fileName}' is added`,
+        );
+      }
     };
 
     // Add listeners
@@ -91,21 +89,24 @@ const ExportArchiveDataPage = (): JSX.Element => {
       socket.off('admin:onStartZippingForExport', onStartZipping);
       socket.off('admin:onTerminateForExport', onTerminateForExport);
     };
-  }, [socket]);
+  }, [socket, mutateExportStatus]);
 
-  const onZipFileStatRemove = useCallback(async (fileName) => {
-    try {
-      await apiDelete(`/v3/export/${fileName}`, {});
+  const onZipFileStatRemove = useCallback(
+    async (fileName) => {
+      try {
+        await apiDelete(`/v3/export/${fileName}`, {});
 
-      setZipFileStats((prev) =>
-        prev.filter((stat) => stat.fileName !== fileName),
-      );
+        // Re-sync with the server rather than filtering the local list by
+        // fileName (which would drop every entry sharing that name).
+        await mutateExportStatus();
 
-      toastSuccess(`Deleted ${fileName}`);
-    } catch (err) {
-      toastError(err);
-    }
-  }, []);
+        toastSuccess(`Deleted ${fileName}`);
+      } catch (err) {
+        toastError(err);
+      }
+    },
+    [mutateExportStatus],
+  );
 
   const exportingRequestedHandler = useCallback(() => {}, []);
 
@@ -148,13 +149,12 @@ const ExportArchiveDataPage = (): JSX.Element => {
   }, [isExported, isZipping]);
 
   useEffect(() => {
-    fetchData();
     const cleanupWebsocket = setupWebsocketEventHandler();
 
     return () => {
       if (cleanupWebsocket) cleanupWebsocket();
     };
-  }, [fetchData, setupWebsocketEventHandler]);
+  }, [setupWebsocketEventHandler]);
 
   const showExportingData = (isExported || isExporting) && progressList != null;
 
@@ -191,7 +191,7 @@ const ExportArchiveDataPage = (): JSX.Element => {
         isOpen={isExportModalOpen}
         onExportingRequested={exportingRequestedHandler}
         onClose={() => setExportModalOpen(false)}
-        collections={collections}
+        collections={collections ?? []}
       />
     </div>
   );
