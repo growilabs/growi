@@ -1,4 +1,5 @@
 import type { JSX } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import InAppNotificationElm from '~/client/components/InAppNotification/InAppNotificationElm';
@@ -12,12 +13,18 @@ import type { FilterType } from './types';
 type InAppNotificationContentProps = {
   activeFilter: FilterType;
   merged: UseMergedInAppNotificationsResult;
+  /**
+   * Whether the unread-only toggle is active. Needed here because the
+   * news-id → page-index mapping is only valid against the unfiltered feed
+   * (see newsPageIndexById below).
+   */
+  isUnopendNotificationsVisible: boolean;
 };
 
 export const InAppNotificationContent = (
   props: InAppNotificationContentProps,
 ): JSX.Element => {
-  const { activeFilter, merged } = props;
+  const { activeFilter, merged, isUnopendNotificationsVisible } = props;
   const { t } = useTranslation('commons');
   const { isCollapsedMode } = useSidebarMode();
 
@@ -40,6 +47,23 @@ export const InAppNotificationContent = (
     handleNotificationRead,
   } = merged;
 
+  // Map each news item id to its SWRInfinite page index. This lets NewsItem
+  // navigate directly to `/_news?page=N#news-<id>` without walking pages.
+  // Under the unread-only filter the sidebar stream is a different (filtered)
+  // sequence, so its page boundaries do not match the full /_news feed — no
+  // valid mapping exists. Leave the map empty so NewsItem receives
+  // `pageIndex: undefined` and navigates without a `?page` query.
+  const newsPageIndexById = useMemo(() => {
+    const map = new Map<string, number>();
+    if (isUnopendNotificationsVisible) return map;
+    newsResponse.data?.forEach((page, pageIdx) => {
+      for (const item of page.docs) {
+        map.set(item._id.toString(), pageIdx);
+      }
+    });
+    return map;
+  }, [newsResponse.data, isUnopendNotificationsVisible]);
+
   if (activeFilter === 'news') {
     if (allNewsItems.length === 0 && !newsResponse.isValidating) {
       return <>{t('in_app_notification.no_news')}</>;
@@ -56,6 +80,7 @@ export const InAppNotificationContent = (
               <NewsItem
                 key={item._id.toString()}
                 item={item}
+                pageIndex={newsPageIndexById.get(item._id.toString())}
                 onReadMutate={handleNewsRead}
               />
             ))}
@@ -114,10 +139,12 @@ export const InAppNotificationContent = (
         <div className="list-group">
           {mergedItems.map((entry) => {
             if (entry.type === 'news') {
+              const newsId = entry.item._id.toString();
               return (
                 <NewsItem
-                  key={`news-${entry.item._id.toString()}`}
+                  key={`news-${newsId}`}
                   item={entry.item}
+                  pageIndex={newsPageIndexById.get(newsId)}
                   onReadMutate={handleNewsRead}
                 />
               );

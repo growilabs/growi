@@ -7,10 +7,28 @@ import type { PaginateResult } from '~/interfaces/in-app-notification';
 
 import { apiv3Get } from '../../../../client/util/apiv3-client';
 import type { INewsItemWithReadStatus } from '../../interfaces/news-item';
+import { NEWS_PER_PAGE } from '../consts';
 
-const NEWS_PER_PAGE = 10;
+/** SWR cache key for one page of /news/list. */
+type NewsListKey = [
+  endpoint: string,
+  limit: number,
+  offset: number,
+  onlyUnread: boolean,
+];
 
-type NewsListKey = [string, number, number, boolean] | null;
+/** Shared fetcher for every /news/list key (infinite and single-page). */
+const fetchNewsPage = ([
+  endpoint,
+  limit,
+  offset,
+  onlyUnread,
+]: NewsListKey): Promise<PaginateResult<INewsItemWithReadStatus>> =>
+  apiv3Get<PaginateResult<INewsItemWithReadStatus>>(endpoint, {
+    limit,
+    offset,
+    onlyUnread,
+  }).then((response) => response.data);
 
 /**
  * SWRInfinite hook for paginated news items
@@ -23,18 +41,13 @@ export const useSWRINFxNews = (
   const onlyUnread = options?.onlyUnread ?? false;
 
   return useSWRInfinite<PaginateResult<INewsItemWithReadStatus>, Error>(
-    (pageIndex, previousPageData): NewsListKey => {
+    (pageIndex, previousPageData): NewsListKey | null => {
       if (previousPageData != null && !previousPageData.hasNextPage)
         return null;
       const offset = pageIndex * limit;
       return ['/news/list', limit, offset, onlyUnread];
     },
-    ([endpoint, limit, offset, onlyUnread]) =>
-      apiv3Get<PaginateResult<INewsItemWithReadStatus>>(endpoint, {
-        limit,
-        offset,
-        onlyUnread,
-      }).then((response) => response.data),
+    fetchNewsPage,
     {
       ...config,
       revalidateFirstPage: false,
@@ -55,5 +68,31 @@ export const useSWRxNewsUnreadCount = (
         (response) => response.data.count,
       ),
     config,
+  );
+};
+
+/**
+ * SWR hook for a single paginated page of the full news feed. Used by the
+ * /_news feed page (page-by-page navigation), as opposed to `useSWRINFxNews`
+ * which is used by the sidebar (infinite scroll).
+ *
+ * Fetching a specific page instead of walking pages via infinite scroll avoids
+ * loading N-1 pages just to reach an anchored item near the bottom of a long
+ * feed.
+ */
+export const useSWRxNewsPage = (
+  page: number,
+  limit: number = NEWS_PER_PAGE,
+  config?: SWRConfiguration,
+): SWRResponse<PaginateResult<INewsItemWithReadStatus>, Error> => {
+  const offset = Math.max(0, page - 1) * limit;
+
+  return useSWR<PaginateResult<INewsItemWithReadStatus>, Error>(
+    ['/news/list', limit, offset, false] satisfies NewsListKey,
+    fetchNewsPage,
+    {
+      keepPreviousData: true,
+      ...config,
+    },
   );
 };
