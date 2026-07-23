@@ -7,18 +7,24 @@ import InfiniteScroll from '~/client/components/InfiniteScroll';
 import { NewsItem } from '~/features/news/client/components/NewsItem';
 import { useSidebarMode } from '~/states/ui/sidebar';
 
-import { useMergedInAppNotifications } from './hooks/useMergedInAppNotifications';
-import type { FilterType } from './InAppNotification';
+import type { UseMergedInAppNotificationsResult } from './hooks/useMergedInAppNotifications';
+import type { FilterType } from './types';
 
 type InAppNotificationContentProps = {
-  isUnopendNotificationsVisible: boolean;
   activeFilter: FilterType;
+  merged: UseMergedInAppNotificationsResult;
+  /**
+   * Whether the unread-only toggle is active. Needed here because the
+   * news-id → page-index mapping is only valid against the unfiltered feed
+   * (see newsPageIndexById below).
+   */
+  isUnopendNotificationsVisible: boolean;
 };
 
 export const InAppNotificationContent = (
   props: InAppNotificationContentProps,
 ): JSX.Element => {
-  const { isUnopendNotificationsVisible, activeFilter } = props;
+  const { activeFilter, merged, isUnopendNotificationsVisible } = props;
   const { t } = useTranslation('commons');
   const { isCollapsedMode } = useSidebarMode();
 
@@ -37,9 +43,9 @@ export const InAppNotificationContent = (
     notifExhausted,
     allModeSWRResponse,
     mergedItems,
-    handleReadMutate,
+    handleNewsRead,
     handleNotificationRead,
-  } = useMergedInAppNotifications(isUnopendNotificationsVisible);
+  } = merged;
 
   // Map each news item id to its SWRInfinite page index. This lets NewsItem
   // navigate directly to `/_news?page=N#news-<id>` without walking pages.
@@ -75,7 +81,7 @@ export const InAppNotificationContent = (
                 key={item._id.toString()}
                 item={item}
                 pageIndex={newsPageIndexById.get(item._id.toString())}
-                onReadMutate={handleReadMutate}
+                onReadMutate={handleNewsRead}
               />
             ))}
           </div>
@@ -139,7 +145,7 @@ export const InAppNotificationContent = (
                   key={`news-${newsId}`}
                   item={entry.item}
                   pageIndex={newsPageIndexById.get(newsId)}
-                  onReadMutate={handleReadMutate}
+                  onReadMutate={handleNewsRead}
                 />
               );
             }

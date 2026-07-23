@@ -15,6 +15,7 @@ import type { ZipFileStat } from '~/server/service/interfaces/export';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
+import { executeImport } from './import-executor';
 
 const logger = loggerFactory('growi:routes:apiv3:import');
 
@@ -354,17 +355,14 @@ export default function route(crowi: Crowi): Router {
       /*
        * import
        */
-      try {
-        importService.import(collections, importSettingsMap);
-
-        const parameters = {
-          action: SupportedAction.ACTION_ADMIN_GROWI_DATA_IMPORTED,
-        };
-        activityEvent.emit('update', res.locals.activity._id, parameters);
-      } catch (err) {
-        logger.error(err);
-        adminEvent.emit('onErrorForImport', { message: err.message });
-      }
+      await executeImport({
+        importService,
+        adminEvent,
+        activityEvent,
+        activityId: res.locals.activity._id,
+        collections,
+        importSettingsMap,
+      });
     },
   );
 

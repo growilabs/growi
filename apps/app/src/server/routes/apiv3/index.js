@@ -151,7 +151,19 @@ module.exports = (crowi, app) => {
 
   router.use('/page', require('./page')(crowi));
   router.use('/pages', require('./pages')(crowi));
-  router.use('/revisions', require('./revisions')(crowi));
+  {
+    const revisionsRouter = require('./revisions')(crowi);
+    const {
+      changesRouteHandlersFactory,
+    } = require('~/features/revision-diff/server/routes/changes');
+    const {
+      diffRouteHandlersFactory,
+    } = require('~/features/revision-diff/server/routes/diff');
+
+    revisionsRouter.get('/changes', changesRouteHandlersFactory(crowi));
+    revisionsRouter.post('/diff', diffRouteHandlersFactory(crowi));
+    router.use('/revisions', revisionsRouter);
+  }
 
   router.use('/page-listing', pageListing(crowi));
 

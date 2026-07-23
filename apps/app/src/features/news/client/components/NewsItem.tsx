@@ -27,7 +27,7 @@ type Props = {
    * then omits the `?page` query and lands on the first page.
    */
   pageIndex?: number;
-  onReadMutate: () => void;
+  onReadMutate: (newsItemId: string) => void;
 };
 
 const NewsItemInner: FC<Props> = ({ item, pageIndex, onReadMutate }) => {
@@ -51,7 +51,7 @@ const NewsItemInner: FC<Props> = ({ item, pageIndex, onReadMutate }) => {
     const id = item._id.toString();
     try {
       await apiv3Post('/news/mark-read', { newsItemId: id });
-      onReadMutate();
+      onReadMutate(id);
     } catch {
       // silently ignore mark-read failures
     }

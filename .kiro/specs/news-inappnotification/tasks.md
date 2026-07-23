@@ -228,3 +228,46 @@
 - [x] 16.4 テストを整備する
   - `NewsFeed.spec.tsx`（9件、アンカー退行ガードは旧実装で fail することを実証）、`parse-page-query.spec.ts`（10件）、`NewsItem.spec.tsx` へ非ゼロ pageIndex / pageIndex 未指定ケースを追加
   - _Requirements: 10.7, 10.8, 11.1–11.7_
+
+- [x] 17. 「すべて既読にする」UI と楽観更新規約の統一
+- [x] 17.1 `FilterType` を `types.ts` に切り出す
+  - `InAppNotification.tsx` で定義していた `FilterType = 'all' | 'news' | 'notifications'` を新規ファイル `client/components/Sidebar/InAppNotification/types.ts` に移動する
+  - hook（`useMergedInAppNotifications`）と panel-root（`InAppNotification.tsx`）の循環依存を回避し、Forms / Content / hook の三者が中立な共通型を参照できるようにする
+  - _Requirements: 5.8（設計上の前準備）_
+
+- [x] 17.2 `useMergedInAppNotifications` を拡張する
+  - `useSWRxInAppNotificationStatus` を hook に取り込み、`notifUnreadCount` と `mutateNotifUnreadCount` を取得する
+  - `handleReadMutate()` を `handleNewsRead(newsItemId: string)` に名称・シグネチャ変更し、`mutateNews(updater, { revalidate: false })` で該当ニュースの `isRead: true` を楽観更新する。同時に `mutateNewsUnreadCount(c => max(c-1, 0), { revalidate: false })` で未読カウントを楽観的にデクリメントする
+  - `handleNotificationRead(id)` に `mutateNotifUnreadCount(c => max(c-1, 0), { revalidate: false })` を追加し、通知側未読カウントの楽観的デクリメントを追加する
+  - `handleMarkAllRead({ news?, notifications? })` を新規追加する。フラグに応じて該当側の docs を一括 `isRead/STATUS_OPENED` に楽観更新し、未読カウントを `0` に固定したうえで、`POST /news/mark-all-read` と `PUT /in-app-notification/all-statuses-open` を並列発火する。`Promise.all` が reject した場合のみ `mutateXxx()` で再検証してロールバックする
+  - 戻り値に `newsUnreadCount` / `notifUnreadCount` / `handleMarkAllRead` を追加する
+  - _Requirements: 5.8, 6.5, 6.6_
+
+- [x] 17.3 hook を panel-root に lift し、Content を merged 受け取り型にする
+  - `useMergedInAppNotifications` の呼び出しを `InAppNotificationContent.tsx` から `InAppNotification.tsx` に移動する
+  - `InAppNotificationContent` の props を `{ activeFilter, merged: UseMergedInAppNotificationsResult }` に変更し、hook を直接呼ばないようにする
+  - これにより `Forms`（ボタン）と `Content`（一覧）が同じ hook 結果を共有でき、楽観更新がパネル内全域で即時反映される
+  - _Requirements: 5.8（実装構造）_
+
+- [x] 17.4 `InAppNotificationForms` に「すべて既読にする」ボタンを追加する
+  - 「未読のみ」トグルの右側に並置（`d-flex justify-content-between`）
+  - クラスは `btn btn-sm btn-link text-decoration-none p-0`。未読 0 件時は `disabled` 属性 + `opacity-25` ユーティリティで存在感を更に弱める。インラインスタイル不使用（Bootstrap クラスのみ）
+  - props として `onMarkAllRead: () => void` と `isMarkAllReadDisabled: boolean` を受け取る
+  - i18n キー `commons:in_app_notification.mark_all_as_read` は既存のものを再利用する（`ja_JP`, `en_US`, `zh_CN`, `ko_KR`, `fr_FR` に既存）
+  - _Requirements: 5.8, 5.9_
+
+- [x] 17.5 panel-root でフィルタ連動の disable 判定とハンドラ wrapping を行う
+  - `InAppNotification.tsx` で `newsUnreadCount` / `notifUnreadCount` から `isMarkAllReadDisabled` を算出する：「お知らせ」フィルタ時は news の未読 = 0、「通知」フィルタ時は notif の未読 = 0、「すべて」フィルタ時は両方とも 0 のときに disable
+  - `onMarkAllRead` を `() => handleMarkAllRead({ news: activeFilter !== 'notifications', notifications: activeFilter !== 'news' })` として wrap する
+  - _Requirements: 5.8, 5.9_
+
+- [x] 17.6 `NewsItem` の `onReadMutate` シグネチャを `(newsItemId: string) => void` に変更する
+  - 既存の `onReadMutate: () => void` から `onReadMutate: (newsItemId: string) => void` に変更し、`handleClick` 内で id を渡す
+  - hook 側で id を受けて該当アイテムのみを書き換えるため必要。`memo` 再レンダー回避のため、呼び出し元 (`Content`) は `handleNewsRead` を直接渡す（クロージャ生成を避ける）
+  - _Requirements: 6.5（楽観更新の前提）_
+
+- [x] 17.7 テスト追加
+  - `useMergedInAppNotifications.spec.tsx`: フィルタごとの API 呼び分け（`{news: true, notifications: true}` で両方発火、片方のみのケース、API 失敗時の再検証ロールバック、`handleNewsRead` のカウントデクリメント、未読カウント露出の 4 軸）
+  - `InAppNotificationForms.spec.tsx`: ボタン可視性 / クリックハンドラ発火 / `disabled` 状態の挙動
+  - `NewsItem.spec.tsx`: `onReadMutate` シグネチャ変更（id を渡す）の検証
+  - _Requirements: テスト方針_
