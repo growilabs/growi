@@ -1,4 +1,8 @@
 {
+  "backlinks": {
+    "no_backlinks": "아직 백링크가 없습니다.",
+    "panel": "백링크"
+  },
   "meta": {
     "display_name": "한국어"
   },

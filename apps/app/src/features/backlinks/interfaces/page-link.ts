@@ -2,11 +2,6 @@ import type { Document, Model, Types } from 'mongoose';
 
 export type LinkTargetState = 'normal' | 'trashed' | 'broken';
 
-export interface IBacklink {
-  pageId: string;
-  path: string;
-}
-
 export interface ILinkTarget {
   pageId: string;
   path: string;

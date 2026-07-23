@@ -244,6 +244,19 @@ const PageOperationMenuItems = (
         {t('attachment_data')}
       </DropdownItem>
 
+      <DropdownItem
+        onClick={() =>
+          openAccessoriesModal(PageAccessoriesModalContents.Backlinks)
+        }
+        data-testid="open-page-accessories-modal-btn-with-backlinks-tab"
+        className="grw-page-control-dropdown-item"
+      >
+        <span className="material-symbols-outlined me-1 grw-page-control-dropdown-icon">
+          input
+        </span>
+        {t('backlinks.panel')}
+      </DropdownItem>
+
       {!isGuestUser && !isReadOnlyUser && !isSharedUser && (
         <NotAvailable
           isDisabled={isLinkSharingDisabled ?? false}

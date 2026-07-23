@@ -7,7 +7,7 @@ import type { PageDocument, PageModel } from '~/server/models/page';
 import { PageQueryBuilder } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
-import type { IBacklink } from '../../interfaces/page-link';
+import type { IBacklink } from '../../interfaces/backlink';
 import PageLink from '../models/page-link';
 import { handlePageUpsert } from './page-link-service-handlers';
 

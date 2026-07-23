@@ -1,4 +1,8 @@
 {
+  "backlinks": {
+    "no_backlinks": "尚无反向链接。",
+    "panel": "反向链接"
+  },
   "meta": {
     "display_name": "简体中文"
   },
