@@ -194,7 +194,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Requirements: 1.6, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2_
   - _Depends: B1.12, B1.13_
 
-- [ ] B1.16 E2E test for the backlinks panel (B1 slice)
+- [x] B1.16 E2E test for the backlinks panel (B1 slice)
   - Verify the Backlinks tab lists linking pages with title + path, and shows the empty state when
     none exist
   - **B1 scope:** skip trashed/deleted-target-indicator assertions (B5.8)
