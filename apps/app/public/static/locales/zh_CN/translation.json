@@ -1097,5 +1097,43 @@
     "searching": "搜索中...",
     "noResults": "未找到页面",
     "candidatesLabel": "页面候选"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "标题 1",
+      "description": "大号章节标题"
+    },
+    "heading2": {
+      "label": "标题 2",
+      "description": "中号章节标题"
+    },
+    "heading3": {
+      "label": "标题 3",
+      "description": "小号章节标题"
+    },
+    "bulletList": {
+      "label": "项目符号列表",
+      "description": "创建简单的项目符号列表"
+    },
+    "numberedList": {
+      "label": "编号列表",
+      "description": "创建带编号的列表"
+    },
+    "taskList": {
+      "label": "任务列表",
+      "description": "使用清单跟踪任务"
+    },
+    "quote": {
+      "label": "引用",
+      "description": "插入引用"
+    },
+    "codeBlock": {
+      "label": "代码块",
+      "description": "插入代码块"
+    },
+    "table": {
+      "label": "表格",
+      "description": "插入表格"
+    }
   }
 }

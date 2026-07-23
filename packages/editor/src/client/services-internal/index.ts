@@ -5,5 +5,6 @@ export * from './keymaps/index.js';
 export * from './link-util/index.js';
 export * from './list-util/index.js';
 export * from './paste-util/index.js';
+export * from './slash-command/index.js';
 export * from './table/index.js';
 export * from './unified-merge-view/index.js';
