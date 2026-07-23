@@ -556,6 +556,7 @@ model users {
   lang                    Lang      @default(en_US)
   status                  Int       @default(2)
   lastLoginAt             DateTime?
+  contributionsMigratedAt DateTime?
   admin                   Boolean   @default(false)
   readOnly                Boolean   @default(false)
   isInvitationEmailSended Boolean   @default(false)
