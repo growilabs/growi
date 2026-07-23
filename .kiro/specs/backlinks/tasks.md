@@ -185,7 +185,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: PageAccessoriesModal_
   - _Depends: B1.11_
 
-- [ ] B1.15 Integration tests (B1 slice)
+- [x] B1.15 Integration tests (B1 slice)
   - Cover: create/update add and remove backlinks; backlinks exclude pages the viewer cannot read and
     reflect grant changes; a source linking B→A more than once is listed once; a page linking to its
     own permalink is excluded from its own backlinks
