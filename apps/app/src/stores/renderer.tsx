@@ -127,13 +127,12 @@ export const useCommentForCurrentPageOptions = (): SWRResponse<
       ? ['commentPreviewOptions', rendererConfig, currentPagePath]
       : null,
     async ([, rendererConfig, currentPagePath]) => {
-      const { generateSimpleViewOptions } = await import(
+      const { generateCommentViewOptions } = await import(
         '~/client/services/renderer/renderer'
       );
-      return generateSimpleViewOptions(
+      return generateCommentViewOptions(
         rendererConfig,
         currentPagePath,
-        undefined,
         rendererConfig.isEnabledLinebreaksInComments,
       );
     },

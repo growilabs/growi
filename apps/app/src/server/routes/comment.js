@@ -10,7 +10,6 @@ import {
 import loggerFactory from '~/utils/logger';
 
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
-import { preNotifyService } from '../service/pre-notify';
 
 /**
  * @swagger
@@ -68,7 +67,7 @@ module.exports = (crowi, _app) => {
   const globalNotificationService = crowi.globalNotificationService;
   const userNotificationService = crowi.userNotificationService;
 
-  const { body } = require('express-validator');
+  const { body, query } = require('express-validator');
   const mongoose = require('mongoose');
   const ObjectId = mongoose.Types.ObjectId;
 
@@ -125,30 +124,42 @@ module.exports = (crowi, _app) => {
    * @apiParam {String} revision_id Revision Id.
    */
   api.get = async (req, res) => {
+    // Query ids are validated (MongoId) by `validators.get()` + apiV1FormValidator
+    // in the route chain, so malformed input is already rejected before here.
     const pageId = req.query.page_id;
     const revisionId = req.query.revision_id;
+    const { isSharedPage } = req;
 
-    // check whether accessible
-    const isAccessible = await Page.isAccessiblePageByViewer(pageId, req.user);
+    // In a valid share-link context, certify-shared-page has already verified
+    // that this exact page_id is the share link's related page, so bypass the
+    // viewer access check — but the bypass applies ONLY to that verified
+    // page_id (see the revision_id handling below).
+    const isAccessible =
+      isSharedPage === true ||
+      (await Page.isAccessiblePageByViewer(pageId, req.user));
     if (!isAccessible) {
       return res.json(
         ApiResponse.error('Current user is not accessible to this page.'),
       );
     }
 
-    let query = null;
+    let commentQuery = null;
 
     try {
-      if (revisionId) {
-        query = Comment.findCommentsByRevisionId(revisionId);
+      // revision_id can point to a revision belonging to a different page.
+      // In a share context the access bypass is scoped to the verified
+      // page_id, so we must NOT honor revision_id there; fetch strictly by
+      // page_id. Non-shared (authenticated) access keeps the revision_id path.
+      if (revisionId && !isSharedPage) {
+        commentQuery = Comment.findCommentsByRevisionId(revisionId);
       } else {
-        query = Comment.findCommentsByPageId(pageId);
+        commentQuery = Comment.findCommentsByPageId(pageId);
       }
     } catch (err) {
       return res.json(ApiResponse.error(err));
     }
 
-    const comments = await query.populate('creator');
+    const comments = await commentQuery.populate('creator');
     comments.forEach((comment) => {
       if (comment.creator != null && comment.creator instanceof User) {
         comment.creator = serializeUserSecurely(comment.creator);
@@ -156,6 +167,41 @@ module.exports = (crowi, _app) => {
     });
 
     res.json(ApiResponse.success({ comments }));
+  };
+
+  api.validators.get = () => {
+    // Validate ids as scalar MongoId strings to close the NoSQL injection
+    // surface. `.isMongoId()` alone does NOT reject array/object values:
+    // `?page_id[$gt]=` (object) and, more importantly, `?page_id[0]=A&page_id[1]=B`
+    // (array) both slip through, and Mongoose casts an array id into an implicit
+    // `$in`. That would let one request fetch comments across multiple page_ids
+    // (an IDOR that defeats the "verify id === fetch id" single-id invariant).
+    // `.isString().bail()` rejects non-string values first, then `.isMongoId()`
+    // validates the string. Enforcement happens at the route-level
+    // `apiV1FormValidator`, which short-circuits before this handler runs.
+    // page_id is required; shareLinkId / revision_id are optional.
+    return [
+      query('page_id')
+        .isString()
+        .bail()
+        .isMongoId()
+        .withMessage('page_id must be a valid MongoId'),
+      // `checkFalsy` skips empty-string params (e.g. `revision_id=`) so external
+      // API callers keep backward compatibility; matches design.md and the
+      // existing `get-page-info.ts` validator.
+      query('shareLinkId')
+        .optional({ checkFalsy: true })
+        .isString()
+        .bail()
+        .isMongoId()
+        .withMessage('shareLinkId must be a valid MongoId'),
+      query('revision_id')
+        .optional({ checkFalsy: true })
+        .isString()
+        .bail()
+        .isMongoId()
+        .withMessage('revision_id must be a valid MongoId'),
+    ];
   };
 
   api.validators.add = () => {
@@ -294,25 +340,29 @@ module.exports = (crowi, _app) => {
       contributor: req.user,
     };
 
-    /** @type {import('../service/pre-notify').GetAdditionalTargetUsers} */
-    const getAdditionalTargetUsers = async (activity) => {
-      const mentionedUsers = await crowi.commentService.getMentionedUsers(
-        activity.event,
+    const { generatePreNotify, notify: notifyMentions } =
+      await crowi.commentService.prepareMentionNotifications(
+        createdComment._id,
+        req.user._id,
+        res.locals.activity._id,
+        page,
       );
-
-      return mentionedUsers;
-    };
 
     activityEvent.emit(
       'update',
       res.locals.activity._id,
       parameters,
       page,
-      preNotifyService.generatePreNotify,
-      getAdditionalTargetUsers,
+      generatePreNotify,
     );
 
     res.json(ApiResponse.success({ comment: createdComment }));
+
+    try {
+      await notifyMentions();
+    } catch (err) {
+      logger.error('Mention notification failed', err);
+    }
 
     // global notification
     try {

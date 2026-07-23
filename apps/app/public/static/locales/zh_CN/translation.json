@@ -334,6 +334,27 @@
     },
     "exclude_tag": {
       "desc": "排除带有{{tag}标记的页"
+    },
+    "author": {
+      "desc": "搜索由{{author}}创建的页面"
+    },
+    "exclude_author": {
+      "desc": "排除由{{author}}创建的页面"
+    },
+    "editor": {
+      "desc": "搜索最后由{{editor}}编辑的页面"
+    },
+    "exclude_editor": {
+      "desc": "排除由{{editor}}编辑的页面"
+    },
+    "group": {
+      "desc": "搜索授予{{group}}组的页面"
+    },
+    "exclude_group": {
+      "desc": "排除授予{{group}}组的页面"
+    },
+    "quoted_value": {
+      "desc": "筛选值包含空格时，请用双引号括起来（例如组名或页面路径）"
     }
   },
   "search": {
@@ -384,7 +405,8 @@
     "no_user_found": "未找到用户名",
     "reply": "Reply",
     "delete_comment": "Delete comment?",
-    "comment_management_is_not_allowed": "不允许操作评论。"
+    "comment_management_is_not_allowed": "不允许操作评论。",
+    "no_comments": "暂无评论。"
   },
   "page_api_error": {
     "notfound_or_forbidden": "未找到或禁止原始页。",
@@ -886,7 +908,7 @@
     "sign_in_failure": "登录失败。",
     "aws_sttings_required": "使用此功能所需的AWS设置。请询问管理员。",
     "application_already_installed": "应用程序已安装。",
-    "email_address_could_not_be_used": "无法使用此电子邮件地址。（确保允许的电子邮件地址）",
+    "email_address_could_not_be_used": "此电子邮件地址无法在此 Wiki 中使用。请联系管理员。",
     "user_id_is_not_available": "此用户ID不可用。",
     "username_should_not_be_null": "用户名不应为空。请检查管理页面上的身份验证机制设置",
     "email_address_is_already_registered": "此电子邮件地址已注册。",
@@ -968,7 +990,8 @@
   "user_group": {
     "select_group": "选择组别",
     "belonging_to_no_group": "无法找到你所属的团体。",
-    "manage_user_groups": "管理用户组"
+    "manage_user_groups": "管理用户组",
+    "only_yourself": "仅限自己"
   },
   "fix_page_grant": {
     "modal": {

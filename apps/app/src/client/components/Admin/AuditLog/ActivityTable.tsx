@@ -71,7 +71,7 @@ export const ActivityTable: FC<Props> = (props: Props) => {
                       {activity.endpoint}
                     </span>
                     <CopyToClipboard
-                      text={activity.endpoint}
+                      text={activity.endpoint ?? ''}
                       onCopy={() => showToolTip(activity._id)}
                     >
                       <button

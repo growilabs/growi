@@ -13,7 +13,7 @@ const projects: Array<Project> = supportedBrowsers.map((browser) => ({
   name: browser,
   use: { ...devices[`Desktop ${browser}`], storageState },
   testIgnore: /(10-installer|21-basic-features-for-guest)\/.*\.spec\.ts/,
-  dependencies: ['setup', 'auth'],
+  dependencies: ['setup', 'auth', 'users'],
 }));
 
 const projectsForGuestMode: Array<Project> = supportedBrowsers.map(
@@ -74,13 +74,22 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
-    // Setup project
+    // Generic setup that is safe to run before GROWI is installed. The installer
+    // project depends on this, so nothing matched here may assume an installed
+    // app. Post-install setup (admin login, user provisioning) lives in the
+    // dedicated `auth` / `users` projects below, which the installer does NOT
+    // depend on.
     {
       name: 'setup',
       testMatch: /.*\.setup\.ts/,
-      testIgnore: /auth\.setup\.ts/,
+      testIgnore: /(auth|users)\.setup\.ts/,
     },
     { name: 'auth', testMatch: /auth\.setup\.ts/ },
+    // Provisions the author/editor filter test users. Requires an installed app
+    // (it logs in as admin to invite users), so it must stay out of the `setup`
+    // project that the installer depends on — otherwise it runs against the
+    // fresh, uninstalled installer DB and times out on the login form.
+    { name: 'users', testMatch: /users\.setup\.ts/ },
 
     {
       name: 'chromium/installer',

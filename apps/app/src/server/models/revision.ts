@@ -67,6 +67,7 @@ const revisionSchema = new Schema<IRevisionDocument, IRevisionModel>(
   },
 );
 revisionSchema.plugin(mongoosePaginate);
+revisionSchema.index({ author: 1, createdAt: -1 });
 
 const updateRevisionListByPageId: UpdateRevisionListByPageId = async function (
   this: IRevisionModel,
