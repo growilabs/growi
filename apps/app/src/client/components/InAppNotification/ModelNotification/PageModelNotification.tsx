@@ -18,10 +18,12 @@ export const usePageModelNotification = (
     useActionMsgAndIconForModelNotification(notification);
 
   const getActionUsers = useCallback(() => {
-    // actionUsers may contain null when the action was performed by a
-    // since-deleted user (population yields null). Exclude those before
-    // reading `.name`, otherwise a single null crashes the whole
-    // notification list (and, via the error boundary, the entire page).
+    // actionUsers can contain null when the linked activity has no user:
+    // chiefly an activity settled without its request context (bare
+    // activity, mostly from editor saves), or one that references a
+    // since-removed user. Drop nulls before reading `.name`, otherwise a
+    // single null crashes the whole notification list (and, via the error
+    // boundary, the entire page).
     const actionUsers = notification.actionUsers.filter((user) => user != null);
     const latestActionUsers = actionUsers.slice(0, 3);
     const latestUsers = latestActionUsers.map((user) => {
