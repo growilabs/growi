@@ -1,4 +1,8 @@
 {
+  "backlinks": {
+    "no_backlinks": "被リンクはまだありません。",
+    "panel": "被リンク"
+  },
   "meta": {
     "display_name": "日本語"
   },

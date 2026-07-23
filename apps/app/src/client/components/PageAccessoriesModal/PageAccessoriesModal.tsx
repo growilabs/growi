@@ -4,6 +4,7 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
+import { BacklinksPanel } from '~/features/backlinks/client/components/BacklinksPanel';
 import {
   useIsGuestUser,
   useIsReadOnlyUser,
@@ -44,6 +45,9 @@ const PageAttachmentIcon = (): JSX.Element => (
 const ShareLinkIcon = (): JSX.Element => (
   <span className="material-symbols-outlined">share</span>
 );
+const BacklinksIcon = (): JSX.Element => (
+  <span className="material-symbols-outlined">input</span>
+);
 
 const PageHistoryContent = (): JSX.Element => {
   const { close } = usePageAccessoriesModalActions();
@@ -57,6 +61,10 @@ const PageAttachmentContent = (): JSX.Element => {
 
 const ShareLinkContent = (): JSX.Element => {
   return <ShareLink />;
+};
+
+const BacklinksContent = (): JSX.Element => {
+  return <BacklinksPanel />;
 };
 
 interface PageAccessoriesModalSubstanceProps {
@@ -102,6 +110,11 @@ const PageAccessoriesModalSubstance = ({
           !isReadOnlyUser &&
           !isSharedUser &&
           !isLinkSharingDisabled,
+      },
+      [PageAccessoriesModalContents.Backlinks]: {
+        Icon: BacklinksIcon,
+        Content: BacklinksContent,
+        i18n: t('backlinks.panel'),
       },
     };
   }, [t, isGuestUser, isReadOnlyUser, isSharedUser, isLinkSharingDisabled]);
