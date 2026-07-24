@@ -169,3 +169,4 @@ The following rules in `.claude/rules/` are always applied when working in this 
 | **package-dependencies** | Turbopack dependency classification — when to use `dependencies` vs `devDependencies`, verification procedure |
 | **import-convention** | Single no-extension import convention for `apps/app/src` (local → relative, cross-module → `~/`; `.js` added only at build emit) |
 | **server-boot-imports** | Lazy-load conventions for config-gated heavy SDKs vs boot warmup for universal costs; required `no-eager-*-imports` drift specs (shared static-import-graph walker, two-root walk) |
+| **activity-recording** | Order-sensitive audit `Activity` recording: emit before the response is sent (or capture+re-arm the context for post-response emits); place `addActivity` after auth and before validators; decision criteria for what gets an `ACTION_UNSETTLED` attempt row (incl. anonymous abuse-sensitive endpoints) |

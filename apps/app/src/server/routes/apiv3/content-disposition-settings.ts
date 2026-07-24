@@ -92,9 +92,11 @@ export const setup = (crowi): Router => {
     '/',
     loginRequiredStrictly,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validateUpdateMimeTypes,
     apiV3FormValidator,
-    addActivity,
 
     async (req: UpdateMimeTypesRequest, res: ApiV3Response) => {
       const newInlineMimeTypes: string[] = req.body.newInlineMimeTypes;
