@@ -33,3 +33,4 @@ export const FILTER_FIELDS = [
 // `.map` infers the literal element union (`'author:' | ...`), which a `string[]`
 // annotation would widen away, so consumers deriving a type from these stay exact.
 export const SEARCH_FILTER_PREFIXES = FILTER_FIELDS.map(([, prefix]) => prefix);
+export const SEARCH_FILTER_FIELDS = FILTER_FIELDS.map(([key]) => key);

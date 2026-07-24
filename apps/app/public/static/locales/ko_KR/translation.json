@@ -767,6 +767,8 @@
     "hit_number_unit": "개",
     "filter": "필터",
     "search_option": "검색 옵션",
+    "filter_remove": "제거",
+    "filter_clear": "모두 지우기",
     "filter_author": "생성자",
     "filter_by_author": "생성자로 필터링",
     "filter_editor": "편집자",

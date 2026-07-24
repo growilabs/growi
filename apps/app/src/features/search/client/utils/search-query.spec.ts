@@ -2,8 +2,10 @@ import {
   buildSearchQuery,
   createEmptyFilterState,
   isFilterStateEmpty,
+  isSameFilterState,
   parseSearchQuery,
   type SearchFilterState,
+  sanitizeFilterState,
 } from './search-query';
 
 const filterState = (
@@ -215,5 +217,65 @@ describe('isFilterStateEmpty', () => {
     expect(isFilterStateEmpty(filterState({ authors: ['alice'] }))).toBe(false);
     expect(isFilterStateEmpty(filterState({ editors: ['bob'] }))).toBe(false);
     expect(isFilterStateEmpty(filterState({ groups: ['Docs'] }))).toBe(false);
+  });
+});
+
+describe('sanitizeFilterState', () => {
+  it('strips embedded double-quotes so state matches the built query', () => {
+    const sanitized = sanitizeFilterState(
+      filterState({ groups: ['a"b'], authors: ['alice'] }),
+    );
+    expect(sanitized.groups).toEqual(['ab']);
+    // The sanitized value round-trips losslessly (no further rewrite on reload).
+    expect(parseSearchQuery(buildSearchQuery('', sanitized)).filters).toEqual(
+      sanitized,
+    );
+  });
+
+  it('leaves quote-free values untouched', () => {
+    const input = filterState({ tags: ['wiki', 'dev docs'] });
+    expect(sanitizeFilterState(input)).toEqual(input);
+  });
+
+  it('trims surrounding whitespace so state matches the built query', () => {
+    // buildSearchQuery trims values; sanitize must too, or the chip would show
+    // ` x ` while the URL/search used `x`.
+    const sanitized = sanitizeFilterState(
+      filterState({ authors: ['  alice '] }),
+    );
+    expect(sanitized.authors).toEqual(['alice']);
+  });
+
+  it('drops values that are empty after cleaning', () => {
+    const sanitized = sanitizeFilterState(
+      filterState({ authors: ['alice', '   ', '""'], tags: [''] }),
+    );
+    expect(sanitized.authors).toEqual(['alice']);
+    expect(sanitized.tags).toEqual([]);
+  });
+});
+
+describe('isSameFilterState', () => {
+  it('is true for equal values across all fields', () => {
+    const a = filterState({ authors: ['alice'], tags: ['wiki', 'docs'] });
+    const b = filterState({ authors: ['alice'], tags: ['wiki', 'docs'] });
+    // Different object identities, same values — the round-trip re-seed case.
+    expect(isSameFilterState(a, b)).toBe(true);
+  });
+
+  it('is false when a value differs, is added, or is reordered', () => {
+    const base = filterState({ tags: ['wiki', 'docs'] });
+    expect(isSameFilterState(base, filterState({ tags: ['wiki'] }))).toBe(
+      false,
+    );
+    expect(
+      isSameFilterState(base, filterState({ tags: ['docs', 'wiki'] })),
+    ).toBe(false);
+    expect(
+      isSameFilterState(
+        base,
+        filterState({ tags: ['wiki', 'docs'], authors: ['a'] }),
+      ),
+    ).toBe(false);
   });
 });

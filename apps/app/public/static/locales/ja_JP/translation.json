@@ -840,6 +840,8 @@
     "hit_number_unit": "件",
     "filter": "フィルター",
     "search_option": "検索オプション",
+    "filter_remove": "削除",
+    "filter_clear": "すべてクリア",
     "filter_author": "作成者",
     "filter_by_author": "作成者で絞り込む",
     "filter_editor": "更新者",

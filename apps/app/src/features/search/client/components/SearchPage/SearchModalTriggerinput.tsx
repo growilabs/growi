@@ -1,5 +1,4 @@
-import type React from 'react';
-import { useCallback } from 'react';
+import React, { useCallback } from 'react';
 
 import { useSearchModalActions } from '../../states/modal/search';
 
@@ -8,7 +7,12 @@ type Props = {
   onSearchInvoked?: (keyword: string) => void;
 };
 
-export const SearchModalTriggerinput: React.FC<Props> = (props: Props) => {
+// forwardRef exposes the inner <input> so callers can move keyboard focus here
+// (e.g. after the filter-chip bar unmounts, see SearchControl).
+export const SearchModalTriggerinput = React.forwardRef<
+  HTMLInputElement,
+  Props
+>((props, ref) => {
   const { keywordOnInit, onSearchInvoked } = props;
 
   const { open: openSearchModal } = useSearchModalActions();
@@ -28,6 +32,7 @@ export const SearchModalTriggerinput: React.FC<Props> = (props: Props) => {
         onKeyDown={inputClickHandler}
       >
         <input
+          ref={ref}
           className="form-control"
           type="input"
           value={keywordOnInit}
@@ -37,4 +42,6 @@ export const SearchModalTriggerinput: React.FC<Props> = (props: Props) => {
       </form>
     </div>
   );
-};
+});
+
+SearchModalTriggerinput.displayName = 'SearchModalTriggerinput';

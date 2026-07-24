@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useEffect,
   useId,
+  useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'next-i18next';
@@ -13,8 +14,11 @@ import type { ISearchConditions, ISearchConfigurations } from '~/stores/search';
 
 import {
   createEmptyFilterState,
+  isSameFilterState,
   type SearchFilterState,
+  sanitizeFilterState,
 } from '../../utils/search-query';
+import { SearchFilterChips } from './SearchFilterChips';
 import { SearchFilterPanel } from './SearchFilterPanel';
 import { SearchModalTriggerinput } from './SearchModalTriggerinput';
 import { SearchOptionModalLazyLoaded } from './SearchOptionModal';
@@ -74,6 +78,12 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
   const [isFileterOptionModalShown, setIsFileterOptionModalShown] =
     useState(false);
   const filterPanelId = useId();
+
+  // Stable, always-visible target used to catch keyboard focus when the filter
+  // chip bar removes its last chip and unmounts (which would otherwise drop
+  // focus to <body>). The search trigger input is present on every viewport, so
+  // it works regardless of input modality — unlike the desktop-only Filters button.
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { t } = useTranslation('');
 
@@ -137,8 +147,9 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
 
   const changeFiltersHandler = useCallback(
     (newFilters: SearchFilterState) => {
-      setFilters(newFilters);
-      invokeSearch(keyword, { filters: newFilters });
+      const sanitized = sanitizeFilterState(newFilters);
+      setFilters(sanitized);
+      invokeSearch(keyword, { filters: sanitized });
     },
     [invokeSearch, keyword],
   );
@@ -147,11 +158,21 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
     setKeyword(keywordOnInit);
   }, [keywordOnInit]);
 
+  // Re-seed filters when the URL-derived state changes (reload, back/forward, a
+  // hand-typed operator). Guarded so our own round-trip — which re-parses to the
+  // same values — is a no-op rather than a loop.
+  const filtersOnInit = initialSearchConditions.filters;
+  useEffect(() => {
+    const next = filtersOnInit ?? createEmptyFilterState();
+    setFilters((prev) => (isSameFilterState(prev, next) ? prev : next));
+  }, [filtersOnInit]);
+
   return (
     <div className="shadow-sm">
       <div className="grw-search-page-nav d-flex py-3 align-items-center">
         <div className="flex-grow-1 mx-4">
           <SearchModalTriggerinput
+            ref={searchInputRef}
             keywordOnInit={keyword}
             onSearchInvoked={searchBySearchControlHandler}
           />
@@ -251,6 +272,14 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
 
         {extraControls}
       </div>
+
+      {isEnableFilter && (
+        <SearchFilterChips
+          filters={filters}
+          onChange={changeFiltersHandler}
+          fallbackFocusRef={searchInputRef}
+        />
+      )}
 
       {isEnableFilter && (
         <Collapse isOpen={isFilterPanelOpen}>
