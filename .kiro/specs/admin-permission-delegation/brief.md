@@ -15,6 +15,22 @@ GROWI の管理画面は `IUser.admin: boolean` の**全か無か**でしか守�
 これは access-control umbrella の**第一の実証対象**であり、「柔軟なユーザー権限管理」の中でも
 最も具体的に要望されている形（例: usergroup だけ編集できる非管理者）である。
 
+**実要望の裏付け**:
+- [discussion #7709「管理者以外によるグループの設定」](https://github.com/growilabs/growi/discussions/7709)
+  （原点）: 「数百ユーザのいる環境では管理者の負担が大きすぎるという判断の元、グループ機能の運用を
+  断念せざるを得ない」——グループの設定画面だけを一般利用者が使えるようにしてほしい、という要望。
+  コアメンテナーの返信で「アビリティ」概念（capability をユーザー/グループに付与）が提案されている。
+- [discussion #11148 のコメント](https://github.com/growilabs/growi/discussions/11148#discussioncomment-17669027)
+  （最近の再提起）: 「グループ管理者を指定してグループ管理は委譲できるようにしていただきたいです。
+  エンタープライズの運用を考えると大変なので。」— #7709 と同根の要望が、4年以上経った現在も
+  継続して求められていることを示す。
+
+**要検討（open question）**: #11148 の文脈（「自分の所属するグループ」のメンバー可視化スレッドへの
+派生コメント）は、委譲の粒度が「admin セクション丸ごと（全 UserGroup を管理可能）」ではなく
+**「特定の1グループだけを管理できる（per-group 委譲）」を求めている可能性を示唆する**。本 brief の
+Desired Outcome は現状セクション単位（例:「UserGroup 管理者」＝全グループ管理）を前提にしているが、
+requirements フェーズで、この粒度（セクション単位か per-group か）をユーザーに確認し確定させること。
+
 ## Current State（現状）
 
 - **admin ゲート**（`apps/app/src/server/middlewares/admin-required.ts`）: `req.user.admin`
