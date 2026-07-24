@@ -61,7 +61,12 @@
     "unopend": "未读",
     "mark_all_as_read": "标记为已读",
     "no_unread_messages": "no_unread_messages",
-    "only_unread": "Only unread"
+    "only_unread": "Only unread",
+    "news": "公告",
+    "notifications": "通知",
+    "filter_all": "全部",
+    "no_news": "暂无公告",
+    "view_detail": "查看详情"
   },
   "personal_dropdown": {
     "home": "家",
@@ -134,6 +139,7 @@
         "all": "授予查看管理功能的权限。",
         "top": "授予查看Wiki管理顶部的权限。",
         "app": "授予查看应用程序设置的权限。",
+        "ai": "授予查看 AI 设置的权限。",
         "security": "授予查看安全设置的权限。",
         "markdown": "授予查看markdown设置的权限。",
         "customize": "授予查看自定义设置的权限。",
@@ -147,7 +153,6 @@
         "user_group_management": "授予查看用户组管理的权限。",
         "audit_log": "授予查看审计日志的权限。",
         "plugin": "授予查看插件设置的权限。",
-        "ai_integration": "授予查看AI集成设置的权限。",
         "full_text_search": "授予查看全文搜索管理的权限。"
       },
       "user_settings": {
@@ -165,12 +170,15 @@
       },
       "features": {
         "all": "授予查看功能的权限。",
-        "ai_assistant": "授予查看AI助手功能的权限。",
+        "ai": "授予查看AI助手功能的权限。",
         "page": "授予查看页面功能的权限。",
         "share_link": "授予查看共享链接功能的权限。",
         "bookmark": "授予查看书签功能的权限。",
         "attachment": "授予查看附件功能的权限。",
-        "page_bulk_export": "授予查看页面批量导出功能的权限。"
+        "page_bulk_export": "授予查看页面批量导出功能的权限。",
+        "in_app_notification": "授予查看应用内通知功能的权限。",
+        "user": "授予查看用户信息功能的权限。",
+        "user_group": "授予查看用户组成员功能的权限。"
       }
     },
     "write": {
@@ -179,6 +187,7 @@
         "all": "授予编辑管理功能的权限。",
         "top": "授予编辑Wiki管理顶部的权限。",
         "app": "授予编辑应用程序设置的权限。",
+        "ai": "授予编辑 AI 设置的权限。",
         "security": "授予编辑安全设置的权限。",
         "markdown": "授予编辑markdown设置的权限。",
         "customize": "授予编辑自定义设置的权限。",
@@ -192,7 +201,6 @@
         "user_group_management": "授予编辑用户组管理的权限。",
         "audit_log": "授予编辑审计日志的权限。",
         "plugin": "授予编辑插件设置的权限。",
-        "ai_integration": "授予编辑AI集成设置的权限。",
         "full_text_search": "授予编辑全文搜索管理的权限。"
       },
       "user_settings": {
@@ -210,12 +218,15 @@
       },
       "features": {
         "all": "授予编辑功能的权限。",
-        "ai_assistant": "授予编辑AI助手功能的权限。",
+        "ai": "授予编辑AI助手功能的权限。",
         "page": "授予编辑页面功能的权限。",
         "share_link": "授予编辑共享链接功能的权限。",
         "bookmark": "授予编辑书签功能的权限。",
         "attachment": "授予编辑附件功能的权限。",
-        "page_bulk_export": "授予编辑页面批量导出功能的权限。"
+        "page_bulk_export": "授予编辑页面批量导出功能的权限。",
+        "in_app_notification": "授予编辑应用内通知功能的权限。",
+        "user": "授予编辑用户信息功能的权限。",
+        "user_group": "授予编辑用户组成员功能的权限。"
       }
     }
   }

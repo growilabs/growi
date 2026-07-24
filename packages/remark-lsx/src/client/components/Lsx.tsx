@@ -2,10 +2,10 @@ import React, { type JSX, useCallback, useMemo } from 'react';
 import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 
-import { useSWRxLsx } from '../stores/lsx';
-import { generatePageNodeTree } from '../utils/page-node';
-import { LsxListView } from './LsxPageList/LsxListView';
-import { LsxContext } from './lsx-context';
+import { useSWRxLsx } from '../stores/lsx/index.js';
+import { generatePageNodeTree } from '../utils/page-node.js';
+import { LsxListView } from './LsxPageList/LsxListView.js';
+import { LsxContext } from './lsx-context.js';
 
 import styles from './Lsx.module.scss';
 
@@ -57,9 +57,9 @@ const LsxSubstance = React.memo(
     const hasError = error != null;
     const errorMessage = error?.message;
 
-    const ErrorMessage = useCallback((): JSX.Element => {
+    const ErrorMessage = useCallback(() => {
       if (!hasError) {
-        return;
+        return null;
       }
 
       return (
@@ -75,12 +75,12 @@ const LsxSubstance = React.memo(
       );
     }, [errorMessage, hasError, lsxContext]);
 
-    const Loading = useCallback((): JSX.Element => {
+    const Loading = useCallback(() => {
       if (hasError) {
-        return;
+        return null;
       }
       if (!isLoading) {
-        return;
+        return null;
       }
 
       return (
@@ -95,7 +95,7 @@ const LsxSubstance = React.memo(
 
     const contents = useMemo(() => {
       if (data == null) {
-        return;
+        return null;
       }
 
       const depthRange = lsxContext.getOptDepth();
@@ -120,14 +120,14 @@ const LsxSubstance = React.memo(
       const lastResult = data?.at(-1);
 
       if (lastResult == null) {
-        return;
+        return null;
       }
 
       const { cursor, total } = lastResult;
       const leftItemsNum = total - cursor;
 
       if (leftItemsNum === 0) {
-        return;
+        return null;
       }
 
       return (

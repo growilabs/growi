@@ -17,6 +17,10 @@ import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import assert from 'assert';
 import type { HydratedDocument, model } from 'mongoose';
 
+import {
+  toMarkdownAlternateLinkHeader,
+  toPermalinkMdUrl,
+} from '~/features/page-markdown';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
@@ -202,6 +206,27 @@ export async function getPageDataForInitial(
 
     // type assertion
     assert(isIPageInfo(meta), 'meta should be IPageInfo when data is not null');
+
+    // Requirement 6.2/6.3: advertise the Markdown alternate via the `Link`
+    // response header. Set it here, before the empty-page early return below,
+    // using the still-in-scope entity `_id`, so empty (container) pages,
+    // CSR-fallback pages (skipSSR), and normal pages all carry the pageId-form
+    // Link header. Append rather than overwrite to preserve any existing header.
+    const mdLinkHeader = toMarkdownAlternateLinkHeader(
+      toPermalinkMdUrl(page._id.toString()),
+    );
+    const existingLink = context.res.getHeader('Link');
+    context.res.setHeader(
+      'Link',
+      existingLink == null
+        ? mdLinkHeader
+        : [
+            ...(Array.isArray(existingLink)
+              ? existingLink
+              : [String(existingLink)]),
+            mdLinkHeader,
+          ],
+    );
 
     // Handle empty pages - return as not found to avoid serialization issues
     if (page.isEmpty) {

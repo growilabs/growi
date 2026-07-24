@@ -120,7 +120,13 @@ describe('delete-completely-user-home-by-system test', () => {
 
       // then
       expect(mockUpdateDescendantCountOfAncestors).toHaveBeenCalled();
-      expect(mockDeleteCompletelyOperation).toHaveBeenCalled();
+      // The system path has no operator: it must pass an explicit null actor
+      // so no cascade attachment-removal activity is recorded for it
+      expect(mockDeleteCompletelyOperation).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(Array),
+        null,
+      );
       expect(mockPageEvent.emit).toHaveBeenCalled();
       expect(mockDeleteMultipleCompletely).toHaveBeenCalled();
     });

@@ -122,8 +122,11 @@ const router = express.Router();
  *                type: boolean
  *                description: whether the current exporting job exists or not
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequired = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
@@ -251,9 +254,11 @@ module.exports = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.EXPORT_DATA], { acceptLegacy: true }),
     loginRequired,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.generateZipFile,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       // TODO: add express validator
       try {
@@ -310,9 +315,11 @@ module.exports = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.EXPORT_DATA], { acceptLegacy: true }),
     loginRequired,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.deleteFile,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       // TODO: add express validator
       const { fileName } = req.params;

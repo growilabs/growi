@@ -15,7 +15,6 @@ import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { isAiEnabled } from '~/features/openai/server/services';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import {
   type IApiv3PageUpdateParams,
@@ -106,19 +105,31 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     body('wip').optional().isBoolean().withMessage('wip must be boolean'),
   ];
 
-  async function postAction(
+  /**
+   * Emit the page-update activity.
+   *
+   * This MUST run before the response is sent (see the call site). The
+   * activity's request context (operator user / ip / endpoint / username) is
+   * held in `pendingActivityContext`, keyed by the pre-minted activity id, and
+   * `registerFailsafeFinalizer` clears that entry on the `res` 'finish'/'close'
+   * events. The ActivityService 'update' listener consumes the context
+   * synchronously (`pendingActivityContext.take`) as the first thing it does.
+   *
+   * If the emit ran after `res.apiv3()` (as it used to, from inside
+   * `postAction`), the `await shouldGenerateUpdate(...)` below would yield the
+   * event loop long enough for the response's 'finish' to clear the context
+   * first, so the listener would settle the row with `user: null` -- a "bare"
+   * activity that later surfaces as a `null` entry in a notification's
+   * `actionUsers` and crashed the notification list. Emitting before the
+   * response guarantees `take()` runs while the context is still alive.
+   * (create-page.ts is unaffected: its emit is the first statement of its
+   * postAction, with no `await` between `res.apiv3()` and the emit.)
+   */
+  async function generateUpdateActivity(
     req: UpdatePageRequest,
     res: ApiV3Response,
     updatedPage: HydratedDocument<PageDocument>,
-    previousRevision: IRevisionHasId | null,
   ) {
-    // Reflect the updates in ydoc
-    const origin = req.body.origin;
-    if (origin === Origin.View || origin === undefined) {
-      const yjsService = getYjsService();
-      await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
-    }
-
     // Decide if update activity should generate
     let shouldGenerateUpdateActivity = false;
     try {
@@ -138,29 +149,45 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       );
     }
 
-    if (shouldGenerateUpdateActivity) {
-      try {
-        // persist activity
-        const creator =
-          updatedPage.creator != null
-            ? getIdForRef(updatedPage.creator)
-            : undefined;
-        const parameters = {
-          targetModel: SupportedTargetModel.MODEL_PAGE,
-          target: updatedPage,
-          action: SupportedAction.ACTION_PAGE_UPDATE,
-        };
-        const activityEvent = crowi.events.activity;
-        activityEvent.emit(
-          'update',
-          res.locals.activity._id,
-          parameters,
-          { path: updatedPage.path, creator },
-          preNotifyService.generatePreNotify,
-        );
-      } catch (err) {
-        logger.error('Failed to generate update activity', err);
-      }
+    if (!shouldGenerateUpdateActivity) {
+      return;
+    }
+
+    try {
+      // persist activity
+      const creator =
+        updatedPage.creator != null
+          ? getIdForRef(updatedPage.creator)
+          : undefined;
+      const parameters = {
+        targetModel: SupportedTargetModel.MODEL_PAGE,
+        target: updatedPage,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+        contributor: req.user,
+      };
+      const activityEvent = crowi.events.activity;
+      activityEvent.emit(
+        'update',
+        res.locals.activity._id,
+        parameters,
+        { path: updatedPage.path, creator },
+        preNotifyService.generatePreNotify,
+      );
+    } catch (err) {
+      logger.error('Failed to generate update activity', err);
+    }
+  }
+
+  async function postAction(
+    req: UpdatePageRequest,
+    updatedPage: HydratedDocument<PageDocument>,
+    previousRevision: IRevisionHasId | null,
+  ) {
+    // Reflect the updates in ydoc
+    const origin = req.body.origin;
+    if (origin === Origin.View || origin === undefined) {
+      const yjsService = getYjsService();
+      await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
     }
 
     // global notification
@@ -197,19 +224,6 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         }
       } catch (err) {
         logger.error({ err }, 'Create user notification failed');
-      }
-    }
-
-    // Rebuild vector store file
-    if (isAiEnabled()) {
-      const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai'
-      );
-      try {
-        const openaiService = getOpenaiService();
-        await openaiService?.updateVectorStoreFileOnPageUpdate(updatedPage);
-      } catch (err) {
-        logger.error({ err }, 'Rebuild vector store failed');
       }
     }
   }
@@ -379,9 +393,16 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         revision: serializeRevisionSecurely(updatedPage.revision),
       };
 
+      // Generate the update activity BEFORE sending the response so the
+      // ActivityService listener captures the request context while it is
+      // still alive (see generateUpdateActivity's doc comment). This is
+      // awaited because the synchronous context `take()` happens inside the
+      // emit, and the emit must not be preceded by `res.apiv3()`.
+      await generateUpdateActivity(req, res, updatedPage);
+
       res.apiv3(result, 201);
 
-      postAction(req, res, updatedPage, previousRevision);
+      postAction(req, updatedPage, previousRevision);
     },
   ];
 };

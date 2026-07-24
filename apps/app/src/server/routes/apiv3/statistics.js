@@ -2,11 +2,11 @@ import loggerFactory from '~/utils/logger';
 
 const _logger = loggerFactory('growi:routes:apiv3:healthcheck');
 
-const express = require('express');
+import express from 'express';
 
 const router = express.Router();
 
-const noCache = require('nocache');
+import noCache from 'nocache';
 
 const USER_STATUS_MASTER = {
   1: 'registered',
@@ -58,8 +58,11 @@ const USER_STATUS_MASTER = {
  *                     example: 0
  */
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const models = crowi.models;
   const User = models.User;
 

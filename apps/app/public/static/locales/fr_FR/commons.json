@@ -59,7 +59,12 @@
     "all": "Toutes",
     "unopend": "Non-lues",
     "mark_all_as_read": "Tout marquer comme lu",
-    "no_unread_messages": "aucun message non lu"
+    "no_unread_messages": "aucun message non lu",
+    "news": "Actualités",
+    "notifications": "Notifications",
+    "filter_all": "Tout",
+    "no_news": "Aucune actualité disponible",
+    "view_detail": "Voir les détails"
   },
   "personal_dropdown": {
     "home": "Accueil",
@@ -132,6 +137,7 @@
         "all": "Accorde la permission de voir les fonctionnalités d'administration.",
         "top": "Accorde la permission de voir la page principale de gestion du Wiki.",
         "app": "Accorde la permission de voir les paramètres de l'application.",
+        "ai": "Accorde la permission de voir les paramètres IA.",
         "security": "Accorde la permission de voir les paramètres de sécurité.",
         "markdown": "Accorde la permission de voir les paramètres markdown.",
         "customize": "Accorde la permission de voir les paramètres de personnalisation.",
@@ -145,7 +151,6 @@
         "user_group_management": "Accorde la permission de voir la gestion des groupes d'utilisateurs.",
         "audit_log": "Accorde la permission de voir les journaux d'audit.",
         "plugin": "Accorde la permission de voir les paramètres des plugins.",
-        "ai_integration": "Accorde la permission de voir les paramètres d'intégration IA.",
         "full_text_search": "Accorde la permission de voir la gestion de la recherche en texte intégral."
       },
       "user_settings": {
@@ -163,12 +168,15 @@
       },
       "features": {
         "all": "Accorde la permission de voir les fonctionnalités.",
-        "ai_assistant": "Accorde la permission de voir les fonctionnalités d'assistant IA.",
+        "ai": "Accorde la permission de voir les fonctionnalités d'assistant IA.",
         "page": "Accorde la permission de voir les fonctionnalités de page.",
         "share_link": "Accorde la permission de voir les fonctionnalités de lien de partage.",
         "bookmark": "Accorde la permission de voir les fonctionnalités de signet.",
         "attachment": "Accorde la permission de voir les fonctionnalités de pièce jointe.",
-        "page_bulk_export": "Accorde la permission de voir les fonctionnalités d'exportation en masse de pages."
+        "page_bulk_export": "Accorde la permission de voir les fonctionnalités d'exportation en masse de pages.",
+        "in_app_notification": "Accorde la permission de voir les fonctionnalités de notification intégrée à l'application.",
+        "user": "Accorde la permission de voir les fonctionnalités d'informations utilisateur.",
+        "user_group": "Accorde la permission de voir les fonctionnalités de membres de groupe d'utilisateurs."
       }
     },
     "write": {
@@ -177,6 +185,7 @@
         "all": "Accorde la permission de modifier les fonctionnalités d'administration.",
         "top": "Accorde la permission de modifier la page principale de gestion du Wiki.",
         "app": "Accorde la permission de modifier les paramètres de l'application.",
+        "ai": "Accorde la permission de modifier les paramètres IA.",
         "security": "Accorde la permission de modifier les paramètres de sécurité.",
         "markdown": "Accorde la permission de modifier les paramètres markdown.",
         "customize": "Accorde la permission de modifier les paramètres de personnalisation.",
@@ -190,7 +199,6 @@
         "user_group_management": "Accorde la permission de modifier la gestion des groupes d'utilisateurs.",
         "audit_log": "Accorde la permission de modifier les journaux d'audit.",
         "plugin": "Accorde la permission de modifier les paramètres des plugins.",
-        "ai_integration": "Accorde la permission de modifier les paramètres d'intégration IA.",
         "full_text_search": "Accorde la permission de modifier la gestion de la recherche en texte intégral."
       },
       "user_settings": {
@@ -208,12 +216,15 @@
       },
       "features": {
         "all": "Accorde la permission de modifier les fonctionnalités.",
-        "ai_assistant": "Accorde la permission de modifier les fonctionnalités d'assistant IA.",
+        "ai": "Accorde la permission de modifier les fonctionnalités d'assistant IA.",
         "page": "Accorde la permission de modifier les fonctionnalités de page.",
         "share_link": "Accorde la permission de modifier les fonctionnalités de lien de partage.",
         "bookmark": "Accorde la permission de modifier les fonctionnalités de signet.",
         "attachment": "Accorde la permission de modifier les fonctionnalités de pièce jointe.",
-        "page_bulk_export": "Accorde la permission de modifier les fonctionnalités d'exportation en masse de pages."
+        "page_bulk_export": "Accorde la permission de modifier les fonctionnalités d'exportation en masse de pages.",
+        "in_app_notification": "Accorde la permission de modifier les fonctionnalités de notification intégrée à l'application.",
+        "user": "Accorde la permission de modifier les fonctionnalités d'informations utilisateur.",
+        "user_group": "Accorde la permission de modifier les fonctionnalités de membres de groupe d'utilisateurs."
       }
     }
   }

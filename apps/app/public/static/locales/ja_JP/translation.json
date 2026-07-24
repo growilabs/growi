@@ -153,9 +153,7 @@
   "Page Tree": "ページツリー",
   "Bookmarks": "ブックマーク",
   "In-App Notification": "通知",
-  "AI Assistant": "AI アシスタント",
-  "Knowledge Assistant": "ナレッジアシスタント (ベータ版)",
-  "Editor Assistant": "エディターアシスタント (ベータ版)",
+  "GROWI AI Agent": "GROWI AI Agent",
   "original_path": "元のパス",
   "new_path": "新しいパス",
   "duplicated_path": "重複したパス",
@@ -376,6 +374,27 @@
     },
     "exclude_tag": {
       "desc": "{{tag}} というタグを含むページを除外"
+    },
+    "author": {
+      "desc": "{{author}} が作成したページを検索"
+    },
+    "exclude_author": {
+      "desc": "{{author}} が作成したページを除外"
+    },
+    "editor": {
+      "desc": "{{editor}} が最後に編集したページを検索"
+    },
+    "exclude_editor": {
+      "desc": "{{editor}} が編集したページを除外"
+    },
+    "group": {
+      "desc": "{{group}} グループに許可されたページを検索"
+    },
+    "exclude_group": {
+      "desc": "{{group}} グループに許可されたページを除外"
+    },
+    "quoted_value": {
+      "desc": "フィルターの値にスペースが含まれる場合はダブルクォートで囲む（例: グループ名やページパス）"
     }
   },
   "search": {
@@ -407,7 +426,6 @@
       "file": "ファイルのみ"
     },
     "editor_config": "エディター設定",
-    "editor_assistant": "エディターアシスタント",
     "Show active line": "アクティブ行をハイライト",
     "auto_format_table": "表の自動整形",
     "overwrite_scopes": "{{operation}}と同時に全ての配下ページのスコープを上書き",
@@ -426,7 +444,8 @@
     "no_user_found": "ユーザー名が見つかりません",
     "reply": "返信",
     "delete_comment": "コメントを削除しますか？",
-    "comment_management_is_not_allowed": "コメントの操作が許可されていません。"
+    "comment_management_is_not_allowed": "コメントの操作が許可されていません。",
+    "no_comments": "コメントはありません。"
   },
   "page_api_error": {
     "notfound_or_forbidden": "元のページが見つからないか、アクセス権がありません。",
@@ -576,145 +595,31 @@
     "latest_revision": "最新の本文",
     "selected_editable_revision": "保存するページ本文(編集可能)"
   },
-  "sidebar_ai_assistant": {
-    "reference_pages_label": "参照するページ",
-    "recent_chat": "最近のチャット",
-    "no_recent_chat": "チャットがありません",
-    "knowledge_assistant_placeholder": "ききたいことを入力してください",
-    "editor_assistant_placeholder": "お手伝いできることはありますか？",
-    "summary_mode_label": "要約モード",
-    "summary_mode_help": "2～3文以内の簡潔な回答",
-    "extended_thinking_mode_label": "拡張思考モード",
-    "extended_thinking_mode_help": "有効にすると、AIはより時間をかけて考え、より包括的な回答を提供します。",
-    "caution_against_hallucination": "情報が正しいか出典を確認しましょう",
-    "progress_label": "回答を生成しています",
-    "failed_to_create_or_retrieve_thread": "スレッドの作成または取得に失敗しました",
-    "budget_exceeded": "OpenAI の API の利用上限に達しました。ナレッジアシスタントを再度利用するには OpenAI の請求ページからクレジットを追加してください。",
-    "budget_exceeded_for_growi_cloud": "OpenAI の API の利用上限に達しました。ナレッジアシスタントを再度利用するには Hosted の場合は GROWI.cloud の管理画面から Owned の場合は OpenAI の請求ページからクレジットを追加してください。",
-    "error_message": "エラーが発生しました",
-    "show_error_detail": "詳細を表示",
-    "editor_assistant_long_context_warn_with_unit_line": "本文が長すぎるため、エディターアシスタントは {{startPosition}}行から{{endPosition}}行付近までを参照して回答します",
-    "editor_assistant_long_context_warn_with_unit_char": "本文が長すぎるため、エディターアシスタントは {{startPosition}}文字目から{{endPosition}}文字目までを参照して回答します",
-    "discard": "破棄",
-    "accept": "採用",
-    "use_assistant": "アシスタントを使用する",
-    "remove_assistant": "選択されているアシスタントの解除",
-    "text_generation_by_editor_assistant_label": "エディターアシスタントが文章を生成中",
-    "preset_menu": {
-      "summarize": {
-        "title": "この記事の要約をつくる",
-        "prompt": "マークダウンの内容を要約してください"
-      },
-      "correct": {
-        "title": "文章の誤りを修正する",
-        "prompt": "マークダウンの内の文章の誤りを修正してください"
-      }
-    }
+  "ai_unavailable": {
+    "open_admin_settings_to_enable": "AI 連携を有効にするには管理画面で設定してください",
+    "to_admin_ai_settings": "AI 設定の管理画面へ",
+    "contact_admin_to_enable": "AI 連携が有効になっていません。管理者にお問い合わせください"
   },
-  "modal_ai_assistant": {
-    "header": {
-      "update_assistant": "アシスタントの更新",
-      "add_new_assistant": "新規アシスタントの追加"
-    },
-    "assistant_name_placeholder": "アシスタント名を入力",
-    "page_count": "{{count}} ページ",
-    "memo": {
-      "title": "アシスタントのメモ",
-      "optional": "任意",
-      "placeholder": "内容や用途のメモを表示させることができます",
-      "description": "メモの内容はアシスタントの処理に影響しません。"
-    },
-    "submit_button": {
-      "update_assistant": "アシスタントを更新する",
-      "create_assistant": "アシスタントを作成する"
-    },
-    "toaster": {
-      "create_success": "アシスタントが作成されました",
-      "update_success": "アシスタントが更新されました",
-      "create_failed": "アシスタントの作成に失敗しました",
-      "update_failed": "アシスタントの更新に失敗しました"
-    },
-    "select_source_pages": "アシスタントが参照するページを選択します",
-    "search_reference_pages_by_keyword": "アシスタントが参照するページをキーワードで検索",
-    "search_by_keyword": "キーワードで検索",
-    "enter_keywords": "キーワードを入力",
-    "max_items_space_separated_hint": "スペース区切りで最大5つまで入力できます",
-    "select_assistant_reference_pages": "アシスタントが参照するページを選択してください",
-    "reference_pages": "参照するページ",
-    "no_pages_selected": "ページが選択されていません",
-    "can_add_later": "あとからでも追加できます",
-    "next": "次へ",
-    "select_from_page_tree": "ページツリーから選択",
-    "edit_page_description": " アシスタントが参照するページを編集します。<br> 参照できるページは配下ページも含めて {{limitLearnablePageCountPerAssistant}} ページまでです。",
-    "default_instruction": "あなたはこのWikiの知識アシスタントです。\n\n## 多言語サポート:\nユーザーが入力で使用した言語と同じ言語で応答してください。\n",
-    "add_page_button": "ページを追加する",
-    "page_mode_title": {
-      "share": "アシスタントの共有",
-      "pages": "参照ページ",
-      "instruction": "アシスタントへの指示"
-    },
-    "share_assistant": "アシスタントを共有する",
-    "page_access_permission": "ページのアクセス権限",
-    "access_scope": {
-      "owner": "{{username}} がアクセス可能な全てのページ",
-      "groups": "グループを指定",
-      "publicOnly": "公開ページのみ"
-    },
-    "share_scope": {
-      "title": "アシスタントの共有範囲",
-      "owner": {
-        "label": "{{username}} のみ"
-      },
-      "publicOnly": {
-        "label": "全体公開",
-        "desc": "すべてのユーザーに共有されます"
-      },
-      "groups": {
-        "label": "グループを指定",
-        "desc": "選択したグループのメンバーにのみ共有されます"
-      },
-      "sameAsAccessScope": {
-        "label": "ページのアクセス権限と同じ範囲",
-        "desc": "ページのアクセス権限と同じ範囲で共有されます"
-      }
-    },
-    "instructions": {
-      "description": "アシスタントの振る舞いを決める指示文を設定できます。<br>この指示に従ってにアシスタントの回答や分析を行います。",
-      "reset_to_default": "デフォルトに戻す"
-    }
-  },
-  "share_scope_warning_modal": {
-    "header_title": "共有範囲の確認",
-    "warning_message": "このアシスタントには限定公開されているページが含まれています。<br />現在の設定では、アシスタントを通じてこれらのページの情報が、本来のアクセス権限を超えて共有される可能性があります。",
-    "selected_pages_label": "選択されているページパス",
-    "confirmation_message": "続行する場合、これらのページの内容がアシスタントの公開範囲内で共有される可能性があることを確認してください。",
-    "button": {
-      "review": "設定を見直す",
-      "proceed": "理解して続行する"
-    }
-  },
-  "default_ai_assistant": {
-    "not_set": "デフォルトアシスタントが設定されていません",
-    "open_cloud_settings_to_enable": "AI 連携を有効にするには GROWI.cloud の管理画面をご確認ください",
-    "to_cloud_settings": "GROWI.cloud の管理画面へ"
-  },
-  "ai_assistant_substance": {
-    "add_assistant": "アシスタントを追加する",
-    "my_assistants": "マイアシスタント",
-    "team_assistants": "チームアシスタント",
-    "thread_does_not_exist": "スレッドが存在しません",
+  "ai_sidebar": {
+    "new_chat": "新規チャット",
     "recent_threads": "最近の項目",
-    "toaster": {
-      "ai_assistant_deleted_success": "アシスタントを削除しました",
-      "ai_assistant_deleted_failed": "アシスタントの削除に失敗しました",
-      "thread_deleted_success": "スレッドを削除しました",
-      "thread_deleted_failed": "スレッドの削除に失敗しました",
-      "ai_assistant_set_default_success": "デフォルトアシスタントを設定しました",
-      "ai_assistant_set_default_failed": "デフォルトアシスタントの設定に失敗しました"
+    "accuracy_notice": "情報が正しいか参照ページを確認しましょう。",
+    "sources": "参照したページ {{count}} 件",
+    "error": {
+      "title": "エラーが発生しました",
+      "retry": "再試行",
+      "dismiss": "閉じる"
     },
-    "delete_modal": {
-      "title": "アシスタントを削除する",
-      "confirm_message": "本当にアシスタントを削除しますか？"
+    "incomplete": {
+      "length": "回答が最大長に達したため、途中で停止しました。",
+      "tool_calls": "処理ステップの上限に達したため、途中で停止しました。",
+      "content_filter": "コンテンツポリシーにより、回答が途中で停止しました。",
+      "error": "エラーが発生したため、回答が途中で停止しました。",
+      "unknown": "回答が途中で停止しました。"
+    },
+    "toaster": {
+      "thread_deleted_success": "スレッドを削除しました",
+      "thread_deleted_failed": "スレッドの削除に失敗しました"
     }
   },
   "link_edit": {
@@ -914,7 +819,7 @@
     "sign_in_failure": "ログインに失敗しました。",
     "aws_sttings_required": "この機能にはAWS設定が必要です。管理者に訪ねて下さい。",
     "application_already_installed": "アプリケーションのインストールが完了しました。",
-    "email_address_could_not_be_used": "このメールアドレスは使用できません。(許可されたメールアドレスを確認してください。)",
+    "email_address_could_not_be_used": "このメールアドレスはこの Wiki では使用できません。管理者にお問い合わせください。",
     "user_id_is_not_available": "このユーザーIDは使用できません。",
     "username_should_not_be_null": "Username が null になっています 管理画面の認証機構設定にて設定の確認をしてください",
     "email_address_is_already_registered": "このメールアドレスは既に登録されています。",
@@ -996,7 +901,8 @@
   "user_group": {
     "select_group": "グループを選ぶ",
     "belonging_to_no_group": "所属しているグループが見つかりませんでした。",
-    "manage_user_groups": "グループ管理"
+    "manage_user_groups": "グループ管理",
+    "only_yourself": "自分のみ"
   },
   "fix_page_grant": {
     "modal": {
@@ -1045,6 +951,8 @@
   },
   "user_home_page": {
     "bookmarks": "ブックマーク",
+    "contribution_graph": "コントリビューショングラフ",
+    "contribution_migration_in_progress": "コントリビューションデータを準備しています。少し待ってから再読み込みしてください。",
     "recently_created": "最近作成したページ",
     "recent_activity": "最近のアクティビティ",
     "unknown_action": "未指定の変更を加えました",
@@ -1126,6 +1034,7 @@
     "checklist": "チェックリスト",
     "code": "コード",
     "diagram": "ダイアグラム",
+    "editor_guide": "エディターガイド",
     "emoji": "絵文字",
     "heading": "見出し",
     "italic": "イタリック",
@@ -1135,5 +1044,86 @@
     "table": "テーブル",
     "template": "テンプレート",
     "text_formatting": "テキスト書式"
+  },
+  "editor_guide": {
+    "title": "エディターガイド",
+    "tabs": {
+      "textstyle": "テキストスタイル",
+      "layout": "レイアウト",
+      "decoration": "装飾"
+    },
+    "textstyle": {
+      "copy_done": "コピーしました！",
+      "this": "これは",
+      "is": "です",
+      "bold": "太字",
+      "italic": "斜体",
+      "strikethrough": "取り消し線",
+      "inline_code": "インラインコード",
+      "bold_italic": "全体が太字か斜体",
+      "emoji": "絵文字",
+      "sub_sup": "下付き・上付き",
+      "link_label": "ラベル付きリンク",
+      "link_docs": "GROWI ドキュメント",
+      "link_growi": "GROWIのリンク",
+      "link_sandbox": "砂場ページはこちら",
+      "all_important": "このテキストはすべて\n重要です",
+      "sub_text": "下付き",
+      "sup_text": "上付き",
+      "is_text": "これは{{val}}です"
+    },
+    "layout": {
+      "copy_done": "コピーしました！",
+      "header": "ヘッダー",
+      "header_text": "見出し",
+      "list": "箇条書きリスト",
+      "list_text": "箇条書きリストです",
+      "ordered_list": "番号付きリスト",
+      "ordered_list_text": "番号付きリストです",
+      "checkbox": "チェックボックス",
+      "task": "タスク",
+      "quote": "引用",
+      "quote_text": "引用",
+      "multi_quote": "多重引用",
+      "hr": "水平線",
+      "br": "改行",
+      "br_code": "スペース2つ入れると  改行\nできます",
+      "br_preview_1": "スペース2つ入れると",
+      "br_preview_2": "改行できます",
+      "code_block": "コードブロック",
+      "code_block_text": "ここにコードを追加",
+      "table": "表",
+      "left": "左揃え",
+      "right": "右揃え",
+      "center": "中央揃え",
+      "row_text": "この列は",
+      "row_display": "で表示されます",
+      "footnote": "脚注",
+      "footnote_label": "脚注つきテキスト",
+      "footnote_desc": "注記はこのように書きます"
+    },
+    "decoration": {
+      "copy_done": "コピーしました！",
+      "style": "スタイル",
+      "alert": "アラート",
+      "alert_with_custom_title": "ラベル付きアラート",
+      "alert_with_custom_title_text": "カスタムタイトル",
+      "alert_unavailable": "このスタイルでは使用できません",
+      "badge": "バッジ",
+      "text_color": "テキストカラー",
+      "back_color": "背景色",
+      "placeholder": "テキストが入ります",
+      "docs_title": "Bootstrap5 公式ドキュメント",
+      "docs_badge": "バッジの詳細はこちら",
+      "docs_color": "カラーの詳細はこちら",
+      "docs_alert": "アラートブロックの詳細はこちら"
+    }
+  },
+  "pageMention": {
+    "placeholder": "メッセージを入力...（@でページを参照）",
+    "hint": "ページ名を入力して検索",
+    "searching": "検索中...",
+    "noResults": "該当するページがありません",
+    "candidatesLabel": "ページ候補"
   }
 }

@@ -1,22 +1,21 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
-import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
-import { addMinutes } from 'date-fns/addMinutes';
-import { isValid } from 'date-fns/isValid';
-import { parseISO } from 'date-fns/parseISO';
-import type { Request, Router } from 'express';
+import type { NextFunction, Request, Router } from 'express';
 import express from 'express';
-import { query } from 'express-validator';
+import { body, query } from 'express-validator';
 
-import type { IActivity, ISearchFilter } from '~/interfaces/activity';
+import type { ISearchFilter } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import {
+  paginateAndSerializeActivities,
+  resolveActivityListWhere,
+} from './fetch-activity-list';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
@@ -32,6 +31,19 @@ const validator = {
       .optional()
       .isString()
       .withMessage('query must be a string'),
+  ],
+  // POST /activity/list carries the same parameters in the request body so the
+  // searchFilter (which lists every selected action) never bloats the URL.
+  listByPost: [
+    body('limit')
+      .optional()
+      .isInt({ max: 100 })
+      .withMessage('limit must be a number less than or equal to 100'),
+    body('offset').optional().isInt().withMessage('offset must be a number'),
+    body('searchFilter')
+      .optional()
+      .isObject()
+      .withMessage('searchFilter must be an object'),
   ],
 };
 
@@ -65,9 +77,19 @@ const validator = {
  *                     example: "/_api/pages.remove"
  *                   targetModel:
  *                     type: string
+ *                     description: >-
+ *                       Model name of the activity target. For attachment
+ *                       activities (ATTACHMENT_ADD / ATTACHMENT_REMOVE /
+ *                       ATTACHMENT_DOWNLOAD) this is "Attachment".
  *                     example: "Page"
  *                   target:
  *                     type: string
+ *                     description: >-
+ *                       ID of the activity target. For attachment activities
+ *                       this is the attachment ID; combined with the snapshot
+ *                       fields it lets consumers build a download link for
+ *                       attachments that still exist (ATTACHMENT_ADD /
+ *                       ATTACHMENT_DOWNLOAD, distinguished by `action`).
  *                     example: "675547e97f208f8050a361d4"
  *                   action:
  *                     type: string
@@ -77,10 +99,43 @@ const validator = {
  *                     properties:
  *                       username:
  *                         type: string
+ *                         description: >-
+ *                           Username of the operator. Omitted when the activity
+ *                           was recorded without an authenticated user (e.g.
+ *                           guest ATTACHMENT_DOWNLOAD).
  *                         example: "growi"
  *                       _id:
  *                         type: string
  *                         example: "67e33da5d97e8d3b53e99f96"
+ *                       originalName:
+ *                         type: string
+ *                         description: >-
+ *                           Original file name of the attachment.
+ *                           Present on attachment activities (ATTACHMENT_ADD /
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD).
+ *                         example: "design-v2.pdf"
+ *                       pagePath:
+ *                         type: string
+ *                         description: >-
+ *                           Path of the page the attachment belongs or belonged
+ *                           to. Present on attachment activities (ATTACHMENT_ADD /
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD) when it
+ *                           could be resolved at capture time.
+ *                         example: "/Sandbox/attachments"
+ *                       pageId:
+ *                         type: string
+ *                         description: >-
+ *                           ID of the page the attachment belongs or belonged
+ *                           to. Present on attachment activities (ATTACHMENT_ADD /
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD).
+ *                         example: "675547e97f208f8050a361d4"
+ *                       fileSize:
+ *                         type: integer
+ *                         description: >-
+ *                           File size in bytes of the attachment.
+ *                           Present on attachment activities (ATTACHMENT_ADD /
+ *                           ATTACHMENT_REMOVE / ATTACHMENT_DOWNLOAD).
+ *                         example: 12345
  *                   createdAt:
  *                     type: string
  *                     format: date-time
@@ -176,11 +231,26 @@ const validator = {
  *               example: null
  */
 
-module.exports = (crowi: Crowi): Router => {
+export const setup = (crowi: Crowi): Router => {
   const adminRequired = adminRequiredFactory(crowi);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   const router = express.Router();
+
+  // Shared gate for every list transport: 405 when the audit log is disabled.
+  // Kept as one middleware so the GET and POST routes cannot drift apart.
+  const ensureAuditLogEnabled = (
+    _req: Request,
+    res: ApiV3Response,
+    next: NextFunction,
+  ) => {
+    if (!configManager.getConfig('app:auditLogEnabled')) {
+      const msg = 'AuditLog is not enabled';
+      logger.error(msg);
+      return res.apiv3Err(msg, 405);
+    }
+    next();
+  };
 
   /**
    * @swagger
@@ -192,6 +262,7 @@ module.exports = (crowi: Crowi): Router => {
    *     security:
    *       - bearer: []
    *       - accessTokenInQuery: []
+   *       - accessTokenHeaderAuth: []
    *     parameters:
    *       - name: limit
    *         in: query
@@ -223,94 +294,141 @@ module.exports = (crowi: Crowi): Router => {
     adminRequired,
     validator.list,
     apiV3FormValidator,
+    ensureAuditLogEnabled,
     async (req: Request, res: ApiV3Response) => {
-      const auditLogEnabled = configManager.getConfig('app:auditLogEnabled');
-      if (!auditLogEnabled) {
-        const msg = 'AuditLog is not enabled';
-        logger.error(msg);
-        return res.apiv3Err(msg, 405);
-      }
-
       const limit =
         req.query.limit ||
         configManager.getConfig('customize:showPageLimitationS');
+      // Preserve the existing offset || 1 quirk exactly (pure migration, req 2.1):
+      // an absent offset is falsy and becomes 1, skipping the first record. This
+      // behaviour is intentional to maintain observational parity before a
+      // separate fix is landed. Note: a query string turns an explicit offset=0
+      // into the truthy "0", so page 1 (offset=0) is NOT skipped here — only a
+      // fully absent offset is. The POST route below must reproduce that.
       const offset = req.query.offset || 1;
 
-      const query = {};
-
+      let where: ReturnType<typeof resolveActivityListWhere> = {};
       try {
         const parsedSearchFilter = JSON.parse(
           req.query.searchFilter as string,
         ) as ISearchFilter;
-
-        // add username to query
-        const canContainUsernameFilterToQuery =
-          parsedSearchFilter.usernames != null &&
-          parsedSearchFilter.usernames.length > 0 &&
-          parsedSearchFilter.usernames.every((u) => typeof u === 'string');
-        if (canContainUsernameFilterToQuery) {
-          Object.assign(query, {
-            'snapshot.username': parsedSearchFilter.usernames,
-          });
-        }
-
-        // add action to query
-        if (parsedSearchFilter.actions != null) {
-          const availableActions =
-            crowi.activityService.getAvailableActions(false);
-          const searchableActions = parsedSearchFilter.actions.filter(
-            (action) => availableActions.includes(action),
-          );
-          Object.assign(query, { action: searchableActions });
-        }
-
-        // add date to query
-        const startDate = parseISO(parsedSearchFilter?.dates?.startDate || '');
-        const endDate = parseISO(parsedSearchFilter?.dates?.endDate || '');
-        if (isValid(startDate) && isValid(endDate)) {
-          Object.assign(query, {
-            createdAt: {
-              $gte: startDate,
-              // + 23 hours 59 minutes
-              $lt: addMinutes(endDate, 1439),
-            },
-          });
-        } else if (isValid(startDate) && !isValid(endDate)) {
-          Object.assign(query, {
-            createdAt: {
-              $gte: startDate,
-              // + 23 hours 59 minutes
-              $lt: addMinutes(startDate, 1439),
-            },
-          });
-        }
+        where = resolveActivityListWhere(
+          crowi.activityService.getAvailableActions(false),
+          parsedSearchFilter,
+        );
       } catch (err) {
         logger.error('Invalid value', err);
         return res.apiv3Err(err, 400);
       }
 
       try {
-        const paginateResult = await Activity.paginate(query, {
-          lean: true,
-          limit,
-          offset,
-          sort: { createdAt: -1 },
-          populate: 'user',
-        });
+        const serializedPaginationResult = await paginateAndSerializeActivities(
+          where,
+          limit as number,
+          offset as number,
+        );
+        return res.apiv3({ serializedPaginationResult });
+      } catch (err) {
+        logger.error('Failed to get paginated activity', err);
+        return res.apiv3Err(err, 500);
+      }
+    },
+  );
 
-        const serializedDocs = paginateResult.docs.map((doc: IActivity) => {
-          const { user, ...rest } = doc;
-          return {
-            user: serializeUserSecurely(user),
-            ...rest,
-          };
-        });
+  /**
+   * @swagger
+   *
+   * /activity/list:
+   *   post:
+   *     summary: /activity/list
+   *     description: >-
+   *       Same as `GET /activity` but takes limit / offset / searchFilter in the
+   *       request body. The audit-log UI uses this so the searchFilter (which
+   *       lists every selected action) never bloats the query string and hits a
+   *       URL-length limit for large action-group configurations.
+   *     tags: [Activity]
+   *     security:
+   *       - bearer: []
+   *       - accessTokenInQuery: []
+   *       - accessTokenHeaderAuth: []
+   *     requestBody:
+   *       required: false
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               limit:
+   *                 type: integer
+   *               offset:
+   *                 type: integer
+   *               searchFilter:
+   *                 type: object
+   *                 properties:
+   *                   usernames:
+   *                     type: array
+   *                     items:
+   *                       type: string
+   *                   actions:
+   *                     type: array
+   *                     description: >-
+   *                       Omit this field to match every activity. Send it only
+   *                       to restrict the result to the listed actions.
+   *                     items:
+   *                       type: string
+   *                   dates:
+   *                     type: object
+   *                     properties:
+   *                       startDate:
+   *                         type: string
+   *                         nullable: true
+   *                       endDate:
+   *                         type: string
+   *                         nullable: true
+   *     responses:
+   *       200:
+   *         description: Activity fetched successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ActivityResponse'
+   */
+  router.post(
+    '/list',
+    accessTokenParser([SCOPE.READ.ADMIN.AUDIT_LOG], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    adminRequired,
+    validator.listByPost,
+    apiV3FormValidator,
+    ensureAuditLogEnabled,
+    async (req: Request, res: ApiV3Response) => {
+      const limit =
+        req.body.limit ||
+        configManager.getConfig('customize:showPageLimitationS');
+      // The body carries a real numeric offset, so 0 MUST mean "no skip" (page 1
+      // shows the newest record). The GET route's `offset || 1` quirk only
+      // survives there because the query string turns 0 into the truthy "0";
+      // applying `|| 1` to a numeric 0 here would wrongly skip the newest record.
+      const offset = req.body.offset ?? 0;
+      const parsedSearchFilter = (req.body.searchFilter ?? {}) as ISearchFilter;
 
-        const serializedPaginationResult = {
-          ...paginateResult,
-          docs: serializedDocs,
-        };
+      let where: ReturnType<typeof resolveActivityListWhere>;
+      try {
+        where = resolveActivityListWhere(
+          crowi.activityService.getAvailableActions(false),
+          parsedSearchFilter,
+        );
+      } catch (err) {
+        logger.error('Invalid value', err);
+        return res.apiv3Err(err, 400);
+      }
 
+      try {
+        const serializedPaginationResult = await paginateAndSerializeActivities(
+          where,
+          limit as number,
+          offset as number,
+        );
         return res.apiv3({ serializedPaginationResult });
       } catch (err) {
         logger.error('Failed to get paginated activity', err);

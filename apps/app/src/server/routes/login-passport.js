@@ -1,22 +1,23 @@
 import { ErrorV3 } from '@growi/core/dist/models';
+import passport from 'passport';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { ExternalAccountLoginError } from '~/models/vo/external-account-login-error';
 import { getTranslation } from '~/server/service/i18next';
 import { createRedirectToForUnauthenticated } from '~/server/util/createRedirectToForUnauthenticated';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { externalAccountService } from '../service/external-account';
+import ApiResponse from '../util/apiResponse';
+import { sendLoginSuccessResponse } from './login-success-response';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi, app) => {
+export const setup = (crowi, app) => {
   const logger = loggerFactory('growi:routes:login-passport');
-  const passport = require('passport');
   const passportService = crowi.passportService;
 
   const activityEvent = crowi.events.activity;
-
-  const ApiResponse = require('../util/apiResponse');
 
   const promisifiedPassportAuthentication = (strategyName, req, res) => {
     return new Promise((resolve, reject) => {
@@ -59,7 +60,7 @@ module.exports = (crowi, app) => {
     res,
     user,
     action,
-    isExternalAccount = false,
+    respondWithRedirect = false,
   ) => {
     // update lastLoginAt
     user.updateLastLoginAt(new Date(), (err, userData) => {
@@ -87,11 +88,7 @@ module.exports = (crowi, app) => {
     const redirectTo =
       redirectToForUnauthenticated ?? res.locals.redirectTo ?? '/';
 
-    if (isExternalAccount) {
-      return res.safeRedirect(redirectTo);
-    }
-
-    return res.apiv3({ redirectTo });
+    return sendLoginSuccessResponse(res, redirectTo, respondWithRedirect);
   };
 
   const injectRedirectTo = (req, res, next) => {
@@ -243,7 +240,16 @@ module.exports = (crowi, app) => {
       return next(new ErrorV3('message.external_account_not_exist'));
     }
 
-    const user = (await externalAccount.populate('user')).user;
+    const user = await prisma.externalaccounts
+      .findUnique({
+        select: {
+          user: true,
+        },
+        where: {
+          id: externalAccount.id,
+        },
+      })
+      .then((result) => result?.user ?? null);
 
     // login
     await req.logIn(user, (err) => {
@@ -252,12 +258,15 @@ module.exports = (crowi, app) => {
         return next(err);
       }
 
+      // LDAP login is submitted through the AJAX login form (POST /_api/v3/login), the
+      // same as local login, so it must respond with JSON. Do NOT pass respondWithRedirect
+      // here even though LDAP is an external account: a 302 would leave the client stuck on
+      // the login page until a manual reload. See issue #11384.
       return loginSuccessHandler(
         req,
         res,
         user,
         SupportedAction.ACTION_USER_LOGIN_WITH_LDAP,
-        true,
       );
     });
   };
@@ -449,7 +458,16 @@ module.exports = (crowi, app) => {
       return next(new ExternalAccountLoginError('message.sign_in_failure'));
     }
 
-    const user = (await externalAccount.populate('user')).user;
+    const user = await prisma.externalaccounts
+      .findUnique({
+        select: {
+          user: true,
+        },
+        where: {
+          id: externalAccount.id,
+        },
+      })
+      .then((result) => result?.user ?? null);
 
     // login
     req.logIn(user, async (err) => {
@@ -510,7 +528,16 @@ module.exports = (crowi, app) => {
       return next(new ExternalAccountLoginError('message.sign_in_failure'));
     }
 
-    const user = (await externalAccount.populate('user')).user;
+    const user = await prisma.externalaccounts
+      .findUnique({
+        select: {
+          user: true,
+        },
+        where: {
+          id: externalAccount.id,
+        },
+      })
+      .then((result) => result?.user ?? null);
 
     // login
     req.logIn(user, async (err) => {
@@ -594,7 +621,17 @@ module.exports = (crowi, app) => {
     }
 
     // login
-    const user = (await externalAccount.populate('user')).user;
+    const user = await prisma.externalaccounts
+      .findUnique({
+        select: {
+          user: true,
+        },
+        where: {
+          id: externalAccount.id,
+        },
+      })
+      .then((result) => result?.user ?? null);
+
     req.logIn(user, async (err) => {
       if (err) {
         logger.debug(err.message);
@@ -686,7 +723,16 @@ module.exports = (crowi, app) => {
       return next(new ExternalAccountLoginError('message.sign_in_failure'));
     }
 
-    const user = (await externalAccount.populate('user')).user;
+    const user = await prisma.externalaccounts
+      .findUnique({
+        select: {
+          user: true,
+        },
+        where: {
+          id: externalAccount.id,
+        },
+      })
+      .then((result) => result?.user ?? null);
 
     // login
     req.logIn(user, (err) => {

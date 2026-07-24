@@ -1,11 +1,15 @@
 import type { IPageHasId, IUser } from '@growi/core';
+import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import type { Request, Response } from 'express';
 import createError from 'http-errors';
 import { mock } from 'vitest-mock-extended';
 
-import type { LsxApiParams, LsxApiResponseData } from '../../../interfaces/api';
-import { addFilterCondition, listPages } from '.';
-import type { PageQuery, PageQueryBuilder } from './generate-base-query';
+import type {
+  LsxApiParams,
+  LsxApiResponseData,
+} from '../../../interfaces/api.js';
+import type { PageQuery, PageQueryBuilder } from './generate-base-query.js';
+import { addFilterCondition, listPages } from './index.js';
 
 interface IListPagesRequest
   extends Request<undefined, undefined, undefined, LsxApiParams> {
@@ -187,7 +191,7 @@ describe('listPages', () => {
       const pagePath = '/parent';
       const optionsFilter = '^child';
       const expectedRegex = new RegExp(
-        `^${RegExp.escape('/parent/')}${RegExp.escape('child')}`,
+        `^${escapeStringForMongoRegex('/parent/')}${escapeStringForMongoRegex('child')}`,
       );
 
       // when
@@ -202,7 +206,7 @@ describe('listPages', () => {
       const pagePath = '/parent';
       const optionsFilter = 'child';
       const expectedRegex = new RegExp(
-        `^${RegExp.escape('/parent/')}.*${RegExp.escape('child')}`,
+        `^${escapeStringForMongoRegex('/parent/')}.*${escapeStringForMongoRegex('child')}`,
       );
 
       // when
@@ -230,7 +234,7 @@ describe('listPages', () => {
       const pagePath = '/parent';
       const optionsFilter = 'child';
       const expectedRegex = new RegExp(
-        `^${RegExp.escape('/parent/')}.*${RegExp.escape('child')}`,
+        `^${escapeStringForMongoRegex('/parent/')}.*${escapeStringForMongoRegex('child')}`,
       );
 
       // when
@@ -320,7 +324,7 @@ describe('when excludedPaths is handled', () => {
 
     // check if the logic generates the correct regex: ^\/(user|tmp)(\/|$)
     const expectedRegex = new RegExp(
-      `^\\/(${RegExp.escape('user')}|${RegExp.escape('tmp')})(\\/|$)`,
+      `^\\/(${escapeStringForMongoRegex('user')}|${escapeStringForMongoRegex('tmp')})(\\/|$)`,
     );
     expect(queryMock.and).toHaveBeenCalledWith([
       {

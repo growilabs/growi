@@ -8,7 +8,15 @@ type ConfirmModalProps = {
   warningMessage: string;
   supplymentaryMessage: string | null;
   confirmButtonTitle: string;
-  onConfirm?: () => Promise<void>;
+  // Optional overrides; defaults keep the original "Warning" appearance so
+  // existing callers are unaffected.
+  title?: string;
+  cancelButtonTitle?: string;
+  headerClassName?: string;
+  iconName?: string;
+  // The modal ignores the return value, so sync handlers are fine too —
+  // demanding a Promise would force callers into no-await async functions.
+  onConfirm?: () => void | Promise<void>;
   onCancel?: () => void;
 };
 
@@ -16,6 +24,13 @@ export const ConfirmModal: FC<ConfirmModalProps> = (
   props: ConfirmModalProps,
 ) => {
   const { t } = useTranslation();
+
+  const {
+    title,
+    cancelButtonTitle,
+    headerClassName = 'text-danger',
+    iconName = 'warning',
+  } = props;
 
   const onCancel = () => {
     if (props.onCancel != null) {
@@ -31,9 +46,9 @@ export const ConfirmModal: FC<ConfirmModalProps> = (
 
   return (
     <Modal isOpen={props.isModalOpen} toggle={onCancel}>
-      <ModalHeader tag="h4" toggle={onCancel} className="text-danger">
-        <span className="material-symbols-outlined me-1">warning</span>
-        {t('Warning')}
+      <ModalHeader tag="h4" toggle={onCancel} className={headerClassName}>
+        <span className="material-symbols-outlined me-1">{iconName}</span>
+        {title ?? t('Warning')}
       </ModalHeader>
       <ModalBody>
         {props.warningMessage}
@@ -56,7 +71,7 @@ export const ConfirmModal: FC<ConfirmModalProps> = (
           className="btn btn-outline-secondary"
           onClick={onCancel}
         >
-          {t('Cancel')}
+          {cancelButtonTitle ?? t('Cancel')}
         </button>
         <button
           type="button"

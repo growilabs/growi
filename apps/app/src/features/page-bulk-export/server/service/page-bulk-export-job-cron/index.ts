@@ -9,7 +9,6 @@ import type { SupportedActionType } from '~/interfaces/activity';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
-import type { ActivityDocument } from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
 import { preNotifyService } from '~/server/service/pre-notify';
@@ -256,6 +255,15 @@ class PageBulkExportJobCronService
         ? PageBulkExportJobStatus.completed
         : PageBulkExportJobStatus.failed;
 
+    // Guarantee completedAt is set for every completion path (including the
+    // duplicate-reuse path in createPageSnapshotsAsync, which marks the job as
+    // completed without setting completedAt). Without this, the download-expiration
+    // cleanup query `{ completedAt: { $lt } }` never matches such jobs (MongoDB
+    // type bracketing excludes null), so they accumulate forever.
+    if (action === SupportedAction.ACTION_PAGE_BULK_EXPORT_COMPLETED) {
+      pageBulkExportJob.completedAt ??= new Date();
+    }
+
     try {
       await pageBulkExportJob.save();
       await this.notifyExportResult(pageBulkExportJob, action);
@@ -333,9 +341,12 @@ class PageBulkExportJobCronService
           : '',
       },
     });
-    const getAdditionalTargetUsers = async (activity: ActivityDocument) => [
-      activity.user,
-    ];
+    if (activity == null) {
+      return;
+    }
+    // createActivity's result never has `user` populated (only `userId`) --
+    // reference the acting user we already have on hand instead.
+    const getAdditionalTargetUsers = async () => [pageBulkExportJob.user];
     const preNotify = preNotifyService.generatePreNotify(
       activity,
       getAdditionalTargetUsers,

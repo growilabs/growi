@@ -9,9 +9,6 @@ import type { MockInstance } from 'vitest';
 
 import { getInstance } from '^/test/setup/crowi';
 
-import type { CommentModel } from '~/features/comment/server';
-import type { IBookmark } from '~/interfaces/bookmark-info';
-import type { IComment } from '~/interfaces/comment';
 import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
@@ -21,7 +18,6 @@ import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { generalXssFilter } from '~/services/general-xss-filter';
 
-import type { BookmarkModel } from '../../models/bookmark';
 import type { ShareLinkModel } from '../../models/share-link';
 
 let rootPage: PageDocument;
@@ -72,8 +68,6 @@ describe('PageService', () => {
   let Page: PageModel;
   let Revision: Model<IRevision>;
   let User: Model<IUser>;
-  let Bookmark: BookmarkModel;
-  let Comment: CommentModel;
   let ShareLink: ShareLinkModel;
   let generalXssFilterProcessSpy: MockInstance;
 
@@ -84,8 +78,6 @@ describe('PageService', () => {
     User = mongoose.model('User');
     Page = mongoose.model('Page') as PageModel;
     Revision = mongoose.model<IRevision>('Revision');
-    Bookmark = mongoose.model<IBookmark, BookmarkModel>('Bookmark');
-    Comment = mongoose.model<IComment, CommentModel>('Comment');
     ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
 
     // Create test users if they don't exist
@@ -640,7 +632,10 @@ describe('PageService', () => {
 
         expect(generalXssFilterProcessSpy).toHaveBeenCalled();
 
-        expect(pageEventSpy).toHaveBeenCalledWith('rename');
+        expect(pageEventSpy).toHaveBeenCalledWith(
+          'rename',
+          expect.objectContaining({ newPath: '/renamed1', user: testUser2 }),
+        );
 
         assert(resultPage != null);
         expect(resultPage.path).toBe('/renamed1');
@@ -660,7 +655,10 @@ describe('PageService', () => {
 
         expect(generalXssFilterProcessSpy).toHaveBeenCalled();
 
-        expect(pageEventSpy).toHaveBeenCalledWith('rename');
+        expect(pageEventSpy).toHaveBeenCalledWith(
+          'rename',
+          expect.objectContaining({ newPath: '/renamed2', user: testUser2 }),
+        );
 
         assert(resultPage != null);
         expect(resultPage.path).toBe('/renamed2');
@@ -679,7 +677,10 @@ describe('PageService', () => {
         );
 
         expect(generalXssFilterProcessSpy).toHaveBeenCalled();
-        expect(pageEventSpy).toHaveBeenCalledWith('rename');
+        expect(pageEventSpy).toHaveBeenCalledWith(
+          'rename',
+          expect.objectContaining({ newPath: '/renamed3', user: testUser2 }),
+        );
 
         assert(resultPage != null);
         expect(resultPage.path).toBe('/renamed3');
@@ -699,7 +700,10 @@ describe('PageService', () => {
 
         expect(generalXssFilterProcessSpy).toHaveBeenCalled();
         expect(renameDescendantsWithStreamSpy).toHaveBeenCalled();
-        expect(pageEventSpy).toHaveBeenCalledWith('rename');
+        expect(pageEventSpy).toHaveBeenCalledWith(
+          'rename',
+          expect.objectContaining({ newPath: '/renamed4', user: testUser2 }),
+        );
 
         assert(resultPage != null);
         expect(resultPage.path).toBe('/renamed4');
@@ -748,6 +752,7 @@ describe('PageService', () => {
         'updateMany',
         [childForRename1],
         testUser2,
+        { oldPagePathPrefix, newPagePathPrefix },
       );
 
       expect(resultPage?.path).toBe('/renamed1/child');
@@ -774,6 +779,7 @@ describe('PageService', () => {
         'updateMany',
         [childForRename2],
         testUser2,
+        { oldPagePathPrefix, newPagePathPrefix },
       );
 
       expect(resultPage?.path).toBe('/renamed2/child');
@@ -800,6 +806,7 @@ describe('PageService', () => {
         'updateMany',
         [childForRename3],
         testUser2,
+        { oldPagePathPrefix, newPagePathPrefix },
       );
 
       expect(resultPage?.path).toBe('/renamed3/child');

@@ -2,18 +2,18 @@ import { useEffect } from 'react';
 import type { EditorView } from '@codemirror/view';
 import { type KeyBinding, keymap } from '@codemirror/view';
 
-import type { UseCodeMirrorEditor } from '../services';
-import { useAddMultiCursorKeyBindings } from '../services/use-codemirror-editor/utils/editor-shortcuts/add-multi-cursor';
-import { useInsertBlockquoteKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/insert-blockquote';
-import { useInsertBulletListKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/insert-bullet-list';
-import { useInsertLinkKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/insert-link';
-import { useInsertNumberedKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/insert-numbered-list';
-import { useMakeTextBoldKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/make-text-bold';
-import { useMakeTextCodeKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/make-text-code';
-import { useMakeCodeBlockExtension } from '../services/use-codemirror-editor/utils/editor-shortcuts/make-text-code-block';
-import { useMakeTextItalicKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/make-text-italic';
-import { useMakeTextStrikethroughKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/make-text-strikethrough';
-import type { ShortcutCategory } from '../services-internal/keymaps';
+import type { UseCodeMirrorEditor } from '../services/index.js';
+import { useAddMultiCursorKeyBindings } from '../services/use-codemirror-editor/utils/editor-shortcuts/add-multi-cursor.js';
+import { useInsertBlockquoteKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/insert-blockquote.js';
+import { useInsertBulletListKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/insert-bullet-list.js';
+import { useInsertLinkKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/insert-link.js';
+import { useInsertNumberedKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/insert-numbered-list.js';
+import { useMakeTextBoldKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/make-text-bold.js';
+import { useMakeTextCodeKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/make-text-code.js';
+import { useMakeCodeBlockExtension } from '../services/use-codemirror-editor/utils/editor-shortcuts/make-text-code-block.js';
+import { useMakeTextItalicKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/make-text-italic.js';
+import { useMakeTextStrikethroughKeyBinding } from '../services/use-codemirror-editor/utils/editor-shortcuts/make-text-strikethrough.js';
+import type { ShortcutCategory } from '../services-internal/keymaps/index.js';
 
 interface CategorizedKeyBindings {
   readonly category: ShortcutCategory | null;

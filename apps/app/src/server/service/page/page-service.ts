@@ -11,6 +11,7 @@ import type {
 import type { HydratedDocument, Types } from 'mongoose';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
+import type { SupportedActionType } from '~/interfaces/activity';
 import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
@@ -19,6 +20,7 @@ import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageDocument } from '~/server/models/page';
 import type { PageOperationDocument } from '~/server/models/page-operation';
 import type { UserGroupDocument } from '~/server/models/user-group';
+import type { ActivityActor } from '~/server/service/attachment/attachment-removal-snapshot';
 
 export interface IPageService {
   // Page event emitter
@@ -55,6 +57,9 @@ export interface IPageService {
   deleteCompletelyOperation: (
     pageIds: ObjectIdLike[],
     pagePaths: string[],
+    // Required (nullable) so that a new caller cannot silently omit the
+    // operator; null explicitly marks a system operation without one.
+    actor: ActivityActor | null,
   ) => Promise<void>;
   getEventEmitter: () => EventEmitter;
   deleteMultipleCompletely: (
@@ -110,7 +115,8 @@ export interface IPageService {
     user,
     options,
     pageOpId: ObjectIdLike,
-    activity?,
+    resolvedAction: SupportedActionType,
+    activityId: string,
   ): Promise<void>;
   revertDeletedPage(
     page,
@@ -183,6 +189,13 @@ export interface IPageService {
     page,
     user,
     options: IOptionsForCreate,
+    pageOpId: ObjectIdLike,
+  ): Promise<void>;
+  updatePageSubOperation(
+    page,
+    user,
+    exPage,
+    options: IOptionsForUpdate,
     pageOpId: ObjectIdLike,
   ): Promise<void>;
 

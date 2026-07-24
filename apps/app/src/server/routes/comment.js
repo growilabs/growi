@@ -1,16 +1,19 @@
 import { getIdStringForRef } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import { body, query, validationResult } from 'express-validator';
+import mongoose from 'mongoose';
 
-import { Comment, CommentEvent, commentEvent } from '~/features/comment/server';
+import { CommentEvent, commentEvent } from '~/features/comment/server';
 import {
   SupportedAction,
   SupportedEventModel,
   SupportedTargetModel,
 } from '~/interfaces/activity';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
-import { preNotifyService } from '../service/pre-notify';
+import ApiResponse from '../util/apiResponse';
 
 /**
  * @swagger
@@ -58,18 +61,15 @@ import { preNotifyService } from '../service/pre-notify';
  */
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi, _app) => {
+export const setup = (crowi, _app) => {
   const logger = loggerFactory('growi:routes:comment');
-  const { User, Page } = crowi.models;
-  const ApiResponse = require('../util/apiResponse');
+  const { Page } = crowi.models;
 
   const activityEvent = crowi.events.activity;
 
   const globalNotificationService = crowi.globalNotificationService;
   const userNotificationService = crowi.userNotificationService;
 
-  const { body } = require('express-validator');
-  const mongoose = require('mongoose');
   const ObjectId = mongoose.Types.ObjectId;
 
   const actions = {};
@@ -125,37 +125,94 @@ module.exports = (crowi, _app) => {
    * @apiParam {String} revision_id Revision Id.
    */
   api.get = async (req, res) => {
+    // Query ids are validated (MongoId) by `validators.get()` + apiV1FormValidator
+    // in the route chain, so malformed input is already rejected before here.
     const pageId = req.query.page_id;
     const revisionId = req.query.revision_id;
+    const { isSharedPage } = req;
 
-    // check whether accessible
-    const isAccessible = await Page.isAccessiblePageByViewer(pageId, req.user);
+    // In a valid share-link context, certify-shared-page has already verified
+    // that this exact page_id is the share link's related page, so bypass the
+    // viewer access check — but the bypass applies ONLY to that verified
+    // page_id (see the revision_id handling below).
+    const isAccessible =
+      isSharedPage === true ||
+      (await Page.isAccessiblePageByViewer(pageId, req.user));
     if (!isAccessible) {
       return res.json(
         ApiResponse.error('Current user is not accessible to this page.'),
       );
     }
 
-    let query = null;
+    let comments;
 
     try {
-      if (revisionId) {
-        query = Comment.findCommentsByRevisionId(revisionId);
+      // revision_id can point to a revision belonging to a different page.
+      // In a share context the access bypass is scoped to the verified
+      // page_id, so we must NOT honor revision_id there; fetch strictly by
+      // page_id. Non-shared (authenticated) access keeps the revision_id path.
+      if (revisionId && !isSharedPage) {
+        comments = await prisma.comments.findCommentsByRevisionId(revisionId, {
+          include: { creator: true },
+        });
       } else {
-        query = Comment.findCommentsByPageId(pageId);
+        comments = await prisma.comments.findCommentsByPageId(pageId, {
+          include: { creator: true },
+        });
       }
     } catch (err) {
       return res.json(ApiResponse.error(err));
     }
 
-    const comments = await query.populate('creator');
-    comments.forEach((comment) => {
-      if (comment.creator != null && comment.creator instanceof User) {
-        comment.creator = serializeUserSecurely(comment.creator);
-      }
-    });
+    res.json(
+      ApiResponse.success({
+        comments: comments.map((comment) => ({
+          ...comment,
+          page: comment.pageId,
+          creator:
+            comment.creator != null
+              ? serializeUserSecurely(comment.creator)
+              : comment.creatorId,
+          revision: comment.revisionId,
+          replyTo: comment.replyToId,
+        })),
+      }),
+    );
+  };
 
-    res.json(ApiResponse.success({ comments }));
+  api.validators.get = () => {
+    // Validate ids as scalar MongoId strings to close the NoSQL injection
+    // surface. `.isMongoId()` alone does NOT reject array/object values:
+    // `?page_id[$gt]=` (object) and, more importantly, `?page_id[0]=A&page_id[1]=B`
+    // (array) both slip through, and Mongoose casts an array id into an implicit
+    // `$in`. That would let one request fetch comments across multiple page_ids
+    // (an IDOR that defeats the "verify id === fetch id" single-id invariant).
+    // `.isString().bail()` rejects non-string values first, then `.isMongoId()`
+    // validates the string. Enforcement happens at the route-level
+    // `apiV1FormValidator`, which short-circuits before this handler runs.
+    // page_id is required; shareLinkId / revision_id are optional.
+    return [
+      query('page_id')
+        .isString()
+        .bail()
+        .isMongoId()
+        .withMessage('page_id must be a valid MongoId'),
+      // `checkFalsy` skips empty-string params (e.g. `revision_id=`) so external
+      // API callers keep backward compatibility; matches design.md and the
+      // existing `get-page-info.ts` validator.
+      query('shareLinkId')
+        .optional({ checkFalsy: true })
+        .isString()
+        .bail()
+        .isMongoId()
+        .withMessage('shareLinkId must be a valid MongoId'),
+      query('revision_id')
+        .optional({ checkFalsy: true })
+        .isString()
+        .bail()
+        .isMongoId()
+        .withMessage('revision_id must be a valid MongoId'),
+    ];
   };
 
   api.validators.add = () => {
@@ -236,7 +293,6 @@ module.exports = (crowi, _app) => {
    */
   api.add = async (req, res) => {
     const { commentForm, slackNotificationForm } = req.body;
-    const { validationResult } = require('express-validator');
 
     const errors = validationResult(req.body);
     if (!errors.isEmpty()) {
@@ -263,7 +319,7 @@ module.exports = (crowi, _app) => {
 
     let createdComment;
     try {
-      createdComment = await Comment.add(
+      createdComment = await prisma.comments.add(
         pageId,
         req.user._id,
         revisionId,
@@ -289,29 +345,44 @@ module.exports = (crowi, _app) => {
       targetModel: SupportedTargetModel.MODEL_PAGE,
       target: page,
       eventModel: SupportedEventModel.MODEL_COMMENT,
-      event: createdComment,
+      event: createdComment.id,
       action: SupportedAction.ACTION_COMMENT_CREATE,
+      contributor: req.user,
     };
 
-    /** @type {import('../service/pre-notify').GetAdditionalTargetUsers} */
-    const getAdditionalTargetUsers = async (activity) => {
-      const mentionedUsers = await crowi.commentService.getMentionedUsers(
-        activity.event,
+    const { generatePreNotify, notify: notifyMentions } =
+      await crowi.commentService.prepareMentionNotifications(
+        createdComment._id,
+        req.user._id,
+        res.locals.activity._id,
+        page,
       );
-
-      return mentionedUsers;
-    };
 
     activityEvent.emit(
       'update',
       res.locals.activity._id,
       parameters,
       page,
-      preNotifyService.generatePreNotify,
-      getAdditionalTargetUsers,
+      generatePreNotify,
     );
 
-    res.json(ApiResponse.success({ comment: createdComment }));
+    res.json(
+      ApiResponse.success({
+        comment: {
+          ...createdComment,
+          page: createdComment.pageId,
+          creator: createdComment.creatorId,
+          revision: createdComment.revisionId,
+          replyTo: createdComment.replyToId,
+        },
+      }),
+    );
+
+    try {
+      await notifyMentions();
+    } catch (err) {
+      logger.error('Mention notification failed', err);
+    }
 
     // global notification
     try {
@@ -409,7 +480,7 @@ module.exports = (crowi, _app) => {
 
     const commentStr = commentForm?.comment;
     const commentId = commentForm?.comment_id;
-    const revision = commentForm?.revision_id;
+    const revisionId = commentForm?.revision_id;
 
     if (commentStr === '') {
       return res.json(ApiResponse.error('Comment text is required'));
@@ -421,14 +492,22 @@ module.exports = (crowi, _app) => {
 
     let updatedComment;
     try {
-      const comment = await Comment.findOne({ _id: { $eq: commentId } }).exec();
+      const comment = await prisma.comments.findUnique({
+        select: {
+          pageId: true,
+          creatorId: true,
+        },
+        where: {
+          id: commentId,
+        },
+      });
 
       if (comment == null) {
         throw new Error('This comment does not exist.');
       }
 
       // check whether accessible
-      const pageId = comment.page;
+      const pageId = comment.pageId;
       const isAccessible = await Page.isAccessiblePageByViewer(
         pageId,
         req.user,
@@ -436,14 +515,23 @@ module.exports = (crowi, _app) => {
       if (!isAccessible) {
         throw new Error('Current user is not accessible to this page.');
       }
-      if (req.user._id.toString() !== comment.creator.toString()) {
+      if (req.user._id.toString() !== comment.creatorId.toString()) {
         throw new Error('Current user is not operatable to this comment.');
       }
 
-      updatedComment = await Comment.findOneAndUpdate(
-        { _id: { $eq: commentId } },
-        { $set: { comment: commentStr, revision } },
-      );
+      updatedComment = await prisma.comments.update({
+        where: {
+          id: commentId,
+        },
+        data: {
+          comment: commentStr,
+          revision: {
+            connect: {
+              id: revisionId,
+            },
+          },
+        },
+      });
       commentEvent.emit(CommentEvent.UPDATE, updatedComment);
     } catch (err) {
       logger.error(err);
@@ -453,7 +541,17 @@ module.exports = (crowi, _app) => {
     const parameters = { action: SupportedAction.ACTION_COMMENT_UPDATE };
     activityEvent.emit('update', res.locals.activity._id, parameters);
 
-    res.json(ApiResponse.success({ comment: updatedComment }));
+    res.json(
+      ApiResponse.success({
+        comment: {
+          ...updatedComment,
+          page: createdComment.pageId,
+          creator: createdComment.creatorId,
+          revision: createdComment.revisionId,
+          replyTo: createdComment.replyToId,
+        },
+      }),
+    );
 
     // process notification if needed
   };
@@ -504,15 +602,21 @@ module.exports = (crowi, _app) => {
     }
 
     try {
-      /** @type {import('mongoose').HydratedDocument<import('~/interfaces/comment').IComment>} */
-      const comment = await Comment.findOne({ _id: { $eq: commentId } }).exec();
+      const comment = await prisma.comments.findUnique({
+        include: {
+          page: true,
+        },
+        where: {
+          id: commentId,
+        },
+      });
 
       if (comment == null) {
         throw new Error('This comment does not exist.');
       }
 
       // check whether accessible
-      const pageId = getIdStringForRef(comment.page);
+      const pageId = comment.pageId;
       const isAccessible = await Page.isAccessiblePageByViewer(
         pageId,
         req.user,
@@ -520,12 +624,12 @@ module.exports = (crowi, _app) => {
       if (!isAccessible) {
         throw new Error('Current user is not accessible to this page.');
       }
-      if (getIdStringForRef(req.user) !== getIdStringForRef(comment.creator)) {
+      if (getIdStringForRef(req.user) !== comment.creatorId) {
         throw new Error('Current user is not operatable to this comment.');
       }
 
-      await Comment.removeWithReplies(comment);
-      await Page.updateCommentCount(comment.page);
+      await prisma.comments.removeWithReplies(comment.id);
+      await Page.updateCommentCount(comment.pageId);
       commentEvent.emit(CommentEvent.DELETE, comment);
     } catch (err) {
       return res.json(ApiResponse.error(err));

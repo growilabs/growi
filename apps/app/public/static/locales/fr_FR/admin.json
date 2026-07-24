@@ -25,10 +25,15 @@
     "The whitelist of registration permission E-mail address": "Autoriser l'inscription à ces adresses courriel",
     "users_without_account": "Inaccessible aux utilisateurs sans compte",
     "example": "Exemple",
-    "restrict_emails": "L'inscription par courriel peut-être restreinte par domaine (démarrant par @). ",
-    "for_example": " Par exemple, pour restreindre l'inscription aux utilisateurs dans le domaine growi.org, ajouter ",
-    "in_this_case": "; dans ce cas particulier, seul les utilisateurs du domaine growi.org peuvent s'inscrire.",
-    "insert_single": "Insérer une adresse courriel par ligne",
+    "restrict_emails": "Vous pouvez restreindre l'inscription par domaine exact ou par adresse exacte.",
+    "whitelist_domain_desc": " Pour autoriser uniquement les adresses d'un domaine exact, écrire ",
+    "whitelist_domain_suffix": " (seules les adresses de ce domaine exact seront autorisées, sans les sous-domaines).",
+    "whitelist_subdomain_desc": " Pour autoriser aussi les sous-domaines, écrire ",
+    "whitelist_subdomain_suffix": " (toute adresse d'un sous-domaine sera autorisée).",
+    "whitelist_exact_desc": " Pour autoriser une adresse précise, écrire l'adresse complète comme ",
+    "whitelist_exact_suffix": ".",
+    "insert_single": "Insérer une entrée par ligne.",
+    "whitelist_invalid_format": "Format invalide. Utilisez @example.com pour un domaine exact, @*.example.com pour les sous-domaines, ou user@example.com pour une adresse exacte.",
     "page_list_and_search_results": "Affichage des pages",
     "page_listing_1": "Liste et recherche de pages<br>restreint à 'Seulement moi'",
     "page_listing_1_desc": "Voir les pages restreintes à 'Seulement moi' lors de la recherche",
@@ -332,6 +337,13 @@
     "migration_succeeded": "Conversion réussie! Le mode maintenance peut être désactivée et GROWI utilisé.",
     "migration_failed": "Conversion échouée. Lire la documentation GROWI pour des informations supplémentaires."
   },
+  "news_delivery": {
+    "section_title": "Diffusion des actualités",
+    "label": "Diffusion des actualités",
+    "enable": "Activer la diffusion des actualités",
+    "description": "Contrôle si la tâche cron récupère le flux d'actualités et met à jour le cache local. Les actualités déjà en cache restent visibles lorsque la diffusion est désactivée.",
+    "update_succeeded": "Paramètre de diffusion des actualités mis à jour"
+  },
   "maintenance_mode": {
     "maintenance_mode": "Mode maintenance",
     "under_maintenance_mode": "Mode maintenance activé",
@@ -369,6 +381,10 @@
     "page_bulk_export_explanation": "Active une fonctionnalité qui permet à tous les utilisateurs d'exporter simultanément toutes les pages sélectionnées dans le menu des pages et leurs pages subordonnées. Les données exportées seront automatiquement supprimées une fois la période de conservation écoulée.",
     "page_bulk_export_warning": "La fonctionnalité d’exportation de pages en masse est disponible pour tous les utilisateurs. Afin de maintenir les ressources du système, nous demandons votre coopération pour utiliser le montant minimum nécessaire. Si vous êtes administrateur, veuillez en informer tous les utilisateurs.",
     "page_bulk_export_storage_period": "Date limite de téléchargement",
+    "page_bulk_export_reload_title": "Recharger la page",
+    "page_bulk_export_reload_prompt": "Un rechargement de la page est nécessaire pour appliquer le changement de paramètre. Recharger maintenant ?",
+    "page_bulk_export_reload_dismiss": "Pas maintenant",
+    "reload_page": "Recharger",
     "update": "Sauvegarder",
     "mail_settings": "SMTP",
     "mailer_is_not_set_up": "Paramètres d'envoi de courriels non configurés.",
@@ -428,6 +444,65 @@
     "use_env_var_if_empty": "Si la valeur dans la base de données est vide, la valeur de variable d'environnement <code>{{variable}}</code> est utilisé.",
     "note_for_the_only_env_option": "Les paramètres sont définis par des variables d'environnement.<br>Pour modifier ce paramètre, supprimer la variable d'environnement <code>{{env}}</code> .",
     "note_for_the_only_env_option_cloud": "Les paramètres GCS peuvent être modifiés depuis le panneau d'administration GROWI.cloud."
+  },
+  "ai_settings": {
+    "ai_settings": "Paramètres IA",
+    "ai_enabled_label": "Activer les fonctionnalités IA",
+    "providers_section_title": "Fournisseurs",
+    "provider_enabled_label": "Activer ce fournisseur",
+    "provider_status_available": "Disponible",
+    "provider_status_disabled": "Désactivé",
+    "provider_status_misconfigured": "Configuration incomplète",
+    "provider_warning_missing_api_key": "Ce fournisseur est activé mais sa clé API n'est pas définie ; ses modèles ne sont donc pas proposés aux utilisateurs.",
+    "provider_warning_missing_azure_endpoint": "Ce fournisseur est activé mais son point de terminaison (nom de ressource ou URL de base) n'est pas défini ; ses modèles ne sont donc pas proposés aux utilisateurs.",
+    "api_key_label": "Clé API",
+    "api_key_help": "La clé API utilisée pour s'authentifier auprès du fournisseur d'IA.",
+    "api_key_set_placeholder": "(configurée)",
+    "models_section_title": "Models",
+    "models_section_desc": "Choisissez l'un de vos modèles enregistrés comme modèle par défaut. Le modèle par défaut est celui sélectionné au départ pour les utilisateurs dans la conversation.",
+    "default_model_label": "Modèle par défaut",
+    "default_model_help": "Le modèle sélectionné au départ pour les utilisateurs dans la conversation. Choisissez parmi n'importe quel modèle enregistré, tous fournisseurs confondus.",
+    "default_model_placeholder": "Sélectionnez un modèle par défaut",
+    "default_model_no_models": "Aucun modèle n'est enregistré",
+    "model_label": "Nom du modèle",
+    "model_placeholder": "Sélectionnez un modèle",
+    "model_duplicate_error": "Cet identifiant de modèle est déjà enregistré pour ce fournisseur",
+    "refresh_model_catalog": "Actualiser le catalogue de modèles",
+    "refresh_model_catalog_confirmation": "L'actualisation du catalogue de modèles envoie une requête au service externe (models.dev) pour récupérer la liste des modèles la plus récente. Voulez-vous continuer ?",
+    "refresh_model_catalog_confirm": "Actualiser",
+    "refresh_model_catalog_success": "Le catalogue de modèles a été actualisé.",
+    "refresh_model_catalog_failed": "Échec de l'actualisation du catalogue de modèles. Le catalogue précédent reste en vigueur.",
+    "refresh_model_catalog_label": "Catalogue de modèles",
+    "refresh_model_catalog_scope": "Les données source de la liste de modèles affichée dans le sélecteur de modèle du chat. Actualisez pour refléter les modèles récemment publiés.",
+    "set_as_default": "Définir par défaut",
+    "default_badge": "Par défaut",
+    "add_model": "Ajouter un modèle",
+    "azure_add_deployment": "Ajouter un déploiement",
+    "remove_model": "Supprimer",
+    "remove_model_confirmation": "Voulez-vous vraiment supprimer « {{modelName}} » de la liste ?",
+    "remove_model_confirm": "Supprimer le modèle",
+    "provider_options_label": "Options du fournisseur (JSON)",
+    "provider_options_doc_link": "Comment écrire",
+    "provider_options_invalid_json": "JSON non valide",
+    "provider_options_invalid_json_save_blocked": "Un modèle a des options de fournisseur (JSON) non valides. Veuillez les corriger avant d'enregistrer.",
+    "provider_options_error_at_line": "(ligne {{line}})",
+    "env_only_mode_notice": "Les paramètres IA sont fixés par des variables d'environnement et ne peuvent pas être modifiés ici.",
+    "unconfigured_warning": "L'IA est activée mais n'est pas entièrement configurée ; elle ne fonctionnera pas tant que les paramètres ne seront pas complétés.",
+    "save": "Mettre à jour",
+    "save_success": "Paramètres IA mis à jour avec succès.",
+    "azure_section_title": "Paramètres Azure OpenAI",
+    "azure_resource_name_label": "Nom de la ressource Azure",
+    "azure_base_url_label": "URL de base Azure",
+    "azure_api_version_label": "Version de l'API Azure",
+    "azure_use_entra_id_label": "Utiliser Microsoft Entra ID",
+    "azure_entra_id_api_key_note": "Lorsque Microsoft Entra ID est activé, la clé API n'est pas utilisée.",
+    "azure_entra_id_credential_note": "Les informations d'identification sont résolues automatiquement à partir de l'environnement Azure :",
+    "azure_entra_id_managed_identity_note": "Si GROWI s'exécute sur Azure (VM, App Service, Container Apps ou AKS) avec une identité managée ou de charge de travail, aucune information d'identification n'est nécessaire ici.",
+    "azure_entra_id_env_note": "Sinon, définissez ces variables d'environnement sur le serveur GROWI :",
+    "azure_resource_name_help": "Construit le point de terminaison standard https://<nom-de-ressource>.openai.azure.com. À utiliser pour le cloud Azure standard (global). Si l'URL de base est également définie, elle est prioritaire.",
+    "azure_base_url_help": "À utiliser à la place du nom de ressource pour les clouds souverains (par ex. Azure Government), les passerelles API Management ou les proxys. Prioritaire sur le nom de ressource si les deux sont définis.",
+    "azure_api_version_help": "Facultatif. Laissez vide pour utiliser la valeur par défaut. À définir uniquement si un déploiement spécifique nécessite une version d'API particulière.",
+    "azure_model_deployment_label": "Nom du déploiement"
   },
   "markdown_settings": {
     "markdown_settings": "Markdown",
@@ -766,6 +841,8 @@
       "send_temporary_password": "Si un courriel d'invitation n'est pas envoyé, copiez le mot de passe temporaire",
       "send_email": "Le courriel d'invitation peut aussi être envoyé depuis la table utilisateur",
       "existing_email": "Des comptes avec les adresses courriel suivantes sont déjà existants",
+      "whitelist_violation": "Les adresses courriel suivantes ne sont pas autorisées par la liste blanche :",
+      "reason_email_not_in_whitelist": "Non incluse dans la liste blanche",
       "issue": "Créer"
     },
     "user_table": {
@@ -993,6 +1070,8 @@
     "SEARCH_PAGE": "Rechercher une page",
     "SEARCH_PAGE_VIEW": "Résultats de recherche",
     "ADMIN_APP_SETTING_UPDATE": "Modifier les paramètres d'application",
+    "ADMIN_AI_SETTING_UPDATE": "Modifier les paramètres d'IA",
+    "ADMIN_AI_MODEL_CATALOG_REFRESH": "Actualiser le catalogue de modèles",
     "ADMIN_SITE_URL_UPDATE": "Modifier les paramètres d'URL",
     "ADMIN_MAIL_SMTP_UPDATE": "Modifier les paramètres d'e-mail",
     "ADMIN_MAIL_SES_UPDATE": "Modifier les paramètres d'e-mail (SES)",
@@ -1155,9 +1234,97 @@
   "forbidden_page": {
     "do_not_have_admin_permission": "Seul les administrateurs peuvent accéder à cette page."
   },
-  "ai_integration": {
-    "ai_integration": "Intégration de l'IA",
-    "disable_mode_explanation": "Actuellement, l'intégration AI est désactivée. Pour l'activer, configurez la variable d'environnement <code>AI_ENABLED</code> ainsi que les autres variables nécessaires.<br><br>Pour plus de détails, veuillez consulter la <a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>documentation</a>.",
-    "ai_search_management": "Gestion de la recherche par l'IA"
+  "admin_navigation": {
+    "section_users": "Utilisateurs",
+    "section_data": "Données",
+    "section_external_notifications": "Notifications externes"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "Avertissement :",
+        "message_html": "La dernière initialisation a été déclenchée par <code>VAULT_BOOTSTRAP_ON_START=force</code>. Redémarrer le serveur avec cette variable d'environnement toujours définie sur <code>force</code> réinitialisera à nouveau toutes les données du Vault. Veuillez modifier la variable d'environnement en <code>true</code> ou <code>false</code>."
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "Statut de la fonctionnalité",
+        "enabled": "Activé",
+        "disabled": "Désactivé",
+        "description_html": "Contrôlé par la variable d'environnement <code>VAULT_ENABLED</code>. Pour basculer activé/désactivé, modifiez la variable d'environnement et redémarrez le serveur."
+      },
+      "clone-url": {
+        "label": "URL de clone",
+        "description": "Exécutez cette commande dans votre terminal pour cloner le dépôt du Vault.",
+        "copy-button": "Copier la commande",
+        "copied-tooltip": "Copié !",
+        "copy-failed": "Échec de la copie de la commande de clone.",
+        "no-site-url_html": "L'URL du site n'est pas configurée, la commande ne peut pas être affichée. Définissez-la dans les <a href=\"/admin/app\">Paramètres de l'application</a>."
+      },
+      "kill-switch": {
+        "heading": "Reconstruction",
+        "button": "Reconstruire le Vault",
+        "description_html": "Détruit toutes les données des dépôts Git et reconstruit les données Git à partir de MongoDB. Pendant la reconstruction, toutes les requêtes <code>git clone</code> / <code>fetch</code> sont rejetées avec 503. L'opération est enregistrée dans le journal d'audit comme <code>vault.wipe</code>.",
+        "confirm-title": "Confirmer la reconstruction du Vault",
+        "confirm-message_html": "L'exécution de cette action va <strong>perdre toutes les données des dépôts Git actuels</strong>.",
+        "confirm-question": "Êtes-vous sûr de vouloir continuer ?",
+        "confirm-button": "Confirmer",
+        "cancel-button": "Annuler",
+        "started-toast": "Reconstruction démarrée. Le Vault renverra 503 jusqu'à la fin de la reconstruction des données."
+      },
+      "bootstrap-status": {
+        "state": "Statut",
+        "processed-total": "Traité / Total estimé",
+        "started-at": "Démarré le",
+        "completed-at": "Terminé le",
+        "last-error": "Dernière erreur",
+        "progress-label": "{{processed}} sur {{total}} pages"
+      },
+      "completion-reliability": {
+        "heading": "Statut de fiabilité",
+        "check-result": "Dernier résultat de vérification",
+        "last-completed-at": "Dernière complétion",
+        "processed-estimated": "Traité / Estimé",
+        "trigger-source": "Source du déclencheur",
+        "last-error": "Dernière erreur"
+      },
+      "auto-retry-status": {
+        "heading": "Statut du réessai automatique",
+        "escalated-warning_html": "Le réessai automatique pendant l'initialisation a échoué, et l'état a atteint <strong>escalated</strong>. Une intervention manuelle est requise.",
+        "attempt-no": "N° de tentative",
+        "next-attempt-at": "Prochaine tentative",
+        "last-error": "Dernière erreur",
+        "abort-button": "Annuler le réessai automatique",
+        "aborting": "Annulation…",
+        "aborted-toast": "Réessai automatique annulé."
+      },
+      "drift-activity": {
+        "heading": "Statut de détection des incohérences de données",
+        "last-sweep-at": "Dernier balayage",
+        "last-watermark": "Dernière marque de filigrane",
+        "detected-since-boot": "Détectés depuis le démarrage du serveur",
+        "repairs-emitted-since-boot": "Réparations émises depuis le démarrage du serveur",
+        "last-error": "Dernière erreur détectée",
+        "out-of-scope_html": "<strong>Remarque (hors périmètre) :</strong> Les incohérences de données causées par des changements de chemin (renommage / suppression définitive) et la révocation de droits ne sont pas détectées dans l'implémentation actuelle. Elles nécessiteront un support futur de <code>growi-vault-ha</code>."
+      },
+      "storage-observability": {
+        "fetch-failed": "Échec de récupération des statistiques de stockage. vault-manager peut être injoignable.",
+        "namespace-count": "Nombre de namespaces",
+        "total-commit-count": "Nombre total de commits",
+        "loose-object-count": "Nombre d'objets vrac",
+        "repo-size": "Taille du dépôt",
+        "last-squash": "Dernier squash",
+        "last-gc": "Dernier GC"
+      },
+      "audit-log": {
+        "heading": "Journal d'audit",
+        "button": "Voir les entrées du journal VAULT_*",
+        "description": "Ouvre le journal d'audit administrateur filtré sur les actions liées au Vault (VAULT_*)."
+      },
+      "reconcile-admin": {
+        "heading": "Réconcilier",
+        "trigger-button": "Lancer la réconciliation",
+        "description": "Réconcilie manuellement les incohérences de données entre les pages MongoDB et les arbres git du Vault sans effectuer une initialisation complète."
+      }
+    }
   }
 }

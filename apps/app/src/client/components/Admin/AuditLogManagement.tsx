@@ -21,6 +21,7 @@ import { ActivityTable } from './AuditLog/ActivityTable';
 import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';
 import { AuditLogExportModal } from './AuditLog/AuditLogExportModal';
 import { AuditLogSettings } from './AuditLog/AuditLogSettings';
+import { buildActivitySearchFilter } from './AuditLog/build-search-filter';
 import { DateRangePicker } from './AuditLog/DateRangePicker';
 import { SearchUsernameTypeahead } from './AuditLog/SearchUsernameTypeahead';
 import { SelectActionDropdown } from './AuditLog/SelectActionDropdown';
@@ -76,11 +77,12 @@ export const AuditLogManagement: FC = () => {
   const selectedActionList = Array.from(actionMap.entries())
     .filter((v) => v[1])
     .map((v) => v[0]);
-  const searchFilter = {
-    actions: selectedActionList,
+  const searchFilter = buildActivitySearchFilter({
+    selectedActions: selectedActionList,
+    availableActions: auditLogAvailableActionsData ?? [],
     dates: selectedDate,
     usernames: selectedUsernames,
-  };
+  });
 
   const {
     data: activityData,

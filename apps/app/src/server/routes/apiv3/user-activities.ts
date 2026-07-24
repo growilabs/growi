@@ -3,15 +3,16 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
-import type { PaginateResult, PipelineStage } from 'mongoose';
-import { Types } from 'mongoose';
+import type { PaginateResult } from 'mongoose';
 
 import type { IActivity } from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import Activity from '~/server/models/activity';
+import { aggregateUserActivities } from '~/server/service/activity/aggregate-user-activities';
 import { configManager } from '~/server/service/config-manager';
+import { toRawObjectId } from '~/server/util/prisma-raw-normalize';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
@@ -143,7 +144,79 @@ type ActivityPaginationResult = PaginateResult<IActivity>;
  *               example: null
  */
 
-module.exports = (crowi: Crowi): Router => {
+/**
+ * Builds the $facet aggregation pipeline for a single user's activity list.
+ *
+ * The pipeline is run via `aggregateRaw` (see `aggregateUserActivities`), so
+ * `user` must be matched with `toRawObjectId`'s MongoDB Extended JSON `$oid`
+ * form -- a raw ObjectId instance or bare string serializes to a plain JSON
+ * string instead, which does not match a stored ObjectId-typed field and
+ * silently returns zero results (verified against a real MongoDB replica set).
+ */
+export const buildUserActivityPipeline = (
+  targetUserId: string,
+  { limit, offset }: { limit: number; offset: number },
+): Record<string, unknown>[] => [
+  {
+    $match: {
+      user: toRawObjectId(targetUserId),
+      action: { $in: Object.values(ActivityLogActions) },
+    },
+  },
+  {
+    $facet: {
+      totalCount: [{ $count: 'count' }],
+      docs: [
+        { $sort: { createdAt: -1 } },
+        { $skip: offset },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: 'pages',
+            localField: 'target',
+            foreignField: '_id',
+            as: 'target',
+          },
+        },
+        {
+          $unwind: {
+            path: '$target',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user',
+            foreignField: '_id',
+            as: 'user',
+          },
+        },
+        {
+          $unwind: {
+            path: '$user',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            'user._id': 1,
+            'user.username': 1,
+            'user.name': 1,
+            'user.imageUrlCached': 1,
+            action: 1,
+            createdAt: 1,
+            target: 1,
+            targetModel: 1,
+          },
+        },
+      ],
+    },
+  },
+];
+
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   const router = express.Router();
@@ -159,6 +232,7 @@ module.exports = (crowi: Crowi): Router => {
    *       - cookieAuth: []
    *       - bearer: []
    *       - accessTokenInQuery: []
+   *       - accessTokenHeaderAuth: []
    *     parameters:
    *       - name: limit
    *         in: query
@@ -209,70 +283,15 @@ module.exports = (crowi: Crowi): Router => {
       }
 
       try {
-        const userObjectId = new Types.ObjectId(targetUserId);
+        const userActivityPipeline = buildUserActivityPipeline(targetUserId, {
+          limit,
+          offset,
+        });
 
-        const userActivityPipeline: PipelineStage[] = [
-          {
-            $match: {
-              user: userObjectId,
-              action: { $in: Object.values(ActivityLogActions) },
-            },
-          },
-          {
-            $facet: {
-              totalCount: [{ $count: 'count' }],
-              docs: [
-                { $sort: { createdAt: -1 } },
-                { $skip: offset },
-                { $limit: limit },
-                {
-                  $lookup: {
-                    from: 'pages',
-                    localField: 'target',
-                    foreignField: '_id',
-                    as: 'target',
-                  },
-                },
-                {
-                  $unwind: {
-                    path: '$target',
-                    preserveNullAndEmptyArrays: true,
-                  },
-                },
-                {
-                  $lookup: {
-                    from: 'users',
-                    localField: 'user',
-                    foreignField: '_id',
-                    as: 'user',
-                  },
-                },
-                {
-                  $unwind: {
-                    path: '$user',
-                    preserveNullAndEmptyArrays: true,
-                  },
-                },
-                {
-                  $project: {
-                    _id: 1,
-                    'user._id': 1,
-                    'user.username': 1,
-                    'user.name': 1,
-                    'user.imageUrlCached': 1,
-                    action: 1,
-                    createdAt: 1,
-                    target: 1,
-                    targetModel: 1,
-                  },
-                },
-              ],
-            },
-          },
-        ];
-
-        const [activityResults] =
-          await Activity.aggregate(userActivityPipeline);
+        const activityResults = await aggregateUserActivities(
+          prisma,
+          userActivityPipeline,
+        );
 
         const serializedResults = activityResults.docs.map((doc: IActivity) => {
           const { user, ...rest } = doc;
@@ -282,10 +301,7 @@ module.exports = (crowi: Crowi): Router => {
           };
         });
 
-        const totalDocs =
-          activityResults.totalCount.length > 0
-            ? activityResults.totalCount[0].count
-            : 0;
+        const totalDocs = activityResults.totalCount;
         const totalPages = Math.ceil(totalDocs / limit);
         const page = Math.floor(offset / limit) + 1;
 
@@ -294,7 +310,8 @@ module.exports = (crowi: Crowi): Router => {
         const pagingCounter = offset + 1;
 
         const serializedPaginationResult: ActivityPaginationResult = {
-          docs: serializedResults,
+          // serializedResults are IActivity docs with their user populated and serialized
+          docs: serializedResults as unknown as IActivity[],
           totalDocs,
           limit,
           offset,

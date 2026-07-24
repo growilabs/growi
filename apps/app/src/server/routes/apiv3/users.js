@@ -1,19 +1,21 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import { userHomepagePath } from '@growi/core/dist/utils/page-path-utils';
 import express from 'express';
 import { body, query } from 'express-validator';
-import { isEmail } from 'validator';
+// `validator`'s named exports are not statically detectable by cjs-module-lexer
+// (its module.exports is a built object), so a named ESM import fails. Import
+// the per-function module's default export instead (also avoids colliding with
+// the local `validator` middleware map below).
+import isEmail from 'validator/lib/isEmail.js';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { deleteUserAiAssistant } from '~/features/openai/server/services/delete-ai-assistant';
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import Activity from '~/server/models/activity';
-import ExternalAccount from '~/server/models/external-account';
 import { serializePageSecurely } from '~/server/models/serializers';
 import { UserStatus } from '~/server/models/user/conts';
 import UserGroupRelation from '~/server/models/user-group-relation';
@@ -21,6 +23,7 @@ import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import { deleteCompletelyUserHomeBySystem } from '~/server/service/page/delete-completely-user-home-by-system';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
@@ -109,8 +112,11 @@ const validator = {};
  *            example: 0
  */
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequired = loginRequiredFactory(crowi, true);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
@@ -317,7 +323,7 @@ module.exports = (crowi) => {
 
   router.get(
     '/',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }),
+    accessTokenParser([SCOPE.READ.FEATURES.USER], { acceptLegacy: true }),
     loginRequired,
     validator.statusList,
     apiV3FormValidator,
@@ -340,7 +346,7 @@ module.exports = (crowi) => {
 
       // Search from input
       const searchText = req.query.searchText || '';
-      const searchWord = new RegExp(RegExp.escape(searchText));
+      const searchWord = new RegExp(escapeStringForMongoRegex(searchText));
       // Sort
       const { sort, sortOrder } = req.query;
       const sortOutput = {
@@ -558,8 +564,25 @@ module.exports = (crowi) => {
       const emailList = Array.from(new Set(req.body.shapedEmailList));
       let failedEmailList = [];
 
+      // Filter out emails that are not in the whitelist
+      const { validEmailList, invalidEmailList } = emailList.reduce(
+        (acc, email) => {
+          if (User.isEmailValid(email)) {
+            acc.validEmailList.push(email);
+          } else {
+            acc.invalidEmailList.push({
+              email,
+              reason: 'email_not_in_whitelist',
+            });
+          }
+          return acc;
+        },
+        { validEmailList: [], invalidEmailList: [] },
+      );
+      failedEmailList = failedEmailList.concat(invalidEmailList);
+
       // Create users
-      const createUser = await User.createUsersByEmailList(emailList);
+      const createUser = await User.createUsersByEmailList(validEmailList);
       if (createUser.failedToCreateUserEmailList.length > 0) {
         failedEmailList = failedEmailList.concat(
           createUser.failedToCreateUserEmailList,
@@ -1000,9 +1023,11 @@ module.exports = (crowi) => {
         await UserGroupRelation.remove({ relatedUser: user });
         await ExternalUserGroupRelation.remove({ relatedUser: user });
         await user.statusDelete();
-        await ExternalAccount.remove({ user });
-
-        deleteUserAiAssistant(user);
+        await prisma.externalaccounts.deleteMany({
+          where: {
+            userId: user._id.toString(),
+          },
+        });
 
         const serializedUser = serializeUserSecurely(user);
 
@@ -1059,10 +1084,14 @@ module.exports = (crowi) => {
     adminRequired,
     async (req, res) => {
       const page = parseInt(req.query.page) || 1;
+      const limit = 50; // DEFAULT_LIMIT in external-account.ts
+      const offset = (page - 1) * limit;
       try {
-        const paginateResult = await ExternalAccount.findAllWithPagination({
-          page,
-        });
+        const paginateResult =
+          await prisma.externalaccounts.findAllWithPagination({
+            offset,
+            limit,
+          });
         return res.apiv3({ paginateResult });
       } catch (err) {
         const msg = 'Error occurred in fetching external-account list  ';
@@ -1114,7 +1143,11 @@ module.exports = (crowi) => {
       const { id } = req.params;
 
       try {
-        const externalAccount = await ExternalAccount.findByIdAndRemove(id);
+        const externalAccount = await prisma.externalaccounts.delete({
+          where: {
+            id,
+          },
+        });
 
         return res.apiv3({ externalAccount });
       } catch (err) {
@@ -1412,7 +1445,7 @@ module.exports = (crowi) => {
    */
   router.get(
     '/list',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }),
+    accessTokenParser([SCOPE.READ.FEATURES.USER], { acceptLegacy: true }),
     loginRequired,
     async (req, res) => {
       const userIds = req.query.userIds ?? null;
@@ -1519,7 +1552,7 @@ module.exports = (crowi) => {
    */
   router.get(
     '/usernames',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }),
+    accessTokenParser([SCOPE.READ.FEATURES.USER], { acceptLegacy: true }),
     loginRequired,
     validator.usernames,
     apiV3FormValidator,
@@ -1578,7 +1611,7 @@ module.exports = (crowi) => {
 
         if (options.isIncludeActivitySnapshotUser && req.user.admin) {
           const activitySnapshotUserData =
-            await Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+            await prisma.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
               q,
               { offset, limit },
             );

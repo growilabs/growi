@@ -1,8 +1,129 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.5.2...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.5.7...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.5.7](https://github.com/growilabs/compare/v7.5.6...v7.5.7) - 2026-07-21
+
+### 💎 Features
+
+* feat: Display comments at the share link (#11401) @mariko-h
+* feat: Filter by author, editor and group in the search results (#11368) @arvid-e
+* feat: User group member visibility (#11320) @Ryosei-Fukushima
+
+### 🚀 Improvement
+
+* imprv: Email white list (#11314) @mariko-h
+
+### 🐛 Bug Fixes
+
+* fix(plantuml): Stop deprecation warning painted onto carbon-gray diagrams (#11475) @yuki-takei
+* fix(plantuml): Stop leaking PlantUML theme YAML front matter into diagram source (#11461) @yuki-takei
+* fix(import): Harden admin data import (re-enable button on failure, await import) (#11474) @yuki-takei
+* fix: Prevent blank screen when Next.js falls back to the error page (#11423) @yuki-takei
+* fix: Prevent PageSelectModal infinite render loop (#11422) (#11428) @yuki-takei
+
+## [v7.5.6](https://github.com/growilabs/compare/v7.5.5...v7.5.6) - 2026-06-25
+
+### 💎 Features
+
+* feat: Contribution Graph on the user's profile (#10509) @arvid-e
+* feat(comment): Comment mention and add In-App-notification (#11058) @Ryosei-Fukushima
+* feat: Changes Index and Revision Diff APIs (#11353) @yuki-takei
+* feat: Add button to make all notification as read (#11352) @ryotaro-nagahara
+
+### 🚀 Improvement
+
+* imprv: Expose news body (#11317) @ryotaro-nagahara
+* imprv: Include page revert action in supported contribution actions (#11321) @arvid-e
+* imprv: Page create button interaction (#11313) @hikaru-n-cpu
+
+### 🐛 Bug Fixes
+
+* fix: Suppress modifier shortcuts in editable elements (#11340) @yuki-takei
+* fix: escape </style> breakout in renderCustomCss (#11298) @yuki-takei
+* fix: Use req.user.username in LDAP Execute Sync instead of req.user.name (#11356) @yuki-takei
+* feat(page-bulk-export): Rework bulk PDF/HTML export to render Markdown like the web (tables, math, emoji, directives) (#11288) @yuki-takei
+
+### 🧰 Maintenance
+
+* ci(deps): bump js-yaml from 4.1.1 to 4.2.0 (#11311) @[dependabot[bot]](https://github.com/apps/dependabot)
+* chore(deps): dedupe pnpm-lock.yaml to CI-gate release dependency churn (#11343) @yuki-takei
+* ci(deps-dev): bump vitest from 3.2.4 to 3.2.6 (#11279) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump form-data from 4.0.5 to 4.0.6 (#11335) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.5.5](https://github.com/growilabs/compare/v7.5.4...v7.5.5) - 2026-06-10
+
+### 🚀 Improvement
+
+* imprv: Enable API token header "X-GROWI-ACCESS-TOKEN" (#11244) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: disable $lsx() and attachment-refs directives on share link pages to prevent Basic auth challenge (#11271) @yuki-takei
+* fix: Prevent bulk-export cleanup race on shared attachment (#11229) @tomoyuki-t-weseek
+* fix: Remove uglifycss to preserve CSS Color Level 4 syntax (#11277) @yuki-takei
+* fix: Index rebuild fails on boot when initializing a Crowi instance takes a long time (#11247) @ryu-sato
+* fix: Page operations and v5 page migration fail for paths containing non-ASCII whitespace (e.g. U+3000) (#11236) @yuki-takei
+* fix(editor): fix Shift+Arrow selection stuck on wrapped lines by upgrading @codemirror/commands to ^6.10.3 (#11264) @yuki-takei
+* fix(editor): Preserve page grant on mobile & before grant loads (#11272) (#11276) @yuki-takei
+* fix(ui): right-align ModalHeader close content wrapped in a custom element (#11269) @yuki-takei
+* fix(attachment): deny direct access to /uploads to prevent stored XSS (#11257) @miya
+* fix(page-grant): guard against TypeError when grantedUsers is empty in calcApplicableGrantData (#11211) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Verify initial pages are created with content after installation (#11234) @Ryosei-Fukushima
+* ci(deps): bump mermaid from 11.10.0 to 11.15.0 (#11121) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump axios from 1.15.0 to 1.16.0 (#11260) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump qs from 6.14.2 to 6.15.2 (#11209) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps-dev): bump turbo from 2.1.3 to 2.9.14 (#11202) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump js-cookie from 3.0.5 to 3.0.7 (#11205) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.5.4](https://github.com/growilabs/compare/v7.5.3...v7.5.4) - 2026-05-27
+
+### 💎 Features
+
+* feat: Retrieve GROWI news (#10986) @ryotaro-nagahara
+* feat: Editor guide (#10847) @yuki-takei
+* feat(otel): Add growi_installed_at metrics (#11214) @ryotaro-nagahara
+* feat(otel): add yjs docs count and mongoose connection pool metrics (v7 backport) (#11218) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: UserPicture in order to show tooltip in production builds (#11192) @yuki-takei
+* fix: Correct parent grant value in /grant-data endpoint (#11181) @yuki-takei
+* fix: Permit GRANT_RESTRICTED child under any parent grant (#11182) @yuki-takei
+* fix(editor): Fix cursor stuck on wrapped lines by upgrading @codemirror/view to ^6.42.1 (#11153) @yuki-takei
+* fix(bookmark): Add owner authorization checks to bookmark folder api (#11178) @Ryosei-Fukushima
+* fix(bulk-export): Set completedAt on all bulk export completion paths (#11195) @tomoyuki-t-weseek
+* fix(admin): Prompt reload after toggling page bulk export setting (#11180) @tomoyuki-t-weseek
+* fix(drawio): draw.io stencil URLs for local instances (#11196) @yuki-takei
+* fix(bulk-export): Show bulk-export restart modal on duplicate-job error (#11186) @tomoyuki-t-weseek
+* fix(admin): stop infinite render loop on G2G data transfer page (#11166) @miya
+
+## [v7.5.3](https://github.com/growilabs/compare/v7.5.2...v7.5.3) - 2026-05-14
+
+### 🐛 Bug Fixes
+
+* fix: GrowiSlides throws an unhandled exception when the rendererOptions are undefined (#11110) @Ryosei-Fukushima
+* fix: Rebalance blockquote margins in wiki and page comments (#11072) @yuki-takei
+* fix(drawio): Prevent host CSS leaking into <foreignObject> (#11068) @yuki-takei
+* fix(search): resolve nested <button> DOM warning in search result list (#11065) @yuki-takei
+* fix: Page publish/unpublish IDOR bypasses page grant system (#11032) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: switch pnpm install to corepack & devcontainer node:2 (#11157) @yuki-takei
+* ci(deps): bump next from 16.2.3 to 16.2.6 (#11117) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump @opentelemetry/auto-instrumentations-node from 0.60.1 to 0.75.0 (#11112) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump @opentelemetry/sdk-node from 0.202.0 to 0.217.0 (#11114) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Figma plugin (#11069) @satof3
+* ci(deps): bump next from 16.2.1 to 16.2.3 (#10995) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump mongoose from 6.13.8 to 6.13.9 (#11083) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Add vulnerability hunters (#11071) @hikaru-n-cpu
+* support: Fix ES security settings for CI (#11048) @yuki-takei
 
 ## [v7.5.2](https://github.com/growilabs/compare/v7.5.1...v7.5.2) - 2026-04-22
 

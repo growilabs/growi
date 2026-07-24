@@ -1,4 +1,5 @@
 import ejs from 'ejs';
+import type { Transporter } from 'nodemailer';
 import { promisify } from 'util';
 
 import loggerFactory from '~/utils/logger';
@@ -8,12 +9,29 @@ import { FailedEmail } from '../../models/failed-email';
 import S2sMessage from '../../models/vo/s2s-message';
 import type { IConfigManagerForApp } from '../config-manager';
 import type { S2sMessageHandlable } from '../s2s-messaging/handlable';
-import { createOAuth2Client } from './oauth2';
-import { createSESClient } from './ses';
-import { createSMTPClient } from './smtp';
 import type { EmailConfig, MailConfig, SendResult } from './types';
 
 const logger = loggerFactory('growi:service:mail');
+
+type TransportFactory = (
+  configManager: IConfigManagerForApp,
+) => Transporter | null;
+
+// Static loader map keyed by the configured transmission method, mirroring
+// the pattern in service/file-uploader/index.ts: each entry is an explicit,
+// statically analyzable specifier (not a computed `import(\`./${method}\`)`,
+// which a bundler/runtime resolver cannot follow). nodemailer and its
+// transport packages (nodemailer-ses-transport -> aws-sdk) therefore only
+// load once a transmission method is actually selected, instead of whenever
+// the mail service module itself loads.
+const transportFactoryLoaders: Record<
+  'smtp' | 'ses' | 'oauth2',
+  () => Promise<TransportFactory>
+> = {
+  smtp: async () => (await import('./smtp')).createSMTPClient,
+  ses: async () => (await import('./ses')).createSESClient,
+  oauth2: async () => (await import('./oauth2')).createOAuth2Client,
+};
 
 class MailService implements S2sMessageHandlable {
   appService!: any;
@@ -26,7 +44,11 @@ class MailService implements S2sMessageHandlable {
 
   mailConfig: MailConfig = {};
 
-  mailer: any = {};
+  // `null` (not `{}`) so that `send()` sees an unambiguous "not set up" state
+  // for the window between construction and the caller's awaited
+  // `initialize()` call — initialize() can no longer run synchronously in the
+  // constructor now that transport loading is async.
+  mailer: any = null;
 
   lastLoadedAt?: Date;
 
@@ -40,8 +62,6 @@ class MailService implements S2sMessageHandlable {
     this.appService = crowi.appService;
     this.configManager = crowi.configManager;
     this.s2sMessagingService = crowi.s2sMessagingService;
-
-    this.initialize();
   }
 
   /**
@@ -67,7 +87,7 @@ class MailService implements S2sMessageHandlable {
 
     logger.info('Initialize mail settings by pubsub notification');
     await configManager.loadConfigs();
-    this.initialize();
+    await this.initialize();
   }
 
   async publishUpdatedMessage() {
@@ -89,7 +109,7 @@ class MailService implements S2sMessageHandlable {
     }
   }
 
-  initialize() {
+  async initialize(): Promise<void> {
     const { appService, configManager } = this;
 
     this.isMailerSetup = false;
@@ -103,15 +123,15 @@ class MailService implements S2sMessageHandlable {
       'mail:transmissionMethod',
     );
 
-    if (transmissionMethod === 'smtp') {
-      this.mailer = createSMTPClient(configManager);
-    } else if (transmissionMethod === 'ses') {
-      this.mailer = createSESClient(configManager);
-    } else if (transmissionMethod === 'oauth2') {
-      this.mailer = createOAuth2Client(configManager);
-    } else {
-      this.mailer = null;
-    }
+    const loadTransportFactory =
+      transmissionMethod != null
+        ? transportFactoryLoaders[transmissionMethod]
+        : undefined;
+
+    this.mailer =
+      loadTransportFactory != null
+        ? (await loadTransportFactory())(configManager)
+        : null;
 
     if (this.mailer != null) {
       this.isMailerSetup = true;

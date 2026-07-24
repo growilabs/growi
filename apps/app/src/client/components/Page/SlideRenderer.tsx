@@ -1,5 +1,4 @@
 import type { JSX } from 'react';
-import type { Options as ReactMarkdownOptions } from 'react-markdown';
 
 import { usePresentationViewOptions } from '~/stores/renderer';
 
@@ -16,10 +15,7 @@ export const SlideRenderer = (props: SlideRendererProps): JSX.Element => {
   const { data: rendererOptions } = usePresentationViewOptions();
 
   return (
-    <Slides
-      hasMarpFlag={marp}
-      options={{ rendererOptions: rendererOptions as ReactMarkdownOptions }}
-    >
+    <Slides hasMarpFlag={marp} options={{ rendererOptions }}>
       {markdown}
     </Slides>
   );

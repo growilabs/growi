@@ -9,16 +9,18 @@ OUT=${OUT:-"${APP_PATH}/tmp/openapi-spec-apiv3.json"}
 
 swagger-jsdoc \
   -o "${OUT}" \
-  -d "${APP_PATH}/bin/openapi/definition-apiv3.js" \
+  -d "${APP_PATH}/bin/openapi/definition-apiv3.cjs" \
   "${APP_PATH}/src/features/external-user-group/server/routes/apiv3/*.ts" \
   "${APP_PATH}/src/features/templates/server/routes/apiv3/*.ts" \
   "${APP_PATH}/src/features/ai-tools/**/server/routes/apiv3/*.ts" \
+  "${APP_PATH}/src/features/mastra/server/routes/admin-ai-settings/*.ts" \
   "${APP_PATH}/src/features/growi-plugin/server/routes/apiv3/**/*.ts" \
+  "${APP_PATH}/src/features/revision-diff/server/routes/*.ts" \
   "${APP_PATH}/src/server/routes/apiv3/**/*.{js,ts}" \
   "${APP_PATH}/src/server/routes/login.js" \
   "${APP_PATH}/src/server/models/openapi/**/*.{js,ts}"
 
 if [ $? -eq 0 ]; then
-  npx tsx "${APP_PATH}/bin/openapi/generate-operation-ids/cli.ts" "${OUT}" --out "${OUT}" --overwrite-existing
+  node --import "${APP_PATH}/bin/runtime/dev-esm-resolver.mjs" "${APP_PATH}/bin/openapi/generate-operation-ids/cli.ts" "${OUT}" --out "${OUT}" --overwrite-existing
   echo "OpenAPI spec generated and transformed: ${OUT}"
 fi

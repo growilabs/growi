@@ -12,7 +12,7 @@
 
 ### Goals
 
-- 外部フィード（`NEWS_FEED_URL`）を cron で定期取得し、MongoDB にキャッシュする
+- 外部フィード（コードにハードコードされた配信元 URL）を cron で定期取得し、MongoDB にキャッシュする
 - InAppNotification パネルで通知とニュースを統合表示する
 - ニュースの既読/未読状態をユーザー単位で管理する
 - ロール別表示制御（admin/general）をサーバーサイドで強制する
@@ -33,7 +33,7 @@
 
 InAppNotification は per-user ドキュメント設計であり、`user` フィールドが必須。通知発生時に全対象ユーザー分のドキュメントを生成する（push 型）。ニュースは全ユーザーで1件のドキュメントを共有し、ユーザーがパネルを開いたときに取得する（pull 型）。この設計上の差異により、ニュースは別モデルとして実装する（詳細は `research.md` の Design Decisions を参照）。
 
-サイドバーパネルは `Sidebar/InAppNotification/InAppNotification.tsx` が `useState` でトグル state を管理し、`InAppNotificationSubstance.tsx` へ prop として渡すパターンを採用している。本機能のフィルタ state も同じパターンで実装する。
+サイドバーパネルは `Sidebar/InAppNotification/InAppNotification.tsx` が `useState` でトグル state を管理し、子コンポーネントへ prop として渡すパターンを採用している。本機能ではフィルタ state も同じく親で管理する。データ層（2 つの SWR ストリーム合流・マージ・mutation handlers）は責務集中による凝集度低下を避けるため `hooks/useMergedInAppNotifications.ts` のカスタムフックに集約し、Forms（フィルタ UI）と Content（リスト描画）のプレゼンテーションを分離する。
 
 ### Architecture Pattern & Boundary Map
 
@@ -65,8 +65,9 @@ graph TB
 
 **Architecture Integration**:
 - 選択パターン: Pull 型 + クライアントサイドマージ
-- 新規コンポーネント: `NewsCronService`, `NewsItem Model`, `NewsReadStatus Model`, `NewsService`, `News API`, `NewsItem Component`, `useSWRINFxNews`
-- 既存コンポーネント拡張: `InAppNotification.tsx`（フィルタ state 追加）, `InAppNotificationSubstance.tsx`（フィルタタブ + InfiniteScroll）, `useSWRINFxInAppNotifications`（新設）, `PrimaryItemForNotification`（未読カウント合算）
+- 新規コンポーネント: `NewsCronService`, `NewsItem Model`, `NewsReadStatus Model`, `NewsService`, `News API`, `NewsItem Component`, `useSWRINFxNews`, `useMergedInAppNotifications`（パネルのデータ層フック）, `InAppNotificationForms.tsx`, `InAppNotificationContent.tsx`
+- 既存コンポーネント拡張: `InAppNotification.tsx`（フィルタ state 追加）, `useSWRINFxInAppNotifications`（新設）, `PrimaryItemForNotification`（未読カウント合算）, `InAppNotificationElm.tsx`（既存通知側の修正あり）
+- スコープ拡張: `@growi/core` に `features.in_app_notification` を新設し、News API と既存 `/in-app-notification/*` の通知データ取得系エンドポイントを移行（設定 CRUD は `user_settings.in_app_notification` のまま）
 - 既存 `InfiniteScroll.tsx` をそのまま再利用
 
 ### Technology Stack
@@ -74,7 +75,7 @@ graph TB
 | Layer | 選択 / バージョン | 役割 |
 |---|---|---|
 | Backend Cron | node-cron（既存） | フィード定期取得スケジューリング |
-| Backend HTTP | node `fetch` / axios（既存） | `NEWS_FEED_URL` から feed.json 取得 |
+| Backend HTTP | node `fetch` / axios（既存） | コードに内蔵された配信元 URL から feed.json 取得 |
 | Data Store | MongoDB + Mongoose（既存） | NewsItem, NewsReadStatus の永続化 |
 | Frontend Data | SWR `useSWRInfinite`（既存） | ニュース・通知の無限スクロール取得 |
 | Frontend State | React `useState`（既存パターン） | フィルタタブ・未読トグルのローカル state |
@@ -92,14 +93,15 @@ sequenceDiagram
   participant Feed as GitHub Pages
   participant DB as MongoDB
 
-  Cron->>Cron: getCronSchedule() = '0 1 * * *'
-  Cron->>Cron: NEWS_FEED_URL 未設定? → スキップ
+  Cron->>Cron: getCronSchedule() = '0 0 * * *'（midnight 起動）
+  Cron->>Cron: configManager.getConfig('news:isDeliveryEnabled') が false? → スキップ
+  Cron->>Cron: randomSleep（0–5 時間）でリクエスト時刻を分散
   Cron->>Feed: HTTP GET feed.json
   alt 取得失敗
     Cron->>Cron: ログ記録、既存 DB データ維持
   else 取得成功
     Cron->>Cron: growiVersionRegExps でフィルタ
-    Cron->>DB: externalId で upsert（新規/更新）
+    Cron->>DB: bulkWrite で一括 upsert（externalId キー、ordered:false）
     Cron->>DB: フィードにないアイテムを削除
   end
   Note over DB: TTL インデックス（90日）で自動削除
@@ -155,7 +157,7 @@ sequenceDiagram
 | 2.1–2.4 | NewsItem モデル | NewsItem Model | MongoDB schema | フィード取得フロー |
 | 3.1–3.5 | 既読/未読管理 | NewsReadStatus Model, NewsService, News API | `POST /mark-read`, `GET /unread-count` | 既読フロー |
 | 4.1–4.2 | ロール別表示制御 | NewsService | `listForUser(userRole)` | パネル表示フロー |
-| 5.1–5.7 | UI 統合表示 | InAppNotification Panel, InAppNotificationSubstance | filter state props | パネル表示フロー |
+| 5.1–5.7 | UI 統合表示 | InAppNotification Panel, InAppNotificationForms, InAppNotificationContent, useMergedInAppNotifications | filter state props, フックの戻り値 | パネル表示フロー |
 | 6.1–6.4 | 視覚表示 | NewsItem Component | CSS classes（`fw-bold`, `bg-primary`） | — |
 | 7.1–7.2 | 未読バッジ | PrimaryItemForNotification | `useSWRxNewsUnreadCount` | — |
 | 8.1–8.4 | 多言語対応 | NewsItem Component, locales | locale fallback logic | — |
@@ -168,11 +170,13 @@ sequenceDiagram
 
 | コンポーネント | 層 | Intent | 要件 | 主要依存 |
 |---|---|---|---|---|
-| NewsCronService | Server / Cron | フィード定期取得・DB 同期 | 1.1–1.7 | CronService (P0), NewsService (P0) |
+| NewsCronService | Server / Cron | フィード定期取得・DB 同期 | 1.1–1.7, 9.5, 9.6 | CronService (P0), NewsService (P0), configManager (P0) |
 | NewsItem Model | Server / Data | ニュースアイテムの永続化 | 2.1–2.4 | MongoDB (P0) |
 | NewsReadStatus Model | Server / Data | ユーザー既読状態の永続化 | 3.1–3.3 | MongoDB (P0) |
 | NewsService | Server / Domain | ニュース一覧・既読管理のビジネスロジック | 3.4–3.5, 4.1–4.2 | NewsItem Model (P0), NewsReadStatus Model (P0) |
 | News API | Server / API | HTTP エンドポイント提供 | 3.1–3.5, 4.1–4.2 | NewsService (P0) |
+| News Delivery Config | Server / Config | 配信フラグ `news:isDeliveryEnabled` の登録（DB 主体、defaultValue: true） | 9.1, 9.2 | configManager (P0) |
+| App Settings UI（拡張） | Client / Admin | `/admin/app` UI から配信フラグを切り替える | 9.3, 9.4 | News Delivery Config (P0), 既存 `app-settings` API (P0) |
 
 ---
 
@@ -184,36 +188,41 @@ sequenceDiagram
 | Requirements | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7 |
 
 **Responsibilities & Constraints**
-- 毎日 AM 1:00 に実行（`'0 1 * * *'`）
-- `NEWS_FEED_URL` 未設定時はスキップ（エラーなし）
+- 毎日 0 時に発火し、ランダムスリープで実取得時刻を 0–5 時に分散させる（cron 起動 `'0 0 * * *'` + `randomSleep(0–5h)`）
+- **配信フラグ判定**：cron 発火ごとに `configManager.getConfig('news:isDeliveryEnabled')` を読み、`false` ならフィード取得をスキップ（再起動不要、次回 tick から即時反映）
+- **配信元 URL はコードにハードコード**（`https://growilabs.github.io/growi-news-feed/feed.json`）。env による上書き経路は持たず、ユーザー（admin 含む）・運用者ともに変更不可
 - 取得失敗時は既存 DB データを維持
 - `growiVersionRegExps` の照合はここで実施（DB には合致アイテムのみ保存）
-- ランダムスリープ（0–5分）で複数インスタンスのリクエストを分散
+
+**配信先への分散戦略**:
+全 GROWI インスタンスが同じ時間帯にフィードへアクセスするため、CDN ミス時に origin（GitHub Pages）へ集中する thundering herd を避ける必要がある。`'0 1 * * *'` + 5 分窓では実用上の希釈が小さいため、**5 時間ウィンドウ + 60 倍希釈**（対 5 分窓比）に拡張した。GitHub Pages の月間 100GB 帯域クォータと CDN キャッシュ TTL 10 分という外部条件を踏まえ、夜間帯 0–5 時に均等分散する設計。
 
 **Dependencies**
 - Inbound: node-cron — スケジュール実行（P0）
 - Outbound: NewsService — upsert/delete（P0）
-- External: `NEWS_FEED_URL` の HTTP エンドポイント — feed.json 取得（P0）
+- External: 弊社管理の HTTP エンドポイント（コードに内蔵された URL） — feed.json 取得（P0）
 
 **Contracts**: Batch [x]
 
 ##### Batch / Job Contract
-- Trigger: `node-cron` スケジュール `'0 1 * * *'`
-- Input: `NEWS_FEED_URL` 環境変数、GROWI バージョン文字列
+- Trigger: `node-cron` スケジュール `'0 0 * * *'`（実取得は randomSleep を経て 0–5 時に分散）
+- Input: GROWI バージョン文字列（配信元 URL はコードに内蔵）
 - Output: MongoDB の NewsItem コレクションを最新フィードと同期
 - Idempotency: `externalId` ユニークインデックスにより冪等。再実行しても重複なし
 
 ##### Service Interface
 ```typescript
 class NewsCronService extends CronService {
-  getCronSchedule(): string;  // '0 1 * * *'
+  getCronSchedule(): string;  // '0 0 * * *'
   executeJob(): Promise<void>;
 }
+
+const MAX_RANDOM_SLEEP_MS = 5 * 60 * 60 * 1000;  // 5 hours
 ```
 
 **Implementation Notes**
 - Integration: `server/service/cron.ts` の `CronService` を継承。`startCron()` をアプリ起動時に呼ぶ
-- Validation: `NEWS_FEED_URL` が `https://` で始まることを確認。`growiVersionRegExps` は try-catch で個別評価し、不正 regex はスキップ
+- Validation: 配信元 URL はコードにハードコードされており、ランタイムの URL 検証は不要（外部入力経路がない）。`growiVersionRegExps` は try-catch で個別評価し、不正 regex はスキップ
 - Risks: フィード取得タイムアウト（10秒推奨）。外部依存のため失敗を前提に設計する
 
 ---
@@ -313,6 +322,29 @@ interface INewsItemWithReadStatus extends INewsItem {
 - Postconditions: `listForUser` の結果は `publishedAt` 降順。各アイテムに `isRead` が付与される
 - ロールフィルタ: `conditions.targetRoles` が未設定または `userRoles` に一致するアイテムのみ返す
 
+**`upsertNewsItems` の実装制約**:
+
+配信側（`tmp/news-feed-delivery-spec.md`）でフィードアイテム数の上限は規定されない（運用の柔軟性を優先）。受信側 NewsItem の TTL（90 日）はフィードに残り続けるアイテムの `fetchedAt` が毎回更新されるため実質発火しない。よって items 配列は理論上無制限に成長しうる。実運用想定は 5 年で ~150–250 件だが上限保証は無い。
+
+`Promise.all(items.map(NewsItem.updateMany))` での並列 fan-out は項目数増加時に DB コネクションプール圧迫・IO 飽和を招くため、**`NewsItem.bulkWrite([...], { ordered: false })` で 1 DB コマンドにバッチ化**する。`markAllRead` の `insertMany({ ordered: false })` と一貫したスタイル。
+
+```typescript
+async upsertNewsItems(items: INewsItemInput[]): Promise<void> {
+  if (items.length === 0) return;
+  const now = new Date();
+  await NewsItem.bulkWrite(
+    items.map(item => ({
+      updateOne: {
+        filter: { externalId: item.id },
+        update: { $set: { ... fetchedAt: now } },
+        upsert: true,
+      },
+    })),
+    { ordered: false },
+  );
+}
+```
+
 ---
 
 #### News API
@@ -335,10 +367,73 @@ interface INewsItemWithReadStatus extends INewsItem {
 
 全エンドポイントに `loginRequiredStrictly` と `accessTokenParser` を適用する。
 
+**Scope 設計**:
+
+GROWI の scope 階層は以下の意味論で運用する：
+
+| 階層 | 意味 | 例 |
+|---|---|---|
+| `user_settings.X` | ユーザーの **X 機能に関する設定値** の CRUD | `/personal-setting/in-app-notification-settings`（通知設定） |
+| `features.X` | **X 機能のデータ自体** へのアクセス | `/pages/list`（ページデータ）, `/news/list`（ニュースデータ） |
+
+通知データ取得は機能データへのアクセスに該当するため `features.in_app_notification` を新設し、News API 4 エンドポイントを移行する。あわせて既存 `/in-app-notification/*` の 4 エンドポイント（`list` / `status` / `open` / `all-statuses-open`）も同スコープへ移行（既存は `user_settings.in_app_notification` を誤用していた）。`/personal-setting/in-app-notification-settings` GET/POST は通知設定 CRUD なので `user_settings.in_app_notification` のまま維持する。
+
+| Method | Endpoint | Scope |
+|---|---|---|
+| GET | `/apiv3/news/list` | `read:features:in_app_notification` |
+| GET | `/apiv3/news/unread-count` | `read:features:in_app_notification` |
+| POST | `/apiv3/news/mark-read` | `write:features:in_app_notification` |
+| POST | `/apiv3/news/mark-all-read` | `write:features:in_app_notification` |
+
+`@growi/core` の `SCOPE_SEED_USER.features.in_app_notification` 追加と、`accesstoken_scopes_desc` i18n（`en_US` / `ja_JP` / `zh_CN` / `fr_FR`）の更新が必要。
+
 **Implementation Notes**
-- Integration: `apps/app/src/server/routes/apiv3/news.ts` に新規作成
+- Integration: `apps/app/src/features/news/server/routes/news.ts` に新規作成。`createNewsRouter(crowi?: Crowi)` をエクスポートし、optional `Crowi` で受けてテスト時にミドルウェアを pass-through できる構造（型アサーションは使わない）
 - Validation: `newsItemId` は `mongoose.isValidObjectId()` で検証
 - Risks: ロールフィルタはサーバーサイドで強制。クライアントから `targetRoles` を受け取らない
+
+---
+
+#### News Delivery Config
+
+| Field | Detail |
+|---|---|
+| Intent | `news:isDeliveryEnabled` を configManager に登録し、cron／API／UI から共通で参照できるようにする |
+| Requirements | 9.1, 9.2 |
+
+**Responsibilities & Constraints**
+- `apps/app/src/server/service/config-manager/config-definition.ts` に CONFIG_KEYS と `defineConfig` の 2 箇所を追加
+- `defineConfig` パターンを踏襲しつつ、**`envVarName` を意図的に持たせない**（`defaultValue: true` のみ）。これにより env からの上書きを禁じ、admin UI 経由の DB 操作のみが ON/OFF を変えられる経路となる
+- `defaultValue: true` をコードに内蔵 → DB に値が無い状態で全顧客が ON
+- 値の優先順は configManager の既存仕様（DB > env > defaultValue）に従う
+
+**Dependencies**
+- Inbound: NewsCronService, App Settings UI
+- Outbound: configManager（既存）
+
+**Implementation Notes**
+- env 変数として一切暴露しないため `/admin` 環境変数一覧には決して現れない（DB 単独運用）
+- 開発時に強制的に値を変更したい場合は、ローカルで DB レコードを直接書き換えるか、コードを一時編集する
+- 設定変更時は configManager の `updateConfigs` がメモリキャッシュ更新と pubsub 通知（multi-pod 反映）を行う
+
+---
+
+#### App Settings UI（拡張）
+
+| Field | Detail |
+|---|---|
+| Intent | `/admin/app` 画面に「ニュース配信」ON/OFF トグルを追加する |
+| Requirements | 9.3, 9.4 |
+
+**Responsibilities & Constraints**
+- 既存 `app-settings` 画面・API（`PUT /apiv3/app-setting`）に項目を追加するパターンを踏襲
+- 認可：`accessTokenParser([SCOPE.WRITE.ADMIN.APP])` + `adminRequired` で admin のみに制限
+- トグル値の永続化先：`configManager.updateConfigs({ 'news:isDeliveryEnabled': boolean })`
+- UI 文言は i18n 対応（`ja_JP`, `en_US`, `zh_CN`, `ko_KR`, `fr_FR`）
+
+**Dependencies**
+- Inbound: 管理画面（admin user）
+- Outbound: News Delivery Config（configManager 経由）
 
 ---
 
@@ -349,9 +444,11 @@ interface INewsItemWithReadStatus extends INewsItem {
 | useSWRINFxNews | Client / Hooks | ニュースアイテムの無限スクロール取得 | 5.4 | News API (P0) |
 | useSWRxNewsUnreadCount | Client / Hooks | ニュース未読カウント取得 | 7.1 | News API (P0) |
 | useSWRINFxInAppNotifications | Client / Hooks | 通知の無限スクロール取得（既存 hook を拡張） | 5.4 | InAppNotification API (P0) |
+| useMergedInAppNotifications | Client / Hooks | パネルのデータ層（2 SWR + 終端判定 + 合成 response + マージ + 既読 mutation handlers） | 5.1–5.5 | useSWRINFxNews (P0), useSWRINFxInAppNotifications (P0) |
 | InAppNotification.tsx（変更） | Client / UI | フィルタ state を追加管理 | 5.2, 5.3 | useState (P0) |
-| InAppNotificationSubstance.tsx（変更） | Client / UI | フィルタタブ + InfiniteScroll | 5.1–5.5 | useSWRINFxNews (P0), InfiniteScroll (P0) |
-| NewsItem Component | Client / UI | ニュースアイテム1件の表示 | 5.5, 5.6, 5.7, 6.1–6.4, 8.1–8.2 | — |
+| InAppNotificationForms.tsx（新設） | Client / UI | フィルタタブ + 未読トグル UI | 5.2, 5.3 | — |
+| InAppNotificationContent.tsx（新設） | Client / UI | 3 分岐レンダラー（all/news/notifications） + InfiniteScroll | 5.1, 5.4, 5.5 | useMergedInAppNotifications (P0), InfiniteScroll (P0) |
+| NewsItem Component | Client / UI | ニュースアイテム1件の表示（`React.memo` で wrap） | 5.5, 5.6, 5.7, 6.1–6.4, 8.1–8.2 | — |
 | PrimaryItemForNotification（変更） | Client / UI | 未読バッジに NewsItem の未読数を合算 | 7.1, 7.2 | useSWRxNewsUnreadCount (P0) |
 
 ---
@@ -399,26 +496,112 @@ type FilterType = 'all' | 'news' | 'notifications';
 
 ---
 
-#### InAppNotificationSubstance.tsx（変更）
+#### InAppNotificationElm.tsx（既存・修正あり）
+
+**実装後に判明した落とし穴**: 未読ドットに使われていた CSS クラス `grw-unopend-notification` はコードベースに定義が存在せず、ドットが不可視だった。`bg-primary rounded-circle` + インラインスタイル（`width/height: 8px, display: inline-block`）に置き換えて修正済み。このコンポーネントを今後変更する場合、同クラスを再導入しないこと。
+
+---
+
+#### Panel modules: Forms + Content + data hook
 
 | Field | Detail |
 |---|---|
-| Intent | フィルタタブ UI の追加と、InfiniteScroll を用いた統合リスト表示 |
+| Intent | フィルタタブ UI とリスト描画を独立に保ち、データ層はカスタムフックに集約する |
 | Requirements | 5.1, 5.2, 5.3, 5.4, 5.5 |
 
 **Contracts**: State [x]
 
-**InAppNotificationForms への追加**:
-- フィルタボタン（「すべて」「通知」「お知らせ」）を Bootstrap `btn-group` で実装
-- 既存「未読のみ」トグルは維持
+**ファイル構成**:
 
-**InAppNotificationContent の変更**:
-- `activeFilter` に応じて3パターンに分岐
-  - `'all'`: `useSWRINFxNews` + `useSWRINFxInAppNotifications` の結果を `publishedAt/createdAt` 降順でマージ
-  - `'news'`: `useSWRINFxNews` のみ。`NewsList` に渡す
-  - `'notifications'`: `useSWRINFxInAppNotifications` のみ。既存 `InAppNotificationList` に渡す
-- 既存 `InfiniteScroll` コンポーネントを使用（`client/components/InfiniteScroll.tsx`）
+```
+client/components/Sidebar/InAppNotification/
+├── InAppNotification.tsx                  (フィルタ state + hook 呼び出しの所在地、props で配布)
+├── InAppNotificationForms.tsx             (Forms UI: タブ・トグル・「すべて既読にする」ボタン)
+├── InAppNotificationContent.tsx           (3 分岐レンダラー、merged を prop で受け取る)
+├── types.ts                               (FilterType の中立な置き場・循環依存回避)
+└── hooks/
+    └── useMergedInAppNotifications.ts     (データ層 + 既読化ハンドラ群)
+```
+
+**設計原則**:
+- **データ層と表示層を分離する**。`useMergedInAppNotifications` フックがニュース・通知の両 `useSWRInfinite` 呼び出し、ページ終端判定、合成 SWRInfiniteResponse の構築、マージ、既読 mutation handlers を一手に引き受ける。これにより `InAppNotificationContent` はフックの戻り値を受け取って `activeFilter` で 3 分岐するだけの薄い renderer になる
+- **Forms はプレゼンテーションのみ**。データ層に触れない
+- 単一ファイルで 7 責務（スクロール戦略・SWR 2 本・終端判定・合成 response・マージ・mutation 2 種・3 分岐 render）を抱えていた v1 の `InAppNotificationSubstance.tsx`（339 行）は廃止し、上記 3 モジュールに分割する
+
+**InAppNotificationForms**:
+- フィルタボタン（「すべて」「通知」「お知らせ」）を Bootstrap `btn-group` で実装
+- 既存「未読のみ」トグルを維持
+- 「未読のみ」トグルの右側に「すべて既読にする」ボタンを並置。`btn btn-sm btn-link text-decoration-none p-0` で控えめなテキストリンク調。未読 0 件時は `disabled` + `opacity-25` ユーティリティで存在感を更に弱め、インラインスタイルは使わない（Bootstrap クラスのみで実現）
+
+**「すべて既読にする」のフィルタ連動**:
+
+ボタンは現在の `activeFilter` に応じて発火する API を切り替える：
+
+| activeFilter | 発火する API |
+|---|---|
+| `'all'` | `POST /apiv3/news/mark-all-read` + `PUT /apiv3/in-app-notification/all-statuses-open`（並列） |
+| `'news'` | `POST /apiv3/news/mark-all-read` のみ |
+| `'notifications'` | `PUT /apiv3/in-app-notification/all-statuses-open` のみ |
+
+API 呼び出しに先立ち SWR キャッシュを楽観的に書き換え（後述）、API 失敗時のみ `mutate()` で再検証してロールバックする。
+
+**InAppNotificationContent (3 分岐)**:
+- `'all'`: `useMergedInAppNotifications.allModeSWRResponse` + `mergedItems` を `InfiniteScroll` に渡し、両ストリームをマージ表示
+- `'news'`: `newsResponse` + `allNewsItems` のみ
+- `'notifications'`: `notificationResponse` + `allNotificationItems` のみ
+- 既存 `InfiniteScroll` コンポーネント（`client/components/InfiniteScroll.tsx`）を再利用
 - 既存 `// TODO: Infinite scroll implemented` コメントを解消
+
+**useMergedInAppNotifications フック**:
+
+戻り値:
+```typescript
+{
+  newsResponse, allNewsItems, newsExhausted,
+  notificationResponse, allNotificationItems, notifExhausted,
+  allModeSWRResponse, mergedItems,
+  newsUnreadCount, notifUnreadCount,                 // 「すべて既読にする」ボタンの disable 判定に使用
+  handleNewsRead, handleNotificationRead,            // 単発既読化（id 受け取り、楽観更新）
+  handleMarkAllRead,                                 // 一括既読化（{news?, notifications?} を受け取る）
+}
+```
+
+**hook の呼び出し位置**: `useMergedInAppNotifications` は `InAppNotification`（panel-root）で呼び、結果オブジェクト `merged` を `InAppNotificationContent` に prop で渡す。`Forms` 側にはボタンの `onMarkAllRead` と `isMarkAllReadDisabled` のみを props として配布する。これにより一覧 (Content) とボタン (Forms) が同じ hook 結果を共有する。
+
+- `'all'` モード用の合成 `SWRInfiniteResponse`: `setSize` は終端に達していないストリームをインクリメント（両方未終端なら両方）、`isValidating` はいずれかが true なら true、両ストリーム終端時に `isReachingEnd = true`
+- `mergedItems` は両ストリームの `flatMap → publishedAt/createdAt 降順 sort`
+- ハンドラは `useCallback` で参照を安定化する。SWR の `mutate` は cache key 単位で stable なので、`{ mutate: mutateNews } = newsResponse` のように destructure して deps に含める（biome のルール対応）
+
+**サイドバーモード別スクロール戦略**:
+
+サイドバーには2種類のモードがあり、スクロール担当コンテナが異なる。
+
+| モード | UI | スクロール担当 | コンテンツエリアの制約 |
+|---|---|---|---|
+| collapsed（ホバーパネル ①） | ベルアイコンにホバー時の小パネル | `InAppNotificationContent` 内の `overflow-auto` div | `maxHeight: 60vh` で高さを制限 |
+| dock / drawer（全面サイドバー ②） | 展開した全面パネル | 外側の `SimpleBar`（`h-100`） | 制約なし。コンテンツが自然に伸長 |
+
+collapsed モードで `overflow-auto + maxHeight` を使い、dock/drawer モードでは外していない場合、**二重スクロールコンテナ**が発生する。具体的には：
+- `overflow-auto` div がサイドバーと同高の scroll context を作る
+- スクロールバーがコンテンツ高さとほぼ同じ縦幅で出現し、わずかな余白でしか動かせなくなる（振動挙動）
+
+対策として `InAppNotificationContent` 内で `useSidebarMode()` を呼び、`isCollapsedMode()` が true のときのみ `overflow-auto` クラスと `maxHeight: 60vh` を付与する。dock/drawer モードでは div に何も付与せず、SimpleBar にスクロールを委ねる。
+
+**ドット即時消去 + 未読カウント即時減算: SWR mutate による楽観的更新**:
+
+ニュース・通知の両方で、既読化アクションのサーバー応答を待たずに UI 反映する。`useMergedInAppNotifications` 内で以下の関数群が一貫した規約に従って実装される：
+
+| ハンドラ | キャッシュ書換え | 未読カウント書換え | API |
+|---|---|---|---|
+| `handleNotificationRead(id)` | `mutateNotifications(updater, { revalidate: false })` で該当 `doc.status` を `STATUS_OPENED` に | `mutateNotifUnreadCount(c => max(c-1, 0), { revalidate: false })` | `POST /in-app-notification/open`（呼び出し元の Elm 側） |
+| `handleNewsRead(id)` | `mutateNews(updater, { revalidate: false })` で該当 `doc.isRead = true` に | `mutateNewsUnreadCount(c => max(c-1, 0), { revalidate: false })` | `POST /news/mark-read`（呼び出し元の NewsItem 側） |
+| `handleMarkAllRead({news?, notifications?})` | 対象側の全 doc を一括書換え | 対象側のカウントを `0` に固定 | `POST /news/mark-all-read` / `PUT /in-app-notification/all-statuses-open`（並列） |
+
+`useSWRInfinite` のキャッシュは `SWRConfig` プロバイダの Map に保持されるため、同一 React tree のアンマウント／リマウントを跨いで状態が維持され、リマウント後もドットは消えたままとなる。ローカル `useState` を持たずに SWR の標準機能のみで完結させることで、キャッシュ・再検証制御・キー共有といった SWR の利点をそのまま活かせる。
+
+**ロールバック戦略**: `handleMarkAllRead` は API を `Promise.all` で並列実行し、いずれかが失敗した場合は `mutateXxx()`（引数なし）でサーバー値を再検証することでキャッシュを真実に戻す。単発既読化（`handleNotificationRead` / `handleNewsRead`）は呼び出し元（Elm / NewsItem）で API 失敗時に try/catch で握り潰す既存方針を維持する（クリック → ページ遷移という導線のため、UX 上のロールバック必要性が低い）。
+
+品質改善の経緯: PR #10986 のレビュー FB を受け、当初採用した `useState<Set<string>>` 戦略を SWR `mutate` + `revalidate: false` に差し替えた。PR #11050 で Substance 単一ファイル構造を Forms / Content / data hook の 3 モジュールに分割（凝集度向上）し、ハンドラを `useCallback` 化した。さらに PR（本ブランチ）で `handleNewsRead` も通知側と同じ楽観更新規約に揃え、未読カウントの楽観的デクリメントと「すべて既読にする」ボタン経由の一括既読化を追加した。
 
 ---
 
@@ -431,11 +614,16 @@ type FilterType = 'all' | 'news' | 'notifications';
 
 **Implementation Notes**
 - 配置: `features/news/client/components/NewsItem.tsx`
-- ロケールフォールバック: `browserLocale → ja_JP → en_US → 最初に利用可能なキー`
-- 未読: `fw-bold` + 左端に `bg-primary` 8px 丸ドット
-- 既読: `fw-normal` + 同幅の透明スペーサー
-- `emoji` 未設定時は `📢` をフォールバック
+- **レイアウト**: 既存の `InAppNotificationElm` と同一カラム構成に揃える
+  - 左端: 未読ドット（`bg-primary` 8px 丸）または同幅の透明スペーサー
+  - アバター位置: `emoji` を表示（`UserPicture` が占める位置と同等）。未設定時は `📢` をフォールバック
+  - コンテンツ列: タイトル（未読時 `fw-bold`、既読時 `fw-normal`）+ 公開日時
+- ロケールフォールバック: `i18n.language → ja_JP → en_US → 最初に利用可能なキー`（`useTranslation()` から取得）
+- 日付フォーマット: `date-fns` の `format` と `getLocale(i18n.language)` を用い、`ActivityListItem` と同じロケールパターンに統一
+- Bootstrap クラス: `w-100 text-start bg-transparent fs-5 lh-1` などを利用し、インラインスタイルを最小化
+- 未読ドット: `InAppNotificationElm` と共有の `UnreadDot.module.scss` を使用し、両者の見た目を完全に揃える
 - クリック時: `POST /mark-read` + SWR mutate + `url` があれば新タブで開く
+- **再レンダ最適化**: `export const NewsItem = memo(NewsItemInner)` で `React.memo` ラップ。親 `InAppNotificationContent` の再レンダ時、SWR が同一参照を返している `item` props と `useCallback` で参照安定化された `onReadMutate` props により、変化のないアイテムは再レンダされない。`<InAppNotificationElm>`（legacy 経路 `InAppNotificationDropdown` / `InAppNotificationPage` から共有される）の memo 化は本機能のスコープ外として将来 PR で対応
 
 ---
 
@@ -522,13 +710,7 @@ interface INewsItemWithReadStatus {
   isRead: boolean;
 }
 
-interface PaginateResult<T> {
-  docs: T[];
-  totalDocs: number;
-  limit: number;
-  offset: number;
-  hasNextPage: boolean;
-}
+// PaginateResult<T> は ~/interfaces/in-app-notification の既存型を再利用する（再定義不要）
 ```
 
 ---
@@ -544,7 +726,7 @@ interface PaginateResult<T> {
 | カテゴリ | エラー | 対応 |
 |---|---|---|
 | Cron / External | フィード取得失敗（ネットワーク、タイムアウト） | `logger.error` + 既存 DB データ維持。次回 cron で再試行 |
-| Cron / Config | `NEWS_FEED_URL` 未設定 | スキップ（ログなし）。設定されるまで無害に動作 |
+| Cron / Config | `news:isDeliveryEnabled` が `false` | スキップ（debug ログ）。admin が再度 ON にするまで無害に停止 |
 | Cron / Validation | `growiVersionRegExps` に不正 regex | try-catch で該当アイテムをスキップ、`logger.warn` |
 | API / Auth | 未認証リクエスト | 401（`loginRequiredStrictly` が処理） |
 | API / Validation | 不正な `newsItemId` フォーマット | 400（`mongoose.isValidObjectId()` チェック） |
@@ -561,7 +743,7 @@ interface PaginateResult<T> {
 
 ### Unit Tests
 
-- `NewsCronService.executeJob()`: 正常取得 → upsert、取得失敗 → DB 変更なし、`NEWS_FEED_URL` 未設定 → スキップ
+- `NewsCronService.executeJob()`: 正常取得 → upsert、取得失敗 → DB 変更なし、`news:isDeliveryEnabled` が `false` → スキップ
 - `NewsCronService.executeJob()`: `growiVersionRegExps` 一致 → 保存、不一致 → 除外
 - `NewsService.listForUser()`: `targetRoles` フィルタ（admin のみ、general 除外）
 - `NewsService.listForUser()`: `onlyUnread=true` で未読のみ返す
@@ -586,13 +768,31 @@ interface PaginateResult<T> {
 ## Security Considerations
 
 - すべての `/apiv3/news/*` エンドポイントに `loginRequiredStrictly` を適用する
+- アクセストークン用 scope は **`features.in_app_notification`** を使用する（read / write）。設定 CRUD 用の `user_settings.in_app_notification` とはセマンティクスが異なるため流用しない。アクセストークン発行時にユーザーが意図した粒度でアクセスを許可できるようにする
 - `conditions.targetRoles` のフィルタリングはサーバーサイドの `NewsService.listForUser()` で強制する。クライアントから `targetRoles` パラメータを受け付けない
-- `NEWS_FEED_URL` は `https://` のみ許可（HTTP 不可）
+- 配信元 URL はコードにハードコードされており、ランタイムで変更できる経路を持たない。env 変数による上書きもサポートしない
 - フィードから取得したデータはそのまま DB に保存し、クライアントへのレスポンス時に Mongoose スキーマで型安全に扱う
 
 ## Performance & Scalability
 
+**データ量とインデックス**:
 - NewsItem は全ユーザーで1件共有のため、ユーザー数に比例してドキュメントが増えない
 - `publishedAt` インデックスにより降順ソートが効率的
-- `fetchedAt` TTL インデックス（90日）で古いデータを自動削除し、コレクションサイズを制限
+- `fetchedAt` TTL インデックス（90日）は **フィードから外れたアイテムにのみ実質発火** する（フィードに残り続けるアイテムは毎回 `fetchedAt` が更新されるため発火しない）。よってコレクションサイズの上限は配信側のキュレーションに依存する
 - `NewsReadStatus` の compound unique index により `listForUser` の LEFT JOIN 相当クエリが効率的
+
+**フィードアイテム規模の前提**:
+- 配信側スキーマ（`tmp/news-feed-delivery-spec.md`）でフィードアイテム数の上限規定は設けない（運用の柔軟性を優先）
+- 想定ペース: release 12–24 件/年、security/tips/maintenance/announcement 合わせて 30–50 件/年
+- 5 年運用で **150–250 件程度** の見込み。ただし上限保証はないため、実装は無制限成長に耐える形で設計する
+
+**書き込み戦略**:
+- `NewsCronService.executeJob()` 内の upsert は `NewsItem.bulkWrite([...], { ordered: false })` で 1 DB コマンドにバッチ化。`Promise.all(items.map(updateMany))` の並列 fan-out は項目数増加時に DB コネクションプール圧迫・IO 飽和を招くため採用しない
+
+**配信先への分散**:
+- cron を `'0 0 * * *'` + `randomSleep(0–5 時間)` に設定し、複数 GROWI インスタンスのリクエストを夜間 5 時間ウィンドウに均等分散する
+- `'0 1 * * *'` + 5 分窓と比較して **約 60 倍の希釈**。GitHub Pages の月間 100GB 帯域クォータ・10 分 CDN キャッシュ TTL に対して thundering herd を回避できる
+- 即時性は不要（日次配信）であり、5 時間ウィンドウは UX への影響なし
+
+**フロントエンド再レンダ**:
+- `<NewsItem>` は `React.memo` ラップ。`useMergedInAppNotifications` のハンドラ群は `useCallback` で参照安定化されており、SWR が返す `item` 参照と組み合わせて、変化のないリスト項目は再レンダをスキップする

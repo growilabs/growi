@@ -25,10 +25,15 @@
     "The whitelist of registration permission E-mail address": "The whitelist of registration permission E-mail address",
     "users_without_account": "Users without account is not accessible",
     "example": "Example",
-    "restrict_emails": "You can restrict email registration to your wiki by writing an email domain (beginning with @). ",
-    "for_example": " For example, if you would like to restrict registration to users within the growi.org domain, you can write ",
-    "in_this_case": "; in this case, only users within the growi.org domain would be able to register, and all other users would be rejected.",
-    "insert_single": "Please insert single e-mail address per line.",
+    "restrict_emails": "You can restrict email registration by domain or by exact address.",
+    "whitelist_domain_desc": " To allow only addresses from an exact domain, write ",
+    "whitelist_domain_suffix": " (only addresses with exactly that domain will be allowed).",
+    "whitelist_subdomain_desc": " To also allow subdomains, write ",
+    "whitelist_subdomain_suffix": " (any address at a subdomain of that domain will be allowed).",
+    "whitelist_exact_desc": " To allow only a specific address, write a full address like ",
+    "whitelist_exact_suffix": ".",
+    "insert_single": "Please insert one entry per line.",
+    "whitelist_invalid_format": "Invalid format. Use @example.com for exact domain, @*.example.com for subdomains, or user@example.com for exact address.",
     "page_list_and_search_results": "Page list / Search results",
     "page_listing_1": "Page listing/searching<br>restricted by 'Only me'",
     "page_listing_1_desc": "Show pages that are restricted by 'Only me' option when listing/searching",
@@ -332,6 +337,13 @@
     "migration_succeeded": "Your upgrade has been successfully completed! Exit maintenance mode and GROWI can be used.",
     "migration_failed": "Upgrade failed. Please refer to the GROWI docs for information on what to do in the event of failure."
   },
+  "news_delivery": {
+    "section_title": "News delivery",
+    "label": "News delivery",
+    "enable": "Enable news delivery",
+    "description": "Controls whether the cron job pulls the news feed and updates the local cache. Existing cached items remain visible while delivery is disabled.",
+    "update_succeeded": "News delivery setting updated"
+  },
   "maintenance_mode": {
     "maintenance_mode": "Maintenance Mode",
     "under_maintenance_mode": "Under Maintenance Mode",
@@ -369,6 +381,10 @@
     "page_bulk_export_explanation": "Enables a feature that allows all users to export a page and all it's child pages at once from the menu. Exported data will be automatically deleted after the storage period has passed.",
     "page_bulk_export_warning": "The bulk page export feature is available to all users. In order to maintain system resources, we ask for your cooperation in using the minimum amount necessary. If you are an administrator, please inform all users of this.",
     "page_bulk_export_storage_period": "Storage period",
+    "page_bulk_export_reload_title": "Reload page",
+    "page_bulk_export_reload_prompt": "You need to reload the page to reflect the setting change. Reload now?",
+    "page_bulk_export_reload_dismiss": "Not now",
+    "reload_page": "Reload",
     "update": "Update",
     "mail_settings": "E-mail Settings",
     "mailer_is_not_set_up": "E-mail setting is not set up.",
@@ -428,6 +444,65 @@
     "use_env_var_if_empty": "If the value in the database is empty, the value of the environment variable <code>{{variable}}</code> is used.",
     "note_for_the_only_env_option": "The GCS Settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> .",
     "note_for_the_only_env_option_cloud": "GCS settings can be changed from the GROWI.cloud admin panel."
+  },
+  "ai_settings": {
+    "ai_settings": "AI Settings",
+    "ai_enabled_label": "Enable AI features",
+    "providers_section_title": "Providers",
+    "provider_enabled_label": "Enable this provider",
+    "provider_status_available": "Available",
+    "provider_status_disabled": "Disabled",
+    "provider_status_misconfigured": "Setup incomplete",
+    "provider_warning_missing_api_key": "This provider is enabled but its API key is not set, so its models are not offered to users.",
+    "provider_warning_missing_azure_endpoint": "This provider is enabled but its endpoint (resource name or base URL) is not set, so its models are not offered to users.",
+    "api_key_label": "API Key",
+    "api_key_help": "The API key used to authenticate with the AI provider.",
+    "api_key_set_placeholder": "(configured)",
+    "models_section_title": "Models",
+    "models_section_desc": "Choose one of your registered models as the default. The default is the model initially selected for users in chat.",
+    "default_model_label": "Default model",
+    "default_model_help": "The model initially selected for users in chat. Pick from any registered model across all providers.",
+    "default_model_placeholder": "Select a default model",
+    "default_model_no_models": "No models are registered",
+    "model_label": "Model name",
+    "model_placeholder": "Select a model",
+    "model_duplicate_error": "This model id is already registered for this provider",
+    "refresh_model_catalog": "Refresh model catalog",
+    "refresh_model_catalog_confirmation": "Refreshing the model catalog sends a request to the external service (models.dev) to fetch the latest model list. Do you want to continue?",
+    "refresh_model_catalog_confirm": "Refresh",
+    "refresh_model_catalog_success": "The model catalog has been refreshed.",
+    "refresh_model_catalog_failed": "Failed to refresh the model catalog. The previous catalog remains in effect.",
+    "refresh_model_catalog_label": "Model catalog",
+    "refresh_model_catalog_scope": "The source data for the model list shown in the chat model picker. Refresh it to reflect newly released models.",
+    "set_as_default": "Set as default",
+    "default_badge": "Default",
+    "add_model": "Add model",
+    "azure_add_deployment": "Add deployment",
+    "remove_model": "Remove",
+    "remove_model_confirmation": "Are you sure you want to remove \"{{modelName}}\" from the list?",
+    "remove_model_confirm": "Remove model",
+    "provider_options_label": "Provider Options (JSON)",
+    "provider_options_doc_link": "How to write",
+    "provider_options_invalid_json": "Invalid JSON",
+    "provider_options_invalid_json_save_blocked": "A model has invalid provider options (JSON). Please fix it before saving.",
+    "provider_options_error_at_line": "(line {{line}})",
+    "env_only_mode_notice": "AI settings are fixed by environment variables and cannot be edited here.",
+    "unconfigured_warning": "AI is enabled but not fully configured, so it will not work until you complete the settings.",
+    "save": "Update",
+    "save_success": "AI settings updated successfully.",
+    "azure_section_title": "Azure OpenAI settings",
+    "azure_resource_name_label": "Azure resource name",
+    "azure_base_url_label": "Azure base URL",
+    "azure_api_version_label": "Azure API version",
+    "azure_use_entra_id_label": "Use Microsoft Entra ID",
+    "azure_entra_id_api_key_note": "When Microsoft Entra ID is enabled, the API key is not used.",
+    "azure_entra_id_credential_note": "Credentials are resolved automatically from the Azure environment:",
+    "azure_entra_id_managed_identity_note": "If GROWI runs on Azure (VM, App Service, Container Apps, or AKS) with a managed or workload identity, no credentials are needed here.",
+    "azure_entra_id_env_note": "Otherwise, set these environment variables on the GROWI server:",
+    "azure_resource_name_help": "Builds the standard endpoint https://<resource-name>.openai.azure.com. Use this for the global Azure cloud. If the base URL is also set, the base URL takes precedence.",
+    "azure_base_url_help": "Use instead of the resource name for sovereign clouds (e.g. Azure Government), API Management gateways, or proxies. Takes precedence over the resource name when both are set.",
+    "azure_api_version_help": "Optional. Leave empty to use the default. Set only when a specific deployment requires a particular API version.",
+    "azure_model_deployment_label": "Deployment name"
   },
   "markdown_settings": {
     "markdown_settings": "Markdown Settings",
@@ -766,6 +841,8 @@
       "send_temporary_password": "If you have not sent an invitation email, copy the temporary password on this screen and contact the inviter.",
       "send_email": "You can also send or resend the invitation email from the drop-down in the users table.",
       "existing_email": "The following emails already exist",
+      "whitelist_violation": "The following email addresses are not allowed by the whitelist:",
+      "reason_email_not_in_whitelist": "Not included in whitelist",
       "issue": "Issue"
     },
     "user_table": {
@@ -896,6 +973,16 @@
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
   },
+  "audit_log_snapshot": {
+    "file_name": "File name",
+    "file_size": "File size",
+    "page": "Page",
+    "no_detail": "No snapshot detail available",
+    "unknown_file_name": "Unknown file name",
+    "page_unavailable": "Page unavailable",
+    "unknown_size": "Unknown size",
+    "download": "Download"
+  },
   "g2g_data_transfer": {
     "transfer_data_to_another_growi": "Transfer data from this GROWI to another GROWI",
     "advanced_options": "Advanced options",
@@ -994,6 +1081,8 @@
     "SEARCH_PAGE": "Page Search",
     "SEARCH_PAGE_VIEW": "Page view(Search results page)",
     "ADMIN_APP_SETTING_UPDATE": "Update App Settings",
+    "ADMIN_AI_SETTING_UPDATE": "Update AI Settings",
+    "ADMIN_AI_MODEL_CATALOG_REFRESH": "Refresh model catalog",
     "ADMIN_SITE_URL_UPDATE": "Update Site URL Settings",
     "ADMIN_MAIL_SMTP_UPDATE": "Update E-mail(SMTP) Settings",
     "ADMIN_MAIL_SES_UPDATE": "Update E-mail(SES) Settings",
@@ -1156,9 +1245,97 @@
   "forbidden_page": {
     "do_not_have_admin_permission": "Users without administrative rights cannot access the administration screen"
   },
-  "ai_integration": {
-    "ai_integration": "AI Integration",
-    "disable_mode_explanation": "Currently, AI integration is disabled. To enable it, configure the <code>AI_ENABLED</code> environment variable along with the required additional variables.<br><br>For details, please refer to the <a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>documentation</a>.",
-    "ai_search_management": "AI search management"
+  "admin_navigation": {
+    "section_users": "Users",
+    "section_data": "Data",
+    "section_external_notifications": "External Notifications"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "Warning:",
+        "message_html": "The last initialization was triggered by <code>VAULT_BOOTSTRAP_ON_START=force</code>. Restarting the server while this env var is still set to <code>force</code> will reinitialize all Vault data again. Please change the env var to <code>true</code> or <code>false</code>."
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "Feature Status",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "description_html": "Controlled by the <code>VAULT_ENABLED</code> environment variable. To toggle enable/disable, change the env var and restart the server."
+      },
+      "clone-url": {
+        "label": "Clone URL",
+        "description": "Run this command in your terminal to clone the Vault repository.",
+        "copy-button": "Copy command",
+        "copied-tooltip": "Copied!",
+        "copy-failed": "Failed to copy the clone command.",
+        "no-site-url_html": "Site URL is not configured. Set it in <a href=\"/admin/app\">App Settings</a> to display the clone command."
+      },
+      "kill-switch": {
+        "heading": "Rebuild",
+        "button": "Rebuild Vault",
+        "description_html": "Destroys all data in the Git repositories and rebuilds the Git data from MongoDB. During the rebuild, all <code>git clone</code> / <code>fetch</code> requests are rejected with 503. The action is recorded in the audit log as <code>vault.wipe</code>.",
+        "confirm-title": "Confirm Rebuild Vault",
+        "confirm-message_html": "Executing this action will <strong>lose all data in the current Git repositories</strong>.",
+        "confirm-question": "Are you sure you want to proceed?",
+        "confirm-button": "Confirm",
+        "cancel-button": "Cancel",
+        "started-toast": "Rebuild started. The Vault will return 503 until the data is rebuilt."
+      },
+      "bootstrap-status": {
+        "state": "Status",
+        "processed-total": "Processed / Total Estimated",
+        "started-at": "Started At",
+        "completed-at": "Completed At",
+        "last-error": "Last Error",
+        "progress-label": "{{processed}} of {{total}} pages"
+      },
+      "completion-reliability": {
+        "heading": "Reliability Status",
+        "check-result": "Last Check Result",
+        "last-completed-at": "Last Completed At",
+        "processed-estimated": "Processed / Estimated",
+        "trigger-source": "Trigger Source",
+        "last-error": "Last Error"
+      },
+      "auto-retry-status": {
+        "heading": "Auto-Retry Status",
+        "escalated-warning_html": "Auto-retry during initialization has failed, and the state has reached <strong>escalated</strong>. Manual intervention is required.",
+        "attempt-no": "Attempt No.",
+        "next-attempt-at": "Next Attempt At",
+        "last-error": "Last Error",
+        "abort-button": "Abort Auto-Retry",
+        "aborting": "Aborting…",
+        "aborted-toast": "Auto-retry aborted."
+      },
+      "drift-activity": {
+        "heading": "Data Inconsistency Detection Status",
+        "last-sweep-at": "Last Sweep At",
+        "last-watermark": "Last Watermark",
+        "detected-since-boot": "Detected Since Server Start",
+        "repairs-emitted-since-boot": "Repairs Emitted Since Server Start",
+        "last-error": "Last Detected Error",
+        "out-of-scope_html": "<strong>Note (out-of-scope):</strong> Data inconsistencies caused by path changes (rename / hard delete) and grant revocation are not detected in the current implementation. These require future <code>growi-vault-ha</code> support."
+      },
+      "storage-observability": {
+        "fetch-failed": "Failed to retrieve storage statistics. vault-manager may be unreachable.",
+        "namespace-count": "Namespace Count",
+        "total-commit-count": "Total Commit Count",
+        "loose-object-count": "Loose Object Count",
+        "repo-size": "Repository Size",
+        "last-squash": "Last Squash At",
+        "last-gc": "Last GC At"
+      },
+      "audit-log": {
+        "heading": "Audit Log",
+        "button": "View VAULT_* Audit Log Entries",
+        "description": "Opens the admin audit log filtered to Vault-related actions (VAULT_*)."
+      },
+      "reconcile-admin": {
+        "heading": "Reconcile",
+        "trigger-button": "Trigger Reconcile",
+        "description": "Manually reconcile data inconsistencies between MongoDB pages and Vault git trees without performing a full initialization."
+      }
+    }
   }
 }

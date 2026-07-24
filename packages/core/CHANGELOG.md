@@ -1,5 +1,25 @@
 # @growi/core
 
+## 2.4.0
+
+### Minor Changes
+
+- [#11320](https://github.com/growilabs/growi/pull/11320) [`5e8f105`](https://github.com/growilabs/growi/commit/5e8f1054c01771275682dcdbcb2fc3488e1c0be3) Thanks [@Ryosei-Fukushima](https://github.com/Ryosei-Fukushima)! - Add `features:user` and `features:user_group` access-token scopes (read/write). These separate "reading other users'/groups' directory information" from the self-oriented `user_settings:info` scope, which previously over-granted such reads.
+
+## 2.3.2
+
+### Patch Changes
+
+- [#11317](https://github.com/growilabs/growi/pull/11317) [`4a0bf1d`](https://github.com/growilabs/growi/commit/4a0bf1dac5954f9ae7756a574970a3968a4ae8b9) Thanks [@ryotaro-nagahara](https://github.com/ryotaro-nagahara)! - Reserve the `/_news` path (in-app news feed page) in `isCreatablePage` so it cannot be created as a wiki page.
+
+## 2.3.1
+
+### Patch Changes
+
+- [#11236](https://github.com/growilabs/growi/pull/11236) [`bd28252`](https://github.com/growilabs/growi/commit/bd28252c1a6e7f76f9bdadbdc3a07690f6bc0573) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Fix page operations and v5 page migration failing for page paths that contain non-ASCII whitespace (e.g. U+3000 IDEOGRAPHIC SPACE)
+
+  Node.js 24's `RegExp.escape()` escapes non-ASCII whitespace (code points >= U+0100, such as U+3000) into `\uXXXX` form, which MongoDB's PCRE2 engine does not support (error 51091). Added `escapeStringForMongoRegex()`, which escapes only regex metacharacters and passes other characters through literally, and used it wherever the resulting pattern is sent to MongoDB.
+
 ## 2.3.0
 
 ### Minor Changes

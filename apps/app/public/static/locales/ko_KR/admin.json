@@ -25,10 +25,15 @@
     "The whitelist of registration permission E-mail address": "등록 허용 이메일 주소 화이트리스트",
     "users_without_account": "계정 없는 사용자는 접근할 수 없습니다",
     "example": "예시",
-    "restrict_emails": "이메일 도메인(@로 시작)을 작성하여 위키에 대한 이메일 등록을 제한할 수 있습니다. ",
-    "for_example": " 예를 들어, growi.org 도메인 내의 사용자로 등록을 제한하려면 ",
-    "in_this_case": "를 작성할 수 있습니다. 이 경우 growi.org 도메인 내의 사용자만 등록할 수 있으며, 다른 모든 사용자는 거부됩니다.",
-    "insert_single": "한 줄에 하나의 이메일 주소를 입력하십시오.",
+    "restrict_emails": "정확한 도메인 또는 이메일 주소로 등록을 제한할 수 있습니다.",
+    "whitelist_domain_desc": " 정확한 도메인만 허용하려면 ",
+    "whitelist_domain_suffix": "를 입력하세요 (해당 도메인의 주소만 허용됩니다. 서브도메인은 포함되지 않습니다).",
+    "whitelist_subdomain_desc": " 서브도메인도 허용하려면 ",
+    "whitelist_subdomain_suffix": "를 입력하세요 (서브도메인의 모든 주소가 허용됩니다).",
+    "whitelist_exact_desc": " 특정 주소만 허용하려면 전체 주소를 입력하세요. 예: ",
+    "whitelist_exact_suffix": ".",
+    "insert_single": "한 줄에 하나의 항목을 입력하십시오.",
+    "whitelist_invalid_format": "형식이 올바르지 않습니다. 정확한 도메인은 @example.com, 서브도메인 허용은 @*.example.com, 정확한 주소는 user@example.com 형식으로 입력하세요.",
     "page_list_and_search_results": "페이지 목록 / 검색 결과",
     "page_listing_1": "'나만'으로 제한된 페이지 목록/검색<br>",
     "page_listing_1_desc": "목록/검색 시 '나만' 옵션으로 제한된 페이지 표시",
@@ -332,6 +337,13 @@
     "migration_succeeded": "업그레이드가 성공적으로 완료되었습니다! 유지 보수 모드를 종료하면 GROWI를 사용할 수 있습니다.",
     "migration_failed": "업그레이드 실패. 실패 시 수행할 작업에 대한 정보는 GROWI 문서를 참조하십시오."
   },
+  "news_delivery": {
+    "section_title": "뉴스 배포",
+    "label": "뉴스 배포",
+    "enable": "뉴스 배포 활성화",
+    "description": "외부 피드에서 뉴스를 가져와 로컬 캐시를 업데이트하는 cron 작업의 동작을 제어합니다. 비활성화해도 캐시된 뉴스는 계속 표시됩니다.",
+    "update_succeeded": "뉴스 배포 설정이 업데이트되었습니다"
+  },
   "maintenance_mode": {
     "maintenance_mode": "유지 보수 모드",
     "under_maintenance_mode": "유지 보수 모드 중",
@@ -369,6 +381,10 @@
     "page_bulk_export_explanation": "모든 사용자가 메뉴에서 한 번에 페이지와 모든 하위 페이지를 내보낼 수 있는 기능을 활성화합니다. 내보낸 데이터는 저장 기간이 지나면 자동으로 삭제됩니다.",
     "page_bulk_export_warning": "대량 페이지 내보내기 기능은 모든 사용자에게 제공됩니다. 시스템 리소스 유지를 위해 최소한의 사용을 부탁드립니다. 관리자라면 모든 사용자에게 이 사실을 알려주십시오.",
     "page_bulk_export_storage_period": "저장 기간",
+    "page_bulk_export_reload_title": "페이지 다시 로드",
+    "page_bulk_export_reload_prompt": "설정을 반영하려면 페이지를 다시 로드해야 합니다. 지금 다시 로드하시겠습니까?",
+    "page_bulk_export_reload_dismiss": "지금 하지 않음",
+    "reload_page": "다시 로드",
     "update": "업데이트",
     "mail_settings": "이메일 설정",
     "mailer_is_not_set_up": "이메일 설정이 되어 있지 않습니다.",
@@ -428,6 +444,65 @@
     "use_env_var_if_empty": "데이터베이스 값이 비어 있으면 환경 변수 <code>{{variable}}</code>의 값이 사용됩니다.",
     "note_for_the_only_env_option": "GCS 설정은 환경 변수 값에 의해 제한됩니다.<br>이 설정을 변경하려면 환경 변수 <code>{{env}}</code>의 값을 false로 변경하거나 삭제하십시오.",
     "note_for_the_only_env_option_cloud": "GCS 설정은 GROWI.cloud 관리 화면에서 변경할 수 있습니다."
+  },
+  "ai_settings": {
+    "ai_settings": "AI 설정",
+    "ai_enabled_label": "AI 기능 사용",
+    "providers_section_title": "공급자",
+    "provider_enabled_label": "이 공급자 사용",
+    "provider_status_available": "사용 가능",
+    "provider_status_disabled": "비활성화됨",
+    "provider_status_misconfigured": "설정 미완료",
+    "provider_warning_missing_api_key": "이 공급자는 사용으로 설정되어 있지만 API 키가 설정되지 않아 해당 모델이 사용자에게 제공되지 않습니다.",
+    "provider_warning_missing_azure_endpoint": "이 공급자는 사용으로 설정되어 있지만 엔드포인트(리소스 이름 또는 기본 URL)가 설정되지 않아 해당 모델이 사용자에게 제공되지 않습니다.",
+    "api_key_label": "API 키",
+    "api_key_help": "AI 공급자 인증에 사용되는 API 키입니다.",
+    "api_key_set_placeholder": "(설정됨)",
+    "models_section_title": "Models",
+    "models_section_desc": "등록한 모델 중 하나를 기본값으로 선택합니다. 기본 모델은 채팅에서 사용자에게 처음 선택되어 있는 모델입니다.",
+    "default_model_label": "기본 모델",
+    "default_model_help": "채팅에서 사용자에게 처음 선택되어 있는 모델입니다. 모든 공급자에 등록된 모델 중에서 선택할 수 있습니다.",
+    "default_model_placeholder": "기본 모델을 선택하세요",
+    "default_model_no_models": "등록된 모델이 없습니다",
+    "model_label": "모델 이름",
+    "model_placeholder": "모델을 선택하세요",
+    "model_duplicate_error": "이 모델 ID는 이 공급자에 이미 등록되어 있습니다",
+    "refresh_model_catalog": "모델 카탈로그 새로고침",
+    "refresh_model_catalog_confirmation": "모델 카탈로그를 새로고침하면 최신 모델 목록을 가져오기 위해 외부 서비스(models.dev)와 통신합니다. 계속하시겠습니까?",
+    "refresh_model_catalog_confirm": "새로고침",
+    "refresh_model_catalog_success": "모델 카탈로그를 새로고침했습니다.",
+    "refresh_model_catalog_failed": "모델 카탈로그 새로고침에 실패했습니다. 이전 카탈로그가 계속 사용됩니다.",
+    "refresh_model_catalog_label": "모델 카탈로그",
+    "refresh_model_catalog_scope": "채팅 모델 선택기에 표시되는 후보 목록의 원본 데이터입니다. 최신 모델을 반영하려면 새로 고치세요.",
+    "set_as_default": "기본값으로 설정",
+    "default_badge": "기본",
+    "add_model": "모델 추가",
+    "azure_add_deployment": "배포 추가",
+    "remove_model": "삭제",
+    "remove_model_confirmation": "\"{{modelName}}\" 모델을 목록에서 삭제하시겠습니까?",
+    "remove_model_confirm": "모델 삭제",
+    "provider_options_label": "공급자 옵션 (JSON)",
+    "provider_options_doc_link": "작성 방법",
+    "provider_options_invalid_json": "유효하지 않은 JSON입니다",
+    "provider_options_invalid_json_save_blocked": "제공자 옵션(JSON)이 유효하지 않은 모델이 있습니다. 저장하기 전에 수정해 주세요.",
+    "provider_options_error_at_line": "({{line}}번째 줄)",
+    "env_only_mode_notice": "AI 설정은 환경 변수로 고정되어 있어 여기에서 편집할 수 없습니다.",
+    "unconfigured_warning": "AI가 활성화되었지만 설정이 완료되지 않아 설정을 완료하기 전까지 작동하지 않습니다.",
+    "save": "업데이트",
+    "save_success": "AI 설정이 업데이트되었습니다.",
+    "azure_section_title": "Azure OpenAI 설정",
+    "azure_resource_name_label": "Azure 리소스 이름",
+    "azure_base_url_label": "Azure 기본 URL",
+    "azure_api_version_label": "Azure API 버전",
+    "azure_use_entra_id_label": "Microsoft Entra ID 사용",
+    "azure_entra_id_api_key_note": "Microsoft Entra ID를 사용하면 API 키는 사용되지 않습니다.",
+    "azure_entra_id_credential_note": "자격 증명은 Azure 환경에서 자동으로 확인됩니다:",
+    "azure_entra_id_managed_identity_note": "GROWI를 관리 ID 또는 워크로드 ID가 활성화된 Azure(VM, App Service, Container Apps, AKS)에서 실행하는 경우 여기에서 추가 설정이 필요하지 않습니다.",
+    "azure_entra_id_env_note": "그 외의 환경에서는 GROWI 서버에 다음 환경 변수를 설정하세요:",
+    "azure_resource_name_help": "표준 엔드포인트 https://<리소스-이름>.openai.azure.com 를 구성합니다. 일반(글로벌) Azure 클라우드에서는 이 값을 사용하세요. 기본 URL도 함께 설정하면 기본 URL이 우선합니다.",
+    "azure_base_url_help": "소버린 클라우드(예: Azure Government), API Management 게이트웨이 또는 프록시를 사용할 때 리소스 이름 대신 사용합니다. 둘 다 설정하면 이 값이 우선합니다.",
+    "azure_api_version_help": "선택 사항입니다. 비워 두면 기본값이 사용됩니다. 특정 배포가 특정 API 버전을 요구하는 경우에만 설정하세요.",
+    "azure_model_deployment_label": "배포 이름"
   },
   "markdown_settings": {
     "markdown_settings": "마크다운 설정",
@@ -766,6 +841,8 @@
       "send_temporary_password": "초대 이메일을 보내지 않은 경우, 이 화면에서 임시 비밀번호를 복사하여 초대자에게 연락하십시오.",
       "send_email": "사용자 테이블의 드롭다운에서 초대 이메일을 보내거나 다시 보낼 수도 있습니다.",
       "existing_email": "다음 이메일은 이미 존재합니다.",
+      "whitelist_violation": "다음 이메일 주소는 화이트리스트에 포함되어 있지 않습니다:",
+      "reason_email_not_in_whitelist": "화이트리스트에 포함되어 있지 않습니다",
       "issue": "발급"
     },
     "user_table": {
@@ -994,6 +1071,8 @@
     "SEARCH_PAGE": "페이지 검색",
     "SEARCH_PAGE_VIEW": "페이지 보기(검색 결과 페이지)",
     "ADMIN_APP_SETTING_UPDATE": "앱 설정 업데이트",
+    "ADMIN_AI_SETTING_UPDATE": "AI 설정 업데이트",
+    "ADMIN_AI_MODEL_CATALOG_REFRESH": "모델 카탈로그 새로고침",
     "ADMIN_SITE_URL_UPDATE": "사이트 URL 설정 업데이트",
     "ADMIN_MAIL_SMTP_UPDATE": "이메일(SMTP) 설정 업데이트",
     "ADMIN_MAIL_SES_UPDATE": "이메일(SES) 설정 업데이트",
@@ -1156,9 +1235,97 @@
   "forbidden_page": {
     "do_not_have_admin_permission": "관리자 권한이 없는 사용자는 관리 화면에 접근할 수 없습니다."
   },
-  "ai_integration": {
-    "ai_integration": "AI 통합",
-    "disable_mode_explanation": "현재 AI 통합이 비활성화되어 있습니다. 활성화하려면 <code>AI_ENABLED</code> 환경 변수와 필요한 추가 변수를 구성하십시오.<br><br>자세한 내용은 <a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>문서</a>를 참조하십시오.",
-    "ai_search_management": "AI 검색 관리"
+  "admin_navigation": {
+    "section_users": "사용자",
+    "section_data": "데이터",
+    "section_external_notifications": "외부 알림 연동"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "경고:",
+        "message_html": "최근 초기화 처리는 <code>VAULT_BOOTSTRAP_ON_START=force</code> 에 의해 실행되었습니다. 이 환경 변수가 <code>force</code> 로 설정된 상태에서 서버를 다시 시작하면 모든 Vault 데이터가 다시 초기화됩니다. 환경 변수를 <code>true</code> 또는 <code>false</code> 로 변경해 주세요."
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "기능 상태",
+        "enabled": "활성화됨",
+        "disabled": "비활성화됨",
+        "description_html": "<code>VAULT_ENABLED</code> 환경 변수로 제어됩니다. 활성화/비활성화를 전환하려면 환경 변수를 변경하고 서버를 다시 시작하십시오."
+      },
+      "clone-url": {
+        "label": "클론 URL",
+        "description": "이 명령을 터미널에서 실행하면 Vault 리포지토리를 클론할 수 있습니다.",
+        "copy-button": "명령 복사",
+        "copied-tooltip": "복사되었습니다!",
+        "copy-failed": "클론 명령 복사에 실패했습니다.",
+        "no-site-url_html": "사이트 URL 이 설정되지 않아 명령을 표시할 수 없습니다. <a href=\"/admin/app\">앱 설정</a> 에서 설정해 주세요."
+      },
+      "kill-switch": {
+        "heading": "재구축",
+        "button": "Vault 재구축",
+        "description_html": "Git 저장소의 모든 데이터를 파기하고 MongoDB 의 데이터를 기반으로 Git 데이터를 재구축합니다. 재구축 중에는 모든 <code>git clone</code> / <code>fetch</code> 요청이 503 으로 거부됩니다. 이 작업은 감사 로그에 <code>vault.wipe</code> 로 기록됩니다.",
+        "confirm-title": "Vault 재구축 확인",
+        "confirm-message_html": "이 작업을 실행하면 <strong>현재 Git 저장소의 모든 데이터가 손실됩니다</strong>.",
+        "confirm-question": "정말로 진행하시겠습니까?",
+        "confirm-button": "확인",
+        "cancel-button": "취소",
+        "started-toast": "재구축을 시작했습니다. 데이터 재구축이 완료될 때까지 Vault 는 503 을 반환합니다."
+      },
+      "bootstrap-status": {
+        "state": "상태",
+        "processed-total": "처리됨 / 총 예상",
+        "started-at": "시작 시각",
+        "completed-at": "완료 시각",
+        "last-error": "최근 오류",
+        "progress-label": "{{processed}} / {{total}} 페이지"
+      },
+      "completion-reliability": {
+        "heading": "신뢰성 상태",
+        "check-result": "최종 검사 결과",
+        "last-completed-at": "최종 완료 시각",
+        "processed-estimated": "처리됨 / 예상",
+        "trigger-source": "트리거 소스",
+        "last-error": "최근 오류"
+      },
+      "auto-retry-status": {
+        "heading": "자동 재시도 상태",
+        "escalated-warning_html": "초기화 처리에서의 자동 재시도가 실패하여 <strong>escalated</strong> 상태가 되었습니다. 수동 개입이 필요합니다.",
+        "attempt-no": "시도 횟수",
+        "next-attempt-at": "다음 시도 시각",
+        "last-error": "최근 오류",
+        "abort-button": "자동 재시도 중단",
+        "aborting": "중단 중…",
+        "aborted-toast": "자동 재시도가 중단되었습니다."
+      },
+      "drift-activity": {
+        "heading": "데이터 불일치 감지 상태",
+        "last-sweep-at": "최종 스윕 시각",
+        "last-watermark": "최종 워터마크",
+        "detected-since-boot": "서버 시작 이후 감지 건수",
+        "repairs-emitted-since-boot": "서버 시작 이후 복구 발행 건수",
+        "last-error": "마지막으로 감지된 오류",
+        "out-of-scope_html": "<strong>주의 (범위 외):</strong> 경로 변경(이름 변경 / 하드 삭제) 으로 인한 데이터 불일치 및 권한 해제로 인한 불일치는 현재 구현에서는 감지할 수 없습니다. 이는 향후 <code>growi-vault-ha</code> 지원이 필요합니다."
+      },
+      "storage-observability": {
+        "fetch-failed": "스토리지 통계를 가져오지 못했습니다. vault-manager 에 도달할 수 없을 수 있습니다.",
+        "namespace-count": "네임스페이스 수",
+        "total-commit-count": "총 커밋 수",
+        "loose-object-count": "Loose 오브젝트 수",
+        "repo-size": "저장소 크기",
+        "last-squash": "최종 squash 시각",
+        "last-gc": "최종 GC 시각"
+      },
+      "audit-log": {
+        "heading": "감사 로그",
+        "button": "VAULT_* 감사 로그 항목 보기",
+        "description": "Vault 관련 작업(VAULT_*)으로 필터링된 관리자 감사 로그를 엽니다."
+      },
+      "reconcile-admin": {
+        "heading": "리컨실",
+        "trigger-button": "리컨실 실행",
+        "description": "데이터 초기화를 수행하지 않고 MongoDB 페이지와 Vault git 트리 간의 데이터 불일치를 수동으로 복구합니다."
+      }
+    }
   }
 }

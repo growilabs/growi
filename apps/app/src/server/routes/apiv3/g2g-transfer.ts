@@ -81,7 +81,7 @@ const validator = {
 /*
  * Routes
  */
-module.exports = (crowi: Crowi): Router => {
+export const setup = (crowi: Crowi): Router => {
   const {
     g2gTransferPusherService,
     g2gTransferReceiverService,
@@ -615,6 +615,7 @@ module.exports = (crowi: Crowi): Router => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      requestBody:
    *        required: true
    *        content:
@@ -688,6 +689,7 @@ module.exports = (crowi: Crowi): Router => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      requestBody:
    *        required: true
    *        content:

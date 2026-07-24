@@ -18,7 +18,6 @@ import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { isAiEnabled } from '~/features/openai/server/services';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
 import { subscribeRuleNames } from '~/interfaces/in-app-notification';
@@ -213,20 +212,46 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     return PageTagRelation.listTagNamesByPage(createdPage.id);
   }
 
-  async function postAction(
+  /**
+   * Emit the page-create activity.
+   *
+   * This MUST run before the response is sent (see the call site). The
+   * activity's request context (operator/ip/endpoint/username) is held in
+   * `pendingActivityContext` and cleared by `registerFailsafeFinalizer` on the
+   * `res` 'finish'/'close' events; the ActivityService 'update' listener reads
+   * it synchronously via `pendingActivityContext.take()`. Emitting before the
+   * response guarantees `take()` runs while the context is still alive.
+   *
+   * This emit used to sit at the top of `postAction` (after `res.apiv3()`) and
+   * was safe only because nothing `await`ed between the two -- a fragile
+   * property. Emitting it here removes that fragility: it can no longer regress
+   * into the update-page-style null-user bug (PR #11510) if an `await` is later
+   * inserted. There is no latency cost because there was never an `await`
+   * before this emit.
+   */
+  function generateCreateActivity(
     req: CreatePageRequest,
     res: ApiV3Response,
     createdPage: HydratedDocument<PageDocument>,
   ) {
-    // persist activity
-    const parameters = {
-      targetModel: SupportedTargetModel.MODEL_PAGE,
-      target: createdPage,
-      action: SupportedAction.ACTION_PAGE_CREATE,
-    };
-    const activityEvent = crowi.events.activity;
-    activityEvent.emit('update', res.locals.activity._id, parameters);
+    try {
+      const parameters = {
+        targetModel: SupportedTargetModel.MODEL_PAGE,
+        target: createdPage,
+        action: SupportedAction.ACTION_PAGE_CREATE,
+        contributor: req.user,
+      };
+      const activityEvent = crowi.events.activity;
+      activityEvent.emit('update', res.locals.activity._id, parameters);
+    } catch (err) {
+      logger.error('Failed to generate create activity', err);
+    }
+  }
 
+  async function postAction(
+    req: CreatePageRequest,
+    createdPage: HydratedDocument<PageDocument>,
+  ) {
     // global notification
     try {
       await crowi.globalNotificationService.fire(
@@ -267,19 +292,6 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       );
     } catch (err) {
       logger.error('Failed to create subscription document', err);
-    }
-
-    // Rebuild vector store file
-    if (isAiEnabled()) {
-      const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai'
-      );
-      try {
-        const openaiService = getOpenaiService();
-        await openaiService?.createVectorStoreFileOnPageCreate([createdPage]);
-      } catch (err) {
-        logger.error('Rebuild vector store failed', err);
-      }
     }
   }
 
@@ -374,9 +386,14 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         revision: serializeRevisionSecurely(createdPage.revision),
       };
 
+      // Emit the create activity BEFORE sending the response so the
+      // ActivityService listener captures the request context while it is still
+      // alive (see generateCreateActivity's doc comment).
+      generateCreateActivity(req, res, createdPage);
+
       res.apiv3(result, 201);
 
-      postAction(req, res, createdPage);
+      postAction(req, createdPage);
     },
   ];
 };

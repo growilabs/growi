@@ -12,6 +12,9 @@ import {
   getConnectionStatuses,
   sendSuccessMessage,
 } from '@growi/slack/dist/utils/check-communicable';
+import express from 'express';
+import { body, param } from 'express-validator';
+import urljoin from 'url-join';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -22,10 +25,6 @@ import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-
-const express = require('express');
-const { body, param } = require('express-validator');
-const urljoin = require('url-join');
 
 const logger = loggerFactory('growi:routes:apiv3:slack-integration-settings');
 
@@ -49,8 +48,11 @@ const router = express.Router();
  *            type: string
  */
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
@@ -710,9 +712,11 @@ module.exports = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]),
     loginRequiredStrictly,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.deleteIntegration,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const { id } = req.params;
 

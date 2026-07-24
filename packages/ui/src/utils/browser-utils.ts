@@ -1,4 +1,4 @@
-import type { Breakpoint } from '../interfaces/breakpoints';
+import type { Breakpoint } from '../interfaces/breakpoints.js';
 
 const EVENT_TYPE_CHANGE = 'change';
 

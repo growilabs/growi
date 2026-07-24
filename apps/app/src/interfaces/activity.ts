@@ -1,10 +1,4 @@
-import type {
-  HasObjectId,
-  IPageHasId,
-  IUser,
-  IUserHasId,
-  Ref,
-} from '@growi/core';
+import type { HasObjectId, IUser, IUserHasId, Ref } from '@growi/core';
 
 import type { PaginateResult } from './mongoose-utils';
 
@@ -14,6 +8,7 @@ const MODEL_USER = 'User';
 const MODEL_COMMENT = 'Comment';
 const MODEL_PAGE_BULK_EXPORT_JOB = 'PageBulkExportJob';
 const MODEL_AUDIT_LOG_BULK_EXPORT_JOB = 'AuditLogBulkExportJob';
+export const MODEL_ATTACHMENT = 'Attachment';
 
 // Action
 const ACTION_UNSETTLED = 'UNSETTLED';
@@ -49,13 +44,13 @@ const ACTION_PAGE_LIKE = 'PAGE_LIKE';
 const ACTION_PAGE_UNLIKE = 'PAGE_UNLIKE';
 const ACTION_PAGE_BOOKMARK = 'PAGE_BOOKMARK';
 const ACTION_PAGE_UNBOOKMARK = 'PAGE_UNBOOKMARK';
-const ACTION_PAGE_CREATE = 'PAGE_CREATE';
-const ACTION_PAGE_UPDATE = 'PAGE_UPDATE';
+export const ACTION_PAGE_CREATE = 'PAGE_CREATE';
+export const ACTION_PAGE_UPDATE = 'PAGE_UPDATE';
 const ACTION_PAGE_RENAME = 'PAGE_RENAME';
-const ACTION_PAGE_DUPLICATE = 'PAGE_DUPLICATE';
+export const ACTION_PAGE_DUPLICATE = 'PAGE_DUPLICATE';
 const ACTION_PAGE_DELETE = 'PAGE_DELETE';
 const ACTION_PAGE_DELETE_COMPLETELY = 'PAGE_DELETE_COMPLETELY';
-const ACTION_PAGE_REVERT = 'PAGE_REVERT';
+export const ACTION_PAGE_REVERT = 'PAGE_REVERT';
 const ACTION_PAGE_EMPTY_TRASH = 'PAGE_EMPTY_TRASH';
 const ACTION_PAGE_RECURSIVELY_RENAME = 'PAGE_RECURSIVELY_RENAME';
 const ACTION_PAGE_RECURSIVELY_DELETE = 'PAGE_RECURSIVELY_DELETE';
@@ -78,9 +73,10 @@ const ACTION_AUDIT_LOG_BULK_EXPORT_NO_RESULTS =
 const ACTION_TAG_UPDATE = 'TAG_UPDATE';
 const ACTION_IN_APP_NOTIFICATION_ALL_STATUSES_OPEN =
   'IN_APP_NOTIFICATION_ALL_STATUSES_OPEN';
-const ACTION_COMMENT_CREATE = 'COMMENT_CREATE';
+export const ACTION_COMMENT_CREATE = 'COMMENT_CREATE';
 const ACTION_COMMENT_UPDATE = 'COMMENT_UPDATE';
 const ACTION_COMMENT_REMOVE = 'COMMENT_REMOVE';
+const ACTION_COMMENT_MENTION = 'COMMENT_MENTION';
 const ACTION_SHARE_LINK_CREATE = 'SHARE_LINK_CREATE';
 const ACTION_SHARE_LINK_DELETE = 'SHARE_LINK_DELETE';
 const ACTION_SHARE_LINK_DELETE_BY_PAGE = 'SHARE_LINK_DELETE_BY_PAGE';
@@ -94,6 +90,8 @@ const ACTION_ATTACHMENT_DOWNLOAD = 'ATTACHMENT_DOWNLOAD';
 const ACTION_SEARCH_PAGE = 'SEARCH_PAGE';
 const ACTION_SEARCH_PAGE_VIEW = 'SEARCH_PAGE_VIEW';
 const ACTION_ADMIN_APP_SETTINGS_UPDATE = 'ADMIN_APP_SETTING_UPDATE';
+const ACTION_ADMIN_AI_SETTING_UPDATE = 'ADMIN_AI_SETTING_UPDATE';
+const ACTION_ADMIN_AI_MODEL_CATALOG_REFRESH = 'ADMIN_AI_MODEL_CATALOG_REFRESH';
 const ACTION_ADMIN_SITE_URL_UPDATE = 'ADMIN_SITE_URL_UPDATE';
 const ACTION_ADMIN_MAIL_SMTP_UPDATE = 'ADMIN_MAIL_SMTP_UPDATE';
 const ACTION_ADMIN_MAIL_SES_UPDATE = 'ADMIN_MAIL_SES_UPDATE';
@@ -202,11 +200,56 @@ const ACTION_ADMIN_SEARCH_CONNECTION = 'ADMIN_SEARCH_CONNECTION';
 const ACTION_ADMIN_SEARCH_INDICES_NORMALIZE = 'ADMIN_SEARCH_INDICES_NORMALIZE';
 const ACTION_ADMIN_SEARCH_INDICES_REBUILD = 'ADMIN_SEARCH_INDICES_REBUILD';
 
+// GROWI Vault audit log actions
+const ACTION_VAULT_CLONE_PREPARE = 'VAULT_CLONE_PREPARE';
+const ACTION_VAULT_CLONE_COMPLETE = 'VAULT_CLONE_COMPLETE';
+const ACTION_VAULT_AUTH_FAILURE = 'VAULT_AUTH_FAILURE';
+const ACTION_VAULT_WIPE = 'vault.wipe';
+
+// GROWI Vault resilience audit log actions
+const ACTION_VAULT_RESILIENCE_BOOTSTRAP_STARTED =
+  'vault.resilience.bootstrap-started';
+const ACTION_VAULT_RESILIENCE_BOOTSTRAP_COMPLETED =
+  'vault.resilience.bootstrap-completed';
+const ACTION_VAULT_RESILIENCE_BOOTSTRAP_FAILED =
+  'vault.resilience.bootstrap-failed';
+const ACTION_VAULT_RESILIENCE_COMPLETENESS_CHECK_FAILED =
+  'vault.resilience.completeness-check-failed';
+const ACTION_VAULT_RESILIENCE_RETRY_SCHEDULED =
+  'vault.resilience.retry-scheduled';
+const ACTION_VAULT_RESILIENCE_RETRY_FAILED = 'vault.resilience.retry-failed';
+const ACTION_VAULT_RESILIENCE_RETRY_ESCALATED =
+  'vault.resilience.retry-escalated';
+const ACTION_VAULT_RESILIENCE_RETRY_ABORTED = 'vault.resilience.retry-aborted';
+const ACTION_VAULT_RESILIENCE_FORCE_WARNING_ACTIVE =
+  'vault.resilience.force-warning-active';
+const ACTION_VAULT_RESILIENCE_STALE_RUNNING_DETECTED =
+  'vault.resilience.stale-running-detected';
+const ACTION_VAULT_RESILIENCE_DRIFT_SWEEP_STARTED =
+  'vault.resilience.drift-sweep-started';
+const ACTION_VAULT_RESILIENCE_DRIFT_DETECTED =
+  'vault.resilience.drift-detected';
+const ACTION_VAULT_RESILIENCE_DRIFT_REPAIRED =
+  'vault.resilience.drift-repaired';
+const ACTION_VAULT_RESILIENCE_DRIFT_SWEEP_FAILED =
+  'vault.resilience.drift-sweep-failed';
+const ACTION_VAULT_RESILIENCE_DRIFT_SWEEP_OUT_OF_SCOPE =
+  'vault.resilience.drift-sweep-out-of-scope';
+
+// GROWI Vault reconcile audit log actions
+export const ACTION_VAULT_RECONCILE_STARTED = 'vault.reconcile.started';
+export const ACTION_VAULT_RECONCILE_COMPLETED = 'vault.reconcile.completed';
+export const ACTION_VAULT_RECONCILE_FAILED = 'vault.reconcile.failed';
+export const ACTION_VAULT_RECONCILE_REJECTED = 'vault.reconcile.rejected';
+export const ACTION_VAULT_RECONCILE_PARTIAL_ACL_FILTERED =
+  'vault.reconcile.partial-acl-filtered';
+
 export const SupportedTargetModel = {
   MODEL_PAGE,
   MODEL_USER,
   MODEL_PAGE_BULK_EXPORT_JOB,
   MODEL_AUDIT_LOG_BULK_EXPORT_JOB,
+  MODEL_ATTACHMENT,
 } as const;
 
 export const SupportedEventModel = {
@@ -277,6 +320,7 @@ export const SupportedAction = {
   ACTION_COMMENT_CREATE,
   ACTION_COMMENT_UPDATE,
   ACTION_COMMENT_REMOVE,
+  ACTION_COMMENT_MENTION,
   ACTION_SHARE_LINK_CREATE,
   ACTION_SHARE_LINK_DELETE,
   ACTION_SHARE_LINK_DELETE_BY_PAGE,
@@ -290,6 +334,8 @@ export const SupportedAction = {
   ACTION_SEARCH_PAGE,
   ACTION_SEARCH_PAGE_VIEW,
   ACTION_ADMIN_APP_SETTINGS_UPDATE,
+  ACTION_ADMIN_AI_SETTING_UPDATE,
+  ACTION_ADMIN_AI_MODEL_CATALOG_REFRESH,
   ACTION_ADMIN_SITE_URL_UPDATE,
   ACTION_ADMIN_MAIL_SMTP_UPDATE,
   ACTION_ADMIN_MAIL_SES_UPDATE,
@@ -385,6 +431,33 @@ export const SupportedAction = {
   ACTION_AUDIT_LOG_BULK_EXPORT_FAILED,
   ACTION_AUDIT_LOG_BULK_EXPORT_JOB_EXPIRED,
   ACTION_AUDIT_LOG_BULK_EXPORT_NO_RESULTS,
+  // GROWI Vault actions
+  ACTION_VAULT_CLONE_PREPARE,
+  ACTION_VAULT_CLONE_COMPLETE,
+  ACTION_VAULT_AUTH_FAILURE,
+  ACTION_VAULT_WIPE,
+  // GROWI Vault resilience actions
+  ACTION_VAULT_RESILIENCE_BOOTSTRAP_STARTED,
+  ACTION_VAULT_RESILIENCE_BOOTSTRAP_COMPLETED,
+  ACTION_VAULT_RESILIENCE_BOOTSTRAP_FAILED,
+  ACTION_VAULT_RESILIENCE_COMPLETENESS_CHECK_FAILED,
+  ACTION_VAULT_RESILIENCE_RETRY_SCHEDULED,
+  ACTION_VAULT_RESILIENCE_RETRY_FAILED,
+  ACTION_VAULT_RESILIENCE_RETRY_ESCALATED,
+  ACTION_VAULT_RESILIENCE_RETRY_ABORTED,
+  ACTION_VAULT_RESILIENCE_FORCE_WARNING_ACTIVE,
+  ACTION_VAULT_RESILIENCE_STALE_RUNNING_DETECTED,
+  ACTION_VAULT_RESILIENCE_DRIFT_SWEEP_STARTED,
+  ACTION_VAULT_RESILIENCE_DRIFT_DETECTED,
+  ACTION_VAULT_RESILIENCE_DRIFT_REPAIRED,
+  ACTION_VAULT_RESILIENCE_DRIFT_SWEEP_FAILED,
+  ACTION_VAULT_RESILIENCE_DRIFT_SWEEP_OUT_OF_SCOPE,
+  // GROWI Vault reconcile actions
+  ACTION_VAULT_RECONCILE_STARTED,
+  ACTION_VAULT_RECONCILE_COMPLETED,
+  ACTION_VAULT_RECONCILE_FAILED,
+  ACTION_VAULT_RECONCILE_REJECTED,
+  ACTION_VAULT_RECONCILE_PARTIAL_ACL_FILTERED,
 } as const;
 
 // Action required for notification
@@ -491,6 +564,8 @@ export const LargeActionGroup = {
   ...MediumActionGroup,
   ACTION_SHARE_LINK_ALL_DELETE,
   ACTION_ADMIN_APP_SETTINGS_UPDATE,
+  ACTION_ADMIN_AI_SETTING_UPDATE,
+  ACTION_ADMIN_AI_MODEL_CATALOG_REFRESH,
   ACTION_ADMIN_SITE_URL_UPDATE,
   ACTION_ADMIN_MAIL_SMTP_UPDATE,
   ACTION_ADMIN_MAIL_SES_UPDATE,
@@ -672,7 +747,38 @@ export type SupportedActionCategoryType =
   (typeof SupportedActionCategory)[keyof typeof SupportedActionCategory];
 export type SupportedActivityActionType =
   (typeof ActivityLogActions)[keyof typeof ActivityLogActions];
-export type ISnapshot = Partial<Pick<IUser, 'username'>>;
+/**
+ * Catch-all snapshot variant for every action without action-specific fields.
+ * Keeps the pre-union `{ username?: string }` shape for backward compatibility.
+ */
+export type DefaultSnapshot = Partial<Pick<IUser, 'username'>>;
+
+/**
+ * Canonical snapshot variant shared by every attachment activity
+ * (ACTION_ATTACHMENT_ADD / ACTION_ATTACHMENT_REMOVE / ACTION_ATTACHMENT_DOWNLOAD).
+ * Every field is optional: snapshot builders omit fields they cannot resolve
+ * (e.g. pagePath when the page is gone, username on guest downloads).
+ */
+export type AttachmentSnapshot = {
+  username?: string;
+  originalName?: string;
+  pagePath?: string;
+  pageId?: string;
+  fileSize?: number;
+};
+
+/**
+ * Backward-compatible alias kept for existing importers
+ * (snapshot-viewer and the REMOVE builder predate the canonical name).
+ */
+export type AttachmentRemoveSnapshot = AttachmentSnapshot;
+
+/**
+ * Discriminated union of snapshot shapes. The discriminant is the activity's
+ * existing `action` field (see the isAttachment*Activity guards); snapshots
+ * carry no discriminator field of their own.
+ */
+export type ISnapshot = DefaultSnapshot | AttachmentSnapshot;
 
 export type IActivity = {
   user?: Ref<IUser>;
@@ -686,6 +792,37 @@ export type IActivity = {
   createdAt: Date;
   snapshot?: ISnapshot;
 };
+
+/**
+ * Narrows an activity's snapshot to AttachmentRemoveSnapshot.
+ * The existing required `action` field is the sole discriminant —
+ * no discriminator field is added to the snapshot itself.
+ */
+export const isAttachmentRemoveActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: AttachmentRemoveSnapshot;
+} => activity.action === SupportedAction.ACTION_ATTACHMENT_REMOVE;
+
+/**
+ * Narrows an ATTACHMENT_ADD activity's snapshot to AttachmentSnapshot.
+ * Same pattern as isAttachmentRemoveActivity: `action` is the sole discriminant.
+ */
+export const isAttachmentAddActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: AttachmentSnapshot;
+} => activity.action === SupportedAction.ACTION_ATTACHMENT_ADD;
+
+/**
+ * Narrows an ATTACHMENT_DOWNLOAD activity's snapshot to AttachmentSnapshot.
+ * Same pattern as isAttachmentRemoveActivity: `action` is the sole discriminant.
+ */
+export const isAttachmentDownloadActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: AttachmentSnapshot;
+} => activity.action === SupportedAction.ACTION_ATTACHMENT_DOWNLOAD;
 
 export type IActivityHasId = IActivity & HasObjectId;
 
