@@ -74,13 +74,34 @@ apiV3FormValidator,      // after addActivity: validation failures ARE audited
 handler,                 // its own 4xx/5xx are also audited as ACTION_UNSETTLED
 ```
 
-Project policy behind this: a validation failure by an authenticated operator IS
-worth an attempt record; an authentication failure is NOT. So **do not place
-`apiV3FormValidator` before `addActivity`**.
+So **do not place `apiV3FormValidator` before `addActivity`** on any route that
+should record attempts (see the decision criteria below).
 
 > Some routes predate this rule and still order `apiV3FormValidator` before
 > `addActivity` (their validation failures are silently not audited). Migrating
 > them to the canonical order is a separate, tracked change.
+
+## Decision criteria — what deserves an audit attempt row
+
+Record an `ACTION_UNSETTLED` attempt for any request that reached a genuine
+operation attempt worth auditing; do not record mere "not authenticated" noise.
+
+- **Authenticated write, then validation/handler failure** → record. An
+  authenticated operator tried to do something that did not complete.
+- **Anonymous but abuse-sensitive endpoint** (password reset, and similar
+  unauthenticated POST/PUT/DELETE) → **record, even though `user` is null**. The
+  `ip` + `endpoint` + `createdAt` trace is the whole point here: it is the
+  forensic record for abuse / DoS / account-enumeration against these public
+  endpoints. Put `addActivity` before the validators on these too; a null
+  operator on the row is expected and wanted.
+- **Pre-auth rejection on a protected route** (401/403 from `accessTokenParser`
+  / `loginRequired`) → **do not record**. There is no operator, it is ordinary
+  unauthenticated traffic, and authentication events are captured by the
+  login-activity path — this is why the auth chain runs before `addActivity`.
+
+Rule of thumb for placement: put `addActivity` right after the last "is this an
+allowable actor / endpoint at all" gate, and before the "is this input valid /
+can this operation complete" checks.
 
 ## Call-site comments
 
