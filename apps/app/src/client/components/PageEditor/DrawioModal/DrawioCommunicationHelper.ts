@@ -1,6 +1,6 @@
-import loggerFactory from '~/utils/logger';
+import { extractDrawioData } from '@growi/remark-drawio';
 
-import { extractDrawioData } from './extract-drawio-data';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:cli:DrawioCommunicationHelper');
 

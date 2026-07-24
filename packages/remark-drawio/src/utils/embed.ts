@@ -1,6 +1,8 @@
 // transplanted from https://github.com/jgraph/drawio-tools/blob/d46977060ffad70cae5a9059a2cbfcd8bcf420de/tools/convert.html
 import pako from 'pako';
 
+import { isMxfileData } from './mxfile.js';
+
 const unconpressedDataRegexp = /<mxGraphModel/;
 const validateUncompressedData = (input: string): boolean => {
   return unconpressedDataRegexp.test(input);
@@ -51,14 +53,6 @@ const escapeHTML = (string): string => {
       }[match] ?? match
     );
   });
-};
-
-// A multi-page diagram is persisted as a whole <mxfile> wrapping every
-// <diagram> (see #11522). Detect that shape so it can be rendered as-is instead
-// of being re-wrapped into a single diagram.
-const mxfileRegexp = /^<mxfile[\s>]/;
-const isMxfileData = (input: string): boolean => {
-  return mxfileRegexp.test(input);
 };
 
 export const generateMxgraphData = (
