@@ -7,7 +7,7 @@
   - 非同期 `scrypt` を Promise 化して使う方針を確認する（`util.promisify(scrypt)` など）
   - _Requirements: 1.1_
 
-- [ ] 1.2 PasswordHashService を実装する
+- [x] 1.2 PasswordHashService を実装する
   - `hash(plaintext)` を実装: `randomBytes(16)` でソルト生成 → `scrypt(plaintext, salt, 64, {N, r, p, maxmem})` → `scrypt$N$r$p$<salt base64>$<hash base64>` に符号化して返す（keylen=64）。PASSWORD_SEED は不使用
   - scrypt パラメータは既定 **N=131072 (2^17), r=8, p=1（OWASP 最小推奨）**。環境変数で調整可能とし、**下限（N=2^17）未満はクランプして起動時 WARNING を出力**する
   - `maxmem` を明示的に **≥192MB** に設定する（N=2^17 は約128MB を消費し、Node 既定 `maxmem=32MB` のままだと `scrypt` が throw するため必須）。パラメータ上限もクランプする（極端な N によるメモリ枯渇・DoS 防止）
@@ -215,3 +215,4 @@
 ## Implementation Notes（実装ログ）
 
 - **1.1 (v8)**: `bcryptjs`/`@types/bcryptjs` は v8 package.json に不在（scrypt は `node:crypto` 組み込み、新規依存不要）。`util.promisify(scrypt)` は options 付きオーバーロードを落とすため（TS2554）、`new Promise` の手動ラッパーで `scrypt(pw, salt, keylen, {N,r,p,maxmem}, cb)` を呼ぶこと。v8 tsconfig（`tsgo --noEmit`）で型チェック通過を確認済み。型チェックは v8 では `tsgo`（`tsc` ではない）。
+- **1.2 (v8)**: `createPasswordHashService(params)` ファクトリ + env バインド既定シングルトン `passwordHashService`（env 名 `PASSWORD_SCRYPT_N/R/P`）をエクスポート。既定 N=2^17/r=8/p=1、`maxmem=Math.max(192MB, 128*N*r*2)`。ファクトリは floor クランプなし（テストで小 N 注入可、上限クランプのみ）／env パスは floor+ceiling クランプ + 起動時 WARNING。`verify()` は verifyScrypt/verifyLegacy に委譲し throw しない。biome の `useAwait` 警告回避のため verifyLegacy は同期メソッド。task 2.2 で User model からは既定シングルトン `passwordHashService` を import。**import は拡張子なし**（v8 規約）。
