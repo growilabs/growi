@@ -27,10 +27,10 @@ import type {
   IRevisionDocument,
   IRevisionModel,
 } from '~/server/models/revision';
-import Tag from '~/server/models/tag';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { generalXssFilter } from '~/services/general-xss-filter';
+import { prisma } from '~/utils/prisma';
 
 type EmittedActivityParams = {
   action: string;
@@ -1051,10 +1051,12 @@ describe('PageService page operations with non-public pages', () => {
       },
     ]);
 
-    await Tag.insertMany([
-      { _id: tagIdRevert1, name: 'np_revertTag1' },
-      { _id: tagIdRevert2, name: 'np_revertTag2' },
-    ]);
+    await prisma.tags.createMany({
+      data: [
+        { id: tagIdRevert1.toString(), name: 'np_revertTag1' },
+        { id: tagIdRevert2.toString(), name: 'np_revertTag2' },
+      ],
+    });
 
     await PageTagRelation.insertMany([
       {
@@ -2217,7 +2219,9 @@ describe('PageService page operations with non-public pages', () => {
         grant: Page.GRANT_RESTRICTED,
       });
       const revision = await Revision.findOne({ pageId: trashedPage?._id });
-      const tag = await Tag.findOne({ name: 'np_revertTag1' });
+      const tag = await prisma.tags.findUnique({
+        where: { name: 'np_revertTag1' },
+      });
       const deletedPageTagRelation = await PageTagRelation.findOne({
         relatedPage: trashedPage?._id,
         relatedTag: tag?._id,
@@ -2260,7 +2264,9 @@ describe('PageService page operations with non-public pages', () => {
         grant: Page.GRANT_USER_GROUP,
       });
       const revision = await Revision.findOne({ pageId: trashedPage?._id });
-      const tag = await Tag.findOne({ name: 'np_revertTag2' });
+      const tag = await prisma.tags.findUnique({
+        where: { name: 'np_revertTag2' },
+      });
       const deletedPageTagRelation = await PageTagRelation.findOne({
         relatedPage: trashedPage?._id,
         relatedTag: tag?._id,

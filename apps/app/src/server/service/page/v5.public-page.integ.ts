@@ -30,7 +30,6 @@ import type {
   IRevisionModel,
 } from '~/server/models/revision';
 import type { ShareLinkModel } from '~/server/models/share-link';
-import Tag from '~/server/models/tag';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import { prisma } from '~/utils/prisma';
 
@@ -799,10 +798,12 @@ describe('PageService page operations with only public pages', () => {
     const tagForDuplicate1 = new mongoose.Types.ObjectId();
     const tagForDuplicate2 = new mongoose.Types.ObjectId();
 
-    await Tag.insertMany([
-      { _id: tagForDuplicate1, name: 'duplicate_Tag1' },
-      { _id: tagForDuplicate2, name: 'duplicate_Tag2' },
-    ]);
+    await prisma.tags.createMany({
+      data: [
+        { id: tagForDuplicate1.toString(), name: 'duplicate_Tag1' },
+        { id: tagForDuplicate2.toString(), name: 'duplicate_Tag2' },
+      ],
+    });
 
     await PageTagRelation.insertMany([
       { relatedPage: pageIdForDuplicate10, relatedTag: tagForDuplicate1 },
@@ -900,10 +901,12 @@ describe('PageService page operations with only public pages', () => {
     const tagIdForDelete1 = new mongoose.Types.ObjectId();
     const tagIdForDelete2 = new mongoose.Types.ObjectId();
 
-    await Tag.insertMany([
-      { _id: tagIdForDelete1, name: 'TagForDelete1' },
-      { _id: tagIdForDelete2, name: 'TagForDelete2' },
-    ]);
+    await prisma.tags.createMany({
+      data: [
+        { id: tagIdForDelete1.toString(), name: 'TagForDelete1' },
+        { id: tagIdForDelete2.toString(), name: 'TagForDelete2' },
+      ],
+    });
 
     await PageTagRelation.insertMany([
       { relatedPage: pageIdForDelete3, relatedTag: tagIdForDelete1 },
@@ -1030,10 +1033,12 @@ describe('PageService page operations with only public pages', () => {
 
     const tagForDeleteCompletely1 = new mongoose.Types.ObjectId();
     const tagForDeleteCompletely2 = new mongoose.Types.ObjectId();
-    await Tag.insertMany([
-      { name: 'TagForDeleteCompletely1' },
-      { name: 'TagForDeleteCompletely2' },
-    ]);
+    await prisma.tags.createMany({
+      data: [
+        { name: 'TagForDeleteCompletely1' },
+        { name: 'TagForDeleteCompletely2' },
+      ],
+    });
 
     await PageTagRelation.insertMany([
       {
@@ -1161,7 +1166,9 @@ describe('PageService page operations with only public pages', () => {
     ]);
 
     const tagIdRevert1 = new mongoose.Types.ObjectId();
-    await Tag.insertMany([{ _id: tagIdRevert1, name: 'revertTag1' }]);
+    await prisma.tags.createMany({
+      data: [{ id: tagIdRevert1.toString(), name: 'revertTag1' }],
+    });
 
     await PageTagRelation.insertMany([
       {
@@ -2303,8 +2310,12 @@ describe('PageService page operations with only public pages', () => {
 
     it('Should duplicate tags', async () => {
       const basePage = await Page.findOne({ path: '/v5_PageForDuplicate5' });
-      const tag1 = await Tag.findOne({ name: 'duplicate_Tag1' });
-      const tag2 = await Tag.findOne({ name: 'duplicate_Tag2' });
+      const tag1 = await prisma.tags.findUnique({
+        where: { name: 'duplicate_Tag1' },
+      });
+      const tag2 = await prisma.tags.findUnique({
+        where: { name: 'duplicate_Tag2' },
+      });
       const basePageTagRelation1 = await PageTagRelation.findOne({
         relatedTag: tag1?._id,
       });
@@ -2590,8 +2601,12 @@ describe('PageService page operations with only public pages', () => {
 
     it('Should delete page tag relation', async () => {
       const pageToDelete = await Page.findOne({ path: '/v5_PageForDelete6' });
-      const tag1 = await Tag.findOne({ name: 'TagForDelete1' });
-      const tag2 = await Tag.findOne({ name: 'TagForDelete2' });
+      const tag1 = await prisma.tags.findUnique({
+        where: { name: 'TagForDelete1' },
+      });
+      const tag2 = await prisma.tags.findUnique({
+        where: { name: 'TagForDelete2' },
+      });
       const pageRelation1 = await PageTagRelation.findOne({
         relatedTag: tag1?._id,
       });
@@ -2717,8 +2732,12 @@ describe('PageService page operations with only public pages', () => {
       const grandchildPage = await Page.findOne({
         path: '/v5_PageForDeleteCompletely2/v5_PageForDeleteCompletely3/v5_PageForDeleteCompletely4',
       });
-      const tag1 = await Tag.findOne({ name: 'TagForDeleteCompletely1' });
-      const tag2 = await Tag.findOne({ name: 'TagForDeleteCompletely2' });
+      const tag1 = await prisma.tags.findUnique({
+        where: { name: 'TagForDeleteCompletely1' },
+      });
+      const tag2 = await prisma.tags.findUnique({
+        where: { name: 'TagForDeleteCompletely2' },
+      });
       const pageTagRelation1 = await PageTagRelation.findOne({
         relatedPage: parentPage?._id,
       });
@@ -2767,7 +2786,13 @@ describe('PageService page operations with only public pages', () => {
       const deletedRevisions = await Revision.find({
         pageId: { $in: [parentPage?._id, grandchildPage?._id] },
       });
-      const tags = await Tag.find({ _id: { $in: [tag1?._id, tag2?._id] } });
+      const tags = await prisma.tags.findMany({
+        where: {
+          id: {
+            in: [tag1?.id, tag2?.id].filter((id) => id != null),
+          },
+        },
+      });
       const deletedPageTagRelations = await PageTagRelation.find({
         _id: { $in: [pageTagRelation1?._id, pageTagRelation2?._id] },
       });
@@ -2901,7 +2926,9 @@ describe('PageService page operations with only public pages', () => {
         status: Page.STATUS_DELETED,
       });
       const revision = await Revision.findOne({ pageId: deletedPage?._id });
-      const tag = await Tag.findOne({ name: 'revertTag1' });
+      const tag = await prisma.tags.findUnique({
+        where: { name: 'revertTag1' },
+      });
       const deletedPageTagRelation = await PageTagRelation.findOne({
         relatedPage: deletedPage?._id,
         relatedTag: tag?._id,
