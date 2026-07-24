@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. Foundation: PasswordHashService（scrypt）の構築
-- [ ] 1.1 scrypt が新規依存なしで利用できることを確認する
+- [x] 1.1 scrypt が新規依存なしで利用できることを確認する
   - scrypt は `node:crypto` 組み込みのため **package.json への依存追加は不要**（`bcryptjs` / `@types/bcryptjs` も追加しない）
   - `import { scrypt, randomBytes, timingSafeEqual } from 'node:crypto'` が TypeScript で型エラーなく解決されることを確認する
   - 非同期 `scrypt` を Promise 化して使う方針を確認する（`util.promisify(scrypt)` など）
@@ -211,3 +211,7 @@
 - **server-boot-imports**: `PasswordHashService` は `node:crypto` のみ（追加コストなし）なので top-level import で可。重量級 SDK の遅延ロード規約には抵触しない。
 - **activity-recording**: 本 spec は既存ルート（login / personal-setting / user-activation）内の条件式を編集するのみで、ルート追加・middleware 順序変更はないため activity 記録の変更は不要。
 - タスク内の行番号は v8 実コードに合わせた近似値（`~`）。実装時は該当パターンを grep で確認してから編集する。
+
+## Implementation Notes（実装ログ）
+
+- **1.1 (v8)**: `bcryptjs`/`@types/bcryptjs` は v8 package.json に不在（scrypt は `node:crypto` 組み込み、新規依存不要）。`util.promisify(scrypt)` は options 付きオーバーロードを落とすため（TS2554）、`new Promise` の手動ラッパーで `scrypt(pw, salt, keylen, {N,r,p,maxmem}, cb)` を呼ぶこと。v8 tsconfig（`tsgo --noEmit`）で型チェック通過を確認済み。型チェックは v8 では `tsgo`（`tsc` ではない）。
