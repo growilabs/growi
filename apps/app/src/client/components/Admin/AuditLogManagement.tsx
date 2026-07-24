@@ -6,6 +6,7 @@ import { format } from 'date-fns/format';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
+import { SearchUsernameTypeahead } from '~/client/components/SearchUsernameTypeahead';
 import type { IClearable } from '~/client/interfaces/clearable';
 import { toastError } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
@@ -22,7 +23,6 @@ import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';
 import { AuditLogExportModal } from './AuditLog/AuditLogExportModal';
 import { AuditLogSettings } from './AuditLog/AuditLogSettings';
 import { DateRangePicker } from './AuditLog/DateRangePicker';
-import { SearchUsernameTypeahead } from './AuditLog/SearchUsernameTypeahead';
 import { SelectActionDropdown } from './AuditLog/SelectActionDropdown';
 
 const formatDate = (date: Date | null) => {
