@@ -84,7 +84,12 @@ export class DrawioCommunicationHelper {
          * https://redmine.weseek.co.jp/issues/104507
          */
 
-        this.callbackOpts?.onSave?.(drawioData);
+        // Skip the save when nothing could be extracted (e.g. a 0-diagram or
+        // unparseable payload) so an empty block never silently overwrites the
+        // existing diagram.
+        if (drawioData.length > 0) {
+          this.callbackOpts?.onSave?.(drawioData);
+        }
       }
 
       this.callbackOpts?.onClose?.();
