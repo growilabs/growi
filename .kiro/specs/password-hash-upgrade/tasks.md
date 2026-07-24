@@ -49,11 +49,11 @@
   - `isPasswordValid(password)` を async 化: `PasswordHashService.verify(password, this.passwordHash, this.password, SEED)` を呼び出し `VerifyResult` を返す
   - `setPassword(password)` を async 化: `this.passwordHash = await PasswordHashService.hash(password)` のみ設定し、`password`（SHA-256）フィールドは変更しない（ダウングレード安全のため保持）
   - `setPassword` を呼ぶ **実在 5 メソッドすべて**の呼び出しを `await` 付きに更新する（未 await のまま `save()` すると passwordHash 未設定で保存されログイン不能になるため）:
-    - `updatePassword`（line ~208）
-    - `activateInvitedUser`（line ~277）— 招待ユーザー有効化。**欠落すると当該ユーザーがログイン不能**
-    - `resetPasswordByRandomString`（line ~575）
-    - `createUserByEmail`（line ~591）— メール招待ユーザー作成。**欠落すると当該ユーザーがログイン不能**
-    - `createUserByEmailAndPasswordAndStatus`（line ~683）
+    - `updatePassword`（v8: setPassword 呼び出し line ~230）
+    - `activateInvitedUser`（v8: line ~299）— 招待ユーザー有効化。**欠落すると当該ユーザーがログイン不能**
+    - `resetPasswordByRandomString`（v8: line ~598）
+    - `createUserByEmail`（v8: line ~614）— メール招待ユーザー作成。**欠落すると当該ユーザーがログイン不能**
+    - `createUserByEmailAndPasswordAndStatus`（v8: line ~706）
   - `setPassword()` 後に `passwordHash` が設定されており、`password` フィールドが変更されておらず、5 つの呼び出し元すべてが TypeScript コンパイルエラーなく動作することが確認できる
   - _Requirements: 1.1, 1.3, 2.1, 2.2_
   - _Boundary: User Model_
@@ -75,7 +75,7 @@
   - _Boundary: User Model_
 
 - [ ] 2.5 isPasswordValid の外部呼び出し元（personal-setting）を async 化する
-  - `apps/app/src/server/routes/apiv3/personal-setting/index.js`（line ~432）の
+  - `apps/app/src/server/routes/apiv3/personal-setting/index.js`（v8: line ~441）の
     `if (user.isPasswordSet() && !user.isPasswordValid(oldPassword)) {` を
     `if (user.isPasswordSet() && !(await user.isPasswordValid(oldPassword)).isValid) {` に置換する
   - **CRITICAL**: `isPasswordValid` が `Promise<VerifyResult>` を返すため、`!Promise` は常に `false` となり旧パスワード検証がスキップされる（= 現在のパスワードを知らなくても新パスワードに変更できる認証バイパス）。必ず `await` + `.isValid` 参照にする
@@ -87,7 +87,7 @@
 - [ ] 2.6 password == null 代用のパスワード設定判定を isPasswordSet() に置換する
   - passwordHash-only ユーザー（`password` unset、`passwordHash` set）を誤判定するため、以下 3 箇所を `isPasswordSet()` ベースに置換する:
     - `apps/app/src/server/routes/login.js`（line ~145）: `userData.password == null` → `!userData.isPasswordSet()`（全 passwordHash-only ユーザーが毎回 `/me#password_settings` へ誤リダイレクトされるのを防ぐ）
-    - `apps/app/src/server/routes/apiv3/personal-setting/index.js`（line ~702）: `user.password == null && count <= 1` → `!user.isPasswordSet() && count <= 1`（LDAP アカウント切り離しの誤ブロックを防ぐ）
+    - `apps/app/src/server/routes/apiv3/personal-setting/index.js`（v8: line ~715）: `user.password == null && count <= 1` → `!user.isPasswordSet() && count <= 1`（LDAP アカウント切り離しの誤ブロックを防ぐ）
     - `apps/app/src/server/routes/apiv3/user-activation.ts`（line ~278）: `userData.password != null` → `userData.isPasswordSet()`（リダイレクト先の誤判定を防ぐ）
   - 各判定が `isPasswordSet()` に置換され、passwordHash-only ユーザーで誤リダイレクト・誤ブロックが発生しないことが確認できる
   - _Requirements: 2.2, 2.3_
@@ -95,7 +95,7 @@
   - _Boundary: User Model_
 
 - [ ] 2.7 statusDelete で passwordHash を消去する
-  - `statusDelete()`（`apps/app/src/server/models/user/index.js` line ~349）に `this.passwordHash = undefined;` を追加し、削除ユーザーが有効な scrypt 認証情報ハッシュを保持しないようにする（既存の `this.password = ''` と同じ意図）
+  - `statusDelete()`（`apps/app/src/server/models/user/index.js` v8: line ~371、`this.password = ''` は line ~379）に `this.passwordHash = undefined;` を追加し、削除ユーザーが有効な scrypt 認証情報ハッシュを保持しないようにする（既存の `this.password = ''` と同じ意図）
   - `''` ではなく `undefined`（unset）にする理由: verify() が `noPassword`（正常系）として扱い、フォーマット不一致の Req 2.4 WARNING を誤発火させないため
   - 既存の統合テスト `user.integ.ts`（削除ユーザーの属性検証、`password` の空文字を確認している箇所）に `passwordHash` が unset されている検証を追加する
   - 削除後のユーザードキュメントに有効な `passwordHash` が残らないことが確認できる
@@ -133,7 +133,7 @@
 
 - [ ] 4. (P) マイグレーションスクリプトの実装
 - [ ] 4.1 (P) Status migration script を実装する
-  - `20260514000001-password-hash-status` マイグレーションを作成する
+  - `20260724000001-password-hash-status` マイグレーションを作成する（**v8: 既存最新 `20260721103639` より後のタイムスタンプにする**。旧 `20260514000001` は過去日付になり migrate-mongo が out-of-order 扱いするため不可）
   - `up()` 内で以下 4 区分のユーザー数を集計する（DB 書き込みなし）:
     - upgradedOnly（`passwordHash` あり、`password` なし）: 完全移行済み
     - both（両フィールドあり）: 移行中
@@ -199,3 +199,15 @@
   - CodeQL 上でアラートが解消（または正当な dismissal 付与）されていることが確認できる
   - _Requirements: 1.1, 1.3_
   - _Boundary: PasswordHashService_
+
+## v8（8.0.x 系）実装メモ
+
+本 spec は 8.0.x 系（`feat/170496-password-hash-algorithm-v8` → `feat/170496-183017-password-hash-upgrade-v8`）で実装する。v7 と異なり以下の前提に従うこと（`apps/app/.claude/rules/` 準拠）:
+
+- **import は拡張子なし**（相対 / `~/` 指定子に `.js`・`.jsx` を書かない。`.js` は build 出力時のみ付与）。`password-hash.ts` や各修正ファイルの import はこの規約に従う。
+- **User モデルは v8 でも Mongoose の `.js`**（`src/server/models/user/index.js`）。Prisma 移行されていないため設計どおり Mongoose メソッドを編集する。
+- **standalone スクリプト（4.2 / 4.3）**: `src/server/scripts/` は v8 に未存在なので新規作成。実行は `pnpm run tsrun <path>`（`ts-node` ではなく、`bin/runtime/dev-esm-resolver.mjs` + `bin/runtime/env-preload.mjs` を `--import` する ESM ランナー）。downgrade-prep の Crowi bootstrap も ESM 下で動作させる。
+- **migrate-mongo（4.1）**: v8 の config は `config/migrate-mongo-config.cjs`（トリガー `pnpm run migrate:migrate-mongo` 自体は不変）。migration ファイルは `.js`、co-located 統合テストは `.integ.ts`（既存例 `20260721103639-backfill-users-timestamps.integ.ts` に倣う）。タイムスタンプは既存最新（`20260721103639`）より後にする。
+- **server-boot-imports**: `PasswordHashService` は `node:crypto` のみ（追加コストなし）なので top-level import で可。重量級 SDK の遅延ロード規約には抵触しない。
+- **activity-recording**: 本 spec は既存ルート（login / personal-setting / user-activation）内の条件式を編集するのみで、ルート追加・middleware 順序変更はないため activity 記録の変更は不要。
+- タスク内の行番号は v8 実コードに合わせた近似値（`~`）。実装時は該当パターンを grep で確認してから編集する。

@@ -131,7 +131,8 @@ apps/app/src/server/service/
 └── password-hash.ts                        # PasswordHashService (scrypt + legacy verify, hash)
 
 apps/app/src/migrations/
-└── 20260514000001-password-hash-status.js     # Req 3.1, 3.2: hash format count report (read-only, migrate-mongo)
+└── 20260724000001-password-hash-status.js     # Req 3.1, 3.2: hash format count report (read-only, migrate-mongo)
+                                                # v8: timestamp MUST be later than the latest existing migration (20260721103639)
 
 apps/app/src/server/scripts/
 ├── password-hash-cleanup.ts                   # Req 3.3, 3.4: remove legacy password (standalone admin script)
