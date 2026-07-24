@@ -9,6 +9,7 @@ import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
+import { pendingActivityContext } from '~/server/service/activity/index';
 import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
 import { generateOverwriteParams } from '~/server/service/import/overwrite-params';
@@ -293,6 +294,14 @@ export default function route(crowi: Crowi): Router {
 
       const zipFile = importService.getFile(fileName);
 
+      // Capture the activity context BEFORE responding. The import runs after
+      // this response and registerFailsafeFinalizer clears this request's
+      // pending context on the response's 'finish' event, so the post-import
+      // activity emit would otherwise settle with user=null (see PR #11510 and
+      // ExecuteImportArgs.activityContext).
+      const activityId = res.locals.activity._id;
+      const activityContext = pendingActivityContext.take(activityId);
+
       // return response first
       res.apiv3();
 
@@ -370,7 +379,8 @@ export default function route(crowi: Crowi): Router {
         importService,
         adminEvent,
         activityEvent,
-        activityId: res.locals.activity._id,
+        activityId,
+        activityContext,
         collections,
         importSettingsMap,
       });

@@ -31,6 +31,9 @@ describe('executeImport', () => {
       adminEvent,
       activityEvent,
       activityId,
+      // These cases mock the activity event; the context re-arm (activityContext)
+      // is covered end-to-end in import-executor.integ.ts.
+      activityContext: undefined,
       collections,
       importSettingsMap,
     });
@@ -58,6 +61,9 @@ describe('executeImport', () => {
       adminEvent,
       activityEvent,
       activityId,
+      // These cases mock the activity event; the context re-arm (activityContext)
+      // is covered end-to-end in import-executor.integ.ts.
+      activityContext: undefined,
       collections,
       importSettingsMap,
     });
