@@ -61,7 +61,7 @@
     "mysql2": "^2.2.5",
     "read-pkg-up": "^7.0.1",
     "tslib": "^2.8.0",
-    "typeorm": "=0.2.45"
+    "typeorm": "=0.3.31"
   },
   "// comments for devDependencies": {
     "@tsed/*": "v6.133.1 causes 'TypeError: Cannot read properties of undefined (reading 'prototype')' with `@Middleware()`",
