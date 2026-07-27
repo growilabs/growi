@@ -142,7 +142,7 @@ export const setup = (crowi, app) => {
       }
 
       let redirectTo;
-      if (userData.password == null) {
+      if (!userData.isPasswordSet()) {
         // userData.password can't be empty but, prepare redirect because password property in User Model is optional
         // https://github.com/growilabs/growi/pull/6670
         redirectTo = '/me#password_settings';

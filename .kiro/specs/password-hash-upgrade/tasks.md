@@ -84,7 +84,7 @@
   - _Depends: 2.2_
   - _Boundary: User Model_
 
-- [ ] 2.6 password == null 代用のパスワード設定判定を isPasswordSet() に置換する
+- [x] 2.6 password == null 代用のパスワード設定判定を isPasswordSet() に置換する
   - passwordHash-only ユーザー（`password` unset、`passwordHash` set）を誤判定するため、以下 3 箇所を `isPasswordSet()` ベースに置換する:
     - `apps/app/src/server/routes/login.js`（line ~145）: `userData.password == null` → `!userData.isPasswordSet()`（全 passwordHash-only ユーザーが毎回 `/me#password_settings` へ誤リダイレクトされるのを防ぐ）
     - `apps/app/src/server/routes/apiv3/personal-setting/index.js`（v8: line ~715）: `user.password == null && count <= 1` → `!user.isPasswordSet() && count <= 1`（LDAP アカウント切り離しの誤ブロックを防ぐ）

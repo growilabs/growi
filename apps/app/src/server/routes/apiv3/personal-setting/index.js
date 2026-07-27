@@ -715,7 +715,7 @@ export const setup = (crowi) => {
           },
         });
         // make sure password set or this user has two or more ExternalAccounts
-        if (user.password == null && count <= 1) {
+        if (!user.isPasswordSet() && count <= 1) {
           return res.apiv3Err('disassociate-ldap-account-failed');
         }
         const disassociateUser = await prisma.externalaccounts.delete({
