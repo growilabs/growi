@@ -150,14 +150,35 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     }
   };
 
-  // select first item on load
+  // Tracks the `resetKey` whose initial preview (first item) has already been
+  // applied, so an append under the same `resetKey` does not re-select pages[0]
+  // and overwrite the user's chosen preview (Req 6.3).
+  const appliedPreviewResetKeyRef = useRef<string | undefined>(undefined);
+
+  // Right-pane preview initial selection — 2-stage, resetKey-driven.
+  // (a) When `resetKey` changes, clear the preview immediately. At that moment
+  //     the new `pages` have not arrived yet, so there is nothing to select.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resetKey is the sole trigger — clear the preview only when the search identity changes, not on every pages update
   useEffect(() => {
+    setSelectedPageWithMeta(undefined);
+  }, [resetKey]);
+
+  // (b) On the FIRST data arrival for the current `resetKey`, select the first
+  //     item exactly once. Subsequent appends (same `resetKey`) are ignored so
+  //     the user's chosen preview is preserved (Req 6.1 / 6.3).
+  useEffect(() => {
+    // No data yet (e.g. right after a resetKey change): keep preview cleared.
     if (pages == null || pages.length === 0) {
       setSelectedPageWithMeta(undefined);
-    } else if (pages != null && pages.length > 0) {
-      setSelectedPageWithMeta(pages[0]);
+      return;
     }
-  }, [pages]);
+    // Initial preview already applied for this search => this is an append.
+    if (appliedPreviewResetKeyRef.current === resetKey) {
+      return;
+    }
+    appliedPreviewResetKeyRef.current = resetKey;
+    setSelectedPageWithMeta(pages[0]);
+  }, [pages, resetKey]);
 
   // Reset selection when the search identity (`resetKey`) changes.
   // This is data-independent: empty the Set and notify a count of 0.

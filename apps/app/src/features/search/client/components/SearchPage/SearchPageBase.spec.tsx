@@ -53,10 +53,32 @@ vi.mock('next/dynamic', () => ({
   },
 }));
 
+// Capture the props SearchPageBase hands to SearchResultList so the right-pane
+// preview selection (`selectedPageId`) can be observed, and the user's preview
+// choice can be simulated by invoking the captured `onPageSelected`.
+const searchResultListSpy = vi.hoisted(() => ({
+  lastProps: undefined as
+    | {
+        selectedPageId?: string;
+        pages: IPageWithSearchMeta[];
+        onPageSelected?: (page?: IPageWithSearchMeta) => void;
+      }
+    | undefined,
+}));
+
 // Decouple from the real list: only the imperative selectAll/deselectAll surface
-// is relevant to SearchPageBase, so provide a ref-forwarding stub that renders nothing.
+// and the selection props are relevant to SearchPageBase, so provide a
+// ref-forwarding stub that records its props and renders nothing.
 vi.mock('./SearchResultList', () => ({
-  SearchResultList: React.forwardRef<ISelectableAll>((_props, ref) => {
+  SearchResultList: React.forwardRef<
+    ISelectableAll,
+    {
+      selectedPageId?: string;
+      pages: IPageWithSearchMeta[];
+      onPageSelected?: (page?: IPageWithSearchMeta) => void;
+    }
+  >((props, ref) => {
+    searchResultListSpy.lastProps = props;
     React.useImperativeHandle(ref, () => ({
       selectAll: vi.fn(),
       deselectAll: vi.fn(),
@@ -196,5 +218,110 @@ describe('SearchPageBase selection reset (resetKey-driven)', () => {
     expect(selected?.has('a')).toBe(true);
     expect(selected?.has('b')).toBe(true);
     expect(selected?.has('c')).toBe(true);
+  });
+});
+
+describe('SearchPageBase right-pane preview initial selection (2-stage, resetKey-driven)', () => {
+  beforeEach(() => {
+    searchResultListSpy.lastProps = undefined;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('selects the first item as preview on the first data arrival for a new search', () => {
+    const ref = createRef<SelectableRef>();
+
+    render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={[createPage('a'), createPage('b')]}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('a');
+  });
+
+  it('keeps the user-selected preview when pages are appended under the same resetKey', () => {
+    const ref = createRef<SelectableRef>();
+    const initialPages = [createPage('a'), createPage('b')];
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={initialPages}
+        {...noopControls}
+      />,
+    );
+
+    // the first item is the initial preview
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('a');
+
+    // user picks a non-first item as the preview
+    act(() => {
+      searchResultListSpy.lastProps?.onPageSelected?.(initialPages[1]);
+    });
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('b');
+
+    // append more pages (infinite scroll) with the SAME resetKey
+    const appendedPages = [...initialPages, createPage('c'), createPage('d')];
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={appendedPages}
+        {...noopControls}
+      />,
+    );
+
+    // the user's chosen preview is preserved, not reset to the first item
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('b');
+  });
+
+  it('resets the preview to the new first item when the resetKey changes', () => {
+    const ref = createRef<SelectableRef>();
+    const firstSearchPages = [createPage('a'), createPage('b')];
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={firstSearchPages}
+        {...noopControls}
+      />,
+    );
+
+    // user picks a non-first item as the preview under the first search
+    act(() => {
+      searchResultListSpy.lastProps?.onPageSelected?.(firstSearchPages[1]);
+    });
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('b');
+
+    // new search / condition change => resetKey changes; new data has not arrived yet
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-2"
+        pages={[]}
+        {...noopControls}
+      />,
+    );
+
+    // first data arrival for the new resetKey => first item of the new results
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-2"
+        pages={[createPage('x'), createPage('y')]}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('x');
   });
 });
