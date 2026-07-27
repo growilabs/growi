@@ -1,5 +1,11 @@
 # @growi/vault-manager
 
+## 1.0.0
+
+### Major Changes
+
+- First stable release, published alongside GROWI v8.0.0. GROWI Vault is generally available: users can `git clone` a GROWI wiki and receive the pages they are allowed to read as a tree of Markdown files. The vault stays read-only in this release — `git push` is rejected, and attachments, per-page metadata and history from before the feature was enabled are not exported.
+
 ## 0.1.1
 
 ### Patch Changes
