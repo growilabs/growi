@@ -27,7 +27,6 @@ import {
 } from '~/client/services/update-page';
 import { uploadAttachments } from '~/client/services/upload-attachments';
 import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
-import { useIsEnableUnifiedMergeView } from '~/features/openai/client/states';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
 import { useCurrentPathname, useCurrentUser } from '~/states/global';
 import {
@@ -135,7 +134,6 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   const onConflict = useConflictResolver();
   const reservedNextCaretLine = useReservedNextCaretLineValue();
   const setReservedNextCaretLine = useSetReservedNextCaretLine();
-  const isEnableUnifiedMergeView = useIsEnableUnifiedMergeView();
 
   const { data: rendererOptions } = usePreviewOptions();
 
@@ -466,7 +464,6 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
       <div className={`flex-expand-horiz ${props.visibility ? '' : 'd-none'}`}>
         <div className="page-editor-editor-container flex-expand-vert border-end">
           <CodeMirrorEditorMain
-            enableUnifiedMergeView={isEnableUnifiedMergeView}
             enableCollaboration={editorMode === EditorMode.Editor}
             onSave={saveWithShortcut}
             onUpload={uploadHandler}

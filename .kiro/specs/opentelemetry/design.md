@@ -89,7 +89,8 @@
 - `@opentelemetry/api`: `metrics`, `diag`, `Attributes`, `Meter`, `ObservableGauge` 等の public API のみ。
 - `@opentelemetry/sdk-node`, `@opentelemetry/sdk-metrics`, `@opentelemetry/sdk-trace-node`, `@opentelemetry/resources`: SDK 初期化用。
 - `@opentelemetry/exporter-trace-otlp-grpc`, `@opentelemetry/exporter-metrics-otlp-grpc`: OTLP gRPC エクスポート。
-- `@opentelemetry/auto-instrumentations-node`: `getNodeAutoInstrumentations()` および `InstrumentationConfigMap` 型。
+- `@opentelemetry/instrumentation-http`, `@opentelemetry/instrumentation-express`, `@opentelemetry/instrumentation-mongodb`, `@opentelemetry/instrumentation-mongoose`: 4 instrumentation を direct import。`@opentelemetry/auto-instrumentations-node` は採用しない（Design Decisions 参照）。
+- `@opentelemetry/instrumentation`（type-only import）: `Instrumentation` 型の取得用。
 - `@opentelemetry/semantic-conventions`: stable attribute のみ（`ATTR_SERVICE_NAME` / `ATTR_SERVICE_VERSION`）。incubating は import しない。
 - 上記以外の新規 npm dependency 追加は不可。追加する場合は `apps/app/.next/node_modules/` 残留有無の確認と `dependencies` 分類が必要（`.claude/rules/package-dependencies.md` 参照）。
 
@@ -101,6 +102,8 @@
 - Node.js ランタイム要件のダウングレード（`engines.node` が `^24` 未満）→ `process.constrainedMemory()` / `v8.getHeapStatistics()` の互換性再確認。
 - 新規 anonymization 対象パス／パラメータ追加要望 → handler の登録順と canHandle 衝突の再評価。
 - 受信側ダッシュボード／クエリの参照更新が未完了の状態でメトリクス／ラベル変更を行う → ロールアウト順序の再調整。
+- 4 instrumentation（HTTP / Express / MongoDB / Mongoose）に新たな instrumentation を追加・削除する場合 → `generateNodeSDKConfiguration` の `instrumentations` 配列と `apps/app/package.json` の `dependencies` を同時に更新し、Turbopack bundling および `.next/server/chunks/` 配下への取り込みを `pnpm run build` 後に検証する。
+- `@opentelemetry/auto-instrumentations-node` への切り戻し提案が出た場合 → research.md の "Decision: 4 instrumentation の direct import 採用" の rationale（`enabled: false` でも 31 instrumentation 全件が instantiate される仕様 / ≈ 11 MB の RSS オーバーヘッド）を再確認し、isolated benchmark での再計測が無い限り採用しない。
 
 ## Architecture
 
@@ -199,7 +202,8 @@ sequenceDiagram
     alt otel:enabled === true
         Lifecycle->>Config: generateNodeSDKConfiguration({ enableAnonymization })
         Config->>Config: build Resource(service.name, service.version)
-        Config->>Config: getNodeAutoInstrumentations(httpInstrumentationConfig?)
+        Config->>Config: instantiate 4 instrumentations (Http/Express/MongoDB/Mongoose)
+        Config->>Config: merge httpInstrumentationConfig if enableAnonymization
         Config-->>Lifecycle: Configuration
         Lifecycle->>SDK: new NodeSDK(config)
     end
@@ -227,7 +231,7 @@ sequenceDiagram
 | Runtime | Node.js `^24` | `process.constrainedMemory()` / `v8.getHeapStatistics()` 等 stdlib API | `apps/app/package.json` の `engines` ではなくリポジトリルートの `engines` で指定 |
 | Telemetry SDK | `@opentelemetry/api ^1.9.0`, `@opentelemetry/sdk-node ^0.217.0`, `@opentelemetry/sdk-metrics ^2.0.1`, `@opentelemetry/sdk-trace-node ^2.0.1`, `@opentelemetry/resources ^2.0.1` | NodeSDK / Meter / Resource | 既存導入済み |
 | Exporter | `@opentelemetry/exporter-trace-otlp-grpc`, `@opentelemetry/exporter-metrics-otlp-grpc ^0.202.0` | OTLP gRPC エクスポート | 引数なしで生成し endpoint は OTel 標準 env var で解決 |
-| Auto-instrumentation | `@opentelemetry/auto-instrumentations-node ^0.75.0` | HTTP / Express / Mongoose 等の自動計測 | `instrumentation-pino`, `instrumentation-fs` は無効化 |
+| Instrumentation (direct import) | `@opentelemetry/instrumentation-http ^0.217.0`, `@opentelemetry/instrumentation-express ^0.65.0`, `@opentelemetry/instrumentation-mongodb ^0.70.0`, `@opentelemetry/instrumentation-mongoose ^0.63.0` | HTTP / Express / MongoDB / Mongoose の計測（4 instrumentation を `generateNodeSDKConfiguration` 内で直接 `new`） | `@opentelemetry/auto-instrumentations-node` は不採用（Design Decisions 参照）。Turbopack によって chunk bundle 側に取り込まれるため、`.next/node_modules/` 配下に symlink は生成されない |
 | SemConv | `@opentelemetry/semantic-conventions ^1.34.0` | stable attribute のみ import | incubating は `semconv.ts` にローカルコピー |
 | Logger | pino（`~/utils/logger`） + `diag` アダプタ | dev 環境のみ DiagLogger を pino に差し替え | production は OpenTelemetry の default diag |
 | Test | Vitest + `vitest-mock-extended` | `vi.mock('node:os'/'node:v8')`, `mock<Meter>()` パターン | 既存テスト基盤 |
@@ -363,11 +367,12 @@ export const __testing__: { getSdkInstance, reset };
 - 2 段階目 Resource: `{ service.instance.id?, ...osAttrs, ...appAttrs }` を merge。
 - Trace exporter: `OTLPTraceExporter()`（引数なし）。
 - Metric reader: `PeriodicExportingMetricReader({ exporter: new OTLPMetricExporter(), exportIntervalMillis: 300000 })`。
-- Instrumentation: `getNodeAutoInstrumentations({ pino: disabled, fs: disabled, http: { enabled, ...httpInstrumentationConfig } })`。
-- `enableAnonymization` が `true` のときのみ `httpInstrumentationConfig` を注入。
+- Instrumentation: `HttpInstrumentation` / `ExpressInstrumentation` / `MongoDBInstrumentation` / `MongooseInstrumentation` の 4 class を直接 `new` し、`instrumentations` 配列に inline 構築。`@opentelemetry/auto-instrumentations-node` および `OTEL_AUTO_INSTRUMENTATION_PROFILE` 環境変数は一切参照しない。
+- `enableAnonymization` が `true` のときのみ `HttpInstrumentation` の constructor 第 1 引数に `httpInstrumentationConfigForAnonymize` を渡し、falsy / 未指定のときは引数なしで呼び出す。
+- 戻り値 `Configuration` の `instrumentations` 配列は常に長さ 4。
 
 **Dependencies**
-- Outbound: `@opentelemetry/sdk-node`, `@opentelemetry/sdk-metrics`, `@opentelemetry/exporter-*-otlp-grpc`, `@opentelemetry/auto-instrumentations-node`, `@opentelemetry/resources`, `@opentelemetry/semantic-conventions` (stable), `./semconv`, `./anonymization`, `./custom-resource-attributes`, `~/server/service/config-manager`, `~/utils/growi-version`.
+- Outbound: `@opentelemetry/sdk-node`, `@opentelemetry/sdk-metrics`, `@opentelemetry/exporter-*-otlp-grpc`, `@opentelemetry/instrumentation-http`, `@opentelemetry/instrumentation-express`, `@opentelemetry/instrumentation-mongodb`, `@opentelemetry/instrumentation-mongoose`, `@opentelemetry/resources`, `@opentelemetry/semantic-conventions` (stable), `./semconv`, `./anonymization`, `./custom-resource-attributes`, `~/server/service/config-manager`, `~/utils/growi-version`.
 
 ##### Service Interface
 ```typescript

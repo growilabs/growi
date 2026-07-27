@@ -23,7 +23,6 @@ import { DropdownItem } from 'reactstrap';
 
 import { toggleLike, toggleSubscribe } from '~/client/services/page-operation';
 import { toastError } from '~/client/util/toastr';
-import OpenDefaultAiAssistantButton from '~/features/openai/client/components/AiAssistant/OpenDefaultAiAssistantButton';
 import {
   useIsGuestUser,
   useIsReadOnlyUser,
@@ -360,10 +359,7 @@ const PageControlsSubstance = (
       ref={pageControlsRef}
     >
       {isViewMode && isDeviceLargerThanMd && !isSearchPage && !isSearchPage && (
-        <>
-          <SearchButton />
-          <OpenDefaultAiAssistantButton />
-        </>
+        <SearchButton />
       )}
 
       {revisionId != null && !isViewMode && (

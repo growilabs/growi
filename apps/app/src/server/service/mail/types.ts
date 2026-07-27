@@ -1,5 +1,5 @@
 import type { NonBlankString } from '@growi/core/dist/interfaces';
-import type SMTPTransport from 'nodemailer/lib/smtp-transport';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
 
 /**
  * Type-safe OAuth2 configuration with non-blank string validation.

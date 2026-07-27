@@ -42,9 +42,12 @@ skinparam defaultFontSize        12
 'skinparam dpi                    125
 skinparam shadowing              false
 skinparam roundcorner            0
-skinparam ParticipantPadding     30
+'' ParticipantPadding and Padding are intentionally NOT declared as skinparam:
+'' PlantUML paints a "Please use CSS style instead of skinparam <name>" warning
+'' into every diagram for them (#11258). ParticipantPadding is replaced by the
+'' sequenceDiagram <style> rule below; the general Padding has no working CSS
+'' equivalent (plantuml/plantuml#2622), so it is dropped. BoxPadding does not warn.
 skinparam BoxPadding             30
-skinparam Padding                10
 skinparam ArrowColor             $GRAY
 skinparam stereotype {
     CBackgroundColor $SECONDARY_LIGHT
@@ -441,6 +444,17 @@ skinparam useBetaStyle true
 !startsub mindmap
 
 <style>
+
+' Sequence-diagram participant spacing (replaces the removed skinparam ParticipantPadding).
+' Padding restores each participant box's inner spacing; Margin 0 20 0 20 adds only the
+' left/right gap between participants, keeping top/bottom 0 so the box stays attached to
+' its lifeline (an all-sides margin would visibly detach the box from its dashed line).
+sequenceDiagram {
+  participant {
+    Padding 20
+    Margin 0 20 0 20
+  }
+}
 
 boardDiagram {
 	node {

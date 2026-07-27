@@ -1,8 +1,8 @@
 import type { IUser } from '@growi/core';
 import mongoose from 'mongoose';
 
-import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
+import { prisma } from '~/utils/prisma';
 
 import type { IMigratableUser } from '../../interfaces/contribution-migration';
 import Contribution from '../models/contribution-model';
@@ -87,10 +87,18 @@ export const resolveContributor = async (
     return contributor;
   }
 
-  const activity = await Activity.findById(activityId).select('user');
-  if (activity?.user == null) {
+  // Prisma findUnique: returns { userId } where userId is the stored user ObjectId
+  // string (mapped from the `user` field in MongoDB). Equivalent to the previous
+  // Activity.findById(activityId).select('user') which returned a doc with `.user`
+  // as an ObjectId. mongoose.model('User').findById() accepts both ObjectId and
+  // string, so the string userId is passed through without conversion.
+  const activity = await prisma.activities.findUnique({
+    where: { id: activityId },
+    select: { userId: true },
+  });
+  if (activity?.userId == null) {
     return null;
   }
 
-  return await mongoose.model<IUser>('User').findById(activity.user);
+  return await mongoose.model<IUser>('User').findById(activity.userId);
 };

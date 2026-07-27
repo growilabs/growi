@@ -79,7 +79,7 @@ export const PrimaryItem = (props: PrimaryItemProps): JSX.Element => {
     onHover?.(contents);
   }, [contents, onHover, selectThisItem, sidebarMode]);
 
-  const labelForTestId = label.toLowerCase().replace(' ', '-');
+  const labelForTestId = label.toLowerCase().replaceAll(' ', '-');
 
   return (
     <>

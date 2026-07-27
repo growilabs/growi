@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { EditorView } from '@codemirror/view';
 
-import type { UseCodeMirrorEditor } from '../../services';
+import type { UseCodeMirrorEditor } from '../../services/index.js';
 
 export const useCustomizedButtonStyles = (
   codeMirrorEditor?: UseCodeMirrorEditor,

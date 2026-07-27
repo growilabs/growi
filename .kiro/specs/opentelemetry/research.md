@@ -59,6 +59,8 @@
 | Single-stage Resource | すべての Resource を DB 初期化後に作る | private アクセス不要 | OpenTelemetry の起動が DB 接続まで遅延、`service.name` などの基本属性も遅れる | 不採用 |
 | Module-based anonymization | `AnonymizationModule` interface + 配列順評価 | 新規パス追加が局所変更で済む、handler ごとに spec | 配列順への暗黙依存 | **採用** |
 | Centralized anonymization (switch / regex map) | 1 ファイルで if/else または map で振り分け | フローが見やすい | 拡張ごとに 1 ファイルが肥大化、spec が結合 | 不採用 |
+| 4 instrumentation の direct import | `HttpInstrumentation` 等 4 class を `new` で構築し配列に詰める | actual usage と依存表面が一致、RSS が真に削減される（isolated benchmark で −11 MB）、`OTEL_AUTO_INSTRUMENTATION_*` 系の制御変数 / 分岐が不要 | 新 instrumentation 追加時にコード変更（1 import + 1 `new` 行）が必要 | **採用** |
+| `@opentelemetry/auto-instrumentations-node` の deny-list | `getNodeAutoInstrumentations({ pino: false, fs: false, ... })` で不要 instrumentation を無効化 | 設定が宣言的、追加 instrumentation のオプトインが容易 | `enabled: false` でも 31 instrumentation 全件が instantiate される仕様で、約 11 MB の RSS オーバーヘッドが発生（`memory-leak-investigation` L2 finding で実証） | 不採用 |
 
 ## Design Decisions
 
@@ -134,13 +136,21 @@
 - **Rationale**: GROWI のメトリクスは business カウント（users / pages）と config 情報が中心で、秒オーダーの解像度は不要。export 頻度を下げることで OTLP 帯域と receiving side の負荷を抑える。
 - **Trade-offs**: メモリ使用量の急変は最大 5 分遅れて観測される。OOM 直前検知などの用途には不十分だが、本 spec の範囲ではトレードオフを受容する。
 
-### Decision: Auto-instrumentation は pino と fs を除外
+### Decision: 4 instrumentation の direct import 採用（`@opentelemetry/auto-instrumentations-node` は不採用）
 
-- **Context**: `getNodeAutoInstrumentations()` を全有効化すると pino log と fs operation がトレース化される。
-- **Selected Approach**: `@opentelemetry/instrumentation-pino` と `@opentelemetry/instrumentation-fs` を `enabled: false` で明示的に無効化。
+- **Context**: GROWI が必要とする instrumentation は HTTP / Express / MongoDB / Mongoose の 4 個のみ。当初は `@opentelemetry/auto-instrumentations-node` の `getNodeAutoInstrumentations({ pino: { enabled: false }, fs: { enabled: false }, ... })` で deny-list 方式（minimal profile）を採用していたが、`memory-leak-investigation` spec の L2 finding と isolated benchmark（`apps/app/tmp/otel-import-bench/bench.js`）により、`enabled: false` を渡しても 31 instrumentation 全件が instantiate される `getNodeAutoInstrumentations` の仕様が判明し、RSS に約 11 MB のオーバーヘッドが乗ることが実証された。
+- **Alternatives Considered**:
+  1. Deny-list 継続（`getNodeAutoInstrumentations` + `enabled: false`）— RSS 削減効果ゼロのため却下。
+  2. **4 instrumentation の direct import（採用）** — `HttpInstrumentation` / `ExpressInstrumentation` / `MongoDBInstrumentation` / `MongooseInstrumentation` を direct named import で構築し `instrumentations` 配列に渡す。
+  3. Registry pattern（map で instrumentation を動的に解決）— speculative abstraction で現要件外。却下（YAGNI）。
+- **Selected Approach**: `generateNodeSDKConfiguration` 内で 4 instrumentation を直接 `new` し、`instrumentations` 配列に inline で組み立てる。専用の helper / registry / DI は導入しない。HTTP instrumentation には `enableAnonymization` が truthy のときのみ `httpInstrumentationConfigForAnonymize` を constructor 引数として渡す。
 - **Rationale**:
-  - **pino**: GROWI は log signal を OTel に送らない。pino instrumentation はトレースに log を相関させる目的だが、現状は使用しない。
-  - **fs**: ファイル I/O が極めて頻繁で、有効化すると span 量が膨大になる。OpenTelemetry 公式の[ガイド](https://opentelemetry.io/docs/languages/js/libraries/#registration)も無効化を推奨。
+  - isolated benchmark で `auto-deny` strategy（旧 GROWI minimal）と比べ約 −11 MB の RSS 削減を実測（`sdk-only` と同等の 82 MB 台）。
+  - 依存表面（`apps/app/package.json` の `dependencies`）が actual usage と一致し、supply chain audit が明瞭になる。
+  - pino / fs を含む 27 個の不要 instrumentation の常駐コストを排除できる。
+  - `OTEL_AUTO_INSTRUMENTATION_PROFILE` 環境変数による分岐 / deny-list 構築 / 31 entry の package 名 list を保持する必要が無くなり、実装が単純化される。
+- **Trade-offs**: 新規 instrumentation を追加するときに `generateNodeSDKConfiguration` のコード変更（1 つの import 行 + 1 行の `new ...()`）が必要だが、4 → 5 への変化は単純な追記で済むため、registry 化のコスト > 利得。
+- **Follow-up**: 新規 instrumentation 追加時は `generateNodeSDKConfiguration` の `instrumentations` 配列に direct import を追加する。`@opentelemetry/auto-instrumentations-node` の transitive dep 残存監視は本 spec の boundary 外（`.claude/rules/package-dependencies.md` の責務）。`OTEL_AUTO_INSTRUMENTATION_PROFILE` の参照ロジックは実装から完全に削除済みであり、当該環境変数を deployment 環境で設定していても runtime 挙動には影響しない（無視される）。
 
 ### Decision: `service.instance.id` は config 値の passthrough、自動生成しない
 

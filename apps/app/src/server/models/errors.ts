@@ -1,4 +1,4 @@
-import ExtensibleCustomError from 'extensible-custom-error';
+import { ExtensibleCustomError } from '~/server/util/extensible-custom-error';
 
 export class PathAlreadyExistsError extends ExtensibleCustomError {
   targetPath: string;

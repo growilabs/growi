@@ -2,7 +2,7 @@ import type { MarpOptions } from '@marp-team/marp-core';
 import { Marp } from '@marp-team/marp-core';
 import { Element } from '@marp-team/marpit';
 
-import { MARP_CONTAINER_CLASS_NAME } from '../consts';
+import { MARP_CONTAINER_CLASS_NAME } from '../consts/index.js';
 
 export { MARP_CONTAINER_CLASS_NAME };
 

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-import type { RespondBodyForResponseUrl } from '../interfaces/response-url';
+import type { RespondBodyForResponseUrl } from '../interfaces/response-url.js';
 
 export async function respond(
   responseUrl: string,

@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { pathUtils } from '@growi/core/dist/utils';
 import { PageListMeta, PagePathLabel } from '@growi/ui/dist/components';
 
-import type { PageNode } from '../../../interfaces/page-node';
-import type { LsxContext } from '../lsx-context';
+import type { PageNode } from '../../../interfaces/page-node.js';
+import type { LsxContext } from '../lsx-context.js';
 
 import styles from './LsxPage.module.scss';
 

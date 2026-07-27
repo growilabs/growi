@@ -322,5 +322,123 @@ describe('ConfigManager test', () => {
       ); // Should fallback to env when db value is undefined
       expect(configManager.getConfig('app:fileUploadType')).toBe('gridfs'); // Should use db value when valid
     });
+
+    describe('env-only mode for AI settings (env:useOnlyEnvVars:ai)', () => {
+      // The 3 keys fixed by the env:useOnlyEnvVars:ai control key: the AI
+      // enable toggle + the two provider connection keys (multi-provider
+      // settings and per-provider API keys). ai:allowedModels is deliberately
+      // NOT part of the group: model settings stay editable from the admin UI
+      // even in env-only mode (R5.3).
+      const aiEnvOnlyKeys = [
+        'app:aiEnabled',
+        'ai:providers',
+        'ai:providerApiKeys',
+      ] as const;
+
+      // Distinct db/env values per key so a resolution that picks the wrong
+      // source is observable. Booleans use opposite values across db/env; the
+      // Record-typed keys differ by provider entry across db/env.
+      const dbValues: Partial<TestConfigData> = {
+        'app:aiEnabled': { value: true },
+        'ai:providers': {
+          value: {
+            openai: { enabled: true },
+            'azure-openai': {
+              enabled: true,
+              azureOpenaiSettings: { resourceName: 'db-resource' },
+            },
+          },
+        },
+        'ai:providerApiKeys': { value: { openai: 'db-api-key' } },
+        'ai:allowedModels': {
+          value: [
+            {
+              provider: 'openai',
+              modelId: 'db-model',
+              providerOptions: { openai: { db: true } },
+              isDefault: true,
+            },
+          ],
+        },
+      };
+      const envValues: Partial<TestConfigData> = {
+        'app:aiEnabled': { value: false },
+        'ai:providers': {
+          value: { anthropic: { enabled: true } },
+        },
+        'ai:providerApiKeys': { value: { anthropic: 'env-api-key' } },
+        'ai:allowedModels': {
+          value: [
+            {
+              provider: 'anthropic',
+              modelId: 'env-model',
+              providerOptions: { anthropic: { env: true } },
+              isDefault: true,
+            },
+          ],
+        },
+      };
+
+      test('returns env value only (ignoring db) for the 3 connection keys when control key is true', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:ai': { value: true },
+        });
+
+        for (const key of aiEnvOnlyKeys) {
+          expect(configManager.getConfig(key)).toEqual(envValues[key]?.value);
+        }
+      });
+
+      test('keeps db-first resolution for ai:allowedModels even when control key is true (R5.3)', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:ai': { value: true },
+        });
+
+        expect(configManager.getConfig('ai:allowedModels')).toEqual(
+          dbValues['ai:allowedModels']?.value,
+        );
+      });
+
+      test('returns db value (env as fallback default) for all AI keys when control key is false', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:ai': { value: false },
+        });
+
+        for (const key of [...aiEnvOnlyKeys, 'ai:allowedModels'] as const) {
+          expect(configManager.getConfig(key)).toEqual(dbValues[key]?.value);
+        }
+      });
+
+      test('falls back to env value when db value is undefined and control key is false', () => {
+        setTestConfigs(
+          { 'ai:providers': { value: undefined } },
+          {
+            'ai:providers': { value: { anthropic: { enabled: true } } },
+            'env:useOnlyEnvVars:ai': { value: false },
+          },
+        );
+
+        expect(configManager.getConfig('ai:providers')).toEqual({
+          anthropic: { enabled: true },
+        });
+      });
+
+      test('does not change resolution of unrelated keys when control key is true', () => {
+        // app:title is not part of the ai env-only group, so it must keep the
+        // default db ?? env resolution regardless of env:useOnlyEnvVars:ai.
+        setTestConfigs(
+          { 'app:title': { value: 'db-title' } },
+          {
+            'app:title': { value: 'env-title' },
+            'env:useOnlyEnvVars:ai': { value: true },
+          },
+        );
+
+        expect(configManager.getConfig('app:title')).toBe('db-title');
+      });
+    });
   });
 });
