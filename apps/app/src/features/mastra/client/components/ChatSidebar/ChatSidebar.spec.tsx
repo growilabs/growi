@@ -345,6 +345,24 @@ describe('ChatSidebar — prompt input focus on open', () => {
 
     expect(document.activeElement).toBe(view.contentDOM);
   });
+
+  it('leaves the caret alone on a re-render that is not an open', () => {
+    // ChatSidebar re-renders constantly while an answer streams (one render per
+    // chunk) and whenever an SWR store resolves. Focus must be handed over on
+    // open only — re-grabbing it on every render would yank the caret away from
+    // whatever the user is doing (picking a model, selecting text).
+    const { container, rerender } = render(<ChatSidebar />);
+    const view = getView(container);
+
+    act(() => {
+      view.contentDOM.blur();
+    });
+
+    // Same openSeq: this is an ordinary re-render, not a re-open.
+    rerender(<ChatSidebar />);
+
+    expect(document.activeElement).not.toBe(view.contentDOM);
+  });
 });
 
 describe('ChatSidebar — PageMentionInput integration (6.1)', () => {
