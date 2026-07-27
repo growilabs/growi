@@ -43,12 +43,15 @@ vi.mock('@ai-sdk/react', () => ({
 }));
 
 // Chat sidebar status: provide an opened sidebar so ChatSidebar renders its
-// header + input without reaching into jotai.
+// header + input without reaching into jotai. Controllable so a test can bump
+// `openSeq` to simulate re-opening the sidebar.
+const { sidebarStatus } = vi.hoisted(() => ({
+  sidebarStatus: {
+    current: { isOpened: true, openSeq: 0 } as ChatSidebarStatus,
+  },
+}));
 vi.mock('../../status/chat-sidebar', () => ({
-  useChatSidebarStatus: (): ChatSidebarStatus => ({
-    isOpened: true,
-    openSeq: 0,
-  }),
+  useChatSidebarStatus: (): ChatSidebarStatus => sidebarStatus.current,
   useChatSidebarActions: () => ({ close: vi.fn() }),
 }));
 
@@ -269,6 +272,7 @@ const submitViaEvent = async (container: HTMLElement): Promise<void> => {
 };
 
 beforeEach(() => {
+  sidebarStatus.current = { isOpened: true, openSeq: 0 };
   sendMessage.mockClear();
   regenerate.mockClear();
   clearError.mockClear();
@@ -316,6 +320,31 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe('ChatSidebar — prompt input focus on open', () => {
+  it('puts the caret in the prompt input when the sidebar opens', () => {
+    const { container } = render(<ChatSidebar />);
+
+    expect(document.activeElement).toBe(getView(container).contentDOM);
+  });
+
+  it('puts the caret back when the already-displayed chat is re-opened', () => {
+    // Re-opening the thread that is already displayed keeps the same remount
+    // key, so there is no fresh mount to focus — only the bumped openSeq.
+    const { container, rerender } = render(<ChatSidebar />);
+    const view = getView(container);
+
+    act(() => {
+      view.contentDOM.blur();
+    });
+    expect(document.activeElement).not.toBe(view.contentDOM);
+
+    sidebarStatus.current = { isOpened: true, openSeq: 1 };
+    rerender(<ChatSidebar />);
+
+    expect(document.activeElement).toBe(view.contentDOM);
+  });
 });
 
 describe('ChatSidebar — PageMentionInput integration (6.1)', () => {

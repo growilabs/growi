@@ -43,7 +43,10 @@ import {
 } from '~/components/ai-elements/reasoning';
 import { Response } from '~/components/ai-elements/response';
 import { Button } from '~/components/ui/button';
-import { PageMentionInput } from '~/features/mastra/client/components/PageMentionInput';
+import {
+  PageMentionInput,
+  type PageMentionInputHandle,
+} from '~/features/mastra/client/components/PageMentionInput';
 import { getProviderLabel } from '~/features/mastra/interfaces/ai-provider';
 import type { CustomUIMessage } from '~/features/mastra/interfaces/chat-message';
 import {
@@ -79,6 +82,20 @@ export const ChatSidebar = (): JSX.Element => {
   const chatSidebarStatus = useChatSidebarStatus();
   const { close } = useChatSidebarActions();
   const threadId = chatSidebarStatus?.threadId;
+  const openSeq = chatSidebarStatus?.openSeq;
+
+  // Hand the caret to the prompt input every time the sidebar is opened, so the
+  // user can type right away after clicking "New chat" or a recent thread.
+  //
+  // Keyed on `openSeq` (bumped by every openChat() call), not on mount alone:
+  // re-opening the thread that is already displayed keeps the same remount key
+  // in `dynamic.tsx`, so no remount happens and a mount-only focus would be
+  // skipped.
+  const promptInputRef = useRef<PageMentionInputHandle>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: openSeq is the trigger, not a value read by the effect
+  useEffect(() => {
+    promptInputRef.current?.focus();
+  }, [openSeq]);
 
   // Generate a stable thread id for this chat session.
   // For an existing thread, reuse the given id; for a new chat, mint one
@@ -387,6 +404,7 @@ export const ChatSidebar = (): JSX.Element => {
             >
               <PromptInputBody>
                 <PageMentionInput
+                  ref={promptInputRef}
                   value={input}
                   onChange={setInput}
                   placeholder={t('pageMention.placeholder')}
