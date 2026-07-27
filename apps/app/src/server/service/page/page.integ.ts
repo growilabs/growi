@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { GroupType, type IRevision, type IUser } from '@growi/core';
+import { GroupType, type IUser } from '@growi/core';
 import mongoose, { type HydratedDocument, type Model } from 'mongoose';
 import type { MockInstance } from 'vitest';
 
@@ -62,7 +62,6 @@ let childForRevert: PageDocument | null;
 describe('PageService', () => {
   let crowi: Crowi;
   let Page: PageModel;
-  let Revision: Model<IRevision>;
   let User: Model<IUser>;
   let ShareLink: ShareLinkModel;
   let generalXssFilterProcessSpy: MockInstance;
@@ -73,7 +72,6 @@ describe('PageService', () => {
 
     User = mongoose.model('User');
     Page = mongoose.model('Page') as PageModel;
-    Revision = mongoose.model<IRevision>('Revision');
     ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
 
     // Create test users if they don't exist
@@ -428,22 +426,26 @@ describe('PageService', () => {
       ]);
     }
 
-    const existingRevision = await Revision.findOne({
-      _id: '600d395667536503354cbe91',
+    const existingRevision = await prisma.revisions.findUnique({
+      where: { id: '600d395667536503354cbe91' },
     });
     if (existingRevision == null && parentForDuplicate && childForDuplicate) {
-      await Revision.insertMany([
-        {
-          _id: '600d395667536503354cbe91',
-          pageId: parentForDuplicate._id,
-          body: 'duplicateBody',
-        },
-        {
-          _id: '600d395667536503354cbe92',
-          pageId: childForDuplicate._id,
-          body: 'duplicateChildBody',
-        },
-      ]);
+      assert(parentForDuplicate._id != null);
+      assert(childForDuplicate._id != null);
+      await prisma.revisions.createMany({
+        data: [
+          {
+            id: '600d395667536503354cbe91',
+            pageId: parentForDuplicate._id.toString(),
+            body: 'duplicateBody',
+          },
+          {
+            id: '600d395667536503354cbe92',
+            pageId: childForDuplicate._id.toString(),
+            body: 'duplicateChildBody',
+          },
+        ],
+      });
     }
 
     generalXssFilterProcessSpy = vi.spyOn(generalXssFilter, 'process');
