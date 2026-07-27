@@ -214,7 +214,7 @@ interface SearchResultPagePathProps {
 - 1〜3 セグメント → 全セグメント表示、末尾のみ `isPageName`、`ellipsis` を含まない（2.1）。
 - ちょうど 4 セグメント → `ellipsis` 1 個、先頭・親（`segments[2]`）・ページ名（`segments[3]`）を保持（2.3）。
 - 深い階層（例: 祖先 5 + ページ名）→ 先頭 + `ellipsis` + 親 + ページ名（1.1, 1.2）。
-- **日付パス（現行規則の踏襲）**: 日付束ねは「日付より前に祖先 2 セグメント以上」の条件で発動する（`DevidedPagePath` の実挙動）。`/notes/2024/01/01` は祖先が `notes` の 1 個のみのため**束ねられず** former=`/notes/2024/01`・latter=`01`（単位数 4 → `notes / … / 01 / 01`）。`/team/notes/2024/01/01` は束ねられ latter=`2024/01/01`（単位数 4 → `team / … / notes / 2024/01/01`）。`/Projects/team/notes/2024/01/01` → `先頭=Projects / … / 親=notes / ページ名=2024/01/01`。いずれもページ名 `text` が `DevidedPagePath.latter` と一致すること（1.3）。
+- **日付パス（現行規則の踏襲）**: 日付束ねは「日付より前に祖先 2 セグメント以上」の条件で発動する（`DevidedPagePath` の実挙動）。`/notes/2024/01/01` は祖先が `notes` の 1 個のみのため**束ねられず** former=`/notes/2024/01`・latter=`01`（単位数 4 → `notes / … / 01 / 01`）。`/team/notes/2024/01/01` は束ねられ latter=`2024/01/01`・祖先=`[team, notes]`（単位数 3 → **省略なし** `team / notes / 2024/01/01`）。`/Projects/team/notes/2024/01/01` は束ねられ latter=`2024/01/01`・祖先=`[Projects, team, notes]`（単位数 4 → `先頭=Projects / … / 親=notes / ページ名=2024/01/01`）。いずれもページ名 `text` が `DevidedPagePath.latter` と一致すること（1.3）。
 - 長い CJK セグメントを含む入力でもパーツ構造が壊れないこと（内容そのままを保持）。
 - 末尾/先頭スラッシュ等の正規化前後で期待どおり分割されること。
 
