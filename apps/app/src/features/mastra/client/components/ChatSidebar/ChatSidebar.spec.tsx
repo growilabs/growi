@@ -45,11 +45,12 @@ vi.mock('@ai-sdk/react', () => ({
 // Chat sidebar status: provide an opened sidebar so ChatSidebar renders its
 // header + input without reaching into jotai. Controllable so a test can bump
 // `openSeq` to simulate re-opening the sidebar.
-const { sidebarStatus } = vi.hoisted(() => ({
-  sidebarStatus: {
-    current: { isOpened: true, openSeq: 0 } as ChatSidebarStatus,
-  },
-}));
+const { sidebarStatus } = vi.hoisted(() => {
+  const sidebarStatus: { current: ChatSidebarStatus } = {
+    current: { isOpened: true, openSeq: 0 },
+  };
+  return { sidebarStatus };
+});
 vi.mock('../../status/chat-sidebar', () => ({
   useChatSidebarStatus: (): ChatSidebarStatus => sidebarStatus.current,
   useChatSidebarActions: () => ({ close: vi.fn() }),
