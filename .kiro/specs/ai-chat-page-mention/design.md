@@ -239,9 +239,10 @@ sequenceDiagram
 - 候補リスト（`MentionCandidateList`）を入力欄の真上に配置（CSS アンカー、上記参照）。
 - **標準カーソル移動キーマップ（`@codemirror/commands` の `defaultKeymap`）を mention キーマップ（`Prec.highest`）と併せて組み込む**。これにより非セッション時の矢印/編集キーがドキュメントモデル基準でカーソルを動かす: 空 doc での右矢印が placeholder ウィジェットを跨がず、横移動が `atomicRanges` を参照してメンションチップを 1 単位として扱う（5.x）。
 - **プレースホルダ/フォーカス/キャレット**: `placeholder` 拡張で空時の案内（**Compartment 経由で装着し、prop 変更時に reconfigure** — i18n リソースの非同期ロードや言語切替に追従するため、生成時固定にしない）、`EditorView.contentAttributes` で `.cm-content` に `data-slot="input-group-control"` を付与し host `InputGroup` のフォーカスリングを発火、テーマで `min-height`・`caret-color: currentColor`（テーマ追従）を設定。
+- **imperative focus ハンドル（`forwardRef`）**: 編集要素は本コンポーネントが内部で生成・所有する CodeMirror の `contentDOM` なので、ホストは通常の DOM ref で掴めない。`useImperativeHandle` で `focus()` のみを公開し、ホストが任意のタイミング（チャットサイドバーのオープン時）でキャレットを渡せるようにする。`view` 本体は internal のまま（公開面を最小に保つ）。ハンドルは `viewRef` を**呼び出し時に**読むため、view 再生成後も正しく追従する。
 
 **Dependencies**
-- Inbound: ChatSidebar — value/onChange/placeholder/disabled (P0)
+- Inbound: ChatSidebar — value/onChange/placeholder (P0)、および `ref`（`PageMentionInputHandle`、オープン時のフォーカス付与用）
 - Outbound: useMentionController (P0), createPageMentionExtensions (P0)
 - External: ホスト `<form>`（`PromptInput` が描画）— `requestSubmit()` と `name="message"` 経由の送信（P0）
 
@@ -252,7 +253,11 @@ export interface PageMentionInputProps {
   value: string;                       // フラット済みパス文字列(送信/空判定用)
   onChange: (value: string) => void;   // doc変更ごとにflatten結果を返す
   placeholder?: string;
-  disabled?: boolean;
+}
+
+// forwardRef で公開する imperative ハンドル
+export interface PageMentionInputHandle {
+  focus(): void;                       // エディタにキャレットを移す（view 未マウント時は no-op）
 }
 ```
 - Preconditions: `~/components/ai-elements/prompt-input` の `PromptInputBody` 子（=ホスト `<form>` の内側）として配置される。
