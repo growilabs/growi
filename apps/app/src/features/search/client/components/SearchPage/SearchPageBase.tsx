@@ -47,6 +47,11 @@ type Props = {
   pages?: IPageWithSearchMeta[];
   searchingKeyword?: string;
 
+  // Identity of the current search. Selection is reset only when this value
+  // changes (new search / condition change), never on every `pages` update.
+  // Appended pages under a stable `resetKey` keep the existing selection.
+  resetKey: string;
+
   forceHideMenuItems?: ForceHideMenuItems;
 
   onSelectedPagesByCheckboxesChanged?: (
@@ -74,6 +79,7 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     className,
     pages,
     searchingKeyword,
+    resetKey,
     forceHideMenuItems,
     onSelectedPagesByCheckboxesChanged,
     searchControl,
@@ -153,23 +159,23 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     }
   }, [pages]);
 
-  // reset selectedPageIdsByCheckboxes
+  // Reset selection when the search identity (`resetKey`) changes.
+  // This is data-independent: empty the Set and notify a count of 0.
+  // Appending pages (resetKey unchanged) does NOT fire this effect, so the
+  // selection is preserved (Req 4.3); only a new search / condition change
+  // (resetKey change) clears it (Req 7.2).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resetKey is a trigger dep — re-run this effect only when the search identity changes, not when the reset body itself changes
   useEffect(() => {
-    if (pages == null) {
-      return;
-    }
-
-    if (pages.length > 0) {
-      selectedPageIdsByCheckboxes.clear();
-    }
+    selectedPageIdsByCheckboxes.clear();
 
     if (onSelectedPagesByCheckboxesChanged != null) {
-      onSelectedPagesByCheckboxesChanged(
-        selectedPageIdsByCheckboxes.size,
-        pages.length,
-      );
+      onSelectedPagesByCheckboxesChanged(0, 0);
     }
-  }, [onSelectedPagesByCheckboxesChanged, pages, selectedPageIdsByCheckboxes]);
+  }, [
+    resetKey,
+    onSelectedPagesByCheckboxesChanged,
+    selectedPageIdsByCheckboxes,
+  ]);
 
   if (!isSearchServiceConfigured) {
     return (

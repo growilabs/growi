@@ -20,7 +20,7 @@
   - _Boundary: useSWRINFxSearch, getSearchInfiniteKey_
 
 - [ ] 2. Core: SearchPageBase を累積表示前提に拡張
-- [ ] 2.1 選択リセットを resetKey 駆動化し、全選択を累積対象にする
+- [x] 2.1 選択リセットを resetKey 駆動化し、全選択を累積対象にする
   - 選択クリアの発火契機を「表示リスト変化」から「検索アイデンティティ（`resetKey`）変化」に変更する
   - 追加読み込み（`resetKey` 不変）では選択が維持され、新規検索・条件変更（`resetKey` 変化）でのみ選択がクリアされる
   - 「全選択」が読み込み済みの累積全件を対象に選択する
