@@ -66,7 +66,7 @@
   - _Requirements: 2.1, 2.3_
   - _Boundary: User Model_
 
-- [ ] 2.4 passwordHash の API レスポンス漏洩を防止する（@growi/core）
+- [x] 2.4 passwordHash の API レスポンス漏洩を防止する（@growi/core）
   - `packages/core/src/models/serializers/user-serializer.ts` の `omitInsecureAttributes()` の omit リストに `passwordHash` を追加する（現状は `password`/`apiToken`/`email` のみ除外しており新フィールドが漏洩する）
   - `packages/core/src/interfaces/user.ts` の `IUser` に `passwordHash?: string` を追加する
   - `@growi/core` は published package のため `npx changeset` で patch bump を作成する
@@ -216,5 +216,6 @@
 
 - **1.1 (v8)**: `bcryptjs`/`@types/bcryptjs` は v8 package.json に不在（scrypt は `node:crypto` 組み込み、新規依存不要）。`util.promisify(scrypt)` は options 付きオーバーロードを落とすため（TS2554）、`new Promise` の手動ラッパーで `scrypt(pw, salt, keylen, {N,r,p,maxmem}, cb)` を呼ぶこと。v8 tsconfig（`tsgo --noEmit`）で型チェック通過を確認済み。型チェックは v8 では `tsgo`（`tsc` ではない）。
 - **1.2 (v8)**: `createPasswordHashService(params)` ファクトリ + env バインド既定シングルトン `passwordHashService`（env 名 `PASSWORD_SCRYPT_N/R/P`）をエクスポート。既定 N=2^17/r=8/p=1、`maxmem=Math.max(192MB, 128*N*r*2)`。ファクトリは floor クランプなし（テストで小 N 注入可、上限クランプのみ）／env パスは floor+ceiling クランプ + 起動時 WARNING。`verify()` は verifyScrypt/verifyLegacy に委譲し throw しない。biome の `useAwait` 警告回避のため verifyLegacy は同期メソッド。task 2.2 で User model からは既定シングルトン `passwordHashService` を import。**import は拡張子なし**（v8 規約）。
+- **2.4 (v8)**: `omitInsecureAttributes()` は destructure-drop（`const { password, passwordHash, apiToken, email, ...rest }`）で runtime 除外。`IUserSerializedSecurely` の Omit union にも passwordHash 追加。`IUser` に `passwordHash?: string`。changeset は `.changeset/password-hash-omit.md`（@growi/core patch）。**@growi/core は consumer が `dist` を import するため、app レベルの integ テスト（2.8/3.2）前に `turbo run build --filter @growi/core` が必要**。注意: サブエージェントのツール実行で `.claude/settings.json` に grep/echo 許可が混入する（boundary 外）→ コミット前に `git checkout -- .claude/settings.json` で戻すこと。
 - **2.2 (v8)**: User model は `import { passwordHashService } from '~/server/service/password-hash';`（拡張子なし）で既定シングルトンを利用。`isPasswordValid` は `crowi.env.PASSWORD_SEED`（= 既存 generatePassword と同じアクセサ）を verify に渡し `Promise<VerifyResult>` を返す（boolean ではない → 外部呼び出し元は 2.5/3.1 で await 化）。`setPassword` は `this.passwordHash` のみ設定し `this.password` は不変。5 呼び出し元（updatePassword/activateInvitedUser/resetPasswordByRandomString/createUserByEmail/createUserByEmailAndPasswordAndStatus）すべて await 済み。`generatePassword` は 2.3 まで残す（findUserByEmailAndPassword が最後の呼び出し元）。この変更で updatePassword/activateInvitedUser の pre-existing useAwait 警告が2件解消。
 - **1.3 (v8)**: 1.3 の必須マトリクス全ケース + 任意拡張（弱パラメータ→needsRehash:true）を 1.2 で作成済みの `password-hash.spec.ts`（全12件）が網羅済み。追加テストは不要と確認し 1.3 完了。noPassword は空文字も不在扱い、malformed は scrypt envelope 不正 / legacy 非 hex / corrupt envelope の3ケースを検証。
