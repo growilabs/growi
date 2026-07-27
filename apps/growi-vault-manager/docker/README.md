@@ -8,7 +8,7 @@ GROWI Vault Manager Official docker image
 Supported tags and respective Dockerfile links
 ------------------------------------------------
 
-* [`0.1.1`, `0.1`, `0`, `latest` (Dockerfile)](https://github.com/growilabs/growi/blob/vault-manager/v0.1.1/apps/growi-vault-manager/docker/Dockerfile)
+* [`1.0.0`, `1.0`, `1`, `latest` (Dockerfile)](https://github.com/growilabs/growi/blob/vault-manager/v1.0.0/apps/growi-vault-manager/docker/Dockerfile)
 
 
 What is GROWI Vault?
