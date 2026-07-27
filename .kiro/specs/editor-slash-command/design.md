@@ -52,8 +52,10 @@
 
 ### Existing Architecture Analysis
 - 補完は `stores/use-default-extensions.ts` の `defaultExtensions[]` に Extension を並べ、`appendExtensions([...])`（`Compartment` + `StateEffect.appendConfig`）で登録される。
-- 絵文字補完は `autocompletion({ override: [emojiAutocompletion], addToOptions: [render], icons: false })` を Extension として直接登録している。
+- 絵文字補完は、共有の `autocompletion({ icons: false })` ファシリティ（`baseExtensions`）に対し、`markdownLanguage.data.of({ autocomplete: emojiCompletionSource })` で補完ソースを、`autocompletion({ addToOptions: [render] })` でレンダラを足す形で登録している。
 - 挿入系 pure 関数は `EditorView` を受け取り内部で `view.dispatch` する（選択範囲ベース・トグル意味論）。
+
+> **設計改訂メモ（dev/8.0.x マージ後）**: 当初 emoji・slash を単一 `autocompletion({ override: [...] })` に統合する設計だったが、dev/8.0.x で先行した `@` メンション補完が `markdownLanguage.data.of(...)` で登録されており、`override` を使うと language-data 由来のソースが全て置き換わりメンションが動かなくなる。このためマージ後は **slash・emoji・mention とも「共有 `autocompletion()` ファシリティ + language-data ソース追加」方式**に統一した。以降の記述はこの改訂後の形を指す。
 
 ### Architecture Pattern & Boundary Map
 
@@ -82,7 +84,7 @@ graph TB
 ```
 
 **Architecture Integration**:
-- **Selected pattern**: 既存実績のある `@codemirror/autocomplete` 補完ソースパターンを踏襲し、emoji と slash を**単一 `autocompletion()`** に統合する。
+- **Selected pattern**: 既存実績のある `@codemirror/autocomplete` 補完ソースパターンを踏襲し、slash・emoji・mention を**共有 `autocompletion()` ファシリティ + language-data ソース追加**方式で共存させる（上記「設計改訂メモ」参照）。
 - **Domain boundaries**: コマンド宣言（データ）/ 挿入生成（純粋ビルダー）/ トリガー・適用（補完ソース）/ 登録・i18n 解決（フック）を分離。
 - **Existing patterns preserved**: `Compartment` 登録、`services-internal` 配下のモジュール分割、barrel 公開面。
 - **Steering compliance**: 「Executors take their work-set as input」「Data-Driven Control」「pure function 抽出」「barrel 最小公開」に準拠。
@@ -91,7 +93,7 @@ graph TB
 
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
-| Frontend (editor) | `@codemirror/autocomplete` (既存) | 補完ソース/ポップアップ/キーボード操作/フィルタ | emoji と統合 |
+| Frontend (editor) | `@codemirror/autocomplete` (既存) | 補完ソース/ポップアップ/キーボード操作/フィルタ | 共有ファシリティに language-data ソースとして追加（emoji/mention と共存） |
 | Frontend (editor) | `@codemirror/state`, `@codemirror/view` (既存) | `EditorView`・トランザクション（`ChangeSpec`/`EditorSelection`） | 単一トランザクション挿入 |
 | Frontend (i18n) | `react-i18next` (既存) | コマンドラベル/説明の解決 | キーは locale JSON |
 | Data / Storage | なし | — | 永続化なし |
@@ -116,7 +118,7 @@ packages/editor/src/client/services-internal/slash-command/
 
 ### Modified Files
 - `packages/editor/src/client/services-internal/extensions/emojiAutocompletionSettings.ts` — emoji の `CompletionSource` と `render` addToOption を named export として切り出す（既存の統合済み Extension export は登録点へ移動）。
-- `packages/editor/src/client/stores/use-default-extensions.ts` — `useTranslation` でラベル解決し、`createSlashCommandSource(resolveSlashCommands(t))` と emoji ソースを 1 つの `autocompletion({ override: [slashSource, emojiSource], addToOptions: [emojiRender], icons: false })` に統合して登録する。
+- `packages/editor/src/client/stores/use-default-extensions.ts` — `useTranslation` でラベル解決し、`createSlashCommandExtension(t) = markdownLanguage.data.of({ autocomplete: createSlashCommandSource(resolveSlashCommands(t)) })` を共有の `autocompletion({ icons: false })` ファシリティ（`baseExtensions`）とともに登録する。`override` は使わない（language-data の emoji/mention ソースを消さないため）。
 - `packages/editor/src/client/services-internal/extensions/index.ts` — emoji source/render の再エクスポート調整。
 - `packages/editor/src/client/services-internal/index.ts` — `slash-command` barrel を公開。
 - `apps/app/public/static/locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/translation.json` — `slash_command.*` キー追加（GROWI がサポートする全ロケール）。
@@ -364,12 +366,12 @@ export const createSlashCommandSource: (
 #### use-default-extensions（変更）
 | Field | Detail |
 |-------|--------|
-| Intent | emoji と slash を単一 `autocompletion()` に統合して登録、ラベル解決 | 
+| Intent | slash を共有 `autocompletion()` ファシリティに language-data ソースとして登録、ラベル解決（emoji/mention と共存） | 
 | Requirements | 6.2, 7.1 |
 
 **Responsibilities & Constraints**
 - `useTranslation('translation')` で `t` を取得 → `resolveSlashCommands(t)` → `createSlashCommandSource(...)`。
-- emoji 補完ソース/レンダラと合わせて `autocompletion({ override: [slashSource, emojiSource], addToOptions: [emojiRender], icons: false })` を構築し `defaultExtensions` に組み込む。
+- slash ソースは `markdownLanguage.data.of({ autocomplete: ... })` として登録し、共有 `autocompletion({ icons: false })` ファシリティ（`baseExtensions`）に足す。`override` は使わない（emoji/mention の language-data ソースを消さないため）。
 - emoji の従来挙動を不変に保つ（Out of Boundary）。
 
 **登録機構（多重 append / 破壊の防止）**
@@ -383,6 +385,8 @@ export const createSlashCommandSource: (
 - Integration: 既存の単独 emoji Extension 登録を、統合 `autocompletion()` に置換。emoji 側は `emojiCompletionSource` と render addToOption を named export に切り出す（ロジックは不変）。
 - Validation: emoji 補完が回帰しないこと、slash と同時に機能すること、言語切替で補完が多重化/消失しないことをスモーク確認（Req 6.2）。
 - Risks: `appendExtensions` は呼び出しごとに新 `Compartment` を作る仕様のため、cleanup 漏れが多重登録に直結する点に注意。
+- 対象エディタ（コメント欄）: `useDefaultExtensions` はページ本文エディタとコメント欄エディタ（`CodeMirrorEditorComment`）の双方で使われるため、slash は両方で有効になる。コメント欄では `CommentEditor` が `@` メンション拡張を追加で append するため、slash・emoji・mention の 3 ソースが同一エディタ上で共存する。3 者は全て language-data ソースとして登録され互いを消さない（Integration Tests で検証）。
+- follow-up #6（emoji の `addToOptions` render が全候補に適用され、slash のように `type` を持たない候補に空 `<span>` が付く問題）は、language-data 統一により **mention 候補にも同じ影響が及ぶ**範囲になった。render を emoji 候補（`completion.type` あり）に限定する対応の優先度を引き上げる。
 
 ## Error Handling
 
@@ -408,8 +412,9 @@ export const createSlashCommandSource: (
 （テストは markdown-utils の既存規約に倣い、`@codemirror/state` の `EditorState`/`EditorSelection` と `@codemirror/view` の `EditorView` を組んで `view.state.doc.toString()` と `view.state.selection` を検証。`// @vitest-environment jsdom`。）
 
 ### Integration Tests
-1. `use-default-extensions` 経由で slash と emoji の両補完ソースが同一 `autocompletion()` に登録され、`/` と `:` がそれぞれ独立に発火する（6.2）。
+1. `use-default-extensions` 経由で slash と emoji の両補完ソースが共有 `autocompletion()` に登録され、`/` と `:` がそれぞれ独立に発火する（6.2）。
 2. コマンド選択による挿入が通常の `view.dispatch` トランザクションとして発行され、協調編集前提の編集経路と整合する（6.3、トランザクション発行の検証）。
+3. コメント欄相当の構成（`baseExtensions` + emoji + slash + mention）で、`/head`・`:smi`・`@ab` の各トリガー位置で slash・emoji・mention の候補がそれぞれ surface し、互いを消さないこと（`slash-command-source.integ.ts`）。dev/8.0.x 由来の `emojiAutocompletionSettings.integ.ts`（emoji+mention の 2 者）を、slash を含む 3 者へ拡張したもの（6.2、Adjacent expectations の mention 共存）。
 
 ### E2E/UI Tests（任意）
 1. エディタで `/` 入力→`table` 絞り込み→Enter で空テーブルが挿入されカーソルが先頭セルに来る（1.1, 2.1, 3.2, 3.3, 3.4）。
