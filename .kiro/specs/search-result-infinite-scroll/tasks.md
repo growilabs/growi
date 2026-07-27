@@ -10,7 +10,7 @@
   - _Requirements: 1.4, 1.5_
   - _Boundary: mergeInfiniteSearchResult_
 
-- [ ] 1.2 (P) infinite scroll 用の検索取得フックとページキー関数
+- [x] 1.2 (P) infinite scroll 用の検索取得フックとページキー関数
   - `useSWRInfinite` で既存 apiv1 `/search`（offset/limit）を取得し、取得済みページの配列を返す。SWR key 名前空間を既存フックと分離する
   - チャンクサイズを「`showPageLimitationL` 設定値、無ければ既定20」で固定し、同一検索中は一定にする
   - ページキーを純粋関数として抽出し、keyword 空・前ページがチャンク未満で `null`（停止）、offset を `pageIndex × チャンク` で算出する。キー関数のユニットテストを付ける
