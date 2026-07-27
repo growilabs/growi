@@ -77,6 +77,8 @@ describe('User', () => {
       username: 'adminusertestToBeRemoved',
     });
     adminusertestToBeRemovedId = adminusertestToBeRemoved._id;
+    // Set passwordHash so the credential-scrub assertion in statusDelete is meaningful
+    adminusertestToBeRemoved.passwordHash = 'scrypt$dummy$hash';
     await adminusertestToBeRemoved.statusDelete();
   });
 
@@ -122,6 +124,7 @@ describe('User', () => {
         expect(adminusertestToBeRemoved).toBeInstanceOf(User);
         expect(adminusertestToBeRemoved.name).toBe('');
         expect(adminusertestToBeRemoved.password).toBe('');
+        expect(adminusertestToBeRemoved.passwordHash).toBeUndefined();
         expect(adminusertestToBeRemoved.googleId).toBeNull();
         expect(adminusertestToBeRemoved.isGravatarEnabled).toBeFalsy();
         expect(adminusertestToBeRemoved.image).toBeNull();

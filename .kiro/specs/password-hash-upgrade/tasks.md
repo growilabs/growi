@@ -94,7 +94,7 @@
   - _Depends: 2.1_
   - _Boundary: User Model_
 
-- [ ] 2.7 statusDelete で passwordHash を消去する
+- [x] 2.7 statusDelete で passwordHash を消去する
   - `statusDelete()`（`apps/app/src/server/models/user/index.js` v8: line ~371、`this.password = ''` は line ~379）に `this.passwordHash = undefined;` を追加し、削除ユーザーが有効な scrypt 認証情報ハッシュを保持しないようにする（既存の `this.password = ''` と同じ意図）
   - `''` ではなく `undefined`（unset）にする理由: verify() が `noPassword`（正常系）として扱い、フォーマット不一致の Req 2.4 WARNING を誤発火させないため
   - 既存の統合テスト `user.integ.ts`（削除ユーザーの属性検証、`password` の空文字を確認している箇所）に `passwordHash` が unset されている検証を追加する

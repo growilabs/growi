@@ -378,6 +378,7 @@ const factory = (crowi) => {
     this.status = UserStatus.STATUS_DELETED;
     this.username = deletedLabel;
     this.password = '';
+    this.passwordHash = undefined;
     this.name = '';
     this.email = `${deletedLabel}@deleted`;
     this.googleId = null;
