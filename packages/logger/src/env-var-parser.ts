@@ -1,4 +1,4 @@
-import type { LoggerConfig } from './types';
+import type { LoggerConfig } from './types.js';
 
 const LEVEL_ENV_VARS: ReadonlyArray<[string, string]> = [
   ['DEBUG', 'debug'],

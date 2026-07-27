@@ -3,26 +3,27 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { Router } from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
-import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
+import { pendingActivityContext } from '~/server/service/activity/index';
 import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
-import { generateOverwriteParams } from '~/server/service/import/overwrite-params';
 import type { ZipFileStat } from '~/server/service/interfaces/export';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { executeImport } from './import-executor';
+import { buildImportSettingsMap } from './import-settings-builder';
+import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:import');
 
-const path = require('path');
-
-const express = require('express');
-const multer = require('multer');
+import express from 'express';
+import multer from 'multer';
+import path from 'path';
 
 const router = express.Router();
 
@@ -196,7 +197,7 @@ export default function route(crowi: Crowi): Router {
     accessTokenParser([SCOPE.READ.ADMIN.IMPORT_DATA], { acceptLegacy: true }),
     loginRequired,
     adminRequired,
-    async (req, res) => {
+    async (req: CrowiRequest, res: ApiV3Response) => {
       try {
         const status = await importService.getStatus();
         return res.apiv3(status);
@@ -250,9 +251,18 @@ export default function route(crowi: Crowi): Router {
     loginRequired,
     adminRequired,
     addActivity,
-    async (req, res) => {
+    async (req: CrowiRequest, res: ApiV3Response) => {
       // TODO: add express validator
       const { fileName, collections, options } = req.body;
+
+      // loginRequired + adminRequired guarantee req.user at runtime; guard narrows the type
+      const { user } = req;
+      if (user == null) {
+        return res.apiv3Err(
+          new ErrorV3('param "user" must be set.', 'forbidden'),
+          403,
+        );
+      }
 
       // pages collection can only be imported by upsert if isV5Compatible is true
       const isV5Compatible =
@@ -282,6 +292,14 @@ export default function route(crowi: Crowi): Router {
       }
 
       const zipFile = importService.getFile(fileName);
+
+      // Capture the activity context BEFORE responding. The import runs after
+      // this response and registerFailsafeFinalizer clears this request's
+      // pending context on the response's 'finish' event, so the post-import
+      // activity emit would otherwise settle with user=null (see PR #11510 and
+      // ExecuteImportArgs.activityContext).
+      const activityId = res.locals.activity._id;
+      const activityContext = pendingActivityContext.take(activityId);
 
       // return response first
       res.apiv3();
@@ -330,27 +348,18 @@ export default function route(crowi: Crowi): Router {
       }
 
       // generate maps of ImportSettings to import
-      // Use the Map for a potential fix for the code scanning alert no. 895: Prototype-polluting assignment
-      const importSettingsMap = new Map<string, ImportSettings>();
-      fileStatsToImport.forEach(({ fileName, collectionName }) => {
-        // instanciate GrowiArchiveImportOption
-        const option: GrowiArchiveImportOption = options.find(
-          (opt) => opt.collectionName === collectionName,
+      let importSettingsMap: Map<string, ImportSettings>;
+      try {
+        importSettingsMap = buildImportSettingsMap(
+          fileStatsToImport,
+          options,
+          user._id.toString(),
         );
-
-        // generate options
-        const importSettings = {
-          mode: option.mode,
-          jsonFileName: fileName,
-          overwriteParams: generateOverwriteParams(
-            collectionName,
-            req.user._id,
-            option,
-          ),
-        } satisfies ImportSettings;
-
-        importSettingsMap.set(collectionName, importSettings);
-      });
+      } catch (err) {
+        logger.error(err);
+        adminEvent.emit('onErrorForImport', { message: err.message });
+        return;
+      }
 
       /*
        * import
@@ -359,7 +368,8 @@ export default function route(crowi: Crowi): Router {
         importService,
         adminEvent,
         activityEvent,
-        activityId: res.locals.activity._id,
+        activityId,
+        activityContext,
         collections,
         importSettingsMap,
       });
@@ -402,8 +412,12 @@ export default function route(crowi: Crowi): Router {
     adminRequired,
     uploads.single('file'),
     addActivity,
-    async (req, res) => {
+    async (req: CrowiRequest, res: ApiV3Response) => {
       const { file } = req;
+      // uploads.single('file') populates req.file; guard narrows the type
+      if (file == null) {
+        return res.apiv3Err(new ErrorV3('File error.', 'file_not_found'), 400);
+      }
       const zipFile = importService.getFile(file.filename);
       let data: ZipFileStat | null;
 
@@ -454,7 +468,7 @@ export default function route(crowi: Crowi): Router {
     accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA], { acceptLegacy: true }),
     loginRequired,
     adminRequired,
-    async (req, res) => {
+    async (req: CrowiRequest, res: ApiV3Response) => {
       try {
         importService.deleteAllZipFiles();
 

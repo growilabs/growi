@@ -9,7 +9,7 @@ export interface TestUser {
   authFile: string;
 }
 
-const authDir = path.resolve(__dirname, '../.auth');
+const authDir = path.resolve(import.meta.dirname, '../.auth');
 
 // Shared password for every provisioned test user (>= 6 ASCII chars, see
 // invited-form-validator). Not a secret — these accounts only exist in the

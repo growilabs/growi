@@ -1,5 +1,7 @@
-import { SupportedAction } from '~/interfaces/activity';
+import { MODEL_ATTACHMENT, SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
+import { buildAttachmentRemoveSnapshot } from '~/server/service/attachment/attachment-removal-snapshot';
+import { resolveAttachmentPagePath } from '~/server/service/attachment/attachment-snapshot';
 import loggerFactory from '~/utils/logger';
 
 import { Attachment } from '../../models/attachment';
@@ -7,7 +9,7 @@ import { validateImageContentType } from './image-content-type-validator';
 
 const logger = loggerFactory('growi:routes:attachment');
 
-const ApiResponse = require('../../util/apiResponse');
+import ApiResponse from '../../util/apiResponse';
 
 /**
  * @swagger
@@ -328,6 +330,27 @@ export const routesFactory = (crowi) => {
       );
     }
 
+    // Build the activity snapshot BEFORE removeAttachment,
+    // because the attachment document is deleted afterwards (requirements 2.1, 2.2).
+    // The shared resolver warns and yields undefined when the page cannot be
+    // resolved, so the snapshot is recorded without pagePath (requirement 2.3).
+    const pagePath = await resolveAttachmentPagePath(attachment.page, {
+      attachmentId: attachment._id,
+    });
+    const snapshot = buildAttachmentRemoveSnapshot(
+      {
+        _id: attachment._id.toString(),
+        originalName: attachment.originalName,
+        fileSize: attachment.fileSize,
+        // the Mongoose attachment holds the page reference as `page` (ObjectId);
+        // the builder expects it as `pageId` (see AttachmentLike NOTE)
+        pageId:
+          attachment.page != null ? attachment.page.toString() : undefined,
+      },
+      pagePath,
+      req.user.username,
+    );
+
     try {
       await attachmentService.removeAttachment(attachment);
     } catch (err) {
@@ -339,6 +362,9 @@ export const routesFactory = (crowi) => {
 
     activityEvent.emit('update', res.locals.activity._id, {
       action: SupportedAction.ACTION_ATTACHMENT_REMOVE,
+      target: attachment._id,
+      targetModel: MODEL_ATTACHMENT,
+      snapshot,
     });
 
     return res.json(ApiResponse.success({}));

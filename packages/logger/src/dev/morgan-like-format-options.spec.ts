@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { describe, expect, it } from 'vitest';
 
-import { morganLikeFormatOptions } from './morgan-like-format-options';
+import { morganLikeFormatOptions } from './morgan-like-format-options.js';
 
 // Strip ANSI escape codes for plain-text assertions (avoids control-char lint rule)
 const ANSI_RE = new RegExp(`${String.fromCharCode(27)}\\[\\d+m`, 'g');

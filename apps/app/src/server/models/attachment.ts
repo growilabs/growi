@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { IAttachment } from '@growi/core';
 import { addSeconds } from 'date-fns/addSeconds';
 import { type Document, type Model, Schema } from 'mongoose';
@@ -13,7 +14,7 @@ import { getOrCreateModel } from '../util/mongoose-utils';
 const _logger = loggerFactory('growi:models:attachment');
 
 function generateFileHash(fileName) {
-  const hash = require('crypto').createHash('md5');
+  const hash = createHash('md5');
   hash.update(`${fileName}_${Date.now()}`);
 
   return hash.digest('hex');

@@ -1,4 +1,4 @@
-import type { ParseRangeResult } from '../interfaces/option-parser';
+import type { ParseRangeResult } from '../interfaces/option-parser.js';
 
 /**
  * Options parser for custom tag

@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   normalizeCRLFFilter(value) {
     return value.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   },

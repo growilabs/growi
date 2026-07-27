@@ -1,2 +1,2 @@
-export * from './CodeMirrorEditorDiff';
-export * from './MergeViewer';
+export * from './CodeMirrorEditorDiff.js';
+export * from './MergeViewer.js';

@@ -27,6 +27,15 @@ export interface IPageListingService {
     showPagesRestrictedByOwner?: boolean,
     showPagesRestrictedByGroup?: boolean,
   ): Promise<IPageForTreeItem[]>;
+  findLimitedChildrenByParentIdAndViewer(
+    parentId: string,
+    user: IUser | undefined,
+    limit: number,
+  ): Promise<IPageForTreeItem[]>;
+  countChildrenByParentIdAndViewer(
+    parentId: string,
+    user?: IUser,
+  ): Promise<number>;
 }
 
 let pageOperationService: IPageOperationService;
@@ -106,6 +115,76 @@ class PageListingService implements IPageListingService {
     return injectedPages.map((page) =>
       Object.assign(page, { _id: page._id.toString() }),
     );
+  }
+
+  /**
+   * Return at most `limit` viewer-visible direct children of the given parent page id,
+   * limited at the query level (never by slicing an all-loaded array) so memory stays
+   * bounded even when a page has many children. Mirrors the semantics of
+   * findChildrenByParentPathOrIdAndViewer (viewer grant filter, empty container pages
+   * included, ascending path order) but resolves strictly by parent id — no path regex.
+   * Intended for the page-markdown footer, where only the first N children are linked.
+   */
+  async findLimitedChildrenByParentIdAndViewer(
+    parentId: string,
+    user: IUser | undefined,
+    limit: number,
+  ): Promise<IPageForTreeItem[]> {
+    const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
+      'Page',
+    );
+
+    // Use $eq for user-controlled sources. see: https://codeql.github.com/codeql-query-help/javascript/js-sql-injection/#recommendation
+    const queryBuilder = new PageQueryBuilder(
+      Page.find({ parent: { $eq: parentId } }),
+      true,
+    );
+    // Share the exact viewer condition with countChildrenByParentIdAndViewer so the
+    // grant logic is not re-implemented and the two can never drift apart.
+    await queryBuilder.addViewerCondition(user);
+
+    const pages: HydratedDocument<Omit<IPageForTreeItem, 'processData'>>[] =
+      await queryBuilder
+        .addConditionToPagenate(0, limit, 'path')
+        .query.select(
+          '_id path parent revision descendantCount grant isEmpty wip',
+        )
+        .lean()
+        .exec();
+
+    const injectedPages = await this.injectProcessDataIntoPagesByActionTypes(
+      pages,
+      [PageActionType.Rename],
+    );
+
+    // Type-safe conversion to IPageForTreeItem
+    return injectedPages.map((page) =>
+      Object.assign(page, { _id: page._id.toString() }),
+    );
+  }
+
+  /**
+   * Return the exact number of viewer-visible direct children of the given parent page id.
+   * Uses countDocuments({ parent: id }) with the same addViewerCondition applied to the
+   * limited fetch above, so the total reflects the identical grant filter (no double
+   * implementation) and is not affected by the footer link limit.
+   */
+  async countChildrenByParentIdAndViewer(
+    parentId: string,
+    user?: IUser,
+  ): Promise<number> {
+    const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
+      'Page',
+    );
+
+    // Use $eq for user-controlled sources. see: https://codeql.github.com/codeql-query-help/javascript/js-sql-injection/#recommendation
+    const queryBuilder = new PageQueryBuilder(
+      Page.countDocuments({ parent: { $eq: parentId } }),
+      true,
+    );
+    await queryBuilder.addViewerCondition(user);
+
+    return queryBuilder.query.exec();
   }
 
   /**

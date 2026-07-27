@@ -196,4 +196,4 @@ const contributors = [
   },
 ];
 
-module.exports = contributors;
+export default contributors;

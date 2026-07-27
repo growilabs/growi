@@ -68,7 +68,7 @@ export async function getPageWritable(
 
   // Build renderer once — reused for every page in the job.
   // BulkExportMarkdownRenderer caches the unified pipeline at module level.
-  const renderer = createBulkExportMarkdownRenderer(__dirname);
+  const renderer = createBulkExportMarkdownRenderer(import.meta.dirname);
 
   // For pdf format, write the shared stylesheet once per job. Every page links
   // to it relatively, so the (~MB) CSS is not duplicated into each page's HTML.

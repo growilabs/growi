@@ -6,26 +6,24 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:adjust-page-grant');
 
-module.exports = {
-  async up(db) {
-    logger.info('Apply migration');
-    await mongoose.connect(getMongoUri(), mongoOptions);
+export async function up(db) {
+  logger.info('Apply migration');
+  await mongoose.connect(getMongoUri(), mongoOptions);
 
-    const Page = getPageModel();
+  const Page = getPageModel();
 
-    await Page.bulkWrite([
-      {
-        updateMany: {
-          filter: { grant: null },
-          update: { $set: { grant: Page.GRANT_PUBLIC } },
-        },
+  await Page.bulkWrite([
+    {
+      updateMany: {
+        filter: { grant: null },
+        update: { $set: { grant: Page.GRANT_PUBLIC } },
       },
-    ]);
+    },
+  ]);
 
-    logger.info('Migration has successfully applied');
-  },
+  logger.info('Migration has successfully applied');
+}
 
-  down(db) {
-    // do not rollback
-  },
-};
+export function down(db) {
+  // do not rollback
+}

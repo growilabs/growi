@@ -10,14 +10,11 @@ import mongoose from 'mongoose';
 
 import { getInstance } from '^/test/setup/crowi';
 
-import type { CommentModel } from '~/features/comment/server/models/comment';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
-import type { IComment } from '~/interfaces/comment';
 import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
 import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
-import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
@@ -35,6 +32,7 @@ import type {
 import type { ShareLinkModel } from '~/server/models/share-link';
 import Tag from '~/server/models/tag';
 import { generalXssFilter } from '~/services/general-xss-filter';
+import { prisma } from '~/utils/prisma';
 
 type EmittedActivityParams = {
   action: string;
@@ -52,8 +50,6 @@ describe('PageService page operations with only public pages', () => {
   let Page: PageModel;
   let Revision: IRevisionModel;
   let User: Model<IUser>;
-  let Bookmark: BookmarkModel;
-  let Comment: CommentModel;
   let ShareLink: ShareLinkModel;
   let PageRedirect: PageRedirectModel;
   let PageOperation: PageOperationModel;
@@ -96,8 +92,6 @@ describe('PageService page operations with only public pages', () => {
     User = mongoose.model('User');
     Page = mongoose.model<IPage, PageModel>('Page');
     Revision = mongoose.model<IRevision, IRevisionModel>('Revision');
-    Bookmark = mongoose.model<BookmarkDocument, BookmarkModel>('Bookmark');
-    Comment = mongoose.model<IComment, CommentModel>('Comment');
     ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
     PageRedirect = mongoose.model<IPageRedirect, PageRedirectModel>(
       'PageRedirect',
@@ -815,15 +809,15 @@ describe('PageService page operations with only public pages', () => {
       { relatedPage: pageIdForDuplicate10._id, relatedTag: tagForDuplicate2 },
     ]);
 
-    await Comment.insertMany([
-      {
+    await prisma.comments.create({
+      data: {
         commentPosition: -1,
-        page: pageIdForDuplicate11,
-        creator: dummyUser1._id,
-        revision: revisionIdForDuplicate10,
+        pageId: pageIdForDuplicate11.toString(),
+        creatorId: dummyUser1._id.toString(),
+        revisionId: revisionIdForDuplicate10.toString(),
         comment: 'this is comment',
       },
-    ]);
+    });
 
     /**
      * Delete
@@ -1052,26 +1046,28 @@ describe('PageService page operations with only public pages', () => {
       },
     ]);
 
-    await Bookmark.insertMany([
-      {
-        page: pageIdForDeleteCompletely2,
-        user: dummyUser1._id,
-      },
-      {
-        page: pageIdForDeleteCompletely2,
-        user: dummyUser2._id,
-      },
-    ]);
+    await prisma.bookmarks.createMany({
+      data: [
+        {
+          pageId: pageIdForDeleteCompletely2.toString(),
+          userId: dummyUser1._id.toString(),
+        },
+        {
+          pageId: pageIdForDeleteCompletely2.toString(),
+          userId: dummyUser2._id.toString(),
+        },
+      ],
+    });
 
-    await Comment.insertMany([
-      {
+    await prisma.comments.create({
+      data: {
         commentPosition: -1,
-        page: pageIdForDeleteCompletely2,
-        creator: dummyUser1._id,
-        revision: revisionIdForDeleteCompletely4,
+        pageId: pageIdForDeleteCompletely2.toString(),
+        creatorId: dummyUser1._id.toString(),
+        revisionId: revisionIdForDeleteCompletely4.toString(),
         comment: 'comment_ForDeleteCompletely4',
       },
-    ]);
+    });
 
     await PageRedirect.insertMany([
       {
@@ -2339,7 +2335,9 @@ describe('PageService page operations with only public pages', () => {
 
     it('Should NOT duplicate comments', async () => {
       const basePage = await Page.findOne({ path: '/v5_PageForDuplicate6' });
-      const basePageComments = await Comment.find({ page: basePage?._id });
+      const basePageComments = await prisma.comments.findMany({
+        where: { pageId: basePage?._id.toString() },
+      });
       expect(basePage).toBeTruthy();
       expect(basePageComments.length).toBeGreaterThan(0); // length > 0
 
@@ -2350,8 +2348,8 @@ describe('PageService page operations with only public pages', () => {
         dummyUser1,
         false,
       );
-      const duplicatedComments = await Comment.find({
-        page: duplicatedPage._id,
+      const duplicatedComments = await prisma.comments.findMany({
+        where: { pageId: duplicatedPage._id.toString() },
       });
 
       expect(generalXssFilterProcessSpy).toHaveBeenCalled();
@@ -2727,8 +2725,12 @@ describe('PageService page operations with only public pages', () => {
       const pageTagRelation2 = await PageTagRelation.findOne({
         relatedPage: grandchildPage?._id,
       });
-      const bookmark = await Bookmark.findOne({ page: parentPage?._id });
-      const comment = await Comment.findOne({ page: parentPage?._id });
+      const bookmark = await prisma.bookmarks.findFirst({
+        where: { pageId: parentPage?._id.toString() },
+      });
+      const comment = await prisma.comments.findFirst({
+        where: { pageId: parentPage?._id.toString() },
+      });
       const pageRedirect1 = await PageRedirect.findOne({
         toPath: parentPage?.path,
       });
@@ -2769,8 +2771,12 @@ describe('PageService page operations with only public pages', () => {
       const deletedPageTagRelations = await PageTagRelation.find({
         _id: { $in: [pageTagRelation1?._id, pageTagRelation2?._id] },
       });
-      const remainingBookmarks = await Bookmark.find({ _id: bookmark?._id });
-      const deletedComments = await Comment.find({ _id: comment?._id });
+      const remainingBookmarks = await prisma.bookmarks.findMany({
+        where: { id: bookmark?.id },
+      });
+      const deletedComments = await prisma.comments.findMany({
+        where: { id: comment?.id },
+      });
       const deletedPageRedirects = await PageRedirect.find({
         _id: { $in: [pageRedirect1?._id, pageRedirect2?._id] },
       });
@@ -3008,14 +3014,19 @@ describe('PageService page operations with only public pages', () => {
           dummyUser1._id.toString(),
         );
 
-        // The emitted activity id must correspond to a persisted Activity.
-        // We assert the linkage only, not the intermediate action state: whether
-        // the activity is created unsettled-then-settled is an implementation
-        // detail of the listener, covered behaviorally in
-        // contribution-orchestration.spec.ts.
+        // Under lazy fail-safe (Option C), the Activity row for this id is
+        // created lazily by the real `update` listener when it processes
+        // this very emit (settleActivityRecord) -- there is no more
+        // self-pre-create in revertDeletedPage. This test suppresses that
+        // listener via the mocked `emit` above so the assertions on
+        // `parameters` stay deterministic, which means the row is
+        // deliberately NOT persisted at this point. The real, end-to-end,
+        // real-DB "the row IS persisted with the right fields" contract is
+        // covered by revert-cascade-activity.integ.ts, which does not mock
+        // `emit` and lets the real listener settle the row.
         const Activity = mongoose.model('Activity');
         const activity = await Activity.findById(activityId);
-        expect(activity).toBeTruthy();
+        expect(activity).toBeNull();
       } finally {
         emitSpy.mockRestore();
       }

@@ -9,11 +9,6 @@ import type { RendererConfig } from '~/interfaces/services/renderer';
 export const aiEnabledAtom = atom<boolean>(false);
 
 /**
- * Atom for limit learnable page count per assistant
- */
-export const limitLearnablePageCountPerAssistantAtom = atom<number>(0);
-
-/**
  * Atom for users homepage deletion enabled status
  */
 export const isUsersHomepageDeletionEnabledAtom = atom<boolean>(false);

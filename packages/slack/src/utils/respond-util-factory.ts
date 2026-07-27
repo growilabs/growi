@@ -1,9 +1,9 @@
 import axios from 'axios';
 import urljoin from 'url-join';
 
-import type { IRespondUtil } from '../interfaces/respond-util';
-import type { RespondBodyForResponseUrl } from '../interfaces/response-url';
-import { isValidResponseUrl } from './response-url-validator';
+import type { IRespondUtil } from '../interfaces/respond-util.js';
+import type { RespondBodyForResponseUrl } from '../interfaces/response-url.js';
+import { isValidResponseUrl } from './response-url-validator.js';
 
 type AxiosOptions = {
   headers?: {

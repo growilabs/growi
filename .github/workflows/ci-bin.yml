@@ -1,0 +1,62 @@
+name: Node CI for bin scripts
+
+on:
+  push:
+    branches-ignore:
+      - release/**
+      - rc/**
+      - changeset-release/**
+      - mergify/merge-queue/**
+      - tmp-mergify/merge-queue/**
+    paths:
+      - .github/workflows/ci-bin.yml
+      - pnpm-lock.yaml
+      - bin/**
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - .github/workflows/ci-bin.yml
+      - pnpm-lock.yaml
+      - bin/**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
+jobs:
+  ci-bin-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: |
+          pnpm add turbo --global
+          pnpm install --frozen-lockfile
+
+      - name: Test
+        run: |
+          turbo run test --filter=./bin
+
+      - name: Slack Notification
+        uses: weseek/ghaction-slack-notification@master
+        if: failure()
+        with:
+          type: ${{ job.status }}
+          job_name: '*Node CI for bin scripts - test (${{ matrix.node-version }})*'
+          channel: '#ci'
+          isCompactMode: true
+          url: ${{ secrets.SLACK_WEBHOOK_URL }}

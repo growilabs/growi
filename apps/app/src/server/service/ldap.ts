@@ -1,4 +1,4 @@
-import ldap, { NoSuchObjectError } from 'ldapjs';
+import type { Client } from 'ldapjs';
 
 import loggerFactory from '~/utils/logger';
 
@@ -21,7 +21,7 @@ export interface SearchResultEntry {
  * User auth using LDAP is done with PassportService, not here.
  */
 class LdapService {
-  client: ldap.Client | null;
+  client: Client | null;
 
   searchBase: string;
 
@@ -30,7 +30,10 @@ class LdapService {
    * @param {string} userBindUsername Necessary when bind type is user bind
    * @param {string} userBindPassword Necessary when bind type is user bind
    */
-  initClient(userBindUsername?: string, userBindPassword?: string): void {
+  async initClient(
+    userBindUsername?: string,
+    userBindPassword?: string,
+  ): Promise<void> {
     const serverUrl = configManager.getConfig(
       'security:passport-ldap:serverUrl',
     );
@@ -45,6 +48,12 @@ class LdapService {
     }
     const url = match[1];
     this.searchBase = match[2] || '';
+
+    // Lazy-load ldapjs so it stays out of the boot module graph (~18 MiB RSS);
+    // it is only needed once LDAP directory access actually runs. ldapjs is CJS
+    // and cjs-module-lexer cannot detect its named exports, so reach
+    // createClient through the default (CJS module.exports) export.
+    const ldap = (await import('ldapjs')).default;
 
     this.client = ldap.createClient({
       url,
@@ -105,13 +114,17 @@ class LdapService {
    * @param {string} base Base DN to execute search on
    * @returns {SearchEntry[]} Search result. Default scope is set to 'sub'.
    */
-  search(
+  async search(
     filter?: string,
     base?: string,
     scope: 'sub' | 'base' | 'one' = 'sub',
   ): Promise<SearchResultEntry[]> {
     const client = this.client;
     if (client == null) throw new Error('LDAP client is not initialized');
+
+    // Lazy-load ldapjs (see initClient); the module is already cached after
+    // initClient. NoSuchObjectError is needed for the instanceof check below.
+    const { NoSuchObjectError } = (await import('ldapjs')).default;
 
     const searchResults: SearchResultEntry[] = [];
 

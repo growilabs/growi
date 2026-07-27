@@ -1,0 +1,24 @@
+{
+  "feature_name": "growi-vault-gateway",
+  "created_at": "2026-05-07T00:00:00.000Z",
+  "updated_at": "2026-06-05T00:00:00.000Z",
+  "language": "ja",
+  "phase": "implementation-complete",
+  "cleaned_up_at": "2026-06-05T00:00:00.000Z",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "revision_note": "Reopened to fix ACL guest-mode bypass (req 2.4a) and align /vault.git with the standard apps/app middleware composition (req 11). Reverse-proxy Basic-auth coexistence (req 2.6) resolved by reusing PR #11244's X-GROWI-ACCESS-TOKEN header + extractAccessToken (arrives via master -> dev/8.0.x -> feat/growi-vault), with git-native Basic as fallback."
+}

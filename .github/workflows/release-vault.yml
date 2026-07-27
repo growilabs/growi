@@ -1,0 +1,156 @@
+name: Release Docker Image for @growi/vault-manager
+
+# Publishes the growi-vault-manager image to Docker Hub.
+#
+# Trigger: a pull request into a `release/vault-manager/**` branch being MERGED
+# (closed with merge). The version comes from apps/growi-vault-manager/package.json.
+#
+# Secrets (already available in GitHub Actions):
+#   - DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE
+#       Password/token for the `growimoogle` Docker Hub account. Used both to
+#       pull the DHI base image from dhi.io (the release stage pulls
+#       `dhi.io/node:24-debian13-dev`) and to push the built image to docker.io.
+#       Same secret used by release-pdf-converter.yml.
+#
+# Assumptions to confirm in review:
+#   - Docker Hub repository name: growilabs/vault-manager
+#   - Release branch prefix: release/vault-manager/**
+
+on:
+  pull_request:
+    branches:
+      - release/vault-manager/**
+    types: [closed]
+
+jobs:
+  build-and-push-image:
+    # Only publish when the PR is actually merged, not merely closed.
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.base.ref }}
+
+    - name: Retrieve information from package.json
+      uses: myrotvorets/info-from-package-json-action@v2.0.2
+      id: package-json
+      with:
+        workingDir: apps/growi-vault-manager
+
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: growilabs/vault-manager
+        tags: |
+          type=raw,value=latest
+          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}
+          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}.{{minor}}
+          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}.{{minor}}.{{patch}}
+
+    # Authenticate to dhi.io so the release stage can pull the DHI dev base image
+    # (uses the same growimoogle Docker Hub credentials as the docker.io push).
+    - name: Login to dhi.io registry (DHI base image pull)
+      uses: docker/login-action@v3
+      with:
+        registry: dhi.io
+        username: growimoogle
+        password: ${{ secrets.DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE }}
+
+    - name: Login to docker.io registry (push target)
+      uses: docker/login-action@v3
+      with:
+        username: growimoogle
+        password: ${{ secrets.DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE }}
+
+    # QEMU is required to cross-build the linux/arm64 variant on an amd64 runner.
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build and push
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: ./apps/growi-vault-manager/docker/Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: true
+        builder: ${{ steps.buildx.outputs.name }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        tags: ${{ steps.meta.outputs.tags }}
+
+    - name: Add tag
+      uses: anothrNick/github-tag-action@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CUSTOM_TAG: vault-manager/v${{ steps.package-json.outputs.packageVersion }}
+        VERBOSE: true
+
+    - name: Update Docker Hub Description
+      uses: peter-evans/dockerhub-description@v4
+      with:
+        username: growimoogle
+        password: ${{ secrets.DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE }}
+        repository: growilabs/vault-manager
+        readme-filepath: ./apps/growi-vault-manager/docker/README.md
+
+
+  create-pr-for-next-rc:
+    needs: build-and-push-image
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.base.ref }}
+
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: |
+        pnpm add turbo --global
+        pnpm install --frozen-lockfile
+
+    - name: Bump versions for next RC
+      run: |
+        turbo run version:prerelease --filter=@growi/vault-manager
+
+    - name: Retrieve information from package.json
+      uses: myrotvorets/info-from-package-json-action@v2.0.2
+      id: package-json
+      with:
+        workingDir: apps/growi-vault-manager
+
+    - name: Commit
+      uses: github-actions-x/commit@v2.9
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        push-branch: support/prepare-vault-manager-v${{ steps.package-json.outputs.packageVersion }}
+        commit-message: 'Bump vault-manager version'
+        name: GitHub Action
+
+    - name: Create PR
+      uses: repo-sync/pull-request@v2
+      with:
+        source_branch: support/prepare-vault-manager-v${{ steps.package-json.outputs.packageVersion }}
+        destination_branch: master
+        pr_title: Prepare vault-manager v${{ steps.package-json.outputs.packageVersion }}
+        pr_label: flag/exclude-from-changelog,type/prepare-next-version
+        pr_body: "An automated PR generated by ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        github_token: ${{ secrets.GITHUB_TOKEN }}

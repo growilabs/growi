@@ -4,7 +4,7 @@
 
 import type { Types } from 'mongoose';
 
-import { isValidObjectId } from '../utils/objectid-utils';
+import { isValidObjectId } from '../utils/objectid-utils.js';
 
 type ObjectId = Types.ObjectId;
 

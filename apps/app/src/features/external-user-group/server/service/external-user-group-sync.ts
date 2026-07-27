@@ -2,12 +2,12 @@ import type { IUserHasId } from '@growi/core';
 
 import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 import { SocketEventName } from '~/interfaces/websocket';
-import ExternalAccount from '~/server/models/external-account';
 import S2sMessage from '~/server/models/vo/s2s-message';
 import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
 import type { S2sMessageHandlable } from '~/server/service/s2s-messaging/handlable';
 import { excludeTestIdsFromTargetIds } from '~/server/util/compare-objectId';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 import { batchProcessPromiseAll } from '~/utils/promise';
 
 import { configManager } from '../../../../server/service/config-manager';
@@ -222,7 +222,7 @@ abstract class ExternalUserGroupSyncService implements S2sMessageHandlable {
           // remove existing relations from list to create
           const existingRelations = await ExternalUserGroupRelation.find({
             relatedGroup: { $in: userGroupIds },
-            relatedUser: user._id,
+            relatedUser: user.id,
           });
           const existingGroupIds = existingRelations.map((r) =>
             r.relatedGroup.toString(),
@@ -249,9 +249,7 @@ abstract class ExternalUserGroupSyncService implements S2sMessageHandlable {
    * @param {ExternalUserInfo} externalUserInfo Search external app/server using this identifier
    * @returns {Promise<IUserHasId | null>} User when found or created, null when neither
    */
-  private async getMemberUser(
-    userInfo: ExternalUserInfo,
-  ): Promise<IUserHasId | null> {
+  private async getMemberUser(userInfo: ExternalUserInfo) {
     const authProviderType = this.authProviderType;
     if (authProviderType == null)
       throw new Error('auth provider type is not set');
@@ -260,7 +258,7 @@ abstract class ExternalUserGroupSyncService implements S2sMessageHandlable {
       `external-user-group:${this.groupProviderType}:autoGenerateUserOnGroupSync`,
     );
 
-    const getExternalAccount = async () => {
+    const getExternalAccount = () => {
       if (autoGenerateUserOnGroupSync && externalAccountService != null) {
         return externalAccountService.getOrCreateUser(
           {
@@ -272,18 +270,29 @@ abstract class ExternalUserGroupSyncService implements S2sMessageHandlable {
           authProviderType,
         );
       }
-      return ExternalAccount.findOne({
-        providerType: this.groupProviderType,
-        accountId: userInfo.id,
+      return prisma.externalaccounts.findUnique({
+        where: {
+          providerType_accountId: {
+            providerType: this.groupProviderType,
+            accountId: userInfo.id,
+          },
+        },
       });
     };
 
     const externalAccount = await getExternalAccount();
 
     if (externalAccount != null) {
-      return (
-        await externalAccount.populate<{ user: IUserHasId | null }>('user')
-      ).user;
+      return prisma.externalaccounts
+        .findUnique({
+          select: {
+            user: true,
+          },
+          where: {
+            id: externalAccount.id,
+          },
+        })
+        .then((result) => result?.user ?? null);
     }
     return null;
   }
