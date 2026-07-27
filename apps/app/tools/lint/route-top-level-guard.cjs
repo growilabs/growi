@@ -1,5 +1,5 @@
 /**
- * Route top-level side-effect guard (esm-migration task 3.3.h).
+ * Route top-level side-effect guard.
  *
  * Under ESM, imports of route modules are hoisted to application boot, BEFORE
  * the Crowi container is initialized. Any top-level execution in a route
