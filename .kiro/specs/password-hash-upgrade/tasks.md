@@ -74,7 +74,7 @@
   - _Requirements: 1.1, 2.2_
   - _Boundary: User Model_
 
-- [ ] 2.5 isPasswordValid の外部呼び出し元（personal-setting）を async 化する
+- [x] 2.5 isPasswordValid の外部呼び出し元（personal-setting）を async 化する
   - `apps/app/src/server/routes/apiv3/personal-setting/index.js`（v8: line ~441）の
     `if (user.isPasswordSet() && !user.isPasswordValid(oldPassword)) {` を
     `if (user.isPasswordSet() && !(await user.isPasswordValid(oldPassword)).isValid) {` に置換する
