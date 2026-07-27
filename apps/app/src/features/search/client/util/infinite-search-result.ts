@@ -1,0 +1,50 @@
+import type {
+  IFormattedSearchResult,
+  IPageWithSearchMeta,
+} from '~/interfaces/search';
+
+export type MergedSearchResult = {
+  pages: IPageWithSearchMeta[];
+  loadedCount: number;
+  total: number;
+  took?: number;
+  isEmpty: boolean;
+  isReachingEnd: boolean;
+};
+
+/**
+ * Derive the accumulated, render-ready search result from the page array
+ * returned by useSWRInfinite.
+ *
+ * The `total` and `took` are taken from the first chunk's meta because
+ * `meta.total` is invariant across chunks for the same search condition.
+ * When `data` is not yet loaded (`undefined`), an empty and non-terminal
+ * result is returned so the caller neither shows "0 hits" nor stops loading.
+ */
+export const mergeInfiniteSearchResult = (
+  data: IFormattedSearchResult[] | undefined,
+): MergedSearchResult => {
+  if (data == null) {
+    return {
+      pages: [],
+      loadedCount: 0,
+      total: 0,
+      isEmpty: false,
+      isReachingEnd: false,
+    };
+  }
+
+  const pages = data.flatMap((result) => result.data);
+  const loadedCount = pages.length;
+  const total = data[0]?.meta.total ?? 0;
+  const took = data[0]?.meta.took;
+
+  return {
+    pages,
+    loadedCount,
+    total,
+    took,
+    isEmpty: total === 0,
+    isReachingEnd: loadedCount >= total,
+  };
+};

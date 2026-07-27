@@ -3,7 +3,7 @@
 > 注: タスク 2.x は共有コンポーネント `SearchPageBase` を破壊的に拡張する（`resetKey` を必須プロップ化）。app 全体の型チェック／ビルドが green になるのは消費者更新（3.1・4.1）完了後。各 2.x の観測可能な完了条件は当該コンポーネント／ユニットテストのスコープで判定する。
 
 - [ ] 1. Foundation: 純粋ロジック（累積合成・取得キー）
-- [ ] 1.1 (P) 累積検索結果の合成ユーティリティ
+- [x] 1.1 (P) 累積検索結果の合成ユーティリティ
   - SWRInfinite の `data` 配列を `flatMap` で平坦化し、累積ページ・`loadedCount`・`total`・`took` を導出する
   - `isReachingEnd = loadedCount >= total`、`isEmpty = (data 取得済み かつ total === 0)`、`data == null` では空リスト・非停止を返す
   - ユニットテストで「未満／一致（停止）／0件／未取得」の各境界を検証しグリーンにする
