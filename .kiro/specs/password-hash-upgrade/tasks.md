@@ -58,7 +58,7 @@
   - _Requirements: 1.1, 1.3, 2.1, 2.2_
   - _Boundary: User Model_
 
-- [ ] 2.3 findUserByEmailAndPassword（デッドコード）を削除する
+- [x] 2.3 findUserByEmailAndPassword（デッドコード）を削除する
   - `findUserByEmailAndPassword(email, password)` はリポジトリ全体で呼び出し元が存在しないデッドコードのため削除する（`grep -rn findUserByEmailAndPassword apps/app/src packages` で呼び出し元ゼロを確認済み）
   - DB を password hash でクエリするこのメソッドは scrypt 移行後に動作不能だが、呼び出し元がないため fetch-then-compare リファクタではなく削除が適切（実装工数の無駄を避ける）
   - 万一、削除前の再 grep で呼び出し元が発見された場合に限り、`{ email }` 検索 + `await user.isPasswordValid()` の fetch-then-compare にリファクタする

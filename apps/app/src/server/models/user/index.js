@@ -159,15 +159,6 @@ const factory = (crowi) => {
     return `change-it-${randomstr}@example.com`;
   }
 
-  function generatePassword(password) {
-    validateCrowi();
-
-    const hasher = crypto.createHash('sha256');
-    hasher.update(crowi.env.PASSWORD_SEED + password);
-
-    return hasher.digest('hex');
-  }
-
   function generateApiToken(user) {
     const hasher = crypto.createHash('sha256');
     hasher.update(new Date().getTime() + user._id);
@@ -508,17 +499,6 @@ const factory = (crowi) => {
       .exec((err, userData) => {
         callback(err, userData);
       });
-  };
-
-  userSchema.statics.findUserByEmailAndPassword = function (
-    email,
-    password,
-    callback,
-  ) {
-    const hashedPassword = generatePassword(password);
-    this.findOne({ email, password: hashedPassword }, (err, userData) => {
-      callback(err, userData);
-    });
   };
 
   userSchema.statics.isUserCountExceedsUpperLimit = async function () {
