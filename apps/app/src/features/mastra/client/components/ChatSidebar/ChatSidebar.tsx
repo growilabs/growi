@@ -91,6 +91,13 @@ export const ChatSidebar = (): JSX.Element => {
   // re-opening the thread that is already displayed keeps the same remount key
   // in `dynamic.tsx`, so no remount happens and a mount-only focus would be
   // skipped.
+  //
+  // On the mount path this depends on `PageMentionInput` mounting synchronously
+  // below us: React flushes child effects before the parent's, so its CodeMirror
+  // view already exists when this runs. Should the input ever move behind
+  // Suspense or a conditional render, the ref would still be null here and the
+  // focus silently skipped (`focus()` no-ops rather than throwing) — keep it
+  // eagerly rendered, or move the trigger down to the input itself.
   const promptInputRef = useRef<PageMentionInputHandle>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: openSeq is the trigger, not a value read by the effect
   useEffect(() => {
