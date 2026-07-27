@@ -29,6 +29,7 @@ export function getAclService() {
   return _aclService;
 }
 
+import { passwordHashService } from '~/server/service/password-hash';
 import { isEmailMatchedByEntry } from '~/utils/email-whitelist';
 import { generateGravatarSrc } from '~/utils/gravatar';
 import loggerFactory from '~/utils/logger';
@@ -192,12 +193,23 @@ const factory = (crowi) => {
     return !!(this.passwordHash || this.password);
   };
 
-  userSchema.methods.isPasswordValid = function (password) {
-    return this.password === generatePassword(password);
+  userSchema.methods.isPasswordValid = async function (password) {
+    validateCrowi();
+    // Delegates to PasswordHashService, which transparently verifies both the
+    // scrypt envelope (passwordHash) and the legacy SHA-256 hash (password).
+    // Returns a VerifyResult ({ isValid, needsRehash }), NOT a boolean.
+    return await passwordHashService.verify(
+      password,
+      this.passwordHash,
+      this.password,
+      crowi.env.PASSWORD_SEED,
+    );
   };
 
-  userSchema.methods.setPassword = function (password) {
-    this.password = generatePassword(password);
+  userSchema.methods.setPassword = async function (password) {
+    // Only write the scrypt hash. The legacy SHA-256 `password` field is left
+    // untouched so a downgrade to an older GROWI keeps working (Req 1.3).
+    this.passwordHash = await passwordHashService.hash(password);
     return this;
   };
 
@@ -225,7 +237,7 @@ const factory = (crowi) => {
   };
 
   userSchema.methods.updatePassword = async function (password) {
-    this.setPassword(password);
+    await this.setPassword(password);
     const userData = await this.save();
     return userData;
   };
@@ -294,7 +306,7 @@ const factory = (crowi) => {
     name,
     password,
   ) {
-    this.setPassword(password);
+    await this.setPassword(password);
     this.name = name;
     this.username = username;
     this.status = UserStatus.STATUS_ACTIVE;
@@ -593,7 +605,7 @@ const factory = (crowi) => {
     }
 
     const newPassword = generateRandomTempPassword();
-    user.setPassword(newPassword);
+    await user.setPassword(newPassword);
     await user.save();
 
     return newPassword;
@@ -609,7 +621,7 @@ const factory = (crowi) => {
 
     newUser.username = tmpUsername;
     newUser.email = email;
-    newUser.setPassword(password);
+    await newUser.setPassword(password);
     newUser.status = UserStatus.STATUS_INVITED;
 
     const globalLang = getConfigManager().getConfig('app:globalLang');
@@ -701,7 +713,7 @@ const factory = (crowi) => {
     newUser.username = username;
     newUser.email = email;
     if (password != null) {
-      newUser.setPassword(password);
+      await newUser.setPassword(password);
     }
 
     // Default email show/hide is up to the administrator

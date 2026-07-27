@@ -6,6 +6,10 @@
  *   (b) Each getter is a synchronous function (not async, no Promise returned)
  */
 
+import { mockDeep } from 'vitest-mock-extended';
+
+import type Crowi from '~/server/crowi';
+
 // Mock heavy dependencies to enable unit-level testing
 vi.mock('mongoose', () => ({
   default: {
@@ -57,6 +61,17 @@ vi.mock('../../service/config-manager', () => ({
 }));
 vi.mock('../../service/acl', () => ({
   aclService: mockAclService,
+}));
+
+// PasswordHashService singleton is mocked so the password methods can be tested
+// as thin delegators without running scrypt. Its contract is covered by
+// password-hash.spec.ts.
+const mockPasswordHashService = {
+  hash: vi.fn(),
+  verify: vi.fn(),
+};
+vi.mock('~/server/service/password-hash', () => ({
+  passwordHashService: mockPasswordHashService,
 }));
 
 describe('models/user lazy singleton getters', () => {
@@ -125,6 +140,79 @@ describe('models/user lazy singleton getters', () => {
     it('should return false when neither passwordHash nor password is set', async () => {
       const isPasswordSet = await buildIsPasswordSet();
       expect(isPasswordSet.call({})).toBe(false);
+    });
+  });
+});
+
+describe('models/user password methods (PasswordHashService delegation)', () => {
+  const SEED = 'test-password-seed';
+
+  // Build the schema through the factory with a Crowi whose env carries the
+  // legacy PASSWORD_SEED, then grab the schema instance passed to the mocked
+  // mongoose.model() so instance methods can be invoked against a plain `this`.
+  const buildMethods = async () => {
+    const crowi = mockDeep<Crowi>();
+    crowi.env = { PASSWORD_SEED: SEED };
+
+    const mongoose = (await import('mongoose')).default;
+    const userModule = await import('.');
+    userModule.default(crowi);
+
+    const modelMock = vi.mocked(mongoose.model);
+    const userSchema = modelMock.mock.calls.at(-1)?.[1] as unknown as {
+      methods: Record<
+        string,
+        (this: Record<string, unknown>, ...args: unknown[]) => unknown
+      >;
+    };
+    return userSchema.methods;
+  };
+
+  beforeEach(() => {
+    mockPasswordHashService.hash.mockReset();
+    mockPasswordHashService.verify.mockReset();
+  });
+
+  describe('setPassword', () => {
+    it('should set passwordHash to the scrypt hash and leave legacy password untouched', async () => {
+      mockPasswordHashService.hash.mockResolvedValue('scrypt$mock$hash');
+      const { setPassword } = await buildMethods();
+
+      const doc: Record<string, unknown> = { password: 'legacy-sha256' };
+      const returned = await setPassword.call(doc, 'my-plaintext');
+
+      // Delegates hashing to the service with the raw plaintext
+      expect(mockPasswordHashService.hash).toHaveBeenCalledWith('my-plaintext');
+      // Only passwordHash is written
+      expect(doc.passwordHash).toBe('scrypt$mock$hash');
+      // Legacy SHA-256 field is preserved (downgrade safety)
+      expect(doc.password).toBe('legacy-sha256');
+      // Returns the document itself
+      expect(returned).toBe(doc);
+    });
+  });
+
+  describe('isPasswordValid', () => {
+    it('should delegate to PasswordHashService.verify and return its VerifyResult', async () => {
+      const verifyResult = { isValid: true, needsRehash: true };
+      mockPasswordHashService.verify.mockResolvedValue(verifyResult);
+      const { isPasswordValid } = await buildMethods();
+
+      const doc: Record<string, unknown> = {
+        passwordHash: 'scrypt$stored$hash',
+        password: 'legacy-sha256',
+      };
+      const result = await isPasswordValid.call(doc, 'my-plaintext');
+
+      // Passes plaintext, both stored fields, and the legacy SEED through
+      expect(mockPasswordHashService.verify).toHaveBeenCalledWith(
+        'my-plaintext',
+        'scrypt$stored$hash',
+        'legacy-sha256',
+        SEED,
+      );
+      // Returns the service's VerifyResult verbatim (not a boolean)
+      expect(result).toBe(verifyResult);
     });
   });
 });
