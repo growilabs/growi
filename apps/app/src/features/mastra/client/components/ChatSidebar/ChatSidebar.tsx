@@ -81,8 +81,8 @@ export const ChatSidebar = (): JSX.Element => {
 
   const chatSidebarStatus = useChatSidebarStatus();
   const { close } = useChatSidebarActions();
-  const threadId = chatSidebarStatus?.threadId;
-  const openSeq = chatSidebarStatus?.openSeq;
+  const threadId = chatSidebarStatus.threadId;
+  const openSeq = chatSidebarStatus.openSeq;
 
   // Hand the caret to the prompt input every time the sidebar is opened, so the
   // user can type right away after clicking "New chat" or a recent thread.
