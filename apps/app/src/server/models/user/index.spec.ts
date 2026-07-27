@@ -10,6 +10,7 @@
 vi.mock('mongoose', () => ({
   default: {
     Schema: class MockSchema {
+      static Types = { ObjectId: class {} };
       plugin() {
         return this;
       }
@@ -92,6 +93,38 @@ describe('models/user lazy singleton getters', () => {
       const second = getAclService();
       // Must be strictly the same object (cached reference)
       expect(first).toBe(second);
+    });
+  });
+
+  describe('userSchema.methods.isPasswordSet', () => {
+    // Build the schema through the factory (crowi=null path skips event wiring)
+    // and grab the schema instance passed to the mocked mongoose.model(), so we
+    // can invoke the instance method against a plain `this` without a DB/crowi
+    // bootstrap.
+    const buildIsPasswordSet = async () => {
+      const mongoose = (await import('mongoose')).default;
+      const userModule = await import('.');
+      userModule.default(null);
+      const modelMock = vi.mocked(mongoose.model);
+      const userSchema = modelMock.mock.calls[0][1] as unknown as {
+        methods: { isPasswordSet: (this: unknown) => boolean };
+      };
+      return userSchema.methods.isPasswordSet;
+    };
+
+    it('should return true when passwordHash is set', async () => {
+      const isPasswordSet = await buildIsPasswordSet();
+      expect(isPasswordSet.call({ passwordHash: 'x' })).toBe(true);
+    });
+
+    it('should return true when legacy password is set', async () => {
+      const isPasswordSet = await buildIsPasswordSet();
+      expect(isPasswordSet.call({ password: 'y' })).toBe(true);
+    });
+
+    it('should return false when neither passwordHash nor password is set', async () => {
+      const isPasswordSet = await buildIsPasswordSet();
+      expect(isPasswordSet.call({})).toBe(false);
     });
   });
 });

@@ -77,6 +77,7 @@ const factory = (crowi) => {
       // email: { type: String, required: true, unique: true },
       introduction: String,
       password: String,
+      passwordHash: { type: String },
       apiToken: { type: String, index: true },
       lang: {
         type: String,
@@ -188,10 +189,7 @@ const factory = (crowi) => {
   };
 
   userSchema.methods.isPasswordSet = function () {
-    if (this.password) {
-      return true;
-    }
-    return false;
+    return !!(this.passwordHash || this.password);
   };
 
   userSchema.methods.isPasswordValid = function (password) {

@@ -37,7 +37,7 @@
   - _Boundary: PasswordHashService_
 
 - [ ] 2. User モデルとパスワード関連呼び出し元の刷新
-- [ ] 2.1 User schema に passwordHash フィールドを追加し isPasswordSet を更新する
+- [x] 2.1 User schema に passwordHash フィールドを追加し isPasswordSet を更新する
   - Mongoose スキーマ定義に `passwordHash: { type: String }` フィールドを追加する
   - `isPasswordSet()` を `!!(this.passwordHash || this.password)` に更新して両フィールドを確認するようにする
   - MongoDB フィールド追加は既存ドキュメントに影響しない（自動マイグレーション不要）
