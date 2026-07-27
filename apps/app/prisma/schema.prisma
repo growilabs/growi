@@ -484,8 +484,8 @@ model subscriptions {
 
 model tags {
   id   String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  name Json?  @unique(map: "name_1")
+  v    Int    @default(0) @map("__v")
+  name String @unique(map: "name_1")
 }
 
 model transferkeys {

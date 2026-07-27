@@ -1,5 +1,5 @@
 import { SupportedAction } from '~/interfaces/activity';
-import Tag from '~/server/models/tag';
+import { prisma } from '~/utils/prisma';
 
 import PageTagRelation from '../models/page-tag-relation';
 import { Revision } from '../models/revision';
@@ -60,12 +60,11 @@ export const setup = (crowi, _app) => {
     // Search for regular expressions as normal characters
     // e.g. user*$ -> user\*\$ (escape a regular expression)
     const escapeRegExp = req.query.q.replace(/[\\^$/.*+?()[\]{}|]/g, '\\$&');
-    let tags = await Tag.find({ name: new RegExp(`^${escapeRegExp}`) }).select(
-      '_id name',
-    );
-    tags = tags.map((tag) => {
-      return tag.name;
+    const matchedTags = await prisma.tags.findMany({
+      where: { name: { startsWith: escapeRegExp } },
+      select: { name: true },
     });
+    const tags = matchedTags.map((tag) => tag.name);
     return res.json(ApiResponse.success({ tags }));
   };
 
