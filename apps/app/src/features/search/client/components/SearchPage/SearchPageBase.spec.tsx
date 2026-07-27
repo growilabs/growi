@@ -62,6 +62,7 @@ const searchResultListSpy = vi.hoisted(() => ({
         selectedPageId?: string;
         pages: IPageWithSearchMeta[];
         onPageSelected?: (page?: IPageWithSearchMeta) => void;
+        onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
       }
     | undefined,
 }));
@@ -76,6 +77,7 @@ vi.mock('./SearchResultList', () => ({
       selectedPageId?: string;
       pages: IPageWithSearchMeta[];
       onPageSelected?: (page?: IPageWithSearchMeta) => void;
+      onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
     }
   >((props, ref) => {
     searchResultListSpy.lastProps = props;
@@ -323,5 +325,136 @@ describe('SearchPageBase right-pane preview initial selection (2-stage, resetKey
     );
 
     expect(searchResultListSpy.lastProps?.selectedPageId).toBe('x');
+  });
+});
+
+describe('SearchPageBase select-all header follows appended pages (append re-notify)', () => {
+  beforeEach(() => {
+    searchResultListSpy.lastProps = undefined;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('re-notifies partial selection (indeterminate) when unselected pages are appended under the same resetKey', () => {
+    const ref = createRef<SelectableRef>();
+    const onChanged = vi.fn();
+    const initialPages = [createPage('a'), createPage('b')];
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={initialPages}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    // select every currently-loaded item => parent renders "checked"
+    act(() => {
+      ref.current?.selectAll();
+    });
+
+    onChanged.mockClear();
+
+    // append more (unselected) pages via infinite scroll under the SAME resetKey
+    const appendedPages = [...initialPages, createPage('c'), createPage('d')];
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={appendedPages}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    // parent is re-notified with the CURRENT selected count vs the CURRENT
+    // accumulated total => selectedCount(2) < totalCount(4) => indeterminate (Req 4.5)
+    expect(onChanged).toHaveBeenLastCalledWith(2, 4);
+  });
+
+  it('re-notifies full selection (checked) when the appended pages are also selected', () => {
+    const ref = createRef<SelectableRef>();
+    const onChanged = vi.fn();
+    const initialPages = [createPage('a'), createPage('b')];
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={initialPages}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    // the accumulated selection already covers every page that will be loaded:
+    // the two visible pages plus the two about to be appended
+    act(() => {
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'a');
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'b');
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'c');
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'd');
+    });
+
+    onChanged.mockClear();
+
+    // append the remaining pages under the SAME resetKey
+    const appendedPages = [...initialPages, createPage('c'), createPage('d')];
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={appendedPages}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    // every accumulated page is selected => selectedCount(4) === totalCount(4)
+    // => parent keeps "checked" after the append (Req 4.6)
+    expect(onChanged).toHaveBeenLastCalledWith(4, 4);
+  });
+
+  it('does not double-fire the append re-notify on a resetKey change (still notifies count 0)', () => {
+    const ref = createRef<SelectableRef>();
+    const onChanged = vi.fn();
+    const pages = [createPage('a'), createPage('b')];
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={pages}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    act(() => {
+      ref.current?.selectAll();
+    });
+
+    onChanged.mockClear();
+
+    // new search / condition change => resetKey changes AND pages reference changes
+    const newPages = [createPage('x'), createPage('y')];
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-2"
+        pages={newPages}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    // the selection-clear effect owns the notification on a resetKey change;
+    // the append re-notify must not fight it
+    expect(onChanged).toHaveBeenLastCalledWith(0, 0);
   });
 });

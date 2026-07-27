@@ -198,6 +198,35 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     selectedPageIdsByCheckboxes,
   ]);
 
+  // Keep the select-all header (checked / indeterminate) in sync with appends.
+  // On append, no checkbox event fires, so the parent's checked/indeterminate
+  // state would go stale. When `pages` grows under a STABLE `resetKey`, re-report
+  // the CURRENT selected count against the CURRENT accumulated total so the parent
+  // recomputes checked (all selected) vs indeterminate (partial) (Req 4.4/4.5/4.6).
+  // A `resetKey` change is skipped here so this does not double-fire against the
+  // selection-clear effect above, which already notifies (0, 0) in that case.
+  const notifiedAppendResetKeyRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const isSameSearch = notifiedAppendResetKeyRef.current === resetKey;
+    notifiedAppendResetKeyRef.current = resetKey;
+
+    // First render or a new search: the selection-clear effect owns the
+    // notification. Do not re-notify here.
+    if (!isSameSearch || pages == null) {
+      return;
+    }
+
+    onSelectedPagesByCheckboxesChanged?.(
+      selectedPageIdsByCheckboxes.size,
+      pages.length,
+    );
+  }, [
+    pages,
+    resetKey,
+    onSelectedPagesByCheckboxesChanged,
+    selectedPageIdsByCheckboxes,
+  ]);
+
   if (!isSearchServiceConfigured) {
     return (
       <div className="container-lg grw-container-convertible">
