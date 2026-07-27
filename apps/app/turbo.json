@@ -98,7 +98,7 @@
     },
 
     "test": {
-      "dependsOn": ["^dev", "pre:styles-bulk-export"],
+      "dependsOn": ["^dev", "@growi/vault-manager#build", "pre:styles-bulk-export"],
       "outputLogs": "new-only"
     },
     "test:unit": {

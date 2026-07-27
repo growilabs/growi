@@ -1,12 +1,12 @@
 import { type JSX, lazy, Suspense } from 'react';
 
-import type { PresentationOptions } from '../consts';
-import { GrowiSlides } from './GrowiSlides';
+import type { PresentationOptions } from '../consts/index.js';
+import { GrowiSlides } from './GrowiSlides.js';
 
 import styles from './Slides.module.scss';
 
 const MarpSlides = lazy(() =>
-  import('./MarpSlides').then((mod) => ({ default: mod.MarpSlides })),
+  import('./MarpSlides.js').then((mod) => ({ default: mod.MarpSlides })),
 );
 
 export type SlidesProps = {

@@ -14,6 +14,28 @@ GROWI is a team collaboration wiki platform using Markdown, featuring hierarchic
 
 ## Knowledge Base
 
+### Two Scopes: repo-wide vs package-scoped
+
+Agent knowledge lives in **two tiers of `.claude/` directory**, and where a document goes
+is determined by *what it applies to*:
+
+| Directory | Scope | Applies when |
+|---|---|---|
+| `/.claude/` (repo root) | The whole monorepo | Always — rules here are loaded in every session, in every package |
+| `/apps/app/.claude/` | `apps/app` only | Loaded/offered when the work touches files under `apps/app/` |
+
+**When adding a rule or skill, decide the scope first.** A convention that only holds for
+the main application (import specifier form, Turbopack dependency classification, Express
+route conventions, native-ESM authoring traps) belongs in `apps/app/.claude/rules/` or
+`apps/app/.claude/skills/` — putting it at the root implies it governs `packages/*` and the
+other apps too, which is both wrong and noise for everyone else. Keep `/.claude/rules/` for
+things that genuinely hold monorepo-wide (coding style, security, testing, project
+structure).
+
+Both tiers use the same layout: `rules/` (always loaded), `skills/` (loaded on demand via
+the Skill tool), `agents/`, `commands/`. Each tier's rule inventory is tabulated below
+(root) and in `apps/app/AGENTS.md` (apps/app).
+
 ### Always-Loaded Context
 
 **Rules** (`.claude/rules/`) — loaded into every session automatically:

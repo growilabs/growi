@@ -1,5 +1,5 @@
 import { getIdStringForRef, type IPage } from '@growi/core';
-import gc from 'expose-gc/function';
+import gc from 'expose-gc/function.js';
 import mongoose from 'mongoose';
 import { Transform, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
@@ -39,11 +39,9 @@ import type {
 } from './bulk-write';
 import {
   type ElasticsearchClientDelegator,
-  type ES7SearchQuery,
   type ES8SearchQuery,
   type ES9SearchQuery,
   getClient,
-  isES7ClientDelegator,
   isES8ClientDelegator,
   isES9ClientDelegator,
   type SearchQuery,
@@ -89,16 +87,13 @@ type Data = any;
 class ElasticsearchDelegator
   implements SearchDelegator<Data, ESTermsKey, ESQueryTerms>
 {
-  name!: SearchDelegatorName.DEFAULT;
+  name!: typeof SearchDelegatorName.DEFAULT;
 
   private socketIoService!: SocketIoService;
 
-  // TODO: https://redmine.weseek.co.jp/issues/168446
-  private isElasticsearchV7: boolean;
-
   private isElasticsearchReindexOnBoot: boolean;
 
-  private elasticsearchVersion: 7 | 8 | 9;
+  private elasticsearchVersion: 8 | 9;
 
   private client: ElasticsearchClientDelegator;
 
@@ -116,17 +111,11 @@ class ElasticsearchDelegator
       'app:elasticsearchVersion',
     );
 
-    if (
-      elasticsearchVersion !== 7 &&
-      elasticsearchVersion !== 8 &&
-      elasticsearchVersion !== 9
-    ) {
+    if (elasticsearchVersion !== 8 && elasticsearchVersion !== 9) {
       throw new Error(
         "Unsupported Elasticsearch version. Please specify a valid number to 'ELASTICSEARCH_VERSION'",
       );
     }
-
-    this.isElasticsearchV7 = elasticsearchVersion === 7;
 
     this.elasticsearchVersion = elasticsearchVersion;
 
@@ -180,10 +169,6 @@ class ElasticsearchDelegator
       rejectUnauthorized,
     });
     this.indexName = indexName;
-  }
-
-  getType(): '_doc' | undefined {
-    return this.isElasticsearchV7 ? '_doc' : undefined;
   }
 
   /**
@@ -274,7 +259,11 @@ class ElasticsearchDelegator
    *
    * @see https://www.elastic.co/guide/en/elasticsearch/reference/6.6/cluster-health.html
    */
-  async getInfoForHealth() {
+  async getInfoForHealth(): Promise<{
+    esClusterHealth: Awaited<
+      ReturnType<ElasticsearchClientDelegator['cluster']['health']>
+    >;
+  }> {
     const esClusterHealth = await this.client.cluster.health();
     return { esClusterHealth };
   }
@@ -282,7 +271,17 @@ class ElasticsearchDelegator
   /**
    * Return information for Admin Full Text Search Management page
    */
-  async getInfoForAdmin() {
+  async getInfoForAdmin(): Promise<{
+    indices:
+      | Awaited<
+          ReturnType<ElasticsearchClientDelegator['indices']['stats']>
+        >['indices']
+      | never[];
+    aliases:
+      | Awaited<ReturnType<ElasticsearchClientDelegator['indices']['getAlias']>>
+      | never[];
+    isNormalized: boolean;
+  }> {
     const { client, indexName, aliasName } = this;
 
     const tmpIndexName = `${indexName}-tmp`;
@@ -425,18 +424,12 @@ class ElasticsearchDelegator
     }
   }
 
-  async createIndex(index: string) {
-    // TODO: https://redmine.weseek.co.jp/issues/168446
-    if (isES7ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-es7');
-      return this.client.indices.create({
-        index,
-        body: {
-          ...mappings,
-        },
-      });
-    }
-
+  async createIndex(
+    index: string,
+  ): Promise<
+    | Awaited<ReturnType<ElasticsearchClientDelegator['indices']['create']>>
+    | undefined
+  > {
     if (isES8ClientDelegator(this.client)) {
       const { mappings } = await import('./mappings/mappings-es8');
       return this.client.indices.create({
@@ -480,7 +473,6 @@ class ElasticsearchDelegator
     const command = {
       index: {
         _index: this.indexName,
-        _type: this.getType(),
         _id: page._id.toString(),
       },
     };
@@ -513,7 +505,6 @@ class ElasticsearchDelegator
     const command = {
       delete: {
         _index: this.indexName,
-        _type: this.getType(),
         _id: page._id.toString(),
       },
     };
@@ -662,7 +653,7 @@ class ElasticsearchDelegator
     return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
   }
 
-  deletePages(pages) {
+  deletePages(pages): ReturnType<ElasticsearchClientDelegator['bulk']> {
     const body = [];
     pages.forEach((page) => {
       this.prepareBodyForDelete(body, page);
@@ -689,17 +680,6 @@ class ElasticsearchDelegator
       logger.debug({ query }, 'query');
 
       const validateQueryResponse = await (async () => {
-        if (isES7ClientDelegator(this.client)) {
-          const es7SearchQuery = query as ES7SearchQuery;
-          return await this.client.indices.validateQuery({
-            explain: true,
-            index: es7SearchQuery.index,
-            body: {
-              query: es7SearchQuery.body?.query,
-            },
-          });
-        }
-
         if (isES8ClientDelegator(this.client)) {
           const es8SearchQuery = query as ES8SearchQuery;
           return await this.client.indices.validateQuery({
@@ -726,10 +706,6 @@ class ElasticsearchDelegator
     }
 
     const searchResponse = await (async () => {
-      if (isES7ClientDelegator(this.client)) {
-        return await this.client.search(query as ES7SearchQuery);
-      }
-
       if (isES8ClientDelegator(this.client)) {
         return await this.client.search(query as ES8SearchQuery);
       }
@@ -761,10 +737,13 @@ class ElasticsearchDelegator
         took: searchResponse.took,
         hitsCount: searchResponse.hits.hits.length,
       },
-      data: searchResponse.hits.hits.map((elm) => {
+      // The ES client types mark _id and _score as optional, but every document
+      // hit from these queries carries an _id; _score is null only when results
+      // are sorted by a field instead of relevance.
+      data: searchResponse.hits.hits.map((elm): ISearchResultData => {
         return {
-          _id: elm._id,
-          _score: elm._score,
+          _id: elm._id ?? '',
+          _score: elm._score ?? 0,
           _source: elm._source,
           _highlight: elm.highlight,
         };
@@ -1229,7 +1208,12 @@ class ElasticsearchDelegator
     return await this.updateOrInsertDescendantsPagesById(parentPage, user);
   }
 
-  async syncDescendantsPagesDeleted(pages, user) {
+  async syncDescendantsPagesDeleted(
+    pages,
+    user,
+  ): Promise<
+    Awaited<ReturnType<ElasticsearchClientDelegator['bulk']>> | undefined
+  > {
     for (let i = 0; i < pages.length; i++) {
       logger.debug('SearchClient.syncDescendantsPagesDeleted', pages[i].path);
     }
@@ -1241,7 +1225,12 @@ class ElasticsearchDelegator
     }
   }
 
-  async syncPageDeleted(page, user) {
+  async syncPageDeleted(
+    page,
+    user,
+  ): Promise<
+    Awaited<ReturnType<ElasticsearchClientDelegator['bulk']>> | undefined
+  > {
     logger.debug('SearchClient.syncPageDeleted', page.path);
 
     try {
@@ -1260,7 +1249,7 @@ class ElasticsearchDelegator
   async syncCommentChanged(comment) {
     logger.debug('SearchClient.syncCommentChanged', comment);
 
-    return await this.updateOrInsertPageById(comment.page);
+    return await this.updateOrInsertPageById(comment.pageId);
   }
 
   async syncTagChanged(page) {

@@ -6,9 +6,9 @@ import type { MockInstance } from 'vitest';
 
 import { getInstance } from '^/test/setup/crowi';
 
-import type { CommentModel } from '~/features/comment/server/models/comment';
 import type Crowi from '~/server/crowi';
 import type { ShareLinkModel } from '~/server/models/share-link';
+import { prisma } from '~/utils/prisma';
 
 const { ObjectId } = Types;
 
@@ -42,7 +42,6 @@ describe('/comments.get share-link authorization (integration)', () => {
   // typed `any`, so there is no usable type to spy on here.
   // biome-ignore lint/suspicious/noExplicitAny: no usable type for Page (see above)
   let Page: any;
-  let Comment: CommentModel;
   let ShareLink: ShareLinkModel;
   let certifySharedPage: RequestHandler;
 
@@ -55,8 +54,8 @@ describe('/comments.get share-link authorization (integration)', () => {
   const pageBId = new ObjectId();
   const revAId = new ObjectId();
   const revBId = new ObjectId();
-  let commentAId: Types.ObjectId;
-  let commentBId: Types.ObjectId;
+  let commentAId: string;
+  let commentBId: string;
   let shareLinkAId: Types.ObjectId;
   let expiredShareLinkId: Types.ObjectId;
 
@@ -64,24 +63,38 @@ describe('/comments.get share-link authorization (integration)', () => {
     crowi = await getInstance();
     Page = crowi.models.Page;
 
-    Comment = (await import('~/features/comment/server')).Comment;
     ShareLink = (await import('~/server/models/share-link')).default;
 
+    // api.remove reads the comment with `include: { page: true }` (a required
+    // relation), so the referenced pages must actually exist: Prisma throws on a
+    // required relation whose target is missing (the pre-migration mongoose test
+    // relied on populate silently yielding null instead).
+    await prisma.pages.create({
+      data: { id: pageAId.toString(), path: '/comment-integ-a', v: 0 },
+    });
+    await prisma.pages.create({
+      data: { id: pageBId.toString(), path: '/comment-integ-b', v: 0 },
+    });
+
     // Seed one comment on page A and one on page B (with distinct revisions).
-    const commentA = await Comment.create({
-      page: pageAId,
-      revision: revAId,
-      comment: 'comment on page A',
-      creator: new ObjectId(),
-    });
-    const commentB = await Comment.create({
-      page: pageBId,
-      revision: revBId,
-      comment: 'comment on page B',
-      creator: new ObjectId(),
-    });
-    commentAId = commentA._id;
-    commentBId = commentB._id;
+    // Comments live in Prisma (the mongoose Comment model was migrated), so
+    // seed through the same `prisma.comments.add` the route handler uses.
+    const commentA = await prisma.comments.add(
+      pageAId.toString(),
+      new ObjectId().toString(),
+      revAId.toString(),
+      'comment on page A',
+      -1,
+    );
+    const commentB = await prisma.comments.add(
+      pageBId.toString(),
+      new ObjectId().toString(),
+      revBId.toString(),
+      'comment on page B',
+      -1,
+    );
+    commentAId = commentA.id;
+    commentBId = commentB.id;
 
     // Share links related to page A: one valid, one expired.
     const shareLinkA = await ShareLink.create({ relatedPage: pageAId });
@@ -95,14 +108,12 @@ describe('/comments.get share-link authorization (integration)', () => {
     const apiV1FormValidator = (
       await import('~/server/middlewares/apiv1-form-validator')
     ).default;
-    // biome-ignore lint/suspicious/noExplicitAny: route factory is an untyped JS module
-    const commentFactory = (await import('~/server/routes/comment')) as any;
-    const comment = (commentFactory.default ?? commentFactory)(crowi, {});
-    const certifyFactory = (await import(
+    const { setup: setupComment } = await import('~/server/routes/comment');
+    const comment = setupComment(crowi, {});
+    const { setup: setupCertifySharedPage } = await import(
       '~/server/middlewares/certify-shared-page'
-      // biome-ignore lint/suspicious/noExplicitAny: untyped JS module
-    )) as any;
-    certifySharedPage = (certifyFactory.default ?? certifyFactory)(crowi);
+    );
+    certifySharedPage = setupCertifySharedPage(crowi);
 
     app = express();
     app.use(express.json());
@@ -162,8 +173,11 @@ describe('/comments.get share-link authorization (integration)', () => {
   });
 
   afterAll(async () => {
-    await Comment.deleteMany({
-      _id: { $in: [commentAId, commentBId] },
+    await prisma.comments.deleteMany({
+      where: { id: { in: [commentAId, commentBId] } },
+    });
+    await prisma.pages.deleteMany({
+      where: { id: { in: [pageAId.toString(), pageBId.toString()] } },
     });
     await ShareLink.deleteMany({
       _id: { $in: [shareLinkAId, expiredShareLinkId] },

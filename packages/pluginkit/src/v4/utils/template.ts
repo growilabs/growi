@@ -1,4 +1,4 @@
-import type { TemplateStatus, TemplateSummary } from '../interfaces';
+import type { TemplateStatus, TemplateSummary } from '../interfaces/index.js';
 
 export const getLocalizedTemplate = (
   templateSummary: TemplateSummary | undefined,

@@ -8,21 +8,21 @@ import deepmerge from 'ts-deepmerge';
 import {
   type AppendExtensions,
   useAppendExtensions,
-} from './utils/append-extensions';
-import { type Focus, useFocus } from './utils/focus';
-import type { FoldDrawio } from './utils/fold-drawio';
-import { useFoldDrawio } from './utils/fold-drawio';
-import type { GetDocString } from './utils/get-doc';
-import { type GetDoc, useGetDoc, useGetDocString } from './utils/get-doc';
-import { type InitDoc, useInitDoc } from './utils/init-doc';
+} from './utils/append-extensions.js';
+import { type Focus, useFocus } from './utils/focus.js';
+import type { FoldDrawio } from './utils/fold-drawio.js';
+import { useFoldDrawio } from './utils/fold-drawio.js';
+import type { GetDocString } from './utils/get-doc.js';
+import { type GetDoc, useGetDoc, useGetDocString } from './utils/get-doc.js';
+import { type InitDoc, useInitDoc } from './utils/init-doc.js';
 import {
   type InsertMarkdownElements,
   useInsertMarkdownElements,
-} from './utils/insert-markdown-elements';
-import { type InsertPrefix, useInsertPrefix } from './utils/insert-prefix';
-import { type InsertText, useInsertText } from './utils/insert-text';
-import { type ReplaceText, useReplaceText } from './utils/replace-text';
-import { type SetCaretLine, useSetCaretLine } from './utils/set-caret-line';
+} from './utils/insert-markdown-elements.js';
+import { type InsertPrefix, useInsertPrefix } from './utils/insert-prefix.js';
+import { type InsertText, useInsertText } from './utils/insert-text.js';
+import { type ReplaceText, useReplaceText } from './utils/replace-text.js';
+import { type SetCaretLine, useSetCaretLine } from './utils/set-caret-line.js';
 
 type UseCodeMirrorEditorUtils = {
   initDoc: InitDoc;

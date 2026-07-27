@@ -1,7 +1,7 @@
-import type { IAttachment } from './attachment';
-import type { Ref } from './common';
-import type { HasObjectId } from './has-object-id';
-import type { Lang } from './lang';
+import type { IAttachment } from './attachment.js';
+import type { Ref } from './common.js';
+import type { HasObjectId } from './has-object-id.js';
+import type { Lang } from './lang.js';
 
 export type IUser = {
   name: string;

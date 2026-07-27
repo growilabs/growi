@@ -1,0 +1,23 @@
+{
+  "feature_name": "activity-log-snapshot-viewer",
+  "created_at": "2026-07-10T09:49:50Z",
+  "updated_at": "2026-07-16T00:00:00Z",
+  "language": "ja",
+  "phase": "tasks-approved",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "increment_note": "Initial scope (requirements 1-5, tasks 1-5) is implemented (PR #11440); task 6 (ja/ko/zh/fr translation) is a deferred follow-up. Increment (2026-07-16): ADD/DOWNLOAD formatted rendering + download link — requirements 6-8, design section, and tasks 7-10 are approved AND implemented (2026-07-16): shared LiveAttachmentSnapshotDetail for ADD/DOWNLOAD, AttachmentSnapshotFields extracted (REMOVE behavior-neutral), registry gains 2 entries, download link /download/{target}. Verified: 34 AuditLog specs green, tsgo clean, biome/import-convention clean, independent review GO. Trigger for this increment (upstream ADD/DOWNLOAD capture) was met by PR #11433. Task 6 (translation, now including audit_log_snapshot.download) remains a deferred follow-up."
+}

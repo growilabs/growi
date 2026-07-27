@@ -8,66 +8,9 @@
 import type { NextConfig } from 'next';
 import path from 'node:path';
 
-import nextI18nConfig from './config/next-i18next.config';
-import { listPrefixedPackages } from './src/utils/next.config.utils';
+import nextI18nConfig from './config/next-i18next.config.mjs';
 
 const { i18n } = nextI18nConfig;
-
-const getTranspilePackages = (): string[] => {
-  const packages = [
-    // listing ESM packages until experimental.esmExternals works correctly to avoid ERR_REQUIRE_ESM
-    'react-markdown',
-    'unified',
-    'markdown-table',
-    'bail',
-    'ccount',
-    'character-entities',
-    'character-entities-html4',
-    'character-entities-legacy',
-    'comma-separated-tokens',
-    'decode-named-character-reference',
-    'devlop',
-    'fault',
-    'hastscript',
-    'html-void-elements',
-    'is-absolute-url',
-    'is-plain-obj',
-    'longest-streak',
-    'micromark',
-    'property-information',
-    'space-separated-tokens',
-    'stringify-entities',
-    'trim-lines',
-    'trough',
-    'web-namespaces',
-    'vfile',
-    'vfile-location',
-    'vfile-message',
-    'zwitch',
-    'emoticon',
-    'direction', // for hast-util-select
-    'bcp-47-match', // for hast-util-select
-    'parse-entities',
-    'character-reference-invalid',
-    'is-hexadecimal',
-    'is-alphabetical',
-    'is-alphanumerical',
-    'github-slugger',
-    'html-url-attributes',
-    'estree-util-is-identifier-name',
-    'superjson',
-    ...listPrefixedPackages([
-      'remark-',
-      'rehype-',
-      'hast-',
-      'mdast-',
-      'micromark-',
-      'unist-',
-    ]),
-  ];
-
-  return packages;
-};
 
 const optimizePackageImports: string[] = [
   '@growi/core',
@@ -99,7 +42,11 @@ const nextConfig: NextConfig = {
   typescript: {
     tsconfigPath: 'tsconfig.build.client.json',
   },
-  transpilePackages: getTranspilePackages(),
+  // transpilePackages: all entries (40 hardcoded + 6 prefix groups) were removed during
+  // the ESM migration (Phase 4). The unified/remark/rehype ecosystem and superjson are
+  // ESM-only, but once apps/app became ESM, Turbopack resolves them natively without
+  // transpilation, so none are needed. No entry remains for CJS/ESM incompatibility
+  // reasons (Req 3.1-3.4 / 7.2; verified by build + production boot smoke + Phase 4 CI E2E).
   sassOptions: {
     loadPaths: [path.resolve(__dirname, 'src')],
   },

@@ -268,6 +268,26 @@
 - **Impact**: Design Req 3.5 (`--mount=type=bind,from=builder` pattern) was replaced with `COPY --from=builder`. The security goal of not requiring a shell at runtime was achieved even more robustly
 - **Lesson**: DHI runtime images are truly minimal — `COPY`, `WORKDIR`, `ENV`, `LABEL`, `ENTRYPOINT` are processed by the Docker daemon and do not require a shell
 
+### Native Allocator Retention — glibc main arena (jemalloc, PR #11411)
+
+- **Context**: The memory-leak-investigation spec left an open question: ~+366 MiB of native-side RSS retained after load, outside the V8 heap. It was root-caused here and remedied as an opt-in allocator swap.
+- **Method**: `/proc/<pid>/smaps` diffing on the production dist under the memory-profiler scenario (100 Yjs sessions + page load, 300s idle), fresh DB each run.
+- **Findings**:
+  - The retention lives almost entirely in glibc malloc's **main arena** (the `[heap]` sbrk segment grew 25 → 407 MiB), while the V8 heap, `external` (Buffers), anonymous mmaps, and the Prisma engine stayed flat. It is freed-but-unreturned memory: fragmentation prevents glibc from trimming the sbrk heap, so the working set stays inflated indefinitely. It is **not** a native leak and **not** arena proliferation.
+  - Allocator A/B (same scenario, drain-phase RSS mean):
+
+    | variant | drain-phase RSS mean | retention vs baseline |
+    |---|---|---|
+    | glibc (default) | 786 MiB | +468 MiB |
+    | `MALLOC_ARENA_MAX=2` | 769 MiB | +456 MiB (no effect — not arena proliferation) |
+    | `MALLOC_MMAP_THRESHOLD_=65536` | 736 MiB | +423 MiB (partial) |
+    | **jemalloc (LD_PRELOAD)** | **472 MiB** | **+142 MiB (−70%)** |
+
+  - jemalloc keeps returning freed memory via time-based decay (drain min 424 MiB and still falling), confirming this is allocator behavior, not a leak. It adds ~12 MiB of metadata at idle; the payoff grows with load.
+- **Decision**: Ship jemalloc as **opt-in** (`JEMALLOC_ENABLED=true`), applied to the app process only, default glibc. Rationale: let GROWI.cloud soak it per-app (CPU/latency validation) before any default flip. `MALLOC_ARENA_MAX` was rejected (measured no effect); `MALLOC_MMAP_THRESHOLD_` was only partial and tunes a global glibc knob rather than fixing the root behavior.
+- **Packaging**: The DHI runtime has no package manager, so a separate `debian:13-slim` stage (matching the runtime's distro so the library is built against the same glibc generation) provides `libjemalloc.so.2`; the release stage copies the single `.so`. jemalloc's runtime deps (libc/libm/libstdc++/libgcc) are already present in any Node.js image.
+- **Fallback limitation**: The entrypoint guards only against the library *file* being absent (`fs.existsSync`) — it logs an error and boots on glibc. If the file exists but fails to load at runtime (transitive-dep or symbol-version mismatch), the dynamic linker aborts the app process; there is no graceful glibc fallback for that path. The deliberate `debian:13`/`debian13` glibc-generation match makes this unlikely, and the feature is opt-in and soak-tested per-app.
+
 ### process.initgroups() Type Definition Gap
 
 - **Issue**: `process.initgroups('node', 1000)` was called for in the design, but implementation was deferred because the type definition does not exist in `@types/node`

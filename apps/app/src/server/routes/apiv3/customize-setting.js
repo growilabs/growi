@@ -188,8 +188,11 @@ const router = express.Router();
  *            type: boolean
  *            description: The flag whether the logo is default or not.
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
@@ -596,9 +599,11 @@ module.exports = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]),
     loginRequiredStrictly,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.sidebar,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const requestParams = {
         'customize:isSidebarCollapsedMode': req.body.isSidebarCollapsedMode,

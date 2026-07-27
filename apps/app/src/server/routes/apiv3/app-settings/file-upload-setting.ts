@@ -4,6 +4,7 @@ import {
   toNonBlankStringOrUndefined,
 } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
@@ -136,7 +137,7 @@ const validator = {
  *                      type: object
  *                      $ref: '#/components/schemas/FileUploadSettingParams'
  */
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();

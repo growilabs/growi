@@ -1,9 +1,9 @@
 import { Prec } from '@codemirror/state';
 
-import type { KeymapFactory } from '../types';
-import { registerFormattingBindings } from './formatting';
-import { registerNavigationBindings } from './navigation';
-import { registerStructuralBindings } from './structural';
+import type { KeymapFactory } from '../types.js';
+import { registerFormattingBindings } from './formatting.js';
+import { registerNavigationBindings } from './navigation.js';
+import { registerStructuralBindings } from './structural.js';
 
 export const emacsKeymap: KeymapFactory = async (onSave) => {
   const { EmacsHandler, emacs } = await import('@replit/codemirror-emacs');
