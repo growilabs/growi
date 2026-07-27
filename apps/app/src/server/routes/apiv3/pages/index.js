@@ -23,6 +23,7 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import PageTagRelation from '~/server/models/page-tag-relation';
 import { configManager } from '~/server/service/config-manager';
+import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
 import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
 
@@ -48,6 +49,7 @@ export const setup = (crowi) => {
   const adminRequired = adminRequiredFactory(crowi);
 
   const { Page, User } = crowi.models;
+  const { pageGrantService, pageService } = crowi;
 
   const activityEvent = crowi.events.activity;
 
@@ -310,8 +312,10 @@ export const setup = (crowi) => {
    *                  properties:
    *                    page:
    *                      $ref: '#/components/schemas/Page'
-   *          401:
-   *            description: page id is invalid
+   *          403:
+   *            description: Page is forbidden (page-is-forbidden).
+   *          404:
+   *            description: Page is not found (page-not-found).
    *          409:
    *            description: page path is already existed
    */
@@ -373,18 +377,38 @@ export const setup = (crowi) => {
       let renamedPage;
 
       try {
-        page = await Page.findByIdAndViewer(pageId, req.user, null, true);
-        options.isRecursively = page.descendantCount > 0;
+        const pageWithMeta = await findPageAndMetaDataByViewer(
+          pageService,
+          pageGrantService,
+          {
+            pageId,
+            path: null,
+            user: req.user,
+            basicOnly: true,
+          },
+        );
+        page = pageWithMeta.data;
 
         if (page == null) {
+          const { meta } = pageWithMeta;
+          if (meta.isForbidden) {
+            return res.apiv3Err(
+              new ErrorV3(
+                'Page is forbidden',
+                'page-is-forbidden',
+                undefined,
+                meta,
+              ),
+              403,
+            );
+          }
           return res.apiv3Err(
-            new ErrorV3(
-              `Page '${pageId}' is not found or forbidden`,
-              'notfound_or_forbidden',
-            ),
-            401,
+            new ErrorV3('Page is not found', 'page-not-found', undefined, meta),
+            404,
           );
         }
+
+        options.isRecursively = page.descendantCount > 0;
 
         // empty page does not require revisionId validation
         if (!page.isEmpty && revisionId == null) {
