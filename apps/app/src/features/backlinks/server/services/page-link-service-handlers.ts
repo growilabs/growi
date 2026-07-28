@@ -1,6 +1,7 @@
 import { getIdForRef, isPopulated } from '@growi/core';
+import mongoose from 'mongoose';
 
-import type { PageDocument } from '~/server/models/page';
+import type { PageDocument, PageModel } from '~/server/models/page';
 import { Revision } from '~/server/models/revision';
 
 import { extractInternalLinks } from './extract-internal-links';
@@ -35,4 +36,23 @@ export const handlePageUpsert = async (
   }));
 
   await syncOutboundLinks(fromPage, rows);
+};
+
+/**
+ * Drain-time entry point for the coalescing queue: load the page by id, then upsert its links.
+ * The queue holds ids rather than the event's documents so the body is re-read here — coalesced
+ * saves then collapse to one extraction over the latest state, with no ordering assumption about
+ * which event payload arrived last.
+ */
+export const handlePageUpsertById = async (
+  pageId: string,
+  siteUrl?: string,
+): Promise<void> => {
+  const Page = mongoose.model<PageDocument, PageModel>('Page');
+
+  const page = await Page.findById(pageId).select('_id path revision');
+  // Gone between the save and this drain: skip rather than re-create rows for a deleted source.
+  if (page == null) return;
+
+  await handlePageUpsert(page, siteUrl);
 };

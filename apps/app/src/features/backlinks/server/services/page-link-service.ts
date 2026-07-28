@@ -9,7 +9,7 @@ import loggerFactory from '~/utils/logger';
 
 import type { IBacklink } from '../../interfaces/backlink';
 import PageLink from '../models/page-link';
-import { handlePageUpsert } from './page-link-service-handlers';
+import { handlePageUpsertById } from './page-link-service-handlers';
 
 const logger = loggerFactory('growi:features:backlinks:page-link-service');
 
@@ -18,8 +18,20 @@ type BacklinkSource = {
   _id: Types.ObjectId;
   path: string;
 };
+
+export const DRAIN_INTERVAL_MS = 1000;
+export const MAX_PAGES_PER_DRAIN = 3;
+
 export class PageLinkService {
-  constructor(private crowi: Crowi) {}
+  private pagesToUpsert: Set<string>;
+  private drainTimer: NodeJS.Timeout | null;
+  private draining: boolean;
+  constructor(private crowi: Crowi) {
+    this.pagesToUpsert = new Set<string>();
+    this.draining = false;
+    this.drainTimer = null;
+  }
+
   static create(crowi: Crowi): PageLinkService {
     const pageLinkService = new PageLinkService(crowi);
     pageLinkService.registerEvents();
@@ -32,11 +44,15 @@ export class PageLinkService {
     pageEvent.on('update', (page: PageDocument) => this.onUpsert(page));
   }
 
-  private async onUpsert(page: PageDocument): Promise<void> {
+  private onUpsert(page: PageDocument): void {
     try {
-      const siteUrl = this.crowi.configManager.getConfig('app:siteUrl');
+      if (page._id == null) {
+        throw new Error('Page ID is undefined');
+      }
 
-      await handlePageUpsert(page, siteUrl);
+      this.pagesToUpsert.add(page._id.toString());
+
+      this.scheduleDrain();
     } catch (err) {
       logger.error({ err, pageId: page._id }, 'backlinks sync failed');
     }
@@ -69,5 +85,44 @@ export class PageLinkService {
     }));
 
     return backlinks;
+  }
+
+  private scheduleDrain(): void {
+    if (this.drainTimer != null || this.draining) return;
+    this.drainTimer = setTimeout(() => {
+      this.drain().catch((err) =>
+        logger.error({ err }, 'backlinks drain failed'),
+      );
+    }, DRAIN_INTERVAL_MS);
+    // A pending drain must not keep the process alive; dropped work self-heals on the next edit.
+    this.drainTimer.unref();
+  }
+
+  private async drain(): Promise<void> {
+    this.drainTimer = null;
+    this.draining = true;
+
+    try {
+      const siteUrl = this.crowi.configManager.getConfig('app:siteUrl');
+      const batch = [...this.pagesToUpsert].slice(0, MAX_PAGES_PER_DRAIN);
+
+      // Remove before processing: a save landing mid-drain re-enqueues the id and gets a fresh
+      // run, whereas removing afterwards would swallow that save's changes.
+      for (const id of batch) {
+        this.pagesToUpsert.delete(id);
+      }
+
+      for (const id of batch) {
+        try {
+          // biome-ignore lint/performance/noAwaitInLoops: pacing is the point — parses run one at a time so the event loop is yielded between them (req 3.5)
+          await handlePageUpsertById(id, siteUrl);
+        } catch (err) {
+          logger.error({ err, pageId: id }, 'backlinks sync failed');
+        }
+      }
+    } finally {
+      this.draining = false;
+      if (this.pagesToUpsert.size > 0) this.scheduleDrain();
+    }
   }
 }
