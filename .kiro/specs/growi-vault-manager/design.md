@@ -212,7 +212,7 @@ vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn す�
 | 1.1–1.6 | change stream 購読・冪等処理 | VaultInstructionWatcher |
 | 2.1–2.8 | 全 op の namespace tree 更新 | VaultNamespaceBuilder, VaultPathMapper, VaultBlobHasher, VaultRepoStorage |
 | 3.1–3.7 | ページパス純関数マッピング | VaultPathMapper |
-| 4.1–4.8 | per-user view 合成・キャッシュ | ComposeViewController, VaultViewComposer |
+| 4.1–4.12 | per-user view 合成・キャッシュ・tree 正規化 | ComposeViewController, VaultViewComposer, VaultTreeNormalizer |
 | 5.1–5.5 | git smart HTTP lower-half | GitProxyController, VaultUploadPackSpawner |
 | 6.1–6.7 | メンテナンス自走スケジューリング | VaultMaintenanceScheduler |
 | 7.1–7.5 | shared secret 認証 | SharedSecretAuth |
@@ -236,6 +236,7 @@ vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn す�
 | VaultInstructionWatcher | Service | change stream 購読 + drain + retry | 1.1–1.6 |
 | VaultNamespaceBuilder | Service | instruction → blob/tree/commit + ref 更新 | 2.1–2.8 |
 | VaultViewComposer | Service | namespace merge → user view ref（delta merge + cache） | 4.2–4.8 |
+| VaultTreeNormalizer | Service | merged tree のエントリ名正規化（大小衝突 suffix + 名前の長さの上限） | 4.9–4.12 |
 | VaultRepoStorage | Service | bare repo object I/O 抽象 | 9.1–9.5 |
 | VaultPathMapper | Service | pagePath → filePath 純関数 | 3.1–3.7 |
 | VaultBlobHasher | Service | git blob OID 計算（isomorphic-git） | 2.1, 2.2 |
