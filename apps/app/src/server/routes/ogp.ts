@@ -25,12 +25,18 @@ const DEFAULT_USER_IMAGE_URL = '/images/icons/user.svg';
 const DEFAULT_USER_IMAGE_PATH = `public${DEFAULT_USER_IMAGE_URL}`;
 
 let bufferedDefaultUserImageCache: Buffer = Buffer.from('');
-fs.readFile(path.join(projectRoot, DEFAULT_USER_IMAGE_PATH), (err, buffer) => {
-  if (err) throw err;
-  bufferedDefaultUserImageCache = buffer;
-});
 
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi) => {
+  // populate the default-image cache at setup time, not at import time
+  // (ESM imports are hoisted to boot, before the app environment is ready)
+  fs.readFile(
+    path.join(projectRoot, DEFAULT_USER_IMAGE_PATH),
+    (err, buffer) => {
+      if (err) throw err;
+      bufferedDefaultUserImageCache = buffer;
+    },
+  );
+
   const isUserImageAttachment = (userImageUrlCached: string): boolean => {
     return /^\/attachment\/.+/.test(userImageUrlCached);
   };
@@ -93,7 +99,9 @@ module.exports = (crowi: Crowi) => {
       }
     } catch (err) {
       logger.error(err);
-      return res.status(500).send(`error: ${err}`);
+      // Do not echo the error into the response body: it can carry
+      // request-derived text and the string body is served as text/html (XSS).
+      return res.status(500).send('Internal Server Error');
     }
 
     let result: { data: any };
@@ -113,7 +121,8 @@ module.exports = (crowi: Crowi) => {
       );
     } catch (err) {
       logger.error(err);
-      return res.status(500).send(`error: ${err}`);
+      // Do not echo the error into the response body (see note above).
+      return res.status(500).send('Internal Server Error');
     }
 
     res.writeHead(200, {
@@ -165,7 +174,10 @@ module.exports = (crowi: Crowi) => {
         req.body.page = page;
       } catch (error) {
         logger.error(error);
-        return res.status(500).send(`error: ${error}`);
+        // Do not echo the error into the response body: a malformed pageId
+        // reaches Mongoose ObjectId casting, whose CastError echoes the raw
+        // value, and the string body is served as text/html (reflected XSS).
+        return res.status(500).send('Internal Server Error');
       }
 
       return next();

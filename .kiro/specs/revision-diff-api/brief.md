@@ -85,7 +85,7 @@ PAT を持つ利用者が、次の2本の汎用 API を組み合わせて
   - API② 汎用 diff（複数ページ・バッチ・per-item 権限検証・サーバ側 diff 計算）
   - PAT/scope による認可、ページ閲覧権限に基づくフィルタ/フラグ付け
   - 両 API の swagger(JSDoc) 注釈
-  - API① のための revisions 複合インデックス追加（migration）
+  - API① のための revisions 複合インデックス追加（schema 宣言＋autoIndex で構築。専用 migration は設けない）
 - **Out**:
   - PrimaVista 側（agent-memory-ingest-growi）の consumer 実装・SDK 利用
   - GROWI 画面 UI の変更（本 spec は API のみ）
@@ -152,7 +152,7 @@ PAT を持つ利用者が、次の2本の汎用 API を組み合わせて
 
 ## パフォーマンス要件（design/impl で必須）
 
-- **複合インデックス追加（前提条件）**: revisions に `{ author: 1, createdAt: -1 }`（migration）。
+- **複合インデックス追加（前提条件）**: revisions に `{ author: 1, createdAt: -1 }`（schema 宣言＋autoIndex で構築。専用 migration は設けない。GROWI.cloud など共有 MongoDB 構成では起動時の一斉構築を避けるためオペレーションで事前作成）。
   無いと著者横断クエリが全走査になり大規模 wiki で致命的。
 - **前版算出の N+1 回避**（決定#2）。
 - **権限判定のバルク化**: 多数ページの閲覧可否をページ単位で評価しない。

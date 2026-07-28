@@ -20,9 +20,6 @@ on:
       skip-e2e-test:
         type: boolean
         default: false
-    secrets:
-      SLACK_WEBHOOK_URL:
-        required: true
 
 jobs:
 
@@ -57,6 +54,16 @@ jobs:
       env:
         ANALYZE: 1
 
+    - name: Verify dist import resolution (C5)
+      working-directory: ./apps/app
+      run: |
+        node bin/verify-dist-resolution.ts dist
+
+    - name: Check import convention lint
+      working-directory: ./apps/app
+      run: |
+        node tools/lint/import-extension-guard.cjs src
+
     - name: Assemble production artifacts
       run: bash apps/app/bin/assemble-prod.sh
 
@@ -66,6 +73,14 @@ jobs:
     - name: Archive production files
       id: archive-prod-files
       run: |
+        # apps/app/bin/runtime/ holds the self-contained hooks the prod server
+        # and its migration step load via `node --import` at runtime
+        # (dev-esm-resolver.mjs for `migrate:umzug`'s prisma/migrate.ts, and
+        # env-preload.mjs for `server` and `migrate:migrate-mongo`). Ship the
+        # whole directory rather than naming files individually, so adding a
+        # new runtime hook there can't silently go missing from the tarball
+        # the way env-preload.mjs did before. The rest of bin/ is build-time
+        # only and is intentionally excluded.
         tar -zcf production.tar.gz --exclude ./apps/app/.next/cache \
           package.json \
           node_modules \
@@ -74,6 +89,7 @@ jobs:
           apps/app/config \
           apps/app/dist \
           apps/app/prisma \
+          apps/app/bin/runtime \
           apps/app/public \
           apps/app/resource \
           apps/app/tmp \
@@ -122,12 +138,6 @@ jobs:
       matrix:
         mongodb-version: ['6.0', '8.0']
 
-    services:
-      mongodb:
-        image: mongo:${{ matrix.mongodb-version }}
-        ports:
-        - 27017/tcp
-
     steps:
     - uses: actions/setup-node@v6
       with:
@@ -144,6 +154,12 @@ jobs:
 
     # Run after extraction so pnpm/action-setup@v6 can read packageManager from package.json
     - uses: pnpm/action-setup@v6
+
+    - name: Start MongoDB (replica set)
+      uses: supercharge/mongodb-github-action@1.12.1
+      with:
+        mongodb-version: ${{ matrix.mongodb-version }}
+        mongodb-replica-set: rs0
 
     - name: Start Elasticsearch with plugins
       uses: elastic/elastic-github-actions/elasticsearch@master
@@ -170,7 +186,7 @@ jobs:
         cp config/ci/.env.local.for-ci .env.production.local
         pnpm run server:ci
       env:
-        MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi
+        MONGO_URI: mongodb://localhost:27017/growi?replicaSet=rs0
         ELASTICSEARCH_URI: http://localhost:9200/growi
 
     - name: Slack Notification
@@ -240,12 +256,6 @@ jobs:
         shard: [1/2, 2/2]
         mongodb-version: ['6.0', '8.0']
 
-    services:
-      mongodb:
-        image: mongo:${{ matrix.mongodb-version }}
-        ports:
-        - 27017/tcp
-
     steps:
     - uses: actions/checkout@v4
 
@@ -259,6 +269,15 @@ jobs:
     - name: Install dependencies
       run: |
         pnpm install --frozen-lockfile
+
+    # Playwright test files import runtime values from @growi/core (e.g. PageGrant),
+    # so packages/core/dist must exist before `pnpm playwright test` resolves them.
+    # This job runs playwright directly instead of through `turbo run test`, so the
+    # `^build` that builds workspace deps for the unit/integration suites never runs
+    # here. Build @growi/core explicitly to fill that gap.
+    - name: Build @growi/core (required by Playwright test files)
+      run: |
+        pnpm --filter @growi/core build
 
     # Browsers are pre-populated by `prime-playwright-cache`. Always a cache hit;
     # restore-keys provides a partial fallback if the keyed cache was evicted.
@@ -275,6 +294,12 @@ jobs:
     - name: Install Playwright system deps and any missing browsers
       run: |
         pnpm playwright install --with-deps
+
+    - name: Start MongoDB (replica set)
+      uses: supercharge/mongodb-github-action@1.12.1
+      with:
+        mongodb-version: ${{ matrix.mongodb-version }}
+        mongodb-replica-set: rs0
 
     - name: Start Elasticsearch with plugins
       uses: elastic/elastic-github-actions/elasticsearch@master
@@ -319,7 +344,7 @@ jobs:
       env:
         DEBUG: pw:api
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
-        MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-playwright-installer
+        MONGO_URI: mongodb://localhost:27017/growi-playwright-installer?replicaSet=rs0
         ELASTICSEARCH_URI: http://localhost:9200/growi
 
     # Each `playwright test` run clears blob-report/ when it writes its report
@@ -346,7 +371,7 @@ jobs:
       env:
         DEBUG: pw:api
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
-        MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-playwright
+        MONGO_URI: mongodb://localhost:27017/growi-playwright?replicaSet=rs0
         ELASTICSEARCH_URI: http://localhost:9200/growi
 
     - name: Stash main blob report
@@ -369,7 +394,7 @@ jobs:
       env:
         DEBUG: pw:api
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
-        MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-playwright-guest-mode
+        MONGO_URI: mongodb://localhost:27017/growi-playwright-guest-mode?replicaSet=rs0
         ELASTICSEARCH_URI: http://localhost:9200/growi
 
     - name: Stash guest-mode blob report

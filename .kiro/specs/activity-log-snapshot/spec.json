@@ -1,0 +1,23 @@
+{
+  "feature_name": "activity-log-snapshot",
+  "created_at": "2026-06-29T09:16:21Z",
+  "updated_at": "2026-07-10T11:47:34Z",
+  "language": "ja",
+  "phase": "tasks-approved",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "increment_note": "REMOVE scope (requirements 1-4, tasks 1-7) is implemented (PR #11393). Increment (requirements 5-8, tasks 8-13: attachment ADD/DOWNLOAD snapshot capture) has approved requirements, design, and tasks; ready for implementation. Only the increment tasks 8-13 are pending implementation; REMOVE tasks 1-7 remain done."
+}

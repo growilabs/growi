@@ -1,6 +1,6 @@
 import type { IUserHasId } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
-import type { Request } from 'express';
+import type { Request, Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
@@ -18,7 +18,7 @@ const logger = loggerFactory('growi:routes:apiv3:content-disposition-settings');
 
 const router = express.Router();
 
-module.exports = (crowi) => {
+export const setup = (crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
@@ -92,9 +92,11 @@ module.exports = (crowi) => {
     '/',
     loginRequiredStrictly,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validateUpdateMimeTypes,
     apiV3FormValidator,
-    addActivity,
 
     async (req: UpdateMimeTypesRequest, res: ApiV3Response) => {
       const newInlineMimeTypes: string[] = req.body.newInlineMimeTypes;

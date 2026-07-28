@@ -1,3 +1,3 @@
-export * from './mentionAutocompletionSettings';
-export * from './mentionDecorationSettings';
-export * from './use-codemirror-editor';
+export * from './mentionAutocompletionSettings.js';
+export * from './mentionDecorationSettings.js';
+export * from './use-codemirror-editor/index.js';

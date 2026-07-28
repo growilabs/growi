@@ -1,4 +1,4 @@
-export * from './consts/preset-themes';
+export * from './consts/preset-themes.js';
 
 export const themesRootPath = 'dist/themes';
 export const manifestPath = `${themesRootPath}/.vite/manifest.json`;

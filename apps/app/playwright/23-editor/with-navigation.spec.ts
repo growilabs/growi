@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readFileSync } from 'fs';
 import path from 'path';
 
-import { appendTextToEditorUntilContains } from '../utils/AppendTextToEditorUntilContains';
+import { appendTextToEditorUntilContains } from '../utils/append-text-to-editor-until-contains';
 
 /**
  * for the issues:
@@ -26,7 +26,10 @@ test('should not be cleared and should prevent GrantSelector from modified', asy
   await expect(page.getByTestId('grw-grant-selector')).toContainText('Only me');
 
   // Upload attachment
-  const filePath = path.resolve(__dirname, '../23-editor/assets/example.txt');
+  const filePath = path.resolve(
+    import.meta.dirname,
+    '../23-editor/assets/example.txt',
+  );
   const buffer = readFileSync(filePath).toString('base64');
   const dataTransfer = await page.evaluateHandle(
     async ({ bufferData, localFileName, localFileType }) => {

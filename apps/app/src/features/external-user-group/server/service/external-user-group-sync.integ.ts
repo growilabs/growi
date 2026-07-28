@@ -14,12 +14,12 @@ import { mock } from 'vitest-mock-extended';
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
-import ExternalAccount from '~/server/models/external-account';
 import type { PageModel } from '~/server/models/page';
 import { configManager } from '~/server/service/config-manager';
 import instanciateExternalAccountService from '~/server/service/external-account';
 import type PassportService from '~/server/service/passport';
 import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
+import { prisma } from '~/utils/prisma';
 
 import type {
   ExternalUserGroupTreeNode,
@@ -330,14 +330,16 @@ describe('ExternalUserGroupSyncService.syncExternalUserGroups', () => {
         ],
       },
     });
-    await ExternalAccount.deleteMany({
-      accountId: {
-        $in: [
-          'childGroupUser',
-          'parentGroupUser',
-          'grandParentGroupUser',
-          'previouslySyncedGroupUser',
-        ],
+    await prisma.externalaccounts.deleteMany({
+      where: {
+        accountId: {
+          in: [
+            'childGroupUser',
+            'parentGroupUser',
+            'grandParentGroupUser',
+            'previouslySyncedGroupUser',
+          ],
+        },
       },
     });
     await mongoose.model('Page').deleteMany({

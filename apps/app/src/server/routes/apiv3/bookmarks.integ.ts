@@ -7,11 +7,15 @@ import request, { type Response as SupertestResponse } from 'supertest';
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
-import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { configManager } from '~/server/service/config-manager';
+import { prisma } from '~/utils/prisma';
 
 import type { ApiV3Response } from './interfaces/apiv3-response';
+
+// bookmarks / bookmarkfolders are Prisma-backed since v8, so fixtures go through
+// Prisma. Pages, users and groups stay on mongoose (not yet migrated).
+type BookmarkRow = Awaited<ReturnType<typeof prisma.bookmarks.create>>;
 
 const seedUser = async (username: string): Promise<HydratedDocument<IUser>> => {
   const User = mongoose.model<IUser>('User');
@@ -51,12 +55,10 @@ const seedPage = async (
 const seedBookmark = (
   user: HydratedDocument<IUser>,
   page: HydratedDocument<PageDocument>,
-): Promise<HydratedDocument<BookmarkDocument>> => {
-  const Bookmark = mongoose.model<
-    HydratedDocument<BookmarkDocument>,
-    BookmarkModel
-  >('Bookmark');
-  return Bookmark.create({ user: user._id, page: page._id });
+): Promise<BookmarkRow> => {
+  return prisma.bookmarks.create({
+    data: { userId: user._id.toString(), pageId: page._id.toString() },
+  });
 };
 
 const seedGroup = async (
@@ -147,16 +149,14 @@ describe('GET /bookmarks/:userId', () => {
     });
 
     // Mount the real router (same factory the production server mounts).
-    const bookmarksModule = await import('./bookmarks');
-    const createBookmarksRouter = ((bookmarksModule as { default?: unknown })
-      .default ?? bookmarksModule) as (c: Crowi) => express.Router;
-    app.use('/', createBookmarksRouter(crowi));
+    const { setup } = await import('./bookmarks');
+    app.use('/', setup(crowi));
   });
 
   afterEach(async () => {
     await Promise.all([
-      mongoose.model('Bookmark').deleteMany({}),
-      mongoose.model('BookmarkFolder').deleteMany({}),
+      prisma.bookmarks.deleteMany({}),
+      prisma.bookmarkfolders.deleteMany({}),
       mongoose.model('Page').deleteMany({}),
       mongoose.model('User').deleteMany({}),
       mongoose.model('UserGroup').deleteMany({}),

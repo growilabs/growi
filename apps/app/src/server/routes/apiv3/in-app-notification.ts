@@ -1,5 +1,6 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import type { Router } from 'express';
 import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
@@ -86,7 +87,7 @@ const router = express.Router();
  *           items:
  *             $ref: '#/components/schemas/User'
  */
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
 
@@ -171,6 +172,11 @@ module.exports = (crowi: Crowi) => {
       const getActionUsersFromActivities = (activities) =>
         activities
           .map(({ user }) => user)
+          // activity.user can be null: an activity settled without its
+          // request context (bare activity, mostly from editor saves), or a
+          // reference to a since-removed user. Exclude those so the API never
+          // returns null entries in actionUsers.
+          .filter((user) => user != null)
           .filter((user, i, self) => self.indexOf(user) === i);
 
       const serializedDocs: Array<IInAppNotification> =

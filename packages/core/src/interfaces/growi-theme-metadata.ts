@@ -1,4 +1,4 @@
-import { ColorScheme } from './color-scheme';
+import { ColorScheme } from './color-scheme.js';
 
 export const GrowiThemeSchemeType = {
   ...ColorScheme,

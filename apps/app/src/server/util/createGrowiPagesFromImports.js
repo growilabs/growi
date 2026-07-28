@@ -3,7 +3,7 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 const { isCreatablePage } = pagePathUtils;
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+export const setup = (crowi) => {
   const { Page } = crowi.models;
 
   /**

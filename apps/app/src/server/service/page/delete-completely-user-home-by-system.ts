@@ -70,7 +70,9 @@ export const deleteCompletelyUserHomeBySystem = async (
     }
 
     // Delete the user's homepage
-    await pageService.deleteCompletelyOperation(ids, paths);
+    // actor=null: this is a system operation with no operator, so no
+    // cascade attachment-removal activity is recorded for it.
+    await pageService.deleteCompletelyOperation(ids, paths, null);
 
     if (shouldUseV5Process) {
       // Remove leaf empty pages

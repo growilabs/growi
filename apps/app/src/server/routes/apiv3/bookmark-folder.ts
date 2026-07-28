@@ -1,14 +1,19 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import { objectIdUtils } from '@growi/core/dist/utils';
 import {
   isUserPage,
   isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
+import type { Router } from 'express';
+import express from 'express';
 import { body } from 'express-validator';
-import mongoose, { type Types } from 'mongoose';
+// Page is not migrated to Prisma yet; its viewer/grant filter is a mongoose static.
+import mongoose from 'mongoose';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
@@ -23,11 +28,11 @@ import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
-import BookmarkFolder from '../../models/bookmark-folder';
+import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:bookmark-folder');
-const express = require('express');
 
 const router = express.Router();
 
@@ -117,8 +122,10 @@ const validator = {
       .isMongoId()
       .optional({ nullable: true })
       .custom(async (parent: string) => {
-        const parentFolder = await BookmarkFolder.findById(parent);
-        if (parentFolder == null || parentFolder.parent != null) {
+        const parentFolder = await prisma.bookmarkfolders.findUnique({
+          where: { id: parent },
+        });
+        if (parentFolder == null || parentFolder.parentId != null) {
           throw new Error('Maximum folder hierarchy of 2 levels');
         }
       }),
@@ -146,10 +153,12 @@ const validator = {
   ],
 };
 
+// Prisma throws a validation error (500) on a malformed ObjectId string, so ids
+// are rejected up front to keep the endpoint's 400 contract.
 const isValidObjectString = (v: unknown): v is string =>
-  typeof v === 'string' && mongoose.isValidObjectId(v);
+  typeof v === 'string' && objectIdUtils.isValidObjectId(v);
 
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   /**
@@ -193,8 +202,17 @@ module.exports = (crowi: Crowi) => {
     loginRequiredStrictly,
     validator.bookmarkFolder,
     apiV3FormValidator,
-    async (req, res) => {
-      const owner = req.user?._id;
+    async (req: CrowiRequest, res: ApiV3Response) => {
+      // loginRequiredStrictly guarantees req.user at runtime; guard narrows the type
+      if (req.user == null) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'param "user" must be set.',
+            'failed_to_create_bookmark_folder',
+          ),
+        );
+      }
+      const owner = req.user._id;
       const { name, parent } = req.body;
       const params = {
         name,
@@ -203,9 +221,17 @@ module.exports = (crowi: Crowi) => {
       };
 
       try {
-        const bookmarkFolder = await BookmarkFolder.createByParameters(params);
+        const bookmarkFolder =
+          await prisma.bookmarkfolders.createByParameters(params);
         logger.debug({ bookmarkFolder }, 'bookmark folder created');
-        return res.apiv3({ bookmarkFolder });
+        return res.apiv3({
+          bookmarkFolder: {
+            ...bookmarkFolder,
+            bookmarks: bookmarkFolder.bookmarkIds,
+            owner: bookmarkFolder.ownerId,
+            parent: bookmarkFolder.parentId,
+          },
+        });
       } catch (err) {
         logger.error(err);
         if (err instanceof BookmarkFolderForbiddenError) {
@@ -257,7 +283,7 @@ module.exports = (crowi: Crowi) => {
     '/list/:userId',
     accessTokenParser([SCOPE.READ.FEATURES.BOOKMARK], { acceptLegacy: true }),
     loginRequiredStrictly,
-    async (req, res) => {
+    async (req: CrowiRequest, res: ApiV3Response) => {
       const { userId } = req.params;
       const Page = mongoose.model<InstanceType<PageModel>, PageModel>('Page');
 
@@ -289,35 +315,44 @@ module.exports = (crowi: Crowi) => {
           : null;
 
       const getBookmarkFolders = async (
-        userId: Types.ObjectId | string,
-        parentFolderId?: Types.ObjectId | string,
+        userId: string,
+        parentFolderId?: string,
       ) => {
-        const folders = (await BookmarkFolder.find({
-          owner: userId,
-          parent: parentFolderId,
-        })
-          .populate('childFolder')
-          .populate({
-            path: 'bookmarks',
-            model: 'Bookmark',
-            populate: {
-              path: 'page',
-              model: 'Page',
-              populate: {
-                path: 'lastUpdateUser',
-                model: 'User',
-              },
-            },
-          })
-          .exec()) as never as BookmarkFolderItems[];
+        const folders = await prisma.bookmarkfolders.findMany({
+          where: {
+            ownerId: userId,
+            ...(parentFolderId
+              ? { parentId: parentFolderId }
+              : { OR: [{ parentId: { isSet: false } }, { parentId: null }] }),
+          },
+        });
 
         const returnValue: BookmarkFolderItems[] = [];
 
-        const promises = folders.map(async (folder: BookmarkFolderItems) => {
-          const childFolder = await getBookmarkFolders(userId, folder._id);
+        const promises = folders.map(async (folder) => {
+          const childFolder = await getBookmarkFolders(userId, folder.id);
+          let populatedBookmarks: Awaited<
+            ReturnType<typeof prisma.bookmarks.findMany>
+          > = [];
+          if (folder.bookmarkIds.length > 0) {
+            const fetched = await prisma.bookmarks.findMany({
+              where: { id: { in: folder.bookmarkIds } },
+              include: {
+                page: {
+                  include: {
+                    lastUpdateUser: true,
+                  },
+                },
+              },
+            });
+            const bookmarkMap = new Map(fetched.map((b) => [b.id, b]));
+            populatedBookmarks = folder.bookmarkIds
+              .map((id) => bookmarkMap.get(id))
+              .filter((b) => b != null);
+          }
 
-          const bookmarkedPageIds = folder.bookmarks
-            .map((bookmark) => bookmark.page?._id?.toString())
+          const bookmarkedPageIds = populatedBookmarks
+            .map((bookmark) => bookmark.pageId)
             .filter((id): id is string => id != null);
 
           const viewablePages = await Page.findByIdsAndViewer(
@@ -343,26 +378,36 @@ module.exports = (crowi: Crowi) => {
 
           // Drop bookmarks the viewer cannot access, and orphaned ones (null page):
           // they carry no path/title and the client renders them as nothing anyway.
-          //
-          // !! DO NOT THIS SERIALIZING OUTSIDE OF PROMISES !! -- 05.23.2023 ryoji-s
-          // Serializing outside of promises will cause not populated.
-          const bookmarks = folder.bookmarks
+          const bookmarks = populatedBookmarks
             .filter(
               (bookmark) =>
-                bookmark.page?._id != null &&
-                viewableIdSet.has(bookmark.page._id.toString()),
+                bookmark.pageId != null && viewableIdSet.has(bookmark.pageId),
             )
-            .map((bookmark) => serializeBookmarkSecurely(bookmark));
-
-          const res = {
-            _id: folder._id.toString(),
+            .map((bookmark) => {
+              const serializedBookmark = serializeBookmarkSecurely(bookmark);
+              return {
+                ...serializedBookmark,
+                user: serializedBookmark.userId,
+                page:
+                  serializedBookmark.page == null
+                    ? null
+                    : {
+                        ...serializedBookmark.page,
+                        creator: serializedBookmark.page.creatorId,
+                        deleteUser: serializedBookmark.page.deleteUserId,
+                        parent: serializedBookmark.page.parentId,
+                        revision: serializedBookmark.page.revisionId,
+                      },
+              };
+            });
+          return {
+            _id: folder.id,
             name: folder.name,
-            owner: folder.owner,
+            owner: folder.ownerId,
             bookmarks,
             childFolder,
-            parent: folder.parent,
+            parent: folder.parentId,
           };
-          return res;
         });
 
         const results = (await Promise.all(
@@ -373,7 +418,7 @@ module.exports = (crowi: Crowi) => {
       };
 
       try {
-        const bookmarkFolderItems = await getBookmarkFolders(userId, undefined);
+        const bookmarkFolderItems = await getBookmarkFolders(userId);
 
         return res.apiv3({ bookmarkFolderItems });
       } catch (err) {
@@ -418,10 +463,17 @@ module.exports = (crowi: Crowi) => {
     '/:id',
     accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
     loginRequiredStrictly,
-    async (req, res) => {
+    async (req: CrowiRequest, res: ApiV3Response) => {
       const { id } = req.params;
+      // loginRequiredStrictly guarantees req.user at runtime; guard narrows the type
+      if (req.user == null) {
+        return res.apiv3Err(
+          new ErrorV3('param "user" must be set.', 'forbidden'),
+          403,
+        );
+      }
       try {
-        const result = await BookmarkFolder.deleteFolderAndChildren(
+        const result = await prisma.bookmarkfolders.deleteFolderAndChildren(
           id,
           req.user._id,
         );
@@ -490,7 +542,15 @@ module.exports = (crowi: Crowi) => {
     loginRequiredStrictly,
     validator.bookmarkFolder,
     apiV3FormValidator,
-    async (req, res) => {
+    async (req: CrowiRequest, res: ApiV3Response) => {
+      // loginRequiredStrictly guarantees req.user at runtime; guard narrows the type
+      if (req.user == null) {
+        return res.apiv3Err(
+          new ErrorV3('param "user" must be set.', 'forbidden'),
+          403,
+        );
+      }
+      const userId = req.user._id.toString();
       const { bookmarkFolderId, name, parent, childFolder } = req.body;
       try {
         if (!isValidObjectString(bookmarkFolderId)) {
@@ -503,12 +563,14 @@ module.exports = (crowi: Crowi) => {
           );
         }
 
-        const folder = await BookmarkFolder.findById(bookmarkFolderId);
+        const folder = await prisma.bookmarkfolders.findUnique({
+          where: { id: bookmarkFolderId },
+        });
         if (folder == null) {
           return res.apiv3Err('bookmark_folder_not_found', 404);
         }
 
-        if (folder.owner.toString() !== req.user._id.toString()) {
+        if (folder.ownerId !== userId) {
           return res.apiv3Err('forbidden', 403);
         }
 
@@ -522,23 +584,33 @@ module.exports = (crowi: Crowi) => {
               400,
             );
           }
-          const parentFolder = await BookmarkFolder.findById(parent);
+          const parentFolder = await prisma.bookmarkfolders.findUnique({
+            where: { id: parent },
+          });
           if (parentFolder == null) {
             return res.apiv3Err('bookmark_folder_not_found', 404);
           }
           // A user must not move a folder under another user's folder
-          if (parentFolder.owner.toString() !== req.user._id.toString()) {
+          if (parentFolder.ownerId !== userId) {
             return res.apiv3Err('forbidden', 403);
           }
         }
 
-        const bookmarkFolder = await BookmarkFolder.updateBookmarkFolder(
-          bookmarkFolderId,
-          name,
-          parent,
-          childFolder,
-        );
-        return res.apiv3({ bookmarkFolder });
+        const bookmarkFolder =
+          await prisma.bookmarkfolders.updateBookmarkFolder(
+            bookmarkFolderId,
+            name,
+            parent,
+            childFolder,
+          );
+        return res.apiv3({
+          bookmarkFolder: {
+            ...bookmarkFolder,
+            bookmarks: bookmarkFolder.bookmarkIds,
+            owner: bookmarkFolder.ownerId,
+            parent: bookmarkFolder.parentId,
+          },
+        });
       } catch (err) {
         logger.error(err);
         return res.apiv3Err(err, 500);
@@ -588,8 +660,15 @@ module.exports = (crowi: Crowi) => {
     loginRequiredStrictly,
     validator.bookmarkPage,
     apiV3FormValidator,
-    async (req, res) => {
-      const userId = req.user?._id;
+    async (req: CrowiRequest, res: ApiV3Response) => {
+      // loginRequiredStrictly guarantees req.user at runtime; guard narrows the type
+      if (req.user == null) {
+        return res.apiv3Err(
+          new ErrorV3('param "user" must be set.', 'forbidden'),
+          403,
+        );
+      }
+      const userId = req.user._id.toString();
       const { pageId, folderId } = req.body;
 
       try {
@@ -603,24 +682,35 @@ module.exports = (crowi: Crowi) => {
               400,
             );
           }
-          const folder = await BookmarkFolder.findById(folderId);
+          const folder = await prisma.bookmarkfolders.findUnique({
+            where: { id: folderId },
+          });
           if (folder == null) {
             return res.apiv3Err('bookmark_folder_not_found', 404);
           }
           // A user must not add a bookmark under another user's folder
-          if (folder.owner.toString() !== userId.toString()) {
+          if (folder.ownerId !== userId) {
             return res.apiv3Err('forbidden', 403);
           }
         }
 
         const bookmarkFolder =
-          await BookmarkFolder.insertOrUpdateBookmarkedPage(
+          await prisma.bookmarkfolders.insertOrUpdateBookmarkedPage(
             pageId,
             userId,
             folderId,
           );
         logger.debug({ bookmarkFolder }, 'bookmark added to folder');
-        return res.apiv3({ bookmarkFolder });
+        return res.apiv3({
+          bookmarkFolder: bookmarkFolder
+            ? {
+                ...bookmarkFolder,
+                bookmarks: bookmarkFolder.bookmarkIds,
+                owner: bookmarkFolder.ownerId,
+                parent: bookmarkFolder.parentId,
+              }
+            : null,
+        });
       } catch (err) {
         logger.error(err);
         return res.apiv3Err(err, 500);
@@ -668,16 +758,32 @@ module.exports = (crowi: Crowi) => {
     accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
     loginRequiredStrictly,
     validator.bookmark,
-    async (req, res) => {
+    async (req: CrowiRequest, res: ApiV3Response) => {
       const { pageId, status } = req.body;
-      const userId = req.user?._id;
+      // loginRequiredStrictly guarantees req.user at runtime; guard narrows the type
+      if (req.user == null) {
+        return res.apiv3Err(
+          new ErrorV3('param "user" must be set.', 'forbidden'),
+          403,
+        );
+      }
+      const userId = req.user._id.toString();
       try {
-        const bookmarkFolder = await BookmarkFolder.updateBookmark(
+        const bookmarkFolder = await prisma.bookmarkfolders.updateBookmark(
           pageId,
           status,
           userId,
         );
-        return res.apiv3({ bookmarkFolder });
+        return res.apiv3({
+          bookmarkFolder: bookmarkFolder
+            ? {
+                ...bookmarkFolder,
+                bookmarks: bookmarkFolder.bookmarkIds,
+                owner: bookmarkFolder.ownerId,
+                parent: bookmarkFolder.parentId,
+              }
+            : null,
+        });
       } catch (err) {
         logger.error(err);
         return res.apiv3Err(err, 500);

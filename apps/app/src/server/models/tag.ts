@@ -1,11 +1,10 @@
 import type { Model, Types } from 'mongoose';
 import { Schema } from 'mongoose';
+import mongoosePaginate from 'mongoose-paginate-v2';
+import uniqueValidator from 'mongoose-unique-validator';
 
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import { getOrCreateModel } from '../util/mongoose-utils';
-
-const mongoosePaginate = require('mongoose-paginate-v2');
-const uniqueValidator = require('mongoose-unique-validator');
 
 export interface TagDocument {
   _id: Types.ObjectId;

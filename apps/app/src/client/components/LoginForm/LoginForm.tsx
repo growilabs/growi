@@ -26,7 +26,6 @@ type LoginFormProps = {
   email?: string;
   isEmailAuthenticationEnabled: boolean;
   registrationMode: RegistrationMode;
-  registrationWhitelist: string[];
   isPasswordResetEnabled: boolean;
   isLocalStrategySetup: boolean;
   isLdapStrategySetup: boolean;
@@ -48,7 +47,6 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
     isPasswordResetEnabled,
     isEmailAuthenticationEnabled,
     registrationMode,
-    registrationWhitelist,
     isMailerSetup,
     enabledExternalAuthType,
     minPasswordLength,
@@ -393,7 +391,8 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
           <p className="alert alert-danger">
             {registerErrors.map((err) => (
               <span key={err.message}>
-                {tWithOpt(err.message, err.args)}
+                {/* Leading "・" is an intentional bullet so multiple errors read as a list */}
+                ・{tWithOpt(err.message, err.args)}
                 <br />
               </span>
             ))}
@@ -472,21 +471,6 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
             />
           </div>
 
-          {registrationWhitelist.length > 0 && (
-            <>
-              <p className="form-text">{t('page_register.form_help.email')}</p>
-              <ul>
-                {registrationWhitelist.map((elem) => {
-                  return (
-                    <li key={elem}>
-                      <code>{elem}</code>
-                    </li>
-                  );
-                })}
-              </ul>
-            </>
-          )}
-
           {!isEmailAuthenticationEnabled && (
             <div>
               <div className="input-group">
@@ -556,7 +540,6 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
     props.username,
     props.name,
     props.email,
-    registrationWhitelist,
     minPasswordLength,
     isLoading,
     switchForm,

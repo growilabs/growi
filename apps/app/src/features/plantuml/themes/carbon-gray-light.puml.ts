@@ -1,18 +1,19 @@
 import commonStyles from './carbon-gray-common.puml';
 
+/**
+ * ---
+ * name: growi-carbon-gray-light
+ * display_name: GROWI Carbon Gray
+ * description: A gray theme using the IBM Carbon Design Gray palette for GROWI light themes
+ * author: Yuki Takei
+ * release:
+ * license:
+ * version:
+ * source:
+ * inspiration: https://carbondesignsystem.com/elements/color/overview/
+ * ---
+ */
 const style = `
----
-name: growi-carbon-gray-light
-display_name: GROWI Carbon Gray
-description: A gray theme using the IBM Carbon Design Gray palette for GROWI light themes
-author: Yuki Takei
-release:
-license:
-version:
-source:
-inspiration: https://carbondesignsystem.com/elements/color/overview/
----
-
 !$THEME = "growi-carbon-gray-light"
 
 '!$BGCOLOR = "#f5f5f5"

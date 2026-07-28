@@ -7,16 +7,17 @@ import request from 'supertest';
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
-import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
-import type {
-  BookmarkFolderDocument,
-  BookmarkFolderModel,
-} from '~/server/models/bookmark-folder';
+import { prisma } from '~/utils/prisma';
 
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
-const getBookmarkFolderModel = () =>
-  mongoose.model<BookmarkFolderDocument, BookmarkFolderModel>('BookmarkFolder');
+// bookmarks / bookmarkfolders are Prisma-backed since v8, so fixtures and
+// effect assertions go through Prisma — the same layer as the handler under test.
+// Users stay on mongoose (not yet migrated).
+type BookmarkFolderRow = Awaited<
+  ReturnType<typeof prisma.bookmarkfolders.create>
+>;
+type BookmarkRow = Awaited<ReturnType<typeof prisma.bookmarks.create>>;
 
 const seedUser = async (username: string): Promise<HydratedDocument<IUser>> => {
   const User = mongoose.model<IUser>('User');
@@ -29,24 +30,24 @@ const seedUser = async (username: string): Promise<HydratedDocument<IUser>> => {
 const seedFolder = (
   name: string,
   owner: HydratedDocument<IUser>,
-  parent?: HydratedDocument<BookmarkFolderDocument>,
-): Promise<HydratedDocument<BookmarkFolderDocument>> => {
-  return getBookmarkFolderModel().create({
-    name,
-    owner: owner._id,
-    parent: parent?._id,
+  parent?: BookmarkFolderRow,
+): Promise<BookmarkFolderRow> => {
+  return prisma.bookmarkfolders.create({
+    data: {
+      name,
+      ownerId: owner._id.toString(),
+      parentId: parent?.id,
+    },
   });
 };
 
 const seedBookmark = (
   user: HydratedDocument<IUser>,
   pageId: mongoose.Types.ObjectId,
-): Promise<HydratedDocument<BookmarkDocument>> => {
-  const Bookmark = mongoose.model<
-    HydratedDocument<BookmarkDocument>,
-    BookmarkModel
-  >('Bookmark');
-  return Bookmark.create({ user: user._id, page: pageId });
+): Promise<BookmarkRow> => {
+  return prisma.bookmarks.create({
+    data: { userId: user._id.toString(), pageId: pageId.toString() },
+  });
 };
 
 interface TestRequest extends Request {
@@ -120,13 +121,14 @@ describe('bookmark-folder apiv3 routes', () => {
     });
 
     // Mount the real router (same factory the production server mounts).
-    const routerModule = await import('./bookmark-folder');
-    const createRouter = ((routerModule as { default?: unknown }).default ??
-      routerModule) as (c: Crowi) => express.Router;
-    app.use('/', createRouter(crowi));
+    const { setup } = await import('./bookmark-folder');
+    app.use('/', setup(crowi));
   });
 
   afterEach(async () => {
+    // Wipe through mongoose: Prisma emulates the self-relation on
+    // bookmarkfolders.parent and refuses to delete a folder that still has
+    // children, which a whole-collection teardown has no reason to honour.
     await Promise.all([
       mongoose.model('Bookmark').deleteMany({}),
       mongoose.model('BookmarkFolder').deleteMany({}),
@@ -177,7 +179,7 @@ describe('bookmark-folder apiv3 routes', () => {
         .put('/')
         .send({
           name: 'renamed',
-          bookmarkFolderId: folder._id.toString(),
+          bookmarkFolderId: folder.id,
           parent: { $gt: '' },
         });
 
@@ -193,7 +195,7 @@ describe('bookmark-folder apiv3 routes', () => {
 
       const res = await request(app)
         .put('/')
-        .send({ name: 'after', bookmarkFolderId: folder._id.toString() });
+        .send({ name: 'after', bookmarkFolderId: folder.id });
 
       expect(res.status).toBe(200);
       expect(res.body.bookmarkFolder.name).toBe('after');
@@ -209,13 +211,13 @@ describe('bookmark-folder apiv3 routes', () => {
 
       const res = await request(app).put('/').send({
         name: 'child',
-        bookmarkFolderId: child._id.toString(),
-        parent: parent._id.toString(),
+        bookmarkFolderId: child.id,
+        parent: parent.id,
         childFolder: [],
       });
 
       expect(res.status).toBe(200);
-      expect(res.body.bookmarkFolder.parent).toBe(parent._id.toString());
+      expect(res.body.bookmarkFolder.parent).toBe(parent.id);
     });
 
     it('returns 403 when the folder is owned by another user', async () => {
@@ -226,7 +228,7 @@ describe('bookmark-folder apiv3 routes', () => {
 
       const res = await request(app)
         .put('/')
-        .send({ name: 'renamed', bookmarkFolderId: folder._id.toString() });
+        .send({ name: 'renamed', bookmarkFolderId: folder.id });
 
       expect(res.status).toBe(403);
     });
@@ -285,15 +287,15 @@ describe('bookmark-folder apiv3 routes', () => {
 
       const res = await request(app)
         .post('/add-bookmark-to-folder')
-        .send({ pageId: pageId.toString(), folderId: folder._id.toString() });
+        .send({ pageId: pageId.toString(), folderId: folder.id });
 
       expect(res.status).toBe(200);
       // Assert the effect, not just the status: the bookmark is persisted into
       // the target folder.
-      const updated = await getBookmarkFolderModel().findById(folder._id);
-      expect(updated?.bookmarks?.map((b) => b.toString())).toContain(
-        bookmark._id.toString(),
-      );
+      const updated = await prisma.bookmarkfolders.findUnique({
+        where: { id: folder.id },
+      });
+      expect(updated?.bookmarkIds).toContain(bookmark.id);
     });
 
     it('returns 403 when the folder is owned by another user', async () => {
@@ -306,7 +308,7 @@ describe('bookmark-folder apiv3 routes', () => {
 
       const res = await request(app)
         .post('/add-bookmark-to-folder')
-        .send({ pageId: pageId.toString(), folderId: folder._id.toString() });
+        .send({ pageId: pageId.toString(), folderId: folder.id });
 
       expect(res.status).toBe(403);
     });

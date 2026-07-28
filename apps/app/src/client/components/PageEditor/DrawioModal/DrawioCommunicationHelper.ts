@@ -1,3 +1,5 @@
+import { extractDrawioData } from '@growi/remark-drawio';
+
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:cli:DrawioCommunicationHelper');
@@ -73,9 +75,8 @@ export class DrawioCommunicationHelper {
 
     if (typeof event.data === 'string' && event.data.match(/mxfile/)) {
       if (event.data.length > 0) {
-        const parser = new DOMParser();
-        const dom = parser.parseFromString(event.data, 'text/xml');
-        const drawioData = dom.getElementsByTagName('diagram')[0].innerHTML;
+        // Preserve every page of a multi-page diagram (see #11522).
+        const drawioData = extractDrawioData(event.data);
 
         /*
          * Saving Drawio will be implemented by the following tasks
@@ -83,7 +84,12 @@ export class DrawioCommunicationHelper {
          * https://redmine.weseek.co.jp/issues/104507
          */
 
-        this.callbackOpts?.onSave?.(drawioData);
+        // Skip the save when nothing could be extracted (e.g. a 0-diagram or
+        // unparseable payload) so an empty block never silently overwrites the
+        // existing diagram.
+        if (drawioData.length > 0) {
+          this.callbackOpts?.onSave?.(drawioData);
+        }
       }
 
       this.callbackOpts?.onClose?.();

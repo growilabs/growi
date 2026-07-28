@@ -1,7 +1,7 @@
 import { toNonBlankStringOrUndefined } from '@growi/core/dist/interfaces';
 import type { Transporter } from 'nodemailer';
 import nodemailer from 'nodemailer';
-import type SMTPTransport from 'nodemailer/lib/smtp-transport';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
 
 import loggerFactory from '~/utils/logger';
 
