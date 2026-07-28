@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useIsGuestUser } from '~/states/context';
 
 import type { IBacklink } from '../../interfaces/backlink';
-import { useSWRxBacklinks } from './use-swrx-backlinks';
+import { useSWRxBacklinks } from './backlinks';
 
 // Wrap an untyped mock so mockResolvedValue is not constrained to AxiosResponse.
 const mockApiv3Get = vi.fn();

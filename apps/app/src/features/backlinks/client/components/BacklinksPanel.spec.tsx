@@ -7,7 +7,7 @@ import type { IErrorV3 } from '~/interfaces/errors/v3-error';
 import { useCurrentPageId } from '~/states/page';
 
 import type { IBacklink } from '../../interfaces/backlink';
-import { useSWRxBacklinks } from '../stores/use-swrx-backlinks';
+import { useSWRxBacklinks } from '../stores/backlinks';
 import { BacklinksPanel } from './BacklinksPanel';
 
 vi.mock('next-i18next', () => ({
@@ -16,7 +16,7 @@ vi.mock('next-i18next', () => ({
 vi.mock('~/states/page', () => ({
   useCurrentPageId: vi.fn(),
 }));
-vi.mock('../stores/use-swrx-backlinks', () => ({
+vi.mock('../stores/backlinks', () => ({
   useSWRxBacklinks: vi.fn(),
 }));
 

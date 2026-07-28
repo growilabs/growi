@@ -4,7 +4,7 @@ import { useTranslation } from 'next-i18next';
 
 import { useCurrentPageId } from '~/states/page';
 
-import { useSWRxBacklinks } from '../stores/use-swrx-backlinks';
+import { useSWRxBacklinks } from '../stores/backlinks';
 import { BacklinkListItem } from './BacklinkListItem';
 
 export const BacklinksPanel = (): JSX.Element => {
