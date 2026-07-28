@@ -79,6 +79,7 @@
 9. VaultViewComposer は merged tree を生成したのち、その view の最終ファイル構造を確定する **tree 正規化**（大小衝突解消）を実行する。正規化は merged tree の構造のみから決定論的に導出され、reverse-index コレクションを必要としない
 10. （大小衝突解消）同一ディレクトリ直下で、小文字化して一致する名前が 2 件以上存在するとき（blob・subtree の双方を対象）、VaultViewComposer は各メンバーの名前に `__<hash8>` suffix を付与して衝突を解消する。`hash8` は当該エントリの suffix 付与前 filePath の SHA-1 先頭 8 文字とする
 11. （reactive churn）衝突していたエントリの一方が view から消え、グループのメンバーが 1 件になったとき、VaultViewComposer は残ったエントリの suffix を取り除いて素の名前に戻す。suffix 付与の有無を示す状態は永続化しない
+12. （名前の長さの上限）エントリ名が UTF-8 で 255 バイトを超えるとき、VaultViewComposer は拡張子より前の部分をコードポイント境界で切り詰め、10 と同じ `__<hash8>` suffix を付与して 255 バイト以内に収める。判定は suffix を含んだ最終的な名前に対して行う（10 の suffix によって上限を超える場合も切り詰めの対象になる）。255 バイト以内に収まる名前は一切変更しない
 
 ---
 
