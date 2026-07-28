@@ -7,7 +7,7 @@ import { mock } from 'vitest-mock-extended';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
 
-import type { IBacklink } from '../../interfaces/page-link';
+import type { IBacklink } from '../../interfaces/backlink';
 import type { PageLinkService } from '../services/page-link-service';
 
 type Viewer = NonNullable<CrowiRequest['user']>;
