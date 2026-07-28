@@ -23,7 +23,7 @@ vi.mock('./ai-sdk-modules/llm-providers/provider-availability', () => ({
   getAvailableModels,
 }));
 
-vi.mock('~/features/openai/server/services', () => ({
+vi.mock('./is-ai-enabled', () => ({
   isAiEnabled,
 }));
 

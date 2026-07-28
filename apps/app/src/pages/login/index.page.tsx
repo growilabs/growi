@@ -40,7 +40,6 @@ type ServerConfigurationProps = {
   registrationMode: RegistrationMode;
   isMailerSetup: boolean;
   enabledExternalAuthType: IExternalAuthProviderType[];
-  registrationWhitelist: string[];
   isLocalStrategySetup: boolean;
   isLdapStrategySetup: boolean;
   isLdapSetupFailed: boolean;
@@ -69,7 +68,6 @@ const LoginPage: NextPage<Props> = (props: Props) => {
         isLdapStrategySetup={props.isLdapStrategySetup}
         isLdapSetupFailed={props.isLdapSetupFailed}
         isEmailAuthenticationEnabled={props.isEmailAuthenticationEnabled}
-        registrationWhitelist={props.registrationWhitelist}
         isPasswordResetEnabled={props.isPasswordResetEnabled}
         isMailerSetup={props.isMailerSetup}
         registrationMode={props.registrationMode}
@@ -115,9 +113,6 @@ const getServerSideConfigurationProps: GetServerSideProps<
       isLdapSetupFailed:
         configManager.getConfig('security:passport-ldap:isEnabled') &&
         !passportService.isLdapStrategySetup,
-      registrationWhitelist: configManager.getConfig(
-        'security:registrationWhitelist',
-      ),
       isEmailAuthenticationEnabled: configManager.getConfig(
         'security:passport-local:isEmailAuthenticationEnabled',
       ),

@@ -29,7 +29,7 @@ const handlerFactorySpies = vi.hoisted(() => ({
   postMessage: vi.fn(),
 }));
 
-vi.mock('~/features/openai/server/services', () => ({
+vi.mock('~/features/mastra/server/services/is-ai-enabled', () => ({
   isAiEnabled: () => aiState.enabled,
 }));
 vi.mock('~/features/mastra/server/services/is-ai-configured', () => ({

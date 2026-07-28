@@ -1,4 +1,3 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import type { MastraModelConfig } from '@mastra/core/llm';
 
 import { requireApiKey } from './config';
@@ -8,5 +7,16 @@ import { requireApiKey } from './config';
 // id. The key is read for THIS provider (requireApiKey('google')); the modelId is
 // passed in by the caller (resolveMastraModel parses the effective modelKey and
 // dispatches the bare modelId here).
-export const resolveGoogleModel = (modelId: string): MastraModelConfig =>
-  createGoogleGenerativeAI({ apiKey: requireApiKey('google') })(modelId);
+//
+// `@ai-sdk/google` is loaded via dynamic import() so its module graph is pulled
+// ONLY when a Google model is actually resolved — an instance configured for a
+// different provider never pays that memory cost (see llm-providers/index.ts).
+// The api key is read BEFORE the import so a misconfigured provider fails fast
+// without loading the SDK.
+export const resolveGoogleModel = async (
+  modelId: string,
+): Promise<MastraModelConfig> => {
+  const apiKey = requireApiKey('google');
+  const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
+  return createGoogleGenerativeAI({ apiKey })(modelId);
+};

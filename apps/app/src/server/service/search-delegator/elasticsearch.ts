@@ -1,4 +1,3 @@
-import type { estypes as estypes7 } from '@elastic/elasticsearch7';
 import type { estypes as estypes9 } from '@elastic/elasticsearch9';
 import { getIdStringForRef, type IPage } from '@growi/core';
 import gc from 'expose-gc/function.js';
@@ -22,6 +21,7 @@ import type {
   ESQueryTerms,
   ESTermsKey,
   QueryTerms,
+  ResolvedFilterData,
   SearchableData,
   SearchDelegator,
   UnavailableTermsKey,
@@ -43,11 +43,9 @@ import type {
 } from './bulk-write';
 import {
   type ElasticsearchClientDelegator,
-  type ES7SearchQuery,
   type ES8SearchQuery,
   type ES9SearchQuery,
   getClient,
-  isES7ClientDelegator,
   isES8ClientDelegator,
   isES9ClientDelegator,
   type SearchQuery,
@@ -80,6 +78,12 @@ const AVAILABLE_KEYS = [
   'not_prefix',
   'tag',
   'not_tag',
+  'author',
+  'not_author',
+  'editor',
+  'not_editor',
+  'group',
+  'not_group',
 ];
 
 type Data = any;
@@ -91,12 +95,9 @@ class ElasticsearchDelegator
 
   private socketIoService!: SocketIoService;
 
-  // TODO: https://redmine.weseek.co.jp/issues/168446
-  private isElasticsearchV7: boolean;
-
   private isElasticsearchReindexOnBoot: boolean;
 
-  private elasticsearchVersion: 7 | 8 | 9;
+  private elasticsearchVersion: 8 | 9;
 
   private client: ElasticsearchClientDelegator;
 
@@ -117,17 +118,11 @@ class ElasticsearchDelegator
       'app:elasticsearchVersion',
     );
 
-    if (
-      elasticsearchVersion !== 7 &&
-      elasticsearchVersion !== 8 &&
-      elasticsearchVersion !== 9
-    ) {
+    if (elasticsearchVersion !== 8 && elasticsearchVersion !== 9) {
       throw new Error(
         "Unsupported Elasticsearch version. Please specify a valid number to 'ELASTICSEARCH_VERSION'",
       );
     }
-
-    this.isElasticsearchV7 = elasticsearchVersion === 7;
 
     this.elasticsearchVersion = elasticsearchVersion;
 
@@ -181,10 +176,6 @@ class ElasticsearchDelegator
       rejectUnauthorized,
     });
     this.indexName = indexName;
-  }
-
-  getType(): '_doc' | undefined {
-    return this.isElasticsearchV7 ? '_doc' : undefined;
   }
 
   /**
@@ -648,17 +639,6 @@ class ElasticsearchDelegator
     | Awaited<ReturnType<ElasticsearchClientDelegator['indices']['create']>>
     | undefined
   > {
-    // TODO: https://redmine.weseek.co.jp/issues/168446
-    if (isES7ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-es7');
-      return this.client.indices.create({
-        index,
-        body: {
-          ...mappings,
-        },
-      });
-    }
-
     if (isES8ClientDelegator(this.client)) {
       const { mappings } = await import('./mappings/mappings-es8');
       return this.client.indices.create({
@@ -677,10 +657,6 @@ class ElasticsearchDelegator
   }
 
   async createAuditlogIndex(index: string) {
-    if (isES7ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-auditlog-es7');
-      return this.client.indices.create({ index, body: { ...mappings } });
-    }
     if (isES8ClientDelegator(this.client)) {
       const { mappings } = await import('./mappings/mappings-auditlog-es8');
       return this.client.indices.create({ index, ...mappings });
@@ -720,7 +696,6 @@ class ElasticsearchDelegator
     const command = {
       index: {
         _index: this.indexName,
-        _type: this.getType(),
         _id: page._id.toString(),
       },
     };
@@ -730,6 +705,7 @@ class ElasticsearchDelegator
       body: page.revision.body,
       body_embedded: page.revisionBodyEmbedded,
       username: page.creator?.username,
+      last_update_username: page.lastUpdateUser?.username,
       comments: page.commentsCount > 0 ? page.comments : undefined,
       comment_count: page.commentsCount,
       bookmark_count: page.bookmarksCount,
@@ -765,7 +741,6 @@ class ElasticsearchDelegator
     const command = {
       delete: {
         _index: this.indexName,
-        _type: this.getType(),
         _id: page._id.toString(),
       },
     };
@@ -932,25 +907,6 @@ class ElasticsearchDelegator
       },
     };
 
-    if (isES7ClientDelegator(this.client)) {
-      const result = await this.client.search({
-        index: this.auditlogAliasName,
-        body: {
-          size: 0,
-          query,
-          aggs: { unique_values: { terms: { field, size: limit } } },
-        },
-      });
-      const agg = result.aggregations?.unique_values as
-        | estypes7.AggregationsStringTermsAggregate
-        | undefined;
-      const rawBuckets = agg?.buckets;
-      const buckets = Array.isArray(rawBuckets)
-        ? (rawBuckets as estypes7.AggregationsStringTermsBucket[])
-        : [];
-      return buckets.map((b) => String(b.key));
-    }
-
     if (
       isES8ClientDelegator(this.client) ||
       isES9ClientDelegator(this.client)
@@ -1031,17 +987,6 @@ class ElasticsearchDelegator
       logger.debug({ query }, 'query');
 
       const validateQueryResponse = await (async () => {
-        if (isES7ClientDelegator(this.client)) {
-          const es7SearchQuery = query as ES7SearchQuery;
-          return await this.client.indices.validateQuery({
-            explain: true,
-            index: es7SearchQuery.index,
-            body: {
-              query: es7SearchQuery.body?.query,
-            },
-          });
-        }
-
         if (isES8ClientDelegator(this.client)) {
           const es8SearchQuery = query as ES8SearchQuery;
           return await this.client.indices.validateQuery({
@@ -1068,10 +1013,6 @@ class ElasticsearchDelegator
     }
 
     const searchResponse = await (async () => {
-      if (isES7ClientDelegator(this.client)) {
-        return await this.client.search(query as ES7SearchQuery);
-      }
-
       if (isES8ClientDelegator(this.client)) {
         return await this.client.search(query as ES8SearchQuery);
       }
@@ -1103,10 +1044,13 @@ class ElasticsearchDelegator
         took: searchResponse.took,
         hitsCount: searchResponse.hits.hits.length,
       },
-      data: searchResponse.hits.hits.map((elm) => {
+      // The ES client types mark _id and _score as optional, but every document
+      // hit from these queries carries an _id; _score is null only when results
+      // are sorted by a field instead of relevance.
+      data: searchResponse.hits.hits.map((elm): ISearchResultData => {
         return {
-          _id: elm._id,
-          _score: elm._score,
+          _id: elm._id ?? '',
+          _score: elm._score ?? 0,
           _source: elm._source,
           _highlight: elm.highlight,
         };
@@ -1318,6 +1262,66 @@ class ElasticsearchDelegator
       });
       query.body.query.bool.filter.push({ bool: { must_not: queries } });
     }
+
+    if (parsedKeywords.author.length > 0) {
+      const queries = parsedKeywords.author.map((author) => {
+        return { term: { username: author } };
+      });
+      query.body.query.bool.filter.push({ bool: { should: queries } });
+    }
+
+    if (parsedKeywords.not_author.length > 0) {
+      const queries = parsedKeywords.not_author.map((author) => {
+        return { term: { username: author } };
+      });
+      query.body.query.bool.filter.push({ bool: { must_not: queries } });
+    }
+
+    if (parsedKeywords.editor.length > 0) {
+      const queries = parsedKeywords.editor.map((editor) => {
+        return { term: { last_update_username: editor } };
+      });
+      query.body.query.bool.filter.push({ bool: { should: queries } });
+    }
+
+    if (parsedKeywords.not_editor.length > 0) {
+      const queries = parsedKeywords.not_editor.map((editor) => {
+        return { term: { last_update_username: editor } };
+      });
+      query.body.query.bool.filter.push({ bool: { must_not: queries } });
+    }
+  }
+
+  appendCriteriaForGroupFilter(
+    query: SearchQuery,
+    parsedKeywords: ESQueryTerms,
+    resolvedFilterData?: ResolvedFilterData,
+  ): void {
+    if (resolvedFilterData == null) return;
+    const { groupIds, notGroupIds } = resolvedFilterData;
+
+    // biome-ignore lint/style/noParameterAssign: ignore
+    query = this.initializeBoolQuery(query);
+    if (
+      query.body?.query?.bool?.filter == null ||
+      !Array.isArray(query.body.query.bool.filter) ||
+      !Array.isArray(query.body.query.bool.must_not)
+    ) {
+      throw new Error('query.body.query.bool is not initialized');
+    }
+
+    // Gate on whether the user typed group:, NOT on whether resolution produced ids.
+    if (parsedKeywords.group.length > 0) {
+      query.body.query.bool.filter.push({
+        terms: { granted_groups: groupIds },
+      });
+    }
+
+    if (parsedKeywords.not_group.length > 0) {
+      query.body.query.bool.must_not.push({
+        terms: { granted_groups: notGroupIds },
+      });
+    }
   }
 
   filterPagesByViewer(query: SearchQuery, user, userGroups): void {
@@ -1456,6 +1460,7 @@ class ElasticsearchDelegator
     const query = this.createSearchQuery();
 
     this.appendCriteriaForQueryString(query, terms);
+    this.appendCriteriaForGroupFilter(query, terms, data.resolvedFilterData);
     this.filterPagesByViewer(query, user, userGroups);
     await this.appendFunctionScore(query, queryString);
 

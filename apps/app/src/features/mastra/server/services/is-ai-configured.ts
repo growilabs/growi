@@ -1,6 +1,5 @@
-import { isAiEnabled } from '~/features/openai/server/services';
-
 import { getAvailableModels } from './ai-sdk-modules/llm-providers/provider-availability';
+import { isAiEnabled } from './is-ai-enabled';
 
 // "Is AI configured?" in the multi-provider model means: at least one AVAILABLE
 // provider (enabled AND configured) has at least one allowed model under it

@@ -55,7 +55,7 @@ type CombinedCommonProps =
   | (CommonEachProps & CommonInitialProps);
 type GrowiAppProps = AppProps<CombinedCommonProps> & {
   Component: NextPageWithLayout<CombinedCommonProps>;
-  userLocale: Locale;
+  userLocale: Locale | undefined;
 };
 
 const GrowiAppSubstance = ({
@@ -80,7 +80,10 @@ const GrowiAppSubstance = ({
 
   useEffect(() => {
     const updateLangAttribute = () => {
-      if (document.documentElement.getAttribute('lang') !== userLocale) {
+      if (
+        userLocale != null &&
+        document.documentElement.getAttribute('lang') !== userLocale
+      ) {
         document.documentElement.setAttribute('lang', userLocale);
       }
     };
@@ -114,9 +117,13 @@ function GrowiApp(props: GrowiAppProps): JSX.Element {
 // inject userLocale by context
 GrowiApp.getInitialProps = async (appContext: AppContext) => {
   const appProps = await App.getInitialProps(appContext);
-  const userLocale = getLocaleAtServerSide(
-    appContext.ctx.req as unknown as CrowiRequest,
-  );
+
+  // `ctx.req` is undefined when Next.js re-invokes _app's getInitialProps
+  // purely on the client (e.g. its error-page fallback after an uncaught
+  // client-side render exception). getLocaleAtServerSide would throw on a
+  // missing req and make that fallback render fail too, leaving a blank page.
+  const req = appContext.ctx.req as unknown as CrowiRequest | undefined;
+  const userLocale = req != null ? getLocaleAtServerSide(req) : undefined;
 
   return { ...appProps, userLocale };
 };

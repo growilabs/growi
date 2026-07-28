@@ -1,3 +1,4 @@
+import { autocompletion } from '@codemirror/autocomplete';
 import {
   defaultKeymap,
   deleteCharBackward,
@@ -33,7 +34,9 @@ const markdownHighlighting = HighlightStyle.define([
   { tag: tags.heading6, class: 'cm-header-6 cm-header' },
 ]);
 
-const defaultExtensions: Extension[] = [
+// The defaults MINUS feature-specific extensions (emoji) — keeps the shared facility.
+// Exported so a regression test can prove mention works on this base without emoji.
+export const baseExtensions: Extension[] = [
   EditorView.lineWrapping,
   markdown({
     base: markdownLanguage,
@@ -45,6 +48,13 @@ const defaultExtensions: Extension[] = [
   Prec.lowest(keymap.of(defaultKeymap)),
   syntaxHighlighting(markdownHighlighting),
   Prec.lowest(syntaxHighlighting(defaultHighlightStyle)),
+  // Shared facility, not owned by any feature. Emoji also adds addToOptions via its own
+  // autocompletion() call; CodeMirror dedups the core and merges the configs.
+  autocompletion({ icons: false }),
+];
+
+const defaultExtensions: Extension[] = [
+  ...baseExtensions,
   emojiAutocompletionSettings,
 ];
 

@@ -1,9 +1,9 @@
-import { isAiEnabled } from '~/features/openai/server/services';
 import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
 import loggerFactory from '~/utils/logger';
 
 import { refreshModelCatalog } from './ai-sdk-modules/refresh-model-catalog';
+import { isAiEnabled } from './is-ai-enabled';
 
 const logger = loggerFactory(
   'growi:features:mastra:services:model-catalog-refresh-jobs',

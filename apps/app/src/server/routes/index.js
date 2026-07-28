@@ -15,6 +15,7 @@ import apiV1FormValidator from '../middlewares/apiv1-form-validator';
 import { setup as setupApplicationInstalled } from '../middlewares/application-installed';
 import * as applicationNotInstalled from '../middlewares/application-not-installed';
 import { setup as setupAutoReconnectToSearch } from '../middlewares/auto-reconnect-to-search';
+import { setup as setupCertifySharedPage } from '../middlewares/certify-shared-page';
 import {
   excludeReadOnlyUser,
   excludeReadOnlyUserIfCommentNotAllowed,
@@ -52,6 +53,7 @@ export const setup = (crowi, app) => {
   const loginRequired = loginRequiredFactory(crowi, true);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
+  const certifySharedPage = setupCertifySharedPage(crowi);
 
   const uploads = multer({ dest: `${crowi.tmpDir}uploads` });
   const page = setupPage(crowi, app);
@@ -275,6 +277,13 @@ export const setup = (crowi, app) => {
   apiV1Router.get(
     '/comments.get',
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    // Validate ids (MongoId) and short-circuit malformed input BEFORE
+    // certifySharedPage, so injection (e.g. `page_id[$gt]=`) never reaches the
+    // share-link DB query, and certifySharedPage must run before loginRequired
+    // (the guest-pass depends on req.isSharedPage).
+    comment.api.validators.get(),
+    apiV1FormValidator,
+    certifySharedPage,
     loginRequired,
     comment.api.get,
   );

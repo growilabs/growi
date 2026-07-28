@@ -10,6 +10,7 @@ import { prisma } from '~/utils/prisma';
 
 import { externalAccountService } from '../service/external-account';
 import ApiResponse from '../util/apiResponse';
+import { sendLoginSuccessResponse } from './login-success-response';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const setup = (crowi, app) => {
@@ -59,7 +60,7 @@ export const setup = (crowi, app) => {
     res,
     user,
     action,
-    isExternalAccount = false,
+    respondWithRedirect = false,
   ) => {
     // update lastLoginAt
     user.updateLastLoginAt(new Date(), (err, userData) => {
@@ -87,11 +88,7 @@ export const setup = (crowi, app) => {
     const redirectTo =
       redirectToForUnauthenticated ?? res.locals.redirectTo ?? '/';
 
-    if (isExternalAccount) {
-      return res.safeRedirect(redirectTo);
-    }
-
-    return res.apiv3({ redirectTo });
+    return sendLoginSuccessResponse(res, redirectTo, respondWithRedirect);
   };
 
   const injectRedirectTo = (req, res, next) => {
@@ -261,12 +258,15 @@ export const setup = (crowi, app) => {
         return next(err);
       }
 
+      // LDAP login is submitted through the AJAX login form (POST /_api/v3/login), the
+      // same as local login, so it must respond with JSON. Do NOT pass respondWithRedirect
+      // here even though LDAP is an external account: a 302 would leave the client stuck on
+      // the login page until a manual reload. See issue #11384.
       return loginSuccessHandler(
         req,
         res,
         user,
         SupportedAction.ACTION_USER_LOGIN_WITH_LDAP,
-        true,
       );
     });
   };

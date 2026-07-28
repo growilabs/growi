@@ -69,21 +69,27 @@ vi.mock('../memory', () => ({
 // `resolveMastraModel(modelKey?)` returns, while the mock itself stays declared
 // once. The mock mirrors the real signature (`modelKey?: string`) so the spec
 // can assert which modelKey the agent forwarded.
-// Because growi-agent.ts resolves the model lazily inside its `model()`
-// function (not at import time), changing this return value between tests is
-// enough to vary behavior — no module reset / re-import is required (and
-// re-importing would re-register transitive Mongoose models and throw).
+//
+// The real resolveMastraModel is async (it dynamically imports only the selected
+// provider's `@ai-sdk/*` SDK), so the mock is async too: the inner `resolverMock.fn`
+// stays a plain sync fn whose return value / throw the spec controls, and the async
+// wrapper turns a returned value into a resolved Promise and a thrown error into a
+// rejected Promise — exactly mirroring the real function's sync-throw-inside-async
+// behavior. Because growi-agent.ts resolves the model lazily inside its `model()`
+// function (not at import time), changing this between tests is enough to vary
+// behavior — no module reset / re-import is required (and re-importing would
+// re-register transitive Mongoose models and throw).
 const resolverMock = vi.hoisted(() => ({
   fn: vi.fn<(modelKey?: string) => MastraModelConfig>(),
 }));
 
 vi.mock('../../ai-sdk-modules/resolve-mastra-model', () => ({
-  resolveMastraModel: (modelKey?: string) => resolverMock.fn(modelKey),
+  resolveMastraModel: async (modelKey?: string) => resolverMock.fn(modelKey),
 }));
 
-// A sentinel model. The agent must hand back exactly this object from its
-// `model()` function when resolution succeeds — proving it forwards the
-// resolver's model rather than constructing one itself.
+// A sentinel model. The agent's `model()` function must resolve to exactly this
+// object when resolution succeeds — proving it forwards the resolver's model
+// (via the Promise it returns) rather than constructing one itself.
 const sentinelModel = { id: 'sentinel-model' } as unknown as MastraModelConfig;
 
 // Importing growiAgent is the act under test for Req 4.3: module load (and thus
@@ -102,7 +108,7 @@ const resolverCalledDuringImport = resolverMock.fn.mock.calls.length > 0;
 // The dynamic model function Mastra invokes per request. It receives the
 // request-scoped `{ requestContext }` and returns the resolved model.
 type ModelFnArg = { requestContext: RequestContext<MastraRequestContextShape> };
-type ModelFn = (arg: ModelFnArg) => MastraModelConfig;
+type ModelFn = (arg: ModelFnArg) => Promise<MastraModelConfig>;
 
 // Narrow the captured config's `model` to the dynamic function without an
 // assertion of its return value — only the callable shape is asserted.
@@ -146,23 +152,24 @@ describe('growiAgent', () => {
   });
 
   describe('model supply (requirements 3.3, 5.1)', () => {
-    it('returns the resolved model when resolution succeeds', () => {
+    it('resolves to the resolved model when resolution succeeds', async () => {
       resolverMock.fn.mockReturnValue(sentinelModel);
 
       const modelFn = getModelFn();
 
       // The dynamic function forwards exactly the resolver's model (Req 3.3,
-      // 5.1) — a single provider's single model, resolved at use time.
-      expect(modelFn(makeModelFnArg())).toBe(sentinelModel);
+      // 5.1) — a single provider's single model, resolved (asynchronously, since
+      // the resolver lazily imports the provider SDK) at use time.
+      await expect(modelFn(makeModelFnArg())).resolves.toBe(sentinelModel);
     });
   });
 
   describe('per-request model selection (requirements 4.1, 4.3)', () => {
-    it('forwards the requestContext modelKey to the resolver', () => {
+    it('forwards the requestContext modelKey to the resolver', async () => {
       resolverMock.fn.mockReturnValue(sentinelModel);
 
       const modelFn = getModelFn();
-      modelFn(makeModelFnArg('openai/gpt-4o-mini'));
+      await modelFn(makeModelFnArg('openai/gpt-4o-mini'));
 
       // The observable contract: the modelKey selected for this request
       // (carried on requestContext) is the key the resolver is asked to
@@ -171,11 +178,11 @@ describe('growiAgent', () => {
       expect(resolverMock.fn).toHaveBeenCalledWith('openai/gpt-4o-mini');
     });
 
-    it('passes undefined to the resolver when no modelKey is set, so the default is used', () => {
+    it('passes undefined to the resolver when no modelKey is set, so the default is used', async () => {
       resolverMock.fn.mockReturnValue(sentinelModel);
 
       const modelFn = getModelFn();
-      modelFn(makeModelFnArg());
+      await modelFn(makeModelFnArg());
 
       // When the request carries no modelKey the resolver is invoked with
       // undefined, which it resolves to the effective default (Req 4.3).
@@ -183,9 +190,9 @@ describe('growiAgent', () => {
     });
   });
 
-  describe('model supply on misconfiguration (requirement 4.1, 4.3 — throw surfaces at use time)', () => {
-    it('propagates the resolver throw at use time without swallowing it', () => {
-      // On misconfiguration resolveMastraModel() throws; the agent's lazy
+  describe('model supply on misconfiguration (requirement 4.1, 4.3 — rejection surfaces at use time)', () => {
+    it('propagates the resolver rejection at use time without swallowing it', async () => {
+      // On misconfiguration resolveMastraModel() rejects; the agent's lazy
       // `model()` must let it surface (handled by the post-message route's
       // try/catch — Req 4.4), not swallow or replace it.
       const resolverError = new Error(
@@ -197,13 +204,9 @@ describe('growiAgent', () => {
 
       const modelFn = getModelFn();
 
-      // Calling the dynamic function in a misconfigured state throws (Req 4.1).
-      let thrown: unknown;
-      try {
-        modelFn(makeModelFnArg());
-      } catch (e) {
-        thrown = e;
-      }
+      // Calling the dynamic function in a misconfigured state rejects with the
+      // resolver's error, unchanged (Req 4.1).
+      const thrown = await modelFn(makeModelFnArg()).catch((e: unknown) => e);
       expect(thrown).toBe(resolverError);
       // Defense-in-depth: the surfaced message carries no secret material.
       const message = thrown instanceof Error ? thrown.message : '';

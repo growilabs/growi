@@ -94,7 +94,10 @@ export const ActivityTableRow: FC<Props> = (props) => {
             <span className="flex-grow-1 text-truncate">
               {activity.endpoint}
             </span>
-            <CopyToClipboard text={activity.endpoint} onCopy={showToolTip}>
+            <CopyToClipboard
+              text={activity.endpoint ?? ''}
+              onCopy={showToolTip}
+            >
               <button
                 type="button"
                 className="btn btn-sm btn-outline-secondary border-0 ms-2"

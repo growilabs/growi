@@ -1,4 +1,4 @@
-import React, { type JSX, useEffect, useMemo, useRef } from 'react';
+import { type JSX, useEffect, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import type { IRevisionHasId } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
@@ -27,15 +27,16 @@ type CommentsProps = {
   pageId: string;
   pagePath: string;
   revision: IRevisionHasId;
+  isReadOnly?: boolean;
   onLoaded?: () => void;
 };
 
 export const Comments = (props: CommentsProps): JSX.Element => {
-  const { pageId, pagePath, revision, onLoaded } = props;
+  const { pageId, pagePath, revision, isReadOnly = false, onLoaded } = props;
 
   const { t } = useTranslation('');
 
-  const { mutate } = useSWRxPageComment(pageId);
+  const { data: comments, mutate } = useSWRxPageComment(pageId);
   const { trigger: mutatePageInfo } = useSWRMUTxPageInfo(pageId);
   const isDeleted = useIsTrashPage();
   const currentUser = useCurrentUser();
@@ -68,6 +69,11 @@ export const Comments = (props: CommentsProps): JSX.Element => {
     return <></>;
   }
 
+  // On read-only views (e.g. share link page) the comment editor is hidden,
+  // so an empty list would render just the heading with no body and look broken.
+  // Show an explicit empty-state message instead.
+  const hasNoComments = comments != null && comments.length === 0;
+
   const onCommentButtonClickHandler = () => {
     mutate();
     mutatePageInfo();
@@ -86,10 +92,15 @@ export const Comments = (props: CommentsProps): JSX.Element => {
           pagePath={pagePath}
           revision={revision}
           currentUser={currentUser}
-          isReadOnly={false}
+          isReadOnly={isReadOnly}
         />
+        {isReadOnly && hasNoComments && (
+          <p className="text-muted mb-0" data-testid="comments-empty-state">
+            {t('page_comment.no_comments')}
+          </p>
+        )}
       </div>
-      {!isDeleted && (
+      {!isDeleted && !isReadOnly && (
         <div id="page-comment-write">
           <CommentEditorPre
             pageId={pageId}

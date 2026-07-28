@@ -1,5 +1,11 @@
 # @growi/core
 
+## 2.4.0
+
+### Minor Changes
+
+- [#11320](https://github.com/growilabs/growi/pull/11320) [`5e8f105`](https://github.com/growilabs/growi/commit/5e8f1054c01771275682dcdbcb2fc3488e1c0be3) Thanks [@Ryosei-Fukushima](https://github.com/Ryosei-Fukushima)! - Add `features:user` and `features:user_group` access-token scopes (read/write). These separate "reading other users'/groups' directory information" from the self-oriented `user_settings:info` scope, which previously over-granted such reads.
+
 ## 2.3.2
 
 ### Patch Changes

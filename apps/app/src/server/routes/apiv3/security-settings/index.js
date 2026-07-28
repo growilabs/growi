@@ -15,6 +15,7 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import ShareLink from '~/server/models/share-link';
 import { configManager } from '~/server/service/config-manager';
+import { isValidWhitelistEntry } from '~/utils/email-whitelist';
 import loggerFactory from '~/utils/logger';
 import {
   prepareDeleteConfigValuesForCalc,
@@ -77,9 +78,9 @@ const validator = {
     body('registrationWhitelist')
       .if((value) => value != null)
       .isArray()
-      .customSanitizer((value, { req }) => {
-        return value.filter((email) => email !== '');
-      }),
+      .customSanitizer((value) =>
+        value.map((entry) => entry.trim()).filter((entry) => entry !== ''),
+      ),
   ],
   ldapAuth: [
     body('serverUrl')
@@ -1298,6 +1299,16 @@ export const setup = (crowi) => {
           req.body.registrationWhitelist.map((line) =>
             xss(line, { stripIgnoreTag: true }),
           );
+
+        if (!sanitizedRegistrationWhitelist.every(isValidWhitelistEntry)) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'Each entry must be a valid email address or a domain starting with @',
+              'invalid-registration-whitelist-format',
+            ),
+            400,
+          );
+        }
 
         const requestParams = {
           'security:registrationMode': req.body.registrationMode,

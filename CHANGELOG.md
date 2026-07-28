@@ -1,8 +1,57 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.5.5...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.5.7...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.5.7](https://github.com/growilabs/compare/v7.5.6...v7.5.7) - 2026-07-21
+
+### 💎 Features
+
+* feat: Display comments at the share link (#11401) @mariko-h
+* feat: Filter by author, editor and group in the search results (#11368) @arvid-e
+* feat: User group member visibility (#11320) @Ryosei-Fukushima
+
+### 🚀 Improvement
+
+* imprv: Email white list (#11314) @mariko-h
+
+### 🐛 Bug Fixes
+
+* fix(plantuml): Stop deprecation warning painted onto carbon-gray diagrams (#11475) @yuki-takei
+* fix(plantuml): Stop leaking PlantUML theme YAML front matter into diagram source (#11461) @yuki-takei
+* fix(import): Harden admin data import (re-enable button on failure, await import) (#11474) @yuki-takei
+* fix: Prevent blank screen when Next.js falls back to the error page (#11423) @yuki-takei
+* fix: Prevent PageSelectModal infinite render loop (#11422) (#11428) @yuki-takei
+
+## [v7.5.6](https://github.com/growilabs/compare/v7.5.5...v7.5.6) - 2026-06-25
+
+### 💎 Features
+
+* feat: Contribution Graph on the user's profile (#10509) @arvid-e
+* feat(comment): Comment mention and add In-App-notification (#11058) @Ryosei-Fukushima
+* feat: Changes Index and Revision Diff APIs (#11353) @yuki-takei
+* feat: Add button to make all notification as read (#11352) @ryotaro-nagahara
+
+### 🚀 Improvement
+
+* imprv: Expose news body (#11317) @ryotaro-nagahara
+* imprv: Include page revert action in supported contribution actions (#11321) @arvid-e
+* imprv: Page create button interaction (#11313) @hikaru-n-cpu
+
+### 🐛 Bug Fixes
+
+* fix: Suppress modifier shortcuts in editable elements (#11340) @yuki-takei
+* fix: escape </style> breakout in renderCustomCss (#11298) @yuki-takei
+* fix: Use req.user.username in LDAP Execute Sync instead of req.user.name (#11356) @yuki-takei
+* feat(page-bulk-export): Rework bulk PDF/HTML export to render Markdown like the web (tables, math, emoji, directives) (#11288) @yuki-takei
+
+### 🧰 Maintenance
+
+* ci(deps): bump js-yaml from 4.1.1 to 4.2.0 (#11311) @[dependabot[bot]](https://github.com/apps/dependabot)
+* chore(deps): dedupe pnpm-lock.yaml to CI-gate release dependency churn (#11343) @yuki-takei
+* ci(deps-dev): bump vitest from 3.2.4 to 3.2.6 (#11279) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump form-data from 4.0.5 to 4.0.6 (#11335) @[dependabot[bot]](https://github.com/apps/dependabot)
 
 ## [v7.5.5](https://github.com/growilabs/compare/v7.5.4...v7.5.5) - 2026-06-10
 

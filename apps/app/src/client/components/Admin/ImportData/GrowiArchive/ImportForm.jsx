@@ -355,6 +355,11 @@ class ImportForm extends React.Component {
         toastError(t('admin:importer_management.error.only_upsert_available'));
       }
       toastError(err);
+
+      // Re-enable the form so the user can retry; otherwise the Import button
+      // stays disabled forever because progress events (which reset this flag)
+      // never arrive when the request itself failed.
+      this.setState({ isImporting: false });
     }
   }
 

@@ -1,19 +1,14 @@
 import axiosRetry from 'axios-retry';
 import type { IncomingMessage } from 'http';
 import luceneQueryParser from 'lucene-query-parser';
-import {
-  custom,
-  Issuer as OIDCIssuer,
-  Strategy as OidcStrategy,
-} from 'openid-client';
+// Only the `Issuer` type is needed at module scope (for the getOIDCIssuerInstance
+// return annotation); the value bindings (custom / Issuer / Strategy) are loaded
+// lazily inside the setup methods. See the lazy `import('openid-client')` calls.
+import type { Issuer } from 'openid-client';
 import pRetry from 'p-retry';
 import passport from 'passport';
-import { Strategy as GitHubStrategy } from 'passport-github';
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import LdapStrategy from 'passport-ldapauth';
 import { Strategy as LocalStrategy } from 'passport-local';
 import type { Profile, VerifiedCallback } from 'passport-saml';
-import { Strategy as SamlStrategy } from 'passport-saml';
 import urljoin from 'url-join';
 
 import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
@@ -27,6 +22,32 @@ import { growiInfoService } from './growi-info';
 import type { S2sMessageHandlable } from './s2s-messaging/handlable';
 
 const logger = loggerFactory('growi:service:PassportService');
+
+/**
+ * The single source of truth for the auth strategy ids this service dispatches.
+ * Kept module-private: no external caller needs the id set (the security-settings
+ * route validates authId against its own `isIn([...])` list, and getSetupStrategies
+ * returns plain strings).
+ */
+const STRATEGY_IDS = [
+  'local',
+  'ldap',
+  'saml',
+  'oidc',
+  'google',
+  'github',
+] as const;
+
+type StrategyId = (typeof STRATEGY_IDS)[number];
+
+const isStrategyId = (id: string): id is StrategyId =>
+  STRATEGY_IDS.some((strategyId) => strategyId === id);
+
+/** One strategy's setup/reset pair, referenced by the dispatch table. */
+type StrategySetup = {
+  setup: () => Promise<void>;
+  reset: () => void;
+};
 
 interface IncomingMessageWithLdapAccountInfo extends IncomingMessage {
   ldapAccountInfo: any;
@@ -96,30 +117,36 @@ class PassportService implements S2sMessageHandlable {
     'security:passport-saml:attrMapMail',
   ] satisfies ConfigKey[];
 
-  setupFunction = {
+  /**
+   * Dispatch table of method references keyed by strategy id. Using references
+   * (not string method names) makes the compiler verify each method exists and
+   * matches the setup/reset signatures, and requires every StrategyId to have an
+   * entry. Arrow initializers preserve the `this` binding at call time.
+   */
+  private readonly strategySetups: Record<StrategyId, StrategySetup> = {
     local: {
-      setup: 'setupLocalStrategy',
-      reset: 'resetLocalStrategy',
+      setup: () => this.setupLocalStrategy(),
+      reset: () => this.resetLocalStrategy(),
     },
     ldap: {
-      setup: 'setupLdapStrategy',
-      reset: 'resetLdapStrategy',
+      setup: () => this.setupLdapStrategy(),
+      reset: () => this.resetLdapStrategy(),
     },
     saml: {
-      setup: 'setupSamlStrategy',
-      reset: 'resetSamlStrategy',
+      setup: () => this.setupSamlStrategy(),
+      reset: () => this.resetSamlStrategy(),
     },
     oidc: {
-      setup: 'setupOidcStrategy',
-      reset: 'resetOidcStrategy',
+      setup: () => this.setupOidcStrategy(),
+      reset: () => this.resetOidcStrategy(),
     },
     google: {
-      setup: 'setupGoogleStrategy',
-      reset: 'resetGoogleStrategy',
+      setup: () => this.setupGoogleStrategy(),
+      reset: () => this.resetGoogleStrategy(),
     },
     github: {
-      setup: 'setupGitHubStrategy',
-      reset: 'resetGitHubStrategy',
+      setup: () => this.setupGitHubStrategy(),
+      reset: () => this.resetGitHubStrategy(),
     },
   };
 
@@ -210,26 +237,30 @@ class PassportService implements S2sMessageHandlable {
   }
 
   /**
-   * get SetupFunction
+   * setup strategy by target id
    *
-   * @return {Object}
-   * @param {string} authId
+   * `authId` crosses a trust boundary (e.g. an S2s pubsub payload), so it is a
+   * plain string here and narrowed by isStrategyId before dispatch. An unknown
+   * id is logged and skipped rather than dispatched: before this guard, an
+   * unknown id read `undefined.setup` (a TypeError caught and logged as debug),
+   * then the catch ran `undefined.reset` — a second TypeError that escaped the
+   * method (an unhandled rejection on the un-awaited S2s path). The
+   * security-settings route already rejects unknown authIds via its validator,
+   * so in practice this only hardens the S2s message path.
    */
-  getSetupFunction(authId) {
-    return this.setupFunction[authId];
-  }
+  async setupStrategyById(authId: string): Promise<void> {
+    if (!isStrategyId(authId)) {
+      logger.warn(`Unknown strategy id '${authId}'; skipping setup`);
+      return;
+    }
 
-  /**
-   * setup strategy by target name
-   */
-  async setupStrategyById(authId) {
-    const func = this.getSetupFunction(authId);
+    const { setup, reset } = this.strategySetups[authId];
 
     try {
-      await this[func.setup]();
+      await setup();
     } catch (err) {
       logger.debug(err);
-      this[func.reset]();
+      reset();
     }
 
     this.lastLoadedAt = new Date();
@@ -240,7 +271,7 @@ class PassportService implements S2sMessageHandlable {
    *
    * @memberof PassportService
    */
-  resetLocalStrategy() {
+  resetLocalStrategy(): void {
     logger.debug('LocalStrategy: reset');
     passport.unuse('local');
     this.isLocalStrategySetup = false;
@@ -251,7 +282,8 @@ class PassportService implements S2sMessageHandlable {
    *
    * @memberof PassportService
    */
-  setupLocalStrategy() {
+  // biome-ignore lint/suspicious/useAwait: async to satisfy the uniform StrategySetup dispatch contract; LocalStrategy is static so the body has no async work
+  async setupLocalStrategy(): Promise<void> {
     this.resetLocalStrategy();
 
     const { configManager } = this.crowi;
@@ -300,7 +332,7 @@ class PassportService implements S2sMessageHandlable {
    *
    * @memberof PassportService
    */
-  resetLdapStrategy() {
+  resetLdapStrategy(): void {
     logger.debug('LdapStrategy: reset');
     passport.unuse('ldapauth');
     this.isLdapStrategySetup = false;
@@ -311,7 +343,7 @@ class PassportService implements S2sMessageHandlable {
    *
    * @memberof PassportService
    */
-  setupLdapStrategy() {
+  async setupLdapStrategy(): Promise<void> {
     this.resetLdapStrategy();
 
     const config = this.crowi.config;
@@ -327,6 +359,11 @@ class PassportService implements S2sMessageHandlable {
     }
 
     logger.debug('LdapStrategy: setting up..');
+
+    // Lazy-load the strategy SDK only when LDAP is enabled, to keep
+    // passport-ldapauth (and its heavy ldapjs dependency, ~18 MiB RSS) out of
+    // the boot module graph. passport-ldapauth is a CJS default export.
+    const LdapStrategy = (await import('passport-ldapauth')).default;
 
     passport.use(
       new LdapStrategy(
@@ -508,7 +545,7 @@ class PassportService implements S2sMessageHandlable {
    *
    * @memberof PassportService
    */
-  setupGoogleStrategy() {
+  async setupGoogleStrategy(): Promise<void> {
     this.resetGoogleStrategy();
 
     const isGoogleEnabled = configManager.getConfig(
@@ -521,6 +558,13 @@ class PassportService implements S2sMessageHandlable {
     }
 
     logger.debug('GoogleStrategy: setting up..');
+
+    // Lazy-load the strategy SDK only when Google auth is enabled
+    // (see setupLdapStrategy for rationale).
+    const { Strategy: GoogleStrategy } = await import(
+      'passport-google-oauth20'
+    );
+
     passport.use(
       new GoogleStrategy(
         {
@@ -560,13 +604,13 @@ class PassportService implements S2sMessageHandlable {
    *
    * @memberof PassportService
    */
-  resetGoogleStrategy() {
+  resetGoogleStrategy(): void {
     logger.debug('GoogleStrategy: reset');
     passport.unuse('google');
     this.isGoogleStrategySetup = false;
   }
 
-  setupGitHubStrategy() {
+  async setupGitHubStrategy(): Promise<void> {
     this.resetGitHubStrategy();
 
     const isGitHubEnabled = configManager.getConfig(
@@ -579,6 +623,11 @@ class PassportService implements S2sMessageHandlable {
     }
 
     logger.debug('GitHubStrategy: setting up..');
+
+    // Lazy-load the strategy SDK only when GitHub auth is enabled
+    // (see setupLdapStrategy for rationale).
+    const { Strategy: GitHubStrategy } = await import('passport-github');
+
     passport.use(
       new GitHubStrategy(
         {
@@ -618,7 +667,7 @@ class PassportService implements S2sMessageHandlable {
    *
    * @memberof PassportService
    */
-  resetGitHubStrategy() {
+  resetGitHubStrategy(): void {
     logger.debug('GitHubStrategy: reset');
     passport.unuse('github');
     this.isGitHubStrategySetup = false;
@@ -637,6 +686,15 @@ class PassportService implements S2sMessageHandlable {
     }
 
     logger.debug('OidcStrategy: setting up..');
+
+    // Lazy-load the strategy SDK only when OIDC is enabled, to keep
+    // openid-client (and its jose dependency) out of the boot module graph
+    // (see setupLdapStrategy for rationale).
+    const {
+      custom,
+      Issuer: OIDCIssuer,
+      Strategy: OidcStrategy,
+    } = await import('openid-client');
 
     // setup client
     // extend oidc request timeouts
@@ -768,7 +826,7 @@ class PassportService implements S2sMessageHandlable {
    *
    * @memberof PassportService
    */
-  resetOidcStrategy() {
+  resetOidcStrategy(): void {
     logger.debug('OidcStrategy: reset');
     passport.unuse('oidc');
     this.isOidcStrategySetup = false;
@@ -839,7 +897,11 @@ class PassportService implements S2sMessageHandlable {
    */
   async getOIDCIssuerInstance(
     issuerHost: string | undefined,
-  ): Promise<void | OIDCIssuer> {
+  ): Promise<void | Issuer> {
+    // Lazy-load the strategy SDK only when OIDC is enabled (this method is
+    // only reached from setupOidcStrategy, after its enabled check).
+    const { custom, Issuer: OIDCIssuer } = await import('openid-client');
+
     const OIDC_TIMEOUT_MULTIPLIER = configManager.getConfig(
       'security:passport-oidc:timeoutMultiplier',
     );
@@ -885,7 +947,7 @@ class PassportService implements S2sMessageHandlable {
     return oidcIssuer;
   }
 
-  setupSamlStrategy(): void {
+  async setupSamlStrategy(): Promise<void> {
     this.resetSamlStrategy();
 
     const isSamlEnabled = configManager.getConfig(
@@ -904,6 +966,10 @@ class PassportService implements S2sMessageHandlable {
       logger.warn('SamlStrategy: cert is not set. setup is skipped.');
       return;
     }
+
+    // Lazy-load the strategy SDK only when SAML is enabled and configured
+    // (see setupLdapStrategy for rationale).
+    const { Strategy: SamlStrategy } = await import('passport-saml');
 
     passport.use(
       new SamlStrategy(
@@ -941,7 +1007,7 @@ class PassportService implements S2sMessageHandlable {
    *
    * @memberof PassportService
    */
-  resetSamlStrategy() {
+  resetSamlStrategy(): void {
     logger.debug('SamlStrategy: reset');
     passport.unuse('saml');
     this.isSamlStrategySetup = false;

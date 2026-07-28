@@ -9,7 +9,7 @@
 //   - refreshModelCatalog: mocked — the refresh behavior itself is covered by
 //     refresh-model-catalog.spec.ts; here only the trigger contract matters
 const { isAiEnabled } = vi.hoisted(() => ({ isAiEnabled: vi.fn() }));
-vi.mock('~/features/openai/server/services', () => ({ isAiEnabled }));
+vi.mock('./is-ai-enabled', () => ({ isAiEnabled }));
 
 const { getConfig } = vi.hoisted(() => ({ getConfig: vi.fn() }));
 vi.mock('~/server/service/config-manager', () => ({

@@ -323,7 +323,7 @@ export const setup = (crowi) => {
 
   router.get(
     '/',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }),
+    accessTokenParser([SCOPE.READ.FEATURES.USER], { acceptLegacy: true }),
     loginRequired,
     validator.statusList,
     apiV3FormValidator,
@@ -564,8 +564,25 @@ export const setup = (crowi) => {
       const emailList = Array.from(new Set(req.body.shapedEmailList));
       let failedEmailList = [];
 
+      // Filter out emails that are not in the whitelist
+      const { validEmailList, invalidEmailList } = emailList.reduce(
+        (acc, email) => {
+          if (User.isEmailValid(email)) {
+            acc.validEmailList.push(email);
+          } else {
+            acc.invalidEmailList.push({
+              email,
+              reason: 'email_not_in_whitelist',
+            });
+          }
+          return acc;
+        },
+        { validEmailList: [], invalidEmailList: [] },
+      );
+      failedEmailList = failedEmailList.concat(invalidEmailList);
+
       // Create users
-      const createUser = await User.createUsersByEmailList(emailList);
+      const createUser = await User.createUsersByEmailList(validEmailList);
       if (createUser.failedToCreateUserEmailList.length > 0) {
         failedEmailList = failedEmailList.concat(
           createUser.failedToCreateUserEmailList,
@@ -1428,7 +1445,7 @@ export const setup = (crowi) => {
    */
   router.get(
     '/list',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }),
+    accessTokenParser([SCOPE.READ.FEATURES.USER], { acceptLegacy: true }),
     loginRequired,
     async (req, res) => {
       const userIds = req.query.userIds ?? null;
@@ -1535,7 +1552,7 @@ export const setup = (crowi) => {
    */
   router.get(
     '/usernames',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }),
+    accessTokenParser([SCOPE.READ.FEATURES.USER], { acceptLegacy: true }),
     loginRequired,
     validator.usernames,
     apiV3FormValidator,

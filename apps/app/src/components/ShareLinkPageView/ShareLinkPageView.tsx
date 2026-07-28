@@ -42,6 +42,10 @@ const PageContentRenderer = dynamic(
     ),
   { ssr: true },
 );
+const Comments = dynamic(
+  () => import('~/client/components/Comments').then((mod) => mod.Comments),
+  { ssr: false },
+);
 // biome-ignore-end lint/style/noRestrictedImports: no-problem dynamic import
 
 type Props = {
@@ -159,6 +163,14 @@ export const ShareLinkPageView = memo((props: Props): JSX.Element => {
               <div className="mb-5">
                 <Contents />
               </div>
+              {page._id != null && page.revision != null && (
+                <Comments
+                  pageId={page._id}
+                  pagePath={pagePath}
+                  revision={page.revision}
+                  isReadOnly
+                />
+              )}
             </>
           )}
         </>

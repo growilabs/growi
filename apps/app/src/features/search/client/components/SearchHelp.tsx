@@ -104,6 +104,76 @@ export const SearchHelp = (): JSX.Element => {
                 </h6>
               </td>
             </tr>
+            <tr className="border-bottom">
+              <th className="py-2">
+                <code>author:mark</code>
+              </th>
+              <td>
+                <h6 className="m-0 text-muted">
+                  {t('search_help.author.desc', { author: 'mark' })}
+                </h6>
+              </td>
+            </tr>
+            <tr className="border-bottom">
+              <th className="py-2">
+                <code>-author:mark</code>
+              </th>
+              <td>
+                <h6 className="m-0 text-muted">
+                  {t('search_help.exclude_author.desc', { author: 'mark' })}
+                </h6>
+              </td>
+            </tr>
+            <tr className="border-bottom">
+              <th className="py-2">
+                <code>editor:john</code>
+              </th>
+              <td>
+                <h6 className="m-0 text-muted">
+                  {t('search_help.editor.desc', { editor: 'john' })}
+                </h6>
+              </td>
+            </tr>
+            <tr className="border-bottom">
+              <th className="py-2">
+                <code>-editor:john</code>
+              </th>
+              <td>
+                <h6 className="m-0 text-muted">
+                  {t('search_help.exclude_editor.desc', { editor: 'john' })}
+                </h6>
+              </td>
+            </tr>
+            <tr className="border-bottom">
+              <th className="py-2">
+                <code>group:developers</code>
+              </th>
+              <td>
+                <h6 className="m-0 text-muted">
+                  {t('search_help.group.desc', { group: 'developers' })}
+                </h6>
+              </td>
+            </tr>
+            <tr className="border-bottom">
+              <th className="py-2">
+                <code>-group:developers</code>
+              </th>
+              <td>
+                <h6 className="m-0 text-muted">
+                  {t('search_help.exclude_group.desc', { group: 'developers' })}
+                </h6>
+              </td>
+            </tr>
+            <tr>
+              <th className="py-2">
+                <code>group:&quot;dev team&quot;</code>
+              </th>
+              <td>
+                <h6 className="m-0 text-muted">
+                  {t('search_help.quoted_value.desc')}
+                </h6>
+              </td>
+            </tr>
           </tbody>
         </table>
       </Collapse>

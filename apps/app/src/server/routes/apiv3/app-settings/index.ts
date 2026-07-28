@@ -17,7 +17,6 @@ import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
-import { createSMTPClient } from '~/server/service/mail/smtp';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
@@ -730,6 +729,10 @@ export const setup = (crowi: Crowi): Router => {
       throw Error('fromAddress is not setup');
     }
 
+    // Lazy: nodemailer must not load at server boot merely because this
+    // admin route module is statically registered (~/server/routes/apiv3/index.js
+    // -> app-settings/index.ts); only load it when a test email is actually sent.
+    const { createSMTPClient } = await import('~/server/service/mail/smtp');
     const smtpClient = createSMTPClient(configManager);
     if (smtpClient == null) {
       throw Error(
