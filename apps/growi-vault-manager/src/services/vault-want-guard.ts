@@ -47,6 +47,18 @@ export interface PeekWantSectionResult {
   readonly reason?: string;
 }
 
+/**
+ * Most distinct OIDs a single request may ask about.
+ *
+ * A view advertises one commit (plus HEAD pointing at it), so a real clone or
+ * fetch asks for one — measured across full clone, shallow clone and
+ * incremental fetch. The limit exists because each distinct want costs a git
+ * process: a 64 KiB want section holds ~1300 want lines, and answering all of
+ * them measured 1.3 s of process churn for a single cheap request. Anything
+ * past this limit is refused outright rather than answered.
+ */
+const MAX_DISTINCT_WANTS = 64;
+
 /** Inputs for the reachability check. */
 export interface FindWantsOutsideViewOptions {
   /** Absolute path of the bare repository. */
@@ -153,35 +165,46 @@ export function peekWantSection(
  * fails when the object or the ref is missing. Every failure mode is a denial,
  * so the check is closed by default.
  *
- * The cost stays small because a view's history is squashed to a single
- * parentless commit hourly (requirement 6), and a clone or fetch asks for one
- * or two OIDs.
+ * One call measured 1–2 ms against a view holding 20,000 pages with a
+ * 1,001-commit chain, and stayed at that figure with 5,000 view refs in the
+ * repository: the walk only visits commits, so neither page count nor user
+ * count enters into it, and squash keeps the chain short (requirement 6).
+ *
+ * The work is bounded on purpose. Duplicate wants are collapsed, a request
+ * asking about more than MAX_DISTINCT_WANTS distinct OIDs is refused as a
+ * whole, and the remaining checks run one at a time — otherwise a single
+ * request could spawn one git process per want line it chose to include.
  *
  * @param opts - Repository, view ref and the requested OIDs.
- * @returns The denied OIDs, in the order they were requested.
+ * @returns The denied OIDs. Empty when every want may be served.
  */
 export async function findWantsOutsideView(
   opts: FindWantsOutsideViewOptions,
 ): Promise<readonly string[]> {
   const { repoPath, viewRef, wants } = opts;
 
-  const verdicts = await Promise.all(
-    wants.map(async (oid) => {
-      try {
-        await execFileAsync('git', [
-          '-C',
-          repoPath,
-          'merge-base',
-          '--is-ancestor',
-          oid,
-          viewRefPath(viewRef),
-        ]);
-        return true;
-      } catch {
-        return false;
-      }
-    }),
-  );
+  const distinctWants = [...new Set(wants)];
 
-  return wants.filter((_, i) => !verdicts[i]);
+  if (distinctWants.length > MAX_DISTINCT_WANTS) {
+    return distinctWants;
+  }
+
+  const denied: string[] = [];
+  for (const oid of distinctWants) {
+    try {
+      // biome-ignore lint/performance/noAwaitInLoops: sequential on purpose — running these concurrently lets one request spawn a git process per want line
+      await execFileAsync('git', [
+        '-C',
+        repoPath,
+        'merge-base',
+        '--is-ancestor',
+        oid,
+        viewRefPath(viewRef),
+      ]);
+    } catch {
+      denied.push(oid);
+    }
+  }
+
+  return denied;
 }

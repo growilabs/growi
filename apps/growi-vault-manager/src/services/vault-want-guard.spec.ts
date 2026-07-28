@@ -243,6 +243,57 @@ describe('findWantsOutsideView', () => {
     expect(disallowed).toEqual([danglingBlob]);
   });
 
+  it('collapses a repeated OID, so a client cannot multiply the work by repeating one want', async () => {
+    // A 64 KiB want section holds ~1300 want lines. Without collapsing, each
+    // one costs a git process, letting one cheap request spawn a burst of them.
+    const disallowed = await findWantsOutsideView({
+      repoPath,
+      viewRef: 'own-view',
+      wants: Array.from({ length: 300 }, () => otherBlob),
+    });
+
+    expect(disallowed).toEqual([otherBlob]);
+  });
+
+  it('refuses the whole request when it carries more distinct wants than any git client would send', async () => {
+    // 65 distinct wants, one of which the view really does reach. Over the
+    // limit the request is refused as a whole, so even that one is denied.
+    const wants = [
+      ownTip,
+      ...Array.from(
+        { length: 64 },
+        (_, i) => `${'0'.repeat(38)}${i.toString(16).padStart(2, '0')}`,
+      ),
+    ];
+
+    const disallowed = await findWantsOutsideView({
+      repoPath,
+      viewRef: 'own-view',
+      wants,
+    });
+
+    expect(disallowed).toContain(ownTip);
+  });
+
+  it('still answers a request that sits just inside the distinct-want limit', async () => {
+    const wants = [
+      ownTip,
+      ...Array.from(
+        { length: 63 },
+        (_, i) => `${'0'.repeat(38)}${i.toString(16).padStart(2, '0')}`,
+      ),
+    ];
+
+    const disallowed = await findWantsOutsideView({
+      repoPath,
+      viewRef: 'own-view',
+      wants,
+    });
+
+    expect(disallowed).not.toContain(ownTip);
+    expect(disallowed).toHaveLength(63);
+  });
+
   it('rejects a file body from the requester own view, because a blob is never a valid want here', async () => {
     // The view advertises a commit; a client that asks for a blob directly is
     // either doing a partial-clone lazy fetch (not supported) or probing.
