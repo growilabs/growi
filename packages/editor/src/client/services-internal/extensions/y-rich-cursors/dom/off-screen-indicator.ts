@@ -1,4 +1,4 @@
-import { toInitials } from './widget';
+import { toInitials } from './widget.js';
 
 export type OffScreenIndicatorOptions = {
   direction: 'above' | 'below';

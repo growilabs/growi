@@ -1,1 +1,1 @@
-export * from './CodeMirrorEditor';
+export * from './CodeMirrorEditor.js';

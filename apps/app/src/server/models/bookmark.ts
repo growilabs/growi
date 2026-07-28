@@ -1,151 +1,163 @@
-import type { Document, Model, Types } from 'mongoose';
+import type { Types } from 'mongoose';
 import { Schema } from 'mongoose';
-import mongoosePaginate from 'mongoose-paginate-v2';
-import uniqueValidator from 'mongoose-unique-validator';
 
-import type { IBookmark } from '~/interfaces/bookmark-info';
-import loggerFactory from '~/utils/logger';
+import { Prisma } from '~/generated/prisma/client';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
+import type { prisma } from '~/utils/prisma';
 
-import type Crowi from '../crowi';
-import { getOrCreateModel } from '../util/mongoose-utils';
+// TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
+// Until then, use mongoose to automatically create collections and indexes when connected.
+const bookmarkSchema = new Schema(
+  {
+    page: { type: Schema.Types.ObjectId, ref: 'Page', index: true },
+    user: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+  },
+  {
+    timestamps: { createdAt: true, updatedAt: false },
+  },
+);
 
-const logger = loggerFactory('growi:models:bookmark');
+bookmarkSchema.index({ page: 1, user: 1 }, { unique: true });
+getOrCreateModel('Bookmark', bookmarkSchema);
 
-export interface BookmarkDocument extends IBookmark, Document {
-  _id: Types.ObjectId;
-  page: Types.ObjectId;
-  user: Types.ObjectId;
-  createdAt: Date;
-}
-
-export interface BookmarkModel extends Model<BookmarkDocument> {
-  countByPageId(pageId: Types.ObjectId | string): Promise<number>;
-  getPageIdToCountMap(
-    pageIds: Types.ObjectId[],
-  ): Promise<{ [key: string]: number }>;
-  findByPageIdAndUserId(
-    pageId: Types.ObjectId | string,
-    userId: Types.ObjectId | string,
-  ): Promise<BookmarkDocument | null>;
-  add(
-    page: Types.ObjectId | string,
-    user: Types.ObjectId | string,
-  ): Promise<BookmarkDocument>;
-  removeBookmarksByPageId(
-    pageId: Types.ObjectId | string,
-  ): Promise<{ deletedCount: number }>;
-  removeBookmark(
-    pageId: Types.ObjectId | string,
-    user: Types.ObjectId | string,
-  ): Promise<BookmarkDocument | null>;
-}
-
-const factory = (crowi: Crowi) => {
-  const bookmarkEvent = crowi.events.bookmark;
-
-  const bookmarkSchema = new Schema<BookmarkDocument, BookmarkModel>(
-    {
-      page: { type: Schema.Types.ObjectId, ref: 'Page', index: true },
-      user: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+export const extension = Prisma.defineExtension((client) => {
+  return client.$extends({
+    result: {
+      bookmarks: {
+        // for backward compatibility with mongoose
+        _id: {
+          needs: { id: true },
+          compute(model) {
+            return model.id;
+          },
+        },
+        // for backward compatibility with mongoose
+        __v: {
+          needs: { v: true },
+          compute(model) {
+            return model.v;
+          },
+        },
+      },
     },
-    {
-      timestamps: { createdAt: true, updatedAt: false },
+    model: {
+      bookmarks: {
+        async countByPageId(pageId: Types.ObjectId | string): Promise<number> {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.bookmarks>(this);
+          return await context.count({
+            where: {
+              pageId: pageId.toString(),
+            },
+          });
+        },
+
+        /**
+         * @return {object} key: page._id, value: bookmark count
+         */
+        async getPageIdToCountMap(pageIds: Types.ObjectId[]) {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.bookmarks>(this);
+          const results = await context.groupBy({
+            by: ['pageId'],
+            where: {
+              pageId: {
+                in: pageIds.map((id) => id.toString()),
+              },
+            },
+            _count: {
+              pageId: true,
+            },
+          });
+
+          // convert to map
+          // note: result.pageId is typed nullable because the schema allows
+          // orphaned bookmarks, but the `where` filter above only matches
+          // bookmarks whose pageId is one of `pageIds`, so it is never null here
+          const idToCountMap: { [key: string]: number } = {};
+          results.forEach((result) => {
+            if (result.pageId == null) return;
+            idToCountMap[result.pageId] = result._count.pageId;
+          });
+
+          return idToCountMap;
+        },
+
+        // bookmark チェック用
+        async findByPageIdAndUserId(
+          pageId: Types.ObjectId | string,
+          userId: Types.ObjectId | string,
+        ) {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.bookmarks>(this);
+          return await context.findUnique({
+            where: {
+              pageId_userId: {
+                pageId: pageId.toString(),
+                userId: userId.toString(),
+              },
+            },
+          });
+        },
+
+        async add(
+          pageId: Types.ObjectId | string,
+          userId: Types.ObjectId | string,
+        ) {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.bookmarks>(this);
+          // use upsert instead of create: concurrent requests for the same
+          // page/user can race past the existence check in the route handler,
+          // and create() would throw P2002 on the unique (pageId, userId) index
+          const bookmark = await context.upsert({
+            where: {
+              pageId_userId: {
+                pageId: pageId.toString(),
+                userId: userId.toString(),
+              },
+            },
+            create: {
+              pageId: pageId.toString(),
+              userId: userId.toString(),
+            },
+            update: {},
+          });
+          return bookmark;
+        },
+
+        /**
+         * Remove bookmark
+         * used only when removing the page
+         * @param {string} pageId
+         */
+        async removeBookmarksByPageId(pageId: Types.ObjectId | string) {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.bookmarks>(this);
+          const result = await context.deleteMany({
+            where: {
+              pageId: pageId.toString(),
+            },
+          });
+          return { deletedCount: result.count };
+        },
+
+        async removeBookmark(
+          pageId: Types.ObjectId | string,
+          userId: Types.ObjectId | string,
+        ) {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.bookmarks>(this);
+          const data = await context.delete({
+            where: {
+              pageId_userId: {
+                pageId: pageId.toString(),
+                userId: userId.toString(),
+              },
+            },
+          });
+          return data;
+        },
+      },
     },
-  );
-
-  bookmarkSchema.index({ page: 1, user: 1 }, { unique: true });
-  bookmarkSchema.plugin(mongoosePaginate);
-  bookmarkSchema.plugin(uniqueValidator);
-
-  bookmarkSchema.statics.countByPageId = async function (
-    pageId: Types.ObjectId | string,
-  ): Promise<number> {
-    return await this.countDocuments({ page: pageId });
-  };
-
-  /**
-   * @return {object} key: page._id, value: bookmark count
-   */
-  bookmarkSchema.statics.getPageIdToCountMap = async function (
-    pageIds: Types.ObjectId[],
-  ): Promise<{ [key: string]: number }> {
-    const results = await this.aggregate()
-      .match({ page: { $in: pageIds } })
-      .group({ _id: '$page', count: { $sum: 1 } });
-
-    // convert to map
-    const idToCountMap: { [key: string]: number } = {};
-    results.forEach((result) => {
-      idToCountMap[result._id] = result.count;
-    });
-
-    return idToCountMap;
-  };
-
-  // bookmark チェック用
-  bookmarkSchema.statics.findByPageIdAndUserId = async function (
-    pageId: Types.ObjectId | string,
-    userId: Types.ObjectId | string,
-  ): Promise<BookmarkDocument | null> {
-    return await this.findOne({ page: pageId, user: userId });
-  };
-
-  bookmarkSchema.statics.add = async function (
-    page: Types.ObjectId | string,
-    user: Types.ObjectId | string,
-  ): Promise<BookmarkDocument> {
-    const newBookmark = new this({ page, user });
-
-    try {
-      const bookmark = await newBookmark.save();
-      bookmarkEvent.emit('create', page);
-      return bookmark;
-    } catch (err: any) {
-      if (err.code === 11000) {
-        // duplicate key (dummy response of new object)
-        return newBookmark;
-      }
-      logger.debug('Bookmark.save failed', err);
-      throw err;
-    }
-  };
-
-  /**
-   * Remove bookmark
-   * used only when removing the page
-   * @param {string} pageId
-   */
-  bookmarkSchema.statics.removeBookmarksByPageId = async function (
-    pageId: Types.ObjectId | string,
-  ): Promise<{ deletedCount: number }> {
-    try {
-      const result = await this.deleteMany({ page: pageId });
-      bookmarkEvent.emit('delete', pageId);
-      return { deletedCount: result.deletedCount ?? 0 };
-    } catch (err) {
-      logger.debug('Bookmark.remove failed (removeBookmarkByPage)', err);
-      throw err;
-    }
-  };
-
-  bookmarkSchema.statics.removeBookmark = async function (
-    pageId: Types.ObjectId | string,
-    user: Types.ObjectId | string,
-  ): Promise<BookmarkDocument | null> {
-    try {
-      const data = await this.findOneAndDelete({ page: pageId, user });
-      bookmarkEvent.emit('delete', pageId);
-      return data;
-    } catch (err) {
-      logger.debug('Bookmark.findOneAndRemove failed', err);
-      throw err;
-    }
-  };
-
-  return getOrCreateModel<BookmarkDocument, BookmarkModel>(
-    'Bookmark',
-    bookmarkSchema,
-  );
-};
-
-export default factory;
+  });
+});

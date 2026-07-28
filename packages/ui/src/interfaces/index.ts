@@ -1,2 +1,2 @@
-export * from './breakpoints';
-export * from './popper-data';
+export * from './breakpoints.js';
+export * from './popper-data.js';

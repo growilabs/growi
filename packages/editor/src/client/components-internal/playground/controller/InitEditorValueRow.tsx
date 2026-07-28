@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 
-import { GlobalCodeMirrorEditorKey } from '../../../../consts';
-import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
+import { GlobalCodeMirrorEditorKey } from '../../../../consts/index.js';
+import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor.js';
 
 export const InitEditorValueRow = (): JSX.Element => {
   const { data } = useCodeMirrorEditorIsolated(GlobalCodeMirrorEditorKey.MAIN);

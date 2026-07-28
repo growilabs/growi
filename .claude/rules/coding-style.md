@@ -295,3 +295,4 @@ Before marking work complete:
 - [ ] Modules with multiple responsibilities split by domain
 - [ ] **Module public surface is minimal** — `index.ts` re-exports only what external callers need; internals stay unexported
 - [ ] **Cohesive internals are grouped in subdirectories** with their own barrel, not flattened into the parent
+- [ ] *(apps/app)* Import specifiers follow the no-extension convention — see `apps/app/.claude/rules/import-convention.md`
