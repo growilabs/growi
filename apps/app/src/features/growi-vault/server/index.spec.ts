@@ -851,7 +851,7 @@ describe('runVaultSyncStateMigration', () => {
         string,
         Record<string, unknown>
       >;
-      expect(upd.$set.bootstrapLastError).toMatch(/stale running/i);
+      expect(upd.$set.bootstrapLastError).toMatch(/no live runner/i);
     });
   });
 
@@ -894,65 +894,152 @@ describe('runVaultSyncStateMigration', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // (d) running + null instanceId — step 3 normalizes to failed
+  // (d) In-flight state with no live runner — step 3 normalizes to failed
+  //
+  // Contract: after a restart, a bootstrap state that claims to be in flight
+  // ('running' / 'verifying') is only left alone when some process is still
+  // refreshing the heartbeat. Otherwise the run died and the state must be
+  // normalized to 'failed', which is the state operators can act on (the
+  // admin UI offers a re-bootstrap, and auto-retry can pick it up).
+  //
+  // Liveness is decided by the heartbeat, not by the presence of an instance
+  // id: an id is written at the *start* of every run, so a crashed run leaves
+  // one behind and an id-based check would strand the state forever.
   // ---------------------------------------------------------------------------
-  describe('stale running state (no instanceId)', () => {
-    it('normalizes running + instanceId=null to failed with error message', async () => {
-      mockFindOneAndUpdateResult(null);
-      mockUpdateOneSuccess();
-      mockFindOneLean({
-        bootstrapState: 'running',
-        bootstrapInstanceId: null,
-      });
+  describe('in-flight state with no live runner', () => {
+    /** Heartbeat threshold used by these tests (ms). */
+    const STALE_MS = 60_000;
 
-      await runVaultSyncStateMigration();
+    function ageMs(ms: number): Date {
+      return new Date(Date.now() - ms);
+    }
 
-      expect(VaultSyncState.updateOne).toHaveBeenCalledWith(
-        { _id: 'singleton' },
-        {
-          $set: {
-            bootstrapState: 'failed',
-            bootstrapLastError:
-              'normalized stale running on first startup after schema migration',
-          },
-        },
-      );
-    });
-
-    it('does NOT normalize running when bootstrapInstanceId is set (live run)', async () => {
-      mockFindOneAndUpdateResult(null);
-      mockUpdateOneSuccess();
-      mockFindOneLean({
-        bootstrapState: 'running',
-        bootstrapInstanceId: 'live-instance-xyz',
-      });
-
-      await runVaultSyncStateMigration();
-
-      const updateOneCalls = vi.mocked(VaultSyncState.updateOne).mock.calls;
-      const normalizationCall = updateOneCalls.find((call) => {
+    /** Extract the step-3 normalization call, if any. */
+    function findNormalizationCall() {
+      return vi.mocked(VaultSyncState.updateOne).mock.calls.find((call) => {
         const upd = call[1] as Record<string, Record<string, unknown>>;
         return upd.$set?.bootstrapState === 'failed';
       });
-      expect(normalizationCall).toBeUndefined();
-    });
+    }
 
-    it('does NOT normalize when bootstrapState is not running', async () => {
+    beforeEach(() => {
       mockFindOneAndUpdateResult(null);
       mockUpdateOneSuccess();
+    });
+
+    it('normalizes running to failed when the heartbeat has expired, even though an instance id is present', async () => {
+      // The real-world case: a run started, wrote its instance id, then the
+      // process died. The heartbeat stops; nothing else ever moves the state.
+      mockFindOneLean({
+        bootstrapState: 'running',
+        bootstrapInstanceId: 'instance-of-a-dead-process',
+        bootstrapHeartbeatAt: ageMs(STALE_MS * 10),
+      });
+
+      await runVaultSyncStateMigration({ heartbeatStaleMs: STALE_MS });
+
+      const normalizationCall = findNormalizationCall();
+      expect(normalizationCall).toBeDefined();
+      if (normalizationCall == null) return;
+      const upd = normalizationCall[1] as Record<
+        string,
+        Record<string, unknown>
+      >;
+      expect(upd.$set.bootstrapLastError).toMatch(/no live runner/i);
+    });
+
+    it('normalizes verifying to failed when the heartbeat has expired', async () => {
+      // The heartbeat keeps ticking through the completeness check, so an
+      // expired heartbeat in 'verifying' also means the runner is gone.
+      mockFindOneLean({
+        bootstrapState: 'verifying',
+        bootstrapInstanceId: 'instance-of-a-dead-process',
+        bootstrapHeartbeatAt: ageMs(STALE_MS * 10),
+      });
+
+      await runVaultSyncStateMigration({ heartbeatStaleMs: STALE_MS });
+
+      expect(findNormalizationCall()).toBeDefined();
+    });
+
+    it('normalizes running + instanceId=null to failed (pre-resilience document)', async () => {
+      mockFindOneLean({
+        bootstrapState: 'running',
+        bootstrapInstanceId: null,
+        bootstrapHeartbeatAt: null,
+      });
+
+      await runVaultSyncStateMigration({ heartbeatStaleMs: STALE_MS });
+
+      expect(findNormalizationCall()).toBeDefined();
+    });
+
+    it('normalizes running to failed when no heartbeat was ever written', async () => {
+      mockFindOneLean({
+        bootstrapState: 'running',
+        bootstrapInstanceId: 'instance-abc',
+        bootstrapHeartbeatAt: null,
+      });
+
+      await runVaultSyncStateMigration({ heartbeatStaleMs: STALE_MS });
+
+      expect(findNormalizationCall()).toBeDefined();
+    });
+
+    it('does NOT normalize running while the heartbeat is fresh (another instance owns the run)', async () => {
+      mockFindOneLean({
+        bootstrapState: 'running',
+        bootstrapInstanceId: 'instance-of-a-live-process',
+        bootstrapHeartbeatAt: ageMs(STALE_MS / 10),
+      });
+
+      await runVaultSyncStateMigration({ heartbeatStaleMs: STALE_MS });
+
+      expect(findNormalizationCall()).toBeUndefined();
+    });
+
+    it('does NOT normalize verifying while the heartbeat is fresh', async () => {
+      mockFindOneLean({
+        bootstrapState: 'verifying',
+        bootstrapInstanceId: 'instance-of-a-live-process',
+        bootstrapHeartbeatAt: ageMs(STALE_MS / 10),
+      });
+
+      await runVaultSyncStateMigration({ heartbeatStaleMs: STALE_MS });
+
+      expect(findNormalizationCall()).toBeUndefined();
+    });
+
+    it('does NOT normalize a state that is not in flight, whatever the heartbeat age', async () => {
       mockFindOneLean({
         bootstrapState: 'failed',
         bootstrapInstanceId: null,
+        bootstrapHeartbeatAt: ageMs(STALE_MS * 10),
       });
 
-      await runVaultSyncStateMigration();
+      await runVaultSyncStateMigration({ heartbeatStaleMs: STALE_MS });
 
-      const updateOneCalls = vi.mocked(VaultSyncState.updateOne).mock.calls;
-      const normalizationCall = updateOneCalls.find((call) => {
-        const upd = call[1] as Record<string, Record<string, unknown>>;
-        return upd.$set?.bootstrapState === 'failed';
+      expect(findNormalizationCall()).toBeUndefined();
+    });
+
+    it('does NOT touch the resume cursor when normalizing (the cursor stays a valid resume point)', async () => {
+      mockFindOneLean({
+        bootstrapState: 'running',
+        bootstrapInstanceId: 'instance-of-a-dead-process',
+        bootstrapHeartbeatAt: ageMs(STALE_MS * 10),
+        bootstrapCursor: 'aaaaaaaaaaaaaaaaaaaaaaaa',
       });
-      expect(normalizationCall).toBeUndefined();
+
+      await runVaultSyncStateMigration({ heartbeatStaleMs: STALE_MS });
+
+      const normalizationCall = findNormalizationCall();
+      expect(normalizationCall).toBeDefined();
+      if (normalizationCall == null) return;
+      const upd = normalizationCall[1] as Record<
+        string,
+        Record<string, unknown>
+      >;
+      expect(upd.$set).not.toHaveProperty('bootstrapCursor');
     });
   });
 });

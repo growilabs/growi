@@ -899,6 +899,105 @@ describe('BootstrapRunner', () => {
   });
 
   // -------------------------------------------------------------------------
+  // getStatus — runner liveness
+  //
+  // Contract: isStaleRunner answers "the state says a bootstrap is in flight,
+  // but is anyone still working on it?". Callers (the admin UI) use it to
+  // decide whether a re-bootstrap may be started, so it must be false while a
+  // real run is progressing and true once the owning process has gone away.
+  // The staleness threshold belongs to the server (heartbeatStaleMs = 120s in
+  // this fixture); callers must not have to re-derive it.
+  // -------------------------------------------------------------------------
+
+  describe('getStatus() — runner liveness (isStaleRunner)', () => {
+    it('is false while a running bootstrap keeps its heartbeat within the threshold', async () => {
+      const { runner } = createTestRunner({
+        bootstrapState: 'running',
+        bootstrapHeartbeatAt: new Date(Date.now() - 119_000),
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.isStaleRunner).toBe(false);
+    });
+
+    it('is true once a running bootstrap heartbeat is older than the threshold', async () => {
+      const { runner } = createTestRunner({
+        bootstrapState: 'running',
+        bootstrapHeartbeatAt: new Date(Date.now() - 121_000),
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.isStaleRunner).toBe(true);
+    });
+
+    it('is true for a verifying bootstrap whose heartbeat has expired', async () => {
+      // The heartbeat keeps ticking through the completeness check, so an
+      // expired heartbeat in 'verifying' means the owning process is gone.
+      const { runner } = createTestRunner({
+        bootstrapState: 'verifying',
+        bootstrapHeartbeatAt: new Date(Date.now() - 600_000),
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.isStaleRunner).toBe(true);
+    });
+
+    it('is true for a running bootstrap that never wrote a heartbeat', async () => {
+      const { runner } = createTestRunner({
+        bootstrapState: 'running',
+        bootstrapHeartbeatAt: null,
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.isStaleRunner).toBe(true);
+    });
+
+    it.each([
+      'done',
+      'failed',
+      'escalated',
+      'pending',
+    ] as const)('is false for the settled state %s even when the heartbeat is ancient', async (settledState) => {
+      const { runner } = createTestRunner({
+        bootstrapState: settledState,
+        bootstrapHeartbeatAt: new Date(Date.now() - 86_400_000),
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.isStaleRunner).toBe(false);
+    });
+
+    it('exposes the raw heartbeat timestamp so operators can see how old it is', async () => {
+      const heartbeatAt = new Date('2026-06-16T13:10:30.008Z');
+      const { runner } = createTestRunner({
+        bootstrapState: 'running',
+        bootstrapHeartbeatAt: heartbeatAt,
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.heartbeatAt).toEqual(heartbeatAt);
+    });
+
+    it('is false when no state document exists yet', async () => {
+      const { mockVaultSyncState, runner } = createTestRunner();
+      mockVaultSyncState.findOne.mockReturnValue({
+        lean: () => Promise.resolve(null),
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.isStaleRunner).toBe(false);
+      expect(status.bootstrap.heartbeatAt).toBeNull();
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // stop()
   // -------------------------------------------------------------------------
 
