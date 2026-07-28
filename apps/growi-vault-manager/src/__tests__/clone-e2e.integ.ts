@@ -464,6 +464,116 @@ async function callComposeView(
     // Test 5: Tree normalization — no-collision scenario (req 4.11)
     // -------------------------------------------------------------------------
 
+    // -------------------------------------------------------------------------
+    // Objects outside the requester's view must not be served (req 5.4 / 追補 A)
+    // -------------------------------------------------------------------------
+
+    describe('Objects outside the view (req 5.4)', () => {
+      beforeAll(async () => {
+        await connectMongo();
+      });
+
+      afterAll(async () => {
+        await disconnectMongo();
+      });
+
+      /**
+       * Runs git against the bare repository the manager maintains.
+       * Only possible when the manager runs in-process (the default integ
+       * setup), which is where VAULT_REPO_PATH points at a local directory.
+       */
+      const gitInRepo = async (...args: string[]): Promise<string> => {
+        const repoPath = process.env.VAULT_REPO_PATH;
+        if (repoPath == null || !fs.existsSync(repoPath)) {
+          throw new Error('VAULT_REPO_PATH is not a local directory');
+        }
+        const { stdout } = await execFileAsync('git', [
+          '-C',
+          repoPath,
+          ...args,
+        ]);
+        return stdout.trim();
+      };
+
+      /** Sends a hand-built want request, the way a non-git client would. */
+      const postWant = async (
+        viewRef: string,
+        oid: string,
+      ): Promise<{ status: number; body: Buffer }> => {
+        const wantLine = `want ${oid} thin-pack ofs-delta agent=integ\n`;
+        const len = (wantLine.length + 4).toString(16).padStart(4, '0');
+        const res = await fetch(`${BASE_URL}/internal/git/git-upload-pack`, {
+          method: 'POST',
+          headers: {
+            Authorization: AUTH_HEADER,
+            'x-vault-view-ref': viewRef,
+            'Content-Type': 'application/x-git-upload-pack-request',
+          },
+          body: `${len}${wantLine}00000009done\n`,
+        });
+        return {
+          status: res.status,
+          body: Buffer.from(await res.arrayBuffer()),
+        };
+      };
+
+      it('does not serve a page body that belongs to a namespace the requester cannot access', {
+        timeout: 60_000,
+      }, async () => {
+        if (mongoose == null) {
+          throw new Error('Mongoose not connected');
+        }
+        const { ObjectId } = mongoose.mongo;
+
+        // Seed a page into a private namespace of some *other* user.
+        const otherNamespace = 'user-0badc0de0badc0de0badc0de-only-me';
+        await upsertPageAndWait({
+          namespace: otherNamespace,
+          pageId: new ObjectId().toHexString(),
+          pagePath: '/leak-probe/secret',
+          revisionId: new ObjectId().toHexString(),
+          bodyText: 'another users private page body\n',
+        });
+
+        // Object names of that page's content, read straight out of the shared
+        // object store — this is what an attacker would have recorded earlier.
+        const otherRef = `refs/namespaces/${otherNamespace}/refs/heads/main`;
+        const foreignBlob = await gitInRepo(
+          'rev-parse',
+          `${otherRef}:leak-probe/secret.md`,
+        );
+        const foreignTree = await gitInRepo('rev-parse', `${otherRef}^{tree}`);
+
+        // The requester's own view does not include that namespace.
+        const { viewRef } = await callComposeView(
+          TEST_USER_ID,
+          TEST_NAMESPACES,
+        );
+
+        for (const oid of [foreignBlob, foreignTree]) {
+          const { body } = await postWant(viewRef, oid);
+
+          // A pack in the response means the object was handed over.
+          expect(body.includes(Buffer.from('PACK'))).toBe(false);
+          expect(body.toString('utf8')).toContain('ERR');
+        }
+      });
+
+      it('still serves the commit its own view advertises', {
+        timeout: 60_000,
+      }, async () => {
+        const { viewRef, commitOid } = await callComposeView(
+          TEST_USER_ID,
+          TEST_NAMESPACES,
+        );
+
+        const { status, body } = await postWant(viewRef, commitOid);
+
+        expect(status).toBe(200);
+        expect(body.includes(Buffer.from('PACK'))).toBe(true);
+      });
+    });
+
     describe('Tree normalization: filename collision rules (req 4.10, 4.11)', () => {
       let normCloneDir: string;
 

@@ -554,7 +554,7 @@ interface VaultUploadPackSpawner {
 - `mode: 'advertise'` → `git upload-pack --stateless-rpc --advertise-refs <repoPath>`
 - `mode: 'rpc'` → `git upload-pack --stateless-rpc <repoPath>`（stdin: request body）
 - env: `GIT_NAMESPACE=<viewRef>`
-- `uploadpack.allowAnySHA1InWant=false`（git デフォルト）を維持する。ただしこれで防げるのは commit の直接取得だけで、ファイルの中身とディレクトリ一覧はビューを越えて取得できる（「追補 A」参照）
+- `uploadpack.allowAnySHA1InWant=false`（git デフォルト）を維持する。ただしこれで防げるのは commit の直接取得だけなので、要求された object がビューからたどれるかの検査を upload-pack 起動前に GitProxyController が行う（要件 5.6・5.7、「追補 A」参照）
 - クライアント切断時・タイムアウト時はプロセスを kill
 
 ---
@@ -759,7 +759,7 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 - **single security perimeter**: vault-manager は外部から到達不可（k8s NetworkPolicy で apps/app からのみ許可）。Ingress には登録しない
 - **shared secret**: env var only（`VAULT_MANAGER_INTERNAL_SECRET`）、DB に保存しない。k8s Secret で両 pod に注入
 - **constant-time 比較**: `crypto.timingSafeEqual` で timing attack を防止（要件 7.5）
-- **commit の直接取得の禁止**: `uploadpack.allowAnySHA1InWant=false`（git デフォルト）で、ビューに広告していない commit は取得できない。**ファイル 1 個の中身とディレクトリ 1 個分の一覧はこれでは防げず、ビューを越えて取得できる**（git 2.49.0 で実測。「追補 A」参照）
+- **ビュー外 object の取得禁止**: `uploadpack.allowAnySHA1InWant=false`（git デフォルト）だけでは commit の直接取得しか防げない（ファイルの中身とディレクトリ一覧はビューを越えて取得できた。git 2.49.0 で実測）。そのため GitProxyController が upload-pack 起動前にクライアントの要求を検査し、ビュー ref からたどれない object の要求を拒否する（要件 5.6・5.7、「追補 A」）
 - **pages コレクション非アクセス**: vault-manager は `revisions` のみ ID 指定 body lookup（namespace 判定は apps/app に集約済み）
 - **情報漏洩防止**: namespace 集合は apps/app が ACL 評価済みで渡す。vault-manager は受け取った namespace をそのまま処理するのみ
 
@@ -840,13 +840,28 @@ git 側では想定通りの動作で、`gitnamespaces(7)` にも明記されて
 - object の ID を知る必要があるが、以前アクセスできたときに clone して ID を控えていた元メンバーや、public から非公開に変えたページは現実的な経路になる。他のビューから参照されている object は gc でも消えない。
 - **partial clone（`--filter=blob:none`、必要な分だけ後から取りに行く clone）を有効にする場合の前提**: 成立させるには `uploadpack.allowFilter=true` と `uploadpack.allowReachableSHA1InWant=true` の両方が必要で、後者を入れると上記が `git fetch --filter=blob:none origin <object の ID>` の一行で踏めるようになる（実測確認済み。commit は引き続き拒否される）。#11595 の転送量削減はこの追補の結論が出るまで保留する。
 
-### 対応方針（未決定）
+### 対応方針（決定: 案 1 を採用・実装済み）
 
-git の設定では解決できないため、いずれも設計の判断が必要。
+検討した 3 案。
 
-1. **GitProxyController が要求を検査する** — クライアントから来た要求を解析し、そのビューに広告した ref からたどれない object の要求を拒否する。要件 5.3（pack をメモリに溜めず一定量のメモリで転送する）と両立させる必要があり、要求 1 件ごとに「たどれるか」を確認するコストの見積もりが要る。
-2. **object の保管場所の共有をやめる** — ビューごとに独立させる。確実だが保存容量が増える。
-3. **制約として受け入れ、記述を実態に合わせる** — 「vault の読み取り権限は、その bare repo 全体の読み取り権限と同じ」と明示する。この場合は要件 3 の目的（他ユーザの非公開ページの内容や存在が leak しない）の書き方も見直す必要がある。
+1. **GitProxyController が要求を検査する** — ← **採用**。クライアントの要求を upload-pack に渡す前に解析し、そのビューからたどれない object の要求を拒否する。
+2. **object の保管場所の共有をやめる** — ビューごとに独立させる。確実だが保存容量が views 数に比例して増え、blob の重複排除という設計の前提を捨てることになる。
+3. **制約として受け入れ、記述を実態に合わせる** — 「vault の読み取り権限は bare repo 全体の読み取り権限と同じ」と明示する。要件 3 の目的（他ユーザの非公開ページの内容や存在が leak しない）を諦めることになるため採らない。
+
+### 採用した検査の内容
+
+`GitProxyController.uploadPack()` は upload-pack を起動する前に次を行う。
+
+1. **要求の先頭だけを読む** — リクエスト本文の先頭は「どの object が欲しいか」を並べた区間（want 区間）で、終わりは flush（`0000`）。この区間だけを読み取り、要求された object の ID を取り出す（`vault-pkt-line.ts` の `parseWantSection`。純関数）。実測では clone / shallow clone / 差分 fetch のいずれも 183〜345 バイトで、64 KiB を超えても flush が来なければ拒否するので、要件 5.3（pack をメモリに溜めず一定量のメモリで転送する）は保たれる。
+2. **読んだ分をストリームから失わせない** — 検査のために先頭を読むが、リクエスト本文は upload-pack に**そのまま全部**渡さなければならない。読み取りは `for await` ではなく `pause()` で止め、読んだ先頭は `spawnUploadPack({ stdinPrefix })` で書き戻してから残りを pipe する（`vault-want-guard.ts` の `peekWantSection`）。`for await` で読むとストリームが閉じられ、want 区間の後ろにある negotiation が失われて upload-pack が入力待ちで止まる（実装中に実際に踏んだ）。
+3. **ビューからたどれるかを確認する** — 要求 1 件ごとに `git merge-base --is-ancestor <要求された ID> refs/namespaces/<viewRef>/refs/heads/main` を実行し、非ゼロ終了なら拒否する（`findWantsOutsideView`）。この 1 コマンドで、ファイルの中身やディレクトリ一覧（commit ではない）・他ビューの commit・存在しない ID・ビュー ref 自体が無い場合のすべてが拒否側に落ちる（**閉じる方向に倒れる**）。ビューの履歴は 1 時間ごとに親なし commit へ squash される（要件 6）ので、確認は commit chain の長さに縛られ軽い。
+4. **拒否の返し方** — HTTP 200 と pkt-line 1 本の `ERR vault: requested object is not available in this view`。upload-pack 自身が拒否時に返す形と同じなので、git クライアントは `fatal: remote error: ...` と表示する。「ビューに無い」と「そもそも存在しない」で文言を変えないので、リポジトリが何を持っているかは応答から分からない（要件 2.3）。拒否は vault-manager のログに残す。
+
+**正当な操作を壊していないこと**（実測で確認）: full clone / `--depth=1` の shallow clone / 差分 fetch / 広告より古い（＝ビューからたどれる）commit の要求は、いずれも従来どおり通る。4 番目は、ビューの広告を取得してから POST するまでの間に ref が動いた場合に必要で、「広告された ID と完全一致」ではなく「たどれるか」で判定している理由でもある。
+
+**この検査で拒否されるようになった正当な用途**: partial clone の遅延取得（`--filter=blob:none` を有効にした場合にクライアントが行うファイル単体の要求）。現在 filter は無効なので実害はないが、**将来 filter を有効にするならこの検査を先に拡張する必要がある**（#11595 参照）。
+
+**protocol v2 について**: 現在 gateway はクライアントの `Git-Protocol` ヘッダを転送しないため upload-pack は v0 でしか動かず、この検査も v0 の形式だけを解釈する。v2 形式の本文は拒否される（閉じる方向に倒す）。**v2 を通すなら検査の拡張が前提**。Revalidation Triggers に該当する。
 
 ---
 
