@@ -554,7 +554,7 @@ interface VaultUploadPackSpawner {
 - `mode: 'advertise'` → `git upload-pack --stateless-rpc --advertise-refs <repoPath>`
 - `mode: 'rpc'` → `git upload-pack --stateless-rpc <repoPath>`（stdin: request body）
 - env: `GIT_NAMESPACE=<viewRef>`
-- `uploadpack.allowAnySHA1InWant=false`（git デフォルト）で OID 直接 fetch を禁止
+- `uploadpack.allowAnySHA1InWant=false`（git デフォルト）を維持する。ただしこれで防げるのは commit の直接取得だけで、ファイルの中身とディレクトリ一覧はビューを越えて取得できる（「追補 A」参照）
 - クライアント切断時・タイムアウト時はプロセスを kill
 
 ---
@@ -759,7 +759,7 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 - **single security perimeter**: vault-manager は外部から到達不可（k8s NetworkPolicy で apps/app からのみ許可）。Ingress には登録しない
 - **shared secret**: env var only（`VAULT_MANAGER_INTERNAL_SECRET`）、DB に保存しない。k8s Secret で両 pod に注入
 - **constant-time 比較**: `crypto.timingSafeEqual` で timing attack を防止（要件 7.5）
-- **OID 直接 fetch 禁止**: `uploadpack.allowAnySHA1InWant=false`（git デフォルト）で namespace 外の OID を fetch させない
+- **commit の直接取得の禁止**: `uploadpack.allowAnySHA1InWant=false`（git デフォルト）で、ビューに広告していない commit は取得できない。**ファイル 1 個の中身とディレクトリ 1 個分の一覧はこれでは防げず、ビューを越えて取得できる**（git 2.49.0 で実測。「追補 A」参照）
 - **pages コレクション非アクセス**: vault-manager は `revisions` のみ ID 指定 body lookup（namespace 判定は apps/app に集約済み）
 - **情報漏洩防止**: namespace 集合は apps/app が ACL 評価済みで渡す。vault-manager は受け取った namespace をそのまま処理するのみ
 
@@ -795,9 +795,64 @@ git binary が pack 生成・delta 圧縮・転送を担当するため、vault-
 
 ---
 
+## 追補 A: `GIT_NAMESPACE` は読み取りの隔離にならない（2026-07-28 実測）
+
+要件 5.4 と上記「セキュリティ考慮事項」は、`uploadpack.allowAnySHA1InWant=false`（git の既定値）を維持すれば、クライアントはビューに広告していない object を取得できない、という前提で書かれていた。git 2.49.0 で実際に動かして確かめたところ、この前提は **commit にしか当てはまらない**ことが分かった。#11595（clone の転送量を絞る手段が README 通りに動かない）の調査中に判明したもの。
+
+### 前提となる用語
+
+git は、ページ 1 件の中身も、ディレクトリの一覧も、コミットも、すべて「object」として同じ場所に保管する。object には中身から計算した ID が付く。
+
+- **ファイル 1 個の中身**（git の用語では blob）— ページ 1 件の Markdown 本文がこれにあたる
+- **ディレクトリ 1 個分の一覧**（git の用語では tree）— そのディレクトリに直接置かれているファイル名・サブディレクトリ名と、それぞれの中身の ID が並んだもの
+- **commit** — ある時点のディレクトリ一覧を指し、親の commit を指すもの
+
+vault は 1 つの bare repo の中に利用者ごとのビューを作り、`GIT_NAMESPACE` でビューを分けている。分かれているのは **ref をどこまで見せるか**だけで、object の保管場所は全ビューで共有されている。
+
+### 実測結果
+
+2 つのビュー（`nsA` / `nsB`）を持つ bare repo を作り、`spawnUploadPack()` と同じ形（`GIT_NAMESPACE=nsA` を設定した `git upload-pack --stateless-rpc`）で起動したプロセスに、`nsB` 側の object の ID を「これが欲しい」という要求として標準入力から送った。
+
+| 要求した object | 結果 |
+|---|---|
+| `nsA` の中のファイル 1 個の中身（ref では広告されていないもの） | 受け取れる |
+| **`nsB` の中のファイル 1 個の中身** | **受け取れる。中身をそのまま復元できた** |
+| **`nsB` のディレクトリ 1 個分の一覧** | **受け取れる** |
+| **どの履歴からも参照されなくなった、消し忘れのファイルの中身** | **受け取れる** |
+| `nsB` の commit | `ERR upload-pack: not our ref <ID>` で拒否される |
+
+ディレクトリ 1 個分の一覧が取れると、そこに並んでいる ID をそのまま次の要求に使えるので、同じ手順を繰り返してディレクトリの中を丸ごと読み出せる。ファイル名が並んでいるので、ページのパス一覧も分かる。
+
+### なぜこうなるか
+
+git が「広告していない object を要求されたとき、それが本当にこのビューからたどれるのか」を確かめる処理は、commit を前提に作られている。ファイルの中身やディレクトリの一覧を渡された場合、この確認は実質的に何もしない。`GIT_NAMESPACE` は ref の見せ方を絞るだけなので、保管場所にある object はビューに関係なく渡される。
+
+git 側では想定通りの動作で、`gitnamespaces(7)` にも明記されている。
+
+> namespaces on a server are not effective for read access control; you should only grant read access to a namespace to clients that you would trust with read access to the entire repository.
+>
+> （サーバ上の namespace は読み取りのアクセス制御には有効ではない。namespace への読み取りを許すのは、リポジトリ全体の読み取りを許してよい相手だけにすべきである。）
+
+### 現時点でどの程度危ないか
+
+- **素の git コマンドでは踏めない。** サーバが「広告していない object を要求してよい」という合図（`allow-reachable-sha1-in-want`）を出していないため、git クライアントが要求を送る前に自分で諦める（`error: Server does not allow request for unadvertised object <ID>`）。取得するには git の通信手順を直接しゃべるクライアントが必要で、Node で 40 行程度書けば再現できた。サーバ側には拒否のログも残らない。
+- `VAULT_ENABLED` は既定で false なので、影響を受けるのは vault を明示的に有効にした環境だけ。
+- object の ID を知る必要があるが、以前アクセスできたときに clone して ID を控えていた元メンバーや、public から非公開に変えたページは現実的な経路になる。他のビューから参照されている object は gc でも消えない。
+- **partial clone（`--filter=blob:none`、必要な分だけ後から取りに行く clone）を有効にする場合の前提**: 成立させるには `uploadpack.allowFilter=true` と `uploadpack.allowReachableSHA1InWant=true` の両方が必要で、後者を入れると上記が `git fetch --filter=blob:none origin <object の ID>` の一行で踏めるようになる（実測確認済み。commit は引き続き拒否される）。#11595 の転送量削減はこの追補の結論が出るまで保留する。
+
+### 対応方針（未決定）
+
+git の設定では解決できないため、いずれも設計の判断が必要。
+
+1. **GitProxyController が要求を検査する** — クライアントから来た要求を解析し、そのビューに広告した ref からたどれない object の要求を拒否する。要件 5.3（pack をメモリに溜めず一定量のメモリで転送する）と両立させる必要があり、要求 1 件ごとに「たどれるか」を確認するコストの見積もりが要る。
+2. **object の保管場所の共有をやめる** — ビューごとに独立させる。確実だが保存容量が増える。
+3. **制約として受け入れ、記述を実態に合わせる** — 「vault の読み取り権限は、その bare repo 全体の読み取り権限と同じ」と明示する。この場合は要件 3 の目的（他ユーザの非公開ページの内容や存在が leak しない）の書き方も見直す必要がある。
+
+---
+
 ## 参考情報
 
-- [git namespaces](https://git-scm.com/docs/gitnamespaces) — `GIT_NAMESPACE` 環境変数の仕様
+- [git namespaces](https://git-scm.com/docs/gitnamespaces) — `GIT_NAMESPACE` 環境変数の仕様。読み取りのアクセス制御には使えないことも明記されている（「追補 A」参照）
 - [git smart HTTP protocol](https://git-scm.com/docs/http-protocol) — upload-pack wire format
 - [isomorphic-git GitHub](https://github.com/isomorphic-git/isomorphic-git) — v1.37.x API リファレンス
 - [MongoDB change streams](https://www.mongodb.com/docs/manual/changeStreams/) — resume token の挙動

@@ -94,6 +94,8 @@
 4. git upload-pack プロセスが起動したとき、GitProxyController は `uploadpack.allowAnySHA1InWant=false`（git のデフォルト）が維持され、namespace 外の OID が直接 fetch されないことを保証する
 5. git upload-pack プロセスでエラーが発生したとき、GitProxyController はプロセスを終了させ、エラーをログに記録する
 
+> **追補 A（2026-07-28）**: 上記 4 の保証は、実際には commit にしか効いていない。ファイル 1 個の中身とディレクトリ 1 個分の一覧は、ビューを越えて取得できる（git 2.49.0 で実測）。承認済みの受け入れ基準 4 はそのまま残し、実測結果・現時点の危険度・対応方針の候補は `design.md` の「追補 A」に記録する。
+
 ---
 
 ### 要件 6: メンテナンス自走スケジューリング（squash + gc）

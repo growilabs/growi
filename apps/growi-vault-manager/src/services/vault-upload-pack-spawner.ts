@@ -17,9 +17,16 @@
  * (gitnamespaces(7)).
  *
  * `uploadpack.allowAnySHA1InWant=false` is git's default and is therefore
- * left unconfigured rather than set explicitly; this prevents clients from
- * fetching arbitrary OIDs that are not advertised in the namespace view
- * (requirement 5.4).
+ * left unconfigured rather than set explicitly (requirement 5.4).
+ *
+ * Note what this does and does not buy us: it only stops clients from fetching
+ * unadvertised *commits*. Git's reachability check for an unadvertised want
+ * assumes the want is a commit, so blobs and trees are served for any OID that
+ * exists in the object database, regardless of GIT_NAMESPACE — namespaces scope
+ * ref advertisement, not the shared object store, and gitnamespaces(7) states
+ * outright that they are not effective for read access control. Measured on git
+ * 2.49.0; see "追補 A" in .kiro/specs/growi-vault-manager/design.md for the
+ * measurements and the candidate fixes.
  */
 
 import type { ChildProcess } from 'node:child_process';
