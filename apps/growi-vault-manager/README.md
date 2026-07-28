@@ -57,17 +57,26 @@ These rules are versioned (v1) and are **immutable after the first release**.
 
 ## Excluding `/user` pages with git sparse-checkout
 
-To clone a vault while excluding all personal pages stored under `user/`, use git sparse-checkout:
+To clone a vault while excluding all personal pages stored under `user/`, use git sparse-checkout in **non-cone** mode:
 
 ```bash
 git clone --no-checkout <url> my-growi-vault
 cd my-growi-vault
-git sparse-checkout init --cone
-git sparse-checkout set '/*' '!/user'
+git sparse-checkout init --no-cone
+printf '/*\n!/user\n' | git sparse-checkout set --stdin
 git checkout HEAD
 ```
 
-> **Important**: sparse-checkout only controls which files are materialized in your **working tree**. It does not affect the objects transferred from the server — the full history is still fetched. To limit server-side object delivery, a partial-clone filter (e.g. `--filter=blob:none`) is needed in addition to sparse-checkout.
+Two details are easy to get wrong:
+
+- **`--no-cone` is required.** Cone mode cannot express an exclusion, so `git sparse-checkout set '/*' '!/user'` fails with `fatal: specify directories rather than patterns (no leading slash)`, and the `git checkout` that follows then leaves you with an *empty* working tree rather than one without `user/`.
+- **Pass the patterns on stdin.** On Git Bash (MSYS) an argument that looks like an absolute path is rewritten before git ever sees it, which mangles `!/user`. Reading from `--stdin` sidesteps that, and also avoids per-shell quoting differences.
+
+> **Important**: sparse-checkout only controls which files are materialized in your **working tree**. Every object in your view is still transferred from the server, so the clone itself is not any smaller.
+>
+> A partial-clone filter (`--filter=blob:none`) is what would shrink the transfer, but **this server does not enable it**: `git clone --filter=blob:none` just prints `warning: filtering not recognized by server, ignoring` and fetches everything. Passing the flag anyway is worse than useless — git still records `remote.origin.promisor=true` and `remote.origin.partialclonefilter=blob:none` locally, leaving the clone marked as a partial clone that the server will not serve as one. Whether to enable the filter is an open decision; see "追補 A" in `.kiro/specs/growi-vault-manager/design.md`.
+>
+> `--depth=1` (shallow clone) does work, but saves little: each view's history is squashed to a single parentless commit whenever it exceeds `VAULT_SQUASH_COMMIT_THRESHOLD` commits (default 1000) or `VAULT_SQUASH_AGE_HOURS` (default 1), so there is not much history to omit in the first place. What dominates the transfer is the current snapshot, not the history.
 
 ---
 
@@ -80,6 +89,7 @@ The following items are **not supported** in the current MVP:
 - **Per-page metadata** — comments, likes, bookmarks, tags, and similar social/annotation metadata are not exported.
 - **Revision history before feature activation** — only revisions created after the vault feature is enabled are captured; pre-existing history is not back-filled.
 - **Drafts and unpublished pages** — only published pages are exported to the vault.
+- **Partial clone (`--filter=...`)** — the server does not advertise the filter capability, so a clone always transfers every object in your view. `git sparse-checkout` still limits what is written to your working tree (see above), but it does not reduce the transfer.
 
 ### Known limitation: long paths on Windows
 
