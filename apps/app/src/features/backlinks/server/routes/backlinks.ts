@@ -14,7 +14,7 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:routes:apiv3:backlink');
 
-export const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
+const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
   return async (req: CrowiRequest, res: ApiV3Response) => {
     const { pageId } = req.query;
 
