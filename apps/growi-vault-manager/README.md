@@ -91,7 +91,7 @@ Highlights of the refactor:
 
 ### Cross-repository impact: `growi-docker-compose`
 
-The separate [`growi-docker-compose`](https://github.com/weseek/growi-docker-compose) repository may reference this `Dockerfile` (e.g. via an image-build target or a published image tag). When a new vault-manager image built from this refactored Dockerfile is published, the `growi-docker-compose` repository **must be checked separately** to confirm that its compose definitions still build / run against the new image. That cross-repository update is intentionally out of scope for this PR — it must land as a separate PR in `growi-docker-compose`.
+The separate [`growi-docker-compose`](https://github.com/growilabs/growi-docker-compose) repository consumes the published image, as an opt-in override in [`examples/growi-vault`](https://github.com/growilabs/growi-docker-compose/tree/master/examples/growi-vault). When the image is republished with a new major/minor, that override pins the tag and has to be updated there in a separate PR.
 
 ### CI compatibility: `.github/workflows/ci-vault.yml`
 
