@@ -416,6 +416,52 @@ describe('BootstrapRunner', () => {
   });
 
   // -------------------------------------------------------------------------
+  // (c-2) force wipe must invalidate the persisted resume cursor immediately
+  //
+  // A force wipe re-seeds the vault from the first page, so a cursor left over
+  // from an earlier run is not a valid resume point. If the wipe run dies
+  // before it streams its first page, that stale cursor would survive and the
+  // next resume would skip every page below it — leaving those pages missing
+  // from the freshly wiped repository while the completeness check still
+  // passes.
+  // -------------------------------------------------------------------------
+
+  describe('(c-2) force wipe invalidates the persisted cursor', () => {
+    it('has cleared the persisted cursor by the time the run is acknowledged as running', async () => {
+      const pages = [makePageDoc(FAKE_ID_B, '/page-b')];
+      const { state, runner } = createTestRunner(
+        { bootstrapState: 'done', bootstrapCursor: FAKE_ID_A },
+        pages,
+      );
+
+      // onRunning fires right after the state transition is committed and
+      // before any page is streamed — the exact window a crash would freeze.
+      let cursorWhenRunning: unknown = 'never-captured';
+      await runner.bootstrap({
+        triggerSource: 'env-force',
+        onRunning: () => {
+          cursorWhenRunning = state.bootstrapCursor;
+        },
+      });
+
+      expect(cursorWhenRunning).toBeNull();
+    });
+
+    it('does not carry a previous cursor into the page query of the wipe run', async () => {
+      const pages = [makePageDoc(FAKE_ID_B, '/page-b')];
+      const { mockPage, runner } = createTestRunner(
+        { bootstrapState: 'done', bootstrapCursor: FAKE_ID_A },
+        pages,
+      );
+
+      await runner.bootstrap({ triggerSource: 'env-force' });
+
+      // The stream query must be unfiltered: a wipe re-seeds from page one.
+      expect(mockPage.find).toHaveBeenCalledWith({});
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // (d) env=true + failed → resume (no reset-all)
   // -------------------------------------------------------------------------
 

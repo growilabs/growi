@@ -438,6 +438,14 @@ export function createBootstrapRunner(
               bootstrapLastError: null,
               bootstrapLastTriggerSource: triggerSource,
               bootstrapRetryAttempts: currentRetryAttempts,
+              // A wipe re-seeds from the first page, so any cursor from an
+              // earlier run is not a valid resume point. Clear it here, not
+              // just in the local `resumeCursor` below: if this run dies before
+              // it streams its first page (which is what overwrites the field),
+              // the leftover cursor would make the next resume skip every page
+              // below it — leaving those pages missing from the wiped
+              // repository while the completeness check still passes.
+              bootstrapCursor: null,
             },
           },
           { upsert: true },
