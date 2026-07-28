@@ -114,7 +114,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: PageLinkService_
   - _Depends: B1.5_
 
-- [ ] B1.7 Implement the permission-filtered read query — findBacklinks only
+- [x] B1.7 Implement the permission-filtered read query — findBacklinks only
   - Implement `findBacklinks` (sources pointing at a page, filtered to readable, non-trashed pages
     via the shared viewer/grant filter, mapped to `IBacklink`)
   - Never return unfiltered paths; any count is derived only from the filtered set
@@ -125,7 +125,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: PageLinkService_
   - _Depends: B1.2_
 
-- [ ] B1.8 Add the backlinks read endpoint
+- [x] B1.8 Add the backlinks read endpoint
   - Add an authenticated apiv3 GET route that validates a page id, resolves the viewer from the
     request, and returns the permission-filtered backlinks for that page
   - Done when the endpoint returns backlinks for a readable page and 400/403 for invalid id /
@@ -134,7 +134,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: get-page-backlinks route_
   - _Depends: B1.7_
 
-- [ ] B1.9 Add the client data hook
+- [x] B1.9 Add the client data hook
   - Add an SWR hook keyed by page id (and guest state) that fetches from the backlinks endpoint and
     returns the backlink list
   - Done when the hook returns data for a page and revalidates when the page id changes
@@ -142,7 +142,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: useSWRxBacklinks_
   - _Depends: B1.8_
 
-- [ ] B1.10 Build the backlink list-item component — title + path only
+- [x] B1.10 Build the backlink list-item component — title + path only
   - Build a presentational row showing a linked page's title and path (reusing existing page-path
     label components)
   - **B1 scope:** skip the trashed/broken target-state badge (B5.5)
@@ -151,7 +151,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: BacklinkListItem_
   - _Depends: B1.1_
 
-- [ ] B1.11 Build the backlinks panel — incoming list + empty state
+- [x] B1.11 Build the backlinks panel — incoming list + empty state
   - Build the panel that lists incoming links via the hook and renders an explicit empty state when
     there are none
   - **B1 scope:** skip the secondary "outgoing links needing attention" forward-health section (B5.6)
@@ -171,21 +171,21 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Boundary: crowi setup, PageLinkService_
   - _Depends: B1.6_
 
-- [ ] B1.13 Register the backlinks endpoint
+- [x] B1.13 Register the backlinks endpoint
   - Register the read route in the apiv3 router
   - Done when the endpoint is reachable over HTTP and returns backlinks for a seeded page
   - _Requirements: 1.1_
   - _Boundary: apiv3 router_
   - _Depends: B1.8 (independent of B1.12)_
 
-- [ ] B1.14 Add the Backlinks tab to the page accessories UI
+- [x] B1.14 Add the Backlinks tab to the page accessories UI
   - Add a Backlinks entry to the page-accessories tab mapping that renders the panel
   - Done when opening the tab on a page displays the backlinks panel
   - _Requirements: 1.1_
   - _Boundary: PageAccessoriesModal_
   - _Depends: B1.11_
 
-- [ ] B1.15 Integration tests (B1 slice)
+- [x] B1.15 Integration tests (B1 slice)
   - Cover: create/update add and remove backlinks; backlinks exclude pages the viewer cannot read and
     reflect grant changes; a source linking B→A more than once is listed once; a page linking to its
     own permalink is excluded from its own backlinks
@@ -194,7 +194,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - _Requirements: 1.6, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2_
   - _Depends: B1.12, B1.13_
 
-- [ ] B1.16 E2E test for the backlinks panel (B1 slice)
+- [x] B1.16 E2E test for the backlinks panel (B1 slice)
   - Verify the Backlinks tab lists linking pages with title + path, and shows the empty state when
     none exist
   - **B1 scope:** skip trashed/deleted-target-indicator assertions (B5.8)

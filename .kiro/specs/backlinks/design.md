@@ -64,7 +64,9 @@ by Mongoose `autoIndex` at model registration (new collection — no migration n
 
 - Emitting page-lifecycle events, and the page create/update/delete/rename logic itself
   (consumed read-only via `crowi.events.page`).
-- The grant/permission model and its condition generator (consumed via `findByIdsAndViewer`).
+- The grant/permission model and its condition generator (consumed via the shared viewer/grant
+  filter — `PageQueryBuilder.addViewerCondition` / `generateGrantCondition`, as `findByIdsAndViewer`
+  also does).
 - Markdown/wiki-link parsing and link resolution rules (consumed via existing remark/rehype
   plugins; no syntax owned here).
 - `PageRedirect` creation/cleanup (consumed read-only via `retrievePageRedirectEndpoints`).
@@ -77,7 +79,8 @@ by Mongoose `autoIndex` at model registration (new collection — no migration n
   recognize absolute URLs that point back to this wiki (may be `undefined`).
 - Renderer plugins: `pukiwiki-like-linker`, `relative-links`,
   `relative-links-by-pukiwiki-like-linker`, and `generateCommonOptions`'s plugin set.
-- Mongoose models: `Page` (`findByPath`, `findByIdsAndViewer`), `Revision`, `PageRedirect`.
+- Mongoose models: `Page` (`findByPath`, `PageQueryBuilder.addViewerCondition` /
+  `addConditionToExcludeTrashed`), `Revision`, `PageRedirect`.
 - `crowi.events.page` (subscribe only), apiv3 middleware (`accessTokenParser`, `loginRequired`),
   `getModelSafely` + `createBatchStream`, `CronService` (node-cron base) and the
   admin Socket.IO channel for backfill scheduling/progress (mirroring the page-bulk-export job).
@@ -90,7 +93,8 @@ Re-check this feature if any of the following change:
 
 - `crowi.events.page` event names or payload shapes (esp. `delete`, `deleteCompletely`,
   `syncDescendantsDelete`).
-- `Page.findByIdsAndViewer` / `generateGrantCondition` signatures or semantics.
+- `PageQueryBuilder.addViewerCondition` / `addConditionToExcludeTrashed` / `generateGrantCondition`
+  (and `Page.findByIdsAndViewer`) signatures or semantics.
 - The remark/rehype link-resolution plugins' resolution rules or `pagePath` injection.
 - `PageRedirect.retrievePageRedirectEndpoints` contract.
 - `normalizePath` / `isCreatablePage` behavior.
@@ -111,8 +115,9 @@ Re-check this feature if any of the following change:
   the index faithful to what the renderer shows and avoids a divergent parser.
 - **Event bus is the integration seam** — `search.ts` already subscribes to `crowi.events.page`;
   backlinks follows that precedent, so `PageService` is not modified.
-- **Grant filtering is centralized** — `findByIdsAndViewer` is the only correct place to enforce
-  visibility; the read path must route through it.
+- **Grant filtering is centralized** — the shared viewer/grant filter (`addViewerCondition` /
+  `generateGrantCondition`, as also applied by `findByIdsAndViewer`) is the only correct place to
+  enforce visibility; the read path must route through it.
 
 ### Architecture Pattern & Boundary Map
 
@@ -122,7 +127,7 @@ graph TB
         PageSvc[PageService]
         Bus[crowi events page]
         Render[remark rehype link plugins]
-        Grant[Page findByIdsAndViewer]
+        Grant[Page viewer grant filter]
         Redirect[PageRedirect endpoints]
         Rev[Revision]
     end
@@ -246,7 +251,7 @@ sequenceDiagram
     participant UI as BacklinksPanel
     participant API as backlinks route
     participant DB as PageLink
-    participant Grant as findByIdsAndViewer
+    participant Grant as viewer grant filter
 
     UI->>API: GET backlinks pageId
     API->>DB: find toPage == pageId -> fromPage ids
@@ -284,8 +289,8 @@ needs no write — derived state reads the restored page's status.
 | 1.9 | Permalink (`/{id}`) link targets page by id | extractInternalLinks (verbatim) + resolveToPage permalink branch | Save flow |
 | 1.10 | Same-host absolute URL → internal | extractInternalLinks classifier (`app:siteUrl` host match) | — |
 | 1.11 | Unset `app:siteUrl` → absolute URLs not internal | extractInternalLinks classifier (no base origin) | — |
-| 2.1 | Only readable linking pages | findBacklinks → findByIdsAndViewer | Read flow |
-| 2.2 | Unreadable omitted from list and count | findByIdsAndViewer (post-filter ids) | Read flow |
+| 2.1 | Only readable linking pages | findBacklinks → addViewerCondition (shared grant filter) | Read flow |
+| 2.2 | Unreadable omitted from list and count | addViewerCondition + addConditionToExcludeTrashed (filter ids in-query) | Read flow |
 | 2.3 | No leak of title/path/existence | DTO built only from filtered pages | Read flow |
 | 2.4 | Grant change reflected | per-request filtering (no cached list) | Read flow |
 | 3.1 | Create → backlinks appear | PageLinkService create handler | Save flow |
@@ -312,7 +317,7 @@ needs no write — derived state reads the restored page's status.
 | PageLink model | Data | Persist directed link edges | 1.5,3.x,4.3 | Mongoose, getOrCreateModel (P0) | State |
 | extractInternalLinks | Server logic | Body+path+siteUrl → resolved internal paths | 1.2–1.6, 1.10, 1.11 | render plugins, isCreatablePage, normalizePath, isPermalink, app:siteUrl (P0) | Service |
 | resolveToPage | Server logic | toPath → toPage id (incl. permalink by id) | 1.9, 5.x | Page.findById/findByPath, PageRedirect, isPermalink (P0) | Service |
-| PageLinkService | Server service | Subscribe to events, sync index, query backlinks | 1.1,2.x,3.x,5,6 | events.page (P0), findByIdsAndViewer (P0) | Service, Event |
+| PageLinkService | Server service | Subscribe to events, sync index, query backlinks | 1.1,2.x,3.x,5,6 | events.page (P0), PageQueryBuilder.addViewerCondition (P0) | Service, Event |
 | get-page-backlinks route | API | Read endpoint | 1.1,1.7,2.x,6.4 | apiv3 middleware (P0), PageLinkService (P0) | API |
 | useSWRxBacklinks | Client store | Fetch backlinks | 1.1 | apiv3Get (P0) | Service |
 | BacklinksPanel / BacklinkListItem | UI | Render list, empty state, target-state badge | 1.1,1.7,1.8,6.4 | useSWRxBacklinks, PageListItemS (P1) | — |
@@ -428,7 +433,8 @@ function resolveToPage(toPath: string): Promise<ObjectId | null>;
 **Dependencies**
 - Inbound: `crowi.events.page` events (P0).
 - Outbound: `extractInternalLinks`, `resolveToPage`, `PageLink` model,
-  `Page.findByIdsAndViewer` (P0); `Revision` to read body when payload lacks it (P1).
+  `PageQueryBuilder.addViewerCondition` + `addConditionToExcludeTrashed` (P0); `Revision` to read
+  body when payload lacks it (P1).
 
 **Contracts**: Service [x] / Event [x]
 
@@ -467,9 +473,14 @@ interface IBacklinkResult { backlinks: IBacklink[]; }
 findBacklinks(toPageId: ObjectId, user: IUser | null): Promise<IBacklink[]>;
 findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTarget[]>;
 ```
-- `findBacklinks`: `findBacklinkSources(toPageId)` → ids → `findByIdsAndViewer` with the user's
-  groups, **excluding trashed source pages** → map to `IBacklink` (2.1–2.3). Empty array
-  when none (1.7).
+- `findBacklinks`: `findBacklinkSources(toPageId)` → ids → route them through the shared
+  viewer/grant filter (`PageQueryBuilder.addViewerCondition` — the same grant logic
+  `findByIdsAndViewer` runs internally, unioning the viewer's normal and external user groups) with
+  `addConditionToExcludeTrashed` to **exclude trashed source pages in-query**, then `.select('_id path').lean()`
+  and map to `IBacklink` (2.1–2.3). Empty array when none (1.7). The builder is used directly rather
+  than the `findByIdsAndViewer` static so trashed exclusion happens in the DB (see risk note below)
+  and so only the two fields the DTO needs are hydrated — this keeps the read to the two indexed
+  queries described under Performance & Scalability.
 - `findForwardLinkHealth`: rows where `fromPage == X`; derive each target's
   `LinkTargetState` (`toPage == null` → `broken`; target trashed → `trashed`; else `normal`);
   return the `trashed`/`broken` rows as `ILinkTarget` for the editor's attention (6.4).
@@ -483,7 +494,9 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTa
 - Self-link exclusion (1.6): extraction drops a **path** self-link (`toPath == normalizePath(page.path)`);
   a **permalink** self-link (`/{own _id}`) is dropped at sync by skipping any resolved row whose
   `toPage` equals `fromPage` — this also covers any alias that resolves back to the source.
-- Risks: confirm `findByIdsAndViewer` excludes trashed sources; if not, add a status filter.
+- Resolved risk: `findByIdsAndViewer` / `addViewerCondition` apply only the grant condition and do
+  **not** exclude trashed pages, so `findBacklinks` adds `addConditionToExcludeTrashed` explicitly
+  (`status` published/null, excluding `deleted`) rather than relying on the viewer filter.
 
 ### API
 
@@ -667,10 +680,11 @@ interface ILinkTarget {
 
 ## Security Considerations
 
-- The only data-exposure surface is `findBacklinks`; it **must** route ids through
-  `findByIdsAndViewer` (never return raw `PageLink` paths). `toPath` strings are page paths and
-  could reveal restricted pages' existence if returned unfiltered — so the DTO is built solely
-  from permission-filtered page documents.
+- The only data-exposure surface is `findBacklinks`; it **must** route the source ids through the
+  shared viewer/grant filter (`PageQueryBuilder.addViewerCondition`, the same filter
+  `findByIdsAndViewer` applies) and **never return raw `PageLink` paths**. `toPath` strings are page
+  paths and could reveal restricted pages' existence if returned unfiltered — so the DTO is built
+  solely from permission-filtered page documents (only their `_id`/`path` are read).
 - `pageId` is validated as a MongoId; no regex is built from user input for MongoDB.
 
 ## Performance & Scalability
