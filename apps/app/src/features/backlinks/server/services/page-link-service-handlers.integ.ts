@@ -1,11 +1,15 @@
 import { Types } from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
-import type { PageDocument } from '~/server/models/page';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import PageModelFactory from '~/server/models/page';
 import { Revision } from '~/server/models/revision';
 
 import PageLink from '../models/page-link';
-import { handlePageUpsert } from './page-link-service-handlers';
+import {
+  handlePageUpsert,
+  handlePageUpsertById,
+} from './page-link-service-handlers';
 
 // resolveToPages has its own coverage (target-page-resolution.spec.ts); mock it so this test
 // isolates the handler's contract against the real PageLink collection.
@@ -143,5 +147,105 @@ describe('handlePageUpsert (integration)', () => {
     await handlePageUpsert(pageWithBody('/from', 'no links here'), siteUrl);
 
     expect(await outboundRows()).toEqual([]);
+  });
+});
+
+/*
+ * B2.2 — the coalescing queue holds ids, so the drain entry point loads the page itself.
+ * Contract: the body is read from the database at drain time, and a page that no longer exists
+ * produces no rows.
+ */
+describe('handlePageUpsertById (integration)', () => {
+  const PREFIX = '/backlinks-upsert-by-id-test';
+  const siteUrl = 'https://wiki.example';
+  const idByPath = new Map<string, Types.ObjectId>();
+  const createdPageIds: Types.ObjectId[] = [];
+
+  let Page: PageModel;
+
+  beforeAll(() => {
+    // The Page model is registered by its factory rather than on import; the schema does not
+    // need a crowi instance here.
+    Page = PageModelFactory(null);
+  });
+
+  afterEach(async () => {
+    await PageLink.deleteMany({ fromPage: { $in: createdPageIds } });
+    await Page.deleteMany({ _id: { $in: createdPageIds } });
+    await Revision.deleteMany({ pageId: { $in: createdPageIds } });
+    createdPageIds.length = 0;
+  });
+
+  beforeEach(() => {
+    idByPath.clear();
+    mocks.resolveToPages.mockImplementation((paths: string[]) => {
+      const result = new Map<string, Types.ObjectId>();
+      for (const path of paths) {
+        const id = idByPath.get(path);
+        if (id != null) result.set(path, id);
+      }
+      return Promise.resolve(result);
+    });
+  });
+
+  // The id is minted here rather than read back off the document so it is known to be defined.
+  const createPage = async (
+    path: string,
+    body: string,
+  ): Promise<Types.ObjectId> => {
+    const pageId = new Types.ObjectId();
+    await Page.create({ _id: pageId, path: `${PREFIX}${path}`, grant: 1 });
+    createdPageIds.push(pageId);
+    await setRevision(pageId, body);
+    return pageId;
+  };
+
+  const setRevision = async (
+    pageId: Types.ObjectId,
+    body: string,
+  ): Promise<void> => {
+    const revision = await Revision.create({ pageId, body });
+    await Page.updateOne({ _id: pageId }, { $set: { revision: revision._id } });
+  };
+
+  const outboundRowsOf = (pageId: Types.ObjectId) =>
+    PageLink.find({ fromPage: pageId }).select('toPath toPage -_id').lean();
+
+  it('extracts from the body stored in the database for the given page id', async () => {
+    const targetId = new Types.ObjectId();
+    idByPath.set('/docs/target', targetId);
+    const pageId = await createPage('/from', '[docs](/docs/target)');
+
+    await handlePageUpsertById(pageId.toString(), siteUrl);
+
+    expect(await outboundRowsOf(pageId)).toEqual([
+      { toPath: '/docs/target', toPage: targetId },
+    ]);
+  });
+
+  it('picks up the latest body when the page was saved again after being queued', async () => {
+    idByPath.set('/a', new Types.ObjectId());
+    const bId = new Types.ObjectId();
+    idByPath.set('/b', bId);
+    const pageId = await createPage('/from', '[a](/a)');
+
+    // A later save replaces the revision while the id sits in the queue; the drain must see it.
+    await setRevision(pageId, '[b](/b)');
+
+    await handlePageUpsertById(pageId.toString(), siteUrl);
+
+    expect(await outboundRowsOf(pageId)).toEqual([
+      { toPath: '/b', toPage: bId },
+    ]);
+  });
+
+  it('creates no rows for a page that no longer exists', async () => {
+    const goneId = new Types.ObjectId();
+    idByPath.set('/a', new Types.ObjectId());
+
+    await handlePageUpsertById(goneId.toString(), siteUrl);
+
+    // A stale queue entry for a deleted source must not leave orphan rows behind.
+    expect(await PageLink.find({ fromPage: goneId }).lean()).toEqual([]);
   });
 });
