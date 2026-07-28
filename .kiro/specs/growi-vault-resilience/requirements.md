@@ -176,7 +176,7 @@ GROWI Vault の現行 bootstrap 機構は「完了状態の信頼性」を保証
 3. When 別のインスタンスが bootstrap を実行中で、`bootstrapHeartbeatAt` が上記の時間内に更新されている場合, the GROWI Vault Resilience Layer shall その状態を書き換えず、進行中の処理を妨げない
 4. The GROWI Vault Resilience Layer shall 上記の判断を 1 つの純関数にまとめ、起動時の正規化と `getStatus()` の両方が同じ関数を使う（「実行が途絶えた」の定義が 2 か所に分かれて食い違わないようにする）
 5. The GROWI Vault Resilience Layer shall その判断の結果と `bootstrapHeartbeatAt` を `getStatus()` および `GET /_api/v3/vault/status` の応答に含める（`VAULT_BOOTSTRAP_HEARTBEAT_STALE_MS` はサーバ側の設定値なので、時刻から同じ判断を組み立てる処理を client 側に持たせない）
-6. When `bootstrapState` が `running` / `verifying` で、かつその bootstrap の実行が途絶えている場合, the GROWI Vault Resilience Layer shall admin UI の再構築ボタンを押せる状態にし、あわせて「進捗が報告されていないので押せるようにしている」旨を画面に表示する（要件 5 の表示項目に追加する。状態が `running` と表示されたままデータを消すボタンが押せる理由を、運用者が読んで分かるようにする）
+6. When `bootstrapState` が `running` / `verifying` で、かつその bootstrap の実行が途絶えている場合, the GROWI Vault Resilience Layer shall admin UI の再構築ボタンを押せる状態にし、あわせて「進捗が報告されていないので押せるようにしている」旨を画面に表示する（要件 5 の表示項目に追加する。状態が `running` と表示されたまま破壊的な操作のボタンが押せる理由を、運用者が読んで分かるようにする）
 7. While `running` / `verifying` の bootstrap が実際に動いている（`bootstrapHeartbeatAt` が上記の時間内に更新されている）場合, the GROWI Vault Resilience Layer shall admin UI の再構築ボタンを従来どおり押せないままにする
 8. When 起動時の正規化が `failed` を書き込む場合, the GROWI Vault Resilience Layer shall `bootstrapCursor` をそのまま残す（wipe を伴わない bootstrap では、まだ有効な再開位置である。wipe の側は基準 9 で開始時に消す）
 9. When VaultBootstrapper が全 wipe を伴う bootstrap を開始する場合, the GROWI Vault Resilience Layer shall 状態を `running` に変える更新と同じ更新で、DB に保存された `bootstrapCursor` を null にする（メモリ上の変数だけで cursor を無視する作りでは、最初のページを処理する前に落ちたときに前回の cursor が残ってしまい、要件 2 が解消したはずの「cursor より前のページが永久に取り込まれない」状態が再発する）

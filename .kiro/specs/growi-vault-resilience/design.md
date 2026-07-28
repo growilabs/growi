@@ -1025,9 +1025,9 @@ barrel（`resilience/index.ts`。この配下のモジュールを外部へ公�
 
 判断はサーバ側で行い、結論だけを `GET /_api/v3/vault/status` に載せる（要件 7.5）。「古い」と判断する時間はサーバの設定値なので、client 側が `heartbeatAt` から同じ判断を組み立てる作りにすると、設定を変えても UI に伝わらず、判断基準が 2 か所に分かれてしまう。
 
-admin UI は再構築ボタンを押せるかどうかを `isStaleRunner` に従わせ、実行が途絶えているときは押せるようにする。あわせて警告文を表示する（要件 7.6）。状態が `running` と表示されたままデータを消すボタンが押せると、運用者には UI の不具合に見えて押せないため、「進捗が報告されていないので押せるようにしている」ことを文章で示す。文言は `growi-vault.admin-settings.kill-switch.abandoned-run-notice`（en_US / ja_JP）。
+admin UI は再構築ボタンを押せるかどうかを `isStaleRunner` に従わせ、実行が途絶えているときは押せるようにする。あわせて警告文を表示する（要件 7.6）。状態が `running` と表示されたまま破壊的な操作のボタンが押せると、運用者には UI の不具合に見えて押せないため、「進捗が報告されていないので押せるようにしている」ことを文章で示す。文言は `growi-vault.admin-settings.kill-switch.abandoned-run-notice`（en_US / ja_JP）。
 
-ボタンを押した直後に画面側の状態を先に書き換える処理（optimistic update）では、`isStaleRunner: false` と現在時刻の `heartbeatAt` を入れる。押した直後は「たった今始まった bootstrap」なので、次のポーリングでサーバの判断が返るまでボタンを再び押せなくするのが正しい。
+楽観更新（optimistic update: ボタンを押した直後に画面側の状態を先に書き換える処理）では、`isStaleRunner: false` と現在時刻の `heartbeatAt` を入れる。押した直後は「たった今始まった bootstrap」なので、次のポーリングでサーバの判断が返るまでボタンを再び押せなくするのが正しい。
 
 ### Requirements Traceability（追補分）
 
