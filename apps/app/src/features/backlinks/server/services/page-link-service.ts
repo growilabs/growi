@@ -1,5 +1,5 @@
 import type { IUser } from '@growi/core';
-import type { HydratedDocument, Types } from 'mongoose';
+import type { Types } from 'mongoose';
 import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
@@ -46,9 +46,7 @@ export class PageLinkService {
     toPageId: Types.ObjectId,
     user: IUser | null,
   ): Promise<IBacklink[]> {
-    const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
-      'Page',
-    );
+    const Page = mongoose.model<PageDocument, PageModel>('Page');
     const backlinkIds = await PageLink.findBacklinkSources(toPageId);
 
     const builder = new PageQueryBuilder(
