@@ -11,9 +11,24 @@ export const BacklinksPanel = (): JSX.Element => {
   const { t } = useTranslation();
   const pageId = useCurrentPageId();
 
-  const { data: backlinks, isLoading } = useSWRxBacklinks(pageId ?? null);
+  const {
+    data: backlinks,
+    error,
+    isLoading,
+  } = useSWRxBacklinks(pageId ?? null);
 
-  if (isLoading || backlinks == null) {
+  if (error != null) {
+    return (
+      <div className="text-danger" data-testid="backlinks-error">
+        {t('backlinks.failed_to_fetch')}
+      </div>
+    );
+  }
+
+  // A null pageId (empty / not-found page) gives the hook a null key, so nothing
+  // is ever fetched -- skip the spinner and fall through to the empty state,
+  // otherwise it would spin forever.
+  if (pageId != null && (isLoading || backlinks == null)) {
     return (
       <div className="text-muted text-center" data-testid="backlinks-loading">
         <LoadingSpinner className="me-1 fs-3" />
@@ -21,7 +36,7 @@ export const BacklinksPanel = (): JSX.Element => {
     );
   }
 
-  if (backlinks.length === 0) {
+  if (backlinks == null || backlinks.length === 0) {
     return (
       <div className="text-muted" data-testid="backlinks-empty">
         {t('backlinks.no_backlinks')}

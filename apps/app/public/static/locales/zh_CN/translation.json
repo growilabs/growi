@@ -1,5 +1,6 @@
 {
   "backlinks": {
+    "failed_to_fetch": "获取反向链接失败。",
     "no_backlinks": "尚无反向链接。",
     "panel": "反向链接"
   },

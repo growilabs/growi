@@ -27,6 +27,17 @@ const wrapper = ({ children }: { children: ReactNode }): JSX.Element => (
   </SWRConfig>
 );
 
+// A cache shared across renders/mounts, so an extra fetch can only come from a
+// changed cache key or a real revalidation -- never from a cold cache.
+const createSharedCacheWrapper = () => {
+  const sharedCache = new Map();
+  return ({ children }: { children: ReactNode }): JSX.Element => (
+    <SWRConfig value={{ provider: () => sharedCache, dedupingInterval: 0 }}>
+      {children}
+    </SWRConfig>
+  );
+};
+
 describe('useSWRxBacklinks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -61,16 +72,7 @@ describe('useSWRxBacklinks', () => {
   it('revalidates when the page id changes', async () => {
     // Arrange: a SHARED cache across renders so a second fetch can only happen
     // if the cache key actually changed with the page id.
-    const sharedCache = new Map();
-    const sharedWrapper = ({
-      children,
-    }: {
-      children: ReactNode;
-    }): JSX.Element => (
-      <SWRConfig value={{ provider: () => sharedCache, dedupingInterval: 0 }}>
-        {children}
-      </SWRConfig>
-    );
+    const sharedWrapper = createSharedCacheWrapper();
     mockApiv3Get.mockResolvedValue({ data: { backlinks: [] } });
 
     // Act
@@ -91,16 +93,7 @@ describe('useSWRxBacklinks', () => {
 
   it('separates the cache by guest state (refetches after login)', async () => {
     // Arrange: shared cache; only a changed key can cause a second fetch.
-    const sharedCache = new Map();
-    const sharedWrapper = ({
-      children,
-    }: {
-      children: ReactNode;
-    }): JSX.Element => (
-      <SWRConfig value={{ provider: () => sharedCache, dedupingInterval: 0 }}>
-        {children}
-      </SWRConfig>
-    );
+    const sharedWrapper = createSharedCacheWrapper();
     mockApiv3Get.mockResolvedValue({ data: { backlinks: [] } });
 
     vi.mocked(useIsGuestUser).mockReturnValue(true);
@@ -114,6 +107,25 @@ describe('useSWRxBacklinks', () => {
     rerender();
 
     // Assert
+    await waitFor(() => expect(mockApiv3Get).toHaveBeenCalledTimes(2));
+  });
+
+  it('revalidates a warm cache on remount, so a reopened panel reads fresh data', async () => {
+    // Arrange: warm the shared cache with a first mount
+    const sharedWrapper = createSharedCacheWrapper();
+    mockApiv3Get.mockResolvedValue({ data: { backlinks: [] } });
+
+    const first = renderHook(() => useSWRxBacklinks('page-1'), {
+      wrapper: sharedWrapper,
+    });
+    await waitFor(() => expect(mockApiv3Get).toHaveBeenCalledTimes(1));
+    first.unmount();
+
+    // Act: remount with the SAME key, as when the panel is closed and reopened
+    renderHook(() => useSWRxBacklinks('page-1'), { wrapper: sharedWrapper });
+
+    // Assert: the cached list is revalidated rather than served for the rest of
+    // the session -- backlinks depend on grants that can change server-side
     await waitFor(() => expect(mockApiv3Get).toHaveBeenCalledTimes(2));
   });
 });
