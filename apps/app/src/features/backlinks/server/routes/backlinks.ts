@@ -18,6 +18,8 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
   return async (req: CrowiRequest, res: ApiV3Response) => {
     const { pageId } = req.query;
 
+    // Guard needed for TypeScript type narrowing.
+    // pageId is already validated and is always a string here.
     if (typeof pageId !== 'string') {
       return res.apiv3Err('pageId must be a string', 400);
     }
