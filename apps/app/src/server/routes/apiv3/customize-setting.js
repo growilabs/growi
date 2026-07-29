@@ -599,9 +599,11 @@ export const setup = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]),
     loginRequiredStrictly,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.sidebar,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const requestParams = {
         'customize:isSidebarCollapsedMode': req.body.isSidebarCollapsedMode,

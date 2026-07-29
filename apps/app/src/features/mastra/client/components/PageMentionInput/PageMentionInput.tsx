@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import { useRouter } from 'next/router';
 import { defaultKeymap } from '@codemirror/commands';
 import { Compartment, EditorState } from '@codemirror/state';
@@ -26,6 +33,7 @@ import type {
   MentionController,
   MentionData,
   MentionSessionState,
+  PageMentionInputHandle,
   PageMentionInputProps,
 } from './types';
 import { useMentionController } from './use-mention-controller';
@@ -78,11 +86,10 @@ const contentDataSlot = EditorView.contentAttributes.of({
  * flattened text through a hidden `input[name="message"]` so the existing
  * `formData.get('message')` submit path reads it (Requirement 6.1).
  */
-export const PageMentionInput = ({
-  value,
-  onChange,
-  placeholder,
-}: PageMentionInputProps): JSX.Element => {
+export const PageMentionInput = forwardRef<
+  PageMentionInputHandle,
+  PageMentionInputProps
+>(({ value, onChange, placeholder }, ref): JSX.Element => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
@@ -113,6 +120,17 @@ export const PageMentionInput = ({
   // Mirror of `flattened` for synchronous comparison inside the update listener
   // (state reads inside a CM callback would be stale within the same tick).
   const flattenedRef = useRef('');
+
+  // Imperative focus for hosts that hand the caret over on their own timing
+  // (the chat sidebar focuses the input as soon as it opens). Reads the ref at
+  // call time, so it stays correct across view re-creation.
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => viewRef.current?.focus(),
+    }),
+    [],
+  );
 
   const controller = useMentionController(view, session);
 
@@ -274,4 +292,6 @@ export const PageMentionInput = ({
       <MentionCandidateList controller={controller} />
     </div>
   );
-};
+});
+
+PageMentionInput.displayName = 'PageMentionInput';

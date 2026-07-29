@@ -1,5 +1,5 @@
 /**
- * Import extension guard lint tool (C3, esm-import-convention task 6).
+ * Import extension guard lint tool.
  *
  * Detects relative (./  ../) and ~/alias specifiers that contain .js or .jsx
  * extensions, which violate the canonical "no-extension" import convention.

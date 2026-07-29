@@ -380,9 +380,11 @@ export const setup = (crowi) => {
     }),
     loginRequiredStrictly,
     excludeReadOnlyUser,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.retrieveAddAttachment,
     apiV3FormValidator,
-    addActivity,
     // Removed autoReap middleware to use file data in asynchronous processes. Instead, implemented file deletion after asynchronous processes complete
     async (req, res) => {
       const pageId = req.body.page_id;

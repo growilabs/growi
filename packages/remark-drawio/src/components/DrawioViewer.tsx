@@ -14,6 +14,7 @@ import { debounce } from 'throttle-debounce';
 import type { IGraphViewerGlobal } from '../index.js';
 import { generateMxgraphData } from '../utils/embed.js';
 import { isGraphViewerGlobal } from '../utils/global.js';
+import { shouldRerenderOnResize } from './should-rerender-on-resize.js';
 
 import styles from './DrawioViewer.module.scss';
 
@@ -170,8 +171,20 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
       return;
     }
 
+    // Re-rendering recreates the viewer and resets a multi-page diagram to its
+    // first page, so only react to width changes (external layout changes).
+    // The viewer's own page navigation resizes the diagram vertically while the
+    // block width stays fixed, and must not trigger a re-render.
+    let lastWidth: number | undefined;
+
     const observer = new ResizeObserver((entries) => {
-      for (const _entry of entries) {
+      for (const entry of entries) {
+        const width = entry.contentRect.width;
+        if (!shouldRerenderOnResize(lastWidth, width)) {
+          continue;
+        }
+        lastWidth = width;
+
         onRenderingStart?.();
         // Signal re-rendering in progress so the auto-scroll system can detect the upcoming layout shift
         drawioContainerRef.current?.setAttribute(

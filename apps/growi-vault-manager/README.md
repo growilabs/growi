@@ -6,9 +6,11 @@ Exports GROWI pages to a git repository (vault) in Markdown format.
 
 ## Path-to-Filename Mapping Rules
 
-`VaultPathMapper` converts a GROWI page path into a deterministic git-tree file path. The same `(pagePath, pageId)` pair always produces the same file path, so the vault can reconstruct any file path from a page record without a reverse-index collection.
+`VaultPathMapper` converts a GROWI page path into a deterministic git-tree file path. The same page path always produces the same file path, so the vault can reconstruct any file path from a page record without a reverse-index collection. The last two rules below (case collision and length) are applied per vault view when the view's tree is composed, because whether a name collides depends on which pages the view contains.
 
 These rules are versioned (v1) and are **immutable after the first release**.
+
+> The length rule was added in v1.0.1 ([#11596](https://github.com/growilabs/growi/issues/11596)). It leaves every name that already fitted in 255 bytes byte-for-byte unchanged, so an existing clone only sees the names that no client could check out before. Lowering the 255-byte budget later would rename names that work today, and is therefore treated as a breaking change.
 
 ### Encoding rules (applied in order)
 
@@ -18,26 +20,30 @@ These rules are versioned (v1) and are **immutable after the first release**.
 | Control characters | U+0000–U+001F or U+007F (DEL) appear in a segment | Percent-encode each character |
 | Leading / trailing spaces | Segment starts or ends with a space | Percent-encode the space (`%20`) |
 | Windows reserved filename | Segment stem matches `CON`, `PRN`, `AUX`, `NUL`, `COM0-9`, `LPT0-9` (case-insensitive) | Prepend `_` to the segment (e.g. `CON` → `_CON`) |
-| Case collision (collision-only) | Two or more page paths in the same vault view differ only in case within the same directory (e.g. `/Foo` and `/foo` both exist) | Append `__<pageId[0..7]>` suffix to the **last** filename component before the `.md` extension for **each colliding path** |
+| Case collision (collision-only) | Two or more page paths in the same vault view differ only in case within the same directory (e.g. `/Foo` and `/foo` both exist) | Append `__<hash8>` suffix to the **last** filename component before the `.md` extension for **each colliding path**, where `hash8` is the first 8 characters of `sha1(<file path before the suffix>)` |
+| Name longer than 255 bytes (length-only) | A filename component is longer than 255 UTF-8 bytes — the per-component limit on ext4 / APFS. A Japanese page title reaches it at 85 characters | Shorten the component (cutting only on character boundaries) and append the same `__<hash8>` suffix, so that the whole name fits in 255 bytes |
 | Orphan pages | Path is `/trash` or starts with `/trash/` | Prefix the entire relative path with `_orphaned/` |
 | Extension | All pages | Append `.md` to the final filename component |
 
 > **Case collision is reactive**: the suffix is added only when a collision actually exists and disappears automatically if the collision resolves (e.g. one of the conflicting pages is deleted or its access grant changes).
 
+> **Shortening applies to the finished name**: the 255-byte budget is checked against the name *including* its suffix and extension, because the 10-byte `__<hash8>` can by itself push a name that would otherwise fit over the limit. A name that already fits is never rewritten. Two shortened names that begin with the same characters stay distinct, because their hashes are taken from their full (pre-shortening) paths.
+
 ### Examples
 
-| GROWI page path | Condition | pageId (first 8 chars) | Resulting file path |
-|----------------|-----------|------------------------|---------------------|
-| `/normal/page` | — | *(any)* | `normal/page.md` |
-| `/Sandbox/Markdown` | no collision | *(any)* | `Sandbox/Markdown.md` |
-| `/Sandbox` | no collision; has child pages | *(any)* | `Sandbox.md` (folder `Sandbox/` coexists) |
-| `/Foo` | `/Foo` and `/foo` both exist in same view | `507f1f77` | `Foo__507f1f77.md` |
-| `/foo` | `/Foo` and `/foo` both exist in same view | `a1b2c3d4` | `foo__a1b2c3d4.md` |
-| `/CON/notes` | — | *(any)* | `_CON/notes.md` |
-| `/page<name` | *(any, lowercase)* | *(any)* | `page%3Cname.md` |
-| `/page*name` | *(any, lowercase)* | *(any)* | `page%2Aname.md` |
-| `/trash/old-page` | — | *(any)* | `_orphaned/trash/old-page.md` |
-| `/trash/A/B` | no collision | *(any)* | `_orphaned/trash/A/B.md` |
+| GROWI page path | Condition | Resulting file path |
+|----------------|-----------|---------------------|
+| `/normal/page` | — | `normal/page.md` |
+| `/Sandbox/Markdown` | no collision | `Sandbox/Markdown.md` |
+| `/Sandbox` | no collision; has child pages | `Sandbox.md` (folder `Sandbox/` coexists) |
+| `/Foo` | `/Foo` and `/foo` both exist in same view | `Foo__daf05ac8.md` (`daf05ac8` = `sha1('Foo.md')[0..7]`) |
+| `/foo` | `/Foo` and `/foo` both exist in same view | `foo__3f9791a2.md` (`3f9791a2` = `sha1('foo.md')[0..7]`) |
+| `/ああ…あ` (85 Japanese characters) | name would be 258 bytes | `ああ…あ__17e5a70f.md` — first 80 characters kept (240 bytes), 253 bytes in total |
+| `/CON/notes` | — | `_CON/notes.md` |
+| `/page<name` | — | `page%3Cname.md` |
+| `/page*name` | — | `page%2Aname.md` |
+| `/trash/old-page` | — | `_orphaned/trash/old-page.md` |
+| `/trash/A/B` | no collision | `_orphaned/trash/A/B.md` |
 
 > **Note on `/`**: The forward-slash is GROWI's path separator and is split into segments before encoding. A literal `/` that appears inside a segment would be encoded as `%2F`, but GROWI path semantics make this impossible in practice.
 
@@ -45,7 +51,7 @@ These rules are versioned (v1) and are **immutable after the first release**.
 
 ### `mapPrefix` (directory prefix variant)
 
-`mapPrefix(pagePath)` applies the same segment encoding and reserved-name prefixing but does **not** append `.md` and does **not** add the pageId suffix. It is used for rename-prefix and grant-change-prefix instructions where only the directory portion matters.
+`mapPrefix(pagePath)` applies the same segment encoding and reserved-name prefixing but does **not** append `.md` and does **not** add the `__<hash8>` suffix. It is used for rename-prefix and grant-change-prefix instructions where only the directory portion matters.
 
 ---
 
@@ -75,6 +81,14 @@ The following items are **not supported** in the current MVP:
 - **Revision history before feature activation** — only revisions created after the vault feature is enabled are captured; pre-existing history is not back-filled.
 - **Drafts and unpublished pages** — only published pages are exported to the vault.
 
+### Known limitation: long paths on Windows
+
+Individual filenames are kept within 255 bytes (see the mapping rules above), but Windows additionally limits a **whole** path to 260 characters unless long paths are enabled. A deeply nested page tree can exceed that even when every single name is short, and `git checkout` aborts the entire operation on the first path it cannot create. Clients on Windows should enable long paths before cloning:
+
+```bash
+git config --global core.longpaths true
+```
+
 ---
 
 ## Docker image (DHI multi-stage build)
@@ -91,7 +105,7 @@ Highlights of the refactor:
 
 ### Cross-repository impact: `growi-docker-compose`
 
-The separate [`growi-docker-compose`](https://github.com/weseek/growi-docker-compose) repository may reference this `Dockerfile` (e.g. via an image-build target or a published image tag). When a new vault-manager image built from this refactored Dockerfile is published, the `growi-docker-compose` repository **must be checked separately** to confirm that its compose definitions still build / run against the new image. That cross-repository update is intentionally out of scope for this PR — it must land as a separate PR in `growi-docker-compose`.
+The separate [`growi-docker-compose`](https://github.com/growilabs/growi-docker-compose) repository consumes the published image, as an opt-in override in [`examples/growi-vault`](https://github.com/growilabs/growi-docker-compose/tree/master/examples/growi-vault). When the image is republished with a new major/minor, that override pins the tag and has to be updated there in a separate PR.
 
 ### CI compatibility: `.github/workflows/ci-vault.yml`
 

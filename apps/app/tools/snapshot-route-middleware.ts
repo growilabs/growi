@@ -1,11 +1,12 @@
 /**
- * Snapshot apiv3 route middleware chains for ESM migration Phase 0 baseline.
+ * Snapshot apiv3 route middleware chains (structural authorization baseline).
  *
  * This tool boots Crowi, walks `app._router.stack`, and records every leaf
  * route under the apiv3 mount point (`/_api/v3/**`) as
  * `{ method, path, middlewares: string[] }`. The output is written as a
- * deterministic JSON document so Phase 3.8.c can diff against the post-ESM
- * snapshot to detect authorization bypass regressions.
+ * deterministic JSON document so a re-capture after a refactor can be diffed
+ * against it to detect authorization bypass regressions. See the
+ * "Authorization Regression Check" section of the app-commands skill.
  *
  * Design notes:
  * - The walker FAILS if any apiv3 **middleware** (any layer before the route
@@ -23,8 +24,7 @@
  *   future ESM runners without refactoring.
  * - Metadata fields (`capturedAt`, `git`, `node`) are separated from the
  *   sortable `entries[]` payload so diffs remain byte-stable across reruns.
- *
- * Requirements covered: 2.6, 2.8
+ *   Only `entries[]` is signal; the metadata changes on every run.
  */
 
 import { execSync } from 'node:child_process';
@@ -34,8 +34,7 @@ import { dirname, resolve } from 'node:path';
 import Crowi from '../src/server/crowi';
 
 const APIV3_MOUNT_PREFIX = '/_api/v3';
-const DEFAULT_OUTPUT =
-  '.kiro/specs/esm-migration/route-middleware-baseline.json';
+const DEFAULT_OUTPUT = 'tools/authz-matrix/baselines/route-middleware.json';
 
 type RouteEntry = {
   method: string;

@@ -53,8 +53,8 @@ describe('consume-points.ts', async () => {
     // 10s (2x the 5s default): this test issues `maxRequests + 1` (=501)
     // sequential consumePoints round-trips to Mongo. It passed at ~3s before
     // the ESM runner switch; the regression is the dev runner's load cost, not
-    // this test (see esm-migration research.md §"dev runner bake-off"). Keep
-    // the bump modest — revert toward the default once the runner perf is fixed.
+    // this test. Keep the bump modest — revert toward the default once the
+    // runner perf is fixed.
   }, 10_000);
 
   it('Should trigger a rate limit error when maxRequest is exceeded (maxRequest: {random integer between 1 and 1000})', async () => {
