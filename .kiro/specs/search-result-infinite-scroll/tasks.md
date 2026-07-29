@@ -69,7 +69,7 @@
   - _Requirements: 5.1, 5.2, 5.3, 7.2_
 
 - [ ] 4. Integration: レガシー画面の非回帰対応
-- [ ] 4.1 (P) PrivateLegacyPages を新 SearchPageBase 契約へ追随
+- [x] 4.1 (P) PrivateLegacyPages を新 SearchPageBase 契約へ追随
   - 新プロップ（`resetKey` 等）に追随し、番号ページ遷移のたびに選択がリセットされる従来挙動を維持する（`resetKey` にページ位置を含める）
   - 一括削除には現在ページのデータを渡す
   - infinite scroll 未指定のため、番号ページャと表示件数セレクタが従来どおり動作する
@@ -106,3 +106,5 @@
 ## Implementation Notes
 - 2.4: SearchPageBase の error endingIndicator は `t('Retry')` を使うが `Retry` キーが locales(en_US/ja_JP) に未定義でリテラル "Retry" にフォールバックする。後続の 3.2（エラー再試行）で locales に `Retry` キー（日本語「再試行」等）を追加すること。`Error` キーは en_US に存在。
 - 2.4: error endingIndicator は InfiniteScroll が `isReachingEnd === true` の時のみ表示される。SearchPage(3.x) は design どおり `isReachingEnd = 累積>=total || hasError` として hasError を OR すること。
+- 4.1: レガシー(PrivateLegacyPages)は sort/order/filter を hard-disable(`isEnableSort/Filter={false}`)しているため resetKey は `keyword|offset|limit` で十分（sort/order 省略は非回帰）。
+- 4.1(横断課題・validate-impl で検討): resetKey 設計により、同一クエリの refetch（一括削除/convert 後の mutate）ではレガシーの選択 Set とプレビューが以前ほど自動リセットされない（旧 `[pages]` キーは refetch で reset していた）。design は legacy を「非回帰のみ担保」とし delete-reset を規定していない。SearchPage は明示 deselect 済み。レガシーにも同等の deselect を足すか、feature 検証で判断する。

@@ -387,7 +387,7 @@ const PrivateLegacyPages = (): JSX.Element => {
 
   // for bulk deletion
   const deleteAllButtonClickedHandler = usePageDeleteModalForBulkDeletion(
-    data,
+    data?.data,
     searchPageBaseRef,
     () => mutate(),
   );
@@ -565,11 +565,22 @@ const PrivateLegacyPages = (): JSX.Element => {
     );
   }, [conditions, data, pagingNumberChangedHandler]);
 
+  // Compose the SearchPageBase reset identity from the current search conditions,
+  // INCLUDING the page position (offset). SearchPageBase used to key selection/
+  // preview reset on `[pages]`, so legacy reset selection & moved the preview to
+  // the first item on every number-pager navigation. Including `offset` here
+  // reproduces that behavior exactly: resetKey changes per page → selection clears.
+  const resetKey = useMemo(
+    () => `${keyword}|${offset}|${limit}`,
+    [keyword, offset, limit],
+  );
+
   return (
     <>
       <SearchPageBase
         ref={searchPageBaseRef}
         pages={data?.data}
+        resetKey={resetKey}
         onSelectedPagesByCheckboxesChanged={
           selectedPagesByCheckboxesChangedHandler
         }
