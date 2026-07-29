@@ -50,9 +50,14 @@ export const handlePageUpsertById = async (
 ): Promise<void> => {
   const Page = mongoose.model<PageDocument, PageModel>('Page');
 
-  const page = await Page.findById(pageId).select('_id path revision');
+  const page = await Page.findById(pageId).select('_id path revision status');
   // Gone between the save and this drain: skip rather than re-create rows for a deleted source.
   if (page == null) return;
+  // A soft delete only rewrites path and status, so the check above does not catch it and a stale
+  // upsert would index a source now under /trash. Keyed on STATUS_DELETED rather than
+  // STATUS_PUBLISHED because a legacy page's null status means published. Clearing the rows such a
+  // page already owns is reconciliation (B5.2), not yet implemented.
+  if (page.status === Page.STATUS_DELETED) return;
 
   await handlePageUpsert(page, siteUrl);
 };

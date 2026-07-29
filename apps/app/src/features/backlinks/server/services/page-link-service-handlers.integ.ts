@@ -248,4 +248,36 @@ describe('handlePageUpsertById (integration)', () => {
     // A stale queue entry for a deleted source must not leave orphan rows behind.
     expect(await PageLink.find({ fromPage: goneId }).lean()).toEqual([]);
   });
+
+  it('creates no rows for a page trashed while it sat in the queue', async () => {
+    idByPath.set('/a', new Types.ObjectId());
+    const pageId = await createPage('/trashed-source', '[a](/a)');
+
+    // GROWI's soft delete rewrites the document in place, so unlike the case above the id stays
+    // resolvable and the drain still finds the page.
+    await Page.updateOne(
+      { _id: pageId },
+      { $set: { path: `/trash${PREFIX}/trashed-source`, status: 'deleted' } },
+    );
+
+    await handlePageUpsertById(pageId.toString(), siteUrl);
+
+    expect(await outboundRowsOf(pageId)).toEqual([]);
+  });
+
+  it('still indexes a legacy page whose status is unset', async () => {
+    const targetId = new Types.ObjectId();
+    idByPath.set('/a', targetId);
+    const pageId = await createPage('/legacy-source', '[a](/a)');
+
+    // A page predating the status field reads back as null, which GROWI treats as published — so
+    // the guard has to key on STATUS_DELETED rather than STATUS_PUBLISHED.
+    await Page.updateOne({ _id: pageId }, { $unset: { status: '' } });
+
+    await handlePageUpsertById(pageId.toString(), siteUrl);
+
+    expect(await outboundRowsOf(pageId)).toEqual([
+      { toPath: '/a', toPage: targetId },
+    ]);
+  });
 });
