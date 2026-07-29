@@ -122,7 +122,7 @@
   - _Depends: 2.2, 2.3_
   - _Boundary: Passport LocalStrategy_
 
-- [ ] 3.2 ログインフローの統合テストを作成する
+- [x] 3.2 ログインフローの統合テストを作成する
   - legacy SHA-256 ユーザーのログイン成功 + lazy migration 後に `passwordHash` が DB に書き込まれることを確認する
   - scrypt ユーザーのログイン成功 + rehash が発生しないことを確認する
   - 無効な認証情報でのログイン失敗を確認する
