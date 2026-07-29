@@ -376,6 +376,41 @@
 
 ---
 
+- [x] 21. 転送量を絞る手段（**要件 5.9–5.11 の追加** — #11595）
+
+  clone はビューに含まれる object を全量転送し、sparse-checkout も shallow clone も転送量を実質減らせない。git の絞り込み指定のうち、除外をサーバ側で適用して 1 リクエストで完結するのは `sparse:oid` だけで、これは要件 5.6–5.8 の検査を無変更で通る。他の指定は object を ID で名指しする経路を必要とするため必ず拒否されるが、`uploadpack.allowFilter` を種類ごとに分けられない以上、受理してしまう分は明示的に拒否しないと「clone だけ成功して checkout が失敗する」状態になる。実測と案の比較は research.md、設計は design.md「転送量を絞る手段」を参照。
+
+- [x] 21.1 (P) 公開するパターン集合と絞り込み指定の判定を実装（TDD）
+  - パターン集合を単一の宣言として持ち、object ID は内容から計算する（repo の状態に依存させない）。判定は公開した `sparse:oid` 以外をすべて拒否側に落とす。README に載せた ID との突き合わせをドリフト検出テストで固定する。
+  - _Requirements: 5.9, 5.10_
+  - _Boundary: apps/growi-vault-manager/src/services/vault-sparse-filter.ts, vault-sparse-filter.spec.ts_
+
+- [x] 21.2 want 区間の解析に `filter` 行の収集を足す（TDD）
+  - `want` の capability 列に現れる `filter` という語（能力の宣言）と、`filter <指定>` 行（実際の要求）を混同しないこと。本文は一切書き換えずに upload-pack へ渡す性質を保つ。
+  - _Depends: 21.1_
+  - _Requirements: 5.9_
+  - _Boundary: apps/growi-vault-manager/src/services/vault-pkt-line.ts, vault-want-guard.ts, および各 spec_
+
+- [x] 21.3 GitProxyController に判定を配線し、`allowFilter` を有効化して起動時にパターン集合を設置
+  - 判定は到達性の確認より前に置く（安く済み、`blob:none` を渡した利用者に最も有用な文言を返せる）。拒否応答には対応している指定の形を含める。パターン集合は `refs/vault/sparse-filters/<name>` から参照させ、起動ごとに再設置する。
+  - _Depends: 21.2_
+  - _Requirements: 5.9, 5.10, 5.11_
+  - _Boundary: apps/growi-vault-manager/src/controllers/git-proxy-controller.ts, vault-upload-pack-spawner.ts, server-runtime.ts_
+
+- [x] 21.4 clone の end-to-end を結合テストで固定
+  - `--filter=sparse:oid=<公開 ID>` ＋ sparse-checkout で `user/` 配下が作業ツリーに現れず、その中身が clone の object 置き場にも存在しないこと（＝転送されていないこと）を確認する。`--filter=blob:none` が clone の時点で拒否されることも同時に固定する。
+  - _Depends: 21.3_
+  - _Requirements: 5.9_
+  - _Boundary: apps/growi-vault-manager/src/__tests__/clone-e2e.integ.ts_
+
+- [x] 21.5 README を実際に動く手順に直す
+  - `--no-cone` ＋ `--stdin` の sparse-checkout 手順、`--filter=sparse:oid=<公開 ID>` の手順、filter 付き clone の以後の制約（除外したページは取得できない）、他の指定が拒否されること、`--depth=1` の削減幅が小さい理由を書く。
+  - _Depends: 21.4_
+  - _Requirements: 5.9, 5.11_
+  - _Boundary: apps/growi-vault-manager/README.md_
+
+---
+
 ## Implementation Notes
 
 実装を経て判明した、refactor 時に押さえるべき設計上の課題・教訓を記録する。
@@ -451,6 +486,10 @@ want の検査には本文の先頭が必要だが、本文は upload-pack に�
 ### 検査の作業量はクライアントに決めさせない
 
 要求 1 件ごとに git プロセスが必要なため、`Promise.all` で素朴に並列化すると 1 リクエストで大量のプロセスを起動できる（want 区間 64 KiB に want 行は約 1,310 行入り、実測で同時 1,310 プロセス・1.3 秒）。重複 ID の排除・異なる ID 64 件の上限・直列実行の 3 点で縛っている。外部が件数を決められる入力に対してプロセスを起動する実装を足すときは同じ縛りを検討すること。
+
+### 絞り込み指定は種類ごとに有効化できない
+
+`uploadpack.allowFilter` は「絞り込みに対応している」という 1 つの合図で、指定の種類を選べない。したがって「1 種類だけ対応する」は、サーバ設定ではなく**リクエストの検査**で実現するしかない。有効化しただけの状態は、対応していない指定を渡した利用者にとって有効化前より悪い（clone は成功し checkout が空のまま失敗する）ので、有効化と検査は必ず同じ変更で入れる。
 
 ### Test mock の partial mock パターン採用
 

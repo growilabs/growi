@@ -55,28 +55,57 @@ These rules are versioned (v1) and are **immutable after the first release**.
 
 ---
 
-## Excluding `/user` pages with git sparse-checkout
+## Excluding `/user` pages from a clone
 
-To clone a vault while excluding all personal pages stored under `user/`, use git sparse-checkout in **non-cone** mode:
+To clone a vault without the personal pages stored under `user/`:
 
 ```bash
-git clone --no-checkout <url> my-growi-vault
+git clone --filter=sparse:oid=ab678fd8055db49e954e61acfdb76add2a6291b9 --no-checkout <url> my-growi-vault
 cd my-growi-vault
 git sparse-checkout init --no-cone
 printf '/*\n!/user\n' | git sparse-checkout set --stdin
 git checkout HEAD
 ```
 
-Two details are easy to get wrong:
+Both halves are needed, and they do different jobs:
+
+- **`--filter=sparse:oid=<object name>` is what shrinks the transfer.** It names a blob in the repository holding the pattern set `/*` and `!/user`, and the server applies those patterns before building the pack — the excluded page bodies are never sent. Measured on a 20,000-page view with a quarter of the pages under `user/`: 6.3 MB → 4.8 MB, in a single request.
+- **`git sparse-checkout` decides what lands in your working tree.** On its own it transfers nothing less; combined with the filter it also has to be set to the *same* patterns, so your checkout never asks for a page body the server left out.
+
+The object name is fixed: it is the content address of those exact patterns, so it only changes if the published pattern set does. The server keeps the blob anchored to a ref of its own so garbage collection cannot remove it.
+
+Two details of the sparse-checkout call are easy to get wrong:
 
 - **`--no-cone` is required.** Cone mode cannot express an exclusion, so `git sparse-checkout set '/*' '!/user'` fails with `fatal: specify directories rather than patterns (no leading slash)`, and the `git checkout` that follows then leaves you with an *empty* working tree rather than one without `user/`.
 - **Pass the patterns on stdin.** On Git Bash (MSYS) an argument that looks like an absolute path is rewritten before git ever sees it, which mangles `!/user`. Reading from `--stdin` sidesteps that, and also avoids per-shell quoting differences.
 
-> **Important**: sparse-checkout only controls which files are materialized in your **working tree**. Every object in your view is still transferred from the server, so the clone itself is not any smaller.
->
-> A partial-clone filter (`--filter=blob:none`) is what would shrink the transfer, but **this server does not enable it**: `git clone --filter=blob:none` just prints `warning: filtering not recognized by server, ignoring` and fetches everything. Passing the flag anyway is worse than useless — git still records `remote.origin.promisor=true` and `remote.origin.partialclonefilter=blob:none` locally, leaving the clone marked as a partial clone that the server will not serve as one. Whether to enable the filter is an open decision; see "追補 A" in `.kiro/specs/growi-vault-manager/design.md`.
->
-> `--depth=1` (shallow clone) does work, but saves little: each view's history is squashed to a single parentless commit whenever it exceeds `VAULT_SQUASH_COMMIT_THRESHOLD` commits (default 1000) or `VAULT_SQUASH_AGE_HOURS` (default 1), so there is not much history to omit in the first place. What dominates the transfer is the current snapshot, not the history.
+### What the filtered clone can and cannot do afterwards
+
+The clone is a partial clone: git records `remote.origin.promisor=true` and `remote.origin.partialclonefilter` locally. Ordinary work inside it (`git status`, `git log`, `git pull`, grepping the checked-out files) behaves normally.
+
+What it cannot do is obtain the excluded pages later. The server never lets a client ask for an object by name, so a command that needs one of those bodies stops at:
+
+```console
+error: Server does not allow request for unadvertised object <object name>
+fatal: could not fetch <object name> from promisor remote
+```
+
+If you need the personal pages, take a fresh clone without the filter.
+
+### Other filters are refused
+
+`sparse:oid` with a published pattern set is the only filter this server serves. Anything else — `blob:none`, `blob:limit`, `tree:<n>`, `object:type`, `combine:`, or a `sparse:oid` naming some other object — is refused when the clone starts:
+
+```console
+$ git clone --filter=blob:none <url> my-growi-vault
+fatal: remote error: vault: unsupported partial-clone filter; this server serves only --filter=sparse:oid=<published spec> (see the vault-manager README)
+```
+
+Those filters all work the same way: the server sends a pack with the file bodies left out, and the client then fetches each missing object **by name** as it needs it. Naming objects is exactly what a client is not allowed to do here (a view scopes which refs it can see, not which objects exist), so such a clone would break at its first checkout rather than at the clone. It is refused up front instead.
+
+### `--depth=1`
+
+A shallow clone works but saves little: each view's history is squashed to a single parentless commit whenever it exceeds `VAULT_SQUASH_COMMIT_THRESHOLD` commits (default 1000) or `VAULT_SQUASH_AGE_HOURS` (default 1), so there is not much history to omit in the first place. What dominates the transfer is the current snapshot, not the history.
 
 ---
 
@@ -89,7 +118,9 @@ The following items are **not supported** in the current MVP:
 - **Per-page metadata** — comments, likes, bookmarks, tags, and similar social/annotation metadata are not exported.
 - **Revision history before feature activation** — only revisions created after the vault feature is enabled are captured; pre-existing history is not back-filled.
 - **Drafts and unpublished pages** — only published pages are exported to the vault.
-- **Partial clone (`--filter=...`)** — the server does not advertise the filter capability, so a clone always transfers every object in your view. `git sparse-checkout` still limits what is written to your working tree (see above), but it does not reduce the transfer.
+- **Partial-clone filters other than the published `sparse:oid` specs** — `blob:none`, `blob:limit`, `tree:<n>`, `object:type` and `combine:` are refused when the clone starts, because each of them leaves the client to fetch objects by name afterwards and the server does not serve those requests (see above).
+- **Client-chosen exclusion patterns** — the transfer can only be narrowed by a pattern set the server publishes; there is currently one (`user/` excluded).
+- **Fetching an excluded page into a filtered clone** — the server never serves a request for an object by name, so the pages a filter left out cannot be obtained later. Take a fresh clone without the filter instead.
 
 ### Known limitation: long paths on Windows
 

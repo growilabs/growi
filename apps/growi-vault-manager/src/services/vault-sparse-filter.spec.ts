@@ -45,6 +45,20 @@ describe('sparseFilterOid', () => {
     expect(sparseFilterOid(EXCLUDE_USER_PAGES)).toBe(fromGit.trim());
   });
 
+  it('is the object name the README tells clients to pass', () => {
+    // The object name is content-addressed, so editing a spec's patterns
+    // silently invalidates every documented clone command. This is the drift
+    // check for that: change the patterns and the README has to change too.
+    const readme = fs.readFileSync(
+      path.join(import.meta.dirname, '../../README.md'),
+      'utf8',
+    );
+
+    expect(readme).toContain(
+      `--filter=sparse:oid=${sparseFilterOid(EXCLUDE_USER_PAGES)}`,
+    );
+  });
+
   it('gives different patterns different names', () => {
     expect(sparseFilterOid({ name: 'a', patterns: '/*\n' })).not.toBe(
       sparseFilterOid({ name: 'a', patterns: '/*\n!/user\n' }),
