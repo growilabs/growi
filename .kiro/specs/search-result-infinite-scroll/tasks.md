@@ -47,7 +47,7 @@
   - _Requirements: 2.1, 5.1_
 
 - [ ] 3. Integration: SearchPage で infinite scroll を統括
-- [ ] 3.1 取得フック配線と番号ページャ撤去
+- [x] 3.1 取得フック配線と番号ページャ撤去
   - 合成ユーティリティで累積ページ・`isReachingEnd`・`isEmpty` を導出し、`resetKey` を keyword＋並び替え＋フィルタから生成する（offset を含めず追加読み込みで不変にする）
   - `PaginationWrapper`（番号ページャ）を撤去し、`InfiniteScroll` を配線して読み込み中インジケータを表示する。表示件数セレクタは復活させず、0件表示を維持する
   - 検索実行・条件変更時は先頭チャンクから読み込み直す（累積を破棄）
