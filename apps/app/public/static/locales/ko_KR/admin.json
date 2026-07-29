@@ -35,6 +35,7 @@
     "insert_single": "한 줄에 하나의 항목을 입력하십시오.",
     "whitelist_invalid_format": "형식이 올바르지 않습니다. 정확한 도메인은 @example.com, 서브도메인 허용은 @*.example.com, 정확한 주소는 user@example.com 형식으로 입력하세요.",
     "page_list_and_search_results": "페이지 목록 / 검색 결과",
+    "page_list_and_search_results_desc": "이 설정은 페이지에 접근 권한이 없는 사용자에게만 영향을 줍니다. 페이지를 볼 수 있는 사용자(예: “그룹 내에서만”으로 제한된 그룹의 구성원)에게는 “항상 숨김”으로 설정해도 목록과 검색에 항상 표시됩니다.",
     "page_listing_1": "'나만'으로 제한된 페이지 목록/검색<br>",
     "page_listing_1_desc": "목록/검색 시 '나만' 옵션으로 제한된 페이지 표시",
     "page_listing_2": "사용자 그룹으로 제한된 페이지 목록/검색<br>",

@@ -35,6 +35,7 @@
     "insert_single": "Please insert one entry per line.",
     "whitelist_invalid_format": "Invalid format. Use @example.com for exact domain, @*.example.com for subdomains, or user@example.com for exact address.",
     "page_list_and_search_results": "Page list / Search results",
+    "page_list_and_search_results_desc": "These settings only affect users without access to a page. Users who can view a page (e.g. members of a group it is restricted to via \"Only inside the group\") always see it in listings and search, even when set to \"Always hidden\".",
     "page_listing_1": "Page listing/searching<br>restricted by 'Only me'",
     "page_listing_1_desc": "Show pages that are restricted by 'Only me' option when listing/searching",
     "page_listing_2": "Page listing/searching<br>restricted by User group",

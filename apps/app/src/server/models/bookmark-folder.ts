@@ -7,7 +7,7 @@ import type {
   BookmarkFolderItems,
   IBookmarkFolder,
 } from '~/interfaces/bookmark-info';
-import { prisma } from '~/utils/prisma';
+import type { prisma } from '~/utils/prisma';
 
 import { getOrCreateModel } from '../util/mongoose-utils';
 import {
@@ -91,6 +91,12 @@ export const extension = Prisma.defineExtension((client) => {
               'Parent folder not found',
             );
           }
+
+          // A user must not create a folder under another user's folder
+          if (parentFolder.ownerId !== ownerId) {
+            throw new BookmarkFolderForbiddenError('forbidden');
+          }
+
           return context.create({
             data: {
               name,
@@ -124,7 +130,7 @@ export const extension = Prisma.defineExtension((client) => {
           let deletedCount = 0;
           if (bookmarkFolder != null) {
             if (bookmarkFolder.bookmarkIds.length > 0) {
-              await prisma.bookmarks.deleteMany({
+              await client.bookmarks.deleteMany({
                 where: { id: { in: bookmarkFolder.bookmarkIds } },
               });
             }
@@ -191,7 +197,7 @@ export const extension = Prisma.defineExtension((client) => {
           const context =
             Prisma.getExtensionContext<typeof prisma.bookmarkfolders>(this);
           // Find bookmark
-          const bookmarkedPage = await prisma.bookmarks.findUnique({
+          const bookmarkedPage = await client.bookmarks.findUnique({
             where: {
               pageId_userId: {
                 pageId,
@@ -212,7 +218,7 @@ export const extension = Prisma.defineExtension((client) => {
                 q: { owner: { $oid: userId } },
                 u: {
                   $pull: {
-                    bookmarks: { $oid: bookmarkedPage._id },
+                    bookmarks: { $oid: bookmarkedPage.id },
                   },
                   $inc: { __v: 1 },
                 },
@@ -236,7 +242,7 @@ export const extension = Prisma.defineExtension((client) => {
                 },
                 u: {
                   $addToSet: {
-                    bookmarks: { $oid: bookmarkedPage._id },
+                    bookmarks: { $oid: bookmarkedPage.id },
                   },
                   $inc: { __v: 1 },
                 },
@@ -256,7 +262,7 @@ export const extension = Prisma.defineExtension((client) => {
           if (status) {
             const context =
               Prisma.getExtensionContext<typeof prisma.bookmarkfolders>(this);
-            const bookmarkedPage = await prisma.bookmarks.findUnique({
+            const bookmarkedPage = await client.bookmarks.findUnique({
               where: {
                 pageId_userId: {
                   pageId,
@@ -268,7 +274,7 @@ export const extension = Prisma.defineExtension((client) => {
               where: {
                 ownerId: userId,
                 bookmarkIds: {
-                  hasSome: bookmarkedPage ? [bookmarkedPage._id] : [],
+                  hasSome: bookmarkedPage ? [bookmarkedPage.id] : [],
                 },
               },
             });
@@ -283,7 +289,7 @@ export const extension = Prisma.defineExtension((client) => {
                     },
                     u: {
                       $pull: {
-                        bookmarks: { $oid: bookmarkedPage._id },
+                        bookmarks: { $oid: bookmarkedPage.id },
                       },
                       $inc: { __v: 1 },
                     },
@@ -294,7 +300,7 @@ export const extension = Prisma.defineExtension((client) => {
             }
 
             if (bookmarkedPage) {
-              await prisma.bookmarks.delete({
+              await client.bookmarks.delete({
                 where: {
                   id: bookmarkedPage.id,
                 },
@@ -303,7 +309,7 @@ export const extension = Prisma.defineExtension((client) => {
             return bookmarkFolder;
           }
           // else , Add bookmark
-          await prisma.bookmarks.create({
+          await client.bookmarks.create({
             data: {
               pageId,
               userId,
