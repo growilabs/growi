@@ -72,6 +72,12 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     // Assign the ObjectId directly: this mirrors the unpopulated-revision path
     // and avoids relying on populate() in the test.
     page.revision = revision._id;
+    // Persist the pointer as well: the coalescing queue holds ids, so the drain
+    // re-reads the page from the DB (handlePageUpsertById) rather than using the
+    // emitted document. PageService likewise commits the revision (pushRevision)
+    // before emitting, so an in-memory-only assignment would leave the drain
+    // extracting from the previous revision.
+    await Page.updateOne({ _id: page._id }, { revision: revision._id });
     crowi.events.page.emit(event, page);
   };
 
