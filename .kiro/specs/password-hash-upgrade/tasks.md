@@ -111,7 +111,7 @@
   - _Boundary: User Model_
 
 - [ ] 3. (P) Passport LocalStrategy の async 化と lazy migration 統合
-- [ ] 3.1 Passport LocalStrategy を async 化し lazy migration をトリガーする
+- [x] 3.1 Passport LocalStrategy を async 化し lazy migration をトリガーする
   - `findUserByUsernameOrEmail` をコールバックスタイルから Promise ベース（async/await）に変更またはラップする
   - LocalStrategy コールバックを async 関数に変更し、try/catch で全エラーを `done(err)` に渡す
   - `VerifyResult.needsRehash === true` の場合（legacy 認証成功時）: `await user.setPassword(password)` + `await user.save()` を実行してから `done(null, user)` を返す
@@ -216,6 +216,8 @@
 
 - **1.1 (v8)**: `bcryptjs`/`@types/bcryptjs` は v8 package.json に不在（scrypt は `node:crypto` 組み込み、新規依存不要）。`util.promisify(scrypt)` は options 付きオーバーロードを落とすため（TS2554）、`new Promise` の手動ラッパーで `scrypt(pw, salt, keylen, {N,r,p,maxmem}, cb)` を呼ぶこと。v8 tsconfig（`tsgo --noEmit`）で型チェック通過を確認済み。型チェックは v8 では `tsgo`（`tsc` ではない）。
 - **1.2 (v8)**: `createPasswordHashService(params)` ファクトリ + env バインド既定シングルトン `passwordHashService`（env 名 `PASSWORD_SCRYPT_N/R/P`）をエクスポート。既定 N=2^17/r=8/p=1、`maxmem=Math.max(192MB, 128*N*r*2)`。ファクトリは floor クランプなし（テストで小 N 注入可、上限クランプのみ）／env パスは floor+ceiling クランプ + 起動時 WARNING。`verify()` は verifyScrypt/verifyLegacy に委譲し throw しない。biome の `useAwait` 警告回避のため verifyLegacy は同期メソッド。task 2.2 で User model からは既定シングルトン `passwordHashService` を import。**import は拡張子なし**（v8 規約）。
+- **PROCESS (v8)**: サブエージェントは重い `tsgo --noEmit`（~400s）をスキップしがちで、**biome/vitest は型エラーを検出しない**ため型エラーが commit をすり抜けた（tasks 1.2/2.2）。実際に発生: ①pino の `logger.warn` は**オブジェクトを第1引数**に（`logger.warn({ error }, 'msg')`。文字列第1・オブジェクト第2 は TS2769）②`mockDeep<Crowi>()` の `crowi.env` は proxy 型なので `crowi.env = {…}` 代入は不可、`crowi.env.PASSWORD_SEED = …` とプロパティ設定する。**各グループ完了時に `pnpm exec tsgo --noEmit` を1回流すこと**（`lint:typecheck` = `tsgo --noEmit`）。
+- **3.1 (v8)**: LocalStrategy の verify ロジックを exported 純関数 `verifyLocalCredentials(User, username, password, done)` に抽出し `setupLocalStrategy` を薄いアダプタ化。`findUserByUsernameOrEmail`（callback）は passport.ts 内で Promise ラップ（User model は不変＝境界維持）。`needsRehash` 時に `setPassword`+`save`、その save 失敗は log のみでログイン成功継続。全エラーは try/catch→`done(err)`。
 - **2.4 (v8)**: `omitInsecureAttributes()` は destructure-drop（`const { password, passwordHash, apiToken, email, ...rest }`）で runtime 除外。`IUserSerializedSecurely` の Omit union にも passwordHash 追加。`IUser` に `passwordHash?: string`。changeset は `.changeset/password-hash-omit.md`（@growi/core patch）。**@growi/core は consumer が `dist` を import するため、app レベルの integ テスト（2.8/3.2）前に `turbo run build --filter @growi/core` が必要**。注意: サブエージェントのツール実行で `.claude/settings.json` に grep/echo 許可が混入する（boundary 外）→ コミット前に `git checkout -- .claude/settings.json` で戻すこと。
 - **2.2 (v8)**: User model は `import { passwordHashService } from '~/server/service/password-hash';`（拡張子なし）で既定シングルトンを利用。`isPasswordValid` は `crowi.env.PASSWORD_SEED`（= 既存 generatePassword と同じアクセサ）を verify に渡し `Promise<VerifyResult>` を返す（boolean ではない → 外部呼び出し元は 2.5/3.1 で await 化）。`setPassword` は `this.passwordHash` のみ設定し `this.password` は不変。5 呼び出し元（updatePassword/activateInvitedUser/resetPasswordByRandomString/createUserByEmail/createUserByEmailAndPasswordAndStatus）すべて await 済み。`generatePassword` は 2.3 まで残す（findUserByEmailAndPassword が最後の呼び出し元）。この変更で updatePassword/activateInvitedUser の pre-existing useAwait 警告が2件解消。
 - **1.3 (v8)**: 1.3 の必須マトリクス全ケース + 任意拡張（弱パラメータ→needsRehash:true）を 1.2 で作成済みの `password-hash.spec.ts`（全12件）が網羅済み。追加テストは不要と確認し 1.3 完了。noPassword は空文字も不在扱い、malformed は scrypt envelope 不正 / legacy 非 hex / corrupt envelope の3ケースを検証。
