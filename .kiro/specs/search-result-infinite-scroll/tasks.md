@@ -40,7 +40,7 @@
   - 完了時: 追加読み込み後に select-all が checked ↔ indeterminate を正しく遷移する（コンポーネントテストで確認）
   - _Requirements: 4.4, 4.5, 4.6_
 
-- [ ] 2.4 infinite scroll 描画スロットと一括削除の累積対応
+- [x] 2.4 infinite scroll 描画スロットと一括削除の累積対応
   - infinite scroll 用プロップ指定時は結果リストを `InfiniteScroll` でラップして描画し、未指定時は従来の番号ページャ描画を維持する（レガシー非回帰）
   - 一括削除の対象抽出を、単一ページ結果ではなく累積ページリストを入力として受け取る形へ一般化する
   - 完了時: infinite scroll 指定でセンチネルが描画され、削除ロジックが渡された累積リストから選択分のみを抽出する
@@ -102,3 +102,7 @@
   - 完了時: 実機でスクロールによる継ぎ足しが動作することを確認
   - _Depends: 3.1, 3.2, 3.3_
   - _Requirements: 1.2_
+
+## Implementation Notes
+- 2.4: SearchPageBase の error endingIndicator は `t('Retry')` を使うが `Retry` キーが locales(en_US/ja_JP) に未定義でリテラル "Retry" にフォールバックする。後続の 3.2（エラー再試行）で locales に `Retry` キー（日本語「再試行」等）を追加すること。`Error` キーは en_US に存在。
+- 2.4: error endingIndicator は InfiniteScroll が `isReachingEnd === true` の時のみ表示される。SearchPage(3.x) は design どおり `isReachingEnd = 累積>=total || hasError` として hasError を OR すること。

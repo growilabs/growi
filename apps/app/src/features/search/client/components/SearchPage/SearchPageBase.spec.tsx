@@ -1,11 +1,16 @@
 import type { JSX } from 'react';
 import React, { createRef } from 'react';
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render, renderHook } from '@testing-library/react';
 import { atom } from 'jotai';
+import type { SWRInfiniteResponse } from 'swr/infinite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
 import type { ISelectableAll } from '~/client/interfaces/selectable-all';
-import type { IPageWithSearchMeta } from '~/interfaces/search';
+import type {
+  IFormattedSearchResult,
+  IPageWithSearchMeta,
+} from '~/interfaces/search';
 
 // --- Mock the heavy / environment-coupled dependencies of SearchPageBase ---
 // Search service atoms must resolve truthy, otherwise the component early-returns
@@ -24,8 +29,39 @@ vi.mock('~/states/context', () => ({
   useIsReadOnlyUser: vi.fn(() => false),
 }));
 
+// Capture the delete modal `open` action so the bulk-deletion hook can be
+// asserted to receive ONLY the selected subset of the accumulated page list.
+const deleteModalSpy = vi.hoisted(() => ({ open: vi.fn() }));
 vi.mock('~/states/ui/modal/page-delete', () => ({
-  usePageDeleteModalActions: vi.fn(() => ({ open: vi.fn() })),
+  usePageDeleteModalActions: vi.fn(() => ({ open: deleteModalSpy.open })),
+}));
+
+// Passthrough stub for the infinite-scroll wrapper: renders the wrapped list
+// (children) plus the endingIndicator so the error/retry control is observable,
+// and records its props so `isReachingEnd` wiring can be asserted.
+const infiniteScrollSpy = vi.hoisted(() => ({
+  lastProps: undefined as
+    | {
+        isReachingEnd?: boolean;
+        children?: React.ReactNode;
+        endingIndicator?: React.ReactNode;
+      }
+    | undefined,
+}));
+vi.mock('~/client/components/InfiniteScroll', () => ({
+  default: (props: {
+    isReachingEnd?: boolean;
+    children?: React.ReactNode;
+    endingIndicator?: React.ReactNode;
+  }) => {
+    infiniteScrollSpy.lastProps = props;
+    return (
+      <div data-testid="infinite-scroll">
+        {props.children}
+        {props.endingIndicator}
+      </div>
+    );
+  },
 }));
 
 vi.mock('~/stores/page-listing', () => ({
@@ -90,7 +126,10 @@ vi.mock('./SearchResultList', () => ({
 }));
 
 import type { IReturnSelectedPageIds } from './SearchPageBase';
-import { SearchPageBase } from './SearchPageBase';
+import {
+  SearchPageBase,
+  usePageDeleteModalForBulkDeletion,
+} from './SearchPageBase';
 
 type SelectableRef = ISelectableAll & IReturnSelectedPageIds;
 
@@ -456,5 +495,162 @@ describe('SearchPageBase select-all header follows appended pages (append re-not
     // the selection-clear effect owns the notification on a resetKey change;
     // the append re-notify must not fight it
     expect(onChanged).toHaveBeenLastCalledWith(0, 0);
+  });
+});
+
+const createInfiniteScrollProps = (overrides?: {
+  isReachingEnd?: boolean;
+  hasError?: boolean;
+  onRetry?: () => void;
+}) => ({
+  swrInfiniteResponse:
+    mock<SWRInfiniteResponse<IFormattedSearchResult, Error>>(),
+  isReachingEnd: false,
+  hasError: false,
+  onRetry: vi.fn(),
+  ...overrides,
+});
+
+describe('SearchPageBase infinite-scroll rendering slot', () => {
+  beforeEach(() => {
+    infiniteScrollSpy.lastProps = undefined;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const pagerControls = {
+    searchControl: null,
+    searchResultListHead: (<span />) as JSX.Element,
+    searchPager: (<div data-testid="search-pager" />) as JSX.Element,
+  };
+
+  it('wraps the list in InfiniteScroll and hides the numbered pager when infiniteScroll is provided', () => {
+    const infiniteScroll = createInfiniteScrollProps({ isReachingEnd: true });
+
+    const { queryByTestId } = render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={[createPage('a'), createPage('b')]}
+        infiniteScroll={infiniteScroll}
+        {...pagerControls}
+      />,
+    );
+
+    // sentinel/infinite-scroll wrapper is rendered ...
+    expect(queryByTestId('infinite-scroll')).not.toBeNull();
+    // ... and it received the computed reaching-end flag
+    expect(infiniteScrollSpy.lastProps?.isReachingEnd).toBe(true);
+    // ... while the legacy numbered pager is NOT rendered
+    expect(queryByTestId('search-pager')).toBeNull();
+  });
+
+  it('renders the numbered pager and no InfiniteScroll when infiniteScroll is not provided (legacy)', () => {
+    const { queryByTestId } = render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={[createPage('a'), createPage('b')]}
+        {...pagerControls}
+      />,
+    );
+
+    expect(queryByTestId('search-pager')).not.toBeNull();
+    expect(queryByTestId('infinite-scroll')).toBeNull();
+  });
+
+  it('renders a retry control in the endingIndicator on error and invokes onRetry when clicked', () => {
+    const onRetry = vi.fn();
+    const infiniteScroll = createInfiniteScrollProps({
+      isReachingEnd: true,
+      hasError: true,
+      onRetry,
+    });
+
+    const { getByRole } = render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={[createPage('a'), createPage('b')]}
+        infiniteScroll={infiniteScroll}
+        {...pagerControls}
+      />,
+    );
+
+    const retryButton = getByRole('button', { name: 'Retry' });
+    fireEvent.click(retryButton);
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders no retry control in the endingIndicator when there is no error', () => {
+    const infiniteScroll = createInfiniteScrollProps({
+      isReachingEnd: true,
+      hasError: false,
+    });
+
+    const { queryByRole } = render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={[createPage('a'), createPage('b')]}
+        infiniteScroll={infiniteScroll}
+        {...pagerControls}
+      />,
+    );
+
+    expect(queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+});
+
+describe('usePageDeleteModalForBulkDeletion (accumulated list)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('opens the delete modal with only the selected pages from the accumulated list', () => {
+    const pages = [createPage('a'), createPage('b'), createPage('c')];
+    const ref: React.MutableRefObject<SelectableRef | null> = {
+      current: {
+        selectAll: vi.fn(),
+        deselectAll: vi.fn(),
+        getSelectedPageIds: () => new Set(['a', 'c']),
+      },
+    };
+
+    const { result } = renderHook(() =>
+      usePageDeleteModalForBulkDeletion(pages, ref),
+    );
+
+    act(() => {
+      result.current();
+    });
+
+    expect(deleteModalSpy.open).toHaveBeenCalledTimes(1);
+    const openedPages = deleteModalSpy.open.mock
+      .calls[0][0] as IPageWithSearchMeta[];
+    expect(openedPages.map((p) => p.data._id)).toEqual(['a', 'c']);
+  });
+
+  it('does not open the modal when the accumulated list is undefined', () => {
+    const ref: React.MutableRefObject<SelectableRef | null> = {
+      current: {
+        selectAll: vi.fn(),
+        deselectAll: vi.fn(),
+        getSelectedPageIds: () => new Set(['a']),
+      },
+    };
+
+    const { result } = renderHook(() =>
+      usePageDeleteModalForBulkDeletion(undefined, ref),
+    );
+
+    act(() => {
+      result.current();
+    });
+
+    expect(deleteModalSpy.open).not.toHaveBeenCalled();
   });
 });

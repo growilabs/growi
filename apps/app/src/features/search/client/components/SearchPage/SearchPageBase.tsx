@@ -11,8 +11,10 @@ import dynamic from 'next/dynamic';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
+import type { SWRInfiniteResponse } from 'swr/infinite';
 
 import type { ForceHideMenuItems } from '~/client/components/Common/Dropdown/PageItemControl';
+import InfiniteScroll from '~/client/components/InfiniteScroll';
 import type { ISelectableAll } from '~/client/interfaces/selectable-all';
 import { toastSuccess } from '~/client/util/toastr';
 import type {
@@ -42,6 +44,16 @@ export interface IReturnSelectedPageIds {
   getSelectedPageIds?: () => Set<string>;
 }
 
+// Optional wiring for infinite-scroll rendering. When present, the result list
+// is wrapped in <InfiniteScroll> instead of the legacy numbered pager.
+type SearchPageBaseInfiniteProps = {
+  swrInfiniteResponse: SWRInfiniteResponse<IFormattedSearchResult, Error>;
+  // Computed by the caller: accumulated count >= total, or a fetch error.
+  isReachingEnd: boolean;
+  hasError: boolean;
+  onRetry: () => void;
+};
+
 type Props = {
   className?: string;
   pages?: IPageWithSearchMeta[];
@@ -62,6 +74,10 @@ type Props = {
   searchControl: React.ReactNode;
   searchResultListHead: JSX.Element;
   searchPager: React.ReactNode;
+
+  // When provided, the result list is rendered inside <InfiniteScroll> and the
+  // numbered pager is suppressed. When omitted, legacy pager rendering is kept.
+  infiniteScroll?: SearchPageBaseInfiniteProps;
 };
 
 const SearchResultContent = dynamic(
@@ -85,7 +101,10 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     searchControl,
     searchResultListHead,
     searchPager,
+    infiniteScroll,
   } = props;
+
+  const { t } = useTranslation();
 
   const searchResultListRef = useRef<ISelectableAll | null>(null);
 
@@ -287,21 +306,56 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
             <>
               <div className="my-3 px-md-4 px-3">{searchResultListHead}</div>
 
-              {pages.length > 0 && (
-                <div className={`page-list ${styles['page-list']} px-md-4`}>
-                  <SearchResultList
-                    ref={searchResultListRef}
-                    pages={pages}
-                    selectedPageId={selectedPageWithMeta?.data._id}
-                    forceHideMenuItems={forceHideMenuItems}
-                    onPageSelected={(page) => setSelectedPageWithMeta(page)}
-                    onCheckboxChanged={checkboxChangedHandler}
-                  />
-                </div>
-              )}
-              <div className="my-4 d-flex justify-content-center">
-                {searchPager}
-              </div>
+              {/* Selection wiring on SearchResultList is IDENTICAL across the
+                  infinite-scroll and legacy branches; only the wrapping differs. */}
+              {(() => {
+                const searchResultListNode = pages.length > 0 && (
+                  <div className={`page-list ${styles['page-list']} px-md-4`}>
+                    <SearchResultList
+                      ref={searchResultListRef}
+                      pages={pages}
+                      selectedPageId={selectedPageWithMeta?.data._id}
+                      forceHideMenuItems={forceHideMenuItems}
+                      onPageSelected={(page) => setSelectedPageWithMeta(page)}
+                      onCheckboxChanged={checkboxChangedHandler}
+                    />
+                  </div>
+                );
+
+                if (infiniteScroll != null) {
+                  return (
+                    <InfiniteScroll
+                      swrInifiniteResponse={infiniteScroll.swrInfiniteResponse}
+                      isReachingEnd={infiniteScroll.isReachingEnd}
+                      endingIndicator={
+                        infiniteScroll.hasError ? (
+                          <div className="my-4 d-flex flex-column align-items-center">
+                            <span className="text-muted">{t('Error')}</span>
+                            <button
+                              type="button"
+                              className="btn btn-outline-secondary mt-2"
+                              onClick={infiniteScroll.onRetry}
+                            >
+                              {t('Retry')}
+                            </button>
+                          </div>
+                        ) : undefined
+                      }
+                    >
+                      {searchResultListNode}
+                    </InfiniteScroll>
+                  );
+                }
+
+                return (
+                  <>
+                    {searchResultListNode}
+                    <div className="my-4 d-flex justify-content-center">
+                      {searchPager}
+                    </div>
+                  </>
+                );
+              })()}
             </>
           )}
         </div>
@@ -328,7 +382,9 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
 type VoidFunction = () => void;
 
 export const usePageDeleteModalForBulkDeletion = (
-  data: IFormattedSearchResult | undefined,
+  // Accepts the accumulated page list (across infinite-scroll appends), not a
+  // single-page result, so bulk deletion targets every loaded page.
+  pages: IPageWithSearchMeta[] | undefined,
   ref: React.MutableRefObject<(ISelectableAll & IReturnSelectedPageIds) | null>,
   onDeleted?: OnDeletedFunction,
 ): VoidFunction => {
@@ -337,7 +393,7 @@ export const usePageDeleteModalForBulkDeletion = (
   const { open: openDeleteModal } = usePageDeleteModalActions();
 
   return () => {
-    if (data == null) {
+    if (pages == null) {
       return;
     }
 
@@ -352,7 +408,7 @@ export const usePageDeleteModalForBulkDeletion = (
       return;
     }
 
-    const selectedPages = data.data.filter((pageWithMeta) =>
+    const selectedPages = pages.filter((pageWithMeta) =>
       selectedPageIds.has(pageWithMeta.data._id),
     );
 
