@@ -38,6 +38,12 @@ export interface PeekWantSectionResult {
   /** OIDs the client asked for; empty when `status` is 'invalid'. */
   readonly wants: readonly string[];
   /**
+   * Partial-clone filter specs the client asked to be applied; empty when
+   * `status` is 'invalid' or the request carries no filter. Judged by
+   * `findUnsupportedFilters` in vault-sparse-filter.ts.
+   */
+  readonly filters: readonly string[];
+  /**
    * The bytes already taken off the stream. The caller must write these to
    * upload-pack's stdin before piping the remainder, or the request body would
    * arrive truncated.
@@ -119,11 +125,13 @@ export function peekWantSection(
           ? {
               status: 'complete',
               wants: parsed.wants,
+              filters: parsed.filters,
               prefix: Buffer.concat(chunks),
             }
           : {
               status: 'invalid',
               wants: [],
+              filters: [],
               prefix: Buffer.concat(chunks),
               reason: parsed.reason,
             },
@@ -136,6 +144,7 @@ export function peekWantSection(
       resolve({
         status: 'invalid',
         wants: [],
+        filters: [],
         prefix,
         reason:
           parsed.status === 'need-more'

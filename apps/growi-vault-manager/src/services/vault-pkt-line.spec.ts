@@ -30,6 +30,7 @@ describe('parseWantSection', () => {
       expect(parseWantSection(buf)).toEqual({
         status: 'complete',
         wants: [OID_A],
+        filters: [],
       });
     });
 
@@ -44,6 +45,7 @@ describe('parseWantSection', () => {
       expect(parseWantSection(buf)).toEqual({
         status: 'complete',
         wants: [OID_A],
+        filters: [],
       });
     });
 
@@ -57,14 +59,30 @@ describe('parseWantSection', () => {
       expect(parseWantSection(buf)).toEqual({
         status: 'complete',
         wants: [OID_A, OID_B],
+        filters: [],
       });
     });
 
-    it('skips lines that are not wants (shallow / deepen / filter)', () => {
+    it('skips lines that carry no decision for the guard (shallow / deepen)', () => {
       const buf = Buffer.concat([
         pkt(`want ${OID_A} side-band-64k\n`),
         pkt(`shallow ${OID_B}\n`),
         pkt('deepen 1\n'),
+        FLUSH,
+      ]);
+
+      expect(parseWantSection(buf)).toEqual({
+        status: 'complete',
+        wants: [OID_A],
+        filters: [],
+      });
+    });
+
+    it('returns the partial-clone filter the client asked for', () => {
+      // The guard has to decide on the filter too: an unserved one is refused
+      // before upload-pack runs, rather than failing the client's checkout later.
+      const buf = Buffer.concat([
+        pkt(`want ${OID_A} side-band-64k filter\n`),
         pkt('filter blob:none\n'),
         FLUSH,
       ]);
@@ -72,13 +90,48 @@ describe('parseWantSection', () => {
       expect(parseWantSection(buf)).toEqual({
         status: 'complete',
         wants: [OID_A],
+        filters: ['blob:none'],
+      });
+    });
+
+    it('returns each filter when the client sends more than one line', () => {
+      const buf = Buffer.concat([
+        pkt(`want ${OID_A}\n`),
+        pkt(`filter sparse:oid=${OID_B}\n`),
+        pkt('filter tree:0\n'),
+        FLUSH,
+      ]);
+
+      expect(parseWantSection(buf)).toEqual({
+        status: 'complete',
+        wants: [OID_A],
+        filters: [`sparse:oid=${OID_B}`, 'tree:0'],
+      });
+    });
+
+    it('does not mistake the `filter` capability on the first want for a filter line', () => {
+      // git announces the capability in the want line whenever it *could* use a
+      // filter; only a `filter <spec>` line actually asks for one.
+      const buf = Buffer.concat([
+        pkt(`want ${OID_A} multi_ack_detailed filter\n`),
+        FLUSH,
+      ]);
+
+      expect(parseWantSection(buf)).toEqual({
+        status: 'complete',
+        wants: [OID_A],
+        filters: [],
       });
     });
 
     it('accepts a section that carries no want at all', () => {
       const buf = Buffer.concat([pkt('deepen 1\n'), FLUSH]);
 
-      expect(parseWantSection(buf)).toEqual({ status: 'complete', wants: [] });
+      expect(parseWantSection(buf)).toEqual({
+        status: 'complete',
+        wants: [],
+        filters: [],
+      });
     });
 
     it('stops at the first flush and ignores whatever follows it', () => {
@@ -92,6 +145,7 @@ describe('parseWantSection', () => {
       expect(parseWantSection(buf)).toEqual({
         status: 'complete',
         wants: [OID_A],
+        filters: [],
       });
     });
 
@@ -102,6 +156,7 @@ describe('parseWantSection', () => {
       expect(parseWantSection(buf)).toEqual({
         status: 'complete',
         wants: [sha256],
+        filters: [],
       });
     });
   });
