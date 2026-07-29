@@ -94,6 +94,11 @@
 3. git upload-pack を spawn したとき、GitProxyController は vault-manager の Node.js プロセスがメモリを O(1) でのみ消費するよう、stdout を直接 HTTP body にストリーム転送する（フルバッファリングしない）
 4. git upload-pack プロセスが起動したとき、GitProxyController は `uploadpack.allowAnySHA1InWant=false`（git のデフォルト）が維持され、namespace 外の OID が直接 fetch されないことを保証する
 5. git upload-pack プロセスでエラーが発生したとき、GitProxyController はプロセスを終了させ、エラーをログに記録する
+6. `POST /internal/git/git-upload-pack` を受信したとき、GitProxyController は upload-pack を起動する前にクライアントが要求した object の ID を取り出し、`refs/namespaces/<viewRef>/refs/heads/main` からたどれない ID が 1 つでも含まれる場合は、リクエストを upload-pack に渡さず pkt-line 1 本の `ERR` を返して拒否し、拒否をログに記録する。「ビューに無い」場合と「そもそも存在しない」場合で応答の文言は変えない
+7. 上記 6 の解析はリクエスト本文の先頭（want 区間）のみを対象とし、読み取った先頭は upload-pack の標準入力にそのまま書き戻す。want 区間が終わらないまま 64 KiB を超えた場合、または protocol v0 の形式として解釈できない場合、GitProxyController はリクエストを拒否する
+8. 上記 6 の確認を行うとき、GitProxyController は同一 ID の重複を排除し、異なる ID が 64 件を超えるリクエストは確認せずに拒否し、残った確認は直列に実行する。これによりクライアントが要求件数を増やして vault-manager の処理量を増幅させられないようにする
+
+> **注記（2026-07-28）**: 上記 4 の保証は、実際には commit にしか効いていない。ファイル 1 個の中身とディレクトリ 1 個分の一覧は、ビューを越えて取得できる（git 2.49.0 で実測）。承認済みの受け入れ基準 4 はそのまま残し、これを補う検査として 6–8 を追加した。実測結果と設計判断は [`research.md`](./research.md)、検査の位置と内容および残る制約は [`design.md`](./design.md) の「ビュー外 object の要求の拒否」に記録する。
 
 ---
 

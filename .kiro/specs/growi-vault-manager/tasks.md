@@ -347,6 +347,35 @@
 
 ---
 
+- [x] 20. ビュー外 object の要求の拒否（**要件 5.6–5.8 の追加 / 要件 5.4 の保証範囲の訂正**）
+
+  実装後の調査で、要件 5.4 が前提にしていた「`uploadpack.allowAnySHA1InWant=false`（git の既定値）を維持すればビューに広告していない object は取得できない」が commit にしか当てはまらないと実測で判明した（git 2.49.0）。ファイルの中身（blob）とディレクトリの一覧（tree）はビューを越えて取得でき、`gitnamespaces(7)` も namespace が読み取りのアクセス制御に使えないと明記しているため git の設定では解決できない。upload-pack を起動する前に要求 object のビュー ref からの到達性を検査する層を追加する。実測・3 案の比較・性能実測は research.md、検査の位置と内容は design.md「ビュー外 object の要求の拒否」を参照。
+
+- [x] 20.1 (P) want 区間の pkt-line 解析を純関数として実装（TDD）
+  - flush までを解析し want の object ID を返す。protocol v2 の delimiter・壊れた長さ・終わらない want 区間（64 KiB 超）は invalid として拒否する。
+  - _Requirements: 5.6, 5.7_
+  - _Boundary: apps/growi-vault-manager/src/services/vault-pkt-line.ts, vault-pkt-line.spec.ts_
+
+- [x] 20.2 本文先頭の peek と到達性確認を実装（TDD）
+  - peek はストリームを閉じない（`for await` は negotiation を失わせ upload-pack がハングする）。到達性は `git merge-base --is-ancestor <要求 ID> refs/namespaces/<viewRef>/refs/heads/main` の 1 コマンドで判定し、非ゼロ終了はすべて拒否とする。重複 ID の排除・異なる ID 64 件の上限・直列実行で作業量を縛る。
+  - _Depends: 20.1_
+  - _Requirements: 5.6, 5.8_
+  - _Boundary: apps/growi-vault-manager/src/services/vault-want-guard.ts, vault-want-guard.spec.ts_
+
+- [x] 20.3 GitProxyController に検査を配線し、拒否応答を実装
+  - 拒否は HTTP 200 ＋ pkt-line 1 本の `ERR`。「ビューに無い」と「そもそも存在しない」で文言を共通にする（要件 2.3）。検査済みの先頭は `spawnUploadPack({ stdinPrefix })` で書き戻す。
+  - _Depends: 20.2_
+  - _Requirements: 5.6, 5.7_
+  - _Boundary: apps/growi-vault-manager/src/controllers/git-proxy-controller.ts, apps/growi-vault-manager/src/services/vault-upload-pack-spawner.ts_
+
+- [x] 20.4 漏えいの再現と回帰を結合テストで固定
+  - 修正前に「他 namespace のページ本文に対して pack が返る」ことを再現したうえで green に転じることを確認する。full clone / shallow clone / 差分 fetch が従来どおり通ることも同時に固定する。
+  - _Depends: 20.3_
+  - _Requirements: 5.6_
+  - _Boundary: apps/growi-vault-manager/src/__tests__/clone-e2e.integ.ts_
+
+---
+
 ## Implementation Notes
 
 実装を経て判明した、refactor 時に押さえるべき設計上の課題・教訓を記録する。
@@ -414,6 +443,14 @@ gateway 側で null revision page をスキップしても、防御層として 
 ### 起動時プリフライトと idempotent init
 
 `src/index.ts` の起動時に必須環境変数チェックと MongoDB ping を行い、いずれか失敗すれば `process.exit(1)` する（task 12）。これは k8s の crash-loop による自然な復旧を可能にする。レジリエント resume を実装する際、追加の起動時状態チェック（例: `vault_sync_state.bootstrapState === 'failed'` 検出時の自動再試行）はこのプリフライト枠で実装するのが整合的。
+
+### リクエスト本文を検査するときストリームを閉じてはいけない
+
+want の検査には本文の先頭が必要だが、本文は upload-pack にそのまま全部渡さなければならない。`for await` で読むと抜けた時点でストリームが閉じ、want 区間の後ろにある negotiation（`done` 等）が失われて upload-pack が入力待ちのまま応答しなくなる（shallow clone のハングとして顕在化した）。`pause()` で止めて listener を外し、読み取った先頭を `stdinPrefix` で書き戻す形にしている。回帰は「読み取った先頭 ＋ 残り == 元の本文」という等式で固定した。同じ経路に手を入れるときはこの等式を壊さないこと。
+
+### 検査の作業量はクライアントに決めさせない
+
+要求 1 件ごとに git プロセスが必要なため、`Promise.all` で素朴に並列化すると 1 リクエストで大量のプロセスを起動できる（want 区間 64 KiB に want 行は約 1,310 行入り、実測で同時 1,310 プロセス・1.3 秒）。重複 ID の排除・異なる ID 64 件の上限・直列実行の 3 点で縛っている。外部が件数を決められる入力に対してプロセスを起動する実装を足すときは同じ縛りを検討すること。
 
 ### Test mock の partial mock パターン採用
 

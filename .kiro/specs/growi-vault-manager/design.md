@@ -61,6 +61,8 @@ Ts.ED v7.x ベースのマイクロサービスとして、`apps/pdf-converter` 
 - git binary が container image から外れる事態
 - GROWI Revision モデルの `body` フィールド形式変更
 - ページパスエンコーディング規則の変更（既存 clone 履歴との互換破壊）
+- `uploadpack.allowFilter` を有効化して partial clone を通す場合（ビュー外 object の要求の検査が、ファイル単体の要求を拒否するため。research.md の Decision A 参照）
+- gateway がクライアントの `Git-Protocol` ヘッダを転送し、upload-pack が protocol v2 を使うようになる場合（同検査が v0 の形式のみ解釈するため）
 
 ---
 
@@ -178,6 +180,8 @@ apps/growi-vault-manager/
 │   │   ├── vault-path-mapper.ts             # ページパス → base filePath（エンコード・orphan、suffix なし）
 │   │   ├── vault-tree-normalizer.ts         # merged tree の compose-time 正規化（大小衝突 suffix）
 │   │   ├── vault-blob-hasher.ts             # isomorphic-git hashObject
+│   │   ├── vault-pkt-line.ts                # want 区間の pkt-line 解析（純関数）
+│   │   ├── vault-want-guard.ts              # 本文先頭の peek + ビュー ref からの到達性確認
 │   │   ├── vault-upload-pack-spawner.ts     # git upload-pack 子プロセス起動
 │   │   └── vault-maintenance-scheduler.ts  # squash + 周期 gc 自走スケジューラ
 │   ├── models/
@@ -214,6 +218,7 @@ vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn す�
 | 3.1–3.7 | ページパス純関数マッピング | VaultPathMapper |
 | 4.1–4.12 | per-user view 合成・キャッシュ・tree 正規化 | ComposeViewController, VaultViewComposer, VaultTreeNormalizer |
 | 5.1–5.5 | git smart HTTP lower-half | GitProxyController, VaultUploadPackSpawner |
+| 5.6–5.8 | ビュー外 object の要求の拒否・解析範囲と作業量の制限 | GitProxyController, VaultWantGuard, VaultPktLine |
 | 6.1–6.7 | メンテナンス自走スケジューリング | VaultMaintenanceScheduler |
 | 7.1–7.5 | shared secret 認証 | SharedSecretAuth |
 | 8.1–8.4 | health endpoint | HealthController |
@@ -240,7 +245,9 @@ vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn す�
 | VaultRepoStorage | Service | bare repo object I/O 抽象 | 9.1–9.5 |
 | VaultPathMapper | Service | pagePath → filePath 純関数 | 3.1–3.7 |
 | VaultBlobHasher | Service | git blob OID 計算（isomorphic-git） | 2.1, 2.2 |
-| VaultUploadPackSpawner | Service | git upload-pack 子プロセス起動 | 5.1–5.5 |
+| VaultUploadPackSpawner | Service | git upload-pack 子プロセス起動（検査済み本文の先頭を書き戻す） | 5.1–5.5 |
+| VaultPktLine | Service | want 区間の pkt-line 解析（純関数） | 5.6, 5.7 |
+| VaultWantGuard | Service | 本文先頭の peek + ビュー ref からの到達性確認 | 5.6–5.8 |
 | VaultMaintenanceScheduler | Service | squash + gc 自走スケジューラ | 6.1–6.7 |
 | SharedSecretAuth | Middleware | Bearer token constant-time 検証 | 7.1–7.5 |
 
@@ -565,7 +572,7 @@ interface VaultUploadPackSpawner {
 - `mode: 'advertise'` → `git upload-pack --stateless-rpc --advertise-refs <repoPath>`
 - `mode: 'rpc'` → `git upload-pack --stateless-rpc <repoPath>`（stdin: request body）
 - env: `GIT_NAMESPACE=<viewRef>`
-- `uploadpack.allowAnySHA1InWant=false`（git デフォルト）で OID 直接 fetch を禁止
+- `uploadpack.allowAnySHA1InWant=false`（git デフォルト）を維持する。ただしこれで防げるのは commit の直接取得だけなので、要求された object がビューからたどれるかの検査を upload-pack 起動前に GitProxyController が行う（要件 5.6・5.7、「追補 A」参照）
 - クライアント切断時・タイムアウト時はプロセスを kill
 
 ---
@@ -770,7 +777,7 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 - **single security perimeter**: vault-manager は外部から到達不可（k8s NetworkPolicy で apps/app からのみ許可）。Ingress には登録しない
 - **shared secret**: env var only（`VAULT_MANAGER_INTERNAL_SECRET`）、DB に保存しない。k8s Secret で両 pod に注入
 - **constant-time 比較**: `crypto.timingSafeEqual` で timing attack を防止（要件 7.5）
-- **OID 直接 fetch 禁止**: `uploadpack.allowAnySHA1InWant=false`（git デフォルト）で namespace 外の OID を fetch させない
+- **ビュー外 object の取得禁止**: `uploadpack.allowAnySHA1InWant=false`（git デフォルト）だけでは commit の直接取得しか防げない（ファイルの中身とディレクトリ一覧はビューを越えて取得できた。git 2.49.0 で実測）。そのため GitProxyController が upload-pack 起動前にクライアントの要求を検査し、ビュー ref からたどれない object の要求を拒否する（要件 5.6・5.7、「追補 A」）
 - **pages コレクション非アクセス**: vault-manager は `revisions` のみ ID 指定 body lookup（namespace 判定は apps/app に集約済み）
 - **情報漏洩防止**: namespace 集合は apps/app が ACL 評価済みで渡す。vault-manager は受け取った namespace をそのまま処理するのみ
 
@@ -806,9 +813,32 @@ git binary が pack 生成・delta 圧縮・転送を担当するため、vault-
 
 ---
 
+## ビュー外 object の要求の拒否（要件 5.6–5.8）
+
+`GIT_NAMESPACE` はビューに広告する ref の範囲を絞るだけで、object の保管領域はビュー間で共有されている。git が「広告していない object を要求されたとき、それがこのビューからたどれるか」を確かめる処理は commit を前提としており、ファイルの中身（blob）とディレクトリの一覧（tree）に対しては実質的に何も確認しない。したがって `uploadpack.allowAnySHA1InWant=false`（git の既定値）だけでは、**ビューに含まれないページの中身が取得できる**。`gitnamespaces(7)` が「namespace は読み取りのアクセス制御には有効ではない」と明記している通り、git の設定では解決できない。
+
+> 実測結果・原因・検討した 3 案の比較・性能と規模依存性の実測は [`research.md`](./research.md) を参照（Research Log と Decision A–C）。
+
+### 検査の位置と内容
+
+`GitProxyController.uploadPack()` が upload-pack を起動する **前に** 実施する。
+
+1. **要求の先頭だけを解析する** — リクエスト本文の先頭は要求する object を並べた区間（want 区間）で、終わりは flush（`0000`）。この区間のみを読み取り、要求された object の ID を取り出す（`vault-pkt-line.ts` の `parseWantSection`、純関数）。flush が来ないまま 64 KiB を超えた場合と、protocol v0 の形式として解釈できない場合は拒否する。要件 5.3（pack をメモリに溜めず一定量のメモリで転送する）は、解析対象を先頭に限ることで保たれる
+2. **読み取った先頭を upload-pack に書き戻す** — 本文は upload-pack にそのまま全部渡す必要がある。`peekWantSection` はストリームを閉じずに `pause()` で止め、読み取った先頭は `spawnUploadPack({ stdinPrefix })` で書き戻してから残りを pipe する（`vault-want-guard.ts`）
+3. **ビュー ref からの到達性を確認する** — 要求 1 件ごとに `git merge-base --is-ancestor <要求された ID> refs/namespaces/<viewRef>/refs/heads/main` を実行し、非ゼロ終了なら拒否する（`findWantsOutsideView`）。commit でないもの・他ビューの commit・存在しない ID・ビュー ref 自体が無い場合のすべてが拒否側に落ちる（閉じる方向に倒れる）
+4. **作業量を縛る** — 同一 ID の重複を排除し、異なる ID が 64 件を超えるリクエストは 1 件も確認せず拒否し、残りは直列に確認する。要求 1 件ごとに git プロセスが必要なため、件数をクライアントが決められる状態を残さない
+5. **拒否の返し方** — HTTP 200 と pkt-line 1 本の `ERR vault: requested object is not available in this view`。upload-pack 自身が拒否時に返す形と同じなので、git クライアントは `fatal: remote error: ...` と表示する。「ビューに無い」と「そもそも存在しない」で文言を変えず、リポジトリの保持内容を応答から推測させない（要件 2.3）。拒否はログに記録する
+
+### この検査が拒否する正当な用途（既知の制約）
+
+- **partial clone の遅延取得** — `--filter=blob:none` を有効にしたクライアントはファイル単体を要求するため拒否される。`uploadpack.allowFilter` を有効にするなら本検査の拡張が前提（#11595）
+- **protocol v2 の本文** — 現在 gateway はクライアントの `Git-Protocol` ヘッダを転送しないため upload-pack は v0 でしか動かず、本検査も v0 の形式のみ解釈する。v2 を通すなら本検査の拡張が前提
+
+いずれも Revalidation Triggers に登録済み。
+
 ## 参考情報
 
-- [git namespaces](https://git-scm.com/docs/gitnamespaces) — `GIT_NAMESPACE` 環境変数の仕様
+- [git namespaces](https://git-scm.com/docs/gitnamespaces) — `GIT_NAMESPACE` 環境変数の仕様。読み取りのアクセス制御には使えないことも明記されている（「追補 A」参照）
 - [git smart HTTP protocol](https://git-scm.com/docs/http-protocol) — upload-pack wire format
 - [isomorphic-git GitHub](https://github.com/isomorphic-git/isomorphic-git) — v1.37.x API リファレンス
 - [MongoDB change streams](https://www.mongodb.com/docs/manual/changeStreams/) — resume token の挙動
