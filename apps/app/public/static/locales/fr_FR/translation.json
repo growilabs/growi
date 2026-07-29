@@ -42,6 +42,7 @@
   "Update": "Enregistrer",
   "Update Page": "Mettre à jour la page",
   "Error": "Erreur",
+  "Retry": "Réessayer",
   "Warning": "Avertissement",
   "Sign in": "Connexion",
   "Sign in with External auth": "Se connecter avec {{signin}}",

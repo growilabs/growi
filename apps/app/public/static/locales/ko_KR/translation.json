@@ -42,6 +42,7 @@
   "Update": "업데이트",
   "Update Page": "페이지 업데이트",
   "Error": "오류",
+  "Retry": "재시도",
   "Warning": "경고",
   "Sign in": "로그인",
   "Sign in with External auth": "{{signin}}으로 로그인",
