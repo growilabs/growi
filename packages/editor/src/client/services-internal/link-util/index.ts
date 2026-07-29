@@ -1,1 +1,1 @@
-export * from './markdown-link-util';
+export * from './markdown-link-util.js';

@@ -48,8 +48,8 @@ vi.mock('~/server/middlewares/login-required', () => ({
     },
 }));
 
-vi.mock('~/server/middlewares/apiv3-form-validator', () => {
-  const { validationResult } = require('express-validator');
+vi.mock('~/server/middlewares/apiv3-form-validator', async () => {
+  const { validationResult } = await import('express-validator');
   return {
     apiV3FormValidator: (
       req: Request,

@@ -1,5 +1,7 @@
-export * from './components/DrawioViewer';
-export * from './interfaces/graph-viewer';
-export * from './services/renderer/remark-drawio';
-export * from './utils/embed';
-export * from './utils/global';
+export * from './components/DrawioViewer.js';
+export * from './interfaces/graph-viewer.js';
+export * from './services/renderer/remark-drawio.js';
+export * from './utils/embed.js';
+export * from './utils/global.js';
+// Only the save-side builder is public; isMxfileData is internal to embed.ts.
+export { extractDrawioData } from './utils/mxfile.js';

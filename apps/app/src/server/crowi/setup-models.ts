@@ -18,7 +18,6 @@ export const setupModelsDependentOnCrowi = async (
   const modelsDependsOnCrowi = {
     Page: (await import('../models/page')).default,
     User: (await import('../models/user')).default,
-    Bookmark: (await import('../models/bookmark')).default,
     GlobalNotificationSetting: (
       await import('../models/GlobalNotificationSetting')
     ).default,

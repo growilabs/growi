@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { Page } from '@playwright/test';
 
-const adminAuthFile = path.resolve(__dirname, '../.auth/admin.json');
+const adminAuthFile = path.resolve(import.meta.dirname, '../.auth/admin.json');
 
 interface LoginOptions {
   usernameOrEmail?: string;

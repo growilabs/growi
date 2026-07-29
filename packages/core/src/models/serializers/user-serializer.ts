@@ -1,7 +1,7 @@
 import { Document } from 'mongoose';
 
-import { isPopulated, isRef, type Ref } from '../../interfaces/common';
-import type { IUser } from '../../interfaces/user';
+import { isPopulated, isRef, type Ref } from '../../interfaces/common.js';
+import type { IUser } from '../../interfaces/user.js';
 
 export type IUserSerializedSecurely<U extends IUser> = Omit<
   U,

@@ -19,7 +19,12 @@ type BacklinkSource = {
   path: string;
 };
 export class PageLinkService {
-  constructor(private crowi: Crowi) {}
+  private crowi: Crowi;
+
+  constructor(crowi: Crowi) {
+    this.crowi = crowi;
+  }
+
   static create(crowi: Crowi): PageLinkService {
     const pageLinkService = new PageLinkService(crowi);
     pageLinkService.registerEvents();

@@ -114,6 +114,24 @@ await expect(sendWithRetry(config, 3)).rejects.toThrow('failed after 3 attempts'
 expect(mockMailer.sendMail).toHaveBeenCalledTimes(3);
 ```
 
+### Guard / Drift Specs ("X must never happen" tests)
+
+A spec that asserts a codebase invariant (e.g. "no static import chain from a
+boot entrypoint reaches a heavy package") can rot silently: if its walk starts
+from a wrong or renamed root it traces nothing and passes vacuously — green
+forever, guarding nothing.
+
+- **Prove it can fail before committing it (mutation check)**: introduce the
+  violation deliberately (re-add the banned import / legacy code path), confirm
+  the spec goes RED with a message pointing at the cause, then revert. Include
+  the red output as evidence in the PR.
+- **Guard the guard**: assert that every walked entrypoint/fixture still exists,
+  so a rename fails the spec instead of emptying the walk.
+
+Real case: the `no-eager-*-imports.spec.ts` drift specs in apps/app each
+shipped with mutation evidence; boot-rooted walks caught two real leak paths
+(an admin route, a group-sync service) that module-rooted walks could not see.
+
 ## When to Apply
 
 - Writing new test cases for any function or method

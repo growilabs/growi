@@ -4,7 +4,7 @@ import type { NextFunction, Response } from 'express';
 import createError from 'http-errors';
 import { stringify } from 'qs';
 
-import type { RequestFromSlack } from '../interfaces/request-from-slack';
+import type { RequestFromSlack } from '../interfaces/request-from-slack.js';
 
 const logger = loggerFactory('@growi/slack:middlewares:verify-slack-request');
 

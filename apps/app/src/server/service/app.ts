@@ -72,7 +72,9 @@ export default class AppService implements S2sMessageHandlable {
   }
 
   getAppTitle() {
-    return configManager.getConfig('app:title') ?? 'GROWI';
+    // Treat an empty string as unset so the default 'GROWI' is shown everywhere.
+    const title = configManager.getConfig('app:title');
+    return title != null && title !== '' ? title : 'GROWI';
   }
 
   getTzoffset() {

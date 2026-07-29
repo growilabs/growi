@@ -1,1 +1,1 @@
-export * from './validate-growi-plugin-directive';
+export * from './validate-growi-plugin-directive.js';

@@ -20,4 +20,4 @@ export const defaultSupportedCommandsNameForSingleUse: string[] = [
 
 export const defaultSupportedSlackEventActions: string[] = ['unfurl'];
 
-export * from './required-scopes';
+export * from './required-scopes.js';
