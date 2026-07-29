@@ -21,6 +21,7 @@ type CapturedSearchPageBaseProps = {
     onRetry?: () => void;
   };
   onSelectedPagesByCheckboxesChanged?: (a: number, b: number) => void;
+  searchControl?: React.ReactNode;
 };
 
 const searchPageBaseSpy = vi.hoisted(() => ({
@@ -41,7 +42,9 @@ vi.mock('./SearchPageBase', () => ({
           getSelectedPageIds: () => new Set<string>(),
         };
       }
-      return null;
+      // Render the searchControl slot so the bulk-delete button reached through
+      // SearchControl.collapseContents is observable in the DOM (Req 5.2).
+      return <>{props.searchControl}</>;
     },
   ),
   usePageDeleteModalForBulkDeletion: vi.fn(() => vi.fn()),
@@ -80,10 +83,30 @@ vi.mock('~/states/server-configurations', () => ({
 
 // --- Peripheral UI dependencies (never actually rendered here) ---------------
 vi.mock('./SearchControl', () => ({
-  default: () => null,
+  // Render only the collapse body (which contains the bulk-delete button) so the
+  // Req 5.2 disabled/enabled contract is observable in the DOM; the rest of
+  // SearchControl is exercised by its own spec.
+  default: (props: { collapseContents?: React.ReactNode }) => (
+    <>{props.collapseContents}</>
+  ),
 }));
 vi.mock('./OperateAllControl', () => ({
-  OperateAllControl: () => null,
+  // Forward an imperative handle so SearchPage's selectAllControlRef is populated.
+  // Without it, selectedPagesByCheckboxesChangedHandler bails out at its null-check
+  // before updating selectedCount — the state that drives the delete button's
+  // disabled attribute (Req 5.2).
+  OperateAllControl: React.forwardRef(
+    (_props: unknown, ref: React.Ref<unknown>) => {
+      if (ref != null && typeof ref === 'object') {
+        (ref as React.MutableRefObject<unknown>).current = {
+          select: vi.fn(),
+          deselect: vi.fn(),
+          setIndeterminate: vi.fn(),
+        };
+      }
+      return null;
+    },
+  ),
 }));
 vi.mock('~/client/components/NotAvailableForGuest', () => ({
   NotAvailableForGuest: ({ children }: { children?: React.ReactNode }) => (
@@ -302,5 +325,47 @@ describe('SearchPage bulk-delete orchestration (Req 5.1/5.3/7.2)', () => {
     });
 
     expect(searchPageBaseSpy.deselectAll).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Req 5.2 — the bulk-delete execution button must be disabled while the selection
+// is empty and become enabled once at least one loaded page is selected.
+describe('SearchPage bulk-delete disabling (Req 5.2)', () => {
+  beforeEach(() => {
+    searchPageBaseSpy.lastProps = undefined;
+    keywordSpy.keyword = 'initial-keyword';
+    searchStoreSpy.infiniteResponse = createInfiniteResponse([
+      createChunk(['a', 'b']),
+    ]);
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const getDeleteButton = (container: HTMLElement) =>
+    container.querySelector<HTMLButtonElement>(
+      'button.open-delete-modal-button',
+    );
+
+  it('disables the bulk-delete button while nothing is selected (Req 5.2)', () => {
+    const { container } = render(<SearchPage />);
+
+    // selectedCount starts at 0 → the execute-delete button must be disabled.
+    expect(getDeleteButton(container)).toBeDisabled();
+  });
+
+  it('enables the bulk-delete button once at least one page is selected (Req 5.2)', () => {
+    const { container } = render(<SearchPage />);
+    expect(getDeleteButton(container)).toBeDisabled();
+
+    // Simulate an individual-checkbox selection reported up from SearchPageBase
+    // (2 of 4 loaded rows selected) — selectedCount becomes non-zero.
+    act(() => {
+      searchPageBaseSpy.lastProps?.onSelectedPagesByCheckboxesChanged?.(2, 4);
+    });
+
+    expect(getDeleteButton(container)).toBeEnabled();
   });
 });
