@@ -153,7 +153,7 @@
   - _Requirements: 3.3, 3.4_
   - _Boundary: Cleanup migration script_
 
-- [ ] 4.3 (P) Downgrade prep standalone script を実装する
+- [x] 4.3 (P) Downgrade prep standalone script を実装する
   - `apps/app/src/server/scripts/password-hash-downgrade-prep.ts` を作成する（Crowi bootstrap が必要な standalone スクリプト）
   - スクリプト内でダウングレード後にログイン不可になるユーザー数（`passwordHash` あり・`password` なし）を集計してログ出力する（Req 4.1）
   - 環境変数 `SEND_RESET_EMAILS` が `'true'` の場合:
@@ -182,7 +182,7 @@
   - _Requirements: 3.3, 3.4_
   - _Boundary: Cleanup migration script_
 
-- [ ] 5.3 (P) Downgrade prep standalone script の統合テストを作成する
+- [x] 5.3 (P) Downgrade prep standalone script の統合テストを作成する
   - `SEND_RESET_EMAILS` 未設定時に DB が変更されずカウントのみ出力されることを確認する
   - `SEND_RESET_EMAILS=true` 時に対象ユーザーの `PasswordResetOrder` が作成されることを確認する
   - `SEND_RESET_EMAILS=true` 時にメール送信成功ユーザーのみ `passwordHash` が `$unset`（フィールド不在）になり、送信失敗ユーザーの `passwordHash` が変更されないことを確認する
