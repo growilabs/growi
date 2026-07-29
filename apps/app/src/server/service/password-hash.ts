@@ -224,10 +224,8 @@ class PasswordHashService implements IPasswordHashService {
     } catch (err) {
       // Field is present but its content is not a usable scrypt envelope (Req 2.4).
       logger.warn(
+        { error: err },
         'Malformed scrypt password hash encountered during verification',
-        {
-          error: err,
-        },
       );
       return { isValid: false, needsRehash: false };
     }
@@ -258,7 +256,7 @@ class PasswordHashService implements IPasswordHashService {
       // A successful legacy verification always triggers a rehash to scrypt (Req 2.2).
       return { isValid, needsRehash: isValid };
     } catch (err) {
-      logger.warn('Error while verifying legacy password hash', { error: err });
+      logger.warn({ error: err }, 'Error while verifying legacy password hash');
       return { isValid: false, needsRehash: false };
     }
   }
