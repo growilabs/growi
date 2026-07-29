@@ -132,7 +132,7 @@
   - _Boundary: Passport LocalStrategy_
 
 - [ ] 4. (P) マイグレーションスクリプトの実装
-- [ ] 4.1 (P) Status migration script を実装する
+- [x] 4.1 (P) Status migration script を実装する
   - `20260724000001-password-hash-status` マイグレーションを作成する（**v8: 既存最新 `20260721103639` より後のタイムスタンプにする**。旧 `20260514000001` は過去日付になり migrate-mongo が out-of-order 扱いするため不可）
   - `up()` 内で以下 4 区分のユーザー数を集計する（DB 書き込みなし）:
     - upgradedOnly（`passwordHash` あり、`password` なし）: 完全移行済み
@@ -167,7 +167,7 @@
   - _Boundary: Downgrade prep migration script_
 
 - [ ] 5. マイグレーションスクリプトの統合テスト
-- [ ] 5.1 (P) Status migration script の統合テストを作成する
+- [x] 5.1 (P) Status migration script の統合テストを作成する
   - テスト DB に 4 区分（upgradedOnly、both、legacyOnly、noPassword）のユーザーを用意する
   - `up()` 実行後に各カウントが期待値と一致することを確認する
   - `up()` 実行後に DB のユーザードキュメントが一切変更されていないことを確認する

@@ -1,0 +1,102 @@
+/**
+ * Integration test for the password-hash status migration.
+ *
+ * Contract under test (implementation-agnostic — asserts observable behavior):
+ *  - up() classifies every user document into exactly one of the four
+ *    dual-field categories and reports the count of each:
+ *      upgradedOnly (passwordHash only), both (both fields),
+ *      legacyOnly (password only), noPassword (neither field);
+ *  - up() performs NO writes — every user document is byte-for-byte identical
+ *    before and after the run (this is a read-only progress report).
+ *
+ * The four categories are seeded via the raw driver (not the Mongoose User
+ * model) with precisely-set fields, so a miscategorization is detectable via
+ * deliberately-distinct per-category counts.
+ *
+ * Requires a real MongoDB connection (wired by vitest.workspace.mts integ setup;
+ * prisma is bound to the same per-worker DB as mongoose by test/setup/prisma.ts,
+ * so the migration's prisma-based counts hit the collection mongoose seeded).
+ */
+import type { Collection } from 'mongodb';
+import { ObjectId } from 'mongodb';
+import mongoose from 'mongoose';
+
+// Distinct per-category counts so any miscategorization changes a total.
+const EXPECTED = {
+  upgradedOnly: 2,
+  both: 1,
+  legacyOnly: 3,
+  noPassword: 1,
+} as const;
+
+const MARKER = 'pwhash-status-test';
+
+describe('password-hash-status migration', () => {
+  let collection: Collection;
+  let migrate: typeof import('./20260724000001-password-hash-status');
+
+  beforeAll(async () => {
+    migrate = await import('./20260724000001-password-hash-status');
+    collection = mongoose.connection.collection('users');
+
+    // The migration counts the WHOLE collection, so make the collection contain
+    // ONLY the seeded fixtures — then whole-collection counts equal EXPECTED.
+    await collection.deleteMany({});
+
+    const docs: Record<string, unknown>[] = [];
+    // upgradedOnly: passwordHash present, password absent
+    for (let i = 0; i < EXPECTED.upgradedOnly; i++) {
+      docs.push({
+        _id: new ObjectId(),
+        username: `${MARKER}-upgraded-${i}`,
+        passwordHash: 'scrypt$hash',
+      });
+    }
+    // both: both fields present
+    for (let i = 0; i < EXPECTED.both; i++) {
+      docs.push({
+        _id: new ObjectId(),
+        username: `${MARKER}-both-${i}`,
+        passwordHash: 'scrypt$hash',
+        password: 'legacy-sha256',
+      });
+    }
+    // legacyOnly: password present, passwordHash absent
+    for (let i = 0; i < EXPECTED.legacyOnly; i++) {
+      docs.push({
+        _id: new ObjectId(),
+        username: `${MARKER}-legacy-${i}`,
+        password: 'legacy-sha256',
+      });
+    }
+    // noPassword: neither field present
+    for (let i = 0; i < EXPECTED.noPassword; i++) {
+      docs.push({
+        _id: new ObjectId(),
+        username: `${MARKER}-nopass-${i}`,
+      });
+    }
+    await collection.insertMany(docs);
+  });
+
+  afterAll(async () => {
+    await collection.deleteMany({ username: { $regex: `^${MARKER}` } });
+  });
+
+  it('reports the correct count for each of the four hash-format categories', async () => {
+    const counts = await migrate.up();
+
+    expect(counts).toEqual(EXPECTED);
+  });
+
+  it('does not modify any user document (read-only)', async () => {
+    // Full-collection snapshot before/after: any added/removed/changed field is
+    // detected by deep equality. Sort by _id for a stable ordering.
+    const before = await collection.find({}).sort({ _id: 1 }).toArray();
+
+    await migrate.up();
+
+    const after = await collection.find({}).sort({ _id: 1 }).toArray();
+    expect(after).toEqual(before);
+  });
+});
