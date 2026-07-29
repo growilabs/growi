@@ -246,7 +246,7 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
   - _Requirements: 3.4_
   - _Depends: B1.12, B1.13_
 
-- [ ] B2.2 Coalesce and pace live extraction (write-path burst control)
+- [x] B2.2 Coalesce and pace live extraction (write-path burst control)
   - Replace the B1.6/B1.12 inline per-event extraction with an in-process coalescing queue: the
     `create`/`update` handlers mark the page dirty (`Set<pageId>`); a paced tick drains a bounded
     number of ids per cycle, re-reads each page's latest body at drain time, and runs the existing
