@@ -144,7 +144,7 @@
   - _Requirements: 3.1, 3.2_
   - _Boundary: Status migration script_
 
-- [ ] 4.2 (P) Cleanup standalone script を実装する
+- [x] 4.2 (P) Cleanup standalone script を実装する
   - `apps/app/src/server/scripts/password-hash-cleanup.ts` を作成する（migrate-mongo 対象外の standalone スクリプト）
   - スクリプト開始時に `legacyOnly` ユーザー数（`passwordHash` なし・`password` あり）を取得する
   - `legacyOnly > 0` の場合: エラーメッセージ（件数含む）を出力して process.exit(1) する（Req 3.4）
@@ -175,7 +175,7 @@
   - _Requirements: 3.1, 3.2_
   - _Boundary: Status migration script_
 
-- [ ] 5.2 (P) Cleanup standalone script の統合テストを作成する
+- [x] 5.2 (P) Cleanup standalone script の統合テストを作成する
   - `legacyOnly` ユーザーが存在する状態でスクリプト実行が中断し、ユーザードキュメントが変更されないことを確認する
   - 全ユーザーが `passwordHash` 移行済みの状態で `password` フィールドが `$unset` されることを確認する
   - 統合テストが PASS することが確認できる
