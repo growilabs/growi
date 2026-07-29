@@ -212,7 +212,7 @@ vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn す�
 | 1.1–1.6 | change stream 購読・冪等処理 | VaultInstructionWatcher |
 | 2.1–2.8 | 全 op の namespace tree 更新 | VaultNamespaceBuilder, VaultPathMapper, VaultBlobHasher, VaultRepoStorage |
 | 3.1–3.7 | ページパス純関数マッピング | VaultPathMapper |
-| 4.1–4.8 | per-user view 合成・キャッシュ | ComposeViewController, VaultViewComposer |
+| 4.1–4.12 | per-user view 合成・キャッシュ・tree 正規化 | ComposeViewController, VaultViewComposer, VaultTreeNormalizer |
 | 5.1–5.5 | git smart HTTP lower-half | GitProxyController, VaultUploadPackSpawner |
 | 6.1–6.7 | メンテナンス自走スケジューリング | VaultMaintenanceScheduler |
 | 7.1–7.5 | shared secret 認証 | SharedSecretAuth |
@@ -236,6 +236,7 @@ vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn す�
 | VaultInstructionWatcher | Service | change stream 購読 + drain + retry | 1.1–1.6 |
 | VaultNamespaceBuilder | Service | instruction → blob/tree/commit + ref 更新 | 2.1–2.8 |
 | VaultViewComposer | Service | namespace merge → user view ref（delta merge + cache） | 4.2–4.8 |
+| VaultTreeNormalizer | Service | merged tree のエントリ名正規化（大小衝突 suffix + 名前の長さの上限） | 4.9–4.12 |
 | VaultRepoStorage | Service | bare repo object I/O 抽象 | 9.1–9.5 |
 | VaultPathMapper | Service | pagePath → filePath 純関数 | 3.1–3.7 |
 | VaultBlobHasher | Service | git blob OID 計算（isomorphic-git） | 2.1, 2.2 |
@@ -423,10 +424,18 @@ interface VaultViewComposer {
 **衝突解消（同一 path に複数 namespace のエントリ）**:
 優先順位: `user-<uid>-only-me` > `group-*` > `restricted-link` > `public`
 
-**Tree 正規化（compose-time, per-view / 要件 4.9–4.11）**:
-merged tree 確定後、view ごとに大小衝突解消を行う。merged tree の構造のみから決定論的に導出し、状態を永続化しない（reactive）。
+**Tree 正規化（compose-time, per-view / 要件 4.9–4.12）**:
+merged tree 確定後、view ごとに大小衝突解消と名前の長さの調整を行う。merged tree の構造のみから決定論的に導出し、状態を永続化しない（reactive）。
 
 - **大小衝突解消**: 各ディレクトリ直下で小文字化キーが一致する 2 件以上のエントリ（blob・subtree 双方）に対し、各メンバー名へ `__<sha1(suffix付与前filePath)[0..7]>` を付与する。衝突が解消（メンバー 1 件）したら suffix を外す。
+- **名前の長さの上限（issue #11596）**: 名前が UTF-8 で 255 バイト（ext4 / APFS が許すファイル名 1 つ分の上限）を超えるとき、拡張子より前の部分を文字の境界で切り詰め、同じ `__<hash8>` を付与する。判定は `__<hash8>` を付けたあとの最終的な名前に対して行う（`__<hash8>` は 10 バイトあるため、それを付けなければ収まる名前が、付けたことで上限を超えることがある）。切り詰めた結果として先頭が同じになる 2 つの名前も、hash が異なるので別名のまま残る。
+
+長さの上限を「mapper 側（`VaultPathMapper.encodeSegment`）ではなく view 側に置く」のは意図的な選択である。mapper 側で切り詰めると次の 2 つが起き、既存 vault を作り直す（再 bootstrap する）必要が出てしまう。
+
+1. namespace repo にはすでに長い名前のエントリが入っている。upsert はファイルごとの差し替えなので古いエントリが消えず、view に古い名前と新しい名前が並ぶ。
+2. `rename-prefix` / `grant-change-prefix` は `mapPrefix()` の結果で保存済みツリーから subtree を探す。切り詰めた prefix は保存済みの長い prefix と一致しないので subtree が見つからず、「すでに目的の状態」と判断してエラーも出さずに何もしないまま終わる（ページの移動が失敗しても気づけない）。
+
+view は compose のたびに namespace 群から全エントリを作り直すため、view 側に置けば次の compose で新しい規則が行き渡り、移行作業が要らない。
 
 実装は `vault-tree-normalizer.ts`（純関数: merged tree → normalized tree）に集約し、composer から呼ぶ。delta merge では membership が変化したディレクトリのみ再正規化すればよく、`sourceVersions` 一致時は正規化ごとスキップされる（キャッシュ維持）。
 
@@ -509,8 +518,10 @@ interface VaultPathMapper {
 
 **Implementation Notes**:
 - エンコーディング規則および tree 正規化規則（大小衝突 suffix）は v1 確定後 immutable（Revalidation Trigger）
+  - v1.0.1 で tree 正規化に名前の長さの上限を追加した（issue #11596）。既存 vault を作り直す必要はない — 追加したのは view 側だけで、mapper と namespace repo の名前は変えていない。また 255 バイト以内に収まる名前は 1 バイトも変えないため、今 checkout できている名前は既存 clone でも変わらない。変わるのは、上限を超えていて元から checkout できなかった名前だけである。上限そのものを後から下げると、今使えている名前までファイル名が変わってしまうので、下げる場合は破壊的な変更として扱う
 - `map()` は pageId を取らない（suffix を扱わないため）
 - `mapPrefix('/A/B')` はセグメント単位でエンコードして `/` 結合、末尾 `.md` なし
+- 長さの上限で切り詰めた名前は、元のページ名に戻せない。`map()` と namespace repo の名前は元に戻せるままだが、将来 push（書き戻し）を実装するときは、切り詰められた view 上の名前からページパスを求められないため、名前からページを引き当てる仕組みが別途必要になる
 
 ---
 

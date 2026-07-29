@@ -1,8 +1,45 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.5.7...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.0...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v8.0.0](https://github.com/growilabs/compare/v7.5.7...v8.0.0) - 2026-07-27
+
+### 💎 Features
+
+* feat(ai): AI agent using Mastra (#10327) @miya
+* feat(ai): Support multiple AI providers and cross-provider model selection (#11394) @miya
+* feat(ai): Show official AI provider & model names in the UI (#11432) @miya
+* feat: GROWI Vault (#11092) @yuki-takei
+* feat: Agentic search engine for suggest-path (#11293) @tomoyuki-t-weseek
+* feat: Page Markdown endpoint (.md URL / Accept: text/markdown) with navigation footer (#11439) @yuki-takei
+* feat(activity): Capture attachment snapshots for ADD/DOWNLOAD actions (#11433) @yuki-takei
+* feat(activity-log): Activity Log with action-keyed snapshot union (incl. activities Prisma migration) (#11393) @yuki-takei
+* feat(news): Switch news delivery settings from admin page (#11091) @ryotaro-nagahara
+
+### 🚀 Improvement
+
+* imprv: Lazy-load passport strategy SDKs and ldapjs (#11480) @yuki-takei
+* imprv: Lazy-load mail transports to keep nodemailer/aws-sdk out of boot (#11479) @yuki-takei
+* imprv: Warm up Prisma connection at boot (#11481) @yuki-takei
+* imprv(activity-log): Activity Log snapshot detail viewer (formatted attachment-removal view + raw fallback) (#11440) @yuki-takei
+* imprv(activity-log): Activity Log recording gate (lazy fail-safe) — skip persisting out-of-gate updates (#11421) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Build safeRedirect target from app:siteUrl behind a reverse proxy (#11248) (#11489) @yuki-takei
+* fix(drawio): Preserve and render all pages of a multi-page diagram (#11524) @yuki-takei
+* fix(import): Derive export archive list from server state via SWR (#11511) @yuki-takei
+* fix(import): Surface import-settings build errors to the admin UI (#11520) @yuki-takei
+
+### 🧰 Maintenance
+
+* support(search): Drop Elasticsearch 7 support (#11490) @yuki-takei
+* support: Opt-in jemalloc allocator (JEMALLOC_ENABLED) to release glibc's retained native memory (#11411) @yuki-takei
+* support: Migrate to ESM (#11309) @yuki-takei
+* support: Reduce memory consumption for the GROWI server (#11208) @yuki-takei
+* ci(deps): bump body-parser from 1.20.3 to 1.20.6 (#11504) @[dependabot[bot]](https://github.com/apps/dependabot)
 
 ## [v7.5.7](https://github.com/growilabs/compare/v7.5.6...v7.5.7) - 2026-07-21
 

@@ -957,3 +957,90 @@ export interface DriftStatus {
 - Existing reference specs（cleanup 済み、編集禁止）:
   - [growi-vault-gateway/requirements.md](../growi-vault-gateway/requirements.md) Req 5 — 現行 bootstrap の挙動定義
   - [growi-vault-manager/requirements.md](../growi-vault-manager/requirements.md) Req 2.6 — 現行 `reset-all` op の挙動定義
+
+---
+
+## 追補 A: 実行が途絶えた bootstrap の復旧と、全 wipe 時の cursor 無効化（要件 7 — PR #11599）
+
+実装完了後の運用で、bootstrap の途中でプロセスが落ちた状態から、GROWI 自身の手段（サーバの再起動 / admin UI）では復帰できないことが判明した。原因は 1 つの実装ミスではなく、本 design が別々の箇所で決めた 3 つの判断が重なった結果である。
+
+**用語**: 以下では、bootstrap を実行していたプロセスが落ちたあと、状態だけが `running` / `verifying` のまま残っている状況を「実行が途絶えた bootstrap」と呼ぶ。プロセスがまだ動いているかどうかは `bootstrapHeartbeatAt`（実行中のプロセスが定期的に書き込む時刻）の新しさで見分ける。
+
+### 何が重なっていたか
+
+| 経路 | 本 design での決定 | 実行が途絶えた bootstrap に対して起きたこと |
+|---|---|---|
+| 起動時の正規化（tasks 1.4） | `running` かつ `bootstrapInstanceId` が null の doc を `failed` に書き換える | instanceId は bootstrap の開始時（`heartbeat.acquireInstance()`）に書かれるため、プロセスが落ちても残る。復旧させたい doc がちょうど条件から外れる |
+| `bootstrapHeartbeatAt` を見た resume（tasks 4.1 / BootstrapTriggerResolver） | `running` かつ heartbeat が古ければ `resumeFromCursor` | この行に到達するのは `VAULT_BOOTSTRAP_ON_START` が `true` / `force` のときだけ。既定の `false` では判定自体が呼ばれない |
+| admin UI（tasks 5.4） | 状態が `running` / `verifying` なら再構築ボタンを押せなくする（二重起動の抑止） | プロセスが動いているかを区別しないため、誰も処理していない状態でも押せない |
+
+`verifying` は `running` より深い行き止まりだった。BootstrapTriggerResolver は `verifying` を無条件で skip とし（進行中の completeness check を邪魔しないため）、起動時の正規化も対象にしていなかった。completeness の待機ループは同じプロセスの中で回っているので、その最中にプロセスが落ちれば誰も先に進められない。
+
+なお `POST /_api/v3/vault/wipe` は状態を検査しておらず、state machine の `forceOverride` はどの状態からでも有効なので、API を直接呼ぶ経路だけは生きていた。UI からは到達できない。
+
+### プロセスが動いているかの判断を 1 か所に置く
+
+判断を `runner-liveness.ts`（純関数のみ、I/O なし）にまとめ、起動時の正規化と `getStatus()` の双方がこれを使う。2 か所が「実行が途絶えた」の定義で食い違わないことが目的（要件 7.4）。
+
+```
+resilience/runner-liveness.ts
+  isBootstrapInFlight(state)            -- running / verifying かどうか
+  isStaleBootstrapRunner({ state, heartbeatAt, staleThresholdMs, now? })
+```
+
+判断の材料は `bootstrapHeartbeatAt` の新しさだけとする（要件 7.2）。`running` / `verifying` 以外の状態では、heartbeat がどれだけ古くても false を返す。`running` / `verifying` なのに heartbeat が一度も書かれていない場合は「途絶えた」と扱う（bootstrap はページの処理を始める前に必ず 1 つ書き込むので、無いということは誰も実行していない）。
+
+barrel（`resilience/index.ts`。この配下のモジュールを外部へ公開する唯一の入口）からこの関数を export する。起動時の正規化は `features/growi-vault/server/index.ts` にあって resilience layer の外側なので、barrel 以外から内部モジュールを直接 import しない原則（tasks 4.4）に従う。
+
+「古い」と判断する時間は `app:vaultBootstrapHeartbeatStaleMs`（既定 60 秒）を呼び出し側から渡す。`runVaultSyncStateMigration` が configManager を直接読まないので、テストから明示的な値を与えられる。
+
+### 起動時の正規化の変更
+
+対象を「`running` / `verifying` かつプロセスが動いていない」に広げ（`verifying` を含める）、`failed` に書き換える。`failed` は運用者と自動再試行のどちらからでも扱える状態である（要件 3.1）。
+
+`bootstrapCursor` はそのまま残す（要件 7.8）。wipe を伴わない bootstrap ではまだ有効な再開位置であり、消せば毎回全件をやり直すことになる。wipe の側の cursor は下記のとおり開始時に消えるので、両方あわせて「古い cursor が残る経路」が閉じる。
+
+書き換えるときは WARN ログに状態・heartbeat の時刻・instanceId を残す。運用者が「なぜ状態が変わったのか」を後から追えるようにするため。
+
+### 全 wipe 時の cursor 無効化
+
+`executeBootstrap` の forceWipe 分岐では、状態を `running` に変える `$set` に `bootstrapCursor: null` を含める（要件 7.9）。
+
+これまでは、処理を始めるときのローカル変数（`resumeCursor = forceWipe ? null : cursor`）でのみ cursor を無視しており、DB に保存された値は最初の 1 ページを処理した時点で初めて上書きされていた。その手前で落ちると前回の cursor が残る。残ったまま resume すると次のようになる。
+
+1. ページの取得条件が `_id > 残った cursor` になり、それより古いページを 1 件も処理しない
+2. しかし wipe の `reset-all` は既に vault-manager に届いており、repository は空
+3. completeness check は cursor が snapshotMaxId に届いたかだけを見るので、新しいページを処理し終えれば条件を満たし `done` になる
+
+結果として、中身が欠けた vault が `done` として公開される。要件 2 が解消したはずの「cursor より前のページが永久に取り込まれない」状態の再発であり、エラーも警告も出ないまま起きるので気付きにくい。
+
+### 状態の公開と admin UI
+
+`BootstrapStatus` に 2 つのフィールドを追加する。
+
+| フィールド | 意味 |
+|---|---|
+| `heartbeatAt` | 実行中のプロセスが最後に書いた時刻。運用者が古さを目で確認できる |
+| `isStaleRunner` | `running` / `verifying` なのにプロセスが動いていないとき true |
+
+判断はサーバ側で行い、結論だけを `GET /_api/v3/vault/status` に載せる（要件 7.5）。「古い」と判断する時間はサーバの設定値なので、client 側が `heartbeatAt` から同じ判断を組み立てる作りにすると、設定を変えても UI に伝わらず、判断基準が 2 か所に分かれてしまう。
+
+admin UI は再構築ボタンを押せるかどうかを `isStaleRunner` に従わせ、実行が途絶えているときは押せるようにする。あわせて警告文を表示する（要件 7.6）。状態が `running` と表示されたまま破壊的な操作のボタンが押せると、運用者には UI の不具合に見えて押せないため、「進捗が報告されていないので押せるようにしている」ことを文章で示す。文言は `growi-vault.admin-settings.kill-switch.abandoned-run-notice`（en_US / ja_JP）。
+
+楽観更新（optimistic update: ボタンを押した直後に画面側の状態を先に書き換える処理）では、`isStaleRunner: false` と現在時刻の `heartbeatAt` を入れる。押した直後は「たった今始まった bootstrap」なので、次のポーリングでサーバの判断が返るまでボタンを再び押せなくするのが正しい。
+
+### Requirements Traceability（追補分）
+
+| 要件 | 実装 | テスト |
+|---|---|---|
+| 7.1, 7.2, 7.3, 7.8 | `features/growi-vault/server/index.ts` の `runVaultSyncStateMigration`（step 3） | `server/index.spec.ts`「in-flight state with no live runner」 |
+| 7.2, 7.4 | `resilience/runner-liveness.ts` | `resilience/__tests__/runner-liveness.spec.ts`（「古い」と判断する時間の境界 / heartbeat が未記録 / `done` や `failed` など処理が終わっている状態） |
+| 7.5 | `bootstrap-runner.ts` の `getStatus()`、`routes/vault-admin.ts` の `GET /status` | `bootstrap-runner.spec.ts`「getStatus() — runner liveness」、`vault-admin.spec.ts` |
+| 7.6, 7.7 | `client/admin/VaultAdminSettings.tsx` | `VaultAdminSettings.spec.tsx`（ボタンを押せるかどうか / 警告文の有無） |
+| 7.9, 7.10 | `bootstrap-runner.ts` の `executeBootstrap` forceWipe 分岐 | `bootstrap-runner.spec.ts`「(c-2) force wipe invalidates the persisted cursor」（`onRunning` が呼ばれた時点の cursor を観測する = プロセスが落ちる窓そのもの） |
+
+### 残る論点
+
+- **`VAULT_BOOTSTRAP_ON_START` の既定値**: 既定 `false` のままとした。実行が途絶えた bootstrap は再起動で `failed` に落ち、そこから先は要件 1.5 のとおり admin の明示操作で進む。既定を `true` に変えると「env をつけっぱなしにしても安全」という判断（要件 1.3）と別の議論になるため、本追補では触らない。
+- **`verifying` からの自動 resume**: 起動時の正規化が `failed` に落とすため、`VAULT_BOOTSTRAP_ON_START=true` の環境では次の起動で resume される。BootstrapTriggerResolver の「`verifying` は skip」という行自体は変更していない（進行中の completeness check を邪魔しないという判断は維持する）。
+- **プロセスは動いているのに heartbeat の書き込みだけ止まる場合**: 起動時の正規化は再起動しないと走らないため、この状態では admin UI 側でボタンが押せることだけが救いになる。heartbeat の書き込み失敗を検知して自分で状態を `failed` に落とす仕組みは入れていない（`updateOne` の失敗を握り潰さない形にする話であり、別途検討する）。

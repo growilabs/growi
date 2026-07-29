@@ -16,10 +16,21 @@ const DEFAULT_EMOJI = '📢';
 
 type Props = {
   item: INewsItemWithReadStatus;
+  /**
+   * 0-based index of the full-feed (/_news) page this item appears on,
+   * derived from the sidebar SWRInfinite pages. Used to construct the
+   * `/_news?page=N` query so that clicking a news item lands on the
+   * corresponding page without loading N-1 prior pages.
+   *
+   * `undefined` when no valid mapping exists (e.g. the unread-only filter is
+   * active — its page boundaries do not match the full feed); navigation
+   * then omits the `?page` query and lands on the first page.
+   */
+  pageIndex?: number;
   onReadMutate: (newsItemId: string) => void;
 };
 
-const NewsItemInner: FC<Props> = ({ item, onReadMutate }) => {
+const NewsItemInner: FC<Props> = ({ item, pageIndex, onReadMutate }) => {
   const { i18n } = useTranslation();
   const router = useRouter();
   const locale = i18n.language;
@@ -44,8 +55,19 @@ const NewsItemInner: FC<Props> = ({ item, onReadMutate }) => {
     } catch {
       // silently ignore mark-read failures
     }
-    router.push(`${NEWS_FEED_PATH}#${newsItemAnchorId(id)}`);
-  }, [item._id, onReadMutate, router]);
+    // `?page=N` sends the caller to the specific page of the full feed so
+    // /_news doesn't need to walk N-1 pages to reach the anchored item.
+    // When the mapping is unknown (pageIndex undefined), omit the query
+    // rather than point at a possibly wrong page.
+    // `scroll: false` prevents Next.js from resetting scroll on navigation;
+    // NewsFeed handles anchor scroll itself in a useEffect.
+    const pageQuery = pageIndex != null ? `?page=${pageIndex + 1}` : '';
+    router.push(
+      `${NEWS_FEED_PATH}${pageQuery}#${newsItemAnchorId(id)}`,
+      undefined,
+      { scroll: false },
+    );
+  }, [item._id, pageIndex, onReadMutate, router]);
 
   return (
     <button

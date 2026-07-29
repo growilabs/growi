@@ -625,6 +625,100 @@ async function callComposeView(
         expect(files).not.toContain('Foo.md');
         expect(files).not.toContain('foo.md');
       });
+
+      // -----------------------------------------------------------------------
+      // Test 7: Tree normalization — byte-length budget (req 4.12)
+      // -----------------------------------------------------------------------
+
+      it('over-long name: a page whose filename would exceed 255 bytes is still checked out, together with its neighbours (req 4.12)', {
+        timeout: 60_000,
+      }, async () => {
+        // Reproduces issue #11596. An 85-character Japanese title maps to a
+        // 258-byte filename, which ext4 / APFS reject with ENAMETOOLONG, and
+        // `git clone` aborts the WHOLE checkout on the first rejected file.
+        // The neighbouring page is therefore the real regression signal: it has
+        // nothing wrong with its own name, yet before the fix it never reached
+        // the working tree either.
+        const ns = 'integ-norm-long-name-ns';
+        const userId = 'norm0000long0name0000001';
+
+        if (mongoose == null) {
+          throw new Error('Mongoose not connected');
+        }
+        const { ObjectId } = mongoose.mongo;
+
+        const longTitle = 'あ'.repeat(85);
+        // Sanity-check the premise of this test: the un-shortened filename is
+        // over the limit. If this ever stops holding, the test below would pass
+        // for the wrong reason.
+        expect(Buffer.byteLength(`${longTitle}.md`, 'utf8')).toBeGreaterThan(
+          255,
+        );
+
+        await upsertPageAndWait({
+          namespace: ns,
+          pageId: new ObjectId().toHexString(),
+          pagePath: `/${longTitle}`,
+          revisionId: new ObjectId().toHexString(),
+          bodyText: '# long\nA long-title page.',
+        });
+
+        await upsertPageAndWait({
+          namespace: ns,
+          pageId: new ObjectId().toHexString(),
+          pagePath: '/Neighbour',
+          revisionId: new ObjectId().toHexString(),
+          bodyText: '# Neighbour\nA page with an ordinary name.',
+        });
+
+        const { viewRef } = await callComposeView(userId, [ns]);
+
+        const cloneTarget = path.join(normCloneDir, 'long-name-clone');
+
+        // Must not fail — before the fix this aborted with
+        // 'error: unable to create file …: File name too long'.
+        await execFileAsync('git', [
+          'clone',
+          '--config',
+          `http.extraheader=Authorization: ${AUTH_HEADER}`,
+          '--config',
+          `http.extraheader=x-vault-view-ref: ${viewRef}`,
+          `${BASE_URL}/internal/git`,
+          cloneTarget,
+        ]);
+
+        const files = await listFilesRecursive(cloneTarget);
+
+        // The checkout ran to completion: the unrelated page is on disk.
+        expect(files).toContain('Neighbour.md');
+
+        // The long page is on disk too, under a shortened name: the stem is cut
+        // to the 242 bytes left over by '__<hash8>' (10) and '.md' (3), i.e. 80
+        // 3-byte characters, and hash8 is taken from the pre-suffix filePath —
+        // the same rule as req 4.10.
+        const expectedLongFile = `${'あ'.repeat(80)}__${computeExpectedHash8(`${longTitle}.md`)}.md`;
+        expect(Buffer.byteLength(expectedLongFile, 'utf8')).toBeLessThanOrEqual(
+          255,
+        );
+        expect(files).toContain(expectedLongFile);
+
+        // Shortening touches the name only — the body is intact.
+        const body = await fs.promises.readFile(
+          path.join(cloneTarget, expectedLongFile),
+          'utf8',
+        );
+        expect(body).toContain('A long-title page.');
+
+        // git itself agrees the working tree matches the index, i.e. the
+        // checkout was not left half-applied.
+        const { stdout } = await execFileAsync('git', [
+          '-C',
+          cloneTarget,
+          'status',
+          '--porcelain',
+        ]);
+        expect(stdout.trim()).toBe('');
+      });
     });
   },
 );

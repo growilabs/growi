@@ -1306,7 +1306,8 @@
         "confirm-question": "本当に続行してよろしいですか？",
         "confirm-button": "確認",
         "cancel-button": "キャンセル",
-        "started-toast": "初期化を開始しました。データの再構築が完了するまで Vault は 503 を返します。"
+        "started-toast": "初期化を開始しました。データの再構築が完了するまで Vault は 503 を返します。",
+        "abandoned-run-notice": "ステータスは再構築中となっていますが、{{heartbeatAt}} 以降まったく進捗が報告されていません。実行していたプロセスが失われた状態です。やり直せるよう「Vault を初期化」は実行可能にしています。"
       },
       "bootstrap-status": {
         "state": "ステータス",

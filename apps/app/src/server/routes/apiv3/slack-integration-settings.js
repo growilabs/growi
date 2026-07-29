@@ -712,9 +712,11 @@ export const setup = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.SLACK_INTEGRATION]),
     loginRequiredStrictly,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.deleteIntegration,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const { id } = req.params;
 

@@ -203,7 +203,7 @@
                   },
                   {
                     "group": ["~/migrations/**", "**/src/migrations/**"],
-                    "message": "Importing from src/migrations/ in server code is forbidden. Migrations run independently via migrate-mongo CLI and must remain CJS-isolated."
+                    "message": "Importing from src/migrations/ in server code is forbidden. Migrations run independently via the migrate-mongo CLI; server code must not depend on a one-shot migration module."
                   }
                 ]
               }

@@ -6,22 +6,26 @@ The tech-stack overview lives in `AGENTS.md` / `apps/app/AGENTS.md` (auto-loaded
 
 ### Module System (native ESM)
 
-Since the ESM migration (2026-06), the workspace root, `apps/app`, and the 17 shared `@growi/*` packages under `packages/*` all declare `"type": "module"`. `apps/app`'s Express server emits native ESM under `dist/`, and **the runtime path contains no `ts-node` / `tsx`** — TypeScript runs via Node v24's built-in type stripping:
+Native ESM is the baseline of GROWI v8 (the version now on the mainline): the workspace root, `apps/app`, and the 17 shared `@growi/*` packages under `packages/*` all declare `"type": "module"`. `apps/app`'s Express server emits native ESM under `dist/`, and **the runtime path contains no `ts-node` / `tsx`** — TypeScript runs via Node v24's built-in type stripping:
 
 - **Production**: `node --import ./bin/runtime/env-preload.mjs dist/server/app.js` (`server:ci` adds `--ci` for load-only smoke); `bin/runtime/` holds the self-contained runtime hooks and is the only `bin/` subset shipped in the production tarball
 - **Dev**: `nodemon` → Node v24 native TS + an in-thread resolve-only hook (`apps/app/bin/runtime/dev-esm-resolver.mjs`) that maps `~/`/`^/` aliases and `.js`→`.ts`
 
-Node 24's `require(esm)` lets residual CommonJS consumers (e.g. third-party `@lykmapipo/common`) load ESM-only transitive deps, **but it returns a module *namespace* object, not the CJS default export**. Packages that read members off the default (e.g. `mime.getType`) still need a CJS pin; packages that use named members (e.g. `flat.flatten`) work natively. This is why `pnpm-workspace.yaml` keeps the `@lykmapipo/common>mime` pin but no longer needs the `flat` / `parse-json` pins (esm-migration Phase 5).
+**Why a hand-written resolve hook instead of a TS runner** (measured during the migration, and the reason not to "simplify" this back): `@swc-node/register` misreads the `^/*` alias as a bare package `'^'` and cannot resolve it at all; `tsx` works but routes every resolve/load through an out-of-thread loader hook and made a cold graph load ~2.3× slower than Node's native transform (5.8–6.4 s vs 2.4–2.8 s). Node's own type stripping needs no runner but has no `tsconfig.paths` support — hence the ~40-line in-thread `module.registerHooks` resolver, which is the only piece that has to exist. To keep Node's *default* strip-only mode usable (no `--experimental-transform-types`), `tsconfig.json` sets `erasableSyntaxOnly: true`, so `enum` / parameter properties / namespaces are banned repo-wide in `apps/app` and CI lint catches a regression.
 
-### apps/app Import Convention (esm-import-convention, 2026-06)
+Node 24's `require(esm)` lets residual CommonJS consumers (e.g. third-party `@lykmapipo/common`) load ESM-only transitive deps, **but it returns a module *namespace* object, not the CJS default export**. Packages that read members off the default (e.g. `mime.getType`) still need a CJS pin; packages that use named members (e.g. `flat.flatten`) work natively. This is why `pnpm-workspace.yaml` keeps the `@lykmapipo/common>mime` pin but no longer needs the `flat` / `parse-json` pins.
 
-`apps/app/src` uses a **single no-extension import convention** (local → relative `./X` / `../X`, cross-module → `~/X`; never `.js`/`.jsx` in source). The `.js` is added only at server-build emit by `bin/add-js-extensions.ts` and verified by `bin/verify-dist-resolution.ts` (both run directly via Node native type stripping) — this replaced the former dual-notation (`~/X.js` for NodeNext-program files vs extensionless relative) from esm-migration. The full developer rule lives in **`apps/app/.claude/rules/import-convention.md`** (app-scoped); this note records only the build/runtime decision behind it.
+App-scoped detail lives under `apps/app/.claude/`: **`rules/esm-authoring.md`** (native-ESM traps that build and boot checks do not catch — JSON import attributes, `__dirname`, CJS default-import interop, TS2742 on exported route factories, the no-`Crowi`-import cycle invariant) and **`skills/esm-merge-coverage/`** (the coverage pass for merging a pre-ESM branch, plus the codemod / lint tool inventory).
+
+### apps/app Import Convention
+
+`apps/app/src` uses a **single no-extension import convention** (local → relative `./X` / `../X`, cross-module → `~/X`; never `.js`/`.jsx` in source). The `.js` is added only at server-build emit by `bin/add-js-extensions.ts` and verified by `bin/verify-dist-resolution.ts` (both run directly via Node native type stripping) — the server build type-checks with `module: Preserve` / `moduleResolution: Bundler`, so the compile-time extension guarantee that `NodeNext` used to give is replaced by an exhaustive check of the emitted artifact. The full developer rule lives in **`apps/app/.claude/rules/import-convention.md`** (app-scoped); this note records only the build/runtime decision behind it.
 
 ### Bundler Strategy (Project-Wide Decision)
 
 GROWI uses **Turbopack** (Next.js 16 default) for **both development and production builds** (`next build` without flags). Webpack fallback is available via `USE_WEBPACK=1` environment variable for debugging only. All custom webpack loaders/plugins have been migrated to Turbopack equivalents (`turbopack.rules`, `turbopack.resolveAlias`). See `apps/app/.claude/skills/build-optimization/SKILL.md` for details.
 
-`transpilePackages` is now **empty**: once `apps/app` became native ESM, Turbopack resolves the ESM-only unified/remark/rehype ecosystem (and superjson) natively, so the former 40 hardcoded + 6 prefix-group entries were all removed during the migration (Phase 4). See `apps/app/next.config.ts` for the rationale comment.
+`transpilePackages` is now **empty**: once `apps/app` became native ESM, Turbopack resolves the ESM-only unified/remark/rehype ecosystem (and superjson) natively, so the former 40 hardcoded + 6 prefix-group entries were all removed during the ESM migration. See `apps/app/next.config.ts` for the rationale comment.
 
 ### Import Optimization Principles
 
@@ -74,7 +78,7 @@ For apps/app-specific build optimization details (webpack config, null-loader ru
 
 The monorepo uses **pino** (via `@growi/logger`) as the standard logging library. Legacy bunyan usage has been migrated.
 
-`@growi/logger` is a **universal** package (server + browser). Two constraints follow from that, both learned the hard way (esm-migration):
+`@growi/logger` is a **universal** package (server + browser). Two constraints follow from that, both learned the hard way during the ESM migration:
 
 - **No static `import … from 'node:*'` that a browser code path can reach.** Builtins like `node:module` have no browser polyfill and break the Turbopack client build. Acquire them at runtime inside a server-only branch via `process.getBuiltinModule('node:module')` (not an import statement → never enters the browser graph).
 - **pino transport targets must be ABSOLUTE PATHS, not bare specifiers,** because pino loads transports in a worker thread that resolves a bare specifier relative to the caller — and when the logger is **bundled** (Next.js SSR via Turbopack) that resolution fails with `unable to determine transport target for "pino-pretty"`, 500-ing every SSR page when `FORMAT_NODE_LOG` is truthy. `transport-factory.ts` resolves both the dev (`bunyan-format`) and prod (`pino-pretty`) targets to absolute paths for this reason.
@@ -111,8 +115,8 @@ still regress** — the plugin install route factory, the `/static/plugins` serv
 `@growi/pluginkit` format. Any change touching those (the ESM migration touched several)
 must re-run the **plugin-install smoke** — install one officially-released *script*, one
 *theme*, and one *template* plugin and confirm each is served/loaded — because build/boot
-checks do not exercise this path. (See `.kiro/specs/esm-migration/` Requirement 6 /
-`phase6-gate-evidence/`.)
+checks do not exercise this path. Procedure and reference plugins: the "External Plugin
+Install Smoke" section of `apps/app/.claude/skills/app-commands/SKILL.md`.
 
 ---
-_Updated: 2026-06-17. Added "External Plugin Distribution Contract" as a system-wide invariant (external plugins are prebuilt assets loaded as browser ESM / scanned server-side; orthogonal to the internal module system but must be smoke-verified on changes). Prior: 2026-06-16 Module System (native ESM) + transpilePackages-empty (esm-migration Phase 5.5)._
+_Updated: 2026-07-27. v8 (native ESM) is now the mainline. The `esm-migration` / `esm-import-convention` specs were retired: their durable content moved to `apps/app/.claude/rules/esm-authoring.md`, `apps/app/.claude/skills/esm-merge-coverage/`, and the app-commands skill (authorization-matrix + plugin-install smoke procedures), and the dev-runner selection rationale was folded into "Module System" above. Prior: 2026-06-17 External Plugin Distribution Contract; 2026-06-16 Module System (native ESM) + transpilePackages-empty._
