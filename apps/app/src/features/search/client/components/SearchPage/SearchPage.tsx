@@ -195,13 +195,24 @@ export const SearchPage = (): JSX.Element => {
     };
   }, [keyword]);
 
-  // for bulk deletion — target every accumulated page across appends.
-  // NOTE: full delete-reset (setSize(1) + deselect) is handled by a later task;
-  // here a minimal revalidation is sufficient.
+  // Post-delete reset (Req 5.3 / 7.2): discard the accumulation and reload from
+  // the first chunk, then clear the selection. Order matters — reset the size to
+  // 1 BEFORE revalidating so the first-chunk re-fetch is not raced by a mutate()
+  // against the stale (larger) size; the selection is cleared last so it never
+  // reflects rows that the reload has already dropped.
+  const deleteCompletedHandler = useCallback(() => {
+    swr.setSize(1);
+    swr.mutate();
+    searchPageBaseRef.current?.deselectAll();
+    setSelectedCount(0);
+  }, [swr]);
+
+  // for bulk deletion — target every accumulated page across appends. Selection
+  // of only the loaded-and-selected pages is handled inside the hook (Req 5.1).
   const deleteAllButtonClickedHandler = usePageDeleteModalForBulkDeletion(
     merged.pages,
     searchPageBaseRef,
-    () => swr.mutate(),
+    deleteCompletedHandler,
   );
 
   const extraControls = useMemo(() => {

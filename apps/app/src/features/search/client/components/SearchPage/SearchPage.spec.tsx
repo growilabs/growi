@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import { atom } from 'jotai';
 import type { SWRInfiniteResponse } from 'swr/infinite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -25,12 +25,22 @@ type CapturedSearchPageBaseProps = {
 
 const searchPageBaseSpy = vi.hoisted(() => ({
   lastProps: undefined as CapturedSearchPageBaseProps | undefined,
+  deselectAll: vi.fn(),
 }));
 
 vi.mock('./SearchPageBase', () => ({
   SearchPageBase: React.forwardRef(
-    (props: CapturedSearchPageBaseProps, _ref: React.Ref<unknown>) => {
+    (props: CapturedSearchPageBaseProps, ref: React.Ref<unknown>) => {
       searchPageBaseSpy.lastProps = props;
+      // Populate the imperative ref so SearchPage's post-delete reset can reach
+      // deselectAll() (the real SearchPageBase exposes it via ISelectableAll).
+      if (ref != null && typeof ref === 'object') {
+        (ref as React.MutableRefObject<unknown>).current = {
+          selectAll: vi.fn(),
+          deselectAll: searchPageBaseSpy.deselectAll,
+          getSelectedPageIds: () => new Set<string>(),
+        };
+      }
       return null;
     },
   ),
@@ -95,6 +105,9 @@ vi.mock('next-i18next', () => ({
 }));
 
 import { SearchPage } from './SearchPage';
+import { usePageDeleteModalForBulkDeletion } from './SearchPageBase';
+
+const mockedBulkDeletionHook = vi.mocked(usePageDeleteModalForBulkDeletion);
 
 const createInfiniteResponse = (
   data: IFormattedSearchResult[] | undefined,
@@ -226,5 +239,68 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
     const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
     expect(infiniteScroll?.hasError).toBe(false);
     expect(infiniteScroll?.isReachingEnd).toBe(false);
+  });
+});
+
+// Req 5.1/5.3/7.2 — bulk-delete orchestration: only selected loaded pages are
+// handed to the modal, and completing a delete resets the accumulation to the
+// first chunk while clearing the selection.
+describe('SearchPage bulk-delete orchestration (Req 5.1/5.3/7.2)', () => {
+  beforeEach(() => {
+    searchPageBaseSpy.lastProps = undefined;
+    keywordSpy.keyword = 'initial-keyword';
+    searchStoreSpy.infiniteResponse = createInfiniteResponse([
+      createChunk(['a', 'b']),
+    ]);
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // The onDeleted callback that SearchPage wires into the bulk-deletion hook.
+  const getOnDeleted = () =>
+    mockedBulkDeletionHook.mock.calls.at(-1)?.[2] as
+      | ((...args: unknown[]) => void)
+      | undefined;
+
+  it('hands the accumulated pages array to the bulk-deletion hook (Req 5.1)', () => {
+    searchStoreSpy.infiniteResponse = createInfiniteResponse([
+      createChunk(['a', 'b']),
+      createChunk(['c', 'd']),
+    ]);
+
+    render(<SearchPage />);
+
+    // The first arg is the merged/accumulated pages across appends (4 pages).
+    expect(mockedBulkDeletionHook.mock.calls.at(-1)?.[0]).toHaveLength(4);
+  });
+
+  it('re-fetches from the first chunk on delete completion: setSize(1) then mutate (Req 5.3)', () => {
+    render(<SearchPage />);
+
+    const swr = searchStoreSpy.infiniteResponse;
+    // Nothing resets the accumulation on a plain render.
+    expect(swr?.setSize).not.toHaveBeenCalled();
+
+    act(() => {
+      getOnDeleted()?.();
+    });
+
+    expect(swr?.setSize).toHaveBeenCalledWith(1);
+    expect(swr?.mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the selection on delete completion via deselectAll (Req 7.2)', () => {
+    render(<SearchPage />);
+
+    expect(searchPageBaseSpy.deselectAll).not.toHaveBeenCalled();
+
+    act(() => {
+      getOnDeleted()?.();
+    });
+
+    expect(searchPageBaseSpy.deselectAll).toHaveBeenCalledTimes(1);
   });
 });
