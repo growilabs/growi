@@ -572,7 +572,7 @@ interface VaultUploadPackSpawner {
 - `mode: 'advertise'` → `git upload-pack --stateless-rpc --advertise-refs <repoPath>`
 - `mode: 'rpc'` → `git upload-pack --stateless-rpc <repoPath>`（stdin: request body）
 - env: `GIT_NAMESPACE=<viewRef>`
-- `uploadpack.allowAnySHA1InWant=false`（git デフォルト）を維持する。ただしこれで防げるのは commit の直接取得だけなので、要求された object がビューからたどれるかの検査を upload-pack 起動前に GitProxyController が行う（要件 5.6・5.7、「追補 A」参照）
+- `uploadpack.allowAnySHA1InWant=false`（git デフォルト）を維持する。ただしこれで防げるのは commit の直接取得だけなので、要求された object がビューからたどれるかの検査を upload-pack 起動前に GitProxyController が行う（要件 5.6・5.7、本書「ビュー外 object の要求の拒否」参照）
 - クライアント切断時・タイムアウト時はプロセスを kill
 
 ---
@@ -777,7 +777,7 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 - **single security perimeter**: vault-manager は外部から到達不可（k8s NetworkPolicy で apps/app からのみ許可）。Ingress には登録しない
 - **shared secret**: env var only（`VAULT_MANAGER_INTERNAL_SECRET`）、DB に保存しない。k8s Secret で両 pod に注入
 - **constant-time 比較**: `crypto.timingSafeEqual` で timing attack を防止（要件 7.5）
-- **ビュー外 object の取得禁止**: `uploadpack.allowAnySHA1InWant=false`（git デフォルト）だけでは commit の直接取得しか防げない（ファイルの中身とディレクトリ一覧はビューを越えて取得できた。git 2.49.0 で実測）。そのため GitProxyController が upload-pack 起動前にクライアントの要求を検査し、ビュー ref からたどれない object の要求を拒否する（要件 5.6・5.7、「追補 A」）
+- **ビュー外 object の取得禁止**: `uploadpack.allowAnySHA1InWant=false`（git デフォルト）だけでは commit の直接取得しか防げない（ファイルの中身とディレクトリ一覧はビューを越えて取得できた。git 2.49.0 で実測）。そのため GitProxyController が upload-pack 起動前にクライアントの要求を検査し、ビュー ref からたどれない object の要求を拒否する（要件 5.6・5.7、本書「ビュー外 object の要求の拒否」）
 - **pages コレクション非アクセス**: vault-manager は `revisions` のみ ID 指定 body lookup（namespace 判定は apps/app に集約済み）
 - **情報漏洩防止**: namespace 集合は apps/app が ACL 評価済みで渡す。vault-manager は受け取った namespace をそのまま処理するのみ
 
@@ -838,7 +838,7 @@ git binary が pack 生成・delta 圧縮・転送を担当するため、vault-
 
 ## 参考情報
 
-- [git namespaces](https://git-scm.com/docs/gitnamespaces) — `GIT_NAMESPACE` 環境変数の仕様。読み取りのアクセス制御には使えないことも明記されている（「追補 A」参照）
+- [git namespaces](https://git-scm.com/docs/gitnamespaces) — `GIT_NAMESPACE` 環境変数の仕様。読み取りのアクセス制御には使えないことも明記されている（[research.md](./research.md) 参照）
 - [git smart HTTP protocol](https://git-scm.com/docs/http-protocol) — upload-pack wire format
 - [isomorphic-git GitHub](https://github.com/isomorphic-git/isomorphic-git) — v1.37.x API リファレンス
 - [MongoDB change streams](https://www.mongodb.com/docs/manual/changeStreams/) — resume token の挙動

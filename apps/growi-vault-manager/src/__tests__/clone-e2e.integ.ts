@@ -465,7 +465,7 @@ async function callComposeView(
     // -------------------------------------------------------------------------
 
     // -------------------------------------------------------------------------
-    // Objects outside the requester's view must not be served (req 5.4 / 追補 A)
+    // Objects outside the requester's view must not be served (req 5.4 / 5.6)
     // -------------------------------------------------------------------------
 
     describe('Objects outside the view (req 5.4)', () => {

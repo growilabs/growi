@@ -12,13 +12,13 @@
  *
  * `parseWantSection` reads only up to the first flush packet, which is all the
  * guard in vault-want-guard.ts needs in order to decide whether the request may
- * reach upload-pack (requirement 5.4 / 追補 A). Everything here is pure so the
+ * reach upload-pack (requirement 5.4 / 5.6). Everything here is pure so the
  * parsing can be tested without a stream or a git process.
  *
  * Only protocol v0 is covered, which is the only version reachable today: the
  * gateway does not forward the client's `Git-Protocol` header, so upload-pack
  * never negotiates v2. A v2 body is reported as invalid rather than guessed at
- * — see the note on the same subject in design.md 追補 A.
+ * — see the note on the same subject in the vault-manager research.md.
  */
 
 /** Largest want section the parser will buffer before giving up (bytes). */

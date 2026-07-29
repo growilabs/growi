@@ -166,7 +166,7 @@ export class GitProxyController {
 
     // Authorise the client's wants before upload-pack runs (requirement 5.4).
     // git would serve any blob or tree in the shared object store here, whether
-    // or not this view reaches it — see 追補 A in the vault-manager design.
+    // or not this view reaches it — see the vault-manager research.md.
     const peeked = await peekWantSection(req);
     if (peeked.status === 'invalid') {
       process.stderr.write(

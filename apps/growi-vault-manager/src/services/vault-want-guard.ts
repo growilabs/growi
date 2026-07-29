@@ -5,7 +5,7 @@
  * reachability check for an unadvertised want assumes the want is a commit. A
  * client that asks for a blob or a tree by object name therefore receives it
  * even when nothing in its own view reaches that object — measured on git
- * 2.49.0, see 追補 A in `.kiro/specs/growi-vault-manager/design.md`. Since
+ * 2.49.0, see `.kiro/specs/growi-vault-manager/research.md`. Since
  * gitnamespaces(7) states outright that namespaces are not a read
  * access-control boundary, the check has to happen before upload-pack runs.
  *

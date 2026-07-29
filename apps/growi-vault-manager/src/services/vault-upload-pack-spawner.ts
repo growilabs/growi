@@ -30,8 +30,8 @@
  * The gap is therefore closed before this spawner runs: GitProxyController
  * authorises every want against the view ref via vault-want-guard.ts, and hands
  * the already-inspected head of the request body back through `stdinPrefix`. Do
- * not call this in 'rpc' mode without that check. See "追補 A" in
- * .kiro/specs/growi-vault-manager/design.md.
+ * not call this in 'rpc' mode without that check. See
+ * .kiro/specs/growi-vault-manager/research.md.
  */
 
 import type { ChildProcess } from 'node:child_process';
