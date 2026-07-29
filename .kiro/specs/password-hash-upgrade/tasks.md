@@ -193,6 +193,8 @@
 
 - [ ] 6. CodeQL アラート（CWE-916 / #541）解消の確認
 - [ ] 6.1 実装後に CodeQL を再スキャンしアラート状態を確認する
+  _Manual/CI: CodeQL は GitHub Actions 上で実行するため devcontainer では確認不可。ブランチ push 後に CI の CodeQL 再スキャンで #541 の状態を確認すること。_
+  _コードレベルの裏付け（本ランで確認済み）: パスワード**保存**経路は scrypt のみ（`password-hash.ts` の `hash()` は scrypt、`setPassword` は `hash()` に委譲）。SHA-256 は legacy **検証**パス（`password-hash.ts:248` `verifyLegacy` 内の `SHA256(SEED+plaintext)`）にのみ残存し、Req 2.1 後方互換のため除去不可。`user/index.js:163` の sha256 は `generateApiToken`（スコープ外）。→ CWE-916 の保存経路脆弱性は解消済み。legacy 検証行が CodeQL に再フラグされたら「移行期間限定・新規保存未使用・Cleanup 後除去」の dismissal を付与、完全緑化は Cleanup フェーズ後。_
   - 保存経路が scrypt 化されたことで `js/insufficient-password-hash`（アラート #541）が解消されるか、CodeQL の再スキャンで確認する
   - legacy 検証パス（`verify()` 内の `SHA256(SEED + plaintext)`）が再フラグされる場合は、当該箇所に**正当理由付きの dismissal** を付与する（例: 「移行期間限定の legacy ハッシュ検証専用。新規保存には未使用。Cleanup 後に除去予定」）
   - SHA-256 計算は後方互換（Req 2.1）のため除去不可であり、完全な緑化は Cleanup フェーズで legacy 検証コードを削除した時点で達成される旨を PR / Issue に記録する
