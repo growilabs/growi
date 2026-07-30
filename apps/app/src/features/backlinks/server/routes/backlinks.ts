@@ -1,4 +1,5 @@
 import { SCOPE } from '@growi/core';
+import { ErrorV3 } from '@growi/core/dist/models';
 import type { RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { query } from 'express-validator';
@@ -21,7 +22,10 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
     // Guard needed for TypeScript type narrowing.
     // pageId is already validated and is always a string here.
     if (typeof pageId !== 'string') {
-      return res.apiv3Err('pageId must be a string', 400);
+      return res.apiv3Err(
+        new ErrorV3('pageId must be a string', 'invalid-page-id'),
+        400,
+      );
     }
     try {
       const backlinks = await crowi.pageLinkService.findBacklinks(
@@ -31,7 +35,12 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
       return res.apiv3({ backlinks });
     } catch (err) {
       logger.error('Failed to get backlinks', err);
-      res.apiv3Err(err, 500);
+      // Deliberately not forwarding `err`: apiv3Err serializes an Error's own
+      // message to the client, which would leak driver/internal detail.
+      return res.apiv3Err(
+        new ErrorV3('Failed to get backlinks', 'failed-to-get-backlinks'),
+        500,
+      );
     }
   };
 };
