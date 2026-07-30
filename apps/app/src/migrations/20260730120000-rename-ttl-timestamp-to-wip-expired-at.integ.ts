@@ -146,6 +146,26 @@ describe('rename-ttl-timestamp-to-wip-expired-at', () => {
     const wipIndex = indexes.find((i) => i.name === WIP_EXPIRED_AT_INDEX_NAME);
     expect(wipIndex).toBeDefined();
     expect(wipIndex?.expireAfterSeconds).toBeUndefined();
+    // Must match the mongoose schema declaration, or whichever of the two creates
+    // it second fails with IndexOptionsConflict.
+    expect(wipIndex?.sparse).toBe(true);
+  });
+
+  it('brings an existing wipExpiredAt index up to the expected options', async () => {
+    // A non-sparse index of this name can already exist (an earlier run, or
+    // mongoose autoIndex before this change). Leaving it alone would make the
+    // schema's own createIndexes call conflict on every boot.
+    await pages.createIndex(
+      { wipExpiredAt: 1 },
+      { name: WIP_EXPIRED_AT_INDEX_NAME },
+    );
+
+    await migrate.up(db);
+
+    const wipIndex = (await pages.indexes()).find(
+      (i) => i.name === WIP_EXPIRED_AT_INDEX_NAME,
+    );
+    expect(wipIndex?.sparse).toBe(true);
   });
 
   it('is idempotent', async () => {

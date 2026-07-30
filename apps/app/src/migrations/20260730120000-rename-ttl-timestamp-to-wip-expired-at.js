@@ -197,9 +197,14 @@ export async function up(db) {
     `Exempted ${exempted.modifiedCount} page(s) with descendants from auto-expiry`,
   );
 
+  // Dropped first so the options below are applied even when an index of this name
+  // already exists with different ones: mongoose's autoIndex creates it too, and
+  // MongoDB rejects a same-name index whose options differ (IndexOptionsConflict).
+  // `sparse` must therefore stay in step with the schema declaration in models/page.ts.
+  await dropIndexIfExists(db, PAGES, WIP_EXPIRED_AT_INDEX_NAME);
   await collection.createIndex(
     { wipExpiredAt: 1 },
-    { name: WIP_EXPIRED_AT_INDEX_NAME },
+    { name: WIP_EXPIRED_AT_INDEX_NAME, sparse: true },
   );
 
   // Recounting descendantCount is deliberately NOT done here: it is one aggregate

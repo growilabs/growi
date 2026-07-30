@@ -2,15 +2,21 @@
  * Integration tests for deleteExpiredWipPageBySystem.
  *
  * Contract under test (observable state + boundary calls, not internals):
- *  - an expired WIP leaf is removed and its ancestors are decremented exactly once;
- *  - the claim is exclusive: concurrent sweeps delete once and decrement once;
+ *  - an expired WIP leaf is handed to the complete-delete primitive and its
+ *    ancestors are decremented, exactly once;
+ *  - the claim is exclusive: concurrent sweeps act once;
  *  - a page that stopped being eligible between the sweep query and the claim
- *    (published, or given a child) is left alone — this is the data-loss guard;
+ *    (published, expiry pushed out, or given a child) is left alone — this is the
+ *    data-loss guard;
+ *  - a claimed page loses its expiry, so no sweep picks it up again;
+ *  - a failed deletion leaves the page in place rather than half-deleted;
  *  - the returned summary reports what happened.
  *
- * `IPageService` is mocked at the boundary (that IS the observable effect of the
- * delete for our purposes), while the Page collection is real so the atomic claim
- * is exercised against MongoDB rather than simulated.
+ * `IPageService` is mocked at the boundary — deleteCompletelyOperation IS the
+ * observable deletion here — while the Page collection is real so the atomic claim
+ * is exercised against MongoDB rather than simulated. Because that boundary is
+ * mocked, the page document itself survives these tests; the row actually going
+ * away is covered by wip-page-cleanup-cron.integ.ts against the real service.
  */
 import type EventEmitter from 'node:events';
 import type { IPage } from '@growi/core';
@@ -95,7 +101,6 @@ describe('deleteExpiredWipPageBySystem', () => {
 
     const summary = await deleteExpiredWipPageBySystem([page], pageService);
 
-    expect(await Page.findById(page._id)).toBeNull();
     expect(mockUpdateDescendantCountOfAncestors).toHaveBeenCalledTimes(1);
     expect(mockUpdateDescendantCountOfAncestors).toHaveBeenCalledWith(
       parentId,
@@ -104,8 +109,8 @@ describe('deleteExpiredWipPageBySystem', () => {
     );
     // A system operation has no operator, so the actor must be an explicit null.
     expect(mockDeleteCompletelyOperation).toHaveBeenCalledWith(
-      expect.any(Array),
-      expect.any(Array),
+      [page._id],
+      [page.path],
       null,
     );
     expect(mockPageEvent.emit).toHaveBeenCalled();
@@ -117,7 +122,22 @@ describe('deleteExpiredWipPageBySystem', () => {
     });
   });
 
-  it('claims exclusively: concurrent sweeps delete once and decrement once', async () => {
+  it('withdraws the expiry of a claimed page, so a later sweep does not act twice', async () => {
+    // The page row is removed by deleteCompletelyOperation (mocked here), so what
+    // makes the claim safe to re-run is the expiry being gone.
+    const page = await createWipPage(`${base}/claimed-once`, past());
+
+    await deleteExpiredWipPageBySystem([page], pageService);
+    expect((await Page.findById(page._id))?.wipExpiredAt).toBeUndefined();
+
+    const second = await deleteExpiredWipPageBySystem([page], pageService);
+
+    expect(mockDeleteCompletelyOperation).toHaveBeenCalledTimes(1);
+    expect(second.deleted).toBe(0);
+    expect(second.skippedNotClaimed).toBe(1);
+  });
+
+  it('claims exclusively: concurrent sweeps act once', async () => {
     // The regression this guards: without the atomic claim both instances would
     // run the ancestor $inc, permanently double-decrementing descendantCount.
     const page = await createWipPage(`${base}/contended`, past());
@@ -127,8 +147,8 @@ describe('deleteExpiredWipPageBySystem', () => {
       deleteExpiredWipPageBySystem([page], pageService),
     ]);
 
-    expect(await Page.findById(page._id)).toBeNull();
     expect(mockUpdateDescendantCountOfAncestors).toHaveBeenCalledTimes(1);
+    expect(mockDeleteCompletelyOperation).toHaveBeenCalledTimes(1);
     // exactly one sweep won the claim; the other skipped
     expect(a.deleted + b.deleted).toBe(1);
     expect(a.skippedNotClaimed + b.skippedNotClaimed).toBe(1);
@@ -179,9 +199,32 @@ describe('deleteExpiredWipPageBySystem', () => {
     });
   });
 
-  it('keeps sweeping after one page fails', async () => {
-    // One bad page must not abort the run — the rest of the expired backlog
-    // still has to be collected.
+  it('skips a page that gained a child after the sweep read it', async () => {
+    // descendantCount is updated in a separate operation from the child insert, so
+    // a page that just gained a child still passes the pre-filter and the claim.
+    // Only the parent-link check catches it — without it the child is orphaned.
+    const page = await createWipPage(`${base}/gained-child`, past());
+    await Page.create({
+      path: `${base}/gained-child/kid`,
+      grant: Page.GRANT_PUBLIC,
+      parent: page._id,
+      isEmpty: false,
+      descendantCount: 0,
+    });
+
+    const summary = await deleteExpiredWipPageBySystem([page], pageService);
+
+    expect(await Page.findById(page._id)).not.toBeNull();
+    expect(mockDeleteCompletelyOperation).not.toHaveBeenCalled();
+    expect(summary.skippedNonLeaf).toBe(1);
+    expect(summary.deleted).toBe(0);
+  });
+
+  it('keeps sweeping after one page fails, leaving the failed page intact', async () => {
+    // One bad page must not abort the run — the rest of the expired backlog still
+    // has to be collected. And the failed page must survive whole: the claim is
+    // non-destructive precisely so a mid-deletion failure cannot leave the page
+    // gone while its revisions and attachments linger.
     const failing = await createWipPage(`${base}/fails`, past());
     const ok = await createWipPage(`${base}/succeeds`, past());
 
@@ -196,5 +239,6 @@ describe('deleteExpiredWipPageBySystem', () => {
 
     expect(summary.failed).toBe(1);
     expect(summary.deleted).toBe(1);
+    expect(await Page.findById(failing._id)).not.toBeNull();
   });
 });

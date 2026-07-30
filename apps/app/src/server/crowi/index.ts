@@ -498,10 +498,12 @@ class Crowi {
     );
     new NewsCronService().startCron();
 
-    const { WipPageCleanupCronService } = await import(
+    // Expired WIP page cleanup (the schedule defaults to daily and can be disabled
+    // with an empty app:wipPageCleanupCronSchedule)
+    const { startWipPageCleanupCronIfEnabled } = await import(
       '~/server/service/page/wip-page-cleanup-cron'
     );
-    new WipPageCleanupCronService(this).startCron();
+    startWipPageCleanupCronIfEnabled(this);
 
     // Periodic model-catalog refresh (no-op unless AI is enabled; the schedule
     // defaults to daily and can be disabled with an empty ai:modelCatalogRefreshCronSchedule)

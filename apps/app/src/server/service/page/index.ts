@@ -22,7 +22,6 @@ import {
   pagePathUtils,
   pathUtils,
 } from '@growi/core/dist/utils';
-import { config } from 'dotenv-flow';
 import type EventEmitter from 'events';
 import type { Cursor, HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';

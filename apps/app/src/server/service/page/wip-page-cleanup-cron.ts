@@ -2,20 +2,22 @@ import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
+import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
 import { randomSleep } from '~/server/util/random-sleep';
 import loggerFactory from '~/utils/logger';
 
-import { deleteExpiredWipPageBySystem } from './delete-expired-wip-page-by-system';
+import {
+  deleteExpiredWipPageBySystem,
+  type ExpiredWipPageCandidate,
+} from './delete-expired-wip-page-by-system';
 
 const logger = loggerFactory('growi:service:wip-page-cleanup-cron');
 
-const CRON_SCHEDULE = '0 3 * * *';
-
-// setupCron() runs on every app instance; jitter de-synchronizes the sweep across
-// pods so they don't all hit the DB at 03:00. It is a load-spreading measure only —
-// correctness under overlap comes from the atomic claim in
-// deleteExpiredWipPageBySystem, not from this.
+// setupCron() runs on every app instance and they share one schedule, so jitter
+// de-synchronizes the sweep across pods instead of having them all hit the DB at the
+// same instant. It is a load-spreading measure only — correctness under overlap
+// comes from the atomic claim in deleteExpiredWipPageBySystem, not from this.
 const MAX_RANDOM_SLEEP_MS = 5 * 60 * 1000;
 
 /**
@@ -26,6 +28,8 @@ const MAX_RANDOM_SLEEP_MS = 5 * 60 * 1000;
  * inflated and empty placeholder pages orphaned. Expiry is now application
  * driven: this cron selects expired pages and deletes them through the normal
  * service path, so counts and empty ancestors are maintained by the deletion.
+ *
+ * Instantiated by startWipPageCleanupCronIfEnabled, which owns the enabled check.
  */
 export class WipPageCleanupCronService extends CronService {
   crowi: Crowi;
@@ -36,7 +40,10 @@ export class WipPageCleanupCronService extends CronService {
   }
 
   override getCronSchedule(): string {
-    return CRON_SCHEDULE;
+    // `?? ''` only satisfies the non-nullable return type: this service is
+    // constructed solely by startWipPageCleanupCronIfEnabled, after it has
+    // confirmed a non-empty schedule.
+    return configManager.getConfig('app:wipPageCleanupCronSchedule') ?? '';
   }
 
   override async executeJob(): Promise<void> {
@@ -44,18 +51,22 @@ export class WipPageCleanupCronService extends CronService {
 
     const Page = mongoose.model<PageDocument, PageModel>('Page');
 
-    // Streamed, not materialized: the result set is unbounded in principle and
-    // hydrated documents cost ~3.7 KiB of wrapper each.
+    // Streamed and projected, not materialized: the result set is unbounded in
+    // principle, and the sweep only needs to identify each candidate — the
+    // deletion works from the document its own claim returns.
     //
     // A WIP page that gains a descendant has its wipExpiredAt cleared
     // (updateDescendantCountOfAncestors), so an expired page with children should
-    // not exist. Filtering here keeps the sweep cheap; the equivalent check in
-    // deleteExpiredWipPageBySystem is the safety net if the invariant is ever broken.
+    // not exist. Filtering here keeps the sweep cheap; the equivalent checks in
+    // deleteExpiredWipPageBySystem are the safety net if the invariant is ever broken.
     const pages = Page.find({
       wip: true,
       wipExpiredAt: { $lte: new Date() },
       descendantCount: 0,
-    }).cursor();
+    })
+      .select({ _id: 1, path: 1, descendantCount: 1 })
+      .lean<ExpiredWipPageCandidate>()
+      .cursor();
 
     const summary = await deleteExpiredWipPageBySystem(
       pages,
@@ -65,3 +76,31 @@ export class WipPageCleanupCronService extends CronService {
     logger.info(summary, 'Expired WIP page cleanup finished');
   }
 }
+
+/**
+ * Start the cleanup cron IFF `app:wipPageCleanupCronSchedule` is non-empty. Called
+ * from Crowi#setupCron at boot.
+ *
+ * The schedule defaults to a daily expression, so the sweep is on by default;
+ * setting the env var to an empty string opts out, which an operator needs when the
+ * sweep is too heavy for their wiki or has to be run out-of-band. An invalid
+ * expression is logged and skipped rather than allowed to break the boot — WIP
+ * pages lingering is preferable to a server that will not start.
+ */
+export const startWipPageCleanupCronIfEnabled = (crowi: Crowi): void => {
+  const schedule = configManager.getConfig('app:wipPageCleanupCronSchedule');
+  if (schedule == null || schedule.trim() === '') {
+    logger.info('Expired WIP page cleanup is disabled by configuration');
+    return;
+  }
+
+  try {
+    new WipPageCleanupCronService(crowi).startCron();
+    logger.info(`Scheduled the expired WIP page cleanup (cron: '${schedule}')`);
+  } catch (err) {
+    logger.error(
+      `Failed to schedule the expired WIP page cleanup (cron: '${schedule}')`,
+      err,
+    );
+  }
+};

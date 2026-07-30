@@ -17,7 +17,10 @@ import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
-import { repairPageTree } from '~/server/service/page/repair-page-tree';
+import {
+  isRepairPageTreeRunning,
+  repairPageTree,
+} from '~/server/service/page/repair-page-tree';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
@@ -1126,6 +1129,18 @@ export const setup = (crowi: Crowi): Router => {
           new ErrorV3(
             'GROWI is not maintenance mode. To repair the page tree, please activate the maintenance mode first.',
             'not_maintenance_mode',
+          ),
+        );
+      }
+
+      // The admin UI disables its button after starting, but that state is
+      // per-browser and resets on reload — reject here so a reloaded page cannot
+      // stack a second collection-wide scan on top of the running one.
+      if (isRepairPageTreeRunning()) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'Page tree repair is already running. Please wait for it to finish; progress is written to the server log.',
+            'repair_already_running',
           ),
         );
       }

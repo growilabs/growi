@@ -67,6 +67,12 @@ export interface PageDocument extends IPage, Document<Types.ObjectId> {
   populateDataToShowRevision(
     shouldExcludeBody?: boolean,
   ): Promise<IPagePopulatedToShowRevision & PageDocument>;
+  publish(): void;
+  unpublish(): void;
+  // Declared explicitly despite the index signature above: omitting
+  // wipExpirationSeconds would otherwise compile and store `new Date(NaN)`,
+  // surfacing only as a save-time CastError.
+  makeWip(disableTtl: boolean, wipExpirationSeconds: number): void;
 }
 
 type TargetAndAncestorsResult = {
@@ -272,7 +278,13 @@ const schema = new Schema<PageDocument, PageModel>(
 // indexes
 schema.index({ createdAt: 1 });
 schema.index({ updatedAt: 1 });
-schema.index({ wipExpiredAt: 1 });
+// sparse: only WIP pages awaiting expiry carry this field, so the index stays
+// proportional to them rather than to the whole collection. Safe for the only
+// query that uses it (`wipExpiredAt: { $lte: <Date> }`): a missing or null value
+// never satisfies a Date range comparison, so nothing the index omits is a hit.
+// Keep in sync with the createIndex options in the wipExpiredAt migration —
+// mismatched options on the same index name fail with IndexOptionsConflict.
+schema.index({ wipExpiredAt: 1 }, { sparse: true });
 // apply plugins
 schema.plugin(mongoosePaginate);
 schema.plugin(uniqueValidator);

@@ -1,13 +1,13 @@
 import { getIdForRef, type IPage, type Ref } from '@growi/core';
-import { loggerFactory } from '@growi/logger';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
+import loggerFactory from '~/utils/logger';
 
 import type { IPageService } from './page-service';
 import { shouldUseV4Process } from './should-use-v4-process';
 
-const logger = loggerFactory('growi:services:page');
+const logger = loggerFactory('growi:services:page:delete-completely-by-system');
 
 type IPageUnderV5 = Omit<IPage, 'parent'> & { parent: Ref<IPage> };
 
