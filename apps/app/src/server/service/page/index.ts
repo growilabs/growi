@@ -665,7 +665,6 @@ class PageService implements IPageService {
       this.activityEvent.emit('updated', activity, page, preNotify);
     }
 
-    this.clearAncestorPagesWipExpiration(newPagePath);
     return renamedPage;
   }
 
@@ -4476,10 +4475,37 @@ class PageService implements IPageService {
 
     await Page.incrementDescendantCountOfPageIds(ancestorPageIds, inc);
 
+    if (inc > 0) {
+      await this.clearWipExpirationOf(ancestorPageIds);
+    }
+
     const updateDescCountData: UpdateDescCountRawData = Object.fromEntries(
       ancestors.map((p) => [p._id.toString(), p.descendantCount + inc]),
     );
     this.emitUpdateDescCount(updateDescCountData);
+  }
+
+  /**
+   * A WIP page that gains a descendant must not auto-expire — deleting it would
+   * orphan that descendant. `makeWip()` already applies this rule at creation time
+   * via `disableTtl`, but that is a point-in-time snapshot; this keeps the invariant
+   * true for pages that acquire descendants later.
+   *
+   * Called from updateDescendantCountOfAncestors, which every descendant-adding
+   * path (create / rename / duplicate / revert / v5 migration) routes through — so
+   * "this page gained a descendant" and "this page must stop expiring" stay a single
+   * event. The ancestor ids are passed in rather than re-derived: the caller has
+   * already resolved them from the parent links.
+   */
+  private async clearWipExpirationOf(
+    ancestorPageIds: ObjectIdLike[],
+  ): Promise<void> {
+    const Page = mongoose.model<IPage, PageModel>('Page');
+
+    await Page.updateMany(
+      { _id: { $in: ancestorPageIds }, wipExpiredAt: { $ne: null } },
+      { $unset: { wipExpiredAt: true } },
+    );
   }
 
   private emitUpdateDescCount(data: UpdateDescCountRawData): void {
@@ -4971,8 +4997,6 @@ class PageService implements IPageService {
     options: IOptionsForCreate,
     pageOpId: ObjectIdLike,
   ): Promise<void> {
-    await this.clearAncestorPagesWipExpiration(page.path);
-
     // Update descendantCount
     await this.updateDescendantCountOfAncestors(page._id, 1, false);
 
@@ -5066,21 +5090,6 @@ class PageService implements IPageService {
     },
   ): Promise<boolean> {
     return this.canProcessCreate(path, grantData, false);
-  }
-
-  private async clearAncestorPagesWipExpiration(path: string): Promise<void> {
-    const Page = mongoose.model<PageDocument, PageModel>('Page');
-
-    const ancestorPaths = collectAncestorPaths(path);
-    const ancestorPageIds = await Page.aggregate([
-      { $match: { path: { $in: ancestorPaths, $nin: ['/'] }, isEmpty: false } },
-      { $project: { _id: 1 } },
-    ]);
-
-    await Page.updateMany(
-      { _id: { $in: ancestorPageIds } },
-      { $unset: { wipExpiredAt: true } },
-    );
   }
 
   /**
