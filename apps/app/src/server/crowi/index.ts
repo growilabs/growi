@@ -498,6 +498,11 @@ class Crowi {
     );
     new NewsCronService().startCron();
 
+    const { PageCleanupCronService } = await import(
+      '~/server/service/page/page-cleanup-cron'
+    );
+    new PageCleanupCronService(this).startCron();
+
     // Periodic model-catalog refresh (no-op unless AI is enabled; the schedule
     // defaults to daily and can be disabled with an empty ai:modelCatalogRefreshCronSchedule)
     const { startModelCatalogRefreshCronIfEnabled } = await import(
