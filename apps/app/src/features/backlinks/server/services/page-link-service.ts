@@ -1,38 +1,35 @@
 import type { IUser } from '@growi/core';
 import type { Types } from 'mongoose';
-import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import { PageQueryBuilder } from '~/server/models/page';
+import type { PageDocument } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
 import type { IBacklink } from '../../interfaces/backlink';
-import PageLink from '../models/page-link';
-import { handlePageUpsertById } from './page-link-service-handlers';
+import { findBacklinks } from './find-backlinks';
+import { PageLinkUpsertQueue } from './page-link-upsert-queue';
 
 const logger = loggerFactory('growi:features:backlinks:page-link-service');
 
-// Read-path scale for heavily-linked hub pages (bounding/index/interactive-time) is handled in B2.1; intentionally unbounded here.
-type BacklinkSource = {
-  _id: Types.ObjectId;
-  path: string;
-};
-
-export const DRAIN_INTERVAL_MS = 1000;
-export const MAX_PAGES_PER_DRAIN = 3;
-
+/**
+ * Crowi-facing entry point for the backlinks index.
+ *
+ * Deliberately thin: it owns only the wiring that needs a Crowi instance —
+ * lifecycle-event subscription and config access — and delegates the work to
+ * modules that need neither. The write side is paced by `PageLinkUpsertQueue`,
+ * the read side is `findBacklinks`.
+ */
 export class PageLinkService {
   private crowi: Crowi;
-  private pagesToUpsert: Set<string>;
-  private drainTimer: NodeJS.Timeout | null;
-  private draining: boolean;
+  private upsertQueue: PageLinkUpsertQueue;
 
   constructor(crowi: Crowi) {
     this.crowi = crowi;
-    this.pagesToUpsert = new Set<string>();
-    this.draining = false;
-    this.drainTimer = null;
+    // Read per drain rather than captured now: the service is constructed during
+    // boot, before admins can change the site URL at runtime.
+    this.upsertQueue = new PageLinkUpsertQueue(() =>
+      this.crowi.configManager.getConfig('app:siteUrl'),
+    );
   }
 
   static create(crowi: Crowi): PageLinkService {
@@ -53,77 +50,16 @@ export class PageLinkService {
         throw new Error('Page ID is undefined');
       }
 
-      this.pagesToUpsert.add(page._id.toString());
-
-      this.scheduleDrain();
+      this.upsertQueue.enqueue(page._id.toString());
     } catch (err) {
       logger.error({ err, pageId: page._id }, 'backlinks sync failed');
     }
   }
 
-  async findBacklinks(
+  findBacklinks(
     toPageId: Types.ObjectId,
     user: IUser | null,
   ): Promise<IBacklink[]> {
-    const Page = mongoose.model<PageDocument, PageModel>('Page');
-    const backlinkIds = await PageLink.findBacklinkSources(toPageId);
-
-    const builder = new PageQueryBuilder(
-      Page.find({ _id: { $in: backlinkIds } }),
-    );
-
-    await builder.addViewerCondition(user);
-    builder.addConditionToExcludeTrashed();
-
-    const pages: BacklinkSource[] = await builder.query
-      .select('_id path')
-      .lean()
-      .exec();
-
-    const backlinks: IBacklink[] = pages.map((page) => ({
-      pageId: page._id.toString(),
-      path: page.path,
-    }));
-
-    return backlinks;
-  }
-
-  private scheduleDrain(): void {
-    if (this.drainTimer != null || this.draining) return;
-    this.drainTimer = setTimeout(() => {
-      this.drain().catch((err) =>
-        logger.error({ err }, 'backlinks drain failed'),
-      );
-    }, DRAIN_INTERVAL_MS);
-    // A pending drain must not keep the process alive; dropped work self-heals on the next edit.
-    this.drainTimer.unref();
-  }
-
-  private async drain(): Promise<void> {
-    this.drainTimer = null;
-    this.draining = true;
-
-    try {
-      const siteUrl = this.crowi.configManager.getConfig('app:siteUrl');
-      const batch = [...this.pagesToUpsert].slice(0, MAX_PAGES_PER_DRAIN);
-
-      // Remove before processing: a save landing mid-drain re-enqueues the id and gets a fresh
-      // run, whereas removing afterwards would swallow that save's changes.
-      for (const id of batch) {
-        this.pagesToUpsert.delete(id);
-      }
-
-      for (const id of batch) {
-        try {
-          // biome-ignore lint/performance/noAwaitInLoops: pacing is the point — parses run one at a time so the event loop is yielded between them (req 3.5)
-          await handlePageUpsertById(id, siteUrl);
-        } catch (err) {
-          logger.error({ err, pageId: id }, 'backlinks sync failed');
-        }
-      }
-    } finally {
-      this.draining = false;
-      if (this.pagesToUpsert.size > 0) this.scheduleDrain();
-    }
+    return findBacklinks(toPageId, user);
   }
 }

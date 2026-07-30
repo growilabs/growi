@@ -6,11 +6,11 @@ import type Crowi from '~/server/crowi';
 import type PageEvent from '~/server/events/page';
 import type { PageDocument } from '~/server/models/page';
 
+import { PageLinkService } from './page-link-service';
 import {
   DRAIN_INTERVAL_MS,
   MAX_PAGES_PER_DRAIN,
-  PageLinkService,
-} from './page-link-service';
+} from './page-link-upsert-queue';
 
 // handlePageUpsertById has its own coverage (page-link-service-handlers.integ.ts); mock it so this
 // test isolates the queue contract — which pages are extracted, how often, and how many per tick.
