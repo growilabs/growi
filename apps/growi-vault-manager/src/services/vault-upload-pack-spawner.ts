@@ -30,8 +30,17 @@
  * The gap is therefore closed before this spawner runs: GitProxyController
  * authorises every want against the view ref via vault-want-guard.ts, and hands
  * the already-inspected head of the request body back through `stdinPrefix`. Do
- * not call this in 'rpc' mode without that check. See "追補 A" in
- * .kiro/specs/growi-vault-manager/design.md.
+ * not call this in 'rpc' mode without that check. See
+ * .kiro/specs/growi-vault-manager/research.md.
+ *
+ * `uploadpack.allowFilter=true` is set so that a client can shrink its clone
+ * with `--filter=sparse:oid=<published spec>` (requirement 5.9). The setting is
+ * all-or-nothing — git cannot advertise one kind of filter and not another — so
+ * the filters this server does not serve are refused by the same guard, which
+ * inspects the `filter` line before this spawner runs. Note that
+ * `uploadpack.allowReachableSHA1InWant` stays off: a client is never allowed to
+ * ask for an object by name, which is why `sparse:oid` (applied entirely on the
+ * server, one want, no follow-up request) is the only filter that fits.
  */
 
 import type { ChildProcess } from 'node:child_process';
@@ -99,11 +108,21 @@ export function spawnUploadPack(opts: SpawnOptions): SpawnResult {
   const { mode, viewRef, stdin, stdinPrefix } = opts;
   const repoPath = getRepoPath();
 
+  // Both modes carry the config: 'advertise' is where the filter capability is
+  // announced, 'rpc' is where the filter is applied.
+  const config = ['-c', 'uploadpack.allowFilter=true'];
+
   // Build the argument list based on mode.
   const args =
     mode === 'advertise'
-      ? ['upload-pack', '--stateless-rpc', '--advertise-refs', repoPath]
-      : ['upload-pack', '--stateless-rpc', repoPath];
+      ? [
+          ...config,
+          'upload-pack',
+          '--stateless-rpc',
+          '--advertise-refs',
+          repoPath,
+        ]
+      : [...config, 'upload-pack', '--stateless-rpc', repoPath];
 
   // Spawn the process with GIT_NAMESPACE so git only sees the view ref's
   // namespace (gitnamespaces(7): refs are rewritten to refs/namespaces/<ns>/).

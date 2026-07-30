@@ -6,6 +6,8 @@
 
 実装後の調査で、要件 5.4 が前提にしていた「`uploadpack.allowAnySHA1InWant=false`（git の既定値）を維持すればビューに広告していない object は取得できない」が **commit にしか当てはまらない**ことが実測で判明した。umbrella の Decision 3（namespace モデル採用）が「namespace 分離で per-user の可視範囲を表現する」としていた前提のうち、**読み取りの遮断は git 側が提供していない**部分に相当する。対策として、upload-pack を起動する前に要求された object を検査する層を GitProxyController に置いた（要件 5.6–5.8）。
 
+あわせて #11595（clone の転送量を絞る手段が README 通りに動かない）の残件として、転送量を絞る方式を決めた。git の絞り込み指定のうち `sparse:oid` だけが除外をサーバ側で適用して 1 リクエストで完結するため、上記の検査を無変更で通る。他の指定は object を ID で名指しする経路を必要とするため通らず、`uploadpack.allowFilter` が種類ごとに分けられないことから、受理してしまう分は同じ検査で拒否する（要件 5.9–5.11）。
+
 ---
 
 ## Research Log
@@ -66,6 +68,31 @@
 | 異なる ID を 1,310 件 | 0 ms（検査せず拒否） | 0 |
 | 異なる ID を 64 件（上限ぎりぎり） | 141 ms | 1 |
 
+### 転送量を絞る手段 — git の絞り込み指定の比較（2026-07-29 実測 / git 2.49.0）
+
+**調べた動機**: #11595 の残件。README が案内していた 2 つの手段（`--filter=blob:none` と cone mode の sparse-checkout）がどちらも動かず、長く運用した wiki の clone を小さくする手段が実質存在しなかった。
+
+**方法**: `wiki/` 配下 15,000 ページ ＋ `user/` 配下 5,000 ページを持つビュー（squash 後と同じ親なし commit 1 個）の bare repo を作り、GitProxyController と同じ形（`GIT_NAMESPACE` を設定した `git upload-pack --stateless-rpc`）で起動する最小の HTTP サーバに実際の `git clone` を当てて、サーバが書き出したバイト数・クライアントが送った本文・要求された object の件数を数えた。
+
+| 手段 | HTTP のやりとり | クライアントが送る本文 | 要求 object 件数 | 転送量 | 削減 |
+|---|---|---|---|---|---|
+| 通常の clone | 1 回 | 183 B | 1 | 6,269,214 | — |
+| `--filter=blob:none` ＋ sparse-checkout | 2 回 | 210 B → **359,260 B（圧縮済み）** | 1 → **15,000** | 4,815,233 | 23.2% |
+| **`--filter=sparse:oid=<blob>` ＋ sparse-checkout** | **1 回** | **252 B** | **1** | 4,815,099 | 23.2% |
+| `user/` を外したビュー用ブランチを配る（採用せず） | 1 回 | 195 B | 1 | 4,690,525 | 25.2% |
+| `--depth=1` | 1 回 | — | — | 削減なし | — |
+
+**分かったこと 3 点**:
+
+1. **`blob:none` の 2 回目のリクエストは圧縮されて届く。** git クライアントは HTTP リクエスト本文が大きいと `Content-Encoding: gzip` を付ける（750,160 B → 359,260 B）。マージ済みの `parseWantSection` に実物を通すと、圧縮された形は `malformed pkt-line length prefix`、展開した形も `want section exceeds the size a git client would send`（64 KiB 上限）で拒否される。`upload-pack` 自身も圧縮された本文は読めず `fatal: protocol error: bad line length character` で落ちるため、通すなら proxy 側での展開が前提になる。
+2. **`sparse:oid` は遅延取得を発生させない。** 除外がサーバ側で適用されるため、クライアントは 1 回目の応答で checkout に必要なものを全部受け取る。要求は commit 1 件で、マージ済みの検査をそのまま通る（実物の本文 252 バイトを `parseWantSection` に通して `complete` / want 1 件を確認）。必要なサーバ設定は `uploadpack.allowFilter=true` のみで、`allowReachableSHA1InWant` は不要。
+3. **`allowFilter` を有効にすると `blob:none` の失敗の仕方が悪化する。** 有効化前は `warning: filtering not recognized by server, ignoring` で全量転送になり、clone は使える状態で終わる。有効化後（かつ object を ID で名指しする経路を許さない状態）では `error: Server does not allow request for unadvertised object <ID>` が数千行続いたのち `warning: Clone succeeded, but checkout failed.` で終了コード 128・作業ツリー 0 件になる。
+
+**副産物 2 点**:
+
+- `--filter=sparse:oid` に他人のページの blob を指定すると応答サイズが変わる（正規のパターン 4,815,099 B / 他人のページを指定 488,217 B / 何にも一致しないパターン 488,167 B）。object の ID を知っている相手に、その内容についてのわずかな手がかりを与える。
+- `sparse:path`（サーバ上のパスをクライアントが指定する形式）は git 側で削除済み（`fatal: sparse:path filters support has been dropped`）。同じ理由（クライアントがサーバ上の任意のファイルを名指しできる）による。
+
 ---
 
 ## Design Decisions
@@ -103,6 +130,28 @@
 - **Rationale**: ビューが広告するのは commit 1 個（と HEAD）で、full clone / shallow clone / 差分 fetch はいずれも実測で要求 1 件。64 は実用の 30 倍以上の余裕。直列にすれば同時に走る git プロセスは 1 個に収まり、並列度の調整パラメータも増えない
 - **Trade-offs**: 上限内の最悪ケース（異なる ID 64 件）は直列で 141 ms かかる。正当な利用では起こらない形
 
+### Decision D: 転送量削減は `sparse:oid` で行う
+
+- **Context**: #11595。転送量を絞る手段が実質存在しない状態で、方式の選択が未決だった
+- **Alternatives Considered**:
+  1. `blob:none` を通す — 検査に 3 つの拡張が必要（本文の展開、want 区間 64 KiB と異なる ID 64 件の上限引き上げ、到達性の確認を「そのビューから使われている object を全列挙して照合する」形へ差し替え）。除外パスをクライアントが自由に選べる利点はあるが、マージ直後のセキュリティ経路に手を入れることになり、要件 5.3 の「一定量のメモリ」がビュー規模に比例する形（1 リクエスト 1 MB 前後）に変わる
+  2. **`sparse:oid` を通す** — サーバ設定 1 行（`allowFilter`）とパターン集合の公開のみ。要件 5.6–5.8 の検査は無変更で通る
+  3. `user/` を外したビュー用ブランチを配る — 削減幅は最大（25.2%）でクライアントの手順も最短（`--single-branch --branch <名前>`）だが、git の標準の仕組みではなく VaultViewComposer にブランチ生成を足す必要があり、検査も「ビュー内のどのブランチからたどれるか」に広げる必要がある
+  4. 何もせず README に非対応と明記する（#11605 の当初案）
+- **Selected Approach**: 案 2
+- **Rationale**: git の標準の仕組みのまま成立し、セキュリティ経路（要件 5.6–5.8）に一切手を入れずに済むことを実物のリクエスト本文で確認できた。削減幅は案 3 と 2 ポイント差で、案 1 と同等
+- **Trade-offs**: 除外できるのはサーバが公開したパターン集合だけ（現在 1 つ）。filter を付けた clone は partial clone として記録され、除外したページを後から取得することはできない（`allowReachableSHA1InWant` を有効にしないため、クライアントの手前で止まる）
+
+### Decision E: 公開していない絞り込み指定は clone の時点で拒否する
+
+- **Context**: `uploadpack.allowFilter` は指定の種類ごとに分けられないため、有効にすると `blob:none` も受理される
+- **Alternatives Considered**:
+  1. 放置する — clone は成功し checkout が失敗、作業ツリーは空（Research Log の 3 点目）。有効化前の「無視されるが動く」より悪化する
+  2. **want 区間の `filter` 行を検査し、公開した `sparse:oid` 以外を拒否する**
+- **Selected Approach**: 案 2。既存の検査と同じ場所（upload-pack 起動前）で判定し、pkt-line 1 本の `ERR` に対応している指定の形を書いて返す
+- **Rationale**: clone の時点で 1 行で止まり、次に何をすればよいかが分かる。同じ判定が、公開していない object を `sparse:oid` に指定して応答サイズの差から内容を推し量る余地も塞ぐ
+- **Trade-offs**: 応答の文言がサーバの対応状況を明かす。ただしこれはリポジトリの保持内容ではないため要件 2.3 には触れない
+
 ---
 
 ## 実装知見（Post-Implementation Discoveries）
@@ -124,7 +173,9 @@ upload-pack 自身が拒否時に返す形と同じなので、git クライア�
 | Risk | Mitigation |
 |---|---|
 | 検査を通さず `spawnUploadPack` を 'rpc' で呼ぶ実装が将来追加される | spawner の冒頭コメントで検査必須を明示。要件 5.6 として受け入れ基準化 |
-| `uploadpack.allowFilter` を有効化して partial clone を通そうとする | design.md の Revalidation Triggers に登録。検査の拡張が前提であることを #11595 側にも記録 |
+| `uploadpack.allowReachableSHA1InWant` を有効化して object を ID で名指しできるようにする | design.md の Revalidation Triggers に登録。要件 5.6 の検査を blob / tree の到達性まで拡張することが前提（Decision D の案 1） |
+| 公開する sparse filter のパターンを変えて README を直し忘れる | パターンから object ID を計算する単体テストが README を突き合わせる（`vault-sparse-filter.spec.ts`） |
+| gc が公開した filter の blob を消し、README の clone コマンドが解決できなくなる | `refs/vault/sparse-filters/<name>` から参照させ、起動ごとに再設置する。ref 経由の blob が `gc --prune=now` を越えて残ることを単体テストで固定 |
 | protocol v2 を通すと本文が解釈できず全拒否になる | 同上。gateway が `Git-Protocol` を転送しない現状が前提条件であることを明記 |
 | git の内部挙動（commit の到達性判定）に依存している | 到達性判定は自前の `merge-base` で行い、git 側の暗黙の挙動には依存しない。他ビューの commit 拒否は結合試験で固定 |
 

@@ -29,6 +29,10 @@ import type { Request, Response } from 'express';
 import { SharedSecretAuth } from '../middlewares/shared-secret-auth.js';
 import { encodePktLine } from '../services/vault-pkt-line.js';
 import { getRepoPath } from '../services/vault-repo-storage.js';
+import {
+  findUnsupportedFilters,
+  PUBLISHED_SPARSE_FILTERS,
+} from '../services/vault-sparse-filter.js';
 import { spawnUploadPack } from '../services/vault-upload-pack-spawner.js';
 import {
   findWantsOutsideView,
@@ -73,6 +77,19 @@ const REFUSAL_RESPONSE = encodePktLine(
 /** Response sent when the request head is not a protocol v0 want section. */
 const MALFORMED_REQUEST_RESPONSE = encodePktLine(
   'ERR vault: malformed upload-pack request\n',
+);
+
+/**
+ * Response sent when the client asks for a partial-clone filter this server does
+ * not serve (requirement 5.9).
+ *
+ * Unlike the refusal above, this message is deliberately specific: it describes
+ * what this server offers, not what the repository holds, and a client that is
+ * told nothing here would instead see its clone succeed and its checkout fail
+ * with a wall of per-object errors.
+ */
+const UNSUPPORTED_FILTER_RESPONSE = encodePktLine(
+  'ERR vault: unsupported partial-clone filter; this server serves only --filter=sparse:oid=<published spec> (see the vault-manager README)\n',
 );
 
 @Controller('/internal/git')
@@ -166,13 +183,28 @@ export class GitProxyController {
 
     // Authorise the client's wants before upload-pack runs (requirement 5.4).
     // git would serve any blob or tree in the shared object store here, whether
-    // or not this view reaches it — see 追補 A in the vault-manager design.
+    // or not this view reaches it — see the vault-manager research.md.
     const peeked = await peekWantSection(req);
     if (peeked.status === 'invalid') {
       process.stderr.write(
         `[git-proxy upload-pack] refused a request that is not a v0 want section (view=${viewRef}): ${peeked.reason}\n`,
       );
       res.end(MALFORMED_REQUEST_RESPONSE);
+      req.destroy();
+      return;
+    }
+
+    // A filter this server does not serve is refused here rather than left to
+    // fail the client's checkout later (requirement 5.9).
+    const unsupportedFilters = findUnsupportedFilters(
+      peeked.filters,
+      PUBLISHED_SPARSE_FILTERS,
+    );
+    if (unsupportedFilters.length > 0) {
+      process.stderr.write(
+        `[git-proxy upload-pack] refused an unsupported filter (view=${viewRef}): ${unsupportedFilters.join(', ')}\n`,
+      );
+      res.end(UNSUPPORTED_FILTER_RESPONSE);
       req.destroy();
       return;
     }

@@ -5,7 +5,7 @@
  * reachability check for an unadvertised want assumes the want is a commit. A
  * client that asks for a blob or a tree by object name therefore receives it
  * even when nothing in its own view reaches that object — measured on git
- * 2.49.0, see 追補 A in `.kiro/specs/growi-vault-manager/design.md`. Since
+ * 2.49.0, see `.kiro/specs/growi-vault-manager/research.md`. Since
  * gitnamespaces(7) states outright that namespaces are not a read
  * access-control boundary, the check has to happen before upload-pack runs.
  *
@@ -37,6 +37,12 @@ export interface PeekWantSectionResult {
   readonly status: 'complete' | 'invalid';
   /** OIDs the client asked for; empty when `status` is 'invalid'. */
   readonly wants: readonly string[];
+  /**
+   * Partial-clone filter specs the client asked to be applied; empty when
+   * `status` is 'invalid' or the request carries no filter. Judged by
+   * `findUnsupportedFilters` in vault-sparse-filter.ts.
+   */
+  readonly filters: readonly string[];
   /**
    * The bytes already taken off the stream. The caller must write these to
    * upload-pack's stdin before piping the remainder, or the request body would
@@ -119,11 +125,13 @@ export function peekWantSection(
           ? {
               status: 'complete',
               wants: parsed.wants,
+              filters: parsed.filters,
               prefix: Buffer.concat(chunks),
             }
           : {
               status: 'invalid',
               wants: [],
+              filters: [],
               prefix: Buffer.concat(chunks),
               reason: parsed.reason,
             },
@@ -136,6 +144,7 @@ export function peekWantSection(
       resolve({
         status: 'invalid',
         wants: [],
+        filters: [],
         prefix,
         reason:
           parsed.status === 'need-more'
