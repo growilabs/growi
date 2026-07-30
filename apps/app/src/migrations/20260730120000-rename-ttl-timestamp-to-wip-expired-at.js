@@ -202,6 +202,22 @@ export async function up(db) {
     { name: WIP_EXPIRED_AT_INDEX_NAME },
   );
 
+  // Recounting descendantCount is deliberately NOT done here: it is one aggregate
+  // per page over the whole collection, and a boot-time migration is the wrong
+  // place to stall an upgrade for an unbounded time. Instead, tell the operator —
+  // but only when this instance actually carries TTL-era data, so a fresh install
+  // stays silent. These counters are already computed above, so the check is free.
+  const wasAffectedByTtlDeletion =
+    removed > 0 || converted.modifiedCount > 0 || exempted.modifiedCount > 0;
+  if (wasAffectedByTtlDeletion) {
+    logger.warn(
+      'This instance previously used TTL-based WIP page expiry, which deleted pages ' +
+        'without running application code, so some descendantCount values may be too ' +
+        'high. To correct them, enable maintenance mode and run the page tree repair ' +
+        'from Admin > App Settings.',
+    );
+  }
+
   logger.info('Migration has successfully applied');
 }
 
