@@ -1,21 +1,69 @@
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { normalizePath } from '@growi/core/dist/utils/path-utils';
 import type { Nodes } from 'hast';
-import { selectAll } from 'hast-util-select';
-import rehypeRaw from 'rehype-raw';
-import gfm from 'remark-gfm';
-import remarkParse from 'remark-parse';
-import remarkRehype from 'remark-rehype';
-import { unified } from 'unified';
-
-import { relativeLinks } from '~/services/renderer/rehype-plugins/relative-links';
-import { relativeLinksByPukiwikiLikeLinker } from '~/services/renderer/rehype-plugins/relative-links-by-pukiwiki-like-linker';
-import { pukiwikiLikeLinker } from '~/services/renderer/remark-plugins/pukiwiki-like-linker';
 
 const RELATIVE_BASE = new URL('https://relative.invalid');
 
 const isAnchorLink = (href: string): boolean => {
   return href.length > 0 && href[0] === '#';
+};
+
+/**
+ * Load the markdown->hast stack and assemble a processor for one extraction.
+ *
+ * WHY dynamic import(): this module is statically reachable from the server's
+ * boot graph (crowi -> PageLinkService -> handlers -> here), and the unified /
+ * remark / rehype stack adds ~16 MiB RSS on top of what the rest of the boot
+ * graph already loads (31 MiB measured in isolation, but ~15 MiB of that is
+ * shared with mongoose / the page model and paid regardless). Imported at top
+ * level, every deployment would pay that at startup forever — including
+ * processes that never save a page (`server:ci` boot check, read-only
+ * instances). Extraction runs only on the backlinks drain timer, off the request
+ * path, so the ~80 ms first load costs no user-visible latency; Node caches
+ * modules, so later extractions resolve from the registry (~0.04 ms each).
+ *
+ * The local plugins are dynamic for the same reason — `relative-links` and
+ * `relative-links-by-pukiwiki-like-linker` each reach `hast-util-select`
+ * independently, so a static import of either keeps part of the stack eager.
+ *
+ * Guarded by `no-eager-markdown-imports.spec.ts`; see
+ * `.claude/rules/server-boot-imports.md`.
+ */
+const buildPipeline = async (pagePath: string) => {
+  const [
+    { unified },
+    { default: remarkParse },
+    { default: gfm },
+    { default: remarkRehype },
+    { default: rehypeRaw },
+    { selectAll },
+    { relativeLinks },
+    { relativeLinksByPukiwikiLikeLinker },
+    { pukiwikiLikeLinker },
+  ] = await Promise.all([
+    import('unified'),
+    import('remark-parse'),
+    import('remark-gfm'),
+    import('remark-rehype'),
+    import('rehype-raw'),
+    import('hast-util-select'),
+    import('~/services/renderer/rehype-plugins/relative-links'),
+    import(
+      '~/services/renderer/rehype-plugins/relative-links-by-pukiwiki-like-linker'
+    ),
+    import('~/services/renderer/remark-plugins/pukiwiki-like-linker'),
+  ]);
+
+  const processor = unified()
+    .use(remarkParse)
+    .use(gfm)
+    .use(pukiwikiLikeLinker)
+    .use(remarkRehype, { allowDangerousHtml: true })
+    .use(rehypeRaw)
+    .use(relativeLinksByPukiwikiLikeLinker, { pagePath })
+    .use(relativeLinks, { pagePath });
+
+  return { processor, selectAll };
 };
 
 /**
@@ -31,14 +79,7 @@ export const extractInternalLinks = async (
   pagePath: string,
   siteUrl?: string,
 ): Promise<string[]> => {
-  const processor = unified()
-    .use(remarkParse)
-    .use(gfm)
-    .use(pukiwikiLikeLinker)
-    .use(remarkRehype, { allowDangerousHtml: true })
-    .use(rehypeRaw)
-    .use(relativeLinksByPukiwikiLikeLinker, { pagePath })
-    .use(relativeLinks, { pagePath });
+  const { processor, selectAll } = await buildPipeline(pagePath);
 
   const hastTree = processor.parse(markdown);
   const runTree = await processor.run(hastTree);
