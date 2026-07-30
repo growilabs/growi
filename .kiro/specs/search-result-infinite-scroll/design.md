@@ -197,7 +197,7 @@ stateDiagram-v2
 | 1.6 | 失敗時エラー通知・再試行維持 | SearchPage, InfiniteScroll | hasError, onRetry, mutate | 追加読込(失敗) |
 | 2.1 | 番号ページャ非表示 | SearchPage, SearchPageBase | infiniteScroll slot | — |
 | 2.2 | 超過分はスクロール提供 | InfiniteScroll | setSize | 追加読込 |
-| 3.1 | 1回最大20件（既定） | useSWRINFxSearch | chunkSize = showPageLimitationL ?? 20 | 追加読込 |
+| 3.1 | 1回 showPageLimitationL 件（config 既定50、未取得時20） | useSWRINFxSearch | chunkSize = showPageLimitationL ?? 20 | 追加読込 |
 | 3.2 | 件数セレクタ非提供 | SearchPage | （SearchResultListHead のセレクタ復活させない） | — |
 | 4.1 | 全選択=読込済み全件 | SearchPageBase | selectAll over accumulated pages | リセット |
 | 4.2 | 全解除 | SearchPageBase | deselectAll | リセット |
@@ -237,7 +237,7 @@ stateDiagram-v2
 **Responsibilities & Constraints**
 - `useSWRInfinite` で apiv1 `/search`（offset/limit）を呼び、`IFormattedSearchResult` のページ配列を返す
 - SWR key の名前空間を `useSWRxSearch`（`'/search'`）と衝突させないため `'/search/infinite'` を用いる
-- チャンクサイズは `showPageLimitationL ?? INITIAL_PAGIONG_SIZE(20)` の固定値（セッション内一定・ユーザー変更手段なし）
+- チャンクサイズは `showPageLimitationL ?? INITIAL_PAGIONG_SIZE(20)` の固定値（セッション内一定・ユーザー変更手段なし）。`showPageLimitationL` の config 既定値は **50** のため、admin 未設定でも実効チャンクは 50（`?? 20` は client が値を取得できない場合のみのフォールバック）
 - offset は `pageIndex * chunkSize`。前ページが `chunkSize` 未満なら以降の key を `null` にして過剰取得を止める
 
 **Contracts**: State [x] / Service [x]（pure key 関数）

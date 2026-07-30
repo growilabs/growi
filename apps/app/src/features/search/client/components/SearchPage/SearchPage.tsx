@@ -326,7 +326,6 @@ export const SearchPage = (): JSX.Element => {
       // Components
       searchControl={searchControl}
       searchResultListHead={searchResultListHead}
-      searchPager={null}
       infiniteScroll={{
         swrInfiniteResponse: swr,
         isReachingEnd: merged.isReachingEnd || hasError,

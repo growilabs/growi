@@ -73,7 +73,8 @@ type Props = {
 
   searchControl: React.ReactNode;
   searchResultListHead: JSX.Element;
-  searchPager: React.ReactNode;
+  // Legacy numbered pager. Omit when `infiniteScroll` is provided.
+  searchPager?: React.ReactNode;
 
   // When provided, the result list is rendered inside <InfiniteScroll> and the
   // numbered pager is suppressed. When omitted, legacy pager rendering is kept.

@@ -389,7 +389,14 @@ const PrivateLegacyPages = (): JSX.Element => {
   const deleteAllButtonClickedHandler = usePageDeleteModalForBulkDeletion(
     data?.data,
     searchPageBaseRef,
-    () => mutate(),
+    () => {
+      // SearchPageBase now resets selection on `resetKey` change, not on every
+      // `pages` update, so a same-query refetch no longer clears the selection.
+      // Clear it explicitly to preserve the legacy behavior after deletion.
+      searchPageBaseRef.current?.deselectAll();
+      selectedPagesByCheckboxesChangedHandler(0, 0);
+      mutate();
+    },
   );
 
   const convertMenuItemClickedHandler = useCallback(() => {
@@ -421,11 +428,22 @@ const PrivateLegacyPages = (): JSX.Element => {
     openModal(selectedPages, () => {
       toastSuccess(t('Successfully requested'));
       closeModal();
+      // Clear selection explicitly after a same-query refetch (see delete handler).
+      searchPageBaseRef.current?.deselectAll();
+      selectedPagesByCheckboxesChangedHandler(0, 0);
       mutateMigrationStatus();
       mutate();
       mutatePageTree();
     });
-  }, [data, openModal, t, closeModal, mutateMigrationStatus, mutate]);
+  }, [
+    data,
+    openModal,
+    t,
+    closeModal,
+    selectedPagesByCheckboxesChangedHandler,
+    mutateMigrationStatus,
+    mutate,
+  ]);
 
   const pagingSizeChangedHandler = useCallback(
     (pagingSize: number) => {
