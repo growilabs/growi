@@ -115,6 +115,11 @@ const PageAccessoriesModalSubstance = ({
         Icon: BacklinksIcon,
         Content: BacklinksContent,
         i18n: t('backlinks.panel'),
+        // Guests are allowed (the endpoint admits them so backlinks stay readable
+        // on a public wiki), but a share-link viewer is not: that request carries
+        // no user and no isSharedPage flag, so the endpoint 403s and the panel
+        // could only ever render its error state.
+        isLinkEnabled: () => !isSharedUser,
       },
     };
   }, [t, isGuestUser, isReadOnlyUser, isSharedUser, isLinkSharingDisabled]);

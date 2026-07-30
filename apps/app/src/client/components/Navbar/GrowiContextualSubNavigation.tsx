@@ -250,6 +250,10 @@ const PageOperationMenuItems = (
         onClick={() =>
           openAccessoriesModal(PageAccessoriesModalContents.Backlinks)
         }
+        // Guests are fine (backlinks are readable on a public wiki); a share-link
+        // viewer is not — the endpoint 403s for that request. Mirrors the modal's
+        // isLinkEnabled for this tab.
+        disabled={!!isSharedUser}
         data-testid="open-page-accessories-modal-btn-with-backlinks-tab"
         className="grw-page-control-dropdown-item"
       >
