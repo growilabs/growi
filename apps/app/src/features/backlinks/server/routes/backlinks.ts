@@ -36,6 +36,48 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
   };
 };
 
+/**
+ * @swagger
+ *
+ *    /page/backlinks:
+ *      get:
+ *        tags: [Page]
+ *        summary: /page/backlinks
+ *        description: >
+ *          Get the pages that link to the given page. Sources the requesting user
+ *          cannot read, and sources in the trash, are omitted.
+ *        parameters:
+ *          - name: pageId
+ *            in: query
+ *            required: true
+ *            description: id of the page to list backlinks for
+ *            schema:
+ *              $ref: '#/components/schemas/ObjectId'
+ *        responses:
+ *          200:
+ *            description: Successfully retrieved the backlinks.
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *                  properties:
+ *                    backlinks:
+ *                      type: array
+ *                      description: Readable, non-trashed pages linking to this page
+ *                      items:
+ *                        type: object
+ *                        properties:
+ *                          pageId:
+ *                            $ref: '#/components/schemas/ObjectId'
+ *                          path:
+ *                            type: string
+ *                            description: current path of the linking page
+ *                            example: /Sandbox/source
+ *          400:
+ *            description: pageId is missing or is not a MongoDB ID.
+ *          500:
+ *            description: Internal server error.
+ */
 export const getBacklinksHandlerFactory = (crowi: Crowi): RequestHandler[] => {
   const loginRequired = loginRequiredFactory(crowi, true);
 
