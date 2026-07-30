@@ -45,6 +45,14 @@ interface VaultStatusData {
   startedAt: string | null;
   completedAt: string | null;
   lastError: string | null;
+  /** Last liveness signal from the process that owns the run. */
+  heartbeatAt: string | null;
+  /**
+   * Server-side verdict: the state claims a run is in flight but nobody is
+   * working on it any more. Computed on the server because the staleness
+   * threshold is server configuration.
+   */
+  isStaleRunner: boolean;
   storageStats: StorageStatsResponse | null;
 }
 
@@ -341,8 +349,14 @@ const BootstrapStatusSection = ({
   const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
 
   const isRunning = data?.bootstrapState === 'running';
-  const isBootstrapRunning =
+  const isBootstrapInFlight =
     data?.bootstrapState === 'running' || data?.bootstrapState === 'verifying';
+  // An in-flight state whose runner is gone will never move on its own, and
+  // this button is the only way out of it — so it stays enabled in that case.
+  // Blocking it there is what strands an admin after a mid-bootstrap crash.
+  const isRunnerAbandoned =
+    isBootstrapInFlight && (data?.isStaleRunner ?? false);
+  const isBootstrapRunning = isBootstrapInFlight && !isRunnerAbandoned;
   const processed = data?.processed ?? 0;
   const totalEstimated = data?.totalEstimated ?? 0;
 
@@ -383,6 +397,17 @@ const BootstrapStatusSection = ({
                   ),
                 }}
               />
+
+              {/* Without this, an enabled destructive button next to a
+                  "running" status reads as a UI bug rather than a way out. */}
+              {isRunnerAbandoned && (
+                <Alert color="warning" className="mt-2">
+                  {t(
+                    'growi-vault.admin-settings.kill-switch.abandoned-run-notice',
+                    { heartbeatAt: formatDate(data?.heartbeatAt) },
+                  )}
+                </Alert>
+              )}
             </div>
           </div>
         </div>
@@ -924,6 +949,10 @@ export const VaultAdminSettings = (): JSX.Element => {
       startedAt: new Date().toISOString(),
       completedAt: null,
       lastError: null,
+      // A run has just been requested, so treat it as freshly alive: this
+      // re-disables the button until the next poll brings the server verdict.
+      heartbeatAt: new Date().toISOString(),
+      isStaleRunner: false,
       storageStats: current?.storageStats ?? null,
     }),
     [],

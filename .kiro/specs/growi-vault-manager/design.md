@@ -61,6 +61,9 @@ Ts.ED v7.x ベースのマイクロサービスとして、`apps/pdf-converter` 
 - git binary が container image から外れる事態
 - GROWI Revision モデルの `body` フィールド形式変更
 - ページパスエンコーディング規則の変更（既存 clone 履歴との互換破壊）
+- 公開する sparse-checkout パターン集合（`PUBLISHED_SPARSE_FILTERS`）を変更する場合（object の ID が内容から決まるため、README に載せた clone コマンドと既存クライアントに残る `remote.origin.partialclonefilter` が無効になる。README との突き合わせは単体テストで固定済み）
+- `uploadpack.allowReachableSHA1InWant` を有効にする場合（クライアントが object を ID で名指しできるようになるため、要件 5.6 の検査を blob / tree の到達性まで拡張することが前提になる。research.md の Decision D 参照）
+- gateway がクライアントの `Git-Protocol` ヘッダを転送し、upload-pack が protocol v2 を使うようになる場合（同検査が v0 の形式のみ解釈するため）
 
 ---
 
@@ -178,6 +181,9 @@ apps/growi-vault-manager/
 │   │   ├── vault-path-mapper.ts             # ページパス → base filePath（エンコード・orphan、suffix なし）
 │   │   ├── vault-tree-normalizer.ts         # merged tree の compose-time 正規化（大小衝突 suffix）
 │   │   ├── vault-blob-hasher.ts             # isomorphic-git hashObject
+│   │   ├── vault-pkt-line.ts                # want 区間の pkt-line 解析（純関数）
+│   │   ├── vault-want-guard.ts              # 本文先頭の peek + ビュー ref からの到達性確認
+│   │   ├── vault-sparse-filter.ts           # 公開する sparse filter 集合と絞り込み指定の判定
 │   │   ├── vault-upload-pack-spawner.ts     # git upload-pack 子プロセス起動
 │   │   └── vault-maintenance-scheduler.ts  # squash + 周期 gc 自走スケジューラ
 │   ├── models/
@@ -212,8 +218,10 @@ vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn す�
 | 1.1–1.6 | change stream 購読・冪等処理 | VaultInstructionWatcher |
 | 2.1–2.8 | 全 op の namespace tree 更新 | VaultNamespaceBuilder, VaultPathMapper, VaultBlobHasher, VaultRepoStorage |
 | 3.1–3.7 | ページパス純関数マッピング | VaultPathMapper |
-| 4.1–4.8 | per-user view 合成・キャッシュ | ComposeViewController, VaultViewComposer |
+| 4.1–4.12 | per-user view 合成・キャッシュ・tree 正規化 | ComposeViewController, VaultViewComposer, VaultTreeNormalizer |
 | 5.1–5.5 | git smart HTTP lower-half | GitProxyController, VaultUploadPackSpawner |
+| 5.6–5.8 | ビュー外 object の要求の拒否・解析範囲と作業量の制限 | GitProxyController, VaultWantGuard, VaultPktLine |
+| 5.9–5.11 | 配信する partial clone の絞り込み指定の限定と公開 | GitProxyController, VaultSparseFilter, VaultUploadPackSpawner |
 | 6.1–6.7 | メンテナンス自走スケジューリング | VaultMaintenanceScheduler |
 | 7.1–7.5 | shared secret 認証 | SharedSecretAuth |
 | 8.1–8.4 | health endpoint | HealthController |
@@ -236,10 +244,14 @@ vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn す�
 | VaultInstructionWatcher | Service | change stream 購読 + drain + retry | 1.1–1.6 |
 | VaultNamespaceBuilder | Service | instruction → blob/tree/commit + ref 更新 | 2.1–2.8 |
 | VaultViewComposer | Service | namespace merge → user view ref（delta merge + cache） | 4.2–4.8 |
+| VaultTreeNormalizer | Service | merged tree のエントリ名正規化（大小衝突 suffix + 名前の長さの上限） | 4.9–4.12 |
 | VaultRepoStorage | Service | bare repo object I/O 抽象 | 9.1–9.5 |
 | VaultPathMapper | Service | pagePath → filePath 純関数 | 3.1–3.7 |
 | VaultBlobHasher | Service | git blob OID 計算（isomorphic-git） | 2.1, 2.2 |
-| VaultUploadPackSpawner | Service | git upload-pack 子プロセス起動 | 5.1–5.5 |
+| VaultUploadPackSpawner | Service | git upload-pack 子プロセス起動（検査済み本文の先頭を書き戻す） | 5.1–5.5 |
+| VaultPktLine | Service | want 区間の pkt-line 解析（純関数） | 5.6, 5.7 |
+| VaultWantGuard | Service | 本文先頭の peek + ビュー ref からの到達性確認 | 5.6–5.8 |
+| VaultSparseFilter | Service | 公開する sparse-checkout パターン集合・その object ID の算出・絞り込み指定の判定・repo への設置 | 5.9–5.11 |
 | VaultMaintenanceScheduler | Service | squash + gc 自走スケジューラ | 6.1–6.7 |
 | SharedSecretAuth | Middleware | Bearer token constant-time 検証 | 7.1–7.5 |
 
@@ -423,10 +435,18 @@ interface VaultViewComposer {
 **衝突解消（同一 path に複数 namespace のエントリ）**:
 優先順位: `user-<uid>-only-me` > `group-*` > `restricted-link` > `public`
 
-**Tree 正規化（compose-time, per-view / 要件 4.9–4.11）**:
-merged tree 確定後、view ごとに大小衝突解消を行う。merged tree の構造のみから決定論的に導出し、状態を永続化しない（reactive）。
+**Tree 正規化（compose-time, per-view / 要件 4.9–4.12）**:
+merged tree 確定後、view ごとに大小衝突解消と名前の長さの調整を行う。merged tree の構造のみから決定論的に導出し、状態を永続化しない（reactive）。
 
 - **大小衝突解消**: 各ディレクトリ直下で小文字化キーが一致する 2 件以上のエントリ（blob・subtree 双方）に対し、各メンバー名へ `__<sha1(suffix付与前filePath)[0..7]>` を付与する。衝突が解消（メンバー 1 件）したら suffix を外す。
+- **名前の長さの上限（issue #11596）**: 名前が UTF-8 で 255 バイト（ext4 / APFS が許すファイル名 1 つ分の上限）を超えるとき、拡張子より前の部分を文字の境界で切り詰め、同じ `__<hash8>` を付与する。判定は `__<hash8>` を付けたあとの最終的な名前に対して行う（`__<hash8>` は 10 バイトあるため、それを付けなければ収まる名前が、付けたことで上限を超えることがある）。切り詰めた結果として先頭が同じになる 2 つの名前も、hash が異なるので別名のまま残る。
+
+長さの上限を「mapper 側（`VaultPathMapper.encodeSegment`）ではなく view 側に置く」のは意図的な選択である。mapper 側で切り詰めると次の 2 つが起き、既存 vault を作り直す（再 bootstrap する）必要が出てしまう。
+
+1. namespace repo にはすでに長い名前のエントリが入っている。upsert はファイルごとの差し替えなので古いエントリが消えず、view に古い名前と新しい名前が並ぶ。
+2. `rename-prefix` / `grant-change-prefix` は `mapPrefix()` の結果で保存済みツリーから subtree を探す。切り詰めた prefix は保存済みの長い prefix と一致しないので subtree が見つからず、「すでに目的の状態」と判断してエラーも出さずに何もしないまま終わる（ページの移動が失敗しても気づけない）。
+
+view は compose のたびに namespace 群から全エントリを作り直すため、view 側に置けば次の compose で新しい規則が行き渡り、移行作業が要らない。
 
 実装は `vault-tree-normalizer.ts`（純関数: merged tree → normalized tree）に集約し、composer から呼ぶ。delta merge では membership が変化したディレクトリのみ再正規化すればよく、`sourceVersions` 一致時は正規化ごとスキップされる（キャッシュ維持）。
 
@@ -509,8 +529,10 @@ interface VaultPathMapper {
 
 **Implementation Notes**:
 - エンコーディング規則および tree 正規化規則（大小衝突 suffix）は v1 確定後 immutable（Revalidation Trigger）
+  - v1.0.1 で tree 正規化に名前の長さの上限を追加した（issue #11596）。既存 vault を作り直す必要はない — 追加したのは view 側だけで、mapper と namespace repo の名前は変えていない。また 255 バイト以内に収まる名前は 1 バイトも変えないため、今 checkout できている名前は既存 clone でも変わらない。変わるのは、上限を超えていて元から checkout できなかった名前だけである。上限そのものを後から下げると、今使えている名前までファイル名が変わってしまうので、下げる場合は破壊的な変更として扱う
 - `map()` は pageId を取らない（suffix を扱わないため）
 - `mapPrefix('/A/B')` はセグメント単位でエンコードして `/` 結合、末尾 `.md` なし
+- 長さの上限で切り詰めた名前は、元のページ名に戻せない。`map()` と namespace repo の名前は元に戻せるままだが、将来 push（書き戻し）を実装するときは、切り詰められた view 上の名前からページパスを求められないため、名前からページを引き当てる仕組みが別途必要になる
 
 ---
 
@@ -554,7 +576,7 @@ interface VaultUploadPackSpawner {
 - `mode: 'advertise'` → `git upload-pack --stateless-rpc --advertise-refs <repoPath>`
 - `mode: 'rpc'` → `git upload-pack --stateless-rpc <repoPath>`（stdin: request body）
 - env: `GIT_NAMESPACE=<viewRef>`
-- `uploadpack.allowAnySHA1InWant=false`（git デフォルト）で OID 直接 fetch を禁止
+- `uploadpack.allowAnySHA1InWant=false`（git デフォルト）を維持する。ただしこれで防げるのは commit の直接取得だけなので、要求された object がビューからたどれるかの検査を upload-pack 起動前に GitProxyController が行う（要件 5.6・5.7、本書「ビュー外 object の要求の拒否」参照）
 - クライアント切断時・タイムアウト時はプロセスを kill
 
 ---
@@ -759,7 +781,7 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 - **single security perimeter**: vault-manager は外部から到達不可（k8s NetworkPolicy で apps/app からのみ許可）。Ingress には登録しない
 - **shared secret**: env var only（`VAULT_MANAGER_INTERNAL_SECRET`）、DB に保存しない。k8s Secret で両 pod に注入
 - **constant-time 比較**: `crypto.timingSafeEqual` で timing attack を防止（要件 7.5）
-- **OID 直接 fetch 禁止**: `uploadpack.allowAnySHA1InWant=false`（git デフォルト）で namespace 外の OID を fetch させない
+- **ビュー外 object の取得禁止**: `uploadpack.allowAnySHA1InWant=false`（git デフォルト）だけでは commit の直接取得しか防げない（ファイルの中身とディレクトリ一覧はビューを越えて取得できた。git 2.49.0 で実測）。そのため GitProxyController が upload-pack 起動前にクライアントの要求を検査し、ビュー ref からたどれない object の要求を拒否する（要件 5.6・5.7、本書「ビュー外 object の要求の拒否」）
 - **pages コレクション非アクセス**: vault-manager は `revisions` のみ ID 指定 body lookup（namespace 判定は apps/app に集約済み）
 - **情報漏洩防止**: namespace 集合は apps/app が ACL 評価済みで渡す。vault-manager は受け取った namespace をそのまま処理するのみ
 
@@ -795,9 +817,56 @@ git binary が pack 生成・delta 圧縮・転送を担当するため、vault-
 
 ---
 
+## ビュー外 object の要求の拒否（要件 5.6–5.8）
+
+`GIT_NAMESPACE` はビューに広告する ref の範囲を絞るだけで、object の保管領域はビュー間で共有されている。git が「広告していない object を要求されたとき、それがこのビューからたどれるか」を確かめる処理は commit を前提としており、ファイルの中身（blob）とディレクトリの一覧（tree）に対しては実質的に何も確認しない。したがって `uploadpack.allowAnySHA1InWant=false`（git の既定値）だけでは、**ビューに含まれないページの中身が取得できる**。`gitnamespaces(7)` が「namespace は読み取りのアクセス制御には有効ではない」と明記している通り、git の設定では解決できない。
+
+> 実測結果・原因・検討した 3 案の比較・性能と規模依存性の実測は [`research.md`](./research.md) を参照（Research Log と Decision A–C）。
+
+### 検査の位置と内容
+
+`GitProxyController.uploadPack()` が upload-pack を起動する **前に** 実施する。
+
+1. **要求の先頭だけを解析する** — リクエスト本文の先頭は要求する object を並べた区間（want 区間）で、終わりは flush（`0000`）。この区間のみを読み取り、要求された object の ID と絞り込み指定（`filter` 行）を取り出す（`vault-pkt-line.ts` の `parseWantSection`、純関数）。flush が来ないまま 64 KiB を超えた場合と、protocol v0 の形式として解釈できない場合は拒否する。要件 5.3（pack をメモリに溜めず一定量のメモリで転送する）は、解析対象を先頭に限ることで保たれる
+2. **読み取った先頭を upload-pack に書き戻す** — 本文は upload-pack にそのまま全部渡す必要がある。`peekWantSection` はストリームを閉じずに `pause()` で止め、読み取った先頭は `spawnUploadPack({ stdinPrefix })` で書き戻してから残りを pipe する（`vault-want-guard.ts`）
+3. **絞り込み指定を判定する** — 公開したパターン集合を指す `sparse:oid` 以外が含まれていれば、到達性の確認に進まず拒否する（`vault-sparse-filter.ts` の `findUnsupportedFilters`、要件 5.9。「転送量を絞る手段」参照）
+4. **ビュー ref からの到達性を確認する** — 要求 1 件ごとに `git merge-base --is-ancestor <要求された ID> refs/namespaces/<viewRef>/refs/heads/main` を実行し、非ゼロ終了なら拒否する（`findWantsOutsideView`）。commit でないもの・他ビューの commit・存在しない ID・ビュー ref 自体が無い場合のすべてが拒否側に落ちる（閉じる方向に倒れる）
+5. **作業量を縛る** — 同一 ID の重複を排除し、異なる ID が 64 件を超えるリクエストは 1 件も確認せず拒否し、残りは直列に確認する。要求 1 件ごとに git プロセスが必要なため、件数をクライアントが決められる状態を残さない
+6. **拒否の返し方** — HTTP 200 と pkt-line 1 本の `ERR vault: requested object is not available in this view`。upload-pack 自身が拒否時に返す形と同じなので、git クライアントは `fatal: remote error: ...` と表示する。「ビューに無い」と「そもそも存在しない」で文言を変えず、リポジトリの保持内容を応答から推測させない（要件 2.3）。拒否はログに記録する
+
+### この検査が拒否する正当な用途（既知の制約）
+
+- **公開していない絞り込み指定** — `blob:none` などはファイルの中身を後から ID で名指しして取り直す方式なので拒否される（要件 5.9）。転送量を絞る用途は公開済みの `sparse:oid` で満たす（次節）
+- **protocol v2 の本文** — 現在 gateway はクライアントの `Git-Protocol` ヘッダを転送しないため upload-pack は v0 でしか動かず、本検査も v0 の形式のみ解釈する。v2 を通すなら本検査の拡張が前提
+
+いずれも Revalidation Triggers に登録済み。
+
+---
+
+## 転送量を絞る手段（要件 5.9–5.11）
+
+clone はビューに含まれる object を全量転送する。`git sparse-checkout` は作業ツリーに書き出すファイルを選ぶだけで転送量は変わらず、shallow clone が省ける履歴も squash（要件 6）で既に短い。残る手段は partial clone の絞り込み指定だけである。
+
+git の絞り込み指定のうち、**除外をサーバ側で適用して 1 リクエストで完結するのは `sparse:oid=<blob>` だけ**である。sparse-checkout 形式のパターンを書いた blob を指定する形式で、upload-pack がそのパターンで除外されるファイルの中身を pack に入れない。クライアントは最初の応答で checkout に必要なものを受け取り、以後 object を個別に要求しない。したがって要求は commit 1 件のままで、要件 5.6–5.8 の検査を変更なしで通る（実測: 本文 252 バイト・要求 1 件）。
+
+他の指定（`blob:none` / `blob:limit` / `tree:<n>` / `object:type` / `combine:`）はいずれもファイルの中身を後から ID で名指しして取り直す方式なので、要件 5.6 の検査に必ず拒否される。`uploadpack.allowFilter` は指定の種類ごとに分けられないため、受理してしまう分をこの検査で拒否する（要件 5.9）。拒否しない場合、`git clone --filter=blob:none` は clone だけ成功して checkout が object ごとのエラーの列とともに失敗し、作業ツリーが空のまま残る（実測）。
+
+### 公開するパターン集合
+
+| name | パターン | object ID |
+|---|---|---|
+| `exclude-user-pages` | `/*` と `!/user` | `ab678fd8055db49e954e61acfdb76add2a6291b9` |
+
+- object ID は内容から決まるため、パターンを変えると ID も変わる（Revalidation Trigger）。ID は計算して求め、repo の状態に依存させない（判定に使う集合が解決できない状態を作らない）
+- `refs/vault/sparse-filters/<name>` から参照させ、gc で消えないようにする（要件 5.10）。この ref は `refs/namespaces/` の外なので、どのビューにも広告されない
+- 公開した集合以外の `sparse:oid` は拒否する（要件 5.9）。任意の object を指定できると、返ってくるパスの集合からその object の内容を推し量る余地が生じる（実測で応答サイズに差が出た）
+- クライアントは同じパターンをローカルの sparse-checkout にも設定する必要がある。設定しないと checkout がサーバの除外したファイルを要求し、要件 5.6 の検査に拒否される
+
+削減幅の実測（20,000 ページ・うち 5,000 が `user/` 配下）: 6,269,214 → 4,815,099 バイト（23.2%）。詳細と他案との比較は [`research.md`](./research.md)。
+
 ## 参考情報
 
-- [git namespaces](https://git-scm.com/docs/gitnamespaces) — `GIT_NAMESPACE` 環境変数の仕様
+- [git namespaces](https://git-scm.com/docs/gitnamespaces) — `GIT_NAMESPACE` 環境変数の仕様。読み取りのアクセス制御には使えないことも明記されている（[research.md](./research.md) 参照）
 - [git smart HTTP protocol](https://git-scm.com/docs/http-protocol) — upload-pack wire format
 - [isomorphic-git GitHub](https://github.com/isomorphic-git/isomorphic-git) — v1.37.x API リファレンス
 - [MongoDB change streams](https://www.mongodb.com/docs/manual/changeStreams/) — resume token の挙動

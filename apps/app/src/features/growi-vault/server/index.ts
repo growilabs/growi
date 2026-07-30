@@ -15,6 +15,7 @@ import {
   type VaultReconcileService,
 } from './services/reconcile';
 import { createHistoryStore } from './services/reconcile/reconcile-history-store';
+import { isStaleBootstrapRunner } from './services/resilience';
 import { createVaultBootstrapper } from './services/vault-bootstrapper';
 import { createVaultDispatcher } from './services/vault-dispatcher';
 import { vaultNamespaceMapper } from './services/vault-namespace-mapper';
@@ -97,6 +98,13 @@ const logger = loggerFactory('growi:features:growi-vault:server');
 // ---------------------------------------------------------------------------
 
 /**
+ * Fallback heartbeat-staleness threshold for runVaultSyncStateMigration when
+ * the caller does not pass one. Mirrors the `app:vaultBootstrapHeartbeatStaleMs`
+ * default; production callers pass the configured value explicitly.
+ */
+const DEFAULT_HEARTBEAT_STALE_MS = 60_000;
+
+/**
  * Run the vault_sync_state startup migration.
  *
  * Idempotent — safe to call on every boot regardless of DB state.
@@ -109,14 +117,22 @@ const logger = loggerFactory('growi:features:growi-vault:server');
  *         one-time predicate — once migrated the update becomes a no-op.
  *         No upsert option to prevent E11000 on concurrent runs.
  *
- * Step 3: Normalize a stale 'running' state that has no instanceId.
- *         A running document without an instanceId means the previous process
- *         crashed before the resilience schema was applied; mark it 'failed'
- *         so the bootstrapper can decide whether to retry.
+ * Step 3: Normalize an in-flight state ('running' / 'verifying') that has no
+ *         live runner behind it — see the step 3 body for why the heartbeat,
+ *         not the instanceId, decides this.
  *
  * Requirements: 1.11, 3.3
  */
-export const runVaultSyncStateMigration = async (): Promise<void> => {
+export const runVaultSyncStateMigration = async (opts?: {
+  /**
+   * Heartbeat age beyond which an in-flight run counts as abandoned. Passed in
+   * by the caller (from `app:vaultBootstrapHeartbeatStaleMs`) so this function
+   * stays independent of configManager and testable with an explicit value.
+   */
+  heartbeatStaleMs?: number;
+}): Promise<void> => {
+  const heartbeatStaleMs = opts?.heartbeatStaleMs ?? DEFAULT_HEARTBEAT_STALE_MS;
+
   // Step 1: ensure singleton exists (fresh install)
   await VaultSyncState.findOneAndUpdate(
     { _id: 'singleton' },
@@ -175,16 +191,46 @@ export const runVaultSyncStateMigration = async (): Promise<void> => {
     },
   );
 
-  // Step 3: normalize stale 'running' with no instanceId to 'failed'.
+  // Step 3: normalize an in-flight state that has no live runner to 'failed'.
+  //
+  // 'running' / 'verifying' only move forward while the process that owns the
+  // run is alive, so after a crash or restart they would stay there forever:
+  // the gateway keeps answering 503, the trigger resolver skips 'running'
+  // unless VAULT_BOOTSTRAP_ON_START is set, and the admin UI hides its
+  // re-bootstrap control while a run looks active. 'failed' is the state
+  // operators (and auto-retry) can act on, so we land there.
+  //
+  // Liveness is decided by the heartbeat, NOT by the presence of an instance
+  // id: the id is written at the start of every run and therefore survives the
+  // crash, so an id-based check leaves exactly the abandoned runs it should be
+  // rescuing. A live peer instance mid-bootstrap keeps its heartbeat fresh and
+  // is left untouched.
+  //
+  // bootstrapCursor is deliberately preserved: for a non-wipe run it is still a
+  // valid resume point, and a wipe clears it when it starts.
   const doc = await VaultSyncState.findOne({ _id: 'singleton' }).lean();
-  if (doc?.bootstrapState === 'running' && doc?.bootstrapInstanceId == null) {
+  if (
+    doc != null &&
+    isStaleBootstrapRunner({
+      state: doc.bootstrapState,
+      heartbeatAt: doc.bootstrapHeartbeatAt,
+      staleThresholdMs: heartbeatStaleMs,
+    })
+  ) {
+    logger.warn(
+      {
+        bootstrapState: doc.bootstrapState,
+        bootstrapHeartbeatAt: doc.bootstrapHeartbeatAt,
+        bootstrapInstanceId: doc.bootstrapInstanceId,
+      },
+      `GROWI Vault: bootstrapState='${doc.bootstrapState}' has no live runner (heartbeat older than ${heartbeatStaleMs}ms); normalizing to 'failed'`,
+    );
     await VaultSyncState.updateOne(
       { _id: 'singleton' },
       {
         $set: {
           bootstrapState: 'failed',
-          bootstrapLastError:
-            'normalized stale running on first startup after schema migration',
+          bootstrapLastError: `normalized on startup: state was '${doc.bootstrapState}' with no live runner (heartbeat expired or never written)`,
         },
       },
     );
@@ -539,9 +585,13 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
   // This is idempotent and must execute on every boot so that:
   //   - fresh installs get a singleton doc with all required fields,
   //   - pre-resilience installs get the 14 new fields back-filled, and
-  //   - stale 'running' states (no instanceId) are normalized to 'failed'.
+  //   - in-flight states with no live runner are normalized to 'failed'.
   // ------------------------------------------------------------------
-  await runVaultSyncStateMigration();
+  await runVaultSyncStateMigration({
+    heartbeatStaleMs: configManager.getConfig(
+      'app:vaultBootstrapHeartbeatStaleMs',
+    ),
+  });
 
   // ------------------------------------------------------------------
   // Step 1.6: Reconcile history store — normalize stale lifecycle records.

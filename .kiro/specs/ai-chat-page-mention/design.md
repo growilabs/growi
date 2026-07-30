@@ -128,6 +128,7 @@ apps/app/src/features/mastra/client/components/PageMentionInput/
 
 ### Modified Files
 - `apps/app/src/features/mastra/client/components/ChatSidebar/ChatSidebar.tsx` — 入力リーフを `PromptInputTextarea` → `PageMentionInput` に差し替え。`onChange` を `(value: string) => setInput(value)` に変更（`PageMentionInput` は文字列を直接返す）。送信は従来どおり `PromptInput` の `onSubmit={handleSubmit}` 経路を維持（`PageMentionInput` の Enter が `requestSubmit()` を発火するため ChatSidebar 側の送信配線は変更不要）。新規文言を i18n 化。`PromptInput`/`PromptInputBody`/`PromptInputFooter`/`PromptInputSubmit`/`handleSubmit` は維持。
+  - **オープン時のフォーカス付与（8.x）**: `PageMentionInputHandle` の ref を保持し、`useChatSidebarStatus().openSeq` を依存に持つ effect から `focus()` を呼ぶ。**マウントのみを契機にしない**理由は、表示中スレッドを Recent Items から再選択した場合に `dynamic.tsx` の remount key（`threadId`）が変わらず再マウントが起きないため（8.2）。逆に依存を `openSeq` に限定することで、ストリーミング中の毎チャンク再描画や SWR 解決ではキャレットを奪わない（8.3）。`openSeq` は `dynamic.tsx` の remount key と本 effect の 2 consumer を持つため、**すべての `openChat()` で bump される**ことが前提（`status/chat-sidebar.tsx` に明記）。マウント経路の成立は `PageMentionInput` が同期マウントされること（React が子 effect を親より先に flush する）に依存する。
 - GROWI i18n ロケールリソース — `pageMention.placeholder` / `pageMention.hint` / `pageMention.searching` / `pageMention.noResults` / `pageMention.candidatesLabel`（listbox の aria-label）を全 5 ロケール（en_US/ja_JP/ko_KR/zh_CN/fr_FR）に追加。
 
 > 依存方向: `types` → `editor-state/*`(純CM) → `use-mention-controller` → `PageMentionInput`/`MentionCandidateList`(React) → `ChatSidebar`。左方向のみ import。`editor-state/*` は React/SWR に依存しない。
@@ -207,6 +208,7 @@ sequenceDiagram
 | 6.1, 6.3 | パス文字列を該当位置・順序で送信 | flatten | getMentionFlattenedText() | 挿入フロー |
 | 6.2 | 本文非付与 | flatten | doc.toString()のみ | — |
 | 7.1, 7.2 | 既存検索・権限内ページのみ | use-mention-controller | useSWRxSearch | — |
+| 8.1, 8.2, 8.3 | オープン時のみキャレット付与 | ChatSidebar, PageMentionInput | PageMentionInputHandle.focus() + `openSeq` trigger | — |
 
 ## Components and Interfaces
 
@@ -239,9 +241,10 @@ sequenceDiagram
 - 候補リスト（`MentionCandidateList`）を入力欄の真上に配置（CSS アンカー、上記参照）。
 - **標準カーソル移動キーマップ（`@codemirror/commands` の `defaultKeymap`）を mention キーマップ（`Prec.highest`）と併せて組み込む**。これにより非セッション時の矢印/編集キーがドキュメントモデル基準でカーソルを動かす: 空 doc での右矢印が placeholder ウィジェットを跨がず、横移動が `atomicRanges` を参照してメンションチップを 1 単位として扱う（5.x）。
 - **プレースホルダ/フォーカス/キャレット**: `placeholder` 拡張で空時の案内（**Compartment 経由で装着し、prop 変更時に reconfigure** — i18n リソースの非同期ロードや言語切替に追従するため、生成時固定にしない）、`EditorView.contentAttributes` で `.cm-content` に `data-slot="input-group-control"` を付与し host `InputGroup` のフォーカスリングを発火、テーマで `min-height`・`caret-color: currentColor`（テーマ追従）を設定。
+- **imperative focus ハンドル（`forwardRef`）**: 編集要素は本コンポーネントが内部で生成・所有する CodeMirror の `contentDOM` なので、ホストは通常の DOM ref で掴めない。`useImperativeHandle` で `focus()` のみを公開し、ホストが任意のタイミング（チャットサイドバーのオープン時）でキャレットを渡せるようにする。`view` 本体は internal のまま（公開面を最小に保つ）。ハンドルは `viewRef` を**呼び出し時に**読むため、view 再生成後も正しく追従する。
 
 **Dependencies**
-- Inbound: ChatSidebar — value/onChange/placeholder/disabled (P0)
+- Inbound: ChatSidebar — value/onChange/placeholder (P0)、および `ref`（`PageMentionInputHandle`、オープン時のフォーカス付与用）
 - Outbound: useMentionController (P0), createPageMentionExtensions (P0)
 - External: ホスト `<form>`（`PromptInput` が描画）— `requestSubmit()` と `name="message"` 経由の送信（P0）
 
@@ -252,7 +255,11 @@ export interface PageMentionInputProps {
   value: string;                       // フラット済みパス文字列(送信/空判定用)
   onChange: (value: string) => void;   // doc変更ごとにflatten結果を返す
   placeholder?: string;
-  disabled?: boolean;
+}
+
+// forwardRef で公開する imperative ハンドル
+export interface PageMentionInputHandle {
+  focus(): void;                       // エディタにキャレットを移す（view 未マウント時は no-op）
 }
 ```
 - Preconditions: `~/components/ai-elements/prompt-input` の `PromptInputBody` 子（=ホスト `<form>` の内側）として配置される。
@@ -451,6 +458,7 @@ export const getMentionFlattenedText: (state: EditorState) => string; // = doc.t
 - `MentionCandidateList`: `@` 起動直後の空クエリでヒント行表示・検索未実行（1.1/1.2）、query 1文字以上で候補表示（1.4/2.1）、`isLoading` 中 loading 表示（2.5）、空結果で該当なし表示（2.6）、行クリックで commit コールバック発火（2.3）。
 - `useMentionController` / `PageMentionInput`（DOM 非依存部）: controller の `moveUp/moveDown` で `highlightedIndex` が変化（2.2 のロジック）、`commit` で `addMention` を dispatch しチップ挿入（2.3/3.1）、`close` で候補が閉じる（2.4）、チップ DOM の click で NavCallback 発火（4.1）。
 - `ChatSidebar` 統合: メンション挿入後、隠し `input[name=message]` が flatten 値を保持し、送信で `sendMessage` に**パス文字列を含む text**が渡る（6.1）。
+- `PageMentionInput` の imperative ハンドル / `ChatSidebar` のフォーカス付与（8.x）: `document.activeElement` が `view.contentDOM` になるかで検証する（`focus()` が呼ばれたかのスパイではなく観察可能な結果）。初回オープン（8.1）、`openSeq` bump のみでの再オープン（8.2）、`openSeq` 据え置きの再描画ではフォーカスを触らない（8.3）の 3 点。キャレットの画素位置は検証しない（上記のレイアウト非依存方針）。
 
 > ↑↓ハイライト移動（2.2）は「キー入力→`coordsAtPos`」ではなく **controller のメソッド呼び出し→state 変化** として検証する（キーマップが鍵を controller へ委譲する設計のため、ロジックは DOM 非依存）。実際のキー伝播はスモークで確認。
 
