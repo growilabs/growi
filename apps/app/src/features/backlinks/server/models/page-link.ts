@@ -14,12 +14,10 @@ const pageLinkSchema = new Schema<PageLinkDocument, PageLinkModel>({
     type: Schema.Types.ObjectId,
     ref: 'Page',
     required: true,
-    index: true,
   },
   toPath: {
     type: String,
     required: true,
-    index: true,
   },
   toPage: {
     type: Schema.Types.ObjectId,
@@ -29,6 +27,13 @@ const pageLinkSchema = new Schema<PageLinkDocument, PageLinkModel>({
   },
 });
 
+// Only the indexes an actual query uses:
+//  - { fromPage, toPath } unique — serves replaceOutboundLinks' per-row upsert
+//    filter, its `toPath: { $nin }` delete, and every fromPage-only lookup
+//    (fromPage is the prefix), so a standalone fromPage index would be dead weight
+//  - toPage — serves findBacklinkSources
+// toPath alone has no query yet; B4's re-resolve-by-path adds one and should add
+// the index with it (the compound cannot serve toPath alone — wrong prefix).
 pageLinkSchema.index({ fromPage: 1, toPath: 1 }, { unique: true });
 
 /**
