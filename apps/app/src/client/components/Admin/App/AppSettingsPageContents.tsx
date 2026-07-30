@@ -15,6 +15,7 @@ import FileUploadSetting from './FileUploadSetting';
 import MailSetting from './MailSetting';
 import { MaintenanceMode } from './MaintenanceMode';
 import PageBulkExportSettings from './PageBulkExportSettings';
+import PageTreeRepair from './PageTreeRepair';
 import SiteUrlSetting from './SiteUrlSetting';
 import V5PageMigration from './V5PageMigration';
 
@@ -151,6 +152,16 @@ const AppSettingsPageContents = (props: Props) => {
             {t('admin:maintenance_mode.maintenance_mode')}
           </h2>
           <MaintenanceMode />
+        </div>
+      </div>
+
+      {/* Placed after MaintenanceMode: the repair requires it to be enabled. */}
+      <div className="row">
+        <div className="col-lg-12">
+          <h2 className="admin-setting-header" id="page-tree-repair">
+            {t('admin:page_tree_repair.page_tree_repair')}
+          </h2>
+          <PageTreeRepair />
         </div>
       </div>
     </div>
