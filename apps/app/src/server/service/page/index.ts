@@ -4448,7 +4448,12 @@ class PageService implements IPageService {
           const descendantCount = await Page.recountDescendantCount(
             document._id,
           );
-          await Page.findByIdAndUpdate(document._id, { descendantCount });
+          // Skip no-op writes: on a healthy tree almost every page is already
+          // correct, so this avoids rewriting the whole collection and shrinks the
+          // window in which a concurrent live edit could be clobbered.
+          if (descendantCount !== document.descendantCount) {
+            await Page.findByIdAndUpdate(document._id, { descendantCount });
+          }
         }
         callback();
       },
