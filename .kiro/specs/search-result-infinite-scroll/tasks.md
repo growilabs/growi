@@ -109,3 +109,11 @@
 - 4.1: レガシー(PrivateLegacyPages)は sort/order/filter を hard-disable(`isEnableSort/Filter={false}`)しているため resetKey は `keyword|offset|limit` で十分（sort/order 省略は非回帰）。
 - 4.1(横断課題・validate-impl で検討): resetKey 設計により、同一クエリの refetch（一括削除/convert 後の mutate）ではレガシーの選択 Set とプレビューが以前ほど自動リセットされない（旧 `[pages]` キーは refetch で reset していた）。design は legacy を「非回帰のみ担保」とし delete-reset を規定していない。SearchPage は明示 deselect 済み。レガシーにも同等の deselect を足すか、feature 検証で判断する。
 - 5.2: no-op（監査のみ）。SearchPageBase.spec の既存15テストが 4.1/4.3/4.5/4.6/6.1/6.3/7.2 を観測可能な assertion で網羅済み。追加テスト不要。
+- 5.3: ユーザーが後で手動で目視確認する方針（manual-pending、チェックは付けない）。手動スモーク手順:
+  1. `pnpm run dev`（apps/app）で dev サーバ起動、ログイン。
+  2. `/_search?q=<20件以上ヒットする語>` を開く（ES growi index は現状 ~30 件。広めの語で20件超を狙う）。
+  3. 番号ページャ（<< < 1 2 3 > >>）が表示されないこと。
+  4. 結果リストを下端までスクロール → 次チャンク（+最大20件）が末尾に継ぎ足されること（RN4: 2ペイン overflow-y-scroll 内で IntersectionObserver が発火）。
+  5. スクロールで追記しても選択・右ペインのプレビューが維持されること。全件到達で追加読み込みが止まること。
+  6. （任意）ネットワークを一時遮断して追加読み込みを失敗させ、エラー＋「再試行」表示、再試行で復帰すること。
+  7. 一括削除後に先頭チャンクから再表示・選択クリアされること。0件クエリで「0 件」表示。
