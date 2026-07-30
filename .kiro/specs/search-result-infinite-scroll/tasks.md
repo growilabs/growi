@@ -88,7 +88,7 @@
   - _Requirements: 1.2, 1.6, 2.1, 5.1, 5.2, 5.3_
   - _Boundary: SearchPage_
 
-- [ ] 5.2 (P) SearchPageBase コンポーネントテスト
+- [x] 5.2 (P) SearchPageBase コンポーネントテスト
   - `resetKey` 不変で選択・プレビューが維持され、変化でクリア・先頭選択されること、全選択が累積全件を対象にすること
   - プレビュー2段構成（新規検索で先頭、追記で維持）、全選択ヘッダの追記追従（checked↔indeterminate）
   - 完了時: 上記を検証するテストがグリーン
@@ -108,3 +108,4 @@
 - 2.4: error endingIndicator は InfiniteScroll が `isReachingEnd === true` の時のみ表示される。SearchPage(3.x) は design どおり `isReachingEnd = 累積>=total || hasError` として hasError を OR すること。
 - 4.1: レガシー(PrivateLegacyPages)は sort/order/filter を hard-disable(`isEnableSort/Filter={false}`)しているため resetKey は `keyword|offset|limit` で十分（sort/order 省略は非回帰）。
 - 4.1(横断課題・validate-impl で検討): resetKey 設計により、同一クエリの refetch（一括削除/convert 後の mutate）ではレガシーの選択 Set とプレビューが以前ほど自動リセットされない（旧 `[pages]` キーは refetch で reset していた）。design は legacy を「非回帰のみ担保」とし delete-reset を規定していない。SearchPage は明示 deselect 済み。レガシーにも同等の deselect を足すか、feature 検証で判断する。
+- 5.2: no-op（監査のみ）。SearchPageBase.spec の既存15テストが 4.1/4.3/4.5/4.6/6.1/6.3/7.2 を観測可能な assertion で網羅済み。追加テスト不要。
