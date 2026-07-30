@@ -329,6 +329,25 @@ admin-triggered start was deferred as a one-line future change. Independent of B
   - _Requirements: 4.1, 4.2, 4.3_
   - _Depends: B3.2_
 
+- [ ] B3.5 Index the descendants of a recursive duplicate
+  - Gap found in review of B2.2. A recursive duplicate bulk-inserts the copied descendants
+    (`PageService.duplicateDescendants` → `Page.insertMany`) and emits no per-page event, so their
+    outbound links are never extracted. The duplicated **root** is already covered: it goes through
+    `PageService.create`, which emits `create`. Not fixable inside this feature — `duplicate` carries
+    the *source* page and fires *before* `duplicateDescendantsWithStream` runs, so the copies do not
+    yet exist and their ids are never published.
+  - Note: the Elasticsearch index has the same blind spot (nothing subscribes to `duplicate`, and no
+    `syncDescendantsUpdate` is emitted here), so the fix belongs in `PageService` and should be decided
+    for search and backlinks together rather than worked around per-consumer.
+  - Options: (a) emit a descendants-created event from `duplicateDescendants` and subscribe to it;
+    (b) accept the gap and let the B3 backfill repair it, documenting that a recursive duplicate is
+    not indexed until then
+  - Done when a duplicated subtree's descendants appear as backlink sources in an integration test, or
+    option (b) is recorded here as an accepted limitation with the user-visible effect stated
+  - _Requirements: 3.1, 3.2_
+  - _Boundary: PageService (page events), PageLinkService_
+  - _Depends: B1.12_
+
 ---
 
 ## Story B4 — Link integrity across rename / move
