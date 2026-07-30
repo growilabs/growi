@@ -18,7 +18,7 @@ const _shouldUseV5Process = (page: IPage): page is IPageUnderV5 => {
 export const deletePageCompletelyBySystem = async (
   page: HydratedDocument<PageDocument>,
   pageService: IPageService,
-) => {
+): Promise<void> => {
   const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
     'Page',
   );
