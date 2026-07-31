@@ -311,12 +311,32 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
   - **No-rescan confirmed:** one `syncOutboundLinks` issues exactly one `bulkWrite` whose every
     operation filter is scoped to the edited `fromPage`; a sibling page's rows are byte-identical
     afterwards and the collection total moves only by that page's delta.
-  - **Observation, deliberately not acted on:** the `distinct` is `FETCH <- IXSCAN`, not a covered
-    `DISTINCT_SCAN`, because the key (`fromPage`) is not in the index it rides (`{toPage}`) — Mongo
-    fetches each matching row to read `fromPage`. A `{toPage, fromPage}` compound would make it
-    covered and drop that FETCH. Not added: the `distinct` is 10% of a read that already has 8x
-    headroom, and a third index would re-add per-save write cost that B2.2 just removed. Revisit only
-    if a real deployment shows a hub far beyond this scale.
+  - **The `distinct` is not covered, and the fix for that was measured and rejected.** It runs
+    `FETCH <- IXSCAN`, not `DISTINCT_SCAN`, because its key (`fromPage`) is not in the index it rides
+    (`{toPage}`) — so Mongo opens each matching row to read one field. A `{toPage, fromPage}` compound
+    makes the query covered. `measurements/b21-index-cost.mjs` measures what that costs and buys
+    (205k rows, A/B/A' against drift):
+
+    | | 2 indexes | + `{toPage, fromPage}` | |
+    |---|---|---|---|
+    | storage | — | **+3.2 MiB** (~16 B/row; ~150 MiB at 10M rows) | modest |
+    | per-save write (10 links) | 6.05 ms | **6.04 ms** | no measurable cost |
+    | `distinct`, 1 row per source→target | 7.3 ms | **10.1 ms** | **44% worse** |
+    | `distinct`, 3 rows per source→target | 13.3 ms | **9.0 ms** | 39% better |
+
+    **Not added — because it makes the common case slower, not because it costs too much.**
+    `DISTINCT_SCAN`'s advantage is skipping duplicate keys; when each source links a target once,
+    every `fromPage` under a `toPage` is already unique, so there is nothing to skip and the wider
+    index is pure overhead. It only pays when a source links the same target several ways (path +
+    permalink + anchor all resolving to one page — the case B1.15 asserts is de-duplicated).
+
+    Revisit if real wikis turn out to average ≥2 rows per source→target pair; measure that first, with
+    the script above. A `{toPage, fromPage}` index also cannot serve `toPath` alone, so it does not
+    pre-empt the index B4 needs.
+
+    > Corrects an earlier note here that justified skipping the index by "per-save write cost B2.2
+    > just removed". That was asserted without measurement and is wrong: the write cost is
+    > unmeasurable. The real reason is the negative read effect above.
 
 - [x] B2.2 Coalesce and pace live extraction (write-path burst control)
   - Replace the B1.6/B1.12 inline per-event extraction with an in-process coalescing queue: the
