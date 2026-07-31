@@ -551,6 +551,7 @@ model users {
   slackMemberId           String?   @unique(map: "slackMemberId_1")
   introduction            String?
   password                String?
+  passwordHash            String?
   apiToken                String?   @unique(map: "apiToken_1")
   lang                    Lang      @default(en_US)
   status                  Int       @default(2)
