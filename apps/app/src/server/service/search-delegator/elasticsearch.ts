@@ -656,7 +656,11 @@ class ElasticsearchDelegator
     }
   }
 
-  async createAuditlogIndex(index: string) {
+  async createAuditlogIndex(
+    index: string,
+  ): Promise<
+    Awaited<ReturnType<ElasticsearchClientDelegator['indices']['create']>>
+  > {
     if (isES8ClientDelegator(this.client)) {
       const { mappings } = await import('./mappings/mappings-auditlog-es8');
       return this.client.indices.create({ index, ...mappings });
