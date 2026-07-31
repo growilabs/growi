@@ -39,12 +39,22 @@ export const mergeInfiniteSearchResult = (
   const total = data[0]?.meta.total ?? 0;
   const took = data[0]?.meta.took;
 
+  // Number of results Elasticsearch actually returned across all fetched chunks,
+  // counted BEFORE the server drops pages missing from MongoDB. End-of-results
+  // must be judged by this pre-filter count: `loadedCount` (post-filter) can stay
+  // below `total` forever when the ES index has drifted, which would otherwise
+  // keep `isReachingEnd` false and spin the loader indefinitely.
+  const fetchedCount = data.reduce(
+    (acc, result) => acc + result.meta.hitsCount,
+    0,
+  );
+
   return {
     pages,
     loadedCount,
     total,
     took,
     isEmpty: total === 0,
-    isReachingEnd: loadedCount >= total,
+    isReachingEnd: fetchedCount >= total,
   };
 };

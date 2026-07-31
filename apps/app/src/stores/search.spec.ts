@@ -1,4 +1,5 @@
 import type { IPageHasId } from '@growi/core';
+import { mutate as swrMutate } from 'swr';
 import { mock } from 'vitest-mock-extended';
 
 import type {
@@ -7,7 +8,12 @@ import type {
 } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 
-import { getSearchInfiniteKey } from './search';
+import { getSearchInfiniteKey, mutateSearching } from './search';
+
+vi.mock('swr', () => ({
+  default: vi.fn(),
+  mutate: vi.fn(),
+}));
 
 const createResultWithDataCount = (count: number): IFormattedSearchResult => ({
   data: Array.from(
@@ -17,6 +23,21 @@ const createResultWithDataCount = (count: number): IFormattedSearchResult => ({
     }),
   ),
   meta: { total: 100, hitsCount: count },
+});
+
+// Decouples the returned data length (post-MongoDB-filter) from hitsCount
+// (the raw count Elasticsearch returned) to model index drift.
+const createDriftedResult = (
+  dataCount: number,
+  hitsCount: number,
+): IFormattedSearchResult => ({
+  data: Array.from(
+    { length: dataCount },
+    (_, i): IPageWithSearchMeta => ({
+      data: mock<IPageHasId>({ _id: `page-${i}` }),
+    }),
+  ),
+  meta: { total: 100, hitsCount },
 });
 
 // Minimal fixed configuration (offset/limit are excluded from the key contract)
@@ -74,6 +95,39 @@ describe('getSearchInfiniteKey', () => {
     });
   });
 
+  describe('when the ES index has drifted (server dropped pages)', () => {
+    it('continues when data.length < chunkSize but hitsCount is a full chunk', () => {
+      // ES returned a full chunk (hitsCount === CHUNK_SIZE) but the server
+      // dropped 3 pages missing from MongoDB, so data.length is below the chunk.
+      const previousPageData = createDriftedResult(CHUNK_SIZE - 3, CHUNK_SIZE);
+      const key = getSearchInfiniteKey(
+        1,
+        previousPageData,
+        'growi',
+        CHUNK_SIZE,
+        configurations,
+      );
+      // The old `data.length < chunkSize` check would stop here (null) and
+      // truncate the results. The hitsCount-based check keeps going.
+      expect(key).not.toBeNull();
+    });
+
+    it('stops when hitsCount itself is below the chunk size (true end)', () => {
+      const previousPageData = createDriftedResult(
+        CHUNK_SIZE - 3,
+        CHUNK_SIZE - 1,
+      );
+      const key = getSearchInfiniteKey(
+        1,
+        previousPageData,
+        'growi',
+        CHUNK_SIZE,
+        configurations,
+      );
+      expect(key).toBeNull();
+    });
+  });
+
   describe('when fetching a valid page', () => {
     it('uses the "/search/infinite" namespace as the key head', () => {
       const key = getSearchInfiniteKey(
@@ -118,5 +172,22 @@ describe('getSearchInfiniteKey', () => {
       );
       expect(thirdKey?.[2]).toBe(2 * CHUNK_SIZE);
     });
+  });
+});
+
+describe('mutateSearching', () => {
+  it('revalidates both the paginated and the infinite-scroll caches', async () => {
+    await mutateSearching();
+
+    // capture the key-matcher predicate handed to swr's global mutate
+    const predicate = vi.mocked(swrMutate).mock.calls.at(-1)?.[0] as (
+      key: unknown,
+    ) => boolean;
+
+    expect(predicate(['/search', 'growi', {}])).toBe(true);
+    expect(predicate(['/search/infinite', 'growi', 0, {}])).toBe(true);
+    // unrelated caches and non-array keys must not match
+    expect(predicate(['/pages/recent'])).toBe(false);
+    expect(predicate('/search')).toBe(false);
   });
 });

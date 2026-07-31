@@ -49,7 +49,14 @@ const createSearchQuery = (
 };
 
 export const mutateSearching = async (): Promise<void[]> => {
-  return mutate((key) => Array.isArray(key) && key[0] === '/search');
+  // Match both the paginated ('/search') and the infinite-scroll
+  // ('/search/infinite') caches, so item-level page operations (delete / rename
+  // / duplicate) in SearchResultList refresh whichever list is shown.
+  return mutate(
+    (key) =>
+      Array.isArray(key) &&
+      (key[0] === '/search' || key[0] === '/search/infinite'),
+  );
 };
 
 export const useSWRxSearch = (
@@ -139,8 +146,12 @@ export const getSearchInfiniteKey = (
     return null;
   }
 
-  // Stop once the previous page is shorter than a full chunk (no more results).
-  if (previousPageData != null && previousPageData.data.length < chunkSize) {
+  // Stop once the previous chunk returned fewer hits than requested (no more
+  // results). Use `meta.hitsCount` (the count Elasticsearch actually returned)
+  // rather than `data.length`, because the server drops pages missing from
+  // MongoDB, so `data.length` can be below `chunkSize` mid-results and would
+  // stop the fetch prematurely.
+  if (previousPageData != null && previousPageData.meta.hitsCount < chunkSize) {
     return null;
   }
 

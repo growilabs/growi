@@ -80,6 +80,29 @@ describe('mergeInfiniteSearchResult', () => {
     });
   });
 
+  describe('when the ES index has drifted (server dropped pages, chunk still full)', () => {
+    it('signals the end from the pre-filter hitsCount, not the post-filter loadedCount', () => {
+      // Elasticsearch returned a full chunk (hitsCount 2 === total), but the
+      // server dropped one page missing from MongoDB, so `data` holds only 1.
+      const data = [
+        createFormattedResult([createPage('page-1')], {
+          total: 2,
+          hitsCount: 2,
+          took: 1,
+        }),
+      ];
+
+      const result = mergeInfiniteSearchResult(data);
+
+      // post-filter count is below total ...
+      expect(result.loadedCount).toBe(1);
+      expect(result.total).toBe(2);
+      // ... but hitsCount reached total, so we must stop. The old
+      // `loadedCount >= total` (1 >= 2) would be false and spin forever.
+      expect(result.isReachingEnd).toBe(true);
+    });
+  });
+
   describe('when there are zero hits', () => {
     it('marks the result as empty and terminal', () => {
       const data = [
