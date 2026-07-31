@@ -184,5 +184,55 @@ describe('PasswordHashService', () => {
       ).resolves.toEqual({ isValid: false, needsRehash: false });
       expect(getMockLogger().warn).toHaveBeenCalled();
     });
+
+    it('rejects (without invoking scrypt) a stored envelope whose N exceeds the upper bound', async () => {
+      // DoS guard: an attacker-planted envelope with N=2^21 (> N_MAX 2^20) must be
+      // rejected at parse time, BEFORE scrypt is asked to allocate ~128*N*r bytes.
+      const stored = await service.hash('pw');
+      const tampered = stored.replace(/^scrypt\$\d+/, 'scrypt$2097152');
+
+      const result = await service.verify('pw', tampered, undefined, SEED);
+
+      expect(result).toEqual({ isValid: false, needsRehash: false });
+      expect(getMockLogger().warn).toHaveBeenCalled();
+    });
+
+    it('rejects a stored envelope whose r exceeds the upper bound', async () => {
+      const stored = await service.hash('pw');
+      // Replace only the r segment (2nd numeric field) with a value > R_MAX (32).
+      const tampered = stored.replace(/^scrypt\$(\d+)\$\d+/, 'scrypt$$$1$$64');
+
+      const result = await service.verify('pw', tampered, undefined, SEED);
+
+      expect(result).toEqual({ isValid: false, needsRehash: false });
+      expect(getMockLogger().warn).toHaveBeenCalled();
+    });
+
+    it('rejects a stored envelope whose p exceeds the upper bound', async () => {
+      const stored = await service.hash('pw');
+      // Replace only the p segment (3rd numeric field) with a value > P_MAX (16).
+      const tampered = stored.replace(
+        /^scrypt\$(\d+)\$(\d+)\$\d+/,
+        'scrypt$$$1$$$2$$32',
+      );
+
+      const result = await service.verify('pw', tampered, undefined, SEED);
+
+      expect(result).toEqual({ isValid: false, needsRehash: false });
+      expect(getMockLogger().warn).toHaveBeenCalled();
+    });
+
+    it('rejects a stored envelope whose hash segment is shorter than the minimum keylen', async () => {
+      // verifyScrypt uses hash.length as the scrypt keylen; a <32-byte hash weakens
+      // verification and must be rejected. Header is valid; only the hash is too short.
+      const salt = Buffer.from('0123456789abcdef').toString('base64');
+      const shortHash = Buffer.from('shorthash').toString('base64'); // 9 bytes < 32
+      const tooShort = `scrypt$16384$8$1$${salt}$${shortHash}`;
+
+      const result = await service.verify('pw', tooShort, undefined, SEED);
+
+      expect(result).toEqual({ isValid: false, needsRehash: false });
+      expect(getMockLogger().warn).toHaveBeenCalled();
+    });
   });
 });

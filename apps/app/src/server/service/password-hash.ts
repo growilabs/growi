@@ -43,6 +43,13 @@ export interface ScryptParams {
 // stored hash length is used so that hashes produced with any keylen still verify.
 const KEYLEN = 64;
 
+// Bounds for a STORED envelope's salt/hash byte lengths (verify path). verifyScrypt uses
+// hash.length as the scrypt keylen, so it must be bounded: below HASH_MIN it weakens
+// verification, above HASH_MAX it is a memory-DoS vector.
+const SALT_MIN_BYTES = 8;
+const HASH_MIN_BYTES = 32;
+const HASH_MAX_BYTES = 1024;
+
 // The envelope prefix / algorithm identifier.
 const ALGORITHM = 'scrypt';
 
@@ -131,9 +138,21 @@ const parseScryptHash = (encoded: string): ParsedScryptHash => {
     throw new Error('Invalid scrypt parameters');
   }
 
+  // DoS guard: a stored envelope must not drive scrypt past the upper bounds we clamp
+  // configured params to. Without this, computeMaxmem() derives maxmem from the stored
+  // value and defeats Node's memory guard. Reject (not clamp): an out-of-range stored
+  // value is not a hash this service produced.
+  if (N > N_MAX || r > R_MAX || p > P_MAX) {
+    throw new Error('scrypt parameters out of bounds');
+  }
+
   const salt = Buffer.from(parts[4], 'base64');
   const hash = Buffer.from(parts[5], 'base64');
-  if (salt.length === 0 || hash.length === 0) {
+  if (
+    salt.length < SALT_MIN_BYTES ||
+    hash.length < HASH_MIN_BYTES ||
+    hash.length > HASH_MAX_BYTES
+  ) {
     throw new Error('Invalid scrypt salt/hash');
   }
 
