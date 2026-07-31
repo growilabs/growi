@@ -27,7 +27,11 @@ export interface PasswordHashCleanupResult {
  * WHY a standalone script (not a migrate-mongo migration): aborting here is a
  * hard requirement (Req 3.4), and a `throw`/exit during migrate-mongo's
  * boot-time auto-run would break the deployment. This is run manually by an
- * admin via `pnpm run tsrun src/server/scripts/password-hash-cleanup.ts`.
+ * admin:
+ *   - development: `pnpm run password-hash:cleanup:dev`
+ *     (= `pnpm run tsrun src/server/scripts/password-hash-cleanup.ts`)
+ *   - production (Docker, built output): `pnpm run password-hash:cleanup`
+ *     (= `node dist/server/scripts/password-hash-cleanup.js`)
  *
  * This function is the pure core: it takes the `users` collection as input and
  * returns a structured result (it never calls process.exit). The thin CLI entry

@@ -316,7 +316,7 @@ class PasswordHashService implements IPasswordHashService {
  * Resolve scrypt params from the environment, applying the security floor (clamp up with
  * a startup WARNING) and the DoS upper bound (clamp down with a WARNING).
  */
-const resolveScryptParamsFromEnv = (): ScryptParams => {
+export const resolveScryptParamsFromEnv = (): ScryptParams => {
   const parsePositiveInt = (raw: string | undefined): number | undefined => {
     if (raw == null || raw === '') {
       return undefined;

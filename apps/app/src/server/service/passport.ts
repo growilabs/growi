@@ -123,6 +123,14 @@ export const verifyLocalCredentials = async (
       try {
         await user.setPassword(password);
         await user.save();
+        // Progress visibility for the lazy migration (design "Monitoring"): emit
+        // an INFO on each successful legacy→scrypt rehash. This is the intended
+        // per-user progress signal; PasswordHashService.verify() stays quiet to
+        // avoid per-call spam. Failures are logged below.
+        logger.info(
+          { username },
+          'Lazy password rehash succeeded (legacy credential migrated to scrypt)',
+        );
       } catch (rehashErr) {
         logger.error('Lazy password rehash failed; login continues', rehashErr);
       }

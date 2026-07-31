@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it, type MockInstance, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from 'vitest';
 
 // Mock the project logger so we can assert WARNING emission (Req 2.4 / 2.5).
 vi.mock('~/utils/logger', () => {
@@ -16,7 +24,10 @@ vi.mock('~/utils/logger', () => {
 
 import loggerFactory from '~/utils/logger';
 
-import { createPasswordHashService } from './password-hash';
+import {
+  createPasswordHashService,
+  resolveScryptParamsFromEnv,
+} from './password-hash';
 
 // The mocked loggerFactory always returns the same logger instance.
 const getMockLogger = () =>
@@ -284,5 +295,65 @@ describe('PasswordHashService', () => {
       expect(result).toEqual({ isValid: false, needsRehash: false });
       expect(getMockLogger().warn).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('resolveScryptParamsFromEnv() — env-derived params (startup clamping)', () => {
+  beforeEach(() => {
+    // Call history persists across tests (no global mock reset), so isolate the
+    // startup-WARNING assertions per test.
+    getMockLogger().warn.mockClear();
+  });
+
+  afterEach(() => {
+    // Fully restore process.env so later tests / the module singleton are unaffected.
+    vi.unstubAllEnvs();
+  });
+
+  it('returns the OWASP production defaults and does NOT warn when no env override is set', () => {
+    vi.stubEnv('PASSWORD_SCRYPT_N', '');
+    vi.stubEnv('PASSWORD_SCRYPT_R', '');
+    vi.stubEnv('PASSWORD_SCRYPT_P', '');
+
+    const params = resolveScryptParamsFromEnv();
+
+    expect(params).toEqual({ N: 2 ** 17, r: 8, p: 1 });
+    expect(getMockLogger().warn).not.toHaveBeenCalled();
+  });
+
+  it('clamps N UP to the security floor and warns when PASSWORD_SCRYPT_N is below it', () => {
+    vi.stubEnv('PASSWORD_SCRYPT_N', '1024');
+
+    const params = resolveScryptParamsFromEnv();
+
+    expect(params.N).toBe(2 ** 17);
+    expect(getMockLogger().warn).toHaveBeenCalled();
+  });
+
+  it('clamps N DOWN to the DoS upper bound (N_MAX) and warns when PASSWORD_SCRYPT_N exceeds it', () => {
+    vi.stubEnv('PASSWORD_SCRYPT_N', String(2 ** 22));
+
+    const params = resolveScryptParamsFromEnv();
+
+    expect(params.N).toBe(2 ** 20);
+    expect(getMockLogger().warn).toHaveBeenCalled();
+  });
+
+  it('clamps r UP to the security floor and warns when PASSWORD_SCRYPT_R is below it', () => {
+    vi.stubEnv('PASSWORD_SCRYPT_R', '4');
+
+    const params = resolveScryptParamsFromEnv();
+
+    expect(params.r).toBe(8);
+    expect(getMockLogger().warn).toHaveBeenCalled();
+  });
+
+  it('clamps p DOWN to the DoS upper bound (P_MAX) and warns when PASSWORD_SCRYPT_P exceeds it', () => {
+    vi.stubEnv('PASSWORD_SCRYPT_P', '32');
+
+    const params = resolveScryptParamsFromEnv();
+
+    expect(params.p).toBe(16);
+    expect(getMockLogger().warn).toHaveBeenCalled();
   });
 });

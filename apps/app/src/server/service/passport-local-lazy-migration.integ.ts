@@ -116,6 +116,10 @@ describe('verifyLocalCredentials (Passport LocalStrategy login flow)', () => {
       expect(created.password).toBe(legacyHash);
       expect(created.passwordHash).toBeUndefined();
 
+      // Isolate the lazy-migration progress INFO assertion below.
+      const infoSpy = getMockLogger().info;
+      infoSpy.mockClear();
+
       const { err, user, info } = await runVerify(
         User,
         'lazymig-legacy',
@@ -134,6 +138,13 @@ describe('verifyLocalCredentials (Passport LocalStrategy login flow)', () => {
       expect(reread.passwordHash.startsWith('scrypt$')).toBe(true);
       // The legacy SHA-256 field is preserved (downgrade safety).
       expect(reread.password).toBe(legacyHash);
+
+      // A successful lazy migration emits a progress INFO (design "Monitoring")
+      // carrying the user identifier.
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ username: 'lazymig-legacy' }),
+        expect.stringContaining('rehash'),
+      );
     });
   });
 

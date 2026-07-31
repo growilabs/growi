@@ -49,6 +49,14 @@ export interface DowngradePrepDeps {
  * needs `mailService`, which only exists after a full Crowi bootstrap — not
  * available in the migrate-mongo container.
  *
+ * Run manually by an admin:
+ *   - development: `pnpm run password-hash:downgrade-prep:dev`
+ *     (= `pnpm run tsrun src/server/scripts/password-hash-downgrade-prep.ts`)
+ *   - production (Docker, built output): `pnpm run password-hash:downgrade-prep`
+ *     (= `node dist/server/scripts/password-hash-downgrade-prep.js`)
+ *   Set `SEND_RESET_EMAILS=true` to actually send emails and unset passwordHash
+ *   (default is a report-only run).
+ *
  * This function is the pure core: it takes the `users` collection and a
  * `sendResetEmailForUser` collaborator as input and returns a structured tally.
  * It never bootstraps Crowi, never touches SMTP directly, and never calls
