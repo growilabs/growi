@@ -2,7 +2,7 @@
 
 > 注: タスク 2.x は共有コンポーネント `SearchPageBase` を破壊的に拡張する（`resetKey` を必須プロップ化）。app 全体の型チェック／ビルドが green になるのは消費者更新（3.1・4.1）完了後。各 2.x の観測可能な完了条件は当該コンポーネント／ユニットテストのスコープで判定する。
 
-- [ ] 1. Foundation: 純粋ロジック（累積合成・取得キー）
+- [x] 1. Foundation: 純粋ロジック（累積合成・取得キー）
 - [x] 1.1 (P) 累積検索結果の合成ユーティリティ
   - SWRInfinite の `data` 配列を `flatMap` で平坦化し、累積ページ・`loadedCount`・`total`・`took` を導出する
   - `isReachingEnd = loadedCount >= total`、`isEmpty = (data 取得済み かつ total === 0)`、`data == null` では空リスト・非停止を返す
@@ -19,7 +19,7 @@
   - _Requirements: 1.1, 1.2, 3.1, 3.3_
   - _Boundary: useSWRINFxSearch, getSearchInfiniteKey_
 
-- [ ] 2. Core: SearchPageBase を累積表示前提に拡張
+- [x] 2. Core: SearchPageBase を累積表示前提に拡張
 - [x] 2.1 選択リセットを resetKey 駆動化し、全選択を累積対象にする
   - 選択クリアの発火契機を「表示リスト変化」から「検索アイデンティティ（`resetKey`）変化」に変更する
   - 追加読み込み（`resetKey` 不変）では選択が維持され、新規検索・条件変更（`resetKey` 変化）でのみ選択がクリアされる
@@ -46,7 +46,7 @@
   - 完了時: infinite scroll 指定でセンチネルが描画され、削除ロジックが渡された累積リストから選択分のみを抽出する
   - _Requirements: 2.1, 5.1_
 
-- [ ] 3. Integration: SearchPage で infinite scroll を統括
+- [x] 3. Integration: SearchPage で infinite scroll を統括
 - [x] 3.1 取得フック配線と番号ページャ撤去
   - 合成ユーティリティで累積ページ・`isReachingEnd`・`isEmpty` を導出し、`resetKey` を keyword＋並び替え＋フィルタから生成する（offset を含めず追加読み込みで不変にする）
   - `PaginationWrapper`（番号ページャ）を撤去し、`InfiniteScroll` を配線して読み込み中インジケータを表示する。表示件数セレクタは復活させず、0件表示を維持する
@@ -68,7 +68,7 @@
   - 完了時: 削除後に一覧が先頭チャンクから再表示され、選択がクリアされる
   - _Requirements: 5.1, 5.2, 5.3, 7.2_
 
-- [ ] 4. Integration: レガシー画面の非回帰対応
+- [x] 4. Integration: レガシー画面の非回帰対応
 - [x] 4.1 (P) PrivateLegacyPages を新 SearchPageBase 契約へ追随
   - 新プロップ（`resetKey` 等）に追随し、番号ページ遷移のたびに選択がリセットされる従来挙動を維持する（`resetKey` にページ位置を含める）
   - 一括削除には現在ページのデータを渡す

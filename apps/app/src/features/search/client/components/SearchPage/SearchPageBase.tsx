@@ -124,6 +124,12 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     IPageWithSearchMeta | undefined
   >();
 
+  // Keep the latest change handler in a ref so the effects below can call it
+  // without listing it in their deps. Otherwise a consumer passing an inline
+  // handler would re-run (and clear) the selection on every render (P3-1).
+  const onSelectedChangedRef = useRef(onSelectedPagesByCheckboxesChanged);
+  onSelectedChangedRef.current = onSelectedPagesByCheckboxesChanged;
+
   // publish selectAll()
   useImperativeHandle(ref, () => ({
     selectAll: () => {
@@ -209,14 +215,14 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
   useEffect(() => {
     selectedPageIdsByCheckboxes.clear();
 
-    if (onSelectedPagesByCheckboxesChanged != null) {
-      onSelectedPagesByCheckboxesChanged(0, 0);
-    }
-  }, [
-    resetKey,
-    onSelectedPagesByCheckboxesChanged,
-    selectedPageIdsByCheckboxes,
-  ]);
+    // Also uncheck the currently rendered rows. With keepPreviousData (the
+    // legacy number-pager path), the previous page's rows stay mounted for a
+    // moment after a resetKey change, so clearing only the Set would leave
+    // stale checkmarks visible (P3-7).
+    searchResultListRef.current?.deselectAll();
+
+    onSelectedChangedRef.current?.(0, 0);
+  }, [resetKey, selectedPageIdsByCheckboxes]);
 
   // Keep the select-all header (checked / indeterminate) in sync with appends.
   // On append, no checkbox event fires, so the parent's checked/indeterminate
@@ -236,16 +242,11 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       return;
     }
 
-    onSelectedPagesByCheckboxesChanged?.(
+    onSelectedChangedRef.current?.(
       selectedPageIdsByCheckboxes.size,
       pages.length,
     );
-  }, [
-    pages,
-    resetKey,
-    onSelectedPagesByCheckboxesChanged,
-    selectedPageIdsByCheckboxes,
-  ]);
+  }, [pages, resetKey, selectedPageIdsByCheckboxes]);
 
   if (!isSearchServiceConfigured) {
     return (
@@ -331,7 +332,9 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
                       endingIndicator={
                         infiniteScroll.hasError ? (
                           <div className="my-4 d-flex flex-column align-items-center">
-                            <span className="text-muted">{t('Error')}</span>
+                            <span className="text-muted">
+                              {t('search_result.failed_to_load_more')}
+                            </span>
                             <button
                               type="button"
                               className="btn btn-outline-secondary mt-2"

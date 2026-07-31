@@ -806,6 +806,7 @@
     "number_of_list_to_display": "Display",
     "page_number_unit": "pages",
     "hit_number_unit": "hit",
+    "failed_to_load_more": "Failed to load more results",
     "sort_axis": {
       "relationScore": "Sort by relevance",
       "createdAt": "Creation date",

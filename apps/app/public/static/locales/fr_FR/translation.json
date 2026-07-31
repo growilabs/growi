@@ -801,6 +801,7 @@
     "number_of_list_to_display": "Afficher",
     "page_number_unit": "pages",
     "hit_number_unit": "trouvé",
+    "failed_to_load_more": "Échec du chargement de résultats supplémentaires",
     "sort_axis": {
       "relationScore": "Trier par pertinence",
       "createdAt": "Date de création",

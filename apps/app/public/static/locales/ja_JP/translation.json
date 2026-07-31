@@ -839,6 +839,7 @@
     "number_of_list_to_display": "表示件数",
     "page_number_unit": "件",
     "hit_number_unit": "件",
+    "failed_to_load_more": "検索結果の追加読み込みに失敗しました",
     "sort_axis": {
       "relationScore": "関連度順",
       "createdAt": "作成日時",
