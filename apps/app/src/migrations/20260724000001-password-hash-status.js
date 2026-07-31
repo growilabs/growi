@@ -1,3 +1,9 @@
+import {
+  bothFilter,
+  legacyOnlyFilter,
+  noPasswordFilter,
+  upgradedOnlyFilter,
+} from '~/server/models/user/password-hash-format-filters';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -19,10 +25,11 @@ const logger = loggerFactory('growi:migrate:password-hash-status');
  * migrate-mongo provides the changelog / ordering / boot-time execution that
  * Prisma's MongoDB connector does not offer.
  *
- * NOTE: `{ $exists: false }` here relies on the invariant that these fields are
- * never stored as an explicit `null` — the write paths and the downgrade-prep
- * script `$unset` the field entirely (see design.md), so absence unambiguously
- * means "not set".
+ * NOTE: classification uses the shared password-hash-format filters, which treat
+ * an empty string / `null` credential as ABSENT (not just `{ $exists: false }`).
+ * `statusDelete()` scrubbed deleted users to `password: ''` on older builds, so a
+ * lingering `password: ''` counts as `noPassword`, not `legacyOnly` — keeping the
+ * report (and the cleanup script it gates) accurate.
  */
 export async function up() {
   logger.info('Apply migration: report password-hash format distribution (read-only)');
@@ -35,25 +42,13 @@ export async function up() {
 
   const counts = {
     // fully migrated: adaptive-KDF only
-    upgradedOnly: await count({
-      passwordHash: { $exists: true },
-      password: { $exists: false },
-    }),
+    upgradedOnly: await count(upgradedOnlyFilter),
     // in progress: both formats present
-    both: await count({
-      passwordHash: { $exists: true },
-      password: { $exists: true },
-    }),
+    both: await count(bothFilter),
     // not migrated: legacy SHA-256 only
-    legacyOnly: await count({
-      passwordHash: { $exists: false },
-      password: { $exists: true },
-    }),
-    // no password set (external-auth-only or not-yet-activated users)
-    noPassword: await count({
-      passwordHash: { $exists: false },
-      password: { $exists: false },
-    }),
+    legacyOnly: await count(legacyOnlyFilter),
+    // no password set (external-auth-only, not-yet-activated, or scrubbed users)
+    noPassword: await count(noPasswordFilter),
   };
 
   logger.info('Password-hash format distribution:');

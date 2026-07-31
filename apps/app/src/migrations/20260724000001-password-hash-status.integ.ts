@@ -26,7 +26,7 @@ const EXPECTED = {
   upgradedOnly: 2,
   both: 1,
   legacyOnly: 3,
-  noPassword: 1,
+  noPassword: 4,
 } as const;
 
 const MARKER = 'pwhash-status-test';
@@ -69,13 +69,33 @@ describe('password-hash-status migration', () => {
         password: 'legacy-sha256',
       });
     }
-    // noPassword: neither field present
-    for (let i = 0; i < EXPECTED.noPassword; i++) {
-      docs.push({
-        _id: new ObjectId(),
-        username: `${MARKER}-nopass-${i}`,
-      });
-    }
+    // noPassword: neither credential field holds a real value. Besides the
+    // plain neither-field case, an empty-string / null credential MUST also
+    // classify as noPassword (statusDelete scrubs deleted users to
+    // `password: ''`, and older docs may carry it) — NOT as legacyOnly.
+    docs.push({
+      // neither field present
+      _id: new ObjectId(),
+      username: `${MARKER}-nopass-neither`,
+    });
+    docs.push({
+      // empty-string password (scrubbed deleted user, older build)
+      _id: new ObjectId(),
+      username: `${MARKER}-nopass-emptystr`,
+      password: '',
+    });
+    docs.push({
+      // null password
+      _id: new ObjectId(),
+      username: `${MARKER}-nopass-null`,
+      password: null,
+    });
+    docs.push({
+      // empty-string passwordHash, no password
+      _id: new ObjectId(),
+      username: `${MARKER}-nopass-emptyhash`,
+      passwordHash: '',
+    });
     await collection.insertMany(docs);
   });
 

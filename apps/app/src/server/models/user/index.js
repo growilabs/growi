@@ -377,7 +377,10 @@ const factory = (crowi) => {
 
     this.status = UserStatus.STATUS_DELETED;
     this.username = deletedLabel;
-    this.password = '';
+    // $unset both credential fields (undefined, not '') so a scrubbed deleted
+    // user classifies as `noPassword`. An empty-string `password` would be
+    // mis-counted as `legacyOnly` and make the cleanup script abort forever.
+    this.password = undefined;
     this.passwordHash = undefined;
     this.name = '';
     this.email = `${deletedLabel}@deleted`;

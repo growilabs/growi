@@ -78,6 +78,56 @@ describe('password-hash cleanup script', () => {
     });
   });
 
+  describe('when the only remaining "legacy" docs are scrubbed deleted users (Req 3.3, 3.4)', () => {
+    it('does NOT abort: an empty-string `password` (from statusDelete) reads as absent, not legacyOnly', async () => {
+      await collection.deleteMany({});
+
+      const bothCount = 2;
+      const upgradedOnlyCount = 1;
+      const docs: Record<string, unknown>[] = [];
+      for (let i = 0; i < bothCount; i++) {
+        docs.push({
+          _id: new ObjectId(),
+          username: `${MARKER}-both-${i}`,
+          passwordHash: `scrypt$hash-both-${i}`,
+          password: 'legacy-sha256',
+        });
+      }
+      for (let i = 0; i < upgradedOnlyCount; i++) {
+        docs.push({
+          _id: new ObjectId(),
+          username: `${MARKER}-upgraded-${i}`,
+          passwordHash: `scrypt$hash-upgraded-${i}`,
+        });
+      }
+      // Deleted-style user scrubbed by statusDelete on an older build: the
+      // `password` field STILL EXISTS but holds '' — it must count as absent,
+      // otherwise it is mis-classified as legacyOnly and the run aborts forever.
+      docs.push({
+        _id: new ObjectId(),
+        username: `${MARKER}-deleted-0`,
+        password: '',
+      });
+      await collection.insertMany(docs);
+
+      const result = await runPasswordHashCleanup(collection);
+
+      expect(result.aborted).toBe(false);
+      expect(result.legacyOnly).toBe(0);
+      expect(result.unset).toBe(bothCount);
+
+      // both users: legacy password removed, scrypt passwordHash retained.
+      const both = await collection
+        .find({ username: { $regex: `^${MARKER}-both` } })
+        .toArray();
+      expect(both).toHaveLength(bothCount);
+      for (const doc of both) {
+        expect(doc.password).toBeUndefined();
+        expect(typeof doc.passwordHash).toBe('string');
+      }
+    });
+  });
+
   describe('when all users are migrated (Req 3.3)', () => {
     it('unsets password on both-field users, keeps passwordHash, leaves upgradedOnly untouched', async () => {
       await collection.deleteMany({});

@@ -4,6 +4,10 @@ import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
 
+import {
+  bothFilter,
+  legacyOnlyFilter,
+} from '../models/user/password-hash-format-filters';
 import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
 
 const logger = loggerFactory('growi:scripts:password-hash-cleanup');
@@ -36,17 +40,16 @@ export interface PasswordHashCleanupResult {
  *  3. Otherwise `$unset` the legacy `password` field from every `both` user
  *     (both fields present), keeping the scrypt `passwordHash` (Req 3.3).
  *
- * NOTE: `{ $exists: false }` relies on the invariant that these fields are never
- * stored as explicit `null` — all write paths `$unset` the field entirely, so
- * absence unambiguously means "not set".
+ * NOTE: classification uses the shared password-hash-format filters, which treat
+ * an empty string / `null` credential as ABSENT (not just `{ $exists: false }`).
+ * `statusDelete()` scrubbed deleted users to `password: ''` on older builds, so a
+ * lingering legacy `password: ''` must read as "no password" — otherwise those
+ * deleted users are counted as `legacyOnly` and this cleanup would abort forever.
  */
 export async function runPasswordHashCleanup(
   usersCollection: Collection,
 ): Promise<PasswordHashCleanupResult> {
-  const legacyOnly = await usersCollection.countDocuments({
-    passwordHash: { $exists: false },
-    password: { $exists: true },
-  });
+  const legacyOnly = await usersCollection.countDocuments(legacyOnlyFilter);
 
   if (legacyOnly > 0) {
     // Abort WITHOUT modifying the DB (Req 3.4).
@@ -56,10 +59,9 @@ export async function runPasswordHashCleanup(
     return { aborted: true, legacyOnly, unset: 0 };
   }
 
-  const updateResult = await usersCollection.updateMany(
-    { passwordHash: { $exists: true }, password: { $exists: true } },
-    { $unset: { password: '' } },
-  );
+  const updateResult = await usersCollection.updateMany(bothFilter, {
+    $unset: { password: '' },
+  });
 
   logger.info(
     `Password-hash cleanup complete: removed the legacy password field from ${updateResult.modifiedCount} fully-migrated user(s).`,

@@ -123,7 +123,10 @@ describe('User', () => {
 
         expect(adminusertestToBeRemoved).toBeInstanceOf(User);
         expect(adminusertestToBeRemoved.name).toBe('');
-        expect(adminusertestToBeRemoved.password).toBe('');
+        // statusDelete $unsets both credential fields (undefined, not ''), so a
+        // scrubbed deleted user classifies as `noPassword` — an empty-string
+        // `password` would be mis-counted as `legacyOnly` by the cleanup script.
+        expect(adminusertestToBeRemoved.password).toBeUndefined();
         expect(adminusertestToBeRemoved.passwordHash).toBeUndefined();
         expect(adminusertestToBeRemoved.googleId).toBeNull();
         expect(adminusertestToBeRemoved.isGravatarEnabled).toBeFalsy();

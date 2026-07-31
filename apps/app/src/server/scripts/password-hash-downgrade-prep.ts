@@ -8,6 +8,7 @@ import loggerFactory from '~/utils/logger';
 
 import Crowi from '../crowi';
 import PasswordResetOrder from '../models/password-reset-order';
+import { upgradedOnlyFilter } from '../models/user/password-hash-format-filters';
 import { configManager } from '../service/config-manager';
 import { growiInfoService } from '../service/growi-info';
 import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
@@ -63,21 +64,17 @@ export interface DowngradePrepDeps {
  *     - if the send FAILS, leave `passwordHash` intact so a re-run retries it;
  *     - tally success / failure.
  *
- * CRITICAL: `passwordHash` is removed with `$unset` (never set to `null`). The
- * `$exists`-based classification used by the status/cleanup scripts treats a
- * `null` field as present, so a nulled user would stay counted as `upgradedOnly`
- * → inaccurate counts AND a double-sent reset email on the next run. `$unset`
- * moves the user to the `noPassword` category, as required.
+ * CRITICAL: `passwordHash` is removed with `$unset` (never set to `null` or '').
+ * The shared classification filters now treat null/'' as absent, so a nulled
+ * user would classify as `noPassword` rather than `upgradedOnly` — but relying on
+ * that would still cause a double-sent reset email on the next run (the user
+ * would re-enter neither the upgradedOnly nor a clean state predictably). `$unset`
+ * cleanly moves the user to `noPassword`, as required.
  */
 export async function runDowngradePrep(
   deps: DowngradePrepDeps,
 ): Promise<DowngradePrepResult> {
   const { usersCollection, sendResetEmailForUser, sendResetEmails } = deps;
-
-  const upgradedOnlyFilter = {
-    passwordHash: { $exists: true },
-    password: { $exists: false },
-  };
 
   const upgradedOnly = await usersCollection.countDocuments(upgradedOnlyFilter);
 
