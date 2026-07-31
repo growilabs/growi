@@ -32,6 +32,10 @@ import {
 
 import styles from './SearchPage.module.scss';
 
+// Elasticsearch `index.max_result_window` default. A query is rejected once
+// `limit + offset` exceeds it, so infinite scroll must stop before that point.
+const ES_MAX_RESULT_WINDOW = 10000;
+
 /**
  * SearchResultListHead
  */
@@ -110,15 +114,27 @@ export const SearchPage = (): JSX.Element => {
     ...configurationsByControl,
     limit,
   });
+  // useSWRInfinite returns a fresh object every render; destructure its stable
+  // members so the callbacks below keep stable identities (and their memoized
+  // consumers, e.g. searchControl, are not recomputed on every append).
+  const { data: swrData, error: swrError, setSize, mutate } = swr;
 
   // Accumulated, render-ready result derived from the infinite-scroll chunks.
-  const merged = useMemo(() => mergeInfiniteSearchResult(swr.data), [swr.data]);
+  const merged = useMemo(() => mergeInfiniteSearchResult(swrData), [swrData]);
 
-  const hasError = swr.error != null;
+  const hasError = swrError != null;
+
+  // Elasticsearch rejects a query whose `limit + offset` exceeds
+  // `max_result_window` (default 10000). The next chunk's offset is
+  // `loadedChunks * limit`, so stop before requesting one that would exceed the
+  // window — otherwise scrolling to the cap fails on every further attempt.
+  const loadedChunks = swrData?.length ?? 0;
+  const reachedResultWindowLimit =
+    (loadedChunks + 1) * limit > ES_MAX_RESULT_WINDOW;
 
   const onRetry = useCallback(() => {
-    swr.mutate();
-  }, [swr]);
+    mutate();
+  }, [mutate]);
 
   // Identity of the current search. Derived WITHOUT offset/size/pageIndex so it
   // stays stable across infinite-scroll appends and changes only on a new
@@ -141,9 +157,9 @@ export const SearchPage = (): JSX.Element => {
       setSearchKeyword(newKeyword);
 
       // Discard the accumulation and reload from the first chunk (Req 7.1).
-      swr.setSize(1);
+      setSize(1);
     },
-    [setSearchKeyword, swr],
+    [setSearchKeyword, setSize],
   );
 
   const selectAllCheckboxChangedHandler = useCallback((isChecked: boolean) => {
@@ -199,11 +215,11 @@ export const SearchPage = (): JSX.Element => {
   // against the stale (larger) size; the selection is cleared last so it never
   // reflects rows that the reload has already dropped.
   const deleteCompletedHandler = useCallback(() => {
-    swr.setSize(1);
-    swr.mutate();
+    setSize(1);
+    mutate();
     searchPageBaseRef.current?.deselectAll();
     setSelectedCount(0);
-  }, [swr]);
+  }, [setSize, mutate]);
 
   // for bulk deletion — target every accumulated page across appends. Selection
   // of only the loaded-and-selected pages is handled inside the hook (Req 5.1).
@@ -326,7 +342,8 @@ export const SearchPage = (): JSX.Element => {
       searchResultListHead={searchResultListHead}
       infiniteScroll={{
         swrInfiniteResponse: swr,
-        isReachingEnd: merged.isReachingEnd || hasError,
+        isReachingEnd:
+          merged.isReachingEnd || hasError || reachedResultWindowLimit,
         hasError,
         onRetry,
       }}

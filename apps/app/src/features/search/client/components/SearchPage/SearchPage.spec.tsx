@@ -143,6 +143,18 @@ const createChunk = (ids: string[]): IFormattedSearchResult =>
     meta: { total: 42, took: 3, hitsCount: ids.length },
   }) as unknown as IFormattedSearchResult;
 
+// Full chunks (hitsCount 20) against a huge total, so merged.isReachingEnd stays
+// false and only the result-window guard can stop the load.
+const createFullChunks = (count: number): IFormattedSearchResult[] =>
+  Array.from(
+    { length: count },
+    () =>
+      ({
+        data: [],
+        meta: { total: 1_000_000, took: 1, hitsCount: 20 },
+      }) as unknown as IFormattedSearchResult,
+  );
+
 describe('SearchPage infinite-scroll wiring', () => {
   beforeEach(() => {
     searchPageBaseSpy.lastProps = undefined;
@@ -255,6 +267,34 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
 
     const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
     expect(infiniteScroll?.hasError).toBe(false);
+    expect(infiniteScroll?.isReachingEnd).toBe(false);
+  });
+
+  it('stops at the Elasticsearch max_result_window even when the total is not reached (P2-4)', () => {
+    // limit is 20 (showPageLimitationL unset). With 500 loaded chunks the next
+    // offset is 500 * 20 = 10000, and 10000 + 20 > 10000 exceeds the window,
+    // even though only 10000 of 1,000,000 results are fetched.
+    searchStoreSpy.infiniteResponse = createInfiniteResponse(
+      createFullChunks(500),
+    );
+
+    render(<SearchPage />);
+
+    const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
+    expect(infiniteScroll?.hasError).toBe(false);
+    expect(infiniteScroll?.isReachingEnd).toBe(true);
+  });
+
+  it('keeps auto-load enabled just below the max_result_window (P2-4 boundary)', () => {
+    // 499 chunks => next offset 499 * 20 = 9980, and 9980 + 20 = 10000 is NOT
+    // greater than the window, so loading may continue.
+    searchStoreSpy.infiniteResponse = createInfiniteResponse(
+      createFullChunks(499),
+    );
+
+    render(<SearchPage />);
+
+    const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
     expect(infiniteScroll?.isReachingEnd).toBe(false);
   });
 });
