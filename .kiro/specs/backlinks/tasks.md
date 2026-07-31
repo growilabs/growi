@@ -225,7 +225,11 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     hub page** (thousands of inbound sources) — the worst case for the read path and the page you
     actually measure. Use a throwaway/fixture seeding script, **not** the B3 backfill job.
   - **Confirm the indexes exist** on the seeded collection (created by B1.2 `autoIndex`) — a check,
-    not new work: `{toPage}` in particular.
+    not new work. The collection carries exactly two: `{toPage}` (what this benchmark exercises, via
+    `findBacklinkSources`) and the unique `{fromPage, toPath}` compound. The standalone `{fromPage}`
+    and `{toPath}` indexes were dropped in B2.2 as unused, so their absence is expected, not a gap —
+    `{fromPage}` is the compound's prefix, and `toPath`-alone gets its index in B4 with the query
+    that needs it.
   - **Measure the real read path** for the hub page **as a viewer**: the full `findBacklinks` →
     `findBacklinkSources` (`distinct` on `{toPage}`) → permission/viewer filter path, not the raw
     Mongo query alone. Confirm it returns in interactive time (<~1s).
@@ -251,16 +255,22 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     `create`/`update` handlers mark the page dirty (`Set<pageId>`); a paced tick drains a bounded
     number of ids per cycle, re-reads each page's latest body at drain time, and runs the existing
     upsert handler once per page. `handlePageUpsert` stays the per-page unit — the queue is the seam.
-  - A `delete`-family event removes the id from the dirty set and routes to `reconcileDeletedPages`
-    (delete supersedes a pending upsert), so a stale upsert never re-creates rows for a gone page.
+  - **B2.2 scope (delete):** the drain guards against a stale upsert by re-checking status at drain
+    time and declining to index a page that is now `STATUS_DELETED` — keyed on deleted rather than
+    published because a legacy page's `null` status means published. That closes the window
+    coalescing opened (a soft delete keeps the `_id`, so the "page is gone" check does not catch it).
+    Routing the delete to `reconcileDeletedPages` and clearing the rows the page already owned needs
+    the reconcile op and the delete-family handlers — deferred to **B5.2**/**B5.3**.
   - Best-effort/in-memory by design: a restart drops pending work (self-heals on next edit/backfill);
     the set is per-instance in multi-container deployments (safe because upserts are idempotent).
   - **Why (MongoDB impact):** every save runs `PageLink.replaceOutboundLinks`, a single `bulkWrite`
     that upserts one row per extracted link and issues a `deleteMany` for links no longer present —
-    each component write maintaining all four `pagelinks` indexes (`{fromPage}`, `{toPath}`,
-    `{toPage}`, unique `{fromPage, toPath}`). Without coalescing, N rapid saves of one page = N full
+    each component write maintaining every `pagelinks` index. This story also cut those from four to
+    the two an actual query uses — unique `{fromPage, toPath}` and `{toPage}`; the standalone
+    `{fromPage}` (already the compound's prefix) and `{toPath}` (no query until B4) were pure write
+    overhead. Without coalescing, N rapid saves of one page = N full
     `bulkWrite` replaces of which N−1 are immediately obsolete, yet each still re-upserts every row,
-    re-scans for the `deleteMany`, rewrites all four index B-trees, and (under the `rs0` replica set)
+    re-scans for the `deleteMany`, rewrites every index B-tree, and (under the `rs0` replica set)
     emits oplog entries that replicate to secondaries. A burst across distinct pages runs these
     `bulkWrite`s concurrently, contending for write tickets and collection locks with the
     latency-sensitive backlinks read (`findBacklinkSources`, a `distinct` on `{toPage}`) — so the
@@ -275,7 +285,7 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
   - Done when: repeated saves of the same page within the tick window produce exactly one extraction
     / one `replaceOutboundLinks` `bulkWrite` (asserted via a spy/count on the upsert handler); a burst
     of distinct-page saves is drained over multiple ticks rather than in one synchronous spree; a
-    delete during a pending upsert results in reconcile, not a re-created row.
+    page trashed while its upsert is pending is not indexed by the drain (no row written for it).
   - _Requirements: 3.5_
   - _Boundary: PageLinkService_
   - _Depends: B1.6, B1.12_
@@ -416,15 +426,24 @@ the restored page's status. Independent of B3/B4.
   - Implement the reconcile op deferred from B1.5: reconcile a deleted page by checking its current DB
     state — still trashed → no-op (derived state shows trashed); truly gone → remove its outbound rows
     and null inbound `toPage` (broken)
+  - **Carried over from B2.2:** delete must supersede a pending coalesced upsert. B2.2 only stops the
+    drain from writing *new* rows for a page that is now `STATUS_DELETED`; the rows the page already
+    owned when it was trashed are still there, so this op is what actually settles them. The upsert
+    path uses `upsert: true`, so a stale upsert for a since-gone page would re-create rows for a
+    non-existent source — orphan rows a reader could surface as phantom backlinks.
   - Done when unit tests show reconcile no-ops a trashed page and nulls inbound `toPage` for a
-    permanently-gone page
-  - _Requirements: 3.3, 6.1, 6.2_
+    permanently-gone page, and a delete landing while an upsert is pending ends in the reconciled
+    state rather than a re-created row
+  - _Requirements: 3.3, 3.5, 6.1, 6.2_
   - _Boundary: page-link-sync_
   - _Depends: B5.1_
 
 - [ ] B5.3 Implement the delete-family lifecycle handlers
   - Implement the service handlers deferred from B1.6: delete/deleteCompletely/syncDescendantsDelete
     all route to the state-based reconcile. Idempotent; tolerate already-removed pages
+  - Also drop the page id from `PageLinkUpsertQueue`'s dirty set here, so a pending upsert is
+    abandoned rather than merely declined at drain time (the queue side of B5.2's carried-over
+    criterion)
   - Done when unit tests invoke each handler with a fake event payload and assert the resulting row
     changes (removed/nulled)
   - _Requirements: 3.3, 6.1, 6.2_
