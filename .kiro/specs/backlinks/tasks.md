@@ -259,30 +259,52 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     BACKLINKS_PERF=1 pnpm vitest run page-link-read-perf
   ```
   (The harness rewrites the db name to `growi_test_<workerId>`, so the dev `growi` database is never
-  touched. `BACKLINKS_PERF_PAGES` / `BACKLINKS_PERF_INBOUND` override the scale.)
+  touched. `BACKLINKS_PERF_PAGES` / `BACKLINKS_PERF_INBOUND` override the scale;
+  `BACKLINKS_PERF_COLD=1` adds the cold-cache run below.)
 
   Environment: devcontainer MongoDB 8.2.9, wiredTiger, `rs0` single-node replica set, 16 cores /
-  15.9 GB. Dataset: 100,001 pages, 205,000 link rows, hub page with 5,000 inbound sources; hub
-  sources mixed 75% public / 5% owned-by-viewer / 15% owned-by-others / 5% trashed, so the viewer
-  filter really sifts (4,000 of 5,000 — i.e. 80% — returned; asserted, so this doubles as a
-  correctness check at scale). Seed took 4.8 s; 5 timed runs after a discarded warm-up.
+  15.9 GB. Dataset: 100,001 pages, 205,000 link rows, hub page with 5,000 inbound sources. Pages
+  carry the full real field set (`revision`, `creator`, `lastUpdateUser`, `parent`, `seenUsers`, …),
+  giving a **427 B average document** against the 384 B seen in a real wiki — document size is what
+  the FETCH-and-project read actually pays, so a stripped 185 B page would have understated it.
+
+  Hub sources are mixed so the viewer filter really sifts: 60% public, 10% granted to a group the
+  viewer belongs to, 10% granted to a group they don't, 10% owned by someone else, 5% owned by the
+  viewer, 5% trashed ⇒ 3,750 of 5,000 visible. The viewer is a member of two real `UserGroup`s, so
+  `generateGrantCondition` emits its `grantedGroups: {$elemMatch: …}` branch — without groups seeded
+  that branch is omitted and the measured query would be structurally simpler than a real member's.
+  The visible count is asserted, so this doubles as a correctness check at scale.
 
   | measurement | 5,000 inbound | 20,000 inbound |
   |---|---|---|
-  | `findBacklinks` (full read path) | **median 127 ms** (min 121 / max 147) | **median 189 ms** (min 173 / max 261) |
-  | └ `findBacklinkSources` (`distinct` on `{toPage}`) | median 13 ms | median 34 ms |
-  | └ viewer-filtered `Page` query | median 114 ms | median 155 ms |
+  | `findBacklinks` (full read path) | **median 128 ms** (min 122 / max 138) | **median 192 ms** (min 168 / max 216) |
+  | └ `findBacklinkSources` (`distinct` on `{toPage}`) | median 7 ms | median 29 ms |
+  | └ viewer-filtered `Page` query | median 115 ms | median 150 ms |
 
   One run's samples; repeated runs land at a 116–130 ms median for the 5,000-inbound case, with the
-  max the noisy figure (147–224 ms) since the devcontainer shares its CPU. Read the medians as
-  ~an order of magnitude under the target, not as a precise figure to regression-test against.
+  max the noisy figure since the devcontainer shares its CPU. Read the medians as ~an order of
+  magnitude under the target, not as a precise figure to regression-test against.
+
+  **Cold cache** (`BACKLINKS_PERF_COLD=1` shrinks the server's WiredTiger cache below the working set,
+  then restores it) — answers what happens when the pages are *not* already in memory:
+
+  | cache vs working set | first read | settled median |
+  |---|---|---|
+  | 64 MiB vs 80 MiB (1.25x) | 163 ms | 128 ms |
+  | 8 MiB vs 155 MiB (19x) | 141 ms | **164 ms** |
+
+  Even with the cache 19x too small to hold the data, the read is 164 ms — still ~6x under target. So
+  the warm figures are not an artifact of everything being cache-resident.
 
   - **Where the time goes:** the viewer filter, not the `distinct` — ~90% of the total. It is a
     `_id: {$in: [5k ids]}` fetch plus the grant `$or`, so it scales with the number of sources, which
     is the expected shape.
-  - **Scaling:** 4x the inbound rows costs only ~1.5x latency (127 → 189 ms), i.e. sub-linear and
+  - **Scaling:** 4x the inbound rows costs only ~1.5x latency (128 → 192 ms), i.e. sub-linear and
     still 5x under target. Extrapolating, the 1 s budget is not at risk until a hub reaches roughly
     100k inbound sources.
+  - **Document size and group grants barely moved the number:** 2.3x bigger documents plus the extra
+    `$elemMatch` branch cost ~1 ms (127 → 128 ms). Both were fixed because the earlier seed made the
+    result *look* optimistic, not because the correction turned out to matter.
   - **Plans (all index-backed, no COLLSCAN anywhere):** `distinct` → `FETCH <- IXSCAN` on `toPage_1`;
     viewer filter → `PROJECTION_SIMPLE <- FETCH <- IXSCAN` on `_id_`; the save-path delete filter
     (`{fromPage, toPath: {$nin}}`) → `FETCH <- IXSCAN` on `fromPage_1_toPath_1`.

@@ -9,9 +9,9 @@ import type { IBacklink } from '../../interfaces/backlink';
 import PageLink from '../models/page-link';
 
 // Intentionally unbounded: B2.1 measured this path against 100k pages with a
-// 5,000-inbound hub at a median 127 ms (189 ms at 20,000 inbound), both plans
-// index-backed, so no result cap or extra index is warranted yet. Re-measure with
-// page-link-read-perf.integ.ts before adding either.
+// 5,000-inbound hub at a median 128 ms (192 ms at 20,000 inbound; 164 ms with a cache
+// 19x too small to hold the data), both plans index-backed, so no result cap or extra
+// index is warranted yet. Re-measure with page-link-read-perf.integ.ts before adding either.
 type BacklinkSource = {
   _id: Types.ObjectId;
   path: string;

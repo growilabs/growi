@@ -6,6 +6,8 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { PageQueryBuilder } from '~/server/models/page';
+import UserGroup from '~/server/models/user-group';
+import UserGroupRelation from '~/server/models/user-group-relation';
 
 import PageLink from '../models/page-link';
 import { findBacklinks } from './find-backlinks';
@@ -32,14 +34,23 @@ import { syncOutboundLinks } from './page-link-sync';
  *
  * Scale is overridable for a quicker smoke run of the harness itself:
  *   BACKLINKS_PERF_PAGES=10000 BACKLINKS_PERF_INBOUND=2000
+ *
+ * BACKLINKS_PERF_COLD=1 adds a cold-cache measurement. It temporarily shrinks the
+ * server's WiredTiger cache below the working-set size so reads must go to disk,
+ * then restores the original size. Opt-in and off by default because it mutates a
+ * *server-wide* setting: if the process is killed mid-test the cache stays small
+ * until mongod restarts. Never point it at anything but a throwaway MongoDB.
  */
 
 const isEnabled = process.env.BACKLINKS_PERF != null;
+const isColdEnabled = process.env.BACKLINKS_PERF_COLD != null;
 
 const PAGE_COUNT = Number(process.env.BACKLINKS_PERF_PAGES ?? 100_000);
 const HUB_INBOUND = Number(process.env.BACKLINKS_PERF_INBOUND ?? 5_000);
 /** Outbound links per page besides the hub link — makes the collection realistically sized. */
 const EXTRA_LINKS_PER_PAGE = 2;
+/** Cache ceiling for the cold run. Must be well under the seeded working set to force eviction. */
+const COLD_CACHE_MB = Number(process.env.BACKLINKS_PERF_COLD_CACHE_MB ?? 64);
 /** Requirement 3.4: the hub read must come back in interactive time. */
 const TARGET_MS = 1_000;
 const TIMED_RUNS = 5;
@@ -103,6 +114,48 @@ const collectStages = (plan: any): string[] => {
 // biome-ignore lint/suspicious/noConsole: reporting the measurement is this test's purpose
 const report = (...args: unknown[]): void => console.log(...args);
 
+const adminDb = () => {
+  const db = mongoose.connection.db;
+  if (db == null) throw new Error('no mongoose connection');
+  return db.admin();
+};
+
+const wiredTigerCacheBytes = async (): Promise<number> => {
+  const status = await adminDb().command({ serverStatus: 1 });
+  return status.wiredTiger.cache['maximum bytes configured'];
+};
+
+/** Set the server-wide WiredTiger cache ceiling. Caller MUST restore the original. */
+const setWiredTigerCacheMb = async (mb: number): Promise<void> => {
+  await adminDb().command({
+    setParameter: 1,
+    wiredTigerEngineRuntimeConfig: `cache_size=${mb}M`,
+  });
+};
+
+const describeCacheRegime = async (): Promise<{
+  workingSetMb: number;
+  cacheMb: number;
+  avgPageBytes: number;
+}> => {
+  const db = mongoose.connection.db;
+  if (db == null) throw new Error('no mongoose connection');
+  const [pages, links] = await Promise.all([
+    db.command({ collStats: 'pages' }),
+    db.command({ collStats: PageLink.collection.collectionName }),
+  ]);
+  const bytes =
+    pages.storageSize +
+    pages.totalIndexSize +
+    links.storageSize +
+    links.totalIndexSize;
+  return {
+    workingSetMb: Math.round(bytes / 1024 / 1024),
+    cacheMb: Math.round((await wiredTigerCacheBytes()) / 1024 / 1024),
+    avgPageBytes: Math.round(pages.avgObjSize),
+  };
+};
+
 describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
   let Page: PageModel;
   // biome-ignore lint/suspicious/noExplicitAny: the User model is an untyped JS model in GROWI
@@ -155,14 +208,65 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
       viewer = await User.findOne({ username: 'b21-viewer' });
       foreignUser = await User.findOne({ username: 'b21-foreign' });
 
+      // Put the viewer in real user groups. Without them
+      // UserGroupRelation.findAllUserGroupIdsRelatedToUser returns [] and
+      // generateGrantCondition omits its GRANT_USER_GROUP branch entirely — so the
+      // measured grant condition would be structurally simpler than a real member's.
+      await UserGroup.insertMany([
+        { name: 'b21-group-a' },
+        { name: 'b21-group-b' },
+        { name: 'b21-group-foreign' },
+      ]);
+      const [groupA, groupB, groupForeign] = await Promise.all([
+        UserGroup.findOne({ name: 'b21-group-a' }),
+        UserGroup.findOne({ name: 'b21-group-b' }),
+        UserGroup.findOne({ name: 'b21-group-foreign' }),
+      ]);
+      if (groupA == null || groupB == null || groupForeign == null) {
+        throw new Error('failed to seed user groups');
+      }
+      await UserGroupRelation.insertMany([
+        { relatedGroup: groupA._id, relatedUser: viewer._id },
+        { relatedGroup: groupB._id, relatedUser: viewer._id },
+        { relatedGroup: groupForeign._id, relatedUser: foreignUser._id },
+      ]);
+
       const seedStarted = performance.now();
 
       // --- pages -----------------------------------------------------------
       // Raw collection inserts: mongoose casting/validation over 100k documents costs
-      // more than the seed itself, and the read path only reads path/grant/status/
-      // grantedUsers/grantedGroups/isEmpty. Defaults are therefore set explicitly.
+      // more than the seed itself. Because that skips schema defaults, every field a
+      // real page carries is written explicitly — not just the ones the read path
+      // filters on. Document *size* is what matters here: the viewer filter is a
+      // FETCH + projection, so WiredTiger reads whole documents, and a stripped-down
+      // 185-byte page would understate that cost against a real ~384-427 byte one.
       hubPageId = new mongoose.Types.ObjectId();
       const now = new Date();
+      const rootId = new mongoose.Types.ObjectId();
+      // Stand-ins for the reference fields; the read path never follows them, so no
+      // Revision/User documents need to exist behind these ids — only their bytes matter.
+      const seenUsers = [
+        viewer._id,
+        foreignUser._id,
+        new mongoose.Types.ObjectId(),
+      ];
+
+      // biome-ignore lint/suspicious/noExplicitAny: raw documents, not hydrated PageDocuments
+      const realisticFields = (): any => ({
+        parent: rootId,
+        descendantCount: 0,
+        revision: new mongoose.Types.ObjectId(),
+        latestRevisionBodyLength: 1200,
+        creator: viewer._id,
+        lastUpdateUser: viewer._id,
+        liker: [],
+        seenUsers,
+        commentCount: 0,
+        isEmpty: false,
+        createdAt: now,
+        updatedAt: now,
+        __v: 0,
+      });
 
       // biome-ignore lint/suspicious/noExplicitAny: raw documents, not hydrated PageDocuments
       const pageDocs: any[] = [
@@ -171,11 +275,9 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
           path: `${PREFIX}/hub`,
           grant: Page.GRANT_PUBLIC,
           status: Page.STATUS_PUBLISHED,
-          isEmpty: false,
           grantedUsers: [],
           grantedGroups: [],
-          createdAt: now,
-          updatedAt: now,
+          ...realisticFields(),
         },
       ];
 
@@ -183,24 +285,48 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
       for (let i = 0; i < PAGE_COUNT; i++) {
         const isHubSource = i < HUB_INBOUND;
         // Grant/status mix applied to the hub's sources — the set the viewer filter
-        // actually has to sift. Buckets of 20: 0-14 public (75%), 15-17 owned by
-        // someone else (15%, excluded), 18 owned by the viewer (5%, visible),
-        // 19 trashed (5%, excluded) — so 80% is visible.
+        // actually has to sift. Buckets of 20:
+        //   0-11 public                       60%  visible
+        //   12-13 group-granted to the viewer 10%  visible  (exercises the $elemMatch branch)
+        //   14-15 group-granted to others     10%  excluded
+        //   16-17 owned by someone else       10%  excluded
+        //   18    owned by the viewer          5%  visible
+        //   19    trashed                      5%  excluded
+        // => 75% visible.
         const bucket = i % 20;
         const trashed = isHubSource && bucket === 19;
         const ownedByViewer = isHubSource && bucket === 18;
-        const ownedByForeign = isHubSource && bucket >= 15 && bucket <= 17;
+        const ownedByForeign = isHubSource && bucket >= 16 && bucket <= 17;
+        const groupForeignGranted = isHubSource && bucket >= 14 && bucket <= 15;
+        const groupViewerGranted = isHubSource && bucket >= 12 && bucket <= 13;
 
-        if (isHubSource && !trashed && !ownedByForeign) visible++;
+        if (
+          isHubSource &&
+          !trashed &&
+          !ownedByForeign &&
+          !groupForeignGranted
+        ) {
+          visible++;
+        }
 
-        const grant =
-          ownedByViewer || ownedByForeign
-            ? Page.GRANT_OWNER
-            : Page.GRANT_PUBLIC;
+        const grant = ((): number => {
+          if (ownedByViewer || ownedByForeign) return Page.GRANT_OWNER;
+          if (groupViewerGranted || groupForeignGranted) {
+            return Page.GRANT_USER_GROUP;
+          }
+          return Page.GRANT_PUBLIC;
+        })();
         const grantedUsers = ownedByViewer
           ? [viewer._id]
           : ownedByForeign
             ? [foreignUser._id]
+            : [];
+        // Granted to group A (one of the viewer's two) or to the group only the
+        // stranger belongs to.
+        const grantedGroups = groupViewerGranted
+          ? [{ type: 'UserGroup', item: groupA._id }]
+          : groupForeignGranted
+            ? [{ type: 'UserGroup', item: groupForeign._id }]
             : [];
 
         pageDocs.push({
@@ -212,11 +338,9 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
             : `${PREFIX}/source-${i}`,
           grant,
           status: trashed ? Page.STATUS_DELETED : Page.STATUS_PUBLISHED,
-          isEmpty: false,
           grantedUsers,
-          grantedGroups: [],
-          createdAt: now,
-          updatedAt: now,
+          grantedGroups,
+          ...realisticFields(),
         });
       }
       expectedVisibleCount = visible;
@@ -260,6 +384,18 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
       report(
         `[B2.1] hub inbound rows: ${HUB_INBOUND}, expected visible to viewer: ${expectedVisibleCount}`,
       );
+
+      // Working set vs cache: without this the reader cannot tell which regime the
+      // numbers describe. A fully cache-resident read is the optimistic case.
+      const { workingSetMb, cacheMb, avgPageBytes } =
+        await describeCacheRegime();
+      report(
+        `[B2.1] avg page doc: ${avgPageBytes} B | working set: ${workingSetMb} MiB | WT cache: ${cacheMb} MiB ${
+          workingSetMb < cacheMb
+            ? '(fully resident — warm reads)'
+            : '(exceeds cache)'
+        }`,
+      );
     },
     30 * 60 * 1000,
   );
@@ -277,6 +413,10 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
       await Promise.all([
         PageLink.deleteMany({ toPage: hubPageId }),
         User.deleteMany({ username: { $in: ['b21-viewer', 'b21-foreign'] } }),
+        UserGroupRelation.deleteMany({
+          relatedUser: { $in: [viewer._id, foreignUser._id] },
+        }),
+        UserGroup.deleteMany({ name: { $regex: '^b21-group-' } }),
         // Safety net for any path-prefixed leftovers (escaped per rules/mongodb-regex.md).
         Page.deleteMany({
           path: new RegExp(`^${escapeStringForMongoRegex(PREFIX)}`),
@@ -340,6 +480,50 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
 
     expect(full.median).toBeLessThan(TARGET_MS);
   });
+
+  it.skipIf(!isColdEnabled)(
+    'still returns in interactive time with a cache too small to hold the data',
+    async () => {
+      // Answers the question the warm numbers cannot: what happens when the pages are
+      // NOT already in memory. Shrinking the WT cache below the working set forces
+      // eviction, so the FETCH half has to go to storage.
+      const originalBytes = await wiredTigerCacheBytes();
+      const originalMb = Math.round(originalBytes / 1024 / 1024);
+
+      try {
+        await setWiredTigerCacheMb(COLD_CACHE_MB);
+        const regime = await describeCacheRegime();
+        report(
+          `[B2.1][cold] working set ${regime.workingSetMb} MiB vs cache ${regime.cacheMb} MiB`,
+        );
+        expect(regime.workingSetMb).toBeGreaterThan(regime.cacheMb);
+
+        // No warm-up discard here — the first read under cache pressure is the
+        // interesting one, so it is reported separately from the settled runs.
+        const firstStarted = performance.now();
+        const first = await findBacklinks(hubPageId, viewer);
+        const firstMs = performance.now() - firstStarted;
+        expect(first).toHaveLength(expectedVisibleCount);
+
+        const settled = await measure(TIMED_RUNS, () =>
+          findBacklinks(hubPageId, viewer),
+        );
+
+        report(`[B2.1][cold] first read: ${firstMs.toFixed(1)} ms`);
+        report(`[B2.1][cold] settled:    ${fmt(settled)}`);
+
+        expect(settled.median).toBeLessThan(TARGET_MS);
+      } finally {
+        // Restore to the exact original, not a rounded guess.
+        await setWiredTigerCacheMb(originalMb);
+        const restored = await wiredTigerCacheBytes();
+        report(
+          `[B2.1][cold] restored WT cache to ${Math.round(restored / 1024 / 1024)} MiB (was ${originalMb} MiB)`,
+        );
+      }
+    },
+    5 * 60 * 1000,
+  );
 
   it('serves both read queries from an index, with no collection scan', async () => {
     const db = mongoose.connection.db;
