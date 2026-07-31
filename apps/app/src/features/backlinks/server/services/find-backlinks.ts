@@ -8,8 +8,10 @@ import { PageQueryBuilder } from '~/server/models/page';
 import type { IBacklink } from '../../interfaces/backlink';
 import PageLink from '../models/page-link';
 
-// Read-path scale for heavily-linked hub pages (bounding/index/interactive-time)
-// is handled in B2.1; intentionally unbounded here.
+// Intentionally unbounded: B2.1 measured this path against 100k pages with a
+// 5,000-inbound hub at a median 127 ms (189 ms at 20,000 inbound), both plans
+// index-backed, so no result cap or extra index is warranted yet. Re-measure with
+// page-link-read-perf.integ.ts before adding either.
 type BacklinkSource = {
   _id: Types.ObjectId;
   path: string;

@@ -217,7 +217,7 @@ reads. Read-side query latency is independent of write pacing, so the two share 
 write path today; B2.1 is a read-only benchmark on static data that can run at any time and mainly
 confirms B1's index choice. (Not a hard dependency — either order is correct.)
 
-- [ ] B2.1 Performance check for backlinks retrieval at scale (read-path)
+- [x] B2.1 Performance check for backlinks retrieval at scale (read-path)
   - A measurement exercise, not a feature build: prove Req 3.4's target and locate any bottleneck
     while it is still a cheap, pre-merge index fix. Pure read benchmark on a statically seeded
     dataset — independent of B2.2's write pacing.
@@ -240,15 +240,61 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     only that page's rows (the `replaceOutboundLinks` bulkWrite) and never walks all pages.
   - If the target is missed, the `explain()` output points at the fix (usually a missing/compound
     index or a filter restructure); that fix — an index/query change only — is then part of this task.
-  - **Decision to make before starting:** keep this as a permanent CI integ test, or run it as a
-    one-off/manual (or separately-gated) benchmark? Seeding 100k pages on every CI run is expensive,
-    so it is usually run manually with the result recorded rather than left in the normal test suite.
-    This changes how the measurement step is written (timed integ test vs. standalone script).
+  - **Decision made:** an env-gated integ test, not a CI test and not a standalone script —
+    `server/services/page-link-read-perf.integ.ts`. It is collected by the normal
+    `app-integration` project but every test is skipped unless `BACKLINKS_PERF` is set, so CI never
+    pays the seed, while the measurement stays runnable/repeatable in-tree and reuses the crowi test
+    harness (so it measures the real `findBacklinks`, with no hand-rolled model bootstrap to drift).
   - Done when a measured retrieval against the ~100k-page dataset meets the <~1s target, the
     `explain()` evidence shows the query is index-backed, and the no-rescan guarantee is confirmed
     (plus any surfaced index/query fix is applied)
   - _Requirements: 3.4_
   - _Depends: B1.12, B1.13_
+
+  **Result — measured 2026-07-31. Target met with ~8x headroom; no index/query fix needed.**
+
+  How to reproduce:
+  ```
+  MONGO_URI=mongodb://mongo:27017/growi?replicaSet=rs0 \
+    BACKLINKS_PERF=1 pnpm vitest run page-link-read-perf
+  ```
+  (The harness rewrites the db name to `growi_test_<workerId>`, so the dev `growi` database is never
+  touched. `BACKLINKS_PERF_PAGES` / `BACKLINKS_PERF_INBOUND` override the scale.)
+
+  Environment: devcontainer MongoDB 8.2.9, wiredTiger, `rs0` single-node replica set, 16 cores /
+  15.9 GB. Dataset: 100,001 pages, 205,000 link rows, hub page with 5,000 inbound sources; hub
+  sources mixed 75% public / 5% owned-by-viewer / 15% owned-by-others / 5% trashed, so the viewer
+  filter really sifts (4,000 of 5,000 — i.e. 80% — returned; asserted, so this doubles as a
+  correctness check at scale). Seed took 4.8 s; 5 timed runs after a discarded warm-up.
+
+  | measurement | 5,000 inbound | 20,000 inbound |
+  |---|---|---|
+  | `findBacklinks` (full read path) | **median 127 ms** (min 121 / max 147) | **median 189 ms** (min 173 / max 261) |
+  | └ `findBacklinkSources` (`distinct` on `{toPage}`) | median 13 ms | median 34 ms |
+  | └ viewer-filtered `Page` query | median 114 ms | median 155 ms |
+
+  One run's samples; repeated runs land at a 116–130 ms median for the 5,000-inbound case, with the
+  max the noisy figure (147–224 ms) since the devcontainer shares its CPU. Read the medians as
+  ~an order of magnitude under the target, not as a precise figure to regression-test against.
+
+  - **Where the time goes:** the viewer filter, not the `distinct` — ~90% of the total. It is a
+    `_id: {$in: [5k ids]}` fetch plus the grant `$or`, so it scales with the number of sources, which
+    is the expected shape.
+  - **Scaling:** 4x the inbound rows costs only ~1.5x latency (127 → 189 ms), i.e. sub-linear and
+    still 5x under target. Extrapolating, the 1 s budget is not at risk until a hub reaches roughly
+    100k inbound sources.
+  - **Plans (all index-backed, no COLLSCAN anywhere):** `distinct` → `FETCH <- IXSCAN` on `toPage_1`;
+    viewer filter → `PROJECTION_SIMPLE <- FETCH <- IXSCAN` on `_id_`; the save-path delete filter
+    (`{fromPage, toPath: {$nin}}`) → `FETCH <- IXSCAN` on `fromPage_1_toPath_1`.
+  - **No-rescan confirmed:** one `syncOutboundLinks` issues exactly one `bulkWrite` whose every
+    operation filter is scoped to the edited `fromPage`; a sibling page's rows are byte-identical
+    afterwards and the collection total moves only by that page's delta.
+  - **Observation, deliberately not acted on:** the `distinct` is `FETCH <- IXSCAN`, not a covered
+    `DISTINCT_SCAN`, because the key (`fromPage`) is not in the index it rides (`{toPage}`) — Mongo
+    fetches each matching row to read `fromPage`. A `{toPage, fromPage}` compound would make it
+    covered and drop that FETCH. Not added: the `distinct` is 10% of a read that already has 8x
+    headroom, and a third index would re-add per-save write cost that B2.2 just removed. Revisit only
+    if a real deployment shows a hub far beyond this scale.
 
 - [x] B2.2 Coalesce and pace live extraction (write-path burst control)
   - Replace the B1.6/B1.12 inline per-event extraction with an in-process coalescing queue: the
