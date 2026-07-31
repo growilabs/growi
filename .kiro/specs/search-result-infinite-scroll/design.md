@@ -20,6 +20,8 @@
 - 「検索ヒット全件（未読み込み分を含む `total` 全件）」の一括選択（Gmail 式全件選択バナー）
 - infinite scroll と番号ページャの切替式提供
 - 検索モーダル・タイプアヘッド・AI アシスタント検索の表示方式（`useSWRxSearch` 消費者）の変更
+- **累積結果の描画仮想化（既知の制約 / 後続対応）**: `SearchResultList` は累積 `pages` を全件 DOM に展開する。数千件までスクロールすると重い `PageListItemL`（ドロップダウン・チェックボックス・スニペット）が無制限に増え、終盤でスクロールがもたつく。仮想スクロール（`react-window`/`react-virtuoso` 等）は本スペックでは導入せず、後続タスク/issue とする（P2-3）。
+- **付随情報取得の差分化（既知の制約 / 後続対応）**: 各行のスニペット/ブックマーク数等は `useSWRxPageInfoForList(pageIds)` が GET クエリで取得する。infinite scroll では `pages` が append で伸びるため、追記のたびに「累積 ID 全件」を再取得し（差分ではない）、スクロール全体で O(n²) の転送・DB 参照になる。ID を数百件溜めるとクエリ長が 8KB を超え 414/431 で失敗し得る。差分取得（新規追加分の ID のみ問い合わせ）への変更は本スペックでは行わず、後続タスク/issue とする（P2-2）。
 
 ## Boundary Commitments
 
