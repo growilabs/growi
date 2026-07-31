@@ -1,11 +1,15 @@
 import React from 'react';
+import type { IPageHasId } from '@growi/core';
 import { act, render } from '@testing-library/react';
 import { atom } from 'jotai';
 import type { SWRInfiniteResponse } from 'swr/infinite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
-import type { IFormattedSearchResult } from '~/interfaces/search';
+import type {
+  IFormattedSearchResult,
+  IPageWithSearchMeta,
+} from '~/interfaces/search';
 
 // --- Capture the props SearchPage hands to SearchPageBase ---------------------
 // SearchPageBase itself is exercised by its own spec; here it is a passthrough
@@ -138,21 +142,23 @@ const createInfiniteResponse = (
   });
 
 const createChunk = (ids: string[]): IFormattedSearchResult =>
-  ({
-    data: ids.map((id) => ({ data: { _id: id, path: `/page/${id}` } })),
+  mock<IFormattedSearchResult>({
+    data: ids.map((id) =>
+      mock<IPageWithSearchMeta>({
+        data: mock<IPageHasId>({ _id: id, path: `/page/${id}` }),
+      }),
+    ),
     meta: { total: 42, took: 3, hitsCount: ids.length },
-  }) as unknown as IFormattedSearchResult;
+  });
 
 // Full chunks (hitsCount 20) against a huge total, so merged.isReachingEnd stays
 // false and only the result-window guard can stop the load.
 const createFullChunks = (count: number): IFormattedSearchResult[] =>
-  Array.from(
-    { length: count },
-    () =>
-      ({
-        data: [],
-        meta: { total: 1_000_000, took: 1, hitsCount: 20 },
-      }) as unknown as IFormattedSearchResult,
+  Array.from({ length: count }, () =>
+    mock<IFormattedSearchResult>({
+      data: [],
+      meta: { total: 1_000_000, took: 1, hitsCount: 20 },
+    }),
   );
 
 describe('SearchPage infinite-scroll wiring', () => {

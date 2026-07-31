@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
 import React, { createRef } from 'react';
+import type { IPageHasId } from '@growi/core';
 import { act, fireEvent, render, renderHook } from '@testing-library/react';
 import { atom } from 'jotai';
 import type { SWRInfiniteResponse } from 'swr/infinite';
@@ -134,9 +135,9 @@ import {
 type SelectableRef = ISelectableAll & IReturnSelectedPageIds;
 
 const createPage = (id: string): IPageWithSearchMeta =>
-  ({
-    data: { _id: id, path: `/page/${id}` },
-  }) as unknown as IPageWithSearchMeta;
+  mock<IPageWithSearchMeta>({
+    data: mock<IPageHasId>({ _id: id, path: `/page/${id}` }),
+  });
 
 const noopControls = {
   searchControl: null,
@@ -416,7 +417,7 @@ describe('SearchPageBase select-all header follows appended pages (append re-not
     expect(onChanged).toHaveBeenLastCalledWith(2, 4);
   });
 
-  it('re-notifies full selection (checked) when the appended pages are also selected', () => {
+  it('re-notifies full selection (checked) once the appended pages are also selected (Req 4.6)', () => {
     const ref = createRef<SelectableRef>();
     const onChanged = vi.fn();
     const initialPages = [createPage('a'), createPage('b')];
@@ -431,18 +432,14 @@ describe('SearchPageBase select-all header follows appended pages (append re-not
       />,
     );
 
-    // the accumulated selection already covers every page that will be loaded:
-    // the two visible pages plus the two about to be appended
+    // select the two visible pages
     act(() => {
       searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'a');
       searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'b');
-      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'c');
-      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'd');
     });
 
-    onChanged.mockClear();
-
-    // append the remaining pages under the SAME resetKey
+    // append two more (unselected) pages under the SAME resetKey => the
+    // append-follow effect reports indeterminate (2 of 4 selected)
     const appendedPages = [...initialPages, createPage('c'), createPage('d')];
     rerender(
       <SearchPageBase
@@ -453,9 +450,17 @@ describe('SearchPageBase select-all header follows appended pages (append re-not
         {...noopControls}
       />,
     );
+    expect(onChanged).toHaveBeenLastCalledWith(2, 4);
 
-    // every accumulated page is selected => selectedCount(4) === totalCount(4)
-    // => parent keeps "checked" after the append (Req 4.6)
+    onChanged.mockClear();
+
+    // now the user selects the newly-loaded rows too (reachable only after the
+    // append) => selectedCount(4) === totalCount(4) => checked (Req 4.6)
+    act(() => {
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'c');
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'd');
+    });
+
     expect(onChanged).toHaveBeenLastCalledWith(4, 4);
   });
 
