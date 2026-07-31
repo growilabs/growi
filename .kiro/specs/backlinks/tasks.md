@@ -339,7 +339,7 @@ redirect-following keeps links resolvable when the source is re-saved after the 
 the redirect-following half of resolution plus the re-resolve-by-path repointing. Independent of
 B3/B5.
 
-- [ ] B4.1 Add redirect-chain following to resolveToPage
+- [x] B4.1 Add redirect-chain following to resolveToPage
   - Extend the resolver with the redirect step deferred from B1.4: when direct path lookup misses,
     follow the redirect chain to its endpoint and resolve there; handle multi-hop renames (A→B→C) via
     the redirect endpoint lookup; null when neither a page nor a redirect resolves (the broken case).
