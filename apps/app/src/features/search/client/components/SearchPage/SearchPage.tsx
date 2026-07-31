@@ -15,6 +15,7 @@ import {
   showPageLimitationLAtom,
 } from '~/states/server-configurations';
 import {
+  DEFAULT_SEARCH_CHUNK_SIZE,
   type ISearchConditions,
   type ISearchConfigurations,
   useSWRINFxSearch,
@@ -30,9 +31,6 @@ import {
 } from './SearchPageBase';
 
 import styles from './SearchPage.module.scss';
-
-// TODO: replace with "customize:showPageLimitationS"
-const INITIAL_PAGIONG_SIZE = 20;
 
 /**
  * SearchResultListHead
@@ -93,7 +91,7 @@ export const SearchPage = (): JSX.Element => {
   const disableUserPages = useAtomValue(disableUserPagesAtom);
 
   // Fixed chunk size for the whole search session (no user-facing selector).
-  const limit = showPageLimitationL ?? INITIAL_PAGIONG_SIZE;
+  const limit = showPageLimitationL ?? DEFAULT_SEARCH_CHUNK_SIZE;
 
   const [configurationsByControl, setConfigurationsByControl] = useState<
     Partial<ISearchConfigurations>
@@ -191,7 +189,7 @@ export const SearchPage = (): JSX.Element => {
   const initialSearchConditions: Partial<ISearchConditions> = useMemo(() => {
     return {
       keyword,
-      limit: INITIAL_PAGIONG_SIZE,
+      limit: DEFAULT_SEARCH_CHUNK_SIZE,
     };
   }, [keyword]);
 

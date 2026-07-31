@@ -59,13 +59,7 @@ const searchStoreSpy = vi.hoisted(() => ({
 
 vi.mock('~/stores/search', () => ({
   useSWRINFxSearch: vi.fn(() => searchStoreSpy.infiniteResponse),
-  // Kept so the pre-refactor implementation still resolves its import during
-  // the RED phase; the post-refactor implementation no longer imports it.
-  useSWRxSearch: vi.fn(() => ({
-    data: { data: [], meta: { total: 0, took: 1, hitsCount: 0 } },
-    conditions: { offset: 0, limit: 20 },
-    mutate: vi.fn(),
-  })),
+  DEFAULT_SEARCH_CHUNK_SIZE: 20,
 }));
 
 // --- Search keyword state -----------------------------------------------------

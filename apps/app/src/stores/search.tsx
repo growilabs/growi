@@ -116,15 +116,19 @@ export const useSWRxSearch = (
 };
 
 // Default chunk size used when a caller does not supply a positive limit.
-// Mirrors the initial paging size (showPageLimitationL ?? 20) decided at the call site.
-const DEFAULT_SEARCH_CHUNK_SIZE = 20;
+// Single source of truth for the initial paging size, shared with SearchPage.
+export const DEFAULT_SEARCH_CHUNK_SIZE = 20;
 
-// Configuration carried in the infinite-scroll SWR key.
-// offset (derived per page) and limit (= chunkSize) are excluded on purpose.
+// Configuration carried in the infinite-scroll SWR key. Includes `limit`
+// (chunk size) and `nqName` because the fetcher's response depends on them —
+// every value the fetcher reads must be part of the key so different values
+// never share a cache entry. Only `offset` is excluded (derived per page).
 type ISearchInfiniteConfigurations = Omit<
   ISearchConfigurationsFixed,
-  'offset' | 'limit'
->;
+  'offset'
+> & {
+  nqName: string | null;
+};
 
 /**
  * Pure key generator for the infinite-scroll search fetch.
@@ -137,7 +141,6 @@ export const getSearchInfiniteKey = (
   pageIndex: number,
   previousPageData: IFormattedSearchResult | null,
   keyword: string | null,
-  chunkSize: number,
   configurations: ISearchInfiniteConfigurations,
 ):
   | readonly ['/search/infinite', string, number, ISearchInfiniteConfigurations]
@@ -145,6 +148,8 @@ export const getSearchInfiniteKey = (
   if (keyword == null || keyword.length === 0) {
     return null;
   }
+
+  const chunkSize = configurations.limit;
 
   // Stop once the previous chunk returned fewer hits than requested (no more
   // results). Use `meta.hitsCount` (the count Elasticsearch actually returned)
@@ -170,11 +175,15 @@ export const useSWRINFxSearch = (
   // Chunk size is fixed for the whole search session (no user-facing selector).
   const chunkSize = limit > 0 ? limit : DEFAULT_SEARCH_CHUNK_SIZE;
 
+  // Every value the fetcher reads (chunk size, nqName, sort/order/filters) is
+  // carried here so it becomes part of the SWR key.
   const fixedConfigurations: ISearchInfiniteConfigurations = {
+    limit: chunkSize,
     sort: sort ?? SORT_AXIS.RELATION_SCORE,
     order: order ?? SORT_ORDER.DESC,
     includeTrashPages: includeTrashPages ?? false,
     includeUserPages: includeUserPages ?? false,
+    nqName,
   };
 
   const rawQuery = createSearchQuery(
@@ -189,7 +198,6 @@ export const useSWRINFxSearch = (
         pageIndex,
         previousPageData,
         keyword,
-        chunkSize,
         fixedConfigurations,
       ),
     ([, , offset]) => {
@@ -197,8 +205,11 @@ export const useSWRINFxSearch = (
       // the actual apiv1 endpoint is '/search' (shared with useSWRxSearch).
       return apiGet('/search', {
         q: encodeURIComponent(rawQuery),
-        nq: typeof nqName === 'string' ? encodeURIComponent(nqName) : null,
-        limit: chunkSize,
+        nq:
+          typeof fixedConfigurations.nqName === 'string'
+            ? encodeURIComponent(fixedConfigurations.nqName)
+            : null,
+        limit: fixedConfigurations.limit,
         offset,
         sort: fixedConfigurations.sort,
         order: fixedConfigurations.order,
@@ -206,6 +217,7 @@ export const useSWRINFxSearch = (
     },
     {
       revalidateFirstPage: false,
+      revalidateOnFocus: false,
     },
   );
 };
