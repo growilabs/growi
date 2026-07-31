@@ -1,14 +1,17 @@
 import { resolve } from 'node:path';
 import { format } from 'date-fns/format';
 import { subSeconds } from 'date-fns/subSeconds';
-import type { Collection, Document, WithId } from 'mongodb';
+import type { Collection, Document, Filter, WithId } from 'mongodb';
 import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
 
 import Crowi from '../crowi';
 import PasswordResetOrder from '../models/password-reset-order';
-import { upgradedOnlyFilter } from '../models/user/password-hash-format-filters';
+import {
+  scopeFilter,
+  upgradedOnlyFilter,
+} from '../models/user/password-hash-format-filters';
 import { configManager } from '../service/config-manager';
 import { growiInfoService } from '../service/growi-info';
 import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
@@ -38,6 +41,13 @@ export interface DowngradePrepDeps {
   sendResetEmailForUser: (user: WithId<Document>) => Promise<void>;
   /** true → send emails and $unset passwordHash; false → report-only (Req 4.1). */
   sendResetEmails: boolean;
+  /**
+   * Optional scope AND-combined with the upgradedOnly classification; defaults
+   * to `{}` (whole collection) so `main()` and production behavior are unchanged.
+   * A caller (integ test) may pass a marker scope to confine the count/find/write
+   * to a marker-seeded subset of the shared `users` collection.
+   */
+  baseFilter?: Filter<Document>;
 }
 
 /**
@@ -82,9 +92,18 @@ export interface DowngradePrepDeps {
 export async function runDowngradePrep(
   deps: DowngradePrepDeps,
 ): Promise<DowngradePrepResult> {
-  const { usersCollection, sendResetEmailForUser, sendResetEmails } = deps;
+  const {
+    usersCollection,
+    sendResetEmailForUser,
+    sendResetEmails,
+    baseFilter = {},
+  } = deps;
 
-  const upgradedOnly = await usersCollection.countDocuments(upgradedOnlyFilter);
+  const scopedUpgradedOnlyFilter = scopeFilter(baseFilter, upgradedOnlyFilter);
+
+  const upgradedOnly = await usersCollection.countDocuments(
+    scopedUpgradedOnlyFilter,
+  );
 
   logger.info(
     `${upgradedOnly} user(s) have a scrypt-only credential (passwordHash set, no legacy password) and would be locked out after a downgrade.`,
@@ -101,7 +120,7 @@ export async function runDowngradePrep(
   let failed = 0;
   let unset = 0;
 
-  const cursor = usersCollection.find(upgradedOnlyFilter);
+  const cursor = usersCollection.find(scopedUpgradedOnlyFilter);
   for await (const user of cursor) {
     try {
       // Sequential by design: send one reset email at a time (avoid hammering

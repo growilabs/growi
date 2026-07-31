@@ -35,3 +35,19 @@ export const legacyOnlyFilter: Filter<Document> = {
 export const noPasswordFilter: Filter<Document> = {
   $and: [absent('passwordHash'), absent('password')],
 };
+
+/**
+ * AND-combine an optional base scope (e.g. a test marker) with a format filter.
+ * An empty base returns the format filter unchanged (production: whole
+ * collection), so passing no base preserves existing behavior; a non-empty base
+ * narrows every classification query to that subset (used by the integ tests to
+ * scope counts/writes to their marker-seeded fixtures, so they never touch the
+ * shared `users` collection).
+ */
+export const scopeFilter = (
+  base: Filter<Document>,
+  formatFilter: Filter<Document>,
+): Filter<Document> =>
+  base != null && Object.keys(base).length > 0
+    ? { $and: [base, formatFilter] }
+    : formatFilter;

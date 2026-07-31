@@ -30,6 +30,9 @@ const EXPECTED = {
 } as const;
 
 const MARKER = 'pwhash-status-test';
+// Scope every count to this test's marker-seeded fixtures so the run never
+// depends on (or wipes) the `users` collection shared with other integ tests.
+const markerFilter = { username: { $regex: `^${MARKER}` } };
 
 describe('password-hash-status migration', () => {
   let collection: Collection;
@@ -39,10 +42,9 @@ describe('password-hash-status migration', () => {
     migrate = await import('./20260724000001-password-hash-status');
     collection = mongoose.connection.collection('users');
 
-    // The migration counts the WHOLE collection, so make the collection contain
-    // ONLY the seeded fixtures — then whole-collection counts equal EXPECTED.
-    await collection.deleteMany({});
-
+    // up() is called with the marker scope, so the seeded fixtures are the only
+    // documents counted — marker-scoped counts equal EXPECTED regardless of what
+    // other tests left in the shared collection.
     const docs: Record<string, unknown>[] = [];
     // upgradedOnly: passwordHash present, password absent
     for (let i = 0; i < EXPECTED.upgradedOnly; i++) {
@@ -104,19 +106,25 @@ describe('password-hash-status migration', () => {
   });
 
   it('reports the correct count for each of the four hash-format categories', async () => {
-    const counts = await migrate.up();
+    const counts = await migrate.up(markerFilter);
 
     expect(counts).toEqual(EXPECTED);
   });
 
   it('does not modify any user document (read-only)', async () => {
-    // Full-collection snapshot before/after: any added/removed/changed field is
-    // detected by deep equality. Sort by _id for a stable ordering.
-    const before = await collection.find({}).sort({ _id: 1 }).toArray();
+    // Marker-scoped snapshot before/after: any added/removed/changed field on a
+    // fixture is detected by deep equality. Sort by _id for a stable ordering.
+    const before = await collection
+      .find(markerFilter)
+      .sort({ _id: 1 })
+      .toArray();
 
-    await migrate.up();
+    await migrate.up(markerFilter);
 
-    const after = await collection.find({}).sort({ _id: 1 }).toArray();
+    const after = await collection
+      .find(markerFilter)
+      .sort({ _id: 1 })
+      .toArray();
     expect(after).toEqual(before);
   });
 });

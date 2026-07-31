@@ -95,7 +95,12 @@ describe('verifyLocalCredentials (Passport LocalStrategy login flow)', () => {
   afterAll(async () => {
     await User.deleteMany({
       username: {
-        $in: ['lazymig-legacy', 'lazymig-scrypt', 'lazymig-nopassword'],
+        $in: [
+          'lazymig-legacy',
+          'lazymig-scrypt',
+          'lazymig-scrypt-wrongpw',
+          'lazymig-nopassword',
+        ],
       },
     });
   });
@@ -184,9 +189,20 @@ describe('verifyLocalCredentials (Passport LocalStrategy login flow)', () => {
     });
 
     it('rejects an incorrect password (401 semantics: done(null, false))', async () => {
+      // Seed a dedicated scrypt user so this case does not depend on any user
+      // left behind by a prior test (order-independent under --sequence.shuffle).
+      const doc = new User({
+        name: 'Lazy Migration Scrypt WrongPw',
+        username: 'lazymig-scrypt-wrongpw',
+        email: 'lazymig-scrypt-wrongpw@example.com',
+        lang: 'en_US',
+      });
+      await doc.setPassword(plaintext); // writes a scrypt passwordHash
+      await doc.save();
+
       const { err, user, info } = await runVerify(
         User,
-        'lazymig-scrypt',
+        'lazymig-scrypt-wrongpw',
         'totally-wrong-password',
       );
 

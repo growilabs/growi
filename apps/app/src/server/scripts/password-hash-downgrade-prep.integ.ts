@@ -26,6 +26,9 @@ import { ObjectId } from 'mongodb';
 import mongoose from 'mongoose';
 
 const MARKER = 'pwhash-downgrade-test';
+// Scope every count/find/write to this test's marker-seeded fixtures so the run
+// never touches the `users` collection shared with other integ tests.
+const markerFilter = { username: { $regex: `^${MARKER}` } };
 
 type RunDowngradePrep =
   typeof import('./password-hash-downgrade-prep').runDowngradePrep;
@@ -54,9 +57,6 @@ describe('password-hash downgrade-prep script', () => {
 
   describe('report-only default: SEND_RESET_EMAILS unset (Req 4.1)', () => {
     it('counts upgradedOnly users, sends nothing, and modifies no document', async () => {
-      // Own the whole collection so the snapshot comparison is exact.
-      await collection.deleteMany({});
-
       const upgradedOnlyCount = 3;
       const docs: Record<string, unknown>[] = [];
       // upgradedOnly: passwordHash only (would be locked out after downgrade)
@@ -83,7 +83,10 @@ describe('password-hash downgrade-prep script', () => {
       docs.push({ _id: new ObjectId(), username: `${MARKER}-nopass-0` });
       await collection.insertMany(docs);
 
-      const before = await collection.find({}).sort({ _id: 1 }).toArray();
+      const before = await collection
+        .find(markerFilter)
+        .sort({ _id: 1 })
+        .toArray();
 
       const sendResetEmailForUser = vi.fn(
         (_user: WithId<Document>): Promise<void> => Promise.resolve(),
@@ -93,6 +96,7 @@ describe('password-hash downgrade-prep script', () => {
         usersCollection: collection,
         sendResetEmailForUser,
         sendResetEmails: false,
+        baseFilter: markerFilter,
       });
 
       expect(result.upgradedOnly).toBe(upgradedOnlyCount);
@@ -102,15 +106,16 @@ describe('password-hash downgrade-prep script', () => {
 
       // No email attempted and no DB change.
       expect(sendResetEmailForUser).not.toHaveBeenCalled();
-      const after = await collection.find({}).sort({ _id: 1 }).toArray();
+      const after = await collection
+        .find(markerFilter)
+        .sort({ _id: 1 })
+        .toArray();
       expect(after).toEqual(before);
     });
   });
 
   describe('send mode: SEND_RESET_EMAILS=true (Req 4.2, 4.3)', () => {
     it('emails every upgradedOnly user and unsets passwordHash only on send success', async () => {
-      await collection.deleteMany({});
-
       const upgradedOnlyCount = 4;
       const failUsername = `${MARKER}-upgraded-2`;
       const docs: Record<string, unknown>[] = [];
@@ -145,6 +150,7 @@ describe('password-hash downgrade-prep script', () => {
         usersCollection: collection,
         sendResetEmailForUser,
         sendResetEmails: true,
+        baseFilter: markerFilter,
       });
 
       expect(result.upgradedOnly).toBe(upgradedOnlyCount);
@@ -178,8 +184,6 @@ describe('password-hash downgrade-prep script', () => {
     });
 
     it('re-classifies unset users as noPassword so a re-run does not re-email them (Req 4.3)', async () => {
-      await collection.deleteMany({});
-
       const upgradedOnlyCount = 3;
       const docs: Record<string, unknown>[] = [];
       for (let i = 0; i < upgradedOnlyCount; i++) {
@@ -200,6 +204,7 @@ describe('password-hash downgrade-prep script', () => {
         usersCollection: collection,
         sendResetEmailForUser,
         sendResetEmails: true,
+        baseFilter: markerFilter,
       });
       expect(first.sent).toBe(upgradedOnlyCount);
       expect(first.unset).toBe(upgradedOnlyCount);
@@ -218,6 +223,7 @@ describe('password-hash downgrade-prep script', () => {
         usersCollection: collection,
         sendResetEmailForUser,
         sendResetEmails: true,
+        baseFilter: markerFilter,
       });
       expect(second.upgradedOnly).toBe(0);
       expect(second.sent).toBe(0);

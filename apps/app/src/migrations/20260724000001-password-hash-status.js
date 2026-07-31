@@ -2,6 +2,7 @@ import {
   bothFilter,
   legacyOnlyFilter,
   noPasswordFilter,
+  scopeFilter,
   upgradedOnlyFilter,
 } from '~/server/models/user/password-hash-format-filters';
 import loggerFactory from '~/utils/logger';
@@ -31,7 +32,7 @@ const logger = loggerFactory('growi:migrate:password-hash-status');
  * lingering `password: ''` counts as `noPassword`, not `legacyOnly` — keeping the
  * report (and the cleanup script it gates) accurate.
  */
-export async function up() {
+export async function up(baseFilter = {}) {
   logger.info('Apply migration: report password-hash format distribution (read-only)');
 
   const count = async (query) => {
@@ -40,15 +41,18 @@ export async function up() {
     return typeof result.n === 'number' ? result.n : 0;
   };
 
+  // `baseFilter` defaults to `{}` (whole collection) so migrate-mongo's no-arg
+  // `up()` call is unchanged; a caller (integ test) may pass a scope to narrow
+  // every count to a marker-seeded subset of the shared `users` collection.
   const counts = {
     // fully migrated: adaptive-KDF only
-    upgradedOnly: await count(upgradedOnlyFilter),
+    upgradedOnly: await count(scopeFilter(baseFilter, upgradedOnlyFilter)),
     // in progress: both formats present
-    both: await count(bothFilter),
+    both: await count(scopeFilter(baseFilter, bothFilter)),
     // not migrated: legacy SHA-256 only
-    legacyOnly: await count(legacyOnlyFilter),
+    legacyOnly: await count(scopeFilter(baseFilter, legacyOnlyFilter)),
     // no password set (external-auth-only, not-yet-activated, or scrubbed users)
-    noPassword: await count(noPasswordFilter),
+    noPassword: await count(scopeFilter(baseFilter, noPasswordFilter)),
   };
 
   logger.info('Password-hash format distribution:');

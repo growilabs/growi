@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import type { Collection } from 'mongodb';
+import type { Collection, Document, Filter } from 'mongodb';
 import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
@@ -7,6 +7,7 @@ import loggerFactory from '~/utils/logger';
 import {
   bothFilter,
   legacyOnlyFilter,
+  scopeFilter,
 } from '../models/user/password-hash-format-filters';
 import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
 
@@ -52,8 +53,14 @@ export interface PasswordHashCleanupResult {
  */
 export async function runPasswordHashCleanup(
   usersCollection: Collection,
+  baseFilter: Filter<Document> = {},
 ): Promise<PasswordHashCleanupResult> {
-  const legacyOnly = await usersCollection.countDocuments(legacyOnlyFilter);
+  // `baseFilter` defaults to `{}` (whole collection) so `main()` and production
+  // behavior are unchanged; a caller (integ test) may pass a scope to narrow the
+  // count/write to a marker-seeded subset of the shared `users` collection.
+  const legacyOnly = await usersCollection.countDocuments(
+    scopeFilter(baseFilter, legacyOnlyFilter),
+  );
 
   if (legacyOnly > 0) {
     // Abort WITHOUT modifying the DB (Req 3.4).
@@ -63,9 +70,12 @@ export async function runPasswordHashCleanup(
     return { aborted: true, legacyOnly, unset: 0 };
   }
 
-  const updateResult = await usersCollection.updateMany(bothFilter, {
-    $unset: { password: '' },
-  });
+  const updateResult = await usersCollection.updateMany(
+    scopeFilter(baseFilter, bothFilter),
+    {
+      $unset: { password: '' },
+    },
+  );
 
   logger.info(
     `Password-hash cleanup complete: removed the legacy password field from ${updateResult.modifiedCount} fully-migrated user(s).`,
