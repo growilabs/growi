@@ -387,9 +387,16 @@ const PrivateLegacyPages = (): JSX.Element => {
 
   // for bulk deletion
   const deleteAllButtonClickedHandler = usePageDeleteModalForBulkDeletion(
-    data,
+    data?.data,
     searchPageBaseRef,
-    () => mutate(),
+    () => {
+      // SearchPageBase now resets selection on `resetKey` change, not on every
+      // `pages` update, so a same-query refetch no longer clears the selection.
+      // Clear it explicitly to preserve the legacy behavior after deletion.
+      searchPageBaseRef.current?.deselectAll();
+      selectedPagesByCheckboxesChangedHandler(0, 0);
+      mutate();
+    },
   );
 
   const convertMenuItemClickedHandler = useCallback(() => {
@@ -421,11 +428,22 @@ const PrivateLegacyPages = (): JSX.Element => {
     openModal(selectedPages, () => {
       toastSuccess(t('Successfully requested'));
       closeModal();
+      // Clear selection explicitly after a same-query refetch (see delete handler).
+      searchPageBaseRef.current?.deselectAll();
+      selectedPagesByCheckboxesChangedHandler(0, 0);
       mutateMigrationStatus();
       mutate();
       mutatePageTree();
     });
-  }, [data, openModal, t, closeModal, mutateMigrationStatus, mutate]);
+  }, [
+    data,
+    openModal,
+    t,
+    closeModal,
+    selectedPagesByCheckboxesChangedHandler,
+    mutateMigrationStatus,
+    mutate,
+  ]);
 
   const pagingSizeChangedHandler = useCallback(
     (pagingSize: number) => {
@@ -565,11 +583,22 @@ const PrivateLegacyPages = (): JSX.Element => {
     );
   }, [conditions, data, pagingNumberChangedHandler]);
 
+  // Compose the SearchPageBase reset identity from the current search conditions,
+  // INCLUDING the page position (offset). SearchPageBase used to key selection/
+  // preview reset on `[pages]`, so legacy reset selection & moved the preview to
+  // the first item on every number-pager navigation. Including `offset` here
+  // reproduces that behavior exactly: resetKey changes per page → selection clears.
+  const resetKey = useMemo(
+    () => `${keyword}|${offset}|${limit}`,
+    [keyword, offset, limit],
+  );
+
   return (
     <>
       <SearchPageBase
         ref={searchPageBaseRef}
         pages={data?.data}
+        resetKey={resetKey}
         onSelectedPagesByCheckboxesChanged={
           selectedPagesByCheckboxesChangedHandler
         }

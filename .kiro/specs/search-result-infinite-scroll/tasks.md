@@ -1,0 +1,119 @@
+# Implementation Plan
+
+> 注: タスク 2.x は共有コンポーネント `SearchPageBase` を破壊的に拡張する（`resetKey` を必須プロップ化）。app 全体の型チェック／ビルドが green になるのは消費者更新（3.1・4.1）完了後。各 2.x の観測可能な完了条件は当該コンポーネント／ユニットテストのスコープで判定する。
+
+- [x] 1. Foundation: 純粋ロジック（累積合成・取得キー）
+- [x] 1.1 (P) 累積検索結果の合成ユーティリティ
+  - SWRInfinite の `data` 配列を `flatMap` で平坦化し、累積ページ・`loadedCount`・`total`・`took` を導出する
+  - `isReachingEnd = loadedCount >= total`、`isEmpty = (data 取得済み かつ total === 0)`、`data == null` では空リスト・非停止を返す
+  - ユニットテストで「未満／一致（停止）／0件／未取得」の各境界を検証しグリーンにする
+  - _Requirements: 1.4, 1.5_
+  - _Boundary: mergeInfiniteSearchResult_
+
+- [x] 1.2 (P) infinite scroll 用の検索取得フックとページキー関数
+  - `useSWRInfinite` で既存 apiv1 `/search`（offset/limit）を取得し、取得済みページの配列を返す。SWR key 名前空間を既存フックと分離する
+  - チャンクサイズを「`showPageLimitationL` 設定値、無ければ既定20」で固定し、同一検索中は一定にする
+  - ページキーを純粋関数として抽出し、keyword 空・前ページがチャンク未満で `null`（停止）、offset を `pageIndex × チャンク` で算出する。キー関数のユニットテストを付ける
+  - 既存 `useSWRxSearch`（通常 useSWR）は変更しない（6 消費者の非回帰）
+  - 完了時: キー関数テストがグリーンで、フックが複数ページを配列として返す
+  - _Requirements: 1.1, 1.2, 3.1, 3.3_
+  - _Boundary: useSWRINFxSearch, getSearchInfiniteKey_
+
+- [x] 2. Core: SearchPageBase を累積表示前提に拡張
+- [x] 2.1 選択リセットを resetKey 駆動化し、全選択を累積対象にする
+  - 選択クリアの発火契機を「表示リスト変化」から「検索アイデンティティ（`resetKey`）変化」に変更する
+  - 追加読み込み（`resetKey` 不変）では選択が維持され、新規検索・条件変更（`resetKey` 変化）でのみ選択がクリアされる
+  - 「全選択」が読み込み済みの累積全件を対象に選択する
+  - 完了時: `resetKey` 不変のまま結果を追加しても選択が保持され、`resetKey` 変化で選択が0になる（コンポーネントテストで確認）
+  - _Requirements: 4.1, 4.2, 4.3, 7.2_
+
+- [x] 2.2 右ペインプレビューの初期選択を2段構成にする
+  - `resetKey` 変化時に即座にプレビュー選択をクリアする
+  - 当該 `resetKey` に対する最初のデータ到着時に一度だけ先頭要素を選択する（適用済み `resetKey` を記録し二重適用を防ぐ）
+  - 追加読み込みでは先頭へ選択を戻さず、ユーザーが選んだプレビューを維持する
+  - 完了時: 新規検索で先頭がプレビュー表示され、追加読み込み後もプレビュー選択が維持される
+  - _Requirements: 6.1, 6.2, 6.3_
+
+- [x] 2.3 全選択ヘッダ状態を追加読み込みに追従させる
+  - 累積件数の変化を契機に、現在の選択件数と累積件数を親へ再通知する
+  - 全件選択済みの状態で未選択の結果が追記されると「全選択」チェックボックスが中間状態へ遷移し、追記分も選択済みなら選択状態を維持する
+  - 完了時: 追加読み込み後に select-all が checked ↔ indeterminate を正しく遷移する（コンポーネントテストで確認）
+  - _Requirements: 4.4, 4.5, 4.6_
+
+- [x] 2.4 infinite scroll 描画スロットと一括削除の累積対応
+  - infinite scroll 用プロップ指定時は結果リストを `InfiniteScroll` でラップして描画し、未指定時は従来の番号ページャ描画を維持する（レガシー非回帰）
+  - 一括削除の対象抽出を、単一ページ結果ではなく累積ページリストを入力として受け取る形へ一般化する
+  - 完了時: infinite scroll 指定でセンチネルが描画され、削除ロジックが渡された累積リストから選択分のみを抽出する
+  - _Requirements: 2.1, 5.1_
+
+- [x] 3. Integration: SearchPage で infinite scroll を統括
+- [x] 3.1 取得フック配線と番号ページャ撤去
+  - 合成ユーティリティで累積ページ・`isReachingEnd`・`isEmpty` を導出し、`resetKey` を keyword＋並び替え＋フィルタから生成する（offset を含めず追加読み込みで不変にする）
+  - `PaginationWrapper`（番号ページャ）を撤去し、`InfiniteScroll` を配線して読み込み中インジケータを表示する。表示件数セレクタは復活させず、0件表示を維持する
+  - 検索実行・条件変更時は先頭チャンクから読み込み直す（累積を破棄）
+  - 2.3 の累積件数再通知を SearchPage 既存の選択件数ハンドラが受け取り、中間状態／全選択表示に反映されることを確認する（必要なら配線を追加）
+  - 完了時: 検索結果ページに番号ページャが表示されず、スクロールで結果が継ぎ足される
+  - _Depends: 1.1, 1.2, 2.1, 2.2, 2.3, 2.4_
+  - _Requirements: 1.1, 1.2, 1.3, 1.5, 2.1, 2.2, 3.2, 4.4, 4.5, 4.6, 7.1_
+
+- [x] 3.2 追加読み込み失敗時の停止と再試行
+  - 追加読み込みが失敗したら自動追加読み込みを停止し（タイトなリトライループを防ぐ）、既に表示済みの結果は保持する
+  - リスト末尾にエラー表示と再試行手段を出し、再試行で再検証して復帰後はスクロール追加読み込みを再開する
+  - 完了時: 追加読み込み失敗でエラー＋再試行が表示され、自動で連続リトライしない
+  - _Requirements: 1.6_
+
+- [x] 3.3 一括削除の統括（無効化・削除後リセット）
+  - 選択件数が0のとき削除実行を無効化し、選択済みかつ読み込み済みのページのみを削除モーダルへ渡す
+  - 削除完了後は先頭チャンクから取得し直し、選択状態をクリアする
+  - 完了時: 削除後に一覧が先頭チャンクから再表示され、選択がクリアされる
+  - _Requirements: 5.1, 5.2, 5.3, 7.2_
+
+- [x] 4. Integration: レガシー画面の非回帰対応
+- [x] 4.1 (P) PrivateLegacyPages を新 SearchPageBase 契約へ追随
+  - 新プロップ（`resetKey` 等）に追随し、番号ページ遷移のたびに選択がリセットされる従来挙動を維持する（`resetKey` にページ位置を含める）
+  - 一括削除には現在ページのデータを渡す
+  - infinite scroll 未指定のため、番号ページャと表示件数セレクタが従来どおり動作する
+  - 完了時: レガシー画面が番号ページャで従来どおり動作し、回帰が無い
+  - _Depends: 2.1, 2.2, 2.3, 2.4_
+  - _Requirements: 2.1_
+  - _Boundary: PrivateLegacyPages_
+
+- [ ] 5. Validation: テストと実機スモーク
+- [x] 5.1 (P) SearchPage コンポーネントテスト
+  - 番号ページャが描画されないこと、追加読み込み失敗でエラー＋再試行が出て再試行で再検証されること
+  - 一括削除は選択済み読み込み分のみを対象にし、選択0で無効、削除後は先頭チャンク再取得＋選択クリアになること
+  - IntersectionObserver をモックし、センチネル交差で追加読み込みが要求されること
+  - 完了時: 上記を検証するテストがグリーン
+  - _Depends: 3.1, 3.2, 3.3_
+  - _Requirements: 1.2, 1.6, 2.1, 5.1, 5.2, 5.3_
+  - _Boundary: SearchPage_
+
+- [x] 5.2 (P) SearchPageBase コンポーネントテスト
+  - `resetKey` 不変で選択・プレビューが維持され、変化でクリア・先頭選択されること、全選択が累積全件を対象にすること
+  - プレビュー2段構成（新規検索で先頭、追記で維持）、全選択ヘッダの追記追従（checked↔indeterminate）
+  - 完了時: 上記を検証するテストがグリーン
+  - _Depends: 2.1, 2.2, 2.3, 2.4_
+  - _Requirements: 4.1, 4.3, 4.5, 4.6, 6.1, 6.3, 7.2_
+  - _Boundary: SearchPageBase_
+
+- [ ] 5.3 実機スモーク（IntersectionObserver × 2ペインレイアウト）
+  - devcontainer で dev サーバを起動しフルページ検索を実行、スクロールで追加読み込みが発火することを目視確認する（RN4）
+  - 0件表示、追加読み込みエラー時の表示、削除後の先頭リセットを実機で確認する
+  - 完了時: 実機でスクロールによる継ぎ足しが動作することを確認
+  - _Depends: 3.1, 3.2, 3.3_
+  - _Requirements: 1.2_
+
+## Implementation Notes
+- 2.4: SearchPageBase の error endingIndicator は `t('Retry')` を使うが `Retry` キーが locales(en_US/ja_JP) に未定義でリテラル "Retry" にフォールバックする。後続の 3.2（エラー再試行）で locales に `Retry` キー（日本語「再試行」等）を追加すること。`Error` キーは en_US に存在。
+- 2.4: error endingIndicator は InfiniteScroll が `isReachingEnd === true` の時のみ表示される。SearchPage(3.x) は design どおり `isReachingEnd = 累積>=total || hasError` として hasError を OR すること。
+- 4.1: レガシー(PrivateLegacyPages)は sort/order/filter を hard-disable(`isEnableSort/Filter={false}`)しているため resetKey は `keyword|offset|limit` で十分（sort/order 省略は非回帰）。
+- 4.1(横断課題・validate-impl で検討): resetKey 設計により、同一クエリの refetch（一括削除/convert 後の mutate）ではレガシーの選択 Set とプレビューが以前ほど自動リセットされない（旧 `[pages]` キーは refetch で reset していた）。design は legacy を「非回帰のみ担保」とし delete-reset を規定していない。SearchPage は明示 deselect 済み。レガシーにも同等の deselect を足すか、feature 検証で判断する。
+- 5.2: no-op（監査のみ）。SearchPageBase.spec の既存15テストが 4.1/4.3/4.5/4.6/6.1/6.3/7.2 を観測可能な assertion で網羅済み。追加テスト不要。
+- 5.3: ユーザーが後で手動で目視確認する方針（manual-pending、チェックは付けない）。手動スモーク手順:
+  1. `pnpm run dev`（apps/app）で dev サーバ起動、ログイン。
+  2. `/_search?q=<20件以上ヒットする語>` を開く（ES growi index は現状 ~30 件。広めの語で20件超を狙う）。
+  3. 番号ページャ（<< < 1 2 3 > >>）が表示されないこと。
+  4. 結果リストを下端までスクロール → 次チャンク（+最大20件）が末尾に継ぎ足されること（RN4: 2ペイン overflow-y-scroll 内で IntersectionObserver が発火）。
+  5. スクロールで追記しても選択・右ペインのプレビューが維持されること。全件到達で追加読み込みが止まること。
+  6. （任意）ネットワークを一時遮断して追加読み込みを失敗させ、エラー＋「再試行」表示、再試行で復帰すること。
+  7. 一括削除後に先頭チャンクから再表示・選択クリアされること。0件クエリで「0 件」表示。

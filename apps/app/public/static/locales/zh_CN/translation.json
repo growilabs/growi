@@ -39,6 +39,7 @@
   "Update": "更新",
   "Update Page": "更新本页",
   "Error": "误差",
+  "Retry": "重试",
   "Warning": "警告",
   "Sign in": "登录",
   "Sign in with External auth": "Sign in with {{signin}}",
@@ -693,6 +694,7 @@
     "number_of_list_to_display": "显示器的数量",
     "page_number_unit": "例",
     "hit_number_unit": "例",
+    "failed_to_load_more": "加载更多结果失败",
     "sort_axis": {
       "relationScore": "按相关性排序",
       "createdAt": "按创建日期排序",
