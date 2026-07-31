@@ -118,9 +118,6 @@ vi.mock('~/client/components/NotAvailableForReadOnlyUser', () => ({
     children?: React.ReactNode;
   }) => <>{children}</>,
 }));
-vi.mock('~/client/components/PaginationWrapper', () => ({
-  default: () => <div data-testid="pagination-wrapper" />,
-}));
 vi.mock('next-i18next', () => ({
   useTranslation: vi.fn(() => ({ t: (key: string) => key })),
 }));
@@ -190,7 +187,8 @@ describe('SearchPage infinite-scroll wiring', () => {
     expect(props?.infiniteScroll?.swrInfiniteResponse).toBe(
       searchStoreSpy.infiniteResponse,
     );
-    expect(typeof props?.infiniteScroll?.isReachingEnd).toBe('boolean');
+    // 1 loaded chunk of 2 hits out of total 42 => not at the end.
+    expect(props?.infiniteScroll?.isReachingEnd).toBe(false);
     expect(typeof props?.resetKey).toBe('string');
   });
 
