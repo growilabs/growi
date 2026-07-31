@@ -235,4 +235,54 @@ describe('PasswordHashService', () => {
       expect(getMockLogger().warn).toHaveBeenCalled();
     });
   });
+
+  describe('verify() - anomaly WARNING carries user identifier (Req 2.4)', () => {
+    const context = { userId: 'u123', username: 'alice' };
+
+    it('includes the user identifier in the malformed-scrypt WARNING', async () => {
+      const result = await service.verify(
+        'anything',
+        'this-is-not-a-scrypt-envelope',
+        undefined,
+        SEED,
+        context,
+      );
+
+      expect(result).toEqual({ isValid: false, needsRehash: false });
+      // Structured, object-first payload whose userId is the supplied identifier.
+      expect(getMockLogger().warn).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'u123' }),
+        expect.any(String),
+      );
+    });
+
+    it('includes the user identifier in the malformed-legacy WARNING (structured object-first)', async () => {
+      const result = await service.verify(
+        'anything',
+        undefined,
+        'ZZZZ-not-hex-and-wrong-length',
+        SEED,
+        context,
+      );
+
+      expect(result).toEqual({ isValid: false, needsRehash: false });
+      expect(getMockLogger().warn).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'u123' }),
+        expect.any(String),
+      );
+    });
+
+    it('does NOT warn on the noPassword path even when a context is supplied (Req 2.5)', async () => {
+      const result = await service.verify(
+        'anything',
+        undefined,
+        undefined,
+        SEED,
+        context,
+      );
+
+      expect(result).toEqual({ isValid: false, needsRehash: false });
+      expect(getMockLogger().warn).not.toHaveBeenCalled();
+    });
+  });
 });

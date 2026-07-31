@@ -201,17 +201,21 @@ describe('models/user password methods (PasswordHashService delegation)', () => 
       const { isPasswordValid } = await buildMethods();
 
       const doc: Record<string, unknown> = {
+        _id: 'user-object-id',
+        username: 'alice',
         passwordHash: 'scrypt$stored$hash',
         password: 'legacy-sha256',
       };
       const result = await isPasswordValid.call(doc, 'my-plaintext');
 
-      // Passes plaintext, both stored fields, and the legacy SEED through
+      // Passes plaintext, both stored fields, the legacy SEED, and the identity
+      // context (Req 2.4 — anomaly WARNINGs must carry a user identifier).
       expect(mockPasswordHashService.verify).toHaveBeenCalledWith(
         'my-plaintext',
         'scrypt$stored$hash',
         'legacy-sha256',
         SEED,
+        { userId: 'user-object-id', username: 'alice' },
       );
       // Returns the service's VerifyResult verbatim (not a boolean)
       expect(result).toBe(verifyResult);

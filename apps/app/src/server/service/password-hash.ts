@@ -23,6 +23,16 @@ export interface VerifyResult {
   needsRehash: boolean;
 }
 
+/**
+ * Optional identity context threaded into verify() so that anomaly WARNINGs
+ * (Req 2.4 — a stored credential field present but matching no known format)
+ * carry a user identifier for forensic triage. Supplied by the User model.
+ */
+export interface VerifyLogContext {
+  userId?: string;
+  username?: string;
+}
+
 export interface IPasswordHashService {
   hash(plaintext: string): Promise<string>;
   verify(
@@ -30,6 +40,7 @@ export interface IPasswordHashService {
     scryptHash: string | undefined,
     legacyHash: string | undefined,
     passwordSeed: string,
+    context?: VerifyLogContext,
   ): Promise<VerifyResult>;
 }
 
@@ -201,15 +212,16 @@ class PasswordHashService implements IPasswordHashService {
     scryptHash: string | undefined,
     legacyHash: string | undefined,
     passwordSeed: string,
+    context?: VerifyLogContext,
   ): Promise<VerifyResult> {
     // Branch 1: scrypt envelope present.
     if (isPresent(scryptHash)) {
-      return await this.verifyScrypt(plaintext, scryptHash);
+      return await this.verifyScrypt(plaintext, scryptHash, context);
     }
 
     // Branch 2: legacy SHA-256 hash present.
     if (isPresent(legacyHash)) {
-      return this.verifyLegacy(plaintext, legacyHash, passwordSeed);
+      return this.verifyLegacy(plaintext, legacyHash, passwordSeed, context);
     }
 
     // Branch 3: both absent (noPassword). Normal state for external-auth-only or
@@ -220,6 +232,7 @@ class PasswordHashService implements IPasswordHashService {
   private async verifyScrypt(
     plaintext: string,
     scryptHash: string,
+    context?: VerifyLogContext,
   ): Promise<VerifyResult> {
     try {
       const parsed = parseScryptHash(scryptHash);
@@ -243,7 +256,7 @@ class PasswordHashService implements IPasswordHashService {
     } catch (err) {
       // Field is present but its content is not a usable scrypt envelope (Req 2.4).
       logger.warn(
-        { error: err },
+        { error: err, userId: context?.userId, username: context?.username },
         'Malformed scrypt password hash encountered during verification',
       );
       return { isValid: false, needsRehash: false };
@@ -254,11 +267,13 @@ class PasswordHashService implements IPasswordHashService {
     plaintext: string,
     legacyHash: string,
     passwordSeed: string,
+    context?: VerifyLogContext,
   ): VerifyResult {
     try {
       if (!isSha256Hex(legacyHash)) {
         // Field is present but not a known format (Req 2.4).
         logger.warn(
+          { userId: context?.userId, username: context?.username },
           'Malformed legacy password hash encountered during verification',
         );
         return { isValid: false, needsRehash: false };
@@ -275,7 +290,10 @@ class PasswordHashService implements IPasswordHashService {
       // A successful legacy verification always triggers a rehash to scrypt (Req 2.2).
       return { isValid, needsRehash: isValid };
     } catch (err) {
-      logger.warn({ error: err }, 'Error while verifying legacy password hash');
+      logger.warn(
+        { error: err, userId: context?.userId, username: context?.username },
+        'Error while verifying legacy password hash',
+      );
       return { isValid: false, needsRehash: false };
     }
   }

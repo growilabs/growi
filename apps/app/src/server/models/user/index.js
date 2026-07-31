@@ -194,6 +194,10 @@ const factory = (crowi) => {
       this.passwordHash,
       this.password,
       crowi.env.PASSWORD_SEED,
+      {
+        userId: this._id != null ? String(this._id) : undefined,
+        username: this.username,
+      },
     );
   };
 
