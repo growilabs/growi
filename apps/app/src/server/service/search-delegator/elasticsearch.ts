@@ -88,6 +88,12 @@ const AVAILABLE_KEYS = [
 
 type Data = any;
 
+// Add a field here to sync it to the auditlog index — see prepareBodyForAuditlog.
+type AuditlogSyncFields = Partial<{
+  username: string;
+  endpoint: string;
+}>;
+
 class ElasticsearchDelegator
   implements SearchDelegator<Data, ESTermsKey, ESQueryTerms>
 {
@@ -726,17 +732,17 @@ class ElasticsearchDelegator
 
   private prepareBodyForAuditlog(
     activity: Pick<ActivityDocument, '_id' | 'snapshot' | 'endpoint'>,
-  ): [] | [{ index: { _index: string; _id: string } }, Record<string, string>] {
-    // Add a field here to sync it to the auditlog index — no other change needed.
-    const candidates: Record<string, string | undefined> = {
+  ): [] | [{ index: { _index: string; _id: string } }, AuditlogSyncFields] {
+    const candidates: AuditlogSyncFields = {
       username: activity.snapshot?.username || undefined,
       endpoint: activity.endpoint || undefined,
     };
     const doc = Object.fromEntries(
       Object.entries(candidates).filter(
-        (entry): entry is [string, string] => entry[1] != null,
+        (entry): entry is [keyof AuditlogSyncFields, string] =>
+          entry[1] != null,
       ),
-    );
+    ) as AuditlogSyncFields;
     if (Object.keys(doc).length === 0) return [];
 
     return [
