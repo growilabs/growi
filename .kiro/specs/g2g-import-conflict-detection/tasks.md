@@ -30,8 +30,8 @@
   - _Boundary: detect-unique-conflicts_
   - _Depends: 1.1_
 
-- [ ] 3. 受信サービスに検知メソッドを追加（統合）
-- [ ] 3.1 innerFileStats からファイルを解決して検知を駆動する受信メソッドを実装する
+- [x] 3. 受信サービスに検知メソッドを追加（統合）
+- [x] 3.1 innerFileStats からファイルを解決して検知を駆動する受信メソッドを実装する
   - 受信サービスに、unzip 済みアーカイブのファイル一覧（コレクション名とファイル名）からユーザー/グループの JSON パスを解決し、無ければ null を渡して検知を駆動するメソッドを追加する（受信インターフェースにも追加）。
   - 取り込みは行わず、衝突レポートを呼び出し元へ返す（DB 無変更）。
   - RED→GREEN（integ・実 DB）: 受信サービス経由で、ユーザー/グループの JSON がある場合に検知が動き、片方が無い場合はその種別だけスキップされる。
@@ -87,4 +87,7 @@
 - **integ の前提**: この worktree では `packages/*` の `dist` が未生成だと結合試験が `@growi/logger` の解決失敗で起動しない。`npx turbo run build --filter '@growi/app^...'` で解消する（cache hit で速い）。
 - **integ のテスト分離**: per-worker DB を他ファイルと共有しうるので `deleteMany({})` は使わず、固有プレフィックス付き fixture を `$in` で消す。一時アーカイブは `os.tmpdir()` 配下に作り `afterAll` で削除する。
 - **`mock<Model<IUser>>({ find: ... })` は書けない**（`find` の overload により `DeepPartial` で表現できず TS2740/TS2322）。`mock<Model<IUser>>()` で自動スタブしてから `model.find.mockImplementation(...)` で振る舞いを差し込む。
+- **`detectImportConflicts` の 2 種類の結末を混同しないこと**（3.1 で確定）: 「転送対象に users/usergroups が無い」＝ `null` を渡して検知スキップ（要件 1.6、例外なし）。「宣言されたファイルが解決できない・読めない」＝ **例外**（`getFile` が `fs.accessSync` で不在を例外化する）。ルート（4.1）は検知呼び出しを try/catch で包み、例外は 500 系へ、衝突ありは 409 へと**別経路**に振り分ける。
+- **4.1 で `collections` との突き合わせを足さないこと**（3.1 レビューの記録）: `collections` に `users` が無いのにアーカイブに `users.json` がある組み合わせでは、取り込まれないコレクションで 409 になり得る。ただし push 側の `exportService.export(collections)` は選択分のみ書き出すので実運用では到達不能で、かつ安全側に倒れる挙動。design.md は `innerFileStats` からの解決を明示しているので現状が仕様準拠。
+- **`g2g-transfer.ts` は既に 800 行超**（変更前 801 行 → 858 行）。coding-style の上限超過は 3.1 以前からの既存債務で、`_Boundary:_` がこのファイルへの追加を指定しているため回避不能。将来 pusher / receiver で分割する価値あり。
 - **残存する理論的な穴（対応不要・記録のみ）**: 根の配列が閉じないまま末尾が `]` で終わるアーカイブ（例 `[[{doc}]`）は構造検査も JSONStream も通過し「衝突なし」を返す。`users` / `usergroups` スキーマに配列フィールドが無いためエクスポート経路から到達不能。完全に閉じるなら JSONStream の stream の `root` プロパティ（根の値が未完結なら値が残る）を見る手があるが、未文書の内部プロパティで型アサーションが必要。

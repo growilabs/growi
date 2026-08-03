@@ -21,6 +21,7 @@ import { TransferKey } from '~/utils/vo/transfer-key';
 
 import type Crowi from '../crowi';
 import { Attachment } from '../models/attachment';
+import UserGroup from '../models/user-group';
 import {
   G2GTransferError,
   G2GTransferErrorCode,
@@ -28,6 +29,10 @@ import {
 import { configManager } from './config-manager';
 import type { ConfigKey } from './config-manager/config-definition';
 import { exportService } from './export';
+import {
+  detectUniqueConflicts,
+  type UniqueConflictReport,
+} from './import/detect-unique-conflicts';
 import { generateOverwriteParams } from './import/overwrite-params';
 
 const logger = loggerFactory('growi:service:g2g-transfer');
@@ -163,6 +168,27 @@ interface Pusher {
 }
 
 /**
+ * One entry of the file list `growiBridgeService.parseZipFile` reports for an unzipped
+ * archive. The receive route also carries `size`, which the conflict detection ignores.
+ */
+type InnerFileStat = {
+  fileName: string;
+  collectionName: string;
+};
+
+/**
+ * The export service decides the inner file names, so which collection a file holds is
+ * only knowable from `collectionName`. Returns null when the collection is not part of
+ * the transfer at all.
+ */
+const findInnerFileName = (
+  innerFileStats: InnerFileStat[],
+  collectionName: string,
+): string | null =>
+  innerFileStats.find((stat) => stat.collectionName === collectionName)
+    ?.fileName ?? null;
+
+/**
  * G2g transfer receiver
  */
 interface Receiver {
@@ -197,6 +223,16 @@ interface Receiver {
     optionsMap: { [key: string]: GrowiArchiveImportOption },
     operatorUserId: string,
   ): Map<string, ImportSettings>;
+  /**
+   * Detect unique field conflicts between the unzipped archive and the existing data of
+   * this GROWI, so that the caller can stop the import before any document is written.
+   * Detection only reads; a collection that is not part of the transfer is skipped.
+   * @param {InnerFileStat[]} innerFileStats File list of the unzipped archive
+   * @returns {Promise<UniqueConflictReport>} Every detected conflict
+   */
+  detectImportConflicts(
+    innerFileStats: InnerFileStat[],
+  ): Promise<UniqueConflictReport>;
   /**
    * Import collections
    * @param {string} collections Array of collection name
@@ -733,6 +769,27 @@ export class G2GTransferReceiverService implements Receiver {
     });
 
     return importSettingsMap;
+  }
+
+  public async detectImportConflicts(
+    innerFileStats: InnerFileStat[],
+  ): Promise<UniqueConflictReport> {
+    const importService = getImportService();
+
+    // A declared file that cannot be resolved must throw rather than be downgraded to
+    // "this collection is not part of the transfer": treating it as absent would let the
+    // import run and drop the conflicting documents silently (issue #10151).
+    const resolvePath = (collectionName: string): string | null => {
+      const fileName = findInnerFileName(innerFileStats, collectionName);
+      return fileName == null ? null : importService.getFile(fileName);
+    };
+
+    return detectUniqueConflicts({
+      usersJsonPath: resolvePath('users'),
+      groupsJsonPath: resolvePath('usergroups'),
+      userModel: mongoose.model<IUser>('User'),
+      userGroupModel: UserGroup,
+    });
   }
 
   public async importCollections(
