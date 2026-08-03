@@ -42,9 +42,9 @@ describe('password-hash-status migration', () => {
     migrate = await import('./20260724000001-password-hash-status');
     collection = mongoose.connection.collection('users');
 
-    // up() is called with the marker scope, so the seeded fixtures are the only
-    // documents counted — marker-scoped counts equal EXPECTED regardless of what
-    // other tests left in the shared collection.
+    // reportPasswordHashFormatDistribution() is called with the marker scope, so
+    // the seeded fixtures are the only documents counted — marker-scoped counts
+    // equal EXPECTED regardless of what other tests left in the shared collection.
     const docs: Record<string, unknown>[] = [];
     // upgradedOnly: passwordHash present, password absent
     for (let i = 0; i < EXPECTED.upgradedOnly; i++) {
@@ -106,7 +106,8 @@ describe('password-hash-status migration', () => {
   });
 
   it('reports the correct count for each of the four hash-format categories', async () => {
-    const counts = await migrate.up(markerFilter);
+    const counts =
+      await migrate.reportPasswordHashFormatDistribution(markerFilter);
 
     expect(counts).toEqual(EXPECTED);
   });
@@ -119,12 +120,25 @@ describe('password-hash-status migration', () => {
       .sort({ _id: 1 })
       .toArray();
 
-    await migrate.up(markerFilter);
+    await migrate.reportPasswordHashFormatDistribution(markerFilter);
 
     const after = await collection
       .find(markerFilter)
       .sort({ _id: 1 })
       .toArray();
     expect(after).toEqual(before);
+  });
+
+  it('runs under the migrate-mongo up(db, client) call signature without a stack overflow (regression)', async () => {
+    // migrate-mongo invokes the migration as `up(db, client)`. `up()` MUST ignore
+    // those args: forwarding the Db object as a query filter previously
+    // AND-combined it into the count query and BSON-serialized the whole Db →
+    // `RangeError: Maximum call stack size exceeded` (broke every migrate-mongo
+    // run and, transitively, launch-dev + all integ setup). This calls the real
+    // entry point exactly as migrate-mongo does.
+    const db = mongoose.connection.db;
+    const client = mongoose.connection.getClient();
+
+    await expect(migrate.up(db, client)).resolves.toBeUndefined();
   });
 });
