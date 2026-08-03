@@ -82,7 +82,7 @@
 
 ## Implementation Notes
 
-- **モデルの型**: design.md の `Model<UserDocument>` / `Model<UserGroupDocument>` のうち `UserDocument` は実在しない（`models/user/index.js` は JS の factory）。orchestrator は `Model<IUser>` / `Model<IUserGroup>` を受け取る。`mongoose.model<IUser>('User')` と `~/server/models/user-group` の default export がそのまま代入可能（型検査で確認済み。2 つを入れ違いに渡すと TS2322 で弾かれる）。
+- **モデルの型**: design.md の `Model<UserDocument>` / `Model<UserGroupDocument>` のうち `UserDocument` は実在しない（`models/user/index.js` は JS の factory）。orchestrator は `Model<IUser>` / `Model<IUserGroup>` を受け取る。`mongoose.model<IUser>('User')` と `~/server/models/user-group` の default export がそのまま代入可能。**入れ違いを型で防げるのは片方向だけ**（`UserGroupModel` が `[x: string]: any` の索引シグネチャを持つため、`UserGroup` は `Model<IUser>` にも構造的に代入できてしまう）。実際の守りは `g2g-transfer.integ.ts` が users / usergroups の衝突を別々に assert していること。
 - **検知処理の失敗は例外で伝播する**（空レポートで素通りさせない）。アーカイブ JSON が途中で切れている / 0 バイト / 配列でない場合は `detectUniqueConflicts` が throw する。受信ルート（4.1）はこれを 500 系に変換する責務を持つ（design.md Error Handling / Error Strategy）。衝突検知の 409 と混同しないこと。
 - **integ の前提**: この worktree では `packages/*` の `dist` が未生成だと結合試験が `@growi/logger` の解決失敗で起動しない。`npx turbo run build --filter '@growi/app^...'` で解消する（cache hit で速い）。
 - **integ のテスト分離**: per-worker DB を他ファイルと共有しうるので `deleteMany({})` は使わず、固有プレフィックス付き fixture を `$in` で消す。一時アーカイブは `os.tmpdir()` 配下に作り `afterAll` で削除する。
@@ -93,7 +93,17 @@
 - **衝突サマリの生成は `service/import/summarize-unique-conflicts.ts`**（4.1 で追加。design.md の File Structure Plan には未記載）。値の露出は 1 コレクションあたり先頭 `CONFLICT_SAMPLE_LIMIT = 3` 件＋残件数まで。要件 3.3（解消のための指針）はこのサマリではなく 5.2 の i18n 文言の担当。
 - **5.2 が追加する i18n キーの正確な位置**（5.1 で確定）: push 側が emit するキーは `admin:g2g:error_data_conflict`（`service/g2g-transfer.ts` の素のリテラル。同ファイルの既存 3 キーと同じ慣習で、定数化は不要と判定済み）。i18next は最初の `:` で namespace `admin` を切り出して残りをキー区切りで繋ぐので、書く場所は `apps/app/public/static/locales/en_US/admin.json` の **`g2g` オブジェクト直下の `error_data_conflict`**。
 - **詳細トーストの出し分けは payload の `key` で判断する**（5.2 で確定。**文言の一致で判断しないこと**）: `client/components/Admin/g2g-error-toast-contents.ts` の `KEYS_WITH_DETAIL_MESSAGE` に宣言されたキーだけ `message` を併記する。当初は「訳した見出しと `message` が異なるときだけ併記」にしていたが、`ja_JP` / `fr_FR` / `ko_KR` は既存キーを翻訳済みなので等価判定が必ず不成立になり、「日本語の見出し＋英語の生文字列」の 2 重トーストに退行した（5 言語 × 実 payload 4 種で実測）。en_US と zh_CN（未翻訳）だけ症状が出ないため英語で動かすと気づけない。
-- **他言語では衝突見出しが生キーで出る**（5.2 の出荷範囲）: `error_data_conflict` は en_US のみ。ja/fr/ko/zh では見出しが生キー表示になり、**要件 3.3 の解消指針は見出しの中にしか無いので英語以外の管理者には届かない**（衝突サマリ本文は英語で出る）。後続の翻訳タスクで `error_data_conflict` と `error_upload_attachment` を 4 言語へ追加する。
+- **他言語では衝突見出しが英語にフォールバックする**（当初「生キーが出る」と書いたのは誤り。最終検証で訂正）: `config/i18next.config.mjs` が `fallbackLng: 'en_US'` を設定しているので、`error_data_conflict` が en_US にだけあれば ja/fr/ko/zh でも英語の見出し（＝要件 3.3 の解消指針を含む）に解決される。「生キー」という当初の読みは、locale JSON を直接読む probe が fallback を経由しなかったことによるもの。したがって `error_upload_attachment` が 5 言語すべてに無かった以前の状態こそが生キー表示の原因で、en_US へ追加した時点で全言語が英語表示に直っている。後続の翻訳タスクは「英語で読める」状態を各言語へ訳す作業であり、機能のゲートではない。**この fallback は設定とライブラリのコードから読み取ったもので、実行中のアプリでは未確認。**
 - **既存のキー欠落が 1 件ある**（5.1 レビューで発見）: `admin:g2g:error_upload_attachment` は pusher が emit しているのに 5 言語すべての `admin.json` の `g2g` に存在せず（各ファイル `transfer_success` / `error_generate_growi_archive` / `error_send_growi_archive` の 3 キーのみ）、トーストに raw キーが出る。5.2 では「pusher が emit する全キーが en_US/admin.json で解決できる」ことを assert する spec を 1 本足すことを推奨（この既存欠落も直せる）。
 - **`g2g-transfer.ts` は既に 800 行超**（変更前 801 行 → 858 行）。coding-style の上限超過は 3.1 以前からの既存債務で、`_Boundary:_` がこのファイルへの追加を指定しているため回避不能。将来 pusher / receiver で分割する価値あり。
+## Follow-ups（本 spec の受け入れ対象外。最終検証で挙がったもの）
+
+- **一意インデックス定義の変更を検知する仕組みが無い**: `USER_UNIQUE_FIELDS` / `GROUP_UNIQUE_FIELDS` は `models/user/index.js` と `models/user-group.ts` を手で写したもので、現内容は正しいが、将来 unique 索引が 1 本増えたときに検知対象へ入らず #10151 が再発しうる。スキーマ定義から索引を読んで宣言リストと突き合わせるドリフト spec を 1 本足す価値がある（design.md の Revalidation Triggers 第 1 項に対応する自動化）。
+- **中断時に展開済みアーカイブが tmp に残る**: 409 / 500 で中断しても `<tmpDir>/imports` の JSON と zip は消えない（メールアドレス等を含む）。既存の全中断経路（`validation_failed` / `version_incompatible` / `import_settings_invalid`）と同一挙動で新規の退行ではないが、409 は通常運用で踏まれる新しい経路なので掃除を検討する価値がある。
+- **要件 4.3 のうち添付転送と進捗完了通知はテストで固定されていない**: 差分は `startTransfer` の失敗 catch 1 行だけなので実挙動は不変だが、「添付転送が完走する」「`mongo`/`attachments` とも COMPLETED が飛び client が `transfer_success` を出す」を固定するテストは新旧どこにも無い（本 spec 以前からの空白）。
+- **要件 3.3 の文言そのものは無検証**: locale-drift spec は「非空文字列に解決できる」しか見ないので、`error_data_conflict` から解消指針を削っても全テストが緑のまま通る。
+- **`G2GTransferErrorCode.DATA_CONFLICT` に機能上の利用者がいない**: wire に乗るのは別定数 `G2G_DATA_CONFLICT_ERROR_CODE` で、追加した列挙値はルートの `logger.warn` のフィールドにしか現れない。design の「型付きエラーで扱う識別子」という意図は未実現。
+- **`detect-unique-conflicts.integ.ts` が 1046 行**で coding-style の 800 行上限を超え、かつ `getImportSettingMap` 自体を検証するテスト 2 本を抱えている（import ドメインのテストから G2G 層への逆向き参照）。本番コードの依存方向は汚れていないが、この 2 本は `g2g-transfer.integ.ts` 側の方が収まりが良い。
+- **design.md が実装の最終形に追随していない**: 追加ファイル 2 本（`summarize-unique-conflicts.ts` / `g2g-error-toast-contents.ts`）が File Structure Plan に無く、Event Contract の「`admin:g2gError` に `message` を追加」は不正確（`message` は変更前から全 emit 箇所に存在し、実際に変わったのは client が読むようになったこと）。`/kiro-spec-cleanup` で整える。
+
 - **残存する理論的な穴（対応不要・記録のみ）**: 根の配列が閉じないまま末尾が `]` で終わるアーカイブ（例 `[[{doc}]`）は構造検査も JSONStream も通過し「衝突なし」を返す。`users` / `usergroups` スキーマに配列フィールドが無いためエクスポート経路から到達不能。完全に閉じるなら JSONStream の stream の `root` プロパティ（根の値が未完結なら値が残る）を見る手があるが、未文書の内部プロパティで型アサーションが必要。

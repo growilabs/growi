@@ -89,8 +89,35 @@ const CLEAN_GROUP = {
 
 const OPERATOR_USER_ID = '0123456789abcdef01410005';
 
+// Requirement 2.1 names usergrouprelations and pages alongside users and usergroups, so the
+// colliding archive carries one of each. Neither collides with anything: an import that
+// started anyway would insert them, which is what makes the "destination unchanged" check
+// below say something about these two collections rather than comparing empty sets.
+const CLEAN_RELATION = {
+  _id: '0123456789abcdef01410006',
+  relatedGroup: CLEAN_GROUP._id,
+  relatedUser: CLEAN_USER._id,
+} as const;
+
+const CLEAN_PAGE = {
+  _id: '0123456789abcdef01410007',
+  path: '/g2g-route-clean-page',
+  grantedGroups: [{ type: 'UserGroup', item: CLEAN_GROUP._id }],
+} as const;
+
+// What the source UI sends for pages; `isImportOptionForPages` keys off the first flag.
+const PAGE_IMPORT_OPTION_FLAGS = {
+  isOverwriteAuthorWithCurrentUser: false,
+  makePublicForGrant2: false,
+  makePublicForGrant4: false,
+  makePublicForGrant5: false,
+  initPageMetadatas: false,
+} as const;
+
 const USERS_JSON = 'users.json';
 const GROUPS_JSON = 'usergroups.json';
+const RELATIONS_JSON = 'usergrouprelations.json';
+const PAGES_JSON = 'pages.json';
 const ZIP_NAME = 'g2g-route-transfer.zip';
 
 const SNAPSHOT_COLLECTIONS = [
@@ -148,7 +175,12 @@ describe('receive route POST / — unique conflict gate', () => {
           Object.fromEntries(
             collections.map((collectionName) => [
               collectionName,
-              { mode: ImportMode.insert },
+              // pages is the one collection with its own option shape: getImportSettingMap
+              // rejects `insert` for it, and generateOverwriteParams rejects an option that
+              // carries none of the page-specific flags.
+              collectionName === 'pages'
+                ? { mode: ImportMode.upsert, ...PAGE_IMPORT_OPTION_FLAGS }
+                : { mode: ImportMode.insert },
             ]),
           ),
         ),
@@ -277,11 +309,18 @@ describe('receive route POST / — unique conflict gate', () => {
     const zipPath = await writeArchiveZip({
       [USERS_JSON]: JSON.stringify([COLLIDING_USER, CLEAN_USER]),
       [GROUPS_JSON]: JSON.stringify([COLLIDING_GROUP]),
+      [RELATIONS_JSON]: JSON.stringify([CLEAN_RELATION]),
+      [PAGES_JSON]: JSON.stringify([CLEAN_PAGE]),
     });
 
     const before = await snapshotDestination();
 
-    const response = await postArchive(zipPath, ['users', 'usergroups']);
+    const response = await postArchive(zipPath, [
+      'users',
+      'usergroups',
+      'usergrouprelations',
+      'pages',
+    ]);
 
     expect(response.status).toBe(409);
     // The exact body shape the pusher reads to tell a conflict from any other failure.
@@ -304,6 +343,18 @@ describe('receive route POST / — unique conflict gate', () => {
     expect(await User.findById(CLEAN_USER._id)).toBeNull();
     expect(await User.findById(COLLIDING_USER._id)).toBeNull();
     expect(await UserGroup.findById(COLLIDING_GROUP._id)).toBeNull();
+    // Requirement 2.1 covers usergrouprelations and pages too, and those two are what
+    // issue #10151 leaves pointing at a user that was never created.
+    for (const [collectionName, id] of [
+      ['usergrouprelations', CLEAN_RELATION._id],
+      ['pages', CLEAN_PAGE._id],
+    ] as const) {
+      expect(
+        await mongoose.connection
+          .collection(collectionName)
+          .findOne({ _id: new mongoose.Types.ObjectId(id) }),
+      ).toBeNull();
+    }
     expect(await snapshotDestination()).toEqual(before);
   });
 
