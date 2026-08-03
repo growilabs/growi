@@ -23,6 +23,7 @@ import {
   type SaveFileParam,
   type TemporaryUrl,
 } from './file-uploader';
+import { buildLocalStoragePath } from './local-storage-path';
 import {
   applyHeaders,
   createContentHeaders,
@@ -155,9 +156,10 @@ export const setup = (crowi: Crowi) => {
       attachment.page != null
         ? FilePathOnStoragePrefix.attachment
         : FilePathOnStoragePrefix.user;
-    const filePath = path.posix.join(basePath, dirName, attachment.fileName);
 
-    return filePath;
+    // Guard against path traversal via a crafted fileName (e.g. imported via
+    // g2g transfer). Throws if the resolved path escapes the uploads base.
+    return buildLocalStoragePath(basePath, dirName, attachment.fileName);
   };
 
   async function readdirRecursively(dirPath) {
