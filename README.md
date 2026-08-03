@@ -32,6 +32,7 @@
   - [docker-compose](#docker-compose)
   - [Helm (Experimental)](#helm-experimental)
   - [On-premise](#on-premise)
+  - [Managed hosting](#managed-hosting)
 - [Environment Variables](#environment-variables)
 - [Documentation](#documentation)
 - [License](#license)
@@ -68,6 +69,10 @@
 
 - [GROWI Docs: Install on Ubuntu Server](https://docs.growi.org/en/admin-guide/getting-started/ubuntu-server.html)
 - [GROWI Docs: Install on CentOS](https://docs.growi.org/en/admin-guide/getting-started/centos.html)
+
+### Managed hosting
+
+- [![Deploy with Zenith](https://cdn.zenith.hosting/buttons/deploy-with-zenith.svg)](https://zenith.hosting/host/growi) one-click managed GROWI on Zenith: storage, backups, email and a free subdomain included. A share of every subscription goes back to GROWI.
 
 ## Configuration
 
