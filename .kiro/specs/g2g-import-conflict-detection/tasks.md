@@ -52,7 +52,7 @@
   - _Boundary: routes/apiv3/g2g-transfer.ts, g2g-transfer-error.ts_
   - _Depends: 3.1_
 
-- [ ] 5. 衝突通知を転送元管理者へ届ける（統合）
+- [x] 5. 衝突通知を転送元管理者へ届ける（統合）
 - [x] 5.1 push 側で衝突応答を判別し具体的なエラーを WebSocket 送出する
   - push 側のアーカイブ送信の失敗処理で、受信側応答本文のデータ衝突コードを判別し、専用の見出しキーと衝突サマリ本文を含む管理者向け WebSocket エラーを送出する。それ以外の失敗は従来の汎用エラーのまま。
   - RED→GREEN（unit）: 受信側がデータ衝突エラー応答を返したとき、専用キー＋衝突サマリ本文の管理者向けエラーが送出される（応答本文の形は実装時に確認し、テストで固定する）。型安全モック（`mock<T>()`）を用いる。
@@ -61,7 +61,7 @@
   - _Boundary: g2g-transfer.ts PusherService_
   - _Depends: 4.1_
 
-- [ ] 5.2 クライアントで衝突詳細を表示し英語の通知文言を追加する
+- [x] 5.2 クライアントで衝突詳細を表示し英語の通知文言を追加する
   - 管理者向け WebSocket エラー受信時に、翻訳した見出しに加えて衝突サマリ本文を表示するようトースト処理を更新する。
   - データ衝突の見出しキー（種別・件数の要約と、解消のための指針＝衝突アカウント/グループを事前に解消する、初期セットアップ前の空の GROWI へ転送する 等）を英語で追加する。他言語翻訳は後続タスク（本機能のゲートにしない）。
   - RED→GREEN（unit）: 衝突エラーを受け取ったとき、見出し（翻訳キー）と詳細本文の双方が表示される。
@@ -92,6 +92,8 @@
 - **409 応答本文の実際の形**（4.1 で確定。5.1 はこれに依存する）: `{ "errors": [ { "message": "<衝突サマリ>", "code": "growi_data_conflict" } ] }`。`ErrorV3` の `info` / `stack` / `args` は `undefined` なので JSON から落ちる。push 側は `rawAxios.post` の catch で `err.response?.data?.errors?.[0]?.code` と `.message` を読む。検知失敗は同じ封筒で `code: 'conflict_detection_failed'` / HTTP 500 なので、ステータスとコードの両方で区別できる。コード文字列は `G2G_DATA_CONFLICT_ERROR_CODE`（`models/vo/g2g-transfer-error.ts`）を import して使う — 文字列リテラルを二重定義しないこと。
 - **衝突サマリの生成は `service/import/summarize-unique-conflicts.ts`**（4.1 で追加。design.md の File Structure Plan には未記載）。値の露出は 1 コレクションあたり先頭 `CONFLICT_SAMPLE_LIMIT = 3` 件＋残件数まで。要件 3.3（解消のための指針）はこのサマリではなく 5.2 の i18n 文言の担当。
 - **5.2 が追加する i18n キーの正確な位置**（5.1 で確定）: push 側が emit するキーは `admin:g2g:error_data_conflict`（`service/g2g-transfer.ts` の素のリテラル。同ファイルの既存 3 キーと同じ慣習で、定数化は不要と判定済み）。i18next は最初の `:` で namespace `admin` を切り出して残りをキー区切りで繋ぐので、書く場所は `apps/app/public/static/locales/en_US/admin.json` の **`g2g` オブジェクト直下の `error_data_conflict`**。
+- **詳細トーストの出し分けは payload の `key` で判断する**（5.2 で確定。**文言の一致で判断しないこと**）: `client/components/Admin/g2g-error-toast-contents.ts` の `KEYS_WITH_DETAIL_MESSAGE` に宣言されたキーだけ `message` を併記する。当初は「訳した見出しと `message` が異なるときだけ併記」にしていたが、`ja_JP` / `fr_FR` / `ko_KR` は既存キーを翻訳済みなので等価判定が必ず不成立になり、「日本語の見出し＋英語の生文字列」の 2 重トーストに退行した（5 言語 × 実 payload 4 種で実測）。en_US と zh_CN（未翻訳）だけ症状が出ないため英語で動かすと気づけない。
+- **他言語では衝突見出しが生キーで出る**（5.2 の出荷範囲）: `error_data_conflict` は en_US のみ。ja/fr/ko/zh では見出しが生キー表示になり、**要件 3.3 の解消指針は見出しの中にしか無いので英語以外の管理者には届かない**（衝突サマリ本文は英語で出る）。後続の翻訳タスクで `error_data_conflict` と `error_upload_attachment` を 4 言語へ追加する。
 - **既存のキー欠落が 1 件ある**（5.1 レビューで発見）: `admin:g2g:error_upload_attachment` は pusher が emit しているのに 5 言語すべての `admin.json` の `g2g` に存在せず（各ファイル `transfer_success` / `error_generate_growi_archive` / `error_send_growi_archive` の 3 キーのみ）、トーストに raw キーが出る。5.2 では「pusher が emit する全キーが en_US/admin.json で解決できる」ことを assert する spec を 1 本足すことを推奨（この既存欠落も直せる）。
 - **`g2g-transfer.ts` は既に 800 行超**（変更前 801 行 → 858 行）。coding-style の上限超過は 3.1 以前からの既存債務で、`_Boundary:_` がこのファイルへの追加を指定しているため回避不能。将来 pusher / receiver で分割する価値あり。
 - **残存する理論的な穴（対応不要・記録のみ）**: 根の配列が閉じないまま末尾が `]` で終わるアーカイブ（例 `[[{doc}]`）は構造検査も JSONStream も通過し「衝突なし」を返す。`users` / `usergroups` スキーマに配列フィールドが無いためエクスポート経路から到達不能。完全に閉じるなら JSONStream の stream の `root` プロパティ（根の値が未完結なら値が残る）を見る手があるが、未文書の内部プロパティで型アサーションが必要。

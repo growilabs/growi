@@ -12,9 +12,10 @@ import {
 import { useGrowiDocumentationUrl } from '~/states/context';
 
 import CustomCopyToClipBoard from '../Common/CustomCopyToClipBoard';
-// import { FileUploadSettingMolecule } from './App/FileUploadSetting';
 import G2GDataTransferExportForm from './G2GDataTransferExportForm';
 import G2GDataTransferStatusIcon from './G2GDataTransferStatusIcon';
+// import { FileUploadSettingMolecule } from './App/FileUploadSetting';
+import { buildG2GErrorToastContents } from './g2g-error-toast-contents';
 
 const IGNORED_COLLECTION_NAMES = [
   'sessions',
@@ -99,10 +100,13 @@ const G2GDataTransfer = (): JSX.Element => {
         }
       });
 
-      socket.on('admin:g2gError', ({ key }) => {
-        setTransferring(false);
-        toastError(t(key));
-      });
+      socket.on(
+        'admin:g2gError',
+        ({ key, message }: { key: string; message: string }) => {
+          setTransferring(false);
+          toastError(buildG2GErrorToastContents(key, t(key), message));
+        },
+      );
     }
   }, [socket, t]);
 
