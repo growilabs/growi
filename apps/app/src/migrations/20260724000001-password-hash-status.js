@@ -77,12 +77,14 @@ export async function reportPasswordHashFormatDistribution(baseFilter = {}) {
 }
 
 /**
- * migrate-mongo entry point. migrate-mongo invokes this as `up(db, client)`; those
- * arguments are intentionally ignored (this migration uses the Prisma client, not
- * migrate-mongo's `db`) and MUST NOT be forwarded as a query filter — see the note
- * on `reportPasswordHashFormatDistribution`. Reports over the whole collection.
+ * migrate-mongo entry point. migrate-mongo invokes this as `up(db, client)`; the
+ * `_db` / `_client` arguments are intentionally ignored (this migration uses the
+ * Prisma client, not migrate-mongo's `db`) and MUST NOT be forwarded as a query
+ * filter — see the note on `reportPasswordHashFormatDistribution`. The params are
+ * declared (and prefixed `_`) so the signature matches how migrate-mongo calls it.
+ * Reports over the whole collection.
  */
-export async function up() {
+export async function up(_db, _client) {
   await reportPasswordHashFormatDistribution();
 }
 
