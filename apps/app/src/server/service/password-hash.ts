@@ -214,6 +214,15 @@ class PasswordHashService implements IPasswordHashService {
     passwordSeed: string,
     context?: VerifyLogContext,
   ): Promise<VerifyResult> {
+    // Guard: a nullish/empty plaintext is a bad *input*, not corrupt stored data.
+    // Without this it would reach verifyScrypt where crypto.scrypt throws synchronously,
+    // and the catch would mislog it as a "Malformed scrypt password hash" WARNING
+    // (Req 2.4) — blaming the stored hash for a caller mistake. Reject quietly instead;
+    // design.md → PasswordHashService Preconditions require a non-empty plaintext.
+    if (plaintext == null || plaintext === '') {
+      return { isValid: false, needsRehash: false };
+    }
+
     // Branch 1: scrypt envelope present.
     if (isPresent(scryptHash)) {
       return await this.verifyScrypt(plaintext, scryptHash, context);

@@ -161,6 +161,37 @@ describe('PasswordHashService', () => {
     });
   });
 
+  describe('verify() - empty/nullish plaintext (bad input, not corrupt data)', () => {
+    beforeEach(() => {
+      // Isolate the "does NOT warn" assertions from earlier tests' call history.
+      getMockLogger().warn.mockClear();
+    });
+
+    it('returns { isValid: false, needsRehash: false } and does NOT warn for an empty plaintext against a valid scrypt hash', async () => {
+      const hashed = await service.hash('correct-horse');
+
+      const result = await service.verify('', hashed, undefined, SEED);
+
+      expect(result).toEqual({ isValid: false, needsRehash: false });
+      // An empty input is a caller mistake, not malformed stored data (no Req 2.4 WARNING).
+      expect(getMockLogger().warn).not.toHaveBeenCalled();
+    });
+
+    it('returns { isValid: false, needsRehash: false } and does NOT warn for a nullish plaintext', async () => {
+      const hashed = await service.hash('correct-horse');
+
+      const result = await service.verify(
+        undefined as unknown as string,
+        hashed,
+        undefined,
+        SEED,
+      );
+
+      expect(result).toEqual({ isValid: false, needsRehash: false });
+      expect(getMockLogger().warn).not.toHaveBeenCalled();
+    });
+  });
+
   describe('verify() - malformed field (anomaly, Req 2.4)', () => {
     it('warns and rejects when the scrypt field is not a valid envelope', async () => {
       const result = await service.verify(

@@ -537,7 +537,7 @@ passwordHash: { type: String },  // scrypt self-describing hash (scrypt$N$r$p$sa
 
 ### Error Strategy
 
-- `PasswordHashService.verify()`: does not throw internal errors to the caller; returns `{ isValid: false, needsRehash: false }`. Errors are logged at ERROR level
+- `PasswordHashService.verify()`: never throws to the caller; it always returns a `VerifyResult`, returning `{ isValid: false, needsRehash: false }` on any internal error. Internal verify() errors and malformed-field anomalies (a stored credential field present but matching no known format) are logged at **WARNING** (Req 2.4), not ERROR
   - **Note on `timingSafeEqual`**: if the stored hash is corrupted and its length differs from the computed result, `crypto.timingSafeEqual` throws. Wrap it in try/catch inside verify and reduce it to a format mismatch (the Req 2.4 error case) as `{ isValid: false }` + WARNING (this path preserves the "verify never throws" invariant)
 - Passport LocalStrategy: pass all errors to `done(err)` with try/catch
 - Lazy migration failure: log a failure to save the rehash, but let the login itself succeed (it can be retried on the next login)
@@ -554,8 +554,8 @@ passwordHash: { type: String },  // scrypt self-describing hash (scrypt$N$r$p$sa
 
 ### Monitoring
 
-- `PasswordHashService`: log at INFO level when `needsRehash: true` occurs (to visualize migration progress)
-- Passport: log lazy migration success/failure at INFO/ERROR
+- `PasswordHashService.verify()` does **not** emit a per-call INFO when `needsRehash: true`. Emitting one on every legacy verification would spam the log on each legacy login; the migration-progress signal is logged instead at the point migration actually happens (see below)
+- Passport LocalStrategy: log successful lazy migration at INFO (the migration-progress signal — one line per user actually rehashed). A lazy-migration save failure is logged, but the login still succeeds and the rehash is retried on the next login
 - Migration scripts: output each count to logger at INFO
 
 ---
@@ -564,7 +564,7 @@ passwordHash: { type: String },  // scrypt self-describing hash (scrypt$N$r$p$sa
 
 ### Unit Tests
 
-1. `PasswordHashService.hash()`: the return value begins with the `$2b$` prefix; returns different hashes for the same plaintext (Req 1.1, 1.4)
+1. `PasswordHashService.hash()`: the return value is a `scrypt$`-prefixed self-describing string (NOT a 64-character SHA-256 hex); returns different hashes for the same plaintext (Req 1.1, 1.4)
 2. `PasswordHashService.verify()`: cases for the scrypt path (`needsRehash=false`), the SHA-256 path (`needsRehash=true`), invalid credentials, neither field (`isValid=false`, no WARNING), and format mismatch (`isValid=false`, with WARNING) (Req 2.1–2.5)
 3. `User.isPasswordValid()`: correctly delegates the verify result
 4. `User.setPassword()`: confirm that it updates only the `passwordHash` field and retains the `password` field (Req 1.3)
@@ -584,8 +584,8 @@ passwordHash: { type: String },  // scrypt self-describing hash (scrypt$N$r$p$sa
 ### Security Tests
 
 1. `PasswordHashService.hash()` does not return a SHA-256 hash (confirm the `scrypt$` prefix and that it is not a 64-character hex string)
-2. When scrypt parameter N is set below the lower bound (2^17=131072), confirm that a startup warning is emitted and it is clamped to the lower bound
-3. Confirm that even with parameters exceeding the `maxmem` ceiling, `hash()`/`verify()` do not throw and process safely (DoS / memory-exhaustion resistance)
+2. env-derived scrypt params below the OWASP floor (N=2^17, r=8, p=1) are clamped **up** with a startup WARNING (verified via the exported `resolveScryptParamsFromEnv`; env params above the DoS upper bound are likewise clamped **down** with a WARNING)
+3. A stored scrypt envelope whose N/r/p exceed the upper bound — or whose salt/hash byte length is out of range — is **rejected at parse time, before `crypto.scrypt` is invoked** → `{ isValid: false }` + WARNING. So `verify()` never drives an extreme-memory scrypt call and never throws (DoS / memory-exhaustion resistance)
 
 ---
 
