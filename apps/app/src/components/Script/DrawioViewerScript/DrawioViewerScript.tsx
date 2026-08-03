@@ -3,6 +3,8 @@ import Script from 'next/script';
 import type { IGraphViewerGlobal } from '@growi/remark-drawio';
 
 import { patchStencilRegistryUrls } from './patch-stencil-registry-urls';
+import { relaunchMathJax } from './relaunch-mathjax';
+import { relocateMathUrl } from './relocate-math-url';
 import { generateViewerMinJsUrl } from './use-viewer-min-js-url';
 
 declare global {
@@ -37,6 +39,12 @@ export const DrawioViewerScript = ({ drawioUri }: Props): JSX.Element => {
       const origin = new URL(drawioUri).origin;
       if (origin !== DEFAULT_DRAWIO_ORIGIN) {
         patchStencilRegistryUrls(mxStencilRegistry?.libraries, origin);
+
+        const bakedMathUrl = window.DRAW_MATH_URL;
+        const mathBaseUrl = relocateMathUrl(bakedMathUrl, drawioUri);
+        if (bakedMathUrl != null && mathBaseUrl != null) {
+          relaunchMathJax(bakedMathUrl, mathBaseUrl);
+        }
       }
     } catch {
       // skip patching if drawioUri cannot be parsed
