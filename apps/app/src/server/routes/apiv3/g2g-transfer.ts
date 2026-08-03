@@ -10,6 +10,7 @@ import path from 'pathe';
 import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
+import { generateAdminRequiredIfInstalled } from '~/server/middlewares/admin-required-if-installed';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { isG2GTransferError } from '~/server/models/vo/g2g-transfer-error';
 import { configManager } from '~/server/service/config-manager';
@@ -25,6 +26,7 @@ import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import { Attachment } from '../../models/attachment';
 import { isPathWithinBase } from '../../util/safe-path-utils';
+import { validateAttachmentMetadata } from './g2g-transfer-attachment-metadata';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 interface AuthorizedRequest extends Request {
@@ -131,24 +133,17 @@ export const setup = (crowi: Crowi): Router => {
     }),
   });
 
-  const isInstalled = configManager.getConfig('app:installed');
-
   const adminRequired = adminRequiredFactory(crowi);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
-  // Middleware
-  const adminRequiredIfInstalled = (
-    req: Request,
-    res: ApiV3Response,
-    next: NextFunction,
-  ) => {
-    if (!isInstalled) {
-      next();
-      return;
-    }
+  // Read the install state live (per request), never a value captured here at
+  // server boot — see middlewares/admin-required-if-installed.ts for why.
+  const isInstalled = () => configManager.getConfig('app:installed') === true;
 
-    return adminRequired(req, res, next);
-  };
+  const adminRequiredIfInstalled = generateAdminRequiredIfInstalled(
+    isInstalled,
+    adminRequired,
+  );
 
   // Middleware
   const appSiteUrlRequiredIfNotInstalled = (
@@ -156,7 +151,7 @@ export const setup = (crowi: Crowi): Router => {
     res: ApiV3Response,
     next: NextFunction,
   ) => {
-    if (!isInstalled && req.body.appSiteUrl != null) {
+    if (!isInstalled() && req.body.appSiteUrl != null) {
       next();
       return;
     }
@@ -458,35 +453,19 @@ export const setup = (crowi: Crowi): Router => {
       }
 
       try {
+        // Reject unsafe metadata (incl. path-traversal fileNames) at this trust
+        // boundary — fileName is attacker-controlled and later joined into the
+        // storage path. See g2g-transfer-attachment-metadata.ts.
+        const validationError = validateAttachmentMetadata(attachmentMap);
+        if (validationError != null) {
+          logger.warn({ attachmentMap }, validationError.message);
+          return res.apiv3Err(
+            new ErrorV3(validationError.message, validationError.code),
+            400,
+          );
+        }
+
         const { fileName, fileSize } = attachmentMap;
-        if (
-          typeof fileName !== 'string' ||
-          fileName.length === 0 ||
-          fileName.length > 256
-        ) {
-          logger.warn({ fileName }, 'Invalid fileName in attachment metadata.');
-          return res.apiv3Err(
-            new ErrorV3(
-              'Invalid fileName in attachment metadata.',
-              'invalid_metadata',
-            ),
-            400,
-          );
-        }
-        if (
-          typeof fileSize !== 'number' ||
-          !Number.isInteger(fileSize) ||
-          fileSize < 0
-        ) {
-          logger.warn({ fileSize }, 'Invalid fileSize in attachment metadata.');
-          return res.apiv3Err(
-            new ErrorV3(
-              'Invalid fileSize in attachment metadata.',
-              'invalid_metadata',
-            ),
-            400,
-          );
-        }
         const count = await Attachment.countDocuments({ fileName, fileSize });
         if (count === 0) {
           logger.warn(
