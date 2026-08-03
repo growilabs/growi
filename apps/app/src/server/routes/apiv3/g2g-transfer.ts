@@ -10,7 +10,6 @@ import path from 'pathe';
 import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
-import { generateAdminRequiredIfInstalled } from '~/server/middlewares/admin-required-if-installed';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { isG2GTransferError } from '~/server/models/vo/g2g-transfer-error';
 import { configManager } from '~/server/service/config-manager';
@@ -26,6 +25,7 @@ import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import { Attachment } from '../../models/attachment';
 import { isPathWithinBase } from '../../util/safe-path-utils';
+import { generateAdminRequiredIfInstalled } from './g2g-transfer-admin-required-if-installed';
 import { validateAttachmentMetadata } from './g2g-transfer-attachment-metadata';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
@@ -137,7 +137,7 @@ export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   // Read the install state live (per request), never a value captured here at
-  // server boot — see middlewares/admin-required-if-installed.ts for why.
+  // server boot — see ./g2g-transfer-admin-required-if-installed for why.
   const isInstalled = () => configManager.getConfig('app:installed') === true;
 
   const adminRequiredIfInstalled = generateAdminRequiredIfInstalled(

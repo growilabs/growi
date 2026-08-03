@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 
-import { generateAdminRequiredIfInstalled } from './admin-required-if-installed';
+import { generateAdminRequiredIfInstalled } from './g2g-transfer-admin-required-if-installed';
 
 describe('generateAdminRequiredIfInstalled', () => {
   let req: Request;
