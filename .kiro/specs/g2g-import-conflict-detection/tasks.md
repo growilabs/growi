@@ -19,8 +19,8 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
   - _Boundary: detect-unique-conflicts_
 
-- [ ] 2. 検知の I/O オーケストレーション（コア）
-- [ ] 2.1 アーカイブ読み取り・既存照会・検知駆動を実装し実 DB で検証する
+- [x] 2. 検知の I/O オーケストレーション（コア）
+- [x] 2.1 アーカイブ読み取り・既存照会・検知駆動を実装し実 DB で検証する
   - 取り込み対象アーカイブの JSON から、ユーザーは username / email / slackMemberId と `_id`、グループは name と `_id` のみを stream 抽出する（本文・パスワード等は読まない）。
   - 抽出値を使って転送先の既存データを一意フィールドごとに `$in` でバッチ照会し（read-only）、純関数に渡して衝突レポートを得る orchestrator を実装する。
   - 対象にユーザー（またはグループ）の JSON が含まれない場合は、そのコレクションの検知をスキップし例外を出さない。
@@ -79,3 +79,12 @@
   - _Requirements: 4.1, 4.2, 5.2_
   - _Boundary: detect-unique-conflicts.integ_
   - _Depends: 2.1_
+
+## Implementation Notes
+
+- **モデルの型**: design.md の `Model<UserDocument>` / `Model<UserGroupDocument>` のうち `UserDocument` は実在しない（`models/user/index.js` は JS の factory）。orchestrator は `Model<IUser>` / `Model<IUserGroup>` を受け取る。`mongoose.model<IUser>('User')` と `~/server/models/user-group` の default export がそのまま代入可能（型検査で確認済み。2 つを入れ違いに渡すと TS2322 で弾かれる）。
+- **検知処理の失敗は例外で伝播する**（空レポートで素通りさせない）。アーカイブ JSON が途中で切れている / 0 バイト / 配列でない場合は `detectUniqueConflicts` が throw する。受信ルート（4.1）はこれを 500 系に変換する責務を持つ（design.md Error Handling / Error Strategy）。衝突検知の 409 と混同しないこと。
+- **integ の前提**: この worktree では `packages/*` の `dist` が未生成だと結合試験が `@growi/logger` の解決失敗で起動しない。`npx turbo run build --filter '@growi/app^...'` で解消する（cache hit で速い）。
+- **integ のテスト分離**: per-worker DB を他ファイルと共有しうるので `deleteMany({})` は使わず、固有プレフィックス付き fixture を `$in` で消す。一時アーカイブは `os.tmpdir()` 配下に作り `afterAll` で削除する。
+- **`mock<Model<IUser>>({ find: ... })` は書けない**（`find` の overload により `DeepPartial` で表現できず TS2740/TS2322）。`mock<Model<IUser>>()` で自動スタブしてから `model.find.mockImplementation(...)` で振る舞いを差し込む。
+- **残存する理論的な穴（対応不要・記録のみ）**: 根の配列が閉じないまま末尾が `]` で終わるアーカイブ（例 `[[{doc}]`）は構造検査も JSONStream も通過し「衝突なし」を返す。`users` / `usergroups` スキーマに配列フィールドが無いためエクスポート経路から到達不能。完全に閉じるなら JSONStream の stream の `root` プロパティ（根の値が未完結なら値が残る）を見る手があるが、未文書の内部プロパティで型アサーションが必要。
