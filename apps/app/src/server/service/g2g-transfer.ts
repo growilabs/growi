@@ -23,6 +23,7 @@ import type Crowi from '../crowi';
 import { Attachment } from '../models/attachment';
 import UserGroup from '../models/user-group';
 import {
+  G2G_DATA_CONFLICT_ERROR_CODE,
   G2GTransferError,
   G2GTransferErrorCode,
 } from '../models/vo/g2g-transfer-error';
@@ -260,6 +261,67 @@ interface Receiver {
    */
   receiveAttachment(content: ReadStream, attachmentMap: any): Promise<void>;
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+/**
+ * Payload the pusher's `admin:g2gError` socket event carries for a failed archive POST.
+ * `key` selects the client's i18n heading; `message` is the detail shown alongside it.
+ */
+interface ArchivePostErrorEvent {
+  key: string;
+  message: string;
+}
+
+const GENERIC_ARCHIVE_POST_ERROR_EVENT: ArchivePostErrorEvent = {
+  message: 'Failed to send GROWI archive file to the destination GROWI',
+  key: 'admin:g2g:error_send_growi_archive',
+};
+
+/**
+ * Maps a failed archive POST to the admin-facing `admin:g2gError` payload.
+ *
+ * Pure / no I/O, so it is unit-testable without mocking axios, exportService, or the
+ * filesystem (see g2g-transfer.spec.ts) — the framework-facing catch in `startTransfer`
+ * reduces to a thin call of this function.
+ *
+ * The receive route answers a data conflict with `{ errors: [{ message, code:
+ * G2G_DATA_CONFLICT_ERROR_CODE }] }` (apiv3Err), but that shape is untrusted at this
+ * network boundary: a network failure carries no `response` at all, and a proxy error
+ * page or a future receiver change could reshape the body. Every access below is
+ * therefore a guarded read, and anything it does not recognize falls back to the same
+ * generic event `startTransfer` emitted before this function existed.
+ */
+export const toArchivePostErrorEvent = (
+  err: unknown,
+): ArchivePostErrorEvent => {
+  if (
+    !isRecord(err) ||
+    !isRecord(err.response) ||
+    !isRecord(err.response.data)
+  ) {
+    return GENERIC_ARCHIVE_POST_ERROR_EVENT;
+  }
+
+  const { errors } = err.response.data;
+  const firstError = Array.isArray(errors) ? errors[0] : undefined;
+
+  if (!isRecord(firstError)) {
+    return GENERIC_ARCHIVE_POST_ERROR_EVENT;
+  }
+
+  const { code, message } = firstError;
+
+  if (code !== G2G_DATA_CONFLICT_ERROR_CODE || typeof message !== 'string') {
+    return GENERIC_ARCHIVE_POST_ERROR_EVENT;
+  }
+
+  return {
+    key: 'admin:g2g:error_data_conflict',
+    message,
+  };
+};
 
 /**
  * G2g transfer pusher
@@ -561,10 +623,7 @@ export class G2GTransferPusherService implements Pusher {
         mongo: G2G_PROGRESS_STATUS.ERROR,
         attachments: G2G_PROGRESS_STATUS.PENDING,
       });
-      socket?.emit('admin:g2gError', {
-        message: 'Failed to send GROWI archive file to the destination GROWI',
-        key: 'admin:g2g:error_send_growi_archive',
-      });
+      socket?.emit('admin:g2gError', toArchivePostErrorEvent(err));
       throw err;
     }
 

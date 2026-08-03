@@ -53,7 +53,7 @@
   - _Depends: 3.1_
 
 - [ ] 5. 衝突通知を転送元管理者へ届ける（統合）
-- [ ] 5.1 push 側で衝突応答を判別し具体的なエラーを WebSocket 送出する
+- [x] 5.1 push 側で衝突応答を判別し具体的なエラーを WebSocket 送出する
   - push 側のアーカイブ送信の失敗処理で、受信側応答本文のデータ衝突コードを判別し、専用の見出しキーと衝突サマリ本文を含む管理者向け WebSocket エラーを送出する。それ以外の失敗は従来の汎用エラーのまま。
   - RED→GREEN（unit）: 受信側がデータ衝突エラー応答を返したとき、専用キー＋衝突サマリ本文の管理者向けエラーが送出される（応答本文の形は実装時に確認し、テストで固定する）。型安全モック（`mock<T>()`）を用いる。
   - Observable: push 側の unit がグリーンで、衝突応答時に専用キーとサマリ本文が送出される。
@@ -91,5 +91,7 @@
 - **4.1 で `collections` との突き合わせを足さないこと**（3.1 レビューの記録）: `collections` に `users` が無いのにアーカイブに `users.json` がある組み合わせでは、取り込まれないコレクションで 409 になり得る。ただし push 側の `exportService.export(collections)` は選択分のみ書き出すので実運用では到達不能で、かつ安全側に倒れる挙動。design.md は `innerFileStats` からの解決を明示しているので現状が仕様準拠。
 - **409 応答本文の実際の形**（4.1 で確定。5.1 はこれに依存する）: `{ "errors": [ { "message": "<衝突サマリ>", "code": "growi_data_conflict" } ] }`。`ErrorV3` の `info` / `stack` / `args` は `undefined` なので JSON から落ちる。push 側は `rawAxios.post` の catch で `err.response?.data?.errors?.[0]?.code` と `.message` を読む。検知失敗は同じ封筒で `code: 'conflict_detection_failed'` / HTTP 500 なので、ステータスとコードの両方で区別できる。コード文字列は `G2G_DATA_CONFLICT_ERROR_CODE`（`models/vo/g2g-transfer-error.ts`）を import して使う — 文字列リテラルを二重定義しないこと。
 - **衝突サマリの生成は `service/import/summarize-unique-conflicts.ts`**（4.1 で追加。design.md の File Structure Plan には未記載）。値の露出は 1 コレクションあたり先頭 `CONFLICT_SAMPLE_LIMIT = 3` 件＋残件数まで。要件 3.3（解消のための指針）はこのサマリではなく 5.2 の i18n 文言の担当。
+- **5.2 が追加する i18n キーの正確な位置**（5.1 で確定）: push 側が emit するキーは `admin:g2g:error_data_conflict`（`service/g2g-transfer.ts` の素のリテラル。同ファイルの既存 3 キーと同じ慣習で、定数化は不要と判定済み）。i18next は最初の `:` で namespace `admin` を切り出して残りをキー区切りで繋ぐので、書く場所は `apps/app/public/static/locales/en_US/admin.json` の **`g2g` オブジェクト直下の `error_data_conflict`**。
+- **既存のキー欠落が 1 件ある**（5.1 レビューで発見）: `admin:g2g:error_upload_attachment` は pusher が emit しているのに 5 言語すべての `admin.json` の `g2g` に存在せず（各ファイル `transfer_success` / `error_generate_growi_archive` / `error_send_growi_archive` の 3 キーのみ）、トーストに raw キーが出る。5.2 では「pusher が emit する全キーが en_US/admin.json で解決できる」ことを assert する spec を 1 本足すことを推奨（この既存欠落も直せる）。
 - **`g2g-transfer.ts` は既に 800 行超**（変更前 801 行 → 858 行）。coding-style の上限超過は 3.1 以前からの既存債務で、`_Boundary:_` がこのファイルへの追加を指定しているため回避不能。将来 pusher / receiver で分割する価値あり。
 - **残存する理論的な穴（対応不要・記録のみ）**: 根の配列が閉じないまま末尾が `]` で終わるアーカイブ（例 `[[{doc}]`）は構造検査も JSONStream も通過し「衝突なし」を返す。`users` / `usergroups` スキーマに配列フィールドが無いためエクスポート経路から到達不能。完全に閉じるなら JSONStream の stream の `root` プロパティ（根の値が未完結なら値が残る）を見る手があるが、未文書の内部プロパティで型アサーションが必要。
