@@ -6,6 +6,7 @@ export const PageAccessoriesModalContents = {
   PageHistory: 'PageHistory',
   Attachment: 'Attachment',
   ShareLink: 'ShareLink',
+  Backlinks: 'Backlinks',
 } as const;
 export type PageAccessoriesModalContents =
   (typeof PageAccessoriesModalContents)[keyof typeof PageAccessoriesModalContents];

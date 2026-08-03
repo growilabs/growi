@@ -14,6 +14,7 @@ import uidSafe from 'uid-safe';
 import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
 import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
+import { PageLinkService } from '~/features/backlinks/server/services/page-link-service';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { initializeVaultFeature } from '~/features/growi-vault/server';
@@ -145,6 +146,8 @@ class Crowi {
   passportService!: PassportService;
 
   searchService!: SearchService;
+
+  pageLinkService!: PageLinkService;
 
   slackIntegrationService!: SlackIntegrationService;
 
@@ -885,6 +888,9 @@ class Crowi {
       await this.pageService.createTtlIndex();
     }
     this.pageOperationService = instanciatePageOperationService(this);
+
+    // create() subscribes to page create/update events (like SearchService).
+    this.pageLinkService = PageLinkService.create(this);
   }
 
   setupInAppNotificationService(): void {
