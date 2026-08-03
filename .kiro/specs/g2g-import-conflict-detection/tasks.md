@@ -40,8 +40,8 @@
   - _Boundary: g2g-transfer.ts ReceiverService_
   - _Depends: 2.1_
 
-- [ ] 4. 受信ルートに衝突検知ゲートを差し込む（統合）
-- [ ] 4.1 取り込み開始前に検知し、衝突時は中断してエラーを返す
+- [x] 4. 受信ルートに衝突検知ゲートを差し込む（統合）
+- [x] 4.1 取り込み開始前に検知し、衝突時は中断してエラーを返す
   - 受信ルートの、取り込み設定生成の後・コレクション取り込み呼び出しの前に、検知メソッドを呼ぶゲートを追加する。
   - 衝突が 1 件以上ある場合はコレクション取り込みを呼ばず、衝突サマリ（種別・件数・代表的な衝突フィールドと値の先頭数件）を含む専用コード（データ衝突）のエラー応答を 409 で返す。値の大量露出は避け、代表例＋件数に留める。
   - 衝突が無い場合は従来どおりコレクション取り込みを呼ぶ（挙動不変）。
@@ -89,5 +89,7 @@
 - **`mock<Model<IUser>>({ find: ... })` は書けない**（`find` の overload により `DeepPartial` で表現できず TS2740/TS2322）。`mock<Model<IUser>>()` で自動スタブしてから `model.find.mockImplementation(...)` で振る舞いを差し込む。
 - **`detectImportConflicts` の 2 種類の結末を混同しないこと**（3.1 で確定）: 「転送対象に users/usergroups が無い」＝ `null` を渡して検知スキップ（要件 1.6、例外なし）。「宣言されたファイルが解決できない・読めない」＝ **例外**（`getFile` が `fs.accessSync` で不在を例外化する）。ルート（4.1）は検知呼び出しを try/catch で包み、例外は 500 系へ、衝突ありは 409 へと**別経路**に振り分ける。
 - **4.1 で `collections` との突き合わせを足さないこと**（3.1 レビューの記録）: `collections` に `users` が無いのにアーカイブに `users.json` がある組み合わせでは、取り込まれないコレクションで 409 になり得る。ただし push 側の `exportService.export(collections)` は選択分のみ書き出すので実運用では到達不能で、かつ安全側に倒れる挙動。design.md は `innerFileStats` からの解決を明示しているので現状が仕様準拠。
+- **409 応答本文の実際の形**（4.1 で確定。5.1 はこれに依存する）: `{ "errors": [ { "message": "<衝突サマリ>", "code": "growi_data_conflict" } ] }`。`ErrorV3` の `info` / `stack` / `args` は `undefined` なので JSON から落ちる。push 側は `rawAxios.post` の catch で `err.response?.data?.errors?.[0]?.code` と `.message` を読む。検知失敗は同じ封筒で `code: 'conflict_detection_failed'` / HTTP 500 なので、ステータスとコードの両方で区別できる。コード文字列は `G2G_DATA_CONFLICT_ERROR_CODE`（`models/vo/g2g-transfer-error.ts`）を import して使う — 文字列リテラルを二重定義しないこと。
+- **衝突サマリの生成は `service/import/summarize-unique-conflicts.ts`**（4.1 で追加。design.md の File Structure Plan には未記載）。値の露出は 1 コレクションあたり先頭 `CONFLICT_SAMPLE_LIMIT = 3` 件＋残件数まで。要件 3.3（解消のための指針）はこのサマリではなく 5.2 の i18n 文言の担当。
 - **`g2g-transfer.ts` は既に 800 行超**（変更前 801 行 → 858 行）。coding-style の上限超過は 3.1 以前からの既存債務で、`_Boundary:_` がこのファイルへの追加を指定しているため回避不能。将来 pusher / receiver で分割する価値あり。
 - **残存する理論的な穴（対応不要・記録のみ）**: 根の配列が閉じないまま末尾が `]` で終わるアーカイブ（例 `[[{doc}]`）は構造検査も JSONStream も通過し「衝突なし」を返す。`users` / `usergroups` スキーマに配列フィールドが無いためエクスポート経路から到達不能。完全に閉じるなら JSONStream の stream の `root` プロパティ（根の値が未完結なら値が残る）を見る手があるが、未文書の内部プロパティで型アサーションが必要。
