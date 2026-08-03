@@ -1,4 +1,3 @@
-import { resolve } from 'node:path';
 import type { Collection, Document, Filter } from 'mongodb';
 import mongoose from 'mongoose';
 
@@ -9,7 +8,7 @@ import {
   legacyOnlyFilter,
   scopeFilter,
 } from '../models/user/password-hash-format-filters';
-import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
+import { isEntryPoint, withMongoConnection } from './script-runner';
 
 const logger = loggerFactory('growi:scripts:password-hash-cleanup');
 
@@ -86,26 +85,16 @@ export async function runPasswordHashCleanup(
 
 // ─── Thin CLI wrapper (only runs when executed as the entry point) ───────────
 
-const isEntryPoint = (): boolean => {
-  const entry = process.argv[1];
-  return (
-    entry != null && resolve(entry) === resolve(import.meta.filename ?? '')
-  );
-};
-
-export async function main(): Promise<void> {
-  await mongoose.connect(getMongoUri(), mongoOptions);
-  try {
+async function main(): Promise<void> {
+  await withMongoConnection(async () => {
     const result = await runPasswordHashCleanup(
       mongoose.connection.collection('users'),
     );
     process.exitCode = result.aborted ? 1 : 0;
-  } finally {
-    await mongoose.disconnect();
-  }
+  });
 }
 
-if (isEntryPoint()) {
+if (isEntryPoint(import.meta.url)) {
   main().catch((err) => {
     logger.error('password-hash cleanup script failed:', err);
     process.exitCode = 1;

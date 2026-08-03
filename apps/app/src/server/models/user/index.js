@@ -10,14 +10,23 @@ import uniqueValidator from 'mongoose-unique-validator';
 // import and read `.i18n` from it.
 import nextI18nextConfig from '^/config/next-i18next.config.mjs';
 
+import { passwordHashService } from '~/server/service/password-hash';
+import { isEmailMatchedByEntry } from '~/utils/email-whitelist';
+import { generateGravatarSrc } from '~/utils/gravatar';
+import loggerFactory from '~/utils/logger';
+
 import { aclService as _aclService } from '../../service/acl';
+import { configManager as _configManager } from '../../service/config-manager';
+import { getModelSafely } from '../../util/mongoose-utils';
+import { Attachment } from '../attachment';
+import { UserStatus } from './conts';
+
 // Getter wrappers for service singletons: callers use getConfigManager() /
 // getAclService() so that this module's import of service singletons can be
 // intercepted by tests (vi.mock) without changing the call-site API.
 // The singletons are module-level bindings (ESM live-binding); accesses happen
 // only inside functions, never at module-top, so circular-dep evaluation order
 // is safe.
-import { configManager as _configManager } from '../../service/config-manager';
 
 /** @returns {import('../../service/config-manager').IConfigManagerForApp} */
 export function getConfigManager() {
@@ -28,15 +37,6 @@ export function getConfigManager() {
 export function getAclService() {
   return _aclService;
 }
-
-import { passwordHashService } from '~/server/service/password-hash';
-import { isEmailMatchedByEntry } from '~/utils/email-whitelist';
-import { generateGravatarSrc } from '~/utils/gravatar';
-import loggerFactory from '~/utils/logger';
-
-import { getModelSafely } from '../../util/mongoose-utils';
-import { Attachment } from '../attachment';
-import { UserStatus } from './conts';
 
 const logger = loggerFactory('growi:models:user');
 
@@ -499,7 +499,6 @@ const factory = (crowi) => {
 
   userSchema.statics.findUserByUsernameOrEmail = function (
     usernameOrEmail,
-    password,
     callback,
   ) {
     this.findOne()

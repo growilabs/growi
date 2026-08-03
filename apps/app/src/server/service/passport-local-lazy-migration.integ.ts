@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import type { MockInstance } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
@@ -27,14 +26,16 @@ import loggerFactory from '~/utils/logger';
 
 import { verifyLocalCredentials } from './passport';
 
-const getMockLogger = () =>
-  (
-    loggerFactory as unknown as () => {
-      warn: MockInstance;
-      error: MockInstance;
-      info: MockInstance;
-    }
-  )();
+// The mocked loggerFactory always returns the same logger instance; vi.mocked()
+// re-types its methods as spies (Tier-1 type-safe mocking) without a cast.
+const getMockLogger = () => {
+  const mockLogger = vi.mocked(loggerFactory)('growi:service:passport');
+  return {
+    warn: vi.mocked(mockLogger.warn),
+    error: vi.mocked(mockLogger.error),
+    info: vi.mocked(mockLogger.info),
+  };
+};
 
 // This SEED is what the User model's isPasswordValid passes to
 // PasswordHashService.verify (via crowi.env.PASSWORD_SEED). The legacy SHA-256

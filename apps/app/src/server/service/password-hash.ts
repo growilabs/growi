@@ -179,7 +179,7 @@ const parseScryptHash = (encoded: string): ParsedScryptHash => {
 /**
  * Clamp params to the DoS upper bounds only. The security floor is applied only on the
  * env-derived path (`resolveScryptParamsFromEnv`) so that callers/tests may inject
- * deliberately small params via `createPasswordHashService`.
+ * deliberately small params via `createPasswordHashServiceForTest`.
  */
 const clampUpperBounds = (params: ScryptParams): ScryptParams => ({
   N: Math.min(params.N, N_MAX),
@@ -382,11 +382,12 @@ export const resolveScryptParamsFromEnv = (): ScryptParams => {
 };
 
 /**
- * Factory for a PasswordHashService with explicit params. Used by tests to inject small
- * params. The security floor is NOT applied here (only the DoS upper bound) — floor
- * clamping belongs to the env-derived production singleton below.
+ * Test-only factory for a PasswordHashService with explicit params. Used by tests to
+ * inject small params so they stay fast. The security floor is NOT applied here (only the
+ * DoS upper bound) — floor clamping belongs to the env-derived production singleton below,
+ * so this MUST NOT be used in production code (hence the `ForTest` suffix).
  */
-export const createPasswordHashService = (
+export const createPasswordHashServiceForTest = (
   params: ScryptParams,
 ): IPasswordHashService => new PasswordHashService(params);
 

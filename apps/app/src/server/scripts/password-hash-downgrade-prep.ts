@@ -1,4 +1,3 @@
-import { resolve } from 'node:path';
 import { format } from 'date-fns/format';
 import { subSeconds } from 'date-fns/subSeconds';
 import type { Collection, Document, Filter, WithId } from 'mongodb';
@@ -14,8 +13,8 @@ import {
 } from '../models/user/password-hash-format-filters';
 import { configManager } from '../service/config-manager';
 import { growiInfoService } from '../service/growi-info';
-import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
 import { resolveLocalePath } from '../util/safe-path-utils';
+import { isEntryPoint, withMongoConnection } from './script-runner';
 
 const logger = loggerFactory('growi:scripts:password-hash-downgrade-prep');
 
@@ -159,13 +158,6 @@ export async function runDowngradePrep(
 
 // ─── Thin CLI wrapper (only runs when executed as the entry point) ───────────
 
-const isEntryPoint = (): boolean => {
-  const entry = process.argv[1];
-  return (
-    entry != null && resolve(entry) === resolve(import.meta.filename ?? '')
-  );
-};
-
 /**
  * Build the real `sendResetEmailForUser` from the app's PasswordResetOrder model
  * and Crowi's mailService, mirroring the forgot-password route's email flow.
@@ -209,23 +201,20 @@ const createRealSender = (crowi: Crowi) => {
   };
 };
 
-export async function main(): Promise<void> {
-  await mongoose.connect(getMongoUri(), mongoOptions);
-  const crowi = new Crowi();
-  await crowi.init();
-  try {
+async function main(): Promise<void> {
+  await withMongoConnection(async () => {
+    const crowi = new Crowi();
+    await crowi.init();
     const result = await runDowngradePrep({
       usersCollection: mongoose.connection.collection('users'),
       sendResetEmailForUser: createRealSender(crowi),
       sendResetEmails: process.env.SEND_RESET_EMAILS === 'true',
     });
     logger.info({ result }, 'Downgrade prep result');
-  } finally {
-    await mongoose.disconnect();
-  }
+  });
 }
 
-if (isEntryPoint()) {
+if (isEntryPoint(import.meta.url)) {
   main().catch((err) => {
     logger.error('password-hash downgrade-prep script failed:', err);
     process.exitCode = 1;

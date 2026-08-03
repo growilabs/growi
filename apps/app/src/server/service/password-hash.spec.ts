@@ -1,13 +1,5 @@
 import { createHash } from 'node:crypto';
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type MockInstance,
-  vi,
-} from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the project logger so we can assert WARNING emission (Req 2.4 / 2.5).
 vi.mock('~/utils/logger', () => {
@@ -25,19 +17,20 @@ vi.mock('~/utils/logger', () => {
 import loggerFactory from '~/utils/logger';
 
 import {
-  createPasswordHashService,
+  createPasswordHashServiceForTest,
   resolveScryptParamsFromEnv,
 } from './password-hash';
 
-// The mocked loggerFactory always returns the same logger instance.
-const getMockLogger = () =>
-  (
-    loggerFactory as unknown as () => {
-      warn: MockInstance;
-      error: MockInstance;
-      info: MockInstance;
-    }
-  )();
+// The mocked loggerFactory always returns the same logger instance; vi.mocked()
+// re-types its methods as spies (Tier-1 type-safe mocking) without a cast.
+const getMockLogger = () => {
+  const mockLogger = vi.mocked(loggerFactory)('growi:service:password-hash');
+  return {
+    warn: vi.mocked(mockLogger.warn),
+    error: vi.mocked(mockLogger.error),
+    info: vi.mocked(mockLogger.info),
+  };
+};
 
 // Use a deliberately small N so tests stay fast; production default is 2^17.
 const TEST_PARAMS = { N: 2 ** 14, r: 8, p: 1 };
@@ -49,7 +42,7 @@ const sha256Legacy = (plaintext: string, seed: string): string =>
     .digest('hex');
 
 describe('PasswordHashService', () => {
-  const service = createPasswordHashService(TEST_PARAMS);
+  const service = createPasswordHashServiceForTest(TEST_PARAMS);
 
   describe('hash()', () => {
     it('returns a self-describing scrypt$ envelope, not a 64-char SHA-256 hex', async () => {
@@ -97,7 +90,11 @@ describe('PasswordHashService', () => {
     });
 
     it('returns needsRehash: true when the stored params are weaker than the current defaults', async () => {
-      const weakService = createPasswordHashService({ N: 2 ** 13, r: 8, p: 1 });
+      const weakService = createPasswordHashServiceForTest({
+        N: 2 ** 13,
+        r: 8,
+        p: 1,
+      });
       const weakHash = await weakService.hash('legacy-params');
 
       // `service` is configured with a stronger N (2^14 > 2^13).

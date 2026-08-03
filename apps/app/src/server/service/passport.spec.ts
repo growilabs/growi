@@ -299,7 +299,6 @@ const createUserModel = (result: { err?: unknown; doc?: unknown } = {}) => ({
   findUserByUsernameOrEmail: vi.fn(
     (
       _usernameOrEmail: string,
-      _password: string,
       callback: (err: unknown, user?: unknown) => void,
     ) => callback(result.err ?? null, result.doc),
   ),

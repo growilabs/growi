@@ -70,7 +70,6 @@ interface LocalStrategyUserDoc {
 interface LocalStrategyUserModel {
   findUserByUsernameOrEmail(
     usernameOrEmail: string,
-    password: string,
     callback: (err: unknown, user?: LocalStrategyUserDoc | null) => void,
   ): void;
 }
@@ -101,7 +100,7 @@ export const verifyLocalCredentials = async (
     // this boundary.
     const user = await new Promise<LocalStrategyUserDoc | null>(
       (resolve, reject) => {
-        User.findUserByUsernameOrEmail(username, password, (err, u) =>
+        User.findUserByUsernameOrEmail(username, (err, u) =>
           err != null ? reject(err) : resolve(u ?? null),
         );
       },
