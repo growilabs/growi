@@ -3,7 +3,12 @@ import type { NextFunction, Request, Router } from 'express';
 import express from 'express';
 import { body, query } from 'express-validator';
 
-import type { ISearchFilter } from '~/interfaces/activity';
+import {
+  AUDITLOG_SUGGESTION_FIELDS,
+  type AuditlogSuggestionField,
+  type ISearchFilter,
+  isAuditlogSuggestionField,
+} from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
@@ -20,6 +25,14 @@ import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
 
+interface ISuggestionsRequest
+  extends Request<
+    undefined,
+    undefined,
+    undefined,
+    { field?: string | string[]; q?: string; limit?: number }
+  > {}
+
 const validator = {
   list: [
     query('limit')
@@ -31,6 +44,27 @@ const validator = {
       .optional()
       .isString()
       .withMessage('query must be a string'),
+  ],
+  suggestions: [
+    query('field')
+      .optional()
+      .custom((value) => {
+        const values = Array.isArray(value) ? value : [value];
+        return values.every(isAuditlogSuggestionField);
+      })
+      .withMessage(
+        `field must be one or more of: ${AUDITLOG_SUGGESTION_FIELDS.join(', ')}`,
+      ),
+    query('q')
+      .optional()
+      .isString()
+      .isLength({ max: 100 })
+      .withMessage('q must be a string'),
+    query('limit')
+      .optional()
+      .isInt({ min: 1, max: 100 })
+      .toInt()
+      .withMessage('limit must be a number less than or equal to 100'),
   ],
   // POST /activity/list carries the same parameters in the request body so the
   // searchFilter (which lists every selected action) never bloats the URL.
@@ -432,6 +466,72 @@ export const setup = (crowi: Crowi): Router => {
         return res.apiv3({ serializedPaginationResult });
       } catch (err) {
         logger.error('Failed to get paginated activity', err);
+        return res.apiv3Err(err, 500);
+      }
+    },
+  );
+
+  /**
+   * @swagger
+   *
+   * /activity/suggestions:
+   *   get:
+   *     summary: /activity/suggestions
+   *     tags: [Activity]
+   *     security:
+   *       - bearer: []
+   *       - accessTokenInQuery: []
+   *     parameters:
+   *       - name: field
+   *         in: query
+   *         required: false
+   *         schema:
+   *           type: string
+   *           enum: [username]
+   *       - name: q
+   *         in: query
+   *         required: false
+   *         schema:
+   *           type: string
+   *       - name: limit
+   *         in: query
+   *         required: false
+   *         schema:
+   *           type: integer
+   *     responses:
+   *       200:
+   *         description: Suggestions fetched successfully
+   */
+  router.get(
+    '/suggestions',
+    accessTokenParser([SCOPE.READ.ADMIN.AUDIT_LOG], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    adminRequired,
+    validator.suggestions,
+    apiV3FormValidator,
+    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+    // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
+    async (req: ISuggestionsRequest, res: ApiV3Response) => {
+      const { field, q = '', limit = 5 } = req.query;
+
+      const fields: AuditlogSuggestionField[] =
+        field == null
+          ? [...AUDITLOG_SUGGESTION_FIELDS]
+          : (Array.isArray(field) ? field : [field]).filter(
+              isAuditlogSuggestionField,
+            );
+
+      const { searchService } = crowi;
+
+      try {
+        const result = await searchService.searchAuditlogSuggestions(
+          fields,
+          q,
+          limit,
+        );
+        return res.apiv3(result);
+      } catch (err) {
+        logger.error('Failed to get suggestions', err);
         return res.apiv3Err(err, 500);
       }
     },
