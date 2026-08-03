@@ -91,9 +91,43 @@ apiv3に描画プロキシを新設。クライアントは図ソースをPOST�
 - **XSSはサニタイザ新設不要**: SVGを `<img>`（blob URL）でのみ描画 → 画像コンテキストでスクリプト非実行。research の「SVGサニタイザ gap」は、インラインSVG化を避けることで回避。
 - **ハッシュ2段配信（B2）は不採用**: プロキシが直接SVGを返す1往復（B1）で十分。クライアント側のハッシュURL生成という間接を排除。
 - **誤設定検知（9.3）は最小実装**: `render-plantuml` が `maxRedirects: 0` とし、3xx/非2xxを一律失敗扱い（公開plantuml.comの302を検知）。専用の対応判定ロジックは不要。
-- **テーマ前置はクライアント側で現行ロジック再利用**: サーバ側テーマ共有（`.puml.ts` のサーバ解決）の整合性リスクを避け、v1はDOM本文増を許容（Open Question として最適化余地を記録）。
+- **テーマ前置はサーバ（プロキシ）へ集約**: クライアントは生ソース＋darkModeのみ送信し、`render-plantuml` が `themes/*.puml.ts` をサーバ import して前置。これにより図が多いページのDOM/転送量増（当初のOpen Question）を解消。
+
+## 設計レビュー（validate-design）での3 Critical Issue と解決
+1. **アクセス制御/CSRF（10.1）**: プロキシを `loginRequired`（ゲスト許可はインスタンス設定に追従）で保護＝ページ閲覧と同ポリシー。ページ単位権限は文脈なしのため Out of Boundary。非変更エンドポイント（コンテンツ addressable なキャッシュ、ユーザー状態を変えない）のため CSRF は要件としない。
+2. **キャッシュ方式（5.x）**: B2（ハッシュ別GET配信）はマルチインスタンスで GET 側キャッシュミス→404の失敗モードがあるため不採用。**B1（プロキシが直接SVG返却）を正式採用**（本文完結で水平スケールに堅牢）。ブラウザHTTPキャッシュ喪失は、サーバLRU＋クライアントのセッション内メモで緩和（Req 5 は SHOULD）。
+3. **テーマDOM同梱（7.x）**: 上記のとおりサーバ前置へ移設して解消。
 
 ## Key Risks（設計時点）
-- テーマ資産のサーバ共有可否（`.puml.ts` インポートのNode解決）→ v1では回避（クライアント前置）。将来最適化時に要検証。
+- テーマ資産のサーバ import 可否（`.puml.ts` の Node/サーバビルドでの解決）→ **採用**方針。実装時に import 解決を smoke で確認（純粋な文字列 export モジュールのため低リスク）。
 - 新config key 追加に伴う `config-definition.spec.ts` / `PageContentRenderer.spec.tsx` mock の更新漏れ（型崩れ）。
-- POST経路のアクセス制御ミドルウェア選定（閲覧同等：ゲスト許可時の扱い）は実装時に既存 `loginRequired` 系と突き合わせて確定。
+- `loginRequired` のゲスト許可挙動が、対象インスタンスの閲覧ポリシーと一致するかを実装時に確認。
+
+---
+
+# 差分ギャップ分析（要件改訂 Req 4/5/8/9 改訂・Req 10 追加後 / 2026-08-03）
+
+改訂要件と設計で新たに採用した統合点（アクセス制御・サイズ/タイムアウト上限・LRU・SSRF/誤設定検知）を、コードベースの実在パターンに突合して feasibility を確認した。
+
+## 新規/改訂要件 → 資産マップ（追補）
+
+| Req | 必要な要素 | 既存資産（file:line） | 判定 |
+|---|---|---|---|
+| 10.1 アクセス制御 | 閲覧同等の認証（ゲスト許可追従） | `server/middlewares/login-required.ts:32` `loginRequiredFactory(crowi, isGuestAllowed)`。ゲスト分岐 L57-66（`aclService.isGuestAllowedToRead()`）。使用例 `apiv3/page/get-page-info.ts:59,72` | **OK**（`loginRequiredFactory(crowi, true)` で閲覧同等） |
+| 10.2 サイズ上限(413) | 本文サイズ制限 | グローバル body parser は 50mb（`server/crowi/express-init.js:116-117`）。ルート単位で `express.json({ limit })` を重ねると `entity.too.large`→413 | **OK**（ルートスコープで tighter limit を追加） |
+| 10.2 過負荷(レート制限) | レート制限 | 既存 `features/rate-limiter/`（`rate-limiter-flexible`+Mongo）。グローバル適用 `server/routes/index.js:82`。エンドポイント別は `API_RATE_LIMIT_*` env で調整（`middleware/factory.ts:17-19,64`） | **OK**（グローバルで自動被覆＋env で厳格化可能） |
+| 10.2 タイムアウト | 上流タイムアウト | axios `timeout` 実例 `apiv3/slack-integration-settings.js:124,143`。`maxRedirects` は未使用だが標準config（`g2g-transfer.ts:251` が per-request config 実績） | **OK**（`timeout`＋`maxRedirects:0` 可） |
+| 4.2 SSRF/9.3 誤設定 | 送信先固定・リダイレクト非追従 | 上記 axios per-request config で `maxRedirects:0` 指定可 | **OK** |
+| 5.1/5.2 キャッシュ | LRU（TTL/上限） | `lru-cache` は **直接依存に無し**（apps/app/root package.json 未記載）。pnpm store に transitive のみ（複数版） | **needs-new-dep**（`lru-cache` を apps/app `dependencies` へ。代替 `rate-limiter-flexible` 流用も可） |
+| 5.x キャッシュキー | sha256 | `crypto.createHash('sha256')` 実例 `server/models/access-token.ts:16`、`import { createHash } from 'node:crypto'`（`attachment.ts:1,17`） | **OK**（追加依存なし） |
+
+## 判定サマリ
+- **新規依存は `lru-cache` のみ**（point 4）。`.claude/rules/package-dependencies.md` に従い SSR ランタイムコードとして `apps/app/package.json` の `dependencies` に追加。上限付き `Map` 自作、または既存 `rate-limiter-flexible` を KV 代替に使う選択肢もある。
+- **その他はすべて実在パターンあり**（loginRequired / body limit / rate-limiter / axios timeout / crypto）。設計の統合点に致命的ギャップなし。
+
+## 設計への反映（実装時に確定させる細目）
+1. プロキシルートで **`loginRequiredFactory(crowi, true)`** を適用（Req 10.1）。
+2. ルートスコープの **`express.json({ limit: '<上限>' })`**（JSON `{source, darkMode}` 契約）で 413 を得る（Req 10.2）。グローバル 50mb はこの用途に過大なので必ずルート側で絞る。
+3. レート制限は**グローバル適用で自動被覆**。必要なら `API_RATE_LIMIT_*` env でこのエンドポイントを厳格化（Req 10.2）。
+4. 上流呼び出しは `{ responseType: 'text', maxRedirects: 0, timeout }`（Req 9.3, 4.2, 10.2）。
+5. キャッシュキーは `createHash('sha256').update(source + darkMode).digest('hex')`（Req 5）。
