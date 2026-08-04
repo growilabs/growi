@@ -2,9 +2,9 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import {
-  buildAssetUrl,
   proxiableAssetExtension,
   readAsset,
+  resolveAsset,
 } from './drawio-assets';
 
 describe('proxiableAssetExtension', () => {
@@ -43,7 +43,7 @@ describe('proxiableAssetExtension', () => {
   });
 });
 
-describe('buildAssetUrl', () => {
+describe('resolveAsset', () => {
   it.each`
     drawioUri                               | expected
     ${'http://localhost:8080/?offline=1'}   | ${'http://localhost:8080/stencils/aws4.xml'}
@@ -52,18 +52,19 @@ describe('buildAssetUrl', () => {
   `(
     'should resolve against "$drawioUri"',
     ({ drawioUri, expected }: { drawioUri: string; expected: string }) => {
-      expect(buildAssetUrl(drawioUri, 'stencils/aws4.xml')).toBe(expected);
+      expect(resolveAsset(drawioUri, 'stencils/aws4.xml')?.url).toBe(expected);
     },
   );
 
   it('should drop the query DRAWIO_URI carries, which configures the editor', () => {
     expect(
-      buildAssetUrl('http://localhost:8080/?offline=1&https=0', 'shapes/a.js'),
+      resolveAsset('http://localhost:8080/?offline=1&https=0', 'shapes/a.js')
+        ?.url,
     ).toBe('http://localhost:8080/shapes/a.js');
   });
 
   it('should return undefined when the configured value is not a URL', () => {
-    expect(buildAssetUrl('not-a-url', 'stencils/aws4.xml')).toBeUndefined();
+    expect(resolveAsset('not-a-url', 'stencils/aws4.xml')).toBeUndefined();
   });
 
   it.each`
@@ -77,14 +78,15 @@ describe('buildAssetUrl', () => {
       // defence in depth: proxiableAssetExtension refuses all of these first, so this
       // holds even if that allow-list were ever loosened
       expect(
-        buildAssetUrl('http://localhost:8080/drawio/', assetPath),
+        resolveAsset('http://localhost:8080/drawio/', assetPath),
       ).toBeUndefined();
     },
   );
 
   it('should keep an asset that resolves inside the subtree', () => {
     expect(
-      buildAssetUrl('http://localhost:8080/drawio/', 'stencils/rack/hpe.xml'),
+      resolveAsset('http://localhost:8080/drawio/', 'stencils/rack/hpe.xml')
+        ?.url,
     ).toBe('http://localhost:8080/drawio/stencils/rack/hpe.xml');
   });
 });
@@ -130,7 +132,9 @@ describe('readAsset', () => {
   });
 
   it('should hand back exactly the bytes that were served', async () => {
-    const body = await readAsset(`${origin}/stencils/aws4.xml`);
+    const body = await readAsset(`${origin}/stencils/aws4.xml`, {
+      subtree: `${origin}/`,
+    });
 
     expect(body).toBeInstanceOf(Buffer);
     expect(body?.equals(ASSET_BODY)).toBe(true);
@@ -139,7 +143,10 @@ describe('readAsset', () => {
   it('should report success so a fallback read can be logged as such', async () => {
     const onSuccess = vi.fn();
 
-    await readAsset(`${origin}/stencils/aws4.xml`, { onSuccess });
+    await readAsset(`${origin}/stencils/aws4.xml`, {
+      subtree: `${origin}/`,
+      onSuccess,
+    });
 
     expect(onSuccess).toHaveBeenCalledOnce();
   });
@@ -151,14 +158,19 @@ describe('readAsset', () => {
   `(
     'should return undefined when $reason',
     async ({ path }: { path: string }) => {
-      expect(await readAsset(`${origin}${path}`)).toBeUndefined();
+      expect(
+        await readAsset(`${origin}${path}`, { subtree: `${origin}/` }),
+      ).toBeUndefined();
     },
   );
 
   it('should not report success when nothing could be read', async () => {
     const onSuccess = vi.fn();
 
-    await readAsset(`${origin}/stencils/absent.xml`, { onSuccess });
+    await readAsset(`${origin}/stencils/absent.xml`, {
+      subtree: `${origin}/`,
+      onSuccess,
+    });
 
     expect(onSuccess).not.toHaveBeenCalled();
   });
@@ -166,13 +178,44 @@ describe('readAsset', () => {
   it('should return undefined rather than throw when the host is unreachable', async () => {
     // an air-gapped deployment reaching for the draw.io fallback ends up here
     expect(
-      await readAsset('http://127.0.0.1:1/stencils/aws4.xml'),
+      await readAsset('http://127.0.0.1:1/stencils/aws4.xml', {
+        subtree: 'http://127.0.0.1:1/',
+      }),
     ).toBeUndefined();
   });
 
   it('should request the asset path unchanged', async () => {
-    await readAsset(`${origin}/stencils/aws4.xml`);
+    await readAsset(`${origin}/stencils/aws4.xml`, { subtree: `${origin}/` });
 
     expect(lastPath).toBe('/stencils/aws4.xml');
+  });
+});
+
+describe('readAsset — the subtree it was given', () => {
+  it('should refuse a location outside it without making the request', async () => {
+    // The guard is restated next to the request rather than trusted from the caller: the
+    // location is built from a path the client chose, so "reads nothing outside this
+    // subtree" has to hold where the request happens.
+    let requested = false;
+    const server = createServer((_req, res) => {
+      requested = true;
+      res.writeHead(200);
+      res.end('should not have been read');
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, '127.0.0.1', resolve),
+    );
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+    try {
+      const body = await readAsset(`${origin}/stencils/aws4.xml`, {
+        subtree: 'http://elsewhere.example.com/',
+      });
+
+      expect(body).toBeUndefined();
+      expect(requested).toBe(false);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });

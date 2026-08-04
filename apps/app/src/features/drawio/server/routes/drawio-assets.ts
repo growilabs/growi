@@ -72,44 +72,41 @@ export const proxiableAssetExtension = (
 };
 
 /**
- * The asset's location on the configured instance, or undefined when the request would
- * lead anywhere else.
+ * Where `assetPath` sits under `baseUri`, together with the subtree it has to stay inside.
+ * Undefined when the request would lead anywhere else.
  *
- * Origin and base path come only from `app:drawioUri`, never from the request. On top of
- * that, `assetPath` is *resolved* against the instance's own subtree rather than
- * concatenated onto it, and the result is then required to still sit inside that subtree.
- * Resolving first is what makes the check meaningful: a traversal segment is normalised
- * away before it is compared, instead of being passed along verbatim. This is defence in
- * depth behind {@link proxiableAssetExtension} — the allow-list should already have refused
- * anything of the sort, and this makes it so that a hole in it still cannot reach another
- * host or climb out of the subtree.
+ * The subtree comes only from `baseUri` — server configuration, never the request. The path
+ * is then *resolved* against it rather than concatenated onto it, and the result is required
+ * to still sit inside it. Resolving first is what makes the check meaningful: a traversal
+ * segment is normalised away before it is compared, instead of being passed along verbatim.
  *
- * Any query DRAWIO_URI carries (`?offline=1` and friends) is dropped: it configures the
+ * This is defence in depth behind {@link proxiableAssetExtension}, which should already have
+ * refused anything of the sort; it makes a hole in that allow-list unable to reach another
+ * host or climb out of the subtree. The subtree is handed back so {@link readAsset} can hold
+ * the same line at the point where the request is actually made.
+ *
+ * Any query `baseUri` carries (`?offline=1` and friends) is dropped: it configures the
  * editor and means nothing to a static asset.
  */
-export const buildAssetUrl = (
-  drawioUri: string,
+export const resolveAsset = (
+  baseUri: string,
   assetPath: string,
-): string | undefined => {
-  let instance: URL;
+): { url: string; subtree: string } | undefined => {
   try {
-    instance = new URL(drawioUri);
+    const base = new URL(baseUri);
+    const subtree = `${base.origin}${
+      base.pathname.endsWith('/') ? base.pathname : `${base.pathname}/`
+    }`;
+
+    const url = new URL(assetPath, subtree).href;
+    if (!url.startsWith(subtree)) {
+      return undefined;
+    }
+
+    return { url, subtree };
   } catch {
     return undefined;
   }
-
-  const subtree = `${instance.origin}${
-    instance.pathname.endsWith('/')
-      ? instance.pathname
-      : `${instance.pathname}/`
-  }`;
-
-  const resolved = new URL(assetPath, subtree).href;
-  if (!resolved.startsWith(subtree)) {
-    return undefined;
-  }
-
-  return resolved;
 };
 
 /**
@@ -122,8 +119,17 @@ export const buildAssetUrl = (
  */
 export const readAsset = async (
   url: string,
-  { onSuccess }: { onSuccess?: () => void } = {},
+  { subtree, onSuccess }: { subtree: string; onSuccess?: () => void },
 ): Promise<Buffer | undefined> => {
+  // Re-stated here, right next to the request, rather than trusted from the caller. The
+  // location is built from a path the client chose, so the one guarantee this function
+  // offers -- that it reads nothing outside the subtree it was given -- has to hold at the
+  // point the request is made, not merely somewhere upstream of it.
+  if (!url.startsWith(subtree)) {
+    logger.warn({ url, subtree }, 'Refused to read outside the given subtree');
+    return undefined;
+  }
+
   try {
     const response = await fetch(url, {
       signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -193,8 +199,8 @@ export const drawioAssetsRouterFactory = (): Router => {
       return;
     }
 
-    const assetUrl = buildAssetUrl(drawioUri, assetPath);
-    if (assetUrl == null) {
+    const onInstance = resolveAsset(drawioUri, assetPath);
+    if (onInstance == null) {
       logger.warn({ drawioUri, assetPath }, 'Refused a draw.io asset location');
       res.status(404).end();
       return;
@@ -202,18 +208,19 @@ export const drawioAssetsRouterFactory = (): Router => {
 
     // Older draw.io images ship no stencils/ or shapes/ directory at all (observed absent
     // on 28.2.9, present on 31.1.5), so on such an instance the library exists only on
-    // draw.io's own host. Built through the same check as the instance URL, so it cannot
-    // lead anywhere but under that origin.
-    const fallbackUrl = buildAssetUrl(VIEWER_DIAGRAMS_NET_ORIGIN, assetPath);
+    // draw.io's own host. Resolved through the same check as the instance location, so it
+    // cannot lead anywhere but under that origin.
+    const onDrawio = resolveAsset(VIEWER_DIAGRAMS_NET_ORIGIN, assetPath);
 
     const body =
-      (await readAsset(assetUrl)) ??
+      (await readAsset(onInstance.url, { subtree: onInstance.subtree })) ??
       // Reading the fallback here rather than in the browser keeps the response
       // same-origin and needs no CORS header; on a network with no route out it simply
       // fails, which is no worse than the 404 it replaces.
-      (fallbackUrl == null
+      (onDrawio == null
         ? undefined
-        : await readAsset(fallbackUrl, {
+        : await readAsset(onDrawio.url, {
+            subtree: onDrawio.subtree,
             onSuccess: () =>
               logger.info(
                 { assetPath, drawioUri },
