@@ -82,9 +82,11 @@ describe('self-hosted MathJax adoption', () => {
 
       adoptMathJax(DRAWIO_URI);
 
-      expect(
-        startupSrcs().filter((src) => src.includes('viewer.diagrams.net')),
-      ).toHaveLength(0);
+      // every startup script has to come from the configured instance and nowhere else;
+      // comparing origins rather than matching a substring states exactly that
+      expect(startupSrcs().map((src) => new URL(src).origin)).toEqual([
+        new URL(DRAWIO_URI).origin,
+      ]);
     });
 
     it('should repoint DRAW_MATH_URL, which the font path is derived from', () => {

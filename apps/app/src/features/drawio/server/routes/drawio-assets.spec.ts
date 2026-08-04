@@ -65,6 +65,28 @@ describe('buildAssetUrl', () => {
   it('should return undefined when the configured value is not a URL', () => {
     expect(buildAssetUrl('not-a-url', 'stencils/aws4.xml')).toBeUndefined();
   });
+
+  it.each`
+    assetPath                          | reason
+    ${'http://evil.example.com/a.xml'} | ${'it names another host'}
+    ${'//evil.example.com/a.xml'}      | ${'it names another host without a scheme'}
+    ${'../../WEB-INF/web.xml'}         | ${'it climbs out of the configured subtree'}
+  `(
+    'should return undefined for a path that leads elsewhere, because $reason',
+    ({ assetPath }: { assetPath: string }) => {
+      // defence in depth: proxiableAssetExtension refuses all of these first, so this
+      // holds even if that allow-list were ever loosened
+      expect(
+        buildAssetUrl('http://localhost:8080/drawio/', assetPath),
+      ).toBeUndefined();
+    },
+  );
+
+  it('should keep an asset that resolves inside the subtree', () => {
+    expect(
+      buildAssetUrl('http://localhost:8080/drawio/', 'stencils/rack/hpe.xml'),
+    ).toBe('http://localhost:8080/drawio/stencils/rack/hpe.xml');
+  });
 });
 
 describe('readAsset', () => {

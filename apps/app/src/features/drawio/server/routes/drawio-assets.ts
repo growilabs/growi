@@ -1,6 +1,5 @@
 import type { Request, Response, Router } from 'express';
 import express from 'express';
-import urljoin from 'url-join';
 
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
@@ -72,22 +71,44 @@ export const proxiableAssetExtension = (
 };
 
 /**
- * The asset's location on the configured instance.
+ * The asset's location on the configured instance, or undefined when the request would
+ * lead anywhere else.
  *
- * Origin and base path come only from `app:drawioUri`, never from the request, so the
- * route cannot be pointed at another host. Any query DRAWIO_URI carries (`?offline=1` and
- * friends) is dropped — it configures the editor, and means nothing to a static asset.
+ * Origin and base path come only from `app:drawioUri`, never from the request. On top of
+ * that, `assetPath` is *resolved* against the instance's own subtree rather than
+ * concatenated onto it, and the result is then required to still sit inside that subtree.
+ * Resolving first is what makes the check meaningful: a traversal segment is normalised
+ * away before it is compared, instead of being passed along verbatim. This is defence in
+ * depth behind {@link proxiableAssetExtension} — the allow-list should already have refused
+ * anything of the sort, and this makes it so that a hole in it still cannot reach another
+ * host or climb out of the subtree.
+ *
+ * Any query DRAWIO_URI carries (`?offline=1` and friends) is dropped: it configures the
+ * editor and means nothing to a static asset.
  */
 export const buildAssetUrl = (
   drawioUri: string,
   assetPath: string,
 ): string | undefined => {
+  let instance: URL;
   try {
-    const url = new URL(drawioUri);
-    return `${url.origin}${urljoin(url.pathname, assetPath)}`;
+    instance = new URL(drawioUri);
   } catch {
     return undefined;
   }
+
+  const subtree = `${instance.origin}${
+    instance.pathname.endsWith('/')
+      ? instance.pathname
+      : `${instance.pathname}/`
+  }`;
+
+  const resolved = new URL(assetPath, subtree).href;
+  if (!resolved.startsWith(subtree)) {
+    return undefined;
+  }
+
+  return resolved;
 };
 
 /**
@@ -163,25 +184,31 @@ export const drawioAssetsRouterFactory = (): Router => {
     const drawioUri = configManager.getConfig('app:drawioUri');
     const assetUrl = buildAssetUrl(drawioUri, assetPath);
     if (assetUrl == null) {
-      logger.warn({ drawioUri }, 'app:drawioUri is not a valid URL');
+      logger.warn({ drawioUri, assetPath }, 'Refused a draw.io asset location');
       res.status(404).end();
       return;
     }
 
+    // Older draw.io images ship no stencils/ or shapes/ directory at all (observed absent
+    // on 28.2.9, present on 31.1.5), so on such an instance the library exists only on
+    // draw.io's own host. Built through the same check as the instance URL, so it cannot
+    // lead anywhere but under that origin.
+    const fallbackUrl = buildAssetUrl(VIEWER_DIAGRAMS_NET_ORIGIN, assetPath);
+
     const body =
       (await readAsset(assetUrl)) ??
-      // Older draw.io images ship no stencils/ or shapes/ directory at all
-      // (observed absent on 28.2.9, present on 31.1.5), so on such an instance the
-      // library exists only on draw.io's own host. Reading it here rather than in the
-      // browser keeps the response same-origin and needs no CORS header; on a network
-      // with no route out this simply fails, which is no worse than the 404 it replaces.
-      (await readAsset(`${VIEWER_DIAGRAMS_NET_ORIGIN}/${assetPath}`, {
-        onSuccess: () =>
-          logger.info(
-            { assetPath, drawioUri },
-            'The configured draw.io instance does not ship this library; read it from draw.io instead',
-          ),
-      }));
+      // Reading the fallback here rather than in the browser keeps the response
+      // same-origin and needs no CORS header; on a network with no route out it simply
+      // fails, which is no worse than the 404 it replaces.
+      (fallbackUrl == null
+        ? undefined
+        : await readAsset(fallbackUrl, {
+            onSuccess: () =>
+              logger.info(
+                { assetPath, drawioUri },
+                'The configured draw.io instance does not ship this library; read it from draw.io instead',
+              ),
+          }));
 
     if (body == null) {
       res.status(502).end();
