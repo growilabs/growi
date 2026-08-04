@@ -272,15 +272,14 @@ adoptSelfHostedDrawio(drawioUri)     // onLoad 内、最初の描画より前
 
 ### Directory Structure
 
-現況（この spec は下記のうち `README.md` の削除と `CLAUDE.md` の追加のみを行う）。
+現況（実装後）。この spec が加えた変更は `CLAUDE.md` の追加と `client/self-hosted/README.md` の削除だけで、コードは 1 行も変えていない（[Modified Files](#modified-files)）。
 
 ```
 apps/app/src/features/drawio/
-├── CLAUDE.md                          # 【新規】spec への入口。関心マップの所在を示す
+├── CLAUDE.md                          # spec への入口。関心マップの所在を示す（この spec が追加）
 ├── consts.ts                          # 参照先・配信経路の定数（変更なし）
 ├── is-self-hosted-drawio.ts           # 自前ホスト判定。client/server の共有（変更なし）
 ├── client/self-hosted/
-│   ├── README.md                      # 【削除】内容はこの design.md へ移設済み
 │   ├── index.ts                       # 2 つの入口＋共有判定の再公開（変更なし）
 │   ├── rebase-asset-paths.ts          # 読み込み前の参照先差し替え（変更なし）
 │   ├── adopt-mathjax.ts               # 焼き込み先の抑止と再起動（変更なし）

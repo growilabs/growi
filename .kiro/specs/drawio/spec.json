@@ -1,7 +1,7 @@
 {
   "feature_name": "drawio",
   "created_at": "2026-08-04T13:06:31Z",
-  "updated_at": "2026-08-04T18:40:00Z",
+  "updated_at": "2026-08-04T19:05:00Z",
   "language": "ja",
   "phase": "implementation-complete",
   "approvals": {
@@ -23,5 +23,6 @@
     "decision": "GO",
     "validated_at": "2026-08-04T18:40:00Z",
     "remediation_rounds": 2
-  }
+  },
+  "cleaned_up_at": "2026-08-04T19:05:00Z"
 }
