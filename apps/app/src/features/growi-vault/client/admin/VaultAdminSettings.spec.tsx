@@ -179,7 +179,11 @@ const makeResilienceStatus = (
   forceWarningActive: overrides.forceWarningActive ?? false,
 });
 
-const makeVaultStatus = (state = 'done', vaultEnabled = true) => ({
+const makeVaultStatus = (
+  state = 'done',
+  vaultEnabled = true,
+  isStaleRunner = false,
+) => ({
   vaultEnabled,
   bootstrapState: state,
   processed: 100,
@@ -187,6 +191,8 @@ const makeVaultStatus = (state = 'done', vaultEnabled = true) => ({
   startedAt: '2026-01-01T00:00:00.000Z',
   completedAt: '2026-01-01T01:00:00.000Z',
   lastError: null,
+  heartbeatAt: '2026-01-01T00:30:00.000Z',
+  isStaleRunner,
   storageStats: null,
 });
 
@@ -202,6 +208,17 @@ function setup(
   mocks.swrData.status = makeVaultStatus(vaultState, vaultEnabled);
   mocks.swrData.resilience = resilience;
   mocks.globalState.siteUrl = siteUrl ?? undefined;
+  return render(<VaultAdminSettings />);
+}
+
+/** Render with an explicitly built /vault/status payload. */
+function setupWithStatus(
+  resilience: ResilienceStatusShape,
+  status: ReturnType<typeof makeVaultStatus>,
+): ReturnType<typeof render> {
+  mocks.swrData.status = status;
+  mocks.swrData.resilience = resilience;
+  mocks.globalState.siteUrl = 'https://example.com';
   return render(<VaultAdminSettings />);
 }
 
@@ -538,6 +555,66 @@ describe('VaultAdminSettings — Rebuild Vault (kill switch)', () => {
       name: /rebuild vault/i,
     }) as HTMLButtonElement;
     expect(wipeBtn.disabled).toBe(true);
+  });
+
+  // -- Recovery from an abandoned run ---------------------------------------
+  //
+  // Disabling the button for every 'running' / 'verifying' state assumes some
+  // process is still working. When the owning process died, that assumption
+  // strands the admin: the state never leaves 'running' on its own and the one
+  // control that could fix it is greyed out. The server reports that verdict
+  // as isStaleRunner, and the button must follow it.
+  // ------------------------------------------------------------------------
+
+  it('(f) enables "Rebuild Vault" when the running state has no live runner', () => {
+    setupWithStatus(
+      makeResilienceStatus({ bootstrap: { state: 'running' } }),
+      makeVaultStatus('running', true, true),
+    );
+    const wipeBtn = screen.getByRole('button', {
+      name: /rebuild vault/i,
+    }) as HTMLButtonElement;
+    expect(wipeBtn.disabled).toBe(false);
+  });
+
+  it('(f) enables "Rebuild Vault" when the verifying state has no live runner', () => {
+    setupWithStatus(
+      makeResilienceStatus({ bootstrap: { state: 'verifying' } }),
+      makeVaultStatus('verifying', true, true),
+    );
+    const wipeBtn = screen.getByRole('button', {
+      name: /rebuild vault/i,
+    }) as HTMLButtonElement;
+    expect(wipeBtn.disabled).toBe(false);
+  });
+
+  it('(f) keeps "Rebuild Vault" disabled while a verifying run is still alive', () => {
+    setupWithStatus(
+      makeResilienceStatus({ bootstrap: { state: 'verifying' } }),
+      makeVaultStatus('verifying', true, false),
+    );
+    const wipeBtn = screen.getByRole('button', {
+      name: /rebuild vault/i,
+    }) as HTMLButtonElement;
+    expect(wipeBtn.disabled).toBe(true);
+  });
+
+  it('(f) explains why the button is available when the runner is gone', () => {
+    setupWithStatus(
+      makeResilienceStatus({ bootstrap: { state: 'running' } }),
+      makeVaultStatus('running', true, true),
+    );
+    // Without this, an enabled destructive button next to state=running reads
+    // as a UI bug rather than a recovery path.
+    expect(screen.getByText(/no progress has been reported/i)).toBeTruthy();
+  });
+
+  it('(f) does not show the abandoned-run notice while a run is progressing', () => {
+    setupWithStatus(
+      makeResilienceStatus({ bootstrap: { state: 'running' } }),
+      makeVaultStatus('running', true, false),
+    );
+    expect(screen.queryByText(/no progress has been reported/i)).toBeNull();
   });
 });
 

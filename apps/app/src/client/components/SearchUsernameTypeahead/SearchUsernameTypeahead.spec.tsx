@@ -1,4 +1,13 @@
-import { render } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+import { SearchUsernameTypeahead } from './SearchUsernameTypeahead';
+
+const mockUseSWRxAuditlogSuggestions = vi.hoisted(() => vi.fn());
+
+vi.mock('~/stores/activity', () => ({
+  useSWRxAuditlogSuggestions: mockUseSWRxAuditlogSuggestions,
+}));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -6,11 +15,16 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-vi.mock('~/stores/user', () => ({
-  useSWRxUsernames: () => ({ data: undefined, error: null, isLoading: false }),
-}));
-
-import { SearchUsernameTypeahead } from './SearchUsernameTypeahead';
+const mockSuggestions = (
+  activeUsernames: string[],
+  inactiveUsernames: string[] = [],
+) => {
+  mockUseSWRxAuditlogSuggestions.mockReturnValue({
+    data: { username: { activeUsernames, inactiveUsernames } },
+    error: undefined,
+    isLoading: false,
+  });
+};
 
 const renderTypeahead = (initialUsernames?: string[]) =>
   render(
@@ -22,6 +36,51 @@ const renderTypeahead = (initialUsernames?: string[]) =>
   );
 
 describe('SearchUsernameTypeahead', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSuggestions([]);
+  });
+
+  it('renders active and inactive users in correct groups', async () => {
+    mockSuggestions(['alice'], ['bob']);
+
+    renderTypeahead();
+
+    await userEvent.type(screen.getByRole('combobox'), 'a');
+
+    const menu = await screen.findByRole('listbox');
+    expect(within(menu).getByText('Active User')).toBeInTheDocument();
+    expect(within(menu).getByText('alice')).toBeInTheDocument();
+    expect(within(menu).getByText('Inactive User')).toBeInTheDocument();
+    expect(within(menu).getByText('bob')).toBeInTheDocument();
+  });
+
+  it('filters out already-selected usernames from the suggestion menu', async () => {
+    mockSuggestions(['alice', 'bob']);
+
+    renderTypeahead(['alice']);
+
+    await userEvent.type(screen.getByRole('combobox'), 'b');
+
+    const menu = await screen.findByRole('listbox');
+    expect(within(menu).getByText('bob')).toBeInTheDocument();
+    expect(within(menu).queryByText('alice')).not.toBeInTheDocument();
+  });
+
+  it('renders no options when response has no username data', async () => {
+    mockUseSWRxAuditlogSuggestions.mockReturnValue({
+      data: {},
+      error: undefined,
+      isLoading: false,
+    });
+
+    renderTypeahead();
+
+    await userEvent.type(screen.getByRole('combobox'), 'a');
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
   it('renders the initial usernames as tokens', () => {
     const { getByText } = renderTypeahead(['alice', 'bob']);
 

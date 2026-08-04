@@ -14,6 +14,12 @@ export type ChatSidebarStatus = {
    * chat from the next by id alone. This sequence lets the chat sidebar force a
    * fresh mount (and thus a freshly minted session thread id) every time the
    * user starts a new chat, even back-to-back.
+   *
+   * It has two consumers, so keep it bumped on *every* open:
+   * - `dynamic.tsx` — remount key for a new chat (see above).
+   * - `ChatSidebar` — trigger for handing the caret to the prompt input. This
+   *   one also covers re-opening the thread that is already displayed, where
+   *   the remount key is unchanged and no fresh mount happens.
    */
   openSeq: number;
 };
