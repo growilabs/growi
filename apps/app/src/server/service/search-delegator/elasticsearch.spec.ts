@@ -950,10 +950,11 @@ describe('ElasticsearchDelegator', () => {
   describe('bulkSyncAuditlogs()', () => {
     let mockES8Client: MockProxy<ES8ClientDelegator>;
 
-    const makeActivity = (username?: string) =>
+    const makeActivity = (username?: string, endpoint?: string) =>
       mock<ActivityDocument>({
         _id: new mongoose.Types.ObjectId(),
         snapshot: { username },
+        endpoint,
       });
 
     beforeEach(() => {
@@ -990,7 +991,33 @@ describe('ElasticsearchDelegator', () => {
       });
     });
 
-    it('skips upserts that have no username', async () => {
+    it('includes endpoint alongside username when both are present', async () => {
+      const activity = makeActivity('alice', '/_api/v3/pages/revert');
+
+      await delegator.bulkSyncAuditlogs([activity], []);
+
+      expect(mockES8Client.bulk).toHaveBeenCalledWith({
+        body: [
+          { index: { _index: 'auditlogs', _id: activity._id.toString() } },
+          { username: 'alice', endpoint: '/_api/v3/pages/revert' },
+        ],
+      });
+    });
+
+    it('indexes upserts that have an endpoint but no username', async () => {
+      const activity = makeActivity(undefined, '/_api/v3/pages/revert');
+
+      await delegator.bulkSyncAuditlogs([activity], []);
+
+      expect(mockES8Client.bulk).toHaveBeenCalledWith({
+        body: [
+          { index: { _index: 'auditlogs', _id: activity._id.toString() } },
+          { endpoint: '/_api/v3/pages/revert' },
+        ],
+      });
+    });
+
+    it('skips upserts that have neither username nor endpoint', async () => {
       await delegator.bulkSyncAuditlogs([makeActivity()], []);
 
       expect(mockES8Client.bulk).not.toHaveBeenCalled();

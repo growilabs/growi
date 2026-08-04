@@ -88,6 +88,12 @@ const AVAILABLE_KEYS = [
 
 type Data = any;
 
+// Add a field here to sync it to the auditlog index — see prepareBodyForAuditlog.
+type AuditlogSyncFields = Partial<{
+  username: string;
+  endpoint: string;
+}>;
+
 class ElasticsearchDelegator
   implements SearchDelegator<Data, ESTermsKey, ESQueryTerms>
 {
@@ -571,7 +577,7 @@ class ElasticsearchDelegator
     const totalCount = shouldEmitProgress ? await Activity.countDocuments() : 0;
 
     const readStream = Activity.find()
-      .select('snapshot.username')
+      .select('snapshot.username endpoint')
       .lean()
       .cursor();
     const batchStream = createBatchStream(bulkSize);
@@ -725,15 +731,25 @@ class ElasticsearchDelegator
   }
 
   private prepareBodyForAuditlog(
-    activity: Pick<ActivityDocument, '_id' | 'snapshot'>,
-  ): [] | [{ index: { _index: string; _id: string } }, { username: string }] {
-    const username = activity.snapshot?.username;
-    if (username == null || username === '') return [];
+    activity: Pick<ActivityDocument, '_id' | 'snapshot' | 'endpoint'>,
+  ): [] | [{ index: { _index: string; _id: string } }, AuditlogSyncFields] {
+    const candidates: AuditlogSyncFields = {
+      username: activity.snapshot?.username || undefined,
+      endpoint: activity.endpoint || undefined,
+    };
+    const doc = Object.fromEntries(
+      Object.entries(candidates).filter(
+        (entry): entry is [keyof AuditlogSyncFields, string] =>
+          entry[1] != null,
+      ),
+    ) as AuditlogSyncFields;
+    if (Object.keys(doc).length === 0) return [];
+
     return [
       {
         index: { _index: this.auditlogIndexName, _id: activity._id.toString() },
       },
-      { username },
+      doc,
     ];
   }
 
