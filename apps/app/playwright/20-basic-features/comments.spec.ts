@@ -44,6 +44,29 @@ test.describe('Comment', () => {
     ).toHaveText('2');
   });
 
+  test('Successfully edit comments', async ({ page }) => {
+    const editedText = 'edited comment';
+    await page.goto('/comment');
+
+    const firstComment = page.locator('.page-comment').first();
+    await firstComment.hover();
+    await firstComment.getByTestId('comment-edit-button').click();
+
+    const editor = page.locator('.cm-content').first();
+    await expect(editor).toBeVisible();
+    await editor.fill(editedText);
+    await page.getByTestId('comment-submit-button').first().click();
+
+    // Leaving edit mode is the observable result of a successful update: the
+    // editor closes and the rendered comment shows the new text. A silently
+    // saved edit that keeps the editor open (the /comments.update handler
+    // failing to respond at all) fails here.
+    await expect(editor).not.toBeVisible();
+    await expect(page.locator('.page-comment-body').first()).toHaveText(
+      editedText,
+    );
+  });
+
   // test('Successfully delete comments', async({ page }) => {
   //   await page.goto('/comment');
 
