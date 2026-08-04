@@ -106,7 +106,7 @@ draw.io の関心は `features/drawio/` に閉じていない。次が全体で�
 | エディタへ注入する設定・CSS | `client/components/PageEditor/DrawioModal/drawio-config.ts` | 4.1〜4.3 |
 | エディタとの postMessage | `client/components/PageEditor/DrawioModal/DrawioCommunicationHelper.ts` | 6.5 |
 | markdown への書き戻し | `client/components/Page/markdown-drawio-util-for-view.ts`, `PageEditor/markdown-drawio-util-for-editor.ts` | — |
-| 挿入操作・折りたたみ | `packages/editor/`（`DiagramButton.tsx`, `fold-drawio.ts`, `states/modal/drawio-for-editor.ts`） | — |
+| 挿入操作・折りたたみ | `packages/editor/src/client/components-internal/CodeMirrorEditor/Toolbar/DiagramButton.tsx`, `packages/editor/src/client/services/use-codemirror-editor/utils/fold-drawio.ts`, `packages/editor/src/states/modal/drawio-for-editor.ts` | — |
 | 設定 | `server/service/config-manager/config-definition.ts` の `app:drawioUri`（env `DRAWIO_URI`、既定 `https://embed.diagrams.net/`） | 8.1 |
 
 ### Architecture Pattern & Boundary Map
@@ -172,7 +172,7 @@ graph TB
 
 - **判定を共有する（要件 8.4）** — 参照先を差し替えるのは自前ホストのときだけで、配信ルータもそのときだけ答える。両者が別の基準で判断すると「誰も要求しない経路が開いている」または「差し替えたのに配信が 404」という食い違いが起きる。だから `isSelfHostedDrawio` を 1 つ置き、client と server の両方がそれを呼ぶ。
 - **入口を 2 つに分ける** — MathJax の置き場所だけは事前に決められないため（[2 つの入口](#2-つの入口)）。
-- **公開するのは 2 つの関数だけ** — 呼び出し側（`DrawioViewerScript`）が draw.io のグローバル変数を知らずに済む。細工はすべて `features/drawio/` の内側に閉じる。
+- **呼び出し側が使うのは 2 つの入口だけ** — `DrawioViewerScript` はこの 2 つしか取らないので、draw.io のグローバル変数を知らずに済む。細工はすべて `features/drawio/` の内側に閉じる。なお barrel は共有の判定（`isSelfHostedDrawio`）も再公開しているが、これを import している箇所は 1 つも無い（将来課題）。
 
 ### なぜ後から直せないのか
 
@@ -281,7 +281,7 @@ apps/app/src/features/drawio/
 ├── is-self-hosted-drawio.ts           # 自前ホスト判定。client/server の共有（変更なし）
 ├── client/self-hosted/
 │   ├── README.md                      # 【削除】内容はこの design.md へ移設済み
-│   ├── index.ts                       # 公開 API は 2 つの入口のみ（変更なし）
+│   ├── index.ts                       # 2 つの入口＋共有判定の再公開（変更なし）
 │   ├── rebase-asset-paths.ts          # 読み込み前の参照先差し替え（変更なし）
 │   ├── adopt-mathjax.ts               # 焼き込み先の抑止と再起動（変更なし）
 │   ├── relocate-math-url.ts           # 焼き込みパスから移し替え先を組む純関数（変更なし）
@@ -290,6 +290,8 @@ apps/app/src/features/drawio/
     ├── index.ts                       # 配信ルータの公開（変更なし）
     └── routes/drawio-assets.ts        # 図資産の配信（変更なし）
 ```
+
+> 上の図は**テストを省いている**。`*.spec.ts` は各ファイルの隣に置かれており（`is-self-hosted-drawio.spec.ts` と `client/self-hosted/` の 4 件、`server/routes/drawio-assets.spec.ts` の計 6 件）、どれが何を担保しているかは [Testing Strategy](#testing-strategy) の表が持つ。
 
 ### 関連する既存ファイル（この spec は変更しない）
 
@@ -552,7 +554,7 @@ export const rebaseDrawioAssetPaths = (drawioUri: string): void;
 
 | Method | Endpoint | Request | Response | Errors |
 |---|---|---|---|---|
-| GET | `/_drawio-assets/{dir}/{path}` | `dir` は `stencils` / `shapes` / `styles`。`path` は `.xml` / `.js` / `.css` / `.png` / `.ttf` のいずれかで終わる | 資産のバイト列。`Content-Type` は拡張子由来、`Cache-Control: public, max-age=86400`、`X-Content-Type-Options: nosniff` | 404（許可されない形 / 既定構成 / 範囲外）、502（インスタンスも本家も返せない） |
+| GET | `/_drawio-assets/{dir}/{path}` | `dir` は `stencils` / `shapes` / `styles`。`path` の**ファイル名部分はドットを含めない**（途中のディレクトリ名は含んでよい）で、`.xml` / `.js` / `.css` / `.png` / `.ttf` のいずれかで終わる。つまり `stencils/aws4.xml` は通るが `stencils/a.b.xml` は通らない | 資産のバイト列。`Content-Type` は拡張子由来、`Cache-Control: public, max-age=86400`、`X-Content-Type-Options: nosniff` | 404（許可されない形 / 既定構成 / 範囲外 / `DRAWIO_URI` が `user:pass@` 形式）、502（インスタンスも本家も返せない） |
 
 **Responsibilities & Constraints**
 - **取得先はリクエストから決まらない**。設定 `app:drawioUri` から解決した先と、コードに定めた `viewer.diagrams.net` の 2 つだけ（要件 3.1）。
@@ -572,6 +574,8 @@ export const rebaseDrawioAssetPaths = (drawioUri: string): void;
 
 ```typescript
 export const proxiableAssetExtension = (assetPath: string) => AllowedExtension | undefined;
+// AllowedExtension は drawio-assets.ts 内に閉じた型で export されていない。
+// 呼び出し側が型を書く必要がないため（返り値をそのまま Content-Type の索引に使う）。
 
 export const resolveAsset = (
   baseUri: string,
@@ -658,13 +662,13 @@ markdown の ```drawio ブロックに入る文字列は 2 つの形を取る。
 
 | 対象 | ファイル | 検証していること |
 |---|---|---|
-| MathJax | `adopt-mathjax.spec.ts` | 焼き込み先を要求しないこと、起動が 1 回であること、フォントの参照先が連動すること、焼き込みディレクトリを再利用すること、移し替えできないときに仮値を残さないこと、`Editor` が無くても投げないこと |
+| MathJax | `adopt-mathjax.spec.ts` | 焼き込み先を要求しないこと、起動が 1 回であること、フォントの参照先が連動すること、焼き込みディレクトリを再利用すること、移し替えできないときに仮値を残さないこと、`Editor` が無くても投げないこと、**既にある MathJax の設定を壊さないこと**（`should leave a MathJax configuration that is already present untouched`。特定の受け入れ基準ではなく不変条件に対応する） |
 | MathJax の移し替え先 | `relocate-math-url.spec.ts` | サブパスの保持、解釈できない値 |
 | 参照先の差し替え | `rebase-asset-paths.spec.ts` | XHR で読む 3 つ（`STENCIL_PATH` / `SHAPES_PATH` / `STYLE_PATH`）を GROWI のオリジンへ向けること、`<img>` で読む 3 つはインスタンス直であること、**ライトボックスの編集導線がインスタンスを向くこと（要件 2.7）**、query を落とすこと、サブパスの保持、繰り返し適用しても安全なこと |
 | ビューアのバンドル URL | `use-viewer-min-js-url.spec.ts` | 設定済みインスタンスから読むこと、サブパスの保持、query の引き継ぎ |
 | 読み込み前の入口 | `index.spec.ts` | `prepareSelfHostedDrawio` が、既定のとき・解釈できない値のときに何もしないこと、自前ホストで 2 つの手当て（参照先の差し替えと抑止）が両方走ること。**読み込み後の入口 `adoptSelfHostedDrawio` を呼ぶテストは無い** |
 | 自前ホスト判定 | `is-self-hosted-drawio.spec.ts` | 判定の基準、解釈できない値 |
-| 配信の部品 | `drawio-assets.spec.ts` | 許可された形の判定、取得先の解決、範囲外の拒否、要求直前の範囲の再確認、**リダイレクトを追わず失敗として扱うこと（要件 3.6）**、バイト列がそのまま通ること、到達不能で投げないこと |
+| 配信の部品 | `drawio-assets.spec.ts` | 許可された形の判定、取得先の解決、範囲外の拒否、要求直前の範囲の再確認、**リダイレクトを追わず失敗として扱うこと（要件 3.6）**、バイト列がそのまま通ること、到達不能で投げないこと、**何も読めなかったときに成功を通知しないこと**（`should not report success when nothing could be read`。不変条件に対応する） |
 | 注入 CSS | `drawio-config.spec.ts` | 背景を塗った要素すべてに文字色があること、メニュー項目自体に色が当たること、ボタンには当てないこと（**mutation 確認済み**: 文字色を外す / 一括指定に変える の 2 パターンで RED） |
 | エディタ URL | `build-drawio-editor-url.spec.ts` | パラメータの付与、GROWI が制御しないものの保持、サブパスの保持、重複させないこと、解釈できない値で投げること |
 | 保存形式 | `mxfile.spec.ts` | 単一ページの後方互換、複数ページの全ページ保持、往復、ページが無いときの扱い |
@@ -771,6 +775,8 @@ docker run -d --name drawio-28 -p 8081:8080 jgraph/drawio:28.2.9      # math/es5
 | CodeQL の指摘 2 件 | 静的解析 | PR #11633 |
 | v28 系以前で `stencils/` `shapes/` が同梱されない | 外部制約 | draw.io のバージョン側。インスタンスを上げれば解消 |
 | `PROXY_URL`（図の中から参照する外部画像の取得口）が未対応 | 外部制約 | 自前ホストのイメージに該当のサーブレットが無く（`/proxy` が 404）、向ける先が無い。ビューアの経路では使われない |
+| `client/self-hosted/index.ts` が `isSelfHostedDrawio` を再公開しているが、import している箇所が 1 つも無い | 設計 | barrel は外部の利用者が必要とするものだけを再公開する規約（`.claude/rules/coding-style.md`）に照らすと 1 行削れる。挙動は変わらないがコード変更なのでこの spec では触らない |
+| `DRAWIO_URI` に `user:pass@host` 形式を設定すると図資産が全て 404 になる | 挙動 | 範囲確認が `target.href`（userinfo を含む）を `target.origin` から組んだ範囲（含まない）と比べるため。閉じる方向の失敗なので安全側だが、設定した側には理由が見えない |
 | `offline=1` で保存／終了ボタンが消える | draw.io の仕様 | `stealth=1` / `lockdown=1` を issue で案内する方針。GROWI 側では直さない |
 | `packages/remark-drawio` と `apps/app` の責務再配置 | 設計 | 保存形式の生成と検出は #11524 で同居させたが、描画側と生成側の分担は未整理 |
 | `packages/*` から spec への入口 | 文書 | [CLAUDE.md の届く範囲](#claudemd-の届く範囲) の判断。drift が起きたら再検討 |

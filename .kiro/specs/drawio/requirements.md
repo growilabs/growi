@@ -180,7 +180,7 @@ _担保しているテスト:_
 - **AC 4 — 担保あり。** 同ファイルの `returns an empty string when no diagram element is present` と、`DrawioCommunicationHelper.spec.ts` の `does NOT overwrite the diagram when no page can be extracted`。
 - **AC 2 — 部分的。** 保存した形が自己完結していて検出側と食い違わないことは `mxfile.spec.ts` の `persists an <mxfile> that isMxfileData recognizes (round-trip contract)` と `a multi-page diagram persisted on save renders every page with navigation enabled`、`embed.spec.ts` の `passes the mxfile through untouched so every page survives` が担保する。**エディタへ返す経路（`onReceiveMessage` の `ready` 分岐が保存内容をそのまま返すこと）を呼ぶテストは無い。**
 - **AC 5 — 担保が無い。** `DrawioCommunicationHelper.spec.ts` のテストは常に一致する発信元を渡すので、照合を消しても落ちない。
-- 保存経路そのものは `saves the (single-page) diagram content and closes the modal` が担保する。ただし当てているのは `save` 分岐だけで、`configure` / `ready` / 空メッセージの分岐は呼ばれない。
+- 保存経路そのものは `saves the (single-page) diagram content and closes the modal` が担保する。ただし当てているのは `save` 分岐だけで、`configure` / `ready` / `exit` の分岐は呼ばれない。
 
 ### Requirement 7: ビューアのページ送りが機能する
 
