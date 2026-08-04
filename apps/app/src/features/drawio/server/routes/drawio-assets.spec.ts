@@ -324,6 +324,69 @@ describe('readAsset — the subtree it was given', () => {
   });
 });
 
+describe('readAsset — the size limit', () => {
+  /**
+   * Restated here rather than read from the module: the cap is private, so the test has to
+   * declare the value it expects. That is what makes a change to the production value show
+   * up as a failure instead of silently redefining what the test proves.
+   */
+  const MAX_CONTENT_LENGTH = 64 * 1024 * 1024;
+
+  /**
+   * The largest library draw.io actually ships (`stencils/aws4.xml`, 6.5 MB on 31.1.5),
+   * rounded up. The cap is a runaway guard, not a budget, so this size must go through.
+   */
+  const LARGEST_REAL_LIBRARY = 7 * 1024 * 1024;
+
+  let host: Fixture;
+
+  beforeEach(async () => {
+    host = await startFixture();
+  });
+
+  afterEach(async () => {
+    await host.close();
+  });
+
+  const readBodyOfSize = (byteLength: number, onSuccess: () => void) => {
+    host.serve('/stencils/aws4.xml', {
+      // Content is irrelevant here; only the length is. The cap is applied to the body that
+      // was read, not to a declared Content-Length, so the bytes have to really be sent.
+      body: Buffer.alloc(byteLength, 0x41),
+      contentType: 'application/xml',
+    });
+
+    return readAsset(`${host.origin}/stencils/aws4.xml`, {
+      subtree: `${host.origin}/`,
+      onSuccess,
+    });
+  };
+
+  it('should refuse a body past the size limit', async () => {
+    const onSuccess = vi.fn();
+
+    const body = await readBodyOfSize(MAX_CONTENT_LENGTH + 1, onSuccess);
+
+    // Asserted through `byteLength` rather than on the Buffer itself: when this fails the
+    // body is 64 MiB, and vitest would try to render that whole Buffer as a diff and run
+    // the worker out of heap — an OOM crash instead of a readable failure.
+    expect(body?.byteLength).toBeUndefined();
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
+  // The other side of the same limit. Without this, a cap lowered under a real library would
+  // still satisfy the test above — and that is the failure the cap's own comment warns
+  // about: shapes that silently stop rendering because their library was refused.
+  it('should serve a body the size of the largest library draw.io ships', async () => {
+    const onSuccess = vi.fn();
+
+    const body = await readBodyOfSize(LARGEST_REAL_LIBRARY, onSuccess);
+
+    expect(body?.byteLength).toBe(LARGEST_REAL_LIBRARY);
+    expect(onSuccess).toHaveBeenCalledOnce();
+  });
+});
+
 /**
  * Answer only the key the route actually reads, so a rename of `app:drawioUri`
  * turns these tests RED instead of leaving them green against a route that no
