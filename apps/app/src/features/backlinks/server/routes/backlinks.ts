@@ -34,7 +34,7 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
       );
       return res.apiv3({ backlinks });
     } catch (err) {
-      logger.error('Failed to get backlinks', err);
+      logger.error({ err }, 'Failed to get backlinks');
       // Deliberately not forwarding `err`: apiv3Err serializes an Error's own
       // message to the client, which would leak driver/internal detail.
       return res.apiv3Err(
