@@ -296,7 +296,7 @@ needs no write — derived state reads the restored page's status.
 | 3.1 | Create → backlinks appear | PageLinkService create handler | Save flow |
 | 3.2 | Update add/remove → reflected | create/update replace outbound rows | Save flow |
 | 3.3 | Deleted page not an active source | reconcile (permanent: remove rows; trashed: filtered at read) | Delete flow |
-| 3.4 | <~1s at ≥100k pages | indexes `{toPage}`,`{fromPage}`,`{toPath}` | — |
+| 3.4 | <~1s at ≥100k pages | indexes `{toPage}`, unique `{fromPage, toPath}` | — |
 | 3.5 | Bound extraction impact under save bursts | PageLinkService coalescing queue (`Set<pageId>` + paced drain) | Save flow |
 | 4.1 | One-time backfill | PageLinkBackfillCron (indexes via `autoIndex` at model registration) | Backfill flow |
 | 4.2 | Backfilled == post-enablement | backfill reuses `extractInternalLinks`; emits same rows as the live path | Backfill flow |
@@ -451,9 +451,7 @@ function resolveToPage(toPath: string): Promise<ObjectId | null>;
 - Ordering/delivery: listeners run asynchronously after the lifecycle op (fire-and-forget, like
   search indexing); the index trails the HTTP response by that window. No cross-event ordering
   assumptions; handlers are idempotent.
-- Write-side coalescing (requirement 3.5): _Implementation status — as of B1 the upsert runs inline in
-  the event callback; the coalescing queue described here is the B2.2 target and is not yet implemented._
-  `create`/`update` do **not** extract inline in the event
+- Write-side coalescing (requirement 3.5): `create`/`update` do **not** extract inline in the event
   callback. They mark the page dirty (`Set<pageId>`) and a paced tick drains it, running the upsert
   handler once per page with the **latest** body (re-read at drain time). This is safe because the
   upsert is idempotent last-writer-wins, so intermediate saves carry no information. Properties:
@@ -462,7 +460,14 @@ function resolveToPage(toPath: string): Promise<ObjectId | null>;
     burst of full-body parses is spread over time instead of blocking the single JS thread back-to-back.
   - **Delete supersedes a pending upsert**: a `delete`-family event for a page removes it from the
     dirty set and routes to `reconcileDeletedPages(ids)` instead, so a stale upsert never re-creates
-    rows for a gone page.
+    rows for a gone page — the upsert path uses `upsert: true`, so those would be orphan rows a
+    reader could surface as phantom backlinks.
+    _Implementation status — B2.2 ships the drain-time half only: the drain re-reads the page by id
+    and declines one that is now `STATUS_DELETED` (keyed on deleted rather than published because a
+    legacy page's `null` status means published), which closes the window coalescing opened. Clearing
+    the rows the page already owned when it was trashed is **B5.2** (`reconcileDeletedPages`); the
+    dirty-set removal — abandoning a pending upsert rather than merely declining it at drain time —
+    is **B5.3**._
   - **Best-effort, per-instance**: the set is in-memory. A restart drops pending work (that page
     self-heals on its next edit or via backfill); in multi-instance deployments the set is
     per-instance, which is safe (idempotent) but only coalesces per instance.
@@ -536,7 +541,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklink[]>;
 > full backfill duration** — minutes on small wikis, but tens of minutes to hours on large-plan
 > instances. So the heavy data part runs **online** as a throttled background job after boot.
 > Nothing schema-related blocks boot either: `PageLink` is a new collection, so its indexes
-> (`{fromPage}`, `{toPath}`, `{toPage}`, unique `{fromPage,toPath}`) are created by Mongoose
+> (`{toPage}`, unique `{fromPage,toPath}`) are created by Mongoose
 > `autoIndex` at model registration — no migration is involved. Backlinks are simply incomplete
 > for pre-existing pages until the job finishes (acceptable per 4.2, which only requires
 > completeness *after* the process completes); newly edited pages index immediately via the event
