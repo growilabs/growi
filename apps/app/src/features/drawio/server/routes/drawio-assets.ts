@@ -82,8 +82,9 @@ export const proxiableAssetExtension = (
  *
  * This is defence in depth behind {@link proxiableAssetExtension}, which should already have
  * refused anything of the sort; it makes a hole in that allow-list unable to reach another
- * host or climb out of the subtree. The subtree is handed back so {@link readAsset} can hold
- * the same line at the point where the request is actually made.
+ * host or climb out of the subtree. The host in particular is not merely checked but fixed
+ * by construction — see the comment on the path assignment. The subtree is handed back so
+ * {@link readAsset} can hold the same line where the request is actually made.
  *
  * Any query `baseUri` carries (`?offline=1` and friends) is dropped: it configures the
  * editor and means nothing to a static asset.
@@ -92,21 +93,34 @@ export const resolveAsset = (
   baseUri: string,
   assetPath: string,
 ): { url: string; subtree: string } | undefined => {
+  let target: URL;
   try {
-    const base = new URL(baseUri);
-    const subtree = `${base.origin}${
-      base.pathname.endsWith('/') ? base.pathname : `${base.pathname}/`
-    }`;
-
-    const url = new URL(assetPath, subtree).href;
-    if (!url.startsWith(subtree)) {
-      return undefined;
-    }
-
-    return { url, subtree };
+    target = new URL(baseUri);
   } catch {
     return undefined;
   }
+
+  const basePath = target.pathname.endsWith('/')
+    ? target.pathname
+    : `${target.pathname}/`;
+  const subtree = `${target.origin}${basePath}`;
+
+  // Assigning the path leaves the origin alone. This is why it is not
+  // `new URL(assetPath, subtree)`: there, a path of `//elsewhere/x` or `http://elsewhere/x`
+  // would be parsed as an authority and move the request to another host. Written this way
+  // no value of assetPath can do that, because the host is never read from it — such a path
+  // just becomes odd-looking path text on the configured instance.
+  target.pathname = `${basePath}${assetPath}`;
+  target.search = '';
+  target.hash = '';
+
+  // The path setter still resolves `..` segments, so containment has to be checked even
+  // though the host cannot move.
+  if (!target.href.startsWith(subtree)) {
+    return undefined;
+  }
+
+  return { url: target.href, subtree };
 };
 
 /**

@@ -67,21 +67,28 @@ describe('resolveAsset', () => {
     expect(resolveAsset('not-a-url', 'stencils/aws4.xml')).toBeUndefined();
   });
 
+  // Defence in depth: proxiableAssetExtension refuses all of the paths below first, so
+  // these hold even if that allow-list were ever loosened.
   it.each`
     assetPath                          | reason
-    ${'http://evil.example.com/a.xml'} | ${'it names another host'}
-    ${'//evil.example.com/a.xml'}      | ${'it names another host without a scheme'}
-    ${'../../WEB-INF/web.xml'}         | ${'it climbs out of the configured subtree'}
+    ${'http://evil.example.com/a.xml'} | ${'an absolute URL'}
+    ${'//evil.example.com/a.xml'}      | ${'a scheme-relative URL'}
+    ${'\\\\evil.example.com/a.xml'}    | ${'a backslash-prefixed authority'}
   `(
-    'should return undefined for a path that leads elsewhere, because $reason',
+    'should keep the request on the configured host even when the path is $reason',
     ({ assetPath }: { assetPath: string }) => {
-      // defence in depth: proxiableAssetExtension refuses all of these first, so this
-      // holds even if that allow-list were ever loosened
-      expect(
-        resolveAsset('http://localhost:8080/drawio/', assetPath),
-      ).toBeUndefined();
+      const url = resolveAsset('http://localhost:8080/drawio/', assetPath)?.url;
+
+      expect(url).toBeDefined();
+      expect(new URL(url ?? '').origin).toBe('http://localhost:8080');
     },
   );
+
+  it('should return undefined when the path climbs out of the configured subtree', () => {
+    expect(
+      resolveAsset('http://localhost:8080/drawio/', '../../WEB-INF/web.xml'),
+    ).toBeUndefined();
+  });
 
   it('should keep an asset that resolves inside the subtree', () => {
     expect(
