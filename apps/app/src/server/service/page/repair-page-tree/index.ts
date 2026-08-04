@@ -67,5 +67,3 @@ export const repairPageTree = async (
     isRunning = false;
   }
 };
-
-export { recountAllDescendantCounts, removeEmptyLeafHierarchies };

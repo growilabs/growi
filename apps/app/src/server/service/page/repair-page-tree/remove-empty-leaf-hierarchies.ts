@@ -9,35 +9,97 @@ const logger = loggerFactory(
 );
 
 /**
- * Backstops a data anomaly (e.g. a parent cycle) from spinning forever. Each pass
- * can expose a new layer of empty leaves, so the loop is unbounded in principle.
+ * Bounds every id array this module puts in a query, and every result set it holds
+ * in memory. Without it a wiki with a large orphan backlog builds a `$in` big enough
+ * to breach the 16 MB BSON document limit and fail the whole repair.
+ */
+const BATCH_SIZE = 1000;
+
+/**
+ * Backstops a data anomaly (e.g. a parent cycle) from spinning forever. Passes after
+ * the first only re-examine the parents of what was just deleted, so this caps the
+ * depth of the cascade, not how many pages can be removed.
  */
 const MAX_PASSES = 100;
 
+/** The scan's snapshot of a candidate: enough to delete it and climb one level. */
+type EmptyLeafCandidate = {
+  _id: mongoose.Types.ObjectId;
+  parent?: mongoose.Types.ObjectId | null;
+};
+
+type SweepResult = {
+  removed: number;
+  parentIds: mongoose.Types.ObjectId[];
+};
+
 /**
- * Removes empty placeholder pages that no longer connect anything.
+ * Deletes the candidates that are still orphaned placeholders, and reports the
+ * parents of the ones it removed so the caller can walk one level up.
  *
- * An empty page is a structural node that exists only to link a real descendant to
- * its ancestors; once childless it serves no purpose. Historically the WIP TTL index
- * deleted pages without running application code, so the placeholders that only
- * hosted them were left orphaned.
+ * Candidates are a *snapshot*: the caller found them earlier, and this runs against
+ * a live site (the admin endpoint gates on maintenance mode, the service itself does
+ * not). Both conditions are therefore re-checked at delete time rather than trusted:
  *
- * Deleting one can leave its (also empty) parent childless, so passes repeat until
- * nothing is removed.
+ *  - childlessness, because a page created under a candidate in the meantime would
+ *    be orphaned by removing its parent;
+ *  - `isEmpty`, because a placeholder can be filled in by an ordinary page creation
+ *    (preparePageDocumentToCreate reuses empty pages), turning it into real content.
  *
- * @returns the number of pages removed
+ * Exported for the co-located test, which passes a deliberately stale snapshot to
+ * reproduce both races without having to interleave anything.
  */
-export const removeEmptyLeafHierarchies = async (): Promise<number> => {
+export const deleteStillOrphanedEmptyPages = async (
+  candidates: EmptyLeafCandidate[],
+): Promise<SweepResult> => {
   const Page = mongoose.model<IPage, PageModel>('Page');
 
-  let totalRemoved = 0;
-  let pass = 0;
+  if (candidates.length === 0) {
+    return { removed: 0, parentIds: [] };
+  }
 
-  for (; pass < MAX_PASSES; pass++) {
-    // biome-ignore lint/performance/noAwaitInLoops: each pass must observe the previous pass's deletions
-    const emptyLeaves = await Page.aggregate<{
-      _id: mongoose.Types.ObjectId;
-    }>([
+  const ids = candidates.map((c) => c._id);
+  const idsThatGainedChildren = new Set(
+    (await Page.distinct('parent', { parent: { $in: ids } })).map(String),
+  );
+  const stillChildless = candidates.filter(
+    (c) => !idsThatGainedChildren.has(String(c._id)),
+  );
+  if (stillChildless.length === 0) {
+    return { removed: 0, parentIds: [] };
+  }
+
+  const res = await Page.deleteMany({
+    _id: { $in: stillChildless.map((c) => c._id) },
+    isEmpty: true,
+  });
+
+  // Parents of everything that passed the childless check. A candidate the isEmpty
+  // re-assert rejected contributes its parent too, which costs one wasted
+  // re-examination — cheaper than reading back the ids to find out which went.
+  const parentIds = stillChildless
+    .map((c) => c.parent)
+    .filter((id): id is mongoose.Types.ObjectId => id != null);
+
+  return { removed: res.deletedCount ?? 0, parentIds };
+};
+
+/**
+ * Scans the whole collection for childless empty pages, one bounded batch at a time.
+ *
+ * `$skip` advances past candidates the delete step declined, so a batch that is
+ * rejected in full cannot be handed back forever.
+ */
+const sweepAllEmptyLeaves = async (): Promise<SweepResult> => {
+  const Page = mongoose.model<IPage, PageModel>('Page');
+
+  let removed = 0;
+  const parentIds: mongoose.Types.ObjectId[] = [];
+  let skip = 0;
+
+  for (;;) {
+    // biome-ignore lint/performance/noAwaitInLoops: each batch must observe the previous batch's deletions
+    const batch = await Page.aggregate<EmptyLeafCandidate>([
       { $match: { isEmpty: true, path: { $ne: '/' } } },
       {
         $lookup: {
@@ -49,39 +111,84 @@ export const removeEmptyLeafHierarchies = async (): Promise<number> => {
         },
       },
       { $match: { children: { $size: 0 } } },
-      { $project: { _id: 1 } },
+      { $project: { _id: 1, parent: 1 } },
+      { $skip: skip },
+      { $limit: BATCH_SIZE },
     ]);
 
-    if (emptyLeaves.length === 0) {
-      break;
+    if (batch.length === 0) {
+      return { removed, parentIds };
     }
 
-    const ids = emptyLeaves.map((page) => page._id);
+    const res = await deleteStillOrphanedEmptyPages(batch);
+    removed += res.removed;
+    parentIds.push(...res.parentIds);
+    skip += batch.length - res.removed;
+  }
+};
 
-    // Re-verify childlessness at delete time. This runs against a live site (the
-    // admin endpoint gates on maintenance mode, but the service does not), so a
-    // page could have been created under one of these between the scan above and
-    // the delete below — removing its parent would orphan it.
-    const idsThatGainedChildren = new Set(
-      (await Page.distinct('parent', { parent: { $in: ids } })).map(String),
-    );
-    const stillChildless = ids.filter(
-      (id) => !idsThatGainedChildren.has(String(id)),
-    );
-    if (stillChildless.length === 0) {
-      break;
-    }
+/**
+ * Re-examines a known set of pages — the parents of what the previous pass removed —
+ * and deletes the ones that have themselves become childless placeholders.
+ */
+const sweepCandidates = async (
+  candidateIds: mongoose.Types.ObjectId[],
+): Promise<SweepResult> => {
+  const Page = mongoose.model<IPage, PageModel>('Page');
 
-    // `isEmpty: true` is re-asserted here as well: a placeholder can be filled in
-    // by a real page creation (preparePageDocumentToCreate reuses empty pages).
-    const res = await Page.deleteMany({
-      _id: { $in: stillChildless },
-      isEmpty: true,
-    });
-    totalRemoved += res.deletedCount ?? 0;
+  let removed = 0;
+  const parentIds: mongoose.Types.ObjectId[] = [];
+
+  for (let i = 0; i < candidateIds.length; i += BATCH_SIZE) {
+    const ids = candidateIds.slice(i, i + BATCH_SIZE);
+    // biome-ignore lint/performance/noAwaitInLoops: bounded batches, sequential by design
+    const batch = await Page.find<EmptyLeafCandidate>(
+      { _id: { $in: ids }, isEmpty: true, path: { $ne: '/' } },
+      { _id: 1, parent: 1 },
+    ).lean();
+
+    const res = await deleteStillOrphanedEmptyPages(batch);
+    removed += res.removed;
+    parentIds.push(...res.parentIds);
   }
 
-  if (pass >= MAX_PASSES) {
+  return { removed, parentIds };
+};
+
+/**
+ * Removes empty placeholder pages that no longer connect anything.
+ *
+ * An empty page is a structural node that exists only to link a real descendant to
+ * its ancestors; once childless it serves no purpose. Historically the WIP TTL index
+ * deleted pages without running application code, so the placeholders that only
+ * hosted them were left orphaned.
+ *
+ * Deleting one can leave its (also empty) parent childless, so the cascade repeats —
+ * but only over the parents of what was just removed. Nothing else can have become a
+ * childless empty page as a result of this run, so the previous shape (re-scan the
+ * whole collection per cascade level) re-read every page to find, at most, a handful
+ * of newly exposed leaves.
+ *
+ * @returns the number of pages removed
+ */
+export const removeEmptyLeafHierarchies = async (): Promise<number> => {
+  const first = await sweepAllEmptyLeaves();
+
+  let totalRemoved = first.removed;
+  let candidateIds = first.parentIds;
+  let pass = 1;
+
+  for (; pass < MAX_PASSES && candidateIds.length > 0; pass++) {
+    // biome-ignore lint/performance/noAwaitInLoops: each pass must observe the previous pass's deletions
+    const res = await sweepCandidates(candidateIds);
+    if (res.removed === 0) {
+      return totalRemoved;
+    }
+    totalRemoved += res.removed;
+    candidateIds = res.parentIds;
+  }
+
+  if (candidateIds.length > 0) {
     logger.warn(
       `Empty-page cleanup hit the ${MAX_PASSES}-pass cap without converging; some empty pages may remain. Investigate for a possible parent cycle.`,
     );

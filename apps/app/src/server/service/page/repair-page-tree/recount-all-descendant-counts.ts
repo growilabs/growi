@@ -26,6 +26,12 @@ export const recountAllDescendantCounts = async (
   // includeEmpty: true — empty placeholder pages carry a descendantCount too, and
   // a wrong count on one propagates to every ancestor above it.
   const builder = new PageQueryBuilder(Page.find(), true);
+  // Only pages that are actually on the tree, matching every other recount path
+  // (updateDescendantCountOfSelfAndDescendants et al). A page left unnormalized by
+  // a partial v5 migration has `parent: null`, and so do its children — so
+  // recountDescendantCount finds nothing under it and would zero out a count that
+  // is not ours to touch. Normalizing those pages is the v5 migration's job.
+  builder.addConditionAsOnTree();
   // Deepest paths first, so each page is recounted from children whose own counts
   // have already been corrected in this same pass.
   builder.addConditionToSortPagesByDescPath();

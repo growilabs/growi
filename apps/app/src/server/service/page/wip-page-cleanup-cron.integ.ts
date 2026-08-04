@@ -61,10 +61,9 @@ describe('WipPageCleanupCronService (integration)', () => {
     await Page.deleteMany({ _id: parentId });
   });
 
-  const createPage = async (
-    path: string,
-    fields: Partial<Record<string, unknown>>,
-  ) =>
+  // Partial<IPage>, not Partial<Record<string, unknown>>: these fixtures exist to
+  // pin selection criteria, so a typo in a field name must not compile.
+  const createPage = async (path: string, fields: Partial<IPage>) =>
     Page.create({
       path,
       grant: Page.GRANT_PUBLIC,
@@ -109,6 +108,28 @@ describe('WipPageCleanupCronService (integration)', () => {
     await cron.executeJob();
 
     expect(await Page.findById(withChild._id)).not.toBeNull();
+  });
+
+  it('collects nothing while GROWI is in maintenance mode', async () => {
+    // Maintenance mode is when an operator runs the page tree repair, which
+    // recounts descendantCount across the collection. A sweep deleting pages
+    // underneath it races that recount, so the sweep stands down.
+    const expired = await createPage(`${base}/expired-in-maintenance`, {
+      wip: true,
+      wipExpiredAt: past(),
+    });
+    await crowi.appService.startMaintenanceMode();
+
+    try {
+      await cron.executeJob();
+      expect(await Page.findById(expired._id)).not.toBeNull();
+    } finally {
+      await crowi.appService.endMaintenanceMode();
+    }
+
+    // ...and it is only deferred: the next run outside maintenance mode collects it.
+    await cron.executeJob();
+    expect(await Page.findById(expired._id)).toBeNull();
   });
 
   it('is safe to run twice (nothing left to collect on the second pass)', async () => {

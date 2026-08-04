@@ -9,11 +9,15 @@ import type { PageModel } from '~/server/models/page';
 
 import { repairPageTree } from '.';
 import { recountAllDescendantCounts } from './recount-all-descendant-counts';
-import { removeEmptyLeafHierarchies } from './remove-empty-leaf-hierarchies';
+import {
+  deleteStillOrphanedEmptyPages,
+  removeEmptyLeafHierarchies,
+} from './remove-empty-leaf-hierarchies';
 
 describe('repair-page-tree (integration)', () => {
   let crowi: Crowi;
   let Page: PageModel;
+  let rootId: mongoose.Types.ObjectId;
 
   const base = '/test-repair-page-tree';
 
@@ -22,10 +26,12 @@ describe('repair-page-tree (integration)', () => {
     Page = mongoose.model<IPage, PageModel>('Page');
 
     // The recount walks from each page's children; the root must exist.
-    const root = await Page.findOne({ path: '/' });
-    if (root == null) {
-      await Page.create({ path: '/', grant: Page.GRANT_PUBLIC });
-    }
+    const root =
+      (await Page.findOne({ path: '/' })) ??
+      (await Page.create({ path: '/', grant: Page.GRANT_PUBLIC }));
+    // Fixtures link to it: a page with no parent is off-tree (an unnormalized v5
+    // leftover), which the repair deliberately does not touch.
+    rootId = root._id;
   });
 
   afterEach(async () => {
@@ -41,6 +47,7 @@ describe('repair-page-tree (integration)', () => {
       await Page.create({
         _id: baseId,
         path: base,
+        parent: rootId,
         grant: Page.GRANT_PUBLIC,
         isEmpty: true,
       });
@@ -66,6 +73,7 @@ describe('repair-page-tree (integration)', () => {
       await Page.create({
         _id: baseId,
         path: base,
+        parent: rootId,
         grant: Page.GRANT_PUBLIC,
         isEmpty: true,
       });
@@ -89,12 +97,14 @@ describe('repair-page-tree (integration)', () => {
       await Page.create({
         _id: emptyLeafId,
         path: `${base}/empty-leaf`,
+        parent: rootId,
         grant: Page.GRANT_PUBLIC,
         isEmpty: true,
       });
       await Page.create({
         _id: realLeafId,
         path: `${base}/real-leaf`,
+        parent: rootId,
         grant: Page.GRANT_PUBLIC,
         isEmpty: false,
       });
@@ -106,12 +116,105 @@ describe('repair-page-tree (integration)', () => {
     });
   });
 
+  describe('deleteStillOrphanedEmptyPages', () => {
+    // The scan and the delete are two round trips, and the service can run against
+    // a live site. Candidates are therefore a stale snapshot by construction, which
+    // is what these tests hand it — no interleaving required.
+
+    it('spares a candidate that gained a child after it was scanned', async () => {
+      // Deleting it would orphan the new child: its parent link would dangle and it
+      // would drop out of the page tree entirely.
+      const staleId = new mongoose.Types.ObjectId();
+      await Page.create({
+        _id: staleId,
+        path: `${base}/scanned-then-filled`,
+        parent: rootId,
+        grant: Page.GRANT_PUBLIC,
+        isEmpty: true,
+      });
+      const snapshot = [{ _id: staleId, parent: rootId }];
+
+      await Page.create({
+        path: `${base}/scanned-then-filled/newborn`,
+        parent: staleId,
+        grant: Page.GRANT_PUBLIC,
+        isEmpty: false,
+      });
+
+      const res = await deleteStillOrphanedEmptyPages(snapshot);
+
+      expect(await Page.findById(staleId)).not.toBeNull();
+      expect(res.removed).toBe(0);
+    });
+
+    it('spares a candidate that stopped being empty after it was scanned', async () => {
+      // preparePageDocumentToCreate reuses an empty placeholder when a real page is
+      // created at its path, so a candidate can turn into content. Deleting it then
+      // would destroy a page the user just wrote.
+      const staleId = new mongoose.Types.ObjectId();
+      await Page.create({
+        _id: staleId,
+        path: `${base}/scanned-then-written`,
+        parent: rootId,
+        grant: Page.GRANT_PUBLIC,
+        isEmpty: true,
+      });
+      const snapshot = [{ _id: staleId, parent: rootId }];
+
+      await Page.updateOne({ _id: staleId }, { $set: { isEmpty: false } });
+
+      const res = await deleteStillOrphanedEmptyPages(snapshot);
+
+      expect(await Page.findById(staleId)).not.toBeNull();
+      expect(res.removed).toBe(0);
+    });
+
+    it('deletes the still-orphaned candidates alongside the spared ones', async () => {
+      // A stale entry must not stop the rest of the batch from being collected.
+      const orphanId = new mongoose.Types.ObjectId();
+      const staleId = new mongoose.Types.ObjectId();
+      await Page.create({
+        _id: orphanId,
+        path: `${base}/still-orphaned`,
+        parent: rootId,
+        grant: Page.GRANT_PUBLIC,
+        isEmpty: true,
+      });
+      await Page.create({
+        _id: staleId,
+        path: `${base}/no-longer-orphaned`,
+        parent: rootId,
+        grant: Page.GRANT_PUBLIC,
+        isEmpty: true,
+      });
+      await Page.create({
+        path: `${base}/no-longer-orphaned/newborn`,
+        parent: staleId,
+        grant: Page.GRANT_PUBLIC,
+        isEmpty: false,
+      });
+
+      const res = await deleteStillOrphanedEmptyPages([
+        { _id: orphanId, parent: rootId },
+        { _id: staleId, parent: rootId },
+      ]);
+
+      expect(await Page.findById(orphanId)).toBeNull();
+      expect(await Page.findById(staleId)).not.toBeNull();
+      expect(res.removed).toBe(1);
+      // The parent is reported so the caller can check whether it, too, is now a
+      // childless placeholder — that is how the cascade climbs.
+      expect(res.parentIds.map(String)).toContain(String(rootId));
+    });
+  });
+
   describe('recountAllDescendantCounts', () => {
     it('repairs a descendantCount left inflated by a page deleted behind the app', async () => {
       const parentId = new mongoose.Types.ObjectId();
       await Page.create({
         _id: parentId,
         path: base,
+        parent: rootId,
         grant: Page.GRANT_PUBLIC,
         isEmpty: false,
         descendantCount: 5, // inflated, as if a TTL-deleted descendant were still counted
@@ -140,6 +243,7 @@ describe('repair-page-tree (integration)', () => {
       await Page.create({
         _id: grandparentId,
         path: base,
+        parent: rootId,
         grant: Page.GRANT_PUBLIC,
         isEmpty: false,
         descendantCount: 9,
@@ -174,6 +278,7 @@ describe('repair-page-tree (integration)', () => {
       await Page.create({
         _id: parentId,
         path: base,
+        parent: rootId,
         grant: Page.GRANT_PUBLIC,
         isEmpty: false,
         descendantCount: 1,
@@ -190,6 +295,30 @@ describe('repair-page-tree (integration)', () => {
 
       expect((await Page.findById(parentId))?.descendantCount).toBe(1);
     });
+
+    it('leaves an off-tree page alone instead of zeroing its count', async () => {
+      // A page left unnormalized by a partial v5 migration has no parent, and
+      // neither do its children — so a recount from parent links finds nothing
+      // under it and would flatten a count this repair has no business touching.
+      const strayId = new mongoose.Types.ObjectId();
+      await Page.create({
+        _id: strayId,
+        path: base,
+        grant: Page.GRANT_PUBLIC,
+        isEmpty: false,
+        descendantCount: 3,
+      });
+      await Page.create({
+        path: `${base}/v4-child`,
+        grant: Page.GRANT_PUBLIC,
+        isEmpty: false,
+        descendantCount: 0,
+      });
+
+      await recountAllDescendantCounts(crowi.pageService);
+
+      expect((await Page.findById(strayId))?.descendantCount).toBe(3);
+    });
   });
 
   describe('repairPageTree', () => {
@@ -205,6 +334,7 @@ describe('repair-page-tree (integration)', () => {
       await Page.create({
         _id: parentId,
         path: base,
+        parent: rootId,
         grant: Page.GRANT_PUBLIC,
         isEmpty: false,
         descendantCount: 4, // inflated
