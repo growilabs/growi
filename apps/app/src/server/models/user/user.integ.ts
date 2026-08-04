@@ -77,6 +77,8 @@ describe('User', () => {
       username: 'adminusertestToBeRemoved',
     });
     adminusertestToBeRemovedId = adminusertestToBeRemoved._id;
+    // Set passwordHash so the credential-scrub assertion in statusDelete is meaningful
+    adminusertestToBeRemoved.passwordHash = 'scrypt$dummy$hash';
     await adminusertestToBeRemoved.statusDelete();
   });
 
@@ -121,7 +123,11 @@ describe('User', () => {
 
         expect(adminusertestToBeRemoved).toBeInstanceOf(User);
         expect(adminusertestToBeRemoved.name).toBe('');
-        expect(adminusertestToBeRemoved.password).toBe('');
+        // statusDelete $unsets both credential fields (undefined, not ''), so a
+        // scrubbed deleted user classifies as `noPassword` — an empty-string
+        // `password` would be mis-counted as `legacyOnly` by the cleanup script.
+        expect(adminusertestToBeRemoved.password).toBeUndefined();
+        expect(adminusertestToBeRemoved.passwordHash).toBeUndefined();
         expect(adminusertestToBeRemoved.googleId).toBeNull();
         expect(adminusertestToBeRemoved.isGravatarEnabled).toBeFalsy();
         expect(adminusertestToBeRemoved.image).toBeNull();

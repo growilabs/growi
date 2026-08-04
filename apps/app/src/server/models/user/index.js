@@ -10,14 +10,23 @@ import uniqueValidator from 'mongoose-unique-validator';
 // import and read `.i18n` from it.
 import nextI18nextConfig from '^/config/next-i18next.config.mjs';
 
+import { passwordHashService } from '~/server/service/password-hash';
+import { isEmailMatchedByEntry } from '~/utils/email-whitelist';
+import { generateGravatarSrc } from '~/utils/gravatar';
+import loggerFactory from '~/utils/logger';
+
 import { aclService as _aclService } from '../../service/acl';
+import { configManager as _configManager } from '../../service/config-manager';
+import { getModelSafely } from '../../util/mongoose-utils';
+import { Attachment } from '../attachment';
+import { UserStatus } from './conts';
+
 // Getter wrappers for service singletons: callers use getConfigManager() /
 // getAclService() so that this module's import of service singletons can be
 // intercepted by tests (vi.mock) without changing the call-site API.
 // The singletons are module-level bindings (ESM live-binding); accesses happen
 // only inside functions, never at module-top, so circular-dep evaluation order
 // is safe.
-import { configManager as _configManager } from '../../service/config-manager';
 
 /** @returns {import('../../service/config-manager').IConfigManagerForApp} */
 export function getConfigManager() {
@@ -28,14 +37,6 @@ export function getConfigManager() {
 export function getAclService() {
   return _aclService;
 }
-
-import { isEmailMatchedByEntry } from '~/utils/email-whitelist';
-import { generateGravatarSrc } from '~/utils/gravatar';
-import loggerFactory from '~/utils/logger';
-
-import { getModelSafely } from '../../util/mongoose-utils';
-import { Attachment } from '../attachment';
-import { UserStatus } from './conts';
 
 const logger = loggerFactory('growi:models:user');
 
@@ -77,6 +78,7 @@ const factory = (crowi) => {
       // email: { type: String, required: true, unique: true },
       introduction: String,
       password: String,
+      passwordHash: { type: String },
       apiToken: { type: String, index: true },
       lang: {
         type: String,
@@ -157,15 +159,6 @@ const factory = (crowi) => {
     return `change-it-${randomstr}@example.com`;
   }
 
-  function generatePassword(password) {
-    validateCrowi();
-
-    const hasher = crypto.createHash('sha256');
-    hasher.update(crowi.env.PASSWORD_SEED + password);
-
-    return hasher.digest('hex');
-  }
-
   function generateApiToken(user) {
     const hasher = crypto.createHash('sha256');
     hasher.update(new Date().getTime() + user._id);
@@ -188,18 +181,29 @@ const factory = (crowi) => {
   };
 
   userSchema.methods.isPasswordSet = function () {
-    if (this.password) {
-      return true;
-    }
-    return false;
+    return !!(this.passwordHash || this.password);
   };
 
-  userSchema.methods.isPasswordValid = function (password) {
-    return this.password === generatePassword(password);
+  userSchema.methods.isPasswordValid = async function (password) {
+    validateCrowi();
+    // Returns a VerifyResult ({ isValid, needsRehash }), NOT a boolean — a bare
+    // `!promise` check silently passes, so callers must read `.isValid`.
+    return await passwordHashService.verify(
+      password,
+      this.passwordHash,
+      this.password,
+      crowi.env.PASSWORD_SEED,
+      {
+        userId: this._id != null ? String(this._id) : undefined,
+        username: this.username,
+      },
+    );
   };
 
-  userSchema.methods.setPassword = function (password) {
-    this.password = generatePassword(password);
+  userSchema.methods.setPassword = async function (password) {
+    // Only write the scrypt hash. The legacy SHA-256 `password` field is left
+    // untouched so a downgrade to an older GROWI keeps working (Req 1.3).
+    this.passwordHash = await passwordHashService.hash(password);
     return this;
   };
 
@@ -227,7 +231,7 @@ const factory = (crowi) => {
   };
 
   userSchema.methods.updatePassword = async function (password) {
-    this.setPassword(password);
+    await this.setPassword(password);
     const userData = await this.save();
     return userData;
   };
@@ -296,7 +300,7 @@ const factory = (crowi) => {
     name,
     password,
   ) {
-    this.setPassword(password);
+    await this.setPassword(password);
     this.name = name;
     this.username = username;
     this.status = UserStatus.STATUS_ACTIVE;
@@ -376,7 +380,11 @@ const factory = (crowi) => {
 
     this.status = UserStatus.STATUS_DELETED;
     this.username = deletedLabel;
-    this.password = '';
+    // $unset both credential fields (undefined, not '') so a scrubbed deleted
+    // user classifies as `noPassword`. An empty-string `password` would be
+    // mis-counted as `legacyOnly` and make the cleanup script abort forever.
+    this.password = undefined;
+    this.passwordHash = undefined;
     this.name = '';
     this.email = `${deletedLabel}@deleted`;
     this.googleId = null;
@@ -490,7 +498,6 @@ const factory = (crowi) => {
 
   userSchema.statics.findUserByUsernameOrEmail = function (
     usernameOrEmail,
-    password,
     callback,
   ) {
     this.findOne()
@@ -498,17 +505,6 @@ const factory = (crowi) => {
       .exec((err, userData) => {
         callback(err, userData);
       });
-  };
-
-  userSchema.statics.findUserByEmailAndPassword = function (
-    email,
-    password,
-    callback,
-  ) {
-    const hashedPassword = generatePassword(password);
-    this.findOne({ email, password: hashedPassword }, (err, userData) => {
-      callback(err, userData);
-    });
   };
 
   userSchema.statics.isUserCountExceedsUpperLimit = async function () {
@@ -595,7 +591,7 @@ const factory = (crowi) => {
     }
 
     const newPassword = generateRandomTempPassword();
-    user.setPassword(newPassword);
+    await user.setPassword(newPassword);
     await user.save();
 
     return newPassword;
@@ -611,7 +607,7 @@ const factory = (crowi) => {
 
     newUser.username = tmpUsername;
     newUser.email = email;
-    newUser.setPassword(password);
+    await newUser.setPassword(password);
     newUser.status = UserStatus.STATUS_INVITED;
 
     const globalLang = getConfigManager().getConfig('app:globalLang');
@@ -703,7 +699,7 @@ const factory = (crowi) => {
     newUser.username = username;
     newUser.email = email;
     if (password != null) {
-      newUser.setPassword(password);
+      await newUser.setPassword(password);
     }
 
     // Default email show/hide is up to the administrator

@@ -438,7 +438,10 @@ export const setup = (crowi) => {
       const { body, user } = req;
       const { oldPassword, newPassword } = body;
 
-      if (user.isPasswordSet() && !user.isPasswordValid(oldPassword)) {
+      if (
+        user.isPasswordSet() &&
+        !(await user.isPasswordValid(oldPassword)).isValid
+      ) {
         return res.apiv3Err('wrong-current-password', 400);
       }
       try {
@@ -712,7 +715,7 @@ export const setup = (crowi) => {
           },
         });
         // make sure password set or this user has two or more ExternalAccounts
-        if (user.password == null && count <= 1) {
+        if (!user.isPasswordSet() && count <= 1) {
           return res.apiv3Err('disassociate-ldap-account-failed');
         }
         const disassociateUser = await prisma.externalaccounts.delete({

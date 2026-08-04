@@ -5,7 +5,7 @@ import type { IUser } from '../../interfaces/user.js';
 
 export type IUserSerializedSecurely<U extends IUser> = Omit<
   U,
-  'password' | 'apiToken' | 'email'
+  'password' | 'passwordHash' | 'apiToken' | 'email'
 > & { email?: string };
 
 export const omitInsecureAttributes = <U extends IUser>(
@@ -13,7 +13,7 @@ export const omitInsecureAttributes = <U extends IUser>(
 ): IUserSerializedSecurely<U> => {
   const leanDoc = user instanceof Document ? user.toObject<U>() : user;
 
-  const { password, apiToken, email, ...rest } = leanDoc;
+  const { password, passwordHash, apiToken, email, ...rest } = leanDoc;
 
   const secureUser: IUserSerializedSecurely<U> = rest;
 
