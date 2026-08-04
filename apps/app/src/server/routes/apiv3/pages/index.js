@@ -313,9 +313,9 @@ export const setup = (crowi) => {
    *                    page:
    *                      $ref: '#/components/schemas/Page'
    *          403:
-   *            description: Page is forbidden (page-is-forbidden).
+   *            description: Page is forbidden.
    *          404:
-   *            description: Page is not found (page-not-found).
+   *            description: Page is not found.
    *          409:
    *            description: page path is already existed
    */
@@ -391,20 +391,12 @@ export const setup = (crowi) => {
 
         if (page == null) {
           const { meta } = pageWithMeta;
-          if (meta.isForbidden) {
-            return res.apiv3Err(
-              new ErrorV3(
-                'Page is forbidden',
-                'page-is-forbidden',
-                undefined,
-                meta,
-              ),
-              403,
-            );
-          }
           return res.apiv3Err(
-            new ErrorV3('Page is not found', 'page-not-found', undefined, meta),
-            404,
+            new ErrorV3(
+              `Page '${pageId}' is not found or forbidden`,
+              'notfound_or_forbidden',
+            ),
+            meta.isForbidden ? 403 : 404,
           );
         }
 
