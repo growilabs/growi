@@ -12,8 +12,12 @@ import type { SearchDelegator } from '../interfaces/search';
 import SearchService from './search';
 import type ElasticsearchDelegator from './search-delegator/elasticsearch';
 
-const { mockFindSnapshotUsernamesByUsernameRegex } = vi.hoisted(() => ({
+const {
+  mockFindSnapshotUsernamesByUsernameRegex,
+  mockFindEndpointsByEndpointRegex,
+} = vi.hoisted(() => ({
   mockFindSnapshotUsernamesByUsernameRegex: vi.fn(),
+  mockFindEndpointsByEndpointRegex: vi.fn(),
 }));
 
 vi.mock('~/server/models/named-query', () => ({
@@ -25,6 +29,7 @@ vi.mock('~/utils/prisma', () => ({
     activities: {
       findSnapshotUsernamesByUsernameRegex:
         mockFindSnapshotUsernamesByUsernameRegex,
+      findEndpointsByEndpointRegex: mockFindEndpointsByEndpointRegex,
     },
   },
 }));
@@ -288,5 +293,90 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     expect(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
     ).not.toHaveBeenCalled();
+  });
+
+  it('should return endpoints from ES results without any User classification', async () => {
+    vi.mocked(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).mockResolvedValue(['/api/v3/pages', '/api/v3/pages/revert']);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['endpoint'],
+      '/api',
+      10,
+    );
+
+    expect(result).toEqual({
+      endpoint: { endpoints: ['/api/v3/pages', '/api/v3/pages/revert'] },
+    });
+    expect(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).toHaveBeenCalledWith('endpoint', '/api', 10);
+    expect(mockUserModel.find).not.toHaveBeenCalled();
+  });
+
+  it('should resolve both username and endpoint independently when both fields are requested', async () => {
+    vi.mocked(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).mockImplementation(async (field) =>
+      field === 'username' ? ['alice'] : ['/api/v3/pages'],
+    );
+    setupUserModelMock(mockUserModel, [
+      { username: 'alice', status: UserStatus.STATUS_ACTIVE },
+    ]);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['username', 'endpoint'],
+      'a',
+      10,
+    );
+
+    expect(result).toEqual({
+      username: { activeUsernames: ['alice'], inactiveUsernames: [] },
+      endpoint: { endpoints: ['/api/v3/pages'] },
+    });
+  });
+
+  it('should use the MongoDB fallback for endpoint when ES is not configured', async () => {
+    searchService.isConfiguredOverride = false;
+    mockFindEndpointsByEndpointRegex.mockResolvedValue(['/api/v3/pages']);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['endpoint'],
+      '/api',
+      10,
+    );
+
+    expect(result).toEqual({
+      endpoint: { endpoints: ['/api/v3/pages'] },
+    });
+    expect(mockFindEndpointsByEndpointRegex).toHaveBeenCalledWith('/api', {
+      offset: 0,
+      limit: 10,
+    });
+    expect(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('should fall back to MongoDB for endpoint when the ES search fails', async () => {
+    vi.mocked(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).mockRejectedValue(new Error('ES is down'));
+    mockFindEndpointsByEndpointRegex.mockResolvedValue(['/api/v3/pages']);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['endpoint'],
+      '/api',
+      10,
+    );
+
+    expect(result).toEqual({
+      endpoint: { endpoints: ['/api/v3/pages'] },
+    });
+    expect(mockFindEndpointsByEndpointRegex).toHaveBeenCalledWith('/api', {
+      offset: 0,
+      limit: 10,
+    });
   });
 });

@@ -279,7 +279,7 @@ function buildSnapshotUpdateEnvelope(
 // rejects RegExp.escape's \uXXXX output). Trims `q` so the match stays
 // consistent with isQueryTooShort's trimmed-length check below (untrimmed
 // would leave stray leading/trailing space characters in the pattern).
-const escapeSnapshotUsernameQuery = (q: string): string =>
+const escapeSuggestionQuery = (q: string): string =>
   escapeStringForMongoRegex(q.trim());
 
 // Substring match — used by findSnapshotUsernamesByUsernameRegexWithTotalCount,
@@ -290,20 +290,7 @@ const escapeSnapshotUsernameQuery = (q: string): string =>
 const buildSnapshotUsernameSubstringMatchStage = (q: string) => ({
   $match: {
     'snapshot.username': {
-      $regex: escapeSnapshotUsernameQuery(q),
-      $options: 'i',
-    },
-  },
-});
-
-// Prefix-only match — used by findSnapshotUsernamesByUsernameRegex, the plain
-// (no-total-count) MongoDB fallback for when Elasticsearch is unreachable/
-// unconfigured. Prefix-only, unlike ES's `fuzziness: 'AUTO'`: MongoDB has no
-// native fuzzy match.
-const buildSnapshotUsernamePrefixMatchStage = (q: string) => ({
-  $match: {
-    'snapshot.username': {
-      $regex: `^${escapeSnapshotUsernameQuery(q)}`,
+      $regex: escapeSuggestionQuery(q),
       $options: 'i',
     },
   },
@@ -311,6 +298,42 @@ const buildSnapshotUsernamePrefixMatchStage = (q: string) => ({
 
 const SNAPSHOT_USERNAME_GROUP_STAGE = {
   $group: { _id: '$snapshot.username' },
+};
+
+// Prefix-only, unlike ES's `fuzziness: 'AUTO'`: MongoDB has no native fuzzy match.
+const buildFieldPrefixMatchStage = (fieldPath: string, q: string) => ({
+  $match: {
+    [fieldPath]: {
+      $regex: `^${escapeSuggestionQuery(q)}`,
+      $options: 'i',
+    },
+  },
+});
+
+const buildFieldGroupStage = (fieldPath: string) => ({
+  $group: { _id: `$${fieldPath}` },
+});
+
+// Shared by every suggestion field's plain fallback method so adding a new
+// field (e.g. `ip`) doesn't duplicate the match/group/sort/paginate shape.
+const buildFieldSuggestionPipeline = (
+  fieldPath: string,
+  q: string,
+  option: { offset: number; limit: number },
+) => {
+  if (isQueryTooShort(q)) return null;
+
+  const opt = option || {};
+  const offset = opt.offset || 0;
+  const limit = opt.limit || 10;
+
+  return [
+    buildFieldPrefixMatchStage(fieldPath, q),
+    buildFieldGroupStage(fieldPath),
+    { $sort: { _id: 1 } },
+    { $skip: offset },
+    { $limit: limit },
+  ];
 };
 
 // Bounds the Mongo fallback aggregation so one slow scan can't pin a shared
@@ -485,8 +508,7 @@ export const extension = Prisma.defineExtension((client) => {
          * Find snapshot usernames matching a case-insensitive prefix, unbounded
          * (no total count). Used by the MongoDB fallback path (ES unreachable/
          * unconfigured) — intentionally prefix-only, unlike the substring match
-         * used by the WithTotalCount variant below (see
-         * buildSnapshotUsernamePrefixMatchStage).
+         * used by the WithTotalCount variant below.
          *
          * Requirements: 3.4 — design.md: ActivityExtension Contracts (findSnapshotUsernames).
          */
@@ -494,22 +516,38 @@ export const extension = Prisma.defineExtension((client) => {
           q: string,
           option: { offset: number; limit: number },
         ): Promise<string[]> {
-          if (isQueryTooShort(q)) return [];
-
           const context =
             Prisma.getExtensionContext<typeof prisma.activities>(this);
 
-          const opt = option || {};
-          const offset = opt.offset || 0;
-          const limit = opt.limit || 10;
+          const pipeline = buildFieldSuggestionPipeline(
+            'snapshot.username',
+            q,
+            option,
+          );
+          if (pipeline == null) return [];
 
-          const pipeline = [
-            buildSnapshotUsernamePrefixMatchStage(q),
-            SNAPSHOT_USERNAME_GROUP_STAGE,
-            { $sort: { _id: 1 } },
-            { $skip: offset },
-            { $limit: limit },
-          ];
+          const raw = await context.aggregateRaw({
+            pipeline,
+            options: { maxTimeMS: AGGREGATE_MAX_TIME_MS },
+          });
+
+          const normalized = normalizeAggregateRaw(raw) as Array<{
+            _id: string;
+          }>;
+          return normalized.map((r) => r._id);
+        },
+
+        // MongoDB fallback for the `endpoint` suggestion field. Unlike
+        // username, no Active/Inactive classification applies here.
+        async findEndpointsByEndpointRegex(
+          q: string,
+          option: { offset: number; limit: number },
+        ): Promise<string[]> {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.activities>(this);
+
+          const pipeline = buildFieldSuggestionPipeline('endpoint', q, option);
+          if (pipeline == null) return [];
 
           const raw = await context.aggregateRaw({
             pipeline,

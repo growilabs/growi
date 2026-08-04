@@ -118,6 +118,92 @@ const findPageListByIds = async (pageIds: ObjectIdLike[], crowi: any) => {
   };
 };
 
+async function searchAuditlogFieldValues(
+  searchService: SearchService,
+  field: AuditlogSuggestionField,
+  q: string,
+  limit: number,
+  mongoFallback: (
+    q: string,
+    option: { offset: number; limit: number },
+  ) => Promise<string[]>,
+): Promise<string[]> {
+  if (searchService.isReachable) {
+    try {
+      return await searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
+        field,
+        q,
+        limit,
+      );
+    } catch (err) {
+      logger.error(
+        `Failed to search auditlog suggestions (${field}) on Elasticsearch. Falling back to MongoDB.`,
+        err,
+      );
+    }
+  }
+  return mongoFallback(q, { offset: 0, limit });
+}
+
+// Adding a field (e.g. `ip`) means adding one entry here — no change to
+// searchAuditlogSuggestions itself.
+const AUDITLOG_SUGGESTION_HANDLERS: {
+  [K in AuditlogSuggestionField]: (
+    searchService: SearchService,
+    q: string,
+    limit: number,
+  ) => Promise<AuditlogSuggestionsResponse>;
+} = {
+  async username(searchService, q, limit) {
+    const usernames = await searchAuditlogFieldValues(
+      searchService,
+      'username',
+      q,
+      limit,
+      prisma.activities.findSnapshotUsernamesByUsernameRegex,
+    );
+
+    const User = mongoose.model<IUser>('User');
+    const users =
+      usernames.length === 0
+        ? []
+        : await User.find({ username: { $in: usernames } })
+            .select('username status')
+            .lean();
+
+    const activeUsernames = new Set(
+      users
+        .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
+        .map((u) => u.username),
+    );
+
+    // A username with no live User match (e.g. deleted -- statusDelete()
+    // renames the User doc's username to `deleted_at_*`) must still be
+    // searchable in the audit trail, so anything not proven active is
+    // treated as inactive rather than silently dropped.
+    return {
+      username: {
+        activeUsernames: usernames.filter((u) => activeUsernames.has(u)),
+        inactiveUsernames: usernames.filter((u) => !activeUsernames.has(u)),
+      },
+    };
+  },
+
+  // Unlike username, no User-model classification applies — endpoints have
+  // no notion of Active/Inactive.
+  async endpoint(searchService, q, limit) {
+    const endpoints = await searchAuditlogFieldValues(
+      searchService,
+      'endpoint',
+      q,
+      limit,
+      prisma.activities.findEndpointsByEndpointRegex,
+    );
+
+    return { endpoint: { endpoints } };
+  },
+};
+
 class SearchService implements SearchQueryParser, SearchResolver {
   protected constructor() {}
 
@@ -377,30 +463,6 @@ class SearchService implements SearchQueryParser, SearchResolver {
     return this.fullTextSearchDelegator.rebuildAuditlogIndex(option);
   }
 
-  private async searchAuditlogUsernames(
-    q: string,
-    limit: number,
-  ): Promise<string[]> {
-    if (this.isReachable) {
-      try {
-        return await this.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
-          'username',
-          q,
-          limit,
-        );
-      } catch (err) {
-        logger.error(
-          'Failed to search auditlog suggestions on Elasticsearch. Falling back to MongoDB.',
-          err,
-        );
-      }
-    }
-    return prisma.activities.findSnapshotUsernamesByUsernameRegex(q, {
-      offset: 0,
-      limit,
-    });
-  }
-
   async searchAuditlogSuggestions(
     fields: AuditlogSuggestionField[],
     q: string,
@@ -408,36 +470,14 @@ class SearchService implements SearchQueryParser, SearchResolver {
   ): Promise<AuditlogSuggestionsResponse> {
     if (q === '') return {};
 
-    const response: AuditlogSuggestionsResponse = {};
+    const uniqueFields = [...new Set(fields)];
+    const responses = await Promise.all(
+      uniqueFields.map((field) =>
+        AUDITLOG_SUGGESTION_HANDLERS[field](this, q, limit),
+      ),
+    );
 
-    if (fields.includes('username')) {
-      const usernames = await this.searchAuditlogUsernames(q, limit);
-
-      const User = mongoose.model<IUser>('User');
-      const users =
-        usernames.length === 0
-          ? []
-          : await User.find({ username: { $in: usernames } })
-              .select('username status')
-              .lean();
-
-      const activeUsernames = new Set(
-        users
-          .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
-          .map((u) => u.username),
-      );
-
-      // A username with no live User match (e.g. deleted -- statusDelete()
-      // renames the User doc's username to `deleted_at_*`) must still be
-      // searchable in the audit trail, so anything not proven active is
-      // treated as inactive rather than silently dropped.
-      response.username = {
-        activeUsernames: usernames.filter((u) => activeUsernames.has(u)),
-        inactiveUsernames: usernames.filter((u) => !activeUsernames.has(u)),
-      };
-    }
-
-    return response;
+    return Object.assign({}, ...responses);
   }
 
   async parseSearchQuery(

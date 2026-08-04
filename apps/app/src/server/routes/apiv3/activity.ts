@@ -487,7 +487,7 @@ export const setup = (crowi: Crowi): Router => {
    *         required: false
    *         schema:
    *           type: string
-   *           enum: [username]
+   *           enum: [username, endpoint]
    *       - name: q
    *         in: query
    *         required: false

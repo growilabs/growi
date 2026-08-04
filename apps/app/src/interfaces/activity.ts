@@ -863,7 +863,7 @@ export type ISearchFilter = {
   actions?: SupportedActionType[];
 };
 
-export const AUDITLOG_SUGGESTION_FIELDS = ['username'] as const;
+export const AUDITLOG_SUGGESTION_FIELDS = ['username', 'endpoint'] as const;
 
 export type AuditlogSuggestionField =
   (typeof AUDITLOG_SUGGESTION_FIELDS)[number];
@@ -876,4 +876,5 @@ export const isAuditlogSuggestionField = (
 
 export type AuditlogSuggestionsResponse = {
   username?: { activeUsernames: string[]; inactiveUsernames: string[] };
+  endpoint?: { endpoints: string[] };
 };
