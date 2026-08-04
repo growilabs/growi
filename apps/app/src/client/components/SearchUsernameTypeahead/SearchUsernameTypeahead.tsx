@@ -13,9 +13,9 @@ import { AsyncTypeahead, Menu, MenuItem } from 'react-bootstrap-typeahead';
 import { useTranslation } from 'react-i18next';
 
 import type { IClearable } from '~/client/interfaces/clearable';
-import { useSWRxAuditlogSuggestions } from '~/stores/activity';
 
 import { shouldShowUsernameSuggestion } from './should-show-username-suggestion';
+import type { UseUsernameSuggestions } from './username-suggestions';
 
 const Categories = {
   activeUser: 'Active User',
@@ -38,6 +38,10 @@ const toUserDataItem = (username: string): UserDataType => ({
 
 type Props = {
   onChange: (text: string[]) => void;
+  // Required rather than defaulted: the available sources differ in the privilege
+  // they demand, so picking one silently would 403 for some callers.
+  // See `UseUsernameSuggestions` for the stable-reference requirement.
+  useUsernameSuggestions: UseUsernameSuggestions;
   initialUsernames?: string[];
   // Callers outside the admin pages must supply their own placeholder: the
   // default key lives in the `admin` i18n namespace, which those pages don't load.
@@ -51,7 +55,13 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   IClearable,
   Props
 > = (props: Props, ref) => {
-  const { onChange, initialUsernames, placeholder, id } = props;
+  const {
+    onChange,
+    useUsernameSuggestions,
+    initialUsernames,
+    placeholder,
+    id,
+  } = props;
   const { t } = useTranslation();
 
   const typeaheadRef = useRef<TypeaheadRef>(null);
@@ -82,14 +92,8 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   /*
    * Fetch
    */
-  const {
-    data: suggestionsData,
-    error,
-    isLoading: _isLoading,
-  } = useSWRxAuditlogSuggestions('username', searchKeyword);
-  const activeUsernames = suggestionsData?.username?.activeUsernames ?? [];
-  const inactiveUsernames = suggestionsData?.username?.inactiveUsernames ?? [];
-  const isLoading = _isLoading === true && error == null;
+  const { activeUsernames, inactiveUsernames, isLoading } =
+    useUsernameSuggestions(searchKeyword);
 
   const allUser: UserDataType[] = [
     ...activeUsernames.map((username) => ({

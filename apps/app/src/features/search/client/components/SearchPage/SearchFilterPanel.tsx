@@ -4,7 +4,10 @@ import { useTranslation } from 'next-i18next';
 import { Dropdown, DropdownMenu, DropdownToggle } from 'reactstrap';
 
 import { TagsInput } from '~/client/components/PageTags/TagEditModal/TagsInput';
-import { SearchUsernameTypeahead } from '~/client/components/SearchUsernameTypeahead';
+import {
+  SearchUsernameTypeahead,
+  useRegisteredUsernameSuggestions,
+} from '~/client/components/SearchUsernameTypeahead';
 import { useSWRxUserRelatedGroups } from '~/stores/user';
 
 import type { SearchFilterState } from '../../utils/search-query';
@@ -57,9 +60,14 @@ const UsernameFilterField = (props: UsernameFilterFieldProps): JSX.Element => {
         keeps each item's `category` internally, which this panel (usernames
         only) can't supply — unlike the fully-controlled TagsInput below.
       */}
+      {/*
+        The registered-user source, not the audit-log one: `/activity/suggestions`
+        is adminRequired and would 403 for ordinary users on this page.
+      */}
       <SearchUsernameTypeahead
         id={id}
         onChange={onChange}
+        useUsernameSuggestions={useRegisteredUsernameSuggestions}
         initialUsernames={usernames}
         placeholder={placeholder}
       />
