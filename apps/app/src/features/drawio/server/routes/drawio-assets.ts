@@ -5,6 +5,7 @@ import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import { PROXIED_ASSET_DIRS, VIEWER_DIAGRAMS_NET_ORIGIN } from '../../consts';
+import { isSelfHostedDrawio } from '../../is-self-hosted-drawio';
 
 const logger = loggerFactory('growi:features:drawio:routes:drawio-assets');
 
@@ -182,6 +183,16 @@ export const drawioAssetsRouterFactory = (): Router => {
     }
 
     const drawioUri = configManager.getConfig('app:drawioUri');
+
+    // Nothing asks for these unless a self-hosted instance is configured: the client only
+    // rebases the viewer's asset paths onto this route in that case, and draw.io's own
+    // hosted viewer sends the CORS header that makes the whole route unnecessary. Answering
+    // anyway would leave an outbound fetch reachable on every default deployment.
+    if (!isSelfHostedDrawio(drawioUri)) {
+      res.status(404).end();
+      return;
+    }
+
     const assetUrl = buildAssetUrl(drawioUri, assetPath);
     if (assetUrl == null) {
       logger.warn({ drawioUri, assetPath }, 'Refused a draw.io asset location');

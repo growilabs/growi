@@ -1,20 +1,8 @@
-import { DEFAULT_DRAWIO_ORIGIN } from '../../consts';
+import { isSelfHostedDrawio } from '../../is-self-hosted-drawio';
 import { adoptMathJax, suppressBakedMathJax } from './adopt-mathjax';
 import { rebaseDrawioAssetPaths } from './rebase-asset-paths';
 
-/**
- * Whether DRAWIO_URI points at something other than draw.io's own hosted viewer.
- *
- * An unparsable value counts as not self-hosted: there is nothing to rebase onto, and
- * leaving draw.io's own defaults in place is the better failure.
- */
-export const isSelfHostedDrawio = (drawioUri: string): boolean => {
-  try {
-    return new URL(drawioUri).origin !== DEFAULT_DRAWIO_ORIGIN;
-  } catch {
-    return false;
-  }
-};
+export { isSelfHostedDrawio };
 
 /**
  * Everything that has to be in place BEFORE viewer-static.min.js is inserted.

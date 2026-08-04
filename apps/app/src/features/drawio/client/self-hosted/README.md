@@ -74,6 +74,24 @@ Reusing the baked path means the draw.io version never has to be detected.
 
 refs: https://github.com/growilabs/growi/issues/9774
 
+### Why touching `window.MathJax` is safe here
+
+It reads like a global with a big blast radius, so: GROWI's own page math is
+`remark-math` + `rehype-katex`, and KaTeX never looks at `window.MathJax` — the app has no
+MathJax dependency at all. The only MathJax on a GROWI page is the one draw.io loads for
+diagram labels.
+
+`viewer-static.min.js` is loaded on every page view, not only on pages holding a diagram,
+so **draw.io already sets `window.MathJax` on every page today** — this code does not
+introduce the global, it decides what goes in it. Once `adoptSelfHostedDrawio` has run, the
+value is draw.io's own configuration object, exactly as before.
+
+The one thing to keep in mind: between the two entry points the global holds a placeholder
+`{}`. Anything that treats `typeof window.MathJax !== 'undefined'` as "MathJax is present"
+would be misled during that window — a custom script or plugin loading its own MathJax is
+the realistic case. `adoptMathJax` therefore always clears the placeholder, including on the
+path where it cannot relocate anything, so the window closes as soon as `onLoad` runs.
+
 ## What the proxy route adds on top
 
 Older draw.io images ship **no `stencils/` or `shapes/` directory at all** — absent on
@@ -83,6 +101,20 @@ browser still only ever talks to GROWI's origin; the outbound request, if any, i
 server's. On a network with no route out that fallback fails and the shape renders empty,
 which is the same outcome as before and is a limitation of that draw.io version rather than
 of this code — upgrading the instance fixes it.
+
+### When it is in play, and when it is not
+
+The route answers only while `DRAWIO_URI` names a self-hosted instance — the same condition
+the client rebases on, via the shared `isSelfHostedDrawio`. On a default deployment (or one
+whose `DRAWIO_URI` holds nothing usable) it is a 404 and makes no outbound request, because
+`viewer.diagrams.net` sends `Access-Control-Allow-Origin: *` and the browser can read the
+libraries directly.
+
+It is only needed because a **cross-origin** self-hosted instance sends no such header. Two
+deployment choices remove that need, and both are better than proxying if they are available:
+serve draw.io from GROWI's own origin behind a reverse proxy, or configure the instance to
+send `Access-Control-Allow-Origin`. Neither is something GROWI can arrange on its own, which
+is why the route exists.
 
 ## Known remaining gap
 

@@ -113,13 +113,28 @@ describe('self-hosted MathJax adoption', () => {
       ]);
     });
 
-    it('should leave draw.io alone when the baked-in location cannot be read', () => {
-      suppressBakedMathJax();
-      window.Editor = { initMath: vi.fn() };
+    describe('when the baked-in location cannot be read', () => {
+      // Nothing to relocate onto, so draw.io has to end up exactly as it would have been
+      // without any of this — including not carrying a suppression that would both break
+      // math outright and leave a stray global behind.
+      it("should put draw.io back to its own behaviour, asking for draw.io's location", () => {
+        suppressBakedMathJax();
+        const initMath = vi.fn();
+        window.Editor = { initMath };
 
-      adoptMathJax(DRAWIO_URI);
+        adoptMathJax(DRAWIO_URI);
 
-      expect(window.Editor.initMath).not.toHaveBeenCalled();
+        expect(initMath).toHaveBeenCalledWith(undefined);
+      });
+
+      it('should leave no suppression behind', () => {
+        suppressBakedMathJax();
+        window.Editor = { initMath: vi.fn() };
+
+        adoptMathJax(DRAWIO_URI);
+
+        expect(window.MathJax).toBeUndefined();
+      });
     });
 
     it('should not throw when the bundle exposes no Editor', () => {

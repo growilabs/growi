@@ -38,19 +38,22 @@ export const suppressBakedMathJax = (): void => {
  * configuration derives `loader.paths.fonts` from it, so the font location comes out
  * right without being handled separately.
  *
- * Does nothing when the baked-in value cannot be read, which leaves draw.io's own
- * behaviour untouched rather than half-applying this one.
+ * When the baked-in value cannot be read there is nothing to relocate onto, so draw.io is
+ * put back exactly as it would have been: the suppression is undone and initMath() runs
+ * with draw.io's own location. Leaving the suppression in place instead would both break
+ * math outright and leave a stray window.MathJax behind.
  */
 export const adoptMathJax = (drawioUri: string): void => {
   const mathBaseUrl = relocateMathUrl(window.DRAW_MATH_URL, drawioUri);
-  if (mathBaseUrl == null) {
-    return;
-  }
 
-  window.DRAW_MATH_URL = mathBaseUrl;
+  if (mathBaseUrl != null) {
+    window.DRAW_MATH_URL = mathBaseUrl;
+  }
 
   // re-arm the `typeof window.MathJax === 'undefined'` guard suppressBakedMathJax() tripped
   window.MathJax = undefined;
 
-  window.Editor?.initMath?.(urljoin(mathBaseUrl, 'startup.js'));
+  window.Editor?.initMath?.(
+    mathBaseUrl == null ? undefined : urljoin(mathBaseUrl, 'startup.js'),
+  );
 };
