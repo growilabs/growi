@@ -176,7 +176,8 @@ hast-util-sanitize 用スキーマ。**Wiki の `recommended-whitelist` を継�
 // (imagePath, feedUrl) => 検証済み絶対 URL | null
 export const resolveNewsMediaUrl = (imagePath: string, feedUrl: string): string | null;
 ```
-- https のみ / credentials・query・hash 拒否 / 同一オリジン / feed の `images/` ディレクトリ配下(末尾スラッシュ prefix)/ 拡張子 png・jpe?g・webp・**gif** / `%` 含みパス拒否。例外を投げず不正は null。上記契約に沿って**新規に実装**し、境界テストも新規に書く
+- https のみ / credentials・query・hash 拒否 / 同一オリジン / feed の `images/` **直下のみ**(`images/<filename>`。`images/` の後にスラッシュを含まない単一セグメント。**サブディレクトリは不許可**)/ 拡張子 png・jpe?g・webp・**gif** / `%` 含みパス拒否。例外を投げず不正は null。上記契約に沿って**新規に実装**し、境界テストも新規に書く
+- 封じ込めの基準ディレクトリ名(`images/`)は `features/news/consts.ts` の定数を単一の出所とする(規約の重複を避ける)
 
 #### KEY DECISION: メディア解決は「描画時」(案II)を採用
 

@@ -2,8 +2,8 @@
 
 - [ ] 1. メディア解決の基盤を用意する
 - [ ] 1.1 (P) resolveNewsMediaUrl 純関数を新規実装する
-  - `features/news/utils/resolve-news-media-url.ts` に純関数 `(imagePath, feedUrl) => string | null` を新規実装する。https のみ・credentials/query/hash 拒否・同一オリジン・feed の `images/` ディレクトリ配下封じ込め(末尾スラッシュ prefix)・許可拡張子 png/jpg/jpeg/webp/**gif**(mp4 は含めない)・`%` 含みパス拒否・例外を投げない。クライアント(rehype プラグイン)から import するため `server/services/` ではなく共有 `utils/` に置く
-  - `resolve-news-media-url.spec.ts` に境界マトリクス(ディレクトリ脱出・他リポジトリ配下・偽ディレクトリ・http ダウングレード・credentials/query/hash・`%` 含みパス・gif 受理・mp4 拒否)を実装し全て green
+  - `features/news/utils/resolve-news-media-url.ts` に純関数 `(imagePath, feedUrl) => string | null` を新規実装する。https のみ・credentials/query/hash 拒否・同一オリジン・feed の `images/` **直下のみ**(単一セグメント。サブディレクトリ不許可)・許可拡張子 png/jpg/jpeg/webp/**gif**(mp4 は含めない)・`%` 含みパス拒否・例外を投げない。基準ディレクトリ名 `images/` は `features/news/consts.ts` の定数を参照する。クライアント(rehype プラグイン)から import するため `server/services/` ではなく共有 `utils/` に置く
+  - `resolve-news-media-url.spec.ts` に境界マトリクス(ディレクトリ脱出・他リポジトリ配下・偽ディレクトリ・**サブディレクトリ(`images/sub/x.gif`)拒否**・http ダウングレード・credentials/query/hash・`%` 含みパス・gif 受理・mp4 拒否)を実装し全て green
   - _Boundary: resolveNewsMediaUrl_
   - _Requirements: 3.1, 3.2, 3.3_
 
