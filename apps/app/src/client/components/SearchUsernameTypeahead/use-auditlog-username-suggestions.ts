@@ -1,6 +1,7 @@
 import { useSWRxAuditlogSuggestions } from '~/stores/activity';
 
 import type { UsernameSuggestions } from './username-suggestions';
+import { toUsernameSuggestions } from './username-suggestions';
 
 /**
  * Admin-only source, backed by `/activity/suggestions` (`adminRequired`).
@@ -17,11 +18,10 @@ export const useAuditlogUsernameSuggestions = (
     keyword,
   );
 
-  return {
-    activeUsernames: data?.username?.activeUsernames ?? [],
-    inactiveUsernames: data?.username?.inactiveUsernames ?? [],
-    // SWR keeps `isLoading` true while it retries; a failed request must not
-    // leave the typeahead spinning.
-    isLoading: isLoading === true && error == null,
-  };
+  return toUsernameSuggestions({
+    activeUsernames: data?.username?.activeUsernames,
+    inactiveUsernames: data?.username?.inactiveUsernames,
+    error,
+    isLoading,
+  });
 };

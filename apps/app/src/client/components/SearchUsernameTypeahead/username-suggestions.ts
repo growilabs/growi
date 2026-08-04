@@ -15,3 +15,28 @@ export type UsernameSuggestions = {
  * order, and swapping the function between renders reorders the hooks it calls.
  */
 export type UseUsernameSuggestions = (keyword: string) => UsernameSuggestions;
+
+type SuggestionSourceState = {
+  activeUsernames?: string[];
+  inactiveUsernames?: string[];
+  error?: unknown;
+  isLoading?: boolean;
+};
+
+/**
+ * Builds the injected-source contract from an SWR response.
+ *
+ * Each source reads its two username lists out of a differently-shaped payload
+ * but derives `isLoading` identically: SWR keeps it true while it retries, and a
+ * failed request must not leave the typeahead spinning forever.
+ */
+export const toUsernameSuggestions = ({
+  activeUsernames,
+  inactiveUsernames,
+  error,
+  isLoading,
+}: SuggestionSourceState): UsernameSuggestions => ({
+  activeUsernames: activeUsernames ?? [],
+  inactiveUsernames: inactiveUsernames ?? [],
+  isLoading: isLoading === true && error == null,
+});

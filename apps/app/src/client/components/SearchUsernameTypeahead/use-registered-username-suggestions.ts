@@ -1,6 +1,7 @@
 import { useSWRxUsernames } from '~/stores/user';
 
 import type { UsernameSuggestions } from './username-suggestions';
+import { toUsernameSuggestions } from './username-suggestions';
 
 /**
  * Source for callers outside the admin pages, backed by `/users/usernames`
@@ -14,10 +15,10 @@ export const useRegisteredUsernameSuggestions = (
 ): UsernameSuggestions => {
   const { data, error, isLoading } = useSWRxUsernames(keyword);
 
-  return {
-    activeUsernames: data?.activeUser?.usernames ?? [],
-    inactiveUsernames: data?.inactiveUser?.usernames ?? [],
-    // See the note in use-auditlog-username-suggestions.ts.
-    isLoading: isLoading === true && error == null,
-  };
+  return toUsernameSuggestions({
+    activeUsernames: data?.activeUser?.usernames,
+    inactiveUsernames: data?.inactiveUser?.usernames,
+    error,
+    isLoading,
+  });
 };
