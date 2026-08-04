@@ -19,8 +19,8 @@ vi.mock('next-i18next', () => ({
   }),
 }));
 
-// Not under test here, and it owns an AsyncTypeahead of its own whose requests
-// would muddy the endpoint assertions below.
+// Owns an AsyncTypeahead of its own, whose requests would muddy the endpoint
+// assertions below.
 vi.mock('~/client/components/PageTags/TagEditModal/TagsInput', () => ({
   TagsInput: () => <div data-testid="tags-input" />,
 }));
@@ -35,9 +35,8 @@ const EMPTY_FILTERS: SearchFilterState = {
 const AUDITLOG_SUGGESTIONS_ENDPOINT = '/activity/suggestions';
 const REGISTERED_USERNAMES_ENDPOINT = '/users/usernames';
 
-// Fresh SWR cache per render so cache keys never leak across tests. The
-// suggestion hooks are `useSWRImmutable`, so a key cached by an earlier test
-// would be served without ever calling the fetcher again.
+// Fresh SWR cache per render: the suggestion hooks are `useSWRImmutable`, so a
+// key cached by an earlier test is served without calling the fetcher again.
 const wrapper = ({ children }: { children: ReactNode }): JSX.Element => (
   <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
     {children}
@@ -52,8 +51,7 @@ const renderPanel = () =>
 const requestedEndpoints = () =>
   mockApiv3Get.mock.calls.map(([endpoint]) => endpoint);
 
-// Author and editor both render a username typeahead; the tag input is mocked
-// out, so these are the only comboboxes on the panel.
+// Author and editor both render a username typeahead; author is first.
 const typeIntoAuthorField = (text: string) =>
   userEvent.type(screen.getAllByRole('combobox')[0], text);
 
@@ -63,20 +61,18 @@ describe('SearchFilterPanel', () => {
   });
 
   /**
-   * This page is reachable by any logged-in user, but `/activity/suggestions` is
-   * adminRequired — pointing the username filters at it makes suggestions 403 for
-   * every non-admin (the regression this guards, see PR #11639). The assertion is
-   * on the endpoint actually requested rather than on which hook was passed in, so
-   * it survives any refactoring of how the source reaches the typeahead.
+   * Guards the 403 regression: this page is open to any logged-in user, but
+   * `/activity/suggestions` is adminRequired. Asserted on the endpoint actually
+   * requested, not on which hook was passed, so it survives refactoring of how
+   * the source reaches the typeahead.
    */
   it('suggests usernames from the login-required endpoint, never the admin-only one', async () => {
     renderPanel();
 
     await typeIntoAuthorField('ali');
 
-    // Wait for a suggestion request to actually happen first. Without this the
-    // negative assertion below would pass vacuously, before the debounced
-    // `onSearch` has fired at all.
+    // Without waiting for a request to land, the negative assertion below passes
+    // vacuously — before the debounced `onSearch` has fired at all.
     await waitFor(() => {
       expect(requestedEndpoints()).toContain(REGISTERED_USERNAMES_ENDPOINT);
     });

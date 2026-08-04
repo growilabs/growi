@@ -18,8 +18,8 @@ const EMPTY_SUGGESTIONS: UsernameSuggestions = {
 
 let suggestions: UsernameSuggestions = EMPTY_SUGGESTIONS;
 
-// A module-scope function, so every render passes the same reference — the
-// stability the `UseUsernameSuggestions` contract requires.
+// Module-scope, so every render passes the same reference — the stability
+// `UseUsernameSuggestions` requires.
 const useFakeSuggestions = () => suggestions;
 
 const mockSuggestions = (
@@ -44,10 +44,8 @@ describe('SearchUsernameTypeahead', () => {
     suggestions = EMPTY_SUGGESTIONS;
   });
 
-  // The group headers must resolve from `commons`, the only namespace every
-  // caller loads: admin pages request ['admin'] and the search page requests
-  // ['translation'], so a key in either would render raw on the other. The `t`
-  // mock echoes the key, so asserting the full key locks that namespace in.
+  // The `t` mock echoes the key, so asserting the full key locks in the
+  // namespace — which is the part that breaks (see CATEGORY_LABEL_KEYS).
   it('labels the groups with commons-namespaced keys, not hardcoded text', async () => {
     mockSuggestions(['alice'], ['bob']);
 
@@ -167,9 +165,8 @@ describe('SearchUsernameTypeahead', () => {
     expect(queryByText('alice')).not.toBeInTheDocument();
   });
 
-  // The point of injecting the source: whichever one a caller supplies has to
-  // receive the typed keyword. Awaited because `AsyncTypeahead` debounces
-  // `onSearch` by `delay` before the keyword reaches the source.
+  // Awaited because `AsyncTypeahead` debounces `onSearch` by `delay` before the
+  // keyword reaches the source.
   it('queries the injected source with the typed keyword', async () => {
     const spy = vi.fn(() => EMPTY_SUGGESTIONS);
 

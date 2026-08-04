@@ -17,9 +17,8 @@ import type { IClearable } from '~/client/interfaces/clearable';
 import { shouldShowUsernameSuggestion } from './should-show-username-suggestion';
 import type { UseUsernameSuggestions } from './username-suggestions';
 
-// Internal grouping keys, not display text: `renderMenu` groups options by them
-// and `toUserDataItem` defaults to one, so the values are load-bearing. The
-// visible label is translated at render time via CATEGORY_LABEL_KEYS.
+// Grouping keys, not display text — `renderMenu` groups options by them and
+// `toUserDataItem` defaults to one, so the values are load-bearing.
 const Categories = {
   activeUser: 'activeUser',
   inactiveUser: 'inactiveUser',
@@ -27,11 +26,9 @@ const Categories = {
 
 type CategoryType = (typeof Categories)[keyof typeof Categories];
 
-// `commons` is the only namespace every caller loads: admin pages request
-// ['admin'] and the search page requests ['translation'], so neither is shared
-// (see pages/common-props/i18n.ts, which always prepends 'commons'). Putting
-// these labels anywhere else would render raw keys on half the call sites — the
-// same constraint that makes `placeholder` an overridable prop below.
+// Must be `commons`: admin pages load ['admin'] and the search page loads
+// ['translation'], so it is the only namespace both get (see
+// pages/common-props/i18n.ts). Anywhere else renders raw keys on half the callers.
 const CATEGORY_LABEL_KEYS = {
   [Categories.activeUser]: 'commons:username_suggestion.active_user',
   [Categories.inactiveUser]: 'commons:username_suggestion.inactive_user',
@@ -51,9 +48,7 @@ const toUserDataItem = (username: string): UserDataType => ({
 
 type Props = {
   onChange: (text: string[]) => void;
-  // Required rather than defaulted: the available sources differ in the privilege
-  // they demand, so picking one silently would 403 for some callers.
-  // See `UseUsernameSuggestions` for the stable-reference requirement.
+  // Required, not defaulted — see `UseUsernameSuggestions`.
   useUsernameSuggestions: UseUsernameSuggestions;
   initialUsernames?: string[];
   // Callers outside the admin pages must supply their own placeholder: the

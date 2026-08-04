@@ -59,10 +59,9 @@ const UsernameFilterField = (props: UsernameFilterFieldProps): JSX.Element => {
         Semi-controlled via `initialUsernames`, not `selected`: the typeahead
         keeps each item's `category` internally, which this panel (usernames
         only) can't supply — unlike the fully-controlled TagsInput below.
-      */}
-      {/*
-        The registered-user source, not the audit-log one: `/activity/suggestions`
-        is adminRequired and would 403 for ordinary users on this page.
+
+        The suggestion source must be the registered-user one: this page is open
+        to any logged-in user, and the audit-log source is adminRequired.
       */}
       <SearchUsernameTypeahead
         id={id}

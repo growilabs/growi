@@ -3,10 +3,11 @@ import { useSWRxUsernames } from '~/stores/user';
 import type { UsernameSuggestions } from './username-suggestions';
 
 /**
- * Suggestion source for callers outside the admin pages, backed by
- * `/users/usernames` (`loginRequired`). It suggests only users registered in this
- * GROWI — it cannot surface historical names that exist merely as recorded
- * activity operators, which is the trade-off for being available to non-admins.
+ * Source for callers outside the admin pages, backed by `/users/usernames`
+ * (`loginRequired`).
+ *
+ * Suggests only registered users; historical names that exist merely as activity
+ * operators are unreachable — the trade-off for being available to non-admins.
  */
 export const useRegisteredUsernameSuggestions = (
   keyword: string,
@@ -16,8 +17,7 @@ export const useRegisteredUsernameSuggestions = (
   return {
     activeUsernames: data?.activeUser?.usernames ?? [],
     inactiveUsernames: data?.inactiveUser?.usernames ?? [],
-    // A failed request must not leave the typeahead spinning: SWR keeps
-    // `isLoading` true while it retries.
+    // See the note in use-auditlog-username-suggestions.ts.
     isLoading: isLoading === true && error == null,
   };
 };
