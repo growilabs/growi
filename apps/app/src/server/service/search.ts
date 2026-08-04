@@ -160,7 +160,11 @@ const AUDITLOG_SUGGESTION_HANDLERS: {
       'username',
       q,
       limit,
-      prisma.activities.findSnapshotUsernamesByUsernameRegex,
+      // Wrapped, not passed directly: the Prisma extension method reads
+      // `this` via Prisma.getExtensionContext, so passing it as a bare
+      // reference would detach it from `prisma.activities` and throw.
+      (query, option) =>
+        prisma.activities.findSnapshotUsernamesByUsernameRegex(query, option),
     );
 
     const User = mongoose.model<IUser>('User');
@@ -197,7 +201,8 @@ const AUDITLOG_SUGGESTION_HANDLERS: {
       'endpoint',
       q,
       limit,
-      prisma.activities.findEndpointsByEndpointRegex,
+      (query, option) =>
+        prisma.activities.findEndpointsByEndpointRegex(query, option),
     );
 
     return { endpoint: { endpoints } };
