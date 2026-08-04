@@ -12,16 +12,15 @@ const WIP_EXPIRED_AT_INDEX_NAME = 'wipExpiredAt_1';
 const DEFAULT_WIP_PAGE_EXPIRATION_SECONDS = 172800;
 
 /**
- * Backstops a data anomaly (e.g. a parent cycle) from spinning forever. Passes
- * after the first only re-examine the parents of what was just deleted, so this
- * caps the depth of the cascade, not how many pages can be removed.
+ * Backstops a data anomaly (e.g. a parent cycle) from spinning forever. Caps the
+ * depth of the cascade, not how many pages can be removed.
  */
 const MAX_EMPTY_CLEANUP_PASSES = 100;
 
 /**
- * Bounds every id array this migration puts in a query, and every result set it
- * holds in memory. This runs at boot against a collection of unknown size: an
- * unbounded `$in` breaches the 16 MB BSON document limit and fails the upgrade.
+ * Bounds every id array this migration puts in a query. It runs at boot against a
+ * collection of unknown size, and an unbounded `$in` breaches the 16 MB BSON limit
+ * and fails the upgrade.
  */
 const BATCH_SIZE = 1000;
 
@@ -88,13 +87,12 @@ async function resolveWipPageExpirationSeconds(db) {
 }
 
 /**
- * Deletes a batch of childless empty pages and returns their parents, so the
- * caller can climb one level.
+ * Deletes a batch of childless empty pages and returns their parents, so the caller
+ * can climb one level.
  *
- * The runtime service equivalent re-verifies childlessness and `isEmpty` here
- * because it runs against a live site. This copy deliberately does not: a
- * migration runs at boot before the server accepts requests, so nothing can
- * create a page under a candidate between the scan and the delete.
+ * The service equivalent re-verifies childlessness and `isEmpty` before deleting
+ * because it runs against a live site. This copy needs neither: a migration runs at
+ * boot, before the server accepts requests.
  */
 async function deleteEmptyLeafBatch(collection, candidates) {
   const ids = candidates.map((p) => p._id);
@@ -137,9 +135,8 @@ async function sweepAllEmptyLeaves(collection) {
     removed += res.removed;
     parentIds.push(...res.parentIds);
 
-    // Every candidate is deleted unconditionally here, so the next scan cannot
-    // return the same batch. No $skip is needed (unlike the service copy, whose
-    // live-site re-verification can decline a candidate).
+    // No $skip needed: candidates are deleted unconditionally, so the next scan
+    // cannot return the same batch.
   }
 }
 
@@ -182,16 +179,15 @@ async function filterChildless(collection, candidates) {
 }
 
 /**
- * An empty page is a structural placeholder that only connects a real descendant
- * to its ancestors; once childless it serves no purpose. Historically the TTL
- * index deleted WIP pages without running application code, so the placeholders
- * that only hosted them were orphaned.
+ * An empty page is a structural placeholder that only connects a real descendant to
+ * its ancestors; once childless it serves no purpose. Historically the TTL index
+ * deleted WIP pages without running application code, so the placeholders that only
+ * hosted them were orphaned.
  *
- * Deleting one can leave its (also empty) parent childless, so the cascade
- * repeats — but only over the parents of what was just removed. Nothing else can
- * have become a childless empty page as a result of this run, so re-scanning the
- * whole collection per cascade level would re-read every page to find, at most, a
- * handful of newly exposed leaves. That matters here: this is a boot-time step.
+ * Deleting one can leave its (also empty) parent childless, so the cascade repeats —
+ * but only over the parents of what was just removed, since nothing else can have
+ * become childless as a result of this run. Re-scanning the whole collection per
+ * cascade level would be a real cost at boot.
  */
 async function removeEmptyLeafHierarchies(db) {
   const collection = db.collection(PAGES);
@@ -233,17 +229,14 @@ async function removeEmptyLeafHierarchies(db) {
  * as its expiry, so the stored value has the configured duration added to it.
  *
  * WHY an already-overdue page is re-granted a full window instead:
- *   adding the duration is not sufficient on its own — a `ttlTimestamp` older than
- *   one expiration window still converts to a past instant. That backlog is normal
- *   on an instance whose TTL monitor was not reaping (TTL disabled on a managed
- *   MongoDB, a failed index creation, a long monitor outage), and those are exactly
- *   the instances holding months-old values. Converting them faithfully would hand
- *   the first sweep after the upgrade a mass deletion — and the new sweep deletes
- *   *completely* (revisions, attachments and search-index entries go too, with no
- *   trash to restore from), so it is strictly more destructive than the TTL index it
- *   replaces. Anything already overdue therefore expires one full window from the
- *   migration, giving operators and authors a chance to notice before it goes.
- *   A page that is not yet overdue keeps its real deadline.
+ *   adding the duration is not enough on its own — a `ttlTimestamp` older than one
+ *   window still converts to a past instant, which is the normal state on an
+ *   instance whose TTL monitor was not reaping (TTL disabled on a managed MongoDB,
+ *   a failed index creation, a long outage). Converting those faithfully hands the
+ *   first sweep after the upgrade a mass deletion, and the new sweep deletes
+ *   *completely* — revisions, attachments and search-index entries too, with no
+ *   trash to restore from. So anything already overdue expires one window from the
+ *   migration; anything still inside its window keeps its real deadline.
  *
  * WHY pages with descendants are exempted:
  *   `makeWip()` withholds the expiry from a page that already has children
@@ -297,11 +290,11 @@ export async function up(db) {
   );
   const expirableIds = expirableDocs.map((doc) => doc._id);
 
-  // One instant for both the boundary and the re-granted expiry, so the count
-  // logged below describes exactly the documents the update re-grants.
+  // One instant for both bounds, so the count logged below describes exactly the
+  // documents the update re-grants.
   const migratedAt = new Date();
-  // `ttlTimestamp + expirationMs < migratedAt` restated as a bound on the stored
-  // value, so the comparison can be done in the pipeline and in JS identically.
+  // `ttlTimestamp + expirationMs < migratedAt`, restated as a bound on the stored
+  // value so the pipeline and the JS count compare identically.
   const overdueBefore = new Date(migratedAt.getTime() - expirationMs);
   const regrantedExpiry = new Date(migratedAt.getTime() + expirationMs);
 
@@ -403,10 +396,9 @@ export async function down(db) {
   // - the legacy field on pages exempted for having descendants: they end up with
   //   neither field, so the recreated TTL index cannot delete them. That is the
   //   safe direction — it is what `disableTtl` intended for them all along;
-  // - the original instant on pages up() re-granted for being already overdue:
-  //   subtracting the duration yields the migration time, not their real
-  //   ttlTimestamp, which the re-grant deliberately discarded. So a round trip
-  //   hands them back to the TTL index with the extra window intact rather than
-  //   letting the recreated index reap them immediately — again the safe direction.
+  // - the original instant on pages up() re-granted for being overdue: the re-grant
+  //   discarded it, so subtracting the duration yields the migration time. A round
+  //   trip hands them back with the extra window intact rather than letting the
+  //   recreated index reap them at once — again the safe direction.
   logger.info('Rollback has successfully applied');
 }

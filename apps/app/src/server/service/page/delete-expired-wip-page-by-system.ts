@@ -8,11 +8,7 @@ import type { IPageService } from './page-service';
 
 const logger = loggerFactory('growi:services:page:delete-expired-wip');
 
-/**
- * How long a page whose deletion threw waits before a sweep may claim it again.
- * Shorter than any sensible cron schedule, so in practice it means "retry on the
- * next run" while still keeping a single run from re-claiming the same page.
- */
+/** Shorter than any sensible cron schedule, so effectively "retry on the next run". */
 const FAILED_DELETION_RETRY_BACKOFF_MS = 60 * 60 * 1000;
 
 /**
@@ -38,21 +34,13 @@ export type DeleteExpiredWipPageSummary = {
 };
 
 /**
- * Puts back the expiry that the claim withdrew, after the deletion failed.
+ * Puts back the expiry the claim withdrew, so a later sweep retries the deletion.
+ * Without it the failure is permanent: the sweep selects on `wipExpiredAt`, so a
+ * page left without one is never looked at again.
  *
- * Without this the failure is permanent and silent: the sweep selects on
- * `wipExpiredAt`, so a page left without one is never looked at again — it stays
- * WIP forever while the operator sees nothing but one log line. Re-arming makes a
- * transient failure (a MongoDB hiccup, search index or attachment store being
- * down) cost a retry instead of the whole feature for that page.
- *
- * The filter is what keeps this from becoming its own data-loss path: it re-arms
- * only a page that is still WIP and still has no expiry, i.e. still exactly what
- * the claim left behind. If the page was published, re-claimed, or already removed
- * meanwhile, it matches nothing and the state stands.
- *
- * A failure here is swallowed on purpose — the sweep is already in its error path,
- * and losing the remaining backlog to a secondary error would be the worse outcome.
+ * The filter keeps this from becoming its own data-loss path — it matches only a
+ * page still in the state the claim left it in, never one published or re-claimed
+ * meanwhile. Errors are swallowed rather than lose the rest of the backlog.
  */
 const rearmExpiry = async (
   Page: PageModel,

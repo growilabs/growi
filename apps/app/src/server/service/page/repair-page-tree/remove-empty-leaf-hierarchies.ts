@@ -9,20 +9,18 @@ const logger = loggerFactory(
 );
 
 /**
- * Bounds every id array this module puts in a query, and every result set it holds
- * in memory. Without it a wiki with a large orphan backlog builds a `$in` big enough
- * to breach the 16 MB BSON document limit and fail the whole repair.
+ * Bounds every id array this module puts in a query. Unbounded, a large orphan
+ * backlog builds a `$in` past the 16 MB BSON limit and fails the whole repair.
  */
 const BATCH_SIZE = 1000;
 
 /**
- * Backstops a data anomaly (e.g. a parent cycle) from spinning forever. Passes after
- * the first only re-examine the parents of what was just deleted, so this caps the
+ * Backstops a data anomaly (e.g. a parent cycle) from spinning forever. Caps the
  * depth of the cascade, not how many pages can be removed.
  */
 const MAX_PASSES = 100;
 
-/** The scan's snapshot of a candidate: enough to delete it and climb one level. */
+/** Enough to delete a candidate and climb one level. */
 type EmptyLeafCandidate = {
   _id: mongoose.Types.ObjectId;
   parent?: mongoose.Types.ObjectId | null;
@@ -34,20 +32,16 @@ type SweepResult = {
 };
 
 /**
- * Deletes the candidates that are still orphaned placeholders, and reports the
- * parents of the ones it removed so the caller can walk one level up.
+ * Deletes the candidates that are still orphaned placeholders, reporting their
+ * parents so the caller can climb one level.
  *
- * Candidates are a *snapshot*: the caller found them earlier, and this runs against
- * a live site (the admin endpoint gates on maintenance mode, the service itself does
- * not). Both conditions are therefore re-checked at delete time rather than trusted:
+ * Candidates are a snapshot the caller took earlier, and the service can run against
+ * a live site (only the admin endpoint gates on maintenance mode), so both conditions
+ * are re-checked here: a page created under a candidate meanwhile would be orphaned,
+ * and a placeholder can have been filled in by a real page creation
+ * (preparePageDocumentToCreate reuses empty pages).
  *
- *  - childlessness, because a page created under a candidate in the meantime would
- *    be orphaned by removing its parent;
- *  - `isEmpty`, because a placeholder can be filled in by an ordinary page creation
- *    (preparePageDocumentToCreate reuses empty pages), turning it into real content.
- *
- * Exported for the co-located test, which passes a deliberately stale snapshot to
- * reproduce both races without having to interleave anything.
+ * Exported so the test can pass a stale snapshot instead of interleaving.
  */
 export const deleteStillOrphanedEmptyPages = async (
   candidates: EmptyLeafCandidate[],
@@ -74,9 +68,8 @@ export const deleteStillOrphanedEmptyPages = async (
     isEmpty: true,
   });
 
-  // Parents of everything that passed the childless check. A candidate the isEmpty
-  // re-assert rejected contributes its parent too, which costs one wasted
-  // re-examination — cheaper than reading back the ids to find out which went.
+  // Includes parents of candidates the isEmpty re-assert rejected: one wasted
+  // re-examination is cheaper than reading back which ids actually went.
   const parentIds = stillChildless
     .map((c) => c.parent)
     .filter((id): id is mongoose.Types.ObjectId => id != null);
@@ -85,10 +78,9 @@ export const deleteStillOrphanedEmptyPages = async (
 };
 
 /**
- * Scans the whole collection for childless empty pages, one bounded batch at a time.
- *
- * `$skip` advances past candidates the delete step declined, so a batch that is
- * rejected in full cannot be handed back forever.
+ * Scans the whole collection, one bounded batch at a time. `$skip` advances past
+ * candidates the delete step declined, so a fully rejected batch is not handed back
+ * forever.
  */
 const sweepAllEmptyLeaves = async (): Promise<SweepResult> => {
   const Page = mongoose.model<IPage, PageModel>('Page');
@@ -127,10 +119,7 @@ const sweepAllEmptyLeaves = async (): Promise<SweepResult> => {
   }
 };
 
-/**
- * Re-examines a known set of pages — the parents of what the previous pass removed —
- * and deletes the ones that have themselves become childless placeholders.
- */
+/** Deletes whichever of the given pages have themselves become childless placeholders. */
 const sweepCandidates = async (
   candidateIds: mongoose.Types.ObjectId[],
 ): Promise<SweepResult> => {
@@ -158,16 +147,14 @@ const sweepCandidates = async (
 /**
  * Removes empty placeholder pages that no longer connect anything.
  *
- * An empty page is a structural node that exists only to link a real descendant to
- * its ancestors; once childless it serves no purpose. Historically the WIP TTL index
- * deleted pages without running application code, so the placeholders that only
- * hosted them were left orphaned.
+ * An empty page exists only to link a real descendant to its ancestors; once
+ * childless it serves no purpose. Historically the WIP TTL index deleted pages
+ * without running application code, so the placeholders that only hosted them were
+ * left orphaned.
  *
  * Deleting one can leave its (also empty) parent childless, so the cascade repeats —
- * but only over the parents of what was just removed. Nothing else can have become a
- * childless empty page as a result of this run, so the previous shape (re-scan the
- * whole collection per cascade level) re-read every page to find, at most, a handful
- * of newly exposed leaves.
+ * but only over the parents of what was just removed, since nothing else can have
+ * become childless as a result of this run.
  *
  * @returns the number of pages removed
  */

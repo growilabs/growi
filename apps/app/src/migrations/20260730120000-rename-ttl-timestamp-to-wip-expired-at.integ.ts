@@ -5,11 +5,9 @@
  *  - the stored value is CONVERTED, not renamed: `ttlTimestamp` held the moment the
  *    page was made WIP and the TTL index supplied the duration, whereas
  *    `wipExpiredAt` is the absolute expiry;
- *  - no page comes out of the migration already expired, whatever it went in as:
- *    a legacy timestamp older than one expiration window converts to a past
- *    instant even after the duration is added, so those are re-granted a full
- *    window from the migration. Otherwise the first cleanup run after the upgrade
- *    would completely delete the whole backlog at once;
+ *  - no page comes out already expired, whatever it went in as: a timestamp older
+ *    than one window is still past even after the duration is added, so those get a
+ *    full window from the migration instead of feeding the first cleanup run;
  *  - a legacy page that has descendants is exempted (field dropped, no expiry
  *    granted), mirroring makeWip()'s `disableTtl`;
  *  - the orphaned-empty-page sweep runs first, so "has descendants" is judged
@@ -34,9 +32,8 @@ describe('rename-ttl-timestamp-to-wip-expired-at', () => {
   let configs: Collection;
   let migrate: typeof import('./20260730120000-rename-ttl-timestamp-to-wip-expired-at');
 
-  // Relative to now, not a fixed date: a fixture pinned to an absolute instant
-  // silently ages into the already-overdue branch, which converts to a different
-  // value and would make these expectations pass for the wrong reason.
+  // Relative to now: a fixture pinned to an absolute instant silently ages into the
+  // already-overdue branch and starts passing for the wrong reason.
   const madeWipAt = new Date(Date.now() - 60 * 60 * 1000); // 1h ago: not yet overdue
   const expectedExpiry = new Date(
     madeWipAt.getTime() + EXPIRATION_SECONDS * 1000,
@@ -88,15 +85,14 @@ describe('rename-ttl-timestamp-to-wip-expired-at', () => {
     const doc = await pages.findOne({ _id: id });
     expect(doc?.ttlTimestamp).toBeUndefined();
     expect((doc?.wipExpiredAt as Date).getTime()).toBe(expectedExpiry.getTime());
-    // The whole point: a rename would have produced madeWipAt, i.e. already past,
-    // and the next sweep would have deleted the page completely.
+    // A rename would have produced madeWipAt — already past, so the next sweep
+    // would have deleted the page completely.
     expect((doc?.wipExpiredAt as Date).getTime()).toBeGreaterThan(Date.now());
   });
 
   it('re-grants a full window to a page that was already overdue, instead of converting it to a past instant', async () => {
     // The backlog on an instance whose TTL monitor was not reaping: adding the
-    // duration to a months-old timestamp still lands in the past, so a faithful
-    // conversion would feed the whole backlog to the first sweep after the upgrade.
+    // duration to a months-old timestamp still lands in the past.
     const id = track(new ObjectId());
     await pages.insertOne({
       _id: id,
@@ -118,10 +114,9 @@ describe('rename-ttl-timestamp-to-wip-expired-at', () => {
   });
 
   it('splits at exactly one expiration window: just-overdue is re-granted, just-inside keeps its real deadline', async () => {
-    // Pins where the two branches meet. Without this, the boundary could drift by
-    // a whole window in either direction and both tests above would still pass —
-    // and drifting it earlier reintroduces the bug, since a page that is overdue
-    // by minutes would then convert faithfully to a past instant.
+    // Pins where the two branches meet: the boundary could otherwise drift by a
+    // whole window with both tests above still green, and drifting it earlier
+    // reintroduces the bug for a page overdue by minutes.
     const windowMs = EXPIRATION_SECONDS * 1000;
     const justOverdue = track(new ObjectId());
     const justInside = track(new ObjectId());

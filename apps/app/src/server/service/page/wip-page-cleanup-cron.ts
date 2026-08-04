@@ -49,10 +49,9 @@ export class WipPageCleanupCronService extends CronService {
   override async executeJob(): Promise<void> {
     await randomSleep(MAX_RANDOM_SLEEP_MS);
 
-    // Maintenance mode is when an operator repairs the tree by hand, and the page
-    // tree repair recounts descendantCount across the whole collection while this
-    // sweep deletes pages out from under it. Skipping is free: expired pages stay
-    // expired and the next run collects them.
+    // The page tree repair runs in maintenance mode and recounts descendantCount
+    // across the collection; deleting pages underneath it races that recount.
+    // Skipping is free — the pages stay expired for the next run.
     if (this.crowi.appService.isMaintenanceMode()) {
       logger.info(
         'Skipping the expired WIP page cleanup: GROWI is in maintenance mode',
@@ -86,8 +85,8 @@ export class WipPageCleanupCronService extends CronService {
 
     logger.info(summary, 'Expired WIP page cleanup finished');
 
-    // A failure is retried on the next run, so it is not lost — but a page that
-    // keeps failing would otherwise only ever surface as one error line per run.
+    // Retried next run, but a page that keeps failing would otherwise surface only
+    // as one error line per run.
     if (summary.failed > 0) {
       logger.warn(
         summary,

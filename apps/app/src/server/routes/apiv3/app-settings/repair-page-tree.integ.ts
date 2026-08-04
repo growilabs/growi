@@ -2,18 +2,14 @@
  * Integration test for POST /app-settings/repair-page-tree.
  *
  * Contract under test (HTTP response + whether the repair is started):
- *  - it refuses to start outside maintenance mode. The repair deletes pages and
- *    rewrites descendantCount across the whole collection; running it against a
- *    live wiki races every concurrent edit;
- *  - it refuses to stack a second run on a repair already in progress. The admin
- *    UI disables its button, but that state is per-browser and a reload clears it,
- *    so the server cannot rely on it;
- *  - when both gates pass it starts the repair and answers immediately, because
- *    the work outlives the request.
+ *  - it refuses outside maintenance mode, because the repair deletes pages and
+ *    rewrites descendantCount across the collection while edits are live;
+ *  - it refuses to stack a second run on one already in progress (the admin UI
+ *    disables its button, but that state is per-browser and a reload clears it);
+ *  - when both gates pass it starts the repair and answers immediately.
  *
- * The repair service is mocked at the module boundary: whether it *ran* is the
- * observable outcome the gates exist to control, and the real one needs a whole
- * page collection to chew on. Its own behaviour is covered by
+ * The service is mocked at the module boundary — whether it *ran* is the outcome
+ * the gates control. Its own behaviour is covered by
  * service/page/repair-page-tree/index.integ.ts.
  */
 import type { NextFunction, Request, Response } from 'express';
@@ -70,11 +66,10 @@ describe('POST /app-settings/repair-page-tree', () => {
   let app: express.Application;
   let isMaintenanceMode = true;
 
-  // Mounted ONCE. app-settings/index.ts creates its express.Router() at module
-  // scope, so every setup() call registers another copy of every handler on the
-  // same router — and the first copy, closed over the first crowi mock, is the one
-  // that serves requests. Per-test state therefore has to be reachable through
-  // mutable closures (below), not through a freshly built crowi.
+  // Mounted ONCE: app-settings/index.ts creates its Router at module scope, so a
+  // second setup() call stacks another copy of every handler and the first copy —
+  // closed over the first crowi mock — is what serves requests. Per-test state has
+  // to reach the handler through mutable closures, not a rebuilt crowi.
   beforeAll(async () => {
     const s2sMessagingServiceMock = mock<S2sMessagingService>();
     configManager.setS2sMessagingService(s2sMessagingServiceMock);
@@ -132,8 +127,7 @@ describe('POST /app-settings/repair-page-tree', () => {
   });
 
   it('answers without waiting for the repair to finish', async () => {
-    // The repair walks the whole collection, so holding the request open would
-    // guarantee a gateway timeout and leave the operator with no confirmation.
+    // It walks the whole collection; holding the request open would time out.
     let finishRepair: () => void = () => {};
     mockRepairPageTree.mockReturnValue(
       new Promise<void>((resolve) => {

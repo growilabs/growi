@@ -117,13 +117,11 @@ describe('repair-page-tree (integration)', () => {
   });
 
   describe('deleteStillOrphanedEmptyPages', () => {
-    // The scan and the delete are two round trips, and the service can run against
-    // a live site. Candidates are therefore a stale snapshot by construction, which
-    // is what these tests hand it — no interleaving required.
+    // The scan and the delete are two round trips against a possibly live site, so
+    // candidates are a stale snapshot by construction — which is what these pass.
 
     it('spares a candidate that gained a child after it was scanned', async () => {
-      // Deleting it would orphan the new child: its parent link would dangle and it
-      // would drop out of the page tree entirely.
+      // Deleting it dangles the new child's parent link, dropping it off the tree.
       const staleId = new mongoose.Types.ObjectId();
       await Page.create({
         _id: staleId,
@@ -149,8 +147,7 @@ describe('repair-page-tree (integration)', () => {
 
     it('spares a candidate that stopped being empty after it was scanned', async () => {
       // preparePageDocumentToCreate reuses an empty placeholder when a real page is
-      // created at its path, so a candidate can turn into content. Deleting it then
-      // would destroy a page the user just wrote.
+      // created at its path, so a candidate can have turned into content.
       const staleId = new mongoose.Types.ObjectId();
       await Page.create({
         _id: staleId,
