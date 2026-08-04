@@ -60,7 +60,15 @@ spec を読めば足りる状態にする。回帰したら壊れる約束を要
 5. Where 自前ホストの draw.io がサブパス配下に配置されている, when 数式を有効にした図を閲覧したとき, the GROWI のビューア shall その数式を描画する。
 6. Where 数式を有効にしていない図, the GROWI のビューア shall 数式として組版しない（従来どおりの見え方を保つ）。
 
-_担保しているテスト:_ `adopt-mathjax.spec.ts`（読み込みが 1 回だけであること、参照先の付け替え、フォントの参照先が連動すること、参照先が読めないときに後始末が残らないこと）、`relocate-math-url.spec.ts`（サブパス、解釈できない値）、`index.spec.ts`（自前ホストのときだけ効くこと）。**AC 1・3・4 の「実際に描画される」ことは単体テストでは担保できない** — 要件 10 の検証手順で確かめる。
+_担保しているテスト:_
+
+- **AC 2 — 担保あり。** `adopt-mathjax.spec.ts`: `should boot MathJax from the configured instance`、`should boot MathJax exactly once, so the second boot cannot break the first`、`should repoint DRAW_MATH_URL, which the font path is derived from`、`should reuse the baked-in directory so the draw.io version needs no detecting`。ただしこれらは `viewer-static.min.js` の代役を spec 内に書いて当てているので、担保しているのは「そう振る舞う draw.io に対して GROWI 側の手当てが正しいこと」である。
+- **AC 3 — 部分的。** 焼き込み先へ要求を出さないという機構は `adopt-mathjax.spec.ts` の `should stop the bundle from requesting the baked-in location at all` が担保する。**「それでも数式が描画される」ことは担保が無い。**
+- **AC 5 — 部分的。** URL の組み立てだけを `relocate-math-url.spec.ts` の `should keep the sub path when draw.io is deployed under one` と `use-viewer-min-js-url.spec.ts` の `http://example.com/drawio` の行が担保する。**サブパス構成で実際に描画されることは担保が無い**（design の「未実施の手動確認」）。
+- **AC 1・4 — 担保が無い。** 要件 10 の検証手順で確かめる。
+- **AC 6 — 担保が無い。** 組版するかどうかは draw.io 側の判断で GROWI 側に分岐が無いため、当てるテストも無い。#11633 の実測（数式を有効にしていない図では組版されない）でのみ確認している。
+- `relocate-math-url.spec.ts` は解釈できない値の扱い（`should return undefined when $reason`、`should return undefined when drawioUri cannot be parsed`）も担保する。移し替えができない経路で仮値を残さないこと（`adopt-mathjax.spec.ts` の `should put draw.io back to its own behaviour, asking for draw.io's location`、`should leave no suppression behind`、`should not throw when the bundle exposes no Editor`）は、特定の受け入れ基準ではなく design の SelfHostedEntryPoints の不変条件に対応する。
+- **`index.spec.ts` が担保するのは 2 つの入口のうち読み込み前の `prepareSelfHostedDrawio` だけ**である。読み込み後の `adoptSelfHostedDrawio`（`adoptMathJax` を呼ぶ側）を呼ぶテストは 1 件も無いので、**そちらが「自前ホストのときだけ効く」ことは担保が無い**。
 
 ### Requirement 2: 自前ホストの draw.io で図形（stencil / shape）が描画される
 
@@ -76,7 +84,15 @@ _担保しているテスト:_ `adopt-mathjax.spec.ts`（読み込みが 1 回�
 6. Where 自前ホストの draw.io がサブパス配下に配置されている, when 図を閲覧したとき, the GROWI のビューア shall 図形を描画する。
 7. Where 自前ホストの draw.io が設定されている, when 図を拡大表示（ライトボックス）したとき, the GROWI のビューア shall 編集への導線を設定済みインスタンスへ向ける。
 
-_担保しているテスト:_ `rebase-asset-paths.spec.ts`（参照先の差し替え、サブパスの保持、繰り返し適用しても安全なこと）、`drawio-assets.spec.ts`（バイト列がそのまま通ること、フォールバックが成功として記録されること）。**AC 1・2・3 の「実際に描画される」「外部要求が出ない」ことは単体テストでは担保できない** — 要件 10 の検証手順で確かめる。
+_担保しているテスト:_
+
+- **AC 7 — 担保あり。** `rebase-asset-paths.spec.ts` の `should point the lightbox at the instance itself when DRAWIO_URI has $reason`（末尾スラッシュ無し・有り・2 つ・query 付きの 4 通り）。
+- **AC 2 — 部分的。** 参照先を GROWI のオリジンへ向ける側は `rebase-asset-paths.spec.ts` の `should route $global through GROWI's own origin because $reason`（`STENCIL_PATH` / `SHAPES_PATH` / `STYLE_PATH`）と `should read $global straight from the instance, since <img> is not bound by the same-origin rule`（`<img>` で読む 3 つはインスタンス直）が担保し、ビューアのバンドル自体をインスタンスから読むことは `use-viewer-min-js-url.spec.ts` が担保する。**ブラウザから本家への要求が実際に 0 件であることは担保が無い。**
+- **AC 6 — 部分的。** サブパスの保持は `rebase-asset-paths.spec.ts` の `should keep the sub path when draw.io is deployed under one` と `drawio-assets.spec.ts` の `should resolve against "$drawioUri"`（`https://drawio.example.com/drawio/` の行）が担保する。**実際に描画されることは担保が無い。**
+- **AC 1・3 — 担保が無い。** 要件 10 の検証手順で確かめる。
+- **AC 4 — 担保が無い。** 本家へ切り替える判断は配信ルータ本体にあり、それを呼ぶテストが 1 件も無い（要件 3 の前置きを参照）。`drawio-assets.spec.ts` の `should report success so a fallback read can be logged as such` は `readAsset` が成功を呼び出し元へ通知することだけを確かめており、ルータが本家へ切り替えることは確かめていない。
+- **AC 5 — 担保が無い。** 両方失敗したときに図形だけが欠けてページの描画が続くことは未検証（将来課題）。
+- `drawio-assets.spec.ts` はバイト列がそのまま通ること（`should hand back exactly the bytes that were served`）も担保する。stencil が壊れる回帰を捕まえる要になっている。
 
 ### Requirement 3: 図の資産を GROWI 経由で配信する経路が安全である
 
@@ -95,7 +111,18 @@ _担保しているテスト:_ `rebase-asset-paths.spec.ts`（参照先の差し
 9. Where 既定の draw.io（本家のホスト）が設定されている, when この経路に要求が来たとき, the GROWI の図資産配信 shall 404 を返し、外部への要求を出さない。
 10. The GROWI の図資産配信 shall 認証を求めない。共有ページの未ログイン閲覧者にも必要で、GROWI のデータを含まないため。
 
-_担保しているテスト:_ `drawio-assets.spec.ts` は**判定と取得の部品だけ**を検証している（許可された形の判定、取得先の解決と範囲外の拒否、要求時点での範囲の再確認、到達不能なときに例外を投げないこと、パスを書き換えずに要求すること、バイト列がそのまま通ること）。**配信ルータ本体（`drawioAssetsRouterFactory`）を呼ぶテストは 1 件も無い** — したがって「実際に 404 が返る」「Content-Type が拡張子から決まる」「`nosniff` が付く」「リダイレクトを追わない」「上限で打ち切る」「フォールバックを試みる」「既定構成で 404 になる」「認証を通らずに到達できる」はいずれも自動で担保されていない。要件 9 でこの事実を記録し、テスト追加は将来課題とする。
+_担保しているテスト:_
+
+**前置き（この要件の担保を読むときの前提）:** **配信ルータ本体（`drawioAssetsRouterFactory`）を呼ぶテストは 1 件も無い。** `drawio-assets.spec.ts` が import しているのは `proxiableAssetExtension` / `resolveAsset` / `readAsset` の 3 つだけで、ルータ本体への参照は 0 件である。したがって**応答に関する約束（状態コードとヘッダ）はどれも担保が無い**。担保があるのは、ルータがその応答を決めるために呼ぶ判定と取得の部品である。テスト追加は将来課題とする。
+
+- **AC 6 — 担保あり。** `drawio-assets.spec.ts` の `should return undefined when $reason` のうち `following a redirect would leave the resolved origin` の行。302 の転送先は同じテストサーバー上に実在して 200 を返すのに `readAsset` が `undefined` を返すので、追っていないことと失敗として扱うことの両方が分かる。
+- **AC 1 — 部分的。** リクエストに含まれる値から取得先が決まらないことは `should keep the request on the configured host even when the path is $reason`（絶対 URL・スキーム相対・バックスラッシュ始まりの 3 通り）と `should refuse a location outside it without making the request` が担保する。**取得先が設定値とコード定数の 2 つに限られること**はルータ側なので担保が無い。
+- **AC 2 — 部分的。** 許可された形かどうかの判定は `should refuse $reason`（空パス・許可外ディレクトリ・`WEB-INF/web.xml`・traversal・エスケープした区切り・絶対パス・許可外拡張子・拡張子なし・別ホスト・query 混入の 11 通り）が担保する。**404 を返すことと外部要求を出さないことは担保が無い。**
+- **AC 3 — 部分的。** 「その取得を行わない」ことは `should return undefined when the path climbs out of the configured subtree` と `should refuse a location outside it without making the request`（テストサーバーに要求が届かなかったことを実際に確かめている）が担保する。**404 を返すことは担保が無い。**
+- **AC 9 — 部分的。** ルータのゲートに使う判定は `is-self-hosted-drawio.spec.ts` の既定オリジン 2 行が担保する。**404 を返すことと外部要求を出さないことは担保が無い。**
+- **AC 4・5・8・10 — 担保が無い。** Content-Type を拡張子から決めること、`nosniff` を付けること、フォールバックと 502、認証を求めないことは、いずれもルータ本体の振る舞いである。
+- **AC 7 — 担保が無い。** 10 秒・64 MiB の上限に当てるテストは無い（上限は `readAsset` の中にあるが、テストは上限に触れていない）。
+- このほか `drawio-assets.spec.ts` は、到達不能なときに例外を投げないこと（`should return undefined rather than throw when the host is unreachable`）、パスを書き換えずに要求すること（`should request the asset path unchanged`）、query を落とすこと（`should drop the query DRAWIO_URI carries, which configures the editor`）を担保する。
 
 ### Requirement 4: エディタのメニューが読める
 
@@ -107,7 +134,11 @@ _担保しているテスト:_ `drawio-assets.spec.ts` は**判定と取得の�
 2. When エディタを開いたとき, the GROWI のエディタ連携 shall メニューバーとその項目の文字が背景に対して判読できる状態で表示する。
 3. The GROWI のエディタ連携 shall 保存ボタンと終了ボタンの配色を上書きしない（draw.io が明るい背景に濃い文字で描くため、一括で上書きすると今度はボタンが読めなくなる）。
 
-_担保しているテスト:_ `drawio-config.spec.ts`（背景を塗った要素すべてに文字色があること、メニュー項目自体にも色が当たること、ボタンには当てないこと。文字色を外す／一括指定に変える の 2 パターンで RED になることを確認済み）。
+_担保しているテスト:_
+
+- **AC 1 — 担保あり。** `drawio-config.spec.ts` の `should declare a foreground colour for every surface it repaints`（背景を塗った要素すべてに文字色があること）。文字色を外す／一括指定に変える の 2 パターンで RED になることを確認済み。
+- **AC 3 — 担保あり。** 同ファイルの `should leave the editor buttons alone so draw.io keeps styling them`。
+- **AC 2 — 担保が無い。** 「判読できる」は見え方の話で、CSS の構造からは決まらない。構造の側は `should colour the menubar entries themselves, not only their container`（メニュー項目自体にも色が当たること）が担保している。判読できることは #10478 の対応時にコントラスト比の実測（およそ 1.05 対 1 → 修正）で確認した。
 
 ### Requirement 5: `DRAWIO_URI` に書いた設定が尊重される
 
@@ -120,7 +151,13 @@ _担保しているテスト:_ `drawio-config.spec.ts`（背景を塗った要�
 3. Where `DRAWIO_URI` がサブパスを含む, when エディタの URL を組み立てるとき, the GROWI のエディタ連携 shall そのパスを保持する。
 4. If `DRAWIO_URI` が URL として解釈できない, then the GROWI のエディタ連携 shall 呼び出し元が失敗として扱える形で報告する（黙って既定値で続行しない）。
 
-_担保しているテスト:_ `build-drawio-editor-url.spec.ts`（必要なパラメータの付与、GROWI が制御しないパラメータの保持、サブパスの保持、重複させないこと、解釈できない値で失敗すること）。
+_担保しているテスト:_ 4 項目すべて担保あり。いずれも `build-drawio-editor-url.spec.ts`。
+
+- **AC 1** — `should keep parameters DRAWIO_URI carries that GROWI does not control`。
+- **AC 2** — `should not duplicate a parameter that DRAWIO_URI already sets` と `should not duplicate "%s" when DRAWIO_URI already sets it`（`spin` / `embed` / `ui` / `configure`）。
+- **AC 3** — `should keep the path when draw.io is deployed under a sub path`。
+- **AC 4** — `should throw when drawioUri cannot be parsed`。**ただし呼び出し元の受け方（`DrawioModal` が受けて iframe を描かないこと）に当てるテストは無い。**
+- 必要なパラメータの付与そのものは `should add the parameters the embedded editor needs` が担保する。
 
 _注記（AC 4 の現状）:_ 失敗は投げられ、呼び出し元は既定値で続行しない。ただし観測される結果は「モーダルがローディング表示のまま止まる」であり、利用者に理由は伝わらず、記録も `debug` レベルなので既定のログ設定では運用者にも見えない。**利用者へ伝えることは挙動の変更にあたるため、この spec では扱わず将来課題とする**（要件 9 の AC 6）。
 
@@ -136,7 +173,14 @@ _注記（AC 4 の現状）:_ 失敗は投げられ、呼び出し元は既定�
 4. If 保存されようとしている内容にページが 1 つも含まれない, then the GROWI shall もとの図の内容を上書きしない。
 5. If エディタから届いたメッセージの発信元が設定済みの draw.io と一致しない, then the GROWI shall そのメッセージを処理しない。
 
-_担保しているテスト:_ `mxfile.spec.ts`（単一ページの後方互換、複数ページの全ページ保持、保存と検出の往復、ページが無いときの扱い、保存した複数ページがページ送り可能な形で描画されること）、`DrawioCommunicationHelper.spec.ts`（保存経路、内容が取れないときに上書きしないこと）。**AC 5（発信元の照合）に対応するテストは無い** — 要件 9 でその事実を記録する。
+_担保しているテスト:_
+
+- **AC 1 — 担保あり。** `mxfile.spec.ts` の `preserves every page (content and name), not only the first`。
+- **AC 3 — 担保あり。** 同ファイルの `returns the first diagram inner content unchanged`。
+- **AC 4 — 担保あり。** 同ファイルの `returns an empty string when no diagram element is present` と、`DrawioCommunicationHelper.spec.ts` の `does NOT overwrite the diagram when no page can be extracted`。
+- **AC 2 — 部分的。** 保存した形が自己完結していて検出側と食い違わないことは `mxfile.spec.ts` の `persists an <mxfile> that isMxfileData recognizes (round-trip contract)` と `a multi-page diagram persisted on save renders every page with navigation enabled`、`embed.spec.ts` の `passes the mxfile through untouched so every page survives` が担保する。**エディタへ返す経路（`onReceiveMessage` の `ready` 分岐が保存内容をそのまま返すこと）を呼ぶテストは無い。**
+- **AC 5 — 担保が無い。** `DrawioCommunicationHelper.spec.ts` のテストは常に一致する発信元を渡すので、照合を消しても落ちない。
+- 保存経路そのものは `saves the (single-page) diagram content and closes the modal` が担保する。ただし当てているのは `save` 分岐だけで、`configure` / `ready` / 空メッセージの分岐は呼ばれない。
 
 ### Requirement 7: ビューアのページ送りが機能する
 
@@ -149,7 +193,13 @@ _担保しているテスト:_ `mxfile.spec.ts`（単一ページの後方互換
 3. While 図の高さのみが変わっている状態, the GROWI のビューア shall 図を描き直さない。
 4. When 図が初めて表示されるとき, the GROWI のビューア shall 図を描画する。
 
-_担保しているテスト:_ `should-rerender-on-resize.spec.ts`（初回の描画、幅が変わったときの再描画、高さのみの変化で再描画しないこと、1 ピクセル未満のゆらぎを無視すること）。**AC 1 の「実際にページ送りが保たれる」ことは単体テストでは担保できない** — 要件 10 の検証手順で確かめる。
+_担保しているテスト:_
+
+- **AC 2 — 担保あり。** `should-rerender-on-resize.spec.ts` の `re-renders when the available width changes (external layout change)`。
+- **AC 3 — 担保あり。** 同ファイルの `does NOT re-render when only the height changes (width is stable)`。
+- **AC 4 — 担保あり。** 同ファイルの `re-renders on the first observation (no previous width yet)`。
+- **AC 1 — 部分的。** 1 ページ目に戻される原因（高さだけの変化でビューアを作り直すこと）を防ぐ判定は上記 AC 3 のテストが担保し、ページ送りの操作面が出ること自体は `embed.spec.ts` の `enables page navigation so the extra pages are reachable` が担保する。**送った先が実際に表示され続けることは担保が無い** — 要件 10 の検証手順で確かめる。
+- 1 ピクセル未満のゆらぎを無視することは `ignores sub-pixel width jitter` が担保する。
 
 ### Requirement 8: 既定構成の挙動が変わらない
 
@@ -162,7 +212,13 @@ _担保しているテスト:_ `should-rerender-on-resize.spec.ts`（初回の�
 3. If `DRAWIO_URI` が URL として解釈できない値である, then the GROWI shall 自前ホスト向けの手当てを行わず、draw.io の既定に委ねる。
 4. The GROWI shall 自前ホストかどうかの判定を、ビューア側と配信側で同一の基準で行う（片方だけが自前ホストと見なす状態を作らない）。
 
-_担保しているテスト:_ `is-self-hosted-drawio.spec.ts`（判定の基準、解釈できない値の扱い）、`index.spec.ts`（既定のとき・解釈できない値のときに何もしないこと）。**AC 2 の「従来どおり」は単体テストでは担保できない** — 要件 10 の検証手順で確かめる。**AC 4（同一基準）は現状成り立っている**（判定の呼び出しはビューア側と配信側の 2 か所だけで、いずれも同一の関数を使う）**が、片方が独自判定に置き換わっても落ちるテストは無い** — テスト追加は将来課題とする。
+_担保しているテスト:_
+
+- **AC 1 — 部分的。** `index.spec.ts` の `should leave draw.io untouched when its own hosted viewer is configured` が、既定構成で参照先の差し替えも抑止も起きないことを担保する。**ただし当てているのは読み込み前の入口 `prepareSelfHostedDrawio` だけで、読み込み後の入口 `adoptSelfHostedDrawio` を呼ぶテストは無い**（要件 1 の担保も参照）。
+- **AC 3 — 部分的。** `index.spec.ts` の `should leave draw.io untouched when DRAWIO_URI holds nothing usable`（空の値を渡す。`isSelfHostedDrawio` の中では解釈できない値と同じ経路に入る）と、`is-self-hosted-drawio.spec.ts` の `not-a-url` / 空値の 2 行が担保する。入口の範囲は AC 1 と同じ制限がかかる。
+- **AC 2 — 担保が無い。** 「従来どおり」は要件 10 の検証手順で確かめる。
+- **AC 4 — 担保が無い。** 現状は成り立っている（判定の呼び出しはビューア側の `client/self-hosted/index.ts` と配信側の `server/routes/drawio-assets.ts` の 2 か所だけで、いずれも同一の `isSelfHostedDrawio` を使う）が、**片方が独自判定に置き換わっても落ちるテストは無い**。テスト追加は将来課題とする。
+- 判定の基準そのものは `is-self-hosted-drawio.spec.ts` の `should be $expected for $reason`（7 通り）が担保する。
 
 ### Requirement 9: 保守情報の所在が 1 つにまとまっている
 
@@ -178,7 +234,7 @@ _担保しているテスト:_ `is-self-hosted-drawio.spec.ts`（判定の基準
 6. The drawio spec shall 既知の未解決事項を将来課題として記録する（この spec では直さないことを含めて）。
 7. The drawio spec shall 過去に否定された原因説も、否定済みであることが分かる形で残す（同じ誤りを繰り返さないため）。
 
-_担保しているテスト:_ なし（文書の要件のため）。要件 9 の充足は spec と `CLAUDE.md` の内容確認で判断する。
+_担保しているテスト:_ **AC 1〜7 の 7 項目すべて担保が無い**（文書の要件のため、当てられるテストが無い）。要件 9 の充足は spec と `CLAUDE.md` の内容確認で判断する。AC 5 の充足状況は [research.md](research.md) の「担保テストの突き合わせ（タスク 1.2）」に記録している。
 
 ### Requirement 10: 検証手順が再現できる形で残っている
 
@@ -192,4 +248,4 @@ _担保しているテスト:_ なし（文書の要件のため）。要件 9 �
 4. The drawio spec shall 既定の draw.io での無変化確認を検証手順に含める。
 5. The drawio spec shall 検証時に何を見れば合否が分かるかを、観測できる形で記す（描画されたかどうか、どのホストへ要求が出たか、要求が何回出たか）。
 
-_担保しているテスト:_ なし（文書の要件のため）。要件 10 の充足は spec の内容確認で判断する。
+_担保しているテスト:_ **AC 1〜5 の 5 項目すべて担保が無い**（文書の要件のため、当てられるテストが無い）。要件 10 の充足は spec の内容確認で判断する。

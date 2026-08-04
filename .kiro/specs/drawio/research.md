@@ -59,6 +59,13 @@
 
 ### 2.1 テストの穴（当初の想定より大きい）
 
+> **この節は 2 つの点で古い。正は「担保テストの突き合わせ（タスク 1.2）」（この文書の末尾）である。**
+>
+> 1. **下の表の「リダイレクトを追わないこと」は誤り** — 実際にはテストが存在する（`drawio-assets.spec.ts` の `readAsset` に 302 を返す fixture があり、`redirect: 'manual'` を `follow` に変えると落ちる）。タスク 1.2 の突き合わせで判明した。この行を根拠に「リダイレクトは未検証」と書き直さないこと。
+> 2. **下の表の AC 番号は要件 3 の再採番前のもの** — この節を書いたあとにフォールバックの AC を独立させたため、番号が 1 つずれている（表の AC 6→3.6、AC 7→3.7、AC 8→3.9、AC 9→3.10）。番号での突き合わせには使えない。
+>
+> ルータ本体を呼ぶテストが 1 件も無いという主旨そのものは変わらない。
+
 要件を書いた時点では「要件 3 の AC 5〜8 にテストが無い」と記録したが、実際に spec ファイルを確認したところ **`drawioAssetsRouterFactory` を呼ぶテストは 1 件も存在しない**（`drawio-assets.spec.ts` の import は `proxiableAssetExtension` / `resolveAsset` / `readAsset` の 3 つのみ、ルータ本体の参照は 0 件）。
 
 つまり、テストされているのは「どのパスを許すか」「どの取得先に解決するか」「バイト列がそのまま通るか」という**判定と取得の部品**だけで、**ルータの応答そのもの**は一切検証されていない。
@@ -343,3 +350,119 @@ README を削除する（タスク 3）前に、**README にしか書かれて�
 ## この作業で触っていない範囲
 
 Testing Strategy 節のうち「自動テストで担保していること」「自動テストで担保していないこと（要件 10.1）」の 2 つの表は**タスク 1.2 の担当**なので触っていない。この作業が同節で変更したのは「手動確認の手順」の冒頭 1 文だけである。
+
+---
+
+# 担保テストの突き合わせ（タスク 1.2）
+
+実施日: 2026-08-04 / 対象: requirements.md の `_担保しているテスト:_` 行、design.md の Testing Strategy の 2 つの表・将来課題・否定済みの原因説
+
+## この記録の役割
+
+as-built spec の担保欄は、**書いた本人が「たぶんこのテストで守られている」と思ったこと**が入りやすい。要件 9.5 は「担保が無いものは無いと明記する」ことを求めているので、担保を多く見せる記述はそれ自体が要件違反になる。この節は、受け入れ基準 55 件を 1 件ずつ実在するテストと突き合わせた結果である。
+
+**突き合わせ方**: draw.io 関連の spec ファイル 13 個をすべて読み、(1) import している対象、(2) `describe` / `it` の題、(3) 実際の assert を確認した。そのうえで受け入れ基準ごとに「その振る舞いが壊れたとき、このテストは落ちるか」を判断した。部品（helper 関数）に当てたテストは、それを組み合わせた全体の振る舞いの担保には数えていない。構造への assert（例: この CSS は文字色を宣言している）は、見え方の約束（例: 文字が読める）の担保には数えていない。
+
+**確認に使ったテストの実行結果**: `apps/app` 10 ファイル 97 件、`packages/remark-drawio` 3 ファイル 16 件、いずれも pass（合計 113 件）。
+
+**判定の意味**:
+
+- **担保あり** — その振る舞いが壊れたら落ちるテストが実在する
+- **部分的** — 振る舞いを支える部品や機構には担保があるが、受け入れ基準が言っている観測できる結果そのものには担保が無い
+- **担保なし** — 当たっているテストが 1 件も無い
+
+## 対応表
+
+| 受け入れ基準 | 実在するテスト | 判定 | 根拠（spec ファイルと `describe` / `it`） |
+|---|---|---|---|
+| 1.1 数式が描画される | — | 担保なし | 該当なし。要件 10 の手動確認 |
+| 1.2 インスタンスから読み、1 回だけ | あり | 担保あり | `adopt-mathjax.spec.ts` > `adoptMathJax` > `should boot MathJax from the configured instance` / `should boot MathJax exactly once, so the second boot cannot break the first` / `should repoint DRAW_MATH_URL, which the font path is derived from` |
+| 1.3 焼き込み先が生きていても描画される | 一部 | 部分的 | `adopt-mathjax.spec.ts` > `suppressBakedMathJax` > `should stop the bundle from requesting the baked-in location at all`（機構）。描画は該当なし |
+| 1.4 閉域でも描画される | — | 担保なし | 該当なし。要件 10 の手動確認 |
+| 1.5 サブパスでも描画される | 一部 | 部分的 | `relocate-math-url.spec.ts` > `should keep the sub path when draw.io is deployed under one`、`use-viewer-min-js-url.spec.ts` > `generateViewerMinJsUrl`（`http://example.com/drawio` の行）。描画は該当なし |
+| 1.6 数式無効の図は組版しない | — | 担保なし | 該当なし。draw.io 側の判断で GROWI に分岐が無い |
+| 2.1 図形が描画される | — | 担保なし | 該当なし。要件 10 の手動確認 |
+| 2.2 本家へ要求を出さない | 一部 | 部分的 | `rebase-asset-paths.spec.ts` > `should route $global through GROWI's own origin because $reason` / `should read $global straight from the instance, since <img> is not bound by the same-origin rule`、`use-viewer-min-js-url.spec.ts`。外部要求が 0 件であることは該当なし |
+| 2.3 未ログインの共有ページで描画される | — | 担保なし | 該当なし |
+| 2.4 同梱していないとき本家から取得を試みる | — | 担保なし | 該当なし。ルータのフォールバックを呼ぶテストが無い |
+| 2.5 両方失敗時に図形のみ欠ける | — | 担保なし | 該当なし |
+| 2.6 サブパスでも図形が描画される | 一部 | 部分的 | `rebase-asset-paths.spec.ts` > `should keep the sub path when draw.io is deployed under one`、`drawio-assets.spec.ts` > `resolveAsset` > `should resolve against "$drawioUri"`。描画は該当なし |
+| 2.7 ライトボックスの編集導線 | あり | 担保あり | `rebase-asset-paths.spec.ts` > `should point the lightbox at the instance itself when DRAWIO_URI has $reason`（4 通り） |
+| 3.1 取得先はリクエストから決まらない | 一部 | 部分的 | `drawio-assets.spec.ts` > `resolveAsset` > `should keep the request on the configured host even when the path is $reason`、`readAsset — the subtree it was given` > `should refuse a location outside it without making the request`。取得先が 2 つに限られることは該当なし |
+| 3.2 許可外パスは 404・外部要求なし | 一部 | 部分的 | `drawio-assets.spec.ts` > `proxiableAssetExtension` > `should refuse $reason`（11 通り）。応答は該当なし |
+| 3.3 範囲外は 404・取得しない | 一部 | 部分的 | `resolveAsset` > `should return undefined when the path climbs out of the configured subtree`、`readAsset — the subtree it was given` > `should refuse a location outside it without making the request`。404 は該当なし |
+| 3.4 Content-Type は拡張子から | — | 担保なし | 該当なし |
+| 3.5 `nosniff` を付ける | — | 担保なし | 該当なし |
+| 3.6 リダイレクトを追わない | あり | 担保あり | `drawio-assets.spec.ts` > `readAsset` > `should return undefined when $reason`（`following a redirect would leave the resolved origin` の行）。302 の転送先は実在して 200 を返すのに `undefined` になる |
+| 3.7 10 秒 / 64 MiB で打ち切る | — | 担保なし | 該当なし |
+| 3.8 フォールバックと 502 | — | 担保なし | 該当なし |
+| 3.9 既定構成は 404・外部要求なし | 一部 | 部分的 | `is-self-hosted-drawio.spec.ts` > `should be $expected for $reason`（既定オリジン 2 行、ゲートの判定）。応答は該当なし |
+| 3.10 認証を求めない | — | 担保なし | 該当なし |
+| 4.1 文字色を背景色と対で定める | あり | 担保あり | `drawio-config.spec.ts` > `should declare a foreground colour for every surface it repaints` |
+| 4.2 メニューの文字が判読できる | 構造のみ | 担保なし | 見え方の担保は該当なし。構造は `should colour the menubar entries themselves, not only their container` |
+| 4.3 ボタンを上書きしない | あり | 担保あり | `drawio-config.spec.ts` > `should leave the editor buttons alone so draw.io keeps styling them` |
+| 5.1 制御しないパラメータを保持 | あり | 担保あり | `build-drawio-editor-url.spec.ts` > `should keep parameters DRAWIO_URI carries that GROWI does not control` |
+| 5.2 キーを重複させない | あり | 担保あり | 同 > `should not duplicate a parameter that DRAWIO_URI already sets` / `should not duplicate "%s" when DRAWIO_URI already sets it` |
+| 5.3 サブパスを保持 | あり | 担保あり | 同 > `should keep the path when draw.io is deployed under a sub path` |
+| 5.4 失敗として報告する | あり | 担保あり | 同 > `should throw when drawioUri cannot be parsed`。呼び出し元の受け方は該当なし |
+| 6.1 全ページを保存する | あり | 担保あり | `mxfile.spec.ts` > `preserves every page (content and name), not only the first` |
+| 6.2 開き直すと全ページ復元 | 一部 | 部分的 | `mxfile.spec.ts` > `persists an <mxfile> that isMxfileData recognizes (round-trip contract)` / `a multi-page diagram persisted on save renders every page with navigation enabled`、`embed.spec.ts` > `passes the mxfile through untouched so every page survives`。復元経路（`ready` 分岐）は該当なし |
+| 6.3 単一ページは従来と同一 | あり | 担保あり | `mxfile.spec.ts` > `returns the first diagram inner content unchanged` |
+| 6.4 ページが無いとき上書きしない | あり | 担保あり | `mxfile.spec.ts` > `returns an empty string when no diagram element is present`、`DrawioCommunicationHelper.spec.ts` > `does NOT overwrite the diagram when no page can be extracted` |
+| 6.5 発信元が一致しないメッセージ | — | 担保なし | 該当なし。既存のテストは常に一致する発信元を渡す |
+| 7.1 ページ送りが保たれる | 一部 | 部分的 | `should-rerender-on-resize.spec.ts` > `does NOT re-render when only the height changes (width is stable)`（1 ページ目に戻る原因を防ぐ判定）、`embed.spec.ts` > `enables page navigation so the extra pages are reachable`。保たれること自体は該当なし |
+| 7.2 幅が変わったら再描画 | あり | 担保あり | `should-rerender-on-resize.spec.ts` > `re-renders when the available width changes (external layout change)` |
+| 7.3 高さのみでは再描画しない | あり | 担保あり | 同 > `does NOT re-render when only the height changes (width is stable)` |
+| 7.4 初回は描画する | あり | 担保あり | 同 > `re-renders on the first observation (no previous width yet)` |
+| 8.1 既定構成では差し替えない | 一部 | 部分的 | `index.spec.ts` > `should leave draw.io untouched when its own hosted viewer is configured`。読み込み後の入口 `adoptSelfHostedDrawio` は該当なし |
+| 8.2 既定構成は従来どおり | — | 担保なし | 該当なし。要件 10 の手動確認 |
+| 8.3 解釈できない値では手当てしない | 一部 | 部分的 | `index.spec.ts` > `should leave draw.io untouched when DRAWIO_URI holds nothing usable`、`is-self-hosted-drawio.spec.ts`（`not-a-url` / 空値の行）。読み込み後の入口は該当なし |
+| 8.4 判定が 2 か所で同一 | — | 担保なし | 該当なし。drift テストが無い |
+| 9.1 現況の機構と理由を design に持つ | — | 担保なし（文書） | 該当なし |
+| 9.2 `CLAUDE.md` から spec へ辿れる | — | 担保なし（文書） | 該当なし |
+| 9.3 README を残さない | — | 担保なし（文書） | 該当なし |
+| 9.4 関心マップを持つ | — | 担保なし（文書） | 該当なし |
+| 9.5 担保テストを対応づける | — | 担保なし（文書） | 該当なし。この節がその成果物 |
+| 9.6 未解決事項を将来課題に記録 | — | 担保なし（文書） | 該当なし |
+| 9.7 否定済みの原因説を残す | — | 担保なし（文書） | 該当なし |
+| 10.1 担保が無いことと確かめ方 | — | 担保なし（文書） | 該当なし |
+| 10.2 2 世代の draw.io | — | 担保なし（文書） | 該当なし |
+| 10.3 外部に出られる／出られない両方 | — | 担保なし（文書） | 該当なし |
+| 10.4 既定構成での無変化確認 | — | 担保なし（文書） | 該当なし |
+| 10.5 何を見れば合否が分かるか | — | 担保なし（文書） | 該当なし |
+
+**集計**: 担保あり 15 / 部分的 12 / 担保なし 28（うち文書の要件 12）＝ 55。
+
+## 直した記述と、直す前が何を誤らせていたか
+
+### 担保を多く見せていた 3 か所（危険な向き）
+
+| 場所 | 直す前 | 実態 | なぜ誤りか |
+|---|---|---|---|
+| requirements.md 要件 2 | `drawio-assets.spec.ts`（…フォールバックが成功として記録されること）を要件 2 の担保として挙げていた | AC 2.4 は担保なし | 挙げていたテスト（`should report success so a fallback read can be logged as such`）が確かめているのは `readAsset` が成功を呼び出し元へ通知することだけで、**ルータが本家へ切り替えることは確かめていない**。フォールバックを壊しても落ちない |
+| requirements.md 要件 1 / design.md の表 | `index.spec.ts` が「自前ホストのときだけ効くこと」「2 つの入口」を担保している、と読める書き方だった | `index.spec.ts` が呼ぶのは `prepareSelfHostedDrawio` だけ。`adoptSelfHostedDrawio` を呼ぶテストは 0 件 | design.md 自身が「2 つの入口」を `prepareSelfHostedDrawio` と `adoptSelfHostedDrawio` と定義しているため、表の「2 つの入口」という行名が**両方の入口にテストがあるように読める**。実際は読み込み後の入口のゲート（既定構成なら何もしない）が無防備 |
+| design.md「担保していないこと」の表 | 配信ルータの行に 3.6（リダイレクトを追わない）を含めていた | 3.6 は `readAsset` で担保あり | 実在する強いテストを「無い」側に置くと、テストを消しても気づけない。将来課題の見積りも狂う |
+
+### 担保が無いのに何も書いていなかった 4 か所（要件 9.5 違反）
+
+| 場所 | 抜けていた受け入れ基準 | 足した内容 |
+|---|---|---|
+| requirements.md 要件 1 | AC 1.6（数式を有効にしていない図は組版しない） | 担保なしと明記。組版の判断は draw.io 側で GROWI に分岐が無いため当てるテストが無いこと、#11633 の実測でのみ確認していることを添えた |
+| requirements.md 要件 2 | AC 2.5（両方失敗時に図形だけが欠ける）が担保欄で触れられていなかった | 担保なしと明記（design の「担保していないこと」の表には元からあった） |
+| requirements.md 要件 4 | AC 4.2（判読できる）が担保欄で触れられていなかった | 担保なしと明記し、構造の側だけ担保があることを書き分けた |
+| requirements.md 要件 6 | AC 6.2 の復元経路 | 保存形式の担保と復元経路の担保なしを書き分けた。`onReceiveMessage` の `ready` 分岐を呼ぶテストが 0 件 |
+
+### 挙げられていなかった実在のテスト 3 件
+
+| テスト | どの受け入れ基準を担保するか | どこにも挙がっていなかった理由 |
+|---|---|---|
+| `rebase-asset-paths.spec.ts` > `should point the lightbox at the instance itself when DRAWIO_URI has $reason` | 2.7 | AC 2.7 は design discovery で後から足した受け入れ基準（この文書の「要件に無い挙動が 1 つあった」）。**要件は足したが担保欄を更新していなかった** |
+| `embed.spec.ts` の 5 件 | 6.2 の描画側、7.1 のページ送りの操作面 | ファイル名が draw.io を含まないため、担保欄・design の表のどちらにも一度も現れていなかった |
+| `use-viewer-min-js-url.spec.ts` の 4 件 | 1.5・2.2・2.6 のサブパスとインスタンス直読み | 同上。design の関心マップには実装ファイルとして載っているが、テストとしては載っていなかった |
+
+## 将来課題と否定済みの原因説の突き合わせ
+
+- **将来課題**: 担保なしの発見に対応する行が揃っているかを確認し、4 行を足した（取得の時間・サイズの上限 / 復元経路 / 読み込み後の入口 / 本家へのフォールバックは既存行の由来に追記）。逆向き（将来課題の行が要件か design のどこかに根拠を持つか）も確認し、根拠の無い行は無かった。
+- **`DRAWIO_URI` が不正なとき利用者に理由が伝わらない**: requirements.md（要件 5 AC 4 の注記）と design.md（Error Handling の表、将来課題の表）の両方に載っていることを確認した。追記は不要。
+- **否定済みの原因説**: brief.md の「分かっていて、まだ spec に書かれていないこと」「未解決のまま残っていること」と、この文書の gap 分析・design discovery を突き合わせた。既存の 6 行はすべて出所を辿れる。**1 行足りなかった**ので足した — 「参照先を設定済みインスタンスへ直接向ければ stencil は読める（配信経路は要らない）」。brief.md には CORS で止まることが書かれているが、否定済みの一覧には入っていなかった。配信ルータを消す提案の形で再発しやすい。
+- gap 分析が否定した「要件 3 のテストの穴は AC 5〜8 だけ」は**原因説ではなく担保の見積り違い**なので、否定済みの原因説の表には入れず、この節に記録した（同種の誤りが今回さらに 3 件見つかっている）。
