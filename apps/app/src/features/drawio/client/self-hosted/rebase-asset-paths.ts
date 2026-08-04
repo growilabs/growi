@@ -1,3 +1,4 @@
+import { removeTrailingSlash } from '@growi/core/dist/utils/path-utils';
 import urljoin from 'url-join';
 
 import { drawioAssetProxyUrl } from '../../consts';
@@ -7,7 +8,7 @@ import './drawio-globals';
 /** The configured instance's own base, without the query DRAWIO_URI may carry. */
 const instanceBaseUrl = (drawioUri: string): string => {
   const url = new URL(drawioUri);
-  return `${url.origin}${url.pathname}`.replace(/\/$/, '');
+  return removeTrailingSlash(`${url.origin}${url.pathname}`);
 };
 
 /**

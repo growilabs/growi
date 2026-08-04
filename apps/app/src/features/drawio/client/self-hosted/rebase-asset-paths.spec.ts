@@ -58,11 +58,20 @@ describe('rebaseDrawioAssetPaths', () => {
     );
   });
 
-  it('should point the lightbox at the instance without a trailing slash', () => {
-    rebaseDrawioAssetPaths(DRAWIO_URI);
+  it.each`
+    drawioUri                       | reason
+    ${'http://localhost:8080'}      | ${'no trailing slash'}
+    ${'http://localhost:8080/'}     | ${'a trailing slash'}
+    ${'http://localhost:8080//'}    | ${'more than one trailing slash'}
+    ${'http://localhost:8080/?x=1'} | ${'a query'}
+  `(
+    'should point the lightbox at the instance itself when DRAWIO_URI has $reason',
+    ({ drawioUri }: { drawioUri: string }) => {
+      rebaseDrawioAssetPaths(drawioUri);
 
-    expect(window.DRAWIO_LIGHTBOX_URL).toBe('http://localhost:8080');
-  });
+      expect(window.DRAWIO_LIGHTBOX_URL).toBe('http://localhost:8080');
+    },
+  );
 
   it('should be safe to apply repeatedly, since it may run on every render', () => {
     rebaseDrawioAssetPaths(DRAWIO_URI);

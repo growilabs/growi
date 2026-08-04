@@ -1,3 +1,4 @@
+import { addTrailingSlash } from '@growi/core/dist/utils/path-utils';
 import type { Request, Response, Router } from 'express';
 import express from 'express';
 
@@ -100,9 +101,7 @@ export const resolveAsset = (
     return undefined;
   }
 
-  const basePath = target.pathname.endsWith('/')
-    ? target.pathname
-    : `${target.pathname}/`;
+  const basePath = addTrailingSlash(target.pathname);
   const subtree = `${target.origin}${basePath}`;
 
   // Assigning the path leaves the origin alone. This is why it is not
