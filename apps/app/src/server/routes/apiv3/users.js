@@ -462,7 +462,7 @@ export const setup = (crowi) => {
       }
 
       const limit =
-        parseInt(req.query.limit) ||
+        parseInt(req.query.limit, 10) ||
         (await configManager.getConfig('customize:showPageLimitationM')) ||
         30;
       const page = req.query.page;
@@ -1083,7 +1083,7 @@ export const setup = (crowi) => {
     loginRequiredStrictly,
     adminRequired,
     async (req, res) => {
-      const page = parseInt(req.query.page) || 1;
+      const page = parseInt(req.query.page, 10) || 1;
       const limit = 50; // DEFAULT_LIMIT in external-account.ts
       const offset = (page - 1) * limit;
       try {
@@ -1286,7 +1286,7 @@ export const setup = (crowi) => {
         activityEvent.emit('update', res.locals.activity._id, {
           action: SupportedAction.ACTION_ADMIN_USERS_PASSWORD_RESET,
         });
-        return res.apiv3({ newPassword, user });
+        return res.apiv3({ newPassword, user: serializeUserSecurely(user) });
       } catch (err) {
         logger.error('Error', err);
         return res.apiv3Err(new ErrorV3(err));

@@ -164,10 +164,14 @@ describe('PasswordHashService', () => {
       getMockLogger().warn.mockClear();
     });
 
-    it('returns { isValid: false, needsRehash: false } and does NOT warn for an empty plaintext against a valid scrypt hash', async () => {
-      const hashed = await service.hash('correct-horse');
-
-      const result = await service.verify('', hashed, undefined, SEED);
+    it('returns { isValid: false, needsRehash: false } and does NOT warn for an empty plaintext, short-circuiting before the stored hash is parsed', async () => {
+      // Use a MALFORMED stored hash on purpose: if the empty-plaintext guard did NOT
+      // short-circuit, verifyScrypt would parse this and emit a Req 2.4 WARNING. The
+      // guard must return BEFORE touching the stored hash — this pins the `=== ''`
+      // branch (a valid hash here would pass even without the guard, since scrypt('')
+      // does not throw).
+      const malformedHash = 'not-a-scrypt-hash';
+      const result = await service.verify('', malformedHash, undefined, SEED);
 
       expect(result).toEqual({ isValid: false, needsRehash: false });
       // An empty input is a caller mistake, not malformed stored data (no Req 2.4 WARNING).

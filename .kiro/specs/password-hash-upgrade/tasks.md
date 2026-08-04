@@ -148,7 +148,7 @@
   - Create `apps/app/src/server/scripts/password-hash-cleanup.ts` (a standalone script not managed by migrate-mongo)
   - At script start, get the number of `legacyOnly` users (`passwordHash` absent, `password` present)
   - If `legacyOnly > 0`: output an error message (including the count) and process.exit(1) (Req 3.4)
-  - If `legacyOnly === 0`: execute `updateMany({ passwordHash: { $exists: true }, password: { $exists: true } }, { $unset: { password: '' } })` (Req 3.3)
+  - If `legacyOnly === 0`: `$unset` the legacy `password` from every `both`-category user via `updateMany(bothFilter, { $unset: { password: '' } })`, using the shared `bothFilter` from `password-hash-format-filters.ts` (Req 3.3)
   - Confirm that when `legacyOnly > 0` it aborts with no changes made to the DB, and that the error message includes the count
   - _Requirements: 3.3, 3.4_
   - _Boundary: Cleanup migration script_
@@ -159,7 +159,7 @@
   - When the environment variable `SEND_RESET_EMAILS` is `'true'`:
     - For each target user, create a `PasswordResetOrder` and send a reset email using the existing mail service (Req 4.2)
     - **Only after confirming the email was sent successfully**, `$unset` (remove the field entirely) the `passwordHash` of the successful users to make login impossible (Req 4.3)
-    - **CRITICAL**: use `$unset` rather than assigning `null`. In `$exists`-based classification (status/cleanup), a `null` value also counts as the field "existing", which would leave the user in `upgradedOnly`, making the count inaccurate and causing duplicate email sends on re-run
+    - **CRITICAL**: use `$unset` (remove the field entirely) rather than assigning `null`/`''`. The shared classification filters treat a `null`/empty credential as ABSENT (`present` = `{ $exists: true, $nin: [null, ''] }`), so `$unset` moves the user cleanly to `noPassword`; leaving a stray `null`/`''` field is avoided for consistency with `statusDelete`'s `undefined` scrub, keeping counts accurate and preventing duplicate email sends on re-run
     - Do not unset users whose send failed (they can be retried on the next re-run)
     - Log the success and failure counts at INFO/WARNING respectively
   - Confirm that when `SEND_RESET_EMAILS` is unset only the tally counts are output and the DB is not changed
