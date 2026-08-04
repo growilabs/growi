@@ -74,6 +74,15 @@ export class WipPageCleanupCronService extends CronService {
     );
 
     logger.info(summary, 'Expired WIP page cleanup finished');
+
+    // A failure is retried on the next run, so it is not lost — but a page that
+    // keeps failing would otherwise only ever surface as one error line per run.
+    if (summary.failed > 0) {
+      logger.warn(
+        summary,
+        `${summary.failed} expired WIP page(s) could not be deleted; their expiry was re-armed for a later sweep`,
+      );
+    }
   }
 }
 

@@ -130,8 +130,20 @@ async function removeEmptyLeafHierarchies(db) {
  *   new: `wipExpiredAt`  = the absolute expiry instant, computed up-front in
  *        `makeWip()` as `now + wipPageExpirationSeconds`.
  * A straight rename would leave every existing WIP page carrying a *past* instant
- * as its expiry, and the cleanup cron would delete all of them on its first run.
- * So the stored value has the configured duration added to it.
+ * as its expiry, so the stored value has the configured duration added to it.
+ *
+ * WHY an already-overdue page is re-granted a full window instead:
+ *   adding the duration is not sufficient on its own — a `ttlTimestamp` older than
+ *   one expiration window still converts to a past instant. That backlog is normal
+ *   on an instance whose TTL monitor was not reaping (TTL disabled on a managed
+ *   MongoDB, a failed index creation, a long monitor outage), and those are exactly
+ *   the instances holding months-old values. Converting them faithfully would hand
+ *   the first sweep after the upgrade a mass deletion — and the new sweep deletes
+ *   *completely* (revisions, attachments and search-index entries go too, with no
+ *   trash to restore from), so it is strictly more destructive than the TTL index it
+ *   replaces. Anything already overdue therefore expires one full window from the
+ *   migration, giving operators and authors a chance to notice before it goes.
+ *   A page that is not yet overdue keeps its real deadline.
  *
  * WHY pages with descendants are exempted:
  *   `makeWip()` withholds the expiry from a page that already has children
@@ -165,11 +177,13 @@ export async function up(db) {
 
   const collection = db.collection(PAGES);
 
-  const legacyIds = (
-    await collection
-      .find({ ttlTimestamp: { $ne: null } }, { projection: { _id: 1 } })
-      .toArray()
-  ).map((doc) => doc._id);
+  const legacyDocs = await collection
+    .find(
+      { ttlTimestamp: { $ne: null } },
+      { projection: { _id: 1, ttlTimestamp: 1 } },
+    )
+    .toArray();
+  const legacyIds = legacyDocs.map((doc) => doc._id);
 
   // Resolve "has descendants" from the parent links, NOT from descendantCount:
   // inflating descendantCount is precisely the corruption this PR exists to fix,
@@ -178,15 +192,47 @@ export async function up(db) {
     parent: { $in: legacyIds },
   });
   const idsWithChildrenSet = new Set(idsWithChildren.map(String));
-  const expirableIds = legacyIds.filter(
-    (id) => !idsWithChildrenSet.has(String(id)),
+  const expirableDocs = legacyDocs.filter(
+    (doc) => !idsWithChildrenSet.has(String(doc._id)),
   );
+  const expirableIds = expirableDocs.map((doc) => doc._id);
+
+  // One instant for both the boundary and the re-granted expiry, so the count
+  // logged below describes exactly the documents the update re-grants.
+  const migratedAt = new Date();
+  // `ttlTimestamp + expirationMs < migratedAt` restated as a bound on the stored
+  // value, so the comparison can be done in the pipeline and in JS identically.
+  const overdueBefore = new Date(migratedAt.getTime() - expirationMs);
+  const regrantedExpiry = new Date(migratedAt.getTime() + expirationMs);
 
   const converted = await collection.updateMany({ _id: { $in: expirableIds } }, [
-    { $set: { wipExpiredAt: { $add: ['$ttlTimestamp', expirationMs] } } },
+    {
+      $set: {
+        wipExpiredAt: {
+          $cond: [
+            { $lt: ['$ttlTimestamp', overdueBefore] },
+            regrantedExpiry,
+            { $add: ['$ttlTimestamp', expirationMs] },
+          ],
+        },
+      },
+    },
     { $unset: 'ttlTimestamp' },
   ]);
   logger.info(`Converted ${converted.modifiedCount} page(s) to wipExpiredAt`);
+
+  const regranted = expirableDocs.filter(
+    (doc) => doc.ttlTimestamp < overdueBefore,
+  ).length;
+  if (regranted > 0) {
+    logger.warn(
+      `${regranted} page(s) were already past their expiry before this migration ` +
+        '(the TTL monitor had not reaped them). Rather than letting the first ' +
+        'cleanup run delete them all at once, they were re-granted a full ' +
+        `expiration window and now expire at ${regrantedExpiry.toISOString()}. ` +
+        'Publish or move anything that must be kept before then.',
+    );
+  }
 
   // Whatever still carries the legacy field has descendants: drop it, grant no expiry.
   const exempted = await collection.updateMany(
@@ -247,11 +293,16 @@ export async function down(db) {
     { name: TTL_INDEX_NAME, expireAfterSeconds: expirationSeconds },
   );
 
-  // Two things are deliberately NOT restored:
+  // Three things are deliberately NOT restored:
   // - the empty pages removed by up(): structural placeholders with no content,
   //   and the information needed to recreate exactly those is gone;
   // - the legacy field on pages exempted for having descendants: they end up with
   //   neither field, so the recreated TTL index cannot delete them. That is the
-  //   safe direction — it is what `disableTtl` intended for them all along.
+  //   safe direction — it is what `disableTtl` intended for them all along;
+  // - the original instant on pages up() re-granted for being already overdue:
+  //   subtracting the duration yields the migration time, not their real
+  //   ttlTimestamp, which the re-grant deliberately discarded. So a round trip
+  //   hands them back to the TTL index with the extra window intact rather than
+  //   letting the recreated index reap them immediately — again the safe direction.
   logger.info('Rollback has successfully applied');
 }

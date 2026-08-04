@@ -9,6 +9,13 @@ import type { IPageService } from './page-service';
 const logger = loggerFactory('growi:services:page:delete-expired-wip');
 
 /**
+ * How long a page whose deletion threw waits before a sweep may claim it again.
+ * Shorter than any sensible cron schedule, so in practice it means "retry on the
+ * next run" while still keeping a single run from re-claiming the same page.
+ */
+const FAILED_DELETION_RETRY_BACKOFF_MS = 60 * 60 * 1000;
+
+/**
  * The minimum a candidate must carry: the sweep only needs to identify the page
  * and pre-filter it. Everything the deletion itself needs comes from the document
  * the claim returns, so the caller is free to stream lean projections rather than
@@ -26,8 +33,49 @@ export type DeleteExpiredWipPageSummary = {
   skippedNonLeaf: number;
   /** Claim lost to another instance, or the page stopped being eligible. */
   skippedNotClaimed: number;
-  /** Claimed, but the deletion threw. The page is still there, minus its expiry. */
+  /** Claimed, but the deletion threw. The page is still there, expiry re-armed. */
   failed: number;
+};
+
+/**
+ * Puts back the expiry that the claim withdrew, after the deletion failed.
+ *
+ * Without this the failure is permanent and silent: the sweep selects on
+ * `wipExpiredAt`, so a page left without one is never looked at again — it stays
+ * WIP forever while the operator sees nothing but one log line. Re-arming makes a
+ * transient failure (a MongoDB hiccup, search index or attachment store being
+ * down) cost a retry instead of the whole feature for that page.
+ *
+ * The filter is what keeps this from becoming its own data-loss path: it re-arms
+ * only a page that is still WIP and still has no expiry, i.e. still exactly what
+ * the claim left behind. If the page was published, re-claimed, or already removed
+ * meanwhile, it matches nothing and the state stands.
+ *
+ * A failure here is swallowed on purpose — the sweep is already in its error path,
+ * and losing the remaining backlog to a secondary error would be the worse outcome.
+ */
+const rearmExpiry = async (
+  Page: PageModel,
+  page: ExpiredWipPageCandidate,
+): Promise<void> => {
+  const retryAt = new Date(Date.now() + FAILED_DELETION_RETRY_BACKOFF_MS);
+  try {
+    const res = await Page.updateOne(
+      { _id: page._id, wip: true, wipExpiredAt: { $exists: false } },
+      { $set: { wipExpiredAt: retryAt } },
+    );
+    if (res.modifiedCount === 0) {
+      logger.warn(
+        `Did not re-arm the expiry of ${page.path}: it is no longer the WIP page the claim left behind (published, re-claimed or already removed).`,
+      );
+    }
+  } catch (err) {
+    logger.error(
+      `Failed to re-arm the expiry of ${page.path} (id=${page._id.toString()}). ` +
+        'No later sweep will retry this page until it is made WIP again.',
+      err,
+    );
+  }
 };
 
 export const deleteExpiredWipPageBySystem = async (
@@ -105,9 +153,10 @@ export const deleteExpiredWipPageBySystem = async (
       failed++;
       logger.error(
         `Failed to delete expired WIP page: ${page.path} (id=${page._id.toString()}). ` +
-          'It remains in place with its expiry withdrawn, so no later sweep will retry it.',
+          'Its expiry is being re-armed so a later sweep retries it.',
         err,
       );
+      await rearmExpiry(Page, page);
     }
   }
 

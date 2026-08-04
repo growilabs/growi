@@ -9,7 +9,10 @@
  *    (published, expiry pushed out, or given a child) is left alone — this is the
  *    data-loss guard;
  *  - a claimed page loses its expiry, so no sweep picks it up again;
- *  - a failed deletion leaves the page in place rather than half-deleted;
+ *  - a failed deletion leaves the page in place rather than half-deleted, with its
+ *    expiry re-armed so a later sweep retries it — and without having touched the
+ *    ancestor counters, so that retry cannot double-decrement them;
+ *  - the re-arm is skipped when the page is no longer what the claim left behind;
  *  - the returned summary reports what happened.
  *
  * `IPageService` is mocked at the boundary — deleteCompletelyOperation IS the
@@ -240,5 +243,53 @@ describe('deleteExpiredWipPageBySystem', () => {
     expect(summary.failed).toBe(1);
     expect(summary.deleted).toBe(1);
     expect(await Page.findById(failing._id)).not.toBeNull();
+    // Only the page that was actually deleted moved its ancestors' counters. The
+    // failed one must not have, or the retry below would decrement them twice.
+    expect(mockUpdateDescendantCountOfAncestors).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-arms the expiry of a failed page, so a later sweep retries it', async () => {
+    // The sweep selects on wipExpiredAt, so leaving the claim's withdrawal in place
+    // would drop the page out of every future sweep — a transient error would cost
+    // the page its cleanup permanently, with nothing but a log line to show for it.
+    const page = await createWipPage(`${base}/fails-then-retried`, past());
+    mockDeleteCompletelyOperation.mockRejectedValueOnce(new Error('boom'));
+
+    await deleteExpiredWipPageBySystem([page], pageService);
+
+    const rearmed = (await Page.findById(page._id))?.wipExpiredAt;
+    expect(rearmed).toBeInstanceOf(Date);
+    // Future, so a hot loop cannot re-claim it on the spot...
+    expect((rearmed as Date).getTime()).toBeGreaterThan(Date.now());
+    // ...but well inside one cron interval, or "retry later" quietly becomes
+    // "abandon": a backoff of days satisfies "in the future" just as well.
+    expect((rearmed as Date).getTime()).toBeLessThanOrEqual(
+      Date.now() + 24 * 60 * 60 * 1000,
+    );
+
+    // ...and the retry actually succeeds once the page is due again.
+    await Page.updateOne({ _id: page._id }, { $set: { wipExpiredAt: past() } });
+    const retry = await deleteExpiredWipPageBySystem([page], pageService);
+
+    expect(retry.deleted).toBe(1);
+    expect(mockDeleteCompletelyOperation).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not re-arm a page that was published while the deletion was failing', async () => {
+    // Re-arming blindly would hand an expiry back to a page the user has since
+    // published, and the next sweep would delete it — the re-arm turning into its
+    // own data-loss path.
+    const page = await createWipPage(`${base}/published-while-failing`, past());
+    mockDeleteCompletelyOperation.mockImplementationOnce(async () => {
+      await Page.updateOne({ _id: page._id }, { $unset: { wip: true } });
+      throw new Error('boom');
+    });
+
+    const summary = await deleteExpiredWipPageBySystem([page], pageService);
+
+    expect(summary.failed).toBe(1);
+    const after = await Page.findById(page._id);
+    expect(after).not.toBeNull();
+    expect(after?.wipExpiredAt).toBeUndefined();
   });
 });

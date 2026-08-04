@@ -4,9 +4,12 @@
  * Contract under test (observable DB state):
  *  - the stored value is CONVERTED, not renamed: `ttlTimestamp` held the moment the
  *    page was made WIP and the TTL index supplied the duration, whereas
- *    `wipExpiredAt` is the absolute expiry. A straight rename would leave every
- *    existing WIP page already expired, and the cleanup cron would delete them all
- *    on its first run;
+ *    `wipExpiredAt` is the absolute expiry;
+ *  - no page comes out of the migration already expired, whatever it went in as:
+ *    a legacy timestamp older than one expiration window converts to a past
+ *    instant even after the duration is added, so those are re-granted a full
+ *    window from the migration. Otherwise the first cleanup run after the upgrade
+ *    would completely delete the whole backlog at once;
  *  - a legacy page that has descendants is exempted (field dropped, no expiry
  *    granted), mirroring makeWip()'s `disableTtl`;
  *  - the orphaned-empty-page sweep runs first, so "has descendants" is judged
@@ -31,7 +34,10 @@ describe('rename-ttl-timestamp-to-wip-expired-at', () => {
   let configs: Collection;
   let migrate: typeof import('./20260730120000-rename-ttl-timestamp-to-wip-expired-at');
 
-  const madeWipAt = new Date('2026-01-01T00:00:00.000Z');
+  // Relative to now, not a fixed date: a fixture pinned to an absolute instant
+  // silently ages into the already-overdue branch, which converts to a different
+  // value and would make these expectations pass for the wrong reason.
+  const madeWipAt = new Date(Date.now() - 60 * 60 * 1000); // 1h ago: not yet overdue
   const expectedExpiry = new Date(
     madeWipAt.getTime() + EXPIRATION_SECONDS * 1000,
   );
@@ -82,10 +88,75 @@ describe('rename-ttl-timestamp-to-wip-expired-at', () => {
     const doc = await pages.findOne({ _id: id });
     expect(doc?.ttlTimestamp).toBeUndefined();
     expect((doc?.wipExpiredAt as Date).getTime()).toBe(expectedExpiry.getTime());
-    // The whole point: a rename would have produced madeWipAt, i.e. long past.
-    expect((doc?.wipExpiredAt as Date).getTime()).toBeGreaterThan(
-      madeWipAt.getTime(),
-    );
+    // The whole point: a rename would have produced madeWipAt, i.e. already past,
+    // and the next sweep would have deleted the page completely.
+    expect((doc?.wipExpiredAt as Date).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('re-grants a full window to a page that was already overdue, instead of converting it to a past instant', async () => {
+    // The backlog on an instance whose TTL monitor was not reaping: adding the
+    // duration to a months-old timestamp still lands in the past, so a faithful
+    // conversion would feed the whole backlog to the first sweep after the upgrade.
+    const id = track(new ObjectId());
+    await pages.insertOne({
+      _id: id,
+      path: '/mig-long-overdue',
+      isEmpty: false,
+      wip: true,
+      ttlTimestamp: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000), // 90d ago
+    });
+
+    const before = Date.now();
+    await migrate.up(db);
+
+    const expiry = (
+      (await pages.findOne({ _id: id }))?.wipExpiredAt as Date
+    ).getTime();
+    // One whole window measured from the migration, so it is necessarily future.
+    expect(expiry).toBeGreaterThanOrEqual(before + EXPIRATION_SECONDS * 1000);
+    expect(expiry).toBeLessThanOrEqual(Date.now() + EXPIRATION_SECONDS * 1000);
+  });
+
+  it('splits at exactly one expiration window: just-overdue is re-granted, just-inside keeps its real deadline', async () => {
+    // Pins where the two branches meet. Without this, the boundary could drift by
+    // a whole window in either direction and both tests above would still pass —
+    // and drifting it earlier reintroduces the bug, since a page that is overdue
+    // by minutes would then convert faithfully to a past instant.
+    const windowMs = EXPIRATION_SECONDS * 1000;
+    const justOverdue = track(new ObjectId());
+    const justInside = track(new ObjectId());
+    const justInsideTtl = new Date(Date.now() - windowMs + 5 * 60 * 1000);
+    await pages.insertMany([
+      {
+        _id: justOverdue,
+        path: '/mig-just-overdue',
+        isEmpty: false,
+        wip: true,
+        ttlTimestamp: new Date(Date.now() - windowMs - 5 * 60 * 1000),
+      },
+      {
+        _id: justInside,
+        path: '/mig-just-inside',
+        isEmpty: false,
+        wip: true,
+        ttlTimestamp: justInsideTtl,
+      },
+    ]);
+
+    const before = Date.now();
+    await migrate.up(db);
+
+    const overdueExpiry = (
+      (await pages.findOne({ _id: justOverdue }))?.wipExpiredAt as Date
+    ).getTime();
+    expect(overdueExpiry).toBeGreaterThanOrEqual(before + windowMs);
+    expect(overdueExpiry).toBeLessThanOrEqual(Date.now() + windowMs);
+
+    // Still inside its window, so its own deadline stands — no re-grant.
+    const insideExpiry = (
+      (await pages.findOne({ _id: justInside }))?.wipExpiredAt as Date
+    ).getTime();
+    expect(insideExpiry).toBe(justInsideTtl.getTime() + windowMs);
   });
 
   it('exempts a legacy page that has descendants (no expiry granted)', async () => {
