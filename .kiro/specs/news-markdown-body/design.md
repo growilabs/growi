@@ -37,9 +37,9 @@
 
 ### Allowed Dependencies
 
-- 既存の描画機構: `react-markdown` v9 / `RevisionRenderer`(単体再利用可)/ `remark-gfm` / `remark-breaks` / `rehype-sanitize` / `hast-util-sanitize`(いずれも導入済み。**新規 npm 依存を追加しない**)
+- 既存の描画機構: `react-markdown` v9 / `remark-gfm` / `remark-breaks` / `rehype-sanitize` / `hast-util-sanitize`(いずれも導入済み。**新規 npm 依存を追加しない**)。`RevisionRenderer` は `className="wiki …"` をハードコードするため直接は使わず、`react-markdown` + `react-error-boundary` の薄いラッパを自作する
 - 既存 news feature モジュール(`feed-parser` / `news-cron-service` / interfaces / `NewsFeed.tsx`)への編集
-- `FEED_URL` 定数(`news-cron-service.ts`。解決処理のため export 化して共有)
+- `FEED_URL` 定数 — 現在 `news-cron-service.ts`(サーバ)にハードコードされているが、描画側(クライアント)からも参照するため **`features/news/consts.ts`(サーバ依存を含まない feature 直下の共有 consts)へ移設**する。cron からの export はサーバ専用モジュール(configManager / cron / mongoose)をクライアントバンドルに引き込むため採らない
 
 ### Revalidation Triggers
 
@@ -55,7 +55,7 @@
 - `NewsFeed.tsx` は現状 body を `whiteSpace: pre-wrap` のプレーンテキストで描画。Markdown parse は皆無
 - Wiki レンダラ(`services/renderer` + client `renderer.tsx` + `RevisionRenderer`)は機構としては再利用可能だが、option generator が `pagePath`/`RendererConfig` に結合し、sanitize 許可範囲が広い(`iframe`/`video` 許可 + `rehype-raw` で生 HTML 通過)。**外部フィードにこの許可範囲は過剰**
 - Markdown/sanitize ライブラリは全て導入済み。**最小サブセットレンダラは存在しない**ため新設する
-- `resolve-image-url`(同一オリジン封じ込め)はこの branch に無い(PR #11512 のものは feat/news-images に保全)。cherry-pick + gif 追加で再利用
+- 同一オリジン封じ込めの解決純関数(`resolveNewsMediaUrl`)はこの feature に存在しないため、design の契約(下記 Service Interface)どおり**新規実装**する(gif 対応・mp4 除外)
 
 ### Architecture Pattern & Boundary Map
 
@@ -108,24 +108,27 @@ apps/app/src/features/news/client/components/
 └── NewsMarkdownBody.spec.tsx
 apps/app/src/features/news/client/services/
 ├── news-markdown-options.ts        # react-markdown option generator(remark/rehype 構成 + sanitize schema 適用)
+├── news-markdown-options.spec.ts
 ├── news-sanitize-schema.ts         # ニュース専用の hast-util-sanitize スキーマ(許可タグ/属性)
 ├── news-sanitize-schema.spec.ts
 ├── rehype-resolve-news-media.ts    # rehype プラグイン: img src を解決+封じ込め検証、不適合はノード除去
 └── rehype-resolve-news-media.spec.ts
-apps/app/src/features/news/server/services/            # ※クライアント共有の解決純関数
-└── resolve-news-media-url.ts + .spec.ts   # PR #11512 の resolve-image-url を gif 対応で再導入(純関数)
+apps/app/src/features/news/utils/                      # ※client/server 共有(interfaces/ と同階層)
+└── resolve-news-media-url.ts + .spec.ts   # 同一オリジン封じ込めの解決純関数(新規実装。gif 対応・mp4 除外)
+apps/app/src/features/news/
+└── consts.ts                       # FEED_URL の共有定数(cron・描画の両方が参照)
 ```
 
-> `resolve-news-media-url` は client/server 双方から使える純関数として配置(現状 client 描画だが、取込時検証にも将来転用可能な形)。
+> `resolve-news-media-url` はクライアント(rehype プラグイン)から import するため、サーバ専用ディレクトリ(`server/services/`)ではなく feature 直下の共有 `utils/` に置く。`FEED_URL` も同様に feature 直下 `consts.ts` に共有定数として置く。
 
 ### Modified Files
 
 - `apps/app/src/features/news/client/components/NewsFeed.tsx` — body 描画を「bodyFormat=markdown なら NewsMarkdownBody、それ以外は従来 pre-wrap」に分岐
-- `apps/app/src/features/news/interfaces/news-item.ts` — `INewsItem` / `INewsItemInput` に `bodyFormat?: 'markdown'` を追加
-- `apps/app/src/features/news/server/services/feed-parser.ts` — zod に `bodyFormat: z.literal('markdown').optional()` を追加
-- `apps/app/src/features/news/server/models/news-item.ts` — `bodyFormat` フィールド追加(enum: 'markdown'、任意)
-- `apps/app/src/features/news/server/services/news-cron-service.ts` — `bodyFormat` を INewsItemInput へ写経(body は従来どおり verbatim)、`FEED_URL` を export
-- `apps/app/src/features/news/client/consts.ts` — 描画側でも参照する feed オリジン定数の集約(必要なら)
+- `apps/app/src/features/news/interfaces/news-item.ts` — `INewsItem` / `INewsItemInput` に `bodyFormat?: string` を追加
+- `apps/app/src/features/news/server/services/feed-parser.ts` — zod に `bodyFormat: z.string().optional()` を追加(未知値をアイテムごと落とさないため literal にしない。上記 opt-in ゲート参照)
+- `apps/app/src/features/news/server/models/news-item.ts` — `bodyFormat` フィールド追加(String、任意、enum 制約なし)
+- `apps/app/src/features/news/server/services/news-cron-service.ts` — `bodyFormat` を INewsItemInput へ写経(body は従来どおり verbatim)。ハードコードしている `FEED_URL` は下記の共有 consts へ移設して参照に変更
+- `apps/app/src/features/news/consts.ts` — **新規**。`FEED_URL` をサーバ(cron)・クライアント(描画)双方が参照する共有定数として定義。`images/` ディレクトリ名など封じ込め規約の定数もここに集約する
 
 ## Requirements Traceability
 
@@ -153,41 +156,47 @@ apps/app/src/features/news/server/services/            # ※クライアント�
 | NewsFeed(変更) | Client/UI | bodyFormat で描画分岐 | 1.1,1.2, 5.1 | — |
 | bodyFormat(model/interface/zod) | Server | opt-in ゲートのデータ形状 | 1.1, 5.1–5.3 | State |
 
-#### newsSanitizeSchema(セキュリティの中核)
+#### newsSanitizeSchema(セキュリティの中核・確定スキーマ)
 
-hast-util-sanitize 用スキーマ。**Wiki の `recommended-whitelist` を継承せず、明示ゼロベースで最小許可**:
+hast-util-sanitize 用スキーマ。**Wiki の `recommended-whitelist` を継承せず、明示ゼロベースで最小許可**する。hast-util-sanitize は許可外要素を**子要素ごと丸ごと除去**する(`strip` 未指定時)ため、remark-gfm が出力しうるタグ(表など)を許可リストに漏らすと**その要素が警告なく消える**。これを踏まえ、スキーマの4構成要素を以下に確定する:
 
-- 許可タグ: `p, br, strong, em, del, a, code, pre, blockquote, ul, ol, li, h2, h3, h4, hr, img`(見出しは `h1` を避け h2–h4。表・raw HTML・`iframe`/`video`/`script`/`style` は**非許可**)
-- 許可属性: `a: [href, title]`、`img: [src, alt, title]`、`code: [className(言語のみ)]`。`style` 属性・`on*` イベントハンドラ・任意 `class` は不許可
-- protocols: `a[href]` = http/https/mailto、`img[src]` = https のみ
-- rehype-raw を**パイプラインに含めない**ため、body 中の生 HTML(`<video>` 等)はそもそも parse されず、テキストとしても除去/エスケープされる(Req 2.2 を構造的に担保)
+- **`tagNames`**: `p, br, strong, em, del, a, code, pre, blockquote, ul, ol, li, h1, h2, h3, h4, h5, h6, hr, img, table, thead, tbody, tr, th, td`
+  - **見出しは h1–h6 を許可**し、remark/rehype で**2段シフト**する(body の `#` → DOM 上 `h3` 以降。h5/h6 は h6 で頭打ち)。理由: `NewsFeed.tsx` のニュースタイトルが `<h2>` なので、本文見出しをその配下の階層に落として a11y と視覚階層を保つ。サイズは CSS で調整
+  - **GFM の表は許可**する(`table/thead/tbody/tr/th/td`)。remark-gfm を入れる以上、非許可だと表が黙って消えるため。ただし列の text-align は `style` を許可しないため反映されない(既知の軽微な劣化)
+  - **タスクリスト/脚注は非対応**(`input`・脚注 `section`/`sup` を許可しない)。タスクリストのチェックボックスは除去され、テキストのみ残る(劣化として許容)
+  - 生 HTML・`iframe`/`video`/`script`/`style` は**非許可**
+- **`attributes`**: `a: [href, title]`、`img: [src, alt, title]`。`code` の `className` は**許可しない**(ニュースにハイライタを入れないため言語指定は効果がなく、最小権限の観点でも落とす)。`style` 属性・`on*` イベントハンドラ・任意 `class` は不許可
+- **`protocols`**: `a[href]` = http / https / mailto、`img[src]` = https のみ
+- **`strip`**: `['script', 'style']`(挙動を明示。許可外要素は既定でも子ごと除去されるが、意図を固定する)
+- rehype-raw を**パイプラインに含めない**ため、body 中の生 HTML(`<video>` 等)はそもそも parse されない(Req 2.2 を構造的に担保)
 
-#### resolveNewsMediaUrl(純関数、再導入)
+#### resolveNewsMediaUrl(純関数、新規実装)
 
 ```typescript
 // (imagePath, feedUrl) => 検証済み絶対 URL | null
 export const resolveNewsMediaUrl = (imagePath: string, feedUrl: string): string | null;
 ```
-- https のみ / credentials・query・hash 拒否 / 同一オリジン / feed の images ディレクトリ配下(末尾スラッシュ prefix)/ 拡張子 png・jpe?g・webp・**gif** / `%` 含みパス拒否。例外を投げず不正は null(PR #11512 の実装 + テストを gif 対応で移植)
+- https のみ / credentials・query・hash 拒否 / 同一オリジン / feed の `images/` ディレクトリ配下(末尾スラッシュ prefix)/ 拡張子 png・jpe?g・webp・**gif** / `%` 含みパス拒否。例外を投げず不正は null。上記契約に沿って**新規に実装**し、境界テストも新規に書く
 
 #### KEY DECISION: メディア解決は「描画時」(案II)を採用
 
 gap で挙げた案I(取込時)/案II(描画時)のうち **案II(rehype プラグインで描画時に解決+検証)** を採る。
 
-- 理由: (a) body を verbatim 保存でき、取込時の Markdown parse/serialize による本文変形リスクを回避、(b) 解決ロジックを描画パイプラインに一元化し SSR/クライアントで同一適用、(c) 画像バイトはそもそもサーバに触れない(hotlink)ため「取込時ゲート」の価値が小さく、描画時の resolve プラグイン + sanitize の**二段ゲート**で十分
+- 理由: (a) body を verbatim 保存でき、取込時の Markdown parse/serialize による本文変形リスクを回避、(b) 画像バイトはそもそもサーバに触れない(hotlink)ため「取込時ゲート」の価値が小さく、描画時の resolve プラグイン + sanitize の**二段ゲート**で十分、(c) 解決ロジックを描画パイプラインに一元化できる
+  - 注: `/_news` の NewsMarkdownBody は client 限定描画(下記「SSR について」参照)なので、解決は client-only で完結する。「SSR/クライアント両対応」は不要
 - 二段構え: `rehypeResolveNewsMedia`(オリジン+パス封じ込め、不適合ノード除去)→ `rehype-sanitize`(タグ/プロトコル許可)。前者が漏らしても後者が protocols で止める
-- FEED_URL は定数 export し、描画側(クライアント)からも参照する
+- FEED_URL は `features/news/consts.ts` の共有定数として描画側(クライアント)から参照する
 
 #### opt-in ゲート(`bodyFormat`)
 
-- `INewsItem.bodyFormat?: 'markdown'`(アイテム単位。ロケール別ではない)。未指定=従来のプレーンテキスト描画
-- feed-parser: `bodyFormat: z.literal('markdown').optional()`。旧アプリは未知フィールドを無視 → 生テキスト描画(前方互換、Req 5.3)
+- `INewsItem.bodyFormat?: 'markdown'`(アイテム単位。ロケール別ではない = 配信側は全ロケールを同一フォーマットで揃える契約)。未指定=従来のプレーンテキスト描画
+- feed-parser: **`bodyFormat: z.string().optional()`** とし、描画側で `bodyFormat === 'markdown'` を判定する。`z.literal('markdown').optional()` にしない理由: feed-parser はアイテム単位の `safeParse` で**検証失敗アイテムを丸ごと skip** するため、`bodyFormat: 'mdx'` のような**将来の未知値がニュース自体を消してしまう**(プレーンテキストへの劣化にならず Req 5.3 の前方互換に反する)。`z.string().optional()` なら未知値はそのまま取り込まれ、描画側が markdown 以外を従来描画にフォールバックする
 - NewsFeed: `item.bodyFormat === 'markdown'` のとき NewsMarkdownBody、else 従来 pre-wrap(Req 1.2, 5.1)
 
 ## Data Models
 
 `NewsItem` に additive:
-- `bodyFormat`: `{ type: String, enum: ['markdown'], required: false }`(未指定 = プレーンテキスト)
+- `bodyFormat`: `{ type: String, required: false }`(未指定 = プレーンテキスト)。model では enum 制約を付けず**文字列として保存**する(feed-parser の `z.string().optional()` と揃え、未知値をアイテムごと落とさない)。描画分岐は `=== 'markdown'` 判定で行う
 - `body` は現状のまま `Map<locale,string>`(Markdown 文字列を格納)。**スキーマ変更・マイグレーション不要**(Req 5.2)
 
 ## Error Handling
@@ -203,7 +212,7 @@ gap で挙げた案I(取込時)/案II(描画時)のうち **案II(rehype プラ�
 
 ### Unit(純関数・スキーマ)
 
-- `resolve-news-media-url.spec`: PR #11512 の境界マトリクス(29ケース)+ gif 受理・mp4 拒否・非同一オリジン拒否
+- `resolve-news-media-url.spec`: 境界マトリクス(ディレクトリ脱出・他リポジトリ配下・偽ディレクトリ・http ダウングレード・credentials/query/hash・`%` 含みパス)+ gif 受理・mp4 拒否・非同一オリジン拒否
 - `news-sanitize-schema.spec`: 許可タグが残る / `iframe`・`video`・`script`・`style`・`on*` が除去される / `javascript:` リンク無効化 / img src の https 強制
 
 ### Component(NewsMarkdownBody / NewsFeed)
@@ -230,8 +239,6 @@ gap で挙げた案I(取込時)/案II(描画時)のうち **案II(rehype プラ�
 
 **技術は再利用・設定は隔離**: react-markdown/rehype の**機構**は Wiki と共通のものを使う(実績・保守性)。隔離するのは寛容な**設定(スキーマ+プラグイン集合)**のみ。「一から別レンダラを書く」わけではない。
 
-## design → tasks へ持ち越す確認
+## SSR について(確定)
 
-- news-sanitize-schema の最終的な許可タグ/属性の確定(上記は初期案)
-- `resolve-news-media-url` の feat/news-images からの取り込み手順(cherry-pick or 手移植)
-- /_news が完全 client 描画である前提の最終確認(SSR 経路が無いこと)
+`/_news` の NewsFeed は `apps/app/src/pages/_news/index.page.tsx` で `dynamic(..., { ssr: false })` として読み込まれる。したがって**本文描画に SSR 経路は無く、NewsMarkdownBody は client 限定で描画される**(ページ自体は `getServerSideProps` を持つが、body 描画はクライアントに閉じる)。メディア解決も client-only で完結する。

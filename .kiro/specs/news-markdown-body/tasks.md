@@ -1,16 +1,15 @@
 # Implementation Plan
 
 - [ ] 1. メディア解決の基盤を用意する
-- [ ] 1.1 (P) resolveNewsMediaUrl 純関数を再導入する
-  - PR #11512 の `resolve-image-url.ts` を `server/services/resolve-news-media-url.ts` として移植し、許可拡張子を png/jpg/jpeg/webp/**gif** に(mp4 は含めない)調整する。`(imagePath, feedUrl) => string | null`、https のみ・credentials/query/hash 拒否・同一オリジン・feed の images ディレクトリ配下封じ込め・`%` 含みパス拒否・例外を投げない
-  - `resolve-news-media-url.spec.ts` に境界マトリクス(ディレクトリ脱出・他リポジトリ配下・偽ディレクトリ・http ダウングレード・gif 受理・mp4 拒否)を実装し全て green
+- [ ] 1.1 (P) resolveNewsMediaUrl 純関数を新規実装する
+  - `features/news/utils/resolve-news-media-url.ts` に純関数 `(imagePath, feedUrl) => string | null` を新規実装する。https のみ・credentials/query/hash 拒否・同一オリジン・feed の `images/` ディレクトリ配下封じ込め(末尾スラッシュ prefix)・許可拡張子 png/jpg/jpeg/webp/**gif**(mp4 は含めない)・`%` 含みパス拒否・例外を投げない。クライアント(rehype プラグイン)から import するため `server/services/` ではなく共有 `utils/` に置く
+  - `resolve-news-media-url.spec.ts` に境界マトリクス(ディレクトリ脱出・他リポジトリ配下・偽ディレクトリ・http ダウングレード・credentials/query/hash・`%` 含みパス・gif 受理・mp4 拒否)を実装し全て green
   - _Boundary: resolveNewsMediaUrl_
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 1.2 FEED_URL を export し描画側から参照可能にする
-  - `news-cron-service.ts` の `FEED_URL` 定数を export(または `consts.ts` へ移設)し、クライアント描画から import できるようにする
+- [ ] 1.2 FEED_URL を共有 consts へ移設する
+  - `news-cron-service.ts` にハードコードされている `FEED_URL` を `features/news/consts.ts`(feature 直下・サーバ依存を含まない)へ移設し、cron とクライアント描画の双方が import する。cron から export する案は採らない(サーバ専用モジュールをクライアントバンドルに引き込むため)
   - 既存の cron 側 import が壊れていないことを typecheck で確認
-  - _Depends: なし_
   - _Boundary: FEED_URL const_
   - _Requirements: 3.1_
 
@@ -21,8 +20,8 @@
   - _Requirements: 1.1, 5.1_
 
 - [ ] 2.2 (P) feed-parser と model に bodyFormat を追加する
-  - `feed-parser.ts` の zod に `bodyFormat: z.literal('markdown').optional()` を追加。`news-item.ts` model に `bodyFormat`(enum: 'markdown'、任意、default 無し)を追加
-  - feed-parser.spec に「bodyFormat 有り/無し/不正値」ケースを追加し、不正値でもアイテム自体は取り込まれる(フィールドは落ちる)ことを確認
+  - `feed-parser.ts` の zod に **`bodyFormat: z.string().optional()`** を追加(literal にしない。feed-parser はアイテム単位 safeParse で失敗アイテムを丸ごと skip するため、未知値を literal で弾くとニュース自体が消え Req 5.3 の前方互換に反する)。`news-item.ts` model に `bodyFormat`(String、任意、enum 制約なし)を追加
+  - feed-parser.spec に「bodyFormat=markdown / 未指定 / 未知値(例 'mdx')」ケースを追加し、**未知値でもアイテムが取り込まれ bodyFormat がその値のまま保持される**(＝描画側が markdown 以外を従来描画にフォールバックできる)ことを確認
   - _Boundary: feed-parser schema / NewsItem model_
   - _Requirements: 1.1, 5.1, 5.2, 5.3_
 
@@ -35,8 +34,8 @@
 
 - [ ] 3. ニュース専用の制限描画パスを実装する
 - [ ] 3.1 (P) newsSanitizeSchema を定義する
-  - `client/services/news-sanitize-schema.ts` に hast-util-sanitize 用スキーマを**ゼロベースで**定義(recommended-whitelist は継承しない)。許可タグ: p/br/strong/em/del/a/code/pre/blockquote/ul/ol/li/h2/h3/h4/hr/img。許可属性: a[href,title]/img[src,alt,title]/code[className(言語)]。protocols: a[href]=http,https,mailto / img[src]=https。style・on*・任意 class・iframe/video/script は不許可
-  - `news-sanitize-schema.spec.ts`: 許可タグが残り、iframe/video/script/style/on* が除去され、javascript: リンクが無効化され、img src の https が強制されることを検証
+  - `client/services/news-sanitize-schema.ts` に hast-util-sanitize 用スキーマを**ゼロベースで**定義(recommended-whitelist は継承しない)。design の確定スキーマに従う: tagNames = p/br/strong/em/del/a/code/pre/blockquote/ul/ol/li/**h1–h6**/hr/img/**table/thead/tbody/tr/th/td**。attributes = a[href,title]/img[src,alt,title](**code の className は許可しない**)。protocols = a[href]=http,https,mailto / img[src]=https。strip=['script','style']。style・on*・任意 class・iframe/video/input は不許可
+  - `news-sanitize-schema.spec.ts`: 許可タグ(表・見出し含む)が残り、iframe/video/script/style/on*/input が除去され、javascript: リンクが無効化され、img src の https が強制されることを検証
   - _Boundary: newsSanitizeSchema_
   - _Requirements: 2.1, 2.2, 2.3, 2.5, 4.3_
 
@@ -78,7 +77,6 @@
 
 - [ ] 5.2 全体検証と手動スモーク準備を行う
   - `turbo run lint --filter @growi/app` 相当(biome + typecheck)と対象テスト全件が green
-  - /_news が完全 client 描画である前提(SSR 経路が無いこと)を実コードで最終確認し、必要なら design の注記を更新
-  - `tmp/scripts/insert-demo-news.js` に Markdown 本文ケース(見出し+リスト+複数画像+GIF、不正 img 混在、bodyFormat 未指定の従来ケース)を追加し、手動スモーク可能な状態にする
+  - `tmp/scripts/insert-demo-news.js` に Markdown 本文ケース(見出し+リスト+複数画像+GIF、不正 img 混在、bodyFormat 未指定の従来ケース)を追加し、手動スモーク可能な状態にする(実画像は growi-news-feed の `images/` に置くか、スモーク用に base URL 差し替え手段を用意する前提)
   - _Depends: 4.1_
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 5.1_

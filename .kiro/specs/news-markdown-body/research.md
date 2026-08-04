@@ -7,7 +7,7 @@
 ## Summary
 
 - Markdown + sanitize の**機構は既に全部揃っている**(react-markdown v9 / remark-gfm / remark-breaks / rehype-sanitize / hast-util-sanitize が apps/app の依存に存在)。新規 npm 依存は不要
-- 真に欠けているのは2点だけ: **(a) ニュース専用の制限描画パス**(狭い sanitize スキーマ + body を描画に配線)、**(b) 同一オリジン画像 URL 解決**(この branch に resolve-image-url は無い。PR #11512 のものは feat/news-images 側)
+- 真に欠けているのは2点だけ: **(a) ニュース専用の制限描画パス**(狭い sanitize スキーマ + body を描画に配線)、**(b) 同一オリジン画像 URL 解決**(この feature に解決純関数は存在しないため design の契約どおり新規実装する)
 - GROWI Wiki レンダラは**流用しない方針が gap でも裏付けられた**: Wiki の許可範囲は `iframe`/`video` を許可し `rehype-raw`(`allowDangerousHtml: true`)で生 HTML を通す。外部フィード由来コンテンツにこれは過剰。ただし**同じ機構(react-markdown + RevisionRenderer + rehype-sanitize)を、狭いスキーマ + プラグイン最小で再利用**するのが正解(一から書かない)
 
 ## Requirement → Asset Map(gap タグつき)
@@ -31,19 +31,19 @@
 - 補足: `hast-util-sanitize` の defaultSchema は img src を http/https に制限するが**相対 URL は通す**ため、解決ステップが無いと相対パスは `/_news` 基準で誤解決される。どちらの案でも解決ステップは必須
 - 推奨の方向性は design で判断(前回の news-feed-images は "取込時解決 + 描画時再検証" の二段。今回は Markdown 埋め込みのため案II 寄りに再検討の余地あり)
 
-### resolve-image-url の再利用
+### 同一オリジン封じ込めの解決純関数
 
-PR #11512 の `resolve-image-url.ts`(29ケースの境界テスト + 封じ込めロジック)は feat/news-images に保全済み。**cherry-pick して mp4 除外・gif 追加の拡張子調整のうえ再利用可能**(UI 方式に依存しないと前回明記した通り)。
+この feature に解決純関数は存在しないため、design の Service Interface(`resolveNewsMediaUrl`)の契約に沿って**新規実装**する。https のみ・同一オリジン・`images/` 配下封じ込め・拡張子 png/jpg/jpeg/webp/gif(mp4 除外)を満たし、境界テストも新規に書く。
 
 ## Effort / Risk
 
-- **Effort: M(3〜7日)**。機構は流用でき新規依存ゼロだが、専用 sanitize スキーマ設計 + 画像解決の配線 + SSR/クライアント両対応 + テストがある
+- **Effort: M(3〜7日)**。機構は流用でき新規依存ゼロだが、専用 sanitize スキーマ設計 + 画像解決の配線 + 敵対的テストがある(`/_news` は client 限定描画なので SSR 対応は不要 → 下記 design 確定事項を参照)
 - **Risk: Medium**。技術は既知(rehype-sanitize は社内で実績)だが、**外部由来コンテンツの sanitize スキーマ設計はセキュリティ・クリティカル**。スキーマの穴が全インスタンスに波及するため、許可範囲の確定と敵対的テストが要
 
-## design へ持ち越す Research items
+## design で確定した事項(旧 Research items)
 
-1. 画像 URL 解決の位置(案I 取込時 / 案II 描画時)の確定
-2. ニュース専用 sanitize スキーマの具体的な許可タグ・属性リスト(基本書式 + img のみ、iframe/video/script/style/on* 全除外)
-3. opt-in ゲートの表現(`bodyFormat: "markdown"` フィールド新設か、feed version での判定か)
-4. SSR 対応の要否(/_news が SSR されるか、client-only 描画か)— RevisionRenderer は react-markdown 依存、SSR 経路の確認
-5. resolve-image-url の cherry-pick 元(feat/news-images)からの取り込み手順
+1. 画像 URL 解決の位置 → **案II(描画時)を採択**(design KEY DECISION)
+2. ニュース専用 sanitize スキーマの許可タグ・属性 → **design で確定**(h1–h6 + 表を許可、code.className は不許可、strip=['script','style'])
+3. opt-in ゲート → **`bodyFormat`(zod は `z.string().optional()`、描画側で `=== 'markdown'` 判定)**
+4. SSR 対応の要否 → **不要**。`/_news` の NewsFeed は `dynamic(..., { ssr: false })` で本文描画は client 限定
+5. 解決純関数の実装 → **新規実装**(移植元は無し)
