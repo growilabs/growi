@@ -48,13 +48,9 @@ export async function reportPasswordHashFormatDistribution(baseFilter = {}) {
   };
 
   const counts = {
-    // fully migrated: adaptive-KDF only
     upgradedOnly: await count(scopeFilter(baseFilter, upgradedOnlyFilter)),
-    // in progress: both formats present
     both: await count(scopeFilter(baseFilter, bothFilter)),
-    // not migrated: legacy SHA-256 only
     legacyOnly: await count(scopeFilter(baseFilter, legacyOnlyFilter)),
-    // no password set (external-auth-only, not-yet-activated, or scrubbed users)
     noPassword: await count(scopeFilter(baseFilter, noPasswordFilter)),
   };
 

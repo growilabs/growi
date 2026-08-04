@@ -186,9 +186,8 @@ const factory = (crowi) => {
 
   userSchema.methods.isPasswordValid = async function (password) {
     validateCrowi();
-    // Delegates to PasswordHashService, which transparently verifies both the
-    // scrypt envelope (passwordHash) and the legacy SHA-256 hash (password).
-    // Returns a VerifyResult ({ isValid, needsRehash }), NOT a boolean.
+    // Returns a VerifyResult ({ isValid, needsRehash }), NOT a boolean — a bare
+    // `!promise` check silently passes, so callers must read `.isValid`.
     return await passwordHashService.verify(
       password,
       this.passwordHash,

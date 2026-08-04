@@ -223,12 +223,10 @@ class PasswordHashService implements IPasswordHashService {
       return { isValid: false, needsRehash: false };
     }
 
-    // Branch 1: scrypt envelope present.
     if (isPresent(scryptHash)) {
       return await this.verifyScrypt(plaintext, scryptHash, context);
     }
 
-    // Branch 2: legacy SHA-256 hash present.
     if (isPresent(legacyHash)) {
       return this.verifyLegacy(plaintext, legacyHash, passwordSeed, context);
     }

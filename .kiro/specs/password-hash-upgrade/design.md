@@ -34,7 +34,7 @@ The migration is implemented as a **lazy migration**. Existing users are automat
 - `PasswordHashService` (`src/server/service/password-hash.ts`): scrypt hash generation, verification, and legacy detection
 - The User model's password-related methods (`isPasswordValid`, `setPassword`, `updatePassword`, `isPasswordSet`) — making them async and adding the `passwordHash` field
 - Making **all 5 methods** in the User model that call `setPassword` use `await` (`updatePassword`, `activateInvitedUser`, `resetPasswordByRandomString`, `createUserByEmail`, `createUserByEmailAndPasswordAndStatus`)
-- Clearing `passwordHash` in `statusDelete()` (aligned with the existing `password = ''` scrub, so that a deleted user does not retain a valid credential hash)
+- Clearing both credential fields in `statusDelete()` (`password` and `passwordHash` are both set to `undefined`/unset, so a deleted user does not retain a valid credential hash)
 - Deleting `findUserByEmailAndPassword` (dead code; since no call sites exist, delete it rather than refactoring it into a fetch-then-compare)
 - Making the Passport LocalStrategy async and triggering the lazy migration
 - **Making all call sites of `isPasswordValid` async**: the 2 locations `passport.ts` (LocalStrategy) and `personal-setting/index.js` (old-password verification on password change)
@@ -99,7 +99,7 @@ graph TB
     PHS -->|scrypt / timingSafeEqual| NodeScrypt[node:crypto scrypt]
     PHS -->|createHash sha256| NodeCrypto[node:crypto legacy]
     UserModel -->|save passwordHash| MongoDB[(MongoDB)]
-    StatusScript[Status Migration] -->|countDocuments| MongoDB
+    StatusScript[Status Migration] -->|"$runCommandRaw count"| MongoDB
     CleanupScript[Cleanup Migration] -->|updateMany unset password| MongoDB
     DowngradeScript[Downgrade Prep Migration] -->|count + PasswordResetOrder| MongoDB
 ```
@@ -127,6 +127,11 @@ graph TB
 ### New Files
 
 ```
+apps/app/src/server/models/user/
+└── password-hash-format-filters.ts            # shared dual-field classification filters (null/''-aware):
+                                                # upgradedOnly/both/legacyOnly/noPassword — the single source of
+                                                # truth reused by status / cleanup / downgrade-prep
+
 apps/app/src/server/service/
 └── password-hash.ts                        # PasswordHashService (scrypt + legacy verify, hash)
 
@@ -135,6 +140,7 @@ apps/app/src/migrations/
                                                 # v8: timestamp MUST be later than the latest existing migration (20260721103639)
 
 apps/app/src/server/scripts/
+├── script-runner.ts                           # shared isEntryPoint + withMongoConnection for the standalone scripts
 ├── password-hash-cleanup.ts                   # Req 3.3, 3.4: remove legacy password (standalone admin script)
 └── password-hash-downgrade-prep.ts            # Req 4.1, 4.2, 4.3: count + optional reset email (standalone, Crowi bootstrap)
 ```
@@ -151,10 +157,11 @@ apps/app/src/server/models/user/index.js
   — Make setPassword(password) async → writes passwordHash via PasswordHashService.hash()
   — await ALL 5 setPassword call sites: updatePassword, activateInvitedUser,
     resetPasswordByRandomString, createUserByEmail, createUserByEmailAndPasswordAndStatus
-  — statusDelete(): also clear passwordHash (set to undefined) — existing code scrubs
-    password='' on user deletion but leaves passwordHash, so deleted users would retain
-    a valid credential hash. Unset (not '') so verify() treats it as noPassword, not a
-    malformed field (avoids spurious Req 2.4 WARNING)
+  — statusDelete(): unset BOTH credential fields on user deletion — set
+    password=undefined AND passwordHash=undefined (previously password was scrubbed to
+    '' and passwordHash was left, so deleted users would retain a valid credential hash).
+    Unset (not '') so verify() and the shared filters treat both as noPassword, not a
+    malformed/legacy field (avoids a spurious Req 2.4 WARNING and mis-counting as legacyOnly)
   — DELETE findUserByEmailAndPassword() (dead code: no call sites exist)
 
 apps/app/src/server/service/passport.ts
@@ -296,7 +303,7 @@ flowchart TD
 **Responsibilities & Constraints**
 
 - `hash(plaintext)`: generate a salt with `crypto.randomBytes(16)` → `crypto.scrypt(plaintext, salt, keylen, {N, r, p, maxmem})` → encode and return in the form `scrypt$N$r$p$<salt(base64)>$<hash(base64)>`. SEED is not used
-- `verify(plaintext, scryptHash, legacyHash, passwordSeed)`:
+- `verify(plaintext, scryptHash, legacyHash, passwordSeed, context?)`:
   - `scryptHash` exists → parse `scrypt$…` to extract N/r/p/salt, recompute with `crypto.scrypt`, compare with `crypto.timingSafeEqual` → `{ isValid, needsRehash: false }`
     - **(Optional extension) automatic rehash on parameter update**: if the stored parameters (N/r/p) are weaker than the current defaults, return `needsRehash: true` and rehash at login time with the current parameters. Since verify already parses the stored N/r/p for verification, adding a single comparison against the current defaults costs almost nothing. This lets existing users automatically follow along when scrypt parameters are raised in the future (an optional extension to keep Req 1.1's "at or above OWASP-recommended parameters" satisfied even after migration; not required)
   - `scryptHash` does not exist and `legacyHash` exists → `SHA256(SEED + plaintext) === legacyHash` → `{ isValid, needsRehash: true }`
@@ -320,6 +327,13 @@ export interface VerifyResult {
   needsRehash: boolean;
 }
 
+// Optional identity threaded into verify() so the Req 2.4 anomaly WARNING carries a
+// user identifier. Optional and backward-compatible — existing 4-arg callers are unaffected.
+export interface VerifyLogContext {
+  userId?: string;
+  username?: string;
+}
+
 export interface IPasswordHashService {
   hash(plaintext: string): Promise<string>;
   verify(
@@ -327,6 +341,7 @@ export interface IPasswordHashService {
     scryptHash: string | undefined,
     legacyHash: string | undefined,
     passwordSeed: string,
+    context?: VerifyLogContext,
   ): Promise<VerifyResult>;
 }
 ```
@@ -441,11 +456,11 @@ Output: counts output to standard output (logger.info)
 Idempotency: always read-only; safe to run any number of times
 ```
 
-**Count targets**:
-- `upgradedOnly`: `{ passwordHash: { $exists: true }, password: { $exists: false } }` — fully migrated
-- `both`: `{ passwordHash: { $exists: true }, password: { $exists: true } }` — migrating (both fields present)
-- `legacyOnly`: `{ passwordHash: { $exists: false }, password: { $exists: true } }` — not migrated
-- `noPassword`: `{ passwordHash: { $exists: false }, password: { $exists: false } }` — password not set
+**Count targets** — the four shared filters from `password-hash-format-filters.ts` (the single source of truth reused by status / cleanup / downgrade-prep). A field counts as PRESENT only when it exists **and** is non-empty (`{ $exists: true, $nin: [null, ''] }`); a `null`/`''` value reads as ABSENT — so a `password: ''` scrubbed-deleted user classifies as `noPassword`, **not** `legacyOnly`:
+- `upgradedOnlyFilter`: `passwordHash` present, `password` absent — fully migrated
+- `bothFilter`: both present — migrating (both fields present)
+- `legacyOnlyFilter`: `passwordHash` absent, `password` present — not migrated
+- `noPasswordFilter`: both absent — password not set
 
 #### Cleanup Migration Script
 
@@ -467,7 +482,7 @@ Idempotency: updateMany against users that no longer have password is a no-op
 **Processing flow**:
 1. Obtain the `legacyOnly` count
 2. If `legacyOnly > 0`: log an error message (including the count) and abort processing (Req 3.4)
-3. If `legacyOnly === 0`: run `User.updateMany({ passwordHash: { $exists: true }, password: { $exists: true } }, { $unset: { password: '' } })`
+3. If `legacyOnly === 0`: run `updateMany(bothFilter, { $unset: { password: '' } })` using the shared `bothFilter` (both credentials present) from `password-hash-format-filters.ts`
 
 **Risks**: After Cleanup runs, the `password` field is gone, so if you downgrade, users with only `passwordHash` cannot log in. Administrators must run the downgrade-prep script before downgrading
 
@@ -498,7 +513,7 @@ Idempotency: idempotent if counting only. Be careful with SEND_RESET_EMAILS=true
    - Do not unset users whose send failed (they can be retried on the next run)
    - Log the success and failure counts at INFO/WARNING respectively
 
-> **CRITICAL: why use `$unset` rather than `null`**: This design classifies formats entirely by `$exists` (status/cleanup). In MongoDB, `{ $exists: true }` **also matches a field with a null value**, so setting `passwordHash = null` leaves the field still treated as "existing," and the user in question would still be counted as `upgradedOnly` in the status migration (making Req 4.1's count inaccurate) and would be **sent another reset email on a re-run of downgrade-prep** (breaking idempotency). Always delete the field entirely with `$unset` to reach the `noPassword` state (consistent with statusDelete's `undefined` policy as well).
+> **CRITICAL: why use `$unset` rather than assigning `null`/`''`**: The shared classification filters (`password-hash-format-filters.ts`) treat a credential field as PRESENT only when it exists **and** holds a non-empty value (`present = { $exists: true, $nin: [null, ''] }`; `absent = $or[{ $exists: false }, { $in: [null, ''] }]`). So a `passwordHash = null`/`''` already reads as ABSENT and the user classifies as `noPassword` — it would NOT be re-counted as `upgradedOnly` in the status migration, nor re-sent a reset email on a downgrade-prep re-run. `$unset` is nonetheless preferred: it removes the field entirely rather than leaving a stray `null`/`''` value, reaches the `noPassword` state cleanly, and stays consistent with `statusDelete`'s `undefined` scrub. Always delete the field entirely with `$unset`.
 
 ---
 
@@ -598,7 +613,7 @@ passwordHash: { type: String },  // scrypt self-describing hash (scrypt$N$r$p$sa
   3. **Full green status is achieved after the Cleanup phase** (a future release that removes the legacy verification code once all users are migrated). Until then, handle it with steps 1–2
   - Note that **the security objective (not storing new/changed passwords with weak SHA-256) is reliably achieved at implementation time**. The above concerns the handling of the alert display (the tool-side state)
 - **Preventing `passwordHash` leakage in API responses**: the existing `omitInsecureAttributes()` (`@growi/core`) excludes only `password`/`apiToken`/`email` and does not exclude `passwordHash`. In line with adding the new field, add `passwordHash` to the omit list and add `passwordHash?: string` to `IUser` as well. Because `@growi/core` is a published package, `npx changeset` is required when changing it
-- **Credential scrubbing for deleted users**: `statusDelete()` already intends to scrub legacy credentials via `password = ''`. Unless `passwordHash` is also unset at the same time, a deleted user's scrypt hash (a credential) persists in the DB even after anonymization. To prevent post-migration regression, `statusDelete()` scrubs `passwordHash`
+- **Credential scrubbing for deleted users**: `statusDelete()` unsets both credential fields (`password = undefined` and `passwordHash = undefined`). Previously it scrubbed the legacy credential via `password = ''`; unless `passwordHash` is unset at the same time, a deleted user's scrypt hash (a credential) persists in the DB even after anonymization. To prevent post-migration regression, `statusDelete()` unsets both fields — using `undefined` rather than `''` so the shared filters classify the user as `noPassword`, not `legacyOnly`
 - **Per-user salt**: generate a salt per user with `crypto.randomBytes(16)`, embed it in the self-describing string (`scrypt$N$r$p$salt$hash`), and store it (unlike bcrypt, it is not embedded automatically, so generation, encoding, and parsing are implemented ourselves)
 - **GPU resistance via memory-hardness**: scrypt requires a large amount of memory, so it is more resistant to GPU/ASIC brute force than SHA-256/bcrypt (OWASP also ranks it above bcrypt)
 - **Memory consumption and DoS (operational consideration)**: at the OWASP minimum recommendation (N=2^17, r=8), scrypt consumes **about 128MB** per call. Because the asynchronous `crypto.scrypt` runs on the libuv thread pool (default 4), the number of concurrent computations is naturally capped, and the peak memory stays roughly within "number of threads × 128MB ≒ **512MB**" (it does not become number-of-requests × 128MB). This temporary allocation of around 512MB must be factored into the container's memory budget (check it against GROWI's recommended memory; if it is tight, consider narrowing `UV_THREADPOOL_SIZE`, or the OWASP alternative N=2^16, r=8, p=2 ≒ 64MB/call). As a countermeasure against high-frequency logins (credential stuffing), **rate limiting on the login endpoint** is recommended (shared with the timing-attack countermeasure below). `maxmem` (≥192MB) and clamping the parameter upper bound also prevent memory exhaustion from extreme settings
