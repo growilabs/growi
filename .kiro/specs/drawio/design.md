@@ -100,12 +100,12 @@ draw.io の関心は `features/drawio/` に閉じていない。次が全体で�
 | 配信経路の mount | `server/routes/index.js` | 3.10 |
 | ビューアのスクリプト挿入と起動順 | `components/Script/DrawioViewerScript/` | 1.2, 2.3 |
 | ビューア本体・再描画の判定 | `packages/remark-drawio/src/components/DrawioViewer.tsx`, `should-rerender-on-resize.ts` | 7.1〜7.4 |
-| markdown から図への変換 | `packages/remark-drawio/src/services/renderer/remark-drawio.ts`, `utils/embed.ts` | — |
+| markdown から図への変換 | `packages/remark-drawio/src/services/renderer/remark-drawio.ts`, `packages/remark-drawio/src/utils/embed.ts` | — |
 | 保存形式（複数ページ） | `packages/remark-drawio/src/utils/mxfile.ts` | 6.1〜6.4 |
 | エディタ URL の組み立て | `client/components/PageEditor/DrawioModal/build-drawio-editor-url.ts` | 5.1〜5.4 |
 | エディタへ注入する設定・CSS | `client/components/PageEditor/DrawioModal/drawio-config.ts` | 4.1〜4.3 |
 | エディタとの postMessage | `client/components/PageEditor/DrawioModal/DrawioCommunicationHelper.ts` | 6.5 |
-| markdown への書き戻し | `client/components/Page/markdown-drawio-util-for-view.ts`, `PageEditor/markdown-drawio-util-for-editor.ts` | — |
+| markdown への書き戻し | `client/components/Page/markdown-drawio-util-for-view.ts`, `client/components/PageEditor/markdown-drawio-util-for-editor.ts` | — |
 | 挿入操作・折りたたみ | `packages/editor/src/client/components-internal/CodeMirrorEditor/Toolbar/DiagramButton.tsx`, `packages/editor/src/client/services/use-codemirror-editor/utils/fold-drawio.ts`, `packages/editor/src/states/modal/drawio-for-editor.ts` | — |
 | 設定 | `server/service/config-manager/config-definition.ts` の `app:drawioUri`（env `DRAWIO_URI`、既定 `https://embed.diagrams.net/`） | 8.1 |
 
@@ -172,7 +172,7 @@ graph TB
 
 - **判定を共有する（要件 8.4）** — 参照先を差し替えるのは自前ホストのときだけで、配信ルータもそのときだけ答える。両者が別の基準で判断すると「誰も要求しない経路が開いている」または「差し替えたのに配信が 404」という食い違いが起きる。だから `isSelfHostedDrawio` を 1 つ置き、client と server の両方がそれを呼ぶ。
 - **入口を 2 つに分ける** — MathJax の置き場所だけは事前に決められないため（[2 つの入口](#2-つの入口)）。
-- **呼び出し側が使うのは 2 つの入口だけ** — `DrawioViewerScript` はこの 2 つしか取らないので、draw.io のグローバル変数を知らずに済む。細工はすべて `features/drawio/` の内側に閉じる。なお barrel は共有の判定（`isSelfHostedDrawio`）も再公開しているが、これを import している箇所は 1 つも無い（将来課題）。
+- **呼び出し側が使うのは 2 つの入口だけ** — `DrawioViewerScript` はこの 2 つしか取らないので、**自前ホスト対応で触るグローバル変数**（MathJax の置き場所、資産の参照先）を知らずに済む。ビューアの設定に使う `GraphViewer` 系のグローバルは呼び出し側が直接触っており、そこは変わらない。細工はすべて `features/drawio/` の内側に閉じる。なお barrel は共有の判定（`isSelfHostedDrawio`）も再公開しているが、これを import している箇所は 1 つも無い（将来課題）。
 
 ### なぜ後から直せないのか
 
@@ -673,7 +673,7 @@ markdown の ```drawio ブロックに入る文字列は 2 つの形を取る。
 | エディタ URL | `build-drawio-editor-url.spec.ts` | パラメータの付与、GROWI が制御しないものの保持、サブパスの保持、重複させないこと、解釈できない値で投げること |
 | 保存形式 | `mxfile.spec.ts` | 単一ページの後方互換、複数ページの全ページ保持、往復、ページが無いときの扱い |
 | 描画データの生成 | `embed.spec.ts` | 単一ページの形ではページ送りを出さないこと、複数ページの `<mxfile>` は手を加えず通してページ送りを出すこと、dark mode |
-| 保存経路 | `DrawioCommunicationHelper.spec.ts` | 保存されること、内容が取れないときに上書きしないこと（**`save` 分岐だけ。`configure` / `ready` / 発信元照合は呼ばれない**） |
+| 保存経路 | `DrawioCommunicationHelper.spec.ts` | 保存されること、内容が取れないときに上書きしないこと（**保存の分岐だけ。発信元の照合・`configure`・`ready`・空メッセージ・該当なしの 5 つは呼ばれない**） |
 | 再描画の判定 | `should-rerender-on-resize.spec.ts` | 初回の描画、幅の変化で再描画、高さのみでは再描画しない、1 ピクセル未満のゆらぎを無視 |
 
 ### 自動テストで担保していないこと（要件 10.1）
@@ -776,7 +776,7 @@ docker run -d --name drawio-28 -p 8081:8080 jgraph/drawio:28.2.9      # math/es5
 | v28 系以前で `stencils/` `shapes/` が同梱されない | 外部制約 | draw.io のバージョン側。インスタンスを上げれば解消 |
 | `PROXY_URL`（図の中から参照する外部画像の取得口）が未対応 | 外部制約 | 自前ホストのイメージに該当のサーブレットが無く（`/proxy` が 404）、向ける先が無い。ビューアの経路では使われない |
 | `client/self-hosted/index.ts` が `isSelfHostedDrawio` を再公開しているが、import している箇所が 1 つも無い | 設計 | barrel は外部の利用者が必要とするものだけを再公開する規約（`.claude/rules/coding-style.md`）に照らすと 1 行削れる。挙動は変わらないがコード変更なのでこの spec では触らない |
-| `DRAWIO_URI` に `user:pass@host` 形式を設定すると図資産が全て 404 になる | 挙動 | 範囲確認が `target.href`（userinfo を含む）を `target.origin` から組んだ範囲（含まない）と比べるため。閉じる方向の失敗なので安全側だが、設定した側には理由が見えない |
+| `DRAWIO_URI` に `user:pass@host` 形式を設定すると図資産が全て 404 になる | 挙動 | 範囲確認が `target.href`（userinfo を含む）を `target.origin` から組んだ範囲（含まない）と比べるため。閉じる方向の失敗なので安全側。`warn` は出る（`Refused a draw.io asset location`）が userinfo が原因だとは書かれないため、設定した側は理由に辿り着きにくい |
 | `offline=1` で保存／終了ボタンが消える | draw.io の仕様 | `stealth=1` / `lockdown=1` を issue で案内する方針。GROWI 側では直さない |
 | `packages/remark-drawio` と `apps/app` の責務再配置 | 設計 | 保存形式の生成と検出は #11524 で同居させたが、描画側と生成側の分担は未整理 |
 | `packages/*` から spec への入口 | 文書 | [CLAUDE.md の届く範囲](#claudemd-の届く範囲) の判断。drift が起きたら再検討 |
