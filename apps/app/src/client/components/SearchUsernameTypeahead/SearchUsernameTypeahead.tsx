@@ -17,12 +17,25 @@ import type { IClearable } from '~/client/interfaces/clearable';
 import { shouldShowUsernameSuggestion } from './should-show-username-suggestion';
 import type { UseUsernameSuggestions } from './username-suggestions';
 
+// Internal grouping keys, not display text: `renderMenu` groups options by them
+// and `toUserDataItem` defaults to one, so the values are load-bearing. The
+// visible label is translated at render time via CATEGORY_LABEL_KEYS.
 const Categories = {
-  activeUser: 'Active User',
-  inactiveUser: 'Inactive User',
+  activeUser: 'activeUser',
+  inactiveUser: 'inactiveUser',
 } as const;
 
 type CategoryType = (typeof Categories)[keyof typeof Categories];
+
+// `commons` is the only namespace every caller loads: admin pages request
+// ['admin'] and the search page requests ['translation'], so neither is shared
+// (see pages/common-props/i18n.ts, which always prepends 'commons'). Putting
+// these labels anywhere else would render raw keys on half the call sites — the
+// same constraint that makes `placeholder` an overridable prop below.
+const CATEGORY_LABEL_KEYS = {
+  [Categories.activeUser]: 'commons:username_suggestion.active_user',
+  [Categories.inactiveUser]: 'commons:username_suggestion.inactive_user',
+} as const satisfies Record<CategoryType, string>;
 
 type UserDataType = {
   username: string;
@@ -133,33 +146,36 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
     [searchKeyword, selectedItems],
   );
 
-  const renderMenu = useCallback((allUser: UserDataType[], menuProps) => {
-    if (allUser == null || allUser.length === 0) {
-      return <></>;
-    }
+  const renderMenu = useCallback(
+    (allUser: UserDataType[], menuProps) => {
+      if (allUser == null || allUser.length === 0) {
+        return <></>;
+      }
 
-    let index = 0;
-    const items = Object.values(Categories).map((category) => {
-      const userData = allUser.filter((user) => user.category === category);
-      return (
-        <Fragment key={category}>
-          {index !== 0 && <Menu.Divider />}
-          <Menu.Header>{category}</Menu.Header>
-          {userData.map((user) => {
-            const item = (
-              <MenuItem key={index} option={user} position={index}>
-                {user.username}
-              </MenuItem>
-            );
-            index++;
-            return item;
-          })}
-        </Fragment>
-      );
-    });
+      let index = 0;
+      const items = Object.values(Categories).map((category) => {
+        const userData = allUser.filter((user) => user.category === category);
+        return (
+          <Fragment key={category}>
+            {index !== 0 && <Menu.Divider />}
+            <Menu.Header>{t(CATEGORY_LABEL_KEYS[category])}</Menu.Header>
+            {userData.map((user) => {
+              const item = (
+                <MenuItem key={index} option={user} position={index}>
+                  {user.username}
+                </MenuItem>
+              );
+              index++;
+              return item;
+            })}
+          </Fragment>
+        );
+      });
 
-    return <Menu {...menuProps}>{items}</Menu>;
-  }, []);
+      return <Menu {...menuProps}>{items}</Menu>;
+    },
+    [t],
+  );
 
   useImperativeHandle(ref, () => ({
     clear() {

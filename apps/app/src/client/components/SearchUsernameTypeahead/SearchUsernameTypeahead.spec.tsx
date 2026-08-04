@@ -44,7 +44,11 @@ describe('SearchUsernameTypeahead', () => {
     suggestions = EMPTY_SUGGESTIONS;
   });
 
-  it('renders active and inactive users in correct groups', async () => {
+  // The group headers must resolve from `commons`, the only namespace every
+  // caller loads: admin pages request ['admin'] and the search page requests
+  // ['translation'], so a key in either would render raw on the other. The `t`
+  // mock echoes the key, so asserting the full key locks that namespace in.
+  it('labels the groups with commons-namespaced keys, not hardcoded text', async () => {
     mockSuggestions(['alice'], ['bob']);
 
     renderTypeahead();
@@ -52,9 +56,23 @@ describe('SearchUsernameTypeahead', () => {
     await userEvent.type(screen.getByRole('combobox'), 'a');
 
     const menu = await screen.findByRole('listbox');
-    expect(within(menu).getByText('Active User')).toBeInTheDocument();
+    expect(
+      within(menu).getByText('commons:username_suggestion.active_user'),
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByText('commons:username_suggestion.inactive_user'),
+    ).toBeInTheDocument();
+  });
+
+  it('renders active and inactive users in their respective groups', async () => {
+    mockSuggestions(['alice'], ['bob']);
+
+    renderTypeahead();
+
+    await userEvent.type(screen.getByRole('combobox'), 'a');
+
+    const menu = await screen.findByRole('listbox');
     expect(within(menu).getByText('alice')).toBeInTheDocument();
-    expect(within(menu).getByText('Inactive User')).toBeInTheDocument();
     expect(within(menu).getByText('bob')).toBeInTheDocument();
   });
 
