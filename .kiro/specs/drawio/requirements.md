@@ -69,7 +69,7 @@ _担保しているテスト:_
 - **AC 1・4 — 担保が無い。** 要件 10 の検証手順で確かめる。
 - **AC 6 — 担保が無い。** 組版するかどうかは draw.io 側の判断で GROWI 側に分岐が無いため、当てるテストも無い。#11633 の実測（数式を有効にしていない図では組版されない）でのみ確認している。
 - `relocate-math-url.spec.ts` は解釈できない値の扱い（`should return undefined when $reason`、`should return undefined when drawioUri cannot be parsed`）も担保する。移し替えができない経路で仮値を残さないこと（`adopt-mathjax.spec.ts` の `should put draw.io back to its own behaviour, asking for draw.io's location`、`should leave no suppression behind`、`should not throw when the bundle exposes no Editor`）は、特定の受け入れ基準ではなく design の SelfHostedEntryPoints の不変条件に対応する。
-- **`index.spec.ts` が担保するのは 2 つの入口のうち読み込み前の `prepareSelfHostedDrawio` だけ**である。読み込み後の `adoptSelfHostedDrawio`（`adoptMathJax` を呼ぶ側）を呼ぶテストは 1 件も無いので、**そちらが「自前ホストのときだけ効く」ことは担保が無い**。
+- **`index.spec.ts` は 2 つの入口の両方を呼ぶ。** 読み込み後の `adoptSelfHostedDrawio` については、自前ホストのときに MathJax の置き場所が設定済みインスタンスへ移ることを `should point MathJax at the configured instance` が担保し、2 つの入口を `DrawioViewerScript` と同じ順で走らせた結果（参照先が設定済みインスタンス（と GROWI のオリジン）を向き、MathJax もそこから起動し、仮値が残っていないこと）を `should leave the assets and MathJax on the configured instance, with no placeholder behind` が担保する。どちらも `viewer-static.min.js` の代役を spec 内に置いているので、担保しているのは AC 2 と同じく「そう振る舞う draw.io に対して GROWI 側の手当てが正しいこと」である（**mutation 確認済み**: 入口から `adoptMathJax` の呼び出しを消す / `adoptMathJax` が仮値を消さないようにする の 2 パターンで RED）。既定構成と解釈できない値で何もしないことは要件 8 の AC 1・AC 3 の担保欄を参照。
 
 ### Requirement 2: 自前ホストの draw.io で図形（stencil / shape）が描画される
 
@@ -182,9 +182,9 @@ _担保しているテスト:_
 - **AC 1 — 担保あり。** `mxfile.spec.ts` の `preserves every page (content and name), not only the first`。
 - **AC 3 — 担保あり。** 同ファイルの `returns the first diagram inner content unchanged`。
 - **AC 4 — 担保あり。** 同ファイルの `returns an empty string when no diagram element is present` と、`DrawioCommunicationHelper.spec.ts` の `does NOT overwrite the diagram when no page can be extracted`。
-- **AC 2 — 部分的。** 保存した形が自己完結していて検出側と食い違わないことは `mxfile.spec.ts` の `persists an <mxfile> that isMxfileData recognizes (round-trip contract)` と `a multi-page diagram persisted on save renders every page with navigation enabled`、`embed.spec.ts` の `passes the mxfile through untouched so every page survives` が担保する。**エディタへ返す経路（`onReceiveMessage` の `ready` 分岐が保存内容をそのまま返すこと）を呼ぶテストは無い。**
-- **AC 5 — 担保が無い。** `DrawioCommunicationHelper.spec.ts` のテストは常に一致する発信元を渡すので、照合を消しても落ちない。
-- 保存経路そのものは `saves the (single-page) diagram content and closes the modal` が担保する。ただし当てているのは `mxfile` を含むメッセージ（保存）の分岐だけで、**発信元の照合、`configure`、`ready`、空メッセージ（閉じる）、どれにも当てはまらない場合の 5 つは呼ばれない**。
+- **AC 2 — 部分的。** 保存した形が自己完結していて検出側と食い違わないことは `mxfile.spec.ts` の `persists an <mxfile> that isMxfileData recognizes (round-trip contract)` と `a multi-page diagram persisted on save renders every page with navigation enabled`、`embed.spec.ts` の `passes the mxfile through untouched so every page survives` が担保する。エディタへ返す経路（`ready` を受けたときに保存内容へ手を加えずそのまま返すこと）は `DrawioCommunicationHelper.spec.ts` の `answers with the stored diagram untouched, so every page is restored` が担保する（**mutation 確認済み**: `ready` 分岐を削除する / 返す前に `<mxfile>` を剥がす の 2 パターンで RED）。**残っている未担保は、返した内容を受け取った draw.io が実際に全ページを描くことだけ**で、これはブラウザでしか確かめられないため要件 10 の手動確認に残る。
+- **AC 5 — 担保あり。** `DrawioCommunicationHelper.spec.ts` の `ignores a message sent from an origin other than the configured draw.io`。一致すれば保存される内容を発信元だけ変えて渡すので、照合を無効化すると落ちる（**mutation 確認済み**）。オリジンだけを見ていること（サブパスに置いた自前ホストからのメッセージを弾かないこと）は `accepts a message from the configured instance deployed under a sub path` が担保する。
+- 保存経路そのものは `saves the (single-page) diagram content and closes the modal` が担保する。`onReceiveMessage` の分岐は**発信元の照合・`configure`・`ready`・`mxfile` を含むメッセージ（保存）・空メッセージ（閉じる）・どれにも当てはまらない場合の 6 つすべてに、その分岐が消えたら落ちるテストがある**（`answers the configure request with the configuration it was given`、`closes the modal on an empty message without saving anything`、`does nothing for a message that matches none of the branches`。いずれも mutation 確認済み）。ただし当てているのは helper が返す内容までで、**エディタ側の見え方は担保していない**。
 
 ### Requirement 7: ビューアのページ送りが機能する
 
@@ -218,8 +218,8 @@ _担保しているテスト:_
 
 _担保しているテスト:_
 
-- **AC 1 — 部分的。** `index.spec.ts` の `should leave draw.io untouched when its own hosted viewer is configured` が、既定構成で参照先の差し替えも抑止も起きないことを担保する。**ただし当てているのは読み込み前の入口 `prepareSelfHostedDrawio` だけで、読み込み後の入口 `adoptSelfHostedDrawio` を呼ぶテストは無い**（要件 1 の担保も参照）。
-- **AC 3 — 部分的。** `index.spec.ts` の `should leave draw.io untouched when DRAWIO_URI holds nothing usable`（空の値を渡す。`isSelfHostedDrawio` の中では解釈できない値と同じ経路に入る）と、`is-self-hosted-drawio.spec.ts` の `not-a-url` / 空値の 2 行が担保する。入口の範囲は AC 1 と同じ制限がかかる。
+- **AC 1 — 担保あり（自動テストで捕まえられる範囲）。** `index.spec.ts` が 2 つの入口の両方について、既定構成では何も起きないことを担保する。読み込み前は `prepareSelfHostedDrawio` の `should leave draw.io untouched when its own hosted viewer is configured`（参照先の差し替えも抑止も起きない）、読み込み後は `adoptSelfHostedDrawio` の `should leave draw.io as the bundle left it when its own hosted viewer is configured`。後者は、抑止を置かないままバンドルが焼き込み先から MathJax を起動し終えた状態を作ってから呼び、`DRAW_MATH_URL` が動かないこと・MathJax の起動が 1 回のままであること・draw.io が書いた設定オブジェクトがそのまま（同一のオブジェクトとして）残っていることを見る。**`adoptSelfHostedDrawio` から自前ホスト判定を外す mutation で RED を確認済み**（既定構成では `DRAW_MATH_URL` の移動、解釈できない値では 2 回目の起動として現れる）。**ブラウザで実際に従来どおり見えることは AC 2 のとおり担保が無い。**
+- **AC 3 — 担保あり（自動テストで捕まえられる範囲）。** `index.spec.ts` の 2 つの入口それぞれの空の値を渡すテスト（読み込み前 `should leave draw.io untouched when DRAWIO_URI holds nothing usable`、読み込み後 `should leave draw.io as the bundle left it when DRAWIO_URI holds nothing usable`。`isSelfHostedDrawio` の中では解釈できない値と同じ経路に入る）と、`is-self-hosted-drawio.spec.ts` の `not-a-url` / 空値の 2 行が担保する。読み込み後の側は AC 1 と同じ mutation で RED を確認済み。
 - **AC 2 — 担保が無い。** 「従来どおり」は要件 10 の検証手順で確かめる。
 - **AC 4 — 担保が無い。** 現状は成り立っている（判定の呼び出しはビューア側の `client/self-hosted/index.ts` と配信側の `server/routes/drawio-assets.ts` の 2 か所だけで、いずれも同一の `isSelfHostedDrawio` を使う）が、**片方が独自判定に置き換わっても落ちるテストは無い**。テスト追加は将来課題とする。
 - 判定の基準そのものは `is-self-hosted-drawio.spec.ts` の `should be $expected for $reason`（7 通り）が担保する。
