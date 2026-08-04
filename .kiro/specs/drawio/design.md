@@ -45,7 +45,7 @@
 この spec が依存してよいもの。
 
 - **PR #11633 / #11524 の実装**（記述対象）。これらの成果が現況であるという前提に依存する。
-- **`features/drawio/client/self-hosted/README.md`**（移設元）。移設が済んだ時点でこの依存は消える。
+- **`features/drawio/client/self-hosted/README.md`**（移設元。design.md へ移し終えたため削除済み → [Modified Files](#modified-files)）。この依存はすでに解消している。
 - **`apps/app/AGENTS.md`** — apps/app のセッションで常に読まれる文書。関心マップへの導線を 1 行足す先として使う。
 
 **依存の制約**: この spec の成果物（design.md / `CLAUDE.md`）は**コードを参照するが、コードから参照されない**。コード中のコメントに「詳細は spec を見よ」と書き足すことはしない（コメントと spec の二重管理になり、いま README と PR 本文で起きている問題の作り直しになる）。既にコード中にある `refs:` の issue リンクはそのまま残す。

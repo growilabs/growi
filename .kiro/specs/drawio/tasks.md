@@ -4,7 +4,7 @@
 >
 > **順序の制約（最重要）**: README の削除（タスク 3）は、内容が design.md に移り切っていることの確認（タスク 1.1）と、代わりの入口の設置（タスク 2）が済んだ後に行う。先に消すと根拠が失われ、入口が無い期間ができる。
 
-- [ ] 1. spec の記述を実態に合わせ切る
+- [x] 1. spec の記述を実態に合わせ切る
 - [x] 1.1 README の全記述が design.md に移っていることを節単位で突き合わせる
   - `features/drawio/client/self-hosted/README.md`（147 行）を見出し単位に分け、各節が design.md のどこに対応するかを 1 つずつ指す対応表を作る
   - 移っていない記述が見つかったら design.md に追記する。移設先が複数の節に分かれる記述（例: README の「Verifying a change here」は Testing Strategy と Revalidation Triggers の両方に分かれる）は、分割先を両方記録する
@@ -33,7 +33,7 @@
   - _Boundary: DrawioClaudeMd, apps/app AGENTS.md_
   - _Depends: 1.1, 1.2_
 
-- [ ] 3. README を削除する
+- [x] 3. README を削除する
   - `apps/app/src/features/drawio/client/self-hosted/README.md` を削除する
   - 削除後、リポジトリ内にこの README を指す参照が残っていないことを確認する（PR #11633 の本文からのリンクは GitHub 上のものなので対象外だが、コード中や他の spec からの参照が無いことを見る）
   - **Observable**: ファイルが存在せず、`features/drawio/` 配下の根拠の入口が `CLAUDE.md` の 1 つだけになっている。README を指す参照が 0 件
@@ -69,3 +69,4 @@ design.md の将来課題に載せたうえで、**この spec のタスクに�
 - **担保テストの申告は 3 件が過大だった**（フォールバックを `readAsset` のテストで担保済みとしていた／`index.spec.ts` を 2 つの入口の担保として扱っていた／リダイレクトを未検証としていたが実際はテストがある）。**`adoptSelfHostedDrawio` を呼ぶテストは 1 件も無い**ことがタスク 1.2 で判明した（`drawioAssetsRouterFactory` と同じ形の穴）。
 - **`research.md` の §2.1 は古い。** 正はタスク 1.2 の突き合わせ節。§2.1 の AC 番号は要件 3 の再採番前で 1 つずれている。訂正注記を §2.1 の冒頭に置いた。
 - **`CLAUDE.md` からの相対パスは 5 段上がる**（`features/drawio/` → `features` → `src` → `app` → `apps` → リポジトリ根）。`apps/app/AGENTS.md` からは 2 段。どちらも `realpath -e` で解決を確認した。
+- **README 削除後も追える形の壊れたリンクは 0 件**。spec 内の 13 件の言及はすべて文中の説明（バッククォート）で、markdown リンクではない。`features/drawio/**` に `README` の文字列は 1 つも無い。
