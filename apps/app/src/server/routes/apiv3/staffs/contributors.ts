@@ -181,6 +181,7 @@ export const contributors: ContributorSection[] = [
             position: 'GMO Cybersecurity by Ierae, Inc.',
             name: 'Sho Odagiri',
           },
+          { position: 'Waseda University', name: 'Allan Wirth' },
         ],
       },
     ],
