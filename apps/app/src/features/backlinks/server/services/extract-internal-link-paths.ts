@@ -74,7 +74,7 @@ const buildPipeline = async (pagePath: string) => {
  *
  * @returns Resolved internal page paths the body links to.
  */
-export const extractInternalLinks = async (
+export const extractInternalLinkPaths = async (
   markdown: string,
   pagePath: string,
   siteUrl?: string,

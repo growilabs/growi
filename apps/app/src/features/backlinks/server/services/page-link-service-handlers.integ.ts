@@ -11,11 +11,11 @@ import {
   handlePageUpsertById,
 } from './page-link-service-handlers';
 
-// resolveToPages has its own coverage (target-page-resolution.spec.ts); mock it so this test
+// resolveToPageIds has its own coverage (target-page-resolution.spec.ts); mock it so this test
 // isolates the handler's contract against the real PageLink collection.
-const mocks = vi.hoisted(() => ({ resolveToPages: vi.fn() }));
+const mocks = vi.hoisted(() => ({ resolveToPageIds: vi.fn() }));
 vi.mock('./target-page-resolution', () => ({
-  resolveToPages: mocks.resolveToPages,
+  resolveToPageIds: mocks.resolveToPageIds,
 }));
 
 describe('handlePageUpsert (integration)', () => {
@@ -29,7 +29,7 @@ describe('handlePageUpsert (integration)', () => {
     idByPath.clear();
     // Mirror the real batch contract: return a Map of only the paths that resolve;
     // unresolved paths are absent (the handler reads them back as null).
-    mocks.resolveToPages.mockImplementation((paths: string[]) => {
+    mocks.resolveToPageIds.mockImplementation((paths: string[]) => {
       const result = new Map<string, Types.ObjectId>();
       for (const path of paths) {
         const id = idByPath.get(path);
@@ -178,7 +178,7 @@ describe('handlePageUpsertById (integration)', () => {
 
   beforeEach(() => {
     idByPath.clear();
-    mocks.resolveToPages.mockImplementation((paths: string[]) => {
+    mocks.resolveToPageIds.mockImplementation((paths: string[]) => {
       const result = new Map<string, Types.ObjectId>();
       for (const path of paths) {
         const id = idByPath.get(path);

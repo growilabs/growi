@@ -4,9 +4,9 @@ import mongoose, { type Types } from 'mongoose';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import PageModelFactory from '~/server/models/page';
 
-import { resolveToPages } from './target-page-resolution';
+import { resolveToPageIds } from './target-page-resolution';
 
-describe('resolveToPages (integration)', () => {
+describe('resolveToPageIds (integration)', () => {
   let Page: PageModel;
   let created: Types.ObjectId[] = [];
 
@@ -31,7 +31,7 @@ describe('resolveToPages (integration)', () => {
   it('resolves a regular path to its page id', async () => {
     const page = await createPage({ path: '/resolve-integ/docs' });
 
-    const result = await resolveToPages(['/resolve-integ/docs']);
+    const result = await resolveToPageIds(['/resolve-integ/docs']);
 
     expect(result.get('/resolve-integ/docs')?.toString()).toBe(
       page._id.toString(),
@@ -43,7 +43,7 @@ describe('resolveToPages (integration)', () => {
     const page = await createPage({ path: '/resolve-integ/by-permalink' });
     const permalink = `/${page._id.toString()}`;
 
-    const result = await resolveToPages([permalink]);
+    const result = await resolveToPageIds([permalink]);
 
     expect(result.get(permalink)?.toString()).toBe(page._id.toString());
     expect(result.size).toBe(1);
@@ -53,13 +53,13 @@ describe('resolveToPages (integration)', () => {
     // Empty pages (v5 folder placeholders) are not real link targets and must not resolve.
     await createPage({ path: '/resolve-integ/empty', isEmpty: true });
 
-    const result = await resolveToPages(['/resolve-integ/empty']);
+    const result = await resolveToPageIds(['/resolve-integ/empty']);
 
     expect(result.size).toBe(0);
   });
 
   it('omits an input with no matching page', async () => {
-    const result = await resolveToPages(['/resolve-integ/missing']);
+    const result = await resolveToPageIds(['/resolve-integ/missing']);
 
     expect(result.size).toBe(0);
   });
@@ -69,7 +69,7 @@ describe('resolveToPages (integration)', () => {
     const pathPage = await createPage({ path: '/resolve-integ/np' });
     const permalink = `/${permalinkPage._id.toString()}`;
 
-    const result = await resolveToPages([permalink, '/resolve-integ/np']);
+    const result = await resolveToPageIds([permalink, '/resolve-integ/np']);
 
     expect(result.get(permalink)?.toString()).toBe(
       permalinkPage._id.toString(),

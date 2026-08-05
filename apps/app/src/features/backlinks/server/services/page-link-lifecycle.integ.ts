@@ -16,7 +16,7 @@ import PageLink from '../models/page-link';
  * lifecycle event (emitted exactly as PageService does) drives the real
  * extraction -> resolution -> outbound-row sync, and the permission-filtered
  * read (findBacklinks) reflects the result. Unlike page-link-service-handlers.integ
- * (which mocks resolveToPages) and page-link-service.integ (which seeds rows by
+ * (which mocks resolveToPageIds) and page-link-service.integ (which seeds rows by
  * hand), nothing here is mocked — the pageLinkService created by setupPageService
  * is the object under test, and target pages are real so resolution runs for real.
  *

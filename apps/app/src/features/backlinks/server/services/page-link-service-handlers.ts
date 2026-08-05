@@ -4,9 +4,9 @@ import mongoose from 'mongoose';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { Revision } from '~/server/models/revision';
 
-import { extractInternalLinks } from './extract-internal-links';
+import { extractInternalLinkPaths } from './extract-internal-link-paths';
 import { syncOutboundLinks } from './page-link-sync';
-import { resolveToPages } from './target-page-resolution';
+import { resolveToPageIds } from './target-page-resolution';
 
 const loadBody = async (page: PageDocument): Promise<string> => {
   const { revision } = page;
@@ -26,13 +26,13 @@ export const handlePageUpsert = async (
   if (fromPage == null) return;
 
   const body = await loadBody(page);
-  const paths = await extractInternalLinks(body, page.path, siteUrl);
+  const paths = await extractInternalLinkPaths(body, page.path, siteUrl);
 
-  const resolved = await resolveToPages(paths);
+  const resolvedPageIds = await resolveToPageIds(paths);
   const rows = paths.map((toPath) => ({
     fromPage,
     toPath,
-    toPage: resolved.get(toPath) ?? null,
+    toPage: resolvedPageIds.get(toPath) ?? null,
   }));
 
   await syncOutboundLinks(fromPage, rows);
