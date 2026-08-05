@@ -118,7 +118,7 @@ importers:
         version: 5.0.1(stylelint@16.5.0(typescript@5.9.3))
       stylelint-config-recommended-scss:
         specifier: ^14.0.0
-        version: 14.0.0(postcss@8.5.14)(stylelint@16.5.0(typescript@5.9.3))
+        version: 14.0.0(postcss@8.5.25)(stylelint@16.5.0(typescript@5.9.3))
       ts-deepmerge:
         specifier: ^6.2.0
         version: 6.2.0
@@ -1099,8 +1099,8 @@ importers:
         specifier: ^7.8.0
         version: 7.8.0(typescript@5.9.3)
       postcss:
-        specifier: ^8.5.6
-        version: 8.5.14
+        specifier: ^8.5.23
+        version: 8.5.25
       prisma:
         specifier: ^6.19.2
         version: 6.19.2(magicast@0.3.5)(typescript@5.9.3)
@@ -3008,6 +3008,9 @@ packages:
 
   '@codemirror/view@6.43.6':
     resolution: {integrity: sha512-EVunGSYN1wz1p75WY1s3Xg7t3i8Yol0kGZGizNdX9BUFgMFILYVe8/u6EVpo7Ff5PwbZuILb4QAq7IZoKzIEQA==}
+
+  '@codemirror/view@6.43.8':
+    resolution: {integrity: sha512-qtItTDssZ/5GFfi94hrILu9j/VUeFPDPkhovEfmWFj2ipTxnzPB8DdHgfbb8HYTzLTYhrndKmyQxXUz/PDLenw==}
 
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
@@ -10883,7 +10886,6 @@ packages:
     resolution: {integrity: sha512-Quz3MvAwHxVYNXsOByL7xI5EB2WYOeFswqaHIA3qOK3isRWTxiplBEocmmru6XmxDB2L7jDNYtYA4FyimoAFEw==}
     engines: {node: '>=8.17.0'}
     hasBin: true
-    bundledDependencies: []
 
   jsonfile@3.0.1:
     resolution: {integrity: sha512-oBko6ZHlubVB5mRFkur5vgYR1UyqX+S6Y/oCfLhqNdcc2fYFlDpIoNc7AfKS1KOGcnNAkvsr0grLck9ANM815w==}
@@ -12161,6 +12163,11 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
+  nanoid@3.3.17:
+    resolution: {integrity: sha512-xQLf0A3HOMlgHq0n247/LRuAOYmB7dXJ/DvAxGvsSBij45XtBSmQycu+F8ODbHwns/XyFZagyL1+J0Offw1E0g==}
+    engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
+    hasBin: true
+
   nanoid@5.1.11:
     resolution: {integrity: sha512-v+KEsUv2ps74PaSKv0gHTxTCgMXOIfBEbaqa6w6ISIGC7ZsvHN4N9oJ8d4cmf0n5oTzQz2SLmThbQWhjd/8eKg==}
     engines: {node: ^18 || >=20}
@@ -12932,6 +12939,10 @@ packages:
 
   postcss@8.5.14:
     resolution: {integrity: sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg==}
+    engines: {node: ^10 || ^12 || >=14}
+
+  postcss@8.5.25:
+    resolution: {integrity: sha512-DTPx3RWSSnWyzLxQnlH0rJP+EW5ekl16ZU4/psbIhA0e53kJfdgaN5vKM+xP7yJtXVu+nfdVFmlgFDEKAe4Pyw==}
     engines: {node: ^10 || ^12 || >=14}
 
   posthog-node@5.36.4:
@@ -17806,10 +17817,17 @@ snapshots:
     dependencies:
       '@codemirror/language': 6.12.4
       '@codemirror/state': 6.7.1
-      '@codemirror/view': 6.43.6
+      '@codemirror/view': 6.43.8
       '@lezer/highlight': 1.2.3
 
   '@codemirror/view@6.43.6':
+    dependencies:
+      '@codemirror/state': 6.7.1
+      crelt: 1.0.7
+      style-mod: 4.1.3
+      w3c-keyname: 2.2.8
+
+  '@codemirror/view@6.43.8':
     dependencies:
       '@codemirror/state': 6.7.1
       crelt: 1.0.7
@@ -18683,7 +18701,7 @@ snapshots:
       highlight.js: 11.8.0
       katex: 0.16.47
       mathjax-full: 3.2.2
-      postcss: 8.5.14
+      postcss: 8.5.25
       postcss-selector-parser: 6.1.0
       xss: 1.0.15
 
@@ -18699,7 +18717,7 @@ snapshots:
       lodash.kebabcase: 4.1.1
       markdown-it: 13.0.2
       markdown-it-front-matter: 0.2.4
-      postcss: 8.5.14
+      postcss: 8.5.25
 
   '@mastra/ai-sdk@1.4.4(@mastra/core@1.41.0(@grpc/grpc-js@1.14.3)(ai@6.0.197(zod@4.4.3))(express@4.21.0)(rxjs@7.8.1)(zod@4.4.3))(zod@4.4.3)':
     dependencies:
@@ -21274,7 +21292,7 @@ snapshots:
       '@alloc/quick-lru': 5.2.0
       '@tailwindcss/node': 4.3.0
       '@tailwindcss/oxide': 4.3.0
-      postcss: 8.5.14
+      postcss: 8.5.25
       tailwindcss: 4.3.0
 
   '@tanstack/react-virtual@3.13.12(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
@@ -28228,6 +28246,8 @@ snapshots:
 
   nanoid@3.3.12: {}
 
+  nanoid@3.3.17: {}
+
   nanoid@5.1.11: {}
 
   napi-macros@2.0.0:
@@ -29093,30 +29113,36 @@ snapshots:
     dependencies:
       postcss: 8.5.14
 
-  postcss-scss@4.0.9(postcss@8.5.14):
+  postcss-scss@4.0.9(postcss@8.5.25):
     dependencies:
-      postcss: 8.5.14
+      postcss: 8.5.25
 
   postcss-selector-parser@6.1.0:
     dependencies:
       cssesc: 3.0.0
       util-deprecate: 1.0.2
 
-  postcss-sorting@8.0.2(postcss@8.5.14):
+  postcss-sorting@8.0.2(postcss@8.5.25):
     dependencies:
-      postcss: 8.5.14
+      postcss: 8.5.25
 
   postcss-value-parser@4.2.0: {}
 
   postcss@8.4.31:
     dependencies:
-      nanoid: 3.3.12
+      nanoid: 3.3.17
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
   postcss@8.5.14:
     dependencies:
       nanoid: 3.3.12
+      picocolors: 1.1.1
+      source-map-js: 1.2.1
+
+  postcss@8.5.25:
+    dependencies:
+      nanoid: 3.3.17
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
@@ -30943,14 +30969,14 @@ snapshots:
       stylelint: 16.5.0(typescript@5.9.3)
       stylelint-order: 6.0.4(stylelint@16.5.0(typescript@5.9.3))
 
-  stylelint-config-recommended-scss@14.0.0(postcss@8.5.14)(stylelint@16.5.0(typescript@5.9.3)):
+  stylelint-config-recommended-scss@14.0.0(postcss@8.5.25)(stylelint@16.5.0(typescript@5.9.3)):
     dependencies:
-      postcss-scss: 4.0.9(postcss@8.5.14)
+      postcss-scss: 4.0.9(postcss@8.5.25)
       stylelint: 16.5.0(typescript@5.9.3)
       stylelint-config-recommended: 14.0.0(stylelint@16.5.0(typescript@5.9.3))
       stylelint-scss: 6.3.0(stylelint@16.5.0(typescript@5.9.3))
     optionalDependencies:
-      postcss: 8.5.14
+      postcss: 8.5.25
 
   stylelint-config-recommended@14.0.0(stylelint@16.5.0(typescript@5.9.3)):
     dependencies:
@@ -30958,8 +30984,8 @@ snapshots:
 
   stylelint-order@6.0.4(stylelint@16.5.0(typescript@5.9.3)):
     dependencies:
-      postcss: 8.5.14
-      postcss-sorting: 8.0.2(postcss@8.5.14)
+      postcss: 8.5.25
+      postcss-sorting: 8.0.2(postcss@8.5.25)
       stylelint: 16.5.0(typescript@5.9.3)
 
   stylelint-scss@6.3.0(stylelint@16.5.0(typescript@5.9.3)):
@@ -32098,7 +32124,7 @@ snapshots:
   vite@5.4.21(@types/node@20.19.17)(lightningcss@1.32.0)(sass@1.77.6):
     dependencies:
       esbuild: 0.21.5
-      postcss: 8.5.14
+      postcss: 8.5.25
       rollup: 4.61.1
     optionalDependencies:
       '@types/node': 20.19.17
