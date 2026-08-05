@@ -257,7 +257,11 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
   - Replace the B1.6/B1.12 inline per-event extraction with an in-process coalescing queue: the
     `create`/`update` handlers mark the page dirty (`Set<pageId>`); a paced tick drains a bounded
     number of ids per cycle, re-reads each page's latest body at drain time, and runs the existing
-    upsert handler once per page. `handlePageUpsert` stays the per-page unit — the queue is the seam.
+    upsert handler once per page. `handlePageUpsertById` stays the per-page unit — the queue is the
+    seam. The duty cycle is a deployment knob, not a constant: the tick interval and the per-tick
+    page budget come from `backlinks:drainIntervalMs` / `backlinks:maxPagesPerDrain`
+    (`BACKLINKS_DRAIN_INTERVAL_MS` / `BACKLINKS_MAX_PAGES_PER_DRAIN`, defaulting to 1000 ms / 3
+    pages), read at service construction and passed into the queue.
   - **B2.2 scope (delete):** the drain guards against a stale upsert by re-checking status at drain
     time and declining to index a page that is now `STATUS_DELETED` — keyed on deleted rather than
     published because a legacy page's `null` status means published. That closes the window

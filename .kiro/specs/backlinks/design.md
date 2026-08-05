@@ -737,7 +737,10 @@ interface ILinkTarget {
     the event fires only on an explicit save (`updatePage`).
   - *Many distinct pages saved at once* — the coalescing queue is drained a **bounded number per
     tick**, so parses are paced (with the event loop yielding between them) rather than run in one
-    blocking spree. The tick cadence / batch size is the duty-cycle lever, mirroring the backfill job.
+    blocking spree. The tick cadence / batch size is the duty-cycle lever, mirroring the backfill job,
+    and is env-tunable per deployment: `backlinks:drainIntervalMs` (`BACKLINKS_DRAIN_INTERVAL_MS`,
+    default 1000) × `backlinks:maxPagesPerDrain` (`BACKLINKS_MAX_PAGES_PER_DRAIN`, default 3) bounds
+    extraction to 3 pages/second out of the box.
   - The pacing is about spreading work over time (yielding between parses), not parallelism —
     concurrency buys nothing for CPU-bound work on one thread.
   - Trade-off: the index trails the save by up to (tick interval × queue depth) — acceptable, since
