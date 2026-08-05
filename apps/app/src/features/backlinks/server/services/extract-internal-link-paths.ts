@@ -9,7 +9,7 @@ const isAnchorLink = (href: string): boolean => {
 };
 
 /**
- * Load the markdown->hast stack and assemble a processor for one extraction.
+ * Load the markdown->hast stack.
  *
  * WHY dynamic import(): this module is statically reachable from the server's
  * boot graph (crowi -> PageLinkService -> handlers -> here), and the unified /
@@ -29,7 +29,7 @@ const isAnchorLink = (href: string): boolean => {
  * Guarded by `no-eager-markdown-imports.spec.ts`; see
  * `.claude/rules/server-boot-imports.md`.
  */
-const buildPipeline = async (pagePath: string) => {
+const importMarkdownStack = async () => {
   const [
     { unified },
     { default: remarkParse },
@@ -53,6 +53,58 @@ const buildPipeline = async (pagePath: string) => {
     ),
     import('~/services/renderer/remark-plugins/pukiwiki-like-linker'),
   ]);
+
+  return {
+    unified,
+    remarkParse,
+    gfm,
+    remarkRehype,
+    rehypeRaw,
+    selectAll,
+    relativeLinks,
+    relativeLinksByPukiwikiLikeLinker,
+    pukiwikiLikeLinker,
+  };
+};
+
+let markdownStack: ReturnType<typeof importMarkdownStack> | null = null;
+
+/**
+ * Memoized so the nine `import()`s and their `Promise.all` run once per process rather than once
+ * per extraction. Node caches the modules either way, so this saves the await plumbing, not the
+ * parse — hence the promise is cached, not awaited here.
+ */
+const loadMarkdownStack = (): ReturnType<typeof importMarkdownStack> => {
+  if (markdownStack == null) {
+    markdownStack = importMarkdownStack().catch((err) => {
+      // A rejected promise must not be cached, or one transient load failure would disable
+      // extraction for the lifetime of the process.
+      markdownStack = null;
+      throw err;
+    });
+  }
+  return markdownStack;
+};
+
+/**
+ * Assemble a processor for one extraction.
+ *
+ * Built per call rather than memoized with the stack: both relative-link plugins are configured
+ * with the page's own path, so a shared processor would resolve relative links against whichever
+ * page happened to build it first.
+ */
+const buildPipeline = async (pagePath: string) => {
+  const {
+    unified,
+    remarkParse,
+    gfm,
+    remarkRehype,
+    rehypeRaw,
+    selectAll,
+    relativeLinks,
+    relativeLinksByPukiwikiLikeLinker,
+    pukiwikiLikeLinker,
+  } = await loadMarkdownStack();
 
   const processor = unified()
     .use(remarkParse)

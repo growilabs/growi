@@ -19,6 +19,26 @@ describe('extractInternalLinkPaths()', () => {
     expect(links).toStrictEqual(['/page/new']);
   });
 
+  // Guards the memoized module load: both relative-link plugins are configured with the page's own
+  // path, so a processor reused across pages would resolve every later page's relative links
+  // against the first page it was built for.
+  it('resolves relative links against each page, not the first one processed', async () => {
+    expect(
+      await extractInternalLinkPaths('[test](./new)', '/alpha/one'),
+    ).toStrictEqual(['/alpha/new']);
+    expect(
+      await extractInternalLinkPaths('[test](./new)', '/beta/two'),
+    ).toStrictEqual(['/beta/new']);
+
+    // The pukiwiki-like linker takes pagePath as well.
+    expect(
+      await extractInternalLinkPaths('[[docs]]', '/alpha/one'),
+    ).toStrictEqual(['/alpha/one/docs']);
+    expect(
+      await extractInternalLinkPaths('[[docs]]', '/beta/two'),
+    ).toStrictEqual(['/beta/two/docs']);
+  });
+
   it('extracts HTML absolute path link', async () => {
     const pageString = '<a href="/docs/v2">here</a>';
     const pagePath = '/page/test';
