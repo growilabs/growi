@@ -13,7 +13,7 @@ suggest-path API（AI クライアント向けページ保存先提案）のパ�
 - 現行 suggest-path（`apps/app/src/features/ai-tools/suggest-path/`）は「analyzeContent（LLM でキーワード抽出 + フロー/ストック判定）→ retrieveSearchCandidates（ES 検索 1 回）→ evaluateCandidates（LLM 候補評価）」のワンショットパイプライン。OpenAI 直叩きでモデルは gpt-4.1-nano ハードコード
 - #183968 で評価環境が構築済み: dev.growi.org データをローカル GROWI にインポートし、6 usecases × 10 runs で正解親配下出現率を測定。改修後ベースラインは 41/60
 - 既知の弱点: auto-scroll ケース 0/10（語彙ミスマッチで ES top20 圏外）、culling（スコア閾値 + LLM 評価）側の取りこぼし
-- support/mastra ブランチに Mastra 基盤が実装済み: `growiAgent`（チャット用）、`fullTextSearchTool`（検索演算子 prefix:/tag:/-除外/sort 対応）、`getPageContentTool`（outline + 行ベース pagination）。agentic-search spec はサブタスク 15/15 完了で実質 implementation-complete
+- support/mastra ブランチに Mastra 基盤が実装済み: `growiAgent`（チャット用）、`fullTextSearchTool`（検索演算子 prefix:/tag:/-除外/sort 対応）、`getPageContentTool`（outline + 行ベース pagination）。ai-agentic-search spec はサブタスク 15/15 完了で実質 implementation-complete
 
 ## Desired Outcome
 
@@ -55,14 +55,14 @@ suggest-path のエンジンを Mastra エージェントに換装する（新�
 
 ## Out of Boundary
 
-- チャット向け `growiAgent` の挙動（agentic-search spec が所有）
-- `fullTextSearchTool` / `getPageContentTool` の機能改修（必要が生じた場合は agentic-search 側のフォローアップとして扱う）
+- チャット向け `growiAgent` の挙動（ai-agentic-search spec が所有）
+- `fullTextSearchTool` / `getPageContentTool` の機能改修（必要が生じた場合は ai-agentic-search 側のフォローアップとして扱う）
 - 既存 suggest-path spec の記録の書き換え（完成時に後継ポインタの追記のみ検討）
 
 ## Upstream / Downstream
 
 - **Upstream**:
-  - agentic-search spec（fullTextSearchTool / getPageContentTool / RequestContext 伝搬パターン）
+  - ai-agentic-search spec（fullTextSearchTool / getPageContentTool / RequestContext 伝搬パターン）
   - suggest-path spec（API 契約: エンドポイント、レスポンス型、trailing-slash パス規約、grant 制約、memo フォールバック、Client LLM Independence）
   - support/mastra ブランチ（Mastra 基盤。master 未マージのため本 spec のブランチはここから派生）
   - #183964 / #183967 / #183968（評価器・代表ユースケース・ベースライン 41/60）
@@ -74,7 +74,7 @@ suggest-path のエンジンを Mastra エージェントに換装する（新�
 ## Existing Spec Touchpoints
 
 - **Extends**: なし（新規境界）。完成時に suggest-path spec へ「エンジンは suggest-path-agentic で換装された」旨の後継ポインタ追記を検討
-- **Adjacent**: suggest-path（API 契約を維持・参照）、agentic-search（tools とコンテキスト伝搬パターンを共有。境界はチャット vs パス提案で分離）
+- **Adjacent**: suggest-path（API 契約を維持・参照）、ai-agentic-search（tools とコンテキスト伝搬パターンを共有。境界はチャット vs パス提案で分離）
 
 ## Constraints
 

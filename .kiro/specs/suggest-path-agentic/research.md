@@ -26,13 +26,13 @@
   - モデルは `call-llm-for-json.ts` に `gpt-4.1-nano` ハードコード（brief の Constraints で踏襲しないことが確定済み）
 - **Implications**: エンジン分岐は `generateSuggestions` 内のディスパッチとし、memo + grant 解決を共通基盤として両エンジンから利用する。ワンショット側 4 サービスは無改変のまま `oneshot-engine` がオーケストレーションだけ包む（Requirement 5.3 の挙動維持）
 
-### Mastra 基盤の統合パターン（agentic-search spec の踏襲点）
+### Mastra 基盤の統合パターン（ai-agentic-search spec の踏襲点）
 
 - **Context**: suggest-path 専用 Agent を既存パターンに整合させる
-- **Sources Consulted**: `apps/app/src/features/mastra/server/services/mastra-modules/`、`.kiro/specs/agentic-search/design.md`、`post-message.ts`
+- **Sources Consulted**: `apps/app/src/features/mastra/server/services/mastra-modules/`、`.kiro/specs/ai-agentic-search/design.md`、`post-message.ts`
 - **Findings**:
   - Agent 登録: `new Mastra({ agents: { growiAgent } })` に静的登録し `mastra.getAgent()` で取得するパターン
-  - RequestContext: **per-request で `new RequestContext<MastraRequestContextShape>()` を生成**（module-scope 共有は並行リクエストで user が漏れるため禁止。agentic-search spec の確立済み決定）。shape は `{ user: IUserHasId, searchService: SearchService }`
+  - RequestContext: **per-request で `new RequestContext<MastraRequestContextShape>()` を生成**（module-scope 共有は並行リクエストで user が漏れるため禁止。ai-agentic-search spec の確立済み決定）。shape は `{ user: IUserHasId, searchService: SearchService }`
   - tool は `createTool()` + zod discriminated union output で、**execute から throw しない**（失敗も値で返してエージェントループを生かす）
   - 権限フィルタは tool 側で再実装せず `SearchService` / `Page` モデルに委譲
   - モデル解決: `getOpenaiProvider()(configManager.getConfig('openai:assistantModel:mastraAgent'))`、provider は `@ai-sdk/openai`
@@ -89,7 +89,7 @@
 
 - **Context**: Requirement 3.1〜3.3（上限・上限到達時の手仕舞い・設定変更反映）
 - **Selected Approach**: suggest-path 専用の `limited-search-tool` が `SuggestPathRequestContextShape`（共有 shape の拡張型）上の `searchBudget` を読み、上限超過時に `{ result: 'limit_exceeded' }` を返す。instructions で「limit_exceeded を受けたら収集済み情報で提案を確定せよ」と指示。`maxSteps`（= 2 × searchLimit + 4）とタイムアウトを多層のセーフティネットとする
-- **Rationale**: ループ強制打ち切りと違い、エージェントが gracefully に最終出力へ移行できる。共有 tool (`fullTextSearchTool`) は無改変で boundary（agentic-search spec 所有）を侵さない
+- **Rationale**: ループ強制打ち切りと違い、エージェントが gracefully に最終出力へ移行できる。共有 tool (`fullTextSearchTool`) は無改変で boundary（ai-agentic-search spec 所有）を侵さない
 - **Trade-offs**: tool 委譲の実装がやや増える。budget が RequestContext 経由になるためテストで shape を組み立てる手間
 - **Follow-up**: wrapper → 元 tool の `execute` 委譲のシグネチャをスパイクで確認
 
@@ -139,13 +139,13 @@
 - **Context**: チャット用 growiAgent との並列定義（brief の Approach）
 - **Selected Approach**: `mastra-modules/agents/suggest-path/` サブディレクトリ（barrel 付き）に Agent 定義・instructions・wrapper tool・context 型を配置。memory は接続しない（suggest-path はステートレス）。`mastra-modules/index.ts` の Mastra インスタンスに 1 行追加で登録
 - **Rationale**: 登録によりプラットフォーム共通の logger / observability が効く（Requirement 2.4 の探索過程記録を補強）。memory 不接続でスレッド永続化のオーバーヘッドとデータ残留を回避
-- **Trade-offs**: `mastra-modules/index.ts`（agentic-search spec の成果物）への 1 行の additive 変更が発生。境界上は本 spec が新規ファイル追加 + レジストリ 1 行のみを所有する
+- **Trade-offs**: `mastra-modules/index.ts`（ai-agentic-search spec の成果物）への 1 行の additive 変更が発生。境界上は本 spec が新規ファイル追加 + レジストリ 1 行のみを所有する
 
 ## Synthesis Outcomes
 
 - **Generalization**: ワンショット/agentic を `SuggestPathEngine` インターフェース（入力: user / body / userGroups / searchService、出力: `PathSuggestion[]`）の 2 実装として一般化。インターフェースのみ一般化し、レジストリ等の拡張機構は作らない（実装は 2 つの static map）
 - **Build vs. Adopt**:
-  - Adopt: Mastra Agent ループ（自前の検索リトライループは書かない）、既存 `fullTextSearchTool` / `getPageContentTool`（無改変）、既存共通基盤（memo 生成・grant 解決・configManager・pino logger）、agentic-search spec の RequestContext パターン
+  - Adopt: Mastra Agent ループ（自前の検索リトライループは書かない）、既存 `fullTextSearchTool` / `getPageContentTool`（無改変）、既存共通基盤（memo 生成・grant 解決・configManager・pino logger）、ai-agentic-search spec の RequestContext パターン
   - Build: budget 付き wrapper tool（既存機構では Requirement 3.2 の graceful 手仕舞いを保証できない）、JSON Schema 定数 + 型ガード（既知バグ回避）、エンジンディスパッチ
 - **Simplification**:
   - category 提案を agentic エンジンから除外（上記 Decision）
@@ -167,7 +167,7 @@
 
 - Redmine #184610 — 対象ストーリー（受け入れ条件: 命中率向上・レスポンス時間・フロー/ストック誘導）
 - `.kiro/specs/suggest-path-agentic/brief.md` — スコープ境界・Mastra viability check（1.41.0）
-- `.kiro/specs/agentic-search/design.md` — RequestContext パターン・tool 設計規約・グラント委譲の確立済み決定
+- `.kiro/specs/ai-agentic-search/design.md` — RequestContext パターン・tool 設計規約・グラント委譲の確立済み決定
 - [mastra-ai/mastra#7662](https://github.com/mastra-ai/mastra/issues/7662) — generateVNext で tool 後に structured output が出ないバグ（回避: 使用しない）
 - [mastra-ai/mastra#16383](https://github.com/mastra-ai/mastra/issues/16383) — Zod → JSON Schema 変換の OpenAI strict mode 非互換（回避: JSON Schema 直接記述）
 - [mastra-ai/mastra#3139](https://github.com/mastra-ai/mastra/issues/3139) — structured output 使用時に tools が外れる報告（対処: スパイク実機確認 + structuring model 分離）

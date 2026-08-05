@@ -22,7 +22,7 @@
 - HTC によるリランク（別ストーリー）、セマンティック検索の導入
 - MCP クライアント側の挙動変更、チャット機能・`growiAgent` の改修
 - AI なし・Elasticsearch のみのフォールバックエンジンの実装（将来計画。末尾「将来のロードマップ」節）
-- `fullTextSearchTool` / `getPageContentTool` の機能改修（必要が生じた場合は agentic-search spec のフォローアップ）
+- `fullTextSearchTool` / `getPageContentTool` の機能改修（必要が生じた場合は ai-agentic-search spec のフォローアップ）
 
 ## Boundary Commitments
 
@@ -32,11 +32,11 @@
 - agentic エンジン一式: `suggestPathAgent`（Agent 定義 + instructions）、budget 付き検索 wrapper tool、suggest-path 専用 RequestContext 拡張型、structured output の JSON Schema と型ガード、エンジンアダプタ（タイムアウト・出力マッピング・grant 解決・トレースログ）
 - 新設定キー（検索回数上限・タイムアウト・子ページ一覧上限・providerOptions overlay）の定義と既定値
 - 探索過程の記録（トレースログ）の形式と出力
-- `suggestPathAgent` の Mastra インスタンスへの登録（`mastra-modules/index.ts` への additive な 1 行。レジストリ機構自体は agentic-search spec の所有）
+- `suggestPathAgent` の Mastra インスタンスへの登録（`mastra-modules/index.ts` への additive な 1 行。レジストリ機構自体は ai-agentic-search spec の所有）
 
 ### Out of Boundary
 
-- チャット向け `growiAgent` の挙動（agentic-search spec が所有）
+- チャット向け `growiAgent` の挙動（ai-agentic-search spec が所有）
 - 共有 tool（`fullTextSearchTool` / `getPageContentTool`）の本体改修
 - 温存した非AIサービス（`retrieve-search-candidates` / `generate-category-suggestion`）の内部変更 — 将来の Elasticsearch-only エンジン用に据え置き、本 PR では呼び出さない
 - **AIなし・Elasticsearch のみのフォールバックエンジンの新規実装**（将来タスク F.1〜F.4。末尾「将来のロードマップ」節）
@@ -72,7 +72,7 @@
 
 - `generateSuggestions` はエンジン非依存の責務（memo 生成・可用性ベースのエンジン選択・フォールバック）を持つオーケストレータ。memo 生成（`generateMemoSuggestion`）と grant 解決（`resolveParentGrant`）はエンジンに依存しない共通基盤
 - graceful degradation（提案生成が不能なら memo のみ返却）はオーケストレータのフォールバックポリシーとして実装。agentic の失敗・タイムアウトは memo に縮退し、API は常に 200 + memo を保証する
-- Mastra 基盤（support/mastra）には per-request `RequestContext` パターン・「tool は throw せず discriminated union を値で返す」規約・権限フィルタの `SearchService` / `Page` モデル委譲が確立済み（agentic-search spec）。本設計はこれらをすべて踏襲する
+- Mastra 基盤（support/mastra）には per-request `RequestContext` パターン・「tool は throw せず discriminated union を値で返す」規約・権限フィルタの `SearchService` / `Page` モデル委譲が確立済み（ai-agentic-search spec）。本設計はこれらをすべて踏襲する
 
 ### Architecture Pattern & Boundary Map
 
@@ -731,7 +731,7 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 ## Security Considerations
 
 - **認証・認可**: ミドルウェアチェーン（AI scope の accessTokenParser + loginRequiredStrictly + aiReadyGuard）を維持（4.1）。`aiReadyGuard` は AI 機能有効かつ Mastra 設定済みを要求し、未設定は 501（マウント側とハンドラ側の両層で同一ガードを適用）
-- **権限スコープ（1.5）**: 検索・本文参照はリクエストユーザーの `IUserHasId` を per-request RequestContext で伝搬し、`SearchService.searchKeyword` / `Page.findByIdAndViewer` の既存権限フィルタに委譲。tool 側での再実装はしない（agentic-search spec の確立済み決定の踏襲）。RequestContext の module-scope 共有禁止により並行リクエスト間の user 漏れを防ぐ
+- **権限スコープ（1.5）**: 検索・本文参照はリクエストユーザーの `IUserHasId` を per-request RequestContext で伝搬し、`SearchService.searchKeyword` / `Page.findByIdAndViewer` の既存権限フィルタに委譲。tool 側での再実装はしない（ai-agentic-search spec の確立済み決定の踏襲）。RequestContext の module-scope 共有禁止により並行リクエスト間の user 漏れを防ぐ
 - **プロンプトインジェクション**: 文書本文は信頼できない入力としてエージェントに渡る。エージェントが持つ tool は**読み取り専用かつ要求ユーザーの権限内**に限定されており、本文の細工による権限昇格・書き込みは構造的に不可能。出力は JSON Schema + 型ガード + path 正規化で検証され、任意文字列がレスポンス契約を壊すことはない
 - **ログのプライバシー**: 本文・本文由来の検索クエリは debug レベル限定。info サマリはメタ情報（件数・時間・トークン）のみ
 - **エンジン明示指定の濫用（解消済み）**: 旧 `engine` フィールドによる明示指定は削除された（2026-07-17）。エンジンは可用性で自動選択され、agentic のコストは検索 budget・maxSteps・タイムアウトで構造的に制御される
