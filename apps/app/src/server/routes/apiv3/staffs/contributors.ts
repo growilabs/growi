@@ -1,4 +1,21 @@
-const contributors = [
+export interface ContributorMember {
+  position?: string;
+  name: string;
+}
+
+export interface ContributorGroup {
+  additionalClass: string;
+  members: ContributorMember[];
+}
+
+export interface ContributorSection {
+  order: number;
+  sectionName: string;
+  additionalClass: string;
+  memberGroups: ContributorGroup[];
+}
+
+export const contributors: ContributorSection[] = [
   {
     order: 1,
     sectionName: 'GROWI VILLAGE',
@@ -195,5 +212,3 @@ const contributors = [
     ],
   },
 ];
-
-export default contributors;
