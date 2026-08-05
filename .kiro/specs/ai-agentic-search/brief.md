@@ -1,5 +1,7 @@
 # Brief: ai-agentic-search
 
+> 本ファイルは discovery 時点の記録である。以降の内容は策定当時の理解・提案であり、design.md / requirements.md の記述と相違がある場合はそちらを優先する。
+
 ## Problem
 GROWI のユーザーが「自然言語で問いを投げて根拠つきの回答を得る」体験を必要としているが、現在の全文検索は「キーワード一致のリストを返す」までで止まっている。AI assistant 側にも ElasticSearch を活用した検索能力が組み込まれておらず、既存 wiki 内コンテンツを根拠とした RAG 的な回答ができない。
 

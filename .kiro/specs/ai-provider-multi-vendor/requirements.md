@@ -7,7 +7,7 @@ GROWI AI において、同時に複数の Provider, Model を登録できる機
 ### 背景・目的(既存 spec・コードベースからの補足)
 
 - **問題を抱える人**: (a) 用途に応じて異なる LLM ベンダーのモデルを使い分けたい GROWI のエンドユーザー、(b) 複数ベンダーの接続設定と利用可能モデルを一元的に統制したい、セルフホスティング GROWI の管理者・運用者。
-- **現状**: [ai-provider-selection](../ai-provider-selection/) により LLM プロバイダは OpenAI / Anthropic / Google / Azure OpenAI から選択できるが、**1 App = 単一プロバイダ**(単一の `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings`)に固定されている。[ai-provider-multi-model](../ai-provider-multi-model/)(実装済み)により、許可モデル集合 `ai:allowedModels` に複数モデルを登録しエンドユーザーがチャット画面でモデルを選択できるが、選択できるのは**その単一プロバイダ配下のモデルに限られる**。複数プロバイダの同時利用は両 spec とも明示的にスコープ外とされてきた。
+- **現状**: ai-provider-selection(廃止済みspec。本 spec による全面置換のため削除)により LLM プロバイダは OpenAI / Anthropic / Google / Azure OpenAI から選択できるが、**1 App = 単一プロバイダ**(単一の `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings`)に固定されている。[ai-provider-multi-model](../ai-provider-multi-model/)(実装済み)により、許可モデル集合 `ai:allowedModels` に複数モデルを登録しエンドユーザーがチャット画面でモデルを選択できるが、選択できるのは**その単一プロバイダ配下のモデルに限られる**。複数プロバイダの同時利用は両 spec とも明示的にスコープ外とされてきた。
 - **変えること**: 複数のプロバイダ(それぞれの接続設定・API キーを含む)と、各プロバイダ配下のモデルを**同時に登録**できるようにし、許可モデル集合をプロバイダ横断で構成できるようにする。
 
 ### 確定済みの要件判断(ユーザー確認済み)
@@ -20,13 +20,13 @@ GROWI AI において、同時に複数の Provider, Model を登録できる機
 6. **設定の保持形式は再設計可**: 現行の config の持ち方(キー構造)の温存は要件としない。複数プロバイダに最適な保持形式へ変更してよい(具体形は設計フェーズで決定)。
 7. **プロバイダ構造は固定スロット + 有効/無効トグル**(UI モック準拠): 対応 4 プロバイダを常に設定領域として提供し、動的な追加・削除は設けない。管理者は各プロバイダを有効/無効で切り替え、無効化されたプロバイダのモデルはチャット選択肢から除外される(接続設定・資格情報・モデル設定は保持)。
 8. **保存済み API キーの消去操作は提供しない**(キーは上書きのみ。使わないプロバイダは無効トグルで運用)。
-9. **管理画面 UI は Claude Design モックを参照**: [ui-design/](./ui-design/) の `AI Settings Multi-Provider.dc.html` / `ProviderPanel.dc.html`(2026-07-02 取り込み)。
+9. **管理画面 UI はグローバル既定モデルセレクタ → プロバイダタブ → プロバイダパネルの構成に準拠**(詳細は design.md の管理画面設計を参照)。
 
 ### 関連 spec
 
-- [ai-provider-selection](../ai-provider-selection/) — プロバイダ選択(1 App = 1 ベンダー)の導入
+- ai-provider-selection(廃止済みspec。プロバイダ選択(1 App = 1 ベンダー)の導入。本 spec による全面置換のため削除)
 - [ai-provider-multi-model](../ai-provider-multi-model/) — 同一プロバイダ内の複数許可モデル + チャットでのモデル選択(実装済み)
-- [ai-provider-model-picker](../ai-provider-model-picker/) — 管理画面の許可モデル入力をオフライン同梱カタログからの選択式にする(**実装済み**。2026-07-03 に dev/8.0.x へマージされ、本ブランチのベースに含まれる。最終形は同梱資産に加え opt-in のカタログリフレッシュ機構を持つ)
+- [ai-provider-model-picker](../ai-provider-model-picker/) — 管理画面の許可モデル入力をオフライン同梱カタログからの選択式にする(実装済み。実効カタログは同梱資産に加え opt-in のカタログリフレッシュ機構を持つ)
 
 ## Introduction
 
@@ -58,7 +58,7 @@ GROWI AI において、同時に複数の Provider, Model を登録できる機
   - 許可モデル入力のカタログ選択方式(カタログ対応プロバイダは選択式、非対応プロバイダは自由入力。同梱カタログ + opt-in リフレッシュによる実効カタログ)は ai-provider-model-picker が提供する前提であり、本仕様はそれを所属プロバイダ単位で適用する。カタログのリフレッシュ機構(起動時/cron/手動)とその設定・UI 導線は picker の所管のまま維持され、本仕様の管理画面再構成で失われない。
   - 「許可モデル集合 = 認可境界。クライアントからのモデル指定はサーバが検証する」という原則は維持され、本仕様はその判定単位を(プロバイダ, モデル識別子)の組に拡張する。
   - モデルごとの provider オプション・メッセージ単位のモデル適用・ユーザー個人設定としての選択永続化の各挙動(ai-provider-multi-model)は維持される。
-  - 管理画面のレイアウト・操作構造は [ui-design/](./ui-design/) の Claude Design モック(AI Settings Multi-Provider / ProviderPanel)を参照とする(細部の実装表現は design で確定する)。
+  - 管理画面のレイアウト・操作構造(グローバル既定モデルセレクタ → プロバイダタブ → プロバイダパネル)は design.md の管理画面設計に従う。
 
 ## Requirements
 

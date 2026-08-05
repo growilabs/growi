@@ -1,6 +1,6 @@
 # 環境変数による AI マルチプロバイダ構成 — 記述例
 
-ai-provider-multi-vendor が導入する 3 つの JSON 環境変数(`AI_PROVIDERS` / `AI_PROVIDER_API_KEYS` / `AI_ALLOWED_MODELS`)のコピペ可能な記述例集。**タスク 8.2 のスモークテストは §2 の「2 プロバイダ構成」ブロックをそのまま使って検証する**(記述例の実例検証を兼ねる)。
+ai-provider-multi-vendor が導入する 3 つの JSON 環境変数(`AI_PROVIDERS` / `AI_PROVIDER_API_KEYS` / `AI_ALLOWED_MODELS`)のコピペ可能な記述例集。§2 の「2 プロバイダ構成」ブロックは動作確認にそのまま使える(design.md の Manual Verification Procedures 参照)。
 
 対応する config キーと env var(定義: `apps/app/src/server/service/config-manager/config-definition.ts`):
 
@@ -38,7 +38,7 @@ ai-provider-multi-vendor が導入する 3 つの JSON 環境変数(`AI_PROVIDER
 
 ## 2. 基本例: 2 プロバイダ構成(OpenAI + Anthropic)
 
-> **8.2 スモークテスト用ブロック** — このまま `.env` 等に貼り付け、API キー(`sk-proj-...xxxx` / `sk-ant-...xxxx` はダミー)と必要ならモデル ID を実際の値に置き換えて使う。
+> **動作確認用ブロック** — このまま `.env` 等に貼り付け、API キー(`sk-proj-...xxxx` / `sk-ant-...xxxx` はダミー)と必要ならモデル ID を実際の値に置き換えて使う。
 
 ```bash
 AI_ENABLED=true

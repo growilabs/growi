@@ -1,5 +1,20 @@
 # Technical Design: ai-provider-multi-vendor
 
+## この文書に書くこと・書かないこと(Write / Don't-Write test)
+
+本 spec は実装完了済み(PR #11394)。このセクション以下は「将来この機能を改修するときに、コードとテストを読むだけでは分からないことだけを残す」という基準で整理されている。今後この設計書を編集するときも同じ基準を使うこと。
+
+判定は一貫して次の問いに従う: **「コードとテストファイルを読めば再現できる内容か?」** 再現できるなら書かない。
+
+| 書く | 書かない |
+|---|---|
+| 調査して初めて分かった事実(コードをさっと読むだけでは分からない挙動、外部ライブラリの隠れた仕様) | 関数シグネチャ、ファイル配置図、「どのファイルに何があるか」 |
+| 変わった設計を選んだ理由 — **特に、検討して却下した別案とその理由** | ごく普通の実装のごく普通の説明 |
+| 自動テストで**検知できない**残課題 | どのテストが何をカバーしているかの一覧(spec/テストファイルを直接読めばよく、書いても陳腐化する) |
+| コードから再現できない手動確認手順(再現環境の作り方・見るべき箇所・合格/不合格の基準値) | 差分の有無やいつ実装されたかといった、時点情報の記録 |
+
+迷ったら書かない。コードから読み取れる内容を spec に置くと、コードが変わった瞬間に静かに古くなり、その一箇所の陳腐化が文書全体の信頼性を損なう。
+
 ## Overview
 
 **Purpose**: 本機能は GROWI の AI 機能(Mastra チャット)を「1 App = 単一プロバイダ」から「1 App = 複数プロバイダの同時利用」へ拡張する。管理者は対応 4 プロバイダ(OpenAI / Anthropic / Google / Azure OpenAI)を固定の設定領域で同時に構成・有効/無効切替し、エンドユーザーはプロバイダ横断の許可モデルからチャットごとにモデルを選択できる。
@@ -59,13 +74,12 @@
 - modelKey の書式(セパレータ・解析規則)変更
 - env var 名(`AI_PROVIDERS` / `AI_PROVIDER_API_KEYS` / `AI_ALLOWED_MODELS`)・`ENV_ONLY_GROUPS` targetKeys の変更
 - `UserUISettings` フィールドの変更(PUT ルートのハードコード allow-list と連動)
-- **前提条件(充足済み 2026-07-03)**: ai-provider-model-picker は PR #11383 で dev/8.0.x へマージ済みで、本ブランチ(feat/186460-ai-provider-multi-vendor)のベースに含まれる。マージされた最終形は設計時スナップショットから拡張されている(実効カタログ = DB リフレッシュ済み ?? 同梱資産、opt-in の起動時/cron/手動リフレッシュ。research.md 2026-07-03 追記参照)が、本 spec が依拠する契約(provider 引数の selectable-models・`AllowedModel` 形・env-only グループ)は不変であることを確認済み
 
 ## Architecture
 
-### Existing Architecture Analysis
+### Design Rationale: 既存機構の流用範囲
 
-現行(ai-provider-multi-model + ai-provider-model-picker 実装済み)は「グローバル単一 `ai:provider` + 共用 `ai:apiKey`」を前提に、`modelResolvers: Record<AiProvider, (modelId) => MastraModelConfig>` で resolver をディスパッチする。温存するパターン:
+複数プロバイダ化にあたり、ai-provider-multi-model / ai-provider-model-picker が確立した以下の機構は変更せず流用する方針を採った(単一プロバイダ前提が残っていたのは provider の決定源とアクセサの引数の部分のみで、そこだけを provider 引数化・複合キー化した):
 
 - **メタデータ駆動のプロバイダ宣言**(`AI_PROVIDER_DEFS`。各 provider は `enumerable` に加え公式表示名 `label` を持ち、UI は `getProviderLabel(provider)` で表示 — 生キーは出さない)と Record ディスパッチ
 - **動的モデル関数**: `growiAgent` の `model: ({ requestContext }) => resolveMastraModel(...)`
@@ -73,8 +87,6 @@
 - **サーバ検証 = 認可境界**: クライアント値を信用せず allow-list へ丸める
 - **秘匿規律**: キー値を返さない・request body をログに出さない
 - **full-state replace の PUT** と write-only apiKey フィールド
-
-変更する単一プロバイダ前提: グローバル provider 読取(resolve-mastra-model L30)、共用 `getApiKey()`、素の modelId による許可判定・重複禁止・永続化。
 
 ### Architecture Pattern & Boundary Map
 
@@ -145,70 +157,11 @@ graph TB
 
 ## File Structure Plan
 
-すべて `apps/app/src` 配下。**依存方向**(Boundary Commitments 参照)に従い、下層から実装する。
+依存方向は Boundary Commitments の「依存方向」節に従う(下層から実装)。決定した分割:
 
-### New Files
-
-```
-features/mastra/interfaces/
-├── model-key.ts                  # modelKey の生成・解析 (buildModelKey / parseModelKey / MAX_MODEL_KEY_LENGTH)
-└── provider-settings.ts          # AiProviderSettings / AiProvidersConfig / AiProviderApiKeys 型
-
-features/mastra/server/services/ai-sdk-modules/llm-providers/
-├── warn-dedup.ts                 # (キー/プロバイダ, 理由) 単位の warn dedup レジストリ + clearAvailabilityLogDedup()。config アクセサと provider-availability が共用
-├── provider-availability.ts      # 有効プロバイダ判定・有効モデル集合・不備ログ (warn-dedup を利用)
-└── effective-model-key.ts        # 実効既定モデルの決定・リクエスト時の実効キー解決 (availability 連携。config.ts に置くと config ⇄ availability の循環 import になるため分離)
-
-features/mastra/client/admin/
-├── DefaultModelSelector.tsx      # グローバル既定モデルのプロバイダ横断ドロップダウン (モック gd 部)
-├── ProviderTabs.tsx              # プロバイダタブバー + 構成状態ドット (モック tabs 部)
-└── ProviderPanel.tsx             # プロバイダ 1 件分: 有効トグル・API キー・モデル一覧・Azure 設定の配置 (モック ProviderPanel)
-```
-
-### Modified Files
-
-**interfaces(共有 DTO)**
-- `features/mastra/interfaces/allowed-model.ts` — `AllowedModel` に必須 `provider` 追加。`isModelInAllowList(provider, modelId, list)` へ変更。`MAX_MODEL_ID_LENGTH` は model-key.ts の `MAX_MODEL_KEY_LENGTH` へ移管
-- `features/mastra/interfaces/ai-settings.ts` — `AiSettingsResponse` / `AiSettingsUpdateRequest` を providers Record 形へ。`AI_SETTING_KEYS` を新キー集合へ
-- `features/mastra/interfaces/chat-models-response.ts` — `{ models: ChatModelEntry[]; selectedModelKey }` へ
-- `interfaces/user-ui-settings.ts` — `aiChatSelectedModelId` → `aiChatSelectedModelKey`
-
-**config**
-- `server/service/config-manager/config-definition.ts` — `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings` を削除、`ai:providers`(`AI_PROVIDERS`)・`ai:providerApiKeys`(`AI_PROVIDER_API_KEYS`, isSecret)を追加(`CONFIG_KEYS` 列挙も追従)。`ENV_ONLY_GROUPS` の ai グループ targetKeys を `['app:aiEnabled', 'ai:providers', 'ai:providerApiKeys']` へ(allowedModels を除外 = R5.3)。picker 由来の `ai:modelCatalogRefreshOnStartup` / `ai:modelCatalogRefreshCronSchedule` は**変更対象外**(env-only グループ外・admin 編集単位外の現状を維持)
-
-**server services**
-- `.../llm-providers/config.ts` — アクセサをプロバイダ引数付きへ(`getApiKey(p)` / `requireApiKey(p)` / `getProviderSettings(p)`)。availability / effective-model-key は import しない(現行 `resolveEffectiveModelId` / `getDefaultModelId` 相当は新設 `effective-model-key.ts` へ移設 — New Files 参照)
-- `.../llm-providers/{openai,anthropic,google,azure-openai}.ts` — 自プロバイダ名で `requireApiKey('openai')` 等を呼ぶ。azure は `getProviderSettings('azure-openai')?.azureOpenaiSettings` を読む
-- `.../resolve-mastra-model.ts` — `resolveMastraModel(modelKey?)`: 実効キー解決 → parse → dispatch。キャッシュキー = modelKey。`clearResolvedMastraModelCache` は現行の呼び出し契約のまま
-- `.../resolve-provider-options.ts` — `getProviderOptionsForModel(modelKey)`: (provider, modelId) 照合
-- `features/mastra/server/services/is-ai-configured.ts` — 「有効なプロバイダ ≥1 ∧ その配下の許可モデル ≥1」(provider-availability 委譲)
-- `.../mastra-modules/types/request-context.ts` — `modelId` → `modelKey`
-- `.../mastra-modules/agents/growi-agent.ts` — `resolveMastraModel(requestContext.get('modelKey'))`
-
-**server routes**
-- `.../routes/admin-ai-settings/get-ai-settings.ts` — providers Record + isApiKeySet(プロバイダ別)を返す
-- `.../routes/admin-ai-settings/put-ai-settings.ts` — providers 単位の full-state replace(apiKey のみ merge)。env-only 時は allowedModels のみ受理、providers / aiEnabled を含む場合 400
-- `.../routes/admin-ai-settings/validate-allowed-models.ts` — (provider, modelId) 一意・provider 妥当性・既定ちょうど 1 つ
-- `.../routes/get-models.ts` — 有効モデルのみの `ChatModelsResponse`。selected は保存キー ∈ 有効集合 ? 保存キー : 実効既定
-- `.../routes/post-message.ts` / `post-message-validator.ts` — body `modelKey`(長さ上限 `MAX_MODEL_KEY_LENGTH`)、requestContext へ `modelKey`
-- `server/routes/apiv3/user-ui-settings.ts` — validator・updateData allow-list・OpenAPI を `aiChatSelectedModelKey` へ(**ハードコード allow-list の拡張を忘れない**)
-- `server/models/user-ui-settings.ts` — スキーマフィールド改名
-
-**client**
-- `features/mastra/client/admin/AiSettings.tsx` — モック構成(AI トグル → DefaultModelSelector → ProviderTabs → ProviderPanel → Update)へ再構成
-- `features/mastra/client/admin/ai-settings-form-values.ts` — `AiSettingsFormValues = { aiEnabled, providers: Record<AiProvider, ProviderFormValue>, allowedModels: AllowedModelFormValue[] }` と双方向マッピング
-- `features/mastra/client/admin/AllowedModelsField.tsx` — `provider` prop を受け、グローバル `allowedModels` 配列の該当プロバイダ行のみを編集(追加時は provider + namespace テンプレートをシード。★ = グローバル既定の付替え)。既存の手動カタログリフレッシュ導線(POST `/ai-settings/refresh-model-catalog`)は維持する
-- `features/mastra/client/admin/AzureOpenaiSettings.tsx` — `providers.azure-openai.azureOpenaiSettings` 配下のフィールドへ(グローバル provider watch を廃止)
-- `features/mastra/client/admin/use-ai-settings.ts` — 新 DTO 対応
-- `features/mastra/client/components/ChatSidebar/ChatSidebar.tsx` — modelKey 状態・プロバイダ別グループ表示・`scheduleToPut({ aiChatSelectedModelKey })`
-- `features/mastra/client/components/ChatSidebar/chat-sidebar-helpers.ts` — `getModelKey` ライブ getter(機構は不変)
-- `features/mastra/client/stores/models.tsx` — 新 `ChatModelsResponse` 型
-- `components/ai-elements/prompt-input.tsx` — `PromptInputModelSelectGroup` / `PromptInputModelSelectLabel`(ui/select の再輸出ラッパ)を追加
-- `public/static/locales/{en_US,ja_JP,zh_CN,fr_FR,ko_KR}/admin.json` — providers タブ・有効トグル・既定モデルセレクタ等のキー追加、単一プロバイダ前提キー(`provider_label` / `api_key_provider_change_warning` 等)の削除(**5 ロケールすべて** — ko_KR にも `ai_settings` セクションが存在する)
-
-### Deleted Files
-
-- `features/mastra/client/admin/ProviderCommonSettings.tsx`(+ `.spec.tsx`)— DefaultModelSelector / ProviderTabs / ProviderPanel に置換
+- **サービス層を 3 モジュールに分割**(`warn-dedup.ts` / `provider-availability.ts` / `effective-model-key.ts`)し、既存の `llm-providers/config.ts` には追加しなかった。理由: config アクセサ → 可用性判定 → 実効キー解決という一方向依存を保つため(config.ts が可用性判定を import すると循環 import になる)。dedup レジストリ(warn-dedup.ts)は config アクセサの防御ガードと可用性判定の不備ログの双方が共用するため、両者の外側に切り出した。
+- **クロスレイヤ DTO は `interfaces/` に集約**(`model-key.ts` / `provider-settings.ts`)し、どの層からも一方向に参照できる単一の宣言にした。
+- **管理画面は単一コンポーネント(旧 `ProviderCommonSettings`)を廃し、3 コンポーネントへ分割**(`DefaultModelSelector` / `ProviderTabs` / `ProviderPanel`)。単一プロバイダ前提の 1 フォームから、プロバイダごとに独立した固定 4 スロットの設定領域へ UI 構造を対応させるための分割。
 
 ## System Flows
 
@@ -239,51 +192,6 @@ sequenceDiagram
 - 検証点は `resolveEffectiveModelKey` の 1 箇所(post-message で 1 回だけ解決し、その実効キーを requestContext と providerOptions 解決の両方に渡す — 現行パターン踏襲)。
 - 有効集合外の modelKey は実効既定へ丸め(warn ログ、キー値のみ)。既定自体が無効なら「有効なエントリの先頭」へ(決定的、6.4)。
 - 管理設定保存 → `clearResolvedMastraModelCache()` + s2s で他インスタンスも無効化(再起動なし反映、現行機構)。
-
-## Requirements Traceability
-
-| Req | Summary | Components / Interfaces |
-|-----|---------|-------------------------|
-| 1.1 | 固定領域で複数構成 | config-definition `ai:providers`, ProviderTabs / ProviderPanel |
-| 1.2 | 各種 1 つに限定 | `AiProvidersConfig`(AiProvider キーの Record が型で保証) |
-| 1.3 | プロバイダ独立の永続化 | put-ai-settings(providers 単位 replace) |
-| 1.4 | キー未入力 = 維持 | put-ai-settings(apiKey merge 例外) |
-| 1.5 | 有効/無効切替の提供 | `AiProviderSettings.enabled`, ProviderPanel トグル |
-| 1.6 | 無効化 = 除外・設定保持 | provider-availability(disabled 判定)、put-ai-settings(保持) |
-| 1.7 | 有効復帰 | provider-availability(enabled ∧ 構成済みで復帰) |
-| 1.8 | キーのマスク表示 | get-ai-settings `isApiKeySet`、ProviderPanel `(configured)` placeholder |
-| 1.9 | 秘匿値の非出力 | get/put-ai-settings(値を返さない・body 非ログ)、requireApiKey(メッセージにキー値なし) |
-| 1.10 | Azure 接続設定 | `AiProviderSettings.azureOpenaiSettings`, AzureOpenaiSettings, azure-openai resolver |
-| 2.1 | (provider, modelId) の組 | `AllowedModel.provider`(必須), model-key.ts |
-| 2.2 | パネル内追加で所属確定 | AllowedModelsField(provider prop でシード) |
-| 2.3 | 異プロバイダ同名共存 | validate-allowed-models((provider, modelId) 一意) |
-| 2.4 | 同一プロバイダ内重複拒否 | validate-allowed-models, AllowedModelsField(行エラー表示) |
-| 2.5 | 不正プロバイダ拒否 | validate-allowed-models(`isAiProvider` 検証) |
-| 2.6 | カタログ選択 | AllowedModelsField + use-selectable-models(既存 picker、provider 引数) |
-| 2.7 | 自由入力(Azure 等) | AllowedModelsField(enumerable=false フォールバック、既存) |
-| 2.8 | provider オプション | AllowedModelsField(行内 JSON、既存)+ resolve-provider-options(modelKey 照合) |
-| 2.9 | 未構成プロバイダでも編集可 | put-ai-settings(構成状態と独立に検証・保存)、利用可否は 6.x |
-| 3.1 | グローバル既定 1 つ | `AllowedModel.isDefault` + DefaultModelSelector / 行内★ |
-| 3.2 | 既定 0 or 2+ 拒否(非空時) | validate-allowed-models(非空リストで defaultCount === 1) |
-| 3.3 | 空集合の保存許可 | validate-allowed-models(空配列受理)、put-ai-settings(`[]` を保存)、is-ai-configured(0 件 = 未設定、6.3 合流) |
-| 4.1 | 横断モデルセレクタ | get-models(有効集合)、ChatSidebar + PromptInputModelSelect* |
-| 4.2 | プロバイダ判別表示 | `ChatModelEntry.provider` + SelectGroup / SelectLabel 表示 |
-| 4.3 | 選択プロバイダで生成 | modelKey → parse → modelResolvers dispatch(resolve-mastra-model) |
-| 4.4 | 一意特定で永続化・初期選択 | `aiChatSelectedModelKey`(UserUISettings)+ get-models の selected 解決 |
-| 4.5 | 選択肢外はフォールバック | get-models(保存キー ∉ 有効集合 → 実効既定) |
-| 4.6 | サーバ検証・丸め | resolveEffectiveModelKey(post-message で 1 回解決) |
-| 4.7 | メッセージ単位・途中切替 | chat-sidebar-helpers ライブ getter(機構不変) |
-| 5.1 | env のみで構成可 | `AI_PROVIDERS` / `AI_PROVIDER_API_KEYS` / `AI_ALLOWED_MODELS`(JSON env) |
-| 5.2 | 接続設定 env-only・読み取り専用 | ENV_ONLY_GROUPS targetKeys、put-ai-settings(400)、ProviderPanel disabled 表示 |
-| 5.3 | モデル設定は編集可 | targetKeys から `ai:allowedModels` 除外、put-ai-settings(allowedModels 受理)、buildUpdateRequest(env-only 時 allowedModels のみ送出) |
-| 5.4 | env-only 時も同一検証 | validate-allowed-models(経路共通) |
-| 6.1 | 不備プロバイダ除外 + ログ | provider-availability(reason 付き warn、dedup) |
-| 6.2 | 有効 1 つ以上で利用可 | is-ai-configured(available provider ∧ model ≥1) |
-| 6.3 | 全滅 → 未設定扱い・継続 | is-ai-configured → ai-ready-guard 501(既存機構) |
-| 6.4 | 既定無効 → 代替初期選択 | getEffectiveDefaultModelKey(有効エントリ先頭へ決定的フォールバック) |
-| 7.1 | 旧設定の置換 | config-definition(旧 3 キー削除) |
-| 7.2 | 自動移行なし | migration 追加なし(設計上の不作為を明示) |
-| 7.3 | 旧のみ → 未設定扱い | 新キー不在 → available provider 0 → 6.3 と同経路 |
 
 ## Components and Interfaces
 
@@ -358,7 +266,7 @@ export type AiProviderApiKeys = Partial<Record<AiProvider, string>>;
 
 - `ENV_ONLY_GROUPS` の ai グループ: `targetKeys: ['app:aiEnabled', 'ai:providers', 'ai:providerApiKeys']`(モデル設定を外す = 5.3)。
 - 削除: `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings`(7.1。migration なし = 7.2。新キー不在時は available provider が 0 になり自然に未設定扱い = 7.3)。picker 由来のカタログリフレッシュ 2 キー(`ai:modelCatalogRefreshOnStartup` / `ai:modelCatalogRefreshCronSchedule`)は `ai:*` prefix だが本 spec の対象外 — 削除・移設しない。
-- **単一 JSON env への集約 — トレードオフの記録(5.1)**: `AI_PROVIDER_API_KEYS` は全プロバイダの API キーを 1 つの JSON env 値に合成する形であり、K8s の `secretKeyRef` 等でプロバイダごとに別々のシークレットソースから注入することはできない。config-manager の機構(1 config key = 1 env var)と D2 の Record 保存形に整合するため、この形を採る。**非採用代替**: per-provider env var(`AI_OPENAI_API_KEY` 等)は、config key の per-provider 分割(Record 設計の放棄)か config-loader への例外機構の追加を要するため見送り。運用要望が生じた場合は、loader 段で per-provider env を Record へマージする「追加エイリアス」として後方互換に導入できる(拡張余地 — 本 spec では実装しない)。JSON エスケープ誤りは malformed config warn(Error Handling 参照)で観測可能。env 記述例(JSON エスケープ・複数キー合成の具体例)のドキュメント整備は tasks で 1 タスク化する。
+- **単一 JSON env への集約 — トレードオフの記録(5.1)**: `AI_PROVIDER_API_KEYS` は全プロバイダの API キーを 1 つの JSON env 値に合成する形であり、K8s の `secretKeyRef` 等でプロバイダごとに別々のシークレットソースから注入することはできない。config-manager の機構(1 config key = 1 env var)と D2 の Record 保存形に整合するため、この形を採る。**非採用代替**: per-provider env var(`AI_OPENAI_API_KEY` 等)は、config key の per-provider 分割(Record 設計の放棄)か config-loader への例外機構の追加を要するため見送り。運用要望が生じた場合は、loader 段で per-provider env を Record へマージする「追加エイリアス」として後方互換に導入できる(拡張余地 — 本 spec では実装しない)。JSON エスケープ誤りは malformed config warn(Error Handling 参照)で観測可能。JSON エスケープ・複数キー合成の具体例は [docs/env-configuration-examples.md](./docs/env-configuration-examples.md) を参照。
 - config-manager は値をランタイム検証しないため、アクセサ側で `Array.isArray` / object ガードを行う(現行 `getAllowedModels` の防御パターン踏襲)。ガードが不正形状を検出した場合は「未設定」として fail-soft しつつ、`(config key, 理由)` の warn を dedup 付きで出力する(fail-silent の排除 — Error Handling 参照)。JSON env のタイポ等で `ai:providers` 自体が読めないケースは 6.1 の不備ログ(enabled 判定後)に到達しないため、この warn が唯一の手がかりになる。
 - **env 値と DB 値の混在(シャドーイング)の規則**: config-manager の標準解決(env-only グループ外は「DB 値 ?? env 値」を**キー全体**に適用。Record の deep merge はしない)をそのまま踏襲し、アクセサ側で per-provider の deep merge を自作しない(env-only 判定の複製 = drift 源になるため)。したがって `AI_PROVIDERS` / `AI_PROVIDER_API_KEYS` / `AI_ALLOWED_MODELS` の env 値が効くのは同キーの DB 値が存在しない間だけで、管理画面の保存で DB 値が書かれた後は env 側の変更は反映されない(env 値 = 初期値として振る舞う)。接続設定を env で恒久的に統制したい運用は env-only モード(R5.2)を使う — それがモード分割の意図。観測性のため、アクセサは同一キーで DB 値と env 値が同時に定義されているのを検出したら「env 値が DB 値にシャドーされている」旨を dedup 付き info で出力する(「env を変えたのに反映されない」調査の観測点。値そのものは出力しない)。
 
@@ -374,22 +282,13 @@ export type ProviderUnavailableReason =
   | 'disabled'            // enabled !== true (1.6 — ログ対象外: 管理者の意図)
   | 'missing-api-key'     // 鍵必須プロバイダで未設定 (6.1 — warn)
   | 'missing-azure-endpoint'; // azure で resourceName / baseURL とも未設定 (6.1 — warn)
-
-export const getProviderAvailability = (
-  provider: AiProvider,
-): { available: true } | { available: false; reason: ProviderUnavailableReason };
-
-/** enabled ∧ 構成済み のプロバイダ集合 */
-export const getAvailableProviders = (): AiProvider[];
-
-/** 許可リストのうち所属プロバイダが available なエントリ (6.1 の除外を実装) */
-export const getAvailableModels = (): AllowedModel[];
 ```
 
+- `disabled` は管理者の意図的な操作のためログ対象外、`missing-api-key` / `missing-azure-endpoint` は設定不備のため warn 対象とする(6.1)、という区別がこの型の設計意図。
 - Preconditions: なし(config 未設定でも安全に空集合)。
 - Postconditions: `getAvailableModels()` ⊆ `getAllowedModels()`。
 - **不備ログ(6.1)**: enabled なのに構成不備のプロバイダは `(provider, reason)` 単位で warn。同一内容はモジュール内 dedup し、`clearAvailabilityLogDedup()`(設定保存 / s2s 更新時に `clearResolvedMastraModelCache` と同時に呼ぶ)でリセット — リクエスト毎のログ洪水を防ぎつつ、設定変更後は再通知する。
-- **malformed config warn も同一の dedup・リセット契約を共有**: アクセサの防御ガード(config-definition 節)が出す `(config key, 理由)` warn は、この dedup レジストリと `clearAvailabilityLogDedup()` を共用する。レジストリは共有ヘルパ `warn-dedup.ts`(New Files 参照)に置き、config アクセサと availability の双方がそこへ依存する — config アクセサ → availability の一方向依存を保ち、循環 import を作らない。
+- **malformed config warn も同一の dedup・リセット契約を共有**: アクセサの防御ガード(config-definition 節)が出す `(config key, 理由)` warn は、この dedup レジストリと `clearAvailabilityLogDedup()` を共用する。レジストリは共有ヘルパ `warn-dedup.ts` に置き、config アクセサと availability の双方がそこへ依存する — config アクセサ → availability の一方向依存を保ち、循環 import を作らない。
 - azure の構成済み条件: endpoint(resourceName または baseURL)必須。Entra ID 時は apiKey 免除(現行 `isAiConfigured` の条件を per-provider 化)。
 
 ### service / llm-providers config(アクセサ)
@@ -399,13 +298,7 @@ export const getAvailableModels = (): AllowedModel[];
 | Intent | プロバイダ別 config 読取(availability 非依存の最下層) |
 | Requirements | 1.4, 1.9 |
 
-```typescript
-export const getProviderSettings = (provider: AiProvider): AiProviderSettings | undefined;
-export const getApiKey = (provider: AiProvider): string | undefined;
-export const requireApiKey = (provider: AiProvider): string; // 不在時 throw (メッセージは provider 名 + env var 名のみ。キー値なし)
-export const getAllowedModels = (): AllowedModel[];
-```
-
+- プロバイダ引数付きの読取 API(設定・API キー・許可モデル)を提供する。キー不在時のエラーメッセージは provider 名 + env var 名のみでキー値を含めない。
 - per-provider resolvers(openai/anthropic/google/azure-openai)は署名 `(modelId: string) => MastraModelConfig` を維持し、内部で自プロバイダ名の `requireApiKey` / `getProviderSettings` を呼ぶ。`modelResolvers` Record は不変。
 - config.ts は provider-availability / effective-model-key を import しない(依存方向: config アクセサ → availability → 実効キー解決。共用するのは warn-dedup のみ)。
 
@@ -416,18 +309,7 @@ export const getAllowedModels = (): AllowedModel[];
 | Intent | 実効既定モデルの決定と、リクエスト時の単一検証点 |
 | Requirements | 4.6, 6.4 |
 
-```typescript
-/** 実効既定: isDefault エントリが available ならそれ、でなければ available なエントリの先頭。0 件なら throw */
-export const getEffectiveDefaultModelKey = (): ModelKey;
-
-/**
- * リクエスト時の単一検証点 (4.6):
- *  - modelKey が有効集合内 → そのまま
- *  - 有効集合外 / 省略 → 実効既定へ (集合外は warn、キー値のみ)
- *  - 有効モデル 0 件 → throw (ai-ready-guard が事前に 501 を返すため通常到達しない)
- */
-export const resolveEffectiveModelKey = (modelKey?: string): ModelKey;
-```
+実効既定モデルの決定則(6.4)と、リクエスト時の単一検証点(4.6、System Flows 参照)を提供する。0 件の場合は throw する(ai-ready-guard が事前に 501 を返すため通常到達しない)。
 
 - `resolveMastraModel(modelKey?)`: 実効キー解決 → `parseModelKey` → dispatch → `resolvedModelCache.set(modelKey, model)`。`clearResolvedMastraModelCache()` の呼び出し契約(put-ai-settings + s2s)は不変。
 
@@ -575,41 +457,19 @@ Config コレクションは key-value(値 JSON)のため**スキーマ変更な
 - **不正な設定値(malformed config)の観測性**: JSON env(`AI_PROVIDERS` / `AI_PROVIDER_API_KEYS` / `AI_ALLOWED_MODELS`)や DB 値が期待形状でない場合、アクセサは「未設定」として fail-soft しつつ `(config key, 理由)` の warn を dedup 付きで出力する — ログゼロでの AI 機能無効化(fail-silent)を排除する(R5.1 の env-only 運用で特に重要)。warn には値そのもの(特に `ai:providerApiKeys`)を含めず、config key 名と理由のみ。dedup のリセットは 6.1 の不備ログと同一契約(設定保存 / s2s 更新時)。
 - **観測性**: ログはプロバイダ名・reason・モデルキーのみ(秘匿値なし)。
 
-## Testing Strategy
+## Manual Verification Procedures
 
-### Unit Tests
+自動テストでは検証できない、実 API キー + ブラウザ操作が必要な手動確認手順(コピペ可能な env 例は [docs/env-configuration-examples.md](./docs/env-configuration-examples.md) を参照):
 
-1. `model-key.spec`: buildModelKey/parseModelKey の往復・最初の `/` で分割(modelId 内 `/` 許容)・不正 prefix / 空 modelId → null(2.1)
-2. `validate-allowed-models.spec`: 異プロバイダ同名共存 OK(2.3)/同一プロバイダ重複拒否(2.4)/不正 provider 拒否(2.5)/非空リストで既定 0・2+ 拒否(3.2)/空配列は受理(3.3)/providerOptions namespace 検証(2.8)
-3. `provider-availability.spec`: enabled × apiKey × azure endpoint/Entra のマトリクス(1.6, 1.7, 6.1)、有効モデル集合の導出、warn dedup とリセット
-4. `config.spec`(llm-providers): `requireApiKey(p)` のメッセージにキー値が含まれない(1.9)、malformed な `ai:providers` / `ai:providerApiKeys` / `ai:allowedModels` → 未設定として扱い `(key, 理由)` warn が dedup で 1 回だけ出る・warn に値/キー値を含まない、同一キーの DB 値 + env 値の同時定義でシャドーイング info が dedup 付きで出る(値は含まない)
-5. `effective-model-key.spec`: `resolveEffectiveModelKey` の丸め(4.6)・実効既定のフォールバック(既定が無効プロバイダ → 有効先頭、6.4)・0 件 throw
-6. `resolve-mastra-model.spec`: modelKey ディスパッチ(4.3)・キャッシュ・clear 後の再構築
-
-### Integration Tests
-
-1. `put/get-ai-settings.spec`: プロバイダ独立更新(1.3)・apiKey merge 例外(1.4)・isApiKeySet マスク(1.8)・無効化しても設定保持(1.6)・未構成プロバイダのモデル保存可(2.9)・`providers` の不完全エントリ(4 種未満)→ 400・連続する 2 つの PUT(openai キーのみ → anthropic キーのみ)後に両キーが保持される(merge の現在値が保存時読み取りであることの回帰検証)・env でキーを注入した状態で非空キーなしの PUT をしても `ai:providerApiKeys` の DB 値が作られない(env フォールバック維持)/ 非空キーありの PUT では env 由来キーがマージ後ビューから引き継がれる(1.4)・`allowedModels` 省略の PUT で保存済みモデル集合が変わらない/空配列の PUT で `[]` が保存され AI 未設定扱いになる(3.3)
-2. `env-only-mode.integ.spec`(書き換え): env-only 時に providers/aiEnabled を含む PUT → 400(5.2)、allowedModels のみの PUT → 反映(5.3)+ 同一検証(5.4)、GET の useOnlyEnvVars
-3. `get-models.spec`: 有効プロバイダのみの models(4.1, 6.1)・保存キー有効時はそれ / 無効時は実効既定(4.4, 4.5)
-4. `post-message.spec`: body modelKey の受理・集合外の丸め・requestContext への実効キー設定(4.3, 4.6)
-5. `user-ui-settings` PUT: `aiChatSelectedModelKey` の保存(allow-list 拡張の確認、4.4)
-
-### Component Tests
-
-1. `AiSettings.spec`: タブ 4 種常時表示(1.1)・構成状態ドット・Update で buildUpdateRequest の形(通常時: providers Record + allowedModels / env-only 時: allowedModels のみで providers・aiEnabled を含まない — 5.3)
-2. `ProviderPanel.spec`: 有効トグル(1.5)・`(configured)` placeholder(1.8)・env-only で接続設定 disabled かつモデル編集活性(5.2, 5.3)
-3. `AllowedModelsField.spec`(改修): provider スコープの追加(2.2)・カタログ select / 自由入力の切替(2.6, 2.7)・同一プロバイダ重複エラー(2.4)
-4. `DefaultModelSelector.spec`: プロバイダ別グループ表示・選択で isDefault が単一に付替わる(3.1)
-5. `ChatSidebar.spec`: グループ表示(4.2)・選択変更で scheduleToPut 呼び出し(4.4)・送信 body に modelKey(4.7)
+1. **プロバイダ横断のモデル切替**: 実 API キーで OpenAI + Anthropic を有効化し管理画面 `/admin/ai` を開く。4 プロバイダタブが常時表示され、構成済みプロバイダにドット表示があり、保存できることを確認する。チャットサイドバーのモデルセレクタが両プロバイダのモデルをプロバイダ別グループ見出しで表示し、トリガ表示が「プロバイダ名 · モデル名」であることを確認する。一方のプロバイダのモデルで送信して応答を得たあと、他方のプロバイダのモデルへ切替えて送信し、切替後のプロバイダで生成されることを確認する。管理画面で許可モデルを追加保存し、サーバを再起動せずチャットのセレクタに反映されることを確認する。
+2. **部分縮退**: 管理画面で一方のプロバイダ(例: Anthropic)を無効化して保存する。チャットのセレクタからそのプロバイダのモデルが消え、他方のみ残ることを確認する。サーバログに、そのプロバイダの構成不備の理由(キー値を含まない)を示す warn が出力され、アプリ本体は継続動作することを確認する。
+3. **env-only モード**: `AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS=true` で起動し管理画面を開く。有効トグル・API キー・Azure 接続設定が読み取り専用(disabled)表示であることを確認する。許可モデルの追加・既定モデルの変更・provider オプション編集は保存でき、反映されることを確認する(接続設定は変更不可だがモデル設定は編集可能という部分ロックの目視確認)。
 
 ## Security Considerations
 
-- **秘匿情報**: `ai:providerApiKeys` を isSecret 指定。API 応答は `isApiKeySet` のみ(1.8)。全 catch/ログで request body・キー値を出力しない(1.9)。validator エラーにもキー値を含めない。
-- **キーローテーションの巻き戻り窓**: 同時 PUT では `ai:providerApiKeys` の read-modify-write により直前のキーローテーションが旧キーで上書きされ得る。merge の現在値を保存処理内で読む契約(routes 節)により窓はハンドラ内 read→write 間に限定されるが、ゼロにはならない(検知手段も `isApiKeySet` では得られない)。楽観ロックは導入せず既知の制約として許容する。
-- **認可境界**: クライアント供給の modelKey は常にサーバの有効集合で検証(4.6)。許可リスト = 認可境界の原則を (provider, modelId) 単位に拡張。
-- 管理 API は既存の admin 権限ミドルウェア構成を変更しない。
+- **キーローテーションの巻き戻り窓(既知の制約)**: 同時 PUT では `ai:providerApiKeys` の read-modify-write により直前のキーローテーションが旧キーで上書きされ得る。merge の現在値を保存処理内で読む契約(routes 節参照)により窓はハンドラ内 read→write 間に限定されるが、ゼロにはならない(`isApiKeySet` からは検知できない)。楽観ロックは導入せず既知の制約として許容する。
 
 ## Supporting References
 
-- UI 構造の参照: [ui-design/](./ui-design/)(Claude Design モック。README に注意事項)
-- 調査ログ・判断の経緯: [research.md](./research.md)(gap 分析、D1–D12、RN-1/RN-2 の解決)
+- 調査ログ・判断の経緯: [research.md](./research.md)(gap 分析、D1–D8、RN-1/RN-2 の解決)
+- env var 構成の記述例(運用者向け): [docs/env-configuration-examples.md](./docs/env-configuration-examples.md)
