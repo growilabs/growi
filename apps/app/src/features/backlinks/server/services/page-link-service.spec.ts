@@ -5,6 +5,7 @@ import { mock } from 'vitest-mock-extended';
 import type Crowi from '~/server/crowi';
 import type PageEvent from '~/server/events/page';
 import type { PageDocument } from '~/server/models/page';
+import { CONFIG_DEFINITIONS } from '~/server/service/config-manager/config-definition';
 
 import { PageLinkService } from './page-link-service';
 
@@ -47,36 +48,49 @@ describe('PageLinkService (live extraction queue)', () => {
 
   let pageEvent: EventEmitter;
 
-  beforeEach(() => {
-    vi.useFakeTimers();
-
-    // Subscribe against a real emitter so registered listeners actually fire on emit.
-    // The cast is confined to this one field: mock<T>() cannot supply working
-    // EventEmitter behavior, and PageLinkService only touches events.page here.
-    pageEvent = new EventEmitter();
+  // Subscribes against a real emitter so registered listeners actually fire on emit.
+  // The cast is confined to this one field: mock<T>() cannot supply working
+  // EventEmitter behavior, and PageLinkService only touches events.page here.
+  const createService = (
+    events: EventEmitter,
+    configOverrides: Record<string, string | number> = {},
+  ): void => {
     const crowi = mock<Crowi>({
-      events: { page: pageEvent as unknown as PageEvent },
+      events: { page: events as unknown as PageEvent },
       configManager: {
         // mockImplementation rather than vi.fn(impl): getConfig is generic over the config key,
         // and a concrete implementation signature is not assignable to it.
         getConfig: vi
           .fn()
-          .mockImplementation((key: string) => configValues[key]),
+          .mockImplementation(
+            (key: string) => ({ ...configValues, ...configOverrides })[key],
+          ),
       },
     });
     PageLinkService.create(crowi);
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+
+    pageEvent = new EventEmitter();
+    createService(pageEvent);
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  const save = (event: 'create' | 'update', pageId: Types.ObjectId): void => {
+  const save = (
+    event: 'create' | 'update',
+    pageId: Types.ObjectId,
+    emitter: EventEmitter = pageEvent,
+  ): void => {
     const page = mock<PageDocument>({ path: '/from' });
     // Assign the ObjectId directly: mock<T>() would deep-mock it into a proxy, so toString()
     // would no longer yield the id the queue keys on.
     page._id = pageId;
-    pageEvent.emit(event, page);
+    emitter.emit(event, page);
   };
 
   const upsertedIds = (): string[] =>
@@ -138,6 +152,28 @@ describe('PageLinkService (live extraction queue)', () => {
     expect(upsertedIds().sort()).toEqual(
       pageIds.map((pageId) => pageId.toString()).sort(),
     );
+  });
+
+  it('still bounds the batch when the configured per-tick budget is unusable', async () => {
+    // A typo'd BACKLINKS_MAX_PAGES_PER_DRAIN reaches config as NaN (config-loader parses numeric
+    // env vars with a bare parseInt), and `batch.length >= NaN` is never true — unguarded, one
+    // tick would parse the whole queue, which is the burst this queue exists to prevent.
+    const declaredBudget =
+      CONFIG_DEFINITIONS['backlinks:maxPagesPerDrain'].defaultValue;
+
+    // A separate emitter so only this service — the one with the broken config — sees the saves.
+    const brokenConfigEvent = new EventEmitter();
+    createService(brokenConfigEvent, {
+      'backlinks:maxPagesPerDrain': Number.NaN,
+    });
+
+    for (let i = 0; i < declaredBudget * 2 + 1; i++) {
+      save('create', new Types.ObjectId(), brokenConfigEvent);
+    }
+
+    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
+
+    expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(declaredBudget);
   });
 
   it('processes a page saved while a drain is in flight on a later tick', async () => {

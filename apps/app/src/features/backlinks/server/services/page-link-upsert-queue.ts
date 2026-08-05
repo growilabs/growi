@@ -10,6 +10,9 @@ const logger = loggerFactory('growi:features:backlinks:page-link-upsert-queue');
  *
  * Passed in rather than read here so the defaults live in exactly one place
  * (`backlinks:drainIntervalMs` / `backlinks:maxPagesPerDrain` in CONFIG_DEFINITIONS).
+ *
+ * Both are assumed to be positive integers; `resolveUpsertQueuePacing` guarantees that for
+ * config-sourced values.
  */
 export interface PageLinkUpsertQueuePacing {
   readonly drainIntervalMs: number;
@@ -69,10 +72,17 @@ export class PageLinkUpsertQueue {
 
     try {
       const siteUrl = this.getSiteUrl();
-      const batch = [...this.pagesToUpsert].slice(
-        0,
-        this.pacing.maxPagesPerDrain,
-      );
+
+      // Taken by early break rather than [...set].slice(N): during a burst — the very case this
+      // queue exists for — copying the whole set to read a few ids is the cost it is meant to avoid.
+      // Set iteration is insertion-ordered, so this is the same FIFO batch the slice produced.
+      const batch: string[] = [];
+      for (const id of this.pagesToUpsert) {
+        batch.push(id);
+        if (batch.length >= this.pacing.maxPagesPerDrain) {
+          break;
+        }
+      }
 
       // Remove before processing: a save landing mid-drain re-enqueues the id and gets a fresh
       // run, whereas removing afterwards would swallow that save's changes.

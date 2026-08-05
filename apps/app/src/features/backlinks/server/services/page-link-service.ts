@@ -8,6 +8,7 @@ import loggerFactory from '~/utils/logger';
 import type { IBacklink } from '../../interfaces/backlink';
 import { findBacklinks } from './find-backlinks';
 import { PageLinkUpsertQueue } from './page-link-upsert-queue';
+import { resolveUpsertQueuePacing } from './upsert-queue-pacing';
 
 const logger = loggerFactory('growi:features:backlinks:page-link-service');
 
@@ -30,14 +31,14 @@ export class PageLinkService {
     // budget is env-only, so reading it once here is enough.
     this.upsertQueue = new PageLinkUpsertQueue(
       () => this.crowi.configManager.getConfig('app:siteUrl'),
-      {
+      resolveUpsertQueuePacing({
         drainIntervalMs: crowi.configManager.getConfig(
           'backlinks:drainIntervalMs',
         ),
         maxPagesPerDrain: crowi.configManager.getConfig(
           'backlinks:maxPagesPerDrain',
         ),
-      },
+      }),
     );
   }
 
