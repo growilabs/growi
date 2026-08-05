@@ -270,6 +270,10 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     the reconcile op and the delete-family handlers — deferred to **B5.2**/**B5.3**.
   - Best-effort/in-memory by design: a restart drops pending work (self-heals on next edit/backfill);
     the set is per-instance in multi-container deployments (safe because upserts are idempotent).
+  - **Accepted limitation (review of B2.2):** an upsert that never settles leaves the drain flag set,
+    and the instance then stops indexing until it restarts. Not guarded with a timeout, because a
+    timeout cannot cancel the abandoned run — it would race it, and a resurrected stale run would
+    overwrite a newer link set. Same repair path as any dropped work: the page's next save, or B3.
   - **Why (MongoDB impact):** every save runs `PageLink.replaceOutboundLinks`, a single `bulkWrite`
     that upserts one row per extracted link and issues a `deleteMany` for links no longer present —
     each component write maintaining every `pagelinks` index. This story also cut those from four to

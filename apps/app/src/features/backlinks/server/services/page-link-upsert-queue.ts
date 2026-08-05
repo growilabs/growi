@@ -56,6 +56,12 @@ export class PageLinkUpsertQueue {
   }
 
   private scheduleDrain(): void {
+    // Known limitation: a drain that never settles leaves `draining` true, and this guard then
+    // early-returns forever — the process stops indexing while `enqueue` keeps filling the set.
+    // Accepted rather than guarded with a timeout, because a timeout cannot cancel the abandoned
+    // run: it would only race it, and a resurrected stale run would overwrite a newer link set
+    // (the upsert is last-writer-wins). Recovery is a restart, after which each page's rows are
+    // repaired by its next save or by the backfill (B3).
     if (this.drainTimer != null || this.draining) return;
     this.drainTimer = setTimeout(() => {
       this.drain().catch((err) =>
