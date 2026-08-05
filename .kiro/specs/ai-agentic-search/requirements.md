@@ -68,8 +68,12 @@ GROWI のユーザーは「自然言語で問いを投げて根拠つきの回�
 **Objective:** GROWI ユーザーとして、自分が閲覧できる wiki コンテンツに関する自然言語の質問を投げ、根拠を踏まえた Markdown 回答を得たい。なぜなら、キーワード一致のリストではなく要点をまとめた回答を素早く受け取りたいから。
 
 #### Acceptance Criteria
-
-agent は、ユーザーの自然言語の質問に対して「全文検索 tool で候補ページを取得 → 回答の根拠に本文が必要なら本文取得 tool を呼ぶ → 情報が不足していれば別クエリで再検索または別ページを取得」を自律的に繰り返し、十分と判断した時点で収集した情報を要約して 1 つの回答メッセージにまとめる。この反復ループは「想定ユーザープロンプトの代表類型」に挙げた直接知識質問・手順抽出・存在確認・比較・曖昧クエリの段階的洗練のいずれに対しても試みられる。回答本体は、ユーザーが明示的にコード出力を求めた場合を除き JSON やコードフェンスで包まない。
+1. When ユーザーが wiki コンテンツに関する自然言語の質問を入力したとき、the GROWI Agent shall 既存の全文検索 tool を呼び出して関連ページ候補を取得すること。
+2. When 全文検索 tool が候補を返したとき、the GROWI Agent shall 回答の根拠として本文が必要かを判断し、必要な場合は本文取得 tool を呼び出して本文を取得すること。
+3. When 取得した情報で回答に不足があると判断したとき、the GROWI Agent shall 別のクエリで全文検索 tool を再度呼び出すこと、または別ページに対して本文取得 tool を呼び出すこと。
+4. The GROWI Agent shall 「想定ユーザープロンプトの代表類型」に列挙された直接知識質問・手順抽出・存在確認・比較・曖昧クエリの段階的洗練の各類型に対して、上記の反復ループを通じて回答を試みること。
+5. When 反復が完了したと agent が判断したとき、the GROWI Agent shall 収集した情報を要約・整形して 1 つの回答メッセージとして返すこと。
+6. The GROWI Agent shall ユーザーが明示的にコード出力を依頼した場合を除き、回答本体を JSON やコードフェンスで包まずに返すこと。
 
 **自動テストで検証できない残存ギャップ**: 反復ループが実際に「良い」回答（関連性・要約の質）を生成するかどうかは LLM の判断に依存し、自動テストでは検証できない。手動確認、または将来の回答品質評価基盤（本 spec のスコープ外）に委ねる。
 
@@ -77,35 +81,45 @@ agent は、ユーザーの自然言語の質問に対して「全文検索 tool
 **Objective:** GROWI Agent として、検索ヒットしたページの本文を引用根拠として参照したい。なぜなら、ハイライト断片だけでは要点を抽出して引用つきの回答を組み立てられないから。
 
 #### Acceptance Criteria
-
-`getPageContentTool` は `pageId` または `pagePath`（少なくとも一方が必須。両方欠如は `missing_input`）を受け取り、既存の grant 考慮済みページ取得経路（`Page.findByIdAndViewer` / `findByPathAndViewer`）経由でのみ内容を取得する。存在しないページと閲覧権限がないページは区別せず、共通の `not_found_or_forbidden` を返す。
-
-応答内容は `offset` の有無で切り替わる。**省略時**（初回読み出し）は見出し一覧である `outline`（行番号・level・見出しテキスト）を返し、長いページ（`totalLines > limit`）では本文（`content`）を返さない。ページ全体が 1 回の呼び出しで収まる小さいページに限り `outline` と `content` の両方を返す。**指定時**（2 回目以降のドリルダウン）は、その行から始まる範囲のみを `content`（1-indexed、`limit` デフォルト 200・最大 500）として返し、`outline` は返さない。`content` は元の Markdown 本文を改変しない slice である。`offset` が `totalLines` を超える場合はエラーにせず `result: 'ok'` + 空の `content` + `hasMore: false` を返す。
-
-成功応答には常に `path` と `totalLines` を含み、`content` を返す場合は `offset` / `limit` / `hasMore`（sanitize 後の echo 値）も含める。ページ閲覧権限の判定ロジックは自前実装せず、既存の grant 考慮済みページ取得経路の結果にすべて従う。
+1. When agent が pageId を指定して本文取得 tool を呼び出したとき、the Page Content Tool shall 既存の grant 考慮済みページ取得経路を介して該当ページの内容を返すこと。返す内容は呼び出し方に依存し、`offset` 指定時はその行範囲の本文、`offset` 省略時（初回読み出し）は本文ナビゲーション用の `outline`（長いページの場合）または `outline` + 本文（小さいページの場合）とする（詳細は AC 2.8 / 2.9）。
+2. When agent が pagePath を指定して本文取得 tool を呼び出したとき、the Page Content Tool shall 既存の grant 考慮済みページ取得経路を介して該当ページの内容を返すこと（返す内容の切り替えは AC 2.1 と同じく `offset` の有無に従う。詳細は AC 2.8 / 2.9）。
+3. If pageId と pagePath のいずれも与えられずに本文取得 tool が呼び出された場合、the Page Content Tool shall 入力エラーを示す結果を返すこと（成功・取得失敗と区別可能な形式で）。
+4. If 指定されたページが存在しない、または呼び出しユーザーに閲覧権限がない場合、the Page Content Tool shall 取得失敗を表す共通の戻り値を返すこと（成功時と区別可能な形式で）。
+5. The Page Content Tool shall 要求された行範囲のページ Markdown 本文を、改変を加えない slice として返すこと（文字レベルの変換は行わない）。これは長いページが LLM のコンテキストを 1 度の呼び出しで消費し尽くさないようにするためである。
+6. The Page Content Tool shall 応答に少なくとも該当ページのパスを含めること（agent が回答に引用元として利用できるよう）。
+7. The Page Content Tool shall ページ閲覧権限の判定ロジックを自前で実装せず、既存の grant 考慮済みページ取得経路の結果に従うこと。
+8. When 呼び出し側が `offset` を指定した場合（= 2 回目以降のドリルダウン読み出しを示す）、the Page Content Tool shall 指定行から始まる行範囲のみを `content` として返すこと（1-indexed、`limit` のデフォルト 200 行、最大 500 行）。このとき `outline` は返さないこと（content mode）。
+9. When 呼び出し側が `offset` を省略した場合（= 対象ページへの初回読み出しを示す）、the Page Content Tool shall `outline` フィールドを返すこと。`outline` は CommonMark 準拠の Markdown パーサーが認識する各 heading (ATX 形式 `# ...` および Setext 形式 `===` / `---`) の行番号・level（1-6）・heading text を列挙し、agent が後続の呼び出しで `offset` 指定により該当セクションにジャンプできるようにする。`heading` text は Markdown 装飾を除去したプレーンテキストとする。長いページ（`totalLines > limit`）の場合、the Page Content Tool shall `content` フィールドを返さず `outline` のみを返すこと（1 度の呼び出しで LLM のコンテキストを消費し尽くさないため）。ページ全体が 1 ページに収まる場合（`totalLines <= limit`、小ページ最適化）に限り、the Page Content Tool shall `outline` に加えて `content` フィールドも返し、agent が追加の呼び出しなしに回答できるようにすること。
+10. The Page Content Tool shall 成功応答に常に `totalLines` を含めること。`content` を返す場合（content mode、または小ページ最適化による初回応答）には、加えて `offset`（sanitize 後の echo 値）、`limit`（同じく echo 値）、および `hasMore`（boolean: `(offset - 1) + 返却行数 < totalLines`）を含めること。これにより agent が以降の追加読み出しの要否を判断できる。`outline` のみを返す応答（長いページの初回読み出し）では `content` / `offset` / `limit` / `hasMore` を省略すること。
+11. If content mode（`offset` 指定）において `offset` が `totalLines` を超える場合、the Page Content Tool shall `result: 'ok'` を返し、`content: ''` および `hasMore: false` をセットすること（エラーとして扱わず、agent が通常フローで終端を検知できるようにする）。
 
 ### Requirement 3: ユーザー識別情報の tool への伝搬
 **Objective:** GROWI 運用者として、本機能が呼び出しユーザーの閲覧権限を漏れなく反映していることを保証したい。なぜなら、権限のないユーザーに非公開ページの内容が露出することは絶対に許されないから。
 
 #### Acceptance Criteria
-
-Post-Message Handler は、既存の認証・ログイン必須チェックを通過したリクエストに限り、そのユーザーの識別情報を tool 実行コンテキストに付与する。`getPageContentTool` はこの識別情報を使って本文取得を行い、識別情報が取得できない場合はページ本文を返さず取得失敗の共通戻り値を返す。
+1. When 認証済みユーザーが本機能のメッセージ投稿エンドポイントにリクエストを送ったとき、the Post-Message Handler shall そのユーザーの識別情報を tool 実行コンテキストに付与すること。
+2. While 本機能の tool が実行されている間、the Page Content Tool shall 当該リクエストの呼び出しユーザーを判別可能な状態で本文取得を行うこと。
+3. If 呼び出しユーザーの識別情報が tool 実行コンテキストから取得できない場合、the Page Content Tool shall ページ本文を返さず、取得失敗を表す共通の戻り値を返すこと。
+4. The Post-Message Handler shall 既存の認証・ログイン必須チェックを通過したリクエストに対してのみ tool 実行コンテキストを構築すること。
 
 ### Requirement 4: 既存 OpenAI Files 検索 tool の暫定無効化
 **Objective:** 開発・動作確認担当者として、Agentic Search の挙動を検証する間、OpenAI Files ベースの旧 `fileSearchTool` が agent から呼ばれないようにしたい。なぜなら、新フローと旧フローが混在すると挙動の検証や原因切り分けが困難になるから。
 
 #### Acceptance Criteria
+1. While 本機能が有効な期間中、the GROWI Agent shall `fileSearchTool` を呼び出し可能な tool として保持しないこと。
+2. The ai-agentic-search feature shall `fileSearchTool` のソースコードをリポジトリから削除せず、登録のみをコメントアウトによって無効化すること。
+3. The GROWI Agent shall `fileSearchTool` を呼ばないことを除き、メモリ・スレッド管理および AI SDK によるストリーミング応答の現状挙動を変更しないこと。
 
-本機能が有効な間、GROWI Agent は `fileSearchTool` を呼び出し可能な tool として保持しない。無効化は `growiAgent.tools` への登録行をコメントアウトすることで行い、`fileSearchTool` 自体のソースコードは本 spec の範囲では削除しない（即時削除ではなくロールバックコストの低い無効化を選んだ理由は design.md 参照）。`fileSearchTool` を呼ばないこと以外、メモリ・スレッド管理および AI SDK によるストリーミング応答の既存挙動は変更しない。
-
-（本 spec 完了後、`fileSearchTool` は別の変更で完全に削除されており、本要件が求めていた「無効化に留め削除しない」という制約自体は現在は該当しない。）
+（本 spec 完了後、`fileSearchTool` は別の変更で完全に削除されており、AC 2 が求めていた「無効化に留め削除しない」という制約自体は現在は該当しない。）
 
 ### Requirement 5: 回答の出力フォーマット
 **Objective:** GROWI ユーザーとして、根拠と本文位置が分かる形で回答を読みたい。なぜなら、要約だけでなく一次情報のページにも辿り着いて自分で確認したいから。
 
 #### Acceptance Criteria
-
-GROWI Agent は回答本体を Markdown 形式・ユーザーの入力言語と同じ言語で返し、AI SDK 互換のストリーミング応答として逐次返す（一括待機はしない）。ページ本文を回答の根拠として参照した場合は、該当ページのパスまたはリンクを回答内に含めることが望ましい（`should`、必須ではない）。
+1. The GROWI Agent shall 回答本体を Markdown 形式で返すこと。
+2. The GROWI Agent shall ユーザーの入力言語と同じ言語で回答すること。
+3. When 回答の根拠としてページ本文を参照した場合、the GROWI Agent should 該当ページのパスまたはリンクを回答内に含めること。
+4. The GROWI Agent shall 回答を AI SDK 互換のストリーミング応答として逐次返すこと（応答完了まで一括待機させないこと）。
 
 **自動テストで検証できない残存ギャップ**: 回答に実際に引用パスが含まれるかどうかは LLM の判断に委ねられており、自動テストでは強制できない。
 
@@ -113,9 +127,12 @@ GROWI Agent は回答本体を Markdown 形式・ユーザーの入力言語と�
 **Objective:** GROWI Agent として、自然言語クエリを受けて wiki 内の候補ページを grant 反映済みで列挙したい。なぜなら、ユーザー入力から関連ページを発見できなければ本文取得や反復ループに進めず RAG が成立しないから。
 
 #### Acceptance Criteria
-
-`fullTextSearchTool` は自然言語クエリ文字列（`SearchService.parseQueryString` が解釈する演算子を含む）を受け取り、既存の全文検索経路を介して呼び出しユーザーの閲覧可能なヒット候補のみを返す。各ヒットには少なくとも `pagePath` を含み、`pageId` を含める場合は MongoDB ObjectId 文字列形式とする。`snippet`（ハイライト断片）を含めることが望ましいが、ページ本文（フル Markdown `body`）は返さない（本文取得は `getPageContentTool` の責務）。
-
-ページ閲覧権限の判定ロジックは自前実装せず、既存の grant 反映済み検索経路の結果にすべて従う。呼び出しユーザーの識別情報が取得できない場合、または既存検索経路が例外を発生させた場合は、いずれも例外を agent ループへ throw せず、取得失敗を表す戻り値に変換する（agent ループの継続を保証する）。
-
-agent が `SORT_AXIS`（`relationScore` / `createdAt` / `updatedAt`）および `SORT_ORDER`（`desc` / `asc`）から選んだ `sort` / `order` を指定した場合、tool はそれらを変換せずそのまま `SearchService.searchKeyword` の `searchOpts` に forward する（ユーザーが「最新」「古い」を明示的に求めた際に並び替えを指定できるようにするため）。
+1. When agent が自然言語クエリ文字列を指定して全文検索 tool を呼び出したとき、the Full-Text Search Tool shall 既存の全文検索経路を介して該当ユーザーの閲覧可能なヒット候補を返すこと。
+2. The Full-Text Search Tool shall 各ヒットに少なくとも `pagePath` を含めること（後続の本文取得 tool に直接渡せる形で）。
+3. The Full-Text Search Tool shall 各ヒットに `pageId` を併記する場合は MongoDB ObjectId 文字列形式で返すこと。
+4. The Full-Text Search Tool shall 各ヒットに `snippet`（ハイライト断片）を含めることを推奨する（agent が本文取得の要否を判断できるよう）。
+5. The Full-Text Search Tool shall ページ本文（フル Markdown `body`）を返さないこと（本文取得は `getPageContentTool` の責務）。
+6. If 呼び出しユーザーの識別情報が tool 実行コンテキストから取得できない場合、the Full-Text Search Tool shall 検索結果を返さず、取得失敗を表す共通の戻り値を返すこと。
+7. The Full-Text Search Tool shall ページ閲覧権限の判定ロジックを自前で実装せず、既存の grant 反映済み検索経路の結果に従うこと。
+8. If 既存検索経路から例外が発生した場合、the Full-Text Search Tool shall 例外を agent ループへ throw せず、エラー結果として戻り値に変換すること（agent ループ継続を保証）。
+9. When agent が `SORT_AXIS`（`relationScore` / `createdAt` / `updatedAt`）および `SORT_ORDER`（`desc` / `asc`）から選んだ `sort` / `order` 入力パラメータを指定したとき、the Full-Text Search Tool shall それらを変換せずそのまま既存 `SearchService.searchKeyword` の `searchOpts` に forward すること（ユーザーが「最新」「古い」を明示的に求めた際に agent が並び替えを指定できるようにするため）。

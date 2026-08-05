@@ -19,27 +19,51 @@ suggest-path は、AI クライアント(Claude 経由の MCP など)が GROWI �
 
 ## Requirements
 
-### Requirement 1: パス提案 API のレスポンス契約
+### Requirement 1: 複数回検索による agentic search
+
+#### Acceptance Criteria
+1. When 保存対象の文書本文を受け取ったとき, the agentic search エンジン shall 文書内容に基づいて wiki 内を検索し、検索結果を元文書と照らして保存先候補としての妥当性を判断すること。
+2. If 検索結果が保存先候補として不十分または不適切と判断されたとき, then the agentic search エンジン shall 検索語・検索条件を変えて再検索すること。
+3. When 候補の妥当性判断に候補ページの内容確認が必要なとき, the agentic search エンジン shall 候補ページの本文を参照して判断に反映できること。
+4. When 探索が完了したとき, the agentic search エンジン shall 収集した候補に基づいて保存先パスの提案を生成すること。
+5. The agentic search エンジン shall 検索・本文参照・子ページ一覧参照の対象をリクエストユーザーの閲覧権限の範囲内に限定すること。
+
+候補親の兄弟構成を確認する子ページ一覧参照(listChildren tool)は第三の探索手段であり、AC 5 の権限限定はこの手段にも適用される(`pageListingService` の権限フィルタに委譲)。
+
+### Requirement 2: フロー/ストック判定による探索誘導
+
+#### Acceptance Criteria
+1. When 保存対象の文書本文を受け取ったとき, the agentic search エンジン shall 文書がフロー情報(時限的・時系列的な情報)かストック情報(蓄積・参照される情報)かを判定すること。
+2. While 探索を実行している間, the agentic search エンジン shall フロー/ストック判定の結果を検索の誘導(候補の妥当性判断および再検索の方向付け)に反映すること。
+3. The suggest-path API shall 判定した informationType を該当する提案のレスポンスに含めること。
+4. The agentic search エンジン shall フロー/ストック判定の結果および探索過程(実行した検索、再検索の判断)を、検証およびデバッグ時に確認可能な形で記録すること。
+
+### Requirement 3: 探索の上限による制御
+
+#### Acceptance Criteria
+1. The agentic search エンジン shall 1 リクエストあたりの検索回数に上限を設けること。
+2. When 検索回数が上限に達したとき, the agentic search エンジン shall その時点までに収集した情報に基づいて提案を生成して返すこと。
+3. Where 運用者が検索回数上限を設定で変更したとき, the agentic search エンジン shall 変更後の上限値に従って動作すること。
+4. Where 運用者が agentic search エンジンの使用する AI モデルを設定で変更したとき, the agentic search エンジン shall 変更後のモデルで動作すること。
+5. Where 運用者が agentic search エンジンの推論強度を設定で変更したとき, the agentic search エンジン shall 変更後の推論強度で動作すること。
+6. When 推論強度が設定で指定されていないとき, the agentic search エンジン shall 推論強度を変更しない既定の動作で提案を生成すること。
+
+検索回数上限(AC 1〜3)とは独立に、listChildren tool の呼び出し上限(`aiTools:suggestPathAgenticChildListingLimit`、既定 5)が第二の budget として存在する。AC 4(モデル)は suggest-path 専用キーではなくアプリ全体設定 `ai:provider` / `ai:model` で決まり、AC 5(推論強度)は provider 汎用の `ai:providerOptions:suggestPathAgent`(provider 名前空間付き Record を catalog 宣言 options に deep merge)で決まる。いずれも AI 設定保存時の cache clear により再起動なしで反映される。
+
+*残存ギャップ*: 推論強度の値の妥当性(対応モデル・許容値)はプロバイダ側の実行時エラーに委ねており、事前検証はしていない。未対応の組み合わせはエンジン失敗として memo フォールバックが受け止める(Requirement 4)。
+
+### Requirement 4: API 契約の後方互換
+
+#### Acceptance Criteria
+1. The suggest-path API shall 既存のエンドポイント、リクエスト形式(`body` フィールド)、および認証・認可要件を維持すること。
+2. The suggest-path API shall レスポンスの各提案に `type` / `path` / `label` / `description` / `grant` を含め、`path` は末尾スラッシュ付きの親ディレクトリパスであること。
+3. The suggest-path API shall エンジンの選択にかかわらず memo 提案を常にレスポンスに含めること。
+4. The suggest-path API shall 各提案の `grant` に親ページの grant 値(子ページに設定可能な権限の上限制約)を含めること。
+5. If agentic search エンジンの実行が失敗した、または規定の時間内に完了しなかった(タイムアウトした)とき, then the suggest-path API shall memo 提案のみのレスポンスを返すこと(5xx にしない)。
+
+### Requirement 5: パス提案 API のレスポンス契約
 
 **Summary**: `POST /_api/v3/ai-tools/suggest-path` は `{ body: string }` を受け取り、`{ suggestions: PathSuggestion[] }` を返す。各提案は `type`(`memo` | `search`)・`path`(末尾スラッシュ付き親ディレクトリパス)・`label`・`description`・`grant`(親ページの grant 値。子ページに設定可能な権限の上限制約)を含み、`type: 'search'` の提案はさらに `informationType`(`flow` | `stock`)を含む。`memo` 提案は常にレスポンス先頭に含まれる保証されたフォールバックで、パスは `/user/{username}/memo/`(ユーザーページ有効時)または `/memo/{username}/`、grant は固定 4。エンドポイントは `/_api/v3/page/` とは独立した `ai-tools` 名前空間に置かれ、個別にアクセス制御できる。
-
-### Requirement 2: 複数回検索による agentic search
-
-**Summary**: 一度の検索で妥当な候補が得られない場合、検索結果を元文書と照らして妥当性を判断し、語彙・条件を変えて再検索する。判断に必要なら候補ページの本文も参照する。検索・本文参照・子ページ一覧参照は、いずれもリクエストユーザーの閲覧権限内に限定される(既存の `SearchService` / `Page` モデルの権限フィルタへの委譲による)。
-
-### Requirement 3: フロー/ストック判定による探索誘導
-
-**Summary**: 保存対象の文書がフロー情報(時限的・時系列)かストック情報(蓄積・参照)かを判定し、判定結果を探索の誘導(優先して探す場所・候補の妥当性判断)に反映する。判定結果はレスポンスの `informationType` に含まれ、探索過程(実行した検索・判断根拠)は検証・デバッグ用に記録される。
-
-### Requirement 4: 探索の上限による制御
-
-**Summary**: 1 リクエストあたりの検索回数・子ページ一覧参照回数に上限を設け、上限到達時はその時点までの情報で提案を確定する。上限値・使用モデル・推論強度(reasoning effort)は運用設定で変更可能で、変更は再起動なしに反映される。推論強度未指定時は既定動作(モデルカタログ宣言値のみ)を変えない。
-
-*残存ギャップ*: 推論強度の値の妥当性(対応モデル・許容値)はプロバイダ側の実行時エラーに委ねており、事前検証はしていない。未対応の組み合わせはエンジン失敗として memo フォールバックが受け止める(Requirement 5)。
-
-### Requirement 5: API 契約の後方互換
-
-**Summary**: エンドポイント・リクエスト形式・認証要件はエンジンの変更に関わらず維持される。エンジン実行が失敗またはタイムアウトした場合は memo 提案のみの 200 レスポンスを返す(5xx にしない)。
 
 ### Requirement 6: エンジンの可用性フォールバック
 
