@@ -7,7 +7,7 @@
 > carries the walking skeleton; B2–B5 graft onto it.
 >
 > **Where a capability was split across stories**, the task notes call it out explicitly:
-> `resolveToPage`, the sync ops, the lifecycle handlers, the read queries, `BacklinkListItem`,
+> `resolveToPageIds`, the sync ops, the lifecycle handlers, the read queries, `BacklinkListItem`,
 > `BacklinksPanel`, and the event subscription each get their B1 half here and their B4/B5 half in
 > the later story.
 >
@@ -31,14 +31,17 @@ extraction and resolution for all of them as one unit; there is no separable "na
 "wiki-links later" stage. Lifecycle coverage is **create/update only**.
 
 - [x] B1.1 Define backlinks interfaces and shared types
-  - Define the `IPageLink` edge shape (`fromPage`, `toPath`, `toPage`), the two client DTOs —
-    `IBacklink` (page id + path; incoming backlinks, always healthy) and `ILinkTarget` (page id +
-    path + required target state; outgoing link health) — and the `LinkTargetState` union
-    (`normal` / `trashed` / `broken`)
-  - Define `ILinkTarget` and the full union now even though outgoing health (`trashed`/`broken`)
-    isn't produced until B5 — declaring them up front is harmless and avoids a later type change
+  - Define the `IPageLink` edge shape (`fromPage`, `toPath`, `toPage`) and the incoming-backlinks DTO
+    `IBacklink` (page id + path; always healthy)
+  - **B1 scope: the outgoing-health types are deferred to B5.** `ILinkTarget` (page id + path +
+    required target state) and the `LinkTargetState` union (`normal` / `trashed` / `broken`) are
+    declared by the tasks that first produce them — the union in **B5.1** (with its derivation helper)
+    and the DTO in **B5.4** (with the forward-health read). The design's DTO section (§ Data Models)
+    remains the target shape. _Revised from the original plan, which declared both up front in B1.1;
+    B1 shipped without them, and introducing a type in the story that produces it keeps the type and
+    its only producer in one reviewable change._
   - Done when the types compile and are importable by both server and client code
-  - _Requirements: 1.8, 6.4_
+  - _Requirements: 1.8_
 
 - [x] B1.2 Implement the PageLink model with indexes and the B1 statics
   - Create the Mongoose model following the `PageTagRelation` precedent (`getOrCreateModel`)
@@ -71,7 +74,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
     kept as its path, a different-host URL and a (site-URL-unset) absolute URL both excluded, and a
     permalink returned verbatim; the deduped result excludes the page's own-path self-link
   - _Requirements: 1.2, 1.3, 1.4, 1.5, 1.6, 1.9, 1.10, 1.11_
-  - _Boundary: extractInternalLinks_
+  - _Boundary: extractInternalLinkPaths_
   - _Depends: B1.1 (independent of B1.2)_
 
 - [x] B1.4 Implement target-page resolution — direct path + permalink only
@@ -84,7 +87,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - Done when unit tests cover a direct path hit, a permalink resolving by id, and both null cases
     (no page at path; no page with that id)
   - _Requirements: 1.9_
-  - _Boundary: resolveToPage_
+  - _Boundary: resolveToPageIds_
   - _Depends: B1.1 (independent of B1.2, B1.3)_
 
 - [x] B1.5 Implement the index synchronization operations — replace-outbound + self-drop only
@@ -131,7 +134,7 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - Done when the endpoint returns backlinks for a readable page and 400/403 for invalid id /
     no-access, delegating filtering to the service
   - _Requirements: 1.1, 2.1, 6.4_
-  - _Boundary: get-page-backlinks route_
+  - _Boundary: getBacklinksHandlerFactory (routes/backlinks.ts)_
   - _Depends: B1.7_
 
 - [x] B1.9 Add the client data hook
@@ -368,7 +371,7 @@ redirect-following keeps links resolvable when the source is re-saved after the 
 the redirect-following half of resolution plus the re-resolve-by-path repointing. Independent of
 B3/B5.
 
-- [ ] B4.1 Add redirect-chain following to resolveToPage
+- [ ] B4.1 Add redirect-chain following to resolveToPageIds
   - Extend the resolver with the redirect step deferred from B1.4: when direct path lookup misses,
     follow the redirect chain to its endpoint and resolve there; handle multi-hop renames (A→B→C) via
     the redirect endpoint lookup; null when neither a page nor a redirect resolves (the broken case).
@@ -376,7 +379,7 @@ B3/B5.
   - Done when unit tests cover single and double redirect chains resolving to the endpoint, and the
     unresolved (null) case
   - _Requirements: 1.9, 5.1, 5.2, 5.3, 5.4_
-  - _Boundary: resolveToPage_
+  - _Boundary: resolveToPageIds_
   - _Depends: B1.4_
 
 - [ ] B4.2 Implement the re-resolve-by-path sync operation
@@ -417,9 +420,11 @@ the restored page's status. Independent of B3/B4.
   - Implement the reconcile-deleted static on the model (signature declared in B1.2) and the
     `LinkTargetState` derivation helper (`toPage == null` → `broken`; target trashed → `trashed`; else
     `normal`) — state is derived, never stored
+  - **Declare the `LinkTargetState` union here** (deferred from B1.1) in `interfaces/backlink.ts`, in the
+    shape the design's § Data Models DTO section specifies
   - Done when unit tests cover the three derived states from `toPage`/target status
   - _Requirements: 6.1, 6.2, 6.3_
-  - _Boundary: PageLink, page-link-sync_
+  - _Boundary: PageLink, page-link-sync, interfaces/backlink.ts_
   - _Depends: B1.2_
 
 - [ ] B5.2 Implement the reconcile-deleted sync operation
@@ -451,13 +456,15 @@ the restored page's status. Independent of B3/B4.
   - _Depends: B5.2, B1.6_
 
 - [ ] B5.4 Implement the forward-link-health read query
+  - **Declare the `ILinkTarget` DTO here** (deferred from B1.1) in `interfaces/backlink.ts`, in the shape
+    the design's § Data Models DTO section specifies — `targetState` required
   - Implement `findForwardLinkHealth` (a page's outbound rows whose derived target state is
     trashed/broken, mapped to `ILinkTarget`); derive target state from `toPage`/target status rather
     than a stored flag
   - Done when an integration test shows forward health reports trashed/broken targets with the correct
     state
   - _Requirements: 5.3, 6.1, 6.2, 6.3, 6.4_
-  - _Boundary: PageLinkService_
+  - _Boundary: PageLinkService, interfaces/backlink.ts_
   - _Depends: B5.1, B1.7_
 
 - [ ] B5.5 Add the target-state badge to the list-item
