@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 
-import { resolveToPages } from './target-page-resolution';
+import { resolveToPageIds } from './target-page-resolution';
 
 const mocks = vi.hoisted(() => ({
   find: vi.fn(),
@@ -29,7 +29,7 @@ const mockFind = (opts: { byId?: unknown[]; byPath?: unknown[] } = {}) => {
   });
 };
 
-describe('resolveToPages()', () => {
+describe('resolveToPageIds()', () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
@@ -38,7 +38,7 @@ describe('resolveToPages()', () => {
     const id = new Types.ObjectId();
     mockFind({ byPath: [{ _id: id, path: '/docs/v2' }] });
 
-    const result = await resolveToPages(['/docs/v2']);
+    const result = await resolveToPageIds(['/docs/v2']);
 
     expect(result.get('/docs/v2')).toBe(id);
     expect(result.size).toBe(1);
@@ -48,7 +48,7 @@ describe('resolveToPages()', () => {
     const id = new Types.ObjectId();
     mockFind({ byId: [{ _id: id }] });
 
-    const result = await resolveToPages([`/${id.toString()}`]);
+    const result = await resolveToPageIds([`/${id.toString()}`]);
 
     expect(result.get(`/${id.toString()}`)).toBe(id);
     expect(result.size).toBe(1);
@@ -62,7 +62,7 @@ describe('resolveToPages()', () => {
       byPath: [{ _id: pathId, path: '/docs/v2' }],
     });
 
-    const result = await resolveToPages([
+    const result = await resolveToPageIds([
       `/${permalinkId.toString()}`,
       '/docs/v2',
     ]);
@@ -75,7 +75,7 @@ describe('resolveToPages()', () => {
   it('omits inputs with no matching page', async () => {
     mockFind();
 
-    const result = await resolveToPages(['/docs/v2']);
+    const result = await resolveToPageIds(['/docs/v2']);
 
     expect(result.size).toBe(0);
   });
@@ -83,7 +83,7 @@ describe('resolveToPages()', () => {
   it('runs no query for an empty input', async () => {
     mockFind();
 
-    const result = await resolveToPages([]);
+    const result = await resolveToPageIds([]);
 
     expect(result.size).toBe(0);
     expect(mocks.find).not.toHaveBeenCalled();

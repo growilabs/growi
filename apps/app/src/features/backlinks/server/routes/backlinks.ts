@@ -1,4 +1,5 @@
 import { SCOPE } from '@growi/core';
+import { ErrorV3 } from '@growi/core/dist/models';
 import type { RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { query } from 'express-validator';
@@ -21,7 +22,10 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
     // Guard needed for TypeScript type narrowing.
     // pageId is already validated and is always a string here.
     if (typeof pageId !== 'string') {
-      return res.apiv3Err('pageId must be a string', 400);
+      return res.apiv3Err(
+        new ErrorV3('pageId must be a string', 'invalid-page-id'),
+        400,
+      );
     }
     try {
       const backlinks = await crowi.pageLinkService.findBacklinks(
@@ -30,12 +34,59 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
       );
       return res.apiv3({ backlinks });
     } catch (err) {
-      logger.error('Failed to get backlinks', err);
-      res.apiv3Err(err, 500);
+      logger.error({ err }, 'Failed to get backlinks');
+      // Deliberately not forwarding `err`: apiv3Err serializes an Error's own
+      // message to the client, which would leak driver/internal detail.
+      return res.apiv3Err(
+        new ErrorV3('Failed to get backlinks', 'failed-to-get-backlinks'),
+        500,
+      );
     }
   };
 };
 
+/**
+ * @swagger
+ *
+ *    /page/backlinks:
+ *      get:
+ *        tags: [Page]
+ *        summary: /page/backlinks
+ *        description: >
+ *          Get the pages that link to the given page. Sources the requesting user
+ *          cannot read, and sources in the trash, are omitted.
+ *        parameters:
+ *          - name: pageId
+ *            in: query
+ *            required: true
+ *            description: id of the page to list backlinks for
+ *            schema:
+ *              $ref: '#/components/schemas/ObjectId'
+ *        responses:
+ *          200:
+ *            description: Successfully retrieved the backlinks.
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *                  properties:
+ *                    backlinks:
+ *                      type: array
+ *                      description: Readable, non-trashed pages linking to this page
+ *                      items:
+ *                        type: object
+ *                        properties:
+ *                          pageId:
+ *                            $ref: '#/components/schemas/ObjectId'
+ *                          path:
+ *                            type: string
+ *                            description: current path of the linking page
+ *                            example: /Sandbox/source
+ *          400:
+ *            description: pageId is missing or is not a MongoDB ID.
+ *          500:
+ *            description: Internal server error.
+ */
 export const getBacklinksHandlerFactory = (crowi: Crowi): RequestHandler[] => {
   const loginRequired = loginRequiredFactory(crowi, true);
 

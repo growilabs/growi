@@ -210,5 +210,22 @@ describe('GET /page/backlinks', () => {
       expect(res.status).toBe(500);
       expect(res.body).toHaveProperty('errors');
     });
+
+    // apiv3Err turns a raw Error into ErrorV3(err.message), and `message` is an
+    // enumerable own property — so forwarding the caught error would put driver
+    // and query internals in the response body.
+    it('does not leak the internal error message to the client', async () => {
+      findBacklinks.mockRejectedValue(
+        new Error('E11000 duplicate key error collection: growi.pagelinks'),
+      );
+
+      const res = await get(buildApp(), { pageId: validPageId });
+
+      expect(JSON.stringify(res.body)).not.toContain('E11000');
+      expect(res.body.errors[0]).toMatchObject({
+        message: 'Failed to get backlinks',
+        code: 'failed-to-get-backlinks',
+      });
+    });
   });
 });

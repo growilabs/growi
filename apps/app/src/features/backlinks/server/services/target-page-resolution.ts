@@ -16,7 +16,7 @@ import type { PageDocument, PageModel } from '~/server/models/page';
  * @returns - Map from the original input string to its resolved page ID.
  *            Inputs with no matching page are absent from the map.
  */
-export const resolveToPages = async (
+export const resolveToPageIds = async (
   paths: string[],
 ): Promise<Map<string, Types.ObjectId>> => {
   const Page = mongoose.model<PageDocument, PageModel>('Page');
