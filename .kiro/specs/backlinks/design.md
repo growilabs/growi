@@ -755,6 +755,13 @@ interface ILinkTarget {
 No migration: `PageLink` indexes are created by Mongoose `autoIndex` at model registration (new,
 empty collection). The only bulk step is the online throttled backfill job after boot.
 
+> **`autoIndex` creates, it never drops.** Removing an index from the schema (as B2.2 did for the
+> redundant `{fromPage}` and `{toPath}`) leaves `fromPage_1` / `toPath_1` in place on any collection
+> that was already created with them — so a dev or staging instance that ran an earlier build keeps
+> paying their write cost until the collection is dropped. Harmless while the feature is unreleased,
+> which is why no migration ships here; **once `PageLink` has shipped, an index removal needs a
+> migrate-mongo migration with an explicit `dropIndex`**, not just a schema edit.
+
 ```mermaid
 graph TB
     Boot[boot: model registration] --> Idx[autoIndex creates PageLink indexes]
