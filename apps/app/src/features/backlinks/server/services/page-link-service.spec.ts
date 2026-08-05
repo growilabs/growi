@@ -7,10 +7,6 @@ import type PageEvent from '~/server/events/page';
 import type { PageDocument } from '~/server/models/page';
 
 import { PageLinkService } from './page-link-service';
-import {
-  DRAIN_INTERVAL_MS,
-  MAX_PAGES_PER_DRAIN,
-} from './page-link-upsert-queue';
 
 // handlePageUpsertById has its own coverage (page-link-service-handlers.integ.ts); mock it so this
 // test isolates the queue contract — which pages are extracted, how often, and how many per tick.
@@ -38,6 +34,17 @@ vi.mock('~/utils/logger', () => ({
 describe('PageLinkService (live extraction queue)', () => {
   const siteUrl = 'https://wiki.example';
 
+  // Deliberately not the shipped defaults (1000 / 3): the assertions below only hold if the
+  // queue paces on the configured values rather than on constants of its own.
+  const DRAIN_INTERVAL_MS = 500;
+  const MAX_PAGES_PER_DRAIN = 2;
+
+  const configValues: Record<string, string | number> = {
+    'app:siteUrl': siteUrl,
+    'backlinks:drainIntervalMs': DRAIN_INTERVAL_MS,
+    'backlinks:maxPagesPerDrain': MAX_PAGES_PER_DRAIN,
+  };
+
   let pageEvent: EventEmitter;
 
   beforeEach(() => {
@@ -49,7 +56,13 @@ describe('PageLinkService (live extraction queue)', () => {
     pageEvent = new EventEmitter();
     const crowi = mock<Crowi>({
       events: { page: pageEvent as unknown as PageEvent },
-      configManager: { getConfig: vi.fn().mockReturnValue(siteUrl) },
+      configManager: {
+        // mockImplementation rather than vi.fn(impl): getConfig is generic over the config key,
+        // and a concrete implementation signature is not assignable to it.
+        getConfig: vi
+          .fn()
+          .mockImplementation((key: string) => configValues[key]),
+      },
     });
     PageLinkService.create(crowi);
   });

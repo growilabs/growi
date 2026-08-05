@@ -32,7 +32,15 @@ describe('PageLinkService.findBacklinks (integration)', () => {
   let viewerGroupId: Types.ObjectId;
   let foreignGroupId: Types.ObjectId;
 
-  const service = () => new PageLinkService(mock<Crowi>());
+  // findBacklinks needs nothing from crowi, but the constructor reads the upsert queue's pacing
+  // budget from config. The value is irrelevant here: this instance never subscribes to page
+  // events (no .create()), so nothing is ever enqueued.
+  const service = () =>
+    new PageLinkService(
+      mock<Crowi>({
+        configManager: { getConfig: vi.fn().mockReturnValue(1000) },
+      }),
+    );
 
   // --- seeding helpers ---------------------------------------------------
 

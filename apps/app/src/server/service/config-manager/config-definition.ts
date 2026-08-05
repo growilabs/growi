@@ -379,6 +379,10 @@ export const CONFIG_KEYS = [
 
   // Access Token Settings
   'accessToken:deletionCronExpression',
+
+  // Backlinks Settings
+  'backlinks:drainIntervalMs',
+  'backlinks:maxPagesPerDrain',
 ] as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
@@ -1590,6 +1594,16 @@ export const CONFIG_DEFINITIONS = {
   'accessToken:deletionCronExpression': defineConfig<string>({
     envVarName: 'ACCESS_TOKEN_DELETION_CRON_EXPRESSION',
     defaultValue: '0 15 * * *',
+  }),
+
+  // Backlinks Settings
+  'backlinks:drainIntervalMs': defineConfig<number>({
+    envVarName: 'BACKLINKS_DRAIN_INTERVAL_MS',
+    defaultValue: 1000,
+  }),
+  'backlinks:maxPagesPerDrain': defineConfig<number>({
+    envVarName: 'BACKLINKS_MAX_PAGES_PER_DRAIN',
+    defaultValue: 3,
   }),
 } as const;
 

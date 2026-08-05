@@ -25,10 +25,19 @@ export class PageLinkService {
 
   constructor(crowi: Crowi) {
     this.crowi = crowi;
-    // Read per drain rather than captured now: the service is constructed during
-    // boot, before admins can change the site URL at runtime.
-    this.upsertQueue = new PageLinkUpsertQueue(() =>
-      this.crowi.configManager.getConfig('app:siteUrl'),
+    // The site URL is read per drain rather than captured now: the service is
+    // constructed during boot, before admins can change it at runtime. The pacing
+    // budget is env-only, so reading it once here is enough.
+    this.upsertQueue = new PageLinkUpsertQueue(
+      () => this.crowi.configManager.getConfig('app:siteUrl'),
+      {
+        drainIntervalMs: crowi.configManager.getConfig(
+          'backlinks:drainIntervalMs',
+        ),
+        maxPagesPerDrain: crowi.configManager.getConfig(
+          'backlinks:maxPagesPerDrain',
+        ),
+      },
     );
   }
 
@@ -47,7 +56,8 @@ export class PageLinkService {
   private onUpsert(page: PageDocument): void {
     try {
       if (page._id == null) {
-        throw new Error('Page ID is undefined');
+        logger.error('Page ID is undefined');
+        return;
       }
 
       this.upsertQueue.enqueue(page._id.toString());
