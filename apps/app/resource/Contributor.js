@@ -164,6 +164,7 @@ const contributors = [
             position: 'GMO Cybersecurity by Ierae, Inc.',
             name: 'Sho Odagiri',
           },
+          { position: 'Waseda University', name: 'Allan Wirth' },
         ],
       },
     ],
