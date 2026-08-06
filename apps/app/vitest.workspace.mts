@@ -46,11 +46,15 @@ export default defineWorkspace([
       // Vault E2E tests live in their own project below — they need extra setup
       // (spawning vault-manager, mounting express, seeding users) that the
       // generic app-integration project should not pay for.
+      // `*.exclusive.integ.ts` likewise belongs to its own project below: those
+      // tests empty whole collections, which would destroy the fixtures of any
+      // other file sharing the same per-worker database.
       exclude: [
         ...defaultExclude,
         'playwright/**',
         'tmp/**',
         'src/features/growi-vault/__tests__/**',
+        '**/*.exclusive.integ.ts',
       ],
       // Pre-download the MongoDB binary before workers start to avoid lock-file race conditions
       globalSetup: ['./test/setup/mongo/global-setup.ts'],
@@ -73,6 +77,50 @@ export default defineWorkspace([
             '@growi/remark-lsx',
             /src\/server\/events/,
           ],
+        },
+      },
+    },
+  }),
+
+  // integration test that empties whole collections (separate project).
+  //
+  // The per-worker test database is shared by every file a worker runs, and the other
+  // integration tests clean up by deleting their own prefixed fixtures. A test that
+  // empties a collection wholesale — which the transfer's replace path forces, `configs`
+  // above all — would take those fixtures with it. Two things keep it apart:
+  // `singleFork` gives these files a worker of their own, and `testDbNamespace` keeps
+  // their database name out of reach of the threads pool, whose worker ids are numbered
+  // from 1 independently of this one (see test/setup/mongo/test-db-config.ts).
+  mergeConfig(configShared, {
+    resolve: {
+      conditions: ['require', 'node', 'default'],
+    },
+    ssr: {
+      resolve: {
+        conditions: ['require', 'node', 'default'],
+      },
+    },
+    test: {
+      name: 'app-integration-exclusive',
+      environment: 'node',
+      include: ['**/*.exclusive.integ.ts'],
+      exclude: [...defaultExclude, 'playwright/**', 'tmp/**'],
+      provide: { testDbNamespace: 'exclusive' },
+      globalSetup: ['./test/setup/mongo/global-setup.ts'],
+      setupFiles: [
+        './test/setup/elasticsearch.ts',
+        './test/setup/migrate-mongo.ts',
+        './test/setup/mongo/index.ts',
+        './test/setup/prisma.ts',
+      ],
+      pool: 'forks',
+      poolOptions: {
+        forks: { singleFork: true },
+      },
+      deps: { interopDefault: true },
+      server: {
+        deps: {
+          inline: [/src\/server\/events/],
         },
       },
     },
