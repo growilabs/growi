@@ -18,6 +18,19 @@ export const G2GTransferErrorCode = {
  */
 export const G2G_DATA_CONFLICT_ERROR_CODE = 'growi_data_conflict';
 
+/**
+ * apiv3 error code the receive route answers with when the request names a collection the
+ * transfer is not allowed to carry (see non-transferable-collections.ts).
+ *
+ * A normal transfer never reaches it: the push route drops those collections before the
+ * archive is built. It is the safety net for anything that reaches the receive route by
+ * another path, which is why it refuses the request outright instead of dropping the
+ * collection the way the push side does — at this point the archive has already been
+ * built around a collection list that should not have contained it.
+ */
+export const G2G_PROTECTED_COLLECTION_ERROR_CODE =
+  'protected_collection_included';
+
 export type G2GTransferErrorCode =
   (typeof G2GTransferErrorCode)[keyof typeof G2GTransferErrorCode];
 

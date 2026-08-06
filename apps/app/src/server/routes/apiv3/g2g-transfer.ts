@@ -13,6 +13,7 @@ import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import {
   G2G_DATA_CONFLICT_ERROR_CODE,
+  G2G_PROTECTED_COLLECTION_ERROR_CODE,
   G2GTransferErrorCode,
   isG2GTransferError,
 } from '~/server/models/vo/g2g-transfer-error';
@@ -24,6 +25,10 @@ import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
 import type { UniqueConflictReport } from '~/server/service/import/detect-unique-conflicts';
 import { hasConflicts } from '~/server/service/import/detect-unique-conflicts';
+import {
+  excludeNonTransferableCollections,
+  NON_TRANSFERABLE_COLLECTIONS,
+} from '~/server/service/import/non-transferable-collections';
 import { summarizeUniqueConflicts } from '~/server/service/import/summarize-unique-conflicts';
 import loggerFactory from '~/utils/logger';
 import { TransferKey } from '~/utils/vo/transfer-key';
@@ -315,6 +320,31 @@ export const setup = (crowi: Crowi): Router => {
         return res.apiv3Err(
           new ErrorV3('Failed to parse request body.', 'parse_failed'),
           500,
+        );
+      }
+
+      /*
+       * refuse a request that names a collection the transfer must not carry
+       *
+       * The push route drops those collections before the archive is even built, so this
+       * is unreachable through the normal path. It stays as the safety net that makes
+       * that guarantee structural rather than a convention, and it runs before anything
+       * is unzipped so a refused request leaves the destination untouched.
+       */
+      const protectedCollections = collections.filter((collectionName) =>
+        NON_TRANSFERABLE_COLLECTIONS.has(collectionName),
+      );
+      if (protectedCollections.length > 0) {
+        logger.warn(
+          { protectedCollections },
+          'Refused the transfer import: the request names collections that must not be transferred',
+        );
+        return res.apiv3Err(
+          new ErrorV3(
+            `These collections must not be transferred: ${protectedCollections.join(', ')}`,
+            G2G_PROTECTED_COLLECTION_ERROR_CODE,
+          ),
+          400,
         );
       }
 
@@ -763,7 +793,17 @@ export const setup = (crowi: Crowi): Router => {
     validator.transfer,
     apiV3FormValidator,
     async (req: AuthorizedRequest, res: ApiV3Response) => {
-      const { transferKey, collections, optionsMap } = req.body;
+      const { transferKey } = req.body;
+
+      // Drop the collections a transfer must not carry, rather than refusing the request:
+      // requirement 5.8 asks for the rest of the transfer to go ahead. This happens here,
+      // on the server, and not only in the admin screen that builds the selection — a
+      // caller that posts to this endpoint directly never passes through that screen, and
+      // the destination would answer such a request with a 400 that fails the whole
+      // transfer instead of dropping one collection.
+      const { collections, optionsMap } = excludeNonTransferableCollections(
+        req.body,
+      );
 
       // Parse transfer key
       let tk: TransferKey;

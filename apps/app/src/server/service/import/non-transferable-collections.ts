@@ -138,3 +138,29 @@ export function selectTransferableCollections(
     (collectionName) => !NON_TRANSFERABLE_COLLECTIONS.has(collectionName),
   );
 }
+
+/**
+ * Removes the declared collections from a transfer request.
+ *
+ * The collection list and the import-options map are narrowed **together** because
+ * dropping only one of them breaks the other side: an option left behind for a collection
+ * that is no longer transferred is still a mode the destination has to reconcile, and the
+ * mixed-mode check the migration preset adds would read it as a contradiction and refuse
+ * the whole transfer — exactly the "drop it and carry on" case of requirement 5.8.
+ */
+export function excludeNonTransferableCollections<TOption>(request: {
+  readonly collections: readonly string[];
+  readonly optionsMap: Readonly<Record<string, TOption>>;
+}): {
+  collections: string[];
+  optionsMap: Record<string, TOption>;
+} {
+  return {
+    collections: [...selectTransferableCollections(request.collections)],
+    optionsMap: Object.fromEntries(
+      Object.entries(request.optionsMap).filter(
+        ([collectionName]) => !NON_TRANSFERABLE_COLLECTIONS.has(collectionName),
+      ),
+    ),
+  };
+}
