@@ -80,6 +80,32 @@ describe('SearchFilterPanel', () => {
     expect(requestedEndpoints()).not.toContain(AUDITLOG_SUGGESTIONS_ENDPOINT);
   });
 
+  /**
+   * Suspended / invited accounts are admin-only on the server, and this page is
+   * open to any visitor on a guest-readable wiki. Asserted on the request the
+   * page actually issues, and on `!== true` rather than `=== false`, so omitting
+   * the option entirely — the equivalent request — still passes.
+   */
+  it('does not ask the suggestion endpoint for inactive users', async () => {
+    renderPanel();
+
+    await typeIntoAuthorField('ali');
+
+    await waitFor(() => {
+      expect(requestedEndpoints()).toContain(REGISTERED_USERNAMES_ENDPOINT);
+    });
+
+    // The panel also requests unrelated endpoints (user groups), which carry no
+    // `options` param.
+    const suggestionCalls = mockApiv3Get.mock.calls.filter(
+      ([endpoint]) => endpoint === REGISTERED_USERNAMES_ENDPOINT,
+    );
+    expect(suggestionCalls.length).toBeGreaterThan(0);
+    for (const [, params] of suggestionCalls) {
+      expect(JSON.parse(params.options).isIncludeInactiveUser).not.toBe(true);
+    }
+  });
+
   it('sends the typed keyword to the suggestion request', async () => {
     renderPanel();
 

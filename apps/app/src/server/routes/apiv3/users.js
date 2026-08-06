@@ -1567,9 +1567,10 @@ export const setup = (crowi) => {
 
         const wantsActiveUser =
           options.isIncludeActiveUser == null || options.isIncludeActiveUser;
-        const wantsInactiveUser = options.isIncludeInactiveUser === true;
+        const wantsInactiveUser =
+          options.isIncludeInactiveUser === true && req.user?.admin;
         const wantsActivitySnapshotUser =
-          options.isIncludeActivitySnapshotUser === true && req.user.admin;
+          options.isIncludeActivitySnapshotUser === true && req.user?.admin;
 
         // The three lookups below are independent of each other, so run them
         // concurrently instead of paying their latency sequentially.
@@ -1631,7 +1632,7 @@ export const setup = (crowi) => {
         }
 
         const canIncludeMixedUsernames =
-          (options.isIncludeMixedUsernames && req.user.admin) ||
+          (options.isIncludeMixedUsernames && req.user?.admin) ||
           (options.isIncludeMixedUsernames &&
             !options.isIncludeActivitySnapshotUser);
         if (canIncludeMixedUsernames) {

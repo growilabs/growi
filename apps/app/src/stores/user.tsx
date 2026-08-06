@@ -59,7 +59,7 @@ export const useSWRxUsernames = (
         // The route JSON.parses this param, so it must be sent as a JSON string.
         options: JSON.stringify({
           isIncludeActiveUser: true,
-          isIncludeInactiveUser: true,
+          isIncludeInactiveUser: false,
         }),
       }).then((response) => response.data),
   );
