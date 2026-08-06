@@ -21,8 +21,10 @@ export interface PageLinkModel extends Model<PageLinkDocument> {
     resolvedRows: IPageLink[],
   ): Promise<void>;
   findBacklinkSources(toPageId: Types.ObjectId): Promise<Types.ObjectId[]>;
-  // Declared here for downstream stories; implemented later (re-resolve-by-path in B4,
-  // reconcile-deleted in B5) — not implemented in B1.
-  reResolveByToPath(toPath: string): Promise<void>;
+  repointInboundLinks(
+    toPath: string,
+    toPage: Types.ObjectId | null,
+  ): Promise<void>;
+  // Declared here for a downstream story; implemented later (reconcile-deleted in B5).
   reconcileDeletedPages(pageIds: Types.ObjectId[]): Promise<void>;
 }
