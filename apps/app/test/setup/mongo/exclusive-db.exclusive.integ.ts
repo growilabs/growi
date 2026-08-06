@@ -2,11 +2,12 @@
  * Guard for the isolation the `app-integration-exclusive` vitest project promises.
  *
  * Files in that project empty whole collections, so they may not share a database with
- * anything else. Two pieces of configuration make that true — `singleFork` (a worker of
- * their own) and `provide: { testDbNamespace }` (a database name the threads pool cannot
- * be assigned) — and neither leaves a trace at runtime. If the `provide` entry is dropped
- * or renamed, every exclusive test keeps passing while quietly emptying the database that
- * the ordinary integration tests are using.
+ * anything else. One piece of configuration makes that true — `provide: { testDbNamespace }`,
+ * which puts them on a database name no other project's worker is ever given — and it
+ * leaves no trace at runtime. If that entry is dropped or renamed, every exclusive test
+ * keeps passing while quietly emptying the database the ordinary integration tests are
+ * using. (Giving the project a worker of its own instead was tried and does not work; see
+ * the comment on the project in vitest.workspace.mts.)
  *
  * This asserts the outcome instead: the database this file is connected to is not the one
  * a worker of any other project would be given.

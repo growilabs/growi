@@ -8,6 +8,9 @@ import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
+// The same code both import entry points answer a busy import with; the receive route's
+// caller matches on the exact string, so it is declared once.
+import { G2G_IMPORT_IN_PROGRESS_ERROR_CODE } from '~/server/models/vo/g2g-transfer-error';
 import { pendingActivityContext } from '~/server/service/activity/index';
 import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
@@ -331,19 +334,20 @@ export default function route(crowi: Crowi): Router {
         return res.apiv3Err(
           new ErrorV3(
             'Another import is already running on this GROWI.',
-            'import_already_in_progress',
+            G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
           ),
           409,
         );
       }
 
-      // return response first
-      res.apiv3();
-
       // `try/finally` rather than a response event: this route answers before it starts
       // working, so releasing on the response would hand the job away while the import is
-      // still running.
+      // still running. The response is sent inside the `try` so that nothing at all sits
+      // between the claim and the `finally` that returns it.
       try {
+        // return response first
+        res.apiv3();
+
         /*
          * unzip, parse
          */

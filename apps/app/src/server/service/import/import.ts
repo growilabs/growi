@@ -368,14 +368,14 @@ export class ImportService {
    * purpose beforehand and manages its own clean-up.
    */
   private async enterMaintenanceMode(): Promise<void> {
-    try {
-      await configManager.updateConfig('app:isMaintenanceMode', true);
-    } catch (err) {
-      logger.error(
-        'Failed to enter maintenance mode after importing configs',
-        err,
-      );
-    }
+    // Deliberately not caught. A failure here means the configs collection was replaced
+    // but the flag was not raised — a GROWI running on the archive's settings, open, with
+    // (for a transfer) no attachments yet: exactly the state requirement 2.9 exists to
+    // prevent. Letting it throw out of the `finally` that calls this marks `configs` as a
+    // failed collection, which is already wired all the way through to the operator (the
+    // return value, the response body, the source's failure notice, and the screen's
+    // withheld completion). Swallowing it would report that run as a clean success.
+    await configManager.updateConfig('app:isMaintenanceMode', true);
   }
 
   /**
