@@ -35,6 +35,36 @@ export const useSWRxUsersList = (
   );
 };
 
+type UsernamesResponse = {
+  activeUser?: { usernames: string[]; totalCount: number };
+  inactiveUser?: { usernames: string[]; totalCount: number };
+};
+
+/**
+ * Username suggestions from the registered-user list. `/users/usernames` is
+ * `loginRequired`, so unlike the audit-log suggestions endpoint any logged-in
+ * user can call it.
+ */
+export const useSWRxUsernames = (
+  q: string,
+  limit = 5,
+): SWRResponse<UsernamesResponse, Error> => {
+  const trimmedQ = q.trim();
+  return useSWRImmutable(
+    trimmedQ !== '' ? ['/users/usernames', trimmedQ, limit] : null,
+    ([endpoint, q, limit]) =>
+      apiv3Get(endpoint, {
+        q,
+        limit,
+        // The route JSON.parses this param, so it must be sent as a JSON string.
+        options: JSON.stringify({
+          isIncludeActiveUser: true,
+          isIncludeInactiveUser: false,
+        }),
+      }).then((response) => response.data),
+  );
+};
+
 type RelatedGroupsResponse = {
   relatedGroups: PopulatedGrantedGroup[];
 };

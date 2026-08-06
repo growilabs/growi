@@ -110,11 +110,12 @@ describe('GET /usernames', () => {
     expect(response.body.activeUser.usernames).toContain('alice');
   });
 
-  it('returns inactive users when isIncludeInactiveUser is requested', async () => {
+  it('returns inactive users for admins when isIncludeInactiveUser is requested', async () => {
     const requester = await User.create({
       name: 'Requester',
       username: 'requester2',
       email: 'requester2@example.com',
+      admin: true,
     });
     currentUser.value = requester;
     createdUserIds.push(requester._id);
@@ -145,6 +146,9 @@ describe('GET /usernames', () => {
       name: 'Requester',
       username: 'requester3',
       email: 'requester3@example.com',
+      // Inactive users are admin-only; this case is about the status→group
+      // mapping, so it needs the privilege to observe the inactive group at all.
+      admin: true,
     });
     currentUser.value = requester;
     createdUserIds.push(requester._id);
@@ -168,6 +172,129 @@ describe('GET /usernames', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.inactiveUser.usernames).toContain('carol');
+  });
+
+  it('does not include inactive users for non-admins even when requested', async () => {
+    const regular = await User.create({
+      name: 'Regular',
+      username: 'regular-user2',
+      email: 'regular2@example.com',
+      admin: false,
+    });
+    currentUser.value = regular;
+    createdUserIds.push(regular._id);
+    const suspended = await User.create({
+      name: 'Dave Suspended',
+      username: 'dave-suspended',
+      email: 'dave-suspended@example.com',
+      status: UserStatus.STATUS_SUSPENDED,
+    });
+    createdUserIds.push(suspended._id);
+    const active = await User.create({
+      name: 'Dave Active',
+      username: 'dave-active',
+      email: 'dave-active@example.com',
+      status: UserStatus.STATUS_ACTIVE,
+    });
+    createdUserIds.push(active._id);
+
+    const response = await request(app)
+      .get('/usernames')
+      .query({
+        q: 'dave',
+        options: JSON.stringify({
+          isIncludeActiveUser: true,
+          isIncludeInactiveUser: true,
+        }),
+      });
+
+    // Degrades rather than fails: the privileged group is dropped, the rest of
+    // the response is still served.
+    expect(response.status).toBe(200);
+    expect(response.body.inactiveUser).toBeUndefined();
+    expect(response.body.activeUser.usernames).toContain('dave-active');
+  });
+
+  it('does not leak inactive usernames to non-admins through mixedUsernames', async () => {
+    const regular = await User.create({
+      name: 'Regular',
+      username: 'regular-user3',
+      email: 'regular3@example.com',
+      admin: false,
+    });
+    currentUser.value = regular;
+    createdUserIds.push(regular._id);
+    const suspended = await User.create({
+      name: 'Erin Suspended',
+      username: 'erin-suspended',
+      email: 'erin-suspended@example.com',
+      status: UserStatus.STATUS_SUSPENDED,
+    });
+    createdUserIds.push(suspended._id);
+    const active = await User.create({
+      name: 'Erin Active',
+      username: 'erin-active',
+      email: 'erin-active@example.com',
+      status: UserStatus.STATUS_ACTIVE,
+    });
+    createdUserIds.push(active._id);
+
+    const response = await request(app)
+      .get('/usernames')
+      .query({
+        q: 'erin',
+        options: JSON.stringify({
+          isIncludeActiveUser: true,
+          isIncludeInactiveUser: true,
+          // Merges every group it collected into one flat list — the back door
+          // that would hand the inactive names over despite the group itself
+          // being withheld above.
+          isIncludeMixedUsernames: true,
+        }),
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.mixedUsernames).toContain('erin-active');
+    expect(response.body.mixedUsernames).not.toContain('erin-suspended');
+  });
+
+  it('serves a guest the active users only, without erroring, when privileged options are requested', async () => {
+    // A guest has no `req.user` at all, so every privilege check on this route is
+    // a potential deref of null. On an open wiki the search page reaches here.
+    currentUser.value = null;
+    const suspended = await User.create({
+      name: 'Frank Suspended',
+      username: 'frank-suspended',
+      email: 'frank-suspended@example.com',
+      status: UserStatus.STATUS_SUSPENDED,
+    });
+    createdUserIds.push(suspended._id);
+    const active = await User.create({
+      name: 'Frank Active',
+      username: 'frank-active',
+      email: 'frank-active@example.com',
+      status: UserStatus.STATUS_ACTIVE,
+    });
+    createdUserIds.push(active._id);
+
+    const response = await request(app)
+      .get('/usernames')
+      .query({
+        q: 'frank',
+        options: JSON.stringify({
+          isIncludeActiveUser: true,
+          isIncludeInactiveUser: true,
+          isIncludeActivitySnapshotUser: true,
+          isIncludeMixedUsernames: true,
+        }),
+      });
+
+    expect(response.status).toBe(200);
+    // An error here would also hand the raw TypeError message to the client.
+    expect(response.body.errors).toBeUndefined();
+    expect(response.body.activeUser.usernames).toContain('frank-active');
+    expect(response.body.inactiveUser).toBeUndefined();
+    expect(response.body.activitySnapshotUser).toBeUndefined();
   });
 
   it('returns activity snapshot usernames for admins', async () => {

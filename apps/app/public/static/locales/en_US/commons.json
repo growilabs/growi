@@ -258,5 +258,9 @@
       },
       "cancel": "Cancel"
     }
+  },
+  "username_suggestion": {
+    "active_user": "Active User",
+    "inactive_user": "Inactive User"
   }
 }

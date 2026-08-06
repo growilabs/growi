@@ -4,7 +4,10 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { SearchUsernameTypeahead } from '~/client/components/SearchUsernameTypeahead';
+import {
+  SearchUsernameTypeahead,
+  useAuditlogUsernameSuggestions,
+} from '~/client/components/SearchUsernameTypeahead';
 import type { IAuditLogBulkExportRequestFilters } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import type { SupportedActionType } from '~/interfaces/activity';
 import { auditLogAvailableActionsAtom } from '~/states/server-configurations';
@@ -134,6 +137,7 @@ const AuditLogExportModalSubstance = ({
           <div className="form-label">{t('audit_log_management.username')}</div>
           <SearchUsernameTypeahead
             onChange={setUsernamesHandler}
+            useUsernameSuggestions={useAuditlogUsernameSuggestions}
             initialUsernames={initialSelectedUsernames}
           />
         </div>

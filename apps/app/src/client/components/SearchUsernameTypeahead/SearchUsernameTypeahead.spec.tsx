@@ -1,13 +1,8 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { SearchUsernameTypeahead } from './SearchUsernameTypeahead';
-
-const mockUseSWRxAuditlogSuggestions = vi.hoisted(() => vi.fn());
-
-vi.mock('~/stores/activity', () => ({
-  useSWRxAuditlogSuggestions: mockUseSWRxAuditlogSuggestions,
-}));
+import type { UsernameSuggestions } from './username-suggestions';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -15,21 +10,30 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+const EMPTY_SUGGESTIONS: UsernameSuggestions = {
+  activeUsernames: [],
+  inactiveUsernames: [],
+  isLoading: false,
+};
+
+let suggestions: UsernameSuggestions = EMPTY_SUGGESTIONS;
+
+// Module-scope, so every render passes the same reference — the stability
+// `UseUsernameSuggestions` requires.
+const useFakeSuggestions = () => suggestions;
+
 const mockSuggestions = (
   activeUsernames: string[],
   inactiveUsernames: string[] = [],
 ) => {
-  mockUseSWRxAuditlogSuggestions.mockReturnValue({
-    data: { username: { activeUsernames, inactiveUsernames } },
-    error: undefined,
-    isLoading: false,
-  });
+  suggestions = { activeUsernames, inactiveUsernames, isLoading: false };
 };
 
 const renderTypeahead = (initialUsernames?: string[]) =>
   render(
     <SearchUsernameTypeahead
       onChange={vi.fn()}
+      useUsernameSuggestions={useFakeSuggestions}
       initialUsernames={initialUsernames}
       placeholder="placeholder"
     />,
@@ -37,11 +41,12 @@ const renderTypeahead = (initialUsernames?: string[]) =>
 
 describe('SearchUsernameTypeahead', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockSuggestions([]);
+    suggestions = EMPTY_SUGGESTIONS;
   });
 
-  it('renders active and inactive users in correct groups', async () => {
+  // The `t` mock echoes the key, so asserting the full key locks in the
+  // namespace — which is the part that breaks (see CATEGORY_LABEL_KEYS).
+  it('labels the groups with commons-namespaced keys, not hardcoded text', async () => {
     mockSuggestions(['alice'], ['bob']);
 
     renderTypeahead();
@@ -49,9 +54,23 @@ describe('SearchUsernameTypeahead', () => {
     await userEvent.type(screen.getByRole('combobox'), 'a');
 
     const menu = await screen.findByRole('listbox');
-    expect(within(menu).getByText('Active User')).toBeInTheDocument();
+    expect(
+      within(menu).getByText('commons:username_suggestion.active_user'),
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByText('commons:username_suggestion.inactive_user'),
+    ).toBeInTheDocument();
+  });
+
+  it('renders active and inactive users in their respective groups', async () => {
+    mockSuggestions(['alice'], ['bob']);
+
+    renderTypeahead();
+
+    await userEvent.type(screen.getByRole('combobox'), 'a');
+
+    const menu = await screen.findByRole('listbox');
     expect(within(menu).getByText('alice')).toBeInTheDocument();
-    expect(within(menu).getByText('Inactive User')).toBeInTheDocument();
     expect(within(menu).getByText('bob')).toBeInTheDocument();
   });
 
@@ -67,13 +86,7 @@ describe('SearchUsernameTypeahead', () => {
     expect(within(menu).queryByText('alice')).not.toBeInTheDocument();
   });
 
-  it('renders no options when response has no username data', async () => {
-    mockUseSWRxAuditlogSuggestions.mockReturnValue({
-      data: {},
-      error: undefined,
-      isLoading: false,
-    });
-
+  it('renders no options when the source returns no usernames', async () => {
     renderTypeahead();
 
     await userEvent.type(screen.getByRole('combobox'), 'a');
@@ -102,6 +115,7 @@ describe('SearchUsernameTypeahead', () => {
     rerender(
       <SearchUsernameTypeahead
         onChange={vi.fn()}
+        useUsernameSuggestions={useFakeSuggestions}
         initialUsernames={['carol']}
         placeholder="placeholder"
       />,
@@ -125,6 +139,7 @@ describe('SearchUsernameTypeahead', () => {
     rerender(
       <SearchUsernameTypeahead
         onChange={vi.fn()}
+        useUsernameSuggestions={useFakeSuggestions}
         initialUsernames={['bob']}
         placeholder="placeholder"
       />,
@@ -141,11 +156,32 @@ describe('SearchUsernameTypeahead', () => {
     rerender(
       <SearchUsernameTypeahead
         onChange={vi.fn()}
+        useUsernameSuggestions={useFakeSuggestions}
         initialUsernames={[]}
         placeholder="placeholder"
       />,
     );
 
     expect(queryByText('alice')).not.toBeInTheDocument();
+  });
+
+  // Awaited because `AsyncTypeahead` debounces `onSearch` by `delay` before the
+  // keyword reaches the source.
+  it('queries the injected source with the typed keyword', async () => {
+    const spy = vi.fn(() => EMPTY_SUGGESTIONS);
+
+    render(
+      <SearchUsernameTypeahead
+        onChange={vi.fn()}
+        useUsernameSuggestions={spy}
+        placeholder="placeholder"
+      />,
+    );
+
+    await userEvent.type(screen.getByRole('combobox'), 'ali');
+
+    await waitFor(() => {
+      expect(spy).toHaveBeenLastCalledWith('ali');
+    });
   });
 });

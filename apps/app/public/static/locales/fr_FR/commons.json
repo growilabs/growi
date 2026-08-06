@@ -227,5 +227,9 @@
         "user_group": "Accorde la permission de modifier les fonctionnalités de membres de groupe d'utilisateurs."
       }
     }
+  },
+  "username_suggestion": {
+    "active_user": "Utilisateurs actifs",
+    "inactive_user": "Utilisateurs inactifs"
   }
 }
