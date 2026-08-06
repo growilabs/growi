@@ -4,8 +4,7 @@ import type { Types } from 'mongoose';
 import mongoose from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
-
-import { resolveRedirectEndpoints } from './redirect-endpoint-resolution';
+import PageRedirect from '~/server/models/page-redirect';
 
 // Match findByPath: exclude empty pages ({ isEmpty: null } for v4 compat).
 // Trashed pages are deliberately NOT excluded — a link whose target is in the
@@ -79,8 +78,17 @@ export const resolveToPages = async (
   const missedPaths = normalPaths.filter((path) => !result.has(path));
   if (missedPaths.length === 0) return result;
 
-  const endpointByPath = await resolveRedirectEndpoints(missedPaths);
-  if (endpointByPath.size === 0) return result;
+  const endpoints =
+    await PageRedirect.retrievePageRedirectEndpointsBatch(missedPaths);
+  if (endpoints.size === 0) return result;
+
+  // Only where the chain ends matters here; `start` serves the page-view banner.
+  // $graphLookup visits each document once, so a redirect cycle terminates with an
+  // endpoint that simply has no page — reported as unresolved, never as a hang.
+  const endpointByPath = new Map<string, string>();
+  for (const [path, { end }] of endpoints) {
+    endpointByPath.set(path, end.toPath);
+  }
 
   const pagesAtEndpoints = await findPagesByPath([
     ...new Set(endpointByPath.values()),
