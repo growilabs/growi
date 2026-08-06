@@ -49,6 +49,16 @@ class ImportingCollectionError extends Error {
   }
 }
 
+/** The outcome of one import run. */
+export interface ImportResult {
+  /**
+   * The collections whose import threw. An import carries on past a failed collection —
+   * that is deliberate and unchanged — so without this the caller has no way to learn
+   * that the destination is only half imported. Empty when every collection succeeded.
+   */
+  readonly failedCollections: readonly string[];
+}
+
 export class ImportService {
   private modelCache: Map<string, { Model: any; schema: any }> = new Map();
 
@@ -143,7 +153,7 @@ export class ImportService {
   async import(
     collections: string[],
     importSettingsMap: Map<string, ImportSettings>,
-  ): Promise<void> {
+  ): Promise<ImportResult> {
     await this.preImport();
 
     // init status object
@@ -161,7 +171,7 @@ export class ImportService {
     );
 
     // process serially so as not to waste memory
-    const promises = collections.map((collectionName) => {
+    const importings = collections.map((collectionName) => {
       const importSettings = importSettingsMap.get(collectionName);
       if (importSettings == null) {
         throw new Error(`ImportSettings for ${collectionName} is not found`);
@@ -170,7 +180,7 @@ export class ImportService {
       const importing = this.importCollection(collectionName, importSettings);
 
       if (collectionName !== CONFIGS_COLLECTION_NAME) {
-        return importing;
+        return { collectionName, importing };
       }
 
       // Chained onto the configs import rather than run alongside it, so that the flag is
@@ -178,25 +188,38 @@ export class ImportService {
       // before anything else can reload from a database that has no flag in it.
       // `finally`, because a pipeline that fails after `deleteMany()` leaves the row
       // missing just the same.
-      return (async () => {
-        try {
-          await importing;
-        } finally {
-          await this.reassertMaintenanceMode(isMaintenanceModeBeforeImport);
-        }
-      })();
+      return {
+        collectionName,
+        importing: (async () => {
+          try {
+            await importing;
+          } finally {
+            await this.reassertMaintenanceMode(isMaintenanceModeBeforeImport);
+          }
+        })(),
+      };
     });
-    for await (const promise of promises) {
+
+    const failedCollections: string[] = [];
+    // A plain `for` loop, not `for await`: iterating an array of promises with `for await`
+    // awaits each element at the loop head, so a rejection is thrown there instead of
+    // reaching the `catch` below — which made the first failing collection abort the whole
+    // import, the opposite of the carry-on-and-report behaviour this catch was written for.
+    for (const { collectionName, importing } of importings) {
       try {
-        await promise;
+        await importing;
       } catch (err) {
-        // catch ImportingCollectionError
-        const { collectionProgress } = err;
-        logger.error(
-          `failed to import to ${collectionProgress.collectionName}`,
-          err,
-        );
-        this.emitProgressEvent(collectionProgress, { message: err.message });
+        failedCollections.push(collectionName);
+        logger.error(`failed to import to ${collectionName}`, err);
+
+        // Absent when the failure happened before the per-collection progress record
+        // could be looked up; the progress event is best-effort, the report above is not.
+        const { collectionProgress } = err as ImportingCollectionError;
+        if (collectionProgress != null) {
+          this.emitProgressEvent(collectionProgress, {
+            message: (err as Error).message,
+          });
+        }
       }
     }
 
@@ -216,6 +239,8 @@ export class ImportService {
     // Release caches after import process
     this.modelCache.clear();
     this.convertMap = undefined;
+
+    return { failedCollections };
   }
 
   /**

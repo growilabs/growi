@@ -4,6 +4,7 @@ import { SupportedAction } from '~/interfaces/activity';
 import type { PendingActivityContext } from '~/server/service/activity/index';
 import { pendingActivityContext } from '~/server/service/activity/index';
 import type { ImportSettings } from '~/server/service/import';
+import type { ImportResult } from '~/server/service/import/import';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:routes:apiv3:import-executor');
@@ -13,7 +14,7 @@ export interface ImportRunner {
   import(
     collections: string[],
     importSettingsMap: Map<string, ImportSettings>,
-  ): Promise<void>;
+  ): Promise<ImportResult>;
 }
 
 export interface ExecuteImportArgs {

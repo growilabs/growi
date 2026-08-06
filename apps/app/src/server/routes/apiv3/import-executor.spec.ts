@@ -22,7 +22,7 @@ describe('executeImport', () => {
 
   it('emits an activity update when the import succeeds', async () => {
     const importService = mock<ImportRunner>();
-    importService.import.mockResolvedValue(undefined);
+    importService.import.mockResolvedValue({ failedCollections: [] });
     const adminEvent = mock<EventEmitter>();
     const activityEvent = mock<EventEmitter>();
 

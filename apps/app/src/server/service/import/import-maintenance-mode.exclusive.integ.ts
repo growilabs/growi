@@ -68,7 +68,7 @@ describe('ImportService.import — the maintenance mode flag', () => {
     await fs.writeFile(path.join(importsDir, CONFIGS_JSON), content);
   };
 
-  const importConfigs = (): Promise<void> => {
+  const importConfigs = (): Promise<unknown> => {
     const importSettings: ImportSettings = {
       mode: ImportMode.flushAndInsert,
       jsonFileName: CONFIGS_JSON,
@@ -143,12 +143,12 @@ describe('ImportService.import — the maintenance mode flag', () => {
 
   test('is written back even when importing configs fails', async () => {
     await configManager.updateConfig('app:isMaintenanceMode', true);
-    // Malformed at the token level, so the parser throws part-way through the pipeline —
-    // after `deleteMany` has already emptied the collection. A file that simply does not
-    // exist fails earlier than that and never gets near the flag, so it would prove
-    // nothing here. (A JSON array that is merely unterminated is no good either: the
-    // stream parser reports neither an error nor a completion for one.)
-    await writeConfigsJson('[{"a":}]');
+    // A closing bracket where the parser expects a value: the read throws part-way
+    // through the pipeline, after `deleteMany` has already emptied the collection. A file
+    // that simply does not exist fails earlier than that and never gets near the flag, so
+    // it would prove nothing here — and the malformed shapes the streaming parser accepts
+    // in silence (an unterminated array, a missing value) would not fail at all.
+    await writeConfigsJson('[{"a":]}]');
 
     // Whether the failure surfaces to the caller is a separate concern; here it is only
     // the arrangement.
