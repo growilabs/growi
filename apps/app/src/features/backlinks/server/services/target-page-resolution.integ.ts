@@ -93,7 +93,8 @@ describe('resolveToPages (integration)', () => {
     expect(result.size).toBe(2);
   });
 
-  describe('rename following', () => {
+  // Rename and soft delete both leave a PageRedirect behind, so both are followed here.
+  describe('redirect following', () => {
     it('resolves a renamed target through its redirect, keyed by the original path', async () => {
       const page = await createPage({ path: '/resolve-integ/new' });
       await createRedirect('/resolve-integ/old', '/resolve-integ/new');
@@ -117,6 +118,28 @@ describe('resolveToPages (integration)', () => {
       expect(result.get('/resolve-integ/a')?.toString()).toBe(
         page._id.toString(),
       );
+    });
+
+    it('resolves several renamed targets in one pass', async () => {
+      // The unit spec can only prove every missed path reaches the `$in`; that the
+      // aggregation then returns a chain per input is real-pipeline behaviour.
+      const pageX = await createPage({ path: '/resolve-integ/x2' });
+      const pageY = await createPage({ path: '/resolve-integ/y2' });
+      await createRedirect('/resolve-integ/x', '/resolve-integ/x2');
+      await createRedirect('/resolve-integ/y', '/resolve-integ/y2');
+
+      const result = await resolveToPages([
+        '/resolve-integ/x',
+        '/resolve-integ/y',
+      ]);
+
+      expect(result.get('/resolve-integ/x')?.toString()).toBe(
+        pageX._id.toString(),
+      );
+      expect(result.get('/resolve-integ/y')?.toString()).toBe(
+        pageY._id.toString(),
+      );
+      expect(result.size).toBe(2);
     });
 
     it('prefers a live page at the path over its redirect', async () => {
@@ -158,6 +181,28 @@ describe('resolveToPages (integration)', () => {
       // A permalink names the immutable _id, so it must resolve to that page or to
       // nothing — never to whatever a redirect on the same path points at.
       expect(result.size).toBe(0);
+    });
+
+    it('resolves a soft-deleted target through its trash redirect', async () => {
+      // Soft delete moves the page under /trash and leaves the same kind of
+      // PageRedirect behind (service/page/index.ts deleteNonEmptyTarget), so a
+      // link to a binned page resolves to it instead of reading as broken —
+      // which is what lets the derived state say `trashed` rather than `broken`.
+      const page = await createPage({
+        path: '/trash/resolve-integ/binned',
+        status: Page.STATUS_DELETED,
+      });
+      await createRedirect(
+        '/resolve-integ/binned',
+        '/trash/resolve-integ/binned',
+      );
+
+      const result = await resolveToPages(['/resolve-integ/binned']);
+
+      expect(result.get('/resolve-integ/binned')?.toString()).toBe(
+        page._id.toString(),
+      );
+      expect(result.size).toBe(1);
     });
 
     it('does not hang or resolve on a redirect cycle', async () => {

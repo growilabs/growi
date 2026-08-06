@@ -10,12 +10,23 @@ vi.mock('~/server/models/page-redirect', () => ({
 
 type Hop = { fromPath: string; toPath: string; depth: number };
 
+/**
+ * Return only the docs the pipeline actually asked for, so a `$match` that drops
+ * inputs shows up as an unresolved path rather than passing silently. A pipeline
+ * with no `$match` matches nothing — the safe direction to fail in.
+ */
 const mockRedirects = (
   docs: { fromPath: string; toPath: string; chains?: Hop[] }[],
 ) => {
-  mocks.aggregate.mockResolvedValue(
-    docs.map((doc) => ({ chains: [], ...doc })),
-  );
+  mocks.aggregate.mockImplementation((pipeline) => {
+    const match = pipeline.find((stage) => '$match' in stage)?.$match;
+    const wanted: string[] = match?.fromPath?.$in ?? [];
+    return Promise.resolve(
+      docs
+        .filter((doc) => wanted.includes(doc.fromPath))
+        .map((doc) => ({ chains: [], ...doc })),
+    );
+  });
 };
 
 describe('resolveRedirectEndpoints()', () => {
