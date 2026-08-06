@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { NextFunction, Request, Router } from 'express';
@@ -28,7 +29,10 @@ import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
 import type { UniqueConflictReport } from '~/server/service/import/detect-unique-conflicts';
 import { hasConflicts } from '~/server/service/import/detect-unique-conflicts';
-import type { ImportResult } from '~/server/service/import/import';
+import type {
+  ImportJobLease,
+  ImportResult,
+} from '~/server/service/import/import';
 import {
   excludeNonTransferableCollections,
   NON_TRANSFERABLE_COLLECTIONS,
@@ -52,6 +56,40 @@ interface AuthorizedRequest extends Request {
 }
 
 const logger = loggerFactory('growi:routes:apiv3:transfer');
+
+/**
+ * Removes the archive multer wrote for this request.
+ *
+ * Nothing else does: the receive route unzips in place, and the only sweep of the import
+ * directory — `deleteAllZipFiles` — is reachable from the admin import screen alone. Since
+ * each transfer now lands under a name of its own (it used to overwrite the previous one
+ * by accident), a wiki transferred twice would otherwise cost twice its size on the
+ * destination's disk, for good.
+ *
+ * Only this request's file, by the exact path multer chose, never a sweep of the shared
+ * directory: another request may be uploading into it at the same time. The JSON files
+ * extracted from the archive are a separate matter — `importCollection` deletes each one
+ * it finishes with.
+ */
+const deleteReceivedArchive = async (file?: {
+  path?: string;
+}): Promise<void> => {
+  if (file?.path == null) {
+    return;
+  }
+
+  try {
+    // `force`, so a file multer already cleaned up after a failed upload is not an error.
+    await rm(file.path, { force: true });
+  } catch (err) {
+    // A transfer that worked must not be reported as failed because the leftover archive
+    // could not be removed; the operator is left with a file to delete, not a false alarm.
+    logger.warn(
+      { err, path: file.path },
+      'Failed to delete the received transfer archive',
+    );
+  }
+};
 
 const validator = {
   transfer: [
@@ -102,6 +140,30 @@ const validator = {
  * Routes
  */
 export const setup = (crowi: Crowi): Router => {
+  /**
+   * The import claim `requireImportJob` took for a request, from the moment the
+   * middleware runs until whoever finishes the request's work takes it over.
+   *
+   * Keyed by the request object rather than threaded through as an argument: multer sits
+   * between the middleware and the handler and only ever passes `(req, res)` on. Built
+   * here rather than at module level because this directory forbids top-level
+   * initializers (tools/lint/route-top-level-guard.cjs) — one router, one map.
+   */
+  const pendingImportJobs = new WeakMap<Request, ImportJobLease>();
+
+  /**
+   * Hands the claim `requireImportJob` took over to the caller, who becomes responsible
+   * for releasing it. Returns null once it has been taken — by design, so that the two
+   * places that can take it (the handler at its start, the response's `close` as a
+   * fallback) can both ask without either having to know whether the other got there
+   * first.
+   */
+  const takeImportJob = (req: Request): ImportJobLease | null => {
+    const lease = pendingImportJobs.get(req);
+    pendingImportJobs.delete(req);
+    return lease ?? null;
+  };
+
   const {
     g2gTransferPusherService,
     g2gTransferReceiverService,
@@ -146,6 +208,9 @@ export const setup = (crowi: Crowi): Router => {
    * Claims the right to import before multer starts writing the archive into the shared
    * import directory — not inside the handler, which multer never reaches when it rejects
    * the upload.
+   *
+   * The claim is only *held* here; it is released by whoever ends up owning the work. See
+   * the `close` listener below and the handler's own `finally`.
    */
   const requireImportJob = (
     req: Request,
@@ -164,13 +229,22 @@ export const setup = (crowi: Crowi): Router => {
       );
     }
 
-    // Released on the response's `close`, not in the handler: multer aborts the request
-    // outright for a non-zip upload, a broken multipart body or a client that disconnects
-    // mid-upload, and the handler — with any `finally` in it — never runs. A lease nobody
-    // releases would refuse every later import for the lifetime of the process, and the
-    // likeliest way to hit it is a dropped connection during a large transfer, which is
-    // exactly when the operator retries.
-    res.on('close', lease.release);
+    pendingImportJobs.set(req, lease);
+
+    // A fallback for the requests the handler never gets to run for: multer aborts the
+    // request outright for a non-zip upload, a broken multipart body or a client that
+    // disconnects mid-upload, and a claim nobody releases would refuse every later import
+    // for the lifetime of the process.
+    //
+    // It must not release a claim the handler has taken over, which is why it goes through
+    // `takeImportJob` rather than calling `lease.release` directly: express does not stop
+    // the handler when the client disconnects, so `close` fires while `importCollections`
+    // is still writing. Releasing there would hand the job to the operator's retry — or to
+    // an admin zip import, whose `deleteMany({})` would then run underneath the first
+    // import's writes, which is the very thing this claim exists to prevent.
+    res.on('close', () => {
+      takeImportJob(req)?.release();
+    });
 
     next();
   };
@@ -327,6 +401,213 @@ export const setup = (crowi: Crowi): Router => {
   );
 
   /**
+   * Receives one transfer: unzip the uploaded archive, check it against this GROWI, refuse
+   * it if it would collide with the destination's data, then import it.
+   *
+   * Kept apart from the route handler below so that the two things the handler owns for
+   * the whole request — the import claim and the uploaded archive — are released in one
+   * `finally` there, rather than at each of the many exits scattered through here.
+   */
+  const receiveTransferData = async (
+    req: Request & { file: any },
+    res: ApiV3Response,
+  ): Promise<void> => {
+    const { file } = req;
+    const {
+      collections: strCollections,
+      optionsMap: strOptionsMap,
+      operatorUserId,
+      uploadConfigs: strUploadConfigs,
+    } = req.body;
+
+    /*
+     * parse multipart form data
+     */
+    let collections: string[];
+    let optionsMap: { [key: string]: GrowiArchiveImportOption };
+    let sourceGROWIUploadConfigs: any;
+    try {
+      collections = JSON.parse(strCollections);
+      optionsMap = JSON.parse(strOptionsMap);
+      sourceGROWIUploadConfigs = JSON.parse(strUploadConfigs);
+    } catch (err) {
+      logger.error(err);
+      return res.apiv3Err(
+        new ErrorV3('Failed to parse request body.', 'parse_failed'),
+        500,
+      );
+    }
+
+    /*
+     * refuse a request that names a collection the transfer must not carry
+     *
+     * The push route drops those collections before the archive is even built, so this
+     * is unreachable through the normal path. It stays as the safety net that makes
+     * that guarantee structural rather than a convention, and it runs before anything
+     * is unzipped so a refused request leaves the destination untouched.
+     */
+    const protectedCollections = collections.filter((collectionName) =>
+      NON_TRANSFERABLE_COLLECTIONS.has(collectionName),
+    );
+    if (protectedCollections.length > 0) {
+      logger.warn(
+        { protectedCollections },
+        'Refused the transfer import: the request names collections that must not be transferred',
+      );
+      return res.apiv3Err(
+        new ErrorV3(
+          `These collections must not be transferred: ${protectedCollections.join(', ')}`,
+          G2G_PROTECTED_COLLECTION_ERROR_CODE,
+        ),
+        400,
+      );
+    }
+
+    /*
+     * unzip and parse
+     */
+    let meta: object | undefined;
+    let innerFileStats: {
+      fileName: string;
+      collectionName: string;
+      size: number;
+    }[];
+    try {
+      const zipFile = importService.getFile(file.filename);
+      await importService.unzip(zipFile);
+
+      const zipFileStat = await growiBridgeService.parseZipFile(zipFile);
+      innerFileStats = zipFileStat?.innerFileStats ?? [];
+      meta = zipFileStat?.meta;
+    } catch (err) {
+      logger.error(err);
+      return res.apiv3Err(
+        new ErrorV3(
+          'Failed to validate transfer data file.',
+          'validation_failed',
+        ),
+        500,
+      );
+    }
+
+    /*
+     * validate meta.json
+     */
+    try {
+      importService.validate(meta);
+    } catch (err) {
+      logger.error(err);
+      return res.apiv3Err(
+        new ErrorV3(
+          'The version of this GROWI and the uploaded GROWI data are not the same',
+          'version_incompatible',
+        ),
+        500,
+      );
+    }
+
+    /*
+     * generate maps of ImportSettings to import
+     */
+    let importSettingsMap: Map<string, ImportSettings>;
+    try {
+      importSettingsMap = g2gTransferReceiverService.getImportSettingMap(
+        innerFileStats,
+        optionsMap,
+        operatorUserId,
+      );
+    } catch (err) {
+      logger.error(err);
+      return res.apiv3Err(
+        new ErrorV3(
+          'Import settings are invalid. See GROWI docs about details.',
+          'import_settings_invalid',
+        ),
+      );
+    }
+
+    /*
+     * detect unique constraint conflicts with the existing data
+     *
+     * The archive is unzipped but nothing has been written yet, so this is the last
+     * point at which the transfer can be refused without leaving the destination in a
+     * half-imported state.
+     */
+    // A collection this import empties first cannot collide with anything: its existing
+    // documents are gone before the archive's are written. Detecting a "conflict" there
+    // would abort a transfer that was always going to succeed.
+    const replaceTargetCollections = deriveReplaceTargets(importSettingsMap);
+
+    let conflictReport: UniqueConflictReport;
+    try {
+      conflictReport = await g2gTransferReceiverService.detectImportConflicts(
+        innerFileStats,
+        replaceTargetCollections,
+      );
+    } catch (err) {
+      logger.error(err);
+      // A detection that could not complete says nothing about whether the archive
+      // collides, and importing on that basis is exactly what drops documents
+      // silently and breaks group-granted pages (issue #10151). Fail instead.
+      return res.apiv3Err(
+        new ErrorV3(
+          'Failed to detect data conflicts before import.',
+          'conflict_detection_failed',
+        ),
+        500,
+      );
+    }
+
+    if (hasConflicts(conflictReport)) {
+      // Counts only: the conflicting values are user data and must not reach the log.
+      logger.warn(
+        {
+          // The code the response carries, so a log search by the code an operator
+          // was shown actually finds this line.
+          code: G2G_DATA_CONFLICT_ERROR_CODE,
+          errorCode: G2GTransferErrorCode.DATA_CONFLICT,
+          userConflictCount: conflictReport.userConflicts.length,
+          groupConflictCount: conflictReport.groupConflicts.length,
+        },
+        'Aborted the transfer import before writing anything: the transfer data conflicts with existing data',
+      );
+      return res.apiv3Err(
+        new ErrorV3(
+          summarizeUniqueConflicts(conflictReport),
+          G2G_DATA_CONFLICT_ERROR_CODE,
+        ),
+        409,
+      );
+    }
+
+    let importResult: ImportResult;
+    try {
+      importResult = await g2gTransferReceiverService.importCollections(
+        collections,
+        importSettingsMap,
+        sourceGROWIUploadConfigs,
+      );
+    } catch (err) {
+      logger.error(err);
+      return res.apiv3Err(
+        new ErrorV3(
+          'Failed to import MongoDB collections',
+          'mongo_collection_import_failure',
+        ),
+        500,
+      );
+    }
+
+    // The response body is the only way a failure over here reaches the operator: the
+    // progress notifications the operator watches are emitted by the source's process,
+    // which cannot see anything that happened in this one.
+    return res.apiv3({
+      message: 'Successfully started to receive transfer data.',
+      failedCollections: importResult.failedCollections,
+    });
+  };
+
+  /**
    * @swagger
    *
    *  /g2g-transfer:
@@ -378,199 +659,24 @@ export const setup = (crowi: Crowi): Router => {
     requireImportJob,
     uploads.single('transferDataZipFile'),
     async (req: Request & { file: any }, res: ApiV3Response) => {
-      const { file } = req;
-      const {
-        collections: strCollections,
-        optionsMap: strOptionsMap,
-        operatorUserId,
-        uploadConfigs: strUploadConfigs,
-      } = req.body;
+      // Take the claim over from `requireImportJob` before any work starts: from here on
+      // it follows the import rather than the response, and the `close` listener leaves it
+      // alone. Express does not stop this handler when the client disconnects, so a claim
+      // still tied to the response would be free again while `importCollections` is still
+      // writing — and the retry that a dropped transfer invites would walk straight into
+      // it.
+      const importJob = takeImportJob(req);
 
-      /*
-       * parse multipart form data
-       */
-      let collections: string[];
-      let optionsMap: { [key: string]: GrowiArchiveImportOption };
-      let sourceGROWIUploadConfigs: any;
       try {
-        collections = JSON.parse(strCollections);
-        optionsMap = JSON.parse(strOptionsMap);
-        sourceGROWIUploadConfigs = JSON.parse(strUploadConfigs);
-      } catch (err) {
-        logger.error(err);
-        return res.apiv3Err(
-          new ErrorV3('Failed to parse request body.', 'parse_failed'),
-          500,
-        );
+        await receiveTransferData(req, res);
+      } finally {
+        // Both run whether the transfer succeeded or failed: a failed one leaves just as
+        // much on disk, and the retry it invites would pile another copy on top. The
+        // archive goes first, so the next import never finds this one's leftovers in the
+        // shared directory.
+        await deleteReceivedArchive(req.file);
+        importJob?.release();
       }
-
-      /*
-       * refuse a request that names a collection the transfer must not carry
-       *
-       * The push route drops those collections before the archive is even built, so this
-       * is unreachable through the normal path. It stays as the safety net that makes
-       * that guarantee structural rather than a convention, and it runs before anything
-       * is unzipped so a refused request leaves the destination untouched.
-       */
-      const protectedCollections = collections.filter((collectionName) =>
-        NON_TRANSFERABLE_COLLECTIONS.has(collectionName),
-      );
-      if (protectedCollections.length > 0) {
-        logger.warn(
-          { protectedCollections },
-          'Refused the transfer import: the request names collections that must not be transferred',
-        );
-        return res.apiv3Err(
-          new ErrorV3(
-            `These collections must not be transferred: ${protectedCollections.join(', ')}`,
-            G2G_PROTECTED_COLLECTION_ERROR_CODE,
-          ),
-          400,
-        );
-      }
-
-      /*
-       * unzip and parse
-       */
-      let meta: object | undefined;
-      let innerFileStats: {
-        fileName: string;
-        collectionName: string;
-        size: number;
-      }[];
-      try {
-        const zipFile = importService.getFile(file.filename);
-        await importService.unzip(zipFile);
-
-        const zipFileStat = await growiBridgeService.parseZipFile(zipFile);
-        innerFileStats = zipFileStat?.innerFileStats ?? [];
-        meta = zipFileStat?.meta;
-      } catch (err) {
-        logger.error(err);
-        return res.apiv3Err(
-          new ErrorV3(
-            'Failed to validate transfer data file.',
-            'validation_failed',
-          ),
-          500,
-        );
-      }
-
-      /*
-       * validate meta.json
-       */
-      try {
-        importService.validate(meta);
-      } catch (err) {
-        logger.error(err);
-        return res.apiv3Err(
-          new ErrorV3(
-            'The version of this GROWI and the uploaded GROWI data are not the same',
-            'version_incompatible',
-          ),
-          500,
-        );
-      }
-
-      /*
-       * generate maps of ImportSettings to import
-       */
-      let importSettingsMap: Map<string, ImportSettings>;
-      try {
-        importSettingsMap = g2gTransferReceiverService.getImportSettingMap(
-          innerFileStats,
-          optionsMap,
-          operatorUserId,
-        );
-      } catch (err) {
-        logger.error(err);
-        return res.apiv3Err(
-          new ErrorV3(
-            'Import settings are invalid. See GROWI docs about details.',
-            'import_settings_invalid',
-          ),
-        );
-      }
-
-      /*
-       * detect unique constraint conflicts with the existing data
-       *
-       * The archive is unzipped but nothing has been written yet, so this is the last
-       * point at which the transfer can be refused without leaving the destination in a
-       * half-imported state.
-       */
-      // A collection this import empties first cannot collide with anything: its existing
-      // documents are gone before the archive's are written. Detecting a "conflict" there
-      // would abort a transfer that was always going to succeed.
-      const replaceTargetCollections = deriveReplaceTargets(importSettingsMap);
-
-      let conflictReport: UniqueConflictReport;
-      try {
-        conflictReport = await g2gTransferReceiverService.detectImportConflicts(
-          innerFileStats,
-          replaceTargetCollections,
-        );
-      } catch (err) {
-        logger.error(err);
-        // A detection that could not complete says nothing about whether the archive
-        // collides, and importing on that basis is exactly what drops documents
-        // silently and breaks group-granted pages (issue #10151). Fail instead.
-        return res.apiv3Err(
-          new ErrorV3(
-            'Failed to detect data conflicts before import.',
-            'conflict_detection_failed',
-          ),
-          500,
-        );
-      }
-
-      if (hasConflicts(conflictReport)) {
-        // Counts only: the conflicting values are user data and must not reach the log.
-        logger.warn(
-          {
-            // The code the response carries, so a log search by the code an operator
-            // was shown actually finds this line.
-            code: G2G_DATA_CONFLICT_ERROR_CODE,
-            errorCode: G2GTransferErrorCode.DATA_CONFLICT,
-            userConflictCount: conflictReport.userConflicts.length,
-            groupConflictCount: conflictReport.groupConflicts.length,
-          },
-          'Aborted the transfer import before writing anything: the transfer data conflicts with existing data',
-        );
-        return res.apiv3Err(
-          new ErrorV3(
-            summarizeUniqueConflicts(conflictReport),
-            G2G_DATA_CONFLICT_ERROR_CODE,
-          ),
-          409,
-        );
-      }
-
-      let importResult: ImportResult;
-      try {
-        importResult = await g2gTransferReceiverService.importCollections(
-          collections,
-          importSettingsMap,
-          sourceGROWIUploadConfigs,
-        );
-      } catch (err) {
-        logger.error(err);
-        return res.apiv3Err(
-          new ErrorV3(
-            'Failed to import MongoDB collections',
-            'mongo_collection_import_failure',
-          ),
-          500,
-        );
-      }
-
-      // The response body is the only way a failure over here reaches the operator: the
-      // progress notifications the operator watches are emitted by the source's process,
-      // which cannot see anything that happened in this one.
-      return res.apiv3({
-        message: 'Successfully started to receive transfer data.',
-        failedCollections: importResult.failedCollections,
-      });
     },
   );
 
