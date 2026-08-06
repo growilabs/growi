@@ -75,6 +75,56 @@ export const NON_TRANSFERABLE_COLLECTIONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * The other half of the ledger: collections that were looked at and found to hold GROWI
+ * content, so a transfer carries them.
+ *
+ * Nothing reads this at runtime — {@link selectTransferableCollections} is a deny-list, so
+ * an unlisted collection is transferred anyway. It exists so that a collection added to
+ * GROWI after this list was written cannot pass unnoticed: the drift test
+ * (non-transferable-collections.integ.ts) fails on any collection that appears in neither
+ * declaration, which is the only moment anyone is prompted to make the call.
+ */
+export const TRANSFERABLE_COLLECTIONS: ReadonlySet<string> = new Set([
+  'accesstokens',
+  'aiassistants',
+  'attachments',
+  'bookmarkfolders',
+  'bookmarks',
+  'comments',
+  'configs',
+  'contributions',
+  'editorsettings',
+  'externalaccounts',
+  'externalusergrouprelations',
+  'externalusergroups',
+  'globalnotificationsettings',
+  'growiplugins',
+  'inappnotifications',
+  'inappnotificationsettings',
+  'namedqueries',
+  'newsitems',
+  'newsreadstatuses',
+  'pageredirects',
+  'pages',
+  'pagetagrelations',
+  'passwordresetorders',
+  'revisions',
+  'sharelinks',
+  'slackappintegrations',
+  'subscriptions',
+  'tags',
+  'threadrelations',
+  'updateposts',
+  'usergrouprelations',
+  'usergroups',
+  'userregistrationorders',
+  'users',
+  'useruisettings',
+  'vectorstorefilerelations',
+  'vectorstores',
+]);
+
+/**
  * Narrows a list of collection names down to the ones a transfer may carry.
  *
  * Takes the list as an argument rather than reading the database itself, so that the push
