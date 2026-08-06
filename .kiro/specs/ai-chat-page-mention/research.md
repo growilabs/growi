@@ -1,5 +1,7 @@
 # Gap Analysis: ai-chat-page-mention
 
+> **本文書は discovery 時点の記録である。** 実装方針は設計途中で変更された箇所がある（例: 候補リスト UI は最終的に `@codemirror/autocomplete` ではなく downshift + React 側の独立レイヤになった）。現在の確定した設計・決定事項は design.md を参照すること。
+
 _対象要件: requirements.md (R1〜R7) / 実施日: 2026-06-06_
 
 ## 分析サマリ

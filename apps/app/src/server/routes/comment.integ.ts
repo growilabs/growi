@@ -76,6 +76,20 @@ describe('/comments.get share-link authorization (integration)', () => {
       data: { id: pageBId.toString(), path: '/comment-integ-b', v: 0 },
     });
 
+    // api.update re-links the comment with `revision: { connect: { id } }`, and
+    // Prisma rejects a `connect` to a missing record, so revision A must exist
+    // as a real row (the GET tests only ever use these ids as stored scalars).
+    await prisma.revisions.create({
+      data: {
+        id: revAId.toString(),
+        v: 0,
+        authorId: new ObjectId().toString(),
+        body: 'revision A body',
+        format: 'markdown',
+        pageId: pageAId.toString(),
+      },
+    });
+
     // Seed one comment on page A and one on page B (with distinct revisions).
     // Comments live in Prisma (the mongoose Comment model was migrated), so
     // seed through the same `prisma.comments.add` the route handler uses.
@@ -156,9 +170,21 @@ describe('/comments.get share-link authorization (integration)', () => {
       req.isSharedPage = true;
       next();
     };
-    app.post('/comments.add', forceShared, comment.api.add);
-    app.post('/comments.update', forceShared, comment.api.update);
-    app.post('/comments.remove', forceShared, comment.api.remove);
+    // routes/index.js puts `addActivity` in front of every write route, so the
+    // handlers' success paths read `res.locals.activity._id`. Mirror that here,
+    // otherwise a success path would fail for a reason unrelated to the route.
+    const stubActivity = (
+      _req: TestRequest,
+      res: Response,
+      next: NextFunction,
+    ) => {
+      res.locals.activity = { _id: new ObjectId() };
+      next();
+    };
+
+    app.post('/comments.add', forceShared, stubActivity, comment.api.add);
+    app.post('/comments.update', forceShared, stubActivity, comment.api.update);
+    app.post('/comments.remove', forceShared, stubActivity, comment.api.remove);
   });
 
   beforeEach(() => {
@@ -176,6 +202,7 @@ describe('/comments.get share-link authorization (integration)', () => {
     await prisma.comments.deleteMany({
       where: { id: { in: [commentAId, commentBId] } },
     });
+    await prisma.revisions.deleteMany({ where: { id: revAId.toString() } });
     await prisma.pages.deleteMany({
       where: { id: { in: [pageAId.toString(), pageBId.toString()] } },
     });
@@ -508,6 +535,74 @@ describe('/comments.get share-link authorization (integration)', () => {
 
       expect(res.body.ok).toBe(false);
       expect(accessSpy).toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The authorized-editor path of `/comments.update`.
+   *
+   * Every pre-existing `/comments.update` test above exercises a rejection, so
+   * the handler could (and did) fail to produce any response at all on the happy
+   * path without a single test noticing. When that happens the request never
+   * completes: the comment is written to the DB, but the client's `await` never
+   * settles, so the comment editor stays open and the edit looks like it did
+   * nothing. These tests pin the response itself.
+   */
+  describe('POST /comments.update — authorized editor', () => {
+    const editorId = new ObjectId();
+    let editableCommentId: string;
+
+    const sendUpdate = (comment: string) =>
+      request(app)
+        .post('/comments.update')
+        .send({
+          commentForm: {
+            comment,
+            comment_id: editableCommentId,
+            revision_id: revAId.toString(),
+          },
+        });
+
+    beforeEach(async () => {
+      const seeded = await prisma.comments.add(
+        pageAId.toString(),
+        editorId.toString(),
+        revAId.toString(),
+        'original body',
+        -1,
+      );
+      editableCommentId = seeded.id;
+
+      // the creator of the comment, on a page they can access
+      currentUser = { _id: editorId };
+      accessSpy.mockResolvedValue(true);
+    });
+
+    afterEach(async () => {
+      await prisma.comments.deleteMany({ where: { id: editableCommentId } });
+    });
+
+    it('responds with the updated comment', async () => {
+      const res = await sendUpdate('edited body');
+
+      expect(res.body.ok).toBe(true);
+      // mongoose-compatible field names, as `/comments.get` and `/comments.add` return
+      expect(res.body.comment).toMatchObject({
+        _id: editableCommentId,
+        comment: 'edited body',
+        page: pageAId.toString(),
+        creator: editorId.toString(),
+        revision: revAId.toString(),
+      });
+    });
+
+    it('persists the new comment body', async () => {
+      await sendUpdate('edited body');
+
+      const stored = await prisma.comments.findUnique({
+        where: { id: editableCommentId },
+      });
+      expect(stored?.comment).toBe('edited body');
     });
   });
 });

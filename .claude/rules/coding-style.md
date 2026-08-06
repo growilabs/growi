@@ -296,3 +296,47 @@ Before marking work complete:
 - [ ] **Module public surface is minimal** — `index.ts` re-exports only what external callers need; internals stay unexported
 - [ ] **Cohesive internals are grouped in subdirectories** with their own barrel, not flattened into the parent
 - [ ] *(apps/app)* Import specifiers follow the no-extension convention — see `apps/app/.claude/rules/import-convention.md`
+
+## Reviewing for Design Quality (「筋の良い実装」)
+
+A change can pass its tests and match the spec and still be the *wrong shape*.
+When reviewing (in `/review`, `kiro-review`, or `kiro-validate-impl`), do not stop
+at "does it work?" and "does it match the spec?" — also ask **"is this a sound,
+well-shaped implementation (筋の良い実装)?"**
+
+**"筋が良い" is not conformance to a fixed checklist.** It is the shape that best
+fits *what this particular feature and location need*: first judge which qualities
+matter most here — correctness, latency, memory footprint, security, readability,
+maintainability — and how they trade off against each other, then check that the
+implementation resolves that tradeoff well and executes it cleanly. The right call
+is context-dependent: a hot path may earn complexity a CRUD handler never should; a
+security boundary may justify verbosity that would be noise elsewhere. Reason about
+the tradeoff from first principles and state it — the stronger the reviewing model,
+the more this judgment should drive the verdict rather than rule-matching.
+
+The rest of this file is the repo's **usual defaults** — what good normally looks
+like here — a floor, not a ceiling. Treat the markers below as the common case, and
+expect a well-reasoned deviation to be *itself* 筋が良い when the reviewer names the
+tradeoff that justifies it:
+
+- **Right seams** — logic sits in the layer that owns it; non-trivial logic is a
+  pure function, not buried in a framework wrapper; no needless coupling introduced.
+- **No needless complexity** — the simplest shape that meets the requirement; no
+  speculative abstraction, no over-engineering, no dead branches.
+- **Idiomatic and consistent** — reads like the surrounding code (naming, exports,
+  immutability, error handling), not a foreign transplant.
+- **Single source of truth** — no drift-prone duplication; mode/variant behavior is
+  data-driven; executors take their work-set as input rather than hard-coding it.
+- **Not a workaround in disguise** — it addresses the actual cause, rather than
+  papering over a symptom in a way a maintainer would have to unwind later.
+
+These defaults must never veto a sound, explicitly-argued context judgment. If a
+default and the tradeoff judgment conflict, the judgment wins and the default is the
+thing to revisit — not the code. This section anchors the question; it does not cap
+the answer.
+
+**Severity discipline.** A spec-compliant change with a poor shape is normally a
+`Suggestion` or `Important` finding, not an automatic rejection — reserve blocking
+for a shape that is genuinely hard to maintain, hides coupling, or will force a
+rewrite. Design-quality review sharpens the result; it is not a license to loop on
+taste. (See `kiro-review` for the task-local severity model.)
