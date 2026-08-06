@@ -189,9 +189,10 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
       Page = mongoose.model<PageDocument, PageModel>('Page');
       User = mongoose.model('User');
 
-      // Wait for the model's own autoIndex build (B1.2) rather than creating indexes
-      // here — B2.1 is a check that the shipped indexes suffice, not a place to add any.
-      await PageLink.init();
+      // syncIndexes(), not init(): init() only ever creates, and `growi_test_<workerId>`
+      // is reused across runs — so indexes B2.2 removed from the schema would survive and
+      // the inventory check below would flag a stale local database as a real gap.
+      await PageLink.syncIndexes();
 
       await User.insertMany([
         {
