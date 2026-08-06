@@ -1370,5 +1370,13 @@
         "description": "Manually reconcile data inconsistencies between MongoDB pages and Vault git trees without performing a full initialization."
       }
     }
+  },
+  "maintenance_mode_notice": {
+    "title": "GROWI will stay in maintenance mode",
+    "body_this_growi": "Importing the configs collection replaces every setting of this GROWI with the ones in the archive, so this GROWI is put into maintenance mode and left there. Ordinary users cannot reach it until you switch it off.",
+    "body_destination": "Importing the configs collection replaces every setting of the destination GROWI with the ones from this GROWI, so the destination is put into maintenance mode and left there. Ordinary users cannot reach the destination until you switch it off. Attachments are transferred after the collections, so the destination is incomplete until the whole transfer has finished.",
+    "turn_it_off": "Switch maintenance mode off from Admin > App Settings on the GROWI that was closed, once you have checked the result.",
+    "cancel": "Cancel",
+    "proceed": "Understood, proceed"
   }
 }

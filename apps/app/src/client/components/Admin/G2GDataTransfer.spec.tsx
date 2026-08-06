@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { Socket } from 'socket.io-client';
 import { mock } from 'vitest-mock-extended';
 
@@ -141,6 +141,63 @@ describe('G2GDataTransfer', () => {
         CONFLICT_SUMMARY,
         CONFLICT_SUMMARY,
       ]);
+    });
+  });
+
+  describe('starting a transfer', () => {
+    // The start button is a submit button; happy-dom does not turn a click on one into
+    // a form submission, so the form is submitted directly.
+    const submitTransferForm = () => {
+      const form = screen
+        .getByRole('button', { name: 'admin:g2g_data_transfer.start_transfer' })
+        .closest('form');
+      if (form == null) {
+        throw new Error('Expected the start button to sit in a form');
+      }
+      fireEvent.submit(form);
+    };
+
+    it('does not send anything until the maintenance mode notice is acknowledged', async () => {
+      // Requirement 2.10 — the destination is left in maintenance mode by the transfer,
+      // and the operator has to be told before anything is sent, not after.
+      renderComponent();
+      await act(async () => {});
+
+      await act(async () => {
+        submitTransferForm();
+      });
+      expect(apiv3Post).not.toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', {
+            name: 'maintenance_mode_notice.proceed',
+          }),
+        );
+      });
+
+      expect(apiv3Post).toHaveBeenCalledWith(
+        '/g2g-transfer/transfer',
+        expect.any(Object),
+      );
+    });
+
+    it('sends nothing when the operator backs out of the notice', async () => {
+      renderComponent();
+      await act(async () => {});
+
+      await act(async () => {
+        submitTransferForm();
+      });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', {
+            name: 'maintenance_mode_notice.cancel',
+          }),
+        );
+      });
+
+      expect(apiv3Post).not.toHaveBeenCalled();
     });
   });
 });
