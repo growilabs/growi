@@ -194,9 +194,12 @@
   two copies can drift (a `maxDepth` cap, a collection rename) so that page view and the link
   index disagree about where a chain ends, which is exactly the invariant this feature relies on.
 - **Trade-offs**: Redirect records accumulate (`removePageRedirectsByToPath` is unused) — a
-  data-hygiene caveat, not a correctness one. `$graphLookup` still has no `maxDepth`; now that it
-  runs on the write path it is a cheap hardening to add, and consolidating on one static means
-  adding it in one place.
+  data-hygiene caveat, not a correctness one. The chain walk is capped at `maxDepth: 50`, added
+  once consolidation made it a one-line change: `$graphLookup` is memory-bound at 100MB and
+  cannot spill to disk, so an unbounded walk fails the whole aggregation rather than degrading.
+  A chain past the cap resolves to its 51st hop — the same "endpoint with no live page" outcome
+  a cycle already produces. (`removePageRedirectsByToPath` walks the graph the other way and is
+  still uncapped; it runs on delete, not on save.)
 
 ### Decision: requirement 6.4 implies a **forward-link health** read over the same index
 

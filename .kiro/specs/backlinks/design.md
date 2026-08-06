@@ -222,7 +222,9 @@ apps/app/src/features/backlinks/
   `retrievePageRedirectEndpoints` as a lookup over it. Adding it to the model rather than to this
   feature keeps one copy of the pipeline; the singular contract is unchanged for
   `page-data-props.ts`. Its duplicate-match `logger.warn` is dropped — `fromPath` is
-  unique-indexed, so more than one match was already unreachable.
+  unique-indexed, so more than one match was already unreachable. The consolidated pipeline
+  carries `maxDepth: 50`; `$graphLookup` is memory-bound at 100MB with no disk spill, and now
+  that it runs on every save an unbounded walk would fail the aggregation outright.
 - `apps/app/src/client/components/PageAccessoriesModal/PageAccessoriesModal.tsx` (+ its Jotai
   modal-contents enum) — add the **Backlinks** tab mapping to `BacklinksPanel`.
 
@@ -503,6 +505,13 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTa
 - `findForwardLinkHealth`: rows where `fromPage == X`; derive each target's
   `LinkTargetState` (`toPage == null` → `broken`; target trashed → `trashed`; else `normal`);
   return the `trashed`/`broken` rows as `ILinkTarget` for the editor's attention (6.4).
+  - **Viewer filtering is required here, unlike `findBacklinks`' source filtering.** `ILinkTarget`
+    carries the target's `path`, and since B4.1 resolution follows the rename chain, a `toPage` may
+    point at a page that has since moved into an area the viewer cannot read — so the *target* set
+    must go through the shared viewer/grant filter before the DTO is built, or this endpoint leaks
+    private paths to anyone who can read the linking page. Resolution itself is grant-blind by
+    design (it must match what a click does, and the live path lookup was always grant-blind), so
+    the filter belongs on this read path, not in `resolveToPages`.
 
 **Implementation Notes**
 - Integration: register in `crowi` page-service setup; never edit `PageService`.

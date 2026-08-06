@@ -14,12 +14,24 @@ const NON_EMPTY_PAGE_CONDITION = {
   $or: [{ isEmpty: false }, { isEmpty: null }],
 };
 
+// Per call, never at module scope: this module can be imported before crowi
+// registers the Page schema, and mongoose.model() throws then.
+const getPageModel = () => mongoose.model<PageDocument, PageModel>('Page');
+
+const findPagesById = async (
+  ids: string[],
+): Promise<{ _id: Types.ObjectId }[]> => {
+  return await getPageModel()
+    .find({ _id: { $in: ids } })
+    .select('_id')
+    .lean();
+};
+
 const findPagesByPath = async (
   paths: string[],
 ): Promise<{ _id: Types.ObjectId; path: string }[]> => {
-  const Page = mongoose.model<PageDocument, PageModel>('Page');
-
-  return await Page.find({ path: { $in: paths }, ...NON_EMPTY_PAGE_CONDITION })
+  return await getPageModel()
+    .find({ path: { $in: paths }, ...NON_EMPTY_PAGE_CONDITION })
     .select('_id path')
     .lean();
 };
@@ -48,8 +60,6 @@ const findPagesByPath = async (
 export const resolveToPages = async (
   paths: string[],
 ): Promise<Map<string, Types.ObjectId>> => {
-  const Page = mongoose.model<PageDocument, PageModel>('Page');
-
   const permalinkIds: string[] = [];
   const normalPaths: string[] = [];
 
@@ -62,11 +72,7 @@ export const resolveToPages = async (
   }
 
   const [byId, byPath] = await Promise.all([
-    permalinkIds.length
-      ? Page.find({ _id: { $in: permalinkIds } })
-          .select('_id')
-          .lean()
-      : [],
+    permalinkIds.length ? findPagesById(permalinkIds) : [],
     normalPaths.length ? findPagesByPath(normalPaths) : [],
   ]);
 
@@ -82,9 +88,8 @@ export const resolveToPages = async (
     await PageRedirect.retrievePageRedirectEndpointsBatch(missedPaths);
   if (endpoints.size === 0) return result;
 
-  // Only where the chain ends matters here; `start` serves the page-view banner.
-  // $graphLookup visits each document once, so a redirect cycle terminates with an
-  // endpoint that simply has no page — reported as unresolved, never as a hang.
+  // $graphLookup visits each document once, so a cycle ends at a path with no
+  // page: unresolved, never a hang.
   const endpointByPath = new Map<string, string>();
   for (const [path, { end }] of endpoints) {
     endpointByPath.set(path, end.toPath);

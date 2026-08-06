@@ -27,6 +27,11 @@ export interface PageRedirectModel extends Model<PageRedirectDocument> {
 
 const CHAINS_FIELD_NAME = 'chains';
 const DEPTH_FIELD_NAME = 'depth';
+
+// $graphLookup is memory-bound (100MB, no disk spill), so an unbounded walk
+// fails the aggregation outright rather than degrading. Past the cap a chain
+// ends at a path with no live page — the same outcome as a cycle.
+const MAX_CHAIN_DEPTH = 50;
 type IPageRedirectWithChains = PageRedirectDocument & {
   [CHAINS_FIELD_NAME]: (PageRedirectDocument & {
     [DEPTH_FIELD_NAME]: number;
@@ -60,6 +65,7 @@ schema.statics.retrievePageRedirectEndpointsBatch = async function (
         connectToField: 'fromPath',
         as: CHAINS_FIELD_NAME,
         depthField: DEPTH_FIELD_NAME,
+        maxDepth: MAX_CHAIN_DEPTH,
       },
     },
   ]);

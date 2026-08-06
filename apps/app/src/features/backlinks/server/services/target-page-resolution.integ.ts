@@ -121,8 +121,7 @@ describe('resolveToPages (integration)', () => {
     });
 
     it('resolves several renamed targets in one pass', async () => {
-      // The unit spec can only prove every missed path reaches the `$in`; that the
-      // aggregation then returns a chain per input is real-pipeline behaviour.
+      // Only a real pipeline shows $in returning a chain per input.
       const pageX = await createPage({ path: '/resolve-integ/x2' });
       const pageY = await createPage({ path: '/resolve-integ/y2' });
       await createRedirect('/resolve-integ/x', '/resolve-integ/x2');
@@ -184,10 +183,8 @@ describe('resolveToPages (integration)', () => {
     });
 
     it('resolves a soft-deleted target through its trash redirect', async () => {
-      // Soft delete moves the page under /trash and leaves the same kind of
-      // PageRedirect behind (service/page/index.ts deleteNonEmptyTarget), so a
-      // link to a binned page resolves to it instead of reading as broken —
-      // which is what lets the derived state say `trashed` rather than `broken`.
+      // Soft delete moves the page under /trash and leaves a PageRedirect behind
+      // (deleteNonEmptyTarget), so B5 can derive `trashed` rather than `broken`.
       const page = await createPage({
         path: '/trash/resolve-integ/binned',
         status: Page.STATUS_DELETED,

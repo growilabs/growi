@@ -421,9 +421,14 @@ the restored page's status. Independent of B3/B4.
   - Implement `findForwardLinkHealth` (a page's outbound rows whose derived target state is
     trashed/broken, mapped to `ILinkTarget`); derive target state from `toPage`/target status rather
     than a stored flag
+  - **Filter the targets through the shared viewer/grant filter.** `ILinkTarget` returns the
+    target's `path`, and B4.1 made resolution follow the rename chain, so a `toPage` can point at a
+    page that has since moved somewhere the viewer cannot read. Without this filter the endpoint
+    leaks private paths to anyone who can read the linking page. `findBacklinks`' filter is on the
+    *source* pages and does not cover this
   - Done when an integration test shows forward health reports trashed/broken targets with the correct
-    state
-  - _Requirements: 5.3, 6.1, 6.2, 6.3, 6.4_
+    state, **and** that a target the viewer cannot read is omitted
+  - _Requirements: 5.3, 6.1, 6.2, 6.3, 6.4, 2.1_
   - _Boundary: PageLinkService_
   - _Depends: B5.1, B1.7_
 

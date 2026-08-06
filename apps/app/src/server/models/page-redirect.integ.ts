@@ -132,7 +132,6 @@ describe('PageRedirect', () => {
         ]);
 
       // then:
-      // a chain is followed per input, so one $in query serves both
       expect(endpointsByFromPath.size).toEqual(2);
       expect(endpointsByFromPath.get('/path1')?.start.fromPath).toEqual(
         '/path1',
@@ -158,6 +157,25 @@ describe('PageRedirect', () => {
       expect(endpointsByFromPath.has('/never-existed')).toBe(false);
     });
 
+    test('shoud stop following a chain at the depth cap', async () => {
+      // setup:
+      // uncapped, the walk would reach /p60
+      await PageRedirect.insertMany(
+        Array.from({ length: 60 }, (_, i) => ({
+          fromPath: `/p${i}`,
+          toPath: `/p${i + 1}`,
+        })),
+      );
+
+      // when:
+      const endpointsByFromPath =
+        await PageRedirect.retrievePageRedirectEndpointsBatch(['/p0']);
+
+      // then:
+      // depth 0 is the /p1 hop, so maxDepth 50 ends the walk at /p51 -> /p52
+      expect(endpointsByFromPath.get('/p0')?.end.toPath).toEqual('/p52');
+    });
+
     test('shoud return an empty map without querying for an empty input', async () => {
       // setup:
       const aggregateSpy = vi.spyOn(PageRedirect, 'aggregate');
@@ -168,8 +186,7 @@ describe('PageRedirect', () => {
 
       // then:
       expect(endpointsByFromPath.size).toEqual(0);
-      // an empty $in yields an empty map either way, so only the skipped round
-      // trip distinguishes the guard from its absence
+      // the map is empty either way; only the skipped round trip shows the guard
       expect(aggregateSpy).not.toHaveBeenCalled();
 
       aggregateSpy.mockRestore();

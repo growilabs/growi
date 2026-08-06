@@ -22,11 +22,7 @@ vi.mock('~/server/models/page-redirect', () => ({
   default: { retrievePageRedirectEndpointsBatch: mocks.retrieveEndpoints },
 }));
 
-/**
- * A redirect result as the model static returns it. With no further chain the
- * matched document is itself the endpoint, so `end` equals `start`; only
- * `end.toPath` is read here.
- */
+/** A one-hop redirect as the static returns it: no chain, so `end` is `start`. */
 const endpointsTo = (pairs: [from: string, to: string][]) =>
   new Map(
     pairs.map(([fromPath, toPath]) => [
