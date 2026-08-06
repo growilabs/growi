@@ -1,8 +1,13 @@
-import { Types } from 'mongoose';
+import type { HydratedDocument } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
+
+import type { PageDocument, PageModel } from '~/server/models/page';
+import PageModelFactory from '~/server/models/page';
+import PageRedirect from '~/server/models/page-redirect';
 
 import type { IPageLink } from '../../interfaces/page-link';
 import PageLink from '../models/page-link';
-import { syncOutboundLinks } from './page-link-sync';
+import { reResolveByToPath, syncOutboundLinks } from './page-link-sync';
 
 describe('syncOutboundLinks (integration)', () => {
   const fromPage = new Types.ObjectId();
@@ -108,5 +113,193 @@ describe('syncOutboundLinks (integration)', () => {
     await syncOutboundLinks(fromPage, []);
 
     expect(await outboundRows()).toEqual([]);
+  });
+});
+
+describe('reResolveByToPath (integration)', () => {
+  let Page: PageModel;
+  let createdPages: Types.ObjectId[] = [];
+  let createdLinks: Types.ObjectId[] = [];
+  let createdRedirects: Types.ObjectId[] = [];
+
+  beforeAll(async () => {
+    await PageModelFactory(null);
+    Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>('Page');
+  });
+
+  afterEach(async () => {
+    await Page.deleteMany({ _id: { $in: createdPages } });
+    await PageLink.deleteMany({ _id: { $in: createdLinks } });
+    await PageRedirect.deleteMany({ _id: { $in: createdRedirects } });
+    createdPages = [];
+    createdLinks = [];
+    createdRedirects = [];
+  });
+
+  const createPage = async (
+    path: string,
+  ): Promise<HydratedDocument<PageDocument>> => {
+    const page = await Page.create({ path });
+    createdPages.push(page._id);
+    return page;
+  };
+
+  const createLink = async (row: IPageLink): Promise<void> => {
+    const link = await PageLink.create(row);
+    createdLinks.push(link._id);
+  };
+
+  /** Stands in for what a rename with "create redirect page" leaves behind. */
+  const createRedirect = async (
+    fromPath: string,
+    toPath: string,
+  ): Promise<void> => {
+    const redirect = await PageRedirect.create({ fromPath, toPath });
+    createdRedirects.push(redirect._id);
+  };
+
+  // Whole row set, so a dropped or extra row fails too — not just a wrong target.
+  const inboundRows = (toPath: string) =>
+    PageLink.find({ toPath })
+      .select('fromPage toPage -_id')
+      .sort({ fromPage: 1 })
+      .lean();
+
+  it('repoints a stale cache at the page that now occupies the path', async () => {
+    const source = new Types.ObjectId();
+    const previousOccupant = new Types.ObjectId();
+    await createLink({
+      fromPage: source,
+      toPath: '/re-resolve-integ/reused',
+      toPage: previousOccupant,
+    });
+    const occupant = await createPage('/re-resolve-integ/reused');
+
+    await reResolveByToPath('/re-resolve-integ/reused');
+
+    expect(await inboundRows('/re-resolve-integ/reused')).toEqual([
+      { fromPage: source, toPage: occupant._id },
+    ]);
+  });
+
+  it('heals a broken row when a page appears at the path', async () => {
+    const source = new Types.ObjectId();
+    await createLink({
+      fromPage: source,
+      toPath: '/re-resolve-integ/created-later',
+      toPage: null,
+    });
+    const page = await createPage('/re-resolve-integ/created-later');
+
+    await reResolveByToPath('/re-resolve-integ/created-later');
+
+    expect(await inboundRows('/re-resolve-integ/created-later')).toEqual([
+      { fromPage: source, toPage: page._id },
+    ]);
+  });
+
+  it('nulls the cache when nothing resolves at the path (row becomes broken)', async () => {
+    const source = new Types.ObjectId();
+    await createLink({
+      fromPage: source,
+      toPath: '/re-resolve-integ/vanished',
+      toPage: new Types.ObjectId(),
+    });
+
+    await reResolveByToPath('/re-resolve-integ/vanished');
+
+    expect(await inboundRows('/re-resolve-integ/vanished')).toEqual([
+      { fromPage: source, toPage: null },
+    ]);
+  });
+
+  it('repoints every source linking to the path, and leaves other paths untouched', async () => {
+    const sourceA = new Types.ObjectId();
+    const sourceB = new Types.ObjectId();
+    const untouchedTarget = new Types.ObjectId();
+    await createLink({
+      fromPage: sourceA,
+      toPath: '/re-resolve-integ/shared',
+      toPage: null,
+    });
+    await createLink({
+      fromPage: sourceB,
+      toPath: '/re-resolve-integ/shared',
+      toPage: null,
+    });
+    await createLink({
+      fromPage: sourceA,
+      toPath: '/re-resolve-integ/unrelated',
+      toPage: untouchedTarget,
+    });
+    const page = await createPage('/re-resolve-integ/shared');
+
+    await reResolveByToPath('/re-resolve-integ/shared');
+
+    const rows = await inboundRows('/re-resolve-integ/shared');
+    expect(rows).toHaveLength(2);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { fromPage: sourceA, toPage: page._id },
+        { fromPage: sourceB, toPage: page._id },
+      ]),
+    );
+    expect(await inboundRows('/re-resolve-integ/unrelated')).toEqual([
+      { fromPage: sourceA, toPage: untouchedTarget },
+    ]);
+  });
+
+  it('resolves through a redirect, so a link to a renamed-away path is repointed at the target', async () => {
+    const source = new Types.ObjectId();
+    await createLink({
+      fromPage: source,
+      toPath: '/re-resolve-integ/old-name',
+      toPage: null,
+    });
+    const page = await createPage('/re-resolve-integ/new-name');
+    await createRedirect(
+      '/re-resolve-integ/old-name',
+      '/re-resolve-integ/new-name',
+    );
+
+    await reResolveByToPath('/re-resolve-integ/old-name');
+
+    expect(await inboundRows('/re-resolve-integ/old-name')).toEqual([
+      { fromPage: source, toPage: page._id },
+    ]);
+  });
+
+  it('skips only the row whose source is the target, still repointing the others', async () => {
+    // The page was renamed away from this path and its own body still links to the
+    // old one, so resolution comes back with the linking page itself.
+    const source = await createPage('/re-resolve-integ/self-new');
+    await createRedirect(
+      '/re-resolve-integ/self-old',
+      '/re-resolve-integ/self-new',
+    );
+    const otherSource = new Types.ObjectId();
+    await createLink({
+      fromPage: source._id,
+      toPath: '/re-resolve-integ/self-old',
+      toPage: null,
+    });
+    await createLink({
+      fromPage: otherSource,
+      toPath: '/re-resolve-integ/self-old',
+      toPage: null,
+    });
+
+    await reResolveByToPath('/re-resolve-integ/self-old');
+
+    const rows = await inboundRows('/re-resolve-integ/self-old');
+    expect(rows).toHaveLength(2);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        // a page must never become its own backlink
+        { fromPage: source._id, toPage: null },
+        // ...and one self row must not hold back the rest of the path
+        { fromPage: otherSource, toPage: source._id },
+      ]),
+    );
   });
 });
