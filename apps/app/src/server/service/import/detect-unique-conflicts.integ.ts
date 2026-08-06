@@ -17,6 +17,7 @@ import {
 import type UserEvent from '~/server/events/user';
 import UserGroupRelation from '~/server/models/user-group-relation';
 
+import { configManager } from '../config-manager';
 import { G2GTransferReceiverService } from '../g2g-transfer';
 import { GrowiBridgeService } from '../growi-bridge';
 import { detectUniqueConflicts } from './detect-unique-conflicts';
@@ -914,6 +915,10 @@ describe('detectUniqueConflicts', () => {
       // which group access does not depend on.
       importService = new ImportService(crowi);
       receiverService = new G2GTransferReceiverService(crowi);
+
+      // The import reads the destination's maintenance-mode flag before it starts, so the
+      // configs the server loads at boot have to be in place here too.
+      await configManager.loadConfigs();
 
       await removeImportFixtures();
     });

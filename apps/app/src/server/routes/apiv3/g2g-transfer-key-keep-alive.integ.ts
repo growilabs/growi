@@ -256,7 +256,8 @@ describe('receive route — transfer key keep-alive', () => {
     expect(whileConnected).toBeGreaterThan(0);
 
     pending.abort();
-    await delay(KEEP_ALIVE_INTERVAL_MS);
+    // Long enough for an extension that was already under way to finish writing.
+    await delay(KEEP_ALIVE_INTERVAL_MS * 3);
     const justAfterDisconnect = await readExpireAt();
 
     await delay(KEEP_ALIVE_INTERVAL_MS * 4);
@@ -324,6 +325,9 @@ describe('receive route — transfer key keep-alive', () => {
 
       // Everything after the export is itself a request to the destination, so the
       // reminder has to stop; left running it would hold the key open indefinitely.
+      // The wait before the baseline lets a request that was already on its way when the
+      // reminder stopped arrive, so the baseline is not taken in the middle of one.
+      await delay(KEEP_ALIVE_INTERVAL_MS * 3);
       const afterExport = await readExpireAt(tk.key);
       await delay(KEEP_ALIVE_INTERVAL_MS * 4);
       expect(await readExpireAt(tk.key)).toBe(afterExport);

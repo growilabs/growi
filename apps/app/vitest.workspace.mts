@@ -87,10 +87,15 @@ export default defineWorkspace([
   // The per-worker test database is shared by every file a worker runs, and the other
   // integration tests clean up by deleting their own prefixed fixtures. A test that
   // empties a collection wholesale — which the transfer's replace path forces, `configs`
-  // above all — would take those fixtures with it. Two things keep it apart:
-  // `singleFork` gives these files a worker of their own, and `testDbNamespace` keeps
-  // their database name out of reach of the threads pool, whose worker ids are numbered
-  // from 1 independently of this one (see test/setup/mongo/test-db-config.ts).
+  // above all — would take those fixtures with it. `testDbNamespace` is what keeps them
+  // apart: it puts these files on `growi_test_exclusive_<n>`, a name no worker of any
+  // other project is ever given (see test/setup/mongo/test-db-config.ts).
+  //
+  // Everything else is deliberately identical to app-integration. Giving this project a
+  // fork of its own instead (`pool: 'forks'` + `singleFork`) puts all of its files in one
+  // worker, where the mongo setup's per-file teardown stops the in-memory server the next
+  // file then tries to use — so the isolation has to come from the database name, not
+  // from the worker.
   mergeConfig(configShared, {
     resolve: {
       conditions: ['require', 'node', 'default'],
@@ -113,10 +118,6 @@ export default defineWorkspace([
         './test/setup/mongo/index.ts',
         './test/setup/prisma.ts',
       ],
-      pool: 'forks',
-      poolOptions: {
-        forks: { singleFork: true },
-      },
       deps: { interopDefault: true },
       server: {
         deps: {
