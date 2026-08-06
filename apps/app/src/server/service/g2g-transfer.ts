@@ -8,7 +8,10 @@ import * as FormDataModule from 'form-data';
 import mongoose, { Types as MongooseTypes } from 'mongoose';
 import { basename } from 'pathe';
 
-import { G2G_PROGRESS_STATUS } from '~/interfaces/g2g-transfer';
+import {
+  G2G_PROGRESS_STATUS,
+  type G2GProgressStatus,
+} from '~/interfaces/g2g-transfer';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { ImportMode } from '~/models/admin/import-mode';
 import TransferKeyModel from '~/server/models/transfer-key';
@@ -26,6 +29,7 @@ import UserGroup from '../models/user-group';
 import {
   G2G_DATA_CONFLICT_ERROR_CODE,
   G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+  G2G_PROTECTED_COLLECTION_ERROR_CODE,
   G2GTransferError,
   G2GTransferErrorCode,
 } from '../models/vo/g2g-transfer-error';
@@ -335,6 +339,12 @@ const GENERIC_ARCHIVE_POST_ERROR_EVENT: ArchivePostErrorEvent = {
 const ARCHIVE_POST_ERROR_KEY_BY_CODE: ReadonlyMap<string, string> = new Map([
   [G2G_DATA_CONFLICT_ERROR_CODE, 'admin:g2g:error_data_conflict'],
   [G2G_IMPORT_IN_PROGRESS_ERROR_CODE, 'admin:g2g:error_import_in_progress'],
+  // The push route drops non-transferable collections before the archive is built, so a
+  // transfer started from the admin screen never gets this answer. When it does arrive,
+  // the two GROWIs disagree about which collections a transfer may carry, and the generic
+  // "failed to send the archive" hides exactly the fact that identifies that: the
+  // receiver's message names the collections it refused.
+  [G2G_PROTECTED_COLLECTION_ERROR_CODE, 'admin:g2g:error_protected_collection'],
 ]);
 
 /**
@@ -765,50 +775,83 @@ export class G2GTransferPusherService implements Pusher {
     // import is in the body, and this is the only place that fact can be read: the two
     // GROWIs are separate processes and these notifications are emitted by this one.
     const failedCollections = readFailedCollections(archiveResponseData);
-    if (failedCollections.length > 0) {
+    const isPartiallyImported = failedCollections.length > 0;
+
+    if (isPartiallyImported) {
       logger.error(
         { failedCollections },
         'The destination GROWI could not import every collection',
       );
+    }
+
+    // The status the mongo phase keeps for the rest of the transfer. A partly failed
+    // import is never restated as COMPLETED later on: the admin screen reads
+    // `mongo === COMPLETED && attachments === COMPLETED` as "the transfer succeeded" and
+    // shows the green toast, so restating it would hand the operator a success for a
+    // transfer that lost collections (requirements 2.5, 2.8).
+    const mongoStatus: G2GProgressStatus = isPartiallyImported
+      ? G2G_PROGRESS_STATUS.ERROR
+      : G2G_PROGRESS_STATUS.COMPLETED;
+
+    const emitProgress = (attachments: G2GProgressStatus): void => {
       socket?.emit('admin:g2gProgress', {
-        mongo: G2G_PROGRESS_STATUS.ERROR,
-        attachments: G2G_PROGRESS_STATUS.PENDING,
-        failedCollections,
+        mongo: mongoStatus,
+        attachments,
+        // Only carried when there is something to carry, so a fully successful transfer
+        // keeps emitting exactly the payload it did before.
+        ...(isPartiallyImported ? { failedCollections } : {}),
       });
+    };
+
+    /**
+     * Tells the operator that the transfer did not fully succeed, and which collections
+     * were left out.
+     *
+     * Deferred until the attachments are done rather than emitted here, because the
+     * client hides the progress panel as soon as an `admin:g2gError` arrives: emitting it
+     * now would replace a live view of the attachment transfer with silence for as long
+     * as the files take. Until then the panel already shows the mongo phase in error, so
+     * the failure is visible the whole time; this event is the closing word on it.
+     */
+    const reportPartialImport = (): void => {
       socket?.emit('admin:g2gError', {
         key: 'admin:g2g:error_partial_import',
         message: `Collections that could not be imported: ${failedCollections.join(', ')}`,
       });
-      // The attachments are not sent: the destination holds a partly imported database
-      // and has to be transferred again, so pushing files into it now would only make the
-      // retry slower. Reporting completion here is what requirement 2.5 rules out.
-      return;
-    }
+    };
 
-    socket?.emit('admin:g2gProgress', {
-      mongo: G2G_PROGRESS_STATUS.COMPLETED,
-      attachments: G2G_PROGRESS_STATUS.IN_PROGRESS,
-    });
+    emitProgress(G2G_PROGRESS_STATUS.IN_PROGRESS);
 
+    // The attachments are transferred even when the import was only partly successful.
+    // The destination keeps everything it did import — `users` among it — so the unique
+    // conflict gate refuses a plain retry of the whole transfer with a 409, and skipping
+    // the files here would leave the operator with no way to get them across short of
+    // rebuilding the destination. Requirement 5.2 asks for the attachments not to be
+    // lost; requirement 2.8 asks for the failure to be reported, and both are satisfied
+    // by sending the files and still reporting the failure below.
     try {
       await this.transferAttachments(tk);
     } catch (err) {
       logger.error(err);
-      socket?.emit('admin:g2gProgress', {
-        mongo: G2G_PROGRESS_STATUS.COMPLETED,
-        attachments: G2G_PROGRESS_STATUS.ERROR,
-      });
+      emitProgress(G2G_PROGRESS_STATUS.ERROR);
       socket?.emit('admin:g2gError', {
         message: 'Failed to transfer attachments',
         key: 'admin:g2g:error_upload_attachment',
       });
+      // A failed attachment transfer does not take the place of the import failure: they
+      // are separate facts, and only this event names the collections the destination is
+      // missing.
+      if (isPartiallyImported) {
+        reportPartialImport();
+      }
       throw err;
     }
 
-    socket?.emit('admin:g2gProgress', {
-      mongo: G2G_PROGRESS_STATUS.COMPLETED,
-      attachments: G2G_PROGRESS_STATUS.COMPLETED,
-    });
+    emitProgress(G2G_PROGRESS_STATUS.COMPLETED);
+
+    if (isPartiallyImported) {
+      reportPartialImport();
+    }
   }
 
   /**

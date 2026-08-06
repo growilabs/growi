@@ -1206,7 +1206,8 @@
     "error_data_conflict": "Transfer aborted: some of the transferred data conflicts with users or user groups that already exist on the destination GROWI, so nothing was imported. Resolve the conflicting accounts or groups before retrying, or transfer into a destination GROWI that has not yet completed its initial setup.",
     "error_upload_attachment": "Failed to transfer attachments",
     "error_import_in_progress": "Transfer aborted: another data import is already running on the destination GROWI. Wait for it to finish, then retry the transfer.",
-    "error_partial_import": "Transfer incomplete: the destination GROWI could not import every collection, so it now holds a partly transferred database. Fix the cause and run the transfer again."
+    "error_partial_import": "Transfer incomplete: the destination GROWI could not import every collection, so it now holds a partly transferred database. Fix the cause and run the transfer again.",
+    "error_protected_collection": "Transfer aborted: the destination GROWI refused the request because it named collections that a transfer must not carry, so nothing was imported. The transfer screen never selects those collections, so check that both GROWIs are running the same version, then report the collection names shown below."
   },
   "external_user_group": {
     "management": "External Group Management",

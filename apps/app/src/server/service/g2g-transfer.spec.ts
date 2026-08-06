@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream';
 // biome-ignore lint/style/noRestrictedImports: startTransfer's archive POST calls rawAxios directly, so the spy must attach to that same singleton instance.
-import rawAxios from 'axios';
+import rawAxios, { type AxiosResponse } from 'axios';
 import type { Namespace } from 'socket.io';
 import { mock } from 'vitest-mock-extended';
 
@@ -9,7 +9,10 @@ import type Crowi from '~/server/crowi';
 import {
   G2G_DATA_CONFLICT_ERROR_CODE,
   G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+  G2G_PROTECTED_COLLECTION_ERROR_CODE,
+  G2GTransferErrorCode,
 } from '~/server/models/vo/g2g-transfer-error';
+import axios from '~/utils/axios';
 import { TransferKey } from '~/utils/vo/transfer-key';
 
 import {
@@ -41,6 +44,14 @@ vi.mock('./export', () => ({
 // not inspect, so a stub avoiding that throw is enough.
 vi.mock('./config-manager', () => ({
   configManager: { getConfig: vi.fn() },
+}));
+
+// The custom axios instance is the pusher's other network boundary (the archive POST goes
+// through `rawAxios`): the transfer key keep-alive and the attachment phase's "which
+// files do you already have?" both go through it. Left real, the attachment phase in the
+// test below would try to reach dest.example.com for real.
+vi.mock('~/utils/axios', () => ({
+  default: { get: vi.fn(), post: vi.fn() },
 }));
 
 const GENERIC_EVENT = {
@@ -89,6 +100,33 @@ describe('toArchivePostErrorEvent', () => {
     expect(toArchivePostErrorEvent(err)).toEqual({
       key: 'admin:g2g:error_import_in_progress',
       message: busyMessage,
+    });
+  });
+
+  test('maps a protected_collection_included response to its own event', () => {
+    // Requirements 5.7, 5.8 — the push side drops the collections a transfer must not
+    // carry before the archive is built, so this answer means the two GROWIs disagree
+    // about which those are. The generic "failed to send the archive" hides exactly the
+    // fact that says so: the receiver's message names the collections it refused.
+    const refusalMessage =
+      'These collections must not be transferred: transferkeys, sessions';
+    const err = {
+      response: {
+        status: 400,
+        data: {
+          errors: [
+            {
+              message: refusalMessage,
+              code: G2G_PROTECTED_COLLECTION_ERROR_CODE,
+            },
+          ],
+        },
+      },
+    };
+
+    expect(toArchivePostErrorEvent(err)).toEqual({
+      key: 'admin:g2g:error_protected_collection',
+      message: refusalMessage,
     });
   });
 
@@ -153,18 +191,18 @@ describe('toArchivePostErrorEvent', () => {
   });
 });
 
+const tk = new TransferKey('https://dest.example.com', 'test-transfer-key');
+
+const buildCrowiAndSocket = (): { crowi: Crowi; socket: Namespace } => {
+  const socket = mock<Namespace>();
+  const crowi = mock<Crowi>({
+    appService: { getAppTitle: () => 'Test GROWI' },
+    socketIoService: { getAdminSocket: () => socket },
+  });
+  return { crowi, socket };
+};
+
 describe('G2GTransferPusherService.startTransfer archive POST failure', () => {
-  const tk = new TransferKey('https://dest.example.com', 'test-transfer-key');
-
-  const buildCrowiAndSocket = (): { crowi: Crowi; socket: Namespace } => {
-    const socket = mock<Namespace>();
-    const crowi = mock<Crowi>({
-      appService: { getAppTitle: () => 'Test GROWI' },
-      socketIoService: { getAdminSocket: () => socket },
-    });
-    return { crowi, socket };
-  };
-
   test('emits the data-conflict admin:g2gError and rethrows when the receiver reports growi_data_conflict', async () => {
     const { crowi, socket } = buildCrowiAndSocket();
     const pusher = new G2GTransferPusherService(crowi);
@@ -228,5 +266,67 @@ describe('G2GTransferPusherService.startTransfer archive POST failure', () => {
       attachments: G2G_PROGRESS_STATUS.PENDING,
     });
     expect(socket.emit).toHaveBeenCalledWith('admin:g2gError', GENERIC_EVENT);
+  });
+});
+
+describe('G2GTransferPusherService.startTransfer partly failed import', () => {
+  const failedCollections = ['pagetagrelations'];
+
+  /**
+   * A destination that finished importing and could not read one collection: it answers
+   * 200 (it did finish trying), and names the collection in the body.
+   */
+  const mockPartiallyFailedArchiveResponse = (): void => {
+    vi.spyOn(rawAxios, 'post').mockResolvedValueOnce(
+      mock<AxiosResponse>({ data: { failedCollections } }),
+    );
+  };
+
+  test('reports the import failure even when the attachment transfer that follows it fails', async () => {
+    const { crowi, socket } = buildCrowiAndSocket();
+    const pusher = new G2GTransferPusherService(crowi);
+
+    mockPartiallyFailedArchiveResponse();
+    // The attachment phase opens by asking the destination which files it already holds,
+    // so failing that request fails the whole phase — the shortest way to reach the
+    // attachment catch without a storage backend.
+    vi.mocked(axios.get).mockRejectedValueOnce(new Error('ECONNRESET'));
+
+    await expect(
+      pusher.startTransfer(
+        tk,
+        { _id: 'operator-id' },
+        ['pages'],
+        {},
+        mock<IDataGROWIInfo>(),
+      ),
+    ).rejects.toMatchObject({
+      code: G2GTransferErrorCode.FAILED_TO_RETRIEVE_FILE_METADATA,
+    });
+
+    expect(socket.emit).toHaveBeenCalledWith('admin:g2gError', {
+      message: 'Failed to transfer attachments',
+      key: 'admin:g2g:error_upload_attachment',
+    });
+    // Both facts reach the operator. Only this event names the collections the
+    // destination is missing, and a failure to send the files does not make that any less
+    // true — reporting one in place of the other would leave the operator repairing the
+    // wrong thing.
+    expect(socket.emit).toHaveBeenCalledWith('admin:g2gError', {
+      key: 'admin:g2g:error_partial_import',
+      message: `Collections that could not be imported: ${failedCollections.join(', ')}`,
+    });
+    expect(socket.emit).toHaveBeenCalledWith('admin:g2gProgress', {
+      mongo: G2G_PROGRESS_STATUS.ERROR,
+      attachments: G2G_PROGRESS_STATUS.ERROR,
+      failedCollections,
+    });
+    // The mongo phase is never restated as completed once a collection was left out; the
+    // admin screen turns `mongo` and `attachments` both COMPLETED into a green
+    // "transfer succeeded" toast.
+    expect(socket.emit).not.toHaveBeenCalledWith(
+      'admin:g2gProgress',
+      expect.objectContaining({ mongo: G2G_PROGRESS_STATUS.COMPLETED }),
+    );
   });
 });
