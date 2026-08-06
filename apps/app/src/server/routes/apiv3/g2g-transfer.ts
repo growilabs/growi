@@ -34,6 +34,7 @@ import {
   NON_TRANSFERABLE_COLLECTIONS,
   selectTransferableCollections,
 } from '~/server/service/import/non-transferable-collections';
+import { deriveReplaceTargets } from '~/server/service/import/replace-target-collections';
 import { summarizeUniqueConflicts } from '~/server/service/import/summarize-unique-conflicts';
 import loggerFactory from '~/utils/logger';
 import { TransferKey } from '~/utils/vo/transfer-key';
@@ -498,12 +499,17 @@ export const setup = (crowi: Crowi): Router => {
        * point at which the transfer can be refused without leaving the destination in a
        * half-imported state.
        */
+      // A collection this import empties first cannot collide with anything: its existing
+      // documents are gone before the archive's are written. Detecting a "conflict" there
+      // would abort a transfer that was always going to succeed.
+      const replaceTargetCollections = deriveReplaceTargets(importSettingsMap);
+
       let conflictReport: UniqueConflictReport;
       try {
-        conflictReport =
-          await g2gTransferReceiverService.detectImportConflicts(
-            innerFileStats,
-          );
+        conflictReport = await g2gTransferReceiverService.detectImportConflicts(
+          innerFileStats,
+          replaceTargetCollections,
+        );
       } catch (err) {
         logger.error(err);
         // A detection that could not complete says nothing about whether the archive

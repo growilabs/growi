@@ -281,6 +281,7 @@ interface Receiver {
    */
   detectImportConflicts(
     innerFileStats: InnerFileStat[],
+    replaceTargetCollections?: ReadonlySet<string>,
   ): Promise<UniqueConflictReport>;
   /**
    * Import collections
@@ -1019,6 +1020,7 @@ export class G2GTransferReceiverService implements Receiver {
 
   public async detectImportConflicts(
     innerFileStats: InnerFileStat[],
+    replaceTargetCollections?: ReadonlySet<string>,
   ): Promise<UniqueConflictReport> {
     const importService = getImportService();
 
@@ -1035,6 +1037,7 @@ export class G2GTransferReceiverService implements Receiver {
       groupsJsonPath: resolvePath('usergroups'),
       userModel: mongoose.model<IUser>('User'),
       userGroupModel: UserGroup,
+      replaceTargetCollections,
     });
   }
 
