@@ -21,13 +21,19 @@ import { TransferKey } from '~/utils/vo/transfer-key';
 
 import type Crowi from '../crowi';
 import { Attachment } from '../models/attachment';
+import UserGroup from '../models/user-group';
 import {
+  G2G_DATA_CONFLICT_ERROR_CODE,
   G2GTransferError,
   G2GTransferErrorCode,
 } from '../models/vo/g2g-transfer-error';
 import { configManager } from './config-manager';
 import type { ConfigKey } from './config-manager/config-definition';
 import { exportService } from './export';
+import {
+  detectUniqueConflicts,
+  type UniqueConflictReport,
+} from './import/detect-unique-conflicts';
 import { generateOverwriteParams } from './import/overwrite-params';
 
 const logger = loggerFactory('growi:service:g2g-transfer');
@@ -163,6 +169,27 @@ interface Pusher {
 }
 
 /**
+ * One entry of the file list `growiBridgeService.parseZipFile` reports for an unzipped
+ * archive. The receive route also carries `size`, which the conflict detection ignores.
+ */
+type InnerFileStat = {
+  fileName: string;
+  collectionName: string;
+};
+
+/**
+ * The export service decides the inner file names, so which collection a file holds is
+ * only knowable from `collectionName`. Returns null when the collection is not part of
+ * the transfer at all.
+ */
+const findInnerFileName = (
+  innerFileStats: InnerFileStat[],
+  collectionName: string,
+): string | null =>
+  innerFileStats.find((stat) => stat.collectionName === collectionName)
+    ?.fileName ?? null;
+
+/**
  * G2g transfer receiver
  */
 interface Receiver {
@@ -198,6 +225,16 @@ interface Receiver {
     operatorUserId: string,
   ): Map<string, ImportSettings>;
   /**
+   * Detect unique field conflicts between the unzipped archive and the existing data of
+   * this GROWI, so that the caller can stop the import before any document is written.
+   * Detection only reads; a collection that is not part of the transfer is skipped.
+   * @param {InnerFileStat[]} innerFileStats File list of the unzipped archive
+   * @returns {Promise<UniqueConflictReport>} Every detected conflict
+   */
+  detectImportConflicts(
+    innerFileStats: InnerFileStat[],
+  ): Promise<UniqueConflictReport>;
+  /**
    * Import collections
    * @param {string} collections Array of collection name
    * @param {{ [key: string]: ImportSettings; }} importSettingsMap Map of collection name and ImportSettings
@@ -224,6 +261,67 @@ interface Receiver {
    */
   receiveAttachment(content: ReadStream, attachmentMap: any): Promise<void>;
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+/**
+ * Payload the pusher's `admin:g2gError` socket event carries for a failed archive POST.
+ * `key` selects the client's i18n heading; `message` is the detail shown alongside it.
+ */
+interface ArchivePostErrorEvent {
+  key: string;
+  message: string;
+}
+
+const GENERIC_ARCHIVE_POST_ERROR_EVENT: ArchivePostErrorEvent = {
+  message: 'Failed to send GROWI archive file to the destination GROWI',
+  key: 'admin:g2g:error_send_growi_archive',
+};
+
+/**
+ * Maps a failed archive POST to the admin-facing `admin:g2gError` payload.
+ *
+ * Pure / no I/O, so it is unit-testable without mocking axios, exportService, or the
+ * filesystem (see g2g-transfer.spec.ts) — the framework-facing catch in `startTransfer`
+ * reduces to a thin call of this function.
+ *
+ * The receive route answers a data conflict with `{ errors: [{ message, code:
+ * G2G_DATA_CONFLICT_ERROR_CODE }] }` (apiv3Err), but that shape is untrusted at this
+ * network boundary: a network failure carries no `response` at all, and a proxy error
+ * page or a future receiver change could reshape the body. Every access below is
+ * therefore a guarded read, and anything it does not recognize falls back to the same
+ * generic event `startTransfer` emitted before this function existed.
+ */
+export const toArchivePostErrorEvent = (
+  err: unknown,
+): ArchivePostErrorEvent => {
+  if (
+    !isRecord(err) ||
+    !isRecord(err.response) ||
+    !isRecord(err.response.data)
+  ) {
+    return GENERIC_ARCHIVE_POST_ERROR_EVENT;
+  }
+
+  const { errors } = err.response.data;
+  const firstError = Array.isArray(errors) ? errors[0] : undefined;
+
+  if (!isRecord(firstError)) {
+    return GENERIC_ARCHIVE_POST_ERROR_EVENT;
+  }
+
+  const { code, message } = firstError;
+
+  if (code !== G2G_DATA_CONFLICT_ERROR_CODE || typeof message !== 'string') {
+    return GENERIC_ARCHIVE_POST_ERROR_EVENT;
+  }
+
+  return {
+    key: 'admin:g2g:error_data_conflict',
+    message,
+  };
+};
 
 /**
  * G2g transfer pusher
@@ -525,10 +623,7 @@ export class G2GTransferPusherService implements Pusher {
         mongo: G2G_PROGRESS_STATUS.ERROR,
         attachments: G2G_PROGRESS_STATUS.PENDING,
       });
-      socket?.emit('admin:g2gError', {
-        message: 'Failed to send GROWI archive file to the destination GROWI',
-        key: 'admin:g2g:error_send_growi_archive',
-      });
+      socket?.emit('admin:g2gError', toArchivePostErrorEvent(err));
       throw err;
     }
 
@@ -733,6 +828,27 @@ export class G2GTransferReceiverService implements Receiver {
     });
 
     return importSettingsMap;
+  }
+
+  public async detectImportConflicts(
+    innerFileStats: InnerFileStat[],
+  ): Promise<UniqueConflictReport> {
+    const importService = getImportService();
+
+    // A declared file that cannot be resolved must throw rather than be downgraded to
+    // "this collection is not part of the transfer": treating it as absent would let the
+    // import run and drop the conflicting documents silently (issue #10151).
+    const resolvePath = (collectionName: string): string | null => {
+      const fileName = findInnerFileName(innerFileStats, collectionName);
+      return fileName == null ? null : importService.getFile(fileName);
+    };
+
+    return detectUniqueConflicts({
+      usersJsonPath: resolvePath('users'),
+      groupsJsonPath: resolvePath('usergroups'),
+      userModel: mongoose.model<IUser>('User'),
+      userGroupModel: UserGroup,
+    });
   }
 
   public async importCollections(

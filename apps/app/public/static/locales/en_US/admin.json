@@ -1202,7 +1202,9 @@
   "g2g": {
     "transfer_success": "Completed GROWI to GROWI transfer successfully",
     "error_generate_growi_archive": "Failed to generate GROWI archive file",
-    "error_send_growi_archive": "Failed to send GROWI archive file to the destination GROWI"
+    "error_send_growi_archive": "Failed to send GROWI archive file to the destination GROWI",
+    "error_data_conflict": "Transfer aborted: some of the transferred data conflicts with users or user groups that already exist on the destination GROWI, so nothing was imported. Resolve the conflicting accounts or groups before retrying, or transfer into a destination GROWI that has not yet completed its initial setup.",
+    "error_upload_attachment": "Failed to transfer attachments"
   },
   "external_user_group": {
     "management": "External Group Management",
