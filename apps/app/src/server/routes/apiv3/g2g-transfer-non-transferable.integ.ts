@@ -40,10 +40,12 @@ import {
 } from '~/server/service/g2g-transfer';
 import { GrowiBridgeService } from '~/server/service/growi-bridge';
 import { initializeImportService } from '~/server/service/import';
+import { NON_TRANSFERABLE_COLLECTIONS } from '~/server/service/import/non-transferable-collections';
 import { getGrowiVersion } from '~/utils/growi-version';
 import { TransferKey } from '~/utils/vo/transfer-key';
 
 import { setup } from './g2g-transfer';
+import { setup as setupMongoRouter } from './mongo';
 import addCustomFunctionToResponse from './response';
 
 const CLEAN_USER = {
@@ -171,6 +173,8 @@ describe('non-transferable collections at the transfer routes', () => {
       next();
     });
     app.use(setup(crowi));
+    // The backup export screen reads this one; the transfer must not have narrowed it.
+    app.use('/mongo', setupMongoRouter(crowi));
 
     transferKeyString = await receiverService.createTransferKey(
       'http://g2g-protected-source.example.com',
@@ -186,6 +190,37 @@ describe('non-transferable collections at the transfer routes', () => {
 
   afterAll(async () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  describe('push route GET /transferable-collections', () => {
+    test('offers the admin screen only the collections a transfer may carry', async () => {
+      const response = await request(app).get('/transferable-collections');
+
+      expect(response.status).toBe(200);
+      const { collections } = response.body;
+
+      // The screen selects everything it is offered, so anything listed here is
+      // something the transfer would try to carry.
+      expect(collections).toEqual(expect.arrayContaining(['users']));
+      expect(
+        collections.filter((name: string) =>
+          NON_TRANSFERABLE_COLLECTIONS.has(name),
+        ),
+      ).toEqual([]);
+      // beforeAll created a transfer key, so this collection really is in the database
+      // and its absence above is a decision rather than an accident.
+      expect(collections).not.toContain('transferkeys');
+    });
+
+    test('does not narrow the list the backup export screen reads', async () => {
+      // /mongo/collections serves a different purpose — everything that is safe to put
+      // in a backup — and taking the transfer's declaration to it would remove choices
+      // from a feature this spec does not touch (requirement 5.7).
+      const response = await request(app).get('/mongo/collections');
+
+      expect(response.status).toBe(200);
+      expect(response.body.collections).toContain('transferkeys');
+    });
   });
 
   describe('push route POST /transfer', () => {

@@ -17,14 +17,6 @@ import G2GDataTransferStatusIcon from './G2GDataTransferStatusIcon';
 // import { FileUploadSettingMolecule } from './App/FileUploadSetting';
 import { buildG2GErrorToastContents } from './g2g-error-toast-contents';
 
-const IGNORED_COLLECTION_NAMES = [
-  'sessions',
-  'rlflx',
-  'activities',
-  'attachmentFiles.files',
-  'attachmentFiles.chunks',
-];
-
 const G2GDataTransfer = (): JSX.Element => {
   const socket = useAdminSocket();
   const { t } = useTranslation(['admin', 'commons']);
@@ -71,20 +63,16 @@ const G2GDataTransfer = (): JSX.Element => {
   }, []);
 
   const setCollectionsAndSelectedCollections = useCallback(async () => {
-    const { data: collectionsData } = await apiv3Get<{ collections: any[] }>(
-      '/mongo/collections',
+    // The server decides which collections a transfer may carry — the screen used to
+    // keep its own list, which the transfer endpoints could not rely on and which had
+    // already drifted from the collections the transfer actually refuses.
+    const { data } = await apiv3Get<{ collections: string[] }>(
+      '/g2g-transfer/transferable-collections',
       {},
     );
 
-    // filter only not ignored collection names
-    const filteredCollections = collectionsData.collections.filter(
-      (collectionName) => {
-        return !IGNORED_COLLECTION_NAMES.includes(collectionName);
-      },
-    );
-
-    setCollections(filteredCollections);
-    setSelectedCollections(new Set(filteredCollections));
+    setCollections(data.collections);
+    setSelectedCollections(new Set(data.collections));
   }, []);
 
   const setupWebsocketEventHandler = useCallback(() => {

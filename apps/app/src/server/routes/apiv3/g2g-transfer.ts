@@ -4,6 +4,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { NextFunction, Request, Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
+import mongoose from 'mongoose';
 import multer from 'multer';
 import path from 'pathe';
 
@@ -28,6 +29,7 @@ import { hasConflicts } from '~/server/service/import/detect-unique-conflicts';
 import {
   excludeNonTransferableCollections,
   NON_TRANSFERABLE_COLLECTIONS,
+  selectTransferableCollections,
 } from '~/server/service/import/non-transferable-collections';
 import { summarizeUniqueConflicts } from '~/server/service/import/summarize-unique-conflicts';
 import loggerFactory from '~/utils/logger';
@@ -741,6 +743,61 @@ export const setup = (crowi: Crowi): Router => {
       }
 
       return res.apiv3({ transferKey: transferKeyString });
+    },
+  );
+
+  /**
+   * @swagger
+   *
+   *  /g2g-transfer/transferable-collections:
+   *    get:
+   *      summary: /g2g-transfer/transferable-collections
+   *      tags: [GROWI to GROWI Transfer]
+   *      security:
+   *        - bearer: []
+   *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
+   *      responses:
+   *        '200':
+   *          description: Successfully got the collections a transfer may carry
+   *          content:
+   *            application/json:
+   *              schema:
+   *                type: object
+   *                properties:
+   *                  collections:
+   *                    type: array
+   *                    items:
+   *                      type: string
+   */
+  // Deliberately separate from /mongo/collections, which the backup export screen also
+  // reads: that screen offers everything that is safe to put in a backup, and narrowing
+  // it there would take choices away from a feature this spec does not touch.
+  pushRouter.get(
+    '/transferable-collections',
+    accessTokenParser([SCOPE.READ.ADMIN.EXPORT_DATA], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    adminRequired,
+    async (req: Request, res: ApiV3Response) => {
+      try {
+        const collectionsInDb = await mongoose.connection.db
+          ?.listCollections()
+          .toArray();
+        const collections = selectTransferableCollections(
+          (collectionsInDb ?? []).map(({ name }) => name),
+        );
+
+        return res.apiv3({ collections });
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(
+          new ErrorV3(
+            'Failed to list the collections available for transfer.',
+            'failed_to_list_transferable_collections',
+          ),
+          500,
+        );
+      }
     },
   );
 
