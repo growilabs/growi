@@ -293,6 +293,24 @@ export default function route(crowi: Crowi): Router {
 
       const zipFile = importService.getFile(fileName);
 
+      // Claimed before the response, so a second import can still be refused: everything
+      // below runs after the response is sent. Maintenance mode is not a substitute —
+      // during a G2G transfer the destination is in maintenance mode by design, so the
+      // check above waves this import straight through into the middle of that one.
+      //
+      // Claimed after the checks above, all of which can still leave without reaching the
+      // `finally` that releases it.
+      const importJob = importService.acquireImportJob();
+      if (importJob == null) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'Another import is already running on this GROWI.',
+            'import_already_in_progress',
+          ),
+          409,
+        );
+      }
+
       // Capture the activity context BEFORE responding. The import runs after
       // this response and registerFailsafeFinalizer clears this request's
       // pending context on the response's 'finish' event, so the post-import
@@ -304,75 +322,82 @@ export default function route(crowi: Crowi): Router {
       // return response first
       res.apiv3();
 
-      /*
-       * unzip, parse
-       */
-      let meta: object;
-      let fileStatsToImport: {
-        fileName: string;
-        collectionName: string;
-        size: number;
-      }[];
+      // `try/finally` rather than a response event: this route answers before it starts
+      // working, so releasing on the response would hand the job away while the import is
+      // still running.
       try {
-        // unzip
-        await importService.unzip(zipFile);
+        /*
+         * unzip, parse
+         */
+        let meta: object;
+        let fileStatsToImport: {
+          fileName: string;
+          collectionName: string;
+          size: number;
+        }[];
+        try {
+          // unzip
+          await importService.unzip(zipFile);
 
-        const parseZipResult = await growiBridgeService.parseZipFile(zipFile);
-        if (parseZipResult == null) {
-          throw new Error('parseZipFile returns null');
+          const parseZipResult = await growiBridgeService.parseZipFile(zipFile);
+          if (parseZipResult == null) {
+            throw new Error('parseZipFile returns null');
+          }
+
+          meta = parseZipResult.meta;
+
+          // filter innerFileStats
+          fileStatsToImport = parseZipResult.innerFileStats.filter(
+            ({ collectionName }) => {
+              return collections.includes(collectionName);
+            },
+          );
+        } catch (err) {
+          logger.error(err);
+          adminEvent.emit('onErrorForImport', { message: err.message });
+          return;
         }
 
-        meta = parseZipResult.meta;
+        /*
+         * validate with meta.json
+         */
+        try {
+          importService.validate(meta);
+        } catch (err) {
+          logger.error(err);
+          adminEvent.emit('onErrorForImport', { message: err.message });
+          return;
+        }
 
-        // filter innerFileStats
-        fileStatsToImport = parseZipResult.innerFileStats.filter(
-          ({ collectionName }) => {
-            return collections.includes(collectionName);
-          },
-        );
-      } catch (err) {
-        logger.error(err);
-        adminEvent.emit('onErrorForImport', { message: err.message });
-        return;
+        // generate maps of ImportSettings to import
+        let importSettingsMap: Map<string, ImportSettings>;
+        try {
+          importSettingsMap = buildImportSettingsMap(
+            fileStatsToImport,
+            options,
+            user._id.toString(),
+          );
+        } catch (err) {
+          logger.error(err);
+          adminEvent.emit('onErrorForImport', { message: err.message });
+          return;
+        }
+
+        /*
+         * import
+         */
+        await executeImport({
+          importService,
+          adminEvent,
+          activityEvent,
+          activityId,
+          activityContext,
+          collections,
+          importSettingsMap,
+        });
+      } finally {
+        importJob.release();
       }
-
-      /*
-       * validate with meta.json
-       */
-      try {
-        importService.validate(meta);
-      } catch (err) {
-        logger.error(err);
-        adminEvent.emit('onErrorForImport', { message: err.message });
-        return;
-      }
-
-      // generate maps of ImportSettings to import
-      let importSettingsMap: Map<string, ImportSettings>;
-      try {
-        importSettingsMap = buildImportSettingsMap(
-          fileStatsToImport,
-          options,
-          user._id.toString(),
-        );
-      } catch (err) {
-        logger.error(err);
-        adminEvent.emit('onErrorForImport', { message: err.message });
-        return;
-      }
-
-      /*
-       * import
-       */
-      await executeImport({
-        importService,
-        adminEvent,
-        activityEvent,
-        activityId,
-        activityContext,
-        collections,
-        importSettingsMap,
-      });
     },
   );
 

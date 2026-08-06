@@ -49,6 +49,15 @@ class ImportingCollectionError extends Error {
   }
 }
 
+/**
+ * The right to run an import, held for as long as {@link release} has not been called.
+ * See {@link ImportService.acquireImportJob}.
+ */
+export interface ImportJobLease {
+  /** Idempotent, and a no-op once someone else holds the job. */
+  release: () => void;
+}
+
 /** The outcome of one import run. */
 export interface ImportResult {
   /**
@@ -71,6 +80,16 @@ export class ImportService {
   private currentProgressingStatus: CollectionProgressingStatus | null;
 
   private convertMap: ConvertMap | undefined;
+
+  /**
+   * Who currently holds the right to run an import, if anyone.
+   *
+   * Deliberately not `currentProgressingStatus`: that one is cleared the moment the
+   * per-collection loop ends, while `loadConfigs()` and the (long) page normalization are
+   * still to come — and, for the receive route, before its own clean-up has run. A second
+   * import let through in that window would empty `users` under the first one's feet.
+   */
+  private importJobOwner: object | null = null;
 
   constructor(crowi: Crowi) {
     this.crowi = crowi;
@@ -146,11 +165,57 @@ export class ImportService {
   }
 
   /**
+   * Claims the right to run an import, or returns null if another one already holds it.
+   *
+   * Both entry points — the G2G receive route and the admin zip import — take this
+   * **before they start writing to the shared import directory**, not when `import()` is
+   * reached: the receive route unzips, re-reads the archive and queries the destination
+   * for conflicts first, and a second import let through during that stretch would
+   * overwrite the JSON files the first one is about to read. `import()` claims it too, so
+   * that a caller which does not go through either route is still covered, and releases
+   * it only if the claim was its own.
+   *
+   * Process-local, so a multi-process deployment can still run two imports at once. That
+   * is the same hole as before this existed; it is not widened.
+   */
+  acquireImportJob(): ImportJobLease | null {
+    if (this.importJobOwner != null) {
+      return null;
+    }
+
+    const owner = {};
+    this.importJobOwner = owner;
+
+    return {
+      release: () => {
+        if (this.importJobOwner === owner) {
+          this.importJobOwner = null;
+        }
+      },
+    };
+  }
+
+  /**
    * import collections from json
    * @param collections MongoDB collection name
    * @param importSettingsMap
    */
   async import(
+    collections: string[],
+    importSettingsMap: Map<string, ImportSettings>,
+  ): Promise<ImportResult> {
+    // Null when the caller already holds the job for this import — the ordinary case, as
+    // both routes claim it before they unzip. Releasing only what was claimed here is
+    // what keeps this from cutting the caller's protection short.
+    const ownLease = this.acquireImportJob();
+    try {
+      return await this.doImport(collections, importSettingsMap);
+    } finally {
+      ownLease?.release();
+    }
+  }
+
+  private async doImport(
     collections: string[],
     importSettingsMap: Map<string, ImportSettings>,
   ): Promise<ImportResult> {

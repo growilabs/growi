@@ -6,7 +6,10 @@ import { mock } from 'vitest-mock-extended';
 
 import { G2G_PROGRESS_STATUS } from '~/interfaces/g2g-transfer';
 import type Crowi from '~/server/crowi';
-import { G2G_DATA_CONFLICT_ERROR_CODE } from '~/server/models/vo/g2g-transfer-error';
+import {
+  G2G_DATA_CONFLICT_ERROR_CODE,
+  G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+} from '~/server/models/vo/g2g-transfer-error';
 import { TransferKey } from '~/utils/vo/transfer-key';
 
 import {
@@ -65,6 +68,27 @@ describe('toArchivePostErrorEvent', () => {
     expect(toArchivePostErrorEvent(err)).toEqual({
       key: 'admin:g2g:error_data_conflict',
       message: conflictSummary,
+    });
+  });
+
+  test('maps an import_already_in_progress response to its own event', () => {
+    // Requirement 2.7 — "the destination is busy, retry later" is something the operator
+    // can act on, and the generic "failed to send the archive" is not.
+    const busyMessage = 'Another import is already running on this GROWI.';
+    const err = {
+      response: {
+        status: 409,
+        data: {
+          errors: [
+            { message: busyMessage, code: G2G_IMPORT_IN_PROGRESS_ERROR_CODE },
+          ],
+        },
+      },
+    };
+
+    expect(toArchivePostErrorEvent(err)).toEqual({
+      key: 'admin:g2g:error_import_in_progress',
+      message: busyMessage,
     });
   });
 

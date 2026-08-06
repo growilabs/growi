@@ -24,6 +24,7 @@ import { Attachment } from '../models/attachment';
 import UserGroup from '../models/user-group';
 import {
   G2G_DATA_CONFLICT_ERROR_CODE,
+  G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
   G2GTransferError,
   G2GTransferErrorCode,
 } from '../models/vo/g2g-transfer-error';
@@ -326,6 +327,15 @@ const GENERIC_ARCHIVE_POST_ERROR_EVENT: ArchivePostErrorEvent = {
 };
 
 /**
+ * The receiver's error codes that the operator on this side is told about specifically.
+ * Anything not listed here falls back to the generic event, as it did before.
+ */
+const ARCHIVE_POST_ERROR_KEY_BY_CODE: ReadonlyMap<string, string> = new Map([
+  [G2G_DATA_CONFLICT_ERROR_CODE, 'admin:g2g:error_data_conflict'],
+  [G2G_IMPORT_IN_PROGRESS_ERROR_CODE, 'admin:g2g:error_import_in_progress'],
+]);
+
+/**
  * Maps a failed archive POST to the admin-facing `admin:g2gError` payload.
  *
  * Pure / no I/O, so it is unit-testable without mocking axios, exportService, or the
@@ -359,14 +369,16 @@ export const toArchivePostErrorEvent = (
 
   const { code, message } = firstError;
 
-  if (code !== G2G_DATA_CONFLICT_ERROR_CODE || typeof message !== 'string') {
+  const key =
+    typeof code === 'string'
+      ? ARCHIVE_POST_ERROR_KEY_BY_CODE.get(code)
+      : undefined;
+
+  if (key == null || typeof message !== 'string') {
     return GENERIC_ARCHIVE_POST_ERROR_EVENT;
   }
 
-  return {
-    key: 'admin:g2g:error_data_conflict',
-    message,
-  };
+  return { key, message };
 };
 
 /**

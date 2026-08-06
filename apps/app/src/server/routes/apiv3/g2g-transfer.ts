@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
@@ -14,6 +15,7 @@ import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import {
   G2G_DATA_CONFLICT_ERROR_CODE,
+  G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
   G2G_PROTECTED_COLLECTION_ERROR_CODE,
   G2GTransferErrorCode,
   isG2GTransferError,
@@ -123,8 +125,11 @@ export const setup = (crowi: Crowi): Router => {
         cb(null, importService.baseDir);
       },
       filename(req, file, cb) {
-        // to prevent hashing the file name. files with same name will be overwritten.
-        cb(null, file.originalname);
+        // A name of our own rather than the uploaded one, which is the same for every
+        // transfer a given source sends: the pusher builds it from the site title and a
+        // timestamp that is never evaluated, so two sources called "GROWI" write to the
+        // same path. Keeping the .zip suffix leaves `deleteAllZipFiles` able to clean up.
+        cb(null, `${randomUUID()}${path.extname(file.originalname)}`);
       },
     }),
     fileFilter: (req, file, cb) => {
@@ -134,6 +139,39 @@ export const setup = (crowi: Crowi): Router => {
       cb(new Error('Only ".zip" is allowed'));
     },
   });
+
+  /**
+   * Claims the right to import before multer starts writing the archive into the shared
+   * import directory — not inside the handler, which multer never reaches when it rejects
+   * the upload.
+   */
+  const requireImportJob = (
+    req: Request,
+    res: ApiV3Response,
+    next: NextFunction,
+  ) => {
+    const lease = importService.acquireImportJob();
+
+    if (lease == null) {
+      return res.apiv3Err(
+        new ErrorV3(
+          'Another import is already running on this GROWI.',
+          G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+        ),
+        409,
+      );
+    }
+
+    // Released on the response's `close`, not in the handler: multer aborts the request
+    // outright for a non-zip upload, a broken multipart body or a client that disconnects
+    // mid-upload, and the handler — with any `finally` in it — never runs. A lease nobody
+    // releases would refuse every later import for the lifetime of the process, and the
+    // likeliest way to hit it is a dropped connection during a large transfer, which is
+    // exactly when the operator retries.
+    res.on('close', lease.release);
+
+    next();
+  };
 
   const uploadsForAttachment = multer({
     storage: multer.diskStorage({
@@ -335,6 +373,7 @@ export const setup = (crowi: Crowi): Router => {
   receiveRouter.post(
     '/',
     validateTransferKey,
+    requireImportJob,
     uploads.single('transferDataZipFile'),
     async (req: Request & { file: any }, res: ApiV3Response) => {
       const { file } = req;
