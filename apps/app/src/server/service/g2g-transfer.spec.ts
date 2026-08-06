@@ -1,0 +1,208 @@
+import { Readable } from 'node:stream';
+// biome-ignore lint/style/noRestrictedImports: startTransfer's archive POST calls rawAxios directly, so the spy must attach to that same singleton instance.
+import rawAxios from 'axios';
+import type { Namespace } from 'socket.io';
+import { mock } from 'vitest-mock-extended';
+
+import { G2G_PROGRESS_STATUS } from '~/interfaces/g2g-transfer';
+import type Crowi from '~/server/crowi';
+import { G2G_DATA_CONFLICT_ERROR_CODE } from '~/server/models/vo/g2g-transfer-error';
+import { TransferKey } from '~/utils/vo/transfer-key';
+
+import {
+  G2GTransferPusherService,
+  type IDataGROWIInfo,
+  toArchivePostErrorEvent,
+} from './g2g-transfer';
+
+// `startTransfer` streams the exported archive to `form-data` and never reads it back
+// in these tests (the POST itself is mocked below), so a real file is unnecessary.
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    createReadStream: vi.fn(() => Readable.from([])),
+  };
+});
+
+// Keeps `startTransfer` past the zip-generation phase so the test can drive the archive
+// POST catch specifically, without depending on the real export pipeline.
+vi.mock('./export', () => ({
+  exportService: {
+    export: vi.fn().mockResolvedValue({ zipFilePath: '/fake/archive.zip' }),
+  },
+}));
+
+// `configManager.getConfig` throws ("Config is not loaded") unless `loadConfigs()` ran
+// first; startTransfer only uses it to build upload-config metadata that this test does
+// not inspect, so a stub avoiding that throw is enough.
+vi.mock('./config-manager', () => ({
+  configManager: { getConfig: vi.fn() },
+}));
+
+const GENERIC_EVENT = {
+  key: 'admin:g2g:error_send_growi_archive',
+  message: 'Failed to send GROWI archive file to the destination GROWI',
+};
+
+describe('toArchivePostErrorEvent', () => {
+  test('maps a growi_data_conflict response to the data-conflict event, carrying the conflict summary as-is', () => {
+    // Requirements 2.2, 3.1, 3.2 — the operator-facing message is the receiver's own
+    // conflict summary, unmodified (no truncation, no rewording).
+    const conflictSummary =
+      'users: 2 conflicts (email: "admin@example.com", "ops@example.com")';
+    const err = {
+      response: {
+        status: 409,
+        data: {
+          errors: [
+            { message: conflictSummary, code: G2G_DATA_CONFLICT_ERROR_CODE },
+          ],
+        },
+      },
+    };
+
+    expect(toArchivePostErrorEvent(err)).toEqual({
+      key: 'admin:g2g:error_data_conflict',
+      message: conflictSummary,
+    });
+  });
+
+  test('falls back to the generic event for a conflict_detection_failed response (not a conflict)', () => {
+    const err = {
+      response: {
+        status: 500,
+        data: {
+          errors: [
+            {
+              message: 'Failed to detect data conflicts before import.',
+              code: 'conflict_detection_failed',
+            },
+          ],
+        },
+      },
+    };
+
+    expect(toArchivePostErrorEvent(err)).toEqual(GENERIC_EVENT);
+  });
+
+  test('falls back to the generic event for a network error carrying no response at all', () => {
+    expect(toArchivePostErrorEvent(new Error('ECONNREFUSED'))).toEqual(
+      GENERIC_EVENT,
+    );
+  });
+
+  test.each<[string, unknown]>([
+    ['err is null', null],
+    ['err is a plain thrown string', 'some non-Error throw'],
+    [
+      'response.data is a string, not an envelope object',
+      { response: { data: 'Internal Server Error' } },
+    ],
+    ['errors is missing from the envelope', { response: { data: {} } }],
+    ['errors is an empty array', { response: { data: { errors: [] } } }],
+    [
+      'errors[0] is not an object',
+      { response: { data: { errors: ['oops'] } } },
+    ],
+    [
+      'errors[0].message is missing',
+      {
+        response: {
+          data: { errors: [{ code: G2G_DATA_CONFLICT_ERROR_CODE }] },
+        },
+      },
+    ],
+    [
+      'errors[0].message is not a string even though the code matches',
+      {
+        response: {
+          data: {
+            errors: [{ code: G2G_DATA_CONFLICT_ERROR_CODE, message: 42 }],
+          },
+        },
+      },
+    ],
+  ])('falls back to the generic event without throwing when %s', (_label, err) => {
+    expect(() => toArchivePostErrorEvent(err)).not.toThrow();
+    expect(toArchivePostErrorEvent(err)).toEqual(GENERIC_EVENT);
+  });
+});
+
+describe('G2GTransferPusherService.startTransfer archive POST failure', () => {
+  const tk = new TransferKey('https://dest.example.com', 'test-transfer-key');
+
+  const buildCrowiAndSocket = (): { crowi: Crowi; socket: Namespace } => {
+    const socket = mock<Namespace>();
+    const crowi = mock<Crowi>({
+      appService: { getAppTitle: () => 'Test GROWI' },
+      socketIoService: { getAdminSocket: () => socket },
+    });
+    return { crowi, socket };
+  };
+
+  test('emits the data-conflict admin:g2gError and rethrows when the receiver reports growi_data_conflict', async () => {
+    const { crowi, socket } = buildCrowiAndSocket();
+    const pusher = new G2GTransferPusherService(crowi);
+    const conflictSummary = 'usergroups: 1 conflict (name: "engineering")';
+
+    // Identity-checked below via `.rejects.toBe(thrownErr)`, so this proves the
+    // rejection is this specific archive-POST failure re-thrown, not merely "some
+    // rejection" from whatever runs next (e.g. `transferAttachments`) if `throw err`
+    // were ever dropped from the catch.
+    const thrownErr = {
+      response: {
+        status: 409,
+        data: {
+          errors: [
+            { message: conflictSummary, code: G2G_DATA_CONFLICT_ERROR_CODE },
+          ],
+        },
+      },
+    };
+    vi.spyOn(rawAxios, 'post').mockRejectedValueOnce(thrownErr);
+
+    await expect(
+      pusher.startTransfer(
+        tk,
+        { _id: 'operator-id' },
+        ['pages'],
+        {},
+        mock<IDataGROWIInfo>(),
+      ),
+    ).rejects.toBe(thrownErr);
+
+    expect(socket.emit).toHaveBeenCalledWith('admin:g2gProgress', {
+      mongo: G2G_PROGRESS_STATUS.ERROR,
+      attachments: G2G_PROGRESS_STATUS.PENDING,
+    });
+    expect(socket.emit).toHaveBeenCalledWith('admin:g2gError', {
+      key: 'admin:g2g:error_data_conflict',
+      message: conflictSummary,
+    });
+  });
+
+  test('emits the existing generic admin:g2gError and rethrows for any other archive POST failure', async () => {
+    const { crowi, socket } = buildCrowiAndSocket();
+    const pusher = new G2GTransferPusherService(crowi);
+
+    const thrownErr = new Error('socket hang up');
+    vi.spyOn(rawAxios, 'post').mockRejectedValueOnce(thrownErr);
+
+    await expect(
+      pusher.startTransfer(
+        tk,
+        { _id: 'operator-id' },
+        ['pages'],
+        {},
+        mock<IDataGROWIInfo>(),
+      ),
+    ).rejects.toBe(thrownErr);
+
+    expect(socket.emit).toHaveBeenCalledWith('admin:g2gProgress', {
+      mongo: G2G_PROGRESS_STATUS.ERROR,
+      attachments: G2G_PROGRESS_STATUS.PENDING,
+    });
+    expect(socket.emit).toHaveBeenCalledWith('admin:g2gError', GENERIC_EVENT);
+  });
+});

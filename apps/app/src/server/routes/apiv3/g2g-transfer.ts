@@ -11,13 +11,20 @@ import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-impo
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { isG2GTransferError } from '~/server/models/vo/g2g-transfer-error';
+import {
+  G2G_DATA_CONFLICT_ERROR_CODE,
+  G2GTransferErrorCode,
+  isG2GTransferError,
+} from '~/server/models/vo/g2g-transfer-error';
 import { configManager } from '~/server/service/config-manager';
 import { exportService } from '~/server/service/export';
 import type { IDataGROWIInfo } from '~/server/service/g2g-transfer';
 import { X_GROWI_TRANSFER_KEY_HEADER_NAME } from '~/server/service/g2g-transfer';
 import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
+import type { UniqueConflictReport } from '~/server/service/import/detect-unique-conflicts';
+import { hasConflicts } from '~/server/service/import/detect-unique-conflicts';
+import { summarizeUniqueConflicts } from '~/server/service/import/summarize-unique-conflicts';
 import loggerFactory from '~/utils/logger';
 import { TransferKey } from '~/utils/vo/transfer-key';
 
@@ -371,6 +378,55 @@ export const setup = (crowi: Crowi): Router => {
             'Import settings are invalid. See GROWI docs about details.',
             'import_settings_invalid',
           ),
+        );
+      }
+
+      /*
+       * detect unique constraint conflicts with the existing data
+       *
+       * The archive is unzipped but nothing has been written yet, so this is the last
+       * point at which the transfer can be refused without leaving the destination in a
+       * half-imported state.
+       */
+      let conflictReport: UniqueConflictReport;
+      try {
+        conflictReport =
+          await g2gTransferReceiverService.detectImportConflicts(
+            innerFileStats,
+          );
+      } catch (err) {
+        logger.error(err);
+        // A detection that could not complete says nothing about whether the archive
+        // collides, and importing on that basis is exactly what drops documents
+        // silently and breaks group-granted pages (issue #10151). Fail instead.
+        return res.apiv3Err(
+          new ErrorV3(
+            'Failed to detect data conflicts before import.',
+            'conflict_detection_failed',
+          ),
+          500,
+        );
+      }
+
+      if (hasConflicts(conflictReport)) {
+        // Counts only: the conflicting values are user data and must not reach the log.
+        logger.warn(
+          {
+            // The code the response carries, so a log search by the code an operator
+            // was shown actually finds this line.
+            code: G2G_DATA_CONFLICT_ERROR_CODE,
+            errorCode: G2GTransferErrorCode.DATA_CONFLICT,
+            userConflictCount: conflictReport.userConflicts.length,
+            groupConflictCount: conflictReport.groupConflicts.length,
+          },
+          'Aborted the transfer import before writing anything: the transfer data conflicts with existing data',
+        );
+        return res.apiv3Err(
+          new ErrorV3(
+            summarizeUniqueConflicts(conflictReport),
+            G2G_DATA_CONFLICT_ERROR_CODE,
+          ),
+          409,
         );
       }
 

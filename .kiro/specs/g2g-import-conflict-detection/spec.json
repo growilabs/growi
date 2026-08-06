@@ -1,0 +1,22 @@
+{
+  "feature_name": "g2g-import-conflict-detection",
+  "created_at": "2026-08-03T11:25:54Z",
+  "updated_at": "2026-08-04T14:30:30Z",
+  "language": "ja",
+  "phase": "implementation-complete",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}
