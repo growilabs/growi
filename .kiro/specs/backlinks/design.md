@@ -69,7 +69,9 @@ by Mongoose `autoIndex` at model registration (new collection — no migration n
   also does).
 - Markdown/wiki-link parsing and link resolution rules (consumed via existing remark/rehype
   plugins; no syntax owned here).
-- `PageRedirect` creation/cleanup (consumed read-only via `retrievePageRedirectEndpoints`).
+- `PageRedirect` creation/cleanup (consumed read-only via
+  `retrievePageRedirectEndpointsBatch`; see Modified Files — the batch static itself is owned
+  by the model, not by this feature).
 
 ### Allowed Dependencies
 
@@ -96,7 +98,8 @@ Re-check this feature if any of the following change:
 - `PageQueryBuilder.addViewerCondition` / `addConditionToExcludeTrashed` / `generateGrantCondition`
   (and `Page.findByIdsAndViewer`) signatures or semantics.
 - The remark/rehype link-resolution plugins' resolution rules or `pagePath` injection.
-- `PageRedirect.retrievePageRedirectEndpoints` contract.
+- `PageRedirect.retrievePageRedirectEndpoints` contract (it is now a lookup over
+  `retrievePageRedirectEndpointsBatch`, but its signature and return shape are unchanged).
 - `normalizePath` / `isCreatablePage` behavior.
 - The `PageLink` schema, its `toPath` faithfulness rule, or the derived target-state contract
   (would force consumers of the read API to revalidate).
@@ -134,7 +137,7 @@ graph TB
     subgraph Backlinks
         Listener[PageLinkService listener]
         Extract[extractInternalLinks]
-        Resolve[resolveToPage]
+        Resolve[resolveToPages]
         Model[PageLink model]
         Route[apiv3 backlinks route]
         Hook[useSWRxBacklinks]
@@ -190,9 +193,9 @@ apps/app/src/features/backlinks/
 │   ├── models/
 │   │   ├── page-link.ts          # Mongoose model (getOrCreateModel) + statics
 │   │   └── page-link-backfill-job.ts   # Mongoose model: backfill progress marker + atomic claim (multi-instance)
-│   ├── service/
+│   ├── services/
 │   │   ├── extract-internal-links.ts   # pure: (markdown, pagePath, siteUrl?) => string[] (resolved, deduped)
-│   │   ├── resolve-to-page.ts          # toPath -> toPage id (permalink by id | findByPath + redirect) — live path only
+│   │   ├── target-page-resolution.ts   # paths -> toPage ids, batched (permalink by id | path | redirect endpoint)
 │   │   ├── page-link-sync.ts           # pure-ish ops: upsert outbound, reconcile-delete, re-resolve inbound
 │   │   ├── page-link-service.ts        # subscribes to crowi.events.page; orchestrates sync; read query
 │   │   └── page-link-backfill-cron.ts  # CronService: chunked, resumable, throttled backfill (in-memory path->id map)
@@ -214,10 +217,16 @@ apps/app/src/features/backlinks/
   (subscribe to events) in the page-service setup phase, mirroring `search.ts`; also register the
   backfill `CronService` (mirroring the page-bulk-export job-cron registration).
 - `apps/app/src/server/routes/apiv3/index.js` — register the backlinks route.
+- `apps/app/src/server/models/page-redirect.ts` — add the `retrievePageRedirectEndpointsBatch`
+  static (`$match: { fromPath: { $in } }` + the existing `$graphLookup`) and re-implement
+  `retrievePageRedirectEndpoints` as a lookup over it. Adding it to the model rather than to this
+  feature keeps one copy of the pipeline; the singular contract is unchanged for
+  `page-data-props.ts`. Its duplicate-match `logger.warn` is dropped — `fromPath` is
+  unique-indexed, so more than one match was already unreachable.
 - `apps/app/src/client/components/PageAccessoriesModal/PageAccessoriesModal.tsx` (+ its Jotai
   modal-contents enum) — add the **Backlinks** tab mapping to `BacklinksPanel`.
 
-> Each file owns one responsibility. `extract-internal-links.ts` and `resolve-to-page.ts` are
+> Each file owns one responsibility. `extract-internal-links.ts` and `target-page-resolution.ts` are
 > pure/stateless and unit-testable in isolation; `page-link-service.ts` is the only framework
 > adapter (event wiring) and receives the page/body as input rather than owning lifecycle logic.
 
@@ -230,7 +239,7 @@ sequenceDiagram
     participant Bus as events.page
     participant Svc as PageLinkService
     participant Ext as extractInternalLinks
-    participant Res as resolveToPage
+    participant Res as resolveToPages
     participant DB as PageLink
 
     PS->>Bus: emit create/update (page, user)
@@ -286,7 +295,7 @@ needs no write — derived state reads the restored page's status.
 | 1.6 | Exclude self-link (path or own permalink) | extractInternalLinks (drop `toPath == page.path`) + sync (drop `toPage == fromPage`) | Save flow |
 | 1.7 | Empty state | BacklinksPanel | Read flow |
 | 1.8 | Show title + path | IBacklink DTO, BacklinkListItem | Read flow |
-| 1.9 | Permalink (`/{id}`) link targets page by id | extractInternalLinks (verbatim) + resolveToPage permalink branch | Save flow |
+| 1.9 | Permalink (`/{id}`) link targets page by id | extractInternalLinks (verbatim) + resolveToPages permalink branch | Save flow |
 | 1.10 | Same-host absolute URL → internal | extractInternalLinks classifier (`app:siteUrl` host match) | — |
 | 1.11 | Unset `app:siteUrl` → absolute URLs not internal | extractInternalLinks classifier (no base origin) | — |
 | 2.1 | Only readable linking pages | findBacklinks → addViewerCondition (shared grant filter) | Read flow |
@@ -301,10 +310,10 @@ needs no write — derived state reads the restored page's status.
 | 4.1 | One-time backfill | PageLinkBackfillCron (indexes via `autoIndex` at model registration) | Backfill flow |
 | 4.2 | Backfilled == post-enablement | backfill reuses `extractInternalLinks`; emits same rows as the live path | Backfill flow |
 | 4.3 | Re-run / restart produces no duplicates | unique `{fromPage,toPath}` + upsert; resumable progress marker | Backfill flow |
-| 5.1 | Links survive rename/move | resolveToPage redirect-following + `_id`-stable cache | Reconcile notes |
+| 5.1 | Links survive rename/move | resolveToPages redirect-following + `_id`-stable cache | Reconcile notes |
 | 5.2 | Descendants re-associated | same (each descendant keeps `_id`) | Reconcile notes |
-| 5.3 | Unresolvable move → broken | resolveToPage → null → broken state | Read flow |
-| 5.4 | Permalink links rename-immune (no re-association) | resolveToPage permalink branch + `_id`-stable `toPath`/`toPage` | Reconcile notes |
+| 5.3 | Unresolvable move → broken | resolveToPages → absent from map → `toPage` null → broken state | Read flow |
+| 5.4 | Permalink links rename-immune (no re-association) | resolveToPages permalink branch + `_id`-stable `toPath`/`toPage` | Reconcile notes |
 | 6.1 | Soft-delete target → trashed | derived state from target status | Delete flow |
 | 6.2 | Permanent-delete target → broken | reconcile nulls inbound `toPage` | Delete flow |
 | 6.3 | Restore → normal | derived state (no write) | Delete flow |
@@ -316,7 +325,7 @@ needs no write — derived state reads the restored page's status.
 |-----------|-------|--------|-----|--------------------------|-----------|
 | PageLink model | Data | Persist directed link edges | 1.5,3.x,4.3 | Mongoose, getOrCreateModel (P0) | State |
 | extractInternalLinks | Server logic | Body+path+siteUrl → resolved internal paths | 1.2–1.6, 1.10, 1.11 | render plugins, isCreatablePage, normalizePath, isPermalink, app:siteUrl (P0) | Service |
-| resolveToPage | Server logic | toPath → toPage id (incl. permalink by id) | 1.9, 5.x | Page.findById/findByPath, PageRedirect, isPermalink (P0) | Service |
+| resolveToPages | Server logic | paths → toPage ids, batched (incl. permalink by id) | 1.9, 5.x | Page.find by _id/path, PageRedirect.retrievePageRedirectEndpointsBatch, isPermalink (P0) | Service |
 | PageLinkService | Server service | Subscribe to events, sync index, query backlinks | 1.1,2.x,3.x,5,6 | events.page (P0), PageQueryBuilder.addViewerCondition (P0) | Service, Event |
 | get-page-backlinks route | API | Read endpoint | 1.1,1.7,2.x,6.4 | apiv3 middleware (P0), PageLinkService (P0) | API |
 | useSWRxBacklinks | Client store | Fetch backlinks | 1.1 | apiv3Get (P0) | Service |
@@ -395,24 +404,34 @@ function extractInternalLinks(markdown: string, pagePath: string, siteUrl?: stri
 - **Purity**: `siteUrl` is an injected parameter; the function does not read `configManager` itself.
 - Skip `sanitize`/`katex`/`math` plugins — only link resolution is needed.
 
-#### resolveToPage
+#### resolveToPages
 
 | Field | Detail |
 |-------|--------|
-| Intent | Resolve a stored `toPath` to a target page `_id` — by id for permalinks, else by path/redirect | 
+| Intent | Resolve a batch of stored `toPath`s to target page `_id`s — by id for permalinks, else by path/redirect | 
 | Requirements | 1.9, 5.1, 5.2, 5.3, 5.4 |
 
 **Contracts**: Service [x]
 
 ##### Service Interface
 ```typescript
-function resolveToPage(toPath: string): Promise<ObjectId | null>;
+function resolveToPages(paths: string[]): Promise<Map<string, ObjectId>>;
 ```
-- Order: **(0)** if `isPermalink(toPath)` → `Page.findById(removeHeadingSlash(toPath))?._id ?? null`
-  (the id *is* the target; no path lookup, no redirect-following). **(1)** else `Page.findByPath(toPath)`
-  → **(2)** else `PageRedirect.retrievePageRedirectEndpoints(toPath)` then
-  `Page.findByPath(endpoints.end.toPath)` → **(3)** else `null`.
+- **Batched.** A page carries many links and every save re-resolves all of them, so the resolver
+  takes the whole set and answers with one `$in` query per stage. Keys are always the **input**
+  string, never a redirect endpoint, so a caller's stored `toPath` stays faithful to the body.
+  Inputs that resolve to no page are absent from the map (the `null` of the singular form).
+- Order, applied to the batch: **(0)** inputs where `isPermalink` → one `Page.find({_id: {$in}})`
+  (the id *is* the target; no path lookup, no redirect-following). **(1)** the rest → one
+  `Page.find({path: {$in}})` → **(2)** only the paths that missed →
+  `PageRedirect.retrievePageRedirectEndpointsBatch(missedPaths)`, then one more path query at the
+  endpoints → **(3)** else absent.
 - Always read `.end.toPath` (handles A→B→C via `$graphLookup`; cycle-safe).
+- **Redirect following lives on the model, not here.** `retrievePageRedirectEndpointsBatch` is a
+  `PageRedirect` static (`server/models/page-redirect.ts`) and the singular
+  `retrievePageRedirectEndpoints` is a lookup over it, so the `$match` + `$graphLookup` pipeline
+  and the deepest-hop rule exist exactly once and cannot drift between the page-view redirect and
+  the link index. This resolver only projects `end.toPath` out of the result.
 - **Permalink targets are the strongest case (1.9, 5.4)**: `toPath` already encodes the immutable
   `_id`, so `toPage` is permanent and immune to rename/move/redirect — it never needs
   redirect-following or re-resolution. (`isPermalink` has already validated a 24-hex ObjectId, so
@@ -432,7 +451,7 @@ function resolveToPage(toPath: string): Promise<ObjectId | null>;
 
 **Dependencies**
 - Inbound: `crowi.events.page` events (P0).
-- Outbound: `extractInternalLinks`, `resolveToPage`, `PageLink` model,
+- Outbound: `extractInternalLinks`, `resolveToPages`, `PageLink` model,
   `PageQueryBuilder.addViewerCondition` + `addConditionToExcludeTrashed` (P0); `Revision` to read
   body when payload lacks it (P1).
 
@@ -562,7 +581,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklink[]>;
   permanently once complete. (GROWI has no distributed lock; this Mongo claim is the minimal
   hardening over the bulk-export pattern, which has a known race window.)
 - **In-memory resolution**: loads `{path → _id}` for all pages once (one lightweight projection
-  query) and resolves extracted links by hash lookup — **never** per-link `resolveToPage`.
+  query) and resolves extracted links by hash lookup — **never** per-link `resolveToPages`.
   Redirect-following is skipped during backfill. For a **permalink** `toPath` (`isPermalink`),
   resolution is an **existence check** against the set of known page ids (the map's values):
   present → that id; absent → `null` (broken). The id is the target, so the path map is not
@@ -648,9 +667,14 @@ interface ILinkTarget {
   per-type base. A same-host absolute URL (`https://<siteUrl-host>/a/b`) yields
   `/a/b` while a different-host URL is excluded (1.10); with `siteUrl` undefined, absolute URLs are
   excluded (1.11); a permalink `/{id}` is returned verbatim (1.9).
-- `resolveToPage`: live page wins; single and double redirect chains resolve to `.end.toPath`;
-  no page + no redirect → `null` (5.1–5.3). A permalink `toPath` resolves directly by id
-  (`findById`, no path/redirect lookup) and yields `null` when no page has that id (1.9, 5.4).
+- `resolveToPages`: live page wins; single and double redirect chains resolve to `.end.toPath`;
+  no page + no redirect → absent from the map (5.1–5.3). A permalink `toPath` resolves directly
+  by id (no path/redirect lookup) and is absent when no page has that id (1.9, 5.4). Several
+  missed paths resolve in one redirect lookup, and a target in the trash resolves rather than
+  reading as broken (6.1).
+- `PageRedirect.retrievePageRedirectEndpointsBatch`: one chain endpoint per requested `fromPath`;
+  unrequested paths excluded; an empty input runs no aggregation. The existing
+  `retrievePageRedirectEndpoints` tests double as the regression net for the shared pipeline.
 - `reconcileDeletedPages`: trashed page → no-op; permanently-gone page → outbound removed and
   inbound `toPage` nulled (3.3, 6.2).
 

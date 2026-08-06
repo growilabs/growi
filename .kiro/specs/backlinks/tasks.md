@@ -7,7 +7,7 @@
 > carries the walking skeleton; B2–B5 graft onto it.
 >
 > **Where a capability was split across stories**, the task notes call it out explicitly:
-> `resolveToPage`, the sync ops, the lifecycle handlers, the read queries, `BacklinkListItem`,
+> `resolveToPages`, the sync ops, the lifecycle handlers, the read queries, `BacklinkListItem`,
 > `BacklinksPanel`, and the event subscription each get their B1 half here and their B4/B5 half in
 > the later story.
 >
@@ -339,15 +339,20 @@ redirect-following keeps links resolvable when the source is re-saved after the 
 the redirect-following half of resolution plus the re-resolve-by-path repointing. Independent of
 B3/B5.
 
-- [x] B4.1 Add redirect-chain following to resolveToPage
+- [x] B4.1 Add redirect-chain following to resolveToPages
   - Extend the resolver with the redirect step deferred from B1.4: when direct path lookup misses,
     follow the redirect chain to its endpoint and resolve there; handle multi-hop renames (A→B→C) via
-    the redirect endpoint lookup; null when neither a page nor a redirect resolves (the broken case).
-    A permalink `toPath` still short-circuits by id (never needs redirect-following — 5.4)
-  - Done when unit tests cover single and double redirect chains resolving to the endpoint, and the
-    unresolved (null) case
+    the redirect endpoint lookup; unresolved when neither a page nor a redirect resolves (the broken
+    case). A permalink `toPath` still short-circuits by id (never needs redirect-following — 5.4)
+  - Follow the chain for **all** missed paths in one lookup, via a new
+    `PageRedirect.retrievePageRedirectEndpointsBatch` static; re-implement the existing singular
+    `retrievePageRedirectEndpoints` over it so the `$graphLookup` pipeline and deepest-hop rule
+    exist once and page view cannot disagree with the link index about where a chain ends
+  - Done when tests cover single and double redirect chains resolving to the endpoint, the
+    unresolved case, several missed paths resolving in one lookup, and a trashed target resolving
+    through its trash redirect rather than reading as broken
   - _Requirements: 1.9, 5.1, 5.2, 5.3, 5.4_
-  - _Boundary: resolveToPage_
+  - _Boundary: resolveToPages, PageRedirect (batch static)_
   - _Depends: B1.4_
 
 - [ ] B4.2 Implement the re-resolve-by-path sync operation
