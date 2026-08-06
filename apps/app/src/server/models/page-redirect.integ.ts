@@ -113,4 +113,83 @@ describe('PageRedirect', () => {
       expect(endpoints?.end.toPath).toEqual('/path4');
     });
   });
+
+  describe('.retrievePageRedirectEndpointsBatch', () => {
+    test('shoud resolve every requested fromPath to its own chain endpoint', async () => {
+      // setup:
+      await PageRedirect.insertMany([
+        { fromPath: '/path1', toPath: '/path2' },
+        { fromPath: '/path2', toPath: '/path3' },
+        { fromPath: '/other1', toPath: '/other2' },
+        { fromPath: '/unrequested', toPath: '/nowhere' },
+      ]);
+
+      // when:
+      const endpointsByFromPath =
+        await PageRedirect.retrievePageRedirectEndpointsBatch([
+          '/path1',
+          '/other1',
+        ]);
+
+      // then:
+      expect(endpointsByFromPath.size).toEqual(2);
+      expect(endpointsByFromPath.get('/path1')?.start.fromPath).toEqual(
+        '/path1',
+      );
+      expect(endpointsByFromPath.get('/path1')?.end.toPath).toEqual('/path3');
+      expect(endpointsByFromPath.get('/other1')?.end.toPath).toEqual('/other2');
+      expect(endpointsByFromPath.has('/unrequested')).toBe(false);
+    });
+
+    test('shoud omit a fromPath that has no redirect', async () => {
+      // setup:
+      await PageRedirect.insertMany([{ fromPath: '/path1', toPath: '/path2' }]);
+
+      // when:
+      const endpointsByFromPath =
+        await PageRedirect.retrievePageRedirectEndpointsBatch([
+          '/path1',
+          '/never-existed',
+        ]);
+
+      // then:
+      expect(endpointsByFromPath.size).toEqual(1);
+      expect(endpointsByFromPath.has('/never-existed')).toBe(false);
+    });
+
+    test('shoud stop following a chain at the depth cap', async () => {
+      // setup:
+      // uncapped, the walk would reach /p60
+      await PageRedirect.insertMany(
+        Array.from({ length: 60 }, (_, i) => ({
+          fromPath: `/p${i}`,
+          toPath: `/p${i + 1}`,
+        })),
+      );
+
+      // when:
+      const endpointsByFromPath =
+        await PageRedirect.retrievePageRedirectEndpointsBatch(['/p0']);
+
+      // then:
+      // depth 0 is the /p1 hop, so maxDepth 50 ends the walk at /p51 -> /p52
+      expect(endpointsByFromPath.get('/p0')?.end.toPath).toEqual('/p52');
+    });
+
+    test('shoud return an empty map without querying for an empty input', async () => {
+      // setup:
+      const aggregateSpy = vi.spyOn(PageRedirect, 'aggregate');
+
+      // when:
+      const endpointsByFromPath =
+        await PageRedirect.retrievePageRedirectEndpointsBatch([]);
+
+      // then:
+      expect(endpointsByFromPath.size).toEqual(0);
+      // the map is empty either way; only the skipped round trip shows the guard
+      expect(aggregateSpy).not.toHaveBeenCalled();
+
+      aggregateSpy.mockRestore();
+    });
+  });
 });

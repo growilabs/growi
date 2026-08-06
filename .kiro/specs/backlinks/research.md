@@ -176,14 +176,30 @@
 ### Decision: resolve `toPage` through `PageRedirect`; rename needs no write-time work
 
 - **Context**: Requirement 5 (links survive rename/move, including descendants).
-- **Selected Approach**: Resolution order — `findByPath(toPath)` first; else follow
-  `PageRedirect.retrievePageRedirectEndpoints(toPath).end.toPath` (a `$graphLookup` chain with
-  cycle protection); else `null`. Because rename keeps `_id`, existing inbound `toPage` caches
-  stay valid; new links to the old path resolve via the redirect chain.
+- **Selected Approach**: Resolution order — live path lookup first; else follow
+  `PageRedirect.retrievePageRedirectEndpointsBatch(missedPaths)` and read each chain's
+  `end.toPath` (a `$graphLookup` chain with cycle protection); else unresolved. Because rename
+  keeps `_id`, existing inbound `toPage` caches stay valid; new links to the old path resolve via
+  the redirect chain.
 - **Rationale**: Matches what a user clicking the stale link actually experiences; keeps
   `toPath` faithful to the body. `$graphLookup` handles double renames (A→B→C) in one query.
+- **Batched on the model, not per link (revised at B4.1)**: a page commonly carries several paths
+  that resolve to nothing — renamed targets, but also the ordinary habit of linking to
+  not-yet-created pages — and every save re-resolves all of them. Matching with
+  `$in` keeps that at one aggregation regardless of how many missed. The batch lives as a
+  `PageRedirect` static (`retrievePageRedirectEndpointsBatch`) and the pre-existing singular
+  `retrievePageRedirectEndpoints` — which page view uses for its "redirected from" banner — is
+  re-implemented as a lookup over it. Rejected alternative: a backlinks-local batch resolver,
+  which was implemented first and duplicated the `$match` + `$graphLookup` + deepest-hop logic;
+  two copies can drift (a `maxDepth` cap, a collection rename) so that page view and the link
+  index disagree about where a chain ends, which is exactly the invariant this feature relies on.
 - **Trade-offs**: Redirect records accumulate (`removePageRedirectsByToPath` is unused) — a
-  data-hygiene caveat, not a correctness one.
+  data-hygiene caveat, not a correctness one. The chain walk is capped at `maxDepth: 50`, added
+  once consolidation made it a one-line change: `$graphLookup` is memory-bound at 100MB and
+  cannot spill to disk, so an unbounded walk fails the whole aggregation rather than degrading.
+  A chain past the cap resolves to its 51st hop — the same "endpoint with no live page" outcome
+  a cycle already produces. (`removePageRedirectsByToPath` walks the graph the other way and is
+  still uncapped; it runs on delete, not on save.)
 
 ### Decision: requirement 6.4 implies a **forward-link health** read over the same index
 
@@ -218,8 +234,10 @@
   entrypoint (`docker-entrypoint.ts:247`, `execFileSync`) *before* `spawnApp`, and via the
   `preserver` npm hook (`package.json:17`). A data migration ⇒ the wiki is **offline for the full
   backfill duration**.
-- **Finding 2 — per-link resolution is the real cost.** Calling `resolveToPage` per extracted
-  link is `findByPath` (+ redirect `$graphLookup`) × millions of links ⇒ potentially hours.
+- **Finding 2 — per-link resolution is the real cost.** Resolving one link at a time is
+  `findByPath` (+ redirect `$graphLookup`) × millions of links ⇒ potentially hours. (This drove
+  both the backfill's in-memory map and, later, batching the resolver itself — see the redirect
+  decision above.)
 - **Finding 3 — process model.** GROWI is a **single Node process**, no `worker_threads`, no job
   queue, no distributed lock; horizontal scaling = multiple containers on one MongoDB. The
   closest precedent for a heavy background job is the **page-bulk-export job** (extends
@@ -279,8 +297,9 @@
     absolute path** rather than promising the `./{pageId}` syntax. (Requirements clarification, not
     a design workaround.)
 - **Selected Approach**:
-  - `resolveToPage`: permalink branch first — `isPermalink(toPath)` → `Page.findById(removeHeadingSlash(toPath))`;
-    no path lookup or redirect-following. Such rows are `_id`-stable and rename-immune (5.4).
+  - `resolveToPages`: permalink branch first — inputs where `isPermalink(toPath)` are resolved by
+    `_id` in their own query; no path lookup or redirect-following. Such rows are `_id`-stable
+    and rename-immune (5.4).
   - `extractInternalLinks(markdown, pagePath, siteUrl?)`: classify each `a[href]` — absolute URL kept
     as `url.pathname` iff `siteUrl` set and same host (1.10); dropped otherwise / when `siteUrl` unset
     (1.3, 1.11); `siteUrl` is an injected param (function stays pure; the service reads `configManager`).
@@ -324,7 +343,10 @@
 - `apps/app/src/server/service/search.ts:172-239` — event-subscriber precedent
 - `apps/app/src/server/models/page.ts:526-571,808-825,1288-1325` — viewer/grant filtering
 - `apps/app/src/services/renderer/renderer.tsx:111-181` — shared remark/rehype pipeline
-- `apps/app/src/server/models/page-redirect.ts` — `retrievePageRedirectEndpoints` ($graphLookup)
+- `apps/app/src/server/models/page-redirect.ts` — `retrievePageRedirectEndpointsBatch` ($graphLookup),
+  with `retrievePageRedirectEndpoints` as a single-path lookup over it
+- `apps/app/src/pages/[[...path]]/page-data-props.ts:76` — the singular static's caller (page-view
+  redirect banner); the resolution order there is what the link index must agree with
 - migrate-mongo refs: `20220131001218-convert-redirect-to-pages-to-page-redirect-documents.js`,
   `20211227060705-revision-path-to-page-id-schema-migration--fixed-8998.js`
 - `apps/app/docker/docker-entrypoint.ts:247` — migrations run synchronously at boot (blocking)

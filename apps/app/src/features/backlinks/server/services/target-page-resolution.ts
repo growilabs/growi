@@ -4,23 +4,62 @@ import type { Types } from 'mongoose';
 import mongoose from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
+import PageRedirect from '~/server/models/page-redirect';
+
+// Match findByPath: exclude empty pages ({ isEmpty: null } for v4 compat).
+// Trashed pages are deliberately NOT excluded — a link whose target is in the
+// trash resolves to it, so the derived link state can report `trashed` rather
+// than `broken`.
+const NON_EMPTY_PAGE_CONDITION = {
+  $or: [{ isEmpty: false }, { isEmpty: null }],
+};
+
+// Per call, never at module scope: this module can be imported before crowi
+// registers the Page schema, and mongoose.model() throws then.
+const getPageModel = () => mongoose.model<PageDocument, PageModel>('Page');
+
+const findPagesById = async (
+  ids: string[],
+): Promise<{ _id: Types.ObjectId }[]> => {
+  return await getPageModel()
+    .find({ _id: { $in: ids } })
+    .select('_id')
+    .lean();
+};
+
+const findPagesByPath = async (
+  paths: string[],
+): Promise<{ _id: Types.ObjectId; path: string }[]> => {
+  return await getPageModel()
+    .find({ path: { $in: paths }, ...NON_EMPTY_PAGE_CONDITION })
+    .select('_id path')
+    .lean();
+};
 
 /**
- * Resolves page IDs for a batch of paths using at most two database calls.
+ * Resolves page IDs for a batch of paths.
  *
  * Inputs are split into permalinks (eg. '/6a4c8be9b698d2b7ab35cd6e') and
  * regular paths (eg. '/docs/new'), each resolved with a single `$in` query.
  * The two queries run concurrently.
  *
+ * A regular path with no live page may have been renamed away, so it is then
+ * followed through its `PageRedirect` chain and resolved at the chain's endpoint
+ * — two further queries, and only when something actually missed. This is what
+ * keeps an inbound link valid when its target is renamed and the *source* page
+ * is re-saved later: the source body still contains the old path, so without
+ * redirect following that re-resolution would report a working link as broken.
+ * A permalink never needs this — it encodes the target's immutable `_id`.
+ *
  * @param paths - Extracted deduped absolute paths and/or permalinks.
- * @returns - Map from the original input string to its resolved page ID.
- *            Inputs with no matching page are absent from the map.
+ * @returns - Map from the original input string to its resolved page ID. Keys are
+ *            always the input, never a redirect endpoint, so a caller's stored
+ *            `toPath` stays faithful to the page body.
+ *            Inputs that resolve to no page are absent from the map.
  */
 export const resolveToPages = async (
   paths: string[],
 ): Promise<Map<string, Types.ObjectId>> => {
-  const Page = mongoose.model<PageDocument, PageModel>('Page');
-
   const permalinkIds: string[] = [];
   const normalPaths: string[] = [];
 
@@ -33,26 +72,40 @@ export const resolveToPages = async (
   }
 
   const [byId, byPath] = await Promise.all([
-    permalinkIds.length
-      ? Page.find({ _id: { $in: permalinkIds } })
-          .select('_id')
-          .lean()
-      : [],
-    normalPaths.length
-      ? // Match findByPath: exclude empty pages ({ isEmpty: null } for v4 compat).
-        Page.find({
-          path: { $in: normalPaths },
-          $or: [{ isEmpty: false }, { isEmpty: null }],
-        })
-          .select('_id path')
-          .lean()
-      : [],
+    permalinkIds.length ? findPagesById(permalinkIds) : [],
+    normalPaths.length ? findPagesByPath(normalPaths) : [],
   ]);
 
   const result = new Map<string, Types.ObjectId>();
 
   for (const p of byId) result.set(`/${p._id.toString()}`, p._id);
   for (const p of byPath) result.set(p.path, p._id);
+
+  const missedPaths = normalPaths.filter((path) => !result.has(path));
+  if (missedPaths.length === 0) return result;
+
+  const endpoints =
+    await PageRedirect.retrievePageRedirectEndpointsBatch(missedPaths);
+  if (endpoints.size === 0) return result;
+
+  // $graphLookup visits each document once, so a cycle ends at a path with no
+  // page: unresolved, never a hang.
+  const endpointByPath = new Map<string, string>();
+  for (const [path, { end }] of endpoints) {
+    endpointByPath.set(path, end.toPath);
+  }
+
+  const pagesAtEndpoints = await findPagesByPath([
+    ...new Set(endpointByPath.values()),
+  ]);
+
+  const idByEndpointPath = new Map<string, Types.ObjectId>();
+  for (const p of pagesAtEndpoints) idByEndpointPath.set(p.path, p._id);
+
+  for (const [path, endpointPath] of endpointByPath) {
+    const id = idByEndpointPath.get(endpointPath);
+    if (id != null) result.set(path, id);
+  }
 
   return result;
 };
