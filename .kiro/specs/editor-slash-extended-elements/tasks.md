@@ -42,7 +42,8 @@
 
 - [ ] 1.5 (P) 拡張要素コマンドのロケールキーを追加
   - `slash_command.drawio.*` / `plantuml.*` / `lsx.*` / `callout.<type>.*`（ラベル・説明）を en_US / ja_JP に追加する
-  - 観測: 両ロケールにキーが存在し、各コマンドのラベル/説明が表示言語で解決される（未対応言語は既定言語へフォールバック）
+  - `slash_command.link.*` / `tableBuilder.*` は GROWI がサポートする**全ロケール**（en_US/ja_JP/fr_FR/ko_KR/zh_CN）に追加する（基盤 Req 7.3 に合わせる）
+  - 観測: 両ロケール（drawio 等）または全ロケール（link/tableBuilder）にキーが存在し、各コマンドのラベル/説明が表示言語で解決される（未対応言語は既定言語へフォールバック）
   - _Requirements: 7.1, 7.2_
   - _Boundary: locale files_
 
@@ -75,13 +76,29 @@
   - _Boundary: use-extended-element-commands_
   - _Depends: 1.3, 1.4, 2.1_
 
+- [ ] 2.5 (P) リンクコマンドを `useExtendedElementCommands` に合流（既存モーダル再利用、新規ファイルなし）
+  - 既存の `useLinkEditModalActions`（`packages/editor/src/states/modal/link-edit.ts`）・`getMarkdownLink` / `replaceFocusedMarkdownLinkWithEditor`（`packages/editor/src/client/services-internal/link-util/markdown-link-util.ts`）はいずれも既存。新規ファイルは作らない
+  - `run(view, from)` は `ensureBlockLineStart` を呼ば**ない**（インライン要素）。`getMarkdownLink(view)` を初期値として `openLink(defaultMarkdownLink, onSave)` を呼び、`onSave = (linkText) => replaceFocusedMarkdownLinkWithEditor(view, linkText)` を渡す
+  - 観測: リンクコマンドが `kind:'run'` を持ち、`run(view, from)` で `getMarkdownLink(view)` が読まれ `openLink` が呼ばれること、返された `onSave` を呼ぶと `replaceFocusedMarkdownLinkWithEditor(view, linkText)` が呼ばれること（モックで検証）。行の途中で `run` してもドキュメントに改行が入らないこと（`ensureBlockLineStart` 未呼出の確認）
+  - _Requirements: 1.1, 1.6, 9.1, 9.2, 9.3, 9.4_
+  - _Boundary: use-extended-element-commands_
+  - _Depends: 1.4_
+
+- [ ] 2.6 (P) テーブルビルダーコマンドを `useExtendedElementCommands` に合流（既存モーダル再利用、新規ファイルなし）
+  - 既存の `useHandsontableModalForEditorActions`（`packages/editor/src/states/modal/handsontable.ts`）を再利用。新規ファイルは作らない。基盤の `table` コマンド（プレーンな2列テーブル即挿入）とは**別 id**（例 `tableBuilder`）として共存させる
+  - `run(view, from)` は `ensureBlockLineStart(view, from)` で行頭正規化してから `openTableBuilder(view)` を呼ぶ（`editorKey` は不要、`view` を直接渡す）
+  - 観測: テーブルビルダーコマンドが `kind:'run'` を持ち、`run(view, from)` で（行途中なら行頭正規化後に）`openTableBuilder` が `view` 付きで呼ばれること（モックで検証）。基盤 `SLASH_COMMANDS` の `table` と id が競合しないこと
+  - _Requirements: 1.1, 1.7, 10.1, 10.2, 10.3, 10.4, 10.5_
+  - _Boundary: use-extended-element-commands_
+  - _Depends: 1.4_
+
 - [ ] 3. 統合: 基盤コマンド集合への合流
 
 - [ ] 3.1 拡張コマンドを基盤の有効コマンド集合へ合流（React 合成点）
   - 合成点（`use-default-extensions` 相当）で `editorKey` を取得し、`[...SLASH_COMMANDS, ...useExtendedElementCommands(editorKey)]` を `resolveSlashCommands(t, ...)` に渡す（基盤 core は拡張を import しない＝依存逆転なし）
-  - 観測: エディタ起動時に `/drawio` `/plantuml` `/lsx` `/callout` が基本コマンドと同一の補完メニューに現れ、絵文字補完（`:`）と同時に機能する
+  - 観測: エディタ起動時に `/drawio` `/plantuml` `/lsx` `/callout` `/link` および テーブルビルダーコマンドが基本コマンドと同一の補完メニューに現れ、絵文字補完（`:`）と同時に機能する
   - _Requirements: 6.1, 6.2, 8.2_
-  - _Depends: 2.4_
+  - _Depends: 2.4, 2.5, 2.6_
   - _Boundary: コマンド集合合成点（基盤側）_
 
 - [ ] 4. 検証
@@ -89,8 +106,18 @@
 - [ ] 4.1 統合・スモーク検証
   - `/uml` で plantuml、`/warn` で warning callout が絞り込まれること、plantuml/callout 選択で `/query` が置換され単一トランザクションで挿入され undo 1 回で復元すること
   - `/drawio` `/lsx` 選択で `/query` が削除されモーダルが起動し、drawio 保存で ` ```drawio ` フェンス、lsx 確定で `$lsx(...)` が挿入されること、キャンセルで未挿入であることを実アプリで確認
-  - **行の途中（例 `図: /drawio`）で起動しても、挿入されるブロックが独立行に置かれ描画が壊れないこと**（行頭正規化）を確認
-  - 既存 drawio モーダルのツールバー起動・書き戻しが回帰しないこと
+  - `/link` 選択で `/query` が削除され Edit Link Modal が起動し、確定でリンクがカーソル位置（行の途中ならその位置のまま）に挿入されること、キャンセルで未挿入であることを実アプリで確認
+  - テーブルビルダーコマンド選択で `/query` が削除され Handsontable Modal が起動し、確定で Markdown テーブルが挿入されること、キャンセルで未挿入であることを実アプリで確認。基盤の `table` コマンドも引き続き選べ、両者が共存すること
+  - **行の途中（例 `図: /drawio`、テーブルビルダーも同様）で起動しても、挿入されるブロックが独立行に置かれ描画が壊れないこと**（行頭正規化）を確認。**リンクは行の途中で起動してもその位置にインラインで挿入されること**（行頭正規化されないことの確認）
+  - 既存 drawio モーダル・Edit Link Modal・Handsontable Modal のツールバー起動・書き戻しが回帰しないこと
   - 観測: 上記シナリオが統合テスト/手動スモークで再現し、`turbo run lint/test/build --filter @growi/app` 相当が green
-  - _Requirements: 1.2, 1.4, 4.4, 5.1, 5.2, 5.3, 5.4, 6.2, 6.3, 8.2, 8.3_
+  - _Requirements: 1.2, 1.4, 4.4, 5.1, 5.2, 5.3, 5.4, 6.2, 6.3, 8.2, 8.3, 8.4, 9.1, 9.2, 9.3, 10.1, 10.2, 10.3, 10.5_
   - _Depends: 3.1_
+
+## Implementation Notes
+
+- リンク（2.5）・テーブルビルダー（2.6）は、drawio と同じ「既存モーダルを起動導線だけ足して再利用する」パターンだが、**`editorKey` の束縛が不要**という点で drawio/lsx より単純: `useLinkEditModalActions().open(defaultMarkdownLink, onSave)` と `useHandsontableModalForEditorActions().open(editor?: EditorView)` はいずれも `run(view, from)` が受け取る `view` をそのまま渡せる。新規ファイルは作らない（既存トリガーフック・書き戻しユーティリティをそのまま呼ぶのみ）。
+- リンクは**インライン要素**なので `ensureBlockLineStart` を呼ばない。テーブルビルダーは**ブロック要素**（既存の `replaceFocusedMarkdownTableWithEditor` は先行段落との空行を保証しないため）なので drawio/lsx と同様に呼ぶ。この違いを取り違えると、リンクが不要な改行を挿入したり、テーブルビルダーが段落に吸収されて表として描画されない不具合になる。
+
+### Follow-up (deferred, out of this spec's scope — from usability trial feedback)
+- **画像アップロード**: 既存の添付ボタン（`AttachmentsDropdownItem` / `useFileDropzone`）は `onUpload` / `acceptedUploadFileType` を apps/app 側コンポーネントから React props として受け取る構成で、`run(view, from)`（editor 側 state のみ）では起動を完結できない。drawio/リンク/テーブルビルダーのような「editor 側 atom を叩くだけ」の再利用パターンが効かない唯一の候補。コンポーネントレイヤでの合成方法（例: 合成点自体に `onUpload` を渡す新しい経路を作る）を検討してから、別スペックとして改めてスコープ化する。

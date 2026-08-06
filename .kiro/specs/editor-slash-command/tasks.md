@@ -72,6 +72,26 @@
   - _Requirements: 1.1, 2.1, 3.2, 3.3, 3.6, 4.1, 6.2, 6.3_
   - _Depends: 3.2_
 
+- [x] 5. 構造上の文脈に応じたコマンド絞り込み（試用フィードバック, Req 8）
+
+- [x] 5.1 コマンドに文脈除外データを追加し、補完ソースで文脈判定して絞り込む
+  - `SlashCommand` に `disallowedIn?: readonly ('list'|'table')[]` を追加。heading1-3/table/codeBlock は `['list','table']`、bulletList/numberedList/taskList/quote は `['table']` のみを宣言する（リスト項目内に収まらないものが前者）
+  - `slash-command-source` に、`isInCodeContext` と同型の「syntax tree 親チェーンを辿る」判定（`activeContextsAt`）を追加し、`ListItem` / `Table`・`TableRow`・`TableCell`・`TableHeader` ノードの有無から現在の文脈を求める。クエリ照合の前に `disallowedIn` と現在の文脈の積が空でないコマンドを除外する
+  - コードコンテキスト（メニュー自体を非表示）とは異なり、list/table 文脈は**メニューは開いたまま該当コマンドのみ除外**する
+  - 観測: フィルタ機構は `disallowedIn` の形ごとの合成コマンドで検証（list+table 制限は list 内で除外、table のみ制限は list 内で残る、未宣言はどこでも残る）。実コマンドがどの形を持つかは `slash-command-definitions` の契約テストで固定（リスト内に残るのはリスト系と引用のみ）
+  - _Requirements: 8.1, 8.2, 8.3, 8.4_
+  - _Boundary: slash-command-types, slash-command-definitions, slash-command-source_
+
+- [x] 5.2 リストマーカーのみの行でコマンドが項目の内側で働くようにする（試用フィードバック, Req 9）
+  - `SlashInsertion` に `replaceFromOffset`（`<= 0`、既定 `0`）を追加し、`apply` が `from + replaceFromOffset` を置換起点にする。相対オフセットのままなので position-free の原則は維持され、ChangeSpec を組むのは引き続き `apply` のみ・単一 change なので undo も 1 回
+  - `insertion-builders` に「行の内容がリストマーカーのみか」を判定する `bareListMarkerOffsetAt` を追加し、該当時はマーカー開始位置への相対オフセット、非該当時は `null` を返す
+  - `lineMarkerInsertion(marker, listItemBehavior?)` に振る舞いをデータで渡す。`convert`（リスト系）は既存マーカーを置換レンジに吸収して置換、`append`（引用）は区切りを前置せず同一行に付加。コードブロックはリスト固有の分岐を持たず、かつリスト文脈では候補から除外する（Req 8.1）
+  - マーカー以外の本文がある行・通常の文章中は Req 3.6 の既存挙動を維持する
+  - 観測: `apply` と同じ合成で結果ドキュメントを検証（`  - /`＋番号付き → `  1. `、`- /`＋引用 → `- > `、`- [ ] /`＋箇条書き → `- `）。非リスト位置の回帰も固定。ミューテーションチェック（`convert` の範囲拡張を無効化）で該当テストのみ RED になることを確認済み
+  - _Requirements: 8.1, 9.1, 9.2, 9.3, 9.4, 9.5_
+  - _Boundary: slash-command-types, insertion-builders, slash-command-definitions, slash-command-source_
+  - _Depends: 5.1_
+
 ## Implementation Notes
 - 3.2: `appendExtensions(args)` wraps EVERY top-level element of `args` with the SAME `Compartment` (`services/.../utils/append-extensions.ts`), and a Compartment can wrap only one extension. So the default set MUST be passed as a single nested element (`[[...all]]`); a flat multi-element array throws `RangeError: Duplicate use of compartment in extensions` at runtime (only surfaced when the editor mounts — build/typecheck/unit pass). Encoded via `buildDefaultExtensionsArg` + regression test. Found during 4.1 smoke.
 - 1.2: insertion-builders decide line-start vs mid-line purely from **same-line** preceding non-whitespace text (Req 3.6 wording). The design's cross-line nuance (table on a fresh empty line directly below a non-empty paragraph → also needs a blank line) is intentionally NOT handled by the builders — the typical `/` trigger hits the mid-line path. Verified during smoke: GROWI's renderer (remark-gfm) still renders a table directly below a paragraph, so no blank line is required in practice — non-issue.
@@ -82,3 +102,15 @@
 - 6: the unified `autocompletion` applies `addToOptions: [emojiRenderOption]` to ALL options, so emoji's glyph renderer runs for slash options too and emits an empty `<span>` (no `type`). Fix: return `null` from the renderer when there is no emoji.
 - 7: mid-line insertion does not absorb the single space before `/`, leaving a trailing space on the preceding line (`abc /h1` → `abc \n# `). Fix: include the single space immediately before `/` in the replaced range.
 - Investigated and dismissed as non-issues: code-context suppression inside language-annotated fenced blocks (```js) works (parent chain reaches FencedCode); table directly below a paragraph renders (remark-gfm); fixed gray-800/gray-600 menu colors remain legible in dark mode.
+- 5.1: `markdownLanguage` from `@codemirror/lang-markdown` already configures the GFM extension (`Table`/`TaskList`/etc.) by default, so `ListItem`/`Table`/`TableCell` node detection works without any extra parser config — confirmed by reading the package source, not assumed.
+- 5.2: keeping `quote`/`codeBlock` offered inside a list (the 5.1 decision) was only half the story — with the original builders they still emitted an unindented block that escaped the list (`- /` + quote produced `- ` + newline + `> `). Verified empirically against the real source before changing anything. Req 9 fixes the insertion side rather than hiding the commands, so the 5.1 filtering matrix stays as-is.
+- 5.2: an earlier revision DID nest the code fence inside the list item (indenting the content line and closing fence to the item's content column). That was reverted on review feedback — a fence is easier to edit as its own block, so `codeBlock` carries no list-specific branch. The `bareListMarkerOffsetAt` helper was reduced to returning just the offset once the continuation-indent it also computed became unused.
+- 5.1/5.2 (order matters): once the fence stopped being nested, leaving `codeBlock` offered inside a list produced the worst of both — it broke out of the list AND left an empty `- ` marker behind, i.e. exactly the structural damage Req 8 exists to prevent. So `codeBlock` moved to `disallowedIn: ['list','table']`, joining heading/table. The rule that fell out: **a command may stay offered in a list only if it acts within the item** (list types convert the marker, quote appends to the same line).
+- 5.1: in a table cell every one of the 9 commands is excluded, so the menu opens with zero options and closes immediately — observationally identical to suppressing it. Filtering (not suppression) is still the right mechanism, because the deferred inline commands (bold / link / inline code) are valid inside a table cell and will simply not declare `table` in `disallowedIn`.
+- 5.2: `replaceFromOffset` intentionally stays a RELATIVE offset instead of an absolute `replaceFrom`, so `SlashInsertion` keeps the position-free invariant documented on the type and `apply` remains the only place that builds a ChangeSpec.
+
+### Follow-up (deferred, new-command scope — from usability trial feedback; NOT this spec)
+Adding this to `SLASH_COMMANDS` breaks the `toHaveLength(9)` contract test (Req 5.1) and reopens the approved base scope, so it is not implemented here. The decision was pinned down during Req 8's design discussion so a follow-up story can use it directly:
+- Bold / link insertion with no active selection (cursor on an empty line, `/` typed): insert empty markers with the cursor placed between them (e.g. bold → `**` + cursor + `**`). Link should compose with `editor-slash-extended-elements`' `run` action reusing the existing `Edit Link Modal` (`useLinkEditModalActions().open(getMarkdownLink(view), onSave)`).
+
+> **Correction**: list-type "convert" was previously listed here as deferred new-command scope. It is now **implemented as Req 9** — existing list commands behave as a conversion inside a list item, so no command is added and the 9-command contract holds. See design.md's Implementation Notes for why the "exclude the current line's own type" refinement was dropped.

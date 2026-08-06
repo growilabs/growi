@@ -27,6 +27,8 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
     descriptionKey: 'slash_command.heading1.description',
     keywords: ['h1', 'title'],
     action: { kind: 'insert', buildInsertion: lineMarkerInsertion('# ') },
+    disallowedIn: ['list', 'table'],
+    syntaxHint: '#',
   },
   {
     id: 'heading2',
@@ -34,6 +36,8 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
     descriptionKey: 'slash_command.heading2.description',
     keywords: ['h2', 'subtitle'],
     action: { kind: 'insert', buildInsertion: lineMarkerInsertion('## ') },
+    disallowedIn: ['list', 'table'],
+    syntaxHint: '##',
   },
   {
     id: 'heading3',
@@ -41,34 +45,56 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
     descriptionKey: 'slash_command.heading3.description',
     keywords: ['h3'],
     action: { kind: 'insert', buildInsertion: lineMarkerInsertion('### ') },
+    disallowedIn: ['list', 'table'],
+    syntaxHint: '###',
   },
   {
     id: 'bulletList',
     labelKey: 'slash_command.bulletList.label',
     descriptionKey: 'slash_command.bulletList.description',
     keywords: ['ul', 'unordered', 'bullet', 'list'],
-    action: { kind: 'insert', buildInsertion: lineMarkerInsertion('- ') },
+    action: {
+      kind: 'insert',
+      buildInsertion: lineMarkerInsertion('- ', 'convert'),
+    },
+    disallowedIn: ['table'],
+    syntaxHint: '-',
   },
   {
     id: 'numberedList',
     labelKey: 'slash_command.numberedList.label',
     descriptionKey: 'slash_command.numberedList.description',
     keywords: ['ol', 'ordered', 'number', 'list'],
-    action: { kind: 'insert', buildInsertion: lineMarkerInsertion('1. ') },
+    action: {
+      kind: 'insert',
+      buildInsertion: lineMarkerInsertion('1. ', 'convert'),
+    },
+    disallowedIn: ['table'],
+    syntaxHint: '1.',
   },
   {
     id: 'taskList',
     labelKey: 'slash_command.taskList.label',
     descriptionKey: 'slash_command.taskList.description',
     keywords: ['todo', 'checkbox', 'check', 'list'],
-    action: { kind: 'insert', buildInsertion: lineMarkerInsertion('- [ ] ') },
+    action: {
+      kind: 'insert',
+      buildInsertion: lineMarkerInsertion('- [ ] ', 'convert'),
+    },
+    disallowedIn: ['table'],
+    syntaxHint: '- [ ]',
   },
   {
     id: 'quote',
     labelKey: 'slash_command.quote.label',
     descriptionKey: 'slash_command.quote.description',
     keywords: ['blockquote', 'citation'],
-    action: { kind: 'insert', buildInsertion: lineMarkerInsertion('> ') },
+    action: {
+      kind: 'insert',
+      buildInsertion: lineMarkerInsertion('> ', 'append'),
+    },
+    disallowedIn: ['table'],
+    syntaxHint: '>',
   },
   {
     id: 'codeBlock',
@@ -76,6 +102,10 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
     descriptionKey: 'slash_command.codeBlock.description',
     keywords: ['code', 'fence', 'pre'],
     action: { kind: 'insert', buildInsertion: codeBlockInsertion },
+    // Excluded from list items for the same reason as heading/table: the fence
+    // is not nested into the item, so it would break out of the list and leave
+    // the now-empty marker behind. Quote stays because it appends in place.
+    disallowedIn: ['list', 'table'],
   },
   {
     id: 'table',
@@ -83,5 +113,6 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
     descriptionKey: 'slash_command.table.description',
     keywords: ['grid'],
     action: { kind: 'insert', buildInsertion: tableInsertion },
+    disallowedIn: ['list', 'table'],
   },
 ];
