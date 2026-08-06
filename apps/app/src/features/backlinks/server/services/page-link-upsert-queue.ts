@@ -4,8 +4,20 @@ import { handlePageUpsertById } from './page-link-service-handlers';
 
 const logger = loggerFactory('growi:features:backlinks:page-link-upsert-queue');
 
-export const DRAIN_INTERVAL_MS = 1000;
-export const MAX_PAGES_PER_DRAIN = 3;
+/**
+ * Pacing budget for the drain loop: how long a dirty page waits before its links are
+ * re-extracted, and how many pages one tick may process.
+ *
+ * Passed in rather than read here so the defaults live in exactly one place
+ * (`backlinks:drainIntervalMs` / `backlinks:maxPagesPerDrain` in CONFIG_DEFINITIONS).
+ *
+ * Both are assumed to be positive integers; `resolveUpsertQueuePacing` guarantees that for
+ * config-sourced values.
+ */
+export interface PageLinkUpsertQueuePacing {
+  readonly drainIntervalMs: number;
+  readonly maxPagesPerDrain: number;
+}
 
 /**
  * Coalescing, paced queue of page ids whose outbound links need re-extracting
@@ -15,18 +27,23 @@ export const MAX_PAGES_PER_DRAIN = 3;
  * single extraction over the latest stored body, and drains a bounded number per
  * tick so an editing burst never becomes one blocking spree of markdown parses.
  *
- * Takes `getSiteUrl` as a callback rather than a Crowi instance: the queue's job
- * is pacing, and keeping config access at the boundary leaves it unit-testable
- * without a Crowi.
+ * Takes `getSiteUrl` and the pacing budget as constructor input rather than a Crowi
+ * instance: the queue's job is pacing, and keeping config access at the boundary
+ * leaves it unit-testable without a Crowi.
  */
 export class PageLinkUpsertQueue {
   private getSiteUrl: () => string | undefined;
+  private pacing: PageLinkUpsertQueuePacing;
   private pagesToUpsert: Set<string>;
   private drainTimer: NodeJS.Timeout | null;
   private draining: boolean;
 
-  constructor(getSiteUrl: () => string | undefined) {
+  constructor(
+    getSiteUrl: () => string | undefined,
+    pacing: PageLinkUpsertQueuePacing,
+  ) {
     this.getSiteUrl = getSiteUrl;
+    this.pacing = pacing;
     this.pagesToUpsert = new Set<string>();
     this.draining = false;
     this.drainTimer = null;
@@ -39,12 +56,18 @@ export class PageLinkUpsertQueue {
   }
 
   private scheduleDrain(): void {
+    // Known limitation: a drain that never settles leaves `draining` true, and this guard then
+    // early-returns forever — the process stops indexing while `enqueue` keeps filling the set.
+    // Accepted rather than guarded with a timeout, because a timeout cannot cancel the abandoned
+    // run: it would only race it, and a resurrected stale run would overwrite a newer link set
+    // (the upsert is last-writer-wins). Recovery is a restart, after which each page's rows are
+    // repaired by its next save or by the backfill (B3).
     if (this.drainTimer != null || this.draining) return;
     this.drainTimer = setTimeout(() => {
       this.drain().catch((err) =>
         logger.error({ err }, 'backlinks drain failed'),
       );
-    }, DRAIN_INTERVAL_MS);
+    }, this.pacing.drainIntervalMs);
     // A pending drain must not keep the process alive; dropped work self-heals on the next edit.
     this.drainTimer.unref();
   }
@@ -55,7 +78,17 @@ export class PageLinkUpsertQueue {
 
     try {
       const siteUrl = this.getSiteUrl();
-      const batch = [...this.pagesToUpsert].slice(0, MAX_PAGES_PER_DRAIN);
+
+      // Taken by early break rather than [...set].slice(N): during a burst — the very case this
+      // queue exists for — copying the whole set to read a few ids is the cost it is meant to avoid.
+      // Set iteration is insertion-ordered, so this is the same FIFO batch the slice produced.
+      const batch: string[] = [];
+      for (const id of this.pagesToUpsert) {
+        batch.push(id);
+        if (batch.length >= this.pacing.maxPagesPerDrain) {
+          break;
+        }
+      }
 
       // Remove before processing: a save landing mid-drain re-enqueues the id and gets a fresh
       // run, whereas removing afterwards would swallow that save's changes.

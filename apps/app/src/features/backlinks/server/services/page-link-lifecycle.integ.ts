@@ -16,7 +16,7 @@ import PageLink from '../models/page-link';
  * lifecycle event (emitted exactly as PageService does) drives the real
  * extraction -> resolution -> outbound-row sync, and the permission-filtered
  * read (findBacklinks) reflects the result. Unlike page-link-service-handlers.integ
- * (which mocks resolveToPages) and page-link-service.integ (which seeds rows by
+ * (which mocks resolveToPageIds) and page-link-service.integ (which seeds rows by
  * hand), nothing here is mocked — the pageLinkService created by setupPageService
  * is the object under test, and target pages are real so resolution runs for real.
  *
@@ -25,8 +25,11 @@ import PageLink from '../models/page-link';
  *  - a source the viewer cannot read is excluded; a grant change is reflected on re-read
  *  - a source linking B->A more than once is listed once
  *  - a page linking to its own permalink is excluded from its own backlinks
+ *  - a page trashed while its upsert sat in the queue is not indexed (3.5, B2.2)
  *
- * B1 scope: rename/move (B4.4) and trash/delete/restore (B5.8) are out of scope.
+ * B1 scope: rename/move (B4.4) is out of scope, and so is the rest of
+ * trash/delete/restore (B5.8) — the trash case below covers only B2.2's drain-time
+ * guard, not the B5.2 reconcile of rows the page already owned.
  */
 describe('Backlinks B1 slice (lifecycle integration)', () => {
   const PREFIX = '/backlinks-b1-lifecycle-test';
@@ -130,13 +133,14 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
   });
 
   afterEach(async () => {
-    const pages = await Page.find({ path: new RegExp(`^${PREFIX}/`) }).select(
-      '_id',
-    );
+    // Also matches /trash… : a soft delete rewrites the path in place, so a page trashed by a
+    // spec below would otherwise survive into the next one.
+    const seededPaths = new RegExp(`^(/trash)?${PREFIX}/`);
+    const pages = await Page.find({ path: seededPaths }).select('_id');
     const ids = pages.map((p) => p._id);
     await PageLink.deleteMany({ fromPage: { $in: ids } });
     await Revision.deleteMany({ pageId: { $in: ids } });
-    await Page.deleteMany({ path: new RegExp(`^${PREFIX}/`) });
+    await Page.deleteMany({ path: seededPaths });
   });
 
   afterAll(async () => {
@@ -248,6 +252,34 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     expect(
       await crowi.pageLinkService.findBacklinks(target._id, viewer),
     ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+  });
+
+  it('does not index a page trashed while its upsert sat in the queue (3.5)', async () => {
+    const target = await createPage('/target');
+    const trashed = await createPage('/trashed-while-queued');
+    const control = await createPage('/queued-alongside');
+
+    await emitUpsert('create', trashed, `[t](${target.path})`);
+    // GROWI's soft delete rewrites path and status in place, so the id stays resolvable and the
+    // drain still finds the page — without the status check, `upsert: true` would index a source
+    // now living under /trash as a backlink of the target.
+    await Page.updateOne(
+      { _id: trashed._id },
+      { $set: { path: `/trash${trashed.path}`, status: Page.STATUS_DELETED } },
+    );
+
+    // Enqueued in the same tick window as the trashed page, so its row appearing proves the batch
+    // (and therefore the trashed page) has been drained. Waiting on a positive signal rather than
+    // sleeping past the interval keeps the absence assertion below from passing vacuously.
+    await emitUpsert('create', control, `[t](${target.path})`);
+    await waitForOutboundCount(control._id, 1);
+
+    expect(await outboundRows(trashed._id)).toEqual([]);
+
+    // And the trashed page is not surfaced as a phantom backlink of the target.
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: control._id.toString(), path: control.path }]);
   });
 
   it('excludes a page linking to its own permalink from its own backlinks (1.6)', async () => {

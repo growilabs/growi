@@ -111,6 +111,7 @@ const PageOperationMenuItems = (
   const isGuestUser = useIsGuestUser();
   const isReadOnlyUser = useIsReadOnlyUser();
   const isSharedUser = useIsSharedUser();
+  const shareLinkId = useShareLinkId();
   const isBulkExportPagesEnabled = useAtomValue(isBulkExportPagesEnabledAtom);
   const isUploadEnabled = useAtomValue(isUploadEnabledAtom);
 
@@ -250,10 +251,8 @@ const PageOperationMenuItems = (
         onClick={() =>
           openAccessoriesModal(PageAccessoriesModalContents.Backlinks)
         }
-        // Guests are fine (backlinks are readable on a public wiki); a share-link
-        // viewer is not — the endpoint 403s for that request. Mirrors the modal's
-        // isLinkEnabled for this tab.
-        disabled={!!isSharedUser}
+        // Inverse of the modal's isLinkEnabled for this tab — rationale there.
+        disabled={shareLinkId != null}
         data-testid="open-page-accessories-modal-btn-with-backlinks-tab"
         className="grw-page-control-dropdown-item"
       >

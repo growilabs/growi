@@ -370,3 +370,47 @@ describe('config-definition multi-provider ai keys', () => {
     });
   });
 });
+
+describe('config-definition backlinks keys', () => {
+  describe('CONFIG_KEYS array', () => {
+    it('contains backlinks:drainIntervalMs', () => {
+      expect(CONFIG_KEYS).toContain('backlinks:drainIntervalMs');
+    });
+
+    it('contains backlinks:maxPagesPerDrain', () => {
+      expect(CONFIG_KEYS).toContain('backlinks:maxPagesPerDrain');
+    });
+  });
+
+  describe('CONFIG_DEFINITIONS defaults', () => {
+    // The pair is the shipped pacing budget of the live extraction queue: at most 3 markdown
+    // parses per second, whatever a save burst does.
+    describe('backlinks:drainIntervalMs', () => {
+      it('has default value of 1000', () => {
+        expect(
+          CONFIG_DEFINITIONS['backlinks:drainIntervalMs'].defaultValue,
+        ).toBe(1000);
+      });
+
+      it('has envVarName BACKLINKS_DRAIN_INTERVAL_MS', () => {
+        expect(CONFIG_DEFINITIONS['backlinks:drainIntervalMs'].envVarName).toBe(
+          'BACKLINKS_DRAIN_INTERVAL_MS',
+        );
+      });
+    });
+
+    describe('backlinks:maxPagesPerDrain', () => {
+      it('has default value of 3', () => {
+        expect(
+          CONFIG_DEFINITIONS['backlinks:maxPagesPerDrain'].defaultValue,
+        ).toBe(3);
+      });
+
+      it('has envVarName BACKLINKS_MAX_PAGES_PER_DRAIN', () => {
+        expect(
+          CONFIG_DEFINITIONS['backlinks:maxPagesPerDrain'].envVarName,
+        ).toBe('BACKLINKS_MAX_PAGES_PER_DRAIN');
+      });
+    });
+  });
+});

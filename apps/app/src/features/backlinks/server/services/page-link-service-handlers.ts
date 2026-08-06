@@ -1,24 +1,25 @@
-import { getIdForRef, isPopulated } from '@growi/core';
+import { getIdForRef } from '@growi/core';
 import mongoose from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { Revision } from '~/server/models/revision';
 
-import { extractInternalLinks } from './extract-internal-links';
+import { extractInternalLinkPaths } from './extract-internal-link-paths';
 import { syncOutboundLinks } from './page-link-sync';
-import { resolveToPages } from './target-page-resolution';
+import { resolveToPageIds } from './target-page-resolution';
 
+// The only caller reads the page with a projection and never populates, so the revision is always
+// a ref here.
 const loadBody = async (page: PageDocument): Promise<string> => {
   const { revision } = page;
   if (revision == null) return '';
-  if (isPopulated(revision)) return revision.body ?? '';
   const rev = await Revision.findById(getIdForRef(revision))
     .select('body')
     .lean();
   return rev?.body ?? '';
 };
 
-export const handlePageUpsert = async (
+const handlePageUpsert = async (
   page: PageDocument,
   siteUrl?: string,
 ): Promise<void> => {
@@ -26,13 +27,13 @@ export const handlePageUpsert = async (
   if (fromPage == null) return;
 
   const body = await loadBody(page);
-  const paths = await extractInternalLinks(body, page.path, siteUrl);
+  const paths = await extractInternalLinkPaths(body, page.path, siteUrl);
 
-  const resolved = await resolveToPages(paths);
+  const resolvedPageIds = await resolveToPageIds(paths);
   const rows = paths.map((toPath) => ({
     fromPage,
     toPath,
-    toPage: resolved.get(toPath) ?? null,
+    toPage: resolvedPageIds.get(toPath) ?? null,
   }));
 
   await syncOutboundLinks(fromPage, rows);

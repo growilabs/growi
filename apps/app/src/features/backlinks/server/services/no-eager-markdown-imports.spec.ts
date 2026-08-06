@@ -15,7 +15,7 @@ import {
 // ~16 MiB RSS on top of the rest of the boot graph (31 MiB in isolation, but
 // ~15 MiB of that is shared with mongoose / the page model and paid anyway).
 // Extraction runs on the backlinks drain timer, off the request path, so
-// `extract-internal-links.ts` loads the stack with dynamic import() and nothing
+// `extract-internal-link-paths.ts` loads the stack with dynamic import() and nothing
 // may reintroduce a top-level import.
 //
 // This is the only server-side consumer of that stack; the other one
@@ -38,7 +38,7 @@ import {
 //
 // Dynamic import() calls are treated as boundaries (not followed). `import type`
 // lines are skipped (erased at build) — the type-only `hast` import in
-// extract-internal-links.ts is fine and must remain.
+// extract-internal-link-paths.ts is fine and must remain.
 
 const SRC_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -67,7 +67,7 @@ describe('lazy-load boundary for the markdown pipeline', () => {
     expect(
       formatted,
       'The backlinks server entry must not statically reach the markdown pipeline.\n' +
-        'Load it with a dynamic import() inside extractInternalLinks (see buildPipeline) ' +
+        'Load it with a dynamic import() inside extractInternalLinkPaths (see buildPipeline) ' +
         'instead of a top-level import — including the local ~/services/renderer plugins, ' +
         'which reach hast-util-select transitively.\n\n' +
         `${formatted.join('\n\n')}`,
