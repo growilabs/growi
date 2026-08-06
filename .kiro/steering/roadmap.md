@@ -20,10 +20,15 @@ activity log サブシステムを責務ごとに分割したファミリー。f
 
 ### Specs（依存順）
 
-- [x] `activity-log-snapshot` — snapshot の型付け＋添付削除ログ（REMOVE: PR #11393）＋添付系 action（ADD/DOWNLOAD）への capture 拡張（PR #11433）。旧 `activity-log` を改名。残: 配置リファクタ（タスク14: builder/recorder を `service/attachment/` へ移動・挙動不変。配置ポリシーは flagship の関心マップを参照）。依存: なし
-- [ ] `activity-log`（flagship / 記録ゲート） — 対象外 action を今後保存しない。直し方（defer-create / delete-at-settle）は design で比較。既存残骸の掃除は対象外。依存: なし（並行可）
-- [ ] `activity-log-snapshot-viewer` — 監査ログ画面での snapshot 表示（生表示＋添付系整形）。依存: `activity-log-snapshot`（capture 拡張は PR #11433 で完了済み → 着手可能）
+3 spec すべてサブタスク完了。実装は master に入っている（下記 PR はいずれもマージ済み）。
+
+- [x] `activity-log-snapshot` — snapshot の型付け＋添付削除ログ（REMOVE: PR #11393）＋添付系 action（ADD/DOWNLOAD）への capture 拡張、および builder / recorder を `server/service/attachment/` へ移して `service/activity` を機構のみに収束させる配置リファクタ（挙動不変・PR #11433）。旧 `activity-log` を改名。依存: なし
+- [x] `activity-log`（flagship / 記録ゲート） — 対象外 action を今後保存しない（PR #11421）。失敗・中断時の記録経路は `recordFailsafeAttempt` / `registerFailsafeFinalizer`（`server/service/activity/`）。既存残骸の掃除は当初から対象外。ファミリー全体の関心マップは引き続きこの spec が持つ。依存: なし
+- [x] `activity-log-snapshot-viewer` — 監査ログ画面での snapshot 表示（生表示＋添付系整形・PR #11440）。UI は `client/components/Admin/AuditLog/snapshot-detail/`。残っているのは翻訳のみ（タスク 6.1: ja / ko / zh / fr のラベル）で、英語ファーストの方針により後続扱い・実施要否は別途判断。依存: `activity-log-snapshot`
 
 ### 将来課題（未割当）
 
 `target × targetModel` の全面的型安全化 / 保持期間・TTL / 大量カスケード削除時のボリューム制御。整理先は flagship `activity-log` の関心マップ（`.kiro/specs/activity-log/brief.md`）で管理する。
+
+---
+_Updated: 2026-08-06. activity log ファミリー 3 spec の状態を実装実績に合わせて更新（3 件とも master にマージ済みを確認、残タスクは snapshot-viewer の翻訳のみ）。単発で完了した spec（`drawio`、`g2g-import-conflict-detection` など）はファミリーでも umbrella でもないため、ここには列挙せず各 spec 側に残す。_
