@@ -365,6 +365,118 @@ describe('createSlashCommandSource - code context suppression', () => {
   });
 });
 
+// Req 8: commands whose insertion would break the surrounding structure are
+// excluded per-context via `disallowedIn`, not suppressed entirely (the menu
+// itself still fires — unlike code context, which suppresses it wholesale).
+describe('createSlashCommandSource - structural context filtering (Req 8)', () => {
+  // Synthetic commands, one per `disallowedIn` shape, so this covers the
+  // filtering MECHANISM. Which real command carries which shape is fixed by the
+  // slash-command-definitions contract test instead.
+  const bothRestricted: ResolvedSlashCommand = {
+    ...resolvedCommand({
+      id: 'bothRestricted',
+      label: 'Both restricted',
+      keywords: ['both'],
+      action: insertAction('# '),
+    }),
+    disallowedIn: ['list', 'table'],
+  };
+  const tableOnlyRestricted: ResolvedSlashCommand = {
+    ...resolvedCommand({
+      id: 'tableOnlyRestricted',
+      label: 'Table only restricted',
+      keywords: ['tableonly'],
+      action: insertAction('> '),
+    }),
+    disallowedIn: ['table'],
+  };
+  // No `disallowedIn` at all — proves the field is genuinely optional (Req 8.4).
+  const unrestricted = resolvedCommand({
+    id: 'unrestricted',
+    label: 'Unrestricted',
+    keywords: ['any'],
+    action: insertAction('- '),
+  });
+
+  const source = createSlashCommandSource([
+    bothRestricted,
+    tableOnlyRestricted,
+    unrestricted,
+  ]);
+
+  it('excludes only the list-restricted command inside a list item', () => {
+    const doc = '- /';
+    const pos = doc.indexOf('/') + 1;
+
+    const result = queryAtInMarkdown(source, doc, pos);
+
+    const labels = result?.options.map((o) => o.label);
+    expect(labels).not.toContain('Both restricted');
+    expect(labels).toContain('Table only restricted');
+    expect(labels).toContain('Unrestricted');
+  });
+
+  it('excludes every table-restricted command inside a table cell', () => {
+    const doc = '| a | b |\n| --- | --- |\n| / | c |';
+    const pos = doc.indexOf('/') + 1;
+
+    const result = queryAtInMarkdown(source, doc, pos);
+
+    const labels = result?.options.map((o) => o.label);
+    expect(labels).not.toContain('Both restricted');
+    expect(labels).not.toContain('Table only restricted');
+    expect(labels).toContain('Unrestricted');
+  });
+
+  it('offers every command outside list/table context (control)', () => {
+    const doc = '/';
+    const result = queryAtInMarkdown(source, doc, 1);
+
+    const labels = result?.options.map((o) => o.label);
+    expect(labels).toEqual([
+      'Both restricted',
+      'Table only restricted',
+      'Unrestricted',
+    ]);
+  });
+
+  // lezer-markdown keeps the line that FOLLOWS a table/list inside that node
+  // until a blank line ends it. The cursor's own line must therefore also look
+  // like the structure, or a single Enter after a table would leave the user
+  // with a menu that has nothing in it.
+  describe('the cursor own line must also look like the structure', () => {
+    const labelsAt = (doc: string): string[] | undefined =>
+      queryAtInMarkdown(source, doc, doc.lastIndexOf('/') + 1)?.options.map(
+        (o) => o.label,
+      );
+
+    it('does not treat the line after a table row as table context', () => {
+      const doc = '| a | b |\n| --- | --- |\n| c | d |\n/';
+
+      expect(labelsAt(doc)).toContain('Table only restricted');
+    });
+
+    it('does not treat the line after a list item as list context', () => {
+      const doc = '- foo\n/';
+
+      expect(labelsAt(doc)).toContain('Both restricted');
+    });
+
+    it('still treats an actual table row as table context', () => {
+      const doc = '| a | b |\n| --- | --- |\n| / | d |';
+
+      expect(labelsAt(doc)).not.toContain('Table only restricted');
+    });
+
+    it('still treats a blockquote-nested list item as list context', () => {
+      const doc = '> - /';
+
+      expect(labelsAt(doc)).not.toContain('Both restricted');
+      expect(labelsAt(doc)).toContain('Table only restricted');
+    });
+  });
+});
+
 // Integration: drive the real @codemirror/autocomplete plugin so the live
 // re-query behaviour is exercised — a unit call to the source cannot catch a
 // stale-menu regression (e.g. re-introducing `validFor` with `filter: false`).

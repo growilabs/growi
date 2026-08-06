@@ -28,6 +28,46 @@ const hasPrecedingText = (view: EditorView, from: number): boolean => {
   return before.trim() !== '';
 };
 
+/**
+ * A list item whose marker is the ONLY content before the insertion point, e.g.
+ * `- /`, `  1. /`, `- [ ] /`, `> - /`. The leading group captures the indent AND
+ * any blockquote markers, so a conversion replaces just the list marker and
+ * keeps both the nesting depth and the enclosing quote.
+ */
+const BARE_LIST_MARKER_REGEX =
+  /^(\s*(?:>\s*)*)(?:[-*+]|\d+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?$/;
+
+/**
+ * Offset (`< 0`) from `from` back to the first character of the list marker when
+ * `from` sits right after a bare list marker, otherwise `null` (Req 9).
+ */
+const bareListMarkerOffsetAt = (
+  view: EditorView,
+  from: number,
+): number | null => {
+  const line = view.state.doc.lineAt(from);
+  const before = line.text.slice(0, from - line.from);
+  const match = BARE_LIST_MARKER_REGEX.exec(before);
+  if (match == null) return null;
+
+  const indent = match[1];
+  return indent.length - before.length;
+};
+
+/**
+ * How a line-marker command behaves when it fires on a bare list marker (Req 9).
+ *
+ * - `convert`: replace the item's own marker, keeping the indent — the
+ *   numbered-list command turns `  - /` into `  1. `.
+ * - `append`: keep the item's marker and add this one after it on the SAME line —
+ *   the quote command turns `- /` into `- > ` (a quote inside the list item)
+ *   instead of breaking out of the list onto a new line.
+ *
+ * Omitted (headings) means no list-specific handling; those commands are not
+ * offered inside a list anyway (Req 8).
+ */
+export type ListItemBehavior = 'convert' | 'append';
+
 interface BlockSpec {
   readonly body: string;
   readonly bodyCursorOffset: number;
@@ -73,14 +113,35 @@ const TABLE_CURSOR_OFFSET = '| '.length;
  * `'> '`. The cursor lands right after the marker so the user can keep typing.
  */
 export const lineMarkerInsertion =
-  (marker: string): SlashInsertAction['buildInsertion'] =>
-  (view, from) =>
-    buildBlockInsertion(view, from, {
+  (
+    marker: string,
+    listItemBehavior?: ListItemBehavior,
+  ): SlashInsertAction['buildInsertion'] =>
+  (view, from) => {
+    const markerFromOffset =
+      listItemBehavior != null ? bareListMarkerOffsetAt(view, from) : null;
+
+    if (markerFromOffset != null) {
+      return {
+        insert: marker,
+        cursorOffset: marker.length,
+        replaceFromOffset:
+          listItemBehavior === 'convert' ? markerFromOffset : 0,
+      };
+    }
+
+    return buildBlockInsertion(view, from, {
       body: marker,
       bodyCursorOffset: marker.length,
       separator: '\n',
     });
+  };
 
+/**
+ * Empty fenced code block, always placed on its own new line. It has no
+ * list-item case on purpose: nesting a fence into the item was tried and
+ * rejected, and the command is excluded from list context instead (Req 8.1).
+ */
 export const codeBlockInsertion: SlashInsertAction['buildInsertion'] = (
   view,
   from,
