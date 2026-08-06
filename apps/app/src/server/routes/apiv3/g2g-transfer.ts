@@ -71,21 +71,37 @@ const logger = loggerFactory('growi:routes:apiv3:transfer');
  * extracted from the archive are a separate matter — `importCollection` deletes each one
  * it finishes with.
  */
-const deleteReceivedArchive = async (file?: {
-  path?: string;
-}): Promise<void> => {
+const deleteReceivedArchive = async (
+  baseDir: string,
+  file?: { path?: string },
+): Promise<void> => {
   if (file?.path == null) {
+    return;
+  }
+
+  // multer composed this path from the `filename` callback below — a UUID plus the
+  // extension — so nothing the caller sent reaches it. Checked against the import
+  // directory anyway: this is a delete, and the cost of being wrong once is a file
+  // removed from somewhere else. The same guard the attachment route applies before it
+  // reads an uploaded file, and what the path-traversal analysis in CI looks for, since
+  // it cannot see through multer's storage configuration.
+  const resolvedPath = path.resolve(file.path);
+  if (!isPathWithinBase(resolvedPath, baseDir)) {
+    logger.error(
+      { path: resolvedPath, baseDir },
+      'Refused to delete a received archive from outside the import directory',
+    );
     return;
   }
 
   try {
     // `force`, so a file multer already cleaned up after a failed upload is not an error.
-    await rm(file.path, { force: true });
+    await rm(resolvedPath, { force: true });
   } catch (err) {
     // A transfer that worked must not be reported as failed because the leftover archive
     // could not be removed; the operator is left with a file to delete, not a false alarm.
     logger.warn(
-      { err, path: file.path },
+      { err, path: resolvedPath },
       'Failed to delete the received transfer archive',
     );
   }
@@ -674,7 +690,7 @@ export const setup = (crowi: Crowi): Router => {
         // much on disk, and the retry it invites would pile another copy on top. The
         // archive goes first, so the next import never finds this one's leftovers in the
         // shared directory.
-        await deleteReceivedArchive(req.file);
+        await deleteReceivedArchive(importService.baseDir, req.file);
         importJob?.release();
       }
     },
