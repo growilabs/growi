@@ -68,6 +68,23 @@ interface ReceiverOptions {
 }
 
 /**
+ * How often the source GROWI reminds the destination that a transfer is still coming,
+ * while it builds the archive.
+ *
+ * Exporting every collection and zipping the result is one uninterrupted stretch of work
+ * during which the destination hears nothing at all, and it handles the same volume of
+ * data as the import — so a transfer big enough for the import to outlast the key is one
+ * where the export does too. Nothing has reached the destination by then, so what is lost
+ * is the entire transfer.
+ */
+export const PUSHER_KEEP_ALIVE_INTERVAL_MS = 5 * 60 * 1000;
+
+interface PusherOptions {
+  /** Overrides {@link PUSHER_KEEP_ALIVE_INTERVAL_MS}; see {@link ReceiverOptions}. */
+  readonly transferKeyKeepAliveIntervalMs?: number;
+}
+
+/**
  * Keys for file upload related config
  */
 const UPLOAD_CONFIG_KEYS = [
@@ -358,8 +375,46 @@ export const toArchivePostErrorEvent = (
 export class G2GTransferPusherService implements Pusher {
   crowi: Crowi;
 
-  constructor(crowi: Crowi) {
+  private readonly transferKeyKeepAliveIntervalMs: number;
+
+  constructor(crowi: Crowi, options: PusherOptions = {}) {
     this.crowi = crowi;
+    this.transferKeyKeepAliveIntervalMs =
+      options.transferKeyKeepAliveIntervalMs ?? PUSHER_KEEP_ALIVE_INTERVAL_MS;
+  }
+
+  /**
+   * Reminds the destination that this transfer is still coming, for as long as the
+   * returned function is not called.
+   *
+   * Uses the dedicated keep-alive endpoint rather than `growi-info`: answering that one
+   * writes a probe file to the destination's attachment storage and never deletes it, so
+   * polling it every few minutes would litter the destination for the length of every
+   * export.
+   */
+  private startTransferKeyKeepAlive(tk: TransferKey): () => void {
+    const touch = async (): Promise<void> => {
+      try {
+        await axios.post(
+          '/_api/v3/g2g-transfer/keep-alive',
+          null,
+          this.generateAxiosConfig(tk),
+        );
+      } catch (err) {
+        // The destination being briefly unreachable costs the key some of its remaining
+        // window; failing the transfer over it would cost the whole export.
+        logger.warn('Failed to extend the lifetime of the transfer key', err);
+      }
+    };
+
+    // No immediate call: the caller has just spoken to the destination, so the key was
+    // touched moments ago.
+    const timer = setInterval(() => {
+      void touch();
+    }, this.transferKeyKeepAliveIntervalMs);
+    timer.unref();
+
+    return () => clearInterval(timer);
   }
 
   public generateAxiosConfig(
@@ -605,6 +660,11 @@ export class G2GTransferPusherService implements Pusher {
       }),
     );
 
+    // Exporting and zipping is the one stretch of the transfer during which the
+    // destination hears nothing from this GROWI, and it is as long as the import. Without
+    // this the key can expire before the archive has been handed over at all.
+    const stopTransferKeyKeepAlive = this.startTransferKeyKeepAlive(tk);
+
     let zipFileStream: ReadStream;
     try {
       const zipFileStat = await exportService?.export(collections);
@@ -624,6 +684,10 @@ export class G2GTransferPusherService implements Pusher {
         key: 'admin:g2g:error_generate_growi_archive',
       });
       throw err;
+    } finally {
+      // Everything from here on is a request to the destination, which extends the key by
+      // arriving.
+      stopTransferKeyKeepAlive();
     }
 
     // Send a zip file to other GROWI via axios

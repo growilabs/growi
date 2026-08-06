@@ -263,6 +263,32 @@ export const setup = (crowi: Crowi): Router => {
   /**
    * @swagger
    *
+   *  /g2g-transfer/keep-alive:
+   *    post:
+   *      summary: /g2g-transfer/keep-alive
+   *      tags: [GROWI to GROWI Transfer]
+   *      security:
+   *        - transferHeaderAuth: []
+   *      responses:
+   *        '204':
+   *          description: The transfer key's lifetime was extended
+   */
+  // Answering costs a single key update and nothing else. The source calls this while it
+  // builds the archive, and `growi-info` — the only other endpoint it could have used —
+  // writes a probe file to the attachment storage that nothing deletes.
+  receiveRouter.post(
+    '/keep-alive',
+    validateTransferKey,
+    (req: Request, res: ApiV3Response) => {
+      // validateTransferKey has already pushed the key's expiry forward; there is nothing
+      // left to do but say so.
+      return res.sendStatus(204);
+    },
+  );
+
+  /**
+   * @swagger
+   *
    *  /g2g-transfer:
    *    post:
    *      summary: /g2g-transfer

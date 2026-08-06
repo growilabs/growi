@@ -20,6 +20,8 @@
 import { EventEmitter } from 'node:events';
 import { createWriteStream } from 'node:fs';
 import fs from 'node:fs/promises';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import type { IUser } from '@growi/core';
@@ -40,14 +42,18 @@ import type UserEvent from '~/server/events/user';
 import TransferKeyModel from '~/server/models/transfer-key';
 import type AppService from '~/server/service/app';
 import { configManager } from '~/server/service/config-manager';
-import instanciateExportService from '~/server/service/export';
+import instanciateExportService, {
+  exportService,
+} from '~/server/service/export';
 import {
-  type G2GTransferPusherService,
+  G2GTransferPusherService,
   G2GTransferReceiverService,
+  type IDataGROWIInfo,
   X_GROWI_TRANSFER_KEY_HEADER_NAME,
 } from '~/server/service/g2g-transfer';
 import { GrowiBridgeService } from '~/server/service/growi-bridge';
 import { initializeImportService } from '~/server/service/import';
+import type { SocketIoService } from '~/server/service/socket-io';
 import { getGrowiVersion } from '~/utils/growi-version';
 import { TransferKey } from '~/utils/vo/transfer-key';
 
@@ -65,6 +71,9 @@ const CLEAN_USER = {
 
 const OPERATOR_USER_ID = '0123456789abcdef01430002';
 
+/** Where apiv3 mounts this router in production; the pusher posts to absolute paths. */
+const G2G_TRANSFER_ROUTE_PREFIX = '/_api/v3/g2g-transfer';
+
 const USERS_JSON = 'users.json';
 const ZIP_NAME = 'g2g-keep-alive-transfer.zip';
 
@@ -75,6 +84,8 @@ const delay = (ms: number): Promise<void> =>
 
 describe('receive route — transfer key keep-alive', () => {
   let app: express.Application;
+  let crowi: Crowi;
+  let server: Server;
   let User: Model<IUser>;
   let receiverService: G2GTransferReceiverService;
   let tmpDir: string;
@@ -82,19 +93,19 @@ describe('receive route — transfer key keep-alive', () => {
   let transferKeyValue: string;
   let zipPath: string;
 
-  const readExpireAt = async (): Promise<number> => {
-    const key = await TransferKeyModel.findOne<ITransferKey>({
-      key: transferKeyValue,
+  const readExpireAt = async (key = transferKeyValue): Promise<number> => {
+    const transferKeyDoc = await TransferKeyModel.findOne<ITransferKey>({
+      key,
     });
-    if (key == null) {
+    if (transferKeyDoc == null) {
       throw new Error('The transfer key is gone');
     }
-    return new Date(key.expireAt).getTime();
+    return new Date(transferKeyDoc.expireAt).getTime();
   };
 
   const postArchive = (): request.Test =>
     request(app)
-      .post('/')
+      .post(`${G2G_TRANSFER_ROUTE_PREFIX}/`)
       .set(X_GROWI_TRANSFER_KEY_HEADER_NAME, transferKeyValue)
       .field('collections', JSON.stringify(['users']))
       .field(
@@ -110,7 +121,7 @@ describe('receive route — transfer key keep-alive', () => {
     importsDir = path.join(tmpDir, 'imports');
     await fs.mkdir(importsDir, { recursive: true });
 
-    const crowi = mock<Crowi>({
+    crowi = mock<Crowi>({
       tmpDir,
       events: {
         page: mock<EventEmitter>(),
@@ -137,7 +148,15 @@ describe('receive route — transfer key keep-alive', () => {
     addCustomFunctionToResponse(express);
 
     app = express();
-    app.use(setup(crowi));
+    // Mounted where production mounts it: the pusher builds absolute apiv3 paths.
+    app.use(G2G_TRANSFER_ROUTE_PREFIX, setup(crowi));
+    // The pusher reaches the destination over the network, so the destination has to be
+    // a real listening server rather than a supertest-driven handler.
+    server = await new Promise<Server>((resolve) => {
+      const listening = app.listen(0, () => {
+        resolve(listening);
+      });
+    });
 
     const keyString = await receiverService.createTransferKey(
       'http://g2g-keep-alive-source.example.com',
@@ -171,6 +190,11 @@ describe('receive route — transfer key keep-alive', () => {
   });
 
   afterAll(async () => {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -206,7 +230,7 @@ describe('receive route — transfer key keep-alive', () => {
     // out during the import answers this with 403 and the destination keeps a replaced
     // database with no attachments in it.
     const attachmentResponse = await request(app)
-      .post('/attachment')
+      .post(`${G2G_TRANSFER_ROUTE_PREFIX}/attachment`)
       .set(X_GROWI_TRANSFER_KEY_HEADER_NAME, transferKeyValue)
       .field('attachmentMetadata', JSON.stringify({ fileName: 'a.png' }))
       .attach('content', Buffer.from('irrelevant'), 'a.png');
@@ -239,5 +263,69 @@ describe('receive route — transfer key keep-alive', () => {
     // Left running, the key would never expire again — the 30-minute idle lifetime it is
     // supposed to have would be gone for good.
     expect(await readExpireAt()).toBe(justAfterDisconnect);
+  });
+
+  describe('while the source builds the archive', () => {
+    test('the source keeps the destination’s key alive, and stops once the archive is ready', async () => {
+      // Exporting and zipping is one uninterrupted stretch on the source during which the
+      // destination is never contacted. This drives the real pusher against the real
+      // receive route over a real socket, so what is asserted is the destination's own
+      // record of the key rather than a call count on the source.
+      const { port } = server.address() as AddressInfo;
+      const keyString = await receiverService.createTransferKey(
+        `http://127.0.0.1:${port}`,
+      );
+      const tk = TransferKey.parse(keyString);
+
+      const pusher = new G2GTransferPusherService(
+        // startTransfer reports its progress over the admin socket before it does
+        // anything else.
+        mock<Crowi>({ socketIoService: mock<SocketIoService>() }),
+        { transferKeyKeepAliveIntervalMs: KEEP_ALIVE_INTERVAL_MS },
+      );
+
+      // Whether the export succeeds is beside the point; its duration is the arrangement.
+      // Failing it ends startTransfer right after the stretch under test.
+      if (exportService == null) {
+        throw new Error('Expected the export service to be instantiated');
+      }
+      vi.spyOn(exportService, 'export').mockImplementation(async () => {
+        await delay(KEEP_ALIVE_INTERVAL_MS * 6);
+        throw new Error('export failed on purpose');
+      });
+
+      const before = await readExpireAt(tk.key);
+
+      const transferring = pusher
+        .startTransfer(
+          tk,
+          { _id: new mongoose.Types.ObjectId() },
+          ['users'],
+          { users: { mode: ImportMode.insert } },
+          mock<IDataGROWIInfo>(),
+        )
+        .catch(() => {
+          // The deliberately failed export.
+        });
+
+      await delay(KEEP_ALIVE_INTERVAL_MS * 2);
+      const earlyInExport = await readExpireAt(tk.key);
+      await delay(KEEP_ALIVE_INTERVAL_MS * 3);
+      const laterInExport = await readExpireAt(tk.key);
+
+      await transferring;
+
+      // Without this, nothing reaches the destination between the growi-info call and the
+      // archive itself, so a long export runs the key out before the archive is handed
+      // over at all — and then not one byte of the transfer has arrived.
+      expect(earlyInExport).toBeGreaterThan(before);
+      expect(laterInExport).toBeGreaterThan(earlyInExport);
+
+      // Everything after the export is itself a request to the destination, so the
+      // reminder has to stop; left running it would hold the key open indefinitely.
+      const afterExport = await readExpireAt(tk.key);
+      await delay(KEEP_ALIVE_INTERVAL_MS * 4);
+      expect(await readExpireAt(tk.key)).toBe(afterExport);
+    });
   });
 });
