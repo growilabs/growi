@@ -37,6 +37,9 @@ const logger = loggerFactory('growi:services:ImportService');
 
 const BULK_IMPORT_SIZE = 100;
 
+/** The collection whose import takes the maintenance-mode flag with it. */
+const CONFIGS_COLLECTION_NAME = 'configs';
+
 class ImportingCollectionError extends Error {
   collectionProgress: CollectionProgress;
 
@@ -148,13 +151,40 @@ export class ImportService {
       collections,
     );
 
+    // The maintenance-mode flag is a row of the configs collection, and that collection is
+    // always imported by replacement — so importing it deletes the flag that is keeping
+    // ordinary users out while the import runs. Read the destination's own value here:
+    // `getConfig()` serves the in-memory copy, which the raw-driver writes below never
+    // touch, so it still holds what the destination had before any of this started.
+    const isMaintenanceModeBeforeImport = configManager.getConfig(
+      'app:isMaintenanceMode',
+    );
+
     // process serially so as not to waste memory
     const promises = collections.map((collectionName) => {
       const importSettings = importSettingsMap.get(collectionName);
       if (importSettings == null) {
         throw new Error(`ImportSettings for ${collectionName} is not found`);
       }
-      return this.importCollection(collectionName, importSettings);
+
+      const importing = this.importCollection(collectionName, importSettings);
+
+      if (collectionName !== CONFIGS_COLLECTION_NAME) {
+        return importing;
+      }
+
+      // Chained onto the configs import rather than run alongside it, so that the flag is
+      // back in the database before the `loadConfigs()` at the end of this method — and
+      // before anything else can reload from a database that has no flag in it.
+      // `finally`, because a pipeline that fails after `deleteMany()` leaves the row
+      // missing just the same.
+      return (async () => {
+        try {
+          await importing;
+        } finally {
+          await this.reassertMaintenanceMode(isMaintenanceModeBeforeImport);
+        }
+      })();
     });
     for await (const promise of promises) {
       try {
@@ -186,6 +216,30 @@ export class ImportService {
     // Release caches after import process
     this.modelCache.clear();
     this.convertMap = undefined;
+  }
+
+  /**
+   * Puts the maintenance-mode flag the destination had back into the database.
+   *
+   * Deliberately not a fixed `true`: this runs for every import path, including a G2G
+   * transfer into a destination that was serving normally. Forcing the flag on there
+   * would leave the destination in maintenance mode with nobody expecting to switch it
+   * off — the receiving side only cleans up a flag it raised itself.
+   */
+  private async reassertMaintenanceMode(
+    isMaintenanceMode: boolean,
+  ): Promise<void> {
+    try {
+      await configManager.updateConfig(
+        'app:isMaintenanceMode',
+        isMaintenanceMode,
+      );
+    } catch (err) {
+      logger.error(
+        'Failed to restore the maintenance mode flag after importing configs',
+        err,
+      );
+    }
   }
 
   /**
