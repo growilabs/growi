@@ -206,6 +206,7 @@ describe('receive route — transfer key keep-alive', () => {
     vi.spyOn(receiverService, 'importCollections').mockImplementation(
       async () => {
         await importBlocked;
+        return { failedCollections: [] };
       },
     );
 
@@ -242,7 +243,7 @@ describe('receive route — transfer key keep-alive', () => {
     // Nothing releases this one: the request is abandoned while the import is running,
     // which is what a dropped connection during a large transfer looks like.
     vi.spyOn(receiverService, 'importCollections').mockImplementation(
-      () => new Promise<void>(() => {}),
+      () => new Promise(() => {}),
     );
 
     const pending = postArchive();

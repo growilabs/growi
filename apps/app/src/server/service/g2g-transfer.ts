@@ -13,6 +13,7 @@ import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-op
 import { ImportMode } from '~/models/admin/import-mode';
 import TransferKeyModel from '~/server/models/transfer-key';
 import { getImportService, type ImportSettings } from '~/server/service/import';
+import type { ImportResult } from '~/server/service/import/import';
 import { createBatchStream } from '~/server/util/batch-stream';
 import axios from '~/utils/axios';
 import { getGrowiVersion } from '~/utils/growi-version';
@@ -291,7 +292,7 @@ interface Receiver {
     collections: string[],
     importSettingsMap: Map<string, ImportSettings>,
     sourceGROWIUploadConfigs: FileUploadConfigs,
-  ): Promise<void>;
+  ): Promise<ImportResult>;
   /**
    * Returns file upload configs
    */
@@ -379,6 +380,31 @@ export const toArchivePostErrorEvent = (
   }
 
   return { key, message };
+};
+
+/**
+ * Reads the collections the destination failed to import out of its response to the
+ * archive.
+ *
+ * Guarded the whole way down, like {@link toArchivePostErrorEvent}: this is a network
+ * boundary, an older destination answers without the field at all, and a proxy can
+ * replace the body with something else entirely. Anything unrecognized reads as "nothing
+ * failed", which is what this code assumed before the field existed.
+ */
+export const readFailedCollections = (
+  responseData: unknown,
+): readonly string[] => {
+  if (!isRecord(responseData)) {
+    return [];
+  }
+
+  const { failedCollections } = responseData;
+
+  return Array.isArray(failedCollections)
+    ? failedCollections.filter(
+        (name): name is string => typeof name === 'string',
+      )
+    : [];
 };
 
 /**
@@ -703,6 +729,7 @@ export class G2GTransferPusherService implements Pusher {
     }
 
     // Send a zip file to other GROWI via axios
+    let archiveResponseData: unknown;
     try {
       // Use FormData to immitate browser's form data object
       const form = new FormData();
@@ -717,11 +744,12 @@ export class G2GTransferPusherService implements Pusher {
       form.append('optionsMap', JSON.stringify(optionsMap));
       form.append('operatorUserId', user._id.toString());
       form.append('uploadConfigs', JSON.stringify(uploadConfigs));
-      await rawAxios.post(
+      const { data } = await rawAxios.post(
         '/_api/v3/g2g-transfer/',
         form,
         this.generateAxiosConfig(tk, { headers: form.getHeaders() }),
       );
+      archiveResponseData = data;
     } catch (err) {
       logger.error(err);
       socket?.emit('admin:g2gProgress', {
@@ -730,6 +758,30 @@ export class G2GTransferPusherService implements Pusher {
       });
       socket?.emit('admin:g2gError', toArchivePostErrorEvent(err));
       throw err;
+    }
+
+    // A 200 only means the destination finished trying. Which collections it could not
+    // import is in the body, and this is the only place that fact can be read: the two
+    // GROWIs are separate processes and these notifications are emitted by this one.
+    const failedCollections = readFailedCollections(archiveResponseData);
+    if (failedCollections.length > 0) {
+      logger.error(
+        { failedCollections },
+        'The destination GROWI could not import every collection',
+      );
+      socket?.emit('admin:g2gProgress', {
+        mongo: G2G_PROGRESS_STATUS.ERROR,
+        attachments: G2G_PROGRESS_STATUS.PENDING,
+        failedCollections,
+      });
+      socket?.emit('admin:g2gError', {
+        key: 'admin:g2g:error_partial_import',
+        message: `Collections that could not be imported: ${failedCollections.join(', ')}`,
+      });
+      // The attachments are not sent: the destination holds a partly imported database
+      // and has to be transferred again, so pushing files into it now would only make the
+      // retry slower. Reporting completion here is what requirement 2.5 rules out.
+      return;
     }
 
     socket?.emit('admin:g2gProgress', {
@@ -990,26 +1042,28 @@ export class G2GTransferReceiverService implements Receiver {
     collections: string[],
     importSettingsMap: Map<string, ImportSettings>,
     sourceGROWIUploadConfigs: FileUploadConfigs,
-  ): Promise<void> {
+  ): Promise<ImportResult> {
     const { appService } = this.crowi;
     const importService = getImportService();
     /** whether to keep current file upload configs */
     const shouldKeepUploadConfigs =
       configManager.getConfig('app:fileUploadType') !== 'none';
 
+    let importResult: ImportResult;
+
     if (shouldKeepUploadConfigs) {
       /** cache file upload configs */
       const fileUploadConfigs = await this.getFileUploadConfigs();
 
       // import mongo collections(overwrites file uplaod configs)
-      await importService.import(collections, importSettingsMap);
+      importResult = await importService.import(collections, importSettingsMap);
 
       // restore file upload config from cache
       await configManager.removeConfigs(UPLOAD_CONFIG_KEYS);
       await configManager.updateConfigs(fileUploadConfigs);
     } else {
       // import mongo collections(overwrites file uplaod configs)
-      await importService.import(collections, importSettingsMap);
+      importResult = await importService.import(collections, importSettingsMap);
 
       // update file upload config
       await configManager.updateConfigs(sourceGROWIUploadConfigs);
@@ -1017,6 +1071,10 @@ export class G2GTransferReceiverService implements Receiver {
 
     await this.crowi.setUpFileUpload(true);
     await appService.setupAfterInstall();
+
+    // Handed back so the route can put it in the response: the source is a different
+    // process, and its own progress events cannot know what happened over here.
+    return importResult;
   }
 
   public async getFileUploadConfigs(): Promise<FileUploadConfigs> {

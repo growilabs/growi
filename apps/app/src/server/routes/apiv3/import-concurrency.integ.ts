@@ -56,6 +56,13 @@ describe('admin import route POST / — refusing a concurrent import', () => {
     const appService = mock<AppService>();
     appService.isMaintenanceMode.mockReturnValue(true);
 
+    // The route reports the (expected) import failure over the admin socket after it has
+    // responded; without a socket to report to, that turns into an unhandled rejection.
+    const socketIoService = mock<SocketIoService>();
+    socketIoService.getAdminSocket.mockReturnValue(
+      mock<ReturnType<SocketIoService['getAdminSocket']>>(),
+    );
+
     const crowi = mock<Crowi>({
       tmpDir,
       events: {
@@ -64,7 +71,7 @@ describe('admin import route POST / — refusing a concurrent import', () => {
         activity: new EventEmitter(),
       },
       appService,
-      socketIoService: mock<SocketIoService>(),
+      socketIoService,
     });
     crowi.growiBridgeService = new GrowiBridgeService(crowi);
     // The route reads app:isV5Compatible from it.

@@ -28,6 +28,7 @@ import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
 import type { UniqueConflictReport } from '~/server/service/import/detect-unique-conflicts';
 import { hasConflicts } from '~/server/service/import/detect-unique-conflicts';
+import type { ImportResult } from '~/server/service/import/import';
 import {
   excludeNonTransferableCollections,
   NON_TRANSFERABLE_COLLECTIONS,
@@ -539,8 +540,9 @@ export const setup = (crowi: Crowi): Router => {
         );
       }
 
+      let importResult: ImportResult;
       try {
-        await g2gTransferReceiverService.importCollections(
+        importResult = await g2gTransferReceiverService.importCollections(
           collections,
           importSettingsMap,
           sourceGROWIUploadConfigs,
@@ -556,8 +558,12 @@ export const setup = (crowi: Crowi): Router => {
         );
       }
 
+      // The response body is the only way a failure over here reaches the operator: the
+      // progress notifications the operator watches are emitted by the source's process,
+      // which cannot see anything that happened in this one.
       return res.apiv3({
         message: 'Successfully started to receive transfer data.',
+        failedCollections: importResult.failedCollections,
       });
     },
   );

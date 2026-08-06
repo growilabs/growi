@@ -373,6 +373,8 @@ describe('receive route POST / — unique conflict gate', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       message: 'Successfully started to receive transfer data.',
+      // The source reads this to tell a finished transfer from a half-finished one.
+      failedCollections: [],
     });
 
     // The import really ran: both archive documents are now in the destination.

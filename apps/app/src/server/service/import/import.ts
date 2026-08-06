@@ -58,6 +58,12 @@ export interface ImportJobLease {
   release: () => void;
 }
 
+/** How one collection's import ended: `error` is null when it succeeded. */
+interface SettledImport {
+  collectionName: string;
+  error: unknown;
+}
+
 /** The outcome of one import run. */
 export interface ImportResult {
   /**
@@ -242,49 +248,51 @@ export class ImportService {
         throw new Error(`ImportSettings for ${collectionName} is not found`);
       }
 
-      const importing = this.importCollection(collectionName, importSettings);
+      const importing =
+        collectionName === CONFIGS_COLLECTION_NAME
+          ? // Chained onto the configs import rather than run alongside it, so the flag is
+            // back in the database before the `loadConfigs()` at the end of this method —
+            // and before anything else can reload from a database with no flag in it.
+            // `finally`, because a pipeline that fails after `deleteMany()` leaves the row
+            // missing just the same.
+            (async () => {
+              try {
+                await this.importCollection(collectionName, importSettings);
+              } finally {
+                await this.reassertMaintenanceMode(
+                  isMaintenanceModeBeforeImport,
+                );
+              }
+            })()
+          : this.importCollection(collectionName, importSettings);
 
-      if (collectionName !== CONFIGS_COLLECTION_NAME) {
-        return { collectionName, importing };
-      }
-
-      // Chained onto the configs import rather than run alongside it, so that the flag is
-      // back in the database before the `loadConfigs()` at the end of this method — and
-      // before anything else can reload from a database that has no flag in it.
-      // `finally`, because a pipeline that fails after `deleteMany()` leaves the row
-      // missing just the same.
-      return {
-        collectionName,
-        importing: (async () => {
-          try {
-            await importing;
-          } finally {
-            await this.reassertMaintenanceMode(isMaintenanceModeBeforeImport);
-          }
-        })(),
-      };
+      // Settled here, where the import starts, rather than in the loop below. Every
+      // collection is already running by then, so one that fails while an earlier one is
+      // still going would be a rejection with nothing attached to it yet — which Node
+      // treats as an unhandled rejection and, by default, exits the process over.
+      return importing.then(
+        (): SettledImport => ({ collectionName, error: null }),
+        (error: unknown): SettledImport => ({ collectionName, error }),
+      );
     });
 
     const failedCollections: string[] = [];
-    // A plain `for` loop, not `for await`: iterating an array of promises with `for await`
-    // awaits each element at the loop head, so a rejection is thrown there instead of
-    // reaching the `catch` below — which made the first failing collection abort the whole
-    // import, the opposite of the carry-on-and-report behaviour this catch was written for.
-    for (const { collectionName, importing } of importings) {
-      try {
-        await importing;
-      } catch (err) {
-        failedCollections.push(collectionName);
-        logger.error(`failed to import to ${collectionName}`, err);
+    for (const settled of importings) {
+      const { collectionName, error } = await settled;
+      if (error == null) {
+        continue;
+      }
 
-        // Absent when the failure happened before the per-collection progress record
-        // could be looked up; the progress event is best-effort, the report above is not.
-        const { collectionProgress } = err as ImportingCollectionError;
-        if (collectionProgress != null) {
-          this.emitProgressEvent(collectionProgress, {
-            message: (err as Error).message,
-          });
-        }
+      failedCollections.push(collectionName);
+      logger.error({ err: error }, `failed to import to ${collectionName}`);
+
+      // Absent when the failure happened before the per-collection progress record could
+      // be looked up; the progress event is best-effort, the report above is not.
+      const { collectionProgress } = error as ImportingCollectionError;
+      if (collectionProgress != null) {
+        this.emitProgressEvent(collectionProgress, {
+          message: (error as Error).message,
+        });
       }
     }
 

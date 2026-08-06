@@ -9,6 +9,9 @@
  */
 export const KEYS_WITH_DETAIL_MESSAGE: readonly string[] = [
   'admin:g2g:error_data_conflict',
+  // Requirement 2.8 — the operator has to be told *which* collections were left out, and
+  // that list is built by the destination, so the heading alone cannot carry it.
+  'admin:g2g:error_partial_import',
 ];
 
 /**

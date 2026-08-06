@@ -183,6 +183,7 @@ describe('receive route POST / — refusing a concurrent import', () => {
     vi.spyOn(receiverService, 'importCollections').mockImplementation(
       async () => {
         await importBlocked;
+        return { failedCollections: [] };
       },
     );
 
@@ -238,7 +239,7 @@ describe('receive route POST / — refusing a concurrent import', () => {
     // Nothing resolves this: the first request is abandoned while the import runs, which
     // is what a dropped connection during a large transfer looks like.
     vi.spyOn(receiverService, 'importCollections').mockImplementation(
-      () => new Promise<void>(() => {}),
+      () => new Promise(() => {}),
     );
 
     const abandonedZip = await writeArchiveZip('abandoned.growi.zip', [
