@@ -8,6 +8,7 @@ import { extension as ActivityExtension } from '~/server/models/activity';
 import { extension as BookmarkExtension } from '~/server/models/bookmark';
 import { extension as BookmarkFolderExtension } from '~/server/models/bookmark-folder';
 import { extension as ExternalAccountExtension } from '~/server/models/external-account';
+import { extension as PageTagRelationExtension } from '~/server/models/page-tag-relation';
 import { extension as RevisionExtension } from '~/server/models/revision';
 import { extension as TagExtension } from '~/server/models/tag';
 import { extension as UserExtension } from '~/server/models/user/index.prisma';
@@ -219,7 +220,12 @@ export const createPrisma = (datasourceUrl?: string) =>
     .$extends(MastraRefreshedModelCatalogExtension)
     .$extends(RevisionExtension)
     .$extends(UserExtension)
-    .$extends(TagExtension);
+    // TagExtension must precede PageTagRelationExtension: the latter calls
+    // client.tags.getIdToNameMap/findOrCreateMany (custom Tag methods) from
+    // within its own factory, which only exist on `client` once TagExtension
+    // has already been applied earlier in the chain.
+    .$extends(TagExtension)
+    .$extends(PageTagRelationExtension);
 
 export const prisma = createPrisma();
 

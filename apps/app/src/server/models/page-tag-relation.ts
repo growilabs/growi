@@ -1,17 +1,11 @@
-import type { ITag } from '@growi/core';
-import flatMap from 'array.prototype.flatmap';
-import type { Document, Model, ObjectId, Types } from 'mongoose';
+import type { Types } from 'mongoose';
 import mongoose from 'mongoose';
-import mongoosePaginate from 'mongoose-paginate-v2';
-import uniqueValidator from 'mongoose-unique-validator';
 
-import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
-import { prisma } from '~/utils/prisma';
+import { Prisma } from '~/generated/prisma/client';
+import type { IDataTagCount } from '~/interfaces/tag';
+import type { prisma } from '~/utils/prisma';
 
-import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import { getOrCreateModel } from '../util/mongoose-utils';
-
-export interface PageTagRelationDocument extends IPageTagRelation, Document {}
 
 type CreateTagListWithCountOpts = {
   sortOpt?: any;
@@ -19,49 +13,13 @@ type CreateTagListWithCountOpts = {
   limit?: number;
 };
 type CreateTagListWithCountResult = {
-  data: ITag[];
+  data: IDataTagCount[];
   totalCount: number;
 };
-type CreateTagListWithCount = (
-  this: PageTagRelationModel,
-  opts?: CreateTagListWithCountOpts,
-) => Promise<CreateTagListWithCountResult>;
 
-type ListTagNamesByPage = (
-  pageId: Types.ObjectId | string,
-) => Promise<PageTagRelationDocument[]>;
-
-type FindByPageId = (
-  pageId: Types.ObjectId | string,
-  options?: { nullable?: boolean },
-) => Promise<PageTagRelationDocument[]>;
-
-type GetIdToTagNamesMap = (
-  this: PageTagRelationModel,
-  pageIds: string[],
-) => Promise<{ [key: string]: string[] }>;
-
-type UpdatePageTags = (
-  this: PageTagRelationModel,
-  pageId: Types.ObjectId | string,
-  tags: string[],
-) => Promise<void>;
-
-export interface PageTagRelationModel extends Model<PageTagRelationDocument> {
-  createTagListWithCount: CreateTagListWithCount;
-  findByPageId: FindByPageId;
-  listTagNamesByPage: ListTagNamesByPage;
-  getIdToTagNamesMap: GetIdToTagNamesMap;
-  updatePageTags: UpdatePageTags;
-}
-
-/*
- * define schema
- */
-const schema = new mongoose.Schema<
-  PageTagRelationDocument,
-  PageTagRelationModel
->({
+// TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
+// Until then, use mongoose to automatically create collections and indexes when connected.
+const schema = new mongoose.Schema({
   relatedPage: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Page',
@@ -83,164 +41,238 @@ const schema = new mongoose.Schema<
 });
 // define unique compound index
 schema.index({ relatedPage: 1, relatedTag: 1 }, { unique: true });
-schema.plugin(mongoosePaginate);
-schema.plugin(uniqueValidator);
 
-const createTagListWithCount: CreateTagListWithCount = async function (
-  this,
-  opts,
-) {
-  const sortOpt = opts?.sortOpt || {};
-  const offset = opts?.offset ?? 0;
-  const limit = opts?.limit;
+getOrCreateModel('PageTagRelation', schema);
 
-  let query = this.aggregate()
-    .match({ isPageTrashed: false })
-    .lookup({
-      from: 'tags',
-      localField: 'relatedTag',
-      foreignField: '_id',
-      as: 'tag',
-    })
-    .unwind('$tag')
-    .group({
-      _id: '$relatedTag',
-      count: { $sum: 1 },
-      name: { $first: '$tag.name' },
-    })
-    .sort(sortOpt)
-    .skip(offset);
+type PageTagRelationWithTag = Prisma.pagetagrelationsGetPayload<{
+  include: { relatedTag: true };
+}>;
 
-  if (limit != null) {
-    query = query.limit(limit);
-  }
+function hasRelatedTag(
+  relation: PageTagRelationWithTag,
+): relation is PageTagRelationWithTag & {
+  relatedTag: NonNullable<PageTagRelationWithTag['relatedTag']>;
+} {
+  return relation.relatedTag !== null;
+}
 
-  const totalCount = (
-    await this.find({ isPageTrashed: false }).distinct('relatedTag')
-  ).length;
-
-  return { data: await query.exec(), totalCount };
+// Raw shape of a `createTagListWithCount` aggregation row: aggregateRaw()
+// serializes ObjectId as MongoDB Extended JSON (`{ $oid: string }`), not a
+// plain string.
+type RawTagCountRow = {
+  _id: { $oid: string };
+  count: number;
+  name: string;
 };
-schema.statics.createTagListWithCount = createTagListWithCount;
 
-const findByPageId: FindByPageId = async function (pageId, options = {}) {
-  const isAcceptRelatedTagNull = options.nullable || null;
-  // biome-ignore lint/plugin: allow populate for backward compatibility
-  const relations = await this.find({ relatedPage: pageId })
-    .populate('relatedTag')
-    .select('relatedTag');
-  return isAcceptRelatedTagNull
-    ? relations
-    : relations.filter((relation) => {
-        return relation.relatedTag !== null;
-      });
-};
-schema.statics.findByPageId = findByPageId;
+export const extension = Prisma.defineExtension((client) => {
+  // `client.tags` has TagExtension's custom methods (getIdToNameMap,
+  // findOrCreateMany) attached at runtime -- utils/prisma.ts's `.$extends()`
+  // chain applies TagExtension before PageTagRelationExtension specifically
+  // for this. `Prisma.defineExtension`'s `client` parameter type can't reflect
+  // chain-position-dependent extensions, so this re-typing bridges that gap;
+  // it does not create a runtime dependency on `~/utils/prisma` (unlike a
+  // module-level `prisma` import, which would form a circular import with
+  // utils/prisma.ts and resolve to the wrong client under the test harness's
+  // `vi.mock('~/utils/prisma', ...)`).
+  const tagsModel = client.tags as unknown as typeof prisma.tags;
 
-const listTagNamesByPage: ListTagNamesByPage = async function (pageId) {
-  const relations = await this.findByPageId(pageId);
-  return relations.map((relation) => {
-    return relation.relatedTag.name;
+  return client.$extends({
+    result: {
+      pagetagrelations: {
+        // for backward compatibility with mongoose
+        _id: {
+          needs: { id: true },
+          compute(model) {
+            return model.id;
+          },
+        },
+        // for backward compatibility with mongoose
+        __v: {
+          needs: { v: true },
+          compute(model) {
+            return model.v;
+          },
+        },
+      },
+    },
+    model: {
+      pagetagrelations: {
+        async createTagListWithCount(
+          opts?: CreateTagListWithCountOpts,
+        ): Promise<CreateTagListWithCountResult> {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.pagetagrelations>(this);
+          const sortOpt = opts?.sortOpt ?? {};
+          const offset = opts?.offset ?? 0;
+          const limit = opts?.limit;
+
+          const pipeline: Prisma.InputJsonValue[] = [
+            { $match: { isPageTrashed: false } },
+            {
+              $lookup: {
+                from: 'tags',
+                localField: 'relatedTag',
+                foreignField: '_id',
+                as: 'tag',
+              },
+            },
+            { $unwind: '$tag' },
+            {
+              $group: {
+                _id: '$relatedTag',
+                count: { $sum: 1 },
+                name: { $first: '$tag.name' },
+              },
+            },
+            { $sort: sortOpt },
+            { $skip: offset },
+            ...(limit != null ? [{ $limit: limit }] : []),
+          ];
+
+          const [rawRows, totalCount] = await Promise.all([
+            context.aggregateRaw({ pipeline }) as unknown as Promise<
+              RawTagCountRow[]
+            >,
+            // Matches the pre-migration `totalCount` definition exactly: a
+            // distinct count of relatedTag values, INCLUDING dangling ones (no
+            // `$lookup` here) -- `data` and `totalCount` intentionally diverge
+            // when dangling tags exist, same as the Mongoose implementation.
+            context
+              .findMany({
+                where: { isPageTrashed: false },
+                select: { relatedTagId: true },
+                distinct: ['relatedTagId'],
+              })
+              .then((rows) => rows.length),
+          ]);
+
+          const data: IDataTagCount[] = rawRows.map((row) => ({
+            _id: row._id.$oid,
+            count: row.count,
+            name: row.name,
+          }));
+
+          return { data, totalCount };
+        },
+
+        async findByPageId(
+          pageId: Types.ObjectId | string,
+          options: { nullable?: boolean } = {},
+        ) {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.pagetagrelations>(this);
+
+          const relations = await context.findMany({
+            where: { relatedPageId: pageId.toString() },
+            include: { relatedTag: true },
+          });
+
+          return options.nullable ? relations : relations.filter(hasRelatedTag);
+        },
+
+        async listTagNamesByPage(pageId: Types.ObjectId | string) {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.pagetagrelations>(this);
+          const relations = await context.findByPageId(pageId);
+          return relations.map((relation) => relation.relatedTag.name);
+        },
+
+        async getIdToTagNamesMap(pageIds: string[]) {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.pagetagrelations>(this);
+
+          const relations = await context.findMany({
+            where: { relatedPageId: { in: pageIds } },
+            select: { relatedPageId: true, relatedTagId: true },
+          });
+
+          if (relations.length === 0) {
+            return {};
+          }
+
+          const distinctTagIds = Array.from(
+            new Set(relations.map((relation) => relation.relatedTagId)),
+          );
+          const tagIdToNameMap = await tagsModel.getIdToNameMap(distinctTagIds);
+
+          const pageIdToTagIds = new Map<string, string[]>();
+          relations.forEach((relation) => {
+            const tagIds = pageIdToTagIds.get(relation.relatedPageId) ?? [];
+            pageIdToTagIds.set(relation.relatedPageId, [
+              ...tagIds,
+              relation.relatedTagId,
+            ]);
+          });
+
+          return Object.fromEntries(
+            Array.from(pageIdToTagIds.entries()).map(([pageId, tagIds]) => [
+              pageId,
+              tagIds
+                .map((tagId) => tagIdToNameMap[tagId])
+                .filter((tagName): tagName is string => tagName != null),
+            ]),
+          );
+        },
+
+        async updatePageTags(pageId: Types.ObjectId | string, tags: string[]) {
+          if (pageId == null || tags == null) {
+            throw new Error("args 'pageId' and 'tags' are required.");
+          }
+
+          const context =
+            Prisma.getExtensionContext<typeof prisma.pagetagrelations>(this);
+
+          const filteredTags = tags.filter((tag) => {
+            return tag !== '';
+          });
+
+          // get relations for this page
+          const relations = await context.findByPageId(pageId, {
+            nullable: true,
+          });
+
+          const unlinkTagRelationIds: string[] = [];
+          const relatedTagNames: string[] = [];
+
+          relations.forEach((relation) => {
+            if (relation.relatedTag == null) {
+              unlinkTagRelationIds.push(relation._id);
+            } else {
+              relatedTagNames.push(relation.relatedTag.name);
+              if (!filteredTags.includes(relation.relatedTag.name)) {
+                unlinkTagRelationIds.push(relation._id);
+              }
+            }
+          });
+          const bulkDeletePromise = context.deleteMany({
+            where: { id: { in: unlinkTagRelationIds } },
+          });
+          // find or create tags
+          const tagsToCreate = filteredTags.filter((tag) => {
+            return !relatedTagNames.includes(tag);
+          });
+          const tagEntities = await tagsModel.findOrCreateMany(tagsToCreate);
+
+          // create relations
+          // MongoDB's insertMany rejects an empty document array (unlike
+          // Mongoose's insertMany([]), which no-ops), so skip the call entirely
+          // when there's nothing to create.
+          const bulkCreatePromise =
+            tagEntities.length === 0
+              ? Promise.resolve()
+              : context.createMany({
+                  data: tagEntities.map((relatedTag) => {
+                    return {
+                      relatedPageId: pageId.toString(),
+                      relatedTagId: relatedTag._id,
+                    };
+                  }),
+                });
+
+          await Promise.all([bulkDeletePromise, bulkCreatePromise]);
+        },
+      },
+    },
   });
-};
-schema.statics.listTagNamesByPage = listTagNamesByPage;
-
-const getIdToTagNamesMap: GetIdToTagNamesMap = async function (this, pageIds) {
-  /**
-   * @see https://docs.mongodb.com/manual/reference/operator/aggregation/group/#pivot-data
-   *
-   * results will be:
-   * [
-   *   { _id: 58dca7b2c435b3480098dbbc, tagIds: [ 5da630f71a677515601e36d7, 5da77163ec786e4fe43e0e3e ]},
-   *   { _id: 58dca7b2c435b3480098dbbd, tagIds: [ ... ]},
-   *   ...
-   * ]
-   */
-  const results = await this.aggregate<{
-    _id: ObjectId;
-    tagIds: ObjectIdLike[];
-  }>()
-    .match({ relatedPage: { $in: pageIds } })
-    .group({ _id: '$relatedPage', tagIds: { $push: '$relatedTag' } });
-
-  if (results.length === 0) {
-    return {};
-  }
-
-  results.flatMap = flatMap.shim(); // TODO: remove after upgrading to node v12
-
-  // extract distinct tag ids
-  const allTagIds = results.flatMap((result) => result.tagIds); // map + flatten
-  const distinctTagIds = Array.from(new Set(allTagIds));
-
-  // TODO: set IdToNameMap type by 93933
-  const tagIdToNameMap = await prisma.tags.getIdToNameMap(distinctTagIds);
-
-  // convert to map
-  const idToTagNamesMap = {};
-  results.forEach((result) => {
-    const tagNames = result.tagIds
-      .map((tagId) => tagIdToNameMap[tagId.toString()])
-      .filter((tagName) => tagName != null); // filter null object
-
-    idToTagNamesMap[result._id.toString()] = tagNames;
-  });
-
-  return idToTagNamesMap;
-};
-schema.statics.getIdToTagNamesMap = getIdToTagNamesMap;
-
-const updatePageTags: UpdatePageTags = async function (pageId, tags) {
-  if (pageId == null || tags == null) {
-    throw new Error("args 'pageId' and 'tags' are required.");
-  }
-
-  // filter empty string
-  // biome-ignore lint/style/noParameterAssign: ignore
-  tags = tags.filter((tag) => {
-    return tag !== '';
-  });
-
-  // get relations for this page
-  const relations = await this.findByPageId(pageId, { nullable: true });
-
-  const unlinkTagRelationIds: string[] = [];
-  const relatedTagNames: string[] = [];
-
-  relations.forEach((relation) => {
-    if (relation.relatedTag == null) {
-      unlinkTagRelationIds.push(relation._id);
-    } else {
-      relatedTagNames.push(relation.relatedTag.name);
-      if (!tags.includes(relation.relatedTag.name)) {
-        unlinkTagRelationIds.push(relation._id);
-      }
-    }
-  });
-  const bulkDeletePromise = this.deleteMany({
-    _id: { $in: unlinkTagRelationIds },
-  });
-  // find or create tags
-  const tagsToCreate = tags.filter((tag) => {
-    return !relatedTagNames.includes(tag);
-  });
-  const tagEntities = await prisma.tags.findOrCreateMany(tagsToCreate);
-
-  // create relations
-  const bulkCreatePromise = this.insertMany(
-    tagEntities.map((relatedTag) => {
-      return {
-        relatedPage: pageId,
-        relatedTag,
-      };
-    }),
-  );
-
-  await Promise.all([bulkDeletePromise, bulkCreatePromise]);
-};
-schema.statics.updatePageTags = updatePageTags;
-
-export default getOrCreateModel<PageTagRelationDocument, PageTagRelationModel>(
-  'PageTagRelation',
-  schema,
-);
+});
