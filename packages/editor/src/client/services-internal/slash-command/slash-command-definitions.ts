@@ -28,6 +28,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
     keywords: ['h1', 'title'],
     action: { kind: 'insert', buildInsertion: lineMarkerInsertion('# ') },
     disallowedIn: ['list', 'table'],
+    syntaxHint: '#',
   },
   {
     id: 'heading2',
@@ -36,6 +37,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
     keywords: ['h2', 'subtitle'],
     action: { kind: 'insert', buildInsertion: lineMarkerInsertion('## ') },
     disallowedIn: ['list', 'table'],
+    syntaxHint: '##',
   },
   {
     id: 'heading3',
@@ -44,6 +46,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
     keywords: ['h3'],
     action: { kind: 'insert', buildInsertion: lineMarkerInsertion('### ') },
     disallowedIn: ['list', 'table'],
+    syntaxHint: '###',
   },
   {
     id: 'bulletList',
@@ -55,6 +58,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
       buildInsertion: lineMarkerInsertion('- ', 'convert'),
     },
     disallowedIn: ['table'],
+    syntaxHint: '-',
   },
   {
     id: 'numberedList',
@@ -66,6 +70,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
       buildInsertion: lineMarkerInsertion('1. ', 'convert'),
     },
     disallowedIn: ['table'],
+    syntaxHint: '1.',
   },
   {
     id: 'taskList',
@@ -77,6 +82,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
       buildInsertion: lineMarkerInsertion('- [ ] ', 'convert'),
     },
     disallowedIn: ['table'],
+    syntaxHint: '- [ ]',
   },
   {
     id: 'quote',
@@ -88,6 +94,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
       buildInsertion: lineMarkerInsertion('> ', 'append'),
     },
     disallowedIn: ['table'],
+    syntaxHint: '>',
   },
   {
     id: 'codeBlock',

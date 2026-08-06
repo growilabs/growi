@@ -90,4 +90,31 @@ describe('slash-command-definitions', () => {
       expect(command?.disallowedIn).toEqual(['table']);
     }
   });
+
+  // A command whose result is a single-line marker shows that marker as its
+  // hint instead of a written description (the notation IS the explanation).
+  // codeBlock/table are not single-line markers, so they carry no hint yet —
+  // a written description is expected once one is added.
+  it('gives every single-line-marker command a syntaxHint matching its own builder marker', () => {
+    const expectedHints: Record<string, string> = {
+      heading1: '#',
+      heading2: '##',
+      heading3: '###',
+      bulletList: '-',
+      numberedList: '1.',
+      taskList: '- [ ]',
+      quote: '>',
+    };
+    for (const [id, hint] of Object.entries(expectedHints)) {
+      const command = SLASH_COMMANDS.find((c) => c.id === id);
+      expect(command?.syntaxHint).toBe(hint);
+    }
+  });
+
+  it('gives codeBlock and table no syntaxHint (not a single-line marker)', () => {
+    for (const id of ['codeBlock', 'table']) {
+      const command = SLASH_COMMANDS.find((c) => c.id === id);
+      expect(command?.syntaxHint).toBeUndefined();
+    }
+  });
 });

@@ -67,6 +67,14 @@ export interface SlashCommand {
    * means the command is always offered.
    */
   readonly disallowedIn?: readonly SlashCommandContext[];
+  /**
+   * The literal Markdown marker shown in place of a description (e.g. `#`,
+   * `>`) for a command simple enough that the notation IS the explanation.
+   * Not localized: Markdown syntax is the same in every display language.
+   * Omitted for commands whose result isn't a single-line marker (codeBlock,
+   * table) — those get a written description instead, once one exists.
+   */
+  readonly syntaxHint?: string;
 }
 
 export interface ResolvedSlashCommand extends SlashCommand {

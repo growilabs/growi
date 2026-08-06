@@ -210,7 +210,13 @@ const applyCommand = (
 
 const toCompletion = (command: ResolvedSlashCommand): Completion => ({
   label: command.label,
-  detail: command.description,
+  // Prefer the Markdown syntax itself as the hint where one exists (it IS the
+  // explanation for a simple command); fall back to a written description,
+  // omitting `detail` rather than an empty string so a not-yet-written
+  // description doesn't render as blank space in the completion popup.
+  detail:
+    command.syntaxHint ??
+    (command.description === '' ? undefined : command.description),
   apply: (view, _completion, from, to) => applyCommand(command, view, from, to),
 });
 

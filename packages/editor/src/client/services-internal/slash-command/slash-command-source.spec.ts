@@ -271,6 +271,42 @@ describe('createSlashCommandSource - filtering', () => {
   });
 });
 
+describe('createSlashCommandSource - completion detail precedence', () => {
+  it('prefers syntaxHint over description when both are present', () => {
+    const command: ResolvedSlashCommand = {
+      ...resolvedCommand({
+        id: 'heading1',
+        label: 'Heading 1',
+        keywords: ['h1'],
+        action: insertAction('# '),
+      }),
+      syntaxHint: '#',
+    };
+    const source = createSlashCommandSource([command]);
+
+    const result = queryAt(source, '/', 1);
+
+    expect(result?.options[0].detail).toBe('#');
+  });
+
+  it('omits detail (not an empty string) when there is neither a syntaxHint nor a description', () => {
+    const command: ResolvedSlashCommand = {
+      ...resolvedCommand({
+        id: 'table',
+        label: 'Table',
+        keywords: ['grid'],
+        action: insertAction(''),
+      }),
+      description: '',
+    };
+    const source = createSlashCommandSource([command]);
+
+    const result = queryAt(source, '/', 1);
+
+    expect(result?.options[0].detail).toBeUndefined();
+  });
+});
+
 describe('createSlashCommandSource - apply (insert)', () => {
   const source = createSlashCommandSource(INSERT_COMMANDS);
 
