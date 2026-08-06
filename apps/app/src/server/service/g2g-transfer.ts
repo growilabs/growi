@@ -46,6 +46,28 @@ const FormData = FormDataModule.default ?? FormDataModule;
 export const X_GROWI_TRANSFER_KEY_HEADER_NAME = 'x-growi-transfer-key';
 
 /**
+ * How often an in-flight request pushes the transfer key's expiry forward.
+ *
+ * The key is removed by a MongoDB TTL index 30 minutes after `expireAt`
+ * (models/transfer-key.ts), and a single request can outlast that on its own: receiving
+ * the archive over the network, unzipping it, checking the version, detecting conflicts,
+ * importing every collection and normalizing pages all happen before the response is
+ * written. Touching the key on arrival only buys one more 30-minute window for all of
+ * that, so the touch repeats while the request is in flight. The interval only has to be
+ * comfortably below the TTL; one write per minute per in-flight transfer is negligible.
+ */
+export const TRANSFER_KEY_KEEP_ALIVE_INTERVAL_MS = 60 * 1000;
+
+interface ReceiverOptions {
+  /**
+   * Overrides {@link TRANSFER_KEY_KEEP_ALIVE_INTERVAL_MS}. Exists so a test can observe
+   * the repetition — with the production interval, the only thing an assertion could
+   * reach within a test run is the touch that happens on arrival.
+   */
+  readonly transferKeyKeepAliveIntervalMs?: number;
+}
+
+/**
  * Keys for file upload related config
  */
 const UPLOAD_CONFIG_KEYS = [
@@ -199,6 +221,13 @@ interface Receiver {
    * @param {string} key Transfer key
    */
   validateTransferKey(key: string): Promise<void>;
+  /**
+   * Keep the transfer key from expiring while a request that uses it is in flight.
+   * @param {string} key Transfer key
+   * @returns {() => void} Stops the extension. The caller MUST call it when the response
+   * closes — on completion *and* on a client disconnect, or the key never expires again.
+   */
+  startTransferKeyKeepAlive(key: string): () => void;
   /**
    * Generate GROWIInfo
    * @throws {import('../models/vo/g2g-transfer-error').G2GTransferError}
@@ -683,8 +712,38 @@ export class G2GTransferPusherService implements Pusher {
 export class G2GTransferReceiverService implements Receiver {
   crowi: Crowi;
 
-  constructor(crowi: Crowi) {
+  private readonly transferKeyKeepAliveIntervalMs: number;
+
+  constructor(crowi: Crowi, options: ReceiverOptions = {}) {
     this.crowi = crowi;
+    this.transferKeyKeepAliveIntervalMs =
+      options.transferKeyKeepAliveIntervalMs ??
+      TRANSFER_KEY_KEEP_ALIVE_INTERVAL_MS;
+  }
+
+  public startTransferKeyKeepAlive(key: string): () => void {
+    // Moving `expireAt` to now restarts the TTL index's 30-minute countdown, so the key
+    // keeps the meaning it had before: it expires 30 minutes after the last time this
+    // GROWI heard from the transfer, not 30 minutes after it was issued.
+    const touch = async (): Promise<void> => {
+      try {
+        await TransferKeyModel.updateOne({ key }, { expireAt: new Date() });
+      } catch (err) {
+        // A failed touch costs the key some of its remaining window; failing the
+        // transfer over it would cost the whole transfer.
+        logger.warn('Failed to extend the lifetime of the transfer key', err);
+      }
+    };
+
+    void touch();
+
+    const timer = setInterval(() => {
+      void touch();
+    }, this.transferKeyKeepAliveIntervalMs);
+    // A transfer must not be the reason the process refuses to shut down.
+    timer.unref();
+
+    return () => clearInterval(timer);
   }
 
   public async validateTransferKey(key: string): Promise<void> {

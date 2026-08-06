@@ -203,6 +203,18 @@ export const setup = (crowi: Crowi): Router => {
       );
     }
 
+    // Hold the key open for the whole request, starting here rather than around the
+    // import: receiving the archive over the network, unzipping it, checking the version
+    // and detecting conflicts all happen first and handle the same volume of data, so the
+    // key can run out before the import even begins. Starting here also spares
+    // `importCollections` any knowledge of transfer keys.
+    //
+    // `close` rather than `finish`: it fires for a client that disconnects mid-upload too,
+    // and an extension nobody stops would keep the key alive forever.
+    const stopTransferKeyKeepAlive =
+      g2gTransferReceiverService.startTransferKeyKeepAlive(transferKey);
+    res.on('close', stopTransferKeyKeepAlive);
+
     next();
   };
 

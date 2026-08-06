@@ -117,7 +117,10 @@ describe('non-transferable collections at the transfer routes', () => {
     return Object.fromEntries(
       PROTECTED_COLLECTIONS.map((collectionName, i) => [
         collectionName,
-        snapshots[i],
+        // `expireAt` is left out: every request that authenticates with a transfer key
+        // pushes it forward on purpose, so that a transfer outlasting the key's lifetime
+        // still finishes. What must not change is the key itself.
+        snapshots[i].map(({ expireAt: _expireAt, ...rest }) => rest),
       ]),
     );
   };
