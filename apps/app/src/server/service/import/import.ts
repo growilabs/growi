@@ -232,15 +232,6 @@ export class ImportService {
       collections,
     );
 
-    // The maintenance-mode flag is a row of the configs collection, and that collection is
-    // always imported by replacement — so importing it deletes the flag that is keeping
-    // ordinary users out while the import runs. Read the destination's own value here:
-    // `getConfig()` serves the in-memory copy, which the raw-driver writes below never
-    // touch, so it still holds what the destination had before any of this started.
-    const isMaintenanceModeBeforeImport = configManager.getConfig(
-      'app:isMaintenanceMode',
-    );
-
     // process serially so as not to waste memory
     const importings = collections.map((collectionName) => {
       const importSettings = importSettingsMap.get(collectionName);
@@ -251,17 +242,15 @@ export class ImportService {
       const importing =
         collectionName === CONFIGS_COLLECTION_NAME
           ? // Chained onto the configs import rather than run alongside it, so the flag is
-            // back in the database before the `loadConfigs()` at the end of this method —
-            // and before anything else can reload from a database with no flag in it.
+            // in the database before the `loadConfigs()` at the end of this method — and
+            // before anything else can reload from a database with no flag in it.
             // `finally`, because a pipeline that fails after `deleteMany()` leaves the row
             // missing just the same.
             (async () => {
               try {
                 await this.importCollection(collectionName, importSettings);
               } finally {
-                await this.reassertMaintenanceMode(
-                  isMaintenanceModeBeforeImport,
-                );
+                await this.enterMaintenanceMode();
               }
             })()
           : this.importCollection(collectionName, importSettings);
@@ -317,24 +306,26 @@ export class ImportService {
   }
 
   /**
-   * Puts the maintenance-mode flag the destination had back into the database.
+   * Puts this GROWI into maintenance mode, unconditionally, once the configs collection
+   * has been imported.
    *
-   * Deliberately not a fixed `true`: this runs for every import path, including a G2G
-   * transfer into a destination that was serving normally. Forcing the flag on there
-   * would leave the destination in maintenance mode with nobody expecting to switch it
-   * off — the receiving side only cleans up a flag it raised itself.
+   * Importing `configs` replaces every setting this GROWI has — including the flag that
+   * keeps ordinary users out — with the archive's. What is left behind is a GROWI running
+   * on someone else's settings, and, for a transfer, one whose attachments have not
+   * started arriving yet. So the import closes it rather than leaving whoever wrote the
+   * archive to decide.
+   *
+   * **Nothing here reopens it.** The admin screens warn the operator before an import or
+   * a transfer starts that they will have to switch maintenance mode off themselves. The
+   * one exception is the receiving side of a migration transfer, which raises the flag on
+   * purpose beforehand and manages its own clean-up.
    */
-  private async reassertMaintenanceMode(
-    isMaintenanceMode: boolean,
-  ): Promise<void> {
+  private async enterMaintenanceMode(): Promise<void> {
     try {
-      await configManager.updateConfig(
-        'app:isMaintenanceMode',
-        isMaintenanceMode,
-      );
+      await configManager.updateConfig('app:isMaintenanceMode', true);
     } catch (err) {
       logger.error(
-        'Failed to restore the maintenance mode flag after importing configs',
+        'Failed to enter maintenance mode after importing configs',
         err,
       );
     }

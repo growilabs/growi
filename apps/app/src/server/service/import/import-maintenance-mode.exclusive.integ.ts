@@ -1,12 +1,15 @@
 /**
- * Importing the configs collection must not take the maintenance-mode flag with it
+ * Importing the configs collection leaves this GROWI in maintenance mode
  * (requirement 2.4).
  *
  * `app:isMaintenanceMode` is a row in the configs collection, and that collection is
- * always imported by replacement — every row is deleted before the source's rows are
- * written. GROWI asks the operator to switch maintenance mode on before a manual import
- * and then deletes the very flag that enforces it, and a G2G transfer that protects the
- * destination the same way loses that protection halfway through.
+ * always imported by replacement — every row is deleted before the archive's are written.
+ * So an import replaces every setting this GROWI has with someone else's, and takes the
+ * flag that keeps ordinary users out with it. GROWI used to end up open, running on the
+ * archive's settings, with (for a transfer) not one attachment delivered yet.
+ *
+ * The import therefore closes it, and nothing here reopens it: the operator is told
+ * beforehand that they will have to switch maintenance mode off themselves.
  *
  * These tests read the flag back **from the database with the raw driver**. Asking
  * `isMaintenanceMode()` would prove nothing: it serves an in-memory copy that the
@@ -34,11 +37,11 @@ import { ImportService } from '~/server/service/import/import';
 const CONFIGS_JSON = 'configs.json';
 
 /**
- * What the source GROWI's configs.json holds. The source's own flag is always set to the
- * opposite of the destination's, so that "the destination kept its own value" can never
- * be confused with "the source happened to carry the same value".
+ * What the archive's configs.json holds. Its own flag is `false`, so that a `true` in the
+ * database afterwards can only have come from the import putting it there — never from
+ * the archive, and never from what the destination happened to hold before.
  */
-const buildSourceConfigs = (sourceMaintenanceMode: boolean) => [
+const SOURCE_CONFIGS = [
   {
     _id: '0123456789abcdef01440001',
     key: 'app:title',
@@ -47,7 +50,7 @@ const buildSourceConfigs = (sourceMaintenanceMode: boolean) => [
   {
     _id: '0123456789abcdef01440002',
     key: 'app:isMaintenanceMode',
-    value: JSON.stringify(sourceMaintenanceMode),
+    value: JSON.stringify(false),
   },
 ];
 
@@ -100,8 +103,8 @@ describe('ImportService.import — the maintenance mode flag', () => {
   }, 120_000);
 
   afterEach(async () => {
-    // The import emptied the collection, so put the destination's own settings back
-    // before the next test decides what "before the import" means.
+    // The import emptied the collection and left maintenance mode on, so put the
+    // destination's own settings back before the next test arranges its own.
     await configManager.updateConfig('app:isMaintenanceMode', false);
     const leftovers = await fs.readdir(importsDir);
     await Promise.all(
@@ -116,24 +119,19 @@ describe('ImportService.import — the maintenance mode flag', () => {
   test.each([
     true,
     false,
-  ])('is still %s in the database after importing configs', async (isMaintenanceModeBeforeImport) => {
+  ])('is true in the database afterwards, whether or not it was set before (%s)', async (isMaintenanceModeBeforeImport) => {
     await configManager.updateConfig(
       'app:isMaintenanceMode',
       isMaintenanceModeBeforeImport,
     );
-    await writeConfigsJson(
-      JSON.stringify(buildSourceConfigs(!isMaintenanceModeBeforeImport)),
-    );
+    await writeConfigsJson(JSON.stringify(SOURCE_CONFIGS));
 
     await importConfigs();
 
-    // Not the source's value, and not a hard-coded `true` either: a transfer into a
-    // destination that was running normally would otherwise be left in maintenance
-    // mode with nobody to switch it off.
-    expect(await readMaintenanceModeFromDb()).toBe(
-      isMaintenanceModeBeforeImport,
-    );
-    // The rest of the source's configs really did arrive, so the assertion above is
+    // The archive says `false` and, in one of these two runs, so did the destination.
+    // Only the import can be the reason it is `true`.
+    expect(await readMaintenanceModeFromDb()).toBe(true);
+    // The rest of the archive's configs really did arrive, so the assertion above is
     // about the flag rather than about an import that never ran.
     const title = await mongoose.connection
       .collection('configs')
@@ -141,8 +139,8 @@ describe('ImportService.import — the maintenance mode flag', () => {
     expect(title).not.toBeNull();
   });
 
-  test('is written back even when importing configs fails', async () => {
-    await configManager.updateConfig('app:isMaintenanceMode', true);
+  test('is set even when importing configs fails', async () => {
+    await configManager.updateConfig('app:isMaintenanceMode', false);
     // A closing bracket where the parser expects a value: the read throws part-way
     // through the pipeline, after `deleteMany` has already emptied the collection. A file
     // that simply does not exist fails earlier than that and never gets near the flag, so
