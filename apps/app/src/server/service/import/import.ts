@@ -90,10 +90,11 @@ export class ImportService {
   /**
    * Who currently holds the right to run an import, if anyone.
    *
-   * Deliberately not `currentProgressingStatus`: that one is cleared the moment the
-   * per-collection loop ends, while `loadConfigs()` and the (long) page normalization are
-   * still to come — and, for the receive route, before its own clean-up has run. A second
-   * import let through in that window would empty `users` under the first one's feet.
+   * Deliberately not `currentProgressingStatus`: that one only exists while `import()` is
+   * running, whereas the window that has to be protected is longer at both ends — the
+   * receive route unzips into the shared directory before it calls `import()`, and still
+   * has its own clean-up to do after it returns. A second import let through at either end
+   * would empty `users` under the first one's feet.
    */
   private importJobOwner: object | null = null;
 
@@ -177,9 +178,12 @@ export class ImportService {
    * **before they start writing to the shared import directory**, not when `import()` is
    * reached: the receive route unzips, re-reads the archive and queries the destination
    * for conflicts first, and a second import let through during that stretch would
-   * overwrite the JSON files the first one is about to read. `import()` claims it too, so
-   * that a caller which does not go through either route is still covered, and releases
-   * it only if the claim was its own.
+   * overwrite the JSON files the first one is about to read.
+   *
+   * The routes are the only place this actually refuses anything. `import()` claims the
+   * job as well, but does not check the result: a direct call keeps the job claimed for
+   * the length of its run — so a route starting meanwhile is turned away — while two
+   * direct calls, bypassing both routes, still run side by side.
    *
    * Process-local, so a multi-process deployment can still run two imports at once. That
    * is the same hole as before this existed; it is not widened.
@@ -210,9 +214,11 @@ export class ImportService {
     collections: string[],
     importSettingsMap: Map<string, ImportSettings>,
   ): Promise<ImportResult> {
-    // Null when the caller already holds the job for this import — the ordinary case, as
-    // both routes claim it before they unzip. Releasing only what was claimed here is
-    // what keeps this from cutting the caller's protection short.
+    // Null when someone else already holds the job — the ordinary case, as both routes
+    // claim it before they unzip. Deliberately not treated as a refusal: the run goes
+    // ahead either way, and the only thing this claim buys is that an import reached
+    // directly, without a route, still keeps the job taken for its own length. Releasing
+    // only what was claimed here is what keeps it from cutting the caller's claim short.
     const ownLease = this.acquireImportJob();
     try {
       return await this.doImport(collections, importSettingsMap);
@@ -232,6 +238,63 @@ export class ImportService {
       collections,
     );
 
+    let failedCollections: string[];
+    try {
+      failedCollections = await this.importCollections(
+        collections,
+        importSettingsMap,
+      );
+
+      await configManager.loadConfigs();
+
+      const currentIsV5Compatible =
+        configManager.getConfig('app:isV5Compatible');
+      const isImportPagesCollection = collections.includes('pages');
+      const shouldNormalizePages =
+        currentIsV5Compatible && isImportPagesCollection;
+
+      if (shouldNormalizePages)
+        await this.crowi.pageService.normalizeAllPublicPages();
+
+      // Release caches after import process
+      this.modelCache.clear();
+      this.convertMap = undefined;
+    } finally {
+      // `getStatus()` answers `isImporting` from this field, so it has to stay set for as
+      // long as the run really lasts — the page normalization above included, which takes
+      // minutes on a v5 wiki — and it has to be cleared even when that tail work throws,
+      // or the screen would go on reporting an import that has already stopped.
+      this.currentProgressingStatus = null;
+    }
+
+    // Emitted here, at the very end, and only for a run that lost nothing.
+    //
+    // Its one consumer is the admin screen, which turns it into a green "Import process
+    // has completed." Emitted where it used to be — right after the per-collection loop —
+    // it told the operator the import was over while the route still held the import
+    // claim, so re-importing came back as a 409 the screen had no way to explain. And
+    // emitted after a collection had failed it claimed a wiki was fully imported when part
+    // of it was missing; the failure is reported by the caller instead (`executeImport`
+    // for the admin route, the response body for the G2G one).
+    if (failedCollections.length === 0) {
+      this.emitTerminateEvent();
+    }
+
+    return { failedCollections };
+  }
+
+  /**
+   * Import every collection and wait for all of them, whatever becomes of each one.
+   *
+   * A collection that throws does not stop the others — that is long-standing policy and
+   * is what makes the returned list the only record of a partial import.
+   *
+   * @returns the names of the collections whose import threw, in the requested order
+   */
+  private async importCollections(
+    collections: string[],
+    importSettingsMap: Map<string, ImportSettings>,
+  ): Promise<string[]> {
     // process serially so as not to waste memory
     const importings = collections.map((collectionName) => {
       const importSettings = importSettingsMap.get(collectionName);
@@ -242,8 +305,9 @@ export class ImportService {
       const importing =
         collectionName === CONFIGS_COLLECTION_NAME
           ? // Chained onto the configs import rather than run alongside it, so the flag is
-            // in the database before the `loadConfigs()` at the end of this method — and
-            // before anything else can reload from a database with no flag in it.
+            // in the database before the `loadConfigs()` the caller runs once every
+            // collection is in — and before anything else can reload from a database with
+            // no flag in it.
             // `finally`, because a pipeline that fails after `deleteMany()` leaves the row
             // missing just the same.
             (async () => {
@@ -285,24 +349,7 @@ export class ImportService {
       }
     }
 
-    this.currentProgressingStatus = null;
-    this.emitTerminateEvent();
-
-    await configManager.loadConfigs();
-
-    const currentIsV5Compatible = configManager.getConfig('app:isV5Compatible');
-    const isImportPagesCollection = collections.includes('pages');
-    const shouldNormalizePages =
-      currentIsV5Compatible && isImportPagesCollection;
-
-    if (shouldNormalizePages)
-      await this.crowi.pageService.normalizeAllPublicPages();
-
-    // Release caches after import process
-    this.modelCache.clear();
-    this.convertMap = undefined;
-
-    return { failedCollections };
+    return failedCollections;
   }
 
   /**

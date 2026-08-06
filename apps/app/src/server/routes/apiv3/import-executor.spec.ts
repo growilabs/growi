@@ -47,6 +47,63 @@ describe('executeImport', () => {
     );
   });
 
+  it('reports the collections that failed and records no success activity', async () => {
+    // The regression this guards: import() stopped rejecting on a collection it could not
+    // read and started reporting the failure in its return value instead. Ignoring that
+    // value left the operator with a green "Import process has completed." toast and an
+    // ACTION_ADMIN_GROWI_DATA_IMPORTED audit row for a wiki that is missing data — which
+    // is exactly what they consult before switching maintenance mode off.
+    const importService = mock<ImportRunner>();
+    importService.import.mockResolvedValue({
+      failedCollections: ['pagetagrelations', 'revisions'],
+    });
+    const adminEvent = mock<EventEmitter>();
+    const activityEvent = mock<EventEmitter>();
+
+    await executeImport({
+      importService,
+      adminEvent,
+      activityEvent,
+      activityId,
+      activityContext: undefined,
+      collections,
+      importSettingsMap,
+    });
+
+    expect(adminEvent.emit).toHaveBeenCalledWith('onErrorForImport', {
+      message:
+        'Collections that could not be imported: pagetagrelations, revisions',
+    });
+    expect(activityEvent.emit).not.toHaveBeenCalled();
+  });
+
+  it('runs the import even when the request has no activity id', async () => {
+    // add-activity swallows its own failures, so res.locals.activity can be missing. The
+    // import is the work the operator asked for; the audit row is not worth losing it
+    // over. See ExecuteImportArgs.activityId.
+    const importService = mock<ImportRunner>();
+    importService.import.mockResolvedValue({ failedCollections: [] });
+    const adminEvent = mock<EventEmitter>();
+    const activityEvent = mock<EventEmitter>();
+
+    await executeImport({
+      importService,
+      adminEvent,
+      activityEvent,
+      activityId: undefined,
+      activityContext: undefined,
+      collections,
+      importSettingsMap,
+    });
+
+    expect(importService.import).toHaveBeenCalledWith(
+      collections,
+      importSettingsMap,
+    );
+    expect(activityEvent.emit).not.toHaveBeenCalled();
+    expect(adminEvent.emit).not.toHaveBeenCalled();
+  });
+
   it('reports the failure over onErrorForImport when the import rejects', async () => {
     // Regression guarded: the import must be awaited so its rejection is caught
     // and surfaced to the client, instead of escaping as an unhandled rejection

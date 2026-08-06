@@ -293,13 +293,39 @@ export default function route(crowi: Crowi): Router {
 
       const zipFile = importService.getFile(fileName);
 
-      // Claimed before the response, so a second import can still be refused: everything
-      // below runs after the response is sent. Maintenance mode is not a substitute —
-      // during a G2G transfer the destination is in maintenance mode by design, so the
-      // check above waves this import straight through into the middle of that one.
+      // Capture the activity context BEFORE responding. The import runs after
+      // this response and registerFailsafeFinalizer clears this request's
+      // pending context on the response's 'finish' event, so the post-import
+      // activity emit would otherwise settle with user=null (see PR #11510 and
+      // ExecuteImportArgs.activityContext).
       //
-      // Claimed after the checks above, all of which can still leave without reaching the
-      // `finally` that releases it.
+      // Optional on purpose: `add-activity` catches its own failures and calls `next()`
+      // without setting `res.locals.activity`, so reading `._id` outright can throw. That
+      // read used to sit between the claim below and the `try` that releases it, where a
+      // throw — which Express 4 does not catch for an async handler — would have left the
+      // claim held for the life of the process and every later import, admin and G2G
+      // alike, refused with a 409. Losing the audit row is the lesser harm; losing the
+      // import is not.
+      const activityId: string | undefined = res.locals.activity?._id;
+      const activityContext =
+        activityId != null
+          ? pendingActivityContext.take(activityId)
+          : undefined;
+
+      // Claimed before the response, because everything below runs after it has been sent:
+      // without the claim, a second import could start writing while this one is still
+      // reading the same directory.
+      //
+      // The maintenance-mode check above is no substitute. It only asks whether the wiki
+      // is closed to ordinary users, which says nothing about whether an import is already
+      // under way — and being closed is the normal state around one, since importing
+      // `configs` leaves maintenance mode on afterwards. So that gate waves a second zip
+      // straight through into the middle of the first import, or of a G2G transfer writing
+      // to the same place.
+      //
+      // Claimed last, immediately before the `try`: everything above can still leave
+      // without reaching the `finally` that releases it, and nothing may be added in
+      // between.
       const importJob = importService.acquireImportJob();
       if (importJob == null) {
         return res.apiv3Err(
@@ -310,14 +336,6 @@ export default function route(crowi: Crowi): Router {
           409,
         );
       }
-
-      // Capture the activity context BEFORE responding. The import runs after
-      // this response and registerFailsafeFinalizer clears this request's
-      // pending context on the response's 'finish' event, so the post-import
-      // activity emit would otherwise settle with user=null (see PR #11510 and
-      // ExecuteImportArgs.activityContext).
-      const activityId = res.locals.activity._id;
-      const activityContext = pendingActivityContext.take(activityId);
 
       // return response first
       res.apiv3();

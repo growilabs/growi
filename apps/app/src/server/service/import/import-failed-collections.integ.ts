@@ -1,11 +1,18 @@
 /**
- * An import that fails part-way has to say so (requirement 2.8).
+ * What `ImportService.import()` tells the outside world when a run ends (requirement 2.8).
  *
- * The import deliberately carries on past a collection it could not read — that policy is
- * unchanged — but until now it kept that entirely to itself, logging the failure and
- * emitting a progress event while returning nothing. The caller therefore could not tell
- * a completed transfer from one that left the destination half filled, and the operator
- * on the source side was told the transfer had finished.
+ * Two channels, and both used to mislead:
+ *
+ *  - the **return value**. The import deliberately carries on past a collection it could
+ *    not read — that policy is unchanged — but it used to keep that entirely to itself,
+ *    logging the failure and emitting a progress event while returning nothing. The caller
+ *    could not tell a completed transfer from one that left the destination half filled,
+ *    and the operator on the source side was told the transfer had finished.
+ *  - the **'onTerminateForImport' event**, which the admin screen turns into a green
+ *    "Import process has completed." It used to fire right after the per-collection loop:
+ *    before the page normalization that can run for minutes and while the route still held
+ *    the import claim, so an operator who acted on it and re-imported was refused with a
+ *    409; and it fired for a partly failed run just the same.
  */
 
 import { EventEmitter } from 'node:events';
@@ -30,6 +37,7 @@ const READABLE_TAG = {
 
 const TAGS_JSON = 'tags.json';
 const RELATIONS_JSON = 'pagetagrelations.json';
+const PAGES_JSON = 'pages.json';
 
 /**
  * A closing bracket where the parser expects a value, which is one of the few malformed
@@ -40,10 +48,14 @@ const RELATIONS_JSON = 'pagetagrelations.json';
  */
 const UNPARSEABLE_JSON = '[{"a":]}]';
 
-describe('ImportService.import — reporting the collections that failed', () => {
+describe('ImportService.import — what a finished run reports', () => {
   let importService: ImportService;
   let tmpDir: string;
   let importsDir: string;
+  let adminEvent: EventEmitter;
+  /** Counts every 'onTerminateForImport', reset before each case. */
+  let terminateCount: number;
+  const normalizeAllPublicPages = vi.fn();
 
   const buildImportSettings = (jsonFileName: string): ImportSettings => ({
     mode: ImportMode.insert,
@@ -56,19 +68,35 @@ describe('ImportService.import — reporting the collections that failed', () =>
     importsDir = path.join(tmpDir, 'imports');
     await fs.mkdir(importsDir, { recursive: true });
 
+    adminEvent = new EventEmitter();
     const crowi = mock<Crowi>({
       tmpDir,
       events: {
         page: mock<EventEmitter>(),
         user: mock<UserEvent>(),
-        admin: new EventEmitter(),
+        admin: adminEvent,
       },
+      // The real one walks the whole page tree and takes minutes; the point of the
+      // ordering case below is that it holds up the completion signal.
+      pageService: { normalizeAllPublicPages },
     });
     crowi.growiBridgeService = new GrowiBridgeService(crowi);
     importService = new ImportService(crowi);
 
     await configManager.loadConfigs();
   }, 120_000);
+
+  beforeEach(() => {
+    terminateCount = 0;
+    adminEvent.on('onTerminateForImport', () => {
+      terminateCount += 1;
+    });
+    normalizeAllPublicPages.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    adminEvent.removeAllListeners('onTerminateForImport');
+  });
 
   afterEach(async () => {
     await mongoose.connection
@@ -107,6 +135,9 @@ describe('ImportService.import — reporting the collections that failed', () =>
         .collection('tags')
         .findOne({ name: READABLE_TAG.name }),
     ).not.toBeNull();
+    // And the screen must not be told it completed: that event is the operator's cue that
+    // the wiki is whole and maintenance mode can come off.
+    expect(terminateCount).toBe(0);
   });
 
   test('reports nothing when every collection could be read', async () => {
@@ -123,5 +154,54 @@ describe('ImportService.import — reporting the collections that failed', () =>
     );
 
     expect(result.failedCollections).toEqual([]);
+    expect(terminateCount).toBe(1);
+  });
+
+  test('holds back the completion signal until the page normalization is over', async () => {
+    // Only a v5-compatible wiki importing `pages` reaches normalizeAllPublicPages, and it
+    // is the long part of the run — the stretch during which the route still holds the
+    // import claim and answers a re-import with a 409.
+    const originalIsV5Compatible =
+      configManager.getConfig('app:isV5Compatible');
+    await configManager.updateConfig('app:isV5Compatible', true);
+
+    // The `try` opens right here: this worker's database is shared with every other file
+    // it runs, so the flag has to be put back however this case ends.
+    try {
+      let finishNormalization: () => void = () => {};
+      normalizeAllPublicPages.mockReturnValue(
+        new Promise<void>((resolve) => {
+          finishNormalization = resolve;
+        }),
+      );
+
+      await fs.writeFile(path.join(importsDir, PAGES_JSON), '[]');
+
+      const running = importService.import(
+        ['pages'],
+        new Map([['pages', buildImportSettings(PAGES_JSON)]]),
+      );
+
+      await vi.waitFor(() =>
+        expect(normalizeAllPublicPages).toHaveBeenCalledOnce(),
+      );
+
+      expect(terminateCount).toBe(0);
+      // The same window seen from the other side: getStatus() is what the status endpoint
+      // answers with, and it has to agree that the import is still running.
+      expect((await importService.getStatus()).isImporting).toBe(true);
+
+      finishNormalization();
+      await running;
+
+      expect(terminateCount).toBe(1);
+      expect((await importService.getStatus()).isImporting).toBe(false);
+    } finally {
+      await configManager.updateConfig(
+        'app:isV5Compatible',
+        originalIsV5Compatible,
+        { removeIfUndefined: true },
+      );
+    }
   });
 });

@@ -3,16 +3,23 @@
  * (requirement 2.7).
  *
  * It has a gate of its own — it refuses to run unless GROWI is in maintenance mode — but
- * that gate points the wrong way here: a transfer puts the destination *into* maintenance
- * mode for the length of the import, so during exactly the window that must be protected,
- * this route waves an operator's zip straight through into the middle of it. Both entry
- * points therefore share one claim.
+ * that gate answers a different question. It asks whether the wiki is closed to ordinary
+ * users, not whether an import is already running, and being closed is the normal state
+ * around an import (importing `configs` leaves maintenance mode on afterwards). So during
+ * exactly the window that must be protected, this route waves an operator's zip straight
+ * through into the middle of the other import. Both entry points therefore share one
+ * claim.
+ *
+ * The second case below covers the other way that claim can go wrong: being taken and
+ * never given back, which refuses every later import — admin and G2G alike — for the life
+ * of the process.
  */
 
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import request from 'supertest';
 import { mock } from 'vitest-mock-extended';
@@ -31,6 +38,31 @@ import type { SocketIoService } from '~/server/service/socket-io';
 import route from './import';
 import addCustomFunctionToResponse from './response';
 
+/**
+ * Turned on for the second case only, where it reproduces `add-activity` failing: the
+ * real middleware catches its own errors and calls `next()` without ever having set
+ * `res.locals.activity`, leaving the route to read a property off `undefined`.
+ */
+let suppressActivityContext = false;
+
+vi.mock('~/server/middlewares/add-activity', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('~/server/middlewares/add-activity')>();
+
+  return {
+    generateAddActivityMiddleware: () => {
+      const addActivity = actual.generateAddActivityMiddleware();
+      return (req: Request, res: Response, next: NextFunction): void => {
+        if (suppressActivityContext) {
+          next();
+          return;
+        }
+        addActivity(req, res, next);
+      };
+    },
+  };
+});
+
 const UPLOADED_ZIP = 'admin-import-concurrency.zip';
 
 const ADMIN_USER = {
@@ -38,6 +70,27 @@ const ADMIN_USER = {
   admin: true,
   status: 2, // UserStatus.STATUS_ACTIVE
 } as const;
+
+/**
+ * Polls until the import claim can be taken again. Polled rather than read once because
+ * the route answers before the import it started has finished, and the claim is only given
+ * back when that import ends.
+ */
+async function waitUntilImportJobIsFree(
+  importService: ImportService,
+  maxWaitMs = 10_000,
+): Promise<boolean> {
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    const lease = importService.acquireImportJob();
+    if (lease != null) {
+      lease.release();
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  return false;
+}
 
 describe('admin import route POST / — refusing a concurrent import', () => {
   let app: express.Application;
@@ -125,5 +178,35 @@ describe('admin import route POST / — refusing a concurrent import', () => {
     // The import itself fails right after this response — there is no such zip — but the
     // route answered before starting, which is the point: the claim was available.
     expect(accepted.status).toBe(200);
+  });
+
+  test('gives the claim back when the request carries no activity context', async () => {
+    // The import the case above started is still finishing; it releases the claim when it
+    // does, and this case needs to begin from a free one.
+    expect(await waitUntilImportJobIsFree(importService)).toBe(true);
+
+    suppressActivityContext = true;
+    try {
+      // `deadline` because the failure mode here is silence, not an error status: reading
+      // the missing activity context threw between claiming and the `try` that releases
+      // the claim, and Express 4 does not catch an async handler's rejection, so the
+      // request simply never came back.
+      const accepted = await request(app)
+        .post('/')
+        .send({
+          fileName: UPLOADED_ZIP,
+          collections: ['tags'],
+          options: [{ collectionName: 'tags', mode: 'insert' }],
+        })
+        .timeout({ deadline: 3000 });
+
+      expect(accepted.status).toBe(200);
+    } finally {
+      suppressActivityContext = false;
+    }
+
+    // The regression itself: with the claim never released, every later import — this
+    // route and the G2G receive route alike — is refused for the life of the process.
+    expect(await waitUntilImportJobIsFree(importService)).toBe(true);
   });
 });
