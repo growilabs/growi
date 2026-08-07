@@ -365,6 +365,16 @@
     "migration_succeeded": "Your upgrade has been successfully completed! Exit maintenance mode and GROWI can be used.",
     "migration_failed": "Upgrade failed. Please refer to the GROWI docs for information on what to do in the event of failure."
   },
+  "page_tree_repair": {
+    "page_tree_repair": "Page Tree Repair",
+    "repair_desc": "Removes orphaned empty pages and recalculates the descendant count of every page. Use this if the page tree shows empty folders that contain nothing, or child counts that do not match the actual number of pages. This is needed on instances upgraded from a version that expired WIP pages with a MongoDB TTL index.",
+    "repair_note": "Note: Maintenance mode must be enabled. This scans every page, so it may take a long time on a large wiki. Progress is written to the server log.",
+    "repair_page_tree": "Repair page tree",
+    "modal_repair_warning": "This process scans and updates every page and may take a long time. It is highly recommended that administrators tell users not to create, modify, or delete pages during the repair.",
+    "start_repair": "Start repairing the page tree",
+    "successfully_started": "Succeeded to start the page tree repair",
+    "repair_in_progress": "The page tree repair is running in the background. See the server log for the result."
+  },
   "news_delivery": {
     "section_title": "News delivery",
     "label": "News delivery",
