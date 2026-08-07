@@ -37,6 +37,9 @@ const logger = loggerFactory('growi:services:ImportService');
 
 const BULK_IMPORT_SIZE = 100;
 
+/** The collection whose import takes the maintenance-mode flag with it. */
+const CONFIGS_COLLECTION_NAME = 'configs';
+
 class ImportingCollectionError extends Error {
   collectionProgress: CollectionProgress;
 
@@ -44,6 +47,31 @@ class ImportingCollectionError extends Error {
     super(error);
     this.collectionProgress = collectionProgress;
   }
+}
+
+/**
+ * The right to run an import, held for as long as {@link release} has not been called.
+ * See {@link ImportService.acquireImportJob}.
+ */
+export interface ImportJobLease {
+  /** Idempotent, and a no-op once someone else holds the job. */
+  release: () => void;
+}
+
+/** How one collection's import ended: `error` is null when it succeeded. */
+interface SettledImport {
+  collectionName: string;
+  error: unknown;
+}
+
+/** The outcome of one import run. */
+export interface ImportResult {
+  /**
+   * The collections whose import threw. An import carries on past a failed collection —
+   * that is deliberate and unchanged — so without this the caller has no way to learn
+   * that the destination is only half imported. Empty when every collection succeeded.
+   */
+  readonly failedCollections: readonly string[];
 }
 
 export class ImportService {
@@ -58,6 +86,17 @@ export class ImportService {
   private currentProgressingStatus: CollectionProgressingStatus | null;
 
   private convertMap: ConvertMap | undefined;
+
+  /**
+   * Who currently holds the right to run an import, if anyone.
+   *
+   * Deliberately not `currentProgressingStatus`: that one only exists while `import()` is
+   * running, whereas the window that has to be protected is longer at both ends — the
+   * receive route unzips into the shared directory before it calls `import()`, and still
+   * has its own clean-up to do after it returns. A second import let through at either end
+   * would empty `users` under the first one's feet.
+   */
+  private importJobOwner: object | null = null;
 
   constructor(crowi: Crowi) {
     this.crowi = crowi;
@@ -133,6 +172,40 @@ export class ImportService {
   }
 
   /**
+   * Claims the right to run an import, or returns null if another one already holds it.
+   *
+   * Both entry points — the G2G receive route and the admin zip import — take this
+   * **before they start writing to the shared import directory**, not when `import()` is
+   * reached: the receive route unzips, re-reads the archive and queries the destination
+   * for conflicts first, and a second import let through during that stretch would
+   * overwrite the JSON files the first one is about to read.
+   *
+   * The routes are the only place this actually refuses anything. `import()` claims the
+   * job as well, but does not check the result: a direct call keeps the job claimed for
+   * the length of its run — so a route starting meanwhile is turned away — while two
+   * direct calls, bypassing both routes, still run side by side.
+   *
+   * Process-local, so a multi-process deployment can still run two imports at once. That
+   * is the same hole as before this existed; it is not widened.
+   */
+  acquireImportJob(): ImportJobLease | null {
+    if (this.importJobOwner != null) {
+      return null;
+    }
+
+    const owner = {};
+    this.importJobOwner = owner;
+
+    return {
+      release: () => {
+        if (this.importJobOwner === owner) {
+          this.importJobOwner = null;
+        }
+      },
+    };
+  }
+
+  /**
    * import collections from json
    * @param collections MongoDB collection name
    * @param importSettingsMap
@@ -140,7 +213,24 @@ export class ImportService {
   async import(
     collections: string[],
     importSettingsMap: Map<string, ImportSettings>,
-  ): Promise<void> {
+  ): Promise<ImportResult> {
+    // Null when someone else already holds the job — the ordinary case, as both routes
+    // claim it before they unzip. Deliberately not treated as a refusal: the run goes
+    // ahead either way, and the only thing this claim buys is that an import reached
+    // directly, without a route, still keeps the job taken for its own length. Releasing
+    // only what was claimed here is what keeps it from cutting the caller's claim short.
+    const ownLease = this.acquireImportJob();
+    try {
+      return await this.doImport(collections, importSettingsMap);
+    } finally {
+      ownLease?.release();
+    }
+  }
+
+  private async doImport(
+    collections: string[],
+    importSettingsMap: Map<string, ImportSettings>,
+  ): Promise<ImportResult> {
     await this.preImport();
 
     // init status object
@@ -148,44 +238,144 @@ export class ImportService {
       collections,
     );
 
+    let failedCollections: string[];
+    try {
+      failedCollections = await this.importCollections(
+        collections,
+        importSettingsMap,
+      );
+
+      await configManager.loadConfigs();
+
+      const currentIsV5Compatible =
+        configManager.getConfig('app:isV5Compatible');
+      const isImportPagesCollection = collections.includes('pages');
+      const shouldNormalizePages =
+        currentIsV5Compatible && isImportPagesCollection;
+
+      if (shouldNormalizePages)
+        await this.crowi.pageService.normalizeAllPublicPages();
+
+      // Release caches after import process
+      this.modelCache.clear();
+      this.convertMap = undefined;
+    } finally {
+      // `getStatus()` answers `isImporting` from this field, so it has to stay set for as
+      // long as the run really lasts — the page normalization above included, which takes
+      // minutes on a v5 wiki — and it has to be cleared even when that tail work throws,
+      // or the screen would go on reporting an import that has already stopped.
+      this.currentProgressingStatus = null;
+    }
+
+    // Emitted here, at the very end, and only for a run that lost nothing.
+    //
+    // Its one consumer is the admin screen, which turns it into a green "Import process
+    // has completed." Emitted where it used to be — right after the per-collection loop —
+    // it told the operator the import was over while the route still held the import
+    // claim, so re-importing came back as a 409 the screen had no way to explain. And
+    // emitted after a collection had failed it claimed a wiki was fully imported when part
+    // of it was missing; the failure is reported by the caller instead (`executeImport`
+    // for the admin route, the response body for the G2G one).
+    if (failedCollections.length === 0) {
+      this.emitTerminateEvent();
+    }
+
+    return { failedCollections };
+  }
+
+  /**
+   * Import every collection and wait for all of them, whatever becomes of each one.
+   *
+   * A collection that throws does not stop the others — that is long-standing policy and
+   * is what makes the returned list the only record of a partial import.
+   *
+   * @returns the names of the collections whose import threw, in the requested order
+   */
+  private async importCollections(
+    collections: string[],
+    importSettingsMap: Map<string, ImportSettings>,
+  ): Promise<string[]> {
     // process serially so as not to waste memory
-    const promises = collections.map((collectionName) => {
+    const importings = collections.map((collectionName) => {
       const importSettings = importSettingsMap.get(collectionName);
       if (importSettings == null) {
         throw new Error(`ImportSettings for ${collectionName} is not found`);
       }
-      return this.importCollection(collectionName, importSettings);
+
+      const importing =
+        collectionName === CONFIGS_COLLECTION_NAME
+          ? // Chained onto the configs import rather than run alongside it, so the flag is
+            // in the database before the `loadConfigs()` the caller runs once every
+            // collection is in — and before anything else can reload from a database with
+            // no flag in it.
+            // `finally`, because a pipeline that fails after `deleteMany()` leaves the row
+            // missing just the same.
+            (async () => {
+              try {
+                await this.importCollection(collectionName, importSettings);
+              } finally {
+                await this.enterMaintenanceMode();
+              }
+            })()
+          : this.importCollection(collectionName, importSettings);
+
+      // Settled here, where the import starts, rather than in the loop below. Every
+      // collection is already running by then, so one that fails while an earlier one is
+      // still going would be a rejection with nothing attached to it yet — which Node
+      // treats as an unhandled rejection and, by default, exits the process over.
+      return importing.then(
+        (): SettledImport => ({ collectionName, error: null }),
+        (error: unknown): SettledImport => ({ collectionName, error }),
+      );
     });
-    for await (const promise of promises) {
-      try {
-        await promise;
-      } catch (err) {
-        // catch ImportingCollectionError
-        const { collectionProgress } = err;
-        logger.error(
-          `failed to import to ${collectionProgress.collectionName}`,
-          err,
-        );
-        this.emitProgressEvent(collectionProgress, { message: err.message });
+
+    const failedCollections: string[] = [];
+    for (const settled of importings) {
+      const { collectionName, error } = await settled;
+      if (error == null) {
+        continue;
+      }
+
+      failedCollections.push(collectionName);
+      logger.error({ err: error }, `failed to import to ${collectionName}`);
+
+      // Absent when the failure happened before the per-collection progress record could
+      // be looked up; the progress event is best-effort, the report above is not.
+      const { collectionProgress } = error as ImportingCollectionError;
+      if (collectionProgress != null) {
+        this.emitProgressEvent(collectionProgress, {
+          message: (error as Error).message,
+        });
       }
     }
 
-    this.currentProgressingStatus = null;
-    this.emitTerminateEvent();
+    return failedCollections;
+  }
 
-    await configManager.loadConfigs();
-
-    const currentIsV5Compatible = configManager.getConfig('app:isV5Compatible');
-    const isImportPagesCollection = collections.includes('pages');
-    const shouldNormalizePages =
-      currentIsV5Compatible && isImportPagesCollection;
-
-    if (shouldNormalizePages)
-      await this.crowi.pageService.normalizeAllPublicPages();
-
-    // Release caches after import process
-    this.modelCache.clear();
-    this.convertMap = undefined;
+  /**
+   * Puts this GROWI into maintenance mode, unconditionally, once the configs collection
+   * has been imported.
+   *
+   * Importing `configs` replaces every setting this GROWI has — including the flag that
+   * keeps ordinary users out — with the archive's. What is left behind is a GROWI running
+   * on someone else's settings, and, for a transfer, one whose attachments have not
+   * started arriving yet. So the import closes it rather than leaving whoever wrote the
+   * archive to decide.
+   *
+   * **Nothing here reopens it.** The admin screens warn the operator before an import or
+   * a transfer starts that they will have to switch maintenance mode off themselves. The
+   * one exception is the receiving side of a migration transfer, which raises the flag on
+   * purpose beforehand and manages its own clean-up.
+   */
+  private async enterMaintenanceMode(): Promise<void> {
+    // Deliberately not caught. A failure here means the configs collection was replaced
+    // but the flag was not raised — a GROWI running on the archive's settings, open, with
+    // (for a transfer) no attachments yet: exactly the state requirement 2.9 exists to
+    // prevent. Letting it throw out of the `finally` that calls this marks `configs` as a
+    // failed collection, which is already wired all the way through to the operator (the
+    // return value, the response body, the source's failure notice, and the screen's
+    // withheld completion). Swallowing it would report that run as a clean success.
+    await configManager.updateConfig('app:isMaintenanceMode', true);
   }
 
   /**

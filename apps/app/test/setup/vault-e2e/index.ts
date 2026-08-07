@@ -38,7 +38,7 @@ import { createVaultGatewayRouter } from '~/features/growi-vault/server/routes/v
 import type { VaultBootstrapper } from '~/features/growi-vault/server/services/vault-bootstrapper';
 import type { VaultDispatcher } from '~/features/growi-vault/server/services/vault-dispatcher';
 
-import { getTestDbConfig } from '../mongo/utils';
+import { getTestDbConfig } from '../mongo/test-db-config';
 import { seedVaultE2eFixture } from './seed';
 import { spawnVaultManager } from './spawn-vault-manager';
 
