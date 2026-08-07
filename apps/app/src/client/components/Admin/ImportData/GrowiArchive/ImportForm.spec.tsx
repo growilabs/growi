@@ -69,11 +69,42 @@ describe('ImportFormWrapperFc', () => {
     );
     await waitFor(() => expect(importButton()).toBeEnabled());
 
-    // trigger the (failing) import
+    // The Import button only opens the notice about maintenance mode; nothing is sent
+    // until the operator acknowledges it (requirement 2.10).
     fireEvent.click(importButton());
+    expect(apiv3Post).not.toHaveBeenCalled();
+
+    // trigger the (failing) import
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'maintenance_mode_notice.proceed',
+      }),
+    );
 
     // the button must become usable again once the failure is handled
     await waitFor(() => expect(importButton()).toBeEnabled());
     expect(apiv3Post).toHaveBeenCalledWith('/import', expect.any(Object));
+  });
+
+  it('does not import when the maintenance mode notice is dismissed', async () => {
+    // Requirement 2.10 — the operator has to be able to back out after reading that
+    // GROWI will be left closed.
+    renderForm();
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /export_management\.check_all/,
+      }),
+    );
+    await waitFor(() => expect(importButton()).toBeEnabled());
+
+    fireEvent.click(importButton());
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'maintenance_mode_notice.cancel',
+      }),
+    );
+
+    expect(apiv3Post).not.toHaveBeenCalled();
   });
 });

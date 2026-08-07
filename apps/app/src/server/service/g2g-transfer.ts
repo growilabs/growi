@@ -8,11 +8,15 @@ import * as FormDataModule from 'form-data';
 import mongoose, { Types as MongooseTypes } from 'mongoose';
 import { basename } from 'pathe';
 
-import { G2G_PROGRESS_STATUS } from '~/interfaces/g2g-transfer';
+import {
+  G2G_PROGRESS_STATUS,
+  type G2GProgressStatus,
+} from '~/interfaces/g2g-transfer';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { ImportMode } from '~/models/admin/import-mode';
 import TransferKeyModel from '~/server/models/transfer-key';
 import { getImportService, type ImportSettings } from '~/server/service/import';
+import type { ImportResult } from '~/server/service/import/import';
 import { createBatchStream } from '~/server/util/batch-stream';
 import axios from '~/utils/axios';
 import { getGrowiVersion } from '~/utils/growi-version';
@@ -24,6 +28,8 @@ import { Attachment } from '../models/attachment';
 import UserGroup from '../models/user-group';
 import {
   G2G_DATA_CONFLICT_ERROR_CODE,
+  G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+  G2G_PROTECTED_COLLECTION_ERROR_CODE,
   G2GTransferError,
   G2GTransferErrorCode,
 } from '../models/vo/g2g-transfer-error';
@@ -44,6 +50,45 @@ const FormData = FormDataModule.default ?? FormDataModule;
  * Header name for transfer key
  */
 export const X_GROWI_TRANSFER_KEY_HEADER_NAME = 'x-growi-transfer-key';
+
+/**
+ * How often an in-flight request pushes the transfer key's expiry forward.
+ *
+ * The key is removed by a MongoDB TTL index 30 minutes after `expireAt`
+ * (models/transfer-key.ts), and a single request can outlast that on its own: receiving
+ * the archive over the network, unzipping it, checking the version, detecting conflicts,
+ * importing every collection and normalizing pages all happen before the response is
+ * written. Touching the key on arrival only buys one more 30-minute window for all of
+ * that, so the touch repeats while the request is in flight. The interval only has to be
+ * comfortably below the TTL; one write per minute per in-flight transfer is negligible.
+ */
+export const TRANSFER_KEY_KEEP_ALIVE_INTERVAL_MS = 60 * 1000;
+
+interface ReceiverOptions {
+  /**
+   * Overrides {@link TRANSFER_KEY_KEEP_ALIVE_INTERVAL_MS}. Exists so a test can observe
+   * the repetition — with the production interval, the only thing an assertion could
+   * reach within a test run is the touch that happens on arrival.
+   */
+  readonly transferKeyKeepAliveIntervalMs?: number;
+}
+
+/**
+ * How often the source GROWI reminds the destination that a transfer is still coming,
+ * while it builds the archive.
+ *
+ * Exporting every collection and zipping the result is one uninterrupted stretch of work
+ * during which the destination hears nothing at all, and it handles the same volume of
+ * data as the import — so a transfer big enough for the import to outlast the key is one
+ * where the export does too. Nothing has reached the destination by then, so what is lost
+ * is the entire transfer.
+ */
+export const PUSHER_KEEP_ALIVE_INTERVAL_MS = 5 * 60 * 1000;
+
+interface PusherOptions {
+  /** Overrides {@link PUSHER_KEEP_ALIVE_INTERVAL_MS}; see {@link ReceiverOptions}. */
+  readonly transferKeyKeepAliveIntervalMs?: number;
+}
 
 /**
  * Keys for file upload related config
@@ -200,6 +245,13 @@ interface Receiver {
    */
   validateTransferKey(key: string): Promise<void>;
   /**
+   * Keep the transfer key from expiring while a request that uses it is in flight.
+   * @param {string} key Transfer key
+   * @returns {() => void} Stops the extension. The caller MUST call it when the response
+   * closes — on completion *and* on a client disconnect, or the key never expires again.
+   */
+  startTransferKeyKeepAlive(key: string): () => void;
+  /**
    * Generate GROWIInfo
    * @throws {import('../models/vo/g2g-transfer-error').G2GTransferError}
    */
@@ -233,6 +285,7 @@ interface Receiver {
    */
   detectImportConflicts(
     innerFileStats: InnerFileStat[],
+    replaceTargetCollections?: ReadonlySet<string>,
   ): Promise<UniqueConflictReport>;
   /**
    * Import collections
@@ -244,7 +297,7 @@ interface Receiver {
     collections: string[],
     importSettingsMap: Map<string, ImportSettings>,
     sourceGROWIUploadConfigs: FileUploadConfigs,
-  ): Promise<void>;
+  ): Promise<ImportResult>;
   /**
    * Returns file upload configs
    */
@@ -280,6 +333,21 @@ const GENERIC_ARCHIVE_POST_ERROR_EVENT: ArchivePostErrorEvent = {
 };
 
 /**
+ * The receiver's error codes that the operator on this side is told about specifically.
+ * Anything not listed here falls back to the generic event, as it did before.
+ */
+const ARCHIVE_POST_ERROR_KEY_BY_CODE: ReadonlyMap<string, string> = new Map([
+  [G2G_DATA_CONFLICT_ERROR_CODE, 'admin:g2g:error_data_conflict'],
+  [G2G_IMPORT_IN_PROGRESS_ERROR_CODE, 'admin:g2g:error_import_in_progress'],
+  // The push route drops non-transferable collections before the archive is built, so a
+  // transfer started from the admin screen never gets this answer. When it does arrive,
+  // the two GROWIs disagree about which collections a transfer may carry, and the generic
+  // "failed to send the archive" hides exactly the fact that identifies that: the
+  // receiver's message names the collections it refused.
+  [G2G_PROTECTED_COLLECTION_ERROR_CODE, 'admin:g2g:error_protected_collection'],
+]);
+
+/**
  * Maps a failed archive POST to the admin-facing `admin:g2gError` payload.
  *
  * Pure / no I/O, so it is unit-testable without mocking axios, exportService, or the
@@ -313,14 +381,41 @@ export const toArchivePostErrorEvent = (
 
   const { code, message } = firstError;
 
-  if (code !== G2G_DATA_CONFLICT_ERROR_CODE || typeof message !== 'string') {
+  const key =
+    typeof code === 'string'
+      ? ARCHIVE_POST_ERROR_KEY_BY_CODE.get(code)
+      : undefined;
+
+  if (key == null || typeof message !== 'string') {
     return GENERIC_ARCHIVE_POST_ERROR_EVENT;
   }
 
-  return {
-    key: 'admin:g2g:error_data_conflict',
-    message,
-  };
+  return { key, message };
+};
+
+/**
+ * Reads the collections the destination failed to import out of its response to the
+ * archive.
+ *
+ * Guarded the whole way down, like {@link toArchivePostErrorEvent}: this is a network
+ * boundary, an older destination answers without the field at all, and a proxy can
+ * replace the body with something else entirely. Anything unrecognized reads as "nothing
+ * failed", which is what this code assumed before the field existed.
+ */
+export const readFailedCollections = (
+  responseData: unknown,
+): readonly string[] => {
+  if (!isRecord(responseData)) {
+    return [];
+  }
+
+  const { failedCollections } = responseData;
+
+  return Array.isArray(failedCollections)
+    ? failedCollections.filter(
+        (name): name is string => typeof name === 'string',
+      )
+    : [];
 };
 
 /**
@@ -329,8 +424,46 @@ export const toArchivePostErrorEvent = (
 export class G2GTransferPusherService implements Pusher {
   crowi: Crowi;
 
-  constructor(crowi: Crowi) {
+  private readonly transferKeyKeepAliveIntervalMs: number;
+
+  constructor(crowi: Crowi, options: PusherOptions = {}) {
     this.crowi = crowi;
+    this.transferKeyKeepAliveIntervalMs =
+      options.transferKeyKeepAliveIntervalMs ?? PUSHER_KEEP_ALIVE_INTERVAL_MS;
+  }
+
+  /**
+   * Reminds the destination that this transfer is still coming, for as long as the
+   * returned function is not called.
+   *
+   * Uses the dedicated keep-alive endpoint rather than `growi-info`: answering that one
+   * writes a probe file to the destination's attachment storage and never deletes it, so
+   * polling it every few minutes would litter the destination for the length of every
+   * export.
+   */
+  private startTransferKeyKeepAlive(tk: TransferKey): () => void {
+    const touch = async (): Promise<void> => {
+      try {
+        await axios.post(
+          '/_api/v3/g2g-transfer/keep-alive',
+          null,
+          this.generateAxiosConfig(tk),
+        );
+      } catch (err) {
+        // The destination being briefly unreachable costs the key some of its remaining
+        // window; failing the transfer over it would cost the whole export.
+        logger.warn('Failed to extend the lifetime of the transfer key', err);
+      }
+    };
+
+    // No immediate call: the caller has just spoken to the destination, so the key was
+    // touched moments ago.
+    const timer = setInterval(() => {
+      void touch();
+    }, this.transferKeyKeepAliveIntervalMs);
+    timer.unref();
+
+    return () => clearInterval(timer);
   }
 
   public generateAxiosConfig(
@@ -576,6 +709,11 @@ export class G2GTransferPusherService implements Pusher {
       }),
     );
 
+    // Exporting and zipping is the one stretch of the transfer during which the
+    // destination hears nothing from this GROWI, and it is as long as the import. Without
+    // this the key can expire before the archive has been handed over at all.
+    const stopTransferKeyKeepAlive = this.startTransferKeyKeepAlive(tk);
+
     let zipFileStream: ReadStream;
     try {
       const zipFileStat = await exportService?.export(collections);
@@ -595,9 +733,14 @@ export class G2GTransferPusherService implements Pusher {
         key: 'admin:g2g:error_generate_growi_archive',
       });
       throw err;
+    } finally {
+      // Everything from here on is a request to the destination, which extends the key by
+      // arriving.
+      stopTransferKeyKeepAlive();
     }
 
     // Send a zip file to other GROWI via axios
+    let archiveResponseData: unknown;
     try {
       // Use FormData to immitate browser's form data object
       const form = new FormData();
@@ -612,11 +755,12 @@ export class G2GTransferPusherService implements Pusher {
       form.append('optionsMap', JSON.stringify(optionsMap));
       form.append('operatorUserId', user._id.toString());
       form.append('uploadConfigs', JSON.stringify(uploadConfigs));
-      await rawAxios.post(
+      const { data } = await rawAxios.post(
         '/_api/v3/g2g-transfer/',
         form,
         this.generateAxiosConfig(tk, { headers: form.getHeaders() }),
       );
+      archiveResponseData = data;
     } catch (err) {
       logger.error(err);
       socket?.emit('admin:g2gProgress', {
@@ -627,30 +771,87 @@ export class G2GTransferPusherService implements Pusher {
       throw err;
     }
 
-    socket?.emit('admin:g2gProgress', {
-      mongo: G2G_PROGRESS_STATUS.COMPLETED,
-      attachments: G2G_PROGRESS_STATUS.IN_PROGRESS,
-    });
+    // A 200 only means the destination finished trying. Which collections it could not
+    // import is in the body, and this is the only place that fact can be read: the two
+    // GROWIs are separate processes and these notifications are emitted by this one.
+    const failedCollections = readFailedCollections(archiveResponseData);
+    const isPartiallyImported = failedCollections.length > 0;
 
+    if (isPartiallyImported) {
+      logger.error(
+        { failedCollections },
+        'The destination GROWI could not import every collection',
+      );
+    }
+
+    // The status the mongo phase keeps for the rest of the transfer. A partly failed
+    // import is never restated as COMPLETED later on: the admin screen reads
+    // `mongo === COMPLETED && attachments === COMPLETED` as "the transfer succeeded" and
+    // shows the green toast, so restating it would hand the operator a success for a
+    // transfer that lost collections (requirements 2.5, 2.8).
+    const mongoStatus: G2GProgressStatus = isPartiallyImported
+      ? G2G_PROGRESS_STATUS.ERROR
+      : G2G_PROGRESS_STATUS.COMPLETED;
+
+    const emitProgress = (attachments: G2GProgressStatus): void => {
+      socket?.emit('admin:g2gProgress', {
+        mongo: mongoStatus,
+        attachments,
+        // Only carried when there is something to carry, so a fully successful transfer
+        // keeps emitting exactly the payload it did before.
+        ...(isPartiallyImported ? { failedCollections } : {}),
+      });
+    };
+
+    /**
+     * Tells the operator that the transfer did not fully succeed, and which collections
+     * were left out.
+     *
+     * Deferred until the attachments are done rather than emitted here, because the
+     * client hides the progress panel as soon as an `admin:g2gError` arrives: emitting it
+     * now would replace a live view of the attachment transfer with silence for as long
+     * as the files take. Until then the panel already shows the mongo phase in error, so
+     * the failure is visible the whole time; this event is the closing word on it.
+     */
+    const reportPartialImport = (): void => {
+      socket?.emit('admin:g2gError', {
+        key: 'admin:g2g:error_partial_import',
+        message: `Collections that could not be imported: ${failedCollections.join(', ')}`,
+      });
+    };
+
+    emitProgress(G2G_PROGRESS_STATUS.IN_PROGRESS);
+
+    // The attachments are transferred even when the import was only partly successful.
+    // The destination keeps everything it did import — `users` among it — so the unique
+    // conflict gate refuses a plain retry of the whole transfer with a 409, and skipping
+    // the files here would leave the operator with no way to get them across short of
+    // rebuilding the destination. Requirement 5.2 asks for the attachments not to be
+    // lost; requirement 2.8 asks for the failure to be reported, and both are satisfied
+    // by sending the files and still reporting the failure below.
     try {
       await this.transferAttachments(tk);
     } catch (err) {
       logger.error(err);
-      socket?.emit('admin:g2gProgress', {
-        mongo: G2G_PROGRESS_STATUS.COMPLETED,
-        attachments: G2G_PROGRESS_STATUS.ERROR,
-      });
+      emitProgress(G2G_PROGRESS_STATUS.ERROR);
       socket?.emit('admin:g2gError', {
         message: 'Failed to transfer attachments',
         key: 'admin:g2g:error_upload_attachment',
       });
+      // A failed attachment transfer does not take the place of the import failure: they
+      // are separate facts, and only this event names the collections the destination is
+      // missing.
+      if (isPartiallyImported) {
+        reportPartialImport();
+      }
       throw err;
     }
 
-    socket?.emit('admin:g2gProgress', {
-      mongo: G2G_PROGRESS_STATUS.COMPLETED,
-      attachments: G2G_PROGRESS_STATUS.COMPLETED,
-    });
+    emitProgress(G2G_PROGRESS_STATUS.COMPLETED);
+
+    if (isPartiallyImported) {
+      reportPartialImport();
+    }
   }
 
   /**
@@ -683,8 +884,38 @@ export class G2GTransferPusherService implements Pusher {
 export class G2GTransferReceiverService implements Receiver {
   crowi: Crowi;
 
-  constructor(crowi: Crowi) {
+  private readonly transferKeyKeepAliveIntervalMs: number;
+
+  constructor(crowi: Crowi, options: ReceiverOptions = {}) {
     this.crowi = crowi;
+    this.transferKeyKeepAliveIntervalMs =
+      options.transferKeyKeepAliveIntervalMs ??
+      TRANSFER_KEY_KEEP_ALIVE_INTERVAL_MS;
+  }
+
+  public startTransferKeyKeepAlive(key: string): () => void {
+    // Moving `expireAt` to now restarts the TTL index's 30-minute countdown, so the key
+    // keeps the meaning it had before: it expires 30 minutes after the last time this
+    // GROWI heard from the transfer, not 30 minutes after it was issued.
+    const touch = async (): Promise<void> => {
+      try {
+        await TransferKeyModel.updateOne({ key }, { expireAt: new Date() });
+      } catch (err) {
+        // A failed touch costs the key some of its remaining window; failing the
+        // transfer over it would cost the whole transfer.
+        logger.warn('Failed to extend the lifetime of the transfer key', err);
+      }
+    };
+
+    void touch();
+
+    const timer = setInterval(() => {
+      void touch();
+    }, this.transferKeyKeepAliveIntervalMs);
+    // A transfer must not be the reason the process refuses to shut down.
+    timer.unref();
+
+    return () => clearInterval(timer);
   }
 
   public async validateTransferKey(key: string): Promise<void> {
@@ -832,6 +1063,7 @@ export class G2GTransferReceiverService implements Receiver {
 
   public async detectImportConflicts(
     innerFileStats: InnerFileStat[],
+    replaceTargetCollections?: ReadonlySet<string>,
   ): Promise<UniqueConflictReport> {
     const importService = getImportService();
 
@@ -848,6 +1080,7 @@ export class G2GTransferReceiverService implements Receiver {
       groupsJsonPath: resolvePath('usergroups'),
       userModel: mongoose.model<IUser>('User'),
       userGroupModel: UserGroup,
+      replaceTargetCollections,
     });
   }
 
@@ -855,26 +1088,28 @@ export class G2GTransferReceiverService implements Receiver {
     collections: string[],
     importSettingsMap: Map<string, ImportSettings>,
     sourceGROWIUploadConfigs: FileUploadConfigs,
-  ): Promise<void> {
+  ): Promise<ImportResult> {
     const { appService } = this.crowi;
     const importService = getImportService();
     /** whether to keep current file upload configs */
     const shouldKeepUploadConfigs =
       configManager.getConfig('app:fileUploadType') !== 'none';
 
+    let importResult: ImportResult;
+
     if (shouldKeepUploadConfigs) {
       /** cache file upload configs */
       const fileUploadConfigs = await this.getFileUploadConfigs();
 
       // import mongo collections(overwrites file uplaod configs)
-      await importService.import(collections, importSettingsMap);
+      importResult = await importService.import(collections, importSettingsMap);
 
       // restore file upload config from cache
       await configManager.removeConfigs(UPLOAD_CONFIG_KEYS);
       await configManager.updateConfigs(fileUploadConfigs);
     } else {
       // import mongo collections(overwrites file uplaod configs)
-      await importService.import(collections, importSettingsMap);
+      importResult = await importService.import(collections, importSettingsMap);
 
       // update file upload config
       await configManager.updateConfigs(sourceGROWIUploadConfigs);
@@ -882,6 +1117,10 @@ export class G2GTransferReceiverService implements Receiver {
 
     await this.crowi.setUpFileUpload(true);
     await appService.setupAfterInstall();
+
+    // Handed back so the route can put it in the response: the source is a different
+    // process, and its own progress events cannot know what happened over here.
+    return importResult;
   }
 
   public async getFileUploadConfigs(): Promise<FileUploadConfigs> {
