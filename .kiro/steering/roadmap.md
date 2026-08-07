@@ -11,6 +11,7 @@
 | Umbrella spec | Status | Sub-spec roadmap |
 |---|---|---|
 | [growi-vault](../specs/growi-vault/) | resilience / reconcile 完了、ha は brief 段階 | [.kiro/specs/growi-vault/roadmap.md](../specs/growi-vault/roadmap.md) |
+| [i18n](../specs/i18n/) | discovery 完了、sub-spec 2 本とも brief 段階。翻訳ファイル構成の整理方式は未決 | [.kiro/specs/i18n/roadmap.md](../specs/i18n/roadmap.md) |
 
 ## Spec Family: activity log（監査ログ改善）
 
@@ -31,4 +32,4 @@ activity log サブシステムを責務ごとに分割したファミリー。f
 `target × targetModel` の全面的型安全化 / 保持期間・TTL / 大量カスケード削除時のボリューム制御。整理先は flagship `activity-log` の関心マップ（`.kiro/specs/activity-log/brief.md`）で管理する。
 
 ---
-_Updated: 2026-08-06. activity log ファミリー 3 spec の状態を実装実績に合わせて更新（3 件とも master にマージ済みを確認、残タスクは snapshot-viewer の翻訳のみ）。単発で完了した spec（`drawio`、`g2g-import-conflict-detection` など）はファミリーでも umbrella でもないため、ここには列挙せず各 spec 側に残す。_
+_Updated: 2026-08-06. umbrella spec `i18n` を追加（`apps/app` の多言語化アーキテクチャ改善。discovery による分解、sub-spec 2 本）。詳細な経緯・決定事項・未決の論点はすべて [.kiro/specs/i18n/roadmap.md](../specs/i18n/roadmap.md) 側に置き、ここには表の 1 行だけを持つ。同日: activity log ファミリー 3 spec の状態を実装実績に合わせて更新（3 件とも master にマージ済みを確認、残タスクは snapshot-viewer の翻訳のみ）。単発で完了した spec（`drawio`、`g2g-import-conflict-detection` など）はファミリーでも umbrella でもないため、ここには列挙せず各 spec 側に残す。_
