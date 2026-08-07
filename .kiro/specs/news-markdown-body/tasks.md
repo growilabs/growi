@@ -15,7 +15,7 @@
 
 - [ ] 2. opt-in ゲート(bodyFormat)を additive に通す
 - [ ] 2.1 (P) interface に bodyFormat を追加する
-  - `interfaces/news-item.ts` の `INewsItem` / `INewsItemInput` に `bodyFormat?: 'markdown'` を追加。typecheck が通る
+  - `interfaces/news-item.ts` の `INewsItem` / `INewsItemInput` に `bodyFormat?: string` を追加(literal `'markdown'` にしない。未知値も型で受ける)。typecheck が通る
   - _Boundary: news interfaces_
   - _Requirements: 1.1, 5.1_
 
@@ -34,7 +34,7 @@
 
 - [ ] 3. ニュース専用の制限描画パスを実装する
 - [ ] 3.1 (P) newsSanitizeSchema を定義する
-  - `client/services/news-sanitize-schema.ts` に hast-util-sanitize 用スキーマを**ゼロベースで**定義(recommended-whitelist は継承しない)。design の確定スキーマに従う: tagNames = p/br/strong/em/del/a/code/pre/blockquote/ul/ol/li/**h1–h6**/hr/img/**table/thead/tbody/tr/th/td**。attributes = a[href,title]/img[src,alt,title](**code の className は許可しない**)。protocols = a[href]=http,https,mailto / img[src]=https。strip=['script','style']。style・on*・任意 class・iframe/video/input は不許可
+  - `client/services/news-sanitize-schema.ts` に hast-util-sanitize 用スキーマを**ゼロベースで**定義(recommended-whitelist は継承しない)。design の確定スキーマに従う: tagNames = p/br/strong/em/del/a/code/pre/blockquote/ul/ol/li/**h1–h6**/hr/img/**table/thead/tbody/tr/th/td**。attributes = a[href,title]/img[src,alt,title](**code の className は許可しない**)。protocols = `{ href: ['http','https','mailto'], src: ['https'] }`(属性名キー。href は a、src は img のみが持つ)。strip=['script','style']。style・on*・任意 class・iframe/video/input は不許可
   - `news-sanitize-schema.spec.ts`: 許可タグ(表・見出し含む)が残り、iframe/video/script/style/on*/input が除去され、javascript: リンクが無効化され、img src の https が強制されることを検証
   - _Boundary: newsSanitizeSchema_
   - _Requirements: 2.1, 2.2, 2.3, 2.5, 4.3_

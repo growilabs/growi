@@ -166,7 +166,7 @@ hast-util-sanitize 用スキーマ。**Wiki の `recommended-whitelist` を継�
   - **タスクリスト/脚注は非対応**(`input`・脚注 `section`/`sup` を許可しない)。タスクリストのチェックボックスは除去され、テキストのみ残る(劣化として許容)
   - 生 HTML・`iframe`/`video`/`script`/`style` は**非許可**
 - **`attributes`**: `a: [href, title]`、`img: [src, alt, title]`。`code` の `className` は**許可しない**(ニュースにハイライタを入れないため言語指定は効果がなく、最小権限の観点でも落とす)。`style` 属性・`on*` イベントハンドラ・任意 `class` は不許可
-- **`protocols`**: `a[href]` = http / https / mailto、`img[src]` = https のみ
+- **`protocols`**(hast-util-sanitize は属性名キーのグローバル設定): `{ href: ['http', 'https', 'mailto'], src: ['https'] }`。許可タグのうち `href` を持つのは `a`、`src` を持つのは `img` だけなので、属性名キーでも「リンクは http/https/mailto、画像は https のみ」というタグ別の意図と同じ効果になる
 - **`strip`**: `['script', 'style']`(挙動を明示。許可外要素は既定でも子ごと除去されるが、意図を固定する)
 - rehype-raw を**パイプラインに含めない**ため、body 中の生 HTML(`<video>` 等)はそもそも parse されない(Req 2.2 を構造的に担保)
 
@@ -190,7 +190,7 @@ gap で挙げた案I(取込時)/案II(描画時)のうち **案II(rehype プラ�
 
 #### opt-in ゲート(`bodyFormat`)
 
-- `INewsItem.bodyFormat?: 'markdown'`(アイテム単位。ロケール別ではない = 配信側は全ロケールを同一フォーマットで揃える契約)。未指定=従来のプレーンテキスト描画
+- `INewsItem.bodyFormat?: string`(アイテム単位。ロケール別ではない = 配信側は全ロケールを同一フォーマットで揃える契約)。未指定=従来のプレーンテキスト描画。型を literal `'markdown'` にしない理由は下記(未知値も型として受ける)
 - feed-parser: **`bodyFormat: z.string().optional()`** とし、描画側で `bodyFormat === 'markdown'` を判定する。`z.literal('markdown').optional()` にしない理由: feed-parser はアイテム単位の `safeParse` で**検証失敗アイテムを丸ごと skip** するため、`bodyFormat: 'mdx'` のような**将来の未知値がニュース自体を消してしまう**(プレーンテキストへの劣化にならず Req 5.3 の前方互換に反する)。`z.string().optional()` なら未知値はそのまま取り込まれ、描画側が markdown 以外を従来描画にフォールバックする
 - NewsFeed: `item.bodyFormat === 'markdown'` のとき NewsMarkdownBody、else 従来 pre-wrap(Req 1.2, 5.1)
 
