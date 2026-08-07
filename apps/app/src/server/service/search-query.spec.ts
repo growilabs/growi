@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import { type MockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
+import { SEARCH_FILTER_PREFIXES } from '~/features/search/utils/filter-fields';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type Crowi from '~/server/crowi';
 import UserGroup from '~/server/models/user-group';
@@ -430,27 +431,27 @@ describe('resolveFilterData()', () => {
   });
 });
 
+const emptyTerms = (overrides: Partial<QueryTerms> = {}): QueryTerms => ({
+  match: [],
+  not_match: [],
+  phrase: [],
+  not_phrase: [],
+  prefix: [],
+  not_prefix: [],
+  tag: [],
+  not_tag: [],
+  author: [],
+  not_author: [],
+  editor: [],
+  not_editor: [],
+  group: [],
+  not_group: [],
+  ...overrides,
+});
+
 describe('parseQueryString()', () => {
   let searchService: TestSearchService;
   let mockCrowi: MockProxy<Crowi>;
-
-  const emptyTerms = (overrides: Partial<QueryTerms> = {}): QueryTerms => ({
-    match: [],
-    not_match: [],
-    phrase: [],
-    not_phrase: [],
-    prefix: [],
-    not_prefix: [],
-    tag: [],
-    not_tag: [],
-    author: [],
-    not_author: [],
-    editor: [],
-    not_editor: [],
-    group: [],
-    not_group: [],
-    ...overrides,
-  });
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -617,5 +618,35 @@ describe('parseQueryString()', () => {
       tag: ['foo'],
     };
     expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+});
+
+// Guards the shared vocabulary contract from the server side. The client can't be
+// imported here (server/client lint boundary), so instead of a full round-trip we
+// assert this tokenizer handles every operator in the shared table: one added to
+// the table but missing from the server's dispatch would leak into `match`.
+describe('server tokenizer recognizes every shared filter operator', () => {
+  let searchService: TestSearchService;
+  let mockCrowi: MockProxy<Crowi>;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+
+    mockCrowi = mock<Crowi>();
+    mockCrowi.configManager = configManager;
+    searchService = new TestSearchService(mockCrowi);
+  });
+
+  it.each(
+    SEARCH_FILTER_PREFIXES,
+  )('routes "%s<value>" into its own bucket, not free-text match', (prefix) => {
+    // Each operator's term bucket is its prefix without the trailing colon
+    // (`author:` -> `author`), so the mapping is derivable, not hard-coded.
+    const bucket = prefix.slice(0, -1) as keyof QueryTerms;
+
+    const terms = searchService.parseQueryString(`${prefix}value`);
+
+    expect(terms[bucket]).toEqual(['value']);
+    expect(terms.match).not.toContain(`${prefix}value`);
   });
 });
