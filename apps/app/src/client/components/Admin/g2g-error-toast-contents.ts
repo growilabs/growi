@@ -9,6 +9,13 @@
  */
 export const KEYS_WITH_DETAIL_MESSAGE: readonly string[] = [
   'admin:g2g:error_data_conflict',
+  // Requirement 2.8 — the operator has to be told *which* collections were left out, and
+  // that list is built by the destination, so the heading alone cannot carry it.
+  'admin:g2g:error_partial_import',
+  // Same reason: the `message` is the receiver's own list of the collections it refused
+  // ("These collections must not be transferred: …"), and that list is the only thing
+  // that identifies which side of the transfer disagrees about what may be carried.
+  'admin:g2g:error_protected_collection',
 ];
 
 /**

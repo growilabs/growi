@@ -331,6 +331,12 @@ const logDetectedConflicts = (report: UniqueConflictReport): void => {
  * runs the pure comparison. A `null` path means that collection is not part of the
  * transfer, so its detection is skipped rather than failing (requirement 1.6).
  *
+ * A collection listed in `replaceTargetCollections` is skipped as well: every document in
+ * it is deleted before the archive's are written, so there is nothing left for the
+ * archive to collide with and a conflict reported here would abort a transfer that would
+ * have succeeded. The set is passed in rather than worked out here — which collections a
+ * given import replaces is the caller's knowledge (see replace-target-collections.ts).
+ *
  * The destination is only ever read (requirement 2.4).
  */
 export async function detectUniqueConflicts(input: {
@@ -338,11 +344,21 @@ export async function detectUniqueConflicts(input: {
   groupsJsonPath: string | null;
   userModel: Model<IUser>;
   userGroupModel: Model<IUserGroup>;
+  replaceTargetCollections?: ReadonlySet<string>;
 }): Promise<UniqueConflictReport> {
-  const { usersJsonPath, groupsJsonPath, userModel, userGroupModel } = input;
+  const {
+    usersJsonPath,
+    groupsJsonPath,
+    userModel,
+    userGroupModel,
+    replaceTargetCollections,
+  } = input;
+
+  const isReplaced = (collectionName: string): boolean =>
+    replaceTargetCollections?.has(collectionName) ?? false;
 
   const [userConflicts, groupConflicts] = await Promise.all([
-    usersJsonPath == null
+    usersJsonPath == null || isReplaced('users')
       ? []
       : detectForCollection({
           collection: 'users',
@@ -351,7 +367,7 @@ export async function detectUniqueConflicts(input: {
           pick: pickUserUniqueFields,
           lookup: toLookup(userModel),
         }),
-    groupsJsonPath == null
+    groupsJsonPath == null || isReplaced('usergroups')
       ? []
       : detectForCollection({
           collection: 'usergroups',

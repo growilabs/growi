@@ -1204,7 +1204,10 @@
     "error_generate_growi_archive": "Failed to generate GROWI archive file",
     "error_send_growi_archive": "Failed to send GROWI archive file to the destination GROWI",
     "error_data_conflict": "Transfer aborted: some of the transferred data conflicts with users or user groups that already exist on the destination GROWI, so nothing was imported. Resolve the conflicting accounts or groups before retrying, or transfer into a destination GROWI that has not yet completed its initial setup.",
-    "error_upload_attachment": "Failed to transfer attachments"
+    "error_upload_attachment": "Failed to transfer attachments",
+    "error_import_in_progress": "Transfer aborted: another data import is already running on the destination GROWI. Wait for it to finish, then retry the transfer.",
+    "error_partial_import": "Transfer incomplete: the destination GROWI could not import every collection, so it now holds a partly transferred database. Fix the cause and run the transfer again.",
+    "error_protected_collection": "Transfer aborted: the destination GROWI refused the request because it named collections that a transfer must not carry, so nothing was imported. The transfer screen never selects those collections, so check that both GROWIs are running the same version, then report the collection names shown below."
   },
   "external_user_group": {
     "management": "External Group Management",
@@ -1368,5 +1371,13 @@
         "description": "Manually reconcile data inconsistencies between MongoDB pages and Vault git trees without performing a full initialization."
       }
     }
+  },
+  "maintenance_mode_notice": {
+    "title": "GROWI will stay in maintenance mode",
+    "body_this_growi": "Importing the configs collection replaces every setting of this GROWI with the ones in the archive, so this GROWI is put into maintenance mode and left there. Ordinary users cannot reach it until you switch it off.",
+    "body_destination": "Importing the configs collection replaces every setting of the destination GROWI with the ones from this GROWI, so the destination is put into maintenance mode and left there. Ordinary users cannot reach the destination until you switch it off. Attachments are transferred after the collections, so the destination is incomplete until the whole transfer has finished.",
+    "turn_it_off": "Switch maintenance mode off from Admin > App Settings on the GROWI that was closed, once you have checked the result.",
+    "cancel": "Cancel",
+    "proceed": "Understood, proceed"
   }
 }
