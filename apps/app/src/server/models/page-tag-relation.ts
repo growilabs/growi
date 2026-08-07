@@ -6,11 +6,10 @@ import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
 import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
+import { prisma } from '~/utils/prisma';
 
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import { getOrCreateModel } from '../util/mongoose-utils';
-import type { IdToNamesMap } from './tag';
-import Tag from './tag';
 
 export interface PageTagRelationDocument extends IPageTagRelation, Document {}
 
@@ -40,7 +39,7 @@ type FindByPageId = (
 type GetIdToTagNamesMap = (
   this: PageTagRelationModel,
   pageIds: string[],
-) => Promise<IdToNamesMap>;
+) => Promise<{ [key: string]: string[] }>;
 
 type UpdatePageTags = (
   this: PageTagRelationModel,
@@ -175,7 +174,7 @@ const getIdToTagNamesMap: GetIdToTagNamesMap = async function (this, pageIds) {
   const distinctTagIds = Array.from(new Set(allTagIds));
 
   // TODO: set IdToNameMap type by 93933
-  const tagIdToNameMap = await Tag.getIdToNameMap(distinctTagIds);
+  const tagIdToNameMap = await prisma.tags.getIdToNameMap(distinctTagIds);
 
   // convert to map
   const idToTagNamesMap = {};
@@ -225,7 +224,7 @@ const updatePageTags: UpdatePageTags = async function (pageId, tags) {
   const tagsToCreate = tags.filter((tag) => {
     return !relatedTagNames.includes(tag);
   });
-  const tagEntities = await Tag.findOrCreateMany(tagsToCreate);
+  const tagEntities = await prisma.tags.findOrCreateMany(tagsToCreate);
 
   // create relations
   const bulkCreatePromise = this.insertMany(
