@@ -803,7 +803,7 @@ interface ImportCollectionsResult {
 | GET | `/_api/v3/g2g-transfer/growi-info` | 転送キー（既存） | 既存 + `destinationCounts`, `passwordSeedFingerprint`, `loginableAdminCount`, `sessionStoreSupportsEnumeration` | 既存のまま |
 | POST | `/_api/v3/g2g-transfer/` | 既存 | 既存 + `rescue`（救済結果）+ `rescueApplied` + `failedCollections` + `maintenanceModeReleased` | 既存 + `mixed_import_modes`(400), `protected_collection_included`(400), `import_already_in_progress`(409), `growi_data_conflict`(409) |
 
-同時実行の拒否（`import_already_in_progress`）は押す側の失敗処理にも枝を足す（`toArchivePostErrorEvent` に対応する分岐が無いと汎用のエラーになる）。受信側が「取り込み中か」を問う口は、進捗表示のための既存の状態とは別に `ImportService` の契約として明示する（D9 のとおり `currentProgressingStatus` は流用しない）。
+同時実行の拒否（`import_already_in_progress`）は押す側の失敗処理にも枝を足す（`toArchivePostErrorEvent` に対応する分岐が無いと汎用のエラーになる）。この 409 は要求のヘッダだけで決まるので、アーカイブが届き終わる前に返せてしまうが、**未読の本文を残したまま応答すると、その応答は押す側に届かない**（接続が本文の下で壊れ、押す側は応答ではなく送信エラーを受け取る）。受信ルートはアーカイブを最後まで読んで捨ててから 409 を返す。断られた側は送るはずだった転送量を払うが、それと引き換えに理由が届く。受信側が「取り込み中か」を問う口は、進捗表示のための既存の状態とは別に `ImportService` の契約として明示する（D9 のとおり `currentProgressingStatus` は流用しない）。
 
 ##### Event Contract
 
