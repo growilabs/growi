@@ -21,6 +21,12 @@
  * So the handler takes the claim over at its start and releases it in its own `finally`,
  * and the response's `close` only releases a claim the handler never got to take.
  *
+ * **Getting the refusal back to the source.** The claim is checked from the headers, so
+ * the refusal is decided while the archive is still arriving. Sent then, it does not reach
+ * the source at all: the connection breaks under the unread upload and the pusher gets a
+ * send error in its place, which is the one thing that would leave the operator without
+ * the reason. So the route reads the archive to the end and throws it away first.
+ *
  * **The received archive.** Each transfer now lands under a name of its own, and nothing
  * else in this route ever removes it — the only sweep of the import directory is the admin
  * screen's "delete all". Left behind, a wiki transferred twice would cost twice its size
@@ -29,10 +35,11 @@
  */
 
 import { EventEmitter } from 'node:events';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, type ReadStream } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import type { IUser } from '@growi/core';
 import archiver from 'archiver';
 import express from 'express';
@@ -273,6 +280,65 @@ describe('receive route POST / — the import claim and the received archive', (
     // able to finish, and that is worth asserting.
     releaseBlockedImport();
     expect((await firstInFlight).status).toBe(200);
+  });
+
+  test('holds the refusal back until the archive has finished arriving', async () => {
+    const importStarted = blockImport();
+
+    const firstZip = await writeArchiveZip('in-flight-first.growi.zip', [
+      FIRST_USER,
+    ]);
+    const firstInFlight = postArchive(firstZip).then((res) => res);
+    await importStarted;
+
+    // A body that is still being written for a while after the request arrives, which is
+    // what a real archive looks like and what the small files above finish too fast to be.
+    let uploadEnded = false;
+    let remainingChunks = 10;
+    const archiveStillArriving = new Readable({
+      read() {
+        setTimeout(() => {
+          if (remainingChunks-- > 0) {
+            this.push(Buffer.alloc(1024));
+            return;
+          }
+          uploadEnded = true;
+          this.push(null);
+        }, 20);
+      },
+    });
+
+    const refused = await request(app)
+      .post('/')
+      .set(X_GROWI_TRANSFER_KEY_HEADER_NAME, transferKeyValue)
+      .field('collections', JSON.stringify(['users']))
+      .field(
+        'optionsMap',
+        JSON.stringify({ users: { mode: ImportMode.insert } }),
+      )
+      .field('operatorUserId', OPERATOR_USER_ID)
+      .field('uploadConfigs', JSON.stringify({}))
+      .attach(
+        'transferDataZipFile',
+        // supertest types the part as a file stream, while superagent sends any readable —
+        // and a readable is the only way to keep the body arriving after the request has
+        // begun, which is the whole situation under test.
+        archiveStillArriving as unknown as ReadStream,
+        'refused.growi.zip',
+      );
+
+    expect(refused.status).toBe(409);
+    expect(refused.body.errors[0].code).toBe(G2G_IMPORT_IN_PROGRESS_ERROR_CODE);
+    // The refusal is decided from the headers, so nothing here stops it from being sent
+    // straight away — and sent then, over a body still on its way, it does not reach the
+    // source at all: the connection breaks under the unread upload and the pusher gets a
+    // `write EPIPE` send error in place of the response. Reading the archive to the end
+    // first is what makes the answer above arrive, so that is what this asserts.
+    expect(uploadEnded).toBe(true);
+
+    // Let the transfer this test blocked finish, so it does not outlive the test.
+    releaseBlockedImport();
+    await firstInFlight;
   });
 
   test('accepts the next import after an upload was rejected for not being a zip', async () => {

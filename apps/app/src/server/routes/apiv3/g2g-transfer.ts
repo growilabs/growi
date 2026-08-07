@@ -236,13 +236,30 @@ export const setup = (crowi: Crowi): Router => {
     const lease = importService.acquireImportJob();
 
     if (lease == null) {
-      return res.apiv3Err(
-        new ErrorV3(
-          'Another import is already running on this GROWI.',
-          G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
-        ),
-        409,
-      );
+      const refuse = () =>
+        res.apiv3Err(
+          new ErrorV3(
+            'Another import is already running on this GROWI.',
+            G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+          ),
+          409,
+        );
+
+      if (req.readableEnded) {
+        return refuse();
+      }
+
+      // Read the archive to the end and throw it away before answering. It is never
+      // written anywhere — multer is not reached, so the import directory this refusal
+      // protects stays untouched — but it has to be read, because an answer sent while the
+      // upload is still arriving does not reach the source at all: the connection breaks
+      // under the unread body and the pusher gets a send error (`write EPIPE`) in place of
+      // this response. The operator would then be told the transfer failed for no stated
+      // reason instead of that the destination is already importing. Draining costs the
+      // source the upload it had already committed to; answering early costs it the reason.
+      req.resume();
+      req.once('end', refuse);
+      return;
     }
 
     pendingImportJobs.set(req, lease);
