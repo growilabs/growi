@@ -2,7 +2,6 @@ import { SupportedAction } from '~/interfaces/activity';
 import { prisma } from '~/utils/prisma';
 
 import PageTagRelation from '../models/page-tag-relation';
-import { Revision } from '../models/revision';
 import ApiResponse from '../util/apiResponse';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
@@ -135,8 +134,8 @@ export const setup = (crowi, _app) => {
         );
       }
 
-      const previousRevision = await Revision.findOne({
-        _id: { $eq: revisionId },
+      const previousRevision = await prisma.revisions.findUnique({
+        where: { id: revisionId },
       });
       result.savedPage = await crowi.pageService.updatePage(
         page,

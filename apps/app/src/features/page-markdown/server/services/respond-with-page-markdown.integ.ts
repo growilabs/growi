@@ -5,6 +5,7 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
+import { prisma } from '~/utils/prisma';
 
 import {
   type MarkdownResolution,
@@ -26,13 +27,6 @@ const WORKER_ID = process.env.VITEST_WORKER_ID ?? '1';
 const BASE = `/mdtest-${WORKER_ID}`;
 const ORIGIN = 'https://md.example.test';
 
-type RevisionDoc = {
-  pageId: mongoose.Types.ObjectId;
-  body: string;
-  format: string;
-  author: mongoose.Types.ObjectId;
-};
-
 // Narrow a resolution to its markdown body, failing loudly on passthrough.
 function markdownOf(res: MarkdownResolution): string {
   if (res.type === 'passthrough') {
@@ -47,7 +41,6 @@ describe('respondWithPageMarkdown (integration)', () => {
   let crowi: Crowi;
   let Page: PageModel;
   let User: Model<IUser>;
-  let Revision: Model<RevisionDoc>;
 
   let testUser: HydratedDocument<IUser>;
   let otherUser: HydratedDocument<IUser>;
@@ -75,7 +68,6 @@ describe('respondWithPageMarkdown (integration)', () => {
 
     Page = mongoose.model<PageDocument, PageModel>('Page');
     User = mongoose.model<IUser>('User');
-    Revision = mongoose.model<RevisionDoc>('Revision');
 
     const testUserName = `mdtest-user-${WORKER_ID}`;
     const otherUserName = `mdtest-other-${WORKER_ID}`;
@@ -181,65 +173,90 @@ describe('respondWithPageMarkdown (integration)', () => {
       descendantCount: 1,
     });
 
-    const revisions = await Revision.insertMany([
-      {
-        pageId: hub._id,
-        body: bodyHub,
-        format: 'markdown',
-        author: testUser._id,
-      },
-      {
-        pageId: aaa._id,
-        body: bodyAaa,
-        format: 'markdown',
-        author: testUser._id,
-      },
-      {
-        pageId: bbb._id,
-        body: bodyBbb,
-        format: 'markdown',
-        author: testUser._id,
-      },
-      {
-        pageId: secret._id,
-        body: bodySecret,
-        format: 'markdown',
-        author: otherUser._id,
-      },
-      {
-        pageId: literal._id,
-        body: bodyLiteral,
-        format: 'markdown',
-        author: testUser._id,
-      },
-      {
-        pageId: doc._id,
-        body: bodyDoc,
-        format: 'markdown',
-        author: testUser._id,
-      },
-      {
-        pageId: guardedBase._id,
-        body: bodyGuardedBase,
-        format: 'markdown',
-        author: testUser._id,
-      },
-      {
-        pageId: guardedLiteral._id,
-        body: bodyGuardedLiteral,
-        format: 'markdown',
-        author: otherUser._id,
-      },
+    const [
+      hubRevision,
+      aaaRevision,
+      bbbRevision,
+      secretRevision,
+      literalRevision,
+      docRevision,
+      guardedBaseRevision,
+      guardedLiteralRevision,
+    ] = await Promise.all([
+      prisma.revisions.create({
+        data: {
+          pageId: hub._id.toString(),
+          body: bodyHub,
+          format: 'markdown',
+          authorId: testUser._id.toString(),
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: aaa._id.toString(),
+          body: bodyAaa,
+          format: 'markdown',
+          authorId: testUser._id.toString(),
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: bbb._id.toString(),
+          body: bodyBbb,
+          format: 'markdown',
+          authorId: testUser._id.toString(),
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: secret._id.toString(),
+          body: bodySecret,
+          format: 'markdown',
+          authorId: otherUser._id.toString(),
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: literal._id.toString(),
+          body: bodyLiteral,
+          format: 'markdown',
+          authorId: testUser._id.toString(),
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: doc._id.toString(),
+          body: bodyDoc,
+          format: 'markdown',
+          authorId: testUser._id.toString(),
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: guardedBase._id.toString(),
+          body: bodyGuardedBase,
+          format: 'markdown',
+          authorId: testUser._id.toString(),
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: guardedLiteral._id.toString(),
+          body: bodyGuardedLiteral,
+          format: 'markdown',
+          authorId: otherUser._id.toString(),
+        },
+      }),
     ]);
 
-    hub.revision = revisions[0]._id;
-    aaa.revision = revisions[1]._id;
-    bbb.revision = revisions[2]._id;
-    secret.revision = revisions[3]._id;
-    literal.revision = revisions[4]._id;
-    doc.revision = revisions[5]._id;
-    guardedBase.revision = revisions[6]._id;
-    guardedLiteral.revision = revisions[7]._id;
+    hub.revision = hubRevision._id;
+    aaa.revision = aaaRevision._id;
+    bbb.revision = bbbRevision._id;
+    secret.revision = secretRevision._id;
+    literal.revision = literalRevision._id;
+    doc.revision = docRevision._id;
+    guardedBase.revision = guardedBaseRevision._id;
+    guardedLiteral.revision = guardedLiteralRevision._id;
     await hub.save();
     await aaa.save();
     await bbb.save();

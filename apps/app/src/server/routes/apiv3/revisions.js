@@ -6,12 +6,12 @@ import { param, query } from 'express-validator';
 
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { Revision } from '~/server/models/revision';
 import {
   getAppliedAtForRevisionFilter,
   normalizeLatestRevisionIfBroken,
 } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import { setup as certifySharedPageSetup } from '../../middlewares/certify-shared-page';
@@ -168,31 +168,29 @@ export const setup = (crowi) => {
 
         const appliedAt = await getAppliedAtForRevisionFilter();
 
-        const queryOpts = {
-          offset,
-          sort: { createdAt: -1 },
-          populate: 'author',
-          pagination: false,
-        };
+        const paginationOption = {};
 
         if (limit > 0) {
-          queryOpts.limit = limit;
-          queryOpts.pagination = true;
+          // NOTE: prisma does not accept skip without take
+          paginationOption.limit = limit;
+          paginationOption.offset = offset;
         }
 
         const queryCondition = {
-          pageId: page._id,
-          ...(appliedAt != null && { createdAt: { $gt: appliedAt } }),
+          pageId: page._id.toString(),
+          ...(appliedAt != null && { createdAt: { gt: appliedAt } }),
         };
 
         // https://redmine.weseek.co.jp/issues/151652
-        const paginateResult = await Revision.paginate(
-          queryCondition,
-          queryOpts,
-        );
+        const paginateResult = await prisma.revisions.paginate({
+          where: queryCondition,
+          orderBy: { createdAt: 'desc' },
+          include: { author: true },
+          ...paginationOption,
+        });
 
         paginateResult.docs.forEach((doc) => {
-          if (doc.author != null && doc.author instanceof User) {
+          if (doc.author != null) {
             doc.author = serializeUserSecurely(doc.author);
           }
         });
@@ -205,9 +203,9 @@ export const setup = (crowi) => {
 
         return res.apiv3(result);
       } catch (err) {
-        const msg = 'Error occurred in getting revisions by poge id';
+        const msg = 'Error occurred in getting revisions by page` id';
         logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg, 'faild-to-find-revisions'), 500);
+        return res.apiv3Err(new ErrorV3(msg, 'failed-to-find-revisions'), 500);
       }
     },
   );
@@ -269,9 +267,12 @@ export const setup = (crowi) => {
       }
 
       try {
-        const revision = await Revision.findById(revisionId).populate('author');
+        const revision = await prisma.revisions.findUnique({
+          where: { id: revisionId },
+          include: { author: true },
+        });
 
-        if (revision.author != null && revision.author instanceof User) {
+        if (revision.author != null) {
           revision.author = serializeUserSecurely(revision.author);
         }
 
@@ -279,7 +280,7 @@ export const setup = (crowi) => {
       } catch (err) {
         const msg = 'Error occurred in getting revision data by id';
         logger.error('Error', err);
-        return res.apiv3Err(new ErrorV3(msg, 'faild-to-find-revision'), 500);
+        return res.apiv3Err(new ErrorV3(msg, 'failed-to-find-revision'), 500);
       }
     },
   );

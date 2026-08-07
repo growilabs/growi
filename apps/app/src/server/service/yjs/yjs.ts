@@ -9,8 +9,8 @@ import { docs, setPersistence, setupWSConnection } from 'y-websocket/bin/utils';
 import type { SessionConfig } from '~/interfaces/session-config';
 import type { SyncLatestRevisionBody } from '~/interfaces/yjs';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
-import { Revision } from '../../models/revision';
 import { normalizeLatestRevisionIfBroken } from '../revision/normalize-latest-revision-if-broken';
 import { createIndexes } from './create-indexes';
 import { createMongoDBPersistence } from './create-mongodb-persistence';
@@ -125,13 +125,11 @@ class YjsService implements IYjsService {
     await normalizeLatestRevisionIfBroken(pageId);
 
     // get the latest revision createdAt
-    const result = await Revision.findOne(
-      // filter
-      { pageId },
-      // projection
-      { createdAt: 1 },
-      { sort: { createdAt: -1 } },
-    ).lean();
+    const result = await prisma.revisions.findFirst({
+      where: { pageId },
+      select: { createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
 
     if (result == null) {
       dumpLog(YDocStatus.ISOLATED, { result });

@@ -32,8 +32,8 @@ import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type Crowi from '~/server/crowi';
-import { Revision } from '~/server/models/revision';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import { prisma } from '~/utils/prisma';
 
 import { changesRouteHandlersFactory } from './changes';
 
@@ -123,7 +123,7 @@ function buildApp(userId: Types.ObjectId): express.Express {
 
 describe('Revision routing — /:id([0-9a-fA-F]{24}) constraint vs /changes', () => {
   beforeEach(async () => {
-    await Revision.deleteMany({});
+    await prisma.revisions.deleteMany();
   });
 
   afterEach(() => {

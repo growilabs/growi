@@ -8,6 +8,7 @@ import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { configManager } from '~/server/service/config-manager';
 import SearchService from '~/server/service/search';
+import { prisma } from '~/utils/prisma';
 
 import type { MastraRequestContextShape } from '../types/request-context';
 import { fullTextSearchTool } from './full-text-search-tool';
@@ -116,12 +117,6 @@ describe.skipIf(!hasElasticsearch)(
     let searchService: SearchService;
     let User: Model<IUserHasId>;
     let Page: PageModel;
-    let Revision: Model<{
-      pageId: mongoose.Types.ObjectId;
-      body: string;
-      format: string;
-      author: mongoose.Types.ObjectId;
-    }>;
 
     let userA: IUserHasId;
     let userB: IUserHasId;
@@ -163,14 +158,14 @@ describe.skipIf(!hasElasticsearch)(
     }): Promise<Seeded> => {
       const { path, grant, creator, token, grantedUsers = [] } = opts;
       const pageId = new mongoose.Types.ObjectId();
-      const [revision] = await Revision.insertMany([
-        {
-          pageId,
+      const revision = await prisma.revisions.create({
+        data: {
+          pageId: pageId.toString(),
           body: `This page mentions ${token} in its content.`,
           format: 'markdown',
-          author: creator._id,
+          authorId: creator._id,
         },
-      ]);
+      });
       const [page] = await Page.insertMany([
         {
           _id: pageId,
@@ -265,7 +260,6 @@ describe.skipIf(!hasElasticsearch)(
 
       User = mongoose.model<IUserHasId>('User');
       Page = mongoose.model<PageDocument, PageModel>('Page');
-      Revision = mongoose.model('Revision');
 
       const userAName = `agentic-search-realint-userA-${WORKER_ID}`;
       const userBName = `agentic-search-realint-userB-${WORKER_ID}`;
@@ -336,7 +330,9 @@ describe.skipIf(!hasElasticsearch)(
       const seedIds = seeds.map((s) => s.id);
       try {
         await Page?.deleteMany({ _id: { $in: seedIds } });
-        await Revision?.deleteMany({ pageId: { $in: seedIds } });
+        await prisma.revisions.deleteMany({
+          where: { pageId: { in: seedIds } },
+        });
         await User?.deleteMany({ _id: { $in: [userA?._id, userB?._id] } });
       } catch {
         // ignore
