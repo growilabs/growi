@@ -104,7 +104,8 @@ feed-parser(zod: bodyFormat 追加) → news-cron-service → NewsItem model
 
 ```
 apps/app/src/features/news/client/components/
-├── NewsMarkdownBody.tsx            # 制限レンダラ本体(RevisionRenderer 相当 + news options)
+├── NewsMarkdownBody.tsx            # 制限レンダラ本体(react-markdown + react-error-boundary の薄いラッパ + news options)
+├── NewsMarkdownBody.module.scss    # ニュース本文の最小スコープスタイル(下記「スタイリング」参照)
 └── NewsMarkdownBody.spec.tsx
 apps/app/src/features/news/client/services/
 ├── news-markdown-options.ts        # react-markdown option generator(remark/rehype 構成 + sanitize schema 適用)
@@ -239,6 +240,16 @@ gap で挙げた案I(取込時)/案II(描画時)のうち **案II(rehype プラ�
 **多層防御**: ①`rehype-raw` を含めない(生 HTML を parse しない)→ ②`rehypeResolveNewsMedia`(メディアを同一オリジン+封じ込めに限定)→ ③`rehype-sanitize`(タグ/属性/プロトコルの許可)。いずれか一層が漏らしても次で止まる。
 
 **技術は再利用・設定は隔離**: react-markdown/rehype の**機構**は Wiki と共通のものを使う(実績・保守性)。隔離するのは寛容な**設定(スキーマ+プラグイン集合)**のみ。「一から別レンダラを書く」わけではない。
+
+## スタイリング(スコープ CSS)
+
+Wiki の `.wiki` スタイル面を意図的に流用しないため(上記)、`.wiki` が担っていた見た目(テーブル罫線・リンクの色/下線など)はニュース側で別途用意する必要がある。これを `NewsMarkdownBody.module.scss` の**ニュース本文ラッパ1クラス**に閉じ、子孫セレクタ(`.news-markdown-body table` / `... a` 等)で最小限だけ付与する。テーマ対応のため Bootstrap の CSS 変数(`--bs-border-color` / `--bs-tertiary-bg` / `--bs-link-color`)を用いる。
+
+- 対象は表示のみ(罫線・パディング・ヘッダ背景・リンク色/下線)。アーキテクチャ・sanitize・契約には影響しない
+- sanitize は本文由来の `class` を除去するが、この CSS はラッパクラスの子孫セレクタで当てるため本文側にクラスを付ける必要がなく、sanitize と独立
+- 将来 Markdown で使う要素(引用・コードブロック等)の見た目が必要になったら、同じ module に追記する
+
+> 経緯: この節はローカルスモークで「表が平文に見える / 本文リンクが本文色のまま」と判明したため追記した後追い記録。`.wiki` 非流用の帰結としての穴埋めであり、設計方針(Wiki スタイルからの隔離)とは整合する additive な追加。
 
 ## SSR について(確定)
 

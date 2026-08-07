@@ -54,7 +54,8 @@
   - _Requirements: 1.3, 2.2, 2.4, 3.4, 4.2_
 
 - [ ] 3.4 NewsMarkdownBody コンポーネントを実装する
-  - `client/components/NewsMarkdownBody.tsx` を新設。react-markdown(または RevisionRenderer 相当)+ newsMarkdownOptions で body(ロケール解決済み文字列)を描画。ErrorBoundary で最悪時もページを保つ
+  - `client/components/NewsMarkdownBody.tsx` を新設。react-markdown + react-error-boundary の薄いラッパ + newsMarkdownOptions で body(ロケール解決済み文字列)を描画。ErrorBoundary で最悪時もページを保つ
+  - `.wiki` を流用しないため、`NewsMarkdownBody.module.scss` にニュース本文の最小スタイル(テーブル罫線/パディング・リンク色/下線、Bootstrap CSS 変数でテーマ対応)をラッパ1クラスの子孫セレクタで用意する
   - `NewsMarkdownBody.spec.tsx`: 見出し/リスト/強調/リンク/複数画像が要素として描画される、生 HTML(<video>,<script>)が実行・描画されない、非同一オリジン/非 https img が出ない、取得失敗で当該 img のみ消える、外部リンクが target=_blank rel=noopener noreferrer
   - _Depends: 3.3_
   - _Boundary: NewsMarkdownBody_
