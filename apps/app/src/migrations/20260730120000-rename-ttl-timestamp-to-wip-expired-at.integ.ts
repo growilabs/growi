@@ -10,8 +10,8 @@
  *    full window from the migration instead of feeding the first cleanup run;
  *  - a legacy page that has descendants is exempted (field dropped, no expiry
  *    granted), mirroring makeWip()'s `disableTtl`;
- *  - the orphaned-empty-page sweep runs first, so "has descendants" is judged
- *    against the cleaned tree;
+ *  - no page is deleted: orphaned empty placeholders are left for the admin page
+ *    tree repair, so "has descendants" is judged against the uncleaned tree;
  *  - the TTL index is replaced by a plain one;
  *  - re-running is a no-op, and down() round-trips.
  *
@@ -175,10 +175,12 @@ describe('rename-ttl-timestamp-to-wip-expired-at', () => {
     expect(doc?.wipExpiredAt).toBeUndefined();
   });
 
-  it('sweeps orphaned empty pages before judging descendants', async () => {
-    // The only child is a childless empty placeholder, which the sweep removes.
-    // Judged after the sweep, this page IS childless and must get an expiry —
-    // running the conversion first would exempt it forever.
+  it('deletes no page, and exempts a legacy page whose only child is an orphaned empty one', async () => {
+    // This migration repairs the expiry field only — removing orphaned placeholders
+    // belongs to the admin page tree repair. So the placeholder survives, and since
+    // it still counts as a child, its parent is exempted instead of being granted an
+    // expiry. That is the safe direction: a migration must never delete pages, which
+    // is what this asserts.
     const parent = track(new ObjectId());
     const ghost = track(new ObjectId());
     await pages.insertMany([
@@ -194,9 +196,13 @@ describe('rename-ttl-timestamp-to-wip-expired-at', () => {
 
     await migrate.up(db);
 
-    expect(await pages.findOne({ _id: ghost })).toBeNull();
+    expect(await pages.findOne({ _id: ghost })).not.toBeNull();
     const doc = await pages.findOne({ _id: parent });
-    expect((doc?.wipExpiredAt as Date).getTime()).toBe(expectedExpiry.getTime());
+    // Asserted before the field checks below: on a null doc both of them read
+    // undefined and would pass vacuously.
+    expect(doc).not.toBeNull();
+    expect(doc?.ttlTimestamp).toBeUndefined();
+    expect(doc?.wipExpiredAt).toBeUndefined();
   });
 
   it('replaces the TTL index with a plain index', async () => {
@@ -253,6 +259,51 @@ describe('rename-ttl-timestamp-to-wip-expired-at', () => {
       (afterFirst?.wipExpiredAt as Date).getTime(),
     );
     expect(afterSecond?.ttlTimestamp).toBeUndefined();
+  });
+
+  it('converts every page when the stream spans more than one batch', async () => {
+    // The conversion streams and flushes per batch, so the batch boundary is control
+    // flow no other fixture here reaches. The classic bug in that shape is dropping the
+    // trailing partial batch, leaving those pages with no expiry at all.
+    //
+    // Mirrors BATCH_SIZE in the migration. If that grows, raise this — otherwise the
+    // stream fits in one batch and this stops testing the boundary.
+    const MIGRATION_BATCH_SIZE = 1000;
+    const total = MIGRATION_BATCH_SIZE + 1;
+    // All overdue, so every page takes the re-grant branch and shares one instant.
+    const longOverdue = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const ids = Array.from({ length: total }, () => track(new ObjectId()));
+    await pages.insertMany(
+      ids.map((_id, i) => ({
+        _id,
+        path: `/mig-bulk-${i}`,
+        isEmpty: false,
+        wip: true,
+        ttlTimestamp: longOverdue,
+      })),
+    );
+
+    await migrate.up(db);
+
+    // Counts what was granted, not what is absent: a page left behind by a dropped
+    // final batch loses ttlTimestamp to the exemption either way.
+    expect(
+      await pages.countDocuments({
+        _id: { $in: ids },
+        wipExpiredAt: { $ne: null },
+      }),
+    ).toBe(total);
+    expect(
+      await pages.countDocuments({
+        _id: { $in: ids },
+        ttlTimestamp: { $ne: null },
+      }),
+    ).toBe(0);
+    // One instant across both batches. Recomputing it per batch would smear these
+    // across the run and contradict the expiry time the warning log quotes.
+    expect(
+      await pages.distinct('wipExpiredAt', { _id: { $in: ids } }),
+    ).toHaveLength(1);
   });
 
   it('down() restores the original stored value and the TTL index', async () => {

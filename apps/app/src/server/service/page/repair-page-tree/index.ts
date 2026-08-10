@@ -32,15 +32,13 @@ export const isRepairPageTreeRunning = (): boolean => isRunning;
  *
  * Both halves walk the whole page collection, which is why this is exposed as an
  * admin-triggered maintenance action rather than a cron or a boot-time step. The
- * one-time migration performs the equivalent repair for the upgrade itself; this is
- * the operator's tool for wikis that need it again later.
+ * ttlTimestamp -> wipExpiredAt migration leaves the damage in place for the same
+ * reason and logs a pointer here, so this is the only thing that repairs it.
  *
  * Removal runs first so the recount walks a smaller tree. This is an efficiency
  * choice, not a correctness one: `recountDescendantCount` already excludes empty
  * pages from the count and the recount is bottom-up, so a placeholder contributes 0
- * whether or not it has been removed yet. (The one-time migration's equivalent
- * ordering IS load-bearing — there the sweep decides which legacy pages count as
- * having descendants.)
+ * whether or not it has been removed yet.
  *
  * @throws if a repair is already running in this process (see isRunning)
  */

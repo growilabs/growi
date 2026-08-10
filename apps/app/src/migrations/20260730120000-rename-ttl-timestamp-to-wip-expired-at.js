@@ -12,33 +12,17 @@ const WIP_EXPIRED_AT_INDEX_NAME = 'wipExpiredAt_1';
 const DEFAULT_WIP_PAGE_EXPIRATION_SECONDS = 172800;
 
 /**
- * Backstops a data anomaly (e.g. a parent cycle) from spinning forever. Caps the
- * depth of the cascade, not how many pages can be removed.
- */
-const MAX_EMPTY_CLEANUP_PASSES = 100;
-
-/**
- * Bounds every id array this migration puts in a query. It runs at boot against a
- * collection of unknown size, and an unbounded `$in` breaches the 16 MB BSON limit
- * and fails the upgrade.
+ * Bounds both the size of each query and how many documents are resident. This runs
+ * at boot against a collection of unknown size: an unbounded `$in` breaches the 16 MB
+ * BSON limit, and materializing every legacy page costs hundreds of MB.
  */
 const BATCH_SIZE = 1000;
-
-/** Runs `fn` over `items` in BATCH_SIZE slices and concatenates the results. */
-async function inBatches(items, fn) {
-  const results = [];
-  for (let i = 0; i < items.length; i += BATCH_SIZE) {
-    results.push(...(await fn(items.slice(i, i + BATCH_SIZE))));
-  }
-  return results;
-}
 
 /**
  * This migration uses the raw `db` handle only — no mongoose models, no service
  * imports. A migration must keep working against the schema as it stood at this
  * point in history; importing application code that continues to evolve makes it
- * rot silently. (This is also why the empty-leaf sweep below is inlined rather
- * than shared with the runtime maintenance path.)
+ * rot silently.
  */
 
 async function dropIndexIfExists(db, collectionName, indexName) {
@@ -87,136 +71,6 @@ async function resolveWipPageExpirationSeconds(db) {
 }
 
 /**
- * Deletes a batch of childless empty pages and returns their parents, so the caller
- * can climb one level.
- *
- * The service equivalent re-verifies childlessness and `isEmpty` before deleting
- * because it runs against a live site. This copy needs neither: a migration runs at
- * boot, before the server accepts requests.
- */
-async function deleteEmptyLeafBatch(collection, candidates) {
-  const ids = candidates.map((p) => p._id);
-  const res = await collection.deleteMany({ _id: { $in: ids } });
-  return {
-    removed: res.deletedCount ?? 0,
-    parentIds: candidates.map((p) => p.parent).filter((id) => id != null),
-  };
-}
-
-/** Scans the whole collection for childless empty pages, one bounded batch at a time. */
-async function sweepAllEmptyLeaves(collection) {
-  let removed = 0;
-  const parentIds = [];
-
-  for (;;) {
-    const batch = await collection
-      .aggregate([
-        { $match: { isEmpty: true, path: { $ne: '/' } } },
-        {
-          $lookup: {
-            from: PAGES,
-            localField: '_id',
-            foreignField: 'parent',
-            pipeline: [{ $limit: 1 }, { $project: { _id: 1 } }],
-            as: 'children',
-          },
-        },
-        { $match: { children: { $size: 0 } } },
-        { $project: { _id: 1, parent: 1 } },
-        { $limit: BATCH_SIZE },
-      ])
-      .toArray();
-
-    if (batch.length === 0) {
-      return { removed, parentIds };
-    }
-
-    const res = await deleteEmptyLeafBatch(collection, batch);
-    removed += res.removed;
-    parentIds.push(...res.parentIds);
-
-    // No $skip needed: candidates are deleted unconditionally, so the next scan
-    // cannot return the same batch.
-  }
-}
-
-/** Re-examines the parents of what the previous pass removed. */
-async function sweepCandidates(collection, candidateIds) {
-  let removed = 0;
-  const parentIds = [];
-
-  for (let i = 0; i < candidateIds.length; i += BATCH_SIZE) {
-    const ids = candidateIds.slice(i, i + BATCH_SIZE);
-    const candidates = await collection
-      .find(
-        { _id: { $in: ids }, isEmpty: true, path: { $ne: '/' } },
-        { projection: { _id: 1, parent: 1 } },
-      )
-      .toArray();
-
-    if (candidates.length === 0) {
-      continue;
-    }
-    const stillChildless = await filterChildless(collection, candidates);
-    if (stillChildless.length === 0) {
-      continue;
-    }
-    const res = await deleteEmptyLeafBatch(collection, stillChildless);
-    removed += res.removed;
-    parentIds.push(...res.parentIds);
-  }
-
-  return { removed, parentIds };
-}
-
-/** Of the given pages, the ones that have no children. */
-async function filterChildless(collection, candidates) {
-  const ids = candidates.map((p) => p._id);
-  const withChildren = new Set(
-    (await collection.distinct('parent', { parent: { $in: ids } })).map(String),
-  );
-  return candidates.filter((p) => !withChildren.has(String(p._id)));
-}
-
-/**
- * An empty page is a structural placeholder that only connects a real descendant to
- * its ancestors; once childless it serves no purpose. Historically the TTL index
- * deleted WIP pages without running application code, so the placeholders that only
- * hosted them were orphaned.
- *
- * Deleting one can leave its (also empty) parent childless, so the cascade repeats —
- * but only over the parents of what was just removed, since nothing else can have
- * become childless as a result of this run. Re-scanning the whole collection per
- * cascade level would be a real cost at boot.
- */
-async function removeEmptyLeafHierarchies(db) {
-  const collection = db.collection(PAGES);
-
-  const first = await sweepAllEmptyLeaves(collection);
-
-  let totalRemoved = first.removed;
-  let candidateIds = first.parentIds;
-  let pass = 1;
-
-  for (; pass < MAX_EMPTY_CLEANUP_PASSES && candidateIds.length > 0; pass++) {
-    const res = await sweepCandidates(collection, candidateIds);
-    if (res.removed === 0) {
-      return totalRemoved;
-    }
-    totalRemoved += res.removed;
-    candidateIds = res.parentIds;
-  }
-
-  if (candidateIds.length > 0) {
-    logger.warn(
-      `Empty-leaf cleanup stopped at the ${MAX_EMPTY_CLEANUP_PASSES}-pass limit; orphaned empty pages may remain. This suggests a structural anomaly (e.g. a parent cycle).`,
-    );
-  }
-
-  return totalRemoved;
-}
-
-/**
  * Migrates WIP page expiry from a MongoDB TTL index to application-driven deletion.
  *
  * WHY the field is CONVERTED, not renamed:
@@ -246,21 +100,20 @@ async function removeEmptyLeafHierarchies(db) {
  *   non-leaf" state. They get the legacy field dropped and no expiry, which is the
  *   state `makeWip()` would have produced had the children existed at creation.
  *
- * Ordering matters: the orphaned-empty-page sweep runs BEFORE the conversion, so
- * "has descendants" is evaluated against the cleaned tree rather than against
- * placeholders that are about to disappear.
+ * NOTE: this repairs the expiry field only. Inflated `descendantCount` values and
+ * orphaned empty pages are the admin page tree repair's job (see the warning at the
+ * end of `up`) — a boot-time migration must not stall an upgrade on a full scan.
  *
- * NOTE: this does NOT repair `descendantCount` values inflated by past TTL
- * deletions — that recount is a separate, admin-triggered maintenance operation.
+ * Consequence: "has descendants" is judged against the uncleaned tree, so a page
+ * whose only children are orphaned placeholders is exempted rather than given an
+ * expiry. Nothing is deleted, but it stays WIP with no expiry even after the repair
+ * removes those placeholders, and must be published or deleted by hand.
  */
 export async function up(db) {
   logger.info('Apply migration: ttlTimestamp -> wipExpiredAt');
 
   // Drop the TTL index FIRST so the TTL monitor cannot delete pages midway through.
   await dropIndexIfExists(db, PAGES, TTL_INDEX_NAME);
-
-  const removed = await removeEmptyLeafHierarchies(db);
-  logger.info(`Removed ${removed} orphaned empty page(s)`);
 
   const expirationSeconds = await resolveWipPageExpirationSeconds(db);
   const expirationMs = expirationSeconds * 1000;
@@ -270,57 +123,91 @@ export async function up(db) {
 
   const collection = db.collection(PAGES);
 
-  const legacyDocs = await collection
-    .find(
-      { ttlTimestamp: { $ne: null } },
-      { projection: { _id: 1, ttlTimestamp: 1 } },
-    )
-    .toArray();
-  const legacyIds = legacyDocs.map((doc) => doc._id);
-
-  // Resolve "has descendants" from the parent links, NOT from descendantCount:
-  // inflating descendantCount is precisely the corruption this PR exists to fix,
-  // so the stored counter cannot be trusted here.
-  const idsWithChildren = await inBatches(legacyIds, (ids) =>
-    collection.distinct('parent', { parent: { $in: ids } }),
-  );
-  const idsWithChildrenSet = new Set(idsWithChildren.map(String));
-  const expirableDocs = legacyDocs.filter(
-    (doc) => !idsWithChildrenSet.has(String(doc._id)),
-  );
-  const expirableIds = expirableDocs.map((doc) => doc._id);
-
-  // One instant for both bounds, so the count logged below describes exactly the
-  // documents the update re-grants.
+  // Decided once, before the first batch: the warning below quotes `regrantedExpiry`,
+  // so a per-batch value would make it wrong for every batch but the last.
   const migratedAt = new Date();
   // `ttlTimestamp + expirationMs < migratedAt`, restated as a bound on the stored
   // value so the pipeline and the JS count compare identically.
   const overdueBefore = new Date(migratedAt.getTime() - expirationMs);
   const regrantedExpiry = new Date(migratedAt.getTime() + expirationMs);
 
-  const convertedCounts = await inBatches(expirableIds, async (ids) => {
-    const res = await collection.updateMany({ _id: { $in: ids } }, [
-      {
-        $set: {
-          wipExpiredAt: {
-            $cond: [
-              { $lt: ['$ttlTimestamp', overdueBefore] },
-              regrantedExpiry,
-              { $add: ['$ttlTimestamp', expirationMs] },
-            ],
+  let convertedCount = 0;
+  let regranted = 0;
+  let buffer = [];
+
+  // Releasing the buffer is what keeps memory flat — batching the queries alone does
+  // not, which is what the earlier `find().toArray()` got wrong.
+  const flush = async () => {
+    if (buffer.length === 0) {
+      return;
+    }
+    const batch = buffer;
+    buffer = [];
+
+    // Resolve "has descendants" from the parent links, NOT from descendantCount:
+    // inflating descendantCount is precisely the corruption this PR exists to fix,
+    // so the stored counter cannot be trusted here. Per batch is equivalent to one
+    // global pass — whether a page has a child depends on that page alone.
+    const ids = batch.map((doc) => doc._id);
+    const idsWithChildren = new Set(
+      (await collection.distinct('parent', { parent: { $in: ids } })).map(String),
+    );
+    const expirable = batch.filter(
+      (doc) => !idsWithChildren.has(String(doc._id)),
+    );
+    if (expirable.length === 0) {
+      return;
+    }
+
+    const res = await collection.updateMany(
+      { _id: { $in: expirable.map((doc) => doc._id) } },
+      [
+        {
+          $set: {
+            wipExpiredAt: {
+              $cond: [
+                { $lt: ['$ttlTimestamp', overdueBefore] },
+                regrantedExpiry,
+                { $add: ['$ttlTimestamp', expirationMs] },
+              ],
+            },
           },
         },
-      },
-      { $unset: 'ttlTimestamp' },
-    ]);
-    return [res.modifiedCount ?? 0];
-  });
-  const convertedCount = convertedCounts.reduce((a, b) => a + b, 0);
+        { $unset: 'ttlTimestamp' },
+      ],
+    );
+    convertedCount += res.modifiedCount ?? 0;
+    regranted += expirable.filter(
+      (doc) => doc.ttlTimestamp < overdueBefore,
+    ).length;
+  };
+
+  // Streamed rather than materialized — the TTL index is already dropped, so this is a
+  // full scan, and reading it all in cost hundreds of MB at boot on a large wiki.
+  //
+  // Writing while the cursor is open is safe: only already-returned documents are
+  // written, and WiredTiger updates in place, so no unread document is pushed past the
+  // scan position. Re-querying with a limit instead would never terminate — pages with
+  // descendants keep `ttlTimestamp` until the exemption below.
+  const cursor = collection
+    .find(
+      { ttlTimestamp: { $ne: null } },
+      { projection: { _id: 1, ttlTimestamp: 1 } },
+    )
+    .batchSize(BATCH_SIZE);
+
+  for await (const doc of cursor) {
+    buffer.push(doc);
+    if (buffer.length >= BATCH_SIZE) {
+      await flush();
+    }
+  }
+  // The trailing partial batch: without this the exemption below strips its legacy
+  // field as if those pages had children, leaving them with no expiry.
+  await flush();
+
   logger.info(`Converted ${convertedCount} page(s) to wipExpiredAt`);
 
-  const regranted = expirableDocs.filter(
-    (doc) => doc.ttlTimestamp < overdueBefore,
-  ).length;
   if (regranted > 0) {
     logger.warn(
       `${regranted} page(s) were already past their expiry before this migration ` +
@@ -350,18 +237,13 @@ export async function up(db) {
     { name: WIP_EXPIRED_AT_INDEX_NAME, sparse: true },
   );
 
-  // Recounting descendantCount is deliberately NOT done here: it is one aggregate
-  // per page over the whole collection, and a boot-time migration is the wrong
-  // place to stall an upgrade for an unbounded time. Instead, tell the operator —
-  // but only when this instance actually carries TTL-era data, so a fresh install
-  // stays silent. These counters are already computed above, so the check is free.
-  const wasAffectedByTtlDeletion =
-    removed > 0 || convertedCount > 0 || exempted.modifiedCount > 0;
+  const wasAffectedByTtlDeletion = convertedCount > 0 || exempted.modifiedCount > 0;
   if (wasAffectedByTtlDeletion) {
     logger.warn(
       'This instance previously used TTL-based WIP page expiry, which deleted pages ' +
         'without running application code, so some descendantCount values may be too ' +
-        'high. To correct them, enable maintenance mode and run the page tree repair ' +
+        'high and there is a possibility that old empty pages exist that cannot be cleaned ' +
+        'up automatically. To correct this, enable maintenance mode and run the page tree repair ' +
         'from Admin > App Settings.',
     );
   }
@@ -390,9 +272,7 @@ export async function down(db) {
     { name: TTL_INDEX_NAME, expireAfterSeconds: expirationSeconds },
   );
 
-  // Three things are deliberately NOT restored:
-  // - the empty pages removed by up(): structural placeholders with no content,
-  //   and the information needed to recreate exactly those is gone;
+  // Two things are deliberately NOT restored:
   // - the legacy field on pages exempted for having descendants: they end up with
   //   neither field, so the recreated TTL index cannot delete them. That is the
   //   safe direction — it is what `disableTtl` intended for them all along;
