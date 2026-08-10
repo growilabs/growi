@@ -694,22 +694,46 @@ interface SessionInvalidationResult {
 }
 
 /**
- * store だけでは MongoDB 経路を書けない（`connect-mongo` は `all()` でセッション ID を返さず、
- * store から `sessions` コレクションへ到達する公開 API も無い）。
- * したがってコレクションへの到達手段も受け取る。
+ * 選んだ手段そのものを運ぶ（8.1 の実装で確定した形）。
+ *
+ * 当初は `{ store, sessionsCollection? }` という 1 つの型にしていたが、その形だと Redis 構成が
+ * `sessionsCollection == null` になるため、`canSelectSessions` が「これは Redis か」をもう一度
+ * 判定しないと真を返せない。上の Responsibilities が禁じている 2 回目の判定がそこで復活する。
+ * 種類で分けた型にすると「対応していると申告できるのに破棄する手段が無い」状態を型として作れず、
+ * 破棄する側（9.2）も取りこぼしの無い分岐で書ける。
  */
-interface SessionAccess {
-  readonly store: import('express-session').Store;
-  /** MongoDB のときだけ渡す。`session` フィールドは既定で文字列なので JSON として解析する */
-  readonly sessionsCollection?: import('mongodb').Collection;
+type SessionAccess =
+  /** セッションが MongoDB のドキュメント。このコレクションで選んで消す */
+  | {
+      readonly kind: 'sessions-collection';
+      readonly store: import('express-session').Store;
+      readonly sessionsCollection: import('mongodb').Collection<StoredSessionDocument>;
+    }
+  /** store 自身の列挙がセッション ID を返すので `all` / `destroy` で足りる */
+  | { readonly kind: 'store-enumeration'; readonly store: import('express-session').Store }
+  /** 1 件を選び出す手段が無い。破棄は行わず、その事実を申告する */
+  | { readonly kind: 'unsupported' };
+
+/** `connect-mongo` の保存形。ドキュメントの `_id` がセッション ID で、`session` は既定で文字列 */
+interface StoredSessionDocument {
+  _id: string;
+  session: string;
+  expires?: Date;
 }
+
+/**
+ * 設定された store（`crowi.sessionConfig.store`）を渡して手段を決める。
+ * コレクションは store 自身の `collectionP` から取る（mongoose の接続から名前を推測しない。
+ * コレクション名もデータベースも store の設定なので、推測が外れると 1 件も消さずに成功を返す）。
+ */
+function resolveSessionAccess(store: unknown): Promise<SessionAccess>;
 
 function invalidateSessionsExcept(
   access: SessionAccess,
   keepUserIds: readonly string[],
 ): Promise<SessionInvalidationResult>;
 
-/** 「セッション ID 付きで対象を選べるか」で判定する（`all` の有無で判定しない） */
+/** `resolveSessionAccess` が選んだ手段だけを読む（`all` の有無で判定しない） */
 function canSelectSessions(access: SessionAccess): boolean;
 ```
 

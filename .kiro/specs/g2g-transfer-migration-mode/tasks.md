@@ -160,7 +160,7 @@
   - _Boundary: g2g-transfer-transferability, PusherService_
 
 - [ ] 8. 転送前の点検の経路を作る
-- [ ] 8.1 受信側が自分の状態を答える
+- [x] 8.1 受信側が自分の状態を答える
   - 移行先の件数（ユーザー・ユーザーグループ・ページ）、パスワードの種の指紋、ログインできる管理者の数、セッションを選んで無効化できる保存先かどうかを、既存の状態を答える口に足す。
   - 種は**一方向のハッシュだけを送る**。値そのものは送らない。件数は数値のみで、ユーザー名やメールアドレスは返さない。
   - セッションを選べるかの判定と、後段で実際に破棄するときに使う手段を、**同じ判定から作る**（別々に作ると「対応している」と申告して 1 件も破棄しない状態になる）。
@@ -276,5 +276,7 @@
 - **9.3 / 10.3 は救済の結果をそのまま移行元へ返してはいけない**（7.2 のレビューで判明）。`AdminRescuePlan` は再投入のためのデータなので、移行先の管理者のパスワードのハッシュ・`apiToken`・アクセストークンの `tokenHash` を含む。design.md の `ImportCollectionsResult.rescue: AdminRescuePlan | null` を文字どおり実装して進捗通知に載せると、それらが移行元のサーバを経由して移行元の管理者のブラウザまで届く。通知に必要な値（`originalUsername` / `rescuedUsername` / `emailRemoved` / `slackMemberIdRemoved` / `idReassigned` / `notLoginable`）は別のフィールドに分かれているので、応答本体を組み立てる側でそれだけを取り出すこと。
 - **9.3 が移行先の管理者を読むときの読み方**（7.2 の実装メモ）。管理者は `lean()` か明示的な projection で読む（`toObject()` は `password` / `apiToken` を落とすため救済に使えない）。アクセストークンは `tokenHash` と `user` を含む projection で読む（`findTokenByUserId` は使えない）。
 - **8.1 は `IDataGROWIInfo` に警告用の 3 フィールドを足すだけで足りる**（7.3 の実装）。判定側の型 `TransferabilityDestination` は `TransferabilityBlockerDestination` を継承する形になっており、`IDataGROWIInfo` がフィールドを満たせば構造的に代入できる。判定モジュール側の書き換えは要らない。あわせて `IDataGROWIInfo.fileUploadDisabled` は 7.3 でどこからも読まれない値になったので、8.1 で同じ型を触るときに廃止するか判定へ戻すかを決めること。
+- **`IDataGROWIInfo.fileUploadDisabled` は 8.1 で廃止した**（OpenAPI の記述も削除）。`attachmentInfo.type === 'none'` と同じ事実を同じオブジェクトに二重に持っていただけで、読む側はもう居ない。バージョンが違う相手との組み合わせは、そもそもバージョン不一致が先頭の中断事由になって早く止まるので問題にならない。
+- **セッションの手段は design.md の契約どおり**（8.1 で `SessionAccess` の記述を実装に合わせて更新済み）。9.2 は `resolveSessionAccess` が返す 3 種類を取りこぼしなく分岐すればよく、`canSelectSessions` を作り直す必要はない。
 - **中断事由の判定と警告の判定は入口が分かれている**（7.3 のレビューで確定）。`evaluateBlockers` は警告用の入力を持たない呼び出し元のためのもので、8.2 の点検の口は `evaluateTransferability` を呼ぶ。警告用の 4 入力は「未確認」を表す無難な値が存在しない（どれも警告が出ない側に倒れてしまう）ため、必須フィールドとして型で作れなくしてある。省略可能に戻さないこと。
 - **識別子は必ず文字列にそろえてから比べる**（7.2 のレビューで判明）。`lean()` で読むと `_id` も参照フィールドも `ObjectId` になるため、片側だけ文字列のまま比べると一致せず、静かに 0 件になる。試験の fixture が両側とも 16 進文字列だとこの取り違えを検出できない。

@@ -1,7 +1,8 @@
+import { createHash } from 'node:crypto';
 import type { ReadStream } from 'node:fs';
 import { createReadStream } from 'node:fs';
 import { ConfigSource } from '@growi/core';
-import type { IUser } from '@growi/core/dist/interfaces';
+import type { IUser, IUserHasId } from '@growi/core/dist/interfaces';
 // biome-ignore lint/style/noRestrictedImports: TODO: check effects of using custom axios
 import rawAxios, { type AxiosRequestConfig } from 'axios';
 import * as FormDataModule from 'form-data';
@@ -37,6 +38,10 @@ import { configManager } from './config-manager';
 import type { ConfigKey } from './config-manager/config-definition';
 import { exportService } from './export';
 import {
+  canSelectSessions,
+  resolveSessionAccess,
+} from './g2g-transfer-session-invalidation';
+import {
   describeBlocker,
   evaluateBlockers,
   type TransferBlocker,
@@ -46,6 +51,7 @@ import {
   type UniqueConflictReport,
 } from './import/detect-unique-conflicts';
 import { generateOverwriteParams } from './import/overwrite-params';
+import { isLoginable } from './import/rescue-admins';
 
 const logger = loggerFactory('growi:service:g2g-transfer');
 
@@ -121,16 +127,44 @@ type FileUploadConfigs = { [key in (typeof UPLOAD_CONFIG_KEYS)[number]]: any };
 
 /**
  * Data used for comparing to/from GROWI information
+ *
+ * This is everything the source is ever told about the destination, and the whole input
+ * to the transferability judgement (`evaluateTransferability`, which this type satisfies
+ * structurally). It carries counts, a fingerprint and flags — never a user name, an
+ * address or a secret (requirement 3.6 and the Security Considerations of design.md).
  */
 export type IDataGROWIInfo = {
   /** GROWI version */
   version: string;
   /** Max user count */
   userUpperLimit: number | null; // Handle null as Infinity
-  /** Whether file upload is disabled */
-  fileUploadDisabled: boolean;
   /** Total file size allowed */
   fileUploadTotalLimit: number | null; // Handle null as Infinity
+  /**
+   * How much of the destination a migration transfer would delete, so the operator sees
+   * it before the archive is built (requirement 3.1). Counts only — the operator is being
+   * shown a size, not the contents.
+   */
+  destinationCounts: {
+    users: number;
+    userGroups: number;
+    pages: number;
+  };
+  /** One-way hash of this GROWI's password seed; see {@link computePasswordSeedFingerprint}. */
+  passwordSeedFingerprint: string;
+  /**
+   * Administrators who are active *and* have a password hash, i.e. the accounts the
+   * rescue would keep able to log in. Reported as "how many can", not "how many cannot",
+   * so `=== 0` answers requirement 3.5 exactly: an administrator being suspended is not
+   * by itself a reason to warn while others can still get in.
+   */
+  loginableAdminCount: number;
+  /**
+   * Whether the sessions of replaced users can actually be invalidated here
+   * (requirement 3.7). Decided by the same resolution that later performs the
+   * invalidation — see `g2g-transfer-session-invalidation.ts`.
+   */
+  sessionStoreSupportsEnumeration: boolean;
   /** Attachment infromation */
   attachmentInfo: {
     /** File storage type */
@@ -160,6 +194,23 @@ interface FileMeta {
   /** File size in bytes */
   size: number;
 }
+
+/**
+ * One-way fingerprint of a password seed, for the two GROWIs to compare theirs without
+ * either of them learning the other's (requirement 3.6).
+ *
+ * The seed is what every password hash on a GROWI is derived from (`generatePassword` in
+ * `models/user/index.js` hashes `PASSWORD_SEED + password`), so it must not travel; what
+ * the source needs is only whether the destination's differs from its own, which would
+ * mean the migrated users cannot log in with the passwords they had.
+ *
+ * A GROWI started without `PASSWORD_SEED` is fingerprinted like any other value rather
+ * than treated as "unknown": the hashing above concatenates the seed as-is, so two such
+ * GROWIs really do share their users' hashes, and one with a seed really does not.
+ */
+export const computePasswordSeedFingerprint = (
+  seed: string | undefined,
+): string => createHash('sha256').update(String(seed)).digest('hex');
 
 /**
  * Return type for {@link Pusher.getTransferability}
@@ -937,14 +988,59 @@ export class G2GTransferReceiverService implements Receiver {
     }
   }
 
+  /**
+   * How much data a migration transfer would delete from this GROWI (requirement 3.1).
+   */
+  private async countDestinationData(): Promise<
+    IDataGROWIInfo['destinationCounts']
+  > {
+    const User = mongoose.model<IUser, any>('User');
+    const Page = mongoose.model('Page');
+
+    const [users, userGroups, pages] = await Promise.all([
+      User.countDocuments(),
+      UserGroup.countDocuments(),
+      Page.countDocuments(),
+    ]);
+
+    return { users, userGroups, pages };
+  }
+
+  /**
+   * How many administrators would still be able to log in here (requirement 3.5).
+   *
+   * `findAdmins()` returns the administrators in an active status, and `isLoginable` —
+   * the rescue's own rule, imported rather than restated — keeps those that also have a
+   * password hash. A destination whose administrators all sign in through an external
+   * account therefore reports none, which is the case requirement 3.5 exists for.
+   */
+  private async countLoginableAdmins(): Promise<number> {
+    const User = mongoose.model<IUser, any>('User');
+
+    const admins: readonly Pick<IUserHasId, 'status' | 'password'>[] =
+      await User.findAdmins();
+
+    return admins.filter(isLoginable).length;
+  }
+
   public async answerGROWIInfo(): Promise<IDataGROWIInfo> {
     const { fileUploadService } = this.crowi;
     const version = getGrowiVersion();
     const userUpperLimit = configManager.getConfig('security:userUpperLimit');
-    const fileUploadDisabled =
-      configManager.getConfig('app:fileUploadType') === 'none';
     const fileUploadTotalLimit = fileUploadService.getFileUploadTotalLimit();
     const isWritable = await fileUploadService.isWritable();
+
+    const [destinationCounts, loginableAdminCount, sessionAccess] =
+      await Promise.all([
+        this.countDestinationData(),
+        this.countLoginableAdmins(),
+        // The same resolution the invalidation itself runs on, so this GROWI cannot
+        // announce a capability it has no means to deliver (requirement 3.7).
+        // `sessionConfig` is assigned while the server boots; a receiver that has none
+        // reports "cannot select sessions", which warns the operator rather than
+        // promising something.
+        resolveSessionAccess(this.crowi.sessionConfig?.store),
+      ]);
 
     const attachmentInfo: IDataGROWIInfo['attachmentInfo'] = {
       type: configManager.getConfig('app:fileUploadType'),
@@ -983,10 +1079,15 @@ export class G2GTransferReceiverService implements Receiver {
 
     return {
       userUpperLimit,
-      fileUploadDisabled,
       fileUploadTotalLimit,
       version,
       attachmentInfo,
+      destinationCounts,
+      passwordSeedFingerprint: computePasswordSeedFingerprint(
+        this.crowi.env.PASSWORD_SEED,
+      ),
+      loginableAdminCount,
+      sessionStoreSupportsEnumeration: canSelectSessions(sessionAccess),
     };
   }
 

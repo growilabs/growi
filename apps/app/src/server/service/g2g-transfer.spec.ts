@@ -16,13 +16,17 @@ import axios from '~/utils/axios';
 import { TransferKey } from '~/utils/vo/transfer-key';
 
 import {
+  computePasswordSeedFingerprint,
   G2GTransferPusherService,
   type IDataGROWIInfo,
   toArchivePostErrorEvent,
   toTransferability,
 } from './g2g-transfer';
 import type { TransferBlocker } from './g2g-transfer-transferability';
-import { describeBlocker } from './g2g-transfer-transferability';
+import {
+  describeBlocker,
+  evaluateTransferability,
+} from './g2g-transfer-transferability';
 
 // `startTransfer` streams the exported archive to `form-data` and never reads it back
 // in these tests (the POST itself is mocked below), so a real file is unnecessary.
@@ -235,6 +239,89 @@ describe('toTransferability', () => {
     if (!result.canTransfer) {
       expect(result.reason).not.toBe(describeBlocker(second));
     }
+  });
+});
+
+describe('computePasswordSeedFingerprint', () => {
+  // Requirement 3.6 — the two GROWIs have to find out whether their password seeds
+  // agree, and the seed is what every user's password hash is derived from, so the only
+  // thing allowed on the wire is something that answers "same or not" and nothing else.
+  const SEED = 'a-destination-password-seed';
+
+  test('gives away nothing of the seed it was computed from', () => {
+    const fingerprint = computePasswordSeedFingerprint(SEED);
+
+    expect(fingerprint).not.toContain(SEED);
+    // A fixed-length hex digest: whatever the seed was, its length is not observable
+    // from the fingerprint either.
+    expect(fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect(
+      computePasswordSeedFingerprint(`${SEED}-and-then-some-more`),
+    ).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  test('matches for equal seeds and differs for unequal ones, which is the whole comparison', () => {
+    expect(computePasswordSeedFingerprint(SEED)).toBe(
+      computePasswordSeedFingerprint(SEED),
+    );
+    expect(computePasswordSeedFingerprint(SEED)).not.toBe(
+      computePasswordSeedFingerprint('a-source-password-seed'),
+    );
+    // One character apart still has to read as "different", or migrated users are told
+    // their passwords survive when they do not.
+    expect(computePasswordSeedFingerprint(SEED)).not.toBe(
+      computePasswordSeedFingerprint(`${SEED}x`),
+    );
+  });
+
+  test('treats a GROWI started without PASSWORD_SEED as one more seed value', () => {
+    // `generatePassword` hashes `crowi.env.PASSWORD_SEED + password`, so an unset seed
+    // still produces hashes two such GROWIs share — and hashes a GROWI with a real seed
+    // does not. Reporting "no fingerprint" instead would either warn every unset-seed
+    // transfer or, worse, match a GROWI that has one.
+    expect(computePasswordSeedFingerprint(undefined)).toBe(
+      computePasswordSeedFingerprint(undefined),
+    );
+    expect(computePasswordSeedFingerprint(undefined)).not.toBe(
+      computePasswordSeedFingerprint(SEED),
+    );
+  });
+});
+
+describe('the destination report as the transfer judgement reads it', () => {
+  test('every warning the destination is responsible for is decided by a field of its own report', () => {
+    // Requirements 3.4, 3.5, 3.7 — what the destination answers *is* the judgement's
+    // input, so `IDataGROWIInfo` has to satisfy `TransferabilityDestination` outright.
+    // The type check is the real guard here: drop or rename one of the three fields and
+    // this call stops compiling, instead of the warning quietly never firing.
+    const destination: IDataGROWIInfo = {
+      version: '8.0.0',
+      userUpperLimit: null,
+      fileUploadTotalLimit: null,
+      attachmentInfo: { type: 'aws', writable: true },
+      destinationCounts: { users: 12, userGroups: 3, pages: 340 },
+      passwordSeedFingerprint: 'a-destination-fingerprint',
+      loginableAdminCount: 0,
+      sessionStoreSupportsEnumeration: false,
+    };
+
+    const { warnings } = evaluateTransferability(
+      {
+        version: '8.0.0',
+        activeUsers: 1,
+        totalFileSize: 0,
+        fileUploadType: 'aws',
+        passwordSeedFingerprint: 'a-source-fingerprint',
+        isLocalAuthEnabled: true,
+      },
+      destination,
+    );
+
+    expect(warnings).toEqual([
+      { type: 'password_seed_mismatch' },
+      { type: 'no_loginable_admin' },
+      { type: 'sessions_not_invalidatable' },
+    ]);
   });
 });
 

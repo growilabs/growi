@@ -129,11 +129,28 @@ const validator = {
  *           userUpperLimit:
  *             type: number
  *             description: The upper limit of the number of users
- *           fileUploadDisabled:
- *             type: boolean
  *           fileUploadTotalLimit:
  *             type: number
  *             description: The total limit of the file upload size
+ *           destinationCounts:
+ *             type: object
+ *             description: How much data this GROWI holds, all of which a migration transfer deletes
+ *             properties:
+ *               users:
+ *                 type: number
+ *               userGroups:
+ *                 type: number
+ *               pages:
+ *                 type: number
+ *           passwordSeedFingerprint:
+ *             type: string
+ *             description: One-way hash of this GROWI's password seed. The seed itself is never sent.
+ *           loginableAdminCount:
+ *             type: number
+ *             description: Administrators that are in an active status and have a password
+ *           sessionStoreSupportsEnumeration:
+ *             type: boolean
+ *             description: Whether the sessions of replaced users can be invalidated on this GROWI
  *           attachmentInfo:
  *             type: object
  *             properties:

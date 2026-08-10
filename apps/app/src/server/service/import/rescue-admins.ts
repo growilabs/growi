@@ -69,8 +69,19 @@ const hasValue = (value: unknown): value is string =>
  * (middlewares/login-required.ts), and an account with no password hash has no local
  * credential to log in with. Rescuing either of those would satisfy "an admin survived"
  * on paper while leaving nobody able to reach the destination.
+ *
+ * Exported because the destination reports how many administrators can log in before the
+ * transfer starts (`answerGROWIInfo`, requirement 3.5), and that count means "how many
+ * accounts the rescue would keep alive". Restating the rule there instead would let the
+ * two drift: a destination could be told nobody will be locked out and then have every
+ * administrator skipped by the rescue.
+ *
+ * Narrowed to the fields it reads so a caller holding a database document rather than a
+ * plain `IUserHasId` can use the same rule.
  */
-const isLoginable = (user: IUserHasId): boolean =>
+export const isLoginable = (
+  user: Pick<IUserHasId, 'status' | 'password'>,
+): boolean =>
   user.status === UserStatus.STATUS_ACTIVE && hasValue(user.password);
 
 const isRemovedOnCollision = (
