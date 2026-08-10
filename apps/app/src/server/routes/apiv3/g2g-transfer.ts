@@ -10,6 +10,7 @@ import mongoose from 'mongoose';
 import multer from 'multer';
 import path from 'pathe';
 
+import { isCoherentOptionsMap } from '~/models/admin/g2g-transfer-preset';
 import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
@@ -17,6 +18,7 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import {
   G2G_DATA_CONFLICT_ERROR_CODE,
   G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+  G2G_MIXED_IMPORT_MODES_ERROR_CODE,
   G2G_PROTECTED_COLLECTION_ERROR_CODE,
   G2GTransferErrorCode,
   isG2GTransferError,
@@ -511,6 +513,33 @@ export const setup = (crowi: Crowi): Router => {
         new ErrorV3(
           `These collections must not be transferred: ${protectedCollections.join(', ')}`,
           G2G_PROTECTED_COLLECTION_ERROR_CODE,
+        ),
+        400,
+      );
+    }
+
+    /*
+     * refuse a request whose import-method assignment mixes replacing some
+     * collections with appending to others
+     *
+     * `isCoherentOptionsMap` (models/admin/g2g-transfer-preset.ts) is the single judge
+     * of coherence; this route only acts on its answer and never branches on which
+     * collection or mode is involved (requirement 1.3). Today's legacy G2G screen can
+     * still build a mixed request this way (task 10.1 narrows its choices so it no
+     * longer can); this guard is the backstop for anything that reaches this route
+     * without going through that screen at all — an automation script or a modified
+     * client posting to this endpoint directly. Checked before anything is unzipped
+     * or written, so a refused request leaves the destination untouched.
+     */
+    if (!isCoherentOptionsMap(optionsMap, collections)) {
+      logger.warn(
+        { collections },
+        'Refused the transfer import: the import-method assignment mixes replacing and appending',
+      );
+      return res.apiv3Err(
+        new ErrorV3(
+          'The import-method assignment must either replace every collection or replace none of them.',
+          G2G_MIXED_IMPORT_MODES_ERROR_CODE,
         ),
         400,
       );
