@@ -5,12 +5,11 @@ import mongoose, { type Types } from 'mongoose';
 import { getInstance } from '^/test/setup/crowi';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
-import { PageQueryBuilder } from '~/server/models/page';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 
 import PageLink from '../models/page-link';
-import { findBacklinks } from './find-backlinks';
+import { buildVisibleSourcesQuery, findBacklinks } from './find-backlinks';
 import { syncOutboundLinks } from './page-link-sync';
 
 /*
@@ -544,12 +543,10 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
     );
     const sourceIds = await PageLink.findBacklinkSources(hubPageId);
     const filterOnly = await measure(TIMED_RUNS, async () => {
-      const builder = new PageQueryBuilder(
-        Page.find({ _id: { $in: sourceIds } }),
-      );
-      await builder.addViewerCondition(viewer);
-      builder.addConditionToExcludeTrashed();
-      return builder.query.select('_id path').lean().exec();
+      // Production's own query builder, so this sub-step timing cannot drift away from
+      // the query findBacklinks issues.
+      const { query } = await buildVisibleSourcesQuery(sourceIds, viewer);
+      return query.lean().exec();
     });
 
     report(`[B2.1] findBacklinks (full path):        ${fmt(full)}`);
@@ -649,17 +646,14 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
       distinctStages.some((s) => s === 'DISTINCT_SCAN' || s === 'IXSCAN'),
     ).toBe(true);
 
-    // The viewer-filtered Page query. Mirrors find-backlinks.ts — keep the two in
-    // step if that query changes.
+    // The viewer-filtered Page query, built by production — so this no-COLLSCAN
+    // guarantee covers the query findBacklinks issues, not a copy of it.
     const sourceIds = await PageLink.findBacklinkSources(hubPageId);
-    const builder = new PageQueryBuilder(
-      Page.find({ _id: { $in: sourceIds } }),
-    );
-    await builder.addViewerCondition(viewer);
-    builder.addConditionToExcludeTrashed();
-    const filterExplain = await builder.query
-      .select('_id path')
-      .explain('queryPlanner');
+    const { query } = await buildVisibleSourcesQuery(sourceIds, viewer);
+    // mongoose types explain() as resolving to the query's own result type; the real
+    // shape is an untyped driver explain document, matching collectStages' parameter.
+    // biome-ignore lint/suspicious/noExplicitAny: driver explain output has no type
+    const filterExplain: any = await query.explain('queryPlanner');
     const filterStages = collectStages(
       // explain() on a find returns either the plan directly or an array of them
       (Array.isArray(filterExplain) ? filterExplain[0] : filterExplain)
