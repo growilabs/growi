@@ -29,7 +29,10 @@ export type DeleteExpiredWipPageSummary = {
   skippedNonLeaf: number;
   /** Claim lost to another instance, or the page stopped being eligible. */
   skippedNotClaimed: number;
-  /** Claimed, but the deletion threw. The page is still there, expiry re-armed. */
+  /**
+   * Claimed, but the deletion threw. How far it got is in the log: the page document
+   * is removed before its ancestors are updated, so it may already be gone.
+   */
   failed: number;
 };
 
@@ -139,9 +142,13 @@ export const deleteExpiredWipPageBySystem = async (
       deleted++;
     } catch (err) {
       failed++;
+      // Deliberately does not claim an outcome: the page document is removed before
+      // its ancestors are updated, so a throw here can leave the page already deleted,
+      // and the re-arm below can itself no-op. Both are reported on their own lines.
       logger.error(
         `Failed to delete expired WIP page: ${page.path} (id=${page._id.toString()}). ` +
-          'Its expiry is being re-armed so a later sweep retries it.',
+          'The page may already be gone. Re-arming its expiry for a later sweep — a ' +
+          'following warning or error means it was not re-armed.',
         err,
       );
       await rearmExpiry(Page, page);
