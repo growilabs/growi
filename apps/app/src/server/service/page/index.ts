@@ -4946,10 +4946,10 @@ class PageService implements IPageService {
     }
 
     // Make WIP
-    const wipExpirationSeconds = configManager.getConfig(
-      'app:wipPageExpirationSeconds',
-    );
     if (options.wip) {
+      const wipExpirationSeconds = configManager.getConfig(
+        'app:wipPageExpirationSeconds',
+      );
       const hasChildren = await Page.exists({ parent: page._id });
       page.makeWip(hasChildren != null, wipExpirationSeconds); // disableTtl = hasChildren != null
     }

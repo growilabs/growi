@@ -9,9 +9,7 @@ import { withUnstatedContainers } from '../../UnstatedUtils';
 import { ConfirmModal } from './ConfirmModal';
 
 type Props = {
-  adminAppContainer: typeof AdminAppContainer & {
-    repairPageTreeHandler: () => Promise<{ isStarted: boolean }>;
-  };
+  adminAppContainer: AdminAppContainer;
 };
 
 const PageTreeRepair: FC<Props> = (props: Props) => {

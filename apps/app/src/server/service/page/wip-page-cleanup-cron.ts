@@ -113,6 +113,15 @@ export const startWipPageCleanupCronIfEnabled = (crowi: Crowi): void => {
     return;
   }
 
+  // This catch only works because node-cron throws synchronously from schedule(),
+  // which ^3.0.2 does — as a validation error for an out-of-range field ("99 * * * *"),
+  // as an internal TypeError for a malformed one ("abc"). Verified against 3.0.3; it is
+  // not a documented contract, so re-check on a major bump. If throwing ever moves to a
+  // callback or event, a bad expression escapes this catch and the "logged and skipped"
+  // promise above turns into an unhandled boot crash.
+  //
+  // Note it is not exhaustive either: a 7-field expression is accepted here and simply
+  // never fires. Only an operator reading the boot log would notice.
   try {
     new WipPageCleanupCronService(crowi).startCron();
     logger.info(`Scheduled the expired WIP page cleanup (cron: '${schedule}')`);
