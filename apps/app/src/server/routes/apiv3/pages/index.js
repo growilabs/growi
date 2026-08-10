@@ -300,6 +300,8 @@ export const setup = (crowi) => {
    *                  isRecursively:
    *                    type: boolean
    *                    description: whether rename page with descendants
+   *                  revisionId:
+   *                    $ref: '#/components/schemas/ObjectId'
    *                required:
    *                  - pageId
    *                  - revisionId
@@ -312,12 +314,16 @@ export const setup = (crowi) => {
    *                  properties:
    *                    page:
    *                      $ref: '#/components/schemas/Page'
+   *          400:
+   *            description: revisionId is missing, or the destination is under a non-existent user's user page. An empty page may be renamed without revisionId.
    *          403:
    *            description: Page is forbidden.
    *          404:
    *            description: Page is not found.
    *          409:
-   *            description: page path is already existed
+   *            description: The destination path is already taken, cannot be used, or revisionId is not the latest revision.
+   *          500:
+   *            description: Failed to rename page.
    */
   router.put(
     '/rename',
