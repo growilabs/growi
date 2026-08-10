@@ -5,7 +5,7 @@ import {
   type IUser,
   isPopulated,
 } from '@growi/core';
-import type { Model } from 'mongoose';
+import type { HydratedDocument, Model } from 'mongoose';
 import mongoose from 'mongoose';
 
 import { getInstance } from '^/test/setup/crowi';
@@ -25,10 +25,6 @@ import type {
   PageRedirectModel,
 } from '~/server/models/page-redirect';
 import PageTagRelation from '~/server/models/page-tag-relation';
-import type {
-  IRevisionDocument,
-  IRevisionModel,
-} from '~/server/models/revision';
 import type { ShareLinkModel } from '~/server/models/share-link';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import { prisma } from '~/utils/prisma';
@@ -47,7 +43,6 @@ describe('PageService page operations with only public pages', () => {
 
   let crowi: Crowi;
   let Page: PageModel;
-  let Revision: IRevisionModel;
   let User: Model<IUser>;
   let ShareLink: ShareLinkModel;
   let PageRedirect: PageRedirectModel;
@@ -90,7 +85,6 @@ describe('PageService page operations with only public pages', () => {
 
     User = mongoose.model('User');
     Page = mongoose.model<IPage, PageModel>('Page');
-    Revision = mongoose.model<IRevision, IRevisionModel>('Revision');
     ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
     PageRedirect = mongoose.model<IPageRedirect, PageRedirectModel>(
       'PageRedirect',
@@ -709,92 +703,94 @@ describe('PageService page operations with only public pages', () => {
       },
     ]);
 
-    await Revision.insertMany([
-      {
-        _id: revisionIdForDuplicate1,
-        body: 'body1',
-        format: 'markdown',
-        pageId: pageIdForDuplicate1,
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForDuplicate2,
-        body: 'body3',
-        format: 'markdown',
-        pageId: pageIdForDuplicate3,
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForDuplicate3,
-        body: 'parent_page_body4',
-        format: 'markdown',
-        pageId: pageIdForDuplicate4,
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForDuplicate4,
-        body: 'revision_id_4_child_page_body',
-        format: 'markdown',
-        pageId: pageIdForDuplicate5,
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForDuplicate5,
-        body: 'revision_id_5_child_page_body',
-        format: 'markdown',
-        pageId: pageIdForDuplicate6,
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForDuplicate6,
-        body: '/v5_PageForDuplicate4',
-        format: 'markdown',
-        pageId: pageIdForDuplicate7,
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForDuplicate7,
-        body: '/v5_PageForDuplicate4/v5_empty_PageForDuplicate4/v5_grandchild_PageForDuplicate4',
-        format: 'markdown',
-        pageId: pageIdForDuplicate9,
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForDuplicate8,
-        body: '/v5_PageForDuplicate5',
-        format: 'markdown',
-        pageId: pageIdForDuplicate10,
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForDuplicate9,
-        body: '/v5_PageForDuplicate6',
-        format: 'markdown',
-        pageId: pageIdForDuplicate11,
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForDuplicate10,
-        body: '/v5_PageForDuplicate6',
-        format: 'comment',
-        pageId: pageIdForDuplicate12,
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForDuplicate11,
-        body: '/v5_child_PageForDuplicate7',
-        format: 'markdown',
-        pageId: pageIdForDuplicate14,
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForDuplicate12,
-        body: '/v5_grandchild_PageForDuplicate7',
-        format: 'markdown',
-        pageId: pageIdForDuplicate15,
-        author: dummyUser1,
-      },
-    ]);
+    await prisma.revisions.createMany({
+      data: [
+        {
+          id: revisionIdForDuplicate1.toString(),
+          body: 'body1',
+          format: 'markdown',
+          pageId: pageIdForDuplicate1.toString(),
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForDuplicate2.toString(),
+          body: 'body3',
+          format: 'markdown',
+          pageId: pageIdForDuplicate3.toString(),
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForDuplicate3.toString(),
+          body: 'parent_page_body4',
+          format: 'markdown',
+          pageId: pageIdForDuplicate4.toString(),
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForDuplicate4.toString(),
+          body: 'revision_id_4_child_page_body',
+          format: 'markdown',
+          pageId: pageIdForDuplicate5.toString(),
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForDuplicate5.toString(),
+          body: 'revision_id_5_child_page_body',
+          format: 'markdown',
+          pageId: pageIdForDuplicate6.toString(),
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForDuplicate6.toString(),
+          body: '/v5_PageForDuplicate4',
+          format: 'markdown',
+          pageId: pageIdForDuplicate7.toString(),
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForDuplicate7.toString(),
+          body: '/v5_PageForDuplicate4/v5_empty_PageForDuplicate4/v5_grandchild_PageForDuplicate4',
+          format: 'markdown',
+          pageId: pageIdForDuplicate9.toString(),
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForDuplicate8.toString(),
+          body: '/v5_PageForDuplicate5',
+          format: 'markdown',
+          pageId: pageIdForDuplicate10.toString(),
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForDuplicate9.toString(),
+          body: '/v5_PageForDuplicate6',
+          format: 'markdown',
+          pageId: pageIdForDuplicate11.toString(),
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForDuplicate10.toString(),
+          body: '/v5_PageForDuplicate6',
+          format: 'comment',
+          pageId: pageIdForDuplicate12.toString(),
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForDuplicate11.toString(),
+          body: '/v5_child_PageForDuplicate7',
+          format: 'markdown',
+          pageId: pageIdForDuplicate14.toString(),
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForDuplicate12.toString(),
+          body: '/v5_grandchild_PageForDuplicate7',
+          format: 'markdown',
+          pageId: pageIdForDuplicate15.toString(),
+          authorId: dummyUser1._id.toString(),
+        },
+      ],
+    });
     const tagForDuplicate1 = new mongoose.Types.ObjectId();
     const tagForDuplicate2 = new mongoose.Types.ObjectId();
 
@@ -1004,32 +1000,34 @@ describe('PageService page operations with only public pages', () => {
       },
     ]);
 
-    await Revision.insertMany([
-      {
-        _id: revisionIdForDeleteCompletely1,
-        format: 'markdown',
-        pageId: pageIdForDeleteCompletely2,
-        body: 'pageIdForDeleteCompletely2',
-      },
-      {
-        _id: revisionIdForDeleteCompletely2,
-        format: 'markdown',
-        pageId: pageIdForDeleteCompletely4,
-        body: 'pageIdForDeleteCompletely4',
-      },
-      {
-        _id: revisionIdForDeleteCompletely3,
-        format: 'markdown',
-        pageId: pageIdForDeleteCompletely5,
-        body: 'pageIdForDeleteCompletely5',
-      },
-      {
-        _id: revisionIdForDeleteCompletely4,
-        format: 'markdown',
-        pageId: pageIdForDeleteCompletely2,
-        body: 'comment_pageIdForDeleteCompletely3',
-      },
-    ]);
+    await prisma.revisions.createMany({
+      data: [
+        {
+          id: revisionIdForDeleteCompletely1.toString(),
+          format: 'markdown',
+          pageId: pageIdForDeleteCompletely2.toString(),
+          body: 'pageIdForDeleteCompletely2',
+        },
+        {
+          id: revisionIdForDeleteCompletely2.toString(),
+          format: 'markdown',
+          pageId: pageIdForDeleteCompletely4.toString(),
+          body: 'pageIdForDeleteCompletely4',
+        },
+        {
+          id: revisionIdForDeleteCompletely3.toString(),
+          format: 'markdown',
+          pageId: pageIdForDeleteCompletely5.toString(),
+          body: 'pageIdForDeleteCompletely5',
+        },
+        {
+          id: revisionIdForDeleteCompletely4.toString(),
+          format: 'markdown',
+          pageId: pageIdForDeleteCompletely2.toString(),
+          body: 'comment_pageIdForDeleteCompletely3',
+        },
+      ],
+    });
 
     const tagForDeleteCompletely1 = new mongoose.Types.ObjectId();
     const tagForDeleteCompletely2 = new mongoose.Types.ObjectId();
@@ -1141,29 +1139,31 @@ describe('PageService page operations with only public pages', () => {
       },
     ]);
 
-    await Revision.insertMany([
-      {
-        _id: revisionIdForRevert1,
-        pageId: pageIdForRevert1,
-        body: 'revert1',
-        format: 'comment',
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForRevert2,
-        pageId: pageIdForRevert2,
-        body: 'revert2',
-        format: 'comment',
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForRevert3,
-        pageId: pageIdForRevert3,
-        body: 'revert3',
-        format: 'comment',
-        author: dummyUser1,
-      },
-    ]);
+    await prisma.revisions.createMany({
+      data: [
+        {
+          id: revisionIdForRevert1.toString(),
+          pageId: pageIdForRevert1.toString(),
+          body: 'revert1',
+          format: 'comment',
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForRevert2.toString(),
+          pageId: pageIdForRevert2.toString(),
+          body: 'revert2',
+          format: 'comment',
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForRevert3.toString(),
+          pageId: pageIdForRevert3.toString(),
+          body: 'revert3',
+          format: 'comment',
+          authorId: dummyUser1._id.toString(),
+        },
+      ],
+    });
 
     const tagIdRevert1 = new mongoose.Types.ObjectId();
     await prisma.tags.createMany({
@@ -1212,22 +1212,24 @@ describe('PageService page operations with only public pages', () => {
       },
     ]);
 
-    await Revision.insertMany([
-      {
-        _id: revisionIdForRevertActivitySingle,
-        pageId: pageIdForRevertActivitySingle,
-        body: 'revert_activity_single',
-        format: 'comment',
-        author: dummyUser1,
-      },
-      {
-        _id: revisionIdForRevertActivityRecursive,
-        pageId: pageIdForRevertActivityRecursive,
-        body: 'revert_activity_recursive',
-        format: 'comment',
-        author: dummyUser1,
-      },
-    ]);
+    await prisma.revisions.createMany({
+      data: [
+        {
+          id: revisionIdForRevertActivitySingle.toString(),
+          pageId: pageIdForRevertActivitySingle.toString(),
+          body: 'revert_activity_single',
+          format: 'comment',
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdForRevertActivityRecursive.toString(),
+          pageId: pageIdForRevertActivityRecursive.toString(),
+          body: 'revert_activity_recursive',
+          format: 'comment',
+          authorId: dummyUser1._id.toString(),
+        },
+      ],
+    });
   });
 
   describe('create', () => {
@@ -2151,16 +2153,18 @@ describe('PageService page operations with only public pages', () => {
         false,
       );
 
-      const duplicatedRevision = await Revision.findOne({
-        pageId: duplicatedPage._id,
+      const duplicatedRevision = await prisma.revisions.findFirst({
+        where: { pageId: duplicatedPage._id.toString() },
       });
-      const baseRevision = await Revision.findOne({ pageId: page?._id });
+      const baseRevision = await prisma.revisions.findFirst({
+        where: { pageId: page?._id.toString() },
+      });
 
       // new path
       expect(generalXssFilterProcessSpy).toHaveBeenCalled();
       expect(duplicatedPage.path).toBe(newPagePath);
       expect(duplicatedPage._id).not.toStrictEqual(page?._id);
-      expect(duplicatedPage.revision).toStrictEqual(duplicatedRevision?._id);
+      expect(duplicatedPage.revision?.toString()).toBe(duplicatedRevision?.id);
       expect(duplicatedRevision?.body).toEqual(baseRevision?.body);
     });
 
@@ -2193,31 +2197,35 @@ describe('PageService page operations with only public pages', () => {
         false,
       );
 
-      const duplicatedRevision = await Revision.findOne({
-        pageId: duplicatedPage._id,
+      const duplicatedRevision = await prisma.revisions.findFirst({
+        where: { pageId: duplicatedPage._id.toString() },
       });
-      const baseRevision = await Revision.findOne({ pageId: page?._id });
+      const baseRevision = await prisma.revisions.findFirst({
+        where: { pageId: page?._id.toString() },
+      });
 
       // new path
       expect(generalXssFilterProcessSpy).toHaveBeenCalled();
       expect(duplicatedPage.path).toBe(newPagePath);
       expect(duplicatedPage._id).not.toStrictEqual(page?._id);
-      expect(duplicatedPage.revision).toStrictEqual(duplicatedRevision?._id);
+      expect(duplicatedPage.revision?.toString()).toBe(duplicatedRevision?.id);
       expect(duplicatedRevision?.body).toEqual(baseRevision?.body);
     });
 
     it('Should duplicate multiple pages', async () => {
       const basePage = await Page.findOne({ path: '/v5_PageForDuplicate3' });
-      const revision = await Revision.findOne({ pageId: basePage?._id });
+      const revision = await prisma.revisions.findFirst({
+        where: { pageId: basePage?._id.toString() },
+      });
       const childPage1 = await Page.findOne({
         path: '/v5_PageForDuplicate3/v5_Child_1_ForDuplicate3',
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const childPage2 = await Page.findOne({
         path: '/v5_PageForDuplicate3/v5_Child_2_ForDuplicate3',
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
@@ -2245,8 +2253,8 @@ describe('PageService page operations with only public pages', () => {
         parent: duplicatedPage._id,
         path: '/duplicatedv5PageForDuplicate3/v5_Child_2_ForDuplicate3',
       }).populate({ path: 'revision', model: 'Revision' });
-      const revisionForDuplicatedPage = await Revision.findOne({
-        pageId: duplicatedPage._id,
+      const revisionForDuplicatedPage = await prisma.revisions.findFirst({
+        where: { pageId: duplicatedPage._id.toString() },
       });
       const revisionBodyForDupChild1 = duplicatedChildPage1?.revision;
       const revisionBodyForDupChild2 = duplicatedChildPage2?.revision;
@@ -2374,13 +2382,13 @@ describe('PageService page operations with only public pages', () => {
       });
       const basePageChild = await Page.findOne({
         parent: basePage?._id,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const basePageGrandhild = await Page.findOne({
         parent: basePageChild?._id,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
@@ -2398,13 +2406,13 @@ describe('PageService page operations with only public pages', () => {
       );
       const duplicatedChild = await Page.findOne({
         parent: duplicatedPage._id,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const duplicatedGrandchild = await Page.findOne({
         parent: duplicatedChild?._id,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
@@ -2783,8 +2791,14 @@ describe('PageService page operations with only public pages', () => {
       const deletedPages = await Page.find({
         _id: { $in: [parentPage?._id, childPage?._id, grandchildPage?._id] },
       });
-      const deletedRevisions = await Revision.find({
-        pageId: { $in: [parentPage?._id, grandchildPage?._id] },
+      const deletedRevisions = await prisma.revisions.findMany({
+        where: {
+          pageId: {
+            in: [parentPage?._id, grandchildPage?._id]
+              .filter((id) => id != null)
+              .map((id) => id.toString()),
+          },
+        },
       });
       const tags = await prisma.tags.findMany({
         where: {
@@ -2830,7 +2844,9 @@ describe('PageService page operations with only public pages', () => {
       const page = await Page.findOne({
         path: '/trash/v5_PageForDeleteCompletely5',
       });
-      const revision = await Revision.findOne({ pageId: page?._id });
+      const revision = await prisma.revisions.findFirst({
+        where: { pageId: page?._id.toString() },
+      });
       expect(page).toBeTruthy();
       expect(revision).toBeTruthy();
       await deleteCompletely(page, dummyUser1, {}, false, false, {
@@ -2838,7 +2854,9 @@ describe('PageService page operations with only public pages', () => {
         endpoint: '/_api/v3/pages/deletecompletely',
       });
       const deltedPage = await Page.findOne({ _id: page?._id });
-      const deltedRevision = await Revision.findOne({ _id: revision?._id });
+      const deltedRevision = await prisma.revisions.findUnique({
+        where: { id: revision?._id },
+      });
 
       expect(deltedPage).toBeNull();
       expect(deltedRevision).toBeNull();
@@ -2925,7 +2943,9 @@ describe('PageService page operations with only public pages', () => {
         path: '/trash/v5_revert1',
         status: Page.STATUS_DELETED,
       });
-      const revision = await Revision.findOne({ pageId: deletedPage?._id });
+      const revision = await prisma.revisions.findFirst({
+        where: { pageId: deletedPage?._id.toString() },
+      });
       const tag = await prisma.tags.findUnique({
         where: { name: 'revertTag1' },
       });
@@ -2969,8 +2989,12 @@ describe('PageService page operations with only public pages', () => {
         path: '/trash/v5_revert2/v5_revert3/v5_revert4',
         status: Page.STATUS_DELETED,
       });
-      const revision1 = await Revision.findOne({ pageId: deletedPage1?._id });
-      const revision2 = await Revision.findOne({ pageId: deletedPage2?._id });
+      const revision1 = await prisma.revisions.findFirst({
+        where: { pageId: deletedPage1?._id.toString() },
+      });
+      const revision2 = await prisma.revisions.findFirst({
+        where: { pageId: deletedPage2?._id.toString() },
+      });
       expect(deletedPage1).toBeTruthy();
       expect(deletedPage2).toBeTruthy();
       expect(revision1).toBeTruthy();

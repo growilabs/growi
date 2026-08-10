@@ -5,7 +5,6 @@ import type {
   IPage,
   IPageInfoExt,
   IPageNotFoundInfo,
-  IRevision,
 } from '@growi/core';
 import {
   AllSubscriptionStatusType,
@@ -38,7 +37,6 @@ import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
 import Subscription from '~/server/models/subscription';
 import { configManager } from '~/server/service/config-manager';
 import { exportService } from '~/server/service/export';
@@ -47,6 +45,7 @@ import type { IPageGrantService } from '~/server/service/page-grant';
 import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 import { checkPageExistenceHandlersFactory } from './check-page-existence';
@@ -900,7 +899,7 @@ export const setup = (crowi: Crowi): Router => {
       const format: 'md' | 'pdf' = req.query.format ?? 'md';
       const revisionId: string | undefined = req.query.revisionId;
 
-      let revision: HydratedDocument<IRevision> | null;
+      let revision: Awaited<ReturnType<typeof prisma.revisions.findUnique>>;
       let pagePath: string;
 
       const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
@@ -943,8 +942,9 @@ export const setup = (crowi: Crowi): Router => {
           throw new Error('revisionId is not specified');
         }
 
-        const revisionIdForFind = new mongoose.Types.ObjectId(targetId);
-        revision = await Revision.findById(revisionIdForFind);
+        revision = await prisma.revisions.findUnique({
+          where: { id: targetId.toString() },
+        });
         if (revision == null) {
           throw new Error('Revision is not found');
         }
@@ -952,7 +952,7 @@ export const setup = (crowi: Crowi): Router => {
         pagePath = page.path;
 
         // Error if pageId and revison's pageIds do not match
-        if (page._id.toString() !== revision.pageId.toString()) {
+        if (page._id.toString() !== revision.pageId) {
           return res.apiv3Err(
             new ErrorV3("Haven't the right to see the page."),
             403,

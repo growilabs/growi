@@ -6,23 +6,11 @@ vi.mock('~/utils/prisma', () => ({
     activities: {
       findFirst: vi.fn(),
     },
+    revisions: {
+      count: vi.fn(),
+    },
   },
 }));
-
-// Mock mongoose so we can control Revision.countDocuments
-vi.mock('mongoose', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('mongoose')>();
-  return {
-    ...actual,
-    default: {
-      ...actual.default,
-      model: vi.fn(),
-    },
-  };
-});
-
-// Import AFTER mocks are registered
-import mongoose from 'mongoose';
 
 import { prisma } from '~/utils/prisma';
 
@@ -30,7 +18,7 @@ import { shouldGenerateUpdate } from './update-activity-logic';
 
 // Typed references to mocked functions
 const mockFindFirst = vi.mocked(prisma.activities.findFirst);
-const mockMongooseModel = vi.mocked(mongoose.model);
+const mockRevisionsCount = vi.mocked(prisma.revisions.count);
 
 // Fake ObjectId-shaped strings for test IDs
 const TARGET_PAGE_ID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
@@ -72,13 +60,9 @@ function makeActivity(overrides: { userId?: string | null; createdAt?: Date }) {
   };
 }
 
-/** Register a mock Revision model that returns a given countDocuments value */
+/** Make prisma.revisions.count resolve to the given value */
 function setRevisionCount(count: number) {
-  const fakeRevisionModel = {
-    countDocuments: vi.fn().mockResolvedValue(count),
-  };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  mockMongooseModel.mockReturnValue(fakeRevisionModel as any);
+  mockRevisionsCount.mockResolvedValue(count);
 }
 
 describe('shouldGenerateUpdate() — DB-free unit (Prisma findFirst)', () => {
