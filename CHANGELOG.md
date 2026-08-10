@@ -1,8 +1,42 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v8.0.0...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.1...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v8.0.1](https://github.com/growilabs/compare/v8.0.0...v8.0.1) - 2026-08-10
+
+### 💎 Features
+
+* feat: Audit Log fuzzy search by username (#11621) @Appleple47
+* feat: Syntax highlighting view in admin custom (#11453) @mariko-h
+
+### 🚀 Improvement
+
+* imprv(mastra): Focus the chat prompt input when the chat sidebar opens (#11527) @miya
+
+### 🐛 Bug Fixes
+
+* fix(comment): Make /comments.update respond so editing leaves edit mode (#11641) @yuki-takei
+* fix(drawio): Fix math, shapes, menu contrast and DRAWIO_URI on self-hosted instances (#11633) @yuki-takei
+* fix(g2g-transfer): Fix expiring keys, overwritten destination records and silent partial imports (#11658) @yuki-takei
+* fix(g2g-transfer): Abort G2G transfer before import when unique-constraint conflicts exist (#11643) @yuki-takei
+* fix(g2g-transfer): Prevent auth bypass and path traversal in the transfer receiver (#11631) @yuki-takei
+* fix(vault): Reject requests for objects outside the requester's view (#11604) @yuki-takei
+* fix(vault): Recover a bootstrap whose runner is gone (#11599) @yuki-takei
+* fix(vault): Shrink the clone transfer and fix the sparse-checkout recipe (#11605) @yuki-takei
+* fix(vault-manager): Prevent clone checkouts from failing due to long page names (#11603) @yuki-takei
+* fix: Replace dead Slack invite link with a single redirect page (#11626) @yuki-takei
+* fix: Restore native "Choose File" button styling outside .tw-root (#11613) @yuki-takei
+* fix: Bookmark folder authorization and bookmark display restriction (#11478) @arvid-e
+
+### 🧰 Maintenance
+
+* ci(deps-dev): bump vite from 6.4.2 to 6.4.3 (#11533) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump mermaid from 11.15.0 to 11.16.1 (#11662) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump js-yaml from 4.2.0 to 4.3.1 (#11663) @[dependabot[bot]](https://github.com/apps/dependabot)
+* chore(app): remove orphaned openai:serviceType / openai:apiKey config keys (#11652) @yuki-takei
+* support(contributors): Add Allan Wirth as a contributor (#11647) @yuki-takei
 
 ## [v8.0.0](https://github.com/growilabs/compare/v7.5.7...v8.0.0) - 2026-07-27
 
