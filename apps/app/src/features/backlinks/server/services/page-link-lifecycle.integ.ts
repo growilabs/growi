@@ -5,6 +5,7 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
+import PageRedirect from '~/server/models/page-redirect';
 import { Revision } from '~/server/models/revision';
 
 import PageLink from '../models/page-link';
@@ -25,8 +26,9 @@ import PageLink from '../models/page-link';
  *  - a source the viewer cannot read is excluded; a grant change is reflected on re-read
  *  - a source linking B->A more than once is listed once
  *  - a page linking to its own permalink is excluded from its own backlinks
+ *  - a backlink survives the target's rename across a later re-save of the source (5.1)
  *
- * B1 scope: rename/move (B4.4) and trash/delete/restore (B5.8) are out of scope.
+ * Trash/delete/restore (B5.8) is out of scope.
  */
 describe('Backlinks B1 slice (lifecycle integration)', () => {
   const PREFIX = '/backlinks-b1-lifecycle-test';
@@ -131,6 +133,7 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     await PageLink.deleteMany({ fromPage: { $in: ids } });
     await Revision.deleteMany({ pageId: { $in: ids } });
     await Page.deleteMany({ path: new RegExp(`^${PREFIX}/`) });
+    await PageRedirect.deleteMany({ fromPath: new RegExp(`^${PREFIX}/`) });
   });
 
   afterAll(async () => {
@@ -272,5 +275,44 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     expect(
       await crowi.pageLinkService.findBacklinks(other._id, viewer),
     ).toEqual([{ pageId: selfLinker._id.toString(), path: selfLinker.path }]);
+  });
+
+  it('keeps a backlink alive after the target is renamed and the source is re-saved (5.1)', async () => {
+    const target = await createPage('/rn-target');
+    const source = await createPage('/rn-source');
+    const witness = await createPage('/rn-witness');
+    const oldPath = target.path;
+
+    await emitUpsert('create', source, `[to target](${oldPath})`);
+    await waitForOutboundCount(source._id, 1);
+
+    // Rename the target. This reproduces exactly the state a rename with "create
+    // redirect page" leaves behind (PageService: path update + PageRedirect.create),
+    // which is all that link resolution reads. The source's body is untouched, so
+    // it still names the old path.
+    const newPath = `${PREFIX}/rn-target-moved`;
+    await Page.updateOne({ _id: target._id }, { $set: { path: newPath } });
+    await PageRedirect.create({ fromPath: oldPath, toPath: newPath });
+
+    // Re-save the source for an unrelated reason. The extra link to /rn-witness is
+    // what lets this wait on the *new* sync rather than passing on the pre-rename
+    // rows, which would otherwise be indistinguishable.
+    await emitUpsert(
+      'update',
+      source,
+      `[to target](${oldPath}) typo fixed [w](${witness.path})`,
+    );
+    await waitForOutboundCount(source._id, 2);
+
+    // toPath still mirrors the body; toPage followed the rename.
+    expect(await outboundRows(source._id)).toEqual([
+      { toPath: oldPath, toPage: target._id },
+      { toPath: witness.path, toPage: witness._id },
+    ]);
+
+    // What the user sees: the renamed target still lists the source.
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
   });
 });

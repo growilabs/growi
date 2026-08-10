@@ -7,7 +7,7 @@
 > carries the walking skeleton; B2–B5 graft onto it.
 >
 > **Where a capability was split across stories**, the task notes call it out explicitly:
-> `resolveToPage`, the sync ops, the lifecycle handlers, the read queries, `BacklinkListItem`,
+> `resolveToPages`, the sync ops, the lifecycle handlers, the read queries, `BacklinkListItem`,
 > `BacklinksPanel`, and the event subscription each get their B1 half here and their B4/B5 half in
 > the later story.
 >
@@ -339,15 +339,27 @@ redirect-following keeps links resolvable when the source is re-saved after the 
 the redirect-following half of resolution plus the re-resolve-by-path repointing. Independent of
 B3/B5.
 
-- [ ] B4.1 Add redirect-chain following to resolveToPage
-  - Extend the resolver with the redirect step deferred from B1.4: when direct path lookup misses,
-    follow the redirect chain to its endpoint and resolve there; handle multi-hop renames (A→B→C) via
-    the redirect endpoint lookup; null when neither a page nor a redirect resolves (the broken case).
-    A permalink `toPath` still short-circuits by id (never needs redirect-following — 5.4)
-  - Done when unit tests cover single and double redirect chains resolving to the endpoint, and the
-    unresolved (null) case
+- [x] B4.1 Add redirect-chain following to resolveToPages
+  - Extend the resolver with the redirect step deferred from B1.4: follow the redirect chain to its
+    endpoint and resolve there; handle multi-hop renames (A→B→C) via the redirect endpoint lookup;
+    unresolved when neither a page nor a redirect resolves (the broken case). A permalink `toPath`
+    still short-circuits by id (never needs redirect-following — 5.4)
+  - **Match page view's precedence**: a redirect on the path outranks a live page at it, because
+    `resolvePathAndCheckIdentical` follows the redirect without checking for a live page at the
+    requested path. So the chain is looked up for **every** path in one lookup, not only for the
+    ones that missed — a live hit does not settle the answer
+  - Add the lookup as a new `PageRedirect.retrievePageRedirectEndpointsBatch` static and
+    re-implement the existing singular `retrievePageRedirectEndpoints` over it, so the
+    `$graphLookup` pipeline and deepest-hop rule exist once and page view cannot disagree with the
+    link index about where a chain ends. Keep the depth cap a **parameter**: the save path passes
+    50, page view passes none (a cap there turns a much-renamed page's old URL into a not-found)
+  - Done when tests cover single and double redirect chains resolving to the endpoint, a redirect
+    winning over a live page at the same path, the unresolved case, several paths resolving in one
+    lookup, converging chains keyed by input, a cycle advancing one hop rather than hanging, an
+    uncapped walk running past the save path's cap, and a trashed target resolving through its trash
+    redirect rather than reading as broken
   - _Requirements: 1.9, 5.1, 5.2, 5.3, 5.4_
-  - _Boundary: resolveToPage_
+  - _Boundary: resolveToPages, PageRedirect (batch static)_
   - _Depends: B1.4_
 
 - [ ] B4.2 Implement the re-resolve-by-path sync operation
@@ -416,9 +428,14 @@ the restored page's status. Independent of B3/B4.
   - Implement `findForwardLinkHealth` (a page's outbound rows whose derived target state is
     trashed/broken, mapped to `ILinkTarget`); derive target state from `toPage`/target status rather
     than a stored flag
+  - **Filter the targets through the shared viewer/grant filter.** `ILinkTarget` returns the
+    target's `path`, and B4.1 made resolution follow the rename chain, so a `toPage` can point at a
+    page that has since moved somewhere the viewer cannot read. Without this filter the endpoint
+    leaks private paths to anyone who can read the linking page. `findBacklinks`' filter is on the
+    *source* pages and does not cover this
   - Done when an integration test shows forward health reports trashed/broken targets with the correct
-    state
-  - _Requirements: 5.3, 6.1, 6.2, 6.3, 6.4_
+    state, **and** that a target the viewer cannot read is omitted
+  - _Requirements: 5.3, 6.1, 6.2, 6.3, 6.4, 2.1_
   - _Boundary: PageLinkService_
   - _Depends: B5.1, B1.7_
 
