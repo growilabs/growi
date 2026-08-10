@@ -2,8 +2,19 @@ name: Release Docker Image for @growi/vault-manager
 
 # Publishes the growi-vault-manager image to Docker Hub.
 #
-# Trigger: a pull request into a `release/vault-manager/**` branch being MERGED
-# (closed with merge). The version comes from apps/growi-vault-manager/package.json.
+# Trigger: a push to master that touches apps/growi-vault-manager/package.json.
+# The version in that file decides everything — the image is published only when
+# that version is a stable one that has not been tagged yet, so a push that edits
+# the manifest without releasing is a no-op.
+#
+# The version itself comes from changesets, the same way @growi/core and
+# @growi/pluginkit are released: write a changeset naming @growi/vault-manager in
+# the development PR, and merging the generated "Release Subpackages" PR bumps
+# package.json and CHANGELOG.md on master. That merge is what publishes the image.
+# There is no separate release branch and no RC version marker.
+#
+# Note: the "Supported tags" list in apps/growi-vault-manager/docker/README.md is
+# not managed by changesets. Update it in the PR that carries the changeset.
 #
 # Secrets (already available in GitHub Actions):
 #   - DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE
@@ -11,33 +22,77 @@ name: Release Docker Image for @growi/vault-manager
 #       pull the DHI base image from dhi.io (the release stage pulls
 #       `dhi.io/node:24-debian13-dev`) and to push the built image to docker.io.
 #       Same secret used by release-pdf-converter.yml.
-#
-# Assumptions to confirm in review:
-#   - Docker Hub repository name: growilabs/vault-manager
-#   - Release branch prefix: release/vault-manager/**
 
 on:
-  pull_request:
+  push:
     branches:
-      - release/vault-manager/**
-    types: [closed]
+      - master
+    paths:
+      - apps/growi-vault-manager/package.json
+      - .github/workflows/release-vault.yml
+  # Manual re-run for recovery. Publishing stays gated on the check below, so a
+  # dispatch on an already-released version does nothing.
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 jobs:
-  build-and-push-image:
-    # Only publish when the PR is actually merged, not merely closed.
-    if: github.event.pull_request.merged == true
+  determine-release:
     runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.package-json.outputs.packageVersion }}
+      should-release: ${{ steps.decide.outputs.should-release }}
 
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.pull_request.base.ref }}
+        # Tags are the record of what has already been published; the check below
+        # reads them. History is not needed, so fetch the tags without it.
+        fetch-tags: true
 
     - name: Retrieve information from package.json
       uses: myrotvorets/info-from-package-json-action@v2.0.2
       id: package-json
       with:
         workingDir: apps/growi-vault-manager
+
+    - name: Decide whether this version needs publishing
+      id: decide
+      env:
+        VERSION: ${{ steps.package-json.outputs.packageVersion }}
+      run: |
+        TAG="vault-manager/v${VERSION}"
+
+        # A prerelease version is a work-in-progress marker, never something to publish.
+        if [[ "$VERSION" == *-* ]]; then
+          echo "::notice::${VERSION} is a prerelease version - nothing to publish."
+          echo "should-release=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        # The tag is created only after a successful publish, so its presence means
+        # this exact version is already on Docker Hub.
+        if git rev-parse -q --verify "refs/tags/${TAG}" > /dev/null; then
+          echo "::notice::${TAG} already exists - nothing to publish."
+          echo "should-release=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        echo "::notice::Publishing ${TAG}."
+        echo "should-release=true" >> "$GITHUB_OUTPUT"
+
+
+  build-and-push-image:
+    needs: determine-release
+    if: needs.determine-release.outputs.should-release == 'true'
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
 
     - name: Docker meta
       id: meta
@@ -46,9 +101,9 @@ jobs:
         images: growilabs/vault-manager
         tags: |
           type=raw,value=latest
-          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}
-          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}.{{minor}}
-          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}.{{minor}}.{{patch}}
+          type=semver,value=${{ needs.determine-release.outputs.version }},pattern={{major}}
+          type=semver,value=${{ needs.determine-release.outputs.version }},pattern={{major}}.{{minor}}
+          type=semver,value=${{ needs.determine-release.outputs.version }},pattern={{major}}.{{minor}}.{{patch}}
 
     # Authenticate to dhi.io so the release stage can pull the DHI dev base image
     # (uses the same growimoogle Docker Hub credentials as the docker.io push).
@@ -85,11 +140,13 @@ jobs:
         cache-to: type=gha,mode=max
         tags: ${{ steps.meta.outputs.tags }}
 
+    # Runs after the push so the tag always means "this version is on Docker Hub",
+    # which is what determine-release relies on.
     - name: Add tag
       uses: anothrNick/github-tag-action@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        CUSTOM_TAG: vault-manager/v${{ steps.package-json.outputs.packageVersion }}
+        CUSTOM_TAG: vault-manager/v${{ needs.determine-release.outputs.version }}
         VERBOSE: true
 
     - name: Update Docker Hub Description
@@ -99,58 +156,3 @@ jobs:
         password: ${{ secrets.DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE }}
         repository: growilabs/vault-manager
         readme-filepath: ./apps/growi-vault-manager/docker/README.md
-
-
-  create-pr-for-next-rc:
-    needs: build-and-push-image
-
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [24.x]
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.pull_request.base.ref }}
-
-    - uses: pnpm/action-setup@v6
-
-    - uses: actions/setup-node@v6
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'pnpm'
-
-    - name: Install dependencies
-      run: |
-        pnpm add turbo --global
-        pnpm install --frozen-lockfile
-
-    - name: Bump versions for next RC
-      run: |
-        turbo run version:prerelease --filter=@growi/vault-manager
-
-    - name: Retrieve information from package.json
-      uses: myrotvorets/info-from-package-json-action@v2.0.2
-      id: package-json
-      with:
-        workingDir: apps/growi-vault-manager
-
-    - name: Commit
-      uses: github-actions-x/commit@v2.9
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        push-branch: support/prepare-vault-manager-v${{ steps.package-json.outputs.packageVersion }}
-        commit-message: 'Bump vault-manager version'
-        name: GitHub Action
-
-    - name: Create PR
-      uses: repo-sync/pull-request@v2
-      with:
-        source_branch: support/prepare-vault-manager-v${{ steps.package-json.outputs.packageVersion }}
-        destination_branch: master
-        pr_title: Prepare vault-manager v${{ steps.package-json.outputs.packageVersion }}
-        pr_label: flag/exclude-from-changelog,type/prepare-next-version
-        pr_body: "An automated PR generated by ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        github_token: ${{ secrets.GITHUB_TOKEN }}
