@@ -22,6 +22,7 @@
  */
 import type EventEmitter from 'node:events';
 import type { IPage } from '@growi/core';
+import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import mongoose from 'mongoose';
 import { vi } from 'vitest';
 import { mock } from 'vitest-mock-extended';
@@ -79,7 +80,9 @@ describe('deleteExpiredWipPageBySystem', () => {
   });
 
   afterEach(async () => {
-    await Page.deleteMany({ path: new RegExp(`^${base}`) });
+    await Page.deleteMany({
+      path: new RegExp(`^${escapeStringForMongoRegex(base)}`),
+    });
     await Page.deleteMany({ _id: parentId });
   });
 

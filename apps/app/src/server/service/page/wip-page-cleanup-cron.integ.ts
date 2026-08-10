@@ -9,6 +9,7 @@
  * is a load-spreading measure with no bearing on what gets deleted.
  */
 import type { IPage } from '@growi/core';
+import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import mongoose from 'mongoose';
 import { vi } from 'vitest';
 
@@ -57,7 +58,9 @@ describe('WipPageCleanupCronService (integration)', () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await Page.deleteMany({ path: new RegExp(`^${base}`) });
+    await Page.deleteMany({
+      path: new RegExp(`^${escapeStringForMongoRegex(base)}`),
+    });
     await Page.deleteMany({ _id: parentId });
   });
 

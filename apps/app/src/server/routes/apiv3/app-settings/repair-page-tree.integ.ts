@@ -17,6 +17,7 @@ import express from 'express';
 import request from 'supertest';
 import { mock } from 'vitest-mock-extended';
 
+import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { configManager } from '~/server/service/config-manager';
@@ -143,10 +144,14 @@ describe('POST /app-settings/repair-page-tree', () => {
   it('records the activity for the started repair', async () => {
     await request(app).post('/repair-page-tree').expect(200);
 
+    // The exact action, not expect.any(String): this row is the operator-facing
+    // record of what was run, so emitting some other action must fail here.
     expect(activityEmit).toHaveBeenCalledWith(
       'update',
       mockActivityId,
-      expect.objectContaining({ action: expect.any(String) }),
+      expect.objectContaining({
+        action: SupportedAction.ACTION_ADMIN_PAGE_TREE_REPAIR,
+      }),
     );
   });
 });
