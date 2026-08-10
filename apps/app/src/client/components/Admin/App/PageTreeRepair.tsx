@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useIsMaintenanceMode } from '~/states/global';
 
 import AdminAppContainer from '../../../services/AdminAppContainer';
 import { withUnstatedContainers } from '../../UnstatedUtils';
@@ -18,6 +19,11 @@ const PageTreeRepair: FC<Props> = (props: Props) => {
 
   const { t } = useTranslation();
   const { adminAppContainer } = props;
+
+  // The endpoint rejects a repair outside maintenance mode, so without this the only
+  // way to discover the precondition is to press the button and read the error toast.
+  // `repair_note` in the card below is what explains the disabled state.
+  const isMaintenanceMode = useIsMaintenanceMode();
 
   const onConfirm = async () => {
     setIsModalShown(false);
@@ -35,7 +41,8 @@ const PageTreeRepair: FC<Props> = (props: Props) => {
       <ConfirmModal
         isModalOpen={isModalShown}
         warningMessage={t('admin:page_tree_repair.modal_repair_warning')}
-        supplymentaryMessage={t('admin:page_tree_repair.repair_note')}
+        // repair_note is already on the card behind this modal
+        supplymentaryMessage={null}
         confirmButtonTitle={t('admin:page_tree_repair.start_repair')}
         onConfirm={onConfirm}
         onCancel={() => setIsModalShown(false)}
@@ -60,7 +67,7 @@ const PageTreeRepair: FC<Props> = (props: Props) => {
             type="button"
             className="btn btn-warning"
             onClick={() => setIsModalShown(true)}
-            disabled={isStarted}
+            disabled={isStarted || !isMaintenanceMode}
           >
             {t('admin:page_tree_repair.repair_page_tree')}
           </button>
