@@ -17,32 +17,54 @@ const MAX_REQUESTS_TIER_3 = 50;
 const MAX_REQUESTS_TIER_4 = 100;
 
 // default config without reg exp
+//
+// IMPORTANT — each key here MUST be the FULLY-MOUNTED path.
+// The middleware looks the key up as `configWithoutRegExp[req.path]` (see
+// middleware/factory.ts), an exact string match against the path the request
+// actually arrives on. A key that omits the router's mount prefix therefore
+// matches nothing at all and — silently, with no error anywhere — the endpoint
+// falls back to the permissive default (DEFAULT_MAX_REQUESTS 500 ×
+// DEFAULT_USERS_PER_IP_PROSPECTION 5 = 2500 req/min/IP).
+// The auth endpoints below live on apiV3AuthRouter, mounted at '/_api/v3'
+// (server/routes/index.js), so they are keyed '/_api/v3/…'.
 export const defaultConfig: IApiRateLimitEndpointMap = {
   '/_api/v3/healthcheck': {
     method: 'GET',
     maxRequests: 60,
     usersPerIpProspection: 1,
   },
-  '/installer': {
+  // POST lives on routerForAdmin, also mounted at '/_api/v3'. The bare
+  // '/installer' only ever matched the legacy GET page route, so the POST that
+  // actually runs scrypt was unthrottled.
+  '/_api/v3/installer': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 1,
   },
-  '/login': {
+  // The legacy `POST /login` route no longer exists, so a '/login' key matched
+  // nothing and login fell back to 2500 req/min/IP — enough to saturate the libuv
+  // threadpool now that verification runs scrypt (~128MiB, ~100ms per attempt).
+  '/_api/v3/login': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 100,
   },
-  '/invited': {
+  // routerForAuth.use('/invited', …) + router.post('/'). NOTE: the previous bare
+  // '/invited' key did match the live `app.get('/invited')` page route, but its
+  // method is POST so it never applied a limit there — retargeting it to the
+  // mounted apiv3 path leaves that page's throttling unchanged.
+  '/_api/v3/invited': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_2,
   },
-  '/register': {
+  // Unauthenticated and reaches setPassword() → scrypt, same DoS surface as login.
+  '/_api/v3/register': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 20,
   },
-  '/user-activation/register': {
+  // Likewise unauthenticated and scrypt-bearing.
+  '/_api/v3/user-activation/register': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 20,
