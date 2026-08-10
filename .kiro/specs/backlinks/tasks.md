@@ -262,8 +262,9 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     BACKLINKS_PERF=1 pnpm vitest run page-link-read-perf
   ```
   (The harness rewrites the db name to `growi_test_<workerId>`, so the dev `growi` database is never
-  touched. `BACKLINKS_PERF_PAGES` / `BACKLINKS_PERF_INBOUND` override the scale;
-  `BACKLINKS_PERF_COLD=1` adds the cold-cache run below.)
+  touched. `BACKLINKS_PERF_PAGES` / `BACKLINKS_PERF_INBOUND` override the scale.) Safe against the
+  shared devcontainer mongod — the warm runs only read and write their own database. The cold-cache
+  run is **not**; it needs the separate procedure below.
 
   Environment: devcontainer MongoDB 8.2.9, wiredTiger, `rs0` single-node replica set, 16 cores /
   15.9 GB. Dataset: 100,001 pages, 205,000 link rows, hub page with 5,000 inbound sources. Pages
@@ -298,6 +299,38 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
 
   Even with the cache 19x too small to hold the data, the read is 164 ms — still ~6x under target. So
   the warm figures are not an artifact of everything being cache-resident.
+
+  **Never run the cold-cache test against the shared devcontainer mongod.** It shrinks the cache with
+  `setParameter: {wiredTigerEngineRuntimeConfig: 'cache_size=…M'}`, which is **process-wide** — the
+  `growi_test_<workerId>` database isolation that makes the warm runs safe does not apply. The restore
+  is a `finally`, so it survives a failing assertion but not the process being killed (Ctrl-C, a
+  vitest timeout kill, the container stopping). Killed mid-run against the shared instance, mongod
+  keeps the 64 MiB cache until it is restarted, silently slowing every later dev request, integ test,
+  and benchmark run — including the next run of this very test, which would then report a degraded
+  baseline as if it were the real number.
+
+  So give it a throwaway mongod of its own, and let discarding the container be the restore. The
+  devcontainer has no `docker` CLI and `mongo` is a sibling compose service, so the container is
+  started **from the host**, attached to the devcontainer's network so the test can reach it by name:
+  ```
+  # on the host — network name follows the compose project, so look it up rather than guessing
+  docker network ls --filter name=default
+  docker run --rm -d --name mongo-b21-cold --network <that-network> \
+    mongo:8.2 --replSet rs0 --bind_ip_all
+  docker exec mongo-b21-cold mongosh --quiet --eval 'rs.initiate()'
+  ```
+  ```
+  # in the devcontainer — note the host is mongo-b21-cold, NOT the shared mongo
+  MONGO_URI=mongodb://mongo-b21-cold:27017/growi?replicaSet=rs0 \
+    BACKLINKS_PERF=1 BACKLINKS_PERF_COLD=1 pnpm vitest run page-link-read-perf
+  ```
+  ```
+  # on the host — this IS the restore: the shrunk cache dies with the container
+  docker rm -f mongo-b21-cold
+  ```
+  (`BACKLINKS_PERF_COLD_CACHE_MB` sets the shrunk ceiling, default 64. The throwaway has no data
+  volume, so seeding 100k pages lands in its container filesystem; lowering `BACKLINKS_PERF_PAGES` is
+  fine here — the cold conclusion rests on the cache-to-working-set *ratio*, not the absolute scale.)
 
   - **Where the time goes:** the viewer filter, not the `distinct` — ~90% of the total. It is a
     `_id: {$in: [5k ids]}` fetch plus the grant `$or`, so it scales with the number of sources, which
