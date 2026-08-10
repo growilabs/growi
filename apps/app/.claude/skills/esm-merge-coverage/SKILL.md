@@ -1,16 +1,16 @@
 ---
 name: esm-merge-coverage
-description: ESM-ify source files that arrive from a non-ESM branch when merging into the ESM-migrated dev branch (apps/app). Use after merging master, support/mastra, or any large pre-ESM branch into dev/8.0.x — a git merge does NOT re-run any ESM transform, so incoming CJS/extension-bearing sources slip in silently and only break at build/runtime. Auto-invoked when the conversation is about merging a non-ESM branch into apps/app and bringing the result up to the ESM convention.
+description: ESM-ify source files that arrive from a pre-ESM branch when merging into apps/app. Use after merging any branch that predates the v8 ESM migration (long-lived feature branches cut from v7-era master, v7.5 maintenance work) into master or a v8 branch — a git merge does NOT re-run any ESM transform, so incoming CJS/extension-bearing sources slip in silently and only break at build/runtime. Auto-invoked when the conversation is about merging a pre-ESM branch into apps/app and bringing the result up to the ESM convention.
 user-invocable: true
 ---
 
 # ESM Merge Coverage (apps/app)
 
-After `apps/app` was migrated to native ESM (specs `esm-migration` + `esm-import-convention`),
-**every large merge from a pre-ESM branch reopens the migration for the files it carries.**
-A `git merge` copies source verbatim — it does not run any codemod, lint, or build step — so
-code written in the old style (`require`, `module.exports`, `__dirname`, `.js` in specifiers)
-lands unconverted and only fails later at `build:server` type-check, `verify-dist-resolution`,
+`apps/app` is native ESM since v8 (master is the v8 mainline), so **every merge from a
+pre-ESM branch reopens the migration for the files it carries.** A `git merge` copies
+source verbatim — it does not run any codemod, lint, or build step — so code written in
+the old style (`require`, `module.exports`, `__dirname`, `.js` in specifiers) lands
+unconverted and only fails later at `build:server` type-check, `verify-dist-resolution`,
 or runtime (`ERR_MODULE_NOT_FOUND`, `Cannot access 'X' before initialization`).
 
 This skill is the **coverage pass** that runs after such a merge: detect the incoming
@@ -18,20 +18,20 @@ non-ESM sources, convert them with the migration's own tooling, isolate what mus
 and drive the verification gates to green — finishing the merge in one pass while flagging
 the few spots that need human judgment.
 
-> **Premise**: the `esm-migration` / `esm-import-convention` tooling
-> (`tools/codemod/*`, `tools/lint/*`, `bin/add-js-extensions.ts`,
-> `bin/verify-dist-resolution.ts`) is present on the target branch. This skill orchestrates
-> that tooling; it does not reimplement it. If a referenced tool is missing, the ESM specs
-> have not been merged yet — stop and say so rather than improvising a substitute.
+> **Premise**: the tooling listed under [Tools](#tools) is present on the target branch.
+> This skill orchestrates that tooling; it does not reimplement it. If a referenced tool is
+> missing, stop and say so rather than improvising a substitute (`tool-manifest.spec.ts`
+> next to this file fails CI when a path drifts).
 
 ## When to use
 
-- Right after `git merge <pre-ESM-branch>` into an ESM'd branch (`dev/8.0.x` and later),
-  **before** committing the merge or opening a PR.
+- Right after `git merge <pre-ESM-branch>` into master or any v8 branch, **before**
+  committing the merge or opening a PR.
 - When `lint:no-cjs`, `lint:import-convention`, `build:server`, or `verify-dist-resolution`
   start failing on files that were green before a merge.
-- Not for net-new code authored on an ESM branch — that is covered by the normal lint gates.
-  This skill is specifically for **imported** code that predates the convention.
+- Not for net-new code authored on an ESM branch — that is covered by the normal lint gates
+  and `.claude/rules/esm-authoring.md`. This skill is specifically for **imported** code
+  that predates the convention.
 
 ## Operating mode
 
@@ -58,12 +58,12 @@ Partition the result:
 | **Server source** | `apps/app/src/server/**/*.{ts,js}` | Full CJS→ESM conversion (Step 2) |
 | **Other src** | `apps/app/src/**/*.{ts,tsx}` (client, states, stores, utils) | Import-convention only (Step 3) |
 | **Config consumed by CJS tools** | `apps/app/config/*.js`, new `*.config.js` | CJS isolation — `.cjs` (Step 4) |
-| **Migrations** | `apps/app/src/migrations/*.js` | Stay CJS — verify isolation only (Step 4) |
+| **Migrations** | `apps/app/src/migrations/*.js` | Convert to ESM with named exports (Step 4) |
 | **Package manifests** | new `packages/*/package.json`, `apps/*/package.json` | `"type": "module"` (Step 5) |
 | **Build config** | `next.config.ts`, `pnpm-workspace.yaml` | transpilePackages / overrides re-eval (Step 5) |
 
-Skip `node_modules`, generated dirs, and `src/migrations/**` for the codemods (the
-migrations dir is intentionally CJS).
+Skip `node_modules` and generated dirs. `src/migrations/**` gets its own codemod
+(Step 4) — do not run the server codemod over it.
 
 ## Step 2 — Convert server CJS → ESM
 
@@ -72,11 +72,11 @@ routers last) so circular-dependency breakage surfaces in the smallest possible 
 
 ```bash
 cd apps/app
-pnpm codemod:cjs-to-esm -- src/server/models src/server/events
-pnpm codemod:cjs-to-esm -- src/server/service
-pnpm codemod:cjs-to-esm -- src/server/middlewares src/server/util src/server/pageserv
-pnpm codemod:cjs-to-esm -- src/server/routes      # central routers (index.js) last
-pnpm codemod:cjs-to-esm -- src/server/crowi
+node tools/codemod/cjs-to-esm.cjs src/server/models src/server/events
+node tools/codemod/cjs-to-esm.cjs src/server/service
+node tools/codemod/cjs-to-esm.cjs src/server/middlewares src/server/util src/server/pageserv
+node tools/codemod/cjs-to-esm.cjs src/server/routes      # central routers (index.js) last
+node tools/codemod/cjs-to-esm.cjs src/server/crowi
 ```
 
 `cjs-to-esm.cjs` handles **8 patterns**:
@@ -94,7 +94,7 @@ Then fix what the codemod intentionally leaves to a human:
 
 - **`__dirname` / `__filename`** → `import.meta.dirname` / `import.meta.filename` (manual; e.g. `crowi/index.ts`, `crowi/dev.js`, `service/i18next.ts`).
 - **New intentional lazy `require`** acting as a cycle-breaker → keep it, and **add it to the `EXCLUSION_LIST`** in `tools/codemod/cjs-to-esm.cjs` so future runs leave it alone.
-- **Config specifiers** to `~/config/{migrate-mongo-config,next-i18next.config,i18next.config}` → ensure they carry `.cjs` (the codemod rewrites these; verify after).
+- **Config specifiers** to `~/config/migrate-mongo-config` → ensure they carry `.cjs` (the codemod rewrites these; verify after). The i18next configs are `.mjs` and need no suffix in the specifier.
 
 ### Circular-dependency rule (do not skip)
 
@@ -112,17 +112,16 @@ an `interfaces.ts` (as `search-delegator` did) rather than lazy-loading on a hot
 ## Step 3 — Normalize import convention (no extensions)
 
 Pre-ESM branches usually have **no** extensions (fine), but merge-conflict resolutions and
-support/mastra-style branches frequently reintroduce `.js`/`.jsx`. Strip them across all
-touched `src` files:
+branches that were themselves partway through an ESM conversion frequently reintroduce
+`.js`/`.jsx`. Strip them across all touched `src` files:
 
 ```bash
 cd apps/app
 node tools/codemod/normalize-import-convention.cjs src   # strips .js/.jsx, normalizes /index barrels
 ```
 
-> Do **not** run `add-import-extensions` on source — it *adds* extensions and is a
-> build-output tool (`add-js-extensions.ts` does the equivalent over `dist/`). In source you
-> only ever strip.
+> Extensions are **only ever added to build output**, by `bin/add-js-extensions.ts` over
+> `dist/`. In source you only ever strip.
 
 The hard rule (`apps/app/.claude/rules/import-convention.md`): **never write `.js`/`.jsx` in a
 relative (`./`, `../`) or `~/` specifier** — value and type-only alike. `.js` is added only in
@@ -132,14 +131,28 @@ while **preserving** each specifier's authored alias-vs-relative form. The alias
 choice is a readability matter and is **not** linted — follow the natural convention by hand
 (nearby = relative, distant/cross-area = `~/`).
 
-## Step 4 — Isolate what must stay CJS
+## Step 4 — Convert migrations, isolate what genuinely must stay CJS
 
-- **New config files** consumed by `migrate-mongo` / `i18next` / `nodemon` (anything that loads
-  them as CJS) → rename `*.js` → `*.cjs`, and update every importer specifier to `.cjs`.
-- **New migrations** (`src/migrations/*.js`) → leave as CJS. Confirm `src/migrations/package.json`
-  (`{ "type": "commonjs" }`) exists and that `tsconfig.build.server.json`'s `exclude` still
-  covers `src/migrations/**`. If the merge added migrations in a new location, extend the
-  isolation, do not ESM-convert them (migrate-mongo is not ESM-capable).
+- **New migrations** (`src/migrations/*.js`) → **convert to ESM**. Migrations are ESM on
+  this branch (there is no `src/migrations/package.json` isolation any more), and
+  `migrate-mongo` reads `migration.up` / `migration.down` off the loaded module, so they
+  need **named exports** — `export async function up() {}`, never `module.exports = {…}`
+  (which throws under `type: module`) and never `export default { up, down }` (which leaves
+  `migration.up` undefined).
+
+  ```bash
+  cd apps/app
+  node tools/codemod/migrations-cjs-to-esm.cjs src/migrations   # requires jscodeshift installed
+  ```
+
+  A merge typically leaves a *hybrid* file — ESM `import` at the top plus a CJS
+  `module.exports` at the bottom — which passes review by eye and dies at run time. If
+  `jscodeshift` is not installed in the current environment, apply the codemod's
+  transformation by hand and verify with `node --check`.
+- **New config files** consumed by a CJS-only CLI (`migrate-mongo` is the remaining one)
+  → keep them `.cjs`, with a hand-written `.d.cts` sibling, and update every importer
+  specifier to `.cjs`. Config consumed by ESM-capable tooling should be `.mjs`
+  (`config/i18next.config.mjs`, `config/next-i18next.config.mjs` are the precedent).
 
 ## Step 5 — Package & build config
 
@@ -190,12 +203,32 @@ and their result, and an explicit list of **unresolved / human-judgment** items
 conversions, cycle splits). The merge is not done until the gates are green and that list is
 empty or explicitly accepted.
 
-## References
+## Tools
 
-- Specs: `.kiro/specs/esm-migration/` (core CJS→ESM, design.md Codemod Transform = the 8 patterns,
-  circular-dependency baseline) and `.kiro/specs/esm-import-convention/` (no-extension convention,
-  emit-time `.js`, dist verification).
-- Rule: `apps/app/.claude/rules/import-convention.md`.
-- Tools: `tools/codemod/{cjs-to-esm,normalize-import-convention,add-import-extensions,migrations-cjs-to-esm}.cjs`,
-  `tools/lint/{import-extension-guard,route-top-level-guard}.cjs`,
-  `bin/{add-js-extensions,verify-dist-resolution,postbuild-server}.ts`.
+The tools live in the repo (inside Biome's and CI's reach), not in this skill directory;
+this list is the binding between them and `tool-manifest.spec.ts` fails when a path
+drifts. All paths are relative to `apps/app/`.
+
+| Tool | Role |
+|---|---|
+| `tools/codemod/cjs-to-esm.cjs` | CJS→ESM conversion of server source (the 8 patterns above). Migration-only: it exists for pre-ESM merges |
+| `tools/codemod/migrations-cjs-to-esm.cjs` | migrate-mongo migrations → ESM with named `up`/`down` |
+| `tools/codemod/normalize-import-convention.cjs` | Strips `.js`/`.jsx` from relative / `~/` specifiers, normalises `/index` barrels (also the everyday batch fixer for the lint below) |
+| `tools/lint/import-extension-guard.cjs` | `lint:import-convention` — fails on any `.js`/`.jsx` in a relative / `~/` specifier |
+| `tools/lint/route-top-level-guard.cjs` | `lint:route-guard` (central-router top-level invariant) and `lint:no-cjs` (`--cjs-only`) |
+| `bin/add-js-extensions.ts` | Post-build: adds `.js` / `/index.js` / `.jsx` to `dist/` specifiers |
+| `bin/verify-dist-resolution.ts` | CI: every relative import in `dist/` points at a real file |
+| `bin/postbuild-server.ts` | `postbuild:server` — moves `transpiled/` → `dist/` and invokes `add-js-extensions` |
+
+The codemods need `jscodeshift` (a devDependency); it is occasionally missing in a fresh
+environment, in which case both the codemods and `lint:import-convention` fail to run —
+install first rather than hand-editing at scale.
+
+## Related documentation
+
+- `apps/app/.claude/rules/import-convention.md` — the no-extension convention (canonical).
+- `apps/app/.claude/rules/esm-authoring.md` — native-ESM traps that survive build and boot
+  (JSON import attributes, `__dirname`, CJS default-import interop, TS2742, the
+  no-`Crowi`-import cycle invariant). Read it before converting anything by hand.
+- `apps/app/.claude/skills/app-commands/SKILL.md` — smoke-testing procedures, including the
+  authorization-matrix regression check and the external-plugin install smoke.

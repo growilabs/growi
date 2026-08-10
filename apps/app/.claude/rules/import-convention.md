@@ -1,15 +1,15 @@
 # Import Convention (apps/app/src)
 
-Source files in `apps/app/src` follow a **no-extension import convention** (since
-esm-import-convention, 2026-06): a relative (`./`, `../`) or `~/` alias specifier
-**must not carry a `.js` / `.jsx` extension**. The required `.js` is added only in the
-server build *output*, never written in source.
+Source files in `apps/app/src` follow a **no-extension import convention** (adopted
+2026-06): a relative (`./`, `../`) or `~/` alias specifier **must not carry a `.js` /
+`.jsx` extension**. The required `.js` is added only in the server build *output*,
+never written in source.
 
-This replaces the former dual-notation scheme (`~/X.js` alias for NodeNext-program
-files, extensionless relative for client-only files) that esm-migration introduced —
-under which *which* form a file had to use depended on its invisible NodeNext-program
-membership. Removing `.js` from source removes that coupling: both forms now resolve
-everywhere, so the choice is free.
+This replaced a short-lived dual-notation scheme (`~/X.js` alias for files inside the
+NodeNext server-build program, extensionless relative for client-only files) under
+which *which* form a file had to use depended on its invisible program membership.
+Removing `.js` from source removes that coupling: both forms now resolve everywhere,
+so the choice is free.
 
 ## The Rule
 
@@ -38,10 +38,10 @@ correctness one, and the lint does **not** police it.
 
 The codebase follows the **natural convention**: a nearby reference (same area of `src/`)
 uses a relative path (`./Sibling`, `../Near`), and a distant / cross-area reference uses
-a `~/` alias (`~/states/context`). The esm-import-convention migration restored this form
-to match the base branch — esm-migration had temporarily rewritten many nearby relatives
-to `~/…js` aliases to satisfy NodeNext, and removing `.js` from source makes that
-workaround unnecessary. New code should follow the same natural convention by hand.
+a `~/` alias (`~/states/context`). This is the form the codebase had before the ESM
+migration temporarily rewrote many nearby relatives to `~/…js` aliases to satisfy
+NodeNext; removing `.js` from source made that workaround unnecessary and the natural
+form was restored. New code should follow the same convention by hand.
 
 ## Why no `.js` in source
 

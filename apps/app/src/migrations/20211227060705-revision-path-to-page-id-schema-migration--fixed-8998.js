@@ -18,8 +18,22 @@ const logger = loggerFactory(
 
 const LIMIT = 300;
 
+/**
+ * Connect only when disconnected. Under the migrate-mongo CLI nothing has opened
+ * a mongoose connection yet, so this connects as before; when a caller already
+ * holds one (the integration test, which is bound to a per-worker database whose
+ * name getMongoUri() does not know), re-connecting would throw
+ * "Can't call `openUri()` on an active connection with different connection strings".
+ * see: https://mongoosejs.com/docs/api/connection.html#connection_Connection-readyState
+ */
+async function connectIfDisconnected() {
+  if (mongoose.connection.readyState === 0) {
+    await mongoose.connect(getMongoUri(), mongoOptions);
+  }
+}
+
 export async function up(db, client) {
-  await mongoose.connect(getMongoUri(), mongoOptions);
+  await connectIfDisconnected();
   const Page = getModelSafely('Page') || getPageModel();
 
   const pagesStream = await Page.find(
@@ -60,7 +74,7 @@ export async function up(db, client) {
 }
 
 export async function down(db, client) {
-  await mongoose.connect(getMongoUri(), mongoOptions);
+  await connectIfDisconnected();
   const Page = getModelSafely('Page') || getPageModel();
 
   const pagesStream = await Page.find(

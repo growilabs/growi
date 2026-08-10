@@ -4,7 +4,8 @@ import { afterAll, beforeAll } from 'vitest';
 
 import { mongoOptions } from '~/server/util/mongoose-utils';
 
-import { getTestDbConfig, MONGOMS_BINARY_OPTS } from './utils';
+import { getTestDbConfig } from './test-db-config';
+import { MONGOMS_BINARY_OPTS } from './utils';
 
 let mongoServer: MongoMemoryReplSet | undefined;
 

@@ -1,6 +1,6 @@
 /**
  * WebSocket-specific fixtures for the /yjs/<pageId> and socket.io
- * authorization matrix baseline (task 0.3.2).
+ * authorization matrix baseline.
  *
  * Why not reuse the HTTP-side `personas.ts` injector?
  *   The apiv3 matrix uses a test-only Express middleware that populates
@@ -21,8 +21,6 @@
  *        - one the user CANNOT view (GRANT_OWNER by a different user)
  *   3. Log the user in via POST /_api/v3/login and extract the
  *      session cookie (`connect.sid=...`) from Set-Cookie
- *
- * Requirements covered: 2.6, 6.5
  */
 
 import { request as httpRequest } from 'node:http';
