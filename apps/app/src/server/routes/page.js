@@ -305,7 +305,7 @@ export const setup = (crowi, _app) => {
    *               revision_id:
    *                 type: string
    *                 format: ObjectId
-   *                 description: Revision ID for conflict detection
+   *                 description: Revision ID for conflict detection. Required to soft delete a non-empty page — the request is rejected with 'outdated' unless it is the page's latest revision. Not consulted when completely is true, or for an empty page.
    *                 example: "507f1f77bcf86cd799439012"
    *               completely:
    *                 type: boolean
@@ -327,6 +327,7 @@ export const setup = (crowi, _app) => {
    *               summary: Recursive soft delete
    *               value:
    *                 page_id: "507f1f77bcf86cd799439011"
+   *                 revision_id: "507f1f77bcf86cd799439012"
    *                 recursively: true
    *             completeDelete:
    *               summary: Complete deletion
@@ -437,7 +438,9 @@ export const setup = (crowi, _app) => {
           );
         }
 
-        if (!page.isEmpty && !page.isUpdatable(previousRevision)) {
+        // isUpdatable is async: without the await the negation is always false and
+        // this conflict check never fires
+        if (!page.isEmpty && !(await page.isUpdatable(previousRevision))) {
           return res.json(
             ApiResponse.error(
               "Someone could update this page, so couldn't delete.",
