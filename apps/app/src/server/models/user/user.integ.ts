@@ -169,6 +169,85 @@ describe('User', () => {
     });
   });
 
+  describe('User.findUserByUsernameRegexWithTotalCount', () => {
+    afterEach(async () => {
+      await User.deleteMany({ username: { $regex: '^regexTest' } });
+    });
+
+    test('matches usernames by prefix', async () => {
+      await User.create({
+        name: 'Regex Test',
+        username: 'regexTestJohnson',
+        email: 'regexTestJohnson1@example.com',
+        password: 'regexTestPass',
+        lang: 'en_US',
+        status: UserStatus.STATUS_ACTIVE,
+      });
+
+      const { users, totalCount } =
+        await User.findUserByUsernameRegexWithTotalCount(
+          'regexTestJohn',
+          [UserStatus.STATUS_ACTIVE],
+          { offset: 0, limit: 10 },
+        );
+
+      expect(users.map((u: { username: string }) => u.username)).toEqual([
+        'regexTestJohnson',
+      ]);
+      expect(totalCount).toBe(1);
+    });
+
+    test('matches a mid-string occurrence', async () => {
+      await User.create({
+        name: 'Regex Test',
+        username: 'regexTestJohnson',
+        email: 'regexTestJohnson2@example.com',
+        password: 'regexTestPass',
+        lang: 'en_US',
+        status: UserStatus.STATUS_ACTIVE,
+      });
+
+      const { users } = await User.findUserByUsernameRegexWithTotalCount(
+        'hnso',
+        [UserStatus.STATUS_ACTIVE],
+        { offset: 0, limit: 10 },
+      );
+
+      expect(users.map((u: { username: string }) => u.username)).toEqual([
+        'regexTestJohnson',
+      ]);
+    });
+
+    test('treats regex metacharacters in the query as literal characters', async () => {
+      await User.create({
+        name: 'Regex Test',
+        username: 'regexTestJohn.doe',
+        email: 'regexTestJohnDotDoe@example.com',
+        password: 'regexTestPass',
+        lang: 'en_US',
+        status: UserStatus.STATUS_ACTIVE,
+      });
+      await User.create({
+        name: 'Regex Test',
+        username: 'regexTestJohnXdoe',
+        email: 'regexTestJohnXDoe@example.com',
+        password: 'regexTestPass',
+        lang: 'en_US',
+        status: UserStatus.STATUS_ACTIVE,
+      });
+
+      const { users } = await User.findUserByUsernameRegexWithTotalCount(
+        'regexTestJohn.doe',
+        [UserStatus.STATUS_ACTIVE],
+        { offset: 0, limit: 10 },
+      );
+
+      expect(users.map((u: { username: string }) => u.username)).toEqual([
+        'regexTestJohn.doe',
+      ]);
+    });
+  });
+
   describe('User Utilities', () => {
     describe('Get user exists from user page path', () => {
       test('found', async () => {

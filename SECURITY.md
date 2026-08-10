@@ -13,7 +13,7 @@
 
 If you believe you have found a security vulnerability in any GROWI related repository, please report it to us using one of the methods described below.
 
-  * [Join our Slack team](https://communityinviter.com/apps/wsgrowi/invite/) and send DM to `@yuki` who is the lead developer
+  * [Join our Slack team](https://docs.growi.org/slack) and send DM to `@yuki` who is the lead developer
   * Report to JPCERT/CC[^jpcertcc]
     * [[PDF] JPCERT/CC Vulnerability Coordination and Disclosure Policy](https://www.jpcert.or.jp/english/vh/vul-coordination-disclosure-policy_2019.pdf)
 
