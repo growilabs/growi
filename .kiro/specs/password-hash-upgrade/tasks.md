@@ -47,14 +47,14 @@
 
 - [x] 2.2 Make isPasswordValid, setPassword, and updatePassword async and delegate to PasswordHashService
   - Make `isPasswordValid(password)` async: call `PasswordHashService.verify(password, this.passwordHash, this.password, SEED)` and return the `VerifyResult`
-  - Make `setPassword(password)` async: only set `this.passwordHash = await PasswordHashService.hash(password)`, and do not modify the `password` (SHA-256) field (retained for downgrade safety)
+  - Make `setPassword(password, options?)` async: set `this.passwordHash = await PasswordHashService.hash(password)` **and retire the legacy `password` (SHA-256) field** (`this.password = undefined` → `$unset` on save). A replaced password must not stay verifiable: otherwise, after a change/reset, the OLD password still authenticates on a downgraded build. The exception is `options.keepLegacyHash: true`, passed only by the lazy migration in `verifyLocalCredentials`, which re-hashes the SAME password and therefore keeps the legacy field (the `both` state = downgrade safety during the migration period)
   - Update all **five existing methods** that call `setPassword` to add `await` (if left un-awaited, `save()` would persist without passwordHash set, making login impossible):
     - `updatePassword` (v8: setPassword call at line ~230)
     - `activateInvitedUser` (v8: line ~299) — invited-user activation. **If missing, the affected user cannot log in**
     - `resetPasswordByRandomString` (v8: line ~598)
     - `createUserByEmail` (v8: line ~614) — email-invited user creation. **If missing, the affected user cannot log in**
     - `createUserByEmailAndPasswordAndStatus` (v8: line ~706)
-  - Confirm that after `setPassword()` `passwordHash` is set, the `password` field is unchanged, and all five callers work without TypeScript compilation errors
+  - Confirm that after `setPassword()` `passwordHash` is set and the legacy `password` field is cleared (and that `{ keepLegacyHash: true }` keeps it), and that all five callers work without TypeScript compilation errors
   - _Requirements: 1.1, 1.3, 2.1, 2.2_
   - _Boundary: User Model_
 
@@ -114,7 +114,7 @@
 - [x] 3.1 Make Passport LocalStrategy async and trigger lazy migration
   - Change or wrap `findUserByUsernameOrEmail` from callback style to Promise-based (async/await)
   - Change the LocalStrategy callback to an async function, passing all errors to `done(err)` in a try/catch
-  - When `VerifyResult.needsRehash === true` (on successful legacy authentication): execute `await user.setPassword(password)` + `await user.save()` before returning `done(null, user)`
+  - When `VerifyResult.needsRehash === true` (on successful legacy authentication): execute `await user.setPassword(password, { keepLegacyHash: true })` + `await user.save()` before returning `done(null, user)` (`keepLegacyHash` retains the legacy SHA-256 field — this path re-hashes the SAME password, so nothing is retired)
   - On a `save()` failure during lazy migration, record an error log but still let the login succeed (it can be retried on the next login)
   - When `isValid === false`, return `done(null, false)`
   - Confirm that when a user with a SHA-256 hash logs in for the first time, the `passwordHash` field is set in the DB
@@ -146,18 +146,18 @@
 
 - [x] 4.2 (P) Implement the Cleanup standalone script
   - Create `apps/app/src/server/scripts/password-hash-cleanup.ts` (a standalone script not managed by migrate-mongo)
-  - At script start, get the number of `legacyOnly` users (`passwordHash` absent, `password` present)
-  - If `legacyOnly > 0`: output an error message (including the count) and process.exit(1) (Req 3.4)
-  - If `legacyOnly === 0`: `$unset` the legacy `password` from every `both`-category user via `updateMany(bothFilter, { $unset: { password: '' } })`, using the shared `bothFilter` from `password-hash-format-filters.ts` (Req 3.3)
-  - Confirm that when `legacyOnly > 0` it aborts with no changes made to the DB, and that the error message includes the count
+  - At script start, get the number of `legacyOnly` users (`passwordHash` absent, `password` present) **among ACTIVE users** (`activeUserFilter`), plus the non-active count separately
+  - If the ACTIVE `legacyOnly` count > 0: output an error message (including both counts) and process.exit(1) (Req 3.4). Non-active `legacyOnly` users must NOT block the abort — they can never log in, so lazy migration can never migrate them and the cleanup phase would be unreachable forever; WARN about them instead
+  - Otherwise: `$unset` the legacy `password` from every `both`-category user via `updateMany(bothFilter, { $unset: { password: '' } })`, using the shared `bothFilter` from `password-hash-format-filters.ts` (Req 3.3). This write is deliberately NOT status-scoped
+  - Confirm that when ACTIVE `legacyOnly` users exist it aborts with no changes made to the DB, that the error message includes the count, and that a non-active `legacyOnly` user alone does not abort the run
   - _Requirements: 3.3, 3.4_
   - _Boundary: Cleanup migration script_
 
 - [x] 4.3 (P) Implement the Downgrade prep standalone script
   - Create `apps/app/src/server/scripts/password-hash-downgrade-prep.ts` (a standalone script that requires the Crowi bootstrap)
-  - In the script, tally and log the number of users who would be unable to log in after a downgrade (`passwordHash` present, `password` absent) (Req 4.1)
+  - In the script, tally and log the number of users who would be unable to log in after a downgrade (`passwordHash` present, `password` absent), split into ACTIVE (processed) and non-active (reported only) (Req 4.1)
   - When the environment variable `SEND_RESET_EMAILS` is `'true'`:
-    - For each target user, create a `PasswordResetOrder` and send a reset email using the existing mail service (Req 4.2)
+    - For each **ACTIVE** target user, create a `PasswordResetOrder` and send a reset email using the existing mail service (Req 4.2). Non-active users are never emailed and never `$unset`: `/forgot-password` rejects them on both POST and PUT, so removing their `passwordHash` would be a permanent lockout — WARN and leave them for manual handling
     - **Only after confirming the email was sent successfully**, `$unset` (remove the field entirely) the `passwordHash` of the successful users to make login impossible (Req 4.3)
     - **CRITICAL**: use `$unset` (remove the field entirely) rather than assigning `null`/`''`. The shared classification filters treat a `null`/empty credential as ABSENT (`present` = `{ $exists: true, $nin: [null, ''] }`), so `$unset` moves the user cleanly to `noPassword`; leaving a stray `null`/`''` field is avoided for consistency with `statusDelete`'s `undefined` scrub, keeping counts accurate and preventing duplicate email sends on re-run
     - Do not unset users whose send failed (they can be retried on the next re-run)
@@ -176,7 +176,7 @@
   - _Boundary: Status migration script_
 
 - [x] 5.2 (P) Create integration tests for the Cleanup standalone script
-  - Confirm that with `legacyOnly` users present the script run aborts and no user document is changed
+  - Confirm that with ACTIVE `legacyOnly` users present the script run aborts and no user document is changed, and that a NON-ACTIVE `legacyOnly` user does not block the run (it is only reported)
   - Confirm that when all users are already migrated to `passwordHash` the `password` field is `$unset`
   - Confirm that the integration test PASSes
   - _Requirements: 3.3, 3.4_
@@ -186,6 +186,7 @@
   - Confirm that when `SEND_RESET_EMAILS` is unset the DB is not changed and only the counts are output
   - Confirm that when `SEND_RESET_EMAILS=true` a `PasswordResetOrder` is created for the target users
   - Confirm that when `SEND_RESET_EMAILS=true` only users whose email was sent successfully have their `passwordHash` `$unset` (field absent), and that the `passwordHash` of users whose send failed is unchanged
+  - Confirm that a NON-ACTIVE `upgradedOnly` user is never emailed and never `$unset` (it is only counted)
   - Confirm that a user after `$unset` is classified as `noPassword` by the status migration and does not remain in `upgradedOnly` (regression prevention for duplicate email sends)
   - Confirm that the integration test PASSes
   - _Requirements: 4.1, 4.2, 4.3_

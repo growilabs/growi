@@ -4,7 +4,7 @@
 
 Migrate the password hashing in GROWI's local authentication system from SHA-256 (global `PASSWORD_SEED` pepper, no per-user salt) to **scrypt** from `node:crypto` (a memory-hard KDF with a per-user random salt). This resolves the CodeQL `js/insufficient-password-hash` (CWE-916) alert. scrypt is built into Node.js (OpenSSL), requires no new dependency, and has no native-build issues on Alpine/musl.
 
-The migration is implemented as a **lazy migration**. Existing users are automatically re-hashed to a scrypt hash on their next login, so the migration is seamless and requires no password reset. A **dual-field design** (`password` = retains the SHA-256 hash, `passwordHash` = stores the scrypt self-describing string) means that, before the Cleanup migration is run, a user who still has a `password` (SHA-256) field can continue to authenticate on the older version even after a downgrade. **This holds only for users who already had a SHA-256 password**; users created, invited, or reset on the new version have `passwordHash` only (`upgradedOnly`, no legacy `password`) and would be locked out by a downgrade even before Cleanup — the downgrade-prep script targets exactly these users.
+The migration is implemented as a **lazy migration**. Existing users are automatically re-hashed to a scrypt hash on their next login, so the migration is seamless and requires no password reset. A **dual-field design** (`password` = retains the SHA-256 hash, `passwordHash` = stores the scrypt self-describing string) means that, before the Cleanup migration is run, a user who still has a `password` (SHA-256) field can continue to authenticate on the older version even after a downgrade. **This holds only for a credential that was never replaced**: the legacy hash is retained exactly in the lazy-migration case (the same password is only re-hashed, so nothing is retired). Users created, invited, or **whose password was changed / reset** on the new version have `passwordHash` only (`upgradedOnly`, no legacy `password`) and would be locked out by a downgrade even before Cleanup — the downgrade-prep script targets exactly these users. Retiring the legacy hash on a password change/reset is deliberate: keeping the SHA-256 hash of a **replaced** password would let that retired password still authenticate on a downgraded build (a credential-revocation hole).
 
 **Users**: GROWI administrators (managing the migration lifecycle) and end users (transparent migration).  
 **Impact**: Adds a `passwordHash` field to the User model, makes password verification async throughout the entire stack, and adds one read-only migrate-mongo migration (status) plus two standalone administrative scripts (cleanup and downgrade-prep).
@@ -14,7 +14,7 @@ The migration is implemented as a **lazy migration**. Existing users are automat
 - Resolve the CodeQL `js/insufficient-password-hash` (CWE-916) alert
 - Apply scrypt (at or above OWASP-recommended parameters, with a per-user salt) for new passwords and password changes
 - Allow existing SHA-256 users to continue logging in seamlessly without a password reset
-- Keep SHA-256 users authenticating after a downgrade, as long as it happens before the Cleanup migration is run
+- Keep SHA-256 users authenticating after a downgrade, as long as it happens before the Cleanup migration is run and their password has not been changed/reset in the meantime
 - Provide a set of migration scripts for visualizing, managing, cleaning up, and handling downgrade of the migration progress
 
 ### Non-Goals
@@ -133,14 +133,23 @@ apps/app/src/server/models/user/
                                                 # truth reused by status / cleanup / downgrade-prep
 
 apps/app/src/server/service/
-└── password-hash.ts                        # PasswordHashService (scrypt + legacy verify, hash)
+├── password-hash.ts                           # PasswordHashService (scrypt + legacy verify, hash)
+└── password-reset/                            # shared password-reset mail flow, extracted so the
+    ├── index.ts                               # apiv3 forgot-password route and downgrade-prep cannot
+    └── send-password-reset-email.ts           # drift: createAndSendPasswordResetOrder (PasswordResetOrder
+                                                # creation + mail) and sendPasswordResetTemplateEmail
+                                                # (template allowlist + subject + template vars)
 
 apps/app/src/migrations/
 └── 20260724000001-password-hash-status.js     # Req 3.1, 3.2: hash format count report (read-only, migrate-mongo)
                                                 # v8: timestamp MUST be later than the latest existing migration (20260721103639)
 
 apps/app/src/server/scripts/
-├── script-runner.ts                           # shared isEntryPoint + withMongoConnection for the standalone scripts
+├── script-runner.ts                           # shared standalone-script runtime: isEntryPoint,
+                                                # withMongoConnection, redactMongoUri (keeps credentials
+                                                # out of the connection log line) and exitAfterLogFlush
+                                                # (drains pino's transport worker before exiting, so the
+                                                # abort/completion report is never dropped)
 ├── password-hash-cleanup.ts                   # Req 3.3, 3.4: remove legacy password (standalone admin script)
 └── password-hash-downgrade-prep.ts            # Req 4.1, 4.2, 4.3: count + optional reset email (standalone, Crowi bootstrap)
 ```
@@ -154,7 +163,11 @@ apps/app/src/server/models/user/index.js
   — Add passwordHash: String to Mongoose schema
   — Update isPasswordSet() to check either field
   — Make isPasswordValid(password) async → delegates to PasswordHashService.verify()
-  — Make setPassword(password) async → writes passwordHash via PasswordHashService.hash()
+  — Make setPassword(password, { keepLegacyHash }) async → writes passwordHash via
+    PasswordHashService.hash(), and RETIRES the legacy `password` (SHA-256) unless
+    keepLegacyHash is set. Only the Passport lazy re-hash (same password, nothing
+    replaced) passes keepLegacyHash: true, so a changed/reset credential cannot
+    still authenticate on a downgraded build
   — await ALL 5 setPassword call sites: updatePassword, activateInvitedUser,
     resetPasswordByRandomString, createUserByEmail, createUserByEmailAndPasswordAndStatus
   — statusDelete(): unset BOTH credential fields on user deletion — set
@@ -164,10 +177,27 @@ apps/app/src/server/models/user/index.js
     malformed/legacy field (avoids a spurious Req 2.4 WARNING and mis-counting as legacyOnly)
   — DELETE findUserByEmailAndPassword() (dead code: no call sites exist)
 
+apps/app/src/server/models/user/index.prisma.ts
+  — serializeSecurely (the Prisma-side counterpart of @growi/core's omitInsecureAttributes)
+    must select and then strip passwordHash. Selecting it is required: an omitted field
+    cannot be stripped, and the raw scrypt hash otherwise reaches API responses that read
+    users through Prisma (e.g. /bookmarks/info)
+
+apps/app/src/server/routes/apiv3/forgot-password.js
+  — Both mail sends now delegate to the shared service (createAndSendPasswordResetOrder for
+    the request flow, sendPasswordResetTemplateEmail for the "reset succeeded" mail), so the
+    route and the downgrade-prep script cannot drift apart
+
+apps/app/src/features/rate-limiter/config/index.ts
+  — Correct the login rate-limit key to the fully-mounted path '/_api/v3/login'.
+    The middleware matches req.path EXACTLY, so the old '/login' key (a legacy route that
+    no longer exists) matched nothing and login ran at the permissive default —
+    unacceptable now that each attempt costs a ~128MiB / ~100ms scrypt on the libuv pool
+
 apps/app/src/server/service/passport.ts
   — Make LocalStrategy callback async
   — Update isPasswordValid call site (line ~285) to await + read VerifyResult.isValid
-  — Trigger lazy migration (await user.setPassword + save) when needsRehash is true
+  — Trigger lazy migration (await user.setPassword(pw, { keepLegacyHash: true }) + save) when needsRehash is true
 
 apps/app/src/server/routes/apiv3/personal-setting/index.js
   — isPasswordValid call site (line ~432): await user.isPasswordValid(oldPassword)
@@ -190,8 +220,16 @@ packages/core/src/models/serializers/user-serializer.ts
 packages/core/src/interfaces/user.ts
   — Add passwordHash?: string to IUser interface
 
-(No dependency addition to apps/app/package.json is needed — scrypt is built into node:crypto. Adding bcryptjs / @types/bcryptjs is also unnecessary.
- However, changes to @growi/core's serializer/IUser require a changeset because it is a published package — see above)
+apps/app/package.json
+  — No dependency is added (scrypt is built into node:crypto; bcryptjs / @types/bcryptjs are
+    unnecessary), but four scripts are: password-hash:cleanup / :downgrade-prep run the built
+    output under `cross-env NODE_ENV=production node --import ./bin/runtime/env-preload.mjs
+    dist/server/scripts/…` (the preload is what loads the deployment's env), and the
+    :cleanup:dev / :downgrade-prep:dev counterparts run the TS sources via `tsrun`.
+    The scripts are the documented entry points — the JSDoc in both scripts points at them
+    rather than at a bare `node dist/…` command, so the invocation cannot drift
+
+(Changes to @growi/core's serializer/IUser require a changeset because it is a published package — see above)
 ```
 
 ---
@@ -226,7 +264,7 @@ sequenceDiagram
     alt isValid=false
         Passport-->>Client: 401 Unauthorized
     else isValid=true and needsRehash=true
-        Passport->>User: setPassword(plaintext)
+        Passport->>User: setPassword(plaintext, { keepLegacyHash: true })
         User->>PHS: hash(plaintext)
         PHS->>PHS: scrypt(plaintext, salt, SCRYPT_PARAMS) → encode scrypt$N$r$p$salt$hash
         PHS-->>User: scryptHash
@@ -371,7 +409,8 @@ export interface IPasswordHashService {
 - Add a `passwordHash: String` field to the schema
 - `isPasswordSet()`: check both fields with `!!(this.passwordHash || this.password)`
 - `isPasswordValid(password)`: async. Calls `PasswordHashService.verify(password, this.passwordHash, this.password, SEED)`
-- `setPassword(password)`: async. Sets only `passwordHash = await PasswordHashService.hash(password)`. Does not modify the `password` (SHA-256) field (maintains downgrade safety)
+- `setPassword(password, options?)`: async. Sets `passwordHash = await PasswordHashService.hash(password)` **and retires the legacy `password` (SHA-256) field** (`this.password = undefined` → `$unset` on save, consistent with `statusDelete()`). Retiring it is required for credential revocation: after a password change / admin reset, a retained SHA-256 hash would still authenticate the **old** password on a downgraded build. The user thereby becomes `upgradedOnly` and is covered by the downgrade-prep script
+  - `options.keepLegacyHash: true` is used by **one** call site only — the lazy migration in `verifyLocalCredentials` — where the SAME plaintext that just verified against the legacy hash is being re-hashed. Nothing is retired there, so the legacy hash is kept and the user reaches the `both` state, which is what preserves downgrade safety during the migration period (Req 1.3)
 - Make **all 5 methods** that call `setPassword` use `await` (leaving `save()` without awaiting would save without setting passwordHash, making login impossible):
   - `updatePassword`, `activateInvitedUser`, `resetPasswordByRandomString`, `createUserByEmail`, `createUserByEmailAndPasswordAndStatus`
 - `findUserByEmailAndPassword(email, password)`: **delete it** (dead code; no call site exists anywhere in the repository). This method queries the DB by password hash and will no longer work after the scrypt migration, but since there is no call site, deletion (not refactoring) is the appropriate action
@@ -388,7 +427,7 @@ export interface IPasswordHashService {
 
 isPasswordSet(): boolean
 isPasswordValid(password: string): Promise<VerifyResult>
-setPassword(password: string): Promise<this>
+setPassword(password: string, options?: { keepLegacyHash?: boolean }): Promise<this>
 updatePassword(password: string): Promise<UserDocument>
 ```
 
@@ -413,7 +452,7 @@ updatePassword(password: string): Promise<UserDocument>
 - Make the LocalStrategy callback async (guarantee done(err) with try/catch)
 - Receive the `VerifyResult` of `isPasswordValid(password)`:
   - `isValid=false` → return `done(null, false)`
-  - `isValid=true, needsRehash=true` → return `done(null, user)` after `await user.setPassword(password); await user.save()`
+  - `isValid=true, needsRehash=true` → return `done(null, user)` after `await user.setPassword(password, { keepLegacyHash: true }); await user.save()` (the flag keeps the legacy SHA-256 hash: this path only re-hashes the SAME password, so nothing is retired and the user reaches the `both` state)
   - `isValid=true, needsRehash=false` → return `done(null, user)` as-is
 
 **Dependencies**
@@ -480,9 +519,11 @@ Idempotency: updateMany against users that no longer have password is a no-op
 ```
 
 **Processing flow**:
-1. Obtain the `legacyOnly` count
-2. If `legacyOnly > 0`: log an error message (including the count) and abort processing (Req 3.4)
-3. If `legacyOnly === 0`: run `updateMany(bothFilter, { $unset: { password: '' } })` using the shared `bothFilter` (both credentials present) from `password-hash-format-filters.ts`
+1. Obtain the `legacyOnly` count **for ACTIVE users** (`activeUserFilter`), and separately for non-active users (`nonActiveUserFilter`)
+2. If the ACTIVE `legacyOnly` count > 0: log an error message (including both counts) and abort processing (Req 3.4)
+3. Otherwise: WARN about any non-active `legacyOnly` users and run `updateMany(bothFilter, { $unset: { password: '' } })` using the shared `bothFilter` (both credentials present) from `password-hash-format-filters.ts`
+
+> **Why only ACTIVE users block the abort**: lazy migration is the only thing that can move a `legacyOnly` user forward, and it happens on login. Non-active users are **not** excluded on the grounds that they cannot log in — they can: the login path applies no status filter (`findUserByUsernameOrEmail` has no status condition and `verifyLocalCredentials` rehashes without consulting status; status is read only *after* authentication succeeds, in `createRedirectToForUnauthenticated`, to choose the redirect — which is exactly how the invited-user onboarding flow works). They are excluded because an admin cannot **wait for or compel** them to log in before the cleanup window: an invitee may never accept, a suspended or deleted account may never return. Letting a single such document block would make Phase 3 unreachable indefinitely. They are reported at WARNING instead. The `$unset` itself is intentionally **not** status-scoped — removing a suspended user's retired legacy hash is correct and desirable.
 
 **Risks**: After Cleanup runs, the `password` field is gone, so if you downgrade, users with only `passwordHash` cannot log in. Administrators must run the downgrade-prep script before downgrading
 
@@ -504,13 +545,15 @@ Idempotency: idempotent if counting only. Be careful with SEND_RESET_EMAILS=true
 ```
 
 **Processing flow**:
-1. Tally and log the count of `upgradedOnly` users (`passwordHash` present, `password` absent) (Req 4.1)
+1. Tally and log the count of `upgradedOnly` users (`passwordHash` present, `password` absent), split into **ACTIVE** (the actionable set) and non-active (WARNing only) (Req 4.1)
 2. If the environment variable `SEND_RESET_EMAILS` is not `'true'`: output a warning message and exit
-3. If `SEND_RESET_EMAILS=true`:
-   - For each target user, create a `PasswordResetOrder` (existing infrastructure)
+3. **Preflight (send mode only): refuse to run when the recovery path is unavailable.** The entrypoint resolves `isPasswordResetAvailable` from `security:passport-local:isPasswordResetEnabled` **and** `passportService.isLocalStrategySetup` — the same pair that gates `/forgot-password` (POST, PUT, and the reset-link page). If either is off, the core aborts before any email or write (`aborted: true`, exit 1): otherwise every emailed link would 404 and the users just `$unset` would be left with neither a credential nor a recovery path, recoverable only by DB surgery
+4. If `SEND_RESET_EMAILS=true` and the preflight passed:
+   - For each **ACTIVE** target user, create a `PasswordResetOrder` (existing infrastructure)
    - Send a reset email (existing mail service)
    - **Only for users whose email was sent successfully**, `$unset` the `passwordHash` field (unset) to make login impossible (Req 4.3)
    - Do not unset users whose send failed (they can be retried on the next run)
+   - **Never email or unset a non-active user**: `/forgot-password` rejects them on both POST and PUT, so `$unset`ting their `passwordHash` would remove their only credential with no recovery path (permanent lockout). They are reported via `upgradedOnlyNonActive` + a WARNING and handled manually
    - Log the success and failure counts at INFO/WARNING respectively
 
 > **CRITICAL: why use `$unset` rather than assigning `null`/`''`**: The shared classification filters (`password-hash-format-filters.ts`) treat a credential field as PRESENT only when it exists **and** holds a non-empty value (`present = { $exists: true, $nin: [null, ''] }`; `absent = $or[{ $exists: false }, { $in: [null, ''] }]`). So a `passwordHash = null`/`''` already reads as ABSENT and the user classifies as `noPassword` — it would NOT be re-counted as `upgradedOnly` in the status migration, nor re-sent a reset email on a downgrade-prep re-run. `$unset` is nonetheless preferred: it removes the field entirely rather than leaving a stray `null`/`''` value, reaches the `noPassword` state cleanly, and stays consistent with `statusDelete`'s `undefined` scrub. Always delete the field entirely with `$unset`.
@@ -582,7 +625,7 @@ passwordHash: { type: String },  // scrypt self-describing hash (scrypt$N$r$p$sa
 1. `PasswordHashService.hash()`: the return value is a `scrypt$`-prefixed self-describing string (NOT a 64-character SHA-256 hex); returns different hashes for the same plaintext (Req 1.1, 1.4)
 2. `PasswordHashService.verify()`: cases for the scrypt path (`needsRehash=false`), the SHA-256 path (`needsRehash=true`), invalid credentials, neither field (`isValid=false`, no WARNING), and format mismatch (`isValid=false`, with WARNING) (Req 2.1–2.5)
 3. `User.isPasswordValid()`: correctly delegates the verify result
-4. `User.setPassword()`: confirm that it updates only the `passwordHash` field and retains the `password` field (Req 1.3)
+4. `User.setPassword()`: confirm that it sets `passwordHash` **and clears the legacy `password` field** (credential revocation), and that `{ keepLegacyHash: true }` retains it (the lazy-migration path)
 
 ### Integration Tests
 
@@ -616,13 +659,21 @@ passwordHash: { type: String },  // scrypt self-describing hash (scrypt$N$r$p$sa
 - **Credential scrubbing for deleted users**: `statusDelete()` unsets both credential fields (`password = undefined` and `passwordHash = undefined`). Previously it scrubbed the legacy credential via `password = ''`; unless `passwordHash` is unset at the same time, a deleted user's scrypt hash (a credential) persists in the DB even after anonymization. To prevent post-migration regression, `statusDelete()` unsets both fields — using `undefined` rather than `''` so the shared filters classify the user as `noPassword`, not `legacyOnly`
 - **Per-user salt**: generate a salt per user with `crypto.randomBytes(16)`, embed it in the self-describing string (`scrypt$N$r$p$salt$hash`), and store it (unlike bcrypt, it is not embedded automatically, so generation, encoding, and parsing are implemented ourselves)
 - **GPU resistance via memory-hardness**: scrypt requires a large amount of memory, so it is more resistant to GPU/ASIC brute force than SHA-256/bcrypt (OWASP also ranks it above bcrypt)
-- **Memory consumption and DoS (operational consideration)**: at the OWASP minimum recommendation (N=2^17, r=8), scrypt consumes **about 128MB** per call. Because the asynchronous `crypto.scrypt` runs on the libuv thread pool (default 4), the number of concurrent computations is naturally capped, and the peak memory stays roughly within "number of threads × 128MB ≒ **512MB**" (it does not become number-of-requests × 128MB). This temporary allocation of around 512MB must be factored into the container's memory budget (check it against GROWI's recommended memory; if it is tight, consider narrowing `UV_THREADPOOL_SIZE`, or the OWASP alternative N=2^16, r=8, p=2 ≒ 64MB/call). As a countermeasure against high-frequency logins (credential stuffing), **rate limiting on the login endpoint** is recommended (shared with the timing-attack countermeasure below). `maxmem` (≥192MB) and clamping the parameter upper bound also prevent memory exhaustion from extreme settings
+- **Memory consumption and DoS (operational consideration)**: at the OWASP minimum recommendation (N=2^17, r=8), scrypt consumes **about 128MB** per call. Because the asynchronous `crypto.scrypt` runs on the libuv thread pool (default 4), the number of concurrent computations is naturally capped, and the peak memory stays roughly within "number of threads × 128MB ≒ **512MB**" (it does not become number-of-requests × 128MB). This temporary allocation of around 512MB must be factored into the container's memory budget (check it against GROWI's recommended memory; if it is tight, consider narrowing `UV_THREADPOOL_SIZE`, or the OWASP alternative N=2^16, r=8, p=2 ≒ 64MB/call). As a countermeasure against high-frequency logins (credential stuffing), **rate limiting on the password-verifying endpoints was corrected in this scope** (see the dedicated item below). `maxmem` (≥192MB) and clamping the parameter upper bound also prevent memory exhaustion from extreme settings
+- **Rate limiting on the scrypt-bearing endpoints (DONE in this scope, not deferred)**: `features/rate-limiter` matches its endpoint keys against `req.path` **exactly** (`middleware/factory.ts`), so a key that is not the fully-mounted path silently matches nothing and the endpoint falls back to the permissive default (`DEFAULT_MAX_REQUESTS` 500 × `usersPerIpProspection` 5 = 2500 req/min/IP). Four keys were in that state, all of them on endpoints that now run scrypt (~128MiB, ~100ms on a libuv thread) per unauthenticated request:
+  - `/login` → the legacy `POST /login` route was removed; the live endpoint is `apiV3AuthRouter`'s, mounted at `/_api/v3` → **`/_api/v3/login`**
+  - `/invited` → **`/_api/v3/invited`** (`routerForAuth.use('/invited', …)` + `router.post('/')`). The bare `/invited` key did still *match* the live `app.get('/invited')` page route, but with `method: 'POST'` it never applied its limit there, so retargeting the key does not change that page's throttling
+  - `/register` → **`/_api/v3/register`** — unauthenticated, calls `setPassword` → scrypt
+  - `/user-activation/register` → **`/_api/v3/user-activation/register`** — likewise unauthenticated and scrypt-bearing
+  The mounted-path requirement is documented in a comment at the top of `defaultConfig`, and `config/index.spec.ts` guards it (each corrected key resolves, the bare legacy key is gone, and the tier/`usersPerIpProspection` values are pinned so a silent loosening fails the test)
+- **Remaining exposure (accepted, not closed here)**: (a) the limiter is keyed per IP (and per user), so a *distributed* credential-stuffing campaign still spends one scrypt per source IP and can saturate the libuv pool — there is no global concurrency cap on password verification; (b) `/installer` is dead in the same way (the key is bare while the POST endpoint is `/_api/v3/installer`, `routerForAdmin.use('/installer', …)`), and it is also a `setPassword` caller, though only reachable on a not-yet-installed instance; (c) `/_api/check_username` has no route at all in the current codebase. (b) and (c) are outside this spec's boundary (they are not on the login/registration credential path this spec owns) and should be tracked separately
 - **Limiting the role of PASSWORD_SEED**: after migration, `PASSWORD_SEED` is used only to verify legacy SHA-256 hashes. New hashes do not depend on `PASSWORD_SEED`
 - **PASSWORD_SEED after Cleanup**: once all users have migrated to `passwordHash` and the cleanup migration has run, `PASSWORD_SEED` is unnecessary for login verification. However, the existing exported `meta.json` issue is out of scope
 - **No password length limit**: scrypt has no 72-byte truncation like bcrypt, so long passwords can also be hashed safely as-is
-- **User-enumeration timing attack (known limitation)**: with the introduction of scrypt, a "nonexistent user" returns immediately while an "existing user" takes tens to hundreds of ms, so user existence can be inferred from the time difference. This can be mitigated with a dummy scrypt comparison, but in this scope, check whether rate limiting on the login endpoint already exists and, if not, consider addressing it in a separate task
+- **User-enumeration timing attack (known limitation)**: with the introduction of scrypt, a "nonexistent user" returns immediately while an "existing user" takes tens to hundreds of ms, so user existence can be inferred from the time difference. This can be mitigated with a dummy scrypt comparison, which is **not** implemented here. Rate limiting on the login endpoint was checked in this scope and found to be misconfigured (the key did not match the mounted path) — that is now fixed (see the rate-limiting item above), which bounds how fast the timing oracle can be sampled from one IP but does not eliminate it. A dummy scrypt comparison for nonexistent users remains a separate, optional task
 - **Non-constant-time comparison in legacy SHA-256 verification (low risk)**: `===` is not a strict constant-time comparison, but since it compares hash against hash, the actual attack risk is extremely low. If needed, it can be replaced with `crypto.timingSafeEqual`
-- **Old password revives on a downgrade after password change/reset (known limitation)**: for downgrade safety, `setPassword` does not rewrite the `password` (SHA-256) field and updates only `passwordHash`. As a result, if you change or reset a password on the new version and then downgrade to a pre-Cleanup version, the old version authenticates with the old `password` (SHA-256), so **the pre-change/reset password becomes valid again and the new password becomes invalid**. In particular, with a password reset (motivated by a leak or forgetfulness), note that the old credential you thought you retired may revive. This is an inherent trade-off with the downgrade-safe design based on dual fields, and in this scope the behavior is not changed and it is treated as a known limitation. Note that a user who has changed/reset a password is in the `both` state (`password`=old SHA-256 + `passwordHash`=new), and is **not included** in the detection/reset targets of the downgrade-prep script (which targets `upgradedOnly`), so there is no automatic mitigation within this scope (if mitigation is needed, a manual password reset for that user is required, but this is out of scope)
+- **A changed/reset password is genuinely revoked (the old hash is retired, not kept)**: `setPassword` clears the legacy `password` (SHA-256) field whenever a password is replaced (change, admin reset, invited-user activation). Keeping it — the original dual-field behavior — would have meant that after a downgrade to a pre-Cleanup version the old build authenticates with the OLD `password` hash, i.e. **the credential the user thought they had retired becomes valid again while the new one does not** — unacceptable when the reset was motivated by a leak. The trade-off is deliberate: such a user is now `upgradedOnly` (scrypt only), so a downgrade **locks them out** instead of reviving the old password, and they are covered by the downgrade-prep script (which targets `upgradedOnly` ACTIVE users and mails them a reset link). Losing access is recoverable; a revived leaked password is not. Note the exception that preserves the migration-period downgrade story: the lazy migration on login passes `keepLegacyHash: true`, because it re-hashes the SAME password (nothing is retired), leaving the user in the `both` state
+- **Non-active users are never stripped of their only credential**: the downgrade-prep script emails + `$unset`s **ACTIVE** users only. `/forgot-password` rejects non-active users on both POST and PUT, so an invited / registered / suspended `upgradedOnly` user (an invitee created by `createUserByEmail` is `upgradedOnly` by construction) has no reset path at all — unsetting their `passwordHash` would be a permanent lockout. They are counted, WARNed about, and left untouched for manual handling. Symmetrically, the cleanup script's abort counts only **ACTIVE** `legacyOnly` users — but for a *different* reason, which is worth stating precisely because the obvious-sounding one is wrong: a non-active user **can** still log in and **is** still migrated lazily (the login path applies no status filter; status only selects the post-authentication redirect). They are excluded because nobody can compel them to log in before the cleanup window, so counting them would make the cleanup phase unreachable indefinitely (the `$unset` of the legacy field itself is not status-scoped — retiring a suspended user's legacy hash is desirable)
 
 ---
 
