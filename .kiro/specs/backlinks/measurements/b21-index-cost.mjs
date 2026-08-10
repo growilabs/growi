@@ -30,7 +30,7 @@
  */
 import { createRequire } from 'node:module';
 
-const require = createRequire('/workspace/growi/apps/app/');
+const require = createRequire(new URL('../../../../apps/app/', import.meta.url));
 const { MongoClient, ObjectId } = require('mongodb');
 
 const URI = process.env.MONGO_URI ?? 'mongodb://mongo:27017/?replicaSet=rs0';
