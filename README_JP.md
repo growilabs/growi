@@ -7,7 +7,7 @@
 </p>
 <p align="center">
   <a href="https://github.com/growilabs/growi/releases/latest"><img src="https://img.shields.io/github/release/growilabs/growi.svg" alt="Latest version"></a>
-  <a href="https://communityinviter.com/apps/wsgrowi/invite/"><img src="https://img.shields.io/badge/Slack-Join%20Us-4A154B?style=flat&logo=slack&logoColor=white" alt="Slack - Join US"></a>
+  <a href="https://docs.growi.org/slack"><img src="https://img.shields.io/badge/Slack-Join%20Us-4A154B?style=flat&logo=slack&logoColor=white" alt="Slack - Join US"></a>
 </p>
 
 <p align="center">
@@ -130,7 +130,7 @@ Issue と Pull requests の作成は英語・日本語どちらでも受け付�
 
 ## GROWI について話し合いましょう！
 
-質問や提案があれば、私たちの [Slack team](https://communityinviter.com/apps/wsgrowi/invite/) にぜひご参加ください。
+質問や提案があれば、私たちの [Slack team](https://docs.growi.org/slack) にぜひご参加ください。
 いつでも、どこでも GROWI について議論しましょう！
 
 # ライセンス

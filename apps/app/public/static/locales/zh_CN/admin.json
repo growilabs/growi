@@ -44,6 +44,7 @@
     "insert_single": "每行输入一个条目。",
     "whitelist_invalid_format": "格式无效。精确域名请使用 @example.com，子域名请使用 @*.example.com，精确地址请使用 user@example.com。",
     "page_list_and_search_results": "页面列表/搜索结果",
+    "page_list_and_search_results_desc": "这些设置仅影响无页面访问权限的用户。有权查看页面的用户（例如通过“仅组内”限制的所属组成员）即使设置为“总是隐藏”，也始终能在列表和搜索中看到该页面。",
     "page_listing_1": "页面列表/搜索<br>受“仅限我”限制",
     "page_listing_1_desc": "列出/搜索时显示受“仅限我”选项限制的页面",
     "page_listing_2": "页面列表/搜索<br>受用户组限制",
@@ -292,9 +293,9 @@
     "toggle_notification": "Updated setting of {{path}}",
     "not_found_global_notification_triggerid": "未找到全局通知 ID"
   },
-  "full_text_search_management": {
-    "full_text_search_management": "全文搜索管理",
-    "elasticsearch_management": "Elasticsearch管理",
+  "elasticsearch_management": "Elasticsearch管理",
+  "page_data_index_management": {
+    "page_data_management": "页面数据管理",
     "connection_status": "连接状态",
     "connection_status_label_unconfigured": "未配置",
     "connection_status_label_connected": "已连接",
@@ -308,12 +309,17 @@
     "reconnect_button": "尝试重新连接",
     "reconnect_description": "单击按钮尝试重新连接到Elasticsearch。",
     "normalize": "规范化",
-    "normalize_button": "规范化索引",
-    "normalize_description": "单击按钮修复损坏的索引。",
+    "normalize_button": "规范化页面数据索引",
+    "normalize_description": "单击按钮修复损坏的页面数据索引。",
+    "normalize_success": "页面数据索引规范化成功。",
     "rebuild": "重建",
-    "rebuild_button": "重建索引",
+    "rebuild_button": "重建页面数据索引",
+    "rebuild_requested": "页面数据索引重建请求已接受。",
     "rebuild_description_1": "单击按钮以重新生成索引并添加所有页面数据。",
-    "rebuild_description_2": "这可能需要一段时间。"
+    "rebuild_description_2": "这可能需要一段时间。",
+    "rebuild_progress_processing": "处理中..",
+    "rebuild_progress_completed": "已完成",
+    "rebuild_normalization_timeout": "重建完成，但规范化超时。请手动规范化。"
   },
   "mailer_setup_required": "<a href='/admin/app'>Email settings</a> are required to send.",
   "admin_top": {
@@ -960,6 +966,28 @@
       "force_update_parents_label": "强行添加失踪的用户",
       "force_update_parents_description": "激活这个选项，如果在父组改变后，在祖先组中有缺失的用户，可以强制添加这些用户"
     }
+  },
+  "audit_log_index_management": {
+    "audit_log_index_management": "审计日志索引管理",
+    "settings_explanation": "审计日志索引的规范化与重建可在以下页面进行",
+    "index_management_link": "前往 {{destination}}",
+    "docs_url": {
+      "top": "https://docs.growi.org/en/admin-guide/management-cookbook/setup-search-system.html"
+    },
+    "normalize": "规范化",
+    "normalize_button": "规范化审计日志索引",
+    "normalize_success": "审计日志索引规范化成功。",
+    "normalize_description": "修复损坏的审计日志索引。",
+    "rebuild": "重建",
+    "rebuild_button": "重建审计日志索引",
+    "rebuild_requested": "审计日志索引重建请求已接受。",
+    "rebuild_description_1": "删除并重建所有审计日志索引。",
+    "rebuild_description_2": "此操作可能需要一些时间。",
+    "unsynced_events_warning": "部分审计日志事件未能同步到 Elasticsearch。请重建以恢复一致性。",
+    "rebuild_progress_processing": "处理中..",
+    "rebuild_progress_completed": "已完成",
+    "rebuild_normalization_timeout": "重建完成，但规范化超时。请手动规范化。",
+    "reconnect": "重新连接"
   },
   "audit_log_management": {
     "audit_log": "审计日志",

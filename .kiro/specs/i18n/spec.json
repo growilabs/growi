@@ -1,0 +1,27 @@
+{
+  "feature_name": "i18n",
+  "created_at": "2026-08-06T00:00:00.000Z",
+  "updated_at": "2026-08-06T00:00:00.000Z",
+  "language": "ja",
+  "phase": "umbrella-active",
+  "kind": "umbrella",
+  "sub_specs": ["i18n-key-audit", "i18n-community-translation"],
+  "approvals": {
+    "requirements": {
+      "generated": false,
+      "approved": false,
+      "delegated_to_sub_specs": true
+    },
+    "design": {
+      "generated": false,
+      "approved": false,
+      "delegated_to_sub_specs": true
+    },
+    "tasks": {
+      "generated": false,
+      "approved": false,
+      "delegated_to_sub_specs": true
+    }
+  },
+  "ready_for_implementation": false
+}

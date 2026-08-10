@@ -37,25 +37,11 @@ To prevent module count regression across the monorepo:
 
 ### Turbopack Externalisation Rule (`apps/app/package.json`)
 
-**Any package that is reachable via a static `import` statement in SSR-executed code must be listed under `dependencies`, not `devDependencies`.**
+A consequence of the two choices above (Turbopack for the build, `pnpm deploy --prod` for the release artifact): **any package Turbopack externalises must be listed under `dependencies`, not `devDependencies`.** Turbopack emits externalised packages as symlinks in `.next/node_modules/`, while `pnpm deploy --prod` copies only `dependencies` — so a package in the wrong section is simply missing from the deploy output, and the production server dies at startup with `ERR_MODULE_NOT_FOUND`.
 
-Turbopack externalises such packages to `.next/node_modules/` (symlinks into the pnpm store). `pnpm deploy --prod` only includes `dependencies`; packages in `devDependencies` are absent from the deploy output, causing `ERR_MODULE_NOT_FOUND` at production server startup.
+What makes this a recurring cost is that the boundary is **not** where intuition puts it: neither `dynamic(..., { ssr: false })` nor a `useEffect`-guarded `import()` keeps a package out of the production graph, because Turbopack's static import analysis reaches the call site regardless. Classification therefore has to be decided by **inspecting the built artifact**, never by reading the import style at the call site.
 
-**SSR-executed code** = any module that Turbopack statically traces from a Pages Router page component, `_app.page.tsx`, or a server-side utility — without crossing a `dynamic(() => import(...), { ssr: false })` boundary.
-
-**Making a package devDep-eligible:**
-1. Wrap the consuming component with `dynamic(() => import('...'), { ssr: false })`, **or**
-2. Replace the runtime dependency with a static asset (e.g., extract data to a committed JSON file), **or**
-3. Change the import to a dynamic `import()` inside a `useEffect` (browser-only execution).
-
-**Packages justified to stay in `dependencies`** (SSR-reachable static imports as of v8):
-- `react-toastify` — `toastr.ts` static `{ toast }` import reachable from SSR pages; async refactor would break API surface
-- `bootstrap` — still externalised despite `useEffect`-guarded `import()` in `_app.page.tsx`; Turbopack traces call sites statically
-- `diff2html` — still externalised despite `ssr: false` on `RevisionDiff`; static import analysis reaches it
-- `react-dnd`, `react-dnd-html5-backend` — still externalised despite DnD provider wrapped with `ssr: false`
-- `@handsontable/react` — still externalised despite `useEffect` dynamic import in `HandsontableModal`
-- `i18next-http-backend`, `i18next-localstorage-backend`, `react-dropzone` — no direct `src/` imports but appear via transitive imports
-- `@codemirror/state`, `@headless-tree/*`, `@tanstack/react-virtual`, `downshift`, `fastest-levenshtein`, `pretty-bytes`, `react-copy-to-clipboard`, `react-hook-form`, `react-input-autosize`, `simplebar-react` — statically imported in SSR-rendered components
+The operational rule — how to classify a new package, the verified per-package inventory in both directions, and the separate case of a dangling symlink for a package that is already in `dependencies` (a drifting optional peer, fixed by pinning in `pnpm-workspace.yaml`, not by reclassifying) — lives in **`apps/app/.claude/rules/package-dependencies.md`**, which auto-loads when the work touches `apps/app`. That file is the single source of truth: **do not mirror its package lists here**, because the copy goes stale silently and this steering file already had that happen.
 
 ### Production Assembly Pattern
 
@@ -73,6 +59,41 @@ The release image includes `node_modules/` at workspace root alongside `apps/app
 **pnpm version sensitivity**: `--legacy` produces self-contained symlinks in pnpm v10+. Downgrading below v10 may break the assembly. After running `assemble-prod.sh` locally, run `pnpm install` to restore the development environment.
 
 For apps/app-specific build optimization details (webpack config, null-loader rules, SuperJSON architecture, module count KPI), see `apps/app/.claude/skills/build-optimization/SKILL.md`.
+
+### Data Layer (Mongoose → Prisma, migration in progress)
+
+The data layer is **mid-migration**: Mongoose models are being replaced by Prisma
+extensions **one model at a time**, so both access styles coexist in the tree and will
+keep coexisting for a while. `apps/app/prisma/schema.prisma` is the source of truth for
+which collections have been declared so far; `@prisma/client` is a runtime dependency of
+`apps/app`.
+
+Decisions worth knowing before touching a model (the step-by-step procedure lives in the
+**`/mongoose-to-prisma`** skill, and the detailed rules in **`.claude/rules/model.md`**,
+which auto-loads when you edit `apps/app/src/server/models/**`):
+
+- **Mongoose still owns collection and index creation** until every model is migrated —
+  only then does `prisma db push` take over. Do not move index creation to Prisma early.
+- **Mongoose statics / instance methods become `Prisma.defineExtension`**, not free
+  functions bolted onto call sites.
+- **`_id` / `__v` are renamed, not dropped.** Prisma forbids field names starting with
+  `_`, so the schema declares `id` / `v` with `@map("_id")` / `@map("__v")`, and
+  `createPrisma()` (`apps/app/src/utils/prisma.ts`) restores `_id` via a global
+  `$allModels` compute — which **also propagates through nested `include`s**. That last
+  point has already caused a false review finding ("`_id` is missing, so an `_id`-gated
+  serializer silently stops redacting"): the compute means results do carry `_id`, so
+  verify against real query output before reporting that class of leak.
+- **`__v` no longer means what it meant under Mongoose.** Mongoose bumped it only on
+  particular operations (array `$push` / `$pull` etc.); the Prisma query extension bumps
+  it on every `update` / `updateMany`. Any code or test asserting an exact `__v` after a
+  partial update is depending on behavior that no longer exists.
+- **Production runtime**: the Prisma query engine library must be located explicitly via
+  `PRISMA_QUERY_ENGINE_LIBRARY`. Turbopack rewrites the paths Prisma would otherwise use
+  to find it, after which Prisma's internal hardcoded fallback search takes over and SSR
+  500s. Pointing the variable at the real engine file is the fix, not patching paths.
+- **Prisma is a resident startup cost**, so it is subject to the boot-time load
+  conventions in `apps/app/.claude/rules/server-boot-imports.md` (lazy-load
+  config-gated heavy SDKs; warm up costs that every deployment pays anyway).
 
 ### Logging
 
@@ -119,4 +140,4 @@ checks do not exercise this path. Procedure and reference plugins: the "External
 Install Smoke" section of `apps/app/.claude/skills/app-commands/SKILL.md`.
 
 ---
-_Updated: 2026-07-27. v8 (native ESM) is now the mainline. The `esm-migration` / `esm-import-convention` specs were retired: their durable content moved to `apps/app/.claude/rules/esm-authoring.md`, `apps/app/.claude/skills/esm-merge-coverage/`, and the app-commands skill (authorization-matrix + plugin-install smoke procedures), and the dev-runner selection rationale was folded into "Module System" above. Prior: 2026-06-17 External Plugin Distribution Contract; 2026-06-16 Module System (native ESM) + transpilePackages-empty._
+_Updated: 2026-08-06. (1) Added "Data Layer (Mongoose → Prisma, migration in progress)" — the incremental per-model migration was project-wide and in flight but had no steering entry at all. (2) Reduced the Turbopack externalisation section to the decision plus the counter-intuitive part, and delegated the classification procedure and the per-package inventory to `apps/app/.claude/rules/package-dependencies.md`; the list kept here had already drifted behind that rule. Prior: 2026-07-27. v8 (native ESM) is now the mainline. The `esm-migration` / `esm-import-convention` specs were retired: their durable content moved to `apps/app/.claude/rules/esm-authoring.md`, `apps/app/.claude/skills/esm-merge-coverage/`, and the app-commands skill (authorization-matrix + plugin-install smoke procedures), and the dev-runner selection rationale was folded into "Module System" above. Prior: 2026-06-17 External Plugin Distribution Contract; 2026-06-16 Module System (native ESM) + transpilePackages-empty._

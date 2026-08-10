@@ -11,13 +11,19 @@
  *   pnpm vitest run clone-e2e.integ
  */
 
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import {
+  PUBLISHED_SPARSE_FILTERS,
+  sparseFilterOid,
+  sparseFilterRefPath,
+} from '../services/vault-sparse-filter.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -464,6 +470,116 @@ async function callComposeView(
     // Test 5: Tree normalization — no-collision scenario (req 4.11)
     // -------------------------------------------------------------------------
 
+    // -------------------------------------------------------------------------
+    // Objects outside the requester's view must not be served (req 5.4 / 5.6)
+    // -------------------------------------------------------------------------
+
+    describe('Objects outside the view (req 5.4)', () => {
+      beforeAll(async () => {
+        await connectMongo();
+      });
+
+      afterAll(async () => {
+        await disconnectMongo();
+      });
+
+      /**
+       * Runs git against the bare repository the manager maintains.
+       * Only possible when the manager runs in-process (the default integ
+       * setup), which is where VAULT_REPO_PATH points at a local directory.
+       */
+      const gitInRepo = async (...args: string[]): Promise<string> => {
+        const repoPath = process.env.VAULT_REPO_PATH;
+        if (repoPath == null || !fs.existsSync(repoPath)) {
+          throw new Error('VAULT_REPO_PATH is not a local directory');
+        }
+        const { stdout } = await execFileAsync('git', [
+          '-C',
+          repoPath,
+          ...args,
+        ]);
+        return stdout.trim();
+      };
+
+      /** Sends a hand-built want request, the way a non-git client would. */
+      const postWant = async (
+        viewRef: string,
+        oid: string,
+      ): Promise<{ status: number; body: Buffer }> => {
+        const wantLine = `want ${oid} thin-pack ofs-delta agent=integ\n`;
+        const len = (wantLine.length + 4).toString(16).padStart(4, '0');
+        const res = await fetch(`${BASE_URL}/internal/git/git-upload-pack`, {
+          method: 'POST',
+          headers: {
+            Authorization: AUTH_HEADER,
+            'x-vault-view-ref': viewRef,
+            'Content-Type': 'application/x-git-upload-pack-request',
+          },
+          body: `${len}${wantLine}00000009done\n`,
+        });
+        return {
+          status: res.status,
+          body: Buffer.from(await res.arrayBuffer()),
+        };
+      };
+
+      it('does not serve a page body that belongs to a namespace the requester cannot access', {
+        timeout: 60_000,
+      }, async () => {
+        if (mongoose == null) {
+          throw new Error('Mongoose not connected');
+        }
+        const { ObjectId } = mongoose.mongo;
+
+        // Seed a page into a private namespace of some *other* user.
+        const otherNamespace = 'user-0badc0de0badc0de0badc0de-only-me';
+        await upsertPageAndWait({
+          namespace: otherNamespace,
+          pageId: new ObjectId().toHexString(),
+          pagePath: '/leak-probe/secret',
+          revisionId: new ObjectId().toHexString(),
+          bodyText: 'another users private page body\n',
+        });
+
+        // Object names of that page's content, read straight out of the shared
+        // object store — this is what an attacker would have recorded earlier.
+        const otherRef = `refs/namespaces/${otherNamespace}/refs/heads/main`;
+        const foreignBlob = await gitInRepo(
+          'rev-parse',
+          `${otherRef}:leak-probe/secret.md`,
+        );
+        const foreignTree = await gitInRepo('rev-parse', `${otherRef}^{tree}`);
+
+        // The requester's own view does not include that namespace.
+        const { viewRef } = await callComposeView(
+          TEST_USER_ID,
+          TEST_NAMESPACES,
+        );
+
+        for (const oid of [foreignBlob, foreignTree]) {
+          const { body } = await postWant(viewRef, oid);
+
+          // A pack in the response means the object was handed over.
+          expect(body.includes(Buffer.from('PACK'))).toBe(false);
+          expect(body.toString('utf8')).toContain('ERR');
+        }
+      });
+
+      it('still serves the commit its own view advertises', {
+        timeout: 60_000,
+      }, async () => {
+        const { viewRef, commitOid } = await callComposeView(
+          TEST_USER_ID,
+          TEST_NAMESPACES,
+        );
+
+        const { status, body } = await postWant(viewRef, commitOid);
+
+        expect(status).toBe(200);
+        expect(body.includes(Buffer.from('PACK'))).toBe(true);
+      });
+    });
+
     describe('Tree normalization: filename collision rules (req 4.10, 4.11)', () => {
       let normCloneDir: string;
 
@@ -718,6 +834,178 @@ async function callComposeView(
           '--porcelain',
         ]);
         expect(stdout.trim()).toBe('');
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // Partial clone: only a published sparse filter is served (req 5.9, 5.10)
+    // -------------------------------------------------------------------------
+
+    describe('Partial clone with a published sparse filter', () => {
+      const spec = PUBLISHED_SPARSE_FILTERS[0];
+      if (spec == null) {
+        throw new Error('no sparse filter is published');
+      }
+      const publishedOid = sparseFilterOid(spec);
+
+      let sparseCloneDir: string;
+
+      beforeAll(async () => {
+        await connectMongo();
+        sparseCloneDir = await fs.promises.mkdtemp(
+          path.join(os.tmpdir(), 'vault-sparse-clone-'),
+        );
+      });
+
+      afterAll(async () => {
+        await disconnectMongo();
+        if (sparseCloneDir != null) {
+          await fs.promises.rm(sparseCloneDir, {
+            recursive: true,
+            force: true,
+          });
+        }
+      });
+
+      /** Runs git against the bare repository the manager maintains. */
+      const gitInRepo = async (...args: string[]): Promise<string> => {
+        const repoPath = process.env.VAULT_REPO_PATH;
+        if (repoPath == null || !fs.existsSync(repoPath)) {
+          throw new Error('VAULT_REPO_PATH is not a local directory');
+        }
+        const { stdout } = await execFileAsync('git', [
+          '-C',
+          repoPath,
+          ...args,
+        ]);
+        return stdout.trim();
+      };
+
+      it('anchors the filter spec at the object name clients are told to pass', async () => {
+        // The README publishes this object name; if the ref held anything else,
+        // every documented clone command would name an object git cannot find.
+        expect(
+          await gitInRepo('rev-parse', sparseFilterRefPath(spec.name)),
+        ).toBe(publishedOid);
+        const stored = await execFileAsync('git', [
+          '-C',
+          process.env.VAULT_REPO_PATH ?? '',
+          'cat-file',
+          '-p',
+          publishedOid,
+        ]);
+        expect(stored.stdout).toBe(spec.patterns);
+      });
+
+      it('serves a clone that excludes user pages, without sending their file bodies', {
+        timeout: 120_000,
+      }, async () => {
+        if (mongoose == null) {
+          throw new Error('Mongoose not connected');
+        }
+        const { ObjectId } = mongoose.mongo;
+        const userId = 'aabbccddeeff00112233ff01';
+        const ns = 'public';
+
+        await upsertPageAndWait({
+          namespace: ns,
+          pageId: new ObjectId().toHexString(),
+          pagePath: '/user/someone/private-memo',
+          revisionId: new ObjectId().toHexString(),
+          bodyText: 'a personal page body that must not be transferred\n',
+        });
+        await upsertPageAndWait({
+          namespace: ns,
+          pageId: new ObjectId().toHexString(),
+          pagePath: '/sparse-probe/kept',
+          revisionId: new ObjectId().toHexString(),
+          bodyText: '# Kept\nAn ordinary wiki page.\n',
+        });
+
+        const { viewRef } = await callComposeView(userId, [ns]);
+        const viewRefPath = `refs/namespaces/${viewRef}/refs/heads/main`;
+
+        // The object name of the excluded page's body, read from the bare repo.
+        const excludedBlob = await gitInRepo(
+          'rev-parse',
+          `${viewRefPath}:user/someone/private-memo.md`,
+        );
+
+        const cloneTarget = path.join(sparseCloneDir, 'filtered-clone');
+        await execFileAsync('git', [
+          'clone',
+          '--config',
+          `http.extraheader=Authorization: ${AUTH_HEADER}`,
+          '--config',
+          `http.extraheader=x-vault-view-ref: ${viewRef}`,
+          `--filter=sparse:oid=${publishedOid}`,
+          '--no-checkout',
+          `${BASE_URL}/internal/git`,
+          cloneTarget,
+        ]);
+
+        // The client applies the same patterns locally, so its checkout asks
+        // for nothing the server left out.
+        await execFileAsync('git', ['sparse-checkout', 'init', '--no-cone'], {
+          cwd: cloneTarget,
+        });
+        execFileSync('git', ['sparse-checkout', 'set', '--stdin'], {
+          cwd: cloneTarget,
+          input: spec.patterns,
+        });
+        await execFileAsync('git', ['checkout', 'HEAD'], { cwd: cloneTarget });
+
+        const files = await listFilesRecursive(cloneTarget);
+
+        // The checkout ran to completion for everything outside user/.
+        expect(files).toContain('sparse-probe/kept.md');
+        expect(files.some((p) => p.startsWith('user/'))).toBe(false);
+
+        // The point of the filter: the excluded body was never transferred, so
+        // it is not in the clone's object store either.
+        await expect(
+          execFileAsync('git', ['cat-file', '-e', excludedBlob], {
+            cwd: cloneTarget,
+          }),
+        ).rejects.toThrow();
+
+        // git considers the working tree clean, i.e. the checkout was not left
+        // half-applied by a rejected object request.
+        const { stdout: status } = await execFileAsync(
+          'git',
+          ['status', '--porcelain'],
+          { cwd: cloneTarget },
+        );
+        expect(status.trim()).toBe('');
+      });
+
+      it('refuses a filter it does not serve at clone time, instead of failing the checkout later', {
+        timeout: 60_000,
+      }, async () => {
+        // With the filter capability advertised, git accepts --filter=blob:none
+        // and defers every file body — which it would then fetch one object at a
+        // time, and the want guard refuses those. Left unchecked, this exact
+        // command reports "Clone succeeded, but checkout failed" after a wall of
+        // per-object errors and leaves an empty working tree. Written the way a
+        // user would type it, so that outcome is what the test rules out.
+        const { viewRef } = await callComposeView(
+          TEST_USER_ID,
+          TEST_NAMESPACES,
+        );
+        const cloneTarget = path.join(sparseCloneDir, 'blobless-clone');
+
+        await expect(
+          execFileAsync('git', [
+            'clone',
+            '--config',
+            `http.extraheader=Authorization: ${AUTH_HEADER}`,
+            '--config',
+            `http.extraheader=x-vault-view-ref: ${viewRef}`,
+            '--filter=blob:none',
+            `${BASE_URL}/internal/git`,
+            cloneTarget,
+          ]),
+        ).rejects.toThrow(/unsupported partial-clone filter/);
       });
     });
   },

@@ -1,10 +1,6 @@
 import assert from 'node:assert';
-import { GroupType, type IRevision, type ITag, type IUser } from '@growi/core';
-import mongoose, {
-  type HydratedDocument,
-  type Model,
-  type Types,
-} from 'mongoose';
+import { GroupType, type IRevision, type IUser } from '@growi/core';
+import mongoose, { type HydratedDocument, type Model } from 'mongoose';
 import type { MockInstance } from 'vitest';
 
 import { getInstance } from '^/test/setup/crowi';
@@ -13,10 +9,10 @@ import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import PageTagRelation from '~/server/models/page-tag-relation';
-import Tag from '~/server/models/tag';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { generalXssFilter } from '~/services/general-xss-filter';
+import { prisma } from '~/utils/prisma';
 
 import type { ShareLinkModel } from '../../models/share-link';
 
@@ -25,8 +21,8 @@ let dummyUser1: HydratedDocument<IUser>;
 let testUser1: HydratedDocument<IUser>;
 let testUser2: HydratedDocument<IUser>;
 let testUser3: HydratedDocument<IUser>;
-let parentTag: (ITag & { _id: Types.ObjectId }) | null;
-let childTag: (ITag & { _id: Types.ObjectId }) | null;
+let parentTag: Awaited<ReturnType<typeof prisma.tags.findUnique>>;
+let childTag: Awaited<ReturnType<typeof prisma.tags.findUnique>>;
 
 let parentForRename1: PageDocument | null;
 let parentForRename2: PageDocument | null;
@@ -406,13 +402,17 @@ describe('PageService', () => {
       path: '/trash/parentForRevert/child',
     });
 
-    const existingTag = await Tag.findOne({ name: 'Parent' });
+    const existingTag = await prisma.tags.findUnique({
+      where: { name: 'Parent' },
+    });
     if (existingTag == null) {
-      await Tag.insertMany([{ name: 'Parent' }, { name: 'Child' }]);
+      await prisma.tags.createMany({
+        data: [{ name: 'Parent' }, { name: 'Child' }],
+      });
     }
 
-    parentTag = await Tag.findOne({ name: 'Parent' });
-    childTag = await Tag.findOne({ name: 'Child' });
+    parentTag = await prisma.tags.findUnique({ where: { name: 'Parent' } });
+    childTag = await prisma.tags.findUnique({ where: { name: 'Child' } });
 
     const existingPageTagRelation = await PageTagRelation.findOne({
       relatedPage: parentForDuplicate?._id,
