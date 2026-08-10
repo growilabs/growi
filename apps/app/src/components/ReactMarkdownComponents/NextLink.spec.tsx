@@ -23,12 +23,31 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-vi.mock('~/states/global', () => ({
-  useSiteUrl: () => 'https://wiki.example.com',
+const mocks = vi.hoisted(() => ({
+  siteUrl: 'https://wiki.example.com' as string | undefined,
 }));
 
-const renderLink = (href: string) => {
-  const { container } = render(<NextLink href={href}>link text</NextLink>);
+vi.mock('~/states/global', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('~/states/global')>()),
+  useSiteUrl: () => mocks.siteUrl,
+}));
+
+beforeEach(() => {
+  mocks.siteUrl = 'https://wiki.example.com';
+});
+
+const renderLink = (
+  href: string,
+  props: Record<string, unknown> = {},
+): {
+  isClientSideTransition: boolean;
+  anchor: HTMLAnchorElement | null;
+} => {
+  const { container } = render(
+    <NextLink href={href} {...props}>
+      link text
+    </NextLink>,
+  );
   const anchor = container.querySelector('a');
   return {
     /** true when the link performs a client-side transition */
@@ -46,8 +65,13 @@ describe('NextLink', () => {
       ${'/Sandbox/%E3%83%9A%E3%83%BC%E3%82%B8%20%E5%90%8D'}   | ${'percent-encoded path containing a space'}
       ${'/Sandbox/%E6%97%A5%E6%9C%AC%E8%AA%9E?q=foo#heading'} | ${'percent-encoded path with query and hash'}
       ${'/Sandbox/日本語'}                                    | ${'non-ASCII page path written literally'}
+      ${'/Sandbox/mail%40example'}                            | ${'percent-encoded reserved character'}
+      ${'/Sandbox/a%2Fb'}                                     | ${'percent-encoded path separator'}
     `('routes $pathDescription through next/link', ({ href }) => {
-      expect(renderLink(href).isClientSideTransition).toBe(true);
+      const { isClientSideTransition, anchor } = renderLink(href);
+      expect(isClientSideTransition).toBe(true);
+      // the destination must survive the branch untouched -- query and hash included
+      expect(anchor?.getAttribute('href')).toBe(href);
     });
   });
 
@@ -61,12 +85,38 @@ describe('NextLink', () => {
       ${'/Sandbox/Bootstrap5.md'}            | ${'path reserved for the markdown endpoint'}
       ${'/%E6%97%A5%E6%9C%AC%E8%AA%9E.md'}   | ${'reserved suffix hidden behind percent-encoding'}
       ${'/user/%E6%97%A5%E6%9C%AC%E8%AA%9E'} | ${'user homepage root hidden behind percent-encoding'}
+      ${'/%61ttachment/653a1f1b'}            | ${'reserved prefix hidden behind percent-encoding'}
       ${'/Sandbox/broken%ZZ'}                | ${'malformed percent-encoding'}
       ${'/Sandbox/50%25off'}                 | ${'literal percent sign in the path'}
     `('keeps $reason on a plain anchor', ({ href }) => {
       const { isClientSideTransition, anchor } = renderLink(href);
       expect(isClientSideTransition).toBe(false);
       expect(anchor?.getAttribute('href')).toBe(href);
+    });
+
+    it('honours an explicit target on an otherwise routable path', () => {
+      const { isClientSideTransition, anchor } = renderLink('/Sandbox/日本語', {
+        target: '_self',
+      });
+      expect(isClientSideTransition).toBe(false);
+      expect(anchor?.getAttribute('target')).toBe('_self');
+    });
+  });
+
+  describe('attributes carried across the branch boundary', () => {
+    // The routable/non-routable branches render different elements, so a link
+    // must not lose attributes just because its path became routable.
+    it.each`
+      href                    | branch
+      ${'/Sandbox/日本語'}    | ${'client-side transition'}
+      ${'/Sandbox/日本語.md'} | ${'plain anchor'}
+    `('keeps id and data-* on the $branch branch', ({ href }) => {
+      const { anchor } = renderLink(href, {
+        id: 'my-anchor',
+        'data-tracking': 'x',
+      });
+      expect(anchor?.getAttribute('id')).toBe('my-anchor');
+      expect(anchor?.getAttribute('data-tracking')).toBe('x');
     });
   });
 
@@ -78,6 +128,27 @@ describe('NextLink', () => {
       expect(isClientSideTransition).toBe(false);
       expect(anchor?.getAttribute('target')).toBe('_blank');
       expect(anchor?.getAttribute('rel')).toBe('noopener noreferrer');
+    });
+
+    it('treats an absolute URL on the site host as an internal link', () => {
+      const { isClientSideTransition } = renderLink(
+        'https://wiki.example.com/Sandbox/日本語',
+      );
+      expect(isClientSideTransition).toBe(true);
+    });
+
+    it('falls back to a new tab for an absolute URL when the site url is unset', () => {
+      mocks.siteUrl = undefined;
+      const { isClientSideTransition, anchor } = renderLink(
+        'https://wiki.example.com/Sandbox/日本語',
+      );
+      expect(isClientSideTransition).toBe(false);
+      expect(anchor?.getAttribute('target')).toBe('_blank');
+    });
+
+    it('still routes a root-relative path when the site url is unset', () => {
+      mocks.siteUrl = undefined;
+      expect(renderLink('/Sandbox/日本語').isClientSideTransition).toBe(true);
     });
   });
 });
