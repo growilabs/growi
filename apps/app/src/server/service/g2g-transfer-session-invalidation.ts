@@ -165,3 +165,242 @@ export async function resolveSessionAccess(
 export function canSelectSessions(access: SessionAccess): boolean {
   return access.kind !== 'unsupported';
 }
+
+export interface SessionInvalidationResult {
+  /** Sessions removed because they belong to a user this transfer replaced. */
+  readonly destroyed: number;
+  /** Sessions left in place: the rescued accounts', and those nobody is logged into. */
+  readonly skipped: number;
+  /** True when no session could be picked out, so none was destroyed (requirement 3.7). */
+  readonly unsupported: boolean;
+}
+
+/**
+ * An identifier in either form a read produces. `serializeUser` writes `user.id` — the hex
+ * string of `_id` — into the session (`service/passport.ts`), while a `lean()` read of the
+ * rescued administrators hands back `ObjectId`s. Comparing the two forms as they come
+ * matches nothing and silently keeps every session, so both sides go through
+ * {@link normaliseUserId} first (tasks.md Implementation Notes, from the review of 7.2).
+ *
+ * Design note: design.md types this parameter `readonly string[]`. Accepting the `ObjectId`
+ * form as well is what makes the mistake above unrepresentable at the call site instead of
+ * merely documented; it is a widening, so a caller passing strings is unaffected.
+ */
+export type UserIdLike = string | { toHexString(): string };
+
+/** One enumerated session, reduced to the two facts the choice is made from. */
+interface SessionEntry {
+  readonly sessionId?: string;
+  readonly userId?: string;
+}
+
+const normaliseUserId = (value: unknown): string | undefined => {
+  if (typeof value === 'string') {
+    return value;
+  }
+  // An `ObjectId`, recognised by the method only it has rather than by importing the class
+  // — mongoose and the driver each export their own, and both arrive here.
+  if (isRecord(value) && typeof value.toHexString === 'function') {
+    return String(value);
+  }
+  return undefined;
+};
+
+const parseStoredSession = (session: string): unknown => {
+  try {
+    return JSON.parse(session);
+  } catch {
+    // A session that cannot be read belongs to nobody this can name, and destroying it
+    // would be a guess. Leaving it costs an unusable session; guessing could cut off the
+    // rescued administrator, which is the one session that must survive (requirement 4.3).
+    return undefined;
+  }
+};
+
+/**
+ * Whose session this is. `session.passport.user` is the only place that says so — a
+ * dependency on the session's structure that is deliberate and documented, not incidental.
+ */
+const readSessionUserId = (session: unknown): string | undefined => {
+  // `stringify: true` is `connect-mongo`'s default and GROWI's configuration, so what the
+  // document holds is JSON; a store that hands over the object already parsed is read as-is.
+  const parsed =
+    typeof session === 'string' ? parseStoredSession(session) : session;
+  if (!isRecord(parsed) || !isRecord(parsed.passport)) {
+    return undefined;
+  }
+  return normaliseUserId(parsed.passport.user);
+};
+
+const invalidateInSessionsCollection = async (
+  sessionsCollection: Collection<StoredSessionDocument>,
+  keep: ReadonlySet<string>,
+): Promise<SessionInvalidationResult> => {
+  // The owner of a session is inside the serialized `session` field, so the choice cannot
+  // be made by a query; the documents are read, chosen here, and removed in one statement.
+  const sessionIdsToDestroy: string[] = [];
+  let examined = 0;
+
+  const cursor = sessionsCollection.find({}, { projection: { session: 1 } });
+  for await (const document of cursor) {
+    examined += 1;
+    const userId = readSessionUserId(document.session);
+    if (userId != null && !keep.has(userId)) {
+      sessionIdsToDestroy.push(document._id);
+    }
+  }
+
+  if (sessionIdsToDestroy.length > 0) {
+    await sessionsCollection.deleteMany({ _id: { $in: sessionIdsToDestroy } });
+  }
+
+  return {
+    destroyed: sessionIdsToDestroy.length,
+    skipped: examined - sessionIdsToDestroy.length,
+    unsupported: false,
+  };
+};
+
+const enumerateSessions = (store: Store): Promise<unknown> =>
+  new Promise((resolve, reject) => {
+    if (typeof store.all !== 'function') {
+      // Rejecting rather than leaving the promise unsettled: an optional call on a store
+      // without `all` never invokes the callback, so the caller — task 9.3, inside its
+      // `finally` — would wait for it for the rest of the process's life. Whoever removes
+      // the guard in `invalidateThroughStore` gets an error, not a stalled transfer.
+      reject(new Error('This session store does not enumerate its sessions'));
+      return;
+    }
+    store.all((err: unknown, sessions: unknown) => {
+      if (err != null) {
+        reject(err);
+        return;
+      }
+      resolve(sessions);
+    });
+  });
+
+const destroySession = (store: Store, sessionId: string): Promise<void> =>
+  new Promise((resolve, reject) => {
+    store.destroy(sessionId, (err: unknown) => {
+      if (err != null) {
+        reject(err);
+        return;
+      }
+      resolve();
+    });
+  });
+
+const toSessionEntries = (sessions: unknown): readonly SessionEntry[] => {
+  // `connect-redis` answers with an array whose entries carry `id`; `express-session`'s own
+  // stores answer with a map keyed by session id. Both say which session is which, which is
+  // what makes this variant of `SessionAccess` selectable at all.
+  if (Array.isArray(sessions)) {
+    return sessions.map((session) => ({
+      sessionId:
+        isRecord(session) && typeof session.id === 'string'
+          ? session.id
+          : undefined,
+      userId: readSessionUserId(session),
+    }));
+  }
+  if (isRecord(sessions)) {
+    return Object.entries(sessions).map(([sessionId, session]) => ({
+      sessionId,
+      userId: readSessionUserId(session),
+    }));
+  }
+  return [];
+};
+
+const invalidateThroughStore = async (
+  store: Store,
+  keep: ReadonlySet<string>,
+): Promise<SessionInvalidationResult> => {
+  if (typeof store.all !== 'function') {
+    // `resolveSessionAccess` only chooses this variant for a store that enumerates, so
+    // this is unreachable through it — and the type system is no help here at all:
+    // `express-session` ships no type declarations and this package compiles with
+    // `noImplicitAny: false`, so `Store` is `any`. This check is the only thing standing
+    // between a caller and a store that cannot enumerate, and reporting "nothing could be
+    // selected" is the honest answer; claiming a successful destruction of zero is not.
+    return { destroyed: 0, skipped: 0, unsupported: true };
+  }
+
+  const entries = toSessionEntries(await enumerateSessions(store));
+
+  let destroyed = 0;
+  for (const entry of entries) {
+    if (
+      entry.sessionId == null ||
+      entry.userId == null ||
+      keep.has(entry.userId)
+    ) {
+      continue;
+    }
+    // One command per session at a time, on purpose: `Promise.all` would open as many
+    // concurrent commands as there are logged-in browsers, against a destination that is
+    // already busy importing.
+    // biome-ignore lint/performance/noAwaitInLoops: sequential by design, see above
+    await destroySession(store, entry.sessionId);
+    destroyed += 1;
+  }
+
+  return {
+    destroyed,
+    skipped: entries.length - destroyed,
+    unsupported: false,
+  };
+};
+
+const destroySessionsExcept = (
+  access: SessionAccess,
+  keep: ReadonlySet<string>,
+): Promise<SessionInvalidationResult> => {
+  switch (access.kind) {
+    case 'sessions-collection':
+      return invalidateInSessionsCollection(access.sessionsCollection, keep);
+    case 'store-enumeration':
+      return invalidateThroughStore(access.store, keep);
+    case 'unsupported':
+      // Nothing is destroyed here on purpose: this is the case the operator was warned
+      // about before the transfer started (requirement 3.7), and a partial, unselective
+      // sweep would log every user out of a destination nobody asked to lock out.
+      return Promise.resolve({
+        destroyed: 0,
+        skipped: 0,
+        unsupported: true,
+      });
+  }
+};
+
+/**
+ * Destroys the sessions of the users this transfer replaced, keeping the sessions of the
+ * accounts that were rescued (requirements 5.5 and 4.3).
+ *
+ * Takes the mechanism {@link resolveSessionAccess} already chose rather than working out
+ * the store kind again, so what is destroyed and what the destination announced it could
+ * destroy cannot disagree.
+ */
+export async function invalidateSessionsExcept(
+  access: SessionAccess,
+  keepUserIds: readonly UserIdLike[],
+): Promise<SessionInvalidationResult> {
+  const keep = new Set(
+    keepUserIds.map(normaliseUserId).filter((id): id is string => id != null),
+  );
+
+  const result = await destroySessionsExcept(access, keep);
+
+  // Counts only: a session id is a credential, and whose session it is is personal data.
+  logger.info(
+    {
+      destroyed: result.destroyed,
+      skipped: result.skipped,
+      unsupported: result.unsupported,
+    },
+    'Invalidated the login sessions of replaced users',
+  );
+
+  return result;
+}

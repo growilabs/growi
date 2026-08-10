@@ -731,9 +731,18 @@ interface StoredSessionDocument {
  */
 function resolveSessionAccess(store: unknown): Promise<SessionAccess>;
 
+/**
+ * 残す利用者の識別子は `ObjectId` でも受ける（9.2 の実装で確定した形）。
+ *
+ * 9.3 は救済対象の管理者を `lean()` で読むので、手元にあるのは `ObjectId` になる。文字列だけを
+ * 受ける形にすると、呼び出し側が `.toString()` を忘れた瞬間に 1 件も一致せず、静かに 0 件破棄で
+ * 成功を返す。型で `ObjectId` も受けて内側で文字列にそろえることで、その取り違えを起こせなくする。
+ */
+type UserIdLike = string | { toHexString(): string };
+
 function invalidateSessionsExcept(
   access: SessionAccess,
-  keepUserIds: readonly string[],
+  keepUserIds: readonly UserIdLike[],
 ): Promise<SessionInvalidationResult>;
 
 /** `resolveSessionAccess` が選んだ手段だけを読む（`all` の有無で判定しない） */
