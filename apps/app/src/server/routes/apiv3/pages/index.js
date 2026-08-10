@@ -410,7 +410,9 @@ export const setup = (crowi) => {
           );
         }
 
-        if (!page.isEmpty && !page.isUpdatable(revisionId)) {
+        // isUpdatable is async: without the await the negation is always false and
+        // this conflict check never fires
+        if (!page.isEmpty && !(await page.isUpdatable(revisionId))) {
           return res.apiv3Err(
             new ErrorV3(
               "Someone could update this page, so couldn't delete.",

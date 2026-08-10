@@ -1,9 +1,9 @@
 /**
  * Integration test — PUT /pages/rename must answer with the canonical status for
  * every outcome: 404 (no such page), 403 (the page exists but the requester may not
- * read it), 400 (a non-empty page renamed without revisionId) and 200 (renamed).
- * PR #11615 split the single 401 this route used to return into 403 / 404, which is
- * what the first two cases pin.
+ * read it), 400 (a non-empty page renamed without revisionId), 409 (revisionId is
+ * not the latest) and 200 (renamed). PR #11615 split the single 401 this route used
+ * to return into 403 / 404, which is what the first two cases pin.
  *
  * Why the fixtures look the way they do:
  *
@@ -325,6 +325,29 @@ describe('PUT /rename', () => {
         code: 'invalid_body',
         message: 'revisionId must be a mongoId',
       }),
+    ]);
+
+    const untouchedPage = await crowi.models.Page.findById(page._id);
+    expect(untouchedPage?.path).toBe(sourcePath);
+  });
+
+  it('returns 409 when revisionId is not the latest revision', async () => {
+    const page = await createPage(sourcePath, 'source body', requester);
+
+    const response = await request(app)
+      .put('/rename')
+      .set('X-Forwarded-For', TEST_IP)
+      .send({
+        pageId: page._id.toString(),
+        newPagePath: renamedPath,
+        revisionId: new Types.ObjectId().toString(),
+      });
+
+    // Only the code is asserted: the message this route pairs with it still says
+    // "couldn't delete", which is a wart a fix should be free to correct.
+    expect(response.status).toBe(409);
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({ code: 'notfound_or_forbidden' }),
     ]);
 
     const untouchedPage = await crowi.models.Page.findById(page._id);
