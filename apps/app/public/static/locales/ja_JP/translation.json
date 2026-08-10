@@ -451,6 +451,7 @@
     "notfound_or_forbidden": "元のページが見つからないか、アクセス権がありません。",
     "already_exists": "そのパスを持つページは既に存在しています。",
     "outdated": "ページが他のユーザーによって更新されました。",
+    "invalid_body": "操作対象のページのバージョンがリクエストに含まれていません。",
     "user_not_admin": "権限のあるユーザーのみが削除できます",
     "single_deletion_empty_pages": "空ページの単体削除はできません",
     "complete_deletion_not_allowed_for_user": "ページを完全に削除する権限がありません"
