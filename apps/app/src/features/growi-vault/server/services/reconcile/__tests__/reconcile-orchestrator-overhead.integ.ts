@@ -4,7 +4,9 @@
  * Performance and idempotency integration tests for ReconcileOrchestrator.
  *
  * Tests:
- *   1. Accept gate latency — assert < 200ms (p99 approximated by single measurement)
+ *   1. Accept gate — submit returns while the reconcile it scheduled is still in
+ *      flight (see the test for why this is asserted relatively rather than as a
+ *      wall-clock budget)
  *   2. Instruction count bounded — each page produces exactly 1 instruction when
  *      it has a unique namespace (the makeNamespaceMapper stub gives each page its
  *      own namespace, so no mid-stream chunk flush occurs; all buffers flush at
@@ -145,6 +147,46 @@ function waitForReconcileStatus(
   });
 }
 
+/**
+ * Wait until no reconcile is still in flight.
+ *
+ * `afterEach` empties vault_instructions and vault_reconcile_log, but a reconcile
+ * that is still running goes on writing into them afterwards, and that late row is
+ * counted by the next test. The per-test `waitForReconcileStatus` calls do not
+ * prevent this: they sit at the end of the test body, so any assertion that fails
+ * before them skips the wait entirely. That is exactly how this file used to fail
+ * in pairs — a failed assertion in the accept-gate test turned the following test's
+ * "expected 25" into "expected 26". Draining here instead makes the cleanup
+ * independent of whether the test passed.
+ */
+function waitForNoActiveReconciles(timeoutMs = 30000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      VaultReconcileLog.countDocuments({
+        status: { $in: ['pending', 'running'] },
+      })
+        .then((count: number) => {
+          if (count === 0) {
+            resolve();
+            return;
+          }
+          if (Date.now() >= deadline) {
+            reject(
+              new Error(
+                `Timeout waiting for ${count} in-flight reconcile(s) to settle`,
+              ),
+            );
+            return;
+          }
+          setTimeout(tick, 50);
+        })
+        .catch(reject);
+    };
+    tick();
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -165,6 +207,7 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  await waitForNoActiveReconciles();
   await mongoose.connection.collection('vault_reconcile_log').deleteMany({});
   await mongoose.connection.collection('vault_instructions').deleteMany({});
   await mongoose.connection.collection('pages').deleteMany({
@@ -220,11 +263,29 @@ function buildService(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// Test 1: Accept gate latency < 200ms
+// Test 1: Accept gate does not block on the reconcile
 // ---------------------------------------------------------------------------
 
-describe('Accept gate latency', () => {
-  it('accept gate resolves within 200ms for a normal request', async () => {
+describe('Accept gate', () => {
+  /**
+   * What is being guarded: the gate stays a cheap synchronous path (要件 6.2 —
+   * one findOne, no collection scan) and hands the work to the background
+   * orchestrator instead of awaiting it.
+   *
+   * Why this is asserted relatively — "submit returned before the reconcile it
+   * scheduled finished" — rather than as a wall-clock budget: a slower machine
+   * slows the gate and the reconcile by the same factor, so the property holds
+   * regardless of how loaded the runner is. The absolute bound this replaced
+   * (`elapsed < 200ms`) behaved the other way round on both counts. It failed on
+   * CI runner noise alone (313ms observed on an otherwise healthy run), and it
+   * could not have caught the regression it looked like it was guarding: measured
+   * here, the gate takes ~8ms and the whole reconcile ~63ms, so a gate that
+   * awaited the entire reconcile would still have come in under 200ms and passed.
+   *
+   * 要件 6.10's "accept gate p99 ≤ 200ms" is a production SLO. A single sample in
+   * CI cannot measure a p99, so this test does not attempt to.
+   */
+  it('resolves while the reconcile it scheduled is still in flight', async () => {
     await Page.insertMany([
       {
         path: '/overhead-latency',
@@ -236,7 +297,6 @@ describe('Accept gate latency', () => {
 
     const service = buildService({});
 
-    const start = Date.now();
     const result = await service.submit({
       targetType: 'sub-tree',
       targetPath: '/overhead-latency',
@@ -245,19 +305,23 @@ describe('Accept gate latency', () => {
         isAdmin: true,
       },
     });
-    const elapsed = Date.now() - start;
 
     expect(result.status).toBe('accepted');
-    expect(elapsed).toBeLessThan(200);
-
-    // Wait for background reconcile to reach a terminal state before afterEach
-    // clears vault_instructions, so it doesn't bleed into the next test.
     const { reconcileId } = result as {
       status: 'accepted';
       reconcileId: string;
       descendantCount: number;
     };
-    await waitForReconcileStatus(reconcileId, ['completed', 'failed']);
+
+    // Read the status the moment submit resolves: a gate that awaited the
+    // orchestrator would already be at a terminal status here.
+    const log = await VaultReconcileLog.findOne({ reconcileId }).lean();
+    expect(['pending', 'running']).toContain(
+      (log as Record<string, unknown> | null)?.status,
+    );
+
+    // The in-flight reconcile is drained by afterEach, which runs whether or not
+    // the assertions above hold.
   });
 });
 
