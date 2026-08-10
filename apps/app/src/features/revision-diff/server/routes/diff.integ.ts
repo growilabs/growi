@@ -27,8 +27,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import { prisma } from '~/utils/prisma';
 
 import { diffRouteHandlersFactory } from './diff';
 
@@ -82,8 +82,8 @@ const makeId = (): Types.ObjectId => new Types.ObjectId();
 /**
  * Create a Revision document in the test database.
  *
- * Uses `Revision.collection.insertOne()` to bypass Mongoose's automatic
- * timestamps so the `createdAt` we specify is persisted as-is.
+ * Passes `createdAt` explicitly so it is persisted as-is instead of the
+ * schema default.
  */
 async function createRevision(props: {
   pageId: Types.ObjectId;
@@ -92,13 +92,15 @@ async function createRevision(props: {
   createdAt?: Date;
 }): Promise<{ _id: Types.ObjectId }> {
   const id = makeId();
-  await Revision.collection.insertOne({
-    _id: id,
-    pageId: props.pageId,
-    author: props.author,
-    body: props.body ?? 'content',
-    format: 'markdown',
-    createdAt: props.createdAt ?? new Date(),
+  await prisma.revisions.create({
+    data: {
+      id: id.toString(),
+      pageId: props.pageId.toString(),
+      authorId: props.author.toString(),
+      body: props.body ?? 'content',
+      format: 'markdown',
+      createdAt: props.createdAt ?? new Date(),
+    },
   });
   return { _id: id };
 }
@@ -174,7 +176,7 @@ describe('POST /api/v3/revisions/diff — Revision Diff integration', () => {
 
   beforeEach(async () => {
     userId = makeId();
-    await Revision.deleteMany({});
+    await prisma.revisions.deleteMany();
   });
 
   afterEach(() => {
