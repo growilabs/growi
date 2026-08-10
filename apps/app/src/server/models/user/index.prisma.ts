@@ -49,13 +49,17 @@ export const extension = Prisma.defineExtension((client) => {
           },
         },
         serializeSecurely: {
+          // Must mirror omitInsecureAttributes() in @growi/core: every credential
+          // field has to be listed here too, or it leaks through this path (the
+          // scrypt `passwordHash` reached /bookmarks/info this way).
           needs: {
             password: true,
+            passwordHash: true,
             apiToken: true,
             email: true,
             isEmailPublished: true,
           },
-          compute({ password, apiToken, email, ...user }) {
+          compute({ password, passwordHash, apiToken, email, ...user }) {
             return () => ({
               ...user,
               email: user.isEmailPublished ? email : undefined,
