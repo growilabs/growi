@@ -26,7 +26,10 @@ const isExternalLink = (href: string, siteUrl: string | undefined): boolean => {
 const isCreatablePage = (href: string) => {
   try {
     const url = new URL(href, 'http://example.com');
-    const pathName = url.pathname;
+    // URL.pathname is percent-encoded, and '%' itself is one of the characters
+    // isCreatablePage() forbids -- so every path holding a non-ASCII character
+    // or a space would be judged non-creatable unless it is decoded back first.
+    const pathName = decodeURIComponent(url.pathname);
     return pagePathUtils.isCreatablePage(pathName);
   } catch (err) {
     logger.debug(err);
