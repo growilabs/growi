@@ -37,6 +37,11 @@ import { configManager } from './config-manager';
 import type { ConfigKey } from './config-manager/config-definition';
 import { exportService } from './export';
 import {
+  describeBlocker,
+  evaluateBlockers,
+  type TransferBlocker,
+} from './g2g-transfer-transferability';
+import {
   detectUniqueConflicts,
   type UniqueConflictReport,
 } from './import/detect-unique-conflicts';
@@ -159,9 +164,33 @@ interface FileMeta {
 /**
  * Return type for {@link Pusher.getTransferability}
  */
-type Transferability =
+export type Transferability =
   | { canTransfer: true }
   | { canTransfer: false; reason: string };
+
+/**
+ * Maps a blocker list to `getTransferability`'s existing return shape: proceed if
+ * there are none, otherwise stop with the first one's message.
+ *
+ * Pure, and exported for the same reason {@link toArchivePostErrorEvent} is: so
+ * `getTransferability` itself reduces to gathering the inputs and calling this, and the
+ * "which blocker wins, what does the caller see" behavior is unit-testable without a
+ * database. `describeBlocker` stays the only place that turns a blocker into text
+ * (see g2g-transfer-transferability.ts), so this function never builds a message itself.
+ *
+ * Takes the blocker list directly, not a `TransferabilityReport` — there is no warning
+ * to fold in here (this pre-existing check has no room for one in its return shape;
+ * surfacing warnings to the operator is the preflight endpoint's job, task 8.2), so
+ * there is nothing to gain and a fabricated `warnings: []` to avoid by requiring one.
+ */
+export const toTransferability = (
+  blockers: readonly TransferBlocker[],
+): Transferability => {
+  const [firstBlocker] = blockers;
+  return firstBlocker == null
+    ? { canTransfer: true }
+    : { canTransfer: false, reason: describeBlocker(firstBlocker) };
+};
 
 /**
  * G2g transfer pusher
@@ -505,68 +534,43 @@ export class G2GTransferPusherService implements Pusher {
     destGROWIInfo: IDataGROWIInfo,
   ): Promise<Transferability> {
     const { fileUploadService } = this.crowi;
-
-    const version = getGrowiVersion();
-    if (version !== destGROWIInfo.version) {
-      return {
-        canTransfer: false,
-        // TODO: i18n for reason
-        reason: `GROWI versions mismatch. src GROWI: ${version} / dest GROWI: ${destGROWIInfo.version}.`,
-      };
-    }
-
     const User = mongoose.model<IUser, any>('User');
-    const activeUserCount = await User.countActiveUsers();
-    if ((destGROWIInfo.userUpperLimit ?? Infinity) < activeUserCount) {
-      return {
-        canTransfer: false,
-        // TODO: i18n for reason
-        reason: `The number of active users (${activeUserCount} users) exceeds the limit of the destination GROWI (up to ${destGROWIInfo.userUpperLimit} users).`,
-      };
-    }
 
-    if (destGROWIInfo.fileUploadDisabled) {
-      return {
-        canTransfer: false,
-        // TODO: i18n for reason
-        reason: 'The file upload setting is disabled in the destination GROWI.',
-      };
-    }
+    // Gathered eagerly rather than short-circuited like the original sequence of early
+    // returns: `evaluateBlockers` is a pure function, so every input it might need has
+    // to be in hand before it runs. This costs an extra query in cases that would
+    // previously have returned before reaching it (e.g. a version mismatch used to skip
+    // the active-user count entirely); it does not change which blocker is reported,
+    // since `toTransferability` still reads only the first one, in the same priority
+    // order the old checks ran in (see g2g-transfer-transferability.spec.ts).
+    const [activeUsers, totalFileSize] = await Promise.all([
+      User.countActiveUsers(),
+      fileUploadService.getTotalFileSize(),
+    ]);
 
-    if (configManager.getConfig('app:fileUploadType') === 'none') {
-      return {
-        canTransfer: false,
-        // TODO: i18n for reason
-        reason: 'File upload is not configured for src GROWI.',
-      };
-    }
+    // `evaluateBlockers`, not `evaluateTransferability`: this call has no password-seed
+    // fingerprint, no local-auth flag, no loginable-admin count and no session-store
+    // capability to offer (those are task 8.1/8.2's job, once the preflight endpoint
+    // exists to show the resulting warnings), and there is no honest placeholder for
+    // any of them — every value that type-checks also reads as "checked, found fine",
+    // which would make this call silently claim requirement 3.5 was evaluated when it
+    // was not.
+    const blockers = evaluateBlockers(
+      {
+        version: getGrowiVersion(),
+        activeUsers,
+        totalFileSize,
+        fileUploadType: configManager.getConfig('app:fileUploadType'),
+      },
+      {
+        version: destGROWIInfo.version,
+        userUpperLimit: destGROWIInfo.userUpperLimit,
+        fileUploadTotalLimit: destGROWIInfo.fileUploadTotalLimit,
+        attachmentInfo: destGROWIInfo.attachmentInfo,
+      },
+    );
 
-    if (destGROWIInfo.attachmentInfo.type === 'none') {
-      return {
-        canTransfer: false,
-        // TODO: i18n for reason
-        reason: 'File upload is not configured for dest GROWI.',
-      };
-    }
-
-    if (!destGROWIInfo.attachmentInfo.writable) {
-      return {
-        canTransfer: false,
-        // TODO: i18n for reason
-        reason: 'The storage of the destination GROWI is not writable.',
-      };
-    }
-
-    const totalFileSize = await fileUploadService.getTotalFileSize();
-    if ((destGROWIInfo.fileUploadTotalLimit ?? Infinity) < totalFileSize) {
-      return {
-        canTransfer: false,
-        // TODO: i18n for reason
-        reason: `The total file size of attachments exceeds the file upload limit of the destination GROWI. Requires ${totalFileSize.toLocaleString()} bytes, but got ${(destGROWIInfo.fileUploadTotalLimit as number).toLocaleString()} bytes.`,
-      };
-    }
-
-    return { canTransfer: true };
+    return toTransferability(blockers);
   }
 
   public async listFilesInStorage(tk: TransferKey): Promise<FileMeta[]> {

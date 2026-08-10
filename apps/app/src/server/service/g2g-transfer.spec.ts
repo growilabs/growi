@@ -19,7 +19,10 @@ import {
   G2GTransferPusherService,
   type IDataGROWIInfo,
   toArchivePostErrorEvent,
+  toTransferability,
 } from './g2g-transfer';
+import type { TransferBlocker } from './g2g-transfer-transferability';
+import { describeBlocker } from './g2g-transfer-transferability';
 
 // `startTransfer` streams the exported archive to `form-data` and never reads it back
 // in these tests (the POST itself is mocked below), so a real file is unnecessary.
@@ -188,6 +191,50 @@ describe('toArchivePostErrorEvent', () => {
   ])('falls back to the generic event without throwing when %s', (_label, err) => {
     expect(() => toArchivePostErrorEvent(err)).not.toThrow();
     expect(toArchivePostErrorEvent(err)).toEqual(GENERIC_EVENT);
+  });
+});
+
+describe('toTransferability', () => {
+  test('allows the transfer when there are no blockers', () => {
+    expect(toTransferability([])).toEqual({
+      canTransfer: true,
+    });
+  });
+
+  test('refuses the transfer with the first blocker described, when there is exactly one', () => {
+    const blocker: TransferBlocker = {
+      type: 'destination_storage_not_writable',
+    };
+
+    expect(toTransferability([blocker])).toEqual({
+      canTransfer: false,
+      reason: describeBlocker(blocker),
+    });
+  });
+
+  test('reports only the first blocker when several apply, matching the old early-return priority', () => {
+    // The pre-existing checks were a sequence of early returns, so a caller reading
+    // `reason` only ever saw the earliest applicable one. `evaluateBlockers` reports
+    // every applicable blocker (so a preflight screen can show them all), but this
+    // legacy shape still has room for exactly one message.
+    const first: TransferBlocker = {
+      type: 'version_mismatch',
+      src: '7.5.0',
+      dest: '7.4.0',
+    };
+    const second: TransferBlocker = {
+      type: 'destination_storage_not_writable',
+    };
+
+    const result = toTransferability([first, second]);
+
+    expect(result).toEqual({
+      canTransfer: false,
+      reason: describeBlocker(first),
+    });
+    if (!result.canTransfer) {
+      expect(result.reason).not.toBe(describeBlocker(second));
+    }
   });
 });
 
