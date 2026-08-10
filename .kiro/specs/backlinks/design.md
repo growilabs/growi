@@ -437,11 +437,17 @@ function resolveToPages(paths: string[]): Promise<Map<string, ObjectId>>;
 - **A redirect on the path outranks a live page at it**, because that is what page view does:
   `resolvePathAndCheckIdentical` (`pages/[[...path]]/page-data-props.ts`) overwrites the requested
   path with `chains.end.toPath` whenever a redirect exists, without ever looking for a live page at
-  the requested path. The two states can coexist — page creation deletes the redirect for the new
-  path, but from a sub-operation that is not awaited and logs rather than retries its failure — so
-  matching the precedence is what keeps a backlink from being filed under a page no click reaches.
-  This is why the redirect lookup cannot stop at the paths that missed: a live hit does not settle
-  the answer.
+  the requested path. A live page and a redirect can coexist at one path in two ways: the v5 create
+  deletes the redirect from a sub-operation that is not awaited and logs rather than retries its
+  failure (fixed separately in #11683), and `createV4` — taken whenever `app:isV5Compatible` is
+  false — never touches `PageRedirect` at all, which makes the coexistence ordinary rather than
+  exceptional on a not-yet-migrated install. Matching the precedence is what keeps a backlink from
+  being filed under a page no click reaches. This is why the redirect lookup cannot stop at the paths
+  that missed: a live hit does not settle the answer.
+  - **Cost, accepted deliberately**: one aggregation on every save of a page that has links, and
+    three concurrent queries instead of two when everything resolves. Restoring live-page-first to
+    win that query back reintroduces the disagreement, and #11683 does not make it safe — the v4
+    path above is unchanged.
 - **Cycles resolve one hop, they do not fall out as unresolved.** `$graphLookup` visits each
   document once, so a cycle brings the walk back to the starting document, which is then the
   deepest hop — `end` collapses to `start`. Never a hang, and page view lands on the same hop
@@ -457,6 +463,11 @@ function resolveToPages(paths: string[]): Promise<Map<string, ObjectId>>;
   because it runs on every save and `$graphLookup` is memory-bound at 100MB with no spill to disk.
   Page view calls the same static with no cap: shortening a chain there would answer an old URL
   with a not-found for a page that was renamed more times than the cap.
+- **Breadth is not bounded here (deferred to B4.5).** The cap limits how far one chain is walked, not
+  how many chains one call walks: `fromPaths` is every link path on the page. The same memory bound
+  therefore stays reachable through width, and the failure is silent (`PageLinkService.onUpsert`
+  logs and drops it, so that page's rows stop being updated). Left as-is for B4.1 on purpose;
+  B4.5 owns chunking `fromPaths`.
 - **Permalink targets are the strongest case (1.9, 5.4)**: `toPath` already encodes the immutable
   `_id`, so `toPage` is permanent and immune to rename/move/redirect — it never needs
   redirect-following or re-resolution. (`isPermalink` has already validated a 24-hex ObjectId, so

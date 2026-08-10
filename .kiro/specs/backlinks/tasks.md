@@ -388,6 +388,29 @@ B3/B5.
   - _Requirements: 1.9, 5.1, 5.2, 5.4_
   - _Depends: B4.3, B1.12_
 
+- [ ] B4.5 Bound how many chains one redirect lookup walks
+  - Deliberately deferred out of B4.1 (judged out of that PR's scope), and independent of
+    B4.2–B4.4 — pick it up at any point after B4.1.
+  - B4.1 capped the *depth* of a chain (`maxDepth: 50` from the save path) but nothing caps the
+    *width*: `retrievePageRedirectEndpointsBatch` receives every link path on the page, and B4.1's
+    precedence decision means it receives them on **every** save rather than only the ones that
+    missed. `$graphLookup` is memory-bound at 100MB and cannot spill to disk, so a page carrying
+    thousands of links (generated content, imported trees) can fail the aggregation outright — the
+    same failure mode the depth cap was added to prevent, reached through width instead.
+  - **Why it matters more than the raw failure**: `PageLinkService.onUpsert` catches and logs the
+    error without acting on it, so the page's `PageLink` rows silently stop being updated on that
+    save and every save after it. There is no signal in the UI and no retry.
+  - Fix: chunk `fromPaths` inside the static (one aggregation per chunk, results merged into the same
+    map) so the caller cannot exceed the bound by passing a large set. Keep the chunk size a
+    constant in the model, next to the reason — callers should not have to know it.
+  - Consider covering `removePageRedirectsByToPath` in the same pass: it walks the graph the other
+    way and is also unbounded, though it runs on delete rather than on save.
+  - Done when a unit or integ test shows a `fromPaths` set larger than the chunk size resolves every
+    input in more than one aggregation, with the same result as a single-chunk run
+  - _Requirements: 5.1, 5.2_
+  - _Boundary: PageRedirect (batch static)_
+  - _Depends: B4.1_
+
 ---
 
 ## Story B5 — Broken / trashed link handling on deletion

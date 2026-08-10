@@ -186,11 +186,21 @@
 - **Redirect before live page, for every path (revised after B4.1 review)**: page view's
   `resolvePathAndCheckIdentical` follows a redirect without ever checking for a live page at the
   requested path, so resolving the live page first would answer differently from a click whenever a
-  path both holds a page and kept a redirect — reachable because page creation deletes the redirect
-  from a sub-operation that is not awaited and swallows its own failure. Cost of the agreement: the
-  redirect aggregation cannot be limited to the paths that missed, so it runs on every save (three
+  path both holds a page and kept a redirect. Two ways to reach that state, one of them ordinary:
+  - the **v5 path** deletes the redirect on create, but from a sub-operation that is not awaited and
+    swallows its own failure, so a single transient failure leaves it forever (being fixed
+    separately in #11683 by deleting it inside `create`, before the page is written);
+  - the **v4 path** (`createV4`, taken whenever `app:isV5Compatible` is false) never touches
+    `PageRedirect` at all, so on a not-yet-migrated install the coexistence is the *normal* outcome,
+    not a failure case. Precedence cannot be treated as a defense against a rare failure.
+
+  **Cost of the agreement, accepted deliberately**: the redirect aggregation cannot be limited to the
+  paths that missed — a live hit no longer settles the answer — so it runs on every save (three
   concurrent queries instead of two, plus the endpoint query only for endpoints the path query did
-  not already answer).
+  not already answer). This gives up the "two queries when everything resolves" property that B4.1
+  review called out as a strength; agreeing with a click was judged worth more than the query. Do
+  **not** restore live-page-first as an optimization: it reintroduces the disagreement, and #11683
+  does not remove the need (the v4 path above stays as it is).
 - **Batched on the model, not per link (revised at B4.1)**: a page commonly carries several paths
   that resolve to nothing — renamed targets, but also the ordinary habit of linking to
   not-yet-created pages — and every save re-resolves all of them. Matching with
@@ -209,9 +219,10 @@
   chain is longer than the cap with a not-found (an intermediate hop holds no live page). Page view
   therefore calls the static with no cap, and only the save path passes one.
   (`removePageRedirectsByToPath` walks the graph the other way and is also uncapped; it runs on
-  delete, not on save.) Still open: nothing bounds the *breadth* — one aggregation now takes every
-  link path on the page, so a page with thousands of links sends a `$in` of that size into a stage
-  that cannot spill to disk.
+  delete, not on save.) **Breadth is deliberately left unbounded for now** — one aggregation takes
+  every link path on the page, so a page with thousands of links sends a `$in` of that size into a
+  stage that cannot spill to disk. Judged out of scope for B4.1 and deferred to **B4.5**, which is
+  where the reasoning and the fix (chunk `fromPaths`) are written down.
 
 ### Decision: requirement 6.4 implies a **forward-link health** read over the same index
 
