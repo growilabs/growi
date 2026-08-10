@@ -1,6 +1,6 @@
 {
   "name": "@growi/vault-manager",
-  "version": "1.1.1-RC.0",
+  "version": "1.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
@@ -15,8 +15,6 @@
     "lint:typecheck": "tsc --noEmit",
     "lint": "run-p lint:**",
     "build": "pnpm tsc -p tsconfig.build.json",
-    "version:prerelease": "pnpm version prerelease --preid=RC --no-git-tag-version --no-git-checks",
-    "version:prepatch": "pnpm version prepatch --preid=RC --no-git-tag-version --no-git-checks",
     "test": "vitest run",
     "test:integ": "RUN_VAULT_INTEG=true vitest run src/__tests__"
   },

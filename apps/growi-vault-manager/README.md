@@ -144,6 +144,16 @@ Highlights of the refactor:
 - OCI standard labels (`org.opencontainers.image.source`, `title`, `description`, `vendor`, `authors`) on the release stage.
 - **Non-root runtime**: `docker/docker-entrypoint.ts` (run via Node 24 type stripping) creates and chowns the bare repo on the shared `/data` volume as root, then drops to the `node` user (uid/gid 1000) via native `process.setuid/setgid` before exec'ing the app. This keeps `vault-manager` and `apps/app` on a single uid so they can share the `/data` volume (Requirement 10.3); no `gosu`/`setpriv` binary is needed.
 
+### Releasing
+
+The image is released through changesets, the same flow `@growi/core` and `@growi/pluginkit` use — there is no release branch and no RC version marker.
+
+1. In the PR that changes `apps/growi-vault-manager/**` (or `packages/core` / `packages/logger`, which are compiled into the image), run `npx changeset` and give `@growi/vault-manager` a `patch` / `minor` / `major` bump. Update the "Supported tags" list in `docker/README.md` in the same PR — changesets does not manage that file.
+2. Merging that PR makes changesets open or update a **Release Subpackages** PR against `master`, which bumps `package.json` and writes `CHANGELOG.md`.
+3. Merging the Release Subpackages PR publishes the image. `.github/workflows/release-vault.yml` watches pushes to `master` that touch `apps/growi-vault-manager/package.json`, publishes when the version is a stable one with no `vault-manager/v<version>` tag yet, and creates that tag afterwards.
+
+Because the gate is "stable version, not tagged yet", a push that edits `package.json` without releasing does nothing, and the same version can never be published twice.
+
 ### Cross-repository impact: `growi-docker-compose`
 
 The separate [`growi-docker-compose`](https://github.com/growilabs/growi-docker-compose) repository consumes the published image, as an opt-in override in [`examples/growi-vault`](https://github.com/growilabs/growi-docker-compose/tree/master/examples/growi-vault). When the image is republished with a new major/minor, that override pins the tag and has to be updated there in a separate PR.
