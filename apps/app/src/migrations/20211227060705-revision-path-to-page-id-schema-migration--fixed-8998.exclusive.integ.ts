@@ -1,27 +1,31 @@
 /**
  * Integration test for the revision path -> pageId migration.
  *
- * Runs against the real (in-memory) MongoDB test database wired by the
- * `app-integration` Vitest project (see vitest.workspace.mts) — mongoose and
- * prisma are NOT mocked (and this file never imports `mongoose` itself);
- * `up()`/`down()` execute for real against that database. `pages`/`revisions`
- * documents are seeded and read back through a plain `mongodb` driver
- * `MongoClient` connected to the same per-worker test database, bypassing
- * model-level schema validation so the pre-migration legacy document shapes
- * (`revisions.path`, no `pages` required fields) can be represented directly
- * — exactly how the migration itself finds them in production. The `Page`
- * mongoose model gets registered as a side effect of the migration's own
+ * Runs against the real MongoDB test database wired by the
+ * `app-integration-exclusive` Vitest project (see vitest.workspace.mts) —
+ * mongoose and prisma are NOT mocked, so `up()`/`down()` execute for real.
+ * `pages`/`revisions` documents are seeded and read back through
+ * `mongoose.connection.collection()`, i.e. the raw driver collection on the
+ * connection the test setup already opened. That bypasses model-level schema
+ * validation, so the pre-migration legacy document shapes (`revisions.path`, no
+ * `pages` required fields) can be represented directly — exactly how the
+ * migration itself finds them in production. The `Page` mongoose model gets
+ * registered as a side effect of the migration's own
  * `getModelSafely('Page') || getPageModel()` fallback.
+ *
+ * WHY the `exclusive` project: both `up()` and `down()` operate on the whole
+ * database (every page with a revision), and `down()` in particular rewrites
+ * every revision that is pageId-keyed — i.e. every revision in its current,
+ * post-migration shape — back to the legacy path-keyed shape. Sharing a database
+ * with the ordinary integration tests would let this file silently corrupt
+ * fixtures any other file in the same worker left behind.
  */
-import type { Collection, Db } from 'mongodb';
-import { MongoClient, ObjectId } from 'mongodb';
-
-import { getTestDbConfig } from '^/test/setup/mongo/utils';
+import type { Collection } from 'mongodb';
+import { ObjectId } from 'mongodb';
+import mongoose from 'mongoose';
 
 describe('20211227060705-revision-path-to-page-id-schema-migration--fixed-8998', () => {
   let migrate: typeof import('./20211227060705-revision-path-to-page-id-schema-migration--fixed-8998');
-  let client: MongoClient;
-  let db: Db;
   let pages: Collection;
   let revisions: Collection;
 
@@ -29,24 +33,12 @@ describe('20211227060705-revision-path-to-page-id-schema-migration--fixed-8998',
   const revisionIds: ObjectId[] = [];
 
   beforeAll(async () => {
-    const { mongoUri } = getTestDbConfig();
-    if (mongoUri == null) {
-      throw new Error('mongoUri is not resolved by the test mongo setup');
-    }
-
-    client = new MongoClient(mongoUri);
-    await client.connect();
-    db = client.db();
-    pages = db.collection('pages');
-    revisions = db.collection('revisions');
+    pages = mongoose.connection.collection('pages');
+    revisions = mongoose.connection.collection('revisions');
 
     migrate = await import(
       './20211227060705-revision-path-to-page-id-schema-migration--fixed-8998'
     );
-  });
-
-  afterAll(async () => {
-    await client.close();
   });
 
   afterEach(async () => {
