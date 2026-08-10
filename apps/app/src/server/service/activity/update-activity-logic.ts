@@ -1,6 +1,4 @@
-import type { IRevisionHasId } from '@growi/core';
 import { getIdStringForRef } from '@growi/core';
-import mongoose from 'mongoose';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { prisma } from '~/utils/prisma';
@@ -38,7 +36,8 @@ export const shouldGenerateUpdate = async (payload: GenerateUpdatePayload) => {
 
   const isLastActivityByMe =
     lastContentActivity != null &&
-    getIdStringForRef(lastContentActivity.userId as string) === currentUserId;
+    lastContentActivity.userId != null &&
+    getIdStringForRef(lastContentActivity.userId) === currentUserId;
   const lastActivityTime = lastContentActivity?.createdAt?.getTime?.() ?? 0;
   const timeSinceLastActivityMs = Date.now() - lastActivityTime;
 
@@ -49,9 +48,8 @@ export const shouldGenerateUpdate = async (payload: GenerateUpdatePayload) => {
   } else if (timeSinceLastActivityMs < SUPPRESION_UPDATE_WINDOW_MS) {
     shouldGenerateUpdateActivity = false;
   } else {
-    const Revision = mongoose.model<IRevisionHasId>('Revision');
-    const revisionCount = await Revision.countDocuments({
-      pageId: targetPageId,
+    const revisionCount = await prisma.revisions.count({
+      where: { pageId: targetPageId },
     });
 
     shouldGenerateUpdateActivity =

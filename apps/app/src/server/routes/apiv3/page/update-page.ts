@@ -1,4 +1,4 @@
-import type { IPage, IRevisionHasId, IUserHasId } from '@growi/core';
+import type { IPage, IUserHasId } from '@growi/core';
 import { allOrigin, getIdForRef, getIdStringForRef, Origin } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
@@ -15,6 +15,7 @@ import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
+import type { revisions } from '~/generated/prisma/client';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import {
   type IApiv3PageUpdateParams,
@@ -38,6 +39,7 @@ import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/norma
 import { getYjsService } from '~/server/service/yjs';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
@@ -54,7 +56,6 @@ interface UpdatePageRequest
 
 export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   const Page = mongoose.model<IPage, PageModel>('Page');
-  const Revision = mongoose.model<IRevisionHasId>('Revision');
 
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
@@ -181,7 +182,7 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   async function postAction(
     req: UpdatePageRequest,
     updatedPage: HydratedDocument<PageDocument>,
-    previousRevision: IRevisionHasId | null,
+    previousRevision: { body: string } | null,
   ) {
     // Reflect the updates in ydoc
     const origin = req.body.origin;
@@ -268,6 +269,10 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         );
       }
 
+      const currentPageRevisionId =
+        typeof currentPage.revision === 'string'
+          ? currentPage.revision
+          : currentPage.revision?._id.toString();
       const disableUserPages = configManager.getConfig(
         'security:disableUserPages',
       );
@@ -304,14 +309,20 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         currentPage != null &&
         !(await currentPage.isUpdatable(sanitizeRevisionId, origin))
       ) {
-        const latestRevision = await Revision.findById(
-          currentPage.revision,
-        ).populate('author');
+        const latestRevision =
+          currentPageRevisionId != null
+            ? await prisma.revisions.findUnique({
+                where: { id: currentPageRevisionId },
+                include: { author: true },
+              })
+            : undefined;
         const returnLatestRevision = {
-          revisionId: latestRevision?._id.toString(),
+          revisionId: latestRevision?._id,
           revisionBody: latestRevision?.body,
           createdAt: latestRevision?.createdAt,
-          user: serializeUserSecurely(latestRevision?.author),
+          user: serializeUserSecurely(
+            latestRevision?.author as IUserHasId | undefined,
+          ),
         };
         return res.apiv3Err(
           new ErrorV3(
@@ -324,7 +335,7 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         );
       }
       let updatedPage: HydratedDocument<PageDocument>;
-      let previousRevision: IRevisionHasId | null;
+      let previousRevision: revisions | null = null;
       try {
         const {
           userRelatedGrantUserGroupIds,
@@ -345,7 +356,9 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         previousRevision = null;
         if (sanitizeRevisionId != null) {
           try {
-            previousRevision = await Revision.findById(sanitizeRevisionId);
+            previousRevision = await prisma.revisions.findUnique({
+              where: { id: sanitizeRevisionId },
+            });
           } catch (error) {
             logger.error(
               {
@@ -361,15 +374,17 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         // Priority 2: Fallback to currentPage.revision (for diff detection)
         if (previousRevision == null && currentPage.revision != null) {
           try {
-            previousRevision = await Revision.findById(currentPage.revision);
+            previousRevision = await prisma.revisions.findUnique({
+              where: { id: currentPageRevisionId },
+            });
           } catch (error) {
             logger.error(
               {
                 pageId: currentPage._id,
-                revisionId: currentPage.revision,
+                revisionId: currentPageRevisionId,
                 err: error,
               },
-              'Failed to fetch previousRevision by currentPage.revision',
+              'Failed to fetch previousRevision by currentPageRevisionId',
             );
           }
         }

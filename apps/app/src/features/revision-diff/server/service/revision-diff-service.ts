@@ -12,7 +12,7 @@ import type { HydratedDocument } from 'mongoose';
 import mongoose, { Types } from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
+import { prisma } from '~/utils/prisma';
 
 import type {
   RevisionDiffRequestPair,
@@ -39,8 +39,8 @@ export const MAX_PAIRS = 20;
  * Only the fields needed for ownership validation and diff computation are included.
  */
 export interface RevisionDoc {
-  readonly _id: Types.ObjectId;
-  readonly pageId: Types.ObjectId;
+  readonly _id: string;
+  readonly pageId: string;
   readonly body: string;
 }
 
@@ -88,7 +88,7 @@ export function computeDiffForPair(
 
   // Step 2: validate toRevision — must exist and belong to the specified pageId.
   const toRevision = revisionMap.get(toRevisionId);
-  if (toRevision == null || toRevision.pageId.toString() !== pageId) {
+  if (toRevision == null || toRevision.pageId !== pageId) {
     return { status: 'invalid', pageId, toRevisionId };
   }
 
@@ -96,7 +96,7 @@ export function computeDiffForPair(
   let fromBody = '';
   if (fromRevisionId !== null) {
     const fromRevision = revisionMap.get(fromRevisionId);
-    if (fromRevision == null || fromRevision.pageId.toString() !== pageId) {
+    if (fromRevision == null || fromRevision.pageId !== pageId) {
       return { status: 'invalid', pageId, toRevisionId };
     }
     fromBody = fromRevision.body;
@@ -182,12 +182,12 @@ export async function computeDiffs(
   );
 
   // Bulk query 2: fetch revision documents needed for diff computation.
-  const revisionDocs: RevisionDoc[] = await Revision.find(
-    { _id: { $in: uniqueRevisionIds } },
-    { _id: 1, pageId: 1, body: 1 },
-  ).lean();
+  const revisionDocs: RevisionDoc[] = await prisma.revisions.findMany({
+    where: { id: { in: uniqueRevisionIds.map((id) => id.toString()) } },
+    select: { _id: true, pageId: true, body: true },
+  });
   const revisionMap = new Map<string, RevisionDoc>(
-    revisionDocs.map((r) => [r._id.toString(), r]),
+    revisionDocs.map((r) => [r._id, r]),
   );
 
   // Compute per-pair results in order.
