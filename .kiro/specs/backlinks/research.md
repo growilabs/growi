@@ -176,17 +176,25 @@
 ### Decision: resolve `toPage` through `PageRedirect`; rename needs no write-time work
 
 - **Context**: Requirement 5 (links survive rename/move, including descendants).
-- **Selected Approach**: Resolution order — live path lookup first; else follow
-  `PageRedirect.retrievePageRedirectEndpointsBatch(missedPaths)` and read each chain's
-  `end.toPath` (a `$graphLookup` chain with cycle protection); else unresolved. Because rename
-  keeps `_id`, existing inbound `toPage` caches stay valid; new links to the old path resolve via
-  the redirect chain.
+- **Selected Approach**: Resolution order — `PageRedirect.retrievePageRedirectEndpointsBatch(allPaths, 50)`
+  for every path, concurrently with the live path lookup; a path with a redirect resolves at its
+  chain's `end.toPath`, a path without one resolves at its own live page; else unresolved. Because
+  rename keeps `_id`, existing inbound `toPage` caches stay valid; new links to the old path resolve
+  via the redirect chain.
 - **Rationale**: Matches what a user clicking the stale link actually experiences; keeps
   `toPath` faithful to the body. `$graphLookup` handles double renames (A→B→C) in one query.
+- **Redirect before live page, for every path (revised after B4.1 review)**: page view's
+  `resolvePathAndCheckIdentical` follows a redirect without ever checking for a live page at the
+  requested path, so resolving the live page first would answer differently from a click whenever a
+  path both holds a page and kept a redirect — reachable because page creation deletes the redirect
+  from a sub-operation that is not awaited and swallows its own failure. Cost of the agreement: the
+  redirect aggregation cannot be limited to the paths that missed, so it runs on every save (three
+  concurrent queries instead of two, plus the endpoint query only for endpoints the path query did
+  not already answer).
 - **Batched on the model, not per link (revised at B4.1)**: a page commonly carries several paths
   that resolve to nothing — renamed targets, but also the ordinary habit of linking to
   not-yet-created pages — and every save re-resolves all of them. Matching with
-  `$in` keeps that at one aggregation regardless of how many missed. The batch lives as a
+  `$in` keeps that at one aggregation regardless of how many paths a page carries. The batch lives as a
   `PageRedirect` static (`retrievePageRedirectEndpointsBatch`) and the pre-existing singular
   `retrievePageRedirectEndpoints` — which page view uses for its "redirected from" banner — is
   re-implemented as a lookup over it. Rejected alternative: a backlinks-local batch resolver,
@@ -194,12 +202,16 @@
   two copies can drift (a `maxDepth` cap, a collection rename) so that page view and the link
   index disagree about where a chain ends, which is exactly the invariant this feature relies on.
 - **Trade-offs**: Redirect records accumulate (`removePageRedirectsByToPath` is unused) — a
-  data-hygiene caveat, not a correctness one. The chain walk is capped at `maxDepth: 50`, added
-  once consolidation made it a one-line change: `$graphLookup` is memory-bound at 100MB and
-  cannot spill to disk, so an unbounded walk fails the whole aggregation rather than degrading.
-  A chain past the cap resolves to its 51st hop — the same "endpoint with no live page" outcome
-  a cycle already produces. (`removePageRedirectsByToPath` walks the graph the other way and is
-  still uncapped; it runs on delete, not on save.)
+  data-hygiene caveat, not a correctness one. The save path caps its walk at `maxDepth: 50`, since
+  `$graphLookup` is memory-bound at 100MB and cannot spill to disk, so an unbounded walk fails the
+  whole aggregation rather than degrading. **The cap is an argument, not a property of the static**:
+  it was first written into the shared pipeline, which silently made page view answer a URL whose
+  chain is longer than the cap with a not-found (an intermediate hop holds no live page). Page view
+  therefore calls the static with no cap, and only the save path passes one.
+  (`removePageRedirectsByToPath` walks the graph the other way and is also uncapped; it runs on
+  delete, not on save.) Still open: nothing bounds the *breadth* — one aggregation now takes every
+  link path on the page, so a page with thousands of links sends a `$in` of that size into a stage
+  that cannot spill to disk.
 
 ### Decision: requirement 6.4 implies a **forward-link health** read over the same index
 

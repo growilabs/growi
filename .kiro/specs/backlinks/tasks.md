@@ -340,17 +340,24 @@ the redirect-following half of resolution plus the re-resolve-by-path repointing
 B3/B5.
 
 - [x] B4.1 Add redirect-chain following to resolveToPages
-  - Extend the resolver with the redirect step deferred from B1.4: when direct path lookup misses,
-    follow the redirect chain to its endpoint and resolve there; handle multi-hop renames (A→B→C) via
-    the redirect endpoint lookup; unresolved when neither a page nor a redirect resolves (the broken
-    case). A permalink `toPath` still short-circuits by id (never needs redirect-following — 5.4)
-  - Follow the chain for **all** missed paths in one lookup, via a new
-    `PageRedirect.retrievePageRedirectEndpointsBatch` static; re-implement the existing singular
-    `retrievePageRedirectEndpoints` over it so the `$graphLookup` pipeline and deepest-hop rule
-    exist once and page view cannot disagree with the link index about where a chain ends
-  - Done when tests cover single and double redirect chains resolving to the endpoint, the
-    unresolved case, several missed paths resolving in one lookup, and a trashed target resolving
-    through its trash redirect rather than reading as broken
+  - Extend the resolver with the redirect step deferred from B1.4: follow the redirect chain to its
+    endpoint and resolve there; handle multi-hop renames (A→B→C) via the redirect endpoint lookup;
+    unresolved when neither a page nor a redirect resolves (the broken case). A permalink `toPath`
+    still short-circuits by id (never needs redirect-following — 5.4)
+  - **Match page view's precedence**: a redirect on the path outranks a live page at it, because
+    `resolvePathAndCheckIdentical` follows the redirect without checking for a live page at the
+    requested path. So the chain is looked up for **every** path in one lookup, not only for the
+    ones that missed — a live hit does not settle the answer
+  - Add the lookup as a new `PageRedirect.retrievePageRedirectEndpointsBatch` static and
+    re-implement the existing singular `retrievePageRedirectEndpoints` over it, so the
+    `$graphLookup` pipeline and deepest-hop rule exist once and page view cannot disagree with the
+    link index about where a chain ends. Keep the depth cap a **parameter**: the save path passes
+    50, page view passes none (a cap there turns a much-renamed page's old URL into a not-found)
+  - Done when tests cover single and double redirect chains resolving to the endpoint, a redirect
+    winning over a live page at the same path, the unresolved case, several paths resolving in one
+    lookup, converging chains keyed by input, a cycle advancing one hop rather than hanging, an
+    uncapped walk running past the save path's cap, and a trashed target resolving through its trash
+    redirect rather than reading as broken
   - _Requirements: 1.9, 5.1, 5.2, 5.3, 5.4_
   - _Boundary: resolveToPages, PageRedirect (batch static)_
   - _Depends: B1.4_
