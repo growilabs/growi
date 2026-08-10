@@ -26,7 +26,11 @@ const isExternalLink = (href: string, siteUrl: string | undefined): boolean => {
 const isCreatablePage = (href: string) => {
   try {
     const url = new URL(href, 'http://example.com');
-    const pathName = url.pathname;
+    // URL.pathname is percent-encoded, and '%' itself is one of the characters
+    // pagePathUtils.isCreatablePage() forbids -- so every path holding a
+    // non-ASCII character or a space would be judged non-creatable unless it is
+    // decoded back first. Same treatment as getServerSideCommonProps().
+    const pathName = decodeURIComponent(url.pathname);
     return pagePathUtils.isCreatablePage(pathName);
   } catch (err) {
     logger.debug(err);
@@ -98,6 +102,7 @@ export const NextLink = (props: Props): JSX.Element => {
   return (
     <Link
       {...rest}
+      id={id}
       href={href}
       prefetch={false}
       className={className}
