@@ -45,6 +45,9 @@ import { syncOutboundLinks } from './page-link-sync';
 const isEnabled = process.env.BACKLINKS_PERF != null;
 const isColdEnabled = process.env.BACKLINKS_PERF_COLD != null;
 
+// Validated in beforeAll, not here: module scope runs during collection even when
+// describe.skipIf skips this suite, so a stale `export BACKLINKS_PERF_PAGES=…` in a shell
+// would break collection for the whole app-integration project.
 const PAGE_COUNT = Number(process.env.BACKLINKS_PERF_PAGES ?? 100_000);
 const HUB_INBOUND = Number(process.env.BACKLINKS_PERF_INBOUND ?? 5_000);
 /** Outbound links per page besides the hub link — makes the collection realistically sized. */
@@ -58,6 +61,11 @@ const INSERT_BATCH = 5_000;
 
 const PREFIX = '/backlinks-b21-perf';
 const TRASH_PREFIX = `/trash${PREFIX}`;
+/** Fixed identities the seed claims; every group name starts with GROUP_NAME_PREFIX. */
+const VIEWER_USERNAME = 'b21-viewer';
+const FOREIGN_USERNAME = 'b21-foreign';
+const FIXTURE_USERNAMES = [VIEWER_USERNAME, FOREIGN_USERNAME];
+const GROUP_NAME_PREFIX = 'b21-group-';
 
 type Percentiles = {
   min: number;
@@ -183,31 +191,100 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
     }
   };
 
+  /**
+   * Delete everything this file seeds under a fixed name or path. Runs at the START of
+   * beforeAll as well as in afterAll, because seeding takes minutes and a killed run is
+   * therefore normal: `username` (models/user/index.js) and UserGroup `name` are both
+   * unique, so one leftover fixture makes every later run throw during seeding — and a
+   * run that dies inside beforeAll is exactly the one whose cleanup ran on a half-built
+   * fixture set. Keyed on the fixed names/paths only — never on a `let` the seed may not
+   * have assigned — so the sole precondition is that the model handles are resolved.
+   */
+  const purgeFixtures = async (): Promise<void> => {
+    // beforeAll can throw before the models are looked up (the scale assertions run
+    // first), and afterAll still runs. Nothing was seeded in that case.
+    if (Page == null || User == null) return;
+
+    const pathRe = new RegExp(`^${escapeStringForMongoRegex(PREFIX)}`);
+    const trashPathRe = new RegExp(
+      `^${escapeStringForMongoRegex(TRASH_PREFIX)}`,
+    );
+    // Relations are keyed by user id, so the ids have to be looked up rather than
+    // taken from `viewer`/`foreignUser` (unassigned on the pre-seed call).
+    const staleUsers = await User.find({
+      username: { $in: FIXTURE_USERNAMES },
+    })
+      .select('_id')
+      .lean();
+
+    await Promise.all([
+      UserGroupRelation.deleteMany({
+        // biome-ignore lint/suspicious/noExplicitAny: lean docs off the untyped User model
+        relatedUser: { $in: staleUsers.map((u: any) => u._id) },
+      }),
+      User.deleteMany({ username: { $in: FIXTURE_USERNAMES } }),
+      UserGroup.deleteMany({ name: { $regex: `^${GROUP_NAME_PREFIX}` } }),
+      Page.deleteMany({ path: pathRe }),
+      Page.deleteMany({ path: trashPathRe }),
+      // A killed run's link rows: their fromPage ids died with the process, but every
+      // seeded row's toPath carries the fixture prefix.
+      PageLink.deleteMany({ toPath: pathRe }),
+    ]);
+  };
+
+  /**
+   * A scale that parsed to NaN or 0 makes every seeding loop run zero times — silently,
+   * since all comparisons against NaN are false. The read-path measurement would then
+   * report a pass on an empty dataset, and its `toHaveLength(expectedVisibleCount)`
+   * cross-check cannot catch that: the same broken loop computes both sides as 0.
+   * `Number()` rejects nothing, so the values have to be checked explicitly —
+   * `Number('10_000')` is NaN (separators are source syntax, not string syntax) and
+   * `Number('')` is 0, which `?? fallback` does not intercept.
+   */
+  const assertPositiveInt = (name: string, value: number): void => {
+    if (!Number.isInteger(value) || value <= 0) {
+      throw new Error(
+        `${name}="${process.env[name]}" is not a positive integer (parsed as ${value})`,
+      );
+    }
+  };
+
   beforeAll(
     async () => {
+      assertPositiveInt('BACKLINKS_PERF_PAGES', PAGE_COUNT);
+      assertPositiveInt('BACKLINKS_PERF_INBOUND', HUB_INBOUND);
+      if (isColdEnabled) {
+        assertPositiveInt('BACKLINKS_PERF_COLD_CACHE_MB', COLD_CACHE_MB);
+      }
+      // Actual inbound rows are min(PAGE_COUNT, HUB_INBOUND), so a larger HUB_INBOUND
+      // would make the report claim more sources than the seed created.
+      if (HUB_INBOUND > PAGE_COUNT) {
+        throw new Error(
+          `BACKLINKS_PERF_INBOUND (${HUB_INBOUND}) exceeds BACKLINKS_PERF_PAGES (${PAGE_COUNT}): the seed cannot create that many inbound rows`,
+        );
+      }
+
       await getInstance();
       Page = mongoose.model<PageDocument, PageModel>('Page');
       User = mongoose.model('User');
+
+      // Self-heal before seeding: see purgeFixtures.
+      await purgeFixtures();
 
       // syncIndexes(), not init(): init() only ever creates, and `growi_test_<workerId>`
       // is reused across runs — so indexes B2.2 removed from the schema would survive and
       // the inventory check below would flag a stale local database as a real gap.
       await PageLink.syncIndexes();
 
-      await User.insertMany([
-        {
-          name: 'b21-viewer',
-          username: 'b21-viewer',
-          email: 'b21-viewer@example.com',
-        },
-        {
-          name: 'b21-foreign',
-          username: 'b21-foreign',
-          email: 'b21-foreign@example.com',
-        },
-      ]);
-      viewer = await User.findOne({ username: 'b21-viewer' });
-      foreignUser = await User.findOne({ username: 'b21-foreign' });
+      await User.insertMany(
+        FIXTURE_USERNAMES.map((username) => ({
+          name: username,
+          username,
+          email: `${username}@example.com`,
+        })),
+      );
+      viewer = await User.findOne({ username: VIEWER_USERNAME });
+      foreignUser = await User.findOne({ username: FOREIGN_USERNAME });
 
       // Put the viewer in real user groups. Without them
       // UserGroupRelation.findAllUserGroupIdsRelatedToUser returns [] and
@@ -411,21 +488,14 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
           PageLink.deleteMany({ fromPage: { $in: batch } }),
         ]);
       }
-      await Promise.all([
-        PageLink.deleteMany({ toPage: hubPageId }),
-        User.deleteMany({ username: { $in: ['b21-viewer', 'b21-foreign'] } }),
-        UserGroupRelation.deleteMany({
-          relatedUser: { $in: [viewer._id, foreignUser._id] },
-        }),
-        UserGroup.deleteMany({ name: { $regex: '^b21-group-' } }),
-        // Safety net for any path-prefixed leftovers (escaped per rules/mongodb-regex.md).
-        Page.deleteMany({
-          path: new RegExp(`^${escapeStringForMongoRegex(PREFIX)}`),
-        }),
-        Page.deleteMany({
-          path: new RegExp(`^${escapeStringForMongoRegex(TRASH_PREFIX)}`),
-        }),
-      ]);
+      // Guarded: a beforeAll that throws before hubPageId is assigned still runs this
+      // hook, and mongoose passes `{toPage: undefined}` through to the driver, which
+      // serializes it to `{toPage: null}` — matching every *unresolved* link row in the
+      // database, including rows this file never created (toPage defaults to null).
+      if (hubPageId != null) {
+        await PageLink.deleteMany({ toPage: hubPageId });
+      }
+      await purgeFixtures();
     },
     10 * 60 * 1000,
   );
@@ -434,16 +504,26 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
     const indexes = await PageLink.collection.indexes();
     const byKey = new Map(indexes.map((idx) => [JSON.stringify(idx.key), idx]));
 
-    // { toPage } — what findBacklinkSources' distinct rides
-    expect(byKey.has(JSON.stringify({ toPage: 1 }))).toBe(true);
-    // unique { fromPage, toPath } — replaceOutboundLinks' upsert filter and $nin delete
-    const compound = byKey.get(JSON.stringify({ fromPage: 1, toPath: 1 }));
-    expect(compound).toBeDefined();
-    expect(compound?.unique).toBe(true);
+    // Closed set, not a presence check: every latency figure this file reports is only
+    // meaningful for one index configuration, so an index nobody enumerated must fail
+    // here. Notably `{toPage, fromPage}` — the compound B2.1 measured and rejected —
+    // would otherwise leave every test in this file green (the distinct merely upgrades
+    // to PROJECTION_COVERED <- DISTINCT_SCAN, still index-backed and still under target)
+    // while the recorded numbers silently described a configuration that no longer
+    // exists. beforeAll's syncIndexes() drops indexes the schema no longer declares, so
+    // this asserts the schema itself rather than whatever a reused local database holds.
+    // `_id_` is included: it is in the inventory, though not one of the two "shipped".
+    expect(indexes.map((idx) => idx.name).sort()).toEqual([
+      '_id_', // implicit
+      'fromPage_1_toPath_1', // replaceOutboundLinks' upsert filter and $nin delete
+      'toPage_1', // what findBacklinkSources' distinct rides
+    ]);
+    // Subsumed by the set above, kept for the WHY: B2.2 dropped a standalone
+    // { fromPage } and { toPath } as unused — their absence is expected, not a gap.
 
-    // Dropped in B2.2 as unused; their absence is expected, not a missing index.
-    expect(byKey.has(JSON.stringify({ fromPage: 1 }))).toBe(false);
-    expect(byKey.has(JSON.stringify({ toPath: 1 }))).toBe(false);
+    // Uniqueness is the one property the name set cannot express.
+    const compound = byKey.get(JSON.stringify({ fromPage: 1, toPath: 1 }));
+    expect(compound?.unique).toBe(true);
 
     report('[B2.1] pagelinks indexes:', indexes.map((i) => i.name).join(', '));
   });
@@ -490,6 +570,7 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
       // eviction, so the FETCH half has to go to storage.
       const originalBytes = await wiredTigerCacheBytes();
       const originalMb = Math.round(originalBytes / 1024 / 1024);
+      let restoredBytes: number | undefined;
 
       try {
         await setWiredTigerCacheMb(COLD_CACHE_MB);
@@ -515,13 +596,30 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
 
         expect(settled.median).toBeLessThan(TARGET_MS);
       } finally {
-        // Restore to the exact original, not a rounded guess.
+        // Restore the size mongod auto-sized at startup. MiB granularity is lossless:
+        // mongod computes its cache in whole MB, so this round-trips byte-exactly
+        // (the devcontainer's 7790919680 B is exactly 7430 MiB) — which is why the
+        // assertion below can compare bytes. It does replace an auto-sized cache with
+        // an explicit one, but only for this mongod process: setParameter is not
+        // persisted, so a restart returns to auto-sizing at the same value.
         await setWiredTigerCacheMb(originalMb);
-        const restored = await wiredTigerCacheBytes();
+        restoredBytes = await wiredTigerCacheBytes();
         report(
-          `[B2.1][cold] restored WT cache to ${Math.round(restored / 1024 / 1024)} MiB (was ${originalMb} MiB)`,
+          `[B2.1][cold] restored WT cache to ${restoredBytes} B (was ${originalBytes} B)`,
         );
+        if (restoredBytes !== originalBytes) {
+          // Reported here as well as asserted below, because a body that already threw
+          // skips the assertion — and a mongod left with the wrong cache must not be
+          // discoverable only by noticing that everything got slower afterwards.
+          report(
+            `[B2.1][cold] WARNING: cache NOT restored — mongod is left at ${restoredBytes} B, restart it`,
+          );
+        }
       }
+
+      // Outside the finally so a failure in the body propagates unmasked; a restore
+      // mismatch on the happy path still fails the test rather than only printing.
+      expect(restoredBytes).toBe(originalBytes);
     },
     5 * 60 * 1000,
   );
