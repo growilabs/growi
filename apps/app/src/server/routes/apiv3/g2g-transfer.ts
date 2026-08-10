@@ -113,6 +113,9 @@ const validator = {
     body('collections').isArray().withMessage('collections is required'),
     body('optionsMap').isObject().withMessage('optionsMap is required'),
   ],
+  preflight: [
+    body('transferKey').isString().withMessage('transferKey is required'),
+  ],
 };
 
 /**
@@ -1039,6 +1042,108 @@ export const setup = (crowi: Crowi): Router => {
           new ErrorV3(
             'Failed to list the collections available for transfer.',
             'failed_to_list_transferable_collections',
+          ),
+          500,
+        );
+      }
+    },
+  );
+
+  /**
+   * @swagger
+   *
+   *  /g2g-transfer/preflight:
+   *    post:
+   *      summary: /g2g-transfer/preflight
+   *      tags: [GROWI to GROWI Transfer]
+   *      security:
+   *        - bearer: []
+   *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
+   *      requestBody:
+   *        required: true
+   *        content:
+   *          application/json:
+   *            schema:
+   *              type: object
+   *              properties:
+   *                transferKey:
+   *                  type: string
+   *                  description: The transfer key
+   *      responses:
+   *        '200':
+   *          description: Successfully inspected the destination GROWI. Reading this never changes the destination.
+   *          content:
+   *            application/json:
+   *              schema:
+   *                type: object
+   *                properties:
+   *                  destinationCounts:
+   *                    type: object
+   *                    description: How much of the destination a migration transfer would delete
+   *                    properties:
+   *                      users:
+   *                        type: number
+   *                      userGroups:
+   *                        type: number
+   *                      pages:
+   *                        type: number
+   *                  blockers:
+   *                    type: array
+   *                    description: Reasons the transfer must not proceed at all
+   *                    items:
+   *                      type: object
+   *                  warnings:
+   *                    type: array
+   *                    description: Conditions the operator must acknowledge before proceeding
+   *                    items:
+   *                      type: object
+   */
+  // Read-only by design (requirement 3.3): this asks the destination for its
+  // `growi-info` answer and judges it, but never calls startTransfer. Admin-only, the
+  // same as /transfer and /transferable-collections above — an unauthenticated caller
+  // must not learn how much of the destination exists or is about to be deleted.
+  //
+  // No addActivity: per rules/activity-recording.md's decision criteria, an audit row
+  // is for an authenticated write that failed, or an anonymous abuse-sensitive
+  // endpoint — this route is neither (no write on this GROWI or the destination, and
+  // already behind loginRequiredStrictly + adminRequired). Adding addActivity without
+  // a matching activityEvent.emit('update', ...) would not settle a row on success —
+  // it would only ever surface the failsafe finalizer's ACTION_UNSETTLED row when a
+  // preflight failed, so the audit log would record exactly the calls that did NOT
+  // work and stay silent about the ones that did, which misrepresents this endpoint's
+  // actual usage rather than describing it.
+  pushRouter.post(
+    '/preflight',
+    accessTokenParser([SCOPE.READ.ADMIN.EXPORT_DATA], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    adminRequired,
+    validator.preflight,
+    apiV3FormValidator,
+    async (req: Request, res: ApiV3Response) => {
+      const { transferKey } = req.body;
+
+      let tk: TransferKey;
+      try {
+        tk = TransferKey.parse(transferKey);
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(
+          new ErrorV3('Transfer key is invalid', 'transfer_key_invalid'),
+          400,
+        );
+      }
+
+      try {
+        const { destinationCounts, blockers, warnings } =
+          await g2gTransferPusherService.preflight(tk);
+        return res.apiv3({ destinationCounts, blockers, warnings });
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(
+          new ErrorV3(
+            'Failed to check whether the transfer can proceed.',
+            'failed_to_preflight_transfer',
           ),
           500,
         );

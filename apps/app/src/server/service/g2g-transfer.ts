@@ -44,7 +44,9 @@ import {
 import {
   describeBlocker,
   evaluateBlockers,
+  evaluateTransferability,
   type TransferBlocker,
+  type TransferWarning,
 } from './g2g-transfer-transferability';
 import {
   detectUniqueConflicts,
@@ -244,6 +246,18 @@ export const toTransferability = (
 };
 
 /**
+ * What the pushing admin is shown before committing to a transfer: how much of the
+ * destination a migration transfer would delete, and anything that should give them
+ * pause before they confirm (requirement 3.1). Gathering this must not itself change
+ * the destination (requirement 3.3) — every field here comes from a read.
+ */
+export interface TransferPreflightResult {
+  readonly destinationCounts: IDataGROWIInfo['destinationCounts'];
+  readonly blockers: readonly TransferBlocker[];
+  readonly warnings: readonly TransferWarning[];
+}
+
+/**
  * G2g transfer pusher
  */
 interface Pusher {
@@ -266,6 +280,14 @@ interface Pusher {
    * @param {IDataGROWIInfo} destGROWIInfo GROWI info from dest GROWI
    */
   getTransferability(destGROWIInfo: IDataGROWIInfo): Promise<Transferability>;
+  /**
+   * Inspects the destination and reports what a migration transfer would delete and
+   * warn about, without starting one (requirements 3.1, 3.3, 3.4, 3.5, 3.7). Performs
+   * no writes of its own anywhere: it reads this GROWI's own state, then asks the
+   * destination for its `growi-info` answer, which is likewise a read on that side.
+   * @param {TransferKey} tk Transfer key
+   */
+  preflight(tk: TransferKey): Promise<TransferPreflightResult>;
   /**
    * List files in the storage
    * @param {TransferKey} tk Transfer key
@@ -622,6 +644,46 @@ export class G2GTransferPusherService implements Pusher {
     );
 
     return toTransferability(blockers);
+  }
+
+  public async preflight(tk: TransferKey): Promise<TransferPreflightResult> {
+    const destGROWIInfo = await this.askGROWIInfo(tk);
+
+    const { fileUploadService, passportService } = this.crowi;
+    const User = mongoose.model<IUser, any>('User');
+
+    const [activeUsers, totalFileSize] = await Promise.all([
+      User.countActiveUsers(),
+      fileUploadService.getTotalFileSize(),
+    ]);
+
+    // `evaluateTransferability`, not `evaluateBlockers`: unlike `getTransferability`
+    // above, this call exists specifically to surface the warnings too (requirements
+    // 3.4, 3.5, 3.7), and by now `IDataGROWIInfo` carries every field
+    // `TransferabilityDestination` needs (task 8.1), so `destGROWIInfo` can be passed
+    // straight through. `isLocalAuthEnabled` is read from this GROWI's own passport
+    // service rather than assumed true/false: the fourth warning exists precisely
+    // because the source's own local-auth setting decides whether a rescued
+    // destination administrator can still use a password (requirement 3.7).
+    const { blockers, warnings } = evaluateTransferability(
+      {
+        version: getGrowiVersion(),
+        activeUsers,
+        totalFileSize,
+        fileUploadType: configManager.getConfig('app:fileUploadType'),
+        passwordSeedFingerprint: computePasswordSeedFingerprint(
+          this.crowi.env.PASSWORD_SEED,
+        ),
+        isLocalAuthEnabled: passportService.isLocalStrategySetup,
+      },
+      destGROWIInfo,
+    );
+
+    return {
+      destinationCounts: destGROWIInfo.destinationCounts,
+      blockers,
+      warnings,
+    };
   }
 
   public async listFilesInStorage(tk: TransferKey): Promise<FileMeta[]> {
