@@ -4895,6 +4895,28 @@ class PageService implements IPageService {
       throw Error('Cannot process create');
     }
 
+    // Clear the redirect for this path before anything is written. Page view
+    // resolves a requested path through its redirect without checking for a live
+    // page at it (resolvePathAndCheckIdentical), so a page created while its
+    // redirect survives is unreachable at its own path. Deleting first means a
+    // failure here leaves nothing half-done: the redirect is still in place and no
+    // page was created, so the operation is safe to retry. This used to run in
+    // createSubOperation, which the caller does not await and which logged a
+    // failure without acting on it, leaving that state permanently.
+    try {
+      const { deletedCount } = await PageRedirect.deleteOne({ fromPath: path });
+      if (deletedCount > 0) {
+        logger.info(
+          `Deleted the page redirect from "${path}" before creating a page there.`,
+        );
+      }
+    } catch (err) {
+      logger.error(`Failed to delete the PageRedirect from "${path}"`, err);
+      throw new Error(
+        `Could not create a page at "${path}": the redirect registered for that path could not be removed, and the page would not be reachable at that path while it remains.`,
+      );
+    }
+
     // Prepare a page document
     const shouldNew = isGrantRestricted;
     const page = await this.preparePageDocumentToCreate(path, shouldNew);
@@ -4972,16 +4994,8 @@ class PageService implements IPageService {
     // Update descendantCount
     await this.updateDescendantCountOfAncestors(page._id, 1, false);
 
-    // Delete PageRedirect if exists
-    try {
-      await PageRedirect.deleteOne({ fromPath: page.path });
-      logger.warn(
-        `Deleted page redirect after creating a new page at path "${page.path}".`,
-      );
-    } catch (err) {
-      // no throw
-      logger.error('Failed to delete PageRedirect');
-    }
+    // The redirect for this path is deleted in create(), before the page is
+    // written — not here, where a failure could not be acted on.
 
     // update scopes for descendants
     if (options.overwriteScopesOfDescendants) {
