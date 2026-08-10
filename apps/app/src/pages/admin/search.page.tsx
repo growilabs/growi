@@ -2,7 +2,9 @@ import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
 import { useHydrateAtoms } from 'jotai/utils';
 
+import type { CrowiRequest } from '~/interfaces/crowi-request';
 import {
+  auditLogEnabledAtom,
   isSearchScopeChildrenAsDefaultAtom,
   isSearchServiceConfiguredAtom,
   isSearchServiceReachableAtom,
@@ -18,23 +20,28 @@ import {
   getServerSideAdminCommonProps,
 } from './_shared';
 
-const FullTextSearchManagement = dynamic(
+const ElasticsearchManagementPage = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/Admin/FullTextSearchManagement').then(
-      (mod) => mod.FullTextSearchManagement,
+    import('~/client/components/Admin/ElasticsearchManagementPage').then(
+      (mod) => mod.ElasticsearchManagementPage,
     ),
   { ssr: false },
 );
 
-type Props = AdminCommonProps & SearchConfigurationProps;
+type PageProps = {
+  auditLogEnabled: boolean;
+};
 
-const AdminFullTextSearchManagementPage: NextPageWithLayout<Props> = (
+type Props = AdminCommonProps & SearchConfigurationProps & PageProps;
+
+const AdminElasticsearchManagementPage: NextPageWithLayout<Props> = (
   props: Props,
 ) => {
   // hydrate
   useHydrateAtoms(
     [
+      [auditLogEnabledAtom, props.auditLogEnabled],
       [
         isSearchServiceConfiguredAtom,
         props.searchConfig.isSearchServiceConfigured,
@@ -51,21 +58,32 @@ const AdminFullTextSearchManagementPage: NextPageWithLayout<Props> = (
     { dangerouslyForceHydrate: true },
   );
 
-  return <FullTextSearchManagement />;
+  return <ElasticsearchManagementPage />;
 };
 
-AdminFullTextSearchManagementPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) =>
-    t('full_text_search_management.full_text_search_management'),
+AdminElasticsearchManagementPage.getLayout = createAdminPageLayout<Props>({
+  title: (_p, t) => t('elasticsearch_management'),
 });
 
 export const getServerSideProps: GetServerSideProps<Props> = async (
   context: GetServerSidePropsContext,
 ) => {
+  const baseResult = await getServerSideAdminCommonProps(context);
+
+  const req: CrowiRequest = context.req as CrowiRequest;
+  const { crowi } = req;
+  const { configManager } = crowi;
+
+  const auditLogPropsFragment = {
+    props: {
+      auditLogEnabled: configManager.getConfig('app:auditLogEnabled'),
+    },
+  } satisfies { props: PageProps };
+
   return mergeGetServerSidePropsResults(
-    await getServerSideAdminCommonProps(context),
+    mergeGetServerSidePropsResults(baseResult, auditLogPropsFragment),
     await getServerSideSearchConfigurationProps(context),
   );
 };
 
-export default AdminFullTextSearchManagementPage;
+export default AdminElasticsearchManagementPage;

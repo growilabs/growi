@@ -79,11 +79,17 @@
 
 flagship としてサブシステム全体の関心をここで一覧する（旧 `activity-log`（現 `activity-log-snapshot`）requirements にあった「用意するセクション（snapshot 以外は TBD）」の一覧をここへ移設）。
 
+### ファミリー分割と改名の経緯
+
+activity log サブシステムは責務ごとに 3 spec へ分割してある。`activity-log`（≒監査ログ）という最も本流の名前は、最も基本的な概念である記録ゲートに充ててある。
+
+もともと `activity-log` という名前の spec は snapshot を対象とした保守用 spec だった。名前と実体が食い違っていたため、その中身を `activity-log-snapshot` へ改名移設し、`activity-log` の名前を記録ゲート（本 spec / flagship）に明け渡した。過去のコミットや PR で `activity-log` を参照している箇所は、時期によってどちらを指すか変わる点に注意。
+
 | 関心 | 担当 spec | 状態 |
 |---|---|---|
-| 何を記録するか（記録ゲート／action グループ制御） | **`activity-log`（本 spec）** | 本 brief で着手 |
+| 何を記録するか（記録ゲート／action グループ制御） | **`activity-log`（本 spec）** | 実装済み（PR #11421） |
 | snapshot の型付け・添付削除ログ・添付系 action（ADD/DOWNLOAD）への capture 拡張 | `activity-log-snapshot` | 実装済み（REMOVE: PR #11393 / ADD・DOWNLOAD: PR #11433） |
-| 監査ログ画面での snapshot 表示（生表示＋添付系整形。旧「対象」列） | `activity-log-snapshot-viewer` | 新規 |
+| 監査ログ画面での snapshot 表示（生表示＋添付系整形。旧「対象」列） | `activity-log-snapshot-viewer` | 実装済み（PR #11440）。翻訳（ja / ko / zh / fr）のみ後続扱い |
 | `target × targetModel` の全面的型安全化 | 未割当（将来課題） | TBD |
 | 保持期間・TTL | 未割当（将来課題） | TBD |
 | 大量カスケード削除時のボリューム制御・スロットリング | 未割当（将来課題） | TBD |

@@ -199,6 +199,10 @@ const ACTION_ADMIN_USER_GROUP_ADD_USER = 'ADMIN_USER_GROUP_ADD_USER';
 const ACTION_ADMIN_SEARCH_CONNECTION = 'ADMIN_SEARCH_CONNECTION';
 const ACTION_ADMIN_SEARCH_INDICES_NORMALIZE = 'ADMIN_SEARCH_INDICES_NORMALIZE';
 const ACTION_ADMIN_SEARCH_INDICES_REBUILD = 'ADMIN_SEARCH_INDICES_REBUILD';
+const ACTION_ADMIN_SEARCH_AUDITLOG_INDICES_NORMALIZE =
+  'ADMIN_SEARCH_AUDITLOG_INDICES_NORMALIZE';
+const ACTION_ADMIN_SEARCH_AUDITLOG_INDICES_REBUILD =
+  'ADMIN_SEARCH_AUDITLOG_INDICES_REBUILD';
 
 // GROWI Vault audit log actions
 const ACTION_VAULT_CLONE_PREPARE = 'VAULT_CLONE_PREPARE';
@@ -424,6 +428,8 @@ export const SupportedAction = {
   ACTION_ADMIN_SEARCH_CONNECTION,
   ACTION_ADMIN_SEARCH_INDICES_NORMALIZE,
   ACTION_ADMIN_SEARCH_INDICES_REBUILD,
+  ACTION_ADMIN_SEARCH_AUDITLOG_INDICES_NORMALIZE,
+  ACTION_ADMIN_SEARCH_AUDITLOG_INDICES_REBUILD,
   ACTION_PAGE_BULK_EXPORT_COMPLETED,
   ACTION_PAGE_BULK_EXPORT_FAILED,
   ACTION_PAGE_BULK_EXPORT_JOB_EXPIRED,
@@ -654,6 +660,8 @@ export const LargeActionGroup = {
   ACTION_ADMIN_SEARCH_CONNECTION,
   ACTION_ADMIN_SEARCH_INDICES_NORMALIZE,
   ACTION_ADMIN_SEARCH_INDICES_REBUILD,
+  ACTION_ADMIN_SEARCH_AUDITLOG_INDICES_NORMALIZE,
+  ACTION_ADMIN_SEARCH_AUDITLOG_INDICES_REBUILD,
 } as const;
 
 export const ActivityLogActions = {
@@ -853,4 +861,19 @@ export type ISearchFilter = {
   usernames?: string[];
   dates?: { startDate: string | null; endDate: string | null };
   actions?: SupportedActionType[];
+};
+
+export const AUDITLOG_SUGGESTION_FIELDS = ['username'] as const;
+
+export type AuditlogSuggestionField =
+  (typeof AUDITLOG_SUGGESTION_FIELDS)[number];
+
+export const isAuditlogSuggestionField = (
+  value: unknown,
+): value is AuditlogSuggestionField =>
+  typeof value === 'string' &&
+  (AUDITLOG_SUGGESTION_FIELDS as readonly string[]).includes(value);
+
+export type AuditlogSuggestionsResponse = {
+  username?: { activeUsernames: string[]; inactiveUsernames: string[] };
 };

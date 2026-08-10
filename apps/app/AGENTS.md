@@ -145,6 +145,7 @@ pnpm run build            # 4. Verify build (optional)
 | Search | `features/search/` | Elasticsearch full-text search |
 | Plugins | `features/growi-plugin/` | Plugin system |
 | OpenTelemetry | `features/opentelemetry/` | Monitoring/telemetry |
+| draw.io | `features/drawio/` | Diagram integration; related code also lives outside this directory (editor modal, viewer script, `packages/remark-drawio`) — the 関心マップ in [the spec](../../.kiro/specs/drawio/design.md) is the full map |
 
 ## Skills (Auto-Loaded)
 

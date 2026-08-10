@@ -12,17 +12,11 @@ import {
 import { useGrowiDocumentationUrl } from '~/states/context';
 
 import CustomCopyToClipBoard from '../Common/CustomCopyToClipBoard';
-// import { FileUploadSettingMolecule } from './App/FileUploadSetting';
 import G2GDataTransferExportForm from './G2GDataTransferExportForm';
 import G2GDataTransferStatusIcon from './G2GDataTransferStatusIcon';
-
-const IGNORED_COLLECTION_NAMES = [
-  'sessions',
-  'rlflx',
-  'activities',
-  'attachmentFiles.files',
-  'attachmentFiles.chunks',
-];
+// import { FileUploadSettingMolecule } from './App/FileUploadSetting';
+import { buildG2GErrorToastContents } from './g2g-error-toast-contents';
+import { MaintenanceModeNoticeModal } from './MaintenanceModeNoticeModal';
 
 const G2GDataTransfer = (): JSX.Element => {
   const socket = useAdminSocket();
@@ -35,6 +29,7 @@ const G2GDataTransfer = (): JSX.Element => {
   );
   const [optionsMap, setOptionsMap] = useState<any>({});
   const [isShowExportForm, setShowExportForm] = useState(false);
+  const [isMaintenanceNoticeOpen, setMaintenanceNoticeOpen] = useState(false);
   const [isTransferring, setTransferring] = useState(false);
   const [g2gProgress, setG2GProgress] = useState<G2GProgress>({
     mongo: G2G_PROGRESS_STATUS.PENDING,
@@ -70,20 +65,16 @@ const G2GDataTransfer = (): JSX.Element => {
   }, []);
 
   const setCollectionsAndSelectedCollections = useCallback(async () => {
-    const { data: collectionsData } = await apiv3Get<{ collections: any[] }>(
-      '/mongo/collections',
+    // The server decides which collections a transfer may carry — the screen used to
+    // keep its own list, which the transfer endpoints could not rely on and which had
+    // already drifted from the collections the transfer actually refuses.
+    const { data } = await apiv3Get<{ collections: string[] }>(
+      '/g2g-transfer/transferable-collections',
       {},
     );
 
-    // filter only not ignored collection names
-    const filteredCollections = collectionsData.collections.filter(
-      (collectionName) => {
-        return !IGNORED_COLLECTION_NAMES.includes(collectionName);
-      },
-    );
-
-    setCollections(filteredCollections);
-    setSelectedCollections(new Set(filteredCollections));
+    setCollections(data.collections);
+    setSelectedCollections(new Set(data.collections));
   }, []);
 
   const setupWebsocketEventHandler = useCallback(() => {
@@ -99,10 +90,13 @@ const G2GDataTransfer = (): JSX.Element => {
         }
       });
 
-      socket.on('admin:g2gError', ({ key }) => {
-        setTransferring(false);
-        toastError(t(key));
-      });
+      socket.on(
+        'admin:g2gError',
+        ({ key, message }: { key: string; message: string }) => {
+          setTransferring(false);
+          toastError(buildG2GErrorToastContents(key, t(key), message));
+        },
+      );
     }
   }, [socket, t]);
 
@@ -123,23 +117,27 @@ const G2GDataTransfer = (): JSX.Element => {
     }
   }, [generateTransferKey]);
 
-  const startTransfer = useCallback(
-    async (e) => {
-      e.preventDefault();
-      setTransferring(true);
+  // The form only asks for confirmation; nothing is sent until the operator has been
+  // told that the destination will be left in maintenance mode (requirement 2.10).
+  const askBeforeTransfer = useCallback((e) => {
+    e.preventDefault();
+    setMaintenanceNoticeOpen(true);
+  }, []);
 
-      try {
-        await apiv3Post('/g2g-transfer/transfer', {
-          transferKey: startTransferKey,
-          collections: Array.from(selectedCollections),
-          optionsMap,
-        });
-      } catch (errs) {
-        toastError(errs);
-      }
-    },
-    [startTransferKey, selectedCollections, optionsMap],
-  );
+  const startTransfer = useCallback(async () => {
+    setMaintenanceNoticeOpen(false);
+    setTransferring(true);
+
+    try {
+      await apiv3Post('/g2g-transfer/transfer', {
+        transferKey: startTransferKey,
+        collections: Array.from(selectedCollections),
+        optionsMap,
+      });
+    } catch (errs) {
+      toastError(errs);
+    }
+  }, [startTransferKey, selectedCollections, optionsMap]);
 
   const documentationUrl = useGrowiDocumentationUrl();
 
@@ -258,7 +256,7 @@ const G2GDataTransfer = (): JSX.Element => {
         </div>
       )}
 
-      <form onSubmit={startTransfer}>
+      <form onSubmit={askBeforeTransfer}>
         <div className="row mt-3">
           <div className="col-9">
             <input
@@ -276,6 +274,13 @@ const G2GDataTransfer = (): JSX.Element => {
           </div>
         </div>
       </form>
+
+      <MaintenanceModeNoticeModal
+        isOpen={isMaintenanceNoticeOpen}
+        onClose={() => setMaintenanceNoticeOpen(false)}
+        onConfirm={startTransfer}
+        isDestinationRemote
+      />
 
       {isTransferring && (
         <div className="border rounded p-4">
