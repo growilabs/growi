@@ -43,3 +43,13 @@ PDF-Converter API を更新した際は、必ずクライアントライブラ�
 - GROWI アプリを起動
     - GROWI の devcontainer 内 **(PDF-Converter の devcontainer ではない)** で
       `cd ${growi_root_path}/apps/app && turbo dev` を実行
+
+# docker image のリリース
+
+image のリリースは changesets を通して行います。`@growi/core` や `@growi/pluginkit` と同じ流れで、リリースブランチも RC 版数の印もありません。
+
+1. `apps/pdf-converter/**` を変更する PR の中で `npx changeset` を実行し、`@growi/pdf-converter` に `patch` / `minor` / `major` を指定します。
+2. その PR をマージすると、changesets が `master` 宛てに **Release Subpackages** PR を作成（または更新）し、その中で `package.json` の版数と `CHANGELOG.md` が更新されます。
+3. Release Subpackages PR をマージすると image が公開されます。`.github/workflows/release-pdf-converter.yml` が `master` への push のうち `apps/pdf-converter/package.json` を含むものを監視し、版数が安定版でかつ `pdf-converter/v<version>` タグが未作成のときだけ公開して、その後にタグを作ります。
+
+判定が「安定版かつタグ未作成」なので、リリースを伴わない `package.json` の編集では何も起きず、同じ版数を二度公開することもありません。
