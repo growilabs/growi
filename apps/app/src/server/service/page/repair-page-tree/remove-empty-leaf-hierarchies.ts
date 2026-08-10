@@ -20,6 +20,12 @@ const BATCH_SIZE = 1000;
  */
 const MAX_PASSES = 100;
 
+/**
+ * Backstops the collection scan below. Counted in rounds, not documents — see the note
+ * on sweepAllEmptyLeaves for why a document offset strands live orphans.
+ */
+const MAX_BARREN_ROUNDS = 2;
+
 /** Enough to delete a candidate and climb one level. */
 type EmptyLeafCandidate = {
   _id: mongoose.Types.ObjectId;
@@ -78,16 +84,23 @@ export const deleteStillOrphanedEmptyPages = async (
 };
 
 /**
- * Scans the whole collection, one bounded batch at a time. `$skip` advances past
- * candidates the delete step declined, so a fully rejected batch is not handed back
- * forever.
+ * Scans the whole collection, one bounded batch at a time.
+ *
+ * No offset is carried between iterations: the scan is self-consuming, returning only
+ * what still matches, so deletions drop out on their own. A declined candidate stops
+ * matching too — it gained a child or is no longer empty, the two conditions matched
+ * below — so it cannot be re-offered either.
+ *
+ * An earlier version advanced a `$skip` past declined candidates to prevent that
+ * re-offer. Since they were already gone from the result set, it stepped over live
+ * orphans instead, stranding one per decline.
  */
 const sweepAllEmptyLeaves = async (): Promise<SweepResult> => {
   const Page = mongoose.model<IPage, PageModel>('Page');
 
   let removed = 0;
   const parentIds: mongoose.Types.ObjectId[] = [];
-  let skip = 0;
+  let barrenRounds = 0;
 
   for (;;) {
     // biome-ignore lint/performance/noAwaitInLoops: each batch must observe the previous batch's deletions
@@ -104,7 +117,6 @@ const sweepAllEmptyLeaves = async (): Promise<SweepResult> => {
       },
       { $match: { children: { $size: 0 } } },
       { $project: { _id: 1, parent: 1 } },
-      { $skip: skip },
       { $limit: BATCH_SIZE },
     ]);
 
@@ -115,7 +127,21 @@ const sweepAllEmptyLeaves = async (): Promise<SweepResult> => {
     const res = await deleteStillOrphanedEmptyPages(batch);
     removed += res.removed;
     parentIds.push(...res.parentIds);
-    skip += batch.length - res.removed;
+
+    if (res.removed > 0) {
+      barrenRounds = 0;
+      continue;
+    }
+
+    // A candidate spared by a child that is itself removed before the next scan does
+    // legitimately come back, so cap the ping-pong rather than trust it to settle.
+    barrenRounds += 1;
+    if (barrenRounds >= MAX_BARREN_ROUNDS) {
+      logger.warn(
+        `Empty-page scan declined every candidate in ${MAX_BARREN_ROUNDS} consecutive batches; stopping the collection scan. Pages are being created under the placeholders about as fast as they are scanned.`,
+      );
+      return { removed, parentIds };
+    }
   }
 };
 
