@@ -3,12 +3,15 @@
  *
  * Contract under test (implementation-agnostic — asserts observable behavior):
  *  - runPasswordHashCleanup() aborts (aborted=true) WITHOUT writing anything when
- *    any legacyOnly user (password only, no passwordHash) still exists, and reports
- *    the legacyOnly count (Req 3.4);
- *  - when no legacyOnly user exists, it $unsets the legacy `password` field from
- *    every `both` user (passwordHash + password), leaves `passwordHash` intact,
- *    leaves `upgradedOnly` (passwordHash only) users untouched, and reports how
- *    many documents were unset (Req 3.3).
+ *    any ACTIVE legacyOnly user (password only, no passwordHash) still exists, and
+ *    reports the blocking legacyOnly count (Req 3.4);
+ *  - a NON-ACTIVE legacyOnly user (suspended / invited / registered / deleted) can
+ *    never log in, so it can never migrate lazily: it must NOT block the cleanup
+ *    forever — it is only reported (legacyOnlyNonActive);
+ *  - when no ACTIVE legacyOnly user exists, it $unsets the legacy `password` field
+ *    from every `both` user (passwordHash + password) REGARDLESS of status, leaves
+ *    `passwordHash` intact, leaves `upgradedOnly` (passwordHash only) users
+ *    untouched, and reports how many documents were unset (Req 3.3).
  *
  * Fixtures are seeded via the raw driver (not the Mongoose User model) with
  * precisely-set fields, matching the status-migration integ test style.
@@ -18,6 +21,8 @@
 import type { Collection } from 'mongodb';
 import { ObjectId } from 'mongodb';
 import mongoose from 'mongoose';
+
+import { UserStatus } from '../models/user/conts';
 
 const MARKER = 'pwhash-cleanup-test';
 // Scope every count/write to this test's marker-seeded fixtures so the run never
@@ -42,15 +47,16 @@ describe('password-hash cleanup script', () => {
     await collection.deleteMany({ username: { $regex: `^${MARKER}` } });
   });
 
-  describe('when legacyOnly users still exist (Req 3.4)', () => {
+  describe('when ACTIVE legacyOnly users still exist (Req 3.4)', () => {
     it('aborts, reports the legacyOnly count, and modifies no document', async () => {
       const legacyOnlyCount = 2;
       const docs: Record<string, unknown>[] = [];
-      // legacyOnly: password only, not migrated
+      // legacyOnly + ACTIVE: not migrated, but can still log in and migrate lazily
       for (let i = 0; i < legacyOnlyCount; i++) {
         docs.push({
           _id: new ObjectId(),
           username: `${MARKER}-legacy-${i}`,
+          status: UserStatus.STATUS_ACTIVE,
           password: 'legacy-sha256',
         });
       }
@@ -59,6 +65,7 @@ describe('password-hash cleanup script', () => {
       docs.push({
         _id: new ObjectId(),
         username: `${MARKER}-both-0`,
+        status: UserStatus.STATUS_ACTIVE,
         passwordHash: 'scrypt$hash',
         password: 'legacy-sha256',
       });
@@ -73,6 +80,7 @@ describe('password-hash cleanup script', () => {
 
       expect(result.aborted).toBe(true);
       expect(result.legacyOnly).toBe(legacyOnlyCount);
+      expect(result.legacyOnlyNonActive).toBe(0);
       expect(result.unset).toBe(0);
 
       // No document changed — the both-field user still has its `password`.
@@ -81,6 +89,71 @@ describe('password-hash cleanup script', () => {
         .sort({ _id: 1 })
         .toArray();
       expect(after).toEqual(before);
+    });
+  });
+
+  describe('when the remaining legacyOnly users are NON-ACTIVE (Req 3.3, 3.4)', () => {
+    it('does NOT abort: a user who cannot log in can never migrate lazily, so it only gets reported', async () => {
+      const docs: Record<string, unknown>[] = [
+        // legacyOnly users that can never log in → must NOT block the cleanup.
+        {
+          _id: new ObjectId(),
+          username: `${MARKER}-legacy-suspended`,
+          status: UserStatus.STATUS_SUSPENDED,
+          password: 'legacy-sha256',
+        },
+        {
+          _id: new ObjectId(),
+          username: `${MARKER}-legacy-invited`,
+          status: UserStatus.STATUS_INVITED,
+          password: 'legacy-sha256',
+        },
+        // both + ACTIVE: the normal cleanup target.
+        {
+          _id: new ObjectId(),
+          username: `${MARKER}-both-active`,
+          status: UserStatus.STATUS_ACTIVE,
+          passwordHash: 'scrypt$hash-active',
+          password: 'legacy-sha256',
+        },
+        // both + NON-ACTIVE: cleaning a suspended user's legacy hash is correct
+        // and desirable, so the $unset is NOT scoped to active users.
+        {
+          _id: new ObjectId(),
+          username: `${MARKER}-both-suspended`,
+          status: UserStatus.STATUS_SUSPENDED,
+          passwordHash: 'scrypt$hash-suspended',
+          password: 'legacy-sha256',
+        },
+      ];
+      await collection.insertMany(docs);
+
+      const result = await runPasswordHashCleanup(collection, markerFilter);
+
+      expect(result.aborted).toBe(false);
+      expect(result.legacyOnly).toBe(0);
+      expect(result.legacyOnlyNonActive).toBe(2);
+      // Both `both` users are cleaned, whatever their status.
+      expect(result.unset).toBe(2);
+
+      const both = await collection
+        .find({ username: { $regex: `^${MARKER}-both` } })
+        .toArray();
+      expect(both).toHaveLength(2);
+      for (const doc of both) {
+        expect(doc.password).toBeUndefined();
+        expect(typeof doc.passwordHash).toBe('string');
+      }
+
+      // The non-active legacyOnly users keep their legacy credential (they are
+      // not `both`, so the cleanup never touches them).
+      const legacy = await collection
+        .find({ username: { $regex: `^${MARKER}-legacy` } })
+        .toArray();
+      expect(legacy).toHaveLength(2);
+      for (const doc of legacy) {
+        expect(doc.password).toBe('legacy-sha256');
+      }
     });
   });
 
@@ -93,6 +166,7 @@ describe('password-hash cleanup script', () => {
         docs.push({
           _id: new ObjectId(),
           username: `${MARKER}-both-${i}`,
+          status: UserStatus.STATUS_ACTIVE,
           passwordHash: `scrypt$hash-both-${i}`,
           password: 'legacy-sha256',
         });
@@ -101,6 +175,7 @@ describe('password-hash cleanup script', () => {
         docs.push({
           _id: new ObjectId(),
           username: `${MARKER}-upgraded-${i}`,
+          status: UserStatus.STATUS_ACTIVE,
           passwordHash: `scrypt$hash-upgraded-${i}`,
         });
       }
@@ -110,6 +185,7 @@ describe('password-hash cleanup script', () => {
       docs.push({
         _id: new ObjectId(),
         username: `${MARKER}-deleted-0`,
+        status: UserStatus.STATUS_DELETED,
         password: '',
       });
       await collection.insertMany(docs);
@@ -118,6 +194,7 @@ describe('password-hash cleanup script', () => {
 
       expect(result.aborted).toBe(false);
       expect(result.legacyOnly).toBe(0);
+      expect(result.legacyOnlyNonActive).toBe(0);
       expect(result.unset).toBe(bothCount);
 
       // both users: legacy password removed, scrypt passwordHash retained.
@@ -141,6 +218,7 @@ describe('password-hash cleanup script', () => {
         docs.push({
           _id: new ObjectId(),
           username: `${MARKER}-both-${i}`,
+          status: UserStatus.STATUS_ACTIVE,
           passwordHash: `scrypt$hash-both-${i}`,
           password: 'legacy-sha256',
         });
@@ -149,6 +227,7 @@ describe('password-hash cleanup script', () => {
         docs.push({
           _id: new ObjectId(),
           username: `${MARKER}-upgraded-${i}`,
+          status: UserStatus.STATUS_ACTIVE,
           passwordHash: `scrypt$hash-upgraded-${i}`,
         });
       }
@@ -158,6 +237,7 @@ describe('password-hash cleanup script', () => {
 
       expect(result.aborted).toBe(false);
       expect(result.legacyOnly).toBe(0);
+      expect(result.legacyOnlyNonActive).toBe(0);
       expect(result.unset).toBe(bothCount);
 
       // both users: password removed, passwordHash retained.

@@ -176,7 +176,7 @@ describe('models/user password methods (PasswordHashService delegation)', () => 
   });
 
   describe('setPassword', () => {
-    it('should set passwordHash to the scrypt hash and leave legacy password untouched', async () => {
+    it('should set passwordHash to the scrypt hash and RETIRE the legacy password', async () => {
       mockPasswordHashService.hash.mockResolvedValue('scrypt$mock$hash');
       const { setPassword } = await buildMethods();
 
@@ -185,12 +185,26 @@ describe('models/user password methods (PasswordHashService delegation)', () => 
 
       // Delegates hashing to the service with the raw plaintext
       expect(mockPasswordHashService.hash).toHaveBeenCalledWith('my-plaintext');
-      // Only passwordHash is written
       expect(doc.passwordHash).toBe('scrypt$mock$hash');
-      // Legacy SHA-256 field is preserved (downgrade safety)
-      expect(doc.password).toBe('legacy-sha256');
+      // The old SHA-256 hash of the REPLACED password is retired (undefined →
+      // $unset on save): leaving it would keep the old password valid on a
+      // downgraded build after a password change / admin reset.
+      expect(doc.password).toBeUndefined();
       // Returns the document itself
       expect(returned).toBe(doc);
+    });
+
+    it('should keep the legacy password when keepLegacyHash is set (lazy migration re-hashes the SAME password)', async () => {
+      mockPasswordHashService.hash.mockResolvedValue('scrypt$mock$hash');
+      const { setPassword } = await buildMethods();
+
+      const doc: Record<string, unknown> = { password: 'legacy-sha256' };
+      await setPassword.call(doc, 'my-plaintext', { keepLegacyHash: true });
+
+      expect(doc.passwordHash).toBe('scrypt$mock$hash');
+      // Nothing is retired here — the same credential is only re-hashed, so the
+      // legacy field stays for downgrade safety (the `both` state).
+      expect(doc.password).toBe('legacy-sha256');
     });
   });
 

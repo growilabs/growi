@@ -62,7 +62,10 @@ interface IncomingMessageWithLdapAccountInfo extends IncomingMessage {
  */
 interface LocalStrategyUserDoc {
   isPasswordValid(password: string): Promise<VerifyResult>;
-  setPassword(password: string): Promise<unknown>;
+  setPassword(
+    password: string,
+    options?: { keepLegacyHash?: boolean },
+  ): Promise<unknown>;
   save(): Promise<unknown>;
 }
 
@@ -120,7 +123,11 @@ export const verifyLocalCredentials = async (
     // on the next successful login.
     if (needsRehash) {
       try {
-        await user.setPassword(password);
+        // keepLegacyHash: the SAME password is only being re-hashed here, so the
+        // legacy SHA-256 field is NOT a retired credential — keeping it is what
+        // preserves downgrade safety during the migration period (the `both`
+        // state). setPassword() otherwise retires it (password change / reset).
+        await user.setPassword(password, { keepLegacyHash: true });
         await user.save();
         // Progress visibility for the lazy migration (design "Monitoring"): emit
         // an INFO on each successful legacy→scrypt rehash. This is the intended

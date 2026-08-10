@@ -356,7 +356,9 @@ describe('verifyLocalCredentials', () => {
 
     await verifyLocalCredentials(User, username, password, done);
 
-    expect(user.setPassword).toHaveBeenCalledWith(password);
+    expect(user.setPassword).toHaveBeenCalledWith(password, {
+      keepLegacyHash: true,
+    });
     expect(user.save).toHaveBeenCalledTimes(1);
     expect(done).toHaveBeenCalledWith(null, user);
   });
@@ -372,7 +374,9 @@ describe('verifyLocalCredentials', () => {
     // The login must succeed regardless of the rehash write failure.
     expect(done).toHaveBeenCalledWith(null, user);
     expect(done).not.toHaveBeenCalledWith(expect.any(Error));
-    expect(user.setPassword).toHaveBeenCalledWith(password);
+    expect(user.setPassword).toHaveBeenCalledWith(password, {
+      keepLegacyHash: true,
+    });
   });
 
   it('routes a findUserByUsernameOrEmail error to done(err)', async () => {

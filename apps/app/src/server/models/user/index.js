@@ -200,10 +200,28 @@ const factory = (crowi) => {
     );
   };
 
-  userSchema.methods.setPassword = async function (password) {
-    // Only write the scrypt hash. The legacy SHA-256 `password` field is left
-    // untouched so a downgrade to an older GROWI keeps working (Req 1.3).
+  /**
+   * Write `password` as the user's credential (scrypt `passwordHash`) and RETIRE
+   * the legacy SHA-256 `password` field.
+   *
+   * The legacy hash must go: after a password change or an admin reset, keeping
+   * it would leave the RETIRED password still able to authenticate on a
+   * downgraded (pre-scrypt) build — a credential-revocation hole. `undefined`
+   * (not '') so mongoose $unsets the field, consistent with statusDelete(); the
+   * user becomes `upgradedOnly` and is therefore covered by the downgrade-prep
+   * script.
+   *
+   * `options.keepLegacyHash` is ONLY for lazy migration on login
+   * (`verifyLocalCredentials`), where the SAME plaintext that just verified
+   * against the legacy hash is being re-hashed. Nothing is retired there, so the
+   * legacy hash is kept — that `both` state is what preserves downgrade safety
+   * during the migration period (Req 1.3).
+   */
+  userSchema.methods.setPassword = async function (password, options = {}) {
     this.passwordHash = await passwordHashService.hash(password);
+    if (!options.keepLegacyHash) {
+      this.password = undefined;
+    }
     return this;
   };
 
