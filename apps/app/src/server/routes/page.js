@@ -305,7 +305,7 @@ export const setup = (crowi, _app) => {
    *               revision_id:
    *                 type: string
    *                 format: ObjectId
-   *                 description: Revision ID for conflict detection. Required to soft delete a non-empty page — the request is rejected with 'outdated' unless it is the page's latest revision. Not consulted when completely is true, or for an empty page.
+   *                 description: Revision ID for conflict detection. Required to soft delete a non-empty page — omitting it is rejected with 'invalid_body', and a value that is not the page's latest revision is rejected with 'outdated'. Not consulted when completely is true, or for an empty page.
    *                 example: "507f1f77bcf86cd799439012"
    *               completely:
    *                 type: boolean
@@ -435,6 +435,16 @@ export const setup = (crowi, _app) => {
         if (notRecursivelyAndEmpty) {
           return res.json(
             ApiResponse.error(`Page '${pageId}' is not found.`, 'notfound'),
+          );
+        }
+
+        // A missing revision_id is answered on its own rather than through
+        // isUpdatable, which cannot tell it apart from a stale one and would report
+        // that someone else had updated the page. Same split as
+        // apiv3 PUT /pages/rename, which pairs this code with its own conflict check.
+        if (!page.isEmpty && previousRevision == null) {
+          return res.json(
+            ApiResponse.error('revision_id must be a mongoId', 'invalid_body'),
           );
         }
 
