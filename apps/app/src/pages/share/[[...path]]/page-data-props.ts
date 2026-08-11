@@ -1,6 +1,5 @@
 import type { GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
-import type { IPage } from '@growi/core';
-import { getIdStringForRef } from '@growi/core';
+import type { IPage, IPageHasId } from '@growi/core';
 import {
   isUserPage,
   isUsersTopPage,
@@ -8,16 +7,14 @@ import {
 import type { model } from 'mongoose';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { IShareLink } from '~/interfaces/share-link';
 import type { PageModel } from '~/server/models/page';
-import type { ShareLinkModel } from '~/server/models/share-link';
 import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
+import { prisma } from '~/utils/prisma';
 
 import type { ShareLinkPageStatesProps } from './types';
 
 let mongooseModel: typeof model;
 let Page: PageModel;
-let ShareLink: ShareLinkModel;
 
 const notFoundProps: GetServerSidePropsResult<ShareLinkPageStatesProps> = {
   props: {
@@ -47,20 +44,17 @@ export const getPageDataForInitial = async (
   if (Page == null) {
     Page = mongooseModel<IPage, PageModel>('Page');
   }
-  if (ShareLink == null) {
-    ShareLink = mongooseModel<IShareLink, ShareLinkModel>('ShareLink');
-  }
 
-  const shareLink = await ShareLink.findOne({ _id: params.linkId }).populate(
-    'relatedPage',
-  );
+  const shareLink = await prisma.sharelinks.findUnique({
+    where: { id: params.linkId },
+  });
 
   // not found
   if (shareLink == null) {
     return notFoundProps;
   }
 
-  const pageId = getIdStringForRef(shareLink.relatedPage);
+  const pageId = shareLink.relatedPageId;
   const pageWithMeta = await findPageAndMetaDataByViewer(
     pageService,
     pageGrantService,
@@ -71,6 +65,16 @@ export const getPageDataForInitial = async (
   if (pageWithMeta.data == null) {
     return notFoundProps;
   }
+
+  // matches the shape previously produced by Mongoose's
+  // `.populate('relatedPage')` + `.toObject()`
+  const shareLinkForProps = {
+    _id: shareLink.id,
+    relatedPage: pageWithMeta.data.toObject() as IPageHasId,
+    createdAt: shareLink.createdAt,
+    expiredAt: shareLink.expiredAt ?? undefined,
+    description: shareLink.description ?? '',
+  };
 
   const disableUserPages = configManager.getConfig('security:disableUserPages');
   if (
@@ -106,7 +110,7 @@ export const getPageDataForInitial = async (
           meta: pageWithMeta.meta,
         },
         isExpired: true,
-        shareLink: shareLink.toObject(),
+        shareLink: shareLinkForProps,
       },
     };
   }
@@ -136,7 +140,7 @@ export const getPageDataForInitial = async (
       },
       skipSSR,
       isExpired: false,
-      shareLink: shareLink.toObject(),
+      shareLink: shareLinkForProps,
     },
   };
 };
