@@ -49,7 +49,6 @@ import type { IOptionsForCreate } from '~/interfaces/page';
 import type Crowi from '~/server/crowi';
 import type { PageDocument } from '~/server/models/page';
 import PageOperation from '~/server/models/page-operation';
-import { Revision } from '~/server/models/revision';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 import { prisma } from '~/utils/prisma';
 
@@ -167,8 +166,10 @@ describe('PUT /rename', () => {
 
     const fixturePageIds = (
       await Page.find({ path: fixturePathPattern }, { _id: 1 })
-    ).map((page) => page._id);
-    await Revision.deleteMany({ pageId: { $in: fixturePageIds } });
+    ).map((page) => page._id.toString());
+    await prisma.revisions.deleteMany({
+      where: { pageId: { in: fixturePageIds } },
+    });
     await Page.deleteMany({ path: fixturePathPattern });
     await PageOperation.deleteMany({ fromPath: fixturePathPattern });
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
