@@ -31,6 +31,7 @@ import { pipeline } from 'stream/promises';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
+import type { revisions } from '~/generated/prisma/client';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
 import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
@@ -68,14 +69,13 @@ import { collectAncestorPaths } from '~/server/util/collect-ancestor-paths';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
 import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
+import { prisma } from '~/utils/prisma';
 
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { PathAlreadyExistsError } from '../../models/errors';
 import type { PageOperationDocument } from '../../models/page-operation';
 import PageOperation from '../../models/page-operation';
 import PageRedirect from '../../models/page-redirect';
-import type { IRevisionDocument } from '../../models/revision';
-import { Revision } from '../../models/revision';
 import { serializePageSecurely } from '../../models/serializers/page-serializer';
 import Subscription from '../../models/subscription';
 import UserGroupRelation from '../../models/user-group-relation';
@@ -1063,9 +1063,10 @@ class PageService implements IPageService {
     if (renamedPage == null) {
       throw new Error('Failed to rename page');
     }
-    await Revision.updateRevisionListByPageId(renamedPage._id, {
-      pageId: renamedPage._id,
-    });
+    await prisma.revisions.updateRevisionListByPageId(
+      renamedPage._id.toString(),
+      { pageId: renamedPage._id.toString() },
+    );
 
     if (createRedirectPage) {
       await PageRedirect.create({
@@ -1737,11 +1738,13 @@ class PageService implements IPageService {
 
     const Page = mongoose.model<PageDocument, PageModel>('Page');
 
-    const pageIds = pages.map((page) => page._id);
-    const revisions = await Revision.find({ pageId: { $in: pageIds } });
+    const pageIds = pages.map((page) => page._id.toString());
+    const revisions = await prisma.revisions.findMany({
+      where: { pageId: { in: pageIds } },
+    });
 
     // Mapping to set to the body of the new revision
-    const pageIdRevisionMapping: Record<string, IRevisionDocument> = {};
+    const pageIdRevisionMapping: Record<string, revisions> = {};
     revisions.forEach((revision) => {
       pageIdRevisionMapping[getIdStringForRef(revision.pageId)] = revision;
     });
@@ -1791,10 +1794,10 @@ class PageService implements IPageService {
           revision: revisionId,
         };
         newRevisions.push({
-          _id: revisionId,
-          pageId: newPageId,
+          id: revisionId.toString(),
+          pageId: newPageId.toString(),
           body: pageIdRevisionMapping[page._id.toString()].body,
-          author: user._id,
+          authorId: user._id.toString(),
           format: 'markdown',
         });
         newPages.push(newPage);
@@ -1803,7 +1806,7 @@ class PageService implements IPageService {
 
     await Page.insertMany(newPages, { ordered: false });
 
-    await Revision.insertMany(newRevisions, { ordered: false });
+    await prisma.revisions.createMany({ data: newRevisions });
     await this.duplicateTags(pageIdMapping);
   }
 
@@ -1815,11 +1818,13 @@ class PageService implements IPageService {
   ) {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
-    const pageIds = pages.map((page) => page._id);
-    const revisions = await Revision.find({ pageId: { $in: pageIds } });
+    const pageIds = pages.map((page) => page._id.toString());
+    const revisions = await prisma.revisions.findMany({
+      where: { pageId: { in: pageIds } },
+    });
 
     // Mapping to set to the body of the new revision
-    const pageIdRevisionMapping: Record<string, IRevisionDocument> = {};
+    const pageIdRevisionMapping: Record<string, revisions> = {};
     revisions.forEach((revision) => {
       pageIdRevisionMapping[getIdStringForRef(revision.pageId)] = revision;
     });
@@ -1850,16 +1855,16 @@ class PageService implements IPageService {
       });
 
       newRevisions.push({
-        _id: revisionId,
-        pageId: newPageId,
+        id: revisionId.toString(),
+        pageId: newPageId.toString(),
         body: pageIdRevisionMapping[page._id.toString()].body,
-        author: user._id,
+        authorId: user._id.toString(),
         format: 'markdown',
       });
     });
 
     await Page.insertMany(newPages, { ordered: false });
-    await Revision.insertMany(newRevisions, { ordered: false });
+    await prisma.revisions.createMany({ data: newRevisions });
     await this.duplicateTags(pageIdMapping);
   }
 
@@ -2222,7 +2227,9 @@ class PageService implements IPageService {
     }
 
     // update Revisions
-    await Revision.updateRevisionListByPageId(page._id, { pageId: page._id });
+    await prisma.revisions.updateRevisionListByPageId(page._id.toString(), {
+      pageId: page._id.toString(),
+    });
     const deletedPage = await Page.findByIdAndUpdate(
       page._id,
       {
@@ -4895,6 +4902,28 @@ class PageService implements IPageService {
       throw Error('Cannot process create');
     }
 
+    // Clear the redirect for this path before anything is written. Page view
+    // resolves a requested path through its redirect without checking for a live
+    // page at it (resolvePathAndCheckIdentical), so a page created while its
+    // redirect survives is unreachable at its own path. Deleting first means a
+    // failure here leaves nothing half-done: the redirect is still in place and no
+    // page was created, so the operation is safe to retry. This used to run in
+    // createSubOperation, which the caller does not await and which logged a
+    // failure without acting on it, leaving that state permanently.
+    try {
+      const { deletedCount } = await PageRedirect.deleteOne({ fromPath: path });
+      if (deletedCount > 0) {
+        logger.info(
+          `Deleted the page redirect from "${path}" before creating a page there.`,
+        );
+      }
+    } catch (err) {
+      logger.error(`Failed to delete the PageRedirect from "${path}"`, err);
+      throw new Error(
+        `Could not create a page at "${path}": the redirect registered for that path could not be removed, and the page would not be reachable at that path while it remains.`,
+      );
+    }
+
     // Prepare a page document
     const shouldNew = isGrantRestricted;
     const page = await this.preparePageDocumentToCreate(path, shouldNew);
@@ -4924,7 +4953,7 @@ class PageService implements IPageService {
     let savedPage = await page.save();
 
     // Create revision
-    const newRevision = Revision.prepareRevision(
+    const newRevision = prisma.revisions.prepareRevision(
       savedPage,
       body,
       null,
@@ -4972,16 +5001,8 @@ class PageService implements IPageService {
     // Update descendantCount
     await this.updateDescendantCountOfAncestors(page._id, 1, false);
 
-    // Delete PageRedirect if exists
-    try {
-      await PageRedirect.deleteOne({ fromPath: page.path });
-      logger.warn(
-        `Deleted page redirect after creating a new page at path "${page.path}".`,
-      );
-    } catch (err) {
-      // no throw
-      logger.error('Failed to delete PageRedirect');
-    }
+    // The redirect for this path is deleted in create(), before the page is
+    // written — not here, where a failure could not be acted on.
 
     // update scopes for descendants
     if (options.overwriteScopesOfDescendants) {
@@ -5032,7 +5053,7 @@ class PageService implements IPageService {
     page.applyScope(user, grant, grantUserGroupIds);
 
     let savedPage = await page.save();
-    const newRevision = Revision.prepareRevision(
+    const newRevision = prisma.revisions.prepareRevision(
       savedPage,
       body,
       null,
@@ -5154,7 +5175,7 @@ class PageService implements IPageService {
     const dummyUser: HasObjectId = {
       _id: new mongoose.Types.ObjectId().toString(),
     };
-    const newRevision = Revision.prepareRevision(
+    const newRevision = prisma.revisions.prepareRevision(
       savedPage,
       body,
       null,
@@ -5450,7 +5471,7 @@ class PageService implements IPageService {
     const shouldUpdateBody = isBodyPresent;
     if (shouldUpdateBody) {
       const origin = options.origin;
-      const newRevision = await Revision.prepareRevision(
+      const newRevision = prisma.revisions.prepareRevision(
         newPageData,
         body,
         previousBody,
@@ -5549,7 +5570,7 @@ class PageService implements IPageService {
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
     if (shouldUpdateBody) {
-      const newRevision = await Revision.prepareRevision(
+      const newRevision = prisma.revisions.prepareRevision(
         pageData,
         body,
         previousBody,

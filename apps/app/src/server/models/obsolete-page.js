@@ -159,7 +159,7 @@ export const getPageSchema = (crowi) => {
     });
   };
 
-  pageSchema.methods.isUpdatable = async function (previousRevision, origin) {
+  pageSchema.methods.isUpdatable = async function (previousRevisionId, origin) {
     // biome-ignore lint/plugin: allow populate for backward compatibility
     const populatedPageDataWithRevisionOrigin = await this.populate(
       'revision',
@@ -175,10 +175,11 @@ export const getPageSchema = (crowi) => {
       return true;
     }
 
-    const revision = this.latestRevision || this.revision._id;
+    const revisionId =
+      this.latestRevision?._id.toString() || this.revision._id.toString();
     // comparing ObjectId with string
     // biome-ignore lint/suspicious/noDoubleEquals: ignore
-    if (revision != previousRevision) {
+    if (revisionId != previousRevisionId) {
       return false;
     }
     return true;

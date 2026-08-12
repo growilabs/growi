@@ -4,7 +4,8 @@ import { Types } from 'mongoose';
 import type { Server } from 'socket.io';
 import { mock } from 'vitest-mock-extended';
 
-import { Revision } from '../../models/revision';
+import { prisma } from '~/utils/prisma';
+
 import type { MongodbPersistence } from './extended/mongodb-persistence';
 import type { IYjsService } from './yjs';
 import { getYjsService, initializeYjsService } from './yjs';
@@ -50,7 +51,7 @@ describe('YjsService', () => {
     });
 
     afterEach(async () => {
-      await Revision.deleteMany({});
+      await prisma.revisions.deleteMany();
     });
 
     afterAll(async () => {
@@ -104,7 +105,9 @@ describe('YjsService', () => {
 
       const pageId = new ObjectId();
 
-      await Revision.insertMany([{ pageId, body: '' }]);
+      await prisma.revisions.create({
+        data: { pageId: pageId.toString(), body: '' },
+      });
 
       // act
       const result = await yjsService.getYDocStatus(pageId.toString());
@@ -119,7 +122,9 @@ describe('YjsService', () => {
 
       const pageId = new ObjectId();
 
-      await Revision.insertMany([{ pageId, body: '' }]);
+      await prisma.revisions.create({
+        data: { pageId: pageId.toString(), body: '' },
+      });
 
       const privateMdb = getPrivateMdbInstance(yjsService);
       await privateMdb.setTypedMeta(
@@ -141,9 +146,13 @@ describe('YjsService', () => {
 
       const pageId = new ObjectId();
 
-      await Revision.insertMany([
-        { pageId, body: '', createdAt: new Date(2025, 1, 1) },
-      ]);
+      await prisma.revisions.create({
+        data: {
+          pageId: pageId.toString(),
+          body: '',
+          createdAt: new Date(2025, 1, 1),
+        },
+      });
 
       const privateMdb = getPrivateMdbInstance(yjsService);
       await privateMdb.setTypedMeta(
@@ -165,7 +174,9 @@ describe('YjsService', () => {
 
       const pageId = new ObjectId();
 
-      await Revision.insertMany([{ pageId, body: '' }]);
+      await prisma.revisions.create({
+        data: { pageId: pageId.toString(), body: '' },
+      });
 
       const privateMdb = getPrivateMdbInstance(yjsService);
       await privateMdb.setTypedMeta(
