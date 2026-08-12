@@ -50,6 +50,8 @@ import {
   isES9ClientDelegator,
   type SearchQuery,
 } from './elasticsearch-client-delegator';
+import type { ES8ClientDelegator } from './elasticsearch-client-delegator/es8-client-delegator';
+import type { ES9ClientDelegator } from './elasticsearch-client-delegator/es9-client-delegator';
 import { sanitizeEndpointForIndex } from './sanitize-endpoint-for-index';
 
 const logger = loggerFactory('growi:service:search-delegator:elasticsearch');
@@ -585,19 +587,16 @@ class ElasticsearchDelegator
    * rejects it — the boot and rebuild paths log such a failure instead of aborting.
    */
   private async syncAuditlogMapping(index: string): Promise<void> {
-    if (isES8ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-auditlog-es8');
-      await this.client.indices.putMapping({ index, ...mappings.mappings });
-      return;
-    }
-    if (isES9ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-auditlog-es9');
-      await this.client.indices.putMapping({ index, ...mappings.mappings });
-      return;
-    }
-    throw new Error(
-      `Unsupported Elasticsearch version: ${this.elasticsearchVersion}`,
-    );
+    await this.runForAuditlogClient({
+      es8: async (client) => {
+        const { mappings } = await import('./mappings/mappings-auditlog-es8');
+        return client.indices.putMapping({ index, ...mappings.mappings });
+      },
+      es9: async (client) => {
+        const { mappings } = await import('./mappings/mappings-auditlog-es9');
+        return client.indices.putMapping({ index, ...mappings.mappings });
+      },
+    });
   }
 
   async addAllAuditlogs(
@@ -703,22 +702,42 @@ class ElasticsearchDelegator
     }
   }
 
-  async createAuditlogIndex(
-    index: string,
-  ): Promise<
-    Awaited<ReturnType<ElasticsearchClientDelegator['indices']['create']>>
-  > {
+  /**
+   * Dispatch to the ES8- or ES9-specific handler for `this.client`, throwing the
+   * same "unsupported version" error both `createAuditlogIndex` and
+   * `syncAuditlogMapping` need. Keeps the version-dispatch skeleton in one place
+   * so the two call sites cannot drift out of sync with each other.
+   */
+  private runForAuditlogClient<T>(handlers: {
+    es8: (client: ES8ClientDelegator) => Promise<T>;
+    es9: (client: ES9ClientDelegator) => Promise<T>;
+  }): Promise<T> {
     if (isES8ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-auditlog-es8');
-      return this.client.indices.create({ index, ...mappings });
+      return handlers.es8(this.client);
     }
     if (isES9ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-auditlog-es9');
-      return this.client.indices.create({ index, ...mappings });
+      return handlers.es9(this.client);
     }
     throw new Error(
       `Unsupported Elasticsearch version: ${this.elasticsearchVersion}`,
     );
+  }
+
+  createAuditlogIndex(
+    index: string,
+  ): Promise<
+    Awaited<ReturnType<ElasticsearchClientDelegator['indices']['create']>>
+  > {
+    return this.runForAuditlogClient({
+      es8: async (client) => {
+        const { mappings } = await import('./mappings/mappings-auditlog-es8');
+        return client.indices.create({ index, ...mappings });
+      },
+      es9: async (client) => {
+        const { mappings } = await import('./mappings/mappings-auditlog-es9');
+        return client.indices.create({ index, ...mappings });
+      },
+    });
   }
 
   /**
