@@ -70,6 +70,23 @@ const ApiErrorMessage = (props) => {
             Invalid path
           </strong>
         );
+      // Raised when the request did not carry the revision the operation applies to.
+      // Reloading is the remedy, as for 'outdated'.
+      case 'invalid_body':
+        return (
+          <>
+            <strong>
+              <span className="material-symbols-outlined me-1">cancel</span>
+              {t('page_api_error.invalid_body')}
+            </strong>
+            <button type="button" className="btn-link" onClick={reload}>
+              <span className="material-symbols-outlined">
+                keyboard_double_arrow_right
+              </span>{' '}
+              {t('Load latest')}
+            </button>
+          </>
+        );
       case 'single_deletion_empty_pages':
         return (
           <strong>
@@ -78,10 +95,12 @@ const ApiErrorMessage = (props) => {
           </strong>
         );
       default:
+        // Show what the server said instead of hiding it: a code this switch does not
+        // know still arrives with a reason, and "Unknown error occured" throws it away.
         return (
           <strong>
             <span className="material-symbols-outlined me-1">cancel</span>{' '}
-            Unknown error occured
+            {errorMessage ?? 'Unknown error occured'}
           </strong>
         );
     }
