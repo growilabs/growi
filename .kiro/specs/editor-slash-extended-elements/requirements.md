@@ -2,7 +2,9 @@
 
 ## Introduction
 
-アンブレラ `editor-commands` の子スペック。基盤 `editor-slash-command` のスラッシュコマンド機構の上に、GROWI 固有の拡張要素を `/` から挿入・起動できるコマンドを追加する。初期リリースの対象は **drawio（作図モーダル起動）・plantuml（フェンス静的挿入）・lsx（設定モーダル起動）・callout（種別選択して静的挿入）** とする。
+アンブレラ `editor-commands` の子スペック。基盤 `editor-slash-command` のスラッシュコマンド機構の上に、GROWI 固有の拡張要素、および基盤が意図的に対象外とした要素（リンク・テーブルビルダー）を `/` から挿入・起動できるコマンドを追加する。初期リリースの対象は **drawio（作図モーダル起動）・plantuml（フェンス静的挿入）・lsx（設定モーダル起動）・callout（種別選択して静的挿入）・リンク（既存 Edit Link Modal 起動）・テーブルビルダー（既存 Handsontable Modal 起動）** とする。
+
+> リンク・テーブルビルダーは試用フィードバック起点（`editor-slash-command` の完成形との比較で要望された）。基盤の Out of scope「テーブル挿入時の表ビルダー起動（将来拡張）」に対応する実装として、本スペックに位置づける。画像アップロードも同時に要望されたが、既存の添付ボタンが `onUpload`/`acceptedUploadFileType` を React props として apps/app 側から受け取る構成のため、`run(view, from)` だけでは起動を完結できない。設計課題として Out of scope に記録し、実装は対象外とする。
 
 拡張要素には「静的テキストを挿入すれば足りるもの（plantuml / callout）」と「専用 UI（モーダル）での設定・編集が要るもの（drawio / lsx）」の2系統がある。後者を扱うため、基盤のコマンドアクションを **「静的挿入（insert）」と「副作用起動（run）」の2種**に一般化する（基盤の所有・本スペックの前提ゲート）。起動・絞り込み・`/query` 置換・i18n 解決・単一トランザクション挿入は基盤の挙動を踏襲する。
 
@@ -15,15 +17,19 @@
   - lsx を挿入するスラッシュコマンド → **新規 lsx 設定モーダルを起動**し、フォームで組み立てた `$lsx(...)` を挿入
   - plantuml を挿入するスラッシュコマンド → フェンス雛形を静的挿入
   - callout を挿入するスラッシュコマンド → 7 バリアント（note / tip / important / info / warning / danger / caution）を**種別を選んで**静的挿入
+  - リンクを挿入するスラッシュコマンド → **既存 Edit Link Modal（`useLinkEditModalActions`）を起動**し、確定したリンクをカーソル位置に挿入（モーダル本体は再利用）
+  - テーブルを構成するスラッシュコマンド → **既存 Handsontable Modal（`useHandsontableModalForEditorActions`）を起動**し、行列を編集してから表を挿入（基盤の `table` コマンドがプレーンな2列テーブルを即挿入するのに対し、本コマンドは行列数を編集できるビルダー）
   - 基盤のアクションモデルを `insert | run` に一般化すること（基盤への変更要求＝前提ゲート）
-  - 基盤のスラッシュコマンドメニュー・絞り込みへの統合（drawio/lsx は React 合成点でモーダルオープナーを束縛）
+  - 基盤のスラッシュコマンドメニュー・絞り込みへの統合（drawio/lsx/リンク/テーブルビルダーは React 合成点でモーダルオープナーを束縛）
   - コマンドのラベル・説明の多言語表示
 - **Out of scope**:
   - 拡張要素の**描画・プレビュー**（既存の描画機構＝remark/rehype プラグインの領域）
   - 既存 drawio モーダル**本体の改修**（起動導線の追加のみ）
+  - 既存 Edit Link Modal / Handsontable Modal **本体の改修**（起動導線の追加のみ。モーダル自体の洗練は別構想）
   - lsx の**サーバ側 list-pages ロジック**（既存。本スペックはフォーム→記法文字列生成と挿入のみ）
   - math（KaTeX）・mermaid 等、今回未選択の要素（将来拡張）
   - テンプレート挿入（別構想）
+  - **画像アップロード**（設計課題。既存の添付ボタンは `onUpload`/`acceptedUploadFileType` を apps/app 側の React props として受け取る構成で、`run(view, from)` という editor 側 state だけでは起動を完結できない。別途、コンポーネントレイヤでの合成方法を検討してから改めてスコープ化する）
   - 基盤のトリガー検出・補完ソース・レジストリ機構そのもの（基盤 `editor-slash-command` の所有。アクションモデルの一般化を除く）
 - **Adjacent expectations**:
   - 基盤 `editor-slash-command` のスラッシュコマンド機構（起動・絞り込み・`apply`・i18n 解決）に乗る。基盤の起動条件（行頭または空白直後の `/`、単語の途中は除外）に従う。
@@ -35,16 +41,18 @@
 
 ### Requirement 1: 拡張要素の挿入・起動コマンド提供
 
-**Objective:** As an エディタで執筆するユーザー, I want GROWI 固有の要素も `/` から挿入・起動したい, so that 記法を手入力せず作図・UML・動的一覧・callout を素早く扱える
+**Objective:** As an エディタで執筆するユーザー, I want GROWI 固有の要素、および基盤が対象外とした要素（リンク・テーブルビルダー）も `/` から挿入・起動したい, so that 記法を手入力せず作図・UML・動的一覧・callout・リンク・表の構成を素早く扱える
 
 #### Acceptance Criteria
 
-1. The 拡張要素コマンド shall 次のコマンドを提供する: drawio、plantuml、lsx、callout（種別別）
+1. The 拡張要素コマンド shall 次のコマンドを提供する: drawio、plantuml、lsx、callout（種別別）、リンク、テーブルビルダー
 2. When ユーザーが drawio コマンドを選択する, the 拡張要素コマンド shall 既存の drawio 作図モーダルを起動する
 3. When ユーザーが plantuml コマンドを選択する, the 拡張要素コマンド shall 内容を記述できる plantuml コードフェンス雛形を挿入する
 4. When ユーザーが lsx コマンドを選択する, the 拡張要素コマンド shall lsx 設定モーダルを起動する
 5. When ユーザーが callout コマンド（いずれかの種別）を選択する, the 拡張要素コマンド shall 対応する種別の callout ディレクティブ（`:::<type>` … `:::`）を挿入する
-6. Where 今回未選択の拡張要素（math、mermaid 等）, the 拡張要素コマンド shall 本リリースではコマンドを提供しない
+6. When ユーザーがリンクコマンドを選択する, the 拡張要素コマンド shall 既存の Edit Link Modal を起動する
+7. When ユーザーがテーブルビルダーコマンドを選択する, the 拡張要素コマンド shall 既存の Handsontable Modal を起動する
+8. Where 今回未選択の拡張要素（math、mermaid 等）、および画像アップロード, the 拡張要素コマンド shall 本リリースではコマンドを提供しない
 
 ### Requirement 2: drawio モーダルの起動と書き戻し
 
@@ -120,3 +128,27 @@
 1. The 拡張要素コマンド shall 記法テキストの挿入またはモーダル起動のみを担い、挿入された要素の描画・プレビューは既存の描画機構に委ねる
 2. The 拡張要素コマンド shall 既存の絵文字オートコンプリート（`:`）および基本スラッシュコマンドと同時に有効であっても、互いの表示・動作を妨げない
 3. The 拡張要素コマンド shall 既存 drawio モーダルの挙動（ツールバーからの起動・描画・書き戻し）を変更しない
+4. The 拡張要素コマンド shall 既存 Edit Link Modal / Handsontable Modal の挙動（ツールバーからの起動・編集・書き戻し）を変更しない
+
+### Requirement 9: リンクモーダルの起動と書き戻し
+
+**Objective:** As an ユーザー, I want `/link` から既存のリンク編集モーダルを開いてリンクを挿入したい, so that リンク記法を意識せず挿入・編集できる
+
+#### Acceptance Criteria
+
+1. When ユーザーがリンクコマンドを選択する, the 拡張要素コマンド shall 入力した `/` とそれに続くクエリ文字列を削除したうえで、カーソル位置に既存の Markdown リンクがあればそれを初期値として Edit Link Modal を起動する
+2. When ユーザーが Edit Link Modal でリンクを確定する, the Edit Link Modal shall 確定したリンク記法をカーソル位置に挿入する（既存の書き戻し機構を利用）
+3. When ユーザーが Edit Link Modal をキャンセルする, the 拡張要素コマンド shall エディタへ要素を挿入しない（`/query` 削除のみが残る）
+4. The 拡張要素コマンド shall Edit Link Modal の起動を packages/editor 側の既存ユーティリティ（`getMarkdownLink` / `replaceFocusedMarkdownLinkWithEditor`）経由で行い、apps/app への逆依存を持たない
+
+### Requirement 10: テーブルビルダーモーダルの起動と書き戻し
+
+**Objective:** As an ユーザー, I want `/table-builder`（仮称）から行列数を編集できるテーブルビルダーを開きたい, so that プレーンな2列テーブルではなく必要な行列数の表を直接構成できる
+
+#### Acceptance Criteria
+
+1. When ユーザーがテーブルビルダーコマンドを選択する, the 拡張要素コマンド shall 入力した `/` とそれに続くクエリ文字列を削除したうえで、現在の `EditorView` を対象に Handsontable Modal を起動する
+2. When ユーザーが Handsontable Modal で表を確定する, the Handsontable Modal shall 確定した表を Markdown テーブル記法としてカーソル位置に挿入する（既存の書き戻し機構を利用）
+3. When ユーザーが Handsontable Modal をキャンセルする, the 拡張要素コマンド shall エディタへ要素を挿入しない（`/query` 削除のみが残る）
+4. The 拡張要素コマンド shall Handsontable Modal の起動を packages/editor 側のトリガー機構（atom、`useHandsontableModalForEditorActions`）経由で行い、apps/app への逆依存を持たない
+5. The 拡張要素コマンド shall 基盤の `table` コマンド（プレーンな2列テーブルの即挿入）を置き換えない。両者は別コマンドとして共存する

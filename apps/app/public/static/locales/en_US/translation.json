@@ -1097,39 +1097,39 @@
   "slash_command": {
     "heading1": {
       "label": "Heading 1",
-      "description": "Large section heading"
+      "description": ""
     },
     "heading2": {
       "label": "Heading 2",
-      "description": "Medium section heading"
+      "description": ""
     },
     "heading3": {
       "label": "Heading 3",
-      "description": "Small section heading"
+      "description": ""
     },
     "bulletList": {
       "label": "Bulleted list",
-      "description": "Create a simple bulleted list"
+      "description": ""
     },
     "numberedList": {
       "label": "Numbered list",
-      "description": "Create a list with numbering"
+      "description": ""
     },
     "taskList": {
       "label": "Task list",
-      "description": "Track tasks with a checklist"
+      "description": ""
     },
     "quote": {
       "label": "Quote",
-      "description": "Capture a quotation"
+      "description": ""
     },
     "codeBlock": {
       "label": "Code block",
-      "description": "Insert a fenced code block"
+      "description": ""
     },
     "table": {
       "label": "Table",
-      "description": "Insert a table"
+      "description": ""
     }
   }
 }

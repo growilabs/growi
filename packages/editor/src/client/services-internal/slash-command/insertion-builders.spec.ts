@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { CompletionContext } from '@codemirror/autocomplete';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { describe, expect, it } from 'vitest';
@@ -8,6 +9,11 @@ import {
   lineMarkerInsertion,
   tableInsertion,
 } from './insertion-builders.js';
+import { createSlashCommandSource } from './slash-command-source.js';
+import type {
+  ResolvedSlashCommand,
+  SlashInsertAction,
+} from './slash-command-types.js';
 
 const EMPTY_TABLE = '|  |  |\n| --- | --- |\n|  |  |';
 const EMPTY_CODE_BLOCK = '```\n\n```';
@@ -131,5 +137,159 @@ describe('tableInsertion', () => {
     expect(view.state.doc.toString()).toBe(`paragraph \n\n${EMPTY_TABLE}`);
     // Cursor sits inside the first header cell.
     expect(view.state.selection.main.head).toBe(from + cursorOffset);
+  });
+});
+
+// Req 9: on a list item whose marker is the only content, a command must act
+// INSIDE the item rather than breaking out onto a new unindented line. Asserted
+// on the resulting document (the observable contract).
+describe('bare list marker behaviour (Req 9)', () => {
+  /**
+   * Apply `buildInsertion` over the trailing `/` of `doc` through the PRODUCTION
+   * path: the completion source's own `apply` composes the ChangeSpec, including
+   * the backwards range widening (`replaceFromOffset`). Dispatching by hand here
+   * would re-implement that composition, so a regression in it — e.g. dropping
+   * `replaceFromOffset` and never absorbing the item's marker — would go unseen.
+   */
+  const applyAtTrailingSlash = (
+    doc: string,
+    buildInsertion: SlashInsertAction['buildInsertion'],
+  ): { text: string; cursor: number } => {
+    const command: ResolvedSlashCommand = {
+      id: 'probe',
+      labelKey: 'slash_command.probe.label',
+      descriptionKey: 'slash_command.probe.description',
+      label: 'Probe',
+      description: '',
+      keywords: ['probe'],
+      action: { kind: 'insert', buildInsertion },
+    };
+    const source = createSlashCommandSource([command]);
+
+    const to = doc.length;
+    const from = to - 1; // the trailing "/"
+    const view = createView(doc, from);
+
+    const result = source(new CompletionContext(view.state, to, false));
+    if (result == null || result instanceof Promise) {
+      throw new Error('source must return a synchronous result here');
+    }
+    const option = result.options[0];
+    if (typeof option?.apply !== 'function') {
+      throw new Error('apply must be a function');
+    }
+    option.apply(view, option, result.from, result.to ?? to);
+
+    return {
+      text: view.state.doc.toString(),
+      cursor: view.state.selection.main.head,
+    };
+  };
+
+  describe('convert: list-type commands replace the item own marker', () => {
+    it('turns a nested bullet item into a numbered one, keeping the indent', () => {
+      const { text } = applyAtTrailingSlash(
+        '- aaa\n- bbb\n- ccc\n  - /',
+        lineMarkerInsertion('1. ', 'convert'),
+      );
+
+      expect(text).toBe('- aaa\n- bbb\n- ccc\n  1. ');
+    });
+
+    it('turns a bullet item into a task item', () => {
+      const { text } = applyAtTrailingSlash(
+        '- foo\n- /',
+        lineMarkerInsertion('- [ ] ', 'convert'),
+      );
+
+      expect(text).toBe('- foo\n- [ ] ');
+    });
+
+    it('turns a task item back into a bullet item (absorbs the checkbox)', () => {
+      const { text } = applyAtTrailingSlash(
+        '- [ ] foo\n- [ ] /',
+        lineMarkerInsertion('- ', 'convert'),
+      );
+
+      expect(text).toBe('- [ ] foo\n- ');
+    });
+
+    it('keeps an enclosing blockquote and converts only the list marker', () => {
+      const { text } = applyAtTrailingSlash(
+        '> - /',
+        lineMarkerInsertion('1. ', 'convert'),
+      );
+
+      expect(text).toBe('> 1. ');
+    });
+
+    it('places the cursor right after the converted marker', () => {
+      const { text, cursor } = applyAtTrailingSlash(
+        '  - /',
+        lineMarkerInsertion('1. ', 'convert'),
+      );
+
+      expect(text).toBe('  1. ');
+      expect(cursor).toBe(text.length);
+    });
+  });
+
+  describe('append: quote is added after the item marker on the same line', () => {
+    it('keeps the bullet and appends the quote marker', () => {
+      const { text } = applyAtTrailingSlash(
+        '- aaa\n- ccc\n- /',
+        lineMarkerInsertion('> ', 'append'),
+      );
+
+      expect(text).toBe('- aaa\n- ccc\n- > ');
+    });
+
+    it('keeps the indent of a nested item', () => {
+      const { text } = applyAtTrailingSlash(
+        '- ccc\n  - /',
+        lineMarkerInsertion('> ', 'append'),
+      );
+
+      expect(text).toBe('- ccc\n  - > ');
+    });
+
+    it('keeps an enclosing blockquote as well', () => {
+      const { text } = applyAtTrailingSlash(
+        '> - /',
+        lineMarkerInsertion('> ', 'append'),
+      );
+
+      expect(text).toBe('> - > ');
+    });
+  });
+
+  // codeBlock is not offered inside a list at all (Req 8.1), so it has no
+  // list-item case here; its behaviour is covered by the codeBlockInsertion
+  // suite above and its exclusion by the slash-command-definitions contract.
+
+  describe('non-list positions keep the original block behaviour', () => {
+    it('still breaks onto a new line after real text (not a bare marker)', () => {
+      const { text } = applyAtTrailingSlash(
+        '- foo /',
+        lineMarkerInsertion('> ', 'append'),
+      );
+
+      expect(text).toBe('- foo \n> ');
+    });
+
+    it('still converts nothing when the line is plain prose', () => {
+      const { text } = applyAtTrailingSlash(
+        'foo /',
+        lineMarkerInsertion('1. ', 'convert'),
+      );
+
+      expect(text).toBe('foo \n1. ');
+    });
+
+    it('still uses a blank line for a code block after prose', () => {
+      const { text } = applyAtTrailingSlash('foo /', codeBlockInsertion);
+
+      expect(text).toBe(`foo \n\n${EMPTY_CODE_BLOCK}`);
+    });
   });
 });

@@ -1065,39 +1065,39 @@
   "slash_command": {
     "heading1": {
       "label": "제목 1",
-      "description": "큰 섹션 제목"
+      "description": ""
     },
     "heading2": {
       "label": "제목 2",
-      "description": "중간 섹션 제목"
+      "description": ""
     },
     "heading3": {
       "label": "제목 3",
-      "description": "작은 섹션 제목"
+      "description": ""
     },
     "bulletList": {
       "label": "글머리 기호 목록",
-      "description": "간단한 글머리 기호 목록을 만듭니다"
+      "description": ""
     },
     "numberedList": {
       "label": "번호 매기기 목록",
-      "description": "번호가 매겨진 목록을 만듭니다"
+      "description": ""
     },
     "taskList": {
       "label": "작업 목록",
-      "description": "체크리스트로 작업을 관리합니다"
+      "description": ""
     },
     "quote": {
       "label": "인용",
-      "description": "인용문을 삽입합니다"
+      "description": ""
     },
     "codeBlock": {
       "label": "코드 블록",
-      "description": "코드 블록을 삽입합니다"
+      "description": ""
     },
     "table": {
       "label": "표",
-      "description": "표를 삽입합니다"
+      "description": ""
     }
   }
 }

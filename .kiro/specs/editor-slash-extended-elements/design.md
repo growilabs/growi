@@ -2,17 +2,18 @@
 
 ## Overview
 
-**Purpose**: 基盤 `editor-slash-command` のスラッシュコマンド機構の上に、GROWI 固有の拡張要素（drawio / plantuml / lsx / callout）を `/` から挿入・起動するコマンドを追加する。拡張要素には「静的テキスト挿入で足りるもの（plantuml / callout）」と「専用モーダルでの設定・編集が要るもの（drawio / lsx）」があるため、基盤のコマンドアクションを **`insert`（静的挿入）/ `run`（副作用起動）** の2種に一般化したうえで、本スペックが各コマンドの定義・ビルダー・モーダル起動導線・（lsx は）新規設定モーダルを足す。
+**Purpose**: 基盤 `editor-slash-command` のスラッシュコマンド機構の上に、GROWI 固有の拡張要素（drawio / plantuml / lsx / callout）、および基盤が対象外とした要素（リンク・テーブルビルダー）を `/` から挿入・起動するコマンドを追加する。要素は「静的テキスト挿入で足りるもの（plantuml / callout）」と「専用モーダルでの設定・編集が要るもの（drawio / lsx / リンク / テーブルビルダー）」に分かれるため、基盤のコマンドアクションを **`insert`（静的挿入）/ `run`（副作用起動）** の2種に一般化したうえで、本スペックが各コマンドの定義・ビルダー・モーダル起動導線・（lsx は）新規設定モーダルを足す。
 
-**Users**: エディタで執筆する全ユーザーが、`/drawio`（作図モーダル）・`/plantuml`（フェンス挿入）・`/lsx`（設定モーダル）・`/callout`（種別選択挿入）で GROWI 拡張要素を素早く扱う。
+**Users**: エディタで執筆する全ユーザーが、`/drawio`（作図モーダル）・`/plantuml`（フェンス挿入）・`/lsx`（設定モーダル）・`/callout`（種別選択挿入）・`/link`（リンク編集モーダル）・テーブルビルダー（Handsontable モーダル）で GROWI 拡張要素・既存モーダルを素早く扱う。
 
-**Impact**: 基盤のコマンド集合に拡張要素コマンドを**合流**させる。drawio / lsx は副作用（モーダル起動）を伴うため、基盤のアクションモデルを `insert | run` に一般化する（基盤の変更＝前提ゲート）。drawio モーダルは既存資産を再利用し、lsx 設定モーダルは新規に作る。基盤の機構・基本コマンド・絵文字補完・描画機構（remark/rehype プラグイン）・既存 drawio モーダル本体の挙動は変更しない。
+**Impact**: 基盤のコマンド集合に拡張要素コマンドを**合流**させる。drawio / lsx / リンク / テーブルビルダーは副作用（モーダル起動）を伴うため、基盤のアクションモデルを `insert | run` に一般化する（基盤の変更＝前提ゲート）。drawio・リンク・テーブルビルダーは既存資産を再利用し、lsx 設定モーダルは新規に作る。基盤の機構・基本コマンド・絵文字補完・描画機構（remark/rehype プラグイン）・既存モーダル本体の挙動は変更しない。
 
 ### Goals
-- drawio / plantuml / lsx / callout を、基盤と一貫した挙動（`/query` 置換・単一トランザクション・undo 整合）で挿入または起動する。
-- 静的挿入（plantuml / callout）と副作用起動（drawio / lsx）の両方を、単一のアクション抽象で表現する。
+- drawio / plantuml / lsx / callout / リンク / テーブルビルダーを、基盤と一貫した挙動（`/query` 置換・単一トランザクション・undo 整合）で挿入または起動する。
+- 静的挿入（plantuml / callout）と副作用起動（drawio / lsx / リンク / テーブルビルダー）の両方を、単一のアクション抽象で表現する。
 - callout を変種宣言リストからデータ駆動で生成し、種別追加を宣言の編集のみで可能にする。
 - packages/editor → apps/app の逆依存を作らずにモーダルを起動する。
+- リンク・テーブルビルダーは**既存モーダルを一切改修せず**、起動導線のみを追加する（drawio と同じ再利用パターン）。
 
 ### Non-Goals
 - 拡張要素の描画・プレビュー（既存 remark/rehype プラグインの領域）。
@@ -24,10 +25,11 @@
 ## Boundary Commitments
 
 ### This Spec Owns
-- 拡張要素コマンドの定義（drawio / plantuml / lsx / callout×7 の id・i18n キー・キーワード・アクション）。
+- 拡張要素コマンドの定義（drawio / plantuml / lsx / callout×7 / リンク / テーブルビルダー の id・i18n キー・キーワード・アクション）。
 - 静的挿入ビルダー（plantuml フェンス、callout ディレクティブ）。
 - callout 種別リスト（`AllCallout` / `Callout` 型）の **`@growi/core` への移動**（真実源の一本化）と、apps/app 既存 consts の再エクスポート化。editor 側は `AllCallout` から `CALLOUT_VARIANTS`（絞り込み別名付き）を生成。
 - drawio / lsx の `run` コマンドを、モーダルオープナーと `editorKey` を束縛して生成する React フック（合成点）。
+- **リンク / テーブルビルダーの `run` コマンド**: 既存トリガーフック（`useLinkEditModalActions` / `useHandsontableModalForEditorActions`）を呼ぶだけの薄いラッパー。drawio/lsx と異なり `editorKey` の束縛が不要（下記 Architecture Integration 参照）。
 - **lsx 設定モーダル一式（新規）**: editor 側トリガーフック（atom）、apps/app 側モーダル UI、`$lsx(...)` 文字列ビルダー、エディタ書き戻しユーティリティ。
 - 拡張要素コマンドのラベル/説明 locale キー（`slash_command.*`）。
 
@@ -35,15 +37,20 @@
 - 基盤 `editor-slash-command` の補完ソース・トリガー検出・i18n 解決機構（基盤が所有）。**例外**: `SlashCommand` のアクションモデル（`insert | run`）一般化と `apply` の分岐は基盤側の変更だが、本スペックの前提ゲートとして要求する（下記「着手前提条件」）。
 - 拡張要素の描画・パース（remark/rehype プラグイン）。
 - 既存 drawio モーダル本体（`DrawioModal` / `DrawioCommunicationHelper` / `replaceFocusedDrawioWithEditor`）。本スペックは起動導線（`useDrawioModalForEditorActions().open`）の呼び出しのみ追加。
+- 既存 Edit Link Modal 本体（`LinkEditModal` / `getMarkdownLink` / `replaceFocusedMarkdownLinkWithEditor`）。本スペックは起動導線（`useLinkEditModalActions().open`）の呼び出しのみ追加。
+- 既存 Handsontable Modal 本体（`HandsontableModal` / `getMarkdownTable` / `replaceFocusedMarkdownTableWithEditor`）。本スペックは起動導線（`useHandsontableModalForEditorActions().open`）の呼び出しのみ追加。
 - lsx サーバ側 list-pages（`packages/remark-lsx/src/server`）。
 - callout 描画コンポーネント（`features/callout/components/CalloutViewer`）と callout パース（`features/callout/services/callout.ts`）。本スペックは種別**名**（`AllCallout`）を参照するのみで、描画・パースは変更しない（`consts.ts` は @growi/core からの再エクスポートに置き換えるが、`AllCallout`/`Callout` の import 経路・値は不変）。
 - 絵文字補完・キーバインド・グローバルホットキー。
+- **画像アップロード**（Out of scope。既存の添付ボタンが React props（`onUpload`/`acceptedUploadFileType`）を apps/app 側コンポーネントから受け取る構成のため、`run(view, from)` だけでは起動を完結できない。コンポーネントレイヤでの合成方法を検討してから改めてスコープ化する設計課題）。
 
 ### Allowed Dependencies
-- 基盤の型/契約: `SlashCommand`、`SlashCommandAction`（`insert | run`）、`SlashInsertion`（`{ insert, cursorOffset }`）。
+- 基盤の型/契約: `SlashCommand`（`disallowedIn` / `syntaxHint` を含む）、`SlashCommandAction`（`insert | run`）、`SlashInsertion`（`{ insert, cursorOffset, replaceFromOffset? }`）。
 - `@growi/core`: callout 種別の真実源 `AllCallout` / `Callout`（本スペックで core へ移動）。packages/editor・apps/app とも既に @growi/core に依存済み。
 - `@codemirror/view`（`EditorView`）。
 - 既存 drawio トリガーフック: `useDrawioModalForEditorActions`（`packages/editor/src/states/modal/drawio-for-editor.ts`）。
+- 既存リンク編集ユーティリティ: `useLinkEditModalActions`（`packages/editor/src/states/modal/link-edit.ts`）、`getMarkdownLink` / `replaceFocusedMarkdownLinkWithEditor`（`packages/editor/src/client/services-internal/link-util/markdown-link-util.ts`）。
+- 既存テーブルビルダー トリガーフック: `useHandsontableModalForEditorActions`（`packages/editor/src/states/modal/handsontable.ts`）。
 - i18n: 基盤の `resolveSlashCommands(t, commands)` 経由でラベル解決（本スペックは locale キーを足すのみ）。
 - 依存方向: `builders/variants → 基盤の型` / `static commands → builders + 基盤の型` / `run commands フック → 基盤の型 + モーダルオープナー` / `合成点（React 登録レイヤ）→ 基盤コマンド + 拡張コマンド`。拡張モジュールは基盤の core 定義を import しない（基盤が拡張を知らない＝逆転なし）。apps/app は editor 側モーダルフックを購読するのみ（packages/editor → apps/app の逆依存なし）。
 
@@ -51,6 +58,7 @@
 - 基盤の `SlashCommand` / `SlashCommandAction` / `SlashInsertion` 契約変更。
 - コマンド集合の**合成点**の構造変更（React 登録レイヤの合成方法、`editorKey` の受け渡し）。
 - 既存 drawio トリガーフック（`useDrawioModalForEditorActions`）のシグネチャ変更。
+- 既存リンク編集 / テーブルビルダー トリガーフック（`useLinkEditModalActions` / `useHandsontableModalForEditorActions`）またはユーティリティ（`getMarkdownLink` / `replaceFocusedMarkdownLinkWithEditor` / `getMarkdownTable` / `replaceFocusedMarkdownTableWithEditor`）のシグネチャ変更。
 - `@growi/core` の `AllCallout` の変種追加・削除（editor 側 `KEYWORDS` の `Record<Callout, …>` が型エラーで検出。別名の追記が必要）。
 - remark-lsx のオプション仕様変更（lsx モーダルのフォーム/ビルダーに影響）。
 - locale キー命名（`slash_command.*`）の変更。
@@ -73,6 +81,16 @@
   - → **packages/editor から `open(editorKey)` を呼べばモーダルが起動し、挿入はモーダルが行う**。apps/app への逆依存は不要。
 - **lsx 設定モーダルは存在しない**: 記法 `$lsx(/path, num=, depth=, sort=, reverse=, filter=, except=)` のみ（`packages/remark-lsx`）。drawio パターンに倣い新規作成する。
 - **callout は対応済み**: `:::type[label] … :::`（`apps/app/src/features/callout`）。7 種（note/tip/important/info/warning/danger/caution、`features/callout/services/consts.ts`）。挿入は静的テキストで足りる。
+- **Edit Link Modal は既存**（実機確認済み）:
+  - トリガーフック `useLinkEditModalActions().open(defaultMarkdownLink, onSave)` が `@growi/editor`（`packages/editor/src/states/modal/link-edit.ts`）にある。drawio と異なり `editorKey` ではなく **`Linker` と保存コールバックを直接渡す**（モーダル側は `EditorView` を持たず、渡された `onSave` を呼ぶだけ）。
+  - `run(view, from)` は `getMarkdownLink(view)` でカーソル位置の既存リンク（無ければ空）を読み、`onSave = (linkText) => replaceFocusedMarkdownLinkWithEditor(view, linkText)` を束縛して `open(defaultMarkdownLink, onSave)` を呼ぶ。両ユーティリティは既存（`markdown-link-util.ts`）。
+  - → **`view`/`from` は `run` の引数からそのまま使え、`editorKey` の束縛が不要**。drawio/lsx より合成が単純（React フックは `useLinkEditModalActions()` の呼び出しのみ）。
+  - リンクは**インライン要素**なので、drawio/lsx のような行頭正規化（`ensureBlockLineStart`）は不要（`図: /link` のように行の途中で起動しても、その位置にインラインでリンクが挿入されるのが正しい挙動）。
+- **Handsontable Modal（テーブルビルダー）は既存**（実機確認済み）:
+  - トリガーフック `useHandsontableModalForEditorActions().open(editor?: EditorView)` が `@growi/editor`（`packages/editor/src/states/modal/handsontable.ts`）にある。drawio と同様 atom に `{ isOpened, editor }` を立てるだけ。
+  - モーダル本体 `HandsontableModal`（apps/app）がこの atom を購読し、`isOpenedForEditor` のときは渡された `editor: EditorView` を直接使う（`useCodeMirrorEditorIsolated(editorKey)` 経由の解決は不要）。開時に `getMarkdownTable(editor)` でカーソル位置の既存テーブルを初期値にし、保存時に `replaceFocusedMarkdownTableWithEditor(editor, table)` で書き戻す（`apps/app/src/client/components/PageEditor/markdown-table-util-for-editor.ts`）。
+  - → **`open(view)` を呼べばよく、`editorKey` の束縛が不要**（drawio/lsx より合成が単純）。
+  - `replaceFocusedMarkdownTableWithEditor` は「テーブルの開始/終了位置」を対象に置換するのみで、**新規テーブル挿入時に先行段落との間の空行を保証しない**（GFM は空行なしのテーブルを段落として吸収する）。そのため drawio/lsx と同様に、`run` はモーダルを開く前に `ensureBlockLineStart(view, from)` を呼ぶ（テーブルはブロック要素のため必要。リンクとの違いはここ）。
 
 ### Architecture Pattern & Boundary Map
 
@@ -82,8 +100,9 @@ graph TB
         Variants[callout variants 宣言リスト]
         StaticBuilders[insertion builders<br/>plantuml / callout]
         StaticCommands[static commands<br/>plantuml + callout×7]
-        RunHook[useExtendedElementCommands フック<br/>drawio / lsx の run 合成]
+        RunHook[useExtendedElementCommands フック<br/>drawio / lsx / link / table-builder の run 合成]
         LsxTrigger[lsx モーダル トリガーフック atom]
+        LineStart[ensureBlockLineStart<br/>drawio / lsx / table-builder が使用]
     end
     subgraph foundation[基盤 editor-slash-command]
         Types[SlashCommand / SlashCommandAction / SlashInsertion]
@@ -92,9 +111,13 @@ graph TB
     end
     subgraph appside[apps/app]
         DrawioModal[既存 DrawioModal 再利用]
+        LinkModal[既存 LinkEditModal 再利用]
+        TableModal[既存 HandsontableModal 再利用]
         LsxModal[新規 LsxModal UI + $lsx ビルダー + 書き戻し]
     end
     DrawioTrigger[既存 useDrawioModalForEditorActions]
+    LinkTrigger[既存 useLinkEditModalActions]
+    TableTrigger[既存 useHandsontableModalForEditorActions]
     Compose[React 合成点 use-default-extensions]
 
     StaticBuilders --> Types
@@ -104,18 +127,25 @@ graph TB
     RunHook --> Types
     RunHook --> DrawioTrigger
     RunHook --> LsxTrigger
+    RunHook --> LinkTrigger
+    RunHook --> TableTrigger
+    RunHook --> LineStart
     Compose --> BasicCommands
     Compose --> StaticCommands
     Compose --> RunHook
     Apply --> RunHook
     LsxModal --> LsxTrigger
     DrawioModal --> DrawioTrigger
+    LinkModal --> LinkTrigger
+    TableModal --> TableTrigger
 ```
 
 **Architecture Integration**:
-- **Selected pattern**: 拡張コマンドを独立モジュール化し、**React 合成点**で基盤コマンドと結合（基盤 core は拡張を知らない）。静的コマンドはデータ宣言、副作用コマンド（drawio/lsx）はモーダルオープナーと `editorKey` を束縛するフックで生成。
-- **アクション一般化**: 基盤 `apply` が `insert | run` を分岐。`run` により「モーダル起動」を汎用的に表現（基盤は drawio/lsx を知らず、`run` 関数を呼ぶだけ）。
-- **drawio = 既存資産再利用 / lsx = 新規モーダル（drawio パターン踏襲）**: editor 側トリガーフック（atom）＋ apps/app 側 UI＋書き戻しユーティリティ。
+- **Selected pattern**: 拡張コマンドを独立モジュール化し、**React 合成点**で基盤コマンドと結合（基盤 core は拡張を知らない）。静的コマンドはデータ宣言、副作用コマンド（drawio/lsx/リンク/テーブルビルダー）はモーダルオープナーを束縛するフックで生成。
+- **アクション一般化**: 基盤 `apply` が `insert | run` を分岐。`run` により「モーダル起動」を汎用的に表現（基盤は drawio/lsx/リンク/テーブルビルダーを知らず、`run` 関数を呼ぶだけ）。
+- **drawio / リンク / テーブルビルダー = 既存資産再利用 / lsx = 新規モーダル（drawio パターン踏襲）**: editor 側トリガーフック（atom）＋ apps/app 側 UI＋書き戻しユーティリティ。
+- **`editorKey` 束縛は drawio/lsx のみ必要**: drawio/lsx のトリガーは `open(editorKey)` を要求するため、合成フックが `editorKey` を束縛する。リンク（`open(defaultMarkdownLink, onSave)`）・テーブルビルダー（`open(editor?: EditorView)`）は `run(view, from)` が受け取る `view` をそのまま渡せるため、`editorKey` の束縛が不要（合成が単純）。
+- **行頭正規化（`ensureBlockLineStart`）が要るのはブロック要素のみ**: drawio（フェンス）・lsx（`$lsx(...)`）・テーブルビルダー（表）はブロック要素なので、モーダルを開く前に呼ぶ。リンクはインライン要素なので不要（行の途中で起動してもその位置に挿入されるのが正しい）。
 - **Steering compliance**: データ駆動（callout 変種・コマンド集合）、pure function 抽出（静的ビルダー・`$lsx` ビルダー）、barrel 最小公開、Executors take their work-set as input（合成点が集合を受け取る）。
 
 ### Technology Stack
@@ -124,7 +154,7 @@ graph TB
 |-------|------------------|-----------------|-------|
 | Frontend (editor) | 基盤 `editor-slash-command`（同一パッケージ） | コマンド機構・補完・apply（insert/run）・i18n 解決 | アクションモデル一般化が前提 |
 | Frontend (editor) | `@codemirror/view`（既存） | `EditorView`・`buildInsertion` の型 | 静的ビルダーは view 未使用 |
-| Frontend (editor) | Jotai（既存） | drawio/lsx モーダルのトリガー atom | drawio は既存、lsx は新規 |
+| Frontend (editor) | Jotai（既存） | drawio/lsx/リンク/テーブルビルダー モーダルのトリガー atom | drawio・リンク・テーブルビルダーは既存、lsx は新規 |
 | Frontend (app) | React + reactstrap Modal（既存） | lsx 設定モーダル UI | drawio モーダルの構成に倣う |
 | Frontend (i18n) | `react-i18next` + locale JSON（既存） | ラベル/説明 | `slash_command.*` キー追加 |
 | Data / Storage | なし | — | 永続化なし |
@@ -150,6 +180,8 @@ packages/editor/src/client/services-internal/slash-command/extended-elements/
 
 packages/editor/src/states/modal/
 └── lsx-for-editor.ts                 # 新規: lsx モーダル トリガーフック（drawio-for-editor.ts に倣う atom）
+# リンク（link-edit.ts）・テーブルビルダー（handsontable.ts）用のトリガーフックは既存のため新規ファイルなし。
+# use-extended-element-commands.ts が既存フックを呼ぶだけ（drawio と同じ再利用パターン）。
 
 # apps/app 側（lsx 設定モーダル UI）
 apps/app/src/client/components/PageEditor/LsxModal/
@@ -164,15 +196,16 @@ apps/app/src/client/components/PageEditor/LsxModal/
 - `apps/app/src/features/callout/services/consts.ts`（変更）— 自前宣言をやめ `export { AllCallout, type Callout } from '@growi/core/...'` の再エクスポートに置換（既存 import 元 `callout.ts` / `CalloutViewer.tsx` は無修正）。
 
 ### Modified Files
-- 基盤の**コマンド集合合成点**（基盤設計で `use-default-extensions.ts`）— `[...SLASH_COMMANDS, ...useExtendedElementCommands(editorKey)]` を `resolveSlashCommands(t, ...)` に渡す。合成点が `editorKey` を取得できるよう配線する。
+- 基盤の**コマンド集合合成点**（基盤設計で `use-default-extensions.ts`）— `[...SLASH_COMMANDS, ...useExtendedElementCommands(editorKey)]` を `resolveSlashCommands(t, ...)` に渡す。合成点が `editorKey` を取得できるよう配線する（drawio/lsx 用。リンク/テーブルビルダーは `view` で足りるため合成点自体の変更は不要）。
 - 基盤の `slash-command-types.ts` / `slash-command-source.ts`（前提ゲート、基盤所有）— `SlashCommandAction`（`insert | run`）導入と `apply` の分岐。詳細は基盤 design.md に反映。
 - apps/app の lsx モーダル登録点 — drawio モーダルが置かれているのと同じモーダルマウント箇所に `LsxModal` を追加。
 - `apps/app/public/static/locales/en_US/translation.json` / `ja_JP/translation.json` — `slash_command.drawio.*` / `plantuml.*` / `lsx.*` / `callout.<type>.*` キー追加、および lsx モーダルのフォームラベル `lsx_modal.*`。
+  - **リンク/テーブルビルダーの新規キー（`slash_command.link.*` / `tableBuilder.*`）は GROWI がサポートする全ロケール（`en_US`/`ja_JP`/`fr_FR`/`ko_KR`/`zh_CN`）に追加する**（基盤の Req 7.3 に合わせる。drawio/lsx/callout の既存キーが en/ja のみである点は本スペックの既存スコープであり、本追記の対象外）。
 
 ## System Flows
 
 ### 静的挿入フロー（plantuml / callout）
-基盤の挿入フローと同一。`apply` が `action.buildInsertion(view, from)` の `{ insert, cursorOffset }` から `/query`（`[from,to]`）を置換する単一 `dispatch` を発行。
+基盤の挿入フローと同一。`apply` が `action.buildInsertion(view, from)` の `{ insert, cursorOffset, replaceFromOffset? }` から置換レンジ（既定は `/query` の `[from,to]`、`replaceFromOffset` があればその分だけ手前へ拡張）を置き換える単一 `dispatch` を発行。
 
 ### 副作用起動フロー（drawio / lsx）
 
@@ -225,6 +258,9 @@ sequenceDiagram
 | 8.1 | 挿入/起動のみ・描画は既存機構 | insertion-builders / run | — | — |
 | 8.2 | 絵文字/基本コマンドと共存 | 合成点（同一 autocompletion） | — | — |
 | 8.3 | 既存 drawio モーダル不変 | use-extended-element-commands | 起動導線追加のみ | — |
+| 8.4 | 既存 Edit Link Modal / Handsontable Modal 不変 | use-extended-element-commands | 起動導線追加のみ | — |
+| 9.1–9.4 | リンクモーダル起動・書き戻し・キャンセル・逆依存なし | use-extended-element-commands, 既存 LinkEditModal | `useLinkEditModalActions`, `getMarkdownLink` | 副作用起動（インライン、行頭正規化なし） |
+| 10.1–10.5 | テーブルビルダー起動・書き戻し・キャンセル・逆依存なし・基盤 table との共存 | use-extended-element-commands, 既存 HandsontableModal | `useHandsontableModalForEditorActions` | 副作用起動（ブロック、行頭正規化あり） |
 
 ## Components and Interfaces
 
@@ -233,8 +269,8 @@ sequenceDiagram
 | callout-variants | data | callout 変種の宣言リスト | 4.1, 4.3 | — | State |
 | insertion-builders | logic | plantuml/callout の雛形（純粋） | 1.3, 1.5, 4.2, 5.2, 8.1 | 基盤 SlashInsertion 型 (P0) | Service |
 | static-commands | data | plantuml + callout×7（insert） | 1.1, 1.5, 1.6, 4.1, 4.4 | builders (P0), variants (P0), 基盤 SlashCommand 型 (P0) | State |
-| use-extended-element-commands | integration/logic | drawio/lsx の run + 静的コマンド合成 | 1.1, 1.2, 1.4, 2.1, 2.4 | drawio トリガー (P0), lsx トリガー (P0), static-commands (P0), ensure-block-line-start (P0) | Service |
-| ensure-block-line-start | logic | run の挿入位置を行頭へ正規化 | 5.4 | `@codemirror/view` (P0) | Service |
+| use-extended-element-commands | integration/logic | drawio/lsx/リンク/テーブルビルダー の run + 静的コマンド合成 | 1.1, 1.2, 1.4, 2.1, 2.4, 9.1, 9.4, 10.1, 10.4 | drawio トリガー (P0), lsx トリガー (P0), リンクユーティリティ (P0), テーブルビルダー トリガー (P0), static-commands (P0), ensure-block-line-start (P0) | Service |
+| ensure-block-line-start | logic | run の挿入位置を行頭へ正規化（ブロック要素のみ使用） | 5.4 | `@codemirror/view` (P0) | Service |
 | lsx-for-editor（新規 atom） | state | lsx モーダル起動トリガー | 1.4, 3.1, 3.6 | Jotai (P0) | State |
 | build-lsx-notation（apps/app） | logic | フォーム値→`$lsx(...)`（純粋） | 3.2, 3.3, 3.4 | — | Service |
 | LsxModal（apps/app） | ui | 設定フォーム + 書き戻し | 3.1–3.6 | lsx-for-editor (P0), build-lsx-notation (P0), useCodeMirrorEditorIsolated (P0) | UI |
@@ -298,15 +334,15 @@ export const calloutInsertion: (type: CalloutVariant['type']) => (view: EditorVi
   - plantuml: ` ```plantuml ` + 改行 + `@startuml` + 改行 + 空行 + `@enduml` + 改行 + ` ``` `。カーソルは中間の空行。
   - callout: `:::<type>` + 改行 + 空行（本文） + 改行 + `:::`。カーソルは本文の空行。
 - **Preconditions**: `from` は `/` の位置。
-- **Postconditions**: `{ insert, cursorOffset }`（`from` 相対）を返す。`view.dispatch` しない。
+- **Postconditions**: `{ insert, cursorOffset }`（`from` 相対）を返す。本スペックのビルダーはいずれも置換レンジを手前へ広げないため `replaceFromOffset` は使わない。`view.dispatch` しない。
 - **行頭/行中の出し分け**: 基盤 design の方針に従い、先行する非空白テキストがある場合は区切り（改行/空行）を前置する。callout / plantuml はブロック要素のため、先行行が非空のとき改行を前置する（テストで固定）。
 - **Invariants**: 副作用なし。
 
 #### use-extended-element-commands
 | Field | Detail |
 |-------|--------|
-| Intent | drawio/lsx の `run` コマンドをモーダルオープナー + `editorKey` で生成し、静的コマンドと合成して返す React フック |
-| Requirements | 1.1, 1.2, 1.4, 2.1, 2.4 |
+| Intent | drawio/lsx/リンク/テーブルビルダー の `run` コマンドを生成し、静的コマンドと合成して返す React フック |
+| Requirements | 1.1, 1.2, 1.4, 2.1, 2.4, 9.1, 9.4, 10.1, 10.4 |
 
 **Contracts**: Service [x]
 
@@ -314,32 +350,50 @@ export const calloutInsertion: (type: CalloutVariant['type']) => (view: EditorVi
 import type { EditorView } from '@codemirror/view';
 import { useDrawioModalForEditorActions } from '../../../states/modal/drawio-for-editor';
 import { useLsxModalForEditorActions } from '../../../states/modal/lsx-for-editor';
+import { useLinkEditModalActions } from '../../../states/modal/link-edit';
+import { useHandsontableModalForEditorActions } from '../../../states/modal/handsontable';
+import {
+  getMarkdownLink,
+  replaceFocusedMarkdownLinkWithEditor,
+} from '../../link-util/markdown-link-util';
 import { ensureBlockLineStart } from './ensure-block-line-start';
 import type { SlashCommand } from '../slash-command-types';
 
 export const useExtendedElementCommands = (editorKey: string): readonly SlashCommand[] => {
   const { open: openDrawio } = useDrawioModalForEditorActions();
   const { open: openLsx } = useLsxModalForEditorActions();
+  const { open: openLink } = useLinkEditModalActions();
+  const { open: openTableBuilder } = useHandsontableModalForEditorActions();
   return useMemo(() => [
     { id: 'drawio', labelKey: 'slash_command.drawio.label', descriptionKey: 'slash_command.drawio.description',
       keywords: ['diagram', 'draw'],
-      // 行頭正規化してからモーダルを開く（Req 5.4）
+      // 行頭正規化してからモーダルを開く（Req 5.4） — editorKey を束縛する必要がある（drawio 固有）
       action: { kind: 'run', run: (view: EditorView, from: number) => { ensureBlockLineStart(view, from); openDrawio(editorKey); } } },
     { id: 'lsx', labelKey: 'slash_command.lsx.label', descriptionKey: 'slash_command.lsx.description',
       keywords: ['list', 'pages', 'tree'],
       action: { kind: 'run', run: (view: EditorView, from: number) => { ensureBlockLineStart(view, from); openLsx(editorKey); } } },
+    { id: 'link', labelKey: 'slash_command.link.label', descriptionKey: 'slash_command.link.description',
+      keywords: ['url', 'href'],
+      // インライン要素なので行頭正規化は不要（Req 9.1）。editorKey も不要 — `view` を直接渡す
+      action: { kind: 'run', run: (view: EditorView) => {
+        openLink(getMarkdownLink(view), (linkText) => replaceFocusedMarkdownLinkWithEditor(view, linkText));
+      } } },
+    { id: 'tableBuilder', labelKey: 'slash_command.tableBuilder.label', descriptionKey: 'slash_command.tableBuilder.description',
+      keywords: ['table', 'grid', 'builder'],
+      // テーブルはブロック要素なので行頭正規化が必要（Req 10.1）。editorKey は不要 — `view` を直接渡す
+      action: { kind: 'run', run: (view: EditorView, from: number) => { ensureBlockLineStart(view, from); openTableBuilder(view); } } },
     ...STATIC_EXTENDED_COMMANDS, // plantuml + callout×7
-  ], [editorKey, openDrawio, openLsx]);
+  ], [editorKey, openDrawio, openLsx, openLink, openTableBuilder]);
 };
 ```
-- **Preconditions**: `editorKey` は現在のエディタインスタンスのキー（合成点が取得）。
-- **Postconditions**: `run` は `ensureBlockLineStart(view, from)` で挿入位置を行頭へ正規化したうえで、オープナーを `editorKey` 付きで呼ぶ（挿入自体はモーダルがカーソル位置に対して行う）。
+- **Preconditions**: `editorKey` は現在のエディタインスタンスのキー（合成点が取得。drawio/lsx のみが使用）。
+- **Postconditions**: drawio/lsx/テーブルビルダーの `run` は `ensureBlockLineStart(view, from)` で挿入位置を行頭へ正規化したうえでオープナーを呼ぶ（ブロック要素）。リンクの `run` は正規化せず `view` をそのまま使う（インライン要素）。drawio/lsx は `editorKey` を渡し、リンク/テーブルビルダーは `view`（または `getMarkdownLink(view)` 等の派生値）を渡す — いずれも挿入自体はモーダル/コールバックがカーソル位置に対して行う。
 - **Invariants**: `STATIC_EXTENDED_COMMANDS`（plantuml + callout）は副作用を持たないデータ。
 
 #### ensure-block-line-start
 | Field | Detail |
 |-------|--------|
-| Intent | run コマンドがモーダルを開く前に、ブロック要素の挿入位置を行頭へ正規化する（Req 5.4） |
+| Intent | run コマンドがモーダルを開く前に、ブロック要素の挿入位置を行頭へ正規化する（Req 5.4）。**ブロック要素（drawio/lsx/テーブルビルダー）のみ使用**し、インライン要素（リンク）は使わない |
 | Requirements | 5.4 |
 
 **Contracts**: Service [x]
@@ -445,8 +499,10 @@ export const buildLsxNotation: (opts: LsxOptions) => string;
 
 ## Error Handling
 - 静的挿入（plantuml/callout）は静的文字列のため失敗経路なし（`buildInsertion` は常に有効な `SlashInsertion` を返す）。
-- run コマンド: `/query` 削除は基盤の単一トランザクション。行の途中で起動された場合は `ensureBlockLineStart` が改行を1つ前置してブロックを独立行へ置く（Req 5.4）。モーダル起動失敗・キャンセルはモーダル側の責務で、エディタには `/query` 削除（＋場合により空行1つ）のみが残る（要素は挿入されない）。
+- run コマンド: `/query` 削除は基盤の単一トランザクション。ブロック要素（drawio/lsx/テーブルビルダー）で行の途中で起動された場合は `ensureBlockLineStart` が改行を1つ前置してブロックを独立行へ置く（Req 5.4）。リンク（インライン）はこの正規化を行わない。モーダル起動失敗・キャンセルはモーダル側の責務で、エディタには `/query` 削除（＋ブロック要素の場合は場合により空行1つ）のみが残る（要素は挿入されない）。
 - lsx モーダル: フォーム未入力時は `$lsx()`（既定描画 = 現在ページ配下一覧）。不正なオプション文字列はサーバ側 list-pages のバリデーションに委ねる（本スペックは文字列生成のみ）。
+- リンクモーダル: カーソル位置に既存リンクが無い場合、`getMarkdownLink` は空の `Linker` を返し、モーダルは新規作成フォームとして開く（既存挙動、変更なし）。
+- テーブルビルダー: カーソル位置に既存テーブルが無い場合、`getMarkdownTable` は `undefined` を返し、モーダルは空のテーブルから開始する（既存挙動、変更なし）。
 - トリガー外・一致なし・キャンセルは基盤の Error Handling に従う。
 
 ## Testing Strategy
@@ -455,18 +511,22 @@ export const buildLsxNotation: (opts: LsxOptions) => string;
 1. `plantumlInsertion`: `@startuml/@enduml` を含むフェンスを返し、カーソルが中間の空行（1.3, 5.2）。
 2. `calloutInsertion('warning')` 等: `:::warning` … `:::` を返し、カーソルが本文行（1.5, 4.2, 5.2）。各種別で記法が正しいこと。
 3. `CALLOUT_VARIANTS` / `STATIC_EXTENDED_COMMANDS`: 7 種の callout コマンドが生成され、各 id・i18n キー・`callout` 共通キーワードを持つこと。plantuml が含まれ未選択要素（math/mermaid）を含まないこと（1.1, 1.6, 4.1, 4.3, 4.4）。
-4. `useExtendedElementCommands`: drawio/lsx コマンドが `kind:'run'` を持ち、`run()` 呼出で対応オープナーが `editorKey` 付きで呼ばれること（モックフックで検証）（1.2, 1.4, 2.1）。
+4. `useExtendedElementCommands`: drawio/lsx コマンドが `kind:'run'` を持ち、`run()` 呼出で対応オープナーが `editorKey` 付きで呼ばれること（モックフックで検証）（1.2, 1.4, 2.1）。リンクコマンドの `run()` 呼出で `getMarkdownLink(view)` が読まれ `openLink` が呼ばれ、その `onSave` 実行で `replaceFocusedMarkdownLinkWithEditor(view, linkText)` が呼ばれること（9.1, 9.2, 9.4）。テーブルビルダーコマンドの `run()` 呼出で `ensureBlockLineStart` が先に走り `openTableBuilder(view)` が `view` 付きで呼ばれること（10.1, 10.4）。
 5. `buildLsxNotation`: 各オプション組合せで期待文字列、全空で `$lsx()`、`reverse=false` は出力しないこと（3.2, 3.3, 3.4）。
 6. `ensureBlockLineStart`: `pos` が行頭のときはドキュメント不変、行の途中（先行非空白あり）のときは改行を1つ前置しカーソルが新行先頭へ来ること（5.4）（jsdom + EditorState/EditorView）。
+7. `STATIC_EXTENDED_COMMANDS` / 全コマンド集合: リンク・テーブルビルダーの id・i18n キー・キーワードが揃い、drawio/lsx/リンク/テーブルビルダーがいずれも `kind:'run'` であること。基盤の `table` コマンドと `tableBuilder` コマンドが**別 id として共存**すること（10.5）。
 
 ### Integration Tests
 1. 合成点経由で `/drawio` `/plantuml` `/lsx` `/callout` が基本コマンドと同一の補完メニューに現れ、`/uml` で plantuml、`/warn` で warning callout が絞り込まれる（6.1, 6.2, 4.4）。
 2. plantuml/callout 選択時、基盤 `apply` により `/query` が置換され単一トランザクションで挿入、undo 1 回で復元（5.1, 5.2）。
-3. drawio/lsx 選択時、`/query` が削除され（単一トランザクション）、行の途中で起動した場合は行頭正規化が入ったうえで対応モーダルの起動 atom が立つこと（5.3, 5.4, 1.2, 1.4）。
-4. 拡張コマンドが絵文字補完（`:`）と同時に機能する（8.2）。
-5. 既存 drawio モーダルのツールバー起動・書き戻しが回帰しないこと（8.3）。
+3. drawio/lsx/テーブルビルダー選択時、`/query` が削除され（単一トランザクション）、行の途中で起動した場合は行頭正規化が入ったうえで対応モーダルの起動 atom が立つこと（5.3, 5.4, 1.2, 1.4, 10.1）。
+4. リンク選択時、`/query` が削除され（単一トランザクション）、行の途中で起動しても行頭正規化されず**その位置に** Edit Link Modal 起動 atom が立つこと（9.1）。
+5. 拡張コマンドが絵文字補完（`:`）と同時に機能する（8.2）。
+6. 既存 drawio モーダル・Edit Link Modal・Handsontable Modal のツールバー起動・書き戻しが回帰しないこと（8.3, 8.4）。
 
 ### E2E/UI Tests（任意）
 1. `/drawio` 選択 → drawio モーダルが開き、保存で ` ```drawio ` フェンスが挿入される（1.2, 2.2）。
 2. `/lsx` 選択 → lsx モーダルでオプション設定 → 確定で `$lsx(...)` が挿入される（1.4, 3.3）。
 3. `/callout` で全種別が候補表示され、`tip` 選択で `:::tip` が挿入されカーソルが本文行に来る（4.1, 4.2, 4.4）。
+4. `/link` 選択 → Edit Link Modal が開き、確定でリンクがカーソル位置（行の途中でもその位置）に挿入される（9.1, 9.2）。
+5. テーブルビルダーコマンド選択 → Handsontable Modal が開き、行列を設定して確定すると Markdown テーブルが挿入される。基盤の `table` コマンド（プレーンな2列テーブル即挿入）も別途選べ、両者が共存する（10.1, 10.2, 10.5）。
