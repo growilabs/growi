@@ -747,6 +747,10 @@ describe('G2GTransferPusherService.startTransfer rescue outcome', () => {
     archiveResponse.data = {
       failedCollections: [],
       rescue: rescueOutcomeFixture,
+      // Matches what the real receiving side sends for a rescue that actually
+      // landed (`ImportCollectionsResult.rescueApplied`) -- a fixture that leaves
+      // this absent exercises a shape the receiving side never produces.
+      rescueApplied: true,
     };
     vi.spyOn(rawAxios, 'post').mockResolvedValueOnce(archiveResponse);
     // Bypasses the real attachment pipeline (the Attachment model and a storage
@@ -798,6 +802,48 @@ describe('G2GTransferPusherService.startTransfer rescue outcome', () => {
       'admin:g2gProgress',
       expect.objectContaining({ rescue: expect.anything() }),
     );
+  });
+
+  test('stays a success for the exact shape a legacy transfer returns (rescueApplied: false with no rescue planned)', async () => {
+    // Pins the case task 10.3's gate found uncovered: `rescueApplied` is only ever
+    // set to `true` inside `importCollections`'s `if (rescuePlan != null)` block
+    // (server/service/g2g-transfer.ts), so a transfer that never needed a rescue at
+    // all -- the ordinary legacy/merge case -- reports `rescueApplied: false` on the
+    // wire exactly like a migration whose rescue genuinely failed does. The two
+    // sibling tests above never exercise this: the "carries" fixture has
+    // `rescueApplied: true` and the "omits" fixture never sets the field, so it
+    // silently defaults to `true` -- neither shape is what a real legacy transfer
+    // sends. Without `rescueOutcome != null` gating `rescueFailed` (as opposed to
+    // `!rescueApplied` alone), this exact response would be misread as a failed
+    // rescue and every successful legacy transfer would be notified as one
+    // (requirement 6.1).
+    const { crowi, socket } = buildCrowiAndSocket();
+    const pusher = new G2GTransferPusherService(crowi);
+
+    vi.spyOn(rawAxios, 'post').mockResolvedValueOnce(
+      mock<AxiosResponse>({
+        data: {
+          failedCollections: [],
+          rescue: null,
+          rescueApplied: false,
+          postProcessFailures: [],
+        },
+      }),
+    );
+    vi.spyOn(pusher, 'transferAttachments').mockResolvedValueOnce();
+
+    await pusher.startTransfer(
+      tk,
+      { _id: 'operator-id' },
+      ['pages'],
+      {},
+      mock<IDataGROWIInfo>(),
+    );
+
+    expect(socket.emit).toHaveBeenCalledWith('admin:g2gProgress', {
+      mongo: G2G_PROGRESS_STATUS.COMPLETED,
+      attachments: G2G_PROGRESS_STATUS.COMPLETED,
+    });
   });
 });
 
