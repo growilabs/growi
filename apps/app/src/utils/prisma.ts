@@ -103,7 +103,7 @@ export async function paginateLogic<T>(
 
   const page = Math.ceil((offset + 1) / limit);
   const pagingCounter = (page - 1) * limit + 1;
-  const totalPages = Math.ceil(totalDocs / limit);
+  const totalPages = Math.max(1, Math.ceil(totalDocs / limit));
 
   // mongoose-paginate-v2 compatible hasPrevPage/prevPage:
   // - page === 1 && offset !== 0: hasPrevPage=true, prevPage=1 (edge case)
