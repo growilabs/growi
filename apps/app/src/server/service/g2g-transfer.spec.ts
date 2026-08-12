@@ -20,6 +20,8 @@ import {
   computePasswordSeedFingerprint,
   G2GTransferPusherService,
   type IDataGROWIInfo,
+  readPostProcessFailures,
+  readRescueApplied,
   readRescueOutcome,
   toArchivePostErrorEvent,
   toTransferability,
@@ -436,6 +438,55 @@ describe('readRescueOutcome', () => {
   });
 });
 
+describe('readRescueApplied', () => {
+  test('reads false when the destination reports the rescue was not written back', () => {
+    expect(readRescueApplied({ rescueApplied: false })).toBe(false);
+  });
+
+  test('reads true when the destination reports the rescue was written back', () => {
+    expect(readRescueApplied({ rescueApplied: true })).toBe(true);
+  });
+
+  test.each<[string, unknown]>([
+    ['the field is absent', {}],
+    ['responseData is not an object', 'Internal Server Error'],
+    ['responseData is null', null],
+  ])('reads true (the best case) when %s, matching what every destination reported before this field existed', (_label, responseData) => {
+    expect(readRescueApplied(responseData)).toBe(true);
+  });
+});
+
+describe('readPostProcessFailures', () => {
+  test('reads the labels of the failed clean-up steps', () => {
+    expect(
+      readPostProcessFailures({
+        postProcessFailures: ['restore-upload-configs', 'invalidate-sessions'],
+      }),
+    ).toEqual(['restore-upload-configs', 'invalidate-sessions']);
+  });
+
+  test('reads an empty list when nothing failed', () => {
+    expect(readPostProcessFailures({ postProcessFailures: [] })).toEqual([]);
+  });
+
+  test.each<[string, unknown]>([
+    ['the field is absent', {}],
+    ['responseData is not an object', 'Internal Server Error'],
+    ['postProcessFailures is not an array', { postProcessFailures: 'nope' }],
+  ])('reads an empty list when %s (an older/malformed destination)', (_label, responseData) => {
+    expect(() => readPostProcessFailures(responseData)).not.toThrow();
+    expect(readPostProcessFailures(responseData)).toEqual([]);
+  });
+
+  test('drops a non-string entry instead of letting it through', () => {
+    expect(
+      readPostProcessFailures({
+        postProcessFailures: ['real-label', 42, null],
+      }),
+    ).toEqual(['real-label']);
+  });
+});
+
 describe('the destination report as the transfer judgement reads it', () => {
   test('every warning the destination is responsible for is decided by a field of its own report', () => {
     // Requirements 3.4, 3.5, 3.7 — what the destination answers *is* the judgement's
@@ -747,5 +798,190 @@ describe('G2GTransferPusherService.startTransfer rescue outcome', () => {
       'admin:g2gProgress',
       expect.objectContaining({ rescue: expect.anything() }),
     );
+  });
+});
+
+describe('G2GTransferPusherService.startTransfer rescue re-insertion failure', () => {
+  // design.md's Integration Tests: "救済の再投入だけを失敗させたとき、保守モードが残り、
+  // 押す側の通知が失敗になる" (2.8, 4.8) -- when only the rescue re-insertion fails, the
+  // receiving side already keeps maintenance mode and reports `rescueApplied: false`
+  // with `rescue: { rescued: [] }` (`ImportCollectionsResult.rescue`'s doc comment);
+  // the receiving-side half is pinned by
+  // `g2g-transfer-replace-procedure.exclusive.integ.ts:593-615`. What was missing --
+  // and is under test here -- is the pusher's own reaction to that response: every
+  // collection imported, so `failedCollections` is empty and `importAborted` is
+  // false, yet the transfer must still be reported as a failure rather than
+  // `mongo: COMPLETED`, because nobody can log into the destination as an
+  // administrator any more.
+  const mockRescueFailedArchiveResponse = (): void => {
+    vi.spyOn(rawAxios, 'post').mockResolvedValueOnce(
+      mock<AxiosResponse>({
+        data: {
+          failedCollections: [],
+          importAborted: false,
+          rescue: { rescued: [] },
+          rescueApplied: false,
+          postProcessFailures: ['reinsert-rescued-admins'],
+        },
+      }),
+    );
+  };
+
+  test('reports a failure rather than a completed transfer when the rescue could not be written back', async () => {
+    const { crowi, socket } = buildCrowiAndSocket();
+    const pusher = new G2GTransferPusherService(crowi);
+
+    mockRescueFailedArchiveResponse();
+    vi.spyOn(pusher, 'transferAttachments').mockResolvedValueOnce();
+
+    await pusher.startTransfer(
+      tk,
+      { _id: 'operator-id' },
+      ['users'],
+      {},
+      mock<IDataGROWIInfo>(),
+    );
+
+    // The mongo phase must never read as COMPLETED for this response, at any point
+    // in the transfer -- not just "eventually corrected".
+    expect(socket.emit).not.toHaveBeenCalledWith(
+      'admin:g2gProgress',
+      expect.objectContaining({ mongo: G2G_PROGRESS_STATUS.COMPLETED }),
+    );
+    expect(socket.emit).toHaveBeenCalledWith('admin:g2gProgress', {
+      mongo: G2G_PROGRESS_STATUS.ERROR,
+      attachments: G2G_PROGRESS_STATUS.COMPLETED,
+    });
+    // And the operator is actually told, not just left to notice the icon.
+    expect(socket.emit).toHaveBeenCalledWith(
+      'admin:g2gError',
+      expect.objectContaining({ key: 'admin:g2g:error_partial_import' }),
+    );
+    // Nobody is named as rescued: the response's `rescue.rescued` is empty (the
+    // receiving side's own fix), so there is nothing to carry even if this code
+    // forgot to check `rescueApplied` at all -- see the dedicated test below for the
+    // case that isolates that guard.
+    expect(socket.emit).not.toHaveBeenCalledWith(
+      'admin:g2gProgress',
+      expect.objectContaining({ rescue: expect.anything() }),
+    );
+  });
+
+  test('does not name any rescued account when the destination reports rescueApplied: false, even if it named some in `rescue`', async () => {
+    // Isolates the `rescueApplied` guard itself from the receiving side's own fix
+    // (an empty `rescue.rescued`): a network boundary must not trust the two fields
+    // to always agree, and if this code ever stopped checking `rescueApplied` and
+    // only checked whether `rescue.rescued` was non-empty, a malformed or
+    // out-of-sync response naming accounts here would report them to the operator
+    // as kept, which is exactly what task 10.3's gate finding was about.
+    const { crowi, socket } = buildCrowiAndSocket();
+    const pusher = new G2GTransferPusherService(crowi);
+
+    const archiveResponse = mock<AxiosResponse>();
+    archiveResponse.data = {
+      failedCollections: [],
+      importAborted: false,
+      rescue: {
+        rescued: [
+          {
+            originalUsername: 'admin',
+            rescuedUsername: 'admin-rescued',
+            emailRemoved: false,
+            slackMemberIdRemoved: false,
+            idReassigned: false,
+          },
+        ],
+      },
+      rescueApplied: false,
+      postProcessFailures: ['reinsert-rescued-admins'],
+    };
+    vi.spyOn(rawAxios, 'post').mockResolvedValueOnce(archiveResponse);
+    vi.spyOn(pusher, 'transferAttachments').mockResolvedValueOnce();
+
+    await pusher.startTransfer(
+      tk,
+      { _id: 'operator-id' },
+      ['users'],
+      {},
+      mock<IDataGROWIInfo>(),
+    );
+
+    expect(socket.emit).not.toHaveBeenCalledWith(
+      'admin:g2gProgress',
+      expect.objectContaining({ mongo: G2G_PROGRESS_STATUS.COMPLETED }),
+    );
+    expect(socket.emit).not.toHaveBeenCalledWith(
+      'admin:g2gProgress',
+      expect.objectContaining({ rescue: expect.anything() }),
+    );
+  });
+});
+
+describe('G2GTransferPusherService.startTransfer post-process clean-up failure', () => {
+  // Requirements 5.3, 5.4, 5.5: a failed clean-up step (upload configs, the
+  // destination-owned configs, or session invalidation) leaves the destination
+  // silently wrong even though every collection imported. design.md's Error
+  // Strategy says these land "ログと通知に落とす" (log and notify) -- the log half
+  // already existed; this is the notify half.
+  test('reports a failure rather than a completed transfer when a post-process clean-up step failed', async () => {
+    const { crowi, socket } = buildCrowiAndSocket();
+    const pusher = new G2GTransferPusherService(crowi);
+
+    vi.spyOn(rawAxios, 'post').mockResolvedValueOnce(
+      mock<AxiosResponse>({
+        data: {
+          failedCollections: [],
+          importAborted: false,
+          postProcessFailures: ['restore-destination-owned-configs'],
+        },
+      }),
+    );
+    vi.spyOn(pusher, 'transferAttachments').mockResolvedValueOnce();
+
+    await pusher.startTransfer(
+      tk,
+      { _id: 'operator-id' },
+      ['pages'],
+      {},
+      mock<IDataGROWIInfo>(),
+    );
+
+    expect(socket.emit).not.toHaveBeenCalledWith(
+      'admin:g2gProgress',
+      expect.objectContaining({ mongo: G2G_PROGRESS_STATUS.COMPLETED }),
+    );
+    expect(socket.emit).toHaveBeenCalledWith(
+      'admin:g2gProgress',
+      expect.objectContaining({ mongo: G2G_PROGRESS_STATUS.ERROR }),
+    );
+  });
+
+  test('stays a success when there are no post-process failures (no false positive)', async () => {
+    const { crowi, socket } = buildCrowiAndSocket();
+    const pusher = new G2GTransferPusherService(crowi);
+
+    vi.spyOn(rawAxios, 'post').mockResolvedValueOnce(
+      mock<AxiosResponse>({
+        data: {
+          failedCollections: [],
+          importAborted: false,
+          postProcessFailures: [],
+        },
+      }),
+    );
+    vi.spyOn(pusher, 'transferAttachments').mockResolvedValueOnce();
+
+    await pusher.startTransfer(
+      tk,
+      { _id: 'operator-id' },
+      ['pages'],
+      {},
+      mock<IDataGROWIInfo>(),
+    );
+
+    expect(socket.emit).toHaveBeenCalledWith('admin:g2gProgress', {
+      mongo: G2G_PROGRESS_STATUS.COMPLETED,
+      attachments: G2G_PROGRESS_STATUS.COMPLETED,
+    });
   });
 });

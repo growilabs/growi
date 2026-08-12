@@ -612,6 +612,12 @@ describe('receive route POST / — the replace procedure around the import', () 
 
     expect(await readMaintenanceModeFromDb()).toBe(true);
     expect(response.body.maintenanceModeReleased).toBe(false);
+    // The response must not report the plan as the outcome: a rescue that was
+    // planned but never written back is not an account the source's operator can be
+    // told is on this destination (task 10.3's gate finding). `rescued` is empty, not
+    // absent — the source still needs `rescue != null` to tell this apart from a
+    // transfer that never needed a rescue at all.
+    expect(response.body.rescue).toEqual({ rescued: [] });
   });
 
   test('destroys the sessions of the replaced users and keeps the rescued administrator’s', async () => {

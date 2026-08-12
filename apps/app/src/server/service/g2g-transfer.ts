@@ -411,7 +411,13 @@ export interface ImportCollectionsResult extends ImportResult {
    * (requirements 2.5, 5.2).
    */
   readonly importAborted: boolean;
-  /** Null when this transfer did not replace the destination's accounts. */
+  /**
+   * Null when this transfer did not replace the destination's accounts. When it did
+   * but the re-insertion failed (`rescueApplied: false`), this is `{ rescued: [] }`,
+   * never the plan's list — the plan is what this GROWI *tried* to write back, not
+   * what actually landed, and a caller that only reads `rescue` (without checking
+   * `rescueApplied`) must not be told about accounts that are not really there.
+   */
   readonly rescue: AdminRescueOutcome | null;
   /** Whether the rescue was actually written back. False leaves the destination closed. */
   readonly rescueApplied: boolean;
@@ -696,6 +702,51 @@ export const readRescueOutcome = (
         })),
       }
     : null;
+};
+
+/**
+ * Reads whether a rescue that was planned actually got written back to the
+ * destination, out of its response to the archive.
+ *
+ * Guarded like the readers above: an older destination answers without the field,
+ * which reads as "applied" — the best case, and what every destination effectively
+ * reported before this field existed.
+ *
+ * On its own this cannot tell a legacy transfer that never needed a rescue (also
+ * answers `rescueApplied: false`, since the flag simply never gets set to `true`
+ * for it — see `ImportCollectionsResult`) apart from a migration whose rescue
+ * genuinely failed to write back. A caller must combine it with
+ * {@link readRescueOutcome} being non-null, which is only true when a rescue was
+ * actually planned.
+ */
+export const readRescueApplied = (responseData: unknown): boolean =>
+  !isRecord(responseData) || responseData.rescueApplied !== false;
+
+/**
+ * Reads the labels of the destination's clean-up steps that failed, out of its
+ * response to the archive.
+ *
+ * Guarded like {@link readFailedCollections}: an older destination answers without
+ * the field, which reads as "nothing failed" — the only thing this code could
+ * assume before the field existed. A failed clean-up step (restoring the upload
+ * configs, the destination-owned configs, or invalidating sessions) leaves the
+ * destination silently wrong in ways requirements 5.3, 5.4 and 5.5 do not allow, so
+ * the source must not read a response carrying one of these as a plain success.
+ */
+export const readPostProcessFailures = (
+  responseData: unknown,
+): readonly string[] => {
+  if (!isRecord(responseData)) {
+    return [];
+  }
+
+  const { postProcessFailures } = responseData;
+
+  return Array.isArray(postProcessFailures)
+    ? postProcessFailures.filter(
+        (label): label is string => typeof label === 'string',
+      )
+    : [];
 };
 
 /**
@@ -1057,15 +1108,40 @@ export class G2GTransferPusherService implements Pusher {
     // because an import that threw can name no collection at all. Both mean the same thing
     // to the operator: the destination is not finished and is still in maintenance mode.
     const importAborted = readImportAborted(archiveResponseData);
-    const isImportIncomplete = failedCollections.length > 0 || importAborted;
-    // Present only when this transfer replaced `users` and rescued at least one
-    // administrator (requirement 4.1) — read from the same response body, for the same
-    // reason as the two facts above: this is the only channel it can cross on.
+    // Present only when this transfer replaced `users` and a rescue was planned
+    // (requirement 4.1) — read from the same response body, for the same reason as
+    // the two facts above: this is the only channel it can cross on. Non-null here
+    // means "a rescue was planned", not "it succeeded" — see `readRescueApplied`.
     const rescueOutcome = readRescueOutcome(archiveResponseData);
+    const rescueApplied = readRescueApplied(archiveResponseData);
+    // A rescue that was planned but never written back leaves the destination with
+    // nobody able to log in as the administrator it was counting on, which is not a
+    // successful transfer even though the collections themselves all imported.
+    // `rescueApplied` alone cannot say this: an ordinary merge transfer that never
+    // needed a rescue also answers `rescueApplied: false` (it is simply never set to
+    // `true`), so this only means "the rescue failed" once combined with `rescueOutcome`
+    // being non-null -- i.e. a rescue was actually planned in the first place.
+    const rescueFailed = rescueOutcome != null && !rescueApplied;
+    // Failed clean-up steps (restoring the upload configs, the destination-owned
+    // configs, or invalidating sessions) leave the destination silently wrong
+    // (requirements 5.3, 5.4, 5.5) with nothing in the response to say so unless this
+    // is read: the receive route answers 200 regardless (design.md's Error Strategy),
+    // so a caller that ignores this list sees the same success as a clean transfer.
+    const postProcessFailures = readPostProcessFailures(archiveResponseData);
+    const isImportIncomplete =
+      failedCollections.length > 0 ||
+      importAborted ||
+      rescueFailed ||
+      postProcessFailures.length > 0;
 
     if (isImportIncomplete) {
       logger.error(
-        { failedCollections, importAborted },
+        {
+          failedCollections,
+          importAborted,
+          rescueFailed,
+          postProcessFailures,
+        },
         'The destination GROWI did not finish importing the transfer data',
       );
     }
@@ -1091,7 +1167,16 @@ export class G2GTransferPusherService implements Pusher {
         // (rescueOutcome === null) or rescued nobody (an empty list — every administrator
         // kept its own account) keeps emitting exactly the payload it did before this
         // field existed, rather than claiming a rescue that has nothing in it.
-        ...(rescueOutcome != null && rescueOutcome.rescued.length > 0
+        //
+        // `rescueApplied` is checked here too, not only folded into `isImportIncomplete`
+        // above: this is a network boundary, and the receiving side already nulling out
+        // the names on a failed rescue (`ImportCollectionsResult.rescue`) must not be the
+        // only thing standing between a stale/out-of-sync destination and naming accounts
+        // that are not really there. Nothing is carried unless both fields agree the
+        // rescue actually landed.
+        ...(rescueOutcome != null &&
+        rescueApplied &&
+        rescueOutcome.rescued.length > 0
           ? { rescue: rescueOutcome }
           : {}),
       });
@@ -1710,7 +1795,16 @@ export class G2GTransferReceiverService implements Receiver {
       // its own — see {@link ImportCollectionsResult}.
       failedCollections: importResult?.failedCollections ?? [],
       importAborted: importResult == null,
-      rescue: rescuePlan == null ? null : toRescueOutcome(rescuePlan),
+      // Reports what actually landed, not what this GROWI attempted: a plan that
+      // failed to write back (`!rescueApplied`) is not an outcome, and naming its
+      // accounts here would tell the source operator that accounts exist on this
+      // destination which do not (see the doc comment on `ImportCollectionsResult`).
+      rescue:
+        rescuePlan == null
+          ? null
+          : rescueApplied
+            ? toRescueOutcome(rescuePlan)
+            : { rescued: [] },
       rescueApplied,
       postProcessFailures,
       maintenanceModeReleased,
