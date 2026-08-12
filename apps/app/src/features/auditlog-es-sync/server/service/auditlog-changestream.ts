@@ -257,8 +257,9 @@ export class AuditlogChangeStreamService {
     const upserts: ActivityDocument[] = [];
     const deleteIds: mongoose.Types.ObjectId[] = [];
     for (const event of batch) {
-      // 'update' is ignored: ES holds only snapshot.username, fixed at creation.
-      // Index a mutable field in the auditlog mapping and 'update' must be handled too.
+      // 'update' is ignored: ES holds only the fields listed in AuditlogSyncFields
+      // (snapshot.username, endpoint), all of which are fixed at creation.
+      // Sync a mutable field and 'update' must be handled too.
       if (
         event.operationType === 'insert' &&
         'fullDocument' in event &&

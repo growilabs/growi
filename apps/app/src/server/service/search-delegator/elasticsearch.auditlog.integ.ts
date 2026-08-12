@@ -121,12 +121,14 @@ describe('ElasticsearchDelegator.addAllAuditlogs()', () => {
     expect(mockES8Client.bulk).not.toHaveBeenCalled();
   });
 
-  it('skips activities that have no username', async () => {
+  it('skips activities that have neither username nor endpoint', async () => {
     const withName = new mongoose.Types.ObjectId();
     await insertActivities([
       { _id: withName, username: 'alice' },
       { _id: new mongoose.Types.ObjectId(), username: null },
-      { _id: new mongoose.Types.ObjectId(), username: '' },
+      // Activity.createByParameters defaults both fields to '', so '' — not
+      // undefined — is the real shape of an activity with neither.
+      { _id: new mongoose.Types.ObjectId(), username: '', endpoint: '' },
     ]);
 
     await delegator.addAllAuditlogs();

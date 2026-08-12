@@ -576,6 +576,45 @@ describe('ElasticsearchDelegator', () => {
 
       expect(mockES8Client.indices.putAlias).not.toHaveBeenCalled();
     });
+
+    // The auditlog index is created once and never re-created, so this is the only
+    // path by which a mapping added after the index existed reaches an upgraded instance.
+    it('pushes the current mapping onto the index', async () => {
+      givenIndexState({
+        tmpExists: false,
+        indexExists: true,
+        aliasExists: true,
+      });
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(mockES8Client.indices.putMapping).toHaveBeenCalledWith({
+        index: 'auditlogs',
+        properties: {
+          username: { type: 'keyword' },
+          endpoint: { type: 'keyword' },
+        },
+      });
+    });
+
+    it('attaches the alias even when the mapping update is rejected', async () => {
+      givenIndexState({
+        tmpExists: false,
+        indexExists: true,
+        aliasExists: false,
+      });
+      mockES8Client.indices.putMapping.mockRejectedValue(
+        new Error('illegal_argument_exception'),
+      );
+
+      await expect(delegator.normalizeAuditlogIndices()).rejects.toThrow(
+        'illegal_argument_exception',
+      );
+      expect(mockES8Client.indices.putAlias).toHaveBeenCalledWith({
+        name: 'auditlogs-alias',
+        index: 'auditlogs',
+      });
+    });
   });
 
   describe('rebuildAuditlogIndex()', () => {
@@ -1015,6 +1054,52 @@ describe('ElasticsearchDelegator', () => {
           { endpoint: '/_api/v3/pages/revert' },
         ],
       });
+    });
+
+    it('strips the query string from endpoint so credentials passed as access_token are not indexed', async () => {
+      const activity = makeActivity(
+        'alice',
+        '/_api/v3/pages/list?access_token=secret&path=/',
+      );
+
+      await delegator.bulkSyncAuditlogs([activity], []);
+
+      expect(mockES8Client.bulk).toHaveBeenCalledWith({
+        body: [
+          { index: { _index: 'auditlogs', _id: activity._id.toString() } },
+          { username: 'alice', endpoint: '/_api/v3/pages/list' },
+        ],
+      });
+    });
+
+    // Activity.createByParameters defaults endpoint to '', so '' — not undefined —
+    // is what an activity without an endpoint actually carries.
+    it('omits endpoint when it is an empty string', async () => {
+      const activity = makeActivity('alice', '');
+
+      await delegator.bulkSyncAuditlogs([activity], []);
+
+      expect(mockES8Client.bulk).toHaveBeenCalledWith({
+        body: [
+          { index: { _index: 'auditlogs', _id: activity._id.toString() } },
+          { username: 'alice' },
+        ],
+      });
+    });
+
+    it('skips upserts whose username and endpoint are both empty strings', async () => {
+      await delegator.bulkSyncAuditlogs([makeActivity('', '')], []);
+
+      expect(mockES8Client.bulk).not.toHaveBeenCalled();
+    });
+
+    it('skips upserts whose endpoint is nothing but a query string', async () => {
+      await delegator.bulkSyncAuditlogs(
+        [makeActivity('', '?access_token=secret')],
+        [],
+      );
+
+      expect(mockES8Client.bulk).not.toHaveBeenCalled();
     });
 
     it('skips upserts that have neither username nor endpoint', async () => {

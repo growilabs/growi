@@ -50,6 +50,7 @@ import {
   isES9ClientDelegator,
   type SearchQuery,
 } from './elasticsearch-client-delegator';
+import { sanitizeEndpointForIndex } from './sanitize-endpoint-for-index';
 
 const logger = loggerFactory('growi:service:search-delegator:elasticsearch');
 
@@ -88,7 +89,14 @@ const AVAILABLE_KEYS = [
 
 type Data = any;
 
-// Add a field here to sync it to the auditlog index — see prepareBodyForAuditlog.
+// Syncing a new field to the auditlog index takes four coordinated changes:
+//   1. this type,
+//   2. prepareBodyForAuditlog(), which reads it off the activity,
+//   3. the .select() in addAllAuditlogs() — omitting it makes the field appear
+//      in live sync but vanish after a rebuild,
+//   4. mappings/mappings-auditlog-properties.ts, so it is not dynamically mapped.
+// Also confirm the field is immutable after creation; see the 'update' note in
+// auditlog-changestream.ts.
 type AuditlogSyncFields = Partial<{
   username: string;
   endpoint: string;
@@ -519,6 +527,7 @@ class ElasticsearchDelegator
     indexName: string,
     aliasName: string,
     createFn: () => Promise<unknown>,
+    syncMappingFn?: () => Promise<unknown>,
   ): Promise<void> {
     const { client } = this;
     const tmpIndexName = `${indexName}-tmp`;
@@ -543,6 +552,11 @@ class ElasticsearchDelegator
     if (!isExistsAlias) {
       await client.indices.putAlias({ name: aliasName, index: indexName });
     }
+
+    // Last, so a rejected mapping update cannot leave the alias detached. An index
+    // created just above already carries the current mapping, but pushing it again
+    // is a no-op on the server and keeps the upgrade path a single code path.
+    await syncMappingFn?.();
   }
 
   async normalizeIndices(): Promise<void> {
@@ -556,6 +570,33 @@ class ElasticsearchDelegator
       this.auditlogIndexName,
       this.auditlogAliasName,
       () => this.createAuditlogIndex(this.auditlogIndexName),
+      () => this.syncAuditlogMapping(this.auditlogIndexName),
+    );
+  }
+
+  /**
+   * Push the current auditlog mapping onto an index that already exists.
+   *
+   * The index is created once and never re-created on upgrade, so a field added
+   * to the mapping would otherwise only reach fresh installs — on an upgraded
+   * instance Elasticsearch would dynamically map it as `text` and break the
+   * `keyword` aggregations it was added for. Adding a field is a compatible
+   * mapping update; changing an existing field's type is not, and Elasticsearch
+   * rejects it — the boot and rebuild paths log such a failure instead of aborting.
+   */
+  private async syncAuditlogMapping(index: string): Promise<void> {
+    if (isES8ClientDelegator(this.client)) {
+      const { mappings } = await import('./mappings/mappings-auditlog-es8');
+      await this.client.indices.putMapping({ index, ...mappings.mappings });
+      return;
+    }
+    if (isES9ClientDelegator(this.client)) {
+      const { mappings } = await import('./mappings/mappings-auditlog-es9');
+      await this.client.indices.putMapping({ index, ...mappings.mappings });
+      return;
+    }
+    throw new Error(
+      `Unsupported Elasticsearch version: ${this.elasticsearchVersion}`,
     );
   }
 
@@ -733,23 +774,19 @@ class ElasticsearchDelegator
   private prepareBodyForAuditlog(
     activity: Pick<ActivityDocument, '_id' | 'snapshot' | 'endpoint'>,
   ): [] | [{ index: { _index: string; _id: string } }, AuditlogSyncFields] {
-    const candidates: AuditlogSyncFields = {
-      username: activity.snapshot?.username || undefined,
-      endpoint: activity.endpoint || undefined,
-    };
-    const doc = Object.fromEntries(
-      Object.entries(candidates).filter(
-        (entry): entry is [keyof AuditlogSyncFields, string] =>
-          entry[1] != null,
-      ),
-    ) as AuditlogSyncFields;
-    if (Object.keys(doc).length === 0) return [];
+    const username = activity.snapshot?.username || undefined;
+    const endpoint =
+      sanitizeEndpointForIndex(activity.endpoint ?? '') || undefined;
+    if (username == null && endpoint == null) return [];
 
     return [
       {
         index: { _index: this.auditlogIndexName, _id: activity._id.toString() },
       },
-      doc,
+      {
+        ...(username != null && { username }),
+        ...(endpoint != null && { endpoint }),
+      },
     ];
   }
 
