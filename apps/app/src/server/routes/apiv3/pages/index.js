@@ -1064,9 +1064,33 @@ export const setup = (crowi) => {
             isRecursively,
           );
       } else {
+        // isUpdatable is async, so it has to be awaited before the result is used as
+        // a predicate: a bare call returns a Promise, which is always truthy, and
+        // kept every page regardless of whether its revision is still the latest.
+        // Resolved up front rather than inside the filter, which cannot await.
+        let isUpdatableFlags;
+        try {
+          isUpdatableFlags = await Promise.all(
+            pagesToDelete.map((p) =>
+              // an empty page has no revision to compare
+              p.isEmpty
+                ? true
+                : p.isUpdatable(pageIdToRevisionIdMap[p._id].toString()),
+            ),
+          );
+        } catch (err) {
+          logger.error(
+            'Failed to check whether the pages to delete are up to date.',
+            err,
+          );
+          return res.apiv3Err(
+            new ErrorV3('Failed to find pages to delete.'),
+            500,
+          );
+        }
+
         const filteredPages = pagesToDelete.filter(
-          (p) =>
-            p.isEmpty || p.isUpdatable(pageIdToRevisionIdMap[p._id].toString()),
+          (_p, index) => isUpdatableFlags[index],
         );
         pagesCanBeDeleted = await crowi.pageService.filterPagesByCanDelete(
           filteredPages,
