@@ -93,8 +93,8 @@ describe('slash-command-definitions', () => {
 
   // A command whose result is a single-line marker shows that marker as its
   // hint instead of a written description (the notation IS the explanation).
-  // codeBlock/table are not single-line markers, so they carry no hint yet —
-  // a written description is expected once one is added.
+  // codeBlock/table are not single-line markers, so they carry no hint and
+  // deliberately no description either — their label alone identifies them.
   it('gives every single-line-marker command a syntaxHint matching its own builder marker', () => {
     const expectedHints: Record<string, string> = {
       heading1: '#',

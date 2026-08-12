@@ -7,6 +7,7 @@ import { syntaxTree } from '@codemirror/language';
 import type { EditorState } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 
+import { LIST_MARKER_LINE_REGEX } from './list-line-patterns.js';
 import type {
   ResolvedSlashCommand,
   SlashCommandContext,
@@ -56,31 +57,72 @@ const TABLE_CONTEXT_NODE_NAMES = new Set([
   'TableHeader',
 ]);
 
+type SyntaxNode = ReturnType<typeof syntaxTree>['topNode'];
+
+/** The nearest ancestor of `pos` named in `nodeNames`, or `null`. */
+const findAncestorNode = (
+  state: EditorState,
+  pos: number,
+  nodeNames: ReadonlySet<string>,
+): SyntaxNode | null => {
+  let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, -1);
+  while (node != null) {
+    if (nodeNames.has(node.name)) return node;
+    node = node.parent;
+  }
+  return null;
+};
+
 /** Whether `pos`'s syntax-tree ancestor chain includes any of `nodeNames`. */
 const matchesAncestorNode = (
   state: EditorState,
   pos: number,
   nodeNames: ReadonlySet<string>,
-): boolean => {
-  let node: ReturnType<typeof syntaxTree>['topNode'] | null = syntaxTree(
-    state,
-  ).resolveInner(pos, -1);
-  while (node != null) {
-    if (nodeNames.has(node.name)) return true;
-    node = node.parent;
-  }
-  return false;
-};
+): boolean => findAncestorNode(state, pos, nodeNames) != null;
 
 /** Whether `pos` sits inside a Markdown code context (fenced/indented/inline). */
 const isInCodeContext = (state: EditorState, pos: number): boolean =>
   matchesAncestorNode(state, pos, CODE_CONTEXT_NODE_NAMES);
 
-/** A list item line: indent, optional blockquote markers, then a list marker. */
-const LIST_ITEM_LINE_REGEX = /^\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s/;
+/**
+ * A cell separator anywhere on the line. Deliberately NOT anchored to the line
+ * start: GFM also accepts tables whose rows omit the leading and trailing pipe
+ * (`a | b` / `--- | ---` / `c | d`), and anchoring would leave those cells
+ * unprotected.
+ */
+const TABLE_CELL_SEPARATOR_REGEX = /\|/;
 
-/** A table row line: indent, optional blockquote markers, then a cell pipe. */
-const TABLE_ROW_LINE_REGEX = /^\s*(?:>\s*)*\|/;
+/** Width of the leading whitespace on `lineText`. */
+const indentWidth = (lineText: string): number =>
+  lineText.length - lineText.trimStart().length;
+
+/**
+ * Whether `pos` is inside the innermost enclosing list item (Req 8.1).
+ *
+ * A line belongs to that item when it carries a marker of its own, or when it is
+ * indented at least to the item's CONTENT column. The content column — not "is
+ * indented at all" — is the threshold that matters, because Enter is bound to
+ * `insertNewlineAndIndent`, which reproduces the current line's indent: after
+ * `  - b` the next line already starts at column 2, so treating any indentation
+ * as "still inside" would leave a nested list with no way to reach the
+ * block-level commands at all, not even by pressing Enter twice.
+ */
+const isInListItem = (state: EditorState, pos: number): boolean => {
+  const item = findAncestorNode(state, pos, LIST_CONTEXT_NODE_NAMES);
+  if (item == null) return false;
+
+  const lineText = state.doc.lineAt(pos).text;
+  if (LIST_MARKER_LINE_REGEX.test(lineText)) return true;
+
+  const markerLine = state.doc.lineAt(item.from);
+  const markerColumn = item.from - markerLine.from;
+  const marker = LIST_MARKER_LINE_REGEX.exec(
+    markerLine.text.slice(markerColumn),
+  );
+  if (marker == null) return false;
+
+  return indentWidth(lineText) >= markerColumn + marker[0].length;
+};
 
 /**
  * The {@link SlashCommandContext}s active at `pos` (Req 8).
@@ -89,8 +131,10 @@ const TABLE_ROW_LINE_REGEX = /^\s*(?:>\s*)*\|/;
  * agree, because either signal alone is wrong in a common case:
  * - tree alone over-reaches. lezer-markdown keeps the line that follows a table
  *   or a list item inside that node until a blank line ends it, so pressing
- *   Enter once after a table and typing `/` would still report `table` — and
- *   since every command excludes `table`, the menu would come up empty.
+ *   Enter after a table and typing `/` would still report `table` — and since
+ *   every command excludes `table`, the menu would come up empty. Requiring the
+ *   line to still look like the structure treats a separator-less, outdented
+ *   line as "the user has left it".
  * - line alone under-constrains. A line may start with `|` or `-` while being
  *   plain prose, and restricting the menu there would be a false positive.
  *
@@ -103,14 +147,11 @@ const activeContextsAt = (
 ): readonly SlashCommandContext[] => {
   const lineText = state.doc.lineAt(pos).text;
   const contexts: SlashCommandContext[] = [];
-  if (
-    LIST_ITEM_LINE_REGEX.test(lineText) &&
-    matchesAncestorNode(state, pos, LIST_CONTEXT_NODE_NAMES)
-  ) {
+  if (isInListItem(state, pos)) {
     contexts.push('list');
   }
   if (
-    TABLE_ROW_LINE_REGEX.test(lineText) &&
+    TABLE_CELL_SEPARATOR_REGEX.test(lineText) &&
     matchesAncestorNode(state, pos, TABLE_CONTEXT_NODE_NAMES)
   ) {
     contexts.push('table');
@@ -208,15 +249,24 @@ const applyCommand = (
   command.action.run(view, from);
 };
 
+/**
+ * The auxiliary text shown beside a command's label (Req 10.1, 10.3, 10.4).
+ *
+ * The Markdown syntax wins where a command has one — it IS the explanation for a
+ * simple command. Otherwise a written description is used, but only when there
+ * actually is one: i18next yields `''` for a key whose value is empty and echoes
+ * the key itself when the entry is missing, and neither belongs in the popup.
+ */
+const resolveDetail = (command: ResolvedSlashCommand): string | undefined => {
+  if (command.syntaxHint != null) return command.syntaxHint;
+  const { description, descriptionKey } = command;
+  if (description === '' || description === descriptionKey) return undefined;
+  return description;
+};
+
 const toCompletion = (command: ResolvedSlashCommand): Completion => ({
   label: command.label,
-  // Prefer the Markdown syntax itself as the hint where one exists (it IS the
-  // explanation for a simple command); fall back to a written description,
-  // omitting `detail` rather than an empty string so a not-yet-written
-  // description doesn't render as blank space in the completion popup.
-  detail:
-    command.syntaxHint ??
-    (command.description === '' ? undefined : command.description),
+  detail: resolveDetail(command),
   apply: (view, _completion, from, to) => applyCommand(command, view, from, to),
 });
 

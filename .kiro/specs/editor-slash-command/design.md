@@ -213,9 +213,18 @@ import type { EditorView } from '@codemirror/view';
  * これにより builder 側が絶対位置の ChangeSpec を持たず、削除レンジとの重なり/競合が原理的に発生しない。
  */
 export interface SlashInsertion {
-  readonly insert: string;        // [from, to] を置換するテキスト全体
-  readonly cursorOffset: number;  // 挿入後のカーソル位置（from からの相対オフセット）
+  readonly insert: string;        // 置換レンジを置き換えるテキスト全体
+  readonly cursorOffset: number;  // 挿入後のカーソル位置（置換レンジ先頭からの相対オフセット）
+  /**
+   * 置換レンジの開始を `from` より手前へ広げる量（<= 0、既定 0）。リスト変換が
+   * 項目自身のマーカーを吸収するために使う（Req 9.1）。相対オフセットのままなので
+   * position-free の原則は維持され、ChangeSpec を組むのは `apply` のみ。
+   */
+  readonly replaceFromOffset?: number;
 }
+
+/** 挿入すると周囲の構造が壊れる文脈（Req 8）。list = リスト項目行、table = テーブルセル */
+export type SlashCommandContext = 'list' | 'table';
 
 /**
  * コマンドのアクション。2 種を判別共用体で表す。
@@ -244,6 +253,13 @@ export interface SlashCommand {
   readonly keywords: readonly string[];  // 追加の照合語 例: ['h1', 'title']
   /** アクション（insert: 静的挿入 / run: 副作用起動） */
   readonly action: SlashCommandAction;
+  /** 候補から除外する文脈（Req 8）。未宣言なら常に候補に出る */
+  readonly disallowedIn?: readonly SlashCommandContext[];
+  /**
+   * 説明文の代わりに表示する Markdown 記法（Req 10）。単一行マーカーで表現できる
+   * コマンドのみが持つ。記法は表示言語によらず同一なので翻訳しない。
+   */
+  readonly syntaxHint?: string;
 }
 
 /** 表示文字列を解決済みのコマンド */
@@ -354,7 +370,11 @@ export const resolveSlashCommands: (
 - **構造上の文脈フィルタ（Req 8）**: `activeContextsAt` が現在位置の文脈（`list` / `table`）を求める。判定は **syntax tree と「カーソル自身の行の見た目」の両方が一致したときのみ**成立させる。片方だけでは誤判定するため:
   - **木だけでは広すぎる**: lezer-markdown はテーブル行やリスト項目の**次の行**を、空行が来るまで同じノード（`Table` / `ListItem`）の内側に含める。テーブルの直後で Enter を1回押して `/` を打つと `table` 文脈と判定され、全コマンドが `table` を除外しているため**メニューが空になる**。
   - **行だけでは狭すぎる**: 単なる本文が `|` や `-` で始まることはあり、そこで絞り込むのは誤検出になる。
-  - 木側は `isInCodeContext` と同じ親チェーン走査（`ListItem` / `Table`・`TableRow`・`TableCell`・`TableHeader`）、行側は行頭の引用マーカーを許容したリストマーカー・セルパイプの正規表現で判定する。両文脈が同時に成立することもある（リスト項目内のテーブル）。各コマンドは `disallowedIn?: readonly ('list'|'table')[]` を宣言し、`activeContextsAt` の結果と `disallowedIn` の積が空でなければそのコマンドを候補から除外する。判定はクエリ照合の**前**に行う（除外されたコマンドは絞り込み対象にも入らない）。コードコンテキストはメニュー自体を非表示にする（`null` を返す）のに対し、list/table 文脈は**メニューは開いたまま該当コマンドだけ除く**という違いがある。
+  - 木側は `isInCodeContext` と同じ親チェーン走査（`ListItem` / `Table`・`TableRow`・`TableCell`・`TableHeader`）。行側の判定は構造ごとに異なる:
+    - **テーブル**: 行内に**セル区切り `|` があること**（行頭パイプは要求しない）。GFM は外側のパイプを省略した表（`a | b` / `--- | ---` / `c | d`）を許すため、行頭アンカーにするとそのセルが無防備になる。
+    - **リスト**: 行がリストマーカーで始まる、**または**最も内側のリスト項目の**内容カラム以上**にインデントされている。閾値を「インデントされているか」ではなく内容カラムにするのが要点: Enter は `insertNewlineAndIndent` に割り当てられており現在行のインデントを再現するため、`  - b` の次行は最初から列2にある。単にインデントの有無で判定すると、**ネストしたリストからブロック系コマンドへ到達する手段が一切なくなる**（Enter を2回押しても戻らない）。
+    - いずれも「インデントも区切りも無い行」は文脈から外れる。これがユーザーが構造を抜ける操作であり、そこを内側と見なすとメニューが空になるため。
+  - 判定に使うリストマーカーの文法は `list-line-patterns.ts` に集約し、ビルダー側の「ベアマーカー判定」と同じソースから導出する（片方だけ更新すると、フィルタは通すのにビルダーが変換しないという無音のデグレになるため）。両文脈が同時に成立することもある（リスト項目内のテーブル）。各コマンドは `disallowedIn?: readonly ('list'|'table')[]` を宣言し、`activeContextsAt` の結果と `disallowedIn` の積が空でなければそのコマンドを候補から除外する。判定はクエリ照合の**前**に行う（除外されたコマンドは絞り込み対象にも入らない）。コードコンテキストはメニュー自体を非表示にする（`null` を返す）のに対し、list/table 文脈は**メニューは開いたまま該当コマンドだけ除く**という違いがある。
 - `apply`: コマンドの `action.kind` で分岐する。
   - `insert`: `action.buildInsertion(view, from)` の結果から、**単一の `view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + cursorOffset } })`** を発行する。削除（`[from, to]`）と挿入が1つの change にまとまるため、change レンジの重なりが発生せず、undo も1回で復元される（Req 3.5）。
   - `run`: `/query` を削除する単一の `view.dispatch({ changes: { from, to, insert: '' }, selection: { anchor: from } })` を発行したうえで `action.run(view, from)` を呼ぶ。`run` はモーダル起動等の副作用を行ってよい（実際の挿入は run / 後続モーダルが別トランザクションで担う）。基盤は `run` の中身を知らない（拡張要素スペックが drawio/lsx 等を供給）。MVP の基本コマンドはすべて `insert`。
@@ -428,9 +448,9 @@ export const createSlashCommandSource: (
 4. `insertion-builders`: `lineMarkerInsertion('# ')` / `codeBlockInsertion` / `tableInsertion` が期待する文字列とカーソル位置を返す（3.3, 3.4, 5.2, 5.3）。
 5. `insertion-builders`: `from` が行頭のときは区切りなし、行の途中（先行する非空白テキストあり）のときは要素種別に応じた区切り（テーブル/コードブロックは空行、見出し/リスト/引用は単一改行）を前置してブロックを新しい行に挿入し、`cursorOffset` が付与分を加味する。特に**テーブルは先行段落の直後で空行を確保**し表として描画されることを検証（3.3, 3.6）。
 5. `resolve-slash-commands`: 各コマンドに label/description が解決され、未対応キーで既定言語にフォールバック（1.3, 7.1, 7.2）。
-6. `slash-command-source`: 絞り込み機構を `disallowedIn` の形ごとの合成コマンドで検証する（list+table 制限は list 内で除外、table のみ制限は list 内で残る、未宣言はどこでも残る）。あわせて**文脈判定が構文木と行の両方を要求する**ことを固定: テーブル行/リスト項目の**次の行**（構文木上はまだ同じノード内）は当該文脈と見なさないこと、実際のテーブル行・引用内リスト項目は見なすこと（8.1, 8.2, 8.4）。
+6. `slash-command-source`: 絞り込み機構を `disallowedIn` の形ごとの合成コマンドで検証する（list+table 制限は list 内で除外、table のみ制限は list 内で残る、未宣言はどこでも残る）。あわせて**文脈判定が構文木と行の両方を要求する**ことを固定: インデントもセル区切りも無い行（テーブル/リストを抜けた位置）は当該文脈と見なさないこと、実際のテーブル行・引用内リスト項目・**パイプ省略テーブルのセル**・**リスト項目のインデント継続行**は見なすこと（8.1, 8.2, 8.4）。
 7. `slash-command-definitions`: `disallowedIn` が heading1-3/table/codeBlock では `['list','table']`、bulletList/numberedList/taskList/quote では `['table']` のみであることを契約テストで固定（8.3）。
-8. `insertion-builders`: リストマーカーのみの行で、リスト系コマンドが**既存マーカーを置換**し（`  - /` → `  1. `、`- [ ] /` → `- `、`> - /` → `> 1. ` と引用を保つ）、引用が**同一行に付加**される（`- /` → `- > `）ことを、`apply` と同じ合成（`replaceFromOffset` 込み）で**結果ドキュメント**として検証（9.1, 9.2）。あわせて、マーカー以外の本文がある行（`- foo /`）と通常の文章中では既存の区切り挙動が変わらないことを回帰として固定（9.5）。
+8. `insertion-builders`: リストマーカーのみの行で、リスト系コマンドが**既存マーカーを置換**し（`  - /` → `  1. `、`- [ ] /` → `- `、`> - /` → `> 1. ` と引用を保つ）、引用が**同一行に付加**される（`- /` → `- > `）ことを、**本番の補完ソースの `apply` を通して**（`replaceFromOffset` の合成込みで）結果ドキュメントとして検証（9.1, 9.2）。dispatch をテスト側で再実装すると `replaceFromOffset` を無視する回帰を検出できないため、ヘルパでの再現は禁止。あわせて、マーカー以外の本文がある行（`- foo /`）と通常の文章中では既存の区切り挙動が変わらないことを回帰として固定（9.5）。
 
 （テストは markdown-utils の既存規約に倣い、`@codemirror/state` の `EditorState`/`EditorSelection` と `@codemirror/view` の `EditorView` を組んで `view.state.doc.toString()` と `view.state.selection` を検証。`// @vitest-environment jsdom`。）
 

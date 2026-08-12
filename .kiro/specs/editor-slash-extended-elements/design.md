@@ -45,7 +45,7 @@
 - **画像アップロード**（Out of scope。既存の添付ボタンが React props（`onUpload`/`acceptedUploadFileType`）を apps/app 側コンポーネントから受け取る構成のため、`run(view, from)` だけでは起動を完結できない。コンポーネントレイヤでの合成方法を検討してから改めてスコープ化する設計課題）。
 
 ### Allowed Dependencies
-- 基盤の型/契約: `SlashCommand`、`SlashCommandAction`（`insert | run`）、`SlashInsertion`（`{ insert, cursorOffset }`）。
+- 基盤の型/契約: `SlashCommand`（`disallowedIn` / `syntaxHint` を含む）、`SlashCommandAction`（`insert | run`）、`SlashInsertion`（`{ insert, cursorOffset, replaceFromOffset? }`）。
 - `@growi/core`: callout 種別の真実源 `AllCallout` / `Callout`（本スペックで core へ移動）。packages/editor・apps/app とも既に @growi/core に依存済み。
 - `@codemirror/view`（`EditorView`）。
 - 既存 drawio トリガーフック: `useDrawioModalForEditorActions`（`packages/editor/src/states/modal/drawio-for-editor.ts`）。
@@ -205,7 +205,7 @@ apps/app/src/client/components/PageEditor/LsxModal/
 ## System Flows
 
 ### 静的挿入フロー（plantuml / callout）
-基盤の挿入フローと同一。`apply` が `action.buildInsertion(view, from)` の `{ insert, cursorOffset }` から `/query`（`[from,to]`）を置換する単一 `dispatch` を発行。
+基盤の挿入フローと同一。`apply` が `action.buildInsertion(view, from)` の `{ insert, cursorOffset, replaceFromOffset? }` から置換レンジ（既定は `/query` の `[from,to]`、`replaceFromOffset` があればその分だけ手前へ拡張）を置き換える単一 `dispatch` を発行。
 
 ### 副作用起動フロー（drawio / lsx）
 
@@ -334,7 +334,7 @@ export const calloutInsertion: (type: CalloutVariant['type']) => (view: EditorVi
   - plantuml: ` ```plantuml ` + 改行 + `@startuml` + 改行 + 空行 + `@enduml` + 改行 + ` ``` `。カーソルは中間の空行。
   - callout: `:::<type>` + 改行 + 空行（本文） + 改行 + `:::`。カーソルは本文の空行。
 - **Preconditions**: `from` は `/` の位置。
-- **Postconditions**: `{ insert, cursorOffset }`（`from` 相対）を返す。`view.dispatch` しない。
+- **Postconditions**: `{ insert, cursorOffset }`（`from` 相対）を返す。本スペックのビルダーはいずれも置換レンジを手前へ広げないため `replaceFromOffset` は使わない。`view.dispatch` しない。
 - **行頭/行中の出し分け**: 基盤 design の方針に従い、先行する非空白テキストがある場合は区切り（改行/空行）を前置する。callout / plantuml はブロック要素のため、先行行が非空のとき改行を前置する（テストで固定）。
 - **Invariants**: 副作用なし。
 

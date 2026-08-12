@@ -1,5 +1,6 @@
 import type { EditorView } from '@codemirror/view';
 
+import { BARE_LIST_MARKER_REGEX } from './list-line-patterns.js';
 import type {
   SlashInsertAction,
   SlashInsertion,
@@ -27,15 +28,6 @@ const hasPrecedingText = (view: EditorView, from: number): boolean => {
   const before = line.text.slice(0, from - line.from);
   return before.trim() !== '';
 };
-
-/**
- * A list item whose marker is the ONLY content before the insertion point, e.g.
- * `- /`, `  1. /`, `- [ ] /`, `> - /`. The leading group captures the indent AND
- * any blockquote markers, so a conversion replaces just the list marker and
- * keeps both the nesting depth and the enclosing quote.
- */
-const BARE_LIST_MARKER_REGEX =
-  /^(\s*(?:>\s*)*)(?:[-*+]|\d+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?$/;
 
 /**
  * Offset (`< 0`) from `from` back to the first character of the list marker when

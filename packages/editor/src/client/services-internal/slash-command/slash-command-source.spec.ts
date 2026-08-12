@@ -305,6 +305,26 @@ describe('createSlashCommandSource - completion detail precedence', () => {
 
     expect(result?.options[0].detail).toBeUndefined();
   });
+
+  // i18next echoes the key when an entry is missing entirely (and would do so
+  // for an empty entry too under `returnEmptyString: false`); showing
+  // "slash_command.table.description" in the popup would be worse than nothing.
+  it('omits detail when the description resolved to the i18n key itself', () => {
+    const command: ResolvedSlashCommand = {
+      ...resolvedCommand({
+        id: 'table',
+        label: 'Table',
+        keywords: ['grid'],
+        action: insertAction(''),
+      }),
+      description: 'slash_command.table.description',
+    };
+    const source = createSlashCommandSource([command]);
+
+    const result = queryAt(source, '/', 1);
+
+    expect(result?.options[0].detail).toBeUndefined();
+  });
 });
 
 describe('createSlashCommandSource - apply (insert)', () => {
@@ -509,6 +529,34 @@ describe('createSlashCommandSource - structural context filtering (Req 8)', () =
 
       expect(labelsAt(doc)).not.toContain('Both restricted');
       expect(labelsAt(doc)).toContain('Table only restricted');
+    });
+
+    // GFM lets a table omit its outer pipes, so a cell is not always on a line
+    // that STARTS with one — the separator just has to be somewhere on the line.
+    it('treats a pipe-less table row as table context', () => {
+      const doc = 'a | b\n--- | ---\nc | /';
+
+      expect(labelsAt(doc)).not.toContain('Table only restricted');
+    });
+
+    // An indented line under a list item carries no marker of its own but sits
+    // at (or past) the item's content column, so it is still inside that item.
+    it('treats a line indented to the item content column as list context', () => {
+      const doc = '- foo\n  /';
+
+      expect(labelsAt(doc)).not.toContain('Both restricted');
+      expect(labelsAt(doc)).toContain('Table only restricted');
+    });
+
+    // Enter is `insertNewlineAndIndent`, which reproduces the current line's
+    // indent — after `  - b` the next line already starts at column 2. Treating
+    // any indentation as "still inside" would leave a nested list with no way
+    // to reach the block-level commands at all, so the threshold is the item's
+    // content column (4 here), not merely "is indented".
+    it('does not treat a line outdented from the item content column as list context', () => {
+      const doc = '- a\n  - b\n  /';
+
+      expect(labelsAt(doc)).toContain('Both restricted');
     });
   });
 });

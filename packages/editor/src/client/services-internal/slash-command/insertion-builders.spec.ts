@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { CompletionContext } from '@codemirror/autocomplete';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { describe, expect, it } from 'vitest';
@@ -8,6 +9,11 @@ import {
   lineMarkerInsertion,
   tableInsertion,
 } from './insertion-builders.js';
+import { createSlashCommandSource } from './slash-command-source.js';
+import type {
+  ResolvedSlashCommand,
+  SlashInsertAction,
+} from './slash-command-types.js';
 
 const EMPTY_TABLE = '|  |  |\n| --- | --- |\n|  |  |';
 const EMPTY_CODE_BLOCK = '```\n\n```';
@@ -136,31 +142,43 @@ describe('tableInsertion', () => {
 
 // Req 9: on a list item whose marker is the only content, a command must act
 // INSIDE the item rather than breaking out onto a new unindented line. Asserted
-// on the resulting document (the observable contract), composing the change the
-// same way `apply` does — including the builder's backwards range widening.
+// on the resulting document (the observable contract).
 describe('bare list marker behaviour (Req 9)', () => {
-  /** Apply `build` over the trailing `/` of `doc`, as `apply` would. */
+  /**
+   * Apply `buildInsertion` over the trailing `/` of `doc` through the PRODUCTION
+   * path: the completion source's own `apply` composes the ChangeSpec, including
+   * the backwards range widening (`replaceFromOffset`). Dispatching by hand here
+   * would re-implement that composition, so a regression in it — e.g. dropping
+   * `replaceFromOffset` and never absorbing the item's marker — would go unseen.
+   */
   const applyAtTrailingSlash = (
     doc: string,
-    build: (
-      view: EditorView,
-      from: number,
-    ) => {
-      insert: string;
-      cursorOffset: number;
-      replaceFromOffset?: number;
-    },
+    buildInsertion: SlashInsertAction['buildInsertion'],
   ): { text: string; cursor: number } => {
+    const command: ResolvedSlashCommand = {
+      id: 'probe',
+      labelKey: 'slash_command.probe.label',
+      descriptionKey: 'slash_command.probe.description',
+      label: 'Probe',
+      description: '',
+      keywords: ['probe'],
+      action: { kind: 'insert', buildInsertion },
+    };
+    const source = createSlashCommandSource([command]);
+
     const to = doc.length;
     const from = to - 1; // the trailing "/"
     const view = createView(doc, from);
 
-    const { insert, cursorOffset, replaceFromOffset = 0 } = build(view, from);
-    const replaceFrom = from + replaceFromOffset;
-    view.dispatch({
-      changes: { from: replaceFrom, to, insert },
-      selection: { anchor: replaceFrom + cursorOffset },
-    });
+    const result = source(new CompletionContext(view.state, to, false));
+    if (result == null || result instanceof Promise) {
+      throw new Error('source must return a synchronous result here');
+    }
+    const option = result.options[0];
+    if (typeof option?.apply !== 'function') {
+      throw new Error('apply must be a function');
+    }
+    option.apply(view, option, result.from, result.to ?? to);
 
     return {
       text: view.state.doc.toString(),
