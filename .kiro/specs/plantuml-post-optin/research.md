@@ -131,3 +131,19 @@ apiv3に描画プロキシを新設。クライアントは図ソースをPOST�
 3. レート制限は**グローバル適用で自動被覆**。必要なら `API_RATE_LIMIT_*` env でこのエンドポイントを厳格化（Req 10.2）。
 4. 上流呼び出しは `{ responseType: 'text', maxRedirects: 0, timeout }`（Req 9.3, 4.2, 10.2）。
 5. キャッシュキーは `createHash('sha256').update(source + darkMode).digest('hex')`（Req 5）。
+
+---
+
+# PlantUML サーバの POST 契約（ソース＋実測で裏取り済み / 2026-08）
+
+`plantuml/plantuml-server` の実コード・PR・実機で確認した、POST実装の前提。
+
+- **POST対応は本体標準**: `UmlDiagramService.doPost()` がリクエスト**body の生テキスト**を読み、リダイレクトせず画像を直接返す。**PR #74「Add POST support」（2018-04-19 merged）以降**。設定・改造不要。
+- **POST可能エンドポイント**（`UmlDiagramService` 継承 servlet）: `/svg` `/png` `/img` `/pdf` `/eps` `/epstext` `/base64` `/txt`。`/map` `/check` は非継承で **405**、`/uml` `/form` はフォーム系で **302**（URL長回避には使えない）。→ 本実装は `/svg` を使用。
+- **body は生テキスト**（deflate+base64 は不要。GETのみエンコード）。
+- **文字コード**: `doPost` は charset を設定しないため、**`Content-Type: text/plain; charset=UTF-8` の明示が必須**（未指定は ISO-8859-1 で日本語が文字化け）。← design の render-plantuml に反映済み。
+- **応答**: 成功=200＋画像。構文エラー=400（`X-PlantUML-Diagram-Error` ヘッダ）。CORSは `Access-Control-Allow-Origin: *`。
+- **公開 plantuml.com は非対応（実測）**: `/plantuml/svg` へ POST すると body が無視され **302 で既定サンプル図**にリダイレクト。理由は未確定（前段CDN/WAF/プロキシ説が有力）。→ **POSTは自前サーバ前提**。
+- **PoC 実測**: 自前 plantuml-server で URL 17,929文字の図が **GET=414 / 同内容 POST=200（正しいSVG）**。GETの文字数制限を回避できることを実証。
+- **前段プロキシ**: nginx は `client_max_body_size` 既定 1MB 超で 413。大きい図を通すなら引き上げが必要（design にも記載）。
+- **出典**: `plantuml-server` の `UmlDiagramService.java`(doGet/doPost) / `SvgServlet.java` / `web.xml` / PR #74 / `DiagramResponse.java`。

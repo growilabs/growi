@@ -5,7 +5,7 @@ GROWIはPlantUML図の内容をエンコードしてURLに載せ、GET（`<img>`
 
 ## Boundary Context
 - **In scope**: 送信方式（GET/POST）の設定による切替、POST送信経路の追加、受信SVGの安全な表示、描画経路の悪用・過負荷対策、描画失敗時のエラー処理、ライト/ダークのテーマ表示維持、既存の遅延描画（auto-scroll補正）との非退行。
-- **Out of scope**: GET方式におけるテーマのURL軽量化（別途対応）、公開 plantuml.com でのPOST対応（サーバ側が非対応のため実現不可）、PlantUMLサーバ自体の構築・運用手順の提供。
+- **Out of scope**: GET方式のテーマの軽量化（別spec `plantuml-lighten-theme`）、上限超過時のユーザー向け表示（別spec `plantuml-oversize-notice`）、公開 plantuml.com でのPOST対応（サーバ側が非対応のため実現不可）、PlantUMLサーバ自体の構築・運用手順の提供。
 - **Adjacent expectations**: POSTモードは、管理者が用意したPOST対応のPlantUMLサーバ（送信先設定が指す先）に依存する。本機能は既存の自動スクロール補正機構と連携して動作する。
 
 ## Requirements

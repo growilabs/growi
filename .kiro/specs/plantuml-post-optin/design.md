@@ -12,7 +12,7 @@
 - 受信SVGの安全な表示、送信先の限定、描画経路の悪用・過負荷対策を満たす。
 
 ### Non-Goals
-- GET方式におけるテーマのURL軽量化（別spec）。
+- GET方式のテーマの軽量化（別spec `plantuml-lighten-theme`）。上限超過時のユーザー向け表示（別spec `plantuml-oversize-notice`）。
 - 公開 plantuml.com でのPOST対応（サーバ側非対応＝実測により不可能）。
 - PlantUMLサーバ自体の構築・運用手順の提供。
 - 管理画面へのUI追加（本specは環境変数ベースの設定に限定。UI化は将来課題）。
@@ -281,7 +281,8 @@ function renderPlantumlSvg(source: string, darkMode: boolean): Promise<string>;
 ```
 - テーマは `features/plantuml/themes/*.puml.ts` をサーバ import して前置（Req 7.1/7.2）。
 - 送信先は `configManager.getConfig('app:plantumlUri')` に固定（Req 4.2, SSRF防止。リクエスト由来URLは受けない）。
-- `axios.post(urljoin(plantumlUri, '/svg'), themedSource, { responseType: 'text', maxRedirects: 0, timeout })`。
+- `axios.post(urljoin(plantumlUri, '/svg'), themedSource, { headers: { 'Content-Type': 'text/plain; charset=UTF-8' }, responseType: 'text', maxRedirects: 0, timeout })`。
+- **【重要】文字コード**: `Content-Type: text/plain; charset=UTF-8` を必ず明示する。plantuml-server の `doPost` は `setCharacterEncoding("UTF-8")` を呼ばず、web.xml にエンコーディングフィルタも無いため、**未指定だと既定 ISO-8859-1 で解釈され、日本語を含む図（note等）が文字化けする**（今回の問い合わせは日本語図が対象）。
 - 3xx/非2xx/タイムアウトは例外（Req 9.3 誤設定検知・Req 10.2）。
 - **Dependencies**: External: PlantUMLサーバ — SVG生成 (P0)。Outbound: axios (P0)。Internal: theme assets (P1)。
 
@@ -316,7 +317,7 @@ interface SvgCache {
 ### Unit Tests
 - `plantuml.spec.ts`: `'get'` で現行同一のテーマ前置＋encoded `<plantuml src>` を生成（3.1）。`'post'` で `src` を付与せず、テーマ非前置の生ソース＋darkMode属性を出力し、`sanitizeOption` が新属性を許可（1.2, 4.1準備, 7系はサーバ委譲）。
 - `svg-cache`: 同一(source,darkMode)で set 後 get ヒット、darkMode 違いで別キー（5.1, 5.2, 7.1/7.2）。
-- `render-plantuml`: 送信先が `plantumlUri` 固定、テーマが darkMode で切替、302応答/タイムアウトが例外化（4.2, 7, 9.3, 10.2）— axios をモック。
+- `render-plantuml`: 送信先が `plantumlUri` 固定、テーマが darkMode で切替、**`Content-Type` に `charset=UTF-8` を付与**、302応答/タイムアウトが例外化（4.2, 7, 9.3, 10.2）— axios をモック。日本語を含む図で文字化けしないこと（少なくとも UTF-8 指定を検証）。
 - `fetch-plantuml-svg`: 同一(source,darkMode)の2回目がメモから返りPOSTを重複しない（5.1）。
 
 ### Integration Tests
@@ -340,3 +341,4 @@ interface SvgCache {
 - **キャッシュ**: サーバ側 `hash(source,darkMode)` LRU（TTL＋件数上限）で上流描画を回避（5.1, 5.2）。クライアントのセッション内メモ（**`Blob` 保持、blob URLは非保持**）でSPA遷移時の再取得を回避。POSTはブラウザHTTPキャッシュを失うが、両キャッシュで再描画コストを吸収（Req 5はSHOULDのため許容）。
 - **B1採用の根拠**: 各POSTが本文完結でマルチインスタンスに堅牢。B2（別GET配信）は水平スケール時にGET側キャッシュミス→404の失敗モードがあるため不採用。
 - **テーマ**: サーバ側前置に集約したため、図が多いページでもクライアントDOM・転送量は増えない（Issue解消）。
+- **運用前提（nginx等の前段プロキシ）**: POSTはURL長制限を解消するが、上限は前段プロキシのリクエストボディ長へ移る。自前サーバ前段の nginx は `client_max_body_size` 既定 **1MB** を超えると **413** になるため、大きい図を通すには引き上げが必要。design/docs に運用注記として明記し、必要なら `render-plantuml`/proxy のサイズ上限（Req 10.2）とも整合させる。
