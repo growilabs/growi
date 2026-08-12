@@ -1,20 +1,20 @@
 {
   "feature_name": "ai-summarize",
   "created_at": "2026-08-12T06:24:37Z",
-  "updated_at": "2026-08-12T07:35:21Z",
+  "updated_at": "2026-08-12T10:47:03Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
-      "approved": false
+      "generated": true,
+      "approved": true
     },
     "tasks": {
-      "generated": false,
+      "generated": true,
       "approved": false
     }
   },
