@@ -1015,7 +1015,12 @@
     "transfer_data_to_another_growi": "Transfer data from this GROWI to another GROWI",
     "advanced_options": "Advanced options",
     "start_transfer": "Start transfer",
-    "paste_transfer_key": "Paste transter key here"
+    "paste_transfer_key": "Paste transter key here",
+    "transfer_method": {
+      "heading": "Transfer method",
+      "migration": "Migration (replace all data on the destination)",
+      "merge": "Add to existing data"
+    }
   },
   "plugins": {
     "plugins": "Plugins",

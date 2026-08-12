@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { Socket } from 'socket.io-client';
 import { mock } from 'vitest-mock-extended';
 
@@ -65,6 +65,19 @@ const fireSocketEvent = async (event: string, payload: unknown) => {
   await act(async () => {
     socketHandlers.get(event)?.(payload);
   });
+};
+
+// The start button is a submit button; happy-dom does not turn a click on one into a
+// form submission, so the form is submitted directly. Shared by both the
+// "transfer method selection" and "starting a transfer" describe blocks below.
+const submitTransferForm = () => {
+  const form = screen
+    .getByRole('button', { name: 'admin:g2g_data_transfer.start_transfer' })
+    .closest('form');
+  if (form == null) {
+    throw new Error('Expected the start button to sit in a form');
+  }
+  fireEvent.submit(form);
 };
 
 describe('G2GDataTransfer', () => {
@@ -144,19 +157,104 @@ describe('G2GDataTransfer', () => {
     });
   });
 
-  describe('starting a transfer', () => {
-    // The start button is a submit button; happy-dom does not turn a click on one into
-    // a form submission, so the form is submitted directly.
-    const submitTransferForm = () => {
-      const form = screen
-        .getByRole('button', { name: 'admin:g2g_data_transfer.start_transfer' })
-        .closest('form');
-      if (form == null) {
-        throw new Error('Expected the start button to sit in a form');
-      }
-      fireEvent.submit(form);
-    };
+  describe('transfer method selection', () => {
+    const migrationRadio = () =>
+      screen.getByRole('radio', {
+        name: 'admin:g2g_data_transfer.transfer_method.migration',
+      });
+    const mergeRadio = () =>
+      screen.getByRole('radio', {
+        name: 'admin:g2g_data_transfer.transfer_method.merge',
+      });
 
+    it('selects "migration" initially and renders neither the collection selection nor the import-method selection', async () => {
+      // Requirements 1.1, 1.2.
+      apiv3Get.mockResolvedValue({
+        data: { collections: ['usergroups', 'configs'] },
+      });
+      renderComponent();
+      await act(async () => {});
+
+      expect(migrationRadio()).toBeChecked();
+      expect(mergeRadio()).not.toBeChecked();
+      // The collection checkbox (rendered by G2GDataTransferExportForm, labeled
+      // with the collection name) must not be in the tree at all -- not merely
+      // hidden -- while "migration" is selected.
+      expect(screen.queryByLabelText('usergroups')).not.toBeInTheDocument();
+    });
+
+    it('renders both the collection selection and the import-method selection once "merge" is chosen', async () => {
+      // Requirement 1.4.
+      apiv3Get.mockResolvedValue({
+        data: { collections: ['usergroups', 'configs'] },
+      });
+      renderComponent();
+      await act(async () => {});
+
+      await act(async () => {
+        fireEvent.click(mergeRadio());
+      });
+
+      expect(screen.getByLabelText('usergroups')).toBeInTheDocument();
+      expect(screen.getByLabelText('configs')).toBeInTheDocument();
+
+      // Import-method selection: each rendered collection carries a "Mode:" label
+      // next to its method dropdown (G2GDataTransferExportForm.spec.tsx pins
+      // which methods that dropdown offers per collection; this only proves the
+      // selector itself is actually mounted on this screen once "merge" is
+      // chosen, which is what this test's name claims).
+      const usergroupsCard = screen
+        .getByLabelText('usergroups')
+        .closest('.card') as HTMLElement | null;
+      if (usergroupsCard == null) {
+        throw new Error('Expected a .card ancestor for usergroups');
+      }
+      expect(within(usergroupsCard).getByText(/Mode:/)).toBeInTheDocument();
+    });
+
+    it('replaces every transferable collection when "migration" is sent, not whatever the (never-shown) merge selection would have been', async () => {
+      // Requirement 1.2. Distinguishes correct wiring from a bug that keeps using
+      // the merge preset's plan-builder regardless of the chosen preset: that
+      // bug would send an empty optionsMap (G2GDataTransferExportForm, which
+      // populates it, never mounts under "migration"), which the assertions
+      // below on `mode` would catch.
+      apiv3Get.mockResolvedValue({
+        data: { collections: ['usergroups', 'configs', 'pages'] },
+      });
+      renderComponent();
+      await act(async () => {});
+
+      await act(async () => {
+        submitTransferForm();
+      });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', {
+            name: 'maintenance_mode_notice.proceed',
+          }),
+        );
+      });
+
+      expect(apiv3Post).toHaveBeenCalledWith(
+        '/g2g-transfer/transfer',
+        expect.objectContaining({
+          collections: ['usergroups', 'configs', 'pages'],
+        }),
+      );
+      const [, body] = apiv3Post.mock.calls[0] as [string, Record<string, any>];
+      expect(body.optionsMap.usergroups.mode).toBe('flushAndInsert');
+      expect(body.optionsMap.configs.mode).toBe('flushAndInsert');
+      expect(body.optionsMap.pages.mode).toBe('flushAndInsert');
+      // `pages` must carry the extra options key, or the receiving side's
+      // import-setting generation throws before anything is imported (see
+      // g2g-transfer-preset.ts).
+      expect(body.optionsMap.pages).toHaveProperty(
+        'isOverwriteAuthorWithCurrentUser',
+      );
+    });
+  });
+
+  describe('starting a transfer', () => {
     it('does not send anything until the maintenance mode notice is acknowledged', async () => {
       // Requirement 2.10 — the destination is left in maintenance mode by the transfer,
       // and the operator has to be told before anything is sent, not after.

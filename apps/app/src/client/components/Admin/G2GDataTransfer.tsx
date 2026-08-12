@@ -1,4 +1,10 @@
-import React, { type JSX, useCallback, useEffect, useState } from 'react';
+import React, {
+  type JSX,
+  useCallback,
+  useEffect,
+  useId,
+  useState,
+} from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { useGenerateTransferKey } from '~/client/services/g2g-transfer';
@@ -9,6 +15,11 @@ import {
   G2G_PROGRESS_STATUS,
   type G2GProgress,
 } from '~/interfaces/g2g-transfer';
+import {
+  buildMergeTransferPlan,
+  buildMigrationTransferPlan,
+  type TransferPreset,
+} from '~/models/admin/g2g-transfer-preset';
 import { useGrowiDocumentationUrl } from '~/states/context';
 
 import CustomCopyToClipBoard from '../Common/CustomCopyToClipBoard';
@@ -21,8 +32,12 @@ import { MaintenanceModeNoticeModal } from './MaintenanceModeNoticeModal';
 const G2GDataTransfer = (): JSX.Element => {
   const socket = useAdminSocket();
   const { t } = useTranslation(['admin', 'commons']);
+  const transferPresetHeadingId = useId();
 
   const [startTransferKey, setStartTransferKey] = useState('');
+  // Requirement 1.1: "migration" (引っ越し) is the initial selection.
+  const [transferPreset, setTransferPreset] =
+    useState<TransferPreset>('migration');
   const [collections, setCollections] = useState<string[]>([]);
   const [selectedCollections, setSelectedCollections] = useState<Set<string>>(
     new Set(),
@@ -128,16 +143,33 @@ const G2GDataTransfer = (): JSX.Element => {
     setMaintenanceNoticeOpen(false);
     setTransferring(true);
 
+    // Requirement 1.2: under "migration", every transferable collection is the
+    // target and every one of them is replaced -- the operator never chose a
+    // subset or a method, so build the plan from the full collection list rather
+    // than from `selectedCollections`/`optionsMap` (which the migration preset
+    // never lets the operator populate). Under "merge", send exactly what the
+    // operator chose, unchanged (requirement 6.1).
+    const transferPlan =
+      transferPreset === 'migration'
+        ? buildMigrationTransferPlan(collections)
+        : buildMergeTransferPlan(Array.from(selectedCollections), optionsMap);
+
     try {
       await apiv3Post('/g2g-transfer/transfer', {
         transferKey: startTransferKey,
-        collections: Array.from(selectedCollections),
-        optionsMap,
+        collections: transferPlan.collections,
+        optionsMap: transferPlan.optionsMap,
       });
     } catch (errs) {
       toastError(errs);
     }
-  }, [startTransferKey, selectedCollections, optionsMap]);
+  }, [
+    startTransferKey,
+    transferPreset,
+    collections,
+    selectedCollections,
+    optionsMap,
+  ]);
 
   const documentationUrl = useGrowiDocumentationUrl();
 
@@ -207,16 +239,74 @@ const G2GDataTransfer = (): JSX.Element => {
         {t('admin:g2g_data_transfer.transfer_data_to_another_growi')}
       </h2>
 
-      <button
-        type="button"
-        className="btn btn-outline-secondary mt-4"
-        disabled={isTransferring}
-        onClick={() => setShowExportForm(!isShowExportForm)}
-      >
-        {t('admin:g2g_data_transfer.advanced_options')}
-      </button>
+      {/*
+        Requirements 1.1, 1.2, 1.4: one choice, up front, decides everything else on
+        this screen. Under "migration" neither the collection selection nor the
+        import-method selection is rendered at all (not merely hidden), so an
+        operator cannot build the mixed replace/append assignment the receiving
+        side's coherence guard (task 9.1) would refuse.
+      */}
+      <div className="mb-4">
+        <h3 className="mb-2" id={transferPresetHeadingId}>
+          {t('admin:g2g_data_transfer.transfer_method.heading')}
+        </h3>
+        {/*
+          The heading above is not itself part of the radio markup (it also isn't a
+          `<label>`), so without this the two radios are exposed to assistive tech as
+          two unrelated controls with no group name. `role="radiogroup"` +
+          `aria-labelledby` names the group from the existing heading without
+          changing anything visually (a plain `div`, no new className).
+        */}
+        <div role="radiogroup" aria-labelledby={transferPresetHeadingId}>
+          <div className="form-check">
+            <input
+              type="radio"
+              id="g2gTransferPresetMigration"
+              name="g2gTransferPreset"
+              className="form-check-input"
+              checked={transferPreset === 'migration'}
+              disabled={isTransferring}
+              onChange={() => setTransferPreset('migration')}
+            />
+            <label
+              className="form-check-label"
+              htmlFor="g2gTransferPresetMigration"
+            >
+              {t('admin:g2g_data_transfer.transfer_method.migration')}
+            </label>
+          </div>
+          <div className="form-check">
+            <input
+              type="radio"
+              id="g2gTransferPresetMerge"
+              name="g2gTransferPreset"
+              className="form-check-input"
+              checked={transferPreset === 'merge'}
+              disabled={isTransferring}
+              onChange={() => setTransferPreset('merge')}
+            />
+            <label
+              className="form-check-label"
+              htmlFor="g2gTransferPresetMerge"
+            >
+              {t('admin:g2g_data_transfer.transfer_method.merge')}
+            </label>
+          </div>
+        </div>
+      </div>
 
-      {collections.length !== 0 && (
+      {transferPreset === 'merge' && (
+        <button
+          type="button"
+          className="btn btn-outline-secondary mt-4"
+          disabled={isTransferring}
+          onClick={() => setShowExportForm(!isShowExportForm)}
+        >
+          {t('admin:g2g_data_transfer.advanced_options')}
+        </button>
+      )}
+
+      {transferPreset === 'merge' && collections.length !== 0 && (
         <div className={`${isShowExportForm ? '' : 'd-none'} px-3 pt-3`}>
           {/* <h3 className='mb-1'>{t('admin:app_setting.file_upload')}</h3>
           <FileUploadSettingMolecule

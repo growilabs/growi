@@ -238,7 +238,7 @@ apps/app/src/
 - `apps/app/src/interfaces/g2g-transfer.ts` — 進捗の型に救済結果を載せる領域を追加。
 - `apps/app/src/server/models/vo/g2g-transfer-error.ts` — 新しい中断事由のコードを追加（取り込み設定の混在、保護対象コレクションの混入）。
 - `apps/app/src/client/components/Admin/G2GDataTransfer.tsx` — preset の選択、確認モーダルの起動、救済結果の表示。
-- `apps/app/src/client/components/Admin/G2GDataTransferExportForm.tsx` — 引っ越しでは対象選択・方法選択のいずれも描画しない。従来では、判定の対象になるコレクションについて「出してよい取り込み方法」を下の共有部品へ渡す。
+- `apps/app/src/client/components/Admin/G2GDataTransferExportForm.tsx` — 従来では、判定の対象になるコレクションについて「出してよい取り込み方法」を下の共有部品へ渡す。**引っ越しで描画しない判断はこの部品ではなく親（`G2GDataTransfer.tsx`）が持つ**（10.1 の実装で確定）。親がそもそもマウントしないので、この部品も共有部品も転送方法の名前を知らないままでいられる。
 - `apps/app/src/client/components/Admin/ImportData/GrowiArchive/ImportCollectionItem.jsx` — **手動 zip 取り込み画面と共有している部品**。出してよい取り込み方法を受け取れるようにし、渡されなければ今までどおり全部出す（zip 画面は引数を渡さないので挙動が変わらない）。部品の中でモードの名前を条件分岐しない。
 - `apps/app/public/static/locales/en_US/admin.json` — preset の見出し、確認文、警告文、救済結果、取り込みに失敗して保守モードのまま残った場合の説明（英語のみ。他言語は後続）。
 
