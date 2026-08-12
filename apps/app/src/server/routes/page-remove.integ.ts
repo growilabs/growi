@@ -34,7 +34,6 @@ import { getInstance } from '^/test/setup/crowi';
 import type Crowi from '~/server/crowi';
 import type { PageDocument } from '~/server/models/page';
 import PageOperation from '~/server/models/page-operation';
-import { Revision } from '~/server/models/revision';
 import { prisma } from '~/utils/prisma';
 
 type AuthenticatedRequest = Request & {
@@ -98,8 +97,10 @@ describe('POST /pages.remove', () => {
 
     const fixturePageIds = (
       await Page.find({ path: fixturePathPattern }, { _id: 1 })
-    ).map((page) => page._id);
-    await Revision.deleteMany({ pageId: { $in: fixturePageIds } });
+    ).map((page) => page._id.toString());
+    await prisma.revisions.deleteMany({
+      where: { pageId: { in: fixturePageIds } },
+    });
     await Page.deleteMany({ path: fixturePathPattern });
     await PageOperation.deleteMany({ fromPath: fixturePathPattern });
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
