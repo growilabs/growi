@@ -25,16 +25,16 @@ import {
 } from '~/server/models/vo/g2g-transfer-error';
 import { configManager } from '~/server/service/config-manager';
 import { exportService } from '~/server/service/export';
-import type { IDataGROWIInfo } from '~/server/service/g2g-transfer';
+import type {
+  IDataGROWIInfo,
+  ImportCollectionsResult,
+} from '~/server/service/g2g-transfer';
 import { X_GROWI_TRANSFER_KEY_HEADER_NAME } from '~/server/service/g2g-transfer';
 import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
 import type { UniqueConflictReport } from '~/server/service/import/detect-unique-conflicts';
 import { hasConflicts } from '~/server/service/import/detect-unique-conflicts';
-import type {
-  ImportJobLease,
-  ImportResult,
-} from '~/server/service/import/import';
+import type { ImportJobLease } from '~/server/service/import/import';
 import {
   excludeNonTransferableCollections,
   NON_TRANSFERABLE_COLLECTIONS,
@@ -662,7 +662,7 @@ export const setup = (crowi: Crowi): Router => {
       );
     }
 
-    let importResult: ImportResult;
+    let importResult: ImportCollectionsResult;
     try {
       importResult = await g2gTransferReceiverService.importCollections(
         collections,
@@ -680,12 +680,23 @@ export const setup = (crowi: Crowi): Router => {
       );
     }
 
-    // The response body is the only way a failure over here reaches the operator: the
-    // progress notifications the operator watches are emitted by the source's process,
-    // which cannot see anything that happened in this one.
+    // The response body is the only way anything that happened over here reaches the
+    // operator: the progress notifications they watch are emitted by the source's process,
+    // which cannot see into this one. `rescue` carries only what the operator is to be
+    // told (see `RescuedAdminSummary`) — never the re-insertion payload, which holds the
+    // destination administrators' password hashes and access-token hashes.
+    //
+    // Answered as a success even when the import aborted: the source transfers no
+    // attachment at all unless it is (requirement 5.2, which outranks 2.8 here), and
+    // `importAborted` is what keeps that success from reading as a finished transfer.
     return res.apiv3({
       message: 'Successfully started to receive transfer data.',
       failedCollections: importResult.failedCollections,
+      importAborted: importResult.importAborted,
+      rescue: importResult.rescue,
+      rescueApplied: importResult.rescueApplied,
+      postProcessFailures: importResult.postProcessFailures,
+      maintenanceModeReleased: importResult.maintenanceModeReleased,
     });
   };
 
@@ -734,6 +745,45 @@ export const setup = (crowi: Crowi): Router => {
    *                  message:
    *                    type: string
    *                    description: The message of the result
+   *                  failedCollections:
+   *                    type: array
+   *                    description: The collections that could not be imported
+   *                    items:
+   *                      type: string
+   *                  importAborted:
+   *                    type: boolean
+   *                    description: Whether the import threw instead of finishing, in which case it names no collection
+   *                  rescue:
+   *                    type: object
+   *                    nullable: true
+   *                    description: How the destination's administrators were kept, when this transfer replaced them
+   *                    properties:
+   *                      rescued:
+   *                        type: array
+   *                        items:
+   *                          type: object
+   *                          properties:
+   *                            originalUsername:
+   *                              type: string
+   *                            rescuedUsername:
+   *                              type: string
+   *                            emailRemoved:
+   *                              type: boolean
+   *                            slackMemberIdRemoved:
+   *                              type: boolean
+   *                            idReassigned:
+   *                              type: boolean
+   *                  rescueApplied:
+   *                    type: boolean
+   *                    description: Whether the rescue was written back
+   *                  postProcessFailures:
+   *                    type: array
+   *                    description: The clean-up steps that failed after the import
+   *                    items:
+   *                      type: string
+   *                  maintenanceModeReleased:
+   *                    type: boolean
+   *                    description: Whether the destination was taken out of maintenance mode again
    */
   receiveRouter.post(
     '/',

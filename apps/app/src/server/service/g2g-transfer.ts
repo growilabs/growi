@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { ReadStream } from 'node:fs';
 import { createReadStream } from 'node:fs';
-import { ConfigSource } from '@growi/core';
+import { ConfigSource, type HasObjectId } from '@growi/core';
 import type { IUser, IUserHasId } from '@growi/core/dist/interfaces';
 // biome-ignore lint/style/noRestrictedImports: TODO: check effects of using custom axios
 import rawAxios, { type AxiosRequestConfig } from 'axios';
@@ -13,6 +13,7 @@ import {
   G2G_PROGRESS_STATUS,
   type G2GProgressStatus,
 } from '~/interfaces/g2g-transfer';
+import { COLLECTIONS_EXCLUDED_FROM_COHERENCE } from '~/models/admin/g2g-transfer-preset';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { ImportMode } from '~/models/admin/import-mode';
 import TransferKeyModel from '~/server/models/transfer-key';
@@ -25,6 +26,7 @@ import loggerFactory from '~/utils/logger';
 import { TransferKey } from '~/utils/vo/transfer-key';
 
 import type Crowi from '../crowi';
+import { AccessToken, type IAccessToken } from '../models/access-token';
 import { Attachment } from '../models/attachment';
 import UserGroup from '../models/user-group';
 import {
@@ -39,6 +41,7 @@ import type { ConfigKey } from './config-manager/config-definition';
 import { exportService } from './export';
 import {
   canSelectSessions,
+  invalidateSessionsExcept,
   resolveSessionAccess,
 } from './g2g-transfer-session-invalidation';
 import {
@@ -50,10 +53,16 @@ import {
 } from './g2g-transfer-transferability';
 import {
   detectUniqueConflicts,
+  readArchiveUserIdentity,
   type UniqueConflictReport,
 } from './import/detect-unique-conflicts';
 import { generateOverwriteParams } from './import/overwrite-params';
-import { isLoginable } from './import/rescue-admins';
+import { deriveReplaceTargets } from './import/replace-target-collections';
+import {
+  type AdminRescuePlan,
+  isLoginable,
+  planAdminRescue,
+} from './import/rescue-admins';
 
 const logger = loggerFactory('growi:service:g2g-transfer');
 
@@ -126,6 +135,32 @@ const UPLOAD_CONFIG_KEYS = [
  * File upload related configs
  */
 type FileUploadConfigs = { [key in (typeof UPLOAD_CONFIG_KEYS)[number]]: any };
+
+/**
+ * Settings that belong to the destination as an installation rather than to the wiki it
+ * holds, and are therefore put back after every import — whatever the transfer replaced
+ * (requirement 5.4).
+ *
+ * Kept apart from {@link UPLOAD_CONFIG_KEYS} on purpose. That restoration is wrapped in a
+ * condition of its own (`app:fileUploadType !== 'none'`, i.e. "this GROWI already has
+ * storage configured"), which has nothing to say about the site URL; folding these keys
+ * into it would hand the destination the source's address on any GROWI that stores no
+ * files.
+ */
+const DESTINATION_OWNED_CONFIG_KEYS = ['app:siteUrl'] satisfies ConfigKey[];
+
+type DestinationOwnedConfigs = {
+  [key in (typeof DESTINATION_OWNED_CONFIG_KEYS)[number]]: any;
+};
+
+/** The collection whose replacement means the destination loses its own accounts. */
+const USERS_COLLECTION_NAME = 'users';
+
+/**
+ * The collection whose replacement means the destination is now running on the archive's
+ * settings — the reason it stays closed until the operator opens it (requirement 2.9).
+ */
+const CONFIGS_COLLECTION_NAME = 'configs';
 
 /**
  * Data used for comparing to/from GROWI information
@@ -337,6 +372,92 @@ const findInnerFileName = (
     ?.fileName ?? null;
 
 /**
+ * What the operator on the source side is told about one rescued administrator.
+ *
+ * Deliberately **not** `RescuedAdmin` and not `AdminRescuePlan`. Those are the
+ * re-insertion payload: they carry the account's password hash, its `apiToken` and the
+ * `tokenHash` of every access token it had. This result travels in the receive route's
+ * response body, which the source GROWI reads and puts into a notification that reaches
+ * the source operator's browser — so what crosses is only what requirements 4.6 and 4.10
+ * ask to be told: which name the account ended up with, what had to be dropped, and
+ * whether its identifier had to be reassigned (which is what costs it its sessions).
+ *
+ * `notLoginable` is left out for the same reason it is not needed: the operator is already
+ * shown how many administrators can log in *before* the transfer starts
+ * (`loginableAdminCount`, requirement 3.5), and naming the destination's administrators
+ * afterwards adds nothing to the decision.
+ */
+export interface RescuedAdminSummary {
+  readonly originalUsername: string;
+  readonly rescuedUsername: string;
+  readonly emailRemoved: boolean;
+  readonly slackMemberIdRemoved: boolean;
+  readonly idReassigned: boolean;
+}
+
+export interface AdminRescueOutcome {
+  readonly rescued: readonly RescuedAdminSummary[];
+}
+
+const toRescueOutcome = (plan: AdminRescuePlan): AdminRescueOutcome => ({
+  // Field by field rather than by removing the secrets from a spread: a field added to
+  // `RescuedAdmin` later is then absent here until someone decides it may cross, instead
+  // of travelling the moment it exists.
+  rescued: plan.rescued.map((rescued) => ({
+    originalUsername: rescued.originalUsername,
+    rescuedUsername: rescued.rescuedUsername,
+    emailRemoved: rescued.emailRemoved,
+    slackMemberIdRemoved: rescued.slackMemberIdRemoved,
+    idReassigned: rescued.idReassigned,
+  })),
+});
+
+/**
+ * The outcome of one received transfer, as far as the source is concerned.
+ *
+ * Every field exists because the source cannot see any of it otherwise: the two GROWIs are
+ * separate processes, and the progress the operator watches is emitted by the source's.
+ */
+export interface ImportCollectionsResult extends ImportResult {
+  /**
+   * Whether the import threw instead of returning.
+   *
+   * `failedCollections` cannot express this: an import that threw hands back no list at
+   * all, so an empty one would read as "every collection arrived". The source needs the
+   * difference — it is what turns a successful answer (which it must be, or the
+   * attachments never cross) into a reported failure rather than a green success
+   * (requirements 2.5, 5.2).
+   */
+  readonly importAborted: boolean;
+  /** Null when this transfer did not replace the destination's accounts. */
+  readonly rescue: AdminRescueOutcome | null;
+  /** Whether the rescue was actually written back. False leaves the destination closed. */
+  readonly rescueApplied: boolean;
+  /** Labels of the clean-up steps that failed. The response stays a success regardless. */
+  readonly postProcessFailures: readonly string[];
+  readonly maintenanceModeReleased: boolean;
+}
+
+/**
+ * Whether this import has to close the destination while it runs (requirement 2.4).
+ *
+ * The set is taken minus the collections whose import method the system, not the operator,
+ * constrains ({@link COLLECTIONS_EXCLUDED_FROM_COHERENCE} — the same declaration the
+ * coherence judgement reads, so there is one answer to "did the operator ask for a
+ * replacement?"). Without that subtraction every transfer would qualify: `configs` is
+ * forced to be replaced, so an ordinary merge transfer would put the destination into
+ * maintenance mode, and `pages` may be replaced in a merge transfer too — both are
+ * behavior changes requirement 6.1 forbids.
+ */
+const shouldEnterMaintenanceMode = (
+  replaceTargetCollections: ReadonlySet<string>,
+): boolean =>
+  [...replaceTargetCollections].some(
+    (collectionName) =>
+      !COLLECTIONS_EXCLUDED_FROM_COHERENCE.has(collectionName),
+  );
+
+/**
  * G2g transfer receiver
  */
 interface Receiver {
@@ -390,7 +511,8 @@ interface Receiver {
     replaceTargetCollections?: ReadonlySet<string>,
   ): Promise<UniqueConflictReport>;
   /**
-   * Import collections
+   * Import collections, together with everything that has to happen around the import for
+   * a transfer that replaces this GROWI's data.
    * @param {string} collections Array of collection name
    * @param {{ [key: string]: ImportSettings; }} importSettingsMap Map of collection name and ImportSettings
    * @param {FileUploadConfigs} sourceGROWIUploadConfigs File upload configs from src GROWI
@@ -399,7 +521,7 @@ interface Receiver {
     collections: string[],
     importSettingsMap: Map<string, ImportSettings>,
     sourceGROWIUploadConfigs: FileUploadConfigs,
-  ): Promise<ImportResult>;
+  ): Promise<ImportCollectionsResult>;
   /**
    * Returns file upload configs
    */
@@ -519,6 +641,18 @@ export const readFailedCollections = (
       )
     : [];
 };
+
+/**
+ * Reads whether the destination's import threw instead of finishing.
+ *
+ * A separate fact from {@link readFailedCollections}, and not derivable from it: an import
+ * that threw names no collection, so its `failedCollections` is empty and looks exactly
+ * like a transfer where everything arrived. Guarded the same way — an older destination
+ * answers without the field, which reads as "the import ran to the end", the only thing
+ * this code could assume before the field existed.
+ */
+export const readImportAborted = (responseData: unknown): boolean =>
+  isRecord(responseData) && responseData.importAborted === true;
 
 /**
  * G2g transfer pusher
@@ -888,25 +1022,29 @@ export class G2GTransferPusherService implements Pusher {
       throw err;
     }
 
-    // A 200 only means the destination finished trying. Which collections it could not
-    // import is in the body, and this is the only place that fact can be read: the two
-    // GROWIs are separate processes and these notifications are emitted by this one.
+    // A 200 only means the destination answered. What became of the import is in the body,
+    // and this is the only place that fact can be read: the two GROWIs are separate
+    // processes and these notifications are emitted by this one.
     const failedCollections = readFailedCollections(archiveResponseData);
-    const isPartiallyImported = failedCollections.length > 0;
+    // Two ways the destination can be left incomplete, and it reports them separately
+    // because an import that threw can name no collection at all. Both mean the same thing
+    // to the operator: the destination is not finished and is still in maintenance mode.
+    const importAborted = readImportAborted(archiveResponseData);
+    const isImportIncomplete = failedCollections.length > 0 || importAborted;
 
-    if (isPartiallyImported) {
+    if (isImportIncomplete) {
       logger.error(
-        { failedCollections },
-        'The destination GROWI could not import every collection',
+        { failedCollections, importAborted },
+        'The destination GROWI did not finish importing the transfer data',
       );
     }
 
-    // The status the mongo phase keeps for the rest of the transfer. A partly failed
-    // import is never restated as COMPLETED later on: the admin screen reads
+    // The status the mongo phase keeps for the rest of the transfer. An import that did
+    // not finish is never restated as COMPLETED later on: the admin screen reads
     // `mongo === COMPLETED && attachments === COMPLETED` as "the transfer succeeded" and
     // shows the green toast, so restating it would hand the operator a success for a
     // transfer that lost collections (requirements 2.5, 2.8).
-    const mongoStatus: G2GProgressStatus = isPartiallyImported
+    const mongoStatus: G2GProgressStatus = isImportIncomplete
       ? G2G_PROGRESS_STATUS.ERROR
       : G2G_PROGRESS_STATUS.COMPLETED;
 
@@ -915,14 +1053,15 @@ export class G2GTransferPusherService implements Pusher {
         mongo: mongoStatus,
         attachments,
         // Only carried when there is something to carry, so a fully successful transfer
-        // keeps emitting exactly the payload it did before.
-        ...(isPartiallyImported ? { failedCollections } : {}),
+        // keeps emitting exactly the payload it did before, and an import that threw —
+        // which names no collection — does not claim an empty list of casualties.
+        ...(failedCollections.length > 0 ? { failedCollections } : {}),
       });
     };
 
     /**
-     * Tells the operator that the transfer did not fully succeed, and which collections
-     * were left out.
+     * Tells the operator that the transfer did not fully succeed, naming the collections
+     * that were left out when the destination could name them.
      *
      * Deferred until the attachments are done rather than emitted here, because the
      * client hides the progress panel as soon as an `admin:g2gError` arrives: emitting it
@@ -930,10 +1069,13 @@ export class G2GTransferPusherService implements Pusher {
      * as the files take. Until then the panel already shows the mongo phase in error, so
      * the failure is visible the whole time; this event is the closing word on it.
      */
-    const reportPartialImport = (): void => {
+    const reportIncompleteImport = (): void => {
       socket?.emit('admin:g2gError', {
         key: 'admin:g2g:error_partial_import',
-        message: `Collections that could not be imported: ${failedCollections.join(', ')}`,
+        message:
+          failedCollections.length > 0
+            ? `Collections that could not be imported: ${failedCollections.join(', ')}`
+            : 'The destination GROWI could not finish importing the transfer data, and is left in maintenance mode.',
       });
     };
 
@@ -956,18 +1098,18 @@ export class G2GTransferPusherService implements Pusher {
         key: 'admin:g2g:error_upload_attachment',
       });
       // A failed attachment transfer does not take the place of the import failure: they
-      // are separate facts, and only this event names the collections the destination is
-      // missing.
-      if (isPartiallyImported) {
-        reportPartialImport();
+      // are separate facts, and only this event says the destination's own data is
+      // incomplete.
+      if (isImportIncomplete) {
+        reportIncompleteImport();
       }
       throw err;
     }
 
     emitProgress(G2G_PROGRESS_STATUS.COMPLETED);
 
-    if (isPartiallyImported) {
-      reportPartialImport();
+    if (isImportIncomplete) {
+      reportIncompleteImport();
     }
   }
 
@@ -1251,43 +1393,290 @@ export class G2GTransferReceiverService implements Receiver {
     });
   }
 
+  /**
+   * Takes a copy of this GROWI's administrators, and of the access tokens they issued,
+   * before the import removes them.
+   *
+   * Read with `lean()`, never through a document's `toObject()`: the users schema runs
+   * `omitInsecureAttributes` in its transform, which drops `password` and `apiToken`
+   * (`models/user/index.js`) — and `IUser.password` is declared as a required string, so
+   * nothing would complain until the rescued administrator turned out to have no password
+   * to log in with. The access tokens are read with a projection of their own for the same
+   * reason: `findTokenByUserId` selects neither `tokenHash` nor `user`, which are exactly
+   * the two fields the re-insertion cannot do without.
+   *
+   * Every administrator is read, not only the ones that can log in: `planAdminRescue`
+   * decides which of them are worth rescuing and lists the rest as `notLoginable`.
+   */
+  private async planDestinationAdminRescue(
+    importSettingsMap: Map<string, ImportSettings>,
+  ): Promise<AdminRescuePlan> {
+    const importService = getImportService();
+    const User = mongoose.model<IUser, any>('User');
+
+    // The very settings the import is about to run on, so the identity is read from the
+    // file whose documents will actually be written.
+    const usersJsonFileName = importSettingsMap.get(
+      USERS_COLLECTION_NAME,
+    )?.jsonFileName;
+    if (usersJsonFileName == null) {
+      throw new Error(
+        'The archive carries no users.json although `users` is being replaced',
+      );
+    }
+
+    const admins: IUserHasId[] = await User.find({ admin: true }).lean();
+    const accessTokens = await AccessToken.find({
+      user: { $in: admins.map((admin) => admin._id) },
+    })
+      .select('user tokenHash expiredAt scopes description')
+      .lean<(IAccessToken & HasObjectId)[]>();
+
+    const archiveIdentity = await readArchiveUserIdentity(
+      importService.getFile(usersJsonFileName),
+    );
+
+    return planAdminRescue(admins, accessTokens, archiveIdentity);
+  }
+
+  /**
+   * Writes the rescued administrators and their access tokens back.
+   *
+   * Through the Mongoose models rather than the raw driver the import itself uses: the
+   * schema validations and the unique indexes are the only thing that can tell us the
+   * renamed `username` and the dropped `email` really are collision-free. A rescue that
+   * failed silently would leave a destination nobody can log into while reporting success.
+   *
+   * The accounts go back before their tokens, so the administrator is restored first and
+   * the tokens are the part that can still fail. One way it does: a transfer that replaces
+   * `users` while leaving `accesstokens` out of its collections never emptied that
+   * collection, so the tokens saved here are still in it and `create` fails on the
+   * duplicate `_id`. `rescueApplied` is then reported false — the administrator *was*
+   * rescued and can log in, but the destination is kept closed anyway. That is the error
+   * in the safe direction: the operator is asked to look at a destination that is fine,
+   * rather than handed a destination whose rescue silently half-landed. The migration
+   * preset always carries `accesstokens`, so this is not the ordinary path.
+   */
+  private async applyAdminRescue(plan: AdminRescuePlan): Promise<void> {
+    const User = mongoose.model<IUser, any>('User');
+
+    await User.create(plan.rescued.map((rescued) => rescued.user));
+
+    const accessTokens = plan.rescued.flatMap((rescued) => [
+      ...rescued.accessTokens,
+    ]);
+    if (accessTokens.length > 0) {
+      await AccessToken.create(accessTokens);
+    }
+  }
+
+  /** The destination's own installation settings, as they stand right now. */
+  private async getDestinationOwnedConfigs(): Promise<DestinationOwnedConfigs> {
+    return Object.fromEntries(
+      DESTINATION_OWNED_CONFIG_KEYS.map((key) => [
+        key,
+        configManager.getConfig(key, ConfigSource.db),
+      ]),
+    ) as DestinationOwnedConfigs;
+  }
+
+  /**
+   * Runs the import and everything that has to happen around it when a transfer replaces
+   * this GROWI's data.
+   *
+   * Three concerns start on three different conditions, and running them off one would
+   * break a different requirement each time (see design.md, ReceiverService):
+   *
+   * - **closing the destination** — when the operator asked for a replacement at all;
+   * - **rescuing the administrators** — only when `users` is among the replaced
+   *   collections. On the wider condition, a merge transfer that replaces only `pages`
+   *   would try to re-insert administrators that were never removed, fail on every one of
+   *   them, and report a successful transfer as failed;
+   * - **putting the destination's own settings back** — always, exactly as before.
+   *
+   * The import call is wrapped in `try`/`catch`/`finally` so that the rescue happens even
+   * when the import throws: `import()` swallows a single collection's failure but not the
+   * page normalization that follows the loop, so "the import returned" cannot be relied on
+   * (requirement 4.8). An import that threw is still answered as a success, carrying
+   * `importAborted`, because the source will not transfer a single attachment otherwise
+   * (requirement 5.2 outranks 2.8 here). Nothing in the `finally` may fail this call for
+   * the same reason, so each step is caught and reported instead.
+   */
   public async importCollections(
     collections: string[],
     importSettingsMap: Map<string, ImportSettings>,
     sourceGROWIUploadConfigs: FileUploadConfigs,
-  ): Promise<ImportResult> {
+  ): Promise<ImportCollectionsResult> {
     const { appService } = this.crowi;
     const importService = getImportService();
+
+    const replaceTargetCollections = deriveReplaceTargets(importSettingsMap);
+    const shouldProtect = shouldEnterMaintenanceMode(replaceTargetCollections);
+    const shouldRescueAdmins = replaceTargetCollections.has(
+      USERS_COLLECTION_NAME,
+    );
+
+    // Read before the flag is raised, so that the clean-up restores what this GROWI was
+    // rather than switching maintenance mode off (requirement 6.1): a destination its own
+    // administrator had closed before the transfer must not be opened by it.
+    const maintenanceModeBeforeTransfer = appService.isMaintenanceMode();
+
+    const destinationOwnedConfigs = await this.getDestinationOwnedConfigs();
     /** whether to keep current file upload configs */
     const shouldKeepUploadConfigs =
       configManager.getConfig('app:fileUploadType') !== 'none';
+    const fileUploadConfigs = shouldKeepUploadConfigs
+      ? await this.getFileUploadConfigs()
+      : null;
 
-    let importResult: ImportResult;
+    const rescuePlan = shouldRescueAdmins
+      ? await this.planDestinationAdminRescue(importSettingsMap)
+      : null;
 
-    if (shouldKeepUploadConfigs) {
-      /** cache file upload configs */
-      const fileUploadConfigs = await this.getFileUploadConfigs();
-
-      // import mongo collections(overwrites file uplaod configs)
-      importResult = await importService.import(collections, importSettingsMap);
-
-      // restore file upload config from cache
-      await configManager.removeConfigs(UPLOAD_CONFIG_KEYS);
-      await configManager.updateConfigs(fileUploadConfigs);
-    } else {
-      // import mongo collections(overwrites file uplaod configs)
-      importResult = await importService.import(collections, importSettingsMap);
-
-      // update file upload config
-      await configManager.updateConfigs(sourceGROWIUploadConfigs);
+    if (shouldProtect) {
+      await appService.startMaintenanceMode();
     }
 
-    await this.crowi.setUpFileUpload(true);
-    await appService.setupAfterInstall();
+    const postProcessFailures: string[] = [];
+    const runPostProcess = async (
+      label: string,
+      step: () => Promise<void>,
+    ): Promise<void> => {
+      try {
+        await step();
+      } catch (err) {
+        // Deliberately says nothing about how much of the step got done: a session
+        // invalidation that throws half way loses the count of what it had already
+        // destroyed along with the exception, so a message shaped around one would
+        // report "0 sessions destroyed" for a step that destroyed hundreds.
+        logger.error(
+          { err, step: label },
+          'A step of the transfer clean-up failed. The transfer itself is still reported as successful, so that the source can go on to transfer the attachments',
+        );
+        postProcessFailures.push(label);
+      }
+    };
+
+    let importResult: ImportResult | null = null;
+    let rescueApplied = false;
+    let maintenanceModeReleased = false;
+
+    try {
+      importResult = await importService.import(collections, importSettingsMap);
+    } catch (err) {
+      // Caught rather than propagated: the route answers this as a success so the source
+      // goes on to the attachments, and `importAborted` in the result is what stops that
+      // success from reading as a complete transfer. `importResult` stays null, which
+      // every decision below already treats as "nothing can vouch for this import".
+      logger.error(
+        { err },
+        'The transfer import did not finish. The destination is left in maintenance mode and the source is told the transfer failed',
+      );
+    } finally {
+      if (rescuePlan != null) {
+        await runPostProcess('reinsert-rescued-admins', async () => {
+          await this.applyAdminRescue(rescuePlan);
+          rescueApplied = true;
+        });
+
+        await runPostProcess('invalidate-sessions', async () => {
+          // The sessions of the accounts that were just replaced now point at users that
+          // no longer exist; the rescued administrators keep theirs (requirements 5.5,
+          // 4.3). The identifiers are handed over as they were read — `invalidateSessionsExcept`
+          // normalises `ObjectId` and string alike, so a `lean()` read cannot silently
+          // match nothing.
+          //
+          // The counts it returns are not carried any further: they are logged by that
+          // function, and what the operator needed to know — that this destination cannot
+          // single out sessions at all — was already reported to them as a warning before
+          // the transfer started (requirement 3.7).
+          const sessionAccess = await resolveSessionAccess(
+            this.crowi.sessionConfig?.store,
+          );
+          await invalidateSessionsExcept(
+            sessionAccess,
+            rescuePlan.rescued.map((rescued) => rescued.user._id),
+          );
+        });
+      }
+
+      // Unconditional, as it has always been: whether this GROWI keeps its own storage
+      // settings has nothing to do with which collections the transfer replaced.
+      await runPostProcess('restore-upload-configs', async () => {
+        if (fileUploadConfigs != null) {
+          // restore file upload config from cache
+          await configManager.removeConfigs(UPLOAD_CONFIG_KEYS);
+          await configManager.updateConfigs(fileUploadConfigs);
+        } else {
+          // update file upload config
+          await configManager.updateConfigs(sourceGROWIUploadConfigs);
+        }
+      });
+
+      // A separate step, not another branch of the one above: this GROWI keeps its own
+      // address whatever its storage is configured to be (requirement 5.4). The source's
+      // maintenance-mode value is never among these keys — that flag is decided here.
+      await runPostProcess('restore-destination-owned-configs', async () => {
+        await configManager.updateConfigs(destinationOwnedConfigs, {
+          // The destination may have had no row of its own (the value coming from the
+          // environment); leaving the archive's row behind would override it.
+          removeIfUndefined: true,
+        });
+      });
+
+      await runPostProcess('set-up-file-upload', async () => {
+        await this.crowi.setUpFileUpload(true);
+        await appService.setupAfterInstall();
+      });
+
+      // An import that threw hands back no list of failed collections, so there is nothing
+      // to conclude "everything arrived" from — it counts as a failure.
+      const importFailed =
+        importResult == null || importResult.failedCollections.length > 0;
+      const rescueFailed = rescuePlan != null && !rescueApplied;
+      // Replacing `configs` leaves this GROWI running on the archive's settings and, for a
+      // transfer, with not one attachment delivered yet. It stays closed until the operator
+      // opens it, which they were told before the transfer started (requirements 2.9, 2.10).
+      const settingsWereReplaced = replaceTargetCollections.has(
+        CONFIGS_COLLECTION_NAME,
+      );
+
+      if (shouldProtect) {
+        if (importFailed || rescueFailed || settingsWereReplaced) {
+          logger.warn(
+            {
+              failedCollections: importResult?.failedCollections,
+              importThrew: importResult == null,
+              rescueFailed,
+              settingsWereReplaced,
+            },
+            'Left the destination GROWI in maintenance mode after the transfer import',
+          );
+        } else {
+          await runPostProcess('restore-maintenance-mode', async () => {
+            // Restoring, not clearing: only a destination this procedure closed is opened
+            // again, and only back to the state it was found in.
+            if (!maintenanceModeBeforeTransfer) {
+              await appService.endMaintenanceMode();
+              maintenanceModeReleased = true;
+            }
+          });
+        }
+      }
+    }
 
     // Handed back so the route can put it in the response: the source is a different
     // process, and its own progress events cannot know what happened over here.
-    return importResult;
+    return {
+      // Empty when the import threw, which is exactly why `importAborted` is a field of
+      // its own — see {@link ImportCollectionsResult}.
+      failedCollections: importResult?.failedCollections ?? [],
+      importAborted: importResult == null,
+      rescue: rescuePlan == null ? null : toRescueOutcome(rescuePlan),
+      rescueApplied,
+      postProcessFailures,
+      maintenanceModeReleased,
+    };
   }
 
   public async getFileUploadConfigs(): Promise<FileUploadConfigs> {

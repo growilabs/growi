@@ -464,3 +464,56 @@ describe('G2GTransferPusherService.startTransfer partly failed import', () => {
     );
   });
 });
+
+describe('G2GTransferPusherService.startTransfer aborted import', () => {
+  /**
+   * A destination whose import threw before it could finish. It answers 200 on purpose —
+   * the attachments still have to cross (requirement 5.2) — and an import that threw hands
+   * back no list of collections, so `failedCollections` is empty and `importAborted` is
+   * the only thing that distinguishes this from a transfer where everything arrived.
+   */
+  const mockAbortedImportArchiveResponse = (): void => {
+    vi.spyOn(rawAxios, 'post').mockResolvedValueOnce(
+      mock<AxiosResponse>({
+        data: { failedCollections: [], importAborted: true },
+      }),
+    );
+  };
+
+  test('reports the failure to the operator although the destination named no collection', async () => {
+    const { crowi, socket } = buildCrowiAndSocket();
+    const pusher = new G2GTransferPusherService(crowi);
+
+    mockAbortedImportArchiveResponse();
+    // The attachment phase opens by asking the destination which files it already holds;
+    // failing that is the shortest way past it without a storage backend. What is under
+    // test is what the operator is told about the *import*.
+    vi.mocked(axios.get).mockRejectedValueOnce(new Error('ECONNRESET'));
+
+    await expect(
+      pusher.startTransfer(
+        tk,
+        { _id: 'operator-id' },
+        ['pages'],
+        {},
+        mock<IDataGROWIInfo>(),
+      ),
+    ).rejects.toMatchObject({
+      code: G2GTransferErrorCode.FAILED_TO_RETRIEVE_FILE_METADATA,
+    });
+
+    expect(socket.emit).toHaveBeenCalledWith('admin:g2gError', {
+      key: 'admin:g2g:error_partial_import',
+      // The wording belongs to task 10.3; what this test fixes is that the operator is
+      // told at all.
+      message: expect.any(String),
+    });
+    // Without reading the marker, an empty `failedCollections` reads as a clean import and
+    // the admin screen shows the green "transfer succeeded" toast — a destination left in
+    // maintenance mode, reported as a success (requirement 2.5).
+    expect(socket.emit).not.toHaveBeenCalledWith(
+      'admin:g2gProgress',
+      expect.objectContaining({ mongo: G2G_PROGRESS_STATUS.COMPLETED }),
+    );
+  });
+});
