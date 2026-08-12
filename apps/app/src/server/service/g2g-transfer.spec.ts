@@ -9,6 +9,7 @@ import type Crowi from '~/server/crowi';
 import {
   G2G_DATA_CONFLICT_ERROR_CODE,
   G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+  G2G_MIXED_IMPORT_MODES_ERROR_CODE,
   G2G_PROTECTED_COLLECTION_ERROR_CODE,
   G2GTransferErrorCode,
 } from '~/server/models/vo/g2g-transfer-error';
@@ -19,6 +20,7 @@ import {
   computePasswordSeedFingerprint,
   G2GTransferPusherService,
   type IDataGROWIInfo,
+  readRescueOutcome,
   toArchivePostErrorEvent,
   toTransferability,
 } from './g2g-transfer';
@@ -133,6 +135,33 @@ describe('toArchivePostErrorEvent', () => {
 
     expect(toArchivePostErrorEvent(err)).toEqual({
       key: 'admin:g2g:error_protected_collection',
+      message: refusalMessage,
+    });
+  });
+
+  test('maps a mixed_import_modes response to its own event', () => {
+    // Requirement 1.5 — this answer means the request's import-method assignment mixed
+    // replacing some collections with appending to others, which the receive route
+    // refused before writing anything. The generic "failed to send the archive" would
+    // hide that specific disagreement between the two GROWIs.
+    const refusalMessage =
+      'The import-method assignment must either replace every collection or replace none of them.';
+    const err = {
+      response: {
+        status: 400,
+        data: {
+          errors: [
+            {
+              message: refusalMessage,
+              code: G2G_MIXED_IMPORT_MODES_ERROR_CODE,
+            },
+          ],
+        },
+      },
+    };
+
+    expect(toArchivePostErrorEvent(err)).toEqual({
+      key: 'admin:g2g:error_mixed_import_methods',
       message: refusalMessage,
     });
   });
@@ -285,6 +314,125 @@ describe('computePasswordSeedFingerprint', () => {
     expect(computePasswordSeedFingerprint(undefined)).not.toBe(
       computePasswordSeedFingerprint(SEED),
     );
+  });
+});
+
+describe('readRescueOutcome', () => {
+  test('reads a rescue outcome carrying only what the operator is told, from the response body', () => {
+    // Requirements 4.6, 4.10 — the renamed username, what was dropped, and whether the
+    // identifier was reassigned all have to survive the read.
+    const responseData = {
+      rescue: {
+        rescued: [
+          {
+            originalUsername: 'admin',
+            rescuedUsername: 'admin-rescued',
+            emailRemoved: true,
+            slackMemberIdRemoved: false,
+            idReassigned: true,
+          },
+        ],
+      },
+    };
+
+    expect(readRescueOutcome(responseData)).toEqual({
+      rescued: [
+        {
+          originalUsername: 'admin',
+          rescuedUsername: 'admin-rescued',
+          emailRemoved: true,
+          slackMemberIdRemoved: false,
+          idReassigned: true,
+        },
+      ],
+    });
+  });
+
+  test('returns null when the transfer did not replace users at all (rescue: null)', () => {
+    expect(readRescueOutcome({ rescue: null })).toBeNull();
+  });
+
+  test.each<[string, unknown]>([
+    ['responseData is not an object', 'Internal Server Error'],
+    ['responseData has no rescue field', {}],
+    ['rescue is a string, not an object', { rescue: 'nope' }],
+    ['rescue.rescued is missing', { rescue: {} }],
+    ['rescue.rescued is not an array', { rescue: { rescued: 'nope' } }],
+  ])('falls back to null without throwing when %s (an older/malformed destination)', (_label, responseData) => {
+    expect(() => readRescueOutcome(responseData)).not.toThrow();
+    expect(readRescueOutcome(responseData)).toBeNull();
+  });
+
+  test('drops a malformed entry instead of letting it through with undefined fields', () => {
+    const responseData = {
+      rescue: {
+        rescued: [
+          {
+            originalUsername: 'admin',
+            rescuedUsername: 'admin-rescued',
+            emailRemoved: true,
+            slackMemberIdRemoved: false,
+            idReassigned: true,
+          },
+          // Missing `idReassigned` -- not a real RescuedAdminSummary.
+          {
+            originalUsername: 'ops',
+            rescuedUsername: 'ops',
+            emailRemoved: false,
+            slackMemberIdRemoved: false,
+          },
+        ],
+      },
+    };
+
+    expect(readRescueOutcome(responseData)).toEqual({
+      rescued: [
+        {
+          originalUsername: 'admin',
+          rescuedUsername: 'admin-rescued',
+          emailRemoved: true,
+          slackMemberIdRemoved: false,
+          idReassigned: true,
+        },
+      ],
+    });
+  });
+
+  test('projects a surviving entry to exactly the five fields the operator is told, dropping anything extra', () => {
+    // The re-insertion payload this travels alongside on the destination carries a
+    // password hash, an `apiToken` and access-token `tokenHash`es -- none of which may
+    // ever reach this response body in the first place (that boundary is task 9.3's).
+    // This test is about a *different* risk: even restricted to a plain object shaped
+    // like RescuedAdminSummary, passing the destination's object through by reference
+    // (rather than rebuilding it field-by-field) would let any extra property the
+    // destination attached ride along untouched into the socket payload the source
+    // operator's browser receives.
+    const responseData = {
+      rescue: {
+        rescued: [
+          {
+            originalUsername: 'admin',
+            rescuedUsername: 'admin-rescued',
+            emailRemoved: true,
+            slackMemberIdRemoved: false,
+            idReassigned: true,
+            // Must never survive the read, whatever it is.
+            apiToken: 'leaked-api-token',
+            passwordHash: 'leaked-password-hash',
+          },
+        ],
+      },
+    };
+
+    const result = readRescueOutcome(responseData);
+
+    expect(result?.rescued[0]).toEqual({
+      originalUsername: 'admin',
+      rescuedUsername: 'admin-rescued',
+      emailRemoved: true,
+      slackMemberIdRemoved: false,
+      idReassigned: true,
+    });
   });
 });
 
@@ -514,6 +662,90 @@ describe('G2GTransferPusherService.startTransfer aborted import', () => {
     expect(socket.emit).not.toHaveBeenCalledWith(
       'admin:g2gProgress',
       expect.objectContaining({ mongo: G2G_PROGRESS_STATUS.COMPLETED }),
+    );
+  });
+});
+
+describe('G2GTransferPusherService.startTransfer rescue outcome', () => {
+  const rescueOutcomeFixture = {
+    rescued: [
+      {
+        originalUsername: 'admin',
+        rescuedUsername: 'admin-rescued',
+        emailRemoved: true,
+        slackMemberIdRemoved: false,
+        idReassigned: true,
+      },
+    ],
+  };
+
+  test('carries the rescue outcome the destination reported in the completion notification', async () => {
+    // Requirements 4.6, 4.10 -- the source is a separate process from the destination
+    // that performed the rescue, so this response body is the only place the fact can
+    // be read from.
+    const { crowi, socket } = buildCrowiAndSocket();
+    const pusher = new G2GTransferPusherService(crowi);
+
+    // Not `mock<AxiosResponse>({ data: {...} })` as the sibling tests above use:
+    // empirically, passing a nested array of plain objects as an override to
+    // `mock<T>()` corrupts it into an array of `undefined` once read through this
+    // file's real `startTransfer` -> `readRescueOutcome` path (`Array.isArray` +
+    // `.filter()`). Assigning `.data` after construction avoids the override path
+    // entirely and needs no cast.
+    const archiveResponse = mock<AxiosResponse>();
+    archiveResponse.data = {
+      failedCollections: [],
+      rescue: rescueOutcomeFixture,
+    };
+    vi.spyOn(rawAxios, 'post').mockResolvedValueOnce(archiveResponse);
+    // Bypasses the real attachment pipeline (the Attachment model and a storage
+    // backend): what this test is about is whether the rescue outcome from the archive
+    // POST's response body reaches the completion notification, not the attachment
+    // phase itself (covered separately above).
+    vi.spyOn(pusher, 'transferAttachments').mockResolvedValueOnce();
+
+    await pusher.startTransfer(
+      tk,
+      { _id: 'operator-id' },
+      ['users'],
+      {},
+      mock<IDataGROWIInfo>(),
+    );
+
+    expect(socket.emit).toHaveBeenCalledWith('admin:g2gProgress', {
+      mongo: G2G_PROGRESS_STATUS.COMPLETED,
+      attachments: G2G_PROGRESS_STATUS.COMPLETED,
+      rescue: rescueOutcomeFixture,
+    });
+  });
+
+  test('omits `rescue` from the notification when the transfer never replaced users', async () => {
+    // A transfer that never rescued anyone must keep emitting exactly the payload it
+    // did before this field existed, not a `rescue: { rescued: [] }` that reads as
+    // "a rescue happened and saved nobody".
+    const { crowi, socket } = buildCrowiAndSocket();
+    const pusher = new G2GTransferPusherService(crowi);
+
+    vi.spyOn(rawAxios, 'post').mockResolvedValueOnce(
+      mock<AxiosResponse>({ data: { failedCollections: [], rescue: null } }),
+    );
+    vi.spyOn(pusher, 'transferAttachments').mockResolvedValueOnce();
+
+    await pusher.startTransfer(
+      tk,
+      { _id: 'operator-id' },
+      ['pages'],
+      {},
+      mock<IDataGROWIInfo>(),
+    );
+
+    expect(socket.emit).toHaveBeenCalledWith('admin:g2gProgress', {
+      mongo: G2G_PROGRESS_STATUS.COMPLETED,
+      attachments: G2G_PROGRESS_STATUS.COMPLETED,
+    });
+    expect(socket.emit).not.toHaveBeenCalledWith(
+      'admin:g2gProgress',
+      expect.objectContaining({ rescue: expect.anything() }),
     );
   });
 });

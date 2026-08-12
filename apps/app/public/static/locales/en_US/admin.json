@@ -1019,7 +1019,7 @@
     "transfer_method": {
       "heading": "Transfer method",
       "migration": "Migration (replace all data on the destination)",
-      "merge": "Add to existing data"
+      "merge": "Add to existing data (the destination's existing data is kept)"
     },
     "confirm_modal": {
       "title": "Confirm transfer",
@@ -1036,6 +1036,13 @@
         "sessions_not_invalidatable": "The destination GROWI's session store cannot invalidate individual sessions. Sessions established before the transfer will remain valid.",
         "local_auth_disabled_at_source": "This GROWI has local (ID/Password) authentication disabled. Even a rescued destination administrator will not be able to log in with a password."
       }
+    },
+    "rescue_outcome": {
+      "heading": "The migration replaced every user on the destination. The following administrator accounts were kept so someone can still sign in:",
+      "renamed_from": "renamed from",
+      "email_removed": "Its email address was removed because it conflicted with an incoming user.",
+      "slack_member_id_removed": "Its Slack member ID was removed because it conflicted with an incoming user.",
+      "id_reassigned": "It was assigned a new internal identifier because the original one conflicted with an incoming user; any login session from before the transfer was lost."
     }
   },
   "plugins": {
@@ -1227,8 +1234,9 @@
     "error_data_conflict": "Transfer aborted: some of the transferred data conflicts with users or user groups that already exist on the destination GROWI, so nothing was imported. Resolve the conflicting accounts or groups before retrying, or transfer into a destination GROWI that has not yet completed its initial setup.",
     "error_upload_attachment": "Failed to transfer attachments",
     "error_import_in_progress": "Transfer aborted: another data import is already running on the destination GROWI. Wait for it to finish, then retry the transfer.",
-    "error_partial_import": "Transfer incomplete: the destination GROWI could not import every collection, so it now holds a partly transferred database. Fix the cause and run the transfer again.",
-    "error_protected_collection": "Transfer aborted: the destination GROWI refused the request because it named collections that a transfer must not carry, so nothing was imported. The transfer screen never selects those collections, so check that both GROWIs are running the same version, then report the collection names shown below."
+    "error_partial_import": "Transfer incomplete: the destination GROWI could not import every collection, so it now holds a partly transferred database. If the destination was put into maintenance mode for this transfer, it stays closed to ordinary users until you switch it off from Admin > App Settings on the destination GROWI. Fix the cause and run the transfer again.",
+    "error_protected_collection": "Transfer aborted: the destination GROWI refused the request because it named collections that a transfer must not carry, so nothing was imported. The transfer screen never selects those collections, so check that both GROWIs are running the same version, then report the collection names shown below.",
+    "error_mixed_import_methods": "Transfer aborted: the destination GROWI refused the request because its import-method assignment mixed replacing some collections with appending to others, so nothing was imported. The transfer screen no longer builds such a request, so check that both GROWIs are running the same version, then retry the transfer."
   },
   "external_user_group": {
     "management": "External Group Management",

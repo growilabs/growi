@@ -164,6 +164,16 @@ const G2GDataTransfer = (): JSX.Element => {
   const startTransfer = useCallback(async () => {
     setConfirmModalOpen(false);
     setTransferring(true);
+    // Clears the previous transfer's progress icons and rescue outcome before this
+    // one's own progress events start arriving. Without this, a transfer refused by
+    // the execution-time re-check (task 10.2) -- which refuses before a single
+    // `admin:g2gProgress` event is emitted for this attempt -- leaves the previous
+    // transfer's stale rescue list (and stale COMPLETED icons) on screen right next
+    // to this attempt's refusal toast.
+    setG2GProgress({
+      mongo: G2G_PROGRESS_STATUS.PENDING,
+      attachments: G2G_PROGRESS_STATUS.PENDING,
+    });
 
     // Requirement 1.2: under "migration", every transferable collection is the
     // target and every one of them is replaced -- the operator never chose a
@@ -395,7 +405,18 @@ const G2GDataTransfer = (): JSX.Element => {
         transferPreset={transferPreset}
       />
 
-      {isTransferring && (
+      {/*
+        Requirements 4.6, 4.10, 4.8: `isTransferring` alone would hide this panel --
+        rescue outcome included -- the instant a later `admin:g2gError` arrives
+        (setTransferring(false), below), and a migration whose import partly failed
+        emits exactly that error right after the completion progress event
+        (server/service/g2g-transfer.ts's `reportIncompleteImport`). That is precisely
+        the scenario requirement 4.8 cares about -- the destination left half migrated,
+        reachable only through the rescued administrator account -- so the rescued
+        username must not disappear from the screen when it happens. Once a rescue
+        outcome has arrived, it keeps the whole panel open regardless of `isTransferring`.
+      */}
+      {(isTransferring || g2gProgress.rescue != null) && (
         <div className="border rounded p-4">
           <div className="my-2">
             <G2GDataTransferStatusIcon
@@ -411,6 +432,60 @@ const G2GDataTransfer = (): JSX.Element => {
             />{' '}
             Attachments
           </div>
+
+          {/*
+            What the pusher read out of the destination's response body and put on
+            the completion notification (task 10.3) -- omitted entirely when the
+            transfer never replaced `users` or rescued nobody, same as
+            `g2gProgress.rescue` itself being absent then.
+          */}
+          {g2gProgress.rescue != null &&
+            g2gProgress.rescue.rescued.length > 0 && (
+              <div className="alert alert-info mt-3 mb-0" role="status">
+                <p className="mb-1">
+                  {t('admin:g2g_data_transfer.rescue_outcome.heading')}
+                </p>
+                <ul className="mb-0">
+                  {g2gProgress.rescue.rescued.map((rescued) => (
+                    <li key={rescued.originalUsername}>
+                      <strong>{rescued.rescuedUsername}</strong>
+                      {rescued.originalUsername !== rescued.rescuedUsername && (
+                        <span className="text-muted">
+                          {` (${t('admin:g2g_data_transfer.rescue_outcome.renamed_from')}: ${rescued.originalUsername})`}
+                        </span>
+                      )}
+                      {(rescued.emailRemoved ||
+                        rescued.slackMemberIdRemoved ||
+                        rescued.idReassigned) && (
+                        <ul className="mb-0">
+                          {rescued.emailRemoved && (
+                            <li>
+                              {t(
+                                'admin:g2g_data_transfer.rescue_outcome.email_removed',
+                              )}
+                            </li>
+                          )}
+                          {rescued.slackMemberIdRemoved && (
+                            <li>
+                              {t(
+                                'admin:g2g_data_transfer.rescue_outcome.slack_member_id_removed',
+                              )}
+                            </li>
+                          )}
+                          {rescued.idReassigned && (
+                            <li>
+                              {t(
+                                'admin:g2g_data_transfer.rescue_outcome.id_reassigned',
+                              )}
+                            </li>
+                          )}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
         </div>
       )}
 

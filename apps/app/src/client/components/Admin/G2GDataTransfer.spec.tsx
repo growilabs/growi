@@ -410,4 +410,224 @@ describe('G2GDataTransfer', () => {
       ).toBeInTheDocument();
     });
   });
+
+  describe('rescue outcome notification', () => {
+    // Requirements 4.6, 4.10 -- what the pusher read out of the destination's response
+    // body and put on the completion notification must reach the operator: the renamed
+    // `username`, what was dropped, and whether the identifier was reassigned.
+    const startTransferAndAcknowledge = async () => {
+      renderComponent();
+      await act(async () => {});
+      await act(async () => {
+        submitTransferForm();
+      });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', {
+            name: 'maintenance_mode_notice.proceed',
+          }),
+        );
+      });
+    };
+
+    it('shows the renamed username and every dropped item when the completion notification carries a rescue outcome', async () => {
+      await startTransferAndAcknowledge();
+
+      await fireSocketEvent('admin:g2gProgress', {
+        mongo: 'COMPLETED',
+        attachments: 'COMPLETED',
+        rescue: {
+          rescued: [
+            {
+              originalUsername: 'admin',
+              rescuedUsername: 'admin-rescued',
+              emailRemoved: true,
+              slackMemberIdRemoved: true,
+              idReassigned: true,
+            },
+          ],
+        },
+      });
+
+      expect(screen.getByText('admin-rescued')).toBeInTheDocument();
+      expect(
+        screen.getByText(/rescue_outcome\.renamed_from: admin/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'admin:g2g_data_transfer.rescue_outcome.email_removed',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'admin:g2g_data_transfer.rescue_outcome.slack_member_id_removed',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'admin:g2g_data_transfer.rescue_outcome.id_reassigned',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('shows neither the "renamed from" note nor any dropped-item note when the rescued admin kept everything', async () => {
+      // Distinguishes "the rescue happened" from "something was dropped/renamed" --
+      // rendering unconditionally on every field regardless of its value would pass the
+      // test above without actually reading the per-field booleans.
+      await startTransferAndAcknowledge();
+
+      await fireSocketEvent('admin:g2gProgress', {
+        mongo: 'COMPLETED',
+        attachments: 'COMPLETED',
+        rescue: {
+          rescued: [
+            {
+              originalUsername: 'admin',
+              rescuedUsername: 'admin',
+              emailRemoved: false,
+              slackMemberIdRemoved: false,
+              idReassigned: false,
+            },
+          ],
+        },
+      });
+
+      expect(screen.getByText('admin')).toBeInTheDocument();
+      expect(screen.queryByText(/renamed_from/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(
+          'admin:g2g_data_transfer.rescue_outcome.email_removed',
+        ),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(
+          'admin:g2g_data_transfer.rescue_outcome.slack_member_id_removed',
+        ),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(
+          'admin:g2g_data_transfer.rescue_outcome.id_reassigned',
+        ),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows nothing when the completion notification carries no rescue outcome', async () => {
+      await startTransferAndAcknowledge();
+
+      await fireSocketEvent('admin:g2gProgress', {
+        mongo: 'COMPLETED',
+        attachments: 'COMPLETED',
+      });
+
+      expect(
+        screen.queryByText('admin:g2g_data_transfer.rescue_outcome.heading'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('keeps the rescued username on screen after a later admin:g2gError hides the progress icons (requirement 4.8)', async () => {
+      // A migration whose import partly failed emits `admin:g2gProgress` (with the
+      // rescue outcome) followed by `admin:g2gError` (server/service/g2g-transfer.ts's
+      // `reportIncompleteImport`, right after the completion progress event). The error
+      // event sets `isTransferring` to false, which used to unmount this whole panel --
+      // taking the rescued username with it, in exactly the scenario (destination left
+      // half migrated, reachable only through the rescued administrator account) where
+      // the operator needs it most.
+      await startTransferAndAcknowledge();
+
+      await fireSocketEvent('admin:g2gProgress', {
+        mongo: 'ERROR',
+        attachments: 'ERROR',
+        failedCollections: ['pages'],
+        rescue: {
+          rescued: [
+            {
+              originalUsername: 'admin',
+              rescuedUsername: 'admin-rescued',
+              emailRemoved: false,
+              slackMemberIdRemoved: false,
+              idReassigned: false,
+            },
+          ],
+        },
+      });
+      await fireSocketEvent('admin:g2gError', {
+        key: 'admin:g2g:error_partial_import',
+        message: 'Collections that could not be imported: pages',
+      });
+
+      expect(screen.getByText('admin-rescued')).toBeInTheDocument();
+    });
+
+    it("clears the previous transfer's rescue list when a later attempt is refused before any progress event arrives", async () => {
+      // The execution-time re-check (task 10.2) can refuse a second transfer attempt
+      // before a single `admin:g2gProgress` event is emitted for it, so without a
+      // reset at the start of `startTransfer` the previous transfer's rescue list
+      // (and its stale COMPLETED icons) would sit on screen right next to this
+      // attempt's refusal toast, as if they belonged to it.
+      let transferCallCount = 0;
+      apiv3Post.mockImplementation((url: string) => {
+        if (url === '/g2g-transfer/preflight') {
+          return Promise.resolve({ data: DEFAULT_PREFLIGHT_RESULT });
+        }
+        if (url === '/g2g-transfer/transfer') {
+          transferCallCount += 1;
+          // First attempt succeeds; the second is refused by the server-side
+          // re-check, exactly like a destination that drifted into a blocked state
+          // between the confirm modal and this second attempt (requirement 3.2's
+          // server-side counterpart).
+          return transferCallCount === 1
+            ? Promise.resolve({ data: {} })
+            : Promise.reject([new Error('growi_incompatible_to_transfer')]);
+        }
+        return Promise.resolve({ data: {} });
+      });
+
+      renderComponent();
+      await act(async () => {});
+
+      // First transfer: succeeds and reports a rescue.
+      await act(async () => {
+        submitTransferForm();
+      });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', {
+            name: 'maintenance_mode_notice.proceed',
+          }),
+        );
+      });
+      await fireSocketEvent('admin:g2gProgress', {
+        mongo: 'COMPLETED',
+        attachments: 'COMPLETED',
+        rescue: {
+          rescued: [
+            {
+              originalUsername: 'admin',
+              rescuedUsername: 'admin-rescued',
+              emailRemoved: false,
+              slackMemberIdRemoved: false,
+              idReassigned: false,
+            },
+          ],
+        },
+      });
+      expect(screen.getByText('admin-rescued')).toBeInTheDocument();
+
+      // Second attempt: refused before its own progress event ever arrives.
+      await act(async () => {
+        submitTransferForm();
+      });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', {
+            name: 'maintenance_mode_notice.proceed',
+          }),
+        );
+      });
+
+      // Proves the refusal path was actually exercised, not skipped.
+      expect(toastError).toHaveBeenCalled();
+      expect(screen.queryByText('admin-rescued')).not.toBeInTheDocument();
+    });
+  });
 });

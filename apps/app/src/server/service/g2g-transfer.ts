@@ -10,8 +10,10 @@ import mongoose, { Types as MongooseTypes } from 'mongoose';
 import { basename } from 'pathe';
 
 import {
+  type AdminRescueOutcome,
   G2G_PROGRESS_STATUS,
   type G2GProgressStatus,
+  type RescuedAdminSummary,
 } from '~/interfaces/g2g-transfer';
 import { COLLECTIONS_EXCLUDED_FROM_COHERENCE } from '~/models/admin/g2g-transfer-preset';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
@@ -32,6 +34,7 @@ import UserGroup from '../models/user-group';
 import {
   G2G_DATA_CONFLICT_ERROR_CODE,
   G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+  G2G_MIXED_IMPORT_MODES_ERROR_CODE,
   G2G_PROTECTED_COLLECTION_ERROR_CODE,
   G2GTransferError,
   G2GTransferErrorCode,
@@ -372,33 +375,12 @@ const findInnerFileName = (
     ?.fileName ?? null;
 
 /**
- * What the operator on the source side is told about one rescued administrator.
- *
- * Deliberately **not** `RescuedAdmin` and not `AdminRescuePlan`. Those are the
- * re-insertion payload: they carry the account's password hash, its `apiToken` and the
- * `tokenHash` of every access token it had. This result travels in the receive route's
- * response body, which the source GROWI reads and puts into a notification that reaches
- * the source operator's browser — so what crosses is only what requirements 4.6 and 4.10
- * ask to be told: which name the account ended up with, what had to be dropped, and
- * whether its identifier had to be reassigned (which is what costs it its sessions).
- *
- * `notLoginable` is left out for the same reason it is not needed: the operator is already
- * shown how many administrators can log in *before* the transfer starts
- * (`loginableAdminCount`, requirement 3.5), and naming the destination's administrators
- * afterwards adds nothing to the decision.
+ * Projects a re-insertion payload down to {@link RescuedAdminSummary}: `notLoginable`
+ * is dropped along with everything else, for the same reason nothing else survives —
+ * the operator is already shown how many administrators can log in *before* the
+ * transfer starts (`loginableAdminCount`, requirement 3.5), and naming the
+ * destination's administrators afterwards adds nothing to that decision.
  */
-export interface RescuedAdminSummary {
-  readonly originalUsername: string;
-  readonly rescuedUsername: string;
-  readonly emailRemoved: boolean;
-  readonly slackMemberIdRemoved: boolean;
-  readonly idReassigned: boolean;
-}
-
-export interface AdminRescueOutcome {
-  readonly rescued: readonly RescuedAdminSummary[];
-}
-
 const toRescueOutcome = (plan: AdminRescuePlan): AdminRescueOutcome => ({
   // Field by field rather than by removing the secrets from a spread: a field added to
   // `RescuedAdmin` later is then absent here until someone decides it may cross, instead
@@ -569,6 +551,14 @@ const ARCHIVE_POST_ERROR_KEY_BY_CODE: ReadonlyMap<string, string> = new Map([
   // "failed to send the archive" hides exactly the fact that identifies that: the
   // receiver's message names the collections it refused.
   [G2G_PROTECTED_COLLECTION_ERROR_CODE, 'admin:g2g:error_protected_collection'],
+  // The push route builds a plan that is always coherent (task 10.1 narrowed the legacy
+  // screen so it can no longer assign replace to some collections and append to others),
+  // so a normal transfer never gets this answer either. When it does, the request reached
+  // the receive route by another path entirely (an automation script, or a modified
+  // client), and the generic "failed to send the archive" would hide the one fact that
+  // explains it: the two GROWIs disagree about whether this request's import-method
+  // assignment is even allowed.
+  [G2G_MIXED_IMPORT_MODES_ERROR_CODE, 'admin:g2g:error_mixed_import_methods'],
 ]);
 
 /**
@@ -653,6 +643,60 @@ export const readFailedCollections = (
  */
 export const readImportAborted = (responseData: unknown): boolean =>
   isRecord(responseData) && responseData.importAborted === true;
+
+/**
+ * Whether `value` has every field {@link RescuedAdminSummary} promises, checked
+ * field-by-field rather than trusted from a type assertion: this is a network boundary,
+ * so a malformed entry must be dropped instead of reaching the operator's browser as a
+ * summary with `undefined` fields.
+ */
+const isRescuedAdminSummary = (value: unknown): value is RescuedAdminSummary =>
+  isRecord(value) &&
+  typeof value.originalUsername === 'string' &&
+  typeof value.rescuedUsername === 'string' &&
+  typeof value.emailRemoved === 'boolean' &&
+  typeof value.slackMemberIdRemoved === 'boolean' &&
+  typeof value.idReassigned === 'boolean';
+
+/**
+ * Reads the rescue outcome out of the destination's response to the archive.
+ *
+ * Guarded the whole way down, like {@link readFailedCollections} and
+ * {@link readImportAborted}: this is a network boundary, an older destination answers
+ * without the field at all, a transfer that never replaced `users` answers with
+ * `rescue: null` (see `ImportCollectionsResult.rescue`), and a proxy can replace the
+ * body with something else entirely. Anything unrecognized reads as "nothing to report",
+ * which is what this code would have to assume before the field existed.
+ *
+ * Each surviving entry is rebuilt field-by-field after the guard passes, the mirror of
+ * {@link toRescueOutcome} on the writing side: `isRescuedAdminSummary` only proves the
+ * five fields it checks are *present*, it does not prove they are the *only* ones. A
+ * destination that attached an extra field to an entry -- whether malicious or just a
+ * future field this code does not know about yet -- would otherwise ride the original
+ * object through untouched and reach the source operator's browser over the
+ * `admin:g2gProgress` socket event.
+ */
+export const readRescueOutcome = (
+  responseData: unknown,
+): AdminRescueOutcome | null => {
+  if (!isRecord(responseData) || !isRecord(responseData.rescue)) {
+    return null;
+  }
+
+  const { rescued } = responseData.rescue;
+
+  return Array.isArray(rescued)
+    ? {
+        rescued: rescued.filter(isRescuedAdminSummary).map((entry) => ({
+          originalUsername: entry.originalUsername,
+          rescuedUsername: entry.rescuedUsername,
+          emailRemoved: entry.emailRemoved,
+          slackMemberIdRemoved: entry.slackMemberIdRemoved,
+          idReassigned: entry.idReassigned,
+        })),
+      }
+    : null;
+};
 
 /**
  * G2g transfer pusher
@@ -1014,6 +1058,10 @@ export class G2GTransferPusherService implements Pusher {
     // to the operator: the destination is not finished and is still in maintenance mode.
     const importAborted = readImportAborted(archiveResponseData);
     const isImportIncomplete = failedCollections.length > 0 || importAborted;
+    // Present only when this transfer replaced `users` and rescued at least one
+    // administrator (requirement 4.1) — read from the same response body, for the same
+    // reason as the two facts above: this is the only channel it can cross on.
+    const rescueOutcome = readRescueOutcome(archiveResponseData);
 
     if (isImportIncomplete) {
       logger.error(
@@ -1039,6 +1087,13 @@ export class G2GTransferPusherService implements Pusher {
         // keeps emitting exactly the payload it did before, and an import that threw —
         // which names no collection — does not claim an empty list of casualties.
         ...(failedCollections.length > 0 ? { failedCollections } : {}),
+        // Same reasoning as `failedCollections`: a transfer that never replaced `users`
+        // (rescueOutcome === null) or rescued nobody (an empty list — every administrator
+        // kept its own account) keeps emitting exactly the payload it did before this
+        // field existed, rather than claiming a rescue that has nothing in it.
+        ...(rescueOutcome != null && rescueOutcome.rescued.length > 0
+          ? { rescue: rescueOutcome }
+          : {}),
       });
     };
 
