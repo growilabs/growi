@@ -36,17 +36,22 @@ describe('ElasticsearchDelegator.addAllAuditlogs()', () => {
   };
 
   // The activities collection has a unique index on (user, target, action,
-  // createdAt). addAllAuditlogs only reads snapshot.username, so a distinct action
-  // per doc keeps inserts unique without affecting what is asserted.
+  // createdAt). addAllAuditlogs only reads snapshot.username and endpoint, so a
+  // distinct action per doc keeps inserts unique without affecting what is asserted.
   let actionSeq = 0;
   const insertActivities = (
-    docs: { _id: mongoose.Types.ObjectId; username: string | null }[],
+    docs: {
+      _id: mongoose.Types.ObjectId;
+      username: string | null;
+      endpoint?: string | null;
+    }[],
   ) =>
     mongoose.connection.collection('activities').insertMany(
       docs.map((doc) => ({
         _id: doc._id,
         action: `test-action-${actionSeq++}`,
         snapshot: { username: doc.username },
+        endpoint: doc.endpoint,
       })),
     );
 
@@ -75,7 +80,7 @@ describe('ElasticsearchDelegator.addAllAuditlogs()', () => {
     const id1 = new mongoose.Types.ObjectId();
     const id2 = new mongoose.Types.ObjectId();
     await insertActivities([
-      { _id: id1, username: 'alice' },
+      { _id: id1, username: 'alice', endpoint: '/_api/v3/pages/revert' },
       { _id: id2, username: 'bob' },
     ]);
 
@@ -87,10 +92,26 @@ describe('ElasticsearchDelegator.addAllAuditlogs()', () => {
     expect(mockES8Client.bulk).toHaveBeenCalledWith({
       body: expect.arrayContaining([
         { index: { _index: 'auditlogs', _id: id1.toString() } },
-        { username: 'alice' },
+        { username: 'alice', endpoint: '/_api/v3/pages/revert' },
         { index: { _index: 'auditlogs', _id: id2.toString() } },
         { username: 'bob' },
       ]),
+    });
+  });
+
+  it('syncs activities that have an endpoint but no username', async () => {
+    const id = new mongoose.Types.ObjectId();
+    await insertActivities([
+      { _id: id, username: null, endpoint: '/_api/v3/pages/revert' },
+    ]);
+
+    await delegator.addAllAuditlogs();
+
+    expect(mockES8Client.bulk).toHaveBeenCalledWith({
+      body: [
+        { index: { _index: 'auditlogs', _id: id.toString() } },
+        { endpoint: '/_api/v3/pages/revert' },
+      ],
     });
   });
 
@@ -100,12 +121,14 @@ describe('ElasticsearchDelegator.addAllAuditlogs()', () => {
     expect(mockES8Client.bulk).not.toHaveBeenCalled();
   });
 
-  it('skips activities that have no username', async () => {
+  it('skips activities that have neither username nor endpoint', async () => {
     const withName = new mongoose.Types.ObjectId();
     await insertActivities([
       { _id: withName, username: 'alice' },
       { _id: new mongoose.Types.ObjectId(), username: null },
-      { _id: new mongoose.Types.ObjectId(), username: '' },
+      // Activity.createByParameters defaults both fields to '', so '' — not
+      // undefined — is the real shape of an activity with neither.
+      { _id: new mongoose.Types.ObjectId(), username: '', endpoint: '' },
     ]);
 
     await delegator.addAllAuditlogs();
