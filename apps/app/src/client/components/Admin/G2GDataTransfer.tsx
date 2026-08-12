@@ -20,14 +20,15 @@ import {
   buildMigrationTransferPlan,
   type TransferPreset,
 } from '~/models/admin/g2g-transfer-preset';
+import type { TransferPreflightResult } from '~/server/service/g2g-transfer';
 import { useGrowiDocumentationUrl } from '~/states/context';
 
 import CustomCopyToClipBoard from '../Common/CustomCopyToClipBoard';
 import G2GDataTransferExportForm from './G2GDataTransferExportForm';
 import G2GDataTransferStatusIcon from './G2GDataTransferStatusIcon';
+import { G2GTransferConfirmModal } from './G2GTransferConfirmModal';
 // import { FileUploadSettingMolecule } from './App/FileUploadSetting';
 import { buildG2GErrorToastContents } from './g2g-error-toast-contents';
-import { MaintenanceModeNoticeModal } from './MaintenanceModeNoticeModal';
 
 const G2GDataTransfer = (): JSX.Element => {
   const socket = useAdminSocket();
@@ -44,7 +45,12 @@ const G2GDataTransfer = (): JSX.Element => {
   );
   const [optionsMap, setOptionsMap] = useState<any>({});
   const [isShowExportForm, setShowExportForm] = useState(false);
-  const [isMaintenanceNoticeOpen, setMaintenanceNoticeOpen] = useState(false);
+  const [isConfirmModalOpen, setConfirmModalOpen] = useState(false);
+  // Requirement 3.1: what the pushing server's preflight check reported -- how much of
+  // the destination will be deleted, and any warnings. Populated before the confirm
+  // modal opens, never guessed at or hardcoded on the client.
+  const [preflightResult, setPreflightResult] =
+    useState<TransferPreflightResult | null>(null);
   const [isTransferring, setTransferring] = useState(false);
   const [g2gProgress, setG2GProgress] = useState<G2GProgress>({
     mongo: G2G_PROGRESS_STATUS.PENDING,
@@ -132,15 +138,31 @@ const G2GDataTransfer = (): JSX.Element => {
     }
   }, [generateTransferKey]);
 
-  // The form only asks for confirmation; nothing is sent until the operator has been
-  // told that the destination will be left in maintenance mode (requirement 2.10).
-  const askBeforeTransfer = useCallback((e) => {
-    e.preventDefault();
-    setMaintenanceNoticeOpen(true);
-  }, []);
+  // Requirements 3.1-3.3: before anything is sent, ask the pushing server what a
+  // migration transfer would delete on the destination and whether there is anything
+  // to warn about, then show the confirm modal with that report. Neither the archive
+  // nor any request to the destination happens until the operator confirms there
+  // (`startTransfer`, below) -- a failed preflight leaves the modal unopened and the
+  // destination untouched, same as declining to confirm does.
+  const askBeforeTransfer = useCallback(
+    async (e) => {
+      e.preventDefault();
+      try {
+        const { data } = await apiv3Post<TransferPreflightResult>(
+          '/g2g-transfer/preflight',
+          { transferKey: startTransferKey },
+        );
+        setPreflightResult(data);
+        setConfirmModalOpen(true);
+      } catch (errs) {
+        toastError(errs);
+      }
+    },
+    [startTransferKey],
+  );
 
   const startTransfer = useCallback(async () => {
-    setMaintenanceNoticeOpen(false);
+    setConfirmModalOpen(false);
     setTransferring(true);
 
     // Requirement 1.2: under "migration", every transferable collection is the
@@ -365,11 +387,12 @@ const G2GDataTransfer = (): JSX.Element => {
         </div>
       </form>
 
-      <MaintenanceModeNoticeModal
-        isOpen={isMaintenanceNoticeOpen}
-        onClose={() => setMaintenanceNoticeOpen(false)}
+      <G2GTransferConfirmModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setConfirmModalOpen(false)}
         onConfirm={startTransfer}
-        isDestinationRemote
+        preflightResult={preflightResult}
+        transferPreset={transferPreset}
       />
 
       {isTransferring && (

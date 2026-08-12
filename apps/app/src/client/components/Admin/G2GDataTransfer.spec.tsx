@@ -57,6 +57,31 @@ vi.mock('next-i18next', () => ({ useTranslation: () => ({ t }) }));
 
 // --- helpers ----------------------------------------------------------------
 
+// The default preflight report used unless a test overrides `apiv3Post`'s
+// implementation for '/g2g-transfer/preflight' -- an empty, warning-free destination.
+const DEFAULT_PREFLIGHT_RESULT = {
+  destinationCounts: { users: 0, userGroups: 0, pages: 0 },
+  blockers: [],
+  warnings: [],
+};
+
+// `apiv3Post` is shared by the preflight check and the actual transfer request; tests
+// that care about one specific call look it up by URL rather than assuming an index,
+// since preflight now always fires first.
+const mockApiv3PostDefaults = () => {
+  apiv3Post.mockImplementation((url: string) => {
+    if (url === '/g2g-transfer/preflight') {
+      return Promise.resolve({ data: DEFAULT_PREFLIGHT_RESULT });
+    }
+    return Promise.resolve({ data: {} });
+  });
+};
+
+const transferRequestCall = () =>
+  apiv3Post.mock.calls.find(
+    ([url]: [string, unknown]) => url === '/g2g-transfer/transfer',
+  );
+
 const socketHandlers = new Map<string, (payload: unknown) => void>();
 
 const renderComponent = () => render(<G2GDataTransfer />);
@@ -89,6 +114,7 @@ describe('G2GDataTransfer', () => {
     // subtree (G2GDataTransferExportForm) out of the render tree, which is
     // irrelevant to the admin:g2gError handling under test here.
     apiv3Get.mockResolvedValue({ data: { collections: [] } });
+    mockApiv3PostDefaults();
 
     const socket = mock<Socket>();
     // socket.io's on() is heavily overloaded; a capturing implementation cannot
@@ -241,7 +267,13 @@ describe('G2GDataTransfer', () => {
           collections: ['usergroups', 'configs', 'pages'],
         }),
       );
-      const [, body] = apiv3Post.mock.calls[0] as [string, Record<string, any>];
+      // Preflight fires first (it always precedes the confirm modal), so the transfer
+      // request is looked up by URL rather than assumed to be the first call.
+      const transferCall = transferRequestCall();
+      if (transferCall == null) {
+        throw new Error('Expected a call to /g2g-transfer/transfer');
+      }
+      const [, body] = transferCall as [string, Record<string, any>];
       expect(body.optionsMap.usergroups.mode).toBe('flushAndInsert');
       expect(body.optionsMap.configs.mode).toBe('flushAndInsert');
       expect(body.optionsMap.pages.mode).toBe('flushAndInsert');
@@ -255,16 +287,25 @@ describe('G2GDataTransfer', () => {
   });
 
   describe('starting a transfer', () => {
-    it('does not send anything until the maintenance mode notice is acknowledged', async () => {
-      // Requirement 2.10 — the destination is left in maintenance mode by the transfer,
-      // and the operator has to be told before anything is sent, not after.
+    it('checks preflight but sends nothing to /transfer until the confirm modal is acknowledged', async () => {
+      // Requirements 3.2, 3.3 — nothing is sent (no archive, no request to the
+      // destination) until the operator confirms. The confirm modal also folds in
+      // the former separate maintenance-mode notice (task 4.4), so the same button
+      // ('maintenance_mode_notice.proceed', reused rather than duplicated) both
+      // acknowledges the notice and starts the transfer.
       renderComponent();
       await act(async () => {});
 
       await act(async () => {
         submitTransferForm();
       });
-      expect(apiv3Post).not.toHaveBeenCalled();
+      // The preflight check itself is a read; only the transfer request would change
+      // the destination, and that must not have happened yet.
+      expect(apiv3Post).toHaveBeenCalledWith(
+        '/g2g-transfer/preflight',
+        expect.any(Object),
+      );
+      expect(transferRequestCall()).toBeUndefined();
 
       await act(async () => {
         fireEvent.click(
@@ -280,7 +321,7 @@ describe('G2GDataTransfer', () => {
       );
     });
 
-    it('sends nothing when the operator backs out of the notice', async () => {
+    it('sends nothing to /transfer when the operator backs out of the confirm modal, and the destination is never touched', async () => {
       renderComponent();
       await act(async () => {});
 
@@ -295,7 +336,78 @@ describe('G2GDataTransfer', () => {
         );
       });
 
-      expect(apiv3Post).not.toHaveBeenCalled();
+      expect(transferRequestCall()).toBeUndefined();
+    });
+
+    it('shows an error and does not open the confirm modal when the preflight check fails', async () => {
+      // A failed preflight must leave the destination exactly as untouched as
+      // declining to confirm does -- the modal never opens, so there is no
+      // confirm button to accidentally click through.
+      const preflightError = [new Error('preflight failed')];
+      apiv3Post.mockImplementation((url: string) => {
+        if (url === '/g2g-transfer/preflight') {
+          return Promise.reject(preflightError);
+        }
+        return Promise.resolve({ data: {} });
+      });
+
+      renderComponent();
+      await act(async () => {});
+
+      await act(async () => {
+        submitTransferForm();
+      });
+
+      expect(toastError).toHaveBeenCalledWith(preflightError);
+      expect(
+        screen.queryByRole('button', {
+          name: 'maintenance_mode_notice.proceed',
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('passes the preflight response through to the confirm modal (wiring), not a hardcoded value', async () => {
+      // Requirement 3.1. This checks the wiring between G2GDataTransfer and the modal
+      // it renders -- that the fetched response reaches `preflightResult` unchanged --
+      // not the modal's own rendering rules (covered by G2GTransferConfirmModal.spec.tsx).
+      // A distinctive fixture (5/2/11) proves the value comes from the server rather
+      // than a fixed or empty placeholder; each assertion names the exact translation
+      // key + count text the component renders (this file's `t` mock returns the raw
+      // key when untranslated), rather than a document-wide "ends with a number" guess.
+      apiv3Post.mockImplementation((url: string) => {
+        if (url === '/g2g-transfer/preflight') {
+          return Promise.resolve({
+            data: {
+              destinationCounts: { users: 5, userGroups: 2, pages: 11 },
+              blockers: [],
+              warnings: [],
+            },
+          });
+        }
+        return Promise.resolve({ data: {} });
+      });
+
+      // The default preset is "migration" (requirement 1.1), which is what renders
+      // the counts at all -- see G2GTransferConfirmModal.spec.tsx for the "merge"
+      // preset hiding them.
+      renderComponent();
+      await act(async () => {});
+
+      await act(async () => {
+        submitTransferForm();
+      });
+
+      expect(
+        screen.getByText('g2g_data_transfer.confirm_modal.counts.users: 5'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'g2g_data_transfer.confirm_modal.counts.user_groups: 2',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('g2g_data_transfer.confirm_modal.counts.pages: 11'),
+      ).toBeInTheDocument();
     });
   });
 });

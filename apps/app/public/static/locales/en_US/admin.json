@@ -1020,6 +1020,22 @@
       "heading": "Transfer method",
       "migration": "Migration (replace all data on the destination)",
       "merge": "Add to existing data"
+    },
+    "confirm_modal": {
+      "title": "Confirm transfer",
+      "description": "The destination GROWI currently holds the following data. Starting this transfer will delete all of it and replace it with data from this GROWI:",
+      "counts": {
+        "users": "Users",
+        "user_groups": "User groups",
+        "pages": "Pages"
+      },
+      "warnings_heading": "Before you continue:",
+      "warnings": {
+        "password_seed_mismatch": "The source and destination GROWI have different password seeds. Migrated users will not be able to log in with their existing password.",
+        "no_loginable_admin": "The destination GROWI has no administrator who can currently log in. After the transfer, nobody may be able to log in.",
+        "sessions_not_invalidatable": "The destination GROWI's session store cannot invalidate individual sessions. Sessions established before the transfer will remain valid.",
+        "local_auth_disabled_at_source": "This GROWI has local (ID/Password) authentication disabled. Even a rescued destination administrator will not be able to log in with a password."
+      }
     }
   },
   "plugins": {

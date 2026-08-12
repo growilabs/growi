@@ -46,8 +46,8 @@ import {
 } from './g2g-transfer-session-invalidation';
 import {
   describeBlocker,
-  evaluateBlockers,
   evaluateTransferability,
+  type TransferabilityReport,
   type TransferBlocker,
   type TransferWarning,
 } from './g2g-transfer-transferability';
@@ -737,52 +737,18 @@ export class G2GTransferPusherService implements Pusher {
     }
   }
 
-  public async getTransferability(
+  /**
+   * Gathers this GROWI's own state and judges it against `destGROWIInfo`. Shared by
+   * {@link getTransferability} (the execution-time re-check the `/transfer` route runs
+   * right before calling `startTransfer`) and {@link preflight} (the read-only report
+   * requirement 3.1 shows the operator before they confirm), so the two never drift
+   * into computing "can this transfer proceed" two different ways — task 10.2's
+   * non-negotiable is exactly that the execution-time check reuses this judgement
+   * rather than re-implementing a blockers-only version of it.
+   */
+  private async evaluateAgainstDestination(
     destGROWIInfo: IDataGROWIInfo,
-  ): Promise<Transferability> {
-    const { fileUploadService } = this.crowi;
-    const User = mongoose.model<IUser, any>('User');
-
-    // Gathered eagerly rather than short-circuited like the original sequence of early
-    // returns: `evaluateBlockers` is a pure function, so every input it might need has
-    // to be in hand before it runs. This costs an extra query in cases that would
-    // previously have returned before reaching it (e.g. a version mismatch used to skip
-    // the active-user count entirely); it does not change which blocker is reported,
-    // since `toTransferability` still reads only the first one, in the same priority
-    // order the old checks ran in (see g2g-transfer-transferability.spec.ts).
-    const [activeUsers, totalFileSize] = await Promise.all([
-      User.countActiveUsers(),
-      fileUploadService.getTotalFileSize(),
-    ]);
-
-    // `evaluateBlockers`, not `evaluateTransferability`: this call has no password-seed
-    // fingerprint, no local-auth flag, no loginable-admin count and no session-store
-    // capability to offer (those are task 8.1/8.2's job, once the preflight endpoint
-    // exists to show the resulting warnings), and there is no honest placeholder for
-    // any of them — every value that type-checks also reads as "checked, found fine",
-    // which would make this call silently claim requirement 3.5 was evaluated when it
-    // was not.
-    const blockers = evaluateBlockers(
-      {
-        version: getGrowiVersion(),
-        activeUsers,
-        totalFileSize,
-        fileUploadType: configManager.getConfig('app:fileUploadType'),
-      },
-      {
-        version: destGROWIInfo.version,
-        userUpperLimit: destGROWIInfo.userUpperLimit,
-        fileUploadTotalLimit: destGROWIInfo.fileUploadTotalLimit,
-        attachmentInfo: destGROWIInfo.attachmentInfo,
-      },
-    );
-
-    return toTransferability(blockers);
-  }
-
-  public async preflight(tk: TransferKey): Promise<TransferPreflightResult> {
-    const destGROWIInfo = await this.askGROWIInfo(tk);
-
+  ): Promise<TransferabilityReport> {
     const { fileUploadService, passportService } = this.crowi;
     const User = mongoose.model<IUser, any>('User');
 
@@ -791,15 +757,11 @@ export class G2GTransferPusherService implements Pusher {
       fileUploadService.getTotalFileSize(),
     ]);
 
-    // `evaluateTransferability`, not `evaluateBlockers`: unlike `getTransferability`
-    // above, this call exists specifically to surface the warnings too (requirements
-    // 3.4, 3.5, 3.7), and by now `IDataGROWIInfo` carries every field
-    // `TransferabilityDestination` needs (task 8.1), so `destGROWIInfo` can be passed
-    // straight through. `isLocalAuthEnabled` is read from this GROWI's own passport
-    // service rather than assumed true/false: the fourth warning exists precisely
+    // `isLocalAuthEnabled` is read from this GROWI's own passport service rather than
+    // assumed true/false: the `local_auth_disabled_at_source` warning exists precisely
     // because the source's own local-auth setting decides whether a rescued
     // destination administrator can still use a password (requirement 3.7).
-    const { blockers, warnings } = evaluateTransferability(
+    return evaluateTransferability(
       {
         version: getGrowiVersion(),
         activeUsers,
@@ -812,6 +774,27 @@ export class G2GTransferPusherService implements Pusher {
       },
       destGROWIInfo,
     );
+  }
+
+  public async getTransferability(
+    destGROWIInfo: IDataGROWIInfo,
+  ): Promise<Transferability> {
+    // `evaluateAgainstDestination` (which runs the full `evaluateTransferability`),
+    // not a blockers-only computation: a confirmation the operator gave a minute ago,
+    // looking at a `preflight` report, must not let a transfer start against a
+    // destination that has since drifted into a blocked state (requirement 3.2's
+    // server-side counterpart). Only `blockers` matters for this method's return
+    // shape — the warnings have already been shown to and acknowledged by the operator
+    // by the time the `/transfer` route calls this.
+    const { blockers } = await this.evaluateAgainstDestination(destGROWIInfo);
+    return toTransferability(blockers);
+  }
+
+  public async preflight(tk: TransferKey): Promise<TransferPreflightResult> {
+    const destGROWIInfo = await this.askGROWIInfo(tk);
+
+    const { blockers, warnings } =
+      await this.evaluateAgainstDestination(destGROWIInfo);
 
     return {
       destinationCounts: destGROWIInfo.destinationCounts,
