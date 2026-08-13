@@ -41,6 +41,22 @@ export const G2G_PROTECTED_COLLECTION_ERROR_CODE =
  */
 export const G2G_IMPORT_IN_PROGRESS_ERROR_CODE = 'import_already_in_progress';
 
+/**
+ * apiv3 error code the receive route answers with when the request's import-method
+ * assignment mixes replacing some collections with appending to others.
+ *
+ * `isCoherentOptionsMap` (`models/admin/g2g-transfer-preset.ts`) is the single judge of
+ * that question; the route only acts on its answer and never inspects which collection or
+ * mode is involved. Today's legacy G2G screen can still build a mixed request (it only
+ * restricts `configs` / `users` / `pages`, so e.g. `usergroups` can be set to replace
+ * while the rest stay append) — task 10.1 narrows that screen so it no longer can. This
+ * guard stays on as the backstop for anything that reaches the receive route without
+ * going through that screen at all — an automation script or a modified client posting
+ * to this endpoint directly. Run before anything is unzipped or written, so a refused
+ * request leaves the destination untouched.
+ */
+export const G2G_MIXED_IMPORT_MODES_ERROR_CODE = 'mixed_import_modes';
+
 export type G2GTransferErrorCode =
   (typeof G2GTransferErrorCode)[keyof typeof G2GTransferErrorCode];
 

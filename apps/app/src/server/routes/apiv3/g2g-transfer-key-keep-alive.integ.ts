@@ -206,7 +206,16 @@ describe('receive route — transfer key keep-alive', () => {
     vi.spyOn(receiverService, 'importCollections').mockImplementation(
       async () => {
         await importBlocked;
-        return { failedCollections: [] };
+        // Nothing was replaced, so nothing was rescued and no clean-up was needed;
+        // what this test observes is the key's lifetime, not the import's outcome.
+        return {
+          failedCollections: [],
+          importAborted: false,
+          rescue: null,
+          rescueApplied: false,
+          postProcessFailures: [],
+          maintenanceModeReleased: false,
+        };
       },
     );
 
