@@ -10,6 +10,7 @@ import mongoose from 'mongoose';
 import multer from 'multer';
 import path from 'pathe';
 
+import { isCoherentOptionsMap } from '~/models/admin/g2g-transfer-preset';
 import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
@@ -17,22 +18,23 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import {
   G2G_DATA_CONFLICT_ERROR_CODE,
   G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+  G2G_MIXED_IMPORT_MODES_ERROR_CODE,
   G2G_PROTECTED_COLLECTION_ERROR_CODE,
   G2GTransferErrorCode,
   isG2GTransferError,
 } from '~/server/models/vo/g2g-transfer-error';
 import { configManager } from '~/server/service/config-manager';
 import { exportService } from '~/server/service/export';
-import type { IDataGROWIInfo } from '~/server/service/g2g-transfer';
+import type {
+  IDataGROWIInfo,
+  ImportCollectionsResult,
+} from '~/server/service/g2g-transfer';
 import { X_GROWI_TRANSFER_KEY_HEADER_NAME } from '~/server/service/g2g-transfer';
 import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
 import type { UniqueConflictReport } from '~/server/service/import/detect-unique-conflicts';
 import { hasConflicts } from '~/server/service/import/detect-unique-conflicts';
-import type {
-  ImportJobLease,
-  ImportResult,
-} from '~/server/service/import/import';
+import type { ImportJobLease } from '~/server/service/import/import';
 import {
   excludeNonTransferableCollections,
   NON_TRANSFERABLE_COLLECTIONS,
@@ -113,6 +115,9 @@ const validator = {
     body('collections').isArray().withMessage('collections is required'),
     body('optionsMap').isObject().withMessage('optionsMap is required'),
   ],
+  preflight: [
+    body('transferKey').isString().withMessage('transferKey is required'),
+  ],
 };
 
 /**
@@ -129,11 +134,28 @@ const validator = {
  *           userUpperLimit:
  *             type: number
  *             description: The upper limit of the number of users
- *           fileUploadDisabled:
- *             type: boolean
  *           fileUploadTotalLimit:
  *             type: number
  *             description: The total limit of the file upload size
+ *           destinationCounts:
+ *             type: object
+ *             description: How much data this GROWI holds, all of which a migration transfer deletes
+ *             properties:
+ *               users:
+ *                 type: number
+ *               userGroups:
+ *                 type: number
+ *               pages:
+ *                 type: number
+ *           passwordSeedFingerprint:
+ *             type: string
+ *             description: One-way hash of this GROWI's password seed. The seed itself is never sent.
+ *           loginableAdminCount:
+ *             type: number
+ *             description: Administrators that are in an active status and have a password
+ *           sessionStoreSupportsEnumeration:
+ *             type: boolean
+ *             description: Whether the sessions of replaced users can be invalidated on this GROWI
  *           attachmentInfo:
  *             type: object
  *             properties:
@@ -497,6 +519,33 @@ export const setup = (crowi: Crowi): Router => {
     }
 
     /*
+     * refuse a request whose import-method assignment mixes replacing some
+     * collections with appending to others
+     *
+     * `isCoherentOptionsMap` (models/admin/g2g-transfer-preset.ts) is the single judge
+     * of coherence; this route only acts on its answer and never branches on which
+     * collection or mode is involved (requirement 1.3). Today's legacy G2G screen can
+     * still build a mixed request this way (task 10.1 narrows its choices so it no
+     * longer can); this guard is the backstop for anything that reaches this route
+     * without going through that screen at all — an automation script or a modified
+     * client posting to this endpoint directly. Checked before anything is unzipped
+     * or written, so a refused request leaves the destination untouched.
+     */
+    if (!isCoherentOptionsMap(optionsMap, collections)) {
+      logger.warn(
+        { collections },
+        'Refused the transfer import: the import-method assignment mixes replacing and appending',
+      );
+      return res.apiv3Err(
+        new ErrorV3(
+          'The import-method assignment must either replace every collection or replace none of them.',
+          G2G_MIXED_IMPORT_MODES_ERROR_CODE,
+        ),
+        400,
+      );
+    }
+
+    /*
      * unzip and parse
      */
     let meta: object | undefined;
@@ -613,7 +662,7 @@ export const setup = (crowi: Crowi): Router => {
       );
     }
 
-    let importResult: ImportResult;
+    let importResult: ImportCollectionsResult;
     try {
       importResult = await g2gTransferReceiverService.importCollections(
         collections,
@@ -631,12 +680,23 @@ export const setup = (crowi: Crowi): Router => {
       );
     }
 
-    // The response body is the only way a failure over here reaches the operator: the
-    // progress notifications the operator watches are emitted by the source's process,
-    // which cannot see anything that happened in this one.
+    // The response body is the only way anything that happened over here reaches the
+    // operator: the progress notifications they watch are emitted by the source's process,
+    // which cannot see into this one. `rescue` carries only what the operator is to be
+    // told (see `RescuedAdminSummary`) — never the re-insertion payload, which holds the
+    // destination administrators' password hashes and access-token hashes.
+    //
+    // Answered as a success even when the import aborted: the source transfers no
+    // attachment at all unless it is (requirement 5.2, which outranks 2.8 here), and
+    // `importAborted` is what keeps that success from reading as a finished transfer.
     return res.apiv3({
       message: 'Successfully started to receive transfer data.',
       failedCollections: importResult.failedCollections,
+      importAborted: importResult.importAborted,
+      rescue: importResult.rescue,
+      rescueApplied: importResult.rescueApplied,
+      postProcessFailures: importResult.postProcessFailures,
+      maintenanceModeReleased: importResult.maintenanceModeReleased,
     });
   };
 
@@ -685,6 +745,45 @@ export const setup = (crowi: Crowi): Router => {
    *                  message:
    *                    type: string
    *                    description: The message of the result
+   *                  failedCollections:
+   *                    type: array
+   *                    description: The collections that could not be imported
+   *                    items:
+   *                      type: string
+   *                  importAborted:
+   *                    type: boolean
+   *                    description: Whether the import threw instead of finishing, in which case it names no collection
+   *                  rescue:
+   *                    type: object
+   *                    nullable: true
+   *                    description: How the destination's administrators were kept, when this transfer replaced them
+   *                    properties:
+   *                      rescued:
+   *                        type: array
+   *                        items:
+   *                          type: object
+   *                          properties:
+   *                            originalUsername:
+   *                              type: string
+   *                            rescuedUsername:
+   *                              type: string
+   *                            emailRemoved:
+   *                              type: boolean
+   *                            slackMemberIdRemoved:
+   *                              type: boolean
+   *                            idReassigned:
+   *                              type: boolean
+   *                  rescueApplied:
+   *                    type: boolean
+   *                    description: Whether the rescue was written back
+   *                  postProcessFailures:
+   *                    type: array
+   *                    description: The clean-up steps that failed after the import
+   *                    items:
+   *                      type: string
+   *                  maintenanceModeReleased:
+   *                    type: boolean
+   *                    description: Whether the destination was taken out of maintenance mode again
    */
   receiveRouter.post(
     '/',
@@ -1022,6 +1121,108 @@ export const setup = (crowi: Crowi): Router => {
           new ErrorV3(
             'Failed to list the collections available for transfer.',
             'failed_to_list_transferable_collections',
+          ),
+          500,
+        );
+      }
+    },
+  );
+
+  /**
+   * @swagger
+   *
+   *  /g2g-transfer/preflight:
+   *    post:
+   *      summary: /g2g-transfer/preflight
+   *      tags: [GROWI to GROWI Transfer]
+   *      security:
+   *        - bearer: []
+   *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
+   *      requestBody:
+   *        required: true
+   *        content:
+   *          application/json:
+   *            schema:
+   *              type: object
+   *              properties:
+   *                transferKey:
+   *                  type: string
+   *                  description: The transfer key
+   *      responses:
+   *        '200':
+   *          description: Successfully inspected the destination GROWI. Reading this never changes the destination.
+   *          content:
+   *            application/json:
+   *              schema:
+   *                type: object
+   *                properties:
+   *                  destinationCounts:
+   *                    type: object
+   *                    description: How much of the destination a migration transfer would delete
+   *                    properties:
+   *                      users:
+   *                        type: number
+   *                      userGroups:
+   *                        type: number
+   *                      pages:
+   *                        type: number
+   *                  blockers:
+   *                    type: array
+   *                    description: Reasons the transfer must not proceed at all
+   *                    items:
+   *                      type: object
+   *                  warnings:
+   *                    type: array
+   *                    description: Conditions the operator must acknowledge before proceeding
+   *                    items:
+   *                      type: object
+   */
+  // Read-only by design (requirement 3.3): this asks the destination for its
+  // `growi-info` answer and judges it, but never calls startTransfer. Admin-only, the
+  // same as /transfer and /transferable-collections above — an unauthenticated caller
+  // must not learn how much of the destination exists or is about to be deleted.
+  //
+  // No addActivity: per rules/activity-recording.md's decision criteria, an audit row
+  // is for an authenticated write that failed, or an anonymous abuse-sensitive
+  // endpoint — this route is neither (no write on this GROWI or the destination, and
+  // already behind loginRequiredStrictly + adminRequired). Adding addActivity without
+  // a matching activityEvent.emit('update', ...) would not settle a row on success —
+  // it would only ever surface the failsafe finalizer's ACTION_UNSETTLED row when a
+  // preflight failed, so the audit log would record exactly the calls that did NOT
+  // work and stay silent about the ones that did, which misrepresents this endpoint's
+  // actual usage rather than describing it.
+  pushRouter.post(
+    '/preflight',
+    accessTokenParser([SCOPE.READ.ADMIN.EXPORT_DATA], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    adminRequired,
+    validator.preflight,
+    apiV3FormValidator,
+    async (req: Request, res: ApiV3Response) => {
+      const { transferKey } = req.body;
+
+      let tk: TransferKey;
+      try {
+        tk = TransferKey.parse(transferKey);
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(
+          new ErrorV3('Transfer key is invalid', 'transfer_key_invalid'),
+          400,
+        );
+      }
+
+      try {
+        const { destinationCounts, blockers, warnings } =
+          await g2gTransferPusherService.preflight(tk);
+        return res.apiv3({ destinationCounts, blockers, warnings });
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(
+          new ErrorV3(
+            'Failed to check whether the transfer can proceed.',
+            'failed_to_preflight_transfer',
           ),
           500,
         );
