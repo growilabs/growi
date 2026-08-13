@@ -85,3 +85,13 @@ GROWIはPlantUML図の内容をエンコードしてURLに載せ、GET（`<img>`
 #### Acceptance Criteria
 1. The GROWI shall 描画経路へのアクセスを、ページ内容の閲覧と同等のアクセス制御下に置く。
 2. While 送信方式が POST に設定されている, when 図ソースが規定の上限を超える、または生成が規定の制限時間を超える, the GROWI shall 当該描画を中止し、エラー状態を返す。
+
+### Requirement 11: 大きい図に対するPOST推奨メッセージ
+**Objective:** As a 大きい図が表示できない管理者/利用者, I want POSTという解決手段があると分かること, so that 自前サーバ＋POSTで根本解決できると気づける
+
+<!-- 別spec plantuml-large-diagram-get は「GET時の上限超過エラー」を汎用文言（分割・簡略化）で表示する。POST という解決策の案内は本specの責務としてここで扱う。 -->
+
+#### Acceptance Criteria
+1. Where 送信方式が GET（POST未使用）であり、かつ POST 機能が利用可能な状態である, when GET方式でURL長超過により図が表示できない, the GROWI shall POST送信（自前サーバ前提）で解決できる旨を案内するメッセージを提示する。
+2. Where POST 機能が存在しない/利用不可の環境である, the GROWI shall POST推奨メッセージを提示しない（未実装機能を案内しない）。
+3. The GROWI shall POST推奨メッセージを対応ロケール（en/ja/fr/ko/zh）で提供する。

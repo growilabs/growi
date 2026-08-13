@@ -55,3 +55,37 @@
 - `features/plantuml/components/PlantUmlViewer.spec.tsx`（RTL、`fireEvent.load/error`、status属性・`img.src`）
 - i18n手本: `ReactMarkdownComponents/DrawioViewerWithEditButton.tsx`（`useTranslation`/`t`）
 - console/status手本: `features/mermaid/components/MermaidViewer.tsx`（logger＋status遷移）
+
+---
+
+# 追補ギャップ（設計反映後 / 2026-08-13）: テーマ削減の正確な削除範囲
+
+design レビューの Issue 1（sequence退行）を受け、`carbon-gray-common.puml.ts` の `<style>` ブロック（`useBetaStyle`, :442-698）内の各図種サブブロックを**UML/非UMLで精密分類**した。**UML図種のルールは残し、真の非UML系のみ削除**する。
+
+## `<style>` 内サブブロック分類（行は現行ファイル基準）
+
+| サブブロック | 行 | 分類 | 方針 |
+|---|---|---|---|
+| `sequenceDiagram` | 452-458 | **UML** | **残す**（参加者間隔＝ParticipantPadding代替。削除で退行） |
+| `boardDiagram` | 459-477 | 非UML | 削除 |
+| `ganttDiagram` | 479-542 | 非UML | 削除 |
+| `jsonDiagram` | 544-574 | 非UML | 削除 |
+| `mindmapDiagram` | 576-596 | 非UML | 削除 |
+| `saltDiagram` | 599-606 | 非UML | 削除 |
+| `timingDiagram` | 608-627 | **UML** | **残す推奨**（timing はUML図。稀だが退行回避のため既定で残す。削るなら明示決定） |
+| `wbsDiagram` | 629-661 | 非UML | 削除 |
+| `wireDiagram` | 664-665 | 非UML（空） | 削除 |
+| `yamlDiagram` | 667-696 | 非UML | 削除 |
+
+- `skinparam useBetaStyle true`(:442) と `<style>`/`</style>` の枠、`sequenceDiagram`（＋timing）ルールは**維持**。削除の主対象は board/gantt/json/mindmap/salt/wbs/wire/yaml（`<style>` の大半の行）。
+- **注意（追加の落とし穴）**: design は削除リストに `timing` を含めていたが、**timing はUML** なので既定で残す方針に補正（design側の記述も要整合）。
+
+## パレット削減は「残した内容の参照」に依存
+- `light/dark` の未使用パレット削減は、**`<style>`削除後に実際に参照される変数のみ残す**手順で行う。例: `timingDiagram` を残すと `$RED_80`(:623 constraintArrow) が必要。`ganttDiagram` を削ると `$RED_20`(:539 closed) は不要化。→ **style削除 → 参照 grep → 未参照パレット削除**の順。
+- 実装タスクで「削除後に未定義変数参照が出ないこと（PlantUMLエラーなし）」を確認する。
+
+## POST推奨メッセージは本specの対象外（確認）
+- design/requirements の修正で、**画面の汎用エラーは本spec**、**POST推奨メッセージは別spec `plantuml-post-optin`（Req 11）** に移管済み。→ 本specにPOST関連のコード/文言ギャップは無い。
+
+## 影響（design整合）
+- design.md の削除リスト記述から `timing` を除外（UMLとして残す）＋「パレットは参照確認後に削除」を明記すると、tasks がより安全・具体化する。要 design 微修正 or tasks 側で明記。

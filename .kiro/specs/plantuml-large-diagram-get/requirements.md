@@ -73,7 +73,7 @@ GROWIはPlantUML図の内容をエンコードしてGET URLに載せ、`<img>`�
 
 #### Acceptance Criteria
 1. When 描画失敗またはURL長超過を検知する, the GROWI shall 画像の代わりに「PlantUMLサーバのURL長上限のため表示できない可能性」を示すメッセージを画面に表示する。
-2. When 上記メッセージを表示する, the GROWI shall 対処方法（図の分割・簡略化、および管理者向けに自前PlantUMLサーバ＋POST送信）を併記する。
+2. When 上記メッセージを表示する, the GROWI shall 汎用の対処方法（図の分割・簡略化）を併記する。（POST/自前サーバの推奨は本specに含めず、別spec `plantuml-post-optin` が担う）
 3. When 検知する, the GROWI shall コンソールに、原因（URL長上限超過の可能性）と該当を識別できる情報を含む警告を出力する。
 4. If 一部の図が表示できない, then the GROWI shall 同一ページ内の他の図・本文の表示を妨げない。
 5. The GROWI shall 画面メッセージを対応ロケール（en/ja/fr/ko/zh）で提供する。
