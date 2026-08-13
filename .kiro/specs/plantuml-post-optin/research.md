@@ -147,3 +147,36 @@ apiv3に描画プロキシを新設。クライアントは図ソースをPOST�
 - **PoC 実測**: 自前 plantuml-server で URL 17,929文字の図が **GET=414 / 同内容 POST=200（正しいSVG）**。GETの文字数制限を回避できることを実証。
 - **前段プロキシ**: nginx は `client_max_body_size` 既定 1MB 超で 413。大きい図を通すなら引き上げが必要（design にも記載）。
 - **出典**: `plantuml-server` の `UmlDiagramService.java`(doGet/doPost) / `SvgServlet.java` / `web.xml` / PR #74 / `DiagramResponse.java`。
+
+---
+
+# 差分ギャップ（Req 11 追加後 / 2026-08-13）: 大きい図へのPOST推奨メッセージ
+
+Req 11（GET時・上限超過で、POST利用可能なら「自前サーバ＋POSTで解決可」を案内）の統合点を確認した。
+
+## 現状の統合機構（確認済み）
+- `plantuml.ts`(:53-64) が `<plantuml>` 要素の **`hProperties`（現状 `src` と `GROWI_IS_CONTENT_RENDERING_ATTR`）** を設定 → `PlantUmlViewer` の props になる。`sanitizeOption`(:73) が許可属性を列挙。
+- **上限超過エラーの表示体＝`PlantUmlViewer` のエラーUI**は別spec `plantuml-large-diagram-get` が新設する（本specはそこに**POST推奨行を相乗り**）。
+- `plantumlHttpMethod`（get/post）は本specで RendererConfig へ伝播済み。remark プラグイン `plantuml.ts` は既に受け取る。
+
+## 要件 → 資産マップ（Req 11）
+| Req | 必要な要素 | 既存/前提資産 | ギャップ |
+|---|---|---|---|
+| 11.1 | GET時・上限超過で「POSTで解決可」を案内 | large-diagram-get のエラーUI（`PlantUmlViewer`） | **Missing/Cross-spec**（エラーUIにPOST推奨行を追加） |
+| 11.1 | 「POST利用可能」の判定 | `plantumlHttpMethod` 伝播済み＋**Bのコード存在**そのものが“利用可能” | Low（`method==='get'` を Viewer に渡せば足る） |
+| 11.2 | POST未対応環境では出さない | B未マージ環境には本行のコードが無い＝自動的に非表示 | Low（コード存在で担保。実行時フラグ不要） |
+| 11.3 | i18n（5ロケール） | large-diagram-get と同じ locale 追加パターン | Low（B用キーを5ロケール追加） |
+
+## 実装アプローチ（Extend・cross-spec 協調）
+- **推奨**: `plantuml.ts` の GET分岐で、Viewer に**送信方式（またはPOST可否）を `hProperties`（`data-*`）で渡す**（`sanitizeOption` に新属性追加）。`PlantUmlViewer` のエラーUI（large-diagram-get 実装）で **`method==='get'` の時だけ POST推奨行（`t()`）を追記**。
+- POST推奨の文言キーは **B が5ロケールへ追加**（large-diagram-get の汎用文言とは別キー）。
+
+## ⚠️ クロススペック依存（設計/実装で必ず扱う）
+- **同一ファイルを2 spec が変更**: `PlantUmlViewer.tsx`（large-diagram-get=エラーUI新設 / B=POST推奨行追加）、`plantuml.ts` `sanitizeOption`、`locales/*`。
+- **順序依存**: B の Req 11 は **large-diagram-get のエラーUIが前提**。PR/実装は **large-diagram-get 先 → B の Req 11 後**（または同時）で整合させる。design の Boundary/Revalidation に明記する。
+- 代替（結合回避）: B が独自のエラーUIを持つ案もあるが、UIが二重化し保守が増えるため**非推奨**。相乗り方式が単純。
+
+## Research Needed（設計へ）
+1. Viewer への「送信方式/POST可否」受け渡し方（`data-*` hProperty か、renderer 経由 prop か）を確定。
+2. large-diagram-get 側エラーUIの**拡張点**（POST行を差し込むための構造）を design で合意（両spec整合）。
+3. POST推奨文言（対処: 管理者が自前サーバ＋POSTを設定）と5ロケール。

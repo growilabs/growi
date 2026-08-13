@@ -97,3 +97,33 @@
   - changeset を追加する
   - _Requirements: 2.1, 2.2, 7.1, 7.2, 9.1_
   - _Depends: 4.1_
+
+- [ ] 6. Req 11: 大きい図へのPOST推奨メッセージ（クロススペック相乗り）
+  > ⚠️ 本グループは別spec `plantuml-large-diagram-get` の **GET時エラーUI（`PlantUmlViewer`）完了・マージ済み**が前提。実装/PRは **large-diagram-get 先 → 本グループ後（or 同時）**。
+- [ ] 6.1 送信方式（POST可否）判定属性を Viewer へ渡す
+  - `plantuml.ts` の GET分岐で `<plantuml>` に送信方式（または POST 可否）を `hProperties`（`data-*`）で付与し、`sanitizeOption` に許可を追加する
+  - GET時に当該属性が要素へ付与され、sanitize を通過することを確認する
+  - _Requirements: 11.1_
+  - _Boundary: plantuml.ts remark_
+  - _Depends: 3.2_
+
+- [ ] 6.2 POST推奨メッセージの i18n キーを5ロケール追加
+  - `locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/translation.json` に、汎用文言とは別の**POST推奨キー**を追加する
+  - 文言は**「自己ホスト運用なら、自前PlantUMLサーバ＋POST送信で解決できる」**旨（自己ホスト前提を明示。cloud等で誤解させない）とする
+  - 5ロケール全てに同一キーが存在し `t()` で引けることを確認する
+  - _Requirements: 11.3_
+  - _Boundary: locales_
+
+- [ ] 6.3 エラーUIへ POST推奨行を相乗り
+  - `plantuml-large-diagram-get` が新設したエラーUI（`PlantUmlViewer`）に、**`method==='get'` の時だけ** POST推奨行（`t()`）を追記する
+  - GET＋上限超過で推奨行が表示され、**POSTモードや上限内では表示されない**ことを確認する（B未マージ環境＝行が無い＝Req 11.2 を自然充足）
+  - _Requirements: 11.1, 11.2_
+  - _Boundary: PlantUmlViewer_
+  - _Depends: 6.1, 6.2_
+  - <!-- クロススペック前提: large-diagram-get のエラーUI完了・マージ済み -->
+
+- [ ] 6.4 POST推奨行のテスト
+  - `PlantUmlViewer.spec.tsx` に、GET＋上限超過→推奨行表示／POSTモード・上限内→非表示／文言はi18n（`useTranslation` モック）を検証する
+  - 上記が緑であることを確認する
+  - _Requirements: 11.1, 11.2, 11.3_
+  - _Depends: 6.3_
