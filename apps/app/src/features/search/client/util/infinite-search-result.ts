@@ -23,6 +23,7 @@ export type MergedSearchResult = {
  */
 export const mergeInfiniteSearchResult = (
   data: IFormattedSearchResult[] | undefined,
+  chunkSize: number,
 ): MergedSearchResult => {
   if (data == null) {
     return {
@@ -49,12 +50,21 @@ export const mergeInfiniteSearchResult = (
     0,
   );
 
+  // A chunk that returned fewer hits than requested means Elasticsearch has no
+  // more results, regardless of `total` (which can over-count with
+  // track_total_hits or concurrent deletions). This mirrors
+  // getSearchInfiniteKey's stop condition, so the two never disagree and leave
+  // the loader spinning after the fetch has already stopped.
+  const lastChunk = data[data.length - 1];
+  const lastChunkPartial =
+    lastChunk != null && lastChunk.meta.hitsCount < chunkSize;
+
   return {
     pages,
     loadedCount,
     total,
     took,
     isEmpty: total === 0,
-    isReachingEnd: fetchedCount >= total,
+    isReachingEnd: fetchedCount >= total || lastChunkPartial,
   };
 };

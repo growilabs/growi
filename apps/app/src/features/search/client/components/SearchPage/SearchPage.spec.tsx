@@ -180,6 +180,12 @@ describe('SearchPage infinite-scroll wiring', () => {
   });
 
   it('passes an infiniteScroll prop carrying the SWRInfinite response and a boolean isReachingEnd, plus a string resetKey', () => {
+    // one FULL chunk (hitsCount === chunk size) against a large total => not at
+    // the end, so isReachingEnd is a meaningful false here.
+    searchStoreSpy.infiniteResponse = createInfiniteResponse(
+      createFullChunks(1),
+    );
+
     render(<SearchPage />);
 
     const props = searchPageBaseSpy.lastProps;
@@ -187,7 +193,6 @@ describe('SearchPage infinite-scroll wiring', () => {
     expect(props?.infiniteScroll?.swrInfiniteResponse).toBe(
       searchStoreSpy.infiniteResponse,
     );
-    // 1 loaded chunk of 2 hits out of total 42 => not at the end.
     expect(props?.infiniteScroll?.isReachingEnd).toBe(false);
     expect(typeof props?.resetKey).toBe('string');
   });
@@ -262,10 +267,11 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
   });
 
   it('allows auto-load when there is no error and the end is not reached', () => {
-    // No error, 2 of 42 loaded → auto-load must remain enabled.
-    searchStoreSpy.infiniteResponse = createInfiniteResponse([
-      createChunk(['a', 'b']),
-    ]);
+    // No error, one FULL chunk against a large total → auto-load must remain
+    // enabled (a partial chunk would signal the end).
+    searchStoreSpy.infiniteResponse = createInfiniteResponse(
+      createFullChunks(1),
+    );
 
     render(<SearchPage />);
 

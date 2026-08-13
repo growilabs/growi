@@ -95,7 +95,12 @@ export const SearchPage = (): JSX.Element => {
   const disableUserPages = useAtomValue(disableUserPagesAtom);
 
   // Fixed chunk size for the whole search session (no user-facing selector).
-  const limit = showPageLimitationL ?? DEFAULT_SEARCH_CHUNK_SIZE;
+  // Floor to the default when misconfigured (<= 0, which `??` does not catch) so
+  // the fetch, the merge, and the result-window guard all use the same value.
+  const chunkSize =
+    showPageLimitationL != null && showPageLimitationL > 0
+      ? showPageLimitationL
+      : DEFAULT_SEARCH_CHUNK_SIZE;
 
   const [configurationsByControl, setConfigurationsByControl] = useState<
     Partial<ISearchConfigurations>
@@ -112,7 +117,7 @@ export const SearchPage = (): JSX.Element => {
 
   const swr = useSWRINFxSearch(keyword ?? '', null, {
     ...configurationsByControl,
-    limit,
+    limit: chunkSize,
   });
   // useSWRInfinite returns a fresh object every render; destructure its stable
   // members so the callbacks below keep stable identities (and their memoized
@@ -120,7 +125,10 @@ export const SearchPage = (): JSX.Element => {
   const { data: swrData, error: swrError, setSize, mutate } = swr;
 
   // Accumulated, render-ready result derived from the infinite-scroll chunks.
-  const merged = useMemo(() => mergeInfiniteSearchResult(swrData), [swrData]);
+  const merged = useMemo(
+    () => mergeInfiniteSearchResult(swrData, chunkSize),
+    [swrData, chunkSize],
+  );
 
   const hasError = swrError != null;
 
@@ -130,7 +138,7 @@ export const SearchPage = (): JSX.Element => {
   // window — otherwise scrolling to the cap fails on every further attempt.
   const loadedChunks = swrData?.length ?? 0;
   const reachedResultWindowLimit =
-    (loadedChunks + 1) * limit > ES_MAX_RESULT_WINDOW;
+    (loadedChunks + 1) * chunkSize > ES_MAX_RESULT_WINDOW;
 
   const onRetry = useCallback(() => {
     mutate();
@@ -157,9 +165,12 @@ export const SearchPage = (): JSX.Element => {
       setSearchKeyword(newKeyword);
 
       // Discard the accumulation and reload from the first chunk (Req 7.1).
+      // `mutate()` forces a refetch even when the SWR key is unchanged, so
+      // re-running the identical keyword/conditions still refreshes results.
       setSize(1);
+      mutate();
     },
-    [setSearchKeyword, setSize],
+    [setSearchKeyword, setSize, mutate],
   );
 
   const selectAllCheckboxChangedHandler = useCallback((isChecked: boolean) => {
