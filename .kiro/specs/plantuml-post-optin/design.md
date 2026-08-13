@@ -12,7 +12,7 @@
 - 受信SVGの安全な表示、送信先の限定、描画経路の悪用・過負荷対策を満たす。
 
 ### Non-Goals
-- GET方式のテーマの軽量化（別spec `plantuml-lighten-theme`）。上限超過時のユーザー向け表示（別spec `plantuml-oversize-notice`）。
+- GET側の大きい図対応（テーマ軽量化＋上限超過時のエラー表示。別spec `plantuml-large-diagram-get`）。
 - 公開 plantuml.com でのPOST対応（サーバ側非対応＝実測により不可能）。
 - PlantUMLサーバ自体の構築・運用手順の提供。
 - 管理画面へのUI追加（本specは環境変数ベースの設定に限定。UI化は将来課題）。
