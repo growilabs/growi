@@ -14,6 +14,7 @@ import {
   G2G_PROGRESS_STATUS,
   type G2GProgressStatus,
   type RescuedAdminSummary,
+  type TransferPreflightResult,
 } from '~/interfaces/g2g-transfer';
 import { COLLECTIONS_EXCLUDED_FROM_COHERENCE } from '~/models/admin/g2g-transfer-preset';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
@@ -32,10 +33,17 @@ import { AccessToken, type IAccessToken } from '../models/access-token';
 import { Attachment } from '../models/attachment';
 import UserGroup from '../models/user-group';
 import {
+  G2G_CONFLICT_DETECTION_FAILED_ERROR_CODE,
   G2G_DATA_CONFLICT_ERROR_CODE,
   G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+  G2G_IMPORT_SETTINGS_INVALID_ERROR_CODE,
+  G2G_INVALID_TRANSFER_KEY_ERROR_CODE,
   G2G_MIXED_IMPORT_MODES_ERROR_CODE,
+  G2G_MONGO_COLLECTION_IMPORT_FAILURE_ERROR_CODE,
+  G2G_PARSE_FAILED_ERROR_CODE,
   G2G_PROTECTED_COLLECTION_ERROR_CODE,
+  G2G_VALIDATION_FAILED_ERROR_CODE,
+  G2G_VERSION_INCOMPATIBLE_ERROR_CODE,
   G2GTransferError,
   G2GTransferErrorCode,
 } from '../models/vo/g2g-transfer-error';
@@ -52,7 +60,6 @@ import {
   evaluateTransferability,
   type TransferabilityReport,
   type TransferBlocker,
-  type TransferWarning,
 } from './g2g-transfer-transferability';
 import {
   detectUniqueConflicts,
@@ -284,18 +291,6 @@ export const toTransferability = (
 };
 
 /**
- * What the pushing admin is shown before committing to a transfer: how much of the
- * destination a migration transfer would delete, and anything that should give them
- * pause before they confirm (requirement 3.1). Gathering this must not itself change
- * the destination (requirement 3.3) — every field here comes from a read.
- */
-export interface TransferPreflightResult {
-  readonly destinationCounts: IDataGROWIInfo['destinationCounts'];
-  readonly blockers: readonly TransferBlocker[];
-  readonly warnings: readonly TransferWarning[];
-}
-
-/**
  * G2g transfer pusher
  */
 interface Pusher {
@@ -375,11 +370,12 @@ const findInnerFileName = (
     ?.fileName ?? null;
 
 /**
- * Projects a re-insertion payload down to {@link RescuedAdminSummary}: `notLoginable`
- * is dropped along with everything else, for the same reason nothing else survives —
- * the operator is already shown how many administrators can log in *before* the
- * transfer starts (`loginableAdminCount`, requirement 3.5), and naming the
- * destination's administrators afterwards adds nothing to that decision.
+ * Projects a re-insertion payload down to {@link RescuedAdminSummary}, dropping the
+ * password hash, `apiToken` and access-token `tokenHash` values `AdminRescuePlan`
+ * carries for re-insertion. The operator is already shown how many administrators can
+ * log in *before* the transfer starts (`loginableAdminCount`, requirement 3.5), so this
+ * projection has no reason to name the administrators the rescue chose not to keep,
+ * either.
  */
 const toRescueOutcome = (plan: AdminRescuePlan): AdminRescueOutcome => ({
   // Field by field rather than by removing the secrets from a spread: a field added to
@@ -565,6 +561,25 @@ const ARCHIVE_POST_ERROR_KEY_BY_CODE: ReadonlyMap<string, string> = new Map([
   // explains it: the two GROWIs disagree about whether this request's import-method
   // assignment is even allowed.
   [G2G_MIXED_IMPORT_MODES_ERROR_CODE, 'admin:g2g:error_mixed_import_methods'],
+  [G2G_INVALID_TRANSFER_KEY_ERROR_CODE, 'admin:g2g:error_invalid_transfer_key'],
+  [G2G_PARSE_FAILED_ERROR_CODE, 'admin:g2g:error_parse_failed'],
+  [G2G_VALIDATION_FAILED_ERROR_CODE, 'admin:g2g:error_validation_failed'],
+  [G2G_VERSION_INCOMPATIBLE_ERROR_CODE, 'admin:g2g:error_version_incompatible'],
+  [
+    G2G_IMPORT_SETTINGS_INVALID_ERROR_CODE,
+    'admin:g2g:error_import_settings_invalid',
+  ],
+  // Distinguishes "the receive route ran and refused to guess whether the archive
+  // conflicts" from a plain network failure, which used to fall back to the same
+  // generic "failed to send the archive" event as a dropped connection.
+  [
+    G2G_CONFLICT_DETECTION_FAILED_ERROR_CODE,
+    'admin:g2g:error_conflict_detection_failed',
+  ],
+  [
+    G2G_MONGO_COLLECTION_IMPORT_FAILURE_ERROR_CODE,
+    'admin:g2g:error_mongo_collection_import_failure',
+  ],
 ]);
 
 /**
@@ -1529,7 +1544,7 @@ export class G2GTransferReceiverService implements Receiver {
    * the two fields the re-insertion cannot do without.
    *
    * Every administrator is read, not only the ones that can log in: `planAdminRescue`
-   * decides which of them are worth rescuing and lists the rest as `notLoginable`.
+   * is what decides which of them are worth rescuing.
    */
   private async planDestinationAdminRescue(
     importSettingsMap: Map<string, ImportSettings>,
@@ -1658,6 +1673,10 @@ export class G2GTransferReceiverService implements Receiver {
 
     if (shouldProtect) {
       await appService.startMaintenanceMode();
+      logger.info(
+        { wasAlreadyInMaintenanceMode: maintenanceModeBeforeTransfer },
+        'Started maintenance mode for the transfer import',
+      );
     }
 
     const postProcessFailures: string[] = [];
@@ -1700,6 +1719,32 @@ export class G2GTransferReceiverService implements Receiver {
         await runPostProcess('reinsert-rescued-admins', async () => {
           await this.applyAdminRescue(rescuePlan);
           rescueApplied = true;
+
+          // Counts and the renamed usernames only -- never the password hash, `apiToken`
+          // or access-token `tokenHash` values `AdminRescuePlan` carries for re-insertion
+          // (design.md's Monitoring section; see also `toRescueOutcome`'s doc comment).
+          const renamedUsernames = rescuePlan.rescued
+            .filter(
+              (rescued) => rescued.originalUsername !== rescued.rescuedUsername,
+            )
+            .map((rescued) => ({
+              from: rescued.originalUsername,
+              to: rescued.rescuedUsername,
+            }));
+          logger.info(
+            {
+              rescuedCount: rescuePlan.rescued.length,
+              renamedUsernames,
+              idReassignedCount: rescuePlan.rescued.filter(
+                (rescued) => rescued.idReassigned,
+              ).length,
+              reinsertedAccessTokenCount: rescuePlan.rescued.reduce(
+                (sum, rescued) => sum + rescued.accessTokens.length,
+                0,
+              ),
+            },
+            'Rescued destination administrators before the transfer import replaced them',
+          );
         });
 
         await runPostProcess('invalidate-sessions', async () => {
@@ -1782,6 +1827,9 @@ export class G2GTransferReceiverService implements Receiver {
             if (!maintenanceModeBeforeTransfer) {
               await appService.endMaintenanceMode();
               maintenanceModeReleased = true;
+              logger.info(
+                'Restored the destination GROWI out of maintenance mode after the transfer import',
+              );
             }
           });
         }

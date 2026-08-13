@@ -156,40 +156,21 @@ export function describeBlocker(blocker: TransferBlocker): string {
 }
 
 /**
- * Builds the operator-facing message for a warning. Sibling of {@link describeBlocker}:
- * the single place that turns a {@link TransferWarning} into text.
- */
-export function describeWarning(warning: TransferWarning): string {
-  switch (warning.type) {
-    case 'password_seed_mismatch':
-      return 'The source and destination GROWI have different password seeds. Migrated users will not be able to log in with their existing password.';
-    case 'no_loginable_admin':
-      return 'The destination GROWI has no administrator who can currently log in. After the transfer, nobody may be able to log in.';
-    case 'sessions_not_invalidatable':
-      return "The destination GROWI's session store cannot invalidate individual sessions. Sessions established before the transfer will remain valid.";
-    case 'local_auth_disabled_at_source':
-      return 'The source GROWI has local (ID/Password) authentication disabled. Even a rescued destination administrator will not be able to log in with a password.';
-    default: {
-      const exhaustiveCheck: never = warning;
-      throw new Error(
-        `Unknown TransferWarning: ${JSON.stringify(exhaustiveCheck)}`,
-      );
-    }
-  }
-}
-
-/**
- * Computes the reasons a transfer must not proceed at all. Pure, and the only piece of
- * this module `G2GTransferPusherService.getTransferability` calls today — it never
- * needs a warning, since its return shape has no room for one (see `toTransferability`
- * in g2g-transfer.ts).
+ * Computes the reasons a transfer must not proceed at all. Pure, and used internally by
+ * {@link evaluateTransferability} below — `G2GTransferPusherService.getTransferability`
+ * and `preflight` both go through `evaluateAgainstDestination`, which always runs the
+ * full `evaluateTransferability`, so there is no current caller that reaches this
+ * function without going through that one.
  *
  * Kept as its own exported function, rather than inlined into
  * {@link evaluateTransferability}, specifically so a caller that only has blocker
  * inputs in hand is never tempted to invent values for the warning-only ones just to
  * call the combined function — there is no such thing as a neutral placeholder for
  * "the destination's loginable admin count is unknown" that cannot be misread as "the
- * destination has one" (see the doc comment on {@link TransferabilityDestination}).
+ * destination has one" (see the doc comment on {@link TransferabilityDestination}). The
+ * same property is why it is unit-tested on its own
+ * (`g2g-transfer-transferability.spec.ts`), independent of the warning fixtures
+ * {@link evaluateTransferability}'s tests need.
  */
 export function evaluateBlockers(
   src: TransferabilityBlockerSource,

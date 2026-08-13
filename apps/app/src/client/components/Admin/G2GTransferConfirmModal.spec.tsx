@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
+import type { TransferPreflightResult } from '~/interfaces/g2g-transfer';
 import type { TransferPreset } from '~/models/admin/g2g-transfer-preset';
-import type { TransferPreflightResult } from '~/server/service/g2g-transfer';
 
 import { G2GTransferConfirmModal } from './G2GTransferConfirmModal';
 
