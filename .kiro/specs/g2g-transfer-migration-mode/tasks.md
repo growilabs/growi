@@ -303,12 +303,12 @@
 - **10.2 が読む点検の応答は、文言ではなく種類（判別可能な union）で返る**（8.2）。`POST /_api/v3/g2g-transfer/preflight` は `{ destinationCounts, blockers, warnings }` を返し、`blockers` / `warnings` は `type` を持つ値のまま。表示は `describeBlocker` / `describeWarning` を通すか、クライアント側で `type` に応じて翻訳する。10.3 の文言一覧には警告 4 種しか入っていないので、確認モーダルが中断事由も出すなら中断事由 5 種の鍵も足すこと。
 - **結合試験でルータを app の直下に mount しない**（8.2 のレビューで判明）。`loginRequiredFactory` は `req.baseUrl` が `/_api/...` に一致するかで「未ログインを 302 で転送するか 403 を返すか」を変える。本番と同じ `/_api/v3` + `/g2g-transfer` の下に mount しないと、本番では起きない応答を固定してしまう。
 - **中断事由の判定と警告の判定は入口が分かれている**（7.3 のレビューで確定）。`evaluateBlockers` は警告用の入力を持たない呼び出し元のためのもので、8.2 の点検の口は `evaluateTransferability` を呼ぶ。警告用の 4 入力は「未確認」を表す無難な値が存在しない（どれも警告が出ない側に倒れてしまう）ため、必須フィールドとして型で作れなくしてある。省略可能に戻さないこと。
-- **最終ゲートが挙げた、この spec の外へ送る宿題**（2026-08-12、実装後の検証）。いずれも出荷を妨げないが、記録が無いと消える。
-  1. 確認モーダルが中断事由を表示しない件（上に記載）の**起票がまだ行われていない**。
-  2. 受信側の拒否 11 種のうち、移行元に固有の文言が届くのは 4 種だけ（`ARCHIVE_POST_ERROR_KEY_BY_CODE`）。とくに `conflict_detection_failed`（壊れたアーカイブの拒否）は通信障害と区別が付かない。
-  3. 使われていないコードが 4 つ。`describeWarning`（本番の呼び出し元なし。しかも文言がすでに locale とずれている——サーバ側「The source GROWI has…」／locale「This GROWI has…」）、`evaluateBlockers`（外部の呼び出し元なし。doc コメントは「`getTransferability` が呼ぶ」と書いているが今は呼んでいない）、`AdminRescuePlan.notLoginable`（算出されるが誰も読まない）、`G2GProgress.failedCollections`（送られるが画面で描画されない）。
-  4. design.md の Monitoring 節が半分だけ実装されている（救済の結果と、保守モードを立てた／戻したことがログに残らない）。
-  5. 画面が `TransferPreflightResult` をサーバ側のサービスから取り込んでいる。今は型だけなので消えるが、他の越境する型と揃えて `~/interfaces/g2g-transfer.ts` へ移すのが自然。
-  6. `admin:g2g:error_partial_import` の見出し「could not import every collection」が、救済の失敗や後始末の失敗（コレクションは 1 つも失敗していない場合）にも使われるようになった。失敗として伝わること自体は正しく、見出しの言葉だけが現状に合っていない。
+- **最終ゲートが挙げた、この spec の外へ送る宿題**（2026-08-12、実装後の検証）。2026-08-13 に 2〜6 を解消済み。1 は簡易対応のみ済み、恒久対応は未起票。
+  1. 確認モーダルが中断事由を表示しない件。**簡易対応済み**: `askBeforeTransfer`（`G2GDataTransfer.tsx`）が preflight の `blockers` を確認モーダルを開く前にチェックし、非空ならトーストで知らせて開かない（値の補間なしの静的文言、`g2g_data_transfer.blockers.*`）。モーダル本体に中断事由 5 種の詳細（バージョン・バイト数・上限の補間）を出す恒久対応は**未起票のまま**。
+  2. ~~受信側の拒否 11 種のうち、移行元に固有の文言が届くのは 4 種だけ~~ → 解消。残り 7 種（`invalid_transfer_key` 等、`conflict_detection_failed` を含む）にも `G2G_*_ERROR_CODE` 定数と専用の見出しを追加（`g2g-transfer-error.ts` / `ARCHIVE_POST_ERROR_KEY_BY_CODE`）。
+  3. ~~使われていないコードが 4 つ~~ → 解消。`describeWarning` は削除（モーダルは元から `WARNING_TRANSLATION_KEY` で自前に翻訳しており呼んでいなかった）。`evaluateBlockers` は内部呼び出し＋単体試験専用として doc コメントを実態に合わせて修正（削除ではない）。`AdminRescuePlan.notLoginable` は削除（`loginableAdminCount` と重複）。`G2GProgress.failedCollections` は画面に描画を追加（削除ではなく活用）。
+  4. ~~design.md の Monitoring 節が半分だけ実装されている~~ → 解消。救済結果（対象数・付け替え username・識別子再割り当て数・再投入トークン数）と、保守モードを立てた／戻したログを追加。
+  5. ~~画面が `TransferPreflightResult` をサーバ側のサービスから取り込んでいる~~ → 解消。`~/interfaces/g2g-transfer.ts` へ移設。
+  6. ~~`admin:g2g:error_partial_import` の見出しが現状と合っていない~~ → 解消。コレクション失敗前提の文言を、救済失敗・後始末失敗も含む一般化した文言に変更。
 - **応答本体の `rescue` は `rescueApplied` と必ず併せて読む**（最終ゲートの留保）。`{rescued: []}` は単体では「救済を計画したが再投入に失敗した」と「計画して成功したが対象が 0 人だった」の両方を意味する。`rescue` が null かどうかは「救済を計画したか」の合図で、従来モードと引っ越しの失敗を区別する唯一の手がかりでもある（従来モードも `rescueApplied: false` を返すため）。この応答を読む 3 人目が現れたときに誤読しやすい。
 - **識別子は必ず文字列にそろえてから比べる**（7.2 のレビューで判明）。`lean()` で読むと `_id` も参照フィールドも `ObjectId` になるため、片側だけ文字列のまま比べると一致せず、静かに 0 件になる。試験の fixture が両側とも 16 進文字列だとこの取り違えを検出できない。
