@@ -1014,7 +1014,35 @@
     "transfer_data_to_another_growi": "将数据从这个GROWI迁移到另一个GROWI上",
     "advanced_options": "高级选项",
     "start_transfer": "开始迁移",
-    "paste_transfer_key": "在这里粘贴过渡键"
+    "paste_transfer_key": "在这里粘贴过渡键",
+    "transfer_method": {
+      "heading": "迁移方式",
+      "migration": "迁移(替换目标GROWI上的所有数据)",
+      "merge": "追加到现有数据(保留目标GROWI的现有数据)"
+    },
+    "confirm_modal": {
+      "title": "确认迁移",
+      "description": "目标GROWI当前持有以下数据。开始此次迁移将删除这些数据，并替换为本GROWI的数据:",
+      "counts": {
+        "users": "用户",
+        "user_groups": "用户组",
+        "pages": "页面"
+      },
+      "warnings_heading": "继续之前请注意:",
+      "warnings": {
+        "password_seed_mismatch": "源GROWI与目标GROWI的密码种子(password seed)不同。迁移后的用户将无法使用原有密码登录。",
+        "no_loginable_admin": "目标GROWI当前没有可以登录的管理员。迁移完成后，可能没有任何人能够登录。",
+        "sessions_not_invalidatable": "目标GROWI的会话存储无法单独使旧会话失效。迁移前建立的会话仍将保持有效。",
+        "local_auth_disabled_at_source": "本GROWI已禁用本地(账号/密码)认证。即使目标端保留下来的管理员账户，也无法使用密码登录。"
+      }
+    },
+    "rescue_outcome": {
+      "heading": "此次迁移替换了目标GROWI上的所有用户。为了确保仍有人可以登录，以下管理员账户被保留了下来:",
+      "renamed_from": "原名称",
+      "email_removed": "由于与迁入的用户发生冲突，其邮箱地址已被移除。",
+      "slack_member_id_removed": "由于与迁入的用户发生冲突，其 Slack 成员 ID 已被移除。",
+      "id_reassigned": "由于原有的内部标识符与迁入的用户发生冲突，系统为其分配了新的内部标识符；迁移前建立的登录会话已失效。"
+    }
   },
   "plugins": {
     "plugins": "Plugins",
@@ -1201,7 +1229,9 @@
   "g2g": {
     "transfer_success": "Completed GROWI to GROWI transfer successfully",
     "error_generate_growi_archive": "Failed to generate GROWI archive file",
-    "error_send_growi_archive": "Failed to send GROWI archive file to the destination GROWI"
+    "error_send_growi_archive": "Failed to send GROWI archive file to the destination GROWI",
+    "error_partial_import": "迁移未完成: 目标GROWI未能导入全部数据集合，因此数据库目前处于部分迁移状态。如果目标GROWI因本次迁移而进入了维护模式，在你从目标GROWI的“管理 > 应用设置”中关闭维护模式之前，普通用户将无法访问。请先解决问题原因，然后重新执行迁移。",
+    "error_mixed_import_methods": "迁移已中止: 目标GROWI拒绝了该请求，因为其导入方式的分配中混合了“替换部分集合”和“追加到其他集合”，因此没有导入任何数据。迁移界面不会再生成此类请求，请确认源GROWI与目标GROWI运行的是相同版本，然后重试迁移。"
   },
   "external_user_group": {
     "management": "External Group Management",

@@ -1005,7 +1005,35 @@
     "transfer_data_to_another_growi": "이 GROWI에서 다른 GROWI로 데이터 전송",
     "advanced_options": "고급 옵션",
     "start_transfer": "전송 시작",
-    "paste_transfer_key": "여기에 전송 키 붙여넣기"
+    "paste_transfer_key": "여기에 전송 키 붙여넣기",
+    "transfer_method": {
+      "heading": "전송 방법",
+      "migration": "마이그레이션 (대상의 모든 데이터를 교체)",
+      "merge": "기존 데이터에 추가 (대상의 기존 데이터는 유지됨)"
+    },
+    "confirm_modal": {
+      "title": "전송 확인",
+      "description": "대상 GROWI에는 현재 다음 데이터가 있습니다. 이 전송을 시작하면 해당 데이터가 모두 삭제되고 이 GROWI의 데이터로 교체됩니다:",
+      "counts": {
+        "users": "사용자",
+        "user_groups": "사용자 그룹",
+        "pages": "페이지"
+      },
+      "warnings_heading": "계속하기 전에 확인하세요:",
+      "warnings": {
+        "password_seed_mismatch": "원본과 대상 GROWI의 비밀번호 시드(password seed)가 다릅니다. 마이그레이션된 사용자는 기존 비밀번호로 로그인할 수 없습니다.",
+        "no_loginable_admin": "대상 GROWI에는 현재 로그인할 수 있는 관리자가 없습니다. 전송 후 아무도 로그인하지 못할 수 있습니다.",
+        "sessions_not_invalidatable": "대상 GROWI의 세션 저장소는 개별 세션을 무효화할 수 없습니다. 전송 전에 생성된 세션은 계속 유효한 상태로 남습니다.",
+        "local_auth_disabled_at_source": "이 GROWI는 로컬(아이디/비밀번호) 인증이 비활성화되어 있습니다. 구제된 대상 관리자라도 비밀번호로는 로그인할 수 없습니다."
+      }
+    },
+    "rescue_outcome": {
+      "heading": "이번 마이그레이션으로 대상의 모든 사용자가 교체되었습니다. 로그인할 수 있는 사람이 남도록 다음 관리자 계정은 유지되었습니다:",
+      "renamed_from": "변경 전 이름",
+      "email_removed": "들어오는 사용자와 충돌하여 이메일 주소가 제거되었습니다.",
+      "slack_member_id_removed": "들어오는 사용자와 충돌하여 Slack 멤버 ID가 제거되었습니다.",
+      "id_reassigned": "기존 내부 식별자가 들어오는 사용자와 충돌하여 새 내부 식별자가 할당되었습니다. 전송 이전의 로그인 세션은 모두 무효화되었습니다."
+    }
   },
   "plugins": {
     "plugins": "플러그인",
@@ -1192,7 +1220,9 @@
   "g2g": {
     "transfer_success": "GROWI 간 전송 성공",
     "error_generate_growi_archive": "GROWI 아카이브 파일 생성 실패",
-    "error_send_growi_archive": "대상 GROWI로 GROWI 아카이브 파일 전송 실패"
+    "error_send_growi_archive": "대상 GROWI로 GROWI 아카이브 파일 전송 실패",
+    "error_partial_import": "전송이 완료되지 않았습니다: 대상 GROWI가 모든 컬렉션을 가져오지 못해 데이터베이스가 일부만 전송된 상태입니다. 이번 전송을 위해 대상을 유지보수 모드로 전환했다면, 대상 GROWI의 관리 > 앱 설정에서 유지보수 모드를 해제할 때까지 일반 사용자는 접근할 수 없습니다. 원인을 해결한 뒤 전송을 다시 실행하세요.",
+    "error_mixed_import_methods": "전송이 중단되었습니다: 대상 GROWI가 요청을 거부했습니다. 가져오기 방식 지정이 일부 컬렉션은 교체하고 다른 컬렉션은 추가하는 방식이 혼합되어 있어 아무것도 가져오지 않았습니다. 전송 화면은 더 이상 이런 요청을 만들지 않으니, 두 GROWI가 동일한 버전으로 실행 중인지 확인한 뒤 다시 시도하세요."
   },
   "external_user_group": {
     "management": "외부 그룹 관리",

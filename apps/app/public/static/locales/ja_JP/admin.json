@@ -1014,7 +1014,35 @@
     "transfer_data_to_another_growi": "このGROWIのデータを別GROWIへ移行する",
     "advanced_options": "詳細オプション",
     "start_transfer": "移行を開始する",
-    "paste_transfer_key": "移行キーをここにペースト"
+    "paste_transfer_key": "移行キーをここにペースト",
+    "transfer_method": {
+      "heading": "移行方法",
+      "migration": "移行(移行先の全データを置き換える)",
+      "merge": "既存データに追加(移行先の既存データは保持される)"
+    },
+    "confirm_modal": {
+      "title": "移行内容の確認",
+      "description": "移行先のGROWIには現在以下のデータがあります。この移行を開始すると、これらはすべて削除され、このGROWIのデータに置き換わります:",
+      "counts": {
+        "users": "ユーザー",
+        "user_groups": "ユーザーグループ",
+        "pages": "ページ"
+      },
+      "warnings_heading": "続行する前に:",
+      "warnings": {
+        "password_seed_mismatch": "移行元と移行先のGROWIでパスワードシードが異なります。移行されたユーザーは既存のパスワードでログインできなくなります。",
+        "no_loginable_admin": "移行先のGROWIには現在ログイン可能な管理者がいません。移行後、誰もログインできなくなる可能性があります。",
+        "sessions_not_invalidatable": "移行先のGROWIのセッションストアは個々のセッションを無効化できません。移行前に確立されたセッションはそのまま有効な状態が続きます。",
+        "local_auth_disabled_at_source": "このGROWIではローカル(ID/パスワード)認証が無効になっています。救済された移行先の管理者であっても、パスワードでログインすることはできません。"
+      }
+    },
+    "rescue_outcome": {
+      "heading": "この移行により、移行先のすべてのユーザーが置き換えられました。誰かがログインできるよう、以下の管理者アカウントは保持されました:",
+      "renamed_from": "変更前の名前",
+      "email_removed": "移行してきたユーザーとメールアドレスが競合したため、メールアドレスは削除されました。",
+      "slack_member_id_removed": "移行してきたユーザーとSlackメンバーIDが競合したため、Slackメンバー IDは削除されました。",
+      "id_reassigned": "元の内部識別子が移行してきたユーザーと競合したため、新しい内部識別子が割り当てられました。移行前に確立されたログインセッションは失われました。"
+    }
   },
   "plugins": {
     "plugins": "プラグイン",
@@ -1201,7 +1229,9 @@
   "g2g": {
     "transfer_success": "G2G移行が完了しました",
     "error_generate_growi_archive": "GROWI アーカイブファイルの作成に失敗しました",
-    "error_send_growi_archive": "GROWI アーカイブファイルの送信に失敗しました"
+    "error_send_growi_archive": "GROWI アーカイブファイルの送信に失敗しました",
+    "error_partial_import": "移行が未完了です: 移行先のGROWIがすべてのコレクションをインポートできなかったため、データベースは一部だけ移行された状態になっています。この移行のために移行先をメンテナンスモードにしていた場合、移行先のGROWIの管理 > アプリ設定でメンテナンスモードを解除するまで、一般ユーザーはアクセスできない状態のままです。原因を解決してから、もう一度移行を実行してください。",
+    "error_mixed_import_methods": "移行が中止されました: 移行先のGROWIが、一部のコレクションを置き換え・別のコレクションを追加するという異なるインポート方法が混在したリクエストを拒否したため、何もインポートされませんでした。移行画面はそのようなリクエストを作成しないため、移行元と移行先のGROWIが同じバージョンで動作しているか確認してから、もう一度移行を実行してください。"
   },
   "external_user_group": {
     "management": "外部グループ管理",
