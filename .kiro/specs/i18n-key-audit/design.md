@@ -103,6 +103,7 @@ apps/app/
 - `apps/app/src/client/components/Admin/Security/SecuritySetting/{CommentManageRightsSettings,PageAccessRightsSettings,PageDeleteRightsSettings,PageListDisplaySettings,SessionMaxAgeSettings,UserHomepageDeletionSettings,UserPageVisibilitySettings}.tsx`（7ファイル） — `t` を props で受け取るのをやめ、各コンポーネントが自前で `useTranslation('admin')` を呼ぶように変更（Components: Call-site Remediation — Group 1）
 - `apps/app/src/pages/admin/*.page.tsx` のうち `createAdminPageLayout` の `title` callback を使う19ファイル — `title: (props, t) => t('xxx')` のキー文字列に `admin:` を前置（Components: Call-site Remediation — Group 2）
 - `apps/app/src/server/routes/apiv3/security-settings/saml.ts` および同様に `getTranslation({ ns: [...] })` を使うサーバー側ファイル — 誤検出の原因になっているキーに namespace を明示前置（Components: Call-site Remediation — Group 3）
+- discovery で判明した31件の真の Bug 1（存在しないキー参照）の call site — `apps/app/src/components/PageView/PageAlerts/FixPageGrantAlert/FixPageGrantModal.tsx`（`fix_page_grant.modal.alert_message` を既存キーへ参照修正、`Successfully updated`/`Failed to update` は新規キー追加）、`apps/app/src/client/components/PageEditor/EditorGuideModal/{components/GuideRow.tsx,contents/TextStyleTab.tsx}`（`common:failed_to_copy` を新規キー追加）を含む。残りの call site は `/kiro-spec-tasks` 時点で research.md の実在チェック手順により再列挙する（Components: Non-Existent Key Reference Fix）
 - 共有ラベル約20〜23件（`Created` / `Cancel` / `Close` / `Name` 等）— `translation.json` の内容を変更せず `commons.json` へ複製し（全5言語）、参照している約43の管理画面コンポーネントの call site のみ `commons:` 前置に変更（Components: Bug 2 Remediation）
 - `apps/app/src/client/components/Admin/shared-labels-locale-sync.spec.ts`（NEW） — 複製した約20〜23キーについて、5言語すべてで `translation.json` と `commons.json` の値が一致することを検証する（`i18n-reconcile.spec.ts` と同種のパターン。Components: Bug 2 Remediation）
 - `apps/app/src/client/components/Admin/g2g-error-keys-locale-drift.spec.ts` — 縮小。「`admin:g2g:*` キーが en_US に実在すること」を確認する部分（新設ゲートと重複）を削除し、「`KEYS_WITH_DETAIL_MESSAGE` がパーサー側の発生キー集合からはみ出していないこと」を確認する部分（翻訳ファイルとは無関係な、アプリケーション内部の整合性チェック）は維持する（Components: Existing Spec Disposition）
@@ -137,7 +138,7 @@ sequenceDiagram
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1–1.4 | 存在しないキー参照の検出とゼロ化 | Audit Orchestrator, Stdout Parser | `runDefaultLanguageCheck()` | System Flow |
+| 1.1–1.4 | 存在しないキー参照の検出とゼロ化 | Audit Orchestrator, Stdout Parser, Non-Existent Key Reference Fix | `runDefaultLanguageCheck()` | System Flow |
 | 1.5 | 除外による恒久的盲点を作らない | Call-site Remediation (Group 1/2/3) | — | — |
 | 1.6 | 書き換え前後で表示文言が変わらないことの確認 | Call-site Remediation | Testing Strategy: 前後比較 | — |
 | 2.1–2.5 | 未使用キー検出（基準線） | Audit Orchestrator, Baseline Store | `runUnusedKeysCheck()`, `baseline.json` | System Flow |
@@ -156,6 +157,7 @@ sequenceDiagram
 | Audit Orchestrator | Tooling | 3種の検出コマンドを実行し合否を決定 | 1.1–1.4, 2.1–2.4, 3.1–3.4, 5.1–5.2, 6.1–6.2 | Stdout Parser, Baseline Store | Batch |
 | Stdout Parser | Tooling | `i18next-cli` の人間向けテキスト出力から件数を抽出する純粋関数 | 1.1, 2.1, 3.1 | なし | Service |
 | Baseline Store | Tooling | 基準線の読み込み・比較・更新 | 2.2, 2.5, 3.2, 3.5 | baseline.json | State |
+| Non-Existent Key Reference Fix | Client | discovery で判明した、本当に存在しない31件のキー参照を修正する | 1.1, 1.4 | なし | — |
 | Call-site Remediation (Group 1/2/3) | Client/Server | 存在しないキー参照の誤検出を、除外でなく書き換えで解消 | 1.1–1.6 | createAdminPageLayout, getTranslation | — |
 | Bug 2 Remediation | Client | 管理画面の共有ラベルを常に翻訳済み表示にする | 7.1, 7.2 | commons namespace | — |
 | Existing Spec Disposition | Test | 手書きドリフトテスト2本を整理 | 8.1, 8.2 | i18n-reconcile.spec.ts, g2g-error-keys-locale-drift.spec.ts | — |
@@ -242,6 +244,28 @@ interface StatusParser {
 
 ### Client/Server
 
+#### Non-Existent Key Reference Fix
+
+| Field | Detail |
+|-------|--------|
+| Intent | research.md が「どの namespace ファイルにも存在しない（真の Bug 1）」と分類した31件のキー参照を実際に修正する |
+| Requirements | 1.1, 1.4 |
+
+**Responsibilities & Constraints**
+- `/kiro-validate-design` のレビューで、Call-site Remediation（Group 1/2/3）が対象にしているのは「namespace ファイルには実在するのに検出ツールが見つけられない119+5件の誤検出」だけであり、要件1.4が名前まで挙げて0件化を約束している31件の「本当に存在しないキー参照」を直す担当が design.md に無いと指摘された。本コンポーネントはその欠落を埋める
+- 各キーについて、次の2通りのいずれかで直す。どちらになるかはキーごとに異なるため、実装時（`/kiro-spec-tasks`）に31件それぞれを判定する:
+  1. **参照修正**: 意図していた既存キーが翻訳ファイルの中に見つかる場合、call site をその既存キーを指すように直す。5言語の翻訳ファイルには手を入れないため、Requirement 3 の基準線に影響しない
+  2. **新規キー追加**: 意図に合う既存キーが見つからない場合、en_US に新しいキーを追加した上で、**同じ変更の中で**残り4言語すべてに翻訳を追加する。1言語だけ追加して他言語を後回しにすると、Requirement 3 が監視する言語別欠損件数がその分だけ増え、Baseline Store の悪化防止ガード（`--allow-regression` が無いと基準線を更新できない）に、この機能を導入する変更自身が引っかかる
+- discovery が名前を挙げている3例の disposition は、レビュー時点で次のように確認済み（残りの28件は同じ手順で `/kiro-spec-tasks` 側で判定する）:
+  - `fix_page_grant.modal.alert_message`（`FixPageGrantModal.tsx`）→ **参照修正**。`translation.json` の `fix_page_grant.modal.need_to_fix_grant`（「権限設定の変更が必要です」という文言）が意図した内容と一致するため、そちらを指すように直す
+  - `Successfully updated` / `Failed to update`（同ファイル）→ **新規キー追加**。既存キーに意味の一致する候補が見つからなかった
+  - `common:failed_to_copy`（`GuideRow.tsx`、`TextStyleTab.tsx`）→ **新規キー追加**。同じ関数内でコピー成功時に使っている `editor_guide.textstyle.copy_done` の対になるキー（例: `editor_guide.textstyle.copy_failed`）として追加する
+
+**Implementation Notes**
+- Integration: 31件の完全な一覧は、research.md が記録した「namespace ファイルへの実在チェック」の手順（`i18next-cli status` の生の報告から、3 namespace ファイルのどこにも存在しないものだけを絞り込む）で `/kiro-spec-tasks` 時点で再生成する
+- Validation: 新規キー追加を伴う修正は、Baseline Store が基準線を記録するタイミングより前に完了させる（Data Models 参照）。参照修正のみの分は Requirement 1.6 の前後比較で検証する
+- Risks: 新規キー追加の翻訳文言（en_US 以外の4言語）が、機械的な直訳で意味を損なう可能性。既存の近傍キーの言い回しに揃える
+
 #### Call-site Remediation (Group 1/2/3)
 
 | Field | Detail |
@@ -318,7 +342,7 @@ interface I18nAuditBaseline {
 }
 ```
 
-- 本機能の提供時点で実測した件数を初期値として記録する（Requirement 2.2, 3.2）
+- 本機能の提供時点で実測した件数を初期値として記録する（Requirement 2.2, 3.2）。この「提供時点」は、Non-Existent Key Reference Fix・Call-site Remediation（Group 1/2/3）・Bug 2 Remediation の複製作業がすべて完了した後を指す。これらの作業のうち新規キー追加を伴う分（Non-Existent Key Reference Fix の一部）が先に完了していないと、まだ翻訳されていない言語分がそのまま基準線に組み込まれてしまう
 - `--update-baseline` フラグ付き実行でのみ上書きされる。CI からの通常実行では読み取りのみ
 - 変更はコミットされた JSON の diff として PR に現れ、基準線がどちら方向にどれだけ動いたかをレビュアーが直接確認できる
 

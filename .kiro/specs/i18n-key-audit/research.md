@@ -41,7 +41,7 @@
     | `admin.json` に実在するが、`translation` namespace の不在として報告される | 119 | 新たな発見。原因は下記 |
     | `commons.json` にのみ存在するが同様の理由で報告される | 5 | 上と同種の少数派 |
   - 119件（と5件）の原因を1件（`security_settings.max_age` / `SessionMaxAgeSettings.tsx`）で特定: この種のコンポーネントは `useTranslation()` を自分では呼ばず、親コンポーネントから **`t` 関数を props で受け取る**（`t: (key: string, options?: Record<string, unknown>) => string` という型のプロパティ）。`i18next-cli` の静的解析はファイル内の `useTranslation()` 呼び出しからしか namespace を追跡できないため、props 経由で渡された `t` の実際の namespace 束縛（親の `useTranslation(['admin', ...])`）を追跡できず、既定 namespace（`translation`）への参照として誤って分類する。実行時には親のフックが正しく `admin` を含むため、これらは高い確度で本物の不具合ではない。
-  - 同種の誤検出パターンとして、`AdminNavigation.tsx`（`useTranslation(['admin', 'commons'])` を使い、21箇所の `t()` 呼び出しを持つ switch 文コンポーネント）由来のキーも一部含まれる。ただしこのファイル固有の内部動作までは追跡していない（下記「調査を打ち切った理由」参照）。
+  - 同種の誤検出パターンとして、`AdminNavigation.tsx`（`useTranslation(['admin', 'commons'])` を使い、21箇所の `t()` 呼び出しを持つ switch 文コンポーネント）由来のキーも一部含まれると当初記録したが、`/kiro-validate-design` 3回目のレビューで実際に `i18next-cli` にこのファイルと実際の `admin.json`/`commons.json` を通して確認したところ、21キーすべてが100%解決し誤検出は無かった。**この記述は誤りだった。** クライアント側の `useTranslation([ns1, ns2])` という配列指定は `i18next-cli` が正しく追跡できるパターンであり、Group 3 をサーバー側の `getTranslation({ ns: [...] })` だけに絞った design.md の判断（クライアント側の配列指定は対象外）を裏付ける結果である。
 - **Implications**:
   - Requirement 1 の「27件」という数字は実測でおおむね裏付けられた（31件、+4件は discovery の見積り誤差として妥当な範囲）。ただし要件文に固定の件数を書き込むのは適切でない（後述の Design Decision）。
   - Requirement 7（Bug 2）の対象範囲「共有ラベル約20件」は実測でも23件で裏付けられ、大きく拡大する必要はない。
@@ -133,6 +133,13 @@
 - **Selected Approach**: design.md に4ファイルの名前と除外理由を明記し、23−4=19という数字の出典を明示する
 - **Rationale**: 実装時にパターン検索だけで対象ファイルを洗い出し直すと、この4ファイル（特に options 引数形式の2ファイル）を誤って書き換え対象に含めてしまうリスクを防ぐ
 - **Follow-up**: なし。design.md の Call-site Remediation Group 2 に反映済み
+
+### Decision: 「31件の真の Bug 1」を修正する担当コンポーネントを design.md に追加する
+- **Context**: `/kiro-validate-design` 3回目のレビュー（回帰リスクを重点的に検証する回として実施）で、design.md の Components が「119+5件の誤検出」（Call-site Remediation）と「共有ラベル約20〜23件」（Bug 2 Remediation）しか担当しておらず、要件1.4が名前まで挙げて0件化を約束している「本当に存在しない31件のキー参照」を直す担当が丸ごと欠けていると指摘された
+- **Sources Consulted**: 指摘を受けて実際にコードと翻訳ファイルを確認した。`common:failed_to_copy`（`GuideRow.tsx`、`TextStyleTab.tsx`）は `common` という namespace ファイル自体が存在せず `commons.json`/`translation.json` にも `failed_to_copy` は無い。`fix_page_grant.modal.alert_message`（`FixPageGrantModal.tsx`）は存在しないが、同じ `fix_page_grant.modal` 配下に意味の近い `need_to_fix_grant` が実在する。`Successfully updated`/`Failed to update`（同ファイル）は `translation.json` に該当キーが無く、意味の一致する既存キーも見つからなかった
+- **Selected Approach**: 「Non-Existent Key Reference Fix」という新しい Component を design.md に追加する。修正はキーごとに「既存キーへの参照修正」（翻訳ファイル変更なし、基準線に影響しない）か「新規キー追加」（5言語すべてに同時追加、追加が終わるまで基準線を記録しない）のいずれかで行う。3つの具体例の disposition は上記の実測結果どおりに確定させた
+- **Rationale**: 要件1.4が個別のキー名まで挙げて約束している内容である以上、design.md のどこかにその修正を担当する記述が無ければ実装可能な設計とは言えない。「新規キー追加」と「基準線を記録するタイミング」を明確に結びつけたのは、この機能の導入自身が iteration 1/2 で追加した悪化防止ガードに引っかかるという具体的な詰みシナリオが実測で見えたため
+- **Follow-up**: 残り28件の call site の完全な一覧は `/kiro-spec-tasks` 実行時に、本セクション「既定言語の欠損参照182件の内訳」で使った実在チェックの手順を再実行して確定させる
 
 ## References
 - [i18next-cli (npm)](https://www.npmjs.com/package/i18next-cli) — バージョン 1.69.0、MIT ライセンス、コマンド仕様の一次情報
