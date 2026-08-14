@@ -97,6 +97,29 @@
 - **グループ3（`ns: ['translation', 'admin']` 等の複数 namespace 配列に前置を加える）でフォールバック順が変わる** — 前置無しでは「先に試した namespace が優先」という順で解決している。あるキーが両方の namespace に存在する場合、前置によって採用される値が変わりうる。ミティゲーション: 前置対象の各キーについて、両方の namespace ファイルに重複が無いことを機械的に確認してから書き換える
 - **Bug 2 の重複修正がドリフトの盲点になる**（`commons.json` に複製する場合、`translation.json` 側の値を更新し忘れると2つの値が食い違う）— ミティゲーション: 複製した約23件のペアが全5言語で一致することを検証する専用テストを設ける
 
+### Decision: `/kiro-validate-design` の指摘を受け、Bug 2 の方式を「移動」から「複製」に戻す
+- **Context**: design.md の初版では、共有ラベル約20〜23件を `translation.json` から削除して `commons.json` へ移動する方式を採った。ところがこの方式は、本セクション冒頭の「未使用キー182件の内訳」調査より前、brief.md 起草時点で既に検討されていた「複製」案（`translation.json` は変更せず `commons.json` に複製する）から外れており、上記 Risks & Mitigations の「Bug 2 の重複修正がドリフトの盲点になる」という記述は複製案を前提に書かれていた。design.md 執筆時にこの前提を踏襲せず「移動」を選んだのは、他言語版から見て取り違えたためで、意図的な変更ではない
+- **Sources Consulted**: サブエージェントによる `/kiro-validate-design i18n-key-audit` の実行（Critical Issue 1）。指摘を受けて `apps/app/src` を実際に grep し、`Cancel`/`Close`/`Created`/`Name`/`Email`/`Update`/`Edit`/`Create`/`add` の少なくとも9キーが、discovery で数えた管理画面43コンポーネント以外に、`Me`/`PageEditor`/`LoginForm`/`InstallerForm`/`external-user-group` 配下など約25ファイルから、namespace 指定無し（既定の `translation`）で参照されていることを確認した
+- **Alternatives Considered**:
+  1. 移動（design.md 初版）— 管理画面外の約25ファイル（および未確認の残りキーの消費者）を新たに壊す
+  2. 複製（brief.md 時点の想定に戻す）— `translation.json` は変更しないため、管理画面外の消費者は無傷。複製ペアのドリフトは専用テストで検知する
+- **Selected Approach**: 2（複製）を採用
+- **Rationale**: 「移動」が要求する「リポジトリ全体から消費者を洗い出す」という未調査タスクを無くせる。複製という単一の真実源からの逸脱は、対象が約20〜23件と限定されており、かつこのリポジトリには `i18n-reconcile.spec.ts` という同種の前例が既にある
+- **Trade-offs**: 2ファイルの同期維持という保守コストが継続的に発生する。専用テストでドリフトを機械的に検知することで軽減する
+- **Follow-up**: なし。design.md に反映済み
+
+### Decision: baseline 更新に改悪方向への書き込みガードを追加する
+- **Context**: `/kiro-validate-design` の Critical Issue 2 で、`--update-baseline` が改悪方向（悪化した測定値）でもそのまま上書きできてしまう点を指摘された。「PRのdiffでレビュアーが気づく」という当初の安全策は、数値1〜2個の変化がレビュー時に見落とされやすいという理由で不十分と判断された
+- **Selected Approach**: `--update-baseline` は測定値が既存の基準線より大きい場合は既定で拒否し、`--allow-regression` を明示的に渡した場合のみ許可する。実行時は常に増減を標準出力に明示する
+- **Rationale**: レビュアーの見落としに依存せず、「基準線は改善方向にしか動かせない」という要件2.5/3.5の意図をツール自身が機構的に守る
+- **Follow-up**: なし。design.md の Baseline Store に反映済み
+
+### Decision: `g2g-error-keys-locale-drift.spec.ts` は全削除ではなく縮小する
+- **Context**: `/kiro-validate-design` の Critical Issue 3 で、このテストが「`admin:g2g:*` キーが en_US に実在すること」（新ゲートと重複）と「`KEYS_WITH_DETAIL_MESSAGE` がパーサー側の発生キー集合からはみ出していないこと」（翻訳ファイルとは無関係な、アプリケーション内部の整合性チェック）という性質の異なる2つの検査を持つことが指摘された。実ファイルを読んで確認し、指摘が正しいことを確認した
+- **Selected Approach**: 前者の検査（新ゲートと重複する部分）だけを削除し、後者（`KEYS_WITH_DETAIL_MESSAGE` の整合性チェック）は維持する
+- **Rationale**: ファイル単位で全部削除か全部維持かの二択ではなく、要件8.2が想定する「重複しない部分は維持する」という粒度で判断する
+- **Follow-up**: なし。design.md の Existing Spec Disposition に反映済み
+
 ## References
 - [i18next-cli (npm)](https://www.npmjs.com/package/i18next-cli) — バージョン 1.69.0、MIT ライセンス、コマンド仕様の一次情報
 - サンドボックス実行ログ（本セッション内、`/tmp` 配下、恒久的な保存はしていない）— `status` / `status --unused` / `extract --ci --dry-run` / `sync --help` の実測結果

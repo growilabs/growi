@@ -28,7 +28,7 @@
 - 動的キー参照の宣言（`extract.preservePatterns`）
 - 既存の `pnpm run lint`（`lint:**` glob）への統合スクリプト1本
 - 存在しないキー参照の0件化を、検出をすり抜けさせる除外ではなく、call site を検出可能な形に書き換えることで達成する一連の修正（後述 Components）
-- 管理画面の共有ラベル約20〜23件の namespace 移動と、参照側 call site の書き換え
+- 管理画面の共有ラベル約20〜23件の `commons` namespace への複製と、管理画面側 call site の書き換え
 - 既存の手書きドリフトテスト2本の disposition（維持 or 削除）の決定と実施
 
 ### Out of Boundary
@@ -99,12 +99,13 @@ apps/app/
 ```
 
 ### Modified Files
-- `apps/app/package.json` — devDependency に `i18next-cli` を追加。`scripts` に `"lint:i18n": "node tools/i18n-audit/run-audit.ts"` を追加（`lint:**` glob に含まれ、`pnpm run lint` から自動実行される）。基準線を意図的に下げるための `"i18n:baseline:update": "node tools/i18n-audit/run-audit.ts --update-baseline"` も追加
+- `apps/app/package.json` — devDependency に `i18next-cli` を追加。`scripts` に `"lint:i18n": "node tools/i18n-audit/run-audit.ts"` を追加（`lint:**` glob に含まれ、`pnpm run lint` から自動実行される）。基準線を更新するための `"i18n:baseline:update": "node tools/i18n-audit/run-audit.ts --update-baseline"` も追加（改悪方向の更新には別途 `--allow-regression` が必要）
 - `apps/app/src/client/components/Admin/Security/SecuritySetting/{CommentManageRightsSettings,PageAccessRightsSettings,PageDeleteRightsSettings,PageListDisplaySettings,SessionMaxAgeSettings,UserHomepageDeletionSettings,UserPageVisibilitySettings}.tsx`（7ファイル） — `t` を props で受け取るのをやめ、各コンポーネントが自前で `useTranslation('admin')` を呼ぶように変更（Components: Call-site Remediation — Group 1）
 - `apps/app/src/pages/admin/*.page.tsx` のうち `createAdminPageLayout` の `title` callback を使う19ファイル — `title: (props, t) => t('xxx')` のキー文字列に `admin:` を前置（Components: Call-site Remediation — Group 2）
 - `apps/app/src/server/routes/apiv3/security-settings/saml.ts` および同様に `getTranslation({ ns: [...] })` を使うサーバー側ファイル — 誤検出の原因になっているキーに namespace を明示前置（Components: Call-site Remediation — Group 3）
-- 共有ラベル約20〜23件（`Created` / `Cancel` / `Close` / `Name` 等）— `translation.json` から `commons.json` へ全5言語分移動し、参照している約43コンポーネントの call site を `commons:` 前置に変更（Components: Bug 2 Remediation）
-- `apps/app/src/client/components/Admin/g2g-error-keys-locale-drift.spec.ts` — 削除（Components: Existing Spec Disposition）
+- 共有ラベル約20〜23件（`Created` / `Cancel` / `Close` / `Name` 等）— `translation.json` の内容を変更せず `commons.json` へ複製し（全5言語）、参照している約43の管理画面コンポーネントの call site のみ `commons:` 前置に変更（Components: Bug 2 Remediation）
+- `apps/app/src/client/components/Admin/shared-labels-locale-sync.spec.ts`（NEW） — 複製した約20〜23キーについて、5言語すべてで `translation.json` と `commons.json` の値が一致することを検証する（`i18n-reconcile.spec.ts` と同種のパターン。Components: Bug 2 Remediation）
+- `apps/app/src/client/components/Admin/g2g-error-keys-locale-drift.spec.ts` — 縮小。「`admin:g2g:*` キーが en_US に実在すること」を確認する部分（新設ゲートと重複）を削除し、「`KEYS_WITH_DETAIL_MESSAGE` がパーサー側の発生キー集合からはみ出していないこと」を確認する部分（翻訳ファイルとは無関係な、アプリケーション内部の整合性チェック）は維持する（Components: Existing Spec Disposition）
 
 ## System Flows
 
@@ -227,6 +228,8 @@ interface StatusParser {
 - `baseline.json`（単一のファイル、Data Models 参照）を単一の真実源とする
 - 比較は「測定値 <= 基準線」であること。等しい場合は合格
 - 更新は明示的な `--update-baseline` 実行時のみ行い、通常の CI 実行では書き込まない
+- `--update-baseline` は、新しい測定値が既存の基準線より大きい（悪化する）場合、既定では書き込みを拒否してエラー終了する。`/kiro-validate-design` のレビューで、悪化した測定値でもそのまま上書きできてしまうと、CI が落ちたときに原因を直す代わりに「基準線を今の状態に合わせて更新する」ことで通してしまう経路が残ると指摘された。改悪方向への更新は `--update-baseline --allow-regression` を明示的に渡した場合のみ許可する
+- 更新実行時は、常に「基準線が何件から何件に変わるか」を標準出力に明示する（改善方向の更新であっても、レビュアーが PR の diff だけでなく実行ログでも変化量を確認できるようにする）
 
 **Contracts**: Service [ ] / API [ ] / Event [ ] / Batch [ ] / State [x]
 
@@ -262,16 +265,21 @@ interface StatusParser {
 | Intent | 管理画面が本番でのみ生キーを表示する不具合を解消する |
 | Requirements | 7.1, 7.2 |
 
+**Design Decision: `translation.json` から削除して移動するのではなく、`commons.json` に複製する**
+- `/kiro-validate-design` によるレビューで、共有ラベル（`Cancel` / `Close` / `Created` / `Name` / `Email` / `Update` / `Edit` / `Create` / `add` の少なくとも9件）が、discovery で数えた管理画面43コンポーネントとは別に、`Me` / `PageEditor` / `LoginForm` / `InstallerForm` / `external-user-group` 配下など少なくとも約25の管理画面外のファイルから、namespace を指定しない書き方（既定の `translation` namespace）で参照されていることが実際のコード検索で確認された。この事実は「移動」案（`translation.json` から削除して `commons.json` へ移す）を採ると、管理画面外のこれら約25ファイルが、今直そうとしているのと同じ「生キー表示」を新たに起こすことを意味する
+- そのため、対象キーは `translation.json` から**削除せず**、`commons.json` に**複製**する。翻訳ファイルとしては同じ値が2ファイルに存在する状態になるが、これは `coding-style.md` が原則とする単一の真実源から意図的に外れる判断であり、根拠は次の2点: (1) 対象は discovery で判明した約20〜23件という限定された集合であり、将来大きく増える見込みが薄い、(2) このリポジトリには既に同種の複製+同期確認テストという前例がある（`i18n-reconcile.spec.ts`、および後述する `g2g-error-keys-locale-drift.spec.ts` の縮小後の姿）。新しい仕組みを持ち込むのではなく、既存の前例に揃える
+- この選択により、管理画面外の約25ファイル（および今回のコード検索で洗い出していない残りのキーの消費者）は一切変更不要になる。「移動」案が要求していた「リポジトリ全体から消費者を洗い出す」という未調査のタスクも不要になる
+
 **Responsibilities & Constraints**
-- 共有ラベル約20〜23件（`Created` / `Cancel` / `Close` / `Name` / `Email` / `Update` / `Description` / `User` / `Edit` / `UserGroup` / `Create` 等）を `translation.json` から `commons.json` へ、5言語すべてで移動する
-- 管理ページの `getServerSideAdminCommonProps` は既に `['commons', 'admin']` を読み込んでいるため、移動後は追加のペイロードなしで解決できる（`translation` を ns リストに追加する代替案は、直前に修正した `preloadAllLang` と同種のペイロード肥大を再導入するため採用しない）
-- 移動対象キーを参照している call site を洗い出す際は、discovery で判明した管理画面43コンポーネントだけでなく、`src/` 全体で同じキー文字列を参照している箇所が無いかを確認する。管理画面以外の箇所が同じキーを `translation` namespace で参照していた場合、移動によってその箇所が新たに壊れる
-- 洗い出した全ての call site のキー文字列に `commons:` を前置する
+- 共有ラベル約20〜23件（`Created` / `Cancel` / `Close` / `Name` / `Email` / `Update` / `Description` / `User` / `Edit` / `UserGroup` / `Create` 等）を、5言語すべての `translation.json` から `commons.json` へ複製する（`translation.json` 側の値は変更しない）
+- 管理ページの `getServerSideAdminCommonProps` は既に `['commons', 'admin']` を読み込んでいるため、複製後は追加のペイロードなしで解決できる
+- discovery で判明した管理画面43コンポーネントの call site のキー文字列にのみ `commons:` を前置する（管理画面外の call site は変更しない）
+- 複製した約20〜23件のキーが、5言語すべてで `translation.json` と `commons.json` の値が一致することを検証する専用テストを設ける（Testing Strategy 参照）。将来どちらかの値だけを更新してしまうドリフトを検知する
 
 **Implementation Notes**
-- Integration: namespace 構成の再編（umbrella 未決1）には踏み込まず、約20〜23キーの移動に限定する
-- Validation: 移動前後で、管理画面と（存在する場合の）非管理画面の両方で表示文言が変わらないことを確認する
-- Risks: 管理画面以外にも同じキーの消費者が存在する可能性（未調査）。実装タスクの最初のステップとして、5言語 × 対象キーそれぞれについてリポジトリ全体を検索し、消費者を確定させる
+- Integration: namespace 構成の再編（umbrella 未決1）には踏み込まず、約20〜23キーの複製に限定する
+- Validation: 変更前後で、管理画面43コンポーネントの表示文言が変わらないことを確認する（`translation.json` は変更しないため、管理画面外への影響はそもそも発生しない）
+- Risks: 複製ペアの片方だけを更新してしまうドリフト。専用テストで機械的に検知する（Testing Strategy 参照）。単一の真実源からの意図的な逸脱であることは上記 Design Decision に明記済み
 
 ### Test
 
@@ -283,11 +291,14 @@ interface StatusParser {
 | Requirements | 8.1, 8.2 |
 
 **Responsibilities & Constraints**
-- `g2g-error-keys-locale-drift.spec.ts` は削除する。このテストが検査する内容（`admin:g2g:*` という静的なキー参照が en_US に実在すること）は、Requirement 1 の新設ゲートが同じ範囲を完全にカバーする
+- `g2g-error-keys-locale-drift.spec.ts` は**縮小**する（全削除ではない）。このファイルは性質の異なる2つの検査を持つ:
+  1. `admin:g2g:*` という静的なキー参照が en_US に実在すること — Requirement 1 の新設ゲートが同じ範囲を完全にカバーするため削除する
+  2. `KEYS_WITH_DETAIL_MESSAGE`（クライアント側で「詳細メッセージ付き通知」として扱うキーの一覧）が、`server/service/g2g-transfer.ts` から抽出した実際の発生キー集合からはみ出していないこと — これは翻訳ファイルの整合性ではなく、アプリケーション内部の2つの配列間の整合性チェックであり、`i18next-cli` は関知しない。この部分は維持する
+  - `/kiro-validate-design` のレビューで、当初の「全削除」判断はこの2番目の検査を見落としていたと判明した
 - `i18n-reconcile.spec.ts` は維持する。このテストは8つの**特定の**キーが存在し空でないことを保証しており、Requirement 2/3 の基準線比較（集計件数のみを見る）では、この特定キーの欠落を検出できない（別のキーが増減して合計件数が基準線以下に収まってしまう可能性があるため）。集約値の基準線と個別キーの存在保証は異なる性質の保証であり、後者は前者に包含されない
 
 **Implementation Notes**
-- Integration: 削除・維持それぞれの判断根拠を PR の説明に残す
+- Integration: 削除・縮小・維持それぞれの判断根拠を PR の説明に残す
 - Risks: 無し（判断はこの設計時点で確定済み）
 
 ## Data Models
@@ -327,11 +338,14 @@ interface I18nAuditBaseline {
 - **Integration Tests**:
   - Audit Orchestrator を実際の `apps/app` リポジトリに対して実行し、Requirement 1 の0件化・Requirement 2/3 の基準線遵守を確認する（CI で毎回実行されるテスト自体がこの役割を果たす）
   - Call-site Remediation の書き換え対象キーそれぞれについて、書き換え前後で実際に解決される翻訳文言が一致することを確認する（Requirement 1.6）。書き換え前の値をテスト実装時に記録し、書き換え後の値と比較する形で行う
-  - Bug 2 Remediation で移動する各キーについて、移動前後で管理画面・（存在する場合の）非管理画面の両方の表示文言が一致することを確認する
+  - Bug 2 Remediation で複製する各キーについて、5言語すべてで `translation.json` と `commons.json` の値が一致することを検証する専用テスト（`i18n-reconcile.spec.ts` と同種のパターン）。将来どちらかだけが更新された場合のドリフトを検知する
+  - Baseline Store の `--update-baseline` について、既存の基準線より悪化した測定値を渡した場合に `--allow-regression` 無しでは書き込みを拒否することを確認するテスト
 - **E2E Tests**: 対象外（本機能は CI 上の静的検出であり、ブラウザ操作を伴わない。Bug 2 の修正確認は既存の管理画面 Playwright スモークテストの範囲で十分カバーされる）
 
 ## Open Questions / Risks
 
-- **Bug 2 の移動対象キーの消費者が管理画面外にも存在するか未調査** — 実装タスクの最初のステップで、リポジトリ全体を対象に確定させる（Bug 2 Remediation の Implementation Notes 参照）
 - **Group 1/3 の書き換えに伴う回帰リスク**（namespace 取り違え、フォールバック順の変化）— research.md の Risks & Mitigations に詳細を記録済み。Testing Strategy の前後比較で検証する
 - **`i18next-cli` の stdout フォーマット依存** — バージョン固定とパーサー単体テストで軽減するが、将来のアップグレード時には再検証が必要（Revalidation Triggers 参照）
+- **複製した約20〜23キーのドリフト** — `translation.json` と `commons.json` の値が将来ずれる可能性。専用の同期テストで機械的に検知する（Bug 2 Remediation 参照）。単一の真実源から意図的に外れた判断であることは Design Decision に明記済み
+
+`/kiro-validate-design` によるレビュー（1回目）で見つかった3件の Critical Issue（Bug 2 の移動対象キーの消費者未調査、baseline 更新に悪化防止ガードが無い、`g2g-error-keys-locale-drift.spec.ts` の全削除判断の見落とし）は、いずれも上記の設計変更（複製方式への変更、`--allow-regression` ガードの追加、縮小への変更）で解消済み。
