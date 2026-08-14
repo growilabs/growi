@@ -154,6 +154,17 @@
 - **Rationale**: 「注意書きを守る」という運用上の期待に頼らず、「テストが通っているか」という機械的に確認できる状態にする。Bug 2 Remediation の複製ペア同期テストと同じ考え方の再利用であり、新しい仕組みを増やしていない
 - **Follow-up**: なし。design.md の Testing Strategy に反映済み
 
+### Decision: 新規キー追加時は call site の書き換えも明記する
+- **Context**: `/kiro-validate-design` 5回目のレビューで、`common:failed_to_copy` の直し方が「新しいキーを追加する」としか書かれておらず、`GuideRow.tsx`/`TextStyleTab.tsx` の呼び出し文字列自体を新しいキー名に書き換えるという一文が無いと指摘された。要件1にはRequirement 2/3のような基準線による救済が無いため、この記載漏れをそのまま実装すると `t('common:failed_to_copy')` という存在しない参照がゼロ件化されずに残ってしまう
+- **Selected Approach**: design.md に「新規キー追加時は call site の呼び出し文字列も新しいキー名に書き換える」ことを明記し、`common:failed_to_copy` → `editor_guide.textstyle.copy_failed` への書き換えを具体的に記述する。`Successfully updated`/`Failed to update` のように、追加するキー名が呼び出し文字列と一致する場合は書き換え不要であることも区別して明記する
+- **Follow-up**: なし。design.md の Non-Existent Key Reference Fix に反映済み
+
+### Decision: Group 2 の対象範囲の書き方を、サブディレクトリを含む再帰的な対象だと明記する
+- **Context**: `/kiro-validate-design` 5回目のレビューで、File Structure Plan の「`apps/app/src/pages/admin/*.page.tsx`」という書き方が、`global-notification/`・`user-group-detail/`・`users/` などサブディレクトリ配下の5ファイルを取り落とすと指摘された。件数（19ファイル）自体は正しく、Components 側の記述（23ファイル・4件除外の内訳）とも一致していたが、File Structure Plan の glob 表記だけが不正確だった
+- **Sources Consulted**: `grep -rl 'createAdminPageLayout' apps/app/src/pages/admin --include='*.page.tsx'` で23ファイルを再確認し、うち5ファイルがサブディレクトリ配下にあることを確認した
+- **Selected Approach**: File Structure Plan の記述を「`pages/admin/` 以下（サブディレクトリを含む、再帰的な対象）」に直し、取り落とされていた5ファイルの名前を明記する
+- **Follow-up**: なし。design.md の Modified Files に反映済み
+
 ## References
 - [i18next-cli (npm)](https://www.npmjs.com/package/i18next-cli) — バージョン 1.69.0、MIT ライセンス、コマンド仕様の一次情報
 - サンドボックス実行ログ（本セッション内、`/tmp` 配下、恒久的な保存はしていない）— `status` / `status --unused` / `extract --ci --dry-run` / `sync --help` の実測結果
