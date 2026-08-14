@@ -120,6 +120,20 @@
 - **Rationale**: ファイル単位で全部削除か全部維持かの二択ではなく、要件8.2が想定する「重複しない部分は維持する」という粒度で判断する
 - **Follow-up**: なし。design.md の Existing Spec Disposition に反映済み
 
+### Decision: baseline.json の初回作成手順と、言語未記録時の扱いを明文化する
+- **Context**: `/kiro-validate-design` の2回目のレビュー（回帰リスクを重点的に検証する回として実施）で、Error Handling 節の「基準線ファイルが読めない場合は即座に失敗する」という記述と、Baseline Store 節の「悪化防止ガード」が、baseline.json をまだ作っていない最初の実行（本機能の初回導入時）にどちらが優先されるのか矛盾していると指摘された。同時に、`missingByLocale` にまだ記録が無い言語をどう扱うか（0件扱いか、無条件合格か）も未規定だった
+- **Sources Consulted**: サブエージェントによる `/kiro-validate-design i18n-key-audit` 2回目の実行。実際のコード（`SecuritySetting/index.tsx`、`saml.ts`、`i18n-reconcile.spec.ts`、`g2g-error-keys-locale-drift.spec.ts`、`getServerSideAdminCommonProps`）を読み直し、1回目の3件の修正が正しく機能することも合わせて再確認済み
+- **Selected Approach**: `--update-baseline` はファイル未存在時のみ悪化防止ガードの対象外とし、基準線0件からの更新として書き込みを許可する。`missingByLocale` に言語が無い場合は基準線0件として扱う（無条件合格にはしない）
+- **Rationale**: 前者は初回導入という一度きりの状況を明示的な例外として切り出すことで、通常実行時の「読めなければ即座に失敗」という原則を壊さない。後者は要件3.2の「提供時点で言語ごとに集計した件数を基準線とする」という原則を、後から言語を追加した場合にも一貫させる
+- **Follow-up**: なし。design.md の Baseline Store・Error Handling に反映済み
+
+### Decision: Group 2（`createAdminPageLayout` 前置対象19ファイル）の除外4ファイルを明記する
+- **Context**: `/kiro-validate-design` 2回目のレビューで、`createAdminPageLayout` を使うファイルは実際には23個あり、design.md の「19ファイル」という数字がどの4ファイルを除外した結果なのか記述が無いと指摘された
+- **Sources Consulted**: `grep -rl 'createAdminPageLayout' pages/admin/` で23ファイルを確認し、うち `[...path].page.tsx` / `vault.page.tsx` の2個は `title` がキー参照を持たない固定文字列、`app.page.tsx` / `data-transfer.page.tsx` の2個は既に `t(key, { ns: 'commons' })` という options 引数形式で namespace を明示済みであることを実際に読んで確認した。さらに、この options 引数形式が `ns:key` という文字列前置と同様に `i18next-cli` の静的解析から正しく認識されることをサンドボックスで確認した（`t('menu_title', { ns: 'admin' })` が missing 0件・100%で解決）
+- **Selected Approach**: design.md に4ファイルの名前と除外理由を明記し、23−4=19という数字の出典を明示する
+- **Rationale**: 実装時にパターン検索だけで対象ファイルを洗い出し直すと、この4ファイル（特に options 引数形式の2ファイル）を誤って書き換え対象に含めてしまうリスクを防ぐ
+- **Follow-up**: なし。design.md の Call-site Remediation Group 2 に反映済み
+
 ## References
 - [i18next-cli (npm)](https://www.npmjs.com/package/i18next-cli) — バージョン 1.69.0、MIT ライセンス、コマンド仕様の一次情報
 - サンドボックス実行ログ（本セッション内、`/tmp` 配下、恒久的な保存はしていない）— `status` / `status --unused` / `extract --ci --dry-run` / `sync --help` の実測結果

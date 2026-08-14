@@ -230,6 +230,8 @@ interface StatusParser {
 - 更新は明示的な `--update-baseline` 実行時のみ行い、通常の CI 実行では書き込まない
 - `--update-baseline` は、新しい測定値が既存の基準線より大きい（悪化する）場合、既定では書き込みを拒否してエラー終了する。`/kiro-validate-design` のレビューで、悪化した測定値でもそのまま上書きできてしまうと、CI が落ちたときに原因を直す代わりに「基準線を今の状態に合わせて更新する」ことで通してしまう経路が残ると指摘された。改悪方向への更新は `--update-baseline --allow-regression` を明示的に渡した場合のみ許可する
 - 更新実行時は、常に「基準線が何件から何件に変わるか」を標準出力に明示する（改善方向の更新であっても、レビュアーが PR の diff だけでなく実行ログでも変化量を確認できるようにする）
+- `baseline.json` がまだ存在しない最初の実行（本機能を初めて導入する時点）では、比較対象となる既存の基準線が無いため、悪化防止ガードの対象外として扱い、`--allow-regression` 無しでも測定値をそのまま書き込む。以後の実行では通常のガードが働く
+- `missingByLocale` にある言語のキーが記録されていない場合（新しい言語をこの機能に追加した直後など）、その言語の基準線は「0」として扱う。すなわち、その言語で1件でも欠損があれば不合格になる。「まだ基準線を決めていないので常に合格」という解釈は採らない（要件3.2が求める「本機能の提供時点で言語ごとに集計した件数を基準線として記録する」という前提に、新しい言語を後から追加した場合でも一貫させる）
 
 **Contracts**: Service [ ] / API [ ] / Event [ ] / Batch [ ] / State [x]
 
@@ -249,7 +251,7 @@ interface StatusParser {
 
 **Responsibilities & Constraints**
 - Group 1（7ファイル）: `t` を props 経由で受け取るのをやめ、各コンポーネントが自前で `useTranslation('admin')` を呼ぶ。書き換え前に親コンポーネントが実際にどの namespace で `t` を束縛していたかを確認し、同じ namespace を明示指定する
-- Group 2（19ファイル）: `createAdminPageLayout` の `title` callback 内のキー文字列に `admin:` を前置する（`useTranslation('admin')` に実際に束縛されているため、前置は文字列上の事実確認に過ぎない）
+- Group 2（19ファイル）: `createAdminPageLayout` の `title` callback 内のキー文字列に `admin:` を前置する（`useTranslation('admin')` に実際に束縛されているため、前置は文字列上の事実確認に過ぎない）。`createAdminPageLayout` を使うファイルは実際には23個あり、そのうち4個は対象外: `[...path].page.tsx` / `vault.page.tsx` の2個は `title` がキー参照を持たない固定文字列（`() => 'Not Found'` 等）、`app.page.tsx` / `data-transfer.page.tsx` の2個は既に `t(key, { ns: 'commons' })` という options 引数形式で明示指定済み。この options 引数形式も、`ns:key` という文字列前置と同様に `i18next-cli` の静的解析が正しく認識することをサンドボックスで確認済みであり、書き換え不要
 - Group 3（`saml.ts` 等）: `getTranslation({ ns: [...] })` で解決しているキーに namespace を前置する。前置対象のキーが両方の namespace に重複して存在しないことを、書き換え前に機械的に確認する（フォールバック順序の変化による値の取り違えを防ぐ）
 - 完全な動的キー（`saml.ts` のテンプレートリテラル等）はこの書き換えの対象外で、Requirement 4 の `preservePatterns` でカバーする
 
@@ -325,7 +327,7 @@ interface I18nAuditBaseline {
 ### Error Strategy
 - **パース失敗**: 期待した形式の出力が見つからない場合、Stdout Parser は例外を投げる。Audit Orchestrator はこれを「不合格」として扱い、`0件` として通過させない。CI 上ではジョブ失敗として現れ、原因（`i18next-cli` の出力フォーマット変更の可能性）をログに出す
 - **コマンド実行失敗**（`i18next-cli` 自体が予期せず終了した場合）: 検出不能として「不合格」扱いにする。「検出できなかったので合格」という解釈は行わない
-- **基準線ファイルの欠落・破損**: 起動時に検証し、読めない場合はエラーとして即座に失敗する（曖昧な既定値へのフォールバックはしない）
+- **基準線ファイルの欠落・破損**: 通常実行（CI 上の `lint:i18n`）では、起動時に検証し、読めない場合はエラーとして即座に失敗する（曖昧な既定値へのフォールバックはしない）。ただし `--update-baseline` 実行時にファイルがまだ存在しない場合（本機能の初回導入時）だけは例外で、Baseline Store の規定どおり「基準線0件からの更新」として書き込みを許可する
 
 ### Monitoring
 - CI のジョブ失敗が唯一の通知経路。既存の Slack 通知（`ci-app.yml` の `Slack Notification` ステップ）が `ci-app-lint` ジョブ全体の失敗として既に配線されているため、追加の監視設定は不要
