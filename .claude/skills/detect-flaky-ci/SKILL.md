@@ -33,6 +33,88 @@ this skill re-derives everything it needs by querying the tracker on each run.
   `flaky/confirmed`. Default `2`. (Playwright-detected flakiness always
   escalates on the first observation — see Step 3.)
 
+## Three Confidence Tiers
+
+Detection now produces one of three outcomes per candidate, cheapest evidence
+first:
+
+1. **`flaky/observing`** — a single vitest observation with no corroborating
+   signal (see "Cheap Suspicion Mining" below). Passive: waits for a future
+   run to repeat it (`--vitest-threshold`).
+2. **`flaky/suspected`** — a vitest observation that also matches one of the
+   three cheap, mechanical signals in "Cheap Suspicion Mining" (diff/PR
+   mismatch, sandwich pattern, or matrix divergence). No LLM judgment is
+   spent getting here — these are grep/diff-level checks against data this
+   skill already fetched. Handed to `investigate-flaky-test`, which spends
+   exactly one rerun to turn this into empirical proof.
+3. **`flaky/confirmed`** — either a Playwright in-run retry (unchanged from
+   before: the retry already IS the empirical proof, no further rerun
+   needed), or a `flaky/suspected` issue that `investigate-flaky-test`
+   reran once with no code change and watched pass.
+
+`detect-flaky-ci` only ever assigns tiers 1 and 3 (3 for Playwright only,
+unchanged). Tier 2 is new. `investigate-flaky-test` is the only skill that
+promotes tier 2 → tier 3 for vitest, because that promotion requires an
+actual rerun, which is an investigation action, not a detection action.
+
+## Cheap Suspicion Mining (vitest only)
+
+Before falling back to passive `--vitest-threshold` accumulation, check each
+vitest failure identity against three mechanical signals. All three are
+grep/diff/API-field comparisons — no log-content reasoning, no code reading.
+Run them in this order and stop at the first hit (cheapest first):
+
+**① Diff / PR-description mismatch.** Fetch the commit's associated PR (if
+any):
+
+```bash
+gh api repos/growilabs/growi/commits/{HEAD_SHA}/pulls -q '.[0].number'
+```
+
+If a PR exists, fetch its changed files and description:
+
+```bash
+gh api repos/growilabs/growi/pulls/{PR_NUMBER}/files --paginate -q '.[].filename'
+gh api repos/growilabs/growi/pulls/{PR_NUMBER} -q '.body'
+```
+
+If the failing spec's `SPEC_PATH` (and the module paths appearing in the
+failure's stack trace) are absent from the changed-files list, **and** the
+PR description does not mention the failing area, this failure is very
+likely unrelated to what the PR actually changed — suspicious. If the run
+has no associated PR (a direct push to `master`, e.g. a merge-queue commit),
+compare against that commit's own diff instead
+(`gh api repos/growilabs/growi/commits/{HEAD_SHA} -q '.files[].filename'`)
+and skip the description check.
+
+**② Sandwich pattern.** Within the `--lookback` window already fetched in
+Step 1, look for the same vitest identity key failing in two (or more) runs
+with a run of the *same job* in between that succeeded. A failure that
+disappears and reappears with an identical signature is stronger evidence of
+non-determinism than two failures with nothing but other failures between
+them (which looks more like an unfixed, ongoing regression). This does not
+require a new API call — it's a re-read of the Step 1 run list plus the
+Step 2 job results you already have from previous scans (this run's and, if
+available, prior observation comments on an existing `flaky/observing`
+issue, which already record run URLs/dates).
+
+**③ Matrix divergence.** `ci-app-test-integration` runs a
+node/MongoDB-version matrix (see any recent job name, e.g.
+`ci-app-test-integration (24.x, 8.0, 8, 8.19.16)`). If the same commit's
+other matrix cells for the same job **passed** while this one failed, that
+is a same-commit, zero-wait signal — no need to wait for a future run at
+all. Get sibling job results from the Step 2 jobs-list call you already made
+for this run (`gh api repos/growilabs/growi/actions/runs/{RUN_ID}/jobs`) —
+filter by job name prefix, compare conclusions.
+
+If none of the three hit, fall through to the existing passive
+`flaky/observing` / `--vitest-threshold` path unchanged — these mechanical
+checks are a fast lane on top of the old path, not a replacement for it.
+Genuinely subtle flakiness that doesn't show up in a diff/PR mismatch, a
+sandwich, or a matrix split still needs the old accumulation path (or a
+human/LLM eyeballing it later) — these three checks are deliberately not
+exhaustive.
+
 ## Why vitest and Playwright are handled differently
 
 - **Playwright** runs with `retries: 2` in CI (`apps/app/playwright.config.ts`).
@@ -61,21 +143,33 @@ Watched workflows (by their GitHub Actions display name, not the file name):
 - `Node CI for app production` — hosts `run-playwright` (via the reusable
   `Reusable build and test app for production` workflow)
 
-Query **each workflow separately** with `gh run list --workflow` — do not
-pull the unfiltered `actions/runs` list and filter client-side, the repo runs
-several other workflows (CodeQL, Auto-labeling, Auto approve PR, ...) and a
-generic `--lookback` window of recent runs across all of them can leave
-zero, or only a handful, of the two workflows actually being watched:
+Query **each workflow separately** — do not pull the unfiltered
+`actions/runs` list and filter client-side, the repo runs several other
+workflows (CodeQL, Auto-labeling, Auto approve PR, ...) and a generic
+`--lookback` window of recent runs across all of them can leave zero, or
+only a handful, of the two workflows actually being watched.
+
+**Use `gh api` against the workflow's own runs endpoint, not
+`gh run list --json`.** `gh run list --json` validates the requested fields
+against a fixed, gh-CLI-version-specific struct — this repo's cloud routine
+runs gh 2.45.0, which does not know the `attempt` field
+(`Unknown JSON field: "attempt"`) and fails the whole command outright, not
+just that field. `gh api` has no such client-side field allowlist — it is a
+thin passthrough to GitHub's REST response, which already includes
+`run_attempt` (among everything else) regardless of gh CLI version:
 
 ```bash
-gh run list --repo growilabs/growi --workflow "Node CI for app development" \
-  --limit {LOOKBACK} --status completed \
-  --json databaseId,conclusion,headSha,createdAt,url,event,attempt
+gh api "repos/growilabs/growi/actions/workflows/ci-app.yml/runs?per_page={LOOKBACK}&status=completed" \
+  -q '.workflow_runs[] | {databaseId: .id, conclusion, headSha: .head_sha, createdAt: .created_at, url: .html_url, event, attempt: .run_attempt}'
 
-gh run list --repo growilabs/growi --workflow "Node CI for app production" \
-  --limit {LOOKBACK} --status completed \
-  --json databaseId,conclusion,headSha,createdAt,url,event,attempt
+gh api "repos/growilabs/growi/actions/workflows/ci-app-prod.yml/runs?per_page={LOOKBACK}&status=completed" \
+  -q '.workflow_runs[] | {databaseId: .id, conclusion, headSha: .head_sha, createdAt: .created_at, url: .html_url, event, attempt: .run_attempt}'
 ```
+
+(`ci-app.yml` = "Node CI for app development", `ci-app-prod.yml` = "Node CI
+for app production" — confirm with
+`gh api repos/growilabs/growi/actions/workflows -q '.workflows[] | {name,path}'`
+if these file names ever change.)
 
 This naturally includes pull_request and merge-queue-triggered runs (the
 merge queue is where today's investigation actually surfaced a failure — a
@@ -106,10 +200,28 @@ newer push, not evidence of anything):
 gh api repos/growilabs/growi/actions/runs/{RUN_ID}/jobs -q '.jobs[] | select(.conclusion == "failure") | {id, name}'
 ```
 
-Fetch each failed job's log:
+Fetch each failed job's log using **whichever method Step 0 of
+`flaky-ci-routine.md` decided for this run** (see that command's "Job Log
+Fetch Method" probe — it is decided once, at the very start of the routine,
+not re-decided per log). If invoked standalone (not via `/flaky-ci-routine`),
+do that same one-time probe yourself before this step: check whether
+`mcp__github__get_job_logs` appears in your available tools; if so, use it
+for every job log fetch below; if not, use `gh run view --log-failed`. Do
+not try one and fall back to the other per log — that produces
+run-to-run-inconsistent behavior for no benefit, since the capability is a
+property of the environment, not of any individual log fetch.
 
 ```bash
+# gh path (devcontainer / any environment where the egress proxy allows
+# results-receiver.actions.githubusercontent.com and *.blob.core.windows.net)
 gh run view {RUN_ID} --repo growilabs/growi --job {JOB_ID} --log-failed
+```
+
+```
+# MCP path (cloud routine — the blob-storage redirect above is Forbidden
+# through this environment's egress proxy; the MCP tool fetches server-side
+# instead)
+mcp__github__get_job_logs(owner="growilabs", repo="growi", job_id={JOB_ID}, failed_only=true)
 ```
 
 ### Step 2b: also check successful `run-playwright` jobs for in-run flakes
@@ -125,9 +237,15 @@ conclusion, not just failed runs), grepping rather than reading the full log
 to keep this cheap:
 
 ```bash
+# gh path
 gh run view {RUN_ID} --repo growilabs/growi --job {JOB_ID} --log \
   | grep -iE "flaky|Retry #|^:*error file="
+
+# MCP path — fetch then grep the returned text the same way
+mcp__github__get_job_logs(owner="growilabs", repo="growi", job_id={JOB_ID}, failed_only=false)
 ```
+
+Use the same Step-0-decided method as the failed-job fetch above.
 
 If this is empty, the shard had no flakiness — move on. If it has a
 ` flaky` count > 0, proceed to Step 3's Playwright extraction using this
@@ -203,8 +321,10 @@ FAIL {app-integration|...} {SPEC_PATH} > {SUITE} > {TEST_TITLE}
 
 Identity key: `vitest:{SPEC_PATH}:{TEST_TITLE}`.
 
-This is an **observation**, not a confirmation — proceed to Step 4 to decide
-whether it crosses the threshold.
+This is an **observation**, not a confirmation. Before proceeding to Step 4,
+run it through "Cheap Suspicion Mining" above — a hit there makes this a
+**suspected** occurrence (tier 2) instead of a plain observation (tier 1).
+Either way, proceed to Step 4.
 
 ## Step 4: Reconcile Against Existing Issues
 
@@ -237,6 +357,7 @@ tokenization would have been:
 
 ```bash
 gh api repos/growilabs/growi/issues -f state=all -f labels="flaky/observing" --paginate -q '.[] | {number,title,state}'
+gh api repos/growilabs/growi/issues -f state=all -f labels="flaky/suspected" --paginate -q '.[] | {number,title,state}'
 gh api repos/growilabs/growi/issues -f state=all -f labels="flaky/confirmed" --paginate -q '.[] | {number,title,state}'
 ```
 
@@ -256,12 +377,12 @@ gh api repos/growilabs/growi/labels --paginate -q '.[].name'
 gh issue create --repo growilabs/growi \
   --title "flaky: {IDENTITY_KEY}" \
   --label "type/bug" --label "{EXACT_PHASE_NEW_LABEL}" \
-  --label "{flaky/confirmed if Step 3 evidence is already confirmed, else flaky/observing}" \
+  --label "{TIER_LABEL}" \
   --body "$(cat <<'EOF'
 ## Detected by detect-flaky-ci
 
 **Identity key**: `{IDENTITY_KEY}`
-**Kind**: {playwright | vitest} {(strong evidence: passed on in-run retry) if confirmed}
+**Kind**: {playwright | vitest} {(strong evidence: passed on in-run retry) if confirmed} {(cheap suspicion: {① diff/PR mismatch | ② sandwich pattern | ③ matrix divergence}) if suspected}
 
 ### First observation
 
@@ -276,12 +397,21 @@ gh issue create --repo growilabs/growi \
 {relevant log excerpt — the FAIL block or the ::error annotation + retry blocks}
 ```
 
+{if suspected, additionally include the specific mining evidence: e.g. "PR #{N} changed {files}, none overlap this spec's path or stack trace" / "same identity failed in run {A}, passed in intervening run {B}, failed again here" / "sibling matrix job {NAME} on the same commit passed"}
+
 ### Status
 
-{"Confirmed flaky from a single run (Playwright retry evidence)." if confirmed else "Observation 1/{VITEST_THRESHOLD} — needs {VITEST_THRESHOLD - 1} more independent occurrence(s) before this is handed to investigate-flaky-test."}
+{pick exactly one:
+ - confirmed (Playwright): "Confirmed flaky from a single run (Playwright retry evidence)."
+ - suspected (vitest, mining hit): "Suspected flaky ({① | ② | ③}) — handed directly to investigate-flaky-test for a one-time confirmation rerun, no threshold wait needed."
+ - observing (vitest, no mining hit): "Observation 1/{VITEST_THRESHOLD} — needs {VITEST_THRESHOLD - 1} more independent occurrence(s) before this is handed to investigate-flaky-test."}
 EOF
 )"
 ```
+
+`{TIER_LABEL}` is `flaky/confirmed` for Playwright, `flaky/suspected` for a
+vitest observation that hit one of the three mining checks, `flaky/observing`
+for a plain vitest observation with no mining hit.
 
 ### Existing OPEN issue found, currently `flaky/observing`
 
@@ -303,13 +433,30 @@ EOF
 )"
 ```
 
-Count observation comments (initial issue body counts as observation 1) plus
-this new one. If the count reaches `--vitest-threshold` (or this evidence
-item is itself a "confirmed" one per Step 3), escalate:
+Then check both escalation paths, in this order:
 
-```bash
-gh issue edit {NUMBER} --repo growilabs/growi --remove-label "flaky/observing" --add-label "flaky/confirmed"
-```
+1. **Does this new observation itself hit a mining check** (① / ② / ③,
+   re-run against the accumulated history now that there are 2+ occurrences
+   to compare)? If so, escalate straight to `flaky/suspected`, skipping the
+   threshold wait entirely:
+   ```bash
+   gh issue edit {NUMBER} --repo growilabs/growi --remove-label "flaky/observing" --add-label "flaky/suspected"
+   ```
+2. Otherwise, count observation comments (initial issue body counts as
+   observation 1) plus this new one. If the count reaches
+   `--vitest-threshold`, escalate the old way — straight to
+   `flaky/confirmed` (unchanged: two independent naturally-occurring
+   observations without any mining hit is already the passive path's own
+   confidence bar, no extra rerun gate added on top of it):
+   ```bash
+   gh issue edit {NUMBER} --repo growilabs/growi --remove-label "flaky/observing" --add-label "flaky/confirmed"
+   ```
+
+### Existing OPEN issue found, currently `flaky/suspected`
+
+Still append the observation comment (useful evidence for
+`investigate-flaky-test`'s confirmation rerun), but do not change labels —
+it is already queued for investigation.
 
 ### Existing OPEN issue found, already `flaky/confirmed`
 
@@ -331,10 +478,12 @@ gh issue edit {NUMBER} --repo growilabs/growi --add-label "flaky/confirmed" --re
 
 ## Step 5: Report
 
-Print a short summary of this run: how many runs/jobs scanned, how many
-classified as infra noise (with which pattern), how many new issues created,
-how many existing issues updated, how many escalated to `flaky/confirmed`.
-This is the only user-facing output — do not create files.
+Print a short summary of this run: which job-log fetch method Step 0 chose
+(`gh` or `mcp`), how many runs/jobs scanned, how many classified as infra
+noise (with which pattern), how many new issues created, how many existing
+issues updated, how many escalated to `flaky/suspected` (and via which of
+the three mining checks) vs `flaky/confirmed`. This is the only user-facing
+output — do not create files.
 
 ## Error Handling
 
@@ -353,3 +502,17 @@ This is the only user-facing output — do not create files.
   underlying flake): do not attempt fuzzy matching — treat as a new issue.
   False negatives here (a missed dedupe) are cheap; false positives (wrongly
   merging two different flakes) are not.
+- Job log content unreachable via either method (`gh run view --log*`
+  returns Forbidden, or `mcp__github__get_job_logs` is not among your
+  available tools): this is the known blob-storage-redirect restriction
+  (see the Job Log Fetch Method note in Steps 2/2b) — it means the Step 0
+  probe in `flaky-ci-routine.md` picked wrong, or this skill is running
+  standalone in an environment with neither path available. Report which
+  jobs could not be evidenced and continue with what you can read (run/job
+  metadata, conclusions) rather than stopping the whole scan; do not
+  silently skip affected runs without reporting them in Step 5.
+- Cheap suspicion mining (① / ② / ③) finds no clean signal either way
+  (e.g. a PR touches half the repo, or matrix siblings are also failing for
+  unrelated reasons): do not force a tier — fall through to
+  `flaky/observing` and let the passive threshold path handle it. These
+  checks are a fast lane, not a required gate.
