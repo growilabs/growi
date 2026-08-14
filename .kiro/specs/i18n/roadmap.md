@@ -85,7 +85,7 @@ SSR ペイロード肥大（`/me/*` で 513 KB、`/admin/{app,ai,vault}` で 347
 
 ## Specs (dependency order)
 
-- [ ] `i18n-key-audit` — 未使用キー / 言語間の欠損 / 存在しないキー参照を CI ゲート化し、discovery で見つかった実バグ 2 件を修正する。Dependencies: なし。Status: 2026-08-06 brief drafted（`.kiro/specs/i18n-key-audit/brief.md`）、requirements 以降は未着手
+- [ ] `i18n-key-audit` — 未使用キー / 言語間の欠損 / 存在しないキー参照を CI ゲート化し、discovery で見つかった実バグ 2 件を修正する。Dependencies: なし。Status: 2026-08-06 brief drafted（`.kiro/specs/i18n-key-audit/brief.md`）、2026-08-14 requirements 生成済み（未使用キー・言語間欠損は現在件数を基準線とし悪化のみ失敗、存在しないキー参照はゼロ件まで解消の3本立てで決着）。design 以降は未着手
 - [ ] `i18n-community-translation` — POEditor を受け皿にしたコミュニティ翻訳の導線と同期経路。Dependencies: なし（ただしリポジトリ側のキーが整合してから同期を繋ぐ方が事故が少ないので、`i18n-key-audit` の後が望ましい）。Status: 2026-08-06 brief drafted（`.kiro/specs/i18n-community-translation/brief.md`）、requirements 以降は未着手
 
 ## 進める順序
