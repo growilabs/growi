@@ -1,0 +1,89 @@
+# Research & Design Decisions
+
+## Summary
+- **Feature**: `i18n-key-audit`
+- **Discovery Scope**: Extension（既存 CI パイプラインへの検出ステップ追加 + 実バグ2件の修正）。ただし採用ツール `i18next-cli` は公開1年未満の若いツールのため、ツール契約の検証は Full Discovery 相当（サンドボックス実行による実測）で行った。
+- **Key Findings**:
+  - brief が想定していたツールの使い方（`extract --ci --dry-run` で未使用キーを検出）は誤り。実際に未使用キー検出を担うのは `status --unused` であり、`extract` は既定で書き込む・削除するコマンドなので CI では一切使わない方針にした。
+  - 実リポジトリに対する実測で、既定言語（en_US）で「コードから参照されているが存在しないキー」は 182 件検出されたが、詳細分類の結果、実際に「どの namespace ファイルにも存在しない」真の壊れた参照は 31 件（brief の 27 件という見積りに近い）。残り約 151 件は別カテゴリ（既知の Bug 2 系23件、および新たに見つかった「props 経由で渡される `t` 関数のため tool が namespace を追跡できない」151件中119件の見せかけの不在）。
+  - 「props 経由の `t` 関数」問題は Requirement 4（動的キーの宣言）では扱えない、別軸の除外機構が要件として必要。
+
+## Research Log
+
+### i18next-cli のコマンド契約（brief の想定との相違）
+- **Context**: brief は `status`（欠損検出）と `extract --ci --dry-run`（未使用キー検出）の2ステップ構成を想定していた。若いツールなので、実装前にこの契約を検証する必要があった。
+- **Sources Consulted**: npm registry（`i18next-cli@1.69.0` の README・型定義）、サンドボックス実行（`npx i18next-cli --help` / `status --help` / `extract --help` / `sync --help`）、実際の入出力を伴う手動実験（2言語・1 namespace の最小プロジェクトを都度作成して実行）
+- **Findings**:
+  - `status`（引数なし）: 全 locale の翻訳進捗（絶対数・パーセント）と、既定言語で「コードにあるがキーが存在しない」件数を1回の実行でまとめて表示する。読み取り専用。問題があれば exit code 1。
+  - `status --unused`: JSON にあってコードから参照されていないキーだけを読み取り専用で報告する専用フラグ。「ファイルは変更されません」と明記されており、見つかれば exit code 1。
+  - `status <locale>`: 指定した1言語のキー単位の詳細（欠損・未翻訳を個別に列挙）。
+  - `extract`: 既定で JSON ファイルを書き換える（コードにあるキーの追加、`removeUnusedKeys: true` の場合は未使用キーの削除も行う）。`--dry-run` を付けた場合のみ書き込まない。`--ci` は「このコマンドの実行結果としてファイルに変更が生じる場合に exit code 1」という意味であり、「未使用キーだけ」を意味しない。
+  - `sync`: 2次言語ファイルを既定言語に同期するコマンドで、そもそも `--dry-run` 相当のオプションが無い（書き込み専用）。CI では使わない。
+  - `preservePatterns`（`extract` 設定内）は `status` / `status --unused` にも効き、動的に構築されるキー（テンプレートリテラルの変数セグメント）を「未使用」判定・「欠損」判定の両方から正しく除外することをサンドボックスで確認済み。
+  - 設定ファイル名は `i18next.config.ts`（`i18next-cli.config.ts` ではない）。除外パターンは `extract.input` に `!` を前置しても無視される（サイレントに効かない、実際に踏んだ罠）。正しいフィールドは `extract.ignore`（別配列）。
+  - `i18next-cli` は自分自身の `i18next`/`react-i18next` を devDependency として内包しており、ホスト側の `i18next ^23.16.5` / `react-i18next ^15.1.1` とバージョン競合しない。
+  - ライセンスは MIT（GROWI と両立）。
+  - JSON 等の機械可読出力オプションは存在しない（人間向けテキストのみ）。基準線比較のラッパーは stdout のテキストを正規表現で解析する必要がある。
+- **Implications**:
+  - CI の検出コマンドは `status`（既定言語の欠損参照＋言語間ドリフト）と `status --unused`（未使用キー）の2つだけで足り、`extract`・`sync` は一切呼ばない。Requirement 5（翻訳ファイルの不変性）は設計上「書き込み系コマンドを呼ばない」ことで機構的に満たされる。
+  - stdout 解析に依存するため、バージョンを厳密固定し、パーサーの単体テストを持つ（後述リスク）。
+
+### 実リポジトリでの実測（既定言語の欠損参照 182 件の内訳）
+- **Context**: Requirement 1 の AC4 は「discovery で判明した27件を含め0件」と書かれているが、これはサンドボックスでの検証だけでは裏付けられない。実際のコードベースに対してツールを走らせて確かめる必要があった。
+- **Sources Consulted**: `npx i18next-cli@1.69.0 status` / `status en_US --hide-translated` / `status --unused` を実際の `apps/app/src` と `public/static/locales` に対して実行（一時的な `i18next.config.ts` を作成して検証、検証後は削除）
+- **Findings**:
+  - 最初の実行では `extract.input` に `src/**/*.{ts,tsx,js,jsx}` を指定し、テストファイルを除外しなかったため、コメント中に書かれた説明用のコード例（`g2g-error-keys-locale-drift.spec.ts` の JSDoc コメント内 `` `t('admin:g2g:foo')` ``）まで実使用として誤検出された。`extract.ignore` で `*.spec.*` 等を除外して再実行し、この誤検出は解消した（ただし全体件数への影響は軽微、184→182件）。
+  - 既定言語で「コードにあるが存在しない」182件を namespace ごとに分類し、さらに各キーが実際に他の namespace ファイルには存在するかを機械的に照合した結果:
+    | 内訳 | 件数 | 実体 |
+    |---|---|---|
+    | どの namespace ファイルにも存在しない（真の Bug 1 類） | 31 | discovery の27件相当。ここに含まれる `common:failed_to_copy` は存在しない namespace `common` への参照という brief の旗艦例そのもの |
+    | `translation.json` にのみ存在し、admin/commons 文脈から参照（既知の Bug 2） | 23 | discovery が独自に洗い出した「共有ラベル約20件」と、別の機械的スクリプトで再現した23件が完全一致 |
+    | `admin.json` に実在するが、`translation` namespace の不在として報告される | 119 | 新たな発見。原因は下記 |
+    | `commons.json` にのみ存在するが同様の理由で報告される | 5 | 上と同種の少数派 |
+  - 119件（と5件）の原因を1件（`security_settings.max_age` / `SessionMaxAgeSettings.tsx`）で特定: この種のコンポーネントは `useTranslation()` を自分では呼ばず、親コンポーネントから **`t` 関数を props で受け取る**（`t: (key: string, options?: Record<string, unknown>) => string` という型のプロパティ）。`i18next-cli` の静的解析はファイル内の `useTranslation()` 呼び出しからしか namespace を追跡できないため、props 経由で渡された `t` の実際の namespace 束縛（親の `useTranslation(['admin', ...])`）を追跡できず、既定 namespace（`translation`）への参照として誤って分類する。実行時には親のフックが正しく `admin` を含むため、これらは高い確度で本物の不具合ではない。
+  - 同種の誤検出パターンとして、`AdminNavigation.tsx`（`useTranslation(['admin', 'commons'])` を使い、21箇所の `t()` 呼び出しを持つ switch 文コンポーネント）由来のキーも一部含まれる。ただしこのファイル固有の内部動作までは追跡していない（下記「調査を打ち切った理由」参照）。
+- **Implications**:
+  - Requirement 1 の「27件」という数字は実測でおおむね裏付けられた（31件、+4件は discovery の見積り誤差として妥当な範囲）。ただし要件文に固定の件数を書き込むのは適切でない（後述の Design Decision）。
+  - Requirement 7（Bug 2）の対象範囲「共有ラベル約20件」は実測でも23件で裏付けられ、大きく拡大する必要はない。
+  - 一方で「props 経由の `t`」による119+5件の誤検出は、Requirement 4（動的キーの宣言）が想定する原因（キーが実行時に動的に構築される）とは別物であり、新しい除外の軸が要件として必要になる。これは design.md で対処するのではなく、requirements.md に一段上げて記録する。
+
+### 調査を打ち切った理由
+- 179件全部の個別フォレンジックは、サードパーティ製ツールの内部ヒューリスティックを完全解明する労力に対して得られる設計上の価値が小さいと判断し、「namespace ファイルに実在するか」という製品的に意味のある軸での分類（上表）が取れた時点で打ち切った。`AdminNavigation.tsx` の switch 文内での挙動の詳細な原因究明は行っていない。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| `status` + `status --unused` のみ（採用） | 読み取り専用の2コマンドだけを CI から呼ぶ | Requirement 5（不変性）を機構的に満たす。書き込み系コマンドを呼ぶ経路が存在しないため、将来の変更でも安全 | stdout のテキスト解析が必要（JSON 出力が無い） | brief の想定（`extract --ci --dry-run`）から変更 |
+| `extract --ci --dry-run` を未使用キー検出に使う（brief の原案、不採用） | brief が最初に想定していた構成 | 追加設定が要らない | 実際は「抽出した結果ファイルが変わるか」を見るコマンドで、未使用キー専用ではない。かつ `--dry-run` を忘れると本番相当で書き込みが発生する経路が常に存在する | 実測で `--unused` の方が意図に一致すると判明 |
+
+## Design Decisions
+
+### Decision: 未使用キー検出は `extract --ci --dry-run` ではなく `status --unused` を使う
+- **Context**: brief は `extract --ci --dry-run` を未使用キー検出の手段として想定していた
+- **Alternatives Considered**:
+  1. `extract --ci --dry-run` — brief の原案
+  2. `status --unused` — 実測で確認した、意図に一致する専用コマンド
+- **Selected Approach**: `status --unused` のみを使う。`extract`/`sync` は CI から一度も呼ばない
+- **Rationale**: `status --unused` は名前通り未使用キーだけを読み取り専用で報告し、`extract` が持つ「既定で書き込む」危険性を構造的に排除できる
+- **Trade-offs**: brief の想定より1コマンド少ない、シンプルな構成になった。デメリットは無い
+- **Follow-up**: なし
+
+### Decision: 既定言語の「存在しないキー参照」ゼロ件化の対象は、namespace ファイルへの実在チェックで判定する
+- **Context**: `status`（既定言語チェック）の生の報告件数（182件）は、大部分が「別の namespace ファイルには実在する」誤検出（namespace 追跡の限界）であり、そのまま「0件」を目指すと本物のバグではないものまで潰しにいく作業になる
+- **Alternatives Considered**:
+  1. ツールの生の報告件数をそのまま0件化の対象にする — 誤検出も含めて全部「解消」しようとすることになり、本来不要な作業（コンポーネントの構造変更）を要求してしまう
+  2. 「3つの namespace ファイルのどこにも実在しないキー」だけを0件化の対象にし、それ以外（他の namespace には実在する）は別の除外機構で扱う — 採用
+- **Selected Approach**: 2を採用。Requirement 1 の対象は「3 namespace のどこにも存在しない」ケースに絞る
+- **Rationale**: 実測で「どこにも存在しない」ケースは31件で discovery の27件と近い値であり、これが本来の Bug 1 の実体に近い。119+5件の「他の namespace には実在する」ケースは Bug 2 か、`t` の props 経由渡しによる検出限界であり、ゼロ件化の対象としては不適切
+- **Trade-offs**: 「他の namespace には実在するが誤った namespace から参照されている」ケースを検出から除外する分だけ、検出の網は狭くなる。ただしこの分類は Requirement 7（Bug 2）または新設する除外機構でカバーする
+- **Follow-up**: requirements.md に「props 経由の `t`」用の新しい除外要件を追加する必要がある（ユーザー確認待ち）
+
+## Risks & Mitigations
+- **stdout のテキスト解析が壊れる** — `i18next-cli` のバージョンアップで出力フォーマットが変わると、基準線比較の正規表現が壊れて誤って0を返す可能性がある。ミティゲーション: バージョンを`^`なしで固定し、既知の出力サンプルに対するパーサーの単体テストを持ち、パースに失敗したら「失敗」として扱う（0扱いにしない）
+- **props 経由の `t` 関数を持つコンポーネントが将来増える** — 新しい除外機構（ファイル単位のアローリスト等）を作った場合、宣言し忘れると誤検出が積み重なる。ミティゲーション: 除外リストを明示的な人手管理にし、CHANGELOG的に増減を追える形にする
+- **Bug 2 の重複修正がドリフトの盲点になる**（`commons.json` に複製する場合、`translation.json` 側の値を更新し忘れると2つの値が食い違う）— ミティゲーション: 複製した約23件のペアが全5言語で一致することを検証する専用テストを設ける
+
+## References
+- [i18next-cli (npm)](https://www.npmjs.com/package/i18next-cli) — バージョン 1.69.0、MIT ライセンス、コマンド仕様の一次情報
+- サンドボックス実行ログ（本セッション内、`/tmp` 配下、恒久的な保存はしていない）— `status` / `status --unused` / `extract --ci --dry-run` / `sync --help` の実測結果
