@@ -1,6 +1,6 @@
 ---
 name: flaky-ci-routine
-description: Full flaky-CI routine - detect flaky CI failures, then investigate/fix every newly-confirmed one. Designed to be run unattended from a cron schedule. Usage: /flaky-ci-routine [--lookback=N] [--vitest-threshold=N]
+description: Full flaky-CI routine - detect flaky CI failures, then investigate/fix every newly-confirmed one. Designed to be run unattended from a cron schedule. Usage: /flaky-ci-routine [--window-hours=N] [--vitest-threshold=N]
 ---
 
 # /flaky-ci-routine
@@ -95,8 +95,11 @@ command's own Step 4 report.
 ## Step 1 — Detect
 
 Invoke the `detect-flaky-ci` skill with `$ARGUMENTS` passed through
-(`--lookback`, `--vitest-threshold`) plus the `JOB_LOG_METHOD` decided in
-Step 0. Let it finish and report its summary.
+(`--window-hours`, `--max-runs-per-workflow`, `--vitest-threshold`) plus the
+`JOB_LOG_METHOD` decided in Step 0. If `--window-hours` isn't in
+`$ARGUMENTS`, don't force a value here — let `detect-flaky-ci`'s own
+default (twice its cron cadence) apply. Let it finish and report its
+summary.
 
 ## Step 2 — Select newly-actionable issues
 
@@ -114,9 +117,13 @@ still new". Run it once per tier and merge the two lists — a single query
 can't OR two different tier labels together:
 
 ```bash
-gh api repos/growilabs/growi/issues -f state=open -f labels="flaky/confirmed,{EXACT_PHASE_NEW_LABEL}" --paginate -q '.[] | {number,title}'
-gh api repos/growilabs/growi/issues -f state=open -f labels="flaky/suspected,{EXACT_PHASE_NEW_LABEL}" --paginate -q '.[] | {number,title}'
+gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/confirmed,{EXACT_PHASE_NEW_LABEL}" --paginate -q '.[] | {number,title}'
+gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/suspected,{EXACT_PHASE_NEW_LABEL}" --paginate -q '.[] | {number,title}'
 ```
+
+(`-X GET` is required whenever `-f`/`-F` is used for a read — `gh api`
+otherwise defaults to `POST`, which a read endpoint like this rejects with
+a confusing "title wasn't supplied" 422.)
 
 If this combined list is empty, report that and stop — there is nothing to
 investigate this run.
