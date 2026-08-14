@@ -1007,12 +1007,12 @@
     "paste_transfer_key": "Copier clé de transfert ici",
     "transfer_method": {
       "heading": "Méthode de transfert",
-      "migration": "Migration (remplace toutes les données de la destination)",
+      "migration": "Migration (remplacer toutes les données de la destination)",
       "merge": "Ajouter aux données existantes (les données existantes de la destination sont conservées)"
     },
     "confirm_modal": {
       "title": "Confirmer le transfert",
-      "description": "Le GROWI de destination contient actuellement les données suivantes. Démarrer ce transfert supprimera l'intégralité de ces données et les remplacera par celles de ce GROWI :",
+      "description": "Le GROWI de destination contient actuellement les données suivantes. Démarrer ce transfert supprimera toutes ces données et les remplacera par les données de ce GROWI :",
       "counts": {
         "users": "Utilisateurs",
         "user_groups": "Groupes d'utilisateurs",
@@ -1020,9 +1020,9 @@
       },
       "warnings_heading": "Avant de continuer :",
       "warnings": {
-        "password_seed_mismatch": "Le GROWI source et le GROWI de destination utilisent des graines de mot de passe différentes. Les utilisateurs migrés ne pourront pas se connecter avec leur mot de passe existant.",
-        "no_loginable_admin": "Le GROWI de destination n'a aucun administrateur pouvant actuellement se connecter. Après le transfert, personne ne pourra peut-être se connecter.",
-        "sessions_not_invalidatable": "Le magasin de sessions du GROWI de destination ne permet pas d'invalider des sessions individuelles. Les sessions établies avant le transfert resteront valides.",
+        "password_seed_mismatch": "Le GROWI source et le GROWI de destination ont des graines de mot de passe (password seed) différentes. Les utilisateurs migrés ne pourront pas se connecter avec leur mot de passe existant.",
+        "no_loginable_admin": "Le GROWI de destination n'a actuellement aucun administrateur pouvant se connecter. Après le transfert, il se peut que personne ne puisse se connecter.",
+        "sessions_not_invalidatable": "Le magasin de sessions du GROWI de destination ne peut pas invalider les sessions individuellement. Les sessions établies avant le transfert resteront valides.",
         "local_auth_disabled_at_source": "Ce GROWI a désactivé l'authentification locale (identifiant/mot de passe). Même un administrateur de destination sauvegardé ne pourra pas se connecter avec un mot de passe."
       }
     },
@@ -1034,7 +1034,7 @@
       "file_upload_total_limit": "Ce transfert ne peut pas continuer : la taille totale des pièces jointes du GROWI source dépasse la limite de téléversement du GROWI de destination."
     },
     "rescue_outcome": {
-      "heading": "La migration a remplacé tous les utilisateurs de la destination. Les comptes administrateurs suivants ont été conservés afin que quelqu'un puisse encore se connecter :",
+      "heading": "Le transfert a remplacé tous les utilisateurs de la destination. Les comptes administrateur suivants ont été conservés afin qu'une personne puisse encore se connecter :",
       "renamed_from": "renommé depuis",
       "email_removed": "Son adresse e-mail a été supprimée car elle entrait en conflit avec un utilisateur entrant.",
       "slack_member_id_removed": "Son identifiant de membre Slack a été supprimé car il entrait en conflit avec un utilisateur entrant.",
@@ -1233,7 +1233,7 @@
     "error_import_in_progress": "Transfert interrompu : une autre importation de données est déjà en cours sur le GROWI de destination. Attendez qu'elle se termine, puis réessayez le transfert.",
     "error_partial_import": "Transfert incomplet : le GROWI de destination n'a pas terminé le transfert proprement (l'importation d'une collection, le sauvetage d'un administrateur ou le nettoyage après importation a peut-être échoué), il se peut donc que sa base de données ne soit que partiellement transférée. Si la destination a été mise en mode maintenance pour ce transfert, elle reste inaccessible aux utilisateurs ordinaires jusqu'à ce que vous le désactiviez depuis Administration > Paramètres de l'application sur le GROWI de destination. Corrigez la cause puis relancez le transfert.",
     "error_protected_collection": "Transfert interrompu : le GROWI de destination a refusé la requête car elle mentionnait des collections qu'un transfert ne doit pas transporter, rien n'a donc été importé. L'écran de transfert ne sélectionne jamais ces collections ; vérifiez que les deux GROWI utilisent la même version, puis signalez les noms de collections affichés ci-dessous.",
-    "error_mixed_import_methods": "Transfert interrompu : le GROWI de destination a refusé la requête car l'affectation des méthodes d'importation mélangeait le remplacement de certaines collections avec l'ajout pour d'autres, rien n'a donc été importé. L'écran de transfert ne construit plus ce type de requête ; vérifiez que les deux GROWI utilisent la même version, puis réessayez le transfert.",
+    "error_mixed_import_methods": "Transfert annulé : le GROWI de destination a refusé la requête car son assignation de méthode d'import mélangeait le remplacement de certaines collections avec l'ajout à d'autres, donc rien n'a été importé. L'écran de transfert ne construit plus ce type de requête ; vérifiez que les deux GROWI utilisent la même version, puis relancez le transfert.",
     "error_invalid_transfer_key": "Transfert interrompu : le GROWI de destination a rejeté la clé de transfert car elle est absente, expirée ou invalide. Publiez une nouvelle clé de transfert sur le GROWI de destination puis réessayez.",
     "error_parse_failed": "Transfert interrompu : le GROWI de destination n'a pas pu analyser la requête de transfert. Vérifiez que les deux GROWI utilisent la même version, puis réessayez le transfert.",
     "error_validation_failed": "Transfert interrompu : le GROWI de destination n'a pas pu valider le fichier d'archive GROWI envoyé. Il est peut-être corrompu ; essayez de régénérer et de renvoyer l'archive.",

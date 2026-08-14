@@ -29,7 +29,7 @@ const prepareAttachmentTextForCreate = (page, siteUrl) => {
  * Return diff with latest revisionBody
  * @param {IPageHasId} page
  * @param {string} siteUrl
- * @param {IRevisionHasId} previousRevision
+ * @param {{ body: string }} previousRevision
  */
 const prepareAttachmentTextForUpdate = (page, siteUrl, previousRevision) => {
   if (previousRevision == null) {

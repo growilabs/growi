@@ -300,6 +300,8 @@ export const setup = (crowi) => {
    *                  isRecursively:
    *                    type: boolean
    *                    description: whether rename page with descendants
+   *                  revisionId:
+   *                    $ref: '#/components/schemas/ObjectId'
    *                required:
    *                  - pageId
    *                  - revisionId
@@ -312,12 +314,16 @@ export const setup = (crowi) => {
    *                  properties:
    *                    page:
    *                      $ref: '#/components/schemas/Page'
+   *          400:
+   *            description: revisionId is missing, or the destination is under a non-existent user's user page. An empty page may be renamed without revisionId.
    *          403:
    *            description: Page is forbidden.
    *          404:
    *            description: Page is not found.
    *          409:
-   *            description: page path is already existed
+   *            description: The destination path is already taken, cannot be used, or revisionId is not the latest revision.
+   *          500:
+   *            description: Failed to rename page.
    */
   router.put(
     '/rename',
@@ -410,7 +416,9 @@ export const setup = (crowi) => {
           );
         }
 
-        if (!page.isEmpty && !page.isUpdatable(revisionId)) {
+        // isUpdatable is async: without the await the negation is always false and
+        // this conflict check never fires
+        if (!page.isEmpty && !(await page.isUpdatable(revisionId))) {
           return res.apiv3Err(
             new ErrorV3(
               "Someone could update this page, so couldn't delete.",
@@ -1056,9 +1064,33 @@ export const setup = (crowi) => {
             isRecursively,
           );
       } else {
+        // isUpdatable is async, so it has to be awaited before the result is used as
+        // a predicate: a bare call returns a Promise, which is always truthy, and
+        // kept every page regardless of whether its revision is still the latest.
+        // Resolved up front rather than inside the filter, which cannot await.
+        let isUpdatableFlags;
+        try {
+          isUpdatableFlags = await Promise.all(
+            pagesToDelete.map((p) =>
+              // an empty page has no revision to compare
+              p.isEmpty
+                ? true
+                : p.isUpdatable(pageIdToRevisionIdMap[p._id].toString()),
+            ),
+          );
+        } catch (err) {
+          logger.error(
+            'Failed to check whether the pages to delete are up to date.',
+            err,
+          );
+          return res.apiv3Err(
+            new ErrorV3('Failed to find pages to delete.'),
+            500,
+          );
+        }
+
         const filteredPages = pagesToDelete.filter(
-          (p) =>
-            p.isEmpty || p.isUpdatable(pageIdToRevisionIdMap[p._id].toString()),
+          (_p, index) => isUpdatableFlags[index],
         );
         pagesCanBeDeleted = await crowi.pageService.filterPagesByCanDelete(
           filteredPages,
