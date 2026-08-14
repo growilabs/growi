@@ -32,10 +32,12 @@ Supports the same two execution modes as `investigate-issue`:
 issue number and mode the same way `investigate-issue` does.
 
 **Precondition**: the issue must carry the `flaky/confirmed` label (fetch
-exact label names with `gh label list --repo growilabs/growi --json name`
-before comparing — never hardcode). If it is still `flaky/observing`, stop
-and report that `detect-flaky-ci` has not gathered enough evidence yet; do
-not attempt to lower the bar by investigating early.
+exact label names with `gh api repos/growilabs/growi/labels --paginate -q '.[].name'`
+before comparing — never hardcode, and use REST here, not
+`gh label list --json`, which a cloud routine's proxy-restricted `gh`
+session rejects — see Error Handling). If it is still `flaky/observing`,
+stop and report that `detect-flaky-ci` has not gathered enough evidence
+yet; do not attempt to lower the bar by investigating early.
 
 ---
 
@@ -50,9 +52,18 @@ this skill: the fix-classification gate (Step 4) and the PR gate (Step 6).
 
 ## Step 1: Fetch Issue Evidence
 
+Use REST (`gh api`), not `gh issue view --json` — the latter is
+GraphQL-backed and rejected by a cloud routine's proxy-restricted `gh`
+session (see Error Handling):
+
 ```bash
-gh issue view {ISSUE_NUMBER} --repo growilabs/growi --json number,title,body,labels,comments,url
+gh api repos/growilabs/growi/issues/{ISSUE_NUMBER}
+gh api repos/growilabs/growi/issues/{ISSUE_NUMBER}/comments --paginate
 ```
+
+The first call gives `title`, `body`, `labels[].name`, `html_url`, `state`;
+the second gives every comment (each observation `detect-flaky-ci` appended
+after the first).
 
 The title is `flaky: {IDENTITY_KEY}` (set by `detect-flaky-ci`), where
 `IDENTITY_KEY` is one of:
@@ -357,6 +368,12 @@ top of the repeat-CI tally above.)
 
 ## Error Handling
 
+- Any `gh issue`/`gh label`/`gh pr` command fails with a GraphQL/proxy error
+  (e.g. "This GraphQL query is not enabled for this session"): switch that
+  specific call to its `gh api` REST equivalent and continue — see
+  `detect-flaky-ci`'s Error Handling for the same note and example mutation
+  form. `gh run ...` commands (Actions API) are never affected by this,
+  since Actions has no GraphQL API to begin with.
 - Issue is not `flaky/confirmed`: stop, do not investigate (see Precondition).
 - Reproduction impossible in devcontainer (e.g. browser deps missing): fall
   back to log-based analysis, note the limitation, and do not let this alone
