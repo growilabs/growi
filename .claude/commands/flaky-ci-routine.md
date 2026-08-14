@@ -12,40 +12,56 @@ self-contained skill usable on its own. Keeping the sequencing here (rather
 than inline in a cron prompt) means there is one place to read or edit the
 chain, whether it's triggered by cron or run by hand.
 
-## Step 0 — Ensure `gh` is available and authenticated
+## Step 0 — Ensure `gh` is available and can write via REST
 
 Every step below depends on `gh`. This command is designed to also run from
-an unattended cloud routine whose checkout may not have `gh` preinstalled
-(confirmed missing in this project's cloud environment during setup) — do
-not assume it's on `PATH`.
+an unattended cloud routine whose checkout may not have `gh` preinstalled.
 
 ```bash
 if ! command -v gh >/dev/null 2>&1; then
-  echo "gh not found, bootstrapping a static binary..."
-  GH_VERSION="$(curl -fsSL https://api.github.com/repos/cli/cli/releases/latest | grep -m1 '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')"
-  curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" -o /tmp/gh.tar.gz
-  tar -xzf /tmp/gh.tar.gz -C /tmp
-  export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:$PATH"
+  echo "gh not found — installing"
+  # Prefer the system package manager: a cloud routine's egress proxy may
+  # only allow GitHub access scoped to growilabs/growi, which blocks a
+  # direct download from github.com/cli/cli's releases (confirmed: 403/404
+  # in this project's cloud environment). apt's archive is a different host
+  # and is not subject to that restriction.
+  if command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get install -y gh 2>&1 || apt-get install -y gh 2>&1
+  fi
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "apt-get unavailable or failed — falling back to a static binary from github.com/cli/cli"
+    GH_VERSION="$(curl -fsSL https://api.github.com/repos/cli/cli/releases/latest | grep -m1 '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')"
+    curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" -o /tmp/gh.tar.gz
+    tar -xzf /tmp/gh.tar.gz -C /tmp
+    export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:$PATH"
+  fi
 fi
 gh --version
 ```
 
-Then confirm write access — a read-only check (`gh issue list`) is not
-enough evidence, since it succeeds even without a token. Actually attempt a
-harmless write and clean it up:
+Then confirm actual write capability — **do not trust `gh auth status`
+alone**: a cloud routine's `gh` session showed an "Active account: true"
+with a token `gh auth status` itself calls invalid, which is confusing but
+not the real signal to gate on either way. The real constraint (confirmed
+empirically) is narrower and stranger than "authenticated or not": this
+environment's `gh` sits behind an egress proxy that serves plain REST calls
+to `repos/{owner}/{repo}/...` with real data, but rejects `gh`'s
+GraphQL-backed commands — which includes `--json` on `gh issue`/`gh label`/
+`gh pr` (NOT `gh run ...`, which is REST-only in GitHub's API regardless of
+`--json`, and unaffected). So probe with plain REST, since that's what
+every step in this routine actually uses (`detect-flaky-ci` and
+`investigate-flaky-test` were rewritten to use `gh api` for all
+issue/label/PR reads and writes for exactly this reason):
 
 ```bash
-gh auth status
-LABEL_TEST=$(gh label list --repo growilabs/growi --json name -q '.[0].name' 2>&1) \
-  && echo "read ok: $LABEL_TEST" || { echo "gh cannot read growilabs/growi — stopping"; exit 1; }
+gh api repos/growilabs/growi/labels -q '.[0].name' \
+  && echo "REST read ok" || { echo "gh api cannot read growilabs/growi via REST — stopping"; exit 1; }
 ```
 
-If `gh` cannot be installed, or `gh auth status` shows no authenticated
-account, or GitHub API calls fail with a permissions/auth error: **stop
-immediately and report this clearly** (this is exactly what happened the
-first time this routine ran unattended — treat a missing prerequisite as a
+If `gh` cannot be installed, or the REST probe above fails: **stop
+immediately and report this clearly** — treat a missing prerequisite as a
 stop condition, not something to route around by improvising a different
-approach). Do not proceed to Step 1 without confirmed write access, since
+approach. Do not proceed to Step 1 without confirmed REST access, since
 Step 1 onward creates issues/labels/PRs and a failure partway through is
 harder to clean up than a clean stop before starting.
 
@@ -61,13 +77,15 @@ List issues that are confirmed flaky AND not already past the "new" stage
 routine run is not re-processed):
 
 ```bash
-gh label list --repo growilabs/growi --json name --limit 100
+gh api repos/growilabs/growi/labels --paginate -q '.[].name'
 ```
 
+REST's `labels` query parameter is an AND filter on comma-separated names
+(an issue must carry every listed label), which is exactly "confirmed AND
+still new":
+
 ```bash
-gh issue list --repo growilabs/growi --state open \
-  --label "flaky/confirmed" --label "{EXACT_PHASE_NEW_LABEL}" \
-  --json number,title
+gh api repos/growilabs/growi/issues -f state=open -f labels="flaky/confirmed,{EXACT_PHASE_NEW_LABEL}" --paginate -q '.[] | {number,title}'
 ```
 
 If this list is empty, report that and stop — there is nothing to

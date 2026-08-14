@@ -220,25 +220,36 @@ Title format (fixed):
 e.g. `flaky: vitest:src/features/external-user-group/server/service/external-user-group-sync.integ.ts:syncs groups and deletes groups that do not exist externally`
 or `flaky: playwright:firefox` (job-level fallback identity).
 
-Search for an existing tracking issue using the identity key as an exact
-title match:
+**Use `gh api` (REST), not `gh issue list --json` / `--search`.** This
+skill is expected to also run from a cloud routine whose `gh` session sits
+behind an egress proxy that blocks `gh`'s GraphQL-backed commands — in
+practice, every `gh` subcommand that accepts `--json` on issues/labels/PRs
+(confirmed: `gh issue list --json`, `gh label list --json`) — while plain
+REST calls (`gh api repos/{owner}/{repo}/...`) go through. GitHub's
+Actions API (used in Steps 1–2 above) has no GraphQL equivalent at all, so
+`gh run ...` commands are unaffected regardless of `--json`; this
+restriction is specific to Issues/Labels/PRs commands.
+
+Fetch every issue carrying either flaky label (both states, so a resolved-
+and-since-reopened issue is still found) and look for an exact title match
+client-side — this is also more precise than GitHub's fuzzy search
+tokenization would have been:
 
 ```bash
-gh issue list --repo growilabs/growi --search "in:title \"{IDENTITY_KEY}\"" --state all --json number,title,labels,state
+gh api repos/growilabs/growi/issues -f state=all -f labels="flaky/observing" --paginate -q '.[] | {number,title,state}'
+gh api repos/growilabs/growi/issues -f state=all -f labels="flaky/confirmed" --paginate -q '.[] | {number,title,state}'
 ```
 
-After the search returns, still confirm the match: `gh search` does
-substring/token matching, not exact — verify at least one returned issue's
-`title` is exactly `flaky: {IDENTITY_KEY}` before treating it as the same
-issue, in case the search surfaced a partial/unrelated match.
+Treat an issue as the same tracking issue only if its `title` is **exactly**
+`flaky: {IDENTITY_KEY}` — do not fuzzy-match.
 
 ### No existing issue found
 
 Create one. Fetch exact label names first (names carry emoji prefixes and
-drift — never hardcode):
+drift — never hardcode), via REST rather than `gh label list --json`:
 
 ```bash
-gh label list --repo growilabs/growi --json name --limit 100
+gh api repos/growilabs/growi/labels --paginate -q '.[].name'
 ```
 
 ```bash
@@ -327,6 +338,12 @@ This is the only user-facing output — do not create files.
 
 ## Error Handling
 
+- Any `gh issue`/`gh label`/`gh pr` command fails with a GraphQL/proxy error
+  (e.g. "This GraphQL query is not enabled for this session"): switch that
+  specific call to its `gh api` REST equivalent (`-X POST`/`-X PATCH` for
+  mutations, e.g. `gh api repos/growilabs/growi/issues -X POST -f title=... -f body=...`
+  in place of `gh issue create`) and continue — this is an environment
+  constraint, not a reason to stop the whole run.
 - `gh api` rate limit hit: report how far the scan got and stop; do not retry
   in a tight loop.
 - A job log too large to fit in context: use `--log-failed` (already filters
