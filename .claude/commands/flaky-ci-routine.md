@@ -65,39 +65,70 @@ approach. Do not proceed to Step 1 without confirmed REST access, since
 Step 1 onward creates issues/labels/PRs and a failure partway through is
 harder to clean up than a clean stop before starting.
 
+### Job Log Fetch Method — decide once, for the whole run
+
+`detect-flaky-ci` and `investigate-flaky-test` both need to read CI job
+logs. `gh run view --log-failed` / `--log` works by following a signed
+redirect to a different domain (`results-receiver.actions.githubusercontent.com`
+/ `*.blob.core.windows.net`); a cloud routine's egress proxy blocks that
+redirect target regardless of whether the request comes from `gh` or a raw
+`gh api` call (confirmed empirically — this is a network policy on the
+redirect's destination domain, not a `gh`-vs-REST distinction). The GitHub
+MCP server's `mcp__github__get_job_logs` tool fetches the same content
+server-side and is not subject to that restriction.
+
+Decide the method **exactly once, here**, and pass it down rather than
+letting each skill probe (or worse, try-and-fall-back) independently per
+log fetch — the capability is a property of this environment for the whole
+run, not of any individual log:
+
+```
+if `mcp__github__get_job_logs` appears among your available tools: JOB_LOG_METHOD=mcp
+else: JOB_LOG_METHOD=gh
+```
+
+State `JOB_LOG_METHOD` explicitly when invoking `detect-flaky-ci` and
+`investigate-flaky-test` below (e.g. as a line in the prompt: "Job log
+fetch method for this run: {JOB_LOG_METHOD}"), and include it in this
+command's own Step 4 report.
+
 ## Step 1 — Detect
 
 Invoke the `detect-flaky-ci` skill with `$ARGUMENTS` passed through
-(`--lookback`, `--vitest-threshold`). Let it finish and report its summary.
+(`--lookback`, `--vitest-threshold`) plus the `JOB_LOG_METHOD` decided in
+Step 0. Let it finish and report its summary.
 
 ## Step 2 — Select newly-actionable issues
 
-List issues that are confirmed flaky AND not already past the "new" stage
-(so an issue already mid-investigation, WIP, or resolved from a prior
-routine run is not re-processed):
+List issues that are confirmed-or-suspected flaky AND not already past the
+"new" stage (so an issue already mid-investigation, WIP, or resolved from a
+prior routine run is not re-processed):
 
 ```bash
 gh api repos/growilabs/growi/labels --paginate -q '.[].name'
 ```
 
 REST's `labels` query parameter is an AND filter on comma-separated names
-(an issue must carry every listed label), which is exactly "confirmed AND
-still new":
+(an issue must carry every listed label), which is exactly "{tier} AND
+still new". Run it once per tier and merge the two lists — a single query
+can't OR two different tier labels together:
 
 ```bash
 gh api repos/growilabs/growi/issues -f state=open -f labels="flaky/confirmed,{EXACT_PHASE_NEW_LABEL}" --paginate -q '.[] | {number,title}'
+gh api repos/growilabs/growi/issues -f state=open -f labels="flaky/suspected,{EXACT_PHASE_NEW_LABEL}" --paginate -q '.[] | {number,title}'
 ```
 
-If this list is empty, report that and stop — there is nothing to
+If this combined list is empty, report that and stop — there is nothing to
 investigate this run.
 
 ## Step 3 — Investigate each, autonomously
 
 For each issue number found, invoke the `investigate-flaky-test` skill with
-`--auto`:
+`--auto`, passing the same `JOB_LOG_METHOD` decided in Step 0:
 
 ```
 investigate-flaky-test {ISSUE_NUMBER} --auto
+(Job log fetch method for this run: {JOB_LOG_METHOD})
 ```
 
 Run these **sequentially, one issue at a time** — not in parallel. Each
@@ -116,7 +147,10 @@ the list.
 
 ## Step 4 — Report
 
-Summarize the run: how many issues were newly confirmed by Step 1, how many
-were investigated in Step 3, how many resulted in a PR, how many were left
+Summarize the run: which `JOB_LOG_METHOD` Step 0 selected, how many issues
+were newly confirmed vs newly suspected by Step 1 (and, of the suspected
+ones, how many `investigate-flaky-test` promoted to confirmed via its
+one-time rerun vs left at suspected pending human review), how many were
+investigated in Step 3, how many resulted in a PR, how many were left
 pending human decision (and why), and how many were quarantined. This is the
 routine's output — nothing else needs to be written.

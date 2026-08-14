@@ -31,13 +31,29 @@ Supports the same two execution modes as `investigate-issue`:
 `$ARGUMENTS` is an issue URL or number, optionally with `--auto`. Parse the
 issue number and mode the same way `investigate-issue` does.
 
-**Precondition**: the issue must carry the `flaky/confirmed` label (fetch
-exact label names with `gh api repos/growilabs/growi/labels --paginate -q '.[].name'`
-before comparing — never hardcode, and use REST here, not
-`gh label list --json`, which a cloud routine's proxy-restricted `gh`
-session rejects — see Error Handling). If it is still `flaky/observing`,
-stop and report that `detect-flaky-ci` has not gathered enough evidence
-yet; do not attempt to lower the bar by investigating early.
+**Precondition**: the issue must carry `flaky/confirmed` **or**
+`flaky/suspected` (fetch exact label names with
+`gh api repos/growilabs/growi/labels --paginate -q '.[].name'` before
+comparing — never hardcode, and use REST here, not `gh label list --json`,
+which a cloud routine's proxy-restricted `gh` session rejects — see Error
+Handling). If it is still `flaky/observing`, stop and report that
+`detect-flaky-ci` has not gathered enough evidence yet; do not attempt to
+lower the bar by investigating early.
+
+These two accepted labels mean different things and change Step 2:
+
+- **`flaky/confirmed`** — already empirically proven (Playwright's in-run
+  retry already IS the proof, or a prior vitest threshold-accumulation
+  already reached two independent observations). No confirmation rerun is
+  owed here before proceeding to root-cause work — go straight into Step 2's
+  existing evidence-gathering.
+- **`flaky/suspected`** — `detect-flaky-ci`'s cheap mechanical mining (diff/
+  PR mismatch, sandwich pattern, or matrix divergence) found this, but
+  nothing has actually reproduced it live yet. This skill owes it exactly
+  **one** confirmation rerun (not the 2-3 tally used elsewhere in this
+  skill — that budget is for a different purpose, see Step 2) before
+  treating the flakiness itself as real. See "Step 2, `flaky/suspected`
+  path" below.
 
 ---
 
@@ -96,28 +112,67 @@ gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "{EXACT_PHASE
 
 ## Step 2: Gather Evidence
 
-**Primary tier — CI log analysis (always available, no live services
-needed).** This skill is expected to run unattended, including from a cloud
-routine whose checkout has no MongoDB replica set, no Elasticsearch, and no
+### `flaky/suspected` path: kick off the confirmation rerun first, in parallel
+
+If the issue's label is `flaky/suspected` (see Precondition), start its
+one-time confirmation rerun **before** doing anything else in this step, so
+it executes in the background while the static analysis below reads:
+
+```bash
+gh run rerun {RUN_ID} --repo growilabs/growi --failed
+```
+
+where `{RUN_ID}` is the run cited in the issue's "First observation" (or
+the mining evidence, if a later comment's observation is what triggered the
+mining hit). Do not wait for it here — proceed immediately to the static
+analysis below, and only come back to check this rerun's result at the end
+of this step, right before Step 3. This is a single rerun, not the 2-3
+tally used in the "second tier" below — that tally is a different budget
+for a different purpose (root-cause confidence), spent later, in Step 4/6.
+
+When you check back: if the rerun **passed** with no code change, that is
+empirical proof of flakiness — escalate the label before continuing:
+
+```bash
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "flaky/suspected" --add-label "flaky/confirmed"
+```
+
+If it **failed again**, you cannot yet tell "still flaky, unlucky twice"
+from "actually a real regression that only looks CI-specific" with a single
+data point — do not silently treat this as confirmed. Carry it into Step 4
+as an explicit caveat (same handling as "reruns failed 100% of the time" in
+that step's confidence table) rather than assuming the mining hit was
+correct.
+
+### Primary tier — CI log analysis (always available, no live services needed)
+
+This skill is expected to run unattended, including from a cloud routine
+whose checkout has no MongoDB replica set, no Elasticsearch, and no
 browsers. Do not make CI-log analysis a fallback for when reproduction
 "isn't available" — treat it as the normal, primary path, and treat live
 reproduction (below) as a bonus when the current environment happens to
 support it.
 
 Pull more history than what's already in the issue, using the same tools
-`detect-flaky-ci` uses:
+`detect-flaky-ci` uses (the `gh api .../actions/workflows/{file}/runs` REST
+calls from its Step 1 — not `gh run list --json`, for the same
+version-fragility reason given there):
 
 ```bash
 # Vitest: how often does this exact test appear as FAIL across recent runs
 # of the job that hosts it?
-gh run list --repo growilabs/growi --workflow "Node CI for app development" --limit 50 --status completed --json databaseId,conclusion,headSha,createdAt
+gh api "repos/growilabs/growi/actions/workflows/ci-app.yml/runs?per_page=50&status=completed" \
+  -q '.workflow_runs[] | {databaseId: .id, conclusion, headSha: .head_sha, createdAt: .created_at}'
 
 # Playwright: how often does this spec/browser show up in Retry#/flaky
 # evidence across recent run-playwright jobs?
-gh run list --repo growilabs/growi --workflow "Node CI for app production" --limit 50 --status completed --json databaseId,conclusion,headSha,createdAt
+gh api "repos/growilabs/growi/actions/workflows/ci-app-prod.yml/runs?per_page=50&status=completed" \
+  -q '.workflow_runs[] | {databaseId: .id, conclusion, headSha: .head_sha, createdAt: .created_at}'
 ```
 
-For each candidate run, fetch the relevant job's log (same commands as
+For each candidate run, fetch the relevant job's log (same method Step 0 of
+`flaky-ci-routine.md` decided — `gh run view --log*` or
+`mcp__github__get_job_logs`, whichever this run is using; see
 `detect-flaky-ci` Step 2/2b) and grep for the test title. Build a picture of:
 how often it fails, whether the failure mode is identical every time (points
 to a deterministic race, easier to fix) or varies (points to genuine timing
@@ -217,6 +272,7 @@ carefully before dismissing as test flakiness.
 | Root cause pinpointed (category from Step 3 is clear, consistent with the Step 2 rerun tally) + fix is surgical (1-2 files) | HIGH |
 | Root cause identified but fix touches product code with broader blast radius, or category is ambiguous between "shared state" and "product race" | MEDIUM |
 | Reruns failed 100% of the time (looks like a real regression, not a flake — see Step 2's note) | MEDIUM — flag this explicitly, do not silently treat it as a flaky-test fix |
+| Issue came in as `flaky/suspected` and its one confirmation rerun (Step 2) also failed | MEDIUM — the mining hit alone is not empirical proof; say explicitly that the confirmation rerun did not reproduce a pass, so this could be a real regression rather than a flake, and that only one rerun was budgeted (not the 100%-tally case above) |
 | CI evidence and reruns alone do not localize a cause | LOW |
 
 **In `autonomous` mode:**
@@ -374,7 +430,16 @@ top of the repeat-CI tally above.)
   `detect-flaky-ci`'s Error Handling for the same note and example mutation
   form. `gh run ...` commands (Actions API) are never affected by this,
   since Actions has no GraphQL API to begin with.
-- Issue is not `flaky/confirmed`: stop, do not investigate (see Precondition).
+- Issue is neither `flaky/confirmed` nor `flaky/suspected`: stop, do not
+  investigate (see Precondition).
+- A human approves proceeding with a best-guess fix at a MEDIUM gate for an
+  issue that came in as `flaky/suspected` and whose confirmation rerun
+  failed (Step 2/Step 4): the label is still `flaky/suspected` at that
+  point, not `flaky/confirmed` — do not silently promote it. Leave the
+  label as-is and let the PR body's Root Cause section carry the caveat
+  that this was never empirically reproduced; only Step 6-D's "reruns
+  green" evidence (a different, later rerun of the PR's own CI) is grounds
+  to also flip the label to `flaky/confirmed` at that point.
 - Reproduction impossible in devcontainer (e.g. browser deps missing): fall
   back to log-based analysis, note the limitation, and do not let this alone
   push confidence below what the CI evidence already supports.
