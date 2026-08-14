@@ -173,6 +173,12 @@
 - **Trade-offs**: 手書きテストを1本、要件8が期待する「重複整理」の対象から外すことになるが、これは「重複が無いから維持する」という要件8.2の趣旨そのものであり、要件からの逸脱ではない
 - **Follow-up**: なし。design.md の Existing Spec Disposition・Modified Files に反映済み
 
+### 追加検証: 変数だけの `t(key)` 呼び出しが `i18next-cli` から正しく無視されることの実測
+- **Context**: `/kiro-validate-design` 7回目のレビューで、g2gのドリフトテスト全面維持（前項の Decision）の前提である「固定部分すら無い、変数一つだけの `t(key)` という呼び出しは新設ゲートから見えない」という主張が、それまでのサンドボックス検証（テンプレートリテラルの変数セグメントの扱い）では直接確認されていないと指摘された
+- **Sources Consulted**: サンドボックスで `t(key)`（`key` は関数引数の変数）と `t('real_key_one')`（固定文字列）を両方含むファイルに `i18next-cli status` を実行
+- **Findings**: 検出されたキーは固定文字列の1件のみ。変数だけの呼び出しは、存在しないキーとして誤って報告されることも、`"key"` という見せかけのキーが作られることも無く、単純に無視された
+- **Implications**: g2gのドリフトテスト全面維持の判断（前項）は、コードの構造面の確認だけでなくツールの実際の挙動としても裏付けられた
+
 ## References
 - [i18next-cli (npm)](https://www.npmjs.com/package/i18next-cli) — バージョン 1.69.0、MIT ライセンス、コマンド仕様の一次情報
 - サンドボックス実行ログ（本セッション内、`/tmp` 配下、恒久的な保存はしていない）— `status` / `status --unused` / `extract --ci --dry-run` / `sync --help` の実測結果
