@@ -9,7 +9,6 @@ import {
 import { isUserPage } from '@growi/core/dist/utils/page-path-utils';
 import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import { differenceInYears } from 'date-fns/differenceInYears';
-import mongoose from 'mongoose';
 import urljoin from 'url-join';
 
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
@@ -149,14 +148,7 @@ export const getPageSchema = (crowi) => {
   };
 
   pageSchema.methods.findRelatedTagsById = async function () {
-    const PageTagRelation = mongoose.model('PageTagRelation');
-    // biome-ignore lint/plugin: allow populate for backward compatibility
-    const relations = await PageTagRelation.find({
-      relatedPage: this._id,
-    }).populate('relatedTag');
-    return relations.map((relation) => {
-      return relation.relatedTag.name;
-    });
+    return prisma.pagetagrelations.listTagNamesByPage(this._id.toString());
   };
 
   pageSchema.methods.isUpdatable = async function (previousRevisionId, origin) {

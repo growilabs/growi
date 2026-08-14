@@ -57,8 +57,6 @@ import {
   PageQueryBuilder,
   pushRevision,
 } from '~/server/models/page';
-import type { PageTagRelationDocument } from '~/server/models/page-tag-relation';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import type { UserGroupDocument } from '~/server/models/user-group';
 import {
   beginActivity,
@@ -1497,10 +1495,13 @@ class PageService implements IPageService {
 
     // 4. Take over tags
     const originTags = await page.findRelatedTagsById();
-    let savedTags: PageTagRelationDocument[] = [];
+    let savedTags: string[] = [];
     if (originTags.length !== 0) {
-      await PageTagRelation.updatePageTags(duplicatedTarget._id, originTags);
-      savedTags = await PageTagRelation.listTagNamesByPage(
+      await prisma.pagetagrelations.updatePageTags(
+        duplicatedTarget._id,
+        originTags,
+      );
+      savedTags = await prisma.pagetagrelations.listTagNamesByPage(
         duplicatedTarget._id,
       );
       this.tagEvent.emit('update', duplicatedTarget, savedTags);
@@ -1668,10 +1669,12 @@ class PageService implements IPageService {
 
     // take over tags
     const originTags = await page.findRelatedTagsById();
-    let savedTags: PageTagRelationDocument[] = [];
+    let savedTags: string[] = [];
     if (originTags != null) {
-      await PageTagRelation.updatePageTags(createdPage.id, originTags);
-      savedTags = await PageTagRelation.listTagNamesByPage(createdPage.id);
+      await prisma.pagetagrelations.updatePageTags(createdPage.id, originTags);
+      savedTags = await prisma.pagetagrelations.listTagNamesByPage(
+        createdPage.id,
+      );
       this.tagEvent.emit('update', createdPage, savedTags);
     }
     const result = serializePageSecurely(createdPage);
@@ -1685,38 +1688,30 @@ class PageService implements IPageService {
    * @param {Object} pageIdMapping e.g. key: oldPageId, value: newPageId
    */
   private async duplicateTags(pageIdMapping) {
-    // convert pageId from string to ObjectId
     const pageIds = Object.keys(pageIdMapping);
-    const stage = {
-      $or: pageIds.map((pageId) => {
-        return { relatedPage: new mongoose.Types.ObjectId(pageId) };
-      }),
-    };
 
-    const pagesAssociatedWithTag = await PageTagRelation.aggregate([
-      {
-        $match: stage,
-      },
-      {
-        $group: {
-          _id: '$relatedTag',
-          relatedPages: { $push: '$relatedPage' },
-        },
-      },
-    ]);
-
-    const newPageTagRelation: any[] = [];
-    pagesAssociatedWithTag.forEach(({ _id, relatedPages }) => {
-      // relatedPages
-      relatedPages.forEach((pageId) => {
-        newPageTagRelation.push({
-          relatedPage: pageIdMapping[pageId], // newPageId
-          relatedTag: _id,
-        });
-      });
+    const relations = await prisma.pagetagrelations.findMany({
+      where: { relatedPageId: { in: pageIds } },
+      select: { relatedPageId: true, relatedTagId: true },
     });
 
-    return PageTagRelation.insertMany(newPageTagRelation, { ordered: false });
+    // Deliberately one `create` per relation instead of a single `createMany`:
+    // the Mongoose implementation used `insertMany(..., { ordered: false })`,
+    // i.e. a duplicate hit on the relatedPage+relatedTag compound unique index
+    // must not abort the rest of the batch. Prisma's MongoDB connector has no
+    // `skipDuplicates`, so `createMany` would fail the whole batch on a single
+    // duplicate. `Promise.allSettled` keeps the "attempt every row, tolerate
+    // individual failures" semantics; no caller reads the return value.
+    return Promise.allSettled(
+      relations.map((relation) => {
+        return prisma.pagetagrelations.create({
+          data: {
+            relatedPageId: pageIdMapping[relation.relatedPageId], // newPageId
+            relatedTagId: relation.relatedTagId,
+          },
+        });
+      }),
+    );
   }
 
   private async duplicateDescendants(
@@ -2156,10 +2151,10 @@ class PageService implements IPageService {
       { new: true },
     );
 
-    await PageTagRelation.updateMany(
-      { relatedPage: page._id },
-      { $set: { isPageTrashed: true } },
-    );
+    await prisma.pagetagrelations.updateMany({
+      where: { relatedPageId: page._id.toString() },
+      data: { isPageTrashed: true },
+    });
     try {
       await PageRedirect.create({ fromPath: page.path, toPath: newPath });
     } catch (err) {
@@ -2242,10 +2237,10 @@ class PageService implements IPageService {
       },
       { new: true },
     );
-    await PageTagRelation.updateMany(
-      { relatedPage: page._id },
-      { $set: { isPageTrashed: true } },
-    );
+    await prisma.pagetagrelations.updateMany({
+      where: { relatedPageId: page._id.toString() },
+      data: { isPageTrashed: true },
+    });
 
     try {
       await PageRedirect.create({ fromPath: page.path, toPath: newPath });
@@ -2893,10 +2888,10 @@ class PageService implements IPageService {
         );
       }
 
-      await PageTagRelation.updateMany(
-        { relatedPage: page._id },
-        { $set: { isPageTrashed: false } },
-      );
+      await prisma.pagetagrelations.updateMany({
+        where: { relatedPageId: page._id.toString() },
+        data: { isPageTrashed: false },
+      });
 
       this.pageEvent.emit('revert', page, updatedPage, user);
 
@@ -3101,10 +3096,10 @@ class PageService implements IPageService {
       },
       { new: true },
     );
-    await PageTagRelation.updateMany(
-      { relatedPage: page._id },
-      { $set: { isPageTrashed: false } },
-    );
+    await prisma.pagetagrelations.updateMany({
+      where: { relatedPageId: page._id.toString() },
+      data: { isPageTrashed: false },
+    });
 
     this.pageEvent.emit('revert', page, updatedPage, user);
 

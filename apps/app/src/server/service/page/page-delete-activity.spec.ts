@@ -109,11 +109,13 @@ vi.mock('mongoose', async (importOriginal) => {
 });
 
 // ---------------------------------------------------------------------------
-// Module-level mock: PageTagRelation (post-revert relatedPage cleanup).
+// Module-level mock: prisma.pagetagrelations (post-revert relatedPage
+// cleanup). Only `pagetagrelations.updateMany` is stubbed -- no other
+// `prisma.*` member is reached by the code paths these tests exercise.
 // ---------------------------------------------------------------------------
 
-vi.mock('~/server/models/page-tag-relation', () => ({
-  default: { updateMany: mockPageTagRelationUpdateMany },
+vi.mock('~/utils/prisma', () => ({
+  prisma: { pagetagrelations: { updateMany: mockPageTagRelationUpdateMany } },
 }));
 
 // ---------------------------------------------------------------------------
