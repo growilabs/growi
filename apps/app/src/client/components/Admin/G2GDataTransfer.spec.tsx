@@ -366,6 +366,45 @@ describe('G2GDataTransfer', () => {
       ).not.toBeInTheDocument();
     });
 
+    it('shows the blockers and does not open the confirm modal when the preflight check reports one', async () => {
+      // The cheapest fix noted in the spec's Implementation Notes for "the confirm
+      // modal doesn't show blockers": check preflight's blockers before ever opening
+      // the modal, client-side only, rather than letting the operator confirm a
+      // destructive migration only to be refused afterwards by the execution-time
+      // re-check (task 10.2).
+      apiv3Post.mockImplementation((url: string) => {
+        if (url === '/g2g-transfer/preflight') {
+          return Promise.resolve({
+            data: {
+              destinationCounts: { users: 0, userGroups: 0, pages: 0 },
+              blockers: [
+                { type: 'version_mismatch', src: '8.0.0', dest: '7.5.0' },
+              ],
+              warnings: [],
+            },
+          });
+        }
+        return Promise.resolve({ data: {} });
+      });
+
+      renderComponent();
+      await act(async () => {});
+
+      await act(async () => {
+        submitTransferForm();
+      });
+
+      expect(toastError).toHaveBeenCalledWith([
+        new Error('g2g_data_transfer.blockers.version_mismatch'),
+      ]);
+      expect(
+        screen.queryByRole('button', {
+          name: 'maintenance_mode_notice.proceed',
+        }),
+      ).not.toBeInTheDocument();
+      expect(transferRequestCall()).toBeUndefined();
+    });
+
     it('passes the preflight response through to the confirm modal (wiring), not a hardcoded value', async () => {
       // Requirement 3.1. This checks the wiring between G2GDataTransfer and the modal
       // it renders -- that the fetched response reaches `preflightResult` unchanged --
@@ -628,6 +667,75 @@ describe('G2GDataTransfer', () => {
       // Proves the refusal path was actually exercised, not skipped.
       expect(toastError).toHaveBeenCalled();
       expect(screen.queryByText('admin-rescued')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('failed collections notification', () => {
+    // Requirement 2.8 -- the destination's own list of collections it could not import
+    // must reach the operator, not just the generic "transfer incomplete" toast.
+    const startTransferAndAcknowledge = async () => {
+      renderComponent();
+      await act(async () => {});
+      await act(async () => {
+        submitTransferForm();
+      });
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', {
+            name: 'maintenance_mode_notice.proceed',
+          }),
+        );
+      });
+    };
+
+    it('lists the failed collections when the completion notification carries them', async () => {
+      await startTransferAndAcknowledge();
+
+      await fireSocketEvent('admin:g2gProgress', {
+        mongo: 'ERROR',
+        attachments: 'COMPLETED',
+        failedCollections: ['pages', 'pagetagrelations'],
+      });
+
+      expect(
+        screen.getByText('admin:g2g_data_transfer.failed_collections_heading'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('pages')).toBeInTheDocument();
+      expect(screen.getByText('pagetagrelations')).toBeInTheDocument();
+    });
+
+    it('shows nothing when the completion notification carries no failed collections', async () => {
+      await startTransferAndAcknowledge();
+
+      await fireSocketEvent('admin:g2gProgress', {
+        mongo: 'COMPLETED',
+        attachments: 'COMPLETED',
+      });
+
+      expect(
+        screen.queryByText(
+          'admin:g2g_data_transfer.failed_collections_heading',
+        ),
+      ).not.toBeInTheDocument();
+    });
+
+    it('keeps the failed collections on screen after a later admin:g2gError hides the progress icons', async () => {
+      // Same reasoning as the rescue outcome panel above: `isTransferring` flips to
+      // `false` when `reportIncompleteImport`'s `admin:g2gError` arrives right after this
+      // event, and the operator needs this list precisely when that happens.
+      await startTransferAndAcknowledge();
+
+      await fireSocketEvent('admin:g2gProgress', {
+        mongo: 'ERROR',
+        attachments: 'ERROR',
+        failedCollections: ['pages'],
+      });
+      await fireSocketEvent('admin:g2gError', {
+        key: 'admin:g2g:error_partial_import',
+        message: 'Collections that could not be imported: pages',
+      });
+
+      expect(screen.getByText('pages')).toBeInTheDocument();
     });
   });
 });

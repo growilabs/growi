@@ -38,8 +38,6 @@ export interface RescuedAdmin {
 
 export interface AdminRescuePlan {
   readonly rescued: readonly RescuedAdmin[];
-  /** Administrators that could not have logged in anyway (no password, or not active). */
-  readonly notLoginable: readonly string[];
 }
 
 /**
@@ -194,10 +192,5 @@ export function planAdminRescue(
     };
   });
 
-  return {
-    rescued,
-    notLoginable: admins
-      .filter((admin) => !isLoginable(admin))
-      .map((admin) => admin.username),
-  };
+  return { rescued };
 }
