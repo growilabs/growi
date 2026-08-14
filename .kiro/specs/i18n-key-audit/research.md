@@ -136,10 +136,23 @@
 
 ### Decision: 「31件の真の Bug 1」を修正する担当コンポーネントを design.md に追加する
 - **Context**: `/kiro-validate-design` 3回目のレビュー（回帰リスクを重点的に検証する回として実施）で、design.md の Components が「119+5件の誤検出」（Call-site Remediation）と「共有ラベル約20〜23件」（Bug 2 Remediation）しか担当しておらず、要件1.4が名前まで挙げて0件化を約束している「本当に存在しない31件のキー参照」を直す担当が丸ごと欠けていると指摘された
-- **Sources Consulted**: 指摘を受けて実際にコードと翻訳ファイルを確認した。`common:failed_to_copy`（`GuideRow.tsx`、`TextStyleTab.tsx`）は `common` という namespace ファイル自体が存在せず `commons.json`/`translation.json` にも `failed_to_copy` は無い。`fix_page_grant.modal.alert_message`（`FixPageGrantModal.tsx`）は存在しないが、同じ `fix_page_grant.modal` 配下に意味の近い `need_to_fix_grant` が実在する。`Successfully updated`/`Failed to update`（同ファイル）は `translation.json` に該当キーが無く、意味の一致する既存キーも見つからなかった
+- **Sources Consulted**: 指摘を受けて実際にコードと翻訳ファイルを確認した。`common:failed_to_copy`（`GuideRow.tsx`、`TextStyleTab.tsx`）は `common` という namespace ファイル自体が存在せず `commons.json`/`translation.json` にも `failed_to_copy` は無い。`fix_page_grant.modal.alert_message`（`FixPageGrantModal.tsx`）は存在しない。当初は同じ `fix_page_grant.modal` 配下の `need_to_fix_grant` を修正先としたが、これは誤りだった（次項の Decision 参照）。`Successfully updated`/`Failed to update`（同ファイル）は `translation.json` に該当キーが無く、意味の一致する既存キーも見つからなかった
 - **Selected Approach**: 「Non-Existent Key Reference Fix」という新しい Component を design.md に追加する。修正はキーごとに「既存キーへの参照修正」（翻訳ファイル変更なし、基準線に影響しない）か「新規キー追加」（5言語すべてに同時追加、追加が終わるまで基準線を記録しない）のいずれかで行う。3つの具体例の disposition は上記の実測結果どおりに確定させた
 - **Rationale**: 要件1.4が個別のキー名まで挙げて約束している内容である以上、design.md のどこかにその修正を担当する記述が無ければ実装可能な設計とは言えない。「新規キー追加」と「基準線を記録するタイミング」を明確に結びつけたのは、この機能の導入自身が iteration 1/2 で追加した悪化防止ガードに引っかかるという具体的な詰みシナリオが実測で見えたため
 - **Follow-up**: 残り28件の call site の完全な一覧は `/kiro-spec-tasks` 実行時に、本セクション「既定言語の欠損参照182件の内訳」で使った実在チェックの手順を再実行して確定させる
+
+### Decision: `fix_page_grant.modal.alert_message` の修正先を `need_to_fix_grant` から `alert_message_select_group` へ訂正する
+- **Context**: `/kiro-validate-design` 4回目のレビューで、iteration 3 が確定させた修正先 `need_to_fix_grant` が、実際の表示条件と食い違っていると指摘された
+- **Sources Consulted**: `FixPageGrantModal.tsx` を実際に読んだ。`need_to_fix_grant` は192行目で常時表示される案内文として既に使用中。`alert_message` は269〜272行で `shouldShowModalAlert` が true のときだけ表示され、この state は69〜73行の `submit` 関数内で「グループ指定を選んだのに1つも選ばず送信した」場合にのみ true になる、入力エラー専用の警告だった。`translation.json` の893行に、まさにこの内容の `alert_message_select_group`（「選択されたグループがありません」）が既に存在し、現在どこからも参照されていない（未使用キーの一部）ことも確認した
+- **Selected Approach**: 修正先を `alert_message_select_group` に変更する
+- **Rationale**: `need_to_fix_grant` に差し替えると、常時表示の案内文が警告枠の中に重複表示されるだけで、「グループが選択されていません」という本来伝えるべき入力エラーが利用者に伝わらない。生キー表示という分かりやすい不具合を、意味の合わない文言という分かりにくい不具合に置き換えてしまう。`alert_message_select_group` は意味が完全に一致し、かつ未使用キーが1件減る副次効果もある
+- **Follow-up**: なし。design.md の Non-Existent Key Reference Fix と File Structure Plan に反映済み
+
+### Decision: 新規追加キーの5言語存在確認を、基準線記録前の実行可能なチェックポイントにする
+- **Context**: `/kiro-validate-design` 4回目のレビューで、「新規キー追加がすべて終わってから基準線を記録する」という順序ルールが、design.md の文章上の注意書きだけで、実装が守らなくても検知できない状態だと指摘された
+- **Selected Approach**: Non-Existent Key Reference Fix が新規追加するキーについて、5言語すべてに値が存在し空でないことを検証する専用テストを Testing Strategy に追加する。このテストが緑であることを、`--update-baseline` を初めて実行する前提条件として運用する
+- **Rationale**: 「注意書きを守る」という運用上の期待に頼らず、「テストが通っているか」という機械的に確認できる状態にする。Bug 2 Remediation の複製ペア同期テストと同じ考え方の再利用であり、新しい仕組みを増やしていない
+- **Follow-up**: なし。design.md の Testing Strategy に反映済み
 
 ## References
 - [i18next-cli (npm)](https://www.npmjs.com/package/i18next-cli) — バージョン 1.69.0、MIT ライセンス、コマンド仕様の一次情報

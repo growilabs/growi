@@ -103,7 +103,7 @@ apps/app/
 - `apps/app/src/client/components/Admin/Security/SecuritySetting/{CommentManageRightsSettings,PageAccessRightsSettings,PageDeleteRightsSettings,PageListDisplaySettings,SessionMaxAgeSettings,UserHomepageDeletionSettings,UserPageVisibilitySettings}.tsx`（7ファイル） — `t` を props で受け取るのをやめ、各コンポーネントが自前で `useTranslation('admin')` を呼ぶように変更（Components: Call-site Remediation — Group 1）
 - `apps/app/src/pages/admin/*.page.tsx` のうち `createAdminPageLayout` の `title` callback を使う19ファイル — `title: (props, t) => t('xxx')` のキー文字列に `admin:` を前置（Components: Call-site Remediation — Group 2）
 - `apps/app/src/server/routes/apiv3/security-settings/saml.ts` および同様に `getTranslation({ ns: [...] })` を使うサーバー側ファイル — 誤検出の原因になっているキーに namespace を明示前置（Components: Call-site Remediation — Group 3）
-- discovery で判明した31件の真の Bug 1（存在しないキー参照）の call site — `apps/app/src/components/PageView/PageAlerts/FixPageGrantAlert/FixPageGrantModal.tsx`（`fix_page_grant.modal.alert_message` を既存キーへ参照修正、`Successfully updated`/`Failed to update` は新規キー追加）、`apps/app/src/client/components/PageEditor/EditorGuideModal/{components/GuideRow.tsx,contents/TextStyleTab.tsx}`（`common:failed_to_copy` を新規キー追加）を含む。残りの call site は `/kiro-spec-tasks` 時点で research.md の実在チェック手順により再列挙する（Components: Non-Existent Key Reference Fix）
+- discovery で判明した31件の真の Bug 1（存在しないキー参照）の call site — `apps/app/src/components/PageView/PageAlerts/FixPageGrantAlert/FixPageGrantModal.tsx`（`fix_page_grant.modal.alert_message` を `fix_page_grant.modal.alert_message_select_group` への参照修正、`Successfully updated`/`Failed to update` は新規キー追加）、`apps/app/src/client/components/PageEditor/EditorGuideModal/{components/GuideRow.tsx,contents/TextStyleTab.tsx}`（`common:failed_to_copy` を新規キー追加）を含む。残りの call site は `/kiro-spec-tasks` 時点で research.md の実在チェック手順により再列挙する（Components: Non-Existent Key Reference Fix）
 - 共有ラベル約20〜23件（`Created` / `Cancel` / `Close` / `Name` 等）— `translation.json` の内容を変更せず `commons.json` へ複製し（全5言語）、参照している約43の管理画面コンポーネントの call site のみ `commons:` 前置に変更（Components: Bug 2 Remediation）
 - `apps/app/src/client/components/Admin/shared-labels-locale-sync.spec.ts`（NEW） — 複製した約20〜23キーについて、5言語すべてで `translation.json` と `commons.json` の値が一致することを検証する（`i18n-reconcile.spec.ts` と同種のパターン。Components: Bug 2 Remediation）
 - `apps/app/src/client/components/Admin/g2g-error-keys-locale-drift.spec.ts` — 縮小。「`admin:g2g:*` キーが en_US に実在すること」を確認する部分（新設ゲートと重複）を削除し、「`KEYS_WITH_DETAIL_MESSAGE` がパーサー側の発生キー集合からはみ出していないこと」を確認する部分（翻訳ファイルとは無関係な、アプリケーション内部の整合性チェック）は維持する（Components: Existing Spec Disposition）
@@ -257,7 +257,7 @@ interface StatusParser {
   1. **参照修正**: 意図していた既存キーが翻訳ファイルの中に見つかる場合、call site をその既存キーを指すように直す。5言語の翻訳ファイルには手を入れないため、Requirement 3 の基準線に影響しない
   2. **新規キー追加**: 意図に合う既存キーが見つからない場合、en_US に新しいキーを追加した上で、**同じ変更の中で**残り4言語すべてに翻訳を追加する。1言語だけ追加して他言語を後回しにすると、Requirement 3 が監視する言語別欠損件数がその分だけ増え、Baseline Store の悪化防止ガード（`--allow-regression` が無いと基準線を更新できない）に、この機能を導入する変更自身が引っかかる
 - discovery が名前を挙げている3例の disposition は、レビュー時点で次のように確認済み（残りの28件は同じ手順で `/kiro-spec-tasks` 側で判定する）:
-  - `fix_page_grant.modal.alert_message`（`FixPageGrantModal.tsx`）→ **参照修正**。`translation.json` の `fix_page_grant.modal.need_to_fix_grant`（「権限設定の変更が必要です」という文言）が意図した内容と一致するため、そちらを指すように直す
+  - `fix_page_grant.modal.alert_message`（`FixPageGrantModal.tsx`）→ **参照修正**。`/kiro-validate-design` 4回目のレビューで、このキーが表示される条件（`shouldShowModalAlert`、グループ指定を選んだのに1つも選ばず「変換」を押した場合のみ true になる、69〜73行の `submit` 関数を参照）を実際に確認した結果、常時表示の案内文である `need_to_fix_grant`（192行目で既に使用中）ではなく、同じ `fix_page_grant.modal` 配下にある `alert_message_select_group`（「選択されたグループがありません」、現在どこからも参照されておらず未使用キーの一部）が意味の一致する修正先だと判明した。修正によって未使用キーが1件減るため、Requirement 2 の基準線にも良い影響がある
   - `Successfully updated` / `Failed to update`（同ファイル）→ **新規キー追加**。既存キーに意味の一致する候補が見つからなかった
   - `common:failed_to_copy`（`GuideRow.tsx`、`TextStyleTab.tsx`）→ **新規キー追加**。同じ関数内でコピー成功時に使っている `editor_guide.textstyle.copy_done` の対になるキー（例: `editor_guide.textstyle.copy_failed`）として追加する
 
@@ -366,6 +366,7 @@ interface I18nAuditBaseline {
   - Call-site Remediation の書き換え対象キーそれぞれについて、書き換え前後で実際に解決される翻訳文言が一致することを確認する（Requirement 1.6）。書き換え前の値をテスト実装時に記録し、書き換え後の値と比較する形で行う
   - Bug 2 Remediation で複製する各キーについて、5言語すべてで `translation.json` と `commons.json` の値が一致することを検証する専用テスト（`i18n-reconcile.spec.ts` と同種のパターン）。将来どちらかだけが更新された場合のドリフトを検知する
   - Baseline Store の `--update-baseline` について、既存の基準線より悪化した測定値を渡した場合に `--allow-regression` 無しでは書き込みを拒否することを確認するテスト
+  - Non-Existent Key Reference Fix が新規追加するキー（`Successfully updated` / `Failed to update` / `editor_guide.textstyle.copy_failed` を含む）について、5言語すべてに値が存在し空でないことを検証する専用テスト。`/kiro-validate-design` 4回目のレビューで、「新規キー追加がすべて終わってから基準線を記録する」という順序が文章の注意書きだけで実行時に確認されないと指摘されたため、この確認を「注意書き」から「実行して合否が付くテスト」に変える。CI のタスク順序としては、このテストが緑になっていることを、`--update-baseline` を初めて実行する前提条件として運用する（Baseline Store 自体には強制する仕組みは持たせず、テストというチェックポイントで担保する）
 - **E2E Tests**: 対象外（本機能は CI 上の静的検出であり、ブラウザ操作を伴わない。Bug 2 の修正確認は既存の管理画面 Playwright スモークテストの範囲で十分カバーされる）
 
 ## Open Questions / Risks
