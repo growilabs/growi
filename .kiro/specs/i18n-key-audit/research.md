@@ -165,6 +165,14 @@
 - **Selected Approach**: File Structure Plan の記述を「`pages/admin/` 以下（サブディレクトリを含む、再帰的な対象）」に直し、取り落とされていた5ファイルの名前を明記する
 - **Follow-up**: なし。design.md の Modified Files に反映済み
 
+### Decision: `g2g-error-keys-locale-drift.spec.ts` は縮小せず全面維持する（iteration 1/3 の「縮小」判断を撤回）
+- **Context**: `/kiro-validate-design` 6回目のレビューで、「`admin:g2g:*` キーが en_US に実在することを確認する検査は、新設ゲートが同じ範囲を完全にカバーするため削除できる」という iteration 1・3 の判断の前提そのものが誤りだと指摘された
+- **Sources Consulted**: `server/service/g2g-transfer.ts` を実際に読み、`admin:g2g:*` というキー文字列が `t()` の固定引数としては一度も書かれておらず、ソケット通信で送るデータの値（`key: 'admin:g2g:error_data_conflict'` 等）として埋め込まれていることを確認した。翻訳する側の唯一の呼び出しはクライアント側 `G2GDataTransfer.tsx` の `t(key)` で、`key` は実行時の変数であり、コード中に固定文字列として現れない
+- **Selected Approach**: `g2g-error-keys-locale-drift.spec.ts` の2つの検査（en_US への実在確認、`KEYS_WITH_DETAIL_MESSAGE` の整合性確認）を両方維持する。ファイルは変更しない
+- **Rationale**: 新設ゲート（`i18next-cli`）はコード中の `t('固定文字列')` という形しか静的に追跡できない。今回のキーはこの形で一度も書かれていないため、そもそも新設ゲートの検査対象に入らない。Requirement 4 の `preservePatterns` に宣言しても「誤検出として報告しない」という除外設定にしかならず、「翻訳ファイルに実在する」ことを確認する仕組みにはならない。したがって既存テストのこの部分を削除すると、新しいエラーキーが追加されたのに翻訳が用意されていない、という不具合（このテストのコメントが記録している `error_upload_attachment` の実例）を検知する手段が丸ごと失われる
+- **Trade-offs**: 手書きテストを1本、要件8が期待する「重複整理」の対象から外すことになるが、これは「重複が無いから維持する」という要件8.2の趣旨そのものであり、要件からの逸脱ではない
+- **Follow-up**: なし。design.md の Existing Spec Disposition・Modified Files に反映済み
+
 ## References
 - [i18next-cli (npm)](https://www.npmjs.com/package/i18next-cli) — バージョン 1.69.0、MIT ライセンス、コマンド仕様の一次情報
 - サンドボックス実行ログ（本セッション内、`/tmp` 配下、恒久的な保存はしていない）— `status` / `status --unused` / `extract --ci --dry-run` / `sync --help` の実測結果

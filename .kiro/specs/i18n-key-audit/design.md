@@ -106,7 +106,7 @@ apps/app/
 - discovery で判明した31件の真の Bug 1（存在しないキー参照）の call site — `apps/app/src/components/PageView/PageAlerts/FixPageGrantAlert/FixPageGrantModal.tsx`（`fix_page_grant.modal.alert_message` を `fix_page_grant.modal.alert_message_select_group` への参照修正、`Successfully updated`/`Failed to update` は新規キー追加）、`apps/app/src/client/components/PageEditor/EditorGuideModal/{components/GuideRow.tsx,contents/TextStyleTab.tsx}`（`common:failed_to_copy` を新規キー追加）を含む。残りの call site は `/kiro-spec-tasks` 時点で research.md の実在チェック手順により再列挙する（Components: Non-Existent Key Reference Fix）
 - 共有ラベル約20〜23件（`Created` / `Cancel` / `Close` / `Name` 等）— `translation.json` の内容を変更せず `commons.json` へ複製し（全5言語）、参照している約43の管理画面コンポーネントの call site のみ `commons:` 前置に変更（Components: Bug 2 Remediation）
 - `apps/app/src/client/components/Admin/shared-labels-locale-sync.spec.ts`（NEW） — 複製した約20〜23キーについて、5言語すべてで `translation.json` と `commons.json` の値が一致することを検証する（`i18n-reconcile.spec.ts` と同種のパターン。Components: Bug 2 Remediation）
-- `apps/app/src/client/components/Admin/g2g-error-keys-locale-drift.spec.ts` — 縮小。「`admin:g2g:*` キーが en_US に実在すること」を確認する部分（新設ゲートと重複）を削除し、「`KEYS_WITH_DETAIL_MESSAGE` がパーサー側の発生キー集合からはみ出していないこと」を確認する部分（翻訳ファイルとは無関係な、アプリケーション内部の整合性チェック）は維持する（Components: Existing Spec Disposition）
+- `apps/app/src/client/components/Admin/g2g-error-keys-locale-drift.spec.ts` — 変更しない（全面維持）。`admin:g2g:*` キーは `t()` の固定引数として書かれておらず新設ゲートの検査対象に入らないため、既存の2つの検査（en_US への実在確認、`KEYS_WITH_DETAIL_MESSAGE` の整合性確認）とも重複しない（Components: Existing Spec Disposition）
 
 ## System Flows
 
@@ -293,7 +293,7 @@ interface StatusParser {
 
 **Design Decision: `translation.json` から削除して移動するのではなく、`commons.json` に複製する**
 - `/kiro-validate-design` によるレビューで、共有ラベル（`Cancel` / `Close` / `Created` / `Name` / `Email` / `Update` / `Edit` / `Create` / `add` の少なくとも9件）が、discovery で数えた管理画面43コンポーネントとは別に、`Me` / `PageEditor` / `LoginForm` / `InstallerForm` / `external-user-group` 配下など少なくとも約25の管理画面外のファイルから、namespace を指定しない書き方（既定の `translation` namespace）で参照されていることが実際のコード検索で確認された。この事実は「移動」案（`translation.json` から削除して `commons.json` へ移す）を採ると、管理画面外のこれら約25ファイルが、今直そうとしているのと同じ「生キー表示」を新たに起こすことを意味する
-- そのため、対象キーは `translation.json` から**削除せず**、`commons.json` に**複製**する。翻訳ファイルとしては同じ値が2ファイルに存在する状態になるが、これは `coding-style.md` が原則とする単一の真実源から意図的に外れる判断であり、根拠は次の2点: (1) 対象は discovery で判明した約20〜23件という限定された集合であり、将来大きく増える見込みが薄い、(2) このリポジトリには既に同種の複製+同期確認テストという前例がある（`i18n-reconcile.spec.ts`、および後述する `g2g-error-keys-locale-drift.spec.ts` の縮小後の姿）。新しい仕組みを持ち込むのではなく、既存の前例に揃える
+- そのため、対象キーは `translation.json` から**削除せず**、`commons.json` に**複製**する。翻訳ファイルとしては同じ値が2ファイルに存在する状態になるが、これは `coding-style.md` が原則とする単一の真実源から意図的に外れる判断であり、根拠は次の2点: (1) 対象は discovery で判明した約20〜23件という限定された集合であり、将来大きく増える見込みが薄い、(2) このリポジトリには既に同種の複製+同期確認テストという前例がある（`i18n-reconcile.spec.ts`）。新しい仕組みを持ち込むのではなく、既存の前例に揃える
 - この選択により、管理画面外の約25ファイル（および今回のコード検索で洗い出していない残りのキーの消費者）は一切変更不要になる。「移動」案が要求していた「リポジトリ全体から消費者を洗い出す」という未調査のタスクも不要になる
 
 **Responsibilities & Constraints**
@@ -317,14 +317,16 @@ interface StatusParser {
 | Requirements | 8.1, 8.2 |
 
 **Responsibilities & Constraints**
-- `g2g-error-keys-locale-drift.spec.ts` は**縮小**する（全削除ではない）。このファイルは性質の異なる2つの検査を持つ:
-  1. `admin:g2g:*` という静的なキー参照が en_US に実在すること — Requirement 1 の新設ゲートが同じ範囲を完全にカバーするため削除する
-  2. `KEYS_WITH_DETAIL_MESSAGE`（クライアント側で「詳細メッセージ付き通知」として扱うキーの一覧）が、`server/service/g2g-transfer.ts` から抽出した実際の発生キー集合からはみ出していないこと — これは翻訳ファイルの整合性ではなく、アプリケーション内部の2つの配列間の整合性チェックであり、`i18next-cli` は関知しない。この部分は維持する
-  - `/kiro-validate-design` のレビューで、当初の「全削除」判断はこの2番目の検査を見落としていたと判明した
+- `g2g-error-keys-locale-drift.spec.ts` は**全面維持**する（削除しない）。このファイルは性質の異なる2つの検査を持つ:
+  1. `admin:g2g:*` という静的なキー参照が en_US に実在すること
+  2. `KEYS_WITH_DETAIL_MESSAGE`（クライアント側で「詳細メッセージ付き通知」として扱うキーの一覧）が、`server/service/g2g-transfer.ts` から抽出した実際の発生キー集合からはみ出していないこと
+  - `/kiro-validate-design` 6回目のレビューで、1番目の検査を「新設ゲートが同じ範囲を完全にカバーする」という理由で削除しようとした判断が誤りだと判明した。`admin:g2g:*` というキー文字列は `g2g-transfer.ts` の中で、`t()` の固定引数としては一度も書かれておらず、ソケット通信で送るデータの値として埋め込まれている（例: `key: 'admin:g2g:error_data_conflict'`）。翻訳する側の唯一の呼び出しはクライアント側 `G2GDataTransfer.tsx` の `t(key)` で、`key` は実行時に受け取った変数である。新設ゲート（`i18next-cli`）はコード中の `t('固定文字列')` という形しか静的に追跡できないため、この経路のキーはそもそも検査対象に入らない（Requirement 4 が扱う「動的キー」そのものであり、`preservePatterns` に宣言しても「誤検出として報告しない」だけで「実在することを確認する」わけではない）。したがって1番目の検査を削除すると、`g2g-transfer.ts` が新しいエラーキーを送るように変更されても対応する翻訳が追加されているかを確認する手段が失われる。このファイル自身のコメント（12〜18行目）が、まさにこの種の不具合（`error_upload_attachment` の翻訳漏れ）が過去に一度実際に起きたことを記録している
+  - 2番目の検査は当初から維持する判断だった（翻訳ファイルの整合性ではなく、アプリケーション内部の2つの配列間の整合性チェックであり `i18next-cli` は関知しない）
+  - 1番目の検査が使う `pusherSource` の読み込みと `emittedKeys` の抽出処理は、2番目の検査も共有して使っている。どちらか一方だけを消すという判断がそもそも成立しない（両方維持する今回の結論と整合する）
 - `i18n-reconcile.spec.ts` は維持する。このテストは8つの**特定の**キーが存在し空でないことを保証しており、Requirement 2/3 の基準線比較（集計件数のみを見る）では、この特定キーの欠落を検出できない（別のキーが増減して合計件数が基準線以下に収まってしまう可能性があるため）。集約値の基準線と個別キーの存在保証は異なる性質の保証であり、後者は前者に包含されない
 
 **Implementation Notes**
-- Integration: 削除・縮小・維持それぞれの判断根拠を PR の説明に残す
+- Integration: `i18n-reconcile.spec.ts` を維持し `g2g-error-keys-locale-drift.spec.ts` を全面維持する、それぞれの判断根拠を PR の説明に残す
 - Risks: 無し（判断はこの設計時点で確定済み）
 
 ## Data Models
@@ -375,4 +377,4 @@ interface I18nAuditBaseline {
 - **`i18next-cli` の stdout フォーマット依存** — バージョン固定とパーサー単体テストで軽減するが、将来のアップグレード時には再検証が必要（Revalidation Triggers 参照）
 - **複製した約20〜23キーのドリフト** — `translation.json` と `commons.json` の値が将来ずれる可能性。専用の同期テストで機械的に検知する（Bug 2 Remediation 参照）。単一の真実源から意図的に外れた判断であることは Design Decision に明記済み
 
-`/kiro-validate-design` によるレビュー（1回目）で見つかった3件の Critical Issue（Bug 2 の移動対象キーの消費者未調査、baseline 更新に悪化防止ガードが無い、`g2g-error-keys-locale-drift.spec.ts` の全削除判断の見落とし）は、いずれも上記の設計変更（複製方式への変更、`--allow-regression` ガードの追加、縮小への変更）で解消済み。
+`/kiro-validate-design` による複数回のレビューで見つかった Critical Issue とその修正経緯は research.md の Design Decisions に記録している。
