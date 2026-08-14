@@ -1,8 +1,8 @@
 ---
 name: detect-flaky-ci
-description: Scan recent GROWI CI runs for flaky (non-deterministic) job/test failures and track them as GitHub issues. Detection only — never modifies source code. Usage - /detect-flaky-ci [--lookback=N] [--vitest-threshold=N]
+description: Scan recent GROWI CI runs for flaky (non-deterministic) job/test failures and track them as GitHub issues. Detection only — never modifies source code. Usage - /detect-flaky-ci [--window-hours=N] [--vitest-threshold=N]
 allowed-tools: Bash, Read, Grep
-argument-hint: "[--lookback=30] [--vitest-threshold=2]"
+argument-hint: "[--window-hours=16] [--vitest-threshold=2]"
 ---
 
 # detect-flaky-ci
@@ -26,12 +26,39 @@ this skill re-derives everything it needs by querying the tracker on each run.
 ## Input
 
 `$ARGUMENTS` (all optional):
-- `--lookback=N` — how many most-recent completed runs of each watched
-  workflow to scan. Default `30`.
+- `--window-hours=N` — scan every completed run of each watched workflow
+  created in the last N hours, rather than a fixed run count. Default `16`
+  (twice this routine's 8-hour cron cadence — see "Why a time window, not a
+  run count" below). Pass this explicitly when invoking standalone outside
+  `/flaky-ci-routine`'s cron cadence.
+- `--max-runs-per-workflow=N` — safety cap on how many runs within the
+  window this skill will actually process per workflow, in case CI volume
+  spikes far beyond what the window is sized for. Default `300`. If the
+  window contains more than this, process the newest `N` and **say so
+  explicitly** in Step 5 — never truncate silently.
 - `--vitest-threshold=N` — number of separate-run observations of the same
   vitest test failure required before escalating from `flaky/observing` to
   `flaky/confirmed`. Default `2`. (Playwright-detected flakiness always
   escalates on the first observation — see Step 3.)
+
+## Why a Time Window, Not a Run Count
+
+A fixed run count (the old `--lookback=30`) silently stops covering older
+failures on any day where the watched workflow runs more than 30 times —
+those failures scroll out of the scanned range and are never seen at all,
+with no error or warning. A time window sized to the routine's own cron
+cadence closes this gap without needing any persisted state between runs
+(consistent with this skill's "no memory between runs" design — see
+Overview): as long as the window is at least **twice** the cron interval,
+one entirely skipped cron fire (cloud environment failure, etc.) still gets
+fully covered by the next successful one. `/flaky-ci-routine` runs every 8
+hours, hence the default of 16.
+
+This does mean a run created 15 hours ago gets scanned by up to two
+consecutive routine runs (deliberate overlap for safety) — Step 4's
+existing-issue reconciliation (backed by the Step 1.5 skip-list below)
+already treats a previously-seen run as a no-op, so the second pass costs
+a metadata check, not a re-read of that run's job logs.
 
 ## Three Confidence Tiers
 
@@ -42,11 +69,13 @@ first:
    signal (see "Cheap Suspicion Mining" below). Passive: waits for a future
    run to repeat it (`--vitest-threshold`).
 2. **`flaky/suspected`** — a vitest observation that also matches one of the
-   three cheap, mechanical signals in "Cheap Suspicion Mining" (diff/PR
-   mismatch, sandwich pattern, or matrix divergence). No LLM judgment is
-   spent getting here — these are grep/diff-level checks against data this
-   skill already fetched. Handed to `investigate-flaky-test`, which spends
-   exactly one rerun to turn this into empirical proof.
+   four cheap, mechanical signals in "Cheap Suspicion Mining" (diff/PR
+   mismatch, sandwich pattern, matrix divergence, or a targeted historical
+   backfill hit). No LLM judgment is spent getting here — these are
+   grep/diff-level checks against data this skill already fetched (or, for
+   ④, a small bounded amount of extra targeted fetching). Handed to
+   `investigate-flaky-test`, which spends exactly one rerun to turn this
+   into empirical proof.
 3. **`flaky/confirmed`** — either a Playwright in-run retry (unchanged from
    before: the retry already IS the empirical proof, no further rerun
    needed), or a `flaky/suspected` issue that `investigate-flaky-test`
@@ -60,9 +89,14 @@ actual rerun, which is an investigation action, not a detection action.
 ## Cheap Suspicion Mining (vitest only)
 
 Before falling back to passive `--vitest-threshold` accumulation, check each
-vitest failure identity against three mechanical signals. All three are
-grep/diff/API-field comparisons — no log-content reasoning, no code reading.
-Run them in this order and stop at the first hit (cheapest first):
+vitest failure identity against four mechanical signals. All four are
+grep/diff/API-field comparisons — no log-content reasoning beyond a literal
+string search, no code reading. ①-③ run against a **fresh** observation
+made during this scan; ④ runs once per scan against **existing**
+`flaky/observing` issues regardless of whether anything new was observed
+for them today (see its own subsection below for why it's structured
+differently). Run ①-③ in this order and stop at the first hit (cheapest
+first):
 
 **① Diff / PR-description mismatch.** Fetch the commit's associated PR (if
 any):
@@ -87,8 +121,8 @@ compare against that commit's own diff instead
 (`gh api repos/growilabs/growi/commits/{HEAD_SHA} -q '.files[].filename'`)
 and skip the description check.
 
-**② Sandwich pattern.** Within the `--lookback` window already fetched in
-Step 1, look for the same vitest identity key failing in two (or more) runs
+**② Sandwich pattern.** Within the `--window-hours` window already fetched
+in Step 1, look for the same vitest identity key failing in two (or more) runs
 with a run of the *same job* in between that succeeded. A failure that
 disappears and reappears with an identical signature is stronger evidence of
 non-determinism than two failures with nothing but other failures between
@@ -107,13 +141,72 @@ all. Get sibling job results from the Step 2 jobs-list call you already made
 for this run (`gh api repos/growilabs/growi/actions/runs/{RUN_ID}/jobs`) —
 filter by job name prefix, compare conclusions.
 
-If none of the three hit, fall through to the existing passive
-`flaky/observing` / `--vitest-threshold` path unchanged — these mechanical
-checks are a fast lane on top of the old path, not a replacement for it.
-Genuinely subtle flakiness that doesn't show up in a diff/PR mismatch, a
-sandwich, or a matrix split still needs the old accumulation path (or a
-human/LLM eyeballing it later) — these three checks are deliberately not
-exhaustive.
+If none of ①-③ hit for a fresh observation, fall through to the existing
+passive `flaky/observing` / `--vitest-threshold` path unchanged.
+
+**④ Targeted historical backfill (existing `flaky/observing` issues only).**
+①-③ only look at data already in hand for *today's* observation. This one
+runs the other direction: for each currently-OPEN `flaky/observing` issue
+(you already fetch this list for Step 4's reconciliation — reuse it, do not
+re-fetch), actively search further back than this scan's `--window-hours`
+for an *earlier* occurrence of that same identity that was never recorded,
+rather than passively waiting for a fresh one to show up in some future
+scan. This is what closes the gap described in "Why a Time Window, Not a
+Run Count" for the specific handful of tests that are already flagged as
+interesting — it does not apply to fresh, never-before-seen failures (that
+would mean deep-searching on every failure, which is the expensive,
+rejected alternative to the time-window approach).
+
+Bounded cost: this only runs per already-`flaky/observing` issue (typically
+a handful at most), and only fetches logs for **failed** runs of the one
+relevant workflow (vitest identities only ever come from `ci-app.yml`), not
+every run in the deeper range:
+
+```bash
+# Deeper, failure-only search for this identity's workflow, going back
+# further than this scan's window (e.g. 14 days) — still only the runs the
+# API says failed, so this is cheap even at a much deeper range than the
+# main window. `created` uses GitHub's search qualifier syntax (`>DATE`),
+# passed via -f so gh api URL-encodes it correctly.
+gh api -X GET repos/growilabs/growi/actions/workflows/ci-app.yml/runs \
+  -f status=completed -f conclusion=failure -f "created=>{FOURTEEN_DAYS_AGO_ISO8601}" --paginate \
+  -q '.workflow_runs[] | {databaseId: .id, headSha: .head_sha, createdAt: .created_at, url: .html_url}'
+```
+
+For each failed run returned, skip it if its `url` already appears in the
+issue's body or any of its comments (already recorded — re-reading it would
+be wasted work and could double-count an observation). For the rest, fetch
+the relevant job(s)' log (same Step-0-decided method as Step 2) and grep
+for this identity's exact `FAIL {SPEC_PATH} > ... > {TEST_TITLE}` block. A
+match is a genuine backfilled observation this issue never had:
+
+```bash
+gh issue comment {NUMBER} --repo growilabs/growi --body "$(cat <<'EOF'
+### Backfilled observation (found during targeted historical search)
+
+- Run: {RUN_HTML_URL}
+- Job: {JOB_NAME}
+- Commit: {HEAD_SHA}
+- Date: {CREATED_AT}
+
+```
+{log excerpt}
+```
+EOF
+)"
+gh issue edit {NUMBER} --repo growilabs/growi --remove-label "flaky/observing" --add-label "flaky/suspected"
+```
+
+A backfill hit always escalates straight to `flaky/suspected` (never
+`flaky/confirmed`) regardless of how many backfilled occurrences are
+found — it is still mechanical suspicion, not an empirical rerun; the same
+promotion rule as ①-③ applies. If the deeper search finds nothing, leave
+the issue at `flaky/observing` and move on; this is not a required gate, it
+is a best-effort extra pass.
+
+Genuinely subtle flakiness that doesn't show up in any of ①-④ still needs
+the old accumulation path (or a human/LLM eyeballing it later) — none of
+these checks are exhaustive.
 
 ## Why vitest and Playwright are handled differently
 
@@ -146,8 +239,8 @@ Watched workflows (by their GitHub Actions display name, not the file name):
 Query **each workflow separately** — do not pull the unfiltered
 `actions/runs` list and filter client-side, the repo runs several other
 workflows (CodeQL, Auto-labeling, Auto approve PR, ...) and a generic
-`--lookback` window of recent runs across all of them can leave zero, or
-only a handful, of the two workflows actually being watched.
+window of recent runs across all of them can leave zero, or only a
+handful, of the two workflows actually being watched.
 
 **Use `gh api` against the workflow's own runs endpoint, not
 `gh run list --json`.** `gh run list --json` validates the requested fields
@@ -156,20 +249,47 @@ runs gh 2.45.0, which does not know the `attempt` field
 (`Unknown JSON field: "attempt"`) and fails the whole command outright, not
 just that field. `gh api` has no such client-side field allowlist — it is a
 thin passthrough to GitHub's REST response, which already includes
-`run_attempt` (among everything else) regardless of gh CLI version:
+`run_attempt` (among everything else) regardless of gh CLI version.
+
+**Page until you cross `--window-hours`, not a fixed count** (see "Why a
+Time Window, Not a Run Count" above). `per_page=100`, walk pages newest
+first, stop once a page's oldest run falls before the cutoff, and stop
+early (report why) if `--max-runs-per-workflow` is hit first:
 
 ```bash
-gh api "repos/growilabs/growi/actions/workflows/ci-app.yml/runs?per_page={LOOKBACK}&status=completed" \
-  -q '.workflow_runs[] | {databaseId: .id, conclusion, headSha: .head_sha, createdAt: .created_at, url: .html_url, event, attempt: .run_attempt}'
+WINDOW_HOURS={window-hours, default 16}
+MAX_RUNS={max-runs-per-workflow, default 300}
+CUTOFF_EPOCH=$(( $(date -u +%s) - WINDOW_HOURS * 3600 ))
 
-gh api "repos/growilabs/growi/actions/workflows/ci-app-prod.yml/runs?per_page={LOOKBACK}&status=completed" \
-  -q '.workflow_runs[] | {databaseId: .id, conclusion, headSha: .head_sha, createdAt: .created_at, url: .html_url, event, attempt: .run_attempt}'
+for WORKFLOW in ci-app.yml ci-app-prod.yml; do
+  : > "/tmp/${WORKFLOW}-runs.jsonl"
+  page=1
+  total=0
+  while :; do
+    resp=$(gh api -X GET "repos/growilabs/growi/actions/workflows/${WORKFLOW}/runs" \
+      -f status=completed -F per_page=100 -F "page=${page}")
+    count=$(echo "$resp" | jq '.workflow_runs | length')
+    [ "$count" -eq 0 ] && break
+    echo "$resp" | jq -c '.workflow_runs[] | {databaseId: .id, conclusion, headSha: .head_sha, createdAt: .created_at, url: .html_url, event, attempt: .run_attempt}' \
+      >> "/tmp/${WORKFLOW}-runs.jsonl"
+    total=$((total + count))
+    oldest_epoch=$(echo "$resp" | jq -r '.workflow_runs[-1].created_at' | date -u -f - +%s 2>/dev/null || date -u -d "$(echo "$resp" | jq -r '.workflow_runs[-1].created_at')" +%s)
+    if [ "$oldest_epoch" -lt "$CUTOFF_EPOCH" ]; then break; fi
+    if [ "$total" -ge "$MAX_RUNS" ]; then
+      echo "TRUNCATED: ${WORKFLOW} hit --max-runs-per-workflow=${MAX_RUNS} before reaching the ${WINDOW_HOURS}h window boundary — report this explicitly in Step 5" >&2
+      break
+    fi
+    page=$((page + 1))
+  done
+done
 ```
 
 (`ci-app.yml` = "Node CI for app development", `ci-app-prod.yml` = "Node CI
 for app production" — confirm with
 `gh api repos/growilabs/growi/actions/workflows -q '.workflows[] | {name,path}'`
-if these file names ever change.)
+if these file names ever change. Adapt the date-parsing line to whatever
+`date` implementation the runtime actually has; the point is "epoch seconds
+of the oldest run's `created_at` in this page", however you get there.)
 
 This naturally includes pull_request and merge-queue-triggered runs (the
 merge queue is where today's investigation actually surfaced a failure — a
@@ -188,11 +308,44 @@ over the JSON you already fetched is enough; skip it under time pressure.
 
 Keep only runs with `conclusion == "failure"` for the main Step 2 flow.
 
+## Step 1.5: Known-Run Skip List
+
+Fetch the existing flaky issues now (Step 4 needs this list anyway — do it
+here instead so it's available before the expensive part of Step 2):
+
+```bash
+gh api -X GET repos/growilabs/growi/issues -f state=all -f labels="flaky/observing" --paginate -q '.[] | {number,title,state,body}'
+gh api -X GET repos/growilabs/growi/issues -f state=all -f labels="flaky/suspected" --paginate -q '.[] | {number,title,state,body}'
+gh api -X GET repos/growilabs/growi/issues -f state=all -f labels="flaky/confirmed" --paginate -q '.[] | {number,title,state,body}'
+```
+
+For each, also fetch its comments (`gh api repos/growilabs/growi/issues/{NUMBER}/comments --paginate`)
+and extract every `actions/runs/{id}` URL appearing anywhere in the body or
+comments into one set — this is the skip-list. In Step 2, if a failed run's
+`RUN_ID` is already in this set, **do not re-fetch its job log at all** —
+its evidence is already recorded on some issue, and nothing further needs
+to happen for that run; just exclude it from Step 2 onward. This is what
+keeps a shorter, more frequent cron cadence cheap: without this, every run
+gets its full job log re-fetched by however many consecutive routine runs
+its `--window-hours` overlap spans. (④'s deeper backfill search does its
+own equivalent check per-issue, independently — the two skip-lists serve
+different loops and aren't the same set.)
+
+**Run ④'s targeted backfill now**, filtering this same issue list down to
+open `flaky/observing` ones — see "Cheap Suspicion Mining" ④ above for the
+procedure. It's independent of whatever Step 2-4 finds for fresh failures
+in this scan's window, so there's no ordering dependency on doing it here
+versus at the end; doing it now means it's out of the way before the
+(usually larger) fresh-candidate loop below.
+
 ## Step 2: Fetch Failed Jobs and Classify Noise
 
-`{RUN_ID}` below is the `databaseId` from Step 1.
+`{RUN_ID}` below is the `databaseId` from Step 1. **Skip any `{RUN_ID}`
+already in Step 1.5's skip-list before doing anything else in this step** —
+its evidence is already recorded, so there is nothing new to extract from
+it.
 
-For each failed run, list its jobs and keep the ones with
+For each remaining failed run, list its jobs and keep the ones with
 `conclusion == "failure"` (skip `cancelled` — those are pre-emptions by a
 newer push, not evidence of anything):
 
@@ -350,16 +503,15 @@ Actions API (used in Steps 1–2 above) has no GraphQL equivalent at all, so
 `gh run ...` commands are unaffected regardless of `--json`; this
 restriction is specific to Issues/Labels/PRs commands.
 
-Fetch every issue carrying either flaky label (both states, so a resolved-
-and-since-reopened issue is still found) and look for an exact title match
-client-side — this is also more precise than GitHub's fuzzy search
-tokenization would have been:
-
-```bash
-gh api repos/growilabs/growi/issues -f state=all -f labels="flaky/observing" --paginate -q '.[] | {number,title,state}'
-gh api repos/growilabs/growi/issues -f state=all -f labels="flaky/suspected" --paginate -q '.[] | {number,title,state}'
-gh api repos/growilabs/growi/issues -f state=all -f labels="flaky/confirmed" --paginate -q '.[] | {number,title,state}'
-```
+You already fetched every issue carrying a flaky label (both states) in
+Step 1.5 — reuse that list here rather than re-querying it; look for an
+exact title match client-side, which is also more precise than GitHub's
+fuzzy search tokenization would have been. (**Always pass `-X GET`
+explicitly whenever `-f`/`-F` is used for a read** — `gh api` defaults to
+`POST` the moment any `-f`/`-F` flag is present, even for an endpoint
+that's semantically a read; confirmed live, the Step 1.5 queries without
+`-X GET` fail with `422 ... "title" wasn't supplied", routed to the
+issue-*creation* endpoint's validator.)
 
 Treat an issue as the same tracking issue only if its `title` is **exactly**
 `flaky: {IDENTITY_KEY}` — do not fuzzy-match.
@@ -479,11 +631,15 @@ gh issue edit {NUMBER} --repo growilabs/growi --add-label "flaky/confirmed" --re
 ## Step 5: Report
 
 Print a short summary of this run: which job-log fetch method Step 0 chose
-(`gh` or `mcp`), how many runs/jobs scanned, how many classified as infra
-noise (with which pattern), how many new issues created, how many existing
-issues updated, how many escalated to `flaky/suspected` (and via which of
-the three mining checks) vs `flaky/confirmed`. This is the only user-facing
-output — do not create files.
+(`gh` or `mcp`), the `--window-hours` covered and how many runs per
+workflow fell in it (and whether `--max-runs-per-workflow` truncated that —
+report this explicitly, never silently), how many runs were skipped via the
+Step 1.5 skip-list (already-known, not re-fetched), how many jobs actually
+scanned, how many classified as infra noise (with which pattern), how many
+new issues created, how many existing issues updated, how many escalated to
+`flaky/suspected` (and via which of the four mining checks, including how
+many via ④'s backfill specifically) vs `flaky/confirmed`. This is the only
+user-facing output — do not create files.
 
 ## Error Handling
 
@@ -511,8 +667,16 @@ output — do not create files.
   jobs could not be evidenced and continue with what you can read (run/job
   metadata, conclusions) rather than stopping the whole scan; do not
   silently skip affected runs without reporting them in Step 5.
-- Cheap suspicion mining (① / ② / ③) finds no clean signal either way
+- Cheap suspicion mining (① / ② / ③ / ④) finds no clean signal either way
   (e.g. a PR touches half the repo, or matrix siblings are also failing for
   unrelated reasons): do not force a tier — fall through to
   `flaky/observing` and let the passive threshold path handle it. These
   checks are a fast lane, not a required gate.
+- `--max-runs-per-workflow` is hit before the `--window-hours` boundary is
+  reached: this means CI volume for that workflow exceeded what the window
+  was sized for. Report it explicitly in Step 5 (which workflow, how many
+  runs were skipped as a result) — do not silently process a truncated set
+  as if it were the full window. If this happens repeatedly, it's a signal
+  to raise `--max-runs-per-workflow` or shorten the cron interval (which
+  shrinks `--window-hours` too, since it's derived from it), not something
+  to route around inside a single run.
