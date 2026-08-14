@@ -1,3 +1,8 @@
+import type {
+  TransferBlocker,
+  TransferWarning,
+} from '~/server/service/g2g-transfer-transferability';
+
 /**
  * G2G transfer progress status master
  */
@@ -39,6 +44,27 @@ export interface RescuedAdminSummary {
 /** Every administrator a migration transfer rescued on the destination. */
 export interface AdminRescueOutcome {
   readonly rescued: readonly RescuedAdminSummary[];
+}
+
+/**
+ * What the pushing admin is shown before committing to a transfer: how much of the
+ * destination a migration transfer would delete, and anything that should give them
+ * pause before they confirm (requirement 3.1). Gathering this must not itself change
+ * the destination (requirement 3.3) -- every field here comes from a read.
+ *
+ * `TransferBlocker` and `TransferWarning` carry no secret or personally-identifying
+ * data (just discriminated classification data -- see their doc comments in
+ * `server/service/g2g-transfer-transferability.ts`), unlike `AdminRescuePlan` above, so
+ * this type re-uses them directly rather than projecting to a redacted summary shape.
+ */
+export interface TransferPreflightResult {
+  readonly destinationCounts: {
+    readonly users: number;
+    readonly userGroups: number;
+    readonly pages: number;
+  };
+  readonly blockers: readonly TransferBlocker[];
+  readonly warnings: readonly TransferWarning[];
 }
 
 /**

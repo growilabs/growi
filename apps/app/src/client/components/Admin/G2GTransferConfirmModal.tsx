@@ -2,8 +2,8 @@ import type { JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
+import type { TransferPreflightResult } from '~/interfaces/g2g-transfer';
 import type { TransferPreset } from '~/models/admin/g2g-transfer-preset';
-import type { TransferPreflightResult } from '~/server/service/g2g-transfer';
 
 type TransferWarning = TransferPreflightResult['warnings'][number];
 
@@ -11,9 +11,7 @@ type TransferWarning = TransferPreflightResult['warnings'][number];
  * Translation key for each {@link TransferWarning}'s `type`. Keyed by the discriminant
  * itself rather than built by the server: the preflight response carries `type` values,
  * not rendered sentences (design.md's Implementation Notes -- "クライアント側で type に応じて
- * 翻訳する" -- is the option this component takes; `describeWarning` in
- * `g2g-transfer-transferability.ts` is the *other* option and stays server-only, used
- * for log lines and notification text, not for this modal).
+ * 翻訳する" -- is the option this component takes).
  *
  * The mapped type, rather than a `Record<string, string>`, makes a new `TransferWarning`
  * variant a compile error here until this map is taught about it.

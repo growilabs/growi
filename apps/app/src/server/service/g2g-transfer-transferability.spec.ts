@@ -1,12 +1,10 @@
 import {
   describeBlocker,
-  describeWarning,
   evaluateBlockers,
   evaluateTransferability,
   type TransferabilityDestination,
   type TransferabilitySource,
   type TransferBlocker,
-  type TransferWarning,
 } from './g2g-transfer-transferability';
 
 /*
@@ -418,19 +416,5 @@ describe('describeBlocker', () => {
     // build inline, for every condition that could actually fire (see this function's
     // doc comment for the one that never could).
     expect(describeBlocker(blocker)).toBe(expected);
-  });
-});
-
-describe('describeWarning', () => {
-  test.each<[TransferWarning, RegExp]>([
-    [{ type: 'password_seed_mismatch' }, /password/i],
-    [{ type: 'no_loginable_admin' }, /log ?in/i],
-    [{ type: 'sessions_not_invalidatable' }, /session/i],
-    [{ type: 'local_auth_disabled_at_source' }, /local.*authentication/i],
-  ])('describes %o with a non-empty, on-topic message', (warning, topic) => {
-    const message = describeWarning(warning);
-
-    expect(message.length).toBeGreaterThan(0);
-    expect(message).toMatch(topic);
   });
 });
