@@ -19,7 +19,7 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
   - 観測可能な完了状態: 全AC ID（1.1〜1.6, 2.1〜2.6, 3.1〜3.5, 4.1〜4.3）について対応箇所を1行ずつ書き出したチェックリストが作れる（コード変更は無し。ギャップがあれば別途報告し、本タスクでは修正しない）
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3_
   - **実施結果**: 19/20 ACは実装済みと確認。AC 2.6（再発証拠が解決済みとした変更より前の時点の場合、誤って再オープンしない）は`detect-flaky-ci/SKILL.md`の「Existing CLOSED issue found」に対応する日時比較ロジックが無く、未実装と判明（#11711で人間/LLMのその場判断のみで回避されていた既知の懸念、research.md参照）。ユーザー承認のうえタスク1.3として追加実装する
-- [ ] 1.3 `detect-flaky-ci/SKILL.md` の「Existing CLOSED issue found」に、再発証拠と解決コミットの前後関係を比較するチェックを追加する（AC 2.6、タスク1.2で発見）
+- [x] 1.3 `detect-flaky-ci/SKILL.md` の「Existing CLOSED issue found」に、再発証拠と解決コミットの前後関係を比較するチェックを追加する（AC 2.6、タスク1.2で発見）
   - 新しい失敗の証拠（run/コミット/ログのタイムスタンプ）を取得し、issueを解決したとされる変更（`Fixed by #NNNN` 等の記載や、そのPRのマージコミット日時）より**前**の時点のものであるかどうかを判定する手順を追加する
   - 前の時点であると判定された場合は、issueを再オープンせず、その証拠を過去の記録として（既存の`### Backfilled observation`系のコメント形式で）issueに残すことを明記する（#11711で実際に発生した状況をそのまま明文化する）
   - 前の時点でない（解決後の新規再発）と判定された場合は、既存どおり再オープンし`flaky/confirmed`にラベル付けする
@@ -27,6 +27,7 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
   - 観測可能な完了状態: `detect-flaky-ci/SKILL.md`の「Existing CLOSED issue found」セクションを読むと、再発証拠の日時と解決コミット日時を比較する具体的な手順が書かれており、その手順だけで「再オープンする/しない」を一意に決定できる
   - _Requirements: 2.6_
   - _Boundary: Escalation Tiering_
+  - **実施結果**: レビュー承認済み。同一issueに`Fixed by #NNNN`コメントが複数付いた場合のタイブレークルール（最新のものを使う等）は未明記のまま残っている（#11711では1件のみだったため実害なし、将来の改善候補としてImplementation Notesに記録）
 
 - [ ] 2. Core: ダッシュボード機能の実装
 - [ ] 2.1 (P) `investigate-flaky-test/SKILL.md` にFix-PR Marker Conventionを追加する
@@ -66,3 +67,6 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
   - 観測可能な完了状態: ダッシュボードissue本文のFix PR列に、マーカー付きissueのPRリンクが表示され、マーカー無しissueは`—`になっている
   - _Depends: 2.1, 2.2_
   - _Requirements: 5.3_
+
+## Implementation Notes
+- タスク1.3: `detect-flaky-ci/SKILL.md`「Existing CLOSED issue found」に日時比較ロジックを追加した際、同一issueに`Fixed by #NNNN`スタイルのコメントが複数付いた場合のタイブレークルールを明記していない（未検証の理論上のエッジケース。#11711では1件のみで実害なし）。将来この状況が実際に発生したら「最新のFixed byコメントを使う」等のルールを追記する

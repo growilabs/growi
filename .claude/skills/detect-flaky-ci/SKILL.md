@@ -618,15 +618,89 @@ for investigation or being investigated.
 
 ### Existing CLOSED issue found
 
-The test regressed again after being marked resolved. Reopen it and add a
-comment explaining the new occurrence, plus the label `flaky/confirmed`
-(skip `flaky/observing` — a recurrence after a claimed fix is stronger
-evidence than a first-time observation):
+New evidence against an identity whose tracking issue is already closed can
+mean two different things, and they call for opposite actions: a genuine
+regression that happened **after** the fix landed (reopen), or a failure
+that actually happened **before** the fix landed and only surfaced now
+because this scan's window/backfill reached far enough back to find it
+(do not reopen — it's a historical record, not a new occurrence). Do not
+reopen on title match alone — first determine which case this is by
+comparing two timestamps.
+
+**Step A — get the new evidence's timestamp.** Use the failing run's
+**commit** date, not the run's `CREATED_AT` — a run can execute well after
+its underlying commit (e.g. a delayed re-run), so commit date is the
+reliable one (same reasoning as ④'s backfill check above):
 
 ```bash
-gh issue reopen {NUMBER} --repo growilabs/growi
-gh issue edit {NUMBER} --repo growilabs/growi --add-label "flaky/confirmed" --remove-label "{EXACT_PHASE_RESOLVED_LABEL}" --add-label "{EXACT_PHASE_NEW_LABEL}"
+gh api -X GET repos/growilabs/growi/commits/{HEAD_SHA} -q '.commit.committer.date'
 ```
+
+**Step B — get the fix's resolution timestamp.** Fetch every comment on
+the closed issue:
+
+```bash
+gh api -X GET repos/growilabs/growi/issues/{NUMBER}/comments --paginate -q '.[].body'
+```
+
+Look for the free-text resolution record actually in use today —
+`Fixed by #{PR_NUMBER}` (optionally followed by `, merged as {SHA}`), as
+seen on #11711. This is **not** the structured `**Fix PR**: {URL}` marker
+(Fix-PR Marker Convention) — that marker only appears on issues closed
+after that convention shipped, so do not assume it exists on an issue this
+old.
+
+- If a comment names a PR number, fetch that PR's own merge time — use the
+  PR's `merged_at`, not the SHA the comment may also quote, since
+  `merged_at` is the authoritative resolution instant regardless of what
+  the comment text happened to record:
+  ```bash
+  gh api -X GET repos/growilabs/growi/pulls/{PR_NUMBER} -q '.merged_at'
+  ```
+- If no such comment exists (an issue closed before even the free-text
+  convention was adopted) and no other PR reference can be found in the
+  issue body/comments either, the resolution time is unknown — fall
+  through to the "genuine recurrence" branch below. Reopening on an
+  unclear resolution record is safer than silently treating a real
+  regression as pre-fix noise.
+
+**Step C — decide.**
+
+- **Evidence commit date is *before* the fix's `merged_at`** → this is the
+  #11711 situation: pre-fix evidence surfacing late, not a new regression.
+  Do **not** reopen and do **not** change any label. Record the evidence as
+  a historical note instead, using the same comment shape as the ④
+  backfill check above but with a heading that marks this as a live-scan
+  discovery rather than a targeted historical search (keep the two
+  headings distinct — they mark different discovery contexts):
+  ```bash
+  gh issue comment {NUMBER} --repo growilabs/growi --body "$(cat <<'EOF'
+  ### Backfilled observation (found during a later detect-flaky-ci scan)
+
+  - Run: {RUN_HTML_URL}
+  - Job: {JOB_NAME}
+  - Commit: {HEAD_SHA}
+  - Date: {CREATED_AT}
+  - Predates fix: this commit ({COMMIT_DATE}) is earlier than {FIX_PR_URL}'s merge ({MERGED_AT}); not reopened.
+
+  ```
+  {log excerpt}
+  ```
+  EOF
+  )"
+  ```
+- **Evidence commit date is *at or after* the fix's `merged_at`** (or Step
+  B could not determine a resolution time at all) → genuine recurrence
+  after a claimed fix. Reopen and escalate straight to `flaky/confirmed`
+  (skip `flaky/observing` — a recurrence after a claimed fix is stronger
+  evidence than a first-time observation), the same as before:
+  ```bash
+  gh issue reopen {NUMBER} --repo growilabs/growi
+  gh issue edit {NUMBER} --repo growilabs/growi --add-label "flaky/confirmed" --remove-label "{EXACT_PHASE_RESOLVED_LABEL}" --add-label "{EXACT_PHASE_NEW_LABEL}"
+  ```
+  and append the usual `### Additional observation` comment (same shape as
+  the OPEN-issue path above) so the reopened issue carries this evidence
+  in its normal place.
 
 ## Step 5: Report
 
