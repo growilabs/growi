@@ -137,6 +137,19 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
     (4) design.mdのKey Decisionsに、「解決済み＝issueのクローズ」であり
     `phase/resolved`ラベルはダッシュボードのアクティブ判定に影響しない旨
     を明記
+  - **4回目のレビュー**: NO-GO（Important 2件、Suggestion 2件）。ラウンド4
+    自体の不備を指摘された:
+    (a) item1・item2の`gh api`取得内容が、新しいFirst seen定義が必要と
+    する「issue本文」を実際には取得しておらず（`{number,title,created_at,
+    labels}`のみ）、手順として実行不可能だった → item1に`body`を追加、
+    item2のコメント取得も`{body}`のみに簡素化
+    (b) design.mdのState Managementセクションが「First seenはissue作成
+    日時」という旧定義のまま取り残されていた → flaky-ci-routine.mdと同じ
+    定義に書き直し
+    (c) Suggestion: item1の3クエリを跨いだ重複排除ルールが無い → 明記
+    (d) Suggestion: `### First observation`にDate:が無いissueへの
+    フォールバックが無い → `—`表示＋Step5報告に明記
+  - **ユーザー指示によるラウンド5**: 上記4件全てに対応
   - _Requirements: 5.1, 5.2, 5.3_
 
 ## Implementation Notes

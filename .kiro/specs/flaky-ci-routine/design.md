@@ -288,8 +288,14 @@ Fix、Environment Adaptation）は本spec化時点で実装済みのため詳細
   |---|---|---|---|---|---|---|
 
 - Persistence & consistency: GitHub issue本文自体が唯一の永続化先。Identity
-  はissueタイトルから `flaky: ` prefixを除いた文字列、First seenは issue
-  作成日時
+  はissueタイトルから `flaky: ` prefixを除いた文字列。First seen / Last
+  seenは、issue本文の`### First observation`が持つ`Date:`と、Occurrences
+  にカウントされる全コメントの`Date:`を1つの集合にまとめ、その最小値を
+  First seen・最大値をLast seenとする。issueの`created_at`/`updated_at`
+  はどちらの列にも使わない（`created_at`は本文の`Date:`より後になるのが
+  通常であり、④backfillが本文の`Date:`より前の証拠を見つけた場合や、単に
+  issue作成がCI失敗の発生より遅れる場合に、代理指標としては不正確になる。
+  `updated_at`はラベル変更等でも進むため、そもそも観測日時を表さない）
 - **Occurrencesの定義（コメント総数ではない）**: 追跡issueの本文（初回観測、
   1件とカウント）に加えて、コメントのうち見出しが次のいずれかの正規表現に
   一致するものだけを1件ずつカウントする: `^### Additional observation` /

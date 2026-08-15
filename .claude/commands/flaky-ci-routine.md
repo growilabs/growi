@@ -173,17 +173,25 @@ table with that tier, same as any other active issue.
    a single query can't OR two tier labels together):
 
    ```bash
-   gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/observing" --paginate -q '.[] | {number,title,created_at,labels}'
-   gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/suspected" --paginate -q '.[] | {number,title,created_at,labels}'
-   gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/confirmed" --paginate -q '.[] | {number,title,created_at,labels}'
+   gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/observing" --paginate -q '.[] | {number,title,labels,body}'
+   gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/suspected" --paginate -q '.[] | {number,title,labels,body}'
+   gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/confirmed" --paginate -q '.[] | {number,title,labels,body}'
    ```
+
+   `body` is fetched here because First seen (step 3 below) is read from
+   it. Merge the three lists and deduplicate by `number` before proceeding
+   — an issue should carry exactly one tier label, but if one somehow
+   carries two (e.g. a mid-transition state), keep only its
+   `flaky/confirmed` row if present, else `flaky/suspected`, else
+   `flaky/observing` (strongest tier wins; do not emit two rows for the
+   same issue).
 
 2. **Fetch each candidate issue's comments** — both Occurrences and Last
    seen (below) and the Fix-PR marker lookup all read from this same call,
    so make it once per issue right after step 1:
 
    ```bash
-   gh api -X GET repos/growilabs/growi/issues/{NUMBER}/comments --paginate -q '.[] | {created_at, body}'
+   gh api -X GET repos/growilabs/growi/issues/{NUMBER}/comments --paginate -q '.[] | {body}'
    ```
 
 3. **Build one row per issue** with columns `Identity | Tier | First seen |
@@ -213,7 +221,11 @@ table with that tier, same as any other active issue.
      predates the issue's own creation, which would otherwise make First
      seen wrong; `updated_at` is bumped by label changes, the Fix-PR
      marker comment, and other bookkeeping that isn't an observation at
-     all, which would make Last seen wrong the same way.
+     all, which would make Last seen wrong the same way. If the issue
+     body has no `### First observation` `Date:` line at all (e.g. a
+     hand-created, manually-labeled issue) and there are no qualifying
+     comments either, leave both cells `—` (em dash) and note this issue
+     number in the Step 5 report — do not guess a date.
    - Tracking issue: a link to the issue.
    - Fix PR: **forward-only**. Populate this only if one of the comments
      from step 2 is exactly a `**Fix PR**: {URL}` marker (written by
