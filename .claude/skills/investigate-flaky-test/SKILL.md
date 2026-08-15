@@ -342,7 +342,7 @@ not the reverse.
 ### 6-A: Open a draft PR
 
 ```bash
-gh pr create --repo growilabs/growi --draft \
+PR_HTML_URL=$(gh pr create --repo growilabs/growi --draft \
   --title "fix: stabilize flaky test in {short scope}" \
   --body "$(cat <<'EOF'
 ## Summary
@@ -360,7 +360,23 @@ executions (see comments below). This PR stays draft until that completes.
 
 Fixes #{ISSUE_NUMBER}
 EOF
-)"
+)")
+```
+
+Then post the marker comment on the tracking issue, so the Dashboard Updater
+(a separate component) can pick up this PR's link with a simple pattern
+match instead of searching issue/comment bodies in free form. Take
+`{PR_HTML_URL}` from the `gh pr create` output above (its stdout is the new
+PR's URL, now captured in `$PR_HTML_URL`). This must be its own comment — a
+fixed one-line marker, not appended to any other comment — and its exact
+text must be `**Fix PR**: {PR_HTML_URL}` (this exact string is what the
+Dashboard Updater matches on; do not add a heading or extra wording that
+would break the match, and do not reuse the `### Additional observation` /
+`### Backfilled observation` headings from `detect-flaky-ci` here — this
+comment is intentionally excluded from that issue's observation-count):
+
+```bash
+gh issue comment {ISSUE_NUMBER} --repo growilabs/growi --body "**Fix PR**: ${PR_HTML_URL}"
 ```
 
 ### 6-B: Re-run this PR's CI for a repeat-green tally

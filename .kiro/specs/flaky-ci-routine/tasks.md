@@ -30,7 +30,7 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
   - **実施結果**: レビュー承認済み。同一issueに`Fixed by #NNNN`コメントが複数付いた場合のタイブレークルール（最新のものを使う等）は未明記のまま残っている（#11711では1件のみだったため実害なし、将来の改善候補としてImplementation Notesに記録）
 
 - [ ] 2. Core: ダッシュボード機能の実装
-- [ ] 2.1 (P) `investigate-flaky-test/SKILL.md` にFix-PR Marker Conventionを追加する
+- [x] 2.1 (P) `investigate-flaky-test/SKILL.md` にFix-PR Marker Conventionを追加する
   - Step 6-A（draft PRオープン）の直後に、対象の追跡issueへ `**Fix PR**: {PR_HTML_URL}` という固定書式の1行を含むコメントを追加する手順を1つ追加する
   - 既存のPR作成フロー・他のステップ番号は変更しない
   - 観測可能な完了状態: SKILL.mdのStep 6-Aブロックを読むと、コメント追加手順とその固定書式が明記されている
@@ -70,3 +70,4 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
 
 ## Implementation Notes
 - タスク1.3: `detect-flaky-ci/SKILL.md`「Existing CLOSED issue found」に日時比較ロジックを追加した際、同一issueに`Fixed by #NNNN`スタイルのコメントが複数付いた場合のタイブレークルールを明記していない（未検証の理論上のエッジケース。#11711では1件のみで実害なし）。将来この状況が実際に発生したら「最新のFixed byコメントを使う」等のルールを追記する
+- タスク2.1: レビュー1周目で`gh pr create`を2回呼んでしまい（1回目は実際のPR作成、2回目はURL取得目的のプレースホルダー本文）、重複PRを作ってしまう不具合が見つかった。修正版は元の`gh pr create`呼び出し自体を`PR_HTML_URL=$(...)`で包んで出力を捕捉する形にし、2回目の呼び出しを削除。以降、他タスクで同様に「既存コマンドの出力を後段で使いたい」場合は、コマンドを複製せず出力を変数に捕捉する形を優先する
