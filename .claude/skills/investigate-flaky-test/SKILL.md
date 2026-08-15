@@ -341,13 +341,13 @@ not the reverse.
 
 ### 6-A: Open a draft PR
 
-Then post a marker comment on the tracking issue in the **same shell
-invocation**, so the Dashboard Updater (a separate component) can pick up
-this PR's link with a simple pattern match instead of searching
-issue/comment bodies in free form. `$PR_HTML_URL` only exists for the
-duration of the shell that set it — a separate tool call starts a fresh
-shell with no memory of it, so both commands below must run as one script,
-not as two independent invocations:
+Open the draft PR, then immediately post a marker comment on the tracking
+issue, in the **same shell invocation** — so the Dashboard Updater (a
+separate component) can pick up this PR's link with a simple pattern match
+instead of searching issue/comment bodies in free form. `$PR_HTML_URL` only
+exists for the duration of the shell that set it — a separate tool call
+starts a fresh shell with no memory of it, so both commands below must run
+as one script, not as two independent invocations:
 
 ```bash
 PR_HTML_URL=$(gh pr create --repo growilabs/growi --draft \

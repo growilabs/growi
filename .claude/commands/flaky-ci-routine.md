@@ -162,10 +162,15 @@ paused on still has a current tier label (`flaky/observing` /
 `flaky/suspected` / `flaky/confirmed`); it simply appears in the dashboard
 table with that tier, same as any other active issue.
 
-1. **Re-fetch the active issue set.** Do not reuse the list Step 2 built —
-   labels may have changed while Step 3 was running. Fetch fresh, `open`,
-   one tier at a time (same AND-filter reasoning as Step 2 — a single query
-   can't OR two tier labels together):
+1. **Re-fetch the active issue set.** "Active" here means **`open`,
+   regardless of its `phase/*` label** — `phase/resolved` marks that
+   `investigate-flaky-test` finished its work on the issue (a fix PR
+   exists, or a quarantine/no-action decision was made), not that the
+   flaky test itself is confirmed gone; only closing the tracking issue
+   removes it from the dashboard (Requirement 5.4). Do not reuse the list
+   Step 2 built — labels may have changed while Step 3 was running. Fetch
+   fresh, `open`, one tier at a time (same AND-filter reasoning as Step 2 —
+   a single query can't OR two tier labels together):
 
    ```bash
    gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/observing" --paginate -q '.[] | {number,title,created_at,labels}'
@@ -195,15 +200,21 @@ table with that tier, same as any other active issue.
      observations and must be excluded. (These two heading strings must
      stay in sync with what `detect-flaky-ci/SKILL.md` actually writes; if
      that wording ever changes, update both files together.)
-   - Last seen: the `Date:` value quoted inside the **most recent**
-     qualifying comment counted for Occurrences above (an `### Additional
-     observation` or `### Backfilled observation` comment always states its
-     own `Date:` line — reuse that, don't parse the comment's
-     `created_at`). If there are no qualifying comments (Occurrences == 1),
-     use the issue's own `created_at` instead — do **not** use the issue's
-     `updated_at` for this column: label changes, the Fix-PR marker
-     comment, and other bookkeeping all bump `updated_at` without being a
-     new observation, so it does not mean "last observed".
+   - Last seen: among the qualifying comments counted for Occurrences
+     above, take the **latest `Date:` value stated inside the comment
+     bodies themselves** — compare those dates, not which comment was
+     posted most recently. A `### Backfilled observation` comment records a
+     historical run's date and is routinely posted well after other,
+     newer-dated observations (`detect-flaky-ci/SKILL.md`'s ④ deliberately
+     searches further back than the scan window for already-`flaky/
+     observing` issues), so "the most recently posted comment" and "the
+     comment describing the most recent occurrence" are frequently
+     different comments — always resolve to the latter. If there are no
+     qualifying comments (Occurrences == 1), use the issue's own
+     `created_at` instead — do **not** use the issue's `updated_at` for
+     this column: label changes, the Fix-PR marker comment, and other
+     bookkeeping all bump `updated_at` without being a new observation, so
+     it does not mean "last observed".
    - Tracking issue: a link to the issue.
    - Fix PR: **forward-only**. Populate this only if one of the comments
      from step 2 is exactly a `**Fix PR**: {URL}` marker (written by
@@ -229,6 +240,8 @@ table with that tier, same as any other active issue.
    - **0 results from the labeled query** → before concluding "no dashboard
      exists", run the same exact-title search once more without the label
      filter (`gh api -X GET repos/growilabs/growi/issues -f state=all --paginate -q '.[] | select(.title == "flaky-ci-routine: dashboard") | {number,created_at}'`).
+     This paginates every issue in the repo (a real but bounded cost — it
+     only runs on this 0-result path, not on every routine invocation).
      If that also finds nothing, create a new issue titled exactly
      `flaky-ci-routine: dashboard`, labeled `flaky/dashboard`, with the
      table built in step 3 as its body. If it finds an unlabeled match,
@@ -244,12 +257,23 @@ table with that tier, same as any other active issue.
      auto-merge or delete the others. Note the anomaly (issue numbers found)
      at the top of the dashboard body and in this routine's Step 5 report.
 
-5. **Body format**: start with a header line stating when this update ran —
-   `_Updated: {ISO8601 timestamp of this Step 4 run}_` — then the table
-   from step 3. If there are zero active issues, replace the table with an
-   explicit one-line statement such as "No active flaky tests right now."
-   rather than an empty table with just headers — a reader should see a
-   deliberate statement, not something that looks broken or unfinished.
+5. **Body format**, in this exact order:
+   - `# flaky-ci-routine dashboard` (title)
+   - `_Updated: {ISO8601 timestamp}_` — read the actual current time when
+     you write this line (e.g. `date -u +%Y-%m-%dT%H:%M:%SZ`); never
+     compose, round, or guess a timestamp — a header that doesn't match
+     when the write actually happened is worse than no header
+   - One short paragraph explaining that this issue is create-or-updated
+     every run and the body is fully replaced (so resolved tests disappear
+     automatically and a zero-active run doesn't show stale content) —
+     this paragraph's wording may vary run to run, it's explanatory prose,
+     not a machine-read field
+   - The table from step 3. If there are zero active issues, replace the
+     table with this **exact** line instead of an empty table with just
+     headers: `No active flaky tests right now.` — always this string,
+     verbatim, so a reader (or a future re-implementation) can rely on it
+     as the zero-state marker rather than inferring "empty" from an absent
+     table
 
 6. **If the table is at risk of exceeding GitHub's ~65536-character body
    limit**, sort the remaining rows by confidence tier (confirmed >

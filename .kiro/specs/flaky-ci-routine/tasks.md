@@ -78,26 +78,29 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
   - _Boundary: Escalation Tiering_
 
 - [ ] 4. 最終adversarialレビュー（Opus）の指摘事項を修正する
-  - 1回目のレビューはNO-GO（Important 4件、Suggestion 3件）。以下を修正:
-    (1) design.mdのFile Structure Planが`detect-flaky-ci/SKILL.md`を
-    「Unmodified」のままにしていた矛盾を解消し、Modified Filesへ移動して
-    タスク1.3・3.4の変更理由を明記
-    (2) `flaky-ci-routine.md` Step4のLast seen定義が実質`updated_at`
-    （ラベル変更時刻）になってしまう不備を修正し、コメント取得APIを明示
-    追加、Occurrences算出対象コメントの`Date:`行を正としてLast seenを
-    定義し直した
-    (3) `investigate-flaky-test/SKILL.md` Step6-Aで`$PR_HTML_URL`が
-    別のbashブロックにまたがって参照されており、ツール呼び出しをまたぐと
-    シェル変数が消えてFix PRマーカーが空文字列になる不具合を発見・
-    1つのシェルスクリプトにまとめて解消
-    (4) 本番issue #11720 の本文に検証作業由来の不整合な記述
-    （創建前の日時を名乗るヘッダ、"validation run"という文言）が残って
-    いたため、Step4の仕様に`Updated: {timestamp}`ヘッダ行を明記した上で
-    実際のissue本文も正しい内容に修正
-    (5) Suggestion 3件（新規heredocのインデントずれ、ゼロ状態文言の明記、
-    ラベル無しダッシュボードissueを見逃すリスクへのフォールバック）も
-    合わせて修正
-  - 観測可能な完了状態: 2回目のレビューでGO判定
+  - **1回目**: NO-GO（Important 4件、Suggestion 3件）。design.mdのFile
+    Structure Plan不整合、Step4のLast seen定義不備、`$PR_HTML_URL`のシェル
+    またぎ参照バグ、本番issue #11720の検証debris、他Suggestion 3件を修正
+  - **2回目**: NO-GO（Important 2件、Suggestion 5件）。1回目の修正自体が
+    抱えていた問題を指摘された:
+    (a) Last seenを「直近に投稿されたコメントのDate:」と定義していたが、
+    ④の深掘りbackfillは実行の遅れたタイムスタンプを持つ過去のrunを
+    「後から」投稿するため、投稿順とDate:の新しさが一致しない。「投稿順」
+    ではなく「Date:の値そのものを比較して最新を選ぶ」定義に修正
+    (b) 1回目で#11720に書いたUpdatedヘッダのタイムスタンプが、実際に
+    書き込んだ時刻より13分未来の作文だった（spec.jsonの`updated_at`も同様
+    のパターン）。Step4に「実行時刻をその場でdateコマンド等から読み取り、
+    合成・丸め・推測しない」ことを明記し、issue本文を実際の書き込み時刻
+    ちょうどに書き直した
+    (c) ゼロ状態文言が「such as」で例示になっており一意でなかった → 固定
+    文言`No active flaky tests right now.`をStep4とdesign.mdシナリオ3の
+    両方で一致させた
+    (d) Step4の本文フォーマット説明が実際にissueへ書いた内容（タイトル+
+    Updated+説明文+表）と食い違っていた → 説明文パラグラフの存在を明記
+    (e) ラベル無しフォールバック検索が全issueページングになるコスト言及、
+    6-Aの「Then」から始まる宙に浮いた文の修正、`phase/resolved`でも
+    dashboard上は依然「アクティブ」である旨の明記、も合わせて実施
+  - 観測可能な完了状態: 3回目のレビューでGO判定
   - _Requirements: 5.1, 5.2, 5.3_
 
 ## Implementation Notes
