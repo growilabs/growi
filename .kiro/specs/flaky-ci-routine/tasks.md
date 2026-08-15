@@ -6,7 +6,7 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
 を確認する。ただし1.2の実施中にAC 2.6が未実装であることが判明したため、
 例外的にタスク1.3でコード修正を行う（詳細は1.2の実施結果を参照）。
 
-- [ ] 1. Foundation: 前提条件の整備
+- [x] 1. Foundation: 前提条件の整備
 - [x] 1.1 GitHubラベル `flaky/dashboard` を作成する
   - `gh api repos/growilabs/growi/labels -X POST -f name=flaky/dashboard -f color=... -f description=...` で作成する
   - 説明文は100文字制限に収める（`flaky/suspected`作成時に一度422で失敗した実績あり）
@@ -29,7 +29,7 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
   - _Boundary: Escalation Tiering_
   - **実施結果**: レビュー承認済み。同一issueに`Fixed by #NNNN`コメントが複数付いた場合のタイブレークルール（最新のものを使う等）は未明記のまま残っている（#11711では1件のみだったため実害なし、将来の改善候補としてImplementation Notesに記録）
 
-- [ ] 2. Core: ダッシュボード機能の実装
+- [x] 2. Core: ダッシュボード機能の実装
 - [x] 2.1 (P) `investigate-flaky-test/SKILL.md` にFix-PR Marker Conventionを追加する
   - Step 6-A（draft PRオープン）の直後に、対象の追跡issueへ `**Fix PR**: {PR_HTML_URL}` という固定書式の1行を含むコメントを追加する手順を1つ追加する
   - 既存のPR作成フロー・他のステップ番号は変更しない
@@ -49,7 +49,7 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
   - _Boundary: Dashboard Updater_
 
-- [ ] 3. Validation: run nowによるシナリオ検証
+- [x] 3. Validation: run nowによるシナリオ検証
 - [x] 3.1 ダッシュボードissueの新規作成と更新・非重複を検証する
   - `flaky-ci-routine: dashboard` issueが存在しない状態で `/flaky-ci-routine` を実行し、1件だけ作成されることを確認する（design.mdシナリオ1）
   - 同issueが存在する状態でもう一度実行し、issue番号が変わらず本文だけが更新されることを確認する（design.mdシナリオ2）
