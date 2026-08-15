@@ -152,12 +152,87 @@ move to the next one" rather than blocking the whole routine: note it in the
 final report as needing human attention and continue with the next issue in
 the list.
 
-## Step 4 — Report
+## Step 4 — Update the dashboard
+
+Run this step **even if Step 3 stopped one or more issues for human
+decision.** "ルーティンの実行が完了した場合" (Requirement 5.1 — "when a run
+of the routine has completed") means this routine cycle reaching its end,
+not every individual investigation having finished. An issue that Step 3
+paused on still has a current tier label (`flaky/observing` /
+`flaky/suspected` / `flaky/confirmed`); it simply appears in the dashboard
+table with that tier, same as any other active issue.
+
+1. **Re-fetch the active issue set.** Do not reuse the list Step 2 built —
+   labels may have changed while Step 3 was running. Fetch fresh, `open`,
+   one tier at a time (same AND-filter reasoning as Step 2 — a single query
+   can't OR two tier labels together):
+
+   ```bash
+   gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/observing" --paginate -q '.[] | {number,title,created_at,labels}'
+   gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/suspected" --paginate -q '.[] | {number,title,created_at,labels}'
+   gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/confirmed" --paginate -q '.[] | {number,title,created_at,labels}'
+   ```
+
+2. **Build one row per issue** with columns `Identity | Tier | First seen |
+   Last seen | Occurrences | Tracking issue | Fix PR`:
+   - Identity: the issue title with the `flaky: ` prefix removed.
+   - Tier: `observing` / `suspected` / `confirmed`, from the label found above.
+   - First seen: the issue's `created_at`.
+   - Last seen: the most recent of the issue's own updates and its
+     qualifying comments (see Occurrences below).
+   - Occurrences: **1** (the tracking issue's own body, i.e. the first
+     observation) **plus** the count of comments on that issue whose
+     heading matches `### Additional observation` or
+     `### Backfilled observation` (prefix match on the comment's first
+     line). Do **not** count every comment — identity corrections, the
+     Fix-PR marker comment, and human notes do not represent additional
+     observations and must be excluded. (These two heading strings must
+     stay in sync with what `detect-flaky-ci/SKILL.md` actually writes; if
+     that wording ever changes, update both files together.)
+   - Tracking issue: a link to the issue.
+   - Fix PR: **forward-only**. Populate this only if the issue carries a
+     `**Fix PR**: {URL}` marker comment (written by `investigate-flaky-test`
+     Step 6-A). If no such marker comment exists — including for tracking
+     issues created before this convention existed — write `—` (em dash).
+     Do **not** scan the issue body or other comments for a PR URL as a
+     fallback: those free-form mentions can reference unrelated PRs (e.g.
+     the PR an evidence commit originally came from), and guessing wrong is
+     worse than leaving the cell blank.
+
+3. **Search for the dashboard issue** by exact title match on
+   `flaky-ci-routine: dashboard` (same exact-title pattern `detect-flaky-ci`
+   already uses for tracking issues):
+
+   ```bash
+   gh api -X GET repos/growilabs/growi/issues -f state=all -f labels="flaky/dashboard" --paginate -q '.[] | select(.title == "flaky-ci-routine: dashboard") | {number,created_at}'
+   ```
+
+   - **0 results** → create a new issue titled exactly
+     `flaky-ci-routine: dashboard`, labeled `flaky/dashboard`, with the
+     table built in step 2 as its body.
+   - **1 result** → replace that issue's body **entirely** with the freshly
+     built table (never append — a full replace is what makes resolved
+     issues disappear from the table on the very next run, and what makes
+     a zero-active-issues run show an empty table instead of stale content).
+   - **2+ results (anomaly)** → this should not happen; treat the oldest
+     (lowest `created_at`) as canonical and update it as above. Do not
+     auto-merge or delete the others. Note the anomaly (issue numbers found)
+     at the top of the dashboard body and in this routine's Step 5 report.
+
+4. **If the table is at risk of exceeding GitHub's ~65536-character body
+   limit**, sort the remaining rows by confidence tier (confirmed >
+   suspected > observing) then by most-recent-last-seen, keep as many rows
+   from the top as fit, and state explicitly at the top of the body how
+   many rows were truncated and why. Never truncate silently.
+
+## Step 5 — Report
 
 Summarize the run: which `JOB_LOG_METHOD` Step 0 selected, how many issues
 were newly confirmed vs newly suspected by Step 1 (and, of the suspected
 ones, how many `investigate-flaky-test` promoted to confirmed via its
 one-time rerun vs left at suspected pending human review), how many were
 investigated in Step 3, how many resulted in a PR, how many were left
-pending human decision (and why), and how many were quarantined. This is the
-routine's output — nothing else needs to be written.
+pending human decision (and why), and how many were quarantined. Also
+report Step 4's outcome: whether the dashboard issue was created or updated,
+how many rows it now lists, and whether any rows were truncated (and if so,
+how many). This is the routine's output — nothing else needs to be written.

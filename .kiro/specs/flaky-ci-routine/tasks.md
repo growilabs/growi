@@ -36,7 +36,7 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
   - 観測可能な完了状態: SKILL.mdのStep 6-Aブロックを読むと、コメント追加手順とその固定書式が明記されている
   - _Requirements: 5.3_
   - _Boundary: Fix-PR Marker Convention_
-- [ ] 2.2 (P) `flaky-ci-routine.md` にDashboard Updaterステップを追加し、ステップ番号を整理する
+- [x] 2.2 (P) `flaky-ci-routine.md` にDashboard Updaterステップを追加し、ステップ番号を整理する
   - 現行Step3（investigate-flaky-testループ）とStep4（Report）の間に新しい **Step4: Update Dashboard** を挿入し、既存Step4（Report）を**同じ編集内で**Step5に繰り下げる（新Step4挿入と旧Step4の繰り下げは同一ファイルの1つの編集としてまとめて行い、Step4が2つ存在する中間状態を作らない）
   - `open`状態かつ `flaky/observing|suspected|confirmed` いずれかのラベルを持つ全issueを再取得する手順を記述する
   - タイトルが完全一致で `flaky-ci-routine: dashboard` のissueを検索し、無ければ作成・あれば本文を全置換する手順を記述する（ラベル `flaky/dashboard` を付与）
