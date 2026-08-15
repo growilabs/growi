@@ -6,7 +6,7 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
 を確認するのみで、コード変更は行わない。
 
 - [ ] 1. Foundation: 前提条件の整備
-- [ ] 1.1 GitHubラベル `flaky/dashboard` を作成する
+- [x] 1.1 GitHubラベル `flaky/dashboard` を作成する
   - `gh api repos/growilabs/growi/labels -X POST -f name=flaky/dashboard -f color=... -f description=...` で作成する
   - 説明文は100文字制限に収める（`flaky/suspected`作成時に一度422で失敗した実績あり）
   - 観測可能な完了状態: `gh api repos/growilabs/growi/labels/flaky%2Fdashboard -X GET` がラベル情報を返す
