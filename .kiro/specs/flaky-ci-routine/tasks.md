@@ -77,6 +77,29 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
   - _Requirements: 2.1_
   - _Boundary: Escalation Tiering_
 
+- [ ] 4. 最終adversarialレビュー（Opus）の指摘事項を修正する
+  - 1回目のレビューはNO-GO（Important 4件、Suggestion 3件）。以下を修正:
+    (1) design.mdのFile Structure Planが`detect-flaky-ci/SKILL.md`を
+    「Unmodified」のままにしていた矛盾を解消し、Modified Filesへ移動して
+    タスク1.3・3.4の変更理由を明記
+    (2) `flaky-ci-routine.md` Step4のLast seen定義が実質`updated_at`
+    （ラベル変更時刻）になってしまう不備を修正し、コメント取得APIを明示
+    追加、Occurrences算出対象コメントの`Date:`行を正としてLast seenを
+    定義し直した
+    (3) `investigate-flaky-test/SKILL.md` Step6-Aで`$PR_HTML_URL`が
+    別のbashブロックにまたがって参照されており、ツール呼び出しをまたぐと
+    シェル変数が消えてFix PRマーカーが空文字列になる不具合を発見・
+    1つのシェルスクリプトにまとめて解消
+    (4) 本番issue #11720 の本文に検証作業由来の不整合な記述
+    （創建前の日時を名乗るヘッダ、"validation run"という文言）が残って
+    いたため、Step4の仕様に`Updated: {timestamp}`ヘッダ行を明記した上で
+    実際のissue本文も正しい内容に修正
+    (5) Suggestion 3件（新規heredocのインデントずれ、ゼロ状態文言の明記、
+    ラベル無しダッシュボードissueを見逃すリスクへのフォールバック）も
+    合わせて修正
+  - 観測可能な完了状態: 2回目のレビューでGO判定
+  - _Requirements: 5.1, 5.2, 5.3_
+
 ## Implementation Notes
 - タスク1.3: `detect-flaky-ci/SKILL.md`「Existing CLOSED issue found」に日時比較ロジックを追加した際、同一issueに`Fixed by #NNNN`スタイルのコメントが複数付いた場合のタイブレークルールを明記していない（未検証の理論上のエッジケース。#11711では1件のみで実害なし）。将来この状況が実際に発生したら「最新のFixed byコメントを使う」等のルールを追記する
 - タスク2.1: レビュー1周目で`gh pr create`を2回呼んでしまい（1回目は実際のPR作成、2回目はURL取得目的のプレースホルダー本文）、重複PRを作ってしまう不具合が見つかった。修正版は元の`gh pr create`呼び出し自体を`PR_HTML_URL=$(...)`で包んで出力を捕捉する形にし、2回目の呼び出しを削除。以降、他タスクで同様に「既存コマンドの出力を後段で使いたい」場合は、コマンドを複製せず出力を変数に捕捉する形を優先する

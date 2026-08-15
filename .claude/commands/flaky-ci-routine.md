@@ -173,15 +173,21 @@ table with that tier, same as any other active issue.
    gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/confirmed" --paginate -q '.[] | {number,title,created_at,labels}'
    ```
 
-2. **Build one row per issue** with columns `Identity | Tier | First seen |
+2. **Fetch each candidate issue's comments** — both Occurrences and Last
+   seen (below) and the Fix-PR marker lookup all read from this same call,
+   so make it once per issue right after step 1:
+
+   ```bash
+   gh api -X GET repos/growilabs/growi/issues/{NUMBER}/comments --paginate -q '.[] | {created_at, body}'
+   ```
+
+3. **Build one row per issue** with columns `Identity | Tier | First seen |
    Last seen | Occurrences | Tracking issue | Fix PR`:
    - Identity: the issue title with the `flaky: ` prefix removed.
    - Tier: `observing` / `suspected` / `confirmed`, from the label found above.
    - First seen: the issue's `created_at`.
-   - Last seen: the most recent of the issue's own updates and its
-     qualifying comments (see Occurrences below).
    - Occurrences: **1** (the tracking issue's own body, i.e. the first
-     observation) **plus** the count of comments on that issue whose
+     observation) **plus** the count of comments (from step 2) whose
      heading matches `### Additional observation` or
      `### Backfilled observation` (prefix match on the comment's first
      line). Do **not** count every comment — identity corrections, the
@@ -189,27 +195,46 @@ table with that tier, same as any other active issue.
      observations and must be excluded. (These two heading strings must
      stay in sync with what `detect-flaky-ci/SKILL.md` actually writes; if
      that wording ever changes, update both files together.)
+   - Last seen: the `Date:` value quoted inside the **most recent**
+     qualifying comment counted for Occurrences above (an `### Additional
+     observation` or `### Backfilled observation` comment always states its
+     own `Date:` line — reuse that, don't parse the comment's
+     `created_at`). If there are no qualifying comments (Occurrences == 1),
+     use the issue's own `created_at` instead — do **not** use the issue's
+     `updated_at` for this column: label changes, the Fix-PR marker
+     comment, and other bookkeeping all bump `updated_at` without being a
+     new observation, so it does not mean "last observed".
    - Tracking issue: a link to the issue.
-   - Fix PR: **forward-only**. Populate this only if the issue carries a
-     `**Fix PR**: {URL}` marker comment (written by `investigate-flaky-test`
-     Step 6-A). If no such marker comment exists — including for tracking
-     issues created before this convention existed — write `—` (em dash).
-     Do **not** scan the issue body or other comments for a PR URL as a
-     fallback: those free-form mentions can reference unrelated PRs (e.g.
-     the PR an evidence commit originally came from), and guessing wrong is
-     worse than leaving the cell blank.
+   - Fix PR: **forward-only**. Populate this only if one of the comments
+     from step 2 is exactly a `**Fix PR**: {URL}` marker (written by
+     `investigate-flaky-test` Step 6-A). If no such marker comment exists —
+     including for tracking issues created before this convention existed —
+     write `—` (em dash). Do **not** scan the issue body or other comments
+     for a PR URL as a fallback: those free-form mentions can reference
+     unrelated PRs (e.g. the PR an evidence commit originally came from),
+     and guessing wrong is worse than leaving the cell blank.
 
-3. **Search for the dashboard issue** by exact title match on
+4. **Search for the dashboard issue** by exact title match on
    `flaky-ci-routine: dashboard` (same exact-title pattern `detect-flaky-ci`
-   already uses for tracking issues):
+   already uses for tracking issues). Filter by the `flaky/dashboard` label
+   first since it's cheaper, but don't trust a 0-result label-filtered
+   query alone — if the label ever failed to attach on creation, this would
+   otherwise never find the existing dashboard issue and would create a
+   second one on every run:
 
    ```bash
    gh api -X GET repos/growilabs/growi/issues -f state=all -f labels="flaky/dashboard" --paginate -q '.[] | select(.title == "flaky-ci-routine: dashboard") | {number,created_at}'
    ```
 
-   - **0 results** → create a new issue titled exactly
+   - **0 results from the labeled query** → before concluding "no dashboard
+     exists", run the same exact-title search once more without the label
+     filter (`gh api -X GET repos/growilabs/growi/issues -f state=all --paginate -q '.[] | select(.title == "flaky-ci-routine: dashboard") | {number,created_at}'`).
+     If that also finds nothing, create a new issue titled exactly
      `flaky-ci-routine: dashboard`, labeled `flaky/dashboard`, with the
-     table built in step 2 as its body.
+     table built in step 3 as its body. If it finds an unlabeled match,
+     treat it as the "1 result" case below and also re-add the
+     `flaky/dashboard` label while updating it (repairing the earlier
+     label-attach failure).
    - **1 result** → replace that issue's body **entirely** with the freshly
      built table (never append — a full replace is what makes resolved
      issues disappear from the table on the very next run, and what makes
@@ -219,7 +244,14 @@ table with that tier, same as any other active issue.
      auto-merge or delete the others. Note the anomaly (issue numbers found)
      at the top of the dashboard body and in this routine's Step 5 report.
 
-4. **If the table is at risk of exceeding GitHub's ~65536-character body
+5. **Body format**: start with a header line stating when this update ran —
+   `_Updated: {ISO8601 timestamp of this Step 4 run}_` — then the table
+   from step 3. If there are zero active issues, replace the table with an
+   explicit one-line statement such as "No active flaky tests right now."
+   rather than an empty table with just headers — a reader should see a
+   deliberate statement, not something that looks broken or unfinished.
+
+6. **If the table is at risk of exceeding GitHub's ~65536-character body
    limit**, sort the remaining rows by confidence tier (confirmed >
    suspected > observing) then by most-recent-last-seen, keep as many rows
    from the top as fit, and state explicitly at the top of the body how

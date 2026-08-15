@@ -681,22 +681,22 @@ old.
   backfill check above but with a heading that marks this as a live-scan
   discovery rather than a targeted historical search (keep the two
   headings distinct — they mark different discovery contexts):
-  ```bash
-  gh issue comment {NUMBER} --repo growilabs/growi --body "$(cat <<'EOF'
-  ### Backfilled observation (found during a later detect-flaky-ci scan)
+```bash
+gh issue comment {NUMBER} --repo growilabs/growi --body "$(cat <<'EOF'
+### Backfilled observation (found during a later detect-flaky-ci scan)
 
-  - Run: {RUN_HTML_URL}
-  - Job: {JOB_NAME}
-  - Commit: {HEAD_SHA}
-  - Date: {CREATED_AT}
-  - Predates fix: this commit ({COMMIT_DATE}) is earlier than {FIX_PR_URL}'s merge ({MERGED_AT}); not reopened.
+- Run: {RUN_HTML_URL}
+- Job: {JOB_NAME}
+- Commit: {HEAD_SHA}
+- Date: {CREATED_AT}
+- Predates fix: this commit ({COMMIT_DATE}) is earlier than {FIX_PR_URL}'s merge ({MERGED_AT}); not reopened.
 
-  ```
-  {log excerpt}
-  ```
-  EOF
-  )"
-  ```
+```
+{log excerpt}
+```
+EOF
+)"
+```
 - **Evidence commit date is *at or after* the fix's `merged_at`** (or Step
   B could not determine a resolution time at all) → genuine recurrence
   after a claimed fix. Reopen and escalate straight to `flaky/confirmed`

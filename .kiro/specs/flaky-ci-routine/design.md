@@ -136,7 +136,7 @@ flowchart TD
 ## File Structure Plan
 
 このspecはアプリケーションコードを持たず、Claude Codeのスキル/コマンド
-定義（Markdown）のみで構成される。新規ファイルは作らず、既存2ファイルに
+定義（Markdown）のみで構成される。新規ファイルは作らず、既存ファイルに
 変更を加える。
 
 ### Modified Files
@@ -148,10 +148,21 @@ flowchart TD
   オープン）の直後に、追跡issueへ固定書式のコメント
   `**Fix PR**: {PR_HTML_URL}` を追記する手順を1つ追加する（Fix-PR Marker
   Conventionコンポーネント、後述）
+- `.claude/skills/detect-flaky-ci/SKILL.md` — 当初は「Requirement 1〜4の
+  既存実装のまま、変更なし」の想定だったが、実装フェーズで2箇所の修正が
+  発生した（いずれもRequirement 5のダッシュボード新設とは別件）:
+  (1) タスク1.2のトレーサビリティ確認でAC 2.6が未実装と判明し、「Existing
+  CLOSED issue found」に証拠コミット日時と解決コミット日時を比較する手順
+  を追加（タスク1.3）。(2) タスク3の本番run now検証で、④backfillが使う
+  `-f status=completed -f conclusion=failure`がGitHub Actions APIの仕様上
+  無効（`conclusion`という独立パラメータが存在しない）と判明し、
+  `-f status=failure`に修正（タスク3.4）。どちらも「事後spec化」対象の
+  Requirement 1・2の既存実装に対する修正であり、Requirement 5の設計判断
+  ではないため、上記のUnmodified節を維持したまま別枠に記録するのではなく、
+  ここに実際の変更として記載する
 
-### Unmodified (Requirement 1–4, 既存実装のまま)
-- `.claude/skills/detect-flaky-ci/SKILL.md`
-- `.claude/skills/investigate-flaky-test/SKILL.md`（上記1箇所を除く）
+### Unmodified
+- なし（上記3ファイル全てに変更が入った）
 
 ### Prerequisite (not a file change)
 - GitHubラベル `flaky/dashboard` を実装前に作成する（`flaky/suspected` を
