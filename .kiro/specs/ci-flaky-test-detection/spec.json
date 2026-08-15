@@ -1,0 +1,23 @@
+{
+  "feature_name": "ci-flaky-test-detection",
+  "created_at": "2026-08-14T19:30:10Z",
+  "updated_at": "2026-08-15T14:25:13Z",
+  "cleaned_up_at": "2026-08-15T14:25:13Z",
+  "language": "ja",
+  "phase": "implementation-complete",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}
