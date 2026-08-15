@@ -50,12 +50,14 @@ describe('consume-points.ts', async () => {
     const maxRequests = 500;
 
     await testRateLimitErrorWhenExceedingMaxRequests(method, key, maxRequests);
-    // 10s (2x the 5s default): this test issues `maxRequests + 1` (=501)
+    // 15s (3x the 5s default): this test issues `maxRequests + 1` (=501)
     // sequential consumePoints round-trips to Mongo. It passed at ~3s before
     // the ESM runner switch; the regression is the dev runner's load cost, not
-    // this test. Keep the bump modest — revert toward the default once the
-    // runner perf is fixed.
-  }, 10_000);
+    // this test. The prior 10s bump (#11718) still timed out intermittently
+    // under CI runner load contention (single-run flake, confirmed via a
+    // no-code-change rerun passing). Keep the bump modest — revert toward
+    // the default once the runner perf is fixed.
+  }, 15_000);
 
   it('Should trigger a rate limit error when maxRequest is exceeded (maxRequest: {random integer between 1 and 1000})', async () => {
     // setup
@@ -64,7 +66,7 @@ describe('consume-points.ts', async () => {
     const maxRequests = faker.number.int({ min: 1, max: 1000 });
 
     await testRateLimitErrorWhenExceedingMaxRequests(method, key, maxRequests);
-    // 10s (2x the 5s default): up to 1001 sequential round-trips — see the
+    // 15s (3x the 5s default): up to 1001 sequential round-trips — see the
     // maxRequest:500 case above.
-  }, 10_000);
+  }, 15_000);
 });
