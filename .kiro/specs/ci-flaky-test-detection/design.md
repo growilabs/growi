@@ -1,5 +1,27 @@
 # Design Document
 
+## このドキュメントに何を書くか（Write / Don't-Write test）
+
+このspecは「実装の記録」ではなく「次にこの機能へ手を入れる人の出発点」である。
+各セクションを書く・残すときは、次の問いを当てる:
+**その内容は、コードとテストファイルを読めば再現できるか？** 再現できるなら
+書かない。
+
+| 書く | 書かない |
+|---|---|
+| 実際に調査・検証して分かった事実（コードをさっと読んだだけでは分からない挙動、外部ライブラリの隠れた挙動） | 関数シグネチャ、ファイル構成図、「どのファイルに何があるか」 |
+| なぜその設計にしたか（特に、検討した末に**却下した案とその理由**） | 素直な実装のありのままの説明 |
+| 自動テストで**担保できていない**残課題 | どのテストが何をカバーしているかの一覧（試験ファイルを読めば分かる・すぐ陳腐化する） |
+| コードから再現できない手動検証手順（再現環境の作り方、何を見るか、合否のしきい値） | 差分の有無・実装時期などの時点情報 |
+
+迷ったら書かない。コードから読み取れる内容をspecに書くと、コードが変わった
+瞬間に気づかれずに陳腐化し、それがドキュメント全体の信頼を落とす。
+
+（この原則は`requirements.md`のAcceptance Criteriaには適用しない。ACは
+「実装の説明」ではなく「実装が満たすべき契約」であり、番号は`tasks.md`の
+`_Requirements:_`やコード・テストのコメントから参照される生きた識別子
+なので、要約への統合や採番変更の対象にはしない）
+
 ## Overview
 
 **Purpose**: `flaky-ci-routine` は GROWI の CI（`ci-app.yml` / `ci-app-prod.yml`）
@@ -123,16 +145,6 @@ flowchart TD
   tech.mdの内容はNode/Turbopack/Prisma等アプリ本体のスタックであり、本spec
   はClaude Codeスキル/コマンドのMarkdownとgh CLI呼び出しのみで構成される）
 
-### Technology Stack
-
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|------------------|-------|
-| オーケストレーション | Claude Code skills/commands（Markdownプロンプト） | 検出・調査・可視化の手順定義 | 新規ランタイム依存なし |
-| CIデータ取得 | GitHub REST API（`gh api`） | run/job/issue/labelの読み書き | `-f`/`-F`使用時は`-X GET`必須（既知の落とし穴） |
-| ログ取得 | `gh run view --log*` / GitHub MCP `get_job_logs` | ジョブログ本文取得 | 実行開始時に1回だけ選択、以降固定 |
-| 永続状態 | GitHub Issues & Labels | 全ての状態（進行中issue・ダッシュボード） | 専用DB・専用状態issueは不採用 |
-| スケジューリング | RemoteTrigger cron（`0 0,8,16 * * *`） | 1日3回の起動 | `--window-hours`既定値(16h)の根拠 |
-
 ## File Structure Plan
 
 このspecはアプリケーションコードを持たず、Claude Codeのスキル/コマンド
@@ -206,24 +218,6 @@ sequenceDiagram
   （observing/suspected/confirmed）のまま一覧に含める。Requirement 5.1の
   「ルーティンの実行が完了した場合」は、個々の調査の完了ではなく、この
   ルーティン1サイクルの完了を指す、と読む
-
-## Requirements Traceability
-
-Requirement 1〜4は本spec化時点で実装済みの既存挙動であり、対応する要件IDの
-文言自体はこのdesign.md本文中には逐語では現れない（詳細ブロックを省略して
-いるため）。それぞれのIDの実装箇所は `.claude/skills/detect-flaky-ci/SKILL.md`
-または `.claude/skills/investigate-flaky-test/SKILL.md` の該当ステップを正
-とする（Components and Interfacesの各行に対応ファイルを記載）。
-
-| Requirement | Summary | Components | Interfaces | Flows |
-|---|---|---|---|---|
-| 1.1–1.6 | 検出とissue追跡 | Detection Scan（既存） | GitHub REST（issues/actions） | — |
-| 2.1–2.6 | 段階的エスカレーション | Escalation Tiering（既存） | GitHub REST（labels） | — |
-| 3.1–3.5 | 自律調査と修正 | Investigation and Fix（既存） | GitHub REST（PRs） | — |
-| 4.1–4.3 | 実行環境差異への耐性 | Environment Adaptation（既存） | gh CLI bootstrap, JOB_LOG_METHOD | — |
-| 5.1, 5.2, 5.5 | ダッシュボードのcreate-or-update・ゼロ状態 | Dashboard Updater（新規） | GitHub REST（issues, exact-title match） | System Flows 図 |
-| 5.3 | ダッシュボードの記載項目（Fix PRリンク含む） | Dashboard Updater + Fix-PR Marker Convention（新規） | GitHub REST（issue body/comments） | System Flows 図 |
-| 5.4 | 解決済みテストの一覧除外 | Dashboard Updater（新規） | GitHub REST（issue state） | System Flows 図 |
 
 ## Components and Interfaces
 

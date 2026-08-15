@@ -1,4 +1,7 @@
-# Brief: flaky-ci-routine
+# Brief: ci-flaky-test-detection
+
+> discovery時点（spec名は当時`flaky-ci-routine`）の記録。以下の本文は
+> discovery当時のまま。現在の判断は`design.md`・`requirements.md`を正とする。
 
 ## Problem
 
