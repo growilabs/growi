@@ -77,7 +77,7 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
   - _Requirements: 2.1_
   - _Boundary: Escalation Tiering_
 
-- [ ] 4. 最終adversarialレビュー（Opus）の指摘事項を修正する
+- [x] 4. 最終adversarialレビュー（Opus）の指摘事項を修正する
   - **1回目**: NO-GO（Important 4件、Suggestion 3件）。design.mdのFile
     Structure Plan不整合、Step4のLast seen定義不備、`$PR_HTML_URL`のシェル
     またぎ参照バグ、本番issue #11720の検証debris、他Suggestion 3件を修正
@@ -150,8 +150,24 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
     (d) Suggestion: `### First observation`にDate:が無いissueへの
     フォールバックが無い → `—`表示＋Step5報告に明記
   - **ユーザー指示によるラウンド5**: 上記4件全てに対応
+  - **5回目のレビュー: GO判定**。ラウンド5の4件の修正は全て検証済み・
+    ライブのダッシュボードissue #11720でも実際に新定義どおりの値
+    （First seenがissue作成日時ではなく本文のDate:になっている）が
+    反映されていることを確認。残ったSuggestion 3件（ダッシュボードissue
+    自体がcloseされた場合に再オープンしない/create・updateの具体的な
+    `gh api`コマンド名が本文に無い/軽微な表記ゆれ数点）はGO判定を妨げない
+    レベルとして、Implementation Notesに将来の改善候補として記録し今回は
+    対応しない
   - _Requirements: 5.1, 5.2, 5.3_
 
 ## Implementation Notes
+- タスク4のレビューで残ったSuggestion（2026-08-15、5回目レビューでGO
+  判定と同時に指摘）: (1) ダッシュボードissue自体が手動でcloseされた場合、
+  Step4は`state`を見ておらず再オープンしないため、以後のrunが見えなく
+  なる（重複作成はしないので実害は限定的）。`state`もfetchし、closed
+  なら再オープンする分岐を足すとよい。(2) Step4のissue作成・更新に
+  具体的な`gh api`コマンド例が無く、他の箇所と比べて詳細さに差がある。
+  (3) 軽微な表記ゆれ数点（Step1.5への誤参照、Date:欠落issueの
+  Occurrencesカウント方針の未整理、Step5報告への反映漏れ）
 - タスク1.3: `detect-flaky-ci/SKILL.md`「Existing CLOSED issue found」に日時比較ロジックを追加した際、同一issueに`Fixed by #NNNN`スタイルのコメントが複数付いた場合のタイブレークルールを明記していない（未検証の理論上のエッジケース。#11711では1件のみで実害なし）。将来この状況が実際に発生したら「最新のFixed byコメントを使う」等のルールを追記する
 - タスク2.1: レビュー1周目で`gh pr create`を2回呼んでしまい（1回目は実際のPR作成、2回目はURL取得目的のプレースホルダー本文）、重複PRを作ってしまう不具合が見つかった。修正版は元の`gh pr create`呼び出し自体を`PR_HTML_URL=$(...)`で包んで出力を捕捉する形にし、2回目の呼び出しを削除。以降、他タスクで同様に「既存コマンドの出力を後段で使いたい」場合は、コマンドを複製せず出力を変数に捕捉する形を優先する
