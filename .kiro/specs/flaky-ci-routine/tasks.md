@@ -100,7 +100,32 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
     (e) ラベル無しフォールバック検索が全issueページングになるコスト言及、
     6-Aの「Then」から始まる宙に浮いた文の修正、`phase/resolved`でも
     dashboard上は依然「アクティブ」である旨の明記、も合わせて実施
-  - 観測可能な完了状態: 3回目のレビューでGO判定
+  - **3回目（最終、方針上ここで自動修正ループを打ち切り）**: NO-GO
+    （Important 1件、Suggestion 3件）。kiro-impl-orchestration方針の
+    remediation上限3回に達したため、これ以上の自動修正・再レビューは
+    行わず、ユーザーに残課題として報告する:
+    - **[Important・未修正]** Last seenの定義（2回目で「投稿順でなく
+      Date:の値そのものを比較」に直した版）は、④backfillが既存の
+      `flaky/observing` issueに対して`created_at`より**前**の日付の
+      occurrenceを見つけた場合、Last seenがFirst seen（`created_at`）
+      より前になる自己矛盾を起こしうる（現在の本番issue #11710等の状態
+      そのものが対象範囲）。根本修正は、First seen/Last seenの両方を
+      「issue本文の`### First observation`の`Date:`＋全ての対象コメントの
+      `Date:`」の集合から算出し直す（min/max）方式にし、`created_at`を
+      代理指標として使わない設計に変える必要がある
+    - **[Suggestion・未修正]** Step4本文フォーマットの「exact order」に、
+      2件以上ヒット時の異常メモ・切り捨て時のメモを差し込む場所が明記
+      されていない
+    - **[Suggestion・未修正]** 検証用に一時closeした5件の本番issue
+      （#11710, #11709, #11708, #11707, #11718）に「task 3.2」という
+      spec内部の作業名を含むコメントが残ったまま（GROWIメンテナーには
+      意味不明）。ダッシュボード自体の動作には影響しない
+    - **[Suggestion・未修正]** 「`phase/resolved`でもdashboard上は
+      アクティブ」という解釈がflaky-ci-routine.mdにのみ明記され、
+      requirements.md 5.4・design.mdの記述とは食い違って見える
+  - 観測可能な完了状態: 上記Important 1件を解消し、4回目のレビューで
+    GO判定（このタスクは`/kiro-impl`の自動ループでは完了しない。ユーザー
+    の指示を待って次の対応を行う）
   - _Requirements: 5.1, 5.2, 5.3_
 
 ## Implementation Notes
