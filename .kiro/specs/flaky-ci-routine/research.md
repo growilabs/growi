@@ -230,6 +230,28 @@ Google・Meta・Uber・Spotifyの公開ブログは、実装は違えど同じ�
 
 - `flaky/observing` のまま何日も2回目の観測が来なかった場合の自動クローズ
   ・タイムアウトの仕組みが無い（放置されたobservingが残り続ける）
-- 「証拠のコミット日時が修正マージより前か後か」でreopen可否を判断するロ
+- ~~「証拠のコミット日時が修正マージより前か後か」でreopen可否を判断するロ
   ジックは、今回モデルがその場で下した判断であり、スキルに明文化されたルー
-  ルではない（次に同じパターンが起きたときも同じ判断をする保証は無い）
+  ルではない~~ → **2026-08-15、`/kiro-impl`のタスク1.2（トレーサビリティ確
+  認）で発見・タスク1.3で解消**。`detect-flaky-ci/SKILL.md`「Existing
+  CLOSED issue found」に日時比較の明文化された手順を追加済み（AC 2.6）
+- **2026-08-15、`/kiro-impl`のTask 3（本番`growilabs/growi`でのrun now検証）
+  で発見・その場で修正**: `gh api repos/.../actions/workflows/{file}/runs`
+  はGitHub Actions APIの仕様上、`status`パラメータが`completed`だけでなく
+  `failure`/`success`等の値も直接受け付ける形になっており、独立した
+  `conclusion`パラメータは存在しない。④の深掘りbackfillが使っていた
+  `-f status=completed -f conclusion=failure`は後者が無視され黙って
+  `status=completed`のみで動作し、成功・失敗・キャンセル全てのrunを返して
+  いた（false negativeには直結しない設計だが、意図した絞り込みが効いてい
+  なかった）。`-f status=failure`単体に修正し、本番で実測（28件全て
+  `conclusion=="failure"`）して確認済み
+- **未対応のまま記録のみ（2026-08-15発見）**: `gh api`でActions run一覧を
+  ページングする際、一部のrunのコミットメッセージに含まれる生の改行文字
+  （JSON文字列として本来`\n`にエスケープされるべきところ、エスケープされ
+  ていない制御文字のまま）が混入し、`jq`でのパースが
+  `Invalid string: control characters ... must be escaped`エラーになる
+  ケースがあった。Node.jsで簡易サニタイザ（文字列リテラル内の制御文字だけ
+  を検出して`\n`等にエスケープし直すスクリプト）を書いて回避したが、
+  `detect-flaky-ci/SKILL.md`のStep1本体はこの対処を明文化していない。
+  再現条件（どのコミットメッセージが原因か）は特定していない。将来また
+  `jq`パースエラーが出た場合、まずこれを疑う

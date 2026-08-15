@@ -168,8 +168,16 @@ every run in the deeper range:
 # API says failed, so this is cheap even at a much deeper range than the
 # main window. `created` uses GitHub's search qualifier syntax (`>DATE`),
 # passed via -f so gh api URL-encodes it correctly.
+#
+# This endpoint's `status` parameter is overloaded to also accept a
+# conclusion value directly (`failure`, `success`, ...) — there is no
+# separate `conclusion` parameter. `-f status=completed -f conclusion=failure`
+# looks like it filters to failures but doesn't: `conclusion` isn't a real
+# query param here, so it's silently ignored and every completed run
+# (success/failure/cancelled alike) comes back. Use `status=failure` alone
+# (confirmed empirically: this returns only conclusion=="failure" runs).
 gh api -X GET repos/growilabs/growi/actions/workflows/ci-app.yml/runs \
-  -f status=completed -f conclusion=failure -f "created=>{FOURTEEN_DAYS_AGO_ISO8601}" --paginate \
+  -f status=failure -f "created=>{FOURTEEN_DAYS_AGO_ISO8601}" --paginate \
   -q '.workflow_runs[] | {databaseId: .id, headSha: .head_sha, createdAt: .created_at, url: .html_url}'
 ```
 

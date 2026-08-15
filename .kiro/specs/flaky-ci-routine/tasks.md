@@ -50,23 +50,32 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
   - _Boundary: Dashboard Updater_
 
 - [ ] 3. Validation: run nowによるシナリオ検証
-- [ ] 3.1 ダッシュボードissueの新規作成と更新・非重複を検証する
+- [x] 3.1 ダッシュボードissueの新規作成と更新・非重複を検証する
   - `flaky-ci-routine: dashboard` issueが存在しない状態で `/flaky-ci-routine` を実行し、1件だけ作成されることを確認する（design.mdシナリオ1）
   - 同issueが存在する状態でもう一度実行し、issue番号が変わらず本文だけが更新されることを確認する（design.mdシナリオ2）
   - 観測可能な完了状態: 2回のrun後もダッシュボードissue番号が1つのままで、本文の更新日時が最新化されている
   - _Depends: 2.2_
   - _Requirements: 5.1, 5.2_
-- [ ] 3.2 ゼロ状態表示を検証する
+  - **実施結果**: 本番`growilabs/growi`に対し`/flaky-ci-routine`のStep0〜4を実際に手動実行して検証。ダッシュボードissue #11720 を新規作成→タイトル一致検索で1件ヒット→本文全置換、の順で確認。issue番号は変わらず`updated_at`のみ更新された
+- [x] 3.2 ゼロ状態表示を検証する
   - 一時的に全ての `flaky/*` 追跡issueを解決済みにしてから `/flaky-ci-routine` を実行し、ダッシュボードが「アクティブなflakyはありません」を表示し、古い表が残らないことを確認する（design.mdシナリオ3）
   - 観測可能な完了状態: ダッシュボードissue本文に古いテスト行が1件も残っていない
   - _Depends: 2.2_
   - _Requirements: 5.4, 5.5_
-- [ ] 3.3 Fix-PRマーカーの反映を検証する
+  - **実施結果**: ユーザー承認のうえ、実際にアクティブな5件（#11710, #11709, #11708, #11707, #11718）を一時close→ダッシュボード本文がゼロ状態表示に置換されることを確認→5件をreopenしラベル・状態が完全に復元されたことを確認→ダッシュボード本文も実際の状態に戻した
+- [x] 3.3 Fix-PRマーカーの反映を検証する
   - investigate-flaky-testが実際にPRを開いた後、追跡issueに `**Fix PR**: ...` コメントが付与され、次のダッシュボード更新でそのリンクが反映されることを確認する（design.mdシナリオ4）
   - マーカーが無い既存issue（例: #11711）についてはFix PR欄が`—`のままであることも合わせて確認する
   - 観測可能な完了状態: ダッシュボードissue本文のFix PR列に、マーカー付きissueのPRリンクが表示され、マーカー無しissueは`—`になっている
   - _Depends: 2.1, 2.2_
   - _Requirements: 5.3_
+  - **実施結果**: ユーザー判断により、本番に人工的なFix PRコメントを追加する実演習は行わず、タスク2.1のレビュー（マーカー書式・変数捕捉の正しさをgit diffとbashでの実行検証込みで確認済み、round2でAPPROVED）を代替エビデンスとして採用。マーカー無しissueの`—`表示は3.1/3.2で実際に確認済み（#11710等はいずれもマーカー無しで`—`）
+- [x] 3.4 `detect-flaky-ci/SKILL.md`④の`conclusion=failure`パラメータが効いていない不具合を修正する（Task 3の本番検証で発見）
+  - GitHub Actions APIの`actions/workflows/{file}/runs`エンドポイントには`conclusion`という独立パラメータは存在せず、`status`パラメータが`completed`だけでなく`failure`/`success`等の値も受け付ける仕様。`-f status=completed -f conclusion=failure`は後者が無視され、実質`status=completed`のみで動作し、成功・失敗・キャンセル全部が返っていた
+  - `-f status=completed -f conclusion=failure`を`-f status=failure`に置き換える
+  - 観測可能な完了状態: 修正後のコマンドを実行すると返る全runの`.conclusion`が`failure`のみになる（本番`growilabs/growi`で実測済み、28件全て`failure`）
+  - _Requirements: 2.1_
+  - _Boundary: Escalation Tiering_
 
 ## Implementation Notes
 - タスク1.3: `detect-flaky-ci/SKILL.md`「Existing CLOSED issue found」に日時比較ロジックを追加した際、同一issueに`Fixed by #NNNN`スタイルのコメントが複数付いた場合のタイブレークルールを明記していない（未検証の理論上のエッジケース。#11711では1件のみで実害なし）。将来この状況が実際に発生したら「最新のFixed byコメントを使う」等のルールを追記する
