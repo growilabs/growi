@@ -126,6 +126,17 @@ Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements
   - 観測可能な完了状態: 上記Important 1件を解消し、4回目のレビューで
     GO判定（このタスクは`/kiro-impl`の自動ループでは完了しない。ユーザー
     の指示を待って次の対応を行う）
+  - **ユーザー指示によるラウンド4**: 3回目のレビューで残った4件全てに対応。
+    (1) First seen/Last seenを両方とも「issue本文の`### First observation`
+    のDate:＋全ての対象コメントのDate:」の集合から算出し直す方式に変更
+    （min=First seen, max=Last seen）、`created_at`/`updated_at`を代理
+    指標として使わないことを明記
+    (2) Step4本文フォーマットに、異常メモ・切り捨てメモを差し込む専用の
+    行を追加（item4/item6からもそこを参照するよう相互参照を整理）
+    (3) 本番5件の追跡issueに残っていた「task 3.2」検証コメントを削除
+    (4) design.mdのKey Decisionsに、「解決済み＝issueのクローズ」であり
+    `phase/resolved`ラベルはダッシュボードのアクティブ判定に影響しない旨
+    を明記
   - _Requirements: 5.1, 5.2, 5.3_
 
 ## Implementation Notes

@@ -188,7 +188,13 @@ sequenceDiagram
 
 **Key Decisions**:
 - ダッシュボード更新は investigate-flaky-test ループが完了した**後**に行う
-  （Requirement 5.4: 調査中に解決されたissueを即座に一覧から外すため）
+  （Requirement 5.4: 調査中に解決されたissueを即座に一覧から外すため）。
+  ここでの「解決された」はissueが**クローズされたこと**を指す。
+  `investigate-flaky-test`が付与する`phase/resolved`ラベルは「調査は完了
+  した」という意味であり、issue自体はopenのままのことが多い（例: 修正PR
+  がまだレビュー待ちの間）。そのためダッシュボードの「アクティブ」判定は
+  `phase/*`ラベルを見ず、issueのopen/closedのみで行う（
+  `flaky-ci-routine.md` Step4参照）
 - issue本文は毎回**全置換**する（追記しない）。これにより、途中でissueが
   解決・再オープンされても次回更新時に必ず正しい状態に収束する
   （Requirement 5.5の「アクティブなflakyが0件でも更新する」も自然に満たす）

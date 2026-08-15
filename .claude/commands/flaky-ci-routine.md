@@ -190,7 +190,6 @@ table with that tier, same as any other active issue.
    Last seen | Occurrences | Tracking issue | Fix PR`:
    - Identity: the issue title with the `flaky: ` prefix removed.
    - Tier: `observing` / `suspected` / `confirmed`, from the label found above.
-   - First seen: the issue's `created_at`.
    - Occurrences: **1** (the tracking issue's own body, i.e. the first
      observation) **plus** the count of comments (from step 2) whose
      heading matches `### Additional observation` or
@@ -200,21 +199,21 @@ table with that tier, same as any other active issue.
      observations and must be excluded. (These two heading strings must
      stay in sync with what `detect-flaky-ci/SKILL.md` actually writes; if
      that wording ever changes, update both files together.)
-   - Last seen: among the qualifying comments counted for Occurrences
-     above, take the **latest `Date:` value stated inside the comment
-     bodies themselves** — compare those dates, not which comment was
-     posted most recently. A `### Backfilled observation` comment records a
-     historical run's date and is routinely posted well after other,
-     newer-dated observations (`detect-flaky-ci/SKILL.md`'s ④ deliberately
-     searches further back than the scan window for already-`flaky/
-     observing` issues), so "the most recently posted comment" and "the
-     comment describing the most recent occurrence" are frequently
-     different comments — always resolve to the latter. If there are no
-     qualifying comments (Occurrences == 1), use the issue's own
-     `created_at` instead — do **not** use the issue's `updated_at` for
-     this column: label changes, the Fix-PR marker comment, and other
-     bookkeeping all bump `updated_at` without being a new observation, so
-     it does not mean "last observed".
+   - First seen / Last seen: collect the `Date:` value from **every**
+     source that counts toward Occurrences above — the issue body's own
+     `### First observation` section (it always has a `Date:` line, see
+     `detect-flaky-ci/SKILL.md`) plus every qualifying comment's `Date:`
+     line — into one set of dates for this issue. First seen is the
+     **earliest** date in that set, Last seen is the **latest**. Do
+     **not** use the issue's `created_at` or `updated_at` for either
+     column: `created_at` is normally the same as the body's `Date:`, but
+     not always — `detect-flaky-ci/SKILL.md`'s ④ backfill check
+     deliberately searches further back than the scan window for
+     already-`flaky/observing` issues and can surface an occurrence that
+     predates the issue's own creation, which would otherwise make First
+     seen wrong; `updated_at` is bumped by label changes, the Fix-PR
+     marker comment, and other bookkeeping that isn't an observation at
+     all, which would make Last seen wrong the same way.
    - Tracking issue: a link to the issue.
    - Fix PR: **forward-only**. Populate this only if one of the comments
      from step 2 is exactly a `**Fix PR**: {URL}` marker (written by
@@ -254,8 +253,9 @@ table with that tier, same as any other active issue.
      a zero-active-issues run show an empty table instead of stale content).
    - **2+ results (anomaly)** → this should not happen; treat the oldest
      (lowest `created_at`) as canonical and update it as above. Do not
-     auto-merge or delete the others. Note the anomaly (issue numbers found)
-     at the top of the dashboard body and in this routine's Step 5 report.
+     auto-merge or delete the others. Note the anomaly (issue numbers
+     found) using item 5's note line below, and also in this routine's
+     Step 5 report.
 
 5. **Body format**, in this exact order:
    - `# flaky-ci-routine dashboard` (title)
@@ -263,6 +263,10 @@ table with that tier, same as any other active issue.
      you write this line (e.g. `date -u +%Y-%m-%dT%H:%M:%SZ`); never
      compose, round, or guess a timestamp — a header that doesn't match
      when the write actually happened is worse than no header
+   - If item 4's anomaly note (2+ dashboard issues found) or item 6's
+     truncation note applies this run, one line here stating it — this is
+     the only place either note belongs; do not also prepend it above the
+     table
    - One short paragraph explaining that this issue is create-or-updated
      every run and the body is fully replaced (so resolved tests disappear
      automatically and a zero-active run doesn't show stale content) —
@@ -278,8 +282,8 @@ table with that tier, same as any other active issue.
 6. **If the table is at risk of exceeding GitHub's ~65536-character body
    limit**, sort the remaining rows by confidence tier (confirmed >
    suspected > observing) then by most-recent-last-seen, keep as many rows
-   from the top as fit, and state explicitly at the top of the body how
-   many rows were truncated and why. Never truncate silently.
+   from the top as fit, and state explicitly — using item 5's note line —
+   how many rows were truncated and why. Never truncate silently.
 
 ## Step 5 — Report
 
