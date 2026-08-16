@@ -245,14 +245,16 @@ the accumulated CI evidence alone supports.
 Determine which category the flake belongs to — this decides the fix
 strategy in Step 4. Do not default to "just flaky, add a retry" — a race
 condition in product code surfaced by a test is a real bug, not a test
-problem, even though it *manifests* as flakiness.
+problem, even though it *manifests* as flakiness. The same discipline
+applies to "Environment timing": do not default to "just bump the
+timeout" either — see the guardrail below.
 
 | Category | Signature | Fix belongs in |
 |---|---|---|
 | **Shared/leaked state** | Test passes alone, fails alongside siblings; order-dependent; touches DB/fixtures another test also mutates | Test (isolate fixtures, don't disable parallelism — see `feedback_integ_test_isolation_per_worker` precedent: per-worker isolation, not disabling parallel execution) |
 | **Missing await / race in the test** | Assertion runs before an async side effect completes; timing-dependent selector waits (Playwright) | Test |
 | **Race in product code** | A fire-and-forget or unsynchronized async operation in application code (not the test) can observably run after the test's cleanup/assertion — e.g. a post-write side effect racing the same request's response | Product code |
-| **Environment timing** | Legitimately slow CI runner, no logic bug, but still worth quarantine if disruptive | Quarantine only, do not "fix" nonexistent code |
+| **Environment timing** | Legitimately slow CI runner, no logic bug, but still worth quarantine if disruptive | See guardrail below — usually a test redesign, not a bare timeout bump; quarantine only when no redesign is possible |
 
 Use `git log --oneline -20 -- {SPEC_PATH}` and read the code under test to
 tell "shared state" from "product race" — a test that fails only when run
@@ -260,6 +262,53 @@ after a specific sibling usually points at a fixture; a test that fails with
 an error surfaced from a service/model file (not the spec file itself) in
 the log's stack trace usually points at a product-code race worth reading
 carefully before dismissing as test flakiness.
+
+### Guardrail — a bare timeout increase is a last resort, not the default "Environment timing" fix
+
+A numeric timeout bump (`}, 15_000)` → `}, 20_000)` and so on) is the
+cheapest possible edit, which is exactly why it is easy to reach for
+without checking whether it actually addresses the cause. Before proposing
+one, check whether the test's own wall time **scales with a parameter of
+the test** (a loop count, a data size, an iteration count) rather than
+being a fixed cost that merely got unlucky under load. A bump over a
+scaling cost does not fix anything — it raises the load level at which the
+test starts failing again, and the next CI-busy period trips it once more.
+Concretely: read the test body, not just the failing assertion. If it
+issues `N` real round-trips (network, DB, filesystem) where `N` is
+`maxRequests`, a loop bound, or similar, and the assertions of interest
+only concern the *boundary* (a limit being reached/exceeded, a count
+saturating, a last-element condition), that is a redesign opportunity, not
+an environment-timing dead end:
+
+- Seed the precondition directly instead of looping to it — many
+  libraries expose a lower-level primitive that reaches the same state in
+  one call (e.g. `rate-limiter-flexible`'s `penalty(key, n)` reaches
+  `n` consumed points through the identical internal upsert path
+  `consume()` uses, in a single round-trip, instead of looping `consume()`
+  `n` times — see the `consume-points.integ.ts` fix for issue #11718/PR
+  #11719 for a worked example. The general shape: find the state-setting
+  primitive the library already ships, confirm it goes through the same
+  code path as the operation under test, and use it to jump straight to
+  one step before the boundary).
+- Exercise only the transition itself (the call(s) at and past the
+  boundary) through the real code under test.
+- This turns an O(N) cost into an O(1) cost, which removes the test's
+  sensitivity to CI load rather than buying temporary headroom against it.
+
+Only accept a bare timeout bump when:
+- a redesign genuinely isn't possible without changing what the test
+  verifies (rare — most "N round-trips to reach a boundary" tests can be
+  reshaped as above), or
+- as a **modest safety margin layered on top of a redesign** that already
+  removed the scaling behavior — not as the fix itself. State explicitly
+  why the margin is still there (e.g. "no CI history yet for this
+  reshaped test, and local/CI timing can differ") rather than leaving it
+  unexplained.
+
+A proposed fix that is only a numeric timeout change, with no evidence the
+test's cost was checked for scaling with a parameter, is not HIGH
+confidence at Step 4 regardless of how clean the diff looks — see the
+confidence table there.
 
 ---
 
@@ -273,6 +322,7 @@ carefully before dismissing as test flakiness.
 | Root cause identified but fix touches product code with broader blast radius, or category is ambiguous between "shared state" and "product race" | MEDIUM |
 | Reruns failed 100% of the time (looks like a real regression, not a flake — see Step 2's note) | MEDIUM — flag this explicitly, do not silently treat it as a flaky-test fix |
 | Issue came in as `flaky/suspected` and its one confirmation rerun (Step 2) also failed | MEDIUM — the mining hit alone is not empirical proof; say explicitly that the confirmation rerun did not reproduce a pass, so this could be a real regression rather than a flake, and that only one rerun was budgeted (not the 100%-tally case above) |
+| Proposed fix is a bare timeout increase, with no check for whether the test's cost scales with a parameter (see the Step 3 guardrail) | MEDIUM at best — go back and check for a redesign before treating this as HIGH, even if the diff is small and clean |
 | CI evidence and reruns alone do not localize a cause | LOW |
 
 **In `autonomous` mode:**
