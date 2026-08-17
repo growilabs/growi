@@ -7,7 +7,7 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import PageRedirect from '~/server/models/page-redirect';
+import { prisma } from '~/utils/prisma';
 
 /**
  * A page created at a path that still carries a redirect is unreachable at its own
@@ -72,32 +72,61 @@ describe('PageService.create with a redirect on the target path', () => {
     vi.restoreAllMocks();
     vi.spyOn(crowi.pageService.pageEvent, 'emit').mockReturnValue(true);
     await Page.deleteMany({ path: new RegExp(`^${PREFIX}/`) });
-    await PageRedirect.deleteMany({ fromPath: new RegExp(`^${PREFIX}/`) });
+    await prisma.pageredirects.deleteMany({
+      where: { fromPath: { startsWith: `${PREFIX}/` } },
+    });
   });
 
   it('has deleted the redirect by the time create resolves', async () => {
     const path = `${PREFIX}/reused`;
-    await PageRedirect.create({ fromPath: path, toPath: `${PREFIX}/moved-to` });
+    await prisma.pageredirects.create({
+      data: { fromPath: path, toPath: `${PREFIX}/moved-to` },
+    });
 
     await createWithoutSubOperation(path);
 
-    expect(await PageRedirect.findOne({ fromPath: path })).toBeNull();
+    expect(
+      await prisma.pageredirects.findFirst({ where: { fromPath: path } }),
+    ).toBeNull();
   });
 
+  // Every delegate method on the `$extends`-wrapped `prisma` client --
+  // built-in CRUD verbs and custom extension methods like `deleteByFromPath`
+  // alike -- is exposed through a Proxy `get` trap rather than a real own
+  // property (see the note at `deleteByFromPath`'s definition in
+  // `page-redirect.ts`). `vi.spyOn` captures the "original" via
+  // `Object.getOwnPropertyDescriptor`, which the Proxy reports as a fake
+  // descriptor (`value: undefined`) for every such method, so
+  // `mockRestore()`/`vi.restoreAllMocks()` reinstalls `undefined` instead of
+  // the real function -- permanently breaking every later call to
+  // `prisma.pageredirects.deleteByFromPath` in this module. The third test
+  // below calls the real implementation via `createWithoutSubOperation`, so
+  // this file can't use `vi.spyOn` here. A plain manual save/restore
+  // sidesteps that: reading the property directly (not via
+  // `getOwnPropertyDescriptor`) returns the real function, so restoring by
+  // assignment puts back the right thing regardless of test order.
   it('creates no page when the redirect cannot be deleted', async () => {
     const path = `${PREFIX}/undeletable`;
-    await PageRedirect.create({ fromPath: path, toPath: `${PREFIX}/moved-to` });
-    vi.spyOn(PageRedirect, 'deleteOne').mockImplementation(() => {
-      throw new Error('simulated failure to delete the redirect');
+    await prisma.pageredirects.create({
+      data: { fromPath: path, toPath: `${PREFIX}/moved-to` },
     });
+    const originalDeleteByFromPath = prisma.pageredirects.deleteByFromPath;
+    prisma.pageredirects.deleteByFromPath = () => {
+      throw new Error('simulated failure to delete the redirect');
+    };
 
-    await expect(createWithoutSubOperation(path)).rejects.toThrow();
+    try {
+      await expect(createWithoutSubOperation(path)).rejects.toThrow();
+    } finally {
+      prisma.pageredirects.deleteByFromPath = originalDeleteByFromPath;
+    }
 
     // Neither half of the inconsistent state was left behind: the page was not
     // created, and the redirect that could not be deleted is still there.
-    vi.restoreAllMocks();
     expect(await Page.findOne({ path })).toBeNull();
-    expect(await PageRedirect.findOne({ fromPath: path })).not.toBeNull();
+    expect(
+      await prisma.pageredirects.findFirst({ where: { fromPath: path } }),
+    ).not.toBeNull();
   });
 
   it('creates a page normally when the path has no redirect', async () => {
