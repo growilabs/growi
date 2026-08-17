@@ -1,6 +1,5 @@
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { body } from 'express-validator';
-import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
@@ -22,8 +21,6 @@ export const setup = (crowi, _app) => {
 
   /** @type {import('../models/page').PageModel} */
   const { Page } = crowi.models;
-
-  const PageRedirect = mongoose.model('PageRedirect');
 
   const globalNotificationService = crowi.globalNotificationService;
 
@@ -716,7 +713,7 @@ export const setup = (crowi, _app) => {
     const path = req.body.path;
 
     try {
-      await PageRedirect.removePageRedirectsByToPath(path);
+      await prisma.pageredirects.removePageRedirectsByToPath(path);
       logger.debug('Redirect Page deleted', path);
     } catch (err) {
       logger.error('Error occured while get setting', err);

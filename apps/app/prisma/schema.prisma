@@ -360,8 +360,9 @@ model pageoperations {
 
 model pageredirects {
   id       String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  fromPath Json?  @unique(map: "fromPath_1")
+  v        Int    @default(0) @map("__v")
+  fromPath String @unique(map: "fromPath_1")
+  toPath   String
 }
 
 model pages {
