@@ -35,9 +35,11 @@ export const useSWRxUsersList = (
   );
 };
 
+// No `totalCount`: this hook does not request `isIncludeTotalCount`, so the
+// route omits it.
 type UsernamesResponse = {
-  activeUser?: { usernames: string[]; totalCount: number };
-  inactiveUser?: { usernames: string[]; totalCount: number };
+  activeUser?: { usernames: string[] };
+  inactiveUser?: { usernames: string[] };
 };
 
 /**

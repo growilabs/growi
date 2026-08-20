@@ -169,7 +169,7 @@ describe('User', () => {
     });
   });
 
-  describe('User.findUserByUsernameRegexWithTotalCount', () => {
+  describe('User.findUserByUsernameRegex', () => {
     afterEach(async () => {
       await User.deleteMany({ username: { $regex: '^regexTest' } });
     });
@@ -184,17 +184,37 @@ describe('User', () => {
         status: UserStatus.STATUS_ACTIVE,
       });
 
-      const { users, totalCount } =
-        await User.findUserByUsernameRegexWithTotalCount(
-          'regexTestJohn',
-          [UserStatus.STATUS_ACTIVE],
-          { offset: 0, limit: 10 },
-        );
+      const { users, totalCount } = await User.findUserByUsernameRegex(
+        'regexTestJohn',
+        [UserStatus.STATUS_ACTIVE],
+        // The count is opt-in; without this the caller gets the page only.
+        { offset: 0, limit: 10, withTotalCount: true },
+      );
 
       expect(users.map((u: { username: string }) => u.username)).toEqual([
         'regexTestJohnson',
       ]);
       expect(totalCount).toBe(1);
+    });
+
+    test('omits the total count unless it is asked for', async () => {
+      await User.create({
+        name: 'Regex Test',
+        username: 'regexTestJohnson',
+        email: 'regexTestJohnsonNoCount@example.com',
+        password: 'regexTestPass',
+        lang: 'en_US',
+        status: UserStatus.STATUS_ACTIVE,
+      });
+
+      const result = await User.findUserByUsernameRegex(
+        'regexTestJohn',
+        [UserStatus.STATUS_ACTIVE],
+        { offset: 0, limit: 10 },
+      );
+
+      expect(result.users).toHaveLength(1);
+      expect(result.totalCount).toBeUndefined();
     });
 
     test('matches a mid-string occurrence', async () => {
@@ -207,7 +227,7 @@ describe('User', () => {
         status: UserStatus.STATUS_ACTIVE,
       });
 
-      const { users } = await User.findUserByUsernameRegexWithTotalCount(
+      const { users } = await User.findUserByUsernameRegex(
         'hnso',
         [UserStatus.STATUS_ACTIVE],
         { offset: 0, limit: 10 },
@@ -236,7 +256,7 @@ describe('User', () => {
         status: UserStatus.STATUS_ACTIVE,
       });
 
-      const { users } = await User.findUserByUsernameRegexWithTotalCount(
+      const { users } = await User.findUserByUsernameRegex(
         'regexTestJohn.doe',
         [UserStatus.STATUS_ACTIVE],
         { offset: 0, limit: 10 },

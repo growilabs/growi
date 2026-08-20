@@ -120,6 +120,85 @@ describe('GET /usernames', () => {
     expect(response.body.activeUser.usernames).toContain('alice');
   });
 
+  describe('totalCount', () => {
+    // Counting every match cannot stop at `limit` the way the page itself does,
+    // so it is opt-in. These two cases pin both halves of that contract.
+    const createActiveUsers = async (usernames: string[]) => {
+      const users = await Promise.all(
+        usernames.map((username) =>
+          User.create({
+            name: username,
+            username,
+            email: `${username}@example.com`,
+            status: UserStatus.STATUS_ACTIVE,
+          }),
+        ),
+      );
+      createdUserIds.push(...users.map((user) => user._id));
+    };
+
+    beforeEach(async () => {
+      const requester = await User.create({
+        name: 'Counter',
+        username: 'counter-requester',
+        email: 'counter-requester@example.com',
+      });
+      currentUser.value = requester;
+      createdUserIds.push(requester._id);
+      await createActiveUsers([
+        'countme-1',
+        'countme-2',
+        'countme-3',
+        'countme-4',
+      ]);
+    });
+
+    it('is omitted, and not even counted, unless requested', async () => {
+      // Spied on right before the request so the fixture creation above (which
+      // goes through mongoose-unique-validator) cannot be mistaken for the
+      // route's own count. Asserting on the query — not just on the response
+      // shape — is the point: omitting the field while still counting would
+      // leave the whole cost in place.
+      const countSpy = vi.spyOn(User, 'countDocuments');
+
+      const response = await request(app)
+        .get('/usernames')
+        .query({ q: 'countme', limit: 2 });
+
+      expect(response.status).toBe(200);
+      // The page is served as before …
+      expect(response.body.activeUser.usernames).toHaveLength(2);
+      // … but nothing tells the client how many matched in total …
+      expect(response.body.activeUser).not.toHaveProperty('totalCount');
+      // … and no count was issued to get there.
+      expect(countSpy).not.toHaveBeenCalled();
+
+      countSpy.mockRestore();
+    });
+
+    it('counts every match, not just the returned page, when requested', async () => {
+      const countSpy = vi.spyOn(User, 'countDocuments');
+
+      const response = await request(app)
+        .get('/usernames')
+        .query({
+          q: 'countme',
+          limit: 2,
+          options: JSON.stringify({ isIncludeTotalCount: true }),
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.activeUser.usernames).toHaveLength(2);
+      // 4 created, 2 returned: asserting 4 is what distinguishes a real count
+      // from `usernames.length`.
+      expect(response.body.activeUser.totalCount).toBe(4);
+      // Positive control for the assertion in the case above.
+      expect(countSpy).toHaveBeenCalled();
+
+      countSpy.mockRestore();
+    });
+  });
+
   it('returns inactive users for admins when isIncludeInactiveUser is requested', async () => {
     const requester = await User.create({
       name: 'Requester',
@@ -329,6 +408,8 @@ describe('GET /usernames', () => {
         options: JSON.stringify({
           isIncludeActiveUser: false,
           isIncludeActivitySnapshotUser: true,
+          // Requested so this case keeps pinning the count value itself.
+          isIncludeTotalCount: true,
         }),
       });
 

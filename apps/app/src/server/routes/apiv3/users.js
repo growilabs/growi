@@ -1508,9 +1508,14 @@ export const setup = (crowi) => {
    *              name: options
    *              schema:
    *                type: string
-   *                description: options for including different types of users
+   *                description: >
+   *                  Options for including different types of users.
+   *                  `isIncludeTotalCount` adds `totalCount` to every returned
+   *                  group; it is omitted by default because counting matches is
+   *                  an order of magnitude more expensive than returning the page.
    *                example: '{"isIncludeActiveUser": true, "isIncludeInactiveUser": true,
-   *                          "isIncludeActivitySnapshotUser": true, "isIncludeMixedUsernames": true}'
+   *                          "isIncludeActivitySnapshotUser": true, "isIncludeMixedUsernames": true,
+   *                          "isIncludeTotalCount": true}'
    *          responses:
    *            200:
    *              description: Succeeded to get list of usernames.
@@ -1527,6 +1532,7 @@ export const setup = (crowi) => {
    *                              type: string
    *                          totalCount:
    *                            type: integer
+   *                            description: only present when isIncludeTotalCount is requested
    *                      inactiveUser:
    *                        type: object
    *                        properties:
@@ -1536,6 +1542,7 @@ export const setup = (crowi) => {
    *                              type: string
    *                          totalCount:
    *                            type: integer
+   *                            description: only present when isIncludeTotalCount is requested
    *                      activitySnapshotUser:
    *                        type: object
    *                        properties:
@@ -1545,6 +1552,7 @@ export const setup = (crowi) => {
    *                              type: string
    *                          totalCount:
    *                            type: integer
+   *                            description: only present when isIncludeTotalCount is requested
    *                      mixedUsernames:
    *                        type: array
    *                        items:
@@ -1576,24 +1584,28 @@ export const setup = (crowi) => {
           options.isIncludeInactiveUser === true && req.user?.admin;
         const wantsActivitySnapshotUser =
           options.isIncludeActivitySnapshotUser === true && req.user?.admin;
+        // Opt-in: the count costs an order of magnitude more than the page it
+        // accompanies (see findUserByUsernameRegex), and the typeahead this route
+        // serves does not display one.
+        const wantsTotalCount = options.isIncludeTotalCount === true;
 
         // The three lookups below are independent of each other, so run them
         // concurrently instead of paying their latency sequentially.
         const [activeUserData, inactiveUserData, activitySnapshotUserData] =
           await Promise.all([
             wantsActiveUser
-              ? User.findUserByUsernameRegexWithTotalCount(
-                  q,
-                  [UserStatus.STATUS_ACTIVE],
-                  { offset, limit },
-                )
+              ? User.findUserByUsernameRegex(q, [UserStatus.STATUS_ACTIVE], {
+                  offset,
+                  limit,
+                  withTotalCount: wantsTotalCount,
+                })
               : null,
             wantsInactiveUser
-              ? User.findUserByUsernameRegexWithTotalCount(
-                  q,
-                  INACTIVE_USER_STATUSES,
-                  { offset, limit },
-                )
+              ? User.findUserByUsernameRegex(q, INACTIVE_USER_STATUSES, {
+                  offset,
+                  limit,
+                  withTotalCount: wantsTotalCount,
+                })
               : null,
             wantsActivitySnapshotUser
               ? prisma.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
@@ -1603,15 +1615,17 @@ export const setup = (crowi) => {
               : null,
           ]);
 
+        // One rule for the whole response: `totalCount` appears in every group or
+        // in none, so a client never has to remember which groups carry one.
+        const toGroup = (usernames, totalCount) =>
+          wantsTotalCount ? { usernames, totalCount } : { usernames };
+
         if (activeUserData != null) {
           const activeUsernames = activeUserData.users.map(
             (user) => user.username,
           );
           Object.assign(data, {
-            activeUser: {
-              usernames: activeUsernames,
-              totalCount: activeUserData.totalCount,
-            },
+            activeUser: toGroup(activeUsernames, activeUserData.totalCount),
           });
         }
 
@@ -1623,16 +1637,23 @@ export const setup = (crowi) => {
             (user) => user.username,
           );
           Object.assign(data, {
-            inactiveUser: {
-              usernames: inactiveUsernames,
-              totalCount: inactiveUserData.totalCount,
-            },
+            inactiveUser: toGroup(
+              inactiveUsernames,
+              inactiveUserData.totalCount,
+            ),
           });
         }
 
         if (activitySnapshotUserData != null) {
+          // This group's count still costs a second aggregation even when it is
+          // dropped here: making it opt-in means changing the Prisma extension
+          // (activity.ts) and its own spec, and this path is admin-only and
+          // low-volume. Tracked separately.
           Object.assign(data, {
-            activitySnapshotUser: activitySnapshotUserData,
+            activitySnapshotUser: toGroup(
+              activitySnapshotUserData.usernames,
+              activitySnapshotUserData.totalCount,
+            ),
           });
         }
 
@@ -1641,9 +1662,9 @@ export const setup = (crowi) => {
           (options.isIncludeMixedUsernames &&
             !options.isIncludeActivitySnapshotUser);
         if (canIncludeMixedUsernames) {
-          // activeUser/inactiveUser (User.findUserByUsernameRegexWithTotalCount) and
-          // activitySnapshotUser (Activity's WithTotalCount) both match by substring,
-          // so this merge is consistent across sources.
+          // activeUser/inactiveUser (User.findUserByUsernameRegex) and
+          // activitySnapshotUser both match by substring, so this merge is
+          // consistent across sources.
           // No caller in this repo currently requests isIncludeMixedUsernames (the
           // only past consumer, useSWRxUsernames, was removed).
           const allUsernames = [
