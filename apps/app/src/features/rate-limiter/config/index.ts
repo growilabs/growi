@@ -56,6 +56,16 @@ export const defaultConfig: IApiRateLimitEndpointMap = {
     method: 'GET',
     maxRequests: MAX_REQUESTS_TIER_3,
   },
+  // Username suggestions, called on every keystroke burst in the search page's
+  // author/editor fields. Each request walks index entries proportional to the
+  // number of non-matching usernames it passes, so the global default of 500/min
+  // is far more headroom than a typeahead needs: the input debounces for 400ms
+  // and each keyword is fetched once and cached client-side, which puts real
+  // sustained typing well inside this tier.
+  '/_api/v3/users/usernames': {
+    method: 'GET',
+    maxRequests: MAX_REQUESTS_TIER_4,
+  },
 };
 
 const isDev = process.env.NODE_ENV === 'development';

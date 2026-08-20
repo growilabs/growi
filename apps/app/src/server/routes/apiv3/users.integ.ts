@@ -199,6 +199,60 @@ describe('GET /usernames', () => {
     });
   });
 
+  describe('offset', () => {
+    // `offset` becomes a `skip()`, which walks that many index entries instead of
+    // jumping, so an uncapped value is a full scan on request.
+    beforeEach(async () => {
+      const requester = await User.create({
+        name: 'Offset',
+        username: 'offset-requester',
+        email: 'offset-requester@example.com',
+      });
+      currentUser.value = requester;
+      createdUserIds.push(requester._id);
+    });
+
+    // Asserted on the validation code, not merely on the 400: an out-of-range
+    // offset that slips past the validator still fails — MongoDB rejects a
+    // negative `skip()`, and a huge one just scans — so a bare status assertion
+    // passes whether or not the cap exists.
+    const expectRejectedByValidation = (response: {
+      status: number;
+      body: { errors?: { code?: string; message?: string }[] };
+    }) => {
+      expect(response.status).toBe(400);
+      expect(response.body.errors?.[0]?.code).toBe('validation_failed');
+      expect(response.body.errors?.[0]?.message).toContain('offset');
+    };
+
+    it('rejects an offset beyond the cap', async () => {
+      const response = await request(app)
+        .get('/usernames')
+        .query({ q: 'offset', offset: 1_000_000 });
+
+      expectRejectedByValidation(response);
+    });
+
+    it('rejects a negative offset', async () => {
+      const response = await request(app)
+        .get('/usernames')
+        .query({ q: 'offset', offset: -1 });
+
+      expectRejectedByValidation(response);
+    });
+
+    it('still accepts an offset at the cap', async () => {
+      const response = await request(app)
+        .get('/usernames')
+        .query({ q: 'offset', offset: 1000 });
+
+      // Past the end of the (tiny) result set, so the page is empty — the point
+      // is that a legitimate deep page is not rejected.
+      expect(response.status).toBe(200);
+      expect(response.body.activeUser.usernames).toEqual([]);
+    });
+  });
+
   it('returns inactive users for admins when isIncludeInactiveUser is requested', async () => {
     const requester = await User.create({
       name: 'Requester',

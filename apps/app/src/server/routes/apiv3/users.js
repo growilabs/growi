@@ -184,7 +184,15 @@ export const setup = (crowi) => {
 
   validator.usernames = [
     query('q').isString().withMessage('q is required'),
-    query('offset').optional().isInt().withMessage('offset must be a number'),
+    // Capped because `offset` becomes a `skip()`, which walks and discards that
+    // many index entries rather than jumping: uncapped, one request could scan
+    // the whole users collection (measured 78ms at 200k users) and return
+    // nothing. 1000 keeps the walk bounded (~5ms) and still allows 50 pages at
+    // the maximum `limit`, which is far more than a suggestion list needs.
+    query('offset')
+      .optional()
+      .isInt({ min: 0, max: 1000 })
+      .withMessage('offset must be a number between 0 and 1000'),
     query('limit')
       .optional()
       .isInt({ max: 20 })
@@ -1496,7 +1504,11 @@ export const setup = (crowi) => {
    *              name: offset
    *              schema:
    *                type: integer
-   *                description: offset for pagination
+   *                minimum: 0
+   *                maximum: 1000
+   *                description: >
+   *                  Offset for pagination. Capped: it becomes a `skip()`, whose
+   *                  cost grows with the value.
    *                example: 0
    *            - in: query
    *              name: limit
@@ -1562,8 +1574,8 @@ export const setup = (crowi) => {
     '/usernames',
     accessTokenParser([SCOPE.READ.FEATURES.USER], { acceptLegacy: true }),
     // Strict, unlike the guest-allowed `loginRequired` on this router's other
-    // reads: the lookup is an unindexable regex with an unbounded `offset`, so an
-    // anonymous caller could page the whole users collection one scan at a time.
+    // reads: a keyword with few matches walks the whole username index, so this
+    // is not work to hand to unauthenticated callers.
     loginRequiredStrictly,
     validator.usernames,
     apiV3FormValidator,
