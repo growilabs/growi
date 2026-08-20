@@ -505,7 +505,7 @@ describe('GET /usernames', () => {
     expect(response.body.activitySnapshotUser).toBeUndefined();
   });
 
-  it('matches activeUser and activitySnapshotUser consistently by substring in mixedUsernames', async () => {
+  it('merges a prefix-matched user list with a substring-matched snapshot list in mixedUsernames', async () => {
     const admin = await User.create({
       name: 'Admin2',
       username: 'thejohnson',
@@ -535,16 +535,14 @@ describe('GET /usernames', () => {
       });
 
     expect(response.status).toBe(200);
-    // "hn" is a mid-string occurrence in both usernames (not a prefix), and
-    // activeUser/inactiveUser and activitySnapshotUser both match by
-    // substring, so both sources hit and mixedUsernames merges them as a
-    // like-for-like union.
-    expect(response.body.activeUser.usernames).toEqual(['thejohnson']);
+    // "hn" is mid-string in both usernames, so prefix matching misses the user
+    // while substring matching still finds the snapshot. Pins the asymmetry.
+    expect(response.body.activeUser.usernames).toEqual([]);
     expect(response.body.activitySnapshotUser.usernames).toEqual([
       'somejohnson',
     ]);
     expect(new Set(response.body.mixedUsernames)).toEqual(
-      new Set(['thejohnson', 'somejohnson']),
+      new Set(['somejohnson']),
     );
   });
 });

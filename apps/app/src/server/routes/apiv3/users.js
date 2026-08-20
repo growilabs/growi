@@ -1492,7 +1492,11 @@ export const setup = (crowi) => {
    *        get:
    *          tags: [Users]
    *          summary: /users/usernames
-   *          description: Get list of usernames. The query matches usernames by case-insensitive substring.
+   *          description: >
+   *            Get list of usernames. `q` matches by case-insensitive **prefix**
+   *            (it matched anywhere before v8). `activitySnapshotUser` still
+   *            matches by substring, so `mixedUsernames` can merge results found
+   *            by different rules.
    *          parameters:
    *            - in: query
    *              name: q
@@ -1597,7 +1601,7 @@ export const setup = (crowi) => {
         const wantsActivitySnapshotUser =
           options.isIncludeActivitySnapshotUser === true && req.user?.admin;
         // Opt-in: the count costs an order of magnitude more than the page it
-        // accompanies (see findUserByUsernameRegex), and the typeahead this route
+        // accompanies (see findUserByUsernamePrefix), and the typeahead this route
         // serves does not display one.
         const wantsTotalCount = options.isIncludeTotalCount === true;
 
@@ -1606,14 +1610,14 @@ export const setup = (crowi) => {
         const [activeUserData, inactiveUserData, activitySnapshotUserData] =
           await Promise.all([
             wantsActiveUser
-              ? User.findUserByUsernameRegex(q, [UserStatus.STATUS_ACTIVE], {
+              ? User.findUserByUsernamePrefix(q, [UserStatus.STATUS_ACTIVE], {
                   offset,
                   limit,
                   withTotalCount: wantsTotalCount,
                 })
               : null,
             wantsInactiveUser
-              ? User.findUserByUsernameRegex(q, INACTIVE_USER_STATUSES, {
+              ? User.findUserByUsernamePrefix(q, INACTIVE_USER_STATUSES, {
                   offset,
                   limit,
                   withTotalCount: wantsTotalCount,
@@ -1674,11 +1678,10 @@ export const setup = (crowi) => {
           (options.isIncludeMixedUsernames &&
             !options.isIncludeActivitySnapshotUser);
         if (canIncludeMixedUsernames) {
-          // activeUser/inactiveUser (User.findUserByUsernameRegex) and
-          // activitySnapshotUser both match by substring, so this merge is
-          // consistent across sources.
-          // No caller in this repo currently requests isIncludeMixedUsernames (the
-          // only past consumer, useSWRxUsernames, was removed).
+          // The sources match differently now: users by prefix (so the lookup can
+          // be index-bounded), activity snapshots still by substring. Not unified
+          // because nothing requests this option, and aligning the audit-log side
+          // would change admin-facing behaviour.
           const allUsernames = [
             ...(data.activeUser?.usernames || []),
             ...(data.inactiveUser?.usernames || []),
