@@ -87,7 +87,7 @@
 
 ## 4. Core: 宣言 namespace から追跡できないキー参照を書き換える（Group 1a / 1b / 4 / 5）
 
-- [ ] 4.1 (P) `SecuritySetting` 配下7ファイルを、`t` を props で受け取る形から自前で束ねる形に書き換える（Group 1a）
+- [x] 4.1 (P) `SecuritySetting` 配下7ファイルを、`t` を props で受け取る形から自前で束ねる形に書き換える（Group 1a）
   - `CommentManageRightsSettings` / `PageAccessRightsSettings` / `PageDeleteRightsSettings` / `PageListDisplaySettings` / `SessionMaxAgeSettings` / `UserHomepageDeletionSettings` / `UserPageVisibilitySettings` の7ファイルで、親コンポーネント（`SecuritySetting/index.tsx`）が実際に束ねている namespace（`admin`）を確認した上で、各コンポーネントが自前で `useTranslation('admin')` を呼ぶように変更する
   - 書き換え前後で、各コンポーネントが表示する翻訳文言が一致することを確認する
   - 観測可能な完了条件: 7ファイルのいずれも `t` を props として受け取らず、`i18next-cli status` がこれらのファイル由来の誤検出を報告しない
