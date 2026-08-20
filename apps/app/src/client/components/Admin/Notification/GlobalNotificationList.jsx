@@ -39,7 +39,7 @@ class GlobalNotificationList extends React.Component {
         },
       );
       toastSuccess(
-        t('notification_settings.toggle_notification', {
+        t('admin:notification_settings.toggle_notification', {
           path: notification.triggerPath,
         }),
       );
@@ -73,7 +73,7 @@ class GlobalNotificationList extends React.Component {
           this.state.notificationForConfiguration._id,
         );
       toastSuccess(
-        t('notification_settings.delete_notification_pattern', {
+        t('admin:notification_settings.delete_notification_pattern', {
           path: deletedNotificaton.triggerPath,
         }),
       );

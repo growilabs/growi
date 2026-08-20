@@ -109,14 +109,14 @@ class PasswordResetModal extends React.Component {
     return (
       <>
         <p>
-          {t('user_management.reset_password_modal.password_never_seen')}
+          {t('admin:user_management.reset_password_modal.password_never_seen')}
           <br />
           <span className="text-danger">
-            {t('user_management.reset_password_modal.send_new_password')}
+            {t('admin:user_management.reset_password_modal.send_new_password')}
           </span>
         </p>
         <p>
-          {t('user_management.reset_password_modal.target_user')}:{' '}
+          {t('admin:user_management.reset_password_modal.target_user')}:{' '}
           <code>{userForPasswordResetModal.email}</code>
         </p>
       </>
@@ -134,14 +134,16 @@ class PasswordResetModal extends React.Component {
     return (
       <>
         <p className="text-danger">
-          {t('user_management.reset_password_modal.password_reset_message')}
+          {t(
+            'admin:user_management.reset_password_modal.password_reset_message',
+          )}
         </p>
         <p>
-          {t('user_management.reset_password_modal.target_user')}:{' '}
+          {t('admin:user_management.reset_password_modal.target_user')}:{' '}
           <code>{userForPasswordResetModal.email}</code>
         </p>
         <p>
-          {t('user_management.reset_password_modal.new_password')}:{' '}
+          {t('admin:user_management.reset_password_modal.new_password')}:{' '}
           <code>
             <button
               type="button"
@@ -150,7 +152,7 @@ class PasswordResetModal extends React.Component {
               onMouseLeave={() => this.setState({ showPassword: false })}
               aria-pressed={showPassword}
               aria-label={t(
-                'user_management.reset_password_modal.new_password',
+                'admin:user_management.reset_password_modal.new_password',
               )}
             >
               {showPassword ? temporaryPassword : maskedPassword}
@@ -191,7 +193,7 @@ class PasswordResetModal extends React.Component {
         className="btn btn-danger"
         onClick={this.resetPassword}
       >
-        {t('user_management.reset_password')}
+        {t('admin:user_management.reset_password')}
       </button>
     );
   }
@@ -234,7 +236,7 @@ class PasswordResetModal extends React.Component {
           toggle={this.props.onClose}
           className="text-warning"
         >
-          {t('user_management.reset_password')}
+          {t('admin:user_management.reset_password')}
         </ModalHeader>
         <ModalBody>
           {this.state.isPasswordResetDone

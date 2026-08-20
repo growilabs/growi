@@ -95,7 +95,7 @@
   - _Boundary: Call-site Remediation (Group 1a)_
   - _Depends: 1.2_
 
-- [ ] 4.2 (P) `t` を props で受け取る管理画面12ファイルのキー文字列に `admin:` を前置する（Group 1b）
+- [x] 4.2 (P) `t` を props で受け取る管理画面12ファイルのキー文字列に `admin:` を前置する（Group 1b）
   - 対象は 1.2 の実測で確定した12ファイル: `Admin/LegacySlackIntegration/SlackConfiguration.jsx`、`Admin/ElasticsearchManagement/StatusTable.jsx`、`Admin/ImportData/GrowiArchiveSection.jsx`、`Admin/MarkdownSetting/XssForm.jsx`、`Admin/MarkdownSetting/LineBreakForm.jsx`、`Admin/Users/PasswordResetModal.jsx`、`Admin/Notification/UserTriggerNotification.jsx`、`Admin/Notification/GlobalNotificationList.jsx`、`Admin/Notification/NotificationDeleteModal.jsx`、`Admin/Security/DeleteAllShareLinksModal.jsx`、`Admin/Users/StatusActivateButton.jsx`、`Admin/Users/UserRemoveButton.jsx`（いずれも `src/client/components/` 配下）
   - この12ファイルが報告の出どころになっているキーは61件で、これが「分類 C の119件のうち Group 1a / 2 / 3 のどこからも参照されていない62件」の大部分に当たる（残り1件は 4.3 が担当する）
   - 4.1 と違い、**hook 化はせずキー文字列への `admin:` 前置で直す**。`StatusTable.jsx` は class component で hook を呼べないうえ、前置だけで検出も実行時の解決も成立するため（design.md の Group 1b を参照）
