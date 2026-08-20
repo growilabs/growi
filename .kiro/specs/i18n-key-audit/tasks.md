@@ -92,10 +92,11 @@
   - この12ファイルが報告の出どころになっているキーは61件で、これが「分類 C の119件のうち Group 1a / 2 / 3 のどこからも参照されていない62件」の大部分に当たる（残り1件は 4.3 が担当する）
   - 4.1 と違い、**hook 化はせずキー文字列への `admin:` 前置で直す**。`StatusTable.jsx` は class component で hook を呼べないうえ、前置だけで検出も実行時の解決も成立するため（design.md の Group 1b を参照）
   - 書き換え前に、各ファイルへ `t` を渡している wrapper が `useTranslation('admin')` を呼んでいることを確認する（12ファイルすべて `admin` であることは 1.2 で確認済み）
+  - **同じファイルを触る他タスクとの調整**: `Admin/Users/PasswordResetModal.jsx` は 3.1（`Send` / `Copied!` の修正）も対象にしており、7.1 の確認結果によっては 7.2（`commons:Done` 周辺）も対象にする。同一ファイルの競合を避けるため、このファイルについては 3.1 → 4.2 →（必要なら）7.2 の順で片方が完了してから次を実行し、並列に走らせない
   - 観測可能な完了条件: `i18next-cli status en_US --hide-translated` の報告から、この12ファイル由来の61件が消え、書き換え前後で各ファイルの表示文言が一致する
   - _Requirements: 1.1, 1.5, 1.6_
   - _Boundary: Call-site Remediation (Group 1b)_
-  - _Depends: 1.2_
+  - _Depends: 1.2, 3.1_
 
 - [ ] 4.3 (P) 宣言 namespace では解決できない6キーに `admin:` / `commons:` を前置する（Group 4）
   - `admin:` を前置する1キー: `security_settings.updated_general_security_setting`（`Me/AssociateModal.tsx:59`、`Me/DisassociateModal.tsx:45`）。この2ファイルは `useTranslation()` を引数なしで呼んでおり、キーは `admin.json` にしか無いため実行時にも生キーが表示されている。`/me` 配下のページには `admin` が配られている（`pages/me/[[...path]].page.tsx:170`）ことを確認してから前置する
@@ -143,7 +144,8 @@
 - [ ] 7.1 (P) 共有ラベル20件を `commons.json` に複製し、複製ペアの同期を検証するテストを追加する
   - 1.2 が確定させた共有ラベル23件（`task-1.2-findings.md` §2）のうち、`commons.json` に既に値がある3件（`Delete` / `toaster.remove_share_link` / `toaster.remove_share_link_success`）を除いた **20件** を、5言語すべての `translation.json` の値を変更せず `commons.json` に複製する
   - 複製した20件が、5言語すべてで `translation.json` と `commons.json` の値が一致することを検証する専用テスト（`i18n-reconcile.spec.ts` と同種のパターン）を追加する
-  - 1.2 の洗い出し手順（「管理画面のコードから `t('固定文字列')` として呼ばれ、その file が宣言した namespace では解決できず、`translation.json` には実在する」ものだけを残す）を再実行し、`Done`（`Admin/Users/PasswordResetModal.jsx:67` が `t('commons:Done')` として呼んでおり、`translation.json` にはあるが `commons.json` には無い）を複製対象に含めるべきかを確認する。含める場合は複製対象が21件になり、同期テストの対象も21件になる（design.md の Bug 2 Remediation「未確定の追加候補1件」）
+  - 20件には `Confirm` / `Help` / `Password` / `Warning` / `add` が含まれていることを確認する。この5件は今は報告に出ていない（CLI が `translation` で解決できている）が、7.2 で `commons:` を前置した後は `commons.json` を見に行くため、複製から漏れると新しい報告が増えて 8.1 が永久に合格しなくなる
+  - 1.2 の洗い出し手順（「管理画面のコードから `t('固定文字列')` として呼ばれ、その file が宣言した namespace では解決できず、`translation.json` には実在する」ものだけを残す）を再実行し、`Done`（`Admin/Users/PasswordResetModal.jsx:67` が `t('commons:Done')` として呼んでおり、`translation.json` にはあるが `commons.json` には無い）を複製対象に含めるべきかを確認する。含める場合は複製対象が21件になり、同期テストの対象も21件になる。あわせて `PasswordResetModal.jsx` は 1.2 の36ファイル一覧に入っていないため、7.2 の対象ファイルも1つ増える（design.md の Bug 2 Remediation「未確定の追加候補1件」）
   - 観測可能な完了条件: 追加したテストが green になり、`translation.json` の diff が空である
   - _Requirements: 7.1_
   - _Boundary: Bug 2 Remediation_
@@ -153,10 +155,11 @@
   - 1.2 が確定させた36ファイル（`task-1.2-findings.md` §2 の一覧。ファイルごとに、そのファイルが持つ共有ラベルも表になっている）の共有ラベル呼び出し（例: `t('Cancel')`）を `t('commons:Cancel')` に書き換える。管理画面外の call site は変更しない
   - `status` の報告に現れるのは23件のうち18件だけだが、報告に出ていない5件（`Confirm` / `Help` / `Password` / `Warning` / `add`）も実行時には生キーになるため、**報告件数を見て対象を狭めない**
   - 書き換え前後で管理画面の表示文言が一致することを確認する
-  - 観測可能な完了条件: 本番相当のビルドで、管理画面がこれらのラベルを生キーではなく翻訳済み文言として表示する
+  - 7.1 の確認結果で `Done` を対象に含める場合、`Admin/Users/PasswordResetModal.jsx` が対象ファイルに加わる（37ファイルになる）。同ファイルは 4.2 も触るため、4.2 の完了後に書き換える
+  - 観測可能な完了条件: 本番相当のビルドで、管理画面がこれらのラベルを生キーではなく翻訳済み文言として表示し、`i18next-cli status` の報告が 7.2 の前置によって増えていない
   - _Requirements: 7.1, 7.2_
   - _Boundary: Bug 2 Remediation_
-  - _Depends: 7.1_
+  - _Depends: 7.1, 4.2_
 
 ## 8. Integration: 基準線を初めて記録する
 

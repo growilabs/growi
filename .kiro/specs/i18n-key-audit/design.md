@@ -185,6 +185,21 @@ Requirement 1 の「0件」は `i18next-cli status` の生の報告件数に対�
 | H. 複数形サフィックスの照合が合わない | 4 | i18next.config.ts の `status.ignoreKeys` |
 | 合計 | 176 | |
 
+**176 件が0件に到達することの検算（どのタスクが何件を報告から消すか）**: 上の分類と担当の対応を、タスク単位に積み直すと合計は 176 になり、余りは出ない。実装中に「どこにも属さない報告」が新たに見つかった場合は、この表のどこかが崩れているという意味になる。
+
+| タスク | 消える件数 | 内訳 |
+|---|---:|---|
+| 3.1（Non-Existent Key Reference Fix） | 25 | A 24 + G 1（`LikeButtons.tsx`） |
+| 3.3（`status.ignoreKeys` への宣言） | 5 | G 1（`GROWI.5.0_new_schema`）+ H 4 |
+| 4.1 + 5.1 + 6.1（Group 1a / 2 / 3） | 57 | C のうち、この3グループのいずれかから参照されている分（119 − 62） |
+| 4.2（Group 1b） | 61 | C のうち、`t` を props で受け取る12ファイルから参照されている分 |
+| 4.3（Group 4） | 6 | C 1（`security_settings.updated_general_security_setting`）+ E 5 |
+| 4.4（Group 5） | 4 | F 4 |
+| 7.2（Bug 2 Remediation） | 18 | D 18 |
+| 合計 | 176 | |
+
+**報告が新たに増えないことの確認**: 7.2 は共有ラベル23件すべてに `commons:` を前置する。このうち5件（`Confirm` / `Help` / `Password` / `Warning` / `add`）は、前置前は CLI が `translation` で解決できていたため今は報告に出ていない。前置後は `commons.json` を見に行くので、7.1 の複製対象（20件）にこの5件が含まれていることが必要である — 23件から除外するのは `commons.json` に既に値がある3件（`Delete` / `toaster.remove_share_link` / `toaster.remove_share_link_success`）だけなので、5件はいずれも複製対象に含まれている。したがって 7.2 は新しい報告を生まない。
+
 C の 119 件のうち **62 件は Group 1a / 2 / 3 のどのファイルからも参照されていない**（task 1.2 の実測）。この62件の報告元を本改訂で改めて測り直したところ、内訳は次のとおりだった。これが Group 1b と Group 4 を新たに起こす根拠である。
 
 - 61件 — Group 1b の12ファイル（`t` を props で受け取る `.jsx` / `.tsx`）のいずれかから参照されている
