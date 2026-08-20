@@ -68,7 +68,7 @@
   - _Boundary: Non-Existent Key Reference Fix_
   - _Depends: 1.2_
 
-- [ ] 3.2 3.1 で新規追加したキーが全5言語で欠けていないことを検証する
+- [x] 3.2 3.1 で新規追加したキーが全5言語で欠けていないことを検証する
   - 新規追加キー（`Successfully updated` / `Failed to update` / `editor_guide.textstyle.copy_failed` および 3.1 で新規追加した残りの分）が、5言語すべてで値を持ち空でないことを確認する専用テストを追加する
   - 観測可能な完了条件: このテストが green であることを、後続の基準線初回記録（8.1）の前提条件として運用できる状態にする
   - _Requirements: 1.4, 3.2_
