@@ -1,5 +1,5 @@
 import type { JSX, ReactNode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 
@@ -25,6 +25,12 @@ vi.mock('~/client/components/PageTags/TagEditModal/TagsInput', () => ({
   TagsInput: () => <div data-testid="tags-input" />,
 }));
 
+const isGuestUser = vi.hoisted(() => ({ value: false }));
+
+vi.mock('~/states/context', () => ({
+  useIsGuestUser: () => isGuestUser.value,
+}));
+
 const EMPTY_FILTERS: SearchFilterState = {
   authors: [],
   editors: [],
@@ -34,6 +40,7 @@ const EMPTY_FILTERS: SearchFilterState = {
 
 const AUDITLOG_SUGGESTIONS_ENDPOINT = '/activity/suggestions';
 const REGISTERED_USERNAMES_ENDPOINT = '/users/usernames';
+const RELATED_GROUPS_ENDPOINT = '/user/related-groups';
 
 // Fresh SWR cache per render: the suggestion hooks are `useSWRImmutable`, so a
 // key cached by an earlier test is served without calling the fetcher again.
@@ -58,6 +65,7 @@ const typeIntoAuthorField = (text: string) =>
 describe('SearchFilterPanel', () => {
   beforeEach(() => {
     mockApiv3Get.mockResolvedValue({ data: {} });
+    isGuestUser.value = false;
   });
 
   /**
@@ -116,6 +124,43 @@ describe('SearchFilterPanel', () => {
         REGISTERED_USERNAMES_ENDPOINT,
         expect.objectContaining({ q: 'ali' }),
       );
+    });
+  });
+
+  describe('for a guest', () => {
+    // The contract is that these controls are absent, not merely empty. Tag is
+    // asserted present as a positive control, so the negative assertions cannot
+    // pass by the whole panel having disappeared.
+    it('renders no author, editor or group control', () => {
+      isGuestUser.value = true;
+
+      renderPanel();
+
+      expect(screen.queryByText('Author')).not.toBeInTheDocument();
+      expect(screen.queryByText('Editor')).not.toBeInTheDocument();
+      expect(screen.queryByText('Group')).not.toBeInTheDocument();
+      expect(screen.queryAllByRole('combobox')).toHaveLength(0);
+      expect(screen.getByText('Tag')).toBeInTheDocument();
+    });
+
+    // The group request fires on mount, so it catches "rendered the field but
+    // emptied it" as well as "did not render it".
+    it('requests no login-required endpoint', async () => {
+      // Logged-in render first, through the same settle procedure: proves the
+      // request lands inside that window, so the guest assertion below cannot
+      // pass by being checked too early.
+      const { unmount } = renderPanel();
+      await act(async () => {});
+      expect(requestedEndpoints()).toContain(RELATED_GROUPS_ENDPOINT);
+
+      unmount();
+      mockApiv3Get.mockClear();
+      isGuestUser.value = true;
+      renderPanel();
+      await act(async () => {});
+
+      expect(requestedEndpoints()).not.toContain(RELATED_GROUPS_ENDPOINT);
+      expect(requestedEndpoints()).not.toContain(REGISTERED_USERNAMES_ENDPOINT);
     });
   });
 });

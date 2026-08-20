@@ -8,6 +8,7 @@ import {
   SearchUsernameTypeahead,
   useRegisteredUsernameSuggestions,
 } from '~/client/components/SearchUsernameTypeahead';
+import { useIsGuestUser } from '~/states/context';
 import { useSWRxUserRelatedGroups } from '~/stores/user';
 
 import type { SearchFilterState } from '../../utils/search-query';
@@ -166,6 +167,11 @@ const GroupFilterField = (props: GroupFilterFieldProps): JSX.Element => {
 export const SearchFilterPanel = (props: Props): JSX.Element => {
   const { filters, onChange } = props;
   const { t } = useTranslation();
+  // Both endpoints behind the username and group fields are strictly
+  // login-required, so for a guest those controls could only be dead UI. Hiding
+  // them drops the affordance, not the capability: `author:` / `group:` terms
+  // already in the URL still resolve server-side.
+  const isGuestUser = useIsGuestUser();
   // Self-generated so this panel's tag input gets a unique, SSR-stable id even
   // when the panel is mounted more than once (desktop inline + mobile modal).
   const tagsInputId = useId();
@@ -201,18 +207,28 @@ export const SearchFilterPanel = (props: Props): JSX.Element => {
   return (
     <div className="p-3">
       <div className="row g-3">
-        <UsernameFilterField
-          label={t('search_result.filter_author', 'Author')}
-          placeholder={t('search_result.filter_by_author', 'Filter by author')}
-          usernames={filters.authors}
-          onChange={authorsChangeHandler}
-        />
-        <UsernameFilterField
-          label={t('search_result.filter_editor', 'Editor')}
-          placeholder={t('search_result.filter_by_editor', 'Filter by editor')}
-          usernames={filters.editors}
-          onChange={editorsChangeHandler}
-        />
+        {!isGuestUser && (
+          <>
+            <UsernameFilterField
+              label={t('search_result.filter_author', 'Author')}
+              placeholder={t(
+                'search_result.filter_by_author',
+                'Filter by author',
+              )}
+              usernames={filters.authors}
+              onChange={authorsChangeHandler}
+            />
+            <UsernameFilterField
+              label={t('search_result.filter_editor', 'Editor')}
+              placeholder={t(
+                'search_result.filter_by_editor',
+                'Filter by editor',
+              )}
+              usernames={filters.editors}
+              onChange={editorsChangeHandler}
+            />
+          </>
+        )}
         <FilterFieldCell label={t('search_result.filter_tag', 'Tag')}>
           <TagsInput
             id={tagsInputId}
@@ -221,11 +237,13 @@ export const SearchFilterPanel = (props: Props): JSX.Element => {
             onTagsUpdated={tagsChangeHandler}
           />
         </FilterFieldCell>
-        <GroupFilterField
-          label={t('search_result.filter_group', 'Group')}
-          selected={filters.groups}
-          onChange={groupsChangeHandler}
-        />
+        {!isGuestUser && (
+          <GroupFilterField
+            label={t('search_result.filter_group', 'Group')}
+            selected={filters.groups}
+            onChange={groupsChangeHandler}
+          />
+        )}
       </div>
     </div>
   );

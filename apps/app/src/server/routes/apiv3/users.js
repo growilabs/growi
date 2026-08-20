@@ -1553,7 +1553,10 @@ export const setup = (crowi) => {
   router.get(
     '/usernames',
     accessTokenParser([SCOPE.READ.FEATURES.USER], { acceptLegacy: true }),
-    loginRequired,
+    // Strict, unlike the guest-allowed `loginRequired` on this router's other
+    // reads: the lookup is an unindexable regex with an unbounded `offset`, so an
+    // anonymous caller could page the whole users collection one scan at a time.
+    loginRequiredStrictly,
     validator.usernames,
     apiV3FormValidator,
     async (req, res) => {
@@ -1567,6 +1570,8 @@ export const setup = (crowi) => {
 
         const wantsActiveUser =
           options.isIncludeActiveUser == null || options.isIncludeActiveUser;
+        // `?.` here and below is defence in case the strict-login gate is ever
+        // relaxed: a bare deref would hand the raw TypeError back via apiv3Err.
         const wantsInactiveUser =
           options.isIncludeInactiveUser === true && req.user?.admin;
         const wantsActivitySnapshotUser =

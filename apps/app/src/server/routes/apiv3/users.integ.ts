@@ -30,11 +30,21 @@ vi.mock('~/server/middlewares/access-token-parser', () => ({
   accessTokenParser: () => passthroughMiddleware,
 }));
 
+// Mirrors the real guest decision rather than waving every request through, so
+// that WHICH factory a route picks is observable here: the guest-allowed variant
+// admits a null user, the strict one 403s on an `/_api/` path. Nothing past that
+// decision (ACL config, shared pages, non-active statuses) is reproduced.
 vi.mock('~/server/middlewares/login-required', () => ({
-  default: () => (req: TestRequest, _res: Response, next: NextFunction) => {
-    req.user = currentUser.value;
-    next();
-  },
+  default:
+    (_crowi: unknown, isGuestAllowed = false) =>
+    (req: TestRequest, res: Response, next: NextFunction) => {
+      req.user = currentUser.value;
+      if (req.user == null && !isGuestAllowed) {
+        res.sendStatus(403);
+        return;
+      }
+      next();
+    },
 }));
 
 describe('GET /usernames', () => {
@@ -258,9 +268,9 @@ describe('GET /usernames', () => {
     expect(response.body.mixedUsernames).not.toContain('erin-suspended');
   });
 
-  it('serves a guest the active users only, without erroring, when privileged options are requested', async () => {
-    // A guest has no `req.user` at all, so every privilege check on this route is
-    // a potential deref of null. On an open wiki the search page reaches here.
+  it('refuses a guest outright, disclosing no username', async () => {
+    // Every privileged option is requested at once, so the refusal is shown to
+    // precede all of them.
     currentUser.value = null;
     const suspended = await User.create({
       name: 'Frank Suspended',
@@ -289,12 +299,10 @@ describe('GET /usernames', () => {
         }),
       });
 
-    expect(response.status).toBe(200);
-    // An error here would also hand the raw TypeError message to the client.
-    expect(response.body.errors).toBeUndefined();
-    expect(response.body.activeUser.usernames).toContain('frank-active');
-    expect(response.body.inactiveUser).toBeUndefined();
-    expect(response.body.activitySnapshotUser).toBeUndefined();
+    expect(response.status).toBe(403);
+    // Neither the active nor the suspended account may appear, and no internal
+    // error message may be handed back in place of them.
+    expect(JSON.stringify(response.body)).not.toContain('frank');
   });
 
   it('returns activity snapshot usernames for admins', async () => {

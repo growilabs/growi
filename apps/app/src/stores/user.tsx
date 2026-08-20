@@ -42,8 +42,8 @@ type UsernamesResponse = {
 
 /**
  * Username suggestions from the registered-user list. `/users/usernames` is
- * `loginRequired`, so unlike the audit-log suggestions endpoint any logged-in
- * user can call it.
+ * strictly login-required, so callers must not render a suggestion input for
+ * guests (see SearchFilterPanel).
  */
 export const useSWRxUsernames = (
   q: string,
