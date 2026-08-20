@@ -146,6 +146,38 @@ export default defineConfig({
       'editor_guide.decoration.success_text',
       'editor_guide.decoration.warning_text',
       'editor_guide.decoration.danger_text',
+      // IdenticalPathPage.tsx:52 — `t('GROWI.5.0_new_schema')`. The key name
+      // itself contains a literal `.` (it is one flat JSON key, not a nested
+      // path); the CLI can only parse a dotted specifier as a hierarchy, so it
+      // reports the flat key as absent. i18next resolves the literal key at
+      // runtime with no such restriction — verified by loading en_US's
+      // translation.json into a real i18next instance and calling
+      // `.t('GROWI.5.0_new_schema')`, which returns "GROWI.5.0 new schema".
+      'GROWI.5.0_new_schema',
+      // PageStaleAlert.tsx:51 — `t('page_page.notice.stale', { count })`. The
+      // CLI requires a `_one`/`_other` (i18next v4 plural) suffixed key to
+      // exist for any `t(key, { count })` call. translation.json only has the
+      // base `stale` (plus a `stale_plural`, an i18next v3-era key i18next v4
+      // does not read) — no `_one`/`_other` variant exists by design. At
+      // runtime, i18next v4 falls back to the base unsuffixed key when no
+      // plural-suffixed variant is present, so `t()` still resolves — verified
+      // by loading en_US's translation.json into a real i18next instance and
+      // calling `.t('page_page.notice.stale', { count: 1 })` /
+      // `{ count: 3 })`, both of which resolve (the English plural wording is
+      // imperfect but that is a separate, already-tracked issue, not a missing
+      // key).
+      'page_page.notice.stale_one',
+      'page_page.notice.stale_other',
+      // ShareLink.tsx:32 / ShareLinkSetting.tsx:74 —
+      // `t('toaster.remove_share_link', { count, ns: 'commons' })`. Same
+      // plural-suffix situation as above: commons.json only has the base
+      // `remove_share_link`, no `_one`/`_other` variant, and i18next v4 falls
+      // back to the base key — verified by loading en_US's commons.json into a
+      // real i18next instance and calling
+      // `.t('toaster.remove_share_link', { count: 1, ns: 'commons' })` /
+      // `{ count: 3, ns: 'commons' })`, both of which resolve.
+      'toaster.remove_share_link_one',
+      'toaster.remove_share_link_other',
     ],
   },
 });

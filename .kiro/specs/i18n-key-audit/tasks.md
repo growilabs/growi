@@ -75,7 +75,7 @@
   - _Boundary: Non-Existent Key Reference Fix_
   - _Depends: 3.1_
 
-- [ ] 3.3 (P) 実行時には解決できるのに CLI が解決できない5キーを `status.ignoreKeys` に宣言する
+- [x] 3.3 (P) 実行時には解決できるのに CLI が解決できない5キーを `status.ignoreKeys` に宣言する
   - `i18next.config.ts` の `status.ignoreKeys` に、次の5キーを**ワイルドカードを使わず具体キーとして**追記する（1.2 で追記済みの6キーに続けて書く）
     - `GROWI.5.0_new_schema` — キー名に `.` を literal で含むため、CLI は階層としてしか解釈できない。実行時は解決する（i18next を起動して確認済み）
     - `page_page.notice.stale_one` / `page_page.notice.stale_other` / `toaster.remove_share_link_one` / `toaster.remove_share_link_other` — CLI は `t(key, { count })` に対して複数形サフィックス付きのキーの実在を求めるが、i18next 本体はサフィックス無しのキーで解決する
