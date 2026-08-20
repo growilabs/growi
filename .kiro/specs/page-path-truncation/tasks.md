@@ -15,7 +15,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 5.1, 5.2, 6.1, 6.2_
   - _Boundary: buildAncestorPathNodes_
 
-- [ ] 3. Core: 検索結果一覧専用の祖先パス表示コンポーネントを実装する
+- [x] 3. Core: 検索結果一覧専用の祖先パス表示コンポーネントを実装する
   - `apps/app/src/features/search/client/components/SearchResultAncestorPath.tsx` を実装し、`buildAncestorPathNodes` の結果を、生存セグメントは `Link`(ハイライトがあれば markup 込み)、省略記号は非リンクのプレーンテキストとして描画する
   - コンテナに `title` 属性としてページ名を含む完全パスを常時付与する
   - 祖先 0 件の場合は現行の `PagePathHierarchicalLink` root 分岐と同じホーム/ゴミ箱アイコン表現を描画する
