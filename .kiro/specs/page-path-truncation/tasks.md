@@ -7,7 +7,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 7.1, 7.2_
   - _Boundary: formatTruncatedPagePath_
 
-- [ ] 2. Core: 中間省略判定と `LinkedPagePath` の橋渡し純粋関数を実装する
+- [x] 2. Core: 中間省略判定と `LinkedPagePath` の橋渡し純粋関数を実装する
   - `apps/app/src/client/util/build-ancestor-path-nodes.ts` に、`formatTruncatedPagePath` の判定結果からページ名パーツを除いた「祖先のみ」の表示計画を、プレーン/ハイライト双方の `LinkedPagePath` チェーンと結合して返す純粋関数を実装する
   - ルート/0 祖先(ホームアイコンのみ)、3 単位以下(全祖先)、4 単位以上(先頭＋省略記号＋直近祖先のみ)、ハイライト付き(対応する祖先にのみ `highlightedHtml` が設定される)の各ケースを実装する
   - プレーン/ハイライトチェーンの総ノード数が一致しない場合、祖先パス全体をプレーンテキストにフォールバックする防御的分岐を実装する(ノード単位の部分フォールバックにはしない)
