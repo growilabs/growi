@@ -682,7 +682,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
             </thead>
             <tbody>
               <tr>
-                <th>{t('security_settings.form_item_name.ABLCRule')}</th>
+                <th>{t('admin:security_settings.form_item_name.ABLCRule')}</th>
                 <td>
                   <textarea
                     className="form-control"
