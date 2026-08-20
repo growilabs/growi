@@ -116,7 +116,7 @@
   - _Boundary: Call-site Remediation (Group 4)_
   - _Depends: 1.2_
 
-- [ ] 4.4 (P) 区切り `:` を重ねて書いている4キーを `.` 区切りに直す（Group 5）
+- [x] 4.4 (P) 区切り `:` を重ねて書いている4キーを `.` 区切りに直す（Group 5）
   - `Admin/G2GDataTransfer.tsx:110` の `t('admin:g2g:transfer_success')` を `t('admin:g2g.transfer_success')` に直す
   - `Admin/AdminHome/AdminHome.tsx:138,147,158` の `admin:admin_top:copy_prefilled_host_information:default` / `:done` / `admin:admin_top:submit_bug_report` を、2つ目以降の `:` を `.` にした形に直す
   - i18next 本体は最初の `:` の前を namespace とみなし残りを `.` で繋ぎ直すため、書き換え前後で解決先は同じである（1.2 で i18next を起動して確認済み）

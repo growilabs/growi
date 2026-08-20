@@ -135,7 +135,7 @@ export const AdminHome: FC = () => {
                   >
                     content_copy
                   </span>
-                  {t('admin:admin_top:copy_prefilled_host_information:default')}
+                  {t('admin:admin_top.copy_prefilled_host_information.default')}
                 </button>
               </CopyToClipboard>
               <Tooltip
@@ -144,7 +144,7 @@ export const AdminHome: FC = () => {
                 target={copyIconRef}
                 fade={false}
               >
-                {t('admin:admin_top:copy_prefilled_host_information:done')}
+                {t('admin:admin_top.copy_prefilled_host_information.done')}
               </Tooltip>
             </li>
             <li>
@@ -155,7 +155,7 @@ export const AdminHome: FC = () => {
                 target="_blank"
                 rel="noreferrer"
               >
-                {t('admin:admin_top:submit_bug_report')}
+                {t('admin:admin_top.submit_bug_report')}
               </a>
             </li>
           </ol>

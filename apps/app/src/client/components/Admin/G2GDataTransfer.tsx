@@ -107,7 +107,7 @@ const G2GDataTransfer = (): JSX.Element => {
           g2gProgress.mongo === G2G_PROGRESS_STATUS.COMPLETED &&
           g2gProgress.attachments === G2G_PROGRESS_STATUS.COMPLETED
         ) {
-          toastSuccess(t('admin:g2g:transfer_success'));
+          toastSuccess(t('admin:g2g.transfer_success'));
         }
       });
 
