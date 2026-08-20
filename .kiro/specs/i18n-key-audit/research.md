@@ -20,6 +20,7 @@
   - `extract`: 既定で JSON ファイルを書き換える（コードにあるキーの追加、`removeUnusedKeys: true` の場合は未使用キーの削除も行う）。`--dry-run` を付けた場合のみ書き込まない。`--ci` は「このコマンドの実行結果としてファイルに変更が生じる場合に exit code 1」という意味であり、「未使用キーだけ」を意味しない。
   - `sync`: 2次言語ファイルを既定言語に同期するコマンドで、そもそも `--dry-run` 相当のオプションが無い（書き込み専用）。CI では使わない。
   - `preservePatterns`（`extract` 設定内）は `status` / `status --unused` にも効き、動的に構築されるキー（テンプレートリテラルの変数セグメント）を「未使用」判定・「欠損」判定の両方から正しく除外することをサンドボックスで確認済み。
+    - **訂正（task 1.2 の実測、2026-08-20）**: この記述のうち「欠損」判定にも効くという部分は**誤り**だった。実リポジトリでの A/B 実測では、`preservePatterns` を追加しても `status` の「en_US に無いキー」は 182 件のまま（一覧も完全に一致）で、変わったのは `status --unused` だけ（3176 → 1992）である。欠損側の除外には別のフィールド `status.ignoreKeys` が必要で、これを足して初めて 182 → 176 になった（`i18next-cli` 1.71.0 の型定義 `node_modules/i18next-cli/types/types.d.ts` にも別々のフィールドとして定義されている）。Requirement 4.2 は Requirement 1（欠損）と Requirement 2（未使用）の両方からの除外を求めているので、**2つのフィールドの両方に宣言が必要**である。詳細は下記 Decision「動的キーの宣言は `preservePatterns` と `status.ignoreKeys` の2箇所に書く」を参照。
   - 設定ファイル名は `i18next.config.ts`（`i18next-cli.config.ts` ではない）。除外パターンは `extract.input` に `!` を前置しても無視される（サイレントに効かない、実際に踏んだ罠）。正しいフィールドは `extract.ignore`（別配列）。
   - `i18next-cli` は自分自身の `i18next`/`react-i18next` を devDependency として内包しており、ホスト側の `i18next ^23.16.5` / `react-i18next ^15.1.1` とバージョン競合しない。
   - ライセンスは MIT（GROWI と両立）。
@@ -178,6 +179,63 @@
 - **Sources Consulted**: サンドボックスで `t(key)`（`key` は関数引数の変数）と `t('real_key_one')`（固定文字列）を両方含むファイルに `i18next-cli status` を実行
 - **Findings**: 検出されたキーは固定文字列の1件のみ。変数だけの呼び出しは、存在しないキーとして誤って報告されることも、`"key"` という見せかけのキーが作られることも無く、単純に無視された
 - **Implications**: g2gのドリフトテスト全面維持の判断（前項）は、コードの構造面の確認だけでなくツールの実際の挙動としても裏付けられた
+
+### Decision: 動的キーの宣言は `preservePatterns` と `status.ignoreKeys` の2箇所に書く
+- **Context**: task 1.2 で実際に `i18next.config.ts` に動的キーを宣言してみたところ、`status --unused` の件数は大きく減ったのに、`status`（存在しないキー参照）の件数と一覧がまったく変わらなかった。research.md 22行目の「`preservePatterns` は欠損判定にも効く」というサンドボックスでの結論は、実リポジトリでは再現しなかった（上記の訂正を参照）
+- **Sources Consulted**: `apps/app` に対する A/B 実測（宣言の前後で `status` / `status --unused` を実行）。`i18next-cli` 1.71.0 の型定義 `node_modules/i18next-cli/types/types.d.ts`（`extract.preservePatterns` と `status.ignoreKeys` は別のフィールド）。README の記述（前者は「extract の削除対象から残す」機能、後者は「`status` が報告しないキー」の機能）
+- **Alternatives Considered**:
+  1. `preservePatterns` だけで両方の要件を満たす（design.md 初版の前提）— 実測で成り立たないことが判明した
+  2. `status.ignoreKeys` を設計に加え、両方に宣言する — 採用
+- **Selected Approach**: 2。`status.ignoreKeys` を design.md の Technology Stack / Boundary Commitments / Requirements Traceability に一級の構成要素として書き、`i18next.config.ts` のコメントにも「どちらの報告に効くか」を残す
+- **Rationale**: Requirement 4.2 は Requirement 1 と Requirement 2 の両方からの除外を求めており、`preservePatterns` だけでは Requirement 2 しか満たせない。この一手が無いと Requirement 1 の「0件」に到達する道が無い
+- **Trade-offs**: 宣言する場所が2つに増え、編集者が「どちらに書くか」を知っている必要がある。design.md の Revalidation Triggers にその判断の仕方を書いて軽減した
+- **Follow-up**: なし。`i18next.config.ts` には task 1.2 で実装済み
+
+### Decision: 宣言はワイルドカードではなく具体キーの列挙を既定とする（同じ接頭辞に静的呼び出しが混ざる場合）
+- **Context**: 宣言した13のキーファミリのうち3つ（`editor_guide.decoration.*_text`、`admin:security_settings.form_item_name.*`、`page_edit.paste.*`）は、同じ接頭辞を静的な `t('…')` 呼び出しと共有していた
+- **Sources Consulted**: 実測。`page_edit.paste.title` を JSON 側で `titleXX` に書き換えたとき、ワイルドカードのままだと未使用件数は 1992 のままで気づけず、具体キーの列挙にすると 1993 に増えて報告された。`status.ignoreKeys` 側でも同じ確認を `alert_with_custom_title_text` について行い、ワイルドカードでは 176 のまま、列挙では 177 に増えて報告されることを確かめた
+- **Selected Approach**: 同じ接頭辞に静的呼び出しが混ざるファミリは具体キーを列挙する。変わる部分の取りうる値がこのファイルの外（保存済みの値、スコープ id、設定されたアップローダ種別など）で決まり将来増えうるファミリは、ワイルドカードのままにする（13ファミリのうち10）
+- **Rationale**: ワイルドカードは、あとでキー名を打ち間違えたり存在しないキーに書き換えたりしても監査が永久に気づけない死角を作る。これは Requirement 1 AC5 が禁じている状態そのものである
+- **Follow-up**: なし。判断の仕方を design.md の Revalidation Triggers に残した
+
+### Decision: task 1.2 の実測に合わせて、担当が決まっていなかった報告をすべて受け皿のあるタスクに割り当てる
+- **Context**: task 1.2 は design.md の前提を実測で確かめ直し、複数のずれを報告した。うち3点は「どのタスクも担当していない報告」であり、実装に入る前に受け皿を決める必要があった: (a) 分類 C の 119 件のうち 62 件が Group 1 / 2 / 3 のどのファイルからも参照されていない、(b) 既存のどの分類にも入らない15件（E 5件 / F 4件 / G 2件 / H 4件）、(c) `preservePatterns` だけでは Requirement 1 側の除外ができない（上記の別 Decision）
+- **Sources Consulted**: `apps/app/tools/i18n-audit/task-1.2-findings.md`（task 1.2 の成果物、実測の一次記録）。加えて本改訂で検算として、`npx i18next-cli status en_US --hide-translated` の報告176件それぞれについて、リポジトリ全体から静的な call site を洗い出し、Group 1 / 2 / 3 に属するかで振り分け直した
+- **Findings（本改訂の検算で新たに分かったこと）**:
+  - 「Group 1 / 2 / 3 のどこからも参照されていない」件数は 62 で、findings.md の実測と一致した（検算の途中で `slack-integration` を含むパスを誤って除外し 64 と出たが、除外を直すと 62 になった）
+  - その 62 件の報告元は、**61 件が `t` を props で受け取る12ファイル**、**残り1件（`security_settings.updated_general_security_setting`）は `Me/AssociateModal.tsx` / `Me/DisassociateModal.tsx` の2ファイルだけ**だった。この 61 / 1 の切り分けは findings.md には無い情報で、Group 1b と Group 4 を別のタスクに分ける根拠になっている
+  - Me の2ファイルは自分で `useTranslation()`（引数なし）を呼んでおり、キーは `admin.json` にしか無いため、**実行時にも生キーが表示される実在の不具合**である。E の5キーも同様に、`commons.json` にしか無いキーを既定 namespace のまま参照しているため実行時に生キーになる（`en_US/translation.json` に `Show` / `Hide` / `New` / `not_found_page` が無いことを確認済み）
+- **Alternatives Considered**:
+  1. 62件の受け皿として Group 1（hook 化）の対象ファイル一覧を12ファイル分増やす — `StatusTable.jsx` が `React.PureComponent` を継承した class component で hook を呼べず、関数コンポーネントへの書き換えという、検出のために必要な変更量を大きく超える作業になる
+  2. 12ファイルは Group 2 と同じ「キー文字列への `admin:` 前置」で直し、Group 1b として別タスクにする — 採用
+- **Selected Approach**: 2。あわせて、15件の内訳ごとに受け皿を決めた:
+  - E（5キー / 9ファイル）と Me の2ファイル（1キー）→ 新しい Group 4（明示 namespace の前置）。実行時の不具合も同時に直る
+  - F（4キー / 2ファイル、区切り `:` の重ね書き）→ 新しい Group 5（区切りを `.` に直す）。`g2g-error-keys-locale-drift.spec.ts` がキーを抽出しているのは `server/service/g2g-transfer.ts` だけで、書き換える `G2GDataTransfer.tsx` は読んでいないため、「既存テスト2本は変更しない」という結論と両立する（実ファイルを読んで確認した）。`status.ignoreKeys` で隠す案は採らなかった。区切りを直せば報告も実行時の解決も両方成り立つのに、除外だけで済ませると死角が残るため
+  - G の `LikeButtons.tsx`（`No users have liked this yet.`）→ 真の Bug 1 の一覧に畳む（参照修正）。ja_JP などで英語が表示される実在の不具合
+  - G の `GROWI.5.0_new_schema` と H の4キー → `status.ignoreKeys` に具体キーとして列挙（新タスク 3.3）
+- **Rationale**: Requirement 1 の「0件」は生の報告件数に対する条件なので、実行時に壊れていない報告も含めて1件残らず受け皿が必要になる。除外で済ませるのは「直せば報告も実行時も良くなる」経路が無い場合に限り、その場合もワイルドカードを使わず具体キーだけを列挙して死角を最小にする
+- **Trade-offs**: タスクが3本増える（3.3 / 4.2 / 4.3 / 4.4 のうち 4.1 以外の3本＋3.3 で計4本）。ただしいずれも独立して並列実行でき、依存は 1.2 だけである
+- **Follow-up**: 下記「複数形形式の移行」を別作業として記録した
+
+### Decision: 真の Bug 1 の件数は 25 件とする（research.md の「31件」からの粒度変更）
+- **Context**: research.md は 31 件、task 1.2 は 24 件と数えていた。同じ対象を数えているのに数字が違う
+- **Sources Consulted**: `task-1.2-findings.md` §0 / §1 / §5。task 1.2 は research.md が行っていなかった3種類の照合（`:` を `.` に置換した形での実在確認、キー名に `.` を literal で含む形での実在確認、複数形サフィックスを外した形での実在確認）を追加し、疑わしいものは i18next を実際に `init()` して `t()` の戻り値まで確認している
+- **Selected Approach**: 24 件（`status` が数えるキー単位。call site は26箇所）に、`LikeButtons.tsx` の `No users have liked this yet.` 1件を加えた **25 件**を design.md / tasks.md の確定値とする
+- **Rationale**: research.md の 31 は、この24件に「実行時には正しく解決されるが CLI が解決できないだけ」の7件を足した数である。件数が減ったのではなく分類の粒度が変わった。照合が細かい後者を採る
+- **Trade-offs**: requirements.md の Requirement 1 AC4 が「31件」という固定の数字を持っていたため、この数字を落として「discovery および実測で判明した、どの namespace ファイルにも存在しないキー参照」という書き方に直した。上記「実リポジトリでの実測」節の Implications が既に「要件文に固定の件数を書き込むのは適切でない」と記録しており、その方針の踏襲である
+- **Follow-up**: なし
+
+### Decision: Bug 2 の確定値は 20キー / 36コンポーネントとし、`Done` 1件は実装時の確認事項として残す
+- **Context**: design.md 初版は「約20〜23件 / 約43コンポーネント」と書いていた。task 1.2 の実測では、対象の共有ラベルは23件、そのうち `commons.json` に既に値がある3件を除いた複製対象が20件、参照している管理画面コンポーネントは36ファイルだった
+- **Sources Consulted**: `task-1.2-findings.md` §2（23件のキー一覧、`commons.json` 既存3件の内訳、36ファイルの一覧）。43との差は数え方の違い（call site 数、または `admin.json` にも実在するキーを含めた数え方）で、7ファイルの取りこぼしではないと同ファイルが記録している
+- **Selected Approach**: design.md / tasks.md の確定値を 20キー / 36コンポーネントにする
+- **未決として残した1件**: 本改訂の検算で、`Done`（`en_US/translation.json` に実在し `commons.json` には無い。`Admin/Users/PasswordResetModal.jsx:67` が `t('commons:Done')` として呼んでいる）が23件と同じ条件を満たすのに task 1.2 の一覧に入っていないことが分かった。`status` の報告（commons namespace の欠損として `Done` が挙がっている）には現れているので、task 1.2 の 182 / 176 の分類自体は崩れておらず、抜けているのは「複製する23件」の洗い出しの側だけである。**件数を独断で 21 に書き換えることはせず**、tasks.md 7.1 に「1.2 と同じ洗い出し手順を再実行して `Done` を含めるか確認する」という手順を足し、design.md にも未確定の追加候補として明記した。最終的に含めるかどうかは実装時の確認結果（または人の判断）で決める
+- **Follow-up**: 上記の確認を 7.1 で行う
+
+### Follow-up（本 spec の対象外として記録）: 複数形形式を i18next v4 に移行する
+- `translation.json` の `page_page.notice.stale` は `stale` と `stale_plural` を持つ。`stale_plural` は i18next v3 時代の書き方で、v4（GROWI の既定）では読まれないため、英語の複数形が崩れている（`count: 3` でも "More than 3 year has passed…" と表示される。i18next を起動して確認済み）。`commons.json` の `toaster.remove_share_link` も単数形／複数形の作り分けが無い
+- 本 spec では `status.ignoreKeys` による除外に留めた。5言語それぞれの複数形規則（言語ごとに必要なサフィックスが違う）を扱う作業であり、Requirement 1 の「存在しないキー参照」とは別の課題で、Non-Goals の「翻訳ファイル構成の再編」に隣接するため
+- 移行する場合は、`status.ignoreKeys` から該当4キーを外すことがそのまま完了条件になる
 
 ## References
 - [i18next-cli (npm)](https://www.npmjs.com/package/i18next-cli) — バージョン 1.69.0、MIT ライセンス、コマンド仕様の一次情報

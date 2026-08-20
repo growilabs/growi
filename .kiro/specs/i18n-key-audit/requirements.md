@@ -39,7 +39,7 @@
 1. When Translation Key Audit を実行した場合, the Translation Key Audit shall コード中の静的に解決可能な翻訳キー参照のうち、既定言語の翻訳ファイルに存在しないものをすべて報告する。
 2. Where あるキー参照が動的に構築されるものとして宣言されている場合（Requirement 4）, the Translation Key Audit shall そのキー参照を本チェックの対象から除外する。
 3. If 存在しない翻訳キーへの参照が 1 件以上見つかった場合, then the Translation Key Audit shall 非ゼロの結果で終了する。
-4. When 本機能の提供後に Translation Key Audit を実行した場合, the Translation Key Audit shall discovery で判明した 31 件（例: `common:failed_to_copy`、`Successfully updated`、`fix_page_grant.modal.alert_message`）を含め、存在しない翻訳キーへの参照を 0 件として報告する。
+4. When 本機能の提供後に Translation Key Audit を実行した場合, the Translation Key Audit shall discovery および実測で判明した、どの namespace ファイルにも存在しないキー参照（例: `common:failed_to_copy`、`Successfully updated`、`fix_page_grant.modal.alert_message`）を含め、存在しない翻訳キーへの参照を 0 件として報告する。
 5. If 本要件のゼロ件化を、静的に解決可能なキー参照の一部を検出対象から除外することによって達成する場合, then the Translation Key Audit shall その除外によって、当該キー参照が将来存在しないキーへの参照に書き換えられても検出されなくなる状態を作らない。
 6. When GROWI 開発者が本要件を満たすためにコードの記述を変更した場合, GROWI 開発者 shall 変更前後で実際に表示される翻訳文言が変わらないことを確認する。
 

@@ -46,33 +46,74 @@
   - _Boundary: Audit Orchestrator_
   - _Depends: 1.3, 1.4_
 
-## 3. Core: 存在しない31件のキー参照を修正する
+## 3. Core: 存在しない25件のキー参照を修正する
 
-- [ ] 3.1 (P) discovery で判明した31件の存在しないキー参照を、参照修正または新規キー追加で解消する
+- [ ] 3.1 (P) どの namespace ファイルにも存在しない25件のキー参照を、参照修正または新規キー追加で解消する
+  - 対象は 1.2 が確定させた24件（`task-1.2-findings.md` §1 の表、call site は26箇所）＋ 同 §5 の `LikeButtons.tsx` 1件の計25件。この表を対象一覧としてそのまま使う（再列挙は不要）
   - `FixPageGrantModal.tsx` の `fix_page_grant.modal.alert_message` を、実際の表示条件（グループ未選択時のみ表示）に一致する既存キー `fix_page_grant.modal.alert_message_select_group` への参照に修正する
-  - 同ファイルの `Successfully updated` / `Failed to update` を、en_US を含む5言語すべてに新規キーとして追加する
+  - 同ファイルの `Successfully updated` / `Failed to update` を、en_US を含む5言語すべてに新規キーとして追加する（`Failed to update` は `Admin/SlackIntegration/CustomBotWithProxySettings.jsx` からも参照されているので、キーの追加でそちらも同時に直る）
   - `GuideRow.tsx` / `TextStyleTab.tsx` の `common:failed_to_copy` を、`editor_guide.textstyle.copy_done` と対になる新規キー `editor_guide.textstyle.copy_failed` として5言語に追加し、呼び出し文字列自体も新しいキー名に書き換える
-  - 1.2 で確定させた残り28件についても、同じ手順（既存キーへの参照修正、または5言語同時の新規キー追加＋必要な call site 書き換え）で解消する
-  - 観測可能な完了条件: `i18next-cli status` の既定言語チェックが、この31件を含めて0件を報告する
+  - `LikeButtons.tsx:87` の `t('No users have liked this yet.')` を、末尾の `.` を外した `t('No users have liked this yet')` に直す。これは ja_JP などで英語が表示されていた実在の不具合の修正なので、**このキーだけは前後の表示文言が変わる**（英語→選択言語の翻訳）。9.2 の前後比較では例外として扱う
+  - 残りの件についても、`task-1.2-findings.md` §1 の表の方針欄（参照修正 / 新規キー追加 / 判断要）に従って解消する。「判断要」の行は call site を読んで修正先を決める
+  - 観測可能な完了条件: `i18next-cli status en_US --hide-translated` の報告から、この25件が消えている
   - _Requirements: 1.1, 1.4_
   - _Boundary: Non-Existent Key Reference Fix_
   - _Depends: 1.2_
 
 - [ ] 3.2 3.1 で新規追加したキーが全5言語で欠けていないことを検証する
-  - 新規追加キー（`Successfully updated` / `Failed to update` / `editor_guide.textstyle.copy_failed` および残り28件のうち新規追加した分）が、5言語すべてで値を持ち空でないことを確認する専用テストを追加する
+  - 新規追加キー（`Successfully updated` / `Failed to update` / `editor_guide.textstyle.copy_failed` および 3.1 で新規追加した残りの分）が、5言語すべてで値を持ち空でないことを確認する専用テストを追加する
   - 観測可能な完了条件: このテストが green であることを、後続の基準線初回記録（8.1）の前提条件として運用できる状態にする
   - _Requirements: 1.4, 3.2_
   - _Boundary: Non-Existent Key Reference Fix_
   - _Depends: 3.1_
 
-## 4. Core: props 経由の `t` を自前の `useTranslation` に書き換える（Group 1）
+- [ ] 3.3 (P) 実行時には解決できるのに CLI が解決できない5キーを `status.ignoreKeys` に宣言する
+  - `i18next.config.ts` の `status.ignoreKeys` に、次の5キーを**ワイルドカードを使わず具体キーとして**追記する（1.2 で追記済みの6キーに続けて書く）
+    - `GROWI.5.0_new_schema` — キー名に `.` を literal で含むため、CLI は階層としてしか解釈できない。実行時は解決する（i18next を起動して確認済み）
+    - `page_page.notice.stale_one` / `page_page.notice.stale_other` / `toaster.remove_share_link_one` / `toaster.remove_share_link_other` — CLI は `t(key, { count })` に対して複数形サフィックス付きのキーの実在を求めるが、i18next 本体はサフィックス無しのキーで解決する
+  - 追記した5キーが `status` の報告から消え、それ以外の報告件数が変わらないことを実行して確認する（ワイルドカードにして周辺の静的キーまで隠していないことの確認も兼ねる）
+  - 観測可能な完了条件: `npx i18next-cli status en_US --hide-translated` の報告に、この5キーがどれも現れない
+  - _Requirements: 1.1, 4.1, 4.2_
+  - _Boundary: i18next.config.ts_
+  - _Depends: 1.2_
 
-- [ ] 4.1 (P) `SecuritySetting` 配下7ファイルを、`t` を props で受け取る形から自前で束ねる形に書き換える
+## 4. Core: 宣言 namespace から追跡できないキー参照を書き換える（Group 1a / 1b / 4 / 5）
+
+- [ ] 4.1 (P) `SecuritySetting` 配下7ファイルを、`t` を props で受け取る形から自前で束ねる形に書き換える（Group 1a）
   - `CommentManageRightsSettings` / `PageAccessRightsSettings` / `PageDeleteRightsSettings` / `PageListDisplaySettings` / `SessionMaxAgeSettings` / `UserHomepageDeletionSettings` / `UserPageVisibilitySettings` の7ファイルで、親コンポーネント（`SecuritySetting/index.tsx`）が実際に束ねている namespace（`admin`）を確認した上で、各コンポーネントが自前で `useTranslation('admin')` を呼ぶように変更する
   - 書き換え前後で、各コンポーネントが表示する翻訳文言が一致することを確認する
   - 観測可能な完了条件: 7ファイルのいずれも `t` を props として受け取らず、`i18next-cli status` がこれらのファイル由来の誤検出を報告しない
   - _Requirements: 1.1, 1.5, 1.6_
-  - _Boundary: Call-site Remediation (Group 1)_
+  - _Boundary: Call-site Remediation (Group 1a)_
+  - _Depends: 1.2_
+
+- [ ] 4.2 (P) `t` を props で受け取る管理画面12ファイルのキー文字列に `admin:` を前置する（Group 1b）
+  - 対象は 1.2 の実測で確定した12ファイル: `Admin/LegacySlackIntegration/SlackConfiguration.jsx`、`Admin/ElasticsearchManagement/StatusTable.jsx`、`Admin/ImportData/GrowiArchiveSection.jsx`、`Admin/MarkdownSetting/XssForm.jsx`、`Admin/MarkdownSetting/LineBreakForm.jsx`、`Admin/Users/PasswordResetModal.jsx`、`Admin/Notification/UserTriggerNotification.jsx`、`Admin/Notification/GlobalNotificationList.jsx`、`Admin/Notification/NotificationDeleteModal.jsx`、`Admin/Security/DeleteAllShareLinksModal.jsx`、`Admin/Users/StatusActivateButton.jsx`、`Admin/Users/UserRemoveButton.jsx`（いずれも `src/client/components/` 配下）
+  - この12ファイルが報告の出どころになっているキーは61件で、これが「分類 C の119件のうち Group 1a / 2 / 3 のどこからも参照されていない62件」の大部分に当たる（残り1件は 4.3 が担当する）
+  - 4.1 と違い、**hook 化はせずキー文字列への `admin:` 前置で直す**。`StatusTable.jsx` は class component で hook を呼べないうえ、前置だけで検出も実行時の解決も成立するため（design.md の Group 1b を参照）
+  - 書き換え前に、各ファイルへ `t` を渡している wrapper が `useTranslation('admin')` を呼んでいることを確認する（12ファイルすべて `admin` であることは 1.2 で確認済み）
+  - 観測可能な完了条件: `i18next-cli status en_US --hide-translated` の報告から、この12ファイル由来の61件が消え、書き換え前後で各ファイルの表示文言が一致する
+  - _Requirements: 1.1, 1.5, 1.6_
+  - _Boundary: Call-site Remediation (Group 1b)_
+  - _Depends: 1.2_
+
+- [ ] 4.3 (P) 宣言 namespace では解決できない6キーに `admin:` / `commons:` を前置する（Group 4）
+  - `admin:` を前置する1キー: `security_settings.updated_general_security_setting`（`Me/AssociateModal.tsx:59`、`Me/DisassociateModal.tsx:45`）。この2ファイルは `useTranslation()` を引数なしで呼んでおり、キーは `admin.json` にしか無いため実行時にも生キーが表示されている。`/me` 配下のページには `admin` が配られている（`pages/me/[[...path]].page.tsx:170`）ことを確認してから前置する
+  - `commons:` を前置する5キー（9ファイル）: `not_found_page.page_not_exist`（`RevisionComparer/RevisionComparer.tsx:79`、`Admin/NotFoundPage.tsx:7`）、`Show`（`Me/BasicInfoSettings.tsx:142`）、`Hide`（同:160）、`New`（`Me/AccessTokenSettings.tsx:152`、`PageAccessoriesModal/ShareLink/ShareLink.tsx:81`）、`toaster.create_failed`（`Hotkeys/Subscribers/EditPage.tsx:68`、`CreateTemplateModal/CreateTemplateModal.tsx:74`、`Navbar/PageEditorModeManager.tsx:68`、`client/services/use-toastr-on-error.tsx:16`）
+  - **この6キーは前後の表示文言が変わる**（生キー → 翻訳済み文言）。9.2 の前後比較では例外として扱い、「生キーが翻訳済み文言に変わったこと」を確認する
+  - 観測可能な完了条件: `i18next-cli status en_US --hide-translated` の報告からこの6キーが消え、各画面で生キーではなく選択言語の文言が表示される
+  - _Requirements: 1.1, 1.5, 1.6, 7.1_
+  - _Boundary: Call-site Remediation (Group 4)_
+  - _Depends: 1.2_
+
+- [ ] 4.4 (P) 区切り `:` を重ねて書いている4キーを `.` 区切りに直す（Group 5）
+  - `Admin/G2GDataTransfer.tsx:110` の `t('admin:g2g:transfer_success')` を `t('admin:g2g.transfer_success')` に直す
+  - `Admin/AdminHome/AdminHome.tsx:138,147,158` の `admin:admin_top:copy_prefilled_host_information:default` / `:done` / `admin:admin_top:submit_bug_report` を、2つ目以降の `:` を `.` にした形に直す
+  - i18next 本体は最初の `:` の前を namespace とみなし残りを `.` で繋ぎ直すため、書き換え前後で解決先は同じである（1.2 で i18next を起動して確認済み）
+  - `g2g-error-keys-locale-drift.spec.ts` はキー文字列を `server/service/g2g-transfer.ts` からのみ抽出しており、`G2GDataTransfer.tsx` の呼び出しは読んでいないため、この書き換えでは同 spec に差分が出ない。書き換え後に同 spec が green のままであることを確認する
+  - 観測可能な完了条件: `i18next-cli status en_US --hide-translated` の報告からこの4キーが消え、書き換え前後で表示文言が一致し、`g2g-error-keys-locale-drift.spec.ts` が無修正で green である
+  - _Requirements: 1.1, 1.5, 1.6_
+  - _Boundary: Call-site Remediation (Group 5)_
   - _Depends: 1.2_
 
 ## 5. Core: 管理画面ページの title callback に namespace を明示する（Group 2）
@@ -88,9 +129,10 @@
 ## 6. Core: サーバー側の複数 namespace 解決に namespace を明示する（Group 3）
 
 - [ ] 6.1 (P) `getTranslation({ ns: [...] })` で解決しているキーに namespace を前置する
-  - `saml.ts`（および 1.2 で確認した同様のファイル）で誤検出の原因になっているキーを対象に、前置対象のキーが `translation` と `admin` の両方の namespace に重複して存在しないことを先に確認する
-  - 重複が無いことを確認できたキーにのみ、namespace を前置する
-  - 完全な動的キー（テンプレートリテラルの変数セグメント）は対象外とし、1.2 の `preservePatterns` でカバーする
+  - 1.2 の実測で、`ns:` の配列を渡しているのは `saml.ts` 1ファイルだけであり、書き換えが必要な固定キーもその中の1つ（`saml.ts:220` の `security_settings.form_item_name.ABLCRule`）だけであることが確定している。同じキーは `Admin/Security/SamlSecuritySettingContents.tsx:685` からも参照されており報告に出ているので、そちらも同時に前置する
+  - 前置対象のキーが `translation` と `admin` の両方の namespace に重複して存在しないことを先に確認し、重複が無いことを確認できたキーにのみ namespace を前置する
+  - `input_validation.message.required` / `input_validation.message.error_message` は `translation.json` に実在し報告に出ていないので前置しない（フォールバック順を変えるリスクを取らない）
+  - 完全な動的キー（`saml.ts:197` のテンプレートリテラル）は対象外とし、1.2 の `preservePatterns` / `status.ignoreKeys` でカバーする
   - 観測可能な完了条件: 書き換え前後で解決される翻訳文言が一致し、`i18next-cli status` がこれらのファイル由来の誤検出を報告しない
   - _Requirements: 1.1, 1.5, 1.6_
   - _Boundary: Call-site Remediation (Group 3)_
@@ -98,16 +140,18 @@
 
 ## 7. Core: 管理画面の共有ラベルを `commons` namespace に複製する（Bug 2）
 
-- [ ] 7.1 (P) 共有ラベル約20〜23件を `commons.json` に複製し、複製ペアの同期を検証するテストを追加する
-  - `Created` / `Cancel` / `Close` / `Name` / `Email` / `Update` / `Description` / `User` / `Edit` / `UserGroup` / `Create` 等を、5言語すべての `translation.json` の値を変更せず `commons.json` に複製する
-  - 複製した各キーが、5言語すべてで `translation.json` と `commons.json` の値が一致することを検証する専用テスト（`i18n-reconcile.spec.ts` と同種のパターン）を追加する
+- [ ] 7.1 (P) 共有ラベル20件を `commons.json` に複製し、複製ペアの同期を検証するテストを追加する
+  - 1.2 が確定させた共有ラベル23件（`task-1.2-findings.md` §2）のうち、`commons.json` に既に値がある3件（`Delete` / `toaster.remove_share_link` / `toaster.remove_share_link_success`）を除いた **20件** を、5言語すべての `translation.json` の値を変更せず `commons.json` に複製する
+  - 複製した20件が、5言語すべてで `translation.json` と `commons.json` の値が一致することを検証する専用テスト（`i18n-reconcile.spec.ts` と同種のパターン）を追加する
+  - 1.2 の洗い出し手順（「管理画面のコードから `t('固定文字列')` として呼ばれ、その file が宣言した namespace では解決できず、`translation.json` には実在する」ものだけを残す）を再実行し、`Done`（`Admin/Users/PasswordResetModal.jsx:67` が `t('commons:Done')` として呼んでおり、`translation.json` にはあるが `commons.json` には無い）を複製対象に含めるべきかを確認する。含める場合は複製対象が21件になり、同期テストの対象も21件になる（design.md の Bug 2 Remediation「未確定の追加候補1件」）
   - 観測可能な完了条件: 追加したテストが green になり、`translation.json` の diff が空である
   - _Requirements: 7.1_
   - _Boundary: Bug 2 Remediation_
   - _Depends: 1.2_
 
-- [ ] 7.2 discovery で判明した管理画面43コンポーネントの call site を `commons:` 前置に変更する
-  - 43コンポーネントの共有ラベル呼び出し（例: `t('Cancel')`）を `t('commons:Cancel')` に書き換える。管理画面外の call site は変更しない
+- [ ] 7.2 管理画面36コンポーネントの call site を `commons:` 前置に変更する
+  - 1.2 が確定させた36ファイル（`task-1.2-findings.md` §2 の一覧。ファイルごとに、そのファイルが持つ共有ラベルも表になっている）の共有ラベル呼び出し（例: `t('Cancel')`）を `t('commons:Cancel')` に書き換える。管理画面外の call site は変更しない
+  - `status` の報告に現れるのは23件のうち18件だけだが、報告に出ていない5件（`Confirm` / `Help` / `Password` / `Warning` / `add`）も実行時には生キーになるため、**報告件数を見て対象を狭めない**
   - 書き換え前後で管理画面の表示文言が一致することを確認する
   - 観測可能な完了条件: 本番相当のビルドで、管理画面がこれらのラベルを生キーではなく翻訳済み文言として表示する
   - _Requirements: 7.1, 7.2_
@@ -122,21 +166,23 @@
   - 観測可能な完了条件: `pnpm run lint:i18n` を通常実行し、既定言語の欠損参照が0件、未使用キー・言語別欠損が新しく記録した基準線以下で合格する
   - _Requirements: 1.4, 2.2, 3.2_
   - _Boundary: Baseline Store_
-  - _Depends: 2.1, 3.1, 3.2, 4.1, 5.1, 6.1, 7.1, 7.2_
+  - _Depends: 2.1, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 5.1, 6.1, 7.1, 7.2_
 
 ## 9. Validation: 既存テストの整理確認と全体の回帰確認
 
 - [ ] 9.1 既存の手書きドリフトテスト2本が、変更無しで妥当なままであることを確認する
   - `i18n-reconcile.spec.ts`（8つの特定キーの存在・非空確認）と `g2g-error-keys-locale-drift.spec.ts`（`admin:g2g:*` の実在確認と `KEYS_WITH_DETAIL_MESSAGE` の整合性確認）の両方を、他タスクの変更後も無修正のまま実行し、green であることを確認する
+  - 特に 4.4（クライアント側の `admin:g2g:transfer_success` を `.` 区切りに直す）の後で `g2g-error-keys-locale-drift.spec.ts` が無修正・green のままであることを確認する。同 spec がキーを抽出しているのは `server/service/g2g-transfer.ts` だけなので差分は出ない想定だが、この想定が正しいことを実行で確かめる
   - 観測可能な完了条件: 2本のテストファイルに差分が無いこと、かつ両方が green であることを確認できる
   - _Requirements: 8.1, 8.2_
   - _Depends: 8.1_
 
 - [ ] 9.2 存在しないキー参照修正・Call-site Remediation の書き換え全体について、表示文言が変わっていないことを最終確認する
   - タスク3・4・5・6で書き換えた全ファイルについて、書き換え前に記録した表示文言と、実装後の表示文言を比較する
-  - 観測可能な完了条件: 比較したすべてのキーで前後の文言が一致する
+  - **前後一致を求めない例外7キー**: 4.3 の6キー（`security_settings.updated_general_security_setting` / `not_found_page.page_not_exist` / `Show` / `Hide` / `New` / `toaster.create_failed`）と、3.1 の `No users have liked this yet.`。これらは書き換え前の表示が不具合（生キー、または ja_JP で英語へフォールバック）なので、確認する内容は「一致」ではなく「選択言語の翻訳済み文言に変わったこと」である
+  - 観測可能な完了条件: 例外7キーを除いたすべてのキーで前後の文言が一致し、例外7キーは翻訳済み文言に変わっている
   - _Requirements: 1.6_
-  - _Depends: 3.1, 4.1, 5.1, 6.1_
+  - _Depends: 3.1, 4.1, 4.2, 4.3, 4.4, 5.1, 6.1_
 
 - [ ] 9.3 リポジトリ全体の lint・テスト・ビルドが green であることを確認する
   - `turbo run lint --filter=@growi/app`、`turbo run test --filter=@growi/app`、`turbo run build --filter=@growi/app` を実行する
