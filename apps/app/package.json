@@ -392,6 +392,7 @@
     "fslightbox-react": "^1.7.6",
     "handsontable": "=6.2.2",
     "happy-dom": "^15.7.4",
+    "i18next-cli": "1.71.0",
     "jotai-devtools": "^0.11.0",
     "jscodeshift": "^17.3.0",
     "load-css-file": "^1.0.0",

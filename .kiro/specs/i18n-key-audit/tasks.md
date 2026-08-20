@@ -2,7 +2,7 @@
 
 ## 1. Foundation: ツール導入と、正しい対象一覧の確定
 
-- [ ] 1.1 `i18next-cli` を導入し、検出対象を宣言する設定を用意する
+- [x] 1.1 `i18next-cli` を導入し、検出対象を宣言する設定を用意する
   - `apps/app/package.json` の devDependency に `i18next-cli`（バージョン固定、`^` 無し）を追加する
   - `apps/app/i18next.config.ts` を作成し、対象言語（en_US/ja_JP/zh_CN/fr_FR/ko_KR）、対象ソース（`src/**/*.{ts,tsx,js,jsx}`）、テストファイル等の除外パターンを宣言する
   - 観測可能な完了条件: `npx i18next-cli status` が設定エラー無く実行でき、既定言語の欠損参照件数が標準出力に表示される
@@ -143,3 +143,7 @@
   - 観測可能な完了条件: 3コマンドすべてが green で終了する
   - _Requirements: 6.1, 6.2_
   - _Depends: 8.1, 9.1, 9.2_
+
+## Implementation Notes
+
+- 1.1: `i18next-cli` を design.md 記載の 1.69.0 ではなく、実装時点の最新安定版 1.71.0 で固定した（`^` 無し）。design.md の意図は「特定の1バージョンに固定してstdout形式の変更を防ぐこと」であり、数値そのものの一致は求めていないため。1.3 のパーサー fixture はこの実際に入っている 1.71.0 の出力形式を基準に作ること。
