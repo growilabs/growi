@@ -120,6 +120,28 @@ Key Status for "ja_JP":
 Everything matches. Nothing to report.
 `;
 
+// Captured verbatim from real `i18next-cli` 1.71.0 stdout on this repo via:
+//   npx i18next-cli status ko_KR
+// The "X untranslated," clause is entirely absent here. Per task 1.5's
+// investigation (tasks.md Implementation Notes, 2.1), this clause drops out
+// whenever the untranslated count is exactly 0 — it is not specific to
+// ko_KR, so any locale can hit this shape once its untranslated count reaches 0.
+const LOCALE_STDOUT_NO_UNTRANSLATED_CLAUSE = `
+- Analyzing project localization status...
+
+✔ Analysis complete.
+
+Key Status for "ko_KR":
+Overall: [■■■■■■■■■■■■■■■■■□□□] 87% (1506/1734)
+
+  ✗ security_settings.read_only_users_comment.accept  (absent)
+  ✗ security_settings.read_only_users_comment.deny  (absent)
+  ✓ Only inside the group
+
+Summary: Found 228 incomplete translations for "ko_KR" — 228 absent.
+✖ Error: Incomplete translations detected for "ko_KR".
+`;
+
 describe('parseDefaultLanguageMissingCount', () => {
   it('extracts the missing-key count from a normal `status` run', () => {
     expect(parseDefaultLanguageMissingCount(STATUS_STDOUT_NORMAL)).toBe(176);
@@ -173,5 +195,11 @@ describe('parseLocaleMissingCount', () => {
     expect(() =>
       parseLocaleMissingCount(LOCALE_STDOUT_NORMAL_TAIL, 'ko_KR'),
     ).toThrow();
+  });
+
+  it('extracts the absent count when the "X untranslated," clause is entirely absent (untranslated count is 0)', () => {
+    expect(
+      parseLocaleMissingCount(LOCALE_STDOUT_NO_UNTRANSLATED_CLAUSE, 'ko_KR'),
+    ).toBe(228);
   });
 });

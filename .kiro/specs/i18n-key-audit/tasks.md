@@ -34,7 +34,7 @@
   - _Requirements: 2.2, 2.3, 2.4, 2.5, 3.2, 3.3, 3.4, 3.5_
   - _Boundary: Baseline Store_
 
-- [ ] 1.5 `parseLocaleMissingCount` に、`X untranslated,` 節が無い実際の出力形式を対応させる
+- [x] 1.5 `parseLocaleMissingCount` に、`X untranslated,` 節が無い実際の出力形式を対応させる
   - 2.1 のレビューで、実リポジトリの `ko_KR` に対する `npx i18next-cli status ko_KR` の実際の出力が `Summary: Found 228 incomplete translations for "ko_KR" — 228 absent.` であり、`X untranslated,` の節がまるごと無いことが判明した（`parseLocaleMissingCount` は現在この節を必須としている）。切り分けの結果、この節が消えるのは未翻訳件数（untranslated）がちょうど0件のときで、`ko_KR` 固有ではなく件数条件で発生する（詳細は `## Implementation Notes` の 2.1 の記録を参照）
   - `parseLocaleMissingCount` を、`X untranslated,` 節が無い場合はその値を0件として扱うように直す（`ja_JP` / `zh_CN` / `fr_FR` のように節がある場合の挙動は変えない）
   - 観測可能な完了条件: 実際の `ko_KR` の出力（`X untranslated,` 節なし）を fixture として追加したテストが green になり、既存のテスト（節ありの fixture）も green のまま

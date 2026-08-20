@@ -62,6 +62,11 @@ export const parseUnusedCount = (stdout: string): number => {
  * locale file entirely, which `i18next-cli` reports separately from keys
  * present but not yet translated.
  *
+ * The "X untranslated," clause itself is omitted from the CLI's output
+ * whenever the untranslated count is exactly 0 (observed on `ko_KR`, but not
+ * specific to it — see tasks.md's task 1.5 note), so that clause is matched
+ * as optional here; its absence does not affect the absent-count extraction.
+ *
  * @throws {Error} if the expected summary line for `locale` is not found.
  */
 export const parseLocaleMissingCount = (
@@ -70,14 +75,14 @@ export const parseLocaleMissingCount = (
 ): number => {
   const escapedLocale = locale.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(
-    `Summary: Found \\d+ incomplete translations for "${escapedLocale}" — \\d+ untranslated, (\\d+) absent`,
+    `Summary: Found \\d+ incomplete translations for "${escapedLocale}" — (?:\\d+ untranslated, )?(\\d+) absent`,
   );
   const match = stdout.match(pattern);
 
   if (match == null) {
     throw new Error(
       `Failed to parse per-locale missing-key count for "${locale}": expected a ` +
-        `"Summary: Found N incomplete translations for "${locale}" — X untranslated, N absent" ` +
+        `"Summary: Found N incomplete translations for "${locale}" — [X untranslated,] N absent" ` +
         `line was not found in \`status ${locale}\` output.`,
     );
   }
