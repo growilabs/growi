@@ -8,7 +8,6 @@ import { getInstance } from '^/test/setup/crowi';
 import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { generalXssFilter } from '~/services/general-xss-filter';
@@ -412,18 +411,30 @@ describe('PageService', () => {
     parentTag = await prisma.tags.findUnique({ where: { name: 'Parent' } });
     childTag = await prisma.tags.findUnique({ where: { name: 'Child' } });
 
-    const existingPageTagRelation = await PageTagRelation.findOne({
-      relatedPage: parentForDuplicate?._id,
+    const existingPageTagRelation = await prisma.pagetagrelations.findFirst({
+      where: { relatedPageId: parentForDuplicate?._id?.toString() },
     });
     if (
       existingPageTagRelation == null &&
       parentForDuplicate &&
       childForDuplicate
     ) {
-      await PageTagRelation.insertMany([
-        { relatedPage: parentForDuplicate, relatedTag: parentTag },
-        { relatedPage: childForDuplicate, relatedTag: childTag },
-      ]);
+      assert(parentTag != null);
+      assert(childTag != null);
+      assert(parentForDuplicate._id != null);
+      assert(childForDuplicate._id != null);
+      await prisma.pagetagrelations.createMany({
+        data: [
+          {
+            relatedPageId: parentForDuplicate._id.toString(),
+            relatedTagId: parentTag._id,
+          },
+          {
+            relatedPageId: childForDuplicate._id.toString(),
+            relatedTagId: childTag._id,
+          },
+        ],
+      });
     }
 
     const existingRevision = await prisma.revisions.findUnique({

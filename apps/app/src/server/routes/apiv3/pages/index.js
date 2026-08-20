@@ -21,11 +21,11 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import { configManager } from '~/server/service/config-manager';
 import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
 import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
@@ -235,17 +235,18 @@ export const setup = (crowi) => {
         });
 
         const ids = result.pages.map((page) => {
-          return page._id;
+          return page._id.toString();
         });
-        const relations = await PageTagRelation.find({
-          relatedPage: { $in: ids },
-        }).populate('relatedTag');
+        const relations = await prisma.pagetagrelations.findMany({
+          where: { relatedPageId: { in: ids } },
+          include: { relatedTag: true },
+        });
 
         // { pageId: [{ tag }, ...] }
         const relationsMap = new Map();
         // increment relationsMap
         relations.forEach((relation) => {
-          const pageId = relation.relatedPage.toString();
+          const pageId = relation.relatedPageId;
           if (!relationsMap.has(pageId)) {
             relationsMap.set(pageId, []);
           }

@@ -1,7 +1,6 @@
 import { SupportedAction } from '~/interfaces/activity';
 import { prisma } from '~/utils/prisma';
 
-import PageTagRelation from '../models/page-tag-relation';
 import ApiResponse from '../util/apiResponse';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
@@ -143,8 +142,8 @@ export const setup = (crowi, _app) => {
         previousRevision.body,
         req.user,
       );
-      await PageTagRelation.updatePageTags(pageId, tags);
-      result.tags = await PageTagRelation.listTagNamesByPage(pageId);
+      await prisma.pagetagrelations.updatePageTags(pageId, tags);
+      result.tags = await prisma.pagetagrelations.listTagNamesByPage(pageId);
 
       tagEvent.emit('update', page, tags);
     } catch (err) {
@@ -213,7 +212,7 @@ export const setup = (crowi, _app) => {
     try {
       // get tag list contains id name and count properties
       const tagsWithCount =
-        await PageTagRelation.createTagListWithCount(queryOptions);
+        await prisma.pagetagrelations.createTagListWithCount(queryOptions);
 
       return res.json(ApiResponse.success(tagsWithCount));
     } catch (err) {
