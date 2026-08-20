@@ -33,7 +33,7 @@
   - _Requirements: 7.1, 7.2, 8.1, 9.1, 9.2_
   - _Boundary: PageListItemL_
 
-- [ ] 4.2 `SearchResultList` から新オプトイン prop を有効化する
+- [x] 4.2 `SearchResultList` から新オプトイン prop を有効化する
   - `apps/app/src/features/search/client/components/SearchPage/SearchResultList.tsx` の `PageListItemL` 呼び出しに `isPathTruncationEnabled` を渡す
   - 開発サーバーで `/_search` を開き、検索結果一覧の祖先パスが新コンポーネントで描画されることを確認する
   - _Requirements: 8.1_
