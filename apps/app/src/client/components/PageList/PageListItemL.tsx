@@ -26,6 +26,7 @@ import { Input } from 'reactstrap';
 import type { ISelectable } from '~/client/interfaces/selectable-all';
 import { bookmark, unbookmark, unlink } from '~/client/services/page-operation';
 import { toastError } from '~/client/util/toastr';
+import { SearchResultAncestorPath } from '~/features/search/client/components/SearchResultAncestorPath';
 import type { IPageSearchMeta, IPageWithSearchMeta } from '~/interfaces/search';
 import { isIPageSearchMeta } from '~/interfaces/search';
 import type {
@@ -56,6 +57,7 @@ type Props = {
   isReadOnlyUser: boolean;
   forceHideMenuItems?: ForceHideMenuItems;
   showPageUpdatedTime?: boolean; // whether to show page's updated time at the top-right corner of item
+  isPathTruncationEnabled?: boolean; // whether to render the ancestor path with middle truncation and unify page-name date bundling (see design.md Requirement 7-9)
   onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
   onClickItem?: (pageId: string) => void;
   onPageDuplicated?: OnDuplicatedFunction;
@@ -82,6 +84,8 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
     onPageDeleted,
     onPagePutBacked,
   } = props;
+
+  const isPathTruncationEnabled = props.isPathTruncationEnabled ?? false;
 
   const { returnPathForURL } = pathUtils;
 
@@ -136,12 +140,10 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
   const dPagePathHighlighted: DevidedPagePath = new DevidedPagePath(
     elasticSearchResult?.highlightedPath || pageData.path,
     true,
+    isPathTruncationEnabled,
   );
   const linkedPagePathHighlightedFormer = new LinkedPagePath(
     dPagePathHighlighted.former,
-  );
-  const linkedPagePathHighlightedLatter = new LinkedPagePath(
-    dPagePathHighlighted.latter,
   );
 
   const lastUpdateDate = format(
@@ -275,10 +277,17 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
             <div className="flex-grow-1 px-2 px-md-4">
               <div className="d-flex justify-content-between">
                 {/* page path */}
-                <PagePathHierarchicalLink
-                  linkedPagePath={linkedPagePathFormer}
-                  linkedPagePathByHtml={linkedPagePathHighlightedFormer}
-                />
+                {isPathTruncationEnabled ? (
+                  <SearchResultAncestorPath
+                    path={pageData.path}
+                    highlightedPath={elasticSearchResult?.highlightedPath}
+                  />
+                ) : (
+                  <PagePathHierarchicalLink
+                    linkedPagePath={linkedPagePathFormer}
+                    linkedPagePathByHtml={linkedPagePathHighlightedFormer}
+                  />
+                )}
                 {showPageUpdatedTime && (
                   <span className="page-list-updated-at text-muted">
                     Last update: {lastUpdateDate}
@@ -304,11 +313,11 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
                           <span
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight markup is sanitized
                             dangerouslySetInnerHTML={{
-                              __html: linkedPagePathHighlightedLatter.pathName,
+                              __html: dPagePathHighlighted.latter,
                             }}
                           />
                         ) : (
-                          linkedPagePathHighlightedLatter.pathName
+                          dPagePathHighlighted.latter
                         )}
                       </Link>
                     </span>

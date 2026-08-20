@@ -25,7 +25,7 @@
   - _Boundary: SearchResultAncestorPath_
 
 - [ ] 4. Integration: `PageListItemL` のオプトイン配線と `/_search` への適用
-- [ ] 4.1 `PageListItemL` にオプトイン prop を追加し、祖先パス描画と `evalDatePath` を切り替える
+- [x] 4.1 `PageListItemL` にオプトイン prop を追加し、祖先パス描画と `evalDatePath` を切り替える
   - 新規 prop `isPathTruncationEnabled?: boolean`(既定 `false`)を追加する
   - `true` のとき、祖先パス描画を `SearchResultAncestorPath` に切り替え、ページ名行が使う `DevidedPagePath` 呼び出しの `evalDatePath` を `true` にする
   - `false`(既定)のときは現行どおり `PagePathHierarchicalLink` ＋ `evalDatePath=false` を使用し、挙動を一切変えない
@@ -44,3 +44,7 @@
   - `PageList.tsx`(子ページ一覧)・`IdenticalPathPage.tsx`(パス重複選択画面)を実際に開き、表示が変更前と同じ(全セグメント表示のまま)であることを確認する
   - `turbo run lint --filter @growi/app`・`turbo run test --filter @growi/app`・`turbo run build --filter @growi/app` を実行し、すべて green であることを確認する
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 4.1, 5.1, 5.2, 6.1, 6.2, 7.1, 7.2, 8.1, 9.1, 9.2_
+
+## Implementation Notes
+
+- Task 4.1: `LinkedPagePath`'s constructor always calls `new DevidedPagePath(path)` with no `evalDatePath` argument (always `false`), so re-wrapping an already-`evalDatePath`-bundled string (e.g. a date-bundled page name like `"2024/01/15"`) in a fresh `LinkedPagePath` silently re-splits it and destroys the bundling. When `evalDatePath` needs to reach a piece of UI, read the value directly off the `DevidedPagePath` instance (e.g. `.latter`) rather than passing it through a new `LinkedPagePath`.
