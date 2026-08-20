@@ -266,13 +266,16 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
         await updateUserGroup(targetGroup, userGroupData, forceUpdateParents);
         toastSuccess(
           t('toaster.update_successed', {
-            target: t('UserGroup'),
+            target: t('commons:UserGroup'),
             ns: 'commons',
           }),
         );
       } catch {
         toastError(
-          t('toaster.update_failed', { target: t('UserGroup'), ns: 'commons' }),
+          t('toaster.update_failed', {
+            target: t('commons:UserGroup'),
+            ns: 'commons',
+          }),
         );
       }
     },
@@ -392,7 +395,7 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
 
         toastSuccess(
           t('toaster.update_successed', {
-            target: t('UserGroup'),
+            target: t('commons:UserGroup'),
             ns: 'commons',
           }),
         );
@@ -438,7 +441,7 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
 
         toastSuccess(
           t('toaster.update_successed', {
-            target: t('UserGroup'),
+            target: t('commons:UserGroup'),
             ns: 'commons',
           }),
         );
@@ -520,7 +523,7 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
 
         toastSuccess(
           t('toaster.update_successed', {
-            target: t('UserGroup'),
+            target: t('commons:UserGroup'),
             ns: 'commons',
           }),
         );
@@ -581,7 +584,7 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
           userGroup={currentUserGroup}
           parentUserGroup={parentUserGroup}
           selectableParentUserGroups={selectableParentUserGroups}
-          submitButtonLabel={t('Update')}
+          submitButtonLabel={t('commons:Update')}
           onSubmit={onClickSubmitForm}
           isExternalGroup={isExternalGroup}
         />
@@ -624,7 +627,7 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
 
       <UserGroupModal
         userGroup={selectedUserGroup}
-        buttonLabel={t('Update')}
+        buttonLabel={t('commons:Update')}
         onClickSubmit={updateChildUserGroup}
         isShow={isUpdateModalShown}
         onHide={hideUpdateModal}
@@ -632,7 +635,7 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
       />
 
       <UserGroupModal
-        buttonLabel={t('Create')}
+        buttonLabel={t('commons:Create')}
         onClickSubmit={createChildUserGroup}
         isShow={isCreateModalShown}
         onHide={hideCreateModal}

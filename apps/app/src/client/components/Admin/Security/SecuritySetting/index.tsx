@@ -86,7 +86,7 @@ const SecuritySettingComponent: React.FC<Props> = ({
     return (
       <div>
         <p>
-          {t('Error occurred')} :{' '}
+          {t('commons:Error occurred')} :{' '}
           {adminGeneralSecurityContainer.state.retrieveError}
         </p>
       </div>
@@ -129,7 +129,7 @@ const SecuritySettingComponent: React.FC<Props> = ({
                 adminGeneralSecurityContainer.state.retrieveError != null
               }
             >
-              {t('Update')}
+              {t('commons:Update')}
             </button>
           </div>
         </div>

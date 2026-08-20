@@ -183,11 +183,11 @@ export const UserGroupTable: FC<Props> = ({
         <thead>
           <tr>
             {isExternalGroup && <th>{t('external_user_group.provider')}</th>}
-            <th>{t('Name')}</th>
-            <th>{t('Description')}</th>
-            <th>{t('User')}</th>
+            <th>{t('commons:Name')}</th>
+            <th>{t('commons:Description')}</th>
+            <th>{t('commons:User')}</th>
             <th>{t('user_group_management.child_user_group')}</th>
-            <th style={{ width: 100 }}>{t('Created')}</th>
+            <th style={{ width: 100 }}>{t('commons:Created')}</th>
             <th style={{ width: 70 }}></th>
           </tr>
         </thead>
@@ -303,7 +303,7 @@ export const UserGroupTable: FC<Props> = ({
                           <span className="material-symbols-outlined text-danger">
                             delete_forever
                           </span>{' '}
-                          {t('Delete')}
+                          {t('commons:Delete')}
                         </button>
                       </div>
                     </div>

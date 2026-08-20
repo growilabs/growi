@@ -782,7 +782,7 @@ pWVdnzS1VCO8fKsJ7YYIr+JmHvseph3kFUOI5RqkCcMZlKUv83aUThsTHw==
                   adminSamlSecurityContainer.state.retrieveError != null
                 }
               >
-                {t('Update')}
+                {t('commons:Update')}
               </button>
             </div>
           </div>
