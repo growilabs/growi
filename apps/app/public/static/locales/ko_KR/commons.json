@@ -1,11 +1,14 @@
 {
   "Show": "표시",
+  "View": "보기",
   "Hide": "숨기기",
   "Add": "추가",
   "Insert": "삽입",
   "Reset": "재설정",
   "Sign out": "로그아웃",
   "New": "새로 만들기",
+  "Send": "전송",
+  "Clear": "지우기",
   "Delete": "삭제",
   "meta": {
     "display_name": "한국어"

@@ -176,7 +176,7 @@ class PasswordResetModal extends React.Component {
             target="copy-tooltip"
             toggle={() => this.setState({ showTooltip: false })}
           >
-            {t('Copied!')}
+            {t('admin:Copied!')}
           </Tooltip>
         </p>
       </>

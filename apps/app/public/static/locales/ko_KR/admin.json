@@ -2,6 +2,12 @@
   "meta": {
     "display_name": "한국어"
   },
+  "Page": "페이지",
+  "Execute": "실행",
+  "Enable": "활성화",
+  "Copied!": "복사되었습니다!",
+  "ExternalUserGroup": "외부 사용자 그룹",
+  "something_went_wrong": "문제가 발생했습니다. 다시 시도해 주십시오.",
   "last_login": "최종 로그인",
   "wiki_management_homepage": "위키 관리 홈페이지",
   "public": "공개",

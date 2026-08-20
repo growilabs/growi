@@ -1,11 +1,14 @@
 {
   "Show": "Show",
+  "View": "View",
   "Hide": "Hide",
   "Add": "Add",
   "Insert": "Insert",
   "Reset": "Reset",
   "Sign out": "Logout",
   "New": "New",
+  "Send": "Send",
+  "Clear": "Clear",
   "Delete": "Delete",
   "meta": {
     "display_name": "English"

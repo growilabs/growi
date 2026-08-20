@@ -106,7 +106,7 @@ class GlobalNotificationList extends React.Component {
                     className="form-label form-check-label"
                     htmlFor={notification._id}
                   >
-                    <span className="visually-hidden">{t('Enable')}</span>
+                    <span className="visually-hidden">{t('admin:Enable')}</span>
                   </label>
                 </div>
               </td>

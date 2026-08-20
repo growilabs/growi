@@ -2,6 +2,12 @@
   "meta": {
     "display_name": "Français"
   },
+  "Page": "Page",
+  "Execute": "Exécuter",
+  "Enable": "Activer",
+  "Copied!": "Copié !",
+  "ExternalUserGroup": "Groupe utilisateur externe",
+  "something_went_wrong": "Une erreur est survenue. Veuillez réessayer.",
   "last_login": "Dernière connexion",
   "wiki_management_homepage": "Système",
   "public": "Public",

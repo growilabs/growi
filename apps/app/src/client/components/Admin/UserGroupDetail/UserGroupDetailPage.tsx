@@ -282,7 +282,7 @@ const UserGroupDetailPage = (props: Props): JSX.Element => {
   const onClickSubmitForm = useCallback(
     async (targetGroup: IUserGroupHasId, userGroupData: IUserGroupHasId) => {
       if (typeof userGroupData.parent === 'string') {
-        toastError(t('Something went wrong. Please try again.'));
+        toastError(t('something_went_wrong'));
         logger.error('Something went wrong.');
         return;
       }

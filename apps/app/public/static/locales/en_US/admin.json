@@ -2,6 +2,12 @@
   "meta": {
     "display_name": "English"
   },
+  "Page": "Page",
+  "Execute": "Execute",
+  "Enable": "Enable",
+  "Copied!": "Copied!",
+  "ExternalUserGroup": "External User Group",
+  "something_went_wrong": "Something went wrong. Please try again.",
   "last_login": "Last login",
   "wiki_management_homepage": "Wiki Management Homepage",
   "public": "Public",

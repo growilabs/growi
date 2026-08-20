@@ -1,5 +1,6 @@
 {
   "Show": "显示",
+  "View": "查看",
   "Hide": "隐藏",
   "Add": "添加",
   "Insert": "插入",
@@ -7,6 +8,7 @@
   "Sign out": "退出",
   "New": "新建",
   "Send": "发送",
+  "Clear": "清除",
   "Close": "关闭",
   "Done": "完成",
   "Delete": "删除",
