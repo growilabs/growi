@@ -33,13 +33,25 @@ type Props = {
   forceHideMenuItems?: ForceHideMenuItems;
   onPageSelected?: (page?: IPageWithSearchMeta) => void;
   onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
+  // Called in addition to `mutateSearching()` after a single-row page operation
+  // (duplicate / rename / delete). `mutateSearching()`'s filtered `mutate` never
+  // reaches an active `useSWRInfinite` subscription (SWR skips `$inf$`-prefixed
+  // keys), so the infinite-scroll caller passes its own bound `mutate` here to
+  // actually revalidate the list (A-1).
+  onItemMutated?: () => void;
 };
 
 const SearchResultListSubstance: ForwardRefRenderFunction<
   ISelectableAll,
   Props
 > = (props: Props, ref) => {
-  const { pages, selectedPageId, forceHideMenuItems, onPageSelected } = props;
+  const {
+    pages,
+    selectedPageId,
+    forceHideMenuItems,
+    onPageSelected,
+    onItemMutated,
+  } = props;
 
   const { t } = useTranslation();
 
@@ -123,8 +135,9 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
       mutatePageTree();
       mutateRecentlyUpdated();
       mutateSearching();
+      onItemMutated?.();
     },
-    [t],
+    [t, onItemMutated],
   );
 
   const renamedHandler = useCallback(
@@ -134,8 +147,9 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
       mutatePageTree();
       mutateRecentlyUpdated();
       mutateSearching();
+      onItemMutated?.();
     },
-    [t],
+    [t, onItemMutated],
   );
 
   const deletedHandler = useCallback(
@@ -154,8 +168,9 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
       mutatePageTree();
       mutateRecentlyUpdated();
       mutateSearching();
+      onItemMutated?.();
     },
-    [t],
+    [t, onItemMutated],
   );
 
   return (

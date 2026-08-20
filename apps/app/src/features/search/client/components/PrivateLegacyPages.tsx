@@ -49,6 +49,7 @@ import { useSWRxSearch } from '~/stores/search';
 import { OperateAllControl } from './SearchPage/OperateAllControl';
 import SearchControl from './SearchPage/SearchControl';
 import {
+  type IResettableAfterMutation,
   type IReturnSelectedPageIds,
   SearchPageBase,
   usePageDeleteModalForBulkDeletion,
@@ -282,7 +283,7 @@ const PrivateLegacyPages = (): JSX.Element => {
     null,
   );
   const searchPageBaseRef = useRef<
-    (ISelectableAll & IReturnSelectedPageIds) | null
+    (ISelectableAll & IReturnSelectedPageIds & IResettableAfterMutation) | null
   >(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: only run on mount
@@ -390,11 +391,11 @@ const PrivateLegacyPages = (): JSX.Element => {
     data?.data,
     searchPageBaseRef,
     () => {
-      // SearchPageBase now resets selection on `resetKey` change, not on every
-      // `pages` update, so a same-query refetch no longer clears the selection.
-      // Clear it explicitly to preserve the legacy behavior after deletion.
-      searchPageBaseRef.current?.deselectAll();
-      selectedPagesByCheckboxesChangedHandler(0, 0);
+      // SearchPageBase resets selection/preview only on a `resetKey` change,
+      // not on every `pages` update, and `resetKey` (keyword|offset|limit) does
+      // not change on a same-page delete. Reset explicitly so the selection AND
+      // the right-pane preview do not keep pointing at deleted pages (A-3/A-7).
+      searchPageBaseRef.current?.resetAfterMutation();
       mutate();
     },
   );
@@ -428,22 +429,14 @@ const PrivateLegacyPages = (): JSX.Element => {
     openModal(selectedPages, () => {
       toastSuccess(t('Successfully requested'));
       closeModal();
-      // Clear selection explicitly after a same-query refetch (see delete handler).
-      searchPageBaseRef.current?.deselectAll();
-      selectedPagesByCheckboxesChangedHandler(0, 0);
+      // Reset selection AND preview explicitly after a same-query refetch (see
+      // the delete handler's A-3/A-7 comment above).
+      searchPageBaseRef.current?.resetAfterMutation();
       mutateMigrationStatus();
       mutate();
       mutatePageTree();
     });
-  }, [
-    data,
-    openModal,
-    t,
-    closeModal,
-    selectedPagesByCheckboxesChangedHandler,
-    mutateMigrationStatus,
-    mutate,
-  ]);
+  }, [data, openModal, t, closeModal, mutateMigrationStatus, mutate]);
 
   const pagingSizeChangedHandler = useCallback(
     (pagingSize: number) => {

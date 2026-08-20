@@ -24,7 +24,10 @@ import {
 import { mergeInfiniteSearchResult } from '../../util/infinite-search-result';
 import { OperateAllControl } from './OperateAllControl';
 import SearchControl from './SearchControl';
-import type { IReturnSelectedPageIds } from './SearchPageBase';
+import type {
+  IResettableAfterMutation,
+  IReturnSelectedPageIds,
+} from './SearchPageBase';
 import {
   SearchPageBase,
   usePageDeleteModalForBulkDeletion,
@@ -112,7 +115,7 @@ export const SearchPage = (): JSX.Element => {
     null,
   );
   const searchPageBaseRef = useRef<
-    (ISelectableAll & IReturnSelectedPageIds) | null
+    (ISelectableAll & IReturnSelectedPageIds & IResettableAfterMutation) | null
   >(null);
 
   const swr = useSWRINFxSearch(keyword ?? '', null, {
@@ -140,6 +143,11 @@ export const SearchPage = (): JSX.Element => {
   const reachedResultWindowLimit =
     (loadedChunks + 1) * chunkSize > ES_MAX_RESULT_WINDOW;
 
+  // NOTE: an argument-less `mutate()` on `useSWRInfinite` force-revalidates
+  // EVERY already-loaded chunk sequentially (`revalidateFirstPage: false` only
+  // skips revalidating the FIRST page on mount/key-change, it does not limit a
+  // manual `mutate()`). After loading e.g. 40 chunks, a single failed chunk's
+  // Retry click re-fetches all 40 (+1) chunks, not just the failed one (A-4).
   const onRetry = useCallback(() => {
     mutate();
   }, [mutate]);
@@ -221,15 +229,17 @@ export const SearchPage = (): JSX.Element => {
   }, [keyword]);
 
   // Post-delete reset (Req 5.3 / 7.2): discard the accumulation and reload from
-  // the first chunk, then clear the selection. Order matters — reset the size to
-  // 1 BEFORE revalidating so the first-chunk re-fetch is not raced by a mutate()
-  // against the stale (larger) size; the selection is cleared last so it never
-  // reflects rows that the reload has already dropped.
+  // the first chunk, then clear the selection AND the right-pane preview.
+  // Order matters — reset the size to 1 BEFORE revalidating so the first-chunk
+  // re-fetch is not raced by a mutate() against the stale (larger) size.
+  // `resetAfterMutation()` (not a bare `deselectAll()` + `setSelectedCount(0)`)
+  // also clears the preview and tells `selectAllControlRef` to deselect via
+  // `onSelectedPagesByCheckboxesChanged` — a bare `setSelectedCount(0)` updated
+  // only local state and left the header checkbox visually checked (A-3 / A-7).
   const deleteCompletedHandler = useCallback(() => {
     setSize(1);
     mutate();
-    searchPageBaseRef.current?.deselectAll();
-    setSelectedCount(0);
+    searchPageBaseRef.current?.resetAfterMutation();
   }, [setSize, mutate]);
 
   // for bulk deletion — target every accumulated page across appends. Selection
@@ -348,6 +358,10 @@ export const SearchPage = (): JSX.Element => {
       onSelectedPagesByCheckboxesChanged={
         selectedPagesByCheckboxesChangedHandler
       }
+      // Revalidate THIS active useSWRInfinite response after a single-row
+      // duplicate / rename / delete — the global mutateSearching() cannot reach
+      // it (A-1).
+      onItemMutated={mutate}
       // Components
       searchControl={searchControl}
       searchResultListHead={searchResultListHead}

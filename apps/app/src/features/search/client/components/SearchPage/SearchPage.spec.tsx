@@ -25,12 +25,14 @@ type CapturedSearchPageBaseProps = {
     onRetry?: () => void;
   };
   onSelectedPagesByCheckboxesChanged?: (a: number, b: number) => void;
+  onItemMutated?: () => void;
   searchControl?: React.ReactNode;
 };
 
 const searchPageBaseSpy = vi.hoisted(() => ({
   lastProps: undefined as CapturedSearchPageBaseProps | undefined,
   deselectAll: vi.fn(),
+  resetAfterMutation: vi.fn(),
 }));
 
 vi.mock('./SearchPageBase', () => ({
@@ -38,12 +40,14 @@ vi.mock('./SearchPageBase', () => ({
     (props: CapturedSearchPageBaseProps, ref: React.Ref<unknown>) => {
       searchPageBaseSpy.lastProps = props;
       // Populate the imperative ref so SearchPage's post-delete reset can reach
-      // deselectAll() (the real SearchPageBase exposes it via ISelectableAll).
+      // resetAfterMutation() (the real SearchPageBase exposes it via
+      // IResettableAfterMutation).
       if (ref != null && typeof ref === 'object') {
         (ref as React.MutableRefObject<unknown>).current = {
           selectAll: vi.fn(),
           deselectAll: searchPageBaseSpy.deselectAll,
           getSelectedPageIds: () => new Set<string>(),
+          resetAfterMutation: searchPageBaseSpy.resetAfterMutation,
         };
       }
       // Render the searchControl slot so the bulk-delete button reached through
@@ -74,9 +78,13 @@ vi.mock('~/states/search', () => ({
 }));
 
 // --- Server-configuration atoms (read via jotai useAtomValue) ----------------
+// Matches the production default (server-configurations.ts: atom<number>(50))
+// so chunk-size-dependent assertions (the ES max_result_window boundary below)
+// exercise the same chunk size actually shipped, not an arbitrary stand-in (T-4).
+const PROD_DEFAULT_CHUNK_SIZE = 50;
 vi.mock('~/states/server-configurations', () => ({
   disableUserPagesAtom: atom(false),
-  showPageLimitationLAtom: atom<number | undefined>(undefined),
+  showPageLimitationLAtom: atom<number | undefined>(50),
 }));
 
 // --- Peripheral UI dependencies (never actually rendered here) ---------------
@@ -148,13 +156,14 @@ const createChunk = (ids: string[]): IFormattedSearchResult =>
     meta: { total: 42, took: 3, hitsCount: ids.length },
   });
 
-// Full chunks (hitsCount 20) against a huge total, so merged.isReachingEnd stays
-// false and only the result-window guard can stop the load.
+// Full chunks (hitsCount === the mocked chunk size) against a huge total, so
+// merged.isReachingEnd stays false and only the result-window guard can stop
+// the load.
 const createFullChunks = (count: number): IFormattedSearchResult[] =>
   Array.from({ length: count }, () =>
     mock<IFormattedSearchResult>({
       data: [],
-      meta: { total: 1_000_000, took: 1, hitsCount: 20 },
+      meta: { total: 1_000_000, took: 1, hitsCount: PROD_DEFAULT_CHUNK_SIZE },
     }),
   );
 
@@ -281,11 +290,11 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
   });
 
   it('stops at the Elasticsearch max_result_window even when the total is not reached (P2-4)', () => {
-    // limit is 20 (showPageLimitationL unset). With 500 loaded chunks the next
-    // offset is 500 * 20 = 10000, and 10000 + 20 > 10000 exceeds the window,
-    // even though only 10000 of 1,000,000 results are fetched.
+    // chunk size is 50 (the production default — T-4). With 200 loaded chunks
+    // the next offset is 200 * 50 = 10000, and 10000 + 50 > 10000 exceeds the
+    // window, even though only 10000 of 1,000,000 results are fetched.
     searchStoreSpy.infiniteResponse = createInfiniteResponse(
-      createFullChunks(500),
+      createFullChunks(200),
     );
 
     render(<SearchPage />);
@@ -296,10 +305,10 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
   });
 
   it('keeps auto-load enabled just below the max_result_window (P2-4 boundary)', () => {
-    // 499 chunks => next offset 499 * 20 = 9980, and 9980 + 20 = 10000 is NOT
+    // 199 chunks => next offset 199 * 50 = 9950, and 9950 + 50 = 10000 is NOT
     // greater than the window, so loading may continue.
     searchStoreSpy.infiniteResponse = createInfiniteResponse(
-      createFullChunks(499),
+      createFullChunks(199),
     );
 
     render(<SearchPage />);
@@ -359,16 +368,32 @@ describe('SearchPage bulk-delete orchestration (Req 5.1/5.3/7.2)', () => {
     expect(swr?.mutate).toHaveBeenCalledTimes(1);
   });
 
-  it('clears the selection on delete completion via deselectAll (Req 7.2)', () => {
+  // A-3/A-7: a bare `deselectAll()` + local `setSelectedCount(0)` only cleared
+  // SearchPageBase's internal Set — it never told the parent (selectAllControlRef
+  // header checkbox) to deselect, and never reset the right-pane preview, so a
+  // deleted page could stay visually selected/previewed after the reload.
+  // `resetAfterMutation()` bundles both.
+  it('resets selection AND the right-pane preview via resetAfterMutation on delete completion (Req 7.2, A-3/A-7)', () => {
     render(<SearchPage />);
 
-    expect(searchPageBaseSpy.deselectAll).not.toHaveBeenCalled();
+    expect(searchPageBaseSpy.resetAfterMutation).not.toHaveBeenCalled();
 
     act(() => {
       getOnDeleted()?.();
     });
 
-    expect(searchPageBaseSpy.deselectAll).toHaveBeenCalledTimes(1);
+    expect(searchPageBaseSpy.resetAfterMutation).toHaveBeenCalledTimes(1);
+  });
+
+  // A-1: mutateSearching()'s filtered mutate() never reaches an active
+  // useSWRInfinite subscription, so SearchPage must hand its OWN bound `mutate`
+  // down as `onItemMutated` for row-level operations to actually revalidate.
+  it('passes its own swr.mutate down as onItemMutated (A-1)', () => {
+    render(<SearchPage />);
+
+    expect(searchPageBaseSpy.lastProps?.onItemMutated).toBe(
+      searchStoreSpy.infiniteResponse?.mutate,
+    );
   });
 });
 

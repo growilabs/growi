@@ -29,7 +29,6 @@ describe('mergeInfiniteSearchResult', () => {
       const result = mergeInfiniteSearchResult(undefined, CHUNK_SIZE);
 
       expect(result.pages).toEqual([]);
-      expect(result.loadedCount).toBe(0);
       expect(result.total).toBe(0);
       expect(result.took).toBeUndefined();
       expect(result.isEmpty).toBe(false);
@@ -56,7 +55,6 @@ describe('mergeInfiniteSearchResult', () => {
       const result = mergeInfiniteSearchResult(data, CHUNK_SIZE);
 
       expect(result.pages).toEqual([page1, page2, page3, page4]);
-      expect(result.loadedCount).toBe(4);
       expect(result.total).toBe(5);
       // took comes from the first chunk's meta
       expect(result.took).toBe(3);
@@ -75,7 +73,6 @@ describe('mergeInfiniteSearchResult', () => {
 
       const result = mergeInfiniteSearchResult(data, CHUNK_SIZE);
 
-      expect(result.loadedCount).toBe(2);
       expect(result.total).toBe(2);
       expect(result.isEmpty).toBe(false);
       // 2 >= 2 => reaching end
@@ -84,7 +81,7 @@ describe('mergeInfiniteSearchResult', () => {
   });
 
   describe('when the ES index has drifted (server dropped pages, chunk still full)', () => {
-    it('signals the end from the pre-filter hitsCount, not the post-filter loadedCount', () => {
+    it('signals the end from the pre-filter hitsCount, not the post-filter pages.length', () => {
       // Elasticsearch returned a full chunk (hitsCount 2 === total), but the
       // server dropped one page missing from MongoDB, so `data` holds only 1.
       const data = [
@@ -98,10 +95,11 @@ describe('mergeInfiniteSearchResult', () => {
       const result = mergeInfiniteSearchResult(data, CHUNK_SIZE);
 
       // post-filter count is below total ...
-      expect(result.loadedCount).toBe(1);
+      expect(result.pages).toHaveLength(1);
       expect(result.total).toBe(2);
-      // ... but hitsCount reached total, so we must stop. The old
-      // `loadedCount >= total` (1 >= 2) would be false and spin forever.
+      // ... but hitsCount reached total, so we must stop. Judging by the
+      // post-filter `pages.length >= total` (1 >= 2) would be false and spin
+      // forever.
       expect(result.isReachingEnd).toBe(true);
     });
   });
@@ -135,7 +133,6 @@ describe('mergeInfiniteSearchResult', () => {
       const result = mergeInfiniteSearchResult(data, CHUNK_SIZE);
 
       expect(result.pages).toEqual([]);
-      expect(result.loadedCount).toBe(0);
       expect(result.total).toBe(0);
       expect(result.isEmpty).toBe(true);
       expect(result.isReachingEnd).toBe(true);

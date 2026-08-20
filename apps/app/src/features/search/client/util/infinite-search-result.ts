@@ -5,7 +5,6 @@ import type {
 
 export type MergedSearchResult = {
   pages: IPageWithSearchMeta[];
-  loadedCount: number;
   total: number;
   took?: number;
   isEmpty: boolean;
@@ -28,7 +27,6 @@ export const mergeInfiniteSearchResult = (
   if (data == null) {
     return {
       pages: [],
-      loadedCount: 0,
       total: 0,
       isEmpty: false,
       isReachingEnd: false,
@@ -36,15 +34,15 @@ export const mergeInfiniteSearchResult = (
   }
 
   const pages = data.flatMap((result) => result.data);
-  const loadedCount = pages.length;
   const total = data[0]?.meta.total ?? 0;
   const took = data[0]?.meta.took;
 
   // Number of results Elasticsearch actually returned across all fetched chunks,
   // counted BEFORE the server drops pages missing from MongoDB. End-of-results
-  // must be judged by this pre-filter count: `loadedCount` (post-filter) can stay
-  // below `total` forever when the ES index has drifted, which would otherwise
-  // keep `isReachingEnd` false and spin the loader indefinitely.
+  // must be judged by this pre-filter count: `pages.length` (post-filter) can
+  // stay below `total` forever when the ES index has drifted, which would
+  // otherwise keep `isReachingEnd` false and spin the loader indefinitely.
+  // (Do not reintroduce a post-filter count field for this purpose — A-6.)
   const fetchedCount = data.reduce(
     (acc, result) => acc + result.meta.hitsCount,
     0,
@@ -61,7 +59,6 @@ export const mergeInfiniteSearchResult = (
 
   return {
     pages,
-    loadedCount,
     total,
     took,
     isEmpty: total === 0,

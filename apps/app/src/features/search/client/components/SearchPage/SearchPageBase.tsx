@@ -2,6 +2,7 @@ import type React from 'react';
 import type { ForwardRefRenderFunction, JSX } from 'react';
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -44,6 +45,14 @@ export interface IReturnSelectedPageIds {
   getSelectedPageIds?: () => Set<string>;
 }
 
+// Imperative reset for a same-search mutation (e.g. bulk delete / convert) that
+// does NOT change `resetKey`. Bundles exactly what a `resetKey` change would do
+// (clear preview, clear checkbox selection, notify the parent) so a caller does
+// not have to reconstruct that sequence itself (R-2 / A-7).
+export interface IResettableAfterMutation {
+  resetAfterMutation: () => void;
+}
+
 // Optional wiring for infinite-scroll rendering. When present, the result list
 // is wrapped in <InfiniteScroll> instead of the legacy numbered pager.
 type SearchPageBaseInfiniteProps = {
@@ -79,6 +88,13 @@ type Props = {
   // When provided, the result list is rendered inside <InfiniteScroll> and the
   // numbered pager is suppressed. When omitted, legacy pager rendering is kept.
   infiniteScroll?: SearchPageBaseInfiniteProps;
+
+  // Called after a single-row page operation (duplicate / rename / delete) so
+  // the caller can revalidate ITS OWN active SWR response. The global
+  // `mutateSearching()` cannot reach an active `useSWRInfinite` subscription
+  // (SWR's filtered `mutate` explicitly skips `$inf$`-prefixed keys), so the
+  // infinite-scroll caller must pass its own bound `mutate` here (A-1).
+  onItemMutated?: () => void;
 };
 
 const SearchResultContent = dynamic(
@@ -89,7 +105,7 @@ const SearchResultContent = dynamic(
   },
 );
 const SearchPageBaseSubstance: ForwardRefRenderFunction<
-  ISelectableAll & IReturnSelectedPageIds,
+  ISelectableAll & IReturnSelectedPageIds & IResettableAfterMutation,
   Props
 > = (props: Props, ref) => {
   const {
@@ -103,6 +119,7 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     searchResultListHead,
     searchPager,
     infiniteScroll,
+    onItemMutated,
   } = props;
 
   const { t } = useTranslation();
@@ -130,6 +147,11 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
   const onSelectedChangedRef = useRef(onSelectedPagesByCheckboxesChanged);
   onSelectedChangedRef.current = onSelectedPagesByCheckboxesChanged;
 
+  // Tracks the `resetKey` whose initial preview (first item) has already been
+  // applied, so an append under the same `resetKey` does not re-select pages[0]
+  // and overwrite the user's chosen preview (Req 6.3).
+  const appliedPreviewResetKeyRef = useRef<string | undefined>(undefined);
+
   // publish selectAll()
   useImperativeHandle(ref, () => ({
     selectAll: () => {
@@ -155,6 +177,21 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     getSelectedPageIds: () => {
       return selectedPageIdsByCheckboxes;
     },
+    // Same-search mutation reset (e.g. bulk delete / convert completion). Unlike
+    // a `resetKey` change, the search identity does not change here, so this
+    // must be triggered imperatively rather than by an effect (A-3 / A-7).
+    resetAfterMutation: () => {
+      // Clear the preview and forget the applied-preview marker so the NEXT
+      // `pages` arrival under the SAME resetKey (the post-mutation refetch) is
+      // treated as a fresh first arrival and re-selects pages[0] (A-3) —
+      // otherwise the deleted page stays pinned in the right pane forever.
+      setSelectedPageWithMeta(undefined);
+      appliedPreviewResetKeyRef.current = undefined;
+
+      selectedPageIdsByCheckboxes.clear();
+      searchResultListRef.current?.deselectAll();
+      onSelectedChangedRef.current?.(0, 0);
+    },
   }));
 
   const checkboxChangedHandler = (isChecked: boolean, pageId: string) => {
@@ -176,23 +213,31 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     }
   };
 
-  // Tracks the `resetKey` whose initial preview (first item) has already been
-  // applied, so an append under the same `resetKey` does not re-select pages[0]
-  // and overwrite the user's chosen preview (Req 6.3).
-  const appliedPreviewResetKeyRef = useRef<string | undefined>(undefined);
+  // The last `pages` reference effect (b) below has actually processed. Used to
+  // detect a `keepPreviousData` (legacy number-pager) holdover: when `resetKey`
+  // changes but `pages` is the EXACT SAME reference as before, the real refetch
+  // for the new resetKey has not landed yet — it is still serving the previous
+  // search's data (A-2). A freshly mounted/rendered `pages` array (first arrival
+  // for this resetKey) is a NEW reference and must not be mistaken for this.
+  const lastProcessedPagesRef = useRef<IPageWithSearchMeta[] | undefined>(
+    undefined,
+  );
 
   // Right-pane preview initial selection — 2-stage, resetKey-driven.
   // (a) When `resetKey` changes, clear the preview immediately. At that moment
-  //     the new `pages` have not arrived yet, so there is nothing to select.
+  //     the new `pages` may not have arrived yet, so there is nothing to select.
   // biome-ignore lint/correctness/useExhaustiveDependencies: resetKey is the sole trigger — clear the preview only when the search identity changes, not on every pages update
   useEffect(() => {
     setSelectedPageWithMeta(undefined);
   }, [resetKey]);
 
-  // (b) On the FIRST data arrival for the current `resetKey`, select the first
-  //     item exactly once. Subsequent appends (same `resetKey`) are ignored so
-  //     the user's chosen preview is preserved (Req 6.1 / 6.3).
+  // (b) On the FIRST *new* pages arrival for the current `resetKey`, select the
+  //     first item exactly once. Subsequent appends (same `resetKey`) are
+  //     ignored so the user's chosen preview is preserved (Req 6.1 / 6.3).
   useEffect(() => {
+    const isStaleCarryover = pages === lastProcessedPagesRef.current;
+    lastProcessedPagesRef.current = pages;
+
     // No data yet (e.g. right after a resetKey change): keep preview cleared.
     if (pages == null || pages.length === 0) {
       setSelectedPageWithMeta(undefined);
@@ -200,6 +245,12 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     }
     // Initial preview already applied for this search => this is an append.
     if (appliedPreviewResetKeyRef.current === resetKey) {
+      return;
+    }
+    // Same reference already processed (keepPreviousData holding over the
+    // PREVIOUS search's pages across the resetKey transition) — wait for the
+    // real refetch for the new resetKey instead of re-selecting stale data (A-2).
+    if (isStaleCarryover) {
       return;
     }
     appliedPreviewResetKeyRef.current = resetKey;
@@ -284,6 +335,54 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
           ?.map((keyword) => keyword.replace(/^"(.*)"$/, '$1')) ?? undefined)
       : undefined;
 
+  // Selection wiring on SearchResultList is IDENTICAL across the infinite-scroll
+  // and legacy branches; only the wrapping (InfiniteScroll vs. numbered pager)
+  // differs (P3-5: computed here instead of an IIFE inside the JSX below).
+  const searchResultListNode = pages != null && pages.length > 0 && (
+    <div className={`page-list ${styles['page-list']} px-md-4`}>
+      <SearchResultList
+        ref={searchResultListRef}
+        pages={pages}
+        selectedPageId={selectedPageWithMeta?.data._id}
+        forceHideMenuItems={forceHideMenuItems}
+        onPageSelected={(page) => setSelectedPageWithMeta(page)}
+        onCheckboxChanged={checkboxChangedHandler}
+        onItemMutated={onItemMutated}
+      />
+    </div>
+  );
+
+  const pagedResultNode =
+    infiniteScroll != null ? (
+      <InfiniteScroll
+        swrInifiniteResponse={infiniteScroll.swrInfiniteResponse}
+        isReachingEnd={infiniteScroll.isReachingEnd}
+        endingIndicator={
+          infiniteScroll.hasError ? (
+            <div className="my-4 d-flex flex-column align-items-center">
+              <span className="text-muted">
+                {t('search_result.failed_to_load_more')}
+              </span>
+              <button
+                type="button"
+                className="btn btn-outline-secondary mt-2"
+                onClick={infiniteScroll.onRetry}
+              >
+                {t('Retry')}
+              </button>
+            </div>
+          ) : undefined
+        }
+      >
+        {searchResultListNode}
+      </InfiniteScroll>
+    ) : (
+      <>
+        {searchResultListNode}
+        <div className="my-4 d-flex justify-content-center">{searchPager}</div>
+      </>
+    );
+
   return (
     <div
       className={`${className ?? ''} search-result-base flex-grow-1 d-flex flex-expand-vh-100`}
@@ -308,58 +407,7 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
             <>
               <div className="my-3 px-md-4 px-3">{searchResultListHead}</div>
 
-              {/* Selection wiring on SearchResultList is IDENTICAL across the
-                  infinite-scroll and legacy branches; only the wrapping differs. */}
-              {(() => {
-                const searchResultListNode = pages.length > 0 && (
-                  <div className={`page-list ${styles['page-list']} px-md-4`}>
-                    <SearchResultList
-                      ref={searchResultListRef}
-                      pages={pages}
-                      selectedPageId={selectedPageWithMeta?.data._id}
-                      forceHideMenuItems={forceHideMenuItems}
-                      onPageSelected={(page) => setSelectedPageWithMeta(page)}
-                      onCheckboxChanged={checkboxChangedHandler}
-                    />
-                  </div>
-                );
-
-                if (infiniteScroll != null) {
-                  return (
-                    <InfiniteScroll
-                      swrInifiniteResponse={infiniteScroll.swrInfiniteResponse}
-                      isReachingEnd={infiniteScroll.isReachingEnd}
-                      endingIndicator={
-                        infiniteScroll.hasError ? (
-                          <div className="my-4 d-flex flex-column align-items-center">
-                            <span className="text-muted">
-                              {t('search_result.failed_to_load_more')}
-                            </span>
-                            <button
-                              type="button"
-                              className="btn btn-outline-secondary mt-2"
-                              onClick={infiniteScroll.onRetry}
-                            >
-                              {t('Retry')}
-                            </button>
-                          </div>
-                        ) : undefined
-                      }
-                    >
-                      {searchResultListNode}
-                    </InfiniteScroll>
-                  );
-                }
-
-                return (
-                  <>
-                    {searchResultListNode}
-                    <div className="my-4 d-flex justify-content-center">
-                      {searchPager}
-                    </div>
-                  </>
-                );
-              })()}
+              {pagedResultNode}
             </>
           )}
         </div>
@@ -396,7 +444,11 @@ export const usePageDeleteModalForBulkDeletion = (
 
   const { open: openDeleteModal } = usePageDeleteModalActions();
 
-  return () => {
+  // Stable identity: an inline arrow returned from this hook was recreated on
+  // every render, invalidating any caller `useMemo` that lists it as a dep
+  // (e.g. SearchPage's `collapseContents` / `searchControl`), which defeated
+  // the re-render suppression P3-4 was meant to add (A-5).
+  return useCallback(() => {
     if (pages == null) {
       return;
     }
@@ -433,7 +485,7 @@ export const usePageDeleteModalForBulkDeletion = (
         }
       },
     });
-  };
+  }, [pages, ref, onDeleted, openDeleteModal, t]);
 };
 
 export const SearchPageBase = forwardRef(SearchPageBaseSubstance);

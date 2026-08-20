@@ -126,13 +126,18 @@ vi.mock('./SearchResultList', () => ({
   }),
 }));
 
-import type { IReturnSelectedPageIds } from './SearchPageBase';
+import type {
+  IResettableAfterMutation,
+  IReturnSelectedPageIds,
+} from './SearchPageBase';
 import {
   SearchPageBase,
   usePageDeleteModalForBulkDeletion,
 } from './SearchPageBase';
 
-type SelectableRef = ISelectableAll & IReturnSelectedPageIds;
+type SelectableRef = ISelectableAll &
+  IReturnSelectedPageIds &
+  IResettableAfterMutation;
 
 const createPage = (id: string): IPageWithSearchMeta =>
   mock<IPageWithSearchMeta>({
@@ -365,6 +370,117 @@ describe('SearchPageBase right-pane preview initial selection (2-stage, resetKey
     );
 
     expect(searchResultListSpy.lastProps?.selectedPageId).toBe('x');
+  });
+
+  // A-2: with `keepPreviousData: true` (legacy number-pager path), `pages` can
+  // still hold the PREVIOUS page's stale data for one commit after `resetKey`
+  // changes, before the real refetch for the new resetKey lands. Naively
+  // re-applying `pages[0]` on that stale commit pinned the preview to the old
+  // page's first article forever (the later, genuinely-new arrival was then
+  // ignored as "already applied").
+  it('does not pin the preview to stale pages served under the OLD resetKey (A-2, keepPreviousData)', () => {
+    const ref = createRef<SelectableRef>();
+    const staleFirstSearchPages = [createPage('old-a'), createPage('old-b')];
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={staleFirstSearchPages}
+        {...noopControls}
+      />,
+    );
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('old-a');
+
+    // resetKey changes (e.g. pager navigation), but `keepPreviousData` means
+    // `pages` is STILL the same stale reference for this commit.
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-2"
+        pages={staleFirstSearchPages}
+        {...noopControls}
+      />,
+    );
+    // the preview must not be re-pinned to the stale page's first item
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBeUndefined();
+
+    // the real refetch for resetKey "search-2" lands: a genuinely NEW array.
+    const newSearchPages = [createPage('new-x'), createPage('new-y')];
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-2"
+        pages={newSearchPages}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('new-x');
+  });
+});
+
+describe('SearchPageBase resetAfterMutation (A-3/A-7)', () => {
+  beforeEach(() => {
+    searchResultListSpy.lastProps = undefined;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('clears the preview and selection without changing resetKey, then re-adopts the next arrival as the new preview', () => {
+    const ref = createRef<SelectableRef>();
+    const onChanged = vi.fn();
+    const pages = [createPage('a'), createPage('b')];
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={pages}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    // user picks a non-first preview and selects a row
+    act(() => {
+      searchResultListSpy.lastProps?.onPageSelected?.(pages[1]);
+      ref.current?.selectAll();
+    });
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('b');
+    expect(ref.current?.getSelectedPageIds?.().size).toBe(2);
+
+    onChanged.mockClear();
+
+    // same-search mutation (e.g. bulk delete completion) — resetKey is UNCHANGED
+    act(() => {
+      ref.current?.resetAfterMutation();
+    });
+
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBeUndefined();
+    expect(ref.current?.getSelectedPageIds?.().size).toBe(0);
+    expect(onChanged).toHaveBeenCalledWith(0, 0);
+
+    // the post-mutation refetch lands under the SAME resetKey with a smaller,
+    // genuinely NEW pages array (the deleted page is gone). Without resetting
+    // the applied-preview marker inside resetAfterMutation, this would be
+    // mistaken for an "append" and skipped, leaving the preview empty forever
+    // and the deleted page effectively still "selected" in spirit (A-3).
+    const pagesAfterDelete = [createPage('b')];
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={pagesAfterDelete}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('b');
   });
 });
 
@@ -617,7 +733,9 @@ describe('usePageDeleteModalForBulkDeletion (accumulated list)', () => {
 
   it('opens the delete modal with only the selected pages from the accumulated list', () => {
     const pages = [createPage('a'), createPage('b'), createPage('c')];
-    const ref: React.MutableRefObject<SelectableRef | null> = {
+    const ref: React.MutableRefObject<
+      (ISelectableAll & IReturnSelectedPageIds) | null
+    > = {
       current: {
         selectAll: vi.fn(),
         deselectAll: vi.fn(),
@@ -640,7 +758,9 @@ describe('usePageDeleteModalForBulkDeletion (accumulated list)', () => {
   });
 
   it('does not open the modal when the accumulated list is undefined', () => {
-    const ref: React.MutableRefObject<SelectableRef | null> = {
+    const ref: React.MutableRefObject<
+      (ISelectableAll & IReturnSelectedPageIds) | null
+    > = {
       current: {
         selectAll: vi.fn(),
         deselectAll: vi.fn(),

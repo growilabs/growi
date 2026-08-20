@@ -184,7 +184,7 @@ stateDiagram-v2
     Accumulating --> Accumulating: スクロールで追記 (resetKey 不変 → 選択/プレビュー維持)
     Accumulating --> Reset: 条件変更 (resetKey 変化)
     Reset --> Loading: 累積破棄 setSize(1) / 選択クリア / 先頭プレビュー
-    Accumulating --> Reset: 一括削除完了 (setSize(1) + mutate + deselectAll)
+    Accumulating --> Reset: 一括削除完了 (setSize(1) + mutate + resetAfterMutation)
 ```
 
 ## Requirements Traceability
@@ -385,15 +385,16 @@ export const usePageDeleteModalForBulkDeletion: (
 - `resetKey` を検索アイデンティティ（`keyword` + `sort` + `order` + フィルタ）から生成（offset を含めない＝append で不変）
 - `PaginationWrapper`/`searchPager` を撤去し、`infiniteScroll` prop（`isReachingEnd = merged.isReachingEnd || hasError`）を渡す
 - 検索実行/条件変更時: `setSize(1)`（累積破棄・先頭再読込）
-- 一括削除完了時: `setSize(1)` + `mutate()` + `deselectAll`（選択クリア）
+- 一括削除完了時: `setSize(1)` + `mutate()` + `resetAfterMutation()`（選択クリア**かつ右ペインプレビューのクリア**）
 - 削除ボタンは `selectedCount === 0` で無効
+- 行単位の複製/リネーム/削除（`SearchResultList` 経由）は `mutateSearching()` に加え、`onItemMutated`（このコンポーネントが保持する `swr.mutate`）を呼び、アクティブな `useSWRInfinite` 購読を確実に再検証する（`mutateSearching()` のフィルタ付き `mutate` は `$inf$` 接頭辞キーを対象外とするため単独では効かない）
 
 **Contracts**: State [x]
 
 **Implementation Notes**
 - Integration: 既存の `OperateAllControl`（全選択/indeterminate）配線は `totalCount = 累積 pages.length` で不変のまま機能
 - Validation: `SearchResultListHead` の 0 件表示（`total === 0`）を維持。コメントアウト済み表示件数セレクタは**復活させない**（3.2）
-- Risks: 削除後 `setSize(1)` と `mutate` の順序（先に size を戻してから再検証）
+- Risks: 削除後 `setSize(1)` と `mutate` の順序（先に size を戻してから再検証）。`resetKey` は削除・変換完了では変化しないため、`SearchPageBase` の `resetKey` 変化 effect には頼れず、`resetAfterMutation()`（`IResettableAfterMutation`）を明示的に呼ぶ必要がある — さもないと右ペインプレビューが削除済みページを指したまま残る
 
 ## Error Handling
 
@@ -409,13 +410,13 @@ export const usePageDeleteModalForBulkDeletion: (
 
 ### Unit Tests
 - `getSearchInfiniteKey`: (1) `keyword` 空で `null`、(2) `previousPageData.data.length < chunkSize` で `null`（末尾到達＝1.4）、(3) `pageIndex * chunkSize` が offset に反映（1.1/1.2）、(4) key 先頭が `'/search/infinite'`（名前空間分離）。
-- `mergeInfiniteSearchResult`: (1) 複数ページを `flatMap` で平坦化し `loadedCount` 一致、(2) `loadedCount >= total` で `isReachingEnd=true`、未満で `false`（1.4）、(3) `total===0` で `isEmpty=true` かつ `isReachingEnd=true`（1.5）、(4) `data==null` で空・非停止。
+- `mergeInfiniteSearchResult`: (1) 複数ページを `flatMap` で平坦化し `pages.length` が一致、(2) 終端判定は post-filter の `pages.length` ではなく pre-filter の `meta.hitsCount` 累計（`fetchedCount`）で行う — MongoDB 側で欠落したページ分だけ `pages.length` が `hitsCount` 未満になっても正しく終端検知できることを確認（1.4）、(3) `total===0` で `isEmpty=true` かつ `isReachingEnd=true`（1.5）、(4) `data==null` で空・非停止。
 
 ### Component Tests (RTL)
 - `SearchPageBase`: `resetKey` 不変のまま `pages` を追加 → 選択状態・プレビュー選択が維持される（4.3/6.3）。`resetKey` 変更 → 選択クリア・先頭プレビュー（7.2/6.1）。`selectAll` で累積全件が選択される（4.1）。
 - `SearchPageBase` プレビュー2段構成: `resetKey` 変化直後（新 `pages` 未到着）はプレビューがクリアされ、その後の初回データ到着で `pages[0]` が選択される。append（同一 `resetKey`）では再選択されない（6.1/6.3）。
 - `SearchPageBase` 全選択 append 追従: 全件選択済み（checked）状態で未選択の `pages` を追記 → select-all が indeterminate に遷移する（4.5）。追記分も選択済みなら checked を維持（4.6）。
-- `SearchPage`: (1) 番号ページャ（`PaginationWrapper`）が描画されない（2.1）、(2) 追加読込エラー時にエラー＋再試行が表示され自動読込が止まる、再試行で `mutate` 呼出（1.6）、(3) 一括削除は選択済み読込分のみをモーダルに渡し、`selectedCount===0` で削除ボタン無効（5.1/5.2）、(4) 削除完了で `setSize(1)`＋選択クリア（5.3/7.2）。
+- `SearchPage`: (1) 番号ページャ（`PaginationWrapper`）が描画されない（2.1）、(2) 追加読込エラー時にエラー＋再試行が表示され自動読込が止まる、再試行で `mutate` 呼出（1.6）、(3) 一括削除は選択済み読込分のみをモーダルに渡し、`selectedCount===0` で削除ボタン無効（5.1/5.2）、(4) 削除完了で `setSize(1)`＋`resetAfterMutation()`（選択クリア**および右ペインプレビューのクリア**、5.3/7.2）、(5) `SearchPage` は自身の `swr.mutate` を `onItemMutated` として `SearchPageBase`（→ `SearchResultList`）に渡し、行単位の複製/リネーム/削除後に呼ばれることを確認。
 - IntersectionObserver をモックし、センチネル交差で `setSize(size+1)` が呼ばれる（1.2）。
 
 ### 非回帰（Regression）
