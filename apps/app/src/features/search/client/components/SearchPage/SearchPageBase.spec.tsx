@@ -430,12 +430,12 @@ describe('SearchPageBase resetAfterMutation (A-3/A-7)', () => {
     vi.clearAllMocks();
   });
 
-  it('clears the preview and selection without changing resetKey, then re-adopts the next arrival as the new preview', () => {
+  it('clears the preview and selection without changing resetKey', () => {
     const ref = createRef<SelectableRef>();
     const onChanged = vi.fn();
     const pages = [createPage('a'), createPage('b')];
 
-    const { rerender } = render(
+    render(
       <SearchPageBase
         ref={ref}
         resetKey="search-1"
@@ -463,24 +463,50 @@ describe('SearchPageBase resetAfterMutation (A-3/A-7)', () => {
     expect(searchResultListSpy.lastProps?.selectedPageId).toBeUndefined();
     expect(ref.current?.getSelectedPageIds?.().size).toBe(0);
     expect(onChanged).toHaveBeenCalledWith(0, 0);
+  });
+
+  // `setSize(1)` (called by the caller just before resetAfterMutation) makes
+  // useSWRInfinite synchronously return the STALE, not-yet-revalidated first
+  // chunk (revalidateFirstPage: false), so a naive "re-arm auto-selection of
+  // pages[0]" implementation would either (a) briefly re-select the very page
+  // that was just deleted, or (b) mark that stale arrival as "applied" and
+  // then permanently ignore the real, revalidated data that lands right after
+  // — leaving the preview stuck on stale/deleted content indefinitely. Since
+  // no requirement demands auto-picking a new preview after a mutation (Req
+  // 6.1 only covers a NEW search), resetAfterMutation must leave the preview
+  // cleared rather than opportunistically re-adopting the next arrival.
+  it('does not re-adopt a later pages arrival under the same resetKey as the new preview (avoids the stale-chunk race)', () => {
+    const ref = createRef<SelectableRef>();
+    const pages = [createPage('a'), createPage('b')];
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={pages}
+        {...noopControls}
+      />,
+    );
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('a');
+
+    act(() => {
+      ref.current?.resetAfterMutation();
+    });
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBeUndefined();
 
     // the post-mutation refetch lands under the SAME resetKey with a smaller,
-    // genuinely NEW pages array (the deleted page is gone). Without resetting
-    // the applied-preview marker inside resetAfterMutation, this would be
-    // mistaken for an "append" and skipped, leaving the preview empty forever
-    // and the deleted page effectively still "selected" in spirit (A-3).
-    const pagesAfterDelete = [createPage('b')];
+    // genuinely NEW pages array (the deleted page is gone).
     rerender(
       <SearchPageBase
         ref={ref}
         resetKey="search-1"
-        pages={pagesAfterDelete}
-        onSelectedPagesByCheckboxesChanged={onChanged}
+        pages={[createPage('b')]}
         {...noopControls}
       />,
     );
 
-    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('b');
+    // preview stays cleared — the user can click a row to preview again.
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBeUndefined();
   });
 });
 

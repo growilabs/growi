@@ -386,18 +386,23 @@ const PrivateLegacyPages = (): JSX.Element => {
     [],
   );
 
+  // SearchPageBase resets selection/preview only on a `resetKey` change, not on
+  // every `pages` update, and `resetKey` (keyword|offset|limit) does not change
+  // on a same-page delete. Reset explicitly so the selection AND the right-pane
+  // preview do not keep pointing at deleted pages (A-3/A-7).
+  // Memoized: usePageDeleteModalForBulkDeletion's own useCallback (A-5) is keyed
+  // on this function's identity, so an inline arrow here would recreate it on
+  // every render and defeat the re-render suppression that fix exists for.
+  const deleteAllCompletedHandler = useCallback(() => {
+    searchPageBaseRef.current?.resetAfterMutation();
+    mutate();
+  }, [mutate]);
+
   // for bulk deletion
   const deleteAllButtonClickedHandler = usePageDeleteModalForBulkDeletion(
     data?.data,
     searchPageBaseRef,
-    () => {
-      // SearchPageBase resets selection/preview only on a `resetKey` change,
-      // not on every `pages` update, and `resetKey` (keyword|offset|limit) does
-      // not change on a same-page delete. Reset explicitly so the selection AND
-      // the right-pane preview do not keep pointing at deleted pages (A-3/A-7).
-      searchPageBaseRef.current?.resetAfterMutation();
-      mutate();
-    },
+    deleteAllCompletedHandler,
   );
 
   const convertMenuItemClickedHandler = useCallback(() => {

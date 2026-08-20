@@ -21,13 +21,19 @@ type CapturedPageListItemLProps = {
 };
 
 const pageListItemLSpy = vi.hoisted(() => ({
-  lastProps: undefined as CapturedPageListItemLProps | undefined,
+  // Keyed by page id so multi-row tests can invoke a SPECIFIC row's callbacks
+  // (e.g. "delete row b while row a is previewed") without one row's props
+  // clobbering another's.
+  propsByPageId: new Map<string, CapturedPageListItemLProps>(),
+  get lastProps(): CapturedPageListItemLProps | undefined {
+    return [...pageListItemLSpy.propsByPageId.values()].at(-1);
+  },
 }));
 
 vi.mock('~/client/components/PageList/PageListItemL', () => ({
   PageListItemL: React.forwardRef(
     (props: CapturedPageListItemLProps, _ref: React.Ref<unknown>) => {
-      pageListItemLSpy.lastProps = props;
+      pageListItemLSpy.propsByPageId.set(props.page.data._id, props);
       return null;
     },
   ),
@@ -72,7 +78,7 @@ const createPage = (id: string): IPageWithSearchMeta =>
 // single-row mutation, so a future refactor cannot silently drop it again.
 describe('SearchResultList item-mutation wiring (A-1)', () => {
   beforeEach(() => {
-    pageListItemLSpy.lastProps = undefined;
+    pageListItemLSpy.propsByPageId.clear();
     vi.clearAllMocks();
   });
 
@@ -128,5 +134,67 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
       pageListItemLSpy.lastProps?.onPageDeleted?.('/deleted', false, false),
     ).not.toThrow();
     expect(mutateSearchingSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The right-pane preview (`selectedPageWithMeta`) is a snapshot object held
+// independently of `pages`, so revalidating the list after a delete removes
+// the row but never clears a preview pointing at data that no longer exists.
+// Deleting the row currently shown in the preview must explicitly signal the
+// caller to clear it.
+describe('SearchResultList onPreviewedPageDeleted wiring', () => {
+  beforeEach(() => {
+    pageListItemLSpy.propsByPageId.clear();
+    vi.clearAllMocks();
+  });
+
+  it('calls onPreviewedPageDeleted when the deleted row is the previewed page', () => {
+    const onPreviewedPageDeleted = vi.fn();
+    render(
+      <SearchResultList
+        pages={[createPage('a'), createPage('b')]}
+        selectedPageId="b"
+        onPreviewedPageDeleted={onPreviewedPageDeleted}
+      />,
+    );
+
+    pageListItemLSpy.propsByPageId
+      .get('b')
+      ?.onPageDeleted?.('/page/b', false, false);
+
+    expect(onPreviewedPageDeleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call onPreviewedPageDeleted when a different row is deleted', () => {
+    const onPreviewedPageDeleted = vi.fn();
+    render(
+      <SearchResultList
+        pages={[createPage('a'), createPage('b')]}
+        selectedPageId="b"
+        onPreviewedPageDeleted={onPreviewedPageDeleted}
+      />,
+    );
+
+    pageListItemLSpy.propsByPageId
+      .get('a')
+      ?.onPageDeleted?.('/page/a', false, false);
+
+    expect(onPreviewedPageDeleted).not.toHaveBeenCalled();
+  });
+
+  it('does not call onPreviewedPageDeleted when no page is previewed', () => {
+    const onPreviewedPageDeleted = vi.fn();
+    render(
+      <SearchResultList
+        pages={[createPage('a')]}
+        onPreviewedPageDeleted={onPreviewedPageDeleted}
+      />,
+    );
+
+    pageListItemLSpy.propsByPageId
+      .get('a')
+      ?.onPageDeleted?.('/page/a', false, false);
+
+    expect(onPreviewedPageDeleted).not.toHaveBeenCalled();
   });
 });

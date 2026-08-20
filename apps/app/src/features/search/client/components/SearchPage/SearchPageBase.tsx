@@ -152,6 +152,19 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
   // and overwrite the user's chosen preview (Req 6.3).
   const appliedPreviewResetKeyRef = useRef<string | undefined>(undefined);
 
+  // Shared by the resetKey-change effect and resetAfterMutation() below so the
+  // "clear selection" sequence has exactly one implementation (previously two
+  // near-duplicate copies could drift independently).
+  const clearSelectionAndNotify = useCallback(() => {
+    selectedPageIdsByCheckboxes.clear();
+    // Also uncheck the currently rendered rows. With keepPreviousData (the
+    // legacy number-pager path), the previous page's rows stay mounted for a
+    // moment after a resetKey change, so clearing only the Set would leave
+    // stale checkmarks visible (P3-7).
+    searchResultListRef.current?.deselectAll();
+    onSelectedChangedRef.current?.(0, 0);
+  }, [selectedPageIdsByCheckboxes]);
+
   // publish selectAll()
   useImperativeHandle(ref, () => ({
     selectAll: () => {
@@ -181,16 +194,21 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     // a `resetKey` change, the search identity does not change here, so this
     // must be triggered imperatively rather than by an effect (A-3 / A-7).
     resetAfterMutation: () => {
-      // Clear the preview and forget the applied-preview marker so the NEXT
-      // `pages` arrival under the SAME resetKey (the post-mutation refetch) is
-      // treated as a fresh first arrival and re-selects pages[0] (A-3) —
-      // otherwise the deleted page stays pinned in the right pane forever.
+      // Clear the preview so a deleted page never stays visible (A-3). Do NOT
+      // reset `appliedPreviewResetKeyRef` to re-arm auto-selection of a new
+      // pages[0]: `setSize(1)` (called by the caller just before this) makes
+      // useSWRInfinite synchronously return the STALE, not-yet-revalidated
+      // first chunk (revalidateFirstPage: false means nothing refetches it
+      // until the caller's own `mutate()` resolves), so the very next `pages`
+      // effect run would see that stale chunk as a fresh arrival and could
+      // pin the preview to the just-deleted page — or, once the real
+      // revalidated data lands afterward, be skipped as an "already applied"
+      // append and never correct itself. No requirement demands auto-picking
+      // a new preview after a mutation (Req 6.1 only covers a NEW search), so
+      // simply leaving the preview cleared until the user clicks a row (or
+      // starts a new search) avoids the race entirely.
       setSelectedPageWithMeta(undefined);
-      appliedPreviewResetKeyRef.current = undefined;
-
-      selectedPageIdsByCheckboxes.clear();
-      searchResultListRef.current?.deselectAll();
-      onSelectedChangedRef.current?.(0, 0);
+      clearSelectionAndNotify();
     },
   }));
 
@@ -264,16 +282,8 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
   // (resetKey change) clears it (Req 7.2).
   // biome-ignore lint/correctness/useExhaustiveDependencies: resetKey is a trigger dep — re-run this effect only when the search identity changes, not when the reset body itself changes
   useEffect(() => {
-    selectedPageIdsByCheckboxes.clear();
-
-    // Also uncheck the currently rendered rows. With keepPreviousData (the
-    // legacy number-pager path), the previous page's rows stay mounted for a
-    // moment after a resetKey change, so clearing only the Set would leave
-    // stale checkmarks visible (P3-7).
-    searchResultListRef.current?.deselectAll();
-
-    onSelectedChangedRef.current?.(0, 0);
-  }, [resetKey, selectedPageIdsByCheckboxes]);
+    clearSelectionAndNotify();
+  }, [resetKey]);
 
   // Keep the select-all header (checked / indeterminate) in sync with appends.
   // On append, no checkbox event fires, so the parent's checked/indeterminate
@@ -348,6 +358,7 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
         onPageSelected={(page) => setSelectedPageWithMeta(page)}
         onCheckboxChanged={checkboxChangedHandler}
         onItemMutated={onItemMutated}
+        onPreviewedPageDeleted={() => setSelectedPageWithMeta(undefined)}
       />
     </div>
   );

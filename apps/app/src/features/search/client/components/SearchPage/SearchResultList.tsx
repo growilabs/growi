@@ -39,6 +39,13 @@ type Props = {
   // keys), so the infinite-scroll caller passes its own bound `mutate` here to
   // actually revalidate the list (A-1).
   onItemMutated?: () => void;
+  // Called when the row deleted via its OWN dropdown menu is the one currently
+  // shown in the right-pane preview (`selectedPageId`). The preview is keyed
+  // off a snapshot object independent of `pages`, so revalidating the list
+  // (mutateSearching/onItemMutated) removes the row but never clears a preview
+  // pointing at data that no longer exists — the right pane would keep
+  // rendering a page that is gone from the results.
+  onPreviewedPageDeleted?: () => void;
 };
 
 const SearchResultListSubstance: ForwardRefRenderFunction<
@@ -51,6 +58,7 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
     forceHideMenuItems,
     onPageSelected,
     onItemMutated,
+    onPreviewedPageDeleted,
   } = props;
 
   const { t } = useTranslation();
@@ -169,8 +177,15 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
       mutateRecentlyUpdated();
       mutateSearching();
       onItemMutated?.();
+
+      const previewedPage = pages.find(
+        (page) => page.data._id === selectedPageId,
+      );
+      if (previewedPage?.data.path === path) {
+        onPreviewedPageDeleted?.();
+      }
     },
-    [t, onItemMutated],
+    [t, onItemMutated, onPreviewedPageDeleted, pages, selectedPageId],
   );
 
   return (
