@@ -42,7 +42,9 @@ const DisassociateModalSubstance = (
     try {
       await disassociateLdapAccount({ providerType, accountId });
       onClose();
-      toastSuccess(t('security_settings.updated_general_security_setting'));
+      toastSuccess(
+        t('admin:security_settings.updated_general_security_setting'),
+      );
     } catch (err) {
       toastError(err);
     }
