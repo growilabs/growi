@@ -62,9 +62,15 @@ export const defaultConfig: IApiRateLimitEndpointMap = {
   // is far more headroom than a typeahead needs: the input debounces for 400ms
   // and each keyword is fetched once and cached client-side, which puts real
   // sustained typing well inside this tier.
+  // Unlike most entries here, every logged-in user hits this one, so the per-IP
+  // allowance (maxRequests x usersPerIpProspection) has to assume a shared egress
+  // IP: at the default of 5 a corporate NAT would share 500/min across everyone
+  // behind it and start returning 429s to legitimate typing. Raised so the
+  // per-user limit above stays the one that does the work.
   '/_api/v3/users/usernames': {
     method: 'GET',
     maxRequests: MAX_REQUESTS_TIER_4,
+    usersPerIpProspection: 20,
   },
 };
 
