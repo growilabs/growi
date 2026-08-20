@@ -34,9 +34,17 @@
   - _Requirements: 2.2, 2.3, 2.4, 2.5, 3.2, 3.3, 3.4, 3.5_
   - _Boundary: Baseline Store_
 
+- [ ] 1.5 `parseLocaleMissingCount` に、`X untranslated,` 節が無い実際の出力形式を対応させる
+  - 2.1 のレビューで、実リポジトリの `ko_KR` に対する `npx i18next-cli status ko_KR` の実際の出力が `Summary: Found 228 incomplete translations for "ko_KR" — 228 absent.` であり、`X untranslated,` の節がまるごと無いことが判明した（`parseLocaleMissingCount` は現在この節を必須としている）。切り分けの結果、この節が消えるのは未翻訳件数（untranslated）がちょうど0件のときで、`ko_KR` 固有ではなく件数条件で発生する（詳細は `## Implementation Notes` の 2.1 の記録を参照）
+  - `parseLocaleMissingCount` を、`X untranslated,` 節が無い場合はその値を0件として扱うように直す（`ja_JP` / `zh_CN` / `fr_FR` のように節がある場合の挙動は変えない）
+  - 観測可能な完了条件: 実際の `ko_KR` の出力（`X untranslated,` 節なし）を fixture として追加したテストが green になり、既存のテスト（節ありの fixture）も green のまま
+  - _Requirements: 1.1, 2.1, 3.1_
+  - _Boundary: Stdout Parser_
+  - _Depends: 1.3_
+
 ## 2. Core: 検出処理の組み立てと既存 CI への統合
 
-- [ ] 2.1 (P) 3種の検出コマンドを実行し合否を決めるオーケストレーターを作り、既存の lint パイプラインに統合する
+- [x] 2.1 (P) 3種の検出コマンドを実行し合否を決めるオーケストレーターを作り、既存の lint パイプラインに統合する
   - `status`（既定言語の欠損参照件数）、`status --unused`（未使用キー件数）、非既定言語ごとの `status <locale>`（言語別欠損件数）の3系統を実行し、Stdout Parser で件数化し、Baseline Store で合否判定する
   - `extract` / `sync` はどの実行経路からも一度も呼ばないことをコードレビューで確認する
   - `apps/app/package.json` の `scripts` に `"lint:i18n"`（通常実行）と `"i18n:baseline:update"`（`--update-baseline` 付き実行）を追加し、`lint:**` glob に `lint:i18n` が含まれることを確認する
@@ -169,7 +177,7 @@
   - 観測可能な完了条件: `pnpm run lint:i18n` を通常実行し、既定言語の欠損参照が0件、未使用キー・言語別欠損が新しく記録した基準線以下で合格する
   - _Requirements: 1.4, 2.2, 3.2_
   - _Boundary: Baseline Store_
-  - _Depends: 2.1, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 5.1, 6.1, 7.1, 7.2_
+  - _Depends: 1.5, 2.1, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 5.1, 6.1, 7.1, 7.2_
 
 ## 9. Validation: 既存テストの整理確認と全体の回帰確認
 
@@ -198,3 +206,4 @@
 - 1.1: `i18next-cli` を design.md 記載の 1.69.0 ではなく、実装時点の最新安定版 1.71.0 で固定した（`^` 無し）。design.md の意図は「特定の1バージョンに固定してstdout形式の変更を防ぐこと」であり、数値そのものの一致は求めていないため。1.3 のパーサー fixture はこの実際に入っている 1.71.0 の出力形式を基準に作ること。
 - 1.2: 実測の結果、design.md の前提と食い違う点が複数見つかった。詳細は `apps/app/tools/i18n-audit/task-1.2-findings.md` を参照。(1) Group 1（`t` を props 経由で受け取る書き方）は7ファイルではなく、`Admin/` 配下だけで19ファイル、`Admin/` 外を含めると23ファイルある。(2) 存在しないキー参照119件のうちGroup 1/2/3でカバーできるのは57件のみで、62件が担当タスク無し。(3) さらに15件（commonsのみ実在5件、`:` 二重4件、literal `.` 2件、複数形語尾違い4件）が31件リストにもGroup 1/2/3にもBug2リストにも入らない。うち `No users have liked this yet.`（`LikeButtons.tsx`）はja_JPで英語表示になる実在の不具合。(4) Bug 2の対象は「約20〜23件/約43コンポーネント」ではなく実測で20件/36コンポーネント。(5) Requirement 4.2（存在しないキー参照側とunused側の両方から除外）を満たす手段としてdesign.mdは`preservePatterns`しか書いていないが、これはunused側にしか効かない。存在しないキー参照側の除外には別の設定項目`status.ignoreKeys`が必要（i18next-cli 1.71.0の実仕様、`node_modules/i18next-cli/types/types.d.ts`で確認済み）。research.md 22行目「`preservePatterns`は`status`の欠損判定にも効く」は誤りと判明。ユーザー判断により、tasks 3以降に進む前にdesign.md/tasks.mdをこれらの実測に合わせて改訂する。
 - 1.4: `computeBaselineUpdate` は前後差分（before→after）を戻り値の `changes` として返すのみで、標準出力への印字は行わない。design.md の Baseline Store は Contracts: State（Service/Batch ではない）であり、印字は 2.1（Audit Orchestrator）の責務と判断した。**2.1 のレビュー時に、`--update-baseline` 実行で実際にこの delta が標準出力に印字されることを必ず確認すること**（design.md がこの要件を明記しているが、まだどのコードもこれを満たしていない）。
+- 2.1: レビュー時に、実リポジトリに対して `npx i18next-cli status <locale>` を4つの非既定言語すべてで実行して確認したところ、`ko_KR` の実際の出力が `parseLocaleMissingCount`（1.3・Stdout Parser の担当、`tools/i18n-audit/parse-status-output.ts`）の前提と食い違うことが分かった。パーサーは `Summary: Found N incomplete translations for "<locale>" — X untranslated, N absent.` の形を要求するが、`ko_KR` の実際の出力は `Summary: Found 228 incomplete translations for "ko_KR" — 228 absent.` で、`X untranslated,` の節がまるごと無い。他の3言語（`ja_JP` / `zh_CN` / `fr_FR`）は今のところ `1 untranslated, ...` を含んでおり正常にパースできる。切り分けた結果、この節が消えるのは「未翻訳件数（untranslated）がちょうど0件のとき」で、`ko_KR` 固有の問題ではなく件数条件で起きる。つまり今後の翻訳追加・削除によって、どの言語でも untranslated が0件になった瞬間にこの欠落が新たに発生しうる。2.1（Audit Orchestrator）は `status <locale>` を呼ぶだけでパース自体はしないため、この節自体の修正は 1.3 の担当ファイル（`parse-status-output.ts`）を触ることになり、2.1 の Boundary 外である。**8.1（基準線の初回記録）は非既定言語すべてに対して `status <locale>` を実行して回るため、この修正が完了していないと `ko_KR` の実測でパーサーが例外を投げ、`pnpm run i18n:baseline:update` がそのまま失敗する。8.1 に進む前に、`parseLocaleMissingCount` を「`X untranslated,` 節が無い場合は 0 件として扱う」形に直す小さな修正タスクを起票し完了させること。**
