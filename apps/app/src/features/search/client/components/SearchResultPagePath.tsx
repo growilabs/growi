@@ -1,8 +1,8 @@
 import type { JSX } from 'react';
 import { Fragment } from 'react';
 
-import type { PagePathPart } from '../utils/format-truncated-page-path';
-import { formatTruncatedPagePath } from '../utils/format-truncated-page-path';
+import type { PagePathPart } from '~/client/util/format-truncated-page-path';
+import { formatTruncatedPagePath } from '~/client/util/format-truncated-page-path';
 
 import styles from './SearchResultPagePath.module.scss';
 
