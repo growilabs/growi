@@ -9,7 +9,7 @@
   - _Requirements: 5.1_
   - _Boundary: i18next.config.ts_
 
-- [ ] 1.2 検出結果を、翻訳ファイルへの実在チェックで正しい分類に絞り込む
+- [x] 1.2 検出結果を、翻訳ファイルへの実在チェックで正しい分類に絞り込む
   - `i18next-cli status` の生の報告を、3つの namespace ファイル（translation/admin/commons）のどこにも存在しないキーだけに絞り込み、discovery で判明した31件の一覧（3つの具体例＋残り28件）を確定させる
   - Call-site Remediation の対象ファイル一覧を実際に検索して確定させる: Group 1（`t` を props 経由で受け取る7ファイル）、Group 2（`createAdminPageLayout` の `title` callback を使う23ファイルから、固定文字列2件・`{ ns: 'commons' }` 明示済み2件を除いた19ファイル、`pages/admin/` のサブディレクトリ配下5件を含む）、Group 3（`getTranslation({ ns: [...] })` を使うサーバー側ファイル、`saml.ts` 以外に同様の書き方をしている箇所が無いかも確認する）
   - 31件の一覧と、Bug 2 remediation が複製する共有ラベル約20〜23件の一覧が重複していないことを確認する（重複があれば、どちらのタスクが担当するかを明記する）。Group 1（`SecuritySetting` 配下7ファイル）と Bug 2 の共有ラベルの重複は無いことを確認済み（7ファイルのキーはいずれも `security_settings.*` 配下または grant 表示用の別名で、共有ラベルと重複しない）。Bug 2 が対象にする管理画面43コンポーネントの正確な一覧も、この時点で確定させる
@@ -147,3 +147,4 @@
 ## Implementation Notes
 
 - 1.1: `i18next-cli` を design.md 記載の 1.69.0 ではなく、実装時点の最新安定版 1.71.0 で固定した（`^` 無し）。design.md の意図は「特定の1バージョンに固定してstdout形式の変更を防ぐこと」であり、数値そのものの一致は求めていないため。1.3 のパーサー fixture はこの実際に入っている 1.71.0 の出力形式を基準に作ること。
+- 1.2: 実測の結果、design.md の前提と食い違う点が複数見つかった。詳細は `apps/app/tools/i18n-audit/task-1.2-findings.md` を参照。(1) Group 1（`t` を props 経由で受け取る書き方）は7ファイルではなく、`Admin/` 配下だけで19ファイル、`Admin/` 外を含めると23ファイルある。(2) 存在しないキー参照119件のうちGroup 1/2/3でカバーできるのは57件のみで、62件が担当タスク無し。(3) さらに15件（commonsのみ実在5件、`:` 二重4件、literal `.` 2件、複数形語尾違い4件）が31件リストにもGroup 1/2/3にもBug2リストにも入らない。うち `No users have liked this yet.`（`LikeButtons.tsx`）はja_JPで英語表示になる実在の不具合。(4) Bug 2の対象は「約20〜23件/約43コンポーネント」ではなく実測で20件/36コンポーネント。(5) Requirement 4.2（存在しないキー参照側とunused側の両方から除外）を満たす手段としてdesign.mdは`preservePatterns`しか書いていないが、これはunused側にしか効かない。存在しないキー参照側の除外には別の設定項目`status.ignoreKeys`が必要（i18next-cli 1.71.0の実仕様、`node_modules/i18next-cli/types/types.d.ts`で確認済み）。research.md 22行目「`preservePatterns`は`status`の欠損判定にも効く」は誤りと判明。ユーザー判断により、tasks 3以降に進む前にdesign.md/tasks.mdをこれらの実測に合わせて改訂する。
