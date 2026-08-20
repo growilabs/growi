@@ -49,6 +49,7 @@ import { useSWRxSearch } from '~/stores/search';
 import { OperateAllControl } from './SearchPage/OperateAllControl';
 import SearchControl from './SearchPage/SearchControl';
 import {
+  type IResettableAfterMutation,
   type IReturnSelectedPageIds,
   SearchPageBase,
   usePageDeleteModalForBulkDeletion,
@@ -282,7 +283,7 @@ const PrivateLegacyPages = (): JSX.Element => {
     null,
   );
   const searchPageBaseRef = useRef<
-    (ISelectableAll & IReturnSelectedPageIds) | null
+    (ISelectableAll & IReturnSelectedPageIds & IResettableAfterMutation) | null
   >(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: only run on mount
@@ -385,11 +386,23 @@ const PrivateLegacyPages = (): JSX.Element => {
     [],
   );
 
+  // SearchPageBase resets selection/preview only on a `resetKey` change, not on
+  // every `pages` update, and `resetKey` (keyword|offset|limit) does not change
+  // on a same-page delete. Reset explicitly so the selection AND the right-pane
+  // preview do not keep pointing at deleted pages (A-3/A-7).
+  // Memoized: usePageDeleteModalForBulkDeletion's own useCallback (A-5) is keyed
+  // on this function's identity, so an inline arrow here would recreate it on
+  // every render and defeat the re-render suppression that fix exists for.
+  const deleteAllCompletedHandler = useCallback(() => {
+    searchPageBaseRef.current?.resetAfterMutation();
+    mutate();
+  }, [mutate]);
+
   // for bulk deletion
   const deleteAllButtonClickedHandler = usePageDeleteModalForBulkDeletion(
-    data,
+    data?.data,
     searchPageBaseRef,
-    () => mutate(),
+    deleteAllCompletedHandler,
   );
 
   const convertMenuItemClickedHandler = useCallback(() => {
@@ -421,6 +434,9 @@ const PrivateLegacyPages = (): JSX.Element => {
     openModal(selectedPages, () => {
       toastSuccess(t('Successfully requested'));
       closeModal();
+      // Reset selection AND preview explicitly after a same-query refetch (see
+      // the delete handler's A-3/A-7 comment above).
+      searchPageBaseRef.current?.resetAfterMutation();
       mutateMigrationStatus();
       mutate();
       mutatePageTree();
@@ -565,11 +581,22 @@ const PrivateLegacyPages = (): JSX.Element => {
     );
   }, [conditions, data, pagingNumberChangedHandler]);
 
+  // Compose the SearchPageBase reset identity from the current search conditions,
+  // INCLUDING the page position (offset). SearchPageBase used to key selection/
+  // preview reset on `[pages]`, so legacy reset selection & moved the preview to
+  // the first item on every number-pager navigation. Including `offset` here
+  // reproduces that behavior exactly: resetKey changes per page → selection clears.
+  const resetKey = useMemo(
+    () => `${keyword}|${offset}|${limit}`,
+    [keyword, offset, limit],
+  );
+
   return (
     <>
       <SearchPageBase
         ref={searchPageBaseRef}
         pages={data?.data}
+        resetKey={resetKey}
         onSelectedPagesByCheckboxesChanged={
           selectedPagesByCheckboxesChangedHandler
         }

@@ -42,6 +42,7 @@
   "Update": "Enregistrer",
   "Update Page": "Mettre à jour la page",
   "Error": "Erreur",
+  "Retry": "Réessayer",
   "Warning": "Avertissement",
   "Sign in": "Connexion",
   "Sign in with External auth": "Se connecter avec {{signin}}",
@@ -685,6 +686,7 @@
     "number_of_list_to_display": "Afficher",
     "page_number_unit": "pages",
     "hit_number_unit": "trouvé",
+    "failed_to_load_more": "Échec du chargement de résultats supplémentaires",
     "sort_axis": {
       "relationScore": "Trier par pertinence",
       "createdAt": "Date de création",

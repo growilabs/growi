@@ -33,13 +33,33 @@ type Props = {
   forceHideMenuItems?: ForceHideMenuItems;
   onPageSelected?: (page?: IPageWithSearchMeta) => void;
   onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
+  // Called in addition to `mutateSearching()` after a single-row page operation
+  // (duplicate / rename / delete). `mutateSearching()`'s filtered `mutate` never
+  // reaches an active `useSWRInfinite` subscription (SWR skips `$inf$`-prefixed
+  // keys), so the infinite-scroll caller passes its own bound `mutate` here to
+  // actually revalidate the list (A-1).
+  onItemMutated?: () => void;
+  // Called when the row deleted via its OWN dropdown menu is the one currently
+  // shown in the right-pane preview (`selectedPageId`). The preview is keyed
+  // off a snapshot object independent of `pages`, so revalidating the list
+  // (mutateSearching/onItemMutated) removes the row but never clears a preview
+  // pointing at data that no longer exists — the right pane would keep
+  // rendering a page that is gone from the results.
+  onPreviewedPageDeleted?: () => void;
 };
 
 const SearchResultListSubstance: ForwardRefRenderFunction<
   ISelectableAll,
   Props
 > = (props: Props, ref) => {
-  const { pages, selectedPageId, forceHideMenuItems, onPageSelected } = props;
+  const {
+    pages,
+    selectedPageId,
+    forceHideMenuItems,
+    onPageSelected,
+    onItemMutated,
+    onPreviewedPageDeleted,
+  } = props;
 
   const { t } = useTranslation();
 
@@ -123,8 +143,9 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
       mutatePageTree();
       mutateRecentlyUpdated();
       mutateSearching();
+      onItemMutated?.();
     },
-    [t],
+    [t, onItemMutated],
   );
 
   const renamedHandler = useCallback(
@@ -134,8 +155,9 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
       mutatePageTree();
       mutateRecentlyUpdated();
       mutateSearching();
+      onItemMutated?.();
     },
-    [t],
+    [t, onItemMutated],
   );
 
   const deletedHandler = useCallback(
@@ -154,8 +176,16 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
       mutatePageTree();
       mutateRecentlyUpdated();
       mutateSearching();
+      onItemMutated?.();
+
+      const previewedPage = pages.find(
+        (page) => page.data._id === selectedPageId,
+      );
+      if (previewedPage?.data.path === path) {
+        onPreviewedPageDeleted?.();
+      }
     },
-    [t],
+    [t, onItemMutated, onPreviewedPageDeleted, pages, selectedPageId],
   );
 
   return (

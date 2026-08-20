@@ -1,5 +1,7 @@
 import type { SWRResponse } from 'swr';
 import useSWR, { mutate } from 'swr';
+import type { SWRInfiniteResponse } from 'swr/infinite';
+import useSWRInfinite from 'swr/infinite';
 
 import { apiGet } from '~/client/util/apiv1-client';
 import type { IFormattedSearchResult } from '~/interfaces/search';
@@ -47,7 +49,14 @@ const createSearchQuery = (
 };
 
 export const mutateSearching = async (): Promise<void[]> => {
-  return mutate((key) => Array.isArray(key) && key[0] === '/search');
+  // Match both the paginated ('/search') and the infinite-scroll
+  // ('/search/infinite') caches, so item-level page operations (delete / rename
+  // / duplicate) in SearchResultList refresh whichever list is shown.
+  return mutate(
+    (key) =>
+      Array.isArray(key) &&
+      (key[0] === '/search' || key[0] === '/search/infinite'),
+  );
 };
 
 export const useSWRxSearch = (
@@ -104,4 +113,111 @@ export const useSWRxSearch = (
       ...fixedConfigurations,
     },
   };
+};
+
+// Default chunk size used when a caller does not supply a positive limit.
+// Single source of truth for the initial paging size, shared with SearchPage.
+export const DEFAULT_SEARCH_CHUNK_SIZE = 20;
+
+// Configuration carried in the infinite-scroll SWR key. Includes `limit`
+// (chunk size) and `nqName` because the fetcher's response depends on them —
+// every value the fetcher reads must be part of the key so different values
+// never share a cache entry. Only `offset` is excluded (derived per page).
+type ISearchInfiniteConfigurations = Omit<
+  ISearchConfigurationsFixed,
+  'offset'
+> & {
+  nqName: string | null;
+};
+
+/**
+ * Pure key generator for the infinite-scroll search fetch.
+ *
+ * Uses the '/search/infinite' namespace so it never collides with useSWRxSearch ('/search').
+ * Returns null (stops fetching) when the keyword is empty, or when the previous page
+ * returned fewer items than the chunk size (end of results reached).
+ */
+export const getSearchInfiniteKey = (
+  pageIndex: number,
+  previousPageData: IFormattedSearchResult | null,
+  keyword: string | null,
+  configurations: ISearchInfiniteConfigurations,
+):
+  | readonly ['/search/infinite', string, number, ISearchInfiniteConfigurations]
+  | null => {
+  if (keyword == null || keyword.length === 0) {
+    return null;
+  }
+
+  const chunkSize = configurations.limit;
+
+  // Stop once the previous chunk returned fewer hits than requested (no more
+  // results). Use `meta.hitsCount` (the count Elasticsearch actually returned)
+  // rather than `data.length`, because the server drops pages missing from
+  // MongoDB, so `data.length` can be below `chunkSize` mid-results and would
+  // stop the fetch prematurely.
+  if (previousPageData != null && previousPageData.meta.hitsCount < chunkSize) {
+    return null;
+  }
+
+  const offset = pageIndex * chunkSize;
+  return ['/search/infinite', keyword, offset, configurations] as const;
+};
+
+export const useSWRINFxSearch = (
+  keyword: string | null,
+  nqName: string | null,
+  configurations: Omit<ISearchConfigurations, 'offset'>,
+): SWRInfiniteResponse<IFormattedSearchResult, Error> => {
+  const { limit, sort, order, includeTrashPages, includeUserPages } =
+    configurations;
+
+  // Chunk size is fixed for the whole search session (no user-facing selector).
+  const chunkSize = limit > 0 ? limit : DEFAULT_SEARCH_CHUNK_SIZE;
+
+  // Every value the fetcher reads (chunk size, nqName, sort/order/filters) is
+  // carried here so it becomes part of the SWR key.
+  const fixedConfigurations: ISearchInfiniteConfigurations = {
+    limit: chunkSize,
+    sort: sort ?? SORT_AXIS.RELATION_SCORE,
+    order: order ?? SORT_ORDER.DESC,
+    includeTrashPages: includeTrashPages ?? false,
+    includeUserPages: includeUserPages ?? false,
+    nqName,
+  };
+
+  const rawQuery = createSearchQuery(
+    keyword ?? '',
+    fixedConfigurations.includeTrashPages,
+    fixedConfigurations.includeUserPages,
+  );
+
+  return useSWRInfinite(
+    (pageIndex, previousPageData: IFormattedSearchResult | null) =>
+      getSearchInfiniteKey(
+        pageIndex,
+        previousPageData,
+        keyword,
+        fixedConfigurations,
+      ),
+    ([, , offset]) => {
+      // The key head ('/search/infinite') is only a cache namespace;
+      // the actual apiv1 endpoint is '/search' (shared with useSWRxSearch).
+      return apiGet('/search', {
+        q: encodeURIComponent(rawQuery),
+        nq:
+          typeof fixedConfigurations.nqName === 'string'
+            ? encodeURIComponent(fixedConfigurations.nqName)
+            : null,
+        limit: fixedConfigurations.limit,
+        offset,
+        sort: fixedConfigurations.sort,
+        order: fixedConfigurations.order,
+      }).then((result) => result as IFormattedSearchResult);
+    },
+    {
+      revalidateFirstPage: false,
+      revalidateOnFocus: false,
+    },
+  );
 };

@@ -4,26 +4,30 @@ import { useTranslation } from 'next-i18next';
 
 import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest';
 import { NotAvailableForReadOnlyUser } from '~/client/components/NotAvailableForReadOnlyUser';
-import PaginationWrapper from '~/client/components/PaginationWrapper';
 import type {
   ISelectableAll,
   ISelectableAndIndeterminatable,
 } from '~/client/interfaces/selectable-all';
-import type { IFormattedSearchResult } from '~/interfaces/search';
+import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 import { useSearchKeyword, useSetSearchKeyword } from '~/states/search';
 import {
   disableUserPagesAtom,
   showPageLimitationLAtom,
 } from '~/states/server-configurations';
 import {
+  DEFAULT_SEARCH_CHUNK_SIZE,
   type ISearchConditions,
   type ISearchConfigurations,
-  useSWRxSearch,
+  useSWRINFxSearch,
 } from '~/stores/search';
 
+import { mergeInfiniteSearchResult } from '../../util/infinite-search-result';
 import { OperateAllControl } from './OperateAllControl';
 import SearchControl from './SearchControl';
-import type { IReturnSelectedPageIds } from './SearchPageBase';
+import type {
+  IResettableAfterMutation,
+  IReturnSelectedPageIds,
+} from './SearchPageBase';
 import {
   SearchPageBase,
   usePageDeleteModalForBulkDeletion,
@@ -31,28 +35,24 @@ import {
 
 import styles from './SearchPage.module.scss';
 
-// TODO: replace with "customize:showPageLimitationS"
-const INITIAL_PAGIONG_SIZE = 20;
+// Elasticsearch `index.max_result_window` default. A query is rejected once
+// `limit + offset` exceeds it, so infinite scroll must stop before that point.
+const ES_MAX_RESULT_WINDOW = 10000;
 
 /**
  * SearchResultListHead
  */
 
 type SearchResultListHeadProps = {
-  searchResult: IFormattedSearchResult;
-  pagingSize: number;
-  onPagingSizeChanged: (size: number) => void;
+  total: number;
+  took?: number;
 };
 
 const SearchResultListHead = React.memo(
   (props: SearchResultListHeadProps): JSX.Element => {
     const { t } = useTranslation();
 
-    const {
-      searchResult, // pagingSize, onPagingSizeChanged,
-    } = props;
-
-    const { took, total } = searchResult.meta;
+    const { total, took } = props;
 
     if (total === 0) {
       return (
@@ -79,22 +79,8 @@ const SearchResultListHead = React.memo(
             </span>
           )}
         </div>
-        {/* TODO: infinite scroll for search result */}
-        {/* <div className="input-group flex-nowrap search-result-select-group ms-auto d-md-flex d-none">
-        <div>
-          <label className="form-label input-group-text text-muted" htmlFor="inputGroupSelect01">{t('search_result.number_of_list_to_display')}</label>
-        </div>
-        <select
-          defaultValue={pagingSize}
-          className="form-select"
-          id="inputGroupSelect01"
-          onChange={e => onPagingSizeChanged(Number(e.target.value))}
-        >
-          {[20, 50, 100, 200].map((limit) => {
-            return <option key={limit} value={limit}>{limit} {t('search_result.page_number_unit')}</option>;
-          })}
-        </select>
-      </div> */}
+        {/* NOTE: The paging-size selector is intentionally removed for infinite
+            scroll (Req 3.2). Do NOT restore it. */}
       </div>
     );
   },
@@ -111,10 +97,14 @@ export const SearchPage = (): JSX.Element => {
 
   const disableUserPages = useAtomValue(disableUserPagesAtom);
 
-  const [offset, setOffset] = useState<number>(0);
-  const [limit, setLimit] = useState<number>(
-    showPageLimitationL ?? INITIAL_PAGIONG_SIZE,
-  );
+  // Fixed chunk size for the whole search session (no user-facing selector).
+  // Floor to the default when misconfigured (<= 0, which `??` does not catch) so
+  // the fetch, the merge, and the result-window guard all use the same value.
+  const chunkSize =
+    showPageLimitationL != null && showPageLimitationL > 0
+      ? showPageLimitationL
+      : DEFAULT_SEARCH_CHUNK_SIZE;
+
   const [configurationsByControl, setConfigurationsByControl] = useState<
     Partial<ISearchConfigurations>
   >({});
@@ -125,25 +115,70 @@ export const SearchPage = (): JSX.Element => {
     null,
   );
   const searchPageBaseRef = useRef<
-    (ISelectableAll & IReturnSelectedPageIds) | null
+    (ISelectableAll & IReturnSelectedPageIds & IResettableAfterMutation) | null
   >(null);
 
-  const { data, conditions, mutate } = useSWRxSearch(keyword ?? '', null, {
+  const swr = useSWRINFxSearch(keyword ?? '', null, {
     ...configurationsByControl,
-    offset,
-    limit,
+    limit: chunkSize,
   });
+  // useSWRInfinite returns a fresh object every render; destructure its stable
+  // members so the callbacks below keep stable identities (and their memoized
+  // consumers, e.g. searchControl, are not recomputed on every append).
+  const { data: swrData, error: swrError, setSize, mutate } = swr;
+
+  // Accumulated, render-ready result derived from the infinite-scroll chunks.
+  const merged = useMemo(
+    () => mergeInfiniteSearchResult(swrData, chunkSize),
+    [swrData, chunkSize],
+  );
+
+  const hasError = swrError != null;
+
+  // Elasticsearch rejects a query whose `limit + offset` exceeds
+  // `max_result_window` (default 10000). The next chunk's offset is
+  // `loadedChunks * limit`, so stop before requesting one that would exceed the
+  // window — otherwise scrolling to the cap fails on every further attempt.
+  const loadedChunks = swrData?.length ?? 0;
+  const reachedResultWindowLimit =
+    (loadedChunks + 1) * chunkSize > ES_MAX_RESULT_WINDOW;
+
+  // NOTE: an argument-less `mutate()` on `useSWRInfinite` force-revalidates
+  // EVERY already-loaded chunk sequentially (`revalidateFirstPage: false` only
+  // skips revalidating the FIRST page on mount/key-change, it does not limit a
+  // manual `mutate()`). After loading e.g. 40 chunks, a single failed chunk's
+  // Retry click re-fetches all 40 (+1) chunks, not just the failed one (A-4).
+  const onRetry = useCallback(() => {
+    mutate();
+  }, [mutate]);
+
+  // Identity of the current search. Derived WITHOUT offset/size/pageIndex so it
+  // stays stable across infinite-scroll appends and changes only on a new
+  // search / sort / filter change (Req 7.1).
+  const resetKey = useMemo(() => {
+    const { sort, order, includeTrashPages, includeUserPages } =
+      configurationsByControl;
+    return JSON.stringify({
+      keyword: keyword ?? '',
+      sort: sort ?? SORT_AXIS.RELATION_SCORE,
+      order: order ?? SORT_ORDER.DESC,
+      includeTrashPages: includeTrashPages ?? false,
+      includeUserPages: includeUserPages ?? false,
+    });
+  }, [keyword, configurationsByControl]);
 
   const searchInvokedHandler = useCallback(
     (newKeyword: string, newConfigurations: Partial<ISearchConfigurations>) => {
-      setOffset(0);
       setConfigurationsByControl(newConfigurations);
-
       setSearchKeyword(newKeyword);
 
+      // Discard the accumulation and reload from the first chunk (Req 7.1).
+      // `mutate()` forces a refetch even when the SWR key is unchanged, so
+      // re-running the identical keyword/conditions still refreshes results.
+      setSize(1);
       mutate();
     },
-    [mutate, setSearchKeyword],
+    [setSearchKeyword, setSize, mutate],
   );
 
   const selectAllCheckboxChangedHandler = useCallback((isChecked: boolean) => {
@@ -186,38 +221,34 @@ export const SearchPage = (): JSX.Element => {
     [],
   );
 
-  const pagingSizeChangedHandler = useCallback(
-    (pagingSize: number) => {
-      setOffset(0);
-      setLimit(pagingSize);
-      mutate();
-    },
-    [mutate],
-  );
-
-  const pagingNumberChangedHandler = useCallback(
-    (activePage: number) => {
-      setOffset((activePage - 1) * limit);
-      mutate();
-    },
-    [limit, mutate],
-  );
-
   const initialSearchConditions: Partial<ISearchConditions> = useMemo(() => {
     return {
       keyword,
-      limit: INITIAL_PAGIONG_SIZE,
+      limit: DEFAULT_SEARCH_CHUNK_SIZE,
     };
   }, [keyword]);
 
-  // for bulk deletion
-  const deleteAllButtonClickedHandler = usePageDeleteModalForBulkDeletion(
-    data,
-    searchPageBaseRef,
-    () => mutate(),
-  );
+  // Post-delete reset (Req 5.3 / 7.2): discard the accumulation and reload from
+  // the first chunk, then clear the selection AND the right-pane preview.
+  // Order matters — reset the size to 1 BEFORE revalidating so the first-chunk
+  // re-fetch is not raced by a mutate() against the stale (larger) size.
+  // `resetAfterMutation()` (not a bare `deselectAll()` + `setSelectedCount(0)`)
+  // also clears the preview and tells `selectAllControlRef` to deselect via
+  // `onSelectedPagesByCheckboxesChanged` — a bare `setSelectedCount(0)` updated
+  // only local state and left the header checkbox visually checked (A-3 / A-7).
+  const deleteCompletedHandler = useCallback(() => {
+    setSize(1);
+    mutate();
+    searchPageBaseRef.current?.resetAfterMutation();
+  }, [setSize, mutate]);
 
-  const hitsCount = data?.meta.hitsCount;
+  // for bulk deletion — target every accumulated page across appends. Selection
+  // of only the loaded-and-selected pages is handled inside the hook (Req 5.1).
+  const deleteAllButtonClickedHandler = usePageDeleteModalForBulkDeletion(
+    merged.pages,
+    searchPageBaseRef,
+    deleteCompletedHandler,
+  );
 
   const extraControls = useMemo(() => {
     return (
@@ -253,7 +284,7 @@ export const SearchPage = (): JSX.Element => {
                 inputId="cb-select-all"
                 inputClassName="form-check-input"
                 ref={selectAllControlRef}
-                isCheckboxDisabled={hitsCount === 0}
+                isCheckboxDisabled={merged.isEmpty}
                 onCheckboxChanged={selectAllCheckboxChangedHandler}
               >
                 <label
@@ -280,7 +311,7 @@ export const SearchPage = (): JSX.Element => {
     );
   }, [
     deleteAllButtonClickedHandler,
-    hitsCount,
+    merged.isEmpty,
     selectAllCheckboxChangedHandler,
     selectedCount,
     t,
@@ -309,50 +340,38 @@ export const SearchPage = (): JSX.Element => {
   ]);
 
   const searchResultListHead = useMemo(() => {
-    if (data == null) {
+    // While the first chunk is still loading there is no meta yet; render
+    // nothing so the "0 hits" message is not shown prematurely.
+    if (swr.data == null) {
       return <></>;
     }
-    return (
-      <SearchResultListHead
-        searchResult={data}
-        pagingSize={limit}
-        onPagingSizeChanged={pagingSizeChangedHandler}
-      />
-    );
-  }, [data, limit, pagingSizeChangedHandler]);
-
-  const searchPager = useMemo(() => {
-    // when pager is not needed
-    if (data == null || data.meta.hitsCount === data.meta.total) {
-      return <></>;
-    }
-
-    const { total } = data.meta;
-    const { offset, limit } = conditions;
-
-    return (
-      <PaginationWrapper
-        activePage={Math.floor(offset / limit) + 1}
-        totalItemsCount={total}
-        pagingLimit={limit}
-        changePage={pagingNumberChangedHandler}
-      />
-    );
-  }, [conditions, data, pagingNumberChangedHandler]);
+    return <SearchResultListHead total={merged.total} took={merged.took} />;
+  }, [swr.data, merged.total, merged.took]);
 
   return (
     <SearchPageBase
       className={styles['search-page']}
       ref={searchPageBaseRef}
-      pages={data?.data}
+      pages={merged.pages}
       searchingKeyword={keyword}
+      resetKey={resetKey}
       onSelectedPagesByCheckboxesChanged={
         selectedPagesByCheckboxesChangedHandler
       }
+      // Revalidate THIS active useSWRInfinite response after a single-row
+      // duplicate / rename / delete — the global mutateSearching() cannot reach
+      // it (A-1).
+      onItemMutated={mutate}
       // Components
       searchControl={searchControl}
       searchResultListHead={searchResultListHead}
-      searchPager={searchPager}
+      infiniteScroll={{
+        swrInfiniteResponse: swr,
+        isReachingEnd:
+          merged.isReachingEnd || hasError || reachedResultWindowLimit,
+        hasError,
+        onRetry,
+      }}
     />
   );
 };
