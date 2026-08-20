@@ -128,7 +128,7 @@
 
 ## 5. Core: 管理画面ページの title callback に namespace を明示する（Group 2）
 
-- [ ] 5.1 (P) `createAdminPageLayout` の `title` callback を使う19ファイルのキー文字列に `admin:` を前置する
+- [x] 5.1 (P) `createAdminPageLayout` の `title` callback を使う19ファイルのキー文字列に `admin:` を前置する
   - 1.2 で確定させた19ファイル（`pages/admin/` 直下およびサブディレクトリ配下を含む）の `title: (props, t) => t('xxx')` を `t('admin:xxx')` に書き換える
   - 固定文字列2件（`[...path].page.tsx` / `vault.page.tsx`）と `{ ns: 'commons' }` 明示済み2件（`app.page.tsx` / `data-transfer.page.tsx`）は対象外のままにする
   - 観測可能な完了条件: 19ファイルすべてで書き換え前後の表示文言が一致し、`i18next-cli status` がこれらのファイル由来の誤検出を報告しない
