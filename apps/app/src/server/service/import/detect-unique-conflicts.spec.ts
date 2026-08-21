@@ -5,11 +5,14 @@ import path from 'node:path';
 import {
   collectConflicts,
   EXTERNAL_ACCOUNT_UNIQUE_KEYS,
+  EXTERNAL_USER_GROUP_UNIQUE_KEYS,
   type ExternalAccountUniqueFields,
+  type ExternalUserGroupUniqueFields,
   findExistingCandidates,
   type GroupUniqueFields,
   hasConflicts,
   pickExternalAccountUniqueFields,
+  pickExternalUserGroupUniqueFields,
   readArchiveUserIdentity,
   type UniqueConflictReport,
   type UserUniqueFields,
@@ -275,6 +278,195 @@ describe('collectConflicts', () => {
         _id: 'raw-id',
         providerType: 'ldap',
         accountId: 'cn=alice',
+      });
+    });
+  });
+
+  describe('externalusergroups collection', () => {
+    test('flags an externalId match with a different _id as a conflict', () => {
+      // Requirement 1.3: externalusergroups' externalId is a single-field unique key.
+      const archiveDocs: ExternalUserGroupUniqueFields[] = [
+        {
+          _id: 'archive-group-1',
+          externalId: 'cn=engineers,ou=groups',
+          name: null,
+          provider: null,
+        },
+      ];
+      const existingDocs: ExternalUserGroupUniqueFields[] = [
+        {
+          _id: 'existing-group-1',
+          externalId: 'cn=engineers,ou=groups',
+          name: null,
+          provider: null,
+        },
+      ];
+
+      const result = collectConflicts(
+        'externalusergroups',
+        archiveDocs,
+        existingDocs,
+        EXTERNAL_USER_GROUP_UNIQUE_KEYS,
+      );
+
+      expect(result).toEqual([
+        {
+          collection: 'externalusergroups',
+          field: 'externalId',
+          value: 'cn=engineers,ou=groups',
+          archiveId: 'archive-group-1',
+          existingId: 'existing-group-1',
+        },
+      ]);
+    });
+
+    test('flags a name+provider match with a different _id as a conflict', () => {
+      // Requirement 1.4: externalusergroups' name+provider is a composite unique key,
+      // independent of the externalId key above.
+      const archiveDocs: ExternalUserGroupUniqueFields[] = [
+        {
+          _id: 'archive-group-2',
+          externalId: null,
+          name: 'engineers',
+          provider: 'ldap',
+        },
+      ];
+      const existingDocs: ExternalUserGroupUniqueFields[] = [
+        {
+          _id: 'existing-group-2',
+          externalId: null,
+          name: 'engineers',
+          provider: 'ldap',
+        },
+      ];
+
+      const result = collectConflicts(
+        'externalusergroups',
+        archiveDocs,
+        existingDocs,
+        EXTERNAL_USER_GROUP_UNIQUE_KEYS,
+      );
+
+      expect(result).toEqual([
+        {
+          collection: 'externalusergroups',
+          field: 'name+provider',
+          value: JSON.stringify(['engineers', 'ldap']),
+          archiveId: 'archive-group-2',
+          existingId: 'existing-group-2',
+        },
+      ]);
+    });
+
+    test('does not flag a conflict when only name matches and provider differs', () => {
+      // Requirement 1.4: a partial match on the composite key is not a conflict.
+      const archiveDocs: ExternalUserGroupUniqueFields[] = [
+        {
+          _id: 'archive-group-3',
+          externalId: null,
+          name: 'engineers',
+          provider: 'ldap',
+        },
+      ];
+      const existingDocs: ExternalUserGroupUniqueFields[] = [
+        {
+          _id: 'existing-group-3',
+          externalId: null,
+          name: 'engineers',
+          provider: 'saml',
+        },
+      ];
+
+      const result = collectConflicts(
+        'externalusergroups',
+        archiveDocs,
+        existingDocs,
+        EXTERNAL_USER_GROUP_UNIQUE_KEYS,
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    test('does not flag a conflict when only provider matches and name differs', () => {
+      // Requirement 1.4: a partial match on the composite key is not a conflict.
+      const archiveDocs: ExternalUserGroupUniqueFields[] = [
+        {
+          _id: 'archive-group-4',
+          externalId: null,
+          name: 'engineers',
+          provider: 'ldap',
+        },
+      ];
+      const existingDocs: ExternalUserGroupUniqueFields[] = [
+        {
+          _id: 'existing-group-4',
+          externalId: null,
+          name: 'sales',
+          provider: 'ldap',
+        },
+      ];
+
+      const result = collectConflicts(
+        'externalusergroups',
+        archiveDocs,
+        existingDocs,
+        EXTERNAL_USER_GROUP_UNIQUE_KEYS,
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    test('detects an externalId conflict independently of a non-matching name+provider', () => {
+      // The two keys in EXTERNAL_USER_GROUP_UNIQUE_KEYS are evaluated independently: a
+      // document can conflict on externalId while its name+provider does not match at all.
+      const archiveDocs: ExternalUserGroupUniqueFields[] = [
+        {
+          _id: 'archive-group-5',
+          externalId: 'cn=engineers,ou=groups',
+          name: 'archive-only-name',
+          provider: 'ldap',
+        },
+      ];
+      const existingDocs: ExternalUserGroupUniqueFields[] = [
+        {
+          _id: 'existing-group-5',
+          externalId: 'cn=engineers,ou=groups',
+          name: 'existing-only-name',
+          provider: 'saml',
+        },
+      ];
+
+      const result = collectConflicts(
+        'externalusergroups',
+        archiveDocs,
+        existingDocs,
+        EXTERNAL_USER_GROUP_UNIQUE_KEYS,
+      );
+
+      expect(result).toEqual([
+        {
+          collection: 'externalusergroups',
+          field: 'externalId',
+          value: 'cn=engineers,ou=groups',
+          archiveId: 'archive-group-5',
+          existingId: 'existing-group-5',
+        },
+      ]);
+    });
+
+    test('pickExternalUserGroupUniqueFields normalises a raw document to string fields', () => {
+      const picked = pickExternalUserGroupUniqueFields({
+        _id: { toString: () => 'raw-id' },
+        externalId: 'cn=engineers,ou=groups',
+        name: 'engineers',
+        provider: 'ldap',
+      });
+
+      expect(picked).toEqual({
+        _id: 'raw-id',
+        externalId: 'cn=engineers,ou=groups',
+        name: 'engineers',
+        provider: 'ldap',
       });
     });
   });

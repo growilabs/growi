@@ -36,6 +36,13 @@ export interface ExternalAccountUniqueFields {
   accountId?: string | null;
 }
 
+export interface ExternalUserGroupUniqueFields {
+  _id: string;
+  externalId?: string | null;
+  name?: string | null;
+  provider?: string | null;
+}
+
 /**
  * Every value the archive's users hold on a unique field, plus every `_id` it carries.
  *
@@ -204,6 +211,16 @@ export const EXTERNAL_ACCOUNT_UNIQUE_KEYS: readonly UniqueKeySpec<ExternalAccoun
     { label: 'providerType+accountId', fields: ['providerType', 'accountId'] },
   ] as const;
 
+// `externalusergroups` has two independent unique keys (see models/external-user-group.ts):
+// a single-field key on `externalId` and a composite key on {name, provider}. Both are
+// declared here so `collectConflicts` evaluates them separately - a document may conflict
+// on one without conflicting on the other.
+export const EXTERNAL_USER_GROUP_UNIQUE_KEYS: readonly UniqueKeySpec<ExternalUserGroupUniqueFields>[] =
+  [
+    { label: 'externalId', fields: ['externalId'] },
+    { label: 'name+provider', fields: ['name', 'provider'] },
+  ] as const;
+
 type RawDocument = Record<string, unknown>;
 
 /**
@@ -247,6 +264,15 @@ export const pickExternalAccountUniqueFields = (
   _id: toIdString(doc._id),
   providerType: asOptionalString(doc.providerType),
   accountId: asOptionalString(doc.accountId),
+});
+
+export const pickExternalUserGroupUniqueFields = (
+  doc: RawDocument,
+): ExternalUserGroupUniqueFields => ({
+  _id: toIdString(doc._id),
+  externalId: asOptionalString(doc.externalId),
+  name: asOptionalString(doc.name),
+  provider: asOptionalString(doc.provider),
 });
 
 // Only the first and last few bytes are inspected, so verifying a multi-gigabyte archive

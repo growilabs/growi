@@ -40,7 +40,7 @@
   - _Boundary: detect-unique-conflicts externalaccounts declaration_
   - _Depends: 2.1_
 
-- [ ] 2.3 externalusergroupsの一意キー宣言と抽出を追加する
+- [x] 2.3 externalusergroupsの一意キー宣言と抽出を追加する
   - `ExternalUserGroupUniqueFields`型とpick関数、`EXTERNAL_USER_GROUP_UNIQUE_KEYS`(`externalId`単体、`name`+`provider`の複合キーの2エントリ)を追加する。
   - **`detect-unique-conflicts.ts`への追記が2.2と競合しないよう、2.2の完了後に着手する**(同一ファイルへの並行編集を避ける)。
   - Observable: `externalId`衝突、`name`+`provider`衝突それぞれを検知するunit testがグリーン。
