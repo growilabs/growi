@@ -6,6 +6,8 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 import type { AncestorPathNode } from '~/client/util/build-ancestor-path-nodes';
 import { buildAncestorPathNodes } from '~/client/util/build-ancestor-path-nodes';
 
+import { PathSeparator } from './PathSeparator';
+
 import styles from './SearchResultAncestorPath.module.scss';
 
 const { isTrashPage } = pagePathUtils;
@@ -14,10 +16,6 @@ interface SearchResultAncestorPathProps {
   readonly path: string;
   readonly highlightedPath?: string | null;
 }
-
-const Separator = (): JSX.Element => (
-  <span className={`${styles.separator} text-muted`}>/</span>
-);
 
 // Mirrors PagePathHierarchicalLink's `isRoot` branch (home/trash icon + link).
 // Deliberately duplicated rather than shared/extracted — PagePathHierarchicalLink
@@ -109,7 +107,7 @@ export const SearchResultAncestorPath: FC<SearchResultAncestorPathProps> = ({
       {hasAncestors &&
         nodes.map((node) => (
           <Fragment key={nodeKey(node)}>
-            <Separator />
+            <PathSeparator className={styles.separator} />
             <AncestorNode node={node} />
           </Fragment>
         ))}
