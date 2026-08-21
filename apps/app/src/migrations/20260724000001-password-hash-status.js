@@ -67,6 +67,14 @@ export async function reportPasswordHashFormatDistribution(baseFilter = {}) {
   logger.info(
     `  noPassword   (neither field, no password set):     ${counts.noPassword}`,
   );
+  // These counts cover every user regardless of status, but the cleanup script
+  // only blocks on ACTIVE legacyOnly users (a suspended / invited / registered
+  // user cannot be compelled to log in, so waiting for them would stall the
+  // lifecycle forever). Without this note a non-zero legacyOnly here looks like
+  // it contradicts a cleanup run that completes; cleanup reports its own split.
+  logger.info(
+    '  note: legacyOnly counts every status; the cleanup script only blocks on ACTIVE users',
+  );
 
   // Returned for programmatic assertion (integ test); migrate-mongo ignores it.
   return counts;
