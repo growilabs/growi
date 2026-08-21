@@ -1,0 +1,23 @@
+{
+  "feature_name": "g2g-transfer-migration-mode",
+  "created_at": "2026-08-04T17:06:04Z",
+  "updated_at": "2026-08-13T00:00:00Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "increment_note": "2 段階で出す spec。第 1 段（タスク 1〜6: 引っ越しモードが無くても効く既存不具合の修正）は PR #11658 でマージ済みで、タグ v8.0.1 に含まれる。第 2 段（タスク 7〜11: 引っ越しモード本体。既定の意味を破壊的な置き換えに変えるため独立したレビューと確認の期間を取る）は 2026-08-10 に着手。第 1 段で部分的にしか満たしていない受け入れ基準（6.3 / 2.4 / 2.8 / 2.1）は第 2 段の 7.3・9.3 で満たす。前提の衝突検知ゲート（spec g2g-import-conflict-detection、PR #11643）はマージ済み。"
+}

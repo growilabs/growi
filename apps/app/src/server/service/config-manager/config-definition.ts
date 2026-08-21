@@ -289,10 +289,6 @@ export const CONFIG_KEYS = [
   'slackbot:withProxy:saltForGtoP',
   'slackbot:withProxy:saltForPtoG',
 
-  // OpenAI Settings
-  'openai:serviceType',
-  'openai:apiKey',
-
   // AI Tools Settings
   'aiTools:suggestPathAgenticSearchLimit',
   'aiTools:suggestPathAgenticChildListingLimit',
@@ -1283,17 +1279,6 @@ export const CONFIG_DEFINITIONS = {
   'slackbot:withProxy:saltForPtoG': defineConfig<string>({
     envVarName: 'SLACKBOT_WITH_PROXY_SALT_FOR_PTOG',
     defaultValue: 'ptog',
-    isSecret: true,
-  }),
-
-  // OpenAI Settings
-  'openai:serviceType': defineConfig<'openai' | 'azure-openai'>({
-    envVarName: 'OPENAI_SERVICE_TYPE',
-    defaultValue: 'openai',
-  }),
-  'openai:apiKey': defineConfig<string | undefined>({
-    envVarName: 'OPENAI_API_KEY',
-    defaultValue: undefined,
     isSecret: true,
   }),
 

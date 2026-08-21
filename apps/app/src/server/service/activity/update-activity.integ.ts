@@ -7,10 +7,9 @@
  * (`test/setup/prisma.ts`) binds the Prisma client to, then assert that all 8
  * observable update-suppression scenarios produce the correct boolean outcome.
  *
- * Revision records are kept as Mongoose `Revision.insertMany` because the Revision
- * model has NOT been migrated to Prisma; in the integration project Mongoose and
- * Prisma share the same DB, so the `revisionCount` path in `shouldGenerateUpdate`
- * still works correctly.
+ * Revision records are seeded via `prisma.revisions.createMany`, matching the
+ * `revisionCount` path in `shouldGenerateUpdate`, which reads via
+ * `prisma.revisions.count`.
  *
  * Requires a real MongoDB connection (wired by vitest.workspace.mts integ setup).
  * These tests CANNOT run locally (no mongod binary / egress 403).
@@ -25,7 +24,6 @@
 import mongoose, { Types } from 'mongoose';
 
 import { SupportedAction } from '~/interfaces/activity';
-import { Revision } from '~/server/models/revision';
 import { prisma } from '~/utils/prisma';
 
 import { shouldGenerateUpdate } from './update-activity-logic';
@@ -73,7 +71,7 @@ describe('shouldGenerateUpdate()', () => {
 
   beforeEach(async () => {
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
-    await Revision.deleteMany({});
+    await prisma.revisions.deleteMany();
 
     // Reset date and IDs between tests
     date = new Date();
@@ -91,7 +89,7 @@ describe('shouldGenerateUpdate()', () => {
 
   afterAll(async () => {
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
-    await Revision.deleteMany({});
+    await prisma.revisions.deleteMany({});
   });
 
   it('should not generate update activity if: a create was performed but no update made', async () => {
@@ -107,15 +105,14 @@ describe('shouldGenerateUpdate()', () => {
       ],
     });
 
-    await Revision.insertMany([
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
+    await prisma.revisions.create({
+      data: {
+        pageId: targetPageId.toString(),
         body: 'Old content',
         format: 'markdown',
-        author: currentUserId,
+        authorId: currentUserId.toString(),
       },
-    ]);
+    });
 
     const result = await shouldGenerateUpdate({
       targetPageId: targetPageIdStr,
@@ -157,29 +154,28 @@ describe('shouldGenerateUpdate()', () => {
     });
 
     // More than 2 revisions means it is NOT the first update
-    await Revision.insertMany([
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Old content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Old content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Newer content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-    ]);
+    await prisma.revisions.createMany({
+      data: [
+        {
+          pageId: targetPageId.toString(),
+          body: 'Old content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+        {
+          pageId: targetPageId.toString(),
+          body: 'Old content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+        {
+          pageId: targetPageId.toString(),
+          body: 'Newer content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+      ],
+    });
 
     const result = await shouldGenerateUpdate({
       targetPageId: targetPageIdStr,
@@ -210,22 +206,22 @@ describe('shouldGenerateUpdate()', () => {
       ],
     });
 
-    await Revision.insertMany([
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Old content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Old content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-    ]);
+    await prisma.revisions.createMany({
+      data: [
+        {
+          pageId: targetPageId.toString(),
+          body: 'Old content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+        {
+          pageId: targetPageId.toString(),
+          body: 'Old content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+      ],
+    });
 
     const result = await shouldGenerateUpdate({
       targetPageId: targetPageIdStr,
@@ -255,22 +251,22 @@ describe('shouldGenerateUpdate()', () => {
       ],
     });
 
-    await Revision.insertMany([
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Old content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Newer content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-    ]);
+    await prisma.revisions.createMany({
+      data: [
+        {
+          pageId: targetPageId.toString(),
+          body: 'Old content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+        {
+          pageId: targetPageId.toString(),
+          body: 'Newer content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+      ],
+    });
 
     const result = await shouldGenerateUpdate({
       targetPageId: targetPageIdStr,
@@ -301,22 +297,22 @@ describe('shouldGenerateUpdate()', () => {
       ],
     });
 
-    await Revision.insertMany([
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Old content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Newer content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-    ]);
+    await prisma.revisions.createMany({
+      data: [
+        {
+          pageId: targetPageId.toString(),
+          body: 'Old content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+        {
+          pageId: targetPageId.toString(),
+          body: 'Newer content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+      ],
+    });
 
     const result = await shouldGenerateUpdate({
       targetPageId: targetPageIdStr,
@@ -355,29 +351,28 @@ describe('shouldGenerateUpdate()', () => {
       ],
     });
 
-    await Revision.insertMany([
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Old content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Old content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Newer content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-    ]);
+    await prisma.revisions.createMany({
+      data: [
+        {
+          pageId: targetPageId.toString(),
+          body: 'Old content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+        {
+          pageId: targetPageId.toString(),
+          body: 'Old content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+        {
+          pageId: targetPageId.toString(),
+          body: 'Newer content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+      ],
+    });
 
     const result = await shouldGenerateUpdate({
       targetPageId: targetPageIdStr,
@@ -416,29 +411,28 @@ describe('shouldGenerateUpdate()', () => {
       ],
     });
 
-    await Revision.insertMany([
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Old content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Old content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Newer content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-    ]);
+    await prisma.revisions.createMany({
+      data: [
+        {
+          pageId: targetPageId.toString(),
+          body: 'Old content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+        {
+          pageId: targetPageId.toString(),
+          body: 'Old content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+        {
+          pageId: targetPageId.toString(),
+          body: 'Newer content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+      ],
+    });
 
     const result = await shouldGenerateUpdate({
       targetPageId: targetPageIdStr,
@@ -481,29 +475,28 @@ describe('shouldGenerateUpdate()', () => {
       ],
     });
 
-    await Revision.insertMany([
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Old content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Newer content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-      {
-        _id: new mongoose.Types.ObjectId(),
-        pageId: targetPageId,
-        body: 'Newer content',
-        format: 'markdown',
-        author: currentUserId,
-      },
-    ]);
+    await prisma.revisions.createMany({
+      data: [
+        {
+          pageId: targetPageId.toString(),
+          body: 'Old content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+        {
+          pageId: targetPageId.toString(),
+          body: 'Newer content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+        {
+          pageId: targetPageId.toString(),
+          body: 'Newer content',
+          format: 'markdown',
+          authorId: currentUserId.toString(),
+        },
+      ],
+    });
 
     const result = await shouldGenerateUpdate({
       targetPageId: targetPageIdStr,
