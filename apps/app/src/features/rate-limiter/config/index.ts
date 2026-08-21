@@ -33,12 +33,21 @@ export const defaultConfig: IApiRateLimitEndpointMap = {
     maxRequests: 60,
     usersPerIpProspection: 1,
   },
-  // POST lives on routerForAdmin, also mounted at '/_api/v3'. The bare
-  // '/installer' only ever matched the legacy GET page route, so the POST that
-  // actually runs scrypt was unthrottled.
+  // The scrypt-running POST lives on routerForAdmin, also mounted at '/_api/v3',
+  // so the bare '/installer' key never throttled it.
   '/_api/v3/installer': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
+    usersPerIpProspection: 1,
+  },
+  // The legacy installer PAGE (`app.get('/installer')`, server/routes/index.js)
+  // still lives at this path and must keep its own entry. A key is looked up by
+  // `req.path` alone — the method is only consulted for `maxRequests`, while
+  // `usersPerIpProspection` applies unconditionally (middleware/factory.ts) — so
+  // dropping this key would silently widen the page's per-IP ceiling 5x.
+  '/installer': {
+    method: 'GET',
+    maxRequests: MAX_REQUESTS_TIER_3,
     usersPerIpProspection: 1,
   },
   // The legacy `POST /login` route no longer exists, so a '/login' key matched
@@ -74,7 +83,9 @@ export const defaultConfig: IApiRateLimitEndpointMap = {
     maxRequests: MAX_REQUESTS_TIER_2,
     usersPerIpProspection: 1,
   },
-  '/_api/check_username': {
+  // The live route is `router.get('/check-username')` on the apiv3 router
+  // (mounted at '/_api/v3'); the old '/_api/check_username' key matched nothing.
+  '/_api/v3/check-username': {
     method: 'GET',
     maxRequests: MAX_REQUESTS_TIER_3,
   },

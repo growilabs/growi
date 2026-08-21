@@ -74,5 +74,10 @@ export const scopeFilter = (
 ): Filter<Document> => {
   const combined =
     base != null && Object.keys(base).length > 0 ? [base, ...filters] : filters;
+  // MongoDB rejects an empty `$and`, so an unscoped call with no filters must
+  // degrade to "match everything" rather than build one.
+  if (combined.length === 0) {
+    return {};
+  }
   return combined.length === 1 ? combined[0] : { $and: combined };
 };

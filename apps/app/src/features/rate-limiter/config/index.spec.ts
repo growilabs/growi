@@ -40,7 +40,6 @@ const DEAD_PRE_MOUNT_KEYS = [
   '/invited',
   '/register',
   '/user-activation/register',
-  '/installer',
 ] as const;
 
 /**
@@ -85,6 +84,21 @@ describe('rate-limiter defaultConfig — unauthenticated scrypt-bearing endpoint
   )('throttles %s strictly below the permissive default', (endpoint) => {
     // A key whose effective ceiling reaches the fallback is a no-op key.
     expect(effectiveCeilingPerIp(endpoint)).toBeLessThan(
+      PERMISSIVE_DEFAULT_CEILING_PER_IP,
+    );
+  });
+
+  it('keeps a separate entry for the legacy GET /installer page', () => {
+    // A key is matched on req.path alone; `usersPerIpProspection` then applies
+    // regardless of method (middleware/factory.ts). Retargeting the POST to
+    // '/_api/v3/installer' without keeping this entry silently widened the
+    // page's per-IP ceiling from 500 to the 2500 default.
+    const config = defaultConfig['/installer'];
+
+    expect(config).toBeDefined();
+    expect(config.method).toBe('GET');
+    expect(config.usersPerIpProspection).toBe(1);
+    expect(effectiveCeilingPerIp('/installer')).toBeLessThan(
       PERMISSIVE_DEFAULT_CEILING_PER_IP,
     );
   });
