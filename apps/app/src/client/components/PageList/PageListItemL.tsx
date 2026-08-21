@@ -134,17 +134,36 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
     ? pageMeta.revisionShortBody
     : null;
 
-  const dPagePath: DevidedPagePath = new DevidedPagePath(pageData.path, false);
-  const linkedPagePathFormer = new LinkedPagePath(dPagePath.former);
+  // evalDatePath is applied here too (not just on the highlighted variant
+  // below) so this plain split can serve as the reliable reference for the
+  // page-name highlight-consistency check below.
+  const dPagePath: DevidedPagePath = new DevidedPagePath(
+    pageData.path,
+    false,
+    isPathTruncationEnabled,
+  );
 
   const dPagePathHighlighted: DevidedPagePath = new DevidedPagePath(
     elasticSearchResult?.highlightedPath || pageData.path,
     true,
     isPathTruncationEnabled,
   );
-  const linkedPagePathHighlightedFormer = new LinkedPagePath(
-    dPagePathHighlighted.former,
-  );
+
+  // An ES highlight `<em>` landing on/inside a trailing date can break the
+  // date-bundling regex (it requires literal trailing digits) on the
+  // highlighted string while it still matches on the plain path, silently
+  // producing a different former/latter split than the ancestor row uses.
+  // Detect the mismatch by comparing ancestor-segment counts -- mirrors
+  // buildAncestorPathNodes' isHighlightReliable guard -- and fall back to the
+  // reliable plain-text page name rather than showing a truncated/incorrect one.
+  const countPathSegments = (former: string): number =>
+    former.split('/').filter((segment) => segment.length > 0).length;
+  const isPageNameHighlightReliable =
+    countPathSegments(dPagePath.former) ===
+    countPathSegments(dPagePathHighlighted.former);
+  const pageName = isPageNameHighlightReliable
+    ? dPagePathHighlighted.latter
+    : dPagePath.latter;
 
   const lastUpdateDate = format(
     new Date(pageData.updatedAt),
@@ -301,8 +320,10 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
                   </span>
                 ) : (
                   <PagePathHierarchicalLink
-                    linkedPagePath={linkedPagePathFormer}
-                    linkedPagePathByHtml={linkedPagePathHighlightedFormer}
+                    linkedPagePath={new LinkedPagePath(dPagePath.former)}
+                    linkedPagePathByHtml={
+                      new LinkedPagePath(dPagePathHighlighted.former)
+                    }
                   />
                 )}
                 {showPageUpdatedTime && (
@@ -330,11 +351,11 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
                           <span
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight markup is sanitized
                             dangerouslySetInnerHTML={{
-                              __html: dPagePathHighlighted.latter,
+                              __html: pageName,
                             }}
                           />
                         ) : (
-                          dPagePathHighlighted.latter
+                          pageName
                         )}
                       </Link>
                     </span>

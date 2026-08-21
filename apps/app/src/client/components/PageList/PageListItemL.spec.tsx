@@ -49,10 +49,14 @@ const createPageData = (overrides: Partial<IPageHasId> = {}): IPageHasId =>
     ...overrides,
   });
 
-const createPageWithMeta = (pageData: IPageHasId): IPageWithSearchMeta => ({
+const createPageWithMeta = (
+  pageData: IPageHasId,
+  highlightedPath?: string,
+): IPageWithSearchMeta => ({
   data: pageData,
   meta: {
-    elasticSearchResult: undefined,
+    elasticSearchResult:
+      highlightedPath != null ? { highlightedPath } : undefined,
   },
 });
 
@@ -178,6 +182,39 @@ describe('PageListItemL', () => {
 
       const titleLink = container.querySelector('a[href="/p2"]');
       expect(titleLink?.textContent).toBe('2024/01/15');
+    });
+
+    it('falls back to the plain bundled page name when a search highlight lands on the date suffix', () => {
+      // Requirement 6/7 regression: an ES <em> landing on/inside a trailing
+      // date used to break the date-bundling regex on the highlighted string
+      // only, desyncing the page name from the ancestor row (which reads the
+      // plain path) -- see tasks.md/design.md notes on this bug.
+      const pageData = createPageData({ _id: 'p3', path: '/A/B/2024/01/15' });
+      const { container } = render(
+        <PageListItemL
+          page={createPageWithMeta(pageData, '/A/B/<em>2024</em>/01/15')}
+          isReadOnlyUser={false}
+          isPathTruncationEnabled
+        />,
+      );
+
+      const titleLink = container.querySelector('a[href="/p3"]');
+      expect(titleLink?.textContent).toBe('2024/01/15');
+    });
+
+    it('falls back to the plain bundled page name when the whole date is highlighted (no orphaned closing tag)', () => {
+      const pageData = createPageData({ _id: 'p4', path: '/A/B/2024/01/15' });
+      const { container } = render(
+        <PageListItemL
+          page={createPageWithMeta(pageData, '/A/B/<em>2024/01/15</em>')}
+          isReadOnlyUser={false}
+          isPathTruncationEnabled
+        />,
+      );
+
+      const titleLink = container.querySelector('a[href="/p4"]');
+      expect(titleLink?.textContent).toBe('2024/01/15');
+      expect(titleLink?.innerHTML).not.toContain('</em>');
     });
 
     it('still supports checkbox selection and row click', () => {
