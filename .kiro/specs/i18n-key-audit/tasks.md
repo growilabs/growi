@@ -201,7 +201,7 @@
 
 ## 9. Validation: 既存テストの整理確認と全体の回帰確認
 
-- [ ] 9.1 既存の手書きドリフトテスト2本が、変更無しで妥当なままであることを確認する
+- [x] 9.1 既存の手書きドリフトテスト2本が、変更無しで妥当なままであることを確認する
   - `i18n-reconcile.spec.ts`（8つの特定キーの存在・非空確認）と `g2g-error-keys-locale-drift.spec.ts`（`admin:g2g:*` の実在確認と `KEYS_WITH_DETAIL_MESSAGE` の整合性確認）の両方を、他タスクの変更後も無修正のまま実行し、green であることを確認する
   - 特に 4.4（クライアント側の `admin:g2g:transfer_success` を `.` 区切りに直す）の後で `g2g-error-keys-locale-drift.spec.ts` が無修正・green のままであることを確認する。同 spec がキーを抽出しているのは `server/service/g2g-transfer.ts` だけなので差分は出ない想定だが、この想定が正しいことを実行で確かめる
   - 観測可能な完了条件: 2本のテストファイルに差分が無いこと、かつ両方が green であることを確認できる
