@@ -7,7 +7,7 @@
 > **進め方**: TDD(RED→GREEN)。検知は実DB(レプリカセット rs0)を読み直す結合試験で合否を判定する既存方針を踏襲する。
 
 - [ ] 1. 一意キーの型と複合キー判定を一般化する(基盤)
-- [ ] 1.1 UniqueKeySpec型を導入し、collectConflictsを複合キー対応にする
+- [x] 1.1 UniqueKeySpec型を導入し、collectConflictsを複合キー対応にする
   - `UniqueKeySpec<T> = {label, fields}`型を定義し、`collectConflicts`の第4引数を`readonly UniqueField[]`から`readonly UniqueKeySpec<T>[]`へ変更する。
   - 複合キーの合成値は`JSON.stringify(fields.map(...))`で作る。`fields`のいずれかが空値のドキュメントは照合しない。
   - `UniqueFieldConflict.collection`を4コレクションの合併型へ、`field`の型を`UniqueField`(閉じた合併型)から`string`へ拡張する。
@@ -95,7 +95,7 @@
   - Observable: `rescue-admins.spec.ts`がコンパイル・実行できる。
   - _Requirements: 1.1_
   - _Boundary: rescue-admins.spec.ts_
-  - _Depends: 1.1_
+  - _Depends: 3.1_
 
 - [ ] 7.2 g2g-transfer.integ.tsのアサーションを新しいレポート形式へ書き換え、externalaccountsの衝突で受信フローが中断することを確認する
   - `report.userConflicts`/`report.groupConflicts`を直接読んでいる箇所(約10箇所)を、`conflictsByCollection`経由の読み方へ書き換える。
@@ -144,3 +144,8 @@
   - [ ] 10.5 本specディレクトリを削除する
     - `.kiro/specs/g2g-external-auth-conflict-detection/`を削除する。
   - Observable: g2g-import-conflict-detectionのdesign.md/requirements.mdがexternalaccounts/externalusergroupsの検知を対象として記述しており、`g2g-external-auth-conflict-detection`ディレクトリが存在しない。
+
+## Implementation Notes
+
+- 1.1完了時のレビューで判明: 7.1の`_Depends:_`を`1.1`から`3.1`へ修正した。7.1は`USER_UNIQUE_KEYS`(1.1ではなく3.1で導入)を参照するため、1.1完了時点ではまだ着手できない。
+- 1.1: 複合キーの`UniqueFieldConflict.value`は`JSON.stringify(values)`形式(例: `["saml","x"]`)。単一フィールドキーは従来どおり素の値を報告する(`toReportedValue`が`toMatchKey`から独立)。タスク4(通知汎用化)はこの形式を前提に文言を組み立てること。

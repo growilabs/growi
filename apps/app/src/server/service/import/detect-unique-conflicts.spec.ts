@@ -23,7 +23,7 @@ describe('collectConflicts', () => {
       ];
 
       const result = collectConflicts('users', archiveDocs, existingDocs, [
-        'username',
+        { label: 'username', fields: ['username'] },
       ]);
 
       expect(result).toEqual([
@@ -47,7 +47,7 @@ describe('collectConflicts', () => {
       ];
 
       const result = collectConflicts('users', archiveDocs, existingDocs, [
-        'email',
+        { label: 'email', fields: ['email'] },
       ]);
 
       expect(result).toEqual([
@@ -71,7 +71,7 @@ describe('collectConflicts', () => {
       ];
 
       const result = collectConflicts('users', archiveDocs, existingDocs, [
-        'slackMemberId',
+        { label: 'slackMemberId', fields: ['slackMemberId'] },
       ]);
 
       expect(result).toEqual([
@@ -95,8 +95,8 @@ describe('collectConflicts', () => {
       ];
 
       const result = collectConflicts('users', archiveDocs, existingDocs, [
-        'username',
-        'email',
+        { label: 'username', fields: ['username'] },
+        { label: 'email', fields: ['email'] },
       ]);
 
       expect(result).toEqual([]);
@@ -118,7 +118,7 @@ describe('collectConflicts', () => {
       ];
 
       const result = collectConflicts('users', archiveDocs, existingDocs, [
-        'email',
+        { label: 'email', fields: ['email'] },
       ]);
 
       expect(result).toEqual([]);
@@ -141,8 +141,8 @@ describe('collectConflicts', () => {
       ];
 
       const result = collectConflicts('users', archiveDocs, existingDocs, [
-        'username',
-        'email',
+        { label: 'username', fields: ['username'] },
+        { label: 'email', fields: ['email'] },
       ]);
 
       expect(result).toHaveLength(2);
@@ -174,7 +174,7 @@ describe('collectConflicts', () => {
       ];
 
       const result = collectConflicts('usergroups', archiveDocs, existingDocs, [
-        'name',
+        { label: 'name', fields: ['name'] },
       ]);
 
       expect(result).toEqual([
@@ -198,7 +198,105 @@ describe('collectConflicts', () => {
       ];
 
       const result = collectConflicts('usergroups', archiveDocs, existingDocs, [
-        'name',
+        { label: 'name', fields: ['name'] },
+      ]);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('composite key', () => {
+    const compositeKey = {
+      label: 'username+email',
+      fields: ['username', 'email'],
+    } as const;
+
+    test('does not flag a conflict when only one of the two fields matches', () => {
+      // Requirement 1.2: a partial match on a composite unique key is not a conflict.
+      const archiveDocs: UserUniqueFields[] = [
+        { _id: 'archive-user-1', username: 'alice', email: 'alice@a.example' },
+      ];
+      const existingDocs: UserUniqueFields[] = [
+        { _id: 'existing-user-1', username: 'alice', email: 'alice@b.example' },
+      ];
+
+      const result = collectConflicts('users', archiveDocs, existingDocs, [
+        compositeKey,
+      ]);
+
+      expect(result).toEqual([]);
+    });
+
+    test('flags a conflict when every field of the key matches under a different _id', () => {
+      // Requirement 1.1 / 1.4
+      const archiveDocs: UserUniqueFields[] = [
+        { _id: 'archive-user-1', username: 'alice', email: 'alice@a.example' },
+      ];
+      const existingDocs: UserUniqueFields[] = [
+        { _id: 'existing-user-1', username: 'alice', email: 'alice@a.example' },
+      ];
+
+      const result = collectConflicts('users', archiveDocs, existingDocs, [
+        compositeKey,
+      ]);
+
+      expect(result).toEqual([
+        {
+          collection: 'users',
+          field: 'username+email',
+          value: JSON.stringify(['alice', 'alice@a.example']),
+          archiveId: 'archive-user-1',
+          existingId: 'existing-user-1',
+        },
+      ]);
+    });
+
+    test('does not flag a conflict when the per-field values differ but a delimiter concatenation would collide', () => {
+      // Requirement 1.2: proves the composite value is built with JSON.stringify and not
+      // by joining the fields with a delimiter -- 'a' + '|' + 'b|c' and 'a|b' + '|' + 'c'
+      // are both 'a|b|c', yet these are two different pairs of values.
+      const archiveDocs: UserUniqueFields[] = [
+        { _id: 'archive-user-1', username: 'a', email: 'b|c' },
+      ];
+      const existingDocs: UserUniqueFields[] = [
+        { _id: 'existing-user-1', username: 'a|b', email: 'c' },
+      ];
+
+      const result = collectConflicts('users', archiveDocs, existingDocs, [
+        compositeKey,
+      ]);
+
+      expect(result).toEqual([]);
+    });
+
+    test('does not flag a conflict when every field of the key matches under the same _id', () => {
+      // Requirement 1.5
+      const archiveDocs: UserUniqueFields[] = [
+        { _id: 'same-id', username: 'alice', email: 'alice@a.example' },
+      ];
+      const existingDocs: UserUniqueFields[] = [
+        { _id: 'same-id', username: 'alice', email: 'alice@a.example' },
+      ];
+
+      const result = collectConflicts('users', archiveDocs, existingDocs, [
+        compositeKey,
+      ]);
+
+      expect(result).toEqual([]);
+    });
+
+    test('does not match a document for a key whose fields are not all filled in', () => {
+      // The sparse-field exclusion generalised to a composite key: a document missing any
+      // field of the key holds no value on that key, so it cannot violate the index.
+      const archiveDocs: UserUniqueFields[] = [
+        { _id: 'archive-user-1', username: 'alice' },
+      ];
+      const existingDocs: UserUniqueFields[] = [
+        { _id: 'existing-user-1', username: 'alice' },
+      ];
+
+      const result = collectConflicts('users', archiveDocs, existingDocs, [
+        compositeKey,
       ]);
 
       expect(result).toEqual([]);

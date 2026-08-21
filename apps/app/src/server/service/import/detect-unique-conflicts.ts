@@ -43,9 +43,29 @@ export type ArchiveUserIdentity = {
   readonly ids: ReadonlySet<string>;
 };
 
+export type CollectionName =
+  | 'users'
+  | 'usergroups'
+  | 'externalaccounts'
+  | 'externalusergroups';
+
+/**
+ * One unique constraint, as a set of fields that are unique *together*.
+ *
+ * A single-field constraint is the one-element case, so the same declaration covers
+ * `username` and `providerType` + `accountId` alike. `label` is what the operator sees
+ * (a field name, or something like `providerType+accountId` for a composite key).
+ */
+export interface UniqueKeySpec<T> {
+  label: string;
+  fields: readonly (keyof T & string)[];
+}
+
 export interface UniqueFieldConflict {
-  collection: 'users' | 'usergroups';
-  field: UniqueField;
+  collection: CollectionName;
+  // Widened from the closed union of field names: a composite key's label is not a field
+  // name, so it does not fit that union.
+  field: string;
   value: string;
   archiveId: string;
   existingId: string;
@@ -65,38 +85,81 @@ const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
 
 /**
- * Pure comparison: enumerates every archive document whose unique field value matches
- * an existing document's value under a different `_id`. Receives both datasets as
- * arguments (does not import or fetch them) so it stays reusable and unit-testable.
+ * The values one document holds on one unique key, or `null` when it holds none.
+ *
+ * A key is only violated when every one of its fields carries a value, so a document
+ * missing any of them is not matched on that key at all - the sparse-field exclusion
+ * above, generalised from a single field to a set of them.
+ */
+const readKeyValues = <T>(
+  doc: T,
+  fields: readonly (keyof T & string)[],
+): string[] | null => {
+  const values: string[] = [];
+
+  for (const field of fields) {
+    const value = doc[field];
+    if (!isNonEmptyString(value)) return null;
+    values.push(value);
+  }
+
+  return values;
+};
+
+/**
+ * The map key a composite unique key is indexed under.
+ *
+ * Built with `JSON.stringify` over the array rather than by joining the values with a
+ * delimiter, because no delimiter is safe here: a field like SAML's `accountId` may hold
+ * any string, including the delimiter itself. Joining with `|` makes
+ * `{providerType: 'a', accountId: 'b|c'}` and `{providerType: 'a|b', accountId: 'c'}`
+ * both read as `a|b|c` and collide, which would report a conflict between two documents
+ * that do not actually share a key (requirement 1.2). The array form keeps each value's
+ * boundaries explicit, so values can never run into each other.
+ */
+const toMatchKey = (values: readonly string[]): string =>
+  JSON.stringify(values);
+
+// A single-field key reports the bare value, which is what the operator recognises; only
+// a composite key needs the array form to show which value belongs to which field.
+// Deliberately not routed through `toMatchKey`: how a key is matched and how it is shown
+// to an operator are separate concerns and must be free to diverge.
+const toReportedValue = (values: readonly string[]): string =>
+  values.length === 1 ? values[0] : JSON.stringify(values);
+
+/**
+ * Pure comparison: enumerates every archive document whose unique key values match an
+ * existing document's under a different `_id`. Receives both datasets as arguments (does
+ * not import or fetch them) so it stays reusable and unit-testable.
  */
 export function collectConflicts<T extends { _id: string }>(
-  collection: 'users' | 'usergroups',
+  collection: CollectionName,
   archiveDocs: readonly T[],
   existingDocs: readonly T[],
-  fields: readonly (UniqueField & keyof T)[],
+  keys: readonly UniqueKeySpec<T>[],
 ): UniqueFieldConflict[] {
   const conflicts: UniqueFieldConflict[] = [];
 
-  for (const field of fields) {
-    // Index existing docs by value once per field to avoid an N+1 scan per archive doc.
+  for (const key of keys) {
+    // Index existing docs by key value once per key to avoid an N+1 scan per archive doc.
     const existingIdByValue = new Map<string, string>();
     for (const existingDoc of existingDocs) {
-      const value = existingDoc[field];
-      if (!isNonEmptyString(value)) continue;
-      existingIdByValue.set(value, existingDoc._id);
+      const values = readKeyValues(existingDoc, key.fields);
+      if (values == null) continue;
+      existingIdByValue.set(toMatchKey(values), existingDoc._id);
     }
 
     for (const archiveDoc of archiveDocs) {
-      const value = archiveDoc[field];
-      if (!isNonEmptyString(value)) continue;
+      const values = readKeyValues(archiveDoc, key.fields);
+      if (values == null) continue;
 
-      const existingId = existingIdByValue.get(value);
+      const existingId = existingIdByValue.get(toMatchKey(values));
       if (existingId == null || existingId === archiveDoc._id) continue;
 
       conflicts.push({
         collection,
-        field,
-        value,
+        field: key.label,
+        value: toReportedValue(values),
         archiveId: archiveDoc._id,
         existingId,
       });
@@ -346,7 +409,14 @@ const detectForCollection = async <T extends { _id: string }>(input: {
     pick,
   });
 
-  return collectConflicts(collection, archiveDocs, existingDocs, fields);
+  // These collections are still declared as a flat field list; each field is its own
+  // single-field unique key. Generalising the declaration itself is a later step.
+  return collectConflicts(
+    collection,
+    archiveDocs,
+    existingDocs,
+    fields.map((field) => ({ label: field, fields: [field] })),
+  );
 };
 
 // Counts and field names only: the conflicting values are user data (e-mail addresses,
