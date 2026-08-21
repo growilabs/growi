@@ -1,5 +1,6 @@
 import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
+import { randomSleep } from '~/server/util/random-sleep';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 
@@ -50,14 +51,6 @@ const matchesGrowiVersion = (
       return false;
     }
   });
-};
-
-/**
- * Sleep for a random duration between 0 and maxMs
- */
-const randomSleep = (maxMs: number): Promise<void> => {
-  const ms = Math.floor(Math.random() * maxMs);
-  return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
 export class NewsCronService extends CronService {
