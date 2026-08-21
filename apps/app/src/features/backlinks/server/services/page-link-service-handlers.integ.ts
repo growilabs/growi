@@ -180,14 +180,35 @@ describe('handlePageUpsertById (integration)', () => {
     expect(await outboundRowsOf(pageId)).toEqual([]);
   });
 
+  it('reports the time it spent extracting, so the queue can pace on it', async () => {
+    idByPath.set('/a', new Types.ObjectId());
+    // Long enough that the extraction is unambiguously measurable.
+    const body = Array.from(
+      { length: 200 },
+      (_, i) => `## Section ${i}\n\nprose with [a](/a) and \`code\`.\n\n`,
+    ).join('');
+    const pageId = await createPage('/measured-source', body);
+
+    const extractionMs = await handlePageUpsertById(pageId.toString(), siteUrl);
+
+    // Bracketed rather than just non-zero: the queue rests in proportion to this number, so both a
+    // handler that stopped reporting it and one reporting the wrong unit would silently scale
+    // pacing by 1000x. A body this size measured ~88ms, so these bounds hold with a wide margin on
+    // any machine while still failing on either unit error.
+    expect(extractionMs).toBeGreaterThan(2);
+    expect(extractionMs).toBeLessThan(1000);
+  });
+
   it('creates no rows for a page that no longer exists', async () => {
     const goneId = new Types.ObjectId();
     idByPath.set('/a', new Types.ObjectId());
 
-    await handlePageUpsertById(goneId.toString(), siteUrl);
+    const extractionMs = await handlePageUpsertById(goneId.toString(), siteUrl);
 
     // A stale queue entry for a deleted source must not leave orphan rows behind.
     expect(await PageLink.find({ fromPage: goneId }).lean()).toEqual([]);
+    // Nothing extracted, so no rest is owed.
+    expect(extractionMs).toBe(0);
   });
 
   it('creates no rows for a page trashed while it sat in the queue', async () => {
@@ -201,9 +222,10 @@ describe('handlePageUpsertById (integration)', () => {
       { $set: { path: `/trash${PREFIX}/trashed-source`, status: 'deleted' } },
     );
 
-    await handlePageUpsertById(pageId.toString(), siteUrl);
+    const extractionMs = await handlePageUpsertById(pageId.toString(), siteUrl);
 
     expect(await outboundRowsOf(pageId)).toEqual([]);
+    expect(extractionMs).toBe(0);
   });
 
   it('still indexes a legacy page whose status is unset', async () => {

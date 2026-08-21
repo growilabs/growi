@@ -382,7 +382,7 @@ export const CONFIG_KEYS = [
 
   // Backlinks Settings
   'backlinks:drainIntervalMs',
-  'backlinks:maxPagesPerDrain',
+  'backlinks:dutyCyclePercent',
 ] as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
@@ -1601,9 +1601,11 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'BACKLINKS_DRAIN_INTERVAL_MS',
     defaultValue: 1000,
   }),
-  'backlinks:maxPagesPerDrain': defineConfig<number>({
-    envVarName: 'BACKLINKS_MAX_PAGES_PER_DRAIN',
-    defaultValue: 3,
+  // Share of the event loop the backlinks queue may occupy. A percent integer, not a fraction:
+  // numeric env vars go through a bare parseInt, which would read 0.2 as 0.
+  'backlinks:dutyCyclePercent': defineConfig<number>({
+    envVarName: 'BACKLINKS_DUTY_CYCLE_PERCENT',
+    defaultValue: 20,
   }),
 } as const;
 

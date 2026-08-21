@@ -5,7 +5,6 @@ import { mock } from 'vitest-mock-extended';
 import type Crowi from '~/server/crowi';
 import type PageEvent from '~/server/events/page';
 import type { PageDocument } from '~/server/models/page';
-import { CONFIG_DEFINITIONS } from '~/server/service/config-manager/config-definition';
 
 import { PageLinkService } from './page-link-service';
 
@@ -35,15 +34,16 @@ vi.mock('~/utils/logger', () => ({
 describe('PageLinkService (live extraction queue)', () => {
   const siteUrl = 'https://wiki.example';
 
-  // Deliberately not the shipped defaults (1000 / 3): the assertions below only hold if the
-  // queue paces on the configured values rather than on constants of its own.
+  // Deliberately not the shipped default (1000): the assertions below only hold if the queue
+  // paces on the configured value rather than on a constant of its own.
   const DRAIN_INTERVAL_MS = 500;
-  const MAX_PAGES_PER_DRAIN = 2;
 
   const configValues: Record<string, string | number> = {
     'app:siteUrl': siteUrl,
     'backlinks:drainIntervalMs': DRAIN_INTERVAL_MS,
-    'backlinks:maxPagesPerDrain': MAX_PAGES_PER_DRAIN,
+    // 100% duty means the queue never rests: pacing is covered in page-link-upsert-queue.spec.ts,
+    // and this file is about which pages get drained, not when.
+    'backlinks:dutyCyclePercent': 100,
   };
 
   let pageEvent: EventEmitter;
@@ -130,50 +130,20 @@ describe('PageLinkService (live extraction queue)', () => {
     expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(1);
   });
 
-  it('drains at most MAX_PAGES_PER_DRAIN distinct pages per tick, and the rest on later ticks', async () => {
-    const pageIds = Array.from(
-      { length: MAX_PAGES_PER_DRAIN * 2 + 1 },
-      () => new Types.ObjectId(),
-    );
+  it('drains a whole burst, extracting each page exactly once', async () => {
+    const pageIds = Array.from({ length: 7 }, () => new Types.ObjectId());
 
     for (const pageId of pageIds) {
       save('create', pageId);
     }
 
-    // A burst is spread over ticks rather than run as one blocking spree of parses.
     await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
-    expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(
-      MAX_PAGES_PER_DRAIN,
-    );
 
-    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS * 2);
-    // Sorted comparison: the order pages are drained in is not part of the contract, but every
-    // page must be extracted exactly once (a mismatch catches both dropped and duplicated ids).
+    // Sorted comparison: drain order is not part of the contract, but every page must be
+    // extracted exactly once (a mismatch catches both dropped and duplicated ids).
     expect(upsertedIds().sort()).toEqual(
       pageIds.map((pageId) => pageId.toString()).sort(),
     );
-  });
-
-  it('still bounds the batch when the configured per-tick budget is unusable', async () => {
-    // A typo'd BACKLINKS_MAX_PAGES_PER_DRAIN reaches config as NaN (config-loader parses numeric
-    // env vars with a bare parseInt), and `batch.length >= NaN` is never true — unguarded, one
-    // tick would parse the whole queue, which is the burst this queue exists to prevent.
-    const declaredBudget =
-      CONFIG_DEFINITIONS['backlinks:maxPagesPerDrain'].defaultValue;
-
-    // A separate emitter so only this service — the one with the broken config — sees the saves.
-    const brokenConfigEvent = new EventEmitter();
-    createService(brokenConfigEvent, {
-      'backlinks:maxPagesPerDrain': Number.NaN,
-    });
-
-    for (let i = 0; i < declaredBudget * 2 + 1; i++) {
-      save('create', new Types.ObjectId(), brokenConfigEvent);
-    }
-
-    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
-
-    expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(declaredBudget);
   });
 
   it('processes a page saved while a drain is in flight on a later tick', async () => {
