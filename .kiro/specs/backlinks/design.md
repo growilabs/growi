@@ -368,7 +368,14 @@ interface IPageLink {
 ```
 - Indexes: `{ fromPage: 1 }`, `{ toPath: 1 }`, `{ toPage: 1 }`, and unique `{ fromPage: 1, toPath: 1 }`.
 - Statics: `replaceOutboundLinks(fromPageId, resolvedRows)`, `findBacklinkSources(toPageId)`,
-  `reconcileDeletedPages(pageIds)`, `reResolveByToPath(path)`.
+  `reconcileDeletedPages(pageIds)`, `repointInboundLinks(toPath, toPage)`.
+- `repointInboundLinks` is the write half of re-resolve-by-path: it points the rows matching
+  `toPath` at an already-resolved `toPage` (`null` = broken) and resolves nothing itself. The
+  resolution lives in the `reResolveByToPath` **service** (page-link-sync), mirroring the
+  `syncOutboundLinks` / `replaceOutboundLinks` split — so the derived `toPage` is always what the
+  shared resolver reports, never a value the caller supplies. The static excludes a row whose own
+  source is the target (a page is never its own backlink), skipping rather than deleting it, since
+  row existence stays owned by `replaceOutboundLinks`.
 
 #### extractInternalLinks
 
@@ -499,8 +506,9 @@ function resolveToPages(paths: string[]): Promise<Map<string, ObjectId>>;
     `reResolveByToPath(page.path)` (correct stale caches from a prior occupant — match on
     `toPath`, not `toPage:null`).
   - `update (page, user)` → re-extract → `syncOutboundLinks`.
-  - Note: handlers call the `syncOutboundLinks` **service** (drops self-links, then
-    persists), never the raw `PageLink.replaceOutboundLinks` model static directly.
+  - Note: handlers call the `syncOutboundLinks` / `reResolveByToPath` **services** (which drop
+    self-links and resolve the target, then persist), never the raw
+    `PageLink.replaceOutboundLinks` / `PageLink.repointInboundLinks` model statics directly.
   - `delete (targetPage, deletedPage, user)`, `deleteCompletely (page, user)`,
     `syncDescendantsDelete (pages[], user)` → `reconcileDeletedPages(ids)`.
 - Ordering/delivery: listeners run asynchronously after the lifecycle op (fire-and-forget, like
@@ -725,6 +733,11 @@ interface ILinkTarget {
   regression net for the shared pipeline, and one of them pins that page view stays uncapped.
 - `reconcileDeletedPages`: trashed page → no-op; permanently-gone page → outbound removed and
   inbound `toPage` nulled (3.3, 6.2).
+- `reResolveByToPath`: forwards the target the resolver reports for the path, and forwards `null`
+  when the path is absent from the map (so a row can return to broken) (5.1, 5.2).
+- `repointInboundLinks`: rows at the path are repointed (stale non-null cache → new occupant, and
+  `null` → healed), rows at other paths untouched; a row whose own source is the target is skipped
+  while the rest of the path is still repointed (1.6, 5.1, 5.2).
 
 ### Integration Tests
 - create/update events drive `PageLink` rows so a page's links appear as backlinks on targets,

@@ -3,12 +3,22 @@ import { Types } from 'mongoose';
 import type { IPageLink } from '../../interfaces/page-link';
 // vi.mock is hoisted above these imports, so PageLink is the mocked default export.
 import PageLink from '../models/page-link';
-import { dropSelfLinks, syncOutboundLinks } from './page-link-sync';
+import {
+  dropSelfLinks,
+  reResolveByToPath,
+  syncOutboundLinks,
+} from './page-link-sync';
+import { resolveToPages } from './target-page-resolution';
 
 vi.mock('../models/page-link', () => ({
   default: {
     replaceOutboundLinks: vi.fn(),
+    repointInboundLinks: vi.fn(),
   },
+}));
+
+vi.mock('./target-page-resolution', () => ({
+  resolveToPages: vi.fn(),
 }));
 
 const row = (toPage: Types.ObjectId | null, toPath = '/target'): IPageLink => ({
@@ -110,5 +120,40 @@ describe('syncOutboundLinks', () => {
     await syncOutboundLinks(fromPageId, [self]);
 
     expect(PageLink.replaceOutboundLinks).toHaveBeenCalledWith(fromPageId, []);
+  });
+});
+
+describe('reResolveByToPath', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('repoints the path at the page the resolver reports for it', async () => {
+    const occupant = new Types.ObjectId();
+    // Two entries, so reading the wrong key fails instead of passing by luck.
+    vi.mocked(resolveToPages).mockResolvedValue(
+      new Map([
+        ['/other', new Types.ObjectId()],
+        ['/target', occupant],
+      ]),
+    );
+
+    await reResolveByToPath('/target');
+
+    expect(PageLink.repointInboundLinks).toHaveBeenCalledTimes(1);
+    expect(PageLink.repointInboundLinks).toHaveBeenCalledWith(
+      '/target',
+      occupant,
+    );
+  });
+
+  it('repoints to null when nothing resolves at the path (rows become broken)', async () => {
+    // The resolver omits unresolvable inputs; an absent key must become a null
+    // write, not a skipped one.
+    vi.mocked(resolveToPages).mockResolvedValue(new Map());
+
+    await reResolveByToPath('/target');
+
+    expect(PageLink.repointInboundLinks).toHaveBeenCalledWith('/target', null);
   });
 });

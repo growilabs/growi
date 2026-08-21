@@ -362,7 +362,7 @@ B3/B5.
   - _Boundary: resolveToPages, PageRedirect (batch static)_
   - _Depends: B1.4_
 
-- [ ] B4.2 Implement the re-resolve-by-path sync operation
+- [x] B4.2 Implement the re-resolve-by-path sync operation
   - Implement the row op deferred from B1.5: re-resolve inbound rows matching a given path (to repoint
     stale caches when a page appears at that path)
   - Done when a unit test shows inbound rows for a path get their `toPage` repointed when a page

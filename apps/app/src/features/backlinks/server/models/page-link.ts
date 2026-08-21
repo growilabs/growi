@@ -78,6 +78,27 @@ pageLinkSchema.statics.findBacklinkSources = async function (
   return await this.distinct('fromPage', { toPage: toPageId });
 };
 
+/**
+ * Point every row linking to `toPath` at `toPage` (null = nothing resolves there,
+ * i.e. broken).
+ *
+ * Low-level primitive: writes the target it is given, resolving nothing. Callers
+ * must go through the `reResolveByToPath` service, which derives `toPage` from
+ * `toPath` — do NOT call this static directly from event handlers.
+ */
+pageLinkSchema.statics.repointInboundLinks = async function (
+  toPath: string,
+  toPage: Types.ObjectId | null,
+): Promise<void> {
+  // Skip — not delete — a row whose source is the target itself: `dropSelfLinks`
+  // keeps that invariant outbound, and row existence is owned by
+  // `replaceOutboundLinks`.
+  const filter =
+    toPage == null ? { toPath } : { toPath, fromPage: { $ne: toPage } };
+
+  await this.updateMany(filter, { $set: { toPage } });
+};
+
 export default getOrCreateModel<PageLinkDocument, PageLinkModel>(
   'PageLink',
   pageLinkSchema,
