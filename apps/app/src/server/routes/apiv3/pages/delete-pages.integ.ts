@@ -137,24 +137,32 @@ describe('POST /delete', () => {
    * reaches `deleted` let a suite's `afterEach` fixture cleanup delete that parent
    * (an auto-created empty page under the fixture root) before the still-in-flight
    * count update looked it up, throwing an unhandled `Target not found` rejection
-   * (see #11740). Waiting for the parent's own descendantCount to reflect the
-   * deletion too keeps the whole chain settled before the test returns.
+   * (see #11740).
+   *
+   * The parent's descendantCount itself is not a safe thing to poll for: trashing
+   * the target also clears the target's own `parent` (see `deleteNonEmptyTarget`),
+   * so once the count update finishes, the very next awaited step in the same
+   * chain — `Page.removeLeafEmptyPagesRecursively` — finds this now-childless
+   * empty ancestor and deletes it, all within the same tick. A "count decremented"
+   * window this narrow is not reliably observable by a 50ms poll. The ancestor's
+   * *removal* is the last mutation in the chain and, unlike the count, a stable
+   * terminal state — waiting for that instead proves the whole chain (including
+   * the vulnerable count update) has already settled.
    */
-  const waitForDescendantCountToDecrement = async (
+  const waitForAncestorCleanupToSettle = async (
     parentId: string,
-    countBefore: number,
     maxWaitMs = 10_000,
   ): Promise<void> => {
     const startedAt = Date.now();
     while (Date.now() - startedAt < maxWaitMs) {
       const parent = await crowi.models.Page.findById(parentId);
-      if (parent != null && parent.descendantCount < countBefore) {
+      if (parent == null) {
         return;
       }
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     throw new Error(
-      `descendantCount of parent ${parentId} did not decrement within ${maxWaitMs}ms`,
+      `ancestor ${parentId} was not cleaned up within ${maxWaitMs}ms`,
     );
   };
 
@@ -266,15 +274,13 @@ describe('POST /delete', () => {
   });
 
   // Explicit timeout: two sequential 10s-cap polling waits below (target status,
-  // then parent descendantCount) can exceed vitest's 5s default under CI load.
+  // then ancestor cleanup) can exceed vitest's 5s default under CI load.
   it('deletes a page whose revisionId is the latest revision', async () => {
     const page = await createPage(targetPath, 'target body');
     if (page.parent == null) {
       throw new Error('the fixture page must have a parent');
     }
     const parentId = getIdStringForRef(page.parent);
-    const parentDescendantCountBefore =
-      (await crowi.models.Page.findById(parentId))?.descendantCount ?? 0;
 
     const response = await request(app)
       .post('/delete')
@@ -292,11 +298,9 @@ describe('POST /delete', () => {
     const deletedPage = await waitForPageToBeDeleted(page._id);
     expect(deletedPage.path).toBe(`/trash${targetPath}`);
 
-    // Wait for the rest of the background chain (the parent's descendantCount
-    // update) to settle too, so afterEach's fixture cleanup can't race it.
-    await waitForDescendantCountToDecrement(
-      parentId,
-      parentDescendantCountBefore,
-    );
+    // Wait for the rest of the background chain (ending in the now-childless
+    // fixture-root ancestor's own removal) to settle too, so afterEach's
+    // fixture cleanup can't race it.
+    await waitForAncestorCleanupToSettle(parentId);
   }, 20_000);
 });
