@@ -19,7 +19,8 @@ import UserGroupRelation from '~/server/models/user-group-relation';
 
 import { G2GTransferReceiverService } from '../g2g-transfer';
 import { GrowiBridgeService } from '../growi-bridge';
-import { detectUniqueConflicts } from './detect-unique-conflicts';
+import type { UniqueConflictReport } from './detect-unique-conflicts';
+import { detectUniqueConflicts, toLookup } from './detect-unique-conflicts';
 import { ImportService } from './import';
 
 // Fixture values carry a distinctive prefix so they cannot collide with documents that
@@ -164,6 +165,52 @@ describe('detectUniqueConflicts', () => {
     });
   };
 
+  // Thin adapter over the new `CollectionInput[]`-driven signature that keeps every
+  // existing users/usergroups call site in this file looking the way it did before task
+  // 3.2 (a flat `{usersJsonPath, groupsJsonPath, ...}` object) instead of rewriting each
+  // of the ~20 call sites into a `collections` array by hand.
+  const detect = (input: {
+    usersJsonPath: string | null;
+    groupsJsonPath: string | null;
+    userModel?: Model<IUser>;
+    userGroupModel?: Model<IUserGroup>;
+    replaceTargetCollections?: ReadonlySet<string>;
+  }): Promise<UniqueConflictReport> => {
+    const {
+      usersJsonPath,
+      groupsJsonPath,
+      userModel = User,
+      userGroupModel = UserGroup,
+      replaceTargetCollections,
+    } = input;
+
+    return detectUniqueConflicts({
+      collections: [
+        {
+          collection: 'users',
+          jsonPath: usersJsonPath,
+          lookup: toLookup(userModel),
+        },
+        {
+          collection: 'usergroups',
+          jsonPath: groupsJsonPath,
+          lookup: toLookup(userGroupModel),
+        },
+      ],
+      replaceTargetCollections,
+    });
+  };
+
+  // A skipped collection (`jsonPath: null`, or excluded by `replaceTargetCollections`) has
+  // no entry in `conflictsByCollection` (see detect-unique-conflicts.ts `isActive`), so
+  // reading through these normalises "not part of this transfer" and "part of it with zero
+  // conflicts" to the same `[]` for assertions that do not care about the distinction.
+  const getUserConflicts = (report: UniqueConflictReport): readonly unknown[] =>
+    report.conflictsByCollection.get('users') ?? [];
+  const getGroupConflicts = (
+    report: UniqueConflictReport,
+  ): readonly unknown[] => report.conflictsByCollection.get('usergroups') ?? [];
+
   // Whole-collection snapshots (raw driver reads, so timestamps and __v are included)
   // are the evidence that detection does not touch the destination data.
   const snapshotDestination = async (): Promise<unknown> => {
@@ -221,14 +268,14 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.userConflicts).toEqual([
+      expect(getUserConflicts(report)).toEqual([
         {
           collection: 'users',
           field: 'username',
@@ -237,7 +284,7 @@ describe('detectUniqueConflicts', () => {
           existingId,
         },
       ]);
-      expect(report.groupConflicts).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
     });
 
     test('detects an email conflict when the archive user shares the email under a different _id', async () => {
@@ -253,14 +300,14 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.userConflicts).toEqual([
+      expect(getUserConflicts(report)).toEqual([
         {
           collection: 'users',
           field: 'email',
@@ -283,14 +330,14 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.userConflicts).toEqual([
+      expect(getUserConflicts(report)).toEqual([
         {
           collection: 'users',
           field: 'slackMemberId',
@@ -315,15 +362,15 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.userConflicts).toEqual([]);
-      expect(report.groupConflicts).toEqual([]);
+      expect(getUserConflicts(report)).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
     });
 
     test('reports no conflict when no unique field value overlaps with the destination', async () => {
@@ -337,14 +384,15 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report).toEqual({ userConflicts: [], groupConflicts: [] });
+      expect(getUserConflicts(report)).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
     });
 
     test('does not compare fields outside the declared unique fields', async () => {
@@ -366,28 +414,30 @@ describe('detectUniqueConflicts', () => {
         ],
       );
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report).toEqual({ userConflicts: [], groupConflicts: [] });
+      expect(getUserConflicts(report)).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
     });
 
     test('reports no conflict for an archive that contains no documents', async () => {
       await seedExistingUser();
       const usersJsonPath = await writeArchiveJson('users-empty.json', []);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report).toEqual({ userConflicts: [], groupConflicts: [] });
+      expect(getUserConflicts(report)).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
     });
   });
 
@@ -403,14 +453,14 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath: null,
         groupsJsonPath,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.groupConflicts).toEqual([
+      expect(getGroupConflicts(report)).toEqual([
         {
           collection: 'usergroups',
           field: 'name',
@@ -419,7 +469,7 @@ describe('detectUniqueConflicts', () => {
           existingId,
         },
       ]);
-      expect(report.userConflicts).toEqual([]);
+      expect(getUserConflicts(report)).toEqual([]);
     });
 
     test('reports no conflict when the archive group is the same document (same _id) as the existing group', async () => {
@@ -429,14 +479,14 @@ describe('detectUniqueConflicts', () => {
         { _id: existingId, name: EXISTING_GROUP_NAME },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath: null,
         groupsJsonPath,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.groupConflicts).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
     });
   });
 
@@ -449,15 +499,15 @@ describe('detectUniqueConflicts', () => {
         { _id: ARCHIVE_GROUP_ID, name: EXISTING_GROUP_NAME },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath: null,
         groupsJsonPath,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.userConflicts).toEqual([]);
-      expect(report.groupConflicts).toEqual([
+      expect(getUserConflicts(report)).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([
         {
           collection: 'usergroups',
           field: 'name',
@@ -480,15 +530,15 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.groupConflicts).toEqual([]);
-      expect(report.userConflicts).toEqual([
+      expect(getGroupConflicts(report)).toEqual([]);
+      expect(getUserConflicts(report)).toEqual([
         {
           collection: 'users',
           field: 'email',
@@ -504,14 +554,149 @@ describe('detectUniqueConflicts', () => {
       await seedExistingUser();
       await seedExistingGroup();
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath: null,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report).toEqual({ userConflicts: [], groupConflicts: [] });
+      expect(getUserConflicts(report)).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
+    });
+
+    // A lookup that must never be called: if `detectUniqueConflicts` ever tried to detect a
+    // collection whose `CollectionInput` was omitted or given `jsonPath: null`, calling this
+    // would be the first observable symptom, well before any DB round trip.
+    const unreachableLookup = () => {
+      throw new Error('lookup must not be called for a skipped collection');
+    };
+
+    test('skips each of the 4 collections in turn without throwing, while the remaining collections still detect normally', async () => {
+      // Requirement 1.6 — extended to all 4 declared collections (task 3.2). `externalaccounts`
+      // and `externalusergroups` are exercised here only for the skip path: their own
+      // detection behaviour (composite-key matching against a real destination) is covered by
+      // task 8.1/8.2, out of this task's boundary. A never-called `unreachableLookup` is
+      // sufficient evidence that the skip is real, not merely that the lookup returned empty.
+      const existingId = await seedExistingUser();
+      const existingGroupId = await seedExistingGroup();
+      const usersJsonPath = await writeArchiveJson(
+        'users-four-collection-skip.json',
+        [
+          {
+            _id: ARCHIVE_USER_ID,
+            username: EXISTING_USER.username,
+            email: ARCHIVE_USER.email,
+            slackMemberId: ARCHIVE_USER.slackMemberId,
+          },
+        ],
+      );
+      const groupsJsonPath = await writeArchiveJson(
+        'usergroups-four-collection-skip.json',
+        [{ _id: ARCHIVE_GROUP_ID, name: EXISTING_GROUP_NAME }],
+      );
+
+      // Case 1: only `users` is part of the transfer.
+      const usersOnlyReport = await detectUniqueConflicts({
+        collections: [
+          {
+            collection: 'users',
+            jsonPath: usersJsonPath,
+            lookup: toLookup(User),
+          },
+          {
+            collection: 'usergroups',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+          {
+            collection: 'externalaccounts',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+          {
+            collection: 'externalusergroups',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+        ],
+      });
+      expect(usersOnlyReport.conflictsByCollection.get('users')).toEqual([
+        {
+          collection: 'users',
+          field: 'username',
+          value: EXISTING_USER.username,
+          archiveId: ARCHIVE_USER_ID,
+          existingId,
+        },
+      ]);
+      expect(
+        usersOnlyReport.conflictsByCollection.get('usergroups'),
+      ).toBeUndefined();
+      expect(
+        usersOnlyReport.conflictsByCollection.get('externalaccounts'),
+      ).toBeUndefined();
+      expect(
+        usersOnlyReport.conflictsByCollection.get('externalusergroups'),
+      ).toBeUndefined();
+
+      // Case 2: only `usergroups` is part of the transfer — the mirror image of case 1, so
+      // `users` being skipped does not depend on it happening to be listed first.
+      const groupsOnlyReport = await detectUniqueConflicts({
+        collections: [
+          { collection: 'users', jsonPath: null, lookup: unreachableLookup },
+          {
+            collection: 'usergroups',
+            jsonPath: groupsJsonPath,
+            lookup: toLookup(UserGroup),
+          },
+          {
+            collection: 'externalaccounts',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+          {
+            collection: 'externalusergroups',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+        ],
+      });
+      expect(
+        groupsOnlyReport.conflictsByCollection.get('users'),
+      ).toBeUndefined();
+      expect(groupsOnlyReport.conflictsByCollection.get('usergroups')).toEqual([
+        {
+          collection: 'usergroups',
+          field: 'name',
+          value: EXISTING_GROUP_NAME,
+          archiveId: ARCHIVE_GROUP_ID,
+          existingId: existingGroupId,
+        },
+      ]);
+
+      // Case 3: none of the 4 collections is part of the transfer at all.
+      const noneReport = await detectUniqueConflicts({
+        collections: [
+          { collection: 'users', jsonPath: null, lookup: unreachableLookup },
+          {
+            collection: 'usergroups',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+          {
+            collection: 'externalaccounts',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+          {
+            collection: 'externalusergroups',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+        ],
+      });
+      expect(noneReport.conflictsByCollection.size).toBe(0);
     });
   });
 
@@ -537,7 +722,7 @@ describe('detectUniqueConflicts', () => {
 
       const before = await snapshotDestination();
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath,
         userModel: User,
@@ -547,8 +732,8 @@ describe('detectUniqueConflicts', () => {
       const after = await snapshotDestination();
 
       // Guard against a vacuous read-only check: this run must really have found something.
-      expect(report.userConflicts).toHaveLength(3);
-      expect(report.groupConflicts).toHaveLength(1);
+      expect(getUserConflicts(report)).toHaveLength(3);
+      expect(getGroupConflicts(report)).toHaveLength(1);
       expect(after).toEqual(before);
     });
   });
@@ -589,7 +774,7 @@ describe('detectUniqueConflicts', () => {
       );
 
       await expect(
-        detectUniqueConflicts({
+        detect({
           usersJsonPath,
           groupsJsonPath: null,
           userModel: User,
@@ -619,7 +804,7 @@ describe('detectUniqueConflicts', () => {
       );
 
       await expect(
-        detectUniqueConflicts({
+        detect({
           usersJsonPath,
           groupsJsonPath: null,
           userModel: User,
@@ -636,7 +821,7 @@ describe('detectUniqueConflicts', () => {
       const usersJsonPath = await writeRawArchive('users-zero-byte.json', '');
 
       await expect(
-        detectUniqueConflicts({
+        detect({
           usersJsonPath,
           groupsJsonPath: null,
           userModel: User,
@@ -659,7 +844,7 @@ describe('detectUniqueConflicts', () => {
       );
 
       await expect(
-        detectUniqueConflicts({
+        detect({
           usersJsonPath,
           groupsJsonPath: null,
           userModel: User,
@@ -670,7 +855,7 @@ describe('detectUniqueConflicts', () => {
 
     test('rejects when the archive JSON file does not exist', async () => {
       await expect(
-        detectUniqueConflicts({
+        detect({
           usersJsonPath: path.join(tmpDir, 'users-does-not-exist.json'),
           groupsJsonPath: null,
           userModel: User,
@@ -699,7 +884,7 @@ describe('detectUniqueConflicts', () => {
       });
 
       await expect(
-        detectUniqueConflicts({
+        detect({
           usersJsonPath,
           groupsJsonPath: null,
           userModel: failingUserModel,
@@ -785,7 +970,7 @@ describe('detectUniqueConflicts', () => {
     };
 
     const detectConflicts = () =>
-      detectUniqueConflicts({
+      detect({
         usersJsonPath: archivePath('users'),
         groupsJsonPath: archivePath('usergroups'),
         userModel: User,
@@ -972,10 +1157,9 @@ describe('detectUniqueConflicts', () => {
       });
 
       // The gate must let this transfer through: nothing collides with the destination.
-      expect(await detectConflicts()).toEqual({
-        userConflicts: [],
-        groupConflicts: [],
-      });
+      const conflictFreeReport = await detectConflicts();
+      expect(getUserConflicts(conflictFreeReport)).toEqual([]);
+      expect(getGroupConflicts(conflictFreeReport)).toEqual([]);
 
       await runImport();
 
@@ -1014,10 +1198,9 @@ describe('detectUniqueConflicts', () => {
         ],
       });
 
-      expect(await detectConflicts()).toEqual({
-        userConflicts: [],
-        groupConflicts: [],
-      });
+      const conflictFreeReport = await detectConflicts();
+      expect(getUserConflicts(conflictFreeReport)).toEqual([]);
+      expect(getGroupConflicts(conflictFreeReport)).toEqual([]);
 
       await runImport();
 

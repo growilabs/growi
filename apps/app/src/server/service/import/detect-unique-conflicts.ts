@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import { Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import type { IUser, IUserGroup } from '@growi/core';
 import type { Model } from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
@@ -230,12 +229,15 @@ type RawDocument = Record<string, unknown>;
  * capability (instead of the model itself) is what makes "detection never writes"
  * structural rather than a convention: there is no write method to reach (requirement 2.4).
  */
-type ExistingDocumentLookup = (
+export type ExistingDocumentLookup = (
   filter: Record<string, unknown>,
   projection: string,
 ) => Promise<RawDocument[]>;
 
-const toLookup = <TDoc>(model: Model<TDoc>): ExistingDocumentLookup => {
+// Exported so the caller (g2g-transfer.ts) can build a `CollectionInput.lookup` from a
+// Mongoose Model without detect-unique-conflicts having to know about Mongoose models at
+// its public boundary (only the narrower `ExistingDocumentLookup` capability crosses it).
+export const toLookup = <TDoc>(model: Model<TDoc>): ExistingDocumentLookup => {
   return async (filter, projection) =>
     await model.find(filter).select(projection).lean<RawDocument[]>();
 };
@@ -607,9 +609,21 @@ const logDetectedConflicts = (report: UniqueConflictReport): void => {
 };
 
 /**
+ * One collection's declared input to detection: where its archive JSON lives (or `null`
+ * when the collection is not part of this transfer) and how to read the destination's
+ * existing documents for it. The caller (`g2g-transfer.ts`) builds one of these per
+ * collection via {@link toLookup}; this module never imports a Mongoose model directly.
+ */
+export interface CollectionInput {
+  collection: CollectionName;
+  jsonPath: string | null;
+  lookup: ExistingDocumentLookup;
+}
+
+/**
  * Orchestrates the detection for one import target: streams the unique fields out of the
  * archive JSONs, batch-queries the destination for the documents that could collide, and
- * runs the pure comparison. A `null` path means that collection is not part of the
+ * runs the pure comparison. A `null` `jsonPath` means that collection is not part of the
  * transfer, so its detection is skipped rather than failing (requirement 1.6).
  *
  * A collection listed in `replaceTargetCollections` is skipped as well: every document in
@@ -618,52 +632,49 @@ const logDetectedConflicts = (report: UniqueConflictReport): void => {
  * have succeeded. The set is passed in rather than worked out here — which collections a
  * given import replaces is the caller's knowledge (see replace-target-collections.ts).
  *
- * The destination is only ever read (requirement 2.4).
+ * Every non-skipped collection is resolved against `COLLECTION_DETECTORS` by name. Every
+ * `CollectionInput.collection` is a `CollectionName`, and `COLLECTION_DETECTORS` declares
+ * exactly one entry per member of that closed union, so the lookup below always finds a
+ * match — there is no runtime fallback branch for "no declared detector" because that
+ * state is unreachable, not merely unlikely.
+ *
+ * The destination is only ever read (requirement 2.3).
  */
 export async function detectUniqueConflicts(input: {
-  usersJsonPath: string | null;
-  groupsJsonPath: string | null;
-  userModel: Model<IUser>;
-  userGroupModel: Model<IUserGroup>;
+  collections: readonly CollectionInput[];
   replaceTargetCollections?: ReadonlySet<string>;
 }): Promise<UniqueConflictReport> {
-  const {
-    usersJsonPath,
-    groupsJsonPath,
-    userModel,
-    userGroupModel,
-    replaceTargetCollections,
-  } = input;
+  const { collections, replaceTargetCollections } = input;
 
-  const isReplaced = (collectionName: string): boolean =>
-    replaceTargetCollections?.has(collectionName) ?? false;
+  // Type predicate (rather than a plain boolean filter) so `jsonPath` narrows to `string`
+  // for every survivor below — no type assertion needed to hand it to `detector.detect`.
+  const isActive = (
+    collectionInput: CollectionInput,
+  ): collectionInput is CollectionInput & { jsonPath: string } =>
+    collectionInput.jsonPath != null &&
+    !(replaceTargetCollections?.has(collectionInput.collection) ?? false);
 
-  const [userConflicts, groupConflicts] = await Promise.all([
-    usersJsonPath == null || isReplaced('users')
-      ? []
-      : detectForCollection({
-          collection: 'users',
-          jsonPath: usersJsonPath,
-          fields: USER_UNIQUE_KEYS,
-          pick: pickUserUniqueFields,
-          lookup: toLookup(userModel),
-        }),
-    groupsJsonPath == null || isReplaced('usergroups')
-      ? []
-      : detectForCollection({
-          collection: 'usergroups',
-          jsonPath: groupsJsonPath,
-          fields: GROUP_UNIQUE_KEYS,
-          pick: pickGroupUniqueFields,
-          lookup: toLookup(userGroupModel),
-        }),
-  ]);
+  const entries = await Promise.all(
+    collections.filter(isActive).map(async (collectionInput) => {
+      const detector = COLLECTION_DETECTORS.find(
+        (candidate) => candidate.collection === collectionInput.collection,
+      );
+      if (detector == null) {
+        throw new Error(
+          `No CollectionDetector declared for collection: ${collectionInput.collection}`,
+        );
+      }
+
+      const conflicts = await detector.detect(
+        collectionInput.jsonPath,
+        collectionInput.lookup,
+      );
+      return [collectionInput.collection, conflicts] as const;
+    }),
+  );
 
   const report: UniqueConflictReport = {
-    conflictsByCollection: new Map([
-      ['users', userConflicts],
-      ['usergroups', groupConflicts],
-    ]),
+    conflictsByCollection: new Map(entries),
   };
 
   if (hasConflicts(report)) {
