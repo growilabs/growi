@@ -5,9 +5,11 @@
  *  - runPasswordHashCleanup() aborts (aborted=true) WITHOUT writing anything when
  *    any ACTIVE legacyOnly user (password only, no passwordHash) still exists, and
  *    reports the blocking legacyOnly count (Req 3.4);
- *  - a NON-ACTIVE legacyOnly user (suspended / invited / registered / deleted) can
- *    never log in, so it can never migrate lazily: it must NOT block the cleanup
- *    forever — it is only reported (legacyOnlyNonActive);
+ *  - a NON-ACTIVE legacyOnly user (suspended / invited / registered / deleted)
+ *    cannot be compelled to log in, so its lazy migration can never be relied on
+ *    to happen: it must NOT block the cleanup forever — it is only reported
+ *    (legacyOnlyNonActive). (Such a user CAN still authenticate; status is only
+ *    consulted after login, for the redirect.);
  *  - when no ACTIVE legacyOnly user exists, it $unsets the legacy `password` field
  *    from every `both` user (passwordHash + password) REGARDLESS of status, leaves
  *    `passwordHash` intact, leaves `upgradedOnly` (passwordHash only) users
@@ -36,6 +38,14 @@ describe('password-hash cleanup script', () => {
   beforeAll(async () => {
     ({ runPasswordHashCleanup } = await import('./password-hash-cleanup'));
     collection = mongoose.connection.collection('users');
+    // Transforming this module's import graph can exceed the 10s default when the
+    // whole suite runs in parallel on a cold cache.
+  }, 60_000);
+
+  // Clear marker fixtures on BOTH sides: the collection is shared per worker, so a
+  // doc surviving a previous run (or an aborted one) would inflate this test's counts.
+  beforeEach(async () => {
+    await collection.deleteMany({ username: { $regex: `^${MARKER}` } });
   });
 
   afterEach(async () => {

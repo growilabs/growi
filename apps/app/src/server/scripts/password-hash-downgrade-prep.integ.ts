@@ -54,6 +54,13 @@ describe('password-hash downgrade-prep script', () => {
   beforeAll(async () => {
     ({ runDowngradePrep } = await import('./password-hash-downgrade-prep'));
     collection = mongoose.connection.collection('users');
+    // Transforming this module's import graph can exceed the 10s default when the
+    // whole suite runs in parallel on a cold cache.
+  }, 60_000);
+
+  // Shared per-worker collection: clear leftovers before seeding too.
+  beforeEach(async () => {
+    await collection.deleteMany({ username: { $regex: `^${MARKER}` } });
   });
 
   afterEach(async () => {
