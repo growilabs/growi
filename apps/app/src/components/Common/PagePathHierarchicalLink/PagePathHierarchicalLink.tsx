@@ -1,8 +1,8 @@
 import { type FC, type JSX, memo, useCallback } from 'react';
 import Link from 'next/link';
-import urljoin from 'url-join';
 
 import type { LinkedPagePath } from '~/models/linked-page-path';
+import { buildLinkedPagePathHref } from '~/models/linked-page-path';
 
 import styles from './PagePathHierarchicalLink.module.scss';
 
@@ -83,7 +83,7 @@ export const PagePathHierarchicalLink: FC<PagePathHierarchicalLinkProps> = memo(
     const isParentRoot = linkedPagePath.parent?.isRoot;
     const isSeparatorRequired = isParentExists && !isParentRoot;
 
-    const href = encodeURI(urljoin(basePath || '/', linkedPagePath.href));
+    const href = buildLinkedPagePathHref(linkedPagePath, basePath);
 
     return (
       <RootElm>

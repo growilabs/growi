@@ -1,9 +1,14 @@
 import { DevidedPagePath } from '@growi/core/dist/models';
-import urljoin from 'url-join';
 
-import { LinkedPagePath } from '~/models/linked-page-path';
+import {
+  buildLinkedPagePathHref,
+  LinkedPagePath,
+} from '~/models/linked-page-path';
+import loggerFactory from '~/utils/logger';
 
 import { formatTruncatedPagePath } from './format-truncated-page-path';
+
+const logger = loggerFactory('growi:client:build-ancestor-path-nodes');
 
 /**
  * A single rendered unit of the ancestor-path breadcrumb.
@@ -46,9 +51,6 @@ const buildRootFirstChain = (topmost: LinkedPagePath): LinkedPagePath[] => {
   return leafToRoot.reverse();
 };
 
-const buildHref = (linkedPagePath: LinkedPagePath): string =>
-  encodeURI(urljoin('/', linkedPagePath.href));
-
 const toLinkNode = (
   plainNode: LinkedPagePath,
   highlightedNode: LinkedPagePath | undefined,
@@ -61,7 +63,7 @@ const toLinkNode = (
 
   return {
     type: 'link',
-    href: buildHref(plainNode),
+    href: buildLinkedPagePathHref(plainNode),
     text: plainNode.pathName,
     ...(highlightedHtml != null ? { highlightedHtml } : {}),
   };
@@ -114,6 +116,23 @@ export const buildAncestorPathNodes = (
 
   const isHighlightReliable = plainChain.length === highlightedChain.length;
   const isTruncated = ancestorParts.some((part) => part.type === 'ellipsis');
+
+  // Defensive invariant: this function hardcodes formatTruncatedPagePath's two
+  // known truncation shapes (all ancestors, or exactly [first, ellipsis, last])
+  // rather than deriving kept positions generically (see the module doc
+  // comment above). If that upstream shape ever changes, this won't throw or
+  // fail type-checking on its own -- it would silently render the wrong
+  // ancestors. Surface that loudly during development instead of staying silent.
+  const hasExpectedShape = isTruncated
+    ? ancestorParts.length === 3
+    : ancestorParts.length === plainChain.length;
+  if (!hasExpectedShape) {
+    logger.error(
+      'formatTruncatedPagePath returned an unexpected truncation shape ' +
+        `(ancestorParts.length=${ancestorParts.length}, plainChain.length=${plainChain.length}, isTruncated=${isTruncated}). ` +
+        "buildAncestorPathNodes assumes a fixed [first, ellipsis, last] or all-ancestors shape; update it if formatTruncatedPagePath's algorithm changed.",
+    );
+  }
 
   const nodes: AncestorPathNode[] = isTruncated
     ? [
