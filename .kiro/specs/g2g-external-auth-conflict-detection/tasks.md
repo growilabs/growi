@@ -82,7 +82,7 @@
   - _Boundary: g2g-transfer.ts ReceiverService_
   - _Depends: 3.2_
 
-- [ ] 6. (P) 受信ルートのログ出力を汎用化する
+- [x] 6. (P) 受信ルートのログ出力を汎用化する
   - 衝突時のログ出力(`routes/apiv3/g2g-transfer.ts`)を、`conflictsByCollection`から件数をコレクションごとに汎用的に集計する形に書き換える。
   - Observable: externalaccounts/externalusergroupsの衝突を含むログに、コレクションごとの件数が出る。
   - _Requirements: 2.2_

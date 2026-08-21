@@ -655,14 +655,22 @@ export const setup = (crowi: Crowi): Router => {
 
     if (hasConflicts(conflictReport)) {
       // Counts only: the conflicting values are user data and must not reach the log.
+      // Walks conflictsByCollection generically (same principle as
+      // summarizeUniqueConflicts) so a collection added to the report later needs no
+      // change here; a collection absent from the Map (not part of this transfer) is
+      // simply not iterated over and gets no key.
+      const conflictCountsByCollection = Object.fromEntries(
+        [...conflictReport.conflictsByCollection.entries()].map(
+          ([collection, conflicts]) => [collection, conflicts.length],
+        ),
+      );
       logger.warn(
         {
           // The code the response carries, so a log search by the code an operator
           // was shown actually finds this line.
           code: G2G_DATA_CONFLICT_ERROR_CODE,
           errorCode: G2GTransferErrorCode.DATA_CONFLICT,
-          userConflictCount: conflictReport.userConflicts.length,
-          groupConflictCount: conflictReport.groupConflicts.length,
+          conflictCountsByCollection,
         },
         'Aborted the transfer import before writing anything: the transfer data conflicts with existing data',
       );
