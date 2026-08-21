@@ -1,3 +1,5 @@
+import { performance } from 'node:perf_hooks';
+
 import loggerFactory from '~/utils/logger';
 
 import { handlePageUpsertById } from './page-link-service-handlers';
@@ -6,6 +8,12 @@ const logger = loggerFactory('growi:features:backlinks:page-link-upsert-queue');
 
 /** Bounds an absurd measurement (a host stall mid-extraction), not the duty cycle itself. */
 const REST_CAP_MS = 10_000;
+
+/** Enough to ride out a replica-set failover, few enough not to chase a permanent fault. */
+const MAX_UPSERT_ATTEMPTS = 5;
+
+/** The drain timer is shared, so a save arriving during a retry backoff waits for it too. */
+const RETRY_BACKOFF_MS = 5000;
 
 /**
  * Pacing budget, passed in so the defaults stay single-sourced in CONFIG_DEFINITIONS
@@ -36,6 +44,8 @@ export class PageLinkUpsertQueue {
   private draining: boolean;
   /** Rest milliseconds owed per millisecond worked. */
   private restRatio: number;
+  /** Failures so far per page; cleared on success or on giving up. */
+  private attemptsByPage: Map<string, number>;
 
   constructor(
     getSiteUrl: () => string | undefined,
@@ -47,6 +57,7 @@ export class PageLinkUpsertQueue {
     this.draining = false;
     this.drainTimer = null;
     this.restRatio = (100 - pacing.dutyCyclePercent) / pacing.dutyCyclePercent;
+    this.attemptsByPage = new Map<string, number>();
   }
 
   enqueue(pageId: string): void {
@@ -54,7 +65,7 @@ export class PageLinkUpsertQueue {
     this.scheduleDrain();
   }
 
-  private scheduleDrain(): void {
+  private scheduleDrain(delayMs = this.pacing.drainIntervalMs): void {
     // A drain that never settles wedges this guard forever: accepted limitation, see tasks.md B2.2.
     if (this.drainTimer != null || this.draining) return;
     this.drainTimer = setTimeout(() => {
@@ -62,9 +73,27 @@ export class PageLinkUpsertQueue {
       this.drain().catch((err) =>
         logger.error({ err }, 'backlinks drain failed'),
       );
-    }, this.pacing.drainIntervalMs);
+    }, delayMs);
     // A pending drain must not keep the process alive; dropped work self-heals on the next edit.
     this.drainTimer.unref();
+  }
+
+  /** @returns whether the page gets another attempt. */
+  private registerFailure(id: string, err: unknown): boolean {
+    const attempts = (this.attemptsByPage.get(id) ?? 0) + 1;
+    logger.error({ err, pageId: id, attempts }, 'backlinks sync failed');
+
+    if (attempts < MAX_UPSERT_ATTEMPTS) {
+      this.attemptsByPage.set(id, attempts);
+      return true;
+    }
+
+    this.attemptsByPage.delete(id);
+    logger.error(
+      { pageId: id, attempts },
+      'backlinks sync giving up on this page; its links stay stale until its next save or the backfill',
+    );
+    return false;
   }
 
   private restMsFor(extractionMs: number): number {
@@ -82,6 +111,9 @@ export class PageLinkUpsertQueue {
     this.drainTimer = null;
     this.draining = true;
 
+    // Per drain: kept on the instance, one failure would re-queue the page on every later drain.
+    const failed = new Set<string>();
+
     try {
       for (const id of this.pagesToUpsert) {
         // Per page, before the id is claimed, so a throw here leaves the id queued rather than
@@ -91,21 +123,28 @@ export class PageLinkUpsertQueue {
         // Claim before processing: a save landing mid-drain re-enqueues the id for a fresh run.
         this.pagesToUpsert.delete(id);
 
+        const startedAt = performance.now();
         let extractionMs = 0;
         try {
           // biome-ignore lint/performance/noAwaitInLoops: pacing is the point — parses run one at a time so the event loop is yielded between them (req 3.5)
           extractionMs = await handlePageUpsertById(id, siteUrl);
+          this.attemptsByPage.delete(id);
         } catch (err) {
-          // Accepted: the page keeps its stale rows until its next save or the backfill (B3).
-          logger.error({ err, pageId: id }, 'backlinks sync failed');
+          // A failure after a completed extraction never reports its cost, so charge elapsed.
+          extractionMs = performance.now() - startedAt;
+          if (this.registerFailure(id, err)) failed.add(id);
         }
 
         const restMs = this.restMsFor(extractionMs);
         if (restMs > 0) await this.rest(restMs);
       }
     } finally {
+      for (const id of failed) this.pagesToUpsert.add(id);
+
       this.draining = false;
-      if (this.pagesToUpsert.size > 0) this.scheduleDrain();
+      if (this.pagesToUpsert.size > 0) {
+        this.scheduleDrain(failed.size > 0 ? RETRY_BACKOFF_MS : undefined);
+      }
     }
   }
 }

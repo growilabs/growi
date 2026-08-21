@@ -208,13 +208,17 @@ describe('PageLinkService (live extraction queue)', () => {
   });
 
   it('keeps accepting saves after a drain failure instead of wedging the queue', async () => {
+    // Mirrors the queue's RETRY_BACKOFF_MS. A drain that failed waits this long before running
+    // again, and since the queue has a single drain timer, a save arriving in the meantime waits
+    // with it — intended, and the reason this advances further than one interval.
+    const RETRY_BACKOFF_MS = 5000;
     mocks.handlePageUpsertById.mockRejectedValueOnce(new Error('boom'));
     save('create', new Types.ObjectId());
     await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
 
     const next = new Types.ObjectId();
     save('create', next);
-    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
+    await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_MS);
 
     expect(mocks.handlePageUpsertById).toHaveBeenLastCalledWith(
       next.toString(),
