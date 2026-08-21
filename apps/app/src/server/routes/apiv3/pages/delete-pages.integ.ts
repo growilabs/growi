@@ -265,6 +265,8 @@ describe('POST /delete', () => {
     expect(survivingPage?.status).toBe('published');
   });
 
+  // Explicit timeout: two sequential 10s-cap polling waits below (target status,
+  // then parent descendantCount) can exceed vitest's 5s default under CI load.
   it('deletes a page whose revisionId is the latest revision', async () => {
     const page = await createPage(targetPath, 'target body');
     if (page.parent == null) {
@@ -296,5 +298,5 @@ describe('POST /delete', () => {
       parentId,
       parentDescendantCountBefore,
     );
-  });
+  }, 20_000);
 });
