@@ -235,8 +235,22 @@ describe('decideBaselineUpdate', () => {
 // depend on the current, ever-changing real key counts in this repo.
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 
+// Includes the "✅ Primary Language:" header and a full Translation Progress
+// section (one line per secondary locale below) because
+// `parseDefaultLanguageMissingCount` requires both as a structural sanity
+// anchor before it will read "no strict line present" as a genuine 0 — see
+// parse-status-output.ts's doc comment.
 const STATUS_STDOUT_ZERO_MISSING = `
-⚠ Primary language "en_US" is missing 0 key(s) that are used in code.
+i18next Project Status
+------------------------
+🌍 Locales:            en_US, ja_JP, zh_CN, fr_FR, ko_KR
+✅ Primary Language:   en_US
+
+Translation Progress:
+- ja_JP: [■■■■■■■■■■■■■■■■■■■■] 100% (0/0 keys)  — 0 absent
+- zh_CN: [■■■■■■■■■■■■■■■■■■■■] 100% (0/0 keys)  — 0 absent
+- fr_FR: [■■■■■■■■■■■■■■■■■■■■] 100% (0/0 keys)  — 0 absent
+- ko_KR: [■■■■■■■■■■■■■■■■■■■■] 100% (0/0 keys)  — 0 absent
 `;
 
 const UNUSED_STDOUT = `

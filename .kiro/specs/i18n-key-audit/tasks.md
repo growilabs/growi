@@ -217,7 +217,7 @@
   - _Requirements: 1.6_
   - _Depends: 3.1, 4.1, 4.2, 4.3, 4.4, 5.1, 6.1_
 
-- [ ] 9.3 リポジトリ全体の lint・テスト・ビルドが green であることを確認する
+- [x] 9.3 リポジトリ全体の lint・テスト・ビルドが green であることを確認する
   - `turbo run lint --filter=@growi/app`、`turbo run test --filter=@growi/app`、`turbo run build --filter=@growi/app` を実行する
   - 観測可能な完了条件: 3コマンドすべてが green で終了する
   - _Requirements: 6.1, 6.2_
