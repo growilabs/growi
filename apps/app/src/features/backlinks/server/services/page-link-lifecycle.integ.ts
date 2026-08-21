@@ -25,7 +25,7 @@ import PageLink from '../models/page-link';
  *  - a source the viewer cannot read is excluded; a grant change is reflected on re-read
  *  - a source linking B->A more than once is listed once
  *  - a page linking to its own permalink is excluded from its own backlinks
- *  - a page trashed while its upsert sat in the queue is not indexed (3.5, B2.2)
+ *  - a source trashed before its queued upsert ran is not indexed (3.5, B2.2)
  *
  * B1 scope: rename/move (B4.4) is out of scope, and so is the rest of
  * trash/delete/restore (B5.8) — the trash case below covers only B2.2's drain-time
@@ -254,23 +254,27 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
   });
 
-  it('does not index a page trashed while its upsert sat in the queue (3.5)', async () => {
+  it('does not index a source trashed before its queued upsert ran (3.5)', async () => {
     const target = await createPage('/target');
     const trashed = await createPage('/trashed-while-queued');
     const control = await createPage('/queued-alongside');
 
-    await emitUpsert('create', trashed, `[t](${target.path})`);
-    // GROWI's soft delete rewrites path and status in place, so the id stays resolvable and the
-    // drain still finds the page — without the status check, `upsert: true` would index a source
-    // now living under /trash as a backlink of the target.
+    // Trashed before the event, so the drain's status re-check is what decides and nothing depends
+    // on this write landing inside the drain interval. GROWI's soft delete rewrites path and status
+    // in place, so the id stays resolvable and the drain still finds the page — without the status
+    // check, `upsert: true` would index a source now living under /trash.
     await Page.updateOne(
       { _id: trashed._id },
       { $set: { path: `/trash${trashed.path}`, status: Page.STATUS_DELETED } },
     );
 
-    // Enqueued in the same tick window as the trashed page, so its row appearing proves the batch
-    // (and therefore the trashed page) has been drained. Waiting on a positive signal rather than
-    // sleeping past the interval keeps the absence assertion below from passing vacuously.
+    // The emitted document is deliberately the stale in-memory one, still reading as published at
+    // its original path: a drain that indexed the event payload instead of re-reading by id would
+    // write rows here.
+    await emitUpsert('create', trashed, `[t](${target.path})`);
+
+    // Enqueued alongside the trashed page, so its row appearing proves the drain ran — a positive
+    // signal, so the absence assertion below cannot pass vacuously.
     await emitUpsert('create', control, `[t](${target.path})`);
     await waitForOutboundCount(control._id, 1);
 
