@@ -57,6 +57,55 @@ export const G2G_IMPORT_IN_PROGRESS_ERROR_CODE = 'import_already_in_progress';
  */
 export const G2G_MIXED_IMPORT_MODES_ERROR_CODE = 'mixed_import_modes';
 
+/**
+ * apiv3 error code the receive route answers with when the transfer key on the request
+ * is missing, expired, or fails to parse.
+ *
+ * Both sides depend on the exact string, like {@link G2G_DATA_CONFLICT_ERROR_CODE}.
+ */
+export const G2G_INVALID_TRANSFER_KEY_ERROR_CODE = 'invalid_transfer_key';
+
+/**
+ * apiv3 error code the receive route answers with when the request body's JSON fields
+ * (`collections` / `optionsMap` / `uploadConfigs`) fail to parse.
+ */
+export const G2G_PARSE_FAILED_ERROR_CODE = 'parse_failed';
+
+/**
+ * apiv3 error code the receive route answers with when the uploaded archive fails to
+ * unzip or its `meta.json` fails to parse.
+ */
+export const G2G_VALIDATION_FAILED_ERROR_CODE = 'validation_failed';
+
+/**
+ * apiv3 error code the receive route answers with when the archive's GROWI version does
+ * not match the destination's.
+ */
+export const G2G_VERSION_INCOMPATIBLE_ERROR_CODE = 'version_incompatible';
+
+/**
+ * apiv3 error code the receive route answers with when the request's import-method map
+ * cannot be turned into `ImportSettings` for one or more collections.
+ */
+export const G2G_IMPORT_SETTINGS_INVALID_ERROR_CODE = 'import_settings_invalid';
+
+/**
+ * apiv3 error code the receive route answers with when it could not determine whether
+ * the archive conflicts with the destination's existing data (as opposed to detecting an
+ * actual conflict, which is {@link G2G_DATA_CONFLICT_ERROR_CODE}). Kept distinct from a
+ * network failure so the operator is told the receive route did run and refused to guess
+ * — see issue #10151.
+ */
+export const G2G_CONFLICT_DETECTION_FAILED_ERROR_CODE =
+  'conflict_detection_failed';
+
+/**
+ * apiv3 error code the receive route answers with when a collection failed to write to
+ * MongoDB for a reason other than a detected unique-constraint conflict.
+ */
+export const G2G_MONGO_COLLECTION_IMPORT_FAILURE_ERROR_CODE =
+  'mongo_collection_import_failure';
+
 export type G2GTransferErrorCode =
   (typeof G2GTransferErrorCode)[keyof typeof G2GTransferErrorCode];
 

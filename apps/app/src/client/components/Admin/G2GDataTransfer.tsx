@@ -14,13 +14,13 @@ import { useAdminSocket } from '~/features/admin/states/socket-io';
 import {
   G2G_PROGRESS_STATUS,
   type G2GProgress,
+  type TransferPreflightResult,
 } from '~/interfaces/g2g-transfer';
 import {
   buildMergeTransferPlan,
   buildMigrationTransferPlan,
   type TransferPreset,
 } from '~/models/admin/g2g-transfer-preset';
-import type { TransferPreflightResult } from '~/server/service/g2g-transfer';
 import { useGrowiDocumentationUrl } from '~/states/context';
 
 import CustomCopyToClipBoard from '../Common/CustomCopyToClipBoard';
@@ -29,6 +29,32 @@ import G2GDataTransferStatusIcon from './G2GDataTransferStatusIcon';
 import { G2GTransferConfirmModal } from './G2GTransferConfirmModal';
 // import { FileUploadSettingMolecule } from './App/FileUploadSetting';
 import { buildG2GErrorToastContents } from './g2g-error-toast-contents';
+
+type TransferBlocker = TransferPreflightResult['blockers'][number];
+
+/**
+ * Translation key for each {@link TransferBlocker}'s `type`. Same convention as
+ * `G2GTransferConfirmModal`'s `WARNING_TRANSLATION_KEY`: the preflight response carries
+ * `type` values, and the client resolves the sentence.
+ *
+ * Deliberately generic, static text per type (no interpolated version/byte-count/limit
+ * values) -- the spec's Implementation Notes call this "the cheapest fix" for showing
+ * blockers before the operator confirms a destructive migration, and reserve the fuller,
+ * parameterized rendering (mirroring `describeBlocker` on the server) for a follow-up.
+ * A blocker refuses the transfer outright regardless of preset, unlike a warning, so it
+ * is shown as an error toast before the confirm modal ever opens rather than inside it.
+ */
+const BLOCKER_TRANSLATION_KEY: {
+  readonly [T in TransferBlocker['type']]: string;
+} = {
+  version_mismatch: 'g2g_data_transfer.blockers.version_mismatch',
+  user_upper_limit: 'g2g_data_transfer.blockers.user_upper_limit',
+  file_upload_not_configured:
+    'g2g_data_transfer.blockers.file_upload_not_configured',
+  destination_storage_not_writable:
+    'g2g_data_transfer.blockers.destination_storage_not_writable',
+  file_upload_total_limit: 'g2g_data_transfer.blockers.file_upload_total_limit',
+};
 
 const G2GDataTransfer = (): JSX.Element => {
   const socket = useAdminSocket();
@@ -152,13 +178,27 @@ const G2GDataTransfer = (): JSX.Element => {
           '/g2g-transfer/preflight',
           { transferKey: startTransferKey },
         );
+
+        // A blocker refuses the transfer outright (the execution-time re-check, task
+        // 10.2, would refuse it too) -- telling the operator now, before the confirm
+        // modal even opens, is cheaper than letting them accept the destructive
+        // migration only to be refused afterwards.
+        if (data.blockers.length > 0) {
+          toastError(
+            data.blockers.map(
+              (blocker) => new Error(t(BLOCKER_TRANSLATION_KEY[blocker.type])),
+            ),
+          );
+          return;
+        }
+
         setPreflightResult(data);
         setConfirmModalOpen(true);
       } catch (errs) {
         toastError(errs);
       }
     },
-    [startTransferKey],
+    [startTransferKey, t],
   );
 
   const startTransfer = useCallback(async () => {
@@ -416,7 +456,9 @@ const G2GDataTransfer = (): JSX.Element => {
         username must not disappear from the screen when it happens. Once a rescue
         outcome has arrived, it keeps the whole panel open regardless of `isTransferring`.
       */}
-      {(isTransferring || g2gProgress.rescue != null) && (
+      {(isTransferring ||
+        g2gProgress.rescue != null ||
+        (g2gProgress.failedCollections?.length ?? 0) > 0) && (
         <div className="border rounded p-4">
           <div className="my-2">
             <G2GDataTransferStatusIcon
@@ -432,6 +474,27 @@ const G2GDataTransfer = (): JSX.Element => {
             />{' '}
             Attachments
           </div>
+
+          {/*
+            Requirement 2.8: the destination's own list of collections it could not
+            import. Kept on screen for the same reason as the rescue outcome panel below
+            -- `reportIncompleteImport`'s `admin:g2gError` flips `isTransferring` to
+            `false` right after this progress event, and the operator needs this list
+            precisely then.
+          */}
+          {g2gProgress.failedCollections != null &&
+            g2gProgress.failedCollections.length > 0 && (
+              <div className="alert alert-danger mt-3 mb-0" role="alert">
+                <p className="mb-1">
+                  {t('admin:g2g_data_transfer.failed_collections_heading')}
+                </p>
+                <ul className="mb-0">
+                  {g2gProgress.failedCollections.map((name) => (
+                    <li key={name}>{name}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
           {/*
             What the pusher read out of the destination's response body and put on

@@ -31,11 +31,29 @@ Supports the same two execution modes as `investigate-issue`:
 `$ARGUMENTS` is an issue URL or number, optionally with `--auto`. Parse the
 issue number and mode the same way `investigate-issue` does.
 
-**Precondition**: the issue must carry the `flaky/confirmed` label (fetch
-exact label names with `gh label list --repo growilabs/growi --json name`
-before comparing — never hardcode). If it is still `flaky/observing`, stop
-and report that `detect-flaky-ci` has not gathered enough evidence yet; do
-not attempt to lower the bar by investigating early.
+**Precondition**: the issue must carry `flaky/confirmed` **or**
+`flaky/suspected` (fetch exact label names with
+`gh api repos/growilabs/growi/labels --paginate -q '.[].name'` before
+comparing — never hardcode, and use REST here, not `gh label list --json`,
+which a cloud routine's proxy-restricted `gh` session rejects — see Error
+Handling). If it is still `flaky/observing`, stop and report that
+`detect-flaky-ci` has not gathered enough evidence yet; do not attempt to
+lower the bar by investigating early.
+
+These two accepted labels mean different things and change Step 2:
+
+- **`flaky/confirmed`** — already empirically proven (Playwright's in-run
+  retry already IS the proof, or a prior vitest threshold-accumulation
+  already reached two independent observations). No confirmation rerun is
+  owed here before proceeding to root-cause work — go straight into Step 2's
+  existing evidence-gathering.
+- **`flaky/suspected`** — `detect-flaky-ci`'s cheap mechanical mining (diff/
+  PR mismatch, sandwich pattern, or matrix divergence) found this, but
+  nothing has actually reproduced it live yet. This skill owes it exactly
+  **one** confirmation rerun (not the 2-3 tally used elsewhere in this
+  skill — that budget is for a different purpose, see Step 2) before
+  treating the flakiness itself as real. See "Step 2, `flaky/suspected`
+  path" below.
 
 ---
 
@@ -50,9 +68,18 @@ this skill: the fix-classification gate (Step 4) and the PR gate (Step 6).
 
 ## Step 1: Fetch Issue Evidence
 
+Use REST (`gh api`), not `gh issue view --json` — the latter is
+GraphQL-backed and rejected by a cloud routine's proxy-restricted `gh`
+session (see Error Handling):
+
 ```bash
-gh issue view {ISSUE_NUMBER} --repo growilabs/growi --json number,title,body,labels,comments,url
+gh api repos/growilabs/growi/issues/{ISSUE_NUMBER}
+gh api repos/growilabs/growi/issues/{ISSUE_NUMBER}/comments --paginate
 ```
+
+The first call gives `title`, `body`, `labels[].name`, `html_url`, `state`;
+the second gives every comment (each observation `detect-flaky-ci` appended
+after the first).
 
 The title is `flaky: {IDENTITY_KEY}` (set by `detect-flaky-ci`), where
 `IDENTITY_KEY` is one of:
@@ -85,28 +112,67 @@ gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "{EXACT_PHASE
 
 ## Step 2: Gather Evidence
 
-**Primary tier — CI log analysis (always available, no live services
-needed).** This skill is expected to run unattended, including from a cloud
-routine whose checkout has no MongoDB replica set, no Elasticsearch, and no
+### `flaky/suspected` path: kick off the confirmation rerun first, in parallel
+
+If the issue's label is `flaky/suspected` (see Precondition), start its
+one-time confirmation rerun **before** doing anything else in this step, so
+it executes in the background while the static analysis below reads:
+
+```bash
+gh run rerun {RUN_ID} --repo growilabs/growi --failed
+```
+
+where `{RUN_ID}` is the run cited in the issue's "First observation" (or
+the mining evidence, if a later comment's observation is what triggered the
+mining hit). Do not wait for it here — proceed immediately to the static
+analysis below, and only come back to check this rerun's result at the end
+of this step, right before Step 3. This is a single rerun, not the 2-3
+tally used in the "second tier" below — that tally is a different budget
+for a different purpose (root-cause confidence), spent later, in Step 4/6.
+
+When you check back: if the rerun **passed** with no code change, that is
+empirical proof of flakiness — escalate the label before continuing:
+
+```bash
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "flaky/suspected" --add-label "flaky/confirmed"
+```
+
+If it **failed again**, you cannot yet tell "still flaky, unlucky twice"
+from "actually a real regression that only looks CI-specific" with a single
+data point — do not silently treat this as confirmed. Carry it into Step 4
+as an explicit caveat (same handling as "reruns failed 100% of the time" in
+that step's confidence table) rather than assuming the mining hit was
+correct.
+
+### Primary tier — CI log analysis (always available, no live services needed)
+
+This skill is expected to run unattended, including from a cloud routine
+whose checkout has no MongoDB replica set, no Elasticsearch, and no
 browsers. Do not make CI-log analysis a fallback for when reproduction
 "isn't available" — treat it as the normal, primary path, and treat live
 reproduction (below) as a bonus when the current environment happens to
 support it.
 
 Pull more history than what's already in the issue, using the same tools
-`detect-flaky-ci` uses:
+`detect-flaky-ci` uses (the `gh api .../actions/workflows/{file}/runs` REST
+calls from its Step 1 — not `gh run list --json`, for the same
+version-fragility reason given there):
 
 ```bash
 # Vitest: how often does this exact test appear as FAIL across recent runs
 # of the job that hosts it?
-gh run list --repo growilabs/growi --workflow "Node CI for app development" --limit 50 --status completed --json databaseId,conclusion,headSha,createdAt
+gh api "repos/growilabs/growi/actions/workflows/ci-app.yml/runs?per_page=50&status=completed" \
+  -q '.workflow_runs[] | {databaseId: .id, conclusion, headSha: .head_sha, createdAt: .created_at}'
 
 # Playwright: how often does this spec/browser show up in Retry#/flaky
 # evidence across recent run-playwright jobs?
-gh run list --repo growilabs/growi --workflow "Node CI for app production" --limit 50 --status completed --json databaseId,conclusion,headSha,createdAt
+gh api "repos/growilabs/growi/actions/workflows/ci-app-prod.yml/runs?per_page=50&status=completed" \
+  -q '.workflow_runs[] | {databaseId: .id, conclusion, headSha: .head_sha, createdAt: .created_at}'
 ```
 
-For each candidate run, fetch the relevant job's log (same commands as
+For each candidate run, fetch the relevant job's log (same method Step 0 of
+`flaky-ci-routine.md` decided — `gh run view --log*` or
+`mcp__github__get_job_logs`, whichever this run is using; see
 `detect-flaky-ci` Step 2/2b) and grep for the test title. Build a picture of:
 how often it fails, whether the failure mode is identical every time (points
 to a deterministic race, easier to fix) or varies (points to genuine timing
@@ -179,14 +245,16 @@ the accumulated CI evidence alone supports.
 Determine which category the flake belongs to — this decides the fix
 strategy in Step 4. Do not default to "just flaky, add a retry" — a race
 condition in product code surfaced by a test is a real bug, not a test
-problem, even though it *manifests* as flakiness.
+problem, even though it *manifests* as flakiness. The same discipline
+applies to "Environment timing": do not default to "just bump the
+timeout" either — see the guardrail below.
 
 | Category | Signature | Fix belongs in |
 |---|---|---|
 | **Shared/leaked state** | Test passes alone, fails alongside siblings; order-dependent; touches DB/fixtures another test also mutates | Test (isolate fixtures, don't disable parallelism — see `feedback_integ_test_isolation_per_worker` precedent: per-worker isolation, not disabling parallel execution) |
 | **Missing await / race in the test** | Assertion runs before an async side effect completes; timing-dependent selector waits (Playwright) | Test |
 | **Race in product code** | A fire-and-forget or unsynchronized async operation in application code (not the test) can observably run after the test's cleanup/assertion — e.g. a post-write side effect racing the same request's response | Product code |
-| **Environment timing** | Legitimately slow CI runner, no logic bug, but still worth quarantine if disruptive | Quarantine only, do not "fix" nonexistent code |
+| **Environment timing** | Legitimately slow CI runner, no logic bug, but still worth quarantine if disruptive | See guardrail below — usually a test redesign, not a bare timeout bump; quarantine only when no redesign is possible |
 
 Use `git log --oneline -20 -- {SPEC_PATH}` and read the code under test to
 tell "shared state" from "product race" — a test that fails only when run
@@ -194,6 +262,53 @@ after a specific sibling usually points at a fixture; a test that fails with
 an error surfaced from a service/model file (not the spec file itself) in
 the log's stack trace usually points at a product-code race worth reading
 carefully before dismissing as test flakiness.
+
+### Guardrail — a bare timeout increase is a last resort, not the default "Environment timing" fix
+
+A numeric timeout bump (`}, 15_000)` → `}, 20_000)` and so on) is the
+cheapest possible edit, which is exactly why it is easy to reach for
+without checking whether it actually addresses the cause. Before proposing
+one, check whether the test's own wall time **scales with a parameter of
+the test** (a loop count, a data size, an iteration count) rather than
+being a fixed cost that merely got unlucky under load. A bump over a
+scaling cost does not fix anything — it raises the load level at which the
+test starts failing again, and the next CI-busy period trips it once more.
+Concretely: read the test body, not just the failing assertion. If it
+issues `N` real round-trips (network, DB, filesystem) where `N` is
+`maxRequests`, a loop bound, or similar, and the assertions of interest
+only concern the *boundary* (a limit being reached/exceeded, a count
+saturating, a last-element condition), that is a redesign opportunity, not
+an environment-timing dead end:
+
+- Seed the precondition directly instead of looping to it — many
+  libraries expose a lower-level primitive that reaches the same state in
+  one call (e.g. `rate-limiter-flexible`'s `penalty(key, n)` reaches
+  `n` consumed points through the identical internal upsert path
+  `consume()` uses, in a single round-trip, instead of looping `consume()`
+  `n` times — see the `consume-points.integ.ts` fix for issue #11718/PR
+  #11719 for a worked example. The general shape: find the state-setting
+  primitive the library already ships, confirm it goes through the same
+  code path as the operation under test, and use it to jump straight to
+  one step before the boundary).
+- Exercise only the transition itself (the call(s) at and past the
+  boundary) through the real code under test.
+- This turns an O(N) cost into an O(1) cost, which removes the test's
+  sensitivity to CI load rather than buying temporary headroom against it.
+
+Only accept a bare timeout bump when:
+- a redesign genuinely isn't possible without changing what the test
+  verifies (rare — most "N round-trips to reach a boundary" tests can be
+  reshaped as above), or
+- as a **modest safety margin layered on top of a redesign** that already
+  removed the scaling behavior — not as the fix itself. State explicitly
+  why the margin is still there (e.g. "no CI history yet for this
+  reshaped test, and local/CI timing can differ") rather than leaving it
+  unexplained.
+
+A proposed fix that is only a numeric timeout change, with no evidence the
+test's cost was checked for scaling with a parameter, is not HIGH
+confidence at Step 4 regardless of how clean the diff looks — see the
+confidence table there.
 
 ---
 
@@ -206,6 +321,8 @@ carefully before dismissing as test flakiness.
 | Root cause pinpointed (category from Step 3 is clear, consistent with the Step 2 rerun tally) + fix is surgical (1-2 files) | HIGH |
 | Root cause identified but fix touches product code with broader blast radius, or category is ambiguous between "shared state" and "product race" | MEDIUM |
 | Reruns failed 100% of the time (looks like a real regression, not a flake — see Step 2's note) | MEDIUM — flag this explicitly, do not silently treat it as a flaky-test fix |
+| Issue came in as `flaky/suspected` and its one confirmation rerun (Step 2) also failed | MEDIUM — the mining hit alone is not empirical proof; say explicitly that the confirmation rerun did not reproduce a pass, so this could be a real regression rather than a flake, and that only one rerun was budgeted (not the 100%-tally case above) |
+| Proposed fix is a bare timeout increase, with no check for whether the test's cost scales with a parameter (see the Step 3 guardrail) | MEDIUM at best — go back and check for a redesign before treating this as HIGH, even if the diff is small and clean |
 | CI evidence and reruns alone do not localize a cause | LOW |
 
 **In `autonomous` mode:**
@@ -274,8 +391,16 @@ not the reverse.
 
 ### 6-A: Open a draft PR
 
+Open the draft PR, then immediately post a marker comment on the tracking
+issue, in the **same shell invocation** — so the Dashboard Updater (a
+separate component) can pick up this PR's link with a simple pattern match
+instead of searching issue/comment bodies in free form. `$PR_HTML_URL` only
+exists for the duration of the shell that set it — a separate tool call
+starts a fresh shell with no memory of it, so both commands below must run
+as one script, not as two independent invocations:
+
 ```bash
-gh pr create --repo growilabs/growi --draft \
+PR_HTML_URL=$(gh pr create --repo growilabs/growi --draft \
   --title "fix: stabilize flaky test in {short scope}" \
   --body "$(cat <<'EOF'
 ## Summary
@@ -293,8 +418,18 @@ executions (see comments below). This PR stays draft until that completes.
 
 Fixes #{ISSUE_NUMBER}
 EOF
-)"
+)")
+
+gh issue comment {ISSUE_NUMBER} --repo growilabs/growi --body "**Fix PR**: ${PR_HTML_URL}"
 ```
+
+This comment must be its own comment — a fixed one-line marker, not
+appended to any other comment — and its exact text must be
+`**Fix PR**: {PR_HTML_URL}` (this exact string is what the Dashboard
+Updater matches on; do not add a heading or extra wording that would break
+the match, and do not reuse the `### Additional observation` /
+`### Backfilled observation` headings from `detect-flaky-ci` here — this
+comment is intentionally excluded from that issue's observation-count).
 
 ### 6-B: Re-run this PR's CI for a repeat-green tally
 
@@ -357,7 +492,22 @@ top of the repeat-CI tally above.)
 
 ## Error Handling
 
-- Issue is not `flaky/confirmed`: stop, do not investigate (see Precondition).
+- Any `gh issue`/`gh label`/`gh pr` command fails with a GraphQL/proxy error
+  (e.g. "This GraphQL query is not enabled for this session"): switch that
+  specific call to its `gh api` REST equivalent and continue — see
+  `detect-flaky-ci`'s Error Handling for the same note and example mutation
+  form. `gh run ...` commands (Actions API) are never affected by this,
+  since Actions has no GraphQL API to begin with.
+- Issue is neither `flaky/confirmed` nor `flaky/suspected`: stop, do not
+  investigate (see Precondition).
+- A human approves proceeding with a best-guess fix at a MEDIUM gate for an
+  issue that came in as `flaky/suspected` and whose confirmation rerun
+  failed (Step 2/Step 4): the label is still `flaky/suspected` at that
+  point, not `flaky/confirmed` — do not silently promote it. Leave the
+  label as-is and let the PR body's Root Cause section carry the caveat
+  that this was never empirically reproduced; only Step 6-D's "reruns
+  green" evidence (a different, later rerun of the PR's own CI) is grounds
+  to also flip the label to `flaky/confirmed` at that point.
 - Reproduction impossible in devcontainer (e.g. browser deps missing): fall
   back to log-based analysis, note the limitation, and do not let this alone
   push confidence below what the CI evidence already supports.

@@ -3,10 +3,10 @@ import { body } from 'express-validator';
 import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { PathAlreadyExistsError } from '../models/errors';
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
-import PageTagRelation from '../models/page-tag-relation';
 import UpdatePost from '../models/update-post';
 import ApiResponse from '../util/apiResponse';
 
@@ -144,7 +144,9 @@ export const setup = (crowi, _app) => {
   api.getPageTag = async (req, res) => {
     const result = {};
     try {
-      result.tags = await PageTagRelation.listTagNamesByPage(req.query.pageId);
+      result.tags = await prisma.pagetagrelations.listTagNamesByPage(
+        req.query.pageId,
+      );
     } catch (err) {
       return res.json(ApiResponse.error(err));
     }

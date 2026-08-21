@@ -168,14 +168,19 @@ describe('toArchivePostErrorEvent', () => {
     });
   });
 
-  test('falls back to the generic event for a conflict_detection_failed response (not a conflict)', () => {
+  test('maps a conflict_detection_failed response to its own event, not the generic one', () => {
+    // The receive route ran and refused to guess whether the archive conflicts (issue
+    // #10151) -- that must read differently from a dropped connection, which is what the
+    // generic event otherwise looks identical to.
+    const detectionFailureMessage =
+      'Failed to detect data conflicts before import.';
     const err = {
       response: {
         status: 500,
         data: {
           errors: [
             {
-              message: 'Failed to detect data conflicts before import.',
+              message: detectionFailureMessage,
               code: 'conflict_detection_failed',
             },
           ],
@@ -183,7 +188,52 @@ describe('toArchivePostErrorEvent', () => {
       },
     };
 
-    expect(toArchivePostErrorEvent(err)).toEqual(GENERIC_EVENT);
+    expect(toArchivePostErrorEvent(err)).toEqual({
+      key: 'admin:g2g:error_conflict_detection_failed',
+      message: detectionFailureMessage,
+    });
+  });
+
+  test.each<[string, string, string]>([
+    [
+      'invalid_transfer_key',
+      'Invalid transfer key',
+      'admin:g2g:error_invalid_transfer_key',
+    ],
+    [
+      'parse_failed',
+      'Failed to parse request body.',
+      'admin:g2g:error_parse_failed',
+    ],
+    [
+      'validation_failed',
+      'Failed to validate transfer data file.',
+      'admin:g2g:error_validation_failed',
+    ],
+    [
+      'version_incompatible',
+      'The version of this GROWI and the uploaded GROWI data are not the same',
+      'admin:g2g:error_version_incompatible',
+    ],
+    [
+      'import_settings_invalid',
+      'Import settings are invalid. See GROWI docs about details.',
+      'admin:g2g:error_import_settings_invalid',
+    ],
+    [
+      'mongo_collection_import_failure',
+      'Failed to import MongoDB collections',
+      'admin:g2g:error_mongo_collection_import_failure',
+    ],
+  ])('maps a %s response to its own event', (code, message, key) => {
+    const err = {
+      response: {
+        status: 500,
+        data: { errors: [{ message, code }] },
+      },
+    };
+
+    expect(toArchivePostErrorEvent(err)).toEqual({ key, message });
   });
 
   test('falls back to the generic event for a network error carrying no response at all', () => {

@@ -16,10 +16,17 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import {
+  G2G_CONFLICT_DETECTION_FAILED_ERROR_CODE,
   G2G_DATA_CONFLICT_ERROR_CODE,
   G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+  G2G_IMPORT_SETTINGS_INVALID_ERROR_CODE,
+  G2G_INVALID_TRANSFER_KEY_ERROR_CODE,
   G2G_MIXED_IMPORT_MODES_ERROR_CODE,
+  G2G_MONGO_COLLECTION_IMPORT_FAILURE_ERROR_CODE,
+  G2G_PARSE_FAILED_ERROR_CODE,
   G2G_PROTECTED_COLLECTION_ERROR_CODE,
+  G2G_VALIDATION_FAILED_ERROR_CODE,
+  G2G_VERSION_INCOMPATIBLE_ERROR_CODE,
   G2GTransferErrorCode,
   isG2GTransferError,
 } from '~/server/models/vo/g2g-transfer-error';
@@ -367,7 +374,10 @@ export const setup = (crowi: Crowi): Router => {
       await g2gTransferReceiverService.validateTransferKey(transferKey);
     } catch (err) {
       return res.apiv3Err(
-        new ErrorV3('Invalid transfer key', 'invalid_transfer_key'),
+        new ErrorV3(
+          'Invalid transfer key',
+          G2G_INVALID_TRANSFER_KEY_ERROR_CODE,
+        ),
         403,
       );
     }
@@ -488,7 +498,10 @@ export const setup = (crowi: Crowi): Router => {
     } catch (err) {
       logger.error(err);
       return res.apiv3Err(
-        new ErrorV3('Failed to parse request body.', 'parse_failed'),
+        new ErrorV3(
+          'Failed to parse request body.',
+          G2G_PARSE_FAILED_ERROR_CODE,
+        ),
         500,
       );
     }
@@ -566,7 +579,7 @@ export const setup = (crowi: Crowi): Router => {
       return res.apiv3Err(
         new ErrorV3(
           'Failed to validate transfer data file.',
-          'validation_failed',
+          G2G_VALIDATION_FAILED_ERROR_CODE,
         ),
         500,
       );
@@ -582,7 +595,7 @@ export const setup = (crowi: Crowi): Router => {
       return res.apiv3Err(
         new ErrorV3(
           'The version of this GROWI and the uploaded GROWI data are not the same',
-          'version_incompatible',
+          G2G_VERSION_INCOMPATIBLE_ERROR_CODE,
         ),
         500,
       );
@@ -603,7 +616,7 @@ export const setup = (crowi: Crowi): Router => {
       return res.apiv3Err(
         new ErrorV3(
           'Import settings are invalid. See GROWI docs about details.',
-          'import_settings_invalid',
+          G2G_IMPORT_SETTINGS_INVALID_ERROR_CODE,
         ),
       );
     }
@@ -634,7 +647,7 @@ export const setup = (crowi: Crowi): Router => {
       return res.apiv3Err(
         new ErrorV3(
           'Failed to detect data conflicts before import.',
-          'conflict_detection_failed',
+          G2G_CONFLICT_DETECTION_FAILED_ERROR_CODE,
         ),
         500,
       );
@@ -674,7 +687,7 @@ export const setup = (crowi: Crowi): Router => {
       return res.apiv3Err(
         new ErrorV3(
           'Failed to import MongoDB collections',
-          'mongo_collection_import_failure',
+          G2G_MONGO_COLLECTION_IMPORT_FAILURE_ERROR_CODE,
         ),
         500,
       );

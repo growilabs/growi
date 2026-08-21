@@ -224,9 +224,6 @@ importers:
       '@codemirror/view':
         specifier: ^6.42.1
         version: 6.43.6
-      '@cspell/dynamic-import':
-        specifier: ^8.15.4
-        version: 8.15.4
       '@elastic/elasticsearch8':
         specifier: npm:@elastic/elasticsearch@^8.18.2
         version: '@elastic/elasticsearch@8.19.0'
@@ -3024,10 +3021,6 @@ packages:
 
   '@croct/json@2.1.0':
     resolution: {integrity: sha512-UrWfjNQVlBxN+OVcFwHmkjARMW55MBN04E9KfGac8ac8z1QnFVuiOOFtMWXCk3UwsyRqhsNaFoYLZC+xxqsVjQ==}
-
-  '@cspell/dynamic-import@8.15.4':
-    resolution: {integrity: sha512-tr0F6EYN6qtniNvt1Uib+PgYQHeo4dQHXE2Optap+hYTOoQ2VoQ+SwBVjZ+Q2bmSAB0fmOyf0AvgsUtnWIpavw==}
-    engines: {node: '>=18.0'}
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
@@ -18250,10 +18243,6 @@ snapshots:
       '@croct/json': 2.1.0
 
   '@croct/json@2.1.0': {}
-
-  '@cspell/dynamic-import@8.15.4':
-    dependencies:
-      import-meta-resolve: 4.2.0
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:

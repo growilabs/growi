@@ -1,9 +1,9 @@
 {
-  "unusedKeys": 1507,
+  "unusedKeys": 1558,
   "missingByLocale": {
-    "ja_JP": 19,
-    "zh_CN": 39,
-    "fr_FR": 39,
-    "ko_KR": 52
+    "ja_JP": 13,
+    "zh_CN": 33,
+    "fr_FR": 33,
+    "ko_KR": 46
   }
 }

@@ -391,15 +391,16 @@ model pages {
   updatedAt                DateTime  @default(now())
   wip                      Boolean?
 
-  creator        users?        @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  lastUpdateUser users?        @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  parent         pages?        @relation("ParentChild", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children       pages[]       @relation("ParentChild")
-  deleteUser     users?        @relation("DeletedPages", fields: [deleteUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  revisions      revisions[]
-  comments       comments[]
-  attachments    attachments[]
-  bookmarks      bookmarks[]
+  creator          users?             @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lastUpdateUser   users?             @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  parent           pages?             @relation("ParentChild", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children         pages[]            @relation("ParentChild")
+  deleteUser       users?             @relation("DeletedPages", fields: [deleteUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  revisions        revisions[]
+  comments         comments[]
+  attachments      attachments[]
+  bookmarks        bookmarks[]
+  pagetagrelations pagetagrelations[]
 
   @@index([parentId], map: "parent_1")
   @@index([path], map: "path_1")
@@ -412,17 +413,18 @@ model pages {
 }
 
 model pagetagrelations {
-  id            String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  isPageTrashed Json?
-  /// Field referred in an index, but found no data to define the type.
-  relatedPage   Json?
-  /// Field referred in an index, but found no data to define the type.
-  relatedTag    Json?
+  id            String  @id @default(auto()) @map("_id") @db.ObjectId
+  v             Int     @default(0) @map("__v")
+  isPageTrashed Boolean @default(false)
+  relatedPageId String  @map("relatedPage") @db.ObjectId
+  relatedTagId  String  @map("relatedTag") @db.ObjectId
 
-  @@unique([relatedPage, relatedTag], map: "relatedPage_1_relatedTag_1")
-  @@index([relatedPage], map: "relatedPage_1")
-  @@index([relatedTag], map: "relatedTag_1")
+  relatedPage pages @relation(fields: [relatedPageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  relatedTag  tags  @relation(fields: [relatedTagId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([relatedPageId, relatedTagId], map: "relatedPage_1_relatedTag_1")
+  @@index([relatedPageId], map: "relatedPage_1")
+  @@index([relatedTagId], map: "relatedTag_1")
   @@index([isPageTrashed], map: "isPageTrashed_1")
 }
 
@@ -499,6 +501,8 @@ model tags {
   id   String @id @default(auto()) @map("_id") @db.ObjectId
   v    Int    @default(0) @map("__v")
   name String @unique(map: "name_1")
+
+  pagetagrelations pagetagrelations[]
 }
 
 model transferkeys {

@@ -88,7 +88,6 @@ describe('planAdminRescue', () => {
       expect(rescued.emailRemoved).toBe(false);
       expect(rescued.slackMemberIdRemoved).toBe(false);
       expect(rescued.idReassigned).toBe(false);
-      expect(plan.notLoginable).toEqual([]);
     });
   });
 
@@ -312,29 +311,30 @@ describe('planAdminRescue', () => {
       ['still only registered', { status: UserStatus.STATUS_REGISTERED }],
       ['deleted', { status: UserStatus.STATUS_DELETED }],
       ['without a password', { password: '' }],
-    ])('does not rescue an admin %s, and reports it as not loginable', (_label, overrides) => {
+    ])('does not rescue an admin %s', (_label, overrides) => {
       // Requirement 4.1 (and the evidence behind the 3.5 warning): rescuing an account
-      // that cannot pass loginRequiredStrictly leaves nobody able to log in.
+      // that cannot pass loginRequiredStrictly leaves nobody able to log in. Whether the
+      // destination has any loginable administrator at all is reported separately, via
+      // `isLoginable` + `loginableAdminCount` (`g2g-transfer.ts`'s `answerGROWIInfo`), not
+      // through this plan.
       const admin = buildAdmin({ username: 'stale-admin', ...overrides });
 
       const plan = planAdminRescue([admin], [], buildArchiveIdentity());
 
       expect(plan.rescued).toEqual([]);
-      expect(plan.notLoginable).toEqual(['stale-admin']);
     });
 
     test('ignores a user that is not an admin at all', () => {
       // Requirement 4.1: the rescue is about administrators; an ordinary member is
-      // neither rescued nor reported as an admin who cannot log in.
+      // never rescued.
       const member = buildAdmin({ username: 'member', admin: false });
 
       const plan = planAdminRescue([member], [], buildArchiveIdentity());
 
       expect(plan.rescued).toEqual([]);
-      expect(plan.notLoginable).toEqual([]);
     });
 
-    test('rescues the loginable admin while reporting the one that cannot log in', () => {
+    test('rescues the loginable admin, leaving out the one that cannot log in', () => {
       // Requirement 4.1
       const loginable = buildAdmin({ username: 'loginable-admin' });
       const passwordless = buildAdmin({
@@ -354,7 +354,6 @@ describe('planAdminRescue', () => {
       expect(plan.rescued.map((rescued) => rescued.user.username)).toEqual([
         'loginable-admin',
       ]);
-      expect(plan.notLoginable).toEqual(['sso-only-admin']);
     });
   });
 
