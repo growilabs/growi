@@ -22,12 +22,17 @@ export interface PageRedirectDocument extends IPageRedirect, Document {}
 export interface PageRedirectModel extends Model<PageRedirectDocument> {
   retrievePageRedirectEndpoints(
     fromPath: string,
-  ): Promise<IPageRedirectEndpoints>;
+  ): Promise<IPageRedirectEndpoints | null>;
+  retrievePageRedirectEndpointsBatch(
+    fromPaths: string[],
+    maxDepth?: number,
+  ): Promise<Map<string, IPageRedirectEndpoints>>;
   removePageRedirectsByToPath(toPath: string): Promise<void>;
 }
 
 const CHAINS_FIELD_NAME = 'chains';
 const DEPTH_FIELD_NAME = 'depth';
+
 type IPageRedirectWithChains = PageRedirectDocument & {
   [CHAINS_FIELD_NAME]: (PageRedirectDocument & {
     [DEPTH_FIELD_NAME]: number;
@@ -44,11 +49,26 @@ const schema = new Schema<PageRedirectDocument, PageRedirectModel>({
   toPath: { type: String, required: true },
 });
 
-schema.statics.retrievePageRedirectEndpoints = async function (
-  fromPath: string,
-): Promise<IPageRedirectEndpoints | null> {
+/**
+ * Resolves the endpoint of each requested `fromPath`'s redirect chain.
+ *
+ * @param maxDepth - Optional cap on how many hops of a chain to walk. `$graphLookup`
+ *                   is memory-bound (100MB, with no spill to disk), so a caller on a
+ *                   hot path can trade reach for a guaranteed bound. Omit it to walk
+ *                   each chain to its real end — page view resolves an old URL
+ *                   through this, where a cap would turn a page that was renamed
+ *                   many times into a not-found for that URL.
+ */
+schema.statics.retrievePageRedirectEndpointsBatch = async function (
+  fromPaths: string[],
+  maxDepth?: number,
+): Promise<Map<string, IPageRedirectEndpoints>> {
+  if (fromPaths.length === 0) {
+    return new Map();
+  }
+
   const aggResult: IPageRedirectWithChains[] = await this.aggregate([
-    { $match: { fromPath } },
+    { $match: { fromPath: { $in: fromPaths } } },
     {
       $graphLookup: {
         from: 'pageredirects',
@@ -57,6 +77,7 @@ schema.statics.retrievePageRedirectEndpoints = async function (
         connectToField: 'fromPath',
         as: CHAINS_FIELD_NAME,
         depthField: DEPTH_FIELD_NAME,
+        ...(maxDepth != null ? { maxDepth } : {}),
       },
     },
   ]);
@@ -82,30 +103,43 @@ schema.statics.retrievePageRedirectEndpoints = async function (
   }
   */
 
-  if (aggResult.length === 0) {
-    return null;
-  }
+  const endpointsByFromPath = new Map<string, IPageRedirectEndpoints>();
 
-  if (aggResult.length > 1) {
-    logger.warn(
-      `Although two or more PageRedirect documents starts from '${fromPath}' exists, The first one is used.`,
+  for (const redirectWithChains of aggResult) {
+    const start = {
+      fromPath: redirectWithChains.fromPath,
+      toPath: redirectWithChains.toPath,
+    };
+
+    // `fromPath` is unique-indexed, but MongoDB refuses to build a unique index
+    // over a collection that already holds duplicates and the app boots anyway,
+    // so duplicates are reachable. Take the first match instead of letting
+    // aggregation order — which is not guaranteed — pick the winner.
+    if (endpointsByFromPath.has(start.fromPath)) {
+      logger.warn(
+        `Although two or more PageRedirect documents starts from '${start.fromPath}' exists, The first one is used.`,
+      );
+      continue;
+    }
+
+    // sort chains in desc, without reordering the aggregation result itself
+    const sortedChains = [...redirectWithChains[CHAINS_FIELD_NAME]].sort(
+      (a, b) => b[DEPTH_FIELD_NAME] - a[DEPTH_FIELD_NAME],
     );
+
+    const end = sortedChains.length === 0 ? start : sortedChains[0];
+
+    endpointsByFromPath.set(start.fromPath, { start, end });
   }
 
-  const redirectWithChains = aggResult[0];
+  return endpointsByFromPath;
+};
 
-  // sort chains in desc
-  const sortedChains = redirectWithChains[CHAINS_FIELD_NAME].sort(
-    (a, b) => b[DEPTH_FIELD_NAME] - a[DEPTH_FIELD_NAME],
-  );
-
-  const start = {
-    fromPath: redirectWithChains.fromPath,
-    toPath: redirectWithChains.toPath,
-  };
-  const end = sortedChains.length === 0 ? start : sortedChains[0];
-
-  return { start, end };
+schema.statics.retrievePageRedirectEndpoints = async function (
+  fromPath: string,
+): Promise<IPageRedirectEndpoints | null> {
+  const endpoint = await this.retrievePageRedirectEndpointsBatch([fromPath]);
+  return endpoint.get(fromPath) ?? null;
 };
 
 schema.statics.removePageRedirectsByToPath = async function (
