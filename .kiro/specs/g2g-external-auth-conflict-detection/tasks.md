@@ -74,7 +74,7 @@
   - _Boundary: summarize-unique-conflicts_
   - _Depends: 1.2_
 
-- [ ] 5. (P) 受信サービスに4コレクションの解決を組み込む
+- [x] 5. (P) 受信サービスに4コレクションの解決を組み込む
   - `detectImportConflicts`(`g2g-transfer.ts`)が、`innerFileStats`からexternalaccounts/externalusergroupsのJSONパスも解決し、`mongoose.model('ExternalAccount')`・`ExternalUserGroup`(デフォルトエクスポート)を取得して`CollectionInput[]`を組み立てる。
   - 解決できないファイルは例外、対象外は`null`という既存の方針をexternalaccounts/externalusergroupsにも適用する(要件1.6)。
   - Observable: 4コレクションすべてを含む転送設定を渡すと、4件分の`CollectionInput`が組み立てられる。
