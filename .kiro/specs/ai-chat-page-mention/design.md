@@ -1,5 +1,20 @@
 # Technical Design: ai-chat-page-mention
 
+## Write / Don't-Write Test
+
+**この文書の役割**: 本 spec の設計上の判断を保つ場所であり、実装の記録ではない。この機能を将来変更する人が、コードとテストファイルだけでは分からない「なぜ今の形なのか」を確認するために読む。
+
+**判定基準**: 各項目について「コードとテストファイルを読めば読み手が再構築できる内容か」を自問する。再構築できるなら、この文書には書かない。
+
+| 書く | 書かない |
+|---|---|
+| 調べるのに時間がかかった事実（コードをさらっと読んでも分からない挙動、CodeMirror や `PromptInput` など外部/共有コンポーネントの隠れた振る舞い） | 関数のシグネチャ、ファイル構成、どのファイルに何があるか |
+| 変わった設計を選んだ理由 — 特に**検討して却下した案とその理由**（textarea 温存案、Lexical/ProseMirror 導入案、`coordsAtPos` 追従案など） | 素直な実装の説明 |
+| 自動テストで**捕まえられない**残存ギャップ（ピクセル単位のキャレット表示など） | どのテストが何を検証しているかの一覧（spec ファイルを読むほうが確実） |
+| コードから再現できない手動検証の手順（devcontainer での確認観点） | 差分の有無や実装時期などの経緯 |
+
+**迷ったら書かない。** コードを読めば分かることをここに置くと、コードが変わったときに黙って古くなり、この文書全体の信頼を落とす。
+
 ## Overview
 
 **Purpose**: AI チャット利用者が、入力欄で `@` に続けて文字列を入力するとページパスをインクリメンタル検索し、候補から選択したページを「原子的な rich text トークン（メンションチップ）」として挿入できる機能を提供する。チップはクリックで対象ページへ遷移でき、送信時には対象ページの**パス文字列**として AI に渡る。
@@ -95,43 +110,13 @@ graph TB
 - **Preserved patterns**: shadcn `PromptInput` 合成シェル、`useSWRxSearch`、`LinkedPagePath`、feature-based 配置。
 - **New components rationale**: textarea ではメンションの「視覚区別・原子性・clickable」を満たせないため、CM ベースの入力リーフと装飾拡張が必須。候補 UI は loading/該当なし（2.5/2.6）と shadcn スタイル要件を満たすため React 側で持つ。
 
-### Technology Stack
-
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Frontend (editor) | `@codemirror/state` `^6.6`, `@codemirror/view` `^6.42` | エディタ・装飾・原子レンジ | 既存依存。新規追加なし |
-| Frontend (keymap) | `@codemirror/commands`（`defaultKeymap`） | mention キーマップ（`Prec.highest`）＋標準カーソル移動の合成 | 矢印/編集キーがドキュメントモデル基準。`@codemirror/autocomplete` は不使用 |
-| Frontend (候補UI) | `downshift`（controlled）+ `simplebar-react` + shadcn/Tailwind 4 (`tw:`) | 候補リストの ARIA/ホバー/クリック・スクロール・スタイル | downshift は状態非所有。Bootstrap 不使用 |
-| Frontend (avatar) | `@growi/ui` `UserPicture` | 候補行の作成者アバター | `noLink`/`noTooltip` |
-| Data | `useSWRxSearch`（`/search`） + `usehooks-ts` `useDebounceValue` | ページパス検索（権限フィルタ済み）・クエリ debounce | 既存。無改修。`includeUserPages: true` を指定（/user 配下もメンション対象） |
-| Navigation | `LinkedPagePath` + `next/router` | チップクリック遷移（SPA 同タブ） | 既存ヘルパ |
-| i18n | `react-i18next` | 新規 UI 文言 | ChatSidebar に新規導入 |
-
 ## File Structure Plan
 
-### Directory Structure
-```
-apps/app/src/features/mastra/client/components/PageMentionInput/
-├── index.ts                          # 公開バレル: PageMentionInput と公開型のみ re-export
-├── PageMentionInput.tsx              # React adapter: EditorView ライフサイクル / value 同期 / 隠しinput[name=message] / requestSubmit / 候補リスト配置
-├── MentionCandidateList.tsx          # shadcn 候補ドロップダウン(loading/該当なし/行レンダリング/ハイライト)
-├── use-mention-controller.ts         # セッション状態↔候補リストの橋渡しフック(検索・選択中index・commit/close)
-├── types.ts                          # PagePathCandidate / MentionData / MentionSessionState / 公開Props
-├── mention-aria.ts                   # 共有ARIA id (MENTION_LISTBOX_ID / mentionOptionId) + 共有述語 isListboxRendered — エディタとlistboxの連携用
-└── editor-state/
-    ├── index.ts                      # サブバレル: 拡張ファクトリ createPageMentionExtensions() を公開
-    ├── mention-decoration.ts         # MentionWidget(WidgetType) + 装飾StateField + addMention効果 + atomicRanges
-    ├── mention-session.ts            # @トリガ検出・セッションStateField・起動規則(1.5)・終了(1.6/1.7)
-    ├── mention-keymap.ts             # 高優先度キーマップ: セッション中はNav鍵をcontrollerへ委譲 / Enter送信・Shift+Enter改行
-    └── flatten.ts                    # doc → 送信用パス文字列の取得(純関数, 6.1-6.3)
-```
-
-### Modified Files
-- `apps/app/src/features/mastra/client/components/ChatSidebar/ChatSidebar.tsx` — 入力リーフを `PromptInputTextarea` → `PageMentionInput` に差し替え。`onChange` を `(value: string) => setInput(value)` に変更（`PageMentionInput` は文字列を直接返す）。送信は従来どおり `PromptInput` の `onSubmit={handleSubmit}` 経路を維持（`PageMentionInput` の Enter が `requestSubmit()` を発火するため ChatSidebar 側の送信配線は変更不要）。新規文言を i18n 化。`PromptInput`/`PromptInputBody`/`PromptInputFooter`/`PromptInputSubmit`/`handleSubmit` は維持。
-  - **オープン時のフォーカス付与（8.x）**: `PageMentionInputHandle` の ref を保持し、`useChatSidebarStatus().openSeq` を依存に持つ effect から `focus()` を呼ぶ。**マウントのみを契機にしない**理由は、表示中スレッドを Recent Items から再選択した場合に `dynamic.tsx` の remount key（`threadId`）が変わらず再マウントが起きないため（8.2）。逆に依存を `openSeq` に限定することで、ストリーミング中の毎チャンク再描画や SWR 解決ではキャレットを奪わない（8.3）。`openSeq` は `dynamic.tsx` の remount key と本 effect の 2 consumer を持つため、**すべての `openChat()` で bump される**ことが前提（`status/chat-sidebar.tsx` に明記）。マウント経路の成立は `PageMentionInput` が同期マウントされること（React が子 effect を親より先に flush する）に依存する。
-- GROWI i18n ロケールリソース — `pageMention.placeholder` / `pageMention.hint` / `pageMention.searching` / `pageMention.noResults` / `pageMention.candidatesLabel`（listbox の aria-label）を全 5 ロケール（en_US/ja_JP/ko_KR/zh_CN/fr_FR）に追加。
+CodeMirror 拡張群（`editor-state/`）は React/SWR に依存しない純粋なレイヤとして分離し、`use-mention-controller` がその状態を React の候補 UI へ橋渡しする唯一の窓口になる。ChatSidebar 側は入力リーフの差し替えのみを担い、送信・添付処理などの既存ロジックには手を入れない。
 
 > 依存方向: `types` → `editor-state/*`(純CM) → `use-mention-controller` → `PageMentionInput`/`MentionCandidateList`(React) → `ChatSidebar`。左方向のみ import。`editor-state/*` は React/SWR に依存しない。
+
+**オープン時のフォーカス付与（8.x）の設計判断**: フォーカス付与のトリガは `useChatSidebarStatus().openSeq` の変化のみであり、マウントを契機にしない。表示中スレッドを Recent Items から再選択した場合は `dynamic.tsx` の remount key（`threadId`）が変わらず再マウントが起きないため、マウント契機では取り逃す（8.2）。逆にトリガを `openSeq` に限定することで、ストリーミング中の毎チャンク再描画や SWR 解決時にはキャレットを奪わない（8.3）。`openSeq` は本 effect と `dynamic.tsx` の remount key の 2 か所から参照されるため、すべての `openChat()` で確実に bump されることが前提となる。
 
 ## System Flows
 
@@ -176,39 +161,6 @@ sequenceDiagram
 - 送信テキストは **隠し `input[name=message]`** を介して既存フォーム経路に渡す。CodeMirror はネイティブフォーム要素でないため、flatten 結果をこの隠し input に同期させて `formData.get('message')` で読めるようにする（Issue 1 対応）。
 - セッション中の Nav 鍵（↑↓/Enter/Tab/Esc）は高優先度キーマップが横取りして候補リスト操作へ委譲し、非セッション時の Enter は `requestSubmit()` で送信に割り当てる。
 - **ARIA 同期（a11y）**: **listbox とその option が実際に DOM に存在する間だけ**、`PageMentionInput` がエディタの `contentDOM` に `aria-controls`（listbox）と `aria-activedescendant`（ハイライト中の option）を `EditorView.contentAttributes` の Compartment で同期する。「listbox が描画されている」条件（open + 非空クエリ + 検索完了 + 候補 ≥1）は共有述語 `isListboxRendered`（`mention-aria.ts`）に単一定義し、`MentionCandidateList` の listbox 描画分岐と同じ述語を使うことで、ヒント/検索中/該当なし状態で存在しない id を参照（dangling）しないことを保証する。ハイライト移動のたびに再構成し、条件を外れたら除去。これによりキーボードで候補を辿る際に SR がアクティブ候補を読み上げる。
-
-## Requirements Traceability
-
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1 | `@`起動・候補パネル即時オープン | mention-session, PageMentionInput | MentionSessionState | 挿入フロー |
-| 1.2 | 空クエリ時はヒント表示 | MentionCandidateList | — | — |
-| 1.3 | `@`後入力で逐次検索 | mention-session, use-mention-controller | useSWRxSearch | 挿入フロー |
-| 1.4 | 1文字以上で候補表示 | use-mention-controller, MentionCandidateList | — | 挿入フロー |
-| 1.5 | 語境界以外では非起動 | mention-session | isMentionTriggerBoundary() | — |
-| 1.6 | 空白でセッション終了 | mention-session | — | — |
-| 1.7 | `@`削除でセッション終了 | mention-session | — | 挿入フロー |
-| 2.1 | 候補にパス表示 | MentionCandidateList | PagePathCandidate | — |
-| 2.2, 2.3 | ↑↓選択・Enter/クリック確定 | mention-keymap, use-mention-controller | MentionController | 挿入フロー |
-| 2.4 | Esc/外クリックで閉じる | mention-keymap, MentionCandidateList | MentionController.close | — |
-| 2.5, 2.6 | loading/該当なし表示 | MentionCandidateList, use-mention-controller | MentionController(isLoading/candidates) | — |
-| 2.7 | 過剰検索抑制(debounce) | use-mention-controller | activateOnTypingDelay/debounce | — |
-| 2.8 | キーボード/SR アクセシビリティ | PageMentionInput, MentionCandidateList | aria-controls/activedescendant, listbox role+aria-label, role=status | — |
-| 3.1 | 検索文字列をチップに置換 | mention-decoration, use-mention-controller | addMention 効果 | 挿入フロー |
-| 3.2 | 視覚的区別 | mention-decoration(MentionWidget) | Tailwind チップ | — |
-| 3.3 | 原子的単位として保持 | mention-decoration | EditorView.atomicRanges | — |
-| 3.4 | 複数メンション | mention-decoration | DecorationSet | — |
-| 4.1 | クリックで遷移 | mention-decoration(MentionWidget) | NavCallback Facet + LinkedPagePath | — |
-| 4.2 | クリックと編集の区別 | mention-decoration | widget click handler | — |
-| 5.1 | 単位削除 | mention-decoration | atomicRanges | — |
-| 5.2 | 編集中も独立維持 | mention-decoration | DecorationSet.map | — |
-| 5.3 | 文字単位編集不可・境界キャレット | mention-decoration | atomicRanges | — |
-| 5.4 | 隣接入力は外側テキスト | mention-decoration | replace 非 inclusive | — |
-| 5.5 | 部分編集手段を提供しない | mention-decoration, mention-session | — | — |
-| 6.1, 6.3 | パス文字列を該当位置・順序で送信 | flatten | getMentionFlattenedText() | 挿入フロー |
-| 6.2 | 本文非付与 | flatten | doc.toString()のみ | — |
-| 7.1, 7.2 | 既存検索・権限内ページのみ | use-mention-controller | useSWRxSearch | — |
-| 8.1, 8.2, 8.3 | オープン時のみキャレット付与 | ChatSidebar, PageMentionInput | PageMentionInputHandle.focus() + `openSeq` trigger | — |
 
 ## Components and Interfaces
 
@@ -438,39 +390,16 @@ export const getMentionFlattenedText: (state: EditorState) => string; // = doc.t
 - **遷移失敗（4.1）**: `LinkedPagePath` から無効 href の場合はクリックを無効化（チップ表示は維持）。
 - **装飾整合崩れ**: 編集で装飾範囲が破壊された場合はチップを破棄し通常テキスト化（フェイルセーフ、5.2 の境界）。
 
-### Monitoring
-- 既存のクライアントロギング規約（`@growi/logger`/console 禁止）に従う。本機能固有の新規メトリクスは追加しない。
-
 ## Testing Strategy
 
 **テスト層の方針（Issue 3 対応）**: CodeMirror のキャレット挙動は `EditorView` の DOM レイアウト計測（`coordsAtPos`・縦方向移動）に依存し、jsdom では信頼性が低い。本機能では **Playwright E2E を採用しない**ため、検証は以下の原則で層別する:
 - **state / command レベルに寄せて jsdom（Vitest）で検証する** — 我々が**著述するロジック**（session field、decoration field の内容、`atomicRanges` facet の出力、flatten、コマンド実行後の doc/selection）はレイアウト非依存で安定して検証できる。
 - **ピクセル単位のキャレット表示そのものは検証しない** — 「キャレットが境界のみで内部に入らない」(3.3/5.3) は CodeMirror が `atomicRanges` 設定から保証する**ライブラリ挙動**であり、我々は *atomicRanges に当該範囲が登録されていること*（facet 出力＝state レベル）を代理検証する。レンダリング後の実挙動は devcontainer 手動スモークで確認（自動ゲートにはしない）。
 
-### Unit Tests（Vitest / jsdom, state・command レベル）
-- `isMentionTriggerBoundary`: 行頭/空白後の `@` は起動、非空白後（`foo@`, メール様）は非起動（1.5）。
-- `mention-session`: 語境界 `@` で `active=true`・`query=""`（即起動、1.1）、`@`+入力で `query` 更新（1.3）、**空白入力で `active=false`**（1.6）、`@` 削除で `active=false`（1.7）、確定メンション内で再起動しない（5.5）。
-- `mention-decoration`（state レベル）: `addMention` 後に decoration 範囲が生成される（3.1/3.4）、`EditorView.atomicRanges` facet が当該範囲を返す（3.3/5.3 の代理検証）、`inclusive:false` で隣接挿入が装飾外＝通常テキスト（5.4）、隣接編集で装飾が `map` され独立維持（5.2）。
-- `mention-decoration`（command レベル）: `EditorView` を jsdom で生成し `deleteCharBackward` 等のコマンドを dispatch、メンション範囲が**単位で消滅**し doc/selection が期待どおりになることを検証（5.1）。レイアウト計測に依存しない範囲に限定。
-- `flatten`: 複数メンションを位置・順序どおりパス文字列化し、ページ本文を含まない（6.1–6.3）。
-
-### Component Tests（RTL / jsdom）
-- `MentionCandidateList`: `@` 起動直後の空クエリでヒント行表示・検索未実行（1.1/1.2）、query 1文字以上で候補表示（1.4/2.1）、`isLoading` 中 loading 表示（2.5）、空結果で該当なし表示（2.6）、行クリックで commit コールバック発火（2.3）。
-- `useMentionController` / `PageMentionInput`（DOM 非依存部）: controller の `moveUp/moveDown` で `highlightedIndex` が変化（2.2 のロジック）、`commit` で `addMention` を dispatch しチップ挿入（2.3/3.1）、`close` で候補が閉じる（2.4）、チップ DOM の click で NavCallback 発火（4.1）。
-- `ChatSidebar` 統合: メンション挿入後、隠し `input[name=message]` が flatten 値を保持し、送信で `sendMessage` に**パス文字列を含む text**が渡る（6.1）。
-- `PageMentionInput` の imperative ハンドル / `ChatSidebar` のフォーカス付与（8.x）: `document.activeElement` が `view.contentDOM` になるかで検証する（`focus()` が呼ばれたかのスパイではなく観察可能な結果）。初回オープン（8.1）、`openSeq` bump のみでの再オープン（8.2）、`openSeq` 据え置きの再描画ではフォーカスを触らない（8.3）の 3 点。キャレットの画素位置は検証しない（上記のレイアウト非依存方針）。
-
-> ↑↓ハイライト移動（2.2）は「キー入力→`coordsAtPos`」ではなく **controller のメソッド呼び出し→state 変化** として検証する（キーマップが鍵を controller へ委譲する設計のため、ロジックは DOM 非依存）。実際のキー伝播はスモークで確認。
-
 ### 手動スモーク（devcontainer, 自動ゲート外）
 - `@`入力 → 候補選択 → チップ表示 → 送信、の一連フロー（1.1→3.1→6.1）と、キャレットがチップ内部に入らない・IME 変換確定 Enter で誤送信しない（Issue 2）ことを実機確認。手順は `apps/app/.claude/skills/app-commands/SKILL.md` の Smoke Testing に従う。
 
 > 権限スコープ（7.x）は既存 `/search` の権限フィルタに委譲。本機能では候補取得が当該エンドポイント経由であることを確認するのみで、権限フィルタ自体の再テストは行わない。
-
-## Security Considerations
-- 候補に表示されるページは `useSWRxSearch` → `/search` の既存権限フィルタにより**ログインユーザーの閲覧可能ページのみ**（7.x）。本機能で独自の権限判定・フィルタは新設しない。
-- メンションのパス文字列は既存検索結果由来であり、ユーザーが本来アクセスできない情報を露出しない。
-- チップ DOM はパス文字列を `textContent` として設定し、HTML 挿入は行わない（XSS 回避）。
 
 ## Open Questions / Risks
 - **候補 UI のキー委譲（決定済み）**: キーボードは CM キーマップ（`Prec.highest`）が所有し、`controller.moveUp/moveDown/commit/close` へ委譲（downshift にはキーが届かない）。候補リストは **downshift を controlled な描画ヘルパ**として採用し、ARIA・マウスホバー（`setHighlightedIndex` で同期）・クリックのみを担当。状態の所有は `MentionController` のまま。`@codemirror/autocomplete` 単独案は不採用。

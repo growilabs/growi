@@ -44,6 +44,7 @@
     "insert_single": "1行に1エントリ入力してください。",
     "whitelist_invalid_format": "無効なフォーマットです。ドメイン完全一致は @example.com 、サブドメイン許可は @*.example.com 、アドレス完全一致は user@example.com の形式で入力してください。",
     "page_list_and_search_results": "ページリスト・検索結果",
+    "page_list_and_search_results_desc": "これらの設定はページへのアクセス権がないユーザーにのみ影響します。閲覧できるユーザー（例: 「特定グループのみ」で許可されたグループのメンバー）には「表示しない」でも常にリストや検索に表示されます。",
     "page_listing_1": "ページのリスト表示と検索<br>'自分のみ'に閲覧制限しているページ",
     "page_listing_1_desc": "ページのリスト表示や検索結果において、'自分のみ'に閲覧制限をしているページをアクセス権のないユーザーにも表示します。",
     "page_listing_2": "ページのリスト表示と検索<br>特定グループに閲覧制限しているページ",
@@ -292,9 +293,9 @@
     "toggle_notification": "{{path}}の通知設定を変更しました",
     "not_found_global_notification_triggerid": "アクセス先の通知設定は見つかりませんでした"
   },
-  "full_text_search_management": {
-    "full_text_search_management": "全文検索管理",
-    "elasticsearch_management": "Elasticsearch 管理",
+  "elasticsearch_management": "Elasticsearch 管理",
+  "page_data_index_management": {
+    "page_data_management": "ページデータ管理",
     "connection_status": "接続の状態",
     "connection_status_label_unconfigured": "設定されていません",
     "connection_status_label_connected": "接続されています",
@@ -308,12 +309,39 @@
     "reconnect_button": "再接続の試行",
     "reconnect_description": "Elasticsearch への再接続を試みます。",
     "normalize": "正規化",
-    "normalize_button": "インデックスの正規化",
-    "normalize_description": "破損したインデックスを修復します。",
+    "normalize_button": "ページデータのインデックスの正規化",
+    "normalize_description": "破損したページデータのインデックスを修復します。",
+    "normalize_success": "ページデータのインデックスを正規化しました。",
     "rebuild": "リビルド",
-    "rebuild_button": "インデックスのリビルド",
+    "rebuild_button": "ページデータのインデックスのリビルド",
+    "rebuild_requested": "ページデータのインデックスのリビルドをリクエストしました。",
     "rebuild_description_1": "全てのページのインデックスを削除し、作り直します。",
-    "rebuild_description_2": "この作業には数秒かかります。"
+    "rebuild_description_2": "この作業には数秒かかります。",
+    "rebuild_progress_processing": "処理中..",
+    "rebuild_progress_completed": "完了",
+    "rebuild_normalization_timeout": "リビルドは完了しましたが、正規化がタイムアウトしました。手動で正規化してください。"
+  },
+  "audit_log_index_management": {
+    "audit_log_index_management": "監査ログのインデックス管理",
+    "settings_explanation": "監査ログのインデックスの正規化・リビルドは、以下のページで行えます",
+    "index_management_link": "{{destination}}ページに移動",
+    "docs_url": {
+      "top": "https://docs.growi.org/ja/admin-guide/management-cookbook/setup-search-system.html"
+    },
+    "normalize": "正規化",
+    "normalize_button": "監査ログのインデックスの正規化",
+    "normalize_success": "監査ログのインデックスを正規化しました。",
+    "normalize_description": "破損した監査ログのインデックスを修復します。",
+    "rebuild": "リビルド",
+    "rebuild_button": "監査ログのインデックスのリビルド",
+    "rebuild_requested": "監査ログのインデックスのリビルドをリクエストしました。",
+    "rebuild_description_1": "全ての監査ログのインデックスを削除し、作り直します。",
+    "rebuild_description_2": "この作業には数秒かかります。",
+    "unsynced_events_warning": "Elasticsearch に同期できなかった監査ログがあります。リビルドして整合性を回復してください。",
+    "rebuild_progress_processing": "処理中..",
+    "rebuild_progress_completed": "完了",
+    "rebuild_normalization_timeout": "リビルドは完了しましたが、正規化がタイムアウトしました。手動で正規化してください。",
+    "reconnect": "再接続"
   },
   "mailer_setup_required": "送信するには <a href='/admin/app'>メールの設定</a> が必要です。",
   "admin_top": {
@@ -986,7 +1014,43 @@
     "transfer_data_to_another_growi": "このGROWIのデータを別GROWIへ移行する",
     "advanced_options": "詳細オプション",
     "start_transfer": "移行を開始する",
-    "paste_transfer_key": "移行キーをここにペースト"
+    "paste_transfer_key": "移行キーをここにペースト",
+    "transfer_method": {
+      "heading": "移行方法",
+      "migration": "移行(移行先の全データを置き換える)",
+      "merge": "既存データに追加(移行先の既存データは保持される)"
+    },
+    "confirm_modal": {
+      "title": "移行内容の確認",
+      "description": "移行先のGROWIには現在以下のデータがあります。この移行を開始すると、これらはすべて削除され、このGROWIのデータに置き換わります:",
+      "counts": {
+        "users": "ユーザー",
+        "user_groups": "ユーザーグループ",
+        "pages": "ページ"
+      },
+      "warnings_heading": "続行する前に:",
+      "warnings": {
+        "password_seed_mismatch": "移行元と移行先のGROWIでパスワードシードが異なります。移行されたユーザーは既存のパスワードでログインできなくなります。",
+        "no_loginable_admin": "移行先のGROWIには現在ログイン可能な管理者がいません。移行後、誰もログインできなくなる可能性があります。",
+        "sessions_not_invalidatable": "移行先のGROWIのセッションストアは個々のセッションを無効化できません。移行前に確立されたセッションはそのまま有効な状態が続きます。",
+        "local_auth_disabled_at_source": "このGROWIではローカル(ID/パスワード)認証が無効になっています。救済された移行先の管理者であっても、パスワードでログインすることはできません。"
+      }
+    },
+    "blockers": {
+      "version_mismatch": "この移行は実行できません: 移行元と移行先のGROWIのバージョンが異なります。",
+      "user_upper_limit": "この移行は実行できません: 移行元のアクティブユーザー数が、移行先GROWIのユーザー数上限を超えています。",
+      "file_upload_not_configured": "この移行は実行できません: 移行元または移行先のGROWIでファイルアップロードが設定されていません。",
+      "destination_storage_not_writable": "この移行は実行できません: 移行先GROWIのストレージに書き込めません。",
+      "file_upload_total_limit": "この移行は実行できません: 移行元GROWIの添付ファイルの合計サイズが、移行先GROWIのファイルアップロード上限を超えています。"
+    },
+    "rescue_outcome": {
+      "heading": "この移行により、移行先のすべてのユーザーが置き換えられました。誰かがログインできるよう、以下の管理者アカウントは保持されました:",
+      "renamed_from": "変更前の名前",
+      "email_removed": "移行してきたユーザーとメールアドレスが競合したため、メールアドレスは削除されました。",
+      "slack_member_id_removed": "移行してきたユーザーとSlackメンバーIDが競合したため、Slackメンバー IDは削除されました。",
+      "id_reassigned": "元の内部識別子が移行してきたユーザーと競合したため、新しい内部識別子が割り当てられました。移行前に確立されたログインセッションは失われました。"
+    },
+    "failed_collections_heading": "移行先が以下のコレクションを取り込めませんでした:"
   },
   "plugins": {
     "plugins": "プラグイン",
@@ -1173,7 +1237,20 @@
   "g2g": {
     "transfer_success": "G2G移行が完了しました",
     "error_generate_growi_archive": "GROWI アーカイブファイルの作成に失敗しました",
-    "error_send_growi_archive": "GROWI アーカイブファイルの送信に失敗しました"
+    "error_send_growi_archive": "GROWI アーカイブファイルの送信に失敗しました",
+    "error_data_conflict": "移行が中止されました: 移行対象のデータの一部が、移行先にすでに存在するユーザーまたはユーザーグループと衝突したため、何もインポートされませんでした。競合しているアカウントやグループを解消してから再試行するか、初期セットアップが完了していない移行先へ移行してください。",
+    "error_upload_attachment": "添付ファイルの移行に失敗しました",
+    "error_import_in_progress": "移行が中止されました: 移行先で別のデータのインポートがすでに実行中です。完了を待ってから移行を再試行してください。",
+    "error_partial_import": "移行が完全には終わりませんでした: 移行先のGROWIがコレクションのインポート・管理者の救済・インポート後の後処理のいずれかに失敗した可能性があり、そのためデータベースが一部だけ移行された状態のままになっているかもしれません。この移行のために移行先がメンテナンスモードになっていた場合、移行先のGROWIの管理 > アプリ設定でメンテナンスモードを解除するまで、一般ユーザーはアクセスできません。原因を解決してから、もう一度移行を実行してください。",
+    "error_protected_collection": "移行が中止されました: 移行してはならないコレクションが指定されていたため、移行先が要求を拒否し、何もインポートされませんでした。移行画面ではそれらのコレクションを選択できないため、移行元と移行先のGROWIが同じバージョンで動作しているか確認したうえで、下に表示されたコレクション名を報告してください。",
+    "error_mixed_import_methods": "移行が中止されました: 移行先のGROWIが、一部のコレクションを置き換え・別のコレクションを追加するという異なるインポート方法が混在したリクエストを拒否したため、何もインポートされませんでした。移行画面はそのようなリクエストを作成しないため、移行元と移行先のGROWIが同じバージョンで動作しているか確認してから、もう一度移行を実行してください。",
+    "error_invalid_transfer_key": "移行が中止されました: 移行先が移行キーを未指定・期限切れ・不正のいずれかとして拒否しました。移行先で新しい移行キーを発行し、再試行してください。",
+    "error_parse_failed": "移行が中止されました: 移行先が移行のリクエストを解析できませんでした。移行元と移行先のGROWIが同じバージョンで動作しているか確認したうえで、移行を再試行してください。",
+    "error_validation_failed": "移行が中止されました: 移行先がアップロードされたGROWIアーカイブファイルを検証できませんでした。ファイルが壊れている可能性があるため、アーカイブの生成と送信をやり直してください。",
+    "error_version_incompatible": "移行が中止されました: 移行元と移行先のGROWIのバージョンが異なるため、何もインポートされませんでした。移行先のGROWIを移行元と同じバージョンにアップグレードしてから、移行を再試行してください。",
+    "error_import_settings_invalid": "移行が中止されました: 移行先が要求されたコレクションのインポート設定を正しく組み立てられませんでした。詳細はGROWIのドキュメントを参照してください。",
+    "error_conflict_detection_failed": "移行が中止されました: 移行先が移行データと既存データの衝突の有無を判定できず、推測でインポートを進めることを拒否しました。移行を再試行してください。繰り返し発生する場合は、移行先のGROWIのログを確認してください。",
+    "error_mongo_collection_import_failure": "移行が完全には終わりませんでした: データの衝突以外の理由で、移行先が1つ以上のコレクションをMongoDBへ書き込めませんでした。詳細は移行先のGROWIのログを確認してください。"
   },
   "external_user_group": {
     "management": "外部グループ管理",
@@ -1337,5 +1414,13 @@
         "description": "データ初期化を行わずに、MongoDB のページと Vault の git ツリー間のデータ不整合の手動修復を試みます。"
       }
     }
+  },
+  "maintenance_mode_notice": {
+    "title": "GROWIはメンテナンスモードのままになります",
+    "body_this_growi": "configsコレクションをインポートすると、このGROWIのすべての設定がアーカイブの内容で置き換えられるため、このGROWIはメンテナンスモードになり、そのままの状態になります。解除するまで、一般利用者はアクセスできません。",
+    "body_destination": "configsコレクションをインポートすると、移行先GROWIのすべての設定がこのGROWIの内容で置き換えられるため、移行先はメンテナンスモードになり、そのままの状態になります。解除するまで、一般利用者は移行先にアクセスできません。添付ファイルはコレクションの後に移行されるため、移行全体が完了するまで移行先は不完全な状態です。",
+    "turn_it_off": "結果を確認したら、閉じられた側のGROWIの管理 > アプリ設定からメンテナンスモードを解除してください。",
+    "cancel": "キャンセル",
+    "proceed": "理解した上で続行する"
   }
 }

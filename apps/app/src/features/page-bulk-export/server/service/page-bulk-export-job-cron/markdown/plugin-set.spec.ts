@@ -142,19 +142,17 @@ describe('plugin-set declaration module', () => {
       expect(xsvIndex).toBeLessThan(names.indexOf('remark-rehype'));
     });
 
-    it('emoji, echo-directive and xsv-to-table declare relative specifiers and named exports', () => {
+    it('emoji, echo-directive and xsv-to-table declare a load thunk and named export', () => {
       for (const name of ['emoji', 'echo-directive', 'xsv-to-table']) {
         const entry = ADOPTED_PLUGINS.find((p) => p.name === name);
-        expect(entry?.specifier, `${name} specifier`).toMatch(
-          /remark-plugins\/.+\.ts$/,
-        );
+        expect(typeof entry?.load, `${name} load`).toBe('function');
         expect(entry?.exportName, `${name} exportName`).toBe('remarkPlugin');
       }
     });
 
-    it('add-class declares a relative specifier, named export, and table additions', () => {
+    it('add-class declares a load thunk, named export, and table additions', () => {
       const addClass = ADOPTED_PLUGINS.find((p) => p.name === 'add-class');
-      expect(addClass?.specifier).toMatch(/add-class\.ts$/);
+      expect(typeof addClass?.load).toBe('function');
       expect(addClass?.exportName).toBe('rehypePlugin');
       expect(addClass?.options).toEqual({ table: 'table table-bordered' });
     });

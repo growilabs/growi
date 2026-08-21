@@ -1,4 +1,5 @@
 import type { IUser, Ref } from '@growi/core';
+import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import type { Document, Model } from 'mongoose';
 import { Schema, Types } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
@@ -274,6 +275,55 @@ function buildSnapshotUpdateEnvelope(
   };
 }
 
+// escapeStringForMongoRegex, not RegExp.escape (mongodb-regex rule — PCRE2
+// rejects RegExp.escape's \uXXXX output). Trims `q` so the match stays
+// consistent with isQueryTooShort's trimmed-length check below (untrimmed
+// would leave stray leading/trailing space characters in the pattern).
+const escapeSnapshotUsernameQuery = (q: string): string =>
+  escapeStringForMongoRegex(q.trim());
+
+// Substring match — used by findSnapshotUsernamesByUsernameRegexWithTotalCount,
+// whose only production caller is the `/usernames` admin listing API. This
+// preserves that API's pre-existing substring-match behavior (the pre-Prisma
+// Mongoose implementation was also substring, unanchored); do not anchor this
+// to a prefix, or the admin listing's search semantics silently change.
+const buildSnapshotUsernameSubstringMatchStage = (q: string) => ({
+  $match: {
+    'snapshot.username': {
+      $regex: escapeSnapshotUsernameQuery(q),
+      $options: 'i',
+    },
+  },
+});
+
+// Prefix-only match — used by findSnapshotUsernamesByUsernameRegex, the plain
+// (no-total-count) MongoDB fallback for when Elasticsearch is unreachable/
+// unconfigured. Prefix-only, unlike ES's `fuzziness: 'AUTO'`: MongoDB has no
+// native fuzzy match.
+const buildSnapshotUsernamePrefixMatchStage = (q: string) => ({
+  $match: {
+    'snapshot.username': {
+      $regex: `^${escapeSnapshotUsernameQuery(q)}`,
+      $options: 'i',
+    },
+  },
+});
+
+const SNAPSHOT_USERNAME_GROUP_STAGE = {
+  $group: { _id: '$snapshot.username' },
+};
+
+// Bounds the Mongo fallback aggregation so one slow scan can't pin a shared
+// MongoDB when ES is unreachable for every tenant at once.
+const AGGREGATE_MAX_TIME_MS = 5000;
+
+// Below this, the prefix regex forces a full collection scan — short-circuit
+// first (Mongo fallback only; ES has no such cost).
+const MIN_QUERY_LENGTH = 2;
+
+const isQueryTooShort = (q: string): boolean =>
+  q.trim().length < MIN_QUERY_LENGTH;
+
 export const extension = Prisma.defineExtension((client) => {
   return client.$extends({
     result: {
@@ -432,22 +482,59 @@ export const extension = Prisma.defineExtension((client) => {
         },
 
         /**
-         * Find snapshot usernames matching a regex, with a distinct total count.
+         * Find snapshot usernames matching a case-insensitive prefix, unbounded
+         * (no total count). Used by the MongoDB fallback path (ES unreachable/
+         * unconfigured) — intentionally prefix-only, unlike the substring match
+         * used by the WithTotalCount variant below (see
+         * buildSnapshotUsernamePrefixMatchStage).
          *
-         * Reproduces the Mongoose static `findSnapshotUsernamesByUsernameRegexWithTotalCount`
-         * via two Prisma `aggregateRaw` calls:
+         * Requirements: 3.4 — design.md: ActivityExtension Contracts (findSnapshotUsernames).
+         */
+        async findSnapshotUsernamesByUsernameRegex(
+          q: string,
+          option: { offset: number; limit: number },
+        ): Promise<string[]> {
+          if (isQueryTooShort(q)) return [];
+
+          const context =
+            Prisma.getExtensionContext<typeof prisma.activities>(this);
+
+          const opt = option || {};
+          const offset = opt.offset || 0;
+          const limit = opt.limit || 10;
+
+          const pipeline = [
+            buildSnapshotUsernamePrefixMatchStage(q),
+            SNAPSHOT_USERNAME_GROUP_STAGE,
+            { $sort: { _id: 1 } },
+            { $skip: offset },
+            { $limit: limit },
+          ];
+
+          const raw = await context.aggregateRaw({
+            pipeline,
+            options: { maxTimeMS: AGGREGATE_MAX_TIME_MS },
+          });
+
+          const normalized = normalizeAggregateRaw(raw) as Array<{
+            _id: string;
+          }>;
+          return normalized.map((r) => r._id);
+        },
+
+        /**
+         * Find snapshot usernames matching a case-insensitive substring, with a
+         * distinct total count. Its only production caller is the `/usernames`
+         * admin listing API (`apiv3/users.js`), so this stays substring-matching
+         * — matching the pre-Prisma Mongoose behavior — rather than the
+         * prefix-only match used by the plain (ES-fallback) variant below.
          *
-         * 1. Usernames pipeline (same stage order as the Mongoose aggregate):
-         *    $limit(10000) → $match(regex) → $group(_id) → $sort → $skip → $limit
-         *    Maps each result `r._id` to a username string.
+         * Unbounded by design — no `$limit` before `$match` (a prior cap there
+         * silently hid matches beyond it); `maxTimeMS` bounds runtime instead.
          *
-         * 2. TotalCount pipeline (distinct count, reproduces distinct('snapshot.username').length):
-         *    $match(regex) → $group(_id) → $count('total')
-         *    Returns the `total` field, or 0 when the result is empty.
-         *
-         * R6 (design.md Open Questions): `q` is passed raw into `$regex` WITHOUT
-         * escaping. This preserves the behavior of the Mongoose static, which also
-         * passes `q` unescaped. Changing this would be a behavior change out of scope.
+         * No MIN_QUERY_LENGTH guard here (unlike the plain variant): the
+         * `/usernames` admin listing route relies on an empty `q` matching
+         * every username.
          *
          * Requirements: 3.4 — design.md: ActivityExtension Contracts (findSnapshotUsernames).
          */
@@ -463,26 +550,31 @@ export const extension = Prisma.defineExtension((client) => {
           const offset = opt.offset || 0;
           const limit = opt.limit || 10;
 
-          // Usernames pipeline — stages match the Mongoose aggregate order exactly
           const usernamesPipeline = [
-            { $limit: 10000 },
-            { $match: { 'snapshot.username': { $regex: q, $options: 'i' } } },
-            { $group: { _id: '$snapshot.username' } },
+            buildSnapshotUsernameSubstringMatchStage(q),
+            SNAPSHOT_USERNAME_GROUP_STAGE,
             { $sort: { _id: sortOpt } },
             { $skip: offset },
             { $limit: limit },
           ];
 
-          // TotalCount pipeline — distinct username count via $count
           const totalCountPipeline = [
-            { $match: { 'snapshot.username': { $regex: q, $options: 'i' } } },
-            { $group: { _id: '$snapshot.username' } },
+            buildSnapshotUsernameSubstringMatchStage(q),
+            SNAPSHOT_USERNAME_GROUP_STAGE,
             { $count: 'total' },
           ];
 
+          const aggregateOptions = { maxTimeMS: AGGREGATE_MAX_TIME_MS };
+
           const [usernamesRaw, totalCountRaw] = await Promise.all([
-            context.aggregateRaw({ pipeline: usernamesPipeline }),
-            context.aggregateRaw({ pipeline: totalCountPipeline }),
+            context.aggregateRaw({
+              pipeline: usernamesPipeline,
+              options: aggregateOptions,
+            }),
+            context.aggregateRaw({
+              pipeline: totalCountPipeline,
+              options: aggregateOptions,
+            }),
           ]);
 
           // normalizeAggregateRaw handles BSON wrappers; after $group, _id is a

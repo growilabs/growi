@@ -46,10 +46,17 @@ the Skill tool), `agents/`, `commands/`. Each tier's rule inventory is tabulated
 | **coding-style** | Coding conventions, naming, exports, immutability, comments |
 | **security** | Security checklist, secret management, OWASP vulnerability prevention |
 | **performance** | Model selection, context management, build troubleshooting |
-| **github-cli** | **CRITICAL**: gh CLI auth required; stop immediately if unauthenticated |
-
 | **testing** | Test commands, pnpm vitest usage |
 | **mongodb-regex** | `RegExp.escape()` breaks MongoDB PCRE2 for non-ASCII whitespace; use `escapeStringForMongoRegex` for query-bound patterns |
+| **devcontainer** | Compose services are reachable by hostname (no connectivity checks); `mongosh` is absent — query via the bundled driver; never run `pnpm install` concurrently with a build/test |
+| **kiro-impl-orchestration** | How `/kiro-impl` distributes work across models (mode selection, implementer model by difficulty, adversarial final review); outranks the generated skill's argument-derived default |
+| **spec-lifecycle** | A spec that amends an already-completed spec's contract (an amend spec) is a temporary vehicle: it must port its changes back into the target spec and delete itself as its final task |
+
+Path-scoped rules load only when the work touches matching files:
+
+| Rule | Applies to | Description |
+|------|-----------|-------------|
+| **model** | `apps/app/src/server/models/**` | Mongoose → Prisma migration rules: Mongoose keeps owning index creation until the migration finishes, statics become `Prisma.defineExtension`, `_id`/`__v` mapping, changed `__v` semantics |
 
 ### On-Demand Skills
 

@@ -414,6 +414,7 @@
     "notfound_or_forbidden": "未找到或禁止原始页。",
     "already_exists": "具有该路径的页面已存在",
     "outdated": "页面已被某人更新，现在已过时。",
+    "invalid_body": "请求中未包含操作对象页面的版本信息。",
     "user_not_admin": "仅管理员用户可以删除",
     "single_deletion_empty_pages": "空的页面不能被单一删除",
     "complete_deletion_not_allowed_for_user": "您无权永久删除该页面"

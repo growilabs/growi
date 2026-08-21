@@ -1,0 +1,433 @@
+import fs from 'node:fs';
+import { Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import type { IUser, IUserGroup } from '@growi/core';
+import type { Model } from 'mongoose';
+
+import loggerFactory from '~/utils/logger';
+
+import * as JSONStream from 'JSONStream';
+
+const logger = loggerFactory('growi:service:import:detect-unique-conflicts');
+
+// Single source of truth for which fields the unique-conflict detection targets,
+// kept in sync with the MongoDB unique index definitions (models/user, models/user-group).
+export type UserUniqueField = 'username' | 'email' | 'slackMemberId';
+export type GroupUniqueField = 'name';
+export type UniqueField = UserUniqueField | GroupUniqueField;
+
+// Minimal document shape extracted from the archive / existing data for comparison.
+// Sparse unique fields (email, slackMemberId) may be absent, so they are optional/nullable.
+export interface UserUniqueFields {
+  _id: string;
+  username?: string | null;
+  email?: string | null;
+  slackMemberId?: string | null;
+}
+
+export interface GroupUniqueFields {
+  _id: string;
+  name?: string | null;
+}
+
+/**
+ * Every value the archive's users hold on a unique field, plus every `_id` it carries.
+ *
+ * The keys are derived from {@link UserUniqueField} - the same declaration the detection
+ * targets - so a unique index added to `users` shows up here as a key whoever builds this
+ * has to fill, instead of being silently left out of what consumes it.
+ */
+export type ArchiveUserIdentity = {
+  readonly [Field in UserUniqueField as `${Field}s`]: ReadonlySet<string>;
+} & {
+  readonly ids: ReadonlySet<string>;
+};
+
+export interface UniqueFieldConflict {
+  collection: 'users' | 'usergroups';
+  field: UniqueField;
+  value: string;
+  archiveId: string;
+  existingId: string;
+}
+
+export interface UniqueConflictReport {
+  userConflicts: UniqueFieldConflict[];
+  groupConflicts: UniqueFieldConflict[];
+}
+
+export const hasConflicts = (report: UniqueConflictReport): boolean =>
+  report.userConflicts.length > 0 || report.groupConflicts.length > 0;
+
+// Sparse unique fields treat null/undefined/empty-string as "not set". Two documents
+// that both lack the value do not violate a unique index, so they must not be compared.
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.length > 0;
+
+/**
+ * Pure comparison: enumerates every archive document whose unique field value matches
+ * an existing document's value under a different `_id`. Receives both datasets as
+ * arguments (does not import or fetch them) so it stays reusable and unit-testable.
+ */
+export function collectConflicts<T extends { _id: string }>(
+  collection: 'users' | 'usergroups',
+  archiveDocs: readonly T[],
+  existingDocs: readonly T[],
+  fields: readonly (UniqueField & keyof T)[],
+): UniqueFieldConflict[] {
+  const conflicts: UniqueFieldConflict[] = [];
+
+  for (const field of fields) {
+    // Index existing docs by value once per field to avoid an N+1 scan per archive doc.
+    const existingIdByValue = new Map<string, string>();
+    for (const existingDoc of existingDocs) {
+      const value = existingDoc[field];
+      if (!isNonEmptyString(value)) continue;
+      existingIdByValue.set(value, existingDoc._id);
+    }
+
+    for (const archiveDoc of archiveDocs) {
+      const value = archiveDoc[field];
+      if (!isNonEmptyString(value)) continue;
+
+      const existingId = existingIdByValue.get(value);
+      if (existingId == null || existingId === archiveDoc._id) continue;
+
+      conflicts.push({
+        collection,
+        field,
+        value,
+        archiveId: archiveDoc._id,
+        existingId,
+      });
+    }
+  }
+
+  return conflicts;
+}
+
+// The archive JSON written by the export service is UTF-8 (growiBridgeService.getEncoding).
+const ARCHIVE_ENCODING = 'utf-8';
+
+// Existing documents are fetched in `$in` batches so that a huge archive never turns into
+// one unbounded query, and the destination collection is never loaded whole into memory.
+const EXISTING_LOOKUP_BATCH_SIZE = 1000;
+
+export const USER_UNIQUE_FIELDS = [
+  'username',
+  'email',
+  'slackMemberId',
+] as const satisfies readonly UserUniqueField[];
+
+const GROUP_UNIQUE_FIELDS = [
+  'name',
+] as const satisfies readonly GroupUniqueField[];
+
+type RawDocument = Record<string, unknown>;
+
+/**
+ * Read-only projection query over one collection. Handing the detection only this
+ * capability (instead of the model itself) is what makes "detection never writes"
+ * structural rather than a convention: there is no write method to reach (requirement 2.4).
+ */
+type ExistingDocumentLookup = (
+  filter: Record<string, unknown>,
+  projection: string,
+) => Promise<RawDocument[]>;
+
+const toLookup = <TDoc>(model: Model<TDoc>): ExistingDocumentLookup => {
+  return async (filter, projection) =>
+    await model.find(filter).select(projection).lean<RawDocument[]>();
+};
+
+const asOptionalString = (value: unknown): string | undefined =>
+  typeof value === 'string' ? value : undefined;
+
+// The archive holds `_id` as a hex string while a lean query result holds an ObjectId.
+// Both sides are normalised to a string so that "is this the same document?" compares like
+// with like — otherwise every re-imported document would look like a conflict (req 1.5).
+const toIdString = (value: unknown): string => String(value);
+
+const pickUserUniqueFields = (doc: RawDocument): UserUniqueFields => ({
+  _id: toIdString(doc._id),
+  username: asOptionalString(doc.username),
+  email: asOptionalString(doc.email),
+  slackMemberId: asOptionalString(doc.slackMemberId),
+});
+
+const pickGroupUniqueFields = (doc: RawDocument): GroupUniqueFields => ({
+  _id: toIdString(doc._id),
+  name: asOptionalString(doc.name),
+});
+
+// Only the first and last few bytes are inspected, so verifying a multi-gigabyte archive
+// costs nothing and the streaming read below keeps its memory profile.
+const ARCHIVE_HEAD_TAIL_BYTES = 64;
+
+/**
+ * Fails unless the file is a complete top-level JSON array. The export service always
+ * writes one (`[` on the first chunk, `]` in the stream's `final`, `[]` for an empty
+ * collection - see export.ts generateTransformStream), so anything else means the archive
+ * was truncated or is not a collection dump.
+ *
+ * This check cannot be replaced by anything JSONStream reports: when the root array never
+ * closes it emits neither an error nor a completion event, it simply stops yielding
+ * documents, and the underlying read stream ends normally at EOF. A truncated archive
+ * would therefore be reported as "no conflicts", the caller would start importing, and
+ * `bulk.insert()` would silently drop the conflicting documents - the very silent
+ * breakage this detection exists to prevent (requirement 2.3, Error Handling: fail fast,
+ * never fall through to the import).
+ */
+const assertCompleteJsonArray = async (jsonPath: string): Promise<void> => {
+  const handle = await fs.promises.open(jsonPath, 'r');
+
+  try {
+    const { size } = await handle.stat();
+    // A zero-byte file yields an empty span, hence no first/last character, and is
+    // rejected by the same condition.
+    const span = Math.min(ARCHIVE_HEAD_TAIL_BYTES, size);
+    const head = Buffer.alloc(span);
+    const tail = Buffer.alloc(span);
+    await handle.read(head, 0, span, 0);
+    await handle.read(tail, 0, span, size - span);
+
+    const first = head.toString(ARCHIVE_ENCODING).trimStart().at(0);
+    const last = tail.toString(ARCHIVE_ENCODING).trimEnd().at(-1);
+
+    if (first !== '[' || last !== ']') {
+      throw new Error(
+        `Archive JSON is not a complete top-level array (truncated or unexpected format): ${jsonPath}`,
+      );
+    }
+  } finally {
+    await handle.close();
+  }
+};
+
+/**
+ * Streams one archive JSON (a top-level array of documents) and reduces each document to
+ * its unique fields while still inside the stream, so nothing else the archive carries
+ * (page bodies, password hashes) is retained past this callback.
+ */
+const readArchiveUniqueFields = async <T>(
+  jsonPath: string,
+  pick: (doc: RawDocument) => T,
+): Promise<T[]> => {
+  await assertCompleteJsonArray(jsonPath);
+
+  const picked: T[] = [];
+
+  await pipeline(
+    fs.createReadStream(jsonPath, { encoding: ARCHIVE_ENCODING }),
+    JSONStream.parse('*'),
+    new Writable({
+      objectMode: true,
+      write(doc: RawDocument, _encoding, callback) {
+        picked.push(pick(doc));
+        callback();
+      },
+    }),
+  );
+
+  return picked;
+};
+
+const collectArchiveValues = <T>(
+  archiveDocs: readonly T[],
+  field: keyof T,
+): string[] => {
+  const values = new Set<string>();
+
+  for (const doc of archiveDocs) {
+    const value = doc[field];
+    if (isNonEmptyString(value)) {
+      values.add(value);
+    }
+  }
+
+  return [...values];
+};
+
+/**
+ * Streams the archive's `users.json` and returns every value it occupies on a unique
+ * field, plus every `_id` it carries.
+ *
+ * The detection's own report cannot answer this: it lists the pairs that collide, so a
+ * value the source uses and the destination does not never appears in it. The admin
+ * rescue needs the whole set — it has to pick a replacement username the source does
+ * *not* use (requirement 4.4) and to know whether its own `_id` is about to be taken by
+ * an incoming document (requirement 4.10).
+ *
+ * A truncated archive throws here (via `assertCompleteJsonArray`) rather than yielding a
+ * partial set, because a partial set is worse than none: the rescue would pick a name the
+ * source actually uses and the re-insertion would fail the unique index.
+ */
+export async function readArchiveUserIdentity(
+  usersJsonPath: string,
+): Promise<ArchiveUserIdentity> {
+  const archiveDocs = await readArchiveUniqueFields(
+    usersJsonPath,
+    pickUserUniqueFields,
+  );
+
+  return {
+    usernames: new Set(collectArchiveValues(archiveDocs, 'username')),
+    emails: new Set(collectArchiveValues(archiveDocs, 'email')),
+    slackMemberIds: new Set(collectArchiveValues(archiveDocs, 'slackMemberId')),
+    // Already normalised to a string by `pickUserUniqueFields`, so this compares like
+    // with like against a destination document's ObjectId.
+    ids: new Set(collectArchiveValues(archiveDocs, '_id')),
+  };
+}
+
+const toBatches = <T>(values: readonly T[], size: number): T[][] => {
+  const batches: T[][] = [];
+
+  for (let i = 0; i < values.length; i += size) {
+    batches.push(values.slice(i, i + size));
+  }
+
+  return batches;
+};
+
+/**
+ * Fetches only the destination documents that could collide: one `$in` query per unique
+ * field over the values the archive actually uses, projected down to `_id` plus those
+ * fields. Results are de-duplicated by `_id` because one document can match several fields.
+ */
+const findExistingCandidates = async <T extends { _id: string }>(input: {
+  lookup: ExistingDocumentLookup;
+  archiveDocs: readonly T[];
+  fields: readonly (UniqueField & keyof T)[];
+  pick: (doc: RawDocument) => T;
+}): Promise<T[]> => {
+  const { lookup, archiveDocs, fields, pick } = input;
+
+  const projection = ['_id', ...fields].join(' ');
+  const existingById = new Map<string, T>();
+
+  for (const field of fields) {
+    for (const batch of toBatches(
+      collectArchiveValues(archiveDocs, field),
+      EXISTING_LOOKUP_BATCH_SIZE,
+    )) {
+      // Sequential on purpose: the batches exist to bound how much one query asks for,
+      // which firing them all at once would defeat.
+      const rawDocs = await lookup({ [field]: { $in: batch } }, projection);
+
+      for (const rawDoc of rawDocs) {
+        const picked = pick(rawDoc);
+        existingById.set(picked._id, picked);
+      }
+    }
+  }
+
+  return [...existingById.values()];
+};
+
+const detectForCollection = async <T extends { _id: string }>(input: {
+  collection: 'users' | 'usergroups';
+  jsonPath: string;
+  fields: readonly (UniqueField & keyof T)[];
+  pick: (doc: RawDocument) => T;
+  lookup: ExistingDocumentLookup;
+}): Promise<UniqueFieldConflict[]> => {
+  const { collection, jsonPath, fields, pick, lookup } = input;
+
+  const archiveDocs = await readArchiveUniqueFields(jsonPath, pick);
+  if (archiveDocs.length === 0) {
+    return [];
+  }
+
+  const existingDocs = await findExistingCandidates({
+    lookup,
+    archiveDocs,
+    fields,
+    pick,
+  });
+
+  return collectConflicts(collection, archiveDocs, existingDocs, fields);
+};
+
+// Counts and field names only: the conflicting values are user data (e-mail addresses,
+// slack member ids) and must not reach the log.
+const logDetectedConflicts = (report: UniqueConflictReport): void => {
+  const { userConflicts, groupConflicts } = report;
+
+  logger.warn(
+    {
+      userConflictCount: userConflicts.length,
+      groupConflictCount: groupConflicts.length,
+      fields: [
+        ...new Set(
+          [...userConflicts, ...groupConflicts].map(
+            (conflict) => conflict.field,
+          ),
+        ),
+      ],
+    },
+    'Unique field conflicts detected before import',
+  );
+};
+
+/**
+ * Orchestrates the detection for one import target: streams the unique fields out of the
+ * archive JSONs, batch-queries the destination for the documents that could collide, and
+ * runs the pure comparison. A `null` path means that collection is not part of the
+ * transfer, so its detection is skipped rather than failing (requirement 1.6).
+ *
+ * A collection listed in `replaceTargetCollections` is skipped as well: every document in
+ * it is deleted before the archive's are written, so there is nothing left for the
+ * archive to collide with and a conflict reported here would abort a transfer that would
+ * have succeeded. The set is passed in rather than worked out here — which collections a
+ * given import replaces is the caller's knowledge (see replace-target-collections.ts).
+ *
+ * The destination is only ever read (requirement 2.4).
+ */
+export async function detectUniqueConflicts(input: {
+  usersJsonPath: string | null;
+  groupsJsonPath: string | null;
+  userModel: Model<IUser>;
+  userGroupModel: Model<IUserGroup>;
+  replaceTargetCollections?: ReadonlySet<string>;
+}): Promise<UniqueConflictReport> {
+  const {
+    usersJsonPath,
+    groupsJsonPath,
+    userModel,
+    userGroupModel,
+    replaceTargetCollections,
+  } = input;
+
+  const isReplaced = (collectionName: string): boolean =>
+    replaceTargetCollections?.has(collectionName) ?? false;
+
+  const [userConflicts, groupConflicts] = await Promise.all([
+    usersJsonPath == null || isReplaced('users')
+      ? []
+      : detectForCollection({
+          collection: 'users',
+          jsonPath: usersJsonPath,
+          fields: USER_UNIQUE_FIELDS,
+          pick: pickUserUniqueFields,
+          lookup: toLookup(userModel),
+        }),
+    groupsJsonPath == null || isReplaced('usergroups')
+      ? []
+      : detectForCollection({
+          collection: 'usergroups',
+          jsonPath: groupsJsonPath,
+          fields: GROUP_UNIQUE_FIELDS,
+          pick: pickGroupUniqueFields,
+          lookup: toLookup(userGroupModel),
+        }),
+  ]);
+
+  const report: UniqueConflictReport = { userConflicts, groupConflicts };
+
+  if (hasConflicts(report)) {
+    logDetectedConflicts(report);
+  }
+
+  return report;
+}

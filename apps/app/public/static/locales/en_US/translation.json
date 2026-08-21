@@ -422,6 +422,7 @@
     "notfound_or_forbidden": "Original page is not found or forbidden.",
     "already_exists": "Page with the path already exists.",
     "outdated": "Page is updated someone and now outdated.",
+    "invalid_body": "The request does not tell which version of the page it applies to.",
     "user_not_admin": "Only admin user can delete",
     "single_deletion_empty_pages": "Empty pages cannot be single deleted",
     "complete_deletion_not_allowed_for_user": "You are not allowed to delete this page completely"

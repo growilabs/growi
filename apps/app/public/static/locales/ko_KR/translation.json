@@ -393,6 +393,7 @@
     "notfound_or_forbidden": "원본 페이지를 찾을 수 없거나 접근이 금지되었습니다.",
     "already_exists": "경로가 있는 페이지가 이미 존재합니다.",
     "outdated": "페이지가 업데이트되어 현재 오래되었습니다.",
+    "invalid_body": "요청에 대상 페이지의 버전 정보가 포함되어 있지 않습니다.",
     "user_not_admin": "관리자만 삭제할 수 있습니다.",
     "single_deletion_empty_pages": "빈 페이지는 단일 삭제할 수 없습니다.",
     "complete_deletion_not_allowed_for_user": "이 페이지를 완전히 삭제할 권한이 없습니다."
