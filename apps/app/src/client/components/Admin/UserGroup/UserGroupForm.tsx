@@ -93,7 +93,7 @@ export const UserGroupForm: FC<Props> = (props: Props) => {
         )}
         {userGroup?.createdAt != null && (
           <div className="row mb-3">
-            <p className="col-md-2 col-form-label">{t('Created')}</p>
+            <p className="col-md-2 col-form-label">{t('commons:Created')}</p>
             <p className="col-md-6 my-auto">
               {dateFnsFormat(userGroup.createdAt, 'yyyy-MM-dd')}
             </p>
@@ -120,7 +120,7 @@ export const UserGroupForm: FC<Props> = (props: Props) => {
 
         <div className="row mb-3">
           <label htmlFor="description" className="col-md-2 col-form-label">
-            {t('Description')}
+            {t('commons:Description')}
           </label>
           <div className="col-md-6">
             <textarea

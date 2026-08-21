@@ -1,12 +1,36 @@
 {
   "Show": "표시",
+  "View": "보기",
   "Hide": "숨기기",
   "Add": "추가",
   "Insert": "삽입",
   "Reset": "재설정",
   "Sign out": "로그아웃",
   "New": "새로 만들기",
+  "Send": "전송",
+  "Clear": "지우기",
   "Delete": "삭제",
+  "Cancel": "취소",
+  "Close": "닫기",
+  "Confirm": "확인",
+  "Create": "생성",
+  "Created": "생성됨",
+  "Description": "설명",
+  "Done": "완료",
+  "Edit": "편집",
+  "Email": "이메일",
+  "Error occurred": "오류 발생",
+  "Help": "도움말",
+  "Name": "이름",
+  "Password": "비밀번호",
+  "Update": "업데이트",
+  "User": "사용자",
+  "UserGroup": "사용자 그룹",
+  "V5 Page Migration": "V5 호환성으로 변환",
+  "Warning": "경고",
+  "add": "추가",
+  "eg": "예:",
+  "username": "사용자 이름",
   "meta": {
     "display_name": "한국어"
   },
@@ -128,5 +152,8 @@
     "transfer_key_limit": "전송 키는 발급 후 1시간 동안 유효합니다.",
     "once_transfer_key_used": "전송 키가 전송에 사용되면 다른 전송에는 사용할 수 없습니다.",
     "transfer_to_growi_cloud": "자세한 내용은 <a href='{{documentationUrl}}en/admin-guide/management-cookbook/g2g-transfer.html'>여기를 클릭하십시오.</a>"
+  },
+  "table_action": {
+    "edit": "편집"
   }
 }

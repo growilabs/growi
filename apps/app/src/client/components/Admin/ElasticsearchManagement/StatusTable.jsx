@@ -14,7 +14,9 @@ class StatusTable extends React.PureComponent {
 
     const errorOccuredLabel = isErrorOccuredOnSearchService ? (
       <span className="badge text-bg-danger ms-2">
-        {t('page_data_index_management.connection_status_label_erroroccured')}
+        {t(
+          'admin:page_data_index_management.connection_status_label_erroroccured',
+        )}
       </span>
     ) : null;
 
@@ -22,7 +24,9 @@ class StatusTable extends React.PureComponent {
     if (!isConfigured) {
       connectionStatusLabel = (
         <span className="badge text-bg-default">
-          {t('page_data_index_management.connection_status_label_unconfigured')}
+          {t(
+            'admin:page_data_index_management.connection_status_label_unconfigured',
+          )}
         </span>
       );
     } else {
@@ -31,11 +35,15 @@ class StatusTable extends React.PureComponent {
           data-testid="connection-status-badge-connected"
           className="badge text-bg-success"
         >
-          {t('page_data_index_management.connection_status_label_connected')}
+          {t(
+            'admin:page_data_index_management.connection_status_label_connected',
+          )}
         </span>
       ) : (
         <span className="badge text-bg-danger">
-          {t('page_data_index_management.connection_status_label_disconnected')}
+          {t(
+            'admin:page_data_index_management.connection_status_label_disconnected',
+          )}
         </span>
       );
     }
@@ -53,11 +61,13 @@ class StatusTable extends React.PureComponent {
 
     return isNormalized ? (
       <span className="badge text-bg-info">
-        {t('page_data_index_management.indices_status_label_normalized')}
+        {t('admin:page_data_index_management.indices_status_label_normalized')}
       </span>
     ) : (
       <span className="badge text-bg-warning">
-        {t('page_data_index_management.indices_status_label_unnormalized')}
+        {t(
+          'admin:page_data_index_management.indices_status_label_unnormalized',
+        )}
       </span>
     );
   }
@@ -167,7 +177,7 @@ class StatusTable extends React.PureComponent {
         <tbody>
           <tr>
             <th className="w-25">
-              {t('page_data_index_management.connection_status')}
+              {t('admin:page_data_index_management.connection_status')}
             </th>
             <td className="w-75">
               {isInitialized
@@ -177,7 +187,7 @@ class StatusTable extends React.PureComponent {
           </tr>
           <tr>
             <th className="w-25">
-              {t('page_data_index_management.indices_status')}
+              {t('admin:page_data_index_management.indices_status')}
             </th>
             <td className="w-75">
               {isInitialized
@@ -187,7 +197,7 @@ class StatusTable extends React.PureComponent {
           </tr>
           <tr>
             <th className="w-25">
-              {t('page_data_index_management.indices_summary')}
+              {t('admin:page_data_index_management.indices_summary')}
             </th>
             <td className="p-4 w-75">
               {isInitialized && this.renderIndexInfoPanels()}
