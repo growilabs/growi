@@ -106,7 +106,7 @@
   - _Depends: 3.2, 4, 5_
 
 - [ ] 8. externalaccounts/externalusergroupsの検知とアクセス維持を実DBで検証する
-- [ ] 8.1 衝突の検知を実DBで検証する
+- [x] 8.1 衝突の検知を実DBで検証する
   - 転送先に既存の`externalaccounts`(同じ`providerType`+`accountId`・別`_id`)/`externalusergroups`(同じ`externalId`、または同じ`name`+`provider`・別`_id`)を持つ実データベース上で、それぞれ衝突が検知されることを確認する。`mongoose.model('ExternalAccount')`を使うため、テストでは`~/server/models/external-account`を明示的にimportする(`MissingSchemaError`回避)。
   - 複合キーの片方だけが一致するケース(`providerType`のみ一致/`accountId`のみ一致)では非衝突になることを確認する。
   - 同一`_id`の再取り込みでは非衝突になることを確認する。
@@ -152,5 +152,6 @@
 - 1.1: 複合キーの`UniqueFieldConflict.value`は`JSON.stringify(values)`形式(例: `["saml","x"]`)。単一フィールドキーは従来どおり素の値を報告する(`toReportedValue`が`toMatchKey`から独立)。タスク4(通知汎用化)はこの形式を前提に文言を組み立てること。
 - 2.1: `findExistingCandidates`をテストのためexportした(design.mdのService Interfaceには無い露出)。タスク3.2で`detectUniqueConflicts`が宣言駆動になれば複合キーの`$or`形状が公開エントリ経由で検証可能になるため、その時点でexportを外せる。
 - 2.1: `EXISTING_LOOKUP_BATCH_SIZE`(1000)を`$or`のタプル件数上限にも流用した。`$in`の1000要素と`$or`の1000分岐はクエリの重さが同じではないため、タスク6.x(実DB検証)で1000分岐境界のクエリプラン(`explain()`で`{providerType,accountId}`の複合索引が使われ、コレクションスキャンにならないこと)を確認すること。
+- 8.1: `externalusergroups`は取り込み中のデータ不変性(要件2.3)を確認するsnapshot的な試験がどこにも無い(`externalaccounts`は`g2g-transfer.integ.ts`にある)。8.2の要件は4.1-4.3で別範囲のため、ここで拾わず`/kiro-validate-impl`実行時にフィーチャレベルの懸念として報告すること。
 - 3.2: `conflictsByCollection`はスキップしたコレクションのキーを持たない(空配列ではなく不在)。`hasConflicts`(1.2)は値を走査するだけなので不在でも問題ないが、タスク4/6/7.2でMapを直接読む側は`.get(name) ?? []`を使うこと(全4キーが必ず存在する前提を置かない)。
 - 3.1: `USER_UNIQUE_FIELDS`/`GROUP_UNIQUE_FIELDS`を`USER_UNIQUE_KEYS`/`GROUP_UNIQUE_KEYS`(`UniqueKeySpec[]`)へ改名した。この変更で`rescue-admins.spec.ts`が壊れる(想定済み、タスク7.1が対応)。`CollectionDetector`型は`collection`/`detect`のみを持ち、キー宣言を公開しない設計(design.md通り)なので、タスク9のドリフト試験は4つの`*_UNIQUE_KEYS`定数を直接importして読むこと(タスク9の本文に追記済み)。`GroupUniqueField`/`UniqueField`型は`satisfies`ガード撤去に伴い未参照になったが、公開型の削除はこのタスクの境界外のため残置(タスク3.2かport-back時のクリーンアップ候補)。

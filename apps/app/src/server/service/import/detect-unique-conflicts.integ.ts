@@ -7,6 +7,7 @@ import type { Model } from 'mongoose';
 import mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { ImportMode } from '~/models/admin/import-mode';
 import type Crowi from '~/server/crowi';
@@ -49,6 +50,35 @@ const ARCHIVE_GROUP_NAME = 'g2g-detect-archive-group';
 const ARCHIVE_USER_ID = '0123456789abcdef01230001';
 const ARCHIVE_GROUP_ID = '0123456789abcdef01230002';
 const ARCHIVE_OTHER_USER_ID = '0123456789abcdef01230003';
+const ARCHIVE_EXTERNAL_ACCOUNT_ID = '0123456789abcdef01230004';
+const ARCHIVE_EXTERNAL_USER_GROUP_ID = '0123456789abcdef01230005';
+
+// `providerType`+`accountId` is the only unique key on `externalaccounts`
+// (models/external-account.ts): neither field on its own identifies a conflict.
+const EXISTING_EXTERNAL_ACCOUNT = {
+  providerType: 'saml',
+  accountId: 'g2g-detect-existing-account-id',
+} as const;
+
+const ARCHIVE_EXTERNAL_ACCOUNT = {
+  providerType: 'oidc',
+  accountId: 'g2g-detect-archive-account-id',
+} as const;
+
+// `externalusergroups` has two independent unique keys
+// (features/external-user-group/server/models/external-user-group.ts): the single-field
+// `externalId` and the composite {name, provider}.
+const EXISTING_EXTERNAL_USER_GROUP = {
+  name: 'g2g-detect-existing-external-group',
+  externalId: 'g2g-detect-existing-external-id',
+  provider: 'ldap',
+} as const;
+
+const ARCHIVE_EXTERNAL_USER_GROUP = {
+  name: 'g2g-detect-archive-external-group',
+  externalId: 'g2g-detect-archive-external-id',
+  provider: 'keycloak',
+} as const;
 
 /*
  * Fixtures for the conflict-free import below. One document exactly as the export service
@@ -123,6 +153,11 @@ const OPERATOR_USER_ID = '0123456789abcdef01230131';
 describe('detectUniqueConflicts', () => {
   let User: Model<IUser>;
   let UserGroup: Model<IUserGroup>;
+  // `ExternalAccount` has no exported interface / default export
+  // (models/external-account.ts keeps it Mongoose-registered only for index creation while
+  // its behavior lives in a Prisma extension); fetched from the model registry untyped,
+  // exactly like the caller (g2g-transfer.ts `detectImportConflicts`) already does.
+  let ExternalAccount: Model<Record<string, unknown>>;
   let tmpDir: string;
 
   const writeArchiveJson = async (
@@ -156,12 +191,70 @@ describe('detectUniqueConflicts', () => {
     return String(created._id);
   };
 
+  // `user` is a required ref on the ExternalAccount schema (models/external-account.ts);
+  // its value is irrelevant to the providerType+accountId conflict under test, so it is
+  // pointed at a real user to satisfy the schema without adding meaning to the fixture.
+  const seedExistingExternalAccount = async (
+    userId: string,
+  ): Promise<string> => {
+    const created = await ExternalAccount.create({
+      ...EXISTING_EXTERNAL_ACCOUNT,
+      user: userId,
+    });
+    return String(created._id);
+  };
+
+  const seedExistingExternalUserGroup = async (): Promise<string> => {
+    const created = await ExternalUserGroup.create({
+      ...EXISTING_EXTERNAL_USER_GROUP,
+    });
+    return String(created._id);
+  };
+
   const removeFixtures = async (): Promise<void> => {
     await User.deleteMany({
       username: { $in: [EXISTING_USER.username, ARCHIVE_USER.username] },
     });
     await UserGroup.deleteMany({
       name: { $in: [EXISTING_GROUP_NAME, ARCHIVE_GROUP_NAME] },
+    });
+    // `externalusergroups.externalId` is a non-sparse unique index, so a document left
+    // behind by a crashed run would make the next run's seed fail with E11000 — which is
+    // why these run from the shared cleanup (`beforeAll` calls it once as well) rather
+    // than from a nested `afterEach`.
+    await ExternalAccount.deleteMany({
+      $or: [
+        {
+          accountId: {
+            $in: [
+              EXISTING_EXTERNAL_ACCOUNT.accountId,
+              ARCHIVE_EXTERNAL_ACCOUNT.accountId,
+            ],
+          },
+        },
+        { _id: { $in: [ARCHIVE_EXTERNAL_ACCOUNT_ID] } },
+      ],
+    });
+    await ExternalUserGroup.deleteMany({
+      $or: [
+        {
+          externalId: {
+            $in: [
+              EXISTING_EXTERNAL_USER_GROUP.externalId,
+              ARCHIVE_EXTERNAL_USER_GROUP.externalId,
+            ],
+          },
+        },
+        {
+          name: {
+            $in: [
+              EXISTING_EXTERNAL_USER_GROUP.name,
+              ARCHIVE_EXTERNAL_USER_GROUP.name,
+            ],
+          },
+        },
+        { _id: { $in: [ARCHIVE_EXTERNAL_USER_GROUP_ID] } },
+      ],
     });
   };
 
@@ -240,6 +333,9 @@ describe('detectUniqueConflicts', () => {
 
     User = mongoose.model<IUser>('User');
     UserGroup = mongoose.model<IUserGroup>('UserGroup');
+    // `setupIndependentModels` above imports `models/external-account`, which is what
+    // registers this schema; without it the registry lookup throws MissingSchemaError.
+    ExternalAccount = mongoose.model('ExternalAccount');
 
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'g2g-detect-conflicts-'));
 
@@ -487,6 +583,267 @@ describe('detectUniqueConflicts', () => {
       });
 
       expect(getGroupConflicts(report)).toEqual([]);
+    });
+  });
+
+  /*
+   * Requirements 6.1, 6.2 — the two collections whose unique constraints are composite.
+   *
+   * These run through the whole `detectUniqueConflicts` orchestrator against the real
+   * replica set, which is what the unit-level `collectConflicts` tests cannot cover: the
+   * composite key is looked up with an `$or` of exact-match conditions
+   * (`buildLookupFilters`), so whether a partial match is a conflict is decided by what
+   * MongoDB actually returns for that filter, not by the pure comparison alone.
+   */
+  describe('externalaccounts and externalusergroups collections', () => {
+    // Block-local mirror of the top-level `detect` helper: both external collections are
+    // listed on every call, with `jsonPath: null` for the one not under test.
+    const detectExternal = (input: {
+      accountsJsonPath: string | null;
+      groupsJsonPath: string | null;
+    }): Promise<UniqueConflictReport> =>
+      detectUniqueConflicts({
+        collections: [
+          {
+            collection: 'externalaccounts',
+            jsonPath: input.accountsJsonPath,
+            lookup: toLookup(ExternalAccount),
+          },
+          {
+            collection: 'externalusergroups',
+            jsonPath: input.groupsJsonPath,
+            lookup: toLookup(ExternalUserGroup),
+          },
+        ],
+      });
+
+    const getAccountConflicts = (
+      report: UniqueConflictReport,
+    ): readonly unknown[] =>
+      report.conflictsByCollection.get('externalaccounts') ?? [];
+    const getExternalGroupConflicts = (
+      report: UniqueConflictReport,
+    ): readonly unknown[] =>
+      report.conflictsByCollection.get('externalusergroups') ?? [];
+
+    test('detects a providerType+accountId conflict when the archive account shares both values under a different _id', async () => {
+      // Requirement 1.1, 6.1
+      const userId = await seedExistingUser();
+      const existingId = await seedExistingExternalAccount(userId);
+      const accountsJsonPath = await writeArchiveJson(
+        'externalaccounts-composite-conflict.json',
+        [
+          {
+            _id: ARCHIVE_EXTERNAL_ACCOUNT_ID,
+            providerType: EXISTING_EXTERNAL_ACCOUNT.providerType,
+            accountId: EXISTING_EXTERNAL_ACCOUNT.accountId,
+            user: ARCHIVE_USER_ID,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath,
+        groupsJsonPath: null,
+      });
+
+      expect(getAccountConflicts(report)).toEqual([
+        {
+          collection: 'externalaccounts',
+          field: 'providerType+accountId',
+          // A composite key reports the value tuple, not a bare field value
+          // (`toReportedValue`), so the operator can tell which value belongs to which field.
+          value: JSON.stringify([
+            EXISTING_EXTERNAL_ACCOUNT.providerType,
+            EXISTING_EXTERNAL_ACCOUNT.accountId,
+          ]),
+          archiveId: ARCHIVE_EXTERNAL_ACCOUNT_ID,
+          existingId,
+        },
+      ]);
+      expect(getExternalGroupConflicts(report)).toEqual([]);
+    });
+
+    test('reports no conflict when only providerType matches and accountId differs', async () => {
+      // Requirement 1.2, 6.1 — half of a composite key is not a unique-index violation.
+      const userId = await seedExistingUser();
+      await seedExistingExternalAccount(userId);
+      const accountsJsonPath = await writeArchiveJson(
+        'externalaccounts-provider-only.json',
+        [
+          {
+            _id: ARCHIVE_EXTERNAL_ACCOUNT_ID,
+            providerType: EXISTING_EXTERNAL_ACCOUNT.providerType,
+            accountId: ARCHIVE_EXTERNAL_ACCOUNT.accountId,
+            user: ARCHIVE_USER_ID,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath,
+        groupsJsonPath: null,
+      });
+
+      expect(getAccountConflicts(report)).toEqual([]);
+    });
+
+    test('reports no conflict when only accountId matches and providerType differs', async () => {
+      // Requirement 1.2, 6.1 — the mirror image of the case above: the same account id
+      // registered against a different identity provider is a different account.
+      const userId = await seedExistingUser();
+      await seedExistingExternalAccount(userId);
+      const accountsJsonPath = await writeArchiveJson(
+        'externalaccounts-account-only.json',
+        [
+          {
+            _id: ARCHIVE_EXTERNAL_ACCOUNT_ID,
+            providerType: ARCHIVE_EXTERNAL_ACCOUNT.providerType,
+            accountId: EXISTING_EXTERNAL_ACCOUNT.accountId,
+            user: ARCHIVE_USER_ID,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath,
+        groupsJsonPath: null,
+      });
+
+      expect(getAccountConflicts(report)).toEqual([]);
+    });
+
+    test('reports no conflict when the archive account is the same document (same _id) as the existing account', async () => {
+      // Requirement 1.5, 6.1 — re-importing the same document.
+      const userId = await seedExistingUser();
+      const existingId = await seedExistingExternalAccount(userId);
+      const accountsJsonPath = await writeArchiveJson(
+        'externalaccounts-same-id.json',
+        [
+          {
+            _id: existingId,
+            providerType: EXISTING_EXTERNAL_ACCOUNT.providerType,
+            accountId: EXISTING_EXTERNAL_ACCOUNT.accountId,
+            user: userId,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath,
+        groupsJsonPath: null,
+      });
+
+      expect(getAccountConflicts(report)).toEqual([]);
+    });
+
+    test('detects an externalId conflict when the archive group shares the externalId under a different _id', async () => {
+      // Requirement 1.3, 6.2 — `name` and `provider` deliberately differ from the seeded
+      // group, so the single-field `externalId` key is the only one that can fire and the
+      // conflict below names which key matched.
+      const existingId = await seedExistingExternalUserGroup();
+      const groupsJsonPath = await writeArchiveJson(
+        'externalusergroups-external-id.json',
+        [
+          {
+            _id: ARCHIVE_EXTERNAL_USER_GROUP_ID,
+            name: ARCHIVE_EXTERNAL_USER_GROUP.name,
+            externalId: EXISTING_EXTERNAL_USER_GROUP.externalId,
+            provider: ARCHIVE_EXTERNAL_USER_GROUP.provider,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath: null,
+        groupsJsonPath,
+      });
+
+      expect(getExternalGroupConflicts(report)).toEqual([
+        {
+          collection: 'externalusergroups',
+          field: 'externalId',
+          // A single-field key reports the bare value (`toReportedValue`).
+          value: EXISTING_EXTERNAL_USER_GROUP.externalId,
+          archiveId: ARCHIVE_EXTERNAL_USER_GROUP_ID,
+          existingId,
+        },
+      ]);
+      expect(getAccountConflicts(report)).toEqual([]);
+    });
+
+    test('detects a name+provider conflict when the archive group shares both values under a different _id', async () => {
+      // Requirement 1.4, 6.2 — `externalId` deliberately differs, so the composite
+      // {name, provider} key is the only one that can fire.
+      const existingId = await seedExistingExternalUserGroup();
+      const groupsJsonPath = await writeArchiveJson(
+        'externalusergroups-name-provider.json',
+        [
+          {
+            _id: ARCHIVE_EXTERNAL_USER_GROUP_ID,
+            name: EXISTING_EXTERNAL_USER_GROUP.name,
+            externalId: ARCHIVE_EXTERNAL_USER_GROUP.externalId,
+            provider: EXISTING_EXTERNAL_USER_GROUP.provider,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath: null,
+        groupsJsonPath,
+      });
+
+      expect(getExternalGroupConflicts(report)).toEqual([
+        {
+          collection: 'externalusergroups',
+          field: 'name+provider',
+          value: JSON.stringify([
+            EXISTING_EXTERNAL_USER_GROUP.name,
+            EXISTING_EXTERNAL_USER_GROUP.provider,
+          ]),
+          archiveId: ARCHIVE_EXTERNAL_USER_GROUP_ID,
+          existingId,
+        },
+      ]);
+    });
+
+    test('reports no conflict when neither externalId nor name+provider overlaps with the destination', async () => {
+      // Requirement 6.2 — the clean case both keys must let through.
+      await seedExistingExternalUserGroup();
+      const groupsJsonPath = await writeArchiveJson(
+        'externalusergroups-no-overlap.json',
+        [
+          {
+            _id: ARCHIVE_EXTERNAL_USER_GROUP_ID,
+            ...ARCHIVE_EXTERNAL_USER_GROUP,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath: null,
+        groupsJsonPath,
+      });
+
+      expect(getExternalGroupConflicts(report)).toEqual([]);
+    });
+
+    test('reports no conflict when the archive group is the same document (same _id) as the existing group', async () => {
+      // Requirement 1.5, 6.2 — re-importing the same document. Here both keys match, so
+      // this is also the case that proves the same-`_id` exclusion applies per key rather
+      // than to whichever key happens to be evaluated first.
+      const existingId = await seedExistingExternalUserGroup();
+      const groupsJsonPath = await writeArchiveJson(
+        'externalusergroups-same-id.json',
+        [{ _id: existingId, ...EXISTING_EXTERNAL_USER_GROUP }],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath: null,
+        groupsJsonPath,
+      });
+
+      expect(getExternalGroupConflicts(report)).toEqual([]);
     });
   });
 
