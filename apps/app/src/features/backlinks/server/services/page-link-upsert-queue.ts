@@ -6,8 +6,13 @@ import { handlePageUpsertById } from './page-link-service-handlers';
 
 const logger = loggerFactory('growi:features:backlinks:page-link-upsert-queue');
 
-/** Bounds an absurd measurement (a host stall mid-extraction), not the duty cycle itself. */
-const REST_CAP_MS = 10_000;
+/**
+ * Ceiling on the work one page may be charged for, well above any real parse cost. Bounding the
+ * charge rather than the resulting rest keeps the configured duty exact for every legitimate
+ * measurement — clamping the rest instead raised the effective duty for expensive pages, worst at
+ * a deliberately low duty, which is where the knob matters most.
+ */
+const MAX_CHARGED_EXTRACTION_MS = 5000;
 
 /** Enough to ride out a replica-set failover, few enough not to chase a permanent fault. */
 const MAX_UPSERT_ATTEMPTS = 5;
@@ -101,7 +106,8 @@ export class PageLinkUpsertQueue {
 
   private restMsFor(extractionMs: number): number {
     if (!Number.isFinite(extractionMs) || extractionMs <= 0) return 0;
-    return Math.min(extractionMs * this.restRatio, REST_CAP_MS);
+    const charged = Math.min(extractionMs, MAX_CHARGED_EXTRACTION_MS);
+    return charged * this.restRatio;
   }
 
   private rest(ms: number): Promise<void> {

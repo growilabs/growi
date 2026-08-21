@@ -133,6 +133,7 @@ describe('PageLinkUpsertQueue (duty-cycle pacing)', () => {
   // rather than silently altering how long a failing page is chased.
   const MAX_UPSERT_ATTEMPTS = 5;
   const RETRY_BACKOFF_MS = 5000;
+  const MAX_CHARGED_EXTRACTION_MS = 5000;
 
   it('retries a failed page after a backoff rather than dropping it', async () => {
     // 100% duty so no rest is owed: a failure's own rest would otherwise shift the drain timeline
@@ -272,16 +273,21 @@ describe('PageLinkUpsertQueue (duty-cycle pacing)', () => {
     expect(callTimes[1] - callTimes[0]).toBeGreaterThan(FAILURE_MS * 2);
   });
 
-  it('caps one rest so an absurd measurement cannot wedge the drain', async () => {
+  it('bounds an absurd measurement without overriding the duty cycle', async () => {
     const queue = createQueue();
-    // A host stall, not a real parse cost: uncapped this would rest for hours.
+    // A host stall mid-extraction, not a real parse cost. Only the charged work is clamped, so the
+    // configured duty still decides the rest — clamping the rest instead would silently raise the
+    // effective duty for legitimately expensive pages, worst at a deliberately low setting.
     mocks.handlePageUpsertById.mockResolvedValue(60 * 60 * 1000);
+    const cappedRestMs =
+      (MAX_CHARGED_EXTRACTION_MS * (100 - DUTY_CYCLE_PERCENT)) /
+      DUTY_CYCLE_PERCENT;
 
     enqueuePages(queue, 2);
     await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
     expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(10_000 - 1);
+    await vi.advanceTimersByTimeAsync(cappedRestMs - 1);
     expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(1);
