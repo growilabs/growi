@@ -175,6 +175,48 @@ describe('PageLinkUpsertQueue (duty-cycle pacing)', () => {
     expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(2);
   });
 
+  it('does not re-extract a page that failed and then succeeded in the same drain', async () => {
+    // A save landing mid-drain re-enqueues the id, and the live Set revisits it in the same pass,
+    // so a page can fail and then succeed within one drain. It must not also be re-queued as a
+    // failure afterwards.
+    const queue = createQueue(100);
+    const pageId = new Types.ObjectId().toString();
+    let attempt = 0;
+    mocks.handlePageUpsertById.mockImplementation(() => {
+      attempt += 1;
+      if (attempt === 1) {
+        queue.enqueue(pageId);
+        return Promise.reject(new Error('transient'));
+      }
+      return Promise.resolve(0);
+    });
+
+    queue.enqueue(pageId);
+    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS + RETRY_BACKOFF_MS * 4);
+
+    expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not let saves during a fault exhaust the retry budget', async () => {
+    // A save means the page changed — new work, not another attempt at the same work. Counting it
+    // against the budget would abandon a page that is merely being edited while writes are failing.
+    const queue = createQueue(100);
+    const pageId = new Types.ObjectId().toString();
+    let saves = 0;
+    mocks.handlePageUpsertById.mockImplementation(() => {
+      if (saves++ < MAX_UPSERT_ATTEMPTS + 1) queue.enqueue(pageId);
+      return Promise.reject(new Error('write fault'));
+    });
+
+    queue.enqueue(pageId);
+    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
+
+    expect(mocks.loggerError).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('giving up'),
+    );
+  });
+
   it('gives up on a page that keeps failing, and says so', async () => {
     const queue = createQueue();
     mocks.handlePageUpsertById.mockRejectedValue(new Error('permanent'));
@@ -237,6 +279,7 @@ describe('PageLinkUpsertQueue (duty-cycle pacing)', () => {
 
     enqueuePages(queue, 2);
     await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
+    expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(10_000 - 1);
     expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(1);

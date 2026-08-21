@@ -62,6 +62,9 @@ export class PageLinkUpsertQueue {
 
   enqueue(pageId: string): void {
     this.pagesToUpsert.add(pageId);
+    // A save is new work, not another attempt at the same work: counting it against the retry
+    // budget would abandon a page that is merely being edited while writes are failing.
+    this.attemptsByPage.delete(pageId);
     this.scheduleDrain();
   }
 
@@ -129,6 +132,9 @@ export class PageLinkUpsertQueue {
           // biome-ignore lint/performance/noAwaitInLoops: pacing is the point — parses run one at a time so the event loop is yielded between them (req 3.5)
           extractionMs = await handlePageUpsertById(id, siteUrl);
           this.attemptsByPage.delete(id);
+          // It may have failed earlier in this same drain (a mid-drain save re-enqueues the id and
+          // the live Set revisits it), so drop the pending retry too.
+          failed.delete(id);
         } catch (err) {
           // A failure after a completed extraction never reports its cost, so charge elapsed.
           extractionMs = performance.now() - startedAt;
