@@ -90,7 +90,7 @@
   - _Depends: 3.2_
 
 - [ ] 7. 既存の周辺テストを新しい形へ追随させ、受信フロー全体の非回帰を確認する
-- [ ] 7.1 (P) rescue-admins.spec.tsのUSER_UNIQUE_FIELDS参照を書き換える
+- [x] 7.1 (P) rescue-admins.spec.tsのUSER_UNIQUE_FIELDS参照を書き換える
   - `USER_UNIQUE_FIELDS`を直接importして文字列配列として使っている箇所(187-201行目)を、`USER_UNIQUE_KEYS.flatMap(key => key.fields)`による変換を経由する形に書き換える。
   - Observable: `rescue-admins.spec.ts`がコンパイル・実行できる。
   - _Requirements: 1.1_
