@@ -4,16 +4,25 @@ test.describe('Comment', () => {
   // make tests run in serial
   test.describe.configure({ mode: 'serial' });
 
-  test('Create comment page', async ({ page }) => {
-    await page.goto('/comment');
+  // A serial group's retry re-runs every test in the group from the top, but
+  // comment creation below is a real, non-idempotent backend write. Reusing
+  // a fixed page path across retries lets an earlier attempt's comments
+  // leak into the next one, so a locator with no index (`.page-comment-body`,
+  // `getByTestId('comment-reply-button')`) hits a strict-mode "resolved to
+  // 2 elements" violation once duplicates pile up. Scoping the path by
+  // testInfo.retry gives every attempt its own comment-free page.
+  const commentPagePath = (retry: number) => `/comment-retry${retry}`;
+
+  test('Create comment page', async ({ page }, testInfo) => {
+    await page.goto(commentPagePath(testInfo.retry));
     await page.getByTestId('editor-button').click();
     await page.getByTestId('save-page-btn').click();
     await expect(page.locator('.page-meta')).toBeVisible();
   });
 
-  test('Successfully add comments', async ({ page }) => {
+  test('Successfully add comments', async ({ page }, testInfo) => {
     const commentText = 'add comment';
-    await page.goto('/comment');
+    await page.goto(commentPagePath(testInfo.retry));
 
     // Add comment
     await page.getByTestId('page-comment-button').click();
@@ -27,9 +36,9 @@ test.describe('Comment', () => {
     ).toHaveText('1');
   });
 
-  test('Successfully reply comments', async ({ page }) => {
+  test('Successfully reply comments', async ({ page }, testInfo) => {
     const commentText = 'reply comment';
-    await page.goto('/comment');
+    await page.goto(commentPagePath(testInfo.retry));
 
     // Reply comment
     await page.getByTestId('comment-reply-button').click();
@@ -42,6 +51,29 @@ test.describe('Comment', () => {
     await expect(
       page.getByTestId('page-comment-button').locator('.grw-count-badge'),
     ).toHaveText('2');
+  });
+
+  test('Successfully edit comments', async ({ page }, testInfo) => {
+    const editedText = 'edited comment';
+    await page.goto(commentPagePath(testInfo.retry));
+
+    const firstComment = page.locator('.page-comment').first();
+    await firstComment.hover();
+    await firstComment.getByTestId('comment-edit-button').click();
+
+    const editor = page.locator('.cm-content').first();
+    await expect(editor).toBeVisible();
+    await editor.fill(editedText);
+    await page.getByTestId('comment-submit-button').first().click();
+
+    // Leaving edit mode is the observable result of a successful update: the
+    // editor closes and the rendered comment shows the new text. A silently
+    // saved edit that keeps the editor open (the /comments.update handler
+    // failing to respond at all) fails here.
+    await expect(editor).not.toBeVisible();
+    await expect(page.locator('.page-comment-body').first()).toHaveText(
+      editedText,
+    );
   });
 
   // test('Successfully delete comments', async({ page }) => {

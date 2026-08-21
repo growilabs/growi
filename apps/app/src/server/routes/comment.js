@@ -545,10 +545,10 @@ export const setup = (crowi, _app) => {
       ApiResponse.success({
         comment: {
           ...updatedComment,
-          page: createdComment.pageId,
-          creator: createdComment.creatorId,
-          revision: createdComment.revisionId,
-          replyTo: createdComment.replyToId,
+          page: updatedComment.pageId,
+          creator: updatedComment.creatorId,
+          revision: updatedComment.revisionId,
+          replyTo: updatedComment.replyToId,
         },
       }),
     );
