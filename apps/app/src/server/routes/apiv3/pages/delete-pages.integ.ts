@@ -129,6 +129,35 @@ describe('POST /delete', () => {
     throw new Error(`page ${pageId} was not deleted within ${maxWaitMs}ms`);
   };
 
+  /**
+   * `PageService#deletePage` moves the target into the trash (the state
+   * `waitForPageToBeDeleted` polls for) and only afterwards awaits
+   * `updateDescendantCountOfAncestors` on `page.parent` — still inside the same
+   * unawaited background chain the route fired. Resolving as soon as the target
+   * reaches `deleted` let a suite's `afterEach` fixture cleanup delete that parent
+   * (an auto-created empty page under the fixture root) before the still-in-flight
+   * count update looked it up, throwing an unhandled `Target not found` rejection
+   * (see #11740). Waiting for the parent's own descendantCount to reflect the
+   * deletion too keeps the whole chain settled before the test returns.
+   */
+  const waitForDescendantCountToDecrement = async (
+    parentId: string,
+    countBefore: number,
+    maxWaitMs = 10_000,
+  ): Promise<void> => {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < maxWaitMs) {
+      const parent = await crowi.models.Page.findById(parentId);
+      if (parent != null && parent.descendantCount < countBefore) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error(
+      `descendantCount of parent ${parentId} did not decrement within ${maxWaitMs}ms`,
+    );
+  };
+
   const removeFixtures = async (): Promise<void> => {
     const { Page } = crowi.models;
 
@@ -238,6 +267,12 @@ describe('POST /delete', () => {
 
   it('deletes a page whose revisionId is the latest revision', async () => {
     const page = await createPage(targetPath, 'target body');
+    if (page.parent == null) {
+      throw new Error('the fixture page must have a parent');
+    }
+    const parentId = getIdStringForRef(page.parent);
+    const parentDescendantCountBefore =
+      (await crowi.models.Page.findById(parentId))?.descendantCount ?? 0;
 
     const response = await request(app)
       .post('/delete')
@@ -254,5 +289,12 @@ describe('POST /delete', () => {
     // Without this case, filtering every page out unconditionally would also pass.
     const deletedPage = await waitForPageToBeDeleted(page._id);
     expect(deletedPage.path).toBe(`/trash${targetPath}`);
+
+    // Wait for the rest of the background chain (the parent's descendantCount
+    // update) to settle too, so afterEach's fixture cleanup can't race it.
+    await waitForDescendantCountToDecrement(
+      parentId,
+      parentDescendantCountBefore,
+    );
   });
 });
