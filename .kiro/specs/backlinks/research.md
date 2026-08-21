@@ -168,6 +168,11 @@
 - **Rationale**: The upsert is idempotent last-writer-wins, so intermediate saves carry no
   information and collapsing them loses nothing. Pacing (not parallelism) is the right lever for
   CPU-bound work on one thread. Reuses the backfill's duty-cycle intuition.
+- **Superseded in part (review of B2.2)**: the coalescing dirty-set stands, but the *bounded ids per
+  tick* half was replaced by a duty cycle over measured extraction time. Measuring the real cost
+  showed it spans ~700x across bodies (1.6 ms at 0.2 KiB, 8.4 ms at 3.2 KiB, 88 ms at 32.6 KiB,
+  1116 ms at 333 KiB), so a page-denominated budget was simultaneously a ~2.5% duty cycle for
+  typical pages and a licence for ~3.3 s of blocking for three large ones. See design.md B2.2.
 - **Trade-offs**: Index trails the save by up to (tick interval × queue depth) — consistent with the
   already-async listener. The set is best-effort/in-memory: a restart drops pending work (self-heals
   on next edit or backfill), and coalescing is per-instance in multi-container deployments (safe
@@ -300,10 +305,10 @@
   and identical to search indexing; document the window. Durable queue / off-thread parsing deferred
   (the in-process coalescing drain below is not that).
 - **Write-side CPU burst** (many saves close together parse full bodies back-to-back on the single
-  JS thread) — Mitigation: coalesce via an in-process `Set<pageId>` drained a bounded number per
-  paced tick; same-page saves collapse, distinct-page parses are spread over time. Naturally
-  low-pressure given no autosave and one-event-per-shared-Yjs-doc. See the coalescing decision above
-  (requirement 3.5).
+  JS thread) — Mitigation: coalesce via an in-process `Set<pageId>`, drained on a paced tick; same-page
+  saves collapse, distinct-page parses are spread over time. Naturally low-pressure given no autosave
+  and one-event-per-shared-Yjs-doc. See the coalescing decision above (requirement 3.5), including
+  the note on how the drain came to be paced by duty cycle rather than by a page budget.
 - **`findByIdsAndViewer` may include trashed pages on the source side** — Mitigation: add an
   explicit non-trashed status filter to the backlink-source query; verify during implementation.
 - **Backfill on very large wikis** — Mitigation: online throttled `CronService` job (not a

@@ -255,13 +255,16 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
 
 - [x] B2.2 Coalesce and pace live extraction (write-path burst control)
   - Replace the B1.6/B1.12 inline per-event extraction with an in-process coalescing queue: the
-    `create`/`update` handlers mark the page dirty (`Set<pageId>`); a paced tick drains a bounded
-    number of ids per cycle, re-reads each page's latest body at drain time, and runs the existing
-    upsert handler once per page. `handlePageUpsertById` stays the per-page unit — the queue is the
-    seam. The duty cycle is a deployment knob, not a constant: the tick interval and the per-tick
-    page budget come from `backlinks:drainIntervalMs` / `backlinks:maxPagesPerDrain`
-    (`BACKLINKS_DRAIN_INTERVAL_MS` / `BACKLINKS_MAX_PAGES_PER_DRAIN`, defaulting to 1000 ms / 3
-    pages), read at service construction and passed into the queue.
+    `create`/`update` handlers mark the page dirty (`Set<pageId>`); a paced drain re-reads each
+    page's latest body at drain time and runs the existing upsert handler once per page.
+    `handlePageUpsertById` stays the per-page unit — the queue is the seam. Pacing is a deployment
+    knob, not a constant: the coalescing window is `backlinks:drainIntervalMs`
+    (`BACKLINKS_DRAIN_INTERVAL_MS`, default 1000 ms) and the share of the event loop the queue may
+    occupy is `backlinks:dutyCyclePercent` (`BACKLINKS_DUTY_CYCLE_PERCENT`, default 20), both read
+    at service construction and passed into the queue. A drain runs until the queue is empty,
+    resting after each page in proportion to the extraction time it measured — see design.md B2.2
+    for why the original per-tick page budget (`BACKLINKS_MAX_PAGES_PER_DRAIN`, 3 pages) was
+    replaced after review.
   - **B2.2 scope (delete):** the drain guards against a stale upsert by re-checking status at drain
     time and declining to index a page that is now `STATUS_DELETED` — keyed on deleted rather than
     published because a legacy page's `null` status means published. That closes the window
@@ -270,6 +273,10 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     the reconcile op and the delete-family handlers — deferred to **B5.2**/**B5.3**.
   - Best-effort/in-memory by design: a restart drops pending work (self-heals on next edit/backfill);
     the set is per-instance in multi-container deployments (safe because upserts are idempotent).
+  - **Accepted limitation (review of B2.2):** a page whose upsert fails is retried on a later drain
+    after `RETRY_BACKOFF_MS`, up to `MAX_UPSERT_ATTEMPTS` attempts; past that the queue gives up and
+    logs the page at error level, and its rows stay stale until its next save or B3. The queue has a
+    single drain timer, so a save arriving during a retry backoff waits for it too.
   - **Accepted limitation (review of B2.2):** an upsert that never settles leaves the drain flag set,
     and the instance then stops indexing until it restarts. Not guarded with a timeout, because a
     timeout cannot cancel the abandoned run — it would race it, and a resurrected stale run would
@@ -288,15 +295,19 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     write storm is what actually slows reader queries at the storage-engine level. Coalescing
     collapses same-page saves to **one** `bulkWrite` reflecting only the final link set (safe because
     `replaceOutboundLinks` is idempotent), cutting write volume, index maintenance, and oplog/
-    replication traffic from N to 1; pacing then caps distinct-page `bulkWrite`s per tick, converting
-    an unbounded write spike into steady, bounded write QPS that coexists with reads. Delete must
+    replication traffic from N to 1; pacing then spreads distinct-page `bulkWrite`s in proportion to
+    each page's extraction cost, converting an unbounded write spike into steady, bounded write QPS
+    that coexists with reads. Delete must
     supersede a pending upsert because the upsert path uses `upsert: true` — running a stale upsert
     for a since-deleted page would re-create `pagelinks` rows for a non-existent source (orphan rows
     a reader could surface as phantom backlinks).
-  - Done when: repeated saves of the same page within the tick window produce exactly one extraction
-    / one `replaceOutboundLinks` `bulkWrite` (asserted via a spy/count on the upsert handler); a burst
-    of distinct-page saves is drained over multiple ticks rather than in one synchronous spree; a
-    page trashed while its upsert is pending is not indexed by the drain (no row written for it).
+  - Done when: repeated saves of the same page within the coalescing window produce exactly one
+    extraction / one `replaceOutboundLinks` `bulkWrite` (asserted via a spy/count on the upsert
+    handler); a burst of distinct-page saves is paced by measured extraction cost rather than run as
+    one back-to-back spree (a page costing 10x as much to extract earns 10x the rest); a source that
+    is `STATUS_DELETED` at drain time is not indexed, even when the event payload still reads as
+    published (no row written for it); a page whose upsert fails is retried on a later drain rather
+    than dropped, and abandoned with an error log after `MAX_UPSERT_ATTEMPTS`.
   - _Requirements: 3.5_
   - _Boundary: PageLinkService_
   - _Depends: B1.6, B1.12_

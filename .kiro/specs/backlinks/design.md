@@ -200,7 +200,8 @@ apps/app/src/features/backlinks/
 │   │   ├── target-page-resolution.ts   # toPaths -> Map<toPath, toPage id> (permalink by id | findByPath + redirect) — live path only
 │   │   ├── page-link-sync.ts           # pure-ish row ops: dropSelfLinks, syncOutboundLinks (+ reconcile-delete B5.2, re-resolve inbound B4.2)
 │   │   ├── page-link-service-handlers.ts   # Crowi-free lifecycle handlers: load body -> extract -> resolve -> sync
-│   │   ├── page-link-upsert-queue.ts   # coalescing paced queue (Set<pageId> + bounded drain) — requirement 3.5
+│   │   ├── page-link-upsert-queue.ts   # coalescing queue (Set<pageId> + duty-cycle paced drain) — requirement 3.5
+│   │   ├── upsert-queue-pacing.ts      # validates the configured pacing budget, per-value fallback to CONFIG_DEFINITIONS
 │   │   ├── find-backlinks.ts           # read query: backlink sources filtered by viewer grant
 │   │   ├── page-link-service.ts        # thin Crowi adapter: subscribes to crowi.events.page, owns config access, delegates
 │   │   └── page-link-backfill-cron.ts  # (B3) CronService: chunked, resumable, throttled backfill (in-memory path->id map)
@@ -483,8 +484,10 @@ function resolveToPageIds(paths: string[]): Promise<Map<string, ObjectId>>;
   handler once per page with the **latest** body (re-read at drain time). This is safe because the
   upsert is idempotent last-writer-wins, so intermediate saves carry no information. Properties:
   - **Same page saved repeatedly** → the `Set` collapses it to one extraction run.
-  - **Many distinct pages saved at once** → the tick processes a bounded number per cycle, so a
-    burst of full-body parses is spread over time instead of blocking the single JS thread back-to-back.
+  - **Many distinct pages saved at once** → the drain rests after each page in proportion to the
+    extraction time it measured, so a burst of full-body parses is spread over time by cost instead
+    of blocking the single JS thread back-to-back. Cost, not page count, is the unit — see the
+    write-path pacing note under Performance.
   - **Delete supersedes a pending upsert**: a `delete`-family event for a page removes it from the
     dirty set and routes to `reconcileDeletedPages(ids)` instead, so a stale upsert never re-creates
     rows for a gone page — the upsert path uses `upsert: true`, so those would be orphan rows a
@@ -735,12 +738,30 @@ interface ILinkTarget {
     `Set<pageId>` coalesces them to one run. Naturally low-pressure: a Yjs document is shared, so
     N co-editors produce **one** `update` event per explicit save, not N, and there is no autosave —
     the event fires only on an explicit save (`updatePage`).
-  - *Many distinct pages saved at once* — the coalescing queue is drained a **bounded number per
-    tick**, so parses are paced (with the event loop yielding between them) rather than run in one
-    blocking spree. The tick cadence / batch size is the duty-cycle lever, mirroring the backfill job,
-    and is env-tunable per deployment: `backlinks:drainIntervalMs` (`BACKLINKS_DRAIN_INTERVAL_MS`,
-    default 1000) × `backlinks:maxPagesPerDrain` (`BACKLINKS_MAX_PAGES_PER_DRAIN`, default 3) bounds
-    extraction to 3 pages/second out of the box.
+  - *Many distinct pages saved at once* — the coalescing queue paces itself by **duty cycle over
+    measured extraction time**: after each page it rests `elapsed x (100 - duty) / duty`, so its
+    share of the event loop holds at `backlinks:dutyCyclePercent`
+    (`BACKLINKS_DUTY_CYCLE_PERCENT`, default 20) whatever a page costs. The drain then runs until
+    the queue is empty; there is no per-tick page budget.
+    - **Why not a pages-per-tick budget** (the original design, replaced after review of B2.2): a
+      page is the wrong unit, because extraction cost spans ~700x across real bodies — measured
+      1.6 ms at 0.2 KiB, 8.4 ms at 3.2 KiB, 88 ms at 32.6 KiB, 1116 ms at 333 KiB. The shipped
+      3 pages/tick was therefore a ~2.5% duty cycle for typical pages (a 10k-page import trailed
+      by ~55 min) while still admitting ~3.3 s of blocking for three large ones. Resting in
+      proportion to measured cost makes small pages effectively burst and large pages throttle
+      themselves, off one operator knob.
+    - **Why the measurement is narrow**: only `extractInternalLinkPaths` is timed, not the whole
+      upsert. The surrounding DB round-trips yield the loop, so charging them would rest the queue
+      for time it never occupied. A failure is charged its elapsed time instead, since a throw
+      after a completed extraction never reports the cost.
+    - **Why no page cap remains**: every page that extracts incurs a proportional rest and awaits
+      its own DB reads, so a cap guards nothing and only inserts dead time between chunks
+      (measured ~56% of the throughput for small pages, the bulk-import case this exists to speed
+      up).
+    - **Accepted limitation (review of B2.2)**: a page whose upsert fails is retried on a later
+      drain after `RETRY_BACKOFF_MS`, up to `MAX_UPSERT_ATTEMPTS`; past that the queue gives up and
+      logs it, and the page's links stay stale until its next save or the backfill (B3). The drain
+      timer is shared, so a save arriving during a retry backoff waits for it too.
   - The pacing is about spreading work over time (yielding between parses), not parallelism —
     concurrency buys nothing for CPU-bound work on one thread.
   - Trade-off: the index trails the save by up to (tick interval × queue depth) — acceptable, since
