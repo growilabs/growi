@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {
+  COLLECTION_DETECTORS,
   collectConflicts,
   EXTERNAL_ACCOUNT_UNIQUE_KEYS,
   EXTERNAL_USER_GROUP_UNIQUE_KEYS,
@@ -734,6 +735,75 @@ describe('findExistingCandidates', () => {
         slackMemberId: undefined,
       },
     ]);
+  });
+});
+
+describe('COLLECTION_DETECTORS', () => {
+  let workDir: string;
+
+  beforeEach(async () => {
+    workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'collection-detectors-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(workDir, { force: true, recursive: true });
+  });
+
+  test('declares one detector per detected collection', () => {
+    // Requirement 5.1: the declaration list is the single source for which collections the
+    // detection covers. The compiler already cross-checks each entry's key list against its
+    // pick function (both fix the same `T`); the collection *name* is the one argument it
+    // cannot check, so a name wired to the wrong declaration is only visible here.
+    expect(COLLECTION_DETECTORS.map((detector) => detector.collection)).toEqual(
+      ['users', 'usergroups', 'externalaccounts', 'externalusergroups'],
+    );
+  });
+
+  test('each declared detector detects a conflict on its own collection', async () => {
+    // Every entry has to be callable through the uniform `detect` signature - that is what
+    // lets the orchestrator dispatch by collection name without knowing any collection's keys.
+    const archiveDocs: Record<string, Record<string, unknown>[]> = {
+      users: [{ _id: 'archive-1', username: 'alice' }],
+      usergroups: [{ _id: 'archive-1', name: 'engineers' }],
+      externalaccounts: [
+        { _id: 'archive-1', providerType: 'saml', accountId: 'cn=alice' },
+      ],
+      externalusergroups: [
+        { _id: 'archive-1', externalId: 'cn=engineers,ou=groups' },
+      ],
+    };
+    const existingDocs: Record<string, Record<string, unknown>[]> = {
+      users: [{ _id: 'existing-1', username: 'alice' }],
+      usergroups: [{ _id: 'existing-1', name: 'engineers' }],
+      externalaccounts: [
+        { _id: 'existing-1', providerType: 'saml', accountId: 'cn=alice' },
+      ],
+      externalusergroups: [
+        { _id: 'existing-1', externalId: 'cn=engineers,ou=groups' },
+      ],
+    };
+
+    for (const detector of COLLECTION_DETECTORS) {
+      const jsonPath = path.join(workDir, `${detector.collection}.json`);
+      await fs.writeFile(
+        jsonPath,
+        JSON.stringify(archiveDocs[detector.collection]),
+        'utf-8',
+      );
+      const lookup = vi
+        .fn()
+        .mockResolvedValue(existingDocs[detector.collection]);
+
+      const conflicts = await detector.detect(jsonPath, lookup);
+
+      expect(conflicts).toEqual([
+        expect.objectContaining({
+          collection: detector.collection,
+          archiveId: 'archive-1',
+          existingId: 'existing-1',
+        }),
+      ]);
+    }
   });
 });
 

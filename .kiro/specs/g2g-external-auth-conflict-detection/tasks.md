@@ -49,7 +49,7 @@
   - _Depends: 2.2_
 
 - [ ] 3. 宣言駆動のorchestratorへ一般化する(統合)
-- [ ] 3.1 declareDetectorヘルパーとCOLLECTION_DETECTORSを実装する
+- [x] 3.1 declareDetectorヘルパーとCOLLECTION_DETECTORSを実装する
   - `declareDetector<T>(collection, keys, pick)`ヘルパーで、コレクションごとに`T`を閉じ込めた`CollectionDetector`を作る。型アサーションを使わない。
   - `users`/`usergroups`/`externalaccounts`/`externalusergroups`の4エントリを`COLLECTION_DETECTORS`として宣言する。
   - Observable: 4エントリの配列が型アサーションなしでコンパイルできる(`tsgo`で確認)。
@@ -125,10 +125,11 @@
 
 - [ ] 9. 一意キー宣言と実際のデータモデルのドリフトを検出する試験を作る
   - `COLLECTION_DETECTORS`の宣言と、`users`/`usergroups`/`externalaccounts`/`externalusergroups`それぞれの`Model.schema.indexes()`(`unique: true`のもの)を突き合わせ、両者がずれたら失敗する試験を作る。
+  - **`CollectionDetector`型は`collection`と`detect`のみを持ち、キー宣言(`fields`)を公開しない(3.1のレビューで確認済み・意図的)。ドリフト試験は`COLLECTION_DETECTORS`からコレクション名の一覧だけを読み、キー宣言自体は4つの`*_UNIQUE_KEYS`定数(`USER_UNIQUE_KEYS`/`GROUP_UNIQUE_KEYS`/`EXTERNAL_ACCOUNT_UNIQUE_KEYS`/`EXTERNAL_USER_GROUP_UNIQUE_KEYS`)を直接importして読むこと。** `CollectionDetector`に`fields`相当のプロパティを追加しない(`T`を消してしまい、3.1が避けた型アサーション問題を再導入するため)。4定数のうち`GROUP_UNIQUE_KEYS`のみ未exportなので、このタスクでexportに変更する(1行、`detect-unique-conflicts.ts`)。
   - `externalaccounts`については、この試験がMongooseスキーマ(Prisma移行完了までの暫定コード)を一意制約の正として読んでいることをコメントで明記する。
   - Observable: 宣言から1エントリ削ると試験が失敗し、不一致のコレクション名・フィールドが分かる形でメッセージに出る。
   - _Requirements: 5.1, 5.2_
-  - _Boundary: detect-unique-conflicts.drift.spec.ts_
+  - _Boundary: detect-unique-conflicts.drift.spec.ts, detect-unique-conflicts.ts(GROUP_UNIQUE_KEYSのexport追加のみ)_
   - _Depends: 3.1_
 
 - [ ] 10. 変更をg2g-import-conflict-detectionへport-backし、本spec自身を削除する
@@ -151,3 +152,4 @@
 - 1.1: 複合キーの`UniqueFieldConflict.value`は`JSON.stringify(values)`形式(例: `["saml","x"]`)。単一フィールドキーは従来どおり素の値を報告する(`toReportedValue`が`toMatchKey`から独立)。タスク4(通知汎用化)はこの形式を前提に文言を組み立てること。
 - 2.1: `findExistingCandidates`をテストのためexportした(design.mdのService Interfaceには無い露出)。タスク3.2で`detectUniqueConflicts`が宣言駆動になれば複合キーの`$or`形状が公開エントリ経由で検証可能になるため、その時点でexportを外せる。
 - 2.1: `EXISTING_LOOKUP_BATCH_SIZE`(1000)を`$or`のタプル件数上限にも流用した。`$in`の1000要素と`$or`の1000分岐はクエリの重さが同じではないため、タスク6.x(実DB検証)で1000分岐境界のクエリプラン(`explain()`で`{providerType,accountId}`の複合索引が使われ、コレクションスキャンにならないこと)を確認すること。
+- 3.1: `USER_UNIQUE_FIELDS`/`GROUP_UNIQUE_FIELDS`を`USER_UNIQUE_KEYS`/`GROUP_UNIQUE_KEYS`(`UniqueKeySpec[]`)へ改名した。この変更で`rescue-admins.spec.ts`が壊れる(想定済み、タスク7.1が対応)。`CollectionDetector`型は`collection`/`detect`のみを持ち、キー宣言を公開しない設計(design.md通り)なので、タスク9のドリフト試験は4つの`*_UNIQUE_KEYS`定数を直接importして読むこと(タスク9の本文に追記済み)。`GroupUniqueField`/`UniqueField`型は`satisfies`ガード撤去に伴い未参照になったが、公開型の削除はこのタスクの境界外のため残置(タスク3.2かport-back時のクリーンアップ候補)。

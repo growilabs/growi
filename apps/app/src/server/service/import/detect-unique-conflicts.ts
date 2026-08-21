@@ -193,15 +193,17 @@ const ARCHIVE_ENCODING = 'utf-8';
 // one unbounded query, and the destination collection is never loaded whole into memory.
 const EXISTING_LOOKUP_BATCH_SIZE = 1000;
 
-export const USER_UNIQUE_FIELDS = [
-  'username',
-  'email',
-  'slackMemberId',
-] as const satisfies readonly UserUniqueField[];
+// `users` has three independent single-field unique keys (see models/user.ts): each is
+// declared on its own so a document may conflict on one without conflicting on another.
+export const USER_UNIQUE_KEYS: readonly UniqueKeySpec<UserUniqueFields>[] = [
+  { label: 'username', fields: ['username'] },
+  { label: 'email', fields: ['email'] },
+  { label: 'slackMemberId', fields: ['slackMemberId'] },
+] as const;
 
-const GROUP_UNIQUE_FIELDS = [
-  'name',
-] as const satisfies readonly GroupUniqueField[];
+const GROUP_UNIQUE_KEYS: readonly UniqueKeySpec<GroupUniqueFields>[] = [
+  { label: 'name', fields: ['name'] },
+] as const;
 
 // `externalaccounts` has no single-field unique key of its own — only the composite
 // {providerType, accountId} index (see models/external-account.ts) — so this is declared
@@ -508,22 +510,18 @@ export const findExistingCandidates = async <T extends { _id: string }>(input: {
 };
 
 const detectForCollection = async <T extends { _id: string }>(input: {
-  collection: 'users' | 'usergroups';
+  collection: CollectionName;
   jsonPath: string;
-  fields: readonly (UniqueField & keyof T)[];
+  fields: readonly UniqueKeySpec<T>[];
   pick: (doc: RawDocument) => T;
   lookup: ExistingDocumentLookup;
 }): Promise<UniqueFieldConflict[]> => {
-  const { collection, jsonPath, fields, pick, lookup } = input;
+  const { collection, jsonPath, fields: keys, pick, lookup } = input;
 
   const archiveDocs = await readArchiveUniqueFields(jsonPath, pick);
   if (archiveDocs.length === 0) {
     return [];
   }
-
-  // These collections are still declared as a flat field list; each field is its own
-  // single-field unique key. Generalising the declaration itself is a later step.
-  const keys = fields.map((field) => ({ label: field, fields: [field] }));
 
   const existingDocs = await findExistingCandidates({
     lookup,
@@ -534,6 +532,59 @@ const detectForCollection = async <T extends { _id: string }>(input: {
 
   return collectConflicts(collection, archiveDocs, existingDocs, keys);
 };
+
+/**
+ * One collection's detection, with its unique-key type already resolved.
+ *
+ * Deliberately non-generic: the minimal document shape differs per collection
+ * (`UserUniqueFields`, `ExternalAccountUniqueFields`, ...), so a container that kept that
+ * type visible could not hold the four declarations in one homogeneous list without a type
+ * assertion. Closing the type inside `detect` is what removes that need.
+ */
+export interface CollectionDetector {
+  readonly collection: CollectionName;
+  detect(
+    jsonPath: string,
+    lookup: ExistingDocumentLookup,
+  ): Promise<UniqueFieldConflict[]>;
+}
+
+/**
+ * Binds one collection's unique-key declaration to the function that extracts those fields.
+ *
+ * Each call is its own generic instantiation, so `T` is fixed here - which also makes the
+ * compiler reject a key list and a pick function that do not describe the same document
+ * shape - and the returned {@link CollectionDetector} carries no type parameter.
+ */
+const declareDetector = <T extends { _id: string }>(
+  collection: CollectionName,
+  keys: readonly UniqueKeySpec<T>[],
+  pick: (doc: RawDocument) => T,
+): CollectionDetector => ({
+  collection,
+  detect: (jsonPath, lookup) =>
+    detectForCollection({ collection, jsonPath, fields: keys, pick, lookup }),
+});
+
+/**
+ * The single source for which collections the detection covers and what makes a document in
+ * each of them unique. Adding a collection means adding one entry here; nothing else
+ * branches on a collection name.
+ */
+export const COLLECTION_DETECTORS: readonly CollectionDetector[] = [
+  declareDetector('users', USER_UNIQUE_KEYS, pickUserUniqueFields),
+  declareDetector('usergroups', GROUP_UNIQUE_KEYS, pickGroupUniqueFields),
+  declareDetector(
+    'externalaccounts',
+    EXTERNAL_ACCOUNT_UNIQUE_KEYS,
+    pickExternalAccountUniqueFields,
+  ),
+  declareDetector(
+    'externalusergroups',
+    EXTERNAL_USER_GROUP_UNIQUE_KEYS,
+    pickExternalUserGroupUniqueFields,
+  ),
+];
 
 // Counts and field names only: the conflicting values are user data (e-mail addresses,
 // slack member ids) and must not reach the log.
@@ -593,7 +644,7 @@ export async function detectUniqueConflicts(input: {
       : detectForCollection({
           collection: 'users',
           jsonPath: usersJsonPath,
-          fields: USER_UNIQUE_FIELDS,
+          fields: USER_UNIQUE_KEYS,
           pick: pickUserUniqueFields,
           lookup: toLookup(userModel),
         }),
@@ -602,7 +653,7 @@ export async function detectUniqueConflicts(input: {
       : detectForCollection({
           collection: 'usergroups',
           jsonPath: groupsJsonPath,
-          fields: GROUP_UNIQUE_FIELDS,
+          fields: GROUP_UNIQUE_KEYS,
           pick: pickGroupUniqueFields,
           lookup: toLookup(userGroupModel),
         }),
