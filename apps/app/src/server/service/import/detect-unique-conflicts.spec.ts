@@ -400,44 +400,64 @@ describe('readArchiveUserIdentity', () => {
 });
 
 describe('hasConflicts', () => {
-  test('returns false when both userConflicts and groupConflicts are empty', () => {
+  test('returns false when the map has no entries', () => {
     const report: UniqueConflictReport = {
-      userConflicts: [],
-      groupConflicts: [],
+      conflictsByCollection: new Map(),
     };
 
     expect(hasConflicts(report)).toBe(false);
   });
 
-  test('returns true when userConflicts has at least one entry', () => {
+  test('returns false when every collection in the map has an empty conflict array', () => {
     const report: UniqueConflictReport = {
-      userConflicts: [
-        {
-          collection: 'users',
-          field: 'username',
-          value: 'alice',
-          archiveId: 'archive-user-1',
-          existingId: 'existing-user-1',
-        },
-      ],
-      groupConflicts: [],
+      conflictsByCollection: new Map([
+        ['users', []],
+        ['usergroups', []],
+      ]),
+    };
+
+    expect(hasConflicts(report)).toBe(false);
+  });
+
+  test('returns true when one collection has at least one conflict entry', () => {
+    const report: UniqueConflictReport = {
+      conflictsByCollection: new Map([
+        [
+          'users',
+          [
+            {
+              collection: 'users',
+              field: 'username',
+              value: 'alice',
+              archiveId: 'archive-user-1',
+              existingId: 'existing-user-1',
+            },
+          ],
+        ],
+        ['usergroups', []],
+      ]),
     };
 
     expect(hasConflicts(report)).toBe(true);
   });
 
-  test('returns true when groupConflicts has at least one entry', () => {
+  test('returns true when a later collection in the map has a conflict entry', () => {
     const report: UniqueConflictReport = {
-      userConflicts: [],
-      groupConflicts: [
-        {
-          collection: 'usergroups',
-          field: 'name',
-          value: 'Engineering',
-          archiveId: 'archive-group-1',
-          existingId: 'existing-group-1',
-        },
-      ],
+      conflictsByCollection: new Map([
+        ['users', []],
+        [
+          'usergroups',
+          [
+            {
+              collection: 'usergroups',
+              field: 'name',
+              value: 'Engineering',
+              archiveId: 'archive-group-1',
+              existingId: 'existing-group-1',
+            },
+          ],
+        ],
+      ]),
     };
 
     expect(hasConflicts(report)).toBe(true);

@@ -17,7 +17,7 @@
   - _Requirements: 1.1, 1.2, 1.4, 1.5_
   - _Boundary: detect-unique-conflicts collectConflicts_
 
-- [ ] 1.2 UniqueConflictReportをコレクション名→衝突配列の汎用形にする
+- [x] 1.2 UniqueConflictReportをコレクション名→衝突配列の汎用形にする
   - `UniqueConflictReport`を`{conflictsByCollection: ReadonlyMap<CollectionName, readonly UniqueFieldConflict[]>}`へ変更する。
   - `hasConflicts`をMapの全値走査に書き換える。
   - Observable: 型変更後も`hasConflicts`のunitがグリーンで、空のMap/衝突を含むMapの両方を正しく判定する。

@@ -72,12 +72,16 @@ export interface UniqueFieldConflict {
 }
 
 export interface UniqueConflictReport {
-  userConflicts: UniqueFieldConflict[];
-  groupConflicts: UniqueFieldConflict[];
+  conflictsByCollection: ReadonlyMap<
+    CollectionName,
+    readonly UniqueFieldConflict[]
+  >;
 }
 
 export const hasConflicts = (report: UniqueConflictReport): boolean =>
-  report.userConflicts.length > 0 || report.groupConflicts.length > 0;
+  [...report.conflictsByCollection.values()].some(
+    (conflicts) => conflicts.length > 0,
+  );
 
 // Sparse unique fields treat null/undefined/empty-string as "not set". Two documents
 // that both lack the value do not violate a unique index, so they must not be compared.
@@ -422,19 +426,18 @@ const detectForCollection = async <T extends { _id: string }>(input: {
 // Counts and field names only: the conflicting values are user data (e-mail addresses,
 // slack member ids) and must not reach the log.
 const logDetectedConflicts = (report: UniqueConflictReport): void => {
-  const { userConflicts, groupConflicts } = report;
+  const conflictCountByCollection: Record<string, number> = {};
+  const allConflicts: UniqueFieldConflict[] = [];
+
+  for (const [collection, conflicts] of report.conflictsByCollection) {
+    conflictCountByCollection[collection] = conflicts.length;
+    allConflicts.push(...conflicts);
+  }
 
   logger.warn(
     {
-      userConflictCount: userConflicts.length,
-      groupConflictCount: groupConflicts.length,
-      fields: [
-        ...new Set(
-          [...userConflicts, ...groupConflicts].map(
-            (conflict) => conflict.field,
-          ),
-        ),
-      ],
+      conflictCountByCollection,
+      fields: [...new Set(allConflicts.map((conflict) => conflict.field))],
     },
     'Unique field conflicts detected before import',
   );
@@ -493,7 +496,12 @@ export async function detectUniqueConflicts(input: {
         }),
   ]);
 
-  const report: UniqueConflictReport = { userConflicts, groupConflicts };
+  const report: UniqueConflictReport = {
+    conflictsByCollection: new Map([
+      ['users', userConflicts],
+      ['usergroups', groupConflicts],
+    ]),
+  };
 
   if (hasConflicts(report)) {
     logDetectedConflicts(report);
