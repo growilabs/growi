@@ -150,9 +150,15 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
       let index = 0;
       const items = Object.values(Categories).map((category) => {
         const userData = allUser.filter((user) => user.category === category);
+
+        if (userData.length === 0) {
+          return [];
+        }
+        const isFirstGroup = index === 0;
+
         return (
           <Fragment key={category}>
-            {index !== 0 && <Menu.Divider />}
+            {!isFirstGroup && <Menu.Divider />}
             <Menu.Header>{t(CATEGORY_LABEL_KEYS[category])}</Menu.Header>
             {userData.map((user) => {
               const item = (
