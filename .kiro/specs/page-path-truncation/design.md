@@ -307,3 +307,4 @@ export const buildAncestorPathNodes: (
   - `PageListItemL.spec.tsx`（新規）: `isPathTruncationEnabled` 未指定／`false` のとき現行どおり `PagePathHierarchicalLink` が描画されチェックボックス・クリック遷移など他要素が変わらないこと（8.1, 9.1）、`true` のとき `SearchResultAncestorPath` が描画されページ名行の `evalDatePath` が有効になること（7.1, 7.2）。
 - **E2E / Runtime Smoke**
   - `/_search` で階層の深い実データを検索し、1 行表示・ホバーツールチップ・生存セグメントのクリック遷移・検索キーワードハイライトを目視確認する（`search-modal-path-truncation` の task 4 で行った手順に準拠）。
+  - 実装時点では「curl 等の HTTP-only ツールでは `/_search` のクライアントサイドレンダリング結果を検証できず、ブラウザが必須」という制約があったが、`npx playwright install chromium` は本 devcontainer で実際に成功した（tasks.md Implementation Notes 参照）。将来この検証を自動化したい場合、headless Chromium 経由のスクリプトは技術的に可能 — 未実施なのは「試していないから」であり「環境上不可能だから」ではない。
