@@ -173,6 +173,7 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
             page={page}
             isEnableActions={!isGuestUser}
             isReadOnlyUser={!!isReadOnlyUser}
+            isPathTruncationEnabled
             isSelected={page.data._id === selectedPageId}
             forceHideMenuItems={forceHideMenuItems}
             onClickItem={clickItemHandler}

@@ -1,0 +1,32 @@
+// Shared Notion-style middle-truncation row recipe: a single-line flex
+// container whose ancestor/page-name segments each truncate individually
+// with an ellipsis before the row itself is allowed to overflow.
+//
+// Consumed by SearchResultPagePath.module.scss (search modal) and
+// SearchResultAncestorPath.module.scss (search results list) via `@use`, so
+// the two independent truncated-path renderers can't silently drift on the
+// shared flex-shrink recipe. Not a CSS module itself (leading underscore) --
+// each consumer still declares its own module-scoped class names.
+
+@mixin row {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+@mixin segment {
+  // Highest shrink priority: ancestor/page-name segments give up space first,
+  // before the ellipsis marker or separators (which never shrink).
+  flex-shrink: 100;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@mixin separator-and-ellipsis {
+  flex-shrink: 0;
+  white-space: nowrap;
+}

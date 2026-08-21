@@ -1,8 +1,10 @@
 import type { JSX } from 'react';
 import { Fragment } from 'react';
 
-import type { PagePathPart } from '../utils/format-truncated-page-path';
-import { formatTruncatedPagePath } from '../utils/format-truncated-page-path';
+import type { PagePathPart } from '~/client/util/format-truncated-page-path';
+import { formatTruncatedPagePath } from '~/client/util/format-truncated-page-path';
+
+import { PathSeparator } from './PathSeparator';
 
 import styles from './SearchResultPagePath.module.scss';
 
@@ -28,10 +30,6 @@ const toKeyedParts = (parts: readonly PagePathPart[]): readonly KeyedPart[] => {
   return keyed;
 };
 
-const Separator = (): JSX.Element => (
-  <span className={`${styles.separator} text-muted`}>/</span>
-);
-
 /**
  * Presentational component that renders a page path on a single line with
  * Notion-style middle truncation. It owns only the path span; click-through and
@@ -49,13 +47,13 @@ export const SearchResultPagePath = ({
   return (
     <span className={styles['search-result-page-path']} title={fullPath}>
       {isRoot ? (
-        <Separator />
+        <PathSeparator className={styles.separator} />
       ) : (
         // A separator precedes every part, producing the leading '/' plus the
         // '/' separators between parts.
         toKeyedParts(parts).map(({ part, key }) => (
           <Fragment key={key}>
-            <Separator />
+            <PathSeparator className={styles.separator} />
             {part.type === 'ellipsis' ? (
               <span className={`${styles.ellipsis} text-muted`}>…</span>
             ) : part.isPageName ? (

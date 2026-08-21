@@ -26,6 +26,7 @@ import { Input } from 'reactstrap';
 import type { ISelectable } from '~/client/interfaces/selectable-all';
 import { bookmark, unbookmark, unlink } from '~/client/services/page-operation';
 import { toastError } from '~/client/util/toastr';
+import { SearchResultAncestorPath } from '~/features/search/client/components/SearchResultAncestorPath';
 import type { IPageSearchMeta, IPageWithSearchMeta } from '~/interfaces/search';
 import { isIPageSearchMeta } from '~/interfaces/search';
 import type {
@@ -56,6 +57,7 @@ type Props = {
   isReadOnlyUser: boolean;
   forceHideMenuItems?: ForceHideMenuItems;
   showPageUpdatedTime?: boolean; // whether to show page's updated time at the top-right corner of item
+  isPathTruncationEnabled?: boolean; // whether to render the ancestor path with middle truncation and unify page-name date bundling (see design.md Requirement 7-9)
   onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
   onClickItem?: (pageId: string) => void;
   onPageDuplicated?: OnDuplicatedFunction;
@@ -82,6 +84,8 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
     onPageDeleted,
     onPagePutBacked,
   } = props;
+
+  const isPathTruncationEnabled = props.isPathTruncationEnabled ?? false;
 
   const { returnPathForURL } = pathUtils;
 
@@ -130,19 +134,36 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
     ? pageMeta.revisionShortBody
     : null;
 
-  const dPagePath: DevidedPagePath = new DevidedPagePath(pageData.path, false);
-  const linkedPagePathFormer = new LinkedPagePath(dPagePath.former);
+  // evalDatePath is applied here too (not just on the highlighted variant
+  // below) so this plain split can serve as the reliable reference for the
+  // page-name highlight-consistency check below.
+  const dPagePath: DevidedPagePath = new DevidedPagePath(
+    pageData.path,
+    false,
+    isPathTruncationEnabled,
+  );
 
   const dPagePathHighlighted: DevidedPagePath = new DevidedPagePath(
     elasticSearchResult?.highlightedPath || pageData.path,
     true,
+    isPathTruncationEnabled,
   );
-  const linkedPagePathHighlightedFormer = new LinkedPagePath(
-    dPagePathHighlighted.former,
-  );
-  const linkedPagePathHighlightedLatter = new LinkedPagePath(
-    dPagePathHighlighted.latter,
-  );
+
+  // An ES highlight `<em>` landing on/inside a trailing date can break the
+  // date-bundling regex (it requires literal trailing digits) on the
+  // highlighted string while it still matches on the plain path, silently
+  // producing a different former/latter split than the ancestor row uses.
+  // Detect the mismatch by comparing ancestor-segment counts -- mirrors
+  // buildAncestorPathNodes' isHighlightReliable guard -- and fall back to the
+  // reliable plain-text page name rather than showing a truncated/incorrect one.
+  const countPathSegments = (former: string): number =>
+    former.split('/').filter((segment) => segment.length > 0).length;
+  const isPageNameHighlightReliable =
+    countPathSegments(dPagePath.former) ===
+    countPathSegments(dPagePathHighlighted.former);
+  const pageName = isPageNameHighlightReliable
+    ? dPagePathHighlighted.latter
+    : dPagePath.latter;
 
   const lastUpdateDate = format(
     new Date(pageData.updatedAt),
@@ -272,13 +293,39 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
               </div>
             )}
 
-            <div className="flex-grow-1 px-2 px-md-4">
+            <div
+              className="flex-grow-1 px-2 px-md-4"
+              // This div is itself a flex item of the row's outer d-flex container and
+              // defaults to min-width:auto, which lets it refuse to shrink below its
+              // content's natural width. That's harmless for the default (wrapping)
+              // PagePathHierarchicalLink/Clamp content below, but once the ancestor path
+              // needs genuine single-line horizontal shrink (isPathTruncationEnabled),
+              // this ancestor also needs min-width:0 -- setting it only on the inner
+              // wrapper around SearchResultAncestorPath is not enough, since this outer
+              // flex item still refuses to shrink and lets its content overflow instead.
+              style={isPathTruncationEnabled ? { minWidth: 0 } : undefined}
+            >
               <div className="d-flex justify-content-between">
                 {/* page path */}
-                <PagePathHierarchicalLink
-                  linkedPagePath={linkedPagePathFormer}
-                  linkedPagePathByHtml={linkedPagePathHighlightedFormer}
-                />
+                {isPathTruncationEnabled ? (
+                  // Let the path take the remaining width and shrink below its content
+                  // size; min-width:0 is what actually enables the 1-line ellipsis inside
+                  // SearchResultAncestorPath (no Bootstrap min-width-0 utility). Mirrors
+                  // the same wrapper used for SearchResultPagePath in SearchResultMenuItem.
+                  <span className="flex-grow-1" style={{ minWidth: 0 }}>
+                    <SearchResultAncestorPath
+                      path={pageData.path}
+                      highlightedPath={elasticSearchResult?.highlightedPath}
+                    />
+                  </span>
+                ) : (
+                  <PagePathHierarchicalLink
+                    linkedPagePath={new LinkedPagePath(dPagePath.former)}
+                    linkedPagePathByHtml={
+                      new LinkedPagePath(dPagePathHighlighted.former)
+                    }
+                  />
+                )}
                 {showPageUpdatedTime && (
                   <span className="page-list-updated-at text-muted">
                     Last update: {lastUpdateDate}
@@ -304,11 +351,11 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
                           <span
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight markup is sanitized
                             dangerouslySetInnerHTML={{
-                              __html: linkedPagePathHighlightedLatter.pathName,
+                              __html: pageName,
                             }}
                           />
                         ) : (
-                          linkedPagePathHighlightedLatter.pathName
+                          pageName
                         )}
                       </Link>
                     </span>

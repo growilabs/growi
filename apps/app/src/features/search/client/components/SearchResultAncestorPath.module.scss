@@ -1,0 +1,34 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use './truncated-path-row' as t;
+
+// Single-line container for the search-result row's ancestor breadcrumb.
+// `min-width: 0` lets it shrink inside PageListItemL's row (which also carries
+// a checkbox, icon, and "last update" sibling) so per-segment ellipsis can
+// engage instead of the row overflowing or wrapping.
+.search-result-ancestor-path {
+  @include t.row;
+}
+
+// Surviving ancestor-segment links: truncate individually with an ellipsis
+// when the row is too narrow, so the last-shrinking segment degrades
+// gracefully instead of the whole row overflowing.
+.segment {
+  @include t.segment;
+}
+
+// Separators and the ellipsis marker must never shrink or wrap — they are the
+// smallest, most meaningful fixed-width pieces of the row.
+.separator,
+.ellipsis {
+  @include t.separator-and-ellipsis;
+}
+
+.separator {
+  padding: 0 0.15rem;
+}
+
+.material-symbols-outlined {
+  flex-shrink: 0;
+  font-size: 1em;
+  line-height: inherit;
+}

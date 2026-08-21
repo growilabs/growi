@@ -1,23 +1,15 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use './truncated-path-row' as t;
 
 // Single-line container. `min-width: 0` lets it shrink inside the flex row so
 // the inner ellipsis can engage instead of overflowing the modal width.
 .search-result-page-path {
-  display: flex;
-  align-items: baseline;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
+  @include t.row;
 }
 
 // Ancestor / page-name segments: truncate individually with an ellipsis.
 .segment {
-  // Shrink ancestor segments first (high priority) so the page name is kept.
-  flex-shrink: 100;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @include t.segment;
 }
 
 // The page name shrinks last (small, but > 0 so it can still truncate as a
@@ -29,8 +21,7 @@
 // Separators and the ellipsis must never shrink or wrap.
 .separator,
 .ellipsis {
-  flex-shrink: 0;
-  white-space: nowrap;
+  @include t.separator-and-ellipsis;
 }
 
 .separator {
