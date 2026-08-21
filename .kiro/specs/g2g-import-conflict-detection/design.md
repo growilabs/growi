@@ -1,5 +1,18 @@
 # Design Document
 
+## Write / Don't-Write Test
+
+このドキュメントを将来編集するときの判定基準。**読者がコードとテストファイルを読めば再現できる内容は書かない**。
+
+| 書く | 書かない |
+|---|---|
+| 調査して初めてわかった事実(コードをざっと読んだだけでは自明でない挙動、外部ライブラリの隠れた振る舞い) | 関数シグネチャ・ファイル配置図・「どのファイルに何があるか」 |
+| 異例な設計を選んだ理由(**特に、試して却下した案とその理由**) | 素直な実装の素直な説明 |
+| 自動テストが**カバーできない**残差 | どのテストが何をカバーしているかの一覧(spec/testファイルを読めばわかる。書くと陳腐化する) |
+| コードから再現できない手動検証の手順(再現環境の作り方、確認する観点、合否を分ける基準値) | 差分の有無・実装時期などの時点情報 |
+
+迷ったら書かない。
+
 ## Overview
 
 **Purpose**: G2G（GROWI-to-GROWI）転送で、取り込むアーカイブと転送先 GROWI の既存データとの間に `users` / `usergroups` の一意制約衝突があるとき、それを**取り込み開始前に検知して転送を中断し、操作者へ具体的に通知**する。これにより、issue #10151 のサイレントなデータ破壊（insert 失敗をログに残しつつ続行し、グループ公開ページを閲覧不能にする）を止める。
@@ -78,25 +91,9 @@ graph LR
 - New components rationale: 検知は経路非依存で再利用可能・実 DB テスト可能にするため独立モジュールにする。
 - Steering compliance: named export、`import type`、no-extension import、English comments、型アサーション回避（テストは `mock<T>()`）。
 
-### Technology Stack
-
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Backend / Services | TypeScript (native ESM, Node 24) | 衝突検知モジュール・受信サービス拡張 | 新規依存なし |
-| Data / Storage | MongoDB via Mongoose ^6.13.6 | 既存 `users`/`usergroups` の一意フィールド照会 | `$in` バッチ照会 |
-| Streaming | `JSONStream`（既存依存） | アーカイブ JSON から一意フィールドのみ抽出 | 既存 `import.ts` と同じ読み方 |
-| Messaging / Events | socket.io `admin:g2gError`（既存） | 転送元管理者への衝突通知 | 契約に `message` 追加 |
-| i18n | next-i18next（既存） | 通知の見出し文言 | 英語ファースト、他言語は後続 |
-
 ## File Structure Plan
 
-### Directory Structure
-```
-apps/app/src/server/service/import/
-├── detect-unique-conflicts.ts        # 新規: 型 + 純関数 collectConflicts + 読み取り/照会アダプタ + orchestrator
-├── detect-unique-conflicts.spec.ts   # 新規: 純関数の unit（sparse null 非衝突・同一_id 非衝突・複数フィールド）
-└── detect-unique-conflicts.integ.ts  # 新規: 実 DB 照会と関係解決の integ（要件 1/4/5）
-```
+検知の純ロジック/I-O は `service/import/detect-unique-conflicts.ts` に集約し、G2G 固有の配線(ファイルパス解決・通知)は `g2g-transfer.ts` とルート側に置く。境界は import ドメイン(経路非依存で再利用可能)と G2G ドメイン(配線)の分離。
 
 ### Modified Files
 - `apps/app/src/server/service/g2g-transfer.ts` — `Receiver` インターフェースと `G2GTransferReceiverService` に `detectImportConflicts(innerFileStats)` を追加（`innerFileStats` から `users`/`usergroups` の JSON パスを解決し、`detectUniqueConflicts` を呼ぶ）。`G2GTransferPusherService.startTransfer` のアーカイブ POST の catch で、応答本文の衝突エラーを判別し具体的な `admin:g2gError` を emit。
@@ -156,29 +153,6 @@ graph TB
 
 衝突が無ければ 3 者が同一 `_id` で取り込まれ、`relatedUser = A_userId` の関係がそのまま生き、閲覧判定が成立する（要件 4.1, 4.2）。issue #10151 は「`ArchiveUser` の insert が失敗して `ImportUser` が欠落」する経路であり、ゲートがそれを事前に弾く。
 
-## Requirements Traceability
-
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1 | username 衝突検知 | detect-unique-conflicts | `collectConflicts` / `detectUniqueConflicts` | 検知ゲート |
-| 1.2 | email 衝突検知 | detect-unique-conflicts | 同上 | 検知ゲート |
-| 1.3 | slackMemberId 衝突検知 | detect-unique-conflicts | 同上 | 検知ゲート |
-| 1.4 | usergroups name 衝突検知 | detect-unique-conflicts | 同上 | 検知ゲート |
-| 1.5 | 同一 `_id` は非衝突 | detect-unique-conflicts (pure) | `collectConflicts` | — |
-| 1.6 | 対象コレクション欠如時はスキップ | ReceiverService | `detectImportConflicts` | 検知ゲート |
-| 2.1 | 衝突時は取り込みを開始しない | receive route gate | route conflict gate | 検知ゲート (中断) |
-| 2.2 | 成功扱いにせず通知 | receive route + pusher | `ErrorV3 growi_data_conflict` / `admin:g2gError` | 検知ゲート (中断) |
-| 2.3 | サイレント続行を起こさない | receive route gate | route conflict gate | 検知ゲート (中断) |
-| 2.4 | 検知中に既存データ不変 | detect-unique-conflicts (read-only) | `detectUniqueConflicts` | 検知ゲート |
-| 3.1 | 種別と件数を通知 | pusher + client | `UniqueConflictReport` / `admin:g2gError` | 中断 |
-| 3.2 | 衝突フィールドと値を通知 | pusher + client | `UniqueFieldConflict` | 中断 |
-| 3.3 | 解消指針を通知 | i18n message | `admin:g2g:error_data_conflict` | 中断 |
-| 4.1 | 3 者の対応関係を維持取り込み | ImportService (unchanged) | — | ID の流れ |
-| 4.2 | グループ公開ページ閲覧維持 | ImportService + PageQueryBuilder (unchanged) | — | ID の流れ |
-| 4.3 | 正常系の非回帰 | receive route (no-conflict branch) | route conflict gate | 検知ゲート (成功) |
-| 5.1 | 検知の実 DB 検証 | detect-unique-conflicts.integ | integ | — |
-| 5.2 | アクセス維持の実 DB 検証 | detect-unique-conflicts.integ | integ | ID の流れ |
-
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
@@ -211,56 +185,9 @@ graph TB
 **Contracts**: Service [x]
 
 ##### Service Interface
-```typescript
-// 検知対象の一意フィールド（インデックス定義と一致させる単一の情報源）
-export type UserUniqueField = 'username' | 'email' | 'slackMemberId';
-export type GroupUniqueField = 'name';
-export type UniqueField = UserUniqueField | GroupUniqueField;
 
-// アーカイブ/既存から抽出する最小ドキュメント形
-export interface UserUniqueFields {
-  _id: string;
-  username?: string | null;
-  email?: string | null;
-  slackMemberId?: string | null;
-}
-export interface GroupUniqueFields {
-  _id: string;
-  name?: string | null;
-}
+`detect-unique-conflicts.ts` が公開する契約: 衝突レポート型(`UniqueConflictReport` = user/group それぞれの `UniqueFieldConflict[]`。各衝突は衝突コレクション種別・一意フィールド名・衝突値・アーカイブ側 `_id`・既存側 `_id` を持つ)、純関数 `collectConflicts`(archive/existing の配列と対象フィールドを引数に取り、比較対象を自身で import しない)、orchestrator `detectUniqueConflicts`(users/groups の JSON パスと Mongoose モデルを受け取り、null は「そのコレクションは転送対象外」を意味する)。具体的なシグネチャは実装ファイルを参照。
 
-export interface UniqueFieldConflict {
-  collection: 'users' | 'usergroups';
-  field: UniqueField;
-  value: string;
-  archiveId: string;   // アーカイブ側ドキュメントの _id
-  existingId: string;  // 転送先の既存ドキュメントの _id
-}
-
-export interface UniqueConflictReport {
-  userConflicts: UniqueFieldConflict[];
-  groupConflicts: UniqueFieldConflict[];
-}
-
-export const hasConflicts = (report: UniqueConflictReport): boolean =>
-  report.userConflicts.length > 0 || report.groupConflicts.length > 0;
-
-// 純関数: I/O を持たない。archive と existing の配列を突き合わせる。
-export function collectConflicts<T extends { _id: string }>(
-  collection: 'users' | 'usergroups',
-  archiveDocs: readonly T[],
-  existingDocs: readonly T[],
-  fields: readonly (keyof T & string)[],
-): UniqueFieldConflict[];
-
-// orchestrator: アーカイブ JSON を stream 抽出し、既存を $in 照会し、collectConflicts を呼ぶ。
-export function detectUniqueConflicts(input: {
-  usersJsonPath: string | null;    // 対象に users が無ければ null（要件 1.6）
-  groupsJsonPath: string | null;   // 対象に usergroups が無ければ null
-  userModel: Model<UserDocument>;
-  userGroupModel: Model<UserGroupDocument>;
-}): Promise<UniqueConflictReport>;
-```
 - Preconditions: 渡す JSON パスは unzip 済みで読み取り可能。null は「そのコレクションは転送対象外」を意味する。
 - Postconditions: 返り値は衝突の全列挙。既存データは無変更。
 - Invariants: `archiveId !== existingId`（値一致かつ同一 `_id` は含めない）。空値は照合しない。
@@ -378,22 +305,9 @@ detectImportConflicts(
 
 ## Testing Strategy
 
-### Unit Tests（`detect-unique-conflicts.spec.ts`）
-- `collectConflicts`: 値一致かつ `_id` 相違 → 衝突（要件 1.1-1.4）。
-- `collectConflicts`: 値一致かつ `_id` 同一 → 非衝突（要件 1.5）。
-- `collectConflicts`: sparse フィールドの空値（null/undefined/空文字）同士 → 非衝突。
-- `collectConflicts`: 同一ドキュメントが複数フィールドで衝突 → フィールドごとに列挙。
-- `hasConflicts`: user/group いずれかに 1 件でもあれば true。
+検知の中核(衝突あり/なし/同一 `_id`/sparse 空値)と、衝突なし時の関係解決(グループ公開ページが当該ユーザーから到達可能であること)は、モック単体ではなく実 DB(レプリカセット rs0)を読み直す結合試験で合否を判定する。個々のテストケースと対応要件は `detect-unique-conflicts.spec.ts` / `.integ.ts` を参照(spec/testファイル自体が最新の一覧)。
 
-### Integration Tests（`detect-unique-conflicts.integ.ts`, 実 DB rs0 / `getInstance`）
-- 転送先に admin（email X）を seed → アーカイブ相当の users（email X・別 `_id`）を一時 JSON に書いて `detectUniqueConflicts` → user 衝突検知（要件 1.2, 5.1）。
-- 転送先に group「G」を seed → アーカイブに「G」別 `_id` → group 衝突検知（要件 1.4）。
-- 同一 `_id` の再取り込み → 非衝突（要件 1.5）。
-- 対象に users JSON 無し（null）→ users 検知をスキップし例外を出さない（要件 1.6）。
-- 衝突なしで users/usergroups/usergrouprelations を取り込み後、`UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)` が期待グループ `_id` を返す（＝グループ公開ページが当該ユーザーから到達可能）（要件 4.1, 4.2, 5.2）。
-
-### E2E/UI Tests
-- 本 spec では必須としない（G2G の 2 インスタンス E2E は重い）。通知表示は client の単体で担保。
+E2E/UI テストは本 spec では必須としない(G2G の 2 インスタンス E2E は重い)。通知表示は client の単体で担保する。
 
 ## Security Considerations
 - 検知は `username` / `email` / `slackMemberId` / `name` のみ読む。パスワードハッシュ等は読まない。
