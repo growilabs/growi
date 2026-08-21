@@ -15,12 +15,12 @@ import {
  * pins the mounted paths so the next router remount fails here instead of
  * quietly un-throttling an unauthenticated endpoint.
  *
- * That is exactly what had happened: `/login`, `/invited`, `/register` and
- * `/user-activation/register` were all keyed by their pre-mount router paths,
- * while every one of them is registered on `apiV3AuthRouter`, mounted at
- * '/_api/v3' (server/routes/index.js). All four run a password hash
- * (scrypt, ~128MiB / ~100ms on a libuv thread) for an unauthenticated caller,
- * so an un-throttled one is a threadpool-exhaustion lever.
+ * That is exactly what had happened: `/login`, `/invited`, `/register`,
+ * `/user-activation/register` and the installer POST were all keyed by their
+ * pre-mount router paths while being registered on routers mounted at
+ * '/_api/v3' (server/routes/index.js). Each runs a password hash (scrypt,
+ * ~128MiB / ~100ms on a libuv thread) for an unauthenticated caller, so an
+ * un-throttled one is a threadpool-exhaustion lever.
  */
 
 /** Fully-mounted paths of the unauthenticated, scrypt-bearing auth endpoints. */
@@ -89,10 +89,9 @@ describe('rate-limiter defaultConfig — unauthenticated scrypt-bearing endpoint
   });
 
   it('keeps a separate entry for the legacy GET /installer page', () => {
-    // A key is matched on req.path alone; `usersPerIpProspection` then applies
-    // regardless of method (middleware/factory.ts). Retargeting the POST to
-    // '/_api/v3/installer' without keeping this entry silently widened the
-    // page's per-IP ceiling from 500 to the 2500 default.
+    // Retargeting the POST to '/_api/v3/installer' once dropped this entry and
+    // widened the page's ceiling 5x — see the config for why a method-mismatched
+    // key is not inert.
     const config = defaultConfig['/installer'];
 
     expect(config).toBeDefined();
