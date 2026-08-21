@@ -6,7 +6,11 @@
  * set, db name) while never revealing a credential — neither the userinfo nor
  * anything hidden in the connection options.
  */
-import { redactMongoUri } from './script-runner';
+import type { Logger } from '@growi/logger';
+import type { MockInstance } from 'vitest';
+import { mock } from 'vitest-mock-extended';
+
+import { exitAfterLogFlush, redactMongoUri } from './script-runner';
 
 describe('redactMongoUri', () => {
   it('keeps the host and database of a plain URI', () => {
@@ -114,5 +118,53 @@ describe('redactMongoUri', () => {
 
   it('withholds a string that is not a URI at all', () => {
     expect(redactMongoUri('not-a-uri')).toBe('(unparsable mongodb uri)');
+  });
+});
+
+describe('exitAfterLogFlush', () => {
+  // The scripts bootstrap Crowi (cron, socket.io, S2S), so nothing else ends the
+  // process — this helper is their only exit path. It has to flush first because
+  // the logger writes through a pino transport worker: a bare process.exit()
+  // truncates the very abort/result line the admin needs.
+  let exitSpy: MockInstance<(code?: number) => never>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    exitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((() => undefined) as never);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    exitSpy.mockRestore();
+  });
+
+  it('flushes the logger before exiting', () => {
+    const logger = mock<Logger>();
+
+    exitAfterLogFlush(logger, 0, 10);
+
+    expect(logger.flush).toHaveBeenCalledOnce();
+    // Still inside the grace period: the transport has not been given its window.
+    expect(exitSpy).not.toHaveBeenCalled();
+  });
+
+  it('exits with the given code once the grace period elapses', () => {
+    const logger = mock<Logger>();
+
+    exitAfterLogFlush(logger, 1, 10);
+    vi.advanceTimersByTime(10);
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('passes a success code through unchanged', () => {
+    const logger = mock<Logger>();
+
+    exitAfterLogFlush(logger, 0, 10);
+    vi.advanceTimersByTime(10);
+
+    expect(exitSpy).toHaveBeenCalledWith(0);
   });
 });
