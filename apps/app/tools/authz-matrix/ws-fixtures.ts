@@ -53,7 +53,7 @@ type UserDoc = {
   admin: boolean;
   readOnly: boolean;
   status: number;
-  setPassword?: (pw: string) => unknown;
+  setPassword?: (pw: string) => Promise<unknown>;
   save?: () => Promise<unknown>;
 };
 
@@ -95,8 +95,9 @@ export async function seedWsFixtures(crowi: Crowi): Promise<WsSeededFixtures> {
   }
 
   // Ensure the test user exists with a known password so we can log in
-  // via POST /_api/v3/login. setPassword uses crowi.env.PASSWORD_SEED so
-  // the server-side hash will match whatever seed this process boots with.
+  // via POST /_api/v3/login. setPassword is async (it writes a scrypt
+  // passwordHash) — it MUST be awaited before save() or the doc persists
+  // with no credential and the login round-trip fails.
   const ensureLocalUser = async (
     username: string,
     password: string | null,
@@ -109,7 +110,7 @@ export async function seedWsFixtures(crowi: Crowi): Promise<WsSeededFixtures> {
       existing.readOnly = false;
       existing.status = STATUS_ACTIVE;
       if (password != null && typeof existing.setPassword === 'function') {
-        existing.setPassword(password);
+        await existing.setPassword(password);
       }
       if (typeof existing.save === 'function') {
         await existing.save();
@@ -127,7 +128,7 @@ export async function seedWsFixtures(crowi: Crowi): Promise<WsSeededFixtures> {
       readOnly: false,
     }) as UserDoc;
     if (password != null && typeof created.setPassword === 'function') {
-      created.setPassword(password);
+      await created.setPassword(password);
     }
     if (typeof created.save === 'function') {
       await created.save();

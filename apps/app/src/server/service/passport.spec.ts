@@ -6,7 +6,7 @@ import type Crowi from '~/server/crowi';
 import type UserEvent from '~/server/events/user';
 
 import { configManager } from './config-manager';
-import PassportService from './passport';
+import PassportService, { verifyLocalCredentials } from './passport';
 
 describe('PassportService test', () => {
   let crowiMock: Crowi;
@@ -277,5 +277,128 @@ describe('setupStrategyById — dispatch and unknown-id boundary', () => {
 
     expect(useSpy).not.toHaveBeenCalled();
     expect(passportService.lastLoadedAt).toBeUndefined();
+  });
+});
+
+/**
+ * Fake User document exposing only the members verifyLocalCredentials touches
+ * (structurally typed against the private LocalStrategyUserDoc) so each test can
+ * control isPasswordValid / setPassword / save.
+ */
+const createUserDoc = (verifyResult: {
+  isValid: boolean;
+  needsRehash: boolean;
+}) => ({
+  isPasswordValid: vi.fn().mockResolvedValue(verifyResult),
+  setPassword: vi.fn().mockResolvedValue(undefined),
+  save: vi.fn().mockResolvedValue(undefined),
+});
+
+/** Fake User model whose static invokes its callback with the given doc / error. */
+const createUserModel = (result: { err?: unknown; doc?: unknown } = {}) => ({
+  findUserByUsernameOrEmail: vi.fn(
+    (
+      _usernameOrEmail: string,
+      callback: (err: unknown, user?: unknown) => void,
+    ) => callback(result.err ?? null, result.doc),
+  ),
+});
+
+describe('verifyLocalCredentials', () => {
+  const username = 'alice';
+  const password = 'correct horse battery staple';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('rejects with "Incorrect credentials." when the user is not found', async () => {
+    const User = createUserModel({ doc: null });
+    const done = vi.fn();
+
+    await verifyLocalCredentials(User, username, password, done);
+
+    expect(done).toHaveBeenCalledWith(null, false, {
+      message: 'Incorrect credentials.',
+    });
+  });
+
+  it('rejects with "Incorrect credentials." and does not rehash when the password is invalid', async () => {
+    const user = createUserDoc({ isValid: false, needsRehash: false });
+    const User = createUserModel({ doc: user });
+    const done = vi.fn();
+
+    await verifyLocalCredentials(User, username, password, done);
+
+    expect(done).toHaveBeenCalledWith(null, false, {
+      message: 'Incorrect credentials.',
+    });
+    expect(user.setPassword).not.toHaveBeenCalled();
+    expect(user.save).not.toHaveBeenCalled();
+  });
+
+  it('authenticates without rehashing when the credential is already a scrypt hash (needsRehash=false)', async () => {
+    const user = createUserDoc({ isValid: true, needsRehash: false });
+    const User = createUserModel({ doc: user });
+    const done = vi.fn();
+
+    await verifyLocalCredentials(User, username, password, done);
+
+    expect(done).toHaveBeenCalledWith(null, user);
+    expect(user.setPassword).not.toHaveBeenCalled();
+    expect(user.save).not.toHaveBeenCalled();
+  });
+
+  it('lazily migrates the credential (setPassword + save) then authenticates when needsRehash=true', async () => {
+    const user = createUserDoc({ isValid: true, needsRehash: true });
+    const User = createUserModel({ doc: user });
+    const done = vi.fn();
+
+    await verifyLocalCredentials(User, username, password, done);
+
+    expect(user.setPassword).toHaveBeenCalledWith(password, {
+      keepLegacyHash: true,
+    });
+    expect(user.save).toHaveBeenCalledTimes(1);
+    expect(done).toHaveBeenCalledWith(null, user);
+  });
+
+  it('still authenticates when the lazy rehash save fails (retried on next login)', async () => {
+    const user = createUserDoc({ isValid: true, needsRehash: true });
+    user.save.mockRejectedValue(new Error('write conflict'));
+    const User = createUserModel({ doc: user });
+    const done = vi.fn();
+
+    await verifyLocalCredentials(User, username, password, done);
+
+    // The login must succeed regardless of the rehash write failure.
+    expect(done).toHaveBeenCalledWith(null, user);
+    expect(done).not.toHaveBeenCalledWith(expect.any(Error));
+    expect(user.setPassword).toHaveBeenCalledWith(password, {
+      keepLegacyHash: true,
+    });
+  });
+
+  it('routes a findUserByUsernameOrEmail error to done(err)', async () => {
+    const lookupError = new Error('db down');
+    const User = createUserModel({ err: lookupError });
+    const done = vi.fn();
+
+    await verifyLocalCredentials(User, username, password, done);
+
+    expect(done).toHaveBeenCalledWith(lookupError);
+  });
+
+  it('routes an unexpected error during verification to done(err)', async () => {
+    const verifyError = new Error('verify blew up');
+    const user = createUserDoc({ isValid: true, needsRehash: false });
+    user.isPasswordValid.mockRejectedValue(verifyError);
+    const User = createUserModel({ doc: user });
+    const done = vi.fn();
+
+    await verifyLocalCredentials(User, username, password, done);
+
+    expect(done).toHaveBeenCalledWith(verifyError);
+    expect(done).not.toHaveBeenCalledWith(null, user);
   });
 });

@@ -2,28 +2,28 @@
 
 ## Overview
 
-GROWI のローカル認証システムにおけるパスワードハッシュを SHA-256（グローバル `PASSWORD_SEED` ペッパー、ユーザー単位ソルトなし）から `node:crypto` の **scrypt**（メモリ困難 KDF、ユーザー単位ランダムソルト）へ移行する。これにより CodeQL `js/insufficient-password-hash`（CWE-916）アラートを解消する。scrypt は Node.js 組み込み（OpenSSL）で新規依存が不要、Alpine/musl でネイティブビルドの問題もない。
+Migrate the password hashing in GROWI's local authentication system from SHA-256 (global `PASSWORD_SEED` pepper, no per-user salt) to **scrypt** from `node:crypto` (a memory-hard KDF with a per-user random salt). This resolves the CodeQL `js/insufficient-password-hash` (CWE-916) alert. scrypt is built into Node.js (OpenSSL), requires no new dependency, and has no native-build issues on Alpine/musl.
 
-移行は **遅延マイグレーション（lazy migration）** として実装する。既存ユーザーは再ログイン時に自動的に scrypt ハッシュへ再ハッシュされ、パスワードリセット不要でシームレスに移行する。**デュアルフィールド方式**（`password` = SHA-256保持、`passwordHash` = scrypt 自己記述文字列を格納）により、Cleanup migration 実行前はダウングレードしても旧バージョンが SHA-256 ハッシュで認証継続可能。
+The migration is implemented as a **lazy migration**. Existing users are automatically re-hashed to a scrypt hash on their next login, so the migration is seamless and requires no password reset. A **dual-field design** (`password` = retains the SHA-256 hash, `passwordHash` = stores the scrypt self-describing string) means that, before the Cleanup migration is run, a user who still has a `password` (SHA-256) field can continue to authenticate on the older version even after a downgrade. **This holds only for a credential that was never replaced**: the legacy hash is retained exactly in the lazy-migration case (the same password is only re-hashed, so nothing is retired). Users created, invited, or **whose password was changed / reset** on the new version have `passwordHash` only (`upgradedOnly`, no legacy `password`) and would be locked out by a downgrade even before Cleanup — the downgrade-prep script targets exactly these users. Retiring the legacy hash on a password change/reset is deliberate: keeping the SHA-256 hash of a **replaced** password would let that retired password still authenticate on a downgraded build (a credential-revocation hole).
 
-**Users**: GROWI 管理者（移行ライフサイクル管理）、エンドユーザー（透過的移行）。  
-**Impact**: User model に `passwordHash` フィールド追加、パスワード検証を全スタックで async 化、1本の読み取り専用 migrate-mongo マイグレーション（status）と 2本の standalone 管理スクリプト（cleanup・downgrade-prep）追加。
+**Users**: GROWI administrators (managing the migration lifecycle) and end users (transparent migration).  
+**Impact**: Adds a `passwordHash` field to the User model, makes password verification async throughout the entire stack, and adds one read-only migrate-mongo migration (status) plus two standalone administrative scripts (cleanup and downgrade-prep).
 
 ### Goals
 
-- CodeQL `js/insufficient-password-hash`（CWE-916）アラート解消
-- 新規パスワードおよびパスワード変更時に scrypt（OWASP 推奨パラメータ以上、per-user salt）を適用
-- 既存 SHA-256 ユーザーがパスワードリセットなしにシームレスにログイン継続
-- Cleanup migration 実行前はダウングレード時に SHA-256 ユーザーの認証が継続
-- 移行進捗の可視化・管理・クリーンアップ・ダウングレード対応のためのマイグレーションスクリプト群
+- Resolve the CodeQL `js/insufficient-password-hash` (CWE-916) alert
+- Apply scrypt (at or above OWASP-recommended parameters, with a per-user salt) for new passwords and password changes
+- Allow existing SHA-256 users to continue logging in seamlessly without a password reset
+- Keep SHA-256 users authenticating after a downgrade, as long as it happens before the Cleanup migration is run and their password has not been changed/reset in the meantime
+- Provide a set of migration scripts for visualizing, managing, cleaning up, and handling downgrade of the migration progress
 
 ### Non-Goals
 
-- LDAP、OAuth、SAML、Passkey 等の外部認証プロバイダー
-- `apiToken` フィールドのハッシュ化改善
-- `PASSWORD_SEED` 環境変数の即時廃止
-- 全ユーザーの一括強制マイグレーション（バッチ rehash）
-- パスワード長に関する特殊対応（scrypt は bcrypt のような 72 バイト切り詰め制限を持たないため不要）
+- External authentication providers such as LDAP, OAuth, SAML, Passkey
+- Improving the hashing of the `apiToken` field
+- Immediate deprecation of the `PASSWORD_SEED` environment variable
+- Bulk forced migration of all users (batch rehash)
+- Special handling of password length (not needed, since scrypt has no 72-byte truncation limit like bcrypt)
 
 ---
 
@@ -31,41 +31,41 @@ GROWI のローカル認証システムにおけるパスワードハッシュ�
 
 ### This Spec Owns
 
-- `PasswordHashService`（`src/server/service/password-hash.ts`）: scrypt ハッシュ生成・検証・legacy 判定
-- User model のパスワード関連メソッド（`isPasswordValid`、`setPassword`、`updatePassword`、`isPasswordSet`）の async 化と `passwordHash` フィールド追加
-- User model 内の `setPassword` を呼ぶ**全 5 メソッド**（`updatePassword`、`activateInvitedUser`、`resetPasswordByRandomString`、`createUserByEmail`、`createUserByEmailAndPasswordAndStatus`）の `await` 化
-- `statusDelete()` での `passwordHash` 消去（既存の `password = ''` スクラブに合わせ、削除ユーザーが有効な認証情報ハッシュを保持しないようにする）
-- `findUserByEmailAndPassword` の削除（デッドコード。呼び出し元が存在しないため fetch-then-compare リファクタではなく削除する）
-- Passport LocalStrategy の async 化と lazy migration トリガー
-- **`isPasswordValid` の全呼び出し元の async 化**: `passport.ts`（LocalStrategy）と `personal-setting/index.js`（パスワード変更時の旧パスワード検証）の 2 箇所
-- **`password == null` 代用によるパスワード設定判定の `isPasswordSet()` への置換**: `login.js`、`personal-setting/index.js`、`user-activation.ts` の 3 箇所（passwordHash-only ユーザーの誤判定防止）
-- **`passwordHash` の API レスポンス漏洩防止**: `@growi/core` の `omitInsecureAttributes()` に `passwordHash` を追加し、`IUser` インターフェースに `passwordHash?: string` を追加
-- 1本の読み取り専用 migrate-mongo マイグレーション（status）と 2本の standalone 管理スクリプト（cleanup・downgrade-prep）
-- scrypt ハッシュの自己記述符号化（`scrypt$N$r$p$salt$hash`）とパラメータ管理（新規依存なし。scrypt は `node:crypto` 組み込み）
+- `PasswordHashService` (`src/server/service/password-hash.ts`): scrypt hash generation, verification, and legacy detection
+- The User model's password-related methods (`isPasswordValid`, `setPassword`, `updatePassword`, `isPasswordSet`) — making them async and adding the `passwordHash` field
+- Making **all 5 methods** in the User model that call `setPassword` use `await` (`updatePassword`, `activateInvitedUser`, `resetPasswordByRandomString`, `createUserByEmail`, `createUserByEmailAndPasswordAndStatus`)
+- Clearing both credential fields in `statusDelete()` (`password` and `passwordHash` are both set to `undefined`/unset, so a deleted user does not retain a valid credential hash)
+- Deleting `findUserByEmailAndPassword` (dead code; since no call sites exist, delete it rather than refactoring it into a fetch-then-compare)
+- Making the Passport LocalStrategy async and triggering the lazy migration
+- **Making all call sites of `isPasswordValid` async**: the 2 locations `passport.ts` (LocalStrategy) and `personal-setting/index.js` (old-password verification on password change)
+- **Replacing password-set detection based on the `password == null` proxy with `isPasswordSet()`**: the 3 locations `login.js`, `personal-setting/index.js`, and `user-activation.ts` (to prevent misjudging passwordHash-only users)
+- **Preventing `passwordHash` leakage in API responses**: add `passwordHash` to `omitInsecureAttributes()` in `@growi/core`, and add `passwordHash?: string` to the `IUser` interface
+- One read-only migrate-mongo migration (status) plus two standalone administrative scripts (cleanup and downgrade-prep)
+- Self-describing encoding of the scrypt hash (`scrypt$N$r$p$salt$hash`) and parameter management (no new dependency; scrypt is built into `node:crypto`)
 
 ### Out of Boundary
 
-- 外部認証プロバイダー（LDAP、OAuth、SAML、Passkey）のパスワード処理
-- `apiToken` フィールドのハッシュ化
-- パスワードリセットメール送信インフラ（既存の `PasswordResetOrder` + メールサービスを利用）
-- 全ユーザー強制マイグレーション（lazy migration のみ。未ログインユーザーは SHA-256 のまま残る）
-- `PASSWORD_SEED` 環境変数の廃止（Cleanup migration 後も legacy 検証パスで使用済みのハッシュは不存在になるが、環境変数設定自体の廃止は別途）
+- Password handling for external authentication providers (LDAP, OAuth, SAML, Passkey)
+- Hashing of the `apiToken` field
+- The password-reset email-sending infrastructure (reuses the existing `PasswordResetOrder` + mail service)
+- Forced migration of all users (lazy migration only; users who never log in remain on SHA-256)
+- Deprecation of the `PASSWORD_SEED` environment variable (even after the Cleanup migration, the hashes used by the legacy verification path no longer exist, but deprecating the environment variable setting itself is handled separately)
 
 ### Allowed Dependencies
 
-- `node:crypto`（built-in）: scrypt（新規ハッシュ生成・検証）＋ SHA-256 legacy 検証パス＋ `timingSafeEqual`。**新規依存の追加なし**
-- `crypto.randomBytes`（built-in）: ユーザー単位ソルトの生成
-- 既存 `PasswordResetOrder` model（downgrade-prep スクリプトでリセット発行に使用）
-- 既存メールサービス（downgrade-prep スクリプトでリセットメール送信）
-- `migrate-mongo`（既存マイグレーションインフラ、status migration のみ）
-- Crowi bootstrap（`new Crowi(); await crowi.init()`、downgrade-prep standalone スクリプトでの mailService 初期化）
+- `node:crypto` (built-in): scrypt (new hash generation and verification) + the SHA-256 legacy verification path + `timingSafeEqual`. **No new dependency is added**
+- `crypto.randomBytes` (built-in): generation of the per-user salt
+- The existing `PasswordResetOrder` model (used by the downgrade-prep script to issue resets)
+- The existing mail service (used by the downgrade-prep script to send reset emails)
+- `migrate-mongo` (the existing migration infrastructure, for the status migration only)
+- Crowi bootstrap (`new Crowi(); await crowi.init()`, for initializing mailService in the downgrade-prep standalone script)
 
 ### Revalidation Triggers
 
-- User model の `password` / `passwordHash` フィールド定義変更
-- `PasswordHashService` の `verify()` / `hash()` インターフェース変更
-- Passport LocalStrategy のコールバックシグネチャ変更
-- `user/index.js` を TypeScript に移行する場合（型定義の更新が必要）
+- Changes to the `password` / `passwordHash` field definitions in the User model
+- Changes to the `verify()` / `hash()` interface of `PasswordHashService`
+- Changes to the callback signature of the Passport LocalStrategy
+- Migrating `user/index.js` to TypeScript (the type definitions would need to be updated)
 
 ---
 
@@ -79,16 +79,16 @@ generatePassword(password)          // private function, SHA-256(SEED + plain) �
 User.isPasswordValid(password)     // sync, string compare
 User.setPassword(password)         // sync, sets this.password
 User.updatePassword(password)      // async, calls setPassword + save
-User.findUserByEmailAndPassword()  // queries DB by { email, password: hash } ← 問題
+User.findUserByEmailAndPassword()  // queries DB by { email, password: hash } ← problem
 User.createUserByEmailAndPasswordAndStatus()
 
 Passport LocalStrategy callback    // sync, calls user.isPasswordValid inline
 ```
 
-**改修が必要な理由**:
-1. SHA-256 は fast hash（CWE-916）
-2. `findUserByEmailAndPassword` は DB に password hash でクエリしているため scrypt 移行後は動作不能（scrypt はソルトにより非決定論的）
-3. 全 password メソッドが同期的なため scrypt（非同期 `crypto.scrypt`）に対応不可
+**Why changes are needed**:
+1. SHA-256 is a fast hash (CWE-916)
+2. `findUserByEmailAndPassword` queries the DB by password hash, so it will no longer work after the scrypt migration (scrypt is non-deterministic because of the salt)
+3. All password methods are synchronous, so they cannot accommodate scrypt (the asynchronous `crypto.scrypt`)
 
 ### Architecture Pattern & Boundary Map
 
@@ -99,26 +99,26 @@ graph TB
     PHS -->|scrypt / timingSafeEqual| NodeScrypt[node:crypto scrypt]
     PHS -->|createHash sha256| NodeCrypto[node:crypto legacy]
     UserModel -->|save passwordHash| MongoDB[(MongoDB)]
-    StatusScript[Status Migration] -->|countDocuments| MongoDB
+    StatusScript[Status Migration] -->|"$runCommandRaw count"| MongoDB
     CleanupScript[Cleanup Migration] -->|updateMany unset password| MongoDB
     DowngradeScript[Downgrade Prep Migration] -->|count + PasswordResetOrder| MongoDB
 ```
 
 **New architecture**:
-- `PasswordHashService`: scrypt/legacy 両対応の薄いサービス層。User model と Passport は直接 crypto に依存しない
-- User model: `passwordHash` フィールド追加、全パスワードメソッドを async 化
-- Passport LocalStrategy: async callback。verify 結果の `needsRehash` を受けて lazy migration をトリガー
-- Migration scripts: `migrate-mongo` 既存インフラ上で動作する 3 本
+- `PasswordHashService`: a thin service layer supporting both scrypt and legacy. The User model and Passport do not depend on crypto directly
+- User model: adds the `passwordHash` field and makes all password methods async
+- Passport LocalStrategy: async callback. Receives `needsRehash` from the verify result and triggers the lazy migration
+- Migration scripts: 3 scripts running on the existing `migrate-mongo` infrastructure
 
 ### Technology Stack
 
 | Layer | Choice / Version | Role | Notes |
 |-------|-----------------|------|-------|
-| Backend / Auth | `node:crypto` scrypt (built-in) | scrypt ハッシュ生成・検証 | **新規依存なし**（OpenSSL 同梱）。memory-hard で GPU 耐性。Alpine/musl でネイティブビルド不要 |
-| Backend / Auth | `node:crypto` (built-in) | Legacy SHA-256 検証 + `timingSafeEqual` | 既存コードと同じ API。移行期間のみ使用 |
-| Backend / Model | Mongoose（既存） | User schema + `passwordHash` フィールド追加 | — |
-| Backend / Auth | Passport.js（既存） | LocalStrategy の async 化 | — |
-| Infrastructure | `migrate-mongo`（既存） | 3 本のマイグレーションスクリプト実行 | — |
+| Backend / Auth | `node:crypto` scrypt (built-in) | scrypt hash generation and verification | **No new dependency** (bundled with OpenSSL). Memory-hard for GPU resistance. No native build needed on Alpine/musl |
+| Backend / Auth | `node:crypto` (built-in) | Legacy SHA-256 verification + `timingSafeEqual` | Same API as the existing code. Used only during the migration period |
+| Backend / Model | Mongoose (existing) | User schema + adding the `passwordHash` field | — |
+| Backend / Auth | Passport.js (existing) | Making LocalStrategy async | — |
+| Infrastructure | `migrate-mongo` (existing) | Running the 3 migration scripts | — |
 
 ---
 
@@ -127,18 +127,34 @@ graph TB
 ### New Files
 
 ```
+apps/app/src/server/models/user/
+└── password-hash-format-filters.ts            # shared dual-field classification filters (null/''-aware):
+                                                # upgradedOnly/both/legacyOnly/noPassword — the single source of
+                                                # truth reused by status / cleanup / downgrade-prep
+
 apps/app/src/server/service/
-└── password-hash.ts                        # PasswordHashService (scrypt + legacy verify, hash)
+├── password-hash.ts                           # PasswordHashService (scrypt + legacy verify, hash)
+└── password-reset/                            # shared password-reset mail flow, extracted so the
+    ├── index.ts                               # apiv3 forgot-password route and downgrade-prep cannot
+    └── send-password-reset-email.ts           # drift: createAndSendPasswordResetOrder (PasswordResetOrder
+                                                # creation + mail) and sendPasswordResetTemplateEmail
+                                                # (template allowlist + subject + template vars)
 
 apps/app/src/migrations/
-└── 20260514000001-password-hash-status.js     # Req 3.1, 3.2: hash format count report (read-only, migrate-mongo)
+└── 20260724000001-password-hash-status.js     # Req 3.1, 3.2: hash format count report (read-only, migrate-mongo)
+                                                # v8: timestamp MUST be later than the latest existing migration (20260721103639)
 
 apps/app/src/server/scripts/
+├── script-runner.ts                           # shared standalone-script runtime: isEntryPoint,
+                                                # withMongoConnection, redactMongoUri (keeps credentials
+                                                # out of the connection log line) and exitAfterLogFlush
+                                                # (drains pino's transport worker before exiting, so the
+                                                # abort/completion report is never dropped)
 ├── password-hash-cleanup.ts                   # Req 3.3, 3.4: remove legacy password (standalone admin script)
 └── password-hash-downgrade-prep.ts            # Req 4.1, 4.2, 4.3: count + optional reset email (standalone, Crowi bootstrap)
 ```
 
-> **standalone スクリプト化の理由（CRITICAL-6）**: cleanup は migrate-mongo 自動実行時に `throw` でデプロイを破壊するリスク、downgrade-prep は mailService のために Crowi bootstrap が必要。いずれも migrate-mongo コンテナでは実現できないため standalone スクリプトとする。
+> **Why standalone scripts (CRITICAL-6)**: cleanup carries the risk of breaking a deployment with a `throw` when migrate-mongo runs it automatically, and downgrade-prep needs a Crowi bootstrap for mailService. Neither can be achieved in the migrate-mongo container, so both are implemented as standalone scripts.
 
 ### Modified Files
 
@@ -147,19 +163,41 @@ apps/app/src/server/models/user/index.js
   — Add passwordHash: String to Mongoose schema
   — Update isPasswordSet() to check either field
   — Make isPasswordValid(password) async → delegates to PasswordHashService.verify()
-  — Make setPassword(password) async → writes passwordHash via PasswordHashService.hash()
+  — Make setPassword(password, { keepLegacyHash }) async → writes passwordHash via
+    PasswordHashService.hash(), and RETIRES the legacy `password` (SHA-256) unless
+    keepLegacyHash is set. Only the Passport lazy re-hash (same password, nothing
+    replaced) passes keepLegacyHash: true, so a changed/reset credential cannot
+    still authenticate on a downgraded build
   — await ALL 5 setPassword call sites: updatePassword, activateInvitedUser,
     resetPasswordByRandomString, createUserByEmail, createUserByEmailAndPasswordAndStatus
-  — statusDelete(): also clear passwordHash (set to undefined) — existing code scrubs
-    password='' on user deletion but leaves passwordHash, so deleted users would retain
-    a valid credential hash. Unset (not '') so verify() treats it as noPassword, not a
-    malformed field (avoids spurious Req 2.4 WARNING)
+  — statusDelete(): unset BOTH credential fields on user deletion — set
+    password=undefined AND passwordHash=undefined (previously password was scrubbed to
+    '' and passwordHash was left, so deleted users would retain a valid credential hash).
+    Unset (not '') so verify() and the shared filters treat both as noPassword, not a
+    malformed/legacy field (avoids a spurious Req 2.4 WARNING and mis-counting as legacyOnly)
   — DELETE findUserByEmailAndPassword() (dead code: no call sites exist)
+
+apps/app/src/server/models/user/index.prisma.ts
+  — serializeSecurely (the Prisma-side counterpart of @growi/core's omitInsecureAttributes)
+    must select and then strip passwordHash. Selecting it is required: an omitted field
+    cannot be stripped, and the raw scrypt hash otherwise reaches API responses that read
+    users through Prisma (e.g. /bookmarks/info)
+
+apps/app/src/server/routes/apiv3/forgot-password.js
+  — Both mail sends now delegate to the shared service (createAndSendPasswordResetOrder for
+    the request flow, sendPasswordResetTemplateEmail for the "reset succeeded" mail), so the
+    route and the downgrade-prep script cannot drift apart
+
+apps/app/src/features/rate-limiter/config/index.ts
+  — Correct the login rate-limit key to the fully-mounted path '/_api/v3/login'.
+    The middleware matches req.path EXACTLY, so the old '/login' key (a legacy route that
+    no longer exists) matched nothing and login ran at the permissive default —
+    unacceptable now that each attempt costs a ~128MiB / ~100ms scrypt on the libuv pool
 
 apps/app/src/server/service/passport.ts
   — Make LocalStrategy callback async
   — Update isPasswordValid call site (line ~285) to await + read VerifyResult.isValid
-  — Trigger lazy migration (await user.setPassword + save) when needsRehash is true
+  — Trigger lazy migration (await user.setPassword(pw, { keepLegacyHash: true }) + save) when needsRehash is true
 
 apps/app/src/server/routes/apiv3/personal-setting/index.js
   — isPasswordValid call site (line ~432): await user.isPasswordValid(oldPassword)
@@ -182,15 +220,23 @@ packages/core/src/models/serializers/user-serializer.ts
 packages/core/src/interfaces/user.ts
   — Add passwordHash?: string to IUser interface
 
-（apps/app/package.json への依存追加は不要 — scrypt は node:crypto 組み込み。bcryptjs / @types/bcryptjs の追加も不要。
- ただし @growi/core の serializer/IUser 変更は published package のため changeset が必要 — 上記参照）
+apps/app/package.json
+  — No dependency is added (scrypt is built into node:crypto; bcryptjs / @types/bcryptjs are
+    unnecessary), but four scripts are: password-hash:cleanup / :downgrade-prep run the built
+    output under `cross-env NODE_ENV=production node --import ./bin/runtime/env-preload.mjs
+    dist/server/scripts/…` (the preload is what loads the deployment's env), and the
+    :cleanup:dev / :downgrade-prep:dev counterparts run the TS sources via `tsrun`.
+    The scripts are the documented entry points — the JSDoc in both scripts points at them
+    rather than at a bare `node dist/…` command, so the invocation cannot drift
+
+(Changes to @growi/core's serializer/IUser require a changeset because it is a published package — see above)
 ```
 
 ---
 
 ## System Flows
 
-### ログイン時 Lazy Migration フロー
+### Login-time Lazy Migration Flow
 
 ```mermaid
 sequenceDiagram
@@ -205,44 +251,44 @@ sequenceDiagram
     DB-->>Passport: User document
     Passport->>User: isPasswordValid(plaintext)
     User->>PHS: verify(plaintext, passwordHash, legacyPassword, SEED)
-    alt passwordHash フィールドが存在
+    alt passwordHash field exists
         PHS->>PHS: scrypt(plaintext, salt from passwordHash) + timingSafeEqual
         PHS-->>User: VerifyResult isValid needsRehash=false
-    else passwordHash なし password フィールド存在
+    else no passwordHash, password field exists
         PHS->>PHS: SHA256(SEED + plaintext) compare with password
         PHS-->>User: VerifyResult isValid needsRehash=true
-    else 両フィールドなし
+    else neither field exists
         PHS-->>User: VerifyResult isValid=false needsRehash=false
     end
     User-->>Passport: VerifyResult
     alt isValid=false
         Passport-->>Client: 401 Unauthorized
     else isValid=true and needsRehash=true
-        Passport->>User: setPassword(plaintext)
+        Passport->>User: setPassword(plaintext, { keepLegacyHash: true })
         User->>PHS: hash(plaintext)
         PHS->>PHS: scrypt(plaintext, salt, SCRYPT_PARAMS) → encode scrypt$N$r$p$salt$hash
         PHS-->>User: scryptHash
         User->>DB: save passwordHash=scryptHash
-        Note over DB: password フィールドは保持
+        Note over DB: the password field is retained
         Passport-->>Client: 200 OK
     else isValid=true and needsRehash=false
         Passport-->>Client: 200 OK
     end
 ```
 
-### Migration Lifecycle フロー
+### Migration Lifecycle Flow
 
 ```mermaid
 flowchart TD
-    A[User: password=sha256, passwordHash=unset] -->|新バージョンで初回ログイン| B[Lazy Migration]
+    A[User: password=sha256, passwordHash=unset] -->|first login on new version| B[Lazy Migration]
     B --> C[User: password=sha256, passwordHash=scrypt]
-    C -->|Admin: cleanup migration 実行| D{unmigrated users 存在?}
-    D -->|Yes: legacyOnly > 0| E[Cleanup ABORT + 警告ログ]
-    D -->|No: 全ユーザー移行済| F[Cleanup: password フィールドを unset]
+    C -->|Admin: run cleanup migration| D{unmigrated users exist?}
+    D -->|Yes: legacyOnly > 0| E[Cleanup ABORT + warning log]
+    D -->|No: all users migrated| F[Cleanup: unset the password field]
     F --> G[User: password=unset, passwordHash=scrypt]
-    G -->|Admin: downgrade-prep 実行| H[移行済みユーザー数報告]
-    H -->|SEND_RESET_EMAILS=true| I[PasswordResetOrder 発行 + メール送信]
-    A -->|未ログイン ダウングレード| A2[旧バージョンが password SHA256 で認証 OK]
+    G -->|Admin: run downgrade-prep| H[report count of migrated users]
+    H -->|SEND_RESET_EMAILS=true| I[issue PasswordResetOrder + send email]
+    A -->|not logged in, downgrade| A2[old version authenticates with password SHA256 OK]
 ```
 
 ---
@@ -251,22 +297,22 @@ flowchart TD
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1 | 新パスワードは scrypt（OWASP 推奨パラメータ）+ per-user salt | PasswordHashService | `hash()` | setPassword flow |
-| 1.2 | 自己記述型フォーマット（`scrypt$N$r$p$salt$hash`） | PasswordHashService | `hash()` | — |
-| 1.3 | 新パスワードに SHA-256+SEED を使用しない | PasswordHashService, User model | `hash()`, `setPassword()` | — |
-| 1.4 | 同一平文 → 異なるハッシュ（per-user salt） | PasswordHashService | `hash()` | — |
-| 2.1 | Legacy SHA-256 ユーザーがログイン継続 | PasswordHashService, Passport | `verify()` | Login flow |
-| 2.2 | Legacy ログイン成功時に自動 rehash | Passport, User model | Lazy migration trigger | Login flow |
-| 2.3 | 両フォーマット透過的処理 | PasswordHashService | `verify()` | Login flow |
-| 2.4 | フィールド内容が既知フォーマット不一致（異常系）→ reject + WARNING ログ | PasswordHashService | `verify()` | Login flow |
-| 2.5 | パスワード未設定（両フィールドなし = 正常系）→ reject、WARNING 出力なし | PasswordHashService | `verify()` | Login flow |
-| 3.1 | Status migration: フォーマット別ユーザー数報告（読み取り専用） | Status migration script | Batch | — |
-| 3.2 | Status migration: 標準出力へカウント出力 | Status migration script | Batch | — |
-| 3.3 | Cleanup: 移行済みユーザーから `password` フィールド削除 | Cleanup migration script | Batch | — |
-| 3.4 | Cleanup: 未移行ユーザーが残る場合は abort | Cleanup migration script | Batch | — |
-| 4.1 | Downgrade prep: scrypt 移行済みユーザー数報告 | Downgrade prep script | Batch | — |
-| 4.2 | Downgrade prep: リセットメール送信オプション | Downgrade prep script, PasswordResetOrder | Batch | — |
-| 4.3 | Downgrade prep: passwordHash-only ユーザーをリセット必須状態にマーク | Downgrade prep script, PasswordResetOrder | Batch | — |
+| 1.1 | New passwords use scrypt (OWASP-recommended parameters) + per-user salt | PasswordHashService | `hash()` | setPassword flow |
+| 1.2 | Self-describing format (`scrypt$N$r$p$salt$hash`) | PasswordHashService | `hash()` | — |
+| 1.3 | Do not use SHA-256+SEED for new passwords | PasswordHashService, User model | `hash()`, `setPassword()` | — |
+| 1.4 | Same plaintext → different hash (per-user salt) | PasswordHashService | `hash()` | — |
+| 2.1 | Legacy SHA-256 users continue to log in | PasswordHashService, Passport | `verify()` | Login flow |
+| 2.2 | Automatic rehash on successful legacy login | Passport, User model | Lazy migration trigger | Login flow |
+| 2.3 | Transparent handling of both formats | PasswordHashService | `verify()` | Login flow |
+| 2.4 | Field content does not match any known format (error case) → reject + WARNING log | PasswordHashService | `verify()` | Login flow |
+| 2.5 | Password not set (neither field = normal case) → reject, no WARNING output | PasswordHashService | `verify()` | Login flow |
+| 3.1 | Status migration: report user count by format (read-only) | Status migration script | Batch | — |
+| 3.2 | Status migration: output the counts to standard output | Status migration script | Batch | — |
+| 3.3 | Cleanup: remove the `password` field from migrated users | Cleanup migration script | Batch | — |
+| 3.4 | Cleanup: abort if any unmigrated users remain | Cleanup migration script | Batch | — |
+| 4.1 | Downgrade prep: report count of scrypt-migrated users | Downgrade prep script | Batch | — |
+| 4.2 | Downgrade prep: option to send reset emails | Downgrade prep script, PasswordResetOrder | Batch | — |
+| 4.3 | Downgrade prep: mark passwordHash-only users as requiring a reset | Downgrade prep script, PasswordResetOrder | Batch | — |
 
 ---
 
@@ -274,12 +320,12 @@ flowchart TD
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|-------------|--------|--------------|------------------|-----------|
-| PasswordHashService | Server / Auth | scrypt ハッシュ生成・検証・legacy 判定 | 1.1–1.4, 2.1–2.5 | node:crypto scrypt (P0) | Service |
-| User model (password methods) | Server / Model | async パスワード操作、`passwordHash` フィールド、呼び出し元（isPasswordValid/isPasswordSet）修正 | 1.1, 1.3, 2.1, 2.2, 2.3 | PasswordHashService (P0) | Service |
-| Passport LocalStrategy | Server / Auth | async 検証、lazy migration オーケストレーション | 2.1–2.3 | User model (P0) | Service |
-| Status migration script | Infrastructure | フォーマット別ユーザー数集計（読み取り専用） | 3.1, 3.2 | MongoDB (P0) | Batch |
-| Cleanup migration script | Infrastructure | 移行済みユーザーから `password` フィールド削除 | 3.3, 3.4 | MongoDB (P0) | Batch |
-| Downgrade prep migration script | Infrastructure | 移行済みユーザー数報告 + リセットメール発行 | 4.1–4.3 | MongoDB (P0), PasswordResetOrder (P1) | Batch |
+| PasswordHashService | Server / Auth | scrypt hash generation, verification, and legacy detection | 1.1–1.4, 2.1–2.5 | node:crypto scrypt (P0) | Service |
+| User model (password methods) | Server / Model | async password operations, `passwordHash` field, fixing call sites (isPasswordValid/isPasswordSet) | 1.1, 1.3, 2.1, 2.2, 2.3 | PasswordHashService (P0) | Service |
+| Passport LocalStrategy | Server / Auth | async verification, lazy migration orchestration | 2.1–2.3 | User model (P0) | Service |
+| Status migration script | Infrastructure | tally user count by format (read-only) | 3.1, 3.2 | MongoDB (P0) | Batch |
+| Cleanup migration script | Infrastructure | remove the `password` field from migrated users | 3.3, 3.4 | MongoDB (P0) | Batch |
+| Downgrade prep migration script | Infrastructure | report count of migrated users + issue reset emails | 4.1–4.3 | MongoDB (P0), PasswordResetOrder (P1) | Batch |
 
 ---
 
@@ -289,25 +335,26 @@ flowchart TD
 
 | Field | Detail |
 |-------|--------|
-| Intent | scrypt ハッシュ生成と両フォーマット（scrypt / legacy SHA-256）検証の単一責任境界 |
+| Intent | The single-responsibility boundary for scrypt hash generation and verification of both formats (scrypt / legacy SHA-256) |
 | Requirements | 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 2.5 |
 
 **Responsibilities & Constraints**
 
-- `hash(plaintext)`: `crypto.randomBytes(16)` でソルト生成 → `crypto.scrypt(plaintext, salt, keylen, {N, r, p, maxmem})` → `scrypt$N$r$p$<salt(base64)>$<hash(base64)>` 形式に符号化して返す。SEED は不使用
-- `verify(plaintext, scryptHash, legacyHash, passwordSeed)`:
-  - `scryptHash` が存在 → `scrypt$…` を分解して N/r/p/salt を取り出し `crypto.scrypt` で再計算 → `crypto.timingSafeEqual` で比較 → `{ isValid, needsRehash: false }`
-    - **（任意拡張）パラメータ更新時の自動再ハッシュ**: 保存済みパラメータ（N/r/p）が現行既定より弱い場合は `needsRehash: true` を返し、ログイン時に現行パラメータで再ハッシュする。verify は検証のため保存済み N/r/p を必ずパースするので、現行既定との比較を1つ加えるだけで追加コストはほぼない。将来 scrypt パラメータを引き上げた際に既存ユーザーが自動で追随できる（Req 1.1 の「OWASP 推奨パラメータ以上」を移行後も維持するための任意拡張。必須ではない）
-  - `scryptHash` が存在せず `legacyHash` が存在 → `SHA256(SEED + plaintext) === legacyHash` → `{ isValid, needsRehash: true }`
-  - 両フィールドが存在しない（パスワード未設定 = `noPassword`）→ `{ isValid: false, needsRehash: false }`。**これは外部認証専用ユーザーや未有効化ユーザーの正常状態であり WARNING ログは出力しない**（Req 2.5）
-  - フィールドは存在するがその内容が既知フォーマット（`scrypt$…` プレフィックス / SHA-256 hex）に一致しない（データ破損等の異常系）→ `{ isValid: false, needsRehash: false }` を返し、ユーザー識別子を含む WARNING ログを出力（Req 2.4）
-- `SCRYPT_PARAMS`: N/r/p を環境変数で調整可能（既定 **N=131072 (2^17), r=8, p=1 = OWASP 最小推奨**。keylen=64）。約128MB/回を消費するため `maxmem` を明示的に ≥192MB へ設定する（未設定だと Node 既定 `maxmem=32MB` を超えて `crypto.scrypt` が throw する）
-- scrypt 生成・検証は `node:crypto` のみ。`node:crypto` の SHA-256 は legacy パスのみ
+- `hash(plaintext)`: generate a salt with `crypto.randomBytes(16)` → `crypto.scrypt(plaintext, salt, keylen, {N, r, p, maxmem})` → encode and return in the form `scrypt$N$r$p$<salt(base64)>$<hash(base64)>`. SEED is not used
+- `verify(plaintext, scryptHash, legacyHash, passwordSeed, context?)`:
+  - `scryptHash` exists → parse `scrypt$…` to extract N/r/p/salt, recompute with `crypto.scrypt`, compare with `crypto.timingSafeEqual` → `{ isValid, needsRehash: false }`
+    - **(Optional extension) automatic rehash on parameter update**: if the stored parameters (N/r/p) are weaker than the current defaults, return `needsRehash: true` and rehash at login time with the current parameters. Since verify already parses the stored N/r/p for verification, adding a single comparison against the current defaults costs almost nothing. This lets existing users automatically follow along when scrypt parameters are raised in the future (an optional extension to keep Req 1.1's "at or above OWASP-recommended parameters" satisfied even after migration; not required)
+  - `scryptHash` does not exist and `legacyHash` exists → compare `SHA256(SEED + plaintext)` with `legacyHash` via `timingSafeEqual` → `{ isValid, needsRehash: true }`
+  - Neither field exists (password not set = `noPassword`) → `{ isValid: false, needsRehash: false }`. **This is the normal state for external-auth-only or not-yet-activated users, and no WARNING log is output** (Req 2.5)
+  - A field exists but its content does not match a known format (`scrypt$…` prefix / SHA-256 hex) (an error case such as data corruption) → return `{ isValid: false, needsRehash: false }` and output a WARNING log including the user identifier (Req 2.4)
+    - **Deliberately no fallback to the legacy path**: when `passwordHash` is present but unparsable, verification is rejected outright — it does NOT retry against the SHA-256 `password` even for a `both` user who still holds a valid one. Which field is present is what decides the format, so an unparsable `passwordHash` is data corruption, not a format hint; silently falling back would both hide the corruption this WARNING exists to surface and let a forged/damaged envelope steer verification onto the weaker scheme. The cost is that such a user cannot log in until the corruption is fixed (password reset remains available), which is accepted: corruption is an abnormal state, and `both` is transient to the migration window
+- `SCRYPT_PARAMS`: N/r/p are adjustable via environment variables (defaults **N=131072 (2^17), r=8, p=1 = the OWASP minimum recommendation**; keylen=64). Because it consumes about 128MB per call, `maxmem` must be explicitly set to ≥192MB (if unset, `crypto.scrypt` throws when it exceeds Node's default `maxmem=32MB`)
+- scrypt generation and verification use `node:crypto` only. `node:crypto`'s SHA-256 is for the legacy path only
 
 **Dependencies**
 
-- External: `node:crypto` (built-in) — scrypt 生成・検証、legacy SHA-256 検証、`randomBytes`、`timingSafeEqual`（P0）
-- Inbound: User model, Passport strategy（P0）
+- External: `node:crypto` (built-in) — scrypt generation and verification, legacy SHA-256 verification, `randomBytes`, `timingSafeEqual` (P0)
+- Inbound: User model, Passport strategy (P0)
 
 **Contracts**: Service [x]
 
@@ -319,6 +366,13 @@ export interface VerifyResult {
   needsRehash: boolean;
 }
 
+// Optional identity threaded into verify() so the Req 2.4 anomaly WARNING carries a
+// user identifier. Optional and backward-compatible — existing 4-arg callers are unaffected.
+export interface VerifyLogContext {
+  userId?: string;
+  username?: string;
+}
+
 export interface IPasswordHashService {
   hash(plaintext: string): Promise<string>;
   verify(
@@ -326,20 +380,21 @@ export interface IPasswordHashService {
     scryptHash: string | undefined,
     legacyHash: string | undefined,
     passwordSeed: string,
+    context?: VerifyLogContext,
   ): Promise<VerifyResult>;
 }
 ```
 
-- **Preconditions**: `plaintext` は非空文字列。scrypt パラメータは OWASP 最小推奨（N≥2^17=131072, r=8, p=1）以上。`maxmem` は消費メモリ（≈128MB）を上回る値（≥192MB）に設定済み
-- **Postconditions**: `hash()` は `scrypt$` プレフィックスの自己記述文字列を返す。`verify()` は必ず `VerifyResult` を返す（throw しない）
-- **Invariants**: `needsRehash: true` は `isValid: true` のときのみ
+- **Preconditions**: `plaintext` is a non-empty string. The scrypt parameters are at or above the OWASP minimum recommendation (N≥2^17=131072, r=8, p=1). `maxmem` is set to a value (≥192MB) exceeding the consumed memory (≈128MB)
+- **Postconditions**: `hash()` returns a self-describing string with the `scrypt$` prefix. `verify()` always returns a `VerifyResult` (does not throw)
+- **Invariants**: `needsRehash: true` only when `isValid: true`
 
 **Implementation Notes**
 
-- scrypt パラメータ（N/r/p）は既定 **N=131072 (2^17), r=8, p=1**（OWASP 最小推奨）、keylen=64。環境変数で調整可能だが、**下限（N=2^17）を下回る設定は起動時 WARNING を出して下限にクランプ**（セキュリティ基準の担保）
-- **メモリ上限の管理**: scrypt は1回あたり約 `128 * N * r` バイト（既定 N=2^17 で**約128MB**）を消費する。`crypto.scrypt` の `maxmem` を明示的に **≥192MB** に設定する（**未設定だと Node 既定の 32MB を超えて throw する**）。パラメータ上限もクランプする（極端な N でのメモリ枯渇・DoS 防止）。非同期 `crypto.scrypt` は libuv スレッドプール上で動くため同時計算数は `UV_THREADPOOL_SIZE`（既定4）で自然に頭打ちとなり、ピークメモリは概ね「スレッド数 × 128MB ≒ 512MB」に収まる（詳細は Security Considerations 参照）
-- パスワード未設定（両フィールドなし = `noPassword`）は `isValid: false` を返すが WARNING ログは出力しない（外部認証専用・未有効化ユーザーの正常状態。Req 2.5）。WARNING は「フィールドは存在するが内容が既知フォーマットに一致しない」異常系のみに限定し、ユーザー ID を含めて出力する（Req 2.4）
-- scrypt は `node:crypto` 組み込みのため新規依存の追加は不要（Turbopack externalization の考慮も不要）
+- The scrypt parameters (N/r/p) default to **N=131072 (2^17), r=8, p=1** (the OWASP minimum recommendation), keylen=64. They are adjustable via environment variables, but **a setting below the lower bound (N=2^17) emits a WARNING at startup and is clamped to the lower bound** (to guarantee the security baseline)
+- **Managing the memory ceiling**: scrypt consumes about `128 * N * r` bytes per call (**about 128MB** at the default N=2^17). Explicitly set `maxmem` for `crypto.scrypt` to **≥192MB** (**if unset, it exceeds Node's default of 32MB and throws**). Also clamp the parameter upper bound (to prevent memory exhaustion / DoS with an extreme N). Because the asynchronous `crypto.scrypt` runs on the libuv thread pool, the number of concurrent computations is naturally capped by `UV_THREADPOOL_SIZE` (default 4), so the peak memory stays roughly within "number of threads × 128MB ≒ 512MB" (see Security Considerations for details)
+- Password not set (neither field = `noPassword`) returns `isValid: false` but outputs no WARNING log (the normal state for external-auth-only / not-yet-activated users; Req 2.5). WARNING is limited to the error case "a field exists but its content does not match a known format," and is output including the user ID (Req 2.4)
+- Since scrypt is built into `node:crypto`, no new dependency needs to be added (no consideration of Turbopack externalization is needed either)
 
 ---
 
@@ -347,41 +402,42 @@ export interface IPasswordHashService {
 
 | Field | Detail |
 |-------|--------|
-| Intent | `PasswordHashService` への委譲 + `passwordHash` フィールド管理 + 呼び出し元の async 化/判定置換 |
+| Intent | Delegation to `PasswordHashService` + management of the `passwordHash` field + making call sites async / replacing their detection logic |
 | Requirements | 1.1, 1.3, 2.1, 2.2, 2.3 |
 
 **Responsibilities & Constraints**
 
-- Schema に `passwordHash: String` フィールドを追加
-- `isPasswordSet()`: `!!(this.passwordHash || this.password)` で両フィールドを確認
-- `isPasswordValid(password)`: async。`PasswordHashService.verify(password, this.passwordHash, this.password, SEED)` を呼び出す
-- `setPassword(password)`: async。`passwordHash = await PasswordHashService.hash(password)` のみ設定。`password`（SHA-256）フィールドは変更しない（ダウングレード安全維持）
-- `setPassword` を呼ぶ **全 5 メソッド**を `await` 化する（未 await のまま `save()` すると passwordHash 未設定で保存されログイン不能になる）:
-  - `updatePassword`、`activateInvitedUser`、`resetPasswordByRandomString`、`createUserByEmail`、`createUserByEmailAndPasswordAndStatus`
-- `findUserByEmailAndPassword(email, password)`: **削除する**（デッドコード。リポジトリ全体で呼び出し元が存在しない）。DB を password hash でクエリするこのメソッドは scrypt 移行後に動作不能となるが、呼び出し元がないためリファクタではなく削除が適切
+- Add a `passwordHash: String` field to the schema
+- `isPasswordSet()`: check both fields with `!!(this.passwordHash || this.password)`
+- `isPasswordValid(password)`: async. Calls `PasswordHashService.verify(password, this.passwordHash, this.password, SEED)`
+- `setPassword(password, options?)`: async. Sets `passwordHash = await PasswordHashService.hash(password)` **and retires the legacy `password` (SHA-256) field** (`this.password = undefined` → `$unset` on save, consistent with `statusDelete()`). Retiring it is required for credential revocation: after a password change / admin reset, a retained SHA-256 hash would still authenticate the **old** password on a downgraded build. The user thereby becomes `upgradedOnly` and is covered by the downgrade-prep script
+  - `options.keepLegacyHash: true` is used by **one** call site only — the lazy migration in `verifyLocalCredentials` — where the SAME plaintext that just verified against the legacy hash is being re-hashed. Nothing is retired there, so the legacy hash is kept and the user reaches the `both` state, which is what preserves downgrade safety during the migration period (Req 1.3)
+- Make **all 5 methods** that call `setPassword` use `await` (leaving `save()` without awaiting would save without setting passwordHash, making login impossible):
+  - `updatePassword`, `activateInvitedUser`, `resetPasswordByRandomString`, `createUserByEmail`, `createUserByEmailAndPasswordAndStatus`
+- `findUserByEmailAndPassword(email, password)`: **delete it** (dead code; no call site exists anywhere in the repository). This method queries the DB by password hash and will no longer work after the scrypt migration, but since there is no call site, deletion (not refactoring) is the appropriate action
 
 **Dependencies**
 
-- Outbound: PasswordHashService — hash / verify（P0）
-- External: MongoDB via Mongoose — `passwordHash` フィールド永続化（P0）
+- Outbound: PasswordHashService — hash / verify (P0)
+- External: MongoDB via Mongoose — persistence of the `passwordHash` field (P0)
 
 **Contracts**: Service [x]
 
 ```typescript
-// User Mongoose document 追加メソッド（既存の .js ファイルに追加）
+// Methods added to the User Mongoose document (added to the existing .js file)
 
 isPasswordSet(): boolean
 isPasswordValid(password: string): Promise<VerifyResult>
-setPassword(password: string): Promise<this>
+setPassword(password: string, options?: { keepLegacyHash?: boolean }): Promise<this>
 updatePassword(password: string): Promise<UserDocument>
 ```
 
 **Implementation Notes**
 
-- `findUserByEmailAndPassword` は呼び出し元が存在しないデッドコードのため削除する（`grep -rn findUserByEmailAndPassword` で確認済み）
-- `setPassword` を呼ぶ 5 メソッド（`updatePassword`・`activateInvitedUser`・`resetPasswordByRandomString`・`createUserByEmail`・`createUserByEmailAndPasswordAndStatus`）はすべて `await setPassword()` に変更する
-- `isPasswordValid` の外部呼び出し元は `passport.ts` と `personal-setting/index.js` の 2 箇所。両方を `await` + `VerifyResult.isValid` 参照に更新する（特に `personal-setting` の `!user.isPasswordValid(...)` は `!Promise` が常に false となり旧パスワード検証をバイパスするため必須）
-- `password == null` によるパスワード設定判定は `login.js`・`personal-setting/index.js`・`user-activation.ts` の 3 箇所に存在し、passwordHash-only ユーザー（`password` unset）を誤判定するため `isPasswordSet()` に置換する
+- `findUserByEmailAndPassword` is dead code with no call sites, so delete it (confirmed with `grep -rn findUserByEmailAndPassword`)
+- The 5 methods that call `setPassword` (`updatePassword`, `activateInvitedUser`, `resetPasswordByRandomString`, `createUserByEmail`, `createUserByEmailAndPasswordAndStatus`) are all changed to `await setPassword()`
+- The external call sites of `isPasswordValid` are the 2 locations `passport.ts` and `personal-setting/index.js`. Update both to `await` + reading `VerifyResult.isValid` (in particular, `personal-setting`'s `!user.isPasswordValid(...)` is essential because `!Promise` is always false and would bypass the old-password verification)
+- The password-set detection based on `password == null` exists in the 3 locations `login.js`, `personal-setting/index.js`, and `user-activation.ts`, and misjudges passwordHash-only users (`password` unset), so replace it with `isPasswordSet()`
 
 ---
 
@@ -389,20 +445,20 @@ updatePassword(password: string): Promise<UserDocument>
 
 | Field | Detail |
 |-------|--------|
-| Intent | async 検証 + needsRehash 時の lazy migration トリガー |
+| Intent | async verification + triggering the lazy migration when needsRehash |
 | Requirements | 2.1, 2.2, 2.3 |
 
 **Responsibilities & Constraints**
 
-- LocalStrategy コールバックを async 化（try/catch で done(err) を保証）
-- `isPasswordValid(password)` の `VerifyResult` を受け取り:
-  - `isValid=false` → `done(null, false)` を返す
-  - `isValid=true, needsRehash=true` → `await user.setPassword(password); await user.save()` 後に `done(null, user)` を返す
-  - `isValid=true, needsRehash=false` → そのまま `done(null, user)` を返す
+- Make the LocalStrategy callback async (guarantee done(err) with try/catch)
+- Receive the `VerifyResult` of `isPasswordValid(password)`:
+  - `isValid=false` → return `done(null, false)`
+  - `isValid=true, needsRehash=true` → return `done(null, user)` after `await user.setPassword(password, { keepLegacyHash: true }); await user.save()` (the flag keeps the legacy SHA-256 hash: this path only re-hashes the SAME password, so nothing is retired and the user reaches the `both` state)
+  - `isValid=true, needsRehash=false` → return `done(null, user)` as-is
 
 **Dependencies**
 
-- Outbound: User model — `findOne`, `isPasswordValid`, `setPassword`, `save`（P0）
+- Outbound: User model — `findOne`, `isPasswordValid`, `setPassword`, `save` (P0)
 
 **Contracts**: Service [x]
 
@@ -417,8 +473,8 @@ passport.use(
 
 **Implementation Notes**
 
-- `findUserByUsernameOrEmail` を Promise ベースに変更するか、async/await ラッパーを使用
-- lazy migration の `save()` が失敗してもログイン自体は成功させる（rehash 失敗はログに記録し、次回ログイン時にリトライ可能）
+- Either change `findUserByUsernameOrEmail` to be Promise-based, or use an async/await wrapper
+- Even if the lazy migration `save()` fails, still let the login itself succeed (log the rehash failure; it can be retried on the next login)
 
 ---
 
@@ -428,76 +484,82 @@ passport.use(
 
 | Field | Detail |
 |-------|--------|
-| Intent | フォーマット別ユーザー数を読み取り専用で集計・報告 |
+| Intent | Tally and report the user count by format, read-only |
 | Requirements | 3.1, 3.2 |
 
 **Contracts**: Batch [x]
 
 ```
-Trigger: pnpm run migrate:migrate-mongo（起動時の通常マイグレーション実行）
-Input: MongoDB Users コレクション（読み取りのみ）
-Output: 標準出力（logger.info）へカウント出力
-Idempotency: 常に読み取りのみ、何度実行しても安全
+Trigger: pnpm run migrate:migrate-mongo (the normal migration run at startup)
+Input: MongoDB Users collection (read-only)
+Output: counts output to standard output (logger.info)
+Idempotency: always read-only; safe to run any number of times
 ```
 
-**カウント対象**:
-- `upgradedOnly`: `{ passwordHash: { $exists: true }, password: { $exists: false } }` — 完全移行済み
-- `both`: `{ passwordHash: { $exists: true }, password: { $exists: true } }` — 移行中（両フィールドあり）
-- `legacyOnly`: `{ passwordHash: { $exists: false }, password: { $exists: true } }` — 未移行
-- `noPassword`: `{ passwordHash: { $exists: false }, password: { $exists: false } }` — パスワード未設定
+**Count targets** — the four shared filters from `password-hash-format-filters.ts` (the single source of truth reused by status / cleanup / downgrade-prep). A field counts as PRESENT only when it exists **and** is non-empty (`{ $exists: true, $nin: [null, ''] }`); a `null`/`''` value reads as ABSENT — so a `password: ''` scrubbed-deleted user classifies as `noPassword`, **not** `legacyOnly`:
+- `upgradedOnlyFilter`: `passwordHash` present, `password` absent — fully migrated
+- `bothFilter`: both present — migrating (both fields present)
+- `legacyOnlyFilter`: `passwordHash` absent, `password` present — not migrated
+- `noPasswordFilter`: both absent — password not set
 
 #### Cleanup Migration Script
 
 | Field | Detail |
 |-------|--------|
-| Intent | 移行済みユーザー（passwordHash あり）から legacy `password` フィールドを削除 |
+| Intent | Remove the legacy `password` field from migrated users (those with passwordHash) |
 | Requirements | 3.3, 3.4 |
 
 **Contracts**: Batch [x]
 
 ```
-Trigger: 管理者が手動実行する standalone スクリプト（migrate-mongo 自動実行対象外）
-  理由: abort throw がデプロイを破壊するリスクを避けるため
-Input: MongoDB Users コレクション
-Output: password フィールドを unset（移行済みユーザーのみ）
-Idempotency: password が既に存在しないユーザーへの updateMany は no-op
+Trigger: a standalone script run manually by an administrator (not subject to migrate-mongo auto-run)
+  Reason: to avoid the risk of an abort throw breaking a deployment
+Input: MongoDB Users collection
+Output: unset the password field (migrated users only)
+Idempotency: updateMany against users that no longer have password is a no-op
 ```
 
-**処理フロー**:
-1. `legacyOnly` カウントを取得
-2. `legacyOnly > 0` の場合: エラーメッセージ（件数含む）をログ出力して処理中断（Req 3.4）
-3. `legacyOnly === 0` の場合: `User.updateMany({ passwordHash: { $exists: true }, password: { $exists: true } }, { $unset: { password: '' } })` を実行
+**Processing flow**:
+1. Obtain the `legacyOnly` count **for ACTIVE users** (`activeUserFilter`), and separately for non-active users (`nonActiveUserFilter`)
+2. If the ACTIVE `legacyOnly` count > 0: log an error message (including both counts) and abort processing (Req 3.4)
+3. Otherwise: WARN about any non-active `legacyOnly` users and run `updateMany(bothFilter, { $unset: { password: '' } })` using the shared `bothFilter` (both credentials present) from `password-hash-format-filters.ts`
 
-**Risks**: Cleanup 実行後は `password` フィールドが消えるため、ダウングレードすると `passwordHash` のみのユーザーはログイン不可になる。管理者はダウングレード前に downgrade-prep スクリプトを実行する必要がある
+> **Why only ACTIVE users block the abort**: lazy migration is the only thing that can move a `legacyOnly` user forward, and it happens on login. Non-active users are **not** excluded on the grounds that they cannot log in — they can: the login path applies no status filter (`findUserByUsernameOrEmail` has no status condition and `verifyLocalCredentials` rehashes without consulting status; status is read only *after* authentication succeeds, in `createRedirectToForUnauthenticated`, to choose the redirect — which is exactly how the invited-user onboarding flow works). They are excluded because an admin cannot **wait for or compel** them to log in before the cleanup window: an invitee may never accept, a suspended or deleted account may never return. Letting a single such document block would make Phase 3 unreachable indefinitely. They are reported at WARNING instead. The `$unset` itself is intentionally **not** status-scoped — removing a suspended user's retired legacy hash is correct and desirable.
+
+**Risks**: After Cleanup runs, the `password` field is gone, so if you downgrade, users with only `passwordHash` cannot log in. Administrators must run the downgrade-prep script before downgrading
 
 #### Downgrade Prep Migration Script
 
 | Field | Detail |
 |-------|--------|
-| Intent | ダウングレード前に移行済みユーザー数を報告し、リセットメール送信オプションを提供 |
+| Intent | Report the count of migrated users before a downgrade and provide an option to send reset emails |
 | Requirements | 4.1, 4.2, 4.3 |
 
 **Contracts**: Batch [x]
 
 ```
-Trigger: ダウングレード前に管理者が手動実行する standalone スクリプト（Crowi bootstrap が必要）
-  理由: mailService 初期化に Crowi.init() が必要なため migrate-mongo コンテナでは実行不可
-Input: MongoDB Users コレクション、環境変数 SEND_RESET_EMAILS=true（省略可）
-Output: 移行済みユーザー数ログ、SEND_RESET_EMAILS=true 時はリセット発行
-Idempotency: カウントのみなら冪等。SEND_RESET_EMAILS=true は重複実行に注意（既存 PasswordResetOrder の確認を推奨）
+Trigger: a standalone script run manually by an administrator before a downgrade (Crowi bootstrap required)
+  Reason: mailService initialization requires Crowi.init(), so it cannot run in the migrate-mongo container
+Input: MongoDB Users collection, environment variable SEND_RESET_EMAILS=true (optional)
+Output: log of the migrated-user count; issues resets when SEND_RESET_EMAILS=true
+Idempotency: idempotent if counting only. Be careful with SEND_RESET_EMAILS=true on repeated runs (checking existing PasswordResetOrder is recommended)
 ```
 
-**処理フロー**:
-1. `upgradedOnly` ユーザー数（`passwordHash` あり、`password` なし）を集計・ログ出力（Req 4.1）
-2. 環境変数 `SEND_RESET_EMAILS` が `'true'` でない場合: 警告メッセージを出力して終了
-3. `SEND_RESET_EMAILS=true` の場合:
-   - 対象ユーザーごとに `PasswordResetOrder` を作成（既存インフラ）
-   - リセットメール送信（既存メールサービス）
-   - **メール送信に成功したユーザーのみ** `passwordHash` フィールドを `$unset`（unset）してログイン不可化（Req 4.3）
-   - 送信失敗ユーザーは unset しない（次回再実行でリトライ可能）
-   - 成功・失敗件数を INFO/WARNING でそれぞれログ出力
+**Processing flow**:
+1. Tally and log the count of `upgradedOnly` users (`passwordHash` present, `password` absent), split into **ACTIVE** (the actionable set) and non-active (WARNing only) (Req 4.1)
+2. If the environment variable `SEND_RESET_EMAILS` is not `'true'`: output a warning message and exit
+3. **Preflight (send mode only): refuse to run when the recovery path is unavailable.** The entrypoint resolves `isPasswordResetAvailable` from `security:passport-local:isPasswordResetEnabled` **and** `passportService.isLocalStrategySetup` — the same pair that gates `/forgot-password` (POST, PUT, and the reset-link page). If either is off, the core aborts before any email or write (`aborted: true`, exit 1): otherwise every emailed link would 404 and the users just `$unset` would be left with neither a credential nor a recovery path, recoverable only by DB surgery
+4. If `SEND_RESET_EMAILS=true` and the preflight passed:
+   - For each **ACTIVE** target user, create a `PasswordResetOrder` (existing infrastructure)
+   - Send a reset email (existing mail service)
+   - **Only for users whose email was sent successfully**, `$unset` the `passwordHash` field (unset) to make login impossible (Req 4.3)
+   - Do not unset users whose send failed (they can be retried on the next run)
+   - **Never email or unset a non-active user**: `/forgot-password` rejects them on both POST and PUT, so `$unset`ting their `passwordHash` would remove their only credential with no recovery path (permanent lockout). They are reported via `upgradedOnlyNonActive` + a WARNING and handled manually
+   - Log the success and failure counts at INFO/WARNING respectively
 
-> **CRITICAL: `null` ではなく `$unset` を使う理由**: 本設計はフォーマット分類をすべて `$exists` で行う（status/cleanup）。MongoDB では `{ $exists: true }` は **null 値のフィールドにもマッチ**するため、`passwordHash = null` としてもフィールドは「存在」扱いのまま残り、status migration で当該ユーザーが依然 `upgradedOnly` にカウントされ（Req 4.1 の件数不正確）、downgrade-prep 再実行時に**同じユーザーへ再度リセットメールを送信**してしまう（冪等性破綻）。必ず `$unset` でフィールドごと削除し `noPassword` 状態にする（statusDelete の `undefined` 方針とも統一）。
+> **KNOWN LIMITATION: a reset completed BEFORE the downgrade puts the user straight back into `upgradedOnly`.** The reset link is only valid for ~10 minutes (`PasswordResetOrder`), so the script is documented to run immediately before the downgrade — but that is exactly when a prompt user can still reach the *new* build. Following the link then runs `PUT /forgot-password` → `updatePassword` → `setPassword` (default, i.e. retiring the legacy hash), leaving them scrypt-only again and locked out the moment the downgrade lands. Nothing in the code detects or blocks this re-migration between the prep run and the downgrade. It is accepted rather than solved: the alternative (holding a "reset disabled until downgrade" state, or re-running prep after the switch) costs more than it saves for what is an exceptional, operator-driven procedure. Operationally: run the downgrade promptly after the send, and re-run the prep script (or have the affected users use `/forgot-password`) once the old build is live. Note that a user who misses the 10-minute window is NOT stranded — they are ACTIVE with no credential, which is exactly the state `/forgot-password` serves.
+
+> **CRITICAL: why use `$unset` rather than assigning `null`/`''`**: The shared classification filters (`password-hash-format-filters.ts`) treat a credential field as PRESENT only when it exists **and** holds a non-empty value (`present = { $exists: true, $nin: [null, ''] }`; `absent = $or[{ $exists: false }, { $in: [null, ''] }]`). So a `passwordHash = null`/`''` already reads as ABSENT and the user classifies as `noPassword` — it would NOT be re-counted as `upgradedOnly` in the status migration, nor re-sent a reset email on a downgrade-prep re-run. `$unset` is nonetheless preferred: it removes the field entirely rather than leaving a stray `null`/`''` value, reaches the `noPassword` state cleanly, and stays consistent with `statusDelete`'s `undefined` scrub. Always delete the field entirely with `$unset`.
 
 ---
 
@@ -507,28 +569,28 @@ Idempotency: カウントのみなら冪等。SEND_RESET_EMAILS=true は重複�
 
 ```
 User aggregate:
-  password: String | undefined        — legacy SHA-256 ハッシュ（移行期間中保持）
-  passwordHash: String | undefined  — scrypt 自己記述ハッシュ（新フィールド）
+  password: String | undefined        — legacy SHA-256 hash (retained during migration)
+  passwordHash: String | undefined  — scrypt self-describing hash (new field)
 
 Migration state (derived from field existence):
-  - legacyOnly:  password=set,   passwordHash=unset  → 未移行
-  - both:        password=set,   passwordHash=set    → 移行中（ログイン済み）
-  - upgradedOnly:  password=unset, passwordHash=set    → 完全移行
-  - noPassword:  password=unset, passwordHash=unset  → パスワード未設定
+  - legacyOnly:  password=set,   passwordHash=unset  → not migrated
+  - both:        password=set,   passwordHash=set    → migrating (logged in)
+  - upgradedOnly:  password=unset, passwordHash=set    → fully migrated
+  - noPassword:  password=unset, passwordHash=unset  → password not set
 ```
 
 ### Logical Data Model
 
-**Schema 変更（Mongoose）**:
+**Schema change (Mongoose)**:
 
 ```javascript
-// apps/app/src/server/models/user/index.js に追加
+// Added to apps/app/src/server/models/user/index.js
 passwordHash: { type: String },  // scrypt self-describing hash (scrypt$N$r$p$salt$hash)
-// 既存フィールド:
-// password: String  — SHA-256 ハッシュ、移行期間中保持、cleanup 後に削除
+// Existing field:
+// password: String  — SHA-256 hash, retained during migration, removed after cleanup
 ```
 
-**Index**: `passwordHash` フィールドにインデックス不要（パスワード検証は fetch-then-compare のため DB クエリに使用しない）
+**Index**: No index is needed on the `passwordHash` field (password verification is fetch-then-compare, so it is not used in a DB query)
 
 ---
 
@@ -536,26 +598,26 @@ passwordHash: { type: String },  // scrypt self-describing hash (scrypt$N$r$p$sa
 
 ### Error Strategy
 
-- `PasswordHashService.verify()`: 内部エラーは呼び出し元に throw せず、`{ isValid: false, needsRehash: false }` を返す。エラーは ERROR レベルでログ記録
-  - **`timingSafeEqual` の注意**: 保存ハッシュが破損して計算結果と長さが異なると `crypto.timingSafeEqual` は throw する。verify 内で try/catch し、フォーマット不一致（Req 2.4 の異常系）として `{ isValid: false }` + WARNING に落とす（この経路が「verify は throw しない」不変条件を守る）
-- Passport LocalStrategy: try/catch で全エラーを `done(err)` に渡す
-- Lazy migration 失敗: rehash 保存の失敗はログに記録するが、ログイン自体は成功させる（次回ログイン時にリトライ可能）
+- `PasswordHashService.verify()`: never throws to the caller; it always returns a `VerifyResult`, returning `{ isValid: false, needsRehash: false }` on any internal error. Internal verify() errors and malformed-field anomalies (a stored credential field present but matching no known format) are logged at **WARNING** (Req 2.4), not ERROR
+  - **Note on `timingSafeEqual`**: if the stored hash is corrupted and its length differs from the computed result, `crypto.timingSafeEqual` throws. Wrap it in try/catch inside verify and reduce it to a format mismatch (the Req 2.4 error case) as `{ isValid: false }` + WARNING (this path preserves the "verify never throws" invariant)
+- Passport LocalStrategy: pass all errors to `done(err)` with try/catch
+- Lazy migration failure: log a failure to save the rehash, but let the login itself succeed (it can be retried on the next login)
 
 ### Error Categories
 
-| シナリオ | 分類 | 対応 |
+| Scenario | Classification | Response |
 |---------|------|------|
-| 無効な認証情報 | 401 | `done(null, false)` — 既存挙動と同じ |
-| 不明フォーマットの password フィールド | 認証拒否 + WARNING ログ | Req 2.4 |
-| scrypt 計算エラー（maxmem 超過等） | 500 → `done(err)` | エラーログ記録 |
-| Lazy migration save 失敗 | ログ記録のみ | ログイン成功を継続 |
-| Cleanup script: 未移行ユーザー存在 | Migration abort | エラーメッセージ + affected count ログ |
+| Invalid credentials | 401 | `done(null, false)` — same as the existing behavior |
+| Unknown-format password field | authentication rejected + WARNING log | Req 2.4 |
+| scrypt computation error (maxmem exceeded, etc.) | 500 → `done(err)` | log the error |
+| Lazy migration save failure | log only | continue with a successful login |
+| Cleanup script: unmigrated users exist | Migration abort | error message + affected count log |
 
 ### Monitoring
 
-- `PasswordHashService`: `needsRehash: true` 発生時に INFO レベルでログ（移行進捗の可視化）
-- Passport: lazy migration 成功/失敗を INFO/ERROR でログ
-- Migration scripts: 各カウントを INFO で logger 出力
+- `PasswordHashService.verify()` does **not** emit a per-call INFO when `needsRehash: true`. Emitting one on every legacy verification would spam the log on each legacy login; the migration-progress signal is logged instead at the point migration actually happens (see below)
+- Passport LocalStrategy: log successful lazy migration at INFO (the migration-progress signal — one line per user actually rehashed). A lazy-migration save failure is logged, but the login still succeeds and the rehash is retried on the next login
+- Migration scripts: output each count to logger at INFO
 
 ---
 
@@ -563,50 +625,53 @@ passwordHash: { type: String },  // scrypt self-describing hash (scrypt$N$r$p$sa
 
 ### Unit Tests
 
-1. `PasswordHashService.hash()`: 返り値が `$2b$` プレフィックスで始まる、同一平文で異なるハッシュを返す（Req 1.1, 1.4）
-2. `PasswordHashService.verify()`: scrypt パス（`needsRehash=false`）、SHA-256 パス（`needsRehash=true`）、無効認証情報、両フィールドなし（`isValid=false`・WARNING なし）、フォーマット不一致（`isValid=false`・WARNING あり）のケース（Req 2.1–2.5）
-3. `User.isPasswordValid()`: verify 結果を正しく委譲する
-4. `User.setPassword()`: `passwordHash` フィールドのみ更新し `password` フィールドを保持することを確認（Req 1.3）
+1. `PasswordHashService.hash()`: the return value is a `scrypt$`-prefixed self-describing string (NOT a 64-character SHA-256 hex); returns different hashes for the same plaintext (Req 1.1, 1.4)
+2. `PasswordHashService.verify()`: cases for the scrypt path (`needsRehash=false`), the SHA-256 path (`needsRehash=true`), invalid credentials, neither field (`isValid=false`, no WARNING), and format mismatch (`isValid=false`, with WARNING) (Req 2.1–2.5)
+3. `User.isPasswordValid()`: correctly delegates the verify result
+4. `User.setPassword()`: confirm that it sets `passwordHash` **and clears the legacy `password` field** (credential revocation), and that `{ keepLegacyHash: true }` retains it (the lazy-migration path)
 
 ### Integration Tests
 
-1. Passport LocalStrategy: legacy SHA-256 ユーザーのログイン成功 → `passwordHash` が書き込まれていることを確認（Req 2.1, 2.2）
-2. Passport LocalStrategy: 既存 scrypt ユーザーのログイン成功 → rehash が発生しないことを確認（Req 2.3）
-3. Passport LocalStrategy: 無効な認証情報 → 401 を確認
-4. **パスワード変更の認証バイパス回帰（最重要）**: `personal-setting` のパスワード変更で、旧パスワードが正しい場合のみ成功し、誤り/未指定では拒否されることを確認（`!Promise` バイパスの回帰防止。Req 2.1, 2.2）
-5. **passwordHash-only ユーザーの誤リダイレクト回帰**: `password` unset・`passwordHash` set のユーザーがログイン後に `/me#password_settings` へ誤リダイレクトされないこと、LDAP 切り離しが誤ブロックされないことを確認（`isPasswordSet()` 置換の回帰防止。Req 2.2, 2.3）
-6. **削除ユーザーの認証情報消去**: `statusDelete()` 後に `passwordHash` が unset され、削除ユーザーが有効な認証情報を保持しないことを確認（Req 1.1, 2.2）
-7. Status migration script: フィールドパターン別ユーザー数が正しく集計される
-8. Cleanup migration script: legacyOnly ユーザーが存在する場合は abort、全員移行済みなら `password` フィールドを削除（Req 3.3, 3.4）
-9. Downgrade prep script: リセットメール送信成功ユーザーの `passwordHash` が `$unset` され、その後 status migration で `noPassword` に分類される（`upgradedOnly` 残留なし＝二重送信回帰防止。Req 4.1, 4.3）
+1. Passport LocalStrategy: successful login of a legacy SHA-256 user → confirm that `passwordHash` was written (Req 2.1, 2.2)
+2. Passport LocalStrategy: successful login of an existing scrypt user → confirm that no rehash occurs (Req 2.3)
+3. Passport LocalStrategy: invalid credentials → confirm 401
+4. **Password-change authentication-bypass regression (most important)**: confirm that a password change in `personal-setting` succeeds only when the old password is correct, and is rejected when it is wrong/unspecified (regression prevention for the `!Promise` bypass; Req 2.1, 2.2)
+5. **passwordHash-only user mis-redirect regression**: confirm that a user with `password` unset and `passwordHash` set is not mis-redirected to `/me#password_settings` after login, and that LDAP detach is not wrongly blocked (regression prevention for the `isPasswordSet()` replacement; Req 2.2, 2.3)
+6. **Credential scrubbing for deleted users**: confirm that after `statusDelete()` the `passwordHash` is unset and a deleted user does not retain valid credentials (Req 1.1, 2.2)
+7. Status migration script: the user counts per field pattern are tallied correctly
+8. Cleanup migration script: abort if legacyOnly users exist; if all are migrated, remove the `password` field (Req 3.3, 3.4)
+9. Downgrade prep script: the `passwordHash` of users whose reset email was sent successfully is `$unset`, and they are then classified as `noPassword` by the status migration (no residual `upgradedOnly` = regression prevention for double-sending; Req 4.1, 4.3)
 
 ### Security Tests
 
-1. `PasswordHashService.hash()` が SHA-256 ハッシュを返さないこと（`scrypt$` プレフィックスであり、64 文字 hex でないことを確認）
-2. scrypt パラメータ N が下限（2^17=131072）未満に設定された場合、起動時警告が出て下限にクランプされることを確認
-3. `maxmem` 上限を超えるパラメータでも `hash()`/`verify()` が throw せず安全に処理されることを確認（DoS/メモリ枯渇耐性）
+1. `PasswordHashService.hash()` does not return a SHA-256 hash (confirm the `scrypt$` prefix and that it is not a 64-character hex string)
+2. env-derived scrypt params below the OWASP floor (N=2^17, r=8, p=1) are clamped **up** with a startup WARNING (verified via the exported `resolveScryptParamsFromEnv`; env params above the DoS upper bound are likewise clamped **down** with a WARNING)
+3. A stored scrypt envelope whose N/r/p exceed the upper bound — or whose salt/hash byte length is out of range — is **rejected at parse time, before `crypto.scrypt` is invoked** → `{ isValid: false }` + WARNING. So `verify()` never drives an extreme-memory scrypt call and never throws (DoS / memory-exhaustion resistance)
 
 ---
 
 ## Security Considerations
 
-- **CWE-916 解消**: `PasswordHashService.hash()` は `crypto.scrypt`（memory-hard KDF）のみを使用し、`crypto.createHash('sha256')` はハッシュ生成（保存）に使用しない
-- **CodeQL アラート（#541）解消の確認方針（重要）**: 後方互換のため、`verify()` の legacy パスは移行期間中 `SHA256(SEED + plaintext)` を計算し続ける（既存ユーザーの検証に必須。Req 2.1）。CodeQL `js/insufficient-password-hash` は「パスワードが弱いハッシュに流れる箇所」を検出するため、**保存に使わなくても legacy 検証コードが再フラグされる可能性がある**。したがってアラート解消は次の手順で確認・対処する:
-  1. 実装後に CodeQL を**再スキャン**し、アラートが実際に解消されるか確認する（保存経路が scrypt 化されたことで解消されるケースを想定）
-  2. legacy 検証パスが再フラグされる場合は、当該箇所に**正当理由付きの dismissal**（「移行期間限定の legacy ハッシュ検証専用。新規保存には未使用」）を付与する。SHA-256 は検証のためだけに残り、後方互換（Req 2）を満たす以上、計算自体を除去することはできない（除去＝全ユーザー強制リセットとなり要件違反）
-  3. **完全な緑化は Cleanup フェーズ後**（全ユーザー移行完了 → legacy 検証コードを削除する将来リリース）に達成される。それまでは 1〜2 で扱う
-  - なお、**セキュリティ上の目的（新規/変更パスワードを弱い SHA-256 で保存しない）は実装時点で確実に達成される**。上記はアラート表示（ツール上の状態）の扱いに関するもの
-- **`passwordHash` の API レスポンス漏洩防止**: 既存の `omitInsecureAttributes()`（`@growi/core`）は `password`/`apiToken`/`email` のみを除外しており `passwordHash` を除外しない。新フィールド追加に合わせて omit リストに `passwordHash` を追加し、`IUser` にも `passwordHash?: string` を追加する。`@growi/core` は published package のため変更時は `npx changeset` が必要
-- **削除ユーザーの認証情報消去**: `statusDelete()` は既存で `password = ''` によりレガシー認証情報を消去する意図を持つ。`passwordHash` も同時に unset しないと、削除ユーザーの scrypt ハッシュ（認証情報）が匿名化後も DB に永続化される。移行後の退行を防ぐため `statusDelete()` で `passwordHash` を消去する
-- **Per-user salt**: `crypto.randomBytes(16)` でユーザーごとにソルトを生成し、自己記述文字列（`scrypt$N$r$p$salt$hash`）に埋め込んで保存する（bcrypt と異なり自動埋め込みではないため、生成・符号化・分解を自前実装する）
-- **memory-hard による GPU 耐性**: scrypt は大量メモリを要求するため、SHA-256/bcrypt より GPU/ASIC ブルートフォースに強い（OWASP でも bcrypt より上位）
-- **メモリ消費と DoS（運用上の考慮）**: OWASP 最小推奨（N=2^17, r=8）では scrypt は1回あたり**約128MB**を消費する。非同期 `crypto.scrypt` は libuv スレッドプール（既定4）上で動くため同時計算数が自然に頭打ちとなり、ピークメモリは概ね「スレッド数 × 128MB ≒ **512MB**」に収まる（リクエスト数 × 128MB にはならない）。この 512MB 程度の一時確保はコンテナのメモリ予算に織り込む必要がある（GROWI の推奨メモリと照らして確認。逼迫する場合は `UV_THREADPOOL_SIZE` を絞るか、OWASP 代替の N=2^16, r=8, p=2 ≒ 64MB/回 を検討）。高頻度ログイン（クレデンシャルスタッフィング）対策として**ログインエンドポイントのレート制限**を推奨（下記タイミング攻撃対策と共通）。`maxmem`（≥192MB）とパラメータ上限のクランプで極端な設定によるメモリ枯渇も防ぐ
-- **PASSWORD_SEED の役割限定**: 移行後、`PASSWORD_SEED` は legacy SHA-256 ハッシュの検証のみに使用。新規ハッシュは `PASSWORD_SEED` に依存しない
-- **Cleanup 後の PASSWORD_SEED**: 全ユーザーが `passwordHash` に移行し cleanup migration 実行後、`PASSWORD_SEED` は login 検証に不要。ただし既存の export `meta.json` 問題は本スコープ外
-- **パスワード長制限なし**: scrypt は bcrypt のような 72 バイト切り詰めがないため、長いパスワードもそのまま安全にハッシュ化できる
-- **ユーザー列挙タイミング攻撃（既知の制限）**: scrypt 導入により「存在しないユーザー」は即時返却・「存在するユーザー」は数十〜数百 ms となり、時間差でユーザー存在を推測できる。ダミー scrypt 比較で緩和可能だが、本スコープではログインエンドポイントのレート制限が既存か確認し、なければ別タスクで対応を検討する
-- **legacy SHA-256 検証の非定数時間比較（低リスク）**: `===` は厳密な定数時間比較ではないが、ハッシュ同士の比較のため実際の攻撃リスクは極めて低い。必要であれば `crypto.timingSafeEqual` で代替可能
-- **パスワード変更/リセット後のダウングレードで旧パスワードが復活する（既知の制限）**: `setPassword` はダウングレード安全のため `password`（SHA-256）フィールドを書き換えず `passwordHash` のみ更新する。この結果、新バージョンでパスワードを変更またはリセットした後に Cleanup 前のバージョンへダウングレードすると、旧バージョンは古い `password`（SHA-256）で認証するため、**変更/リセット前のパスワードが有効に戻り、新しいパスワードは無効になる**。特にパスワードリセット（漏洩・失念を動機とする場合）では、退役させたはずの旧資格情報が復活しうる点に注意する。これはデュアルフィールドによるダウングレード安全設計との本質的なトレードオフであり、本スコープでは挙動を変更せず既知の制限として扱う。なお、パスワード変更/リセット済みユーザーは `both` 状態（`password`=旧SHA-256 + `passwordHash`=新）であり、`upgradedOnly` を対象とする downgrade-prep スクリプトの検出・リセット対象には**含まれない**ため、本スコープ内に自動的な緩和策は存在しない（緩和が必要な場合は当該ユーザーへの手動パスワードリセットが必要だが、これはスコープ外）
+- **CWE-916 resolution**: `PasswordHashService.hash()` uses only `crypto.scrypt` (a memory-hard KDF) and does not use `crypto.createHash('sha256')` for hash generation (storage)
+- **Approach to confirming CodeQL alert (#541) resolution (important)**: for backward compatibility, the legacy path of `verify()` keeps computing `SHA256(SEED + plaintext)` during the migration period (essential for verifying existing users; Req 2.1). Since CodeQL `js/insufficient-password-hash` detects "places where a password flows into a weak hash," **the legacy verification code may be re-flagged even though it is not used for storage**. Therefore, confirm and address alert resolution with the following steps:
+  1. After implementation, **re-scan** with CodeQL and confirm whether the alert is actually resolved (assuming the case where it is resolved because the storage path is now scrypt-based)
+  2. If the legacy verification path is re-flagged, apply a **justified dismissal** to that location ("legacy hash verification limited to the migration period; not used for new storage"). SHA-256 remains solely for verification, and as long as it satisfies backward compatibility (Req 2), the computation itself cannot be removed (removal = a forced reset for all users, violating the requirement)
+  3. **Full green status is achieved after the Cleanup phase** (a future release that removes the legacy verification code once all users are migrated). Until then, handle it with steps 1–2
+  - Note that **the security objective (not storing new/changed passwords with weak SHA-256) is reliably achieved at implementation time**. The above concerns the handling of the alert display (the tool-side state)
+- **Preventing `passwordHash` leakage in API responses**: the existing `omitInsecureAttributes()` (`@growi/core`) excludes only `password`/`apiToken`/`email` and does not exclude `passwordHash`. In line with adding the new field, add `passwordHash` to the omit list and add `passwordHash?: string` to `IUser` as well. Because `@growi/core` is a published package, `npx changeset` is required when changing it
+- **Credential scrubbing for deleted users**: `statusDelete()` unsets both credential fields (`password = undefined` and `passwordHash = undefined`). Previously it scrubbed the legacy credential via `password = ''`; unless `passwordHash` is unset at the same time, a deleted user's scrypt hash (a credential) persists in the DB even after anonymization. To prevent post-migration regression, `statusDelete()` unsets both fields — using `undefined` rather than `''` so the shared filters classify the user as `noPassword`, not `legacyOnly`
+- **Per-user salt**: generate a salt per user with `crypto.randomBytes(16)`, embed it in the self-describing string (`scrypt$N$r$p$salt$hash`), and store it (unlike bcrypt, it is not embedded automatically, so generation, encoding, and parsing are implemented ourselves)
+- **GPU resistance via memory-hardness**: scrypt requires a large amount of memory, so it is more resistant to GPU/ASIC brute force than SHA-256/bcrypt (OWASP also ranks it above bcrypt)
+- **Memory consumption and DoS (operational consideration)**: at the OWASP minimum recommendation (N=2^17, r=8), scrypt consumes **about 128MB** per call. Because the asynchronous `crypto.scrypt` runs on the libuv thread pool (default 4), the number of concurrent computations is naturally capped, and the peak memory stays roughly within "number of threads × 128MB ≒ **512MB**" (it does not become number-of-requests × 128MB). This temporary allocation of around 512MB must be factored into the container's memory budget (check it against GROWI's recommended memory; if it is tight, consider narrowing `UV_THREADPOOL_SIZE`, or the OWASP alternative N=2^16, r=8, p=2 ≒ 64MB/call). As a countermeasure against high-frequency logins (credential stuffing), **rate limiting on the password-verifying endpoints was corrected in this scope** (see the dedicated item below). `maxmem` (≥192MB) and clamping the parameter upper bound also prevent memory exhaustion from extreme settings
+- **Rate limiting on the login endpoint (fixed in this scope)**: `features/rate-limiter` matches its endpoint keys against `req.path` **exactly** (`middleware/factory.ts`), so a key that is not the fully-mounted path silently matches nothing and the endpoint falls back to the permissive default (`DEFAULT_MAX_REQUESTS` 500 × `usersPerIpProspection` 5 = 2500 req/min/IP). `/login` was in that state: the legacy `POST /login` route was removed and the live endpoint is `apiV3AuthRouter`'s, mounted at `/_api/v3`, so the key is now **`/_api/v3/login`**. This was latent before — it only became load-bearing once verification cost ~128MiB / ~100ms of scrypt on a libuv thread per unauthenticated attempt. `config/index.spec.ts` pins the mounted path and the effective per-IP ceiling so a remount or a loosened value fails the test
+- **Remaining exposure (accepted, not closed here)**: the limiter is keyed per IP (and per user), so a *distributed* credential-stuffing campaign still spends one scrypt per source IP and can saturate the libuv pool — there is no global concurrency cap on password verification. Separately, **only the login key was corrected**: other `defaultConfig` keys are stale in the same way (`/invited`, `/register`, `/user-activation/register`, `/installer`, `/_api/check_username` are all pre-mount, and `POST/PUT /_api/v3/forgot-password` has no key at all while its PUT runs `updatePassword` → scrypt). Several of those are unauthenticated and password-hashing, so they carry the same DoS surface — but they are pre-existing defects unrelated to the hash algorithm, and auditing and correcting them belongs to a separate rate-limiter task, deliberately out of this spec's boundary
+- **Limiting the role of PASSWORD_SEED**: after migration, `PASSWORD_SEED` is used only to verify legacy SHA-256 hashes. New hashes do not depend on `PASSWORD_SEED`
+- **PASSWORD_SEED after Cleanup**: once all users have migrated to `passwordHash` and the cleanup migration has run, `PASSWORD_SEED` is unnecessary for login verification. However, the existing exported `meta.json` issue is out of scope
+- **No password length limit**: scrypt has no 72-byte truncation like bcrypt, so long passwords can also be hashed safely as-is
+- **User-enumeration timing attack (known limitation)**: with the introduction of scrypt, a "nonexistent user" returns immediately while an "existing user" takes tens to hundreds of ms, so user existence can be inferred from the time difference. This can be mitigated with a dummy scrypt comparison, which is **not** implemented here. Rate limiting on the login endpoint was checked in this scope and found to be misconfigured (the key did not match the mounted path) — that is now fixed (see the rate-limiting item above), which bounds how fast the timing oracle can be sampled from one IP but does not eliminate it. A dummy scrypt comparison for nonexistent users remains a separate, optional task
+- **Constant-time comparison on the legacy path**: the legacy SHA-256 check uses `crypto.timingSafeEqual` (on equal-length buffers, guaranteed by the 64-char hex format check), not `===`. Hash-against-hash comparison made the risk low either way, but both verification paths are now constant-time
+- **A changed/reset password is genuinely revoked (the old hash is retired, not kept)**: `setPassword` clears the legacy `password` (SHA-256) field whenever a password is replaced (change, admin reset, invited-user activation). Keeping it — the original dual-field behavior — would have meant that after a downgrade to a pre-Cleanup version the old build authenticates with the OLD `password` hash, i.e. **the credential the user thought they had retired becomes valid again while the new one does not** — unacceptable when the reset was motivated by a leak. The trade-off is deliberate: such a user is now `upgradedOnly` (scrypt only), so a downgrade **locks them out** instead of reviving the old password, and they are covered by the downgrade-prep script (which targets `upgradedOnly` ACTIVE users and mails them a reset link). Losing access is recoverable; a revived leaked password is not. Note the exception that preserves the migration-period downgrade story: the lazy migration on login passes `keepLegacyHash: true`, because it re-hashes the SAME password (nothing is retired), leaving the user in the `both` state
+- **Non-active users are never stripped of their only credential**: the downgrade-prep script emails + `$unset`s **ACTIVE** users only. `/forgot-password` rejects non-active users on both POST and PUT, so an invited / registered / suspended `upgradedOnly` user (an invitee created by `createUserByEmail` is `upgradedOnly` by construction) has no reset path at all — unsetting their `passwordHash` would be a permanent lockout. They are counted, WARNed about, and left untouched for manual handling. Symmetrically, the cleanup script's abort counts only **ACTIVE** `legacyOnly` users — but for a *different* reason, which is worth stating precisely because the obvious-sounding one is wrong: a non-active user **can** still log in and **is** still migrated lazily (the login path applies no status filter; status only selects the post-authentication redirect). They are excluded because nobody can compel them to log in before the cleanup window, so counting them would make the cleanup phase unreachable indefinitely (the `$unset` of the legacy field itself is not status-scoped — retiring a suspended user's legacy hash is desirable)
 
 ---
 
@@ -614,17 +679,17 @@ passwordHash: { type: String },  // scrypt self-describing hash (scrypt$N$r$p$sa
 
 ```mermaid
 flowchart LR
-    A[新バージョンリリース] -->|通常デプロイ| B[Status migration 自動実行]
-    B --> C[Lazy migration 開始]
-    C -->|全ユーザーログイン後| D{Cleanup 実行可能?}
+    A[new version release] -->|normal deploy| B[Status migration auto-run]
+    B --> C[Lazy migration starts]
+    C -->|after all users log in| D{Cleanup runnable?}
     D -->|legacyOnly > 0| E[Cleanup ABORT]
-    D -->|legacyOnly = 0| F[Cleanup migration 実行]
-    F --> G[PASSWORD_SEED 不要化]
+    D -->|legacyOnly = 0| F[run Cleanup migration]
+    F --> G[PASSWORD_SEED no longer needed]
 ```
 
-- **Phase 1** (新バージョンリリース直後): Status migration 自動実行、lazy migration 開始。`PASSWORD_SEED` は引き続き必要。CodeQL を再スキャンしアラート状態を確認（保存経路の scrypt 化で解消されない場合は legacy 検証行に正当理由付き dismissal を付与）
-- **Phase 2** (移行期間): 全ユーザーがログインするまで自然に移行。Status migration で進捗確認
-- **Phase 3** (任意): 全ユーザー移行確認後、管理者が Cleanup migration を含むリリースをデプロイ。`password` フィールドを削除し、**legacy SHA-256 検証コードを除去** → この時点で CodeQL アラート（#541）が dismissal なしで完全に緑化する
-- **ダウングレードが必要な場合** (Phase 3 前): Downgrade prep script を実行して影響範囲を確認。必要に応じてリセットメール送信
+- **Phase 1** (immediately after the new version release): Status migration auto-runs, lazy migration starts. `PASSWORD_SEED` is still needed. Re-scan with CodeQL and confirm the alert status (if it is not resolved by making the storage path scrypt-based, apply a justified dismissal to the legacy verification lines)
+- **Phase 2** (migration period): migrates naturally until all users have logged in. Check progress with the Status migration
+- **Phase 3** (optional): after confirming all users are migrated, the administrator deploys a release that includes the Cleanup migration. Remove the `password` field and **remove the legacy SHA-256 verification code** → at this point the CodeQL alert (#541) becomes fully green without a dismissal
+- **If a downgrade is needed** (before Phase 3): run the Downgrade prep script to check the scope of impact. Send reset emails if necessary
 
-**Rollback**: Phase 3（Cleanup）前であれば `password` フィールドが保持されているためコードロールバックで即時復旧可能。Phase 3 後は Downgrade prep script でリセットメールを送信する必要がある。
+**Rollback**: Before Phase 3 (Cleanup), a code rollback restores authentication **only for users who still have a `password` (SHA-256) field** — i.e. existing users who had not yet, or only partially (`both`), migrated. Users created, invited, or reset on the new version are `upgradedOnly` (scrypt only, no legacy `password`) and are locked out by a rollback even before Cleanup; run the Downgrade prep script (which targets `upgradedOnly`) first to send them reset emails. After Phase 3, reset emails must be sent for all migrated users with the Downgrade prep script.

@@ -19,6 +19,7 @@ import S2sMessage from '../models/vo/s2s-message';
 import { configManager } from './config-manager';
 import type { ConfigKey } from './config-manager/config-definition';
 import { growiInfoService } from './growi-info';
+import type { VerifyResult } from './password-hash';
 import type { S2sMessageHandlable } from './s2s-messaging/handlable';
 
 const logger = loggerFactory('growi:service:PassportService');
@@ -52,6 +53,100 @@ type StrategySetup = {
 interface IncomingMessageWithLdapAccountInfo extends IncomingMessage {
   ldapAccountInfo: any;
 }
+
+/**
+ * Minimal structural view of a User document used by the local strategy verify
+ * flow. The User model itself is a loosely-typed Mongoose model (custom statics
+ * and instance methods have no repo-wide TypeScript type), so this captures only
+ * the members the verify flow depends on.
+ */
+interface LocalStrategyUserDoc {
+  isPasswordValid(password: string): Promise<VerifyResult>;
+  setPassword(
+    password: string,
+    options?: { keepLegacyHash?: boolean },
+  ): Promise<unknown>;
+  save(): Promise<unknown>;
+}
+
+/** Minimal structural view of the User model static the verify flow calls. */
+interface LocalStrategyUserModel {
+  findUserByUsernameOrEmail(
+    usernameOrEmail: string,
+    callback: (err: unknown, user?: LocalStrategyUserDoc | null) => void,
+  ): void;
+}
+
+/** Passport verify callback signature (passport-local ships no types). */
+type LocalStrategyVerifyDone = (
+  error: unknown,
+  user?: LocalStrategyUserDoc | false,
+  options?: { message: string },
+) => void;
+
+/**
+ * Verify credentials for the Passport local strategy and, on a successful legacy
+ * SHA-256 login, lazily migrate the credential to a scrypt `passwordHash` (see
+ * design "ログイン時 Lazy Migration フロー"). Extracted from the LocalStrategy
+ * callback so the branching is unit-testable with a mocked User model. Every
+ * error is routed to `done(err)` by the outer try/catch.
+ */
+export const verifyLocalCredentials = async (
+  User: LocalStrategyUserModel,
+  username: string,
+  password: string,
+  done: LocalStrategyVerifyDone,
+): Promise<void> => {
+  try {
+    // findUserByUsernameOrEmail is a callback-style Mongoose static; wrap it in a
+    // Promise here (rather than changing the model) to keep the async work within
+    // this boundary.
+    const user = await new Promise<LocalStrategyUserDoc | null>(
+      (resolve, reject) => {
+        User.findUserByUsernameOrEmail(username, (err, u) =>
+          err != null ? reject(err) : resolve(u ?? null),
+        );
+      },
+    );
+
+    if (user == null) {
+      return done(null, false, { message: 'Incorrect credentials.' });
+    }
+
+    const { isValid, needsRehash } = await user.isPasswordValid(password);
+    if (!isValid) {
+      return done(null, false, { message: 'Incorrect credentials.' });
+    }
+
+    // Lazy migration: a legacy SHA-256 credential just verified — rewrite it as a
+    // scrypt passwordHash. A rehash failure MUST NOT fail the login; it is retried
+    // on the next successful login.
+    if (needsRehash) {
+      try {
+        // keepLegacyHash: the SAME password is only being re-hashed here, so the
+        // legacy SHA-256 field is NOT a retired credential — keeping it is what
+        // preserves downgrade safety during the migration period (the `both`
+        // state). setPassword() otherwise retires it (password change / reset).
+        await user.setPassword(password, { keepLegacyHash: true });
+        await user.save();
+        // Progress visibility for the lazy migration (design "Monitoring"): emit
+        // an INFO on each successful legacy→scrypt rehash. This is the intended
+        // per-user progress signal; PasswordHashService.verify() stays quiet to
+        // avoid per-call spam. Failures are logged below.
+        logger.info(
+          { username },
+          'Lazy password rehash succeeded (legacy credential migrated to scrypt)',
+        );
+      } catch (rehashErr) {
+        logger.error('Lazy password rehash failed; login continues', rehashErr);
+      }
+    }
+
+    return done(null, user);
+  } catch (err) {
+    return done(err);
+  }
+};
 
 /**
  * the service class of Passport
@@ -307,19 +402,8 @@ class PassportService implements S2sMessageHandlable {
           usernameField: PassportService.USERNAME_FIELD,
           passwordField: PassportService.PASSWORD_FIELD,
         },
-        (username, password, done) => {
-          // find user
-          User.findUserByUsernameOrEmail(username, password, (err, user) => {
-            if (err) {
-              return done(err);
-            }
-            // check existence and password
-            if (!user || !user.isPasswordValid(password)) {
-              return done(null, false, { message: 'Incorrect credentials.' });
-            }
-            return done(null, user);
-          });
-        },
+        (username, password, done) =>
+          verifyLocalCredentials(User, username, password, done),
       ),
     );
 

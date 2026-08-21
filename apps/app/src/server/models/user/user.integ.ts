@@ -77,6 +77,8 @@ describe('User', () => {
       username: 'adminusertestToBeRemoved',
     });
     adminusertestToBeRemovedId = adminusertestToBeRemoved._id;
+    // Set passwordHash so the credential-scrub assertion in statusDelete is meaningful
+    adminusertestToBeRemoved.passwordHash = 'scrypt$dummy$hash';
     await adminusertestToBeRemoved.statusDelete();
   });
 
@@ -112,6 +114,28 @@ describe('User', () => {
     });
   });
 
+  describe('Password change (updatePassword → setPassword)', () => {
+    test('should persist a scrypt passwordHash and REMOVE the legacy password field from the document', async () => {
+      const user = await User.create({
+        name: 'Example for Password Change',
+        username: 'usertest-pwchange',
+        email: 'usertest-pwchange@example.com',
+        password: 'legacy-sha256-hash',
+        status: UserStatus.STATUS_ACTIVE,
+        lang: 'en_US',
+      });
+
+      await user.updatePassword('a-brand-new-password');
+
+      // Re-read through the raw driver: the retired SHA-256 hash must be gone
+      // from the stored document, not merely undefined in memory. Keeping it
+      // would let the OLD password still authenticate on a downgraded build.
+      const stored = await User.collection.findOne({ _id: user._id });
+      expect(stored?.passwordHash?.startsWith('scrypt$')).toBe(true);
+      expect('password' in (stored ?? {})).toBe(false);
+    });
+  });
+
   describe('Delete.', () => {
     describe('Deleted users', () => {
       test('should have correct attributes', async () => {
@@ -121,7 +145,11 @@ describe('User', () => {
 
         expect(adminusertestToBeRemoved).toBeInstanceOf(User);
         expect(adminusertestToBeRemoved.name).toBe('');
-        expect(adminusertestToBeRemoved.password).toBe('');
+        // statusDelete $unsets both credential fields (undefined, not ''), so a
+        // scrubbed deleted user classifies as `noPassword` — an empty-string
+        // `password` would be mis-counted as `legacyOnly` by the cleanup script.
+        expect(adminusertestToBeRemoved.password).toBeUndefined();
+        expect(adminusertestToBeRemoved.passwordHash).toBeUndefined();
         expect(adminusertestToBeRemoved.googleId).toBeNull();
         expect(adminusertestToBeRemoved.isGravatarEnabled).toBeFalsy();
         expect(adminusertestToBeRemoved.image).toBeNull();

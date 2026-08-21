@@ -11,6 +11,21 @@ import type AppService from '~/server/service/app';
 
 const mockActivityId = '507f1f77bcf86cd799439011';
 
+// Controllable mock for prisma.externalaccounts.findAllWithPagination.
+// The /external-accounts/ route imports `prisma` directly from ~/utils/prisma
+// (not via crowi), so mock the module to feed a paginate-result-shaped fixture.
+const { mockFindAllWithPagination } = vi.hoisted(() => ({
+  mockFindAllWithPagination: vi.fn(),
+}));
+
+vi.mock('~/utils/prisma', () => ({
+  prisma: {
+    externalaccounts: {
+      findAllWithPagination: mockFindAllWithPagination,
+    },
+  },
+}));
+
 // Passthrough middleware for testing - skips authentication
 const passthroughMiddleware = (
   _req: Request,
@@ -358,5 +373,130 @@ describe('POST /invite', () => {
         }),
       );
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('GET /external-accounts/', () => {
+  let app: express.Application;
+
+  const buildApp = async () => {
+    const application = express();
+    application.use(express.json());
+    application.use((_req, res: ApiV3Response, next) => {
+      res.apiv3 = (data, statusCode = 200) => res.status(statusCode).json(data);
+      res.apiv3Err = (error, statusCode?: number) => {
+        const status = statusCode ?? (Array.isArray(error) ? 400 : 500);
+        return res.status(status).json({ error });
+      };
+      next();
+    });
+
+    vi.resetModules();
+
+    const usersModule = (await import('./users')) as unknown as {
+      setup: (crowi: Crowi) => express.Router;
+    };
+    application.use('/', usersModule.setup(mock<Crowi>()));
+    return application;
+  };
+
+  beforeEach(async () => {
+    app = await buildApp();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should not leak secure user attributes in the nested user objects', async () => {
+    // Fixture mirrors Prisma's `include: { user: true }`: full user rows.
+    mockFindAllWithPagination.mockResolvedValue({
+      docs: [
+        {
+          _id: 'ea1',
+          providerType: 'google',
+          accountId: 'account-1',
+          user: {
+            _id: 'user1',
+            username: 'taro',
+            name: 'Taro',
+            email: 'taro@example.com',
+            isEmailPublished: false,
+            password: 'plain-should-never-exist',
+            passwordHash: 'scrypt$hash$value',
+            apiToken: 'secret-api-token',
+          },
+        },
+      ],
+      totalDocs: 1,
+      limit: 50,
+      offset: 0,
+      page: 1,
+      pagingCounter: 1,
+      totalPages: 1,
+      hasNextPage: false,
+      hasPrevPage: false,
+      nextPage: null,
+      prevPage: null,
+    });
+
+    const response = await request(app).get('/external-accounts/');
+
+    expect(response.status).toBe(200);
+    const returnedUser = response.body.paginateResult.docs[0].user;
+
+    // Secure attributes must be stripped
+    expect(returnedUser).not.toHaveProperty('password');
+    expect(returnedUser).not.toHaveProperty('passwordHash');
+    expect(returnedUser).not.toHaveProperty('apiToken');
+    // email is omitted because isEmailPublished is false
+    expect(returnedUser).not.toHaveProperty('email');
+
+    // Safe attributes are preserved
+    expect(returnedUser.username).toBe('taro');
+    expect(returnedUser.name).toBe('Taro');
+    // Non-user fields of the external account are untouched
+    expect(response.body.paginateResult.docs[0].accountId).toBe('account-1');
+  });
+
+  it('should expose email only when isEmailPublished is true', async () => {
+    mockFindAllWithPagination.mockResolvedValue({
+      docs: [
+        {
+          _id: 'ea2',
+          providerType: 'google',
+          accountId: 'account-2',
+          user: {
+            _id: 'user2',
+            username: 'hanako',
+            email: 'hanako@example.com',
+            isEmailPublished: true,
+            passwordHash: 'scrypt$hash',
+            apiToken: 'token',
+          },
+        },
+      ],
+      totalDocs: 1,
+      limit: 50,
+      offset: 0,
+      page: 1,
+      pagingCounter: 1,
+      totalPages: 1,
+      hasNextPage: false,
+      hasPrevPage: false,
+      nextPage: null,
+      prevPage: null,
+    });
+
+    const response = await request(app).get('/external-accounts/');
+
+    expect(response.status).toBe(200);
+    const returnedUser = response.body.paginateResult.docs[0].user;
+
+    expect(returnedUser).not.toHaveProperty('passwordHash');
+    expect(returnedUser).not.toHaveProperty('apiToken');
+    // published email is retained
+    expect(returnedUser.email).toBe('hanako@example.com');
   });
 });

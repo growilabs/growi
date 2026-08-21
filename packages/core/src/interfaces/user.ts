@@ -8,6 +8,7 @@ export type IUser = {
   username: string;
   email: string;
   password: string;
+  passwordHash?: string;
   image?: string; // for backward conpatibility
   imageAttachment?: Ref<IAttachment>;
   imageUrlCached: string;

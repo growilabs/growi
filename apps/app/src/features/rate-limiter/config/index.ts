@@ -28,7 +28,14 @@ export const defaultConfig: IApiRateLimitEndpointMap = {
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 1,
   },
-  '/login': {
+  // Keys are matched as an exact `configWithoutRegExp[req.path]` lookup
+  // (middleware/factory.ts), so they must be the FULLY-MOUNTED path. The legacy
+  // `POST /login` route is gone and the live one is on apiV3AuthRouter, mounted at
+  // '/_api/v3' (server/routes/index.js) — so the bare '/login' key matched nothing
+  // and login ran at the permissive default (500 x 5 = 2500 req/min/IP). That only
+  // became load-bearing when verification became scrypt (~128MiB, ~100ms on a libuv
+  // thread per attempt).
+  '/_api/v3/login': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 100,
