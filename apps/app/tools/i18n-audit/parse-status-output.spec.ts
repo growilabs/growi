@@ -34,11 +34,42 @@ Translation Progress:
 ✖ Error: Incomplete translations detected.
 `;
 
-// Synthesized from the normal fixture's structure with the count zeroed out.
-// The real repo has 176 missing keys today (see task 1.1/1.2), so a genuine
-// zero-missing run cannot be captured; this represents what the same CLI
-// would print once the count reaches zero, per the observed sentence shape.
+// Captured verbatim from real `i18next-cli` 1.71.0 stdout on this repo via:
+//   NO_COLOR=1 npx i18next-cli status
+// Task 7.3 brought the repo's `en_US` missing-key count to 0, so the whole
+// "Primary language ... is missing N key(s)" line is omitted entirely — not
+// just the digit zeroed out. This is the same class of "0 count omits the
+// line" behavior task 1.5 found for `parseLocaleMissingCount`'s "X
+// untranslated," clause, but here the *entire* summary line drops rather
+// than one clause within it. The run still exits non-zero and prints
+// "✖ Error: Incomplete translations detected." because the non-default
+// locales (ja_JP, zh_CN, fr_FR, ko_KR) still have absent keys.
 const STATUS_STDOUT_ZERO_MISSING = `
+- Analyzing project localization status...
+
+✔ Analysis complete.
+
+i18next Project Status
+------------------------
+🔑 Keys Found:         1699
+📚 Namespaces Found:   3
+🌍 Locales:            en_US, ja_JP, zh_CN, fr_FR, ko_KR
+✅ Primary Language:   en_US
+
+Translation Progress:
+- ja_JP: [■■■■■■■■■■■■■■■■■■■□] 99% (1679/1699 keys)  — 1 untranslated, 19 absent
+- zh_CN: [■■■■■■■■■■■■■■■■■■■□] 98% (1659/1699 keys)  — 1 untranslated, 39 absent
+- fr_FR: [■■■■■■■■■■■■■■■■■■■□] 98% (1659/1699 keys)  — 1 untranslated, 39 absent
+- ko_KR: [■■■■■■■■■■■■■■■■■■■□] 97% (1647/1699 keys)  — 52 absent
+✖ Error: Incomplete translations detected.
+`;
+
+// Adversarial: the real report header and Translation Progress section are
+// present verbatim, but the "Primary language ... is missing N key(s)" line
+// is reworded into a shape the strict regex does not match. A CLI wording
+// change like this must throw, not silently read as "0 missing" — this is
+// the reviewer's REMEDIATION case 1 for task 1.6's round-1 rejection.
+const STATUS_STDOUT_MISSING_LINE_REWORDED = `
 - Analyzing project localization status...
 
 ✔ Analysis complete.
@@ -52,9 +83,94 @@ i18next Project Status
 
 Translation Progress:
 - ja_JP: [■■■■■■■■■■■■■■■■■■□□] 90% (1554/1734 keys)  — 1 untranslated, 179 absent
+- zh_CN: [■■■■■■■■■■■■■■■■■□□□] 89% (1536/1734 keys)  — 1 untranslated, 197 absent
+- fr_FR: [■■■■■■■■■■■■■■■■■□□□] 88% (1523/1734 keys)  — 1 untranslated, 210 absent
+- ko_KR: [■■■■■■■■■■■■■■■■■□□□] 87% (1506/1734 keys)  — 228 absent
 
-⚠ Primary language "en_US" is missing 0 key(s) that are used in code.
+⚠ The primary language en_US has 176 keys missing that are used in code.
   Run "i18next-cli status en_US" for details, or "i18next-cli extract" to add them.
+✖ Error: Incomplete translations detected.
+`;
+
+// Real production stdout, per this module's own doc comment, never contains
+// the CLI's "✖ Error: ..." line at all (that line is written to stderr; the
+// run-audit.ts caller only ever hands this function the stdout stream). Every
+// other fixture in this file embeds "✖ Error:" for readability of a full
+// captured session, so on its own that would leave the no-error-marker path
+// (slotEndIndex falling back to stdout.length) untested against a shape that
+// actually matches production input. This fixture is STATUS_STDOUT_ZERO_MISSING
+// with the stderr-only line removed, confirming the slot-emptiness check
+// still reads a genuine 0 when there is no "✖ Error:" to anchor against.
+const STATUS_STDOUT_ZERO_MISSING_NO_ERROR_MARKER = `
+- Analyzing project localization status...
+
+✔ Analysis complete.
+
+i18next Project Status
+------------------------
+🔑 Keys Found:         1699
+📚 Namespaces Found:   3
+🌍 Locales:            en_US, ja_JP, zh_CN, fr_FR, ko_KR
+✅ Primary Language:   en_US
+
+Translation Progress:
+- ja_JP: [■■■■■■■■■■■■■■■■■■■□] 99% (1679/1699 keys)  — 1 untranslated, 19 absent
+- zh_CN: [■■■■■■■■■■■■■■■■■■■□] 98% (1659/1699 keys)  — 1 untranslated, 39 absent
+- fr_FR: [■■■■■■■■■■■■■■■■■■■□] 98% (1659/1699 keys)  — 1 untranslated, 39 absent
+- ko_KR: [■■■■■■■■■■■■■■■■■■■□] 97% (1647/1699 keys)  — 52 absent
+`;
+
+// Adversarial: the real report header and Translation Progress section are
+// present verbatim, and the missing-line is reworded to avoid the literal
+// word "missing" entirely (unlike STATUS_STDOUT_MISSING_LINE_REWORDED above,
+// which still contains that word). A vocabulary sniff for "missing" would
+// miss this rewording and silently return 0; this is the reviewer's
+// REMEDIATION case for task 1.6's round-2 rejection, requiring a structural
+// (slot-emptiness) check instead of a keyword sniff.
+const STATUS_STDOUT_MISSING_LINE_REWORDED_WITHOUT_KEYWORD = `
+- Analyzing project localization status...
+
+✔ Analysis complete.
+
+i18next Project Status
+------------------------
+🔑 Keys Found:         1734
+📚 Namespaces Found:   4
+🌍 Locales:            en_US, ja_JP, zh_CN, fr_FR, ko_KR
+✅ Primary Language:   en_US
+
+Translation Progress:
+- ja_JP: [■■■■■■■■■■■■■■■■■■□□] 90% (1554/1734 keys)  — 1 untranslated, 179 absent
+- zh_CN: [■■■■■■■■■■■■■■■■■□□□] 89% (1536/1734 keys)  — 1 untranslated, 197 absent
+- fr_FR: [■■■■■■■■■■■■■■■■■□□□] 88% (1523/1734 keys)  — 1 untranslated, 210 absent
+- ko_KR: [■■■■■■■■■■■■■■■■■□□□] 87% (1506/1734 keys)  — 228 absent
+
+⚠ Heads up: en_US currently lacks 42 translation entr(y/ies) referenced by code.
+  Run "i18next-cli status en_US" for details, or "i18next-cli extract" to add them.
+✖ Error: Incomplete translations detected.
+`;
+
+// Adversarial: the real report header is present, but the capture is cut
+// short before the point where the primary-language missing-line's presence
+// or absence would be conclusive (before the Translation Progress section
+// even finishes, well before either the missing-line or the terminal
+// "✖ Error:" marker could appear). A truncated/corrupted capture like this
+// must throw, not silently read as "0 missing" — this is the reviewer's
+// REMEDIATION case 2 for task 1.6's round-1 rejection.
+const STATUS_STDOUT_TRUNCATED_BEFORE_MISSING_LINE = `
+- Analyzing project localization status...
+
+✔ Analysis complete.
+
+i18next Project Status
+------------------------
+🔑 Keys Found:         1734
+📚 Namespaces Found:   4
+🌍 Locales:            en_US, ja_JP, zh_CN, fr_FR, ko_KR
+✅ Primary Language:   en_US
+
+Translation Progress:
+- ja_JP: [■■■■■■■■■■■■■■■■■■□□] 90% (1554/1734 keys)  — 1 untranslated, 179 absent
 `;
 
 const STATUS_STDOUT_UNPARSEABLE = `
@@ -156,6 +272,36 @@ describe('parseDefaultLanguageMissingCount', () => {
   it('throws when the expected summary line is absent', () => {
     expect(() =>
       parseDefaultLanguageMissingCount(STATUS_STDOUT_UNPARSEABLE),
+    ).toThrow();
+  });
+
+  it('throws when the report header is present but the missing-line wording changed instead of being genuinely absent', () => {
+    expect(() =>
+      parseDefaultLanguageMissingCount(STATUS_STDOUT_MISSING_LINE_REWORDED),
+    ).toThrow();
+  });
+
+  it('extracts 0 when there is no missing-line AND no "✖ Error:" marker at all, matching the real stdout-only shape (no stderr content mixed in)', () => {
+    expect(
+      parseDefaultLanguageMissingCount(
+        STATUS_STDOUT_ZERO_MISSING_NO_ERROR_MARKER,
+      ),
+    ).toBe(0);
+  });
+
+  it('throws with a message identifying unrecognized slot text when the missing-line is reworded to avoid the literal word "missing" entirely (structural slot check, not a keyword sniff)', () => {
+    expect(() =>
+      parseDefaultLanguageMissingCount(
+        STATUS_STDOUT_MISSING_LINE_REWORDED_WITHOUT_KEYWORD,
+      ),
+    ).toThrow(/unrecognized text/);
+  });
+
+  it("throws when the report header is present but the capture is truncated before the missing-line's presence or absence is conclusive", () => {
+    expect(() =>
+      parseDefaultLanguageMissingCount(
+        STATUS_STDOUT_TRUNCATED_BEFORE_MISSING_LINE,
+      ),
     ).toThrow();
   });
 });

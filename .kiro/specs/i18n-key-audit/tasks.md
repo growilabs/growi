@@ -42,6 +42,14 @@
   - _Boundary: Stdout Parser_
   - _Depends: 1.3_
 
+- [x] 1.6 `parseDefaultLanguageMissingCount` に、欠損が0件のとき「Primary language ... is missing」行そのものが出力されない実際の形式を対応させる
+  - 8.1 の実行時に判明。7.3 完了により実リポジトリで初めて `en_US` の欠損が0件になったところ、`npx i18next-cli status`（既定言語チェック）の出力に "Primary language ... is missing N key(s)" 行がまるごと無いことが分かった（0件のときは行自体が省略される。1.5 で対応した `parseLocaleMissingCount` の「`X untranslated,` 節が省略される」と同種の、CLI の「0件なら該当行を出さない」という一貫した挙動）。実際の出力は、既定言語チェックが0件の場合、4つの非既定言語の進捗バーだけを表示し `✖ Error: Incomplete translations detected.`（非既定言語側の欠損が原因）で終わる
+  - `parseDefaultLanguageMissingCount` を、この行が無い場合は0件として扱うように直す（行がある場合の既存の挙動は変えない）
+  - 観測可能な完了条件: 実際の欠損0件時の出力（行なし）を fixture として追加したテストが green になり、既存のテスト（行ありの fixture）も green のまま
+  - _Requirements: 1.1, 2.1, 3.1_
+  - _Boundary: Stdout Parser_
+  - _Depends: 1.3_
+
 ## 2. Core: 検出処理の組み立てと既存 CI への統合
 
 - [x] 2.1 (P) 3種の検出コマンドを実行し合否を決めるオーケストレーターを作り、既存の lint パイプラインに統合する
@@ -189,7 +197,7 @@
   - 観測可能な完了条件: `pnpm run lint:i18n` を通常実行し、既定言語の欠損参照が0件、未使用キー・言語別欠損が新しく記録した基準線以下で合格する
   - _Requirements: 1.4, 2.2, 3.2_
   - _Boundary: Baseline Store_
-  - _Depends: 1.5, 2.1, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 5.1, 6.1, 7.1, 7.2, 7.3_
+  - _Depends: 1.5, 1.6, 2.1, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 5.1, 6.1, 7.1, 7.2, 7.3_
 
 ## 9. Validation: 既存テストの整理確認と全体の回帰確認
 
@@ -227,5 +235,6 @@
   - `GlobalNotificationList.jsx:199` の `Delete`、`NotificationDeleteModal.jsx:39` の `Delete`、`DeleteAllShareLinksModal.jsx:32,35` の `Cancel`/`Delete`、`UserRemoveButton.jsx:43` の `Delete` — これらは4.2で対応した「`t` を props で受け取る」12ファイルの中にあるが、CLI の報告には出ない（props 経由の namespace を CLI が追跡できないため）。実行時には生キー表示になっている可能性が高い
   - いずれも Bug 2 と同じ原因・同じ直し方（`commons:` 前置）で解消できると見込まれるが、対象一覧の確定（1.2 相当の再調査）と実装は別タスクとして起票すること。
 - 7.3: `Edit`/`Update` の解消により `i18next-cli status en_US --hide-translated` が初めて0件（要件1の目標）に到達した。実装時に、タスク文が前提としていた「`GlobalNotificationList.jsx` の `Edit` は `commons:Edit` を再利用してよい」という判断が誤りだったことが判明した。実際のUIを確認した結果、この `Edit` は行内ドロップダウンの「この項目を編集する」リンクで、`UserGroupTable.tsx` の編集ボタンと同じ「テーブル行の編集操作」という意味であり、`commons:Edit`（`PageEditorModeManager.tsx` の閲覧/執筆モード切り替えUI専用、fr_FR "Écriture"）とは意味が異なる。タスク文どおりに `commons:Edit` へ前置すると、fr_FR で新たに「Écriture（執筆）」という不自然な表示が生まれてしまう（レビューで独立に検証済み）。実装者はこの1点だけタスク文から離れ、同タスクで新設した `commons:table_action.edit`（`UserGroupTable.tsx` 用）を代わりに使うことで、fr_FR の新規不具合を避けつつ0件化を達成した。レビューでこの逸脱は妥当と判定済み。上記の3件（`GlobalNotificationList.jsx:199` の `Delete` 等、props 経由で CLI から見えない生キー表示バグ）は未解消のまま残っている。
+- 1.6: 8.1 実行時に発覚。7.3 完了で `en_US` の欠損が初めて0件になったところ、`parseDefaultLanguageMissingCount` が対応する「行が無い＝0件」の判定を、レビューで2回差し戻しを受けて修正した。1回目の修正（無関係な `✅ Primary Language:` 行だけをアンカーにする）は、欠損行の文言が変わったり出力が途中で切れたりしても無条件に0件を返してしまう問題がレビューで発見された。2回目の修正（`/missing/i` という語のゆるい検出）も、"missing" という単語自体を避けた言い換えには効かないことがレビューで発見された。最終的には、欠損行が入る「場所」（非既定言語の進捗行の直後から、次の既知の区切りまでの区間）を切り出し、その区間が本当に空白だけかどうかを直接確認する構造的な判定に直した（語彙に依存しない）。「出力が欠損行の直前でちょうど途切れた場合」と「本当に0件の場合」は文字列だけでは原理的に区別できない残存ケースがあるが、これは Stdout Parser の境界（すでに取得済みの文字列を解釈するだけで、プロセスの終了自体は監督しない）の外にあるとレビューで判断済み。
 - 6.1: タスク文は「`SamlSecuritySettingContents.tsx:685` からも参照されており報告に出ている」としていたが、実測（before/after の A/B）では `translation` namespace の欠損はちょうど1件で、その1件は `saml.ts` 由来だった。`.tsx` 側の参照は最初から報告に出ていなかった（`SamlSecuritySettingContents.tsx` 自体が `useTranslation('admin')` を呼んでおり、前置無しでも `admin.json` から解決できていたため）。件数には影響しないが、前置しても解決結果は一致する（レビューで実測確認済み）ため変更は維持した。
 - 4.3: design.md/タスク文は Group 4 の6キーすべてを「実行時にも生キーが表示される実在の不具合」としていたが、実装時に i18next の実際の解決結果を確認した結果、実在の不具合は4キー（`security_settings.updated_general_security_setting` / `Show` / `Hide` / `New`、5ファイル）のみで、残り2キー（`not_found_page.page_not_exist` / `toaster.create_failed`、6ファイル）は前置前から `useTranslation(['translation', 'commons'])` の配列指定または `useTranslation('commons')` の既定指定により正しく解決できており、生キー表示にはなっていなかったことが判明した（レビューで実際に i18next を起動して独立検証済み）。前置自体は6キーすべてに必要（`i18next-cli` の検出のため）だが、9.2 の前後比較で「一致を求めない例外」に含めるのは実在の不具合4キーのみとした。design.md の該当箇所（Group 4 の説明、Testing Strategy）も合わせて訂正済み。
