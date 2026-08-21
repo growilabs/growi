@@ -274,7 +274,18 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
               </div>
             )}
 
-            <div className="flex-grow-1 px-2 px-md-4">
+            <div
+              className="flex-grow-1 px-2 px-md-4"
+              // This div is itself a flex item of the row's outer d-flex container and
+              // defaults to min-width:auto, which lets it refuse to shrink below its
+              // content's natural width. That's harmless for the default (wrapping)
+              // PagePathHierarchicalLink/Clamp content below, but once the ancestor path
+              // needs genuine single-line horizontal shrink (isPathTruncationEnabled),
+              // this ancestor also needs min-width:0 -- setting it only on the inner
+              // wrapper around SearchResultAncestorPath is not enough, since this outer
+              // flex item still refuses to shrink and lets its content overflow instead.
+              style={isPathTruncationEnabled ? { minWidth: 0 } : undefined}
+            >
               <div className="d-flex justify-content-between">
                 {/* page path */}
                 {isPathTruncationEnabled ? (
