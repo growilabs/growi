@@ -229,5 +229,9 @@
         "user_group": "授予编辑用户组成员功能的权限。"
       }
     }
+  },
+  "username_suggestion": {
+    "active_user": "活跃用户",
+    "inactive_user": "非活跃用户"
   }
 }

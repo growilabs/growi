@@ -13,16 +13,26 @@ import { AsyncTypeahead, Menu, MenuItem } from 'react-bootstrap-typeahead';
 import { useTranslation } from 'react-i18next';
 
 import type { IClearable } from '~/client/interfaces/clearable';
-import { useSWRxAuditlogSuggestions } from '~/stores/activity';
 
 import { shouldShowUsernameSuggestion } from './should-show-username-suggestion';
+import type { UseUsernameSuggestions } from './username-suggestions';
 
+// Grouping keys, not display text — `renderMenu` groups options by them and
+// `toUserDataItem` defaults to one, so the values are load-bearing.
 const Categories = {
-  activeUser: 'Active User',
-  inactiveUser: 'Inactive User',
+  activeUser: 'activeUser',
+  inactiveUser: 'inactiveUser',
 } as const;
 
 type CategoryType = (typeof Categories)[keyof typeof Categories];
+
+// Must be `commons`: admin pages load ['admin'] and the search page loads
+// ['translation'], so it is the only namespace both get (see
+// pages/common-props/i18n.ts). Anywhere else renders raw keys on half the callers.
+const CATEGORY_LABEL_KEYS = {
+  [Categories.activeUser]: 'commons:username_suggestion.active_user',
+  [Categories.inactiveUser]: 'commons:username_suggestion.inactive_user',
+} as const satisfies Record<CategoryType, string>;
 
 type UserDataType = {
   username: string;
@@ -38,6 +48,8 @@ const toUserDataItem = (username: string): UserDataType => ({
 
 type Props = {
   onChange: (text: string[]) => void;
+  // Required, not defaulted — see `UseUsernameSuggestions`.
+  useUsernameSuggestions: UseUsernameSuggestions;
   initialUsernames?: string[];
   // Callers outside the admin pages must supply their own placeholder: the
   // default key lives in the `admin` i18n namespace, which those pages don't load.
@@ -51,7 +63,13 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   IClearable,
   Props
 > = (props: Props, ref) => {
-  const { onChange, initialUsernames, placeholder, id } = props;
+  const {
+    onChange,
+    useUsernameSuggestions,
+    initialUsernames,
+    placeholder,
+    id,
+  } = props;
   const { t } = useTranslation();
 
   const typeaheadRef = useRef<TypeaheadRef>(null);
@@ -82,14 +100,8 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   /*
    * Fetch
    */
-  const {
-    data: suggestionsData,
-    error,
-    isLoading: _isLoading,
-  } = useSWRxAuditlogSuggestions('username', searchKeyword);
-  const activeUsernames = suggestionsData?.username?.activeUsernames ?? [];
-  const inactiveUsernames = suggestionsData?.username?.inactiveUsernames ?? [];
-  const isLoading = _isLoading === true && error == null;
+  const { activeUsernames, inactiveUsernames, isLoading } =
+    useUsernameSuggestions(searchKeyword);
 
   const allUser: UserDataType[] = [
     ...activeUsernames.map((username) => ({
@@ -129,33 +141,42 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
     [searchKeyword, selectedItems],
   );
 
-  const renderMenu = useCallback((allUser: UserDataType[], menuProps) => {
-    if (allUser == null || allUser.length === 0) {
-      return <></>;
-    }
+  const renderMenu = useCallback(
+    (allUser: UserDataType[], menuProps) => {
+      if (allUser == null || allUser.length === 0) {
+        return <></>;
+      }
 
-    let index = 0;
-    const items = Object.values(Categories).map((category) => {
-      const userData = allUser.filter((user) => user.category === category);
-      return (
-        <Fragment key={category}>
-          {index !== 0 && <Menu.Divider />}
-          <Menu.Header>{category}</Menu.Header>
-          {userData.map((user) => {
-            const item = (
-              <MenuItem key={index} option={user} position={index}>
-                {user.username}
-              </MenuItem>
-            );
-            index++;
-            return item;
-          })}
-        </Fragment>
-      );
-    });
+      let index = 0;
+      const items = Object.values(Categories).map((category) => {
+        const userData = allUser.filter((user) => user.category === category);
 
-    return <Menu {...menuProps}>{items}</Menu>;
-  }, []);
+        if (userData.length === 0) {
+          return [];
+        }
+        const isFirstGroup = index === 0;
+
+        return (
+          <Fragment key={category}>
+            {!isFirstGroup && <Menu.Divider />}
+            <Menu.Header>{t(CATEGORY_LABEL_KEYS[category])}</Menu.Header>
+            {userData.map((user) => {
+              const item = (
+                <MenuItem key={index} option={user} position={index}>
+                  {user.username}
+                </MenuItem>
+              );
+              index++;
+              return item;
+            })}
+          </Fragment>
+        );
+      });
+
+      return <Menu {...menuProps}>{items}</Menu>;
+    },
+    [t],
+  );
 
   useImperativeHandle(ref, () => ({
     clear() {

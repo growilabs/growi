@@ -6,7 +6,10 @@ import { format } from 'date-fns/format';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
-import { SearchUsernameTypeahead } from '~/client/components/SearchUsernameTypeahead';
+import {
+  SearchUsernameTypeahead,
+  useAuditlogUsernameSuggestions,
+} from '~/client/components/SearchUsernameTypeahead';
 import type { IClearable } from '~/client/interfaces/clearable';
 import { toastError } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
@@ -259,6 +262,7 @@ export const AuditLogManagement: FC = () => {
               <SearchUsernameTypeahead
                 ref={typeaheadRef}
                 onChange={setUsernamesHandler}
+                useUsernameSuggestions={useAuditlogUsernameSuggestions}
               />
             </div>
 
