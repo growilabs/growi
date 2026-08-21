@@ -66,7 +66,7 @@
   - _Requirements: 1.6, 2.3_
   - _Depends: 3.1_
 
-- [ ] 4. (P) 通知生成を汎用化する
+- [x] 4. (P) 通知生成を汎用化する
   - `summarizeUniqueConflicts`を`conflictsByCollection`の走査に書き換え、種別・件数・代表例(先頭数件)を含む文言を生成する。既存のusers/usergroups向けの出力形式は変えない。
   - 既存のunit(`summarize-unique-conflicts.spec.ts`)を新しい形へ書き換える。
   - Observable: externalaccounts/externalusergroupsの衝突を含むレポートでも、種別・件数・代表例を含む通知文が生成される。
