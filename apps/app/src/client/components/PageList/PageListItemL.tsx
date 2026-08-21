@@ -278,10 +278,16 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
               <div className="d-flex justify-content-between">
                 {/* page path */}
                 {isPathTruncationEnabled ? (
-                  <SearchResultAncestorPath
-                    path={pageData.path}
-                    highlightedPath={elasticSearchResult?.highlightedPath}
-                  />
+                  // Let the path take the remaining width and shrink below its content
+                  // size; min-width:0 is what actually enables the 1-line ellipsis inside
+                  // SearchResultAncestorPath (no Bootstrap min-width-0 utility). Mirrors
+                  // the same wrapper used for SearchResultPagePath in SearchResultMenuItem.
+                  <span className="flex-grow-1" style={{ minWidth: 0 }}>
+                    <SearchResultAncestorPath
+                      path={pageData.path}
+                      highlightedPath={elasticSearchResult?.highlightedPath}
+                    />
+                  </span>
                 ) : (
                   <PagePathHierarchicalLink
                     linkedPagePath={linkedPagePathFormer}
