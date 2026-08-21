@@ -25,7 +25,7 @@
   - _Depends: 1.1_
 
 - [ ] 2. externalaccounts/externalusergroupsの抽出と既存候補取得を追加する
-- [ ] 2.1 複合キー向けの既存候補取得(タプル単位のバッチ$or)を追加する
+- [x] 2.1 複合キー向けの既存候補取得(タプル単位のバッチ$or)を追加する
   - `findExistingCandidates`に、フィールドの組(タプル)ごとの完全一致条件をバッチにまとめた`$or`で既存候補を取得する経路を追加する。単一フィールドキーは既存の`$in`方式のまま。
   - Observable: `providerType`のように値の種類が少ないフィールドを含む複合キーで、既存候補の取得件数がタプルの実使用数に比例し、コレクション全件を取得しないことをunitで確認する。
   - _Requirements: 1.1_
@@ -149,3 +149,5 @@
 
 - 1.1完了時のレビューで判明: 7.1の`_Depends:_`を`1.1`から`3.1`へ修正した。7.1は`USER_UNIQUE_KEYS`(1.1ではなく3.1で導入)を参照するため、1.1完了時点ではまだ着手できない。
 - 1.1: 複合キーの`UniqueFieldConflict.value`は`JSON.stringify(values)`形式(例: `["saml","x"]`)。単一フィールドキーは従来どおり素の値を報告する(`toReportedValue`が`toMatchKey`から独立)。タスク4(通知汎用化)はこの形式を前提に文言を組み立てること。
+- 2.1: `findExistingCandidates`をテストのためexportした(design.mdのService Interfaceには無い露出)。タスク3.2で`detectUniqueConflicts`が宣言駆動になれば複合キーの`$or`形状が公開エントリ経由で検証可能になるため、その時点でexportを外せる。
+- 2.1: `EXISTING_LOOKUP_BATCH_SIZE`(1000)を`$or`のタプル件数上限にも流用した。`$in`の1000要素と`$or`の1000分岐はクエリの重さが同じではないため、タスク6.x(実DB検証)で1000分岐境界のクエリプラン(`explain()`で`{providerType,accountId}`の複合索引が使われ、コレクションスキャンにならないこと)を確認すること。

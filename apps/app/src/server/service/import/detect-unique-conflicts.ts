@@ -358,29 +358,96 @@ const toBatches = <T>(values: readonly T[], size: number): T[][] => {
 };
 
 /**
- * Fetches only the destination documents that could collide: one `$in` query per unique
- * field over the values the archive actually uses, projected down to `_id` plus those
- * fields. Results are de-duplicated by `_id` because one document can match several fields.
+ * The distinct value tuples the archive occupies on one unique key.
+ *
+ * De-duplicated through {@link toMatchKey} - the same composition the comparison uses -
+ * so a tuple many documents share is asked for once, and skipping documents that do not
+ * fill every field of the key is the same sparse-field exclusion {@link readKeyValues}
+ * applies (a document holding no value on the key cannot collide on it).
  */
-const findExistingCandidates = async <T extends { _id: string }>(input: {
+const collectArchiveKeyTuples = <T>(
+  archiveDocs: readonly T[],
+  fields: readonly (keyof T & string)[],
+): string[][] => {
+  const tuples = new Map<string, string[]>();
+
+  for (const doc of archiveDocs) {
+    const values = readKeyValues(doc, fields);
+    if (values == null) continue;
+    tuples.set(toMatchKey(values), values);
+  }
+
+  return [...tuples.values()];
+};
+
+// One `$or` element: every field of the key pinned to the value of one tuple.
+const toExactMatchFilter = (
+  fields: readonly string[],
+  values: readonly string[],
+): Record<string, string> =>
+  Object.fromEntries(fields.map((field, index) => [field, values[index]]));
+
+/**
+ * The queries that fetch the destination documents which could collide on one unique key,
+ * batched so that no single query asks for the whole archive's worth of values.
+ *
+ * A single-field key narrows with `$in` over the values the archive uses - effective
+ * because such fields (`username`, `email`) hold a great many distinct values.
+ *
+ * A composite key must not be narrowed field by field: `externalaccounts.providerType`
+ * only ever holds one of a handful of values (`ldap` / `saml` / `oidc` / ...), so an `$in`
+ * on it alone matches nearly the entire destination collection and defeats the constraint
+ * that the destination is never loaded whole into memory. Each tuple the archive actually
+ * uses therefore becomes an exact-match condition over all of the key's fields, gathered
+ * into an `$or` - which is also what the collection's own composite index is built for.
+ *
+ * A key no archive document fills yields no query at all, which is required and not merely
+ * an optimisation: MongoDB rejects an empty `$or`.
+ */
+const buildLookupFilters = <T>(
+  archiveDocs: readonly T[],
+  key: UniqueKeySpec<T>,
+): Record<string, unknown>[] => {
+  const tuples = collectArchiveKeyTuples(archiveDocs, key.fields);
+  const batches = toBatches(tuples, EXISTING_LOOKUP_BATCH_SIZE);
+
+  if (key.fields.length === 1) {
+    const field = key.fields[0];
+    return batches.map((batch) => ({
+      [field]: { $in: batch.map(([value]) => value) },
+    }));
+  }
+
+  return batches.map((batch) => ({
+    $or: batch.map((values) => toExactMatchFilter(key.fields, values)),
+  }));
+};
+
+/**
+ * Fetches only the destination documents that could collide, projected down to `_id` plus
+ * every field any key names. Results are de-duplicated by `_id` because one document can
+ * match several keys.
+ *
+ * Exported for the unit test that pins the shape of the queries this issues - the
+ * performance constraint above is a property of the filters, not of what they return.
+ */
+export const findExistingCandidates = async <T extends { _id: string }>(input: {
   lookup: ExistingDocumentLookup;
   archiveDocs: readonly T[];
-  fields: readonly (UniqueField & keyof T)[];
+  keys: readonly UniqueKeySpec<T>[];
   pick: (doc: RawDocument) => T;
 }): Promise<T[]> => {
-  const { lookup, archiveDocs, fields, pick } = input;
+  const { lookup, archiveDocs, keys, pick } = input;
 
-  const projection = ['_id', ...fields].join(' ');
+  const projectedFields = new Set(keys.flatMap((key) => key.fields));
+  const projection = ['_id', ...projectedFields].join(' ');
   const existingById = new Map<string, T>();
 
-  for (const field of fields) {
-    for (const batch of toBatches(
-      collectArchiveValues(archiveDocs, field),
-      EXISTING_LOOKUP_BATCH_SIZE,
-    )) {
+  for (const key of keys) {
+    for (const filter of buildLookupFilters(archiveDocs, key)) {
       // Sequential on purpose: the batches exist to bound how much one query asks for,
       // which firing them all at once would defeat.
-      const rawDocs = await lookup({ [field]: { $in: batch } }, projection);
+      const rawDocs = await lookup(filter, projection);
 
       for (const rawDoc of rawDocs) {
         const picked = pick(rawDoc);
@@ -406,21 +473,18 @@ const detectForCollection = async <T extends { _id: string }>(input: {
     return [];
   }
 
+  // These collections are still declared as a flat field list; each field is its own
+  // single-field unique key. Generalising the declaration itself is a later step.
+  const keys = fields.map((field) => ({ label: field, fields: [field] }));
+
   const existingDocs = await findExistingCandidates({
     lookup,
     archiveDocs,
-    fields,
+    keys,
     pick,
   });
 
-  // These collections are still declared as a flat field list; each field is its own
-  // single-field unique key. Generalising the declaration itself is a later step.
-  return collectConflicts(
-    collection,
-    archiveDocs,
-    existingDocs,
-    fields.map((field) => ({ label: field, fields: [field] })),
-  );
+  return collectConflicts(collection, archiveDocs, existingDocs, keys);
 };
 
 // Counts and field names only: the conflicting values are user data (e-mail addresses,

@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import {
   collectConflicts,
+  findExistingCandidates,
   type GroupUniqueFields,
   hasConflicts,
   readArchiveUserIdentity,
@@ -301,6 +302,173 @@ describe('collectConflicts', () => {
 
       expect(result).toEqual([]);
     });
+  });
+});
+
+describe('findExistingCandidates', () => {
+  // A composite-key collection shaped like `externalaccounts`: `providerType` takes only a
+  // handful of values, so it must never be queried on its own.
+  interface ExternalAccountLike {
+    _id: string;
+    providerType?: string | null;
+    accountId?: string | null;
+  }
+
+  const pickExternalAccountLike = (
+    doc: Record<string, unknown>,
+  ): ExternalAccountLike => ({
+    _id: String(doc._id),
+    providerType:
+      typeof doc.providerType === 'string' ? doc.providerType : undefined,
+    accountId: typeof doc.accountId === 'string' ? doc.accountId : undefined,
+  });
+
+  const pickUserLike = (doc: Record<string, unknown>): UserUniqueFields => ({
+    _id: String(doc._id),
+    username: typeof doc.username === 'string' ? doc.username : undefined,
+    email: typeof doc.email === 'string' ? doc.email : undefined,
+    slackMemberId:
+      typeof doc.slackMemberId === 'string' ? doc.slackMemberId : undefined,
+  });
+
+  const providerAccountKey = {
+    label: 'providerType+accountId',
+    fields: ['providerType', 'accountId'],
+  } as const;
+
+  test('queries a composite key by exact-match tuples, never by the low-cardinality field alone', async () => {
+    // Requirement 1.1: the fetched candidate set has to be proportional to the tuples the
+    // archive actually uses. A `$in` on `providerType` alone would match nearly the whole
+    // destination collection.
+    const lookup = vi.fn().mockResolvedValue([]);
+    const archiveDocs: ExternalAccountLike[] = [
+      { _id: 'a1', providerType: 'saml', accountId: 'x' },
+      { _id: 'a2', providerType: 'saml', accountId: 'y' },
+      { _id: 'a3', providerType: 'ldap', accountId: 'x' },
+      // A repeat of the first tuple: the query must carry it only once.
+      { _id: 'a4', providerType: 'saml', accountId: 'x' },
+    ];
+
+    await findExistingCandidates({
+      lookup,
+      archiveDocs,
+      keys: [providerAccountKey],
+      pick: pickExternalAccountLike,
+    });
+
+    expect(lookup).toHaveBeenCalledTimes(1);
+
+    const [filter, projection] = lookup.mock.calls[0];
+    // `$or` is the only top-level condition: nothing narrows on a single field, whatever
+    // order the tuples happen to come in.
+    expect(Object.keys(filter)).toEqual(['$or']);
+    expect(filter.$or).toEqual([
+      { providerType: 'saml', accountId: 'x' },
+      { providerType: 'saml', accountId: 'y' },
+      { providerType: 'ldap', accountId: 'x' },
+    ]);
+    expect(projection).toBe('_id providerType accountId');
+  });
+
+  test('batches the tuples of a composite key so that one query never asks for all of them', async () => {
+    const lookup = vi.fn().mockResolvedValue([]);
+    const archiveDocs: ExternalAccountLike[] = Array.from(
+      { length: 1500 },
+      (_unused, i) => ({
+        _id: `a${i}`,
+        providerType: 'saml',
+        accountId: `account-${i}`,
+      }),
+    );
+
+    await findExistingCandidates({
+      lookup,
+      archiveDocs,
+      keys: [providerAccountKey],
+      pick: pickExternalAccountLike,
+    });
+
+    expect(lookup).toHaveBeenCalledTimes(2);
+    expect(lookup.mock.calls[0][0].$or).toHaveLength(1000);
+    expect(lookup.mock.calls[1][0].$or).toHaveLength(500);
+  });
+
+  test('does not query at all when no archive document fills every field of a composite key', async () => {
+    // The sparse-field exclusion: such documents hold no value on the key, so there is
+    // nothing to look for. An empty `$or` would also be rejected by MongoDB itself.
+    const lookup = vi.fn().mockResolvedValue([]);
+    const archiveDocs: ExternalAccountLike[] = [
+      { _id: 'a1', providerType: 'saml' },
+      { _id: 'a2', accountId: 'x' },
+      { _id: 'a3', providerType: 'ldap', accountId: '' },
+    ];
+
+    await findExistingCandidates({
+      lookup,
+      archiveDocs,
+      keys: [providerAccountKey],
+      pick: pickExternalAccountLike,
+    });
+
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  test('keeps querying a single-field key with $in', async () => {
+    const lookup = vi.fn().mockResolvedValue([]);
+    const archiveDocs: UserUniqueFields[] = [
+      { _id: 'a1', username: 'alice', email: 'alice@example.com' },
+      { _id: 'a2', username: 'bob' },
+    ];
+
+    await findExistingCandidates({
+      lookup,
+      archiveDocs,
+      keys: [
+        { label: 'username', fields: ['username'] },
+        { label: 'email', fields: ['email'] },
+      ],
+      pick: pickUserLike,
+    });
+
+    expect(lookup).toHaveBeenCalledTimes(2);
+    expect(lookup.mock.calls[0][0]).toEqual({
+      username: { $in: ['alice', 'bob'] },
+    });
+    expect(lookup.mock.calls[1][0]).toEqual({
+      email: { $in: ['alice@example.com'] },
+    });
+    // Every field of every key is projected, each of them once.
+    expect(lookup.mock.calls[0][1]).toBe('_id username email');
+  });
+
+  test('returns each matched existing document once even when several keys match it', async () => {
+    const existingRawDoc = {
+      _id: 'existing-1',
+      username: 'alice',
+      email: 'alice@example.com',
+    };
+    const lookup = vi.fn().mockResolvedValue([existingRawDoc]);
+
+    const result = await findExistingCandidates({
+      lookup,
+      archiveDocs: [
+        { _id: 'a1', username: 'alice', email: 'alice@example.com' },
+      ] satisfies UserUniqueFields[],
+      keys: [
+        { label: 'username', fields: ['username'] },
+        { label: 'email', fields: ['email'] },
+      ],
+      pick: pickUserLike,
+    });
+
+    expect(result).toEqual([
+      {
+        _id: 'existing-1',
+        username: 'alice',
+        email: 'alice@example.com',
+        slackMemberId: undefined,
+      },
+    ]);
   });
 });
 
