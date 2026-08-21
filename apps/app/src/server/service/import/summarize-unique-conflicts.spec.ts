@@ -176,7 +176,7 @@ describe('summarizeUniqueConflicts', () => {
   });
 
   test('summarizes externalaccounts composite-key conflicts with per-field identifying values', () => {
-    // Requirement 3.1 for the newly-covered collection: providerType+accountId is a
+    // Requirements 3.1 / 3.2 for the newly-covered collection: providerType+accountId is a
     // composite key, so the operator must be able to tell which value belongs to which
     // field, not just see an opaque combined string.
     const summary = summarizeUniqueConflicts(

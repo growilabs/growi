@@ -19,7 +19,7 @@ import {
 } from './detect-unique-conflicts';
 
 /**
- * Guards requirement 5.1/5.2: the unique keys this detection declares must stay equal to
+ * Guards requirement 6.1/6.2: the unique keys this detection declares must stay equal to
  * the unique constraints the data model actually defines. A constraint that exists in the
  * database but is missing from the declaration is exactly the silent detection gap this
  * feature was opened for, and the reverse (a declared key with no real constraint) means

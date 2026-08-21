@@ -436,7 +436,7 @@ describe('G2GTransferReceiverService.detectImportConflicts', () => {
   });
 
   test('detects an externalaccounts unique-constraint conflict and interrupts the receive flow before anything is written', async () => {
-    // Requirements 2.1, 2.2, 2.3, 3.2 — the same non-destructive gate the users/usergroups
+    // Requirements 2.1, 2.2, 2.4, 3.2 — the same non-destructive gate the users/usergroups
     // tests above prove, exercised for the composite {providerType, accountId} key so that
     // externalaccounts (this spec's addition) is proven wired end-to-end into the receive
     // flow, not only unit-tested in isolation (detect-unique-conflicts.integ.ts covers the
@@ -485,13 +485,13 @@ describe('G2GTransferReceiverService.detectImportConflicts', () => {
       },
     ]);
 
-    // Requirement 2.1/2.3 — no collection was written to at all, not just externalaccounts.
+    // Requirement 2.1/2.4 — no collection was written to at all, not just externalaccounts.
     expect(after).toEqual(before);
     // The archive document must not have been imported.
     expect(
       await ExternalAccount.findById(ARCHIVE_EXTERNAL_ACCOUNT_ID),
     ).toBeNull();
-    // Requirement 2.3 — the pre-existing document is completely unchanged.
+    // Requirement 2.4 — the pre-existing document is completely unchanged.
     const existingAfter = await ExternalAccount.findById(
       existingExternalAccountId,
     ).lean();

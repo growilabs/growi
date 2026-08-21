@@ -215,7 +215,7 @@ describe('collectConflicts', () => {
 
   describe('externalaccounts collection', () => {
     test('flags a providerType+accountId match with a different _id as a conflict', () => {
-      // Requirement 1.1: externalaccounts' composite unique index is {providerType, accountId}.
+      // Requirement 1.7: externalaccounts' composite unique index is {providerType, accountId}.
       const archiveDocs: ExternalAccountUniqueFields[] = [
         { _id: 'archive-account-1', providerType: 'saml', accountId: 'user-a' },
       ];
@@ -246,7 +246,7 @@ describe('collectConflicts', () => {
     });
 
     test('does not flag a conflict when only one of providerType/accountId matches', () => {
-      // Requirement 1.1: a partial match on the composite key is not a conflict.
+      // Requirement 1.10: a partial match on the composite key is not a conflict.
       const archiveDocs: ExternalAccountUniqueFields[] = [
         { _id: 'archive-account-1', providerType: 'saml', accountId: 'user-a' },
       ];
@@ -285,7 +285,7 @@ describe('collectConflicts', () => {
 
   describe('externalusergroups collection', () => {
     test('flags an externalId match with a different _id as a conflict', () => {
-      // Requirement 1.3: externalusergroups' externalId is a single-field unique key.
+      // Requirement 1.8: externalusergroups' externalId is a single-field unique key.
       const archiveDocs: ExternalUserGroupUniqueFields[] = [
         {
           _id: 'archive-group-1',
@@ -322,7 +322,7 @@ describe('collectConflicts', () => {
     });
 
     test('flags a name+provider match with a different _id as a conflict', () => {
-      // Requirement 1.4: externalusergroups' name+provider is a composite unique key,
+      // Requirement 1.9: externalusergroups' name+provider is a composite unique key,
       // independent of the externalId key above.
       const archiveDocs: ExternalUserGroupUniqueFields[] = [
         {
@@ -360,7 +360,7 @@ describe('collectConflicts', () => {
     });
 
     test('does not flag a conflict when only name matches and provider differs', () => {
-      // Requirement 1.4: a partial match on the composite key is not a conflict.
+      // Requirement 1.10: a partial match on the composite key is not a conflict.
       const archiveDocs: ExternalUserGroupUniqueFields[] = [
         {
           _id: 'archive-group-3',
@@ -389,7 +389,7 @@ describe('collectConflicts', () => {
     });
 
     test('does not flag a conflict when only provider matches and name differs', () => {
-      // Requirement 1.4: a partial match on the composite key is not a conflict.
+      // Requirement 1.10: a partial match on the composite key is not a conflict.
       const archiveDocs: ExternalUserGroupUniqueFields[] = [
         {
           _id: 'archive-group-4',
@@ -479,7 +479,7 @@ describe('collectConflicts', () => {
     } as const;
 
     test('does not flag a conflict when only one of the two fields matches', () => {
-      // Requirement 1.2: a partial match on a composite unique key is not a conflict.
+      // Requirement 1.10: a partial match on a composite unique key is not a conflict.
       const archiveDocs: UserUniqueFields[] = [
         { _id: 'archive-user-1', username: 'alice', email: 'alice@a.example' },
       ];
@@ -495,7 +495,7 @@ describe('collectConflicts', () => {
     });
 
     test('flags a conflict when every field of the key matches under a different _id', () => {
-      // Requirement 1.1 / 1.4
+      // Requirement 1.7 / 1.9
       const archiveDocs: UserUniqueFields[] = [
         { _id: 'archive-user-1', username: 'alice', email: 'alice@a.example' },
       ];
@@ -519,7 +519,7 @@ describe('collectConflicts', () => {
     });
 
     test('does not flag a conflict when the per-field values differ but a delimiter concatenation would collide', () => {
-      // Requirement 1.2: proves the composite value is built with JSON.stringify and not
+      // Requirement 1.10: proves the composite value is built with JSON.stringify and not
       // by joining the fields with a delimiter -- 'a' + '|' + 'b|c' and 'a|b' + '|' + 'c'
       // are both 'a|b|c', yet these are two different pairs of values.
       const archiveDocs: UserUniqueFields[] = [
@@ -603,7 +603,7 @@ describe('findExistingCandidates', () => {
   } as const;
 
   test('queries a composite key by exact-match tuples, never by the low-cardinality field alone', async () => {
-    // Requirement 1.1: the fetched candidate set has to be proportional to the tuples the
+    // Requirement 1.7: the fetched candidate set has to be proportional to the tuples the
     // archive actually uses. A `$in` on `providerType` alone would match nearly the whole
     // destination collection.
     const lookup = vi.fn().mockResolvedValue([]);
@@ -750,7 +750,7 @@ describe('COLLECTION_DETECTORS', () => {
   });
 
   test('declares one detector per detected collection', () => {
-    // Requirement 5.1: the declaration list is the single source for which collections the
+    // Requirement 6.1: the declaration list is the single source for which collections the
     // detection covers. The compiler already cross-checks each entry's key list against its
     // pick function (both fix the same `T`); the collection *name* is the one argument it
     // cannot check, so a name wired to the wrong declaration is only visible here.

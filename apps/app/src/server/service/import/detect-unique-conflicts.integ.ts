@@ -587,7 +587,7 @@ describe('detectUniqueConflicts', () => {
   });
 
   /*
-   * Requirements 6.1, 6.2 — the two collections whose unique constraints are composite.
+   * Requirements 5.3, 5.4 — the two collections whose unique constraints are composite.
    *
    * These run through the whole `detectUniqueConflicts` orchestrator against the real
    * replica set, which is what the unit-level `collectConflicts` tests cannot cover: the
@@ -627,7 +627,7 @@ describe('detectUniqueConflicts', () => {
       report.conflictsByCollection.get('externalusergroups') ?? [];
 
     test('detects a providerType+accountId conflict when the archive account shares both values under a different _id', async () => {
-      // Requirement 1.1, 6.1
+      // Requirement 1.7, 5.3
       const userId = await seedExistingUser();
       const existingId = await seedExistingExternalAccount(userId);
       const accountsJsonPath = await writeArchiveJson(
@@ -665,7 +665,7 @@ describe('detectUniqueConflicts', () => {
     });
 
     test('reports no conflict when only providerType matches and accountId differs', async () => {
-      // Requirement 1.2, 6.1 — half of a composite key is not a unique-index violation.
+      // Requirement 1.10, 5.3 — half of a composite key is not a unique-index violation.
       const userId = await seedExistingUser();
       await seedExistingExternalAccount(userId);
       const accountsJsonPath = await writeArchiveJson(
@@ -689,7 +689,7 @@ describe('detectUniqueConflicts', () => {
     });
 
     test('reports no conflict when only accountId matches and providerType differs', async () => {
-      // Requirement 1.2, 6.1 — the mirror image of the case above: the same account id
+      // Requirement 1.10, 5.3 — the mirror image of the case above: the same account id
       // registered against a different identity provider is a different account.
       const userId = await seedExistingUser();
       await seedExistingExternalAccount(userId);
@@ -714,7 +714,7 @@ describe('detectUniqueConflicts', () => {
     });
 
     test('reports no conflict when the archive account is the same document (same _id) as the existing account', async () => {
-      // Requirement 1.5, 6.1 — re-importing the same document.
+      // Requirement 1.5, 5.3 — re-importing the same document.
       const userId = await seedExistingUser();
       const existingId = await seedExistingExternalAccount(userId);
       const accountsJsonPath = await writeArchiveJson(
@@ -738,7 +738,7 @@ describe('detectUniqueConflicts', () => {
     });
 
     test('detects an externalId conflict when the archive group shares the externalId under a different _id', async () => {
-      // Requirement 1.3, 6.2 — `name` and `provider` deliberately differ from the seeded
+      // Requirement 1.8, 5.4 — `name` and `provider` deliberately differ from the seeded
       // group, so the single-field `externalId` key is the only one that can fire and the
       // conflict below names which key matched.
       const existingId = await seedExistingExternalUserGroup();
@@ -773,7 +773,7 @@ describe('detectUniqueConflicts', () => {
     });
 
     test('detects a name+provider conflict when the archive group shares both values under a different _id', async () => {
-      // Requirement 1.4, 6.2 — `externalId` deliberately differs, so the composite
+      // Requirement 1.9, 5.4 — `externalId` deliberately differs, so the composite
       // {name, provider} key is the only one that can fire.
       const existingId = await seedExistingExternalUserGroup();
       const groupsJsonPath = await writeArchiveJson(
@@ -808,7 +808,7 @@ describe('detectUniqueConflicts', () => {
     });
 
     test('reports no conflict when neither externalId nor name+provider overlaps with the destination', async () => {
-      // Requirement 6.2 — the clean case both keys must let through.
+      // Requirement 5.4 — the clean case both keys must let through.
       await seedExistingExternalUserGroup();
       const groupsJsonPath = await writeArchiveJson(
         'externalusergroups-no-overlap.json',
@@ -829,7 +829,7 @@ describe('detectUniqueConflicts', () => {
     });
 
     test('reports no conflict when the archive group is the same document (same _id) as the existing group', async () => {
-      // Requirement 1.5, 6.2 — re-importing the same document. Here both keys match, so
+      // Requirement 1.5, 5.4 — re-importing the same document. Here both keys match, so
       // this is also the case that proves the same-`_id` exclusion applies per key rather
       // than to whichever key happens to be evaluated first.
       const existingId = await seedExistingExternalUserGroup();

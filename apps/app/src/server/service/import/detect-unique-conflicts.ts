@@ -130,7 +130,7 @@ const readKeyValues = <T>(
  * any string, including the delimiter itself. Joining with `|` makes
  * `{providerType: 'a', accountId: 'b|c'}` and `{providerType: 'a|b', accountId: 'c'}`
  * both read as `a|b|c` and collide, which would report a conflict between two documents
- * that do not actually share a key (requirement 1.2). The array form keeps each value's
+ * that do not actually share a key (requirement 1.10). The array form keeps each value's
  * boundaries explicit, so values can never run into each other.
  */
 const toMatchKey = (values: readonly string[]): string =>
@@ -638,7 +638,7 @@ export interface CollectionInput {
  * match — there is no runtime fallback branch for "no declared detector" because that
  * state is unreachable, not merely unlikely.
  *
- * The destination is only ever read (requirement 2.3).
+ * The destination is only ever read (requirement 2.4).
  */
 export async function detectUniqueConflicts(input: {
   collections: readonly CollectionInput[];
