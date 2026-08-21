@@ -200,7 +200,7 @@ export const USER_UNIQUE_KEYS: readonly UniqueKeySpec<UserUniqueFields>[] = [
   { label: 'slackMemberId', fields: ['slackMemberId'] },
 ] as const;
 
-const GROUP_UNIQUE_KEYS: readonly UniqueKeySpec<GroupUniqueFields>[] = [
+export const GROUP_UNIQUE_KEYS: readonly UniqueKeySpec<GroupUniqueFields>[] = [
   { label: 'name', fields: ['name'] },
 ] as const;
 

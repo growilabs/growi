@@ -123,7 +123,7 @@
   - _Boundary: detect-unique-conflicts.integ.ts_
   - _Depends: 8.1_
 
-- [ ] 9. 一意キー宣言と実際のデータモデルのドリフトを検出する試験を作る
+- [x] 9. 一意キー宣言と実際のデータモデルのドリフトを検出する試験を作る
   - `COLLECTION_DETECTORS`の宣言と、`users`/`usergroups`/`externalaccounts`/`externalusergroups`それぞれの`Model.schema.indexes()`(`unique: true`のもの)を突き合わせ、両者がずれたら失敗する試験を作る。
   - **`CollectionDetector`型は`collection`と`detect`のみを持ち、キー宣言(`fields`)を公開しない(3.1のレビューで確認済み・意図的)。ドリフト試験は`COLLECTION_DETECTORS`からコレクション名の一覧だけを読み、キー宣言自体は4つの`*_UNIQUE_KEYS`定数(`USER_UNIQUE_KEYS`/`GROUP_UNIQUE_KEYS`/`EXTERNAL_ACCOUNT_UNIQUE_KEYS`/`EXTERNAL_USER_GROUP_UNIQUE_KEYS`)を直接importして読むこと。** `CollectionDetector`に`fields`相当のプロパティを追加しない(`T`を消してしまい、3.1が避けた型アサーション問題を再導入するため)。4定数のうち`GROUP_UNIQUE_KEYS`のみ未exportなので、このタスクでexportに変更する(1行、`detect-unique-conflicts.ts`)。
   - `externalaccounts`については、この試験がMongooseスキーマ(Prisma移行完了までの暫定コード)を一意制約の正として読んでいることをコメントで明記する。
