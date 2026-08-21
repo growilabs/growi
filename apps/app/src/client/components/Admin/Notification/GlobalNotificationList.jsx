@@ -186,7 +186,7 @@ class GlobalNotificationList extends React.Component {
                       )}
                     >
                       <span className="material-symbols-outlined">note</span>{' '}
-                      {t('Edit')}
+                      {t('commons:table_action.edit')}
                     </a>
                     <button
                       className="dropdown-item"

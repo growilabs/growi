@@ -152,5 +152,8 @@
     "transfer_key_limit": "전송 키는 발급 후 1시간 동안 유효합니다.",
     "once_transfer_key_used": "전송 키가 전송에 사용되면 다른 전송에는 사용할 수 없습니다.",
     "transfer_to_growi_cloud": "자세한 내용은 <a href='{{documentationUrl}}en/admin-guide/management-cookbook/g2g-transfer.html'>여기를 클릭하십시오.</a>"
+  },
+  "table_action": {
+    "edit": "편집"
   }
 }

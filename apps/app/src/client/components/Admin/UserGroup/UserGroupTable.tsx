@@ -277,7 +277,7 @@ export const UserGroupTable: FC<Props> = ({
                           <span className="material-symbols-outlined me-1">
                             edit_square
                           </span>{' '}
-                          {t('Edit')}
+                          {t('commons:table_action.edit')}
                         </button>
                         {onRemove != null && (
                           <button

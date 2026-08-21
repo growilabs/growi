@@ -171,6 +171,16 @@
   - _Boundary: Bug 2 Remediation_
   - _Depends: 7.1, 4.2_
 
+- [x] 7.3 残り2件（`Edit` / `Update`）の生キー表示を解消する
+  - **`Edit` の解決（ユーザー判断: 別キーを新設）**: `Admin/UserGroup/UserGroupTable.tsx` の編集ボタンのために、`commons.json` に新規キー（例: `table_action.edit`）を5言語すべてに追加する。値は既存の `Edit`（`translation.json`）の値をそのまま複製する。`UserGroupTable.tsx` の呼び出しをこの新規キーに前置する（`commons:Edit` へは前置しない）。`Navbar/PageEditorModeManager.tsx` の `commons:Edit`（fr_FR "Écriture"）は変更しない
+  - **`Update` の解決**: `Admin/ImportData/GrowiArchive/ImportCollectionConfigurationModal.jsx` と `Admin/Notification/GlobalNotification.jsx` の `t('Update')` を `t('commons:Update')` に前置する（両ファイルとも `useTranslation('admin')` で、`commons:Update` は既に7.1で複製済み・7.2で他ファイルから参照済み）
+  - **`Admin/Notification/GlobalNotificationList.jsx:199` の `Edit`**: 7.2 の対象36ファイルの一覧には無かったが同じ仕組みの生キー表示バグ。`t('commons:Edit')` に前置する（`UserGroupTable.tsx` とは別問題で、こちらは既存の `commons:Edit` をそのまま使ってよい — `PageEditorModeManager.tsx` との衝突は `UserGroupTable.tsx` 固有の懸念であり、このファイルの `Edit` ボタンには当たらない）
+  - 前後で表示文言が一致することを確認する（新規キーは既存の `Edit` の値をそのまま複製するため一致する）
+  - 観測可能な完了条件: `i18next-cli status en_US --hide-translated` の報告が0件になる
+  - _Requirements: 1.1, 1.4, 7.1_
+  - _Boundary: Bug 2 Remediation_
+  - _Depends: 7.2_
+
 ## 8. Integration: 基準線を初めて記録する
 
 - [ ] 8.1 全ての修正が完了した状態で基準線を初めて記録する
@@ -179,7 +189,7 @@
   - 観測可能な完了条件: `pnpm run lint:i18n` を通常実行し、既定言語の欠損参照が0件、未使用キー・言語別欠損が新しく記録した基準線以下で合格する
   - _Requirements: 1.4, 2.2, 3.2_
   - _Boundary: Baseline Store_
-  - _Depends: 1.5, 2.1, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 5.1, 6.1, 7.1, 7.2_
+  - _Depends: 1.5, 2.1, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 5.1, 6.1, 7.1, 7.2, 7.3_
 
 ## 9. Validation: 既存テストの整理確認と全体の回帰確認
 
@@ -216,5 +226,6 @@
   - `UserGroupTable.tsx` の `Edit`（本タスクの前提条件により意図的に未対応。人間判断待ち）と、`Admin/ImportData/GrowiArchive/ImportCollectionConfigurationModal.jsx` の `Update`、`Admin/Notification/GlobalNotification.jsx` の `Update`、`Admin/Notification/GlobalNotificationList.jsx` の `Edit` — この3ファイルは `i18next-cli status` の報告に出ており、`en_US --hide-translated` の残り2件（`Edit`/`Update`）の出どころ
   - `GlobalNotificationList.jsx:199` の `Delete`、`NotificationDeleteModal.jsx:39` の `Delete`、`DeleteAllShareLinksModal.jsx:32,35` の `Cancel`/`Delete`、`UserRemoveButton.jsx:43` の `Delete` — これらは4.2で対応した「`t` を props で受け取る」12ファイルの中にあるが、CLI の報告には出ない（props 経由の namespace を CLI が追跡できないため）。実行時には生キー表示になっている可能性が高い
   - いずれも Bug 2 と同じ原因・同じ直し方（`commons:` 前置）で解消できると見込まれるが、対象一覧の確定（1.2 相当の再調査）と実装は別タスクとして起票すること。
+- 7.3: `Edit`/`Update` の解消により `i18next-cli status en_US --hide-translated` が初めて0件（要件1の目標）に到達した。実装時に、タスク文が前提としていた「`GlobalNotificationList.jsx` の `Edit` は `commons:Edit` を再利用してよい」という判断が誤りだったことが判明した。実際のUIを確認した結果、この `Edit` は行内ドロップダウンの「この項目を編集する」リンクで、`UserGroupTable.tsx` の編集ボタンと同じ「テーブル行の編集操作」という意味であり、`commons:Edit`（`PageEditorModeManager.tsx` の閲覧/執筆モード切り替えUI専用、fr_FR "Écriture"）とは意味が異なる。タスク文どおりに `commons:Edit` へ前置すると、fr_FR で新たに「Écriture（執筆）」という不自然な表示が生まれてしまう（レビューで独立に検証済み）。実装者はこの1点だけタスク文から離れ、同タスクで新設した `commons:table_action.edit`（`UserGroupTable.tsx` 用）を代わりに使うことで、fr_FR の新規不具合を避けつつ0件化を達成した。レビューでこの逸脱は妥当と判定済み。上記の3件（`GlobalNotificationList.jsx:199` の `Delete` 等、props 経由で CLI から見えない生キー表示バグ）は未解消のまま残っている。
 - 6.1: タスク文は「`SamlSecuritySettingContents.tsx:685` からも参照されており報告に出ている」としていたが、実測（before/after の A/B）では `translation` namespace の欠損はちょうど1件で、その1件は `saml.ts` 由来だった。`.tsx` 側の参照は最初から報告に出ていなかった（`SamlSecuritySettingContents.tsx` 自体が `useTranslation('admin')` を呼んでおり、前置無しでも `admin.json` から解決できていたため）。件数には影響しないが、前置しても解決結果は一致する（レビューで実測確認済み）ため変更は維持した。
 - 4.3: design.md/タスク文は Group 4 の6キーすべてを「実行時にも生キーが表示される実在の不具合」としていたが、実装時に i18next の実際の解決結果を確認した結果、実在の不具合は4キー（`security_settings.updated_general_security_setting` / `Show` / `Hide` / `New`、5ファイル）のみで、残り2キー（`not_found_page.page_not_exist` / `toaster.create_failed`、6ファイル）は前置前から `useTranslation(['translation', 'commons'])` の配列指定または `useTranslation('commons')` の既定指定により正しく解決できており、生キー表示にはなっていなかったことが判明した（レビューで実際に i18next を起動して独立検証済み）。前置自体は6キーすべてに必要（`i18next-cli` の検出のため）だが、9.2 の前後比較で「一致を求めない例外」に含めるのは実在の不具合4キーのみとした。design.md の該当箇所（Group 4 の説明、Testing Strategy）も合わせて訂正済み。
