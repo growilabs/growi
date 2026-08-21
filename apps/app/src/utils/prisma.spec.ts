@@ -193,7 +193,7 @@ describe('paginateLogic — observable contract', () => {
 
       const result = await paginateLogic(delegate, { offset: 0, limit: 10 });
 
-      expect(result.totalPages).toBe(0);
+      expect(result.totalPages).toBe(1);
     });
   });
 

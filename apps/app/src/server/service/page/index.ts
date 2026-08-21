@@ -73,7 +73,6 @@ import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { PathAlreadyExistsError } from '../../models/errors';
 import type { PageOperationDocument } from '../../models/page-operation';
 import PageOperation from '../../models/page-operation';
-import PageRedirect from '../../models/page-redirect';
 import { serializePageSecurely } from '../../models/serializers/page-serializer';
 import Subscription from '../../models/subscription';
 import UserGroupRelation from '../../models/user-group-relation';
@@ -767,9 +766,11 @@ class PageService implements IPageService {
 
     // create page redirect
     if (options.createRedirectPage) {
-      await PageRedirect.create({
-        fromPath: page.path,
-        toPath: newPagePathSanitized,
+      await prisma.pageredirects.create({
+        data: {
+          fromPath: page.path,
+          toPath: newPagePathSanitized,
+        },
       });
     }
     // Carry the old path / new path so that subscribers (e.g. growi-vault) can
@@ -1067,9 +1068,11 @@ class PageService implements IPageService {
     );
 
     if (createRedirectPage) {
-      await PageRedirect.create({
-        fromPath: page.path,
-        toPath: newPagePathSanitized,
+      await prisma.pageredirects.create({
+        data: {
+          fromPath: page.path,
+          toPath: newPagePathSanitized,
+        },
       });
     }
 
@@ -1109,7 +1112,7 @@ class PageService implements IPageService {
     const { updateMetadata, createRedirectPage } = options;
 
     const updatePathOperations: any[] = [];
-    const insertPageRedirectOperations: any[] = [];
+    const pageRedirectsToCreate: { fromPath: string; toPath: string }[] = [];
 
     pages.forEach((page) => {
       const newPagePath = page.path.replace(
@@ -1133,13 +1136,9 @@ class PageService implements IPageService {
 
       if (!page.isEmpty && createRedirectPage) {
         // insert PageRedirect
-        insertPageRedirectOperations.push({
-          insertOne: {
-            document: {
-              fromPath: page.path,
-              toPath: newPagePath,
-            },
-          },
+        pageRedirectsToCreate.push({
+          fromPath: page.path,
+          toPath: newPagePath,
         });
       }
 
@@ -1161,13 +1160,9 @@ class PageService implements IPageService {
       }
     }
 
-    try {
-      await PageRedirect.bulkWrite(insertPageRedirectOperations);
-    } catch (err) {
-      if (err.code !== 11000) {
-        throw Error(`Failed to create PageRedirect documents: ${err}`);
-      }
-    }
+    await prisma.pageredirects.createManyIgnoringDuplicates(
+      pageRedirectsToCreate,
+    );
 
     // Carry the prefix shift so subscribers can propagate the bulk rename
     // without re-deriving the prefix from individual pages. Optional 4th arg —
@@ -1189,7 +1184,7 @@ class PageService implements IPageService {
     const { updateMetadata, createRedirectPage } = options;
 
     const unorderedBulkOp = pageCollection.initializeUnorderedBulkOp();
-    const insertPageRedirectOperations: any[] = [];
+    const pageRedirectsToCreate: { fromPath: string; toPath: string }[] = [];
 
     pages.forEach((page) => {
       const newPagePath = page.path.replace(
@@ -1212,13 +1207,9 @@ class PageService implements IPageService {
       }
       // insert PageRedirect
       if (!page.isEmpty && createRedirectPage) {
-        insertPageRedirectOperations.push({
-          insertOne: {
-            document: {
-              fromPath: page.path,
-              toPath: newPagePath,
-            },
-          },
+        pageRedirectsToCreate.push({
+          fromPath: page.path,
+          toPath: newPagePath,
         });
       }
     });
@@ -1231,13 +1222,9 @@ class PageService implements IPageService {
       }
     }
 
-    try {
-      await PageRedirect.bulkWrite(insertPageRedirectOperations);
-    } catch (err) {
-      if (err.code !== 11000) {
-        throw Error(`Failed to create PageRedirect documents: ${err}`);
-      }
-    }
+    await prisma.pageredirects.createManyIgnoringDuplicates(
+      pageRedirectsToCreate,
+    );
 
     // Same payload contract as renameDescendants above — see the comment there
     // for rationale on the optional 4th argument.
@@ -2156,9 +2143,11 @@ class PageService implements IPageService {
       data: { isPageTrashed: true },
     });
     try {
-      await PageRedirect.create({ fromPath: page.path, toPath: newPath });
+      await prisma.pageredirects.create({
+        data: { fromPath: page.path, toPath: newPath },
+      });
     } catch (err) {
-      if (err.code !== 11000) {
+      if (err.code !== 'P2002') {
         throw err;
       }
     }
@@ -2243,9 +2232,11 @@ class PageService implements IPageService {
     });
 
     try {
-      await PageRedirect.create({ fromPath: page.path, toPath: newPath });
+      await prisma.pageredirects.create({
+        data: { fromPath: page.path, toPath: newPath },
+      });
     } catch (err) {
-      if (err.code !== 11000) {
+      if (err.code !== 'P2002') {
         throw err;
       }
     }
@@ -2259,7 +2250,7 @@ class PageService implements IPageService {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
     const deletePageOperations: any[] = [];
-    const insertPageRedirectOperations: any[] = [];
+    const pageRedirectsToCreate: { fromPath: string; toPath: string }[] = [];
 
     pages.forEach((page) => {
       const newPath = Page.getDeletedPageName(page.path);
@@ -2287,13 +2278,9 @@ class PageService implements IPageService {
           };
 
       if (!page.isEmpty) {
-        insertPageRedirectOperations.push({
-          insertOne: {
-            document: {
-              fromPath: page.path,
-              toPath: newPath,
-            },
-          },
+        pageRedirectsToCreate.push({
+          fromPath: page.path,
+          toPath: newPath,
         });
       }
 
@@ -2310,13 +2297,9 @@ class PageService implements IPageService {
       this.pageEvent.emit('syncDescendantsDelete', pages, user);
     }
 
-    try {
-      await PageRedirect.bulkWrite(insertPageRedirectOperations);
-    } catch (err) {
-      if (err.code !== 11000) {
-        throw Error(`Failed to create PageRedirect documents: ${err}`);
-      }
-    }
+    await prisma.pageredirects.createManyIgnoringDuplicates(
+      pageRedirectsToCreate,
+    );
   }
 
   /**
@@ -2782,7 +2765,9 @@ class PageService implements IPageService {
 
     try {
       await Page.bulkWrite(revertPageOperations);
-      await PageRedirect.deleteMany({ fromPath: { $in: fromPathsToDelete } });
+      await prisma.pageredirects.deleteMany({
+        where: { fromPath: { in: fromPathsToDelete } },
+      });
     } catch (err) {
       if (err.code !== 11000) {
         throw new Error(`Failed to revert pages: ${err}`);
@@ -4906,7 +4891,8 @@ class PageService implements IPageService {
     // createSubOperation, which the caller does not await and which logged a
     // failure without acting on it, leaving that state permanently.
     try {
-      const { deletedCount } = await PageRedirect.deleteOne({ fromPath: path });
+      const { count: deletedCount } =
+        await prisma.pageredirects.deleteByFromPath(path);
       if (deletedCount > 0) {
         logger.info(
           `Deleted the page redirect from "${path}" before creating a page there.`,

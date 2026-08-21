@@ -360,8 +360,9 @@ model pageoperations {
 
 model pageredirects {
   id       String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  fromPath Json?  @unique(map: "fromPath_1")
+  v        Int    @default(0) @map("__v")
+  fromPath String @unique(map: "fromPath_1")
+  toPath   String
 }
 
 model pages {
@@ -401,6 +402,7 @@ model pages {
   attachments      attachments[]
   bookmarks        bookmarks[]
   pagetagrelations pagetagrelations[]
+  sharelinks       sharelinks[]
 
   @@index([parentId], map: "parent_1")
   @@index([path], map: "path_1")
@@ -472,11 +474,16 @@ model sessions {
 }
 
 model sharelinks {
-  id          String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  relatedPage Json?
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  v             Int       @default(0) @map("__v")
+  relatedPageId String    @map("relatedPage") @db.ObjectId
+  expiredAt     DateTime?
+  description   String?
+  createdAt     DateTime  @default(now())
 
-  @@index([relatedPage], map: "relatedPage_1")
+  relatedPage pages @relation(fields: [relatedPageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([relatedPageId], map: "relatedPage_1")
 }
 
 model slackappintegrations {

@@ -12,18 +12,12 @@ import { getInstance } from '^/test/setup/crowi';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
-import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
   PageOperationModel,
 } from '~/server/models/page-operation';
-import type {
-  IPageRedirect,
-  PageRedirectModel,
-} from '~/server/models/page-redirect';
-import type { ShareLinkModel } from '~/server/models/share-link';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import { prisma } from '~/utils/prisma';
 
@@ -42,8 +36,6 @@ describe('PageService page operations with only public pages', () => {
   let crowi: Crowi;
   let Page: PageModel;
   let User: Model<IUser>;
-  let ShareLink: ShareLinkModel;
-  let PageRedirect: PageRedirectModel;
   let PageOperation: PageOperationModel;
   let generalXssFilterProcessSpy: ReturnType<typeof vi.spyOn>;
 
@@ -83,10 +75,6 @@ describe('PageService page operations with only public pages', () => {
 
     User = mongoose.model('User');
     Page = mongoose.model<IPage, PageModel>('Page');
-    ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
-    PageRedirect = mongoose.model<IPageRedirect, PageRedirectModel>(
-      'PageRedirect',
-    );
     PageOperation = mongoose.model<IPageOperation, PageOperationModel>(
       'PageOperation',
     );
@@ -1088,31 +1076,35 @@ describe('PageService page operations with only public pages', () => {
       },
     });
 
-    await PageRedirect.insertMany([
-      {
-        fromPath: '/from/v5_PageForDeleteCompletely2',
-        toPath: '/v5_PageForDeleteCompletely2',
-      },
-      {
-        fromPath:
-          '/from/v5_PageForDeleteCompletely2/v5_PageForDeleteCompletely3/v5_PageForDeleteCompletely4',
-        toPath:
-          '/v5_PageForDeleteCompletely2/v5_PageForDeleteCompletely3/v5_PageForDeleteCompletely4',
-      },
-    ]);
+    await prisma.pageredirects.createMany({
+      data: [
+        {
+          fromPath: '/from/v5_PageForDeleteCompletely2',
+          toPath: '/v5_PageForDeleteCompletely2',
+        },
+        {
+          fromPath:
+            '/from/v5_PageForDeleteCompletely2/v5_PageForDeleteCompletely3/v5_PageForDeleteCompletely4',
+          toPath:
+            '/v5_PageForDeleteCompletely2/v5_PageForDeleteCompletely3/v5_PageForDeleteCompletely4',
+        },
+      ],
+    });
 
-    await ShareLink.insertMany([
-      {
-        relatedPage: pageIdForDeleteCompletely2,
-        expiredAt: null,
-        description: 'sharlink_v5PageForDeleteCompletely2',
-      },
-      {
-        relatedPage: pageIdForDeleteCompletely4,
-        expiredAt: null,
-        description: 'sharlink_v5PageForDeleteCompletely4',
-      },
-    ]);
+    await prisma.sharelinks.createMany({
+      data: [
+        {
+          relatedPageId: pageIdForDeleteCompletely2.toString(),
+          expiredAt: null,
+          description: 'sharlink_v5PageForDeleteCompletely2',
+        },
+        {
+          relatedPageId: pageIdForDeleteCompletely4.toString(),
+          expiredAt: null,
+          description: 'sharlink_v5PageForDeleteCompletely4',
+        },
+      ],
+    });
 
     /**
      * Revert
@@ -1599,9 +1591,8 @@ describe('PageService page operations with only public pages', () => {
         },
       );
       assert(renamedPage != null);
-      const pageRedirect = await PageRedirect.findOne({
-        fromPath: oldPath,
-        toPath: renamedPage.path,
+      const pageRedirect = await prisma.pageredirects.findFirst({
+        where: { fromPath: oldPath, toPath: renamedPage.path },
       });
 
       expect(generalXssFilterProcessSpy).toHaveBeenCalled();
@@ -2774,17 +2765,17 @@ describe('PageService page operations with only public pages', () => {
       const comment = await prisma.comments.findFirst({
         where: { pageId: parentPage?._id.toString() },
       });
-      const pageRedirect1 = await PageRedirect.findOne({
-        toPath: parentPage?.path,
+      const pageRedirect1 = await prisma.pageredirects.findFirst({
+        where: { toPath: parentPage?.path },
       });
-      const pageRedirect2 = await PageRedirect.findOne({
-        toPath: grandchildPage?.path,
+      const pageRedirect2 = await prisma.pageredirects.findFirst({
+        where: { toPath: grandchildPage?.path },
       });
-      const shareLink1 = await ShareLink.findOne({
-        relatedPage: parentPage?._id,
+      const shareLink1 = await prisma.sharelinks.findFirst({
+        where: { relatedPageId: parentPage?._id.toString() },
       });
-      const shareLink2 = await ShareLink.findOne({
-        relatedPage: grandchildPage?._id,
+      const shareLink2 = await prisma.sharelinks.findFirst({
+        where: { relatedPageId: grandchildPage?._id.toString() },
       });
       expect(parentPage).toBeTruthy();
       expect(childPage).toBeTruthy();
@@ -2838,11 +2829,21 @@ describe('PageService page operations with only public pages', () => {
       const deletedComments = await prisma.comments.findMany({
         where: { id: comment?.id },
       });
-      const deletedPageRedirects = await PageRedirect.find({
-        _id: { $in: [pageRedirect1?._id, pageRedirect2?._id] },
+      const deletedPageRedirects = await prisma.pageredirects.findMany({
+        where: {
+          id: {
+            in: [pageRedirect1?.id, pageRedirect2?.id].filter(
+              (id) => id != null,
+            ),
+          },
+        },
       });
-      const deletedShareLinks = await ShareLink.find({
-        _id: { $in: [shareLink1?._id, shareLink2?._id] },
+      const deletedShareLinks = await prisma.sharelinks.findMany({
+        where: {
+          id: {
+            in: [shareLink1?.id, shareLink2?.id].filter((id) => id != null),
+          },
+        },
       });
 
       // page should be null

@@ -1,5 +1,5 @@
-import ShareLink from '~/server/models/share-link';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 const logger = loggerFactory('growi:middleware:certify-shared-page');
 
@@ -34,9 +34,15 @@ export const setup = (crowi) => {
       return next();
     }
 
-    const sharelink = await ShareLink.findOne({
-      _id: { $eq: shareLinkId },
-      relatedPage: { $eq: pageId },
+    const sharelink = await prisma.sharelinks.findFirst({
+      // coerce to string: shareLinkId/pageId come straight from
+      // req.query/req.body, and Express's default qs parser can turn a
+      // bracketed query key into an object (e.g. `?shareLinkId[$ne]=1`),
+      // which Prisma would otherwise accept as a filter operator
+      where: {
+        id: String(shareLinkId),
+        relatedPageId: String(pageId),
+      },
     });
 
     // check sharelink enabled
