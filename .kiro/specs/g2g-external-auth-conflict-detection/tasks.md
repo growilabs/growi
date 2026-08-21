@@ -97,7 +97,7 @@
   - _Boundary: rescue-admins.spec.ts_
   - _Depends: 3.1_
 
-- [ ] 7.2 g2g-transfer.integ.tsのアサーションを新しいレポート形式へ書き換え、externalaccountsの衝突で受信フローが中断することを確認する
+- [x] 7.2 g2g-transfer.integ.tsのアサーションを新しいレポート形式へ書き換え、externalaccountsの衝突で受信フローが中断することを確認する
   - `report.userConflicts`/`report.groupConflicts`を直接読んでいる箇所(約10箇所)を、`conflictsByCollection`経由の読み方へ書き換える。
   - externalaccountsの一意制約衝突を仕込んだ受信フローの結合試験を新規に追加し、取り込みが開始されず(要件2.1)、成功として完了せず(要件2.2)、既存データが無変更のまま(要件2.3)であることを確認する。
   - Observable: 既存の`g2g-transfer.integ.ts`がグリーンで、externalaccountsの衝突を仕込んだ新規ケースが中断を確認する。
