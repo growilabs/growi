@@ -4,9 +4,12 @@ import path from 'node:path';
 
 import {
   collectConflicts,
+  EXTERNAL_ACCOUNT_UNIQUE_KEYS,
+  type ExternalAccountUniqueFields,
   findExistingCandidates,
   type GroupUniqueFields,
   hasConflicts,
+  pickExternalAccountUniqueFields,
   readArchiveUserIdentity,
   type UniqueConflictReport,
   type UserUniqueFields,
@@ -203,6 +206,76 @@ describe('collectConflicts', () => {
       ]);
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('externalaccounts collection', () => {
+    test('flags a providerType+accountId match with a different _id as a conflict', () => {
+      // Requirement 1.1: externalaccounts' composite unique index is {providerType, accountId}.
+      const archiveDocs: ExternalAccountUniqueFields[] = [
+        { _id: 'archive-account-1', providerType: 'saml', accountId: 'user-a' },
+      ];
+      const existingDocs: ExternalAccountUniqueFields[] = [
+        {
+          _id: 'existing-account-1',
+          providerType: 'saml',
+          accountId: 'user-a',
+        },
+      ];
+
+      const result = collectConflicts(
+        'externalaccounts',
+        archiveDocs,
+        existingDocs,
+        EXTERNAL_ACCOUNT_UNIQUE_KEYS,
+      );
+
+      expect(result).toEqual([
+        {
+          collection: 'externalaccounts',
+          field: 'providerType+accountId',
+          value: JSON.stringify(['saml', 'user-a']),
+          archiveId: 'archive-account-1',
+          existingId: 'existing-account-1',
+        },
+      ]);
+    });
+
+    test('does not flag a conflict when only one of providerType/accountId matches', () => {
+      // Requirement 1.1: a partial match on the composite key is not a conflict.
+      const archiveDocs: ExternalAccountUniqueFields[] = [
+        { _id: 'archive-account-1', providerType: 'saml', accountId: 'user-a' },
+      ];
+      const existingDocs: ExternalAccountUniqueFields[] = [
+        {
+          _id: 'existing-account-1',
+          providerType: 'saml',
+          accountId: 'user-b',
+        },
+      ];
+
+      const result = collectConflicts(
+        'externalaccounts',
+        archiveDocs,
+        existingDocs,
+        EXTERNAL_ACCOUNT_UNIQUE_KEYS,
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    test('pickExternalAccountUniqueFields normalises a raw document to string fields', () => {
+      const picked = pickExternalAccountUniqueFields({
+        _id: { toString: () => 'raw-id' },
+        providerType: 'ldap',
+        accountId: 'cn=alice',
+      });
+
+      expect(picked).toEqual({
+        _id: 'raw-id',
+        providerType: 'ldap',
+        accountId: 'cn=alice',
+      });
     });
   });
 

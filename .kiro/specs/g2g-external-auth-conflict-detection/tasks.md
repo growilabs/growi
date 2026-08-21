@@ -32,7 +32,7 @@
   - _Boundary: detect-unique-conflicts findExistingCandidates_
   - _Depends: 1.1_
 
-- [ ] 2.2 externalaccountsの一意キー宣言と抽出を追加する
+- [x] 2.2 externalaccountsの一意キー宣言と抽出を追加する
   - `ExternalAccountUniqueFields`型とpick関数、`EXTERNAL_ACCOUNT_UNIQUE_KEYS`(`{providerType, accountId}`の複合キー)を追加する。
   - `mongoose.model('ExternalAccount')`はモデルファイルが一度もimportされていないプロセスでは`MissingSchemaError`を投げるため、unit testでは`~/server/models/external-account`を明示的にimportしてから呼ぶ。
   - Observable: `providerType`+`accountId`の組で衝突を検知するunit testがグリーン。

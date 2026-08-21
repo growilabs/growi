@@ -30,6 +30,12 @@ export interface GroupUniqueFields {
   name?: string | null;
 }
 
+export interface ExternalAccountUniqueFields {
+  _id: string;
+  providerType?: string | null;
+  accountId?: string | null;
+}
+
 /**
  * Every value the archive's users hold on a unique field, plus every `_id` it carries.
  *
@@ -190,6 +196,14 @@ const GROUP_UNIQUE_FIELDS = [
   'name',
 ] as const satisfies readonly GroupUniqueField[];
 
+// `externalaccounts` has no single-field unique key of its own — only the composite
+// {providerType, accountId} index (see models/external-account.ts) — so this is declared
+// directly in the new UniqueKeySpec[] form rather than as a flat field-name list.
+export const EXTERNAL_ACCOUNT_UNIQUE_KEYS: readonly UniqueKeySpec<ExternalAccountUniqueFields>[] =
+  [
+    { label: 'providerType+accountId', fields: ['providerType', 'accountId'] },
+  ] as const;
+
 type RawDocument = Record<string, unknown>;
 
 /**
@@ -225,6 +239,14 @@ const pickUserUniqueFields = (doc: RawDocument): UserUniqueFields => ({
 const pickGroupUniqueFields = (doc: RawDocument): GroupUniqueFields => ({
   _id: toIdString(doc._id),
   name: asOptionalString(doc.name),
+});
+
+export const pickExternalAccountUniqueFields = (
+  doc: RawDocument,
+): ExternalAccountUniqueFields => ({
+  _id: toIdString(doc._id),
+  providerType: asOptionalString(doc.providerType),
+  accountId: asOptionalString(doc.accountId),
 });
 
 // Only the first and last few bytes are inspected, so verifying a multi-gigabyte archive
