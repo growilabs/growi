@@ -68,8 +68,8 @@ first:
 1. **`flaky/observing`** — a single vitest observation with no corroborating
    signal (see "Cheap Suspicion Mining" below). Passive: waits for a future
    run to repeat it (`--vitest-threshold`).
-2. **`flaky/suspected`** — a vitest observation that also matches one of the
-   four cheap, mechanical signals in "Cheap Suspicion Mining" (diff/PR
+2. **`flaky/suspected`** — a vitest observation that also matches one or more
+   of the four cheap, mechanical signals in "Cheap Suspicion Mining" (diff/PR
    mismatch, sandwich pattern, matrix divergence, or a targeted historical
    backfill hit). No LLM judgment is spent getting here — these are
    grep/diff-level checks against data this skill already fetched (or, for
@@ -95,8 +95,33 @@ string search, no code reading. ①-③ run against a **fresh** observation
 made during this scan; ④ runs once per scan against **existing**
 `flaky/observing` issues regardless of whether anything new was observed
 for them today (see its own subsection below for why it's structured
-differently). Run ①-③ in this order and stop at the first hit (cheapest
-first):
+differently).
+
+**Evaluate all of ①-③ for every fresh observation — do not stop at the
+first hit.** All three reuse data already fetched in Steps 1-2 (no extra API
+calls), so short-circuiting saves nothing. It also actively loses
+information: ① (diff/PR mismatch) is the loosest of the three — it only
+needs "the PR/commit diff doesn't touch this area" — so it tends to match
+almost any isolated failure before ② or ③ get evaluated. Stopping at ①
+means never learning whether the same failure also had a same-commit
+matrix-divergence proof (③, arguably the strongest of the three — it's a
+same-commit, same-code comparison, not an inference from an unrelated
+diff) or a sandwich pattern (②). Left unrecorded, this makes ②/③ look like
+they never fire in practice, when in fact they may be firing constantly
+underneath ①'s wider net — record every check that matches, not just the
+first:
+
+- **Record every match.** Note in this run's evidence which of ①/②/③ hit,
+  even when more than one did.
+- **Report all matched checks in the issue**, not just one (see the issue
+  body template below) — a reader deciding how much to trust "suspected"
+  should see every corroborating signal, not whichever happened to be
+  checked first.
+- **When space forces picking a single headline reason** (e.g. a short
+  status line), prefer the strongest evidence, not check order: ③ (same
+  commit, same code, divergent outcome) > ② (disappears-and-reappears
+  within the window) > ① (diff/PR mismatch, an inference rather than a
+  direct comparison).
 
 **① Diff / PR-description mismatch.** Fetch the commit's associated PR (if
 any):
@@ -542,7 +567,7 @@ gh issue create --repo growilabs/growi \
 ## Detected by detect-flaky-ci
 
 **Identity key**: `{IDENTITY_KEY}`
-**Kind**: {playwright | vitest} {(strong evidence: passed on in-run retry) if confirmed} {(cheap suspicion: {① diff/PR mismatch | ② sandwich pattern | ③ matrix divergence}) if suspected}
+**Kind**: {playwright | vitest} {(strong evidence: passed on in-run retry) if confirmed} {(cheap suspicion: {every matched check among ① diff/PR mismatch, ② sandwich pattern, ③ matrix divergence, joined with " + ", e.g. "① + ③"}) if suspected}
 
 ### First observation
 
@@ -557,13 +582,17 @@ gh issue create --repo growilabs/growi \
 {relevant log excerpt — the FAIL block or the ::error annotation + retry blocks}
 ```
 
-{if suspected, additionally include the specific mining evidence: e.g. "PR #{N} changed {files}, none overlap this spec's path or stack trace" / "same identity failed in run {A}, passed in intervening run {B}, failed again here" / "sibling matrix job {NAME} on the same commit passed"}
+{if suspected, include the specific mining evidence **for every check that matched, not just one** — one line per match, e.g.:
+"① PR #{N} changed {files}, none overlap this spec's path or stack trace"
+"② same identity failed in run {A}, passed in intervening run {B}, failed again here"
+"③ sibling matrix job {NAME} on the same commit passed"
+List whichever subset actually matched; omit lines for checks that didn't hit.}
 
 ### Status
 
 {pick exactly one:
  - confirmed (Playwright): "Confirmed flaky from a single run (Playwright retry evidence)."
- - suspected (vitest, mining hit): "Suspected flaky ({① | ② | ③}) — handed directly to investigate-flaky-test for a one-time confirmation rerun, no threshold wait needed."
+ - suspected (vitest, mining hit): "Suspected flaky ({every matched check, e.g. "① + ③", ordered strongest-first: ③ > ② > ①}) — handed directly to investigate-flaky-test for a one-time confirmation rerun, no threshold wait needed."
  - observing (vitest, no mining hit): "Observation 1/{VITEST_THRESHOLD} — needs {VITEST_THRESHOLD - 1} more independent occurrence(s) before this is handed to investigate-flaky-test."}
 EOF
 )"
@@ -595,10 +624,12 @@ EOF
 
 Then check both escalation paths, in this order:
 
-1. **Does this new observation itself hit a mining check** (① / ② / ③,
-   re-run against the accumulated history now that there are 2+ occurrences
-   to compare)? If so, escalate straight to `flaky/suspected`, skipping the
-   threshold wait entirely:
+1. **Does this new observation hit any mining check** (evaluate all of
+   ① / ② / ③ — re-run against the accumulated history now that there are 2+
+   occurrences to compare; do not stop at the first hit, same as the fresh-
+   observation path above)? If so, escalate straight to `flaky/suspected`,
+   skipping the threshold wait entirely, and record every check that
+   matched in the observation comment:
    ```bash
    gh issue edit {NUMBER} --repo growilabs/growi --remove-label "flaky/observing" --add-label "flaky/suspected"
    ```
@@ -719,9 +750,14 @@ report this explicitly, never silently), how many runs were skipped via the
 Step 1.5 skip-list (already-known, not re-fetched), how many jobs actually
 scanned, how many classified as infra noise (with which pattern), how many
 new issues created, how many existing issues updated, how many escalated to
-`flaky/suspected` (and via which of the four mining checks, including how
-many via ④'s backfill specifically) vs `flaky/confirmed`. This is the only
-user-facing output — do not create files.
+`flaky/suspected` vs `flaky/confirmed`, and **a separate hit count for each
+of the four mining checks** (①, ②, ③, ④'s backfill) — since all of ①-③ are
+now evaluated for every observation rather than stopping at the first hit,
+one suspected issue can match more than one check, so these four counts
+will not sum to the total number of suspected issues. Report them
+separately anyway; this is the data that answers "which of these checks is
+actually pulling weight" over time. This is the only user-facing output —
+do not create files.
 
 ## Error Handling
 
