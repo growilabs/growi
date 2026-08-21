@@ -115,7 +115,7 @@
   - _Boundary: detect-unique-conflicts.integ.ts_
   - _Depends: 3.2_
 
-- [ ] 8.2 衝突が無いときのSSO/LDAPログインとグループアクセスの維持を実DBで検証する
+- [x] 8.2 衝突が無いときのSSO/LDAPログインとグループアクセスの維持を実DBで検証する
   - 衝突なしでexternalaccounts/externalusergroupsを含む取り込みを行った後、`providerType`+`accountId`や`externalId`/`name`+`provider`から転送元と同じユーザー・グループへ解決できることを実DBで確認する。**既存の`describe('group access after a conflict-free import', ...)`ブロック(715行目以降、実際の`ImportService`を動かして検証する既存の前例)と同じ形で、externalaccounts/externalusergroups向けの`describe`を追加する**。取り込みの実行自体は`ImportService`が担い(design.mdのOut of Boundary参照)、このタスクは検知が正しく非衝突と判定した後の実際の解決結果を確認する。
   - **8.1と同じファイル(`detect-unique-conflicts.integ.ts`)に追記するため、8.1の完了後に着手する**(同一ファイルへの並行編集を避ける)。
   - Observable: 取り込み後、対象の外部識別子から期待するユーザー・グループが解決される。

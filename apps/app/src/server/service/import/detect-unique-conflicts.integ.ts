@@ -1583,4 +1583,332 @@ describe('detectUniqueConflicts', () => {
       );
     });
   });
+
+  describe('external auth access after a conflict-free import', () => {
+    // Mirrors 'group access after a conflict-free import' above (same seed/detect/import/
+    // resolve shape), but for the two collections this feature adds: externalaccounts and
+    // externalusergroups. `users` is included because ExternalAccount.user is a required ref
+    // and the point of Requirement 4.1 is that the ref keeps resolving to the imported user.
+    const ARCHIVE_COLLECTIONS = [
+      'users',
+      'externalaccounts',
+      'externalusergroups',
+    ] as const;
+    type ExtAuthArchiveCollectionName = (typeof ARCHIVE_COLLECTIONS)[number];
+
+    const SOURCE_EXTAUTH_USER = {
+      _id: '0123456789abcdef01230201',
+      name: 'g2g-detect extauth import user',
+      username: 'g2g-detect-extauth-import-user',
+      email: 'g2g-detect-extauth-import-user@example.com',
+    } satisfies ArchiveDoc;
+
+    const SOURCE_EXTAUTH_ACCOUNT = {
+      _id: '0123456789abcdef01230202',
+      providerType: 'oidc',
+      accountId: 'g2g-detect-extauth-import-account-id',
+      user: SOURCE_EXTAUTH_USER._id,
+    } satisfies ArchiveDoc;
+
+    const SOURCE_EXTAUTH_GROUP = {
+      _id: '0123456789abcdef01230203',
+      name: 'g2g-detect-extauth-import-external-group',
+      externalId: 'g2g-detect-extauth-import-external-id',
+      provider: 'keycloak',
+    } satisfies ArchiveDoc;
+
+    // Destination-side documents that collide with nothing in the archive above: they must
+    // survive the import untouched, proving the insert did not clobber existing SSO/LDAP
+    // bindings.
+    const DESTINATION_EXTAUTH_USER = {
+      name: 'g2g-detect extauth destination user',
+      username: 'g2g-detect-extauth-destination-user',
+      email: 'g2g-detect-extauth-destination-user@example.com',
+    } as const;
+    const DESTINATION_EXTAUTH_ACCOUNT = {
+      providerType: 'saml',
+      accountId: 'g2g-detect-extauth-destination-account-id',
+    } as const;
+    const DESTINATION_EXTAUTH_GROUP = {
+      name: 'g2g-detect-extauth-destination-external-group',
+      externalId: 'g2g-detect-extauth-destination-external-id',
+      provider: 'ldap',
+    } as const;
+
+    let extAuthImportsDir: string;
+    let extAuthImportService: ImportService;
+    let extAuthReceiverService: G2GTransferReceiverService;
+
+    const archiveFileName = (
+      collectionName: ExtAuthArchiveCollectionName,
+    ): string => `${collectionName}.json`;
+
+    const archivePath = (
+      collectionName: ExtAuthArchiveCollectionName,
+    ): string => path.join(extAuthImportsDir, archiveFileName(collectionName));
+
+    const writeArchive = async (
+      docsByCollection: Readonly<
+        Record<ExtAuthArchiveCollectionName, readonly ArchiveDoc[]>
+      >,
+    ): Promise<void> => {
+      await Promise.all(
+        ARCHIVE_COLLECTIONS.map((collectionName) =>
+          fs.writeFile(
+            archivePath(collectionName),
+            JSON.stringify(docsByCollection[collectionName]),
+            'utf-8',
+          ),
+        ),
+      );
+    };
+
+    // Read-only detection over the exact same archive `import()` is about to consume: the
+    // gate this test proves did not falsely block a clean import.
+    const detectConflicts = () =>
+      detectUniqueConflicts({
+        collections: [
+          {
+            collection: 'users',
+            jsonPath: archivePath('users'),
+            lookup: toLookup(User),
+          },
+          {
+            collection: 'externalaccounts',
+            jsonPath: archivePath('externalaccounts'),
+            lookup: toLookup(ExternalAccount),
+          },
+          {
+            collection: 'externalusergroups',
+            jsonPath: archivePath('externalusergroups'),
+            lookup: toLookup(ExternalUserGroup),
+          },
+        ],
+      });
+
+    const buildImportSettingMap = () =>
+      extAuthReceiverService.getImportSettingMap(
+        ARCHIVE_COLLECTIONS.map((collectionName) => ({
+          fileName: archiveFileName(collectionName),
+          collectionName,
+        })),
+        Object.fromEntries(
+          ARCHIVE_COLLECTIONS.map((collectionName) => [
+            collectionName,
+            new GrowiArchiveImportOption(collectionName, ImportMode.insert),
+          ]),
+        ),
+        OPERATOR_USER_ID,
+      );
+
+    const runImport = async (): Promise<void> => {
+      await extAuthImportService.import(
+        [...ARCHIVE_COLLECTIONS],
+        buildImportSettingMap(),
+      );
+    };
+
+    const seedDestination = async (): Promise<{
+      userId: string;
+      accountId: string;
+      groupId: string;
+    }> => {
+      const user = await User.create({ ...DESTINATION_EXTAUTH_USER });
+      const account = await ExternalAccount.create({
+        ...DESTINATION_EXTAUTH_ACCOUNT,
+        user: user._id,
+      });
+      const group = await ExternalUserGroup.create({
+        ...DESTINATION_EXTAUTH_GROUP,
+      });
+      return {
+        userId: String(user._id),
+        accountId: String(account._id),
+        groupId: String(group._id),
+      };
+    };
+
+    const removeExtAuthFixtures = async (): Promise<void> => {
+      await ExternalAccount.deleteMany({
+        accountId: {
+          $in: [
+            SOURCE_EXTAUTH_ACCOUNT.accountId,
+            DESTINATION_EXTAUTH_ACCOUNT.accountId,
+          ],
+        },
+      });
+      await ExternalUserGroup.deleteMany({
+        $or: [
+          { externalId: SOURCE_EXTAUTH_GROUP.externalId },
+          { externalId: DESTINATION_EXTAUTH_GROUP.externalId },
+          {
+            name: {
+              $in: [SOURCE_EXTAUTH_GROUP.name, DESTINATION_EXTAUTH_GROUP.name],
+            },
+          },
+        ],
+      });
+      await User.deleteMany({
+        username: {
+          $in: [
+            SOURCE_EXTAUTH_USER.username,
+            DESTINATION_EXTAUTH_USER.username,
+          ],
+        },
+      });
+      const leftovers = await fs.readdir(extAuthImportsDir);
+      await Promise.all(
+        leftovers.map((fileName) =>
+          fs.rm(path.join(extAuthImportsDir, fileName)),
+        ),
+      );
+    };
+
+    beforeAll(async () => {
+      extAuthImportsDir = path.join(tmpDir, 'imports');
+      await fs.mkdir(extAuthImportsDir, { recursive: true });
+
+      const crowi = mock<Crowi>({
+        tmpDir,
+        events: {
+          page: mock<EventEmitter>(),
+          user: mock<UserEvent>(),
+          admin: mock<EventEmitter>(),
+        },
+      });
+      crowi.growiBridgeService = new GrowiBridgeService(crowi);
+
+      extAuthImportService = new ImportService(crowi);
+      extAuthReceiverService = new G2GTransferReceiverService(crowi);
+
+      await removeExtAuthFixtures();
+    });
+
+    afterEach(async () => {
+      await removeExtAuthFixtures();
+    });
+
+    test('resolves the imported external account to the imported user by providerType+accountId', async () => {
+      // Requirements 4.1, 4.3.
+      await seedDestination();
+
+      await writeArchive({
+        users: [SOURCE_EXTAUTH_USER],
+        externalaccounts: [SOURCE_EXTAUTH_ACCOUNT],
+        externalusergroups: [],
+      });
+
+      // The gate must let this transfer through: nothing collides with the destination.
+      const conflictFreeReport = await detectConflicts();
+      expect(
+        conflictFreeReport.conflictsByCollection.get('externalaccounts'),
+      ).toEqual([]);
+      expect(
+        conflictFreeReport.conflictsByCollection.get('externalusergroups'),
+      ).toEqual([]);
+
+      await runImport();
+
+      const importedAccount = await ExternalAccount.findOne({
+        providerType: SOURCE_EXTAUTH_ACCOUNT.providerType,
+        accountId: SOURCE_EXTAUTH_ACCOUNT.accountId,
+      });
+      if (importedAccount == null) {
+        throw new Error('Imported ExternalAccount was not found');
+      }
+
+      const resolvedUser = await User.findById(importedAccount.user);
+      if (resolvedUser == null) {
+        throw new Error('ExternalAccount.user did not resolve to a user');
+      }
+      expect(resolvedUser.username).toBe(SOURCE_EXTAUTH_USER.username);
+    });
+
+    test('resolves the imported external group from either externalId or name+provider', async () => {
+      // Requirements 4.2, 4.3.
+      await seedDestination();
+
+      await writeArchive({
+        users: [],
+        externalaccounts: [],
+        externalusergroups: [SOURCE_EXTAUTH_GROUP],
+      });
+
+      const conflictFreeReport = await detectConflicts();
+      expect(
+        conflictFreeReport.conflictsByCollection.get('externalaccounts'),
+      ).toEqual([]);
+      expect(
+        conflictFreeReport.conflictsByCollection.get('externalusergroups'),
+      ).toEqual([]);
+
+      await runImport();
+
+      const byExternalId = await ExternalUserGroup.findOne({
+        externalId: SOURCE_EXTAUTH_GROUP.externalId,
+      });
+      if (byExternalId == null) {
+        throw new Error(
+          'Imported ExternalUserGroup was not resolvable by externalId',
+        );
+      }
+      expect(byExternalId.name).toBe(SOURCE_EXTAUTH_GROUP.name);
+
+      const byNameAndProvider = await ExternalUserGroup.findOne({
+        name: SOURCE_EXTAUTH_GROUP.name,
+        provider: SOURCE_EXTAUTH_GROUP.provider,
+      });
+      if (byNameAndProvider == null) {
+        throw new Error(
+          'Imported ExternalUserGroup was not resolvable by name+provider',
+        );
+      }
+      expect(String(byNameAndProvider._id)).toBe(String(byExternalId._id));
+    });
+
+    test('leaves the destination account and group resolvable and unaffected by the insert', async () => {
+      // Requirement 4.3 — the non-regression half: a conflict-free import must not disturb
+      // what was already there.
+      const destination = await seedDestination();
+
+      await writeArchive({
+        users: [SOURCE_EXTAUTH_USER],
+        externalaccounts: [SOURCE_EXTAUTH_ACCOUNT],
+        externalusergroups: [SOURCE_EXTAUTH_GROUP],
+      });
+
+      const conflictFreeReport = await detectConflicts();
+      expect(
+        conflictFreeReport.conflictsByCollection.get('externalaccounts'),
+      ).toEqual([]);
+      expect(
+        conflictFreeReport.conflictsByCollection.get('externalusergroups'),
+      ).toEqual([]);
+
+      await runImport();
+
+      const destinationAccount = await ExternalAccount.findById(
+        destination.accountId,
+      );
+      if (destinationAccount == null) {
+        throw new Error('Destination ExternalAccount was not found');
+      }
+      expect(destinationAccount.providerType).toBe(
+        DESTINATION_EXTAUTH_ACCOUNT.providerType,
+      );
+      expect(destinationAccount.accountId).toBe(
+        DESTINATION_EXTAUTH_ACCOUNT.accountId,
+      );
+
+      const destinationGroup = await ExternalUserGroup.findById(
+        destination.groupId,
+      );
+      if (destinationGroup == null) {
+        throw new Error('Destination ExternalUserGroup was not found');
+      }
+      expect(destinationGroup.externalId).toBe(
+        DESTINATION_EXTAUTH_GROUP.externalId,
+      );
+    });
+  });
 });
