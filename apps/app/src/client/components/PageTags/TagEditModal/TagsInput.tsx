@@ -26,6 +26,17 @@ export const TagsInput: FC<Props> = (props: Props) => {
 
   const isLoading = error == null && tagsSearch === undefined;
 
+  // Mirror the latest SWR result in a ref so searchHandler can read it without
+  // depending on it. AsyncTypeahead recreates its internal debounced search
+  // callback whenever the `onSearch` prop identity changes (see
+  // react-bootstrap-typeahead's useAsync), and its cleanup CANCELS any
+  // in-flight debounced call. If searchHandler's identity changed while a
+  // just-typed keystroke's search was still pending in the 200ms debounce
+  // window, that pending search was silently dropped and the typeahead
+  // dropdown never populated (root cause of #11734).
+  const tagsSearchRef = useRef(tagsSearch);
+  tagsSearchRef.current = tagsSearch;
+
   const changeHandler = useCallback(
     (selected: string[]) => {
       onTagsUpdated(selected);
@@ -33,15 +44,13 @@ export const TagsInput: FC<Props> = (props: Props) => {
     [onTagsUpdated],
   );
 
-  const searchHandler = useCallback(
-    (query: string) => {
-      const tagsSearchData = tagsSearch?.tags || [];
-      setSearchQuery(query);
-      tagsSearchData.unshift(query);
-      setResultTags(Array.from(new Set(tagsSearchData)));
-    },
-    [tagsSearch?.tags],
-  );
+  const searchHandler = useCallback((query: string) => {
+    const tagsSearchData = tagsSearchRef.current?.tags || [];
+    setSearchQuery(query);
+    // Build a new array instead of mutating tagsSearchData, which is SWR's
+    // cached response object — mutating it would corrupt the cache.
+    setResultTags(Array.from(new Set([query, ...tagsSearchData])));
+  }, []);
 
   const keyDownHandler = useCallback((event: KeyboardEvent<HTMLElement>) => {
     if (event.code === 'Space') {

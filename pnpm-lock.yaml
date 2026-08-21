@@ -224,9 +224,6 @@ importers:
       '@codemirror/view':
         specifier: ^6.42.1
         version: 6.43.6
-      '@cspell/dynamic-import':
-        specifier: ^8.15.4
-        version: 8.15.4
       '@elastic/elasticsearch8':
         specifier: npm:@elastic/elasticsearch@^8.18.2
         version: '@elastic/elasticsearch@8.19.0'
@@ -3015,10 +3012,6 @@ packages:
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
-
-  '@cspell/dynamic-import@8.15.4':
-    resolution: {integrity: sha512-tr0F6EYN6qtniNvt1Uib+PgYQHeo4dQHXE2Optap+hYTOoQ2VoQ+SwBVjZ+Q2bmSAB0fmOyf0AvgsUtnWIpavw==}
-    engines: {node: '>=18.0'}
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
@@ -10899,6 +10892,7 @@ packages:
     resolution: {integrity: sha512-Quz3MvAwHxVYNXsOByL7xI5EB2WYOeFswqaHIA3qOK3isRWTxiplBEocmmru6XmxDB2L7jDNYtYA4FyimoAFEw==}
     engines: {node: '>=8.17.0'}
     hasBin: true
+    bundledDependencies: []
 
   jsonfile@3.0.1:
     resolution: {integrity: sha512-oBko6ZHlubVB5mRFkur5vgYR1UyqX+S6Y/oCfLhqNdcc2fYFlDpIoNc7AfKS1KOGcnNAkvsr0grLck9ANM815w==}
@@ -17857,10 +17851,6 @@ snapshots:
 
   '@colors/colors@1.5.0':
     optional: true
-
-  '@cspell/dynamic-import@8.15.4':
-    dependencies:
-      import-meta-resolve: 4.2.0
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:

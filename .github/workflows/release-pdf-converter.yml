@@ -1,25 +1,88 @@
 name: Release Docker Image for @growi/pdf-converter
 
+# Publishes the pdf-converter image to Docker Hub.
+#
+# Trigger: a push to master that touches apps/pdf-converter/package.json.
+# The version in that file decides everything — the image is published only when
+# that version is a stable one that has not been tagged yet, so a push that edits
+# the manifest without releasing is a no-op.
+#
+# The version itself comes from changesets, the same way @growi/core and
+# @growi/pluginkit are released: write a changeset naming @growi/pdf-converter in
+# the development PR, and merging the generated "Release Subpackages" PR bumps
+# package.json and CHANGELOG.md on master. That merge is what publishes the image.
+# There is no separate release branch and no RC version marker.
+
 on:
-  pull_request:
+  push:
     branches:
-      - release/pdf-converter/**
-    types: [closed]
+      - master
+    paths:
+      - apps/pdf-converter/package.json
+      - .github/workflows/release-pdf-converter.yml
+  # Manual re-run for recovery. Publishing stays gated on the check below, so a
+  # dispatch on an already-released version does nothing.
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 jobs:
-  build-and-push-image:
+  determine-release:
     runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.package-json.outputs.packageVersion }}
+      should-release: ${{ steps.decide.outputs.should-release }}
 
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.pull_request.base.ref }}
+        # Tags are the record of what has already been published; the check below
+        # reads them. History is not needed, so fetch the tags without it.
+        fetch-tags: true
 
     - name: Retrieve information from package.json
       uses: myrotvorets/info-from-package-json-action@v2.0.2
       id: package-json
       with:
         workingDir: apps/pdf-converter
+
+    - name: Decide whether this version needs publishing
+      id: decide
+      env:
+        VERSION: ${{ steps.package-json.outputs.packageVersion }}
+      run: |
+        TAG="pdf-converter/v${VERSION}"
+
+        # A prerelease version is a work-in-progress marker, never something to publish.
+        if [[ "$VERSION" == *-* ]]; then
+          echo "::notice::${VERSION} is a prerelease version - nothing to publish."
+          echo "should-release=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        # The tag is created only after a successful publish, so its presence means
+        # this exact version is already on Docker Hub.
+        if git rev-parse -q --verify "refs/tags/${TAG}" > /dev/null; then
+          echo "::notice::${TAG} already exists - nothing to publish."
+          echo "should-release=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        echo "::notice::Publishing ${TAG}."
+        echo "should-release=true" >> "$GITHUB_OUTPUT"
+
+
+  build-and-push-image:
+    needs: determine-release
+    if: needs.determine-release.outputs.should-release == 'true'
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
 
     - name: Docker meta
       id: meta
@@ -28,15 +91,16 @@ jobs:
         images: growilabs/pdf-converter
         tags: |
           type=raw,value=latest
-          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}
-          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}.{{minor}}
-          type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}.{{minor}}.{{patch}}
+          type=semver,value=${{ needs.determine-release.outputs.version }},pattern={{major}}
+          type=semver,value=${{ needs.determine-release.outputs.version }},pattern={{major}}.{{minor}}
+          type=semver,value=${{ needs.determine-release.outputs.version }},pattern={{major}}.{{minor}}.{{patch}}
 
     - name: Login to docker.io registry
       run: |
         echo ${{ secrets.DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE }} | docker login --username growimoogle --password-stdin
 
     - name: Set up Docker Buildx
+      id: buildx
       uses: docker/setup-buildx-action@v3
 
     - name: Build and push
@@ -51,12 +115,14 @@ jobs:
         cache-to: type=gha,mode=max
         tags: ${{ steps.meta.outputs.tags }}
 
+    # Runs after the push so the tag always means "this version is on Docker Hub",
+    # which is what determine-release relies on.
     - name: Add tag
       uses: anothrNick/github-tag-action@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        CUSTOM_TAG: pdf-converter/v${{ steps.package-json.outputs.packageVersion }}
-        VERBOSE : true
+        CUSTOM_TAG: pdf-converter/v${{ needs.determine-release.outputs.version }}
+        VERBOSE: true
 
     - name: Update Docker Hub Description
       uses: peter-evans/dockerhub-description@v4
@@ -65,58 +131,3 @@ jobs:
         password: ${{ secrets.DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE }}
         repository: growilabs/pdf-converter
         readme-filepath: ./apps/pdf-converter/docker/README.md
-
-
-  create-pr-for-next-rc:
-    needs: build-and-push-image
-
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [24.x]
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.pull_request.base.ref }}
-
-    - uses: pnpm/action-setup@v6
-
-    - uses: actions/setup-node@v6
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'pnpm'
-
-    - name: Install dependencies
-      run: |
-        pnpm add turbo --global
-        pnpm install --frozen-lockfile
-
-    - name: Bump versions for next RC
-      run: |
-        turbo run version:prerelease --filter=@growi/pdf-converter
-
-    - name: Retrieve information from package.json
-      uses: myrotvorets/info-from-package-json-action@v2.0.2
-      id: package-json
-      with:
-        workingDir: apps/pdf-converter
-
-    - name: Commit
-      uses: github-actions-x/commit@v2.9
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        push-branch: support/prepare-v${{ steps.package-json.outputs.packageVersion }}
-        commit-message: 'Bump version'
-        name: GitHub Action
-
-    - name: Create PR
-      uses: repo-sync/pull-request@v2
-      with:
-        source_branch: support/prepare-v${{ steps.package-json.outputs.packageVersion }}
-        destination_branch: master
-        pr_title: Prepare pdf-converter v${{ steps.package-json.outputs.packageVersion }}
-        pr_label: flag/exclude-from-changelog,type/prepare-next-version
-        pr_body: "An automated PR generated by ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        github_token: ${{ secrets.GITHUB_TOKEN }}
