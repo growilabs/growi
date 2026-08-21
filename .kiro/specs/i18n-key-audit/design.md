@@ -437,7 +437,7 @@ interface I18nAuditBaseline {
 - **Integration Tests**:
   - Audit Orchestrator を実際の `apps/app` リポジトリに対して実行し、Requirement 1 の0件化・Requirement 2/3 の基準線遵守を確認する（CI で毎回実行されるテスト自体がこの役割を果たす）
   - Call-site Remediation の書き換え対象キーそれぞれについて、書き換え前後で実際に解決される翻訳文言が一致することを確認する（Requirement 1.6）。書き換え前の値をテスト実装時に記録し、書き換え後の値と比較する形で行う
-  - **前後一致を求めない例外（合計7キー）**: 次のキーは、書き換え前の表示が不具合そのものなので、確認する内容は「一致」ではなく「生キー（または誤ったフォールバック）が、選択言語の翻訳済み文言に変わること」である。前後一致を条件にすると、直したことが不合格として現れてしまう
+  - **前後一致を求めない例外（合計5キー）**: 次のキーは、書き換え前の表示が不具合そのものなので、確認する内容は「一致」ではなく「生キー（または誤ったフォールバック）が、選択言語の翻訳済み文言に変わること」である。前後一致を条件にすると、直したことが不合格として現れてしまう
     - Group 4 のうち実在の不具合4キー（`security_settings.updated_general_security_setting`、`Show`、`Hide`、`New`）— 書き換え前は宣言 namespace で解決できず生キーが表示されている。同じ Group 4 でも `not_found_page.page_not_exist` / `toaster.create_failed` は配列指定または `commons` 既定指定により前置前から正しく解決できていたため、この例外には含めない（通常の前後一致確認の対象）
     - `No users have liked this yet.`（`LikeButtons.tsx`、Non-Existent Key Reference Fix）— 書き換え前は ja_JP などで en_US へフォールバックして英語が表示されている
   - Bug 2 Remediation で複製する各キーについて、5言語すべてで `translation.json` と `commons.json` の値が一致することを検証する専用テスト（`i18n-reconcile.spec.ts` と同種のパターン）。将来どちらかだけが更新された場合のドリフトを検知する
