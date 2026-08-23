@@ -767,7 +767,9 @@ export const setup = (crowi) => {
    *                      $ref: '#/components/schemas/Page'
    *
    *          403:
-   *            description: Forbidden to duplicate page.
+   *            description: Page is forbidden.
+   *          404:
+   *            description: Page is not found.
    *          500:
    *            description: Internal server error.
    */
@@ -811,7 +813,28 @@ export const setup = (crowi) => {
         );
       }
 
-      const page = await Page.findByIdAndViewer(pageId, req.user, null, true);
+      const pageWithMeta = await findPageAndMetaDataByViewer(
+        pageService,
+        pageGrantService,
+        {
+          pageId,
+          path: null,
+          user: req.user,
+          basicOnly: true,
+        },
+      );
+      const page = pageWithMeta.data;
+      if (page == null) {
+        const { meta } = pageWithMeta;
+        return res.apiv3Err(
+          new ErrorV3(
+            `Page '${pageId}' is not found or forbidden`,
+            'notfound_or_forbidden',
+          ),
+          meta.isForbidden ? 403 : 404,
+        );
+      }
+
       const disableUserPages = configManager.getConfig(
         'security:disableUserPages',
       );
@@ -826,8 +849,8 @@ export const setup = (crowi) => {
         }
       }
 
-      const isEmptyAndNotRecursively = page?.isEmpty && !isRecursively;
-      if (page == null || isEmptyAndNotRecursively) {
+      const isEmptyAndNotRecursively = page.isEmpty && !isRecursively;
+      if (isEmptyAndNotRecursively) {
         res.code = 'Page is not found';
         logger.error('Failed to find the pages');
         return res.apiv3Err(
@@ -835,7 +858,7 @@ export const setup = (crowi) => {
             `Page '${pageId}' is not found or forbidden`,
             'notfound_or_forbidden',
           ),
-          401,
+          404,
         );
       }
 
