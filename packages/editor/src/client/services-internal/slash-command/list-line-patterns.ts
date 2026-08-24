@@ -15,10 +15,17 @@ const MARKER = String.raw`(?:[-*+]|\d+[.)])`;
 /** Indent plus any blockquote markers that may precede a list marker. */
 const LINE_PREFIX = String.raw`\s*(?:>\s*)*`;
 
-/** A line that OPENS a list item — prefix, marker, then whitespace. */
+/** Whether a line OPENS a list item — prefix, marker, then whitespace. */
 export const LIST_MARKER_LINE_REGEX = new RegExp(
-  String.raw`^${LINE_PREFIX}${MARKER}\s`,
+  String.raw`^${LINE_PREFIX}${MARKER}[ \t]+`,
 );
+
+/**
+ * The marker and ALL of the whitespace that follows it, anchored at the marker
+ * itself (not at the line start). Matching every following space — not just one
+ * — is what makes the item's content column correct for `-   foo` and `-\tfoo`.
+ */
+export const LIST_ITEM_PREFIX_REGEX = new RegExp(String.raw`^${MARKER}[ \t]+`);
 
 /**
  * A bare list marker: the marker (plus an optional task checkbox) is the ONLY

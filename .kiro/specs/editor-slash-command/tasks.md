@@ -86,9 +86,9 @@
   - `SlashInsertion` に `replaceFromOffset`（`<= 0`、既定 `0`）を追加し、`apply` が `from + replaceFromOffset` を置換起点にする。相対オフセットのままなので position-free の原則は維持され、ChangeSpec を組むのは引き続き `apply` のみ・単一 change なので undo も 1 回
   - `insertion-builders` に「行の内容がリストマーカーのみか」を判定する `bareListMarkerOffsetAt` を追加し、該当時はマーカー開始位置への相対オフセット、非該当時は `null` を返す
   - `lineMarkerInsertion(marker, listItemBehavior?)` に振る舞いをデータで渡す。`convert`（リスト系）は既存マーカーを置換レンジに吸収して置換、`append`（引用）は区切りを前置せず同一行に付加。コードブロックはリスト固有の分岐を持たず、かつリスト文脈では候補から除外する（Req 8.1）
-  - マーカー以外の本文がある行・通常の文章中は Req 3.6 の既存挙動を維持する
+  - この時点では、マーカー以外の本文がある行・通常の文章中は Req 3.6 の既存挙動のまま（本文のある行はのちに 5.5 で扱う）
   - 観測: `apply` と同じ合成で結果ドキュメントを検証（`  - /`＋番号付き → `  1. `、`- /`＋引用 → `- > `、`- [ ] /`＋箇条書き → `- `）。非リスト位置の回帰も固定。ミューテーションチェック（`convert` の範囲拡張を無効化）で該当テストのみ RED になることを確認済み
-  - _Requirements: 8.1, 9.1, 9.2, 9.3, 9.4, 9.5_
+  - _Requirements: 8.1, 9.1, 9.2, 9.3, 9.4_
   - _Boundary: slash-command-types, insertion-builders, slash-command-definitions, slash-command-source_
   - _Depends: 5.1_
 
@@ -111,6 +111,17 @@
   - _Boundary: list-line-patterns（新規）, slash-command-source, insertion-builders_
   - _Depends: 5.1, 5.2, 5.3_
 
+- [x] 5.5 本文のあるリスト行で挿入がリストを抜けないようにする（コードレビュー #7, Req 9.5）
+  - `markdown-context.ts`（新規）に「囲っている `ListItem` の幾何情報」を集約する: 構文木で `ListItem` を特定し、**その項目のマーカー行**から兄弟用プレフィックス（そのまま再現）・項目内用プレフィックス（内容カラムまで空白で詰める）・内容カラムを求める。マーカー部分だけを空白化するので `> ` は保たれる。内容カラムはマーカー直後の空白すべてを含め、タブはタブストップ幅（4）で数える
+  - `lineMarkerInsertion` に、ベアマーカーでもない**リスト項目内**の分岐を追加。`convert`（リスト系）は兄弟用、`append`（引用）は項目内用を使って改行後に前置する
+  - 補完ソースの `isInListItem` も同じ幾何情報を使うようにし、内容カラムの計算を1箇所へ寄せる（従来はソース側が「マーカー＋空白1文字」前提で、複数空白やタブを取りこぼしていた）
+  - カーソル行ではなく**項目のマーカー行**を基準にするのが要点。継続行（`- foo` の次行 `  bar /`）はマーカーを持たないため、カーソル行から導出すると列0に落ちてリストを抜ける
+  - 観測: `- foo /`＋引用 → `- foo \n  > `、`  - foo /`＋番号付き → `  - foo \n  1. `、継続行 `- foo\n  bar /`＋引用 → `…\n  > `、`-   foo /`・`-\tfoo /`＋引用 → 内容カラム4、`> - foo /` で引用マーカー保持。非リスト位置は既存挙動のまま。ミューテーションチェック5種（分岐削除 / 常に兄弟用 / 常に項目内用 / 幾何をカーソル行から / タブ展開なし）で該当テストのみ RED を確認
+  - ビルダーが構文木を読むようになったため、`insertion-builders.spec.ts` の `createView` に markdown 拡張を追加（本番は必ず言語が載っているので、載せない構成でのテストは本番を再現していなかった）
+  - _Requirements: 9.5, 9.6_
+  - _Boundary: markdown-context（新規）, list-line-patterns, insertion-builders, slash-command-source_
+  - _Depends: 5.2, 5.4_
+
 ## Implementation Notes
 - 3.2: `appendExtensions(args)` wraps EVERY top-level element of `args` with the SAME `Compartment` (`services/.../utils/append-extensions.ts`), and a Compartment can wrap only one extension. So the default set MUST be passed as a single nested element (`[[...all]]`); a flat multi-element array throws `RangeError: Duplicate use of compartment in extensions` at runtime (only surfaced when the editor mounts — build/typecheck/unit pass). Encoded via `buildDefaultExtensionsArg` + regression test. Found during 4.1 smoke.
 - 1.2: insertion-builders decide line-start vs mid-line purely from **same-line** preceding non-whitespace text (Req 3.6 wording). The design's cross-line nuance (table on a fresh empty line directly below a non-empty paragraph → also needs a blank line) is intentionally NOT handled by the builders — the typical `/` trigger hits the mid-line path. Verified during smoke: GROWI's renderer (remark-gfm) still renders a table directly below a paragraph, so no blank line is required in practice — non-issue.
@@ -130,8 +141,7 @@
 - 5.4 (test through the production path): the Req 9 tests originally re-implemented `apply`'s dispatch in a local helper. That helper computed `replaceFromOffset` itself, so mutating the real `applyCommand` to ignore it left all 81 tests green — the feature's core could be deleted undetected. Driving the real completion source's `apply` instead makes that mutation fail 5 tests. Lesson: a helper that re-derives what production derives is not a test of production.
 - 5.3/5.4 (empty descriptions are a scaffold, not dead data): the 45 empty `slash_command.*.description` values are kept deliberately — they mark where descriptions will be written and keep the resolution path exercised. i18next returns `''` for them today, and the `detail` resolver additionally ignores a value equal to its own key, so the popup stays clean even if `returnEmptyString` is flipped or an entry is dropped.
 
-### Known inconsistency (accepted, from code review)
-- Quote on a list line that already has content (`- foo /`) still breaks out to column 0 (`- foo \n> `), which does not match the "only commands that act within the item stay offered" rule used to exclude `codeBlock`. Req 9 deliberately scopes itself to bare-marker lines and keeps Req 3.6 behaviour elsewhere (Req 9.5), so this is tolerated rather than fixed here. Resolving it would require `disallowedIn` to depend on the position within the line, not just the context — a data-model change worth its own story.
+### Design notes (from code review)
 - 5.1: in a table cell every one of the 9 commands is excluded, so the menu opens with zero options and closes immediately — observationally identical to suppressing it. Filtering (not suppression) is still the right mechanism, because the deferred inline commands (bold / link / inline code) are valid inside a table cell and will simply not declare `table` in `disallowedIn`.
 - 5.2: `replaceFromOffset` intentionally stays a RELATIVE offset instead of an absolute `replaceFrom`, so `SlashInsertion` keeps the position-free invariant documented on the type and `apply` remains the only place that builds a ChangeSpec.
 

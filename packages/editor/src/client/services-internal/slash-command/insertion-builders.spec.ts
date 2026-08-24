@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { CompletionContext } from '@codemirror/autocomplete';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { describe, expect, it } from 'vitest';
@@ -19,14 +20,15 @@ const EMPTY_TABLE = '|  |  |\n| --- | --- |\n|  |  |';
 const EMPTY_CODE_BLOCK = '```\n\n```';
 
 /**
- * Build a view whose cursor sits at `from`. The builders inspect only the text
- * that precedes `from` on the same line to decide line-start vs mid-line, so the
- * document contents up to `from` are what matter.
+ * Build a view whose cursor sits at `from`, with Markdown parsing enabled as in
+ * production: the builders read the syntax tree to find the enclosing list item,
+ * so a view without the language would report no list at all.
  */
 const createView = (doc: string, from: number): EditorView => {
   const state = EditorState.create({
     doc,
     selection: EditorSelection.create([EditorSelection.cursor(from)]),
+    extensions: [markdown({ base: markdownLanguage })],
   });
   return new EditorView({ state });
 };
@@ -267,14 +269,80 @@ describe('bare list marker behaviour (Req 9)', () => {
   // list-item case here; its behaviour is covered by the codeBlockInsertion
   // suite above and its exclusion by the slash-command-definitions contract.
 
-  describe('non-list positions keep the original block behaviour', () => {
-    it('still breaks onto a new line after real text (not a bare marker)', () => {
+  // Req 9.5: a list item that already has content is still a list item — the
+  // new line has to carry the item's prefix or it lands at column 0 and ends
+  // the list. This is the case code review flagged for quote.
+  describe('content-bearing list line keeps the block inside the list', () => {
+    it('indents a quote to the item content column instead of leaving the list', () => {
       const { text } = applyAtTrailingSlash(
         '- foo /',
         lineMarkerInsertion('> ', 'append'),
       );
 
-      expect(text).toBe('- foo \n> ');
+      expect(text).toBe('- foo \n  > ');
+    });
+
+    it('reproduces the prefix so a list marker becomes a sibling at the same level', () => {
+      const { text } = applyAtTrailingSlash(
+        '- a\n  - foo /',
+        lineMarkerInsertion('1. ', 'convert'),
+      );
+
+      expect(text).toBe('- a\n  - foo \n  1. ');
+    });
+
+    // The item's own line is the reference, not the cursor's line: a
+    // continuation line carries no marker, so deriving the prefix from it would
+    // drop the block to column 0 and end the list.
+    it('uses the item prefix from a continuation line too', () => {
+      expect(
+        applyAtTrailingSlash(
+          '- foo\n  bar /',
+          lineMarkerInsertion('> ', 'append'),
+        ).text,
+      ).toBe('- foo\n  bar \n  > ');
+      expect(
+        applyAtTrailingSlash(
+          '- a\n  - foo\n    bar /',
+          lineMarkerInsertion('- ', 'convert'),
+        ).text,
+      ).toBe('- a\n  - foo\n    bar \n  - ');
+    });
+
+    // The content column is the marker plus ALL the whitespace after it, and a
+    // tab counts as a full tab stop — otherwise the quote lands short of the
+    // item's text and renders outside the list.
+    it('measures the content column past multiple spaces and tabs', () => {
+      expect(
+        applyAtTrailingSlash('-   foo /', lineMarkerInsertion('> ', 'append'))
+          .text,
+      ).toBe('-   foo \n    > ');
+      expect(
+        applyAtTrailingSlash('-\tfoo /', lineMarkerInsertion('> ', 'append'))
+          .text,
+      ).toBe('-\tfoo \n    > ');
+    });
+
+    it('keeps an enclosing blockquote on both the sibling and the inside case', () => {
+      expect(
+        applyAtTrailingSlash('> - foo /', lineMarkerInsertion('- ', 'convert'))
+          .text,
+      ).toBe('> - foo \n> - ');
+      expect(
+        applyAtTrailingSlash('> - foo /', lineMarkerInsertion('> ', 'append'))
+          .text,
+      ).toBe('> - foo \n>   > ');
+    });
+  });
+
+  describe('non-list positions keep the original block behaviour', () => {
+    it('still breaks onto a plain new line for a quote after prose', () => {
+      const { text } = applyAtTrailingSlash(
+        'foo /',
+        lineMarkerInsertion('> ', 'append'),
+      );
+
+      expect(text).toBe('foo \n> ');
     });
 
     it('still converts nothing when the line is plain prose', () => {

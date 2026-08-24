@@ -3,11 +3,15 @@ import type {
   CompletionResult,
   CompletionSource,
 } from '@codemirror/autocomplete';
-import { syntaxTree } from '@codemirror/language';
 import type { EditorState } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 
 import { LIST_MARKER_LINE_REGEX } from './list-line-patterns.js';
+import {
+  findAncestorNode,
+  indentWidth,
+  listItemGeometryAt,
+} from './markdown-context.js';
 import type {
   ResolvedSlashCommand,
   SlashCommandContext,
@@ -39,13 +43,6 @@ const CODE_CONTEXT_NODE_NAMES = new Set([
 ]);
 
 /**
- * lezer-markdown node names that denote a list-item line (Req 8). Any of
- * BulletList/OrderedList/TaskList wrap a `ListItem`, so matching `ListItem`
- * alone covers all three list kinds.
- */
-const LIST_CONTEXT_NODE_NAMES = new Set(['ListItem']);
-
-/**
  * lezer-markdown (GFM) node names that denote a table cell (Req 8). A table
  * cell cannot contain a blank line or block content, so it is a stricter
  * context than a list item.
@@ -56,22 +53,6 @@ const TABLE_CONTEXT_NODE_NAMES = new Set([
   'TableCell',
   'TableHeader',
 ]);
-
-type SyntaxNode = ReturnType<typeof syntaxTree>['topNode'];
-
-/** The nearest ancestor of `pos` named in `nodeNames`, or `null`. */
-const findAncestorNode = (
-  state: EditorState,
-  pos: number,
-  nodeNames: ReadonlySet<string>,
-): SyntaxNode | null => {
-  let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, -1);
-  while (node != null) {
-    if (nodeNames.has(node.name)) return node;
-    node = node.parent;
-  }
-  return null;
-};
 
 /** Whether `pos`'s syntax-tree ancestor chain includes any of `nodeNames`. */
 const matchesAncestorNode = (
@@ -92,10 +73,6 @@ const isInCodeContext = (state: EditorState, pos: number): boolean =>
  */
 const TABLE_CELL_SEPARATOR_REGEX = /\|/;
 
-/** Width of the leading whitespace on `lineText`. */
-const indentWidth = (lineText: string): number =>
-  lineText.length - lineText.trimStart().length;
-
 /**
  * Whether `pos` is inside the innermost enclosing list item (Req 8.1).
  *
@@ -108,20 +85,13 @@ const indentWidth = (lineText: string): number =>
  * block-level commands at all, not even by pressing Enter twice.
  */
 const isInListItem = (state: EditorState, pos: number): boolean => {
-  const item = findAncestorNode(state, pos, LIST_CONTEXT_NODE_NAMES);
-  if (item == null) return false;
+  const geometry = listItemGeometryAt(state, pos);
+  if (geometry == null) return false;
 
   const lineText = state.doc.lineAt(pos).text;
   if (LIST_MARKER_LINE_REGEX.test(lineText)) return true;
 
-  const markerLine = state.doc.lineAt(item.from);
-  const markerColumn = item.from - markerLine.from;
-  const marker = LIST_MARKER_LINE_REGEX.exec(
-    markerLine.text.slice(markerColumn),
-  );
-  if (marker == null) return false;
-
-  return indentWidth(lineText) >= markerColumn + marker[0].length;
+  return indentWidth(lineText) >= geometry.contentColumn;
 };
 
 /**

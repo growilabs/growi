@@ -1,6 +1,7 @@
 import type { EditorView } from '@codemirror/view';
 
 import { BARE_LIST_MARKER_REGEX } from './list-line-patterns.js';
+import { listItemGeometryAt } from './markdown-context.js';
 import type {
   SlashInsertAction,
   SlashInsertion,
@@ -120,6 +121,23 @@ export const lineMarkerInsertion =
         replaceFromOffset:
           listItemBehavior === 'convert' ? markerFromOffset : 0,
       };
+    }
+
+    // Somewhere else inside a list item — its marker line already has content
+    // (`- foo /`) or this is one of its continuation lines (`  bar /`). Either
+    // way the new line must carry the ITEM's prefix, or it lands at column 0 and
+    // ends the list (Req 9.5). A list-type marker reproduces the prefix to become
+    // a sibling at the same nesting level; a quote pads to the item's content
+    // column to sit inside it.
+    const geometry =
+      listItemBehavior != null ? listItemGeometryAt(view.state, from) : null;
+    if (geometry != null) {
+      const linePrefix =
+        listItemBehavior === 'convert'
+          ? geometry.siblingPrefix
+          : geometry.insidePrefix;
+      const insert = `\n${linePrefix}${marker}`;
+      return { insert, cursorOffset: insert.length };
     }
 
     return buildBlockInsertion(view, from, {
