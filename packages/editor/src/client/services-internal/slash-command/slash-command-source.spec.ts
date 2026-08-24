@@ -271,6 +271,62 @@ describe('createSlashCommandSource - filtering', () => {
   });
 });
 
+describe('createSlashCommandSource - completion detail precedence', () => {
+  it('prefers syntaxHint over description when both are present', () => {
+    const command: ResolvedSlashCommand = {
+      ...resolvedCommand({
+        id: 'heading1',
+        label: 'Heading 1',
+        keywords: ['h1'],
+        action: insertAction('# '),
+      }),
+      syntaxHint: '#',
+    };
+    const source = createSlashCommandSource([command]);
+
+    const result = queryAt(source, '/', 1);
+
+    expect(result?.options[0].detail).toBe('#');
+  });
+
+  it('omits detail (not an empty string) when there is neither a syntaxHint nor a description', () => {
+    const command: ResolvedSlashCommand = {
+      ...resolvedCommand({
+        id: 'table',
+        label: 'Table',
+        keywords: ['grid'],
+        action: insertAction(''),
+      }),
+      description: '',
+    };
+    const source = createSlashCommandSource([command]);
+
+    const result = queryAt(source, '/', 1);
+
+    expect(result?.options[0].detail).toBeUndefined();
+  });
+
+  // i18next echoes the key when an entry is missing entirely (and would do so
+  // for an empty entry too under `returnEmptyString: false`); showing
+  // "slash_command.table.description" in the popup would be worse than nothing.
+  it('omits detail when the description resolved to the i18n key itself', () => {
+    const command: ResolvedSlashCommand = {
+      ...resolvedCommand({
+        id: 'table',
+        label: 'Table',
+        keywords: ['grid'],
+        action: insertAction(''),
+      }),
+      description: 'slash_command.table.description',
+    };
+    const source = createSlashCommandSource([command]);
+
+    const result = queryAt(source, '/', 1);
+
+    expect(result?.options[0].detail).toBeUndefined();
+  });
+});
+
 describe('createSlashCommandSource - apply (insert)', () => {
   const source = createSlashCommandSource(INSERT_COMMANDS);
 
@@ -362,6 +418,146 @@ describe('createSlashCommandSource - code context suppression', () => {
     const result = queryAtInMarkdown(source, doc, 3);
     expect(result).not.toBeNull();
     expect(result?.options.length).toBeGreaterThan(0);
+  });
+});
+
+// Req 8: commands whose insertion would break the surrounding structure are
+// excluded per-context via `disallowedIn`, not suppressed entirely (the menu
+// itself still fires — unlike code context, which suppresses it wholesale).
+describe('createSlashCommandSource - structural context filtering (Req 8)', () => {
+  // Synthetic commands, one per `disallowedIn` shape, so this covers the
+  // filtering MECHANISM. Which real command carries which shape is fixed by the
+  // slash-command-definitions contract test instead.
+  const bothRestricted: ResolvedSlashCommand = {
+    ...resolvedCommand({
+      id: 'bothRestricted',
+      label: 'Both restricted',
+      keywords: ['both'],
+      action: insertAction('# '),
+    }),
+    disallowedIn: ['list', 'table'],
+  };
+  const tableOnlyRestricted: ResolvedSlashCommand = {
+    ...resolvedCommand({
+      id: 'tableOnlyRestricted',
+      label: 'Table only restricted',
+      keywords: ['tableonly'],
+      action: insertAction('> '),
+    }),
+    disallowedIn: ['table'],
+  };
+  // No `disallowedIn` at all — proves the field is genuinely optional (Req 8.4).
+  const unrestricted = resolvedCommand({
+    id: 'unrestricted',
+    label: 'Unrestricted',
+    keywords: ['any'],
+    action: insertAction('- '),
+  });
+
+  const source = createSlashCommandSource([
+    bothRestricted,
+    tableOnlyRestricted,
+    unrestricted,
+  ]);
+
+  it('excludes only the list-restricted command inside a list item', () => {
+    const doc = '- /';
+    const pos = doc.indexOf('/') + 1;
+
+    const result = queryAtInMarkdown(source, doc, pos);
+
+    const labels = result?.options.map((o) => o.label);
+    expect(labels).not.toContain('Both restricted');
+    expect(labels).toContain('Table only restricted');
+    expect(labels).toContain('Unrestricted');
+  });
+
+  it('excludes every table-restricted command inside a table cell', () => {
+    const doc = '| a | b |\n| --- | --- |\n| / | c |';
+    const pos = doc.indexOf('/') + 1;
+
+    const result = queryAtInMarkdown(source, doc, pos);
+
+    const labels = result?.options.map((o) => o.label);
+    expect(labels).not.toContain('Both restricted');
+    expect(labels).not.toContain('Table only restricted');
+    expect(labels).toContain('Unrestricted');
+  });
+
+  it('offers every command outside list/table context (control)', () => {
+    const doc = '/';
+    const result = queryAtInMarkdown(source, doc, 1);
+
+    const labels = result?.options.map((o) => o.label);
+    expect(labels).toEqual([
+      'Both restricted',
+      'Table only restricted',
+      'Unrestricted',
+    ]);
+  });
+
+  // lezer-markdown keeps the line that FOLLOWS a table/list inside that node
+  // until a blank line ends it. The cursor's own line must therefore also look
+  // like the structure, or a single Enter after a table would leave the user
+  // with a menu that has nothing in it.
+  describe('the cursor own line must also look like the structure', () => {
+    const labelsAt = (doc: string): string[] | undefined =>
+      queryAtInMarkdown(source, doc, doc.lastIndexOf('/') + 1)?.options.map(
+        (o) => o.label,
+      );
+
+    it('does not treat the line after a table row as table context', () => {
+      const doc = '| a | b |\n| --- | --- |\n| c | d |\n/';
+
+      expect(labelsAt(doc)).toContain('Table only restricted');
+    });
+
+    it('does not treat the line after a list item as list context', () => {
+      const doc = '- foo\n/';
+
+      expect(labelsAt(doc)).toContain('Both restricted');
+    });
+
+    it('still treats an actual table row as table context', () => {
+      const doc = '| a | b |\n| --- | --- |\n| / | d |';
+
+      expect(labelsAt(doc)).not.toContain('Table only restricted');
+    });
+
+    it('still treats a blockquote-nested list item as list context', () => {
+      const doc = '> - /';
+
+      expect(labelsAt(doc)).not.toContain('Both restricted');
+      expect(labelsAt(doc)).toContain('Table only restricted');
+    });
+
+    // GFM lets a table omit its outer pipes, so a cell is not always on a line
+    // that STARTS with one — the separator just has to be somewhere on the line.
+    it('treats a pipe-less table row as table context', () => {
+      const doc = 'a | b\n--- | ---\nc | /';
+
+      expect(labelsAt(doc)).not.toContain('Table only restricted');
+    });
+
+    // An indented line under a list item carries no marker of its own but sits
+    // at (or past) the item's content column, so it is still inside that item.
+    it('treats a line indented to the item content column as list context', () => {
+      const doc = '- foo\n  /';
+
+      expect(labelsAt(doc)).not.toContain('Both restricted');
+      expect(labelsAt(doc)).toContain('Table only restricted');
+    });
+
+    // Enter is `insertNewlineAndIndent`, which reproduces the current line's
+    // indent — after `  - b` the next line already starts at column 2. Treating
+    // any indentation as "still inside" would leave a nested list with no way
+    // to reach the block-level commands at all, so the threshold is the item's
+    // content column (4 here), not merely "is indented".
+    it('does not treat a line outdented from the item content column as list context', () => {
+      const doc = '- a\n  - b\n  /';
+
+      expect(labelsAt(doc)).toContain('Both restricted');
+    });
   });
 });
 

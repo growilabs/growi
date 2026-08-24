@@ -3,11 +3,19 @@ import type {
   CompletionResult,
   CompletionSource,
 } from '@codemirror/autocomplete';
-import { syntaxTree } from '@codemirror/language';
 import type { EditorState } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 
-import type { ResolvedSlashCommand } from './slash-command-types.js';
+import { LIST_MARKER_LINE_REGEX } from './list-line-patterns.js';
+import {
+  findAncestorNode,
+  indentWidth,
+  listItemGeometryAt,
+} from './markdown-context.js';
+import type {
+  ResolvedSlashCommand,
+  SlashCommandContext,
+} from './slash-command-types.js';
 
 /**
  * A slash token: a `/` followed by zero or more non-whitespace characters,
@@ -34,16 +42,91 @@ const CODE_CONTEXT_NODE_NAMES = new Set([
   'InlineCode',
 ]);
 
+/**
+ * lezer-markdown (GFM) node names that denote a table cell (Req 8). A table
+ * cell cannot contain a blank line or block content, so it is a stricter
+ * context than a list item.
+ */
+const TABLE_CONTEXT_NODE_NAMES = new Set([
+  'Table',
+  'TableRow',
+  'TableCell',
+  'TableHeader',
+]);
+
+/** Whether `pos`'s syntax-tree ancestor chain includes any of `nodeNames`. */
+const matchesAncestorNode = (
+  state: EditorState,
+  pos: number,
+  nodeNames: ReadonlySet<string>,
+): boolean => findAncestorNode(state, pos, nodeNames) != null;
+
 /** Whether `pos` sits inside a Markdown code context (fenced/indented/inline). */
-const isInCodeContext = (state: EditorState, pos: number): boolean => {
-  let node: ReturnType<typeof syntaxTree>['topNode'] | null = syntaxTree(
-    state,
-  ).resolveInner(pos, -1);
-  while (node != null) {
-    if (CODE_CONTEXT_NODE_NAMES.has(node.name)) return true;
-    node = node.parent;
+const isInCodeContext = (state: EditorState, pos: number): boolean =>
+  matchesAncestorNode(state, pos, CODE_CONTEXT_NODE_NAMES);
+
+/**
+ * A cell separator anywhere on the line. Deliberately NOT anchored to the line
+ * start: GFM also accepts tables whose rows omit the leading and trailing pipe
+ * (`a | b` / `--- | ---` / `c | d`), and anchoring would leave those cells
+ * unprotected.
+ */
+const TABLE_CELL_SEPARATOR_REGEX = /\|/;
+
+/**
+ * Whether `pos` is inside the innermost enclosing list item (Req 8.1).
+ *
+ * A line belongs to that item when it carries a marker of its own, or when it is
+ * indented at least to the item's CONTENT column. The content column — not "is
+ * indented at all" — is the threshold that matters, because Enter is bound to
+ * `insertNewlineAndIndent`, which reproduces the current line's indent: after
+ * `  - b` the next line already starts at column 2, so treating any indentation
+ * as "still inside" would leave a nested list with no way to reach the
+ * block-level commands at all, not even by pressing Enter twice.
+ */
+const isInListItem = (state: EditorState, pos: number): boolean => {
+  const geometry = listItemGeometryAt(state, pos);
+  if (geometry == null) return false;
+
+  const lineText = state.doc.lineAt(pos).text;
+  if (LIST_MARKER_LINE_REGEX.test(lineText)) return true;
+
+  return indentWidth(lineText) >= geometry.contentColumn;
+};
+
+/**
+ * The {@link SlashCommandContext}s active at `pos` (Req 8).
+ *
+ * A context counts only when BOTH the syntax tree and the cursor's own line
+ * agree, because either signal alone is wrong in a common case:
+ * - tree alone over-reaches. lezer-markdown keeps the line that follows a table
+ *   or a list item inside that node until a blank line ends it, so pressing
+ *   Enter after a table and typing `/` would still report `table` — and since
+ *   every command excludes `table`, the menu would come up empty. Requiring the
+ *   line to still look like the structure treats a separator-less, outdented
+ *   line as "the user has left it".
+ * - line alone under-constrains. A line may start with `|` or `-` while being
+ *   plain prose, and restricting the menu there would be a false positive.
+ *
+ * Both contexts can be active at once (a table nested inside a list item), so
+ * the result is a set filtered uniformly against `disallowedIn`.
+ */
+const activeContextsAt = (
+  state: EditorState,
+  pos: number,
+): readonly SlashCommandContext[] => {
+  const lineText = state.doc.lineAt(pos).text;
+  const contexts: SlashCommandContext[] = [];
+  if (isInListItem(state, pos)) {
+    contexts.push('list');
   }
-  return false;
+  if (
+    TABLE_CELL_SEPARATOR_REGEX.test(lineText) &&
+    matchesAncestorNode(state, pos, TABLE_CONTEXT_NODE_NAMES)
+  ) {
+    contexts.push('table');
+  }
+  return contexts;
 };
 
 /**
@@ -114,10 +197,17 @@ const applyCommand = (
   to: number,
 ): void => {
   if (command.action.kind === 'insert') {
-    const { insert, cursorOffset } = command.action.buildInsertion(view, from);
+    const {
+      insert,
+      cursorOffset,
+      replaceFromOffset = 0,
+    } = command.action.buildInsertion(view, from);
+    // A builder may widen the replaced range backwards (e.g. to absorb a list
+    // item's own marker when converting it); still one change, so still one undo.
+    const replaceFrom = from + replaceFromOffset;
     view.dispatch({
-      changes: { from, to, insert },
-      selection: { anchor: from + cursorOffset },
+      changes: { from: replaceFrom, to, insert },
+      selection: { anchor: replaceFrom + cursorOffset },
     });
     return;
   }
@@ -129,9 +219,24 @@ const applyCommand = (
   command.action.run(view, from);
 };
 
+/**
+ * The auxiliary text shown beside a command's label (Req 10.1, 10.3, 10.4).
+ *
+ * The Markdown syntax wins where a command has one — it IS the explanation for a
+ * simple command. Otherwise a written description is used, but only when there
+ * actually is one: i18next yields `''` for a key whose value is empty and echoes
+ * the key itself when the entry is missing, and neither belongs in the popup.
+ */
+const resolveDetail = (command: ResolvedSlashCommand): string | undefined => {
+  if (command.syntaxHint != null) return command.syntaxHint;
+  const { description, descriptionKey } = command;
+  if (description === '' || description === descriptionKey) return undefined;
+  return description;
+};
+
 const toCompletion = (command: ResolvedSlashCommand): Completion => ({
   label: command.label,
-  detail: command.description,
+  detail: resolveDetail(command),
   apply: (view, _completion, from, to) => applyCommand(command, view, from, to),
 });
 
@@ -158,7 +263,15 @@ export const createSlashCommandSource = (
 
     if (isInCodeContext(context.state, context.pos)) return null;
 
+    // Req 8: exclude commands whose insertion would break the surrounding
+    // structure at this position (e.g. a heading inside a list item, a table
+    // inside a table cell). Commands with no `disallowedIn` are unaffected.
+    const activeContexts = activeContextsAt(context.state, context.pos);
+    const isAllowedHere = (command: ResolvedSlashCommand): boolean =>
+      !activeContexts.some((c) => command.disallowedIn?.includes(c));
+
     const options = entries
+      .filter(({ command }) => isAllowedHere(command))
       .filter(({ command }) => matchesQuery(command, trigger.query))
       .map(({ completion }) => completion);
 

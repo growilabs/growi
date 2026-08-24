@@ -1090,39 +1090,39 @@
   "slash_command": {
     "heading1": {
       "label": "Titre 1",
-      "description": "Grand titre de section"
+      "description": ""
     },
     "heading2": {
       "label": "Titre 2",
-      "description": "Titre de section moyen"
+      "description": ""
     },
     "heading3": {
       "label": "Titre 3",
-      "description": "Petit titre de section"
+      "description": ""
     },
     "bulletList": {
       "label": "Liste à puces",
-      "description": "Créer une liste à puces simple"
+      "description": ""
     },
     "numberedList": {
       "label": "Liste numérotée",
-      "description": "Créer une liste avec numérotation"
+      "description": ""
     },
     "taskList": {
       "label": "Liste de tâches",
-      "description": "Suivre les tâches avec une liste de contrôle"
+      "description": ""
     },
     "quote": {
       "label": "Citation",
-      "description": "Insérer une citation"
+      "description": ""
     },
     "codeBlock": {
       "label": "Bloc de code",
-      "description": "Insérer un bloc de code délimité"
+      "description": ""
     },
     "table": {
       "label": "Tableau",
-      "description": "Insérer un tableau"
+      "description": ""
     }
   }
 }

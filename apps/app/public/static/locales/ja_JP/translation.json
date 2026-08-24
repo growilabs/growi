@@ -1129,39 +1129,39 @@
   "slash_command": {
     "heading1": {
       "label": "見出し1",
-      "description": "大見出しを挿入します"
+      "description": ""
     },
     "heading2": {
       "label": "見出し2",
-      "description": "中見出しを挿入します"
+      "description": ""
     },
     "heading3": {
       "label": "見出し3",
-      "description": "小見出しを挿入します"
+      "description": ""
     },
     "bulletList": {
       "label": "箇条書きリスト",
-      "description": "箇条書きのリストを作成します"
+      "description": ""
     },
     "numberedList": {
       "label": "番号付きリスト",
-      "description": "番号付きのリストを作成します"
+      "description": ""
     },
     "taskList": {
       "label": "タスクリスト",
-      "description": "チェックリストでタスクを管理します"
+      "description": ""
     },
     "quote": {
       "label": "引用",
-      "description": "引用文を挿入します"
+      "description": ""
     },
     "codeBlock": {
       "label": "コードブロック",
-      "description": "コードブロックを挿入します"
+      "description": ""
     },
     "table": {
       "label": "テーブル",
-      "description": "テーブルを挿入します"
+      "description": ""
     }
   }
 }

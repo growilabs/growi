@@ -63,4 +63,58 @@ describe('slash-command-definitions', () => {
       expect(command?.keywords).toContain('list');
     }
   });
+
+  // Req 8: which commands must be excluded inside a list item / table cell
+  // because their insertion would break the surrounding structure.
+  it('restricts commands that would break out of a list (heading/table/codeBlock) from both contexts', () => {
+    for (const id of [
+      'heading1',
+      'heading2',
+      'heading3',
+      'table',
+      'codeBlock',
+    ]) {
+      const command = SLASH_COMMANDS.find((c) => c.id === id);
+      expect(command?.disallowedIn).toEqual(
+        expect.arrayContaining(['list', 'table']),
+      );
+    }
+  });
+
+  // These stay available inside a list because they act within the item:
+  // list types convert its marker, quote is appended to the same line (Req 9).
+  it('restricts commands that work inside a list item (list types, quote) from table only', () => {
+    const tableOnlyIds = ['bulletList', 'numberedList', 'taskList', 'quote'];
+    for (const id of tableOnlyIds) {
+      const command = SLASH_COMMANDS.find((c) => c.id === id);
+      expect(command?.disallowedIn).toEqual(['table']);
+    }
+  });
+
+  // A command whose result is a single-line marker shows that marker as its
+  // hint instead of a written description (the notation IS the explanation).
+  // codeBlock/table are not single-line markers, so they carry no hint and
+  // deliberately no description either — their label alone identifies them.
+  it('gives every single-line-marker command a syntaxHint matching its own builder marker', () => {
+    const expectedHints: Record<string, string> = {
+      heading1: '#',
+      heading2: '##',
+      heading3: '###',
+      bulletList: '-',
+      numberedList: '1.',
+      taskList: '- [ ]',
+      quote: '>',
+    };
+    for (const [id, hint] of Object.entries(expectedHints)) {
+      const command = SLASH_COMMANDS.find((c) => c.id === id);
+      expect(command?.syntaxHint).toBe(hint);
+    }
+  });
+
+  it('gives codeBlock and table no syntaxHint (not a single-line marker)', () => {
+    for (const id of ['codeBlock', 'table']) {
+      const command = SLASH_COMMANDS.find((c) => c.id === id);
+      expect(command?.syntaxHint).toBeUndefined();
+    }
+  });
 });
