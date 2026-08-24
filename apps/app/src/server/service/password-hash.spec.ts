@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the project logger so we can assert WARNING emission (Req 2.4 / 2.5).
 vi.mock('~/utils/logger', () => {
@@ -159,11 +159,6 @@ describe('PasswordHashService', () => {
   });
 
   describe('verify() - empty/nullish plaintext (bad input, not corrupt data)', () => {
-    beforeEach(() => {
-      // Isolate the "does NOT warn" assertions from earlier tests' call history.
-      getMockLogger().warn.mockClear();
-    });
-
     it('returns { isValid: false, needsRehash: false } and does NOT warn for an empty plaintext, short-circuiting before the stored hash is parsed', async () => {
       // Use a MALFORMED stored hash on purpose: if the empty-plaintext guard did NOT
       // short-circuit, verifyScrypt would parse this and emit a Req 2.4 WARNING. The
@@ -279,6 +274,45 @@ describe('PasswordHashService', () => {
     });
   });
 
+  describe('verify() - a present passwordHash is never fallen back on', () => {
+    // Rejecting outright instead of retrying the legacy hash is a deliberate
+    // decision, not an oversight — rationale and accepted cost live in design.md
+    // ("Deliberately no fallback to the legacy path"). Pinned here because a
+    // reintroduced fallback is silent: both cases supply a CORRECT legacy hash
+    // and the CORRECT plaintext, so only the absence of a fallback keeps them red.
+
+    it('rejects a correct password when the scrypt envelope is malformed, even though the legacy hash matches', async () => {
+      const plaintext = 'correct-horse-battery-staple';
+      const validLegacy = sha256Legacy(plaintext, SEED);
+
+      const result = await service.verify(
+        plaintext,
+        'this-is-not-a-scrypt-envelope',
+        validLegacy,
+        SEED,
+      );
+
+      expect(result).toEqual({ isValid: false, needsRehash: false });
+    });
+
+    it('rejects a wrong password against a well-formed scrypt envelope without consulting the legacy hash', async () => {
+      // The scrypt hash is for a DIFFERENT password; the legacy hash matches the
+      // supplied one. Only a fallback could make this succeed.
+      const scryptHash = await service.hash('the-real-scrypt-password');
+      const plaintext = 'the-old-legacy-password';
+      const validLegacy = sha256Legacy(plaintext, SEED);
+
+      const result = await service.verify(
+        plaintext,
+        scryptHash,
+        validLegacy,
+        SEED,
+      );
+
+      expect(result).toEqual({ isValid: false, needsRehash: false });
+    });
+  });
+
   describe('verify() - anomaly WARNING carries user identifier (Req 2.4)', () => {
     const context = { userId: 'u123', username: 'alice' };
 
@@ -331,12 +365,6 @@ describe('PasswordHashService', () => {
 });
 
 describe('resolveScryptParamsFromEnv() — env-derived params (startup clamping)', () => {
-  beforeEach(() => {
-    // Call history persists across tests (no global mock reset), so isolate the
-    // startup-WARNING assertions per test.
-    getMockLogger().warn.mockClear();
-  });
-
   afterEach(() => {
     // Fully restore process.env so later tests / the module singleton are unaffected.
     vi.unstubAllEnvs();
