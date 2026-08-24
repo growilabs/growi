@@ -2,8 +2,8 @@ import type { HydratedDocument, Types } from 'mongoose';
 import mongoose from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 const logger = loggerFactory(
   'growi:service:revision:normalize-latest-revision',
@@ -103,7 +103,11 @@ export const normalizeLatestRevisionIfBroken = async (
     return;
   }
 
-  if (await Revision.exists({ pageId: { $eq: pageId } })) {
+  const existingRevision = await prisma.revisions.findFirst({
+    where: { pageId: pageId.toString() },
+    select: { id: true },
+  });
+  if (existingRevision != null) {
     return;
   }
 
@@ -127,7 +131,10 @@ export const normalizeLatestRevisionIfBroken = async (
   }
   if (
     page.revision == null ||
-    !(await Revision.exists({ _id: page.revision }))
+    !(await prisma.revisions.findUnique({
+      where: { id: page.revision.toString() },
+      select: { id: true },
+    }))
   ) {
     logger.warn(
       `Normalization has been canceled since the Page.revision of the page ('${pageId}') could not be found.`,
@@ -136,5 +143,8 @@ export const normalizeLatestRevisionIfBroken = async (
   }
 
   // update Revision.pageId
-  await Revision.updateOne({ _id: page.revision }, { $set: { pageId } }).exec();
+  await prisma.revisions.update({
+    where: { id: page.revision.toString() },
+    data: { pageId: pageId.toString() },
+  });
 };

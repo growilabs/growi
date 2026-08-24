@@ -11,10 +11,16 @@
 
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import type { HydratedDocument } from 'mongoose';
-import mongoose, { Types } from 'mongoose';
+import mongoose, { type Types } from 'mongoose';
 
+import type { Prisma } from '~/generated/prisma/client';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
+import {
+  normalizeAggregateRaw,
+  toRawDate,
+  toRawObjectId,
+} from '~/server/util/prisma-raw-normalize';
+import { prisma } from '~/utils/prisma';
 
 import type {
   ChangesIndexEntry,
@@ -35,12 +41,12 @@ import { type CursorKey, encodeCursor } from '../cursor';
  * `prevRevisionId`  — the _id of that preceding revision, or null when there is none.
  */
 export interface RevisionWithContext {
-  readonly _id: Types.ObjectId;
-  readonly pageId: Types.ObjectId;
-  readonly author: Types.ObjectId;
+  readonly _id: string;
+  readonly pageId: string;
+  readonly author: string;
   readonly createdAt: Date;
-  readonly prevAuthor: Types.ObjectId | null;
-  readonly prevRevisionId: Types.ObjectId | null;
+  readonly prevAuthor: string | null;
+  readonly prevRevisionId: string | null;
 }
 
 /**
@@ -54,10 +60,10 @@ export interface RevisionWithContext {
  * `latestUpdatedAt` — equals toRevision.createdAt.
  */
 export interface Run {
-  readonly pageId: Types.ObjectId;
-  readonly fromRevisionId: Types.ObjectId | null;
-  readonly toRevisionId: Types.ObjectId;
-  readonly authorId: Types.ObjectId;
+  readonly pageId: string;
+  readonly fromRevisionId: string | null;
+  readonly toRevisionId: string;
+  readonly authorId: string;
   readonly latestUpdatedAt: Date;
 }
 
@@ -87,17 +93,17 @@ export interface Run {
  */
 export const buildRuns = (
   revisions: readonly RevisionWithContext[],
-  userId: Types.ObjectId,
+  userId: string,
 ): Run[] => {
   // Open (in-progress) run keyed by pageId string.
   const openRuns = new Map<
     string,
     {
-      fromRevisionId: Types.ObjectId | null;
-      toRevisionId: Types.ObjectId;
-      authorId: Types.ObjectId;
+      fromRevisionId: string | null;
+      toRevisionId: string;
+      authorId: string;
       latestUpdatedAt: Date;
-      pageId: Types.ObjectId;
+      pageId: string;
     }
   >();
 
@@ -272,7 +278,7 @@ export interface NormalizedChangesQuery {
  * Only `status` and `path` are projected; `_id` is always included.
  */
 export interface PageInfo {
-  _id: Types.ObjectId;
+  _id: string;
   status?: string;
   path?: string;
 }
@@ -359,7 +365,7 @@ export async function listChanges(
   query: NormalizedChangesQuery,
 ): Promise<ChangesIndexResponse> {
   const userId = user._id.toString();
-  const authorObjectId = new Types.ObjectId(userId);
+  const authorObjectId = userId;
 
   // Build the post-window $match stage that selects only this user's revisions
   // within the requested window and cursor position.
@@ -369,16 +375,19 @@ export async function listChanges(
   // (regardless of author).  Filtering by author first would cause the window
   // function to miss other-author revisions, making run-split detection (Req 4.2)
   // impossible.
-  const postWindowMatch: Record<string, unknown> = {
-    author: authorObjectId,
+  const postWindowMatch: Prisma.InputJsonObject = {
+    author: toRawObjectId(authorObjectId),
+    ...((query.since != null || query.toDate != null) && {
+      createdAt: {
+        ...(query.since != null && {
+          $gte: toRawDate(query.since),
+        }),
+        ...(query.toDate != null && {
+          $lte: toRawDate(query.toDate),
+        }),
+      },
+    }),
   };
-
-  if (query.since != null || query.toDate != null) {
-    const createdAtFilter: Record<string, Date> = {};
-    if (query.since != null) createdAtFilter.$gte = query.since;
-    if (query.toDate != null) createdAtFilter.$lte = query.toDate;
-    postWindowMatch.createdAt = createdAtFilter;
-  }
 
   // NOTE: the cursor is intentionally NOT applied to the DB query. A run's baseline
   // (fromRevisionId) is the revision immediately before the run's first edit, which can
@@ -403,37 +412,58 @@ export async function listChanges(
   ) {
     pageScanLowerBound = query.cursor.createdAt;
   }
-  if (pageScanLowerBound != null) distinctCreatedAt.$gte = pageScanLowerBound;
-  if (query.toDate != null) distinctCreatedAt.$lte = query.toDate;
-  const authorPageIds: Types.ObjectId[] = await Revision.distinct('pageId', {
-    author: authorObjectId,
-    ...(Object.keys(distinctCreatedAt).length > 0
-      ? { createdAt: distinctCreatedAt }
-      : {}),
-  });
+  if (pageScanLowerBound != null) distinctCreatedAt.gte = pageScanLowerBound;
+  if (query.toDate != null) distinctCreatedAt.lte = query.toDate;
+  const authorPageIds = await prisma.revisions
+    .findMany({
+      select: { pageId: true },
+      where: {
+        authorId: authorObjectId.toString(),
+        ...(distinctCreatedAt.gte != null || distinctCreatedAt.lte != null
+          ? {
+              createdAt: {
+                ...(distinctCreatedAt.gte != null && {
+                  gte: distinctCreatedAt.gte,
+                }),
+                ...(distinctCreatedAt.lte != null && {
+                  lte: distinctCreatedAt.lte,
+                }),
+              },
+            }
+          : {}),
+      },
+      distinct: ['pageId'],
+    })
+    .then((docs) => docs.map(({ pageId }) => pageId));
 
-  const rawRevisions: RevisionWithContext[] = await Revision.aggregate([
-    // Step 1: restrict to pages where the user has revisions (performance gate).
-    { $match: { pageId: { $in: authorPageIds } } },
-    // Step 2: enrich each revision with the immediately-preceding revision on the
-    // same page (author-agnostic), so run boundaries can be detected correctly.
-    {
-      $setWindowFields: {
-        partitionBy: '$pageId',
-        sortBy: { createdAt: 1, _id: 1 },
-        output: {
-          prevAuthor: { $shift: { output: '$author', by: -1 } },
-          prevRevisionId: { $shift: { output: '$_id', by: -1 } },
+  const result = await prisma.revisions.aggregateRaw({
+    pipeline: [
+      // Step 1: restrict to pages where the user has revisions (performance gate).
+      { $match: { pageId: { $in: authorPageIds.map(toRawObjectId) } } },
+      // Step 2: enrich each revision with the immediately-preceding revision on the
+      // same page (author-agnostic), so run boundaries can be detected correctly.
+      {
+        $setWindowFields: {
+          partitionBy: '$pageId',
+          sortBy: { createdAt: 1, _id: 1 },
+          output: {
+            prevAuthor: { $shift: { output: '$author', by: -1 } },
+            prevRevisionId: { $shift: { output: '$_id', by: -1 } },
+          },
         },
       },
-    },
-    // Step 3: keep only the authenticated user's revisions within the window.
-    { $match: postWindowMatch },
-    { $sort: { createdAt: 1, _id: 1 } },
-  ]);
+      // Step 3: keep only the authenticated user's revisions within the window.
+      { $match: postWindowMatch },
+      { $sort: { createdAt: 1, _id: 1 } },
+    ],
+  });
+
+  const normalizedRevisions = normalizeAggregateRaw(
+    result,
+  ) as RevisionWithContext[];
 
   // Group revisions into completed runs.
-  const runs = buildRuns(rawRevisions, authorObjectId);
+  const runs = buildRuns(normalizedRevisions, authorObjectId);
 
   // Apply keyset pagination.
   const { emittedRuns, nextCursor } = paginateRuns(

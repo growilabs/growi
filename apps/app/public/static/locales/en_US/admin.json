@@ -1015,7 +1015,43 @@
     "transfer_data_to_another_growi": "Transfer data from this GROWI to another GROWI",
     "advanced_options": "Advanced options",
     "start_transfer": "Start transfer",
-    "paste_transfer_key": "Paste transter key here"
+    "paste_transfer_key": "Paste transter key here",
+    "transfer_method": {
+      "heading": "Transfer method",
+      "migration": "Migration (replace all data on the destination)",
+      "merge": "Add to existing data (the destination's existing data is kept)"
+    },
+    "confirm_modal": {
+      "title": "Confirm transfer",
+      "description": "The destination GROWI currently holds the following data. Starting this transfer will delete all of it and replace it with data from this GROWI:",
+      "counts": {
+        "users": "Users",
+        "user_groups": "User groups",
+        "pages": "Pages"
+      },
+      "warnings_heading": "Before you continue:",
+      "warnings": {
+        "password_seed_mismatch": "The source and destination GROWI have different password seeds. Migrated users will not be able to log in with their existing password.",
+        "no_loginable_admin": "The destination GROWI has no administrator who can currently log in. After the transfer, nobody may be able to log in.",
+        "sessions_not_invalidatable": "The destination GROWI's session store cannot invalidate individual sessions. Sessions established before the transfer will remain valid.",
+        "local_auth_disabled_at_source": "This GROWI has local (ID/Password) authentication disabled. Even a rescued destination administrator will not be able to log in with a password."
+      }
+    },
+    "blockers": {
+      "version_mismatch": "This transfer cannot proceed: the source and destination GROWI are running different versions.",
+      "user_upper_limit": "This transfer cannot proceed: the number of active users on the source GROWI exceeds the destination GROWI's user limit.",
+      "file_upload_not_configured": "This transfer cannot proceed: file upload is not configured on the source or destination GROWI.",
+      "destination_storage_not_writable": "This transfer cannot proceed: the destination GROWI's storage is not writable.",
+      "file_upload_total_limit": "This transfer cannot proceed: the total size of the source GROWI's attachments exceeds the destination GROWI's file upload limit."
+    },
+    "rescue_outcome": {
+      "heading": "The migration replaced every user on the destination. The following administrator accounts were kept so someone can still sign in:",
+      "renamed_from": "renamed from",
+      "email_removed": "Its email address was removed because it conflicted with an incoming user.",
+      "slack_member_id_removed": "Its Slack member ID was removed because it conflicted with an incoming user.",
+      "id_reassigned": "It was assigned a new internal identifier because the original one conflicted with an incoming user; any login session from before the transfer was lost."
+    },
+    "failed_collections_heading": "The destination GROWI could not import the following collections:"
   },
   "plugins": {
     "plugins": "Plugins",
@@ -1206,8 +1242,16 @@
     "error_data_conflict": "Transfer aborted: some of the transferred data conflicts with users or user groups that already exist on the destination GROWI, so nothing was imported. Resolve the conflicting accounts or groups before retrying, or transfer into a destination GROWI that has not yet completed its initial setup.",
     "error_upload_attachment": "Failed to transfer attachments",
     "error_import_in_progress": "Transfer aborted: another data import is already running on the destination GROWI. Wait for it to finish, then retry the transfer.",
-    "error_partial_import": "Transfer incomplete: the destination GROWI could not import every collection, so it now holds a partly transferred database. Fix the cause and run the transfer again.",
-    "error_protected_collection": "Transfer aborted: the destination GROWI refused the request because it named collections that a transfer must not carry, so nothing was imported. The transfer screen never selects those collections, so check that both GROWIs are running the same version, then report the collection names shown below."
+    "error_partial_import": "Transfer incomplete: the destination GROWI did not finish the transfer cleanly (it may have failed to import a collection, rescue an administrator, or finish its post-import cleanup), so it may hold a partly transferred database. If the destination was put into maintenance mode for this transfer, it stays closed to ordinary users until you switch it off from Admin > App Settings on the destination GROWI. Fix the cause and run the transfer again.",
+    "error_protected_collection": "Transfer aborted: the destination GROWI refused the request because it named collections that a transfer must not carry, so nothing was imported. The transfer screen never selects those collections, so check that both GROWIs are running the same version, then report the collection names shown below.",
+    "error_mixed_import_methods": "Transfer aborted: the destination GROWI refused the request because its import-method assignment mixed replacing some collections with appending to others, so nothing was imported. The transfer screen no longer builds such a request, so check that both GROWIs are running the same version, then retry the transfer.",
+    "error_invalid_transfer_key": "Transfer aborted: the destination GROWI rejected the transfer key as missing, expired, or invalid. Publish a new transfer key on the destination GROWI and retry.",
+    "error_parse_failed": "Transfer aborted: the destination GROWI could not parse the transfer request. Check that both GROWIs are running the same version, then retry the transfer.",
+    "error_validation_failed": "Transfer aborted: the destination GROWI could not validate the uploaded GROWI archive file. It may be corrupted; try generating and sending the archive again.",
+    "error_version_incompatible": "Transfer aborted: the source and destination GROWI are running different versions, so nothing was imported. Upgrade the destination GROWI to match the source, then retry the transfer.",
+    "error_import_settings_invalid": "Transfer aborted: the destination GROWI could not build valid import settings for the requested collections. See GROWI docs about details.",
+    "error_conflict_detection_failed": "Transfer aborted: the destination GROWI could not determine whether the transfer data conflicts with its existing data, so it refused to import rather than guess. Retry the transfer; if this keeps happening, check the destination GROWI's logs.",
+    "error_mongo_collection_import_failure": "Transfer incomplete: the destination GROWI failed to write one or more collections to MongoDB for a reason other than a data conflict. Check the destination GROWI's logs for details."
   },
   "external_user_group": {
     "management": "External Group Management",

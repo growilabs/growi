@@ -30,6 +30,19 @@ export interface GroupUniqueFields {
   name?: string | null;
 }
 
+/**
+ * Every value the archive's users hold on a unique field, plus every `_id` it carries.
+ *
+ * The keys are derived from {@link UserUniqueField} - the same declaration the detection
+ * targets - so a unique index added to `users` shows up here as a key whoever builds this
+ * has to fill, instead of being silently left out of what consumes it.
+ */
+export type ArchiveUserIdentity = {
+  readonly [Field in UserUniqueField as `${Field}s`]: ReadonlySet<string>;
+} & {
+  readonly ids: ReadonlySet<string>;
+};
+
 export interface UniqueFieldConflict {
   collection: 'users' | 'usergroups';
   field: UniqueField;
@@ -100,7 +113,7 @@ const ARCHIVE_ENCODING = 'utf-8';
 // one unbounded query, and the destination collection is never loaded whole into memory.
 const EXISTING_LOOKUP_BATCH_SIZE = 1000;
 
-const USER_UNIQUE_FIELDS = [
+export const USER_UNIQUE_FIELDS = [
   'username',
   'email',
   'slackMemberId',
@@ -234,6 +247,38 @@ const collectArchiveValues = <T>(
 
   return [...values];
 };
+
+/**
+ * Streams the archive's `users.json` and returns every value it occupies on a unique
+ * field, plus every `_id` it carries.
+ *
+ * The detection's own report cannot answer this: it lists the pairs that collide, so a
+ * value the source uses and the destination does not never appears in it. The admin
+ * rescue needs the whole set — it has to pick a replacement username the source does
+ * *not* use (requirement 4.4) and to know whether its own `_id` is about to be taken by
+ * an incoming document (requirement 4.10).
+ *
+ * A truncated archive throws here (via `assertCompleteJsonArray`) rather than yielding a
+ * partial set, because a partial set is worse than none: the rescue would pick a name the
+ * source actually uses and the re-insertion would fail the unique index.
+ */
+export async function readArchiveUserIdentity(
+  usersJsonPath: string,
+): Promise<ArchiveUserIdentity> {
+  const archiveDocs = await readArchiveUniqueFields(
+    usersJsonPath,
+    pickUserUniqueFields,
+  );
+
+  return {
+    usernames: new Set(collectArchiveValues(archiveDocs, 'username')),
+    emails: new Set(collectArchiveValues(archiveDocs, 'email')),
+    slackMemberIds: new Set(collectArchiveValues(archiveDocs, 'slackMemberId')),
+    // Already normalised to a string by `pickUserUniqueFields`, so this compares like
+    // with like against a destination document's ObjectId.
+    ids: new Set(collectArchiveValues(archiveDocs, '_id')),
+  };
+}
 
 const toBatches = <T>(values: readonly T[], size: number): T[][] => {
   const batches: T[][] = [];

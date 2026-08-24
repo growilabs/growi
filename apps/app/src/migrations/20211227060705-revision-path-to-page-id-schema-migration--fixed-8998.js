@@ -3,7 +3,6 @@ import { pipeline } from 'node:stream/promises';
 import mongoose from 'mongoose';
 
 import getPageModel from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
 import { createBatchStream } from '~/server/util/batch-stream';
 import {
   getModelSafely,
@@ -11,6 +10,7 @@ import {
   mongoOptions,
 } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 const logger = loggerFactory(
   'growi:migrate:revision-path-to-page-id-schema-migration--fixed-8998',
@@ -45,25 +45,21 @@ export async function up(db, client) {
   const migratePagesStream = new Writable({
     objectMode: true,
     async write(pages, _encoding, callback) {
-      const updateManyOperations = pages.map((page) => {
-        return {
-          updateMany: {
-            filter: {
-              $and: [{ path: page.path }, { pageId: { $exists: false } }],
-            },
-            update: [
-              {
-                $unset: ['path'],
-              },
-              {
-                $set: { pageId: page._id },
-              },
-            ],
-          },
-        };
-      });
+      const updates = pages.map((page) => ({
+        q: {
+          $and: [{ path: page.path }, { pageId: { $exists: false } }],
+        },
+        u: [
+          { $unset: ['path'] },
+          { $set: { pageId: { $oid: page._id.toString() } } },
+        ],
+        multi: true,
+      }));
 
-      await Revision.bulkWrite(updateManyOperations, { strict: false });
+      await prisma.$runCommandRaw({
+        update: 'revisions',
+        updates,
+      });
 
       callback();
     },
@@ -90,25 +86,21 @@ export async function down(db, client) {
   const migratePagesStream = new Writable({
     objectMode: true,
     async write(pages, _encoding, callback) {
-      const updateManyOperations = pages.map((page) => {
-        return {
-          updateMany: {
-            filter: {
-              $and: [{ pageId: page._id }, { path: { $exists: false } }],
-            },
-            update: [
-              {
-                $unset: ['pageId'],
-              },
-              {
-                $set: { path: page.path },
-              },
-            ],
-          },
-        };
-      });
+      const updates = pages.map((page) => ({
+        q: {
+          $and: [
+            { pageId: { $oid: page._id.toString() } },
+            { path: { $exists: false } },
+          ],
+        },
+        u: [{ $unset: ['pageId'] }, { $set: { path: page.path } }],
+        multi: true,
+      }));
 
-      await Revision.bulkWrite(updateManyOperations, { strict: false });
+      await prisma.$runCommandRaw({
+        update: 'revisions',
+        updates,
+      });
 
       callback();
     },
