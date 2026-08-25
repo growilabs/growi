@@ -14,7 +14,7 @@ describe('addContribution', () => {
     mongod = await MongoMemoryServer.create();
     const uri = mongod.getUri();
     await mongoose.connect(uri);
-  });
+  }, 30_000); // MongoMemoryServer.create() spawns a real mongod; the 10s default can be squeezed under CI load (see #11744)
 
   beforeEach(async () => {
     await Contribution.deleteMany({});
@@ -76,7 +76,7 @@ describe('getContributions', () => {
     mongod = await MongoMemoryServer.create();
     const uri = mongod.getUri();
     await mongoose.connect(uri);
-  });
+  }, 30_000); // MongoMemoryServer.create() spawns a real mongod; the 10s default can be squeezed under CI load (see #11744)
 
   beforeEach(async () => {
     await Contribution.deleteMany({});

@@ -41,7 +41,7 @@ describe('getContributionsHandler', () => {
   beforeAll(async () => {
     mongod = await MongoMemoryServer.create();
     await mongoose.connect(mongod.getUri());
-  });
+  }, 30_000); // MongoMemoryServer.create() spawns a real mongod; the 10s default can be squeezed under CI load (see #11744)
 
   afterAll(async () => {
     await mongoose.connection.dropDatabase();
