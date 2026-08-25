@@ -29,7 +29,8 @@ import { syncOutboundLinks } from './page-link-sync';
  *     BACKLINKS_PERF=1 pnpm vitest run page-link-read-perf
  *
  * The harness rewrites the database name to `growi_test_<workerId>`
- * (test/setup/mongo/utils.ts), so the dev `growi` database is never touched.
+ * (test/setup/mongo/test-db-config.ts), so the dev `growi` database is never
+ * touched.
  *
  * Scale is overridable for a quicker smoke run of the harness itself:
  *   BACKLINKS_PERF_PAGES=10000 BACKLINKS_PERF_INBOUND=2000
