@@ -48,6 +48,27 @@ describe('PageLinkUpsertQueue (duty-cycle pacing)', () => {
     }
   };
 
+  /** A queue whose site URL cannot be read until `recover()` is called. */
+  const createQueueWithUnreadableSiteUrl = () => {
+    let current: string | undefined;
+    const queue = new PageLinkUpsertQueue(
+      () => {
+        if (current == null) throw new Error('config unavailable');
+        return current;
+      },
+      {
+        drainIntervalMs: DRAIN_INTERVAL_MS,
+        dutyCyclePercent: DUTY_CYCLE_PERCENT,
+      },
+    );
+    return {
+      queue,
+      recover: () => {
+        current = siteUrl;
+      },
+    };
+  };
+
   beforeEach(() => {
     vi.useFakeTimers();
     mocks.handlePageUpsertById.mockReset();
@@ -236,6 +257,47 @@ describe('PageLinkUpsertQueue (duty-cycle pacing)', () => {
       expect.objectContaining({ pageId, attempts: MAX_UPSERT_ATTEMPTS }),
       expect.stringContaining('giving up'),
     );
+  });
+
+  it('leaves a page queued when the site URL cannot be read', async () => {
+    // The site URL is read per page *before* the id is claimed, so a throw there must leave the
+    // page queued — dropping it loses the save, and extracting with no site URL classifies every
+    // same-host absolute link as external and deletes the page's correct rows.
+    const { queue, recover } = createQueueWithUnreadableSiteUrl();
+    const pageId = new Types.ObjectId().toString();
+
+    queue.enqueue(pageId);
+    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
+
+    expect(mocks.handlePageUpsertById).not.toHaveBeenCalled();
+    expect(mocks.loggerError).toHaveBeenCalledWith(
+      expect.objectContaining({ err: expect.any(Error) }),
+      expect.stringContaining('drain failed'),
+    );
+
+    recover();
+    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
+
+    expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(1);
+    expect(mocks.handlePageUpsertById).toHaveBeenCalledWith(pageId, siteUrl);
+  });
+
+  it('does not spend the retry budget while the site URL is unreadable', async () => {
+    // An unreadable site URL is a fault of the config, not an attempt at the page. Charged to the
+    // page's budget, an outage outlasting MAX_UPSERT_ATTEMPTS drains would abandon it for good.
+    const { queue, recover } = createQueueWithUnreadableSiteUrl();
+    const pageId = new Types.ObjectId().toString();
+
+    queue.enqueue(pageId);
+    await vi.advanceTimersByTimeAsync(
+      DRAIN_INTERVAL_MS * (MAX_UPSERT_ATTEMPTS + 3),
+    );
+    expect(mocks.handlePageUpsertById).not.toHaveBeenCalled();
+
+    recover();
+    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
+
+    expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(1);
   });
 
   it('charges a failed page to the duty cycle', async () => {
