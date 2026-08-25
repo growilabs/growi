@@ -182,6 +182,13 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
 
   useImperativeHandle(ref, () => ({
     clear() {
+      // Our own selection has to be reset too, not just the inner typeahead's:
+      // `instance.clear()` only empties the library's internal copy and never
+      // calls `onChange`, so `selected` would still hold the old tokens on the
+      // next render — and the library re-syncs state from that prop whenever it
+      // differs (componentDidUpdate), putting the cleared tokens straight back.
+      setSelectedItems([]);
+
       const instance = typeaheadRef?.current;
       if (instance != null) {
         instance.clear();

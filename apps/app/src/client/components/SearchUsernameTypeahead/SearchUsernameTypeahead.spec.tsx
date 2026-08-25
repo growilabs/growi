@@ -245,6 +245,13 @@ describe('SearchUsernameTypeahead', () => {
 
     expect(screen.queryByText('alice')).not.toBeInTheDocument();
     expect(input).toHaveValue('');
+
+    // The clear has to survive the next render, not just the moment after the
+    // call: the inner typeahead re-syncs its selection from `selected` whenever
+    // that prop disagrees with its state, so a clear that leaves our own
+    // `selectedItems` populated puts the token back on the next keystroke.
+    await userEvent.type(input, 'x');
+    expect(screen.queryByText('alice')).not.toBeInTheDocument();
   });
 
   // Awaited because `AsyncTypeahead` debounces `onSearch` by `delay` before the
