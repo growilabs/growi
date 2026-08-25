@@ -1014,7 +1014,43 @@
     "transfer_data_to_another_growi": "将数据从这个GROWI迁移到另一个GROWI上",
     "advanced_options": "高级选项",
     "start_transfer": "开始迁移",
-    "paste_transfer_key": "在这里粘贴过渡键"
+    "paste_transfer_key": "在这里粘贴过渡键",
+    "transfer_method": {
+      "heading": "迁移方式",
+      "migration": "迁移(替换目标GROWI上的所有数据)",
+      "merge": "追加到现有数据(保留目标GROWI的现有数据)"
+    },
+    "confirm_modal": {
+      "title": "确认迁移",
+      "description": "目标GROWI当前持有以下数据。开始此次迁移将删除这些数据，并替换为本GROWI的数据:",
+      "counts": {
+        "users": "用户",
+        "user_groups": "用户组",
+        "pages": "页面"
+      },
+      "warnings_heading": "继续之前请注意:",
+      "warnings": {
+        "password_seed_mismatch": "源GROWI与目标GROWI的密码种子(password seed)不同。迁移后的用户将无法使用原有密码登录。",
+        "no_loginable_admin": "目标GROWI当前没有可以登录的管理员。迁移完成后，可能没有任何人能够登录。",
+        "sessions_not_invalidatable": "目标GROWI的会话存储无法单独使旧会话失效。迁移前建立的会话仍将保持有效。",
+        "local_auth_disabled_at_source": "本GROWI已禁用本地(账号/密码)认证。即使目标端保留下来的管理员账户，也无法使用密码登录。"
+      }
+    },
+    "blockers": {
+      "version_mismatch": "此次迁移无法继续：源和目标 GROWI 的版本不一致。",
+      "user_upper_limit": "此次迁移无法继续：源 GROWI 的活跃用户数超过了目标 GROWI 的用户数上限。",
+      "file_upload_not_configured": "此次迁移无法继续：源或目标 GROWI 未配置文件上传。",
+      "destination_storage_not_writable": "此次迁移无法继续：目标 GROWI 的存储不可写。",
+      "file_upload_total_limit": "此次迁移无法继续：源 GROWI 附件的总大小超过了目标 GROWI 的文件上传上限。"
+    },
+    "rescue_outcome": {
+      "heading": "此次迁移替换了目标GROWI上的所有用户。为了确保仍有人可以登录，以下管理员账户被保留了下来:",
+      "renamed_from": "原名称",
+      "email_removed": "由于与迁入的用户发生冲突，其邮箱地址已被移除。",
+      "slack_member_id_removed": "由于与迁入的用户发生冲突，其 Slack 成员 ID 已被移除。",
+      "id_reassigned": "由于原有的内部标识符与迁入的用户发生冲突，系统为其分配了新的内部标识符；迁移前建立的登录会话已失效。"
+    },
+    "failed_collections_heading": "目标 GROWI 未能导入以下集合："
   },
   "plugins": {
     "plugins": "Plugins",
@@ -1201,7 +1237,20 @@
   "g2g": {
     "transfer_success": "Completed GROWI to GROWI transfer successfully",
     "error_generate_growi_archive": "Failed to generate GROWI archive file",
-    "error_send_growi_archive": "Failed to send GROWI archive file to the destination GROWI"
+    "error_send_growi_archive": "Failed to send GROWI archive file to the destination GROWI",
+    "error_data_conflict": "迁移已中止：部分迁移数据与目标 GROWI 上已存在的用户或用户组冲突，因此未导入任何数据。请先解决冲突的账户或用户组后重试，或迁移到尚未完成初始设置的目标 GROWI。",
+    "error_upload_attachment": "附件迁移失败",
+    "error_import_in_progress": "迁移已中止：目标 GROWI 上已有另一项数据导入正在进行。请等待其完成后再重试迁移。",
+    "error_partial_import": "迁移未完全完成：目标 GROWI 未能干净地完成迁移（可能是某个集合导入失败、管理员救援失败，或导入后的清理步骤失败），因此其数据库可能处于部分迁移状态。如果此次迁移使目标进入了维护模式，在您从目标 GROWI 的 管理 > 应用设置 中手动关闭之前，普通用户将无法访问。请先解决问题原因，然后重新执行迁移。",
+    "error_protected_collection": "迁移已中止：请求中包含了不允许迁移的集合，目标 GROWI 拒绝了该请求，未导入任何数据。迁移界面本身不会选择这些集合，请确认两端 GROWI 版本一致，并反馈下方显示的集合名称。",
+    "error_mixed_import_methods": "迁移已中止: 目标GROWI拒绝了该请求，因为其导入方式的分配中混合了“替换部分集合”和“追加到其他集合”，因此没有导入任何数据。迁移界面不会再生成此类请求，请确认源GROWI与目标GROWI运行的是相同版本，然后重试迁移。",
+    "error_invalid_transfer_key": "迁移已中止：目标 GROWI 认为迁移密钥缺失、已过期或无效，拒绝了该请求。请在目标 GROWI 上重新发布迁移密钥后重试。",
+    "error_parse_failed": "迁移已中止：目标 GROWI 无法解析迁移请求。请确认两端 GROWI 版本一致后重试迁移。",
+    "error_validation_failed": "迁移已中止：目标 GROWI 无法校验上传的 GROWI 归档文件，该文件可能已损坏。请重新生成并发送归档文件。",
+    "error_version_incompatible": "迁移已中止：源和目标 GROWI 的版本不一致，因此未导入任何数据。请将目标 GROWI 升级到与源相同的版本后重试迁移。",
+    "error_import_settings_invalid": "迁移已中止：目标 GROWI 无法为所请求的集合构建有效的导入设置。详情请参阅 GROWI 文档。",
+    "error_conflict_detection_failed": "迁移已中止：目标 GROWI 无法判断迁移数据是否与现有数据冲突，因此拒绝在不确定的情况下继续导入。请重试迁移；如果问题持续出现，请检查目标 GROWI 的日志。",
+    "error_mongo_collection_import_failure": "迁移未完全完成：由于数据冲突以外的原因，目标 GROWI 未能将一个或多个集合写入 MongoDB。详情请检查目标 GROWI 的日志。"
   },
   "external_user_group": {
     "management": "External Group Management",
@@ -1364,5 +1413,13 @@
         "description": "在不进行完整初始化的情况下，手动对账 MongoDB 页面与 Vault git 树之间的数据不一致。"
       }
     }
+  },
+  "maintenance_mode_notice": {
+    "title": "GROWI 将保持在维护模式",
+    "body_this_growi": "导入 configs 集合会用归档中的设置替换本 GROWI 的所有设置，因此本 GROWI 将进入维护模式并保持该状态。在您手动关闭之前，普通用户无法访问。",
+    "body_destination": "导入 configs 集合会用本 GROWI 的设置替换目标 GROWI 的所有设置，因此目标将进入维护模式并保持该状态。在您手动关闭之前，普通用户无法访问目标。附件会在集合之后传输，因此在整个迁移完成之前，目标处于不完整状态。",
+    "turn_it_off": "确认结果后，请从已关闭一侧 GROWI 的 管理 > 应用设置 中关闭维护模式。",
+    "cancel": "取消",
+    "proceed": "已了解，继续"
   }
 }

@@ -1,7 +1,12 @@
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
 import {
   collectConflicts,
   type GroupUniqueFields,
   hasConflicts,
+  readArchiveUserIdentity,
   type UniqueConflictReport,
   type UserUniqueFields,
 } from './detect-unique-conflicts';
@@ -198,6 +203,101 @@ describe('collectConflicts', () => {
 
       expect(result).toEqual([]);
     });
+  });
+});
+
+describe('readArchiveUserIdentity', () => {
+  let workDir: string;
+
+  beforeEach(async () => {
+    workDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'archive-user-identity-'),
+    );
+  });
+
+  afterEach(async () => {
+    await fs.rm(workDir, { force: true, recursive: true });
+  });
+
+  const writeUsersJson = async (content: string): Promise<string> => {
+    const jsonPath = path.join(workDir, 'users.json');
+    await fs.writeFile(jsonPath, content, 'utf-8');
+    return jsonPath;
+  };
+
+  test('returns every username, email, slackMemberId and _id the archive carries', async () => {
+    // The admin rescue picks a replacement username out of these sets, so a value the
+    // archive holds but this function omits becomes a duplicate-key failure at re-insertion.
+    const jsonPath = await writeUsersJson(
+      JSON.stringify([
+        {
+          _id: '0123456789abcdef01230001',
+          username: 'alice',
+          email: 'alice@example.com',
+          slackMemberId: 'UALICE',
+          password: 'source-password-hash',
+        },
+        {
+          _id: '0123456789abcdef01230002',
+          username: 'bob',
+          email: 'bob@example.com',
+          slackMemberId: 'UBOB',
+        },
+      ]),
+    );
+
+    const identity = await readArchiveUserIdentity(jsonPath);
+
+    expect([...identity.usernames].sort()).toEqual(['alice', 'bob']);
+    expect([...identity.emails].sort()).toEqual([
+      'alice@example.com',
+      'bob@example.com',
+    ]);
+    expect([...identity.slackMemberIds].sort()).toEqual(['UALICE', 'UBOB']);
+    expect([...identity.ids].sort()).toEqual([
+      '0123456789abcdef01230001',
+      '0123456789abcdef01230002',
+    ]);
+  });
+
+  test('leaves absent and empty sparse values out of the sets', async () => {
+    // A rescued account may keep an absent email; "no value" must not read as a collision.
+    const jsonPath = await writeUsersJson(
+      JSON.stringify([
+        { _id: '0123456789abcdef01230001', username: 'alice', email: '' },
+        { _id: '0123456789abcdef01230002', username: 'bob', email: null },
+        { _id: '0123456789abcdef01230003', username: 'carol' },
+      ]),
+    );
+
+    const identity = await readArchiveUserIdentity(jsonPath);
+
+    expect(identity.emails.size).toBe(0);
+    expect(identity.slackMemberIds.size).toBe(0);
+    expect(identity.usernames.size).toBe(3);
+  });
+
+  test('returns empty sets for an archive that holds no user', async () => {
+    const jsonPath = await writeUsersJson('[]');
+
+    const identity = await readArchiveUserIdentity(jsonPath);
+
+    expect(identity.usernames.size).toBe(0);
+    expect(identity.emails.size).toBe(0);
+    expect(identity.slackMemberIds.size).toBe(0);
+    expect(identity.ids.size).toBe(0);
+  });
+
+  test('rejects a truncated archive instead of returning a partial set', async () => {
+    // A partial set is worse than no set at all: the rescue would pick a username the
+    // source actually uses and the re-insertion would fail the unique index.
+    const jsonPath = await writeUsersJson(
+      '[{"_id":"0123456789abcdef01230001","username":"alice"}',
+    );
+
+    await expect(readArchiveUserIdentity(jsonPath)).rejects.toThrow(
+      /complete top-level array/,
+    );
   });
 });
 

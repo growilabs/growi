@@ -5,6 +5,7 @@ import mongoose, { type Model } from 'mongoose';
 import { getInstance } from '^/test/setup/crowi';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
+import { prisma } from '~/utils/prisma';
 
 import type { MastraRequestContextShape } from '../types/request-context';
 import { getPageContentTool } from './get-page-content-tool';
@@ -115,12 +116,6 @@ function assertFailure(
 describe('getPageContentTool (integration)', () => {
   let Page: PageModel;
   let User: Model<IUserHasId>;
-  let Revision: Model<{
-    pageId: mongoose.Types.ObjectId;
-    body: string;
-    format: string;
-    author: mongoose.Types.ObjectId;
-  }>;
   let UserGroup: Model<{ name: string }>;
   let UserGroupRelation: Model<{
     relatedGroup: mongoose.Types.ObjectId;
@@ -174,22 +169,15 @@ describe('getPageContentTool (integration)', () => {
 
     // `mongoose.model(name)` without generics returns `Model<any>`. Passing
     // the document shape via the generic narrows it to the matching
-    // `Model<T>` for User/Revision/UserGroup/UserGroupRelation without per-
+    // `Model<T>` for User/UserGroup/UserGroupRelation without per-
     // call casts. Page keeps its `<PageDocument, PageModel>` form because
     // its schema methods are typed on `PageModel`.
-    type RevisionDoc = {
-      pageId: mongoose.Types.ObjectId;
-      body: string;
-      format: string;
-      author: mongoose.Types.ObjectId;
-    };
     type UserGroupRelationDoc = {
       relatedGroup: mongoose.Types.ObjectId;
       relatedUser: mongoose.Types.ObjectId;
     };
     Page = mongoose.model<PageDocument, PageModel>('Page');
     User = mongoose.model<IUserHasId>('User');
-    Revision = mongoose.model<RevisionDoc>('Revision');
     UserGroup = mongoose.model<{ name: string }>('UserGroup');
     UserGroupRelation =
       mongoose.model<UserGroupRelationDoc>('UserGroupRelation');
@@ -286,44 +274,60 @@ describe('getPageContentTool (integration)', () => {
       lastUpdateUser: userA._id,
     });
 
-    const revisions = await Revision.insertMany([
-      {
-        pageId: publicPage._id,
-        body: bodyPublic,
-        format: 'markdown',
-        author: userA._id,
-      },
-      {
-        pageId: ownerPage._id,
-        body: bodyOwner,
-        format: 'markdown',
-        author: userA._id,
-      },
-      {
-        pageId: groupPage._id,
-        body: bodyGroup,
-        format: 'markdown',
-        author: userA._id,
-      },
-      {
-        pageId: restrictedPage._id,
-        body: bodyRestricted,
-        format: 'markdown',
-        author: userA._id,
-      },
-      {
-        pageId: longPage._id,
-        body: bodyLong,
-        format: 'markdown',
-        author: userA._id,
-      },
+    const [
+      publicRevision,
+      ownerRevision,
+      groupRevision,
+      restrictedRevision,
+      longRevision,
+    ] = await Promise.all([
+      prisma.revisions.create({
+        data: {
+          pageId: publicPage._id.toString(),
+          body: bodyPublic,
+          format: 'markdown',
+          authorId: userA._id,
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: ownerPage._id.toString(),
+          body: bodyOwner,
+          format: 'markdown',
+          authorId: userA._id,
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: groupPage._id.toString(),
+          body: bodyGroup,
+          format: 'markdown',
+          authorId: userA._id,
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: restrictedPage._id.toString(),
+          body: bodyRestricted,
+          format: 'markdown',
+          authorId: userA._id,
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: longPage._id.toString(),
+          body: bodyLong,
+          format: 'markdown',
+          authorId: userA._id,
+        },
+      }),
     ]);
 
-    publicPage.revision = revisions[0]._id;
-    ownerPage.revision = revisions[1]._id;
-    groupPage.revision = revisions[2]._id;
-    restrictedPage.revision = revisions[3]._id;
-    longPage.revision = revisions[4]._id;
+    publicPage.revision = publicRevision._id;
+    ownerPage.revision = ownerRevision._id;
+    groupPage.revision = groupRevision._id;
+    restrictedPage.revision = restrictedRevision._id;
+    longPage.revision = longRevision._id;
     await publicPage.save();
     await ownerPage.save();
     await groupPage.save();
@@ -341,15 +345,17 @@ describe('getPageContentTool (integration)', () => {
     // Best-effort cleanup: tolerate failures so teardown never masks
     // assertion errors. Each call is independently guarded.
     try {
-      await Revision.deleteMany({
-        pageId: {
-          $in: [
-            new mongoose.Types.ObjectId(publicPageId),
-            new mongoose.Types.ObjectId(ownerPageId),
-            new mongoose.Types.ObjectId(groupPageId),
-            new mongoose.Types.ObjectId(restrictedPageId),
-            new mongoose.Types.ObjectId(longPageId),
-          ],
+      await prisma.revisions.deleteMany({
+        where: {
+          pageId: {
+            in: [
+              publicPageId,
+              ownerPageId,
+              groupPageId,
+              restrictedPageId,
+              longPageId,
+            ],
+          },
         },
       });
     } catch {

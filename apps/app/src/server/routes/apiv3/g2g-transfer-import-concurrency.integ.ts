@@ -129,7 +129,16 @@ describe('receive route POST / — the import claim and the received archive', (
       async () => {
         signalImportStarted();
         await importBlocked;
-        return { failedCollections: [] };
+        // Nothing was replaced, so nothing was rescued and no clean-up was needed;
+        // what this test observes is the import claim, not the import's outcome.
+        return {
+          failedCollections: [],
+          importAborted: false,
+          rescue: null,
+          rescueApplied: false,
+          postProcessFailures: [],
+          maintenanceModeReleased: false,
+        };
       },
     );
 

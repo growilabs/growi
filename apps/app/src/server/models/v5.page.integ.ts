@@ -3,7 +3,6 @@ import {
   GroupType,
   getIdForRef,
   type IGrantedGroup,
-  type IRevision,
   type IUser,
   PageGrant,
 } from '@growi/core/dist/interfaces';
@@ -34,7 +33,6 @@ describe('Page', () => {
   let pageService: IPageService;
 
   let Page: PageModel;
-  let Revision: Model<IRevision>;
   let User: Model<IUser>;
   let ShareLink: ShareLinkModel;
   let PageRedirect: PageRedirectModel;
@@ -560,7 +558,6 @@ describe('Page', () => {
     vi.restoreAllMocks();
     User = mongoose.model('User');
     Page = mongoose.model('Page') as PageModel;
-    Revision = mongoose.model('Revision');
     ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
     PageRedirect = mongoose.model<IPageRedirect, PageRedirectModel>(
       'PageRedirect',
