@@ -29,7 +29,9 @@ type CategoryType = (typeof Categories)[keyof typeof Categories];
 // Must be `commons`: admin pages load ['admin'] and the search page loads
 // ['translation'], so it is the only namespace both get (see
 // pages/common-props/i18n.ts). Anywhere else renders raw keys on half the callers.
-const CATEGORY_LABEL_KEYS = {
+// Exported for the locale-drift spec only — deliberately kept out of the
+// barrel, so it stays an internal of this module for every other caller.
+export const CATEGORY_LABEL_KEYS = {
   [Categories.activeUser]: 'commons:username_suggestion.active_user',
   [Categories.inactiveUser]: 'commons:username_suggestion.inactive_user',
 } as const satisfies Record<CategoryType, string>;

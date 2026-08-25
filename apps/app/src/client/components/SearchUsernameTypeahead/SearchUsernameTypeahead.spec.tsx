@@ -1,5 +1,8 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { createRef } from 'react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+
+import type { IClearable } from '~/client/interfaces/clearable';
 
 import { SearchUsernameTypeahead } from './SearchUsernameTypeahead';
 import type { UsernameSuggestions } from './username-suggestions';
@@ -62,7 +65,53 @@ describe('SearchUsernameTypeahead', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders active and inactive users in their respective groups', async () => {
+  // 2a leaves the search page with no inactive matches at all, so this is that
+  // page's permanent state — an unconditional header would render over nothing.
+  it('omits the inactive group header when no inactive users match', async () => {
+    mockSuggestions(['alice'], []);
+
+    renderTypeahead();
+
+    await userEvent.type(screen.getByRole('combobox'), 'a');
+
+    const menu = await screen.findByRole('listbox');
+    // Positive control: without it the absence assertions pass on an empty menu.
+    expect(within(menu).getByText('alice')).toBeInTheDocument();
+    expect(
+      within(menu).getByText('commons:username_suggestion.active_user'),
+    ).toBeInTheDocument();
+
+    expect(
+      within(menu).queryByText('commons:username_suggestion.inactive_user'),
+    ).not.toBeInTheDocument();
+    expect(within(menu).queryAllByRole('separator')).toHaveLength(0);
+  });
+
+  it('omits the active group header when only inactive users match', async () => {
+    mockSuggestions([], ['bob']);
+
+    renderTypeahead();
+
+    await userEvent.type(screen.getByRole('combobox'), 'b');
+
+    const menu = await screen.findByRole('listbox');
+    expect(within(menu).getByText('bob')).toBeInTheDocument();
+    expect(
+      within(menu).getByText('commons:username_suggestion.inactive_user'),
+    ).toBeInTheDocument();
+
+    expect(
+      within(menu).queryByText('commons:username_suggestion.active_user'),
+    ).not.toBeInTheDocument();
+    // A divider above the first emitted group would be the `index`-only variant.
+    expect(within(menu).queryAllByRole('separator')).toHaveLength(0);
+  });
+
+  // Order matters, not just presence: each username has to sit under its own
+  // header, and the two groups have to be separated. Asserting the rendered
+  // sequence covers both — membership alone would still pass with every option
+  // piled under one header.
+  it('renders active and inactive users under their respective headers, separated', async () => {
     mockSuggestions(['alice'], ['bob']);
 
     renderTypeahead();
@@ -70,8 +119,10 @@ describe('SearchUsernameTypeahead', () => {
     await userEvent.type(screen.getByRole('combobox'), 'a');
 
     const menu = await screen.findByRole('listbox');
-    expect(within(menu).getByText('alice')).toBeInTheDocument();
-    expect(within(menu).getByText('bob')).toBeInTheDocument();
+    expect(menu.textContent).toMatch(
+      /active_user[\s\S]*alice[\s\S]*inactive_user[\s\S]*bob/,
+    );
+    expect(within(menu).queryAllByRole('separator')).toHaveLength(1);
   });
 
   it('filters out already-selected usernames from the suggestion menu', async () => {
@@ -163,6 +214,37 @@ describe('SearchUsernameTypeahead', () => {
     );
 
     expect(queryByText('alice')).not.toBeInTheDocument();
+  });
+
+  // `AuditLogManagement`'s clear button drives the input through this ref
+  // (`clearButtonPushedHandler` → `typeaheadRef.current?.clear()`), so the
+  // handle reaching the inner typeahead is a contract, not an internal detail:
+  // a plain function component inserted in between would make React drop the
+  // ref silently, with no type error and no failing test elsewhere.
+  it('empties the input when clear() is called on the forwarded ref', async () => {
+    mockSuggestions(['alice']);
+    const ref = createRef<IClearable>();
+
+    render(
+      <SearchUsernameTypeahead
+        ref={ref}
+        onChange={vi.fn()}
+        useUsernameSuggestions={useFakeSuggestions}
+        placeholder="placeholder"
+      />,
+    );
+
+    const input = screen.getByRole('combobox');
+    await userEvent.type(input, 'alice');
+    await userEvent.click(await screen.findByRole('option', { name: 'alice' }));
+    expect(screen.getByText('alice')).toBeInTheDocument();
+
+    act(() => {
+      ref.current?.clear();
+    });
+
+    expect(screen.queryByText('alice')).not.toBeInTheDocument();
+    expect(input).toHaveValue('');
   });
 
   // Awaited because `AsyncTypeahead` debounces `onSearch` by `delay` before the
