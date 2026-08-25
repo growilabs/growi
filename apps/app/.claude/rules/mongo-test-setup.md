@@ -52,36 +52,33 @@ tear down the shared per-worker connection out from under whichever
 unrelated setupFiles (Elasticsearch, migrate-mongo, Prisma) the file doesn't
 need.
 
-Give the file its own stable database name via `replaceMongoDbName` so it
-can't collide with `app-integration`'s `growi_test_${workerId}` naming
+Use `connectSelfContainedMongo` / `disconnectSelfContainedMongo`
+(`test/setup/mongo/self-contained-connection.ts`) rather than writing the
+`MONGO_URI` check inline — it already handles the fallback and gives the
+file its own stable database name via `replaceMongoDbName`, so it can't
+collide with `app-integration`'s `growi_test_${workerId}` naming
 (`test/setup/mongo/test-db-config.ts`) on the same shared external MongoDB:
 
 ```ts
-import { replaceMongoDbName } from '^/test/setup/mongo/utils';
+import type { MongoMemoryServer } from 'mongodb-memory-server-core';
+
+import {
+  connectSelfContainedMongo,
+  disconnectSelfContainedMongo,
+} from '^/test/setup/mongo/self-contained-connection';
 
 let mongod: MongoMemoryServer | undefined;
 
 beforeAll(async () => {
-  const mongoUri = process.env.MONGO_URI
-    ? replaceMongoDbName(process.env.MONGO_URI, 'growi_test_unit_<unique-name>')
-    : null;
-  if (mongoUri != null) {
-    await mongoose.connect(mongoUri);
-    return;
-  }
-  mongod = await MongoMemoryServer.create();
-  await mongoose.connect(mongod.getUri());
+  ({ mongod } = await connectSelfContainedMongo('growi_test_unit_<unique-name>'));
 });
 
 afterAll(async () => {
-  await mongoose.connection.dropDatabase();
-  await mongoose.connection.close();
-  await mongod?.stop();
+  await disconnectSelfContainedMongo(mongod);
 });
 ```
 
-If the local (`MONGO_URI` unset) fallback branch is exercised often enough to
-matter, consider also passing `MONGOMS_BINARY_OPTS` to `MongoMemoryServer.create()`
-for cache consistency — but that is a secondary nicety. The `MONGO_URI`-first
-check is the actual rule; without it, the binary options never come into play
-in CI at all.
+Pass a name that is unique to this file (or `describe` block, if two blocks
+in the same file must not share fixtures concurrently) — sequential
+`describe`s in one file can safely share a name since each `afterAll` drops
+the database before the next one connects.

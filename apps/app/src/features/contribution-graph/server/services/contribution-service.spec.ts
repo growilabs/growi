@@ -1,7 +1,10 @@
-import { MongoMemoryServer } from 'mongodb-memory-server-core';
+import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 
-import { replaceMongoDbName } from '^/test/setup/mongo/utils';
+import {
+  connectSelfContainedMongo,
+  disconnectSelfContainedMongo,
+} from '^/test/setup/mongo/self-contained-connection';
 
 import type { IContribution } from '../../interfaces/contribution';
 import Contribution from '../models/contribution-model';
@@ -13,23 +16,9 @@ describe('addContribution', () => {
   let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
-    // Reuse an already-running MongoDB (CI's ci-app-test job starts one via
-    // supercharge/mongodb-github-action and passes MONGO_URI) instead of
-    // spawning a redundant embedded mongod — see #11744.
-    const mongoUri = process.env.MONGO_URI
-      ? replaceMongoDbName(
-          process.env.MONGO_URI,
-          'growi_test_unit_contribution_service',
-        )
-      : null;
-
-    if (mongoUri != null) {
-      await mongoose.connect(mongoUri);
-      return;
-    }
-
-    mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri());
+    ({ mongod } = await connectSelfContainedMongo(
+      'growi_test_unit_contribution_service',
+    ));
   });
 
   beforeEach(async () => {
@@ -37,9 +26,7 @@ describe('addContribution', () => {
   });
 
   afterAll(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-    await mongod?.stop();
+    await disconnectSelfContainedMongo(mongod);
   });
 
   it('should create a new contribution record if it does not exist (upsert)', async () => {
@@ -89,23 +76,9 @@ describe('getContributions', () => {
   let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
-    // Reuse an already-running MongoDB (CI's ci-app-test job starts one via
-    // supercharge/mongodb-github-action and passes MONGO_URI) instead of
-    // spawning a redundant embedded mongod — see #11744.
-    const mongoUri = process.env.MONGO_URI
-      ? replaceMongoDbName(
-          process.env.MONGO_URI,
-          'growi_test_unit_contribution_service',
-        )
-      : null;
-
-    if (mongoUri != null) {
-      await mongoose.connect(mongoUri);
-      return;
-    }
-
-    mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri());
+    ({ mongod } = await connectSelfContainedMongo(
+      'growi_test_unit_contribution_service',
+    ));
   });
 
   beforeEach(async () => {
@@ -113,9 +86,7 @@ describe('getContributions', () => {
   });
 
   afterAll(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-    await mongod?.stop();
+    await disconnectSelfContainedMongo(mongod);
   });
 
   it('should return one year of contributions if they exist in the database', async () => {
