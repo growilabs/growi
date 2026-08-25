@@ -376,13 +376,16 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
 
 - [x] B2.2 Coalesce and pace live extraction (write-path burst control)
   - Replace the B1.6/B1.12 inline per-event extraction with an in-process coalescing queue: the
-    `create`/`update` handlers mark the page dirty (`Set<pageId>`); a paced tick drains a bounded
-    number of ids per cycle, re-reads each page's latest body at drain time, and runs the existing
-    upsert handler once per page. `handlePageUpsertById` stays the per-page unit — the queue is the
-    seam. The duty cycle is a deployment knob, not a constant: the tick interval and the per-tick
-    page budget come from `backlinks:drainIntervalMs` / `backlinks:maxPagesPerDrain`
-    (`BACKLINKS_DRAIN_INTERVAL_MS` / `BACKLINKS_MAX_PAGES_PER_DRAIN`, defaulting to 1000 ms / 3
-    pages), read at service construction and passed into the queue.
+    `create`/`update` handlers mark the page dirty (`Set<pageId>`); a paced drain re-reads each
+    page's latest body at drain time and runs the existing upsert handler once per page.
+    `handlePageUpsertById` stays the per-page unit — the queue is the seam. Pacing is a deployment
+    knob, not a constant: the coalescing window is `backlinks:drainIntervalMs`
+    (`BACKLINKS_DRAIN_INTERVAL_MS`, default 1000 ms) and the share of the event loop the queue may
+    occupy is `backlinks:dutyCyclePercent` (`BACKLINKS_DUTY_CYCLE_PERCENT`, default 20), both read
+    at service construction and passed into the queue. A drain runs until the queue is empty,
+    resting after each page in proportion to the extraction time it measured — see design.md B2.2
+    for why the original per-tick page budget (`BACKLINKS_MAX_PAGES_PER_DRAIN`, 3 pages) was
+    replaced after review.
   - **B2.2 scope (delete):** the drain guards against a stale upsert by re-checking status at drain
     time and declining to index a page that is now `STATUS_DELETED` — keyed on deleted rather than
     published because a legacy page's `null` status means published. That closes the window
@@ -391,6 +394,10 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     the reconcile op and the delete-family handlers — deferred to **B5.2**/**B5.3**.
   - Best-effort/in-memory by design: a restart drops pending work (self-heals on next edit/backfill);
     the set is per-instance in multi-container deployments (safe because upserts are idempotent).
+  - **Accepted limitation (review of B2.2):** a page whose upsert fails is retried on a later drain
+    after `RETRY_BACKOFF_MS`, up to `MAX_UPSERT_ATTEMPTS` attempts; past that the queue gives up and
+    logs the page at error level, and its rows stay stale until its next save or B3. The queue has a
+    single drain timer, so a save arriving during a retry backoff waits for it too.
   - **Accepted limitation (review of B2.2):** an upsert that never settles leaves the drain flag set,
     and the instance then stops indexing until it restarts. Not guarded with a timeout, because a
     timeout cannot cancel the abandoned run — it would race it, and a resurrected stale run would
@@ -409,15 +416,19 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     write storm is what actually slows reader queries at the storage-engine level. Coalescing
     collapses same-page saves to **one** `bulkWrite` reflecting only the final link set (safe because
     `replaceOutboundLinks` is idempotent), cutting write volume, index maintenance, and oplog/
-    replication traffic from N to 1; pacing then caps distinct-page `bulkWrite`s per tick, converting
-    an unbounded write spike into steady, bounded write QPS that coexists with reads. Delete must
+    replication traffic from N to 1; pacing then spreads distinct-page `bulkWrite`s in proportion to
+    each page's extraction cost, converting an unbounded write spike into steady, bounded write QPS
+    that coexists with reads. Delete must
     supersede a pending upsert because the upsert path uses `upsert: true` — running a stale upsert
     for a since-deleted page would re-create `pagelinks` rows for a non-existent source (orphan rows
     a reader could surface as phantom backlinks).
-  - Done when: repeated saves of the same page within the tick window produce exactly one extraction
-    / one `replaceOutboundLinks` `bulkWrite` (asserted via a spy/count on the upsert handler); a burst
-    of distinct-page saves is drained over multiple ticks rather than in one synchronous spree; a
-    page trashed while its upsert is pending is not indexed by the drain (no row written for it).
+  - Done when: repeated saves of the same page within the coalescing window produce exactly one
+    extraction / one `replaceOutboundLinks` `bulkWrite` (asserted via a spy/count on the upsert
+    handler); a burst of distinct-page saves is paced by measured extraction cost rather than run as
+    one back-to-back spree (a page costing 10x as much to extract earns 10x the rest); a source that
+    is `STATUS_DELETED` at drain time is not indexed, even when the event payload still reads as
+    published (no row written for it); a page whose upsert fails is retried on a later drain rather
+    than dropped, and abandoned with an error log after `MAX_UPSERT_ATTEMPTS`.
   - _Requirements: 3.5_
   - _Boundary: PageLinkService_
   - _Depends: B1.6, B1.12_
@@ -500,15 +511,27 @@ redirect-following keeps links resolvable when the source is re-saved after the 
 the redirect-following half of resolution plus the re-resolve-by-path repointing. Independent of
 B3/B5.
 
-- [ ] B4.1 Add redirect-chain following to resolveToPageIds
-  - Extend the resolver with the redirect step deferred from B1.4: when direct path lookup misses,
-    follow the redirect chain to its endpoint and resolve there; handle multi-hop renames (A→B→C) via
-    the redirect endpoint lookup; null when neither a page nor a redirect resolves (the broken case).
-    A permalink `toPath` still short-circuits by id (never needs redirect-following — 5.4)
-  - Done when unit tests cover single and double redirect chains resolving to the endpoint, and the
-    unresolved (null) case
+- [x] B4.1 Add redirect-chain following to resolveToPageIds
+  - Extend the resolver with the redirect step deferred from B1.4: follow the redirect chain to its
+    endpoint and resolve there; handle multi-hop renames (A→B→C) via the redirect endpoint lookup;
+    unresolved when neither a page nor a redirect resolves (the broken case). A permalink `toPath`
+    still short-circuits by id (never needs redirect-following — 5.4)
+  - **Match page view's precedence**: a redirect on the path outranks a live page at it, because
+    `resolvePathAndCheckIdentical` follows the redirect without checking for a live page at the
+    requested path. So the chain is looked up for **every** path in one lookup, not only for the
+    ones that missed — a live hit does not settle the answer
+  - Add the lookup as a new `PageRedirect.retrievePageRedirectEndpointsBatch` static and
+    re-implement the existing singular `retrievePageRedirectEndpoints` over it, so the
+    `$graphLookup` pipeline and deepest-hop rule exist once and page view cannot disagree with the
+    link index about where a chain ends. Keep the depth cap a **parameter**: the save path passes
+    50, page view passes none (a cap there turns a much-renamed page's old URL into a not-found)
+  - Done when tests cover single and double redirect chains resolving to the endpoint, a redirect
+    winning over a live page at the same path, the unresolved case, several paths resolving in one
+    lookup, converging chains keyed by input, a cycle advancing one hop rather than hanging, an
+    uncapped walk running past the save path's cap, and a trashed target resolving through its trash
+    redirect rather than reading as broken
   - _Requirements: 1.9, 5.1, 5.2, 5.3, 5.4_
-  - _Boundary: resolveToPageIds_
+  - _Boundary: resolveToPageIds, PageRedirect (batch static)_
   - _Depends: B1.4_
 
 - [ ] B4.2 Implement the re-resolve-by-path sync operation
@@ -536,6 +559,29 @@ B3/B5.
   - Done when these scenarios pass against the wired service through real rename/move operations
   - _Requirements: 1.9, 5.1, 5.2, 5.4_
   - _Depends: B4.3, B1.12_
+
+- [ ] B4.5 Bound how many chains one redirect lookup walks
+  - Deliberately deferred out of B4.1 (judged out of that PR's scope), and independent of
+    B4.2–B4.4 — pick it up at any point after B4.1.
+  - B4.1 capped the *depth* of a chain (`maxDepth: 50` from the save path) but nothing caps the
+    *width*: `retrievePageRedirectEndpointsBatch` receives every link path on the page, and B4.1's
+    precedence decision means it receives them on **every** save rather than only the ones that
+    missed. `$graphLookup` is memory-bound at 100MB and cannot spill to disk, so a page carrying
+    thousands of links (generated content, imported trees) can fail the aggregation outright — the
+    same failure mode the depth cap was added to prevent, reached through width instead.
+  - **Why it matters more than the raw failure**: `PageLinkService.onUpsert` catches and logs the
+    error without acting on it, so the page's `PageLink` rows silently stop being updated on that
+    save and every save after it. There is no signal in the UI and no retry.
+  - Fix: chunk `fromPaths` inside the static (one aggregation per chunk, results merged into the same
+    map) so the caller cannot exceed the bound by passing a large set. Keep the chunk size a
+    constant in the model, next to the reason — callers should not have to know it.
+  - Consider covering `removePageRedirectsByToPath` in the same pass: it walks the graph the other
+    way and is also unbounded, though it runs on delete rather than on save.
+  - Done when a unit or integ test shows a `fromPaths` set larger than the chunk size resolves every
+    input in more than one aggregation, with the same result as a single-chunk run
+  - _Requirements: 5.1, 5.2_
+  - _Boundary: PageRedirect (batch static)_
+  - _Depends: B4.1_
 
 ---
 
@@ -590,9 +636,14 @@ the restored page's status. Independent of B3/B4.
   - Implement `findForwardLinkHealth` (a page's outbound rows whose derived target state is
     trashed/broken, mapped to `ILinkTarget`); derive target state from `toPage`/target status rather
     than a stored flag
+  - **Filter the targets through the shared viewer/grant filter.** `ILinkTarget` returns the
+    target's `path`, and B4.1 made resolution follow the rename chain, so a `toPage` can point at a
+    page that has since moved somewhere the viewer cannot read. Without this filter the endpoint
+    leaks private paths to anyone who can read the linking page. `findBacklinks`' filter is on the
+    *source* pages and does not cover this
   - Done when an integration test shows forward health reports trashed/broken targets with the correct
-    state
-  - _Requirements: 5.3, 6.1, 6.2, 6.3, 6.4_
+    state, **and** that a target the viewer cannot read is omitted
+  - _Requirements: 5.3, 6.1, 6.2, 6.3, 6.4, 2.1_
   - _Boundary: PageLinkService, interfaces/backlink.ts_
   - _Depends: B5.1, B1.7_
 

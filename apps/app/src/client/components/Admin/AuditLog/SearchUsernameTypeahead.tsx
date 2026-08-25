@@ -12,12 +12,13 @@ import { AsyncTypeahead, Menu, MenuItem } from 'react-bootstrap-typeahead';
 import { useTranslation } from 'react-i18next';
 
 import type { IClearable } from '~/client/interfaces/clearable';
-import { useSWRxUsernames } from '~/stores/user';
+import { useSWRxAuditlogSuggestions } from '~/stores/activity';
+
+import { shouldShowUsernameSuggestion } from './should-show-username-suggestion';
 
 const Categories = {
   activeUser: 'Active User',
   inactiveUser: 'Inactive User',
-  activitySnapshotUser: 'Activity Snapshot User',
 } as const;
 
 type CategoryType = (typeof Categories)[keyof typeof Categories];
@@ -57,39 +58,25 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   /*
    * Fetch
    */
-  const requestOptions = {
-    isIncludeActiveUser: true,
-    isIncludeInactiveUser: true,
-    isIncludeActivitySnapshotUser: true,
-  };
   const {
-    data: usernameData,
+    data: suggestionsData,
     error,
     isLoading: _isLoading,
-  } = useSWRxUsernames(searchKeyword, 0, 5, requestOptions);
-  const activeUsernames =
-    usernameData?.activeUser?.usernames != null
-      ? usernameData.activeUser.usernames
-      : [];
-  const inactiveUsernames =
-    usernameData?.inactiveUser?.usernames != null
-      ? usernameData.inactiveUser.usernames
-      : [];
-  const activitySnapshotUsernames =
-    usernameData?.activitySnapshotUser?.usernames != null
-      ? usernameData.activitySnapshotUser.usernames
-      : [];
+  } = useSWRxAuditlogSuggestions('username', searchKeyword);
+  const activeUsernames = suggestionsData?.username?.activeUsernames ?? [];
+  const inactiveUsernames = suggestionsData?.username?.inactiveUsernames ?? [];
   const isLoading = _isLoading === true && error == null;
 
-  const allUser: UserDataType[] = [];
-  const pushToAllUser = (usernames: string[], category: CategoryType) => {
-    usernames.forEach((username) => {
-      allUser.push({ username, category });
-    });
-  };
-  pushToAllUser(activeUsernames, Categories.activeUser);
-  pushToAllUser(inactiveUsernames, Categories.inactiveUser);
-  pushToAllUser(activitySnapshotUsernames, Categories.activitySnapshotUser);
+  const allUser: UserDataType[] = [
+    ...activeUsernames.map((username) => ({
+      username,
+      category: Categories.activeUser,
+    })),
+    ...inactiveUsernames.map((username) => ({
+      username,
+      category: Categories.inactiveUser,
+    })),
+  ];
 
   /*
    * Functions
@@ -106,6 +93,17 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   const searchHandler = useCallback((text: string) => {
     setSearchKeyword(text);
   }, []);
+
+  const filterBy = useCallback(
+    (option: UserDataType, { text }: { text: string }) =>
+      shouldShowUsernameSuggestion({
+        option,
+        currentText: text,
+        fetchedForKeyword: searchKeyword,
+        selectedUsernames: selectedItems.map((s) => s.username),
+      }),
+    [searchKeyword, selectedItems],
+  );
 
   const renderMenu = useCallback((allUser: UserDataType[], menuProps) => {
     if (allUser == null || allUser.length === 0) {
@@ -155,6 +153,7 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
         multiple
         delay={400}
         minLength={0}
+        filterBy={filterBy}
         placeholder={t('admin:audit_log_management.username')}
         isLoading={isLoading}
         options={allUser}

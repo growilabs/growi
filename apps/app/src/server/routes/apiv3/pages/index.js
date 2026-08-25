@@ -21,10 +21,11 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import { configManager } from '~/server/service/config-manager';
+import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
 import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
@@ -48,6 +49,7 @@ export const setup = (crowi) => {
   const adminRequired = adminRequiredFactory(crowi);
 
   const { Page, User } = crowi.models;
+  const { pageGrantService, pageService } = crowi;
 
   const activityEvent = crowi.events.activity;
 
@@ -233,17 +235,18 @@ export const setup = (crowi) => {
         });
 
         const ids = result.pages.map((page) => {
-          return page._id;
+          return page._id.toString();
         });
-        const relations = await PageTagRelation.find({
-          relatedPage: { $in: ids },
-        }).populate('relatedTag');
+        const relations = await prisma.pagetagrelations.findMany({
+          where: { relatedPageId: { in: ids } },
+          include: { relatedTag: true },
+        });
 
         // { pageId: [{ tag }, ...] }
         const relationsMap = new Map();
         // increment relationsMap
         relations.forEach((relation) => {
-          const pageId = relation.relatedPage.toString();
+          const pageId = relation.relatedPageId;
           if (!relationsMap.has(pageId)) {
             relationsMap.set(pageId, []);
           }
@@ -298,6 +301,8 @@ export const setup = (crowi) => {
    *                  isRecursively:
    *                    type: boolean
    *                    description: whether rename page with descendants
+   *                  revisionId:
+   *                    $ref: '#/components/schemas/ObjectId'
    *                required:
    *                  - pageId
    *                  - revisionId
@@ -310,10 +315,16 @@ export const setup = (crowi) => {
    *                  properties:
    *                    page:
    *                      $ref: '#/components/schemas/Page'
-   *          401:
-   *            description: page id is invalid
+   *          400:
+   *            description: revisionId is missing, or the destination is under a non-existent user's user page. An empty page may be renamed without revisionId.
+   *          403:
+   *            description: Page is forbidden.
+   *          404:
+   *            description: Page is not found.
    *          409:
-   *            description: page path is already existed
+   *            description: The destination path is already taken, cannot be used, or revisionId is not the latest revision.
+   *          500:
+   *            description: Failed to rename page.
    */
   router.put(
     '/rename',
@@ -373,18 +384,30 @@ export const setup = (crowi) => {
       let renamedPage;
 
       try {
-        page = await Page.findByIdAndViewer(pageId, req.user, null, true);
-        options.isRecursively = page.descendantCount > 0;
+        const pageWithMeta = await findPageAndMetaDataByViewer(
+          pageService,
+          pageGrantService,
+          {
+            pageId,
+            path: null,
+            user: req.user,
+            basicOnly: true,
+          },
+        );
+        page = pageWithMeta.data;
 
         if (page == null) {
+          const { meta } = pageWithMeta;
           return res.apiv3Err(
             new ErrorV3(
               `Page '${pageId}' is not found or forbidden`,
               'notfound_or_forbidden',
             ),
-            401,
+            meta.isForbidden ? 403 : 404,
           );
         }
+
+        options.isRecursively = page.descendantCount > 0;
 
         // empty page does not require revisionId validation
         if (!page.isEmpty && revisionId == null) {
@@ -394,7 +417,9 @@ export const setup = (crowi) => {
           );
         }
 
-        if (!page.isEmpty && !page.isUpdatable(revisionId)) {
+        // isUpdatable is async: without the await the negation is always false and
+        // this conflict check never fires
+        if (!page.isEmpty && !(await page.isUpdatable(revisionId))) {
           return res.apiv3Err(
             new ErrorV3(
               "Someone could update this page, so couldn't delete.",
@@ -1040,9 +1065,33 @@ export const setup = (crowi) => {
             isRecursively,
           );
       } else {
+        // isUpdatable is async, so it has to be awaited before the result is used as
+        // a predicate: a bare call returns a Promise, which is always truthy, and
+        // kept every page regardless of whether its revision is still the latest.
+        // Resolved up front rather than inside the filter, which cannot await.
+        let isUpdatableFlags;
+        try {
+          isUpdatableFlags = await Promise.all(
+            pagesToDelete.map((p) =>
+              // an empty page has no revision to compare
+              p.isEmpty
+                ? true
+                : p.isUpdatable(pageIdToRevisionIdMap[p._id].toString()),
+            ),
+          );
+        } catch (err) {
+          logger.error(
+            'Failed to check whether the pages to delete are up to date.',
+            err,
+          );
+          return res.apiv3Err(
+            new ErrorV3('Failed to find pages to delete.'),
+            500,
+          );
+        }
+
         const filteredPages = pagesToDelete.filter(
-          (p) =>
-            p.isEmpty || p.isUpdatable(pageIdToRevisionIdMap[p._id].toString()),
+          (_p, index) => isUpdatableFlags[index],
         );
         pagesCanBeDeleted = await crowi.pageService.filterPagesByCanDelete(
           filteredPages,

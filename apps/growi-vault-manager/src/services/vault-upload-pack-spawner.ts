@@ -17,9 +17,30 @@
  * (gitnamespaces(7)).
  *
  * `uploadpack.allowAnySHA1InWant=false` is git's default and is therefore
- * left unconfigured rather than set explicitly; this prevents clients from
- * fetching arbitrary OIDs that are not advertised in the namespace view
- * (requirement 5.4).
+ * left unconfigured rather than set explicitly (requirement 5.4).
+ *
+ * Note what that setting does and does not buy us: on its own it only stops
+ * clients from fetching unadvertised *commits*. Git's reachability check for an
+ * unadvertised want assumes the want is a commit, so blobs and trees are served
+ * for any OID that exists in the object database, regardless of GIT_NAMESPACE —
+ * namespaces scope ref advertisement, not the shared object store, and
+ * gitnamespaces(7) states outright that they are not effective for read access
+ * control (measured on git 2.49.0).
+ *
+ * The gap is therefore closed before this spawner runs: GitProxyController
+ * authorises every want against the view ref via vault-want-guard.ts, and hands
+ * the already-inspected head of the request body back through `stdinPrefix`. Do
+ * not call this in 'rpc' mode without that check. See
+ * .kiro/specs/growi-vault-manager/research.md.
+ *
+ * `uploadpack.allowFilter=true` is set so that a client can shrink its clone
+ * with `--filter=sparse:oid=<published spec>` (requirement 5.9). The setting is
+ * all-or-nothing — git cannot advertise one kind of filter and not another — so
+ * the filters this server does not serve are refused by the same guard, which
+ * inspects the `filter` line before this spawner runs. Note that
+ * `uploadpack.allowReachableSHA1InWant` stays off: a client is never allowed to
+ * ask for an object by name, which is why `sparse:oid` (applied entirely on the
+ * server, one want, no follow-up request) is the only filter that fits.
  */
 
 import type { ChildProcess } from 'node:child_process';
@@ -45,6 +66,14 @@ export interface SpawnOptions {
    * Required for 'rpc' mode; ignored in 'advertise' mode.
    */
   readonly stdin?: NodeJS.ReadableStream;
+  /**
+   * Bytes to write to stdin before piping `stdin`.
+   *
+   * The caller inspects the head of the request body to authorise the client's
+   * wants (vault-want-guard.ts), which takes those bytes off the stream; they
+   * are replayed here so upload-pack still receives the body in full.
+   */
+  readonly stdinPrefix?: Buffer;
 }
 
 /** Handle returned by spawnUploadPack. */
@@ -76,14 +105,24 @@ export interface SpawnResult {
  * @returns Streaming handles and a kill function.
  */
 export function spawnUploadPack(opts: SpawnOptions): SpawnResult {
-  const { mode, viewRef, stdin } = opts;
+  const { mode, viewRef, stdin, stdinPrefix } = opts;
   const repoPath = getRepoPath();
+
+  // Both modes carry the config: 'advertise' is where the filter capability is
+  // announced, 'rpc' is where the filter is applied.
+  const config = ['-c', 'uploadpack.allowFilter=true'];
 
   // Build the argument list based on mode.
   const args =
     mode === 'advertise'
-      ? ['upload-pack', '--stateless-rpc', '--advertise-refs', repoPath]
-      : ['upload-pack', '--stateless-rpc', repoPath];
+      ? [
+          ...config,
+          'upload-pack',
+          '--stateless-rpc',
+          '--advertise-refs',
+          repoPath,
+        ]
+      : [...config, 'upload-pack', '--stateless-rpc', repoPath];
 
   // Spawn the process with GIT_NAMESPACE so git only sees the view ref's
   // namespace (gitnamespaces(7): refs are rewritten to refs/namespaces/<ns>/).
@@ -99,6 +138,10 @@ export function spawnUploadPack(opts: SpawnOptions): SpawnResult {
   // In 'rpc' mode, pipe the caller-supplied readable into child stdin so that
   // the git process can read the client's want/have lines.
   if (mode === 'rpc' && stdin != null && child.stdin != null) {
+    // Replay the already-inspected head first so the body stays byte-identical.
+    if (stdinPrefix != null && stdinPrefix.length > 0) {
+      child.stdin.write(stdinPrefix);
+    }
     stdin.pipe(child.stdin);
   } else {
     // In 'advertise' mode git does not read stdin; close it immediately to

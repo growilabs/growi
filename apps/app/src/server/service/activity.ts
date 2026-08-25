@@ -254,6 +254,8 @@ class ActivityService {
   };
 
   // for GET request
+  // No longer emits 'created' (dropped in the Prisma migration). Verified no
+  // listeners depend on it; add it back here if a future caller needs it.
   createActivity = async function (parameters): Promise<IActivity | null> {
     const shoudCreateActivity = this.crowi.activityService.shoudUpdateActivity(
       parameters.action,

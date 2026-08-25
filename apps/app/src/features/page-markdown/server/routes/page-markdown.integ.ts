@@ -12,6 +12,7 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { AccessToken } from '~/server/models/access-token';
 import type { PageDocument, PageModel } from '~/server/models/page';
+import { prisma } from '~/utils/prisma';
 
 import { MARKDOWN_FOOTER_MAX_LINKS } from '../services/constants';
 import { createPageMarkdownHandlers } from './page-markdown';
@@ -39,19 +40,11 @@ const WORKER_ID = process.env.VITEST_WORKER_ID ?? '1';
 const BASE = `/mdroute-${WORKER_ID}`;
 const SENTINEL = 'HTML_FALLBACK_SENTINEL';
 
-type RevisionDoc = {
-  pageId: mongoose.Types.ObjectId;
-  body: string;
-  format: string;
-  author: mongoose.Types.ObjectId;
-};
-
 describe('page-markdown route (integration)', () => {
   let crowi: Crowi;
   let app: express.Application;
   let Page: PageModel;
   let User: Model<IUser>;
-  let Revision: Model<RevisionDoc>;
 
   let testUser: HydratedDocument<IUser>;
   let otherUser: HydratedDocument<IUser>;
@@ -112,7 +105,6 @@ describe('page-markdown route (integration)', () => {
 
     Page = mongoose.model<PageDocument, PageModel>('Page');
     User = mongoose.model<IUser>('User');
-    Revision = mongoose.model<RevisionDoc>('Revision');
 
     const testUserName = `mdroute-user-${WORKER_ID}`;
     const otherUserName = `mdroute-other-${WORKER_ID}`;
@@ -191,50 +183,69 @@ describe('page-markdown route (integration)', () => {
       descendantCount: 0,
     });
 
-    const revisions = await Revision.insertMany([
-      {
-        pageId: doc._id,
-        body: bodyDoc,
-        format: 'markdown',
-        author: testUser._id,
-      },
-      {
-        pageId: secret._id,
-        body: bodySecret,
-        format: 'markdown',
-        author: otherUser._id,
-      },
-      {
-        pageId: literal._id,
-        body: bodyLiteral,
-        format: 'markdown',
-        author: testUser._id,
-      },
-      {
-        pageId: big._id,
-        body: bodyBig,
-        format: 'markdown',
-        author: testUser._id,
-      },
-      {
-        pageId: spacePage._id,
-        body: bodySpace,
-        format: 'markdown',
-        author: testUser._id,
-      },
-      {
-        pageId: jpPage._id,
-        body: bodyJp,
-        format: 'markdown',
-        author: testUser._id,
-      },
+    const [
+      docRevision,
+      secretRevision,
+      literalRevision,
+      bigRevision,
+      spaceRevision,
+      jpRevision,
+    ] = await Promise.all([
+      prisma.revisions.create({
+        data: {
+          pageId: doc._id.toString(),
+          body: bodyDoc,
+          format: 'markdown',
+          authorId: testUser._id.toString(),
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: secret._id.toString(),
+          body: bodySecret,
+          format: 'markdown',
+          authorId: otherUser._id.toString(),
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: literal._id.toString(),
+          body: bodyLiteral,
+          format: 'markdown',
+          authorId: testUser._id.toString(),
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: big._id.toString(),
+          body: bodyBig,
+          format: 'markdown',
+          authorId: testUser._id.toString(),
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: spacePage._id.toString(),
+          body: bodySpace,
+          format: 'markdown',
+          authorId: testUser._id.toString(),
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: jpPage._id.toString(),
+          body: bodyJp,
+          format: 'markdown',
+          authorId: testUser._id.toString(),
+        },
+      }),
     ]);
-    doc.revision = revisions[0]._id;
-    secret.revision = revisions[1]._id;
-    literal.revision = revisions[2]._id;
-    big.revision = revisions[3]._id;
-    spacePage.revision = revisions[4]._id;
-    jpPage.revision = revisions[5]._id;
+    doc.revision = docRevision._id;
+    secret.revision = secretRevision._id;
+    literal.revision = literalRevision._id;
+    big.revision = bigRevision._id;
+    spacePage.revision = spaceRevision._id;
+    jpPage.revision = jpRevision._id;
     await doc.save();
     await secret.save();
     await literal.save();

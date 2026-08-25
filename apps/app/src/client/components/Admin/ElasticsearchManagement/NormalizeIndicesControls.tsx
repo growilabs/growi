@@ -1,34 +1,42 @@
 import React, { type JSX } from 'react';
-import { useTranslation } from 'next-i18next';
 
 type Props = {
-  isRebuildingProcessing: boolean;
+  isEnabled: boolean;
+  isProcessing: boolean;
+  buttonLabel: string;
+  description: string;
   onNormalizingRequested: () => void;
-  isNormalized?: boolean;
 };
 
 const NormalizeIndicesControls = (props: Props): JSX.Element => {
-  const { t } = useTranslation('admin');
-  const { isNormalized, isRebuildingProcessing } = props;
-
-  const isEnabled =
-    isNormalized != null && !isNormalized && !isRebuildingProcessing;
+  const {
+    isEnabled,
+    isProcessing,
+    buttonLabel,
+    description,
+    onNormalizingRequested,
+  } = props;
 
   return (
     <>
       <button
-        type="submit"
+        type="button"
         className={`btn ${isEnabled ? 'btn-outline-info' : 'btn-outline-secondary'}`}
-        onClick={() => {
-          props.onNormalizingRequested();
-        }}
+        onClick={onNormalizingRequested}
         disabled={!isEnabled}
       >
-        {t('full_text_search_management.normalize_button')}
+        {isProcessing && (
+          <span
+            className="spinner-border spinner-border-sm me-2"
+            role="status"
+            aria-hidden="true"
+          />
+        )}
+        {buttonLabel}
       </button>
 
       <p className="form-text text-muted">
-        {t('full_text_search_management.normalize_description')}
+        {description}
         <br />
       </p>
     </>

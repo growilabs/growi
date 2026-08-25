@@ -69,6 +69,7 @@ export const CONFIG_KEYS = [
   'app:elasticsearchMaxBodyLengthToIndex',
   'app:elasticsearchReindexBulkSize',
   'app:elasticsearchReindexOnBoot',
+  'app:elasticsearchAuditlogReindexOnBoot',
   'app:growiCloudUri',
   'app:growiAppIdForCloud',
   'app:ogpUri',
@@ -288,10 +289,6 @@ export const CONFIG_KEYS = [
   'slackbot:withProxy:saltForGtoP',
   'slackbot:withProxy:saltForPtoG',
 
-  // OpenAI Settings
-  'openai:serviceType',
-  'openai:apiKey',
-
   // AI Tools Settings
   'aiTools:suggestPathAgenticSearchLimit',
   'aiTools:suggestPathAgenticChildListingLimit',
@@ -382,7 +379,7 @@ export const CONFIG_KEYS = [
 
   // Backlinks Settings
   'backlinks:drainIntervalMs',
-  'backlinks:maxPagesPerDrain',
+  'backlinks:dutyCyclePercent',
 ] as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
@@ -510,6 +507,10 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:elasticsearchReindexOnBoot': defineConfig<boolean>({
     envVarName: 'ELASTICSEARCH_REINDEX_ON_BOOT',
+    defaultValue: false,
+  }),
+  'app:elasticsearchAuditlogReindexOnBoot': defineConfig<boolean>({
+    envVarName: 'ELASTICSEARCH_AUDITLOG_REINDEX_ON_BOOT',
     defaultValue: false,
   }),
   'app:growiCloudUri': defineConfig<string | undefined>({
@@ -1285,17 +1286,6 @@ export const CONFIG_DEFINITIONS = {
     isSecret: true,
   }),
 
-  // OpenAI Settings
-  'openai:serviceType': defineConfig<'openai' | 'azure-openai'>({
-    envVarName: 'OPENAI_SERVICE_TYPE',
-    defaultValue: 'openai',
-  }),
-  'openai:apiKey': defineConfig<string | undefined>({
-    envVarName: 'OPENAI_API_KEY',
-    defaultValue: undefined,
-    isSecret: true,
-  }),
-
   // AI chat (Mastra) Settings — multi-provider: several providers can be
   // configured at once, one fixed slot per supported provider.
   //
@@ -1601,9 +1591,11 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'BACKLINKS_DRAIN_INTERVAL_MS',
     defaultValue: 1000,
   }),
-  'backlinks:maxPagesPerDrain': defineConfig<number>({
-    envVarName: 'BACKLINKS_MAX_PAGES_PER_DRAIN',
-    defaultValue: 3,
+  // Share of the event loop the backlinks queue may occupy. A percent integer, not a fraction:
+  // numeric env vars go through a bare parseInt, which would read 0.2 as 0.
+  'backlinks:dutyCyclePercent': defineConfig<number>({
+    envVarName: 'BACKLINKS_DUTY_CYCLE_PERCENT',
+    defaultValue: 20,
   }),
 } as const;
 

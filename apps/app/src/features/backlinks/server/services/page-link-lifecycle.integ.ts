@@ -5,7 +5,8 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
+import PageRedirect from '~/server/models/page-redirect';
+import { prisma } from '~/utils/prisma';
 
 import PageLink from '../models/page-link';
 
@@ -25,11 +26,12 @@ import PageLink from '../models/page-link';
  *  - a source the viewer cannot read is excluded; a grant change is reflected on re-read
  *  - a source linking B->A more than once is listed once
  *  - a page linking to its own permalink is excluded from its own backlinks
- *  - a page trashed while its upsert sat in the queue is not indexed (3.5, B2.2)
+ *  - a source trashed before its queued upsert ran is not indexed (3.5, B2.2)
+ *  - a backlink survives the target's rename across a later re-save of the source (5.1)
  *
- * B1 scope: rename/move (B4.4) is out of scope, and so is the rest of
- * trash/delete/restore (B5.8) — the trash case below covers only B2.2's drain-time
- * guard, not the B5.2 reconcile of rows the page already owned.
+ * B1 scope: the rest of trash/delete/restore (B5.8) is out of scope — the trash case
+ * below covers only B2.2's drain-time guard, not the B5.2 reconcile of rows the page
+ * already owned.
  */
 describe('Backlinks B1 slice (lifecycle integration)', () => {
   const PREFIX = '/backlinks-b1-lifecycle-test';
@@ -71,16 +73,19 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     page: HydratedDocument<PageDocument>,
     body: string,
   ): Promise<void> => {
-    const revision = await Revision.create({ pageId: page._id, body });
+    const revision = await prisma.revisions.create({
+      data: { pageId: page._id.toString(), body },
+    });
+    const revisionId = new mongoose.Types.ObjectId(revision.id);
     // Assign the ObjectId directly: this mirrors the unpopulated-revision path
     // and avoids relying on populate() in the test.
-    page.revision = revision._id;
+    page.revision = revisionId;
     // Persist the pointer as well: the coalescing queue holds ids, so the drain
     // re-reads the page from the DB (handlePageUpsertById) rather than using the
     // emitted document. PageService likewise commits the revision (pushRevision)
     // before emitting, so an in-memory-only assignment would leave the drain
     // extracting from the previous revision.
-    await Page.updateOne({ _id: page._id }, { revision: revision._id });
+    await Page.updateOne({ _id: page._id }, { revision: revisionId });
     crowi.events.page.emit(event, page);
   };
 
@@ -139,8 +144,11 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     const pages = await Page.find({ path: seededPaths }).select('_id');
     const ids = pages.map((p) => p._id);
     await PageLink.deleteMany({ fromPage: { $in: ids } });
-    await Revision.deleteMany({ pageId: { $in: ids } });
+    await prisma.revisions.deleteMany({
+      where: { pageId: { in: ids.map((id) => id.toString()) } },
+    });
     await Page.deleteMany({ path: seededPaths });
+    await PageRedirect.deleteMany({ fromPath: seededPaths });
   });
 
   afterAll(async () => {
@@ -254,23 +262,27 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
   });
 
-  it('does not index a page trashed while its upsert sat in the queue (3.5)', async () => {
+  it('does not index a source trashed before its queued upsert ran (3.5)', async () => {
     const target = await createPage('/target');
     const trashed = await createPage('/trashed-while-queued');
     const control = await createPage('/queued-alongside');
 
-    await emitUpsert('create', trashed, `[t](${target.path})`);
-    // GROWI's soft delete rewrites path and status in place, so the id stays resolvable and the
-    // drain still finds the page — without the status check, `upsert: true` would index a source
-    // now living under /trash as a backlink of the target.
+    // Trashed before the event, so the drain's status re-check is what decides and nothing depends
+    // on this write landing inside the drain interval. GROWI's soft delete rewrites path and status
+    // in place, so the id stays resolvable and the drain still finds the page — without the status
+    // check, `upsert: true` would index a source now living under /trash.
     await Page.updateOne(
       { _id: trashed._id },
       { $set: { path: `/trash${trashed.path}`, status: Page.STATUS_DELETED } },
     );
 
-    // Enqueued in the same tick window as the trashed page, so its row appearing proves the batch
-    // (and therefore the trashed page) has been drained. Waiting on a positive signal rather than
-    // sleeping past the interval keeps the absence assertion below from passing vacuously.
+    // The emitted document is deliberately the stale in-memory one, still reading as published at
+    // its original path: a drain that indexed the event payload instead of re-reading by id would
+    // write rows here.
+    await emitUpsert('create', trashed, `[t](${target.path})`);
+
+    // Enqueued alongside the trashed page, so its row appearing proves the drain ran — a positive
+    // signal, so the absence assertion below cannot pass vacuously.
     await emitUpsert('create', control, `[t](${target.path})`);
     await waitForOutboundCount(control._id, 1);
 
@@ -310,5 +322,44 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     expect(
       await crowi.pageLinkService.findBacklinks(other._id, viewer),
     ).toEqual([{ pageId: selfLinker._id.toString(), path: selfLinker.path }]);
+  });
+
+  it('keeps a backlink alive after the target is renamed and the source is re-saved (5.1)', async () => {
+    const target = await createPage('/rn-target');
+    const source = await createPage('/rn-source');
+    const witness = await createPage('/rn-witness');
+    const oldPath = target.path;
+
+    await emitUpsert('create', source, `[to target](${oldPath})`);
+    await waitForOutboundCount(source._id, 1);
+
+    // Rename the target. This reproduces exactly the state a rename with "create
+    // redirect page" leaves behind (PageService: path update + PageRedirect.create),
+    // which is all that link resolution reads. The source's body is untouched, so
+    // it still names the old path.
+    const newPath = `${PREFIX}/rn-target-moved`;
+    await Page.updateOne({ _id: target._id }, { $set: { path: newPath } });
+    await PageRedirect.create({ fromPath: oldPath, toPath: newPath });
+
+    // Re-save the source for an unrelated reason. The extra link to /rn-witness is
+    // what lets this wait on the *new* sync rather than passing on the pre-rename
+    // rows, which would otherwise be indistinguishable.
+    await emitUpsert(
+      'update',
+      source,
+      `[to target](${oldPath}) typo fixed [w](${witness.path})`,
+    );
+    await waitForOutboundCount(source._id, 2);
+
+    // toPath still mirrors the body; toPage followed the rename.
+    expect(await outboundRows(source._id)).toEqual([
+      { toPath: oldPath, toPage: target._id },
+      { toPath: witness.path, toPage: witness._id },
+    ]);
+
+    // What the user sees: the renamed target still lists the source.
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
   });
 });

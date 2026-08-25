@@ -2,7 +2,7 @@ import { Types } from 'mongoose';
 
 import type { PageModel } from '~/server/models/page';
 import PageModelFactory from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
+import { prisma } from '~/utils/prisma';
 
 import PageLink from '../models/page-link';
 import { handlePageUpsertById } from './page-link-service-handlers';
@@ -35,7 +35,9 @@ describe('handlePageUpsertById (integration)', () => {
   afterEach(async () => {
     await PageLink.deleteMany({ fromPage: { $in: createdPageIds } });
     await Page.deleteMany({ _id: { $in: createdPageIds } });
-    await Revision.deleteMany({ pageId: { $in: createdPageIds } });
+    await prisma.revisions.deleteMany({
+      where: { pageId: { in: createdPageIds.map((id) => id.toString()) } },
+    });
     createdPageIds.length = 0;
   });
 
@@ -69,8 +71,13 @@ describe('handlePageUpsertById (integration)', () => {
     pageId: Types.ObjectId,
     body: string,
   ): Promise<void> => {
-    const revision = await Revision.create({ pageId, body });
-    await Page.updateOne({ _id: pageId }, { $set: { revision: revision._id } });
+    const revision = await prisma.revisions.create({
+      data: { pageId: pageId.toString(), body },
+    });
+    await Page.updateOne(
+      { _id: pageId },
+      { $set: { revision: new Types.ObjectId(revision.id) } },
+    );
   };
 
   const outboundRowsOf = (pageId: Types.ObjectId) =>
@@ -180,14 +187,35 @@ describe('handlePageUpsertById (integration)', () => {
     expect(await outboundRowsOf(pageId)).toEqual([]);
   });
 
+  it('reports the time it spent extracting, so the queue can pace on it', async () => {
+    idByPath.set('/a', new Types.ObjectId());
+    // Long enough that the extraction is unambiguously measurable.
+    const body = Array.from(
+      { length: 200 },
+      (_, i) => `## Section ${i}\n\nprose with [a](/a) and \`code\`.\n\n`,
+    ).join('');
+    const pageId = await createPage('/measured-source', body);
+
+    const extractionMs = await handlePageUpsertById(pageId.toString(), siteUrl);
+
+    // Bracketed rather than just non-zero: the queue rests in proportion to this number, so both a
+    // handler that stopped reporting it and one reporting the wrong unit would silently scale
+    // pacing by 1000x. A body this size measured ~88ms, so these bounds hold with a wide margin on
+    // any machine while still failing on either unit error.
+    expect(extractionMs).toBeGreaterThan(2);
+    expect(extractionMs).toBeLessThan(1000);
+  });
+
   it('creates no rows for a page that no longer exists', async () => {
     const goneId = new Types.ObjectId();
     idByPath.set('/a', new Types.ObjectId());
 
-    await handlePageUpsertById(goneId.toString(), siteUrl);
+    const extractionMs = await handlePageUpsertById(goneId.toString(), siteUrl);
 
     // A stale queue entry for a deleted source must not leave orphan rows behind.
     expect(await PageLink.find({ fromPage: goneId }).lean()).toEqual([]);
+    // Nothing extracted, so no rest is owed.
+    expect(extractionMs).toBe(0);
   });
 
   it('creates no rows for a page trashed while it sat in the queue', async () => {
@@ -201,9 +229,10 @@ describe('handlePageUpsertById (integration)', () => {
       { $set: { path: `/trash${PREFIX}/trashed-source`, status: 'deleted' } },
     );
 
-    await handlePageUpsertById(pageId.toString(), siteUrl);
+    const extractionMs = await handlePageUpsertById(pageId.toString(), siteUrl);
 
     expect(await outboundRowsOf(pageId)).toEqual([]);
+    expect(extractionMs).toBe(0);
   });
 
   it('still indexes a legacy page whose status is unset', async () => {

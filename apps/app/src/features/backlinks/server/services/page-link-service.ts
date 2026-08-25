@@ -35,8 +35,8 @@ export class PageLinkService {
         drainIntervalMs: crowi.configManager.getConfig(
           'backlinks:drainIntervalMs',
         ),
-        maxPagesPerDrain: crowi.configManager.getConfig(
-          'backlinks:maxPagesPerDrain',
+        dutyCyclePercent: crowi.configManager.getConfig(
+          'backlinks:dutyCyclePercent',
         ),
       }),
     );
