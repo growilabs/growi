@@ -1,0 +1,215 @@
+export interface ContributorMember {
+  position?: string;
+  name: string;
+}
+
+export interface ContributorGroup {
+  additionalClass: string;
+  members: ContributorMember[];
+}
+
+export interface ContributorSection {
+  order: number;
+  sectionName: string;
+  additionalClass: string;
+  memberGroups: ContributorGroup[];
+}
+
+export const contributors: ContributorSection[] = [
+  {
+    order: 1,
+    sectionName: 'GROWI VILLAGE',
+    additionalClass: '',
+    memberGroups: [
+      {
+        additionalClass: 'col-md-12 my-4',
+        members: [
+          { position: 'Founder', name: 'yuki-takei' },
+          { position: 'Soncho 1st', name: 'mizozobu' },
+          { position: 'Soncho 2nd', name: 'yusuketk' },
+          { position: 'Paladin', name: 'itizawa' },
+          { position: 'Valkyrie', name: 'kaoritokashiki' },
+          { position: 'Slime', name: 'TatsuyaIse' },
+          { position: 'Knight', name: 'Yohei-Shiina' },
+          { position: 'Titan', name: 'ryoh15' },
+          { position: 'Haberion', name: 'hakumizuki' },
+          { position: 'Undefined', name: 'miya' },
+          { position: 'Hoimi Slime', name: 'satof3' },
+          { position: 'Archer', name: 'Ryosei-Fukushima' },
+        ],
+      },
+      {
+        additionalClass: 'col-md-6 my-4',
+        members: [
+          { name: 'utsushiiro' },
+          { name: 'mayumorita' },
+          { name: 'shinoka7' },
+          { name: 'SeiyaTashiro' },
+          { name: 'TsuyoshiSuzukief' },
+          { name: 'Yuchan4342' },
+          { name: 'ryu-sato' },
+          { name: 'haruhikonyan' },
+          { name: 'KazuyaNagase' },
+          { name: 'kaishuu0123' },
+          { name: 'kouki-o' },
+          { name: 'Angola' },
+          { name: 'shukmos' },
+          { name: 'sooouh' },
+          { name: 'ryouhek' },
+          { name: 'ryuichi-e' },
+          { name: 'N1koge' },
+          { name: 'Ertai87' },
+          { name: 'takayuki-t' },
+          { name: 'ayaka0417' },
+          { name: 'zahmis' },
+          { name: 'takeru0001' },
+          { name: 'Shu Katabe' },
+          { name: 'oshikishintaro' },
+          { name: 'makotoshiraishi' },
+          { name: 'yamagai' },
+          { name: 'stevenfukase' },
+          { name: 'kaho819' },
+          { name: 'yuto-oweseek' },
+          { name: 'maow89126' },
+          { name: 'kntowd' },
+          { name: 'yukendev' },
+          { name: 'asami-n' },
+          { name: 'yoshiro-s' },
+          { name: 'kuimac' },
+          { name: 'akira-sugiyama' },
+          { name: 'Ryosei-Fukushima' },
+          { name: 'kazutoweseek' },
+          { name: 'reiji-h' },
+          { name: 'atsuki-t' },
+          { name: 'moekumasaka' },
+          { name: 'WNomunomu' },
+          { name: 'abichan99911111' },
+          { name: 'naoki-higashi-28' },
+          { name: 'meiri-k' },
+          { name: 'soumaeda' },
+          { name: 'akin0ri' },
+          { name: 'ffujisawa' },
+          { name: 'maeshinshin' },
+          { name: 'arafubeatbox' },
+          { name: 'Shunm634-source' },
+          { name: 'kamij-i' },
+          { name: 'shironegi39' },
+          { name: 'ryo-h15' },
+          { name: 'jam411' },
+          { name: 'Naoki427' },
+          { name: 'yusa-bot' },
+          { name: 'arvid-e' },
+          { name: 'riona-k' },
+          { name: 'hiroki-hgs' },
+          { name: 'taikou-m' },
+          { name: 'hikaru-n-cpu' },
+        ],
+      },
+    ],
+  },
+  {
+    order: 10,
+    sectionName: 'CONTRIBUTOR',
+    additionalClass: '',
+    memberGroups: [
+      {
+        additionalClass: 'col-md-4 my-4',
+        members: [
+          { name: 'inductor' },
+          { name: 'shield-9' },
+          { name: 'yaodingyd' },
+          { name: 'hitochan777' },
+          { name: 'ttaka66' },
+          { name: 'watagashi' },
+          { name: 'paichi81' },
+          { name: 'nt-7' },
+          { name: 'hideo54' },
+          { name: 'wadahiro' },
+        ],
+      },
+      {
+        additionalClass: 'col-md-6 my-4',
+        members: [{ name: 'shaminmeerankutty' }, { name: 'rabitarochan' }],
+      },
+      {
+        additionalClass: 'col-md-4 my-4',
+        members: [
+          { name: 'fumitti' },
+          { name: 'fmy' },
+          { name: 'yaamai' },
+          { name: 'ta2yak' },
+          { name: 'ryo33' },
+          { name: 'r-tateshina' },
+          { name: 'nekoruri' },
+          { name: 'kmyk' },
+          { name: 'aximov' },
+          { name: 'tats-u' },
+          { name: 'yamatomo717' },
+          { name: 'tohutohu' },
+          { name: 'Lanhild' },
+          { name: 'urzk' },
+          { name: 'Mxchaeltrxn' },
+          { name: 'nakashimaki' },
+          { name: 'ToshihitoKon' },
+          { name: 'sakazuki' },
+          { name: 'Takahirostride' },
+        ],
+      },
+    ],
+  },
+  {
+    order: 100,
+    sectionName: 'VULNERABILITY HUNTER',
+    additionalClass: '',
+    memberGroups: [
+      {
+        additionalClass: 'col-md-6 my-4',
+        members: [
+          { name: 'Yoshinori Hayashi' },
+          { name: 'Kanta Nishitani' },
+          { position: 'The University of Tokyo', name: 'Takashi Yoneuchi' },
+          { position: 'DeCurret', name: 'Yusuke Tanomogi' },
+          { position: 'Flatt Security', name: 'stypr' },
+          { position: 'Flatt Security', name: 'Azara/Norihide Saito' },
+          { position: 'CyberAgent, Inc.', name: 'Daisuke Takahashi' },
+          {
+            position: 'Mitsui Bussan Secure Directions, Inc.',
+            name: 'Yuji Tounai',
+          },
+          { name: 'yy0931' },
+          {
+            position: 'GMO Cybersecurity by Ierae, Inc.',
+            name: 'Sho Odagiri',
+          },
+          { position: 'Waseda University', name: 'Allan Wirth' },
+        ],
+      },
+    ],
+  },
+  {
+    order: 200,
+    sectionName: 'SPECIAL THANKS',
+    additionalClass: '',
+    memberGroups: [
+      {
+        additionalClass: 'col-md-4 my-4',
+        members: [
+          { name: 'Crowi Team' },
+          { name: 'RIKEN' },
+          { name: 'JPCERT/CC' },
+        ],
+      },
+      {
+        additionalClass: 'col-md-6 my-4',
+        members: [
+          { position: 'Ambassador', name: 'Tsuyoshi Suzuki' },
+          { position: 'Ambassador', name: 'goofmint' },
+        ],
+      },
+      {
+        additionalClass: 'col-12 staff-credit-mt-10rem',
+        members: [{ name: 'AND YOU' }],
+      },
+    ],
+  },
+];

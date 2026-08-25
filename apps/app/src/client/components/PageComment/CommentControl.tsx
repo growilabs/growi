@@ -16,6 +16,7 @@ export const CommentControl = (props: CommentControlProps): JSX.Element => {
       <NotAvailableIfReadOnlyUserNotAllowedToComment>
         <>
           <button
+            data-testid="comment-edit-button"
             type="button"
             className="btn btn-link p-2 opacity-50"
             onClick={onClickEditBtn}

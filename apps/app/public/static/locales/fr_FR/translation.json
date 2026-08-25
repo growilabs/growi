@@ -424,6 +424,7 @@
     "notfound_or_forbidden": "Page originale introuvable ou accès restreint.",
     "already_exists": "Une page avec ce chemin existe déjà.",
     "outdated": "Page obsolète.",
+    "invalid_body": "La requête n'indique pas à quelle révision de la page elle s'applique.",
     "user_not_admin": "Seul un administrateur peut supprimer la page",
     "single_deletion_empty_pages": "Une page vide ne peut pas être supprimée",
     "complete_deletion_not_allowed_for_user": "Vous n'êtes pas autorisé à supprimer cette page"

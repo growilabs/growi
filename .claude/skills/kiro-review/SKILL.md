@@ -124,6 +124,10 @@ Run these checks and use the result as primary signal.
 ### 12. Error Handling
 - Confirm relevant failure paths are handled and not silently swallowed.
 
+### 13. Design Quality (筋の良い実装)
+- Beyond "does it work?" and "does it match the spec?", assess whether this is a **sound, well-shaped implementation** per `.claude/rules/coding-style.md` (Reviewing for Design Quality). "筋が良い" is the shape that best fits this feature's context: judge which qualities matter most here (correctness, latency, memory, security, readability, maintainability), how they trade off, and whether the change resolves that tradeoff well. Reason from first principles and state the tradeoff — do not just pattern-match the repo's default markers. A well-argued deviation from a default, with the tradeoff named, is itself 筋が良い; the defaults are a floor, not a ceiling.
+- Apply the severity discipline from that section: a spec-compliant change with a poor shape is normally a `Suggestion` or `Important` finding, not an automatic `REJECTED`. Reserve rejection for a shape that is genuinely hard to maintain, hides coupling, or will force a rewrite. Do not loop on taste.
+
 ## Severity Model
 
 Use:

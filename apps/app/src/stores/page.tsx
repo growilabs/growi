@@ -70,14 +70,12 @@ export const useSWRxTagsInfo = (
 ): SWRResponse<IPageTagsInfo | null, Error> => {
   const shareLinkId = useShareLinkId();
 
-  const endpoint = `/pages.getPageTag?pageId=${pageId}`;
+  const endpoint = '/pages.getPageTag';
 
   return useSWR(
     shareLinkId == null && pageId != null ? [endpoint, pageId] : null,
     ([endpoint, pageId]) =>
-      apiGet<IPageTagsInfo>(endpoint, { pageId })
-        .then((result) => result)
-        .catch(getPageApiErrorHandler),
+      apiGet<IPageTagsInfo>(endpoint, { pageId }).catch(getPageApiErrorHandler),
     {
       ...config,
       revalidateOnFocus: false,

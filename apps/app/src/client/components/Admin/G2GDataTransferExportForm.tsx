@@ -7,12 +7,15 @@ import React, {
 } from 'react';
 import { useTranslation } from 'next-i18next';
 
+import { COLLECTIONS_EXCLUDED_FROM_COHERENCE } from '~/models/admin/g2g-transfer-preset';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
+import { ImportMode } from '~/models/admin/import-mode';
 import { ImportOptionForPages } from '~/models/admin/import-option-for-pages';
 import { ImportOptionForRevisions } from '~/models/admin/import-option-for-revisions';
 
 import ImportCollectionConfigurationModal from './ImportData/GrowiArchive/ImportCollectionConfigurationModal';
 import ImportCollectionItem, {
+  ALL_IMPORT_MODES,
   DEFAULT_MODE,
   MODE_RESTRICTED_COLLECTION,
 } from './ImportData/GrowiArchive/ImportCollectionItem';
@@ -34,6 +37,35 @@ const IMPORT_OPTION_CLASS_MAPPING: Record<
 > = {
   pages: ImportOptionForPages,
   revisions: ImportOptionForRevisions,
+};
+
+/**
+ * The import methods this (G2G-only) screen offers per collection.
+ *
+ * Requirement 1.4: a collection subject to the coherence judgement -- every
+ * transferable collection except the ones in `COLLECTIONS_EXCLUDED_FROM_COHERENCE`
+ * -- must not offer `flushAndInsert` here, or the operator could build a mixed
+ * assignment (some collections replaced, some not) that the receiving side's
+ * coherence guard (task 9.1) refuses. `configs` and `pages` are excluded from that
+ * judgement (the receiving side forces their method regardless of what is offered),
+ * so their existing choices are returned unchanged.
+ *
+ * `COLLECTIONS_EXCLUDED_FROM_COHERENCE` is read here as the single source of which
+ * collections are narrowed, rather than restating the list -- see
+ * `~/models/admin/g2g-transfer-preset`. `ImportCollectionItem` itself does not know
+ * this rule exists: it only receives the resulting list through `allowedModes`, and
+ * `ImportForm.jsx` (the manual zip import screen) never calls this function, so its
+ * choices are unaffected.
+ */
+const getAllowedModesForG2GTransfer = (collectionName: string): string[] => {
+  const baseModes: string[] =
+    MODE_RESTRICTED_COLLECTION[collectionName] ?? ALL_IMPORT_MODES;
+
+  if (COLLECTIONS_EXCLUDED_FROM_COHERENCE.has(collectionName)) {
+    return baseModes;
+  }
+
+  return baseModes.filter((mode) => mode !== ImportMode.flushAndInsert);
 };
 
 type Props = {
@@ -84,6 +116,7 @@ const ImportItems = ({
               isSelected={selectedCollections.has(collectionName)}
               option={optionsMap[collectionName]}
               isConfigButtonAvailable={isConfigButtonAvailable}
+              allowedModes={getAllowedModesForG2GTransfer(collectionName)}
               // events
               onChange={onToggleCollection}
               onOptionChange={onOptionChange}

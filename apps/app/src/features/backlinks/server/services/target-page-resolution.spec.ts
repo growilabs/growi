@@ -4,7 +4,7 @@ import { resolveToPages } from './target-page-resolution';
 
 const mocks = vi.hoisted(() => ({
   find: vi.fn(),
-  resolveRedirectEndpoints: vi.fn(),
+  retrieveEndpoints: vi.fn(),
 }));
 
 vi.mock('mongoose', async (importOriginal) => {
@@ -18,9 +18,18 @@ vi.mock('mongoose', async (importOriginal) => {
   };
 });
 
-vi.mock('./redirect-endpoint-resolution', () => ({
-  resolveRedirectEndpoints: mocks.resolveRedirectEndpoints,
+vi.mock('~/server/models/page-redirect', () => ({
+  default: { retrievePageRedirectEndpointsBatch: mocks.retrieveEndpoints },
 }));
+
+/** A one-hop redirect as the static returns it: no chain, so `end` is `start`. */
+const endpointsTo = (pairs: [from: string, to: string][]) =>
+  new Map(
+    pairs.map(([fromPath, toPath]) => [
+      fromPath,
+      { start: { fromPath, toPath }, end: { fromPath, toPath } },
+    ]),
+  );
 
 /**
  * Route each query to its docs by shape: the permalink query filters on `_id`,
@@ -50,7 +59,7 @@ const mockFind = (
 describe('resolveToPages()', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.resolveRedirectEndpoints.mockResolvedValue(new Map());
+    mocks.retrieveEndpoints.mockResolvedValue(new Map());
   });
 
   it('resolves a regular path to its page id', async () => {
@@ -114,8 +123,8 @@ describe('resolveToPages()', () => {
       // toPath must stay /test, so the key is the input, not the endpoint.
       const id = new Types.ObjectId();
       mockFind({ byPath: [{ _id: id, path: '/test2' }] });
-      mocks.resolveRedirectEndpoints.mockResolvedValue(
-        new Map([['/test', '/test2']]),
+      mocks.retrieveEndpoints.mockResolvedValue(
+        endpointsTo([['/test', '/test2']]),
       );
 
       const result = await resolveToPages(['/test']);
@@ -128,8 +137,8 @@ describe('resolveToPages()', () => {
     it('leaves it unresolved when the redirect endpoint has no page either', async () => {
       // Renamed, then permanently deleted — genuinely broken.
       mockFind();
-      mocks.resolveRedirectEndpoints.mockResolvedValue(
-        new Map([['/test', '/test2']]),
+      mocks.retrieveEndpoints.mockResolvedValue(
+        endpointsTo([['/test', '/test2']]),
       );
 
       const result = await resolveToPages(['/test']);
@@ -154,8 +163,8 @@ describe('resolveToPages()', () => {
           { _id: idB, path: '/b2' },
         ],
       });
-      mocks.resolveRedirectEndpoints.mockResolvedValue(
-        new Map([
+      mocks.retrieveEndpoints.mockResolvedValue(
+        endpointsTo([
           ['/a', '/a2'],
           ['/b', '/b2'],
         ]),
@@ -165,21 +174,71 @@ describe('resolveToPages()', () => {
 
       expect(result.get('/a')).toBe(idA);
       expect(result.get('/b')).toBe(idB);
-      expect(mocks.resolveRedirectEndpoints).toHaveBeenCalledTimes(1);
-      expect(mocks.resolveRedirectEndpoints).toHaveBeenCalledWith(['/a', '/b']);
-      // One path query + one endpoint query — not one per missed path.
+      expect(mocks.retrieveEndpoints).toHaveBeenCalledTimes(1);
+      expect(mocks.retrieveEndpoints).toHaveBeenCalledWith(
+        ['/a', '/b'],
+        expect.any(Number),
+      );
+      // One path query + one endpoint query — not one per path.
       expect(mocks.find).toHaveBeenCalledTimes(2);
     });
   });
 
-  it('consults no redirects when every path resolves to a live page', async () => {
+  it('consults redirects for every path, including ones with a live page', async () => {
+    // A redirect outranks a live page at the same path (see below), so its
+    // presence has to be known for every path — a live hit cannot end the lookup
+    // early.
     const id = new Types.ObjectId();
     mockFind({ byPath: [{ _id: id, path: '/docs/v2' }] });
 
-    await resolveToPages(['/docs/v2']);
+    const result = await resolveToPages(['/docs/v2']);
 
-    expect(mocks.resolveRedirectEndpoints).not.toHaveBeenCalled();
-    expect(mocks.find).toHaveBeenCalledTimes(1);
+    expect(mocks.retrieveEndpoints).toHaveBeenCalledWith(
+      ['/docs/v2'],
+      expect.any(Number),
+    );
+    // no redirect exists, so the live page is what resolves
+    expect(result.get('/docs/v2')).toBe(id);
+  });
+
+  it('follows the redirect even when a live page occupies the path', async () => {
+    // The old path was renamed away and later reoccupied while its redirect
+    // survived. Page view resolves such a path through the redirect without ever
+    // looking for a live page at it (page-data-props.ts), so resolution must do
+    // the same, or a backlink would be listed under a page a click never reaches.
+    const occupantId = new Types.ObjectId();
+    const renamedId = new Types.ObjectId();
+    mockFind({
+      byPath: [
+        { _id: occupantId, path: '/reused' },
+        { _id: renamedId, path: '/moved-to' },
+      ],
+    });
+    mocks.retrieveEndpoints.mockResolvedValue(
+      endpointsTo([['/reused', '/moved-to']]),
+    );
+
+    const result = await resolveToPages(['/reused']);
+
+    expect(result.get('/reused')).toBe(renamedId);
+  });
+
+  it('resolves two paths whose redirects converge on one endpoint', async () => {
+    // Keyed by input, so both inputs must land in the result — not just whichever
+    // one the endpoint happens to map back to.
+    const id = new Types.ObjectId();
+    mockFind({ byPath: [{ _id: id, path: '/merged' }] });
+    mocks.retrieveEndpoints.mockResolvedValue(
+      endpointsTo([
+        ['/a', '/merged'],
+        ['/b', '/merged'],
+      ]),
+    );
+
+    const result = await resolveToPages(['/a', '/b']);
+
+    expect(result.get('/a')).toBe(id);
+    expect(result.get('/b')).toBe(id);
   });
 
   it('consults no redirects for an unresolved permalink', async () => {
@@ -192,6 +251,6 @@ describe('resolveToPages()', () => {
     ]);
 
     expect(result.size).toBe(0);
-    expect(mocks.resolveRedirectEndpoints).not.toHaveBeenCalled();
+    expect(mocks.retrieveEndpoints).not.toHaveBeenCalled();
   });
 });

@@ -93,7 +93,8 @@ describe('resolveToPages (integration)', () => {
     expect(result.size).toBe(2);
   });
 
-  describe('rename following', () => {
+  // Rename and soft delete both leave a PageRedirect behind, so both are followed here.
+  describe('redirect following', () => {
     it('resolves a renamed target through its redirect, keyed by the original path', async () => {
       const page = await createPage({ path: '/resolve-integ/new' });
       await createRedirect('/resolve-integ/old', '/resolve-integ/new');
@@ -119,9 +120,34 @@ describe('resolveToPages (integration)', () => {
       );
     });
 
-    it('prefers a live page at the path over its redirect', async () => {
-      // The old path was renamed away, then a new page was created at it: a click
-      // lands on the new occupant, so resolution must too.
+    it('resolves several renamed targets in one pass', async () => {
+      // Only a real pipeline shows $in returning a chain per input.
+      const pageX = await createPage({ path: '/resolve-integ/x2' });
+      const pageY = await createPage({ path: '/resolve-integ/y2' });
+      await createRedirect('/resolve-integ/x', '/resolve-integ/x2');
+      await createRedirect('/resolve-integ/y', '/resolve-integ/y2');
+
+      const result = await resolveToPages([
+        '/resolve-integ/x',
+        '/resolve-integ/y',
+      ]);
+
+      expect(result.get('/resolve-integ/x')?.toString()).toBe(
+        pageX._id.toString(),
+      );
+      expect(result.get('/resolve-integ/y')?.toString()).toBe(
+        pageY._id.toString(),
+      );
+      expect(result.size).toBe(2);
+    });
+
+    it('follows the redirect even when a live page occupies the path', async () => {
+      // The old path was renamed away and later reoccupied while its redirect
+      // survived (page creation deletes it, but from a sub-operation that is not
+      // awaited and swallows its own failure). Page view resolves such a path
+      // through the redirect without ever looking for a live page at it, so a
+      // click lands on the rename target — and resolution has to agree, or the
+      // backlink would be listed under a page no click ever reaches.
       const occupant = await createPage({ path: '/resolve-integ/reused' });
       const renamed = await createPage({ path: '/resolve-integ/moved-to' });
       await createRedirect('/resolve-integ/reused', '/resolve-integ/moved-to');
@@ -129,10 +155,10 @@ describe('resolveToPages (integration)', () => {
       const result = await resolveToPages(['/resolve-integ/reused']);
 
       expect(result.get('/resolve-integ/reused')?.toString()).toBe(
-        occupant._id.toString(),
+        renamed._id.toString(),
       );
       expect(result.get('/resolve-integ/reused')?.toString()).not.toBe(
-        renamed._id.toString(),
+        occupant._id.toString(),
       );
     });
 
@@ -160,9 +186,43 @@ describe('resolveToPages (integration)', () => {
       expect(result.size).toBe(0);
     });
 
-    it('does not hang or resolve on a redirect cycle', async () => {
-      // Real $graphLookup, so this exercises its own cycle protection: it visits
-      // each document once, leaving an endpoint that has no page.
+    it('resolves a soft-deleted target through its trash redirect', async () => {
+      // Soft delete moves the page under /trash and leaves a PageRedirect behind
+      // (deleteNonEmptyTarget), so B5 can derive `trashed` rather than `broken`.
+      const page = await createPage({
+        path: '/trash/resolve-integ/binned',
+        status: Page.STATUS_DELETED,
+      });
+      await createRedirect(
+        '/resolve-integ/binned',
+        '/trash/resolve-integ/binned',
+      );
+
+      const result = await resolveToPages(['/resolve-integ/binned']);
+
+      expect(result.get('/resolve-integ/binned')?.toString()).toBe(
+        page._id.toString(),
+      );
+      expect(result.size).toBe(1);
+    });
+
+    it('advances exactly one hop on a redirect cycle, as page view does', async () => {
+      // Real $graphLookup. A cycle does not leave the chain unresolved: the walk
+      // comes back to the starting document, which then *is* the deepest hop, so
+      // the endpoint collapses to the start's own next hop. A page there resolves.
+      // The same static backs page view, so both land on the same page.
+      const page = await createPage({ path: '/resolve-integ/cycle-b' });
+      await createRedirect('/resolve-integ/cycle-a', '/resolve-integ/cycle-b');
+      await createRedirect('/resolve-integ/cycle-b', '/resolve-integ/cycle-a');
+
+      const result = await resolveToPages(['/resolve-integ/cycle-a']);
+
+      expect(result.get('/resolve-integ/cycle-a')?.toString()).toBe(
+        page._id.toString(),
+      );
+    });
+
+    it('does not hang on a redirect cycle whose one-hop endpoint has no page', async () => {
       await createRedirect('/resolve-integ/cycle-a', '/resolve-integ/cycle-b');
       await createRedirect('/resolve-integ/cycle-b', '/resolve-integ/cycle-a');
 
