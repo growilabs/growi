@@ -773,8 +773,8 @@ export const setup = (crowi) => {
    *                    page:
    *                      $ref: '#/components/schemas/Page'
    *
-   *          403:
-   *            description: Forbidden to duplicate page.
+   *          404:
+   *            description: Page is not found or forbidden.
    *          500:
    *            description: Internal server error.
    */
@@ -819,6 +819,21 @@ export const setup = (crowi) => {
       }
 
       const page = await Page.findByIdAndViewer(pageId, req.user, null, true);
+
+      // Check not-found/forbidden before dereferencing `page.path` below, and
+      // always respond 404 regardless of which of the two it is — see
+      // apps/app/.claude/rules/page-write-action-403-404.md
+      const isEmptyAndNotRecursively = page?.isEmpty && !isRecursively;
+      if (page == null || isEmptyAndNotRecursively) {
+        return res.apiv3Err(
+          new ErrorV3(
+            `Page '${pageId}' is not found or forbidden`,
+            'notfound_or_forbidden',
+          ),
+          404,
+        );
+      }
+
       const disableUserPages = configManager.getConfig(
         'security:disableUserPages',
       );
@@ -831,19 +846,6 @@ export const setup = (crowi) => {
         ) {
           return res.apiv3Err('User pages are disabled');
         }
-      }
-
-      const isEmptyAndNotRecursively = page?.isEmpty && !isRecursively;
-      if (page == null || isEmptyAndNotRecursively) {
-        res.code = 'Page is not found';
-        logger.error('Failed to find the pages');
-        return res.apiv3Err(
-          new ErrorV3(
-            `Page '${pageId}' is not found or forbidden`,
-            'notfound_or_forbidden',
-          ),
-          401,
-        );
       }
 
       const newParentPage = await crowi.pageService.duplicate(
