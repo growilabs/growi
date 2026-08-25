@@ -373,9 +373,21 @@ interface IPageLink {
   `toPath` at an already-resolved `toPage` (`null` = broken) and resolves nothing itself. The
   resolution lives in the `reResolveByToPath` **service** (page-link-sync), mirroring the
   `syncOutboundLinks` / `replaceOutboundLinks` split — so the derived `toPage` is always what the
-  shared resolver reports, never a value the caller supplies. The static excludes a row whose own
-  source is the target (a page is never its own backlink), skipping rather than deleting it, since
-  row existence stays owned by `replaceOutboundLinks`.
+  shared resolver reports, never a value the caller supplies. The static **clears** the row whose own
+  source is the target (a page is never its own backlink) rather than skipping it — skipping would
+  preserve whatever page occupied the path when that source was last saved, leaving it listed as a
+  backlink of a page its body no longer points to. The row itself is cleared, not deleted: row
+  existence stays owned by `replaceOutboundLinks`, and `dropSelfLinks` removes it on the source's
+  next save.
+  - A self row therefore reads as `broken` under the derived target state below (`broken :=
+    toPage == null`), even though the path resolves. It is transient — `dropSelfLinks` removes the
+    row on the source's next save — so `findForwardLinkHealth` must not report it as broken (B5.4).
+  - Both arguments are validated: `toPath` unless it is a non-empty string, `toPage` unless it is an
+    ObjectId or null. Neither is protected downstream — `toPath` becomes a query filter where an
+    operator object would match every row, and `toPage` goes into an aggregation pipeline, which
+    mongoose does not cast, so an expression object there would be evaluated into the column.
+  - The two writes are one pipeline update, so a row is never momentarily its own backlink and a
+    failure cannot leave it that way.
 
 #### extractInternalLinks
 
@@ -735,9 +747,6 @@ interface ILinkTarget {
   inbound `toPage` nulled (3.3, 6.2).
 - `reResolveByToPath`: forwards the target the resolver reports for the path, and forwards `null`
   when the path is absent from the map (so a row can return to broken) (5.1, 5.2).
-- `repointInboundLinks`: rows at the path are repointed (stale non-null cache → new occupant, and
-  `null` → healed), rows at other paths untouched; a row whose own source is the target is skipped
-  while the rest of the path is still repointed (1.6, 5.1, 5.2).
 
 ### Integration Tests
 - create/update events drive `PageLink` rows so a page's links appear as backlinks on targets,
@@ -748,6 +757,12 @@ interface ILinkTarget {
   (2.1–2.3); grant change flips visibility on the next read (2.4).
 - Rename/move: inbound links continue resolving to the page at its new path without index
   writes; descendant move behaves identically (5.1, 5.2).
+- `repointInboundLinks` write semantics, driven through `reResolveByToPath` against a real
+  collection (there is no unit spec: the observable contract is the resulting rows, and asserting
+  the `updateMany` filter instead would spy on the mechanism). Rows at the path are repointed
+  (stale non-null cache → new occupant, and `null` → healed), rows at other paths untouched, and
+  the row whose own source is the target is cleared while the rest of the path is still repointed
+  (1.6, 5.1, 5.2). A `toPath` that is not a non-empty string is refused without writing anything.
 - Trash → derived `trashed`; permanent delete → `broken`; restore → `normal` (6.1–6.3).
 - Backfill: rows produced for pre-existing pages match the live create/update path (4.2); running
   the job twice, or resuming after an interrupted chunk, produces no duplicate rows (4.3); the

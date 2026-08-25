@@ -269,24 +269,34 @@ describe('reResolveByToPath (integration)', () => {
     ]);
   });
 
-  it('skips only the row whose source is the target, still repointing the others', async () => {
-    // The page was renamed away from this path and its own body still links to the
-    // old one, so resolution comes back with the linking page itself.
+  it('clears the row whose source is the target, still repointing the others', async () => {
+    // The page was renamed away from this path but its body still links to the old
+    // one, so the path resolves back to the linking page itself. Its row is seeded
+    // non-null: that stale target is what must not survive.
     const source = await createPage('/re-resolve-integ/self-new');
     await createRedirect(
       '/re-resolve-integ/self-old',
       '/re-resolve-integ/self-new',
     );
+    const previousOccupant = new Types.ObjectId();
     const otherSource = new Types.ObjectId();
+    const unrelatedTarget = new Types.ObjectId();
     await createLink({
       fromPage: source._id,
       toPath: '/re-resolve-integ/self-old',
-      toPage: null,
+      toPage: previousOccupant,
     });
     await createLink({
       fromPage: otherSource,
       toPath: '/re-resolve-integ/self-old',
       toPage: null,
+    });
+    // The same source links elsewhere: clearing its self row must stay scoped to
+    // this path.
+    await createLink({
+      fromPage: source._id,
+      toPath: '/re-resolve-integ/self-elsewhere',
+      toPage: unrelatedTarget,
     });
 
     await reResolveByToPath('/re-resolve-integ/self-old');
@@ -295,12 +305,15 @@ describe('reResolveByToPath (integration)', () => {
     expect(rows).toHaveLength(2);
     expect(rows).toEqual(
       expect.arrayContaining([
-        // a page must never become its own backlink
+        // no self-backlink, and no stale target left behind
         { fromPage: source._id, toPage: null },
-        // ...and one self row must not hold back the rest of the path
+        // ...without holding back the rest of the path
         { fromPage: otherSource, toPage: source._id },
       ]),
     );
+    expect(await inboundRows('/re-resolve-integ/self-elsewhere')).toEqual([
+      { fromPage: source._id, toPage: unrelatedTarget },
+    ]);
   });
 });
 
@@ -323,8 +336,7 @@ describe('PageLink.repointInboundLinks (integration)', () => {
       .sort({ fromPage: 1 })
       .lean();
 
-  // A bystander row at an unrelated path: its survival is what proves the call
-  // wrote nothing, rather than matching the whole collection.
+  // A row at an unrelated path: its survival is what proves nothing was written.
   const seedBystander = async (): Promise<{
     source: Types.ObjectId;
     target: Types.ObjectId;
@@ -339,23 +351,38 @@ describe('PageLink.repointInboundLinks (integration)', () => {
     return { source, target };
   };
 
-  // The casts are the point of these tests: the guard exists because callers can
-  // violate the declared type — a lean page document whose `path` was not
-  // selected yields `undefined`, and an unvalidated payload can yield an object.
+  // The casts are the point: the guard exists because callers can violate the type.
   it.each([
-    // Harmless but silent without the guard: mongoose 6 casts an `undefined`
-    // filter value to one that matches nothing, so the caller's bug goes
-    // unnoticed instead of surfacing.
+    // Silent without the guard — mongoose matches nothing, hiding the caller's bug.
     ['undefined', undefined as unknown as string],
-    // Actively destructive without the guard: matches every row in the
-    // collection, so an unrelated path's cache is rewritten.
+    // Destructive without the guard — matches every row.
     ['a query operator object', { $ne: null } as unknown as string],
+    // Silent without the guard — no row carries an empty path.
+    ['an empty string', ''],
   ])('rejects %s as toPath, leaving every row untouched', async (_label, badToPath) => {
     const { source, target } = await seedBystander();
 
+    // Matched on the message: for the two inputs mongoose would ignore anyway,
+    // this is the only assertion that tells the guard from an unrelated failure.
+    await expect(PageLink.repointInboundLinks(badToPath, null)).rejects.toThrow(
+      /non-empty path string/,
+    );
+
+    expect(await inboundRows('/repoint-guard/bystander')).toEqual([
+      { fromPage: source, toPage: target },
+    ]);
+  });
+
+  it('rejects a toPage that is not an id, leaving every row untouched', async () => {
+    const { source, target } = await seedBystander();
+
+    // Unguarded this is written, not rejected: the update is a pipeline, which
+    // mongoose does not cast, so the expression is evaluated into the column.
     await expect(
-      PageLink.repointInboundLinks(badToPath, null),
-    ).rejects.toThrow();
+      PageLink.repointInboundLinks('/repoint-guard/bystander', {
+        $literal: 'pwned',
+      } as unknown as Types.ObjectId),
+    ).rejects.toThrow(/ObjectId or null/);
 
     expect(await inboundRows('/repoint-guard/bystander')).toEqual([
       { fromPage: source, toPage: target },
