@@ -6,7 +6,7 @@ import { UserStatus } from '~/server/models/user/conts';
 
 import {
   type ArchiveUserIdentity,
-  USER_UNIQUE_FIELDS,
+  USER_UNIQUE_KEYS,
 } from './detect-unique-conflicts';
 import { planAdminRescue } from './rescue-admins';
 
@@ -184,7 +184,7 @@ describe('planAdminRescue', () => {
     });
 
     test('resolves a collision on every unique field the detection declares', () => {
-      // USER_UNIQUE_FIELDS is the single source for which fields of `users` are unique.
+      // USER_UNIQUE_KEYS is the single source for which fields of `users` are unique.
       // A field added there without a rescue rule must fail here rather than be
       // re-inserted with a value the source archive already holds.
       const admin = buildAdmin();
@@ -196,7 +196,8 @@ describe('planAdminRescue', () => {
 
       const [rescued] = planAdminRescue([admin], [], archiveIdentity).rescued;
 
-      for (const field of USER_UNIQUE_FIELDS) {
+      const userUniqueFields = USER_UNIQUE_KEYS.flatMap((key) => key.fields);
+      for (const field of userUniqueFields) {
         expect(rescued.user[field]).not.toBe(admin[field]);
       }
     });

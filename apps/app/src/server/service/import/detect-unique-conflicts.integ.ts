@@ -7,6 +7,7 @@ import type { Model } from 'mongoose';
 import mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { ImportMode } from '~/models/admin/import-mode';
 import type Crowi from '~/server/crowi';
@@ -19,7 +20,8 @@ import UserGroupRelation from '~/server/models/user-group-relation';
 
 import { G2GTransferReceiverService } from '../g2g-transfer';
 import { GrowiBridgeService } from '../growi-bridge';
-import { detectUniqueConflicts } from './detect-unique-conflicts';
+import type { UniqueConflictReport } from './detect-unique-conflicts';
+import { detectUniqueConflicts, toLookup } from './detect-unique-conflicts';
 import { ImportService } from './import';
 
 // Fixture values carry a distinctive prefix so they cannot collide with documents that
@@ -48,6 +50,35 @@ const ARCHIVE_GROUP_NAME = 'g2g-detect-archive-group';
 const ARCHIVE_USER_ID = '0123456789abcdef01230001';
 const ARCHIVE_GROUP_ID = '0123456789abcdef01230002';
 const ARCHIVE_OTHER_USER_ID = '0123456789abcdef01230003';
+const ARCHIVE_EXTERNAL_ACCOUNT_ID = '0123456789abcdef01230004';
+const ARCHIVE_EXTERNAL_USER_GROUP_ID = '0123456789abcdef01230005';
+
+// `providerType`+`accountId` is the only unique key on `externalaccounts`
+// (models/external-account.ts): neither field on its own identifies a conflict.
+const EXISTING_EXTERNAL_ACCOUNT = {
+  providerType: 'saml',
+  accountId: 'g2g-detect-existing-account-id',
+} as const;
+
+const ARCHIVE_EXTERNAL_ACCOUNT = {
+  providerType: 'oidc',
+  accountId: 'g2g-detect-archive-account-id',
+} as const;
+
+// `externalusergroups` has two independent unique keys
+// (features/external-user-group/server/models/external-user-group.ts): the single-field
+// `externalId` and the composite {name, provider}.
+const EXISTING_EXTERNAL_USER_GROUP = {
+  name: 'g2g-detect-existing-external-group',
+  externalId: 'g2g-detect-existing-external-id',
+  provider: 'ldap',
+} as const;
+
+const ARCHIVE_EXTERNAL_USER_GROUP = {
+  name: 'g2g-detect-archive-external-group',
+  externalId: 'g2g-detect-archive-external-id',
+  provider: 'keycloak',
+} as const;
 
 /*
  * Fixtures for the conflict-free import below. One document exactly as the export service
@@ -122,6 +153,11 @@ const OPERATOR_USER_ID = '0123456789abcdef01230131';
 describe('detectUniqueConflicts', () => {
   let User: Model<IUser>;
   let UserGroup: Model<IUserGroup>;
+  // `ExternalAccount` has no exported interface / default export
+  // (models/external-account.ts keeps it Mongoose-registered only for index creation while
+  // its behavior lives in a Prisma extension); fetched from the model registry untyped,
+  // exactly like the caller (g2g-transfer.ts `detectImportConflicts`) already does.
+  let ExternalAccount: Model<Record<string, unknown>>;
   let tmpDir: string;
 
   const writeArchiveJson = async (
@@ -155,6 +191,26 @@ describe('detectUniqueConflicts', () => {
     return String(created._id);
   };
 
+  // `user` is a required ref on the ExternalAccount schema (models/external-account.ts);
+  // its value is irrelevant to the providerType+accountId conflict under test, so it is
+  // pointed at a real user to satisfy the schema without adding meaning to the fixture.
+  const seedExistingExternalAccount = async (
+    userId: string,
+  ): Promise<string> => {
+    const created = await ExternalAccount.create({
+      ...EXISTING_EXTERNAL_ACCOUNT,
+      user: userId,
+    });
+    return String(created._id);
+  };
+
+  const seedExistingExternalUserGroup = async (): Promise<string> => {
+    const created = await ExternalUserGroup.create({
+      ...EXISTING_EXTERNAL_USER_GROUP,
+    });
+    return String(created._id);
+  };
+
   const removeFixtures = async (): Promise<void> => {
     await User.deleteMany({
       username: { $in: [EXISTING_USER.username, ARCHIVE_USER.username] },
@@ -162,7 +218,91 @@ describe('detectUniqueConflicts', () => {
     await UserGroup.deleteMany({
       name: { $in: [EXISTING_GROUP_NAME, ARCHIVE_GROUP_NAME] },
     });
+    // `externalusergroups.externalId` is a non-sparse unique index, so a document left
+    // behind by a crashed run would make the next run's seed fail with E11000 — which is
+    // why these run from the shared cleanup (`beforeAll` calls it once as well) rather
+    // than from a nested `afterEach`.
+    await ExternalAccount.deleteMany({
+      $or: [
+        {
+          accountId: {
+            $in: [
+              EXISTING_EXTERNAL_ACCOUNT.accountId,
+              ARCHIVE_EXTERNAL_ACCOUNT.accountId,
+            ],
+          },
+        },
+        { _id: { $in: [ARCHIVE_EXTERNAL_ACCOUNT_ID] } },
+      ],
+    });
+    await ExternalUserGroup.deleteMany({
+      $or: [
+        {
+          externalId: {
+            $in: [
+              EXISTING_EXTERNAL_USER_GROUP.externalId,
+              ARCHIVE_EXTERNAL_USER_GROUP.externalId,
+            ],
+          },
+        },
+        {
+          name: {
+            $in: [
+              EXISTING_EXTERNAL_USER_GROUP.name,
+              ARCHIVE_EXTERNAL_USER_GROUP.name,
+            ],
+          },
+        },
+        { _id: { $in: [ARCHIVE_EXTERNAL_USER_GROUP_ID] } },
+      ],
+    });
   };
+
+  // Thin adapter over the new `CollectionInput[]`-driven signature that keeps every
+  // existing users/usergroups call site in this file looking the way it did before task
+  // 3.2 (a flat `{usersJsonPath, groupsJsonPath, ...}` object) instead of rewriting each
+  // of the ~20 call sites into a `collections` array by hand.
+  const detect = (input: {
+    usersJsonPath: string | null;
+    groupsJsonPath: string | null;
+    userModel?: Model<IUser>;
+    userGroupModel?: Model<IUserGroup>;
+    replaceTargetCollections?: ReadonlySet<string>;
+  }): Promise<UniqueConflictReport> => {
+    const {
+      usersJsonPath,
+      groupsJsonPath,
+      userModel = User,
+      userGroupModel = UserGroup,
+      replaceTargetCollections,
+    } = input;
+
+    return detectUniqueConflicts({
+      collections: [
+        {
+          collection: 'users',
+          jsonPath: usersJsonPath,
+          lookup: toLookup(userModel),
+        },
+        {
+          collection: 'usergroups',
+          jsonPath: groupsJsonPath,
+          lookup: toLookup(userGroupModel),
+        },
+      ],
+      replaceTargetCollections,
+    });
+  };
+
+  // A skipped collection (`jsonPath: null`, or excluded by `replaceTargetCollections`) has
+  // no entry in `conflictsByCollection` (see detect-unique-conflicts.ts `isActive`), so
+  // reading through these normalises "not part of this transfer" and "part of it with zero
+  // conflicts" to the same `[]` for assertions that do not care about the distinction.
+  const getUserConflicts = (report: UniqueConflictReport): readonly unknown[] =>
+    report.conflictsByCollection.get('users') ?? [];
+  const getGroupConflicts = (
+    report: UniqueConflictReport,
+  ): readonly unknown[] => report.conflictsByCollection.get('usergroups') ?? [];
 
   // Whole-collection snapshots (raw driver reads, so timestamps and __v are included)
   // are the evidence that detection does not touch the destination data.
@@ -193,6 +333,9 @@ describe('detectUniqueConflicts', () => {
 
     User = mongoose.model<IUser>('User');
     UserGroup = mongoose.model<IUserGroup>('UserGroup');
+    // `setupIndependentModels` above imports `models/external-account`, which is what
+    // registers this schema; without it the registry lookup throws MissingSchemaError.
+    ExternalAccount = mongoose.model('ExternalAccount');
 
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'g2g-detect-conflicts-'));
 
@@ -221,14 +364,14 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.userConflicts).toEqual([
+      expect(getUserConflicts(report)).toEqual([
         {
           collection: 'users',
           field: 'username',
@@ -237,7 +380,7 @@ describe('detectUniqueConflicts', () => {
           existingId,
         },
       ]);
-      expect(report.groupConflicts).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
     });
 
     test('detects an email conflict when the archive user shares the email under a different _id', async () => {
@@ -253,14 +396,14 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.userConflicts).toEqual([
+      expect(getUserConflicts(report)).toEqual([
         {
           collection: 'users',
           field: 'email',
@@ -283,14 +426,14 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.userConflicts).toEqual([
+      expect(getUserConflicts(report)).toEqual([
         {
           collection: 'users',
           field: 'slackMemberId',
@@ -315,15 +458,15 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.userConflicts).toEqual([]);
-      expect(report.groupConflicts).toEqual([]);
+      expect(getUserConflicts(report)).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
     });
 
     test('reports no conflict when no unique field value overlaps with the destination', async () => {
@@ -337,14 +480,15 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report).toEqual({ userConflicts: [], groupConflicts: [] });
+      expect(getUserConflicts(report)).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
     });
 
     test('does not compare fields outside the declared unique fields', async () => {
@@ -366,28 +510,30 @@ describe('detectUniqueConflicts', () => {
         ],
       );
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report).toEqual({ userConflicts: [], groupConflicts: [] });
+      expect(getUserConflicts(report)).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
     });
 
     test('reports no conflict for an archive that contains no documents', async () => {
       await seedExistingUser();
       const usersJsonPath = await writeArchiveJson('users-empty.json', []);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report).toEqual({ userConflicts: [], groupConflicts: [] });
+      expect(getUserConflicts(report)).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
     });
   });
 
@@ -403,14 +549,14 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath: null,
         groupsJsonPath,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.groupConflicts).toEqual([
+      expect(getGroupConflicts(report)).toEqual([
         {
           collection: 'usergroups',
           field: 'name',
@@ -419,7 +565,7 @@ describe('detectUniqueConflicts', () => {
           existingId,
         },
       ]);
-      expect(report.userConflicts).toEqual([]);
+      expect(getUserConflicts(report)).toEqual([]);
     });
 
     test('reports no conflict when the archive group is the same document (same _id) as the existing group', async () => {
@@ -429,14 +575,275 @@ describe('detectUniqueConflicts', () => {
         { _id: existingId, name: EXISTING_GROUP_NAME },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath: null,
         groupsJsonPath,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.groupConflicts).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
+    });
+  });
+
+  /*
+   * Requirements 5.3, 5.4 — the two collections whose unique constraints are composite.
+   *
+   * These run through the whole `detectUniqueConflicts` orchestrator against the real
+   * replica set, which is what the unit-level `collectConflicts` tests cannot cover: the
+   * composite key is looked up with an `$or` of exact-match conditions
+   * (`buildLookupFilters`), so whether a partial match is a conflict is decided by what
+   * MongoDB actually returns for that filter, not by the pure comparison alone.
+   */
+  describe('externalaccounts and externalusergroups collections', () => {
+    // Block-local mirror of the top-level `detect` helper: both external collections are
+    // listed on every call, with `jsonPath: null` for the one not under test.
+    const detectExternal = (input: {
+      accountsJsonPath: string | null;
+      groupsJsonPath: string | null;
+    }): Promise<UniqueConflictReport> =>
+      detectUniqueConflicts({
+        collections: [
+          {
+            collection: 'externalaccounts',
+            jsonPath: input.accountsJsonPath,
+            lookup: toLookup(ExternalAccount),
+          },
+          {
+            collection: 'externalusergroups',
+            jsonPath: input.groupsJsonPath,
+            lookup: toLookup(ExternalUserGroup),
+          },
+        ],
+      });
+
+    const getAccountConflicts = (
+      report: UniqueConflictReport,
+    ): readonly unknown[] =>
+      report.conflictsByCollection.get('externalaccounts') ?? [];
+    const getExternalGroupConflicts = (
+      report: UniqueConflictReport,
+    ): readonly unknown[] =>
+      report.conflictsByCollection.get('externalusergroups') ?? [];
+
+    test('detects a providerType+accountId conflict when the archive account shares both values under a different _id', async () => {
+      // Requirement 1.7, 5.3
+      const userId = await seedExistingUser();
+      const existingId = await seedExistingExternalAccount(userId);
+      const accountsJsonPath = await writeArchiveJson(
+        'externalaccounts-composite-conflict.json',
+        [
+          {
+            _id: ARCHIVE_EXTERNAL_ACCOUNT_ID,
+            providerType: EXISTING_EXTERNAL_ACCOUNT.providerType,
+            accountId: EXISTING_EXTERNAL_ACCOUNT.accountId,
+            user: ARCHIVE_USER_ID,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath,
+        groupsJsonPath: null,
+      });
+
+      expect(getAccountConflicts(report)).toEqual([
+        {
+          collection: 'externalaccounts',
+          field: 'providerType+accountId',
+          // A composite key reports the value tuple, not a bare field value
+          // (`toReportedValue`), so the operator can tell which value belongs to which field.
+          value: JSON.stringify([
+            EXISTING_EXTERNAL_ACCOUNT.providerType,
+            EXISTING_EXTERNAL_ACCOUNT.accountId,
+          ]),
+          archiveId: ARCHIVE_EXTERNAL_ACCOUNT_ID,
+          existingId,
+        },
+      ]);
+      expect(getExternalGroupConflicts(report)).toEqual([]);
+    });
+
+    test('reports no conflict when only providerType matches and accountId differs', async () => {
+      // Requirement 1.10, 5.3 — half of a composite key is not a unique-index violation.
+      const userId = await seedExistingUser();
+      await seedExistingExternalAccount(userId);
+      const accountsJsonPath = await writeArchiveJson(
+        'externalaccounts-provider-only.json',
+        [
+          {
+            _id: ARCHIVE_EXTERNAL_ACCOUNT_ID,
+            providerType: EXISTING_EXTERNAL_ACCOUNT.providerType,
+            accountId: ARCHIVE_EXTERNAL_ACCOUNT.accountId,
+            user: ARCHIVE_USER_ID,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath,
+        groupsJsonPath: null,
+      });
+
+      expect(getAccountConflicts(report)).toEqual([]);
+    });
+
+    test('reports no conflict when only accountId matches and providerType differs', async () => {
+      // Requirement 1.10, 5.3 — the mirror image of the case above: the same account id
+      // registered against a different identity provider is a different account.
+      const userId = await seedExistingUser();
+      await seedExistingExternalAccount(userId);
+      const accountsJsonPath = await writeArchiveJson(
+        'externalaccounts-account-only.json',
+        [
+          {
+            _id: ARCHIVE_EXTERNAL_ACCOUNT_ID,
+            providerType: ARCHIVE_EXTERNAL_ACCOUNT.providerType,
+            accountId: EXISTING_EXTERNAL_ACCOUNT.accountId,
+            user: ARCHIVE_USER_ID,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath,
+        groupsJsonPath: null,
+      });
+
+      expect(getAccountConflicts(report)).toEqual([]);
+    });
+
+    test('reports no conflict when the archive account is the same document (same _id) as the existing account', async () => {
+      // Requirement 1.5, 5.3 — re-importing the same document.
+      const userId = await seedExistingUser();
+      const existingId = await seedExistingExternalAccount(userId);
+      const accountsJsonPath = await writeArchiveJson(
+        'externalaccounts-same-id.json',
+        [
+          {
+            _id: existingId,
+            providerType: EXISTING_EXTERNAL_ACCOUNT.providerType,
+            accountId: EXISTING_EXTERNAL_ACCOUNT.accountId,
+            user: userId,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath,
+        groupsJsonPath: null,
+      });
+
+      expect(getAccountConflicts(report)).toEqual([]);
+    });
+
+    test('detects an externalId conflict when the archive group shares the externalId under a different _id', async () => {
+      // Requirement 1.8, 5.4 — `name` and `provider` deliberately differ from the seeded
+      // group, so the single-field `externalId` key is the only one that can fire and the
+      // conflict below names which key matched.
+      const existingId = await seedExistingExternalUserGroup();
+      const groupsJsonPath = await writeArchiveJson(
+        'externalusergroups-external-id.json',
+        [
+          {
+            _id: ARCHIVE_EXTERNAL_USER_GROUP_ID,
+            name: ARCHIVE_EXTERNAL_USER_GROUP.name,
+            externalId: EXISTING_EXTERNAL_USER_GROUP.externalId,
+            provider: ARCHIVE_EXTERNAL_USER_GROUP.provider,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath: null,
+        groupsJsonPath,
+      });
+
+      expect(getExternalGroupConflicts(report)).toEqual([
+        {
+          collection: 'externalusergroups',
+          field: 'externalId',
+          // A single-field key reports the bare value (`toReportedValue`).
+          value: EXISTING_EXTERNAL_USER_GROUP.externalId,
+          archiveId: ARCHIVE_EXTERNAL_USER_GROUP_ID,
+          existingId,
+        },
+      ]);
+      expect(getAccountConflicts(report)).toEqual([]);
+    });
+
+    test('detects a name+provider conflict when the archive group shares both values under a different _id', async () => {
+      // Requirement 1.9, 5.4 — `externalId` deliberately differs, so the composite
+      // {name, provider} key is the only one that can fire.
+      const existingId = await seedExistingExternalUserGroup();
+      const groupsJsonPath = await writeArchiveJson(
+        'externalusergroups-name-provider.json',
+        [
+          {
+            _id: ARCHIVE_EXTERNAL_USER_GROUP_ID,
+            name: EXISTING_EXTERNAL_USER_GROUP.name,
+            externalId: ARCHIVE_EXTERNAL_USER_GROUP.externalId,
+            provider: EXISTING_EXTERNAL_USER_GROUP.provider,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath: null,
+        groupsJsonPath,
+      });
+
+      expect(getExternalGroupConflicts(report)).toEqual([
+        {
+          collection: 'externalusergroups',
+          field: 'name+provider',
+          value: JSON.stringify([
+            EXISTING_EXTERNAL_USER_GROUP.name,
+            EXISTING_EXTERNAL_USER_GROUP.provider,
+          ]),
+          archiveId: ARCHIVE_EXTERNAL_USER_GROUP_ID,
+          existingId,
+        },
+      ]);
+    });
+
+    test('reports no conflict when neither externalId nor name+provider overlaps with the destination', async () => {
+      // Requirement 5.4 — the clean case both keys must let through.
+      await seedExistingExternalUserGroup();
+      const groupsJsonPath = await writeArchiveJson(
+        'externalusergroups-no-overlap.json',
+        [
+          {
+            _id: ARCHIVE_EXTERNAL_USER_GROUP_ID,
+            ...ARCHIVE_EXTERNAL_USER_GROUP,
+          },
+        ],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath: null,
+        groupsJsonPath,
+      });
+
+      expect(getExternalGroupConflicts(report)).toEqual([]);
+    });
+
+    test('reports no conflict when the archive group is the same document (same _id) as the existing group', async () => {
+      // Requirement 1.5, 5.4 — re-importing the same document. Here both keys match, so
+      // this is also the case that proves the same-`_id` exclusion applies per key rather
+      // than to whichever key happens to be evaluated first.
+      const existingId = await seedExistingExternalUserGroup();
+      const groupsJsonPath = await writeArchiveJson(
+        'externalusergroups-same-id.json',
+        [{ _id: existingId, ...EXISTING_EXTERNAL_USER_GROUP }],
+      );
+
+      const report = await detectExternal({
+        accountsJsonPath: null,
+        groupsJsonPath,
+      });
+
+      expect(getExternalGroupConflicts(report)).toEqual([]);
     });
   });
 
@@ -449,15 +856,15 @@ describe('detectUniqueConflicts', () => {
         { _id: ARCHIVE_GROUP_ID, name: EXISTING_GROUP_NAME },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath: null,
         groupsJsonPath,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.userConflicts).toEqual([]);
-      expect(report.groupConflicts).toEqual([
+      expect(getUserConflicts(report)).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([
         {
           collection: 'usergroups',
           field: 'name',
@@ -480,15 +887,15 @@ describe('detectUniqueConflicts', () => {
         },
       ]);
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report.groupConflicts).toEqual([]);
-      expect(report.userConflicts).toEqual([
+      expect(getGroupConflicts(report)).toEqual([]);
+      expect(getUserConflicts(report)).toEqual([
         {
           collection: 'users',
           field: 'email',
@@ -504,14 +911,149 @@ describe('detectUniqueConflicts', () => {
       await seedExistingUser();
       await seedExistingGroup();
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath: null,
         groupsJsonPath: null,
         userModel: User,
         userGroupModel: UserGroup,
       });
 
-      expect(report).toEqual({ userConflicts: [], groupConflicts: [] });
+      expect(getUserConflicts(report)).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([]);
+    });
+
+    // A lookup that must never be called: if `detectUniqueConflicts` ever tried to detect a
+    // collection whose `CollectionInput` was omitted or given `jsonPath: null`, calling this
+    // would be the first observable symptom, well before any DB round trip.
+    const unreachableLookup = () => {
+      throw new Error('lookup must not be called for a skipped collection');
+    };
+
+    test('skips each of the 4 collections in turn without throwing, while the remaining collections still detect normally', async () => {
+      // Requirement 1.6 — extended to all 4 declared collections (task 3.2). `externalaccounts`
+      // and `externalusergroups` are exercised here only for the skip path: their own
+      // detection behaviour (composite-key matching against a real destination) is covered by
+      // task 8.1/8.2, out of this task's boundary. A never-called `unreachableLookup` is
+      // sufficient evidence that the skip is real, not merely that the lookup returned empty.
+      const existingId = await seedExistingUser();
+      const existingGroupId = await seedExistingGroup();
+      const usersJsonPath = await writeArchiveJson(
+        'users-four-collection-skip.json',
+        [
+          {
+            _id: ARCHIVE_USER_ID,
+            username: EXISTING_USER.username,
+            email: ARCHIVE_USER.email,
+            slackMemberId: ARCHIVE_USER.slackMemberId,
+          },
+        ],
+      );
+      const groupsJsonPath = await writeArchiveJson(
+        'usergroups-four-collection-skip.json',
+        [{ _id: ARCHIVE_GROUP_ID, name: EXISTING_GROUP_NAME }],
+      );
+
+      // Case 1: only `users` is part of the transfer.
+      const usersOnlyReport = await detectUniqueConflicts({
+        collections: [
+          {
+            collection: 'users',
+            jsonPath: usersJsonPath,
+            lookup: toLookup(User),
+          },
+          {
+            collection: 'usergroups',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+          {
+            collection: 'externalaccounts',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+          {
+            collection: 'externalusergroups',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+        ],
+      });
+      expect(usersOnlyReport.conflictsByCollection.get('users')).toEqual([
+        {
+          collection: 'users',
+          field: 'username',
+          value: EXISTING_USER.username,
+          archiveId: ARCHIVE_USER_ID,
+          existingId,
+        },
+      ]);
+      expect(
+        usersOnlyReport.conflictsByCollection.get('usergroups'),
+      ).toBeUndefined();
+      expect(
+        usersOnlyReport.conflictsByCollection.get('externalaccounts'),
+      ).toBeUndefined();
+      expect(
+        usersOnlyReport.conflictsByCollection.get('externalusergroups'),
+      ).toBeUndefined();
+
+      // Case 2: only `usergroups` is part of the transfer — the mirror image of case 1, so
+      // `users` being skipped does not depend on it happening to be listed first.
+      const groupsOnlyReport = await detectUniqueConflicts({
+        collections: [
+          { collection: 'users', jsonPath: null, lookup: unreachableLookup },
+          {
+            collection: 'usergroups',
+            jsonPath: groupsJsonPath,
+            lookup: toLookup(UserGroup),
+          },
+          {
+            collection: 'externalaccounts',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+          {
+            collection: 'externalusergroups',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+        ],
+      });
+      expect(
+        groupsOnlyReport.conflictsByCollection.get('users'),
+      ).toBeUndefined();
+      expect(groupsOnlyReport.conflictsByCollection.get('usergroups')).toEqual([
+        {
+          collection: 'usergroups',
+          field: 'name',
+          value: EXISTING_GROUP_NAME,
+          archiveId: ARCHIVE_GROUP_ID,
+          existingId: existingGroupId,
+        },
+      ]);
+
+      // Case 3: none of the 4 collections is part of the transfer at all.
+      const noneReport = await detectUniqueConflicts({
+        collections: [
+          { collection: 'users', jsonPath: null, lookup: unreachableLookup },
+          {
+            collection: 'usergroups',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+          {
+            collection: 'externalaccounts',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+          {
+            collection: 'externalusergroups',
+            jsonPath: null,
+            lookup: unreachableLookup,
+          },
+        ],
+      });
+      expect(noneReport.conflictsByCollection.size).toBe(0);
     });
   });
 
@@ -537,7 +1079,7 @@ describe('detectUniqueConflicts', () => {
 
       const before = await snapshotDestination();
 
-      const report = await detectUniqueConflicts({
+      const report = await detect({
         usersJsonPath,
         groupsJsonPath,
         userModel: User,
@@ -547,8 +1089,8 @@ describe('detectUniqueConflicts', () => {
       const after = await snapshotDestination();
 
       // Guard against a vacuous read-only check: this run must really have found something.
-      expect(report.userConflicts).toHaveLength(3);
-      expect(report.groupConflicts).toHaveLength(1);
+      expect(getUserConflicts(report)).toHaveLength(3);
+      expect(getGroupConflicts(report)).toHaveLength(1);
       expect(after).toEqual(before);
     });
   });
@@ -589,7 +1131,7 @@ describe('detectUniqueConflicts', () => {
       );
 
       await expect(
-        detectUniqueConflicts({
+        detect({
           usersJsonPath,
           groupsJsonPath: null,
           userModel: User,
@@ -619,7 +1161,7 @@ describe('detectUniqueConflicts', () => {
       );
 
       await expect(
-        detectUniqueConflicts({
+        detect({
           usersJsonPath,
           groupsJsonPath: null,
           userModel: User,
@@ -636,7 +1178,7 @@ describe('detectUniqueConflicts', () => {
       const usersJsonPath = await writeRawArchive('users-zero-byte.json', '');
 
       await expect(
-        detectUniqueConflicts({
+        detect({
           usersJsonPath,
           groupsJsonPath: null,
           userModel: User,
@@ -659,7 +1201,7 @@ describe('detectUniqueConflicts', () => {
       );
 
       await expect(
-        detectUniqueConflicts({
+        detect({
           usersJsonPath,
           groupsJsonPath: null,
           userModel: User,
@@ -670,7 +1212,7 @@ describe('detectUniqueConflicts', () => {
 
     test('rejects when the archive JSON file does not exist', async () => {
       await expect(
-        detectUniqueConflicts({
+        detect({
           usersJsonPath: path.join(tmpDir, 'users-does-not-exist.json'),
           groupsJsonPath: null,
           userModel: User,
@@ -699,7 +1241,7 @@ describe('detectUniqueConflicts', () => {
       });
 
       await expect(
-        detectUniqueConflicts({
+        detect({
           usersJsonPath,
           groupsJsonPath: null,
           userModel: failingUserModel,
@@ -785,7 +1327,7 @@ describe('detectUniqueConflicts', () => {
     };
 
     const detectConflicts = () =>
-      detectUniqueConflicts({
+      detect({
         usersJsonPath: archivePath('users'),
         groupsJsonPath: archivePath('usergroups'),
         userModel: User,
@@ -972,10 +1514,9 @@ describe('detectUniqueConflicts', () => {
       });
 
       // The gate must let this transfer through: nothing collides with the destination.
-      expect(await detectConflicts()).toEqual({
-        userConflicts: [],
-        groupConflicts: [],
-      });
+      const conflictFreeReport = await detectConflicts();
+      expect(getUserConflicts(conflictFreeReport)).toEqual([]);
+      expect(getGroupConflicts(conflictFreeReport)).toEqual([]);
 
       await runImport();
 
@@ -1014,10 +1555,9 @@ describe('detectUniqueConflicts', () => {
         ],
       });
 
-      expect(await detectConflicts()).toEqual({
-        userConflicts: [],
-        groupConflicts: [],
-      });
+      const conflictFreeReport = await detectConflicts();
+      expect(getUserConflicts(conflictFreeReport)).toEqual([]);
+      expect(getGroupConflicts(conflictFreeReport)).toEqual([]);
 
       await runImport();
 
@@ -1040,6 +1580,334 @@ describe('detectUniqueConflicts', () => {
       );
       expect((await findGroupOrFail(destination.groupId)).name).toBe(
         DESTINATION_GROUP_NAME,
+      );
+    });
+  });
+
+  describe('external auth access after a conflict-free import', () => {
+    // Mirrors 'group access after a conflict-free import' above (same seed/detect/import/
+    // resolve shape), but for the two collections this feature adds: externalaccounts and
+    // externalusergroups. `users` is included because ExternalAccount.user is a required ref
+    // and the point of Requirement 4.1 is that the ref keeps resolving to the imported user.
+    const ARCHIVE_COLLECTIONS = [
+      'users',
+      'externalaccounts',
+      'externalusergroups',
+    ] as const;
+    type ExtAuthArchiveCollectionName = (typeof ARCHIVE_COLLECTIONS)[number];
+
+    const SOURCE_EXTAUTH_USER = {
+      _id: '0123456789abcdef01230201',
+      name: 'g2g-detect extauth import user',
+      username: 'g2g-detect-extauth-import-user',
+      email: 'g2g-detect-extauth-import-user@example.com',
+    } satisfies ArchiveDoc;
+
+    const SOURCE_EXTAUTH_ACCOUNT = {
+      _id: '0123456789abcdef01230202',
+      providerType: 'oidc',
+      accountId: 'g2g-detect-extauth-import-account-id',
+      user: SOURCE_EXTAUTH_USER._id,
+    } satisfies ArchiveDoc;
+
+    const SOURCE_EXTAUTH_GROUP = {
+      _id: '0123456789abcdef01230203',
+      name: 'g2g-detect-extauth-import-external-group',
+      externalId: 'g2g-detect-extauth-import-external-id',
+      provider: 'keycloak',
+    } satisfies ArchiveDoc;
+
+    // Destination-side documents that collide with nothing in the archive above: they must
+    // survive the import untouched, proving the insert did not clobber existing SSO/LDAP
+    // bindings.
+    const DESTINATION_EXTAUTH_USER = {
+      name: 'g2g-detect extauth destination user',
+      username: 'g2g-detect-extauth-destination-user',
+      email: 'g2g-detect-extauth-destination-user@example.com',
+    } as const;
+    const DESTINATION_EXTAUTH_ACCOUNT = {
+      providerType: 'saml',
+      accountId: 'g2g-detect-extauth-destination-account-id',
+    } as const;
+    const DESTINATION_EXTAUTH_GROUP = {
+      name: 'g2g-detect-extauth-destination-external-group',
+      externalId: 'g2g-detect-extauth-destination-external-id',
+      provider: 'ldap',
+    } as const;
+
+    let extAuthImportsDir: string;
+    let extAuthImportService: ImportService;
+    let extAuthReceiverService: G2GTransferReceiverService;
+
+    const archiveFileName = (
+      collectionName: ExtAuthArchiveCollectionName,
+    ): string => `${collectionName}.json`;
+
+    const archivePath = (
+      collectionName: ExtAuthArchiveCollectionName,
+    ): string => path.join(extAuthImportsDir, archiveFileName(collectionName));
+
+    const writeArchive = async (
+      docsByCollection: Readonly<
+        Record<ExtAuthArchiveCollectionName, readonly ArchiveDoc[]>
+      >,
+    ): Promise<void> => {
+      await Promise.all(
+        ARCHIVE_COLLECTIONS.map((collectionName) =>
+          fs.writeFile(
+            archivePath(collectionName),
+            JSON.stringify(docsByCollection[collectionName]),
+            'utf-8',
+          ),
+        ),
+      );
+    };
+
+    // Read-only detection over the exact same archive `import()` is about to consume: the
+    // gate this test proves did not falsely block a clean import.
+    const detectConflicts = () =>
+      detectUniqueConflicts({
+        collections: [
+          {
+            collection: 'users',
+            jsonPath: archivePath('users'),
+            lookup: toLookup(User),
+          },
+          {
+            collection: 'externalaccounts',
+            jsonPath: archivePath('externalaccounts'),
+            lookup: toLookup(ExternalAccount),
+          },
+          {
+            collection: 'externalusergroups',
+            jsonPath: archivePath('externalusergroups'),
+            lookup: toLookup(ExternalUserGroup),
+          },
+        ],
+      });
+
+    const buildImportSettingMap = () =>
+      extAuthReceiverService.getImportSettingMap(
+        ARCHIVE_COLLECTIONS.map((collectionName) => ({
+          fileName: archiveFileName(collectionName),
+          collectionName,
+        })),
+        Object.fromEntries(
+          ARCHIVE_COLLECTIONS.map((collectionName) => [
+            collectionName,
+            new GrowiArchiveImportOption(collectionName, ImportMode.insert),
+          ]),
+        ),
+        OPERATOR_USER_ID,
+      );
+
+    const runImport = async (): Promise<void> => {
+      await extAuthImportService.import(
+        [...ARCHIVE_COLLECTIONS],
+        buildImportSettingMap(),
+      );
+    };
+
+    const seedDestination = async (): Promise<{
+      userId: string;
+      accountId: string;
+      groupId: string;
+    }> => {
+      const user = await User.create({ ...DESTINATION_EXTAUTH_USER });
+      const account = await ExternalAccount.create({
+        ...DESTINATION_EXTAUTH_ACCOUNT,
+        user: user._id,
+      });
+      const group = await ExternalUserGroup.create({
+        ...DESTINATION_EXTAUTH_GROUP,
+      });
+      return {
+        userId: String(user._id),
+        accountId: String(account._id),
+        groupId: String(group._id),
+      };
+    };
+
+    const removeExtAuthFixtures = async (): Promise<void> => {
+      await ExternalAccount.deleteMany({
+        accountId: {
+          $in: [
+            SOURCE_EXTAUTH_ACCOUNT.accountId,
+            DESTINATION_EXTAUTH_ACCOUNT.accountId,
+          ],
+        },
+      });
+      await ExternalUserGroup.deleteMany({
+        $or: [
+          { externalId: SOURCE_EXTAUTH_GROUP.externalId },
+          { externalId: DESTINATION_EXTAUTH_GROUP.externalId },
+          {
+            name: {
+              $in: [SOURCE_EXTAUTH_GROUP.name, DESTINATION_EXTAUTH_GROUP.name],
+            },
+          },
+        ],
+      });
+      await User.deleteMany({
+        username: {
+          $in: [
+            SOURCE_EXTAUTH_USER.username,
+            DESTINATION_EXTAUTH_USER.username,
+          ],
+        },
+      });
+      const leftovers = await fs.readdir(extAuthImportsDir);
+      await Promise.all(
+        leftovers.map((fileName) =>
+          fs.rm(path.join(extAuthImportsDir, fileName)),
+        ),
+      );
+    };
+
+    beforeAll(async () => {
+      extAuthImportsDir = path.join(tmpDir, 'imports');
+      await fs.mkdir(extAuthImportsDir, { recursive: true });
+
+      const crowi = mock<Crowi>({
+        tmpDir,
+        events: {
+          page: mock<EventEmitter>(),
+          user: mock<UserEvent>(),
+          admin: mock<EventEmitter>(),
+        },
+      });
+      crowi.growiBridgeService = new GrowiBridgeService(crowi);
+
+      extAuthImportService = new ImportService(crowi);
+      extAuthReceiverService = new G2GTransferReceiverService(crowi);
+
+      await removeExtAuthFixtures();
+    });
+
+    afterEach(async () => {
+      await removeExtAuthFixtures();
+    });
+
+    test('resolves the imported external account to the imported user by providerType+accountId', async () => {
+      // Requirements 4.1, 4.3.
+      await seedDestination();
+
+      await writeArchive({
+        users: [SOURCE_EXTAUTH_USER],
+        externalaccounts: [SOURCE_EXTAUTH_ACCOUNT],
+        externalusergroups: [],
+      });
+
+      // The gate must let this transfer through: nothing collides with the destination.
+      const conflictFreeReport = await detectConflicts();
+      expect(
+        conflictFreeReport.conflictsByCollection.get('externalaccounts'),
+      ).toEqual([]);
+      expect(
+        conflictFreeReport.conflictsByCollection.get('externalusergroups'),
+      ).toEqual([]);
+
+      await runImport();
+
+      const importedAccount = await ExternalAccount.findOne({
+        providerType: SOURCE_EXTAUTH_ACCOUNT.providerType,
+        accountId: SOURCE_EXTAUTH_ACCOUNT.accountId,
+      });
+      if (importedAccount == null) {
+        throw new Error('Imported ExternalAccount was not found');
+      }
+
+      const resolvedUser = await User.findById(importedAccount.user);
+      if (resolvedUser == null) {
+        throw new Error('ExternalAccount.user did not resolve to a user');
+      }
+      expect(resolvedUser.username).toBe(SOURCE_EXTAUTH_USER.username);
+    });
+
+    test('resolves the imported external group from either externalId or name+provider', async () => {
+      // Requirements 4.2, 4.3.
+      await seedDestination();
+
+      await writeArchive({
+        users: [],
+        externalaccounts: [],
+        externalusergroups: [SOURCE_EXTAUTH_GROUP],
+      });
+
+      const conflictFreeReport = await detectConflicts();
+      expect(
+        conflictFreeReport.conflictsByCollection.get('externalaccounts'),
+      ).toEqual([]);
+      expect(
+        conflictFreeReport.conflictsByCollection.get('externalusergroups'),
+      ).toEqual([]);
+
+      await runImport();
+
+      const byExternalId = await ExternalUserGroup.findOne({
+        externalId: SOURCE_EXTAUTH_GROUP.externalId,
+      });
+      if (byExternalId == null) {
+        throw new Error(
+          'Imported ExternalUserGroup was not resolvable by externalId',
+        );
+      }
+      expect(byExternalId.name).toBe(SOURCE_EXTAUTH_GROUP.name);
+
+      const byNameAndProvider = await ExternalUserGroup.findOne({
+        name: SOURCE_EXTAUTH_GROUP.name,
+        provider: SOURCE_EXTAUTH_GROUP.provider,
+      });
+      if (byNameAndProvider == null) {
+        throw new Error(
+          'Imported ExternalUserGroup was not resolvable by name+provider',
+        );
+      }
+      expect(String(byNameAndProvider._id)).toBe(String(byExternalId._id));
+    });
+
+    test('leaves the destination account and group resolvable and unaffected by the insert', async () => {
+      // Requirement 4.3 — the non-regression half: a conflict-free import must not disturb
+      // what was already there.
+      const destination = await seedDestination();
+
+      await writeArchive({
+        users: [SOURCE_EXTAUTH_USER],
+        externalaccounts: [SOURCE_EXTAUTH_ACCOUNT],
+        externalusergroups: [SOURCE_EXTAUTH_GROUP],
+      });
+
+      const conflictFreeReport = await detectConflicts();
+      expect(
+        conflictFreeReport.conflictsByCollection.get('externalaccounts'),
+      ).toEqual([]);
+      expect(
+        conflictFreeReport.conflictsByCollection.get('externalusergroups'),
+      ).toEqual([]);
+
+      await runImport();
+
+      const destinationAccount = await ExternalAccount.findById(
+        destination.accountId,
+      );
+      if (destinationAccount == null) {
+        throw new Error('Destination ExternalAccount was not found');
+      }
+      expect(destinationAccount.providerType).toBe(
+        DESTINATION_EXTAUTH_ACCOUNT.providerType,
+      );
+      expect(destinationAccount.accountId).toBe(
+        DESTINATION_EXTAUTH_ACCOUNT.accountId,
+      );
+
+      const destinationGroup = await ExternalUserGroup.findById(
+        destination.groupId,
+      );
+      if (destinationGroup == null) {
+        throw new Error('Destination ExternalUserGroup was not found');
+      }
+      expect(destinationGroup.externalId).toBe(
+        DESTINATION_EXTAUTH_GROUP.externalId,
       );
     });
   });
