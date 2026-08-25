@@ -69,7 +69,9 @@ by Mongoose `autoIndex` at model registration (new collection — no migration n
   also does).
 - Markdown/wiki-link parsing and link resolution rules (consumed via existing remark/rehype
   plugins; no syntax owned here).
-- `PageRedirect` creation/cleanup (consumed read-only via `retrievePageRedirectEndpoints`).
+- `PageRedirect` creation/cleanup (consumed read-only via
+  `retrievePageRedirectEndpointsBatch`; see Modified Files — the batch static itself is owned
+  by the model, not by this feature).
 
 ### Allowed Dependencies
 
@@ -96,7 +98,8 @@ Re-check this feature if any of the following change:
 - `PageQueryBuilder.addViewerCondition` / `addConditionToExcludeTrashed` / `generateGrantCondition`
   (and `Page.findByIdsAndViewer`) signatures or semantics.
 - The remark/rehype link-resolution plugins' resolution rules or `pagePath` injection.
-- `PageRedirect.retrievePageRedirectEndpoints` contract.
+- `PageRedirect.retrievePageRedirectEndpoints` contract (it is now a lookup over
+  `retrievePageRedirectEndpointsBatch`, but its signature and return shape are unchanged).
 - `normalizePath` / `isCreatablePage` behavior.
 - The `PageLink` schema, its `toPath` faithfulness rule, or the derived target-state contract
   (would force consumers of the read API to revalidate).
@@ -230,6 +233,18 @@ apps/app/src/features/backlinks/
   (subscribe to events) in the page-service setup phase, mirroring `search.ts`; **(B3)** also register
   the backfill `CronService` (mirroring the page-bulk-export job-cron registration).
 - `apps/app/src/server/routes/apiv3/index.js` — register the backlinks route.
+- `apps/app/src/server/models/page-redirect.ts` — add the `retrievePageRedirectEndpointsBatch`
+  static (`$match: { fromPath: { $in } }` + the existing `$graphLookup`) and re-implement
+  `retrievePageRedirectEndpoints` as a lookup over it. Adding it to the model rather than to this
+  feature keeps one copy of the pipeline; the singular contract is unchanged for
+  `page-data-props.ts`. Its duplicate-match handling is kept as-is — first match wins and a
+  `logger.warn` names the `fromPath`. `fromPath` is unique-indexed, but MongoDB refuses to build a
+  unique index over a collection that already holds duplicates (this one was populated by a data
+  migration) and the app boots anyway, so duplicates are reachable; without the explicit first-wins
+  the winner would be decided by aggregation order, which is not guaranteed. The depth cap is a
+  parameter (`maxDepth`), not baked into the pipeline: `$graphLookup` is memory-bound at 100MB with
+  no disk spill, so the save path passes 50, while page view passes nothing — a cap there would
+  answer an old URL with a not-found once the chain outgrows it.
 - `apps/app/src/client/components/PageAccessoriesModal/PageAccessoriesModal.tsx` (+ the
   modal-contents map in `apps/app/src/states/ui/modal/page-accessories.ts`) — add the **Backlinks**
   tab mapping to `BacklinksPanel`.
@@ -333,7 +348,7 @@ needs no write — derived state reads the restored page's status.
 |-----------|-------|--------|-----|--------------------------|-----------|
 | PageLink model | Data | Persist directed link edges | 1.5,3.x,4.3 | Mongoose, getOrCreateModel (P0) | State |
 | extractInternalLinkPaths | Server logic | Body+path+siteUrl → resolved internal paths | 1.2–1.6, 1.10, 1.11 | render plugins, isCreatablePage, normalizePath, isPermalink, app:siteUrl (P0) | Service |
-| resolveToPageIds | Server logic | toPaths (batch) → Map of toPath → toPage id (incl. permalink by id) | 1.9, 5.x | Page.findById/findByPath, PageRedirect, isPermalink (P0) | Service |
+| resolveToPageIds | Server logic | paths → toPage ids, batched (incl. permalink by id) | 1.9, 5.x | Page.find by _id/path, PageRedirect.retrievePageRedirectEndpointsBatch, isPermalink (P0) | Service |
 | PageLinkService | Server service | Subscribe to events, sync index, query backlinks | 1.1,2.x,3.x,5,6 | events.page (P0), PageQueryBuilder.addViewerCondition (P0) | Service, Event |
 | getBacklinksHandlerFactory (routes/backlinks.ts) | API | Read endpoint | 1.1,1.7,2.x,6.4 | apiv3 middleware (P0), PageLinkService (P0) | API |
 | useSWRxBacklinks | Client store | Fetch backlinks | 1.1 | apiv3Get (P0) | Service |
@@ -430,17 +445,56 @@ function extractInternalLinkPaths(markdown: string, pagePath: string, siteUrl?: 
 ```typescript
 function resolveToPageIds(paths: string[]): Promise<Map<string, ObjectId>>;
 ```
-- **Batched, not per link.** The input is one page's deduped extracted paths and the output maps each
-  input string to its resolved id; an unresolved input is simply **absent** from the map (the caller
-  turns that into `toPage: null` — the `broken` state). Resolving per link would make the number of
-  DB round-trips scale with a page's link count, which the coalescing drain (3.5) exists to bound.
-- Order: **(0)** split the inputs — `isPermalink(p)` → id lookup bucket
-  (`removeHeadingSlash(p)`), everything else → path bucket. **(1)** one `Page.find({ _id: { $in } })`
-  and one `Page.find({ path: { $in }, $or: [{ isEmpty: false }, { isEmpty: null }] })`, run
-  concurrently (at most two queries per page, empty buckets skipped; the `isEmpty` clause matches
-  `findByPath`, including the v4-compat `null`). **(2)** _B4.1 target — not yet implemented:_ for path
-  inputs still unmatched, `PageRedirect.retrievePageRedirectEndpoints` and resolve at the endpoint.
-- Redirect-following always reads `.end.toPath` (handles A→B→C via `$graphLookup`; cycle-safe).
+- **Batched.** A page carries many links and every save re-resolves all of them, so the resolver
+  takes the whole set and answers with one `$in` query per stage. Keys are always the **input**
+  string, never a redirect endpoint, so a caller's stored `toPath` stays faithful to the body.
+  Inputs that resolve to no page are absent from the map (the `null` of the singular form).
+  Resolving per link would make the number of DB round-trips scale with a page's link
+  count, which the coalescing drain (3.5) exists to bound.
+- Order, applied to the batch: **(0)** inputs where `isPermalink` → one `Page.find({_id: {$in}})`
+  (the id *is* the target; no path lookup, no redirect-following). **(1)** the rest → one
+  `Page.find({path: {$in}, $or: [{isEmpty: false}, {isEmpty: null}]})` — the `isEmpty`
+  clause matches `findByPath`, including the v4-compat `null` — **and**, concurrently,
+  `PageRedirect.retrievePageRedirectEndpointsBatch(allPaths, 50)` → **(2)** a path with a redirect
+  resolves at `end.toPath`, a path without one resolves at its own live page → **(3)** else absent.
+  Step (2) needs one more path query, but only for endpoints step (1) did not already answer.
+- Always read `.end.toPath` (handles A→B→C via `$graphLookup`).
+- **A redirect on the path outranks a live page at it**, because that is what page view does:
+  `resolvePathAndCheckIdentical` (`pages/[[...path]]/page-data-props.ts`) overwrites the requested
+  path with `chains.end.toPath` whenever a redirect exists, without ever looking for a live page at
+  the requested path. A live page and a redirect can coexist at one path in two ways: the v5 create
+  deletes the redirect from a sub-operation that is not awaited and logs rather than retries its
+  failure (fixed separately in #11683), and `createV4` — taken whenever `app:isV5Compatible` is
+  false — never touches `PageRedirect` at all, which makes the coexistence ordinary rather than
+  exceptional on a not-yet-migrated install. Matching the precedence is what keeps a backlink from
+  being filed under a page no click reaches. This is why the redirect lookup cannot stop at the paths
+  that missed: a live hit does not settle the answer.
+  - **Cost, accepted deliberately**: one aggregation on every save of a page that has links, and
+    three concurrent queries instead of two when everything resolves. Restoring live-page-first to
+    win that query back reintroduces the disagreement, and #11683 does not make it safe — the v4
+    path above is unchanged.
+- **Cycles resolve one hop, they do not fall out as unresolved.** `$graphLookup` visits each
+  document once, so a cycle brings the walk back to the starting document, which is then the
+  deepest hop — `end` collapses to `start`. Never a hang, and page view lands on the same hop
+  because it reads the same static.
+- **Redirect following lives on the model, not here.** `retrievePageRedirectEndpointsBatch` is a
+  `PageRedirect` static (`server/models/page-redirect.ts`) and the singular
+  `retrievePageRedirectEndpoints` is a lookup over it, so the `$match` + `$graphLookup` pipeline
+  and the deepest-hop rule exist exactly once and cannot drift between the page-view redirect and
+  the link index. Note that sharing the pipeline only makes the two agree about *where a chain
+  ends*; the live-page-versus-redirect precedence above is a separate decision this resolver has
+  to make deliberately. This resolver only projects `end.toPath` out of the result.
+- **The depth cap is the caller's, not the pipeline's.** The save path passes `maxDepth: 50`
+  because it runs on every save and `$graphLookup` is memory-bound at 100MB with no spill to disk.
+  Page view calls the same static with no cap: shortening a chain there would answer an old URL
+  with a not-found for a page that was renamed more times than the cap.
+- **Breadth is not bounded here (deferred to B4.5).** The cap limits how far one chain is walked, not
+  how many chains one call walks: `fromPaths` is every link path on the page. The same memory bound
+  therefore stays reachable through width, and the failure is silent: the upsert queue logs it and
+  retries the page up to `MAX_UPSERT_ATTEMPTS`, but a breadth blow-up is deterministic for that
+  page, so every attempt hits the same bound and the queue eventually gives up — that page's links
+  stay stale until its next save or the backfill. Left as-is for B4.1 on purpose; B4.5 owns
+  chunking `fromPaths`.
 - **Permalink targets are the strongest case (1.9, 5.4)**: `toPath` already encodes the immutable
   `_id`, so `toPage` is permanent and immune to rename/move/redirect — it never needs
   redirect-following or re-resolution. (`isPermalink` has already validated a 24-hex ObjectId, so the
@@ -519,6 +573,13 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTa
 - `findForwardLinkHealth`: rows where `fromPage == X`; derive each target's
   `LinkTargetState` (`toPage == null` → `broken`; target trashed → `trashed`; else `normal`);
   return the `trashed`/`broken` rows as `ILinkTarget` for the editor's attention (6.4).
+  - **Viewer filtering is required here, unlike `findBacklinks`' source filtering.** `ILinkTarget`
+    carries the target's `path`, and since B4.1 resolution follows the rename chain, a `toPage` may
+    point at a page that has since moved into an area the viewer cannot read — so the *target* set
+    must go through the shared viewer/grant filter before the DTO is built, or this endpoint leaks
+    private paths to anyone who can read the linking page. Resolution itself is grant-blind by
+    design (it must match what a click does, and the live path lookup was always grant-blind), so
+    the filter belongs on this read path, not in `resolveToPageIds`.
 
 **Implementation Notes**
 - Integration: register in `crowi` page-service setup; never edit `PageService`.
@@ -685,10 +746,20 @@ interface ILinkTarget {
   per-type base. A same-host absolute URL (`https://<siteUrl-host>/a/b`) yields
   `/a/b` while a different-host URL is excluded (1.10); with `siteUrl` undefined, absolute URLs are
   excluded (1.11); a permalink `/{id}` is returned verbatim (1.9).
-- `resolveToPageIds`: live page wins; single and double redirect chains resolve to `.end.toPath`;
-  no page + no redirect → the input is absent from the returned map (5.1–5.3). A permalink input
-  resolves directly by id (no path/redirect lookup) and is absent when no page has that id (1.9, 5.4).
-  A mixed batch of permalinks and paths resolves both in one call.
+- `resolveToPageIds`: single and double redirect chains resolve to `.end.toPath`; a redirect wins over
+  a live page at the same path (matching page view), and a path with no redirect resolves to its own
+  live page; no page + no redirect → absent from the map (5.1–5.3). Redirects are consulted for
+  every path, not only for the ones that missed. Two paths whose chains converge on one endpoint
+  both land in the result (the map is keyed by input). A permalink `toPath` resolves directly by id
+  (no path/redirect lookup) and is absent when no page has that id (1.9, 5.4). Several paths resolve
+  in one redirect lookup, a cycle advances exactly one hop rather than hanging or falling out, and a
+  target in the trash resolves rather than reading as broken (6.1). A mixed batch of permalinks
+  and paths resolves both in one call.
+- `PageRedirect.retrievePageRedirectEndpointsBatch`: one chain endpoint per requested `fromPath`;
+  unrequested paths excluded; an empty input runs no aggregation; a given `maxDepth` stops the walk
+  while the default walks the chain to its real end; two documents sharing a `fromPath` resolve to
+  the first and log a warning. The existing `retrievePageRedirectEndpoints` tests double as the
+  regression net for the shared pipeline, and one of them pins that page view stays uncapped.
 - `reconcileDeletedPages`: trashed page → no-op; permanently-gone page → outbound removed and
   inbound `toPage` nulled (3.3, 6.2).
 

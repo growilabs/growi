@@ -4,12 +4,10 @@ import mongoose from 'mongoose';
 import type Crowi from '~/server/crowi';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageModel } from '~/server/models/page';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import { prisma } from '~/utils/prisma';
 
 import { Attachment } from '../../models/attachment';
 import PageRedirect from '../../models/page-redirect';
-import { Revision } from '../../models/revision';
 import ShareLink from '../../models/share-link';
 import {
   type ActivityActor,
@@ -65,29 +63,42 @@ export const deleteCompletelyOperation = async (
   // cascade-attachment-removal-inputs); no-op for ids already in string form.
   const pageIdStrings = pageIds.map((pageId) => pageId.toString());
 
+  // Delete reply comments first, then top-level comments, to avoid foreign key constraint violations.
+  await prisma.$transaction([
+    prisma.comments.deleteMany({
+      where: {
+        pageId: {
+          in: pageIdStrings,
+        },
+        replyToId: {
+          not: null,
+        },
+      },
+    }),
+    prisma.comments.deleteMany({
+      where: {
+        pageId: {
+          in: pageIdStrings,
+        },
+      },
+    }),
+  ]);
+
+  // `pagetagrelations.relatedPage` and `revisions.page` are required relations
+  // to `pages` with `onDelete: NoAction`. Running their deleteMany() concurrently
+  // with the page delete below is safe only because `Page.deleteMany` here still
+  // goes through Mongoose, so Prisma's relation check never runs against it.
+  // Once `Page.deleteMany` is replaced with `prisma.pages.deleteMany`/`delete`,
+  // this Promise.all will start throwing P2014 (empirically confirmed:
+  // reliably reproducible when the two run concurrently, never when run
+  // sequentially). At that point, move pagetagrelations/revisions
+  // deletion ahead of the pages delete.
   await Promise.all([
-    prisma.$transaction([
-      prisma.comments.deleteMany({
-        where: {
-          pageId: {
-            in: pageIdStrings,
-          },
-          replyToId: {
-            not: null,
-          },
-        },
-      }),
-      prisma.comments.deleteMany({
-        where: {
-          pageId: {
-            in: pageIdStrings,
-          },
-        },
-      }),
-    ]),
-    PageTagRelation.deleteMany({ relatedPage: { $in: pageIds } }),
+    prisma.pagetagrelations.deleteMany({
+      where: { relatedPageId: { in: pageIdStrings } },
+    }),
     ShareLink.deleteMany({ relatedPage: { $in: pageIds } }),
-    Revision.deleteMany({ pageId: { $in: pageIds } }),
+    prisma.revisions.deleteMany({ where: { pageId: { in: pageIdStrings } } }),
     Page.deleteMany({ _id: { $in: pageIds } }),
     PageRedirect.deleteMany({
       $or: [{ fromPath: { $in: pagePaths } }, { toPath: { $in: pagePaths } }],

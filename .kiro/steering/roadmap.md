@@ -1,29 +1,22 @@
 # Roadmap
 
-リポジトリ全体のロードマップ。プロジェクト横断的なマイルストーンや方針をここに記す。
+リポジトリ全体のロードマップ。プロジェクト横断的なマイルストーンや方針をここに記す。リポジトリ全体に共通する公式な roadmap はまだ確立されていないため、現時点の中身は**複数 spec にまたがるイニシアチブの索引**である。
 
-現在、リポジトリ全体に共通する公式な roadmap は確立されていない。プロジェクト横断的な方針が定まり次第ここに追記する。
+## ここに書くもの / 書かないもの
 
-## Active Umbrella Specs
+- **書く**: **進行中の**、複数 spec にまたがるイニシアチブ（umbrella spec、または flagship spec を持つファミリー）を 1 行だけ。
+- **書かない**: 決定事項・未決の論点・実測値・PR 番号・実装ファイルパス。これらは各イニシアチブ側（umbrella の `roadmap.md`、flagship の `brief.md`、各 spec の `spec.json`）が一次情報源として持つ。ここに写すと二重管理になり、必ず片方が古くなる。
+- **書かない**: 完了したイニシアチブ。**完了した時点でここから消す。** 何をやったかの記録は各 spec 側（`spec.json` の `increment_note`、flagship の `brief.md`）に残るので、roadmap に完了済みの行を積む理由が無い。
+- **書かない**: 単発の spec（`drawio`、`g2g-import-conflict-detection` など）。完了・未完了を問わずイニシアチブではないので、状態は各 spec 側に残す。
 
-実装中 / 完了直後の大型イニシアチブは umbrella spec 内に自身の sub-spec roadmap を持つ。詳細は各 umbrella の `roadmap.md` を参照すること。
+## Umbrella Specs
+
+大型イニシアチブは umbrella spec 内に自身の sub-spec roadmap を持つ。詳細は各 umbrella の `roadmap.md` を参照すること。
 
 | Umbrella spec | Status | Sub-spec roadmap |
 |---|---|---|
-| [growi-vault](../specs/growi-vault/) | resilience / reconcile 完了、ha は brief 段階 | [.kiro/specs/growi-vault/roadmap.md](../specs/growi-vault/roadmap.md) |
+| [growi-vault](../specs/growi-vault/) | resilience / reconcile 完了、ha は brief 段階 | [roadmap.md](../specs/growi-vault/roadmap.md) |
+| [i18n](../specs/i18n/) | discovery 完了、sub-spec 2 本とも brief 段階。翻訳ファイル構成の整理方式は未決 | [roadmap.md](../specs/i18n/roadmap.md) |
 
-## Spec Family: activity log（監査ログ改善）
-
-activity log サブシステムを責務ごとに分割したファミリー。flagship の `activity-log` が「何を記録するか（記録ゲート）」と全体の関心マップを持つ。`activity-log`（≒監査ログ）という最も本流の名前は、最も基本的な概念である記録ゲートに充てている。
-
-分割の経緯: 旧 `activity-log` spec は snapshot を対象とした保守用 spec だった。名前と実体を一致させるため、その中身を `activity-log-snapshot` へ改名移設し、`activity-log` の名前を記録ゲート（flagship）に明け渡した。
-
-### Specs（依存順）
-
-- [x] `activity-log-snapshot` — snapshot の型付け＋添付削除ログ（REMOVE: PR #11393）＋添付系 action（ADD/DOWNLOAD）への capture 拡張（PR #11433）。旧 `activity-log` を改名。残: 配置リファクタ（タスク14: builder/recorder を `service/attachment/` へ移動・挙動不変。配置ポリシーは flagship の関心マップを参照）。依存: なし
-- [ ] `activity-log`（flagship / 記録ゲート） — 対象外 action を今後保存しない。直し方（defer-create / delete-at-settle）は design で比較。既存残骸の掃除は対象外。依存: なし（並行可）
-- [ ] `activity-log-snapshot-viewer` — 監査ログ画面での snapshot 表示（生表示＋添付系整形）。依存: `activity-log-snapshot`（capture 拡張は PR #11433 で完了済み → 着手可能）
-
-### 将来課題（未割当）
-
-`target × targetModel` の全面的型安全化 / 保持期間・TTL / 大量カスケード削除時のボリューム制御。整理先は flagship `activity-log` の関心マップ（`.kiro/specs/activity-log/brief.md`）で管理する。
+---
+_Updated: 2026-08-07. 完了済みの activity log ファミリー（`activity-log` / `activity-log-snapshot` / `activity-log-snapshot-viewer`、3 spec とも master にマージ済み）の節を削除した。PR 番号・実装ファイルパス・将来課題は各 `spec.json` の `increment_note` と flagship の `brief.md`（関心マップ）に既にあり、そこにしか無かった「spec 分割・改名の経緯」は削除前に flagship の brief へ移設済み。あわせて footer に溜まっていた編集履歴を落とし、「ここに書くもの / 書かないもの」を本文の方針として明示した。_

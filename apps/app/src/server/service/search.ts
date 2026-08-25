@@ -1,4 +1,4 @@
-import type { IPage, IPageHasId } from '@growi/core';
+import type { IPage, IPageHasId, IUser } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
@@ -6,15 +6,23 @@ import { FilterXSS } from 'xss';
 import { CommentEvent, commentEvent } from '~/features/comment/server';
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
+import type {
+  AuditlogSuggestionField,
+  AuditlogSuggestionsResponse,
+} from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
   IFormattedSearchResult,
   IPageWithSearchMeta,
   ISearchResult,
 } from '~/interfaces/search';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
+import {
+  USER_FIELDS_EXCEPT_CONFIDENTIAL,
+  UserStatus,
+} from '~/server/models/user/conts';
 import UserGroup from '~/server/models/user-group';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../crowi';
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
@@ -313,14 +321,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
     logger.info('Try to reconnect...');
     this.fullTextSearchDelegator.initClient();
 
-    try {
-      await this.getInfoForHealth();
+    await this.getInfoForHealth();
 
-      logger.info('Reconnecting succeeded.');
-      this.resetErrorStatus();
-    } catch (err) {
-      throw err;
-    }
+    logger.info('Reconnecting succeeded.');
+    this.resetErrorStatus();
   }
 
   async getInfo() {
@@ -351,12 +355,89 @@ class SearchService implements SearchQueryParser, SearchResolver {
     return this.fullTextSearchDelegator.getInfoForAdmin();
   }
 
+  async getAuditlogInfoForAdmin() {
+    return this.fullTextSearchDelegator.getAuditlogInfoForAdmin();
+  }
+
   async normalizeIndices() {
     return this.fullTextSearchDelegator.normalizeIndices();
   }
 
+  async normalizeAuditlogIndices() {
+    return this.fullTextSearchDelegator.normalizeAuditlogIndices();
+  }
+
   async rebuildIndex(shouldEmitProgress = false) {
     return this.fullTextSearchDelegator.rebuildIndex({ shouldEmitProgress });
+  }
+
+  async rebuildAuditlogIndex(
+    option: { shouldEmitProgress: boolean } = { shouldEmitProgress: false },
+  ) {
+    return this.fullTextSearchDelegator.rebuildAuditlogIndex(option);
+  }
+
+  private async searchAuditlogUsernames(
+    q: string,
+    limit: number,
+  ): Promise<string[]> {
+    if (this.isReachable) {
+      try {
+        return await this.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
+          'username',
+          q,
+          limit,
+        );
+      } catch (err) {
+        logger.error(
+          'Failed to search auditlog suggestions on Elasticsearch. Falling back to MongoDB.',
+          err,
+        );
+      }
+    }
+    return prisma.activities.findSnapshotUsernamesByUsernameRegex(q, {
+      offset: 0,
+      limit,
+    });
+  }
+
+  async searchAuditlogSuggestions(
+    fields: AuditlogSuggestionField[],
+    q: string,
+    limit: number,
+  ): Promise<AuditlogSuggestionsResponse> {
+    if (q === '') return {};
+
+    const response: AuditlogSuggestionsResponse = {};
+
+    if (fields.includes('username')) {
+      const usernames = await this.searchAuditlogUsernames(q, limit);
+
+      const User = mongoose.model<IUser>('User');
+      const users =
+        usernames.length === 0
+          ? []
+          : await User.find({ username: { $in: usernames } })
+              .select('username status')
+              .lean();
+
+      const activeUsernames = new Set(
+        users
+          .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
+          .map((u) => u.username),
+      );
+
+      // A username with no live User match (e.g. deleted -- statusDelete()
+      // renames the User doc's username to `deleted_at_*`) must still be
+      // searchable in the audit trail, so anything not proven active is
+      // treated as inactive rather than silently dropped.
+      response.username = {
+        activeUsernames: usernames.filter((u) => activeUsernames.has(u)),
+        inactiveUsernames: usernames.filter((u) => !activeUsernames.has(u)),
+      };
+    }
+
+    return response;
   }
 
   async parseSearchQuery(

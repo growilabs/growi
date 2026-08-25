@@ -52,16 +52,32 @@ test.describe
       // Focus the editor
       await page.locator('.cm-content').click();
 
-      // With no selection, C-c C-s b inserts ** markers and positions cursor between them
-      await page.keyboard.press('Control+c');
-      await page.keyboard.press('Control+s');
-      await page.keyboard.press('b');
+      // The Emacs keymap extension is attached via an async dynamic import
+      // (getKeymap -> emacsKeymap -> @replit/codemirror-emacs) that resolves
+      // after the editor is already visible and interactive. Until it resolves,
+      // the still-default CodeMirror keymap is active, so a keystroke sent in
+      // that window is typed as literal characters instead of triggering the
+      // Emacs binding. Retry the whole interaction (resetting the editor
+      // content first) until it observably worked, rather than adding a fixed
+      // delay before the first attempt — see saving.spec.ts's page-create
+      // shortcut for the same pattern applied to the identical race.
+      await expect(async () => {
+        await page.locator('.cm-content').fill('');
 
-      // Type text inside the inserted markers
-      await page.keyboard.type('bold text');
+        // With no selection, C-c C-s b inserts ** markers and positions cursor between them
+        await page.keyboard.press('Control+c');
+        await page.keyboard.press('Control+s');
+        await page.keyboard.press('b');
 
-      // Verify: bold markdown markers surround the typed text in the editor source
-      await expect(page.locator('.cm-content')).toContainText('**bold text**');
+        // Type text inside the inserted markers
+        await page.keyboard.type('bold text');
+
+        // Verify: bold markdown markers surround the typed text in the editor source
+        await expect(page.locator('.cm-content')).toContainText(
+          '**bold text**',
+          { timeout: 1000 },
+        );
+      }).toPass();
     });
 
     test('C-c C-l should insert a markdown link template (Req 5.2)', async ({
@@ -70,15 +86,24 @@ test.describe
       // Focus the editor
       await page.locator('.cm-content').click();
 
-      // With no selection, C-c C-l inserts []() and positions cursor after [
-      await page.keyboard.press('Control+c');
-      await page.keyboard.press('Control+l');
+      // Same keymap-attach race as the bold test above — retry until the
+      // Emacs binding (not the still-default keymap) has actually fired.
+      await expect(async () => {
+        await page.locator('.cm-content').fill('');
 
-      // Type the link display text inside the brackets
-      await page.keyboard.type('link text');
+        // With no selection, C-c C-l inserts []() and positions cursor after [
+        await page.keyboard.press('Control+c');
+        await page.keyboard.press('Control+l');
 
-      // Verify: link template with typed display text appears in the editor source
-      await expect(page.locator('.cm-content')).toContainText('[link text]()');
+        // Type the link display text inside the brackets
+        await page.keyboard.type('link text');
+
+        // Verify: link template with typed display text appears in the editor source
+        await expect(page.locator('.cm-content')).toContainText(
+          '[link text]()',
+          { timeout: 1000 },
+        );
+      }).toPass();
     });
 
     test('C-c C-n should navigate cursor to the next heading (Req 9.3)', async ({

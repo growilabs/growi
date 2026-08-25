@@ -3,7 +3,7 @@ import { getIdForRef } from '@growi/core';
 import mongoose from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
+import { prisma } from '~/utils/prisma';
 
 import { extractInternalLinkPaths } from './extract-internal-link-paths';
 import { syncOutboundLinks } from './page-link-sync';
@@ -14,9 +14,10 @@ import { resolveToPageIds } from './target-page-resolution';
 const loadBody = async (page: PageDocument): Promise<string> => {
   const { revision } = page;
   if (revision == null) return '';
-  const rev = await Revision.findById(getIdForRef(revision))
-    .select('body')
-    .lean();
+  const rev = await prisma.revisions.findUnique({
+    where: { id: getIdForRef(revision).toString() },
+    select: { body: true },
+  });
   return rev?.body ?? '';
 };
 

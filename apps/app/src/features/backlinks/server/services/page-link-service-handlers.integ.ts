@@ -2,7 +2,7 @@ import { Types } from 'mongoose';
 
 import type { PageModel } from '~/server/models/page';
 import PageModelFactory from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
+import { prisma } from '~/utils/prisma';
 
 import PageLink from '../models/page-link';
 import { handlePageUpsertById } from './page-link-service-handlers';
@@ -35,7 +35,9 @@ describe('handlePageUpsertById (integration)', () => {
   afterEach(async () => {
     await PageLink.deleteMany({ fromPage: { $in: createdPageIds } });
     await Page.deleteMany({ _id: { $in: createdPageIds } });
-    await Revision.deleteMany({ pageId: { $in: createdPageIds } });
+    await prisma.revisions.deleteMany({
+      where: { pageId: { in: createdPageIds.map((id) => id.toString()) } },
+    });
     createdPageIds.length = 0;
   });
 
@@ -69,8 +71,13 @@ describe('handlePageUpsertById (integration)', () => {
     pageId: Types.ObjectId,
     body: string,
   ): Promise<void> => {
-    const revision = await Revision.create({ pageId, body });
-    await Page.updateOne({ _id: pageId }, { $set: { revision: revision._id } });
+    const revision = await prisma.revisions.create({
+      data: { pageId: pageId.toString(), body },
+    });
+    await Page.updateOne(
+      { _id: pageId },
+      { $set: { revision: new Types.ObjectId(revision.id) } },
+    );
   };
 
   const outboundRowsOf = (pageId: Types.ObjectId) =>
