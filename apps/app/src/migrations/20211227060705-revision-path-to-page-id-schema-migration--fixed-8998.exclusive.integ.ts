@@ -2,21 +2,32 @@
  * Integration test for the revision path -> pageId migration.
  *
  * Runs against the real (in-memory) MongoDB test database wired by the
- * `app-integration` Vitest project (see vitest.workspace.mts) — mongoose and
- * prisma are NOT mocked (and this file never imports `mongoose` itself);
- * `up()`/`down()` execute for real against that database. `pages`/`revisions`
- * documents are seeded and read back through a plain `mongodb` driver
- * `MongoClient` connected to the same per-worker test database, bypassing
- * model-level schema validation so the pre-migration legacy document shapes
- * (`revisions.path`, no `pages` required fields) can be represented directly
- * — exactly how the migration itself finds them in production. The `Page`
- * mongoose model gets registered as a side effect of the migration's own
+ * `app-integration-exclusive` Vitest project (see vitest.workspace.mts) —
+ * mongoose and prisma are NOT mocked (and this file never imports `mongoose` or
+ * `prisma` itself); `up()`/`down()` execute for real against that database.
+ * `pages`/`revisions` documents are seeded and read back through a plain
+ * `mongodb` driver `MongoClient` connected to the same per-worker test database,
+ * bypassing model-level schema validation so the pre-migration legacy document
+ * shapes (`revisions.path`, no `pages` required fields) can be represented
+ * directly — exactly how the migration itself finds them in production. The
+ * `Page` mongoose model gets registered as a side effect of the migration's own
  * `getModelSafely('Page') || getPageModel()` fallback.
+ *
+ * Staying off both mongoose and prisma here is deliberate: it is what lets the
+ * same test hold while `revisions` is ported from the Mongoose model to Prisma
+ * (#11602). Seed and assert through the driver only.
+ *
+ * WHY the `exclusive` project: both `up()` and `down()` operate on the whole
+ * database (every page with a revision), and `down()` in particular rewrites
+ * every revision that is pageId-keyed — i.e. every revision in its current,
+ * post-migration shape — back to the legacy path-keyed shape. Sharing a database
+ * with the ordinary integration tests would let this file silently corrupt
+ * fixtures any other file in the same worker left behind.
  */
 import type { Collection, Db } from 'mongodb';
 import { MongoClient, ObjectId } from 'mongodb';
 
-import { getTestDbConfig } from '^/test/setup/mongo/utils';
+import { getTestDbConfig } from '^/test/setup/mongo/test-db-config';
 
 describe('20211227060705-revision-path-to-page-id-schema-migration--fixed-8998', () => {
   let migrate: typeof import('./20211227060705-revision-path-to-page-id-schema-migration--fixed-8998');

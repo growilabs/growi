@@ -31,6 +31,7 @@ import type {
   IPagePathWithDescendantCount,
 } from '~/interfaces/page';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+import { prisma } from '~/utils/prisma';
 
 import loggerFactory from '../../utils/logger';
 import type Crowi from '../crowi';
@@ -1081,15 +1082,26 @@ schema.statics.findParentByPath = async function (
 /*
  * Utils from obsolete-page.js
  */
-export async function pushRevision(pageData, newRevision, user) {
-  await newRevision.save();
+export async function pushRevision(
+  pageData: HydratedDocument<PageDocument>,
+  newRevisionData,
+  user,
+) {
+  const newRevision = await prisma.revisions.create({ data: newRevisionData });
 
-  pageData.revision = newRevision;
+  pageData.revision = newRevision._id;
   pageData.latestRevisionBodyLength = newRevision.body.length;
   pageData.lastUpdateUser = user?._id ?? user;
-  pageData.updatedAt = Date.now();
+  pageData.updatedAt = new Date();
 
-  return pageData.save();
+  const savedPage = await pageData.save();
+  // Setting `revision` to a bare id (above) leaves the path unpopulated.
+  // The old Mongoose flow assigned a hydrated Revision document here instead,
+  // which Mongoose treats as already-populated; recreate that by populating
+  // for real -- the 'Revision' mongoose model still queries the same
+  // `revisions` collection that Prisma writes to.
+  // biome-ignore lint/plugin: allow populate for backward compatibility
+  return savedPage.populate<HydratedDocument<PageDocument>>('revision');
 }
 
 /**

@@ -70,7 +70,7 @@ model accesstokens {
 
 model activities {
   id          String             @id @default(auto()) @map("_id") @db.ObjectId
-  v           Int                @map("__v")
+  v           Int                @default(0) @map("__v")
   action      String
   createdAt   DateTime           @default(now())
   // ip/endpoint are optional as a safeguard: the legacy Mongoose schema never
@@ -186,7 +186,7 @@ model comments {
 
 model configs {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  v         Int?     @map("__v")
+  v         Int?     @default(0) @map("__v")
   createdAt DateTime @default(now())
   key       String   @unique(map: "key_1")
   updatedAt DateTime @updatedAt
@@ -293,7 +293,7 @@ model migrations {
 
 model namedqueries {
   id            String @id @default(auto()) @map("_id") @db.ObjectId
-  v             Int    @map("__v")
+  v             Int    @default(0) @map("__v")
   /// Could not determine type: the field only had null or empty values in the sample set.
   creator       Json?
   delegatorName String
@@ -366,7 +366,7 @@ model pageredirects {
 
 model pages {
   id                       String    @id @default(auto()) @map("_id") @db.ObjectId
-  v                        Int       @map("__v")
+  v                        Int       @default(0) @map("__v")
   commentCount             Int       @default(0)
   createdAt                DateTime  @default(now())
   creatorId                String?   @map("creator") @db.ObjectId
@@ -391,15 +391,16 @@ model pages {
   wip                      Boolean?
   wipExpiredAt             DateTime?
 
-  creator        users?        @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  lastUpdateUser users?        @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  parent         pages?        @relation("ParentChild", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children       pages[]       @relation("ParentChild")
-  deleteUser     users?        @relation("DeletedPages", fields: [deleteUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  revisions      revisions[]
-  comments       comments[]
-  attachments    attachments[]
-  bookmarks      bookmarks[]
+  creator          users?             @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lastUpdateUser   users?             @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  parent           pages?             @relation("ParentChild", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children         pages[]            @relation("ParentChild")
+  deleteUser       users?             @relation("DeletedPages", fields: [deleteUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  revisions        revisions[]
+  comments         comments[]
+  attachments      attachments[]
+  bookmarks        bookmarks[]
+  pagetagrelations pagetagrelations[]
 
   @@index([parentId], map: "parent_1")
   @@index([path], map: "path_1")
@@ -416,17 +417,18 @@ model pages {
 }
 
 model pagetagrelations {
-  id            String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  isPageTrashed Json?
-  /// Field referred in an index, but found no data to define the type.
-  relatedPage   Json?
-  /// Field referred in an index, but found no data to define the type.
-  relatedTag    Json?
+  id            String  @id @default(auto()) @map("_id") @db.ObjectId
+  v             Int     @default(0) @map("__v")
+  isPageTrashed Boolean @default(false)
+  relatedPageId String  @map("relatedPage") @db.ObjectId
+  relatedTagId  String  @map("relatedTag") @db.ObjectId
 
-  @@unique([relatedPage, relatedTag], map: "relatedPage_1_relatedTag_1")
-  @@index([relatedPage], map: "relatedPage_1")
-  @@index([relatedTag], map: "relatedTag_1")
+  relatedPage pages @relation(fields: [relatedPageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  relatedTag  tags  @relation(fields: [relatedTagId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([relatedPageId, relatedTagId], map: "relatedPage_1_relatedTag_1")
+  @@index([relatedPageId], map: "relatedPage_1")
+  @@index([relatedTagId], map: "relatedTag_1")
   @@index([isPageTrashed], map: "isPageTrashed_1")
 }
 
@@ -438,20 +440,21 @@ model passwordresetorders {
 
 model revisions {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  v             Int      @map("__v")
-  authorId      String   @map("author") @db.ObjectId
+  v             Int      @default(0) @map("__v")
+  authorId      String?  @map("author") @db.ObjectId
   body          String
   createdAt     DateTime @default(now())
   hasDiffToPrev Boolean?
-  format        String
+  format        String   @default("markdown")
   origin        String?
   pageId        String   @db.ObjectId
 
-  author   users      @relation(fields: [authorId], references: [id])
-  page     pages      @relation(fields: [pageId], references: [id])
+  author   users?     @relation(fields: [authorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  page     pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   comments comments[]
 
   @@index([pageId], map: "pageId_1")
+  @@index([authorId, createdAt(sort: Desc)], map: "author_1_createdAt_-1")
 }
 
 model rlflx {
@@ -502,6 +505,8 @@ model tags {
   id   String @id @default(auto()) @map("_id") @db.ObjectId
   v    Int    @default(0) @map("__v")
   name String @unique(map: "name_1")
+
+  pagetagrelations pagetagrelations[]
 }
 
 model transferkeys {
@@ -526,7 +531,7 @@ model updateposts {
 
 model usergrouprelations {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  v            Int      @map("__v")
+  v            Int      @default(0) @map("__v")
   createdAt    DateTime @default(now())
   relatedGroup String   @db.ObjectId
   relatedUser  String   @db.ObjectId
@@ -534,7 +539,7 @@ model usergrouprelations {
 
 model usergroups {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  v           Int      @map("__v")
+  v           Int      @default(0) @map("__v")
   createdAt   DateTime @default(now())
   description String
   name        String   @unique(map: "name_1")
@@ -571,6 +576,7 @@ model users {
   lang                    Lang      @default(en_US)
   status                  Int       @default(2)
   lastLoginAt             DateTime?
+  contributionsMigratedAt DateTime?
   admin                   Boolean   @default(false)
   readOnly                Boolean   @default(false)
   isInvitationEmailSended Boolean   @default(false)
@@ -597,7 +603,7 @@ model users {
 
 model useruisettings {
   id                        String  @id @default(auto()) @map("_id") @db.ObjectId
-  v                         Int     @map("__v")
+  v                         Int     @default(0) @map("__v")
   currentSidebarContents    String
   preferCollapsedModeByUser Boolean
   user                      String  @unique(map: "user_1") @db.ObjectId
