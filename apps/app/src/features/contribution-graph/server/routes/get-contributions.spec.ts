@@ -4,6 +4,8 @@ import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 import { mockClear, mockDeep } from 'vitest-mock-extended';
 
+import { replaceMongoDbName } from '^/test/setup/mongo/utils';
+
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { configManager } from '~/server/service/config-manager';
 
@@ -36,17 +38,32 @@ describe('getContributionsHandler', () => {
   const mockRes = mockDeep<ApiV3Response>();
   const targetUserId = new mongoose.Types.ObjectId();
 
-  let mongod: MongoMemoryServer;
+  let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
+    // Reuse an already-running MongoDB (CI's ci-app-test job starts one via
+    // supercharge/mongodb-github-action and passes MONGO_URI) instead of
+    // spawning a redundant embedded mongod — see #11744.
+    const mongoUri = process.env.MONGO_URI
+      ? replaceMongoDbName(
+          process.env.MONGO_URI,
+          'growi_test_unit_get_contributions',
+        )
+      : null;
+
+    if (mongoUri != null) {
+      await mongoose.connect(mongoUri);
+      return;
+    }
+
     mongod = await MongoMemoryServer.create();
     await mongoose.connect(mongod.getUri());
-  }, 30_000); // MongoMemoryServer.create() spawns a real mongod; the 10s default can be squeezed under CI load (see #11744)
+  });
 
   afterAll(async () => {
     await mongoose.connection.dropDatabase();
     await mongoose.connection.close();
-    await mongod.stop();
+    await mongod?.stop();
   });
 
   beforeEach(async () => {

@@ -1,6 +1,8 @@
 import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 
+import { replaceMongoDbName } from '^/test/setup/mongo/utils';
+
 import type { IContribution } from '../../interfaces/contribution';
 import Contribution from '../models/contribution-model';
 import { addContribution, getContributions } from './contribution-service';
@@ -8,13 +10,27 @@ import { addContribution, getContributions } from './contribution-service';
 describe('addContribution', () => {
   const userId = new mongoose.Types.ObjectId().toString();
 
-  let mongod: MongoMemoryServer;
+  let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
+    // Reuse an already-running MongoDB (CI's ci-app-test job starts one via
+    // supercharge/mongodb-github-action and passes MONGO_URI) instead of
+    // spawning a redundant embedded mongod — see #11744.
+    const mongoUri = process.env.MONGO_URI
+      ? replaceMongoDbName(
+          process.env.MONGO_URI,
+          'growi_test_unit_contribution_service',
+        )
+      : null;
+
+    if (mongoUri != null) {
+      await mongoose.connect(mongoUri);
+      return;
+    }
+
     mongod = await MongoMemoryServer.create();
-    const uri = mongod.getUri();
-    await mongoose.connect(uri);
-  }, 30_000); // MongoMemoryServer.create() spawns a real mongod; the 10s default can be squeezed under CI load (see #11744)
+    await mongoose.connect(mongod.getUri());
+  });
 
   beforeEach(async () => {
     await Contribution.deleteMany({});
@@ -23,7 +39,7 @@ describe('addContribution', () => {
   afterAll(async () => {
     await mongoose.connection.dropDatabase();
     await mongoose.connection.close();
-    await mongod.stop();
+    await mongod?.stop();
   });
 
   it('should create a new contribution record if it does not exist (upsert)', async () => {
@@ -70,13 +86,27 @@ describe('addContribution', () => {
 describe('getContributions', () => {
   const userId = new mongoose.Types.ObjectId().toString();
 
-  let mongod: MongoMemoryServer;
+  let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
+    // Reuse an already-running MongoDB (CI's ci-app-test job starts one via
+    // supercharge/mongodb-github-action and passes MONGO_URI) instead of
+    // spawning a redundant embedded mongod — see #11744.
+    const mongoUri = process.env.MONGO_URI
+      ? replaceMongoDbName(
+          process.env.MONGO_URI,
+          'growi_test_unit_contribution_service',
+        )
+      : null;
+
+    if (mongoUri != null) {
+      await mongoose.connect(mongoUri);
+      return;
+    }
+
     mongod = await MongoMemoryServer.create();
-    const uri = mongod.getUri();
-    await mongoose.connect(uri);
-  }, 30_000); // MongoMemoryServer.create() spawns a real mongod; the 10s default can be squeezed under CI load (see #11744)
+    await mongoose.connect(mongod.getUri());
+  });
 
   beforeEach(async () => {
     await Contribution.deleteMany({});
@@ -85,7 +115,7 @@ describe('getContributions', () => {
   afterAll(async () => {
     await mongoose.connection.dropDatabase();
     await mongoose.connection.close();
-    await mongod.stop();
+    await mongod?.stop();
   });
 
   it('should return one year of contributions if they exist in the database', async () => {
