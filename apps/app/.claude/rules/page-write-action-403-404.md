@@ -79,15 +79,30 @@ which one justified it in a comment at the call site:
 
 If neither holds, use a uniform 404.
 
-## Known cases needing revisit
+## Known cases
 
 Found via `grep -rn isForbidden apps/app/src/server/routes/apiv3` while
-writing this rule; not yet fixed — treat as a backlog, not as done:
+writing this rule.
 
-- `apps/app/src/server/routes/apiv3/pages/index.js` — `/pages/rename` and
-  `/pages/duplicate` both compute `meta.isForbidden ? 403 : 404`.
+Fixed (uniform 404):
+
+- `apps/app/src/server/routes/apiv3/pages/index.js` — `/pages/rename`
+  (previously `meta.isForbidden ? 403 : 404`).
 - `apps/app/src/server/routes/apiv3/pages/index.js` — `/pages/resume-rename`
-  has the inverse bug: it always returns 403, even when the source page is
-  genuinely not found. Per this rule, the fix is **not** to add a
-  `isForbidden ? 403 : 404` branch there (that would just introduce the same
-  leak in reverse) — it should collapse to a uniform 404 instead.
+  (previously always returned 403, even when the page was genuinely not
+  found — the fix collapsed this to a uniform 404, not the inverse split).
+- `apps/app/src/server/routes/apiv3/share-links.js` — `DELETE
+  /share-links/:id` (previously skipped the permission check entirely once
+  an existence probe showed the related page was already gone, letting any
+  non-admin delete the share link; now denies uniformly whenever the
+  viewer-filtered lookup returns null).
+
+Pending, intentionally left to its own PR:
+
+- `apps/app/src/server/routes/apiv3/pages/index.js` — `/pages/duplicate`
+  currently computes `meta.isForbidden ? 403 : 404` (PR #11753) on top of a
+  pre-existing crash (`page.path` dereferenced before the null check, under
+  `security:disableUserPages`). Left out of the PR that fixed the three
+  cases above so as not to collide with #11753 already being open against
+  this same route — that PR should fix both the crash and the 403/404 split
+  itself, per this rule.
