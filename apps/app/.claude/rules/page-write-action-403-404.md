@@ -1,20 +1,26 @@
-# Page Write-Action Responses Must Not Leak Existence (403 vs 404)
+# Page API Responses Must Not Leak Existence (403 vs 404)
 
-Scope: **write/mutation** apiv3 routes under `apps/app/src/server/routes/apiv3`
-that act on a page identified by `pageId`/`path` (duplicate, rename,
-resume-rename, delete, and similar). This rule does **not** cover the normal
-page-viewing path (`src/pages/[[...path]]/**`, `respond-with-single-page.ts`,
-`get-page-info.ts`) — that surface still distinguishes forbidden from
-not-found today, and changing it is a separate, larger decision that has not
-been made yet.
+Scope: **any apiv3 endpoint** under `apps/app/src/server/routes/apiv3` that
+acts on or reads a page identified by `pageId`/`path` — GET included, not
+just write/mutation routes. Any authenticated caller can hit a GET endpoint
+the same way they'd hit a POST/PUT/DELETE one, so the HTTP method is not a
+meaningful boundary for this leak.
+
+This rule does **not** cover the Next.js page-render screen
+(`src/pages/[[...path]]/**` — what a browser shows when a human navigates to
+a page). Whether *that* surface should show a different screen for
+"forbidden" vs "not found" is a separate, larger UX decision that has not
+been made yet, and is out of scope here. Everything else that returns JSON
+from `apps/app/src/server/routes/apiv3` — GET included — is in scope and
+must follow this rule.
 
 ## The rule
 
-When a write-action route looks up its target page via
-`findPageAndMetaDataByViewer` (or an equivalent viewer-filtered lookup) and
-the page is not returned, **default to responding with a single, uniform
-404** — do not compute `meta.isForbidden` into a `403 : 404` branch that
-reaches the client, unless you have verified a concrete reason to.
+When a route looks up its target page via `findPageAndMetaDataByViewer` (or
+an equivalent viewer-filtered lookup) and the page is not returned, **default
+to responding with a single, uniform 404** — do not compute
+`meta.isForbidden` into a `403 : 404` branch that reaches the client, unless
+you have verified a concrete reason to.
 
 ```javascript
 // ❌ DEFAULT WRONG: leaks "this page exists" to a caller who cannot view it
@@ -32,14 +38,15 @@ return res.apiv3Err(
 
 ## Why
 
-An authenticated user who lacks permission to view a page can still call a
-write-action route with that page's id — the auth check that gates the route
-is "is this user logged in / not read-only", not "can this user see this
-page". If the route's response distinguishes 403 (exists, forbidden) from
-404 (does not exist), that authenticated-but-unauthorized caller can probe
-arbitrary page ids and learn which private pages exist, one probe at a time —
-a classic existence-oracle / enumeration leak (the same class of problem as a
-login form that says "wrong password" instead of "no such user").
+An authenticated user who lacks permission to view a page can still call any
+apiv3 route with that page's id — the auth check that gates the route is "is
+this user logged in / not read-only", not "can this user see this page".
+This holds for a GET route exactly as much as a POST/PUT/DELETE one. If the
+route's response distinguishes 403 (exists, forbidden) from 404 (does not
+exist), that authenticated-but-unauthorized caller can probe arbitrary page
+ids and learn which private pages exist, one probe at a time — a classic
+existence-oracle / enumeration leak (the same class of problem as a login
+form that says "wrong password" instead of "no such user").
 
 This was found while reviewing PR #11753 (`/pages/duplicate`), which copied
 the `meta.isForbidden ? 403 : 404` pattern from PR #11615 (`/pages/rename`).
@@ -59,12 +66,17 @@ benefit on these two routes. PR #11615's original diagnosis — that returning
 uniform 404, not introduced a distinguishable 403/404.
 
 GROWI's own broader design already treats page existence as sensitive for
-*read* paths: search, page listing, and `/page/exist` all use viewer-filtered
-queries so an unauthorized user gets a plain "not found" experience with no
-separate "forbidden" signal. This rule brings write-action routes in line
-with that same posture, rather than deciding it per-route each time.
+some read paths: search, page listing, and `/page/exist` all use
+viewer-filtered queries so an unauthorized user gets a plain "not found"
+experience with no separate "forbidden" signal. But other GET routes —
+`get-page-info.ts`, `respond-with-single-page.ts`, `page/export` — do the
+opposite, distinguishing 403 from 404 the same way the write routes did.
+Those are not a deliberate, differently-reasoned design; they are the same
+violation this rule fixes, just not yet fixed (see Known cases below). This
+rule states the policy for every apiv3 JSON response, not only the routes
+already fixed.
 
-## Before distinguishing 403 from 404 on a write-action route
+## Before distinguishing 403 from 404 on an apiv3 route
 
 The presence of `meta.isForbidden` is not, by itself, justification. Verify
 both of the following before returning a distinguishable status, and record
@@ -106,3 +118,16 @@ Pending, intentionally left to its own PR:
   cases above so as not to collide with #11753 already being open against
   this same route — that PR should fix both the crash and the 403/404 split
   itself, per this rule.
+
+Pending, not yet scheduled — same violation, GET routes (found during the
+same review, not fixed by any PR yet):
+
+- `apps/app/src/server/routes/apiv3/page/get-page-info.ts` — `GET
+  /page/info`, `meta.isForbidden ? 403 : 404`, pinned by an existing test
+  (`get-page-info.integ.ts`) that will need updating alongside the fix.
+- `apps/app/src/server/routes/apiv3/page/respond-with-single-page.ts` —
+  shared by `GET /page` and `GET /page/shared`.
+- `apps/app/src/server/routes/apiv3/page/index.ts` — `GET
+  /page/export/:pageId`, an explicit `Page.count` probe plus
+  `findByIdAndViewer`, likely the original template this pattern was copied
+  from.
