@@ -120,6 +120,19 @@ describe('DELETE /share-links/:id', () => {
     });
   });
 
+  it('returns 404 (same status as the other cases) when the share-link id itself does not exist', async () => {
+    // Before the fix, a nonexistent share-link id crashed inside the try
+    // block (dereferencing null) and answered a default 400 — a status
+    // distinguishable from the 404 the other two cases return, letting a
+    // non-admin caller learn "this share-link id exists" from the status
+    // alone. See apps/app/.claude/rules/page-write-action-403-404.md.
+    const bogusId = new mongoose.Types.ObjectId();
+
+    const response = await request(app).delete(`/${bogusId}`);
+
+    expect(response.status).toBe(404);
+  });
+
   it('returns 404 and does not delete the share link when the related page no longer exists', async () => {
     const shareLink = await ShareLink.create({
       relatedPage: new mongoose.Types.ObjectId(),

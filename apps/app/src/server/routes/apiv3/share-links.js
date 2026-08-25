@@ -416,6 +416,21 @@ export const setup = (crowi) => {
       try {
         const shareLinkToDelete = await ShareLink.findOne({ _id: id });
 
+        // A nonexistent share-link id must answer the same way as an
+        // existing one whose related page cannot be resolved below —
+        // otherwise the two are distinguishable (400 vs 404) to a
+        // non-admin caller enumerating ids. See
+        // apps/app/.claude/rules/page-write-action-403-404.md.
+        if (shareLinkToDelete == null) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'Page is not found or forbidden',
+              'delete-shareLink-failed',
+            ),
+            404,
+          );
+        }
+
         // check permission
         if (!user.isAdmin) {
           const page = await Page.findByIdAndViewer(
