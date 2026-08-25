@@ -397,13 +397,14 @@ export const setup = (crowi) => {
         page = pageWithMeta.data;
 
         if (page == null) {
-          const { meta } = pageWithMeta;
+          // Always respond 404 regardless of forbidden vs not-found — see
+          // apps/app/.claude/rules/page-write-action-403-404.md
           return res.apiv3Err(
             new ErrorV3(
               `Page '${pageId}' is not found or forbidden`,
               'notfound_or_forbidden',
             ),
-            meta.isForbidden ? 403 : 404,
+            404,
           );
         }
 
@@ -499,9 +500,15 @@ export const setup = (crowi) => {
       // The user has permission to resume rename operation if page is returned.
       const page = await Page.findByIdAndViewer(pageId, user, null, true);
       if (page == null) {
-        const msg = 'The operation is forbidden for this user';
-        const code = 'forbidden-user';
-        return res.apiv3Err(new ErrorV3(msg, code), 403);
+        // Always respond 404 regardless of forbidden vs not-found — see
+        // apps/app/.claude/rules/page-write-action-403-404.md
+        return res.apiv3Err(
+          new ErrorV3(
+            `Page '${pageId}' is not found or forbidden`,
+            'notfound_or_forbidden',
+          ),
+          404,
+        );
       }
 
       const pageOp =
