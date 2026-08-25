@@ -912,15 +912,15 @@ export const setup = (crowi: Crowi): Router => {
         page = await Page.findByIdAndViewer(pageId, req.user);
 
         if (page == null) {
-          const isPageExist = (await Page.count({ _id: pageId })) > 0;
-          if (isPageExist) {
-            // This page exists but req.user has not read permission
-            return res.apiv3Err(
-              new ErrorV3(`Haven't the right to see the page ${pageId}.`),
-              403,
-            );
-          }
-          return res.apiv3Err(new ErrorV3(`Page ${pageId} is not exist.`), 404);
+          // Always respond 404 regardless of forbidden vs not-found — see
+          // apps/app/.claude/rules/page-write-action-403-404.md
+          return res.apiv3Err(
+            new ErrorV3(
+              `Page '${pageId}' is not found or forbidden`,
+              'notfound_or_forbidden',
+            ),
+            404,
+          );
         }
       } catch (err) {
         logger.error('Failed to get page data', err);
