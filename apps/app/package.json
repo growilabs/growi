@@ -1,6 +1,6 @@
 {
   "name": "@growi/app",
-  "version": "8.0.2",
+  "version": "8.0.3-RC.0",
   "license": "MIT",
   "private": true,
   "type": "module",
