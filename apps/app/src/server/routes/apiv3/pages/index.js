@@ -317,10 +317,8 @@ export const setup = (crowi) => {
    *                      $ref: '#/components/schemas/Page'
    *          400:
    *            description: revisionId is missing, or the destination is under a non-existent user's user page. An empty page may be renamed without revisionId.
-   *          403:
-   *            description: Page is forbidden.
    *          404:
-   *            description: Page is not found.
+   *            description: Page is not found or forbidden.
    *          409:
    *            description: The destination path is already taken, cannot be used, or revisionId is not the latest revision.
    *          500:
