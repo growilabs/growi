@@ -324,7 +324,14 @@ describe('POST /delete', () => {
 
     // Falls through to the same "nothing to delete" response every other
     // filtered-out case gets (see the 500 comment on the first test above) —
-    // not a crash, and not a distinguishable status for this pageId.
+    // not a crash, and not a distinguishable status for this pageId. Assert
+    // the message too: a naive `pagesToDelete[0]?.grant` rewrite of the fix
+    // would still return 500 here, but via the sibling "grant of the
+    // retrieved page is not restricted" branch instead of this fallthrough —
+    // a status-only assertion would not catch that.
     expect(response.status).toBe(500);
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({ message: 'No pages can be deleted.' }),
+    ]);
   });
 });
