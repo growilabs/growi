@@ -1,8 +1,13 @@
 import type { Types } from 'mongoose';
 
+import PageRedirect from '~/server/models/page-redirect';
+
 import type { IPageLink } from '../../interfaces/page-link';
 import PageLink from '../models/page-link';
-import { resolveToPages } from './target-page-resolution';
+import {
+  REDIRECT_CHAIN_MAX_DEPTH,
+  resolveToPages,
+} from './target-page-resolution';
 
 export const dropSelfLinks = (
   fromPageId: Types.ObjectId,
@@ -39,8 +44,22 @@ export const syncOutboundLinks = async (
  * returns to broken.
  */
 export const reResolveByToPath = async (toPath: string): Promise<void> => {
-  const resolved = await resolveToPages([toPath]);
-  const toPage = resolved.get(toPath) ?? null;
+  // A row does not have to name the path to reach it: resolution follows the
+  // redirect chain, so `/old` resolves here whenever `/old` redirects here. Those
+  // rows go stale on the same event and nothing else revisits them. The reverse
+  // walk only nominates candidates — `resolveToPages` decides where each one
+  // actually lands, which for a longer chain may be somewhere else entirely.
+  const redirectingPaths = await PageRedirect.retrieveFromPathsRedirectingTo(
+    toPath,
+    REDIRECT_CHAIN_MAX_DEPTH,
+  );
+  const paths = [...new Set([toPath, ...redirectingPaths])];
 
-  await PageLink.repointInboundLinks(toPath, toPage);
+  const resolved = await resolveToPages(paths);
+
+  await Promise.all(
+    paths.map((path) =>
+      PageLink.repointInboundLinks(path, resolved.get(path) ?? null),
+    ),
+  );
 };

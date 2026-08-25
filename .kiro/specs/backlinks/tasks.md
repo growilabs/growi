@@ -365,6 +365,11 @@ B3/B5.
 - [x] B4.2 Implement the re-resolve-by-path sync operation
   - Implement the row op deferred from B1.5: re-resolve inbound rows matching a given path (to repoint
     stale caches when a page appears at that path)
+  - **Not only exact `toPath` matches.** B4.1 made resolution follow the redirect chain, so a row
+    naming `/old` resolves here whenever `/old` redirects here — and it goes stale on the same event.
+    Walk back from the path (`PageRedirect.retrieveFromPathsRedirectingTo`) to nominate candidates,
+    then let `resolveToPages` decide where each one lands: a longer chain can carry a candidate past
+    this path, so the reverse hop must never supply the target itself
   - Done when tests show inbound rows for a path get their `toPage` repointed when a page resolves
     at that path. The service's forwarding (which target it hands to the write) is unit-tested; the
     resulting row state is integration-tested against a real collection, since that is the

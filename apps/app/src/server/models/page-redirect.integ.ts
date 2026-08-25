@@ -28,6 +28,88 @@ describe('PageRedirect', () => {
     );
   };
 
+  describe('.removePageRedirectsByToPath (duplicate fromPath)', () => {
+    test('shoud remove only the document pointing at the path, not its duplicate', async () => {
+      // Same reachable state as the batch static's duplicate case: two documents
+      // share a fromPath, each pointing somewhere different. Unlinking one target
+      // must not take the other redirect with it.
+      // setup:
+      // create through the model first, so the collection (and its indexes) exist
+      // before the unique index is dropped
+      await PageRedirect.create({ fromPath: '/dup', toPath: '/first' });
+      await PageRedirect.collection.dropIndexes();
+      try {
+        await PageRedirect.collection.insertOne({
+          fromPath: '/dup',
+          toPath: '/second',
+        });
+
+        // when:
+        await PageRedirect.removePageRedirectsByToPath('/first');
+
+        // then:
+        const left = await PageRedirect.find({ fromPath: '/dup' }).lean();
+        expect(left).toHaveLength(1);
+        expect(left[0].toPath).toEqual('/second');
+      } finally {
+        await PageRedirect.collection.deleteMany({ fromPath: '/dup' });
+        await PageRedirect.syncIndexes();
+      }
+    });
+  });
+
+  describe('.retrieveFromPathsRedirectingTo', () => {
+    test('shoud collect every fromPath whose chain reaches the path, at any depth', async () => {
+      // setup: /p0 -> /p1 -> /p2 -> /p3, plus one unrelated redirect
+      await insertChain(3);
+      await PageRedirect.insertMany([
+        { fromPath: '/other', toPath: '/elsewhere' },
+      ]);
+
+      // when:
+      const fromPaths =
+        await PageRedirect.retrieveFromPathsRedirectingTo('/p3');
+
+      // then: the direct hop and both upstream ones, and nothing else
+      expect([...fromPaths].sort()).toEqual(['/p0', '/p1', '/p2']);
+    });
+
+    test('shoud return an empty array when nothing redirects to the path', async () => {
+      // setup:
+      await insertChain(3);
+
+      // when / then:
+      expect(await PageRedirect.retrieveFromPathsRedirectingTo('/p0')).toEqual(
+        [],
+      );
+    });
+
+    test('shoud stop walking back at the depth cap it is given', async () => {
+      // setup: /p0 -> ... -> /p5
+      await insertChain(5);
+
+      // when: the matched hop contributes /p4, then the walk back adds depth 0 and
+      // depth 1 — the cap is inclusive, as on the forward static
+      const fromPaths = await PageRedirect.retrieveFromPathsRedirectingTo(
+        '/p5',
+        1,
+      );
+
+      // then: /p1 and /p0 are past the cap
+      expect([...fromPaths].sort()).toEqual(['/p2', '/p3', '/p4']);
+    });
+
+    test('shoud walk back to the real start when given no depth cap', async () => {
+      // setup:
+      await insertChain(5);
+
+      // when / then:
+      expect(
+        (await PageRedirect.retrieveFromPathsRedirectingTo('/p5')).length,
+      ).toEqual(5);
+    });
+  });
+
   describe('.removePageRedirectsByToPath', () => {
     test('works fine', async () => {
       // setup:

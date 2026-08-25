@@ -1,5 +1,7 @@
 import { Types } from 'mongoose';
 
+import PageRedirect from '~/server/models/page-redirect';
+
 import type { IPageLink } from '../../interfaces/page-link';
 // vi.mock is hoisted above these imports, so PageLink is the mocked default export.
 import PageLink from '../models/page-link';
@@ -19,6 +21,11 @@ vi.mock('../models/page-link', () => ({
 
 vi.mock('./target-page-resolution', () => ({
   resolveToPages: vi.fn(),
+  REDIRECT_CHAIN_MAX_DEPTH: 50,
+}));
+
+vi.mock('~/server/models/page-redirect', () => ({
+  default: { retrieveFromPathsRedirectingTo: vi.fn() },
 }));
 
 const row = (toPage: Types.ObjectId | null, toPath = '/target'): IPageLink => ({
@@ -126,6 +133,9 @@ describe('syncOutboundLinks', () => {
 describe('reResolveByToPath', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(PageRedirect.retrieveFromPathsRedirectingTo).mockResolvedValue(
+      [],
+    );
   });
 
   it('repoints the path at the page the resolver reports for it', async () => {
@@ -159,5 +169,37 @@ describe('reResolveByToPath', () => {
 
     expect(resolveToPages).toHaveBeenCalledWith(['/target']);
     expect(PageLink.repointInboundLinks).toHaveBeenCalledWith('/target', null);
+  });
+
+  it('resolves and writes the paths that redirect here, not just the path itself', async () => {
+    const occupant = new Types.ObjectId();
+    const elsewhere = new Types.ObjectId();
+    vi.mocked(PageRedirect.retrieveFromPathsRedirectingTo).mockResolvedValue([
+      '/old',
+      '/older',
+    ]);
+    // '/older' resolves elsewhere: a redirect reaching '/target' does not make the
+    // target the answer, so each candidate carries the resolver's own verdict.
+    vi.mocked(resolveToPages).mockResolvedValue(
+      new Map([
+        ['/target', occupant],
+        ['/old', occupant],
+        ['/older', elsewhere],
+      ]),
+    );
+
+    await reResolveByToPath('/target');
+
+    expect(resolveToPages).toHaveBeenCalledWith(['/target', '/old', '/older']);
+    expect(PageLink.repointInboundLinks).toHaveBeenCalledTimes(3);
+    expect(PageLink.repointInboundLinks).toHaveBeenCalledWith(
+      '/target',
+      occupant,
+    );
+    expect(PageLink.repointInboundLinks).toHaveBeenCalledWith('/old', occupant);
+    expect(PageLink.repointInboundLinks).toHaveBeenCalledWith(
+      '/older',
+      elsewhere,
+    );
   });
 });

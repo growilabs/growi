@@ -269,6 +269,31 @@ describe('reResolveByToPath (integration)', () => {
     ]);
   });
 
+  it('repoints rows that reach the path through a redirect, not only exact matches', async () => {
+    // /redir-a was renamed to /redir-mid, then /redir-mid to /redir-final. Creating
+    // a page at /redir-mid deletes that path's own redirect, so /redir-a's chain now
+    // ends at /redir-mid: a click on /redir-a lands on the new page, so the row must
+    // point there too. Its cached target is the page the chain used to end at.
+    const original = await createPage('/re-resolve-integ/redir-final');
+    await createRedirect(
+      '/re-resolve-integ/redir-a',
+      '/re-resolve-integ/redir-mid',
+    );
+    const newOccupant = await createPage('/re-resolve-integ/redir-mid');
+    const source = new Types.ObjectId();
+    await createLink({
+      fromPage: source,
+      toPath: '/re-resolve-integ/redir-a',
+      toPage: original._id,
+    });
+
+    await reResolveByToPath('/re-resolve-integ/redir-mid');
+
+    expect(await inboundRows('/re-resolve-integ/redir-a')).toEqual([
+      { fromPage: source, toPage: newOccupant._id },
+    ]);
+  });
+
   it('clears the row whose source is the target, still repointing the others', async () => {
     // The page was renamed away from this path but its body still links to the old
     // one, so the path resolves back to the linking page itself. Its row is seeded

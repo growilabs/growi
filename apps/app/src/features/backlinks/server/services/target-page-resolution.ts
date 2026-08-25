@@ -19,7 +19,7 @@ const NON_EMPTY_PAGE_CONDITION = {
 // walk would fail the aggregation outright rather than degrade. This resolution
 // runs on every save, so it caps the walk; page view calls the same static
 // without a cap, where shortening a chain would 404 an old URL instead.
-const REDIRECT_CHAIN_MAX_DEPTH = 50;
+export const REDIRECT_CHAIN_MAX_DEPTH = 50;
 
 // Per call, never at module scope: this module can be imported before crowi
 // registers the Page schema, and mongoose.model() throws then.

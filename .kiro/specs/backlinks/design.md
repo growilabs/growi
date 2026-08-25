@@ -217,7 +217,9 @@ apps/app/src/features/backlinks/
   (subscribe to events) in the page-service setup phase, mirroring `search.ts`; also register the
   backfill `CronService` (mirroring the page-bulk-export job-cron registration).
 - `apps/app/src/server/routes/apiv3/index.js` — register the backlinks route.
-- `apps/app/src/server/models/page-redirect.ts` — add the `retrievePageRedirectEndpointsBatch`
+- `apps/app/src/server/models/page-redirect.ts` — add `retrieveFromPathsRedirectingTo` (the reverse
+  walk: which paths reach a given one) and re-implement `removePageRedirectsByToPath` over it, so
+  that pipeline exists once as well. Add the `retrievePageRedirectEndpointsBatch`
   static (`$match: { fromPath: { $in } }` + the existing `$graphLookup`) and re-implement
   `retrievePageRedirectEndpoints` as a lookup over it. Adding it to the model rather than to this
   feature keeps one copy of the pipeline; the singular contract is unchanged for
@@ -516,7 +518,8 @@ function resolveToPages(paths: string[]): Promise<Map<string, ObjectId>>;
 - Subscribed events (wired in `crowi` setup like `search.ts`):
   - `create (page, user)` → extract `page.revision.body` → `syncOutboundLinks` →
     `reResolveByToPath(page.path)` (correct stale caches from a prior occupant — match on
-    `toPath`, not `toPage:null`).
+    `toPath`, not `toPage:null`; and on every path whose redirect chain reaches it, since those
+    rows resolve here too).
   - `update (page, user)` → re-extract → `syncOutboundLinks`.
   - Note: handlers call the `syncOutboundLinks` / `reResolveByToPath` **services** (which drop
     self-links and resolve the target, then persist), never the raw
@@ -746,7 +749,12 @@ interface ILinkTarget {
 - `reconcileDeletedPages`: trashed page → no-op; permanently-gone page → outbound removed and
   inbound `toPage` nulled (3.3, 6.2).
 - `reResolveByToPath`: forwards the target the resolver reports for the path, and forwards `null`
-  when the path is absent from the map (so a row can return to broken) (5.1, 5.2).
+  when the path is absent from the map (so a row can return to broken); resolves and writes the
+  paths that redirect to it as well, each carrying the resolver's own verdict rather than the
+  target's (5.1, 5.2).
+- `retrieveFromPathsRedirectingTo`: every `fromPath` whose chain reaches the path at any depth,
+  unrelated redirects excluded, empty when none, and a given cap stops the walk while the default
+  reaches the chain's real start.
 
 ### Integration Tests
 - create/update events drive `PageLink` rows so a page's links appear as backlinks on targets,
@@ -763,6 +771,8 @@ interface ILinkTarget {
   (stale non-null cache → new occupant, and `null` → healed), rows at other paths untouched, and
   the row whose own source is the target is cleared while the rest of the path is still repointed
   (1.6, 5.1, 5.2). A `toPath` that is not a non-empty string is refused without writing anything.
+- Re-resolve reaches rows that name a redirecting path, not only exact `toPath` matches: a page
+  created at a path that another path redirects to repoints those rows too (5.1, 5.2).
 - Trash → derived `trashed`; permanent delete → `broken`; restore → `normal` (6.1–6.3).
 - Backfill: rows produced for pre-existing pages match the live create/update path (4.2); running
   the job twice, or resuming after an interrupted chunk, produces no duplicate rows (4.3); the
