@@ -162,28 +162,32 @@ describe('DELETE /share-links/:id', () => {
   });
 
   it('deletes the share link when an admin makes the request, even if the related page no longer exists', async () => {
-    // The route's admin bypass reads `user.isAdmin` directly off req.user, not
-    // the model's real `admin` field — set it directly on the shared fixture
-    // for the duration of this test only.
-    // biome-ignore lint/suspicious/noExplicitAny: exercising the route's own (loosely-typed) check
-    (requester as any).isAdmin = true;
-    try {
-      const { setup } = await import('./share-links');
-      const adminApp = buildApp(requester);
-      adminApp.use('/', setup(crowi));
+    // The route's admin bypass reads `user.isAdmin` off req.user — but
+    // `IUserHasId`/the User schema have no such field (the real field is
+    // `admin`, e.g. server/models/user/index.js). So `user.isAdmin` is always
+    // undefined for a real user, and this branch is unreachable in
+    // production today; that mismatch is a separate, pre-existing bug and
+    // out of scope here. This test exercises the branch as the code is
+    // literally written, via a fresh object (never mutating the shared
+    // `requester` fixture the other cases use).
+    const adminUser = {
+      ...requester.toObject(),
+      isAdmin: true,
+      // biome-ignore lint/suspicious/noExplicitAny: `isAdmin` isn't a real field on IUserHasId — see comment above
+    } as any as HydratedDocument<IUserHasId>;
 
-      const shareLink = await ShareLink.create({
-        relatedPage: new mongoose.Types.ObjectId(),
-      });
+    const { setup } = await import('./share-links');
+    const adminApp = buildApp(adminUser);
+    adminApp.use('/', setup(crowi));
 
-      const response = await request(adminApp).delete(`/${shareLink._id}`);
+    const shareLink = await ShareLink.create({
+      relatedPage: new mongoose.Types.ObjectId(),
+    });
 
-      expect(response.status).toBe(200);
-      const stillExists = await ShareLink.findById(shareLink._id);
-      expect(stillExists).toBeNull();
-    } finally {
-      // biome-ignore lint/suspicious/noExplicitAny: see above
-      (requester as any).isAdmin = undefined;
-    }
+    const response = await request(adminApp).delete(`/${shareLink._id}`);
+
+    expect(response.status).toBe(200);
+    const stillExists = await ShareLink.findById(shareLink._id);
+    expect(stillExists).toBeNull();
   });
 });
