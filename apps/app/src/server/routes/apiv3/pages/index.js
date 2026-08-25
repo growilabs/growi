@@ -767,7 +767,7 @@ export const setup = (crowi) => {
    *                      $ref: '#/components/schemas/Page'
    *
    *          403:
-   *            description: Page is forbidden.
+   *            description: Forbidden to duplicate page.
    *          404:
    *            description: Page is not found.
    *          500:
@@ -825,13 +825,12 @@ export const setup = (crowi) => {
       );
       const page = pageWithMeta.data;
       if (page == null) {
-        const { meta } = pageWithMeta;
         return res.apiv3Err(
           new ErrorV3(
             `Page '${pageId}' is not found or forbidden`,
             'notfound_or_forbidden',
           ),
-          meta.isForbidden ? 403 : 404,
+          404,
         );
       }
 

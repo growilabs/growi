@@ -300,7 +300,7 @@ describe('POST /duplicate', () => {
     ).toBeNull();
   });
 
-  it('returns 403 without changing the source when the requester may not read it', async () => {
+  it('returns 404 without changing the source when the requester may not read it', async () => {
     const sourcePage = await createPage(FORBIDDEN_SOURCE, SOURCE_BODY, owner, {
       grant: PageGrant.GRANT_OWNER,
     });
@@ -311,7 +311,7 @@ describe('POST /duplicate', () => {
       FORBIDDEN_DESTINATION,
     );
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(404);
     expect(response.body.errors).toEqual([
       expect.objectContaining({
         code: 'notfound_or_forbidden',
