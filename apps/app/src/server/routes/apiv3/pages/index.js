@@ -1073,8 +1073,14 @@ export const setup = (crowi) => {
         logger.error('Failed to find pages to delete.', err);
         return res.apiv3Err(new ErrorV3('Failed to find pages to delete.'));
       }
+      // `findByIdsAndViewer` is viewer-filtered, so the requested page can come
+      // back missing from `pagesToDelete` (already deleted, or not readable by
+      // this user) — guard the length before indexing, or a nonexistent/
+      // unreadable pageId throws here instead of falling through to the
+      // generic "No pages can be deleted." response below.
       if (
         isAnyoneWithTheLink &&
+        pagesToDelete.length > 0 &&
         pagesToDelete[0].grant !== PageGrant.GRANT_RESTRICTED
       ) {
         return res.apiv3Err(

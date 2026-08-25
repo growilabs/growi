@@ -303,4 +303,28 @@ describe('POST /delete', () => {
     // fixture cleanup can't race it.
     await waitForAncestorCleanupToSettle(parentId);
   }, 20_000);
+
+  it('does not crash when isAnyoneWithTheLink is set and the page cannot be found', async () => {
+    // `pageIds.length !== 1` is rejected earlier when isAnyoneWithTheLink is
+    // set, so the viewer-filtered lookup below always resolves for a single
+    // id. Before the fix, a nonexistent (or unreadable) pageId left
+    // `pagesToDelete` empty and `pagesToDelete[0].grant` threw instead of
+    // answering cleanly.
+    const missingPageId = new Types.ObjectId();
+
+    const response = await request(app)
+      .post('/delete')
+      .set('X-Forwarded-For', TEST_IP)
+      .send({
+        pageIdToRevisionIdMap: {
+          [missingPageId.toString()]: new Types.ObjectId().toString(),
+        },
+        isAnyoneWithTheLink: true,
+      });
+
+    // Falls through to the same "nothing to delete" response every other
+    // filtered-out case gets (see the 500 comment on the first test above) —
+    // not a crash, and not a distinguishable status for this pageId.
+    expect(response.status).toBe(500);
+  });
 });
