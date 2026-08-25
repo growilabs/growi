@@ -1,5 +1,3 @@
-import path from 'node:path';
-import { dynamicImport } from '@cspell/dynamic-import';
 import type * as Unified from 'unified';
 
 import type { PluginDeclaration } from './plugin-set';
@@ -17,7 +15,7 @@ type AnyPlugin = Unified.Plugin<[unknown?]>;
  * wiring required.
  */
 export interface LoadedPlugin {
-  /** Canonical name from the declaration (npm specifier or local short name). */
+  /** Canonical name from the declaration (npm package name or local short name). */
   readonly name: string;
   /** The resolved plugin export, ready to hand to `processor.use(...)`. */
   readonly plugin: AnyPlugin;
@@ -28,8 +26,6 @@ export interface LoadedPlugin {
 /**
  * The `unified` factory plus the ordered, loaded plugin list.
  *
- * Requirement 5.4: operates in the current CJS server runtime without ESM
- * migration (all modules read via dynamicImport).
  * Requirement 1.6: structural alignment with the GROWI web renderer plugin set.
  */
 export interface LoadedPipeline {
@@ -38,8 +34,7 @@ export interface LoadedPipeline {
 }
 
 /**
- * Load `unified` and every declared plugin via dynamicImport (the only way to
- * consume ESM from the CJS server runtime).
+ * Load `unified` and every declared plugin.
  *
  * This loader's single responsibility is *loading*: the caller decides *what* to
  * load and passes the declarations in (the canonical set lives in plugin-set.ts).
@@ -47,38 +42,33 @@ export interface LoadedPipeline {
  * processor (see BulkExportMarkdownRenderer).
  *
  * Each declaration is resolved as:
- *  - `specifier ?? name` — bare npm specifier, or a relative path (resolved
- *    against `baseDir`) for a reused local GROWI plugin.
+ *  - `load ?? (() => import(name))` — an explicit dynamic-import thunk for a
+ *    reused local GROWI plugin, or a bare npm package import by `name`.
  *  - `exportName ?? 'default'` — which export to use as the plugin.
  *
- * @param baseDir - Resolution base for `dynamicImport` (caller's `__dirname`).
+ * A `load` thunk must use a real `import()` (never a runtime-built string path):
+ * only a literal specifier is rewritten to the correct emitted extension by
+ * `bin/add-js-extensions.ts` and checked by `bin/verify-dist-resolution.ts` in
+ * the production build (see `.claude/rules/import-convention.md`).
+ *
  * @param declarations - Ordered plugin declarations to load.
  */
 export async function loadPlugins(
-  baseDir: string,
   declarations: readonly PluginDeclaration[],
 ): Promise<LoadedPipeline> {
-  const unifiedModule = await dynamicImport<typeof Unified>('unified', baseDir);
+  const unifiedModule = await import('unified');
 
   const plugins = await Promise.all(
     declarations.map(async (declaration): Promise<LoadedPlugin> => {
-      const specifier = declaration.specifier ?? declaration.name;
-      // Relative specifiers point to reused local GROWI plugins; resolve them
-      // against baseDir. Bare specifiers are npm packages dynamicImport resolves.
-      const target = specifier.startsWith('.')
-        ? path.resolve(baseDir, specifier)
-        : specifier;
+      const load = declaration.load ?? (() => import(declaration.name));
       const exportName = declaration.exportName ?? 'default';
 
-      const module = await dynamicImport<Record<string, AnyPlugin>>(
-        target,
-        baseDir,
-      );
+      const module: Record<string, AnyPlugin> = await load();
       const plugin = module[exportName];
       if (plugin == null) {
         throw new Error(
-          `[EsmPluginLoader] "${specifier}" has no export "${exportName}" ` +
-            `(declared for plugin "${declaration.name}" in plugin-set.ts).`,
+          `[EsmPluginLoader] "${declaration.name}" has no export "${exportName}" ` +
+            `(declared in plugin-set.ts).`,
         );
       }
 

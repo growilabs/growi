@@ -44,10 +44,12 @@ test.describe('Click page icons', () => {
   test('Successfully display list of "seen by user"', async ({ page }) => {
     await page.locator('.btn-seen-user').click();
 
-    const imgCount = await page
-      .locator('.user-list-content')
-      .locator('img')
-      .count();
-    expect(imgCount).toBe(1);
+    // The popover content (.user-list-content and its imgs) mounts
+    // asynchronously after the click. Use a web-first assertion that
+    // auto-retries until the count matches, instead of a one-shot .count()
+    // that races the popover mount and reads 0.
+    await expect(page.locator('.user-list-content').locator('img')).toHaveCount(
+      1,
+    );
   });
 });

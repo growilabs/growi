@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { GroupType, type IRevision, type IUser } from '@growi/core';
+import { GroupType, type IUser } from '@growi/core';
 import mongoose, { type HydratedDocument, type Model } from 'mongoose';
 import type { MockInstance } from 'vitest';
 
@@ -8,7 +8,6 @@ import { getInstance } from '^/test/setup/crowi';
 import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { generalXssFilter } from '~/services/general-xss-filter';
@@ -62,7 +61,6 @@ let childForRevert: PageDocument | null;
 describe('PageService', () => {
   let crowi: Crowi;
   let Page: PageModel;
-  let Revision: Model<IRevision>;
   let User: Model<IUser>;
   let ShareLink: ShareLinkModel;
   let generalXssFilterProcessSpy: MockInstance;
@@ -73,7 +71,6 @@ describe('PageService', () => {
 
     User = mongoose.model('User');
     Page = mongoose.model('Page') as PageModel;
-    Revision = mongoose.model<IRevision>('Revision');
     ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
 
     // Create test users if they don't exist
@@ -414,36 +411,52 @@ describe('PageService', () => {
     parentTag = await prisma.tags.findUnique({ where: { name: 'Parent' } });
     childTag = await prisma.tags.findUnique({ where: { name: 'Child' } });
 
-    const existingPageTagRelation = await PageTagRelation.findOne({
-      relatedPage: parentForDuplicate?._id,
+    const existingPageTagRelation = await prisma.pagetagrelations.findFirst({
+      where: { relatedPageId: parentForDuplicate?._id?.toString() },
     });
     if (
       existingPageTagRelation == null &&
       parentForDuplicate &&
       childForDuplicate
     ) {
-      await PageTagRelation.insertMany([
-        { relatedPage: parentForDuplicate, relatedTag: parentTag },
-        { relatedPage: childForDuplicate, relatedTag: childTag },
-      ]);
+      assert(parentTag != null);
+      assert(childTag != null);
+      assert(parentForDuplicate._id != null);
+      assert(childForDuplicate._id != null);
+      await prisma.pagetagrelations.createMany({
+        data: [
+          {
+            relatedPageId: parentForDuplicate._id.toString(),
+            relatedTagId: parentTag._id,
+          },
+          {
+            relatedPageId: childForDuplicate._id.toString(),
+            relatedTagId: childTag._id,
+          },
+        ],
+      });
     }
 
-    const existingRevision = await Revision.findOne({
-      _id: '600d395667536503354cbe91',
+    const existingRevision = await prisma.revisions.findUnique({
+      where: { id: '600d395667536503354cbe91' },
     });
     if (existingRevision == null && parentForDuplicate && childForDuplicate) {
-      await Revision.insertMany([
-        {
-          _id: '600d395667536503354cbe91',
-          pageId: parentForDuplicate._id,
-          body: 'duplicateBody',
-        },
-        {
-          _id: '600d395667536503354cbe92',
-          pageId: childForDuplicate._id,
-          body: 'duplicateChildBody',
-        },
-      ]);
+      assert(parentForDuplicate._id != null);
+      assert(childForDuplicate._id != null);
+      await prisma.revisions.createMany({
+        data: [
+          {
+            id: '600d395667536503354cbe91',
+            pageId: parentForDuplicate._id.toString(),
+            body: 'duplicateBody',
+          },
+          {
+            id: '600d395667536503354cbe92',
+            pageId: childForDuplicate._id.toString(),
+            body: 'duplicateChildBody',
+          },
+        ],
+      });
     }
 
     generalXssFilterProcessSpy = vi.spyOn(generalXssFilter, 'process');

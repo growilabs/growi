@@ -1,6 +1,6 @@
 {
   "name": "@growi/app",
-  "version": "8.0.1",
+  "version": "8.0.2-RC.0",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -102,7 +102,6 @@
     "@codemirror/merge": "^6.8.0",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.42.1",
-    "@cspell/dynamic-import": "^8.15.4",
     "@elastic/elasticsearch8": "npm:@elastic/elasticsearch@^8.18.2",
     "@elastic/elasticsearch9": "npm:@elastic/elasticsearch@^9.0.3",
     "@godaddy/terminus": "^4.9.0",

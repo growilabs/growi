@@ -1,6 +1,6 @@
 {
   "name": "growi",
-  "version": "8.0.1",
+  "version": "8.0.2-RC.0",
   "type": "module",
   "description": "Team collaboration software using markdown",
   "license": "MIT",
