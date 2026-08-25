@@ -19,7 +19,10 @@ import {
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
-import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
+import {
+  certifySharedPageAttachmentMiddleware,
+  type RequestToAllowShareLink,
+} from '../../middlewares/certify-shared-page-attachment';
 import { Attachment, type IAttachmentDocument } from '../../models/attachment';
 import ApiResponse from '../../util/apiResponse';
 
@@ -36,6 +39,7 @@ interface PageModel {
 type LocalsAfterDataInjection = { attachment: IAttachmentDocument };
 
 type RetrieveAttachmentFromIdParamRequest = CrowiProperties &
+  RequestToAllowShareLink &
   Request<{ id: string }, any, any, any, LocalsAfterDataInjection>;
 
 type RetrieveAttachmentFromIdParamResponse = Response<
@@ -58,8 +62,12 @@ export const retrieveAttachmentFromIdParam = async (
 
   const user = req.user;
 
-  // check viewer has permission
-  if (user != null && attachment.page != null) {
+  // Check viewer has permission, for both logged-in users and guests.
+  // Skip only when the request is already certified via a valid share link:
+  // certifySharedPageAttachmentMiddleware binds the fileId to that share
+  // link's page (see validateAttachment), so re-running the viewer check
+  // here would incorrectly reject a non-member share-link viewer.
+  if (!req.isSharedPage && attachment.page != null) {
     const Page = mongoose.model<IPage, PageModel>('Page');
     const isAccessible = await Page.isAccessiblePageByViewer(
       getIdStringForRef(attachment.page),
