@@ -5,7 +5,7 @@ import {
   type IRevision,
   type IUser,
 } from '@growi/core';
-import type { Model } from 'mongoose';
+import type { HydratedDocument, Model } from 'mongoose';
 import mongoose from 'mongoose';
 
 import { getInstance } from '^/test/setup/crowi';
@@ -15,18 +15,12 @@ import ExternalUserGroup from '~/features/external-user-group/server/models/exte
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { PageActionType } from '~/interfaces/page-operation';
-import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
   PageOperationModel,
 } from '~/server/models/page-operation';
-import PageTagRelation from '~/server/models/page-tag-relation';
-import type {
-  IRevisionDocument,
-  IRevisionModel,
-} from '~/server/models/revision';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { generalXssFilter } from '~/services/general-xss-filter';
@@ -59,7 +53,6 @@ describe('PageService page operations with non-public pages', () => {
   let externalGroupIdC: mongoose.Types.ObjectId;
   let crowi: Crowi;
   let Page: PageModel;
-  let Revision: IRevisionModel;
   let User: Model<IUser>;
   let PageOperation: PageOperationModel;
   let generalXssFilterProcessSpy: ReturnType<typeof vi.spyOn>;
@@ -191,7 +184,6 @@ describe('PageService page operations with non-public pages', () => {
 
     User = mongoose.model('User');
     Page = mongoose.model<IPage, PageModel>('Page');
-    Revision = mongoose.model<IRevision, IRevisionModel>('Revision');
     PageOperation = mongoose.model<IPageOperation, PageOperationModel>(
       'PageOperation',
     );
@@ -741,71 +733,73 @@ describe('PageService page operations with non-public pages', () => {
         grantedUsers: [npDummyUser2._id],
       },
     ]);
-    await Revision.insertMany([
-      {
-        _id: revisionIdDuplicate1,
-        body: 'np_duplicate1',
-        format: 'markdown',
-        pageId: pageIdDuplicate1,
-        author: npDummyUser1._id,
-      },
-      {
-        _id: revisionIdDuplicate2,
-        body: 'np_duplicate2',
-        format: 'markdown',
-        pageId: pageIdDuplicate2,
-        author: npDummyUser2._id,
-      },
-      {
-        _id: revisionIdDuplicate3,
-        body: 'np_duplicate3',
-        format: 'markdown',
-        pageId: pageIdDuplicate3,
-        author: npDummyUser2._id,
-      },
-      {
-        _id: revisionIdDuplicate4,
-        body: 'np_duplicate4',
-        format: 'markdown',
-        pageId: pageIdDuplicate4,
-        author: npDummyUser2._id,
-      },
-      {
-        _id: revisionIdDuplicate5,
-        body: 'np_duplicate5',
-        format: 'markdown',
-        pageId: pageIdDuplicate5,
-        author: npDummyUser2._id,
-      },
-      {
-        _id: revisionIdDuplicate6,
-        body: 'np_duplicate6',
-        format: 'markdown',
-        pageId: pageIdDuplicate6,
-        author: npDummyUser1._id,
-      },
-      {
-        _id: revisionIdDuplicate7,
-        body: 'np_duplicate7',
-        format: 'markdown',
-        pageId: pageIdDuplicate7,
-        author: npDummyUser1._id,
-      },
-      {
-        _id: revisionIdDuplicate8,
-        body: 'np_duplicate8',
-        format: 'markdown',
-        pageId: pageIdDuplicate8,
-        author: npDummyUser3._id,
-      },
-      {
-        _id: revisionIdDuplicate9,
-        body: 'np_duplicate9',
-        format: 'markdown',
-        pageId: pageIdDuplicate9,
-        author: npDummyUser2._id,
-      },
-    ]);
+    await prisma.revisions.createMany({
+      data: [
+        {
+          id: revisionIdDuplicate1.toString(),
+          body: 'np_duplicate1',
+          format: 'markdown',
+          pageId: pageIdDuplicate1.toString(),
+          authorId: npDummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdDuplicate2.toString(),
+          body: 'np_duplicate2',
+          format: 'markdown',
+          pageId: pageIdDuplicate2.toString(),
+          authorId: npDummyUser2._id.toString(),
+        },
+        {
+          id: revisionIdDuplicate3.toString(),
+          body: 'np_duplicate3',
+          format: 'markdown',
+          pageId: pageIdDuplicate3.toString(),
+          authorId: npDummyUser2._id.toString(),
+        },
+        {
+          id: revisionIdDuplicate4.toString(),
+          body: 'np_duplicate4',
+          format: 'markdown',
+          pageId: pageIdDuplicate4.toString(),
+          authorId: npDummyUser2._id.toString(),
+        },
+        {
+          id: revisionIdDuplicate5.toString(),
+          body: 'np_duplicate5',
+          format: 'markdown',
+          pageId: pageIdDuplicate5.toString(),
+          authorId: npDummyUser2._id.toString(),
+        },
+        {
+          id: revisionIdDuplicate6.toString(),
+          body: 'np_duplicate6',
+          format: 'markdown',
+          pageId: pageIdDuplicate6.toString(),
+          authorId: npDummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdDuplicate7.toString(),
+          body: 'np_duplicate7',
+          format: 'markdown',
+          pageId: pageIdDuplicate7.toString(),
+          authorId: npDummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdDuplicate8.toString(),
+          body: 'np_duplicate8',
+          format: 'markdown',
+          pageId: pageIdDuplicate8.toString(),
+          authorId: npDummyUser3._id.toString(),
+        },
+        {
+          id: revisionIdDuplicate9.toString(),
+          body: 'np_duplicate9',
+          format: 'markdown',
+          pageId: pageIdDuplicate9.toString(),
+          authorId: npDummyUser2._id.toString(),
+        },
+      ],
+    });
 
     /**
      * Delete
@@ -1006,50 +1000,52 @@ describe('PageService page operations with non-public pages', () => {
         status: Page.STATUS_DELETED,
       },
     ]);
-    await Revision.insertMany([
-      {
-        _id: revisionIdRevert1,
-        pageId: pageIdRevert1,
-        body: 'np_revert1',
-        format: 'markdown',
-        author: dummyUser1._id,
-      },
-      {
-        _id: revisionIdRevert2,
-        pageId: pageIdRevert2,
-        body: 'np_revert2',
-        format: 'markdown',
-        author: npDummyUser1,
-      },
-      {
-        _id: revisionIdRevert3,
-        pageId: pageIdRevert3,
-        body: 'np_revert3',
-        format: 'markdown',
-        author: npDummyUser1,
-      },
-      {
-        _id: revisionIdRevert4,
-        pageId: pageIdRevert4,
-        body: 'np_revert4',
-        format: 'markdown',
-        author: npDummyUser1,
-      },
-      {
-        _id: revisionIdRevert5,
-        pageId: pageIdRevert5,
-        body: 'np_revert5',
-        format: 'markdown',
-        author: npDummyUser1,
-      },
-      {
-        _id: revisionIdRevert6,
-        pageId: pageIdRevert6,
-        body: 'np_revert6',
-        format: 'markdown',
-        author: npDummyUser1,
-      },
-    ]);
+    await prisma.revisions.createMany({
+      data: [
+        {
+          id: revisionIdRevert1.toString(),
+          pageId: pageIdRevert1.toString(),
+          body: 'np_revert1',
+          format: 'markdown',
+          authorId: dummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdRevert2.toString(),
+          pageId: pageIdRevert2.toString(),
+          body: 'np_revert2',
+          format: 'markdown',
+          authorId: npDummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdRevert3.toString(),
+          pageId: pageIdRevert3.toString(),
+          body: 'np_revert3',
+          format: 'markdown',
+          authorId: npDummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdRevert4.toString(),
+          pageId: pageIdRevert4.toString(),
+          body: 'np_revert4',
+          format: 'markdown',
+          authorId: npDummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdRevert5.toString(),
+          pageId: pageIdRevert5.toString(),
+          body: 'np_revert5',
+          format: 'markdown',
+          authorId: npDummyUser1._id.toString(),
+        },
+        {
+          id: revisionIdRevert6.toString(),
+          pageId: pageIdRevert6.toString(),
+          body: 'np_revert6',
+          format: 'markdown',
+          authorId: npDummyUser1._id.toString(),
+        },
+      ],
+    });
 
     await prisma.tags.createMany({
       data: [
@@ -1058,18 +1054,20 @@ describe('PageService page operations with non-public pages', () => {
       ],
     });
 
-    await PageTagRelation.insertMany([
-      {
-        relatedPage: pageIdRevert1,
-        relatedTag: tagIdRevert1,
-        isPageTrashed: true,
-      },
-      {
-        relatedPage: pageIdRevert2,
-        relatedTag: tagIdRevert2,
-        isPageTrashed: true,
-      },
-    ]);
+    await prisma.pagetagrelations.createMany({
+      data: [
+        {
+          relatedPageId: pageIdRevert1.toString(),
+          relatedTagId: tagIdRevert1.toString(),
+          isPageTrashed: true,
+        },
+        {
+          relatedPageId: pageIdRevert2.toString(),
+          relatedTagId: tagIdRevert2.toString(),
+          isPageTrashed: true,
+        },
+      ],
+    });
 
     /*
      * Revert - dedicated GRANT_RESTRICTED page for the v4-process activity
@@ -1088,15 +1086,15 @@ describe('PageService page operations with non-public pages', () => {
         descendantCount: 0,
       },
     ]);
-    await Revision.insertMany([
-      {
-        _id: revisionIdRevertActivityV4,
-        pageId: pageIdRevertActivityV4,
+    await prisma.revisions.create({
+      data: {
+        id: revisionIdRevertActivityV4.toString(),
+        pageId: pageIdRevertActivityV4.toString(),
         body: 'np_revert_activity_v4',
         format: 'markdown',
-        author: npDummyUser1,
+        authorId: npDummyUser1._id.toString(),
       },
-    ]);
+    });
   });
 
   describe('create', () => {
@@ -1575,7 +1573,7 @@ describe('PageService page operations with non-public pages', () => {
       const _page = await Page.findOne({
         path: '/np_duplicate1',
         grant: Page.GRANT_RESTRICTED,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
@@ -1587,8 +1585,8 @@ describe('PageService page operations with non-public pages', () => {
       await duplicate(_page, newPagePath, npDummyUser1, false, false);
 
       const duplicatedPage = await Page.findOne({ path: newPagePath });
-      const duplicatedRevision = await Revision.findOne({
-        pageId: duplicatedPage?._id,
+      const duplicatedRevision = await prisma.revisions.findFirst({
+        where: { pageId: duplicatedPage?._id.toString() },
       });
       expect(generalXssFilterProcessSpy).toHaveBeenCalled();
       expect(duplicatedPage).toBeTruthy();
@@ -1596,7 +1594,7 @@ describe('PageService page operations with non-public pages', () => {
       expect(duplicatedPage?.grant).toBe(_page?.grant);
       expect(duplicatedPage?.parent).toBeNull();
       expect(duplicatedPage?.parent).toStrictEqual(_page?.parent);
-      expect(duplicatedPage?.revision).toStrictEqual(duplicatedRevision?._id);
+      expect(duplicatedPage?.revision?.toString()).toBe(duplicatedRevision?.id);
       expect(duplicatedRevision?.body).toBe(_revision?.body);
     });
 
@@ -1607,7 +1605,7 @@ describe('PageService page operations with non-public pages', () => {
         path: _path1,
         parent: rootPage._id,
         grantedGroups: { $elemMatch: { item: groupIdA } },
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
@@ -1615,7 +1613,7 @@ describe('PageService page operations with non-public pages', () => {
         path: _path2,
         parent: _page1?._id,
         grantedGroups: { $elemMatch: { item: groupIdB } },
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
@@ -1631,13 +1629,13 @@ describe('PageService page operations with non-public pages', () => {
 
       const duplicatedPage1 = await Page.findOne({
         path: newPagePath,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const duplicatedPage2 = await Page.findOne({
         path: '/dup_np_duplicate2/np_duplicate3',
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
@@ -1675,21 +1673,21 @@ describe('PageService page operations with non-public pages', () => {
         path: _path1,
         parent: rootPage._id,
         grant: Page.GRANT_PUBLIC,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const _page2 = await Page.findOne({
         path: _path2,
         grant: Page.GRANT_RESTRICTED,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const _page3 = await Page.findOne({
         path: _path3,
         grant: Page.GRANT_PUBLIC,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
@@ -1707,19 +1705,19 @@ describe('PageService page operations with non-public pages', () => {
 
       const duplicatedPage1 = await Page.findOne({
         path: newPagePath,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const duplicatedPage2 = await Page.findOne({
         path: '/dup_np_duplicate4/np_duplicate5',
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const duplicatedPage3 = await Page.findOne({
         path: '/dup_np_duplicate4/np_duplicate6',
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
@@ -1747,7 +1745,7 @@ describe('PageService page operations with non-public pages', () => {
       const _page1 = await Page.findOne({
         path: _path1,
         parent: rootPage._id,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
@@ -1764,19 +1762,19 @@ describe('PageService page operations with non-public pages', () => {
 
       const duplicatedPage1 = await Page.findOne({
         path: newPagePath,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const duplicatedPage2 = await Page.findOne({
         path: '/dup_np_duplicate7/np_duplicate8',
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const duplicatedPage3 = await Page.findOne({
         path: '/dup_np_duplicate7/np_duplicate9',
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
@@ -1803,21 +1801,21 @@ describe('PageService page operations with non-public pages', () => {
       const _page1 = await Page.findOne({
         path: _path1,
         parent: rootPage._id,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const _page2 = await Page.findOne({
         path: _path2,
         parent: _page1?._id,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const _page3 = await Page.findOne({
         path: _path3,
         parent: _page1?._id,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
@@ -1836,19 +1834,19 @@ describe('PageService page operations with non-public pages', () => {
 
       const duplicatedPage1 = await Page.findOne({
         path: newPagePath,
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const duplicatedPage2 = await Page.findOne({
         path: '/dup2_np_duplicate7/np_duplicate8',
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
       const duplicatedPage3 = await Page.findOne({
         path: '/dup2_np_duplicate7/np_duplicate9',
-      }).populate<{ revision: IRevisionDocument }>({
+      }).populate<{ revision: HydratedDocument<IRevision> }>({
         path: 'revision',
         model: 'Revision',
       });
@@ -2218,14 +2216,18 @@ describe('PageService page operations with non-public pages', () => {
         status: Page.STATUS_DELETED,
         grant: Page.GRANT_RESTRICTED,
       });
-      const revision = await Revision.findOne({ pageId: trashedPage?._id });
+      const revision = await prisma.revisions.findFirst({
+        where: { pageId: trashedPage?._id.toString() },
+      });
       const tag = await prisma.tags.findUnique({
         where: { name: 'np_revertTag1' },
       });
-      const deletedPageTagRelation = await PageTagRelation.findOne({
-        relatedPage: trashedPage?._id,
-        relatedTag: tag?._id,
-        isPageTrashed: true,
+      const deletedPageTagRelation = await prisma.pagetagrelations.findFirst({
+        where: {
+          relatedPageId: trashedPage?._id.toString(),
+          relatedTagId: tag?._id,
+          isPageTrashed: true,
+        },
       });
       expect(trashedPage).toBeTruthy();
       expect(revision).toBeTruthy();
@@ -2241,9 +2243,11 @@ describe('PageService page operations with non-public pages', () => {
       const deltedPageBeforeRevert = await Page.findOne({
         path: '/trash/np_revert1',
       });
-      const pageTagRelation = await PageTagRelation.findOne<IPageTagRelation>({
-        relatedPage: revertedPage?._id,
-        relatedTag: tag?._id,
+      const pageTagRelation = await prisma.pagetagrelations.findFirst({
+        where: {
+          relatedPageId: revertedPage?._id.toString(),
+          relatedTagId: tag?._id,
+        },
       });
       expect(revertedPage).toBeTruthy();
       expect(pageTagRelation).toBeTruthy();
@@ -2263,14 +2267,18 @@ describe('PageService page operations with non-public pages', () => {
         status: Page.STATUS_DELETED,
         grant: Page.GRANT_USER_GROUP,
       });
-      const revision = await Revision.findOne({ pageId: trashedPage?._id });
+      const revision = await prisma.revisions.findFirst({
+        where: { pageId: trashedPage?._id.toString() },
+      });
       const tag = await prisma.tags.findUnique({
         where: { name: 'np_revertTag2' },
       });
-      const deletedPageTagRelation = await PageTagRelation.findOne({
-        relatedPage: trashedPage?._id,
-        relatedTag: tag?._id,
-        isPageTrashed: true,
+      const deletedPageTagRelation = await prisma.pagetagrelations.findFirst({
+        where: {
+          relatedPageId: trashedPage?._id.toString(),
+          relatedTagId: tag?._id,
+          isPageTrashed: true,
+        },
       });
       expect(trashedPage).toBeTruthy();
       expect(revision).toBeTruthy();
@@ -2284,9 +2292,11 @@ describe('PageService page operations with non-public pages', () => {
 
       const revertedPage = await Page.findOne({ path: '/np_revert2' });
       const trashedPageBR = await Page.findOne({ path: beforeRevertPath });
-      const pageTagRelation = await PageTagRelation.findOne<IPageTagRelation>({
-        relatedPage: revertedPage?._id,
-        relatedTag: tag?._id,
+      const pageTagRelation = await prisma.pagetagrelations.findFirst({
+        where: {
+          relatedPageId: revertedPage?._id.toString(),
+          relatedTagId: tag?._id,
+        },
       });
       expect(revertedPage).toBeTruthy();
       expect(pageTagRelation).toBeTruthy();
@@ -2317,8 +2327,12 @@ describe('PageService page operations with non-public pages', () => {
         status: Page.STATUS_DELETED,
         grant: Page.GRANT_RESTRICTED,
       });
-      const revision1 = await Revision.findOne({ pageId: trashedPage1?._id });
-      const revision2 = await Revision.findOne({ pageId: trashedPage2?._id });
+      const revision1 = await prisma.revisions.findFirst({
+        where: { pageId: trashedPage1?._id.toString() },
+      });
+      const revision2 = await prisma.revisions.findFirst({
+        where: { pageId: trashedPage2?._id.toString() },
+      });
       expect(trashedPage1).toBeTruthy();
       expect(trashedPage2).toBeTruthy();
       expect(revision1).toBeTruthy();
@@ -2337,9 +2351,11 @@ describe('PageService page operations with non-public pages', () => {
       // AR => After Revert
       const trashedPage1AR = await Page.findOne({ path: beforeRevertPath1 });
       const trashedPage2AR = await Page.findOne({ path: beforeRevertPath2 });
-      const revision1AR = await Revision.findOne({ pageId: revertedPage?._id });
-      const revision2AR = await Revision.findOne({
-        pageId: trashedPage2AR?._id,
+      const revision1AR = await prisma.revisions.findFirst({
+        where: { pageId: revertedPage?._id.toString() },
+      });
+      const revision2AR = await prisma.revisions.findFirst({
+        where: { pageId: trashedPage2AR?._id.toString() },
       });
 
       expect(revertedPage).toBeTruthy();
@@ -2369,8 +2385,12 @@ describe('PageService page operations with non-public pages', () => {
         grantedGroups: { $elemMatch: { item: groupIdB } },
       });
       const nonExistantPage3 = await Page.findOne({ path: beforeRevertPath3 }); // not exist
-      const revision1 = await Revision.findOne({ pageId: trashedPage1?._id });
-      const revision2 = await Revision.findOne({ pageId: trashedPage2?._id });
+      const revision1 = await prisma.revisions.findFirst({
+        where: { pageId: trashedPage1?._id.toString() },
+      });
+      const revision2 = await prisma.revisions.findFirst({
+        where: { pageId: trashedPage2?._id.toString() },
+      });
       expect(trashedPage1).toBeTruthy();
       expect(trashedPage2).toBeTruthy();
       expect(revision1).toBeTruthy();

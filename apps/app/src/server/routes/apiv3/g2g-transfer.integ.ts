@@ -371,10 +371,22 @@ describe('receive route POST / — unique conflict gate', () => {
     const response = await postArchive(zipPath, ['users', 'usergroups']);
 
     expect(response.status).toBe(200);
+    // Matched whole, not field by field: the body is what crosses to the source GROWI and
+    // on to the source operator's browser, so a field appearing here that nobody decided
+    // to send — the rescue's password hashes above all — has to fail this test.
     expect(response.body).toEqual({
       message: 'Successfully started to receive transfer data.',
       // The source reads this to tell a finished transfer from a half-finished one.
       failedCollections: [],
+      // The import ran to the end, so it could name what failed — nothing did.
+      importAborted: false,
+      // This transfer appends rather than replaces, so the receiving side's replace
+      // procedure has nothing to do: nobody was rescued, no clean-up ran, and the
+      // destination's maintenance mode was never touched.
+      rescue: null,
+      rescueApplied: false,
+      postProcessFailures: [],
+      maintenanceModeReleased: false,
     });
 
     // The import really ran: both archive documents are now in the destination.

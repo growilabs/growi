@@ -11,6 +11,10 @@ on:
       - tmp-mergify/merge-queue/**
     paths:
       - apps/growi-vault-manager/**
+      # vault-manager's only workspace dependencies. They are compiled into the
+      # published image, so a change here has to run these tests too.
+      - packages/core/**
+      - packages/logger/**
       - .github/workflows/ci-vault.yml
 
 concurrency:

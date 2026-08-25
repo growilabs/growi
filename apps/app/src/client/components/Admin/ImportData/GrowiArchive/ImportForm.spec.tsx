@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import type { Socket } from 'socket.io-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mock } from 'vitest-mock-extended';
@@ -106,5 +112,40 @@ describe('ImportFormWrapperFc', () => {
     );
 
     expect(apiv3Post).not.toHaveBeenCalled();
+  });
+
+  it('still offers all three import methods for a collection the G2G screen narrows to two (this screen is out of scope for that narrowing)', () => {
+    // Requirement 1.4 restricts choices only on the G2G screen
+    // (G2GDataTransferExportForm.spec.tsx pins the narrowed side of this same
+    // contract for `usergroups`). This manual zip import screen shares
+    // ImportCollectionItem but never passes it `allowedModes`, so it must keep
+    // offering "Flush and Insert" here.
+    render(
+      <ImportFormWrapperFc
+        fileName="archive.zip"
+        innerFileStats={[
+          {
+            fileName: 'usergroups.json',
+            collectionName: 'usergroups',
+            size: 1,
+          },
+        ]}
+        onDiscard={vi.fn()}
+      />,
+    );
+
+    const card = screen
+      .getByLabelText('usergroups')
+      .closest('.card') as HTMLElement | null;
+    if (card == null) {
+      throw new Error('Expected a .card ancestor for usergroups');
+    }
+    // The dropdown starts closed; its menu is still in the DOM but aria-hidden,
+    // so `{ hidden: true }` is needed to find it by role.
+    const menu = within(card).getByRole('menu', { hidden: true });
+
+    expect(within(menu).getByText('Insert')).toBeInTheDocument();
+    expect(within(menu).getByText('Upsert')).toBeInTheDocument();
+    expect(within(menu).getByText('Flush and Insert')).toBeInTheDocument();
   });
 });
