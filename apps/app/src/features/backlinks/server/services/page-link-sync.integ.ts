@@ -303,3 +303,62 @@ describe('reResolveByToPath (integration)', () => {
     );
   });
 });
+
+describe('PageLink.repointInboundLinks (integration)', () => {
+  let createdLinks: Types.ObjectId[] = [];
+
+  afterEach(async () => {
+    await PageLink.deleteMany({ _id: { $in: createdLinks } });
+    createdLinks = [];
+  });
+
+  const createLink = async (row: IPageLink): Promise<void> => {
+    const link = await PageLink.create(row);
+    createdLinks.push(link._id);
+  };
+
+  const inboundRows = (toPath: string) =>
+    PageLink.find({ toPath })
+      .select('fromPage toPage -_id')
+      .sort({ fromPage: 1 })
+      .lean();
+
+  // A bystander row at an unrelated path: its survival is what proves the call
+  // wrote nothing, rather than matching the whole collection.
+  const seedBystander = async (): Promise<{
+    source: Types.ObjectId;
+    target: Types.ObjectId;
+  }> => {
+    const source = new Types.ObjectId();
+    const target = new Types.ObjectId();
+    await createLink({
+      fromPage: source,
+      toPath: '/repoint-guard/bystander',
+      toPage: target,
+    });
+    return { source, target };
+  };
+
+  // The casts are the point of these tests: the guard exists because callers can
+  // violate the declared type — a lean page document whose `path` was not
+  // selected yields `undefined`, and an unvalidated payload can yield an object.
+  it.each([
+    // Harmless but silent without the guard: mongoose 6 casts an `undefined`
+    // filter value to one that matches nothing, so the caller's bug goes
+    // unnoticed instead of surfacing.
+    ['undefined', undefined as unknown as string],
+    // Actively destructive without the guard: matches every row in the
+    // collection, so an unrelated path's cache is rewritten.
+    ['a query operator object', { $ne: null } as unknown as string],
+  ])('rejects %s as toPath, leaving every row untouched', async (_label, badToPath) => {
+    const { source, target } = await seedBystander();
+
+    await expect(
+      PageLink.repointInboundLinks(badToPath, null),
+    ).rejects.toThrow();
+
+    expect(await inboundRows('/repoint-guard/bystander')).toEqual([
+      { fromPage: source, toPage: target },
+    ]);
+  });
+});

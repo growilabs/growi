@@ -90,6 +90,17 @@ pageLinkSchema.statics.repointInboundLinks = async function (
   toPath: string,
   toPage: Types.ObjectId | null,
 ): Promise<void> {
+  // `toPath` becomes a query filter, so a value that is not a plain string turns
+  // this into a collection-wide write: an operator object ({ $ne: null }) matches
+  // every row. Callers can reach here with one despite the declared type — an
+  // unvalidated payload, or a lean page document whose `path` was not selected.
+  // Refuse rather than write; there is no correct partial answer.
+  if (typeof toPath !== 'string' || toPath.length === 0) {
+    throw new Error(
+      `repointInboundLinks requires a non-empty path string, received ${typeof toPath}`,
+    );
+  }
+
   // Skip — not delete — a row whose source is the target itself: `dropSelfLinks`
   // keeps that invariant outbound, and row existence is owned by
   // `replaceOutboundLinks`.

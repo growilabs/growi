@@ -140,6 +140,9 @@ describe('reResolveByToPath', () => {
 
     await reResolveByToPath('/target');
 
+    // Pin the path handed to the resolver: without this, resolving the wrong
+    // path still reads '/target' out of the stubbed map and passes.
+    expect(resolveToPages).toHaveBeenCalledWith(['/target']);
     expect(PageLink.repointInboundLinks).toHaveBeenCalledTimes(1);
     expect(PageLink.repointInboundLinks).toHaveBeenCalledWith(
       '/target',
@@ -154,6 +157,7 @@ describe('reResolveByToPath', () => {
 
     await reResolveByToPath('/target');
 
+    expect(resolveToPages).toHaveBeenCalledWith(['/target']);
     expect(PageLink.repointInboundLinks).toHaveBeenCalledWith('/target', null);
   });
 });
