@@ -157,7 +157,7 @@ describe('GET /info', () => {
       expect(response.body.isNotFound).toBe(false);
     });
 
-    it('should return 403 when page is forbidden', async () => {
+    it('should return 404 when page is forbidden', async () => {
       const mockSpy = vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer');
       mockSpy.mockResolvedValue({
         data: null,
@@ -173,11 +173,14 @@ describe('GET /info', () => {
         .get('/info')
         .query({ pageId: validPageId });
 
-      expect(response.status).toBe(403);
+      // A requester without read access must not be able to tell a forbidden
+      // page apart from a missing one. See
+      // apps/app/.claude/rules/page-write-action-403-404.md.
+      expect(response.status).toBe(404);
       expect(response.body).toHaveProperty('error');
     });
 
-    it('should return 200 when page is not found but not forbidden', async () => {
+    it('should return 404 (same status) when page is not found and not forbidden', async () => {
       const mockSpy = vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer');
       mockSpy.mockResolvedValue({
         data: null,
@@ -193,10 +196,8 @@ describe('GET /info', () => {
         .get('/info')
         .query({ pageId: validPageId });
 
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('isNotFound');
-      expect(response.body.isNotFound).toBe(true);
-      expect(response.body.isForbidden).toBe(false);
+      expect(response.status).toBe(404);
+      expect(response.body).toHaveProperty('error');
     });
   });
 
