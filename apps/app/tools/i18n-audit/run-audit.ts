@@ -292,16 +292,33 @@ const runCliCommand = (args: readonly string[]): string => {
   }
 };
 
-/** Runs `run` and converts a thrown error into a {@link CheckResult} error, per Error Handling: a parse or execution failure is always "fail", never treated as 0/pass. */
+// `i18next-cli`'s child-process stdout capture is intermittently truncated
+// before the summary line is written -- reproduced locally (~1 in 15-20 runs
+// of a single `status <locale>` invocation) and in real CI (mergify merge
+// queue check for PR #11750, ci-app-lint run 32968568349). This is an
+// upstream stdout-flush race in the CLI's own exit path (observed: the
+// captured text cuts off mid-list of ✓/✗ lines, well before the "Summary:"
+// line at the very end -- not a wording change, not a genuinely malformed
+// run), not a bug in Stdout Parser's regexes. Retrying re-executes the CLI
+// for a fresh capture; it never fabricates a result, so "a parse failure
+// must never be treated as 0/pass" still holds -- every attempt must fail
+// for `measureCheck` to report an error.
+const MAX_MEASURE_ATTEMPTS = 3;
+
+/** Runs `run` and converts a thrown error into a {@link CheckResult} error, per Error Handling: a parse or execution failure is always "fail", never treated as 0/pass. Retries up to {@link MAX_MEASURE_ATTEMPTS} times, since `run` re-invokes the CLI and a failure is often the transient truncation described above. */
 const measureCheck = (label: string, run: () => number): CheckResult => {
-  try {
-    return { status: 'ok', value: run() };
-  } catch (error) {
-    return {
-      status: 'error',
-      message: `${label}: ${(error as Error).message}`,
-    };
+  let lastError: Error | undefined;
+  for (let attempt = 1; attempt <= MAX_MEASURE_ATTEMPTS; attempt += 1) {
+    try {
+      return { status: 'ok', value: run() };
+    } catch (error) {
+      lastError = error as Error;
+    }
   }
+  return {
+    status: 'error',
+    message: `${label}: ${(lastError as Error).message} (failed on all ${MAX_MEASURE_ATTEMPTS} attempts)`,
+  };
 };
 
 const measureAll = (): AuditMeasurements => {

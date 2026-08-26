@@ -396,4 +396,66 @@ describe('runNormalMode / runUpdateBaselineMode (fixture baseline.json + fixture
     expect(process.exitCode).not.toBe(0);
     expect(fs.existsSync(baselinePath)).toBe(false);
   });
+
+  it('retries a transient truncated-stdout parse failure and still passes once a later attempt returns clean output (reproduces the mergify ci-app-lint 32968568349 failure)', () => {
+    fs.writeFileSync(
+      baselinePath,
+      JSON.stringify({
+        unusedKeys: 80,
+        missingByLocale: { ja_JP: 0, zh_CN: 0, fr_FR: 0, ko_KR: 0 },
+      }),
+    );
+
+    // fr_FR's `status fr_FR` call: truncated (no "Summary:" line) on the
+    // first invocation, then a clean capture on the second -- exactly the
+    // shape observed for real `i18next-cli` output truncated mid-list.
+    let frFrCallCount = 0;
+    mockExecFileSync.mockImplementation((_command: string, args: string[]) => {
+      if (args.includes('--unused')) {
+        return UNUSED_STDOUT;
+      }
+      const locale = args[args.length - 1];
+      if (locale === 'status') {
+        return STATUS_STDOUT_ZERO_MISSING;
+      }
+      if (locale === 'fr_FR') {
+        frFrCallCount += 1;
+        if (frFrCallCount === 1) {
+          return '\ni18next Project Status\n------------------------\n  ✓ some.other.key\n  ✓ ';
+        }
+      }
+      return localeStdout(locale, 0);
+    });
+
+    runNormalMode(baselinePath);
+
+    expect(process.exitCode).toBe(0);
+    expect(frFrCallCount).toBe(2);
+  });
+
+  it('reports a failure (never a silent pass) when every retry attempt keeps returning truncated/unparseable stdout', () => {
+    let callCount = 0;
+    mockExecFileSync.mockImplementation((_command: string, args: string[]) => {
+      if (args.includes('--unused')) {
+        return UNUSED_STDOUT;
+      }
+      const locale = args[args.length - 1];
+      if (locale === 'status') {
+        return STATUS_STDOUT_ZERO_MISSING;
+      }
+      if (locale === 'ko_KR') {
+        callCount += 1;
+        return '\ni18next Project Status\n------------------------\n  ✓ truncated, no summary line ever\n';
+      }
+      return localeStdout(locale, 0);
+    });
+
+    runUpdateBaselineMode(false, baselinePath);
+
+    expect(process.exitCode).not.toBe(0);
+    expect(fs.existsSync(baselinePath)).toBe(false);
+    // Exactly MAX_MEASURE_ATTEMPTS (3) real re-invocations, not an
+    // unbounded retry loop and not a single un-retried attempt.
+    expect(callCount).toBe(3);
+  });
 });
