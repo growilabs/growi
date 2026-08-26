@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 
 import type { IClearable } from '~/client/interfaces/clearable';
 
-import { SearchUsernameTypeahead } from './SearchUsernameTypeahead';
+import { UsernameTypeahead } from './UsernameTypeahead';
 import type { UsernameSuggestions } from './username-suggestions';
 
 vi.mock('react-i18next', () => ({
@@ -34,7 +34,7 @@ const mockSuggestions = (
 
 const renderTypeahead = (initialUsernames?: string[]) =>
   render(
-    <SearchUsernameTypeahead
+    <UsernameTypeahead
       onChange={vi.fn()}
       useUsernameSuggestions={useFakeSuggestions}
       initialUsernames={initialUsernames}
@@ -42,7 +42,7 @@ const renderTypeahead = (initialUsernames?: string[]) =>
     />,
   );
 
-describe('SearchUsernameTypeahead', () => {
+describe('UsernameTypeahead', () => {
   beforeEach(() => {
     suggestions = EMPTY_SUGGESTIONS;
   });
@@ -164,7 +164,7 @@ describe('SearchUsernameTypeahead', () => {
     expect(getByText('alice')).toBeInTheDocument();
 
     rerender(
-      <SearchUsernameTypeahead
+      <UsernameTypeahead
         onChange={vi.fn()}
         useUsernameSuggestions={useFakeSuggestions}
         initialUsernames={['carol']}
@@ -188,7 +188,7 @@ describe('SearchUsernameTypeahead', () => {
     expect(getByText('bob')).toBeInTheDocument();
 
     rerender(
-      <SearchUsernameTypeahead
+      <UsernameTypeahead
         onChange={vi.fn()}
         useUsernameSuggestions={useFakeSuggestions}
         initialUsernames={['bob']}
@@ -205,7 +205,7 @@ describe('SearchUsernameTypeahead', () => {
     expect(getByText('alice')).toBeInTheDocument();
 
     rerender(
-      <SearchUsernameTypeahead
+      <UsernameTypeahead
         onChange={vi.fn()}
         useUsernameSuggestions={useFakeSuggestions}
         initialUsernames={[]}
@@ -226,7 +226,7 @@ describe('SearchUsernameTypeahead', () => {
     const ref = createRef<IClearable>();
 
     render(
-      <SearchUsernameTypeahead
+      <UsernameTypeahead
         ref={ref}
         onChange={vi.fn()}
         useUsernameSuggestions={useFakeSuggestions}
@@ -260,7 +260,7 @@ describe('SearchUsernameTypeahead', () => {
     const spy = vi.fn(() => EMPTY_SUGGESTIONS);
 
     render(
-      <SearchUsernameTypeahead
+      <UsernameTypeahead
         onChange={vi.fn()}
         useUsernameSuggestions={spy}
         placeholder="placeholder"

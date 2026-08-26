@@ -1,7 +1,6 @@
+import type { UsernameSuggestions } from '~/client/components/UsernameTypeahead';
+import { toUsernameSuggestions } from '~/client/components/UsernameTypeahead';
 import { useSWRxUsernames } from '~/stores/user';
-
-import type { UsernameSuggestions } from './username-suggestions';
-import { toUsernameSuggestions } from './username-suggestions';
 
 /**
  * Source for callers outside the admin pages, backed by `/users/usernames`

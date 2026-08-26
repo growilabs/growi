@@ -4,14 +4,11 @@ import { useTranslation } from 'next-i18next';
 import { Dropdown, DropdownMenu, DropdownToggle } from 'reactstrap';
 
 import { TagsInput } from '~/client/components/PageTags/TagEditModal/TagsInput';
-import {
-  SearchUsernameTypeahead,
-  useRegisteredUsernameSuggestions,
-} from '~/client/components/SearchUsernameTypeahead';
 import { useIsGuestUser } from '~/states/context';
 import { useSWRxUserRelatedGroups } from '~/stores/user';
 
 import type { SearchFilterState } from '../../utils/search-query';
+import { SearchUsernameTypeahead } from './SearchUsernameTypeahead';
 
 import styles from './SearchFilterPanel.module.scss';
 
@@ -60,14 +57,10 @@ const UsernameFilterField = (props: UsernameFilterFieldProps): JSX.Element => {
         Semi-controlled via `initialUsernames`, not `selected`: the typeahead
         keeps each item's `category` internally, which this panel (usernames
         only) can't supply — unlike the fully-controlled TagsInput below.
-
-        The suggestion source must be the registered-user one: this page is open
-        to any logged-in user, and the audit-log source is adminRequired.
       */}
       <SearchUsernameTypeahead
         id={id}
         onChange={onChange}
-        useUsernameSuggestions={useRegisteredUsernameSuggestions}
         initialUsernames={usernames}
         placeholder={placeholder}
       />

@@ -48,23 +48,37 @@ const toUserDataItem = (username: string): UserDataType => ({
   category: Categories.activeUser,
 });
 
-type Props = {
+export type UsernameTypeaheadProps = {
   onChange: (text: string[]) => void;
   // Required, not defaulted — see `UseUsernameSuggestions`.
   useUsernameSuggestions: UseUsernameSuggestions;
   initialUsernames?: string[];
-  // Callers outside the admin pages must supply their own placeholder: the
-  // default key lives in the `admin` i18n namespace, which those pages don't load.
+  // Passed straight through, never defaulted here: any default would have to
+  // name an i18n namespace, and no single namespace is loaded by every caller
+  // (admin pages load ['admin'], the search page ['translation']). The
+  // per-screen wrapper components own that default instead.
   placeholder?: string;
   // Must be unique per instance: rendering this typeahead more than once on a
   // page (e.g. author + editor filters) would otherwise duplicate the DOM id.
   id?: string;
 };
 
-const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
+/**
+ * What a per-screen wrapper accepts and forwards: everything except the
+ * suggestion source, which each wrapper fixes to its own endpoint.
+ *
+ * Named here so the two wrappers share one definition — the `Omit` written out
+ * at each of them would have to be edited twice whenever these props change.
+ */
+export type UsernameTypeaheadOwnProps = Omit<
+  UsernameTypeaheadProps,
+  'useUsernameSuggestions'
+>;
+
+const UsernameTypeaheadSubstance: ForwardRefRenderFunction<
   IClearable,
-  Props
-> = (props: Props, ref) => {
+  UsernameTypeaheadProps
+> = (props: UsernameTypeaheadProps, ref) => {
   const {
     onChange,
     useUsernameSuggestions,
@@ -203,12 +217,12 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
       </span>
       <AsyncTypeahead
         ref={typeaheadRef}
-        id={id ?? 'search-username-typeahead-asynctypeahead'}
+        id={id ?? 'username-typeahead-asynctypeahead'}
         multiple
         delay={400}
         minLength={0}
         filterBy={filterBy}
-        placeholder={placeholder ?? t('admin:audit_log_management.username')}
+        placeholder={placeholder}
         isLoading={isLoading}
         options={allUser}
         selected={selectedItems}
@@ -221,6 +235,4 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   );
 };
 
-export const SearchUsernameTypeahead = forwardRef(
-  SearchUsernameTypeaheadSubstance,
-);
+export const UsernameTypeahead = forwardRef(UsernameTypeaheadSubstance);

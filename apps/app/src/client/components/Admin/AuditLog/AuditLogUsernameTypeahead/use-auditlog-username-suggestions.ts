@@ -1,7 +1,6 @@
+import type { UsernameSuggestions } from '~/client/components/UsernameTypeahead';
+import { toUsernameSuggestions } from '~/client/components/UsernameTypeahead';
 import { useSWRxAuditlogSuggestions } from '~/stores/activity';
-
-import type { UsernameSuggestions } from './username-suggestions';
-import { toUsernameSuggestions } from './username-suggestions';
 
 /**
  * Admin-only source, backed by `/activity/suggestions` (`adminRequired`).
@@ -10,7 +9,7 @@ import { toUsernameSuggestions } from './username-suggestions';
  * exist as users — what an audit-log filter needs, and why it cannot be used
  * outside the admin pages.
  */
-export const useAuditlogUsernameSuggestions = (
+export const useAuditLogUsernameSuggestions = (
   keyword: string,
 ): UsernameSuggestions => {
   const { data, error, isLoading } = useSWRxAuditlogSuggestions(

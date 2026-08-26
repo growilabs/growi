@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { CATEGORY_LABEL_KEYS } from './SearchUsernameTypeahead';
+import { CATEGORY_LABEL_KEYS } from './UsernameTypeahead';
 
 /**
  * Guards the group-header keys against the locale files.

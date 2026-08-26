@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 
-import { useAuditlogUsernameSuggestions } from './use-auditlog-username-suggestions';
+import { useAuditLogUsernameSuggestions } from './use-auditlog-username-suggestions';
 
 const mockUseSWRxAuditlogSuggestions = vi.hoisted(() => vi.fn());
 
@@ -8,7 +8,7 @@ vi.mock('~/stores/activity', () => ({
   useSWRxAuditlogSuggestions: mockUseSWRxAuditlogSuggestions,
 }));
 
-describe('useAuditlogUsernameSuggestions', () => {
+describe('useAuditLogUsernameSuggestions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -22,7 +22,7 @@ describe('useAuditlogUsernameSuggestions', () => {
       isLoading: false,
     });
 
-    const { result } = renderHook(() => useAuditlogUsernameSuggestions('ali'));
+    const { result } = renderHook(() => useAuditLogUsernameSuggestions('ali'));
 
     expect(mockUseSWRxAuditlogSuggestions).toHaveBeenCalledWith(
       'username',
@@ -42,7 +42,7 @@ describe('useAuditlogUsernameSuggestions', () => {
       isLoading: false,
     });
 
-    const { result } = renderHook(() => useAuditlogUsernameSuggestions('ali'));
+    const { result } = renderHook(() => useAuditLogUsernameSuggestions('ali'));
 
     expect(result.current.activeUsernames).toEqual([]);
     expect(result.current.inactiveUsernames).toEqual([]);
@@ -55,7 +55,7 @@ describe('useAuditlogUsernameSuggestions', () => {
       isLoading: true,
     });
 
-    const { result } = renderHook(() => useAuditlogUsernameSuggestions('ali'));
+    const { result } = renderHook(() => useAuditLogUsernameSuggestions('ali'));
 
     expect(result.current.isLoading).toBe(false);
   });

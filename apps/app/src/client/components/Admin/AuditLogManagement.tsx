@@ -6,10 +6,6 @@ import { format } from 'date-fns/format';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
-import {
-  SearchUsernameTypeahead,
-  useAuditlogUsernameSuggestions,
-} from '~/client/components/SearchUsernameTypeahead';
 import type { IClearable } from '~/client/interfaces/clearable';
 import { toastError } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
@@ -25,6 +21,7 @@ import { ActivityTable } from './AuditLog/ActivityTable';
 import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';
 import { AuditLogExportModal } from './AuditLog/AuditLogExportModal';
 import { AuditLogSettings } from './AuditLog/AuditLogSettings';
+import { AuditLogUsernameTypeahead } from './AuditLog/AuditLogUsernameTypeahead';
 import { buildActivitySearchFilter } from './AuditLog/build-search-filter';
 import { DateRangePicker } from './AuditLog/DateRangePicker';
 import { SelectActionDropdown } from './AuditLog/SelectActionDropdown';
@@ -259,10 +256,9 @@ export const AuditLogManagement: FC = () => {
         <>
           <div className="row row-cols-lg-auto mb-3 g-3">
             <div className="col-12">
-              <SearchUsernameTypeahead
+              <AuditLogUsernameTypeahead
                 ref={typeaheadRef}
                 onChange={setUsernamesHandler}
-                useUsernameSuggestions={useAuditlogUsernameSuggestions}
               />
             </div>
 

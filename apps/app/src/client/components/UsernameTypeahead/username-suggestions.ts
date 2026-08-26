@@ -5,14 +5,21 @@ export type UsernameSuggestions = {
 };
 
 /**
- * The suggestion source injected into `SearchUsernameTypeahead`.
+ * The suggestion source injected into `UsernameTypeahead`.
  *
  * Injected rather than hard-coded because the available endpoints differ in the
  * privilege they demand, so any single default 403s for some callers.
  *
- * Invoked as a hook, so a given instance must receive a **stable** reference (a
- * module-scope hook, not an inline closure): React keys hook state by call
- * order, and swapping the function between renders reorders the hooks it calls.
+ * Called during render, so it must obey the rules of hooks. A fresh inline
+ * wrapper — `(keyword) => useMySource(keyword)` — is *not* a problem: React
+ * keys hook state by call order, not by function identity. What breaks is
+ * changing **which** source a given instance calls between renders, e.g.
+ * `isAdmin ? useAuditLogUsernameSuggestions : useRegisteredUsernameSuggestions`
+ * — the hooks called underneath then change order and React throws.
+ *
+ * This is why the prop is not part of the public surface: each screen has a
+ * wrapper component that hard-codes its own source, so no call site is in a
+ * position to swap one.
  */
 export type UseUsernameSuggestions = (keyword: string) => UsernameSuggestions;
 
