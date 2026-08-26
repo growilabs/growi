@@ -1,12 +1,36 @@
 {
   "Show": "Show",
+  "View": "View",
   "Hide": "Hide",
   "Add": "Add",
   "Insert": "Insert",
   "Reset": "Reset",
   "Sign out": "Logout",
   "New": "New",
+  "Send": "Send",
+  "Clear": "Clear",
   "Delete": "Delete",
+  "Cancel": "Cancel",
+  "Close": "Close",
+  "Confirm": "Confirm",
+  "Create": "Create",
+  "Created": "Created",
+  "Description": "Description",
+  "Done": "Done",
+  "Edit": "Edit",
+  "Email": "Email",
+  "Error occurred": "Error occurred",
+  "Help": "Help",
+  "Name": "Name",
+  "Password": "Password",
+  "Update": "Update",
+  "User": "User",
+  "UserGroup": "UserGroup",
+  "V5 Page Migration": "Convert To V5 Compatibility",
+  "Warning": "Warning",
+  "add": "Add",
+  "eg": "e.g.",
+  "username": "Username",
   "meta": {
     "display_name": "English"
   },
@@ -258,5 +282,8 @@
       },
       "cancel": "Cancel"
     }
+  },
+  "table_action": {
+    "edit": "Edit"
   }
 }

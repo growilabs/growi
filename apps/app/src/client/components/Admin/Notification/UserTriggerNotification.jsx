@@ -53,7 +53,7 @@ class UserTriggerNotification extends React.Component {
         this.state.pathPattern,
         this.state.channel,
       );
-      toastSuccess(t('notification_settings.add_notification_pattern'));
+      toastSuccess(t('admin:notification_settings.add_notification_pattern'));
       this.setState({ pathPattern: '', channel: '' });
     } catch (err) {
       toastError(err);
@@ -70,7 +70,7 @@ class UserTriggerNotification extends React.Component {
           notificationIdForDelete,
         );
       toastSuccess(
-        t('notification_settings.delete_notification_pattern', {
+        t('admin:notification_settings.delete_notification_pattern', {
           path: deletedNotificaton.pathPattern,
         }),
       );
@@ -88,14 +88,14 @@ class UserTriggerNotification extends React.Component {
     return (
       <React.Fragment>
         <h2 className="border-bottom my-4">
-          {t('notification_settings.user_trigger_notification_header')}
+          {t('admin:notification_settings.user_trigger_notification_header')}
         </h2>
 
         <table className="table table-bordered">
           <thead>
             <tr>
-              <th>{t('notification_settings.pattern')}</th>
-              <th>{t('notification_settings.channel')}</th>
+              <th>{t('admin:notification_settings.pattern')}</th>
+              <th>{t('admin:notification_settings.channel')}</th>
               <th />
             </tr>
           </thead>
@@ -116,7 +116,7 @@ class UserTriggerNotification extends React.Component {
                   <span
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
-                      __html: t('notification_settings.pattern_desc'),
+                      __html: t('admin:notification_settings.pattern_desc'),
                     }}
                   />
                 </p>
@@ -144,7 +144,7 @@ class UserTriggerNotification extends React.Component {
                   <span
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                     dangerouslySetInnerHTML={{
-                      __html: t('notification_settings.channel_desc'),
+                      __html: t('admin:notification_settings.channel_desc'),
                     }}
                   />
                 </p>
