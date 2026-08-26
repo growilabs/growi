@@ -8,7 +8,29 @@
   "Reset": "Réinitialiser",
   "Sign out": "Déconnexion",
   "New": "Nouveau",
+  "Send": "Envoyer",
+  "Clear": "Vider",
   "Delete": "Supprimer",
+  "Cancel": "Annuler",
+  "Close": "Fermer",
+  "Confirm": "Confirmer",
+  "Create": "Créer",
+  "Created": "Crée le",
+  "Description": "Description",
+  "Done": "Terminer",
+  "Email": "Adresse courriel",
+  "Error occurred": "Une erreur est survenue",
+  "Help": "Aide",
+  "Name": "Nom",
+  "Password": "Mot de passe",
+  "Update": "Enregistrer",
+  "User": "Utilisateur",
+  "UserGroup": "Groupe utilisateur",
+  "V5 Page Migration": "Convertir vers la V5",
+  "Warning": "Avertissement",
+  "add": "Ajouter",
+  "eg": "e.g.",
+  "username": "Nom d'utilisateur",
   "meta": {
     "display_name": "Français"
   },
@@ -227,5 +249,8 @@
         "user_group": "Accorde la permission de modifier les fonctionnalités de membres de groupe d'utilisateurs."
       }
     }
+  },
+  "table_action": {
+    "edit": "Modifier"
   }
 }
