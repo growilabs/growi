@@ -1620,8 +1620,20 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
     ],
   },
   {
+    // gcs:referenceFileWithRelayMode is included alongside the
+    // credential/bucket keys: for a GROWI.cloud hosted-GCS tenant, the
+    // file-delivery method is infra-managed the same as the bucket itself,
+    // so it must not be overridable from the admin UI either.
+    // TODO: azure:referenceFileWithRelayMode has the same requirement but is
+    // not yet in the azure group below — see the GCS fix this comment
+    // shipped with.
     controlKey: 'env:useOnlyEnvVars:gcs',
-    targetKeys: ['gcs:apiKeyJsonPath', 'gcs:bucket', 'gcs:uploadNamespace'],
+    targetKeys: [
+      'gcs:apiKeyJsonPath',
+      'gcs:bucket',
+      'gcs:uploadNamespace',
+      'gcs:referenceFileWithRelayMode',
+    ],
   },
   {
     controlKey: 'env:useOnlyEnvVars:azure',

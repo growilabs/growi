@@ -1,8 +1,38 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v8.0.1...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.2...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v8.0.2](https://github.com/growilabs/compare/v8.0.1...v8.0.2) - 2026-08-25
+
+### 💎 Features
+
+* No changes
+  
+* feat(g2g-transfer): Add a migration mode that replaces the destination and keeps its admins able to sign in (#11695) @yuki-takei
+  
+
+### 🐛 Bug Fixes
+
+* fix(file-uploader): Restore update button on FileUploadSetting for GROWI.cloud (#11771) @yuki-takei
+* fix(g2g-transfer): Extend G2G unique-conflict detection to externalaccounts/externalusergroups (#11749) @yuki-takei
+* fix: Guard array length before indexing in POST /pages/delete (#11768) @yuki-takei
+* fix: Unify not-found/forbidden responses to a uniform 404 for write-action page routes (#11762) @yuki-takei
+* fix(attachment): Enforce page-viewer permission for guest requests too (#11756) @yuki-takei
+* fix(NextLink): decide client-side routing from an explicit route list (#11747) @yuki-takei
+* fix(page-bulk-export): ERR_MODULE_NOT_FOUND on production builds (#11729) @yuki-takei
+* fix: SelectGroupModal uses list-group with checkbox rows (#11701) @yuki-takei
+* fix: Reduce SSR payload on admin/ai, admin/vault, admin/app by dropping preloadAllLang (#11697) @yuki-takei
+* fix: Report a conflict when deleting a page with a stale revisionId (#11684) @yuki-takei
+* fix: Report a conflict when renaming a page with a stale revisionId (#11680) @yuki-takei
+* fix: Links to pages with non-ASCII paths reload the whole document (#11687) @yuki-takei
+* fix: Page created at a path with a leftover redirect was not reachable at that path (#11683) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Prisma page-tag-relation model (#11691) @mizozobu
+* support: Publish vault-manager and pdf-converter images from master via changesets (#11679) @yuki-takei
 
 ## [v8.0.1](https://github.com/growilabs/compare/v8.0.0...v8.0.1) - 2026-08-10
 

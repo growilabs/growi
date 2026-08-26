@@ -133,7 +133,14 @@ describe('receive route POST / — the ordinary merge-preset shape (configs repl
     });
     const leftovers = await fs.readdir(importsDir);
     await Promise.all(
-      leftovers.map((fileName) => fs.rm(path.join(importsDir, fileName))),
+      // `force`: the receive route's own handler deletes the uploaded archive
+      // (`deleteReceivedArchive` in g2g-transfer.ts) from its `finally` block, which
+      // resolves the client's response before that block runs — so this sweep can
+      // race the route's own cleanup of the same file and hit ENOENT on a file that
+      // is simply already gone, not a real failure to clean up.
+      leftovers.map((fileName) =>
+        fs.rm(path.join(importsDir, fileName), { force: true }),
+      ),
     );
   };
 

@@ -1,9 +1,10 @@
 {
   "feature_name": "g2g-transfer-migration-mode",
   "created_at": "2026-08-04T17:06:04Z",
-  "updated_at": "2026-08-13T00:00:00Z",
+  "updated_at": "2026-08-20T11:15:40.000Z",
   "language": "ja",
   "phase": "completed",
+  "cleaned_up_at": "2026-08-20T11:15:40.000Z",
   "approvals": {
     "requirements": {
       "generated": true,
