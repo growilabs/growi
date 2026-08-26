@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => {
     validateRefererMock: vi.fn(),
     retrieveValidShareLinkByRefererMock: vi.fn(),
     validateAttachmentMock: vi.fn(),
+    getConfigMock: vi.fn(),
   };
 });
 
@@ -26,10 +27,36 @@ vi.mock('./retrieve-valid-share-link', () => ({
 vi.mock('./validate-attachment', () => ({
   validateAttachment: mocks.validateAttachmentMock,
 }));
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: { getConfig: mocks.getConfigMock },
+}));
 
 describe('certifySharedPageAttachmentMiddleware', () => {
   const res = mock<Response>();
   const next = vi.fn();
+
+  beforeEach(() => {
+    // link sharing enabled by default; individual tests override as needed
+    mocks.getConfigMock.mockReturnValue(false);
+  });
+
+  it('calls next() without certifying anything when link sharing is disabled', async () => {
+    // setup
+    mocks.getConfigMock.mockReturnValue(true);
+    const req = mock<RequestToAllowShareLink>();
+    req.params = { id: 'file id string' };
+    req.headers = { referer: 'referer string' };
+
+    // when
+    await certifySharedPageAttachmentMiddleware(req, res, next);
+
+    // then: no ShareLink lookup happens at all, and the existing (unexpired)
+    // ShareLink must not be able to certify the request anymore
+    expect(mocks.validateRefererMock).not.toHaveBeenCalled();
+    expect(mocks.retrieveValidShareLinkByRefererMock).not.toHaveBeenCalled();
+    expect(req.isSharedPage === true).toBeFalsy();
+    expect(next).toHaveBeenCalledOnce();
+  });
 
   describe('should called next() without req.isSharedPage set', () => {
     it('when the fileId param is null', async () => {

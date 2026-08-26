@@ -68,8 +68,8 @@ first:
 1. **`flaky/observing`** — a single vitest observation with no corroborating
    signal (see "Cheap Suspicion Mining" below). Passive: waits for a future
    run to repeat it (`--vitest-threshold`).
-2. **`flaky/suspected`** — a vitest observation that also matches one of the
-   four cheap, mechanical signals in "Cheap Suspicion Mining" (diff/PR
+2. **`flaky/suspected`** — a vitest observation that also matches one or more
+   of the four cheap, mechanical signals in "Cheap Suspicion Mining" (diff/PR
    mismatch, sandwich pattern, matrix divergence, or a targeted historical
    backfill hit). No LLM judgment is spent getting here — these are
    grep/diff-level checks against data this skill already fetched (or, for
@@ -95,8 +95,33 @@ string search, no code reading. ①-③ run against a **fresh** observation
 made during this scan; ④ runs once per scan against **existing**
 `flaky/observing` issues regardless of whether anything new was observed
 for them today (see its own subsection below for why it's structured
-differently). Run ①-③ in this order and stop at the first hit (cheapest
-first):
+differently).
+
+**Evaluate all of ①-③ for every fresh observation — do not stop at the
+first hit.** All three reuse data already fetched in Steps 1-2 (no extra API
+calls), so short-circuiting saves nothing. It also actively loses
+information: ① (diff/PR mismatch) is the loosest of the three — it only
+needs "the PR/commit diff doesn't touch this area" — so it tends to match
+almost any isolated failure before ② or ③ get evaluated. Stopping at ①
+means never learning whether the same failure also had a same-commit
+matrix-divergence proof (③, arguably the strongest of the three — it's a
+same-commit, same-code comparison, not an inference from an unrelated
+diff) or a sandwich pattern (②). Left unrecorded, this makes ②/③ look like
+they never fire in practice, when in fact they may be firing constantly
+underneath ①'s wider net — record every check that matches, not just the
+first:
+
+- **Record every match.** Note in this run's evidence which of ①/②/③ hit,
+  even when more than one did.
+- **Report all matched checks in the issue**, not just one (see the issue
+  body template below) — a reader deciding how much to trust "suspected"
+  should see every corroborating signal, not whichever happened to be
+  checked first.
+- **When space forces picking a single headline reason** (e.g. a short
+  status line), prefer the strongest evidence, not check order: ③ (same
+  commit, same code, divergent outcome) > ② (disappears-and-reappears
+  within the window) > ① (diff/PR mismatch, an inference rather than a
+  direct comparison).
 
 **① Diff / PR-description mismatch.** Fetch the commit's associated PR (if
 any):
@@ -456,9 +481,15 @@ approach instead:
    distinct spec/title referenced anywhere in retry-attachment paths
    (`playwright/output/{slug}.../test-failed-N.png`) that is **not** among
    the `::error`-annotated titles, that leftover slug is the flaky one —
-   use `playwright:{SPEC_PATH}:{TEST_TITLE}` (recover the human title from
-   the slug by matching it against spec files under
-   `apps/app/playwright/` if needed).
+   use `playwright:{BROWSER}:{SPEC_PATH}:{TEST_TITLE}` (recover the human
+   title from the slug by matching it against spec files under
+   `apps/app/playwright/` if needed). Always include `{BROWSER}`, per the
+   "browser IS meaningful" rule above — every tracking issue this skill has
+   created for a specific spec already carries it (e.g. #11785 is
+   `playwright:webkit:playwright/20-basic-features/comments.spec.ts:...`);
+   omitting it here would fork the identity key from the title format Step
+   4 actually searches on, which is exactly the "title/search mismatch →
+   duplicate" failure that section warns about.
 2. **Fallback (job-level)** — in every other case (multiple candidates,
    nothing unambiguous), use `playwright:{BROWSER}` as the identity and say
    so explicitly in the issue body: "flaky test detected in this shard's log
@@ -542,7 +573,7 @@ gh issue create --repo growilabs/growi \
 ## Detected by detect-flaky-ci
 
 **Identity key**: `{IDENTITY_KEY}`
-**Kind**: {playwright | vitest} {(strong evidence: passed on in-run retry) if confirmed} {(cheap suspicion: {① diff/PR mismatch | ② sandwich pattern | ③ matrix divergence}) if suspected}
+**Kind**: {playwright | vitest} {(strong evidence: passed on in-run retry) if confirmed} {(cheap suspicion: {every matched check among ① diff/PR mismatch, ② sandwich pattern, ③ matrix divergence, joined with " + ", e.g. "① + ③"}) if suspected}
 
 ### First observation
 
@@ -557,13 +588,17 @@ gh issue create --repo growilabs/growi \
 {relevant log excerpt — the FAIL block or the ::error annotation + retry blocks}
 ```
 
-{if suspected, additionally include the specific mining evidence: e.g. "PR #{N} changed {files}, none overlap this spec's path or stack trace" / "same identity failed in run {A}, passed in intervening run {B}, failed again here" / "sibling matrix job {NAME} on the same commit passed"}
+{if suspected, include the specific mining evidence **for every check that matched, not just one** — one line per match, e.g.:
+"① PR #{N} changed {files}, none overlap this spec's path or stack trace"
+"② same identity failed in run {A}, passed in intervening run {B}, failed again here"
+"③ sibling matrix job {NAME} on the same commit passed"
+List whichever subset actually matched; omit lines for checks that didn't hit.}
 
 ### Status
 
 {pick exactly one:
  - confirmed (Playwright): "Confirmed flaky from a single run (Playwright retry evidence)."
- - suspected (vitest, mining hit): "Suspected flaky ({① | ② | ③}) — handed directly to investigate-flaky-test for a one-time confirmation rerun, no threshold wait needed."
+ - suspected (vitest, mining hit): "Suspected flaky ({every matched check, e.g. "① + ③", ordered strongest-first: ③ > ② > ①}) — handed directly to investigate-flaky-test for a one-time confirmation rerun, no threshold wait needed."
  - observing (vitest, no mining hit): "Observation 1/{VITEST_THRESHOLD} — needs {VITEST_THRESHOLD - 1} more independent occurrence(s) before this is handed to investigate-flaky-test."}
 EOF
 )"
@@ -572,6 +607,38 @@ EOF
 `{TIER_LABEL}` is `flaky/confirmed` for Playwright, `flaky/suspected` for a
 vitest observation that hit one of the three mining checks, `flaky/observing`
 for a plain vitest observation with no mining hit.
+
+### Attach the new issue to the dashboard as a sub-issue
+
+Every issue this skill creates must become a GitHub sub-issue of the
+tracking dashboard, growilabs/growi#11720 ("flaky-ci-routine: dashboard").
+Being a sub-issue does **not** hide an issue from the default Issues list —
+GitHub still lists it there. What it buys instead: anyone who wants the
+non-flaky backlog without this noise can search
+`is:issue is:open no:parent-issue` (verified — this qualifier excludes
+every issue that has a parent), and the dashboard's own
+`sub_issues_summary` (`total`/`completed`/`percent_completed`) gives a
+progress rollup instead of the manual count kept in its body table today.
+
+Use the REST sub-issues endpoint, not the GraphQL `addSubIssue` mutation —
+this is the same reasoning as the REST-over-GraphQL rule earlier in Step 4:
+the cloud routine's `gh` session sits behind an egress proxy that blocks
+GraphQL-backed commands, and REST works in both environments.
+
+Parse `{NEW_NUMBER}` from the URL `gh issue create` printed to stdout, then:
+
+```bash
+NEW_ISSUE_ID=$(gh api repos/growilabs/growi/issues/{NEW_NUMBER} -q '.id')
+gh api repos/growilabs/growi/issues/11720/sub_issues -X POST -F sub_issue_id="$NEW_ISSUE_ID"
+```
+
+(`sub_issue_id` is the numeric database id from `.id`, not the issue
+number and not the GraphQL node id — these are three different values for
+the same issue.)
+
+If this call fails, treat it the same as any other `gh` failure (see Error
+Handling below): non-fatal, log it, continue the run. Do not block issue
+creation on it and do not retry in a loop.
 
 ### Existing OPEN issue found, currently `flaky/observing`
 
@@ -595,10 +662,12 @@ EOF
 
 Then check both escalation paths, in this order:
 
-1. **Does this new observation itself hit a mining check** (① / ② / ③,
-   re-run against the accumulated history now that there are 2+ occurrences
-   to compare)? If so, escalate straight to `flaky/suspected`, skipping the
-   threshold wait entirely:
+1. **Does this new observation hit any mining check** (evaluate all of
+   ① / ② / ③ — re-run against the accumulated history now that there are 2+
+   occurrences to compare; do not stop at the first hit, same as the fresh-
+   observation path above)? If so, escalate straight to `flaky/suspected`,
+   skipping the threshold wait entirely, and record every check that
+   matched in the observation comment:
    ```bash
    gh issue edit {NUMBER} --repo growilabs/growi --remove-label "flaky/observing" --add-label "flaky/suspected"
    ```
@@ -710,6 +779,34 @@ EOF
   the OPEN-issue path above) so the reopened issue carries this evidence
   in its normal place.
 
+### Link to the dashboard (all branches)
+
+Whichever branch above you just took — new issue, an existing open issue at
+any tier, or a reopened closed issue — end it with the same dashboard-link
+attempt described in "Attach the new issue to the dashboard as a
+sub-issue", using that issue's own number:
+
+```bash
+ISSUE_ID=$(gh api repos/growilabs/growi/issues/{NUMBER} -q '.id')
+gh api repos/growilabs/growi/issues/11720/sub_issues -X POST -F sub_issue_id="$ISSUE_ID"
+```
+
+This keeps the invariant self-healing: an issue that somehow lost its
+parent (or was linked before this rule existed) gets relinked the next
+time this skill touches it, with no separate backfill ever needed again.
+The endpoint rejects a duplicate link with a `422` whose message contains
+"may only have one parent" — treat that specific response as success
+(already linked), not as a failure to log. Any other failure is non-fatal
+(see Error Handling below).
+
+A parent issue also has a cap on how many sub-issues it can hold (GitHub
+does not publish an exact number in its docs; verify empirically if this
+is ever suspected to be the cause of a link failure). Since this skill only
+adds sub-issues and nothing ever removes one from #11720, that cap will
+eventually be reached — when it is, the link attempt above fails and,
+per the non-fatal handling already in place, issue creation/tracking
+continues exactly as before; only the dashboard linkage is affected.
+
 ## Step 5: Report
 
 Print a short summary of this run: which job-log fetch method Step 0 chose
@@ -719,9 +816,14 @@ report this explicitly, never silently), how many runs were skipped via the
 Step 1.5 skip-list (already-known, not re-fetched), how many jobs actually
 scanned, how many classified as infra noise (with which pattern), how many
 new issues created, how many existing issues updated, how many escalated to
-`flaky/suspected` (and via which of the four mining checks, including how
-many via ④'s backfill specifically) vs `flaky/confirmed`. This is the only
-user-facing output — do not create files.
+`flaky/suspected` vs `flaky/confirmed`, and **a separate hit count for each
+of the four mining checks** (①, ②, ③, ④'s backfill) — since all of ①-③ are
+now evaluated for every observation rather than stopping at the first hit,
+one suspected issue can match more than one check, so these four counts
+will not sum to the total number of suspected issues. Report them
+separately anyway; this is the data that answers "which of these checks is
+actually pulling weight" over time. This is the only user-facing output —
+do not create files.
 
 ## Error Handling
 

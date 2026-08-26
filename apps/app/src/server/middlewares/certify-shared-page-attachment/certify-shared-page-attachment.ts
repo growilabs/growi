@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import { retrieveValidShareLinkByReferer } from './retrieve-valid-share-link';
@@ -17,6 +18,13 @@ export const certifySharedPageAttachmentMiddleware = async (
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
+  // Link sharing was globally turned off: an existing, unexpired ShareLink
+  // document must not keep certifying attachment requests (see
+  // reject-link-sharing-disabled.ts for the same guard on the page-render path).
+  if (configManager.getConfig('security:disableLinkSharing')) {
+    return next();
+  }
+
   const fileId: string | undefined = req.params.id;
   const { referer } = req.headers;
 

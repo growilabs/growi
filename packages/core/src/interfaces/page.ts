@@ -45,7 +45,7 @@ export type IPage = {
   latestRevisionBodyLength?: number;
   expandContentWidth?: boolean;
   wip?: boolean;
-  ttlTimestamp?: Date;
+  wipExpiredAt?: Date;
 };
 
 export type IPagePopulatedToShowRevision = Omit<

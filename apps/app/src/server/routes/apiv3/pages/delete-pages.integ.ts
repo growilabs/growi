@@ -129,6 +129,43 @@ describe('POST /delete', () => {
     throw new Error(`page ${pageId} was not deleted within ${maxWaitMs}ms`);
   };
 
+  /**
+   * `PageService#deletePage` moves the target into the trash (the state
+   * `waitForPageToBeDeleted` polls for) and only afterwards awaits
+   * `updateDescendantCountOfAncestors` on `page.parent` — still inside the same
+   * unawaited background chain the route fired. Resolving as soon as the target
+   * reaches `deleted` let a suite's `afterEach` fixture cleanup delete that parent
+   * (an auto-created empty page under the fixture root) before the still-in-flight
+   * count update looked it up, throwing an unhandled `Target not found` rejection
+   * (see #11740).
+   *
+   * The parent's descendantCount itself is not a safe thing to poll for: trashing
+   * the target also clears the target's own `parent` (see `deleteNonEmptyTarget`),
+   * so once the count update finishes, the very next awaited step in the same
+   * chain — `Page.removeLeafEmptyPagesRecursively` — finds this now-childless
+   * empty ancestor and deletes it, all within the same tick. A "count decremented"
+   * window this narrow is not reliably observable by a 50ms poll. The ancestor's
+   * *removal* is the last mutation in the chain and, unlike the count, a stable
+   * terminal state — waiting for that instead proves the whole chain (including
+   * the vulnerable count update) has already settled.
+   */
+  const waitForAncestorCleanupToSettle = async (
+    parentId: string,
+    maxWaitMs = 10_000,
+  ): Promise<void> => {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < maxWaitMs) {
+      const parent = await crowi.models.Page.findById(parentId);
+      if (parent == null) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error(
+      `ancestor ${parentId} was not cleaned up within ${maxWaitMs}ms`,
+    );
+  };
+
   const removeFixtures = async (): Promise<void> => {
     const { Page } = crowi.models;
 
@@ -236,8 +273,14 @@ describe('POST /delete', () => {
     expect(survivingPage?.status).toBe('published');
   });
 
+  // Explicit timeout: two sequential 10s-cap polling waits below (target status,
+  // then ancestor cleanup) can exceed vitest's 5s default under CI load.
   it('deletes a page whose revisionId is the latest revision', async () => {
     const page = await createPage(targetPath, 'target body');
+    if (page.parent == null) {
+      throw new Error('the fixture page must have a parent');
+    }
+    const parentId = getIdStringForRef(page.parent);
 
     const response = await request(app)
       .post('/delete')
@@ -254,5 +297,41 @@ describe('POST /delete', () => {
     // Without this case, filtering every page out unconditionally would also pass.
     const deletedPage = await waitForPageToBeDeleted(page._id);
     expect(deletedPage.path).toBe(`/trash${targetPath}`);
+
+    // Wait for the rest of the background chain (ending in the now-childless
+    // fixture-root ancestor's own removal) to settle too, so afterEach's
+    // fixture cleanup can't race it.
+    await waitForAncestorCleanupToSettle(parentId);
+  }, 20_000);
+
+  it('does not crash when isAnyoneWithTheLink is set and the page cannot be found', async () => {
+    // `pageIds.length !== 1` is rejected earlier when isAnyoneWithTheLink is
+    // set, so the viewer-filtered lookup below always resolves for a single
+    // id. Before the fix, a nonexistent (or unreadable) pageId left
+    // `pagesToDelete` empty and `pagesToDelete[0].grant` threw instead of
+    // answering cleanly.
+    const missingPageId = new Types.ObjectId();
+
+    const response = await request(app)
+      .post('/delete')
+      .set('X-Forwarded-For', TEST_IP)
+      .send({
+        pageIdToRevisionIdMap: {
+          [missingPageId.toString()]: new Types.ObjectId().toString(),
+        },
+        isAnyoneWithTheLink: true,
+      });
+
+    // Falls through to the same "nothing to delete" response every other
+    // filtered-out case gets (see the 500 comment on the first test above) —
+    // not a crash, and not a distinguishable status for this pageId. Assert
+    // the message too: a naive `pagesToDelete[0]?.grant` rewrite of the fix
+    // would still return 500 here, but via the sibling "grant of the
+    // retrieved page is not restricted" branch instead of this fallthrough —
+    // a status-only assertion would not catch that.
+    expect(response.status).toBe(500);
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({ message: 'No pages can be deleted.' }),
+    ]);
   });
 });

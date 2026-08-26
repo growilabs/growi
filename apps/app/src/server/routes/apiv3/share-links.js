@@ -439,18 +439,42 @@ export const setup = (crowi) => {
           where: { id },
         });
 
+        // A nonexistent share-link id must answer the same way as an
+        // existing one whose related page cannot be resolved below —
+        // otherwise the two are distinguishable (400 vs 404) to a
+        // non-admin caller enumerating ids. See
+        // apps/app/.claude/rules/page-write-action-403-404.md.
+        if (shareLinkToDelete == null) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'Page is not found or forbidden',
+              'delete-shareLink-failed',
+            ),
+            404,
+          );
+        }
+
         // check permission
         if (!user.isAdmin) {
           const page = await Page.findByIdAndViewer(
             shareLinkToDelete.relatedPageId,
             user,
           );
-          const isPageExists =
-            (await Page.count({ _id: shareLinkToDelete.relatedPageId })) > 0;
-          if (page == null && isPageExists) {
+          // Deny whenever the related page cannot be resolved for this viewer
+          // — regardless of whether that is because it no longer exists or
+          // because the user cannot read it. The two must be
+          // indistinguishable to a non-admin caller (see
+          // apps/app/.claude/rules/page-write-action-403-404.md). Checking
+          // only the "forbidden" case here previously let any logged-in
+          // non-admin delete a share link whose page had already been
+          // deleted.
+          if (page == null) {
             const msg = 'Page is not found or forbidden';
             logger.error('Error', msg);
-            return res.apiv3Err(new ErrorV3(msg, 'delete-shareLink-failed'));
+            return res.apiv3Err(
+              new ErrorV3(msg, 'delete-shareLink-failed'),
+              404,
+            );
           }
         }
 

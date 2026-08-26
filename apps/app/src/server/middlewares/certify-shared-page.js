@@ -1,3 +1,4 @@
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -8,6 +9,13 @@ export const setup = (crowi) => {
   // Named function so the route-middleware snapshot tool can identify this
   // handler in the apiv3 auth chain.
   return async function certifySharedPage(req, res, next) {
+    // Link sharing was globally turned off: an existing, unexpired ShareLink
+    // document must not keep certifying requests (see
+    // reject-link-sharing-disabled.ts for the same guard on the page-render path).
+    if (configManager.getConfig('security:disableLinkSharing')) {
+      return next();
+    }
+
     // Accept both `pageId` (camelCase, used by /revisions, /page/info) and
     // `page_id` (snake_case, used by /comments.get) so this single shared
     // middleware can certify either route.
