@@ -4,7 +4,7 @@ import { useSWRxUsernames } from '~/stores/user';
 
 /**
  * Source for callers outside the admin pages, backed by `/users/usernames`
- * (`loginRequired`).
+ * (`loginRequiredStrictly` — guests are excluded).
  *
  * Suggests only registered users; historical names that exist merely as activity
  * operators are unreachable — the trade-off for being available to non-admins.
