@@ -29,6 +29,9 @@ const pageLinkSchema = new Schema<PageLinkDocument, PageLinkModel>({
 });
 
 pageLinkSchema.index({ fromPage: 1, toPath: 1 }, { unique: true });
+// { fromPage, toPath } above can't serve a toPath-only query (wrong prefix) —
+// repointInboundLinks filters on toPath alone, so it needs its own index.
+pageLinkSchema.index({ toPath: 1 });
 
 /**
  * Replace a page's outbound links with the freshly extracted set:

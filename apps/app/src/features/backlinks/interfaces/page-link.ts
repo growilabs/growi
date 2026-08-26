@@ -1,13 +1,5 @@
 import type { Document, Model, Types } from 'mongoose';
 
-export type LinkTargetState = 'normal' | 'trashed' | 'broken';
-
-export interface ILinkTarget {
-  pageId: string;
-  path: string;
-  targetState: LinkTargetState;
-}
-
 export interface IPageLink {
   fromPage: Types.ObjectId;
   toPath: string;
@@ -25,6 +17,4 @@ export interface PageLinkModel extends Model<PageLinkDocument> {
     toPath: string,
     toPage: Types.ObjectId | null,
   ): Promise<void>;
-  // Declared here for a downstream story; implemented later (reconcile-deleted in B5).
-  reconcileDeletedPages(pageIds: Types.ObjectId[]): Promise<void>;
 }
