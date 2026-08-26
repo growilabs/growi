@@ -4,7 +4,7 @@ import type { PageDocument } from '~/server/models/page';
 import { Revision } from '~/server/models/revision';
 
 import { extractInternalLinks } from './extract-internal-links';
-import { syncOutboundLinks } from './page-link-sync';
+import { reResolveByToPath, syncOutboundLinks } from './page-link-sync';
 import { resolveToPages } from './target-page-resolution';
 
 const loadBody = async (page: PageDocument): Promise<string> => {
@@ -35,4 +35,5 @@ export const handlePageUpsert = async (
   }));
 
   await syncOutboundLinks(fromPage, rows);
+  await reResolveByToPath(page.path);
 };
