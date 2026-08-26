@@ -13,16 +13,28 @@ import { AsyncTypeahead, Menu, MenuItem } from 'react-bootstrap-typeahead';
 import { useTranslation } from 'react-i18next';
 
 import type { IClearable } from '~/client/interfaces/clearable';
-import { useSWRxAuditlogSuggestions } from '~/stores/activity';
 
 import { shouldShowUsernameSuggestion } from './should-show-username-suggestion';
+import type { UseUsernameSuggestions } from './username-suggestions';
 
+// Grouping keys, not display text — `renderMenu` groups options by them and
+// `toUserDataItem` defaults to one, so the values are load-bearing.
 const Categories = {
-  activeUser: 'Active User',
-  inactiveUser: 'Inactive User',
+  activeUser: 'activeUser',
+  inactiveUser: 'inactiveUser',
 } as const;
 
 type CategoryType = (typeof Categories)[keyof typeof Categories];
+
+// Must be `commons`: admin pages load ['admin'] and the search page loads
+// ['translation'], so it is the only namespace both get (see
+// pages/common-props/i18n.ts). Anywhere else renders raw keys on half the callers.
+// Exported for the locale-drift spec only — deliberately kept out of the
+// barrel, so it stays an internal of this module for every other caller.
+export const CATEGORY_LABEL_KEYS = {
+  [Categories.activeUser]: 'commons:username_suggestion.active_user',
+  [Categories.inactiveUser]: 'commons:username_suggestion.inactive_user',
+} as const satisfies Record<CategoryType, string>;
 
 type UserDataType = {
   username: string;
@@ -36,22 +48,44 @@ const toUserDataItem = (username: string): UserDataType => ({
   category: Categories.activeUser,
 });
 
-type Props = {
+export type UsernameTypeaheadProps = {
   onChange: (text: string[]) => void;
+  // Required, not defaulted — see `UseUsernameSuggestions`.
+  useUsernameSuggestions: UseUsernameSuggestions;
   initialUsernames?: string[];
-  // Callers outside the admin pages must supply their own placeholder: the
-  // default key lives in the `admin` i18n namespace, which those pages don't load.
+  // Passed straight through, never defaulted here: any default would have to
+  // name an i18n namespace, and no single namespace is loaded by every caller
+  // (admin pages load ['admin'], the search page ['translation']). The
+  // per-screen wrapper components own that default instead.
   placeholder?: string;
   // Must be unique per instance: rendering this typeahead more than once on a
   // page (e.g. author + editor filters) would otherwise duplicate the DOM id.
   id?: string;
 };
 
-const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
+/**
+ * What a per-screen wrapper accepts and forwards: everything except the
+ * suggestion source, which each wrapper fixes to its own endpoint.
+ *
+ * Named here so the two wrappers share one definition — the `Omit` written out
+ * at each of them would have to be edited twice whenever these props change.
+ */
+export type UsernameTypeaheadOwnProps = Omit<
+  UsernameTypeaheadProps,
+  'useUsernameSuggestions'
+>;
+
+const UsernameTypeaheadSubstance: ForwardRefRenderFunction<
   IClearable,
-  Props
-> = (props: Props, ref) => {
-  const { onChange, initialUsernames, placeholder, id } = props;
+  UsernameTypeaheadProps
+> = (props: UsernameTypeaheadProps, ref) => {
+  const {
+    onChange,
+    useUsernameSuggestions,
+    initialUsernames,
+    placeholder,
+    id,
+  } = props;
   const { t } = useTranslation();
 
   const typeaheadRef = useRef<TypeaheadRef>(null);
@@ -82,14 +116,8 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   /*
    * Fetch
    */
-  const {
-    data: suggestionsData,
-    error,
-    isLoading: _isLoading,
-  } = useSWRxAuditlogSuggestions('username', searchKeyword);
-  const activeUsernames = suggestionsData?.username?.activeUsernames ?? [];
-  const inactiveUsernames = suggestionsData?.username?.inactiveUsernames ?? [];
-  const isLoading = _isLoading === true && error == null;
+  const { activeUsernames, inactiveUsernames, isLoading } =
+    useUsernameSuggestions(searchKeyword);
 
   const allUser: UserDataType[] = [
     ...activeUsernames.map((username) => ({
@@ -129,36 +157,52 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
     [searchKeyword, selectedItems],
   );
 
-  const renderMenu = useCallback((allUser: UserDataType[], menuProps) => {
-    if (allUser == null || allUser.length === 0) {
-      return <></>;
-    }
+  const renderMenu = useCallback(
+    (allUser: UserDataType[], menuProps) => {
+      if (allUser == null || allUser.length === 0) {
+        return <></>;
+      }
 
-    let index = 0;
-    const items = Object.values(Categories).map((category) => {
-      const userData = allUser.filter((user) => user.category === category);
-      return (
-        <Fragment key={category}>
-          {index !== 0 && <Menu.Divider />}
-          <Menu.Header>{category}</Menu.Header>
-          {userData.map((user) => {
-            const item = (
-              <MenuItem key={index} option={user} position={index}>
-                {user.username}
-              </MenuItem>
-            );
-            index++;
-            return item;
-          })}
-        </Fragment>
-      );
-    });
+      let index = 0;
+      const items = Object.values(Categories).map((category) => {
+        const userData = allUser.filter((user) => user.category === category);
 
-    return <Menu {...menuProps}>{items}</Menu>;
-  }, []);
+        if (userData.length === 0) {
+          return [];
+        }
+        const isFirstGroup = index === 0;
+
+        return (
+          <Fragment key={category}>
+            {!isFirstGroup && <Menu.Divider />}
+            <Menu.Header>{t(CATEGORY_LABEL_KEYS[category])}</Menu.Header>
+            {userData.map((user) => {
+              const item = (
+                <MenuItem key={index} option={user} position={index}>
+                  {user.username}
+                </MenuItem>
+              );
+              index++;
+              return item;
+            })}
+          </Fragment>
+        );
+      });
+
+      return <Menu {...menuProps}>{items}</Menu>;
+    },
+    [t],
+  );
 
   useImperativeHandle(ref, () => ({
     clear() {
+      // Our own selection has to be reset too, not just the inner typeahead's:
+      // `instance.clear()` only empties the library's internal copy and never
+      // calls `onChange`, so `selected` would still hold the old tokens on the
+      // next render — and the library re-syncs state from that prop whenever it
+      // differs (componentDidUpdate), putting the cleared tokens straight back.
+      setSelectedItems([]);
+
       const instance = typeaheadRef?.current;
       if (instance != null) {
         instance.clear();
@@ -173,12 +217,12 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
       </span>
       <AsyncTypeahead
         ref={typeaheadRef}
-        id={id ?? 'search-username-typeahead-asynctypeahead'}
+        id={id ?? 'username-typeahead-asynctypeahead'}
         multiple
         delay={400}
         minLength={0}
         filterBy={filterBy}
-        placeholder={placeholder ?? t('admin:audit_log_management.username')}
+        placeholder={placeholder}
         isLoading={isLoading}
         options={allUser}
         selected={selectedItems}
@@ -191,6 +235,4 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   );
 };
 
-export const SearchUsernameTypeahead = forwardRef(
-  SearchUsernameTypeaheadSubstance,
-);
+export const UsernameTypeahead = forwardRef(UsernameTypeaheadSubstance);
