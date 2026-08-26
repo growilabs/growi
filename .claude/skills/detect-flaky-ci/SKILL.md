@@ -481,9 +481,15 @@ approach instead:
    distinct spec/title referenced anywhere in retry-attachment paths
    (`playwright/output/{slug}.../test-failed-N.png`) that is **not** among
    the `::error`-annotated titles, that leftover slug is the flaky one —
-   use `playwright:{SPEC_PATH}:{TEST_TITLE}` (recover the human title from
-   the slug by matching it against spec files under
-   `apps/app/playwright/` if needed).
+   use `playwright:{BROWSER}:{SPEC_PATH}:{TEST_TITLE}` (recover the human
+   title from the slug by matching it against spec files under
+   `apps/app/playwright/` if needed). Always include `{BROWSER}`, per the
+   "browser IS meaningful" rule above — every tracking issue this skill has
+   created for a specific spec already carries it (e.g. #11785 is
+   `playwright:webkit:playwright/20-basic-features/comments.spec.ts:...`);
+   omitting it here would fork the identity key from the title format Step
+   4 actually searches on, which is exactly the "title/search mismatch →
+   duplicate" failure that section warns about.
 2. **Fallback (job-level)** — in every other case (multiple candidates,
    nothing unambiguous), use `playwright:{BROWSER}` as the identity and say
    so explicitly in the issue body: "flaky test detected in this shard's log
@@ -601,6 +607,38 @@ EOF
 `{TIER_LABEL}` is `flaky/confirmed` for Playwright, `flaky/suspected` for a
 vitest observation that hit one of the three mining checks, `flaky/observing`
 for a plain vitest observation with no mining hit.
+
+### Attach the new issue to the dashboard as a sub-issue
+
+Every issue this skill creates must become a GitHub sub-issue of the
+tracking dashboard, growilabs/growi#11720 ("flaky-ci-routine: dashboard").
+Being a sub-issue does **not** hide an issue from the default Issues list —
+GitHub still lists it there. What it buys instead: anyone who wants the
+non-flaky backlog without this noise can search
+`is:issue is:open no:parent-issue` (verified — this qualifier excludes
+every issue that has a parent), and the dashboard's own
+`sub_issues_summary` (`total`/`completed`/`percent_completed`) gives a
+progress rollup instead of the manual count kept in its body table today.
+
+Use the REST sub-issues endpoint, not the GraphQL `addSubIssue` mutation —
+this is the same reasoning as the REST-over-GraphQL rule earlier in Step 4:
+the cloud routine's `gh` session sits behind an egress proxy that blocks
+GraphQL-backed commands, and REST works in both environments.
+
+Parse `{NEW_NUMBER}` from the URL `gh issue create` printed to stdout, then:
+
+```bash
+NEW_ISSUE_ID=$(gh api repos/growilabs/growi/issues/{NEW_NUMBER} -q '.id')
+gh api repos/growilabs/growi/issues/11720/sub_issues -X POST -F sub_issue_id="$NEW_ISSUE_ID"
+```
+
+(`sub_issue_id` is the numeric database id from `.id`, not the issue
+number and not the GraphQL node id — these are three different values for
+the same issue.)
+
+If this call fails, treat it the same as any other `gh` failure (see Error
+Handling below): non-fatal, log it, continue the run. Do not block issue
+creation on it and do not retry in a loop.
 
 ### Existing OPEN issue found, currently `flaky/observing`
 
@@ -740,6 +778,34 @@ EOF
   and append the usual `### Additional observation` comment (same shape as
   the OPEN-issue path above) so the reopened issue carries this evidence
   in its normal place.
+
+### Link to the dashboard (all branches)
+
+Whichever branch above you just took — new issue, an existing open issue at
+any tier, or a reopened closed issue — end it with the same dashboard-link
+attempt described in "Attach the new issue to the dashboard as a
+sub-issue", using that issue's own number:
+
+```bash
+ISSUE_ID=$(gh api repos/growilabs/growi/issues/{NUMBER} -q '.id')
+gh api repos/growilabs/growi/issues/11720/sub_issues -X POST -F sub_issue_id="$ISSUE_ID"
+```
+
+This keeps the invariant self-healing: an issue that somehow lost its
+parent (or was linked before this rule existed) gets relinked the next
+time this skill touches it, with no separate backfill ever needed again.
+The endpoint rejects a duplicate link with a `422` whose message contains
+"may only have one parent" — treat that specific response as success
+(already linked), not as a failure to log. Any other failure is non-fatal
+(see Error Handling below).
+
+A parent issue also has a cap on how many sub-issues it can hold (GitHub
+does not publish an exact number in its docs; verify empirically if this
+is ever suspected to be the cause of a link failure). Since this skill only
+adds sub-issues and nothing ever removes one from #11720, that cap will
+eventually be reached — when it is, the link attempt above fails and,
+per the non-fatal handling already in place, issue creation/tracking
+continues exactly as before; only the dashboard linkage is affected.
 
 ## Step 5: Report
 
