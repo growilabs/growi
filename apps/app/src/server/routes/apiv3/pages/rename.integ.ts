@@ -1,9 +1,12 @@
 /**
  * Integration test — PUT /pages/rename must answer with the canonical status for
- * every outcome: 404 (no such page), 403 (the page exists but the requester may not
- * read it), 400 (a non-empty page renamed without revisionId), 409 (revisionId is
- * not the latest) and 200 (renamed). PR #11615 split the single 401 this route used
- * to return into 403 / 404, which is what the first two cases pin.
+ * every outcome: 404 (no such page, or the page exists but the requester may not
+ * read it — the two are intentionally indistinguishable to the caller, see
+ * apps/app/.claude/rules/page-write-action-403-404.md), 400 (a non-empty page
+ * renamed without revisionId), 409 (revisionId is not the latest) and 200
+ * (renamed). PR #11615 first split the single 401 this route used to return into
+ * 403 / 404; that distinction was later found to leak page existence to callers
+ * without read access and was collapsed back to a uniform 404.
  *
  * Why the fixtures look the way they do:
  *
@@ -284,13 +287,14 @@ describe('PUT /rename', () => {
     ]);
   });
 
-  it('returns 403 and leaves the page untouched when the requester may not read it', async () => {
+  it('returns 404 (not 403) and leaves the page untouched when the requester may not read it', async () => {
     const page = await createPage(forbiddenPath, 'forbidden body', owner, {
       grant: PageGrant.GRANT_OWNER,
     });
 
-    // A valid revisionId is sent so a 403 can only come from the grant filter — a
-    // missing one would be answered with 400 before the grant is ever consulted.
+    // A valid revisionId is sent so this response can only come from the grant
+    // filter — a missing one would be answered with 400 before the grant is ever
+    // consulted.
     const response = await request(app)
       .put('/rename')
       .set('X-Forwarded-For', TEST_IP)
@@ -300,7 +304,10 @@ describe('PUT /rename', () => {
         revisionId: latestRevisionIdOf(page),
       });
 
-    expect(response.status).toBe(403);
+    // Same status as the "page does not exist" case above — a requester without
+    // read access must not be able to tell a forbidden page apart from a missing
+    // one. See apps/app/.claude/rules/page-write-action-403-404.md.
+    expect(response.status).toBe(404);
     expect(response.body.errors).toEqual([
       expect.objectContaining({
         code: 'notfound_or_forbidden',

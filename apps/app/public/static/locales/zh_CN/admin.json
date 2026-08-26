@@ -356,6 +356,16 @@
     "migration_succeeded": "您的升级已经成功完成! 退出维护模式，可以使用GROWI。",
     "migration_failed": "升级失败。请参考GROWI的文档，了解在失败情况下该如何处理。"
   },
+  "page_tree_repair": {
+    "page_tree_repair": "页面树修复",
+    "repair_desc": "删除不再需要的空页面，并重新计算所有页面的子孙页面数。如果页面树中显示没有任何内容的空文件夹，或者子页面数与实际页面数不一致，请执行此操作。从使用 MongoDB TTL 索引删除 WIP 页面的版本升级而来的实例需要执行此操作。",
+    "repair_note": "注意：必须启用维护模式。此操作会扫描所有页面，因此在规模较大的 wiki 上可能需要很长时间。进度会输出到服务器日志。",
+    "repair_page_tree": "修复页面树",
+    "modal_repair_warning": "此过程会扫描并更新所有页面，可能需要很长时间。强烈建议管理员告知用户在修复期间不要创建、修改或删除页面。",
+    "start_repair": "开始修复页面树",
+    "successfully_started": "已开始修复页面树",
+    "repair_in_progress": "页面树修复正在后台运行。请查看服务器日志了解结果。"
+  },
   "news_delivery": {
     "section_title": "新闻推送",
     "label": "新闻推送",

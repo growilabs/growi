@@ -9,6 +9,7 @@ import { getInstance } from '^/test/setup/crowi';
 import type Crowi from '~/server/crowi';
 import type { PageDocument } from '~/server/models/page';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 import * as findPageModule from '~/server/service/page/find-page-and-meta-data-by-viewer';
 
 // Extend Request type for test
@@ -108,21 +109,16 @@ describe('GET /info', () => {
     app = express();
     app.use(express.json());
 
-    // Add apiv3 response helpers
+    // Add the real apiv3 response helpers (not a hand-rolled shim) so
+    // assertions on the error body's shape — `errors[0].code` — actually
+    // verify what production sends, rather than a stub's own guess at the
+    // shape.
+    const responseHelpers: { response: Record<string, unknown> } = {
+      response: {},
+    };
+    addCustomFunctionToResponse(responseHelpers);
     app.use((_req, res: ApiV3Response, next) => {
-      res.apiv3 = (data: unknown) => res.json(data);
-      res.apiv3Err = (error: unknown, statusCode?: number) => {
-        // Validation errors come as arrays and should return 400
-        const status = statusCode ?? (Array.isArray(error) ? 400 : 500);
-        const errorMessage =
-          typeof error === 'object' &&
-          error !== null &&
-          'message' in error &&
-          typeof error.message === 'string'
-            ? error.message
-            : String(error);
-        return res.status(status).json({ error: errorMessage });
-      };
+      Object.assign(res, responseHelpers.response);
       next();
     });
 
@@ -157,7 +153,7 @@ describe('GET /info', () => {
       expect(response.body.isNotFound).toBe(false);
     });
 
-    it('should return 403 when page is forbidden', async () => {
+    it('should return 404 when page is forbidden', async () => {
       const mockSpy = vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer');
       mockSpy.mockResolvedValue({
         data: null,
@@ -173,11 +169,21 @@ describe('GET /info', () => {
         .get('/info')
         .query({ pageId: validPageId });
 
-      expect(response.status).toBe(403);
-      expect(response.body).toHaveProperty('error');
+      // A requester without read access must not be able to tell a forbidden
+      // page apart from a missing one. See
+      // apps/app/.claude/rules/page-write-action-403-404.md.
+      expect(response.status).toBe(404);
+      expect(response.body.errors).toEqual([
+        expect.objectContaining({ code: 'notfound_or_forbidden' }),
+      ]);
+      // The body must not carry `isForbidden`/`isNotFound` either — a caller
+      // without read access must not learn which case this was from the
+      // body any more than from the status. See
+      // apps/app/.claude/rules/page-write-action-403-404.md.
+      expect(response.body.errors[0].args).toBeUndefined();
     });
 
-    it('should return 200 when page is not found but not forbidden', async () => {
+    it('should return 404 (same status) when page is not found and not forbidden', async () => {
       const mockSpy = vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer');
       mockSpy.mockResolvedValue({
         data: null,
@@ -193,10 +199,15 @@ describe('GET /info', () => {
         .get('/info')
         .query({ pageId: validPageId });
 
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('isNotFound');
-      expect(response.body.isNotFound).toBe(true);
-      expect(response.body.isForbidden).toBe(false);
+      expect(response.status).toBe(404);
+      expect(response.body.errors).toEqual([
+        expect.objectContaining({ code: 'notfound_or_forbidden' }),
+      ]);
+      // The body must not carry `isForbidden`/`isNotFound` either — a caller
+      // without read access must not learn which case this was from the
+      // body any more than from the status. See
+      // apps/app/.claude/rules/page-write-action-403-404.md.
+      expect(response.body.errors[0].args).toBeUndefined();
     });
   });
 
