@@ -68,6 +68,12 @@ export interface PageDocument extends IPage, Document<Types.ObjectId> {
   populateDataToShowRevision(
     shouldExcludeBody?: boolean,
   ): Promise<IPagePopulatedToShowRevision & PageDocument>;
+  publish(): void;
+  unpublish(): void;
+  // Declared explicitly despite the index signature above: omitting
+  // wipExpirationSeconds would otherwise compile and store `new Date(NaN)`,
+  // surfacing only as a save-time CastError.
+  makeWip(disableTtl: boolean, wipExpirationSeconds: number): void;
 }
 
 type TargetAndAncestorsResult = {
@@ -261,7 +267,7 @@ const schema = new Schema<PageDocument, PageModel>(
     commentCount: { type: Number, default: 0 },
     expandContentWidth: { type: Boolean },
     wip: { type: Boolean },
-    ttlTimestamp: { type: Date },
+    wipExpiredAt: { type: Date },
     updatedAt: { type: Date, default: Date.now }, // Do not use timetamps for updatedAt because it breaks 'updateMetadata: false' option
     deleteUser: { type: Schema.Types.ObjectId, ref: 'User' },
     deletedAt: { type: Date },
@@ -275,6 +281,13 @@ const schema = new Schema<PageDocument, PageModel>(
 // indexes
 schema.index({ createdAt: 1 });
 schema.index({ updatedAt: 1 });
+// sparse: only WIP pages awaiting expiry carry this field, so the index stays
+// proportional to them rather than to the whole collection. Safe for the only
+// query that uses it (`wipExpiredAt: { $lte: <Date> }`): a missing or null value
+// never satisfies a Date range comparison, so nothing the index omits is a hit.
+// Keep in sync with the createIndex options in the wipExpiredAt migration —
+// mismatched options on the same index name fail with IndexOptionsConflict.
+schema.index({ wipExpiredAt: 1 }, { sparse: true });
 // apply plugins
 schema.plugin(mongoosePaginate);
 schema.plugin(uniqueValidator);
@@ -1481,19 +1494,22 @@ schema.methods.calculateAndUpdateLatestRevisionBodyLength = async function (
 
 schema.methods.publish = function () {
   this.wip = undefined;
-  this.ttlTimestamp = undefined;
+  this.wipExpiredAt = undefined;
 };
 
 schema.methods.unpublish = function () {
   this.wip = true;
-  this.ttlTimestamp = undefined;
+  this.wipExpiredAt = undefined;
 };
 
-schema.methods.makeWip = function (disableTtl: boolean) {
+schema.methods.makeWip = function (
+  disableTtl: boolean,
+  wipExpirationSeconds: number,
+) {
   this.wip = true;
 
   if (!disableTtl) {
-    this.ttlTimestamp = new Date();
+    this.wipExpiredAt = new Date(Date.now() + wipExpirationSeconds * 1000);
   }
 };
 

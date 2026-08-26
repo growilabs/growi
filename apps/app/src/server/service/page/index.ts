@@ -662,7 +662,6 @@ class PageService implements IPageService {
       this.activityEvent.emit('updated', activity, page, preNotify);
     }
 
-    this.disableAncestorPagesTtl(newPagePath);
     return renamedPage;
   }
 
@@ -4450,7 +4449,12 @@ class PageService implements IPageService {
           const descendantCount = await Page.recountDescendantCount(
             document._id,
           );
-          await Page.findByIdAndUpdate(document._id, { descendantCount });
+          // Skip no-op writes: on a healthy tree almost every page is already
+          // correct, so this avoids rewriting the whole collection and shrinks the
+          // window in which a concurrent live edit could be clobbered.
+          if (descendantCount !== document.descendantCount) {
+            await Page.findByIdAndUpdate(document._id, { descendantCount });
+          }
         }
         callback();
       },
@@ -4477,10 +4481,37 @@ class PageService implements IPageService {
 
     await Page.incrementDescendantCountOfPageIds(ancestorPageIds, inc);
 
+    if (inc > 0) {
+      await this.clearWipExpirationOf(ancestorPageIds);
+    }
+
     const updateDescCountData: UpdateDescCountRawData = Object.fromEntries(
       ancestors.map((p) => [p._id.toString(), p.descendantCount + inc]),
     );
     this.emitUpdateDescCount(updateDescCountData);
+  }
+
+  /**
+   * A WIP page that gains a descendant must not auto-expire — deleting it would
+   * orphan that descendant. `makeWip()` already applies this rule at creation time
+   * via `disableTtl`, but that is a point-in-time snapshot; this keeps the invariant
+   * true for pages that acquire descendants later.
+   *
+   * Called from updateDescendantCountOfAncestors, which every descendant-adding
+   * path (create / rename / duplicate / revert / v5 migration) routes through — so
+   * "this page gained a descendant" and "this page must stop expiring" stay a single
+   * event. The ancestor ids are passed in rather than re-derived: the caller has
+   * already resolved them from the parent links.
+   */
+  private async clearWipExpirationOf(
+    ancestorPageIds: ObjectIdLike[],
+  ): Promise<void> {
+    const Page = mongoose.model<IPage, PageModel>('Page');
+
+    await Page.updateMany(
+      { _id: { $in: ancestorPageIds }, wipExpiredAt: { $ne: null } },
+      { $unset: { wipExpiredAt: true } },
+    );
   }
 
   private emitUpdateDescCount(data: UpdateDescCountRawData): void {
@@ -4940,8 +4971,11 @@ class PageService implements IPageService {
 
     // Make WIP
     if (options.wip) {
+      const wipExpirationSeconds = configManager.getConfig(
+        'app:wipPageExpirationSeconds',
+      );
       const hasChildren = await Page.exists({ parent: page._id });
-      page.makeWip(hasChildren != null); // disableTtl = hasChildren != null
+      page.makeWip(hasChildren != null, wipExpirationSeconds); // disableTtl = hasChildren != null
     }
 
     // Save
@@ -4991,8 +5025,6 @@ class PageService implements IPageService {
     options: IOptionsForCreate,
     pageOpId: ObjectIdLike,
   ): Promise<void> {
-    await this.disableAncestorPagesTtl(page.path);
-
     // Update descendantCount
     await this.updateDescendantCountOfAncestors(page._id, 1, false);
 
@@ -5078,21 +5110,6 @@ class PageService implements IPageService {
     },
   ): Promise<boolean> {
     return this.canProcessCreate(path, grantData, false);
-  }
-
-  private async disableAncestorPagesTtl(path: string): Promise<void> {
-    const Page = mongoose.model<PageDocument, PageModel>('Page');
-
-    const ancestorPaths = collectAncestorPaths(path);
-    const ancestorPageIds = await Page.aggregate([
-      { $match: { path: { $in: ancestorPaths, $nin: ['/'] }, isEmpty: false } },
-      { $project: { _id: 1 } },
-    ]);
-
-    await Page.updateMany(
-      { _id: { $in: ancestorPageIds } },
-      { $unset: { ttlTimestamp: true } },
-    );
   }
 
   /**
@@ -5347,7 +5364,7 @@ class PageService implements IPageService {
 
     // Once updated it's exempt from automatic deletion
     if (options.wip == null) {
-      newPageData.ttlTimestamp = undefined;
+      newPageData.wipExpiredAt = undefined;
     } else if (options.wip) {
       newPageData.unpublish();
     } else {
@@ -5624,44 +5641,6 @@ class PageService implements IPageService {
       hasYdocsNewerThanLatestRevision,
       awarenessStateSize: currentYdoc?.awareness.states.size,
     };
-  }
-
-  async createTtlIndex(): Promise<void> {
-    const wipPageExpirationSeconds =
-      configManager.getConfig('app:wipPageExpirationSeconds') ?? 172800;
-    const collection = mongoose.connection.collection('pages');
-
-    // DELETEME: migrations never runs on test environment (which should be fixed),
-    // until then, create collection if it does not exist to avoid the error when creating an index.
-    // MongoServerError: ns does not exist: growi_test_x.pages
-    await mongoose.connection.createCollection('pages').catch(() => {});
-
-    try {
-      const targetField = 'ttlTimestamp_1';
-
-      const indexes = await collection.indexes();
-      const foundTargetField = indexes.find((i) => i.name === targetField);
-
-      const isNotSpec =
-        foundTargetField?.expireAfterSeconds == null ||
-        foundTargetField?.expireAfterSeconds !== wipPageExpirationSeconds;
-      const shoudDropIndex = foundTargetField != null && isNotSpec;
-      const shoudCreateIndex = foundTargetField == null || shoudDropIndex;
-
-      if (shoudDropIndex) {
-        await collection.dropIndex(targetField);
-      }
-
-      if (shoudCreateIndex) {
-        await collection.createIndex(
-          { ttlTimestamp: 1 },
-          { expireAfterSeconds: wipPageExpirationSeconds },
-        );
-      }
-    } catch (err) {
-      logger.error('Failed to create TTL Index', err);
-      throw err;
-    }
   }
 }
 

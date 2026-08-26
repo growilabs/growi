@@ -17,6 +17,10 @@ import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
+import {
+  isRepairPageTreeRunning,
+  repairPageTree,
+} from '~/server/service/page/repair-page-tree';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
@@ -1083,6 +1087,78 @@ export const setup = (crowi: Crowi): Router => {
           new ErrorV3(msg, 'update-page-bulk-export-settings-failed'),
         );
       }
+    },
+  );
+
+  /**
+   * @swagger
+   *
+   *    /app-settings/repair-page-tree:
+   *      post:
+   *        tags: [AppSettings]
+   *        security:
+   *          - bearer: []
+   *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
+   *        summary: AccessToken supported.
+   *        description: >
+   *          Removes orphaned empty pages and recomputes descendantCount for every
+   *          page. Runs in the background; progress is written to the server log.
+   *        responses:
+   *          200:
+   *            description: Page tree repair has been started
+   *            content:
+   *              application/json:
+   *                schema:
+   *                  type: object
+   *                  properties:
+   *                    isStarted:
+   *                      type: boolean
+   *                      example: true
+   */
+  router.post(
+    '/repair-page-tree',
+    accessTokenParser([SCOPE.WRITE.ADMIN.APP], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    (_req: CrowiRequest, res: ApiV3Response) => {
+      const isMaintenanceMode = crowi.appService.isMaintenanceMode();
+      if (!isMaintenanceMode) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'GROWI is not maintenance mode. To repair the page tree, please activate the maintenance mode first.',
+            'not_maintenance_mode',
+          ),
+        );
+      }
+
+      // The admin UI disables its button after starting, but that state is
+      // per-browser and resets on reload — reject here so a reloaded page cannot
+      // stack a second collection-wide scan on top of the running one.
+      if (isRepairPageTreeRunning()) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'Page tree repair is already running. Please wait for it to finish; progress is written to the server log.',
+            'repair_already_running',
+          ),
+        );
+      }
+
+      // Walks the whole page collection, so it cannot complete within a request.
+      // Kicked off in the background like v5-schema-migration above; the caller
+      // learns the outcome from the server log, not from this response.
+      repairPageTree(crowi.pageService).catch((err) => {
+        logger.error('Failed to repair the page tree', err);
+      });
+
+      // emit before the response is sent — see rules/activity-recording.md
+      const parameters = {
+        action: SupportedAction.ACTION_ADMIN_PAGE_TREE_REPAIR,
+      };
+      activityEvent.emit('update', res.locals.activity._id, parameters);
+
+      return res.apiv3({ isStarted: true });
     },
   );
 

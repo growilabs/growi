@@ -387,9 +387,9 @@ model pages {
   revisionId               String?   @map("revision") @db.ObjectId
   seenUsers                String[]
   status                   String    @default("published")
-  ttlTimestamp             DateTime?
   updatedAt                DateTime  @default(now())
   wip                      Boolean?
+  wipExpiredAt             DateTime?
 
   creator          users?             @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   lastUpdateUser   users?             @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -409,7 +409,11 @@ model pages {
   @@index([creatorId], map: "creator_1")
   @@index([createdAt], map: "createdAt_1")
   @@index([updatedAt], map: "updatedAt_1")
-  @@index([ttlTimestamp], map: "ttlTimestamp_1")
+  // The mongoose schema declares this index as sparse; Prisma cannot express that,
+  // so once `prisma db push` takes over index creation (see .claude/rules/model.md)
+  // the sparse option has to be re-applied out of band. It must never regain
+  // expireAfterSeconds — see server/models/no-ttl-index-on-page.spec.ts.
+  @@index([wipExpiredAt], map: "wipExpiredAt_1")
 }
 
 model pagetagrelations {
