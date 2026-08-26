@@ -317,10 +317,8 @@ export const setup = (crowi) => {
    *                      $ref: '#/components/schemas/Page'
    *          400:
    *            description: revisionId is missing, or the destination is under a non-existent user's user page. An empty page may be renamed without revisionId.
-   *          403:
-   *            description: Page is forbidden.
    *          404:
-   *            description: Page is not found.
+   *            description: Page is not found or forbidden.
    *          409:
    *            description: The destination path is already taken, cannot be used, or revisionId is not the latest revision.
    *          500:
@@ -397,13 +395,14 @@ export const setup = (crowi) => {
         page = pageWithMeta.data;
 
         if (page == null) {
-          const { meta } = pageWithMeta;
+          // Always respond 404 regardless of forbidden vs not-found — see
+          // apps/app/.claude/rules/page-write-action-403-404.md
           return res.apiv3Err(
             new ErrorV3(
               `Page '${pageId}' is not found or forbidden`,
               'notfound_or_forbidden',
             ),
-            meta.isForbidden ? 403 : 404,
+            404,
           );
         }
 
@@ -499,9 +498,15 @@ export const setup = (crowi) => {
       // The user has permission to resume rename operation if page is returned.
       const page = await Page.findByIdAndViewer(pageId, user, null, true);
       if (page == null) {
-        const msg = 'The operation is forbidden for this user';
-        const code = 'forbidden-user';
-        return res.apiv3Err(new ErrorV3(msg, code), 403);
+        // Always respond 404 regardless of forbidden vs not-found — see
+        // apps/app/.claude/rules/page-write-action-403-404.md
+        return res.apiv3Err(
+          new ErrorV3(
+            `Page '${pageId}' is not found or forbidden`,
+            'notfound_or_forbidden',
+          ),
+          404,
+        );
       }
 
       const pageOp =
@@ -768,6 +773,8 @@ export const setup = (crowi) => {
    *
    *          403:
    *            description: Forbidden to duplicate page.
+   *          404:
+   *            description: Page is not found.
    *          500:
    *            description: Internal server error.
    */
@@ -811,7 +818,27 @@ export const setup = (crowi) => {
         );
       }
 
-      const page = await Page.findByIdAndViewer(pageId, req.user, null, true);
+      const pageWithMeta = await findPageAndMetaDataByViewer(
+        pageService,
+        pageGrantService,
+        {
+          pageId,
+          path: null,
+          user: req.user,
+          basicOnly: true,
+        },
+      );
+      const page = pageWithMeta.data;
+      if (page == null) {
+        return res.apiv3Err(
+          new ErrorV3(
+            `Page '${pageId}' is not found or forbidden`,
+            'notfound_or_forbidden',
+          ),
+          404,
+        );
+      }
+
       const disableUserPages = configManager.getConfig(
         'security:disableUserPages',
       );
@@ -826,8 +853,8 @@ export const setup = (crowi) => {
         }
       }
 
-      const isEmptyAndNotRecursively = page?.isEmpty && !isRecursively;
-      if (page == null || isEmptyAndNotRecursively) {
+      const isEmptyAndNotRecursively = page.isEmpty && !isRecursively;
+      if (isEmptyAndNotRecursively) {
         res.code = 'Page is not found';
         logger.error('Failed to find the pages');
         return res.apiv3Err(
@@ -835,7 +862,7 @@ export const setup = (crowi) => {
             `Page '${pageId}' is not found or forbidden`,
             'notfound_or_forbidden',
           ),
-          401,
+          404,
         );
       }
 
@@ -1046,8 +1073,14 @@ export const setup = (crowi) => {
         logger.error('Failed to find pages to delete.', err);
         return res.apiv3Err(new ErrorV3('Failed to find pages to delete.'));
       }
+      // `findByIdsAndViewer` is viewer-filtered, so the requested page can come
+      // back missing from `pagesToDelete` (already deleted, or not readable by
+      // this user) — guard the length before indexing, or a nonexistent/
+      // unreadable pageId throws here instead of falling through to the
+      // generic "No pages can be deleted." response below.
       if (
         isAnyoneWithTheLink &&
+        pagesToDelete.length > 0 &&
         pagesToDelete[0].grant !== PageGrant.GRANT_RESTRICTED
       ) {
         return res.apiv3Err(

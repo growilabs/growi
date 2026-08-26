@@ -9,6 +9,7 @@ import * as FormDataModule from 'form-data';
 import mongoose, { Types as MongooseTypes } from 'mongoose';
 import { basename } from 'pathe';
 
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import {
   type AdminRescueOutcome,
   G2G_PROGRESS_STATUS,
@@ -62,8 +63,10 @@ import {
   type TransferBlocker,
 } from './g2g-transfer-transferability';
 import {
+  type CollectionInput,
   detectUniqueConflicts,
   readArchiveUserIdentity,
+  toLookup,
   type UniqueConflictReport,
 } from './import/detect-unique-conflicts';
 import { generateOverwriteParams } from './import/overwrite-params';
@@ -1522,11 +1525,35 @@ export class G2GTransferReceiverService implements Receiver {
       return fileName == null ? null : importService.getFile(fileName);
     };
 
+    const collections: CollectionInput[] = [
+      {
+        collection: 'users',
+        jsonPath: resolvePath('users'),
+        lookup: toLookup(mongoose.model<IUser>('User')),
+      },
+      {
+        collection: 'usergroups',
+        jsonPath: resolvePath('usergroups'),
+        lookup: toLookup(UserGroup),
+      },
+      {
+        collection: 'externalaccounts',
+        jsonPath: resolvePath('externalaccounts'),
+        // `ExternalAccount` has no default export (see models/external-account.ts): it is
+        // fetched from Mongoose's model registry, same as `User` above. This resolves
+        // because the server always loads every model file at boot, before any G2G
+        // receiver route can run.
+        lookup: toLookup(mongoose.model('ExternalAccount')),
+      },
+      {
+        collection: 'externalusergroups',
+        jsonPath: resolvePath('externalusergroups'),
+        lookup: toLookup(ExternalUserGroup),
+      },
+    ];
+
     return detectUniqueConflicts({
-      usersJsonPath: resolvePath('users'),
-      groupsJsonPath: resolvePath('usergroups'),
-      userModel: mongoose.model<IUser>('User'),
-      userGroupModel: UserGroup,
+      collections,
       replaceTargetCollections,
     });
   }

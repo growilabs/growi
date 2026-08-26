@@ -1,6 +1,6 @@
 {
   "_source": "https://models.dev/api.json (MIT)",
-  "_generatedAt": "2026-08-10T11:39:05.402Z",
+  "_generatedAt": "2026-08-25T14:10:09.998Z",
   "models": {
     "openai": [
       {
@@ -274,6 +274,10 @@
       {
         "id": "gemini-3.6-flash",
         "name": "Gemini 3.6 Flash"
+      },
+      {
+        "id": "gemini-3.7-flash",
+        "name": "Gemini 3.7 Flash"
       },
       {
         "id": "gemini-flash-latest",

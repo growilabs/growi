@@ -207,7 +207,7 @@ const FileUploadSetting = (): JSX.Element => {
         />
       )}
 
-      {!isCloud && <AdminUpdateButtonRow type="submit" disabled={isLoading} />}
+      <AdminUpdateButtonRow type="submit" disabled={isLoading} />
     </form>
   );
 };
