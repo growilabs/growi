@@ -3,11 +3,11 @@
  * kickoff for inline comments (design.md: "InlineCommentService").
  *
  * This is the sole write path for `comments` rows with `isInline: true`
- * (design.md: Responsibilities & Constraints). `create()` and `createReply()`
- * are implemented here; `listByPageId`/`setResolved` (design.md's Service
- * Interface) are added by later tasks (3.3–3.4) as sibling methods on this
- * same class — this file is structured so those additions don't need to
- * touch the existing methods.
+ * (design.md: Responsibilities & Constraints). `create()`, `createReply()`,
+ * and `listByPageId()` are implemented here; `setResolved` (design.md's
+ * Service Interface) is added by a later task (3.4) as a sibling method on
+ * this same class — this file is structured so that addition doesn't need
+ * to touch the existing methods.
  */
 
 import type { IPageHasId } from '@growi/core';
@@ -27,6 +27,7 @@ import type {
   IInlineComment,
   InlineCommentAnchor,
   InlineCommentReply,
+  InlineCommentWithReplies,
 } from '../../interfaces';
 
 const logger = loggerFactory('growi:features:inline-comment:service');
@@ -99,6 +100,19 @@ type InlineCommentReplyCreateResult = Prisma.Result<
 // directly from `this.deps.prisma.comments.findUnique(...)`'s call-site
 // return type, which is already derived from the real `PrismaClient`.
 
+/**
+ * The `comments` row shape `listByPageId()`'s two `findMany()` queries (no
+ * `include`) read back — one row shape shared by both the origin-comment
+ * query and the replies query. Derived the same way
+ * `activity-export-cursor.ts` derives `activities.findMany()`'s row type
+ * (`Awaited<ReturnType<...>>[number]`), an equally-proven alternative to
+ * `Prisma.Result<...>` for this codebase (see
+ * `.kiro/specs/inline-comment/tasks.md`'s Implementation Notes).
+ */
+type InlineCommentListRow = Awaited<
+  ReturnType<PrismaClient['comments']['findMany']>
+>[number];
+
 export interface InlineCommentServiceDeps {
   prisma: Pick<PrismaClient, 'comments' | 'activities'>;
   commentService: Pick<CommentService, 'prepareMentionNotifications'>;
@@ -166,6 +180,79 @@ function toInlineCommentReply(
 ): InlineCommentReply {
   // createReply() always writes creatorId/replyToId together, so a row it
   // just read back from its own insert is guaranteed to have them.
+  if (row.creatorId == null || row.replyToId == null) {
+    throw new Error(
+      `Inline comment reply row '${row.id}' is missing required fields`,
+    );
+  }
+
+  return {
+    id: row.id,
+    pageId: row.pageId,
+    creatorId: row.creatorId,
+    comment: row.comment,
+    replyToId: row.replyToId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/**
+ * Maps a `listByPageId()` origin-comment row (`InlineCommentListRow`) to the
+ * anchor-bearing `IInlineComment` fields — the same fields `toIInlineComment`
+ * produces, but for a row that never carried a `page` relation (the
+ * `findMany()` this method uses requests no `include`, unlike `create()`'s
+ * insert-and-read-back).
+ */
+function toIInlineCommentFromListRow(
+  row: InlineCommentListRow,
+): IInlineComment {
+  // listByPageId only ever queries isInline: true, replyToId: null rows
+  // (origin comments), which — like create()'s insert — always carry these
+  // anchor fields together.
+  if (
+    row.creatorId == null ||
+    row.quote == null ||
+    row.prefix == null ||
+    row.suffix == null ||
+    row.approxOffset == null ||
+    row.anchorOriginRevisionId == null
+  ) {
+    throw new Error(
+      `Inline comment row '${row.id}' is missing required anchor fields`,
+    );
+  }
+
+  return {
+    id: row.id,
+    pageId: row.pageId,
+    creatorId: row.creatorId,
+    comment: row.comment,
+    anchorOriginRevisionId: row.anchorOriginRevisionId,
+    anchor: {
+      quote: row.quote,
+      prefix: row.prefix,
+      suffix: row.suffix,
+      approxOffset: row.approxOffset,
+    },
+    resolvedById: row.resolvedById,
+    resolvedAt: row.resolvedAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/**
+ * Maps a `listByPageId()` reply row (`InlineCommentListRow`) to
+ * `InlineCommentReply` — the reply-side counterpart of
+ * `toIInlineCommentFromListRow` above.
+ */
+function toInlineCommentReplyFromListRow(
+  row: InlineCommentListRow,
+): InlineCommentReply {
+  // listByPageId only ever queries isInline: true, replyToId: { in: [...] }
+  // rows (replies), which always carry creatorId/replyToId together — same
+  // guarantee createReply()'s insert relies on.
   if (row.creatorId == null || row.replyToId == null) {
     throw new Error(
       `Inline comment reply row '${row.id}' is missing required fields`,
@@ -352,5 +439,59 @@ export class InlineCommentService {
     }
 
     return toInlineCommentReply(created);
+  }
+
+  /**
+   * Lists every inline comment for a page, with each origin comment's
+   * replies nested under it (design.md's Service Interface —
+   * `listByPageId(pageId: string): Promise<InlineComment[]>; // 各要素が返信のネスト配列を含む`).
+   *
+   * - No existing `comments` extension method fetches "origin + replies"
+   *   together (`removeWithReplies` is delete-only — see design.md's
+   *   Responsibilities & Constraints and `.claude/skills` testing note in
+   *   this file's header comment), so this assembles the nesting itself:
+   *   one `findMany()` for origin comments (`isInline: true`,
+   *   `replyToId: null`), then one `findMany()` for every reply to any of
+   *   those origins (`replyToId: { in: [...] }`) in a single round trip
+   *   rather than one query per origin.
+   * - Both queries order by `createdAt: 'desc'`, matching the direction the
+   *   existing `findCommentsByPageId`/`findCommentsByRevisionId` extension
+   *   methods already use for the page-footer comment thread (see
+   *   `apps/app/src/features/comment/server/models/comment.ts`) — kept
+   *   consistent with that convention since design.md does not pin a
+   *   direction for this query (requirement 2.6 only says "作成日時順",
+   *   without specifying ascending or descending).
+   * - A reply is matched to its origin by `replyToId`; an origin with no
+   *   matching rows gets an empty `replies` array (never `undefined`).
+   */
+  async listByPageId(pageId: string): Promise<InlineCommentWithReplies[]> {
+    const originRows = await this.deps.prisma.comments.findMany({
+      where: { pageId, isInline: true, replyToId: null },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (originRows.length === 0) {
+      return [];
+    }
+
+    const replyRows = await this.deps.prisma.comments.findMany({
+      where: {
+        isInline: true,
+        replyToId: { in: originRows.map((row) => row.id) },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const repliesByOriginId = replyRows.reduce((map, row) => {
+      const reply = toInlineCommentReplyFromListRow(row);
+      const existing = map.get(reply.replyToId) ?? [];
+      map.set(reply.replyToId, [...existing, reply]);
+      return map;
+    }, new Map<string, InlineCommentReply[]>());
+
+    return originRows.map((row) => ({
+      ...toIInlineCommentFromListRow(row),
+      replies: repliesByOriginId.get(row.id) ?? [],
+    }));
   }
 }

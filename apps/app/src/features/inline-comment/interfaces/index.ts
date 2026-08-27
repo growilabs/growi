@@ -65,3 +65,15 @@ export interface InlineCommentReply {
   createdAt: Date;
   updatedAt: Date;
 }
+
+/**
+ * An origin inline comment together with its replies, nested per
+ * design.md's `listByPageId` Service Interface
+ * (`listByPageId(pageId: string): Promise<InlineComment[]>; // 各要素が返信のネスト配列を含む`)
+ * and Domain Model (`InlineComment` is the aggregate root holding a nested
+ * `InlineCommentReply[]`).
+ */
+export interface InlineCommentWithReplies extends IInlineComment {
+  /** Replies to this origin comment, ordered the same way as the top-level list. */
+  replies: InlineCommentReply[];
+}

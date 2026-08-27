@@ -114,6 +114,19 @@ function makeReplyRow(overrides: Partial<CommentsRow> = {}): CommentsRow {
   });
 }
 
+/** An origin (anchored) inline comment row, as `listByPageId()`'s `findMany()` reads it back (no `page` relation). */
+function makeOriginRow(overrides: Partial<CommentsRow> = {}): CommentsRow {
+  return makeCommentRow({
+    quote: 'the quoted text',
+    prefix: 'preceding context',
+    suffix: 'following context',
+    approxOffset: 10,
+    anchorOriginRevisionId: makeId(),
+    replyToId: null,
+    ...overrides,
+  });
+}
+
 /** The `findUnique` row used to validate a `createReply()` `parentId`. */
 function makeParentRow(
   overrides: Partial<CommentsRow> & { page?: Partial<PagesRow> } = {},
@@ -185,6 +198,31 @@ function makeReplyDeps(
       notify: vi.fn().mockResolvedValue(undefined),
     }),
   });
+  return { prisma, commentService };
+}
+
+/**
+ * Builds a fully-mocked `InlineCommentServiceDeps` for `listByPageId()`:
+ * `findMany` is stubbed to answer the origin-comment query with
+ * `originRows` and the replies query with `replyRows`, distinguished by
+ * `where.replyToId` (`null` for origins, `{ in: [...] }` for replies) —
+ * mirroring the two distinct `findMany` calls `listByPageId()` makes.
+ */
+function makeListDeps(
+  originRows: CommentsRow[],
+  replyRows: CommentsRow[] = [],
+): InlineCommentServiceDeps {
+  const prisma = mock<PrismaClient>({
+    comments: {
+      findMany: vi.fn().mockImplementation(({ where }) => {
+        if (where.replyToId === null) {
+          return Promise.resolve(originRows);
+        }
+        return Promise.resolve(replyRows);
+      }),
+    },
+  });
+  const commentService = mock<PickedCommentService>({});
   return { prisma, commentService };
 }
 
@@ -516,5 +554,112 @@ describe('InlineCommentService.createReply', () => {
       'activity-created',
       'prepare-mention-notifications',
     ]);
+  });
+});
+
+describe('InlineCommentService.listByPageId', () => {
+  it('起点コメントに、対応する返信をネストした配列として、双方とも作成日時順に並べて返す', async () => {
+    const pageId = makeId();
+    const now = Date.now();
+
+    // Two origin comments, newest first — the order listByPageId must
+    // preserve at the top level.
+    const originNewer = makeOriginRow({
+      pageId,
+      comment: 'origin newer',
+      createdAt: new Date(now),
+    });
+    const originOlder = makeOriginRow({
+      pageId,
+      comment: 'origin older',
+      createdAt: new Date(now - 10_000),
+    });
+
+    // Two replies to originOlder, newest first — the order listByPageId
+    // must preserve within that origin's nested `replies` array. A reply to
+    // originNewer confirms replies are matched to the correct parent, not
+    // just concatenated.
+    const replyToOlderNewer = makeReplyRow({
+      pageId,
+      comment: 'reply to older, newer',
+      replyToId: originOlder.id,
+      createdAt: new Date(now - 1_000),
+    });
+    const replyToOlderOlder = makeReplyRow({
+      pageId,
+      comment: 'reply to older, older',
+      replyToId: originOlder.id,
+      createdAt: new Date(now - 5_000),
+    });
+    const replyToNewer = makeReplyRow({
+      pageId,
+      comment: 'reply to newer',
+      replyToId: originNewer.id,
+      createdAt: new Date(now - 500),
+    });
+
+    const deps = makeListDeps(
+      [originNewer, originOlder],
+      [replyToOlderNewer, replyToOlderOlder, replyToNewer],
+    );
+    const service = new InlineCommentService(deps);
+
+    const result = await service.listByPageId(pageId);
+
+    expect(result.map((c) => c.comment)).toEqual([
+      'origin newer',
+      'origin older',
+    ]);
+    expect(
+      result
+        .find((c) => c.id === originNewer.id)
+        ?.replies.map((r) => r.comment),
+    ).toEqual(['reply to newer']);
+    expect(
+      result
+        .find((c) => c.id === originOlder.id)
+        ?.replies.map((r) => r.comment),
+    ).toEqual(['reply to older, newer', 'reply to older, older']);
+
+    // The nested-order assertions above only prove the assembly step
+    // preserves whatever order `findMany` happens to return — they say
+    // nothing about whether the service actually asked Prisma to sort by
+    // `createdAt`. Assert on the query arguments directly (requirement
+    // 2.6), the same way create()'s tests inspect `.mock.calls[0][0].data`
+    // for requirement 1.4.
+    const findManyCalls = vi.mocked(deps.prisma.comments.findMany).mock.calls;
+    const originCall = findManyCalls.find(
+      (call) => call[0]?.where?.replyToId === null,
+    );
+    const replyCall = findManyCalls.find((call) => {
+      const replyToId = call[0]?.where?.replyToId;
+      return replyToId != null && typeof replyToId === 'object';
+    });
+    expect(originCall?.[0]?.orderBy).toEqual({ createdAt: 'desc' });
+    expect(replyCall?.[0]?.orderBy).toEqual({ createdAt: 'desc' });
+  });
+
+  it('返信を持たない起点コメントは空の replies 配列を返す（undefined/null にはしない）', async () => {
+    const pageId = makeId();
+    const originRow = makeOriginRow({ pageId, comment: 'no replies here' });
+    const deps = makeListDeps([originRow], []);
+    const service = new InlineCommentService(deps);
+
+    const result = await service.listByPageId(pageId);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].replies).toEqual([]);
+  });
+
+  it('ページにインラインコメントが1件もない場合は空配列を返し、返信の取得は行わない', async () => {
+    const deps = makeListDeps([], []);
+    const service = new InlineCommentService(deps);
+
+    const result = await service.listByPageId(makeId());
+
+    expect(result).toEqual([]);
+    // Only the origin-comment query ran — no wasted second round trip when
+    // there is nothing to look up replies for.
+    expect(deps.prisma.comments.findMany).toHaveBeenCalledTimes(1);
   });
 });
