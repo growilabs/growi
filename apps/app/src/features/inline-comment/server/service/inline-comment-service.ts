@@ -374,6 +374,16 @@ export class InlineCommentService {
         creatorId,
         comment: input.comment,
         isInline: true,
+        // Explicitly null (not omitted): omitting this field leaves it
+        // entirely absent in the underlying MongoDB document, and Prisma's
+        // MongoDB connector does not treat "field absent" as matching a
+        // `where: { replyToId: null }` filter — which is exactly the filter
+        // listByPageId() uses to select origin comments. An origin comment
+        // is still, semantically, "not a reply" (replyToId: null); this
+        // just makes that `null` a stored value instead of an absent field
+        // so the read-side filter can see it. See list.integ.ts (real DB)
+        // for the regression coverage that would have caught this.
+        replyToId: null,
         quote: input.anchor.quote,
         prefix: input.anchor.prefix,
         suffix: input.anchor.suffix,

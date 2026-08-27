@@ -95,7 +95,7 @@
   - _Requirements: 4.1, 4.2, 4.3, 4.5_
   - _Depends: 3.2_
 
-- [ ] 3.5 apiv3ルートを実装し配線する
+- [x] 3.5 apiv3ルートを実装し配線する
   - `POST /_api/v3/inline-comments`（3.1）、`POST /_api/v3/inline-comments/:id/replies`（3.2）、`GET /_api/v3/inline-comments`（3.3）、`PUT /_api/v3/inline-comments/:id/resolve`（3.4）を実装する
   - すべてのルートに `accessTokenParser` → `loginRequired` → express-validatorチェーン → `apiV3FormValidator` を適用し、`certifySharedPage` はいずれのルートにも適用しない
   - `apps/app/src/server/routes/apiv3/index.js` に新規ルートをマウントする
@@ -182,3 +182,4 @@
 - 3.2で判明（3.3/3.4にも適用）：`InlineCommentServiceDeps.prisma` の型は**手書きインターフェースを作らず**、`import type { PrismaClient } from '~/utils/prisma'` を型のみ取り込みして `Pick<PrismaClient, 'comments' | 'activities'>` のように絞り込む。行の型が要る場合も `Prisma.Result<PrismaClient['comments'], {...}, 'create'>`（`import type { Prisma } from '~/generated/prisma/client'`）のように実体から導出する。手書き型を本物のPrismaクライアントに合わせ込もうとすると（オーバーロード／ユニオン型／実行時ガードいずれも）代入不能や実行時の誤判定を繰り返す（3.2で3ラウンド分のレビュー往復の原因になった）。既存の参考実装は `apps/app/src/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron/steps/activity-export-cursor.ts` とその `.spec.ts`（`mock<PrismaClient>({...})` によるモック）。
 - 3.2〜3.4：`create()`/`createReply()`/`setResolved()` の事前条件エラーは、いずれも区別のない汎用 `Error` を投げる（対象なし・非インライン行・返信ID指定、いずれも同じ形）。**3.5でルートを配線する際、design.md の API Contract（400 vs 404 の使い分け）をそのままには実現できない** — サービス側は現状「例外を投げるか投げないか」しか教えないため、400/404を分けたいならルート層で対象行を再取得するか、サービス側にエラー種別を持たせる変更が必要（後者は3.2〜3.4の再オープンになるため、3.5側での対応を推奨）。
 - 3.4：`comments` テーブルは通常コメントとインラインコメントの共有テーブルであり、通常コメント行も `replyToId: null` を持つ。起点コメントかどうかの事前条件チェックは `replyToId === null` だけでなく **`isInline === true` も必ず確認する**（`setResolved`/`createReply` とも同じ理由でこのチェックが必要）。
+- 3.5：`create()`（3.1）が `replyToId` を明示的に `null` セットしていなかったため、MongoDB上でフィールド自体が欠落し、`listByPageId()`（3.3）の `where: { replyToId: null }` に一致しない不具合を発見・修正した（Prismaの Mongo コネクタは `null` フィルタを「欠落」ではなく「明示的なnull」にのみマッチさせる。生ドライバの `null` フィルタは欠落にもマッチするため挙動が異なる点に注意）。`create()` の `data` に `replyToId: null` を追加する1行修正のみ。400/404 の使い分けは `create-reply.ts`/`resolve.ts` がルート側で対象行を `findUnique` により事前取得することで実現（サービス層は変更していない）。ページ権限チェックは `findPageAndMetaDataByViewer` を使い、`apps/app/.claude/rules/page-write-action-403-404.md` に従って403/404を常に404に統一している（design.mdのAPI Contract表が403としている箇所も含む）。未ログイン時はこのリポジトリの `loginRequiredFactory` がapiv3全体で403を返す仕様のため、要件文の「401」はこのタスクでは403として実現されている（コードベース全体の既存挙動）。

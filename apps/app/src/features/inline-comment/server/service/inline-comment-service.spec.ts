@@ -367,6 +367,38 @@ describe('InlineCommentService.create', () => {
     expect(result.anchorOriginRevisionId).toBe(anchorOriginRevisionId);
   });
 
+  it('挿入する data に replyToId: null を明示的に含める（省略しない）', async () => {
+    // Regression test for a real defect found while wiring the apiv3 routes
+    // (task 3.5): omitting `replyToId` here leaves the field entirely absent
+    // on the underlying MongoDB document (rather than stored as `null`), and
+    // Prisma's MongoDB connector's `where: { replyToId: null }` filter —
+    // exactly what listByPageId() uses to select origin comments — does not
+    // match a document where the field is absent. A mock can't reproduce
+    // that Mongo-connector-specific null-vs-absent distinction (this test
+    // only locks the field-presence contract so it can't silently regress
+    // again); the real regression coverage for the Mongo semantics lives in
+    // list.integ.ts's "lists only the isInline:true origin comments..." test
+    // (real DB, no mocks).
+    const createdRow = makeCreatedRow();
+    const deps = makeDeps(createdRow);
+    const service = new InlineCommentService(deps);
+
+    await service.create(
+      {
+        pageId: makeId(),
+        anchorOriginRevisionId: makeId(),
+        comment: 'x',
+        anchor: { quote: 'q', prefix: 'p', suffix: 's', approxOffset: 0 },
+      },
+      makeId(),
+    );
+
+    const createArgs = vi.mocked(deps.prisma.comments.create).mock
+      .calls[0][0] as { data: { replyToId?: string | null } };
+    expect(createArgs.data).toHaveProperty('replyToId');
+    expect(createArgs.data.replyToId).toBeNull();
+  });
+
   it('Activity レコードを発行してから prepareMentionNotifications を呼び出す', async () => {
     const createdRow = makeCreatedRow();
     const deps = makeDeps(createdRow);

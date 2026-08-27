@@ -9,6 +9,10 @@ import {
   createVaultAdminRouterWithDeps,
   createVaultPageRouterWithDeps,
 } from '~/features/growi-vault/server';
+import { createInlineCommentRouteHandlersFactory } from '~/features/inline-comment/server/routes/create';
+import { createInlineCommentReplyRouteHandlersFactory } from '~/features/inline-comment/server/routes/create-reply';
+import { listInlineCommentsRouteHandlersFactory } from '~/features/inline-comment/server/routes/list';
+import { resolveInlineCommentRouteHandlersFactory } from '~/features/inline-comment/server/routes/resolve';
 import { factory as mastraRouteFactory } from '~/features/mastra/server/routes';
 import { factory as adminAiSettingsRouteFactory } from '~/features/mastra/server/routes/admin-ai-settings';
 import newsRoute from '~/features/news/server/routes/news';
@@ -202,6 +206,29 @@ export const setup = (crowi, app) => {
 
   // vault user API (POST /page/reconcile) — loginRequired only, no adminRequired
   router.use('/vault', createVaultPageRouterWithDeps(crowi));
+
+  {
+    // certifySharedPage is intentionally never applied to any of these routes
+    // (requirement 6.1 — .kiro/specs/inline-comment/design.md).
+    const inlineCommentsRouter = express.Router();
+    inlineCommentsRouter.post(
+      '/',
+      createInlineCommentRouteHandlersFactory(crowi),
+    );
+    inlineCommentsRouter.post(
+      '/:id/replies',
+      createInlineCommentReplyRouteHandlersFactory(crowi),
+    );
+    inlineCommentsRouter.get(
+      '/',
+      listInlineCommentsRouteHandlersFactory(crowi),
+    );
+    inlineCommentsRouter.put(
+      '/:id/resolve',
+      resolveInlineCommentRouteHandlersFactory(crowi),
+    );
+    router.use('/inline-comments', inlineCommentsRouter);
+  }
 
   router.use('/page-listing', pageListing(crowi));
 
