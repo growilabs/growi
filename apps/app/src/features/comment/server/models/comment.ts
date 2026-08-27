@@ -14,11 +14,23 @@ const commentSchema = new Schema(
     comment: { type: String, required: true },
     commentPosition: { type: Number, default: -1 },
     replyTo: { type: Schema.Types.ObjectId },
+    isInline: { type: Boolean, default: false },
+    quote: { type: String },
+    prefix: { type: String },
+    suffix: { type: String },
+    approxOffset: { type: Number },
+    anchorOriginRevisionId: { type: Schema.Types.ObjectId, ref: 'Revision' },
+    resolvedById: { type: Schema.Types.ObjectId, ref: 'User' },
+    resolvedAt: { type: Date },
   },
   {
     timestamps: true,
   },
 );
+// Equivalent to Prisma's `@@index([pageId, isInline])` (schema.prisma).
+// Mongoose still owns index creation until every model has been migrated
+// to Prisma — see .claude/rules/model.md.
+commentSchema.index({ page: 1, isInline: 1 });
 getOrCreateModel('Comment', commentSchema);
 
 export const extension = Prisma.defineExtension((client) => {

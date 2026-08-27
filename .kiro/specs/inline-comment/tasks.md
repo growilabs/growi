@@ -8,7 +8,7 @@
   - 観測できる完了条件：`prisma validate`（または `pnpm run app:build` に含まれるPrisma検証ステップ）が新しいリレーション名・フィールド定義でエラーなく通る
   - _Requirements: 1.2, 1.4, 4.1, 4.5, 5.4, 5.5_
 
-- [ ] 1.2 `comments` Mongooseスキーマを同じ形に同期させる
+- [x] 1.2 `comments` Mongooseスキーマを同じ形に同期させる
   - `apps/app/src/features/comment/server/models/comment.ts` に1.1と同じフィールド（`isInline`/アンカー4項目/`anchorOriginRevisionId`/`resolvedById`/`resolvedAt`）を追加する
   - `@@index([pageId, isInline])` に対応するインデックスをMongooseスキーマ側で宣言する（`.claude/rules/model.md` の通り、インデックス作成は引き続きMongooseが担う）
   - 観測できる完了条件：新規デプロイ環境でコレクション作成・インデックス作成が完走する（結合テストまたはローカルの `mongosh`/Nodeスクリプトでインデックス一覧に `pageId_1_isInline_1` 相当が存在することを確認する）
