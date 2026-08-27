@@ -4,10 +4,15 @@ test.describe('Create page button', () => {
   test('click and autofocus to title text input', async ({ page }) => {
     await page.goto('/');
 
-    await page
-      .getByTestId('grw-page-create-button')
-      .getByRole('button', { name: 'Create' })
-      .click();
+    // Click the container directly instead of scoping into a role-based
+    // locator: `getByRole('button', { name: 'Create' })` substring-matches
+    // both the create button (accessible name "Create edit") and the
+    // dropend toggle (aria-label "Open create page menu"), which enters the
+    // accessibility tree once hover state flips `aria-hidden` to false —
+    // itself triggered by this click's own hover step — causing a strict
+    // mode violation (see issue #11784). Same pattern already used in
+    // access-to-page.spec.ts.
+    await page.getByTestId('grw-page-create-button').click();
 
     // should be focused
     await expect(page.getByPlaceholder('Input page name')).toBeFocused();
