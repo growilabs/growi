@@ -81,6 +81,28 @@ describe('matchQuote', () => {
       expect(nearSecond.startOffset).toBe(secondStart);
     });
 
+    it('compares approxOffset with the candidates in normalized coordinates', () => {
+      // Ten composition-exclusion characters up front: each is one code unit in
+      // the original text and two once normalized, so the candidates sit ten
+      // code units later in normalized coordinates than in the original. The
+      // anchor is placed just past the midpoint between the two occurrences, so
+      // comparing a raw approxOffset against normalized candidate starts picks
+      // the wrong one.
+      const text = `${'क़'.repeat(10)} alpha quikc brown fox beta gamma delta quikc brown fox omega`;
+      const secondStart = text.lastIndexOf('quikc brown fox');
+      const midpoint = Math.floor(
+        (text.indexOf('quikc brown fox') + secondStart) / 2,
+      );
+
+      const result = matchQuote(
+        text,
+        anchorOf('quick brown fox', midpoint + 5),
+      );
+
+      expect(result.status).toBe('fuzzy');
+      expect(result.startOffset).toBe(secondStart);
+    });
+
     it('returns not_found when neither an exact nor a fuzzy match exists', () => {
       const result = matchQuote(
         'nothing here resembles the stored selection',
