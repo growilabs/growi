@@ -101,4 +101,22 @@ describe('resolveAccessibleAttachment', () => {
     expect(isAccessiblePageByViewer).not.toHaveBeenCalled();
     expect(result).toEqual({ attachment });
   });
+
+  it('populates the requested field in a single query when populate is given', async () => {
+    const attachment = buildAttachment(false);
+    const populate = vi.fn().mockResolvedValue(attachment);
+    vi.mocked(Attachment.findById).mockReturnValue({
+      populate,
+    } as unknown as ReturnType<typeof Attachment.findById>);
+
+    const result = await resolveAccessibleAttachment(
+      'attachment1',
+      undefined,
+      false,
+      'creator',
+    );
+
+    expect(populate).toHaveBeenCalledWith('creator');
+    expect(result).toEqual({ attachment });
+  });
 });

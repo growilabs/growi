@@ -21,7 +21,7 @@ import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
 import { excludeReadOnlyUser } from '../../middlewares/exclude-read-only-user';
-import { resolveAccessibleAttachment } from '../attachment/resolve-accessible-attachment';
+import { resolveAccessibleAttachment } from '../../service/attachment/resolve-accessible-attachment';
 
 const logger = loggerFactory('growi:routes:apiv3:attachment');
 
@@ -494,6 +494,7 @@ export const setup = (crowi) => {
           attachmentId,
           req.user,
           isSharedPage ?? false,
+          'creator',
         );
 
         if ('errorCode' in result) {
@@ -502,7 +503,6 @@ export const setup = (crowi) => {
         }
 
         const { attachment } = result;
-        await attachment.populate('creator');
 
         if (attachment.creator != null && attachment.creator instanceof User) {
           attachment.creator = serializeUserSecurely(attachment.creator);

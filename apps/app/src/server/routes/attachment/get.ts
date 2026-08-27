@@ -22,8 +22,8 @@ import {
   type RequestToAllowShareLink,
 } from '../../middlewares/certify-shared-page-attachment';
 import type { IAttachmentDocument } from '../../models/attachment';
+import { resolveAccessibleAttachment } from '../../service/attachment/resolve-accessible-attachment';
 import ApiResponse from '../../util/apiResponse';
-import { resolveAccessibleAttachment } from './resolve-accessible-attachment';
 
 const logger = loggerFactory('growi:routes:attachment:get');
 

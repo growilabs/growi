@@ -26,8 +26,11 @@ export const resolveAccessibleAttachment = async (
   attachmentId: string,
   user: IUser | undefined,
   isSharedPage: boolean,
+  populate?: string,
 ): Promise<ResolveAccessibleAttachmentResult> => {
-  const attachment = await Attachment.findById(attachmentId);
+  const query = Attachment.findById(attachmentId);
+  const attachment =
+    populate != null ? await query.populate(populate) : await query;
 
   if (attachment == null) {
     return { errorCode: 'not_found' };
