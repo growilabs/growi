@@ -32,7 +32,22 @@ describe('PageLinkService.findBacklinks (integration)', () => {
   let viewerGroupId: Types.ObjectId;
   let foreignGroupId: Types.ObjectId;
 
-  const service = () => new PageLinkService(mock<Crowi>());
+  // findBacklinks needs nothing from crowi, but the constructor reads the upsert queue's pacing
+  // budget from config. Answered per key rather than with one value for all: a duty cycle outside
+  // 1-100 is rejected, and the resulting fallback warning on every construction would be the same
+  // warning a real misconfiguration produces.
+  const service = () =>
+    new PageLinkService(
+      mock<Crowi>({
+        configManager: {
+          getConfig: vi
+            .fn()
+            .mockImplementation((key: string) =>
+              key === 'backlinks:dutyCyclePercent' ? 20 : 1000,
+            ),
+        },
+      }),
+    );
 
   // --- seeding helpers ---------------------------------------------------
 

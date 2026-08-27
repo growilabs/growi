@@ -5,9 +5,9 @@ import type { PageDocument, PageModel } from '~/server/models/page';
 import PageModelFactory from '~/server/models/page';
 import PageRedirect from '~/server/models/page-redirect';
 
-import { resolveToPages } from './target-page-resolution';
+import { resolveToPageIds } from './target-page-resolution';
 
-describe('resolveToPages (integration)', () => {
+describe('resolveToPageIds (integration)', () => {
   let Page: PageModel;
   let created: Types.ObjectId[] = [];
   let createdRedirects: Types.ObjectId[] = [];
@@ -44,7 +44,7 @@ describe('resolveToPages (integration)', () => {
   it('resolves a regular path to its page id', async () => {
     const page = await createPage({ path: '/resolve-integ/docs' });
 
-    const result = await resolveToPages(['/resolve-integ/docs']);
+    const result = await resolveToPageIds(['/resolve-integ/docs']);
 
     expect(result.get('/resolve-integ/docs')?.toString()).toBe(
       page._id.toString(),
@@ -56,7 +56,7 @@ describe('resolveToPages (integration)', () => {
     const page = await createPage({ path: '/resolve-integ/by-permalink' });
     const permalink = `/${page._id.toString()}`;
 
-    const result = await resolveToPages([permalink]);
+    const result = await resolveToPageIds([permalink]);
 
     expect(result.get(permalink)?.toString()).toBe(page._id.toString());
     expect(result.size).toBe(1);
@@ -66,13 +66,13 @@ describe('resolveToPages (integration)', () => {
     // Empty pages (v5 folder placeholders) are not real link targets and must not resolve.
     await createPage({ path: '/resolve-integ/empty', isEmpty: true });
 
-    const result = await resolveToPages(['/resolve-integ/empty']);
+    const result = await resolveToPageIds(['/resolve-integ/empty']);
 
     expect(result.size).toBe(0);
   });
 
   it('omits an input with no matching page', async () => {
-    const result = await resolveToPages(['/resolve-integ/missing']);
+    const result = await resolveToPageIds(['/resolve-integ/missing']);
 
     expect(result.size).toBe(0);
   });
@@ -82,7 +82,7 @@ describe('resolveToPages (integration)', () => {
     const pathPage = await createPage({ path: '/resolve-integ/np' });
     const permalink = `/${permalinkPage._id.toString()}`;
 
-    const result = await resolveToPages([permalink, '/resolve-integ/np']);
+    const result = await resolveToPageIds([permalink, '/resolve-integ/np']);
 
     expect(result.get(permalink)?.toString()).toBe(
       permalinkPage._id.toString(),
@@ -99,7 +99,7 @@ describe('resolveToPages (integration)', () => {
       const page = await createPage({ path: '/resolve-integ/new' });
       await createRedirect('/resolve-integ/old', '/resolve-integ/new');
 
-      const result = await resolveToPages(['/resolve-integ/old']);
+      const result = await resolveToPageIds(['/resolve-integ/old']);
 
       // The link keeps working; the key stays what the page body says.
       expect(result.get('/resolve-integ/old')?.toString()).toBe(
@@ -113,7 +113,7 @@ describe('resolveToPages (integration)', () => {
       await createRedirect('/resolve-integ/a', '/resolve-integ/b');
       await createRedirect('/resolve-integ/b', '/resolve-integ/c');
 
-      const result = await resolveToPages(['/resolve-integ/a']);
+      const result = await resolveToPageIds(['/resolve-integ/a']);
 
       expect(result.get('/resolve-integ/a')?.toString()).toBe(
         page._id.toString(),
@@ -127,7 +127,7 @@ describe('resolveToPages (integration)', () => {
       await createRedirect('/resolve-integ/x', '/resolve-integ/x2');
       await createRedirect('/resolve-integ/y', '/resolve-integ/y2');
 
-      const result = await resolveToPages([
+      const result = await resolveToPageIds([
         '/resolve-integ/x',
         '/resolve-integ/y',
       ]);
@@ -152,7 +152,7 @@ describe('resolveToPages (integration)', () => {
       const renamed = await createPage({ path: '/resolve-integ/moved-to' });
       await createRedirect('/resolve-integ/reused', '/resolve-integ/moved-to');
 
-      const result = await resolveToPages(['/resolve-integ/reused']);
+      const result = await resolveToPageIds(['/resolve-integ/reused']);
 
       expect(result.get('/resolve-integ/reused')?.toString()).toBe(
         renamed._id.toString(),
@@ -166,7 +166,7 @@ describe('resolveToPages (integration)', () => {
       // Renamed, then permanently deleted — genuinely broken.
       await createRedirect('/resolve-integ/gone', '/resolve-integ/also-gone');
 
-      const result = await resolveToPages(['/resolve-integ/gone']);
+      const result = await resolveToPageIds(['/resolve-integ/gone']);
 
       expect(result.size).toBe(0);
     });
@@ -179,7 +179,7 @@ describe('resolveToPages (integration)', () => {
       );
       await createPage({ path: '/resolve-integ/decoy-target' });
 
-      const result = await resolveToPages([`/${deletedId.toString()}`]);
+      const result = await resolveToPageIds([`/${deletedId.toString()}`]);
 
       // A permalink names the immutable _id, so it must resolve to that page or to
       // nothing — never to whatever a redirect on the same path points at.
@@ -198,7 +198,7 @@ describe('resolveToPages (integration)', () => {
         '/trash/resolve-integ/binned',
       );
 
-      const result = await resolveToPages(['/resolve-integ/binned']);
+      const result = await resolveToPageIds(['/resolve-integ/binned']);
 
       expect(result.get('/resolve-integ/binned')?.toString()).toBe(
         page._id.toString(),
@@ -215,7 +215,7 @@ describe('resolveToPages (integration)', () => {
       await createRedirect('/resolve-integ/cycle-a', '/resolve-integ/cycle-b');
       await createRedirect('/resolve-integ/cycle-b', '/resolve-integ/cycle-a');
 
-      const result = await resolveToPages(['/resolve-integ/cycle-a']);
+      const result = await resolveToPageIds(['/resolve-integ/cycle-a']);
 
       expect(result.get('/resolve-integ/cycle-a')?.toString()).toBe(
         page._id.toString(),
@@ -226,7 +226,7 @@ describe('resolveToPages (integration)', () => {
       await createRedirect('/resolve-integ/cycle-a', '/resolve-integ/cycle-b');
       await createRedirect('/resolve-integ/cycle-b', '/resolve-integ/cycle-a');
 
-      const result = await resolveToPages(['/resolve-integ/cycle-a']);
+      const result = await resolveToPageIds(['/resolve-integ/cycle-a']);
 
       expect(result.size).toBe(0);
     });

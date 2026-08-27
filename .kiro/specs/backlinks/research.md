@@ -168,6 +168,11 @@
 - **Rationale**: The upsert is idempotent last-writer-wins, so intermediate saves carry no
   information and collapsing them loses nothing. Pacing (not parallelism) is the right lever for
   CPU-bound work on one thread. Reuses the backfill's duty-cycle intuition.
+- **Superseded in part (review of B2.2)**: the coalescing dirty-set stands, but the *bounded ids per
+  tick* half was replaced by a duty cycle over measured extraction time. Measuring the real cost
+  showed it spans ~700x across bodies (1.6 ms at 0.2 KiB, 8.4 ms at 3.2 KiB, 88 ms at 32.6 KiB,
+  1116 ms at 333 KiB), so a page-denominated budget was simultaneously a ~2.5% duty cycle for
+  typical pages and a licence for ~3.3 s of blocking for three large ones. See design.md B2.2.
 - **Trade-offs**: Index trails the save by up to (tick interval × queue depth) — consistent with the
   already-async listener. The set is best-effort/in-memory: a restart drops pending work (self-heals
   on next edit or backfill), and coalescing is per-instance in multi-container deployments (safe
@@ -242,7 +247,7 @@
 - **Build vs. Adopt**: Adopt the existing remark/rehype link plugins, `normalizePath`,
   `isCreatablePage`, `findByIdsAndViewer`, `PageRedirect`, the event bus, migrate-mongo (indexes
   only), and `CronService` + the page-bulk-export job pattern (backfill). Build only: the
-  `PageLink` model, a pure `extractInternalLinks` collector, the resolution helper, the listener
+  `PageLink` model, a pure `extractInternalLinkPaths` collector, the resolution helper, the listener
   service, the backfill cron + its job/claim model, one apiv3 route, one SWR hook, and the panel
   components.
 - **Simplification**: No queue/worker in v1 (event listener is the seam); no stored state enum;
@@ -320,10 +325,10 @@
     absolute path** rather than promising the `./{pageId}` syntax. (Requirements clarification, not
     a design workaround.)
 - **Selected Approach**:
-  - `resolveToPages`: permalink branch first — inputs where `isPermalink(toPath)` are resolved by
+  - `resolveToPageIds`: permalink branch first — inputs where `isPermalink(toPath)` are resolved by
     `_id` in their own query; no path lookup or redirect-following. Such rows are `_id`-stable
     and rename-immune (5.4).
-  - `extractInternalLinks(markdown, pagePath, siteUrl?)`: classify each `a[href]` — absolute URL kept
+  - `extractInternalLinkPaths(markdown, pagePath, siteUrl?)`: classify each `a[href]` — absolute URL kept
     as `url.pathname` iff `siteUrl` set and same host (1.10); dropped otherwise / when `siteUrl` unset
     (1.3, 1.11); `siteUrl` is an injected param (function stays pure; the service reads `configManager`).
   - Self-permalink exclusion (1.6): drop at sync any resolved row where `toPage == fromPage` (the path
@@ -342,10 +347,10 @@
   and identical to search indexing; document the window. Durable queue / off-thread parsing deferred
   (the in-process coalescing drain below is not that).
 - **Write-side CPU burst** (many saves close together parse full bodies back-to-back on the single
-  JS thread) — Mitigation: coalesce via an in-process `Set<pageId>` drained a bounded number per
-  paced tick; same-page saves collapse, distinct-page parses are spread over time. Naturally
-  low-pressure given no autosave and one-event-per-shared-Yjs-doc. See the coalescing decision above
-  (requirement 3.5).
+  JS thread) — Mitigation: coalesce via an in-process `Set<pageId>`, drained on a paced tick; same-page
+  saves collapse, distinct-page parses are spread over time. Naturally low-pressure given no autosave
+  and one-event-per-shared-Yjs-doc. See the coalescing decision above (requirement 3.5), including
+  the note on how the drain came to be paced by duty cycle rather than by a page budget.
 - **`findByIdsAndViewer` may include trashed pages on the source side** — Mitigation: add an
   explicit non-trashed status filter to the backlink-source query; verify during implementation.
 - **Backfill on very large wikis** — Mitigation: online throttled `CronService` job (not a
