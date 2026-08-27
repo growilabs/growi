@@ -6,7 +6,7 @@ import type { IPageLink } from '../../interfaces/page-link';
 import PageLink from '../models/page-link';
 import {
   REDIRECT_CHAIN_MAX_DEPTH,
-  resolveToPages,
+  resolveToPageIds,
 } from './target-page-resolution';
 
 export const dropSelfLinks = (
@@ -47,7 +47,7 @@ export const reResolveByToPath = async (toPath: string): Promise<void> => {
   // A row does not have to name the path to reach it: resolution follows the
   // redirect chain, so `/old` resolves here whenever `/old` redirects here. Those
   // rows go stale on the same event and nothing else revisits them. The reverse
-  // walk only nominates candidates — `resolveToPages` decides where each one
+  // walk only nominates candidates — `resolveToPageIds` decides where each one
   // actually lands, which for a longer chain may be somewhere else entirely.
   const redirectingPaths = await PageRedirect.retrieveFromPathsRedirectingTo(
     toPath,
@@ -55,7 +55,7 @@ export const reResolveByToPath = async (toPath: string): Promise<void> => {
   );
   const paths = [...new Set([toPath, ...redirectingPaths])];
 
-  const resolved = await resolveToPages(paths);
+  const resolved = await resolveToPageIds(paths);
 
   await Promise.all(
     paths.map((path) =>
