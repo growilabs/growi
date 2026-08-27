@@ -202,6 +202,28 @@ function makeReplyDeps(
 }
 
 /**
+ * Builds a fully-mocked `InlineCommentServiceDeps` for `setResolved()`:
+ * `findUnique` resolves with `targetRow` (the precondition check's lookup)
+ * and `update` resolves with `updatedRow`.
+ */
+function makeSetResolvedDeps(
+  targetRow: CommentsRow | null,
+  updatedRow: CommentsRow,
+): InlineCommentServiceDeps {
+  const prisma = mock<PrismaClient>({
+    comments: {
+      findUnique: vi.fn().mockResolvedValue(targetRow),
+      update: vi.fn().mockResolvedValue(updatedRow),
+    },
+    activities: {
+      createByParameters: vi.fn().mockResolvedValue(makeActivity()),
+    },
+  });
+  const commentService = mock<PickedCommentService>({});
+  return { prisma, commentService };
+}
+
+/**
  * Builds a fully-mocked `InlineCommentServiceDeps` for `listByPageId()`:
  * `findMany` is stubbed to answer the origin-comment query with
  * `originRows` and the replies query with `replyRows`, distinguished by
@@ -661,5 +683,147 @@ describe('InlineCommentService.listByPageId', () => {
     // Only the origin-comment query ran — no wasted second round trip when
     // there is nothing to look up replies for.
     expect(deps.prisma.comments.findMany).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('InlineCommentService.setResolved', () => {
+  it('未解決の起点コメントを解決済みにすると、操作者と日時を記録し ACTION_INLINE_COMMENT_RESOLVE の Activity を発行する', async () => {
+    const id = makeId();
+    const actorId = makeId();
+    const targetRow = makeOriginRow({
+      id,
+      resolvedById: null,
+      resolvedAt: null,
+    });
+    const updatedRow = makeOriginRow({
+      id,
+      pageId: targetRow.pageId,
+      resolvedById: actorId,
+      resolvedAt: new Date(),
+    });
+    const deps = makeSetResolvedDeps(targetRow, updatedRow);
+    const service = new InlineCommentService(deps);
+
+    const result = await service.setResolved(id, true, actorId);
+
+    const updateArgs = vi.mocked(deps.prisma.comments.update).mock
+      .calls[0][0] as { where: { id: string }; data: Record<string, unknown> };
+    expect(updateArgs.where).toEqual({ id });
+    expect(updateArgs.data.resolvedById).toBe(actorId);
+    expect(updateArgs.data.resolvedAt).toBeInstanceOf(Date);
+
+    expect(result.resolvedById).toBe(actorId);
+    expect(result.resolvedAt).toBeInstanceOf(Date);
+
+    const [activityParams] = vi.mocked(
+      deps.prisma.activities.createByParameters,
+    ).mock.calls[0];
+    expect(activityParams.action).toBe(
+      SupportedAction.ACTION_INLINE_COMMENT_RESOLVE,
+    );
+    expect(activityParams.user).toBe(actorId);
+
+    // Unlike create()/createReply(), the resolve toggle does not kick off
+    // mention notifications — see setResolved()'s doc for why (design.md's
+    // Requirements Traceability table lists no notification integration for
+    // requirements 4.1-4.4).
+    expect(
+      deps.commentService.prepareMentionNotifications,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('解決済みの起点コメントを未解決に戻すと、resolvedById・resolvedAt を両方 null に戻し ACTION_INLINE_COMMENT_UNRESOLVE の Activity を発行する', async () => {
+    const id = makeId();
+    const actorId = makeId();
+    const targetRow = makeOriginRow({
+      id,
+      resolvedById: makeId(),
+      resolvedAt: new Date(),
+    });
+    const updatedRow = makeOriginRow({
+      id,
+      pageId: targetRow.pageId,
+      resolvedById: null,
+      resolvedAt: null,
+    });
+    const deps = makeSetResolvedDeps(targetRow, updatedRow);
+    const service = new InlineCommentService(deps);
+
+    const result = await service.setResolved(id, false, actorId);
+
+    const updateArgs = vi.mocked(deps.prisma.comments.update).mock
+      .calls[0][0] as { where: { id: string }; data: Record<string, unknown> };
+    expect(updateArgs.data.resolvedById).toBeNull();
+    expect(updateArgs.data.resolvedAt).toBeNull();
+
+    expect(result.resolvedById).toBeNull();
+    expect(result.resolvedAt).toBeNull();
+
+    const [activityParams] = vi.mocked(
+      deps.prisma.activities.createByParameters,
+    ).mock.calls[0];
+    expect(activityParams.action).toBe(
+      SupportedAction.ACTION_INLINE_COMMENT_UNRESOLVE,
+    );
+  });
+
+  it('未解決→解決→未解決と状態遷移できる（1つの行に対する2回の呼び出しの連鎖として検証する）', async () => {
+    const id = makeId();
+    const actorId = makeId();
+
+    // A single mutable row backs both findUnique and update across both
+    // calls, so the second call genuinely observes the first call's write —
+    // not two independent, pre-scripted mocks that happen to assert the same
+    // things as the two tests above.
+    let row = makeOriginRow({ id, resolvedById: null, resolvedAt: null });
+
+    const prisma = mock<PrismaClient>({
+      comments: {
+        findUnique: vi.fn().mockImplementation(() => Promise.resolve(row)),
+        update: vi.fn().mockImplementation(({ data }) => {
+          row = { ...row, ...data };
+          return Promise.resolve(row);
+        }),
+      },
+      activities: {
+        createByParameters: vi.fn().mockResolvedValue(makeActivity()),
+      },
+    });
+    const commentService = mock<PickedCommentService>({});
+    const service = new InlineCommentService({ prisma, commentService });
+
+    const resolvedResult = await service.setResolved(id, true, actorId);
+    expect(resolvedResult.resolvedById).toBe(actorId);
+    expect(resolvedResult.resolvedAt).not.toBeNull();
+
+    const unresolvedResult = await service.setResolved(id, false, actorId);
+    expect(unresolvedResult.resolvedById).toBeNull();
+    expect(unresolvedResult.resolvedAt).toBeNull();
+  });
+
+  it('起点コメントでないID（通常コメント／返信自身／存在しないID）を指定するとエラーになり、永続化を一切呼び出さない', async () => {
+    // Mirrors createReply()'s precondition test above — the same three
+    // non-origin shapes must all be rejected here too.
+    const nonOriginTargets: (CommentsRow | null)[] = [
+      makeOriginRow({ isInline: false, replyToId: null }), // regular comment
+      makeOriginRow({ replyToId: makeId() }), // a reply itself
+      null, // nonexistent id
+    ];
+
+    await Promise.all(
+      nonOriginTargets.map(async (targetRow) => {
+        const deps = makeSetResolvedDeps(targetRow, makeOriginRow());
+        const service = new InlineCommentService(deps);
+
+        await expect(
+          service.setResolved(makeId(), true, makeId()),
+        ).rejects.toThrow();
+
+        expect(deps.prisma.comments.update).not.toHaveBeenCalled();
+        expect(
+          deps.prisma.activities.createByParameters,
+        ).not.toHaveBeenCalled();
+      }),
+    );
   });
 });

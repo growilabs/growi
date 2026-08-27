@@ -4,10 +4,8 @@
  *
  * This is the sole write path for `comments` rows with `isInline: true`
  * (design.md: Responsibilities & Constraints). `create()`, `createReply()`,
- * and `listByPageId()` are implemented here; `setResolved` (design.md's
- * Service Interface) is added by a later task (3.4) as a sibling method on
- * this same class — this file is structured so that addition doesn't need
- * to touch the existing methods.
+ * `listByPageId()`, and `setResolved()` (design.md's Service Interface) are
+ * all implemented here as sibling methods on this same class.
  */
 
 import type { IPageHasId } from '@growi/core';
@@ -112,6 +110,22 @@ type InlineCommentReplyCreateResult = Prisma.Result<
 type InlineCommentListRow = Awaited<
   ReturnType<PrismaClient['comments']['findMany']>
 >[number];
+
+// The `findUnique()` lookup `setResolved()` uses to validate its `id` (must
+// be an origin comment — isInline: true and replyToId: null) needs no
+// separately-declared row type either, for the same reason as
+// `createReply()`'s parent lookup above: its shape is inferred directly from
+// the call site.
+
+/**
+ * The `comments` row shape `setResolved()`'s `update()` (no `include`) reads
+ * back.
+ */
+type InlineCommentUpdateResult = Prisma.Result<
+  PrismaClient['comments'],
+  object,
+  'update'
+>;
 
 export interface InlineCommentServiceDeps {
   prisma: Pick<PrismaClient, 'comments' | 'activities'>;
@@ -265,6 +279,49 @@ function toInlineCommentReplyFromListRow(
     creatorId: row.creatorId,
     comment: row.comment,
     replyToId: row.replyToId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/**
+ * Maps a `setResolved()` `update()` row to `IInlineComment` — the
+ * update-result counterpart of `toIInlineComment`/`toIInlineCommentFromListRow`
+ * above.
+ */
+function toIInlineCommentFromUpdateResult(
+  row: InlineCommentUpdateResult,
+): IInlineComment {
+  // setResolved only ever updates an origin comment (validated by its own
+  // findUnique check before this update runs), which always carries these
+  // anchor fields together — same guarantee create()'s insert relies on.
+  if (
+    row.creatorId == null ||
+    row.quote == null ||
+    row.prefix == null ||
+    row.suffix == null ||
+    row.approxOffset == null ||
+    row.anchorOriginRevisionId == null
+  ) {
+    throw new Error(
+      `Inline comment row '${row.id}' is missing required anchor fields`,
+    );
+  }
+
+  return {
+    id: row.id,
+    pageId: row.pageId,
+    creatorId: row.creatorId,
+    comment: row.comment,
+    anchorOriginRevisionId: row.anchorOriginRevisionId,
+    anchor: {
+      quote: row.quote,
+      prefix: row.prefix,
+      suffix: row.suffix,
+      approxOffset: row.approxOffset,
+    },
+    resolvedById: row.resolvedById,
+    resolvedAt: row.resolvedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -493,5 +550,77 @@ export class InlineCommentService {
       ...toIInlineCommentFromListRow(row),
       replies: repliesByOriginId.get(row.id) ?? [],
     }));
+  }
+
+  /**
+   * Toggles an origin (anchored) inline comment's resolved state
+   * (design.md's Service Interface —
+   * `setResolved(id: string, resolved: boolean, actorId: string): Promise<InlineComment>`).
+   *
+   * - Rejects `id` unless it references a row that is itself an origin
+   *   inline comment (`isInline: true` and `replyToId: null`) — a regular
+   *   non-inline comment, a reply's own id, or a nonexistent id are all
+   *   rejected (design.md's Postconditions: "setResolved の対象が返信
+   *   （replyToId が非null）の場合はエラーとする", requirement 4.5). This
+   *   mirrors `createReply()`'s parent-id precondition check above exactly
+   *   (same three rejected shapes, same error-throwing convention: a generic
+   *   `Error`, left for the route layer — task 3.5 — to map to an HTTP
+   *   status).
+   * - Authorization (does `actorId` hold comment permission on the page) is
+   *   deliberately NOT re-checked here: design.md's Responsibilities
+   *   explicitly scope that check to the route layer
+   *   ("解決トグルの認可は...作成者に限定しない"), and this method takes
+   *   `actorId` only as "who performed this action" for the Activity record.
+   * - `resolved: true` sets `resolvedById`/`resolvedAt` (to `actorId` and
+   *   now); `resolved: false` resets both to `null` (design.md's
+   *   Postconditions).
+   * - Records an `Activity` — `ACTION_INLINE_COMMENT_RESOLVE` when
+   *   `resolved: true`, `ACTION_INLINE_COMMENT_UNRESOLVE` when
+   *   `resolved: false` — using the same self-minted-`activityId` mechanism
+   *   as `create()`/`createReply()` (see `create()`'s doc). Unlike those two
+   *   methods, this one does NOT call `prepareMentionNotifications`: design.md's
+   *   Requirements Traceability table maps requirements 4.1-4.4 to
+   *   InlineCommentService/InlineCommentList only, with no notification
+   *   integration listed — mention notification is scoped to comment
+   *   creation (requirement 3.x), not the resolve toggle.
+   */
+  async setResolved(
+    id: string,
+    resolved: boolean,
+    actorId: string,
+  ): Promise<IInlineComment> {
+    const target = await this.deps.prisma.comments.findUnique({
+      where: { id },
+    });
+
+    if (target == null || !target.isInline || target.replyToId != null) {
+      throw new Error(`Inline comment '${id}' is not an origin inline comment`);
+    }
+
+    const updated = await this.deps.prisma.comments.update({
+      where: { id },
+      data: resolved
+        ? { resolvedById: actorId, resolvedAt: new Date() }
+        : { resolvedById: null, resolvedAt: null },
+    });
+
+    const activityId = new Types.ObjectId().toString();
+
+    // Activity emission mirrors create()/createReply() — see that method's
+    // doc and .claude/rules/activity-recording.md. No
+    // prepareMentionNotifications call here — see this method's doc.
+    await this.deps.prisma.activities.createByParameters({
+      id: activityId,
+      action: resolved
+        ? SupportedAction.ACTION_INLINE_COMMENT_RESOLVE
+        : SupportedAction.ACTION_INLINE_COMMENT_UNRESOLVE,
+      user: actorId,
+      target: updated.pageId,
+      targetModel: SupportedTargetModel.MODEL_PAGE,
+      event: updated.id,
+      eventModel: SupportedEventModel.MODEL_COMMENT,
+    });
+
+    return toIInlineCommentFromUpdateResult(updated);
   }
 }

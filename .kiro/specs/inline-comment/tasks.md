@@ -88,7 +88,7 @@
   - _Requirements: 2.5, 2.6_
   - _Depends: 3.2_
 
-- [ ] 3.4 解決/未解決トグルのロジックを実装する
+- [x] 3.4 解決/未解決トグルのロジックを実装する
   - 対象が起点コメント（`replyToId` が `null`）であることを検証し、返信IDが指定された場合はエラーとする
   - `resolved: true` で `resolvedById`/`resolvedAt` を設定し、`resolved: false` で両方を `null` に戻す。`Activity`（`ACTION_INLINE_COMMENT_RESOLVE`／`ACTION_INLINE_COMMENT_UNRESOLVE`）を発行する
   - 観測できる完了条件：未解決→解決→未解決の状態遷移と、返信IDを指定した場合にエラーになることをユニットテストで確認できる
@@ -180,3 +180,5 @@
 - 2.5 (`quote-matcher.ts`): 上記の終了オフセット縮み問題は、正規化テキスト側で変換前に書記素境界へスナップすることで対処済み（変換後の原文側スナップは `toOriginalOffset` が常にセグメント先頭＝原文の書記素境界を返すため no-op になる）。`matchQuote(text, anchor)` は呼び出しごとに `createNormalizedOffsetMapper(text)` を作り直す設計（signatureがdesignで固定されているため）。4.3 (AnchorResolver) で複数アンカーを同じ `text` に対して呼ぶ場合、静定1回あたり完全一致しないアンカーの数だけ書記素分割が再実行される点に注意（完全一致経路ではmapperを作らないため、そちらは軽い）。
 - 3.1/3.2 (`inline-comment-service.ts`): `create()`／`createReply()` はどちらも `Activity` レコードを `prisma.activities.createByParameters()` で自前生成し、`addActivity` ミドルウェア（`res.locals.activity`／`activityEvent.emit`）には一切依存しない。**3.5でルートを配線する際、この4エンドポイントに `addActivity` ミドルウェアを適用してはいけない** — 適用すると、`activityEvent.emit` で決着されないまま応答が返り、failsafe finalizer が `ACTION_UNSETTLED` の余分な行を書いてしまう（サービスが書いた本来の `ACTION_INLINE_COMMENT_*` 行とは別に）。`prisma.activities.createByParameters` の戻り値の型（`IActivity`）には `id` が無い（実行時には存在するが型からは見えない）ため、両メソッドとも `activityId` を呼び出し側で先に採番して `createByParameters({ id: activityId, ... })` に渡し、`prepareMentionNotifications` にも戻り値からではなくこの自己採番した `activityId` を渡している。3.5配線でも戻り値の `id` を読みに行く必要はない。
 - 3.2で判明（3.3/3.4にも適用）：`InlineCommentServiceDeps.prisma` の型は**手書きインターフェースを作らず**、`import type { PrismaClient } from '~/utils/prisma'` を型のみ取り込みして `Pick<PrismaClient, 'comments' | 'activities'>` のように絞り込む。行の型が要る場合も `Prisma.Result<PrismaClient['comments'], {...}, 'create'>`（`import type { Prisma } from '~/generated/prisma/client'`）のように実体から導出する。手書き型を本物のPrismaクライアントに合わせ込もうとすると（オーバーロード／ユニオン型／実行時ガードいずれも）代入不能や実行時の誤判定を繰り返す（3.2で3ラウンド分のレビュー往復の原因になった）。既存の参考実装は `apps/app/src/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron/steps/activity-export-cursor.ts` とその `.spec.ts`（`mock<PrismaClient>({...})` によるモック）。
+- 3.2〜3.4：`create()`/`createReply()`/`setResolved()` の事前条件エラーは、いずれも区別のない汎用 `Error` を投げる（対象なし・非インライン行・返信ID指定、いずれも同じ形）。**3.5でルートを配線する際、design.md の API Contract（400 vs 404 の使い分け）をそのままには実現できない** — サービス側は現状「例外を投げるか投げないか」しか教えないため、400/404を分けたいならルート層で対象行を再取得するか、サービス側にエラー種別を持たせる変更が必要（後者は3.2〜3.4の再オープンになるため、3.5側での対応を推奨）。
+- 3.4：`comments` テーブルは通常コメントとインラインコメントの共有テーブルであり、通常コメント行も `replyToId: null` を持つ。起点コメントかどうかの事前条件チェックは `replyToId === null` だけでなく **`isInline === true` も必ず確認する**（`setResolved`/`createReply` とも同じ理由でこのチェックが必要）。
