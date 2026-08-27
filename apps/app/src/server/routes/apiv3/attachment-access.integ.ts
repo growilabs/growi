@@ -53,6 +53,7 @@ describe("GET /attachment/:id — must check access to the attachment's owning p
   let privatePageId: string;
   let privateAttachmentId: string;
   let accessibleAttachmentId: string;
+  let profileImageAttachmentId: string;
 
   let currentUser: IUserHasId | undefined;
 
@@ -113,6 +114,15 @@ describe("GET /attachment/:id — must check access to the attachment's owning p
     accessibleAttachmentId = String(accessibleAttachment._id);
     privateAttachmentId = String(privateAttachment._id);
 
+    const profileImageAttachment = await Attachment.create({
+      creator: otherUser._id,
+      fileName: `attachment-access-integ-profile-image-${WORKER_ID}`,
+      fileFormat: 'image/png',
+      originalName: 'avatar.png',
+      attachmentType: AttachmentType.PROFILE_IMAGE,
+    });
+    profileImageAttachmentId = String(profileImageAttachment._id);
+
     const { setup } = await import('./attachment');
     const router = setup(crowi);
 
@@ -133,7 +143,13 @@ describe("GET /attachment/:id — must check access to the attachment's owning p
 
   afterAll(async () => {
     await Attachment.deleteMany({
-      _id: { $in: [accessibleAttachmentId, privateAttachmentId] },
+      _id: {
+        $in: [
+          accessibleAttachmentId,
+          privateAttachmentId,
+          profileImageAttachmentId,
+        ],
+      },
     });
     await crowi.models.Page.deleteMany({
       path: { $in: [ACCESSIBLE_PATH, PRIVATE_PATH] },
@@ -156,5 +172,12 @@ describe("GET /attachment/:id — must check access to the attachment's owning p
 
     expect(res.status).toBe(200);
     expect(res.body.data.attachment.originalName).toBe('accessible.txt');
+  });
+
+  it('returns metadata for a non-page-scoped attachment (e.g. PROFILE_IMAGE), which has no page to check', async () => {
+    const res = await getAttachment(profileImageAttachmentId, testUser);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.attachment.originalName).toBe('avatar.png');
   });
 });

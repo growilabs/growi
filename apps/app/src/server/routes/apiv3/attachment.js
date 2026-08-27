@@ -498,9 +498,13 @@ export const setup = (crowi) => {
           return res.apiv3Err(message, 404);
         }
 
-        // check whether accessible
+        // check whether accessible. Attachments not scoped to a page
+        // (PROFILE_IMAGE, BRAND_LOGO, PAGE_BULK_EXPORT, AUDIT_LOG_BULK_EXPORT)
+        // have no `page` to check against, so this only applies to
+        // page-scoped attachments (mirrors routes/attachment/get.ts).
         if (
           !isSharedPage &&
+          attachment.page != null &&
           !(await Page.isAccessiblePageByViewer(attachment.page, req.user))
         ) {
           const message = 'Attachment not found';
