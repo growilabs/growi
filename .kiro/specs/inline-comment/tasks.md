@@ -22,7 +22,7 @@
   - _Requirements: 6.1, 6.3_
   - _Depends: 1.1, 1.2_
 
-- [ ] 1.4 インラインコメント用の `SupportedAction` 定数を追加する
+- [x] 1.4 インラインコメント用の `SupportedAction` 定数を追加する
   - `apps/app/src/interfaces/activity.ts` に `ACTION_INLINE_COMMENT_CREATE`／`ACTION_INLINE_COMMENT_REPLY`／`ACTION_INLINE_COMMENT_RESOLVE`／`ACTION_INLINE_COMMENT_UNRESOLVE` を追加する
   - 観測できる完了条件：4つの定数が `SupportedAction` からimport可能になる
   - _Requirements: 3.2_
