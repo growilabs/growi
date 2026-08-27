@@ -1,11 +1,11 @@
-import { extractInternalLinks } from './extract-internal-links';
+import { extractInternalLinkPaths } from './extract-internal-link-paths';
 
-describe('extractInternalLinks()', () => {
+describe('extractInternalLinkPaths()', () => {
   it('extracts HTML relative path link', async () => {
     const pageString = '<a href="./new">here</a>';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual(['/page/new']);
   });
@@ -14,16 +14,36 @@ describe('extractInternalLinks()', () => {
     const pageString = '[test](./new)';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual(['/page/new']);
+  });
+
+  // Guards the memoized module load: both relative-link plugins are configured with the page's own
+  // path, so a processor reused across pages would resolve every later page's relative links
+  // against the first page it was built for.
+  it('resolves relative links against each page, not the first one processed', async () => {
+    expect(
+      await extractInternalLinkPaths('[test](./new)', '/alpha/one'),
+    ).toStrictEqual(['/alpha/new']);
+    expect(
+      await extractInternalLinkPaths('[test](./new)', '/beta/two'),
+    ).toStrictEqual(['/beta/new']);
+
+    // The pukiwiki-like linker takes pagePath as well.
+    expect(
+      await extractInternalLinkPaths('[[docs]]', '/alpha/one'),
+    ).toStrictEqual(['/alpha/one/docs']);
+    expect(
+      await extractInternalLinkPaths('[[docs]]', '/beta/two'),
+    ).toStrictEqual(['/beta/two/docs']);
   });
 
   it('extracts HTML absolute path link', async () => {
     const pageString = '<a href="/docs/v2">here</a>';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual(['/docs/v2']);
   });
@@ -32,7 +52,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '[one](/docs/v2)';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual(['/docs/v2']);
   });
@@ -41,7 +61,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '[[/docs/old]]';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual(['/docs/old']);
   });
@@ -50,7 +70,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '[[docs]]';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual(['/page/test/docs']);
   });
@@ -60,7 +80,7 @@ describe('extractInternalLinks()', () => {
     const pagePath = '/page/test';
     const siteUrl = 'https://test.com/';
 
-    const links = await extractInternalLinks(pageString, pagePath, siteUrl);
+    const links = await extractInternalLinkPaths(pageString, pagePath, siteUrl);
 
     expect(links).toStrictEqual(['/folders/doc']);
   });
@@ -70,7 +90,7 @@ describe('extractInternalLinks()', () => {
     const pagePath = '/page/test';
     const siteUrl = 'https://test.com';
 
-    const links = await extractInternalLinks(pageString, pagePath, siteUrl);
+    const links = await extractInternalLinkPaths(pageString, pagePath, siteUrl);
 
     expect(links).toStrictEqual(['/6a4b6790f4032d50076f8eba']);
   });
@@ -79,7 +99,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '[x](/親ページ/子)';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual(['/親ページ/子']);
   });
@@ -89,7 +109,7 @@ describe('extractInternalLinks()', () => {
     const pagePath = '/page/test';
     const siteUrl = 'https://test.com/';
 
-    const links = await extractInternalLinks(pageString, pagePath, siteUrl);
+    const links = await extractInternalLinkPaths(pageString, pagePath, siteUrl);
 
     expect(links).toStrictEqual([]);
   });
@@ -98,7 +118,7 @@ describe('extractInternalLinks()', () => {
     const pageString = 'https://test.com/folders/doc';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual([]);
   });
@@ -107,7 +127,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '[jump to 5](#section-5)';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual([]);
   });
@@ -116,7 +136,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '[self](/page/test)';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual([]);
   });
@@ -125,7 +145,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '<a href="/trash/old-page">here</a>';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual([]);
   });
@@ -134,7 +154,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '[good](/docs/v2) [bad](http://)';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual(['/docs/v2']);
   });
@@ -143,7 +163,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '[bad](/deals/50%off) [good](/docs/v2)';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual(['/docs/v2']);
   });
@@ -152,7 +172,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '[a](/docs/v2#section?x=1)';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual(['/docs/v2']);
   });
@@ -161,7 +181,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '[a](/docs/v2) [a](/docs/v2/)';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual(['/docs/v2']);
   });
@@ -170,7 +190,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '[one](/docs/v2) [two](/docs/v2)';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual(['/docs/v2']);
   });
@@ -179,7 +199,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '[one](/docs/v1) [two](/docs/v2)';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual(['/docs/v1', '/docs/v2']);
   });
@@ -190,7 +210,7 @@ describe('extractInternalLinks()', () => {
     const pagePath = '/page/test';
     const siteUrl = 'https://test.com';
 
-    const links = await extractInternalLinks(pageString, pagePath, siteUrl);
+    const links = await extractInternalLinkPaths(pageString, pagePath, siteUrl);
 
     expect(links).toStrictEqual(['/docs/v2']);
   });
@@ -199,7 +219,7 @@ describe('extractInternalLinks()', () => {
     const pageString = '';
     const pagePath = '/page/test';
 
-    const links = await extractInternalLinks(pageString, pagePath);
+    const links = await extractInternalLinkPaths(pageString, pagePath);
 
     expect(links).toStrictEqual([]);
   });

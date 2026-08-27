@@ -1,13 +1,5 @@
 import type { Document, Model, Types } from 'mongoose';
 
-export type LinkTargetState = 'normal' | 'trashed' | 'broken';
-
-export interface ILinkTarget {
-  pageId: string;
-  path: string;
-  targetState: LinkTargetState;
-}
-
 export interface IPageLink {
   fromPage: Types.ObjectId;
   toPath: string;
@@ -21,8 +13,8 @@ export interface PageLinkModel extends Model<PageLinkDocument> {
     resolvedRows: IPageLink[],
   ): Promise<void>;
   findBacklinkSources(toPageId: Types.ObjectId): Promise<Types.ObjectId[]>;
-  // Declared here for downstream stories; implemented later (re-resolve-by-path in B4,
-  // reconcile-deleted in B5) — not implemented in B1.
-  reResolveByToPath(toPath: string): Promise<void>;
-  reconcileDeletedPages(pageIds: Types.ObjectId[]): Promise<void>;
+  // Declare each static here only when the schema actually implements it: a
+  // declaration without an implementation makes `PageLink.thatStatic()`
+  // type-check and then throw "is not a function" at runtime. The re-resolve-by-path
+  // (B4) and reconcile-deleted (B5) statics are added alongside their code.
 }

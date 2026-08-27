@@ -71,7 +71,7 @@ const findPagesByPath = async (
  *            `toPath` stays faithful to the page body.
  *            Inputs that resolve to no page are absent from the map.
  */
-export const resolveToPages = async (
+export const resolveToPageIds = async (
   paths: string[],
 ): Promise<Map<string, Types.ObjectId>> => {
   const permalinkIds: string[] = [];

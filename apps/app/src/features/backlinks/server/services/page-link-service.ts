@@ -1,28 +1,45 @@
 import type { IUser } from '@growi/core';
 import type { Types } from 'mongoose';
-import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import { PageQueryBuilder } from '~/server/models/page';
+import type { PageDocument } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
 import type { IBacklink } from '../../interfaces/backlink';
-import PageLink from '../models/page-link';
-import { handlePageUpsert } from './page-link-service-handlers';
+import { findBacklinks } from './find-backlinks';
+import { PageLinkUpsertQueue } from './page-link-upsert-queue';
+import { resolveUpsertQueuePacing } from './upsert-queue-pacing';
 
 const logger = loggerFactory('growi:features:backlinks:page-link-service');
 
-// Read-path scale for heavily-linked hub pages (bounding/index/interactive-time) is handled in B2.1; intentionally unbounded here.
-type BacklinkSource = {
-  _id: Types.ObjectId;
-  path: string;
-};
+/**
+ * Crowi-facing entry point for the backlinks index.
+ *
+ * Deliberately thin: it owns only the wiring that needs a Crowi instance —
+ * lifecycle-event subscription and config access — and delegates the work to
+ * modules that need neither. The write side is paced by `PageLinkUpsertQueue`,
+ * the read side is `findBacklinks`.
+ */
 export class PageLinkService {
   private crowi: Crowi;
+  private upsertQueue: PageLinkUpsertQueue;
 
   constructor(crowi: Crowi) {
     this.crowi = crowi;
+    // The site URL is read per drain rather than captured now: the service is
+    // constructed during boot, before admins can change it at runtime. The pacing
+    // budget is env-only, so reading it once here is enough.
+    this.upsertQueue = new PageLinkUpsertQueue(
+      () => this.crowi.configManager.getConfig('app:siteUrl'),
+      resolveUpsertQueuePacing({
+        drainIntervalMs: crowi.configManager.getConfig(
+          'backlinks:drainIntervalMs',
+        ),
+        dutyCyclePercent: crowi.configManager.getConfig(
+          'backlinks:dutyCyclePercent',
+        ),
+      }),
+    );
   }
 
   static create(crowi: Crowi): PageLinkService {
@@ -37,40 +54,23 @@ export class PageLinkService {
     pageEvent.on('update', (page: PageDocument) => this.onUpsert(page));
   }
 
-  private async onUpsert(page: PageDocument): Promise<void> {
+  private onUpsert(page: PageDocument): void {
     try {
-      const siteUrl = this.crowi.configManager.getConfig('app:siteUrl');
+      if (page._id == null) {
+        logger.error('Page ID is undefined');
+        return;
+      }
 
-      await handlePageUpsert(page, siteUrl);
+      this.upsertQueue.enqueue(page._id.toString());
     } catch (err) {
       logger.error({ err, pageId: page._id }, 'backlinks sync failed');
     }
   }
 
-  async findBacklinks(
+  findBacklinks(
     toPageId: Types.ObjectId,
     user: IUser | null,
   ): Promise<IBacklink[]> {
-    const Page = mongoose.model<PageDocument, PageModel>('Page');
-    const backlinkIds = await PageLink.findBacklinkSources(toPageId);
-
-    const builder = new PageQueryBuilder(
-      Page.find({ _id: { $in: backlinkIds } }),
-    );
-
-    await builder.addViewerCondition(user);
-    builder.addConditionToExcludeTrashed();
-
-    const pages: BacklinkSource[] = await builder.query
-      .select('_id path')
-      .lean()
-      .exec();
-
-    const backlinks: IBacklink[] = pages.map((page) => ({
-      pageId: page._id.toString(),
-      path: page.path,
-    }));
-
-    return backlinks;
+    return findBacklinks(toPageId, user);
   }
 }
