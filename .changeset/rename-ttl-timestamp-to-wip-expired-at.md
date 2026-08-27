@@ -1,5 +1,5 @@
 ---
-"@growi/core": minor
+"@growi/core": major
 ---
 
 Rename `IPage.ttlTimestamp` to `IPage.wipExpiredAt` and change its meaning
