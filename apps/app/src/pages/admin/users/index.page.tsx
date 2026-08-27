@@ -38,7 +38,7 @@ const AdminUserManagementPage: NextPageWithLayout<Props> = (props: Props) => {
 };
 
 AdminUserManagementPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('user_management.user_management'),
+  title: (_p, t) => t('admin:user_management.user_management'),
   containerFactories: [
     async () => {
       const AdminUsersContainer =

@@ -20,7 +20,7 @@ type Props = AdminCommonProps;
 const AdminAiPage: NextPageWithLayout<Props> = () => <AiSettings />;
 
 AdminAiPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('ai_settings.ai_settings'),
+  title: (_p, t) => t('admin:ai_settings.ai_settings'),
   containerFactories: [],
 });
 
