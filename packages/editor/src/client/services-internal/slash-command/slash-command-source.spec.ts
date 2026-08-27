@@ -209,9 +209,9 @@ describe('createSlashCommandSource - filtering', () => {
     expect(result?.options.map((o) => o.label)).toEqual(['Heading 1']);
   });
 
-  it('matches the English id by prefix even when the label is localized (ja), and ignores mid-word keyword hits', () => {
+  it('matches the English id by prefix regardless of the localized label, ignoring mid-word keyword hits and the label itself', () => {
     // Localized labels (ja) that do NOT start with the romaji query, so the match
-    // must come from the English `id`. "quote" carries the keyword "citation"
+    // can only come from the English `id`. "quote" carries the keyword "citation"
     // whose "ta" is mid-word and must NOT match.
     const localizedSource = createSlashCommandSource([
       resolvedCommand({
@@ -245,10 +245,11 @@ describe('createSlashCommandSource - filtering', () => {
       queryAt(localizedSource, '/table', 6)?.options.map((o) => o.label),
     ).toEqual(['テーブル']);
 
-    // Localized (Japanese) label prefix ("/テ") is accepted too.
+    // Req 2.6: the localized label is NOT matched, so what the user types to
+    // reach a command is the same in every display language.
     expect(
       queryAt(localizedSource, '/テ', 2)?.options.map((o) => o.label),
-    ).toEqual(['テーブル']);
+    ).toEqual([]);
   });
 
   it('returns empty options (menu closes, doc unchanged) when nothing matches', () => {
@@ -262,6 +263,46 @@ describe('createSlashCommandSource - filtering', () => {
     const result = queryAt(source, '/head ', 6);
 
     expect(result).toBeNull();
+  });
+
+  // Req 2.5: a command the user is actually naming must outrank one that merely
+  // carries a matching alias, otherwise `/c` buries "Code block" under commands
+  // whose keywords happen to start with c.
+  describe('orders name matches before keyword-only matches', () => {
+    const ranked = createSlashCommandSource([
+      // Declared alias-first on purpose: without ranking, declaration order wins
+      // and this test would see the keyword match at the top.
+      resolvedCommand({
+        id: 'taskList',
+        label: 'Task list',
+        keywords: ['checkbox', 'check'],
+        action: insertAction('- [ ] '),
+      }),
+      resolvedCommand({
+        id: 'codeBlock',
+        label: 'Code block',
+        keywords: ['fence'],
+        action: insertAction(''),
+      }),
+    ]);
+
+    it('puts the name match first even when an alias match is declared earlier', () => {
+      const result = queryAt(ranked, '/c', 2);
+
+      expect(result?.options.map((o) => o.label)).toEqual([
+        'Code block',
+        'Task list',
+      ]);
+    });
+
+    it('keeps declaration order among commands that match at the same rank', () => {
+      const result = queryAt(ranked, '/', 1);
+
+      expect(result?.options.map((o) => o.label)).toEqual([
+        'Task list',
+        'Code block',
+      ]);
+    });
   });
 
   it('exposes the description as completion detail', () => {
@@ -612,6 +653,58 @@ describe('createSlashCommandSource - live narrowing via the autocomplete plugin'
       expect(all).toHaveLength(INSERT_COMMANDS.length);
       // ...and typing "quote" narrowed the live menu down to just "Quote".
       expect(narrowed).toEqual(['Quote']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // The rank order is only useful if the plugin shows it. `filter: false` is
+  // what makes CodeMirror take this source's order verbatim, so pin the order
+  // as the menu actually renders it, not just as the source returns it.
+  it('shows the name match above the alias match in the live menu', async () => {
+    vi.useFakeTimers();
+    try {
+      const aliasFirst = [
+        // "Task list" matches `/c` only through its `checkbox` alias, and is
+        // declared first, so an unranked menu would surface it at the top.
+        resolvedCommand({
+          id: 'taskList',
+          label: 'Task list',
+          keywords: ['checkbox'],
+          action: insertAction('- [ ] '),
+        }),
+        resolvedCommand({
+          id: 'codeBlock',
+          label: 'Code block',
+          keywords: ['fence'],
+          action: insertAction(''),
+        }),
+      ];
+      const view = new EditorView({
+        state: EditorState.create({
+          doc: '',
+          extensions: [
+            autocompletion({
+              override: [createSlashCommandSource(aliasFirst)],
+            }),
+          ],
+        }),
+        parent: document.body,
+      });
+      createdViews.push(view);
+
+      view.dispatch({
+        changes: { from: 0, insert: '/c' },
+        selection: EditorSelection.cursor(2),
+        userEvent: 'input.type',
+      });
+      startCompletion(view);
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(currentCompletions(view.state).map((c) => c.label)).toEqual([
+        'Code block',
+        'Task list',
+      ]);
     } finally {
       vi.useRealTimers();
     }

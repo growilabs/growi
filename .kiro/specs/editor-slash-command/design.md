@@ -147,7 +147,7 @@ sequenceDiagram
 ```
 
 - **トリガー判定**: `from`（`/` の位置）の直前が**行頭（先頭空白のみ）または空白文字**の場合に `CompletionResult` を返す。直前が空白以外の文字（単語の途中、例 `foo/`）の場合は `null`（Req 1.2）。
-- **フィルタ**: `filter: false` とし、source 側で query（`/` 以降の文字列）を label と `keywords` に対して大文字小文字を無視して照合（Req 2.1/2.2）。一致なしは `options: []`→メニューは閉じ、入力テキストは不変（Req 2.4/4.3）。
+- **フィルタと並び順**: `filter: false` とし、source 側で query（`/` 以降の文字列）を **id と `keywords`** に対して大文字小文字を無視して前方一致で照合（Req 2.1/2.2）。**表示ラベルは照合しない**（Req 2.6 — 到達に必要な入力が表示言語で変わらないようにするため）。**どこで一致したかでランク付けし**、id 一致をキーワード（別名）一致より先に並べる（Req 2.5）。同順位は `sort` の安定性により宣言順を保つ。`filter: false` はここでも効いており、有効にすると CodeMirror 自身のスコアで並べ替えられこの順序が失われる。一致なしは `options: []`→メニューは閉じ、入力テキストは不変（Req 2.4/4.3）。
 - **apply**: コマンドの `action.kind` で分岐。`insert` は `buildInsertion` が返す `{ insert, cursorOffset }` から `/query`（`[from, to]`）を置換する単一 change を 1 トランザクションで発行（Req 3.2/3.5）。`run` は `/query` 削除の単一 change を発行後に `action.run(view, from)` を呼ぶ（副作用＝モーダル起動等。拡張要素スペックが利用）。
 
 ## Requirements Traceability
@@ -366,7 +366,7 @@ export const resolveSlashCommands: (
 **Responsibilities & Constraints**
 - 入力（work-set）として `ResolvedSlashCommand[]` を受け取る（executor は集合を所有しない）。
 - トリガー判定: `/` の直前が行頭（先頭空白のみ許容）**または空白文字**のときに発火。直前が空白以外（単語の途中）のときは発火しない。`from` を `/` 位置、`to` を `context.pos` とする。
-- `filter: false`、`validFor: /\/\w*$/` 相当。query を `label`/`keywords` に対し大文字小文字無視で照合。
+- `filter: false`。query を **id と `keywords`** に対し大文字小文字無視で前方一致照合（ラベルは照合しない＝Req 2.6）し、id 一致をキーワード一致より先に並べる（Req 2.5）。`validFor` は付けない。
 - **構造上の文脈フィルタ（Req 8）**: `activeContextsAt` が現在位置の文脈（`list` / `table`）を求める。判定は **syntax tree と「カーソル自身の行の見た目」の両方が一致したときのみ**成立させる。片方だけでは誤判定するため:
   - **木だけでは広すぎる**: lezer-markdown はテーブル行やリスト項目の**次の行**を、空行が来るまで同じノード（`Table` / `ListItem`）の内側に含める。テーブルの直後で Enter を1回押して `/` を打つと `table` 文脈と判定され、全コマンドが `table` を除外しているため**メニューが空になる**。
   - **行だけでは狭すぎる**: 単なる本文が `|` や `-` で始まることはあり、そこで絞り込むのは誤検出になる。

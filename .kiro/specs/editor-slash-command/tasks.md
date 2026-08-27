@@ -122,10 +122,18 @@
   - _Boundary: markdown-context（新規）, list-line-patterns, insertion-builders, slash-command-source_
   - _Depends: 5.2, 5.4_
 
+- [x] 5.6 一致箇所で候補を並べ替える（コードレビュー, Req 2.5）
+  - `matchesQuery`（boolean）を `matchRank`（`name` / `keyword` / `null`）に置き換え、コマンド名（id）一致をキーワード一致より先に並べる。`sort` は安定なので同順位は宣言順を保つ
+  - 従来は「どこで一致したか」を捨てて宣言順に並べていたため、`/c` で `checkbox` を持つタスクリストが Code block より先に、`/t` で `title` を持つ見出し1がタスクリスト/テーブルより先に出ていた
+  - 観測: `/c` → Code block が先頭、`/t` → Task list・Table が見出し1より先。**実際の autocomplete プラグイン経由でも並びが保たれること**をテストで固定（`filter: false` が必須である点も確認済み: `from` が `/` を指すため有効にすると候補ゼロになる）。ミューテーションチェック3種（sort 削除 / キーワードを name と同順位 / ラベル照合の復活）で該当テストのみ RED
+  - あわせて**表示ラベルの照合を廃止**（Req 2.6, レビュー指摘）。以前は日本語表示で `/ta` が何も出ない問題への対応として id とラベルの両方を照合していたが、到達に必要な入力が表示言語で変わるため取りやめ、英語 id + キーワードのみに統一した。全9コマンドが英語 id/キーワードで到達可能であることを実測で確認済み（`/テ` 等は一致しなくなる）
+  - _Requirements: 2.5, 2.6_
+  - _Boundary: slash-command-source_
+
 ## Implementation Notes
 - 3.2: `appendExtensions(args)` wraps EVERY top-level element of `args` with the SAME `Compartment` (`services/.../utils/append-extensions.ts`), and a Compartment can wrap only one extension. So the default set MUST be passed as a single nested element (`[[...all]]`); a flat multi-element array throws `RangeError: Duplicate use of compartment in extensions` at runtime (only surfaced when the editor mounts — build/typecheck/unit pass). Encoded via `buildDefaultExtensionsArg` + regression test. Found during 4.1 smoke.
 - 1.2: insertion-builders decide line-start vs mid-line purely from **same-line** preceding non-whitespace text (Req 3.6 wording). The design's cross-line nuance (table on a fresh empty line directly below a non-empty paragraph → also needs a blank line) is intentionally NOT handled by the builders — the typical `/` trigger hits the mid-line path. Verified during smoke: GROWI's renderer (remark-gfm) still renders a table directly below a paragraph, so no blank line is required in practice — non-issue.
-- 2.2: autocompletion filtering — the completion result must NOT set `validFor` while `filter: false`; otherwise CodeMirror keeps the initial option set without re-querying and the menu never narrows. Matching is prefix (`startsWith`) over the command **id** + localized **label** + keywords, so `/table` (English id) works in any display language and `/テ` (localized label) works too, while mid-word keyword hits (e.g. "citation" for `/ta`) are excluded. Covered by a live autocomplete-plugin integration test.
+- 2.2: autocompletion filtering — the completion result must NOT set `validFor` while `filter: false`; otherwise CodeMirror keeps the initial option set without re-querying and the menu never narrows. Matching is prefix (`startsWith`) over the command **id** + keywords, while mid-word keyword hits (e.g. "citation" for `/ta`) are excluded. Covered by a live autocomplete-plugin integration test. (The localized label was matched too until 5.6 dropped it — see Req 2.6.)
 
 ### Follow-up (deferred, minor — from code review; not blocking)
 - 5: `useDefaultExtensions` memoizes the completion extension on `[t]` and registers it together with the static extensions, so a change to `t` (UI language switch) tears down and re-appends the WHOLE default set (lineWrapping/markdown/keymaps/highlighting), not just the completion. Fix: register static extensions once and the t-dependent completion separately.
