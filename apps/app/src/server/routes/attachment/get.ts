@@ -1,7 +1,5 @@
-import { getIdStringForRef, type IPage, type IUser } from '@growi/core';
 import type { NextFunction, Request, Response, Router } from 'express';
 import express from 'express';
-import mongoose from 'mongoose';
 
 import type { CrowiProperties, CrowiRequest } from '~/interfaces/crowi-request';
 import {
@@ -23,18 +21,11 @@ import {
   certifySharedPageAttachmentMiddleware,
   type RequestToAllowShareLink,
 } from '../../middlewares/certify-shared-page-attachment';
-import { Attachment, type IAttachmentDocument } from '../../models/attachment';
+import type { IAttachmentDocument } from '../../models/attachment';
 import ApiResponse from '../../util/apiResponse';
+import { resolveAccessibleAttachment } from './resolve-accessible-attachment';
 
 const logger = loggerFactory('growi:routes:attachment:get');
-
-// TODO: remove this local interface when models/page has typescriptized
-interface PageModel {
-  isAccessiblePageByViewer: (
-    pageId: string,
-    user: IUser | undefined,
-  ) => Promise<boolean>;
-}
 
 type LocalsAfterDataInjection = { attachment: IAttachmentDocument };
 
@@ -53,37 +44,27 @@ export const retrieveAttachmentFromIdParam = async (
   next: NextFunction,
 ): Promise<void> => {
   const id = req.params.id;
-  const attachment = await Attachment.findById(id);
 
-  if (attachment == null) {
-    res.json(ApiResponse.error('attachment not found'));
+  // Skip the viewer check only when the request is already certified via a
+  // valid share link: certifySharedPageAttachmentMiddleware binds the fileId
+  // to that share link's page (see validateAttachment), so re-running the
+  // viewer check here would incorrectly reject a non-member share-link viewer.
+  const result = await resolveAccessibleAttachment(
+    id,
+    req.user,
+    req.isSharedPage ?? false,
+  );
+
+  if ('errorCode' in result) {
+    const message =
+      result.errorCode === 'not_found'
+        ? 'attachment not found'
+        : `Forbidden to access to the attachment '${id}'. This attachment might belong to other pages.`;
+    res.json(ApiResponse.error(message));
     return;
   }
 
-  const user = req.user;
-
-  // Check viewer has permission, for both logged-in users and guests.
-  // Skip only when the request is already certified via a valid share link:
-  // certifySharedPageAttachmentMiddleware binds the fileId to that share
-  // link's page (see validateAttachment), so re-running the viewer check
-  // here would incorrectly reject a non-member share-link viewer.
-  if (!req.isSharedPage && attachment.page != null) {
-    const Page = mongoose.model<IPage, PageModel>('Page');
-    const isAccessible = await Page.isAccessiblePageByViewer(
-      getIdStringForRef(attachment.page),
-      user,
-    );
-    if (!isAccessible) {
-      res.json(
-        ApiResponse.error(
-          `Forbidden to access to the attachment '${attachment.id}'. This attachment might belong to other pages.`,
-        ),
-      );
-      return;
-    }
-  }
-
-  res.locals.attachment = attachment;
+  res.locals.attachment = result.attachment;
 
   return next();
 };
