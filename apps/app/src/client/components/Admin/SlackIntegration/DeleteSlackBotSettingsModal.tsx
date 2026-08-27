@@ -91,7 +91,7 @@ export const DeleteSlackBotSettingsModal = React.memo(
         </ModalHeader>
         <ModalBody>{bodyContent}</ModalBody>
         <ModalFooter>
-          <Button onClick={closeButtonHandler}>{t('Cancel')}</Button>
+          <Button onClick={closeButtonHandler}>{t('commons:Cancel')}</Button>
           <Button color="danger" onClick={deleteSlackCredentialsHandler}>
             {deleteButtonContent}
           </Button>

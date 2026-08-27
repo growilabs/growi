@@ -76,7 +76,7 @@ export const RevisionComparer = (props: RevisionComparerProps): JSX.Element => {
       : sourceRevision._id === targetRevision._id;
 
   if (currentPageId == null || currentPagePath == null) {
-    return <>{t('not_found_page.page_not_exist')}</>;
+    return <>{t('commons:not_found_page.page_not_exist')}</>;
   }
 
   return (

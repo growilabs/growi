@@ -83,7 +83,7 @@ const AppSettingsPageContents = (props: Props) => {
               className="admin-setting-header"
               data-testid="v5-page-migration"
             >
-              {t('V5 Page Migration')}
+              {t('commons:V5 Page Migration')}
             </h2>
             <V5PageMigration />
           </div>
