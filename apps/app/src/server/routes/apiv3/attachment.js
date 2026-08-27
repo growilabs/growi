@@ -487,12 +487,26 @@ export const setup = (crowi) => {
     async (req, res) => {
       try {
         const attachmentId = req.params.id;
+        const { isSharedPage } = req;
 
         const attachment = await Attachment.findById(attachmentId)
           .populate('creator')
           .exec();
 
         if (attachment == null) {
+          const message = 'Attachment not found';
+          return res.apiv3Err(message, 404);
+        }
+
+        // check whether accessible. Attachments not scoped to a page
+        // (PROFILE_IMAGE, BRAND_LOGO, PAGE_BULK_EXPORT, AUDIT_LOG_BULK_EXPORT)
+        // have no `page` to check against, so this only applies to
+        // page-scoped attachments (mirrors routes/attachment/get.ts).
+        if (
+          !isSharedPage &&
+          attachment.page != null &&
+          !(await Page.isAccessiblePageByViewer(attachment.page, req.user))
+        ) {
           const message = 'Attachment not found';
           return res.apiv3Err(message, 404);
         }
