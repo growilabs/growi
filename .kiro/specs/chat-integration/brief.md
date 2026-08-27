@@ -1,4 +1,4 @@
-# slackbot-proxy Generation 2 — Discovery Brief
+# chat-integration（slackbot-proxy Generation 2）— Discovery Brief
 
 `apps/slackbot-proxy` を「Slack 専用プロキシ」から「複数チャットプラットフォームのハブ」へ作り直すための構想メモ。
 **このドキュメントは discovery 段階であり、要件・設計として承認されたものではない。** 未決の意思決定は
