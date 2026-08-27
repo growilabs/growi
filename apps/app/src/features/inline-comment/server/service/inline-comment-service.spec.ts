@@ -1,62 +1,191 @@
 import { Types } from 'mongoose';
 import { describe, expect, it, vi } from 'vitest';
-import type { DeepMockProxy } from 'vitest-mock-extended';
-import { mockDeep } from 'vitest-mock-extended';
+import { mock } from 'vitest-mock-extended';
 
-import type {
-  InlineCommentCreateResult,
-  InlineCommentServiceDeps,
-} from './inline-comment-service';
+import type { IActivity, SupportedActionType } from '~/interfaces/activity';
+import { SupportedAction } from '~/interfaces/activity';
+import type CommentService from '~/server/service/comment';
+import type { PrismaClient } from '~/utils/prisma';
+
+import type { InlineCommentServiceDeps } from './inline-comment-service';
 import { InlineCommentService } from './inline-comment-service';
 
 // ---------------------------------------------------------------------------
 // Test helpers
+//
+// Row/result fixtures below mirror the real `comments`/`pages` Prisma models
+// (prisma/schema.prisma) rather than a hand-written subset — the service
+// under test is now typed directly against the generated `PrismaClient`
+// (see inline-comment-service.ts), so a fixture missing a real column would
+// not be a meaningful stand-in for what Prisma actually returns.
 // ---------------------------------------------------------------------------
 
 function makeId(): string {
   return new Types.ObjectId().toString();
 }
 
-function makeCreatedRow(
-  overrides: Partial<InlineCommentCreateResult> = {},
-): InlineCommentCreateResult {
+type CommentsRow =
+  ReturnType<PrismaClient['comments']['create']> extends Promise<infer R>
+    ? R
+    : never;
+type PagesRow =
+  ReturnType<PrismaClient['pages']['create']> extends Promise<infer R>
+    ? R
+    : never;
+
+function makePageRow(overrides: Partial<PagesRow> = {}): PagesRow {
   const now = new Date();
   return {
     id: makeId(),
+    v: 0,
+    commentCount: 0,
+    createdAt: now,
+    creatorId: null,
+    deletedAt: null,
+    deleteUserId: null,
+    descendantCount: 0,
+    expandContentWidth: null,
+    grant: 1,
+    grantedGroups: null,
+    grantedUsers: [],
+    isEmpty: false,
+    lastUpdateUserId: null,
+    latestRevisionBodyLength: null,
+    liker: [],
+    parentId: null,
+    path: '/test-page',
+    revisionId: null,
+    seenUsers: [],
+    status: 'published',
+    ttlTimestamp: null,
+    updatedAt: now,
+    wip: null,
+    ...overrides,
+  } as PagesRow;
+}
+
+function makeCommentRow(overrides: Partial<CommentsRow> = {}): CommentsRow {
+  const now = new Date();
+  return {
+    id: makeId(),
+    v: 0,
     pageId: makeId(),
     creatorId: makeId(),
+    revisionId: null,
     comment: 'nice point',
+    commentPosition: -1,
+    replyToId: null,
+    createdAt: now,
+    updatedAt: now,
+    isInline: true,
+    quote: null,
+    prefix: null,
+    suffix: null,
+    approxOffset: null,
+    anchorOriginRevisionId: null,
+    resolvedById: null,
+    resolvedAt: null,
+    ...overrides,
+  } as CommentsRow;
+}
+
+/** An origin (anchored) inline comment row, as `create()` inserts it. */
+function makeCreatedRow(
+  overrides: Partial<CommentsRow> & { page?: Partial<PagesRow> } = {},
+) {
+  const { page, ...rest } = overrides;
+  const row = makeCommentRow({
     quote: 'the quoted text',
     prefix: 'preceding context',
     suffix: 'following context',
     approxOffset: 10,
     anchorOriginRevisionId: makeId(),
-    resolvedById: null,
-    resolvedAt: null,
-    createdAt: now,
-    updatedAt: now,
-    page: { id: makeId(), path: '/test-page' },
-    ...overrides,
-  };
+    ...rest,
+  });
+  return { ...row, page: makePageRow({ id: row.pageId, ...page }) };
 }
+
+/** A reply row, as `createReply()` inserts it (no `page` relation included). */
+function makeReplyRow(overrides: Partial<CommentsRow> = {}): CommentsRow {
+  return makeCommentRow({
+    comment: 'thanks for pointing this out',
+    replyToId: makeId(),
+    ...overrides,
+  });
+}
+
+/** The `findUnique` row used to validate a `createReply()` `parentId`. */
+function makeParentRow(
+  overrides: Partial<CommentsRow> & { page?: Partial<PagesRow> } = {},
+) {
+  const { page, ...rest } = overrides;
+  const row = makeCommentRow({
+    isInline: true,
+    replyToId: null,
+    ...rest,
+  });
+  return { ...row, page: makePageRow({ id: row.pageId, ...page }) };
+}
+
+/** A minimal `IActivity` — the real declared return shape of `createByParameters`. */
+function makeActivity(
+  action: SupportedActionType = SupportedAction.ACTION_INLINE_COMMENT_CREATE,
+): IActivity {
+  return { action, createdAt: new Date() };
+}
+
+type PickedCommentService = Pick<CommentService, 'prepareMentionNotifications'>;
 
 /**
  * Builds a fully-mocked `InlineCommentServiceDeps` whose happy-path calls
  * resolve immediately, `prisma.comments.create` resolving with `createdRow`.
  */
 function makeDeps(
-  createdRow: InlineCommentCreateResult,
-): DeepMockProxy<InlineCommentServiceDeps> {
-  const deps = mockDeep<InlineCommentServiceDeps>();
-  deps.prisma.comments.create.mockResolvedValue(createdRow);
-  deps.prisma.activities.createByParameters.mockResolvedValue({
-    id: makeId(),
+  createdRow: ReturnType<typeof makeCreatedRow>,
+): InlineCommentServiceDeps {
+  const prisma = mock<PrismaClient>({
+    comments: {
+      create: vi.fn().mockResolvedValue(createdRow),
+      findUnique: vi.fn(),
+    },
+    activities: {
+      createByParameters: vi.fn().mockResolvedValue(makeActivity()),
+    },
   });
-  deps.commentService.prepareMentionNotifications.mockResolvedValue({
-    generatePreNotify: vi.fn(),
-    notify: vi.fn().mockResolvedValue(undefined),
+  const commentService = mock<PickedCommentService>({
+    prepareMentionNotifications: vi.fn().mockResolvedValue({
+      generatePreNotify: vi.fn(),
+      notify: vi.fn().mockResolvedValue(undefined),
+    }),
   });
-  return deps;
+  return { prisma, commentService };
+}
+
+/**
+ * Builds a fully-mocked `InlineCommentServiceDeps` for `createReply()`
+ * happy-path calls: `findUnique` resolves with `parentRow` (an eligible
+ * origin comment) and `create` resolves with `replyRow`.
+ */
+function makeReplyDeps(
+  parentRow: ReturnType<typeof makeParentRow>,
+  replyRow: CommentsRow,
+): InlineCommentServiceDeps {
+  const prisma = mock<PrismaClient>({
+    comments: {
+      findUnique: vi.fn().mockResolvedValue(parentRow),
+      create: vi.fn().mockResolvedValue(replyRow),
+    },
+    activities: {
+      createByParameters: vi.fn().mockResolvedValue(makeActivity()),
+    },
+  });
+  const commentService = mock<PickedCommentService>({
+    prepareMentionNotifications: vi.fn().mockResolvedValue({
+      generatePreNotify: vi.fn(),
+      notify: vi.fn().mockResolvedValue(undefined),
+    }),
+  });
+  return { prisma, commentService };
 }
 
 // ---------------------------------------------------------------------------
@@ -68,6 +197,9 @@ describe('InlineCommentService.create', () => {
     // "é" as "e" + U+0301 COMBINING ACUTE ACCENT — NFC-normalizing this
     // string changes it to a single U+00E9 codepoint, so this reliably
     // detects an unwanted `.normalize()` call anywhere in the write path.
+    // Written as explicit \u escapes (base letter + combining mark) — a
+    // plain literal here risks being silently NFC-normalized by tooling
+    // (editors, some file-write paths) before it ever reaches the test.
     const decomposedQuote = 'éclair';
     const decomposedPrefix = 'á la carte ';
     const decomposedSuffix = ' menu item';
@@ -104,7 +236,10 @@ describe('InlineCommentService.create', () => {
 
     // What was actually sent to persistence must be byte-for-byte the
     // original decomposed form.
-    const createArgs = deps.prisma.comments.create.mock.calls[0][0];
+    const createArgs = vi.mocked(deps.prisma.comments.create).mock
+      .calls[0][0] as {
+      data: { quote: string; prefix: string; suffix: string };
+    };
     expect(createArgs.data.quote).toBe(decomposedQuote);
     expect(createArgs.data.prefix).toBe(decomposedPrefix);
     expect(createArgs.data.suffix).toBe(decomposedSuffix);
@@ -164,22 +299,28 @@ describe('InlineCommentService.create', () => {
       creatorId,
     );
 
-    const createArgs = deps.prisma.comments.create.mock.calls[0][0];
+    const createArgs = vi.mocked(deps.prisma.comments.create).mock
+      .calls[0][0] as {
+      data: { anchorOriginRevisionId: string };
+    };
     expect(createArgs.data.anchorOriginRevisionId).toBe(anchorOriginRevisionId);
     expect(result.anchorOriginRevisionId).toBe(anchorOriginRevisionId);
   });
 
   it('Activity レコードを発行してから prepareMentionNotifications を呼び出す', async () => {
     const createdRow = makeCreatedRow();
-    const deps = mockDeep<InlineCommentServiceDeps>();
-    deps.prisma.comments.create.mockResolvedValue(createdRow);
+    const deps = makeDeps(createdRow);
 
     const callOrder: string[] = [];
-    deps.prisma.activities.createByParameters.mockImplementation(() => {
-      callOrder.push('activity-created');
-      return Promise.resolve({ id: makeId() });
-    });
-    deps.commentService.prepareMentionNotifications.mockImplementation(() => {
+    vi.mocked(deps.prisma.activities.createByParameters).mockImplementation(
+      () => {
+        callOrder.push('activity-created');
+        return Promise.resolve(makeActivity());
+      },
+    );
+    vi.mocked(
+      deps.commentService.prepareMentionNotifications,
+    ).mockImplementation(() => {
       callOrder.push('prepare-mention-notifications');
       return Promise.resolve({
         generatePreNotify: vi.fn(),
@@ -207,10 +348,6 @@ describe('InlineCommentService.create', () => {
   it('作成した Activity の id を prepareMentionNotifications に渡す', async () => {
     const createdRow = makeCreatedRow();
     const deps = makeDeps(createdRow);
-    const activityId = makeId();
-    deps.prisma.activities.createByParameters.mockResolvedValue({
-      id: activityId,
-    });
 
     const service = new InlineCommentService(deps);
     await service.create(
@@ -223,8 +360,161 @@ describe('InlineCommentService.create', () => {
       createdRow.creatorId as string,
     );
 
-    const [, , passedActivityId] =
-      deps.commentService.prepareMentionNotifications.mock.calls[0];
-    expect(passedActivityId.toString()).toBe(activityId);
+    // The activity id is minted by the service (createByParameters' real
+    // declared return type carries no `id`), so the id it sent as the
+    // create-payload's `id` field is what must reach
+    // prepareMentionNotifications — not anything read off the return value.
+    const [sentActivityParams] = vi.mocked(
+      deps.prisma.activities.createByParameters,
+    ).mock.calls[0];
+    const [, , passedActivityId] = vi.mocked(
+      deps.commentService.prepareMentionNotifications,
+    ).mock.calls[0];
+    expect(passedActivityId.toString()).toBe(sentActivityParams.id);
+  });
+});
+
+describe('InlineCommentService.createReply', () => {
+  it('返信でないコメントID（起点コメント自体ではない）を親に指定するとエラーになり、永続化を一切呼び出さない', async () => {
+    // Covers all three "not an origin comment" shapes the precondition
+    // rejects: a regular non-inline comment, a reply's own id, and a
+    // nonexistent id — each must fail the same way.
+    const nonOriginParents: (ReturnType<typeof makeParentRow> | null)[] = [
+      makeParentRow({ isInline: false, replyToId: null }), // regular comment
+      makeParentRow({ isInline: true, replyToId: makeId() }), // a reply itself
+      null, // nonexistent id
+    ];
+
+    await Promise.all(
+      nonOriginParents.map(async (parentRow) => {
+        const prisma = mock<PrismaClient>({
+          comments: {
+            findUnique: vi.fn().mockResolvedValue(parentRow),
+            create: vi.fn(),
+          },
+          activities: { createByParameters: vi.fn() },
+        });
+        const commentService = mock<PickedCommentService>({
+          prepareMentionNotifications: vi.fn(),
+        });
+        const service = new InlineCommentService({ prisma, commentService });
+
+        await expect(
+          service.createReply({ parentId: makeId(), comment: 'x' }, makeId()),
+        ).rejects.toThrow();
+
+        expect(prisma.comments.create).not.toHaveBeenCalled();
+        expect(prisma.activities.createByParameters).not.toHaveBeenCalled();
+        expect(
+          commentService.prepareMentionNotifications,
+        ).not.toHaveBeenCalled();
+      }),
+    );
+  });
+
+  it('起点コメントへの返信を作成すると、アンカー関連フィールドを持たず isInline: true・replyToId が親IDの行として永続化される', async () => {
+    const parentId = makeId();
+    const pageId = makeId();
+    const creatorId = makeId();
+    const parentRow = makeParentRow({ id: parentId, pageId });
+    const replyRow = makeReplyRow({ pageId, creatorId, replyToId: parentId });
+    const deps = makeReplyDeps(parentRow, replyRow);
+    const service = new InlineCommentService(deps);
+
+    const result = await service.createReply(
+      { parentId, comment: replyRow.comment },
+      creatorId,
+    );
+
+    const createArgs = vi.mocked(deps.prisma.comments.create).mock
+      .calls[0][0] as {
+      data: Record<string, unknown>;
+    };
+    expect(createArgs.data).toMatchObject({
+      pageId,
+      creatorId,
+      comment: replyRow.comment,
+      isInline: true,
+      replyToId: parentId,
+    });
+    // No anchor-related field is present on the insert payload — the
+    // returned domain object mirrors this by not carrying anchor fields at
+    // all (design.md Postconditions, requirement 1.9).
+    expect(createArgs.data).not.toHaveProperty('quote');
+    expect(createArgs.data).not.toHaveProperty('prefix');
+    expect(createArgs.data).not.toHaveProperty('suffix');
+    expect(createArgs.data).not.toHaveProperty('approxOffset');
+    expect(createArgs.data).not.toHaveProperty('anchorOriginRevisionId');
+    // No `page` relation is requested on the reply insert — see
+    // inline-comment-service.ts's createReply() doc.
+    expect(createArgs).not.toHaveProperty('include');
+
+    expect(result).toEqual({
+      id: replyRow.id,
+      pageId,
+      creatorId,
+      comment: replyRow.comment,
+      replyToId: parentId,
+      createdAt: replyRow.createdAt,
+      updatedAt: replyRow.updatedAt,
+    });
+  });
+
+  it('返信作成先のページIDは親コメントのpageIdを用いる（リクエスト側からは受け取らない）', async () => {
+    const parentId = makeId();
+    const parentPageId = makeId();
+    const parentRow = makeParentRow({ id: parentId, pageId: parentPageId });
+    const replyRow = makeReplyRow({
+      pageId: parentPageId,
+      replyToId: parentId,
+    });
+    const deps = makeReplyDeps(parentRow, replyRow);
+    const service = new InlineCommentService(deps);
+
+    await service.createReply({ parentId, comment: 'x' }, makeId());
+
+    const createArgs = vi.mocked(deps.prisma.comments.create).mock
+      .calls[0][0] as {
+      data: { pageId: string };
+    };
+    expect(createArgs.data.pageId).toBe(parentPageId);
+  });
+
+  it('Activity レコードを発行してから prepareMentionNotifications を呼び出す', async () => {
+    const parentId = makeId();
+    const parentRow = makeParentRow({ id: parentId });
+    const replyRow = makeReplyRow({
+      pageId: parentRow.pageId,
+      replyToId: parentId,
+    });
+
+    const deps = makeReplyDeps(parentRow, replyRow);
+
+    const callOrder: string[] = [];
+    vi.mocked(deps.prisma.activities.createByParameters).mockImplementation(
+      () => {
+        callOrder.push('activity-created');
+        return Promise.resolve(
+          makeActivity(SupportedAction.ACTION_INLINE_COMMENT_REPLY),
+        );
+      },
+    );
+    vi.mocked(
+      deps.commentService.prepareMentionNotifications,
+    ).mockImplementation(() => {
+      callOrder.push('prepare-mention-notifications');
+      return Promise.resolve({
+        generatePreNotify: vi.fn(),
+        notify: vi.fn().mockResolvedValue(undefined),
+      });
+    });
+
+    const service = new InlineCommentService(deps);
+    await service.createReply({ parentId, comment: 'x' }, makeId());
+
+    expect(callOrder).toEqual([
+      'activity-created',
+      'prepare-mention-notifications',
+    ]);
   });
 });

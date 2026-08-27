@@ -28,9 +28,7 @@ export interface InlineCommentAnchor {
 
 /**
  * An origin (anchored) inline comment. Reply rows (`isInline: true` with a
- * non-null `replyToId`) are a separate future type (`InlineCommentReply`,
- * design.md's Service Interface) — not declared yet, added by the task that
- * implements `createReply`.
+ * non-null `replyToId`) are a separate type, `InlineCommentReply` below.
  */
 export interface IInlineComment {
   id: string;
@@ -46,6 +44,24 @@ export interface IInlineComment {
   anchor: InlineCommentAnchor;
   resolvedById: string | null;
   resolvedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * A reply to an origin inline comment (`isInline: true` with a non-null
+ * `replyToId`). Design.md's aggregate model (`InlineCommentReply`, "子エン
+ * ティティ") explicitly holds no anchor and no resolved state — it is a
+ * plain comment attached to its parent — so this type omits those fields
+ * entirely rather than carrying them as `null` (requirement 1.9).
+ */
+export interface InlineCommentReply {
+  id: string;
+  pageId: string;
+  creatorId: string;
+  comment: string;
+  /** The origin inline comment this reply belongs to. */
+  replyToId: string;
   createdAt: Date;
   updatedAt: Date;
 }

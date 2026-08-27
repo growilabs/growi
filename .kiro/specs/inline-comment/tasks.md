@@ -74,7 +74,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.7, 3.2, 5.4, 5.5_
   - _Depends: 1.1, 1.2, 1.4_
 
-- [ ] 3.2 インラインコメントへの返信作成ロジックを実装する
+- [x] 3.2 インラインコメントへの返信作成ロジックを実装する
   - 指定された親IDが `isInline: true` かつ `replyToId` が `null`（起点コメント）であることを検証し、そうでなければエラーとする
   - `isInline: true, replyToId: <親id>` の行を、アンカー関連フィールドをすべて `null` のまま挿入する。`Activity`（`ACTION_INLINE_COMMENT_REPLY`）発行後に `prepareMentionNotifications` を呼び出す
   - 観測できる完了条件：返信でないコメントIDを親に指定した場合にエラーが返ることをユニットテストで確認できる
@@ -178,4 +178,5 @@
 
 - 2.4 (`normalized-offset-mapping.ts`): `NormalizedOffsetMapper` は `toOriginalOffset`/`toNormalizedOffset`/`normalizedText` のみを公開し、セグメントの `originalEnd` は非公開。あいまい一致の終了オフセットをそのまま逆変換すると、正規化で伸びた/書き換わったセグメント内部では境界が `originalStart` に丸まり、範囲が縮む可能性がある（2.5で終了オフセットを扱う際は、原文側で書記素境界にスナップして広げるなど別の対処が必要）。
 - 2.5 (`quote-matcher.ts`): 上記の終了オフセット縮み問題は、正規化テキスト側で変換前に書記素境界へスナップすることで対処済み（変換後の原文側スナップは `toOriginalOffset` が常にセグメント先頭＝原文の書記素境界を返すため no-op になる）。`matchQuote(text, anchor)` は呼び出しごとに `createNormalizedOffsetMapper(text)` を作り直す設計（signatureがdesignで固定されているため）。4.3 (AnchorResolver) で複数アンカーを同じ `text` に対して呼ぶ場合、静定1回あたり完全一致しないアンカーの数だけ書記素分割が再実行される点に注意（完全一致経路ではmapperを作らないため、そちらは軽い）。
-- 3.1 (`inline-comment-service.ts`): `create()` は `Activity` レコードを `prisma.activities.createByParameters()` で自前生成し、`addActivity` ミドルウェア（`res.locals.activity`／`activityEvent.emit`）には一切依存しない。**3.5でルートを配線する際、この4エンドポイントに `addActivity` ミドルウェアを適用してはいけない** — 適用すると、`activityEvent.emit` で決着されないまま応答が返り、failsafe finalizer が `ACTION_UNSETTLED` の余分な行を書いてしまう（サービスが書いた本来の `ACTION_INLINE_COMMENT_*` 行とは別に）。また `prisma.activities.createByParameters` の戻り値は実行時に `id` を持つが `IActivity` 型には無いため、3.5配線時に薄い型アダプタが必要。
+- 3.1/3.2 (`inline-comment-service.ts`): `create()`／`createReply()` はどちらも `Activity` レコードを `prisma.activities.createByParameters()` で自前生成し、`addActivity` ミドルウェア（`res.locals.activity`／`activityEvent.emit`）には一切依存しない。**3.5でルートを配線する際、この4エンドポイントに `addActivity` ミドルウェアを適用してはいけない** — 適用すると、`activityEvent.emit` で決着されないまま応答が返り、failsafe finalizer が `ACTION_UNSETTLED` の余分な行を書いてしまう（サービスが書いた本来の `ACTION_INLINE_COMMENT_*` 行とは別に）。`prisma.activities.createByParameters` の戻り値の型（`IActivity`）には `id` が無い（実行時には存在するが型からは見えない）ため、両メソッドとも `activityId` を呼び出し側で先に採番して `createByParameters({ id: activityId, ... })` に渡し、`prepareMentionNotifications` にも戻り値からではなくこの自己採番した `activityId` を渡している。3.5配線でも戻り値の `id` を読みに行く必要はない。
+- 3.2で判明（3.3/3.4にも適用）：`InlineCommentServiceDeps.prisma` の型は**手書きインターフェースを作らず**、`import type { PrismaClient } from '~/utils/prisma'` を型のみ取り込みして `Pick<PrismaClient, 'comments' | 'activities'>` のように絞り込む。行の型が要る場合も `Prisma.Result<PrismaClient['comments'], {...}, 'create'>`（`import type { Prisma } from '~/generated/prisma/client'`）のように実体から導出する。手書き型を本物のPrismaクライアントに合わせ込もうとすると（オーバーロード／ユニオン型／実行時ガードいずれも）代入不能や実行時の誤判定を繰り返す（3.2で3ラウンド分のレビュー往復の原因になった）。既存の参考実装は `apps/app/src/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron/steps/activity-export-cursor.ts` とその `.spec.ts`（`mock<PrismaClient>({...})` によるモック）。

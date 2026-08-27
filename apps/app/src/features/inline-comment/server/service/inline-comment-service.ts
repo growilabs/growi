@@ -3,25 +3,31 @@
  * kickoff for inline comments (design.md: "InlineCommentService").
  *
  * This is the sole write path for `comments` rows with `isInline: true`
- * (design.md: Responsibilities & Constraints). `create()` is implemented here;
- * `createReply`/`listByPageId`/`setResolved` (design.md's Service Interface)
- * are added by later tasks (3.2–3.4) as sibling methods on this same class —
- * this file is structured so those additions don't need to touch `create()`.
+ * (design.md: Responsibilities & Constraints). `create()` and `createReply()`
+ * are implemented here; `listByPageId`/`setResolved` (design.md's Service
+ * Interface) are added by later tasks (3.3–3.4) as sibling methods on this
+ * same class — this file is structured so those additions don't need to
+ * touch the existing methods.
  */
 
 import type { IPageHasId } from '@growi/core';
 import { Types } from 'mongoose';
 
+import type { Prisma } from '~/generated/prisma/client';
 import {
   SupportedAction,
   SupportedEventModel,
   SupportedTargetModel,
 } from '~/interfaces/activity';
-import type { IActivityParameters } from '~/server/models/activity';
 import type CommentService from '~/server/service/comment';
 import loggerFactory from '~/utils/logger';
+import type { PrismaClient } from '~/utils/prisma';
 
-import type { IInlineComment, InlineCommentAnchor } from '../../interfaces';
+import type {
+  IInlineComment,
+  InlineCommentAnchor,
+  InlineCommentReply,
+} from '../../interfaces';
 
 const logger = loggerFactory('growi:features:inline-comment:service');
 
@@ -36,6 +42,12 @@ export interface CreateInlineCommentInput {
   anchor: InlineCommentAnchor;
 }
 
+export interface CreateInlineCommentReplyInput {
+  /** The origin (anchored) inline comment this reply is attached to. */
+  parentId: string;
+  comment: string;
+}
+
 // ---------------------------------------------------------------------------
 // Dependencies
 //
@@ -46,66 +58,49 @@ export interface CreateInlineCommentInput {
 // class (type-only import, erased at build — no runtime cycle), so the
 // route layer (task 3.5) can pass `crowi.commentService` in unmodified.
 //
-// `prisma` is intentionally narrowed to only the two operations this
-// service needs, rather than the full generated Prisma client: `create`
-// (with `include: { page: true }`, so the row needed by
-// `prepareMentionNotifications` comes back in the same round trip instead
-// of a second dependency for fetching the page) and `activities.createByParameters`
-// (the same direct-insert path other non-middleware Activity writers use —
-// see `.claude/rules/activity-recording.md` and `attachment-snapshot.ts`).
+// `prisma` is typed against the real generated `PrismaClient` (type-only
+// import), narrowed with `Pick` to only the two delegates this service uses
+// (`comments`, `activities`) rather than hand-written parallel interfaces.
+// Row/result shapes below are derived from that same real client type via
+// `Prisma.Result<...>` instead of being declared by hand, so they can never
+// drift out of structural assignability with what real Prisma returns (see
+// `.../audit-log-bulk-export/.../activity-export-cursor.ts` for the same
+// pattern applied to `activities`).
 // ---------------------------------------------------------------------------
 
 /**
- * The `comments` row shape this service reads back after `create()`,
- * narrowed to the fields it actually uses. Mirrors the Prisma `comments`
- * model (schema.prisma) plus the `page` relation pulled in via `include`.
+ * The `comments` row shape read back from `create()`'s insert, including the
+ * `page` relation (`include: { page: true }`) so the row needed by
+ * `prepareMentionNotifications` comes back in the same round trip instead of
+ * a second dependency for fetching the page.
  */
-export interface InlineCommentCreateResult {
-  id: string;
-  pageId: string;
-  creatorId: string | null;
-  comment: string;
-  quote: string | null;
-  prefix: string | null;
-  suffix: string | null;
-  approxOffset: number | null;
-  anchorOriginRevisionId: string | null;
-  resolvedById: string | null;
-  resolvedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  /**
-   * The related `pages` row. Typed loosely here (not `IPageHasId`) because
-   * this is the raw Prisma shape (`id`, not `_id`); `toPageHasId` below
-   * adapts it for `prepareMentionNotifications`.
-   */
-  page: { id: string } & Record<string, unknown>;
-}
+type InlineCommentCreateResult = Prisma.Result<
+  PrismaClient['comments'],
+  { include: { page: true } },
+  'create'
+>;
 
-export interface InlineCommentServicePrisma {
-  comments: {
-    create(args: {
-      data: {
-        pageId: string;
-        creatorId: string;
-        comment: string;
-        isInline: true;
-        quote: string;
-        prefix: string;
-        suffix: string;
-        approxOffset: number;
-        anchorOriginRevisionId: string;
-      };
-      include: { page: true };
-    }): Promise<InlineCommentCreateResult>;
-  };
-  activities: {
-    createByParameters(params: IActivityParameters): Promise<{ id: string }>;
-  };
-}
+/**
+ * The `comments` row shape a `createReply()` insert reads back. No `page`
+ * relation is pulled in here: `toPageHasId`/`prepareMentionNotifications`
+ * need the *parent's* page, which the `findUnique()` parent lookup already
+ * returns via its own `include: { page: true }`, so re-fetching it on the
+ * reply row would be a redundant round trip.
+ */
+type InlineCommentReplyCreateResult = Prisma.Result<
+  PrismaClient['comments'],
+  object,
+  'create'
+>;
+
+// The `findUnique()` lookup used to validate a `createReply()` `parentId`
+// (isInline: true and replyToId: null — i.e. it is itself an origin
+// comment) needs no separately-declared row type: its shape is inferred
+// directly from `this.deps.prisma.comments.findUnique(...)`'s call-site
+// return type, which is already derived from the real `PrismaClient`.
 
 export interface InlineCommentServiceDeps {
-  prisma: InlineCommentServicePrisma;
+  prisma: Pick<PrismaClient, 'comments' | 'activities'>;
   commentService: Pick<CommentService, 'prepareMentionNotifications'>;
 }
 
@@ -114,15 +109,16 @@ export interface InlineCommentServiceDeps {
 // ---------------------------------------------------------------------------
 
 /**
- * Adapts a Prisma `pages` row (as returned via `comments.create`'s
- * `include: { page: true }`) to the Mongoose-era `IPageHasId` shape that
- * `CommentService.prepareMentionNotifications` still expects. GROWI's
- * `$allModels` Prisma extension (`~/utils/prisma`) already attaches a
- * computed `_id` alias for exactly this kind of legacy-shape compatibility,
- * but `InlineCommentServicePrisma` deliberately does not depend on that
- * extension's type surface (it is typed loosely as `Record<string, unknown>`
- * to keep this service's own Prisma dependency narrow and mockable), so the
- * alias is added explicitly here instead of relied upon implicitly.
+ * Adapts a Prisma `pages` row (as returned via `comments.create`'s /
+ * `comments.findUnique`'s `include: { page: true }`) to the Mongoose-era
+ * `IPageHasId` shape that `CommentService.prepareMentionNotifications` still
+ * expects. GROWI's `$allModels` Prisma extension (`~/utils/prisma`) attaches
+ * a computed `_id` alias for exactly this kind of legacy-shape compatibility
+ * at runtime, but the *type* derived here via `Prisma.Result<...>` for a
+ * nested `include`d relation does not reflect that extension's computed
+ * field (the extension is applied to the top-level delegate, not to types
+ * TypeScript can see through a relation include), so the alias is added
+ * explicitly instead of relied upon implicitly.
  */
 function toPageHasId(
   page: { id: string } & Record<string, unknown>,
@@ -165,6 +161,28 @@ function toIInlineComment(row: InlineCommentCreateResult): IInlineComment {
   };
 }
 
+function toInlineCommentReply(
+  row: InlineCommentReplyCreateResult,
+): InlineCommentReply {
+  // createReply() always writes creatorId/replyToId together, so a row it
+  // just read back from its own insert is guaranteed to have them.
+  if (row.creatorId == null || row.replyToId == null) {
+    throw new Error(
+      `Inline comment reply row '${row.id}' is missing required fields`,
+    );
+  }
+
+  return {
+    id: row.id,
+    pageId: row.pageId,
+    creatorId: row.creatorId,
+    comment: row.comment,
+    replyToId: row.replyToId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // InlineCommentService
 // ---------------------------------------------------------------------------
@@ -191,7 +209,12 @@ export class InlineCommentService {
    *   `commentService.prepareMentionNotifications`, per design.md's
    *   Responsibilities & Constraints and the ordering `prepareMentionNotifications`
    *   requires (it takes `activityId` as an argument, so the activity must
-   *   exist first).
+   *   exist first). The activity id is minted here (rather than read off
+   *   `createByParameters`'s return value) because the real extension's
+   *   declared return type (`IActivity`) carries no `id` field, even though
+   *   a row is created at runtime — see `IActivityParameters.id` doc in
+   *   `~/server/models/activity.ts` for the caller-assigned-id contract this
+   *   relies on.
    */
   async create(
     input: CreateInlineCommentInput,
@@ -216,12 +239,15 @@ export class InlineCommentService {
       include: { page: true },
     });
 
+    const activityId = new Types.ObjectId().toString();
+
     // Activity first — see the method doc and
     // .claude/rules/activity-recording.md. Unlike a route-level `addActivity`
     // middleware call, this service mints the activity itself: it runs
     // outside any HTTP request context, so `ip`/`endpoint` are omitted
     // (IActivityParameters marks both optional for exactly this case).
-    const activity = await this.deps.prisma.activities.createByParameters({
+    await this.deps.prisma.activities.createByParameters({
+      id: activityId,
       action: SupportedAction.ACTION_INLINE_COMMENT_CREATE,
       user: creatorId,
       target: input.pageId,
@@ -239,7 +265,7 @@ export class InlineCommentService {
         await this.deps.commentService.prepareMentionNotifications(
           new Types.ObjectId(created.id),
           new Types.ObjectId(creatorId),
-          new Types.ObjectId(activity.id),
+          new Types.ObjectId(activityId),
           toPageHasId(created.page),
         );
       await notify();
@@ -248,5 +274,83 @@ export class InlineCommentService {
     }
 
     return toIInlineComment(created);
+  }
+
+  /**
+   * Creates a reply to an origin (anchored) inline comment.
+   *
+   * - Rejects `input.parentId` unless it references a row that is itself an
+   *   origin inline comment (`isInline: true` and `replyToId: null`) — a
+   *   regular non-inline comment, a reply's own id, or a nonexistent id are
+   *   all rejected (design.md's Service Interface Preconditions, requirement
+   *   1.8, 1.9).
+   * - The inserted row leaves every anchor-related field unset (`quote`,
+   *   `prefix`, `suffix`, `approxOffset`, `anchorOriginRevisionId`,
+   *   `resolvedById`, `resolvedAt` all stay `null` — Prisma's `comments`
+   *   model defaults them to `null` when omitted from `data`), matching
+   *   design.md's Postconditions and requirement 1.9. No `page` relation is
+   *   requested on this insert — the reply row itself never needs page data;
+   *   only the *parent's* page (already fetched by the `findUnique` lookup
+   *   above) is needed for `prepareMentionNotifications`.
+   * - Records an `Activity` (`ACTION_INLINE_COMMENT_REPLY`) before calling
+   *   `commentService.prepareMentionNotifications`, same ordering as
+   *   `create()` and for the same reason (`prepareMentionNotifications`
+   *   takes `activityId` as an argument, and the activity id is minted here
+   *   for the same reason as in `create()` — see that method's doc).
+   */
+  async createReply(
+    input: CreateInlineCommentReplyInput,
+    creatorId: string,
+  ): Promise<InlineCommentReply> {
+    const parent = await this.deps.prisma.comments.findUnique({
+      where: { id: input.parentId },
+      include: { page: true },
+    });
+
+    if (parent == null || !parent.isInline || parent.replyToId != null) {
+      throw new Error(
+        `Inline comment '${input.parentId}' is not an origin inline comment`,
+      );
+    }
+
+    const created = await this.deps.prisma.comments.create({
+      data: {
+        pageId: parent.pageId,
+        creatorId,
+        comment: input.comment,
+        isInline: true,
+        replyToId: input.parentId,
+      },
+    });
+
+    const activityId = new Types.ObjectId().toString();
+
+    // Activity first — see create()'s doc and .claude/rules/activity-recording.md.
+    await this.deps.prisma.activities.createByParameters({
+      id: activityId,
+      action: SupportedAction.ACTION_INLINE_COMMENT_REPLY,
+      user: creatorId,
+      target: parent.pageId,
+      targetModel: SupportedTargetModel.MODEL_PAGE,
+      event: created.id,
+      eventModel: SupportedEventModel.MODEL_COMMENT,
+    });
+
+    // Mention notification is best-effort — see create()'s doc for why
+    // failures here must not undo or fail the reply that already succeeded.
+    try {
+      const { notify } =
+        await this.deps.commentService.prepareMentionNotifications(
+          new Types.ObjectId(created.id),
+          new Types.ObjectId(creatorId),
+          new Types.ObjectId(activityId),
+          toPageHasId(parent.page),
+        );
+      await notify();
+    } catch (err) {
+      logger.error('Mention notification failed for inline comment reply', err);
+    }
+
+    return toInlineCommentReply(created);
   }
 }
