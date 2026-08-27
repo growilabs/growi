@@ -81,12 +81,12 @@ pageLinkSchema.statics.findBacklinkSources = async function (
 };
 
 /**
- * Point every row linking to `toPath` at `toPage` (null = nothing resolves there,
- * i.e. broken).
+ * Point every row whose `toPath` field equals `toPath` at `toPage` (null =
+ * broken). One bulk update, matched by text — not per-source-page.
  *
- * Low-level primitive: writes the target it is given, resolving nothing. Callers
- * must go through the `reResolveByToPath` service, which derives `toPage` from
- * `toPath` — do NOT call this static directly from event handlers.
+ * Low-level primitive: writes the target it's given, resolving nothing itself.
+ * `reResolveByToPath` calls this once per already-resolved candidate path — do
+ * NOT call this static directly from event handlers.
  */
 pageLinkSchema.statics.repointInboundLinks = async function (
   toPath: string,

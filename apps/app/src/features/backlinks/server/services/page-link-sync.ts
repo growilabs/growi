@@ -19,10 +19,10 @@ export const dropSelfLinks = (
 };
 
 /**
- * Entry point for keeping a page's outbound links in sync (create/update event
- * handlers call this). Drops self-links, then delegates the write to the
- * `PageLink.replaceOutboundLinks` model primitive — always go through here so
- * self-links never get persisted.
+ * OUTBOUND: rebuild the current page's own rows from a fresh scrape of its body
+ * (see `handlePageUpsert`). Drops self-links, then replaces every existing row
+ * for `fromPageId` via `PageLink.replaceOutboundLinks` — always go through here
+ * so self-links never get persisted.
  */
 export const syncOutboundLinks = async (
   fromPageId: Types.ObjectId,
@@ -34,21 +34,18 @@ export const syncOutboundLinks = async (
 };
 
 /**
- * Recompute the derived `toPage` cache of every row linking to `toPath`, except a
- * row whose own source is the resolved target — a page is never its own backlink.
+ * INBOUND: refresh other pages' cached links that point at current page `toPath`.
+ * A row's `toPage` cache is written only when its source page is
+ * saved, so it goes stale when the target path's occupant changes instead —
+ * this runs on the target side to catch that.
  *
- * A row's cache is only written when its *source* page is saved, so it goes stale
- * when the occupancy of the target path changes underneath it: a page appears at a
- * path that resolved to nothing, or a new occupant takes over a path whose previous
- * one is still cached. A path resolving to nothing writes null — that is how a row
- * returns to broken.
+ *   1. Find other paths that redirect into `toPath`.
+ *   2. Add `toPath` itself, so a row naming it directly is covered too.
+ *   3. Resolve each candidate id independently to its current occupant.
+ *   4. Per candidate, bulk-repoint every `PageLink` row whose `toPath` matches
+ *      that string (by text, not by source page). Unresolved writes null.
  */
 export const reResolveByToPath = async (toPath: string): Promise<void> => {
-  // A row does not have to name the path to reach it: resolution follows the
-  // redirect chain, so `/old` resolves here whenever `/old` redirects here. Those
-  // rows go stale on the same event and nothing else revisits them. The reverse
-  // walk only nominates candidates — `resolveToPages` decides where each one
-  // actually lands, which for a longer chain may be somewhere else entirely.
   const redirectingPaths = await PageRedirect.retrieveFromPathsRedirectingTo(
     toPath,
     REDIRECT_CHAIN_MAX_DEPTH,
