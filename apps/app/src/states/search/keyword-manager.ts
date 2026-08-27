@@ -50,11 +50,20 @@ export const useKeywordManager = (): void => {
   }, [setKeyword]);
 };
 
-type SetSearchKeyword = (newKeyword: string) => void;
+type SetSearchKeywordOptions = {
+  // router.replace instead of push — for updates that should not add a history
+  // entry, e.g. live filter/sort tweaks that would otherwise flood back/forward.
+  replace?: boolean;
+};
+
+type SetSearchKeyword = (
+  newKeyword: string,
+  options?: SetSearchKeywordOptions,
+) => void;
 
 /**
  * Hook to set the search keyword and update the URL
- * @returns A function to update the search keyword and push to router history
+ * @returns A function to update the search keyword and navigate the router
  */
 export const useSetSearchKeyword = (
   pathname = '/_search',
@@ -64,14 +73,19 @@ export const useSetSearchKeyword = (
   const setKeyword = useSetAtom(searchKeywordAtom);
 
   return useCallback(
-    (newKeyword: string) => {
+    (newKeyword: string, options?: SetSearchKeywordOptions) => {
       setKeyword((prevKeyword) => {
         const isOnSearchPage = routerRef.current.pathname === pathname;
         // Navigate if keyword changed OR if not currently on search page
         if (prevKeyword !== newKeyword || !isOnSearchPage) {
           const newUrl = new URL(pathname, 'http://example.com');
           newUrl.searchParams.append('q', newKeyword);
-          routerRef.current.push(`${newUrl.pathname}${newUrl.search}`, '');
+          const href = `${newUrl.pathname}${newUrl.search}`;
+          if (options?.replace) {
+            routerRef.current.replace(href, '');
+          } else {
+            routerRef.current.push(href, '');
+          }
         }
 
         return newKeyword;

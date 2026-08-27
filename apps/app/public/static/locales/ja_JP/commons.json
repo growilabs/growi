@@ -260,5 +260,9 @@
       },
       "cancel": "キャンセル"
     }
+  },
+  "username_suggestion": {
+    "active_user": "アクティブユーザー",
+    "inactive_user": "非アクティブユーザー"
   }
 }
