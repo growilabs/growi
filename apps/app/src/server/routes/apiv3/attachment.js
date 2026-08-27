@@ -487,12 +487,22 @@ export const setup = (crowi) => {
     async (req, res) => {
       try {
         const attachmentId = req.params.id;
+        const { isSharedPage } = req;
 
         const attachment = await Attachment.findById(attachmentId)
           .populate('creator')
           .exec();
 
         if (attachment == null) {
+          const message = 'Attachment not found';
+          return res.apiv3Err(message, 404);
+        }
+
+        // check whether accessible
+        if (
+          !isSharedPage &&
+          !(await Page.isAccessiblePageByViewer(attachment.page, req.user))
+        ) {
           const message = 'Attachment not found';
           return res.apiv3Err(message, 404);
         }
