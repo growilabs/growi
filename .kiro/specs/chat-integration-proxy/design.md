@@ -50,6 +50,8 @@ types → capabilities → db → platform → command → relation → growi �
 ```
 
 - `runtime/` は最も外側。上のどこからも import されない
+- **repository が返す型は `types/` に置く。** `Relation` と `Invocation` を `relation/` と `command/` に置くと、
+  `db`（3 番目）がそれより右の層を import することになる
 - **`orchestration/` は relation と growi の右**。イベントを受けて各層を順に呼ぶ層で、
   アーキテクチャ図にある「束ねる処理」の実体
 - **`relation/` は `growi/` を import しない。** `PairingService` が所有確認に必要とするのは
@@ -73,18 +75,37 @@ types → capabilities → db → platform → command → relation → growi �
 
 | 能力 | Slack | Discord | Teams | Mattermost | 無いときの代わり |
 |---|:--:|:--:|:--:|:--:|---|
+| `requiresInboundReachability`（外部からの接続を受ける必要があるか） | × | × | **○** | × | 要件 13.3 の接続元制限の対象 |
+| `ephemeralMessage`（その場限りのメッセージ） | ○ | ○ | ○ | ○ | — （聞き返しと要件 11.3 の提示が寄りかかる） |
 | `slashCommand` | ○ | ○ | × | × | mention で起動する（決定 4） |
 | `mention` | ○ | ○ | ○ | ○ | — |
 | `modal` | ○ | × | ○ | × | コマンド行の引数 + 聞き返し（決定 5） |
 | `interactiveActions` | ○ | ○ | ○ | × | 番号つきの一覧を出して返信で選ばせる |
 | `card` | ○ | ○ | ○ | △ | markdown で投稿する |
-| `linkPreview` | ○ | 要確認 | 要確認 | 要確認 | 要件 6.5 に従い「使えない」と示す |
+| `linkPreview` | ○ | × | × | × | 要件 6.5 に従い「使えない」と示す（Slack の `link_shared` に相当するものが他に無い） |
 | `fetchMessages` | ○ | ○ | ○ | ○ | — |
 | `plainReply` | 要確認 | 要確認 | 要確認 | 要確認 | **呼びかけ付きの返信にする**（下記） |
 
+**接続をどの単位で張るか**は能力ではなく別の軸なので、表とは別に持つ。
+
+| | 接続の単位 | 根拠 |
+|---|---|---|
+| Slack | **installation ごと**（Socket Mode は workspace ごとの app token） | 要確認 |
+| Discord | **アプリごと**（Gateway は bot token 1 本） | 要確認 |
+| Teams | 接続しない（外部から受ける） | — |
+| Mattermost | **installation ごと**（接続先 URL が installation ごとに違う） | 要確認 |
+
+> **この値を実物で確かめてから実装に入る。** アプリ単位でしか張れないサービスがあるなら、
+> **同じトークンで workspace の数だけ接続を開くと、同じ発言をその数だけ処理する**。
+> 開発中の 1 workspace では気づけず、要件 8.1 の形（1 台に複数 workspace）でだけ起きる。
+> `ConnectionManager` はこの表を読んで動き、`if (platform === 'discord')` と書かない。
+
 `CapabilityLevel` は `full` / `degraded` / `none` / `unverified` の 4 値。
 表の ○ が `full`、△ が `degraded`、× が `none`、要確認が `unverified`。
-**`unverified` は `supports()` が `false` を返す** — 確かめるまで、その能力に寄りかからない。
+`supports()` が `true` を返すのは **`full` のときだけ**。
+- `degraded`（Mattermost の `card`）— `false`。呼ぶ側は代わりの手段（markdown で投稿）を選ぶ。
+  `levelOf()` で `degraded` を見分けられるので、「使えるが劣る」ことを利用者に示したい場所だけがそれを使う
+- `unverified` — `false`。**確かめるまでその能力に寄りかからない**
 
 > **`plainReply` に依存しない。** 番号つき一覧への答えは「`@growi 1`」と**呼びかけ付き**で返信させる。
 > 必要な能力が全サービス ○ の `mention` だけになり、確かめるまで確定できない値への依存が消える。
@@ -100,32 +121,45 @@ Mattermost は WebSocket で、**proxy 側から接続しに行く**（決定 7�
 
 ```typescript
 export interface ConnectionManager {
-  /** 起動時。installation を数え上げて 1 件ずつつなぐ */
   start(): Promise<void>;
-  /** 停止時。全部閉じる */
   stopAll(): Promise<void>;
-  /** ペアリングが成立して workspace が増えたとき、動いているプロセスがその場で足す */
-  attach(installationId: string): Promise<void>;
-  /** 紐付けが解除されたとき */
-  detach(installationId: string): Promise<void>;
+  /**
+   * **あるべき接続と今ある接続の差を埋める。** 一定間隔（既定 20 秒）で呼ぶ。
+   * 起動時に 1 回ではなく**回し続ける**ことが要点（下記）。
+   */
+  reconcile(): Promise<void>;
   /** 現在の接続状態。運用者が確認できる形で出す */
-  status(): Promise<ReadonlyArray<{ installationId: string; platform: PlatformName; state: 'connected' | 'reconnecting' | 'failed'; since: Date }>>;
+  status(): Promise<ReadonlyArray<{ installationId: string; platform: PlatformName; state: 'connected' | 'reconnecting' | 'failed' | 'held-by-other'; since: Date }>>;
 }
 ```
 
 **切れたときは指数的に間隔を空けて張り直す。** 上限を超えたら `failed` として記録し、運用者に見える形で残す。
 **1 つの接続の失敗を他へ波及させない**（要件 1.4）。
 
-#### 複数台で動かすときの持ち分
+#### 起動時に 1 回では成立しない
 
-**1 つの installation の接続は、1 台だけが持つ。** 同じ workspace に 2 台がつなぐと、
-イベントが二重に処理される。持ち分は Chat SDK が要求する state（`@chat-adapter/state-pg`）の
-**分散ロックを `installation:{id}` に掛けて**決める。ロックには寿命を持たせ、
-**持ち主が落ちてから他の台が引き取るまでの時間**を設定で決められるようにする（既定 60 秒）。
+接続の管理を「起動時に数え上げてつなぐ」形にすると、次の 2 つが壊れる。
 
-> **初版は 1 台で動かす前提とし、複数台は上のロックで成立させる。**
-> Performance の記述は「アイドル時のコストがゼロ」ではない — **常時接続を持つ以上、
-> installation の数に比例した常駐コストがかかる**（GROWI の台数には比例しない）。
+1. **取れなかったものを取りに行かない。** 2 台目の起動時に 1 台目が持っている installation は取れず、
+   その後 1 台目が落ちてロックが切れても、2 台目は取りに行かない。
+   **その workspace は誰もつながないまま黙り続ける。** 気づけるのは利用者が「反応しない」と言い出したとき
+2. **ロックが自分の目的を壊す。** 寿命 60 秒の印を生きている持ち主が延ばさないなら、
+   **正常に動いている 1 台目のロックが 60 秒で切れ、2 台目が引き取って二重に処理する。**
+   これはロックが防ごうとしていたことそのもの
+
+したがって `reconcile()` を一定間隔で回し、**毎回** (a) 取れていない installation のロックを取りに行き、
+(b) 自分が持っているロックを延ばし、(c) 延長に失敗したら**自分の接続を閉じる**（引き取り側と重ならないため）、
+(d) `installation` が消えていたら閉じる、を行う。
+
+#### 接続を足す・外す引き金は installation の増減
+
+**GROWI の紐付け（relation）の増減では接続を触らない。** ペアリング（要件 9）は
+**すでにある installation に GROWI を 1 つ足す**操作で、要件 9.7 の解除は relation を 1 件消す操作である。
+これを引き金にすると、**3 台紐づく workspace で 1 台だけ解除したときに残り 2 台の接続まで切れる。**
+`reconcile()` が `installation` の一覧を見て差を埋めるので、引き金は「installation が増えた・消えた」だけでよい。
+
+> **常駐コストは installation の数に比例する**（GROWI の台数には比例しない）。
+> 「アイドル時のコストがゼロ」は常時接続を持つ以上あてはまらない。
 
 ### 引数の収集 — 待つ関数として作らない
 
@@ -168,6 +202,7 @@ apps/chat-integration-proxy/
 ├── src/
 │   ├── types/
 │   │   ├── index.ts               # InteractionRef / TimeRange / ModalForm / FieldSpec
+│   │   ├── outbound-message.ts    # OutboundMessage / HistoryMessage / HistoryOutcome（SDK 型を含まない）
 │   │   └── platform-event.ts      # PlatformEvent / PlatformAppConfig / InstallationCredentials
 │   ├── capabilities/
 │   │   ├── index.ts
@@ -200,6 +235,7 @@ apps/chat-integration-proxy/
 │   │   └── admin-command-set.ts   # 運用者向け（register / unregister / weight / rotate-key）
 │   ├── relation/
 │   │   ├── pairing-service.ts     # 確認値を送る関数を引数で受け取る
+│   │   ├── growi-uri-resolver.ts  # 名前を引き、確かめたアドレスへつなぐ（リダイレクトを追わない）
 │   │   ├── growi-selection.ts
 │   │   └── unpair-service.ts
 │   ├── growi/
@@ -239,6 +275,12 @@ apps/chat-integration-proxy/
 | `ArgumentCollector` | `command/argument-collector.ts` | 値を集め、途中経過を保存して再開 | 1.2, 4.1, 5.2, 8.2, 11.5 |
 | `AdminCommandSet` | `command/admin-command-set.ts` | 運用者の入り口 | 3.8, 9.1, 9.7, 10.5, 13.4 |
 | `GrowiSelector` | `relation/growi-selection.ts` | どの GROWI に対して実行するか | 6.4, 8.1–8.6 |
+
+**GrowiSelector の判断**（要件 8.2–8.4）
+- 対象が 1 つに定まる操作で、許可している GROWI が複数 → **利用者に選ばせる**（8.2）
+- 許可している GROWI が 1 つだけ → **選択を求めずそれに対して実行する**（8.3）
+- **全 GROWI を対象とする操作（検索・ヘルプ）→ 選択を求めず、許可している全 GROWI へ配る**（8.4）
+- どの GROWI も紐づいていない、または許可していない → 実行せず理由を示す（8.6・11.3）
 | `PairingService` | `relation/pairing-service.ts` | ペアリングの proxy 側 | 9.1–9.7 |
 | `FanOutCollector` | `growi/fan-out-collector.ts` | 複数 GROWI への配信と待ち合わせ | 3.1, 3.4, 3.5, 14.5 |
 | `SearchFusion` | `growi/search-fusion.ts` | 重みつきの式で 1 本に統合 | 3.2, 3.3, 3.8 |
@@ -272,8 +314,19 @@ export interface InstallationCredentials {
 
 export interface InstallationProvider {
   resolve(platform: PlatformName, workspaceId: string): Promise<InstallationCredentials | null>;
-  /** `ConnectionManager.start()` が起動時に数え上げるために使う */
+  /** `ConnectionManager.reconcile()` が「あるべき接続」を知るために使う */
   list(platform: PlatformName): Promise<ReadonlyArray<{ installationId: string; workspaceId: string }>>;
+}
+
+/**
+ * **installation を作る口。これが無いと初版が動かない。**
+ * Gen 1 は `GET /oauth_redirect` と `InstallationStore.storeInstallation()` がここを担っていた。
+ * サービスによって入り方が違う — Slack と Discord は OAuth の折り返し、
+ * **Mattermost は運用者が接続先 URL と bot トークンを入力する**。どちらも受けられる形にする。
+ */
+export interface InstallationStore {
+  save(platform: PlatformName, workspaceId: string, workspaceName: string, credentials: InstallationCredentials): Promise<string>;
+  remove(installationId: string): Promise<void>;
 }
 
 /** platform 層が外へ渡すイベント。**Chat SDK の型を含めない** */
@@ -292,6 +345,38 @@ export type PostOutcome =
   | { readonly ok: false; readonly reason: 'bot-not-in-channel'; readonly remedy: string }
   | { readonly ok: false; readonly reason: 'platform-error'; readonly detail: string };
 
+/**
+ * **proxy 自身の語彙で持つ。Chat SDK の Card を含めない。**
+ * Card への変換は `platform/outbound.ts` の中だけで行う。ここに SDK の型が入ると、
+ * 組み立てる `orchestration/` が SDK を import することになり、決定 2 の lint に例外が要る。
+ */
+export type OutboundMessage =
+  | { readonly kind: 'markdown'; readonly markdown: string }
+  | { readonly kind: 'list'; readonly title: string;
+      readonly rows: ReadonlyArray<{ readonly markdown: string; readonly sourceLabel: string }>;
+      readonly footer?: string }
+  | { readonly kind: 'choice'; readonly prompt: string;
+      readonly options: ReadonlyArray<{ readonly id: string; readonly label: string }> };
+
+export type HistoryOutcome =
+  | { readonly ok: true; readonly messages: ReadonlyArray<HistoryMessage> }
+  | { readonly ok: false; readonly reason: 'not-in-channel' | 'not-permitted' | 'unsupported'; readonly remedy: string };
+
+/** `fetchMessages` が返す 1 発言。`KeepMessage`（protocol）へ変換して GROWI へ送る */
+export interface HistoryMessage {
+  readonly postedAt: string;
+  readonly author: ChatAccountRef;
+  readonly text: string;
+}
+
+/** Chat SDK の state が持つ分散ロックを、proxy 自身の型で外へ出す。
+ *  `ConnectionManager` と `runtime/sweeper.ts` の両方がこれを使う */
+export interface DistributedLock {
+  acquire(key: string, ttlMs: number): Promise<boolean>;
+  renew(key: string, ttlMs: number): Promise<boolean>;
+  release(key: string): Promise<void>;
+}
+
 export interface PlatformFacade {
   post(target: ChannelRef, message: OutboundMessage): Promise<PostOutcome>;
   postEphemeral(target: ChannelRef, user: ChatAccountRef, message: OutboundMessage): Promise<PostOutcome>;
@@ -300,9 +385,14 @@ export interface PlatformFacade {
   /** 要件 6.1 */
   attachPreview(target: MessageRef, preview: OutboundMessage): Promise<PostOutcome>;
   fetchHistory(target: ChannelRef, range: TimeRange): Promise<HistoryOutcome>;
+  /** 先に受け付けを返した後、その投稿を差し替える。
+   *  Slack は 3 秒、Discord は一次応答に 3 秒の期限があるため、検索は必ずこの経路を通る */
+  replace(message: MessageRef, replacement: OutboundMessage): Promise<PostOutcome>;
   /** 外部から接続を受けるサービス（Teams）のための受け口 */
   webhookHandler(platform: PlatformName): (request: Request) => Promise<Response>;
   connections(): ConnectionManager;
+  /** Chat SDK の state が持つ分散ロック。`sweeper` と `ConnectionManager` が使う */
+  locks(): DistributedLock;
 }
 
 export const createPlatformFacade: (
@@ -348,17 +438,17 @@ export interface ArgumentCollector {
 
 ```typescript
 export interface FanOutOutcome<T> {
-  readonly responded: ReadonlyArray<{ growiId: string; growiLabel: string; value: T }>;
-  readonly notResponded: ReadonlyArray<{ growiId: string; growiLabel: string; reason: 'timeout' | 'error' }>;
+  readonly responded: ReadonlyArray<{ relationId: string; growiLabel: string; value: T }>;
+  readonly notResponded: ReadonlyArray<{ relationId: string; growiLabel: string; reason: 'timeout' | 'error' }>;
   /**
    * **チャンネル権限で配らなかった GROWI（要件 11.3）。**
    * これが無いと、3 台紐づくチャンネルで 1 台が許可されていないとき、
    * 利用者は残り 2 台の結果だけを見て「全部を検索した」と思う — **検索が黙って不完全になる。**
    */
-  readonly excluded: ReadonlyArray<{ growiId: string; growiLabel: string; reason: 'not-permitted-in-channel' }>;
+  readonly excluded: ReadonlyArray<{ relationId: string; growiLabel: string; reason: 'not-permitted-in-channel' }>;
 }
 
-/** 宛先ごとに `requestId` と `growiId` を作り替えて配る */
+/** 宛先ごとに `requestId` と `relationId` を作り替えて配る */
 export const fanOut: <T>(
   targets: ReadonlyArray<Relation>,
   build: (relation: Relation) => CommandRequest,
@@ -382,15 +472,24 @@ export const fanOut: <T>(
 
 ```typescript
 export const fuseResults: (
-  sources: ReadonlyArray<{ growiId: string; growiLabel: string; weight: number; items: ReadonlyArray<SearchResultItem> }>,
+  sources: ReadonlyArray<{ relationId: string; growiLabel: string; weight: number; items: ReadonlyArray<SearchResultItem> }>,
   options?: { readonly k?: number; readonly limit?: number },
-) => ReadonlyArray<{ item: SearchResultItem; growiId: string; growiLabel: string; score: number }>;
+) => ReadonlyArray<{ item: SearchResultItem; relationId: string; growiLabel: string; score: number }>;
 ```
 
 **単なる交互配置として実装しない。** `weight / (k + 順位)`（`k = 60`）の式のまま持つ。
 GROWI ごとに文書集合が互いに素なので、重みが等しければ結果は交互配置と一致する。
 重みを掛ける形で持つことで、アルゴリズムを変えずに要件 3.8 の調整ができる。
 **関連度順ではない**ことは受け入れる。
+
+### 通知の宛先の検査（要件 2.4・Security）
+
+`NotificationRequest.targets` のチャンネルが、**署名から特定した関係の installation に属すること**を確かめる。
+属さないものは投稿せず `channel-not-in-installation` を返す。
+これは **1 台の GROWI が侵害されたとき、被害が他の workspace や他のチャンネルへ広がらない唯一の手段**である。
+
+チャンネルの一覧は毎回 API を呼ばず、**installation ごとに覚えておいて一定間隔で取り直す**
+（`reconcile()` と同じ周回で行う）。覚えていないチャンネルが来たら、その場で 1 度だけ確かめる。
 
 ### PairingService
 
@@ -405,8 +504,13 @@ export interface PairingService {
 }
 ```
 
-**申告された URL の検証は `@growi/chat` の関数を使う**（protocol spec の「④ で申告された URL を検証する」）。
-custom proxy 向けに、許す宛先を運用者が設定で明示できるようにする（`runtime/config.ts`）。
+**申告された URL の検証は 2 つに割れている**（protocol spec の「この検証をどちらが持つか」）。
+
+- **条件そのものの判定**（https か・既定ポートか・引き終わったアドレスが私的帯でないか）→ `@growi/chat` の `judgeGrowiUri`
+- **名前を引く（`node:dns`）、確かめたアドレスへつなぐ、リダイレクトを追わない、待ち時間の上限** → **この proxy が持つ**
+  （`relation/growi-uri-resolver.ts`）。`@growi/chat` はネットワークに触れられない
+
+custom proxy 向けに、許す宛先を運用者が設定で明示できるようにする（`runtime/config.ts` → `judgeGrowiUri` の `allowList`）。
 
 ---
 
@@ -465,7 +569,7 @@ Chat SDK の state（購読・分散ロック・重複排除）は `@chat-adapte
 
 ### Unit Tests
 
-1. `fuseResults` — 重みが等しいと交互に並ぶこと。重みで順位が変わること。同点が `growiId` で安定すること（3.2・3.3・3.8）
+1. `fuseResults` — 重みが等しいと交互に並ぶこと。重みで順位が変わること。同点が `relationId` で安定すること（3.2・3.3・3.8）
 2. `PlatformCapabilities` — 4 サービス × 9 能力がすべて埋まっていること。**`unverified` に対して `supports()` が `false`** を返すこと（1.2）
 3. `CommandInvocation.normalize` — mention と slash command が同じ `Invocation` になること（決定 4）
 4. **modal を選ぶ条件** — 能力表が対応と言っていても、手がかりが無い／失効していれば聞き返しへ落ちること（4.1・8.3）

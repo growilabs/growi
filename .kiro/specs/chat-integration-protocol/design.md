@@ -82,6 +82,8 @@ packages/chat/
 │   │   └── command-names.ts       # コマンド名の語彙。両側がこれを使う
 │   ├── permission/
 │   │   └── channel-permission.ts  # 純粋関数。両側が同じ判定を使う（要件 11）
+│   ├── url-guard/
+│   │   └── growi-uri-guard.ts     # 申告された URL の条件判定（純粋関数。名前は引かない）
 │   └── signature/
 │       ├── index.ts
 │       ├── covered-components.ts  # 署名対象の宣言。1 か所だけ
@@ -128,6 +130,9 @@ export interface ChatAccountRef {
   /** 紐付いていない発言者の表示に使う（要件 5.3） */
   readonly displayName: string;
 }
+
+> **日時を表す文字列はすべて RFC 3339 の UTC 表記**（`2026-08-27T12:00:00Z`）。
+> `updatedAt` / `postedAt` / `validFrom` / `expiresAt` すべてに適用する。
 
 export interface ChannelRef {
   readonly platform: PlatformName;
@@ -204,9 +209,22 @@ export interface KeyRef {
 }
 
 /** 署名ヘッダに載せる `keyid` は、この形にする */
+/**
+ * `relationId` と `keyId` は **`:` を含まない**（どちらも proxy と鍵の持ち主が採番するので守れる）。
+ * `decodeKeyId` は**最初の `:` で切る**。含まれていたら `null` を返す。
+ */
 export const encodeKeyId = (ref: KeyRef): string => `${ref.relationId}:${ref.keyId}`;
 export const decodeKeyId = (encoded: string): KeyRef | null => { /* ... */ };
 ```
+
+#### 関係を指す識別子は `relationId` ただ 1 つ
+
+**`growiId` という別名を作らない。** 契約の中で GROWI を指す値はすべて `relationId` とし、
+**proxy がペアリングの成立時に採番する**。`PairingResult.relationId` で GROWI に渡るので、
+GROWI はそれを保存して以降のリクエストに載せる。
+
+別名を作ると「誰が付ける値か」「どちらが一意性を保証するか」が読み手ごとに変わり、
+下の `keyId` と同じ種類の取り違えを生む。**関係を指す軸は 1 本に保つ。**
 
 **この決定が波及する先**（両 sub-spec で必ず守る）:
 
@@ -299,6 +317,23 @@ export const verify: (params: VerifyParams) => Promise<VerifyResult>;
 **Contracts**: API [x]
 
 ```typescript
+/**
+ * 公開鍵。**登録する側は必ず検査する。** `JsonWebKey` は楕円曲線でも RSA でも共通鍵でも通る広い型なので、
+ * そのまま受け入れると意図しない種類の鍵が登録される。次をすべて確かめる。
+ *   - `kty` が `'OKP'`、`crv` が `'Ed25519'`
+ *   - **秘密の成分（`d`）を含まない**
+ */
+export interface PublicKeyRegistration {
+  /** 鍵の持ち主が付ける。**関係の中で一意**（「鍵の識別子」を参照） */
+  readonly keyId: string;
+  readonly publicKeyJwk: JsonWebKey;
+  readonly validFrom: string;
+}
+
+export interface PublicKeySet {
+  readonly keys: ReadonlyArray<PublicKeyRegistration & { readonly revokedAt: string | null }>;
+}
+
 /** GROWI → proxy。管理者が GROWI に登録コードを入力すると送られる。**署名は付かない** */
 export interface PairingSubmission {
   readonly registrationCode: string;
@@ -306,7 +341,7 @@ export interface PairingSubmission {
   readonly growiUri: string;
   readonly growiLabel: string;
   /** GROWI の公開鍵はここで渡す */
-  readonly publicKey: { readonly keyId: string; readonly publicKeyJwk: JsonWebKey; readonly validFrom: string };
+  readonly publicKey: PublicKeyRegistration;
 }
 
 export type PairingResult =
@@ -316,7 +351,7 @@ export type PairingResult =
       /** 要件 12.4 の重なり判定に使う */
       readonly workspace: { readonly platform: PlatformName; readonly workspaceId: string; readonly workspaceName: string };
       /** proxy の公開鍵はここで返す */
-      readonly publicKey: { readonly keyId: string; readonly publicKeyJwk: JsonWebKey; readonly validFrom: string };
+      readonly publicKey: PublicKeyRegistration;
     }
   | { readonly status: 'code-expired' }
   | { readonly status: 'ownership-unverified'; readonly detail: string }
@@ -329,18 +364,78 @@ export interface OwnershipChallenge {
 
 export interface ChallengeResponse {
   readonly challenge: string;
+  /**
+   * **③ で申告した秘密鍵で `challenge` に署名したもの。**
+   * これが無いと、所有確認は「その URL に居る誰かが登録コードを知っている」ことしか示さず、
+   * **③ で申告された公開鍵がその相手のものであること**を示さない。
+   */
+  readonly challengeSignature: string;
+}
+```
+
+**足りない往復を含む、鍵の追加と失効**
+
+```typescript
+/**
+ * 新しい公開鍵を相手に足してもらう。**両方向に流れる**（proxy → GROWI と GROWI → proxy）。
+ * ペアリングは最初の 1 組を交換するだけなので、後から足す経路がこれ。
+ * これが無いと要件 10.5（止めずに入れ替える）は成立しない。
+ */
+export interface KeyRegistrationRequest {
+  readonly relationId: string;
+  readonly key: PublicKeyRegistration;
+}
+
+export interface KeyRevocationRequest {
+  readonly relationId: string;
+  readonly keyId: string;
+}
+
+export type KeyOperationResult =
+  | { readonly status: 'ok' }
+  | { readonly status: 'rejected'; readonly reason: 'would-leave-no-valid-key' | 'unknown-key' | 'invalid-key' };
+```
+
+**設定と能力を運ぶ往復**
+
+```typescript
+/** GROWI → proxy。管理者が保存した時点で押し込む。要件 11.4「次の実行から反映」はこれで満たす */
+export interface SettingsPushRequest { readonly settings: RelationSettings }
+
+/** proxy → GROWI（保険）。押し込みが届かなかったときに proxy が取りに行く */
+export interface SettingsPullResponse {
+  readonly settings: RelationSettings;
+  /** GROWI 側で最後に更新した時刻。proxy は自分が持つものと比べて古ければ入れ替える */
+  readonly updatedAt: string;
+}
+
+export type CapabilityLevel = 'full' | 'degraded' | 'none' | 'unverified';
+
+/** proxy → GROWI。管理画面が「このサービスで何が使えるか」を出すために取る（要件 1.3） */
+export interface CapabilityReport {
+  readonly platforms: ReadonlyArray<{
+    readonly platform: PlatformName;
+    readonly capabilities: ReadonlyArray<{
+      readonly capability: string;
+      readonly level: CapabilityLevel;
+      readonly substitute: string | null;
+    }>;
+  }>;
 }
 ```
 
 #### 手順（①〜⑥）
 
-1. proxy が登録コードを発行する（チャットからの管理コマンド）
+1. proxy が登録コードを発行する（チャットからの管理コマンド）。
+   **発行できるのは workspace の管理者だけ。コードは本人にだけ見えるメッセージで渡し、チャンネルに平文で出さない**
 2. 管理者が GROWI に貼る。**GROWI はこれを「保留中の登録コード」として保持する**
 3. GROWI が `PairingSubmission`（**自分の公開鍵を含む**）を proxy へ送る
 4. proxy が `OwnershipChallenge` を**申告された URL へ**送る
 5. **GROWI は、保留中の登録コードと一致するときにだけ** `ChallengeResponse` を返す。
-   一致しなければ 401、保留が失効していれば 410
-6. proxy が一致を確認し、双方の鍵を登録して `PairingResult`（**proxy の公開鍵を含む**）を返す
+   一致しなければ 401、保留が失効していれば 410。
+   **返す `challengeSignature` は、③ で申告した秘密鍵で `challenge` に署名したもの**（下記）
+6. proxy が **`challenge` の一致と `challengeSignature` の検証**を行い、双方の鍵を登録して
+   `PairingResult`（**proxy の公開鍵と `relationId` を含む**）を返す
 
 #### ⑤ に条件が要る理由
 
@@ -351,6 +446,20 @@ export interface ChallengeResponse {
 具体的な壊れ方 — 登録コードを盗み見た第三者が、`growiUri` に**他人の GROWI** を、公開鍵に**自分の鍵**を書いて ③ を送る。
 proxy はその GROWI へ ④ を送り、その GROWI は身に覚えの無いまま ⑤ で答える。
 proxy は「所有を確認できた」と判断し、**他人の GROWI を名乗る関係が成立する。**
+
+#### ⑤ が公開鍵を縛る理由 — 条件だけでは鍵のすり替えを止められない
+
+⑤ に「保留中の登録コードと一致するときだけ答える」という条件を付けても、**まだ足りない。**
+その条件が示すのは「その URL に居る誰かが登録コードを知っている」ことだけで、
+**③ で申告された公開鍵がその相手のものである**ことは示さないからである。
+
+具体的な壊れ方 — 登録コードを見た第三者が、`growiUri` に**本物の GROWI** を、
+公開鍵に**自分の鍵**を書いて ③ を送る。本物の GROWI は同じコードを保留しているので ⑤ に答えてしまい、
+**proxy は第三者の鍵を登録する。** 以後その第三者は、本物の GROWI として通る署名を作れる。
+
+**そこで ⑤ の応答に `challengeSignature` を含める** — ③ で申告した秘密鍵で `challenge` に署名したもの。
+GROWI は自分が申告した鍵でしか署名できないので、鍵のすり替えが成立しなくなる。
+あわせて GROWI 側の保留の行に、**送信先の proxy と自分が申告した `keyId` を記録し、⑤ で突き合わせる。**
 
 #### ④ で申告された URL を検証する（踏み台にされないため）
 
@@ -378,6 +487,33 @@ proxy が侵害される前の、正常に動いている proxy がやってし�
 > **custom proxy の例外**: 閉域内では GROWI の URL が私的アドレス帯になるのが普通なので、
 > **許す宛先を運用者が設定で明示できる**ようにする。official proxy はこの設定を持たず、既定で拒む。
 
+#### この検証を**どちらが持つか**（宙に浮かせない）
+
+本パッケージは Allowed Dependencies のとおり `node:dns` もネットワークも使えない。
+一方 `chat-integration-proxy` の design は「検証は `@growi/chat` の関数を使う」と書いていた。
+**このままだと両側が相手を担当だと読み、誰も実装しないまま終わる。** そうなるとこの検証が防ぐはずだったもの
+（登録コードを 1 つ持つ人が proxy を踏み台にして閉域の中を探ること）が丸ごと無くなり、
+しかも動いている限り誰も気づかない。**担当を次のとおり割る。**
+
+| 何を | どちらが |
+|---|---|
+| 条件そのものの判定（https か・既定ポートか・**引き終わったアドレス**が私的帯でないか） | **`@growi/chat`**（`src/url-guard/`）。引数だけで決まる純粋関数 |
+| 名前を引く（`node:dns`）、確かめたアドレスへつなぐ、リダイレクトを追わない、待ち時間の上限 | **`chat-integration-proxy`**。ネットワークに触れる側 |
+
+```typescript
+// packages/chat/src/url-guard/growi-uri-guard.ts
+export type UriVerdict =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: 'scheme' | 'port' | 'private-address' | 'malformed' };
+
+/** 名前を引いた結果を**呼ぶ側が渡す**。このパッケージは名前を引かない */
+export const judgeGrowiUri: (
+  uri: string,
+  resolvedAddresses: ReadonlyArray<string>,
+  allowList?: ReadonlyArray<string>,   // custom proxy が閉域の宛先を明示するため
+) => UriVerdict;
+```
+
 ---
 
 ### ChannelPermission — 両側が使う純粋関数
@@ -392,10 +528,14 @@ proxy が侵害される前の、正常に動いている proxy がやってし�
  *   一覧   … 挙げた channelId でのみ許可（**名前ではなく id で照合する**）
  */
 export interface RelationSettings {
-  readonly growiId: string;
+  readonly relationId: string;
+  /**
+   * **コマンド 1 つにつき 1 行。** `scope`（全 GROWI 向けか単一向きか）は行に持たない —
+   * それは `BROADCAST_COMMANDS` という定数で決まっているので、行にも持つと同じ知識の二重持ちになり、
+   * 2 行が食い違ったときにどちらを見るかが決まらなくなる。
+   */
   readonly channelPermissions: ReadonlyArray<{
     readonly commandName: CommandName;
-    readonly scope: 'broadcast' | 'single';        // 要件 11.2
     readonly allowedChannels: ReadonlyArray<string> | 'all' | 'none';
   }>;
 }
@@ -412,16 +552,33 @@ export const judge: (
 ) => PermissionVerdict;
 
 /** 全 GROWI 対象のコマンドで、配ってよい GROWI を絞る（要件 11.2） */
+export interface BroadcastTarget {
+  readonly relationId: string;
+  readonly verdict: PermissionVerdict;
+}
+
+/**
+ * 全 GROWI 対象のコマンドで、配ってよい相手を絞る（要件 11.2）。
+ * **落とした相手も理由つきで返す** — 要件 11.3 と `FanOutOutcome.excluded` が
+ * 「配らなかった相手を利用者に示す」ことを求めるため。許可した一覧だけを返すと理由が落ちる。
+ */
 export const filterBroadcastTargets: (
-  settingsByGrowi: ReadonlyArray<{ growiId: string; settings: RelationSettings | null }>,
+  settingsByRelation: ReadonlyArray<{ relationId: string; settings: RelationSettings | null }>,
   commandName: CommandName,
   channel: ChannelRef,
-) => ReadonlyArray<string>;
+) => ReadonlyArray<BroadcastTarget>;
 ```
 
-**既定値**（`settings` が `null` = まだ一度も受け取っていない関係）
+**既定値** — 次の 2 つは**同じ扱い**にする。
+1. `settings` が `null`（まだ一度も受け取っていない関係）
+2. `settings` はあるが、**そのコマンドの行が無い**（`COMMAND_NAMES` に名前を足した直後は必ずこうなる）
+
+どちらの場合も:
 - `WRITE_COMMANDS` に含まれるもの: **不許可**（`no-settings`）
 - それ以外: **許可**
+
+2 を書かずに済ませると、**唯一の存在理由が「両側で同じ結果になること」である関数が、
+正当なデータに対して答えを 1 つに決められない**状態になる。
 
 **複数の GROWI が紐づくチャンネルでの合成**: **全体で許す・許さないを決めず、GROWI ごとに絞る。**
 - 全 GROWI 対象（`search` / `help`）: 許可している GROWI にだけ配る。**配らなかった GROWI は利用者に示す**（要件 11.3）
@@ -437,11 +594,21 @@ export const filterBroadcastTargets: (
 
 ### 通信契約
 
+> **受け取った本文は必ず形を確かめる。** 署名の検証が示すのは「経路上で書き換えられていない」ことだけで、
+> **「契約どおりの形をしている」ことは示さない**。正しく署名された壊れた本文はそのまま処理へ届く。
+> 契約の型ごとに検査する関数を本パッケージが提供し、**両側がそれを使う**（同じ受け入れ条件を持つことが本パッケージの前提そのもの）。
+> 知らない `kind` は `unknown-kind` として断る。`keyword` と `path` と `body` の長さ、`limit` の上限もここで決める。
+>
+> ```typescript
+> export const parseCommandRequest: (raw: unknown) => CommandRequest | { readonly error: 'malformed' | 'unknown-kind' };
+> ```
+
 ```typescript
 export interface CommandEnvelope {
   /** 再送しても変わらない。二重実行の判定に使う（要件 10.4）。**宛先ごとに別の値** */
   readonly requestId: string;
-  readonly growiId: string;
+  /** **`relationId` と同じ値。** 別名を作らない（下記） */
+  readonly relationId: string;
   readonly actor: ChatAccountRef;
   /**
    * どのチャンネルから来たか。GROWI 側でもチャンネル権限を判定し直すために運ぶ。
@@ -452,12 +619,13 @@ export interface CommandEnvelope {
   readonly channel: ChannelRef;
 }
 
+/** `kind` は `CommandName` そのもの。**文字列を書き並べない** — 語彙を 1 か所に置くと決めた以上、ここも従う */
 export type CommandRequest = CommandEnvelope & (
-  | { readonly kind: 'search'; readonly keyword: string; readonly limit: number }
-  | { readonly kind: 'create-page'; readonly path: string; readonly body: string }
-  | { readonly kind: 'keep'; readonly path: string; readonly messages: ReadonlyArray<KeepMessage> }
-  | { readonly kind: 'link-preview'; readonly pageUrl: string }
-  | { readonly kind: 'help' }
+  | { readonly kind: typeof COMMAND_NAMES.search;      readonly keyword: string; readonly limit: number }
+  | { readonly kind: typeof COMMAND_NAMES.createPage;  readonly path: string; readonly body: string }
+  | { readonly kind: typeof COMMAND_NAMES.keep;        readonly path: string; readonly messages: ReadonlyArray<KeepMessage> }
+  | { readonly kind: typeof COMMAND_NAMES.linkPreview; readonly pageUrl: string }
+  | { readonly kind: typeof COMMAND_NAMES.help }
 );
 
 /** 要件 5.2 / 5.3。発言者はチャット上の識別子のまま渡し、GROWI 側が解決する */
@@ -479,11 +647,12 @@ export interface SearchResultItem {
 
 export type CommandResponse =
   | { readonly kind: 'search'; readonly items: ReadonlyArray<SearchResultItem>; readonly appliedAs: 'linked-user' | 'anonymous' }
-  | { readonly kind: 'created'; readonly pageUrl: string }
+  /** `create-page` と `keep` の両方がこれを返す */
+  | { readonly kind: 'created'; readonly pageUrl: string; readonly importedMessageCount?: number }
   | { readonly kind: 'link-preview'; readonly path: string; readonly restricted: boolean; readonly excerpt?: string; readonly updatedAt?: string; readonly commentCount?: number }
   | { readonly kind: 'help'; readonly commands: ReadonlyArray<{ name: CommandName; usage: string; description: string }> }
   | { readonly kind: 'account-link-required'; readonly growiLabel: string; readonly linkUrl: string }
-  | { readonly kind: 'error'; readonly code: 'forbidden' | 'path-conflict' | 'invalid' | 'not-permitted-in-channel'; readonly message: string };
+  | { readonly kind: 'error'; readonly code: 'forbidden' | 'path-conflict' | 'invalid' | 'not-permitted-in-channel' | 'no-settings' | 'unknown-kind'; readonly message: string };
 ```
 
 **再送したときの応答**: GROWI は処理済みの `(relationId, requestId)` に対し、**1 回目の `CommandResponse` をそのまま返す。**
@@ -494,7 +663,7 @@ export type CommandResponse =
 /** GROWI → proxy。通知は markdown 文字列で送る（決定 3） */
 export interface NotificationRequest {
   readonly requestId: string;
-  readonly growiId: string;
+  readonly relationId: string;
   /** **channelId で指定する。** proxy は宛先がその関係の installation に属することを確かめる */
   readonly targets: ReadonlyArray<{ platform: PlatformName; channelId: string }>;
   readonly markdown: string;
@@ -531,7 +700,7 @@ export interface NotificationResult {
  * 本人の紐付けを塞げる）へ逆戻りする。
  */
 export interface AccountLinkStartRequest {
-  readonly growiId: string;
+  readonly relationId: string;
   readonly actor: ChatAccountRef;
 }
 
@@ -560,10 +729,21 @@ export type AccountLinkStartResponse =
 5. **チャンネルの照合が `channelId` だけで行われること** — `channelName` を変えても判定が変わらないこと（11.3）
 6. 申告された URL の検証 — https 以外・既定外ポート・私的アドレス帯・リダイレクトが**すべて拒まれる**こと（9.2）
 7. コマンド名の語彙 — `COMMAND_NAMES` に無い名前が `RelationSettings` に入らないこと（型で担保）
+8. **`judge` の既定値** — 設定が無いときと、設定はあるがそのコマンドの行が無いときで**同じ答え**になること（11.1）
+9. **再送の署名** — `requestId` を据え置き `nonce` を取り直した 2 回目が `replayed` にならず、
+   1 回目の応答をそのまま受け取れること（10.4・2.4・4.2）
+10. **有効期間の上限** — 送る側が長い `expiresInSec` を指定しても、受ける側が上限で切ること。
+    `consumeNonce` に渡る期限が上限を超えないこと（10.3）
+11. **公開鍵の検査** — `kty` / `crv` が違う鍵、**秘密の成分を含む鍵**が登録を拒まれること（10.6）
+12. `encodeKeyId` / `decodeKeyId` の往復。`:` を含む入力が `null` になること
+13. `parseCommandRequest` — 知らない `kind`、欠けた項目、長すぎる値が断られること
 
 ### Integration Tests
 
 1. ペアリングの往復 ①〜⑥ が成立し、双方に相手の公開鍵が登録されること（9.1–9.5）
 2. **ペアリングを始めていない GROWI が `OwnershipChallenge` に答えないこと**（9.2 の本質）
 3. 失効した登録コードが拒まれること（9.4）
-4. 鍵の入れ替え — 新旧が両方有効な間、どちらの署名でも検証が通ること（10.5）
+4. 鍵の入れ替え — 新旧が両方有効な間、どちらの署名でも検証が通ること。
+   **有効な鍵が 0 本になる失効の要求が `would-leave-no-valid-key` で断られること**（10.5）
+5. **鍵のすり替え** — 登録コードを知る第三者が、他人の `growiUri` と自分の公開鍵で申し込んでも、
+   `challengeSignature` の検証で成立しないこと（9.2・9.5）
