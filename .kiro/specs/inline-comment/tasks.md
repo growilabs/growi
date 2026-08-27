@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. データモデル基盤：既存commentsモデルの拡張と読み取り経路の隔離
-- [ ] 1.1 `comments` Prismaモデルにインラインコメント用フィールドを追加する
+- [x] 1.1 `comments` Prismaモデルにインラインコメント用フィールドを追加する
   - `isInline`（Boolean, default false）、`quote`/`prefix`/`suffix`/`approxOffset`（すべて任意）、`anchorOriginRevisionId`（任意, ObjectId）、`resolvedById`（任意, ObjectId）、`resolvedAt`（任意, DateTime）を `comments` モデルに追加する
   - 既存の無名だった `creator` リレーションに `@relation("CommentCreator", ...)` と明示的な名前を付け、新設する `resolvedBy` リレーション（`@relation("InlineCommentResolver", ...)`）と区別できるようにする。`users` モデル側の `comments` フィールドにも同じリレーション名を付け、`resolvedInlineComments comments[] @relation("InlineCommentResolver")` を追加する
   - `@@index([pageId, isInline])` を追加する
