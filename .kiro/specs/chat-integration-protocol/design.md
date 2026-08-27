@@ -217,6 +217,9 @@ export const decodeKeyId = (encoded: string): KeyRef | null => { /* ... */ };
 
 #### 関係を指す識別子は `relationId` ただ 1 つ
 
+**`relationId` は推測できない値にする**（連番にしない）。署名対象の `keyid` に入るため、
+推測できると ⑤ を使った署名の収集が成立する（上記）。
+
 **`growiId` という別名を作らない。** 契約の中で GROWI を指す値はすべて `relationId` とし、
 **proxy がペアリングの成立時に採番する**。`PairingResult.relationId` で GROWI に渡るので、
 GROWI はそれを保存して以降のリクエストに載せる。
@@ -375,8 +378,7 @@ export interface OwnershipChallenge {
 export interface ChallengeResponse {
   readonly challenge: string;
   /**
-   * **③ で申告した秘密鍵で `challenge` に署名したもの。**
-   * 形は「`challenge` の UTF-8 表現に Ed25519 で署名し、base64url で符号化した文字列」。
+   * **③ で申告した秘密鍵で、下記の「署名する値」に署名したもの**（base64url で符号化）。
    * ここが揃わないと、両側が別々に実装した瞬間にペアリングが必ず失敗する。
    * これが無いと、所有確認は「その URL に居る誰かが登録コードを知っている」ことしか示さず、
    * **③ で申告された公開鍵がその相手のものであること**を示さない。
@@ -415,7 +417,9 @@ export type KeyOperationResult =
 export interface SettingsPushRequest {
   readonly settings: RelationSettings;
   /**
-   * GROWI 側で更新した時刻。**proxy は自分が持つものより古い押し込みを捨てる。**
+   * GROWI 側で更新した時刻。**関係ごとに 1 つの値**であり、行ごとの時刻ではない
+   * （設定全体を毎回まるごと送る形なので、行ごとに持つと比べる基準が決まらない）。
+   * **proxy は自分が持つものより古い押し込みを捨てる。**
    * これが無いと、管理者が続けて 2 回変えて 1 回目の再送が遅れて届いたときに、
    * **古い設定が新しい設定を上書きする**（proxy には気づく手立てが無い）。要件 11.4 に触る。
    */
@@ -427,6 +431,17 @@ export interface SettingsPullResponse {
   readonly settings: RelationSettings;
   /** GROWI 側で最後に更新した時刻。proxy は自分が持つものと比べて古ければ入れ替える */
   readonly updatedAt: string;
+}
+
+/** proxy → GROWI。管理画面が通知の宛先を選ぶために取る（要件 2.2 / 11.1）。
+ *  **`channelName` が取れるので、要件 12.4 の宛先の突き合わせもこれで解ける** */
+export interface ChannelInventory {
+  readonly channels: ReadonlyArray<{
+    readonly platform: PlatformName;
+    readonly channelId: string;
+    readonly channelName: string;
+    readonly isPrivate: boolean;
+  }>;
 }
 
 export type CapabilityLevel = 'full' | 'degraded' | 'none' | 'unverified';
@@ -466,6 +481,33 @@ export interface CapabilityReport {
 具体的な壊れ方 — 登録コードを盗み見た第三者が、`growiUri` に**他人の GROWI** を、公開鍵に**自分の鍵**を書いて ③ を送る。
 proxy はその GROWI へ ④ を送り、その GROWI は身に覚えの無いまま ⑤ で答える。
 proxy は「所有を確認できた」と判断し、**他人の GROWI を名乗る関係が成立する。**
+
+#### ⑤ で署名する値 — `challenge` そのものに署名してはいけない
+
+```typescript
+/**
+ * **用途を示す接頭辞と、その場の条件を必ず連結する。**
+ * `challenge` だけに署名すると、⑤ が「相手の指定した文字列に、
+ * **後で本番のリクエスト署名に使う同じ鍵で**署名して返す窓口」になる。
+ */
+export const pairingChallengePayload = (
+  registrationCode: string, proxyUri: string, challenge: string,
+): string => `growi-chat-pairing-challenge:v1:${registrationCode}:${proxyUri}:${challenge}`;
+```
+
+**なぜ必要か。** ⑤ は鍵がまだ無い時点の口なので**署名で守れない**。答える条件は「保留中の登録コードと一致すること」だけである。
+そこで登録コードを窓の開いている間に見た第三者が、proxy を経由せず GROWI の ⑤ へ直接、
+**`challenge` に RFC 9421 の署名対象文字列そのものを入れて**投げると、その署名を受け取れる。
+それを `Signature` ヘッダに載せれば**その GROWI 本人として通る**。
+
+接頭辞を付ければ、⑤ が返す署名は **RFC 9421 の署名対象文字列としては絶対に現れない形**になり、この経路が閉じる。
+
+**あわせて 2 つ縛る。**
+
+- **⑤ は 1 つの保留につき 1 回だけ答える。** 答えたら保留の行に印を付ける。回数に制限が無いと、
+  攻撃者が候補を変えながら署名を集められる
+- **`relationId` は推測できない値にする**（proxy が採番する。連番にしない）。
+  署名対象には `keyid`（= `relationId:keyId`）が入るので、`relationId` が推測できると上の攻撃の前提が揃う
 
 #### ⑤ が公開鍵を縛る理由 — 条件だけでは鍵のすり替えを止められない
 
@@ -603,7 +645,9 @@ export const filterBroadcastTargets: (
 **複数の GROWI が紐づくチャンネルでの合成**: **全体で許す・許さないを決めず、GROWI ごとに絞る。**
 - 全 GROWI 対象（`search` / `help`）: 許可している GROWI にだけ配る。**配らなかった GROWI は利用者に示す**（要件 11.3）
 - 対象が 1 つに定まる（`create-page` / `keep`）: 許可している GROWI だけを選択肢に並べる（要件 8.2）
-- 1 つも無ければ実行せず、理由を示す
+- 1 つも無ければ実行せず、理由を示す。**`no-settings` と `not-permitted-in-channel` は文面を分ける** —
+  前者は「まだ設定されていません（管理者に設定を依頼してください）」、後者は「このチャンネルでは使えません」。
+  要件 11.3 が理由を示すことを求めているので、1 つに丸めない
 
 理由 — 「全台が許可でなければ通さない」だと 1 台の設定漏れで全体が止まり、
 「1 台でも許可なら全台へ通す」だと許可していない GROWI へ配ってしまう。
@@ -620,7 +664,13 @@ export const filterBroadcastTargets: (
 > 知らない `kind` は `unknown-kind` として断る。`keyword` と `path` と `body` の長さ、`limit` の上限もここで決める。
 >
 > ```typescript
-> export const parseCommandRequest: (raw: unknown) => CommandRequest | { readonly error: 'malformed' | 'unknown-kind' };
+> export const parseCommandRequest:      (raw: unknown) => CommandRequest      | { readonly error: 'malformed' | 'unknown-kind' };
+> export const parseNotificationRequest: (raw: unknown) => NotificationRequest | { readonly error: 'malformed' };
+> export const parseSettingsPush:        (raw: unknown) => SettingsPushRequest | { readonly error: 'malformed' };
+> export const parseKeyRegistration:     (raw: unknown) => KeyRegistrationRequest | { readonly error: 'malformed' };
+> export const parseKeyRevocation:       (raw: unknown) => KeyRevocationRequest   | { readonly error: 'malformed' };
+> export const parsePairingSubmission:   (raw: unknown) => PairingSubmission   | { readonly error: 'malformed' };
+> export const parseAccountLinkStart:    (raw: unknown) => AccountLinkStartRequest | { readonly error: 'malformed' };
 > ```
 
 ```typescript
@@ -703,6 +753,11 @@ export interface NotificationRequest {
  * proxy 側にも締め切りを設けるため。
  */
 export interface NotificationResult {
+  /**
+   * **常に `targets` の全件ぶんを返す。** やり直しのときも、前回 `posted` だった宛先は
+   * その結果をそのまま載せる。「今回試した宛先だけ」を返すと、
+   * GROWI が結果を outbox の行に書き戻すたびに**前回の成功が消える**。
+   */
   readonly outcomes: ReadonlyArray<{
     readonly platform: PlatformName;
     readonly channelId: string;

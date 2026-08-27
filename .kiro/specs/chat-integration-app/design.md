@@ -169,7 +169,10 @@ Gen 1 の `/growi search` は既定設定のまま非公開ページのパスを
 
 → **この feature が、返す前にページごとの公開範囲を見て落とす段を持つ。** ただし次の 3 つを決めないと実装できない。
 
-**規則** — **`PageQueryBuilder.addConditionToFilteringByViewer`（`Page.isAccessiblePageByViewer` が使うもの）と同じ判定にする。**
+**規則** — **`PageQueryBuilder.addConditionToFilteringByViewer` と同じ判定にする。**
+**ただし第 3 引数（`includeAnyoneWithTheLink`）は既定の `false` のまま呼ぶ。**
+参照実装として名前を挙げた `Page.isAccessiblePageByViewer` は `true` を渡しているので、
+**そのまま写すとリンクを知っている人だけが読めるページがチャンネルに出る。**
 一番近く見える `canShowSnippet`（`search.ts`）を写してはいけない — **両方向に間違っている**。
 特定ユーザー限定（`GRANT_SPECIFIED`）は 4 つの分岐のどれにも当たらず最後の `return true` に落ちて**素通り**し、
 グループ限定は `grantedGroups` の中身が `{ type, item }` の形なのに 24 桁の ID 文字列と比べているので**常に一致せず、
@@ -177,8 +180,9 @@ Gen 1 の `/growi search` は既定設定のまま非公開ページのパスを
 
 **材料** — **検索結果だけでは判断できない。** `createSearchQuery` が取り出すのは `path` / 各種の件数 /
 `updated_at` / `tag_names` / `comments` だけで、`grant` も `grantedUsers` も `grantedGroups` も含まれない。
-判定にはページ本体が要る。**`formatSearchResult` が `findPageListByIds` で既にページを読んでいるので、そこに乗る** —
-1 件ごとの追加の読み出しはしない。
+判定にはページ本体が要る。ヒットした id をまとめて 1 回問い合わせる — `Page.find({ _id: { $in: ids } }).and(generateGrantCondition(user, userGroups))`。
+**`findPageListByIds` に絞り込みを足さない** — これは GROWI の通常の検索も使う共有の関数なので、
+足すと本体の検索結果まで変わり Non-Goals に反する。`generateGrantCondition` は `export` されているので単体で使える。
 
 **件数と順位** — `limit` 件取ってから落とすと、利用者が求めた件数に届かず `SearchResultItem.rank` に穴が空く。
 proxy はこの `rank` を `weight / (k + 順位)` に入れて複数 GROWI の結果を混ぜるので、穴がそのまま最終的な並びに効く。
@@ -312,15 +316,15 @@ export interface NotificationDispatcher {
 
 | コレクション | 主な項目 | 索引・寿命 |
 |---|---|---|
-| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `createdAt` | `relationId` 一意。**これが無いと送り先も分からない**（下記）。**紐付け解除（要件 9.7）で削除し、連なる鍵・チャンネル権限・宛先も消す** |
+| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `settingsUpdatedAt`, `createdAt` | `relationId` 一意。**これが無いと送り先も分からない**（下記）。**紐付け解除（要件 9.7）では削除せず `state: 'unpaired'` にする** — `workspaceId` を残さないと繋ぎ直しのときに紐付けを引き継げない。消すのは**鍵・チャンネル権限・宛先**だけ（秘密鍵を残さない目的はこれで満たせる） |
 | `chat_account_links` | `relationId`, `userId`, `platform`, `accountId`, `linkedAt` | **`(relationId, platform, accountId)` 複合ユニーク**（下記）。**利用者が解除するまで残る。** 関係の解除では消さない（下記の再ペアリングを参照） |
 | `chat_integration_keys` | `relationId`, `side`(`own`/`peer`), `keyId`, `key`, `validFrom`, `revokedAt` | `(relationId, side, keyId)` 一意。**紐付け解除で削除**（秘密鍵を残さない） |
 | `chat_notification_outbox` | `requestId`, `relationId`, `targets`, `markdown`, `state`, `attempts`, `result`, `createdAt` | `state` に索引。**送信済みは 30 日で TTL 索引により消す**。`given-up` は運用者が確認するまで残す |
 | `chat_processed_requests` | `relationId`, `requestId`, `response`, `processedAt` | `(relationId, requestId)` 一意。**TTL 索引で 24 時間**（再送が起こりうる間だけ） |
 | `chat_request_nonces` | `relationId`, `keyId`, `nonce`, `expiresAt` | `(relationId, keyId, nonce)` 一意。**`expiresAt` に TTL 索引** |
 | `chat_pending_pairings` | `registrationCode`, `proxyUri`, `growiUri`, `createdBy`, **`ownKeyId`**, **`ownKeyPair`（暗号化）**, `expiresAt` | `registrationCode` 一意。**`expiresAt` に TTL 索引**。要件 9.2 の所有確認に使う |
-| `chat_channel_permissions` | `relationId`, `commandName`, `allowedChannels`, `updatedAt` | **`(relationId, commandName)` 一意。** 要件 11.1・11.2 の保存先で、`judge` に渡す `RelationSettings` の出どころ。`scope` は持たない（`BROADCAST_COMMANDS` から導く）。`updatedAt` は proxy が取りに来たときに返す（要件 11.4） |
-| `chat_notification_destinations` | `platform`, `channelId`, `pathPattern`, `triggerEvents`, `relationId` | 管理者が設定する。Gen 1 の設定とは**別に保存する**（要件 12.2） |
+| `chat_channel_permissions` | `relationId`, `commandName`, `allowedChannels` | **`(relationId, commandName)` 一意。** **行ごとの `updatedAt` は持たない** — protocol の `SettingsPushRequest.updatedAt` は関係ごとに 1 つの値なので、行ごとに持つと比べる基準が決まらない。時刻は `chat_relations.settingsUpdatedAt` に 1 つ持つ。 要件 11.1・11.2 の保存先で、`judge` に渡す `RelationSettings` の出どころ。`scope` は持たない（`BROADCAST_COMMANDS` から導く）。`updatedAt` は proxy が取りに来たときに返す（要件 11.4） |
+| `chat_notification_destinations` | `platform`, `channelId`, **`channelName`**, `pathPattern`, `triggerEvents`, `relationId` | 管理者が設定する。Gen 1 の設定とは**別に保存する**（要件 12.2） |
 
 #### ペアリングの途中に、自分の鍵を置く場所が要る（順序の矛盾）
 
@@ -331,21 +335,32 @@ protocol の手順 ⑤ で GROWI は **③ で申告した秘密鍵で `challeng
 
 → **ペアリングの途中の鍵は `chat_pending_pairings` の行に持つ**（`ownKeyId` と暗号化した `ownKeyPair`）。
 ⑥ で `PairingResult.relationId` を受け取った時点で `chat_integration_keys` へ移し、保留の行は消す。
+
+**⑤ で署名するのは `challenge` そのものではない。** protocol の `pairingChallengePayload()`
+（`growi-chat-pairing-challenge:v1:` + 登録コード + proxy の URL + `challenge`）に署名する。
+`challenge` だけに署名すると、**⑤ が「相手の指定した文字列に、後で本番のリクエスト署名に使う同じ鍵で
+署名して返す窓口」**になり、登録コードを見た第三者が RFC 9421 の署名対象文字列を投げ込んで
+その GROWI 本人として通る署名を手に入れられる。
+
+**⑤ は 1 つの保留につき 1 回だけ答える。** 答えたら `chat_pending_pairings` の行に印を付け、以降は 410 を返す。
 `proxyUri` も同じ行に記録し、**⑤ で「送信先の proxy と自分が申告した `keyId`」を突き合わせる**（protocol の要求）。
 
 #### GROWI 側の受け口（proxy から届くもの）
 
-`SignatureGuard` を通った後、**`@growi/chat` の `parseCommandRequest` で本文の形を確かめてから**処理する
-（署名は「経路上で書き換えられていない」ことしか示さない）。受け口は 5 つ。
+**署名が要る口は `SignatureGuard` を通し、その後 `@growi/chat` の検査関数で本文の形を確かめてから**処理する
+（署名は「経路上で書き換えられていない」ことしか示さない）。検査関数は契約ごとにある（`parseCommandRequest` ほか）。
 
-| 口 | 中身 | 要件 |
-|---|---|---|
-| コマンド | `CommandRequest` → `CommandResponse` | 3.6, 3.7, 4, 5, 6, 14.2 |
-| 鍵の追加 | `KeyRegistrationRequest` → `KeyOperationResult` | 10.5 |
-| 鍵の失効 | `KeyRevocationRequest` → `KeyOperationResult`。**有効な鍵が 0 本になる要求は `would-leave-no-valid-key` で断る** | 10.5 |
-| 設定の取り出し | → `SettingsPullResponse`（`updatedAt` つき） | 11.4 |
-| 紐付けの開始 | `AccountLinkStartRequest` → `AccountLinkStartResponse` | 7.3 |
-| 所有の確認 | `OwnershipChallenge` → `ChallengeResponse`（**`challengeSignature` を含む**） | 9.2 |
+| 口 | 中身 | 署名 | 要件 |
+|---|---|:--:|---|
+| コマンド | `CommandRequest` → `CommandResponse` | 要 | 3.6, 3.7, 4, 5, 6, 14.2 |
+| 鍵の追加 | `KeyRegistrationRequest` → `KeyOperationResult` | 要 | 10.5 |
+| 鍵の失効 | `KeyRevocationRequest` → `KeyOperationResult`。**有効な鍵が 0 本になる要求は `would-leave-no-valid-key` で断る** | 要 | 10.5 |
+| 設定の取り出し | → `SettingsPullResponse` | 要 | 11.4 |
+| 紐付けの開始 | `AccountLinkStartRequest` → `AccountLinkStartResponse` | 要 | 7.3 |
+| 所有の確認 | `OwnershipChallenge` → `ChallengeResponse` | **不要** | 9.2 |
+
+**「所有の確認」だけが署名なし。** 鍵がまだ無い時点の口なので署名で守れない（protocol の「署名の付かない唯一の入口」）。
+守るのは**保留中の登録コードとの一致**と、**1 つの保留につき 1 回だけ答える**こと。
 
 `ProxyClient`（GROWI → proxy）が送るもの:
 
@@ -356,7 +371,7 @@ protocol の手順 ⑤ で GROWI は **③ で申告した秘密鍵で `challeng
 | 設定の押し込み | **`SettingsPushRequest`**（`updatedAt` つき） | 11.1, 11.2, 11.4 |
 | 鍵の追加・失効 | `KeyRegistrationRequest` / `KeyRevocationRequest` → `KeyOperationResult` | 10.5 |
 | 能力の一覧 | → **`CapabilityReport`** | 1.3 |
-| チャンネルの一覧 | → その installation のチャンネル | 11.1（管理画面が宛先を選ぶため） |
+| チャンネルの一覧 | → **`ChannelInventory`** | 2.2, 11.1（管理画面が宛先を選ぶため。**`channelName` が取れるので要件 12.4 の突き合わせもこれで解ける**） |
 
 **設定を変えたら押し込む**（要件 11.4「次の実行から反映」はこれで満たす）。押し込みが失敗しても、
 proxy が `SettingsPullResponse` で取りに来るので取りこぼしは埋まる。
@@ -383,8 +398,13 @@ protocol spec が「`keyId` を単独で鍵にすると別の関係のものを�
 
 > **再ペアリングで紐付けを失わせない。** `relationId` は proxy が採番するので、一度解除して繋ぎ直すと値が変わる。
 > `chat_account_links` の一意キーを `relationId` にすると、**繋ぎ直しただけで全利用者の紐付けが消える。**
-> そこで**索引は `(relationId, platform, accountId)` にしつつ、`chat_relations.workspaceId` が同じ関係へは引き継ぐ** —
-> 繋ぎ直しのときに古い `relationId` の行を新しい `relationId` へ移す。
+> そこで**索引は `(relationId, platform, accountId)` にしつつ、繋ぎ直しのときに引き継ぐ** —
+> 解除では `chat_relations` の行を消さず `state: 'unpaired'` にして `platform` と `workspaceId` を残し、
+> 繋ぎ直したときに**同じ `platform` と `workspaceId` を持つ解除済みの行**を探して紐付けを新しい `relationId` へ移し、
+> 古い行を消す。**行を消してしまうと、古い `relationId` がどの workspace のものだったか分からなくなり、引き継げない。**
+>
+> **`chat_account_links` を消すのは 3 つの場合だけ** — 利用者が解除したとき、GROWI ユーザーが削除されたとき、
+> 引き継ぎ先が無いまま一定期間（既定 90 日）過ぎたとき。
 >
 > **要件 7.4 の「同じ GROWI 内で一意」との関係**: 同じ GROWI に 2 つの workspace が紐づくとき、
 > 同じ `accountId` を別の利用者が取れる。**これは正しい振る舞い**（別の workspace の別人なので）。

@@ -164,7 +164,9 @@ export interface ConnectionManager {
 
 したがって `reconcile()` を一定間隔で回し、**毎回** (a) 取れていない**接続の単位**のロックを取りに行き、
 (b) 自分が持っているロックを延ばし、(c) 延長に失敗したら**自分の接続を閉じる**、
-(d) 受け持つ installation が消えていたら閉じる、を行う。
+(d) **受け持ちが 0 件になったときだけ**閉じる、を行う。
+**アプリごとの接続（Slack / Discord）は受け持ちが 0 件でも保つ** — OAuth の折り返しの直後にすぐつながるため。
+ installation が 1 件消えても、アプリごとの接続は閉じてはいけない。
 
 さらに 3 つ決めておく。
 
@@ -177,7 +179,7 @@ export interface ConnectionManager {
   **この間の重複は Chat SDK の state による重複の取り除き（`event_id` 単位）が受け止める** —
   チャットサービスの再送を取り除く仕組みと同じものが、ここでも働く
 
-#### 接続を足す・外す引き金は installation の増減
+#### 接続を張り直す引き金
 
 **GROWI の紐付け（relation）の増減では接続を触らない。** ペアリング（要件 9）は
 **すでにある installation に GROWI を 1 つ足す**操作で、要件 9.7 の解除は relation を 1 件消す操作である。
@@ -186,6 +188,18 @@ export interface ConnectionManager {
 
 > **常駐コストは installation の数に比例する**（GROWI の台数には比例しない）。
 > 「アイドル時のコストがゼロ」は常時接続を持つ以上あてはまらない。
+
+#### Slack と Discord は受信が 1 台に集まる（規模の評価に必要）
+
+`app:slack` のロックは 1 台しか持てないので、**その 1 台が全 workspace のイベントを受ける。** 帰結が 2 つある。
+
+- **台数を増やしても受信は分散しない。** 投稿と GROWI への送信は分散するが、受信は分散しない
+- **持ち主が落ちると、他の台が引き取るまで（既定 60 秒）そのサービス全体がまとめて黙る。**
+  installation ごとに持ち分が分かれる Mattermost なら黙るのは一部だが、Slack と Discord は全体である。
+  **ロックの寿命 60 秒は、そのまま「Slack が黙る最大時間」になる**
+
+初版はこの形とする。受けた台が他の台へ配る仕組みは作らない（要件 8.1 の規模で足りるかは、
+上の 2 点を前提に運用で測る）。
 
 ### 引数の収集 — 待つ関数として作らない
 
@@ -305,6 +319,12 @@ apps/chat-integration-proxy/
 | `ArgumentCollector` | `command/argument-collector.ts` | 値を集め、途中経過を保存して再開 | 1.2, 4.1, 5.2, 8.2, 11.5 |
 | `AdminCommandSet` | `command/admin-command-set.ts` | 運用者の入り口 | 3.8, 9.1, 9.7, 10.5, 13.4 |
 | `GrowiSelector` | `relation/growi-selection.ts` | どの GROWI に対して実行するか | 6.4, 8.1–8.6 |
+| `PairingService` | `relation/pairing-service.ts` | ペアリングの proxy 側 | 9.1–9.7 |
+| `FanOutCollector` | `growi/fan-out-collector.ts` | 複数 GROWI への配信と待ち合わせ | 3.1, 3.4, 3.5, 14.5 |
+| `SearchFusion` | `growi/search-fusion.ts` | 重みつきの式で 1 本に統合 | 3.2, 3.3, 3.8 |
+| `GrowiClient` | `growi/growi-client.ts` | 署名つきで GROWI を呼ぶ | 3.1, 4.2, 5.2, 9.2, 14.2 |
+| `EventSink` | `orchestration/event-sink.ts` | イベントを受けて各層を呼ぶ | 1.1, 1.2, 3.1, 4.1, 6.1, 14.1 |
+| `InboundFlow` | `orchestration/inbound-flow.ts` | GROWI からの通知・設定・鍵の追加と失効 | 2.1–2.6, **10.5**, 10.7, 11.4 |
 
 ### AdminCommandSet
 
@@ -323,8 +343,15 @@ apps/chat-integration-proxy/
 **実行できるのは workspace の管理者だけ。** これが無いと、その workspace の誰でも自分の GROWI を紐付けられ、
 **要件 9 の目的（第三者が勝手に登録できない）が成立しない**。
 
-**調べ方はサービスごとに違うので、能力表と同じくデータとして持つ**（Slack は利用者情報の管理者フラグ、
-Discord は権限のビット、Mattermost はロール、Teams は所属の役割）。`if (platform === ...)` と書かない。
+**調べ方はサービスごとに違うので、能力表の隣にデータとして持つ**（`capabilities/admin-check.ts`）。
+`if (platform === ...)` と書かない。
+
+| | 管理者かどうかの調べ方 |
+|---|---|
+| Slack | 利用者情報の `is_admin` / `is_owner` |
+| Discord | ギルドの権限のビット（`ADMINISTRATOR` または `MANAGE_GUILD`） |
+| Mattermost | 利用者のロールに `system_admin` または対象チームの `team_admin` |
+| Teams | 所属の役割（`owner`） |
 
 **登録コードは本人にだけ見えるメッセージで返す。** チャンネルに平文で出さない（protocol spec 手順 ①）。
 
@@ -333,12 +360,6 @@ Discord は権限のビット、Mattermost はロール、Teams は所属の役�
 - 許可している GROWI が 1 つだけ → **選択を求めずそれに対して実行する**（8.3）
 - **全 GROWI を対象とする操作（検索・ヘルプ）→ 選択を求めず、許可している全 GROWI へ配る**（8.4）
 - どの GROWI も紐づいていない、または許可していない → 実行せず理由を示す（8.6・11.3）
-| `PairingService` | `relation/pairing-service.ts` | ペアリングの proxy 側 | 9.1–9.7 |
-| `FanOutCollector` | `growi/fan-out-collector.ts` | 複数 GROWI への配信と待ち合わせ | 3.1, 3.4, 3.5, 14.5 |
-| `SearchFusion` | `growi/search-fusion.ts` | 重みつきの式で 1 本に統合 | 3.2, 3.3, 3.8 |
-| `GrowiClient` | `growi/growi-client.ts` | 署名つきで GROWI を呼ぶ | 3.1, 4.2, 5.2, 9.2, 14.2 |
-| `EventSink` | `orchestration/event-sink.ts` | イベントを受けて各層を呼ぶ | 1.1, 1.2, 3.1, 4.1, 6.1, 14.1 |
-| `InboundFlow` | `orchestration/inbound-flow.ts` | GROWI からの通知・設定・鍵の追加と失効 | 2.1–2.6, **10.5**, 10.7, 11.4 |
 
 ### PlatformFacade
 
@@ -366,7 +387,9 @@ export interface InstallationCredentials {
 
 export interface InstallationProvider {
   resolve(platform: PlatformName, workspaceId: string): Promise<InstallationCredentials | null>;
-  /** `ConnectionManager.reconcile()` が「あるべき接続」を知るために使う */
+  /** `reconcile()` が **その接続が受け持つ installation** を知るために使う。
+   *  「あるべき接続の本数」は installation の数では決まらない — アプリごとの接続は
+   *  `PlatformAppConfig` にそのサービスの設定があるかどうかで決まる */
   list(platform: PlatformName): Promise<ReadonlyArray<{ installationId: string; workspaceId: string }>>;
 }
 
@@ -507,7 +530,9 @@ export interface FanOutOutcome<T> {
    * これが無いと、3 台紐づくチャンネルで 1 台が許可されていないとき、
    * 利用者は残り 2 台の結果だけを見て「全部を検索した」と思う — **検索が黙って不完全になる。**
    */
-  readonly excluded: ReadonlyArray<{ relationId: string; growiLabel: string; reason: 'not-permitted-in-channel' }>;
+  /** `filterBroadcastTargets` が返す `PermissionVerdict` の理由をそのまま持つ。
+   *  `not-permitted-in-channel` と `no-settings` は利用者への案内が違うので、1 つに丸めない */
+  readonly excluded: ReadonlyArray<{ relationId: string; growiLabel: string; reason: 'not-permitted-in-channel' | 'no-settings' }>;
 }
 
 /** 宛先ごとに `requestId` と `relationId` を作り替えて配る */
@@ -556,11 +581,17 @@ GROWI ごとに文書集合が互いに素なので、重みが等しければ�
 | 口 | 受け取るもの | 返すもの | 要件 |
 |---|---|---|---|
 | 通知 | `NotificationRequest` | `NotificationResult` | 2.1–2.6 |
+
+> **通知は宛先ごとに記録する。** 同じ `requestId` の 2 回目は、**`posted` になっていない宛先だけを投稿し直す**。
+> `(relation_id, request_id)` で丸ごと弾くと、やり直しは記録を読み直すだけで投稿を一度も試みず、
+> **bot を招待して直したのにやり直しても投稿されない**という直しようのない状態になる。
+> 応答は**常に `targets` 全件ぶん**を返し、前回 `posted` だった宛先はその結果をそのまま載せる。
+
 | 設定の押し込み | `SettingsPushRequest` | `204` | 11.1, 11.2, 11.4 |
 | 鍵の追加 | `KeyRegistrationRequest` | `KeyOperationResult` | 10.5 |
 | 鍵の失効 | `KeyRevocationRequest` | `KeyOperationResult`。**有効な鍵が 0 本になる要求は `would-leave-no-valid-key` で断る** | 10.5 |
 | 能力の一覧 | — | `CapabilityReport` | 1.3 |
-| チャンネルの一覧 | — | その installation のチャンネル | 11.1（管理画面が宛先を選ぶため） |
+| チャンネルの一覧 | — | **`ChannelInventory`** | 2.2, 11.1（管理画面が宛先を選ぶため） |
 | ペアリングの申請 | `PairingSubmission` | `PairingResult` | 9.1–9.5（**署名なし。唯一の例外**） |
 
 **設定の押し込みは `updatedAt` を見る。** 自分が持つものより古ければ捨てる —
@@ -576,16 +607,27 @@ GROWI ごとに文書集合が互いに素なので、重みが等しければ�
 
 **「その workspace のチャンネルか」と「bot が入っているチャンネルか」は別物。** 取り違えると案内が出せない —
 bot が招待されていない公開チャンネルは、本当は `bot-not-in-channel`（招待すれば直る）なのに
-`channel-not-in-installation`（この関係のものではない）として断られる。要件 2.4 は前者について
-「投稿できるようにするために必要な操作」を示すことを求めているので、**引くのは workspace のチャンネル一覧**とし、
-bot の在籍は投稿を試みた結果（`PostOutcome`）で判断する。
+`channel-not-in-installation` として断られる。要件 2.4 は前者について「投稿できるようにするために必要な操作」を
+示すことを求めているので、この書き分けは保つ。
 
-一覧は毎回 API を呼ばず、**installation ごとに覚えておいて一定間隔で取り直す**。
-ただし **`reconcile()` の周回は自分がロックを持つ接続の分しか回らない**のに対し、
-通知はロードバランサが選んだ任意の台に届くので、**覚えていない台でも動く形にする** —
-覚えていなければその場で 1 度引き、結果を共有の保存先（PostgreSQL）に置く。
-**引く問い合わせが失敗したときは通す**（チャットサービスの一時的な不調で通知が全部止まるのを避ける）。
-その場合は投稿を試み、失敗すれば `PostOutcome` の理由がそのまま返る。
+**判定の材料は、チャットサービスへの問い合わせではなく proxy が既に持っている許可一覧にする。**
+
+管理者が GROWI の管理画面で Gen 2 の通知先を選ぶとき、その一覧は proxy の「チャンネルの一覧」の口から取る。
+**つまり proxy は、選ばれたチャンネルをその時点で知る。** これを関係ごとの許可一覧
+（`notification_channel_allowlist`）として保存し、**通知の経路では PostgreSQL だけを見る。**
+
+チャットサービスへ毎回問い合わせる形を採らない理由は 2 つある。
+
+- **攻撃者が検査を外せる。** 「引く問い合わせが失敗したら通す」と決めると、侵害された GROWI が
+  覚えていないチャンネル宛ての通知を大量に送るだけで、チャットサービスの呼び出し回数の上限に当たり、
+  以後の検査が通る側へ倒れる。**攻撃者が自分で条件を作れる。**
+  umbrella が「1 台の GROWI が侵害されたとき被害が他の workspace へ広がらない**唯一の手段**」と
+  呼んでいる検査なので、外せる形にしてはいけない
+- **規模に耐えない。** workspace 100・1 workspace に数百チャンネルだと、一覧の取得はページをまたぐ重い呼び出しになる。
+  攻撃が無くても上限に当たりうる
+
+許可一覧に無いチャンネルへの通知は `channel-not-in-installation` として断る。
+**重い一覧の取得は、管理画面を開いたときだけ**になる。
 
 ### PairingService
 
@@ -601,7 +643,8 @@ export interface PairingService {
 ```
 
 **⑥ では `challenge` の一致だけでなく `challengeSignature` を検証する。**
-検証に使うのは **③ で申告された公開鍵**。文字列の一致だけを実装すると、
+検証に使うのは **③ で申告された公開鍵**、検証する値は protocol の `pairingChallengePayload()`
+（`challenge` そのものではない。理由は protocol の「⑤ で署名する値」）。文字列の一致だけを実装すると、
 第三者が本物の GROWI の URL と自分の鍵で申し込んだときに通ってしまい、鍵のすり替えが成立する
 （protocol spec の「⑤ が公開鍵を縛る理由」）。検証に失敗したら `ownership-unverified` を返す。
 
@@ -620,13 +663,14 @@ custom proxy 向けに、許す宛先を運用者が設定で明示できるよ�
 | テーブル | 主な列 | 索引・制約 |
 |---|---|---|
 | `installation` | `id`, `platform`, `workspace_id`, `workspace_name`, `credentials`（暗号化）, `created_at` | `(platform, workspace_id)` 一意 |
-| `relation` | `id`, `installation_id`, `growi_uri`, `growi_label`, `search_weight`, `created_at` | `(installation_id, growi_uri)` 一意 |
+| `relation` | `id`, `installation_id`, `growi_uri`, `growi_label`, `search_weight`, `settings_updated_at`, `created_at` | `(installation_id, growi_uri)` 一意 |
 | `peer_key` | `id`, `relation_id`, `key_id`, `public_key_jwk`, `valid_from`, `revoked_at` | `(relation_id, key_id)` 一意 |
 | `own_key` | `id`, `relation_id`, `key_id`, `private_key_pem`（暗号化）, `valid_from`, `revoked_at` | 同上。**相手ごとに鍵を分ける** — 1 つの関係の鍵が漏れても他へ波及しないため |
 | `pairing_order` | `id`, `installation_id`, `code_hash`, `attempts`, `expires_at`, `consumed_at` | `code_hash` 一意。`attempts` に上限 |
 | `request_nonce` | `relation_id`, `key_id`, `nonce`, `expires_at` | **主キー `(relation_id, key_id, nonce)`** |
-| `processed_request` | `relation_id`, `request_id`, `response`（JSON）, `processed_at`, `expires_at` | **主キー `(relation_id, request_id)`** |
-| `channel_permission` | `id`, `relation_id`, `command_name`, `channels`, `updated_at` | **`(relation_id, command_name)` 一意。** `scope` は持たない — 全 GROWI 向けかどうかは `BROADCAST_COMMANDS` で決まるので、行にも持つと二重持ちになる。`updated_at` は取りに行った設定が古いかを比べるため（要件 11.4） |
+| `processed_request` | `relation_id`, `request_id`, `response`（JSON）, `processed_at`, `expires_at` | **主キー `(relation_id, request_id)`。コマンド用** — 2 回目には 1 回目の応答をそのまま返す |
+| `processed_notification_target` | `relation_id`, `request_id`, `platform`, `channel_id`, `status`, `detail`, `processed_at`, `expires_at` | **主キー `(relation_id, request_id, platform, channel_id)`。通知用** — `posted` の宛先は次のやり直しで飛ばす。**コマンドと同じ表に混ぜない**（主キーの意味が違い、読む人が取り違える） |
+| `channel_permission` | `id`, `relation_id`, `command_name`, `channels` | **`(relation_id, command_name)` 一意。** `scope` も行ごとの `updated_at` も持たない — 前者は `BROADCAST_COMMANDS` で決まり、後者は**関係ごとに 1 つ**（`relation.settings_updated_at`）だから |
 | `pending_collection` | `correlation_id`, `relation_id`（**GROWI 選択中は空**）, `platform`, `channel_id`, `actor_account_id`, `command_name`, `invocation`(JSON), `collected`(JSON), **`offered_options`(JSON)**, `expires_at` | `correlation_id` 主キー。`(platform, channel_id, actor_account_id)` に索引 |
 
 Chat SDK の state（購読・分散ロック・重複排除）は `@chat-adapter/state-pg` が別スキーマに持つ。**触らない。**
@@ -635,7 +679,7 @@ Chat SDK の state（購読・分散ロック・重複排除）は `@chat-adapte
 `runtime/sweeper.ts` が定期的に削除する。**分散ロックで 1 台だけが実行する。**
 
 **紐付けを解除したとき（要件 9.7）**: `relation` に連なる `own_key` / `peer_key` / `channel_permission` /
-`pending_collection` を削除する。**秘密鍵を残さない。** `request_nonce` と `processed_request` は
+`pending_collection` / `processed_notification_target` / `notification_channel_allowlist` を削除する。**秘密鍵を残さない。** `request_nonce` と `processed_request` は
 期限切れで自然に消えるので触らない。
 
 **保存時の暗号化**: `installation.credentials` と `own_key.private_key_pem`。
@@ -682,10 +726,14 @@ Chat SDK の state（購読・分散ロック・重複排除）は `@chat-adapte
 2. **呼びかけ付きの返信** — `@growi 1` が `normalize` で `null` になった後 `resume` に届き、値が集まること（8.2）
 3. `FanOutCollector` — 3 台のうち 1 台が締め切りを超え、1 台が権限で外れたとき、
    **残り 1 台の結果と、超えた 1 台と外れた 1 台の両方が示されること**（3.4・11.3）
-4. `ConnectionManager` — 起動時に installation を数え上げてつなぐこと。切れたら張り直すこと。
-   **1 つの接続の失敗が他へ波及しないこと**（1.1・1.4）
-5. **複数台の持ち分** — 2 台起動しても 1 つの installation につながるのは 1 台だけであること。
-   持ち主を止めると他方が引き取ること
+4. `ConnectionManager`（**接続の単位ごとに書き分ける**）
+   - Slack: **1 本が複数の installation を受け持つこと。** installation が 1 件消えても接続が閉じないこと
+   - Mattermost: **installation ごとに持ち分が分かれること**
+   - 共通: 切れたら張り直すこと。**1 つの接続の失敗が他へ波及しないこと**（1.1・1.4）
+5. **複数台の持ち分**（同じく単位ごと）
+   - Slack: **2 台起動しても張られる接続は 1 本だけ**であること
+   - Mattermost: 1 つの installation につながるのは 1 台だけであること
+   - 共通: 持ち主を止めると他方が引き取ること。**ロックが延長され続ける限り奪われない**こと
 6. ペアリング — 申告された URL が https 以外・私的アドレス帯・リダイレクトのとき拒まれること（9.2）
 
 ### E2E Tests
