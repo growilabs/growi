@@ -125,12 +125,25 @@ export class PageLinkUpsertQueue {
 
     try {
       for (const id of this.pagesToUpsert) {
-        // Per page, before the id is claimed, so a throw here leaves the id queued rather than
-        // dropping it or extracting with no site URL (which would delete correct rows).
-        const siteUrl = this.getSiteUrl();
-
-        // Claim before processing: a save landing mid-drain re-enqueues the id for a fresh run.
         this.pagesToUpsert.delete(id);
+
+        let siteUrl: string | undefined;
+        try {
+          siteUrl = this.getSiteUrl();
+        } catch (err) {
+          // A config/infra fault, not a page-specific one: go straight to `failed` rather than
+          // through registerFailure, so it never spends this page's MAX_UPSERT_ATTEMPTS budget —
+          // it retries indefinitely, for as long as the fault lasts. getSiteUrl() is the same call
+          // for every id in this pass, so a throw here means the rest would throw too; bail out of
+          // the pass now instead of repeating the same failed call (and log line) per remaining id.
+          logger.error(
+            { err, pageId: id },
+            'backlinks sync failed: site URL unreachable',
+          );
+          failed.add(id);
+          for (const remainingId of this.pagesToUpsert) failed.add(remainingId);
+          break;
+        }
 
         const startedAt = performance.now();
         let extractionMs = 0;

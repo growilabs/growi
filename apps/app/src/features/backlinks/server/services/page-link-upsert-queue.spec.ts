@@ -260,9 +260,9 @@ describe('PageLinkUpsertQueue (duty-cycle pacing)', () => {
   });
 
   it('leaves a page queued when the site URL cannot be read', async () => {
-    // The site URL is read per page *before* the id is claimed, so a throw there must leave the
-    // page queued — dropping it loses the save, and extracting with no site URL classifies every
-    // same-host absolute link as external and deletes the page's correct rows.
+    // The id is claimed (removed from pagesToUpsert) before the site URL is read, so a throw there
+    // must still leave the page queued — dropping it loses the save, and extracting with no site
+    // URL classifies every same-host absolute link as external and deletes the page's correct rows.
     const { queue, recover } = createQueueWithUnreadableSiteUrl();
     const pageId = new Types.ObjectId().toString();
 
@@ -271,15 +271,41 @@ describe('PageLinkUpsertQueue (duty-cycle pacing)', () => {
 
     expect(mocks.handlePageUpsertById).not.toHaveBeenCalled();
     expect(mocks.loggerError).toHaveBeenCalledWith(
-      expect.objectContaining({ err: expect.any(Error) }),
-      expect.stringContaining('drain failed'),
+      expect.objectContaining({ pageId, err: expect.any(Error) }),
+      expect.stringContaining('site URL'),
     );
 
     recover();
-    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
+    // A failed site-URL check backs off like any other failure, not the tight drain interval.
+    await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_MS);
 
     expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(1);
     expect(mocks.handlePageUpsertById).toHaveBeenCalledWith(pageId, siteUrl);
+  });
+
+  it('does not lose any queued page when the site URL check fails mid-drain', async () => {
+    // The id whose turn it was is claimed before the check runs, so it has to be added back to
+    // `failed` explicitly alongside the ids not yet visited — miss that and every outage silently
+    // drops exactly the one page the loop was on when it broke.
+    const { queue, recover } = createQueueWithUnreadableSiteUrl();
+    const pageIds = [0, 1, 2].map(() => new Types.ObjectId().toString());
+    for (const id of pageIds) queue.enqueue(id);
+
+    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
+    expect(mocks.handlePageUpsertById).not.toHaveBeenCalled();
+
+    recover();
+    // RETRY_BACKOFF_MS gets the drain started; each of the 3 pages then pays its own rest before
+    // the next one runs, so the wait must cover that too or the drain is still mid-page when the
+    // assertion below runs.
+    await vi.advanceTimersByTimeAsync(
+      RETRY_BACKOFF_MS + REST_MS * pageIds.length,
+    );
+
+    const processedIds = mocks.handlePageUpsertById.mock.calls.map(
+      ([id]) => id,
+    );
+    expect(processedIds.sort()).toEqual([...pageIds].sort());
   });
 
   it('does not spend the retry budget while the site URL is unreadable', async () => {
@@ -289,13 +315,15 @@ describe('PageLinkUpsertQueue (duty-cycle pacing)', () => {
     const pageId = new Types.ObjectId().toString();
 
     queue.enqueue(pageId);
+    // Several backoff-paced attempts, not several tight-interval ones — otherwise this window
+    // covers only a single retry and proves nothing about attempts beyond it.
     await vi.advanceTimersByTimeAsync(
-      DRAIN_INTERVAL_MS * (MAX_UPSERT_ATTEMPTS + 3),
+      DRAIN_INTERVAL_MS + RETRY_BACKOFF_MS * (MAX_UPSERT_ATTEMPTS + 3),
     );
     expect(mocks.handlePageUpsertById).not.toHaveBeenCalled();
 
     recover();
-    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
+    await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_MS);
 
     expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(1);
   });
