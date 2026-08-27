@@ -84,7 +84,10 @@ export const extension = Prisma.defineExtension((client) => {
           const context =
             Prisma.getExtensionContext<typeof prisma.comments>(this);
           return context.findMany({
-            where: { pageId },
+            // Unconditional: this is the only guard that keeps inline
+            // comments out of the existing comment thread, regardless of
+            // share-link context — see design.md "アーキテクチャ選定".
+            where: { pageId, isInline: { not: true } },
             orderBy: {
               createdAt: 'desc',
               ...options.orderBy,
@@ -100,7 +103,8 @@ export const extension = Prisma.defineExtension((client) => {
           const context =
             Prisma.getExtensionContext<typeof prisma.comments>(this);
           return context.findMany({
-            where: { revisionId },
+            // Unconditional — see findCommentsByPageId above.
+            where: { revisionId, isInline: { not: true } },
             orderBy: {
               createdAt: 'desc',
               ...options.orderBy,
@@ -126,7 +130,9 @@ export const extension = Prisma.defineExtension((client) => {
           const context =
             Prisma.getExtensionContext<typeof prisma.comments>(this);
           return context.count({
-            where: { pageId },
+            // Keeps inline comments out of the page-footer comment count
+            // badge — see design.md "アーキテクチャ選定".
+            where: { pageId, isInline: { not: true } },
           });
         },
 

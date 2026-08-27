@@ -14,7 +14,7 @@
   - 観測できる完了条件：新規デプロイ環境でコレクション作成・インデックス作成が完走する（結合テストまたはローカルの `mongosh`/Nodeスクリプトでインデックス一覧に `pageId_1_isInline_1` 相当が存在することを確認する）
   - _Requirements: 1.2, 1.4, 4.1, 4.5, 5.4, 5.5_
 
-- [ ] 1.3 既存の読み取り経路にインラインコメント除外フィルタを追加する
+- [x] 1.3 既存の読み取り経路にインラインコメント除外フィルタを追加する
   - `findCommentsByPageId`／`findCommentsByRevisionId`／`countCommentByPageId`（`comment.ts` のPrisma拡張メソッド）の `where` 条件に `isInline: { not: true }` を無条件で（`isSharedPage` の値によらず）追加する
   - `/_api/comments.get` を通常文脈・共有リンク文脈の両方で呼び出し、`isInline: true` の行が一切レスポンスに含まれないことを確認する結合テストを追加する
   - `countCommentByPageId` を使うページ末尾コメントの件数バッジが、インラインコメントを作成してもカウントに含めないことを確認する結合テストを追加する

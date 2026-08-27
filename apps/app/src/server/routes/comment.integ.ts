@@ -56,6 +56,7 @@ describe('/comments.get share-link authorization (integration)', () => {
   const revBId = new ObjectId();
   let commentAId: string;
   let commentBId: string;
+  let inlineCommentAId: string;
   let shareLinkAId: Types.ObjectId;
   let expiredShareLinkId: Types.ObjectId;
 
@@ -109,6 +110,23 @@ describe('/comments.get share-link authorization (integration)', () => {
     );
     commentAId = commentA.id;
     commentBId = commentB.id;
+
+    // An inline comment on page A, seeded alongside the normal comment above.
+    // `prisma.comments.add` never writes `isInline`, so this is created
+    // directly through `prisma.comments.create` (task 1.3: the read paths
+    // exercised below must exclude this row unconditionally).
+    const inlineCommentA = await prisma.comments.create({
+      data: {
+        pageId: pageAId.toString(),
+        creatorId: new ObjectId().toString(),
+        revisionId: revAId.toString(),
+        comment: 'inline comment on page A',
+        commentPosition: -1,
+        isInline: true,
+        quote: 'quoted text',
+      },
+    });
+    inlineCommentAId = inlineCommentA.id;
 
     // Share links related to page A: one valid, one expired.
     const shareLinkA = await ShareLink.create({ relatedPage: pageAId });
@@ -200,7 +218,7 @@ describe('/comments.get share-link authorization (integration)', () => {
 
   afterAll(async () => {
     await prisma.comments.deleteMany({
-      where: { id: { in: [commentAId, commentBId] } },
+      where: { id: { in: [commentAId, commentBId, inlineCommentAId] } },
     });
     await prisma.revisions.deleteMany({ where: { id: revAId.toString() } });
     await prisma.pages.deleteMany({
@@ -416,6 +434,47 @@ describe('/comments.get share-link authorization (integration)', () => {
 
       expect(res.status).toBe(403);
       expect(res.body.comments).toBeUndefined();
+    });
+  });
+
+  /**
+   * Requirements 6.1 / 6.3: `/comments.get` must never return an
+   * `isInline: true` row, in either the shared-link context or the normal
+   * (non-shared) context. Page A carries both a normal comment
+   * (`commentAId`) and an inline comment (`inlineCommentAId`) seeded above;
+   * every assertion below checks the response contains only the normal one.
+   */
+  describe('GET /comments.get — inline comments are excluded (6.1, 6.3)', () => {
+    it('excludes isInline rows in the share-link context', async () => {
+      const res = await request(app).get('/comments.get').query({
+        page_id: pageAId.toString(),
+        shareLinkId: shareLinkAId.toString(),
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      const ids = res.body.comments.map(
+        (comment: { _id: string }) => comment._id,
+      );
+      expect(ids).toContain(commentAId.toString());
+      expect(ids).not.toContain(inlineCommentAId.toString());
+    });
+
+    it('excludes isInline rows in the normal (non-shared) context', async () => {
+      currentUser = { _id: new ObjectId() };
+      accessSpy.mockResolvedValue(true);
+
+      const res = await request(app)
+        .get('/comments.get')
+        .query({ page_id: pageAId.toString() });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      const ids = res.body.comments.map(
+        (comment: { _id: string }) => comment._id,
+      );
+      expect(ids).toContain(commentAId.toString());
+      expect(ids).not.toContain(inlineCommentAId.toString());
     });
   });
 
