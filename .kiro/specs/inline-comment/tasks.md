@@ -137,7 +137,7 @@
   - _Boundary: InlineCommentList, InlineCommentReplies_
 
 - [ ] 5. 統合：既存ページビューへの配線
-- [ ] 5.1 `RevisionRenderer.tsx` にコンテナrefを転送する
+- [x] 5.1 `RevisionRenderer.tsx` にコンテナrefを転送する
   - `ReactMarkdown` を包むコンテナ `div` に `ref` を転送するよう変更する（新規rehype/remarkプラグインは追加しない）
   - 観測できる完了条件：既存のページレンダリングに視覚的な差分がないことを確認した上で、親コンポーネントからコンテナDOMへ `ref` 経由でアクセスできる
   - _Requirements: 2.1, 5.1_
