@@ -300,7 +300,15 @@ GROWI にはそれを裏付ける手立てが無い。署名が示すのは「�
 
 ## Performance & Scalability
 
-- **アイドル時のコストはゼロに保つ。** ブリーフの決定 7（接続方向）が常時接続方式を採らなかった理由がこれ。ただし Slack の Socket Mode と Discord の Gateway、Mattermost の WebSocket は**チャットサービス側への接続**であり、登録された GROWI の数には比例しない（installation の数に比例する）。
+> **この節は `chat-integration-proxy` の「常時接続の生涯」と「受信が 1 台に集まる」で更新されている。**
+> 実測（Slack の Socket Mode はアプリごと 1 本）により、次の 3 点が確定した。
+> - **常駐コストは installation の数に比例する**（GROWI の台数には比例しない）。アイドル時のコストはゼロではない
+> - **台数を増やしても Slack と Discord の受信は分散しない**（投稿と GROWI への送信は分散する）
+> - **接続の持ち主が落ちると、他の台が引き取るまで（既定 60 秒）そのサービス全体が黙る**
+>
+> 規模と可用性の見積もりは proxy の spec を正とすること。
+
+- ~~**アイドル時のコストはゼロに保つ。**~~（上記のとおり更新された） ブリーフの決定 7（接続方向）が常時接続方式を採らなかった理由がこれ。ただし Slack の Socket Mode と Discord の Gateway、Mattermost の WebSocket は**チャットサービス側への接続**であり、登録された GROWI の数には比例しない（installation の数に比例する）。
 - **水平に増やせる状態を保つ。** 検索の待ち合わせはインスタンスをまたがない。Chat SDK が要求する分散ロックと重複排除は `state-pg` が担う。
 - **検索の締め切り**は既定 10 秒（Gen 1 の `REQUEST_TIMEOUT_FOR_GTOP` に合わせる）。設定で変えられるようにする。
 

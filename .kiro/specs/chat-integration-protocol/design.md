@@ -217,8 +217,11 @@ export const decodeKeyId = (encoded: string): KeyRef | null => { /* ... */ };
 
 #### 関係を指す識別子は `relationId` ただ 1 つ
 
-**`relationId` は推測できない値にする**（連番にしない）。署名対象の `keyid` に入るため、
-推測できると ⑤ を使った署名の収集が成立する（上記）。
+**`relationId` は推測できない値にする**（proxy が採番する。連番にしない）。
+理由は **`keyid`（= `relationId:keyId`）として署名ヘッダに載り外部に出る識別子だから** —
+数え上げられない値にしておく。
+（⑤ を使った署名の収集は、接頭辞を付けた時点で `relationId` の推測可否と無関係に閉じている。
+この控えはそれとは別の、識別子を数え上げられないようにするための習慣である。）
 
 **`growiId` という別名を作らない。** 契約の中で GROWI を指す値はすべて `relationId` とし、
 **proxy がペアリングの成立時に採番する**。`PairingResult.relationId` で GROWI に渡るので、
@@ -372,7 +375,7 @@ export type PairingResult =
 
 export interface OwnershipChallenge {
   readonly registrationCode: string;
-  readonly challenge: string;      // proxy がその場で作る使い捨ての値
+  readonly challenge: string;      // proxy がその場で作る使い捨ての値。**base64url に限る**
 }
 
 export interface ChallengeResponse {
@@ -490,9 +493,22 @@ proxy は「所有を確認できた」と判断し、**他人の GROWI を名�
  * `challenge` だけに署名すると、⑤ が「相手の指定した文字列に、
  * **後で本番のリクエスト署名に使う同じ鍵で**署名して返す窓口」になる。
  */
+/**
+ * `challenge` は base64url に限る（区切りの `:` が値に現れないようにするため）。
+ *
+ * **両側が同じ文字列を持っている値だけで組み立てる。** これが要点。
+ * `proxyUri` は入れない — GROWI は管理者が画面に入力した文字列、proxy は自分の設定値、と
+ * **出どころが違う**ので、末尾スラッシュ・大文字小文字・`:443` の有無が 1 文字ずれただけで
+ * 署名が一致せず、**リバースプロキシの内側のような普通の構成でペアリングが 1 度も成立しない**。
+ * しかも失敗は `ownership-unverified` としか見えないので、運用者は URL の書き方ではなく到達性を疑う。
+ *
+ * **入れなくても足りる。** 用途の区切りは接頭辞が担い、この 1 回のペアリングへの結び付けは
+ * `registrationCode`（128 bit 以上の乱数で、**proxy が発行し ④ で送り返される**）が担う。
+ * proxy B は自分が発行していない登録コードを持たないので、**proxy 間の持ち回しもこれで塞がっている。**
+ */
 export const pairingChallengePayload = (
-  registrationCode: string, proxyUri: string, challenge: string,
-): string => `growi-chat-pairing-challenge:v1:${registrationCode}:${proxyUri}:${challenge}`;
+  registrationCode: string, challenge: string,
+): string => `growi-chat-pairing-challenge:v1:${registrationCode}:${challenge}`;
 ```
 
 **なぜ必要か。** ⑤ は鍵がまだ無い時点の口なので**署名で守れない**。答える条件は「保留中の登録コードと一致すること」だけである。
@@ -504,10 +520,21 @@ export const pairingChallengePayload = (
 
 **あわせて 2 つ縛る。**
 
-- **⑤ は 1 つの保留につき 1 回だけ答える。** 答えたら保留の行に印を付ける。回数に制限が無いと、
-  攻撃者が候補を変えながら署名を集められる
+- **⑤ は「同じ問いには同じ答えを返す」。回数では縛らない。**
+  保留の行に**答えた `challenge` と返した署名を記録**し（`answeredChallenge` / `answeredSignature`）、
+  - **同じ `challenge` が再び来たら → 記録した署名をそのまま返す**
+  - **違う `challenge` が来たら → 410**
+
+  記録は**条件つき更新で 1 本に絞る**（`answeredChallenge` が未設定の行だけを取る）。
+  ふつうの読み書きだと、④ が同時に 2 本届いたときに両方へ別々の署名を返してしまう。
+
+  「1 回だけ答える」にすると**正常系が塞がる** — proxy の ④ には応答の待ち時間の上限があるので、
+  GROWI が重くて上限を超えると **GROWI は答えて印を付け、proxy は受け取れない**。
+  やり直すと 410 が返り、**応答が遅い GROWI は何度やってもペアリングできない**。
+  症状は「所有確認に失敗」なので原因にも辿り着けない。
+  **中身で縛れば、署名の集め放題を止めたまま正常なやり直しが通る。**
 - **`relationId` は推測できない値にする**（proxy が採番する。連番にしない）。
-  署名対象には `keyid`（= `relationId:keyId`）が入るので、`relationId` が推測できると上の攻撃の前提が揃う
+  `keyid` として署名ヘッダに載り外部に出る識別子なので、数え上げられない値にしておく
 
 #### ⑤ が公開鍵を縛る理由 — 条件だけでは鍵のすり替えを止められない
 
@@ -829,3 +856,8 @@ export type AccountLinkStartResponse =
    **有効な鍵が 0 本になる失効の要求が `would-leave-no-valid-key` で断られること**（10.5）
 5. **鍵のすり替え** — 登録コードを知る第三者が、他人の `growiUri` と自分の公開鍵で申し込んでも、
    `challengeSignature` の検証で成立しないこと（9.2・9.5）
+6. **署名の代行窓口が閉じていること** — `challenge` に **RFC 9421 の署名対象文字列そのもの**を入れて ⑤ を叩き、
+   返った署名を `Signature` ヘッダとして使っても**通らないこと**（9.6・10.6）。
+   この設計の要になった判断なので試験で固定する
+7. **同じ問いには同じ答え** — 同じ `challenge` の 2 回目に**記録した署名がそのまま返る**こと。
+   違う `challenge` は 410 になること（9.2・9.3）

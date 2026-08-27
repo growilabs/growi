@@ -322,9 +322,9 @@ export interface NotificationDispatcher {
 | `chat_notification_outbox` | `requestId`, `relationId`, `targets`, `markdown`, `state`, `attempts`, `result`, `createdAt` | `state` に索引。**送信済みは 30 日で TTL 索引により消す**。`given-up` は運用者が確認するまで残す |
 | `chat_processed_requests` | `relationId`, `requestId`, `response`, `processedAt` | `(relationId, requestId)` 一意。**TTL 索引で 24 時間**（再送が起こりうる間だけ） |
 | `chat_request_nonces` | `relationId`, `keyId`, `nonce`, `expiresAt` | `(relationId, keyId, nonce)` 一意。**`expiresAt` に TTL 索引** |
-| `chat_pending_pairings` | `registrationCode`, `proxyUri`, `growiUri`, `createdBy`, **`ownKeyId`**, **`ownKeyPair`（暗号化）**, `expiresAt` | `registrationCode` 一意。**`expiresAt` に TTL 索引**。要件 9.2 の所有確認に使う |
-| `chat_channel_permissions` | `relationId`, `commandName`, `allowedChannels` | **`(relationId, commandName)` 一意。** **行ごとの `updatedAt` は持たない** — protocol の `SettingsPushRequest.updatedAt` は関係ごとに 1 つの値なので、行ごとに持つと比べる基準が決まらない。時刻は `chat_relations.settingsUpdatedAt` に 1 つ持つ。 要件 11.1・11.2 の保存先で、`judge` に渡す `RelationSettings` の出どころ。`scope` は持たない（`BROADCAST_COMMANDS` から導く）。`updatedAt` は proxy が取りに来たときに返す（要件 11.4） |
-| `chat_notification_destinations` | `platform`, `channelId`, **`channelName`**, `pathPattern`, `triggerEvents`, `relationId` | 管理者が設定する。Gen 1 の設定とは**別に保存する**（要件 12.2） |
+| `chat_pending_pairings` | `registrationCode`, `proxyUri`, `growiUri`, `createdBy`, **`ownKeyId`**, **`ownKeyPair`（暗号化）**, **`answeredChallenge`**, **`answeredSignature`**, `expiresAt` | `registrationCode` 一意。**`expiresAt` に TTL 索引**。要件 9.2 の所有確認に使う |
+| `chat_channel_permissions` | `relationId`, `commandName`, `allowedChannels` | **`(relationId, commandName)` 一意。** **行ごとの `updatedAt` は持たない** — protocol の `SettingsPushRequest.updatedAt` は関係ごとに 1 つの値なので、行ごとに持つと比べる基準が決まらない。時刻は `chat_relations.settingsUpdatedAt` に 1 つ持ち、proxy が取りに来たときはそこから返す（要件 11.4） |
+| `chat_notification_destinations` | `platform`, `channelId`, **`channelName`**, `pathPattern`, `triggerEvents`, `relationId` | `channelName` は表示と要件 12.4 の突き合わせ用。**`ChannelInventory` を引いたときに合わせて更新する**（名前は変わりうるので、古いままだと注意喚起が出たり出なかったりする） | 管理者が設定する。Gen 1 の設定とは**別に保存する**（要件 12.2） |
 
 #### ペアリングの途中に、自分の鍵を置く場所が要る（順序の矛盾）
 
@@ -337,13 +337,28 @@ protocol の手順 ⑤ で GROWI は **③ で申告した秘密鍵で `challeng
 ⑥ で `PairingResult.relationId` を受け取った時点で `chat_integration_keys` へ移し、保留の行は消す。
 
 **⑤ で署名するのは `challenge` そのものではない。** protocol の `pairingChallengePayload()`
-（`growi-chat-pairing-challenge:v1:` + 登録コード + proxy の URL + `challenge`）に署名する。
+（`growi-chat-pairing-challenge:v1:` + **登録コード** + `challenge`）に署名する。
+**`proxyUri` は入れない** — GROWI 側は管理者が入力した文字列、proxy 側は自分の設定値と出どころが違い、
+1 文字ずれただけでペアリングが 1 度も成立しないため。**両側が同じ文字列を持っている値だけで組み立てる。**
+proxy 間の持ち回しは、登録コード（proxy が発行し ④ で送り返される乱数）が既に塞いでいる。
 `challenge` だけに署名すると、**⑤ が「相手の指定した文字列に、後で本番のリクエスト署名に使う同じ鍵で
 署名して返す窓口」**になり、登録コードを見た第三者が RFC 9421 の署名対象文字列を投げ込んで
 その GROWI 本人として通る署名を手に入れられる。
 
-**⑤ は 1 つの保留につき 1 回だけ答える。** 答えたら `chat_pending_pairings` の行に印を付け、以降は 410 を返す。
+**⑤ は「同じ問いには同じ答えを返す」。** 保留の行に**答えた `challenge` と返した署名を記録**し、
+同じ `challenge` の再送には記録した署名をそのまま返す。違う `challenge` は 410。
+記録は **`findOneAndUpdate` で `answeredChallenge` が未設定の行だけを取る**形にする —
+ふつうの読み書きだと ④ が同時に 2 本届いたときに両方へ別々の署名を返す。
+
+「1 回だけ答える」にすると**正常系が塞がる** — proxy の ④ には応答の待ち時間の上限があるので、
+GROWI が重くて上限を超えると **GROWI は答えて印を付け、proxy は受け取れない**。
+やり直すと 410 になり、**応答が遅い GROWI は何度やってもペアリングできない**。
 `proxyUri` も同じ行に記録し、**⑤ で「送信先の proxy と自分が申告した `keyId`」を突き合わせる**（protocol の要求）。
+
+> **設定の保存は 1 つのトランザクションで行う。** 権限の行（`chat_channel_permissions`）と
+> 時刻（`chat_relations.settingsUpdatedAt`）が別のコレクションなので、片方だけ書けた状態がありうる。
+> **時刻だけ進むと proxy は古い設定を新しいものとして受け取る。**
+> devcontainer の MongoDB はレプリカセットなのでトランザクションが使える。
 
 #### GROWI 側の受け口（proxy から届くもの）
 
@@ -402,6 +417,11 @@ protocol spec が「`keyId` を単独で鍵にすると別の関係のものを�
 > 解除では `chat_relations` の行を消さず `state: 'unpaired'` にして `platform` と `workspaceId` を残し、
 > 繋ぎ直したときに**同じ `platform` と `workspaceId` を持つ解除済みの行**を探して紐付けを新しい `relationId` へ移し、
 > 古い行を消す。**行を消してしまうと、古い `relationId` がどの workspace のものだったか分からなくなり、引き継げない。**
+>
+> **引き継ぎ元が複数あるときは、いちばん新しい解除済みの行から引き継ぐ。**
+> 移す途中で `(relationId, platform, accountId)` がぶつかったら**新しいほうを残す**。
+> **解除済みの `chat_relations` の行そのものも 90 日で消す**（`chat_account_links` と揃える）。
+> 90 日の掃除は `NotificationDispatcher` と同じく**条件つき更新で 1 台だけ**が回す。
 >
 > **`chat_account_links` を消すのは 3 つの場合だけ** — 利用者が解除したとき、GROWI ユーザーが削除されたとき、
 > 引き継ぎ先が無いまま一定期間（既定 90 日）過ぎたとき。
