@@ -136,8 +136,8 @@ graph TB
     end
     subgraph Backlinks
         Listener[PageLinkService listener]
-        Extract[extractInternalLinks]
-        Resolve[resolveToPages]
+        Extract[extractInternalLinkPaths]
+        Resolve[resolveToPageIds]
         Model[PageLink model]
         Route[apiv3 backlinks route]
         Hook[useSWRxBacklinks]
@@ -185,37 +185,53 @@ graph TB
 ## File Structure Plan
 
 ### Directory Structure
+
+Tests are co-located (`*.spec.ts` / `*.integ.ts`) and omitted below. Files marked **(story)** are
+not yet implemented and land with that story.
+
 ```
 apps/app/src/features/backlinks/
 ├── interfaces/
-│   └── page-link.ts              # IPageLink, IBacklink & ILinkTarget DTOs, LinkTargetState union
+│   ├── page-link.ts              # IPageLink + PageLinkDocument/PageLinkModel (statics declared as implemented)
+│   └── backlink.ts               # read DTOs: IBacklink, IBacklinkResponse (+ LinkTargetState B5.1, ILinkTarget B5.4)
 ├── server/
 │   ├── models/
 │   │   ├── page-link.ts          # Mongoose model (getOrCreateModel) + statics
-│   │   └── page-link-backfill-job.ts   # Mongoose model: backfill progress marker + atomic claim (multi-instance)
+│   │   └── page-link-backfill-job.ts   # (B3) Mongoose model: backfill progress marker + atomic claim (multi-instance)
 │   ├── services/
-│   │   ├── extract-internal-links.ts   # pure: (markdown, pagePath, siteUrl?) => string[] (resolved, deduped)
-│   │   ├── target-page-resolution.ts   # paths -> toPage ids, batched (permalink by id | path | redirect endpoint)
-│   │   ├── page-link-sync.ts           # pure-ish ops: upsert outbound, reconcile-delete, re-resolve inbound
-│   │   ├── page-link-service.ts        # subscribes to crowi.events.page; orchestrates sync; read query
-│   │   └── page-link-backfill-cron.ts  # CronService: chunked, resumable, throttled backfill (in-memory path->id map)
+│   │   ├── extract-internal-link-paths.ts  # pure: (markdown, pagePath, siteUrl?) => Promise<string[]> (resolved, deduped)
+│   │   ├── target-page-resolution.ts   # toPaths -> Map<toPath, toPage id> (permalink by id | findByPath + redirect) — live path only
+│   │   ├── page-link-sync.ts           # pure-ish row ops: dropSelfLinks, syncOutboundLinks (+ reconcile-delete B5.2, re-resolve inbound B4.2)
+│   │   ├── page-link-service-handlers.ts   # Crowi-free lifecycle handlers: load body -> extract -> resolve -> sync
+│   │   ├── page-link-upsert-queue.ts   # coalescing queue (Set<pageId> + duty-cycle paced drain) — requirement 3.5
+│   │   ├── upsert-queue-pacing.ts      # validates the configured pacing budget, per-value fallback to CONFIG_DEFINITIONS
+│   │   ├── find-backlinks.ts           # read query: backlink sources filtered by viewer grant
+│   │   ├── page-link-service.ts        # thin Crowi adapter: subscribes to crowi.events.page, owns config access, delegates
+│   │   └── page-link-backfill-cron.ts  # (B3) CronService: chunked, resumable, throttled backfill (in-memory path->id map)
 │   └── routes/
-│       └── get-page-backlinks.ts       # apiv3 route factory (GET)
+│       └── backlinks.ts                # apiv3 route factory (GET) — getBacklinksHandlerFactory
 └── client/
     ├── stores/
-    │   └── use-swrx-backlinks.ts       # SWR hook
+    │   └── backlinks.ts                # SWR hook — useSWRxBacklinks
     └── components/
-        ├── BacklinksPanel.tsx          # incoming list + empty state + forward-health section
-        └── BacklinkListItem.tsx        # one row (title + path + target-state badge)
+        ├── BacklinksPanel.tsx          # incoming list + empty state (+ forward-health section — B5.6)
+        └── BacklinkListItem.tsx        # one row (title + path + target-state badge — badge B5.5)
 
 # No migration file: PageLink indexes are created by Mongoose autoIndex at model
 # registration (new collection); the backfill is the cron job above.
 ```
 
+> **Outgoing-health types are declared by B5, not up front.** `interfaces/backlink.ts` holds only
+> `IBacklink` / `IBacklinkResponse` today; the `LinkTargetState` union arrives with its derivation
+> helper in **B5.1** and the `ILinkTarget` DTO with the forward-health read in **B5.4**. The target
+> shapes below (§ Data Models) are unchanged — only *when* they are declared moved. (The original plan
+> declared both in B1.1; B1 shipped without them, and keeping a type in the same change as its only
+> producer is the better trade than a type with no consumer.)
+
 ### Modified Files
 - `apps/app/src/server/crowi/index.ts` — instantiate and initialize `PageLinkService`
-  (subscribe to events) in the page-service setup phase, mirroring `search.ts`; also register the
-  backfill `CronService` (mirroring the page-bulk-export job-cron registration).
+  (subscribe to events) in the page-service setup phase, mirroring `search.ts`; **(B3)** also register
+  the backfill `CronService` (mirroring the page-bulk-export job-cron registration).
 - `apps/app/src/server/routes/apiv3/index.js` — register the backlinks route.
 - `apps/app/src/server/models/page-redirect.ts` — add `retrieveFromPathsRedirectingTo` (the reverse
   walk: which paths reach a given one) and re-implement `removePageRedirectsByToPath` over it, so
@@ -231,10 +247,11 @@ apps/app/src/features/backlinks/
   parameter (`maxDepth`), not baked into the pipeline: `$graphLookup` is memory-bound at 100MB with
   no disk spill, so the save path passes 50, while page view passes nothing — a cap there would
   answer an old URL with a not-found once the chain outgrows it.
-- `apps/app/src/client/components/PageAccessoriesModal/PageAccessoriesModal.tsx` (+ its Jotai
-  modal-contents enum) — add the **Backlinks** tab mapping to `BacklinksPanel`.
+- `apps/app/src/client/components/PageAccessoriesModal/PageAccessoriesModal.tsx` (+ the
+  modal-contents map in `apps/app/src/states/ui/modal/page-accessories.ts`) — add the **Backlinks**
+  tab mapping to `BacklinksPanel`.
 
-> Each file owns one responsibility. `extract-internal-links.ts` and `target-page-resolution.ts` are
+> Each file owns one responsibility. `extract-internal-link-paths.ts` and `target-page-resolution.ts` are
 > pure/stateless and unit-testable in isolation; `page-link-service.ts` is the only framework
 > adapter (event wiring) and receives the page/body as input rather than owning lifecycle logic.
 
@@ -246,8 +263,8 @@ sequenceDiagram
     participant PS as PageService
     participant Bus as events.page
     participant Svc as PageLinkService
-    participant Ext as extractInternalLinks
-    participant Res as resolveToPages
+    participant Ext as extractInternalLinkPaths
+    participant Res as resolveToPageIds
     participant DB as PageLink
 
     PS->>Bus: emit create/update (page, user)
@@ -296,16 +313,16 @@ needs no write — derived state reads the restored page's status.
 | Requirement | Summary | Components | Interfaces / Flows |
 |-------------|---------|------------|--------------------|
 | 1.1 | Show list of linking pages | BacklinksPanel, route, PageLinkService.findBacklinks | Read flow |
-| 1.2 | Recognize MD / wiki / raw-HTML anchors | extractInternalLinks (+ render plugins) | — |
-| 1.3 | Exclude external (diff-host) URLs / in-page fragments | extractInternalLinks classifier | — |
-| 1.4 | Ignore links inside code | extractInternalLinks (HAST has no `<a>` in code) | — |
+| 1.2 | Recognize MD / wiki / raw-HTML anchors | extractInternalLinkPaths (+ render plugins) | — |
+| 1.3 | Exclude external (diff-host) URLs / in-page fragments | extractInternalLinkPaths classifier | — |
+| 1.4 | Ignore links inside code | extractInternalLinkPaths (HAST has no `<a>` in code) | — |
 | 1.5 | One source listed once | unique `{fromPage,toPath}` + dedupe in extraction | Save flow |
-| 1.6 | Exclude self-link (path or own permalink) | extractInternalLinks (drop `toPath == page.path`) + sync (drop `toPage == fromPage`) | Save flow |
+| 1.6 | Exclude self-link (path or own permalink) | extractInternalLinkPaths (drop `toPath == page.path`) + sync (drop `toPage == fromPage`) | Save flow |
 | 1.7 | Empty state | BacklinksPanel | Read flow |
 | 1.8 | Show title + path | IBacklink DTO, BacklinkListItem | Read flow |
-| 1.9 | Permalink (`/{id}`) link targets page by id | extractInternalLinks (verbatim) + resolveToPages permalink branch | Save flow |
-| 1.10 | Same-host absolute URL → internal | extractInternalLinks classifier (`app:siteUrl` host match) | — |
-| 1.11 | Unset `app:siteUrl` → absolute URLs not internal | extractInternalLinks classifier (no base origin) | — |
+| 1.9 | Permalink (`/{id}`) link targets page by id | extractInternalLinkPaths (verbatim) + resolveToPageIds permalink branch | Save flow |
+| 1.10 | Same-host absolute URL → internal | extractInternalLinkPaths classifier (`app:siteUrl` host match) | — |
+| 1.11 | Unset `app:siteUrl` → absolute URLs not internal | extractInternalLinkPaths classifier (no base origin) | — |
 | 2.1 | Only readable linking pages | findBacklinks → addViewerCondition (shared grant filter) | Read flow |
 | 2.2 | Unreadable omitted from list and count | addViewerCondition + addConditionToExcludeTrashed (filter ids in-query) | Read flow |
 | 2.3 | No leak of title/path/existence | DTO built only from filtered pages | Read flow |
@@ -313,15 +330,15 @@ needs no write — derived state reads the restored page's status.
 | 3.1 | Create → backlinks appear | PageLinkService create handler | Save flow |
 | 3.2 | Update add/remove → reflected | create/update replace outbound rows | Save flow |
 | 3.3 | Deleted page not an active source | reconcile (permanent: remove rows; trashed: filtered at read) | Delete flow |
-| 3.4 | <~1s at ≥100k pages | indexes `{toPage}`,`{fromPage}`,`{toPath}` | — |
+| 3.4 | <~1s at ≥100k pages | indexes `{toPage}`, unique `{fromPage, toPath}` | — |
 | 3.5 | Bound extraction impact under save bursts | PageLinkService coalescing queue (`Set<pageId>` + paced drain) | Save flow |
 | 4.1 | One-time backfill | PageLinkBackfillCron (indexes via `autoIndex` at model registration) | Backfill flow |
-| 4.2 | Backfilled == post-enablement | backfill reuses `extractInternalLinks`; emits same rows as the live path | Backfill flow |
+| 4.2 | Backfilled == post-enablement | backfill reuses `extractInternalLinkPaths`; emits same rows as the live path | Backfill flow |
 | 4.3 | Re-run / restart produces no duplicates | unique `{fromPage,toPath}` + upsert; resumable progress marker | Backfill flow |
-| 5.1 | Links survive rename/move | resolveToPages redirect-following + `_id`-stable cache | Reconcile notes |
+| 5.1 | Links survive rename/move | resolveToPageIds redirect-following + `_id`-stable cache | Reconcile notes |
 | 5.2 | Descendants re-associated | same (each descendant keeps `_id`) | Reconcile notes |
-| 5.3 | Unresolvable move → broken | resolveToPages → absent from map → `toPage` null → broken state | Read flow |
-| 5.4 | Permalink links rename-immune (no re-association) | resolveToPages permalink branch + `_id`-stable `toPath`/`toPage` | Reconcile notes |
+| 5.3 | Unresolvable move → broken | absent from the resolveToPageIds map → `toPage: null` → broken state | Read flow |
+| 5.4 | Permalink links rename-immune (no re-association) | resolveToPageIds permalink branch + `_id`-stable `toPath`/`toPage` | Reconcile notes |
 | 6.1 | Soft-delete target → trashed | derived state from target status | Delete flow |
 | 6.2 | Permanent-delete target → broken | reconcile nulls inbound `toPage` | Delete flow |
 | 6.3 | Restore → normal | derived state (no write) | Delete flow |
@@ -332,13 +349,13 @@ needs no write — derived state reads the restored page's status.
 | Component | Layer | Intent | Req | Key Dependencies (P0/P1) | Contracts |
 |-----------|-------|--------|-----|--------------------------|-----------|
 | PageLink model | Data | Persist directed link edges | 1.5,3.x,4.3 | Mongoose, getOrCreateModel (P0) | State |
-| extractInternalLinks | Server logic | Body+path+siteUrl → resolved internal paths | 1.2–1.6, 1.10, 1.11 | render plugins, isCreatablePage, normalizePath, isPermalink, app:siteUrl (P0) | Service |
-| resolveToPages | Server logic | paths → toPage ids, batched (incl. permalink by id) | 1.9, 5.x | Page.find by _id/path, PageRedirect.retrievePageRedirectEndpointsBatch, isPermalink (P0) | Service |
+| extractInternalLinkPaths | Server logic | Body+path+siteUrl → resolved internal paths | 1.2–1.6, 1.10, 1.11 | render plugins, isCreatablePage, normalizePath, isPermalink, app:siteUrl (P0) | Service |
+| resolveToPageIds | Server logic | paths → toPage ids, batched (incl. permalink by id) | 1.9, 5.x | Page.find by _id/path, PageRedirect.retrievePageRedirectEndpointsBatch, isPermalink (P0) | Service |
 | PageLinkService | Server service | Subscribe to events, sync index, query backlinks | 1.1,2.x,3.x,5,6 | events.page (P0), PageQueryBuilder.addViewerCondition (P0) | Service, Event |
-| get-page-backlinks route | API | Read endpoint | 1.1,1.7,2.x,6.4 | apiv3 middleware (P0), PageLinkService (P0) | API |
+| getBacklinksHandlerFactory (routes/backlinks.ts) | API | Read endpoint | 1.1,1.7,2.x,6.4 | apiv3 middleware (P0), PageLinkService (P0) | API |
 | useSWRxBacklinks | Client store | Fetch backlinks | 1.1 | apiv3Get (P0) | Service |
 | BacklinksPanel / BacklinkListItem | UI | Render list, empty state, target-state badge | 1.1,1.7,1.8,6.4 | useSWRxBacklinks, PageListItemS (P1) | — |
-| PageLinkBackfillCron | Batch | Populate pre-existing pages (chunked, resumable, throttled, online) | 4.1,4.2,4.3 | CronService (P0), extractInternalLinks (P0), Revision, in-memory path→id map (P0) | Batch, State |
+| PageLinkBackfillCron | Batch | Populate pre-existing pages (chunked, resumable, throttled, online) | 4.1,4.2,4.3 | CronService (P0), extractInternalLinkPaths (P0), Revision, in-memory path→id map (P0) | Batch, State |
 
 ### Data / Server logic
 
@@ -391,19 +408,24 @@ interface IPageLink {
   - The two writes are one pipeline update, so a row is never momentarily its own backlink and a
     failure cannot leave it that way.
 
-#### extractInternalLinks
+#### extractInternalLinkPaths
 
 | Field | Detail |
 |-------|--------|
-| Intent | Pure function: `(markdown, pagePath, siteUrl?) => string[]` of deduped, resolved, internal page paths |
+| Intent | Pure function: `(markdown, pagePath, siteUrl?) => Promise<string[]>` of deduped, resolved, internal page paths |
 | Requirements | 1.2, 1.3, 1.4, 1.5, 1.6, 1.10, 1.11 |
 
 **Contracts**: Service [x]
 
 ##### Service Interface
 ```typescript
-function extractInternalLinks(markdown: string, pagePath: string, siteUrl?: string): string[];
+function extractInternalLinkPaths(markdown: string, pagePath: string, siteUrl?: string): Promise<string[]>;
 ```
+- **Async because the markdown stack is lazy-loaded**: this module sits in the server boot graph
+  (crowi → PageLinkService → handlers), so the unified / remark / rehype plugins are pulled in with
+  dynamic `import()` inside the function instead of at top level (~16 MiB RSS otherwise paid by every
+  deployment). Extraction runs off the request path on the drain timer, so the first-load cost is not
+  user-visible. Guarded by `no-eager-markdown-imports.spec.ts`; see `.claude/rules/server-boot-imports.md`.
 - **Mechanism**: run a trimmed unified processor reusing `pukiwikiLikeLinker` (remark),
   `remark-rehype` (`allowDangerousHtml`), `rehype-raw`, `relativeLinksByPukiwikiLikeLinker({ pagePath })`,
   `relativeLinks({ pagePath })`, then a terminal collector over `selectAll('a[href]')`.
@@ -431,26 +453,29 @@ function extractInternalLinks(markdown: string, pagePath: string, siteUrl?: stri
 - **Purity**: `siteUrl` is an injected parameter; the function does not read `configManager` itself.
 - Skip `sanitize`/`katex`/`math` plugins — only link resolution is needed.
 
-#### resolveToPages
+#### resolveToPageIds
 
 | Field | Detail |
 |-------|--------|
-| Intent | Resolve a batch of stored `toPath`s to target page `_id`s — by id for permalinks, else by path/redirect | 
+| Intent | Resolve a page's extracted `toPath`s to target page `_id`s in one batch — by id for permalinks, else by path/redirect |
 | Requirements | 1.9, 5.1, 5.2, 5.3, 5.4 |
 
 **Contracts**: Service [x]
 
 ##### Service Interface
 ```typescript
-function resolveToPages(paths: string[]): Promise<Map<string, ObjectId>>;
+function resolveToPageIds(paths: string[]): Promise<Map<string, ObjectId>>;
 ```
 - **Batched.** A page carries many links and every save re-resolves all of them, so the resolver
   takes the whole set and answers with one `$in` query per stage. Keys are always the **input**
   string, never a redirect endpoint, so a caller's stored `toPath` stays faithful to the body.
   Inputs that resolve to no page are absent from the map (the `null` of the singular form).
+  Resolving per link would make the number of DB round-trips scale with a page's link
+  count, which the coalescing drain (3.5) exists to bound.
 - Order, applied to the batch: **(0)** inputs where `isPermalink` → one `Page.find({_id: {$in}})`
   (the id *is* the target; no path lookup, no redirect-following). **(1)** the rest → one
-  `Page.find({path: {$in}})` **and**, concurrently,
+  `Page.find({path: {$in}, $or: [{isEmpty: false}, {isEmpty: null}]})` — the `isEmpty`
+  clause matches `findByPath`, including the v4-compat `null` — **and**, concurrently,
   `PageRedirect.retrievePageRedirectEndpointsBatch(allPaths, 50)` → **(2)** a path with a redirect
   resolves at `end.toPath`, a path without one resolves at its own live page → **(3)** else absent.
   Step (2) needs one more path query, but only for endpoints step (1) did not already answer.
@@ -486,18 +511,20 @@ function resolveToPages(paths: string[]): Promise<Map<string, ObjectId>>;
   with a not-found for a page that was renamed more times than the cap.
 - **Breadth is not bounded here (deferred to B4.5).** The cap limits how far one chain is walked, not
   how many chains one call walks: `fromPaths` is every link path on the page. The same memory bound
-  therefore stays reachable through width, and the failure is silent (`PageLinkService.onUpsert`
-  logs and drops it, so that page's rows stop being updated). Left as-is for B4.1 on purpose;
-  B4.5 owns chunking `fromPaths`.
+  therefore stays reachable through width, and the failure is silent: the upsert queue logs it and
+  retries the page up to `MAX_UPSERT_ATTEMPTS`, but a breadth blow-up is deterministic for that
+  page, so every attempt hits the same bound and the queue eventually gives up — that page's links
+  stay stale until its next save or the backfill. Left as-is for B4.1 on purpose; B4.5 owns
+  chunking `fromPaths`.
 - **Permalink targets are the strongest case (1.9, 5.4)**: `toPath` already encodes the immutable
   `_id`, so `toPage` is permanent and immune to rename/move/redirect — it never needs
-  redirect-following or re-resolution. (`isPermalink` has already validated a 24-hex ObjectId, so
-  `findById` is safe.)
-- **Live path only.** This per-call resolver runs on create/update and on the read path, where
-  the per-link cost is negligible. The **backfill must NOT call it per link** — at millions of
-  links that is millions of DB round-trips. Backfill resolves against an in-memory `{path → _id}`
-  map built once (see PageLinkBackfillCron) and skips redirect-following (stragglers self-heal on
-  the next edit/read).
+  redirect-following or re-resolution. (`isPermalink` has already validated a 24-hex ObjectId, so the
+  id lookup is safe.)
+- **Live path only.** This resolver runs on create/update and on the read path, where a per-page
+  batch is negligible. The **backfill must NOT call it per page either** — at millions of pages that
+  is millions of DB round-trips. Backfill resolves against an in-memory `{path → _id}` map built once
+  (see PageLinkBackfillCron) and skips redirect-following (stragglers self-heal on the next
+  edit/read).
 
 #### PageLinkService (event listener + read)
 
@@ -508,7 +535,7 @@ function resolveToPages(paths: string[]): Promise<Map<string, ObjectId>>;
 
 **Dependencies**
 - Inbound: `crowi.events.page` events (P0).
-- Outbound: `extractInternalLinks`, `resolveToPages`, `PageLink` model,
+- Outbound: `extractInternalLinkPaths`, `resolveToPageIds`, `PageLink` model,
   `PageQueryBuilder.addViewerCondition` + `addConditionToExcludeTrashed` (P0); `Revision` to read
   body when payload lacks it (P1).
 
@@ -529,18 +556,25 @@ function resolveToPages(paths: string[]): Promise<Map<string, ObjectId>>;
 - Ordering/delivery: listeners run asynchronously after the lifecycle op (fire-and-forget, like
   search indexing); the index trails the HTTP response by that window. No cross-event ordering
   assumptions; handlers are idempotent.
-- Write-side coalescing (requirement 3.5): _Implementation status — as of B1 the upsert runs inline in
-  the event callback; the coalescing queue described here is the B2.2 target and is not yet implemented._
-  `create`/`update` do **not** extract inline in the event
+- Write-side coalescing (requirement 3.5): `create`/`update` do **not** extract inline in the event
   callback. They mark the page dirty (`Set<pageId>`) and a paced tick drains it, running the upsert
   handler once per page with the **latest** body (re-read at drain time). This is safe because the
   upsert is idempotent last-writer-wins, so intermediate saves carry no information. Properties:
   - **Same page saved repeatedly** → the `Set` collapses it to one extraction run.
-  - **Many distinct pages saved at once** → the tick processes a bounded number per cycle, so a
-    burst of full-body parses is spread over time instead of blocking the single JS thread back-to-back.
+  - **Many distinct pages saved at once** → the drain rests after each page in proportion to the
+    extraction time it measured, so a burst of full-body parses is spread over time by cost instead
+    of blocking the single JS thread back-to-back. Cost, not page count, is the unit — see the
+    write-path pacing note under Performance.
   - **Delete supersedes a pending upsert**: a `delete`-family event for a page removes it from the
     dirty set and routes to `reconcileDeletedPages(ids)` instead, so a stale upsert never re-creates
-    rows for a gone page.
+    rows for a gone page — the upsert path uses `upsert: true`, so those would be orphan rows a
+    reader could surface as phantom backlinks.
+    _Implementation status — B2.2 ships the drain-time half only: the drain re-reads the page by id
+    and declines one that is now `STATUS_DELETED` (keyed on deleted rather than published because a
+    legacy page's `null` status means published), which closes the window coalescing opened. Clearing
+    the rows the page already owned when it was trashed is **B5.2** (`reconcileDeletedPages`); the
+    dirty-set removal — abandoning a pending upsert rather than merely declining it at drain time —
+    is **B5.3**._
   - **Best-effort, per-instance**: the set is in-memory. A restart drops pending work (that page
     self-heals on its next edit or via backfill); in multi-instance deployments the set is
     per-instance, which is safe (idempotent) but only coalesces per instance.
@@ -568,13 +602,13 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTa
     must go through the shared viewer/grant filter before the DTO is built, or this endpoint leaks
     private paths to anyone who can read the linking page. Resolution itself is grant-blind by
     design (it must match what a click does, and the live path lookup was always grant-blind), so
-    the filter belongs on this read path, not in `resolveToPages`.
+    the filter belongs on this read path, not in `resolveToPageIds`.
 
 **Implementation Notes**
 - Integration: register in `crowi` page-service setup; never edit `PageService`.
 - Validation: handlers tolerate missing/empty bodies and already-deleted pages (idempotent).
 - Extraction input: the service reads `configManager.getConfig('app:siteUrl')` and passes it into
-  `extractInternalLinks` (so absolute self-URLs resolve — 1.10/1.11); `extractInternalLinks` stays
+  `extractInternalLinkPaths` (so absolute self-URLs resolve — 1.10/1.11); `extractInternalLinkPaths` stays
   config-free/pure.
 - Self-link exclusion (1.6): extraction drops a **path** self-link (`toPath == normalizePath(page.path)`);
   a **permalink** self-link (`/{own _id}`) is dropped at sync by skipping any resolved row whose
@@ -585,7 +619,7 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTa
 
 ### API
 
-#### get-page-backlinks route
+#### getBacklinksHandlerFactory (routes/backlinks.ts)
 
 **Contracts**: API [x]
 
@@ -621,7 +655,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklink[]>;
 > full backfill duration** — minutes on small wikis, but tens of minutes to hours on large-plan
 > instances. So the heavy data part runs **online** as a throttled background job after boot.
 > Nothing schema-related blocks boot either: `PageLink` is a new collection, so its indexes
-> (`{fromPage}`, `{toPath}`, `{toPage}`, unique `{fromPage,toPath}`) are created by Mongoose
+> (`{toPage}`, unique `{fromPage,toPath}`) are created by Mongoose
 > `autoIndex` at model registration — no migration is involved. Backlinks are simply incomplete
 > for pre-existing pages until the job finishes (acceptable per 4.2, which only requires
 > completeness *after* the process completes); newly edited pages index immediately via the event
@@ -647,7 +681,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklink[]>;
   permanently once complete. (GROWI has no distributed lock; this Mongo claim is the minimal
   hardening over the bulk-export pattern, which has a known race window.)
 - **In-memory resolution**: loads `{path → _id}` for all pages once (one lightweight projection
-  query) and resolves extracted links by hash lookup — **never** per-link `resolveToPages`.
+  query) and resolves extracted links by hash lookup — **never** the live `resolveToPageIds` per page.
   Redirect-following is skipped during backfill. For a **permalink** `toPath` (`isPermalink`),
   resolution is an **existence check** against the set of known page ids (the map's values):
   present → that id; absent → `null` (broken). The id is the target, so the path map is not
@@ -660,7 +694,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklink[]>;
   document is marked complete. (Admin-triggered start deferred — see Delivery decision below.)
 - Input per chunk: a cursor page-batch (`Page.find(...).cursor({ batch_size })` +
   `createBatchStream`); body via `Revision.findById(page.revision).body`.
-- Per page: `extractInternalLinks(body, page.path, siteUrl)` → resolve each path via the in-memory
+- Per page: `extractInternalLinkPaths(body, page.path, siteUrl)` → resolve each path via the in-memory
   map (or, for a permalink path, via the id-existence set) → `bulkWrite` upserts (`ordered:false`).
 - Idempotency: unique `{fromPage,toPath}` + upsert; safe to re-run and to resume mid-chunk (4.3).
 - Progress/observability: emit count/total over the existing admin Socket.IO channel (as the
@@ -684,6 +718,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklink[]>;
   across rename/move/restore), so they satisfy 5.4 with no reconciliation.
 
 ### Derived target state (not stored)
+_Declared in B5.1, alongside the derivation helper (see § File Structure Plan)._
 ```typescript
 type LinkTargetState = 'normal' | 'trashed' | 'broken';
 // broken  := toPage == null
@@ -699,6 +734,7 @@ interface IBacklink {
   path: string;
 }
 // Outgoing link health (findForwardLinkHealth): a page the subject links out to, plus its state.
+// Declared in B5.4, alongside the read query that produces it.
 interface ILinkTarget {
   pageId: string;
   path: string;
@@ -726,21 +762,22 @@ interface ILinkTarget {
 ## Testing Strategy
 
 ### Unit Tests
-- `extractInternalLinks`: Markdown `[x](/a)`, wiki `[[l>/a]]` / `[[./child]]`, raw `<a href>`
+- `extractInternalLinkPaths`: Markdown `[x](/a)`, wiki `[[l>/a]]` / `[[./child]]`, raw `<a href>`
   all yield resolved internal paths (1.2); external/`#`-anchor/code-fence links excluded
   (1.3, 1.4); duplicates collapsed and the **path** self-link dropped (1.5, 1.6 — permalink
   self-links are dropped at sync, covered in integration); relative resolution uses the correct
   per-type base. A same-host absolute URL (`https://<siteUrl-host>/a/b`) yields
   `/a/b` while a different-host URL is excluded (1.10); with `siteUrl` undefined, absolute URLs are
   excluded (1.11); a permalink `/{id}` is returned verbatim (1.9).
-- `resolveToPages`: single and double redirect chains resolve to `.end.toPath`; a redirect wins over
+- `resolveToPageIds`: single and double redirect chains resolve to `.end.toPath`; a redirect wins over
   a live page at the same path (matching page view), and a path with no redirect resolves to its own
   live page; no page + no redirect → absent from the map (5.1–5.3). Redirects are consulted for
   every path, not only for the ones that missed. Two paths whose chains converge on one endpoint
   both land in the result (the map is keyed by input). A permalink `toPath` resolves directly by id
   (no path/redirect lookup) and is absent when no page has that id (1.9, 5.4). Several paths resolve
   in one redirect lookup, a cycle advances exactly one hop rather than hanging or falling out, and a
-  target in the trash resolves rather than reading as broken (6.1).
+  target in the trash resolves rather than reading as broken (6.1). A mixed batch of permalinks
+  and paths resolves both in one call.
 - `PageRedirect.retrievePageRedirectEndpointsBatch`: one chain endpoint per requested `fromPath`;
   unrequested paths excluded; an empty input runs no aggregation; a given `maxDepth` stops the walk
   while the default walks the chain to its real end; two documents sharing a `fromPath` resolve to
@@ -810,9 +847,30 @@ interface ILinkTarget {
     `Set<pageId>` coalesces them to one run. Naturally low-pressure: a Yjs document is shared, so
     N co-editors produce **one** `update` event per explicit save, not N, and there is no autosave —
     the event fires only on an explicit save (`updatePage`).
-  - *Many distinct pages saved at once* — the coalescing queue is drained a **bounded number per
-    tick**, so parses are paced (with the event loop yielding between them) rather than run in one
-    blocking spree. The tick cadence / batch size is the duty-cycle lever, mirroring the backfill job.
+  - *Many distinct pages saved at once* — the coalescing queue paces itself by **duty cycle over
+    measured extraction time**: after each page it rests `elapsed x (100 - duty) / duty`, so its
+    share of the event loop holds at `backlinks:dutyCyclePercent`
+    (`BACKLINKS_DUTY_CYCLE_PERCENT`, default 20) whatever a page costs. The drain then runs until
+    the queue is empty; there is no per-tick page budget.
+    - **Why not a pages-per-tick budget** (the original design, replaced after review of B2.2): a
+      page is the wrong unit, because extraction cost spans ~700x across real bodies — measured
+      1.6 ms at 0.2 KiB, 8.4 ms at 3.2 KiB, 88 ms at 32.6 KiB, 1116 ms at 333 KiB. The shipped
+      3 pages/tick was therefore a ~2.5% duty cycle for typical pages (a 10k-page import trailed
+      by ~55 min) while still admitting ~3.3 s of blocking for three large ones. Resting in
+      proportion to measured cost makes small pages effectively burst and large pages throttle
+      themselves, off one operator knob.
+    - **Why the measurement is narrow**: only `extractInternalLinkPaths` is timed, not the whole
+      upsert. The surrounding DB round-trips yield the loop, so charging them would rest the queue
+      for time it never occupied. A failure is charged its elapsed time instead, since a throw
+      after a completed extraction never reports the cost.
+    - **Why no page cap remains**: every page that extracts incurs a proportional rest and awaits
+      its own DB reads, so a cap guards nothing and only inserts dead time between chunks
+      (measured ~56% of the throughput for small pages, the bulk-import case this exists to speed
+      up).
+    - **Accepted limitation (review of B2.2)**: a page whose upsert fails is retried on a later
+      drain after `RETRY_BACKOFF_MS`, up to `MAX_UPSERT_ATTEMPTS`; past that the queue gives up and
+      logs it, and the page's links stay stale until its next save or the backfill (B3). The drain
+      timer is shared, so a save arriving during a retry backoff waits for it too.
   - The pacing is about spreading work over time (yielding between parses), not parallelism —
     concurrency buys nothing for CPU-bound work on one thread.
   - Trade-off: the index trails the save by up to (tick interval × queue depth) — acceptable, since
@@ -826,6 +884,13 @@ interface ILinkTarget {
 
 No migration: `PageLink` indexes are created by Mongoose `autoIndex` at model registration (new,
 empty collection). The only bulk step is the online throttled backfill job after boot.
+
+> **`autoIndex` creates, it never drops.** Removing an index from the schema (as B2.2 did for the
+> redundant `{fromPage}` and `{toPath}`) leaves `fromPage_1` / `toPath_1` in place on any collection
+> that was already created with them — so a dev or staging instance that ran an earlier build keeps
+> paying their write cost until the collection is dropped. Harmless while the feature is unreleased,
+> which is why no migration ships here; **once `PageLink` has shipped, an index removal needs a
+> migrate-mongo migration with an explicit `dropIndex`**, not just a schema edit.
 
 ```mermaid
 graph TB

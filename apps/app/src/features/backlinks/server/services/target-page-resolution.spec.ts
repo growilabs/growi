@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 
-import { resolveToPages } from './target-page-resolution';
+import { resolveToPageIds } from './target-page-resolution';
 
 const mocks = vi.hoisted(() => ({
   find: vi.fn(),
@@ -56,7 +56,7 @@ const mockFind = (
   });
 };
 
-describe('resolveToPages()', () => {
+describe('resolveToPageIds()', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.retrieveEndpoints.mockResolvedValue(new Map());
@@ -66,7 +66,7 @@ describe('resolveToPages()', () => {
     const id = new Types.ObjectId();
     mockFind({ byPath: [{ _id: id, path: '/docs/v2' }] });
 
-    const result = await resolveToPages(['/docs/v2']);
+    const result = await resolveToPageIds(['/docs/v2']);
 
     expect(result.get('/docs/v2')).toBe(id);
     expect(result.size).toBe(1);
@@ -76,7 +76,7 @@ describe('resolveToPages()', () => {
     const id = new Types.ObjectId();
     mockFind({ byId: [{ _id: id }] });
 
-    const result = await resolveToPages([`/${id.toString()}`]);
+    const result = await resolveToPageIds([`/${id.toString()}`]);
 
     expect(result.get(`/${id.toString()}`)).toBe(id);
     expect(result.size).toBe(1);
@@ -90,7 +90,7 @@ describe('resolveToPages()', () => {
       byPath: [{ _id: pathId, path: '/docs/v2' }],
     });
 
-    const result = await resolveToPages([
+    const result = await resolveToPageIds([
       `/${permalinkId.toString()}`,
       '/docs/v2',
     ]);
@@ -103,7 +103,7 @@ describe('resolveToPages()', () => {
   it('omits inputs with no matching page', async () => {
     mockFind();
 
-    const result = await resolveToPages(['/docs/v2']);
+    const result = await resolveToPageIds(['/docs/v2']);
 
     expect(result.size).toBe(0);
   });
@@ -111,7 +111,7 @@ describe('resolveToPages()', () => {
   it('runs no query for an empty input', async () => {
     mockFind();
 
-    const result = await resolveToPages([]);
+    const result = await resolveToPageIds([]);
 
     expect(result.size).toBe(0);
     expect(mocks.find).not.toHaveBeenCalled();
@@ -127,7 +127,7 @@ describe('resolveToPages()', () => {
         endpointsTo([['/test', '/test2']]),
       );
 
-      const result = await resolveToPages(['/test']);
+      const result = await resolveToPageIds(['/test']);
 
       expect(result.get('/test')).toBe(id);
       expect(result.has('/test2')).toBe(false);
@@ -141,7 +141,7 @@ describe('resolveToPages()', () => {
         endpointsTo([['/test', '/test2']]),
       );
 
-      const result = await resolveToPages(['/test']);
+      const result = await resolveToPageIds(['/test']);
 
       expect(result.size).toBe(0);
     });
@@ -149,7 +149,7 @@ describe('resolveToPages()', () => {
     it('leaves it unresolved when there is no redirect at all', async () => {
       mockFind();
 
-      const result = await resolveToPages(['/never-existed']);
+      const result = await resolveToPageIds(['/never-existed']);
 
       expect(result.size).toBe(0);
     });
@@ -170,7 +170,7 @@ describe('resolveToPages()', () => {
         ]),
       );
 
-      const result = await resolveToPages(['/a', '/b']);
+      const result = await resolveToPageIds(['/a', '/b']);
 
       expect(result.get('/a')).toBe(idA);
       expect(result.get('/b')).toBe(idB);
@@ -191,7 +191,7 @@ describe('resolveToPages()', () => {
     const id = new Types.ObjectId();
     mockFind({ byPath: [{ _id: id, path: '/docs/v2' }] });
 
-    const result = await resolveToPages(['/docs/v2']);
+    const result = await resolveToPageIds(['/docs/v2']);
 
     expect(mocks.retrieveEndpoints).toHaveBeenCalledWith(
       ['/docs/v2'],
@@ -218,7 +218,7 @@ describe('resolveToPages()', () => {
       endpointsTo([['/reused', '/moved-to']]),
     );
 
-    const result = await resolveToPages(['/reused']);
+    const result = await resolveToPageIds(['/reused']);
 
     expect(result.get('/reused')).toBe(renamedId);
   });
@@ -235,7 +235,7 @@ describe('resolveToPages()', () => {
       ]),
     );
 
-    const result = await resolveToPages(['/a', '/b']);
+    const result = await resolveToPageIds(['/a', '/b']);
 
     expect(result.get('/a')).toBe(id);
     expect(result.get('/b')).toBe(id);
@@ -246,7 +246,7 @@ describe('resolveToPages()', () => {
     // it and there is nothing to follow.
     mockFind();
 
-    const result = await resolveToPages([
+    const result = await resolveToPageIds([
       `/${new Types.ObjectId().toString()}`,
     ]);
 

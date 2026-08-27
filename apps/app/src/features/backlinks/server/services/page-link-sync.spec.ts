@@ -10,7 +10,7 @@ import {
   reResolveByToPath,
   syncOutboundLinks,
 } from './page-link-sync';
-import { resolveToPages } from './target-page-resolution';
+import { resolveToPageIds } from './target-page-resolution';
 
 vi.mock('../models/page-link', () => ({
   default: {
@@ -20,7 +20,7 @@ vi.mock('../models/page-link', () => ({
 }));
 
 vi.mock('./target-page-resolution', () => ({
-  resolveToPages: vi.fn(),
+  resolveToPageIds: vi.fn(),
   REDIRECT_CHAIN_MAX_DEPTH: 50,
 }));
 
@@ -141,7 +141,7 @@ describe('reResolveByToPath', () => {
   it('repoints the path at the page the resolver reports for it', async () => {
     const occupant = new Types.ObjectId();
     // Two entries, so reading the wrong key fails instead of passing by luck.
-    vi.mocked(resolveToPages).mockResolvedValue(
+    vi.mocked(resolveToPageIds).mockResolvedValue(
       new Map([
         ['/other', new Types.ObjectId()],
         ['/target', occupant],
@@ -152,7 +152,7 @@ describe('reResolveByToPath', () => {
 
     // Pin the path handed to the resolver: without this, resolving the wrong
     // path still reads '/target' out of the stubbed map and passes.
-    expect(resolveToPages).toHaveBeenCalledWith(['/target']);
+    expect(resolveToPageIds).toHaveBeenCalledWith(['/target']);
     expect(PageLink.repointInboundLinks).toHaveBeenCalledTimes(1);
     expect(PageLink.repointInboundLinks).toHaveBeenCalledWith(
       '/target',
@@ -163,11 +163,11 @@ describe('reResolveByToPath', () => {
   it('repoints to null when nothing resolves at the path (rows become broken)', async () => {
     // The resolver omits unresolvable inputs; an absent key must become a null
     // write, not a skipped one.
-    vi.mocked(resolveToPages).mockResolvedValue(new Map());
+    vi.mocked(resolveToPageIds).mockResolvedValue(new Map());
 
     await reResolveByToPath('/target');
 
-    expect(resolveToPages).toHaveBeenCalledWith(['/target']);
+    expect(resolveToPageIds).toHaveBeenCalledWith(['/target']);
     expect(PageLink.repointInboundLinks).toHaveBeenCalledWith('/target', null);
   });
 
@@ -180,7 +180,7 @@ describe('reResolveByToPath', () => {
     ]);
     // '/older' resolves elsewhere: a redirect reaching '/target' does not make the
     // target the answer, so each candidate carries the resolver's own verdict.
-    vi.mocked(resolveToPages).mockResolvedValue(
+    vi.mocked(resolveToPageIds).mockResolvedValue(
       new Map([
         ['/target', occupant],
         ['/old', occupant],
@@ -190,7 +190,11 @@ describe('reResolveByToPath', () => {
 
     await reResolveByToPath('/target');
 
-    expect(resolveToPages).toHaveBeenCalledWith(['/target', '/old', '/older']);
+    expect(resolveToPageIds).toHaveBeenCalledWith([
+      '/target',
+      '/old',
+      '/older',
+    ]);
     expect(PageLink.repointInboundLinks).toHaveBeenCalledTimes(3);
     expect(PageLink.repointInboundLinks).toHaveBeenCalledWith(
       '/target',
