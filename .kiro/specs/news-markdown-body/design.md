@@ -108,8 +108,7 @@ apps/app/src/features/news/client/components/
 ├── NewsMarkdownBody.module.scss    # ニュース本文の最小スコープスタイル(下記「スタイリング」参照)
 └── NewsMarkdownBody.spec.tsx
 apps/app/src/features/news/client/services/
-├── news-markdown-options.ts        # react-markdown option generator(remark/rehype 構成 + sanitize schema 適用)
-├── news-markdown-options.spec.ts
+├── news-markdown-options.tsx       # react-markdown option generator(remark/rehype 構成 + sanitize schema 適用 + img/a コンポーネント)
 ├── news-sanitize-schema.ts         # ニュース専用の hast-util-sanitize スキーマ(許可タグ/属性)
 ├── news-sanitize-schema.spec.ts
 ├── rehype-resolve-news-media.ts    # rehype プラグイン: img src を解決+封じ込め検証、不適合はノード除去
@@ -121,6 +120,7 @@ apps/app/src/features/news/
 ```
 
 > `resolve-news-media-url` はクライアント(rehype プラグイン)から import するため、サーバ専用ディレクトリ(`server/services/`)ではなく feature 直下の共有 `utils/` に置く。`FEED_URL` も同様に feature 直下 `consts.ts` に共有定数として置く。
+> `news-markdown-options` は JSX(`img`/`a` コンポーネント)を含むため `.tsx`。この options 単体の spec は作らず、観測境界である `NewsMarkdownBody.spec.tsx` の描画テスト+「sanitize がパイプラインに結線されている」ことを固定する mutation ガード(GFM の `input`/脚注が sanitize でのみ除去される)でカバーする。`rehypeShiftNewsHeadings` の見出しシフトも同 spec で観測する。
 
 ### Modified Files
 
@@ -159,16 +159,17 @@ apps/app/src/features/news/
 
 #### newsSanitizeSchema(セキュリティの中核・確定スキーマ)
 
-hast-util-sanitize 用スキーマ。**Wiki の `recommended-whitelist` を継承せず、明示ゼロベースで最小許可**する。hast-util-sanitize は許可外要素を**子要素ごと丸ごと除去**する(`strip` 未指定時)ため、remark-gfm が出力しうるタグ(表など)を許可リストに漏らすと**その要素が警告なく消える**。これを踏まえ、スキーマの4構成要素を以下に確定する:
+hast-util-sanitize 用スキーマ。hast-util-sanitize は与えたスキーマを **`defaultSchema` に浅くマージ**(`{...defaultSchema, ...schema}`)するため、`tagNames`/`attributes`/`protocols` を明示すると既定を**完全に置き換え**、Wiki の `recommended-whitelist` とは無関係の最小許可になる(このため「ゼロベース相当」の最小面になる)。許可外要素の扱いは `strip` に依存し、**`strip` が falsy(null)なら子要素ごと丸ごと除去、配列なら列挙外の要素をアンラップ(子を残す)**する。したがって remark-gfm が出力しうるタグ(表など)を許可リストに漏らすと**その要素が警告なく消える**。これを踏まえ、スキーマの構成要素を以下に確定する:
 
 - **`tagNames`**: `p, br, strong, em, del, a, code, pre, blockquote, ul, ol, li, h1, h2, h3, h4, h5, h6, hr, img, table, thead, tbody, tr, th, td`
   - **見出しは h1–h6 を許可**し、remark/rehype で**2段シフト**する(body の `#` → DOM 上 `h3` 以降。h5/h6 は h6 で頭打ち)。理由: `NewsFeed.tsx` のニュースタイトルが `<h2>` なので、本文見出しをその配下の階層に落として a11y と視覚階層を保つ。サイズは CSS で調整
   - **GFM の表は許可**する(`table/thead/tbody/tr/th/td`)。remark-gfm を入れる以上、非許可だと表が黙って消えるため。ただし列の text-align は `style` を許可しないため反映されない(既知の軽微な劣化)
-  - **タスクリスト/脚注は非対応**(`input`・脚注 `section`/`sup` を許可しない)。タスクリストのチェックボックスは除去され、テキストのみ残る(劣化として許容)
+  - **タスクリスト/脚注は非対応**(`input`・脚注 `section`/`sup` を許可しない)。タスクリストのチェックボックス(`input`)は除去され、`li` のテキストのみ残る。脚注 `section` は `strip: null` により**子(見出し・リスト)ごと丸ごと除去**され、本文に漏れない(劣化として許容)
   - 生 HTML・`iframe`/`video`/`script`/`style` は**非許可**
 - **`attributes`**: `a: [href, title]`、`img: [src, alt, title]`。`code` の `className` は**許可しない**(ニュースにハイライタを入れないため言語指定は効果がなく、最小権限の観点でも落とす)。`style` 属性・`on*` イベントハンドラ・任意 `class` は不許可
 - **`protocols`**(hast-util-sanitize は属性名キーのグローバル設定): `{ href: ['http', 'https', 'mailto'], src: ['https'] }`。許可タグのうち `href` を持つのは `a`、`src` を持つのは `img` だけなので、属性名キーでも「リンクは http/https/mailto、画像は https のみ」というタグ別の意図と同じ効果になる
-- **`strip`**: `['script', 'style']`(挙動を明示。許可外要素は既定でも子ごと除去されるが、意図を固定する)
+- **`strip`**: `null`(**明示必須**)。許可外要素を子ごと除去する挙動は `strip` が falsy のときのみ得られる。省略すると `defaultSchema.strip = ['script']` を継承してしまい、`script` 以外の許可外要素(脚注 `section` 等)がアンラップされて子が漏れる。`[]` も truthy なのでアンラップになるため不可。よって `null` を明示する
+- **`a` コンポーネント(リンクの新規タブ化)**: 解決後の `href` が `http(s)://` の**外部リンクのときだけ** `target="_blank" rel="noopener noreferrer"` を付ける。fragment(`#...`)・`mailto:`・sanitize で `href` が剥がれたリンクは同タブ(`target` 無し)。理由: `id` 属性は許可外で存在しないため、fragment を新規タブで開いても飛び先が無い
 - rehype-raw を**パイプラインに含めない**ため、body 中の生 HTML(`<video>` 等)はそもそも parse されない(Req 2.2 を構造的に担保)
 
 #### resolveNewsMediaUrl(純関数、新規実装)
@@ -208,22 +209,23 @@ gap で挙げた案I(取込時)/案II(描画時)のうち **案II(rehype プラ�
 | 描画(解決) | img src が非 https/オリジン外/封じ込め外 | `rehypeResolveNewsMedia` が当該ノードを除去、本文の残りは描画(Req 4.1) |
 | 描画(sanitize) | 許可外タグ/属性/プロトコル | rehype-sanitize が除去(Req 2.1–2.4, 4.3) |
 | 描画(取得) | 画像 URL は妥当だが取得失敗 | img `onError` で当該画像のみ非表示(Req 4.2) |
-| parse | 不正な Markdown | react-markdown は寛容 parse(壊れない)。ErrorBoundary で最悪時もページ全体は保つ |
+| parse | 不正な Markdown | react-markdown は寛容 parse(壊れない)。ErrorBoundary で最悪時もページ全体は保つ。フォールバックは **`fallbackRender={() => null}`**(`fallback={null}` は不可: react-error-boundary@3 は `fallback` を `isValidElement()` 検査し、`null` は無効値なので描画エラー時に境界自身が throw してフィードを白画面にする) |
 
 ## Testing Strategy
 
 ### Unit(純関数・スキーマ)
 
 - `resolve-news-media-url.spec`: 境界マトリクス(ディレクトリ脱出・他リポジトリ配下・偽ディレクトリ・http ダウングレード・credentials/query/hash・`%` 含みパス)+ gif 受理・mp4 拒否・非同一オリジン拒否
-- `news-sanitize-schema.spec`: 許可タグが残る / `iframe`・`video`・`script`・`style`・`on*` が除去される / `javascript:` リンク無効化 / img src の https 強制
+- `news-sanitize-schema.spec`: `sanitize(tree, newsSanitizeSchema)` に対する契約テスト。許可タグ(表・見出し・リンク・https 画像)が残る / `iframe`・`video`・`script`・`style`・`input` が除去される / **許可外要素は子ごと除去され、アンラップで漏れない**(脚注 `section` の `h2`/`ol` が残らない = `strip: null` の固定)/ `on*`・`style`・`class`・`id` が剥がれる / `javascript:` リンク無効化 / img src の http(非 https)除去。スキーマ単体を直接検証するのは、パイプライン経由のテストだけでは sanitize を外しても緑になり、防御の主体が固定されないため
 
 ### Component(NewsMarkdownBody / NewsFeed)
 
 - Markdown(見出し・リスト・強調・リンク・複数画像)が要素として描画される
-- `bodyFormat` 未指定で従来のプレーンテキスト描画になる(Req 1.2 / 5.1)
+- `bodyFormat` 未指定で従来のプレーンテキスト描画になる(Req 1.2 / 5.1)、`bodyFormat=markdown` かつ**画像なし本文でも描画され壊れない**(Req 1.1)、本文欠如でも item は描画される
 - 生 HTML(`<video>`, `<script>`)が本文にあっても実行・描画されない(Req 2.2)
+- **sanitize がパイプラインに結線されている**ことの mutation ガード: GFM の `input`(タスクリスト)・脚注 `section` は sanitize でのみ除去されるため、これらが漏れないことで sanitize 除去を検知する
 - 同一オリジン外/非 https の img が描画されない(Req 3.2 / 4.3)、取得失敗で当該 img のみ消える(Req 4.2)
-- 外部リンクが `target=_blank rel=noopener noreferrer`(Req 2.4)
+- 外部 http(s) リンクが `target=_blank rel=noopener noreferrer`、fragment/`mailto:` は同タブ(Req 2.4)
 
 ### 敵対的テスト(セキュリティ)
 
@@ -254,3 +256,13 @@ Wiki の `.wiki` スタイル面を意図的に流用しないため(上記)、`
 ## SSR について(確定)
 
 `/_news` の NewsFeed は `apps/app/src/pages/_news/index.page.tsx` で `dynamic(..., { ssr: false })` として読み込まれる。したがって**本文描画に SSR 経路は無く、NewsMarkdownBody は client 限定で描画される**(ページ自体は `getServerSideProps` を持つが、body 描画はクライアントに閉じる)。メディア解決も client-only で完結する。
+
+## 実装後の改訂(1回目レビュー対応)
+
+実装後の1回目コードレビューで判明した「守っているつもりで守れていない」点を修正し、design を実態に合わせて改訂した(いずれも設計方針の変更ではなく、正しく方針を満たすための訂正):
+
+- **sanitize `strip`**: `['script', 'style']` → **`null`**。hast-util-sanitize は与えたスキーマを `defaultSchema` に浅くマージするため、配列を指定すると列挙外の許可外要素(脚注 `section` 等)が**アンラップ**され子が漏れていた。`null`(falsy)で「許可外は子ごと除去」= design 意図(脚注非対応=除去)を満たす。この防御を `news-sanitize-schema.spec` で直接固定し、パイプライン結線を component の mutation ガードで固定した
+- **`a` の新規タブ化**: 全リンク一律 `target=_blank` → **外部 http(s) リンクのみ**。fragment/`mailto:`/href 剥離済みリンクは同タブ(`id` 許可外で fragment の飛び先が無いため)
+- **ErrorBoundary**: `fallback={null}` → **`fallbackRender={() => null}`**。react-error-boundary@3 は `fallback` を `isValidElement()` 検査し `null` は無効値で、描画エラー時に境界自身が throw してフィードを白画面にしていた
+- **`RAW_IMAGE_PATH_PATTERN`**: `images/` の直書き → **`NEWS_IMAGES_DIRNAME` 由来**に統一(定数の単一の出所を実装でも遵守。定数変更時に raw ゲートだけ取り残されて全画像が無言で消える事故を防ぐ)
+- **死に設定の除去**: `clobberPrefix`(id/name 属性を許可しないため発火しない)を削除

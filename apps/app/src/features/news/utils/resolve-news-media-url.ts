@@ -6,9 +6,15 @@ import { NEWS_IMAGES_DIRNAME } from '../consts';
  * before `new URL` so non-canonical forms that WHATWG would normalize into the
  * same URL (`//host/…`, `https:images/x`, `images\x.png`) are rejected up front
  * — they resolve to a safe URL but violate the stated relative-path contract.
+ *
+ * The directory segment is built from NEWS_IMAGES_DIRNAME (the single source of
+ * truth, shared with the resolved-path containment check below) so changing the
+ * constant moves both gates together — a hardcoded `images/` here would be left
+ * behind and silently drop every image. The constant is a plain path segment.
  */
-const RAW_IMAGE_PATH_PATTERN =
-  /^images\/[A-Za-z0-9][A-Za-z0-9._-]*\.(png|jpe?g|webp|gif)$/;
+const RAW_IMAGE_PATH_PATTERN = new RegExp(
+  `^${NEWS_IMAGES_DIRNAME}/[A-Za-z0-9][A-Za-z0-9._-]*\\.(png|jpe?g|webp|gif)$`,
+);
 
 /**
  * Filename grammar (single segment) re-checked on the RESOLVED pathname as a

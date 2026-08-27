@@ -63,15 +63,26 @@ const NewsMarkdownImage = ({
   );
 };
 
+const EXTERNAL_HREF_PATTERN = /^https?:\/\//;
+
 const NewsMarkdownAnchor = ({
   href,
   children,
 }: JSX.IntrinsicElements['a']): JSX.Element => {
-  return (
-    <a href={href} target="_blank" rel="noopener noreferrer">
-      {children}
-    </a>
-  );
+  // Only external http(s) links open in a new tab. Fragment / mailto links —
+  // and links whose href was stripped by sanitize (href undefined) — stay in
+  // the same tab; otherwise a blank-target fragment would open a new tab to a
+  // non-existent anchor (id attributes are not in the allow-list).
+  const isExternal =
+    typeof href === 'string' && EXTERNAL_HREF_PATTERN.test(href);
+  if (isExternal) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    );
+  }
+  return <a href={href}>{children}</a>;
 };
 
 const components: Components = {

@@ -153,11 +153,39 @@ describe('NewsFeed', () => {
       expect(screen.getByText('# NotHeading')).toBeTruthy();
     });
 
-    test('does not break on an item without a body', () => {
-      const items = [makeNewsItem({ body: undefined, bodyFormat: 'markdown' })];
+    test('renders a Markdown body that has no images', () => {
+      const items = [
+        makeNewsItem({
+          body: { en_US: '## Heading\n\n- one\n- two' },
+          bodyFormat: 'markdown',
+        }),
+      ];
       mocks.useSWRxNewsPage.mockReturnValue(swrResponse(makePage(items)));
 
-      expect(() => render(<NewsFeed />)).not.toThrow();
+      const { container } = render(<NewsFeed />);
+
+      // Markdown path is exercised (heading shifted h2 -> h4, list rendered)
+      // and an image-free body emits no <img>.
+      expect(container.querySelector('h4')?.textContent).toBe('Heading');
+      expect(container.querySelectorAll('li')).toHaveLength(2);
+      expect(container.querySelector('img')).toBeNull();
+    });
+
+    test('an item without a body renders the item but no body block', () => {
+      const items = [
+        makeNewsItem({
+          title: { en_US: 'Titled' },
+          body: undefined,
+          bodyFormat: 'markdown',
+        }),
+      ];
+      mocks.useSWRxNewsPage.mockReturnValue(swrResponse(makePage(items)));
+
+      const { container } = render(<NewsFeed />);
+
+      expect(screen.getByText('Titled')).toBeTruthy();
+      // No body → the Markdown block is not rendered at all.
+      expect(container.querySelector('h4')).toBeNull();
     });
   });
 

@@ -42,6 +42,46 @@ describe('NewsMarkdownBody', () => {
       expect(a?.getAttribute('target')).toBe('_blank');
       expect(a?.getAttribute('rel')).toBe('noopener noreferrer');
     });
+
+    // Only external http(s) links get target=_blank; a fragment/mailto link
+    // opened in a new tab would point at nothing (ids are not allow-listed).
+    test('a fragment link stays in the same tab', () => {
+      const { container } = render(<NewsMarkdownBody body={'[s](#section)'} />);
+      const a = container.querySelector('a');
+      expect(a?.getAttribute('href')).toBe('#section');
+      expect(a?.getAttribute('target')).toBeNull();
+    });
+
+    test('a mailto link stays in the same tab', () => {
+      const { container } = render(
+        <NewsMarkdownBody body={'[m](mailto:a@example.com)'} />,
+      );
+      const a = container.querySelector('a');
+      expect(a?.getAttribute('href')).toBe('mailto:a@example.com');
+      expect(a?.getAttribute('target')).toBeNull();
+    });
+  });
+
+  // These fail if `[rehypeSanitize, newsSanitizeSchema]` is removed from the
+  // pipeline: the elements below are produced by remark-gfm and are removed
+  // ONLY by sanitize (raw HTML is already unparsed, and the media plugin only
+  // touches <img>). They pin sanitize as the active defense, which the earlier
+  // tests did not.
+  describe('sanitize is wired into the pipeline', () => {
+    test('a GFM task-list <input> is removed', () => {
+      const { container } = render(
+        <NewsMarkdownBody body={'- [ ] todo\n- [x] done'} />,
+      );
+      expect(container.querySelector('input')).toBeNull();
+    });
+
+    test('a GFM footnote section does not leak', () => {
+      const { container } = render(
+        <NewsMarkdownBody body={'text[^1]\n\n[^1]: a footnote'} />,
+      );
+      expect(container.querySelector('.footnotes')).toBeNull();
+      expect(container.textContent).not.toContain('a footnote');
+    });
   });
 
   describe('blocks unsafe content', () => {

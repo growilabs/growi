@@ -20,10 +20,14 @@ type Props = {
  * style surface is intentionally not reused. Wrapped in an ErrorBoundary so a
  * rendering failure degrades to nothing instead of taking down the feed page.
  * Client-only (the /_news page loads NewsFeed with ssr:false).
+ *
+ * `fallbackRender={() => null}` (not `fallback={null}`): react-error-boundary@3
+ * validates `fallback` with `isValidElement()`, and `null` is not a valid
+ * element, so on a render error it would itself throw and blank the whole feed.
  */
 export const NewsMarkdownBody = ({ body }: Props): JSX.Element => {
   return (
-    <ErrorBoundary fallback={null}>
+    <ErrorBoundary fallbackRender={() => null}>
       <div className={styles['news-markdown-body']}>
         <ReactMarkdown {...newsMarkdownOptions}>{body}</ReactMarkdown>
       </div>
