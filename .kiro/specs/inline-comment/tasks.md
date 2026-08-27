@@ -67,7 +67,7 @@
   - _Boundary: quote-matcher_
 
 - [ ] 3. サーバー側：InlineCommentServiceとapiv3ルート
-- [ ] 3.1 起点インラインコメントの作成ロジックを実装する
+- [x] 3.1 起点インラインコメントの作成ロジックを実装する
   - `comments` テーブルに `isInline: true` の行を挿入する。クオートが空文字の場合はエラーとする。`anchorOriginRevisionId` を作成時にのみ設定する
   - `Activity` レコード（`ACTION_INLINE_COMMENT_CREATE`）を発行してから `crowi.commentService.prepareMentionNotifications` を呼び出す
   - 観測できる完了条件：作成後のレコードに保存したクオート・前後文脈が正規化されず原文のまま残っていることをユニットテストで確認できる
@@ -178,3 +178,4 @@
 
 - 2.4 (`normalized-offset-mapping.ts`): `NormalizedOffsetMapper` は `toOriginalOffset`/`toNormalizedOffset`/`normalizedText` のみを公開し、セグメントの `originalEnd` は非公開。あいまい一致の終了オフセットをそのまま逆変換すると、正規化で伸びた/書き換わったセグメント内部では境界が `originalStart` に丸まり、範囲が縮む可能性がある（2.5で終了オフセットを扱う際は、原文側で書記素境界にスナップして広げるなど別の対処が必要）。
 - 2.5 (`quote-matcher.ts`): 上記の終了オフセット縮み問題は、正規化テキスト側で変換前に書記素境界へスナップすることで対処済み（変換後の原文側スナップは `toOriginalOffset` が常にセグメント先頭＝原文の書記素境界を返すため no-op になる）。`matchQuote(text, anchor)` は呼び出しごとに `createNormalizedOffsetMapper(text)` を作り直す設計（signatureがdesignで固定されているため）。4.3 (AnchorResolver) で複数アンカーを同じ `text` に対して呼ぶ場合、静定1回あたり完全一致しないアンカーの数だけ書記素分割が再実行される点に注意（完全一致経路ではmapperを作らないため、そちらは軽い）。
+- 3.1 (`inline-comment-service.ts`): `create()` は `Activity` レコードを `prisma.activities.createByParameters()` で自前生成し、`addActivity` ミドルウェア（`res.locals.activity`／`activityEvent.emit`）には一切依存しない。**3.5でルートを配線する際、この4エンドポイントに `addActivity` ミドルウェアを適用してはいけない** — 適用すると、`activityEvent.emit` で決着されないまま応答が返り、failsafe finalizer が `ACTION_UNSETTLED` の余分な行を書いてしまう（サービスが書いた本来の `ACTION_INLINE_COMMENT_*` 行とは別に）。また `prisma.activities.createByParameters` の戻り値は実行時に `id` を持つが `IActivity` 型には無いため、3.5配線時に薄い型アダプタが必要。
