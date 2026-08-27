@@ -187,7 +187,7 @@ describe('paginateLogic — observable contract', () => {
       expect(result.totalPages).toBe(3);
     });
 
-    it('0 docs → totalPages=0', async () => {
+    it('0 docs → totalPages=1', async () => {
       delegate.findMany.mockResolvedValue([]);
       delegate.count.mockResolvedValue(0);
 
