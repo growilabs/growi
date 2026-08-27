@@ -77,3 +77,16 @@ export interface InlineCommentWithReplies extends IInlineComment {
   /** Replies to this origin comment, ordered the same way as the top-level list. */
   replies: InlineCommentReply[];
 }
+
+/**
+ * Where an origin comment's anchor currently resolves to in the rendered
+ * page text, as produced by `useAnchorResolver`
+ * (design.md: AnchorResolver > State Management).
+ *
+ * `startOffset`/`endOffset` are UTF-16 code-unit offsets into the original
+ * (un-normalized) text returned by `renderedTextOf` — the same coordinate
+ * space `matchQuote`'s `QuoteMatchResult` reports in.
+ */
+export type ResolvedRange =
+  | { status: 'exact' | 'fuzzy'; startOffset: number; endOffset: number }
+  | { status: 'not_found' };
