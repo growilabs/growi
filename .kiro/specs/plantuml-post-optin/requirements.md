@@ -55,6 +55,8 @@ GROWIはPlantUML図の内容をエンコードしてURLに載せ、GET（`<img>`
 #### Acceptance Criteria
 1. If PlantUMLサーバが図の生成に失敗する, then the GROWI shall 当該図の箇所にエラー状態を表示し、ページ全体の表示を妨げない。
 2. If 同一ページ内の一部の図の描画が失敗する, then the GROWI shall 他の図の描画を継続する。
+3. While 送信方式が POST に設定されている, when 図の描画に失敗する, the GROWI shall プロキシから得られる失敗種別（413=サイズ超過, 4xx=図ソース/構文エラー, 502=上流失敗/誤設定, 504=タイムアウト, ネットワーク拒否=サーバ未到達）に応じたメッセージを表示し、GET向けの「URL長超過・図の分割/簡略化」文言は用いない（POSTではURL長は原因ではなく、分割は502/504を解決しない）。※POST失敗メッセージの所有は本specにある（別spec `plantuml-large-diagram-get` のGETエラー文言はGET失敗にのみ適用）。
+4. The GROWI shall 上記POST失敗メッセージを対応ロケール（en/ja/fr/ko/zh）で提供する。
 
 ### Requirement 7: テーマ表示の維持
 **Objective:** As a GROWI利用者, I want POST方式でもライト/ダークのテーマが図に反映されること, so that GET方式と同じ見た目で図を閲覧できる
@@ -70,6 +72,7 @@ GROWIはPlantUML図の内容をエンコードしてURLに載せ、GET（`<img>`
 
 #### Acceptance Criteria
 1. While 送信方式が POST に設定されている, when 図が非同期に読み込まれて表示される, the GROWI shall 図の読み込みによるレイアウトのずれを補正し、アンカー位置への自動スクロールを機能させる。
+2. While 送信方式が POST に設定されている, when SVG取得が失敗する（fetch reject 等で `<img>` が生成されず onLoad/onError が発火しない）, the GROWI shall 描画ステータス（`GROWI_IS_CONTENT_RENDERING_ATTR`）を完了状態へ遷移させ、自動スクロール監視が無駄な再スクロールを続けないようにする。
 
 ### Requirement 9: 運用境界の明示と誤設定時の扱い（自前サーバ前提）
 **Objective:** As a GROWI管理者, I want POST方式の前提条件が明確に示され、誤設定が黙って壊れないこと, so that 誤設定による原因不明の描画不良を避けられる
@@ -85,6 +88,7 @@ GROWIはPlantUML図の内容をエンコードしてURLに載せ、GET（`<img>`
 #### Acceptance Criteria
 1. The GROWI shall 描画経路へのアクセスを、ページ内容の閲覧と同等のアクセス制御下に置く。
 2. While 送信方式が POST に設定されている, when 図ソースが規定の上限を超える、または生成が規定の制限時間を超える, the GROWI shall 当該描画を中止し、エラー状態を返す。
+3. While 送信方式が POST に設定されている, when 共有リンク経由の匿名閲覧者が図を要求する, the GROWI shall GETモードと同等に図を描画する（`certifySharedPage` により `pageId`＋`shareLinkId` を検証し、有効な共有リンクを持つ匿名要求を許可する）。非公開インスタンスで有効な共有リンクを伴わない匿名要求は拒否する。※GETモードでは `<img>` が外部サーバへ直接届き匿名でも描画できるため、POSTでの本条は Req 3（GET経路と同一）の非退行保証を満たすためのもの。
 
 ### Requirement 11: 大きい図に対するPOST推奨メッセージ
 **Objective:** As a 大きい図が表示できない管理者/利用者, I want POSTという解決手段があると分かること, so that 自前サーバ＋POSTで根本解決できると気づける

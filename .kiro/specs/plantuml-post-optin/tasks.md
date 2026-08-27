@@ -29,25 +29,25 @@
 
 - [ ] 2.2 (P) render-plantuml サービス
   - darkMode に応じテーマ（`themes/*.puml.ts` をサーバ import）を前置し、送信先を `plantumlUri` に固定して生テキストを上流へ POST する（responseType text, `maxRedirects: 0`, timeout）
-  - 3xx/非2xx/タイムアウトを例外化する（誤設定検知・過負荷保護）
-  - 上流200でSVGを返し、302/タイムアウトで例外になることを観測する
-  - _Requirements: 2.2, 2.3, 4.2, 7.1, 7.2, 9.1, 9.3, 10.2_
+  - **上流ステータスの class を保存して例外化**する（#5）: 上流4xxは `ClientDiagramError`（図ソース/構文エラー。`X-PlantUML-Diagram-Error` を保持可）、上流3xx（誤設定）/5xx（上流失敗）とタイムアウトは別クラス
+  - 上流200でSVGを返し、上流400が `ClientDiagramError`・302/5xx/タイムアウトが別クラスで例外になることを観測する
+  - _Requirements: 2.2, 2.3, 4.2, 6.3, 7.1, 7.2, 9.1, 9.3, 10.2_
   - _Boundary: render-plantuml_
   - _Depends: 1.3_
 
 - [ ] 2.3 apiv3 プロキシルート
-  - `POST /_api/v3/plantuml/svg` を追加し、`loginRequired`（ゲスト許可はインスタンス設定に追従）で保護する
+  - `POST /_api/v3/plantuml/svg` を追加。ミドルウェア順は **`certifySharedPage → loginRequiredFactory(crowi, true)`**（＋`rejectLinkSharingDisabled`）で保護する（#2）。body に任意の `pageId`/`shareLinkId` を受け、express-validator で MongoId 検証してから `certifySharedPage` に渡す（共有リンク匿名閲覧者を GET 同等に通す。`certifySharedPage` は必ず `loginRequired` の前）
   - ハンドラ内で本文サイズを明示検査して超過は413（グローバル body parser 済みのためルート limit では効かない前提）
-  - キャッシュ参照→miss時 render→成功時 set し、`image/svg+xml` を返す。400/413/401/502/504 のエラーマッピングを行い、apiv3 index に登録する
-  - 上流モックで200、超過で413、未認証で拒否、上流302で502、キャッシュヒットで上流未呼出 を観測する
-  - _Requirements: 2.1, 5.2, 9.3, 10.1, 10.2_
+  - キャッシュ参照→miss時 render→成功時 set し、`image/svg+xml` を返す。**エラーマッピング: 400/413/401・403/422（上流4xx=構文エラー, `X-PlantUML-Diagram-Error` 転送可）/502（上流3xx誤設定・上流5xx）/504**（#5）。apiv3 index に登録する
+  - 上流モックで200、超過で413、上流400で422、上流302で502、キャッシュヒットで上流未呼出、**匿名＋有効な `pageId`+`shareLinkId` で200／匿名＋共有リンク無しは非公開で拒否** を観測する
+  - _Requirements: 2.1, 5.2, 6.3, 9.3, 10.1, 10.2, 10.3_
   - _Boundary: plantuml svg proxy_
   - _Depends: 2.1, 2.2_
 
 - [ ] 3. Core: クライアント側描画
 - [ ] 3.1 (P) SVG取得ユーティリティ＋セッションメモ
-  - `{source, darkMode}` をプロキシへ POST して Blob を返す。メモ（module-level Map）は `Promise<Blob>` を保持し、同一入力の重複POSTと in-flight を排除する
-  - 同一入力の2回目呼び出しで再POSTが発生しないことを観測する
+  - `{source, darkMode, pageId?, shareLinkId?}` をプロキシへ POST して Blob を返す（共有リンク文脈でのみ id を載せる。#2）。メモは**上限付き module-level LRU（max件数＋任意でTTL）**で `Promise<Blob>` を保持し、同一入力の重複POSTと in-flight を排除する（**無制限Mapは不採用**、#9）。メモキーは `sha256(source+darkMode)`（id は含めない）
+  - 同一入力の2回目でメモから返り再POSTしないこと、**max件数超過で最古を追い出すこと**を観測する
   - _Requirements: 2.1, 5.1_
   - _Boundary: fetch-plantuml-svg_
   - _Depends: 1.3_
@@ -61,12 +61,20 @@
   - _Depends: 1.2_
 
 - [ ] 3.3 PlantUmlViewerのGET/POST描画分岐
-  - GETは現行の `<img src>` を維持。POSTは取得Blobから **mount単位の objectURL** を生成して `<img src>` に設定、`onLoad` で完了・`onError` でエラー状態、rendering-status属性を維持、**unmount で自身のURLのみ revoke**（メモ保持のBlobは revoke しない）
+  - GETは現行の `<img src>` を維持。POSTは取得Blobから **mount単位の objectURL** を生成して `<img src>` に設定、`onLoad` で完了・`onError` でエラー状態、rendering-status属性を維持、**unmount で自身のURLのみ revoke**（メモ保持のBlobは revoke しない）。共有リンク文脈では `fetchPlantumlSvg(source, darkMode, { pageId, shareLinkId })` に id を渡す（#2）
+  - **`fetchPlantumlSvg` が reject した場合（`<img>` 非生成で onLoad/onError 非発火）も `GROWI_IS_CONTENT_RENDERING_ATTR` を `'false'` へ遷移**させる（再スクロール暴走防止、#6/Req 8.2）
+  - **POST失敗の文言を method＋プロキシHTTPステータス（413/422/502/504/ネットワーク reject）で分岐**し、GET向けの「URL長・分割」文言は出さない（#3-b/Req 6.3。文言・i18nは本specが所有）
   - 各Viewerが独立に描画・失敗すること
-  - post描画/失敗時エラー/**再mountで壊れない**/get不変 を観測する
-  - _Requirements: 3.1, 4.1, 6.1, 6.2, 8.1_
+  - post描画/失敗時エラー/**reject時に status='false'**/**method別の失敗文言**/**再mountで壊れない**/get不変 を観測する
+  - _Requirements: 3.1, 4.1, 6.1, 6.2, 6.3, 8.1, 8.2_
   - _Boundary: PlantUmlViewer_
-  - _Depends: 3.1, 3.2_
+  - _Depends: 3.1, 3.2, 3.4_
+
+- [ ] 3.4 POST失敗メッセージの i18n キーを5ロケール追加（本spec所有）
+  - `locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/translation.json` に、失敗種別ごとの POST 失敗文言キー（413=サイズ超過, 422=図ソース/構文エラー, 502=上流失敗/誤設定, 504=タイムアウト, ネットワーク=サーバ未到達）を追加する（#3-b/Req 6.4）
+  - GET向けの「URL長・分割」文言とは別キーとし、5ロケール全てに存在し `t()` で引けることを確認する
+  - _Requirements: 6.3, 6.4_
+  - _Boundary: locales_
 
 - [ ] 4. Integration: エンドツーエンド配線
 - [ ] 4.1 経路の結線と検証
@@ -77,24 +85,24 @@
 
 - [ ] 5. Validation: テスト
 - [ ] 5.1 (P) サーバ単体/統合テスト
-  - svg-cache unit、render-plantuml unit（送信先固定・darkModeでテーマ切替・302/タイムアウト例外）、proxy integ（200/413/未認証拒否/上流302で502/キャッシュヒットで上流未呼出）
+  - svg-cache unit、render-plantuml unit（送信先固定・darkModeでテーマ切替・**上流400=ClientDiagramError／302/5xx/タイムアウトは別クラス**）、proxy integ（200/413/未認証拒否/**上流400で422**/上流302で502/キャッシュヒットで上流未呼出/**匿名＋有効共有リンクで200・無効で拒否**）
   - 上記が緑になることを観測する
-  - _Requirements: 2.2, 2.3, 4.2, 5.1, 5.2, 7.1, 7.2, 9.3, 10.1, 10.2_
+  - _Requirements: 2.2, 2.3, 4.2, 5.1, 5.2, 6.3, 7.1, 7.2, 9.3, 10.1, 10.2, 10.3_
   - _Boundary: svg-cache, render-plantuml, plantuml svg proxy_
   - _Depends: 2.3_
 
 - [ ] 5.2 (P) クライアント単体/コンポーネントテスト
-  - plantuml.spec（get/post分岐・sanitizeOption）、PlantUmlViewer.spec（post描画/エラー/**再mount非破壊**/get不変）、fetch-plantuml-svg のメモ重複排除
+  - plantuml.spec（get/post分岐・sanitizeOption）、PlantUmlViewer.spec（post描画/エラー/**reject時status='false'**（#6）/**method別の失敗文言**（#3-b）/**再mount非破壊**/get不変）、fetch-plantuml-svg のメモ重複排除＋**max超過で最古追い出し**（#9）
   - （※ `PageContentRenderer` モック・config key スナップショットの更新はタスク1.2が所有。本タスクは新規テストケース追加に限定）
   - 上記が緑になることを観測する
-  - _Requirements: 1.1, 1.2, 3.1, 4.1, 5.1, 6.1, 6.2, 8.1_
+  - _Requirements: 1.1, 1.2, 3.1, 4.1, 5.1, 6.1, 6.2, 6.3, 8.1, 8.2_
   - _Boundary: plantuml.ts remark, PlantUmlViewer, fetch-plantuml-svg_
   - _Depends: 3.3_
 
-- [ ] 5.3 手動E2E＋Changeset
+- [ ] 5.3 手動E2E
   - 自前 plantuml-server ＋ `PLANTUML_HTTP_METHOD=post` で、GETでは414になる大きい図がリネームなしで描画されること、ライト/ダークでテーマ反映を確認する
   - puppeteer 経由エクスポートでのPOST描画の可否を確認し、限界を文書化する
-  - changeset を追加する
+  - ⚠️ Changeset は作成しない（`@growi/app` は `.changeset/config.json` の `ignore` 対象かつ private。追加すると release PR パスが張り付き publish に到達しない。commit `1d0a0d9f7a` 参照。app のリリースノートは release-drafter が担う）
   - _Requirements: 2.1, 2.2, 7.1, 7.2, 9.1_
   - _Depends: 4.1_
 

@@ -44,7 +44,7 @@
 
 1. **テーマ削減スコープの確定＋実測**: 「`<style>` beta図ブロック削除／未使用パレット削除／sub-block共通化」を段階適用し、**基準図（今回の問い合わせ図）のエンコード後URL長**を都度測る。目標: 主要サーバ上限（〜6,000〜8,000字）に収まるか。収まらない残余は C(本spec のエラー表示)＋B(POST) が受け皿。
 2. **固定閾値の値**: 誤検知を避ける**安全側（高め）**の1値。onError（Req 6.1）が真の判定なので攻めない。ブラウザ/中間装置の一般上限を根拠に決定。
-3. **エラーメッセージ文言＋5ロケール訳**（en/ja/fr/ko/zh）。対処（分割・簡略化／管理者は自前サーバ＋POST）を含める。
+3. **エラーメッセージ文言＋5ロケール訳**（en/ja/fr/ko/zh）。対処は**汎用（図の分割・簡略化）のみ**。POST/自前サーバの推奨は本specに含めず別spec `plantuml-post-optin`（Req 11）へ移管済み（requirements.md 7.2 / design.md / tasks.md 1.2 と整合）。
 4. **ダーク/ライト目視回帰の確認手順**（削減後に主要図種で崩れないか）。
 5. **PlantUmlViewer 改修点**: onError分離、error state、プレースホルダ、logger追加、status属性の両分岐遷移。
 6. **テスト**: `plantuml.spec.ts`（軽量化後テーマ内容・URL/ソース長）、`PlantUmlViewer.spec.tsx`（src長超過→UI、onError→UI、status属性、i18nは `useTranslation` モック）。`PageContentRenderer.spec.tsx:44` の `plantumlUri:''` 早期returnにも留意。

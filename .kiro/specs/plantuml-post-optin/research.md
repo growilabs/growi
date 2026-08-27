@@ -114,7 +114,7 @@ apiv3に描画プロキシを新設。クライアントは図ソースをPOST�
 | Req | 必要な要素 | 既存資産（file:line） | 判定 |
 |---|---|---|---|
 | 10.1 アクセス制御 | 閲覧同等の認証（ゲスト許可追従） | `server/middlewares/login-required.ts:32` `loginRequiredFactory(crowi, isGuestAllowed)`。ゲスト分岐 L57-66（`aclService.isGuestAllowedToRead()`）。使用例 `apiv3/page/get-page-info.ts:59,72` | **OK**（`loginRequiredFactory(crowi, true)` で閲覧同等） |
-| 10.2 サイズ上限(413) | 本文サイズ制限 | グローバル body parser は 50mb（`server/crowi/express-init.js:116-117`）。ルート単位で `express.json({ limit })` を重ねると `entity.too.large`→413 | **OK**（ルートスコープで tighter limit を追加） |
+| 10.2 サイズ上限(413) | 本文サイズ制限 | グローバル body parser は 50mb（`server/crowi/express-init.js:116-117`）。**このグローバル parser がルート到達前に本文を消費するため、ルート単位 `express.json({ limit })` は効かない**（design.md の結論に統一）。**ハンドラ内で `Content-Length`/`req.body` サイズを明示検査して413を返す** | **OK**（ハンドラ内サイズ検査。ルートスコープ parser 案は不採用） |
 | 10.2 過負荷(レート制限) | レート制限 | 既存 `features/rate-limiter/`（`rate-limiter-flexible`+Mongo）。グローバル適用 `server/routes/index.js:82`。エンドポイント別は `API_RATE_LIMIT_*` env で調整（`middleware/factory.ts:17-19,64`） | **OK**（グローバルで自動被覆＋env で厳格化可能） |
 | 10.2 タイムアウト | 上流タイムアウト | axios `timeout` 実例 `apiv3/slack-integration-settings.js:124,143`。`maxRedirects` は未使用だが標準config（`g2g-transfer.ts:251` が per-request config 実績） | **OK**（`timeout`＋`maxRedirects:0` 可） |
 | 4.2 SSRF/9.3 誤設定 | 送信先固定・リダイレクト非追従 | 上記 axios per-request config で `maxRedirects:0` 指定可 | **OK** |

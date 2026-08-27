@@ -26,17 +26,18 @@
 - 新設のサーバ側描画プロキシ（生ソース＋darkMode受領 → テーマ前置 → `PLANTUML_URI` へPOST → SVG返却）とそのSVGキャッシュ。
 - POST経路のアクセス制御・入力サイズ/タイムアウト上限・誤設定検知。
 - **POST推奨メッセージ（Req 11）**: GET時・上限超過で、POST利用可能なら「自前サーバ＋POSTで解決可」を案内する文言とi18n。表示体は別spec `plantuml-large-diagram-get` のエラーUIに**相乗り**（本specは推奨行の追加と判定を担う）。
+- **POST経路の失敗メッセージ文言とそのi18n（`method==='post'` 分岐, Req 6.3/6.4）**を本specが所有する。get spec のエラーUI文言は GET失敗にのみ適用され、エラーUIは `method` で分岐する（GET向け文言を POST に出さない）。
 
 ### Out of Boundary
 - GET経路の内部実装（`@akebifiky/remark-simple-plantuml` によるエンコード）と現行テーマ前置ロジックのGET側見直し。
 - PlantUMLサーバの提供・バージョン管理・ネットワーク到達性。
 - 管理画面のUI/フォーム追加。
-- ページ単位のアクセス権限照合（本経路はページ文脈を持たない。インスタンスのゲスト許可ポリシーに追従する粗粒度制御に留める）。
+- ページ単位の**権限**照合（本経路はページ本文の権限は評価しない）。ただしアクセス制御は「インスタンスのゲスト許可ポリシー追従」に加え、**共有リンク文脈では任意の `pageId`＋`shareLinkId` を受け取り `certifySharedPage` で共有リンクの有効性のみ検証**する（GETモード同等の匿名描画を可能にするため。粒度は `get-page-info` と同じ粗粒度＝「有効な共有ページ閲覧者か」の判定に留め、`source` 個別の権限照合はしない ── 共有閲覧者は元々ページ本文で全PlantUMLソースを閲覧できるため露出は増えない）。
 
 ### Allowed Dependencies
 - 設定伝播チェーン: `config-definition` → `configuration-props` → `RendererConfig`(interface) → `rendererConfigAtom` → `renderer.tsx`。
 - サーバHTTP: 既存 `axios`（`ogp.ts` の外部取得パターンに準拠）。
-- apiv3 ルート登録機構（`server/routes/apiv3/index.js`）と既存の認証（`loginRequired`）／検証ミドルウェア。
+- apiv3 ルート登録機構（`server/routes/apiv3/index.js`）と既存の認証／検証ミドルウェア: `loginRequiredFactory(crowi, true)`、共有ページ証明 `middlewares/certify-shared-page`（ボディの `pageId`/`shareLinkId` を読む既存実装をそのまま再利用）、`middlewares/reject-link-sharing-disabled`（共有無効インスタンスのキルスイッチ）。
 - 既存テーマ資産 `features/plantuml/themes/*.puml.ts`（サーバ側からも import 可能な純粋な文字列モジュール）。
 - **（Req 11）別spec `plantuml-large-diagram-get` が新設する `PlantUmlViewer` のエラーUI**（POST推奨行の差し込み先）。→ **順序依存: large-diagram-get 先 → 本specのReq 11 後（or 同時）**。
 
@@ -154,8 +155,8 @@ sequenceDiagram
         M-->>V: Blob
     else memo miss
         M->>F: fetch
-        F->>P: POST /_api/v3/plantuml/svg {source, darkMode}
-        P->>P: loginRequired(guest追従) / 本文サイズ検査(ハンドラ内)
+        F->>P: POST /_api/v3/plantuml/svg {source, darkMode, pageId?, shareLinkId?}
+        P->>P: certifySharedPage → loginRequired(guest=true) / 本文サイズ検査(ハンドラ内)
         P->>C: get hash(source, darkMode)
         alt cache hit
             C-->>P: SVG
@@ -167,10 +168,14 @@ sequenceDiagram
                 S-->>R: SVG
                 R-->>P: SVG
                 P->>C: set
-            else 3xx or 非2xx (誤設定/失敗)
-                S-->>R: redirect/error
+            else 上流4xx (図ソース/構文エラー)
+                S-->>R: 400 + X-PlantUML-Diagram-Error
+                R-->>P: throw ClientDiagramError
+                P-->>F: 422 (構文エラー; ヘッダ転送可)
+            else 上流3xx(誤設定)/5xx(上流失敗)/timeout
+                S-->>R: redirect / error / timeout
                 R-->>P: throw
-                P-->>F: 502
+                P-->>F: 502 or 504
             end
         end
         P-->>F: 200 image/svg+xml
@@ -181,8 +186,8 @@ sequenceDiagram
 ```
 
 **フロー上の決定**:
-- **アクセス制御（10.1）**: プロキシは `loginRequired`（ゲスト許可はインスタンス設定に追従）で保護し、ページ閲覧と同じ粒度のポリシーに合わせる。ページ単位権限は文脈が無いため対象外。
-- **誤設定検知（9.3）**: `maxRedirects: 0`。POST対応サーバは200でSVGを直接返す。公開plantuml.com等は302を返すため、3xx/非2xxを一律「失敗」として扱い、黙って誤描画しない。
+- **アクセス制御（10.1/10.3）**: チェーンは `certifySharedPage → loginRequiredFactory(crowi, true)`。通常ページ（ログイン/ゲスト許可）は従来どおり通る。共有リンク閲覧では body の `pageId`＋`shareLinkId` を `certifySharedPage` が検証し `req.isSharedPage` を立て、`loginRequired` のゲストパス（`isGuestAllowed && req.isSharedPage`）で匿名描画を許可 ── **GETモードと同等の匿名描画を実現**（Req 10.3）。`certifySharedPage` は必ず `loginRequired` の**前**に置く（フラグを立てる順序依存）。`loginRequired` は必ず `isGuestAllowed=true` で構築する。ページ単位権限は評価しない（`get-page-info` と同じ粗粒度）。
+- **誤設定検知（9.3）／上流ステータスの区別（6.3, #5）**: `maxRedirects: 0`。POST対応サーバは200でSVGを直接返す。公開plantuml.com等は302を返す＝誤設定→502。**上流ステータスは class を保存する**: 上流4xx（特に構文エラー400）は利用者起因の**図ソースエラー→422**（`X-PlantUML-Diagram-Error` を転送可、誤設定扱いにしない）、上流3xx=誤設定→502、上流5xx=上流失敗→502、timeout→504。黙って誤描画はしない。
 - **XSS（4.1）**: SVGは常に `<img>`（blob URL）で描画。画像コンテキストではSVG内スクリプトは実行されないため、インラインSVG用サニタイザは不要。
 - **テーマ（7.1/7.2）**: プロキシ（`render-plantuml`）が darkMode に応じテーマを前置。クライアントはテーマを送らないためDOM・転送量が増えない。
 - **キャッシュ（5.1/5.2）**: サーバLRU（`hash(source,darkMode)`）で上流再描画を回避。クライアントのセッション内メモ（**`Blob` を保持**）でSPA遷移時の再取得を回避。POSTのためブラウザHTTPキャッシュは効かないが、両キャッシュで実用速度を確保（Req 5はSHOULD）。
@@ -206,13 +211,17 @@ sequenceDiagram
 | 5.2 | 上流へ重複要求しない | svg-cache, proxy | cache hit分岐 | POST描画 |
 | 6.1 | 図単位のエラー表示 | PlantUmlViewer | error状態 | POST描画 |
 | 6.2 | 他図の描画継続 | PlantUmlViewer | 独立描画 | — |
+| 6.3 | POST失敗の文言をmethod＋ステータスで分岐（本spec所有） | PlantUmlViewer, locales | `method==='post'`＋413/422/502/504 | POST描画 |
+| 6.4 | POST失敗文言のi18n(5ロケール) | locales | 5ロケール | — |
 | 7.1/7.2 | ライト/ダーク維持 | render-plantuml(テーマ前置) | darkMode param, テーマ資産 | POST描画 |
 | 8.1 | auto-scroll非退行 | PlantUmlViewer | `GROWI_IS_CONTENT_RENDERING_ATTR` | POST描画 |
+| 8.2 | fetch reject時もstatus完了へ遷移（再スクロール暴走防止） | PlantUmlViewer | `GROWI_IS_CONTENT_RENDERING_ATTR`='false' | POST描画 |
 | 9.1 | POST対応に依存 | render-plantuml | — | POST描画 |
 | 9.2 | 非対応を明示 | config-definition(説明/docs) | env説明 | — |
 | 9.3 | 誤設定を検知 | render-plantuml | `maxRedirects:0`/非2xx失敗 | POST描画 |
-| 10.1 | 閲覧同等のアクセス制御 | proxy(route) | `loginRequired`(guest追従) | POST描画 |
+| 10.1 | 閲覧同等のアクセス制御 | proxy(route) | `certifySharedPage → loginRequiredFactory(crowi,true)` | POST描画 |
 | 10.2 | サイズ/時間上限 | proxy, render-plantuml | 上限定数, `timeout` | POST描画 |
+| 10.3 | 共有リンク匿名閲覧者もGET同等に描画 | proxy(route), fetch-plantuml-svg, PlantUmlViewer | body `pageId`+`shareLinkId`, `certifySharedPage` | POST描画 |
 | 11.1 | GET時にPOST推奨を案内 | plantuml.ts(method属性), PlantUmlViewer(推奨行), locales | `method==='get'` 分岐 | — |
 | 11.2 | 非対応環境では出さない | PlantUmlViewer | Bコード存在＝利用可能 | — |
 | 11.3 | POST推奨のi18n | locales | 5ロケール | — |
@@ -251,7 +260,8 @@ type PlantUMLPluginParams = {
 #### PlantUmlViewer — 拡張
 **Responsibilities & Constraints**
 - GET時: 現行の `<img src>`（不変）。
-- POST時: マウント時に `fetchPlantumlSvg(source, darkMode)`（メモ経由）を呼び、取得した**Blobから自身の `objectURL` を生成**して `<img src>` に設定。`onLoad` で描画完了、失敗で error 状態（Req 6.1）。**unmount 時は自身が生成した `objectURL` のみ revoke**（メモ保持のBlobは revoke しない）。
+- POST時: マウント時に `fetchPlantumlSvg(source, darkMode, { pageId, shareLinkId })`（メモ経由。共有リンク閲覧時のみ id を渡す）を呼び、取得した**Blobから自身の `objectURL` を生成**して `<img src>` に設定。`onLoad` で描画完了、失敗で error 状態（Req 6.1）。**unmount 時は自身が生成した `objectURL` のみ revoke**（メモ保持のBlobは revoke しない）。
+- **`fetchPlantumlSvg` が reject した場合（`<img>` が生成されず onLoad/onError が発火しない）も、`GROWI_IS_CONTENT_RENDERING_ATTR` を明示的に `'false'` へ遷移させる**（Req 8.2）。さもないと `watch-rendering-and-rescroll` が最長10秒間・5秒間隔（`RENDERING_POLL_INTERVAL_MS=5000`／`WATCH_TIMEOUT_MS=10000`）で無駄な再スクロールを続け、最後の補正再スクロールも正しく発火しない。成功/失敗いずれの分岐でも `'false'` に遷移することを保証する。
 - `GROWI_IS_CONTENT_RENDERING_ATTR` のライフサイクルは両モードで維持（Req 8.1）。各 Viewer は独立に描画・失敗（Req 6.2）。
 
 **Contracts**: State（描画ステータス属性）／内部で Service を消費
@@ -269,18 +279,26 @@ type PlantUMLPluginParams = {
 **Contracts**: Service
 ```typescript
 // 生の図ソースと darkMode をプロキシへPOSTし、SVGのBlobを返す。
-// 同一(source, darkMode)はセッション内メモ（module-level Map）が Promise<Blob> を保持しPOSTを重複排除。
-function fetchPlantumlSvg(source: string, darkMode: boolean, signal?: AbortSignal): Promise<Blob>;
+// 同一(source, darkMode)はセッション内メモ（上限付きの module-level LRU: max件数＋任意でTTL）が
+// Promise<Blob> を保持しPOSTを重複排除する。無制限Mapは不採用（research.md「無制限Mapは
+// メモリ境界が無く不採用／上限付きMapは可」に整合）。
+// pageId/shareLinkId は共有リンク閲覧時のみ POST body に載せる（メモキーには含めない ── 同一
+// sourceは閲覧者に依らず同一SVGなので key は sha256(source+darkMode) のまま）。
+function fetchPlantumlSvg(
+  source: string, darkMode: boolean,
+  ctx?: { pageId?: string; shareLinkId?: string; signal?: AbortSignal },
+): Promise<Blob>;
 ```
 - Precondition: `source` は非空。エンドポイント/上限は共有定数（`interfaces/post-rendering.ts`）。
 - Postcondition: 2xxならSVG Blob。非2xxは reject（Viewerがerror状態化）。
 - **所有権（重要）**: メモは **`Promise<Blob>`（=Blob）を保持し、blob URL は保持しない**。`objectURL` の生成/`revokeObjectURL` は各 Viewer が **mount単位**で行う。メモ済みBlobは revoke 対象外。これによりSPA再mountで失効URLを参照するバグを防ぐ（Req 5.1）。
+- **エビクションは安全**: メモは `Promise<Blob>` のみ保持し blob URL は持たないため、追い出しに `revokeObjectURL` は不要（各 Viewer が自分の `objectURL` を所有・revoke。追い出された Blob は参照が無くなり GC 回収）。追い出し後の再mountは単に再取得する。
 
 ### Server
 
 #### plantuml svg proxy (apiv3 route factory) — 新規
 **Responsibilities & Constraints**
-- `POST /_api/v3/plantuml/svg`。`loginRequired`（ゲスト許可はインスタンス設定に追従）でページ閲覧と同ポリシーの保護（Req 10.1）。本文サイズは**ハンドラ内で明示検査**し上限超過は413（Req 10.2）。※グローバル body parser（50mb）がルート前に本文を消費するため、ルート単位 `express.json({ limit })` では413が効かない。`Content-Length`/`req.body` サイズをハンドラで検査する。
+- `POST /_api/v3/plantuml/svg`。ミドルウェア順は **`certifySharedPage → loginRequiredFactory(crowi, true)`**（＋任意で `accessTokenParser`、`rejectLinkSharingDisabled`）でページ閲覧と同ポリシーの保護（Req 10.1）。共有リンク経由の匿名閲覧者は body の `pageId`＋`shareLinkId` を `certifySharedPage` が検証して通す（Req 10.3、GET同等）。`pageId`/`shareLinkId` は express-validator で MongoId 検証してから DB 照会する（`certify-shared-page` 側も `$eq` ガード済み）。本文サイズは**ハンドラ内で明示検査**し上限超過は413（Req 10.2）。※グローバル body parser（50mb）がルート前に本文を消費するため、ルート単位 `express.json({ limit })` では413が効かない。`Content-Length`/`req.body` サイズをハンドラで検査する。
 - **非変更エンドポイント**: ユーザー固有の状態を変更しない（キャッシュはコンテンツ addressable でユーザーに紐づかない）。副作用のある状態変更を伴わないため CSRF トークンは要件としない（GROWI apiv3 の標準認証で足りる）。
 - `svg-cache` を参照し、hit ならSVGを即返却（Req 5）。miss なら `render-plantuml` を呼び、成功時のみキャッシュ。
 - **Boundary**: テーマ前置・送信先決定・上流通信は `render-plantuml` に委譲（プロキシは認証・制御・キャッシュのみ）。
@@ -290,7 +308,7 @@ function fetchPlantumlSvg(source: string, darkMode: boolean, signal?: AbortSigna
 ##### API Contract
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| POST | /_api/v3/plantuml/svg | JSON `{ source: string, darkMode: boolean }` | 200 `image/svg+xml` | 400 空/不正, 401/403 認証, 413 サイズ超過, 502 上流失敗/誤設定, 504 タイムアウト |
+| POST | /_api/v3/plantuml/svg | JSON `{ source: string, darkMode: boolean, pageId?: string, shareLinkId?: string }`（pageId/shareLinkId は共有リンク閲覧時のみ） | 200 `image/svg+xml` | 400 空/不正, 401/403 認証（有効な共有リンク無し）, 413 サイズ超過, 422 上流4xx（図ソース/構文エラー; `X-PlantUML-Diagram-Error` を転送可）, 502 上流3xx（誤設定）/上流5xx（上流失敗）, 504 タイムアウト |
 
 #### render-plantuml — 新規
 **Contracts**: Service
@@ -302,7 +320,7 @@ function renderPlantumlSvg(source: string, darkMode: boolean): Promise<string>;
 - 送信先は `configManager.getConfig('app:plantumlUri')` に固定（Req 4.2, SSRF防止。リクエスト由来URLは受けない）。
 - `axios.post(urljoin(plantumlUri, '/svg'), themedSource, { headers: { 'Content-Type': 'text/plain; charset=UTF-8' }, responseType: 'text', maxRedirects: 0, timeout })`。
 - **【重要】文字コード**: `Content-Type: text/plain; charset=UTF-8` を必ず明示する。plantuml-server の `doPost` は `setCharacterEncoding("UTF-8")` を呼ばず、web.xml にエンコーディングフィルタも無いため、**未指定だと既定 ISO-8859-1 で解釈され、日本語を含む図（note等）が文字化けする**（今回の問い合わせは日本語図が対象）。
-- 3xx/非2xx/タイムアウトは例外（Req 9.3 誤設定検知・Req 10.2）。
+- 上流ステータスの class を保存して例外化する（Req 9.3・6.3・Req 10.2）: 上流**4xx** は `ClientDiagramError`（→プロキシが422、`X-PlantUML-Diagram-Error` 転送可、info/warn ログで**誤設定扱いにしない**）、上流**3xx**（誤設定）／**5xx**（上流失敗）は→502、**timeout** は→504。
 - **Dependencies**: External: PlantUMLサーバ — SVG生成 (P0)。Outbound: axios (P0)。Internal: theme assets (P1)。
 
 #### svg-cache — 新規
@@ -320,30 +338,30 @@ interface SvgCache {
 ## Error Handling
 
 ### Error Strategy
-- **クライアント**: `fetchPlantumlSvg` の reject / 画像 `onError` を Viewer が捕捉し、当該箇所を error 状態表示（Req 6.1）。他 Viewer は独立（Req 6.2）。ページ本文の描画は妨げない。
-- **サーバ（プロキシ）**: 入力空/不正=400、サイズ超過=413、認証=401/403、上流の3xx/非2xx=502、タイムアウト=504。
+- **クライアント（method＋失敗種別で文言分岐, Req 6.3）**: `fetchPlantumlSvg` の reject / 画像 `onError` を Viewer が捕捉し error 状態表示（Req 6.1）。他 Viewer は独立（Req 6.2）。ページ本文は妨げない。**POST失敗の文言は本specが所有**し、Viewer が受け取ったプロキシ HTTP ステータスで分岐する（GET向けの「URL長超過・分割/簡略化」は POST では出さない）: **413**→「サーバの本文サイズ上限超過（`client_max_body_size`/プロキシ上限の引き上げ）」／**422**→「図のソース/構文エラー」／**502**→「PlantUMLサーバの失敗または誤設定」／**504**→「描画タイムアウト」／**ネットワーク reject**→「PlantUMLサーバ未到達」。表示体は別spec `plantuml-large-diagram-get` のエラーUIに `method` 分岐で相乗り（`method` 属性は Req 11 が付与するものを共用）。
+- **サーバ（プロキシ）**: 入力空/不正=400、サイズ超過=413、認証=401/403、上流4xx=422、上流3xx（誤設定）/5xx（上流失敗）=502、タイムアウト=504。
 
 ### Error Categories and Responses
-- User Errors(4xx): 空/不正ソース・サイズ超過・未認証 → 明示的ステータスで拒否。
-- System Errors(5xx): 上流失敗/タイムアウト → 中止しエラー返却、Viewerでエラー表示（graceful degradation）。
+- User Errors(4xx): 空/不正ソース・サイズ超過・未認証・**上流4xx（図ソース/構文エラー）→422** → 明示的ステータスで拒否（上流4xxは誤設定ではなくコンテンツエラーとして扱う）。
+- System Errors(5xx): 上流3xx/5xx失敗・タイムアウト → 中止しエラー返却、Viewerでエラー表示（graceful degradation）。
 - 誤設定(9.3): POST非対応サーバの302等 → 502扱いで「黙って誤描画しない」。
 
 ### Monitoring
-- プロキシは失敗（上流ステータス/タイムアウト/サイズ超過）を logger で記録（原因調査容易化）。図ソース本文はログに残さない。
+- プロキシは失敗（上流ステータス/タイムアウト/サイズ超過）を logger で記録（原因調査容易化）。**上流4xx（422）は利用者起因のコンテンツエラーとして info/warn で記録し、誤設定（502）とは区別する**。図ソース本文はログに残さない。
 
 ## Testing Strategy
 
 ### Unit Tests
 - `plantuml.spec.ts`: `'get'` で現行同一のテーマ前置＋encoded `<plantuml src>` を生成（3.1）。`'post'` で `src` を付与せず、テーマ非前置の生ソース＋darkMode属性を出力し、`sanitizeOption` が新属性を許可（1.2, 4.1準備, 7系はサーバ委譲）。
 - `svg-cache`: 同一(source,darkMode)で set 後 get ヒット、darkMode 違いで別キー（5.1, 5.2, 7.1/7.2）。
-- `render-plantuml`: 送信先が `plantumlUri` 固定、テーマが darkMode で切替、**`Content-Type` に `charset=UTF-8` を付与**、302応答/タイムアウトが例外化（4.2, 7, 9.3, 10.2）— axios をモック。日本語を含む図で文字化けしないこと（少なくとも UTF-8 指定を検証）。
-- `fetch-plantuml-svg`: 同一(source,darkMode)の2回目がメモから返りPOSTを重複しない（5.1）。
+- `render-plantuml`: 送信先が `plantumlUri` 固定、テーマが darkMode で切替、**`Content-Type` に `charset=UTF-8` を付与**、**上流400が `ClientDiagramError`（→422）として、302/5xx/タイムアウトが別クラス（→502/504）として例外化**（4.2, 6.3, 7, 9.3, 10.2）— axios をモック。日本語を含む図で文字化けしないこと（少なくとも UTF-8 指定を検証）。
+- `fetch-plantuml-svg`: 同一(source,darkMode)の2回目がメモから返りPOSTを重複しない（5.1）／**メモが max件数を超えると最古エントリを追い出す（境界テスト, #9）**／共有リンク文脈では `pageId`/`shareLinkId` を body に載せるがメモキーには含めない（#2）。
 
 ### Integration Tests
-- `server/routes/svg.integ.ts`: POSTでSVG 200（上流モック）／キャッシュヒットで上流未呼出（5.2）／本文サイズ超過で413（10.2）／未認証（ゲスト非許可時）で拒否（10.1）／上流302で502（9.3）。
+- `server/routes/svg.integ.ts`: POSTでSVG 200（上流モック）／キャッシュヒットで上流未呼出（5.2）／本文サイズ超過で413（10.2）／未認証（ゲスト非許可時）で拒否（10.1）／上流302で502（9.3）／**上流400で422（構文エラー; 誤設定扱いにしない, #5）**／**匿名＋有効な `pageId`+`shareLinkId` で200、匿名＋共有リンク無し/無効なら非公開インスタンスで401/403（10.3）**。
 
 ### Component Tests
-- `PlantUmlViewer.spec.tsx`: POST分岐で `fetchPlantumlSvg` を呼び自身の `objectURL` を `<img>` に設定、成功で rendering-status 完了（8.1）、失敗で error 状態（6.1）。unmountで自分の `objectURL` のみ revoke、**再mount時にメモ由来Blobから再取得して壊れない**（5.1所有権）。GET分岐は現行不変（3.1）。
+- `PlantUmlViewer.spec.tsx`: POST分岐で `fetchPlantumlSvg` を呼び自身の `objectURL` を `<img>` に設定、成功で rendering-status 完了（8.1）、失敗で error 状態（6.1）。unmountで自分の `objectURL` のみ revoke、**再mount時にメモ由来Blobから再取得して壊れない**（5.1所有権）。**fetch reject 時に rendering-status が 'false' に遷移する（onError 非発火経路, 8.2）**。**POST失敗の文言が method＋ステータス（413/422/502/504）で分岐し、GET向け文言を出さない（6.3、`useTranslation` モック）**。GET分岐は現行不変（3.1）。
 - `PageContentRenderer.spec.tsx`: `mockRendererConfig` に `plantumlHttpMethod` 追加（型整合）。
 - **（Req 11）** `PlantUmlViewer.spec.tsx`: **GET＋上限超過**で **POST推奨行が表示**される（`method='get'`）／**POSTモードや上限内では出ない**／文言はi18n（`useTranslation` モック）を検証。
 
@@ -351,14 +369,14 @@ interface SvgCache {
 - 自前PlantUMLサーバ＋`PLANTUML_HTTP_METHOD=post` で、GETでは414となる大きい図がリネームなしで描画（2.1, 2.2）。ライト/ダークでテーマ反映（7.1, 7.2）。
 
 ## Security Considerations
-- **アクセス制御（10.1）**: プロキシは `loginRequired`（ゲスト許可はインスタンス設定に追従）で保護。ページ閲覧が匿名可のインスタンスでのみ匿名描画を許可し、非公開インスタンスでは要ログイン。ページ単位権限は文脈が無いため対象外（Out of Boundary）。
+- **アクセス制御（10.1/10.3）**: チェーンは `certifySharedPage → loginRequiredFactory(crowi, true)`（＋`rejectLinkSharingDisabled`）。ページ閲覧が匿名可のインスタンス、または有効な共有リンク（body の `pageId`＋`shareLinkId`）を持つ匿名閲覧者に描画を許可し、それ以外の匿名要求は非公開インスタンスで拒否。**IDOR**: `certifySharedPage` は `ShareLink.findOne({ _id: shareLinkId, relatedPage: pageId })`（`$eq` ガード）で「A用の共有リンクでB」を弾く。`source` は保存レコードではなく client 供給テキストで束縛対象が無いが、共有閲覧者は元々ページ本文で全ソースを閲覧できるため露出は増えない。ページ単位権限は評価しない（Out of Boundary）。
 - **CSRF**: 本エンドポイントはユーザー固有状態を変更しない（キャッシュはコンテンツ addressable）。副作用が無いため CSRF トークンは要件としない。GROWI apiv3 標準の認証で足りる。
 - **SSRF**: 送信先は `PLANTUML_URI` に固定し、リクエスト由来URLは一切使わない（4.2）。
 - **XSS**: SVGは `<img>`（blob URL）でのみ描画。画像コンテキストのためSVG内スクリプトは非実行（4.1）。インラインSVG化はしない。
 - **悪用/DoS（10.2）**: **ハンドラ内サイズ検査による413**、上流タイムアウト（504）、キャッシュ件数/TTL上限でリソースを保護。レート制限は既存 `features/rate-limiter/`（グローバル適用）で自動被覆され、必要なら `API_RATE_LIMIT_*` env で当エンドポイントを厳格化。
 
 ## Performance & Scalability
-- **キャッシュ**: サーバ側 `hash(source,darkMode)` LRU（TTL＋件数上限）で上流描画を回避（5.1, 5.2）。クライアントのセッション内メモ（**`Blob` 保持、blob URLは非保持**）でSPA遷移時の再取得を回避。POSTはブラウザHTTPキャッシュを失うが、両キャッシュで再描画コストを吸収（Req 5はSHOULDのため許容）。
+- **キャッシュ**: サーバ側 `hash(source,darkMode)` LRU（TTL＋件数上限）で上流描画を回避（5.1, 5.2）。クライアントのセッション内メモは**上限付き（max件数／任意でTTL）の LRU**（**`Blob` 保持、blob URLは非保持**）でSPA遷移時の再取得を回避しつつメモリを境界化（無制限Mapは不採用＝research.md の既決方針に整合）。POSTはブラウザHTTPキャッシュを失うが、両キャッシュで再描画コストを吸収（Req 5はSHOULDのため許容）。
 - **B1採用の根拠**: 各POSTが本文完結でマルチインスタンスに堅牢。B2（別GET配信）は水平スケール時にGET側キャッシュミス→404の失敗モードがあるため不採用。
 - **テーマ**: サーバ側前置に集約したため、図が多いページでもクライアントDOM・転送量は増えない（Issue解消）。
 - **運用前提（nginx等の前段プロキシ）**: POSTはURL長制限を解消するが、上限は前段プロキシのリクエストボディ長へ移る。自前サーバ前段の nginx は `client_max_body_size` 既定 **1MB** を超えると **413** になるため、大きい図を通すには引き上げが必要。design/docs に運用注記として明記し、必要なら `render-plantuml`/proxy のサイズ上限（Req 10.2）とも整合させる。
