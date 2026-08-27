@@ -19,7 +19,9 @@ import request from 'supertest';
 
 import { getInstance } from '^/test/setup/crowi';
 
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
+import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument } from '~/server/models/page';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 import { prisma } from '~/utils/prisma';
@@ -47,12 +49,14 @@ vi.mock('~/server/middlewares/login-required', () => ({
 const FIXTURE_ROOT = '/inline-comment-create-route-integ';
 const requesterUsername = 'inline-comment-create-route-integ-requester';
 const ownerUsername = 'inline-comment-create-route-integ-owner';
+const mentionedUsername = 'inline-comment-create-route-integ-mentioned';
 
 describe('POST /_api/v3/inline-comments', () => {
   let app: express.Application;
   let crowi: Crowi;
   let requester: HydratedDocument<IUserHasId>;
   let owner: HydratedDocument<IUserHasId>;
+  let mentionedUser: HydratedDocument<IUserHasId>;
   let publicPage: HydratedDocument<PageDocument>;
   let forbiddenPage: HydratedDocument<PageDocument>;
 
@@ -63,7 +67,7 @@ describe('POST /_api/v3/inline-comments', () => {
     const User = mongoose.model<IUserHasId>('User');
 
     await User.deleteMany({
-      username: { $in: [requesterUsername, ownerUsername] },
+      username: { $in: [requesterUsername, ownerUsername, mentionedUsername] },
     });
     requester = await User.create({
       name: requesterUsername,
@@ -74,6 +78,11 @@ describe('POST /_api/v3/inline-comments', () => {
       name: ownerUsername,
       username: ownerUsername,
       email: `${ownerUsername}@example.com`,
+    });
+    mentionedUser = await User.create({
+      name: mentionedUsername,
+      username: mentionedUsername,
+      email: `${mentionedUsername}@example.com`,
     });
 
     publicPage = await Page.create({
@@ -122,8 +131,9 @@ describe('POST /_api/v3/inline-comments', () => {
       _id: { $in: [publicPage._id, forbiddenPage._id] },
     });
     await crowi.models.User.deleteMany({
-      username: { $in: [requesterUsername, ownerUsername] },
+      username: { $in: [requesterUsername, ownerUsername, mentionedUsername] },
     });
+    await InAppNotification.deleteMany({ user: mentionedUser._id });
   });
 
   const validBody = () => ({
@@ -159,6 +169,31 @@ describe('POST /_api/v3/inline-comments', () => {
       where: { id: res.body.inlineComment.id },
     });
     expect(row?.isInline).toBe(true);
+  });
+
+  it('notifies a user mentioned by @username in the comment body (requirement 3.2)', async () => {
+    const res = await request(app)
+      .post('/_api/v3/inline-comments')
+      .send({
+        ...validBody(),
+        comment: `hello @${mentionedUsername}, please take a look`,
+      });
+
+    expect(res.status).toBe(201);
+
+    // Observable side effect of CommentService.prepareMentionNotifications ->
+    // InAppNotificationService.insertMentionNotifications: a real
+    // InAppNotification row for the mentioned user, targeting the page the
+    // comment was posted on. This mirrors the row shape
+    // insertMentionNotifications() writes (see
+    // src/server/service/in-app-notification.ts).
+    const notification = await InAppNotification.findOne({
+      user: mentionedUser._id,
+      action: SupportedAction.ACTION_COMMENT_MENTION,
+      target: publicPage._id,
+      targetModel: SupportedTargetModel.MODEL_PAGE,
+    });
+    expect(notification).not.toBeNull();
   });
 
   it('returns 400 when anchor.quote is empty (service precondition)', async () => {

@@ -14,7 +14,9 @@ import request from 'supertest';
 
 import { getInstance } from '^/test/setup/crowi';
 
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
+import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument } from '~/server/models/page';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 import { prisma } from '~/utils/prisma';
@@ -42,12 +44,14 @@ vi.mock('~/server/middlewares/login-required', () => ({
 const FIXTURE_ROOT = '/inline-comment-create-reply-route-integ';
 const requesterUsername = 'inline-comment-create-reply-route-integ-requester';
 const ownerUsername = 'inline-comment-create-reply-route-integ-owner';
+const mentionedUsername = 'inline-comment-create-reply-route-integ-mentioned';
 
 describe('POST /_api/v3/inline-comments/:id/replies', () => {
   let app: express.Application;
   let crowi: Crowi;
   let requester: HydratedDocument<IUserHasId>;
   let owner: HydratedDocument<IUserHasId>;
+  let mentionedUser: HydratedDocument<IUserHasId>;
   let publicPage: HydratedDocument<PageDocument>;
   let forbiddenPage: HydratedDocument<PageDocument>;
   let originCommentId: string;
@@ -61,7 +65,7 @@ describe('POST /_api/v3/inline-comments/:id/replies', () => {
     const User = mongoose.model<IUserHasId>('User');
 
     await User.deleteMany({
-      username: { $in: [requesterUsername, ownerUsername] },
+      username: { $in: [requesterUsername, ownerUsername, mentionedUsername] },
     });
     requester = await User.create({
       name: requesterUsername,
@@ -72,6 +76,11 @@ describe('POST /_api/v3/inline-comments/:id/replies', () => {
       name: ownerUsername,
       username: ownerUsername,
       email: `${ownerUsername}@example.com`,
+    });
+    mentionedUser = await User.create({
+      name: mentionedUsername,
+      username: mentionedUsername,
+      email: `${mentionedUsername}@example.com`,
     });
 
     publicPage = await Page.create({
@@ -168,8 +177,9 @@ describe('POST /_api/v3/inline-comments/:id/replies', () => {
       _id: { $in: [publicPage._id, forbiddenPage._id] },
     });
     await crowi.models.User.deleteMany({
-      username: { $in: [requesterUsername, ownerUsername] },
+      username: { $in: [requesterUsername, ownerUsername, mentionedUsername] },
     });
+    await InAppNotification.deleteMany({ user: mentionedUser._id });
     // Replies before origins: comments.replyTo (`CommentToReply`) is a
     // required-relation-checked self-reference, so Prisma's Mongo connector
     // rejects deleting a parent row in the same deleteMany() call as a child
@@ -200,6 +210,28 @@ describe('POST /_api/v3/inline-comments/:id/replies', () => {
       comment: 'a reply',
       replyToId: originCommentId,
     });
+  });
+
+  it('notifies a user mentioned by @username in the reply body (requirement 3.2)', async () => {
+    const res = await request(app)
+      .post(`/_api/v3/inline-comments/${originCommentId}/replies`)
+      .send({ comment: `thanks @${mentionedUsername}, could you check?` });
+
+    expect(res.status).toBe(201);
+
+    // Observable side effect of CommentService.prepareMentionNotifications ->
+    // InAppNotificationService.insertMentionNotifications — same assertion
+    // shape as create.integ.ts's mention test. The target page here is the
+    // *origin* comment's page (parent.page), since createReply() passes the
+    // parent's page — not the reply row itself — to
+    // prepareMentionNotifications.
+    const notification = await InAppNotification.findOne({
+      user: mentionedUser._id,
+      action: SupportedAction.ACTION_COMMENT_MENTION,
+      target: publicPage._id,
+      targetModel: SupportedTargetModel.MODEL_PAGE,
+    });
+    expect(notification).not.toBeNull();
   });
 
   it('returns 404 when the parent id does not exist', async () => {
