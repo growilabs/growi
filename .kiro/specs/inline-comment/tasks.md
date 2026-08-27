@@ -57,7 +57,7 @@
   - _Requirements: 2.3, 5.1_
   - _Boundary: normalized-offset-mapping_
 
-- [ ] 2.5 あいまい一致マッチャーを実装する
+- [x] 2.5 あいまい一致マッチャーを実装する
   - `approx-string-match` `^2.0.0` を新規直接依存として追加する
   - 正規化前の `text` に対する完全一致箇所をすべて列挙し、`approxOffset` に最も近い候補を選ぶ。0件ならNFC正規化した上で `approx-string-match` の `search` を実行し（`maxErrors = Math.min(Math.ceil(quote.length * 0.2), 20)`）、複数候補があれば正規化後座標系での `approxOffset` 近さで選ぶ
   - 選ばれた一致位置を2.4の逆変換関数で正規化前オフセットへ変換する。完全一致・あいまい一致とも見つからなければ `not_found` を返す
@@ -177,3 +177,4 @@
 ## Implementation Notes
 
 - 2.4 (`normalized-offset-mapping.ts`): `NormalizedOffsetMapper` は `toOriginalOffset`/`toNormalizedOffset`/`normalizedText` のみを公開し、セグメントの `originalEnd` は非公開。あいまい一致の終了オフセットをそのまま逆変換すると、正規化で伸びた/書き換わったセグメント内部では境界が `originalStart` に丸まり、範囲が縮む可能性がある（2.5で終了オフセットを扱う際は、原文側で書記素境界にスナップして広げるなど別の対処が必要）。
+- 2.5 (`quote-matcher.ts`): 上記の終了オフセット縮み問題は、正規化テキスト側で変換前に書記素境界へスナップすることで対処済み（変換後の原文側スナップは `toOriginalOffset` が常にセグメント先頭＝原文の書記素境界を返すため no-op になる）。`matchQuote(text, anchor)` は呼び出しごとに `createNormalizedOffsetMapper(text)` を作り直す設計（signatureがdesignで固定されているため）。4.3 (AnchorResolver) で複数アンカーを同じ `text` に対して呼ぶ場合、静定1回あたり完全一致しないアンカーの数だけ書記素分割が再実行される点に注意（完全一致経路ではmapperを作らないため、そちらは軽い）。
