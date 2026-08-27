@@ -167,6 +167,7 @@
     "@xyflow/react": "^12.9.0",
     "JSONStream": "^1.3.5",
     "ai": "^6.0.176",
+    "approx-string-match": "^2.0.0",
     "archiver": "^5.3.0",
     "array.prototype.flatmap": "^1.2.2",
     "async-canvas-to-blob": "^1.0.3",
