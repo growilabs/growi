@@ -111,7 +111,8 @@ steering の `structure.md` が禁じているサーバ専用コードの混入�
 | `NotificationContract` | `contract/notification.ts` | 通知の往復と結果 | 2.1–2.6, 12.3 |
 | `AccountLinkContract` | `contract/account-link.ts` | 紐付けの開始と完了 | 7.1–7.7 |
 | `PairingContract` | `contract/pairing.ts` | ペアリングと鍵 | 9.1–9.7, 10.5 |
-| `SettingsContract` | `contract/settings.ts` | 設定と能力の一覧 | 1.3, 3.8, 11.1, 11.2, 11.4 |
+| `SettingsContract` | `contract/settings.ts` | 設定と能力の一覧を運ぶ | 1.3, 11.1, 11.2, 11.4 |
+| `UriGuard` | `url-guard/growi-uri-guard.ts` | 申告された URL の条件判定（純粋関数） | 9.2 |
 | `CommandNames` | `commands/command-names.ts` | コマンド名の語彙 | 11.1, 11.2, 14.1 |
 | `ChannelPermission` | `permission/channel-permission.ts` | チャンネル権限の判定 | 11.1–11.5, 14.4 |
 | `MessageSignature` | `signature/` | 署名の生成と検証 | 9.6, 10.1–10.7 |
@@ -130,9 +131,6 @@ export interface ChatAccountRef {
   /** 紐付いていない発言者の表示に使う（要件 5.3） */
   readonly displayName: string;
 }
-
-> **日時を表す文字列はすべて RFC 3339 の UTC 表記**（`2026-08-27T12:00:00Z`）。
-> `updatedAt` / `postedAt` / `validFrom` / `expiresAt` すべてに適用する。
 
 export interface ChannelRef {
   readonly platform: PlatformName;
@@ -305,6 +303,18 @@ export const verify: (params: VerifyParams) => Promise<VerifyResult>;
 
 - Postconditions: `verify` は例外を投げず、失敗の種類を返す（要件 10.2 の記録に使う）
 - Invariants: **秘密鍵は `sign` の外に出ない**（要件 9.6 / 10.6）
+- Invariants: **検証する側は、保存してある鍵に紐づく方式を使う。** リクエストが名乗る `alg` は
+  一致の確認にだけ使い、**処理の選択には使わない**。`alg` は送る側が名乗る値なので、
+  署名対象に入っていることが示すのは「経路上で書き換えられていない」ことだけである
+- Invariants: **受け入れる有効期間は最大 300 秒、時計のずれは 30 秒まで許す。**
+  `expiresInSec` は**送る側**の値なので、そのまま信じると 1 行の指定で 1 通が何年でも有効になる。
+  **`consumeNonce` に渡す期限は、送られてきた値ではなく受ける側が上限で切った値**にする。
+  これをしないと使い捨ての値の表が自動削除されず、単調に増える
+- Invariants: **再送は `requestId` を据え置き、`nonce` と `created` / `expires` を取り直して署名し直す。**
+  一度作った署名済みのリクエストをそのまま送り直すと、2 回目は必ず `replayed` で弾かれ、
+  記録した 1 回目の応答を返す経路まで**一度も届かない**
+- Invariants: **本文に載せた `relationId` が、署名から特定した関係と一致しないリクエストは `malformed` として断る。**
+  `relationId` に一本化した効き目は、この確認まで書いて完成する
 - Invariants: **`consumeNonce` は署名の検証に成功した後にだけ呼ぶ。** 先に呼ぶと、
   鍵の識別子を知っているだけの相手が使い捨ての値の表を膨らませられる
 - Invariants: 本体の無いリクエストにも空のバイト列に対する digest を付ける。
@@ -366,6 +376,8 @@ export interface ChallengeResponse {
   readonly challenge: string;
   /**
    * **③ で申告した秘密鍵で `challenge` に署名したもの。**
+   * 形は「`challenge` の UTF-8 表現に Ed25519 で署名し、base64url で符号化した文字列」。
+   * ここが揃わないと、両側が別々に実装した瞬間にペアリングが必ず失敗する。
    * これが無いと、所有確認は「その URL に居る誰かが登録コードを知っている」ことしか示さず、
    * **③ で申告された公開鍵がその相手のものであること**を示さない。
    */
@@ -400,7 +412,15 @@ export type KeyOperationResult =
 
 ```typescript
 /** GROWI → proxy。管理者が保存した時点で押し込む。要件 11.4「次の実行から反映」はこれで満たす */
-export interface SettingsPushRequest { readonly settings: RelationSettings }
+export interface SettingsPushRequest {
+  readonly settings: RelationSettings;
+  /**
+   * GROWI 側で更新した時刻。**proxy は自分が持つものより古い押し込みを捨てる。**
+   * これが無いと、管理者が続けて 2 回変えて 1 回目の再送が遅れて届いたときに、
+   * **古い設定が新しい設定を上書きする**（proxy には気づく手立てが無い）。要件 11.4 に触る。
+   */
+  readonly updatedAt: string;
+}
 
 /** proxy → GROWI（保険）。押し込みが届かなかったときに proxy が取りに行く */
 export interface SettingsPullResponse {
@@ -607,7 +627,7 @@ export const filterBroadcastTargets: (
 export interface CommandEnvelope {
   /** 再送しても変わらない。二重実行の判定に使う（要件 10.4）。**宛先ごとに別の値** */
   readonly requestId: string;
-  /** **`relationId` と同じ値。** 別名を作らない（下記） */
+  /** どの GROWI との関係か。**proxy がペアリング成立時に採番する**（下記「関係を指す識別子」） */
   readonly relationId: string;
   readonly actor: ChatAccountRef;
   /**
@@ -655,7 +675,13 @@ export type CommandResponse =
   | { readonly kind: 'error'; readonly code: 'forbidden' | 'path-conflict' | 'invalid' | 'not-permitted-in-channel' | 'no-settings' | 'unknown-kind'; readonly message: string };
 ```
 
-**再送したときの応答**: GROWI は処理済みの `(relationId, requestId)` に対し、**1 回目の `CommandResponse` をそのまま返す。**
+**通知の再送は宛先ごとに記録する**（`CommandRequest` とは扱いが違う）。
+`(relationId, requestId)` だけで記録して同じ応答を返すと、**やり直しは記録を読み直すだけで投稿を一度も試みない。**
+宛先の一部が `timeout` や `platform-error` だった通知は、何度やり直しても同じ結果が返って上限に達する。
+そこで **`(relationId, requestId, platform, channelId)` の単位で記録し、`posted` になった宛先だけを飛ばす。**
+やり直しが実際に働くのはこの形だけである。
+
+**コマンドの再送したときの応答**: GROWI は処理済みの `(relationId, requestId)` に対し、**1 回目の `CommandResponse` をそのまま返す。**
 これをしないと、再送の 2 回目が `path-conflict`（既にページがあります）になり、
 利用者は自分が作らせたページのリンク（要件 4.2）を受け取れない。
 
@@ -727,7 +753,8 @@ export type AccountLinkStartResponse =
 4. `judge` / `filterBroadcastTargets` — 既定値（書き込みは不許可・読み取りは許可）、`'all'`/`'none'`/一覧、
    複数 GROWI の絞り込み（11.1–11.3）
 5. **チャンネルの照合が `channelId` だけで行われること** — `channelName` を変えても判定が変わらないこと（11.3）
-6. 申告された URL の検証 — https 以外・既定外ポート・私的アドレス帯・リダイレクトが**すべて拒まれる**こと（9.2）
+6. `judgeGrowiUri` — https 以外・既定外ポート・私的アドレス帯が**すべて拒まれる**こと。
+   `allowList` に挙げた宛先は私的帯でも通ること（9.2）。**リダイレクトは proxy 側の担当なのでここでは試験しない**
 7. コマンド名の語彙 — `COMMAND_NAMES` に無い名前が `RelationSettings` に入らないこと（型で担保）
 8. **`judge` の既定値** — 設定が無いときと、設定はあるがそのコマンドの行が無いときで**同じ答え**になること（11.1）
 9. **再送の署名** — `requestId` を据え置き `nonce` を取り直した 2 回目が `replayed` にならず、

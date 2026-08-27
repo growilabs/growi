@@ -9,7 +9,7 @@
 **Purpose**: GROWI 本体の Gen 2 連携。proxy から届くコマンドを既存の機能（検索・ページ作成・権限判定）へつなぎ、
 GROWI 内のイベントを通知として送り、チャットの利用者を GROWI ユーザーへ紐付ける。
 
-**Impact**: `apps/app/src/features/chat-integration/`（新規）。既存ファイルの変更は通知の配り口に限る。
+**Impact**: `apps/app/src/features/chat-integration/`（新規）。既存ファイルの変更は**通知の配り口と、保存時に宛先を指定する経路**（要件 2.2）。
 **Gen 1（`packages/slack` と既存の `slack-integration`）には手を入れない。**
 
 ### Non-Goals
@@ -29,6 +29,8 @@ GROWI 内のイベントを通知として送り、チャットの利用者を G
 ### This Spec Owns
 
 - `CommandEndpoint` — proxy から届くコマンドの処理（要件 3.6/3.7, 4, 5, 6, 14.2）
+- **`content/` の 5 部品** — GROWI が送り出す中身の組み立てと、公開範囲による絞り込み（要件 2.1–2.3, 3.6, 3.7, 3.9, 6.2, 6.3, 14.2）
+- **`ProxyClient`** — GROWI から proxy へ送る唯一の口
 - `NotificationSender` — Gen 2 の宛先への通知（要件 2, 12.3）
 - `ChatAccountLink` — チャット利用者と GROWI ユーザーの紐付け（要件 7）
 - `KeyStore`（GROWI 側の実装）— 自分の鍵と proxy の公開鍵（要件 9.5, 10.5）
@@ -39,14 +41,15 @@ GROWI 内のイベントを通知として送り、チャットの利用者を G
 
 - **Gen 1 の実装。** `packages/slack`、`slack-integration.ts`、`slack-command-handler/*`、
   `User.slackMemberId` — いずれも読むだけで変更しない
-- GROWI の検索・ページ作成・権限判定の実装
+- GROWI の検索の索引・クエリ・スコアリング、既存のページ作成の処理そのもの
+  （**返す前の絞り込みと、ページ作成の権限判定・重複の事前確認はこの spec が持つ**）
 
 ### Allowed Dependencies
 
 | 依存先 | 制約 |
 |---|---|
 | `@growi/chat` | 契約型・権限判定は `index.ts` から、署名は `server.ts` から。**client 側は `index.ts` だけ** |
-| GROWI 既存の検索サービス・ページ作成・権限判定 | 呼ぶだけ。実装を変えない |
+| GROWI 既存の検索サービス・ページ作成・権限判定 | 呼ぶ。**返す前の絞り込みはこの spec が足す**（実装は変えない） |
 
 ### Revalidation Triggers
 
@@ -114,7 +117,7 @@ apps/app/src/features/chat-integration/
 | Component | File | Intent | Req Coverage |
 |---|---|---|---|
 | `NotificationContent` | `server/content/notification-content.ts` | 6 イベントぶんの通知の文面 | 2.1, 2.2, 2.3 |
-| `SearchResultMapper` | `server/content/search-result-mapper.ts` | 検索結果を構造化データへ | **3.9** |
+| `SearchResultMapper` | `server/content/search-result-mapper.ts` | 検索結果を構造化データへ（日時は RFC 3339 の UTC 表記） | **3.9** |
 | `LinkPreviewMapper` | `server/content/link-preview-mapper.ts` | ページを要約へ | 6.2, 6.3 |
 | `HelpContent` | `server/content/help-content.ts` | このバージョンが提供するコマンド | 14.2 |
 | `RestrictedPageFilter` | `server/content/restricted-page-filter.ts` | 公開範囲で落とす | 2.3, 3.6, 3.7, 6.3 |
@@ -125,7 +128,7 @@ apps/app/src/features/chat-integration/
 | `ChatAccountLink` | `server/account-link/` | 紐付け | 7.1–7.7 |
 | `KeyStore` | `server/keys/key-store.ts` | 鍵の保持と入れ替え | 9.5, 10.5, 10.6 |
 | `SignatureGuard` | `server/signature-guard.ts` | 届くリクエストの検証 | 10.1–10.4 |
-| `ProxyClient` | `server/proxy-client.ts` | **GROWI から proxy へ送る唯一の口**（通知・ペアリングの申請・設定の反映・鍵の登録と失効） | 2.1–2.6, 9.5, 10.5, 11.1, 11.4 |
+| `ProxyClient` | `server/proxy-client.ts` | **GROWI から proxy へ送る唯一の口**（通知・ペアリングの申請・設定の反映・鍵の登録と失効・能力の一覧・チャンネルの一覧） | 1.3, 2.1–2.6, 9.5, 10.5, 11.1, 11.2, 11.4 |
 | `PairingEndpoint` | `server/pairing/pairing-endpoint.ts` | 所有確認に答える | 9.2, 9.3 |
 
 ---
@@ -140,7 +143,8 @@ export interface ResolvedActor {
 
 export interface CommandEndpoint {
   handle(request: CommandRequest): Promise<CommandResponse>;
-  resolveActor(actor: ChatAccountRef): Promise<ResolvedActor>;
+  /** `ChatAccountRef` に workspace の軸は無いので、`relationId` も受け取る（一意キーに入っているため） */
+  resolveActor(relationId: string, actor: ChatAccountRef): Promise<ResolvedActor>;
 }
 ```
 
@@ -163,8 +167,22 @@ Gen 1 の `/growi search` は既定設定のまま非公開ページのパスを
 （`slack-command-handler/search.js:48-63` は `formatSearchResult` すら通っていない）、
 **「Gen 1 の呼び方を正す」だけでは同じ状態が残る。**
 
-→ **この feature が、返す前にページごとの公開範囲を見て落とす段を持つ。**
-紐付いていなければ誰でも閲覧できるものだけ、紐付いていればその人が所有するものと所属グループのものまで。
+→ **この feature が、返す前にページごとの公開範囲を見て落とす段を持つ。** ただし次の 3 つを決めないと実装できない。
+
+**規則** — **`PageQueryBuilder.addConditionToFilteringByViewer`（`Page.isAccessiblePageByViewer` が使うもの）と同じ判定にする。**
+一番近く見える `canShowSnippet`（`search.ts`）を写してはいけない — **両方向に間違っている**。
+特定ユーザー限定（`GRANT_SPECIFIED`）は 4 つの分岐のどれにも当たらず最後の `return true` に落ちて**素通り**し、
+グループ限定は `grantedGroups` の中身が `{ type, item }` の形なのに 24 桁の ID 文字列と比べているので**常に一致せず、
+メンバー本人でも落ちる**。後者は安全な側に外れているため誰も気づいておらず、確かめるテストもリポジトリにない。
+
+**材料** — **検索結果だけでは判断できない。** `createSearchQuery` が取り出すのは `path` / 各種の件数 /
+`updated_at` / `tag_names` / `comments` だけで、`grant` も `grantedUsers` も `grantedGroups` も含まれない。
+判定にはページ本体が要る。**`formatSearchResult` が `findPageListByIds` で既にページを読んでいるので、そこに乗る** —
+1 件ごとの追加の読み出しはしない。
+
+**件数と順位** — `limit` 件取ってから落とすと、利用者が求めた件数に届かず `SearchResultItem.rank` に穴が空く。
+proxy はこの `rank` を `weight / (k + 順位)` に入れて複数 GROWI の結果を混ぜるので、穴がそのまま最終的な並びに効く。
+**`limit` の 3 倍を取ってから落とし、落とした後に順位を 1 から振り直す。** 3 倍でも足りなければ足りないまま返す。
 
 **ページ作成（要件 4.5 / 4.6）** — `pageService.create`（`server/service/page/index.ts:4840`）が見るのは
 パスの重複と公開範囲の整合性だけで、**「この人がここに書いてよいか」は判定していない**。
@@ -193,11 +211,10 @@ Gen 1 の `/growi search` は既定設定のまま非公開ページのパスを
                           ↓
 ② NotificationDispatcher（別処理）
       → proxy へ送る → NotificationResult を受け取る → 行に書き戻す
-      → 届かなければ間隔を空けてやり直す（同じ requestId で。要件 10.4 が効く）
+      → 届かなければ間隔を空けてやり直す（同じ requestId・**まだ posted でない宛先だけ**。要件 10.4）
       → 諦めた分と bot-not-in-channel を運用者が見られる場所に残す（要件 2.4）
 ```
 
-```typescript
 **文面は `NotificationContent` が作る。** `enqueue` が `markdown` を受け取るのは、
 **非公開ページの本文を落とす作業を `RestrictedPageFilter` が済ませた後**だからである
 （`containsRestrictedPage` は proxy への申し送りにすぎず、落とす場所ではない）。
@@ -231,6 +248,11 @@ export interface NotificationDispatcher {
 ```
 
 - **`requestId` は行を作るときに 1 度だけ採番し、再送しても変えない**（要件 10.4）
+- **やり直しは宛先ごと。** proxy は `(relationId, requestId, platform, channelId)` の単位で記録するので、
+  `posted` になった宛先は飛ばされ、失敗した宛先だけが再び試される。
+  `(relationId, requestId)` だけで記録する形だと、**やり直しは記録を読み直すだけで投稿を一度も試みない**
+- **署名は作り直す。** `requestId` は据え置くが `nonce` と `created` / `expires` は取り直す
+  （protocol の `MessageSignature` の不変条件。しないと 2 回目が必ず `replayed` で弾かれる）
 - 書き留める契機は 2 つ。**管理者がパス条件ごとに設定した通知**（要件 2.1）と、
   **編集した人がページの保存時に宛先を指定した通知**（要件 2.2）。どちらも同じ outbox に入る
 - やり直しは間隔を空けて数回。上限を超えたら `given-up` として残す
@@ -273,7 +295,7 @@ export interface NotificationDispatcher {
 
 **Contracts**: Service [x] / State [x]
 
-- 状態モデル: `{ userId, platform, accountId, linkedAt }`、**`(platform, accountId)` に複合ユニーク索引**
+- 状態モデル: `{ relationId, userId, platform, accountId, linkedAt }`、**`(relationId, platform, accountId)` に複合ユニーク索引**
 - **`User` に項目を足さない。** 要件 7.1 が 1 ユーザー対 N アカウントを求めるため別コレクションにする。
   Gen 1 の `User.slackMemberId` はそのまま残し、Gen 2 は参照しない
 - **紐付けは GROWI ごとに成立する**（要件 7.2）。他の GROWI での紐付けには影響されない
@@ -290,14 +312,54 @@ export interface NotificationDispatcher {
 
 | コレクション | 主な項目 | 索引・寿命 |
 |---|---|---|
-| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `createdAt` | `relationId` 一意。**これが無いと送り先も分からない**（下記） |
-| `chat_account_links` | `relationId`, `userId`, `platform`, `accountId`, `linkedAt` | **`(relationId, platform, accountId)` 複合ユニーク**（下記） |
+| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `createdAt` | `relationId` 一意。**これが無いと送り先も分からない**（下記）。**紐付け解除（要件 9.7）で削除し、連なる鍵・チャンネル権限・宛先も消す** |
+| `chat_account_links` | `relationId`, `userId`, `platform`, `accountId`, `linkedAt` | **`(relationId, platform, accountId)` 複合ユニーク**（下記）。**利用者が解除するまで残る。** 関係の解除では消さない（下記の再ペアリングを参照） |
 | `chat_integration_keys` | `relationId`, `side`(`own`/`peer`), `keyId`, `key`, `validFrom`, `revokedAt` | `(relationId, side, keyId)` 一意。**紐付け解除で削除**（秘密鍵を残さない） |
 | `chat_notification_outbox` | `requestId`, `relationId`, `targets`, `markdown`, `state`, `attempts`, `result`, `createdAt` | `state` に索引。**送信済みは 30 日で TTL 索引により消す**。`given-up` は運用者が確認するまで残す |
 | `chat_processed_requests` | `relationId`, `requestId`, `response`, `processedAt` | `(relationId, requestId)` 一意。**TTL 索引で 24 時間**（再送が起こりうる間だけ） |
 | `chat_request_nonces` | `relationId`, `keyId`, `nonce`, `expiresAt` | `(relationId, keyId, nonce)` 一意。**`expiresAt` に TTL 索引** |
-| `chat_pending_pairings` | `registrationCode`, `growiUri`, `createdBy`, `expiresAt` | `registrationCode` 一意。**`expiresAt` に TTL 索引**。要件 9.2 の所有確認に使う |
+| `chat_pending_pairings` | `registrationCode`, `proxyUri`, `growiUri`, `createdBy`, **`ownKeyId`**, **`ownKeyPair`（暗号化）**, `expiresAt` | `registrationCode` 一意。**`expiresAt` に TTL 索引**。要件 9.2 の所有確認に使う |
+| `chat_channel_permissions` | `relationId`, `commandName`, `allowedChannels`, `updatedAt` | **`(relationId, commandName)` 一意。** 要件 11.1・11.2 の保存先で、`judge` に渡す `RelationSettings` の出どころ。`scope` は持たない（`BROADCAST_COMMANDS` から導く）。`updatedAt` は proxy が取りに来たときに返す（要件 11.4） |
 | `chat_notification_destinations` | `platform`, `channelId`, `pathPattern`, `triggerEvents`, `relationId` | 管理者が設定する。Gen 1 の設定とは**別に保存する**（要件 12.2） |
+
+#### ペアリングの途中に、自分の鍵を置く場所が要る（順序の矛盾）
+
+protocol の手順 ⑤ で GROWI は **③ で申告した秘密鍵で `challenge` に署名する**。
+つまり**鍵ペアは ③ を送る前に作って保存されていなければならない**。
+ところが `chat_integration_keys` の一意キーは `(relationId, side, keyId)` で、
+その **`relationId` は ⑥ で proxy が採番して初めて手に入る**。このままでは置き場所が無い。
+
+→ **ペアリングの途中の鍵は `chat_pending_pairings` の行に持つ**（`ownKeyId` と暗号化した `ownKeyPair`）。
+⑥ で `PairingResult.relationId` を受け取った時点で `chat_integration_keys` へ移し、保留の行は消す。
+`proxyUri` も同じ行に記録し、**⑤ で「送信先の proxy と自分が申告した `keyId`」を突き合わせる**（protocol の要求）。
+
+#### GROWI 側の受け口（proxy から届くもの）
+
+`SignatureGuard` を通った後、**`@growi/chat` の `parseCommandRequest` で本文の形を確かめてから**処理する
+（署名は「経路上で書き換えられていない」ことしか示さない）。受け口は 5 つ。
+
+| 口 | 中身 | 要件 |
+|---|---|---|
+| コマンド | `CommandRequest` → `CommandResponse` | 3.6, 3.7, 4, 5, 6, 14.2 |
+| 鍵の追加 | `KeyRegistrationRequest` → `KeyOperationResult` | 10.5 |
+| 鍵の失効 | `KeyRevocationRequest` → `KeyOperationResult`。**有効な鍵が 0 本になる要求は `would-leave-no-valid-key` で断る** | 10.5 |
+| 設定の取り出し | → `SettingsPullResponse`（`updatedAt` つき） | 11.4 |
+| 紐付けの開始 | `AccountLinkStartRequest` → `AccountLinkStartResponse` | 7.3 |
+| 所有の確認 | `OwnershipChallenge` → `ChallengeResponse`（**`challengeSignature` を含む**） | 9.2 |
+
+`ProxyClient`（GROWI → proxy）が送るもの:
+
+| 送るもの | 型 | 要件 |
+|---|---|---|
+| 通知 | `NotificationRequest` → `NotificationResult` | 2.1–2.6 |
+| ペアリングの申請 | `PairingSubmission` → `PairingResult` | 9.1–9.5 |
+| 設定の押し込み | **`SettingsPushRequest`**（`updatedAt` つき） | 11.1, 11.2, 11.4 |
+| 鍵の追加・失効 | `KeyRegistrationRequest` / `KeyRevocationRequest` → `KeyOperationResult` | 10.5 |
+| 能力の一覧 | → **`CapabilityReport`** | 1.3 |
+| チャンネルの一覧 | → その installation のチャンネル | 11.1（管理画面が宛先を選ぶため） |
+
+**設定を変えたら押し込む**（要件 11.4「次の実行から反映」はこれで満たす）。押し込みが失敗しても、
+proxy が `SettingsPullResponse` で取りに来るので取りこぼしは埋まる。
 
 #### 関係を表すコレクションが要る理由
 
@@ -319,6 +381,15 @@ export interface NotificationDispatcher {
 protocol spec が「`keyId` を単独で鍵にすると別の関係のものを引く」を最も間違えやすい箇所として挙げているのと
 **同じ形の誤り**である。したがって `(relationId, platform, accountId)` を一意にする。
 
+> **再ペアリングで紐付けを失わせない。** `relationId` は proxy が採番するので、一度解除して繋ぎ直すと値が変わる。
+> `chat_account_links` の一意キーを `relationId` にすると、**繋ぎ直しただけで全利用者の紐付けが消える。**
+> そこで**索引は `(relationId, platform, accountId)` にしつつ、`chat_relations.workspaceId` が同じ関係へは引き継ぐ** —
+> 繋ぎ直しのときに古い `relationId` の行を新しい `relationId` へ移す。
+>
+> **要件 7.4 の「同じ GROWI 内で一意」との関係**: 同じ GROWI に 2 つの workspace が紐づくとき、
+> 同じ `accountId` を別の利用者が取れる。**これは正しい振る舞い**（別の workspace の別人なので）。
+> protocol の `taken-by-another-user` の注記もこの意味で読む。
+
 > **要件 7.2（紐付けは GROWI ごと）とも噛み合う。** 同じ GROWI に 2 つの workspace が紐づくなら、
 > 利用者はそれぞれについて紐付ける。
 
@@ -337,8 +408,8 @@ protocol spec が「`keyId` を単独で鍵にすると別の関係のものを�
 2. **`searchKeyword` の引数の並び**を明示的に検証すること。引数がずれても型が通る形だったのが Gen 1 の欠陥（3.6）
 3. `RestrictedPageFilter` — 公開・特定ユーザー限定・所有者限定・グループ限定・リンク限定の 5 種について、
    紐付いている場合といない場合で落ちるものが正しいこと（3.6・3.7・2.3・6.3）
-3. 再送への応答 — 同じ `(relationId, requestId)` の 2 回目に**1 回目の応答がそのまま返ること**（10.4・4.2）
-4. 要件 12.4 の判定 — Gen 1 と Gen 2 に同じチャンネル名があれば注意喚起が出ること
+4. 再送への応答 — 同じ `(relationId, requestId)` の 2 回目に**1 回目の応答がそのまま返ること**（10.4・4.2）
+5. 要件 12.4 の判定 — Gen 1 と Gen 2 に同じチャンネル名があれば注意喚起が出ること
 
 ### Integration Tests
 
