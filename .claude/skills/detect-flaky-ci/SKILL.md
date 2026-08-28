@@ -69,9 +69,10 @@ first:
    signal (see "Cheap Suspicion Mining" below). Passive: waits for a future
    run to repeat it (`--vitest-threshold`).
 2. **`flaky/suspected`** — a vitest observation that also matches one or more
-   of the four cheap, mechanical signals in "Cheap Suspicion Mining" (diff/PR
-   mismatch, sandwich pattern, matrix divergence, or a targeted historical
-   backfill hit). No LLM judgment is spent getting here — these are
+   of the five cheap, mechanical signals in "Cheap Suspicion Mining" (diff/PR
+   mismatch, sandwich pattern, matrix divergence, a shared setup-hook timeout
+   with cross-file slowdown, or a targeted historical backfill hit). No LLM
+   judgment is spent getting here — these are
    grep/diff-level checks against data this skill already fetched (or, for
    ④, a small bounded amount of extra targeted fetching). Handed to
    `investigate-flaky-test`, which spends exactly one rerun to turn this
@@ -89,36 +90,44 @@ actual rerun, which is an investigation action, not a detection action.
 ## Cheap Suspicion Mining (vitest only)
 
 Before falling back to passive `--vitest-threshold` accumulation, check each
-vitest failure identity against four mechanical signals. All four are
-grep/diff/API-field comparisons — no log-content reasoning beyond a literal
-string search, no code reading. ①-③ run against a **fresh** observation
-made during this scan; ④ runs once per scan against **existing**
-`flaky/observing` issues regardless of whether anything new was observed
-for them today (see its own subsection below for why it's structured
-differently).
+vitest failure identity against five mechanical signals. ①-③ and ⑤ are
+grep/diff/API-field comparisons — no code reading and no qualitative log
+judgment; ⑤ additionally needs one extra log fetch (a nearby passing run
+of the same job) to compare numbers against, but the comparison itself is
+still mechanical (duration deltas), not reasoning about *why*. ①-③ and ⑤
+run against a **fresh** observation made during this scan; ④ runs once per
+scan against **existing** `flaky/observing` issues regardless of whether
+anything new was observed for them today (see its own subsection below for
+why it's structured differently) — ④'s number is legacy (it was added
+before ⑤) and does not reflect run order; the fresh/existing split is what
+matters, not the numbering.
 
-**Evaluate all of ①-③ for every fresh observation — do not stop at the
-first hit.** All three reuse data already fetched in Steps 1-2 (no extra API
-calls), so short-circuiting saves nothing. It also actively loses
-information: ① (diff/PR mismatch) is the loosest of the three — it only
+**Evaluate all of ①-③ and ⑤ for every fresh observation — do not stop at
+the first hit.** All reuse data already fetched in Steps 1-2 (⑤ needs one
+extra log fetch, see below, but no extra run/job listing), so
+short-circuiting saves little. Stopping early also actively loses
+information: ① (diff/PR mismatch) is the loosest of the four — it only
 needs "the PR/commit diff doesn't touch this area" — so it tends to match
-almost any isolated failure before ② or ③ get evaluated. Stopping at ①
+almost any isolated failure before ②, ③, or ⑤ get evaluated. Stopping at ①
 means never learning whether the same failure also had a same-commit
-matrix-divergence proof (③, arguably the strongest of the three — it's a
-same-commit, same-code comparison, not an inference from an unrelated
-diff) or a sandwich pattern (②). Left unrecorded, this makes ②/③ look like
-they never fire in practice, when in fact they may be firing constantly
-underneath ①'s wider net — record every check that matches, not just the
-first:
+matrix-divergence proof (③, arguably the strongest of the three original
+signals — it's a same-commit, same-code comparison, not an inference from
+an unrelated diff), a sandwich pattern (②), or a measured cross-file
+slowdown (⑤, the strongest signal of all when it hits — it's a direct
+resource-contention measurement, not an inference). Left unrecorded, this
+makes ②/③/⑤ look like they never fire in practice, when in fact they may
+be firing constantly underneath ①'s wider net — record every check that
+matches, not just the first:
 
-- **Record every match.** Note in this run's evidence which of ①/②/③ hit,
+- **Record every match.** Note in this run's evidence which of ①/②/③/⑤ hit,
   even when more than one did.
 - **Report all matched checks in the issue**, not just one (see the issue
   body template below) — a reader deciding how much to trust "suspected"
   should see every corroborating signal, not whichever happened to be
   checked first.
 - **When space forces picking a single headline reason** (e.g. a short
-  status line), prefer the strongest evidence, not check order: ③ (same
+  status line), prefer the strongest evidence, not check order: ⑤ (measured
+  cross-file slowdown, a direct resource-contention measurement) > ③ (same
   commit, same code, divergent outcome) > ② (disappears-and-reappears
   within the window) > ① (diff/PR mismatch, an inference rather than a
   direct comparison).
@@ -166,8 +175,44 @@ all. Get sibling job results from the Step 2 jobs-list call you already made
 for this run (`gh api repos/growilabs/growi/actions/runs/{RUN_ID}/jobs`) —
 filter by job name prefix, compare conclusions.
 
-If none of ①-③ hit for a fresh observation, fall through to the existing
-passive `flaky/observing` / `--vitest-threshold` path unchanged.
+**⑤ Setup-hook timeout with cross-file slowdown.** A failure whose error is
+`Hook timed out in Nms` on a hook registered in a Vitest **project's
+`setupFiles`** (not a spec file's own `beforeAll`/`afterAll`) — e.g.
+`test/setup/migrate-mongo.ts`, `test/setup/crowi.ts`'s `getInstance()` — is
+shared across every spec file the pool assigns to whichever worker hit it,
+so the failing spec file is often incidental, not the cause. Do not
+classify this as a problem with the named hook (or, worse, propose a bare
+timeout bump on it) without checking whether the whole run was under
+unusual load, which this signal measures directly:
+
+1. Get the failing job's per-file duration lines (the reporter's own
+   `✓ |app-integration| path/to/file.integ.ts (N tests) NNNNms` lines —
+   strip ANSI codes first: `sed -E 's/\x1b\[[0-9;]*m//g'`).
+2. Find a **passing** run of the *same job* (same workflow, same matrix
+   cell) close in time — the sibling matrix cell from ③'s check often
+   already qualifies; otherwise the nearest earlier passing run of the same
+   job name.
+3. Compare 3-5 *unrelated* files' durations (files with no connection to
+   the failing hook or to each other) between the two runs. If they are
+   consistently and substantially slower (this investigation's worked
+   example: 2.6-3.4x) in the failing run, that is direct, measured evidence
+   the whole run — not the named hook — was under unusual load. If the
+   comparison files run at roughly the same speed in both runs, this signal
+   does not fire; do not force it.
+
+Do **not** use per-line `console.log` timestamps from the raw CI log to
+reason about *when within the run* something happened — Vitest/CI log
+capture can buffer a worker's stdout and flush it in one burst near the
+job's end, so dozens of unrelated timestamps landing in the same
+one-second window is an artifact of that buffering, not proof of
+tail-of-run clustering. (This investigation initially misread exactly that
+pattern as "failures cluster at the end of the run" before discovering the
+buffering.) The reporter's own summary `Duration`/per-file `NNNNms` figures
+are computed by Vitest's internal timer, not from log-line timestamps, and
+remain trustworthy for the comparison in step 3.
+
+If none of ①-③ or ⑤ hit for a fresh observation, fall through to the
+existing passive `flaky/observing` / `--vitest-threshold` path unchanged.
 
 **④ Targeted historical backfill (existing `flaky/observing` issues only).**
 ①-③ only look at data already in hand for *today's* observation. This one
@@ -237,7 +282,7 @@ promotion rule as ①-③ applies. If the deeper search finds nothing, leave
 the issue at `flaky/observing` and move on; this is not a required gate, it
 is a best-effort extra pass.
 
-Genuinely subtle flakiness that doesn't show up in any of ①-④ still needs
+Genuinely subtle flakiness that doesn't show up in any of ①-⑤ still needs
 the old accumulation path (or a human/LLM eyeballing it later) — none of
 these checks are exhaustive.
 
@@ -817,10 +862,10 @@ Step 1.5 skip-list (already-known, not re-fetched), how many jobs actually
 scanned, how many classified as infra noise (with which pattern), how many
 new issues created, how many existing issues updated, how many escalated to
 `flaky/suspected` vs `flaky/confirmed`, and **a separate hit count for each
-of the four mining checks** (①, ②, ③, ④'s backfill) — since all of ①-③ are
-now evaluated for every observation rather than stopping at the first hit,
-one suspected issue can match more than one check, so these four counts
-will not sum to the total number of suspected issues. Report them
+of the five mining checks** (①, ②, ③, ⑤, ④'s backfill) — since all of
+①-③ and ⑤ are now evaluated for every observation rather than stopping at
+the first hit, one suspected issue can match more than one check, so these
+five counts will not sum to the total number of suspected issues. Report them
 separately anyway; this is the data that answers "which of these checks is
 actually pulling weight" over time. This is the only user-facing output —
 do not create files.
@@ -851,7 +896,7 @@ do not create files.
   jobs could not be evidenced and continue with what you can read (run/job
   metadata, conclusions) rather than stopping the whole scan; do not
   silently skip affected runs without reporting them in Step 5.
-- Cheap suspicion mining (① / ② / ③ / ④) finds no clean signal either way
+- Cheap suspicion mining (① / ② / ③ / ④ / ⑤) finds no clean signal either way
   (e.g. a PR touches half the repo, or matrix siblings are also failing for
   unrelated reasons): do not force a tier — fall through to
   `flaky/observing` and let the passive threshold path handle it. These
