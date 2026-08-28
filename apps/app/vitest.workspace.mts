@@ -13,27 +13,38 @@ import {
 // child process, and crowi.ts's getInstance() does a cold Crowi init. Both
 // memoize a module-level singleton, but that memoization does NOT make
 // either one "once per worker" — Vitest's `forks` pool resets the module
-// registry per file under the default `isolate: true` (required here: this
-// project's per-file mongo teardown/reconnect in test/setup/mongo/index.ts
-// conflicts with isolate: false's shared module cache — confirmed by
-// reproducing the failure locally, same hazard the app-integration-vault
-// project's isolate: false comment below describes for its own case). So
-// this cost recurs on nearly every file, all run long, not just at worker
-// startup. Vitest's default fork pool sizes itself to availableParallelism(),
-// so on a CI runner (also running MongoDB and Elasticsearch as sibling
-// services) multiple files' setup child processes can end up competing for
-// the same cores at once — confirmed CI log for #11820/#11821/#11822 shows
-// three files' getInstance() hooks timing out in the same ~1s window near
-// the end of a 530s run, alongside a fourth file that succeeded but took
-// 8.4s for work that normally takes ~1s. That contention, not either setup
-// step being inherently slow (measured unloaded cold init is ~0.9s), is
-// what pushed both hookTimeout (#11752, migrate-mongo, already 2x the
-// default) and getInstance() past their limits under load. Capping fork
-// count reduces how many files' worth of this recurring cost can land on
-// the runner at the same moment; it does not make the cost itself go away
-// (that would require making the singleton a real per-worker singleton,
-// which isolate: false would give us if it didn't conflict with the mongo
-// setup above — left as a follow-up, not attempted here).
+// registry per file under the default `isolate: true`, so this cost
+// recurs on nearly every file, all run long, not just at worker startup.
+//
+// Making it a real once-per-worker singleton (isolate: false) was
+// investigated and rejected, for a reason more fundamental than a fixable
+// conflict: confirmed by logging VITEST_WORKER_ID per file, this project's
+// `growi_test_${workerId}` database naming (test/setup/mongo/test-db-config.ts)
+// is assigned per FILE, not per physical worker process — the same reused
+// OS process was handed VITEST_WORKER_ID 2 then 4 across two files in one
+// observed run. A persisted Crowi singleton would keep model bindings from
+// the first file's database while mongo/index.ts's beforeAll/afterAll
+// reconnects the shared mongoose connection to the second file's different
+// database underneath it — reproduced locally as cross-file assertion
+// failures (data written under one dbName, read as missing under another),
+// intermittently rather than every run. Realizing "once per worker" for
+// real would require reworking how database identity is assigned so it
+// tracks the physical process rather than the logical file/task — a larger,
+// separate change, not attempted here.
+//
+// So instead: Vitest's default fork pool sizes itself to
+// availableParallelism(), so on a CI runner (also running MongoDB and
+// Elasticsearch as sibling services) multiple files' setup child processes
+// can end up competing for the same cores at once — confirmed CI log for
+// #11820/#11821/#11822 shows three files' getInstance() hooks timing out in
+// the same ~1s window near the end of a 530s run, alongside a fourth file
+// that succeeded but took 8.4s for work that normally takes ~1s. That
+// contention, not either setup step being inherently slow (measured
+// unloaded cold init is ~0.9s), is what pushed both hookTimeout (#11752,
+// migrate-mongo, already 2x the default) and getInstance() past their
+// limits under load. Capping fork count reduces how many files' worth of
+// this recurring cost can land on the runner at the same moment — a
+// mitigation, not a fix for the underlying per-file recurrence.
 const integrationMaxForks = Math.max(1, availableParallelism() - 1);
 
 const configShared = defineConfig({
