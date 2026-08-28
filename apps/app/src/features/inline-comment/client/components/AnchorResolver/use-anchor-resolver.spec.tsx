@@ -124,4 +124,61 @@ describe('useAnchorResolver', () => {
       Array.from(firstResolved.entries()),
     );
   });
+
+  it('resolves anchors that arrive after mount, with no further DOM settle event', async () => {
+    // Reproduces the real-world gap: on a plain markdown page (no lsx/drawio/
+    // mermaid widget), useContainerSettle fires exactly once, at mount,
+    // before useSWRxInlineComments(pageId) has resolved its list fetch — so
+    // the hook is first rendered with `anchors: []`. Because the container
+    // never settles again (no rendering element ever appears to re-arm the
+    // observer), the real anchors that arrive afterward must be picked up by
+    // some other mechanism, not by a second settle event.
+    container.textContent = 'The quick brown fox jumps over the lazy dog.';
+
+    const { result, rerender } = renderHook(
+      ({ anchors }) => useAnchorResolver(containerRef, anchors),
+      { initialProps: { anchors: [] as AnchorResolverInput[] } },
+    );
+
+    // The SWR fetch resolves later, handing back the real anchor list. No
+    // DOM mutation happens here — the container's rendered text is unchanged
+    // — so no settle event fires; only `anchors` itself changes.
+    rerender({ anchors: [anchorOf('c1', 'quick brown fox', 4)] });
+
+    await waitFor(() =>
+      expect(result.current.get('c1')).toMatchObject({ status: 'exact' }),
+    );
+  });
+
+  it('does not keep recomputing when anchors is replaced by a new array with identical content', async () => {
+    // useSWRxInlineComments hands back a new array reference on every
+    // revalidation even when the comment list itself hasn't changed. If the
+    // hook depended on that reference directly, this would recompute (and
+    // produce a new Map) on every single revalidation tick, forever. Guard
+    // against that: replacing `anchors` with a content-identical array must
+    // not perturb the resolved output.
+    container.textContent = 'alpha needle beta gamma delta needle omega';
+
+    const { result, rerender } = renderHook(
+      ({ anchors }) => useAnchorResolver(containerRef, anchors),
+      { initialProps: { anchors: [anchorOf('c1', 'needle', 30)] } },
+    );
+
+    await waitFor(() => expect(result.current.get('c1')).toBeDefined());
+    const settledResolved = result.current;
+
+    // Re-render several times with a brand-new array instance carrying the
+    // exact same id/anchor content — simulating repeated SWR revalidations.
+    for (let i = 0; i < 5; i += 1) {
+      rerender({ anchors: [anchorOf('c1', 'needle', 30)] });
+    }
+
+    // Give any (incorrect) effect loop a chance to run before asserting.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    // Same reference: proves no recompute was triggered by the
+    // content-identical-but-reference-different anchors array, i.e. no
+    // infinite (or even single extra) recompute loop.
+    expect(result.current).toBe(settledResolved);
+  });
 });

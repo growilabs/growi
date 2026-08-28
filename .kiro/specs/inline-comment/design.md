@@ -307,7 +307,7 @@ flowchart TD
 | InlineCommentService | Server | 作成・返信・一覧・解決トグルの永続化とActivity発行 | 1.1-1.6, 1.8-1.9, 3.2, 4.1-4.5, 5.4-5.5, 6.1, 6.3 | `prisma.comments`(P0), `CommentService`(P0) | Service, API |
 | rendered-text (`renderedTextOf`) | Client / ロジック | 除外対象を除いたプレーンテキストとDOM位置マッピングを構築 | 2.1-2.4, 5.1-5.3 | DOMコンテナ(P0) | State |
 | quote-matcher (`matchQuote`) | Client / ロジック | 完全一致→NFCあいまい一致→逆変換 | 2.1-2.4, 5.1-5.3 | `approx-string-match`(P0), `Intl.Segmenter`(P0) | Service |
-| AnchorResolver (`useAnchorResolver`) | Client / ロジック | 静定検知のたびに全起点アンカーを再計算しResolvedRangeを供給 | 2.1-2.4, 5.1-5.3 | rendered-text(P0), quote-matcher(P0), use-container-settle(P0) | State |
+| AnchorResolver (`useAnchorResolver`) | Client / ロジック | 静定イベントまたはanchors内容の変化のたびに全起点アンカーを再計算しResolvedRangeを供給 | 2.1-2.4, 5.1-5.3 | rendered-text(P0), quote-matcher(P0), use-container-settle(P0) | State |
 | use-text-selection | Client / ロジック | Selectionからアンカー候補（quote/prefix/suffix/offset）を構築 | 1.1-1.4, 1.7 | `Intl.Segmenter`(P1) | State |
 | SelectionCapture / InlineCommentForm / InlineCommentList / InlineCommentReplies / InlineCommentHighlight | Client / UI | 選択キャプチャ・作成フォーム・一覧・返信ネスト表示（読み取り表示でのメンションハイライト含む）・ハイライト描画（提示層） | 1.1-1.2, 1.8, 2.5-2.6, 3.1, 4.4 | 上記ロジック層 | — |
 
@@ -378,12 +378,15 @@ interface InlineCommentService {
 | Requirements | 2.1, 2.2, 2.3, 2.4, 5.1, 5.2, 5.3 |
 
 **Responsibilities & Constraints**
-- 永続キャッシュを持たない（Architecture節参照）。静定検知のたびに全件を冪等に再計算する
+- 永続キャッシュを持たない（Architecture節参照）。以下の2つのトリガーそれぞれで全件を冪等に再計算する
 - 対象は起点コメントのアンカーのみ。返信は対象外（アンカーを持たないため）
 - `renderedTextOf`／`quote-matcher` の合成のみを行い、DOM書き換え（ハイライト描画そのもの）は行わない。描画は `InlineCommentHighlight` の責務
+- **再計算トリガーは2つある。** (1) `use-container-settle` の静定イベント（非同期ウィジェットの解決を待つ経路）。(2) `anchors` 引数の**内容**が変化したとき（`useSWRxInlineComments` の一覧取得が非同期ウィジェットの静定と無関係なタイミングで完了するため）。静的な本文（`lsx`/`drawio`/`mermaid` を含まないページ）は初回マウント時に1回だけ静定し、以後は二度と静定イベントが発火しない。この場合、静定イベントだけに依存すると、静定発火時点でまだ空だった `anchors`（一覧取得が未完了）が実際のアンカーに置き換わっても再計算が走らず、ハイライトが永久に復元されない。トリガー(2)はこの隙間を埋める。`anchors` は再取得のたびに内容が同じでも新しい配列参照になりうるため、内容比較（深い等価性比較）で安定化した値を副作用の依存にし、内容が変わらない限り再計算しない
+- トリガー(2)は「静定済みであること」を検証しない。非同期ウィジェットが未解決のページで一覧取得がウィジェット解決前に完了した場合、トリガー(2)による再計算は描画途中のDOMに対して行われ、一時的に誤った結果（多くは `not_found`）になりうる。これは正常系のフォールバック（2.4/5.3）で吸収され、その後ウィジェット自身の静定イベント（トリガー(1)）が発火すれば再計算により自己修復する（後述「フロー上の決定事項」参照）。この相互作用のE2E検証はタスク6.4の責務とする
 
 **Dependencies**
 - Inbound: `use-container-settle` — 静定イベント（P0）
+- Inbound: `anchors` 引数自体の内容変化（P0）
 - Outbound: `rendered-text`, `quote-matcher`（P0）
 
 **Contracts**: Service [ ] / API [ ] / Event [ ] / Batch [ ] / State [x]
@@ -399,8 +402,8 @@ function useAnchorResolver(
   anchors: ReadonlyArray<{ id: string; anchor: InlineCommentAnchor }>,
 ): ReadonlyMap<string, ResolvedRange>;
 ```
-- 状態モデル: `containerRef` が指すDOMの静定イベントを購読し、そのたびに `renderedTextOf(container)` → 各アンカーへの `matchQuote` を実行して `Map` を再構築する
-- 整合性: 再計算は純粋な読み取り専用処理であり、DOMを変更しない。並行呼び出し（複数の静定イベントが短時間に連続した場合）は最後の完了分が状態を上書きする（React の状態更新の通常のセマンティクスに従う。追加のロック機構は設けない）
+- 状態モデル: `containerRef` が指すDOMの静定イベントを購読し、そのたびに `renderedTextOf(container)` → 各アンカーへの `matchQuote` を実行して `Map` を再構築する。加えて、`anchors` の内容が変化するたびに同じ再構築を独立して行う（上記Responsibilities参照）
+- 整合性: 再計算は純粋な読み取り専用処理であり、DOMを変更しない。並行呼び出し（複数の静定イベント、または静定イベントとanchors変化が短時間に連続した場合）は最後の完了分が状態を上書きする（React の状態更新の通常のセマンティクスに従う。追加のロック機構は設けない）
 
 #### `use-container-settle`
 
@@ -430,7 +433,7 @@ interface RenderedText {
 function renderedTextOf(container: HTMLElement): RenderedText;
 ```
 - 除外対象は `.katex`（KaTeXの標準トップレベルクラス）のみ。理由はSystem Flowsの「フロー上の決定事項」を参照
-- 呼び出し前提: `use-container-settle` が「静定」を発火した後にのみ呼ぶ。静定前に呼ぶと、描画途中のDOM（例: ローディングスピナーのテキスト）を対象にしてしまう
+- 呼び出し前提: `use-container-settle` が「静定」を発火した後にのみ呼ぶ。静定前に呼ぶと、描画途中のDOM（例: ローディングスピナーのテキスト）を対象にしてしまう。ただし `useAnchorResolver` の再計算トリガー(2)（anchors内容の変化）はこの前提を検証せずに呼び出す。非同期ウィジェットが未解決のまま一覧取得が先に完了した場合、その回だけは描画途中のDOMに対して呼ばれうる（詳細は AnchorResolver の Responsibilities & Constraints を参照）。結果が誤っても「見つからなければハイライトなし」のフォールバックで吸収され、後続の静定イベント（トリガー(1)）で自己修復される
 
 #### `quote-matcher` (`matchQuote`)
 
