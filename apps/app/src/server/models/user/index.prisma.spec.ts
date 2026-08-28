@@ -1,15 +1,18 @@
 /**
  * Guard for the Prisma `users` extension's `serializeSecurely()`.
  *
- * WHY this exists: `compute` receives the FULL result record and spreads
- * `...user`, so a credential field is only dropped if it is named in the
- * destructure — listing it in `needs` alone is not enough. When `passwordHash`
- * was added to the schema but not to that destructure, `GET /_api/v3/bookmarks/info`
+ * WHY this exists: `compute` receives the FULL result record, so a credential
+ * field is only dropped if the omission logic knows to strip it — listing it in
+ * `needs` alone is not enough. When `passwordHash` was added to the schema but not
+ * to `compute`'s (then hard-coded) destructure, `GET /_api/v3/bookmarks/info`
  * (the only caller, via `bookmark.user.serializeSecurely()`) returned every
  * bookmarking user's scrypt envelope, and neither typecheck nor any other test
  * caught it. This spec pins the omission set.
  *
- * Keep in sync with omitInsecureAttributes() in @growi/core.
+ * `compute` now drives its omission from @growi/core's shared
+ * `isInsecureUserAttribute` (the single source it shares with
+ * `omitInsecureAttributes()`), so this can no longer drift from the core list on
+ * its own — but the guard stays as the behavioral pin for that shared contract.
  *
  * DB-free: the extension definition is invoked with a stub client so only the
  * pure `compute` is exercised — no connection is opened.

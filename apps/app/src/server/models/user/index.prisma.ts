@@ -3,6 +3,8 @@
 // Defining a prisma extension in js file loosen typings of the prisma client, so we define the extension in ts file and merge it into the js file later.
 // When migrating users model to Prisma, this file should be removed and merged into `apps/app/src/server/models/user/index.js`.
 
+import { isInsecureUserAttribute } from '@growi/core/dist/models/serializers';
+
 import { Prisma, type users } from '~/generated/prisma/client';
 
 // TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
@@ -49,9 +51,12 @@ export const extension = Prisma.defineExtension((client) => {
           },
         },
         serializeSecurely: {
-          // Must mirror omitInsecureAttributes() in @growi/core: every credential
-          // field has to be listed here too, or it leaks through this path (the
-          // scrypt `passwordHash` reached /bookmarks/info this way).
+          // `needs` only guarantees these columns are LOADED; it does not strip
+          // anything. The omission is driven below by @growi/core's shared
+          // isInsecureUserAttribute, the single source it shares with
+          // omitInsecureAttributes() — a credential field added there is dropped
+          // here too, closing the drift that once leaked the scrypt `passwordHash`
+          // to /bookmarks/info (see index.prisma.spec).
           needs: {
             password: true,
             passwordHash: true,
@@ -59,11 +64,19 @@ export const extension = Prisma.defineExtension((client) => {
             email: true,
             isEmailPublished: true,
           },
-          compute({ password, passwordHash, apiToken, email, ...user }) {
-            return () => ({
-              ...user,
-              email: user.isEmailPublished ? email : undefined,
-            });
+          compute(user) {
+            return () => {
+              const secure = Object.fromEntries(
+                Object.entries(user).filter(
+                  ([key]) => !isInsecureUserAttribute(key),
+                ),
+              );
+              // email was stripped above; re-expose it only when published.
+              return {
+                ...secure,
+                email: user.isEmailPublished ? user.email : undefined,
+              };
+            };
           },
         },
       },
