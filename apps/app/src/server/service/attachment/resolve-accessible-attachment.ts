@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import { Attachment, type IAttachmentDocument } from '../../models/attachment';
 
 // TODO: remove this local interface when models/page has typescriptized
-interface PageModel {
+export interface PageModel {
   isAccessiblePageByViewer: (
     pageId: string,
     user: IUser | undefined,
@@ -28,9 +28,11 @@ export const resolveAccessibleAttachment = async (
   isSharedPage: boolean,
   populate?: string,
 ): Promise<ResolveAccessibleAttachmentResult> => {
-  const query = Attachment.findById(attachmentId);
-  const attachment =
-    populate != null ? await query.populate(populate) : await query;
+  const attachment = await Attachment.findById(
+    attachmentId,
+    undefined,
+    populate != null ? { populate } : undefined,
+  );
 
   if (attachment == null) {
     return { errorCode: 'not_found' };

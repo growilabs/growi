@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
 import { Attachment, type IAttachmentDocument } from '../../models/attachment';
+import type { PageModel } from './resolve-accessible-attachment';
 import { resolveAccessibleAttachment } from './resolve-accessible-attachment';
 
 vi.mock('../../models/attachment', () => ({
@@ -25,9 +26,14 @@ describe('resolveAccessibleAttachment', () => {
 
   const mockIsAccessiblePageByViewer = (isAccessible: boolean) => {
     const isAccessiblePageByViewer = vi.fn().mockResolvedValue(isAccessible);
-    vi.spyOn(mongoose, 'model').mockReturnValue({
-      isAccessiblePageByViewer,
-    } as unknown as ReturnType<typeof mongoose.model>);
+    const pageModel = mock<PageModel>({ isAccessiblePageByViewer });
+    // `mongoose.model` is overloaded; its last signature's generic return type
+    // resolves to `unknown` without a call-site instantiation, so a cast is
+    // still needed here to bridge that gap. The mock value itself is checked
+    // against the real `PageModel` contract via `mock<PageModel>()` above.
+    vi.spyOn(mongoose, 'model').mockReturnValue(
+      pageModel as ReturnType<typeof mongoose.model>,
+    );
     return isAccessiblePageByViewer;
   };
 
@@ -102,12 +108,9 @@ describe('resolveAccessibleAttachment', () => {
     expect(result).toEqual({ attachment });
   });
 
-  it('populates the requested field in a single query when populate is given', async () => {
+  it('passes the requested field to findById as a populate option', async () => {
     const attachment = buildAttachment(false);
-    const populate = vi.fn().mockResolvedValue(attachment);
-    vi.mocked(Attachment.findById).mockReturnValue({
-      populate,
-    } as unknown as ReturnType<typeof Attachment.findById>);
+    vi.mocked(Attachment.findById).mockResolvedValue(attachment);
 
     const result = await resolveAccessibleAttachment(
       'attachment1',
@@ -116,7 +119,9 @@ describe('resolveAccessibleAttachment', () => {
       'creator',
     );
 
-    expect(populate).toHaveBeenCalledWith('creator');
+    expect(Attachment.findById).toHaveBeenCalledWith('attachment1', undefined, {
+      populate: 'creator',
+    });
     expect(result).toEqual({ attachment });
   });
 });
