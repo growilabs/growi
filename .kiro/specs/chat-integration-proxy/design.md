@@ -363,7 +363,7 @@ apps/chat-integration-proxy/
 | `PairingService` | `relation/pairing-service.ts` | ペアリングの proxy 側 | 9.1–9.7 |
 | `FanOutCollector` | `growi/fan-out-collector.ts` | 複数 GROWI への配信と待ち合わせ | 3.1, 3.4, 3.5, 14.5 |
 | `SearchFusion` | `growi/search-fusion.ts` | 重みつきの式で 1 本に統合 | 3.2, 3.3, 3.8 |
-| `GrowiClient` | `growi/growi-client.ts` | 署名つきで GROWI を呼ぶ（`GrowiUriResolver` を通す） | 3.1, 4.2, 5.2, 7.3, 9.2, 10.5, 14.2 |
+| `GrowiClient` | `growi/growi-client.ts` | 署名つきで GROWI を呼ぶ（`GrowiUriResolver` を通す）。**受け取った応答は必ず検査関数を通す**（`parseCommandResponse` ほか。応答に署名は付かないので形の確かめが唯一の受け入れ条件） | 3.1, 4.2, 5.2, 7.3, 9.2, 10.1, 10.5, 14.2 |
 | `EventSink` | `orchestration/event-sink.ts` | イベントを受けて各層を呼ぶ | 1.1, 1.2, 3.1, 4.1, 6.1, 14.1 |
 | **`SignatureGuard`** | `routes/signature-guard.ts` | **届くリクエストの署名を検証する。この proxy の一番外側の守り** | **10.1, 10.2, 10.3, 10.4** |
 | `InboundFlow` | `orchestration/inbound-flow.ts` | GROWI からの通知・設定・鍵の追加と失効 | 2.1–2.6, **10.5**, **10.7**, 11.4 |
@@ -940,6 +940,9 @@ export interface PairingService {
   unpair(relationId: string): Promise<void>;
 }
 ```
+
+**⑤ の応答は、検証の前に `parseChallengeResponse` を通す。**
+これは**署名の付かない相手から届く唯一の応答**なので、形の確かめが唯一の受け入れ条件である。
 
 **⑥ では `challenge` の一致だけでなく `challengeSignature` を検証する。**
 検証に使うのは **③ で申告された公開鍵**、検証する値は protocol の `pairingChallengePayload(registrationCode, challenge)`

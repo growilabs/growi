@@ -140,7 +140,7 @@ apps/app/src/features/chat-integration/
 | `ChatAccountLink` | `server/account-link/` | 紐付け | 7.1–7.7 |
 | `KeyStore` | `server/keys/key-store.ts` | 鍵の保持と入れ替え | 9.5, 10.5, 10.6 |
 | `SignatureGuard` | `server/signature-guard.ts` | 届くリクエストの検証 | 10.1–10.4 |
-| `ProxyClient` | `server/proxy-client.ts` | **GROWI から proxy へ送る唯一の口**（通知・ペアリングの申請・設定の反映・鍵の登録と失効・能力の一覧・チャンネルの一覧） | 1.3, 2.1–2.6, 9.5, 10.5, 11.1, 11.2, 11.4 |
+| `ProxyClient` | `server/proxy-client.ts` | **GROWI から proxy へ送る唯一の口**（通知・ペアリングの申請・設定の反映・鍵の登録と失効・能力の一覧・接続の状態・チャンネルの一覧）。**受け取った応答は必ず検査関数を通す**（`parseNotificationResult` / `parsePairingResult` ほか。応答に署名は付かず、`ChannelInventory` は通知の宛先を判定する唯一の材料、`PairingResult` は関係と相手の鍵になるので、壊れた値が入ると後から原因を辿れない） | 1.3, 1.4, 2.1–2.6, 9.5, 10.1, 10.5, 11.1, 11.2, 11.4 |
 | `PairingEndpoint` | `server/pairing/pairing-endpoint.ts` | 所有確認に答える | 9.2, 9.3 |
 
 ---
@@ -533,7 +533,7 @@ GROWI には同じ形のものが既に 3 つある（`models/password-reset-ord
 | `chat_processed_requests` | `relationId`, `requestId`, `response`, `processedAt` | `(relationId, requestId)` 一意。**TTL 索引で 24 時間**（再送が起こりうる間だけ） |
 | `chat_request_nonces` | `relationId`, `keyId`, `nonce`, `expiresAt` | `(relationId, keyId, nonce)` 一意。**`expiresAt` に TTL 索引** |
 | `chat_pending_pairings` | `registrationCode`, `proxyUri`, `growiUri`, `createdBy`, **`ownKeyId`**, **`ownKeyPair`（暗号化）**, `expiresAt` | `registrationCode` 一意。**`expiresAt` に TTL 索引**。要件 9.2 の所有確認に使う。**答えた `challenge` は記録しない** — どの問いにも答える形にしたため（上記） |
-| `chat_challenge_attempts` | `registrationCode`, `sourceKey`, `windowStartedAt`, `count` | **主キー `(registrationCode, sourceKey)`。`windowStartedAt` に TTL 索引。** 回数の上限は**送り元ごと**に数えると決めたので、保留の行に 1 組だけ持つ形では足りない（1 つの保留に対して送り元は複数ある）。`sourceKey` は送り元アドレス（決め方は protocol spec） |
+| `chat_challenge_attempts` | `registrationCode`, `sourceKey`, `windowStartedAt`, `count` | **主キー `(registrationCode, sourceKey)`。`windowStartedAt` に TTL 索引。** 回数の上限は**送り元ごと**に数えると決めたので、保留の行に 1 組だけ持つ形では足りない（1 つの保留に対して送り元は複数ある）。**`sourceKey` の決め方は protocol spec の「送り元アドレスの決め方」に従う** — `req.ip` は Express の `trust proxy` に従うので、GROWI 側でも同じ前提が要る（設定が無ければ送り元を区別できていないことを運用者に見せる） |
 | `chat_account_link_orders` | `token`, `relationId`, `platform`, `accountId`, `isRevoked`, `createdAt`, `expiredAt` | `token` 一意。**`expiredAt` に TTL 索引**（既定 10 分）。要件 7.3 の一度きりのリンク。**`models/password-reset-order.ts` に倣う**（下記） |
 | `chat_channel_permissions` | `relationId`, `commandName`, `allowedChannels` | **`(relationId, commandName)` 一意。** **行ごとの `updatedAt` は持たない** — protocol の `SettingsPushRequest.version` は関係ごとに 1 つの値なので、行ごとに持つと比べる基準が決まらない。版は `chat_relations.settingsVersion` に 1 つ持ち、**保存のたびに 1 増やす**。proxy が取りに来たときはそこから返す（要件 11.4） |
 | `chat_notification_destinations` | `platform`, `channelId`, **`channelName`**, `pathPattern`, `triggerEvents`, `relationId` | `channelName` は表示と要件 12.4 の突き合わせ用。**`ChannelInventory` を引いたときに合わせて更新する**（名前は変わりうるので、古いままだと注意喚起が出たり出なかったりする）。管理者が設定する。Gen 1 の設定とは**別に保存する**（要件 12.2） |
@@ -758,8 +758,15 @@ proxy が `SettingsPullResponse` で取りに来るので取りこぼしは埋�
 末尾スラッシュ・大文字小文字・`:443` の有無が両側で揺れる。**一意制約は例外を投げず、ただ働かない。**
 
 **GROWI 内部の代理キー（`chat_relations._id`）を立てて他の 8 コレクションをそれに載せ替える案も検討したが、採らない。**
-`relationId` に一意索引を張れば衝突は**DB の制約として**塞がるので（アプリ側の事前確認に頼らない）、
-8 つのコレクションに間接の層を足す価値が無い。**関係を指す軸は `relationId` 1 本に保つ。**
+代理キーを立てても、その手前に「`relationId` → 代理キー」の引き当てが要り、
+**それが一意に決まるには結局 `relationId` の一意索引が要る。** 索引を張った時点で保証は済むので、
+間接の層は何も足さず、8 コレクションを載せ替える費用だけが残る。**関係を指す軸は `relationId` 1 本に保つ。**
+
+> **解除済みの行も一意索引の対象である。** 解除では行を消さず `state: 'unpaired'` のまま 90 日残すので、
+> **proxy が繋ぎ直しのときに同じ `relationId` を再発行すると、ペアリングが弾かれる。**
+> これが起きないのは **proxy が毎回新しい乱数を採番する**からである（protocol の
+> 「`relationId` は推測できない値にする。連番にしない」）。前提としてここに書いておく —
+> 書かないと、繋ぎ直しが通らないときに原因へ辿り着けない。
 
 #### 関係を表すコレクションが要る理由
 

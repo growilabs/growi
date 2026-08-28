@@ -105,7 +105,8 @@ packages/chat/
 │   │   ├── parse-pairing.ts       # parsePairingSubmission / parseOwnershipChallenge / parseChallengeResponse
 │   │   ├── parse-keys.ts          # parseKeyRegistration / parseKeyRevocation
 │   │   ├── parse-settings.ts      # parseSettingsPush / parseAccountLinkStart
-│   │   └── parse-envelope.ts      # parseOpEnvelope（読み取りだけの口と settings-pull の本体）
+│   │   ├── parse-envelope.ts      # parseOpEnvelope（読み取りだけの口と settings-pull の本体）
+│   │   └── parse-responses.ts     # 応答側 7 本（下記「受け取るものは必ず検査関数を通す」）
 │   ├── permission/
 │   │   └── channel-permission.ts  # 純粋関数。両側が同じ判定を使う（要件 11）
 │   ├── url-guard/
@@ -1012,7 +1013,26 @@ export const filterBroadcastTargets: (
 > export const parsePairingSubmission:   (raw: unknown) => PairingSubmission      | { readonly error: 'malformed' };
 > export const parseOwnershipChallenge:  (raw: unknown) => OwnershipChallenge     | { readonly error: 'malformed' };
 > export const parseChallengeResponse:   (raw: unknown) => ChallengeResponse      | { readonly error: 'malformed' };
+> /** 応答も同じ扱い（下記） */
+> export const parseKeyOperationResult:   (raw: unknown) => KeyOperationResult     | { readonly error: 'malformed' };
+> export const parseAccountLinkStartResponse: (raw: unknown) => AccountLinkStartResponse | { readonly error: 'malformed' };
+> export const parseSettingsPullResponse: (raw: unknown) => SettingsPullResponse   | { readonly error: 'malformed' };
+> export const parsePairingResult:        (raw: unknown) => PairingResult          | { readonly error: 'malformed' };
+> export const parseCapabilityReport:     (raw: unknown) => CapabilityReport       | { readonly error: 'malformed' };
+> export const parseChannelInventory:     (raw: unknown) => ChannelInventory       | { readonly error: 'malformed' };
+> export const parseConnectionStatusView: (raw: unknown) => ConnectionStatusView   | { readonly error: 'malformed' };
 > ```
+>
+> **受け取るものは、要求も応答も、使う前に必ず検査関数を通す。** 一部だけにする基準は立てない。
+>
+> - **応答には署名が付かない。** 形の確かめが唯一の受け入れ条件である
+> - **関数の無い応答こそ、そのまま保存される。** `ChannelInventory` は通知の宛先を判定する唯一の材料になり、
+>   `PairingResult` は関係と相手の鍵になり、`SettingsPullResponse` は設定を置き換える。
+>   **壊れた値が入ると、後から原因を辿れない形で残る**
+>
+> **呼ぶ場所は 2 つだけ**（「宣言はあるが呼ぶ人が居ない」を構造で防ぐ）。
+> proxy は `growi/growi-client.ts`、GROWI は `server/proxy-client.ts` — どちらも
+> **相手へ送る唯一の口**なので、応答を受ける場所もそこしかない。
 
 ```typescript
 /** **`RequestEnvelope` を継ぐ**（`relationId` と `op` はそこから来る） */
