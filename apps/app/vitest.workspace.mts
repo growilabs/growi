@@ -1,3 +1,4 @@
+import { availableParallelism } from 'node:os';
 import react from '@vitejs/plugin-react';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import {
@@ -6,6 +7,19 @@ import {
   defineWorkspace,
   mergeConfig,
 } from 'vitest/config';
+
+// Each app-integration worker's first `beforeAll` pays two CPU-heavy, concurrent
+// per-worker setup costs: migrate-mongo.ts spawns a `dev:migrate:up` child process,
+// and crowi.ts's getInstance() does a cold Crowi init. Vitest's default fork pool
+// sizes itself to availableParallelism(), so on a CI runner (also running MongoDB
+// and Elasticsearch as sibling services) every worker's setup child process
+// competes for a core against another worker's setup — up to 2x the runner's CPU
+// count in flight at once. That contention, not any single hook being slow, is
+// what pushed both hookTimeout (#11752, migrate-mongo, already 2x the default) and
+// getInstance() (#11820/#11821/#11822) past their limits under load — measured
+// unloaded cold init is ~0.9s. Capping fork count leaves the runner headroom during
+// this contended window instead of widening the deadline around the contention.
+const integrationMaxForks = Math.max(1, availableParallelism() - 1);
 
 const configShared = defineConfig({
   plugins: [tsconfigPaths()],
@@ -64,6 +78,12 @@ export default defineWorkspace([
         './test/setup/mongo/index.ts',
         './test/setup/prisma.ts',
       ],
+      // See integrationMaxForks above: bounds concurrent cold-init contention
+      // rather than widening hookTimeout around it.
+      pool: 'forks',
+      poolOptions: {
+        forks: { maxForks: integrationMaxForks },
+      },
       deps: {
         // Transform inline modules (allows ESM in require context)
         interopDefault: true,
@@ -118,6 +138,11 @@ export default defineWorkspace([
         './test/setup/mongo/index.ts',
         './test/setup/prisma.ts',
       ],
+      // Same setupFiles as app-integration — same contention, same fix.
+      pool: 'forks',
+      poolOptions: {
+        forks: { maxForks: integrationMaxForks },
+      },
       deps: { interopDefault: true },
       server: {
         deps: {
