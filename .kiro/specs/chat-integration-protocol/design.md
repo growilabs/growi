@@ -61,9 +61,20 @@
 
 - 通信契約の型の形が変わったとき
 - 署名の対象に含めるものが変わったとき（**片側だけ変えると全リクエストが通らなくなる**）
+- **`op` が増減したとき、または口のパスが変わったとき**（署名から宛先を外した今、`op` が唯一の縛りである）
 - 鍵の識別子の一意性の範囲が変わったとき
 - チャンネル権限の判定の意味が変わったとき
 - コマンド名の語彙が増減したとき
+- 設定の版の持ち方が変わったとき（**片側が時刻・片側が連番だと、新しい設定が黙って捨てられる**）
+
+**見に行く先は sub-spec だけではない。** 上のいずれかが変わったら、次も必ず開く。
+
+| 場所 | 何が古くなるか |
+|---|---|
+| umbrella の `design.md` の **Security Considerations の表** | 「署名で防げるか」の欄が署名対象を名指ししている。**要件 13.5 により、この表は閉域構成の手順書へそのまま載せると決めてある** — 古いまま配ると、運用者が誤った前提で閉域に置くかどうかを決める |
+| 両 sub-spec の**口の表** | パス・`op`・検査関数の 3 列がここから写されている |
+| 両 sub-spec の**設定の押し込み**の記述 | 版の持ち方を名前で参照している |
+| umbrella の `research.md` | 決定の根拠。書き換えずに design だけ直すと、同じ選択肢が後から蒸し返される |
 
 ---
 
@@ -93,7 +104,8 @@ packages/chat/
 │   │   ├── parse-notification.ts  # parseNotificationRequest / parseNotificationResult
 │   │   ├── parse-pairing.ts       # parsePairingSubmission / parseOwnershipChallenge / parseChallengeResponse
 │   │   ├── parse-keys.ts          # parseKeyRegistration / parseKeyRevocation
-│   │   └── parse-settings.ts      # parseSettingsPush / parseAccountLinkStart
+│   │   ├── parse-settings.ts      # parseSettingsPush / parseAccountLinkStart
+│   │   └── parse-envelope.ts      # parseOpEnvelope（読み取りだけの口と settings-pull の本体）
 │   ├── permission/
 │   │   └── channel-permission.ts  # 純粋関数。両側が同じ判定を使う（要件 11）
 │   ├── url-guard/
@@ -287,10 +299,12 @@ GROWI はそれを保存して以降のリクエストに載せる。
 
 | 場所 | 正しい形 |
 |---|---|
+| GROWI 側の関係の一意性 | **`(proxyUri, relationId)`**。`relationId` だけを一意にしない — 採番するのは**相手（proxy）**なので、1 つの GROWI が複数の proxy と紐づくと衝突しうる。**既にある組と衝突する `PairingResult` は成立させない** |
+| 鍵の識別子の一意性 | **`(relationId, side, keyId)`**。「関係ごと」ではなく**関係と側ごと**。自分の鍵と相手の鍵は別の名前空間である |
 | 公開鍵の解決 | `resolvePublicKey(ref: KeyRef)` — `keyId` だけを受け取らない |
 | 使い捨ての値の消費 | `consumeNonce(ref: KeyRef, nonce, expiresAt)` |
 | proxy 側の `request_nonce` | 主キー `(relation_id, key_id, nonce)` |
-| proxy 側の `processed_request` | 主キー `(relation_id, request_id)` |
+| proxy 側の二重処理の防ぎ方 | 口ごとに違う（`chat-integration-proxy` の表）。**`processed_request` という表は持たない** — コマンドは proxy から送る側なので届かない |
 | GROWI 側の同等のもの | 同上 |
 | 鍵の入れ替えの戻り値 | **関係ごとの新しい `keyId` の一覧**（1 つの文字列ではない） |
 
@@ -307,12 +321,33 @@ GROWI はそれを保存して以降のリクエストに載せる。
 /** 署名対象。ここが唯一の宣言箇所（要件 10.1）。**本体の有無で変えない** */
 export const COVERED_COMPONENTS = ['@method', 'content-type', 'content-digest'] as const;
 
-/** どの口を叩いたか。**本体に入れて `content-digest` で覆う**（下記の理由） */
+/**
+ * どの口を叩いたか。**本体に入れて `content-digest` で覆う**（下記の理由）。
+ * **向きを名前に含める。** 鍵の追加と失効は proxy → GROWI にも GROWI → proxy にも流れるので、
+ * 名前が同じだと `acceptEnvelope` の突き合わせが一意にならない。
+ */
 export const OP_NAMES = [
-  'command', 'notification', 'settings-push', 'key-register', 'key-revoke',
-  'capabilities', 'connection-status', 'channels', 'account-link-start', 'settings-pull',
+  'command', 'account-link-start', 'settings-pull',                 // proxy → GROWI
+  'key-register-to-growi', 'key-revoke-to-growi',                   // proxy → GROWI（proxy 自身の鍵）
+  'notification', 'settings-push',                                  // GROWI → proxy
+  'key-register-to-proxy', 'key-revoke-to-proxy',                   // GROWI → proxy（GROWI 自身の鍵）
+  'capabilities', 'connection-status', 'channels',                  // GROWI → proxy（読み取り）
 ] as const;
 export type OpName = (typeof OP_NAMES)[number];
+
+/**
+ * **署名を付ける本体は、必ずこれを継ぐ。**
+ * `op` は署名対象から宛先とパスを外した代わりに置いた**唯一の**縛りなので、
+ * 文章ではなく型で持つ。型に無いと、手書きの検査関数が黙って `op` を落とし、
+ * **突き合わせが空回りするか、全リクエストが `malformed` になるか**が実装の書き癖で決まってしまう。
+ */
+export interface RequestEnvelope {
+  readonly relationId: string;
+  readonly op: OpName;
+}
+
+/** 読み取りだけの 3 つの口の本体は、これそのもの */
+export type OpOnlyRequest = RequestEnvelope;
 
 /**
  * RFC 9421 では `created` / `expires` / `nonce` / `keyid` / `alg` は
@@ -368,7 +403,13 @@ export interface VerifyParams {
   /** **`KeyRef` を受け取る。** `keyId` 単独では別の関係の鍵を引きうる。
    *  **失効済み（`revokedAt` が過ぎている）と、まだ有効になっていない（`validFrom` が未来）鍵は
    *  `null` を返す。** 呼ぶ側にこの判断を任せると、片側が見落としたときに
-   *  **失効が効かないまま誰も気づかない**（要件 10.5・10.6） */
+   *  **失効が効かないまま誰も気づかない**（要件 10.5・10.6）。
+   *
+   *  **相手側の鍵だけを返す。自分の鍵を引いてはいけない。** 両側が自分の鍵と相手の鍵を
+   *  1 つの表に持つので（GROWI は `(relationId, side, keyId)`）、側で絞らない実装が書けてしまう。
+   *  絞らないと、**自分が署名した鍵追加の要求を自分の口へ差し戻す形が通り、
+   *  攻撃者の鍵が相手の鍵として登録される。** `KeyRef` に側の軸は無いので、
+   *  この関数を用意する側が「相手側だけ」を保証する */
   readonly resolvePublicKey: (ref: KeyRef) => Promise<KeyObject | null>;
   /** 一度使った値は 2 度目に false を返す（要件 10.4）。**署名の検証に成功した後にだけ呼ぶ** */
   readonly consumeNonce: (ref: KeyRef, nonce: string, expiresAt: Date) => Promise<boolean>;
@@ -406,6 +447,8 @@ export const verify: (params: VerifyParams) => Promise<VerifyResult>;
 - Invariants: **`expires` と `nonce` が付いていない署名は `malformed` として断る。**
   RFC 9421 はどちらも省略できるので、無いものをそのまま通すと
   **有効期間の上限（300 秒）も再送の検知も丸ごと無意味になる**（要件 10.3・10.4）
+- Invariants: **`created` が時計のずれ（30 秒）を超えて未来の署名は `expired` として断る。**
+  これが無いと、送る側が `created` を遠い未来にするだけで有効期間の上限を実質無効にできる
 - Invariants: **本体の `op` が、実際に叩かれた口と一致しないリクエストは `malformed` として断る。**
   署名を別の口へ流用させないための縛りはこれ 1 つである（下記のとおり宛先もパスも署名対象に入れない）。
   受ける側は自分がどの口で受けたかを知っているので、その値と本体の `op` を突き合わせる
@@ -439,23 +482,42 @@ HTTP の層から取り出す値は、途中の機器が書き換えるので、
 #### 口の一覧（`op` ↔ パス ↔ 向き）
 
 **この表がこの spec の持ちもので、proxy と app は自分の側だけをこれに合わせる。**
-パスは署名対象ではないので、途中の機器が前置きを付けても構わない。表にあるのは**それぞれの側が公開する形**である。
+パスは署名対象ではないので、途中の機器が前置きを付けても構わない。
+**表のパスは「相手の土台 URL にそのまま繋ぐ文字列」である** — 相対の書き方にすると、
+GROWI 側が `/_api/v3/` の下に生やし proxy 側がルート直下に生やすという**土台の違い**が表から消え、
+繋いだ先が 404 になる。土台は `growiUri` と `proxyUri`（どちらもペアリングで両側が保存した値）。
 
-| `op` | 向き | パス（それぞれの土台からの相対） | 本体 | 要件 |
+| `op` | 向き | 繋ぐ文字列 | 本体 | 要件 |
 |---|---|---|---|---|
-| `command` | proxy → GROWI | `/chat-integration/command` | `CommandRequest` | 3, 4, 5, 6, 14 |
-| `account-link-start` | proxy → GROWI | `/chat-integration/account-link/start` | `AccountLinkStartRequest` | 7.3 |
-| `settings-pull` | proxy → GROWI | `/chat-integration/settings` | `{ relationId, op }` のみ | 11.1 |
-| `notification` | GROWI → proxy | `/chat-integration/notification` | `NotificationRequest` | 2.1–2.6 |
-| `settings-push` | GROWI → proxy | `/chat-integration/settings-push` | `SettingsPushRequest` | 11.1, 11.2, 11.4 |
-| `key-register` | GROWI → proxy | `/chat-integration/keys/register` | `KeyRegistrationRequest` | 10.5 |
-| `key-revoke` | GROWI → proxy | `/chat-integration/keys/revoke` | `KeyRevocationRequest` | 10.5 |
-| `capabilities` | GROWI → proxy | `/chat-integration/capabilities` | `{ relationId, op }` のみ | 1.3 |
-| `connection-status` | GROWI → proxy | `/chat-integration/connection-status` | `{ relationId, op }` のみ | 1.4, 13.2 |
-| `channels` | GROWI → proxy | `/chat-integration/channels` | `{ relationId, op }` のみ | 2.2, 11.1 |
+| `command` | proxy → GROWI | `{growiUri}/_api/v3/chat-integration/peer/command` | `CommandRequest` | 3, 4, 5, 6, 14 |
+| `account-link-start` | proxy → GROWI | `{growiUri}/_api/v3/chat-integration/peer/account-link/start` | `AccountLinkStartRequest` | 7.3 |
+| `settings-pull` | proxy → GROWI | `{growiUri}/_api/v3/chat-integration/peer/settings` | `OpOnlyRequest` | 11.1 |
+| `key-register-to-growi` | proxy → GROWI | `{growiUri}/_api/v3/chat-integration/peer/keys/register` | `KeyRegistrationRequest` | 10.5 |
+| `key-revoke-to-growi` | proxy → GROWI | `{growiUri}/_api/v3/chat-integration/peer/keys/revoke` | `KeyRevocationRequest` | 10.5 |
+| `notification` | GROWI → proxy | `{proxyUri}/chat-integration/notification` | `NotificationRequest` | 2.1–2.6 |
+| `settings-push` | GROWI → proxy | `{proxyUri}/chat-integration/settings-push` | `SettingsPushRequest` | 11.1, 11.2, 11.4 |
+| `key-register-to-proxy` | GROWI → proxy | `{proxyUri}/chat-integration/keys/register` | `KeyRegistrationRequest` | 10.5 |
+| `key-revoke-to-proxy` | GROWI → proxy | `{proxyUri}/chat-integration/keys/revoke` | `KeyRevocationRequest` | 10.5 |
+| `capabilities` | GROWI → proxy | `{proxyUri}/chat-integration/capabilities` | `OpOnlyRequest` | 1.3 |
+| `connection-status` | GROWI → proxy | `{proxyUri}/chat-integration/connection-status` | `OpOnlyRequest` | 1.4 |
+| `channels` | GROWI → proxy | `{proxyUri}/chat-integration/channels` | `OpOnlyRequest` | 2.2, 11.1 |
 
-**ペアリングの申請だけはこの表の外**（`POST /chat-integration/pairing/submit`、署名なし・`op` なし）。
-署名の前段なので鍵がまだ無く、`relationId` もまだ無い。守りは本文の検査と登録コードだけである。
+**鍵の追加と失効は両向きに流れる。** proxy も GROWI も自分の鍵を入れ替えるので、
+どちらも相手へ「この公開鍵を追加してほしい」と送る。**`op` の名前で向きを分ける**
+（同じ名前だと `acceptEnvelope` の突き合わせが一意にならない）。
+
+**署名の付かない入口は 2 つある**（表の外）。どちらも鍵がまだ無い段なので署名で守れない。
+
+| 口 | 繋ぐ文字列 | 本体 | 守り |
+|---|---|---|---|
+| ペアリングの申請（③） | `{proxyUri}/chat-integration/pairing/submit` | `PairingSubmission` | 本文の検査と登録コード。`relationId` はまだ無い |
+| 所有の確認（④→⑤） | `{growiUri}/_api/v3/chat-integration/peer/pairing/challenge` | `OwnershipChallenge` | 保留中の登録コードとの一致、用途の接頭辞、回数の上限 |
+
+> **GROWI 側の口を `/peer/` の下にまとめる理由。** GROWI の管理画面が叩く口
+> （設定の保存・チャンネル一覧の取得・ペアリングの申し込み）も同じ feature の中にある。
+> proxy 向けの口は**届いたバイト列そのもの**で受ける必要があるので（`chat-integration-app` の
+> 「署名の検証には届いたバイト列そのものが要る」）、その扱いを掛ける範囲を
+> **管理画面用の口と分けておかないと、普通の JSON API まで生のバイト列になって動かなくなる。**
 
 ---
 
@@ -529,13 +591,12 @@ export interface ChallengeResponse {
  * ペアリングは最初の 1 組を交換するだけなので、後から足す経路がこれ。
  * これが無いと要件 10.5（止めずに入れ替える）は成立しない。
  */
-export interface KeyRegistrationRequest {
-  readonly relationId: string;
+/** **両向きに流れる。** `op` が `key-register-to-growi` か `key-register-to-proxy` かで向きが決まる */
+export interface KeyRegistrationRequest extends RequestEnvelope {
   readonly key: PublicKeyRegistration;
 }
 
-export interface KeyRevocationRequest {
-  readonly relationId: string;
+export interface KeyRevocationRequest extends RequestEnvelope {
   readonly keyId: string;
 }
 
@@ -548,7 +609,7 @@ export type KeyOperationResult =
 
 ```typescript
 /** GROWI → proxy。管理者が保存した時点で押し込む。要件 11.4「次の実行から反映」はこれで満たす */
-export interface SettingsPushRequest {
+export interface SettingsPushRequest extends RequestEnvelope {
   readonly settings: RelationSettings;
   /**
    * 設定の版。**関係ごとに 1 つの値**であり、行ごとには持たない
@@ -658,8 +719,20 @@ export const pairingChallengePayload = (
 | 縛り | 中身 |
 |---|---|
 | 用途の接頭辞 | 上のとおり。**何度答えても、返した署名は本番のリクエストには使えない** |
-| 回数の上限 | 保留 1 件あたり **1 分 30 回**を上限とし、超えたら 429 を返す。保留そのものの寿命（既定 10 分）でも自然に閉じる |
-| `challenge` の形 | base64url、**32〜128 文字**。これを外れたら 400。長い本体を投げ込ませない |
+| 回数の上限 | **保留 1 件・送り元アドレスごとに 1 分 30 回**。超えたら 429。加えて**口そのものにも上限**を置く（登録コードを知らない相手の叩き込みは保留の行に紐づかないので、保留ごとの上限では止まらない） |
+| `challenge` の形 | base64url、**32〜128 文字**。これを外れたら 400 |
+| 本体の大きさ | **8 KiB まで**。`challenge` の長さを縛っても、本体そのものの大きさは縛れない |
+| 記録 | 上限に当たったことを**運用者が見られる形で残す**（下記） |
+
+> **上限を「保留 1 件あたり」の通し勘定にしてはいけない。** 攻撃者が 1 分に 30 回叩き続けるだけで、
+> 本物の ④ が 429 に当たる。保留が生きている間ずっと塞げるので、
+> **「同じ問いにしか答えない」形をやめた意味が半分失われる。**
+> 送り元ごとに数えれば、1 か所からの洪水が本物の分を食い潰さなくなる。
+>
+> それでも塞ぎ切れる保証は無い（送り元を変えられる相手には効かない）。
+> **最後の受け皿は「登録コードを取り直せば復旧する」ことである。**
+> ただし proxy から見た症状は `ownership-unverified` だけで、取り直せばよいとは気づけない。
+> **だから上の「記録」が要る** — 429 に当たったことが運用者に見えて初めて、この受け皿が使える。
 
 **「一度答えたら、以後は同じ問いにしか答えない」という形にしてはいけない。**
 ⑤ は誰でも叩ける口なので、**登録コードを盗み見た第三者が本物の proxy より先に自分の `challenge` で叩けば、
@@ -692,7 +765,8 @@ GROWI は自分が申告した鍵でしか署名できないので、鍵のす�
 
 #### ④ で申告された URL を検証する（踏み台にされないため）
 
-**`pairing/submit` は署名の付かない唯一の入口で、そこで受け取った URL へ proxy が自分からリクエストを送る。**
+**`pairing/submit` は proxy 側の署名の付かない入口で**（もう 1 つは GROWI 側の ⑤）、
+**そこで受け取った URL へ proxy が自分からリクエストを送る。**
 何も検証しないと、登録コードを 1 つ持っている人が **proxy を踏み台にして、proxy から届く範囲の任意のホストを叩かせられる。**
 閉域構成（要件 13）では proxy は閉域内の GROWI に届く位置に置くので、**これはそのまま閉域内を外から探る手段になる。**
 proxy が侵害される前の、正常に動いている proxy がやってしまう点が重い。
@@ -716,6 +790,10 @@ proxy が侵害される前の、正常に動いている proxy がやってし�
 >
 > **照合するのは URI に書かれたホスト名**であって、引き終わったアドレスではない。
 > アドレスの側で照合すると、名前の引き先が変わっただけで許可が別のホストへ移る。
+>
+> **証明書の照合名は、確かめたアドレスではなく URI に書かれたホスト名にする。**
+> 「確かめたアドレスへそのままつなぐ」形にすると、照合名を明示し忘れたときに
+> アドレスに対して照合してしまい、正しい証明書でも一致しない。
 >
 > **`allowList` に挙げた宛先には、つなぐときに信頼する証明書の根拠を運用者が指定できるようにする**
 > （`chat-integration-proxy` の `runtime/config.ts` が持つ）。閉域では自前の認証局や自己署名の証明書が
@@ -856,22 +934,33 @@ export const filterBroadcastTargets: (
 > 契約の型ごとに検査する関数を本パッケージが提供し、**両側がそれを使う**（同じ受け入れ条件を持つことが本パッケージの前提そのもの）。
 > 知らない `kind` は `unknown-kind` として断る。`keyword` と `path` と `body` の長さ、`limit` の上限もここで決める。
 >
+> **`RequestEnvelope` を継ぐ本体の検査関数は、`relationId` と `op` を必ず確かめて残す。**
+> 落とすと、その後の `acceptEnvelope` が空回りするか全リクエストを断るかのどちらかになる。
+> **`op` は `OP_NAMES` に含まれ、かつその口に許された値**であることまで確かめる。
+>
 > ```typescript
-> export const parseCommandRequest:      (raw: unknown) => CommandRequest      | { readonly error: 'malformed' | 'unknown-kind' };
-> export const parseNotificationRequest: (raw: unknown) => NotificationRequest | { readonly error: 'malformed' };
-> export const parseSettingsPush:        (raw: unknown) => SettingsPushRequest | { readonly error: 'malformed' };
+> export const parseCommandRequest:      (raw: unknown) => CommandRequest         | { readonly error: 'malformed' | 'unknown-kind' };
+> export const parseCommandResponse:     (raw: unknown) => CommandResponse        | { readonly error: 'malformed' | 'unknown-kind' };
+> export const parseNotificationRequest: (raw: unknown) => NotificationRequest    | { readonly error: 'malformed' };
+> export const parseNotificationResult:  (raw: unknown) => NotificationResult     | { readonly error: 'malformed' };
+> export const parseSettingsPush:        (raw: unknown) => SettingsPushRequest    | { readonly error: 'malformed' };
 > export const parseKeyRegistration:     (raw: unknown) => KeyRegistrationRequest | { readonly error: 'malformed' };
 > export const parseKeyRevocation:       (raw: unknown) => KeyRevocationRequest   | { readonly error: 'malformed' };
-> export const parsePairingSubmission:   (raw: unknown) => PairingSubmission   | { readonly error: 'malformed' };
-> export const parseAccountLinkStart:    (raw: unknown) => AccountLinkStartRequest | { readonly error: 'malformed' };
+> export const parseAccountLinkStart:    (raw: unknown) => AccountLinkStartRequest| { readonly error: 'malformed' };
+> /** 読み取りだけの 3 つの口（`capabilities` / `connection-status` / `channels`）と `settings-pull` の本体 */
+> export const parseOpEnvelope:          (raw: unknown) => OpOnlyRequest          | { readonly error: 'malformed' };
+> /** 署名の付かない 2 つの入口。`RequestEnvelope` を継がない（鍵も `relationId` もまだ無い） */
+> export const parsePairingSubmission:   (raw: unknown) => PairingSubmission      | { readonly error: 'malformed' };
+> export const parseOwnershipChallenge:  (raw: unknown) => OwnershipChallenge     | { readonly error: 'malformed' };
+> export const parseChallengeResponse:   (raw: unknown) => ChallengeResponse      | { readonly error: 'malformed' };
 > ```
 
 ```typescript
-export interface CommandEnvelope {
+/** **`RequestEnvelope` を継ぐ**（`relationId` と `op` はそこから来る） */
+export interface CommandEnvelope extends RequestEnvelope {
+  readonly op: typeof OP_NAMES[0];   // 'command'
   /** 再送しても変わらない。二重実行の判定に使う（要件 10.4）。**宛先ごとに別の値** */
   readonly requestId: string;
-  /** どの GROWI との関係か。**proxy がペアリング成立時に採番する**（下記「関係を指す識別子」） */
-  readonly relationId: string;
   readonly actor: ChatAccountRef;
   /**
    * どのチャンネルから来たか。GROWI 側でもチャンネル権限を判定し直すために運ぶ。
@@ -919,11 +1008,11 @@ export type ResponseKind = (typeof RESPONSE_KINDS)[keyof typeof RESPONSE_KINDS];
 export type CommandResponse =
   | { readonly kind: typeof RESPONSE_KINDS.search; readonly items: ReadonlyArray<SearchResultItem>; readonly appliedAs: 'linked-user' | 'anonymous' }
   /** `create-page` と `keep` の両方がこれを返す */
-  | { readonly kind: 'created'; readonly pageUrl: string; readonly importedMessageCount?: number }
-  | { readonly kind: 'link-preview'; readonly path: string; readonly restricted: boolean; readonly excerpt?: string; readonly updatedAt?: string; readonly commentCount?: number }
-  | { readonly kind: 'help'; readonly commands: ReadonlyArray<{ name: CommandName; usage: string; description: string }> }
-  | { readonly kind: 'account-link-required'; readonly growiLabel: string; readonly linkUrl: string }
-  | { readonly kind: 'error'; readonly code: 'forbidden' | 'path-conflict' | 'invalid' | 'not-permitted-in-channel' | 'no-settings' | 'unknown-kind'; readonly message: string };
+  | { readonly kind: typeof RESPONSE_KINDS.created; readonly pageUrl: string; readonly importedMessageCount?: number }
+  | { readonly kind: typeof RESPONSE_KINDS.linkPreview; readonly path: string; readonly restricted: boolean; readonly excerpt?: string; readonly updatedAt?: string; readonly commentCount?: number }
+  | { readonly kind: typeof RESPONSE_KINDS.help; readonly commands: ReadonlyArray<{ name: CommandName; usage: string; description: string }> }
+  | { readonly kind: typeof RESPONSE_KINDS.accountLinkRequired; readonly growiLabel: string; readonly linkUrl: string }
+  | { readonly kind: typeof RESPONSE_KINDS.error; readonly code: 'forbidden' | 'path-conflict' | 'invalid' | 'not-permitted-in-channel' | 'no-settings' | 'unknown-kind'; readonly message: string };
 ```
 
 **通知の再送は宛先ごとに記録する**（`CommandRequest` とは扱いが違う）。
@@ -938,9 +1027,8 @@ export type CommandResponse =
 
 ```typescript
 /** GROWI → proxy。通知は markdown 文字列で送る（決定 3） */
-export interface NotificationRequest {
+export interface NotificationRequest extends RequestEnvelope {
   readonly requestId: string;
-  readonly relationId: string;
   /** **channelId で指定する。** proxy は宛先がその関係の installation に属することを確かめる */
   readonly targets: ReadonlyArray<{ platform: PlatformName; channelId: string }>;
   readonly markdown: string;
@@ -962,7 +1050,10 @@ export interface NotificationResult {
   readonly outcomes: ReadonlyArray<{
     readonly platform: PlatformName;
     readonly channelId: string;
-    readonly status: 'posted' | 'bot-not-in-channel' | 'channel-not-in-installation' | 'platform-error' | 'timeout';
+    /** `inventory-not-ready` は「そのチャンネルは無い」ではなく「proxy がまだ一覧を取れていない」。
+     *  `channel-not-in-installation` と混ぜると、運用者に間違った直し方を案内してしまう（要件 2.4） */
+    readonly status: 'posted' | 'bot-not-in-channel' | 'channel-not-in-installation'
+      | 'inventory-not-ready' | 'platform-error' | 'timeout';
     readonly remedy?: string;
     readonly detail?: string;
   }>;
@@ -981,8 +1072,7 @@ export interface NotificationResult {
  * GROWI の個人設定に手で貼る形。本人確認が無く、他人の ID を先に貼ると
  * 本人の紐付けを塞げる）へ逆戻りする。
  */
-export interface AccountLinkStartRequest {
-  readonly relationId: string;
+export interface AccountLinkStartRequest extends RequestEnvelope {
   readonly actor: ChatAccountRef;
 }
 
@@ -1038,5 +1128,6 @@ export type AccountLinkStartResponse =
    この設計の要になった判断なので試験で固定する
 7. **⑤ はどの `challenge` にも答える** — 保留が生きている間は、違う `challenge` が続けて来ても
    それぞれに署名を返すこと。**先に別の `challenge` で叩かれても、本物の問いに答えられる**こと。
-   上限（1 分 30 回）を超えたときだけ 429 になること。`challenge` が base64url でない、または
+   **別の送り元が上限に当たっていても、本物の送り元からの問いは通る**こと（上限が送り元ごとに数えられていること）。
+   `challenge` が base64url でない、または
    32〜128 文字を外れたら 400 になること（9.2・9.3）

@@ -190,11 +190,35 @@ GROWI が画面からの操作に対して掛けている確認が 2 つあり�
 検索結果はチャンネルへ投稿されるので、**その人だけが読めたページのパスとタイトルがチャンネル全員の目に触れる。**
 運用者から見て食い違いに気づく手がかりが無い。
 
+**3 つ目がある — この GROWI が、ログインしていない相手に何かを見せる設定かどうか。**
+`loginRequired` はログインしていない相手を通すかどうかを `crowi.aclService.isGuestAllowedToRead()` で
+決めている（`middlewares/login-required.ts:56-59`）。この関数は `security:wikiMode` が `private` なら偽、
+そうでなければ `security:restrictGuestMode` が `Readonly` のときだけ真を返す（`service/acl.ts:50-67`）。
+つまり**閉じた運用の GROWI では、ログインしていない相手は公開ページであっても 1 枚も読めない。**
+
+要件 3.7 の道（`user: null` なら公開ページだけを返す）は、この設定を一度も見ていない。
+**紐付けていない人が検索を打つと、閉じた GROWI でも公開扱いのページのパスとタイトルが
+全部チャンネルに出る。** 結果はチャンネルへの投稿なので、GROWI のアカウントを持っていない人も見る。
+**「GROWI にログインできない人には何も見せない」という運用者の設定が、チャット経由でだけ効かない。**
+
+GROWI 自身は、外の相手にページの中身を見せる口ではこの設定を必ず見ている —
+`routes/ogp.ts:152-153` は `isGuestAllowedToRead()` が偽なら `This GROWI is not public` と断る。
+**チャットの検索とリンクの展開は、まさに同じ性質の口である。**
+
 → **`resolveActor` の後条件**:
 - `status !== STATUS_ACTIVE` なら **`user` を `null` として扱う**（読み取りも紐付いていない扱いになる）
 - `user.readOnly` が真なら `user` は返すが **`writeDenied: 'read-only'`** を立てる（検索は本人の権限で通す）
+- **`user` が `null` で、かつ `aclService.isGuestAllowedToRead()` が偽なら、読み取りも実行しない。**
+  検索もリンクの展開も行わず、要件 7.6 の案内（`account-link-required`）を返す
 - 条件は自前で書かず、`excludeReadOnlyUser` と同じ判定を**1 か所から共有する**
   （`.claude/rules/coding-style.md`「枠組みに寄った包み込みから素の関数を切り出す」）
+
+**`PublicPageFilter` を呼ぶ側も、閉じた GROWI での扱いを決める。**
+
+| 呼ぶ側 | 閉じた GROWI ではどうするか |
+|---|---|
+| 通知（要件 2.3） | **そのまま出す。** 宛先は管理者が設定したものなので、運用者が意図して外へ出している |
+| リンクの展開（要件 6.2・6.3） | **パスだけにする。** 本文の冒頭・更新日時・コメント数を出さない。URL を貼った本人が中身を知っていても、チャンネルの全員がそうとは限らない |
 
 #### 既存の機能を呼ぶだけでは要件を満たせない（実コードで確認）
 
@@ -254,10 +278,38 @@ umbrella の `requirements.md` は Adjacent expectations に
 画面からの操作より記録が要る経路である。**
 
 → **書き込みを行うコマンド（`create-page` / `keep`）は、route と同じ形で Activity を出す。**
+ただし**`addActivity` を middleware としては使わない**（下記）。
 
-- `addActivity` は Express の middleware なので、**中身を素の関数として切り出し**、
-  route とこの feature の両方から呼ぶ（`.claude/rules/coding-style.md`）
-- **順序は `.claude/rules/activity-recording.md` に従う** — 応答を返す前に emit する
+**`addActivity` はリクエストが届いた時点で `req.user` を読む**（`middlewares/add-activity.ts:36-42` が
+`{ ip, endpoint, userId: req.user?._id, username: req.user?.username, createdAt }` を組み立てて預ける）。
+**この口ではその時点の `req.user` は空である** — 誰が操作したかは署名付きの本体に入っていて、
+`resolveActor` が処理の中で初めて解決するからである。並びに置くと `userId` も `username` も
+入らないまま行が確定し、`apps/app/.claude/rules/activity-recording.md` の Rule 1 が
+「操作者が抜けた行は通知一覧を壊した（#11510）」と名指ししている形になる。
+**行はできるので、動かして眺めても壊れているように見えない。**
+
+→ **`resolveActor` で操作者が決まった後に、自分で文脈を組み立てて `beginActivity()` を呼ぶ。**
+
+```typescript
+// 操作者が決まってから。応答を返す前に emit する（Rule 1）
+const { activityId } = beginActivity({
+  ip: req.ip, endpoint: req.originalUrl,
+  userId: actor.user._id.toString(), username: actor.user.username,
+  createdAt: requestArrivedAt,     // 到着時刻。beginActivity を呼ぶ時刻ではない
+});
+```
+
+- **切り出す必要は無い。** `beginActivity` と `registerFailsafeFinalizer` は
+  `~/server/service/activity/index` から**既に素の関数として出ている**（`add-activity.ts:5-8, 50-55`）。
+  決めるのは「どう呼ぶか」だけである。この形は規則も逃げ道として用意していて、
+  手本が 2 つある（`routes/apiv3/import.ts` + `import-executor.ts`、`service/page/index.ts` の `revertDeletedPage`）
+- **断った要求（`not-linked` / `read-only`）は記録しない。** 規則の並び
+  （認可の確認 → `addActivity` → 入力の検査）が「認可で断った要求は記録しない」方針だからである。
+  この口では認可にあたる判断が middleware ではなく処理の中にあるので、明示的にそう決める
+- **失敗した書き込み（`path-conflict` など）は `ACTION_UNSETTLED` として残す。**
+  `CommandEndpoint` は「例外を投げず必ず `CommandResponse` を返す」ので応答は 200 になり、
+  規則の失敗検知（`statusCode >= 400` と接続の切断）は**この口では一度も働かない**。
+  自分で文脈を組み立てる以上、失敗したときに何を残すかもここで決める
 - **チャット経由であることと発言元のチャンネルを残す。** protocol 側も `CommandEnvelope.channel` を
   残す価値の 1 つとして監査ログを挙げている
 
@@ -351,6 +403,8 @@ export interface NotificationDispatcher {
   `(relationId, requestId)` だけで記録する形だと、**やり直しは記録を読み直すだけで投稿を一度も試みない**
 - **署名は作り直す。** `requestId` は据え置くが `nonce` と `created` / `expires` は取り直す
   （protocol の `MessageSignature` の不変条件。しないと 2 回目が必ず `replayed` で弾かれる）
+- **`enqueue` は関係を 1 つだけ取る。** 要件 2.6 は紐づく全ての連携先へ配ることを求めるので、
+  **呼ぶ側が関係ごとに繰り返す**（1 件だけ入れて終わる実装にならないよう明記する）
 - 書き留める契機は 2 つ。**管理者がパス条件ごとに設定した通知**（要件 2.1）と、
   **編集した人がページの保存時に宛先を指定した通知**（要件 2.2）。どちらも同じ outbox に入る
 - やり直しは間隔を空けて数回。上限を超えたら `given-up` として残す
@@ -375,7 +429,8 @@ export interface NotificationDispatcher {
   （要件 2.6 は Gen 2 に対する条件であり、Gen 1 の振る舞いを求めていない）
 - **パス条件の突き合わせを二重に書かない。** 既存の `findSettingByPathAndEvent` が
   `generatePathsToMatch`（外へ出していない関数）で `/a/b/c → /a/b/c, /a/b/*, /a/*, /*` を作っている。
-  **この関数を外へ出して共有する**
+  **この関数を外へ出して共有する。振る舞いは変えない** — 置き場所を変えるだけなので、
+  「Gen 1 には手を入れない」（上記）との線引きは保たれる
 
 ---
 
@@ -437,7 +492,7 @@ GROWI には同じ形のものが既に 3 つある（`models/password-reset-ord
 
 | コレクション | 主な項目 | 索引・寿命 |
 |---|---|---|
-| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `settingsVersion`, `createdAt` | `relationId` 一意。**これが無いと送り先も分からない**（下記）。**紐付け解除（要件 9.7）では削除せず `state: 'unpaired'` にする** — `workspaceId` を残さないと繋ぎ直しのときに紐付けを引き継げない。消すのは**鍵・チャンネル権限・宛先**だけ（秘密鍵を残さない目的はこれで満たせる） |
+| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `settingsVersion`, `createdAt` | **`(proxyUri, relationId)` 複合ユニーク** — `relationId` を採番するのは**相手（proxy）**なので、1 つの GROWI が複数の proxy と紐づくと衝突しうる。**既にある組と衝突する `PairingResult` は成立させない**（roadmap が過去の取りこぼしとして挙げている「相手が付けた識別子を自分側の一意キーにする」形を避ける）。**これが無いと送り先も分からない**（下記）。**紐付け解除（要件 9.7）では削除せず `state: 'unpaired'` にする** — `workspaceId` を残さないと繋ぎ直しのときに紐付けを引き継げない。消すのは**鍵・チャンネル権限・宛先**だけ（秘密鍵を残さない目的はこれで満たせる） |
 | `chat_account_links` | `relationId`, `userId`, `platform`, `accountId`, `linkedAt` | **`(relationId, platform, accountId)` 複合ユニーク**（下記）。**利用者が解除するまで残る。** 関係の解除では消さない（下記の再ペアリングを参照） |
 | `chat_integration_keys` | `relationId`, `side`(`own`/`peer`), `keyId`, `key`, `validFrom`, `revokedAt` | `(relationId, side, keyId)` 一意。**紐付け解除で削除**（秘密鍵を残さない） |
 | `chat_notification_outbox` | `requestId`, `relationId`, `targets`, `markdown`, `state`, `attempts`, `result`, `createdAt` | `state` に索引。**送信済みは 30 日で TTL 索引により消す**。`given-up` は運用者が確認するまで残す |
@@ -445,7 +500,7 @@ GROWI には同じ形のものが既に 3 つある（`models/password-reset-ord
 | `chat_request_nonces` | `relationId`, `keyId`, `nonce`, `expiresAt` | `(relationId, keyId, nonce)` 一意。**`expiresAt` に TTL 索引** |
 | `chat_pending_pairings` | `registrationCode`, `proxyUri`, `growiUri`, `createdBy`, **`ownKeyId`**, **`ownKeyPair`（暗号化）**, **`answerCount`**, **`answerWindowStartedAt`**, `expiresAt` | `registrationCode` 一意。**`expiresAt` に TTL 索引**。要件 9.2 の所有確認に使う。**答えた `challenge` は記録しない** — どの問いにも答える形にしたため（上記）。数えるのは**回数の上限**（1 分 30 回）だけ |
 | `chat_account_link_orders` | `token`, `relationId`, `platform`, `accountId`, `isRevoked`, `createdAt`, `expiredAt` | `token` 一意。**`expiredAt` に TTL 索引**（既定 10 分）。要件 7.3 の一度きりのリンク。**`models/password-reset-order.ts` に倣う**（下記） |
-| `chat_channel_permissions` | `relationId`, `commandName`, `allowedChannels` | **`(relationId, commandName)` 一意。** **行ごとの `updatedAt` は持たない** — protocol の `SettingsPushRequest.updatedAt` は関係ごとに 1 つの値なので、行ごとに持つと比べる基準が決まらない。版は `chat_relations.settingsVersion` に 1 つ持ち、**保存のたびに 1 増やす**。proxy が取りに来たときはそこから返す（要件 11.4） |
+| `chat_channel_permissions` | `relationId`, `commandName`, `allowedChannels` | **`(relationId, commandName)` 一意。** **行ごとの `updatedAt` は持たない** — protocol の `SettingsPushRequest.version` は関係ごとに 1 つの値なので、行ごとに持つと比べる基準が決まらない。版は `chat_relations.settingsVersion` に 1 つ持ち、**保存のたびに 1 増やす**。proxy が取りに来たときはそこから返す（要件 11.4） |
 | `chat_notification_destinations` | `platform`, `channelId`, **`channelName`**, `pathPattern`, `triggerEvents`, `relationId` | `channelName` は表示と要件 12.4 の突き合わせ用。**`ChannelInventory` を引いたときに合わせて更新する**（名前は変わりうるので、古いままだと注意喚起が出たり出なかったりする）。管理者が設定する。Gen 1 の設定とは**別に保存する**（要件 12.2） |
 
 #### ペアリングの途中に、自分の鍵を置く場所が要る（順序の矛盾）
@@ -498,12 +553,16 @@ proxy 間の持ち回しは、登録コード（proxy が発行し ④ で送り
 
 | 口（`op`） | パス | 中身 | 署名 | 要件 |
 |---|---|---|:--:|---|
-| `command` | `/chat-integration/command` | `CommandRequest` → `CommandResponse` | 要 | 3.6, 3.7, 4, 5, 6, 14.2 |
-| `key-register` | `/chat-integration/keys/register` | `KeyRegistrationRequest` → `KeyOperationResult` | 要 | 10.5 |
-| `key-revoke` | `/chat-integration/keys/revoke` | `KeyRevocationRequest` → `KeyOperationResult`。**有効な鍵が 0 本になる要求は `would-leave-no-valid-key` で断る** | 要 | 10.5 |
-| `settings-pull` | `/chat-integration/settings` | `{ relationId, op }` → `SettingsPullResponse` | 要 | 11.4 |
-| `account-link-start` | `/chat-integration/account-link/start` | `AccountLinkStartRequest` → `AccountLinkStartResponse` | 要 | 7.3 |
-| （署名なし） | `/chat-integration/pairing/challenge` | `OwnershipChallenge` → `ChallengeResponse` | **不要** | 9.2 |
+| `command` | `/_api/v3/chat-integration/peer/command` | `CommandRequest` → `CommandResponse` | 要 | 3.6, 3.7, 4, 5, 6, 14.2 |
+| `key-register-to-growi` | `/_api/v3/chat-integration/peer/keys/register` | `KeyRegistrationRequest` → `KeyOperationResult` | 要 | 10.5 |
+| `key-revoke-to-growi` | `/_api/v3/chat-integration/peer/keys/revoke` | `KeyRevocationRequest` → `KeyOperationResult`。**有効な鍵が 0 本になる要求は `would-leave-no-valid-key` で断る** | 要 | 10.5 |
+| `settings-pull` | `/_api/v3/chat-integration/peer/settings` | `OpOnlyRequest` → `SettingsPullResponse` | 要 | 11.4 |
+| `account-link-start` | `/_api/v3/chat-integration/peer/account-link/start` | `AccountLinkStartRequest` → `AccountLinkStartResponse` | 要 | 7.3 |
+| （署名なし） | `/_api/v3/chat-integration/peer/pairing/challenge` | `OwnershipChallenge` → `ChallengeResponse` | **不要** | 9.2 |
+
+> **proxy 向けの口は `/peer/` の下にまとめる。** 同じ feature の中に管理画面が叩く口
+> （設定の保存・チャンネル一覧の取得・ペアリングの申し込み）もあり、そちらは**普通の JSON API** である。
+> 下記の生のバイト列の扱いを掛ける範囲を分けるために、接頭辞で切り分ける。
 
 **署名を確かめた後、`acceptEnvelope()` で本体の `relationId` と `op` を突き合わせてから処理する。**
 
@@ -532,8 +591,10 @@ proxy 間の持ち回しは、登録コード（proxy が発行し ④ で送り
 
 ```javascript
 // server/crowi/express-init.js — bodyParser.json より前に置く
+const CHAT_INTEGRATION_PEER_PREFIX = '/_api/v3/chat-integration/peer';
+
 app.use(
-  '/_api/v3/chat-integration',
+  CHAT_INTEGRATION_PEER_PREFIX,
   express.raw({ type: 'application/json', limit: '10mb' }),
 );
 ```
@@ -542,22 +603,55 @@ app.use(
 後続の `bodyParser.json` は `req._body` が立っている要求を飛ばすので、**既存の経路には影響しない。**
 署名を確かめた後、この feature が自分で `JSON.parse` する。
 
+- **掛ける範囲は `/peer/` の下だけ。** `/_api/v3/chat-integration` の全体に掛けると、
+  **同じ接頭辞の下にある管理画面用の口まで生のバイト列になり、入力検査ごと動かなくなる**
+- **`content-type` が `application/json` でなければ、署名の検証に入る前に断る。**
+  `express.raw` はこの type のときだけ働くので、違う値で届くと `req.body` は空の object になる。
+  `content-type` は署名対象なのでどのみち検証は通らないが、
+  **`Buffer` である前提のコードがその手前で落ちる**
 - **`Buffer` のまま扱う。** 文字列に足し込まない（複数バイトの文字が壊れる）
 - **解析した値から本文を組み立て直してハッシュを取らない。** 鍵の並び順や数値の書き方が
   送信時と一致する保証が無く、**正しい相手が弾かれる**。Gen 1 の
   `packages/slack/src/middlewares/verify-slack-request.ts:52-57` がこの形になっているが、写さない
 - 上限を 10mb にするのは、この口が運ぶのがページ 1 枚ぶんの本文だからである（全体の 50mb は要らない）
 
+#### `mongoSanitize` を `/peer/` の下から外す（実測で確認）
+
+GROWI は `express-mongo-sanitize` をアプリ全体に登録している（`server/crowi/express-init.js:150`）。
+その `isPlainObject` は `typeof obj === 'object' && obj !== null` という判定なので、
+**`Buffer` に対して真を返す**。すると `Object.keys()` が**全バイトぶんの添字**を返し、
+1 バイトずつ正規表現の判定が走る。
+
+実測: **1 MiB の `Buffer` で `Object.keys()` が 1,048,576 個・57 ms。**
+その後さらに 1 件ずつコールバックが回るので、実際の費用はこれよりずっと大きい。
+`keep`（会話の取り込み）はこの大きさになる。
+
+→ **`/peer/` の下を `mongoSanitize` の対象から外す。** そもそも `Buffer` に MongoDB の演算子は
+入りようがないので、掛ける意味も無い。JSON に直した後の値には、この feature が自分で検査関数を掛ける。
+
+> **CSRF は障害にならない**（確認済み）。GROWI の `csurf` は `ignoreMethods` に POST を含めて
+> 実質無効で、`/_api` の守りは `CertifyOrigin` である。この関数は `Origin` ヘッダが無い要求を
+> 同一元とみなすので、サーバ同士の POST は通る。
+
+> **メンテナンスモードでは止まる。** apiv3 は `unavailableWhenMaintenanceModeForApi` の下にある
+> （`server/routes/index.js:215`）ので、メンテナンス中は proxy からの口が全て止まる。
+> **通知は outbox に残るので後から回復する**が、**ペアリングと所有確認は失敗する**。
+> これは意図どおりとする — メンテナンス中に新しい連携を成立させる必要は無い。
+
 `ProxyClient`（GROWI → proxy）が送るもの:
 
-| 送るもの | 型 | 要件 |
-|---|---|---|
-| 通知 | `NotificationRequest` → `NotificationResult` | 2.1–2.6 |
-| ペアリングの申請 | `PairingSubmission` → `PairingResult` | 9.1–9.5 |
-| 設定の押し込み | **`SettingsPushRequest`**（`updatedAt` つき） | 11.1, 11.2, 11.4 |
-| 鍵の追加・失効 | `KeyRegistrationRequest` / `KeyRevocationRequest` → `KeyOperationResult` | 10.5 |
-| 能力の一覧 | → **`CapabilityReport`** | 1.3 |
-| チャンネルの一覧 | → **`ChannelInventory`** | 2.2, 11.1（管理画面が宛先を選ぶため。**`channelName` が取れるので要件 12.4 の突き合わせもこれで解ける**） |
+**すべて `POST`。** パスは protocol spec の「口の一覧」が持つ。土台は `chat_relations.proxyUri`。
+
+| 送るもの（`op`） | パス | 型 | 要件 |
+|---|---|---|---|
+| 通知（`notification`） | `{proxyUri}/chat-integration/notification` | `NotificationRequest` → `NotificationResult` | 2.1–2.6 |
+| 設定の押し込み（`settings-push`） | `{proxyUri}/chat-integration/settings-push` | **`SettingsPushRequest`**（`version` つき） | 11.1, 11.2, 11.4 |
+| 鍵の追加（`key-register-to-proxy`） | `{proxyUri}/chat-integration/keys/register` | `KeyRegistrationRequest` → `KeyOperationResult` | 10.5 |
+| 鍵の失効（`key-revoke-to-proxy`） | `{proxyUri}/chat-integration/keys/revoke` | `KeyRevocationRequest` → `KeyOperationResult` | 10.5 |
+| 能力の一覧（`capabilities`） | `{proxyUri}/chat-integration/capabilities` | `OpOnlyRequest` → **`CapabilityReport`** | 1.3 |
+| 接続の状態（`connection-status`） | `{proxyUri}/chat-integration/connection-status` | `OpOnlyRequest` → `ConnectionStatusView` | 1.4（管理画面の「連携の状態」に出す） |
+| チャンネルの一覧（`channels`） | `{proxyUri}/chat-integration/channels` | `OpOnlyRequest` → **`ChannelInventory`** | 2.2, 11.1（管理画面が宛先を選ぶため。**`channelName` が取れるので要件 12.4 の突き合わせもこれで解ける**） |
+| ペアリングの申請（**署名なし**） | `{proxyUri}/chat-integration/pairing/submit` | `PairingSubmission` → `PairingResult` | 9.1–9.5 |
 
 **設定を変えたら押し込む**（要件 11.4「次の実行から反映」はこれで満たす）。押し込みが失敗しても、
 proxy が `SettingsPullResponse` で取りに来るので取りこぼしは埋まる。
@@ -594,8 +688,11 @@ protocol spec が「`keyId` を単独で鍵にすると別の関係のものを�
 > **解除済みの `chat_relations` の行そのものも 90 日で消す**（`chat_account_links` と揃える）。
 > 90 日の掃除は `NotificationDispatcher` と同じく**条件つき更新で 1 台だけ**が回す。
 >
-> **`chat_account_links` を消すのは 3 つの場合だけ** — 利用者が解除したとき、GROWI ユーザーが削除されたとき、
+> **`chat_account_links` を消すのは 2 つの場合だけ** — 利用者が解除したとき（要件 7.5）と、
 > 引き継ぎ先が無いまま一定期間（既定 90 日）過ぎたとき。
+> **GROWI ユーザーが使えなくなっても消さない** — 利用者削除は `status` を変えるだけで
+> 文書は残り、`resolveActor` が状態を見て `user: null` にするので、行が残っていても安全である。
+> 復帰したときに紐付け直さずに済む（上記「`resolveActor` は「行が引けたか」では決められない」）。
 >
 > **要件 7.4 の「同じ GROWI 内で一意」との関係**: 同じ GROWI に 2 つの workspace が紐づくとき、
 > 同じ `accountId` を別の利用者が取れる。**これは正しい振る舞い**（別の workspace の別人なので）。
