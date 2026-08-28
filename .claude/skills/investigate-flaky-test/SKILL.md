@@ -302,30 +302,48 @@ redesign opportunity, not an environment-timing dead end:
 - This turns an O(N) cost into an O(1) cost, which removes the test's
   sensitivity to CI load rather than buying temporary headroom against it.
 
-**Driver 2 — the cost scales with concurrent worker count, not a test-local
-parameter.** A `beforeAll`/`afterAll` in a `setupFiles` entry (migration
-replay, a singleton service cold-init, etc.) runs once per Vitest
-**worker**, and its timeout applies to every spec file that worker happens
-to run — not to one test. "This hook's own cost doesn't loop over
-anything, so there's nothing to redesign" sounds like it forces driver 1's
-dead end, but it doesn't: the cost still scales with **how many workers
-pay it at the same moment**, since sibling workers on the same CI runner
-compete for the same CPU while each does its own heavy cold-start work
-(spawning a migration subprocess, initializing a singleton, etc.). A
-same-commit failure across several unrelated spec files that all timed out
-on the identical `beforeAll` line, with no code change near that line, is
-the signature of this shape (see `test/setup/crowi.ts`'s `getInstance()` /
+**Driver 2 — the cost scales with how much concurrent setup work is in
+flight, not a test-local parameter.** A `beforeAll`/`afterAll` in a
+`setupFiles` entry (migration replay, a singleton service cold-init, etc.)
+looks like it should run once per Vitest worker — the code usually
+memoizes a module-level singleton to make it look that way — but **verify
+that before trusting it**: Vitest's `forks` pool resets the module
+registry per test file under the default `isolate: true`, so a
+"per-worker singleton" comment can be describing intent, not actual
+behavior, and the cost can really be recurring on nearly every file all
+run long (confirm with a throwaway `console.log` inside the memoized
+branch and count how many times it fires across a few files — do not
+assume from the comment). Either way — once per worker or once per file —
+"this hook's own cost doesn't loop over anything, so there's nothing to
+redesign" sounds like it forces driver 1's dead end, but it doesn't: the
+cost still scales with **how many files/workers pay it at the same
+moment**, since anything else running on the same CI runner competes for
+the same CPU while each pays its own heavy setup cost (spawning a
+migration subprocess, initializing a singleton, etc.). A same-commit
+failure across several unrelated spec files that all timed out on the
+identical `beforeAll` line, with no code change near that line, is the
+signature of this shape (see `test/setup/crowi.ts`'s `getInstance()` /
 `test/setup/migrate-mongo.ts` in GROWI's own `apps/app` for a worked
-example — PR #11824 misclassified exactly this as "nothing to redesign,
-so a bump is fine"). Where this applies:
+example — PR #11824 misclassified this as "nothing to redesign, so a bump
+is fine," and the fix that replaced it, PR #11826, initially misclassified
+it too, asserting the *same* per-worker premise without checking it before
+publishing — a `console.log` count across a few files falsified it and
+changed the story that shipped). Where this applies:
 
-- **Measure the unloaded baseline.** Run the failing spec(s) alone (no
-  sibling workers contending) and read the hook's own duration off the
-  reporter. If it already sits close to the current limit, a larger
-  timeout may be warranted — state the measured number. If it sits well
-  under the limit (e.g. under a fifth of it), the limit was never the
-  problem; contention pushed a normally-fast hook past it, and a bigger
-  number just delays the same failure to a heavier-load day.
+- **Measure the unloaded baseline, and don't stop at the number — check
+  the model it's measuring.** Run the failing spec(s) alone (no sibling
+  workers contending) and read the hook's own duration off the reporter.
+  If it already sits close to the current limit, a larger timeout may be
+  warranted — state the measured number. If it sits well under the limit
+  (e.g. under a fifth of it), the limit was never the problem; contention
+  pushed a normally-fast hook past it. But a low unloaded number only says
+  the hook is fast *once* — it does not tell you whether it pays that cost
+  once per worker or once per file. Confirm which, per the paragraph
+  above, before describing the mechanism in a fix or a doc: "once per
+  worker" and "once per file, many times over" call for the same lever
+  (bound concurrency) but very different claims about how much it helps,
+  and an unverified "once per worker" claim is exactly the kind of
+  plausible-but-unchecked assertion this whole guardrail exists to catch.
 - **Check for a same-project precedent that a bump already failed.** If a
   *different* hook sharing the same `setupFiles`/project already had its
   timeout raised for the same "environment timing" reason and still
@@ -334,7 +352,7 @@ so a bump is fine"). Where this applies:
   single hook's deadline — proposing another bump for a second hook in
   the same project repeats a fix this repo's own history already falsified.
 - **Prefer bounding worker concurrency over widening the deadline.** When
-  the mechanism is "N workers cold-initializing at once fight for the
+  the mechanism is "N workers/files doing cold-init at once fight for the
   runner's cores," the fix that addresses the mechanism is capping
   concurrent workers (Vitest `poolOptions.forks.maxForks` /
   `poolOptions.threads.maxThreads`, sized off `availableParallelism()`
