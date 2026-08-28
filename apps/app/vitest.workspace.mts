@@ -56,6 +56,14 @@ export default defineWorkspace([
         'src/features/growi-vault/__tests__/**',
         '**/*.exclusive.integ.ts',
       ],
+      // Each worker's first `getInstance()` call (test/setup/crowi.ts) pays a real,
+      // one-time cost: DB models, passport, socket.io, ACL, page/notification/activity/
+      // user-group services. That cost doesn't scale with any test parameter (nothing to
+      // redesign around, unlike an N-round-trip loop) — it just occasionally exceeds
+      // vitest's 10s default hookTimeout when many workers cold-init concurrently under
+      // CI load (see #11820/#11821/#11822). Give it real headroom rather than leaving
+      // the default too tight for its own worst case.
+      hookTimeout: 30_000,
       // Pre-download the MongoDB binary before workers start to avoid lock-file race conditions
       globalSetup: ['./test/setup/mongo/global-setup.ts'],
       setupFiles: [
