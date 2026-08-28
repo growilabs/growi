@@ -59,7 +59,7 @@
     "prelint:openapi:apiv1": "pnpm run openapi:generate-spec:apiv1",
     "test": "vitest run",
     "test:unit": "vitest run --project=app-unit",
-    "test:integ": "vitest run --project=app-integration --project=app-integration-exclusive",
+    "test:integ": "vitest run --project=app-integration --project=app-integration-exclusive --poolOptions.forks.maxForks=4",
     "test:components": "vitest run --project=app-components",
     "test:coverage": "run-p test:coverage:* test:integ",
     "test:coverage:unit": "COLUMNS=200 vitest run --coverage --project=app-unit",

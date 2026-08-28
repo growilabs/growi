@@ -25,14 +25,28 @@ function runMigrations(mongoUri: string): void {
   });
 }
 
-// 20s timeout (2x the 10s default): this hook spawns `dev:migrate:up`, which
-// runs every migration through the dev TS runner once per Vitest worker. The
-// dev runner is now Node-native (strip-only type stripping + a synchronous
-// resolve-only hook), ~2x faster to load the graph than the former tsx, so per-file
-// resolve/load is no longer the bottleneck — the residual time is mostly DB
-// I/O under the parallel integration run. 20s is a modest margin over that;
-// any further reduction should follow a measured baseline (Phase 3.8.e ±20%
-// gate on the devcontainer), not a guess.
+// This hook spawns `dev:migrate:up`, which runs every migration through the dev
+// TS runner once per test file (VITEST_WORKER_ID — used by getTestDbConfig() to
+// name each file's database — is a per-file dispatch counter, not a bounded
+// physical-worker id, so this genuinely runs once per file, not once per
+// worker despite the `migrationsRun` guard below).
+//
+// #11752: without a concurrency cap, Vitest sizes its fork pool off the
+// runner's reported CPU count, which can be far higher than what the runner
+// can actually sustain running this workload in parallel — CI logs showed
+// 100+ concurrent `dev:migrate:up` invocations, saturating the runner and
+// blowing this hook's budget almost every run. `test:integ`'s
+// `--poolOptions.forks.maxForks=4` flag is the actual fix (matches
+// GitHub-hosted `ubuntu-latest` runners' advertised 4 vCPUs) and cut local
+// reproduction of this failure from ~80% of files to roughly 1%.
+//
+// 30s (was 20s) is a modest margin layered on top of that fix, not a
+// substitute for it: even 4 truly-concurrent `dev:migrate:up` chains (each a
+// nested pnpm -> node -> migrate-mongo -> umzug spawn) can occasionally still
+// exceed 20s under host contention outside the pool's control (a busy CI
+// runner, a slow migration added later). If this still times out with the
+// pool capped, that is a real regression to investigate, not a signal to
+// raise the number further.
 beforeAll(() => {
   // Skip if already run (setupFiles run per test file, but we only need to migrate once per worker)
   if (migrationsRun) {
@@ -51,4 +65,4 @@ beforeAll(() => {
 
   runMigrations(mongoUri);
   migrationsRun = true;
-}, 20_000);
+}, 30_000);
