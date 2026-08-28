@@ -43,7 +43,7 @@
 ### Existing Architecture Analysis
 - `plantuml.ts`(:29) がテーマを図ソース先頭へ前置 → `@akebifiky/remark-simple-plantuml` が `image` ノード化（`node.url = <baseUrl>/svg/<deflate+base64>`）→ 2nd visit(:50-64) が `src = node.url` を `hName:'plantuml'` 要素の `hProperties.src` に格納。`plantumlUri.length===0` で早期return(:43)。
 - `PlantUmlViewer.tsx`(32行): props は `src` のみ。`<div [status]='true'><img src onLoad onError={handleLoaded}/></div>`。onLoad/onErrorとも `handleLoaded` が status を `'false'` にするだけ（成否を区別しない）。
-- テーマ資産は**素のTS文字列モジュール**（`export default style`）。特別なローダ無し ＝ **文字列編集で縮小可**。⚠️ **エンコード後サイズの主レバーはコメント・空白（＝ミニファイ）**であり、非UML `<style>` ブロックではない。実測: ミニファイのみで 4,544→3,128字（**31%減・着色は無傷**）に対し、非UMLブロック削除は 4,544→3,648字（20%減）にとどまる ── 非UMLブロックは類似構造の繰り返しで deflate が既にほぼ潰しており、削除しても encoded はあまり減らない上、当該図種のダーク配色を失う（後述 File Structure Plan / theme assets 参照）。
+- テーマ資産は**素のTS文字列モジュール**（`export default style`）。特別なローダ無し ＝ **文字列編集で縮小可**。⚠️ **エンコード後サイズの主レバーはコメント・空白（＝ミニファイ）**であり、非UML `<style>` ブロックではない。実測(基準図・light): ミニファイで**テーマの encoded 寄与が 4,628→3,192字（寄与ベース31%減）＝図込みの全体URLでは 8,318→6,882字（全体17%減・着色は無傷）**。空白/インデントは deflate が既に圧縮するため、削減の主因はコメント/定義量であり全体では17%に落ち着く。非UMLブロック削除は効果が小さく（deflate が既に潰している）当該図種のダーク配色も失うため主レバーにしない（後述 File Structure Plan / theme assets 参照）。
 - 手本: `MermaidViewer`(logger＋status遷移)、`DrawioViewerWithEditButton`(`useTranslation`/`t`)。
 
 ### Architecture Pattern & Boundary Map
@@ -140,7 +140,7 @@ flowchart TD
 - 単一・静的テーマを縮小。**主レバー＝ミニファイ**（コメント行・行頭空白・空行の除去）。着色・skinparam・`<style>` 定義は削除しないため、**ダーク配色と全図種の見た目が不変**（#1 の退行が原理的に発生しない）。
 - **副次レバー（任意・要緩和）**: 非UML系 `<style>` 定義の削除は追加削減が必要な場合のみ。ただし当該図種（board/gantt/json/mindmap/salt/wbs/wire/yaml）は skinparam で着色できず `<style>` が唯一の着色手段で、削除するとダークモードで既定の黒文字＋transparent背景となり判読不能。採用時は「ダーク既定色フォールバック」等の緩和とセットで。`sequenceDiagram`／`timingDiagram` はUML図なので常に残す。
 - 図種別の切替ロジックは持たない（全図一律）。前置は文字列そのままなので削減分だけURLが縮む。
-- **削減は段階適用し、基準図のエンコード後URL長を都度実測**（Req 5）。実測ではミニファイのみで基準図クラス（~100クラス）のフルURLが 7,858→6,338字となり、Tomcat 既定 `maxHttpHeaderSize`=8192（リクエスト行＋全ヘッダ込み）の実効上限内に収まる見込み。残余（桁違いに巨大な図）は本specのエラー表示＋別specのPOSTで受ける。
+- **削減は段階適用し、基準図のエンコード後URL長を都度実測**（Req 5）。**実測（報告図・light）: フルURL 8,318→6,882字**＝ Tomcat 既定 `maxHttpHeaderSize`=8192 内（余裕 約1,310字）。⚠️ 8192 は**リクエスト行＋全ヘッダ込み**なので、自前サーバで **Cookie 等ヘッダが乗ると余裕が目減り**する（公開plantuml.com は Cookie 無しで安全側）。残余（桁違いに巨大な図）は本specのエラー表示＋別specのPOSTで受ける。
 
 **Implementation Notes**
 - Integration: `plantuml.ts` の import は不変。中身のみ縮小。

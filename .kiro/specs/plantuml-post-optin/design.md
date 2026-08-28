@@ -25,7 +25,7 @@
 - PlantUML描画の送信方式分岐（`features/plantuml` 配下の remark プラグインと表示コンポーネント）。
 - 新設のサーバ側描画プロキシ（生ソース＋darkMode受領 → テーマ前置 → `PLANTUML_URI` へPOST → SVG返却）とそのSVGキャッシュ。
 - POST経路のアクセス制御・入力サイズ/タイムアウト上限・誤設定検知。
-- **POST推奨メッセージ（Req 11）**: GET時・上限超過で、POST利用可能なら「自前サーバ＋POSTで解決可」を案内する文言とi18n。表示体は別spec `plantuml-large-diagram-get` のエラーUIに**相乗り**（本specは推奨行の追加と判定を担う）。
+- **POST推奨メッセージ（Req 11）**: GET時、**URL長超過が疑わしい失敗（プリチェック超過 or `src.length`大）**でPOST利用可能なら「自前サーバ＋POSTで解決可」を案内する文言とi18n。構文エラー/サーバ停止等（URL長でない失敗）では出さない。表示体は別spec `plantuml-large-diagram-get` のエラーUIに**相乗り**（本specは推奨行の追加と判定を担う）。
 - **POST経路の失敗メッセージ文言とそのi18n（`method==='post'` 分岐, Req 6.3/6.4）**を本specが所有する。get spec のエラーUI文言は GET失敗にのみ適用され、エラーUIは `method` で分岐する（GET向け文言を POST に出さない）。
 
 ### Out of Boundary
@@ -134,9 +134,9 @@ apps/app/src/features/plantuml/
 - `features/plantuml/components/PlantUmlViewer.tsx` — POST時は `fetch-plantuml-svg`（メモ経由）でSVGを取得し blob URL を `<img src>` に設定（rendering-status維持、unmountでrevoke）。GET時は現行のまま。
 - `server/routes/apiv3/index.js` — `svg.ts` factory を `/plantuml` にマウント。
 - **（Req 11）** `features/plantuml/services/plantuml.ts` — GET分岐で `<plantuml>` に**送信方式（またはPOST可否）を `hProperties`（`data-*`）で付与**し、`sanitizeOption` に許可追加（POST推奨判定をViewerに渡す）。
-- **（Req 11・共有変更）** `features/plantuml/components/PlantUmlViewer.tsx` — large-diagram-get のエラーUIに、**`method==='get'` の時だけ POST推奨行**（`t()`）を追記。※large-diagram-get と同一ファイルを変更（相乗り）。
+- **（Req 11・共有変更）** `features/plantuml/components/PlantUmlViewer.tsx` — large-diagram-get のエラーUIに、**`method==='get'` かつ URL長超過が疑わしい時（プリチェック超過 or `src.length` が大）だけ POST推奨行**（`t()`）を追記（構文エラー/サーバ停止では出さない）。※large-diagram-get と同一ファイルを変更（相乗り）。
 - **（Req 11）** `apps/app/public/static/locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/translation.json` — POST推奨の文言キーを5ロケール追加（large-diagram-get の汎用文言とは別キー）。
-- テスト: `plantuml.spec.ts`, `PlantUmlViewer.spec.tsx`, `PageContentRenderer.spec.tsx`(mock更新), `config-definition.spec.ts`(key一覧), 新規 `server/routes/svg.integ.ts`。**（Req 11）** `PlantUmlViewer.spec.tsx` に「GET＋上限超過で POST推奨行が出る／POSTモードや非該当では出ない」を追加。
+- テスト: `plantuml.spec.ts`, `PlantUmlViewer.spec.tsx`, `PageContentRenderer.spec.tsx`(mock更新), `config-definition.spec.ts`(key一覧), 新規 `server/routes/svg.integ.ts`。**（Req 11）** `PlantUmlViewer.spec.tsx` に「GET＋URL長超過疑い（プリチェック超過 or `src.length`大）で POST推奨行が出る／POSTモード・上限内の onError（構文エラー/サーバ停止想定）では出ない」を追加。
 
 ## System Flows
 
@@ -222,7 +222,7 @@ sequenceDiagram
 | 10.1 | 閲覧同等のアクセス制御 | proxy(route) | `certifySharedPage → loginRequiredFactory(crowi,true)` | POST描画 |
 | 10.2 | サイズ/時間上限 | proxy, render-plantuml | 上限定数, `timeout` | POST描画 |
 | 10.3 | 共有リンク匿名閲覧者もGET同等に描画 | proxy(route), fetch-plantuml-svg, PlantUmlViewer | body `pageId`+`shareLinkId`, `certifySharedPage` | POST描画 |
-| 11.1 | GET時にPOST推奨を案内 | plantuml.ts(method属性), PlantUmlViewer(推奨行), locales | `method==='get'` 分岐 | — |
+| 11.1 | GET時・URL長超過疑い時のみPOST推奨を案内（構文エラー等では出さない） | plantuml.ts(method属性), PlantUmlViewer(推奨行), locales | `method==='get'`＋（プリチェック超過 or `src.length`大） | — |
 | 11.2 | 非対応環境では出さない | PlantUmlViewer | Bコード存在＝利用可能 | — |
 | 11.3 | POST推奨のi18n | locales | 5ロケール | — |
 
@@ -237,7 +237,7 @@ sequenceDiagram
 | plantuml svg proxy | Server/route | 認証→サイズ→cache→render→SVG | 2.1,2.2,5.2,10.1,10.2 | render, cache (P0) | API |
 | render-plantuml | Server/service | テーマ前置→`PLANTUML_URI` へ生テキストPOST | 2.2,2.3,4.2,7.1,7.2,9.1,9.3,10.2 | axios (P0), PLANTUML_URI (P0), theme assets (P1) | Service |
 | svg-cache | Server/service | `hash(source,darkMode)`→SVG のTTL/上限キャッシュ | 5.1,5.2 | lru-cache (P1) | State |
-| POST推奨メッセージ | Client/UI+i18n | GET時・上限超過で `method==='get'` の時のみ POST推奨行を追記（別spec のエラーUIに相乗り） | 11.1,11.2,11.3 | large-diagram-get エラーUI (P0), locales (P1) | State |
+| POST推奨メッセージ | Client/UI+i18n | `method==='get'` かつ URL長超過が疑わしい時（プリチェック超過 or `src.length`大）のみ POST推奨行を追記（構文エラー等では出さない。別spec のエラーUIに相乗り） | 11.1,11.2,11.3 | large-diagram-get エラーUI (P0), locales (P1) | State |
 
 ### Client
 
@@ -268,7 +268,7 @@ type PlantUMLPluginParams = {
 
 #### POST推奨メッセージ（Req 11）— 新規（クロススペック相乗り）
 **Responsibilities & Constraints**
-- 別spec `plantuml-large-diagram-get` が新設する **GET時・上限超過のエラーUI（`PlantUmlViewer` 内）に、POST推奨行を追記**する。表示条件は **`method==='get'`**（POST未使用だが切替可能）＝ `plantuml.ts` が `<plantuml>` に付与する送信方式属性で判定。
+- 別spec `plantuml-large-diagram-get` が新設する **GET時・上限超過のエラーUI（`PlantUmlViewer` 内）に、POST推奨行を追記**する。表示条件は **`method==='get'`（`plantuml.ts` 付与の送信方式属性）かつ URL長超過が疑わしい時**＝**プリチェック超過、または `src.length` が大きい**時のみ。構文エラー・サーバ停止等（原因がURL長でない失敗）では**出さない**（POSTでは解決せず誤誘導になるため）。
 - 「POST利用可能」は**本specのコード存在そのもの**で担保（B未マージ環境には本行が無い＝Req 11.2 を実行時フラグなしで満たす）。
 - 文言（自前サーバ＋POST設定で解決可）は **B専用のi18nキー**として5ロケール追加（汎用文言とは別）。
 - **Boundary/順序**: large-diagram-get のエラーUI確定が前提（相乗り）。同一 `PlantUmlViewer.tsx`/`plantuml.ts(sanitizeOption)`/`locales` を共有変更。
@@ -363,7 +363,7 @@ interface SvgCache {
 ### Component Tests
 - `PlantUmlViewer.spec.tsx`: POST分岐で `fetchPlantumlSvg` を呼び自身の `objectURL` を `<img>` に設定、成功で rendering-status 完了（8.1）、失敗で error 状態（6.1）。unmountで自分の `objectURL` のみ revoke、**再mount時にメモ由来Blobから再取得して壊れない**（5.1所有権）。**fetch reject 時に rendering-status が 'false' に遷移する（onError 非発火経路, 8.2）**。**POST失敗の文言が method＋ステータス（413/422/502/504）で分岐し、GET向け文言を出さない（6.3、`useTranslation` モック）**。GET分岐は現行不変（3.1）。
 - `PageContentRenderer.spec.tsx`: `mockRendererConfig` に `plantumlHttpMethod` 追加（型整合）。
-- **（Req 11）** `PlantUmlViewer.spec.tsx`: **GET＋上限超過**で **POST推奨行が表示**される（`method='get'`）／**POSTモードや上限内では出ない**／文言はi18n（`useTranslation` モック）を検証。
+- **（Req 11）** `PlantUmlViewer.spec.tsx`: **GET＋URL長超過が疑わしい時（プリチェック超過 or `src.length`大）**に **POST推奨行が表示**される／**POSTモード・上限内の onError（構文エラー/サーバ停止想定）では出ない**／文言はi18n（`useTranslation` モック）を検証。
 
 ### Manual/E2E（クリティカルパス）
 - 自前PlantUMLサーバ＋`PLANTUML_HTTP_METHOD=post` で、GETでは414となる大きい図がリネームなしで描画（2.1, 2.2）。ライト/ダークでテーマ反映（7.1, 7.2）。

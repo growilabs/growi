@@ -96,6 +96,6 @@ GROWIはPlantUML図の内容をエンコードしてURLに載せ、GET（`<img>`
 <!-- 別spec plantuml-large-diagram-get は「GET時の上限超過エラー」を汎用文言（分割・簡略化）で表示する。POST という解決策の案内は本specの責務としてここで扱う。 -->
 
 #### Acceptance Criteria
-1. Where 送信方式が GET（POST未使用）であり、かつ POST 機能が利用可能な状態である, when GET方式でURL長超過により図が表示できない, the GROWI shall POST送信（自前サーバ前提）で解決できる旨を案内するメッセージを提示する。
+1. Where 送信方式が GET（POST未使用）であり、かつ POST 機能が利用可能な状態である, when **URL長超過が疑わしい失敗が起きる（プリチェックで固定閾値超過、または `src.length` が十分大きい）**, the GROWI shall POST送信（自前サーバ前提）で解決できる旨を案内するメッセージを提示する。**ただし原因がURL長超過と考えにくい失敗（プリチェック未満かつ `src.length` が小さい＝構文エラー／サーバ停止等）では提示しない**（POSTでは解決せず誤誘導になるため）。
 2. Where POST 機能が存在しない/利用不可の環境である, the GROWI shall POST推奨メッセージを提示しない（未実装機能を案内しない）。
 3. The GROWI shall POST推奨メッセージを対応ロケール（en/ja/fr/ko/zh）で提供する。

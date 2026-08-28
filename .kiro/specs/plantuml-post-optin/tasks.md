@@ -60,28 +60,28 @@
   - _Boundary: plantuml.ts remark_
   - _Depends: 1.2_
 
-- [ ] 3.3 PlantUmlViewerのGET/POST描画分岐
-  - GETは現行の `<img src>` を維持。POSTは取得Blobから **mount単位の objectURL** を生成して `<img src>` に設定、`onLoad` で完了・`onError` でエラー状態、rendering-status属性を維持、**unmount で自身のURLのみ revoke**（メモ保持のBlobは revoke しない）。共有リンク文脈では `fetchPlantumlSvg(source, darkMode, { pageId, shareLinkId })` に id を渡す（#2）
-  - **`fetchPlantumlSvg` が reject した場合（`<img>` 非生成で onLoad/onError 非発火）も `GROWI_IS_CONTENT_RENDERING_ATTR` を `'false'` へ遷移**させる（再スクロール暴走防止、#6/Req 8.2）
-  - **POST失敗の文言を method＋プロキシHTTPステータス（413/422/502/504/ネットワーク reject）で分岐**し、GET向けの「URL長・分割」文言は出さない（#3-b/Req 6.3。文言・i18nは本specが所有）
-  - 各Viewerが独立に描画・失敗すること
-  - post描画/失敗時エラー/**reject時に status='false'**/**method別の失敗文言**/**再mountで壊れない**/get不変 を観測する
-  - _Requirements: 3.1, 4.1, 6.1, 6.2, 6.3, 8.1, 8.2_
-  - _Boundary: PlantUmlViewer_
-  - _Depends: 3.1, 3.2, 3.4_
-
-- [ ] 3.4 POST失敗メッセージの i18n キーを5ロケール追加（本spec所有）
+- [ ] 3.3 POST失敗メッセージの i18n キーを5ロケール追加（本spec所有）
   - `locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/translation.json` に、失敗種別ごとの POST 失敗文言キー（413=サイズ超過, 422=図ソース/構文エラー, 502=上流失敗/誤設定, 504=タイムアウト, ネットワーク=サーバ未到達）を追加する（#3-b/Req 6.4）
   - GET向けの「URL長・分割」文言とは別キーとし、5ロケール全てに存在し `t()` で引けることを確認する
   - _Requirements: 6.3, 6.4_
   - _Boundary: locales_
+
+- [ ] 3.4 PlantUmlViewerのGET/POST描画分岐
+  - GETは現行の `<img src>` を維持。POSTは取得Blobから **mount単位の objectURL** を生成して `<img src>` に設定、`onLoad` で完了・`onError` でエラー状態、rendering-status属性を維持、**unmount で自身のURLのみ revoke**（メモ保持のBlobは revoke しない）。共有リンク文脈では `fetchPlantumlSvg(source, darkMode, { pageId, shareLinkId })` に id を渡す（#2）
+  - **`fetchPlantumlSvg` が reject した場合（`<img>` 非生成で onLoad/onError 非発火）も `GROWI_IS_CONTENT_RENDERING_ATTR` を `'false'` へ遷移**させる（再スクロール暴走防止、#6/Req 8.2）
+  - **POST失敗の文言を method＋プロキシHTTPステータス（413/422/502/504/ネットワーク reject）で分岐**し、GET向けの「URL長・分割」文言は出さない（#3-b/Req 6.3。文言・i18nは本specが所有。3.3のキーを使用）
+  - 各Viewerが独立に描画・失敗すること
+  - post描画/失敗時エラー/**reject時に status='false'**/**method別の失敗文言**/**再mountで壊れない**/get不変 を観測する
+  - _Requirements: 3.1, 4.1, 6.1, 6.2, 6.3, 8.1, 8.2_
+  - _Boundary: PlantUmlViewer_
+  - _Depends: 3.1, 3.2, 3.3_
 
 - [ ] 4. Integration: エンドツーエンド配線
 - [ ] 4.1 経路の結線と検証
   - `PLANTUML_HTTP_METHOD=post` ＋上流モックで、ページ内 plantuml がプロキシ経由で描画されることを確認する
   - 既定(get)が現行と完全に同一挙動であることを確認する
   - _Requirements: 1.2, 2.1, 2.2, 3.1_
-  - _Depends: 2.3, 3.3_
+  - _Depends: 2.3, 3.4_
 
 - [ ] 5. Validation: テスト
 - [ ] 5.1 (P) サーバ単体/統合テスト
@@ -97,7 +97,7 @@
   - 上記が緑になることを観測する
   - _Requirements: 1.1, 1.2, 3.1, 4.1, 5.1, 6.1, 6.2, 6.3, 8.1, 8.2_
   - _Boundary: plantuml.ts remark, PlantUmlViewer, fetch-plantuml-svg_
-  - _Depends: 3.3_
+  - _Depends: 3.4_
 
 - [ ] 5.3 手動E2E
   - 自前 plantuml-server ＋ `PLANTUML_HTTP_METHOD=post` で、GETでは414になる大きい図がリネームなしで描画されること、ライト/ダークでテーマ反映を確認する
@@ -123,15 +123,15 @@
   - _Boundary: locales_
 
 - [ ] 6.3 エラーUIへ POST推奨行を相乗り
-  - `plantuml-large-diagram-get` が新設したエラーUI（`PlantUmlViewer`）に、**`method==='get'` の時だけ** POST推奨行（`t()`）を追記する
-  - GET＋上限超過で推奨行が表示され、**POSTモードや上限内では表示されない**ことを確認する（B未マージ環境＝行が無い＝Req 11.2 を自然充足）
+  - `plantuml-large-diagram-get` が新設したエラーUI（`PlantUmlViewer`）に、**`method==='get'` かつ URL長超過が疑わしい時（プリチェック超過 or `src.length` が大）だけ** POST推奨行（`t()`）を追記する。**構文エラー/サーバ停止等（原因がURL長でない失敗）では出さない**（POSTでは解決せず誤誘導になるため。Req 11.1）
+  - GET＋URL長超過疑い時に推奨行が表示され、**POSTモード／上限内の onError（構文エラー・サーバ停止想定）では表示されない**ことを確認する（B未マージ環境＝行が無い＝Req 11.2 も自然充足）
   - _Requirements: 11.1, 11.2_
   - _Boundary: PlantUmlViewer_
   - _Depends: 6.1, 6.2_
   - <!-- クロススペック前提: large-diagram-get のエラーUI完了・マージ済み -->
 
 - [ ] 6.4 POST推奨行のテスト
-  - `PlantUmlViewer.spec.tsx` に、GET＋上限超過→推奨行表示／POSTモード・上限内→非表示／文言はi18n（`useTranslation` モック）を検証する
+  - `PlantUmlViewer.spec.tsx` に、**GET＋URL長超過疑い（プリチェック超過 or src.length大）→推奨行表示／POSTモード・上限内の onError（＝構文エラー/サーバ停止想定）→非表示**／文言はi18n（`useTranslation` モック）を検証する
   - 上記が緑であることを確認する
   - _Requirements: 11.1, 11.2, 11.3_
   - _Depends: 6.3_

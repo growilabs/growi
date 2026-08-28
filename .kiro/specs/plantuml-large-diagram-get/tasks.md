@@ -23,20 +23,20 @@
   - _Requirements: 1.1, 2.1, 2.2, 3.1, 4.1_
   - _Boundary: theme assets_
 
-- [ ] 2.2 (副次・任意) 追加削減が必要な場合のみ検討
-  - 2.3 の実測でミニファイだけでは基準図が上限内に収まらない場合に限り、(a) 未参照パレット階調の整理、(b) 非UML系 `<style>` 削除（board/gantt/json/mindmap/salt/wbs/wire/yaml）を検討する
+- [ ] 2.2 軽量化効果を実測（Req 5 の唯一の所有）
+  - **前提依存**: `plantuml-encoder` は `@akebifiky/remark-simple-plantuml` の**推移依存にのみ存在し apps/app から直接 import 不可**。実測スクリプト/テストで直接 import するため、`apps/app/package.json` の `devDependencies` に `plantuml-encoder` を追加し（測定専用でランタイム不使用）、ルートで `pnpm install` する
+  - 軽量化前後で、基準図（今回の問い合わせ図）の**エンコード後URL長**を `plantuml-encoder` で測るスクリプト/テストを用意する
+  - 前後のURL長が出力され、**基準図が目標（主要サーバ上限内）に収まるか**の判定が得られる（公開plantuml.com既定でも有効かの根拠）。⚠️ deflate はコメント/空白を既に圧縮するため、ミニファイの encoded 削減効果は実測でのみ確定する（設計の想定値を鵜呑みにしない）
+  - _Requirements: 1.2, 1.3, 5.1_
+  - _Depends: 2.1_
+
+- [ ] 2.3 (副次・任意) 追加削減が必要な場合のみ検討
+  - 2.2 の実測でミニファイだけでは基準図が上限内に収まらない場合に限り、(a) 未参照パレット階調の整理、(b) 非UML系 `<style>` 削除（board/gantt/json/mindmap/salt/wbs/wire/yaml）を検討する
   - ⚠️ (b) は当該図種のダーク配色を失う（`<style>` が唯一の着色手段）。採用時は「ダーク既定色フォールバック」等の緩和とセットにし、目視回帰で劣化許容範囲を明示的に確認する
   - `$VAR` 参照を grep し**未定義変数参照ゼロ（PlantUMLエラーなし）**であることを確認する
   - _Requirements: 1.1, 2.1, 2.2_
   - _Boundary: theme assets_
-  - _Depends: 2.1, 2.3_
-
-- [ ] 2.3 軽量化効果を実測（Req 5 の唯一の所有）
-  - **前提依存**: `plantuml-encoder` は `@akebifiky/remark-simple-plantuml` の**推移依存にのみ存在し apps/app から直接 import 不可**。実測スクリプト/テストで直接 import するため、`apps/app/package.json` の `devDependencies` に `plantuml-encoder` を追加し（測定専用でランタイム不使用）、ルートで `pnpm install` する
-  - 軽量化前後で、基準図（今回の問い合わせ図）の**エンコード後URL長**を `plantuml-encoder` で測るスクリプト/テストを用意する
-  - 前後のURL長が出力され、**基準図が目標（主要サーバ上限内）に収まるか**の判定が得られる（公開plantuml.com既定でも有効かの根拠）
-  - _Requirements: 1.2, 1.3, 5.1_
-  - _Depends: 2.1_
+  - _Depends: 2.1, 2.2_
 
 - [ ] 3. Core: PlantUmlViewer 拡張
 - [ ] 3.1 (P) 失敗検知・プリチェック・status遷移
