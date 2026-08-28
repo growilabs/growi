@@ -21,6 +21,7 @@ import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
 import { excludeReadOnlyUser } from '../../middlewares/exclude-read-only-user';
+import { resolveAccessibleAttachment } from '../../service/attachment/resolve-accessible-attachment';
 
 const logger = loggerFactory('growi:routes:apiv3:attachment');
 
@@ -489,27 +490,19 @@ export const setup = (crowi) => {
         const attachmentId = req.params.id;
         const { isSharedPage } = req;
 
-        const attachment = await Attachment.findById(attachmentId)
-          .populate('creator')
-          .exec();
+        const result = await resolveAccessibleAttachment(
+          attachmentId,
+          req.user,
+          isSharedPage ?? false,
+          'creator',
+        );
 
-        if (attachment == null) {
+        if ('errorCode' in result) {
           const message = 'Attachment not found';
           return res.apiv3Err(message, 404);
         }
 
-        // check whether accessible. Attachments not scoped to a page
-        // (PROFILE_IMAGE, BRAND_LOGO, PAGE_BULK_EXPORT, AUDIT_LOG_BULK_EXPORT)
-        // have no `page` to check against, so this only applies to
-        // page-scoped attachments (mirrors routes/attachment/get.ts).
-        if (
-          !isSharedPage &&
-          attachment.page != null &&
-          !(await Page.isAccessiblePageByViewer(attachment.page, req.user))
-        ) {
-          const message = 'Attachment not found';
-          return res.apiv3Err(message, 404);
-        }
+        const { attachment } = result;
 
         if (attachment.creator != null && attachment.creator instanceof User) {
           attachment.creator = serializeUserSecurely(attachment.creator);
