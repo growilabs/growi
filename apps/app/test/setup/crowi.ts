@@ -37,7 +37,12 @@ const initCrowi = async (crowi: Crowi): Promise<void> => {
 
 /**
  * Get a Crowi instance for integration testing.
- * By default, returns a singleton instance. Pass true to create a new instance.
+ * Memoizes `_instance` at module scope, but Vitest's `forks` pool resets the
+ * module registry per test file under the default `isolate: true` — so in
+ * practice this cold-inits on (almost) every file, not once per worker. See
+ * `apps/app/vitest.workspace.mts`'s `app-integration` project comment for
+ * why this project cannot set `isolate: false` to make it a real per-worker
+ * singleton.
  *
  * @returns Promise resolving to a Crowi instance
  */

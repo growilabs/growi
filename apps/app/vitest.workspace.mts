@@ -8,17 +8,32 @@ import {
   mergeConfig,
 } from 'vitest/config';
 
-// Each app-integration worker's first `beforeAll` pays two CPU-heavy, concurrent
-// per-worker setup costs: migrate-mongo.ts spawns a `dev:migrate:up` child process,
-// and crowi.ts's getInstance() does a cold Crowi init. Vitest's default fork pool
-// sizes itself to availableParallelism(), so on a CI runner (also running MongoDB
-// and Elasticsearch as sibling services) every worker's setup child process
-// competes for a core against another worker's setup — up to 2x the runner's CPU
-// count in flight at once. That contention, not any single hook being slow, is
-// what pushed both hookTimeout (#11752, migrate-mongo, already 2x the default) and
-// getInstance() (#11820/#11821/#11822) past their limits under load — measured
-// unloaded cold init is ~0.9s. Capping fork count leaves the runner headroom during
-// this contended window instead of widening the deadline around the contention.
+// Every app-integration `beforeAll` pays two CPU-heavy setup costs on
+// (almost) every test file: migrate-mongo.ts spawns a `dev:migrate:up`
+// child process, and crowi.ts's getInstance() does a cold Crowi init. Both
+// memoize a module-level singleton, but that memoization does NOT make
+// either one "once per worker" — Vitest's `forks` pool resets the module
+// registry per file under the default `isolate: true` (required here: this
+// project's per-file mongo teardown/reconnect in test/setup/mongo/index.ts
+// conflicts with isolate: false's shared module cache — confirmed by
+// reproducing the failure locally, same hazard the app-integration-vault
+// project's isolate: false comment below describes for its own case). So
+// this cost recurs on nearly every file, all run long, not just at worker
+// startup. Vitest's default fork pool sizes itself to availableParallelism(),
+// so on a CI runner (also running MongoDB and Elasticsearch as sibling
+// services) multiple files' setup child processes can end up competing for
+// the same cores at once — confirmed CI log for #11820/#11821/#11822 shows
+// three files' getInstance() hooks timing out in the same ~1s window near
+// the end of a 530s run, alongside a fourth file that succeeded but took
+// 8.4s for work that normally takes ~1s. That contention, not either setup
+// step being inherently slow (measured unloaded cold init is ~0.9s), is
+// what pushed both hookTimeout (#11752, migrate-mongo, already 2x the
+// default) and getInstance() past their limits under load. Capping fork
+// count reduces how many files' worth of this recurring cost can land on
+// the runner at the same moment; it does not make the cost itself go away
+// (that would require making the singleton a real per-worker singleton,
+// which isolate: false would give us if it didn't conflict with the mongo
+// setup above — left as a follow-up, not attempted here).
 const integrationMaxForks = Math.max(1, availableParallelism() - 1);
 
 const configShared = defineConfig({
