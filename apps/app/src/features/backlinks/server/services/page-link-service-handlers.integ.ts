@@ -24,6 +24,7 @@ describe('handlePageUpsertById (integration)', () => {
   const siteUrl = 'https://wiki.example';
   const idByPath = new Map<string, Types.ObjectId>();
   const createdPageIds: Types.ObjectId[] = [];
+  const createdLinkIds: Types.ObjectId[] = [];
 
   let Page: PageModel;
 
@@ -34,12 +35,18 @@ describe('handlePageUpsertById (integration)', () => {
   });
 
   afterEach(async () => {
-    await PageLink.deleteMany({ fromPage: { $in: createdPageIds } });
+    await PageLink.deleteMany({
+      $or: [
+        { fromPage: { $in: createdPageIds } },
+        { _id: { $in: createdLinkIds } },
+      ],
+    });
     await Page.deleteMany({ _id: { $in: createdPageIds } });
     await prisma.revisions.deleteMany({
       where: { pageId: { in: createdPageIds.map((id) => id.toString()) } },
     });
     createdPageIds.length = 0;
+    createdLinkIds.length = 0;
   });
 
   beforeEach(() => {
@@ -85,6 +92,23 @@ describe('handlePageUpsertById (integration)', () => {
     PageLink.find({ fromPage: pageId })
       .select('toPath toPage -_id')
       .sort({ toPath: 1 })
+      .lean();
+
+  // Stands in for a row some other, unrelated page already owns because it linked to this
+  // path before (or instead of) the page under test existing there.
+  const createInboundLink = async (
+    fromPage: Types.ObjectId,
+    toPath: string,
+    toPage: Types.ObjectId | null,
+  ): Promise<void> => {
+    const link = await PageLink.create({ fromPage, toPath, toPage });
+    createdLinkIds.push(link._id);
+  };
+
+  const inboundRowsAt = (toPath: string) =>
+    PageLink.find({ toPath })
+      .select('fromPage toPage -_id')
+      .sort({ fromPage: 1 })
       .lean();
 
   it('records internal links from path links and same-wiki absolute URLs', async () => {
@@ -249,6 +273,54 @@ describe('handlePageUpsertById (integration)', () => {
 
     expect(await outboundRowsOf(pageId)).toEqual([
       { toPath: '/a', toPage: targetId },
+    ]);
+  });
+
+  // B4.3 — creating (or re-saving) a page must also re-resolve inbound rows recorded
+  // against its own path, not only sync its own outbound rows.
+  it('repoints an inbound row that referenced this page before it existed', async () => {
+    const inboundSource = new Types.ObjectId();
+    const targetPath = `${PREFIX}/re-resolve-target`;
+    await createInboundLink(inboundSource, targetPath, null);
+
+    const pageId = await createPage('/re-resolve-target', 'no links here');
+    // The mocked resolver stands in for the real one B4.1 exercises separately; it must report
+    // this page's id for its own path the same way a real lookup would.
+    idByPath.set(targetPath, pageId);
+    await handlePageUpsertById(pageId.toString(), siteUrl);
+
+    expect(await inboundRowsAt(targetPath)).toEqual([
+      { fromPage: inboundSource, toPage: pageId },
+    ]);
+  });
+
+  it('repoints an inbound row that still points at a since-gone prior occupant', async () => {
+    const inboundSource = new Types.ObjectId();
+    const priorOccupant = new Types.ObjectId();
+    const targetPath = `${PREFIX}/re-resolve-reused`;
+    // Not null — a stale (non-broken-looking) cached id, distinct from the "broken" case above.
+    await createInboundLink(inboundSource, targetPath, priorOccupant);
+
+    const pageId = await createPage('/re-resolve-reused', 'no links here');
+    idByPath.set(targetPath, pageId);
+    await handlePageUpsertById(pageId.toString(), siteUrl);
+
+    expect(await inboundRowsAt(targetPath)).toEqual([
+      { fromPage: inboundSource, toPage: pageId },
+    ]);
+  });
+
+  it('leaves inbound rows for other paths untouched', async () => {
+    const inboundSource = new Types.ObjectId();
+    const unrelatedPath = `${PREFIX}/unrelated`;
+    const unrelatedTarget = new Types.ObjectId();
+    await createInboundLink(inboundSource, unrelatedPath, unrelatedTarget);
+
+    const pageId = await createPage('/re-resolve-target-2', 'no links here');
+    await handlePageUpsertById(pageId.toString(), siteUrl);
+
+    expect(await inboundRowsAt(unrelatedPath)).toEqual([
+      { fromPage: inboundSource, toPage: unrelatedTarget },
     ]);
   });
 });

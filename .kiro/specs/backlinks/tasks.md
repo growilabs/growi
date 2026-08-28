@@ -550,7 +550,7 @@ B3/B5.
   - _Boundary: page-link-sync, PageLink_
   - _Depends: B1.2, B4.1_
 
-- [ ] B4.3 Wire re-resolve into the create handler
+- [x] B4.3 Wire re-resolve into the create handler
   - Extend the B1.6 create handler to re-resolve inbound matches (`reResolveByToPath(page.path)`)
     after replacing outbound rows, so links that previously pointed at this path (from a prior
     occupant or a broken state) are corrected when the page is (re)created at it
