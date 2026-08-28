@@ -155,30 +155,47 @@ const detectSlashTrigger = (
 };
 
 /**
- * Whether `command` matches `query` case-insensitively against its `id`, its
- * localized `label`, or any of its keywords. An empty query matches everything
- * (Req 2.1, 2.2).
+ * Where a query matched a command. The menu is ordered by this, so a command
+ * the user is actually naming outranks one that merely carries a matching alias
+ * (Req 2.5): `/c` offers "Code block" before "Task list", whose `checkbox`
+ * keyword also starts with `c`.
+ */
+const MATCH_RANK = {
+  /** The query is a prefix of the command's own name — its stable `id`. */
+  name: 0,
+  /** The query only matched one of the command's alias keywords. */
+  keyword: 1,
+} as const;
+type MatchRank = (typeof MATCH_RANK)[keyof typeof MATCH_RANK];
+
+/**
+ * How `command` matches `query` case-insensitively, or `null` when it does not.
+ * An empty query matches everything at {@link MATCH_RANK.name} (Req 2.1, 2.2).
  *
  * Matching is PREFIX-based (`startsWith`), not substring: typing `/ta` must offer
  * "Table"/"Task list" but not "Quote" (whose keyword "citation" contains "ta"
  * mid-word). Prefix matching keeps the menu predictable — the query is the start
  * of a command name or keyword, as in Notion/Slack-style slash commands.
  *
- * The stable `id` (the English command name, e.g. `table`, `taskList`) is matched
- * too, so the English name works regardless of the display language — otherwise a
- * non-English label (e.g. ja "テーブル") would make `/ta` match nothing.
+ * The localized `label` is deliberately NOT matched (Req 2.6): the query is
+ * always the English `id` or one of the English `keywords`, so what a user types
+ * to reach a command does not change with the display language.
  */
-const matchesQuery = (
+const matchRank = (
   command: ResolvedSlashCommand,
   query: string,
-): boolean => {
-  if (query === '') return true;
+): MatchRank | null => {
+  if (query === '') return MATCH_RANK.name;
   const needle = query.toLowerCase();
-  return (
-    command.id.toLowerCase().startsWith(needle) ||
-    command.label.toLowerCase().startsWith(needle) ||
+  if (command.id.toLowerCase().startsWith(needle)) {
+    return MATCH_RANK.name;
+  }
+  if (
     command.keywords.some((keyword) => keyword.toLowerCase().startsWith(needle))
-  );
+  ) {
+    return MATCH_RANK.keyword;
+  }
+  return null;
 };
 
 /**
@@ -270,21 +287,31 @@ export const createSlashCommandSource = (
     const isAllowedHere = (command: ResolvedSlashCommand): boolean =>
       !activeContexts.some((c) => command.disallowedIn?.includes(c));
 
+    // Sort is stable, so commands sharing a rank keep their declaration order.
     const options = entries
       .filter(({ command }) => isAllowedHere(command))
-      .filter(({ command }) => matchesQuery(command, trigger.query))
+      .flatMap(({ command, completion }) => {
+        const rank = matchRank(command, trigger.query);
+        return rank == null ? [] : [{ completion, rank }];
+      })
+      .sort((a, b) => a.rank - b.rank)
       .map(({ completion }) => completion);
 
     return {
       from: trigger.from,
       to: context.pos,
       options,
-      // Source-side matching (matchesQuery over label + keywords); disable
-      // CodeMirror's own filtering. Deliberately NO `validFor`: with `filter:
-      // false`, a `validFor` that still matched the growing `/query` would make
-      // CodeMirror keep the initial option set without re-querying this source,
-      // so the menu would never narrow as the user types. Omitting it forces a
-      // re-query per keystroke, which re-runs matchesQuery and narrows correctly.
+      // Source-side matching and ordering (`matchRank` over id + keywords).
+      // `filter: false` is required, not a preference: `from` points AT the `/`,
+      // so CodeMirror's own filter would match option labels against "/c" and
+      // find nothing — the menu comes up empty (measured). Leaving it off also
+      // makes CodeMirror take this source's order verbatim, which is what keeps
+      // name matches above alias matches (Req 2.5).
+      // Deliberately NO `validFor`: with `filter: false`, a `validFor` that still
+      // matched the growing `/query` would make CodeMirror keep the initial
+      // option set without re-querying this source, so the menu would never
+      // narrow as the user types. Omitting it forces a re-query per keystroke,
+      // which re-runs `matchRank` and narrows correctly.
       filter: false,
     };
   };
