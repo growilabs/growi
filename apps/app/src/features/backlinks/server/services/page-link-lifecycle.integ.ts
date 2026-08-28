@@ -32,6 +32,19 @@ import PageLink from '../models/page-link';
  * B1 scope: the rest of trash/delete/restore (B5.8) is out of scope — the trash case
  * below covers only B2.2's drain-time guard, not the B5.2 reconcile of rows the page
  * already owned.
+ *
+ * B4.4 additionally covers (requirements 5.1, 5.2, 5.4), with no re-save of the source at
+ * all: a path-based backlink stays valid across the target's own rename and across a
+ * descendant move (the target's path changes because an ancestor moved), and a
+ * permalink-based backlink stays valid the same way. Each spec drives a real
+ * crowi.pageService.renamePage() call — not a hand-written path update — specifically so
+ * the 'rename' event PageLinkService does NOT subscribe to (B1.12) actually fires; a
+ * hand-written update would leave that wiring completely unexercised. The `PageLink` row
+ * is then asserted byte-for-byte unchanged (including its own `_id`), which catches a
+ * rename-triggered write that lands a different value (proven by mutation testing during
+ * review). It cannot distinguish "no write happened" from "a write landed the same
+ * value" — the same limitation design.md already accepts for repointInboundLinks, for
+ * the same reason: asserting against the write mechanism instead would spy on it.
  */
 describe('Backlinks B1 slice (lifecycle integration)', () => {
   const PREFIX = '/backlinks-b1-lifecycle-test';
@@ -51,6 +64,7 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
   type CreatePageOptions = {
     grant?: number;
     grantedUsers?: Types.ObjectId[] | null;
+    parent?: Types.ObjectId;
   };
 
   const createPage = (
@@ -62,7 +76,7 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
       grant: options.grant ?? Page.GRANT_PUBLIC,
       grantedUsers: options.grantedUsers ?? null,
       isEmpty: false,
-      parent: rootPage._id,
+      parent: options.parent ?? rootPage._id,
     });
 
   // Attach a body via a fresh revision, then emit the lifecycle event exactly as
@@ -95,6 +109,12 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
       .sort({ toPath: 1 })
       .lean();
 
+  // Full row including its own _id, for a byte-for-byte "this row was never written"
+  // comparison (B4.4) — outboundRows above deliberately drops _id since its callers only
+  // care about toPath/toPage content.
+  const outboundRow = (fromPage: Types.ObjectId) =>
+    PageLink.findOne({ fromPage }).lean();
+
   // The service handles create/update asynchronously (fire-and-forget from the
   // emitter's view). Poll the outbound-row count — the observable write-path
   // result — until it settles to the expected value, then assert precisely.
@@ -113,6 +133,10 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
 
   beforeAll(async () => {
     crowi = await getInstance();
+    // The B4.4 specs below drive real crowi.pageService.renamePage() calls and need the
+    // modern (non-V4) rename path — a fresh test crowi defaults this to false, which
+    // would silently exercise the legacy renamePageV4 branch instead.
+    await crowi.configManager.updateConfig('app:isV5Compatible', true);
     Page = mongoose.model<PageDocument, PageModel>('Page');
     User = mongoose.model('User');
 
@@ -358,6 +382,114 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     ]);
 
     // What the user sees: the renamed target still lists the source.
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+  });
+
+  // B4.4 — none of the three specs below re-save the source, unlike the rename spec
+  // above, and none of them hand-write the target's `path` field: they drive a *real*
+  // crowi.pageService.renamePage() call. A hand-written path update emits no page event
+  // at all, so it could never exercise (or catch a regression in) the actual wiring —
+  // PageLinkService only subscribes to 'create'/'update' (B1.12); the point of these
+  // specs is that 'rename' and descendant-move traffic is invisible to it by construction.
+  const renameActivityParams = {
+    ip: '::ffff:127.0.0.1',
+    endpoint: '/_api/v3/pages/rename',
+  };
+
+  it('keeps a path-based backlink valid across a target rename, with no index write (5.1)', async () => {
+    const target = await createPage('/direct-rename-target');
+    const source = await createPage('/direct-rename-source');
+
+    await emitUpsert('create', source, `[to target](${target.path})`);
+    await waitForOutboundCount(source._id, 1);
+    const before = await outboundRow(source._id);
+
+    await crowi.pageService.renamePage(
+      target,
+      `${PREFIX}/direct-rename-target-moved`,
+      viewer,
+      { createRedirectPage: true },
+      renameActivityParams,
+    );
+
+    // The row was never touched: same _id, same cached toPage.
+    expect(await outboundRow(source._id)).toEqual(before);
+
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+  });
+
+  it('keeps a path-based backlink valid across a descendant move, with no index write (5.1, 5.2)', async () => {
+    const ancestor = await createPage('/desc-move-ancestor');
+    const target = await createPage('/desc-move-ancestor/target', {
+      parent: ancestor._id,
+    });
+    const source = await createPage('/desc-move-source');
+
+    await emitUpsert('create', source, `[to target](${target.path})`);
+    await waitForOutboundCount(source._id, 1);
+    const before = await outboundRow(source._id);
+
+    // Move the ancestor recursively — the target is never the rename's own subject,
+    // only a descendant carried along.
+    const newAncestorPath = `${PREFIX}/desc-move-ancestor-moved`;
+    await crowi.pageService.renamePage(
+      ancestor,
+      newAncestorPath,
+      viewer,
+      { isRecursively: true, createRedirectPage: true },
+      renameActivityParams,
+    );
+
+    // renamePage's descendant step (renameSubOperation) runs fire-and-forget — wait for
+    // the target's path to actually move before asserting anything about it, so the
+    // "unchanged" assertion below cannot pass merely because the move hadn't happened yet.
+    await vi.waitFor(
+      async () => {
+        const moved = await Page.findOne({ _id: target._id }).select('path');
+        expect(moved?.path).toBe(`${newAncestorPath}/target`);
+      },
+      { timeout: 15000, interval: 100 },
+    );
+
+    // The row was never touched: same _id, same cached toPage.
+    expect(await outboundRow(source._id)).toEqual(before);
+
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+  });
+
+  it('keeps a permalink-based backlink valid across a target rename/move, with no index write (5.4)', async () => {
+    const target = await createPage('/permalink-rename-target');
+    const source = await createPage('/permalink-rename-source');
+
+    // Link by permalink (/{id}), not by path — the case 5.4 calls out as immune by
+    // construction, since toPath already encodes the immutable _id.
+    await emitUpsert(
+      'create',
+      source,
+      `[to target](/${target._id.toString()})`,
+    );
+    await waitForOutboundCount(source._id, 1);
+    const before = await outboundRow(source._id);
+    expect(before?.toPath).toBe(`/${target._id.toString()}`);
+
+    await crowi.pageService.renamePage(
+      target,
+      `${PREFIX}/permalink-rename-target-moved`,
+      viewer,
+      { createRedirectPage: true },
+      renameActivityParams,
+    );
+
+    // The row was never touched: the permalink toPath never named a path to begin
+    // with, so there is nothing for the rename to invalidate.
+    expect(await outboundRow(source._id)).toEqual(before);
+
     expect(
       await crowi.pageLinkService.findBacklinks(target._id, viewer),
     ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
