@@ -1,5 +1,6 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { body } from 'express-validator';
 
 // next-i18next.config.mjs has a single `export default` config object; `i18n` is
@@ -345,7 +346,11 @@ export const setup = (crowi) => {
         };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
-        return res.apiv3({ userData });
+        // Strip credential fields (passwordHash/apiToken/email/password) before
+        // returning: res.apiv3 -> res.json serializes via toJSON, which the schema
+        // does NOT transform (only toObject is configured), so a raw doc would leak
+        // the caller's own passwordHash. See rules/security.md.
+        return res.apiv3({ userData: serializeUserSecurely(userData) });
       } catch (err) {
         logger.error(err);
         return res.apiv3Err('update-personal-settings-failed');
@@ -452,7 +457,8 @@ export const setup = (crowi) => {
         };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
-        return res.apiv3({ userData });
+        // Strip credential fields before returning — see the /image-type note.
+        return res.apiv3({ userData: serializeUserSecurely(userData) });
       } catch (err) {
         logger.error(err);
         return res.apiv3Err('update-password-failed');
@@ -497,7 +503,11 @@ export const setup = (crowi) => {
         };
         activityEvent.emit('update', res.locals.activity._id, parameters);
 
-        return res.apiv3({ userData });
+        // Strip credential fields before returning — see the /image-type note.
+        // NOTE: this also omits apiToken from the response body; the client reads
+        // the regenerated token from the subsequent GET, matching prior behavior
+        // where consumers do not depend on this PUT echoing the new token.
+        return res.apiv3({ userData: serializeUserSecurely(userData) });
       } catch (err) {
         logger.error(err);
         return res.apiv3Err('update-api-token-failed');

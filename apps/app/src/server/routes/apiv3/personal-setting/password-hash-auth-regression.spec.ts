@@ -237,3 +237,84 @@ describe('PUT /disassociate-ldap — passwordHash-only mis-block regression (tas
     expect(apiv3).not.toHaveBeenCalled();
   });
 });
+
+describe('credential-leak prevention in userData responses (review #2)', () => {
+  // A raw user doc as the update methods return it (this.save() → full document,
+  // credential fields included). The schema only configures a `toObject`
+  // transform, NOT `toJSON`, so passing this straight to res.apiv3 → res.json
+  // would serialize the credentials via toJSON untouched. Each route must run it
+  // through serializeUserSecurely first. A plain object exercises the same
+  // omit-insecure-attributes contract (isEmailPublished false → email omitted).
+  const rawUserDoc = () => ({
+    _id: { toString: () => 'uid' },
+    id: 'uid',
+    name: 'Test User',
+    username: 'test-user',
+    isGravatarEnabled: true,
+    isEmailPublished: false,
+    password: 'legacy-sha256',
+    passwordHash: 'scrypt$hash',
+    apiToken: 'secret-token',
+    email: 'test@example.com',
+  });
+
+  const expectNoCredentials = (userData: unknown) => {
+    expect(userData).not.toHaveProperty('passwordHash');
+    expect(userData).not.toHaveProperty('password');
+    expect(userData).not.toHaveProperty('apiToken');
+    // email is omitted unless isEmailPublished (false here).
+    expect(userData).not.toHaveProperty('email');
+  };
+
+  it('PUT /password does not return passwordHash/password/apiToken/email', async () => {
+    const user = {
+      _id: { toString: () => 'uid' },
+      id: 'uid',
+      isPasswordSet: () => false, // skip the old-password check
+      updatePassword: vi.fn(async () => rawUserDoc()),
+    };
+    const req = {
+      user,
+      body: { newPassword: 'new-secret' },
+    } as unknown as Request;
+    const { res, apiv3, apiv3Err } = buildRes();
+
+    await invoke(getHandler('/password'), req, res);
+
+    expect(apiv3Err).not.toHaveBeenCalled();
+    expect(apiv3).toHaveBeenCalledTimes(1);
+    expectNoCredentials(apiv3.mock.calls[0][0].userData);
+  });
+
+  it('PUT /api-token does not return apiToken/passwordHash/password/email', async () => {
+    const user = { updateApiToken: vi.fn(async () => rawUserDoc()) };
+    const req = { user } as unknown as Request;
+    const { res, apiv3, apiv3Err } = buildRes();
+
+    await invoke(getHandler('/api-token'), req, res);
+
+    expect(apiv3Err).not.toHaveBeenCalled();
+    expect(apiv3).toHaveBeenCalledTimes(1);
+    expectNoCredentials(apiv3.mock.calls[0][0].userData);
+  });
+
+  it('PUT /image-type strips credentials but keeps isGravatarEnabled', async () => {
+    const user = {
+      updateIsGravatarEnabled: vi.fn(async () => rawUserDoc()),
+    };
+    const req = {
+      user,
+      body: { isGravatarEnabled: true },
+    } as unknown as Request;
+    const { res, apiv3, apiv3Err } = buildRes();
+
+    await invoke(getHandler('/image-type'), req, res);
+
+    expect(apiv3Err).not.toHaveBeenCalled();
+    expect(apiv3).toHaveBeenCalledTimes(1);
+    const { userData } = apiv3.mock.calls[0][0];
+    expectNoCredentials(userData);
+    // a non-credential field the client depends on must survive serialization.
+    expect(userData.isGravatarEnabled).toBe(true);
+  });
+});
