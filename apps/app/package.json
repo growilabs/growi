@@ -70,6 +70,8 @@
     "password-hash:cleanup:dev": "cross-env NODE_ENV=development pnpm run tsrun src/server/scripts/password-hash-cleanup.ts",
     "password-hash:downgrade-prep": "cross-env NODE_ENV=production node --import ./bin/runtime/env-preload.mjs dist/server/scripts/password-hash-downgrade-prep.js",
     "password-hash:downgrade-prep:dev": "cross-env NODE_ENV=development pnpm run tsrun src/server/scripts/password-hash-downgrade-prep.ts",
+    "password-hash:reupgrade-prep": "cross-env NODE_ENV=production node --import ./bin/runtime/env-preload.mjs dist/server/scripts/password-hash-reupgrade-prep.js",
+    "password-hash:reupgrade-prep:dev": "cross-env NODE_ENV=development pnpm run tsrun src/server/scripts/password-hash-reupgrade-prep.ts",
     "repl": "cross-env NODE_ENV=development pnpm run tsrun src/server/repl.ts",
     "prisma:generate": "prisma generate",
     "prisma:pull": "prisma db pull",

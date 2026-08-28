@@ -7,7 +7,7 @@ Migrate the password hashing in GROWI's local authentication system from SHA-256
 The migration is implemented as a **lazy migration**. Existing users are automatically re-hashed to a scrypt hash on their next login, so the migration is seamless and requires no password reset. A **dual-field design** (`password` = retains the SHA-256 hash, `passwordHash` = stores the scrypt self-describing string) means that, before the Cleanup migration is run, a user who still has a `password` (SHA-256) field can continue to authenticate on the older version even after a downgrade. **This holds only for a credential that was never replaced**: the legacy hash is retained exactly in the lazy-migration case (the same password is only re-hashed, so nothing is retired). Users created, invited, or **whose password was changed / reset** on the new version have `passwordHash` only (`upgradedOnly`, no legacy `password`) and would be locked out by a downgrade even before Cleanup — the downgrade-prep script targets exactly these users. Retiring the legacy hash on a password change/reset is deliberate: keeping the SHA-256 hash of a **replaced** password would let that retired password still authenticate on a downgraded build (a credential-revocation hole).
 
 **Users**: GROWI administrators (managing the migration lifecycle) and end users (transparent migration).  
-**Impact**: Adds a `passwordHash` field to the User model, makes password verification async throughout the entire stack, and adds one read-only migrate-mongo migration (status) plus two standalone administrative scripts (cleanup and downgrade-prep).
+**Impact**: Adds a `passwordHash` field to the User model, makes password verification async throughout the entire stack, and adds one read-only migrate-mongo migration (status) plus three standalone administrative scripts (cleanup, downgrade-prep, and re-upgrade-prep).
 
 ### Goals
 
@@ -40,7 +40,7 @@ The migration is implemented as a **lazy migration**. Existing users are automat
 - **Making all call sites of `isPasswordValid` async**: the 2 locations `passport.ts` (LocalStrategy) and `personal-setting/index.js` (old-password verification on password change)
 - **Replacing password-set detection based on the `password == null` proxy with `isPasswordSet()`**: the 3 locations `login.js`, `personal-setting/index.js`, and `user-activation.ts` (to prevent misjudging passwordHash-only users)
 - **Preventing `passwordHash` leakage in API responses**: add `passwordHash` to `omitInsecureAttributes()` in `@growi/core`, and add `passwordHash?: string` to the `IUser` interface
-- One read-only migrate-mongo migration (status) plus two standalone administrative scripts (cleanup and downgrade-prep)
+- One read-only migrate-mongo migration (status) plus three standalone administrative scripts (cleanup, downgrade-prep, and re-upgrade-prep)
 - Self-describing encoding of the scrypt hash (`scrypt$N$r$p$salt$hash`) and parameter management (no new dependency; scrypt is built into `node:crypto`)
 
 ### Out of Boundary
@@ -151,10 +151,11 @@ apps/app/src/server/scripts/
                                                 # (drains pino's transport worker before exiting, so the
                                                 # abort/completion report is never dropped)
 ├── password-hash-cleanup.ts                   # Req 3.3, 3.4: remove legacy password (standalone admin script)
-└── password-hash-downgrade-prep.ts            # Req 4.1, 4.2, 4.3: count + optional reset email (standalone, Crowi bootstrap)
+├── password-hash-downgrade-prep.ts            # Req 4.1, 4.2, 4.3: count + optional reset email (standalone, Crowi bootstrap)
+└── password-hash-reupgrade-prep.ts            # Req 4.4: $unset stale passwordHash from `both` users when re-upgrading after a downgrade (standalone admin script)
 ```
 
-> **Why standalone scripts (CRITICAL-6)**: cleanup carries the risk of breaking a deployment with a `throw` when migrate-mongo runs it automatically, and downgrade-prep needs a Crowi bootstrap for mailService. Neither can be achieved in the migrate-mongo container, so both are implemented as standalone scripts.
+> **Why standalone scripts (CRITICAL-6)**: cleanup carries the risk of breaking a deployment with a `throw` when migrate-mongo runs it automatically, and downgrade-prep needs a Crowi bootstrap for mailService. Neither can be achieved in the migrate-mongo container, so all are implemented as standalone scripts. (Re-upgrade prep is standalone for the same operational reason as cleanup: it is a destructive `$unset` an admin runs deliberately as part of a downgrade-return procedure, not something to auto-run at boot.)
 
 ### Modified Files
 
@@ -222,10 +223,10 @@ packages/core/src/interfaces/user.ts
 
 apps/app/package.json
   — No dependency is added (scrypt is built into node:crypto; bcryptjs / @types/bcryptjs are
-    unnecessary), but four scripts are: password-hash:cleanup / :downgrade-prep run the built
-    output under `cross-env NODE_ENV=production node --import ./bin/runtime/env-preload.mjs
+    unnecessary), but six scripts are: password-hash:cleanup / :downgrade-prep / :reupgrade-prep
+    run the built output under `cross-env NODE_ENV=production node --import ./bin/runtime/env-preload.mjs
     dist/server/scripts/…` (the preload is what loads the deployment's env), and the
-    :cleanup:dev / :downgrade-prep:dev counterparts run the TS sources via `tsrun`.
+    :cleanup:dev / :downgrade-prep:dev / :reupgrade-prep:dev counterparts run the TS sources via `tsrun`.
     The scripts are the documented entry points — the JSDoc in both scripts points at them
     rather than at a bare `node dist/…` command, so the invocation cannot drift
 
@@ -313,6 +314,7 @@ flowchart TD
 | 4.1 | Downgrade prep: report count of scrypt-migrated users | Downgrade prep script | Batch | — |
 | 4.2 | Downgrade prep: option to send reset emails | Downgrade prep script, PasswordResetOrder | Batch | — |
 | 4.3 | Downgrade prep: mark passwordHash-only users as requiring a reset | Downgrade prep script, PasswordResetOrder | Batch | — |
+| 4.4 | Re-upgrade prep: `$unset` passwordHash from `both` users so an old-build password change is not shadowed by a stale hash | Re-upgrade prep script | Batch | — |
 
 ---
 
@@ -326,6 +328,7 @@ flowchart TD
 | Status migration script | Infrastructure | tally user count by format (read-only) | 3.1, 3.2 | MongoDB (P0) | Batch |
 | Cleanup migration script | Infrastructure | remove the `password` field from migrated users | 3.3, 3.4 | MongoDB (P0) | Batch |
 | Downgrade prep migration script | Infrastructure | report count of migrated users + issue reset emails | 4.1–4.3 | MongoDB (P0), PasswordResetOrder (P1) | Batch |
+| Re-upgrade prep script | Infrastructure | `$unset` passwordHash from `both` users when returning to the new build after a downgrade | 4.4 | MongoDB (P0) | Batch |
 
 ---
 
@@ -641,6 +644,7 @@ passwordHash: { type: String },  // scrypt self-describing hash (scrypt$N$r$p$sa
 7. Status migration script: the user counts per field pattern are tallied correctly
 8. Cleanup migration script: abort if legacyOnly users exist; if all are migrated, remove the `password` field (Req 3.3, 3.4)
 9. Downgrade prep script: the `passwordHash` of users whose reset email was sent successfully is `$unset`, and they are then classified as `noPassword` by the status migration (no residual `upgradedOnly` = regression prevention for double-sending; Req 4.1, 4.3)
+10. **Re-upgrade prep script (downgrade → change → re-upgrade regression)**: `$unset`s `passwordHash` from every `both` user regardless of status (so a password changed on the downgraded build is not shadowed by a stale hash), leaves `legacyOnly` and `upgradedOnly` users untouched, and is idempotent (a second run finds no `both` users and writes nothing) (Req 4.4)
 
 ### Security Tests
 
@@ -671,6 +675,7 @@ passwordHash: { type: String },  // scrypt self-describing hash (scrypt$N$r$p$sa
 - **User-enumeration timing attack (known limitation)**: with the introduction of scrypt, a "nonexistent user" returns immediately while an "existing user" takes tens to hundreds of ms, so user existence can be inferred from the time difference. This can be mitigated with a dummy scrypt comparison, which is **not** implemented here. Rate limiting on the login endpoint was checked in this scope and found to be misconfigured (the key did not match the mounted path) — that is now fixed (see the rate-limiting item above), which bounds how fast the timing oracle can be sampled from one IP but does not eliminate it. A dummy scrypt comparison for nonexistent users remains a separate, optional task
 - **Constant-time comparison on the legacy path**: the legacy SHA-256 check uses `crypto.timingSafeEqual` (on equal-length buffers, guaranteed by the 64-char hex format check), not `===`. Hash-against-hash comparison made the risk low either way, but both verification paths are now constant-time
 - **A changed/reset password is genuinely revoked (the old hash is retired, not kept)**: `setPassword` clears the legacy `password` (SHA-256) field whenever a password is replaced (change, admin reset, invited-user activation). Keeping it — the original dual-field behavior — would have meant that after a downgrade to a pre-Cleanup version the old build authenticates with the OLD `password` hash, i.e. **the credential the user thought they had retired becomes valid again while the new one does not** — unacceptable when the reset was motivated by a leak. The trade-off is deliberate: such a user is now `upgradedOnly` (scrypt only), so a downgrade **locks them out** instead of reviving the old password, and they are covered by the downgrade-prep script (which targets `upgradedOnly` ACTIVE users and mails them a reset link). Losing access is recoverable; a revived leaked password is not. Note the exception that preserves the migration-period downgrade story: the lazy migration on login passes `keepLegacyHash: true`, because it re-hashes the SAME password (nothing is retired), leaving the user in the `both` state
+  - **The reverse direction (downgrade → change password on the old build → re-upgrade) reopens the same hole, and is closed by the re-upgrade prep script, NOT by verify().** The `both` state that keeps a user authenticating across a downgrade also carries a `passwordHash` the old build cannot see. If that user changes their password while on the downgraded build, the old build writes only the legacy `password`; the `passwordHash` still encodes the PRE-CHANGE password. On re-upgrade, because verify() always prefers `passwordHash` and never falls back to `password`, the stale hash revives the old (possibly leaked) password and locks out the current one — the exact resurrection this item forbids, reached from the other side. verify() cannot detect this (both fields are individually well-formed; only their disagreement is the tell, and it has no plaintext to compare). It is therefore an **operational** step: the "return from a downgrade" procedure runs the **re-upgrade prep script** (`password-hash-reupgrade-prep.ts`), which `$unset`s `passwordHash` from every `both` user, dropping them to `legacyOnly` so verify() uses the current legacy `password` and the next login re-migrates a matching `passwordHash`. All `both` users are reset unconditionally (a hash cannot be reversed, so the changed-on-old-build subset is indistinguishable; resetting an unchanged user is harmless — one re-migration). It is not status-scoped: every `both` user keeps a live `password`, so removing `passwordHash` can never strip a user's only credential (contrast downgrade-prep, whose ACTIVE-only + reset-email safeguards exist precisely because it strips `passwordHash` from `upgradedOnly` users who have none)
 - **Non-active users are never stripped of their only credential**: the downgrade-prep script emails + `$unset`s **ACTIVE** users only. `/forgot-password` rejects non-active users on both POST and PUT, so an invited / registered / suspended `upgradedOnly` user (an invitee created by `createUserByEmail` is `upgradedOnly` by construction) has no reset path at all — unsetting their `passwordHash` would be a permanent lockout. They are counted, WARNed about, and left untouched for manual handling. Symmetrically, the cleanup script's abort counts only **ACTIVE** `legacyOnly` users — but for a *different* reason, which is worth stating precisely because the obvious-sounding one is wrong: a non-active user **can** still log in and **is** still migrated lazily (the login path applies no status filter; status only selects the post-authentication redirect). They are excluded because nobody can compel them to log in before the cleanup window, so counting them would make the cleanup phase unreachable indefinitely (the `$unset` of the legacy field itself is not status-scoped — retiring a suspended user's legacy hash is desirable)
 
 ---
@@ -685,11 +690,18 @@ flowchart LR
     D -->|legacyOnly > 0| E[Cleanup ABORT]
     D -->|legacyOnly = 0| F[run Cleanup migration]
     F --> G[PASSWORD_SEED no longer needed]
+
+    %% Exceptional path: downgrade before Phase 3, then re-upgrade
+    C -.->|downgrade needed| H[run Downgrade prep, then downgrade]
+    H -.-> I[running on old SHA-256-only build]
+    I -.->|re-upgrade| J[run Re-upgrade prep BEFORE opening logins]
+    J -.-> C
 ```
 
 - **Phase 1** (immediately after the new version release): Status migration auto-runs, lazy migration starts. `PASSWORD_SEED` is still needed. Re-scan with CodeQL and confirm the alert status (if it is not resolved by making the storage path scrypt-based, apply a justified dismissal to the legacy verification lines)
 - **Phase 2** (migration period): migrates naturally until all users have logged in. Check progress with the Status migration
 - **Phase 3** (optional): after confirming all users are migrated, the administrator deploys a release that includes the Cleanup migration. Remove the `password` field and **remove the legacy SHA-256 verification code** → at this point the CodeQL alert (#541) becomes fully green without a dismissal
 - **If a downgrade is needed** (before Phase 3): run the Downgrade prep script to check the scope of impact. Send reset emails if necessary
+- **When re-upgrading after a downgrade**: run the Re-upgrade prep script (`password-hash:reupgrade-prep`) **before the re-upgraded build starts accepting logins** (while still on the old build, or after deploying the new build but before opening it to traffic). It `$unset`s `passwordHash` from every `both` user so that any password changed on the downgraded build (which the old build wrote only to the legacy `password`) is not overridden by a now-stale `passwordHash` — see the "A changed/reset password is genuinely revoked" item for why this is required. Running it after the new build is already serving logins leaves a window in which the stale hash accepts the old (possibly leaked) password, so run it before that window opens. Safe and idempotent: unchanged users simply re-migrate on their next login
 
-**Rollback**: Before Phase 3 (Cleanup), a code rollback restores authentication **only for users who still have a `password` (SHA-256) field** — i.e. existing users who had not yet, or only partially (`both`), migrated. Users created, invited, or reset on the new version are `upgradedOnly` (scrypt only, no legacy `password`) and are locked out by a rollback even before Cleanup; run the Downgrade prep script (which targets `upgradedOnly`) first to send them reset emails. After Phase 3, reset emails must be sent for all migrated users with the Downgrade prep script.
+**Rollback**: Before Phase 3 (Cleanup), a code rollback restores authentication **only for users who still have a `password` (SHA-256) field** — i.e. existing users who had not yet, or only partially (`both`), migrated. Users created, invited, or reset on the new version are `upgradedOnly` (scrypt only, no legacy `password`) and are locked out by a rollback even before Cleanup; run the Downgrade prep script (which targets `upgradedOnly`) first to send them reset emails. After Phase 3, reset emails must be sent for all migrated users with the Downgrade prep script. **When rolling forward again** (re-upgrading), run the Re-upgrade prep script first so a password changed during the rollback window is not shadowed by a stale `passwordHash`.

@@ -166,6 +166,14 @@
   - _Requirements: 4.1, 4.2, 4.3_
   - _Boundary: Downgrade prep migration script_
 
+- [x] 4.4 (P) Implement the Re-upgrade prep standalone script
+  - Create `apps/app/src/server/scripts/password-hash-reupgrade-prep.ts` (a standalone script not managed by migrate-mongo), run when returning to the new build after a temporary downgrade
+  - `$unset` the scrypt `passwordHash` from every `both`-category user via `updateMany(bothFilter, { $unset: { passwordHash: '' } })`, using the shared `bothFilter` from `password-hash-format-filters.ts` (Req 4.4). This closes the reverse resurrection hole: a password changed on the downgraded build is written only to the legacy `password`, so the surviving `passwordHash` is stale; because `verify()` always prefers `passwordHash`, removing it forces re-verification against the current legacy `password` and re-migration on the next login
+  - This write is deliberately NOT status-scoped: every `both` user retains a live legacy `password`, so removing `passwordHash` can never strip a user's only credential (contrast downgrade-prep, which is ACTIVE-only because it strips `passwordHash` from `upgradedOnly` users who have none)
+  - Reset ALL `both` users unconditionally: a hash cannot be reversed, so the changed-on-old-build subset is indistinguishable; resetting an unchanged user is harmless (one re-migration). The run is idempotent (after it, targets are `legacyOnly`, so a re-run finds none)
+  - _Requirements: 4.4_
+  - _Boundary: Re-upgrade prep script_
+
 - [ ] 5. Integration tests for the migration scripts
 - [x] 5.1 (P) Create integration tests for the Status migration script
   - Prepare users in the 4 categories (upgradedOnly, both, legacyOnly, noPassword) in the test DB
@@ -191,6 +199,14 @@
   - Confirm that the integration test PASSes
   - _Requirements: 4.1, 4.2, 4.3_
   - _Boundary: Downgrade prep migration script_
+
+- [x] 5.4 (P) Create integration tests for the Re-upgrade prep standalone script
+  - Confirm that `passwordHash` is `$unset` from every `both` user regardless of status (ACTIVE and non-active), leaving the legacy `password` intact
+  - Confirm that `legacyOnly` (no passwordHash to remove) and `upgradedOnly` (no legacy password, so it cannot hold a stale hash) users are left untouched
+  - Confirm that the run is idempotent (a second run finds no `both` users and writes nothing)
+  - Confirm that the integration test PASSes
+  - _Requirements: 4.4_
+  - _Boundary: Re-upgrade prep script_
 
 - [ ] 6. Confirming resolution of the CodeQL alert (CWE-916 / #541)
 - [ ] 6.1 Re-scan CodeQL after implementation and confirm the alert state
