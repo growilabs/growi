@@ -40,13 +40,15 @@ function runMigrations(mongoUri: string): void {
 // GitHub-hosted `ubuntu-latest` runners' advertised 4 vCPUs) and cut local
 // reproduction of this failure from ~80% of files to roughly 1%.
 //
-// 30s (was 20s) is a modest margin layered on top of that fix, not a
-// substitute for it: even 4 truly-concurrent `dev:migrate:up` chains (each a
-// nested pnpm -> node -> migrate-mongo -> umzug spawn) can occasionally still
-// exceed 20s under host contention outside the pool's control (a busy CI
-// runner, a slow migration added later). If this still times out with the
-// pool capped, that is a real regression to investigate, not a signal to
-// raise the number further.
+// Deliberately kept at 20s (not bumped to 30s): the cap above is the fix,
+// and a wider budget's only job would be absorbing genuine future
+// regressions instead of catching them — a migration step that grows slow
+// enough to need 25s is a real problem worth seeing fail here, not
+// something to give more room to quietly pass. If this still times out
+// with the pool capped, that is a real regression to investigate (or fresh
+// evidence that the budget genuinely needs measured headroom — see
+// investigate-flaky-test's Step 3 guardrail), not a signal to raise the
+// number as insurance ahead of time.
 beforeAll(() => {
   // Skip if already run (setupFiles run per test file, but we only need to migrate once per worker)
   if (migrationsRun) {
@@ -65,4 +67,4 @@ beforeAll(() => {
 
   runMigrations(mongoUri);
   migrationsRun = true;
-}, 30_000);
+}, 20_000);
