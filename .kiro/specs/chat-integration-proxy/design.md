@@ -320,6 +320,7 @@ apps/chat-integration-proxy/
 │   │   └── inbound-flow.ts        # GROWI からの通知・設定・鍵
 │   ├── routes/                    # Hono
 │   │   ├── index.ts               # この層の公開窓口
+│   │   ├── signature-guard.ts     # ★ 署名の検証（Hono の middleware）。GROWI から届く口の手前に立つ
 │   │   ├── install-routes.ts      # OAuth の折り返し（Slack / Discord）。**installation を作る唯一の HTTP 経路**
 │   │   ├── webhook-routes.ts      # Teams の受け口ほか
 │   │   ├── growi-routes.ts        # 通知・設定・能力・鍵・ペアリング
@@ -330,8 +331,13 @@ apps/chat-integration-proxy/
 │       ├── config.ts              # process.env を読んでよい唯一のファイル
 │       ├── mattermost-installations.ts  # 設定から Mattermost の接続先を読み、起動時に InstallationStore.save する
 │       └── sweeper.ts             # 期限切れの掃除。**`DistributedLock` を引数で受け取る**（facade 全体は受け取らない）
-├── docs/
-│   └── closed-network-deployment.md
+├── docs/                          # ★ 要件 1.5。部品は文書を書かないので、置き場所をここで決める
+│   ├── closed-network-deployment.md
+│   ├── setup-slack.md             # アプリ作成・Socket Mode 有効化・appToken の取り方
+│   ├── setup-discord.md           # アプリ作成・bot トークン・Gateway intents
+│   ├── setup-teams.md             # **Azure Bot の登録。4 つで最も重い**
+│   ├── setup-mattermost.md        # bot アカウント作成・接続先 URL の設定
+│   └── rate-limit-notes.md        # GROWI の全体レート制限との関係（下記）
 ├── turbo.json                     # build / dev / lint / test。@growi/chat#build に依存
 └── package.json
 ```
@@ -347,7 +353,7 @@ apps/chat-integration-proxy/
 | `ConnectionManager` | `platform/connection-manager.ts` | 常時接続の生涯 | 1.1, 1.4, 13.2 |
 | `ChannelDirectory` | `platform/channels.ts` | installation のチャンネル一覧を周期で取り直して保存 | 2.2, 2.4, 11.1 |
 | `InstallationProvider` | `platform/installation-provider.ts` | workspace ごとの資格情報を解決 | 1.1, 8.1 |
-| `InstallationStore` | `platform/installation-store.ts` | **installation を作る・消す。** OAuth の折り返しと、Mattermost の設定ファイルから呼ぶ | 1.1, 1.5, 8.1 |
+| `InstallationStore` | `platform/installation-store.ts` | **installation を作る・消す。** OAuth の折り返しと、Mattermost の設定ファイルから呼ぶ | 1.1, 8.1 |
 | `CommandInvocation` | `command/invocation.ts` | mention / slash を 1 つの内部表現へ | 1.2, 3.1, 4.1, 14.1 |
 | `ArgumentCollector` | `command/argument-collector.ts` | 値を集め、途中経過を保存して再開 | 1.2, 4.1, 5.2, 8.2, 11.5 |
 | `CommandSet` | `command/command-set.ts` | **利用者向けコマンドの宣言。** 名前・集める値・対象の決まり方を 1 か所のデータで持つ | 3.1, 4.1, 5.1, 7.3, 14.1 |
@@ -359,6 +365,7 @@ apps/chat-integration-proxy/
 | `SearchFusion` | `growi/search-fusion.ts` | 重みつきの式で 1 本に統合 | 3.2, 3.3, 3.8 |
 | `GrowiClient` | `growi/growi-client.ts` | 署名つきで GROWI を呼ぶ（`GrowiUriResolver` を通す） | 3.1, 4.2, 5.2, 7.3, 9.2, 10.5, 14.2 |
 | `EventSink` | `orchestration/event-sink.ts` | イベントを受けて各層を呼ぶ | 1.1, 1.2, 3.1, 4.1, 6.1, 14.1 |
+| **`SignatureGuard`** | `routes/signature-guard.ts` | **届くリクエストの署名を検証する。この proxy の一番外側の守り** | **10.1, 10.2, 10.3, 10.4** |
 | `InboundFlow` | `orchestration/inbound-flow.ts` | GROWI からの通知・設定・鍵の追加と失効 | 2.1–2.6, **10.5**, **10.7**, 11.4 |
 
 ### CommandSet — 利用者が打てるコマンドの宣言
@@ -368,7 +375,7 @@ apps/chat-integration-proxy/
 
 | 打つ言葉 | 集める値（`FieldSpec` の並び） | 送るもの | 対象の決まり方 | 権限判定に使う名前 |
 |---|---|---|---|---|
-| `search <語>` | `keyword`（必須・自由入力） | `CommandRequest`（`search`） | 許可している全 GROWI | `search` |
+| `search <語>` | `keyword`（必須・自由入力） | `CommandRequest`（`search`）。**`limit` は proxy が決める（既定 10）** — 利用者には聞かない | 許可している全 GROWI | `search` |
 | `create-page` | `path`（必須）, `body`（必須・複数行） | `CommandRequest`（`create-page`） | 1 つに定まる | `create-page` |
 | `keep` | `range`（必須・`TimeRange`）, `path`（必須） | `CommandRequest`（`keep`） | 1 つに定まる | `keep` |
 | `help` | なし | `CommandRequest`（`help`） | 許可している全 GROWI | `help` |
@@ -429,7 +436,8 @@ export interface FieldSpec {
 | `register` | 9.1 | 一定時間で失効する登録コードを発行する |
 | `unregister` | 9.7 | 紐付けを解除する |
 | `weight <growi> <値>` | 3.8 | その workspace における GROWI ごとの検索の重みを決める |
-| `rotate-key` | 10.5 | proxy 側の鍵の入れ替えを始める。配布の結果と未達の相手を返す（中身は `RelationKeyService`。下記の 4 段） |
+| `rotate-key` | 10.5 | proxy 側の鍵の入れ替えを**始める、または続きから進める**。配布の結果と未達の相手を返す（中身は `RelationKeyService`。下記の 4 段）。**2 回目以降は作り直さず配り直す**ので、運用者は相手側を直してからもう一度打てばよい |
+| `rotate-key status` | 10.5 | 入れ替えの途中経過（関係ごとの未達）を見る。**4 段目はここから呼ぶ** — 全員に届いていれば古い鍵を失効させ、そうでなければ残りを示す |
 
 **実行できるのは workspace の管理者だけ。** これが無いと、その workspace の誰でも自分の GROWI を紐付けられ、
 **要件 9 の目的（第三者が勝手に登録できない）が成立しない**。
@@ -477,9 +485,13 @@ export interface RelationKeyService {
   issue(relationId: string): Promise<{ readonly keyId: string; readonly publicKeyJwk: JsonWebKey }>;
   /** 署名するときに呼ぶ。**復号は `own-key-repository` の中だけで行い、この層より外へ秘密鍵の値を持ち出さない** */
   signerFor(relationId: string): Promise<{ readonly key: KeyRef; readonly privateKey: KeyObject }>;
-  /** 入れ替えの 1〜3 段（作る → 配る → 結果を返す）。**関係ごとの結果を返す** */
+  /**
+   * 入れ替えの 1〜3 段（作る → 配る → 結果を返す）。**関係ごとの結果を返す**。
+   * **2 回目以降は作り直さず、届いていない相手にだけ配り直す** — 毎回作り直すと、
+   * 運用者が相手側を直してもう一度打つたびに新しい鍵が増え、古い鍵は失効しないまま積み上がる
+   */
   rotate(installationId: string): Promise<ReadonlyArray<RotationResult>>;
-  /** 4 段目。**全員に届いているときだけ**古い鍵を失効させ、そうでなければ何もせず false を返す */
+  /** 4 段目。**全員に届いているときだけ**、`key-revoke-to-growi` を送ってから自分の古い鍵を失効させる */
   revokeOldIfAllDelivered(installationId: string): Promise<boolean>;
 }
 
@@ -489,6 +501,17 @@ export interface RotationResult {
   readonly delivery: { readonly ok: true } | { readonly ok: false; readonly reason: string };
 }
 ```
+
+**途中経過は `own_key` に保存する。** 呼び出し元へ返すだけだと、
+**`revokeOldIfAllDelivered()` が「全員に届いた」を何から判断するのか決められない。**
+
+| 足す列 | 中身 |
+|---|---|
+| `superseded_key_id` | この鍵が置き換える相手。`null` なら入れ替えの途中ではない |
+| `delivered_to_peer_at` | 相手が `key-register-to-growi` を受け付けた時刻。**`null` なら未達** |
+
+**古い鍵を失効させる前に、相手にも失効を伝える。** `key-revoke-to-growi` を送らないと、
+**GROWI 側は proxy の古い公開鍵を持ったまま**になり、入れ替えの目的（古い鍵を使えなくする）が相手側で果たされない。
 
 **4 段目を別の操作に分けてある。** 同じ関数の中で条件分岐にすると、
 「未達があるうちは失効させない」が**書き忘れで壊れる**。分けておけば**呼ばないだけ**で守れる。
@@ -758,6 +781,47 @@ GROWI ごとに文書集合が互いに素なので、重みが等しければ�
 
 ### GROWI から届く口（`InboundFlow` が受ける）
 
+### SignatureGuard — 届くリクエストの署名を検証する
+
+| Field | Detail |
+|---|---|
+| Intent | GROWI から届くリクエストが、送信時から変わっていないことを確かめる |
+| Requirements | 10.1, 10.2, 10.3, 10.4 |
+
+**この部品が無いと、口を作る 8 本のタスクの中で実装者が各自その場で決めることになる** —
+生のバイト列の取り方、有効期間の上限、`consumeNonce` を呼ぶ順序、失敗の記録。
+**8 か所でばらばらに決まると、そのうち 1 か所が緩いだけで守りが崩れる。**
+対になる `chat-integration-app` には `SignatureGuard` があり、片側だけ空けない。
+
+```typescript
+// routes/signature-guard.ts — Hono の middleware。GROWI から届く口の手前に立つ
+export const signatureGuard = (deps: {
+  readonly resolvePublicKey: (ref: KeyRef) => Promise<KeyObject | null>;  // peer-key-repository
+  readonly consumeNonce: (ref: KeyRef, nonce: string, expiresAt: Date) => Promise<boolean>;  // request-nonce-repository
+  readonly recordFailure: (failure: VerifyFailure, ctx: RequestContext) => Promise<void>;
+}) => MiddlewareHandler;
+```
+
+書くべきことは 4 つ。
+
+1. **本体は生のバイト列で受ける。** Hono では `await c.req.arrayBuffer()` を使う。
+   **`c.req.json()` を呼んではいけない** — `content-digest` の計算に使うバイト列が失われ、
+   解析した値から組み立て直すことになって**正しい相手が弾かれる**（app 側と同じ理由）。
+   検証を通した後、**同じバイト列から**検査関数へ渡す
+2. `resolvePublicKey` は `peer-key-repository`、`consumeNonce` は `request-nonce-repository` を包む。
+   **どちらも `KeyRef`（`relationId` と `keyId` の組）で引く。**
+   `resolvePublicKey` は**相手側の鍵だけを返す**（protocol の不変条件。自分の鍵を引くと反射が成立する）
+3. **`consumeNonce` に渡す期限は、送られてきた値ではなく受ける側が上限（300 秒）で切った値**にする。
+   これをしないと使い捨ての値の表が自動削除されず単調に増える。
+   **`consumeNonce` は署名の検証に成功した後にだけ呼ぶ**（先に呼ぶと、鍵の識別子を知っているだけの相手が表を膨らませられる）
+4. **失敗の種類**（`signature-mismatch` / `digest-mismatch` / `expired` / `replayed` / `unknown-key` / `malformed`）
+   **を運用者向けに記録する**（要件 10.2）。**署名そのものと本文は記録しない**（umbrella の Security Considerations）
+
+**`endpointOp` はハンドラに直接書かず、口の表からデータとして引く。** 経路の登録時に
+「このパスの `op` はこれ」を 1 か所で対応づけておけば、**隣の口と同じ値を書き間違える道が構造で閉じる。**
+
+---
+
 署名を確かめた後、**`@growi/chat` の検査関数で本文の形を確かめてから**処理する
 （署名は「経路上で書き換えられていない」ことしか示さない）。**口ごとに使う関数が違う** — 下の表を参照。
 **`CommandRequest` は proxy へ来ない**（コマンドは proxy から GROWI へ送る側）ので `parseCommandRequest` は使わない。**本文の `relationId` が署名から特定した関係と
@@ -773,7 +837,7 @@ GROWI ごとに文書集合が互いに素なので、重みが等しければ�
 | `key-register-to-proxy` | `/chat-integration/keys/register` | `KeyRegistrationRequest` | `parseKeyRegistration` | `KeyOperationResult` | — | 10.5 |
 | `key-revoke-to-proxy` | `/chat-integration/keys/revoke` | `KeyRevocationRequest` | `parseKeyRevocation` | `KeyOperationResult`。**有効な鍵が 0 本になる要求は `would-leave-no-valid-key` で断る** | — | 10.5 |
 | `capabilities` | `/chat-integration/capabilities` | `OpOnlyRequest` | `parseOpEnvelope` | `CapabilityReport` | **proxy 全体**（能力表は静的で、どの workspace にも同じ。ここは範囲の問題が無い） | 1.3 |
-| `connection-status` | `/chat-integration/connection-status` | `OpOnlyRequest` | `parseOpEnvelope` | `ConnectionStatusView`（下記） | **その関係の installation を受け持つ接続 1 件だけ** | 1.4 |
+| `connection-status` | `/chat-integration/connection-status` | `OpOnlyRequest` | `parseOpEnvelope` | **`ConnectionStatusView`**（`@growi/chat`。下記） | **その関係の installation を受け持つ接続 1 件だけ** | 1.4 |
 | `channels` | `/chat-integration/channels` | `OpOnlyRequest` | `parseOpEnvelope` | **`ChannelInventory`** | **その関係の installation の分だけ** | 2.2, 11.1（管理画面が宛先を選ぶため） |
 | （署名なし） | `/chat-integration/pairing/submit` | `PairingSubmission` | **`parsePairingSubmission`** | `PairingResult` | — | 9.1–9.5（**署名なし。本文の検査だけが守りなので必ず通す**） |
 
@@ -783,17 +847,19 @@ GROWI ごとに文書集合が互いに素なので、重みが等しければ�
 > umbrella の Security Considerations が「1 台の GROWI が侵害されても、他の GROWI の関係にも
 > その workspace の他のチャンネルにも触れられない」と約束している範囲である。
 >
-> ```typescript
-> /** `connection-status` が返す形。**`ConnectionManager.status()` をそのまま返さない** */
-> export interface ConnectionStatusView {
->   readonly platform: PlatformName;
->   readonly state: 'connected' | 'connecting' | 'disconnected';
->   readonly since: string;
->   /** **id の一覧ではなく件数だけ。** 一覧を返すと、1 社が 1 回叩くだけで
->    *  その proxy にぶら下がる全ての workspace の id が読める */
->   readonly servedInstallationCount: number;
-> }
-> ```
+> **返す型は `@growi/chat` の `ConnectionStatusView`**（両側をまたぐ型なのでそちらが持つ）。
+> `ConnectionManager.status()` の内部の形をそのまま返さず、次のように写す。
+>
+> | 内部の `state` | 返す `health` | 理由 |
+> |---|---|---|
+> | `connected` | `connected` | |
+> | **`held-by-other`** | **`connected`** | **これは正常な状態である。** どの台が持っているかは呼ぶ側の関心ではない。`disconnected` に写すと、3 台構成では答えた台が持ち主でない限り「切断」と出る — **3 回に 2 回、正常なのに異常と表示される** |
+> | `reconnecting` | `reconnecting` | |
+> | `failed` | `failed` | **要件 1.4 で見たいのはこれ。** 一時的な切断と区別できる必要がある |
+> | （Teams。接続を張らない） | **`not-applicable`** | `disconnected` と答えると、正常な Teams 連携が壊れているように見える |
+>
+> **件数（`servedInstallationCount`）は返さない。** official proxy では
+> **何社が相乗りしているかを全顧客に見せる値**になる。運用者が見たいなら proxy のログか `health` に置く。
 
 > **`connection-status` の位置づけ。** 「運用者に接続状態を見せる」ことを直接求める受け入れ条件は無い。
 > これは**要件 1.4（あるサービスの失敗が他へ波及しない）が満たされていることを外から確かめる手段**であり、
@@ -816,7 +882,7 @@ GROWI ごとに文書集合が互いに素なので、重みが等しければ�
 | `key-register-to-proxy` | `(relation_id, key_id)` が一意なので、同じ鍵の 2 度目の登録は**何も変えずに成功を返す** |
 | `key-revoke-to-proxy` | 失効は「`revoked_at` を立てる」だけなので、2 度目も結果が変わらない |
 | `capabilities` / `connection-status` / `channels` | 読み取りだけなので、何度呼ばれても変わらない |
-| `pairing/submit`（署名なし） | `pairing_order.consumed_at` を**条件つき更新で立てた 1 本だけ**が先へ進む。2 度目は同じ `PairingResult` を返す（新しい関係を作らない）。**署名も nonce も無い唯一の入口なので、ここが最も再送されやすい** |
+| `pairing/submit`（署名なし） | `pairing_order.consumed_at` を**条件つき更新で立てた 1 本だけ**が先へ進む。2 度目は同じ `PairingResult` を返す（新しい関係を作らない）。**署名も nonce も無い 2 つの入口の 1 つなので（もう 1 つは GROWI 側の ⑤）、ここが最も再送されやすい** |
 
 **どの口も「2 度目が来ても結果が変わらない」形にしてある**ので、記録した応答を返し直す仕組みは要らない。
 
@@ -898,6 +964,11 @@ custom proxy 向けに、許す宛先を運用者が設定で明示できるよ�
 確かめたアドレスへつなぐ**。ペアリングのときだけだと、④ で公開アドレスを申告して通したあと
 名前の引き先を閉域内へ付け替えるだけで、この検証が防ごうとしたものがそのまま成立する。
 
+> **GROWI の全体レート制限に注意する**（`docs/rate-limit-notes.md`）。GROWI は
+> `features/rate-limiter` を全 API に掛けており、既定は「IP・パス・メソッドごとに 1 分 2500 回」なので
+> 普通は詰まらない。ただし **1 つの workspace の通信はすべて proxy の 1 つの IP から来る**ので、
+> 運用者が `API_RATE_LIMIT_*` で絞ると**連携全体が止まる**。導入ドキュメントに書く。
+
 **引いた結果は短い時間だけ覚える（既定 30 秒）。** 検索は紐づく GROWI の数だけ同時に出るので、
 毎回引くと 1 回の検索で名前解決が N 回走る。30 秒なら、付け替えに気づくのが最大 30 秒遅れるだけで、
 ペアリングのときだけ判定していた前の形（気づかないまま送り続ける）とは比べものにならない。
@@ -916,8 +987,8 @@ custom proxy 向けに、許す宛先を運用者が設定で明示できるよ�
 | `installation` | `id`, `platform`, `workspace_id`, `workspace_name`, `credentials`（暗号化）, `created_at` | `(platform, workspace_id)` 一意 |
 | `relation` | `id`（**推測できない値。連番にしない** — `keyid` として署名ヘッダに載り外部に出るため）, `installation_id`, `growi_uri`, `growi_label`, `search_weight`, `settings_version`, `created_at` | `(installation_id, growi_uri)` 一意 |
 | `peer_key` | `id`, `relation_id`, `key_id`, `public_key_jwk`, `valid_from`, `revoked_at` | `(relation_id, key_id)` 一意 |
-| `own_key` | `id`, `relation_id`, `key_id`, `private_key_pem`（暗号化）, `valid_from`, `revoked_at` | 同上。**相手ごとに鍵を分ける** — 1 つの関係の鍵が漏れても他へ波及しないため |
-| `pairing_order` | `id`, `installation_id`, `code_hash`, `attempts`, `expires_at`, `consumed_at` | `code_hash` 一意。`attempts` に上限 |
+| `own_key` | `id`, `relation_id`, `key_id`, `private_key_pem`（暗号化）, `valid_from`, `revoked_at`, **`superseded_key_id`**, **`delivered_to_peer_at`** | 同上。**相手ごとに鍵を分ける** — 1 つの関係の鍵が漏れても他へ波及しないため。後ろ 2 列は入れ替えの途中経過（上記） |
+| `pairing_order` | `id`, `installation_id`, `code_hash`, `attempts`, `expires_at`, `consumed_at`, **`relation_id`** | `code_hash` 一意。`attempts` に上限。**`relation_id` は 2 度目の申請に同じ `PairingResult` を返すための材料** — これが無いと「2 度目は同じものを返す」を実装できない |
 | `request_nonce` | `relation_id`, `key_id`, `nonce`, `expires_at` | **主キー `(relation_id, key_id, nonce)`** |
 | ~~`processed_request`~~ | — | **持たない。** コマンドは proxy から GROWI へ送る側なので、`CommandRequest` は proxy に届かない（下記の口の表）。GROWI から届くもののうち `requestId` を持つのは `NotificationRequest` だけで、それは `processed_notification_target` が受け持つ |
 | `processed_notification_target` | `relation_id`, `request_id`, `platform`, `channel_id`, `status`, `detail`, `processed_at`, `expires_at` | **主キー `(relation_id, request_id, platform, channel_id)`。通知用** — `posted` の宛先は次のやり直しで飛ばす。**コマンドと同じ表に混ぜない**（主キーの意味が違い、読む人が取り違える） |
@@ -1001,7 +1072,15 @@ Chat SDK の state（購読・分散ロック・重複排除）は `@chat-adapte
    **installation を作った直後に一覧が取れていること**（2.4）
 9. **設定の押し込み** — 自分が持つ版より小さい `version` の押し込みが捨てられること（11.4）
 10. **鍵の入れ替え** — 届かない相手が 1 台あるとき、古い鍵が失効しないこと。
-    全員に届いたときにだけ失効すること（10.5・10.6）
+    **その相手を復旧させてもう一度 `rotate-key` を打つと、鍵を作り直さずに配り直し、
+    そのうえで初めて古い鍵が失効すること**（＝続きから進めること）。
+    失効の前に `key-revoke-to-growi` が全 GROWI へ送られること（10.5・10.6）
+11. **署名の検証**（`SignatureGuard`）— 本体を 1 バイト変えると `digest-mismatch` になること。
+    期限切れ・再送・知らない鍵がそれぞれの種類で断られること。
+    **`consumeNonce` が検証に失敗したリクエストでは呼ばれないこと。**
+    渡される期限が 300 秒を超えないこと（10.1–10.4）
+12. **別の口への流用** — ある口へ宛てた署名付きリクエストをそのまま別の口へ投げると
+    `malformed` になること（`op` の突き合わせ。10.1・10.7）
 
 ### E2E Tests
 

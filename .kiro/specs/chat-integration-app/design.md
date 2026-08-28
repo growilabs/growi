@@ -114,7 +114,8 @@ apps/app/src/features/chat-integration/
 | `client/components/SlackNotification.tsx`（または Gen 2 用の新規部品） | 保存時に宛先を選ぶ UI。Gen 2 はチャンネルを **id で選ぶ**ので、`ProxyClient` 経由でチャンネルの一覧を取る |
 | `apps/app/package.json` | `@growi/chat` を `workspace:^` で追加 |
 | `apps/app/turbo.json` | **`@growi/chat#build` への依存を宣言する。** 同じリポジトリ内の build を作る依存が増えたら書き足す決まりである（`.claude/rules/project-structure.md`）。書かないと build の順序が狂い `dist/` が無い状態で型エラーになる |
-| `server/crowi/express-init.js` | **`bodyParser.json` より前に**この feature のパスだけ `express.raw` を通す（上記「署名の検証には届いたバイト列そのものが要る」） |
+| `server/crowi/express-init.js` | **`bodyParser.json` より前に** `/peer/` だけ `express.raw` を通し、**`mongoSanitize` を `/peer/` の下から外す**（上記 2 節） |
+| `server/routes/avoid-session-routes.js` | `/peer/` を足して session を張らせない（上記） |
 | `pages/admin/*.page.tsx`（新規） | 管理画面は feature の外に薄い受け皿が要る（Next.js の Pages Router の決まり） |
 | `components/Admin/Common/AdminNavigation.tsx` | **手作業の追記が 3 か所**（`MenuLabel` の分岐、一覧、スマートフォン用の一覧）。データ駆動になっていないので漏れやすい |
 
@@ -154,8 +155,8 @@ export interface ResolvedActor {
    */
   readonly user: IUser | null;
   readonly userGroups: ReadonlyArray<ObjectIdLike>;   // `user` が null なら空
-  /** 書き込みを断る理由。`user` があっても読み取り専用なら書き込みだけ断る */
-  readonly writeDenied: 'not-linked' | 'read-only' | null;
+  /** 断る理由。**利用者に返す案内が違うので 1 つに丸めない** */
+  readonly writeDenied: 'not-linked' | 'read-only' | 'inactive' | null;
 }
 
 export interface CommandEndpoint {
@@ -206,7 +207,10 @@ GROWI 自身は、外の相手にページの中身を見せる口ではこの�
 **チャットの検索とリンクの展開は、まさに同じ性質の口である。**
 
 → **`resolveActor` の後条件**:
-- `status !== STATUS_ACTIVE` なら **`user` を `null` として扱う**（読み取りも紐付いていない扱いになる）
+- `status !== STATUS_ACTIVE` なら **`user` を `null` として扱う**（読み取りも紐付いていない扱いになる）。
+  ただし **`writeDenied: 'inactive'`** を立て、案内を分ける — その人は既に紐付けているので、
+  「紐付けが要る」と返してリンクを開かせても何も変わらない。
+  **「あなたの GROWI ユーザーはいま利用できません」**と返す
 - `user.readOnly` が真なら `user` は返すが **`writeDenied: 'read-only'`** を立てる（検索は本人の権限で通す）
 - **`user` が `null` で、かつ `aclService.isGuestAllowedToRead()` が偽なら、読み取りも実行しない。**
   検索もリンクの展開も行わず、要件 7.6 の案内（`account-link-required`）を返す
@@ -291,13 +295,38 @@ umbrella の `requirements.md` は Adjacent expectations に
 → **`resolveActor` で操作者が決まった後に、自分で文脈を組み立てて `beginActivity()` を呼ぶ。**
 
 ```typescript
+// router の入口で 1 度取って持ち回る（beginActivity を呼ぶのは処理の後半なので）
+const requestArrivedAt = new Date();
+// ...
+
 // 操作者が決まってから。応答を返す前に emit する（Rule 1）
 const { activityId } = beginActivity({
   ip: req.ip, endpoint: req.originalUrl,
   userId: actor.user._id.toString(), username: actor.user.username,
   createdAt: requestArrivedAt,     // 到着時刻。beginActivity を呼ぶ時刻ではない
 });
+try {
+  // ... 書き込み ...
+  activityEvent.emit('update', activityId, { action, contributor: actor.user, ... });
+}
+finally {
+  // emit に届かなかったすべての道で消す（下記）
+  pendingActivityContext.clear(activityId);
+}
 ```
+
+**`beginActivity` を呼んだら、必ず `take()` か `clear()` のどちらかで終わる。** これが不変条件である。
+
+`beginActivity` は process の中の `Map` に文脈を預けるだけで、
+**時間による掃除も古い順の追い出しも意図的に置かれていない**（`pending-activity-context.ts` の注記）。
+成り立っているのは、既存の 2 か所がどちらも後始末を対にしているからである
+（手本の `service/page/index.ts` の `revertDeletedPage` は `pendingActivityContext.clear(activityId)` を呼び、
+「これが無いと `res` の後始末が無いこの経路では文脈が永久に残る」と理由まで書いている）。
+
+**`CommandEndpoint` は例外を投げず必ず `CommandResponse` を返す**ので、`path-conflict` や `forbidden` は
+**ふつうに起きる正常な失敗**である。そのたびに `Map` の項目が 1 つ残り、
+proxy は届かなかった要求をやり直すので**失敗は繰り返し届く**。
+時間で消える仕組みが無いため、この漏れは process を再起動するまで戻らない。
 
 - **切り出す必要は無い。** `beginActivity` と `registerFailsafeFinalizer` は
   `~/server/service/activity/index` から**既に素の関数として出ている**（`add-activity.ts:5-8, 50-55`）。
@@ -309,7 +338,9 @@ const { activityId } = beginActivity({
 - **失敗した書き込み（`path-conflict` など）は `ACTION_UNSETTLED` として残す。**
   `CommandEndpoint` は「例外を投げず必ず `CommandResponse` を返す」ので応答は 200 になり、
   規則の失敗検知（`statusCode >= 400` と接続の切断）は**この口では一度も働かない**。
-  自分で文脈を組み立てる以上、失敗したときに何を残すかもここで決める
+  その行を書くのは `recordFailsafeAttempt(activityId, context)` で、通常はこれを
+  `registerFailsafeFinalizer` が `res` の出来事から呼ぶ。**`res` の仕組みを使わないと決めた以上、
+  自分で `recordFailsafeAttempt` を呼ぶ**（`clear()` の前に）
 - **チャット経由であることと発言元のチャンネルを残す。** protocol 側も `CommandEnvelope.channel` を
   残す価値の 1 つとして監査ログを挙げている
 
@@ -344,7 +375,7 @@ const { activityId } = beginActivity({
 要件 2.4 は「投稿できなかったことを運用者が後から確認できる形で記録する」。
 待たなければ結果を受け取れず、待てばページ操作が通知に引きずられる。
 
-さらに**再送する主体が居ないと、`requestId` と proxy 側の `processed_request` が働かない**。
+さらに**再送する主体が居ないと、`requestId` と proxy 側の `processed_notification_target` が働かない**。
 重複を取り除く仕組みだけがあって、受け止める相手が居ない状態になる。
 
 ```
@@ -408,6 +439,9 @@ export interface NotificationDispatcher {
 - 書き留める契機は 2 つ。**管理者がパス条件ごとに設定した通知**（要件 2.1）と、
   **編集した人がページの保存時に宛先を指定した通知**（要件 2.2）。どちらも同じ outbox に入る
 - やり直しは間隔を空けて数回。上限を超えたら `given-up` として残す
+- **`inventory-not-ready` は諦めの回数に数えない。** proxy がまだチャンネルの一覧を取れていない
+  というだけの失敗で、**10 分待てば直る**。ふつうの失敗と同じ数え方をすると、
+  紐付けた直後の通知が数回で `given-up` に落ちる。間隔を長くしてやり直す
 - **宛先の集合を種類で分岐しない。** 既存の `GlobalNotificationSettingType` は `{ MAIL, SLACK }` の閉じた 2 値で、
   分岐は `routes/apiv3/notification-setting.js` の入力検査（`isIn(['mail','slack'])`）と種類の切り替え時の後始末、
   型の宣言（**`models/GlobalNotificationSetting/consts.ts:16-19` の 1 か所だけ**。
@@ -492,13 +526,14 @@ GROWI には同じ形のものが既に 3 つある（`models/password-reset-ord
 
 | コレクション | 主な項目 | 索引・寿命 |
 |---|---|---|
-| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `settingsVersion`, `createdAt` | **`(proxyUri, relationId)` 複合ユニーク** — `relationId` を採番するのは**相手（proxy）**なので、1 つの GROWI が複数の proxy と紐づくと衝突しうる。**既にある組と衝突する `PairingResult` は成立させない**（roadmap が過去の取りこぼしとして挙げている「相手が付けた識別子を自分側の一意キーにする」形を避ける）。**これが無いと送り先も分からない**（下記）。**紐付け解除（要件 9.7）では削除せず `state: 'unpaired'` にする** — `workspaceId` を残さないと繋ぎ直しのときに紐付けを引き継げない。消すのは**鍵・チャンネル権限・宛先**だけ（秘密鍵を残さない目的はこれで満たせる） |
+| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `settingsVersion`, `createdAt` | **`relationId` 単独で一意**（複合にしない。理由は下記）。**既にある `relationId` を返す `PairingResult` はペアリングを成立させず、管理者に知らせる**。**これが無いと送り先も分からない**（下記）。**紐付け解除（要件 9.7）では削除せず `state: 'unpaired'` にする** — `workspaceId` を残さないと繋ぎ直しのときに紐付けを引き継げない。消すのは**鍵・チャンネル権限・宛先**だけ（秘密鍵を残さない目的はこれで満たせる） |
 | `chat_account_links` | `relationId`, `userId`, `platform`, `accountId`, `linkedAt` | **`(relationId, platform, accountId)` 複合ユニーク**（下記）。**利用者が解除するまで残る。** 関係の解除では消さない（下記の再ペアリングを参照） |
 | `chat_integration_keys` | `relationId`, `side`(`own`/`peer`), `keyId`, `key`, `validFrom`, `revokedAt` | `(relationId, side, keyId)` 一意。**紐付け解除で削除**（秘密鍵を残さない） |
-| `chat_notification_outbox` | `requestId`, `relationId`, `targets`, `markdown`, `state`, `attempts`, `result`, `createdAt` | `state` に索引。**送信済みは 30 日で TTL 索引により消す**。`given-up` は運用者が確認するまで残す |
+| `chat_notification_outbox` | `requestId`, `relationId`, `targets`, `markdown`, `state`, `attempts`, `claimedAt`, `result`, `createdAt` | **`(state, claimedAt)` に索引**（`drain` が奪うときに引く）、**`(relationId, requestId)` に索引**（結果を書き戻すときに引く）。**送信済みは 30 日で TTL 索引により消す**。`given-up` は運用者が確認するまで残す |
 | `chat_processed_requests` | `relationId`, `requestId`, `response`, `processedAt` | `(relationId, requestId)` 一意。**TTL 索引で 24 時間**（再送が起こりうる間だけ） |
 | `chat_request_nonces` | `relationId`, `keyId`, `nonce`, `expiresAt` | `(relationId, keyId, nonce)` 一意。**`expiresAt` に TTL 索引** |
-| `chat_pending_pairings` | `registrationCode`, `proxyUri`, `growiUri`, `createdBy`, **`ownKeyId`**, **`ownKeyPair`（暗号化）**, **`answerCount`**, **`answerWindowStartedAt`**, `expiresAt` | `registrationCode` 一意。**`expiresAt` に TTL 索引**。要件 9.2 の所有確認に使う。**答えた `challenge` は記録しない** — どの問いにも答える形にしたため（上記）。数えるのは**回数の上限**（1 分 30 回）だけ |
+| `chat_pending_pairings` | `registrationCode`, `proxyUri`, `growiUri`, `createdBy`, **`ownKeyId`**, **`ownKeyPair`（暗号化）**, `expiresAt` | `registrationCode` 一意。**`expiresAt` に TTL 索引**。要件 9.2 の所有確認に使う。**答えた `challenge` は記録しない** — どの問いにも答える形にしたため（上記） |
+| `chat_challenge_attempts` | `registrationCode`, `sourceKey`, `windowStartedAt`, `count` | **主キー `(registrationCode, sourceKey)`。`windowStartedAt` に TTL 索引。** 回数の上限は**送り元ごと**に数えると決めたので、保留の行に 1 組だけ持つ形では足りない（1 つの保留に対して送り元は複数ある）。`sourceKey` は送り元アドレス（決め方は protocol spec） |
 | `chat_account_link_orders` | `token`, `relationId`, `platform`, `accountId`, `isRevoked`, `createdAt`, `expiredAt` | `token` 一意。**`expiredAt` に TTL 索引**（既定 10 分）。要件 7.3 の一度きりのリンク。**`models/password-reset-order.ts` に倣う**（下記） |
 | `chat_channel_permissions` | `relationId`, `commandName`, `allowedChannels` | **`(relationId, commandName)` 一意。** **行ごとの `updatedAt` は持たない** — protocol の `SettingsPushRequest.version` は関係ごとに 1 つの値なので、行ごとに持つと比べる基準が決まらない。版は `chat_relations.settingsVersion` に 1 つ持ち、**保存のたびに 1 増やす**。proxy が取りに来たときはそこから返す（要件 11.4） |
 | `chat_notification_destinations` | `platform`, `channelId`, **`channelName`**, `pathPattern`, `triggerEvents`, `relationId` | `channelName` は表示と要件 12.4 の突き合わせ用。**`ChannelInventory` を引いたときに合わせて更新する**（名前は変わりうるので、古いままだと注意喚起が出たり出なかったりする）。管理者が設定する。Gen 1 の設定とは**別に保存する**（要件 12.2） |
@@ -566,7 +601,23 @@ proxy 間の持ち回しは、登録コード（proxy が発行し ④ で送り
 
 **署名を確かめた後、`acceptEnvelope()` で本体の `relationId` と `op` を突き合わせてから処理する。**
 
-**「所有の確認」だけが署名なし。** 鍵がまだ無い時点の口なので署名で守れない（protocol の「署名の付かない唯一の入口」）。
+#### 二重に処理しないための手立ては口によって違う（要件 10.4）
+
+**`requestId` を持つのは `CommandRequest` だけ**なので、他の口を同じ形では守れない。
+
+| 口 | どう守るか |
+|---|---|
+| `command` | `chat_processed_requests` に `(relationId, requestId)` で記録し、2 回目は 1 回目の応答をそのまま返す |
+| `account-link-start` | **保留中のリンクがあればそれを返し、新しく作らない。** 作り直すと、再送のたびに一度きりのリンクが 1 本ずつ増える |
+| `key-register-to-growi` | `(relationId, side, keyId)` が一意なので、同じ鍵の 2 度目の登録は**何も変えずに成功を返す** |
+| `key-revoke-to-growi` | 失効は「`revokedAt` を立てる」だけなので、2 度目も結果が変わらない |
+| `settings-pull` | 読み取りだけなので、何度呼ばれても変わらない |
+| 所有の確認（署名なし） | **どの `challenge` にも答える**（上記）。同じ問いには同じ署名が返るので、結果は変わらない |
+
+**「所有の確認」だけが署名なし**（proxy 側にもう 1 つ、ペアリングの申請がある）。
+鍵がまだ無い時点の口なので署名で守れない。
+**この口も `/peer/` の下なので本体は `Buffer` で届く** — 署名は無いが、
+`JSON.parse` する手順は他の口と同じである。
 守るのは**保留中の登録コードとの一致**と、**用途を示す接頭辞つきの文字列に署名すること**、
 そして**口ごとの回数の上限**（保留 1 件あたり 1 分 30 回）である。
 
@@ -629,6 +680,39 @@ GROWI は `express-mongo-sanitize` をアプリ全体に登録している（`se
 → **`/peer/` の下を `mongoSanitize` の対象から外す。** そもそも `Buffer` に MongoDB の演算子は
 入りようがないので、掛ける意味も無い。JSON に直した後の値には、この feature が自分で検査関数を掛ける。
 
+`app.use(mongoSanitize())` は条件の無い登録なので、Express に「この道だけ外す」書き方は無い。包む。
+
+```javascript
+// server/crowi/express-init.js
+const sanitizer = mongoSanitize();
+app.use((req, res, next) =>
+  req.path.startsWith(CHAT_INTEGRATION_PEER_PREFIX) ? next() : sanitizer(req, res, next));
+```
+
+（実測は `Object.keys()` だけの値である。`sanitize()` 全体では 1 MiB で 133 ms、
+**上限に決めた 10 MiB では 1,071 ms** — 要求 1 本で 1 秒以上、他の処理を止める。）
+
+#### `/peer/` の下では session を張らない
+
+`/peer/` の下で当たる全体設定を数え上げると、**session が残っている。**
+
+- 全体設定は `/api-docs/` 以外のすべてに session を掛ける
+  （`crowi/express-init.js:120-131` と `routes/avoid-session-routes.js` — 中身は `[/^\/api-docs\//]` の 1 件だけ）
+- その設定は **`saveUninitialized: true`**、`rolling: true`（`crowi/index.ts:402-405`）
+- 保存先は Redis が無ければ **MongoDB**（`connect-mongo`。`crowi/index.ts:432-437`）
+
+つまり **`/peer/` への要求 1 本ごとに session の文書が 1 件 MongoDB に書かれ、
+proxy が捨てる `Set-Cookie` が返る。** `rolling: true` なので応答のたびに書き直しも起きる。
+
+重いのは**署名の要らない `/peer/pairing/challenge`** である。この口には回数の上限を置いたが、
+その上限は router の中にある。**session はその手前の全体設定で張られるので、
+上限に達して断る要求も、断る前に文書を 1 件書く** — 外から誰でも GROWI の DB に文書を積める経路になる。
+
+→ **`routes/avoid-session-routes.js` に `/^\/_api\/v3\/chat-integration\/peer\//` を足す。**
+この口はチャットの proxy との機械同士のやり取りで、cookie も session も一切使わない。
+
+**Gen 1 の `slack-integration` も同じ状態だが、直さない**（Gen 1 には手を入れない方針）。
+
 > **CSRF は障害にならない**（確認済み）。GROWI の `csurf` は `ignoreMethods` に POST を含めて
 > 実質無効で、`/_api` の守りは `CertifyOrigin` である。この関数は `Origin` ヘッダが無い要求を
 > 同一元とみなすので、サーバ同士の POST は通る。
@@ -655,6 +739,27 @@ GROWI は `express-mongo-sanitize` をアプリ全体に登録している（`se
 
 **設定を変えたら押し込む**（要件 11.4「次の実行から反映」はこれで満たす）。押し込みが失敗しても、
 proxy が `SettingsPullResponse` で取りに来るので取りこぼしは埋まる。
+
+#### `relationId` は単独で一意にする（複合ユニークにしない）
+
+一度 `(proxyUri, relationId)` という案を採ったが、**誤りだったので戻した。**
+
+**届くリクエストが関係を名乗る値は `relationId` だけである** — 署名ヘッダの `keyid` は
+`relationId:keyId`、本体は `RequestEnvelope.relationId`。この GROWI が引く先も全部 `relationId` 単独である
+（`chat_integration_keys` / `chat_request_nonces` / `chat_processed_requests` /
+`chat_account_links` / `chat_channel_permissions`）。**どこにも `proxyUri` の軸が無い。**
+
+`chat_relations` だけ複合にすると、`proxyUri` が違えば同じ `relationId` の行を 2 つ作れる。
+すると `chat_integration_keys` の `(relationId, side, keyId)` は `proxyUri` を持たないので、
+**2 台目の proxy の公開鍵が 1 台目の関係の「相手の鍵」として登録される** — 以後 2 台目は
+1 台目になりすました署名を作れる。要件 10.6 が守ると言っているものが崩れる。
+
+**`proxyUri` は鍵の材料にも向かない。** 署名の材料から `proxyUri` を外したのと同じ理由で、
+末尾スラッシュ・大文字小文字・`:443` の有無が両側で揺れる。**一意制約は例外を投げず、ただ働かない。**
+
+**GROWI 内部の代理キー（`chat_relations._id`）を立てて他の 8 コレクションをそれに載せ替える案も検討したが、採らない。**
+`relationId` に一意索引を張れば衝突は**DB の制約として**塞がるので（アプリ側の事前確認に頼らない）、
+8 つのコレクションに間接の層を足す価値が無い。**関係を指す軸は `relationId` 1 本に保つ。**
 
 #### 関係を表すコレクションが要る理由
 

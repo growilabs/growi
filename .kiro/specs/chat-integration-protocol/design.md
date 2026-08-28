@@ -154,7 +154,7 @@ steering の `structure.md` が禁じているサーバ専用コードの混入�
 | `NotificationContract` | `contract/notification.ts` | 通知の往復と結果 | 2.1–2.6, 12.3 |
 | `AccountLinkContract` | `contract/account-link.ts` | 紐付けの開始と完了 | 7.1–7.7 |
 | `PairingContract` | `contract/pairing.ts` | ペアリングと鍵 | 9.1–9.7, 10.5 |
-| `SettingsContract` | `contract/settings.ts` | 設定と能力の一覧を運ぶ | 1.3, 11.1, 11.2, 11.4 |
+| `SettingsContract` | `contract/settings.ts` | 設定・能力の一覧・接続の状態を運ぶ | 1.3, 1.4, 11.1, 11.2, 11.4 |
 | `UriGuard` | `url-guard/growi-uri-guard.ts` | 申告された URL の条件判定（純粋関数） | 9.2 |
 | `CommandNames` | `commands/command-names.ts` | コマンド名の語彙と性質 | 11.1, 11.2, 14.1 |
 | `OpNames` | `endpoints/op-names.ts` | 口の一覧（`op` ↔ パス ↔ 向き） | 10.1 |
@@ -295,11 +295,27 @@ GROWI はそれを保存して以降のリクエストに載せる。
 別名を作ると「誰が付ける値か」「どちらが一意性を保証するか」が読み手ごとに変わり、
 下の `keyId` と同じ種類の取り違えを生む。**関係を指す軸は 1 本に保つ。**
 
+**`relationId` を複合ユニークにしてはいけない。** 一度 `(proxyUri, relationId)` という案を採ったが、誤りだった。
+理由は 2 つある。
+
+1. **届くリクエストが関係を名乗る値は `relationId` だけ**である（署名ヘッダの `keyid` は `relationId:keyId`、
+   本体は `RequestEnvelope.relationId`）。受けた側が引く先も全部 `relationId` 単独なので
+   （鍵・使い捨ての値・処理済みの記録・紐付け・チャンネル権限）、**引き当てが一意にならない形にはできない。**
+   `chat_relations` だけ複合にすると、`proxyUri` が違えば同じ `relationId` の行を 2 つ作れてしまい、
+   **2 台目の公開鍵が 1 台目の関係の「相手の鍵」として登録される** — 1 台目になりすませる。
+2. **`proxyUri` は鍵の材料に向かない。** 署名の材料から `proxyUri` を外したのと同じ理由で、
+   末尾スラッシュ・大文字小文字・`:443` の有無が両側で揺れる。
+   一意制約は例外を投げず、**ただ働かない。**
+
+**GROWI 内部の代理キー（`chat_relations._id`）を立てて他のコレクションをそれに載せ替える案も検討したが、採らない。**
+`relationId` に一意索引を張れば衝突は DB の制約として塞がる（アプリ側の事前確認に頼らない）ので、
+8 つのコレクションに間接の層を足す価値が無い。**通信路の上でも GROWI の中でも、関係を指す軸は `relationId` 1 本に保つ。**
+
 **この決定が波及する先**（両 sub-spec で必ず守る）:
 
 | 場所 | 正しい形 |
 |---|---|
-| GROWI 側の関係の一意性 | **`(proxyUri, relationId)`**。`relationId` だけを一意にしない — 採番するのは**相手（proxy）**なので、1 つの GROWI が複数の proxy と紐づくと衝突しうる。**既にある組と衝突する `PairingResult` は成立させない** |
+| GROWI 側の関係の一意性 | **`relationId` 単独で一意**（複合にしない。理由は下記）。**既にある `relationId` を返す `PairingResult` はペアリングを成立させず、管理者に知らせる** |
 | 鍵の識別子の一意性 | **`(relationId, side, keyId)`**。「関係ごと」ではなく**関係と側ごと**。自分の鍵と相手の鍵は別の名前空間である |
 | 公開鍵の解決 | `resolvePublicKey(ref: KeyRef)` — `keyId` だけを受け取らない |
 | 使い捨ての値の消費 | `consumeNonce(ref: KeyRef, nonce, expiresAt)` |
@@ -326,14 +342,23 @@ export const COVERED_COMPONENTS = ['@method', 'content-type', 'content-digest'] 
  * **向きを名前に含める。** 鍵の追加と失効は proxy → GROWI にも GROWI → proxy にも流れるので、
  * 名前が同じだと `acceptEnvelope` の突き合わせが一意にならない。
  */
-export const OP_NAMES = [
-  'command', 'account-link-start', 'settings-pull',                 // proxy → GROWI
-  'key-register-to-growi', 'key-revoke-to-growi',                   // proxy → GROWI（proxy 自身の鍵）
-  'notification', 'settings-push',                                  // GROWI → proxy
-  'key-register-to-proxy', 'key-revoke-to-proxy',                   // GROWI → proxy（GROWI 自身の鍵）
-  'capabilities', 'connection-status', 'channels',                  // GROWI → proxy（読み取り）
-] as const;
-export type OpName = (typeof OP_NAMES)[number];
+export const OP_NAMES = {
+  // proxy → GROWI
+  command:            'command',
+  accountLinkStart:   'account-link-start',
+  settingsPull:       'settings-pull',
+  keyRegisterToGrowi: 'key-register-to-growi',
+  keyRevokeToGrowi:   'key-revoke-to-growi',
+  // GROWI → proxy
+  notification:       'notification',
+  settingsPush:       'settings-push',
+  keyRegisterToProxy: 'key-register-to-proxy',
+  keyRevokeToProxy:   'key-revoke-to-proxy',
+  capabilities:       'capabilities',
+  connectionStatus:   'connection-status',
+  channels:           'channels',
+} as const;
+export type OpName = (typeof OP_NAMES)[keyof typeof OP_NAMES];
 
 /**
  * **署名を付ける本体は、必ずこれを継ぐ。**
@@ -346,8 +371,29 @@ export interface RequestEnvelope {
   readonly op: OpName;
 }
 
-/** 読み取りだけの 3 つの口の本体は、これそのもの */
-export type OpOnlyRequest = RequestEnvelope;
+/** 読み取りだけの口と `settings-pull` の本体は、これそのもの */
+export interface OpOnlyRequest extends RequestEnvelope {
+  readonly op: typeof OP_NAMES.capabilities | typeof OP_NAMES.connectionStatus
+    | typeof OP_NAMES.channels | typeof OP_NAMES.settingsPull;
+}
+
+/**
+ * 接続の状態（要件 1.4）。**両側をまたぐ型なのでここに置く。**
+ * `ConnectionManager.status()` の内部の形をそのまま返さない — 内部は
+ * `held-by-other`（別の台が持っている）という**正常な状態**を持つが、これを
+ * 「切断」に写すと**多台構成では持ち主でない台が答えるたびに異常と表示される。**
+ */
+export type ConnectionHealth =
+  | 'connected'        // どこかの台が持っていて、つながっている（`held-by-other` もこれ）
+  | 'reconnecting'
+  | 'failed'           // **要件 1.4 で見たいのはこれ**
+  | 'not-applicable';  // 接続を張らないサービス（Teams）
+
+export interface ConnectionStatusView {
+  readonly platform: PlatformName;
+  readonly health: ConnectionHealth;
+  readonly since: string;
+}
 
 /**
  * RFC 9421 では `created` / `expires` / `nonce` / `keyid` / `alg` は
@@ -593,10 +639,12 @@ export interface ChallengeResponse {
  */
 /** **両向きに流れる。** `op` が `key-register-to-growi` か `key-register-to-proxy` かで向きが決まる */
 export interface KeyRegistrationRequest extends RequestEnvelope {
+  readonly op: typeof OP_NAMES.keyRegisterToGrowi | typeof OP_NAMES.keyRegisterToProxy;
   readonly key: PublicKeyRegistration;
 }
 
 export interface KeyRevocationRequest extends RequestEnvelope {
+  readonly op: typeof OP_NAMES.keyRevokeToGrowi | typeof OP_NAMES.keyRevokeToProxy;
   readonly keyId: string;
 }
 
@@ -610,6 +658,7 @@ export type KeyOperationResult =
 ```typescript
 /** GROWI → proxy。管理者が保存した時点で押し込む。要件 11.4「次の実行から反映」はこれで満たす */
 export interface SettingsPushRequest extends RequestEnvelope {
+  readonly op: typeof OP_NAMES.settingsPush;
   readonly settings: RelationSettings;
   /**
    * 設定の版。**関係ごとに 1 つの値**であり、行ごとには持たない
@@ -723,6 +772,16 @@ export const pairingChallengePayload = (
 | `challenge` の形 | base64url、**32〜128 文字**。これを外れたら 400 |
 | 本体の大きさ | **8 KiB まで**。`challenge` の長さを縛っても、本体そのものの大きさは縛れない |
 | 記録 | 上限に当たったことを**運用者が見られる形で残す**（下記） |
+
+**「送り元アドレス」の決め方も書く必要がある。** GROWI の本番の設定は `trust proxy` を立てていないので、
+**リバースプロキシで TLS を終端する構成では `req.ip` が全リクエストでリバースプロキシのアドレスになる。**
+umbrella が「self-host 運用者の大半」と書いているのがまさにその形なので、
+何も決めないと**上限は 1 つの通し勘定に戻り、送り元ごとに数えた意味が消える。**
+
+| 決めること | 決めた内容 |
+|---|---|
+| 送り元の決め方 | 運用者が**信頼するホップ数**を設定できるようにし、`X-Forwarded-For` の末尾からその数だけ遡った値を使う |
+| 設定が無いとき | `req.ip` をそのまま使う（＝実質 1 つの通し勘定）。**その状態であることを運用者に見せる** — 上限の記録に「送り元を区別できていない」と添える |
 
 > **上限を「保留 1 件あたり」の通し勘定にしてはいけない。** 攻撃者が 1 分に 30 回叩き続けるだけで、
 > 本物の ④ が 429 に当たる。保留が生きている間ずっと塞げるので、
@@ -958,7 +1017,7 @@ export const filterBroadcastTargets: (
 ```typescript
 /** **`RequestEnvelope` を継ぐ**（`relationId` と `op` はそこから来る） */
 export interface CommandEnvelope extends RequestEnvelope {
-  readonly op: typeof OP_NAMES[0];   // 'command'
+  readonly op: typeof OP_NAMES.command;
   /** 再送しても変わらない。二重実行の判定に使う（要件 10.4）。**宛先ごとに別の値** */
   readonly requestId: string;
   readonly actor: ChatAccountRef;
@@ -1028,6 +1087,7 @@ export type CommandResponse =
 ```typescript
 /** GROWI → proxy。通知は markdown 文字列で送る（決定 3） */
 export interface NotificationRequest extends RequestEnvelope {
+  readonly op: typeof OP_NAMES.notification;
   readonly requestId: string;
   /** **channelId で指定する。** proxy は宛先がその関係の installation に属することを確かめる */
   readonly targets: ReadonlyArray<{ platform: PlatformName; channelId: string }>;
@@ -1073,6 +1133,7 @@ export interface NotificationResult {
  * 本人の紐付けを塞げる）へ逆戻りする。
  */
 export interface AccountLinkStartRequest extends RequestEnvelope {
+  readonly op: typeof OP_NAMES.accountLinkStart;
   readonly actor: ChatAccountRef;
 }
 
@@ -1113,6 +1174,14 @@ export type AccountLinkStartResponse =
 11. **公開鍵の検査** — `kty` / `crv` が違う鍵、**秘密の成分を含む鍵**が登録を拒まれること（10.6）
 12. `encodeKeyId` / `decodeKeyId` の往復。`:` を含む入力が `null` になること
 13. `parseCommandRequest` — 知らない `kind`、欠けた項目、長すぎる値が断られること
+14. **検査関数が `relationId` と `op` を残すこと**（`RequestEnvelope` を継ぐ 6 つ＋`parseOpEnvelope` を回す）。
+    `OP_NAMES` に無い `op`、**その口に許されない `op`** が `malformed` になること（10.1）
+15. **`acceptEnvelope`** — `op` 違い・`relationId` 違いの本体が `malformed` になること。
+    署名から特定した関係と本体が一致するときだけ通ること（10.1・10.7）
+
+> **14 と 15 は、この設計で最も落としやすい試験である。** `op` の突き合わせは
+> **忘れても間違えても正常系はそのまま動く** — 効かなくなるのは攻撃されたときだけなので、
+> 実装でも受け入れ確認でも気づけない。**署名から宛先とパスを外した以上、これが唯一の縛りである。**
 
 ### Integration Tests
 
@@ -1126,6 +1195,11 @@ export type AccountLinkStartResponse =
 6. **署名の代行窓口が閉じていること** — `challenge` に **RFC 9421 の署名対象文字列そのもの**を入れて ⑤ を叩き、
    返った署名を `Signature` ヘッダとして使っても**通らないこと**（9.6・10.6）。
    この設計の要になった判断なので試験で固定する
+7. **別の口への流用が通らないこと** — ある口へ宛てた署名付きリクエストを、
+   署名もヘッダもそのままに**別の口へ投げると `malformed` になること**。**12 の口すべてを回す**（10.1・10.7）。
+   6 と並んで、この設計の要になった判断である
+8. **同じ `relationId` を返す `PairingResult`** — 既にその `relationId` の関係を持つ GROWI が
+   2 台目の proxy と申し込んだとき、ペアリングが成立せず管理者に知らされること（9.5・10.6）
 7. **⑤ はどの `challenge` にも答える** — 保留が生きている間は、違う `challenge` が続けて来ても
    それぞれに署名を返すこと。**先に別の `challenge` で叩かれても、本物の問いに答えられる**こと。
    **別の送り元が上限に当たっていても、本物の送り元からの問いは通る**こと（上限が送り元ごとに数えられていること）。
