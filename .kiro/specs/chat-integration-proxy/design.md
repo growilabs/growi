@@ -222,9 +222,22 @@ mention から始まったときの段取り:
 **要件 8.3 の経路（紐づく GROWI が 1 つなので選択させない）に注意。** 選択のボタンを出さないため、
 mention から直接 modal を開こうとして手がかりが無い。この場合も上の 1 を通す。
 
-#### イベントの振り分け順序
+#### イベントの振り分け
 
-1. `mention` はまず `CommandInvocation.normalize` を試す
+**`EventSink` が受け取る 6 種類すべての行き先を決める。** 書かないと、受け入れ条件を書けない部品が残る。
+
+| `PlatformEvent.kind` | 行き先 |
+|---|---|
+| `mention` | 下の順序で振り分ける |
+| `slash-command` | `CommandInvocation.normalize` へ直接（コマンド名が確定しているため） |
+| `modal-submit` | `ArgumentCollector.resume`（`correlationId` で途中経過を引く） |
+| `action` | 同上。GROWI の選択ボタン（要件 8.2）と一覧の選択がここに来る |
+| `reply` | **受け取らない。** `plainReply` に依存しないと決めた（上記）ので、呼びかけ無しの返信は扱わない。`PlatformEvent` の型からも外す |
+| `link-posted` | `link-preview` として扱う（要件 6.1）。**コマンドの解釈を通さない** |
+
+`mention` の振り分け順序:
+
+1. まず `CommandInvocation.normalize` を試す
 2. コマンド名として解釈できなければ `ArgumentCollector.resume` に渡す
 3. `resume` が `not-mine` を返したら通常のメッセージとして扱う（何もしない）
 
@@ -242,6 +255,8 @@ apps/chat-integration-proxy/
 ├── src/
 │   ├── types/
 │   │   ├── index.ts               # InteractionRef / TimeRange / ModalForm / FieldSpec
+│   │   ├── relation.ts            # Relation（db が返す型。上の層順の理由でここに置く）
+│   │   ├── invocation.ts          # Invocation（同上）
 │   │   ├── outbound-message.ts    # OutboundMessage / HistoryMessage / HistoryOutcome（SDK 型を含まない）
 │   │   ├── distributed-lock.ts    # DistributedLock（SDK 型を含まない）
 │   │   └── platform-event.ts      # PlatformEvent / PlatformAppConfig / InstallationCredentials
@@ -250,14 +265,19 @@ apps/chat-integration-proxy/
 │   │   ├── platform-capabilities.ts   # 能力表。唯一の宣言箇所
 │   │   └── admin-check.ts             # 管理者かどうかの調べ方（4 サービス分のデータ）
 │   ├── db/
+│   │   ├── index.ts                       # この層の公開窓口
 │   │   ├── prisma-client.ts
 │   │   └── repositories/
+│   │       ├── index.ts                   # リポジトリの公開窓口
 │   │       ├── installation-repository.ts
+│   │       ├── installation-channel-repository.ts   # 通知の宛先の検査に使う一覧
 │   │       ├── relation-repository.ts
-│   │       ├── peer-key-repository.ts     # KeyStore の proxy 側の実装
+│   │       ├── peer-key-repository.ts     # 相手（GROWI）の公開鍵
+│   │       ├── own-key-repository.ts      # **proxy 自身の鍵。秘密鍵は暗号化して保存**
+│   │       ├── channel-permission-repository.ts
 │   │       ├── pairing-order-repository.ts
 │   │       ├── pending-collection-repository.ts
-│   │       ├── processed-request-repository.ts
+│   │       ├── processed-notification-repository.ts # 宛先ごとの通知の記録
 │   │       └── request-nonce-repository.ts
 │   ├── platform/                  # Chat SDK に触れてよい唯一の層
 │   │   ├── index.ts
@@ -265,6 +285,7 @@ apps/chat-integration-proxy/
 │   │   ├── adapter-set.ts         # 接続情報を受け取ってアダプタと state を組み立てる
 │   │   ├── connection-manager.ts  # 常時接続の生涯
 │   │   ├── installation-provider.ts
+│   │   ├── installation-store.ts  # installation を作る・消す
 │   │   ├── event-mapping.ts       # SDK のイベント → PlatformEvent（SDK 型はここで止まる）
 │   │   ├── outbound.ts
 │   │   ├── prompt.ts              # modal の開閉
@@ -274,14 +295,18 @@ apps/chat-integration-proxy/
 │   │   ├── invocation.ts          # mention / slash を 1 つの内部表現へ
 │   │   ├── argument-collector.ts  # start / resume / sweepExpired
 │   │   ├── pending-collection.ts
-│   │   ├── command-set.ts         # 利用者向けコマンド
+│   │   ├── command-set.ts         # 利用者向けコマンドの宣言（下記の表がそのまま中身）
+│   │   ├── index.ts               # この層の公開窓口
 │   │   └── admin-command-set.ts   # 運用者向け（register / unregister / weight / rotate-key）
 │   ├── relation/
+│   │   ├── index.ts               # この層の公開窓口
 │   │   ├── pairing-service.ts     # 確認値を送る関数を引数で受け取る
+│   │   ├── relation-key-service.ts # proxy 自身の鍵を作る・保管する・配る
 │   │   ├── growi-uri-resolver.ts  # 名前を引き、確かめたアドレスへつなぐ（リダイレクトを追わない）
 │   │   ├── growi-selection.ts
 │   │   └── unpair-service.ts
 │   ├── growi/
+│   │   ├── index.ts               # この層の公開窓口
 │   │   ├── growi-client.ts        # 署名つき送信
 │   │   ├── fan-out-collector.ts   # 複数 GROWI への配信と待ち合わせ（検索とヘルプで共用）
 │   │   └── search-fusion.ts
@@ -320,14 +345,52 @@ apps/chat-integration-proxy/
 | `InstallationStore` | `platform/installation-store.ts` | **installation を作る・消す。** OAuth の折り返しと、Mattermost の設定ファイルから呼ぶ | 1.1, 1.5, 8.1 |
 | `CommandInvocation` | `command/invocation.ts` | mention / slash を 1 つの内部表現へ | 1.2, 3.1, 4.1, 14.1 |
 | `ArgumentCollector` | `command/argument-collector.ts` | 値を集め、途中経過を保存して再開 | 1.2, 4.1, 5.2, 8.2, 11.5 |
-| `AdminCommandSet` | `command/admin-command-set.ts` | 運用者の入り口 | 3.8, 9.1, 9.7, 10.5, 13.4 |
-| `GrowiSelector` | `relation/growi-selection.ts` | どの GROWI に対して実行するか | 6.4, 8.1–8.6 |
+| `CommandSet` | `command/command-set.ts` | **利用者向けコマンドの宣言。** 名前・集める値・対象の決まり方を 1 か所のデータで持つ | 3.1, 4.1, 5.1, 7.3, 14.1 |
+| `AdminCommandSet` | `command/admin-command-set.ts` | 運用者の入り口（**文字列の解釈と結果の組み立てだけ**） | 3.8, 9.1, 9.7, 10.5, 13.4 |
+| `RelationKeyService` | `relation/relation-key-service.ts` | **proxy 自身の鍵を作り、保管し、GROWI へ配る** | 9.5, 9.6, 10.5, 10.6 |
+| `GrowiSelector` | `relation/growi-selection.ts` | どの GROWI に対して実行するか | 6.4, 8.1–8.4, 8.6 |
 | `PairingService` | `relation/pairing-service.ts` | ペアリングの proxy 側 | 9.1–9.7 |
 | `FanOutCollector` | `growi/fan-out-collector.ts` | 複数 GROWI への配信と待ち合わせ | 3.1, 3.4, 3.5, 14.5 |
 | `SearchFusion` | `growi/search-fusion.ts` | 重みつきの式で 1 本に統合 | 3.2, 3.3, 3.8 |
-| `GrowiClient` | `growi/growi-client.ts` | 署名つきで GROWI を呼ぶ | 3.1, 4.2, 5.2, 9.2, 14.2 |
+| `GrowiClient` | `growi/growi-client.ts` | 署名つきで GROWI を呼ぶ（`GrowiUriResolver` を通す） | 3.1, 4.2, 5.2, 7.3, 9.2, 10.5, 14.2 |
 | `EventSink` | `orchestration/event-sink.ts` | イベントを受けて各層を呼ぶ | 1.1, 1.2, 3.1, 4.1, 6.1, 14.1 |
-| `InboundFlow` | `orchestration/inbound-flow.ts` | GROWI からの通知・設定・鍵の追加と失効 | 2.1–2.6, **10.5**, 10.7, 11.4 |
+| `InboundFlow` | `orchestration/inbound-flow.ts` | GROWI からの通知・設定・鍵の追加と失効 | 2.1–2.6, **10.5**, **10.7**, 11.4 |
+
+### CommandSet — 利用者が打てるコマンドの宣言
+
+**この表がそのまま `command/command-set.ts` の中身になる。** ここに無いものは打てない。
+`if (name === 'search')` のような分岐を各層に書かず、**この宣言を読んで動く**（`.claude/rules/coding-style.md`）。
+
+| 打つ言葉 | 集める値（`FieldSpec` の並び） | 送るもの | 対象の決まり方 | 権限判定に使う名前 |
+|---|---|---|---|---|
+| `search <語>` | `keyword`（必須・自由入力） | `CommandRequest`（`search`） | 許可している全 GROWI | `search` |
+| `create-page` | `path`（必須）, `title`（任意）, `body`（必須・複数行） | `CommandRequest`（`create-page`） | 1 つに定まる | `create-page` |
+| `keep` | `range`（必須・`TimeRange`）, `path`（必須）, `title`（任意） | `CommandRequest`（`keep`） | 1 つに定まる | `keep` |
+| `help` | なし | `CommandRequest`（`help`） | 許可している全 GROWI | `help` |
+| `link` | なし | **`AccountLinkStartRequest`** | 1 つに定まる | **判定しない**（下記） |
+| （URL の投稿） | — | `CommandRequest`（`link-preview`） | URL の一致で決まる | `link-preview` |
+
+**`link` だけ送るものが違う。** 紐付けの開始は `CommandRequest` ではなく `AccountLinkStartRequest` という
+別の契約なので、**`COMMAND_NAMES` には足さない**。共有する契約を広げずに済み、
+`COMMAND_TRAITS` の分類も `channel_permission` の行も要らなくなる。
+
+**`link` はチャンネル権限の判定に掛けない。** GROWI への書き込みではなく、
+利用者が自分の身元を結び付ける操作だからである。**掛けてしまうと、権限の設定がまだ無いチャンネルで
+`create-page` が「紐付けが要る」と答え、その紐付けを始める `link` も断られて、利用者が抜け出せなくなる。**
+
+#### 要件 7 の入り口は 2 つある
+
+| 入り口 | 流れ |
+|---|---|
+| **利用者が自分から**（`link`） | `GrowiClient` が `AccountLinkStartRequest` を送る → `link-issued` なら `linkUrl` を**本人にだけ見えるメッセージ**で出す。`already-linked` / `taken-by-another-user` はそのまま伝える（要件 7.4） |
+| **書き込みを断られて**（要件 7.6） | GROWI が `CommandResponse` の `account-link-required`（`growiLabel` と `linkUrl` を持つ）を返す → 同じく**本人にだけ見えるメッセージ**で出す |
+
+**どちらも投稿の経路は 1 本にする**（`orchestration/command-flow.ts`）。
+`linkUrl` は一度きりで短時間に失効するので、**チャンネルに平文で出さない。**
+複数の GROWI が紐づくチャンネルでは `growiLabel` を必ず添える — 紐付けは GROWI ごとに成立するので、
+どれに対する紐付けかが分からないと利用者が取り違える（要件 7.2）。
+
+---
 
 ### AdminCommandSet
 
@@ -341,7 +404,7 @@ apps/chat-integration-proxy/
 | `register` | 9.1 | 一定時間で失効する登録コードを発行する |
 | `unregister` | 9.7 | 紐付けを解除する |
 | `weight <growi> <値>` | 3.8 | その workspace における GROWI ごとの検索の重みを決める |
-| `rotate-key` | 10.5 | proxy 側の鍵の入れ替えを始める。配布の結果と未達の相手を返す |
+| `rotate-key` | 10.5 | proxy 側の鍵の入れ替えを始める。配布の結果と未達の相手を返す（中身は `RelationKeyService`。下記の 4 段） |
 
 **実行できるのは workspace の管理者だけ。** これが無いと、その workspace の誰でも自分の GROWI を紐付けられ、
 **要件 9 の目的（第三者が勝手に登録できない）が成立しない**。
@@ -358,6 +421,56 @@ apps/chat-integration-proxy/
 
 **登録コードは本人にだけ見えるメッセージで返す。** チャンネルに平文で出さない（protocol spec 手順 ①）。
 
+**この部品は文字列の解釈と結果の組み立てだけを持つ。** 4 つの操作の中身はすべて右側の層にある
+（`register` / `unregister` は `relation/`、`rotate-key` は `relation/` と `growi/`）ので、
+ここから直に呼ぶと**宣言した依存の向き（`command → relation → growi`）を逆走する**。
+実際の呼び出しは `orchestration/` が行い、この部品は**呼ぶべき操作と引数を値として返す**。
+
+---
+
+### RelationKeyService — proxy 自身の鍵
+
+| Field | Detail |
+|---|---|
+| Intent | 関係ごとに proxy 自身の鍵を作り、秘密鍵を暗号化して保管し、公開鍵を GROWI へ配る |
+| Requirements | 9.5, 9.6, 10.5, 10.6 |
+
+**この部品が無いとペアリングが完成しない。** ⑥ で返す `PairingResult` は proxy の公開鍵を含むので、
+その前に鍵を作っておく必要がある。**`relationId` を採番するのは proxy 自身なので、
+関係の行と鍵の行を同じトランザクションで書ける**（GROWI 側にあった「鍵の置き場所が先に要る」という
+順序の問題は proxy には起きない）。
+
+**鍵は関係ごとに分ける。** 1 つの関係の秘密鍵が漏れても他の GROWI との関係に波及しない。
+
+```typescript
+export interface RelationKeyService {
+  /** ペアリングの成立時に呼ぶ。`relation` の行と同じトランザクションで書く */
+  issue(relationId: string): Promise<{ readonly keyId: string; readonly publicKeyJwk: JsonWebKey }>;
+  /** 署名するときに呼ぶ。**秘密鍵は復号した値ではなく署名する関数として渡す** */
+  signerFor(relationId: string): Promise<{ readonly key: KeyRef; readonly privateKey: KeyObject }>;
+  /** 入れ替え（下記の 4 段）。相手ごとの結果を返す */
+  rotate(relationId: string): Promise<RotationOutcome>;
+}
+
+export interface RotationOutcome {
+  readonly newKeyId: string;
+  readonly delivered: ReadonlyArray<string>;      // 追加を受け付けた relationId
+  readonly undelivered: ReadonlyArray<{ relationId: string; reason: string }>;
+  readonly revokedOld: boolean;                    // 全員に届いたときだけ真
+}
+```
+
+**入れ替えは 4 段で、順番を入れ替えてはいけない**（要件 10.5・10.6）。
+
+1. 新しい鍵を作り、`own_key` に**有効な鍵として**書く（この時点で古い鍵も有効なまま）
+2. 紐づく GROWI へ `KeyRegistrationRequest` を送る（**署名は古い鍵で行う** — 新しい鍵はまだ相手が知らない）
+3. **届かなかった相手を記録して運用者に返す。** ここで止められる形にする
+4. **全員に届いたときにだけ**古い鍵を失効させる
+
+**3 を飛ばして 4 をやると、届いていない相手との通信が止まる。** 受ける側にも
+「有効な鍵が 0 本になる要求は断る」という条件があるが（下記の口の表）、
+それは**相手の側の最後の砦**であって、こちらが順番を守らなくてよい理由にはならない。
+
 **GrowiSelector の判断**（要件 8.2–8.4）
 - 対象が 1 つに定まる操作で、許可している GROWI が複数 → **利用者に選ばせる**（8.2）
 - 許可している GROWI が 1 つだけ → **選択を求めずそれに対して実行する**（8.3）
@@ -366,11 +479,33 @@ apps/chat-integration-proxy/
 
 ### PlatformFacade
 
+**資格情報を 2 つに分ける軸は、上の「接続の単位」の表と同じである。**
+
+| 置き場所 | 何を持つか |
+|---|---|
+| `PlatformAppConfig` | **アプリごとに 1 つしかない値。** 常時接続を開くのに使う値はすべてこちら |
+| `InstallationCredentials` | **その workspace でしか通用しない値。** 投稿・一覧の取得など、workspace を相手にする呼び出しに使う |
+
+**アプリごとの接続は `PlatformAppConfig` から開き、installation ごとの接続は `InstallationCredentials` から開く。**
+この分け方でないと、「受け持ちが 0 件でもアプリごとの接続は保つ」（下記）が成り立たない —
+受け持ちが 0 件なら `installation` の行が 1 つも無く、そこからはトークンを取り出せないからである。
+
 ```typescript
 /** 全 workspace 共通。`runtime/config.ts` が環境変数から読む */
 export interface PlatformAppConfig {
-  readonly slack?: { readonly signingSecret: string; readonly clientId: string; readonly clientSecret: string };
-  readonly discord?: { readonly applicationId: string; readonly publicKey: string };
+  readonly slack?: {
+    readonly signingSecret: string; readonly clientId: string; readonly clientSecret: string;
+    /** `xapp-` で始まる app-level token。**Socket Mode の接続を開くのに使う** */
+    readonly appToken: string;
+  };
+  readonly discord?: {
+    readonly applicationId: string; readonly publicKey: string;
+    /** OAuth の折り返しで受け取った code をトークンに交換するのに使う */
+    readonly clientSecret: string;
+    /** **Gateway の接続を開くのに使う。** Discord の bot トークンはアプリに 1 つで、
+     *  参加しているサーバーごとには存在しない */
+    readonly botToken: string;
+  };
   readonly teams?: { readonly clientId: string; readonly clientSecret: string };
   readonly stateConnectionString: string;
 }
@@ -379,10 +514,14 @@ export interface PlatformAppConfig {
  * **workspace ごとの資格情報は `installation` から解決する。**
  * 1 台の proxy が複数の workspace をさばくハブであること（要件 8.1）がこの分離で成り立つ。
  * ここを 1 組に固定すると `installation` テーブルが誰も読まない列になる。
+ *
+ * **常時接続を開くための値はここに置かない**（上記）。
  */
 export interface InstallationCredentials {
-  readonly slack?: { readonly botToken: string; readonly appToken?: string };
-  readonly discord?: { readonly botToken: string };
+  /** Slack は接続はアプリごと、投稿は workspace ごとのトークン（Socket Mode が `team_id` で解決する） */
+  readonly slack?: { readonly botToken: string };
+  /** Discord は投稿もアプリごとの bot トークンで足りるので、workspace 固有の値は無い */
+  readonly discord?: Record<string, never>;
   readonly teams?: { readonly tenantId: string };
   /** Mattermost は接続先そのものが installation ごとに違う */
   readonly mattermost?: { readonly baseUrl: string; readonly botToken: string };
@@ -423,7 +562,6 @@ export type PlatformEvent =
   | { readonly kind: 'slash-command'; readonly platform: PlatformName; readonly channel: ChannelRef; readonly actor: ChatAccountRef; readonly command: string; readonly text: string; readonly interaction: InteractionRef }
   | { readonly kind: 'modal-submit';  readonly platform: PlatformName; readonly channel: ChannelRef; readonly actor: ChatAccountRef; readonly correlationId: string; readonly values: Readonly<Record<string, string>> }
   | { readonly kind: 'action';        readonly platform: PlatformName; readonly channel: ChannelRef; readonly actor: ChatAccountRef; readonly correlationId: string; readonly actionId: string; readonly value: string | null; readonly interaction: InteractionRef }
-  | { readonly kind: 'reply';         readonly platform: PlatformName; readonly channel: ChannelRef; readonly actor: ChatAccountRef; readonly text: string }
   | { readonly kind: 'link-posted';   readonly platform: PlatformName; readonly channel: ChannelRef; readonly actor: ChatAccountRef; readonly messageRef: MessageRef; readonly urls: ReadonlyArray<string> };
 
 export interface PlatformEventSink { handle(event: PlatformEvent): Promise<void> }
@@ -540,12 +678,19 @@ export interface FanOutOutcome<T> {
   readonly excluded: ReadonlyArray<{ relationId: string; growiLabel: string; reason: 'not-permitted-in-channel' | 'no-settings' }>;
 }
 
-/** 宛先ごとに `requestId` と `relationId` を作り替えて配る */
-export const fanOut: <T>(
-  targets: ReadonlyArray<Relation>,
-  build: (relation: Relation) => CommandRequest,
-  options?: { readonly deadlineMs?: number },   // 既定 10000
-) => Promise<FanOutOutcome<T>>;
+/**
+ * 宛先ごとに `requestId` と `relationId` を作り替えて配る。
+ * **落とした相手も引数で受け取る。** 配る相手だけを渡す形にすると `excluded` を埋める材料が無く、
+ * 常に空になる（＝検索が黙って不完全になるのを防ぐ、という目的が果たせない）。
+ */
+export const fanOut: <T>(args: {
+  readonly targets: ReadonlyArray<Relation>;
+  readonly excluded: FanOutOutcome<never>['excluded'];   // `filterBroadcastTargets` が落とした相手
+  readonly build: (relation: Relation) => CommandRequest;
+  readonly extract: (response: CommandResponse, relation: Relation) => T;   // `T` を決める材料
+  readonly deadlineMs?: number;    // 既定 10000
+  readonly concurrency?: number;   // 既定 20
+}) => Promise<FanOutOutcome<T>>;
 ```
 
 - Invariants: `responded` が空でも例外を投げない（要件 3.5）
@@ -584,17 +729,43 @@ GROWI ごとに文書集合が互いに素なので、重みが等しければ�
 **`CommandRequest` は proxy へ来ない**（コマンドは proxy から GROWI へ送る側）ので `parseCommandRequest` は使わない。**本文の `relationId` が署名から特定した関係と
 一致しないリクエストは `malformed` として断る**（protocol の不変条件）。
 
-| 口 | 受け取るもの | 検査関数 | 返すもの | 要件 |
-|---|---|---|---|---|
-| 通知 | `NotificationRequest` | `parseNotificationRequest` | `NotificationResult` | 2.1–2.6 |
+**パスと `op` は protocol spec の「口の一覧」が持つ。** ここに写すのは proxy が公開する側だけである。
+**すべて `POST`。** 読み取りの口も本体に `{ relationId, op }` を載せる（理由は protocol spec）。
 
-| 設定の押し込み | `SettingsPushRequest` | `parseSettingsPush` | `204` | 11.1, 11.2, 11.4 |
-| 鍵の追加 | `KeyRegistrationRequest` | `parseKeyRegistration` | `KeyOperationResult` | 10.5 |
-| 鍵の失効 | `KeyRevocationRequest` | `parseKeyRevocation` | `KeyOperationResult`。**有効な鍵が 0 本になる要求は `would-leave-no-valid-key` で断る** | 10.5 |
-| 能力の一覧 | — | — | `CapabilityReport` | 1.3 |
-| 接続の状態 | — | — | `ConnectionManager.status()` の結果 | 1.4, 13.2（**どの台がどの接続を持っているか。持ち主が落ちるとそのサービス全体が黙るので、見る手段が要る**） |
-| チャンネルの一覧 | — | — | **`ChannelInventory`** | 2.2, 11.1（管理画面が宛先を選ぶため） |
-| ペアリングの申請 | `PairingSubmission` | **`parsePairingSubmission`** | `PairingResult` | 9.1–9.5（**署名なし。本文の検査だけが守りなので必ず通す**） |
+| 口（`op`） | パス | 受け取るもの | 検査関数 | 返すもの | 要件 |
+|---|---|---|---|---|---|
+| `notification` | `/chat-integration/notification` | `NotificationRequest` | `parseNotificationRequest` | `NotificationResult` | 2.1–2.6 |
+| `settings-push` | `/chat-integration/settings-push` | `SettingsPushRequest` | `parseSettingsPush` | `204` | 11.1, 11.2, 11.4 |
+| `key-register` | `/chat-integration/keys/register` | `KeyRegistrationRequest` | `parseKeyRegistration` | `KeyOperationResult` | 10.5 |
+| `key-revoke` | `/chat-integration/keys/revoke` | `KeyRevocationRequest` | `parseKeyRevocation` | `KeyOperationResult`。**有効な鍵が 0 本になる要求は `would-leave-no-valid-key` で断る** | 10.5 |
+| `capabilities` | `/chat-integration/capabilities` | `{ relationId, op }` | `parseOpEnvelope` | `CapabilityReport` | 1.3 |
+| `connection-status` | `/chat-integration/connection-status` | `{ relationId, op }` | `parseOpEnvelope` | `ConnectionManager.status()` の結果 | 1.4（下記） |
+| `channels` | `/chat-integration/channels` | `{ relationId, op }` | `parseOpEnvelope` | **`ChannelInventory`** | 2.2, 11.1（管理画面が宛先を選ぶため） |
+| （署名なし） | `/chat-integration/pairing/submit` | `PairingSubmission` | **`parsePairingSubmission`** | `PairingResult` | 9.1–9.5（**署名なし。本文の検査だけが守りなので必ず通す**） |
+
+> **`connection-status` の位置づけ。** 「運用者に接続状態を見せる」ことを直接求める受け入れ条件は無い。
+> これは**要件 1.4（あるサービスの失敗が他へ波及しない）が満たされていることを外から確かめる手段**であり、
+> **この設計が Slack と Discord をアプリごとの 1 本に集約したことの帰結**でもある —
+> 1 本しかないので、持ち主の台が落ちるとそのサービス全体が黙り、**他のサービスは動いているように見える。**
+> 見る手段が無いと、1.4 を満たしているのか単に気づいていないのかを区別できない。
+
+**署名を確かめた後、`acceptEnvelope()` で本体の `relationId` と `op` を突き合わせてから処理する。**
+`op` の突き合わせが、署名を別の口へ流用させない唯一の縛りである（protocol spec）。
+
+#### 二重に処理しないための手立ては口によって違う（要件 10.7）
+
+**`requestId` を持つのは `NotificationRequest` だけ**なので、他の口を同じ形では守れない。
+`nonce`（使い捨ての値）は再送のたびに取り直す決まりなので、**再送を見分ける役には立たない**。
+
+| 口 | どう守るか |
+|---|---|
+| `notification` | `processed_notification_target` に**宛先ごと**に記録し、`posted` の宛先は飛ばす |
+| `settings-push` | **設定の版**（`settings_version`）が自分の持つものより大きいときだけ書く。同じ押し込みが 2 度来ても 2 度目は何もしない |
+| `key-register` | `(relation_id, key_id)` が一意なので、同じ鍵の 2 度目の登録は**何も変えずに成功を返す** |
+| `key-revoke` | 失効は「`revoked_at` を立てる」だけなので、2 度目も結果が変わらない |
+| `capabilities` / `connection-status` / `channels` | 読み取りだけなので、何度呼ばれても変わらない |
+
+**どの口も「2 度目が来ても結果が変わらない」形にしてある**ので、記録した応答を返し直す仕組みは要らない。
 
 > **通知は宛先ごとに記録する。** 同じ `requestId` の 2 回目は、**`posted` になっていない宛先だけを投稿し直す**。
 > `(relation_id, request_id)` で丸ごと弾くと、やり直しは記録を読み直すだけで投稿を一度も試みず、
@@ -622,7 +793,9 @@ bot が招待されていない公開チャンネルは、本当は `bot-not-in-
 | | |
 |---|---|
 | 取り直し | **proxy が installation ごとに、自分の周期で**（既定 10 分）`PlatformFacade.listChannels()` を呼び、`installation_channel` に保存する |
+| **最初の 1 回** | **`InstallationStore.save()` が成功した直後に 1 回取り直す。** これが無いと、`installation_channel` が空のまま最初の周期を待つことになり、**紐付けた直後の 10 分間、通知がすべて断られる** |
 | 判定 | 通知が来たら**保存した一覧だけを見る**。無いチャンネルは `channel-not-in-installation` |
+| **一度も取れていない installation** | `refreshed_at` の行が 1 つも無い状態と、取れた結果が空だった状態を**区別する**。前者は `channel-not-in-installation` ではなく **`inventory-not-ready`** を返す。前者で「そのチャンネルは無い」と答えると、**運用者に間違った直し方（チャンネルを作り直す・bot を入れ直す）を案内してしまう** |
 | 取り直しの失敗 | **最後に取れた一覧をそのまま使い続ける**（新しい一覧が取れるまで判定は変わらない） |
 | 誰が回すか | `sweeper` と同じく**分散ロックで 1 台だけ**が取り直す。保存先は PostgreSQL なので、**ロックを持たない台も読める** |
 
@@ -663,6 +836,19 @@ export interface PairingService {
   （`relation/growi-uri-resolver.ts`）。`@growi/chat` はネットワークに触れられない
 
 custom proxy 向けに、許す宛先を運用者が設定で明示できるようにする（`runtime/config.ts` → `judgeGrowiUri` の `allowList`）。
+**`allowList` に挙げた宛先には、つなぐときに信頼する証明書の根拠も運用者が指定できる**
+（`runtime/config.ts`。閉域では自前の認証局や自己署名の証明書がふつうなので、
+指定する手立てが無いと証明書の検証そのものを切る構成に落ちる）。
+
+**判定はペアリングのときだけでなく、保存した `growi_uri` へ送る毎リクエストの前に掛ける**（protocol spec）。
+`GrowiUriResolver` がその窓口で、**リクエストごとに名前を引き直し、引いたアドレスを `judgeGrowiUri` に掛け、
+確かめたアドレスへつなぐ**。ペアリングのときだけだと、④ で公開アドレスを申告して通したあと
+名前の引き先を閉域内へ付け替えるだけで、この検証が防ごうとしたものがそのまま成立する。
+
+**`GrowiClient` は必ず `GrowiUriResolver` を通す。** 直に `fetch` しない。
+2 つの部品が別々に HTTP を組み立てると、片方だけ判定が抜ける。
+`PairingService.submit` が引数で受け取る `SendChallenge` も、**`orchestration/` が
+`GrowiUriResolver` を包んで組み立てて渡す**（`relation/` は `growi/` を import しないため）。
 
 ---
 
@@ -671,12 +857,12 @@ custom proxy 向けに、許す宛先を運用者が設定で明示できるよ�
 | テーブル | 主な列 | 索引・制約 |
 |---|---|---|
 | `installation` | `id`, `platform`, `workspace_id`, `workspace_name`, `credentials`（暗号化）, `created_at` | `(platform, workspace_id)` 一意 |
-| `relation` | `id`（**推測できない値。連番にしない** — `keyid` として署名ヘッダに載り外部に出るため）, `installation_id`, `growi_uri`, `growi_label`, `search_weight`, `settings_updated_at`, `created_at` | `(installation_id, growi_uri)` 一意 |
+| `relation` | `id`（**推測できない値。連番にしない** — `keyid` として署名ヘッダに載り外部に出るため）, `installation_id`, `growi_uri`, `growi_label`, `search_weight`, `settings_version`, `created_at` | `(installation_id, growi_uri)` 一意 |
 | `peer_key` | `id`, `relation_id`, `key_id`, `public_key_jwk`, `valid_from`, `revoked_at` | `(relation_id, key_id)` 一意 |
 | `own_key` | `id`, `relation_id`, `key_id`, `private_key_pem`（暗号化）, `valid_from`, `revoked_at` | 同上。**相手ごとに鍵を分ける** — 1 つの関係の鍵が漏れても他へ波及しないため |
 | `pairing_order` | `id`, `installation_id`, `code_hash`, `attempts`, `expires_at`, `consumed_at` | `code_hash` 一意。`attempts` に上限 |
 | `request_nonce` | `relation_id`, `key_id`, `nonce`, `expires_at` | **主キー `(relation_id, key_id, nonce)`** |
-| `processed_request` | `relation_id`, `request_id`, `response`（JSON）, `processed_at`, `expires_at` | **主キー `(relation_id, request_id)`。コマンド用** — 2 回目には 1 回目の応答をそのまま返す |
+| ~~`processed_request`~~ | — | **持たない。** コマンドは proxy から GROWI へ送る側なので、`CommandRequest` は proxy に届かない（下記の口の表）。GROWI から届くもののうち `requestId` を持つのは `NotificationRequest` だけで、それは `processed_notification_target` が受け持つ |
 | `processed_notification_target` | `relation_id`, `request_id`, `platform`, `channel_id`, `status`, `detail`, `processed_at`, `expires_at` | **主キー `(relation_id, request_id, platform, channel_id)`。通知用** — `posted` の宛先は次のやり直しで飛ばす。**コマンドと同じ表に混ぜない**（主キーの意味が違い、読む人が取り違える） |
 | `installation_channel` | `installation_id`, `platform`, `channel_id`, `channel_name`, `is_private`, `refreshed_at` | **主キー `(installation_id, channel_id)`。** 通知の宛先の検査に使う唯一の材料。周期で取り直す |
 | `channel_permission` | `id`, `relation_id`, `command_name`, `channels` | **`(relation_id, command_name)` 一意。** `scope` も行ごとの `updated_at` も持たない — 前者は `COMMAND_TRAITS` の `targeting` で決まり、後者は**関係ごとに 1 つ**（`relation.settings_version`）だから |
@@ -684,13 +870,19 @@ custom proxy 向けに、許す宛先を運用者が設定で明示できるよ�
 
 Chat SDK の state（購読・分散ロック・重複排除）は `@chat-adapter/state-pg` が別スキーマに持つ。**触らない。**
 
-**期限切れの掃除**: `request_nonce` / `processed_request` / `pending_collection` / `pairing_order` を
-`request_nonce` / `processed_request` / **`processed_notification_target`** / `pending_collection` / `pairing_order` を
+**期限切れの掃除**: `request_nonce` / **`processed_notification_target`** / `pending_collection` / `pairing_order` を
 `runtime/sweeper.ts` が定期的に削除する。**分散ロックで 1 台だけが実行する。**
 
 **紐付けを解除したとき（要件 9.7）**: `relation` に連なる `own_key` / `peer_key` / `channel_permission` /
-`pending_collection` / `processed_notification_target` / `installation_channel` を削除する。**秘密鍵を残さない。** `request_nonce` と `processed_request` は
-期限切れで自然に消えるので触らない。
+`pending_collection` / `processed_notification_target` を削除し、**最後に `relation` の行そのものを削除する**。
+**秘密鍵を残さない。** `request_nonce` は期限切れで自然に消えるので触らない。
+
+- **`relation` の行を消さないと繋ぎ直せない。** `(installation_id, growi_uri)` が一意なので、
+  同じ GROWI をもう一度申し込むと `already-paired`（要件 8.5）が返り続ける。
+  `chat-integration-app` 側は「繋ぎ直すと新しい `relationId` になる」前提で書かれている
+- **`installation_channel` は消さない。** この表は **installation ごと**であって関係ごとではない。
+  1 つの関係を解除しただけで消すと、**同じ workspace に紐づく他の GROWI からの通知が、
+  次の取り直しまで（既定 10 分）すべて `channel-not-in-installation` で断られる**
 
 **保存時の暗号化**: `installation.credentials` と `own_key.private_key_pem`。
 暗号化に使う鍵は `runtime/config.ts` が環境変数から読み、他の層へは復号済みの値ではなく**復号する関数**を渡す。
@@ -744,7 +936,15 @@ Chat SDK の state（購読・分散ロック・重複排除）は `@chat-adapte
    - Slack: **2 台起動しても張られる接続は 1 本だけ**であること
    - Mattermost: 1 つの installation につながるのは 1 台だけであること
    - 共通: 持ち主を止めると他方が引き取ること。**ロックが延長され続ける限り奪われない**こと
-6. ペアリング — 申告された URL が https 以外・私的アドレス帯・リダイレクトのとき拒まれること（9.2）
+6. ペアリング — 申告された URL が https 以外・私的アドレス帯・リダイレクトのとき拒まれること。
+   **`allowList` に挙げた宛先は 3 条件とも通ること。判定が毎リクエストに掛かること**（9.2・13.1）
+7. **管理コマンドは workspace の管理者だけが実行できること**（4 サービス分。要件 9.1・9.7 の目的そのもの）
+8. **通知の宛先の検査** — `channel-not-in-installation` と `bot-not-in-channel` が書き分けられること。
+   **一度も一覧を取れていない installation は `inventory-not-ready` になる**こと。
+   **installation を作った直後に一覧が取れていること**（2.4）
+9. **設定の押し込み** — 自分が持つ版より小さい `version` の押し込みが捨てられること（11.4）
+10. **鍵の入れ替え** — 届かない相手が 1 台あるとき、古い鍵が失効しないこと。
+    全員に届いたときにだけ失効すること（10.5・10.6）
 
 ### E2E Tests
 
@@ -753,3 +953,8 @@ Chat SDK の state（購読・分散ロック・重複排除）は `@chat-adapte
 3. Discord: mention による検索が 2 台の GROWI の結果を出典つきで返す（3.1–3.3）
 4. **Teams**: mention → modal → ページ作成。**外部から接続を受ける唯一のサービス**で、
    slash command は使えず modal は使えるという他と違う組み合わせを持つため確かめる価値が最も高い（1.1・1.2・13.3）
+5. **通知**（要件 2）: GROWI がページを保存 → 通知が指定のチャンネルへ届く →
+   **1 つの宛先だけ失敗させて再送すると、成功した宛先には二重に投稿されない**こと（2.1–2.5）。
+   Gen 1 で最も使われている機能なので、コマンドの流れと同じだけ確かめる
+6. **紐付け**（要件 7）: 紐付いていない利用者が `create-page` を打つ →
+   `account-link-required` が**本人にだけ見えるメッセージ**で返る → `link` でも同じ経路が使えること（7.3・7.6）
