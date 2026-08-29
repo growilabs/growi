@@ -83,6 +83,15 @@ export const deleteCompletelyOperation = async (
     }),
   ]);
 
+  // `pagetagrelations.relatedPage`, `sharelinks.relatedPage` and `revisions.page` are required relations
+  // to `pages` with `onDelete: NoAction`. Running their deleteMany() concurrently
+  // with the page delete below is safe only because `Page.deleteMany` here still
+  // goes through Mongoose, so Prisma's relation check never runs against it.
+  // Once `Page.deleteMany` is replaced with `prisma.pages.deleteMany`/`delete`,
+  // this Promise.all will start throwing P2014 (empirically confirmed:
+  // reliably reproducible when the two run concurrently, never when run
+  // sequentially). At that point, move pagetagrelations/revisions
+  // deletion ahead of the pages delete.
   await Promise.all([
     prisma.pagetagrelations.deleteMany({
       where: { relatedPageId: { in: pageIdStrings } },
