@@ -17,7 +17,7 @@
     },
     "design": {
       "generated": true,
-      "approved": false,
+      "approved": true,
       "delegated_to_sub_specs": true
     },
     "tasks": {
