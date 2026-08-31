@@ -6,7 +6,7 @@ import type { PageDocument, PageModel } from '~/server/models/page';
 import { prisma } from '~/utils/prisma';
 
 import { extractInternalLinkPaths } from './extract-internal-link-paths';
-import { syncOutboundLinks } from './page-link-sync';
+import { reResolveByToPath, syncOutboundLinks } from './page-link-sync';
 import { resolveToPageIds } from './target-page-resolution';
 
 // The only caller reads the page with a projection and never populates, so the revision is always
@@ -45,6 +45,7 @@ const handlePageUpsert = async (
   }));
 
   await syncOutboundLinks(fromPage, rows);
+  await reResolveByToPath(page.path);
 
   return extractionMs;
 };
