@@ -514,6 +514,8 @@
     },
     "editor": {
       "title": "Raccourcis d'édition",
+      "Slash Command": "Commande slash",
+      "Slash Command Desc": "(Insérer des éléments Markdown depuis le menu)",
       "Indent": "Indentation",
       "Outdent": "Retrait",
       "Save Page": "Sauvegarder la page",
