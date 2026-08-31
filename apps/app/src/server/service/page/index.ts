@@ -57,6 +57,7 @@ import {
   PageQueryBuilder,
   pushRevision,
 } from '~/server/models/page';
+import type { IPageRedirect } from '~/server/models/page-redirect.js';
 import type { UserGroupDocument } from '~/server/models/user-group';
 import {
   beginActivity,
@@ -1111,7 +1112,7 @@ class PageService implements IPageService {
     const { updateMetadata, createRedirectPage } = options;
 
     const updatePathOperations: any[] = [];
-    const pageRedirectsToCreate: { fromPath: string; toPath: string }[] = [];
+    const pageRedirectsToCreate: IPageRedirect[] = [];
 
     pages.forEach((page) => {
       const newPagePath = page.path.replace(
@@ -1183,7 +1184,7 @@ class PageService implements IPageService {
     const { updateMetadata, createRedirectPage } = options;
 
     const unorderedBulkOp = pageCollection.initializeUnorderedBulkOp();
-    const pageRedirectsToCreate: { fromPath: string; toPath: string }[] = [];
+    const pageRedirectsToCreate: IPageRedirect[] = [];
 
     pages.forEach((page) => {
       const newPagePath = page.path.replace(
@@ -2249,7 +2250,7 @@ class PageService implements IPageService {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
     const deletePageOperations: any[] = [];
-    const pageRedirectsToCreate: { fromPath: string; toPath: string }[] = [];
+    const pageRedirectsToCreate: IPageRedirect[] = [];
 
     pages.forEach((page) => {
       const newPath = Page.getDeletedPageName(page.path);
