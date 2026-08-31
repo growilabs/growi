@@ -109,33 +109,38 @@ test.describe
     test('C-c C-n should navigate cursor to the next heading (Req 9.3)', async ({
       page,
     }) => {
-      // Set up document with two headings.
-      // Fill directly and wait for the rendered heading text (without # markers) to appear in the
-      // preview, because appendTextToEditorUntilContains checks raw text which markdown headings
-      // strip on render.
-      await page
-        .locator('.cm-content')
-        .fill('# First Heading\n\n## Second Heading');
-      await expect(page.getByTestId('page-editor-preview-body')).toContainText(
-        'Second Heading',
-      );
+      // Same keymap-attach race as the bold/link tests above — retry until the
+      // Emacs binding (not the still-default keymap) has actually fired.
+      await expect(async () => {
+        // Set up document with two headings.
+        // Fill directly and wait for the rendered heading text (without # markers) to appear in the
+        // preview, because appendTextToEditorUntilContains checks raw text which markdown headings
+        // strip on render.
+        await page
+          .locator('.cm-content')
+          .fill('# First Heading\n\n## Second Heading');
+        await expect(
+          page.getByTestId('page-editor-preview-body'),
+        ).toContainText('Second Heading');
 
-      // Click on the first line to position cursor before "## Second Heading"
-      await page.locator('.cm-line').first().click();
+        // Click on the first line to position cursor before "## Second Heading"
+        await page.locator('.cm-line').first().click();
 
-      // Navigate to the next heading with C-c C-n
-      await page.keyboard.press('Control+c');
-      await page.keyboard.press('Control+n');
+        // Navigate to the next heading with C-c C-n
+        await page.keyboard.press('Control+c');
+        await page.keyboard.press('Control+n');
 
-      // Cursor is now at the beginning of "## Second Heading".
-      // Move to end of that line and append a unique marker to verify cursor position.
-      await page.keyboard.press('End');
-      await page.keyboard.type(' NAVIGATED');
+        // Cursor is now at the beginning of "## Second Heading".
+        // Move to end of that line and append a unique marker to verify cursor position.
+        await page.keyboard.press('End');
+        await page.keyboard.type(' NAVIGATED');
 
-      // Verify: the marker was appended at the second heading, not the first
-      await expect(page.locator('.cm-content')).toContainText(
-        '## Second Heading NAVIGATED',
-      );
+        // Verify: the marker was appended at the second heading, not the first
+        await expect(page.locator('.cm-content')).toContainText(
+          '## Second Heading NAVIGATED',
+          { timeout: 1000 },
+        );
+      }).toPass();
     });
 
     test('C-x C-s should save the page (Req 6.1)', async ({ page }) => {
