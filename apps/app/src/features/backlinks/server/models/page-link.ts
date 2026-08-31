@@ -1,5 +1,4 @@
-import type { Types } from 'mongoose';
-import { Schema } from 'mongoose';
+import { Schema, Types } from 'mongoose';
 
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
@@ -35,6 +34,9 @@ const pageLinkSchema = new Schema<PageLinkDocument, PageLinkModel>({
 // toPath alone has no query yet; B4's re-resolve-by-path adds one and should add
 // the index with it (the compound cannot serve toPath alone — wrong prefix).
 pageLinkSchema.index({ fromPage: 1, toPath: 1 }, { unique: true });
+// { fromPage, toPath } above can't serve a toPath-only query (wrong prefix) —
+// repointInboundLinks filters on toPath alone, so it needs its own index.
+pageLinkSchema.index({ toPath: 1 });
 
 /**
  * Replace a page's outbound links with the freshly extracted set:
@@ -81,6 +83,51 @@ pageLinkSchema.statics.findBacklinkSources = async function (
   toPageId: Types.ObjectId,
 ): Promise<Types.ObjectId[]> {
   return await this.distinct('fromPage', { toPage: toPageId });
+};
+
+/**
+ * Point every row linking to `toPath` at `toPage` (null = nothing resolves there,
+ * i.e. broken).
+ *
+ * Low-level primitive: writes the target it is given, resolving nothing. Callers
+ * must go through the `reResolveByToPath` service, which derives `toPage` from
+ * `toPath` — do NOT call this static directly from event handlers.
+ */
+pageLinkSchema.statics.repointInboundLinks = async function (
+  toPath: string,
+  toPage: Types.ObjectId | null,
+): Promise<void> {
+  // Both arguments are validated here because neither is protected downstream:
+  // `toPath` lands in a query filter, where an operator object from an unvalidated
+  // caller would match every row; `toPage` lands in an aggregation pipeline, which
+  // mongoose does not cast, so an expression object there is evaluated and its
+  // result written into the column.
+  if (typeof toPath !== 'string' || toPath.length === 0) {
+    throw new Error(
+      `repointInboundLinks requires a non-empty path string, received ${typeof toPath}`,
+    );
+  }
+  if (toPage != null && !(toPage instanceof Types.ObjectId)) {
+    throw new Error(
+      'repointInboundLinks requires an ObjectId or null as toPage',
+    );
+  }
+
+  // The row whose own source is the target caches null, not the target: a page is
+  // never its own backlink. Clearing it — rather than leaving it alone — is what
+  // stops the path's previous occupant from staying cached there forever. The row
+  // itself survives; `replaceOutboundLinks` owns row existence, and
+  // `dropSelfLinks` drops it on the source's next save.
+  //
+  // One pipeline update rather than two plain ones, so no row is ever momentarily
+  // its own backlink and a failure cannot leave it that way.
+  await this.updateMany({ toPath }, [
+    {
+      $set: {
+        toPage: { $cond: [{ $eq: ['$fromPage', toPage] }, null, toPage] },
+      },
+    },
+  ]);
 };
 
 export default getOrCreateModel<PageLinkDocument, PageLinkModel>(

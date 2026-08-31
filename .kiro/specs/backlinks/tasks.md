@@ -534,11 +534,18 @@ B3/B5.
   - _Boundary: resolveToPageIds, PageRedirect (batch static)_
   - _Depends: B1.4_
 
-- [ ] B4.2 Implement the re-resolve-by-path sync operation
+- [x] B4.2 Implement the re-resolve-by-path sync operation
   - Implement the row op deferred from B1.5: re-resolve inbound rows matching a given path (to repoint
     stale caches when a page appears at that path)
-  - Done when a unit test shows inbound rows for a path get their `toPage` repointed when a page
-    resolves at that path
+  - **Not only exact `toPath` matches.** B4.1 made resolution follow the redirect chain, so a row
+    naming `/old` resolves here whenever `/old` redirects here — and it goes stale on the same event.
+    Walk back from the path (`PageRedirect.retrieveFromPathsRedirectingTo`) to nominate candidates,
+    then let `resolveToPages` decide where each one lands: a longer chain can carry a candidate past
+    this path, so the reverse hop must never supply the target itself
+  - Done when tests show inbound rows for a path get their `toPage` repointed when a page resolves
+    at that path. The service's forwarding (which target it hands to the write) is unit-tested; the
+    resulting row state is integration-tested against a real collection, since that is the
+    observable contract
   - _Requirements: 5.1, 5.2_
   - _Boundary: page-link-sync, PageLink_
   - _Depends: B1.2, B4.1_
@@ -641,8 +648,13 @@ the restored page's status. Independent of B3/B4.
     page that has since moved somewhere the viewer cannot read. Without this filter the endpoint
     leaks private paths to anyone who can read the linking page. `findBacklinks`' filter is on the
     *source* pages and does not cover this
+  - A row whose own source is the target caches `null` (B4.2 clears it so a stale target cannot
+    survive as a phantom backlink), so it reads as `broken` although the path resolves. Do **not**
+    report it as a broken link — it is transient and `dropSelfLinks` removes the row on the source's
+    next save
   - Done when an integration test shows forward health reports trashed/broken targets with the correct
-    state, **and** that a target the viewer cannot read is omitted
+    state, **and** that a target the viewer cannot read is omitted, **and** that a self row is not
+    reported as broken
   - _Requirements: 5.3, 6.1, 6.2, 6.3, 6.4, 2.1_
   - _Boundary: PageLinkService, interfaces/backlink.ts_
   - _Depends: B5.1, B1.7_
