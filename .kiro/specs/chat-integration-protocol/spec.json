@@ -1,7 +1,7 @@
 {
   "feature_name": "chat-integration-protocol",
   "created_at": "2026-08-27T14:07:18.256Z",
-  "updated_at": "2026-08-31T10:21:16.000Z",
+  "updated_at": "2026-09-01T13:19:17.000Z",
   "language": "ja",
   "phase": "tasks-generated",
   "umbrella": "chat-integration",
@@ -17,8 +17,8 @@
     },
     "tasks": {
       "generated": true,
-      "approved": false
+      "approved": true
     }
   },
-  "ready_for_implementation": false
+  "ready_for_implementation": true
 }
