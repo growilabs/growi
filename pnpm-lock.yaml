@@ -1433,6 +1433,12 @@ importers:
         specifier: ^3.2.4
         version: 3.2.6(@types/node@24.13.3)(@vitest/ui@3.2.4(vitest@3.2.6))(happy-dom@15.7.4)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.77.6)(yaml@2.9.0)
 
+  packages/chat:
+    dependencies:
+      structured-headers:
+        specifier: ^2.0.3
+        version: 2.0.3
+
   packages/core:
     dependencies:
       bson-objectid:
@@ -14366,6 +14372,10 @@ packages:
 
   strnum@2.2.2:
     resolution: {integrity: sha512-DnR90I+jtXNSTXWdwrEy9FakW7UX+qUZg28gj5fk2vxxl7uS/3bpI4fjFYVmdK9etptYBPNkpahuQnEwhwECqA==}
+
+  structured-headers@2.0.3:
+    resolution: {integrity: sha512-4g5yxhlDMClRwCcfKfLeS7Z8yAVdOWGDADwm80Poh1iReU2KVKLGBlqwpHWJ2qovq0+ZIf1atAEO1eua2o9Rgg==}
+    engines: {node: '>=18', npm: '>=6'}
 
   stubborn-fs@1.2.5:
     resolution: {integrity: sha512-H2N9c26eXjzL/S/K+i/RHHcFanE74dptvvjM8iwzwbVcWY/zjBbgRqF3K0DY4+OD+uTTASTBvDoxPDaPN02D7g==}
@@ -30963,6 +30973,8 @@ snapshots:
   strnum@1.0.5: {}
 
   strnum@2.2.2: {}
+
+  structured-headers@2.0.3: {}
 
   stubborn-fs@1.2.5: {}
 

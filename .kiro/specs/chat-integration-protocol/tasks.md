@@ -14,7 +14,7 @@
 ---
 
 - [ ] 1. パッケージの土台を作る
-- [ ] 1.1 新規パッケージ `@growi/chat` の雛形を用意する
+- [x] 1.1 新規パッケージ `@growi/chat` の雛形を用意する
   - `packages/chat` に package.json・tsconfig・turbo.json・vitest の設定を置く
   - Biome と Vitest を最初から使う（新規パッケージの既定。ESLint / Jest は入れない）
   - 依存は `structured-headers` のみ。**Chat SDK（`chat` / `@chat-adapter/*`）を入れない**

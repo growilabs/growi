@@ -1,0 +1,33 @@
+{
+  "name": "@growi/chat",
+  "version": "0.0.1",
+  "description": "Shared chat-integration contract types, RFC 9421 signature, and channel-permission logic for GROWI",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "clean": "rimraf dist",
+    "dev": "vite build --mode dev",
+    "watch": "pnpm run dev -w --emptyOutDir=false",
+    "lint:biome": "biome check",
+    "lint:typecheck": "tsgo --noEmit",
+    "lint": "npm-run-all -p lint:*",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "structured-headers": "^2.0.3"
+  }
+}
