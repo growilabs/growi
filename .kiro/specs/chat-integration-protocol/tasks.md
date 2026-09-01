@@ -261,7 +261,7 @@
   - _Requirements: 10.1_
   - _Depends: 1.2, 4.1, 4.2, 4.3, 5.4, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 7.2 ペアリングの 6 段を回す作り物を用意する
+- [x] 7.2 ペアリングの 6 段を回す作り物を用意する
   - 本パッケージの関数だけで両側の役を演じる最小の作り物 — 登録コードの発行と保留、
     所有の確認に答える口、双方の鍵の置き場
   - **保管の仕組みは各 sub-spec の持ちものなので、ここでは記憶の上に置くだけ**にする
@@ -302,6 +302,7 @@
 
 - **1.2**: `packages/chat` の相対 import は、この monorepo の他パッケージ（`packages/slack` / `packages/core`）と同じく末尾に `.js` を付ける書き方（`from './foo.js'`）が実際の慣習。`src/public-surface.spec.ts` の静的 import 木の追跡は、拡張子なし・`.js` 付き・`~/` エイリアス（`tsconfig.json` の `paths`）の 3 通りすべてを解決できる必要がある（最初の実装は `.js` 付きと `~/` を見逃し、レビューで差し戻された）。以降のタスクで `index.ts` / `server.ts` から再輸出を追加する際は、書き方を変えても検査が黙って素通りしないことを確認すること。
 - **2.2**: design.md の `command-names.ts` コメントにある「書き込みは既定で不許可」は design.md 自身の 1 か所（`Security` という見出しは design.md に実在しない）にしか根拠が無く、requirements.md 11.1 は「コマンドごとに許可チャンネルを設定できる」までしか書いていない。4.1（チャンネル権限判定、既定は書き込み不許可・それ以外は許可）を実装する前に、この既定挙動が要件のどこで確定しているかを requirements.md で先に確認すること。
+- **7.2 → 7.3/7.4/7.5 への申し送り**: 作り物は `packages/chat/src/testing/pairing-harness.ts`（+`pairing-flow.spec.ts`）。(a) `completePairing` は「保留が見つからない」と「失効した」を同じ `code-expired` で返す — 7.3 の失効の確認は、コードを一度発行してから `now` を `expiresAt` より後ろへ進める形で書くこと（未発行のまま呼ぶと失効判定が壊れていても通る）。(b) `already-paired` の枝（`growiUri` の文字列一致のみ、末尾スラッシュ・大文字小文字の揺れは別物扱い）は7.2では一度も通っておらず、要件8.5との突き合わせ未確認。(c) `RelationRecord.peerPublicKey` は公開鍵1本のみの形 — 7.5（鍵の入れ替え）はこの共有の型を広げる必要がある。(d) `DeliverChallenge` は同期関数（同一プロセス内なので正しい）。(e) 7.4「署名の代行窓口」は、RFC 9421の署名対象文字列はbase64urlでないため`parseOwnershipChallenge`の段階で400になる — 「署名が返らないこと」でなく「400で断られること」を確認する形になる。
 - **6.4 → 6.5 への申し送り**: `OUTCOME_STATUS_VALUES`（parse-notification.ts）・`ERROR_CODES`（parse-command.ts）・`APPLIED_AS_VALUES` は、契約側に `COMMAND_NAMES`/`OP_NAMES` のような定数オブジェクトが無い直和型から手で書き写した一覧（契約側に対応する定数が無いため型でつなぎようがない）。6.5 で同種の一覧（`CapabilityLevel`・`ConnectionHealth` 等）を書くときも同じ制約になる。書き写し間違いは6.2で確立した「全メンバーを反復するテスト」で担保すること。また、8KiBの本体サイズ確認は「署名の効かない口」だけの条件（design.md:774はペアリング⑤の根拠表）であり、応答一般や「そのまま保存される」こととは無関係— design.mdが名指しする「そのまま保存される」応答は `ChannelInventory`/`PairingResult`/`SettingsPullResponse` の3つだけ（6.5の担当）で、これらにも8KiBの確認は不要（個別項目の上限で十分）。
 - **6.3 → 6.5 への申し送り**: `PublicKeyRegistration`（`keyId`/`publicKeyJwk`/`validFrom` の検査）が `parse-keys.ts`（6.2）と `parse-pairing.ts`（6.3）の2箇所に重複している。6.5 の `parsePairingResult`（`PairingResult.paired` が `publicKey: PublicKeyRegistration` を持つ）を書く際に三重化させないこと。`parse/common-fields.ts` に `parsePublicKeyRegistration` として切り出し、既存2箇所をそれに置き換えること。
 - **6.2**: `parse/common-fields.ts`（非公開・barrel対象外）に `ChatAccountRef`/`ChannelRef` の検査と `PLATFORM_NAMES` をまとめた。2本以上の parse 関数が使う項目の確認はここに集約し、複製しないこと（レビューで `PlatformName` の一覧が2箇所にあるのを指摘され修正済み）。`op` の許可リストはレビューで「1個だけ試す」テストでは書き写し間違いに気付けないことが判明したため、7関数すべてに `Object.values(OP_NAMES)` の総当たりテストを追加済み — 6.3〜6.5 でも同じ形式（許可op以外の全メンバーを反復）で書くこと。
