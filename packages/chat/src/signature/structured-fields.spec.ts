@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  parseByteSequenceDictionary,
+  parseStringInnerListDictionary,
   serializeByteSequenceDictionary,
   serializeStringInnerList,
 } from './structured-fields.js';
@@ -69,5 +71,69 @@ describe('serializeStringInnerList', () => {
     expect(
       serializeStringInnerList([], new Map([['created', 1618884473]])),
     ).toBe('();created=1618884473');
+  });
+});
+
+describe('parseByteSequenceDictionary', () => {
+  it('reads back what `serializeByteSequenceDictionary` wrote', () => {
+    const bytes = new Uint8Array([0x01, 0x02, 0x03]);
+
+    const parsed = parseByteSequenceDictionary(
+      serializeByteSequenceDictionary(new Map([['sig1', bytes]])),
+    );
+
+    expect(parsed?.get('sig1')).toStrictEqual(bytes);
+  });
+
+  it('returns null instead of throwing for a value that is not this shape', () => {
+    // Header values arrive from the network, so every rejection has to be a
+    // return value -- `verify` must never throw (requirement 10.2).
+    for (const value of [
+      'not a structured field ((',
+      'sig1="a string"',
+      'sig1=("inner" "list")',
+      'sig1=42',
+    ]) {
+      expect(parseByteSequenceDictionary(value)).toBeNull();
+    }
+  });
+
+  it('reads an empty header value as an empty dictionary', () => {
+    // RFC 8941 allows it; whether an empty dictionary is enough is the
+    // caller's judgement, not this wrapper's.
+    expect(parseByteSequenceDictionary('')?.size).toBe(0);
+  });
+});
+
+describe('parseStringInnerListDictionary', () => {
+  it('reads back the members and the parameters, in the order they were sent', () => {
+    const parsed = parseStringInnerListDictionary(
+      'sig1=("@method" "content-type");keyid="k";created=1618884473',
+    );
+
+    expect(parsed?.get('sig1')?.members).toStrictEqual([
+      '@method',
+      'content-type',
+    ]);
+    expect([...(parsed?.get('sig1')?.parameters ?? [])]).toStrictEqual([
+      ['keyid', 'k'],
+      ['created', 1618884473],
+    ]);
+  });
+
+  it('returns null instead of throwing for a value that is not this shape', () => {
+    for (const value of [
+      'not a structured field ((',
+      'sig1=42',
+      'sig1="a string"',
+      'sig1=(1 2)',
+      'sig1=("@method");created=?1',
+    ]) {
+      expect(parseStringInnerListDictionary(value)).toBeNull();
+    }
+  });
+
+  it('reads an empty header value as an empty dictionary', () => {
+    expect(parseStringInnerListDictionary('')?.size).toBe(0);
   });
 });
