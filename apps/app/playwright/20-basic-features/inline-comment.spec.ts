@@ -317,3 +317,166 @@ test.describe('Inline comment - best-effort fallback after the anchored text is 
     expect(await highlightCount()).toBe(0);
   });
 });
+
+test.describe('Inline comment - highlight correctness on a page with an async lsx widget', () => {
+  // Serial for the same reason as the suites above: the second test depends
+  // on the comment created by the first, real backend state.
+  test.describe.configure({ mode: 'serial' });
+
+  const lsxPagePath = (retry: number) => `/inline-comment-e2e-lsx${retry}`;
+
+  // `$lsx(depth=1)` is remark-lsx's directive syntax (see
+  // packages/remark-lsx/src/client/services/renderer/lsx.ts) — a bare `$lsx(...)`
+  // on its own line, with no explicit path attribute, lists the current page's
+  // own children (packages/preset-templates' "displaying-child-pages" template
+  // uses the identical form).
+  //
+  // The anchored quote is the child page's own basename — text that does not
+  // exist ANYWHERE in the DOM until lsx's async fetch (useSWRxLsx, an
+  // unconditional axios GET to /_api/lsx) resolves and `LsxListView` replaces
+  // the loading placeholder with the real child list (`LsxPage.tsx` renders
+  // the basename as the link's visible text). This is deliberately different
+  // from anchoring on a static sentence sitting in its own paragraph: a quote
+  // in a paragraph lsx never touches would still resolve correctly even if
+  // settle detection were completely broken, because `resolveDomPosition`
+  // recomputes the Range fresh against whatever DOM exists at match time — a
+  // wrong-but-still-findable match isn't distinguishable from a correct one.
+  // By contrast, quoting text that plainly does not exist pre-settle means
+  // `matchQuote` must return `not_found` before lsx resolves and can only
+  // succeed afterward — so this highlight can only ever come from a
+  // recompute that happens at or after the real settle point (design.md's
+  // `use-container-settle`), not from the settle-independent
+  // anchors-content-change trigger racing ahead of it.
+  const childBasename = 'AsyncLsxResolvedChildMarker';
+  const pageBody = [
+    '# Inline comment E2E - async lsx widget',
+    '',
+    'Some intro text before the lsx block.',
+    '',
+    '$lsx(depth=1)',
+    '',
+  ].join('\n');
+
+  let createdPage: CreatedPage | undefined;
+  let createdChildPage: CreatedPage | undefined;
+
+  test.afterAll(async ({ request }) => {
+    const pages = [createdPage, createdChildPage].filter(
+      (p): p is CreatedPage => p != null,
+    );
+    if (pages.length > 0) {
+      await deletePagesCompletely(request, pages);
+    }
+  });
+
+  test('Create a page with a real lsx block, then comment on the child page name it renders', async ({
+    page,
+    request,
+  }, testInfo) => {
+    createdPage = await createPage(request, {
+      path: lsxPagePath(testInfo.retry),
+      body: pageBody,
+    });
+    // The child page's basename IS the quoted text — it only appears in the
+    // DOM once lsx's async fetch resolves and renders this child's link.
+    createdChildPage = await createPage(request, {
+      path: `${createdPage.path}/${childBasename}`,
+      body: 'A child page whose basename is the inline comment anchor.',
+    });
+
+    await page.goto(createdPage.path);
+
+    // Sanity: lsx actually rendered its child (not an error state) — otherwise
+    // the "async round-trip with real content" premise of this test wouldn't
+    // hold. LsxPage links render the child page's basename as their label
+    // rather than its path (the href is the page's ObjectId), so match by
+    // visible link text.
+    await expect(
+      page.locator('.wiki .lsx').getByRole('link', { name: childBasename }),
+    ).toBeVisible();
+
+    await expect(page.getByTestId('inline-comment-list')).toBeAttached();
+
+    await selectTextInPageBody(page, childBasename);
+
+    const form = page.getByTestId('inline-comment-form');
+    await expect(form).toBeVisible();
+    await expect(form.locator('.inline-comment-form-quote')).toHaveText(
+      childBasename,
+    );
+
+    await form
+      .locator('.cm-content')
+      .fill('a comment anchored on the lsx-rendered child page name');
+    await form.getByTestId('inline-comment-submit-button').click();
+    await expect(form).not.toBeVisible();
+
+    const item = page.getByTestId('inline-comment-item').first();
+    await expect(item).toBeVisible();
+  });
+
+  test('After reloading with the lsx fetch artificially delayed, the highlight lands at the correct position only once lsx settles', async ({
+    page,
+  }, testInfo) => {
+    if (createdPage == null) {
+      throw new Error('createdPage was not set by the previous test');
+    }
+
+    // Delay `/_api/lsx` deterministically instead of relying on the fetch
+    // happening to still be in flight when we check — a race would make this
+    // test flaky in either direction (assert too early and it's a false
+    // negative on a fast CI run; assert too late and it never observes the
+    // pending state at all).
+    const LSX_FETCH_DELAY_MS = 1500;
+    await page.route('**/_api/lsx**', async (route) => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, LSX_FETCH_DELAY_MS);
+      });
+      await route.continue();
+    });
+
+    await page.goto(lsxPagePath(testInfo.retry));
+
+    const lsxContainer = page.locator('.wiki .lsx').first();
+    await expect(lsxContainer).toBeAttached();
+
+    // Confirm the delay is genuinely observed by the app: right after load,
+    // lsx is still mid-fetch (the rendering-status attribute this feature's
+    // settle detection watches — see `GROWI_IS_CONTENT_RENDERING_ATTR` in
+    // design.md — is still "true").
+    await expect(lsxContainer).toHaveAttribute(
+      'data-growi-is-content-rendering',
+      'true',
+    );
+
+    // Once the delayed fetch resolves, lsx flips the attribute to "false" —
+    // the signal use-container-settle waits for before AnchorResolver
+    // recomputes against the now-final DOM (Requirements 2.1/5.1).
+    await expect(lsxContainer).toHaveAttribute(
+      'data-growi-is-content-rendering',
+      'false',
+      { timeout: LSX_FETCH_DELAY_MS + 5_000 },
+    );
+
+    await expect
+      .poll(async () =>
+        page.evaluate(
+          () => CSS.highlights.get('growi-inline-comment')?.size ?? 0,
+        ),
+      )
+      .toBeGreaterThan(0);
+
+    // The decisive assertion: the highlighted range's text is exactly the
+    // child page's basename — text that, per the fixture design above, did
+    // not exist anywhere in the DOM until lsx settled. A highlight with this
+    // exact text can only have been computed after lsx's real settle point,
+    // not from the settle-independent anchors-content-change trigger (which
+    // would have found `not_found` had it run against the pre-settle DOM).
+    const highlightedText = await page.evaluate(() => {
+      const set = CSS.highlights.get('growi-inline-comment');
+      const range = set != null ? [...set][0] : undefined;
+      return range?.toString();
+    });
+    expect(highlightedText).toBe(childBasename);
+  });
+});
