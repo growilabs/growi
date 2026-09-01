@@ -269,7 +269,7 @@
   - _Requirements: 9.1, 9.5_
   - _Depends: 7.1_
 
-- [ ] 7.3 ペアリングで成立してはいけない筋が塞がっていることを確かめる
+- [x] 7.3 ペアリングで成立してはいけない筋が塞がっていることを確かめる
   - ペアリングを始めていない側が所有の確認に答えないこと
   - 失効した登録コードに対して、契約が定めた「失効」の結果が返ること
   - **登録コードを知る第三者が、他人の URL と自分の公開鍵で申し込んでも成立しない**こと
@@ -302,6 +302,7 @@
 
 - **1.2**: `packages/chat` の相対 import は、この monorepo の他パッケージ（`packages/slack` / `packages/core`）と同じく末尾に `.js` を付ける書き方（`from './foo.js'`）が実際の慣習。`src/public-surface.spec.ts` の静的 import 木の追跡は、拡張子なし・`.js` 付き・`~/` エイリアス（`tsconfig.json` の `paths`）の 3 通りすべてを解決できる必要がある（最初の実装は `.js` 付きと `~/` を見逃し、レビューで差し戻された）。以降のタスクで `index.ts` / `server.ts` から再輸出を追加する際は、書き方を変えても検査が黙って素通りしないことを確認すること。
 - **2.2**: design.md の `command-names.ts` コメントにある「書き込みは既定で不許可」は design.md 自身の 1 か所（`Security` という見出しは design.md に実在しない）にしか根拠が無く、requirements.md 11.1 は「コマンドごとに許可チャンネルを設定できる」までしか書いていない。4.1（チャンネル権限判定、既定は書き込み不許可・それ以外は許可）を実装する前に、この既定挙動が要件のどこで確定しているかを requirements.md で先に確認すること。
+- **7.3（feature全体の検証／`/kiro-validate-impl` への申し送り）**: (a) design.md「⑤ が公開鍵を縛る理由」末尾は、`challengeSignature` に加えて「GROWI 側の保留の行に、送信先の proxy と自分が申告した keyId を記録し、⑤ で突き合わせる」という**二重目の防御**を求めているが、7.2 の作り物 `GrowiSide.pendingRegistration` は `{registrationCode, expiresAt}` の2項目のみでこの突き合わせが無く、本 spec のどのタスクでも試されていない。主たる署名検証（7.3で確認済み）とは別の話として feature全体の判定で拾うこと。(b) 要件8.5（同じGROWIの二重紐付け拒否）の**振る舞い**は `chat-integration-proxy` タスク5.4が担当、**型と形**は本パッケージの `contract/pairing.spec.ts`・`parse/parse-responses.spec.ts` が既に押さえている — 宙に浮いているのは作り物内の `already-paired` 分岐（`pairing-harness.ts:423-431`）が一度も到達しないことのみ。
 - **7.2 → 7.3/7.4/7.5 への申し送り**: 作り物は `packages/chat/src/testing/pairing-harness.ts`（+`pairing-flow.spec.ts`）。(a) `completePairing` は「保留が見つからない」と「失効した」を同じ `code-expired` で返す — 7.3 の失効の確認は、コードを一度発行してから `now` を `expiresAt` より後ろへ進める形で書くこと（未発行のまま呼ぶと失効判定が壊れていても通る）。(b) `already-paired` の枝（`growiUri` の文字列一致のみ、末尾スラッシュ・大文字小文字の揺れは別物扱い）は7.2では一度も通っておらず、要件8.5との突き合わせ未確認。(c) `RelationRecord.peerPublicKey` は公開鍵1本のみの形 — 7.5（鍵の入れ替え）はこの共有の型を広げる必要がある。(d) `DeliverChallenge` は同期関数（同一プロセス内なので正しい）。(e) 7.4「署名の代行窓口」は、RFC 9421の署名対象文字列はbase64urlでないため`parseOwnershipChallenge`の段階で400になる — 「署名が返らないこと」でなく「400で断られること」を確認する形になる。
 - **6.4 → 6.5 への申し送り**: `OUTCOME_STATUS_VALUES`（parse-notification.ts）・`ERROR_CODES`（parse-command.ts）・`APPLIED_AS_VALUES` は、契約側に `COMMAND_NAMES`/`OP_NAMES` のような定数オブジェクトが無い直和型から手で書き写した一覧（契約側に対応する定数が無いため型でつなぎようがない）。6.5 で同種の一覧（`CapabilityLevel`・`ConnectionHealth` 等）を書くときも同じ制約になる。書き写し間違いは6.2で確立した「全メンバーを反復するテスト」で担保すること。また、8KiBの本体サイズ確認は「署名の効かない口」だけの条件（design.md:774はペアリング⑤の根拠表）であり、応答一般や「そのまま保存される」こととは無関係— design.mdが名指しする「そのまま保存される」応答は `ChannelInventory`/`PairingResult`/`SettingsPullResponse` の3つだけ（6.5の担当）で、これらにも8KiBの確認は不要（個別項目の上限で十分）。
 - **6.3 → 6.5 への申し送り**: `PublicKeyRegistration`（`keyId`/`publicKeyJwk`/`validFrom` の検査）が `parse-keys.ts`（6.2）と `parse-pairing.ts`（6.3）の2箇所に重複している。6.5 の `parsePairingResult`（`PairingResult.paired` が `publicKey: PublicKeyRegistration` を持つ）を書く際に三重化させないこと。`parse/common-fields.ts` に `parsePublicKeyRegistration` として切り出し、既存2箇所をそれに置き換えること。
