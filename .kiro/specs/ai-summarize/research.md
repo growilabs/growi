@@ -137,10 +137,10 @@
 - **理由**: (a)は「assistant-independent」という既存不変条件に反する。(b)は要件2.3（Q&A用途への非影響）を「同一Agent内の分岐」という壊れやすい形でしか担保できない。(c)は`suggestPathAgent`という直接の前例があり、`growi-agent.ts`・`post-message.ts`のどちらも無変更のまま実現できる。
 - **トレードオフ**: 新規ファイルが増える（許容範囲）。要約後の追質問は「新しいAgentが開始したスレッドを別のAgent(`growiAgent`)が引き継ぐ」形になるが、Mastraのスレッド／メッセージ永続化はAgentを区別しない汎用機構であるため技術的な障害はない。
 
-### 7.3 決定: 全文カバレッジの上限は「instructions側のソフト上限」と「呼び出し側の`maxSteps`のハード上限」の二段構えにする
-- **背景**: `getPageContentTool`自体には合計読み取り量を追跡・強制する仕組みがなく、`growiAgent`との共有ツールであるため上限をツール側に実装すると要件2.3（既存Q&A用途への非影響）に抵触する。
-- **選定**: ツールは無変更のまま、(1) instructionsに読み取り済み行数の目安上限を明記してLLMに自己申告的に打ち切らせる、(2) `/summary`ルート独自の`maxSteps`（`post-message.ts`の`maxSteps: 10`とは別の値）を安全弁として設定する。
-- **フォローアップ**: 実装時に、対象とする最大ページ長の目安から具体的な数値（ソフト上限の行数、`maxSteps`の値）を決定する。
+### 7.3 決定: 全文カバレッジの上限は `limitedGetPageContentTool` のバジェットでコード強制し、instructions・`maxSteps` を併設する三段構えにする
+- **背景**: `getPageContentTool` 自体には合計読み取り量を追跡・強制する仕組みがない。共有ツールである同ツールを改変すると要件2.3（既存Q&A用途への非影響）に抵触するが、`summarizeAgent` にのみ登録する新規ラッパーであれば `growiAgent` の読み取り挙動は変わらないため2.3に抵触しない（`suggestPathAgent` の `limitedSearchTool` と同型）。instructionsだけの自己申告では要件2.2の「最大読み取り量の上限」を保証できず、`maxSteps` はステップ数の上限であって読み取り量の上限ではない。
+- **選定**: (1) `limitedGetPageContentTool` が `RequestContext` の `pageReadBudget`（`{ used, limit }`、`limit` は1500行）を読み、`used >= limit` なら委譲せず `limit_exceeded` を返す — 読み取り量のハード上限をコードで強制する。(2) instructionsは `limit_exceeded` 受領後の打ち切りと、部分的な内容に基づく旨の明示のみを規定する。(3) `/summary` ルート独自の `maxSteps`（`post-message.ts` の `maxSteps: 10` とは別の値）を、instructionsに従わずツール呼び出しを続けた場合の安全弁として設定する。`getPageContentTool` 自体は無変更。
+- **フォローアップ**: バジェット判定は呼び出し**前**に行い、`getPageContentTool` の `limit` は最大500行（`get-page-content-tool.ts` の `inputSchema`）であるため、実効の読み取り量は最大で `limit + 500` 行（約2000行）に達しうる。この許容幅を design.md に明記する。
 
 ### 7.4 決定: 要約リクエストはクライアントの自由入力を受け取らず、`pageId`/`pagePath`からサーバ側で初期発話を組み立てる
 - **理由**: 出力形式（3.1）の安定性と、全文カバレッジ方針の適用対象を「要約リクエストのみ」に限定する境界（2.3）を、プロンプト内容のばらつきに依存せず構造的に保証するため。
@@ -152,11 +152,16 @@
 
 ## 8. Recommendations / Research Needed（ギャップ分析時点で持ち越した事項。7章で決定・解消したものは重複掲載しない）
 
-- **Research Needed**: 要約専用AgentとgrowiAgentのスレッド（`memory`）をどう共有するか。追質問（要件1.4）は要約Agentが引き続き応答するのか、growiAgentへ制御を戻すのか。
-- **Research Needed**: 重複生成の抑止（要件1.5）をサーバ側で行うか、クライアント側のUI制御に委ねるか。
-- **Research Needed**: 全文カバレッジの「上限到達」判定を、instructions頼みのLLM自己申告にするか、`maxSteps` などコード側の値と整合させて二重に担保するか。
+### 7.6 決定: `summarizeAgent` の本文取得ツールは `growiAgent` と同じ登録キー（`getPageContentTool`）で登録する
+- **背景**: 要約専用AgentとgrowiAgentは同じ `memory` インスタンス（スレッド）を共有するが、`suggestPathAgent` はmemory非接続であり、このリポジトリにクロスAgentスレッド共有の前例は無い。`lastMessages: 30` の再生時、assistantのtool-callパート／tool-resultパートは両方とも次ターンのモデル入力に含まれる。
+- **`@mastra/core`（インストール済みソース）で裏取りした事実**:
+  - LLMプロバイダに送られるツール名は、`Agent` の `tools` オプションに渡すレコードの**キー**である（ツールの `id` フィールドではない）。`Agent.__registerMastra` / `listAssignedTools` が `Object.entries(this.#tools)` のキーを `name` として `makeCoreTool` に渡している。
+  - スレッド再生時のメッセージ変換（`aiV5UIMessagesToAIV5ModelMessages`）は、tool-call/tool-resultの**ペア整合性**（`sanitizeOrphanedToolPairs`、toolCallId単位の対応関係）のみを検査する。**ツール名が現在のAgentの登録ツールに存在するかどうかは検証・除去しない**。
+  - Memoryはメッセージ／スレッドにagentIdを記録せず、Agent単位で再生をフィルタする仕組みも無い（`getOrCreateThread` の既存方針「アシスタント識別子をメタデータに書き込まない」と整合）。
+- **選定**: `summarizeAgent` は本文取得ツールを `{ getPageContentTool: limitedGetPageContentTool }` というキーで登録する（ツール自身の `id` は無関係に別途持ってよい）。これにより、`growiAgent` がスレッドを引き継いだ際に再生される過去のtool-callが、`growiAgent` の現在のツールセットに実在する名前（`getPageContentTool`）と一致する。
+- **トレードオフ**: `limitedGetPageContentTool` の出力スキーマは `getPageContentTool` に `limit_exceeded`/`context_error` を加えた拡張だが、スレッド再生時の過去のtool-resultはプロバイダ・SDKいずれの側でも現在のスキーマに対して再検証されないため、この差異は実害を生まない。
 - **設計ガードレールとして明記すべき事項**（実装ミスを防ぐための制約）:
   - 要約Agentのページ本文取得は必ず `getPageContentTool` 経由のツール呼び出しループで行い、ルート層での事前フェッチ・直接DB参照は禁止する。
-  - `getPageContentTool` 自体（共有ツール）には手を入れず、全文カバレッジの挙動差は要約Agent側のinstructions・呼び出しパラメータのみで実現する。
+  - `getPageContentTool` 自体（共有ツール）には手を入れない。全文カバレッジの挙動差は、要約Agentのinstructions・呼び出しパラメータと、要約Agentにのみ登録する `limitedGetPageContentTool`（7.3）で実現する。
   - `growi-agent.ts` は変更対象に含めない。
 - **推奨アプローチ**: Option B（新規の要約専用Agentを `suggestPathAgent` と同型パターンで追加）を基本線とし、統合方法（新規ルート vs 既存ルートへの薄い分岐＝Option C）は設計フェーズでUI連携の詳細と合わせて決定する。

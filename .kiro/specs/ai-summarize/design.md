@@ -44,6 +44,8 @@
 ### Out of Boundary
 - 要約トリガーのUIコンポーネント実装（設置場所は決定済み: ページ上部の操作メニュー。実装は別PR）。
 - 「残す」（永続化を選ぶ）保存ボタンUIの実装（アシスタントメッセージの下に表示。実装はトリガーUIと同じ別PR）。当該UIでのトークン消費の明示も含め、本specはそのUIから呼ばれる `AiSummaryPersistenceRoute` のAPI契約のみを定義する。
+- 要件1.5（重複生成の抑止）の送信中ガード — トリガーUIと同じ別PRが担う。本specはサーバ側の排他制御を追加しない（research.md 7.5）。本specのタスクだけでは1.5は満たされない。
+- 要件5.1のクライアント側表現（AI未設定・無効時にトリガー導線自体を出さない）— トリガーUIと同じ別PRが担う。本specは `aiReadyGuard` によるサーバ側の利用不可化（501）までを担う。
 - `growiAgent` のinstructions・ツール構成・`post-message.ts` の呼び出しロジック — 本specはこれらを一切変更しない。
 - `getPageContentTool` 自体の実装変更 — 本specは既存の入出力契約のまま利用する。`limitedGetPageContentTool` は新規に追加するラッパーであり、`getPageContentTool` を書き換えるものではない。
 - ページ閲覧権限の判定ロジックそのもの（`Page.findByIdAndViewer` 等）— 既存のまま利用する。
@@ -222,6 +224,9 @@ sequenceDiagram
 - `sourceRevisionId` はストリーム応答に `threadId` と併記してクライアントへ返す。永続化を選んだ場合、クライアントはこの値をそのまま `AiSummaryPersistenceRoute` の保存リクエストに渡す。保存ルート側で「保存ボタン押下時点」の revision を取り直すことはしない（7.2, 9.2）。
 - 要約を開始する最初のユーザー発話は、クライアントの自由入力ではなく、`pageId`（または `pagePath`）からルート層が組み立てる固定形式のリクエストとする。これにより出力形式（3.1）と全文カバレッジ方針の適用対象（要約リクエストのみ、2.3）を安定させる。
 - 要約完了後の追質問は、新しく発行された `threadId` を使って既存の `/message` にそのまま送られる。`growiAgent` はスレッド履歴に前段の要約が含まれていることを意識する必要がなく、`growi-agent.ts` は無変更のままで成立する（1.4）。
+  - **成立条件（`@mastra/core` 実装で裏取り済み）**: LLMプロバイダに送るツール名は、`Agent` の `tools` オプションに渡すレコードの**キー**であり、ツールの `id` フィールドではない（`Agent.__registerMastra` / `listAssignedTools` が `Object.entries(this.#tools)` のキーを `name` として `makeCoreTool` に渡す）。`Memory`（`lastMessages: 30`）はスレッド再生時にassistantのtool-callパートとtool-resultパートを両方含めてモデルへ送る。Mastraはtool-call/tool-resultの**ペア整合性**（`sanitizeOrphanedToolPairs`）のみをチェックし、**ツール名が現在のAgentの登録ツールに存在するかは検証・除去しない**（そのまま渡される）。したがって、`summarizeAgent` が本文取得ツールを `growiAgent` の登録キー `getPageContentTool` と**同じキー**で登録して初めて、`growiAgent` が引き継いだ際に再生される過去のtool-callが現在のツールセットに実在する名前と一致する。異なるキー（例: `limitedGetPageContentTool`）で登録すると、`growiAgent` は自身が持たないツール名のtool-callを履歴に含んだままプロバイダに送ることになる。
+  - `suggestPathAgent` はmemory非接続であり、このリポジトリにクロスAgentスレッド共有の前例は存在しない（`suggest-path-agent.ts` の "memory is intentionally NOT connected" コメント）。本specが最初の適用例である。
+  - **決定**: `summarizeAgent` は本文取得ツールを `getPageContentTool` という**キー**で登録する（`tools: { getPageContentTool: limitedGetPageContentTool }`）。`limitedGetPageContentTool` 自身の `id`（`createTool({ id: ... })`）は登録キーと無関係であり、既存の命名規約通り内部識別子として別に持ってよい。
 
 ### 全文カバレッジの読み取り制御（三段構え）
 
@@ -237,7 +242,7 @@ flowchart TD
     StepCap -->|yes, safety net| PartialSummary
 ```
 
-- **ハード上限（ツール呼び出し側、コードで強制）**: `summarizeAgent` は `getPageContentTool` を直接使わず、専用の `limitedGetPageContentTool`（`suggestPathAgent` の `limitedSearchTool` と同じラッパーパターン）経由でのみ本文を取得する。`RequestContext` の `pageReadBudget: { used: number; limit: number }` を1リクエストにつき1個生成し、`limit` は**1500行**（`getPageContentTool` のデフォルト`limit: 200`基準で5〜7回の呼び出し分に相当。読み取り量の上限が実際にコストの予測可能性を担保する値であることを優先し、目安ではなく固定値とする）。呼び出しのたびに返された `content` の行数を `used` に加算し、`used >= limit` の状態で呼ばれた場合は本文を取得せず `limit_exceeded` を返す。これが要件2.2の「最大読み取り量の上限」を実際に保証する機構である。`getPageContentTool` 自体は変更せず、ラップされる側として無変更のまま利用する。
+- **ハード上限（ツール呼び出し側、コードで強制）**: `summarizeAgent` は `getPageContentTool` を直接使わず、専用の `limitedGetPageContentTool`（`suggestPathAgent` の `limitedSearchTool` と同じラッパーパターン）経由でのみ本文を取得する。`RequestContext` の `pageReadBudget: { used: number; limit: number }` を1リクエストにつき1個生成し、`limit` は**1500行**（`getPageContentTool` のデフォルト`limit: 200`基準で5〜7回の呼び出し分に相当。読み取り量の上限が実際にコストの予測可能性を担保する値であることを優先し、目安ではなく固定値とする）。呼び出しのたびに返された `content` の行数を `used` に加算し、`used >= limit` の状態で呼ばれた場合は本文を取得せず `limit_exceeded` を返す。これが要件2.2の「最大読み取り量の上限」を実際に保証する機構である。`getPageContentTool` 自体は変更せず、ラップされる側として無変更のまま利用する。なおバジェット判定は呼び出し**前**に行うため、`used` が上限直前の状態から `getPageContentTool` の1回分（`limit` は最大500行）が通り、実効の読み取り量は最大で約2000行に達しうる。1500行はこの許容幅を含んだ上での上限値である。
 - **打ち切り時の振る舞い（instructions側）**: `summarizeAgent` のinstructionsは、`limitedGetPageContentTool` から `limit_exceeded` を受け取った時点で読み取りを止め、「読み取れた範囲からの要約である」ことを明示して要約を生成するよう指示する。上限値そのものはツール側が強制するため、instructionsは打ち切り後の振る舞いのみを規定すればよい。
 - **安全弁（呼び出し側）**: `/summary` ルートが `summarizeAgent.stream()` に渡す `maxSteps` は、`post-message.ts` の `maxSteps: 10`（Q&A用途、既存・無変更）とは独立した値を設定する。`pageReadBudget` に確実に到達できるだけの十分なステップ数を確保しつつ、`limit_exceeded` を受け取ってもinstructionsに従わずツール呼び出しを続けようとした場合の安全弁として機能する。両者は別の呼び出し箇所のパラメータであるため、この値の変更が `growiAgent` の呼び出しに影響することはない（2.3）。
 
@@ -286,7 +291,7 @@ sequenceDiagram
 | 1.2 | 都度生成（再利用しない） | SummaryRoute | `POST /summary`（毎回新規スレッド） | 要約開始フロー |
 | 1.3 | 現在ページ非依存時は非提供 | SummaryRoute Validator | `pageId` 必須のリクエストスキーマ | — |
 | 1.4 | 同一対話内での追質問継続 | SummaryRoute, Memory, GrowiAgent | `threadId` の引き継ぎ | 要約開始フロー → 追質問合流 |
-| 1.5 | 重複生成の抑止 | （クライアント側の既存in-flightガードに委譲） | — | 要約開始フロー注記 |
+| 1.5 | 重複生成の抑止 | トリガーUI（別PR、Out of Boundary） | — | 要約開始フロー注記 |
 | 2.1 | 全文カバレッジ | SummarizeAgent instructions | `limitedGetPageContentTool` 呼び出しループ | 全文カバレッジ制御 |
 | 2.2 | 読み取り量の上限 | LimitedGetPageContentTool | `pageReadBudget`（1500行のハード上限）＋`maxSteps`（安全弁） | 全文カバレッジ制御 |
 | 2.3 | Q&A用途への非影響 | SummarizeAgent（別ファイル）, LimitedGetPageContentTool（新規、`getPageContentTool`は無変更）, GrowiAgent（無変更） | 独立した `maxSteps`／`pageReadBudget`／instructions | 全文カバレッジ制御 |
@@ -331,6 +336,7 @@ sequenceDiagram
 
 **Responsibilities & Constraints**
 - ページ本文の取得は `limitedGetPageContentTool` のみを通じて行う。独自の本文取得・キャッシュ経路を持たない。`getPageContentTool` を直接ツールとして持たない（読み取り量の上限を確実にラッパー経由にするため）。
+- `tools` への登録は `{ getPageContentTool: limitedGetPageContentTool }` とし、登録**キー**を `growiAgent` の `getPageContentTool` キーと一致させる。これはLLMプロバイダに送られるツール名がAgentの `tools` オプションのレコードキーであり、ツール自身の `id` ではないためで、要約完了後に `growiAgent` がスレッドを引き継いだ際、再生される過去のtool-callが `growiAgent` の現在のツールセットに実在する名前と一致するために必須（1.4、下記フロー上の意思決定を参照）。
 - instructionsは、(a) `hasMore` が真である限り読み取りを続ける、(b) `limitedGetPageContentTool` から `limit_exceeded` を受け取ったら打ち切り、部分的な内容に基づく旨を明示する、(c) リード文1文＋主要ポイント3〜5個の箇条書きで出力する、(d) ユーザーの入力言語で応答する、の4点を規定する。
 - `growi-agent.ts` のinstructionsとは完全に独立したファイルとし、共有しない。
 - `suggestPathAgent` と同様、`resolveMastraModel` によるモデル解決を用いる。`modelKey` はリクエストから渡された場合のみ考慮し（`post-message.ts` と同じ `resolveEffectiveModelKey` による丸め込みを再利用）、省略時はデフォルトモデルを使う。
@@ -405,7 +411,7 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 - 新しい `threadId` を毎回 `uuid()` で採番し、`getOrCreateThread`（既存、無変更で再利用）で新規スレッドを作成する。既存スレッドへの追記は行わない（要約は常に新しい対話として開始する、1.2）。
 - ストリーミング応答の構築（`createUIMessageStream` / `toAISdkStream` / `pipeUIMessageStreamToResponse`）は `post-message.ts` と同型のパターンを踏襲し、`CustomUIMessage`（既存の型）と互換のストリームを返す。将来のトリガーUIが、既存のチャット表示コンポーネント（`ChatSidebar` のメッセージレンダリング）をそのまま再利用できるようにするため。
 - ストリームが正常終了した時点で `AiSummarizeMetrics` のCounterをインクリメントする（6.1）。エラー終了時はインクリメントしない。
-- 重複生成の抑止（1.5）は、サーバ側の新しい排他制御を追加せず、`ChatSidebar` の `handleSubmit` が既に用いている「送信中は再送信しない」という状態ガードと同じ考え方をトリガーUIコンポーネント側（別PR）に適用する前提とする。要約はページ側の状態やページに紐づく永続データを書き換えないため、二重送信が発生してもページの内容・閲覧権限に不整合は生じない。ただし要約対話自体は毎回新規スレッドとして`Memory`に永続化されるため、二重送信は「無駄なリクエスト」に加えて「使われない要約スレッドがMongoDBに残る」という無駄も生む。この判断のトレードオフは research.md に記録する。
+- 重複生成の抑止（1.5）は、サーバ側の新しい排他制御を追加せず、`ChatSidebar` の `handleSubmit` が既に用いている「送信中は再送信しない」という状態ガードと同じ考え方をトリガーUIコンポーネント側（別PR）に適用する前提とする。要約はページ側の状態やページに紐づく永続データを書き換えないため、二重送信が発生してもページの内容・閲覧権限に不整合は生じない。ただし要約対話自体は毎回新規スレッドとして`Memory`に永続化されるため、二重送信は「無駄なリクエスト」に加えて「使われない要約スレッドがMongoDBに残る」という無駄も生む。この判断のトレードオフは research.md 7.5 に記録済み。
 
 **Dependencies**
 - Outbound: `summarizeAgent`（P0）, `memory`（P0、`summarizeAgent.getMemory()` 経由）, `getOrCreateThread`（P1、既存関数の再利用）
@@ -436,7 +442,7 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 
 **Responsibilities & Constraints**
 - 既存の `custom-metrics/` 配下の各ファイルはサーバ起動時に登録される Observable Gauge（ポーリング収集）だが、本コンポーネントは唯一のイベント駆動型 Counter として追加される。
-- `meter.createCounter('growi.ai_summarize.generated', { description: ..., unit: '1' })` をモジュール内で一度だけ生成し、インクリメント用の関数をエクスポートする。`setupCustomMetrics()` からの呼び出しでCounterインスタンスを初期化し、`SummarizeMessageRoute` がその関数を呼び出す。
+- `meter.createCounter('growi.ai.summarize.generated', { description: ..., unit: '1' })` をモジュール内で一度だけ生成し、インクリメント用の関数をエクスポートする。`setupCustomMetrics()` からの呼び出しでCounterインスタンスを初期化し、`SummarizeMessageRoute` がその関数を呼び出す。
 - ラベル（属性）は将来の分析に必要な最小限（例: 成否は成功時のみ呼ばれるため付与しない、モデルプロバイダ種別など機微でない情報に限定）とし、ユーザー識別情報・ページ内容は含めない（`.claude/rules/security.md` のエラー/ログ方針に整合）。
 
 **Contracts**: Service [ ] / API [ ] / Event [ ] / Batch [ ] / State [x]
