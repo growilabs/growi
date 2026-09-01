@@ -99,7 +99,12 @@ const MAX_BODY_BYTES = 8 * 1024; // 8 KiB, per design.md's explicit rationale ta
 // guarantee holding for every future caller.
 const exceedsMaxBodyBytes = (raw: Record<string, unknown>): boolean => {
   try {
-    return Buffer.byteLength(JSON.stringify(raw), 'utf8') > MAX_BODY_BYTES;
+    // `TextEncoder` (not `Buffer`) so this module stays reachable from the
+    // client-safe entry point (`src/index.ts`) without pulling in a
+    // Node-only global -- see design.md's "公開面を2つに分ける理由".
+    return (
+      new TextEncoder().encode(JSON.stringify(raw)).length > MAX_BODY_BYTES
+    );
   } catch {
     return true;
   }
