@@ -558,6 +558,8 @@
     },
     "editor": {
       "title": "エディターショートカット",
+      "Slash Command": "スラッシュコマンド",
+      "Slash Command Desc": "(コマンドメニューを表示)",
       "Indent": "インデント",
       "Outdent": "左インデント",
       "Save Page": "保存",
