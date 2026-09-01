@@ -1,0 +1,172 @@
+// Confirms the wire shape of the two UNSIGNED pairing entry points
+// (Requirement 9.2, 10.1): `PairingSubmission` (pairing step 3) and
+// `OwnershipChallenge` (pairing step 4). See parse-command.ts's header
+// comment for why every parse* function here re-checks shape even though
+// a *signed* body already passed signature verification -- but neither of
+// these two bodies is signed at all. At this point in the pairing
+// procedure no key has been exchanged yet, so signature verification
+// (task 5.3) provides ZERO protection here. Shape-checking these two
+// bodies is HALF of the actual defense; the other half is the
+// registration code itself (checked by the caller, not this file -- see
+// design.md's pairing-procedure rationale, "#### ⑤ に条件が要る理由").
+//
+// This is why these 2 functions are split from task 6.2's 7 functions:
+// `PairingSubmission`/`OwnershipChallenge` do NOT extend `RequestEnvelope`
+// (no `relationId`, no `op`), so there is no relation identifier or op
+// vocabulary to retain/validate here -- retaining `op`/`relationId` (6.2's
+// rule) does not apply to either function in this file.
+//
+// Public-key material judgement is NOT re-derived here: `isValidKeyIdShape`
+// and `isValidPublicKeyMaterial` (task 2.4, `signature/key-identity.ts` /
+// `signature/key-material.ts`) already own that logic, and this file only
+// calls through to it (same rule task 6.2's parse-keys.ts follows).
+
+import type {
+  OwnershipChallenge,
+  PairingSubmission,
+} from '../contract/pairing.js';
+import { isValidKeyIdShape } from '../signature/key-identity.js';
+import { isValidPublicKeyMaterial } from '../signature/key-material.js';
+import { isRecord, str } from './shape.js';
+
+/**
+ * `registrationCode` is a >=128-bit random value (design.md's pairing
+ * rationale) issued by proxy. Encoded as base64/hex/base64url it lands
+ * somewhere around 22-256 characters depending on the encoding proxy
+ * happens to use; this package does not pin the encoding, so this bound is
+ * a generous defensive outer limit, not a precise shape check (unlike
+ * `challenge` below, which DOES have an exact shape spec).
+ */
+const REGISTRATION_CODE_MAX = 256;
+/** A URL an admin typed. Not validated for well-formedness here -- that is
+ * `url-guard/growi-uri-guard.ts`'s (task 4.2) job on the RESOLVED address,
+ * a completely different check with a completely different purpose. This
+ * is only a bounded, non-empty string. */
+const GROWI_URI_MAX = 4096;
+/** A short human-readable label an admin typed. */
+const GROWI_LABEL_MAX = 256;
+/**
+ * `str`'s max here only needs to be >= `isValidKeyIdShape`'s own upper
+ * bound (64, `KEY_ID_SHAPE_PATTERN` in `signature/key-identity.ts`) --
+ * that function is the real authority on keyId's shape, this is just a
+ * defensive outer bound before handing the value to it. Same convention as
+ * task 6.2's parse-keys.ts.
+ */
+const KEY_ID_MAX = 128;
+/** ISO-8601 timestamp (`Date#toISOString()`, see tasks.md's 4.3 Implementation Note). */
+const VALID_FROM_MAX = 64;
+
+/**
+ * `challenge`'s exact shape (design.md's rationale table, "`challenge` の
+ * 形" row): base64url, 32-128 characters inclusive. `str` (task 6.1) only
+ * supports a MAX bound -- it has no minimum-length variant (tasks.md's 6.1
+ * Implementation Note calls this out explicitly) -- so the >=32 half of
+ * this range is checked by hand below, after `str` narrows the MAX side.
+ */
+const CHALLENGE_MIN = 32;
+const CHALLENGE_MAX = 128;
+const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Design.md's rationale table ("本体の大きさ" row) states plainly: bounding
+ * `challenge`'s length alone does not bound the whole request body's size
+ * -- an attacker could pad OTHER fields, or add unexpected extra keys, to
+ * make the body large even with an otherwise-compliant `challenge`. Both
+ * parse functions here receive an ALREADY-PARSED `unknown` value (not raw
+ * wire bytes), so this check re-serializes it via `JSON.stringify` to
+ * approximate the original wire size. This is a deliberate choice, not the
+ * only possible one -- see CONCERNS in the task status report for the
+ * two options weighed and why this one was picked.
+ */
+const MAX_BODY_BYTES = 8 * 1024; // 8 KiB, per design.md's explicit rationale table.
+
+// A JSON.parse result never contains a circular reference, a BigInt, or a
+// throwing toJSON, so JSON.stringify never throws on the actual input this
+// package receives -- but every other parse* function in this package
+// never throws either, so this stays defensive rather than relying on that
+// guarantee holding for every future caller.
+const exceedsMaxBodyBytes = (raw: Record<string, unknown>): boolean => {
+  try {
+    return Buffer.byteLength(JSON.stringify(raw), 'utf8') > MAX_BODY_BYTES;
+  } catch {
+    return true;
+  }
+};
+
+type ParseError = { readonly error: 'malformed' };
+
+export const parsePairingSubmission = (
+  raw: unknown,
+): PairingSubmission | ParseError => {
+  if (!isRecord(raw)) {
+    return { error: 'malformed' };
+  }
+
+  // Whole-body size gate runs BEFORE any per-field check, so an
+  // already-oversized body is rejected without wasted work inspecting its
+  // individual fields.
+  if (exceedsMaxBodyBytes(raw)) {
+    return { error: 'malformed' };
+  }
+
+  const registrationCode = str(raw.registrationCode, REGISTRATION_CODE_MAX);
+  const growiUri = str(raw.growiUri, GROWI_URI_MAX);
+  const growiLabel = str(raw.growiLabel, GROWI_LABEL_MAX);
+  const publicKeyRaw = raw.publicKey;
+
+  if (
+    registrationCode === undefined ||
+    growiUri === undefined ||
+    growiLabel === undefined ||
+    !isRecord(publicKeyRaw)
+  ) {
+    return { error: 'malformed' };
+  }
+
+  const keyId = str(publicKeyRaw.keyId, KEY_ID_MAX);
+  const validFrom = str(publicKeyRaw.validFrom, VALID_FROM_MAX);
+  const publicKeyJwk = publicKeyRaw.publicKeyJwk;
+
+  if (
+    keyId === undefined ||
+    validFrom === undefined ||
+    !isRecord(publicKeyJwk) ||
+    !isValidKeyIdShape(keyId) ||
+    !isValidPublicKeyMaterial(publicKeyJwk).ok
+  ) {
+    return { error: 'malformed' };
+  }
+
+  return {
+    registrationCode,
+    growiUri,
+    growiLabel,
+    publicKey: { keyId, publicKeyJwk, validFrom },
+  };
+};
+
+export const parseOwnershipChallenge = (
+  raw: unknown,
+): OwnershipChallenge | ParseError => {
+  if (!isRecord(raw)) {
+    return { error: 'malformed' };
+  }
+
+  if (exceedsMaxBodyBytes(raw)) {
+    return { error: 'malformed' };
+  }
+
+  const registrationCode = str(raw.registrationCode, REGISTRATION_CODE_MAX);
+  const challenge = str(raw.challenge, CHALLENGE_MAX);
+
+  if (
+    registrationCode === undefined ||
+    challenge === undefined ||
+    challenge.length < CHALLENGE_MIN ||
+    !BASE64URL_PATTERN.test(challenge)
+  ) {
+    return { error: 'malformed' };
+  }
+
+  return { registrationCode, challenge };
+};
