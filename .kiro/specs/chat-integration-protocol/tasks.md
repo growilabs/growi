@@ -202,7 +202,7 @@
   - _Boundary: MessageSignature_
 
 - [ ] 6. 受け取った本文と応答の形を確かめる関数を作る
-- [ ] 6.1 形の確認に使う最小の道具を用意する
+- [x] 6.1 形の確認に使う最小の道具を用意する
   - 検証ライブラリを足さずに書けるだけの道具（object か・文字列か・一覧か・許された値か）
   - **長さと個数の上限を必ず付けられる**形にする。署名を通った本文でも大きさは署名が守らない
   - 道具が揃い、以降の検査関数がこれだけで書ける
@@ -302,6 +302,7 @@
 
 - **1.2**: `packages/chat` の相対 import は、この monorepo の他パッケージ（`packages/slack` / `packages/core`）と同じく末尾に `.js` を付ける書き方（`from './foo.js'`）が実際の慣習。`src/public-surface.spec.ts` の静的 import 木の追跡は、拡張子なし・`.js` 付き・`~/` エイリアス（`tsconfig.json` の `paths`）の 3 通りすべてを解決できる必要がある（最初の実装は `.js` 付きと `~/` を見逃し、レビューで差し戻された）。以降のタスクで `index.ts` / `server.ts` から再輸出を追加する際は、書き方を変えても検査が黙って素通りしないことを確認すること。
 - **2.2**: design.md の `command-names.ts` コメントにある「書き込みは既定で不許可」は design.md 自身の 1 か所（`Security` という見出しは design.md に実在しない）にしか根拠が無く、requirements.md 11.1 は「コマンドごとに許可チャンネルを設定できる」までしか書いていない。4.1（チャンネル権限判定、既定は書き込み不許可・それ以外は許可）を実装する前に、この既定挙動が要件のどこで確定しているかを requirements.md で先に確認すること。
+- **6.1 → 6.2/6.3 への申し送り**: `parse/shape.ts` の道具は4つ（`isRecord`/`str`/`arr`/`oneOf`）に固定し、5つ目は足していない。`str(v, max)` は上限だけを見る（下限や空文字許容の変種は無い）。6.2 で `CommandRequest` の `limit`（数値）の上限判定と、6.3 の `challenge` の「32〜128文字」という**下限**チェックは、`str` を通した後に呼ぶ側で手書きすること。`createPage` の `body`（空ページを許す）のように空文字が正当な項目は `str` に通さず、呼ぶ側でキーの有無・型だけを別に確認すること（`str` は空文字を無条件に拒否する）。
 - **5.3**: `resolvePublicKey`/`consumeNonce` が例外を投げた場合、`verify` はそれぞれ `unknown-key`/`replayed` に畳んで返す（`VerifyFailure` の直和は design.md 固定で種類を増やせないため）。保存先の障害と実際の攻撃（鍵が無い・再送）が要件10.2の記録上見分けられない点は今回の欠陥ではないが、将来 `VerifyFailure` を見直す際の検討材料として残す。
 - **5.2 → 5.3 への申し送り**: `buildSignatureBase`（`signature-base.ts`）は署名の別枠の値（`created`/`expires`/`nonce`/`keyid`/`alg`）を**呼ぶ側が渡した順のまま** `@signature-params` に直列化する（固定の並びに直さない）。これは意図的で正しい — RFC 9421 §3.2 手順7は、検証する側が受け取った `Signature-Input` の値をそのまま使うと定めており、design.md の `VerifyParams.body` の注記（「解析した値から組み立て直したものを渡してはならない…正しい相手が弾かれる」）と同じ理由による。**5.3 の実装で、検証側が `SIGNATURE_PARAMS = ['created','expires','nonce','keyid','alg']` を固定の並びとして読み込み直すと、正しい相手を弾くリグレッションになる。** `SIGNATURE_PARAMS` は「どの値が署名対象に入るか」の宣言であって直列化順序の規定ではない — 署名する側（sign）は固定の並びで組んでよいが、検証する側（verify）は受け取った並びのまま `buildSignatureBase` に渡すこと。
 - **5.1**: design.md の Allowed Dependencies 表（と tasks.md 本文）にある「`structured-headers` は型定義が無いのでこのファイルだけが未型付き API に触れる」という理由は事実誤り — `structured-headers@2.0.3` は `dist/*.d.ts` を同梱している（`BareItem` は7種の union、`Dictionary` の値は `Item | InnerList`）。1ファイルに閉じ込める制約自体は妥当（実装は正しく「型はあるが RFC 8941 全体を表す広すぎる型なので、このパッケージが実際に使う狭い形へ包む」に理由を書き換え済み）。design.md/tasks.md 側の記述訂正は `/kiro-validate-impl` または feature 全体の検証で拾うこと。
