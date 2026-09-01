@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. データモデル基盤：既存commentsモデルの拡張と読み取り経路の隔離
+- [x] 1. データモデル基盤：既存commentsモデルの拡張と読み取り経路の隔離
 - [x] 1.1 `comments` Prismaモデルにインラインコメント用フィールドを追加する
   - `isInline`（Boolean, default false）、`quote`/`prefix`/`suffix`/`approxOffset`（すべて任意）、`anchorOriginRevisionId`（任意, ObjectId）、`resolvedById`（任意, ObjectId）、`resolvedAt`（任意, DateTime）を `comments` モデルに追加する
   - 既存の無名だった `creator` リレーションに `@relation("CommentCreator", ...)` と明示的な名前を付け、新設する `resolvedBy` リレーション（`@relation("InlineCommentResolver", ...)`）と区別できるようにする。`users` モデル側の `comments` フィールドにも同じリレーション名を付け、`resolvedInlineComments comments[] @relation("InlineCommentResolver")` を追加する
@@ -27,7 +27,7 @@
   - 観測できる完了条件：4つの定数が `SupportedAction` からimport可能になる
   - _Requirements: 3.2_
 
-- [ ] 2. クライアント側アンカー計算ロジック（サーバー非依存の純粋関数・フック群）
+- [x] 2. クライアント側アンカー計算ロジック（サーバー非依存の純粋関数・フック群）
 - [x] 2.1 (P) レンダリング状態属性を使った静定検知フックを実装する
   - `GROWI_IS_CONTENT_RENDERING_SELECTOR`（`@growi/core/dist/consts`）でコンテナ内の描画中要素の有無を判定し、ゼロになった時点で「静定」を発火するフックを実装する
   - `watch-rendering-and-rescroll.ts` と同じMutationObserver監視設定（`childList/subtree/attributes` + `attributeFilter`）を使う。初回マウント時にも1回判定する
@@ -66,7 +66,7 @@
   - _Depends: 2.4_
   - _Boundary: quote-matcher_
 
-- [ ] 3. サーバー側：InlineCommentServiceとapiv3ルート
+- [x] 3. サーバー側：InlineCommentServiceとapiv3ルート
 - [x] 3.1 起点インラインコメントの作成ロジックを実装する
   - `comments` テーブルに `isInline: true` の行を挿入する。クオートが空文字の場合はエラーとする。`anchorOriginRevisionId` を作成時にのみ設定する
   - `Activity` レコード（`ACTION_INLINE_COMMENT_CREATE`）を発行してから `crowi.commentService.prepareMentionNotifications` を呼び出す
@@ -103,7 +103,7 @@
   - _Requirements: 1.5, 1.6, 6.1_
   - _Depends: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 4. クライアントUI・状態管理
+- [x] 4. クライアントUI・状態管理
 - [x] 4.1 インラインコメント用のSWRストアを実装する
   - ページの一覧取得、起点作成、返信作成、解決トグルをラップするSWRフックを実装する（3.5のAPIを呼び出す）
   - 観測できる完了条件：作成・返信作成・解決トグルの呼び出し後に一覧が再取得されることを確認できる
@@ -136,7 +136,7 @@
   - _Depends: 4.1_
   - _Boundary: InlineCommentList, InlineCommentReplies_
 
-- [ ] 5. 統合：既存ページビューへの配線
+- [x] 5. 統合：既存ページビューへの配線
 - [x] 5.1 `RevisionRenderer.tsx` にコンテナrefを転送する
   - `ReactMarkdown` を包むコンテナ `div` に `ref` を転送するよう変更する（新規rehype/remarkプラグインは追加しない）
   - 観測できる完了条件：既存のページレンダリングに視覚的な差分がないことを確認した上で、親コンポーネントからコンテナDOMへ `ref` 経由でアクセスできる
@@ -149,7 +149,7 @@
   - _Requirements: 1.1, 2.1, 2.5, 6.2_
   - _Depends: 4.2, 4.3, 4.4, 5.1_
 
-- [ ] 6. 検証：横断的な結合・E2E確認
+- [x] 6. 検証：横断的な結合・E2E確認
 - [x] 6.1 メンション通知の結合テストを追加する
   - 起点コメント作成時・返信作成時それぞれについて、本文中の `@ユーザー名` がメンション通知の対象になることを確認する
   - 観測できる完了条件：結合テストがgreenになる
