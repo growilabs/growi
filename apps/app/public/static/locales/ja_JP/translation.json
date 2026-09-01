@@ -553,7 +553,7 @@
     "editor": {
       "title": "エディターショートカット",
       "Slash Command": "スラッシュコマンド",
-      "Slash Command Desc": "(メニューから Markdown 要素を挿入)",
+      "Slash Command Desc": "(コマンドメニューを表示)",
       "Indent": "インデント",
       "Outdent": "左インデント",
       "Save Page": "保存",

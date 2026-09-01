@@ -511,7 +511,7 @@
     "editor": {
       "title": "编辑器快捷方式",
       "Slash Command": "斜杠命令",
-      "Slash Command Desc": "(从菜单插入 Markdown 元素)",
+      "Slash Command Desc": "(显示命令菜单)",
       "Indent": "缩进",
       "Outdent": "回退缩进",
       "Save Page": "保存页面",

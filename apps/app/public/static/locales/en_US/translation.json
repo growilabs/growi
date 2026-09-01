@@ -519,7 +519,7 @@
     "editor": {
       "title": "Editor shortcuts",
       "Slash Command": "Slash Command",
-      "Slash Command Desc": "(Insert Markdown elements from the menu)",
+      "Slash Command Desc": "(Show the command menu)",
       "Indent": "Indent",
       "Outdent": "Outdent",
       "Save Page": "Save Page",
