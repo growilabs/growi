@@ -117,6 +117,12 @@ describe('GET /_api/v3/inline-comments', () => {
     );
     originAId = originA.id;
 
+    // Guarantee originA and originB land in distinct milliseconds so the
+    // createdAt-desc ordering assertion below isn't a tie-breaking coin flip.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
+
     const originB = await inlineCommentService.create(
       {
         pageId: String(publicPage._id),
@@ -223,6 +229,15 @@ describe('GET /_api/v3/inline-comments', () => {
           c.comment === 'a regular, non-inline comment',
       ),
     ).toBe(false);
+
+    // Requirement 2.6 (creation-order sort), verified against a real query
+    // result — not a mock. originA was created before originB above, so
+    // creation-timestamp order (desc, matching findCommentsByPageId's
+    // existing convention) puts originB first.
+    expect(inlineComments.map((c: ListedInlineComment) => c.id)).toEqual([
+      originBId,
+      originAId,
+    ]);
   });
 
   it('returns 404 for a nonexistent pageId', async () => {

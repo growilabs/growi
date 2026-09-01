@@ -90,6 +90,32 @@ export const resolveInlineCommentRouteHandlersFactory = (
         select: { pageId: true, isInline: true, replyToId: true },
       });
 
+      // Page-permission check runs before the comment-existence/shape check
+      // below, whenever a pageId is known (i.e. `id` exists), so an
+      // authenticated-but-unauthorized caller cannot use this endpoint as an
+      // existence oracle for a page they cannot view (see
+      // apps/app/.claude/rules/page-write-action-403-404.md — the same class
+      // of leak, applied here to a comment id instead of a page id). When
+      // `id` does not exist at all, there is no pageId to check permission
+      // against, so this falls through to the not-found branch below
+      // unconditionally.
+      if (target != null) {
+        const { meta } = await findPageAndMetaDataByViewer(
+          pageService,
+          pageGrantService,
+          { pageId: target.pageId, path: null, user, basicOnly: true },
+        );
+        if (isIPageNotFoundInfo(meta)) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'Page is not found or forbidden',
+              'notfound_or_forbidden',
+            ),
+            404,
+          );
+        }
+      }
+
       if (target == null) {
         return res.apiv3Err(
           new ErrorV3(
@@ -107,22 +133,6 @@ export const resolveInlineCommentRouteHandlersFactory = (
             'inline-comment-not-origin',
           ),
           400,
-        );
-      }
-
-      // Viewer-filtered lookup — see create.ts's file doc / page-write-action-403-404.md.
-      const { meta } = await findPageAndMetaDataByViewer(
-        pageService,
-        pageGrantService,
-        { pageId: target.pageId, path: null, user, basicOnly: true },
-      );
-      if (isIPageNotFoundInfo(meta)) {
-        return res.apiv3Err(
-          new ErrorV3(
-            'Page is not found or forbidden',
-            'notfound_or_forbidden',
-          ),
-          404,
         );
       }
 

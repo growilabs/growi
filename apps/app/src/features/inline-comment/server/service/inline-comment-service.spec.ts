@@ -716,6 +716,29 @@ describe('InlineCommentService.listByPageId', () => {
     // there is nothing to look up replies for.
     expect(deps.prisma.comments.findMany).toHaveBeenCalledTimes(1);
   });
+
+  it('アンカー必須フィールドが欠けた不正な行はスキップし、残りの正常な行だけを返す（1件の不正行で一覧全体を失敗させない）', async () => {
+    // BLOCKING 2 regression: toIInlineCommentFromListRow used to throw on a
+    // row missing an anchor field (e.g. quote: null), which propagated out
+    // of listByPageId() and made GET /inline-comments 500 for every viewer
+    // of the page — even though nothing in the query filter guarantees
+    // quote/prefix/suffix/approxOffset/anchorOriginRevisionId are non-null.
+    const pageId = makeId();
+    const wellFormed = makeOriginRow({ pageId, comment: 'well-formed origin' });
+    const malformed = makeOriginRow({
+      pageId,
+      comment: 'malformed origin (missing quote)',
+      quote: null,
+    });
+    const deps = makeListDeps([wellFormed, malformed], []);
+    const service = new InlineCommentService(deps);
+
+    const result = await service.listByPageId(pageId);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(wellFormed.id);
+    expect(result[0].comment).toBe('well-formed origin');
+  });
 });
 
 describe('InlineCommentService.setResolved', () => {

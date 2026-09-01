@@ -217,13 +217,20 @@ function toInlineCommentReply(
  * produces, but for a row that never carried a `page` relation (the
  * `findMany()` this method uses requests no `include`, unlike `create()`'s
  * insert-and-read-back).
+ *
+ * Returns `null` (rather than throwing) when the row is missing a required
+ * anchor field. `listByPageId()`'s query filter (`isInline: true,
+ * replyToId: null`) does not itself guarantee these fields are non-null —
+ * that is a write-path guarantee (`create()` always writes them together),
+ * not a read-side one. A single malformed row (manual DB edit, a future
+ * write-path bug, schema drift) must not fail the whole page's comment list
+ * for every viewer; skip it and let the rest of the list render, consistent
+ * with this feature's degrade-gracefully philosophy (`matchQuote`'s
+ * `not_found` fallback, the client's highlight-absent behavior).
  */
 function toIInlineCommentFromListRow(
   row: InlineCommentListRow,
-): IInlineComment {
-  // listByPageId only ever queries isInline: true, replyToId: null rows
-  // (origin comments), which — like create()'s insert — always carry these
-  // anchor fields together.
+): IInlineComment | null {
   if (
     row.creatorId == null ||
     row.quote == null ||
@@ -232,9 +239,10 @@ function toIInlineCommentFromListRow(
     row.approxOffset == null ||
     row.anchorOriginRevisionId == null
   ) {
-    throw new Error(
-      `Inline comment row '${row.id}' is missing required anchor fields`,
+    logger.warn(
+      `Skipping malformed inline comment row '${row.id}': missing required anchor field(s)`,
     );
+    return null;
   }
 
   return {
@@ -260,17 +268,19 @@ function toIInlineCommentFromListRow(
  * Maps a `listByPageId()` reply row (`InlineCommentListRow`) to
  * `InlineCommentReply` — the reply-side counterpart of
  * `toIInlineCommentFromListRow` above.
+ *
+ * Returns `null` (rather than throwing) for the same reason as
+ * `toIInlineCommentFromListRow`: a malformed reply row must not fail the
+ * whole page's comment list.
  */
 function toInlineCommentReplyFromListRow(
   row: InlineCommentListRow,
-): InlineCommentReply {
-  // listByPageId only ever queries isInline: true, replyToId: { in: [...] }
-  // rows (replies), which always carry creatorId/replyToId together — same
-  // guarantee createReply()'s insert relies on.
+): InlineCommentReply | null {
   if (row.creatorId == null || row.replyToId == null) {
-    throw new Error(
-      `Inline comment reply row '${row.id}' is missing required fields`,
+    logger.warn(
+      `Skipping malformed inline comment reply row '${row.id}': missing required field(s)`,
     );
+    return null;
   }
 
   return {
@@ -551,15 +561,25 @@ export class InlineCommentService {
 
     const repliesByOriginId = replyRows.reduce((map, row) => {
       const reply = toInlineCommentReplyFromListRow(row);
+      if (reply == null) {
+        return map;
+      }
       const existing = map.get(reply.replyToId) ?? [];
       map.set(reply.replyToId, [...existing, reply]);
       return map;
     }, new Map<string, InlineCommentReply[]>());
 
-    return originRows.map((row) => ({
-      ...toIInlineCommentFromListRow(row),
-      replies: repliesByOriginId.get(row.id) ?? [],
-    }));
+    // A malformed origin row (toIInlineCommentFromListRow returns null) is
+    // skipped rather than failing the whole list — see that function's doc.
+    return originRows
+      .map((row) => {
+        const comment = toIInlineCommentFromListRow(row);
+        if (comment == null) {
+          return null;
+        }
+        return { ...comment, replies: repliesByOriginId.get(row.id) ?? [] };
+      })
+      .filter((entry): entry is InlineCommentWithReplies => entry != null);
   }
 
   /**
