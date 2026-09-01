@@ -21,9 +21,14 @@ import { setupIndependentModels } from '~/server/crowi/setup-models';
 import type CollectionProgress from '~/server/models/vo/collection-progress';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import CollectionProgressingStatus from '../../models/vo/collection-progressing-status';
 import { createBatchStream } from '../../util/batch-stream';
+import {
+  assertIsArray,
+  normalizeAggregateRaw,
+} from '../../util/prisma-raw-normalize';
 import { configManager } from '../config-manager';
 import type { ConvertMap } from './construct-convert-map';
 import { constructConvertMap } from './construct-convert-map';
@@ -412,9 +417,8 @@ export class ImportService {
     }
 
     // select sharelinks whose relatedPage does not exist in pages
-    const orphans = await mongoose.connection
-      .collection('sharelinks')
-      .aggregate([
+    const rawOrphans = await prisma.sharelinks.aggregateRaw({
+      pipeline: [
         {
           $lookup: {
             from: 'pages',
@@ -425,19 +429,21 @@ export class ImportService {
         },
         { $match: { page: { $size: 0 } } },
         { $project: { _id: 1 } },
-      ])
-      .toArray();
+      ],
+    });
+    assertIsArray(rawOrphans, 'orphaned sharelinks');
+    const orphanIds = (
+      normalizeAggregateRaw(rawOrphans) as { _id: string }[]
+    ).map((orphan) => orphan._id);
 
-    if (orphans.length === 0) {
+    if (orphanIds.length === 0) {
       return;
     }
 
-    await mongoose.connection
-      .collection('sharelinks')
-      .deleteMany({ _id: { $in: orphans.map((orphan) => orphan._id) } });
+    await prisma.sharelinks.deleteMany({ where: { id: { in: orphanIds } } });
 
     logger.info(
-      `Pruned ${orphans.length} sharelinks document(s) whose relatedPage no longer exists after import.`,
+      `Pruned ${orphanIds.length} sharelinks document(s) whose relatedPage no longer exists after import.`,
     );
   }
 
