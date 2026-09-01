@@ -26,8 +26,7 @@ import type {
   OwnershipChallenge,
   PairingSubmission,
 } from '../contract/pairing.js';
-import { isValidKeyIdShape } from '../signature/key-identity.js';
-import { isValidPublicKeyMaterial } from '../signature/key-material.js';
+import { parsePublicKeyRegistration } from './common-fields.js';
 import { isRecord, str } from './shape.js';
 
 /**
@@ -46,16 +45,6 @@ const REGISTRATION_CODE_MAX = 256;
 const GROWI_URI_MAX = 4096;
 /** A short human-readable label an admin typed. */
 const GROWI_LABEL_MAX = 256;
-/**
- * `str`'s max here only needs to be >= `isValidKeyIdShape`'s own upper
- * bound (64, `KEY_ID_SHAPE_PATTERN` in `signature/key-identity.ts`) --
- * that function is the real authority on keyId's shape, this is just a
- * defensive outer bound before handing the value to it. Same convention as
- * task 6.2's parse-keys.ts.
- */
-const KEY_ID_MAX = 128;
-/** ISO-8601 timestamp (`Date#toISOString()`, see tasks.md's 4.3 Implementation Note). */
-const VALID_FROM_MAX = 64;
 
 /**
  * `challenge`'s exact shape (design.md's rationale table, "`challenge` の
@@ -135,27 +124,16 @@ export const parsePairingSubmission = (
   const registrationCode = str(raw.registrationCode, REGISTRATION_CODE_MAX);
   const growiUri = str(raw.growiUri, GROWI_URI_MAX);
   const growiLabel = str(raw.growiLabel, GROWI_LABEL_MAX);
-  const publicKeyRaw = raw.publicKey;
+  // Shared with parse-keys.ts's parseKeyRegistration and
+  // parse-responses.ts's parsePairingResult -- see common-fields.ts's doc
+  // comment on parsePublicKeyRegistration (tasks.md's 6.3->6.5 Implementation Note).
+  const publicKey = parsePublicKeyRegistration(raw.publicKey);
 
   if (
     registrationCode === undefined ||
     growiUri === undefined ||
     growiLabel === undefined ||
-    !isRecord(publicKeyRaw)
-  ) {
-    return { error: 'malformed' };
-  }
-
-  const keyId = str(publicKeyRaw.keyId, KEY_ID_MAX);
-  const validFrom = str(publicKeyRaw.validFrom, VALID_FROM_MAX);
-  const publicKeyJwk = publicKeyRaw.publicKeyJwk;
-
-  if (
-    keyId === undefined ||
-    validFrom === undefined ||
-    !isRecord(publicKeyJwk) ||
-    !isValidKeyIdShape(keyId) ||
-    !isValidPublicKeyMaterial(publicKeyJwk).ok
+    publicKey === undefined
   ) {
     return { error: 'malformed' };
   }
@@ -164,7 +142,7 @@ export const parsePairingSubmission = (
     registrationCode,
     growiUri,
     growiLabel,
-    publicKey: { keyId, publicKeyJwk, validFrom },
+    publicKey,
   };
 };
 

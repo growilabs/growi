@@ -16,7 +16,7 @@ import type {
 } from '../contract/pairing.js';
 import { OP_NAMES } from '../endpoints/op-names.js';
 import { isValidKeyIdShape } from '../signature/key-identity.js';
-import { isValidPublicKeyMaterial } from '../signature/key-material.js';
+import { parsePublicKeyRegistration } from './common-fields.js';
 import { isRecord, oneOf, str } from './shape.js';
 
 const RELATION_ID_MAX = 128;
@@ -27,8 +27,6 @@ const RELATION_ID_MAX = 128;
  * defensive outer bound before handing the value to it.
  */
 const KEY_ID_MAX = 128;
-/** ISO-8601 timestamp (`Date#toISOString()`, see tasks.md's 4.3 Implementation Note). */
-const VALID_FROM_MAX = 64;
 
 type ParseError = { readonly error: 'malformed' };
 
@@ -47,31 +45,16 @@ export const parseKeyRegistration = (
     OP_NAMES.keyRegisterToGrowi,
     OP_NAMES.keyRegisterToProxy,
   ]);
-  const keyRaw = raw.key;
+  // Shared with parse-pairing.ts's parsePairingSubmission and
+  // parse-responses.ts's parsePairingResult -- see common-fields.ts's doc
+  // comment on parsePublicKeyRegistration (tasks.md's 6.3->6.5 Implementation Note).
+  const key = parsePublicKeyRegistration(raw.key);
 
-  if (relationId === undefined || op === undefined || !isRecord(keyRaw)) {
+  if (relationId === undefined || op === undefined || key === undefined) {
     return { error: 'malformed' };
   }
 
-  const keyId = str(keyRaw.keyId, KEY_ID_MAX);
-  const validFrom = str(keyRaw.validFrom, VALID_FROM_MAX);
-  const publicKeyJwk = keyRaw.publicKeyJwk;
-
-  if (
-    keyId === undefined ||
-    validFrom === undefined ||
-    !isRecord(publicKeyJwk) ||
-    !isValidKeyIdShape(keyId) ||
-    !isValidPublicKeyMaterial(publicKeyJwk).ok
-  ) {
-    return { error: 'malformed' };
-  }
-
-  return {
-    relationId,
-    op,
-    key: { keyId, publicKeyJwk, validFrom },
-  };
+  return { relationId, op, key };
 };
 
 export const parseKeyRevocation = (

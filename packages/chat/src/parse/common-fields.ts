@@ -1,6 +1,8 @@
-// Internal helpers shared by more than one of task 6.2's parse* functions
-// (`ChatAccountRef` is carried by both `CommandRequest.actor` and
-// `AccountLinkStartRequest.actor`; `ChannelRef` by `CommandRequest.channel`).
+// Internal helpers shared by more than one parse* function across this
+// directory (`ChatAccountRef` is carried by both `CommandRequest.actor` and
+// `AccountLinkStartRequest.actor`; `ChannelRef` by `CommandRequest.channel`;
+// `PublicKeyRegistration` by `KeyRegistrationRequest.key`,
+// `PairingSubmission.publicKey`, and `PairingResult`'s `paired` variant).
 // NOT part of any public barrel -- task 7.1 owns the package's two entry
 // points. Sibling files under `parse/` import this one directly, the same
 // way they import `./shape.js`.
@@ -10,6 +12,9 @@ import type {
   ChatAccountRef,
   PlatformName,
 } from '../contract/common.js';
+import type { PublicKeyRegistration } from '../contract/pairing.js';
+import { isValidKeyIdShape } from '../signature/key-identity.js';
+import { isValidPublicKeyMaterial } from '../signature/key-material.js';
 import { isRecord, oneOf, str } from './shape.js';
 
 /**
@@ -78,4 +83,49 @@ export const parseChannelRef = (v: unknown): ChannelRef | undefined => {
   }
 
   return { platform, channelId, channelName, isPrivate };
+};
+
+/**
+ * `str`'s max here only needs to be >= `isValidKeyIdShape`'s own upper
+ * bound (64, `KEY_ID_SHAPE_PATTERN` in `signature/key-identity.ts`) -- that
+ * function is the real authority on keyId's shape, this is just a
+ * defensive outer bound before handing the value to it.
+ */
+const KEY_ID_MAX = 128;
+/** ISO-8601 timestamp (`Date#toISOString()`, see tasks.md's 4.3 Implementation Note). */
+const VALID_FROM_MAX = 64;
+
+/**
+ * `PublicKeyRegistration` (`keyId`/`publicKeyJwk`/`validFrom`) is carried
+ * by THREE different contract shapes: `KeyRegistrationRequest.key`
+ * (parse-keys.ts), `PairingSubmission.publicKey` (parse-pairing.ts), and
+ * `PairingResult`'s `paired` variant (parse-responses.ts, task 6.5). Per
+ * tasks.md's 6.3->6.5 Implementation Note, this check is centralized here
+ * instead of being hand-copied a third time -- all 3 call sites delegate
+ * to this one function. Public-key material judgement itself is NOT
+ * re-derived here either: `isValidKeyIdShape`/`isValidPublicKeyMaterial`
+ * (task 2.4) already own that logic.
+ */
+export const parsePublicKeyRegistration = (
+  v: unknown,
+): PublicKeyRegistration | undefined => {
+  if (!isRecord(v)) {
+    return undefined;
+  }
+
+  const keyId = str(v.keyId, KEY_ID_MAX);
+  const validFrom = str(v.validFrom, VALID_FROM_MAX);
+  const publicKeyJwk = v.publicKeyJwk;
+
+  if (
+    keyId === undefined ||
+    validFrom === undefined ||
+    !isRecord(publicKeyJwk) ||
+    !isValidKeyIdShape(keyId) ||
+    !isValidPublicKeyMaterial(publicKeyJwk).ok
+  ) {
+    return undefined;
+  }
+
+  return { keyId, publicKeyJwk, validFrom };
 };

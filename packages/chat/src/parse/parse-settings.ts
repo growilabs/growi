@@ -56,10 +56,26 @@ const parseChannelPermissionRow = (
   return { commandName, allowedChannels };
 };
 
-const parseVersion = (v: unknown): number | undefined =>
+/**
+ * Exported: `parse-responses.ts`'s `parseSettingsPullResponse` (task 6.5)
+ * reuses this same rule for `SettingsPullResponse.version` instead of
+ * re-deriving it -- both are "one value per relation, GROWI increments by
+ * 1 on every save" (see `SettingsPushRequest.version`'s doc comment in
+ * `contract/settings.ts`).
+ */
+export const parseVersion = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : undefined;
 
-const parseRelationSettings = (v: unknown): RelationSettings | undefined => {
+/**
+ * Exported: `parse-responses.ts`'s `parseSettingsPullResponse` (task 6.5)
+ * reuses this same nested-shape check for `SettingsPullResponse.settings`
+ * instead of re-deriving the `channelPermissions` array check a second
+ * time (per tasks.md's general "don't duplicate a shared shape" pattern
+ * -- see the 6.3->6.5 Implementation Note about `PublicKeyRegistration`).
+ */
+export const parseRelationSettings = (
+  v: unknown,
+): RelationSettings | undefined => {
   if (!isRecord(v)) {
     return undefined;
   }
