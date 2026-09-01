@@ -7,7 +7,41 @@
 // `./index.ts` instead; see `src/public-surface.spec.ts` for the drift test
 // that keeps `./index.ts` from reaching this module's dependencies.
 //
-// The signature module itself does not exist yet -- it is added by task
-// 5.x in .kiro/specs/chat-integration-protocol/tasks.md. This file only
-// establishes the entry point.
-export {};
+// Everything below comes from the `./signature` directory barrel -- see
+// that file's header comment for what was deliberately left out
+// (`buildSignatureBase`, `structured-fields.ts`'s serialize/parse helpers)
+// and why.
+
+export type {
+  CoveredComponent,
+  KeyMaterialJudgement,
+  KeyRef,
+  KeyRevocationJudgement,
+  RevocableKeyEntry,
+  SignatureParamName,
+  SignParams,
+  SignResult,
+  VerifyFailure,
+  VerifyParams,
+  VerifyResult,
+} from './signature/index.js';
+export {
+  acceptEnvelope,
+  CLOCK_SKEW_TOLERANCE_SEC,
+  CONTENT_DIGEST_ALGORITHM,
+  COVERED_COMPONENTS,
+  computeContentDigest,
+  DEFAULT_EXPIRES_IN_SEC,
+  decodeKeyId,
+  encodeKeyId,
+  isValidKeyIdShape,
+  isValidPublicKeyMaterial,
+  judgeKeyRevocation,
+  MAX_ACCEPTED_EXPIRES_IN_SEC,
+  pairingChallengePayload,
+  SIGNATURE_ALGORITHM,
+  SIGNATURE_LABEL,
+  SIGNATURE_PARAMS,
+  sign,
+  verify,
+} from './signature/index.js';

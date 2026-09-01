@@ -13,6 +13,14 @@ import type {
   PlatformName,
 } from '../contract/common.js';
 import type { PublicKeyRegistration } from '../contract/pairing.js';
+// Deliberately importing these two leaf files directly, NOT
+// `../signature/index.js`. Both files have zero imports of their own (no
+// `node:crypto`), but `signature/index.ts` also re-exports `sign.ts`/
+// `verify.ts`, which DO import `node:crypto`. This file is used by
+// client-safe `src/index.ts` (via several re-exported parse* functions), so
+// importing the signature barrel here would pull `node:crypto` into the
+// client bundle -- exactly what `public-surface.spec.ts` (task 1.2) exists
+// to catch.
 import { isValidKeyIdShape } from '../signature/key-identity.js';
 import { isValidPublicKeyMaterial } from '../signature/key-material.js';
 import { isRecord, oneOf, str } from './shape.js';
