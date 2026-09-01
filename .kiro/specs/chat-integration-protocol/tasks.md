@@ -157,7 +157,7 @@
   - _Boundary: MessageSignature_
 
 - [ ] 5. 署名の生成と検証を作る
-- [ ] 5.1 本文のハッシュと、構造化ヘッダの型付きの扱いを用意する
+- [x] 5.1 本文のハッシュと、構造化ヘッダの型付きの扱いを用意する
   - 本文のバイト列に対するハッシュを作る。**方式の宣言は 1 か所に置く**
   - 構造化ヘッダのライブラリに型定義が無いので、薄い型付きの包みを 1 つ書く
   - 本体のバイト列からハッシュ付きのヘッダ値が作れ、同じ入力で同じ値になる
@@ -302,6 +302,7 @@
 
 - **1.2**: `packages/chat` の相対 import は、この monorepo の他パッケージ（`packages/slack` / `packages/core`）と同じく末尾に `.js` を付ける書き方（`from './foo.js'`）が実際の慣習。`src/public-surface.spec.ts` の静的 import 木の追跡は、拡張子なし・`.js` 付き・`~/` エイリアス（`tsconfig.json` の `paths`）の 3 通りすべてを解決できる必要がある（最初の実装は `.js` 付きと `~/` を見逃し、レビューで差し戻された）。以降のタスクで `index.ts` / `server.ts` から再輸出を追加する際は、書き方を変えても検査が黙って素通りしないことを確認すること。
 - **2.2**: design.md の `command-names.ts` コメントにある「書き込みは既定で不許可」は design.md 自身の 1 か所（`Security` という見出しは design.md に実在しない）にしか根拠が無く、requirements.md 11.1 は「コマンドごとに許可チャンネルを設定できる」までしか書いていない。4.1（チャンネル権限判定、既定は書き込み不許可・それ以外は許可）を実装する前に、この既定挙動が要件のどこで確定しているかを requirements.md で先に確認すること。
+- **5.1**: design.md の Allowed Dependencies 表（と tasks.md 本文）にある「`structured-headers` は型定義が無いのでこのファイルだけが未型付き API に触れる」という理由は事実誤り — `structured-headers@2.0.3` は `dist/*.d.ts` を同梱している（`BareItem` は7種の union、`Dictionary` の値は `Item | InnerList`）。1ファイルに閉じ込める制約自体は妥当（実装は正しく「型はあるが RFC 8941 全体を表す広すぎる型なので、このパッケージが実際に使う狭い形へ包む」に理由を書き換え済み）。design.md/tasks.md 側の記述訂正は `/kiro-validate-impl` または feature 全体の検証で拾うこと。
 - **4.3**: 「有効な鍵」は `validFrom <= now && revokedAt == null` の両軸で判定する（`revokedAt` の有無だけでは不足）。この軸は失効の**対象鍵自身**と**残数の数え方（対象を除いてから数える）**の両方に同じ述語を適用しないと片手落ちになる（レビューで2回、別々の半分の直し漏れが見つかった）。`validFrom`/`now` は同じ書式の UTC 表記（`Date#toISOString()`）である前提で文字列比較する — 書式を決めるのは 3.3 の `PublicKeyRegistration.validFrom` と app/proxy 側で、この関数はその前提に依存するだけ。
 - **4.2**: `judgeGrowiUri`（`url-guard/growi-uri-guard.ts`）は design.md の表に無い2点を、承認済み文書の意図から読んで実装している。(a) `allowList` が免除する scheme は http/https の内側に限る — design.md の免除の正当化段落が挙げているのは平文 http の構成（要件13.1）だけなので、`file:`・`gopher:` 等は allowList 経由でも通さない。(b) 私的帯の判定は design.md の列挙（RFC1918・169.254.0.0/16・loopback・IPv6 unique-local）に加えて `0.0.0.0/8`・IPv6 `::`・CGNAT `100.64.0.0/10`・IPv6 リンクローカル `fe80::/10`・非推奨サイトローカル `fec0::/10` も拒否する — これらはいずれもインターネット上を流れないアドレスで、official proxy が到達できる GROWI がそこに置かれることは無いため、拒否を広げても実構成を1つも塞がない（official proxy は allowList 設定を持たないので「allowList で逃がせる」は理由にならない点に注意）。4.3・`chat-integration-proxy` 側のタスクでこの2点を design.md の表と食い違うとして蒸し返さないこと。
 - **4.1（2.2 の注記を決着）**: 「書き込みは既定で不許可」は requirements.md 11.1〜11.5 に明文が無い。根拠は要件 11 の Objective（想定していないチャンネルからの書き込みを防ぐ）と要件 10.5・10.6（紐付いていない利用者の書き込みを実行しない）。design.md は承認済みの成果物であり、そこに書かれた既定をそのまま実装するのは正しい。4.2・4.3 でこの論点を蒸し返さないこと。
