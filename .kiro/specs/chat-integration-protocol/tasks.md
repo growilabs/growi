@@ -209,7 +209,7 @@
   - _Requirements: 10.1_
   - _Boundary: ShapeParsers_
 
-- [ ] 6.2 (P) 署名付きで届く要求の形を確かめる関数を作る（7 本）
+- [x] 6.2 (P) 署名付きで届く要求の形を確かめる関数を作る（7 本）
   - コマンド・通知・設定の押し込み・鍵の追加・鍵の失効・紐付けの開始・読み取りだけの口の本体
   - **どれも関係の識別子と口の名前を必ず確かめて残す。**
     落とすと、その後の突き合わせが空回りするか全リクエストを断つ
@@ -302,6 +302,7 @@
 
 - **1.2**: `packages/chat` の相対 import は、この monorepo の他パッケージ（`packages/slack` / `packages/core`）と同じく末尾に `.js` を付ける書き方（`from './foo.js'`）が実際の慣習。`src/public-surface.spec.ts` の静的 import 木の追跡は、拡張子なし・`.js` 付き・`~/` エイリアス（`tsconfig.json` の `paths`）の 3 通りすべてを解決できる必要がある（最初の実装は `.js` 付きと `~/` を見逃し、レビューで差し戻された）。以降のタスクで `index.ts` / `server.ts` から再輸出を追加する際は、書き方を変えても検査が黙って素通りしないことを確認すること。
 - **2.2**: design.md の `command-names.ts` コメントにある「書き込みは既定で不許可」は design.md 自身の 1 か所（`Security` という見出しは design.md に実在しない）にしか根拠が無く、requirements.md 11.1 は「コマンドごとに許可チャンネルを設定できる」までしか書いていない。4.1（チャンネル権限判定、既定は書き込み不許可・それ以外は許可）を実装する前に、この既定挙動が要件のどこで確定しているかを requirements.md で先に確認すること。
+- **6.2**: `parse/common-fields.ts`（非公開・barrel対象外）に `ChatAccountRef`/`ChannelRef` の検査と `PLATFORM_NAMES` をまとめた。2本以上の parse 関数が使う項目の確認はここに集約し、複製しないこと（レビューで `PlatformName` の一覧が2箇所にあるのを指摘され修正済み）。`op` の許可リストはレビューで「1個だけ試す」テストでは書き写し間違いに気付けないことが判明したため、7関数すべてに `Object.values(OP_NAMES)` の総当たりテストを追加済み — 6.3〜6.5 でも同じ形式（許可op以外の全メンバーを反復）で書くこと。
 - **6.1 → 6.2/6.3 への申し送り**: `parse/shape.ts` の道具は4つ（`isRecord`/`str`/`arr`/`oneOf`）に固定し、5つ目は足していない。`str(v, max)` は上限だけを見る（下限や空文字許容の変種は無い）。6.2 で `CommandRequest` の `limit`（数値）の上限判定と、6.3 の `challenge` の「32〜128文字」という**下限**チェックは、`str` を通した後に呼ぶ側で手書きすること。`createPage` の `body`（空ページを許す）のように空文字が正当な項目は `str` に通さず、呼ぶ側でキーの有無・型だけを別に確認すること（`str` は空文字を無条件に拒否する）。
 - **5.3**: `resolvePublicKey`/`consumeNonce` が例外を投げた場合、`verify` はそれぞれ `unknown-key`/`replayed` に畳んで返す（`VerifyFailure` の直和は design.md 固定で種類を増やせないため）。保存先の障害と実際の攻撃（鍵が無い・再送）が要件10.2の記録上見分けられない点は今回の欠陥ではないが、将来 `VerifyFailure` を見直す際の検討材料として残す。
 - **5.2 → 5.3 への申し送り**: `buildSignatureBase`（`signature-base.ts`）は署名の別枠の値（`created`/`expires`/`nonce`/`keyid`/`alg`）を**呼ぶ側が渡した順のまま** `@signature-params` に直列化する（固定の並びに直さない）。これは意図的で正しい — RFC 9421 §3.2 手順7は、検証する側が受け取った `Signature-Input` の値をそのまま使うと定めており、design.md の `VerifyParams.body` の注記（「解析した値から組み立て直したものを渡してはならない…正しい相手が弾かれる」）と同じ理由による。**5.3 の実装で、検証側が `SIGNATURE_PARAMS = ['created','expires','nonce','keyid','alg']` を固定の並びとして読み込み直すと、正しい相手を弾くリグレッションになる。** `SIGNATURE_PARAMS` は「どの値が署名対象に入るか」の宣言であって直列化順序の規定ではない — 署名する側（sign）は固定の並びで組んでよいが、検証する側（verify）は受け取った並びのまま `buildSignatureBase` に渡すこと。
