@@ -50,7 +50,7 @@
 | 依存先 | 使ってよい場所 | 制約 |
 |---|---|---|
 | `node:crypto` | `src/signature/` のみ | 暗号は自前で書かない。`crypto.subtle` は Ed25519 の検証が壊れているので使わない |
-| `structured-headers@^2.0.3` | `src/signature/structured-fields.ts` のみ | 型定義が無いので、このファイルだけが未型付き API に触れる |
+| `structured-headers@^2.0.3` | `src/signature/structured-fields.ts` のみ | 型定義はあるが RFC 8941 全体を表す広すぎる型なので、このファイルだけがそれに触れ、このパッケージが実際に使う狭い形へ包む |
 
 **それ以外の実行時依存を持たない。** とくに `chat` / `@chat-adapter/*` / HTTP クライアントを import しない。
 
@@ -821,7 +821,11 @@ proxy から見た症状は `ownership-unverified` で、保留が失効した�
 
 **そこで ⑤ の応答に `challengeSignature` を含める** — ③ で申告した秘密鍵で `challenge` に署名したもの。
 GROWI は自分が申告した鍵でしか署名できないので、鍵のすり替えが成立しなくなる。
-あわせて GROWI 側の保留の行に、**送信先の proxy と自分が申告した `keyId` を記録し、⑤ で突き合わせる。**
+
+**GROWI 側の保留の行に送信先の proxy や `keyId` を記録して ⑤ で突き合わせる、という追加の確認は採らない。**
+`OwnershipChallenge` には送り主を示す値が無い（`registrationCode` と `challenge` の 2 つだけ）ので、
+書いても実装できない（umbrella `research.md` 決定 12。`chat-integration-app` の design も同じ結論）。
+守りは `challengeSignature` の 1 本で足りる。
 
 #### ④ で申告された URL を検証する（踏み台にされないため）
 
@@ -1213,14 +1217,14 @@ export type AccountLinkStartResponse =
 5. **鍵のすり替え** — 登録コードを知る第三者が、他人の `growiUri` と自分の公開鍵で申し込んでも、
    `challengeSignature` の検証で成立しないこと（9.2・9.5）
 6. **署名の代行窓口が閉じていること** — `challenge` に **RFC 9421 の署名対象文字列そのもの**を入れて ⑤ を叩き、
-   返った署名を `Signature` ヘッダとして使っても**通らないこと**（9.6・10.6）。
+   返った署名を `Signature` ヘッダとして使っても**通らないこと**（9.6, 10.1, 10.7）。
    この設計の要になった判断なので試験で固定する
 7. **別の口への流用が通らないこと** — ある口へ宛てた署名付きリクエストを、
    署名もヘッダもそのままに**別の口へ投げると `malformed` になること**。**12 の口すべてを回す**（10.1・10.7）。
    6 と並んで、この設計の要になった判断である
 8. **同じ `relationId` を返す `PairingResult`** — 既にその `relationId` の関係を持つ GROWI が
    2 台目の proxy と申し込んだとき、ペアリングが成立せず管理者に知らされること（9.5・10.6）
-7. **⑤ はどの `challenge` にも答える** — 保留が生きている間は、違う `challenge` が続けて来ても
+9. **⑤ はどの `challenge` にも答える** — 保留が生きている間は、違う `challenge` が続けて来ても
    それぞれに署名を返すこと。**先に別の `challenge` で叩かれても、本物の問いに答えられる**こと。
    **別の送り元が上限に当たっていても、本物の送り元からの問いは通る**こと（上限が送り元ごとに数えられていること）。
    `challenge` が base64url でない、または
