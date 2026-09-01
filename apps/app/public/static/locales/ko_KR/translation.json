@@ -489,6 +489,8 @@
     },
     "editor": {
       "title": "편집기 단축키",
+      "Slash Command": "슬래시 명령어",
+      "Slash Command Desc": "(명령 메뉴 표시)",
       "Indent": "들여쓰기",
       "Outdent": "내어쓰기",
       "Save Page": "페이지 저장",
