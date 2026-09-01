@@ -231,7 +231,7 @@
   - _Depends: 6.1, 3.3_
   - _Boundary: ShapeParsers_
 
-- [ ] 6.4 (P) 要求と対になる応答の形を確かめる関数を作る（4 本）
+- [x] 6.4 (P) 要求と対になる応答の形を確かめる関数を作る（4 本）
   - コマンドの応答・通知の結果・所有確認の応答・鍵の操作の結果
   - **要求も応答も同じ扱いにする。一部だけにする基準は立てない** —
     応答には署名が付かないので、形の確かめが唯一の受け入れ条件である
@@ -302,6 +302,7 @@
 
 - **1.2**: `packages/chat` の相対 import は、この monorepo の他パッケージ（`packages/slack` / `packages/core`）と同じく末尾に `.js` を付ける書き方（`from './foo.js'`）が実際の慣習。`src/public-surface.spec.ts` の静的 import 木の追跡は、拡張子なし・`.js` 付き・`~/` エイリアス（`tsconfig.json` の `paths`）の 3 通りすべてを解決できる必要がある（最初の実装は `.js` 付きと `~/` を見逃し、レビューで差し戻された）。以降のタスクで `index.ts` / `server.ts` から再輸出を追加する際は、書き方を変えても検査が黙って素通りしないことを確認すること。
 - **2.2**: design.md の `command-names.ts` コメントにある「書き込みは既定で不許可」は design.md 自身の 1 か所（`Security` という見出しは design.md に実在しない）にしか根拠が無く、requirements.md 11.1 は「コマンドごとに許可チャンネルを設定できる」までしか書いていない。4.1（チャンネル権限判定、既定は書き込み不許可・それ以外は許可）を実装する前に、この既定挙動が要件のどこで確定しているかを requirements.md で先に確認すること。
+- **6.4 → 6.5 への申し送り**: `OUTCOME_STATUS_VALUES`（parse-notification.ts）・`ERROR_CODES`（parse-command.ts）・`APPLIED_AS_VALUES` は、契約側に `COMMAND_NAMES`/`OP_NAMES` のような定数オブジェクトが無い直和型から手で書き写した一覧（契約側に対応する定数が無いため型でつなぎようがない）。6.5 で同種の一覧（`CapabilityLevel`・`ConnectionHealth` 等）を書くときも同じ制約になる。書き写し間違いは6.2で確立した「全メンバーを反復するテスト」で担保すること。また、8KiBの本体サイズ確認は「署名の効かない口」だけの条件（design.md:774はペアリング⑤の根拠表）であり、応答一般や「そのまま保存される」こととは無関係— design.mdが名指しする「そのまま保存される」応答は `ChannelInventory`/`PairingResult`/`SettingsPullResponse` の3つだけ（6.5の担当）で、これらにも8KiBの確認は不要（個別項目の上限で十分）。
 - **6.3 → 6.5 への申し送り**: `PublicKeyRegistration`（`keyId`/`publicKeyJwk`/`validFrom` の検査）が `parse-keys.ts`（6.2）と `parse-pairing.ts`（6.3）の2箇所に重複している。6.5 の `parsePairingResult`（`PairingResult.paired` が `publicKey: PublicKeyRegistration` を持つ）を書く際に三重化させないこと。`parse/common-fields.ts` に `parsePublicKeyRegistration` として切り出し、既存2箇所をそれに置き換えること。
 - **6.2**: `parse/common-fields.ts`（非公開・barrel対象外）に `ChatAccountRef`/`ChannelRef` の検査と `PLATFORM_NAMES` をまとめた。2本以上の parse 関数が使う項目の確認はここに集約し、複製しないこと（レビューで `PlatformName` の一覧が2箇所にあるのを指摘され修正済み）。`op` の許可リストはレビューで「1個だけ試す」テストでは書き写し間違いに気付けないことが判明したため、7関数すべてに `Object.values(OP_NAMES)` の総当たりテストを追加済み — 6.3〜6.5 でも同じ形式（許可op以外の全メンバーを反復）で書くこと。
 - **6.1 → 6.2/6.3 への申し送り**: `parse/shape.ts` の道具は4つ（`isRecord`/`str`/`arr`/`oneOf`）に固定し、5つ目は足していない。`str(v, max)` は上限だけを見る（下限や空文字許容の変種は無い）。6.2 で `CommandRequest` の `limit`（数値）の上限判定と、6.3 の `challenge` の「32〜128文字」という**下限**チェックは、`str` を通した後に呼ぶ側で手書きすること。`createPage` の `body`（空ページを許す）のように空文字が正当な項目は `str` に通さず、呼ぶ側でキーの有無・型だけを別に確認すること（`str` は空文字を無条件に拒否する）。

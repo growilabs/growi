@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  parseChallengeResponse,
   parseOwnershipChallenge,
   parsePairingSubmission,
 } from './parse-pairing.js';
@@ -176,5 +177,94 @@ describe('parseOwnershipChallenge', () => {
       unexpectedJunk: 'x'.repeat(9000),
     };
     expect(parseOwnershipChallenge(oversized)).toEqual({ error: 'malformed' });
+  });
+});
+
+describe('parseChallengeResponse', () => {
+  // 86 chars: what a base64url-no-padding encoding of a 64-byte Ed25519
+  // signature actually produces.
+  const signature86 = 'A'.repeat(86);
+  const validResponse = {
+    challenge: challenge32,
+    challengeSignature: signature86,
+  };
+
+  describe('non-object input', () => {
+    it.each([null, [], 'a string', 42, undefined])('rejects %p', (value) => {
+      expect(parseChallengeResponse(value)).toEqual({ error: 'malformed' });
+    });
+  });
+
+  it('accepts a valid challenge response', () => {
+    expect(parseChallengeResponse(validResponse)).toEqual(validResponse);
+  });
+
+  it('accepts a challenge of exactly 128 characters', () => {
+    expect(
+      parseChallengeResponse({ ...validResponse, challenge: challenge128 }),
+    ).toEqual({ ...validResponse, challenge: challenge128 });
+  });
+
+  it('rejects when challenge is missing', () => {
+    const { challenge: _omit, ...rest } = validResponse;
+    expect(parseChallengeResponse(rest)).toEqual({ error: 'malformed' });
+  });
+
+  it('rejects when challengeSignature is missing', () => {
+    const { challengeSignature: _omit, ...rest } = validResponse;
+    expect(parseChallengeResponse(rest)).toEqual({ error: 'malformed' });
+  });
+
+  it('rejects a challenge of 31 characters (below the minimum)', () => {
+    expect(
+      parseChallengeResponse({ ...validResponse, challenge: 'A'.repeat(31) }),
+    ).toEqual({ error: 'malformed' });
+  });
+
+  it('rejects a challenge of 129 characters (above the maximum)', () => {
+    expect(
+      parseChallengeResponse({ ...validResponse, challenge: 'A'.repeat(129) }),
+    ).toEqual({ error: 'malformed' });
+  });
+
+  it('rejects a challenge containing a non-base64url character', () => {
+    expect(
+      parseChallengeResponse({
+        ...validResponse,
+        challenge: `${'A'.repeat(31)}+`,
+      }),
+    ).toEqual({ error: 'malformed' });
+  });
+
+  it('rejects an oversized challengeSignature', () => {
+    expect(
+      parseChallengeResponse({
+        ...validResponse,
+        challengeSignature: 'A'.repeat(129),
+      }),
+    ).toEqual({ error: 'malformed' });
+  });
+
+  it('rejects a challengeSignature containing a non-base64url character', () => {
+    expect(
+      parseChallengeResponse({
+        ...validResponse,
+        challengeSignature: `${'A'.repeat(85)}+`,
+      }),
+    ).toEqual({ error: 'malformed' });
+  });
+
+  it('rejects a wrong-typed challengeSignature', () => {
+    expect(
+      parseChallengeResponse({ ...validResponse, challengeSignature: 123 }),
+    ).toEqual({ error: 'malformed' });
+  });
+
+  it('rejects an oversized body (>8 KiB) even when every checked field is within its own bound', () => {
+    const oversized = {
+      ...validResponse,
+      unexpectedJunk: 'x'.repeat(9000),
+    };
+    expect(parseChallengeResponse(oversized)).toEqual({ error: 'malformed' });
   });
 });

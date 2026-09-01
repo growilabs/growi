@@ -22,6 +22,7 @@
 // calls through to it (same rule task 6.2's parse-keys.ts follows).
 
 import type {
+  ChallengeResponse,
   OwnershipChallenge,
   PairingSubmission,
 } from '../contract/pairing.js';
@@ -66,6 +67,28 @@ const VALID_FROM_MAX = 64;
 const CHALLENGE_MIN = 32;
 const CHALLENGE_MAX = 128;
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * `challenge`'s exact shape check, extracted so `parseOwnershipChallenge`
+ * (this file, pairing step 4) and `parseChallengeResponse` (task 6.4,
+ * pairing step 5) apply the SAME rule instead of two hand-written copies
+ * quietly drifting apart (tasks.md's 6.3->6.5 Implementation Note records
+ * this exact duplication concern for `PublicKeyRegistration` and asks
+ * later tasks not to repeat it -- this is the same principle applied to
+ * `challenge`, which is carried by two different contract types in this
+ * same file).
+ */
+const parseChallengeString = (v: unknown): string | undefined => {
+  const challenge = str(v, CHALLENGE_MAX);
+  if (
+    challenge === undefined ||
+    challenge.length < CHALLENGE_MIN ||
+    !BASE64URL_PATTERN.test(challenge)
+  ) {
+    return undefined;
+  }
+  return challenge;
+};
 
 /**
  * Design.md's rationale table ("本体の大きさ" row) states plainly: bounding
@@ -157,16 +180,57 @@ export const parseOwnershipChallenge = (
   }
 
   const registrationCode = str(raw.registrationCode, REGISTRATION_CODE_MAX);
-  const challenge = str(raw.challenge, CHALLENGE_MAX);
+  const challenge = parseChallengeString(raw.challenge);
 
-  if (
-    registrationCode === undefined ||
-    challenge === undefined ||
-    challenge.length < CHALLENGE_MIN ||
-    !BASE64URL_PATTERN.test(challenge)
-  ) {
+  if (registrationCode === undefined || challenge === undefined) {
     return { error: 'malformed' };
   }
 
   return { registrationCode, challenge };
+};
+
+/**
+ * `challengeSignature` is a base64url-encoded Ed25519 signature: a fixed
+ * 64-byte signature encodes (no padding) to exactly 86 base64url
+ * characters. 128 leaves headroom for a future signature scheme without
+ * being unbounded -- design.md does not pin the exact algorithm here, so
+ * this bound is chosen defensively, same convention as this file's other
+ * hand-picked bounds.
+ */
+const CHALLENGE_SIGNATURE_MAX = 128;
+
+/**
+ * Confirms the wire shape of `ChallengeResponse` (pairing step 5, task
+ * 6.4). Design.md's callout box above the parse* signatures states plainly
+ * that a RESPONSE carries no signature at all, so shape-checking is the
+ * ONLY acceptance gate here -- same treatment as this file's two request
+ * parsers above, and the same whole-body byte-size gate applies for the
+ * same reason (`exceedsMaxBodyBytes`'s doc comment above).
+ */
+export const parseChallengeResponse = (
+  raw: unknown,
+): ChallengeResponse | ParseError => {
+  if (!isRecord(raw)) {
+    return { error: 'malformed' };
+  }
+
+  if (exceedsMaxBodyBytes(raw)) {
+    return { error: 'malformed' };
+  }
+
+  const challenge = parseChallengeString(raw.challenge);
+  const challengeSignature = str(
+    raw.challengeSignature,
+    CHALLENGE_SIGNATURE_MAX,
+  );
+
+  if (
+    challenge === undefined ||
+    challengeSignature === undefined ||
+    !BASE64URL_PATTERN.test(challengeSignature)
+  ) {
+    return { error: 'malformed' };
+  }
+
+  return { challenge, challengeSignature };
 };

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { OP_NAMES } from '../endpoints/op-names.js';
-import { parseNotificationRequest } from './parse-notification.js';
+import {
+  parseNotificationRequest,
+  parseNotificationResult,
+} from './parse-notification.js';
 
 const valid = {
   relationId: 'rel-1',
@@ -124,5 +127,93 @@ describe('parseNotificationRequest', () => {
     expect(
       parseNotificationRequest({ ...valid, relationId: 'x'.repeat(1000) }),
     ).toEqual({ error: 'malformed' });
+  });
+});
+
+describe('parseNotificationResult', () => {
+  const outcome = { platform: 'slack', channelId: 'C1', status: 'posted' };
+  const validResult = { outcomes: [outcome] };
+
+  describe('non-object input', () => {
+    it.each([null, [], 'a string', 42, undefined])('rejects %p', (value) => {
+      expect(parseNotificationResult(value)).toEqual({ error: 'malformed' });
+    });
+  });
+
+  it('accepts a valid result', () => {
+    expect(parseNotificationResult(validResult)).toEqual(validResult);
+  });
+
+  it('accepts an empty outcomes array', () => {
+    expect(parseNotificationResult({ outcomes: [] })).toEqual({
+      outcomes: [],
+    });
+  });
+
+  it('accepts an outcome carrying optional remedy and detail', () => {
+    const withOptionals = {
+      outcomes: [{ ...outcome, remedy: 'Invite the bot.', detail: 'n/a' }],
+    };
+    expect(parseNotificationResult(withOptionals)).toEqual(withOptionals);
+  });
+
+  it('rejects when outcomes is missing', () => {
+    expect(parseNotificationResult({})).toEqual({ error: 'malformed' });
+  });
+
+  it.each([
+    'posted',
+    'bot-not-in-channel',
+    'channel-not-in-installation',
+    'inventory-not-ready',
+    'platform-error',
+    'timeout',
+  ])('accepts every real status value: %s', (status) => {
+    const result = { outcomes: [{ ...outcome, status }] };
+    expect(parseNotificationResult(result)).toEqual(result);
+  });
+
+  it('rejects an unrecognized status value', () => {
+    expect(
+      parseNotificationResult({
+        outcomes: [{ ...outcome, status: 'not-a-real-status' }],
+      }),
+    ).toEqual({ error: 'malformed' });
+  });
+
+  it('rejects an outcome with an unrecognized platform', () => {
+    expect(
+      parseNotificationResult({
+        outcomes: [{ ...outcome, platform: 'irc' }],
+      }),
+    ).toEqual({ error: 'malformed' });
+  });
+
+  it('rejects an outcome missing channelId', () => {
+    const { channelId: _omit, ...rest } = outcome;
+    expect(parseNotificationResult({ outcomes: [rest] })).toEqual({
+      error: 'malformed',
+    });
+  });
+
+  it('rejects an outcome with a wrong-typed remedy', () => {
+    expect(
+      parseNotificationResult({
+        outcomes: [{ ...outcome, remedy: 123 }],
+      }),
+    ).toEqual({ error: 'malformed' });
+  });
+
+  it('rejects an oversized outcomes array', () => {
+    const many = Array.from({ length: 501 }, () => outcome);
+    expect(parseNotificationResult({ outcomes: many })).toEqual({
+      error: 'malformed',
+    });
+  });
+
+  it('rejects an outcomes array containing a non-object element', () => {
+    expect(parseNotificationResult({ outcomes: [null] })).toEqual({
+      error: 'malformed',
+    });
   });
 });
