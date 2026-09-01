@@ -89,14 +89,24 @@
   - _Boundary: ChatSidebar_
   - _Depends: 5.2_
 
+- [x] 6.2 オープン時のキャレット付与
+  - `PageMentionInput` を `forwardRef` 化し `useImperativeHandle` で `focus()` のみ公開（`PageMentionInputHandle`、バレルから型を re-export）。`ChatSidebar` は ref を保持し `openSeq` を依存に持つ effect から `focus()` を呼ぶ
+  - マウントのみを契機にしない（表示中スレッドの再選択では remount key が変わらない）。依存を `openSeq` に限定し、ストリーミング中の再描画ではキャレットを奪わない
+  - 観察可能な完了条件: RTL テストで `document.activeElement === view.contentDOM` を用い「初回オープンでフォーカス」「`openSeq` bump のみの再オープンでフォーカス復帰」「`openSeq` 据え置きの再描画ではフォーカス不変」が通り、`PageMentionInput` 単体でも ref 経由 `focus()` がキャレットを移す
+  - _Requirements: 8.1, 8.2, 8.3_
+  - _Boundary: ChatSidebar, PageMentionInput_
+  - _Depends: 6.1_
+
 - [ ] 7. 検証
-- [ ] 7.1 手動スモーク（devcontainer）
+- [x] 7.1 手動スモーク（devcontainer）
   - アプリを起動し、`@` 入力→候補選択→チップ表示→送信の一連フローを実機確認
   - キャレットがチップ内部に入らない（境界のみ・単位削除）こと、IME 変換確定 Enter で誤って候補確定/送信が起きないこと（Issue 2）を確認。手順は `apps/app/.claude/skills/app-commands/SKILL.md` の Smoke Testing に従う
   - 観察可能な完了条件: 上記フローと 2 つの挙動が実機で再現確認できる
+  - 実施根拠: PR #11275（`44f516f987` として master にマージ済み）本文の「動作確認」チェックリストで本項目が実施済みとしてチェックされており、デモ動画も添付されている
   - _Requirements: 1.1, 3.3, 5.1, 5.3, 6.1_
 
 ## Implementation Notes
-- vitest (esbuild) does NOT typecheck — code that passes `pnpm vitest run` can still fail `tsc`. In CodeMirror tests, an empty `const effects = []` infers as `never[]`; annotate as `StateEffect<{...}>[]`. Run `npx tsc --noEmit -p tsconfig.json | grep PageMentionInput` after each task to catch type-only errors before CI. (from task 2.3/3.1)
+- vitest（esbuild）は型検査を行わない — `pnpm vitest run` を通過したコードでも `tsc` では失敗し得る。CodeMirror のテストでは、空の `const effects = []` が `never[]` と推論されてしまうため `StateEffect<{...}>[]` として型注釈する必要がある。各タスクの後に `npx tsc --noEmit -p tsconfig.json | grep PageMentionInput` を実行し、CI 前に型のみのエラーを検出すること。（task 2.3/3.1 で判明）
 - Post-MVP UI/UX additions (beyond the original tasks, reflected in requirements/design): candidate UI uses `downshift` (controlled) + `simplebar-react` + creator avatar (`@growi/ui` `UserPicture`); commit inserts a trailing space; the editor installs `defaultKeymap` (caret motion / atomic traversal); a11y (Requirement 2.8) adds `mention-aria.ts` (`MENTION_LISTBOX_ID`/`mentionOptionId`), editor `aria-controls`/`aria-activedescendant`, listbox `aria-label` (`pageMention.candidatesLabel`), and `role=status` live regions. Navigation is SPA `router.push`.
 - PR レビュー（#11275）後の改善（design に反映済み）: ① placeholder を Compartment 化し prop 変更（i18n 非同期ロード/言語切替）に追従、② 検索に `includeUserPages: true` を指定（/user 配下もメンション対象）、③ deprecated な `useDebounce` を `useDebounceValue` に移行、④ listbox 描画条件を共有述語 `isListboxRendered`（`mention-aria.ts`）に単一化し ARIA 属性の dangling を構造的に防止、⑤ `commit` の置換範囲を React ミラーでなく `view.state.field(mentionSessionField)` からライブに取得、⑥ `INACTIVE_MENTION_SESSION` / `MENTION_CHIP_CLASS` の定数共有・抽出、`computeSession` を `line.text` 走査に簡素化。タイプ中（デバウンス窓）の表示は「検索中…」維持を仕様として確定（前回候補の継続表示は不採用）。
+- Post-MVP 追加（Requirement 8 / task 6.2、requirements・design に反映済み）: サイドバーのオープン時に入力欄へキャレットを付与。入力欄の実体が内部所有の CodeMirror `contentDOM` のため、通常の DOM ref では掴めず `forwardRef` + `useImperativeHandle`（公開は `focus()` のみ）を採用。トリガはマウントではなく `openSeq`。残課題（別チケット）: サイドバーを閉じた際にフォーカスがオープン元へ戻らず `<body>` に落ちる（キーボード/SR 利用時の位置喪失）。

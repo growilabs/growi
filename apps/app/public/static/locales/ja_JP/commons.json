@@ -1,5 +1,6 @@
 {
   "Show": "公開",
+  "View": "閲覧",
   "Hide": "非公開",
   "Add": "追加",
   "Insert": "挿入",
@@ -7,9 +8,28 @@
   "Sign out": "ログアウト",
   "New": "作成",
   "Send": "送信",
+  "Clear": "クリア",
   "Close": "閉じる",
   "Done": "完了",
   "Delete": "削除",
+  "Cancel": "キャンセル",
+  "Confirm": "確認",
+  "Create": "作成",
+  "Created": "作成日",
+  "Description": "説明",
+  "Edit": "編集",
+  "Email": "メールアドレス",
+  "Error occurred": "エラーが発生しました",
+  "Help": "ヘルプ",
+  "Name": "名前",
+  "Password": "パスワード",
+  "Update": "更新",
+  "UserGroup": "グループ",
+  "V5 Page Migration": "V5 互換形式 への変換",
+  "Warning": "注意",
+  "add": "追加",
+  "eg": "例:",
+  "username": "ユーザー名",
   "meta": {
     "display_name": "日本語"
   },
@@ -260,5 +280,8 @@
       },
       "cancel": "キャンセル"
     }
+  },
+  "table_action": {
+    "edit": "編集"
   }
 }

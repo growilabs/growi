@@ -1,8 +1,9 @@
 import express from 'express';
 import request from 'supertest';
 
-import registerSafeRedirectFactory, {
+import {
   type ResWithSafeRedirect,
+  registerSafeRedirectFactory,
 } from './safe-redirect';
 
 /**

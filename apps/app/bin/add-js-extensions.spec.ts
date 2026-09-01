@@ -1,5 +1,5 @@
 /**
- * Tests for the add-js-extensions post-build tool (C1, esm-import-convention task 2.1).
+ * Tests for the add-js-extensions post-build tool.
  *
  * The tool processes emitted .js files in dist and rewrites extensionless relative
  * import specifiers to the correct resolved form (.js / /index.js / .jsx).

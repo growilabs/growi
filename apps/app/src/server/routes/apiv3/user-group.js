@@ -604,9 +604,11 @@ export const setup = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.delete,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const { id: deleteGroupId } = req.params;
       const { actionName, transferToUserGroupId, transferToUserGroupType } =
@@ -697,9 +699,11 @@ export const setup = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.update,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const { id } = req.params;
       const {
@@ -929,9 +933,11 @@ export const setup = (crowi) => {
     accessTokenParser([SCOPE.WRITE.ADMIN.USER_GROUP_MANAGEMENT]),
     loginRequiredStrictly,
     adminRequired,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.users.post,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const { id, username } = req.params;
 

@@ -28,7 +28,6 @@ import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
@@ -36,6 +35,7 @@ import {
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
@@ -207,26 +207,51 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     pageTags: string[];
   }) {
     const tagEvent = crowi.events.tag;
-    await PageTagRelation.updatePageTags(createdPage.id, pageTags);
+    await prisma.pagetagrelations.updatePageTags(createdPage.id, pageTags);
     tagEvent.emit('update', createdPage, pageTags);
-    return PageTagRelation.listTagNamesByPage(createdPage.id);
+    return prisma.pagetagrelations.listTagNamesByPage(createdPage.id);
   }
 
-  async function postAction(
+  /**
+   * Emit the page-create activity.
+   *
+   * This MUST run before the response is sent (see the call site). The
+   * activity's request context (operator/ip/endpoint/username) is held in
+   * `pendingActivityContext` and cleared by `registerFailsafeFinalizer` on the
+   * `res` 'finish'/'close' events; the ActivityService 'update' listener reads
+   * it synchronously via `pendingActivityContext.take()`. Emitting before the
+   * response guarantees `take()` runs while the context is still alive.
+   *
+   * This emit used to sit at the top of `postAction` (after `res.apiv3()`) and
+   * was safe only because nothing `await`ed between the two -- a fragile
+   * property. Emitting it here removes that fragility: it can no longer regress
+   * into the update-page-style null-user bug (PR #11510) if an `await` is later
+   * inserted. There is no latency cost because there was never an `await`
+   * before this emit.
+   */
+  function generateCreateActivity(
     req: CreatePageRequest,
     res: ApiV3Response,
     createdPage: HydratedDocument<PageDocument>,
   ) {
-    // persist activity
-    const parameters = {
-      targetModel: SupportedTargetModel.MODEL_PAGE,
-      target: createdPage,
-      action: SupportedAction.ACTION_PAGE_CREATE,
-      contributor: req.user,
-    };
-    const activityEvent = crowi.events.activity;
-    activityEvent.emit('update', res.locals.activity._id, parameters);
+    try {
+      const parameters = {
+        targetModel: SupportedTargetModel.MODEL_PAGE,
+        target: createdPage,
+        action: SupportedAction.ACTION_PAGE_CREATE,
+        contributor: req.user,
+      };
+      const activityEvent = crowi.events.activity;
+      activityEvent.emit('update', res.locals.activity._id, parameters);
+    } catch (err) {
+      logger.error('Failed to generate create activity', err);
+    }
+  }
 
+  async function postAction(
+    req: CreatePageRequest,
+    createdPage: HydratedDocument<PageDocument>,
+  ) {
     // global notification
     try {
       await crowi.globalNotificationService.fire(
@@ -361,9 +386,14 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         revision: serializeRevisionSecurely(createdPage.revision),
       };
 
+      // Emit the create activity BEFORE sending the response so the
+      // ActivityService listener captures the request context while it is still
+      // alive (see generateCreateActivity's doc comment).
+      generateCreateActivity(req, res, createdPage);
+
       res.apiv3(result, 201);
 
-      postAction(req, res, createdPage);
+      postAction(req, createdPage);
     },
   ];
 };

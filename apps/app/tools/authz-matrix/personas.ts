@@ -13,8 +13,6 @@
  * the two columns have distinct meaning. Authenticated personas are
  * unaffected by the ACL toggle because `loginRequired` consults the ACL
  * only when `req.user == null`.
- *
- * Requirements covered: 2.6, 2.8, 6.5
  */
 
 import type { Express } from 'express';

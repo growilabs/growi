@@ -69,6 +69,7 @@ export const CONFIG_KEYS = [
   'app:elasticsearchMaxBodyLengthToIndex',
   'app:elasticsearchReindexBulkSize',
   'app:elasticsearchReindexOnBoot',
+  'app:elasticsearchAuditlogReindexOnBoot',
   'app:growiCloudUri',
   'app:growiAppIdForCloud',
   'app:ogpUri',
@@ -83,6 +84,7 @@ export const CONFIG_KEYS = [
   'app:deploymentType',
   'app:ssrMaxRevisionBodyLength',
   'app:wipPageExpirationSeconds',
+  'app:wipPageCleanupCronSchedule',
   'app:isReadOnlyForNewUser',
   'app:vaultEnabled',
   'app:vaultManagerEndpoint',
@@ -287,10 +289,6 @@ export const CONFIG_KEYS = [
   'slackbot:withoutProxy:eventActionsPermission',
   'slackbot:withProxy:saltForGtoP',
   'slackbot:withProxy:saltForPtoG',
-
-  // OpenAI Settings
-  'openai:serviceType',
-  'openai:apiKey',
 
   // AI Tools Settings
   'aiTools:suggestPathAgenticSearchLimit',
@@ -508,6 +506,10 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'ELASTICSEARCH_REINDEX_ON_BOOT',
     defaultValue: false,
   }),
+  'app:elasticsearchAuditlogReindexOnBoot': defineConfig<boolean>({
+    envVarName: 'ELASTICSEARCH_AUDITLOG_REINDEX_ON_BOOT',
+    defaultValue: false,
+  }),
   'app:growiCloudUri': defineConfig<string | undefined>({
     envVarName: 'GROWI_CLOUD_URI',
     defaultValue: undefined,
@@ -566,6 +568,13 @@ export const CONFIG_DEFINITIONS = {
   'app:wipPageExpirationSeconds': defineConfig<number>({
     envVarName: 'WIP_PAGE_EXPIRATION_SECONDS',
     defaultValue: 172800,
+  }),
+  // Sweep that deletes expired WIP pages. An empty value disables it, which an
+  // operator needs when the sweep is too heavy for their wiki or must be run
+  // out-of-band; the pages then simply keep their (unenforced) expiry.
+  'app:wipPageCleanupCronSchedule': defineConfig<string>({
+    envVarName: 'WIP_PAGE_CLEANUP_CRON_SCHEDULE',
+    defaultValue: '0 3 * * *',
   }),
   'app:isReadOnlyForNewUser': defineConfig<boolean>({
     envVarName: 'DEFAULT_USER_READONLY',
@@ -1281,17 +1290,6 @@ export const CONFIG_DEFINITIONS = {
     isSecret: true,
   }),
 
-  // OpenAI Settings
-  'openai:serviceType': defineConfig<'openai' | 'azure-openai'>({
-    envVarName: 'OPENAI_SERVICE_TYPE',
-    defaultValue: 'openai',
-  }),
-  'openai:apiKey': defineConfig<string | undefined>({
-    envVarName: 'OPENAI_API_KEY',
-    defaultValue: undefined,
-    isSecret: true,
-  }),
-
   // AI chat (Mastra) Settings — multi-provider: several providers can be
   // configured at once, one fixed slot per supported provider.
   //
@@ -1630,8 +1628,20 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
     ],
   },
   {
+    // gcs:referenceFileWithRelayMode is included alongside the
+    // credential/bucket keys: for a GROWI.cloud hosted-GCS tenant, the
+    // file-delivery method is infra-managed the same as the bucket itself,
+    // so it must not be overridable from the admin UI either.
+    // TODO: azure:referenceFileWithRelayMode has the same requirement but is
+    // not yet in the azure group below — see the GCS fix this comment
+    // shipped with.
     controlKey: 'env:useOnlyEnvVars:gcs',
-    targetKeys: ['gcs:apiKeyJsonPath', 'gcs:bucket', 'gcs:uploadNamespace'],
+    targetKeys: [
+      'gcs:apiKeyJsonPath',
+      'gcs:bucket',
+      'gcs:uploadNamespace',
+      'gcs:referenceFileWithRelayMode',
+    ],
   },
   {
     controlKey: 'env:useOnlyEnvVars:azure',

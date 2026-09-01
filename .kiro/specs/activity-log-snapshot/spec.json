@@ -1,9 +1,9 @@
 {
   "feature_name": "activity-log-snapshot",
   "created_at": "2026-06-29T09:16:21Z",
-  "updated_at": "2026-07-10T11:47:34Z",
+  "updated_at": "2026-08-06T00:00:00Z",
   "language": "ja",
-  "phase": "tasks-approved",
+  "phase": "implementation-complete",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -19,5 +19,5 @@
     }
   },
   "ready_for_implementation": true,
-  "increment_note": "REMOVE scope (requirements 1-4, tasks 1-7) is implemented (PR #11393). Increment (requirements 5-8, tasks 8-13: attachment ADD/DOWNLOAD snapshot capture) has approved requirements, design, and tasks; ready for implementation. Only the increment tasks 8-13 are pending implementation; REMOVE tasks 1-7 remain done."
+  "increment_note": "Fully implemented. REMOVE scope (requirements 1-4, tasks 1-7) landed in PR #11393; the attachment ADD/DOWNLOAD capture increment (requirements 5-8, tasks 8-13) and the behaviour-neutral placement refactor (task 14: attachment-snapshot / attachment-removal-snapshot moved to server/service/attachment/, leaving service/activity as mechanism only) landed in PR #11433. All sub-tasks are done; unchecked entries in tasks.md are parent headers."
 }

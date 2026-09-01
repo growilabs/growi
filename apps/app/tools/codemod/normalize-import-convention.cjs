@@ -1,5 +1,5 @@
 /**
- * Codemod: normalize-import-convention (C2, esm-import-convention task 4.2).
+ * Codemod: normalize-import-convention.
  *
  * Transforms apps/app/src import specifiers to the "no-extension" convention by
  * removing extensions ONLY — it preserves each specifier's authored alias/relative

@@ -1,5 +1,5 @@
 /**
- * Post-build verification: verify-dist-resolution (C5, esm-import-convention task 3).
+ * Post-build verification: verify-dist-resolution.
  *
  * Statically verifies that every relative import specifier in every emitted .js
  * file under distRoot points to a file that actually exists on disk.

@@ -1,6 +1,6 @@
 {
   "name": "growi",
-  "version": "8.0.0-RC.0",
+  "version": "8.0.3-RC.0",
   "type": "module",
   "description": "Team collaboration software using markdown",
   "license": "MIT",
@@ -34,11 +34,11 @@
     "version-subpackages": "changeset version && pnpm update \"@growi/*\" -r && pnpm dedupe",
     "release-subpackages": "turbo run build --filter @growi/core --filter @growi/pluginkit && changeset publish",
     "release-subpackages:snapshot": "turbo run build --filter @growi/core --filter @growi/pluginkit && changeset version --snapshot next && changeset publish --no-git-tag --snapshot --tag next",
-    "version:patch": "pnpm version patch --no-git-tag-version",
-    "version:prerelease": "pnpm version prerelease --preid=RC --no-git-tag-version",
-    "version:prepatch": "pnpm version prepatch --preid=RC --no-git-tag-version",
-    "version:preminor": "pnpm version preminor --preid=RC --no-git-tag-version",
-    "version:premajor": "pnpm version premajor --preid=RC --no-git-tag-version"
+    "version:patch": "pnpm version patch --no-git-tag-version --no-git-checks",
+    "version:prerelease": "pnpm version prerelease --preid=RC --no-git-tag-version --no-git-checks",
+    "version:prepatch": "pnpm version prepatch --preid=RC --no-git-tag-version --no-git-checks",
+    "version:preminor": "pnpm version preminor --preid=RC --no-git-tag-version --no-git-checks",
+    "version:premajor": "pnpm version premajor --preid=RC --no-git-tag-version --no-git-checks"
   },
   "// comments for devDependencies": {},
   "devDependencies": {
@@ -80,7 +80,7 @@
     "turbo": "^2.9.14",
     "typescript": "^5.9.3",
     "typescript-transform-paths": "^3.5.6",
-    "vite": "^6.4.2",
+    "vite": "^6.4.3",
     "vite-plugin-dts": "^4.5.4",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.2.6",

@@ -27,6 +27,7 @@
     "watch": "pnpm run dev -w --emptyOutDir=false",
     "lint:biome": "biome check",
     "lint:styles": "stylelint --allow-empty-input \"src/**/*.scss\" \"src/**/*.css\"",
+    "test": "vitest run",
     "lint:typecheck": "tsgo --noEmit",
     "lint": "run-p lint:*"
   },

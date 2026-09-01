@@ -1,362 +1,280 @@
+import type { IUser } from '@growi/core';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import type { Model } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import request from 'supertest';
-import { mock } from 'vitest-mock-extended';
+
+import { getInstance } from '^/test/setup/crowi';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
-import type AppService from '~/server/service/app';
+import Activity from '~/server/models/activity';
+import { UserStatus } from '~/server/models/user/conts';
 
-const mockActivityId = '507f1f77bcf86cd799439011';
+interface TestRequest extends Request {
+  user?: unknown;
+  crowi?: Crowi;
+}
 
-// Passthrough middleware for testing - skips authentication
 const passthroughMiddleware = (
   _req: Request,
   _res: Response,
   next: NextFunction,
 ) => next();
 
-// Add activity middleware mock - sets activity in res.locals
-const mockAddActivityMiddleware = (
-  _req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  res.locals = res.locals || {};
-  res.locals.activity = { _id: mockActivityId };
-  next();
-};
+// Lets each test set req.user for the hoisted login-required mock below.
+const currentUser = vi.hoisted<{ value: unknown }>(() => ({ value: null }));
 
-// Mock middlewares using vi.mock (hoisted to top)
 vi.mock('~/server/middlewares/access-token-parser', () => ({
   accessTokenParser: () => passthroughMiddleware,
 }));
 
 vi.mock('~/server/middlewares/login-required', () => ({
-  default: () => passthroughMiddleware,
-}));
-
-vi.mock('~/server/middlewares/admin-required', () => ({
-  default: () => passthroughMiddleware,
-}));
-
-vi.mock('../../middlewares/add-activity', () => ({
-  generateAddActivityMiddleware: () => mockAddActivityMiddleware,
-}));
-
-vi.mock('~/server/service/growi-info', () => ({
-  growiInfoService: {
-    getSiteUrl: vi.fn().mockReturnValue('http://localhost:3000'),
+  default: () => (req: TestRequest, _res: Response, next: NextFunction) => {
+    req.user = currentUser.value;
+    next();
   },
 }));
 
-vi.mock('~/server/service/config-manager', () => ({
-  configManager: {
-    getConfig: vi.fn().mockReturnValue('en_US'),
-  },
-}));
-
-describe('POST /invite', () => {
+describe('GET /usernames', () => {
   let app: express.Application;
-  let crowiMock: Crowi;
-  let mockIsEmailValid: ReturnType<typeof vi.fn>;
-  let mockCreateUsersByEmailList: ReturnType<typeof vi.fn>;
-  let mockUpdateIsInvitationEmailSended: ReturnType<typeof vi.fn>;
-  let mockMailServiceSend: ReturnType<typeof vi.fn>;
-  let mockActivityEmit: ReturnType<typeof vi.fn>;
+  let crowi: Crowi;
+  let User: Model<IUser>;
+  // Deleting only what this suite created (not deleteMany({})) avoids wiping
+  // fixtures other integ files are relying on when CI runs them against a
+  // single shared MongoDB instance.
+  const createdUserIds: Types.ObjectId[] = [];
+  const createdActivityIds: Types.ObjectId[] = [];
+
+  beforeAll(async () => {
+    crowi = await getInstance();
+    // crowi.models.User is typed Model<any> (ModelsMapDependentOnCrowi);
+    // retrieve it through mongoose.model to keep this Model<IUser>-typed.
+    User = mongoose.model<IUser>('User');
+    // Patches express.response.apiv3/apiv3Err with the real implementation
+    // (same call production makes in apiv3/index.js) instead of a hand-rolled
+    // stub, so error-shape assertions here would match production behavior.
+    const responseModule = await import('./response');
+    const addCustomFunctionToResponse =
+      'default' in responseModule ? responseModule.default : responseModule;
+    if (typeof addCustomFunctionToResponse !== 'function') {
+      throw new Error('Module does not export a function');
+    }
+    addCustomFunctionToResponse(express);
+  });
 
   beforeEach(async () => {
-    mockIsEmailValid = vi.fn().mockReturnValue(true);
-    mockCreateUsersByEmailList = vi.fn().mockResolvedValue({
-      createdUserList: [],
-      existingEmailList: [],
-      failedToCreateUserEmailList: [],
-    });
-    mockUpdateIsInvitationEmailSended = vi.fn().mockResolvedValue(undefined);
-    mockMailServiceSend = vi.fn().mockResolvedValue(undefined);
-    mockActivityEmit = vi.fn();
-
-    // The User model statics (isEmailValid / createUsersByEmailList /
-    // updateIsInvitationEmailSended) are defined on a plain Mongoose schema in
-    // user/index.js (untyped JS), so they are absent from the `Model<any>` type
-    // that `crowi.models.User` resolves to. A localized cast is required here;
-    // the rest of Crowi stays type-checked via `mock<Crowi>()`.
-    const userModelMock = {
-      isEmailValid: mockIsEmailValid,
-      createUsersByEmailList: mockCreateUsersByEmailList,
-      updateIsInvitationEmailSended: mockUpdateIsInvitationEmailSended,
-    } as unknown as Model<unknown>;
-
-    crowiMock = mock<Crowi>({
-      // `events.activity` and `mailService` are typed as `any` on Crowi, so plain
-      // partials are accepted without a cast.
-      events: {
-        activity: { emit: mockActivityEmit },
-      },
-      models: {
-        User: userModelMock,
-      },
-      appService: mock<AppService>({
-        getAppTitle: vi.fn().mockReturnValue('GROWI'),
-      }),
-      mailService: {
-        send: mockMailServiceSend,
-      },
-      localeDir: '/app/locales/',
-    });
-
-    // Setup express app
     app = express();
     app.use(express.json());
 
-    // Mock apiv3 response helpers
-    app.use((_req, res: ApiV3Response, next) => {
-      res.apiv3 = (data, statusCode = 200) => res.status(statusCode).json(data);
-      res.apiv3Err = (error, statusCode?: number) => {
-        // Validation errors are passed as arrays → respond with 400
-        const status = statusCode ?? (Array.isArray(error) ? 400 : 500);
-        return res.status(status).json({ error });
-      };
+    app.use((req: TestRequest, _res, next) => {
+      req.crowi = crowi;
       next();
     });
 
-    // Reset module cache so each test gets a fresh router (module-level `router`
-    // in users.js would otherwise accumulate route handlers across beforeEach calls)
-    vi.resetModules();
-
-    // Import and mount the users router.
-    // users.js is an untyped JS module exposing a named `setup` factory
-    // (`export const setup = (crowi) => router`). TypeScript types the
-    // dynamic-import namespace without a call signature, so a cast to the real
-    // factory shape is required here — no usable type exists for the JS module.
-    // The cast still type-checks the call site: `crowiMock` is verified against
-    // `Crowi`.
-    const usersModule = (await import('./users')) as unknown as {
-      setup: (crowi: Crowi) => express.Router;
-    };
-    app.use('/', usersModule.setup(crowiMock));
+    const { setup } = await import('./users');
+    const usersRouter = setup(crowi);
+    app.use('/', usersRouter);
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
+  afterEach(async () => {
+    currentUser.value = null;
+    await Promise.all([
+      User.deleteMany({ _id: { $in: createdUserIds } }),
+      Activity.deleteMany({ _id: { $in: createdActivityIds } }),
+    ]);
+    createdUserIds.length = 0;
+    createdActivityIds.length = 0;
   });
 
-  // ---------------------------------------------------------------------------
-  describe('Validation', () => {
-    it('should return 400 when shapedEmailList is missing', async () => {
-      const response = await request(app).post('/invite').send({});
-      expect(response.status).toBe(400);
+  it('returns active users matching the query by default', async () => {
+    const requester = await User.create({
+      name: 'Requester',
+      username: 'requester',
+      email: 'requester@example.com',
     });
+    currentUser.value = requester;
+    createdUserIds.push(requester._id);
+    const alice = await User.create({
+      name: 'Alice',
+      username: 'alice',
+      email: 'alice@example.com',
+      status: UserStatus.STATUS_ACTIVE,
+    });
+    createdUserIds.push(alice._id);
 
-    it('should return 400 when shapedEmailList is an empty array', async () => {
-      const response = await request(app)
-        .post('/invite')
-        .send({ shapedEmailList: [] });
-      expect(response.status).toBe(400);
-    });
+    const response = await request(app).get('/usernames').query({ q: 'ali' });
 
-    it('should return 400 when shapedEmailList contains only invalid email addresses', async () => {
-      const response = await request(app)
-        .post('/invite')
-        .send({ shapedEmailList: ['not-an-email', 'also-invalid'] });
-      expect(response.status).toBe(400);
-    });
+    expect(response.status).toBe(200);
+    expect(response.body.activeUser.usernames).toContain('alice');
   });
 
-  // ---------------------------------------------------------------------------
-  describe('User creation', () => {
-    it('should return 201 with createdUserList when users are created successfully', async () => {
-      const createdUser = {
-        email: 'new@example.com',
-        password: 'randompass',
-        user: { id: 'uid1' },
-      };
-      mockCreateUsersByEmailList.mockResolvedValue({
-        createdUserList: [createdUser],
-        existingEmailList: [],
-        failedToCreateUserEmailList: [],
-      });
-
-      const response = await request(app)
-        .post('/invite')
-        .send({
-          shapedEmailList: ['new@example.com'],
-          sendEmail: false,
-        });
-
-      expect(response.status).toBe(201);
-      expect(response.body.createdUserList).toHaveLength(1);
-      expect(response.body.existingEmailList).toHaveLength(0);
-      expect(response.body.failedEmailList).toHaveLength(0);
+  it('returns inactive users when isIncludeInactiveUser is requested', async () => {
+    const requester = await User.create({
+      name: 'Requester',
+      username: 'requester2',
+      email: 'requester2@example.com',
     });
-
-    it('should deduplicate email addresses before calling createUsersByEmailList', async () => {
-      await request(app)
-        .post('/invite')
-        .send({
-          shapedEmailList: ['dup@example.com', 'dup@example.com'],
-          sendEmail: false,
-        });
-
-      expect(mockCreateUsersByEmailList).toHaveBeenCalledWith([
-        'dup@example.com',
-      ]);
+    currentUser.value = requester;
+    createdUserIds.push(requester._id);
+    const bob = await User.create({
+      name: 'Bob',
+      username: 'bob',
+      email: 'bob@example.com',
+      status: UserStatus.STATUS_SUSPENDED,
     });
+    createdUserIds.push(bob._id);
 
-    it('should return existingEmailList when emails are already registered', async () => {
-      mockCreateUsersByEmailList.mockResolvedValue({
-        createdUserList: [],
-        existingEmailList: ['existing@example.com'],
-        failedToCreateUserEmailList: [],
-      });
-
-      const response = await request(app)
-        .post('/invite')
-        .send({
-          shapedEmailList: ['existing@example.com'],
-          sendEmail: false,
-        });
-
-      expect(response.status).toBe(201);
-      expect(response.body.createdUserList).toHaveLength(0);
-      expect(response.body.existingEmailList).toEqual(['existing@example.com']);
-      expect(response.body.failedEmailList).toHaveLength(0);
-    });
-
-    it('should put whitelist-rejected emails in failedEmailList with reason email_not_in_whitelist', async () => {
-      // Simulate a whitelist that rejects the given email
-      mockIsEmailValid.mockReturnValue(false);
-
-      const response = await request(app)
-        .post('/invite')
-        .send({
-          shapedEmailList: ['blocked@example.com'],
-          sendEmail: false,
-        });
-
-      expect(response.status).toBe(201);
-      expect(response.body.failedEmailList).toHaveLength(1);
-      expect(response.body.failedEmailList[0]).toMatchObject({
-        email: 'blocked@example.com',
-        reason: 'email_not_in_whitelist',
-      });
-      // createUsersByEmailList must not be called for the rejected email
-      expect(mockCreateUsersByEmailList).toHaveBeenCalledWith([]);
-    });
-
-    it('should include creation failures in failedEmailList', async () => {
-      mockCreateUsersByEmailList.mockResolvedValue({
-        createdUserList: [],
-        existingEmailList: [],
-        failedToCreateUserEmailList: [
-          { email: 'fail@example.com', reason: 'DB write error' },
-        ],
-      });
-
-      const response = await request(app)
-        .post('/invite')
-        .send({
-          shapedEmailList: ['fail@example.com'],
-          sendEmail: false,
-        });
-
-      expect(response.status).toBe(201);
-      expect(response.body.failedEmailList).toHaveLength(1);
-      expect(response.body.failedEmailList[0]).toMatchObject({
-        email: 'fail@example.com',
-        reason: 'DB write error',
-      });
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  describe('Email sending (sendEmail: true)', () => {
-    it('should call mailService.send for each created user', async () => {
-      mockCreateUsersByEmailList.mockResolvedValue({
-        createdUserList: [
-          { email: 'a@example.com', password: 'p1', user: { id: 'id1' } },
-          { email: 'b@example.com', password: 'p2', user: { id: 'id2' } },
-        ],
-        existingEmailList: [],
-        failedToCreateUserEmailList: [],
-      });
-
-      const response = await request(app)
-        .post('/invite')
-        .send({
-          shapedEmailList: ['a@example.com', 'b@example.com'],
-          sendEmail: true,
-        });
-
-      expect(response.status).toBe(201);
-      expect(mockMailServiceSend).toHaveBeenCalledTimes(2);
-      // Each created user must be emailed at their own address (not the same one twice)
-      expect(mockMailServiceSend).toHaveBeenCalledWith(
-        expect.objectContaining({ to: 'a@example.com' }),
-      );
-      expect(mockMailServiceSend).toHaveBeenCalledWith(
-        expect.objectContaining({ to: 'b@example.com' }),
-      );
-    });
-
-    it('should include email-send failures in failedEmailList', async () => {
-      mockCreateUsersByEmailList.mockResolvedValue({
-        createdUserList: [
-          { email: 'user@example.com', password: 'pass', user: { id: 'uid1' } },
-        ],
-        existingEmailList: [],
-        failedToCreateUserEmailList: [],
-      });
-      mockMailServiceSend.mockRejectedValue(
-        new Error('SMTP connection refused'),
-      );
-
-      const response = await request(app)
-        .post('/invite')
-        .send({
-          shapedEmailList: ['user@example.com'],
-          sendEmail: true,
-        });
-
-      expect(response.status).toBe(201);
-      expect(response.body.failedEmailList).toHaveLength(1);
-      expect(response.body.failedEmailList[0]).toMatchObject({
-        email: 'user@example.com',
-        reason: 'SMTP connection refused',
-      });
-    });
-
-    it('should not call mailService.send when sendEmail is false', async () => {
-      await request(app)
-        .post('/invite')
-        .send({
-          shapedEmailList: ['user@example.com'],
-          sendEmail: false,
-        });
-
-      expect(mockMailServiceSend).not.toHaveBeenCalled();
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  describe('Activity event', () => {
-    it('should emit an activity update event on success', async () => {
-      await request(app)
-        .post('/invite')
-        .send({
-          shapedEmailList: ['user@example.com'],
-          sendEmail: false,
-        });
-
-      expect(mockActivityEmit).toHaveBeenCalledWith(
-        'update',
-        mockActivityId,
-        expect.objectContaining({
-          action: SupportedAction.ACTION_ADMIN_USERS_INVITE,
+    const response = await request(app)
+      .get('/usernames')
+      .query({
+        q: 'bob',
+        options: JSON.stringify({
+          isIncludeActiveUser: false,
+          isIncludeInactiveUser: true,
         }),
-      );
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.inactiveUser.usernames).toContain('bob');
+  });
+
+  it('classifies a deleted user as inactive rather than dropping them', async () => {
+    const requester = await User.create({
+      name: 'Requester',
+      username: 'requester3',
+      email: 'requester3@example.com',
     });
+    currentUser.value = requester;
+    createdUserIds.push(requester._id);
+    const carol = await User.create({
+      name: 'Carol',
+      username: 'carol',
+      email: 'carol@example.com',
+      status: UserStatus.STATUS_DELETED,
+    });
+    createdUserIds.push(carol._id);
+
+    const response = await request(app)
+      .get('/usernames')
+      .query({
+        q: 'carol',
+        options: JSON.stringify({
+          isIncludeActiveUser: false,
+          isIncludeInactiveUser: true,
+        }),
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.inactiveUser.usernames).toContain('carol');
+  });
+
+  it('returns activity snapshot usernames for admins', async () => {
+    const admin = await User.create({
+      name: 'Admin',
+      username: 'admin-user',
+      email: 'admin@example.com',
+      admin: true,
+    });
+    currentUser.value = admin;
+    createdUserIds.push(admin._id);
+    const activity = await Activity.create({
+      action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
+      // Avoids collisions on the {user, target, action, createdAt} unique index.
+      target: new Types.ObjectId(),
+      snapshot: { username: 'ghost-user' },
+    });
+    createdActivityIds.push(activity._id);
+
+    const response = await request(app)
+      .get('/usernames')
+      .query({
+        q: 'ghost',
+        options: JSON.stringify({
+          isIncludeActiveUser: false,
+          isIncludeActivitySnapshotUser: true,
+        }),
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.activitySnapshotUser).toEqual({
+      usernames: ['ghost-user'],
+      totalCount: 1,
+    });
+  });
+
+  it('does not include activity snapshot usernames for non-admins even when requested', async () => {
+    const regular = await User.create({
+      name: 'Regular',
+      username: 'regular-user',
+      email: 'regular@example.com',
+      admin: false,
+    });
+    currentUser.value = regular;
+    createdUserIds.push(regular._id);
+    const activity = await Activity.create({
+      action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
+      // Avoids collisions on the {user, target, action, createdAt} unique index.
+      target: new Types.ObjectId(),
+      snapshot: { username: 'ghost-user' },
+    });
+    createdActivityIds.push(activity._id);
+
+    const response = await request(app)
+      .get('/usernames')
+      .query({
+        q: 'ghost',
+        options: JSON.stringify({
+          isIncludeActiveUser: false,
+          isIncludeActivitySnapshotUser: true,
+        }),
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.activitySnapshotUser).toBeUndefined();
+  });
+
+  it('matches activeUser and activitySnapshotUser consistently by substring in mixedUsernames', async () => {
+    const admin = await User.create({
+      name: 'Admin2',
+      username: 'thejohnson',
+      email: 'admin2@example.com',
+      admin: true,
+      status: UserStatus.STATUS_ACTIVE,
+    });
+    currentUser.value = admin;
+    createdUserIds.push(admin._id);
+    const activity = await Activity.create({
+      action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
+      // Avoids collisions on the {user, target, action, createdAt} unique index.
+      target: new Types.ObjectId(),
+      snapshot: { username: 'somejohnson' },
+    });
+    createdActivityIds.push(activity._id);
+
+    const response = await request(app)
+      .get('/usernames')
+      .query({
+        q: 'hn',
+        options: JSON.stringify({
+          isIncludeActiveUser: true,
+          isIncludeActivitySnapshotUser: true,
+          isIncludeMixedUsernames: true,
+        }),
+      });
+
+    expect(response.status).toBe(200);
+    // "hn" is a mid-string occurrence in both usernames (not a prefix), and
+    // activeUser/inactiveUser and activitySnapshotUser both match by
+    // substring, so both sources hit and mixedUsernames merges them as a
+    // like-for-like union.
+    expect(response.body.activeUser.usernames).toEqual(['thejohnson']);
+    expect(response.body.activitySnapshotUser.usernames).toEqual([
+      'somejohnson',
+    ]);
+    expect(new Set(response.body.mixedUsernames)).toEqual(
+      new Set(['thejohnson', 'somejohnson']),
+    );
   });
 });

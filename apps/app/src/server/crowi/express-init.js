@@ -23,7 +23,7 @@ import { setup as setupAutoReconnectToS2sMsgServer } from '../middlewares/auto-r
 import CertifyOrigin from '../middlewares/certify-origin';
 import { denyUploadsDirectAccess } from '../middlewares/deny-uploads-direct-access';
 import { setup as setupInjectCurrentuserToLocalvars } from '../middlewares/inject-currentuser-to-localvars';
-import registerSafeRedirectFactory from '../middlewares/safe-redirect';
+import { registerSafeRedirectFactory } from '../middlewares/safe-redirect';
 import avoidSessionRoutes from '../routes/avoid-session-routes';
 
 const logger = loggerFactory('growi:crowi:express-init');

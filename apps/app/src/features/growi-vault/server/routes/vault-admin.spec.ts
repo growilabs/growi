@@ -216,6 +216,46 @@ describe('VaultAdminRouter', () => {
       expect(res.status).toBe(500);
       expect(res.body.ok).toBe(false);
     });
+
+    // The admin UI decides whether a re-bootstrap may be started from this
+    // response, so the runner-liveness verdict has to travel with the state.
+    // The staleness threshold is server-side config — the UI must not have to
+    // re-derive it from a timestamp.
+    it('reports isStaleRunner=true when the in-flight run has no live runner', async () => {
+      mockBootstrapper.getStatus.mockResolvedValue({
+        ...doneStatus,
+        state: 'running',
+        completedAt: null,
+        heartbeatAt: new Date('2026-01-01T00:00:00Z'),
+        isStaleRunner: true,
+      });
+      mockManagerClient.getStorageStats.mockResolvedValue(storageStatsFixture);
+
+      const app = buildApp();
+      const res = await request(app).get('/_api/admin/vault/status');
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.bootstrapState).toBe('running');
+      expect(res.body.data.isStaleRunner).toBe(true);
+      expect(res.body.data.heartbeatAt).toBe('2026-01-01T00:00:00.000Z');
+    });
+
+    it('reports isStaleRunner=false while a run is progressing', async () => {
+      mockBootstrapper.getStatus.mockResolvedValue({
+        ...doneStatus,
+        state: 'running',
+        completedAt: null,
+        heartbeatAt: new Date('2026-01-01T00:00:00Z'),
+        isStaleRunner: false,
+      });
+      mockManagerClient.getStorageStats.mockResolvedValue(storageStatsFixture);
+
+      const app = buildApp();
+      const res = await request(app).get('/_api/admin/vault/status');
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.isStaleRunner).toBe(false);
+    });
   });
 
   // -------------------------------------------------------------------------

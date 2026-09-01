@@ -2,7 +2,7 @@
  * jscodeshift transform: convert migrate-mongo migration modules from the
  * mixed-CJS authoring style to native ESM with NAMED `up`/`down` exports.
  *
- * Background (esm-migration task 3.8.b fix): migrate-mongo loads each migration
+ * Background: migrate-mongo loads each migration
  * and reads `migration.up` / `migration.down` directly off the loaded module
  * (lib/actions/up.js, down.js). Under ESM that requires NAMED exports — a
  * `export default { up, down }` would leave `migration.up` undefined. The
@@ -21,7 +21,13 @@
  *       `export const <key> = <value>`)
  *
  * Bare-package require specifiers (e.g. 'mongoose') need no extension; relative
- * and alias specifiers are handled by the separate add-import-extensions pass.
+ * and alias specifiers follow the repo's no-extension convention as-is
+ * (see .claude/rules/import-convention.md).
+ *
+ * Usage (jscodeshift transform API — this module exports a transform, it is not
+ * a standalone CLI):
+ *   pnpm exec jscodeshift --parser=babel \
+ *     --transform tools/codemod/migrations-cjs-to-esm.cjs src/migrations
  */
 
 'use strict';

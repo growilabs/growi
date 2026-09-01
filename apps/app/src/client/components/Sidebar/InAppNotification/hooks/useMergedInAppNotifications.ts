@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import type { SWRInfiniteResponse } from 'swr/infinite';
 
 import { apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
+import { NEWS_PER_PAGE } from '~/features/news/client/consts';
 import {
   useSWRINFxNews,
   useSWRxNewsUnreadCount,
@@ -17,7 +18,7 @@ import {
   useSWRxInAppNotificationStatus,
 } from '~/stores/in-app-notification';
 
-const PER_PAGE = 10;
+const NOTIFICATIONS_PER_PAGE = 10;
 
 export type MergedItem =
   | { type: 'news'; item: INewsItemWithReadStatus; sortKey: Date }
@@ -73,8 +74,11 @@ export const useMergedInAppNotifications = (
     ? InAppNotificationStatuses.STATUS_UNOPENED
     : undefined;
 
+  // The news stream MUST use the shared NEWS_PER_PAGE: the `?page=N` query
+  // that NewsItem builds for /_news is derived from this stream's page index,
+  // which only maps correctly when both sides use the same page size.
   const newsResponse = useSWRINFxNews(
-    PER_PAGE,
+    NEWS_PER_PAGE,
     { onlyUnread: isUnopendNotificationsVisible },
     { keepPreviousData: true },
   );
@@ -82,7 +86,7 @@ export const useMergedInAppNotifications = (
     useSWRxNewsUnreadCount();
 
   const notificationResponse = useSWRINFxInAppNotifications(
-    PER_PAGE,
+    NOTIFICATIONS_PER_PAGE,
     { status: notificationStatus },
     { keepPreviousData: true },
   );

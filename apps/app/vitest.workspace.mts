@@ -46,11 +46,15 @@ export default defineWorkspace([
       // Vault E2E tests live in their own project below — they need extra setup
       // (spawning vault-manager, mounting express, seeding users) that the
       // generic app-integration project should not pay for.
+      // `*.exclusive.integ.ts` likewise belongs to its own project below: those
+      // tests empty whole collections, which would destroy the fixtures of any
+      // other file sharing the same per-worker database.
       exclude: [
         ...defaultExclude,
         'playwright/**',
         'tmp/**',
         'src/features/growi-vault/__tests__/**',
+        '**/*.exclusive.integ.ts',
       ],
       // Pre-download the MongoDB binary before workers start to avoid lock-file race conditions
       globalSetup: ['./test/setup/mongo/global-setup.ts'],
@@ -60,6 +64,10 @@ export default defineWorkspace([
         './test/setup/mongo/index.ts',
         './test/setup/prisma.ts',
       ],
+      // Fork concurrency is capped in CI via the `test:integ` script's
+      // `--poolOptions.forks.maxForks` flag, not here — see #11752. (Vitest's
+      // deprecated workspace-file resolution does not apply a project-level
+      // `poolOptions` from this file; the CLI flag does, so the cap lives there.)
       deps: {
         // Transform inline modules (allows ESM in require context)
         interopDefault: true,
@@ -73,6 +81,51 @@ export default defineWorkspace([
             '@growi/remark-lsx',
             /src\/server\/events/,
           ],
+        },
+      },
+    },
+  }),
+
+  // integration test that empties whole collections (separate project).
+  //
+  // The per-worker test database is shared by every file a worker runs, and the other
+  // integration tests clean up by deleting their own prefixed fixtures. A test that
+  // empties a collection wholesale — which the transfer's replace path forces, `configs`
+  // above all — would take those fixtures with it. `testDbNamespace` is what keeps them
+  // apart: it puts these files on `growi_test_exclusive_<n>`, a name no worker of any
+  // other project is ever given (see test/setup/mongo/test-db-config.ts).
+  //
+  // Everything else is deliberately identical to app-integration. Giving this project a
+  // fork of its own instead (`pool: 'forks'` + `singleFork`) puts all of its files in one
+  // worker, where the mongo setup's per-file teardown stops the in-memory server the next
+  // file then tries to use — so the isolation has to come from the database name, not
+  // from the worker.
+  mergeConfig(configShared, {
+    resolve: {
+      conditions: ['require', 'node', 'default'],
+    },
+    ssr: {
+      resolve: {
+        conditions: ['require', 'node', 'default'],
+      },
+    },
+    test: {
+      name: 'app-integration-exclusive',
+      environment: 'node',
+      include: ['**/*.exclusive.integ.ts'],
+      exclude: [...defaultExclude, 'playwright/**', 'tmp/**'],
+      provide: { testDbNamespace: 'exclusive' },
+      globalSetup: ['./test/setup/mongo/global-setup.ts'],
+      setupFiles: [
+        './test/setup/elasticsearch.ts',
+        './test/setup/migrate-mongo.ts',
+        './test/setup/mongo/index.ts',
+        './test/setup/prisma.ts',
+      ],
+      deps: { interopDefault: true },
+      server: {
+        deps: {
+          inline: [/src\/server\/events/],
         },
       },
     },

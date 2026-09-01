@@ -19,6 +19,7 @@ import type { BootstrapEnvValue } from './bootstrap-trigger-resolver';
 import { resolveAction } from './bootstrap-trigger-resolver';
 import type { RetryConfig } from './retry-policy';
 import { decideRetry } from './retry-policy';
+import { isStaleBootstrapRunner } from './runner-liveness';
 
 const logger = loggerFactory(
   'growi:features:growi-vault:service:resilience:bootstrap-runner',
@@ -48,6 +49,17 @@ export interface BootstrapStatus {
   readonly totalEstimated: number | null;
   readonly processed: number;
   readonly lastError: string | null;
+  /** Last liveness signal written by the process that owns the run. */
+  readonly heartbeatAt: Date | null;
+  /**
+   * True when `state` claims a run is in flight ('running' / 'verifying') but
+   * no process has refreshed the heartbeat within the configured threshold —
+   * the run was abandoned and will not progress on its own.
+   *
+   * Derived here rather than by callers so the staleness threshold stays a
+   * server-side concern (see runner-liveness.ts).
+   */
+  readonly isStaleRunner: boolean;
 }
 
 export interface RetryStatus {
@@ -438,6 +450,14 @@ export function createBootstrapRunner(
               bootstrapLastError: null,
               bootstrapLastTriggerSource: triggerSource,
               bootstrapRetryAttempts: currentRetryAttempts,
+              // A wipe re-seeds from the first page, so any cursor from an
+              // earlier run is not a valid resume point. Clear it here, not
+              // just in the local `resumeCursor` below: if this run dies before
+              // it streams its first page (which is what overwrites the field),
+              // the leftover cursor would make the next resume skip every page
+              // below it — leaving those pages missing from the wiped
+              // repository while the completeness check still passes.
+              bootstrapCursor: null,
             },
           },
           { upsert: true },
@@ -921,6 +941,8 @@ export function createBootstrapRunner(
             totalEstimated: null,
             processed: 0,
             lastError: null,
+            heartbeatAt: null,
+            isStaleRunner: false,
           },
           retry: null,
           drift: null,
@@ -937,6 +959,12 @@ export function createBootstrapRunner(
         totalEstimated: doc.bootstrapTotalEstimated,
         processed: doc.bootstrapProcessed,
         lastError: doc.bootstrapLastError,
+        heartbeatAt: doc.bootstrapHeartbeatAt,
+        isStaleRunner: isStaleBootstrapRunner({
+          state: doc.bootstrapState,
+          heartbeatAt: doc.bootstrapHeartbeatAt,
+          staleThresholdMs: heartbeatStaleMs,
+        }),
       };
 
       // RetryStatus: expose when retry attempts > 0 or state indicates retry

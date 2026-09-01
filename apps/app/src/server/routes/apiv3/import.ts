@@ -4,19 +4,22 @@ import type { Router } from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
+// The same code both import entry points answer a busy import with; the receive route's
+// caller matches on the exact string, so it is declared once.
+import { G2G_IMPORT_IN_PROGRESS_ERROR_CODE } from '~/server/models/vo/g2g-transfer-error';
+import { pendingActivityContext } from '~/server/service/activity/index';
 import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
-import { generateOverwriteParams } from '~/server/service/import/overwrite-params';
 import type { ZipFileStat } from '~/server/service/interfaces/export';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { executeImport } from './import-executor';
+import { buildImportSettingsMap } from './import-settings-builder';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:import');
@@ -293,87 +296,130 @@ export default function route(crowi: Crowi): Router {
 
       const zipFile = importService.getFile(fileName);
 
-      // return response first
-      res.apiv3();
+      // Capture the activity context BEFORE responding. The import runs after
+      // this response and registerFailsafeFinalizer clears this request's
+      // pending context on the response's 'finish' event, so the post-import
+      // activity emit would otherwise settle with user=null (see PR #11510 and
+      // ExecuteImportArgs.activityContext).
+      //
+      // Optional on purpose: `add-activity` catches its own failures and calls `next()`
+      // without setting `res.locals.activity`, so reading `._id` outright can throw. That
+      // read used to sit between the claim below and the `try` that releases it, where a
+      // throw — which Express 4 does not catch for an async handler — would have left the
+      // claim held for the life of the process and every later import, admin and G2G
+      // alike, refused with a 409. Losing the audit row is the lesser harm; losing the
+      // import is not.
+      const activityId: string | undefined = res.locals.activity?._id;
+      const activityContext =
+        activityId != null
+          ? pendingActivityContext.take(activityId)
+          : undefined;
 
-      /*
-       * unzip, parse
-       */
-      let meta: object;
-      let fileStatsToImport: {
-        fileName: string;
-        collectionName: string;
-        size: number;
-      }[];
+      // Claimed before the response, because everything below runs after it has been sent:
+      // without the claim, a second import could start writing while this one is still
+      // reading the same directory.
+      //
+      // The maintenance-mode check above is no substitute. It only asks whether the wiki
+      // is closed to ordinary users, which says nothing about whether an import is already
+      // under way — and being closed is the normal state around one, since importing
+      // `configs` leaves maintenance mode on afterwards. So that gate waves a second zip
+      // straight through into the middle of the first import, or of a G2G transfer writing
+      // to the same place.
+      //
+      // Claimed last, immediately before the `try`: everything above can still leave
+      // without reaching the `finally` that releases it, and nothing may be added in
+      // between.
+      const importJob = importService.acquireImportJob();
+      if (importJob == null) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'Another import is already running on this GROWI.',
+            G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+          ),
+          409,
+        );
+      }
+
+      // `try/finally` rather than a response event: this route answers before it starts
+      // working, so releasing on the response would hand the job away while the import is
+      // still running. The response is sent inside the `try` so that nothing at all sits
+      // between the claim and the `finally` that returns it.
       try {
-        // unzip
-        await importService.unzip(zipFile);
+        // return response first
+        res.apiv3();
 
-        const parseZipResult = await growiBridgeService.parseZipFile(zipFile);
-        if (parseZipResult == null) {
-          throw new Error('parseZipFile returns null');
+        /*
+         * unzip, parse
+         */
+        let meta: object;
+        let fileStatsToImport: {
+          fileName: string;
+          collectionName: string;
+          size: number;
+        }[];
+        try {
+          // unzip
+          await importService.unzip(zipFile);
+
+          const parseZipResult = await growiBridgeService.parseZipFile(zipFile);
+          if (parseZipResult == null) {
+            throw new Error('parseZipFile returns null');
+          }
+
+          meta = parseZipResult.meta;
+
+          // filter innerFileStats
+          fileStatsToImport = parseZipResult.innerFileStats.filter(
+            ({ collectionName }) => {
+              return collections.includes(collectionName);
+            },
+          );
+        } catch (err) {
+          logger.error(err);
+          adminEvent.emit('onErrorForImport', { message: err.message });
+          return;
         }
 
-        meta = parseZipResult.meta;
+        /*
+         * validate with meta.json
+         */
+        try {
+          importService.validate(meta);
+        } catch (err) {
+          logger.error(err);
+          adminEvent.emit('onErrorForImport', { message: err.message });
+          return;
+        }
 
-        // filter innerFileStats
-        fileStatsToImport = parseZipResult.innerFileStats.filter(
-          ({ collectionName }) => {
-            return collections.includes(collectionName);
-          },
-        );
-      } catch (err) {
-        logger.error(err);
-        adminEvent.emit('onErrorForImport', { message: err.message });
-        return;
-      }
-
-      /*
-       * validate with meta.json
-       */
-      try {
-        importService.validate(meta);
-      } catch (err) {
-        logger.error(err);
-        adminEvent.emit('onErrorForImport', { message: err.message });
-        return;
-      }
-
-      // generate maps of ImportSettings to import
-      // Use the Map for a potential fix for the code scanning alert no. 895: Prototype-polluting assignment
-      const importSettingsMap = new Map<string, ImportSettings>();
-      fileStatsToImport.forEach(({ fileName, collectionName }) => {
-        // instanciate GrowiArchiveImportOption
-        const option: GrowiArchiveImportOption = options.find(
-          (opt) => opt.collectionName === collectionName,
-        );
-
-        // generate options
-        const importSettings = {
-          mode: option.mode,
-          jsonFileName: fileName,
-          overwriteParams: generateOverwriteParams(
-            collectionName,
-            // consumers reconstruct via `new ObjectId(...)`, so the hex string is equivalent
+        // generate maps of ImportSettings to import
+        let importSettingsMap: Map<string, ImportSettings>;
+        try {
+          importSettingsMap = buildImportSettingsMap(
+            fileStatsToImport,
+            options,
             user._id.toString(),
-            option,
-          ),
-        } satisfies ImportSettings;
+          );
+        } catch (err) {
+          logger.error(err);
+          adminEvent.emit('onErrorForImport', { message: err.message });
+          return;
+        }
 
-        importSettingsMap.set(collectionName, importSettings);
-      });
-
-      /*
-       * import
-       */
-      await executeImport({
-        importService,
-        adminEvent,
-        activityEvent,
-        activityId: res.locals.activity._id,
-        collections,
-        importSettingsMap,
-      });
+        /*
+         * import
+         */
+        await executeImport({
+          importService,
+          adminEvent,
+          activityEvent,
+          activityId,
+          activityContext,
+          collections,
+          importSettingsMap,
+        });
+      } finally {
+        importJob.release();
+      }
     },
   );
 

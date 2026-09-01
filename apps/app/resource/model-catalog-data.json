@@ -1,6 +1,6 @@
 {
   "_source": "https://models.dev/api.json (MIT)",
-  "_generatedAt": "2026-07-10T10:04:42.574Z",
+  "_generatedAt": "2026-08-25T14:10:09.998Z",
   "models": {
     "openai": [
       {
@@ -48,10 +48,6 @@
         "name": "GPT-5"
       },
       {
-        "id": "gpt-5-codex",
-        "name": "GPT-5-Codex"
-      },
-      {
         "id": "gpt-5-mini",
         "name": "GPT-5 Mini"
       },
@@ -68,32 +64,12 @@
         "name": "GPT-5.1"
       },
       {
-        "id": "gpt-5.1-chat-latest",
-        "name": "GPT-5.1 Chat"
-      },
-      {
-        "id": "gpt-5.1-codex",
-        "name": "GPT-5.1 Codex"
-      },
-      {
-        "id": "gpt-5.1-codex-max",
-        "name": "GPT-5.1 Codex Max"
-      },
-      {
-        "id": "gpt-5.1-codex-mini",
-        "name": "GPT-5.1 Codex mini"
-      },
-      {
         "id": "gpt-5.2",
         "name": "GPT-5.2"
       },
       {
         "id": "gpt-5.2-chat-latest",
         "name": "GPT-5.2 Chat"
-      },
-      {
-        "id": "gpt-5.2-codex",
-        "name": "GPT-5.2 Codex"
       },
       {
         "id": "gpt-5.2-pro",
@@ -152,6 +128,10 @@
         "name": "GPT-5.6 Terra"
       },
       {
+        "id": "gpt-realtime-2.1",
+        "name": "GPT-Realtime-2.1"
+      },
+      {
         "id": "o1",
         "name": "o1"
       },
@@ -164,10 +144,6 @@
         "name": "o3"
       },
       {
-        "id": "o3-deep-research",
-        "name": "o3-deep-research"
-      },
-      {
         "id": "o3-mini",
         "name": "o3-mini"
       },
@@ -178,10 +154,6 @@
       {
         "id": "o4-mini",
         "name": "o4-mini"
-      },
-      {
-        "id": "o4-mini-deep-research",
-        "name": "o4-mini-deep-research"
       }
     ],
     "anthropic": [
@@ -196,14 +168,6 @@
       {
         "id": "claude-haiku-4-5-20251001",
         "name": "Claude Haiku 4.5"
-      },
-      {
-        "id": "claude-opus-4-1",
-        "name": "Claude Opus 4.1 (latest)"
-      },
-      {
-        "id": "claude-opus-4-1-20250805",
-        "name": "Claude Opus 4.1"
       },
       {
         "id": "claude-opus-4-5",
@@ -226,6 +190,10 @@
         "name": "Claude Opus 4.8"
       },
       {
+        "id": "claude-opus-5",
+        "name": "Claude Opus 5"
+      },
+      {
         "id": "claude-sonnet-4-5",
         "name": "Claude Sonnet 4.5 (latest)"
       },
@@ -244,12 +212,16 @@
     ],
     "google": [
       {
-        "id": "gemini-2.0-flash",
-        "name": "Gemini 2.0 Flash"
+        "id": "deep-research-max-preview-04-2026",
+        "name": "Deep Research Max Preview (Apr-21-2026)"
       },
       {
-        "id": "gemini-2.0-flash-lite",
-        "name": "Gemini 2.0 Flash-Lite"
+        "id": "deep-research-preview-04-2026",
+        "name": "Deep Research Preview (Apr-21-2026)"
+      },
+      {
+        "id": "gemini-2.5-computer-use-preview-10-2025",
+        "name": "Gemini 2.5 Computer Use Preview 10-2025"
       },
       {
         "id": "gemini-2.5-flash",
@@ -268,16 +240,20 @@
         "name": "Gemini 3 Flash Preview"
       },
       {
-        "id": "gemini-3-pro-preview",
-        "name": "Gemini 3 Pro Preview"
-      },
-      {
         "id": "gemini-3.1-flash-lite",
         "name": "Gemini 3.1 Flash Lite"
       },
       {
+        "id": "gemini-3.1-flash-lite-image",
+        "name": "Nano Banana 2 Lite"
+      },
+      {
         "id": "gemini-3.1-flash-lite-preview",
         "name": "Gemini 3.1 Flash Lite Preview"
+      },
+      {
+        "id": "gemini-3.1-flash-live-preview",
+        "name": "Gemini 3.1 Flash Live Preview"
       },
       {
         "id": "gemini-3.1-pro-preview",
@@ -292,12 +268,28 @@
         "name": "Gemini 3.5 Flash"
       },
       {
+        "id": "gemini-3.5-flash-lite",
+        "name": "Gemini 3.5 Flash Lite"
+      },
+      {
+        "id": "gemini-3.6-flash",
+        "name": "Gemini 3.6 Flash"
+      },
+      {
+        "id": "gemini-3.7-flash",
+        "name": "Gemini 3.7 Flash"
+      },
+      {
         "id": "gemini-flash-latest",
         "name": "Gemini Flash Latest"
       },
       {
         "id": "gemini-flash-lite-latest",
         "name": "Gemini Flash-Lite Latest"
+      },
+      {
+        "id": "gemini-robotics-er-1.6-preview",
+        "name": "Gemini Robotics-ER 1.6 Preview"
       },
       {
         "id": "gemma-4-26b-a4b-it",

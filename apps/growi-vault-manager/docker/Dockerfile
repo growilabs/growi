@@ -118,7 +118,7 @@ USER root
 WORKDIR ${appDir}/apps/growi-vault-manager
 
 # OCI standard labels
-LABEL org.opencontainers.image.source="https://github.com/weseek/growi"
+LABEL org.opencontainers.image.source="https://github.com/growilabs/growi"
 LABEL org.opencontainers.image.title="GROWI Vault Manager"
 LABEL org.opencontainers.image.description="GROWI Vault internal execution engine: namespace tree builder + git upload-pack server"
 LABEL org.opencontainers.image.vendor="WESEEK, Inc."

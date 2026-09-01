@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { createRef } from 'react';
 import { EditorView } from '@codemirror/view';
 import { act, render } from '@testing-library/react';
 import { mock } from 'vitest-mock-extended';
@@ -12,6 +13,7 @@ import type {
 import { addMention } from './editor-state/mention-decoration';
 import { MENTION_LISTBOX_ID, mentionOptionId } from './mention-aria';
 import { PageMentionInput } from './PageMentionInput';
+import type { PageMentionInputHandle } from './types';
 
 // --- Search store mock (the data boundary) ---------------------------------
 // useMentionController (rendered inside PageMentionInput) calls useSWRxSearch.
@@ -169,6 +171,23 @@ describe('PageMentionInput', () => {
       );
 
       expect(placeholderText(container)).toBe('second');
+    });
+  });
+
+  describe('imperative handle', () => {
+    it('focus() moves the caret into the editor', () => {
+      const ref = createRef<PageMentionInputHandle>();
+      const { container } = render(
+        <PageMentionInput ref={ref} value="" onChange={vi.fn()} />,
+      );
+      const view = getView(container);
+      expect(document.activeElement).not.toBe(view.contentDOM);
+
+      act(() => {
+        ref.current?.focus();
+      });
+
+      expect(document.activeElement).toBe(view.contentDOM);
     });
   });
 

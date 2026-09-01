@@ -77,7 +77,7 @@ export const AwsSettingMolecule = (
         <div className="col-md-6">
           <input
             className="form-control"
-            placeholder={`${t('eg')} ap-northeast-1`}
+            placeholder={`${t('commons:eg')} ap-northeast-1`}
             id="admin-aws-setting-region"
             {...props.register('s3Region')}
           />
@@ -95,7 +95,7 @@ export const AwsSettingMolecule = (
           <input
             className="form-control"
             type="text"
-            placeholder={`${t('eg')} http://localhost:9000`}
+            placeholder={`${t('commons:eg')} http://localhost:9000`}
             id="admin-aws-setting-custom-endpoint"
             {...props.register('s3CustomEndpoint')}
           />
@@ -116,7 +116,7 @@ export const AwsSettingMolecule = (
           <input
             className="form-control"
             type="text"
-            placeholder={`${t('eg')} crowi`}
+            placeholder={`${t('commons:eg')} crowi`}
             id="admin-aws-setting-bucket-name"
             {...props.register('s3Bucket')}
           />

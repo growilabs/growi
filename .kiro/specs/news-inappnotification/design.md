@@ -796,3 +796,49 @@ interface INewsItemWithReadStatus {
 
 **フロントエンド再レンダ**:
 - `<NewsItem>` は `React.memo` ラップ。`useMergedInAppNotifications` のハンドラ群は `useCallback` で参照安定化されており、SWR が返す `item` 参照と組み合わせて、変化のないリスト項目は再レンダをスキップする
+
+---
+
+## Addendum: ニュース一覧ページ /_news とページネーション（2026-07 追補）
+
+初期実装（Requirements 1–9）マージ後、`integration/news-improvements` ブランチ上で追加された範囲の設計記録。対応要件: Requirement 10, 11。
+
+### 背景と経緯
+
+1. **/_news ページ新設**（マージ済み: PR #11317 ほか）: サイドバーパネルはタイトルのみの表示で本文が読めないため、予約システムパス `/_news` にフルページのニュース一覧を追加した。同時にサイドバー NewsItem のクリック挙動を「詳細 URL を新タブで開く」から「`/_news#news-<id>` へ遷移」に変更した（Requirement 5.6 改訂）
+2. **アンカーの sticky ヘッダーオフセット**（マージ済み: PR #11373）: `scroll-margin-top`（Wiki 見出しと同じ共通変数 `$grw-scroll-margin-top-in-view`）で対象アイテムがヘッダーに隠れないようにした
+3. **無限スクロール → ページネーション**（PR #11416）: URL ハッシュのアンカー対象が未ロードページにある場合、旧実装は対象が見つかるまでページを追い読みしていた（最大 `MAX_ANCHOR_SCAN_PAGES` = 5）。長いフィードの末尾到達に N-1 ページの読み込みが必要になる問題を、`?page=N` 直接遷移で解消した
+
+### コンポーネント構成（/_news）
+
+| コンポーネント | 責務 |
+|---|---|
+| `client/components/NewsFeed.tsx` | /_news 本体。単一ページ表示 + PaginationWrapper + アンカースクロール |
+| `client/hooks/use-news.ts` `useSWRxNewsPage(page, limit)` | 単一ページ取得（`useSWR` + `keepPreviousData`）。SWRInfinite 版 `useSWRINFxNews`（サイドバー用）と `fetchNewsPage` フェッチャ・`NewsListKey` キー型を共有 |
+| `client/utils/parse-page-query.ts` | `?page` クエリの安全なパース（欠落・非数値・非正値 → 1）。純関数 + 境界テスト |
+| `client/consts.ts` `NEWS_PER_PAGE` | **単一ソースのページサイズ定数（10）**。サイドバー news ストリーム・/_news・use-news デフォルトの3箇所が共有 |
+| `NewsItem.tsx` `pageIndex?: number` prop | サイドバー側ページ index から `?page=${pageIndex + 1}` を導出。`undefined` 時は `?page` を省略 |
+| `InAppNotificationContent.tsx` `newsPageIndexById` | news id → SWRInfinite ページ index のマップ。**未読フィルタ ON 時は空マップ**（下記） |
+
+### 設計上の不変条件・決定
+
+- **ページサイズの一致（Requirement 11.1）**: サイドバーの SWRInfinite ページ index → /_news の `?page=N` というマッピングは、両者のページサイズが等しいときのみ成立する。`NEWS_PER_PAGE` を `consts.ts` に集約し、ドリフト時は誤ページ遷移バグに直結する旨をコメントで明記
+- **未読フィルタ例外（Requirement 11.4）**: サイドバーの news ストリームは `onlyUnread` をサーバーに渡すため、フィルタ ON 時の「N ページ目」は全件フィードの「N ページ目」と別物。誤ったページを指すくらいなら `?page` を省略して 1 ページ目に遷移する（安全側）。ページ探索フォールバック・「該当 id は何ページ目か」API は将来オプションとして見送り
+- **アンカースクロールの once-per-navigation 化（Requirement 11.5）**: `useSWRxNewsPage` は `keepPreviousData: true` のため、ページ遷移直後は前ページの DOM が残る。effect のトリガーを `data`（参照）+ `router.asPath` とし、`scrolledForPathRef` で「asPath ごとに 1 回だけ」を保証。`items.length` トリガーでは新旧ページが同数のとき再発火しない退行があった（レビュー指摘、テストで実証済み）
+- **範囲外 `?page`（例: 総ページ数超え）のクランプは未対応**（既知の軽微 UX、別 PR 予定）
+
+### セキュリティ（/_news 固有）
+
+- body はプレーンテキスト描画（React エスケープ）+ `pre-wrap`。Markdown レンダリングは意図的に不採用（外部フィードを全インスタンスでレンダラに通すと XSS 面が拡大するため）
+- `url` は ingest 時（zod: http(s) のみ）+ 描画時（`isSafeHttpUrl`）の二段検証
+
+### テスト
+
+- `NewsFeed.spec.tsx`（9件）: スピナー / 空表示 / アイテム描画 / ページャ表示条件 / `changePage` の push 引数 / アンカー3種（即時・データ到着後 = 退行ガード・再検証で再スクロールしない）。退行ガードは旧実装（`items.length` 依存）に戻すと fail することを実証済み
+- `parse-page-query.spec.ts`（10件）: 境界値（`undefined`/`'abc'`/`'0'`/`'-1'`/`'2.7'`/配列 等）
+- `NewsItem.spec.tsx`（15件）: `pageIndex=2 → ?page=3`（非ゼロ境界）と `pageIndex` 未指定 → `?page` なし、を含む
+
+### 後続（この spec のスコープ外）
+
+- **ニュースへの画像表示**: 設計は `tmp/news-feature-plan.md`「ニュースへの画像表示（2026-07-14 設計決定）」で確定済み（配信側 `images/` + 相対パス + hotlink + /_news 専用欄）。実装着手時に別 spec として起こす想定
+- 範囲外 `?page` のクランプ、`newsPageIndexById` の純関数抽出（PR #11416 レビューで別 PR 合意）

@@ -1,7 +1,7 @@
 /**
  * Black-box authorization matrix capture for the apiv3 surface.
  *
- * This complements the structural route-middleware snapshot (task 0.3) by
+ * This complements the structural route-middleware snapshot by
  * observing the *runtime* authorization response for every apiv3 leaf
  * endpoint × {unauthenticated / guest / readonly / admin} persona. The
  * structural snapshot cannot detect the following regression classes:
@@ -13,12 +13,12 @@
  * The matrix baseline records the observed HTTP status code per cell, not
  * the business-logic validity of the response. A missing request body may
  * produce a 400 after the auth gate passes — that is fine and deterministic
- * because the diff in phase 3.8.c is checking for *auth status* drift.
+ * because the diff is checking for *auth status* drift.
  *
  * Output file (deterministic, sorted by path then method):
- *   .kiro/specs/esm-migration/authz-matrix-baseline.json
+ *   tools/authz-matrix/baselines/authz-matrix.json
  *
- * Requirements covered: 2.6, 2.8, 6.5
+ * See the "Authorization Regression Check" section of the app-commands skill.
  */
 
 import { execSync } from 'node:child_process';
@@ -37,9 +37,8 @@ import {
 } from './authz-matrix/personas';
 
 const APIV3_MOUNT_PREFIX = '/_api/v3';
-const DEFAULT_INPUT =
-  '.kiro/specs/esm-migration/route-middleware-baseline.json';
-const DEFAULT_OUTPUT = '.kiro/specs/esm-migration/authz-matrix-baseline.json';
+const DEFAULT_INPUT = 'tools/authz-matrix/baselines/route-middleware.json';
+const DEFAULT_OUTPUT = 'tools/authz-matrix/baselines/authz-matrix.json';
 
 type StructuralEntry = {
   method: string;

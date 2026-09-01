@@ -1,5 +1,31 @@
 # @growi/core
 
+## 3.0.0
+
+### Major Changes
+
+- [#11513](https://github.com/growilabs/growi/pull/11513) [`211f493`](https://github.com/growilabs/growi/commit/211f49330240ecac27442790416ab20e5ea4e2ab) Thanks [@arvid-e](https://github.com/arvid-e)! - Rename `IPage.ttlTimestamp` to `IPage.wipExpiredAt` and change its meaning
+
+  WIP page expiry is no longer enforced by a MongoDB TTL index (which deleted pages without running application code, leaving `descendantCount` inflated and empty placeholder pages orphaned). It is now application-driven, so the stored value changed meaning as well as name:
+
+  - old `ttlTimestamp` — the instant the page was made WIP; the TTL index supplied the duration via `expireAfterSeconds`.
+  - new `wipExpiredAt` — the absolute instant the page expires, computed up front.
+
+  BREAKING: consumers reading or writing `IPage.ttlTimestamp` must switch to `wipExpiredAt` and must not treat it as "when the page became WIP". A GROWI-side migration converts existing stored values.
+
+## 2.5.0
+
+### Minor Changes
+
+- [#11267](https://github.com/growilabs/growi/pull/11267) [`659c93d`](https://github.com/growilabs/growi/commit/659c93d31d24fe90b0edc777c2e586f9efdd0195) Thanks [@miya](https://github.com/miya)! - Rename and prune AI-related access token scopes
+
+  - Renamed the user-feature scope `features:ai_assistant` → `features:ai` (read/write). The constants `SCOPE.READ/WRITE.FEATURES.AI_ASSISTANT` are now `SCOPE.READ/WRITE.FEATURES.AI`, and the scope strings are `read:features:ai` / `write:features:ai`.
+  - Removed the now-unused admin scope `admin:ai_integration` (read/write); the admin AI integration screen has been removed.
+
+  BREAKING: access tokens previously granted `read|write:features:ai_assistant` no longer match the renamed scope and will lose access to AI endpoints until re-granted (or remapped via migration). Tokens carrying `read|write:admin:ai_integration` retain a now-meaningless scope string.
+
+- [#11092](https://github.com/growilabs/growi/pull/11092) [`e2375eb`](https://github.com/growilabs/growi/commit/e2375ebb787062ad20f4f982d94a2768fb9a3ec1) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Add interfaces for growi-vault
+
 ## 2.4.0
 
 ### Minor Changes

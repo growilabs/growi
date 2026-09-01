@@ -1,6 +1,6 @@
 import { type JSX, useCallback, useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import PrismAsyncLight from 'react-syntax-highlighter/dist/esm/prism-async-light';
 import oneDark from 'react-syntax-highlighter/dist/esm/styles/prism/one-dark';
 import { Card, CardBody } from 'reactstrap';
@@ -9,6 +9,7 @@ import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
+import { AdminCodeEditor } from '../Common/AdminCodeEditor';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 
 type Props = {
@@ -19,7 +20,7 @@ const CustomizeNoscriptSetting = (props: Props): JSX.Element => {
   const { adminCustomizeContainer } = props;
   const { t } = useTranslation();
 
-  const { register, handleSubmit, reset } = useForm();
+  const { control, handleSubmit, reset } = useForm();
 
   // Sync form with container state
   useEffect(() => {
@@ -70,10 +71,18 @@ const CustomizeNoscriptSetting = (props: Props): JSX.Element => {
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <div>
-            <textarea
-              className="form-control mb-2"
-              rows={8}
-              {...register('customizeNoscript')}
+            <Controller
+              name="customizeNoscript"
+              control={control}
+              render={({ field }) => (
+                <AdminCodeEditor
+                  language="html"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  aria-label={t('admin:customize_settings.custom_noscript')}
+                />
+              )}
             />
           </div>
 

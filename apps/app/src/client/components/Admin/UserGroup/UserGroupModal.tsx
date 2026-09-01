@@ -102,7 +102,7 @@ const UserGroupModalSubstance: FC<Props> = (props: Props) => {
 
         <div>
           <label htmlFor="description" className="form-label">
-            {t('Description')}
+            {t('commons:Description')}
           </label>
           <textarea
             className="form-control"

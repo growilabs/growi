@@ -2,6 +2,12 @@
   "meta": {
     "display_name": "Français"
   },
+  "Page": "Page",
+  "Execute": "Exécuter",
+  "Enable": "Activer",
+  "Copied!": "Copié !",
+  "ExternalUserGroup": "Groupe utilisateur externe",
+  "something_went_wrong": "Une erreur est survenue. Veuillez réessayer.",
   "last_login": "Dernière connexion",
   "wiki_management_homepage": "Système",
   "public": "Public",
@@ -35,6 +41,7 @@
     "insert_single": "Insérer une entrée par ligne.",
     "whitelist_invalid_format": "Format invalide. Utilisez @example.com pour un domaine exact, @*.example.com pour les sous-domaines, ou user@example.com pour une adresse exacte.",
     "page_list_and_search_results": "Affichage des pages",
+    "page_list_and_search_results_desc": "Ces paramètres n'affectent que les utilisateurs sans accès à une page. Les utilisateurs pouvant voir une page (par ex. les membres d'un groupe auquel elle est restreinte via « Utilisateurs du groupe ») la voient toujours dans les listes et la recherche, même en cas de réglage sur « Toujours caché ».",
     "page_listing_1": "Liste et recherche de pages<br>restreint à 'Seulement moi'",
     "page_listing_1_desc": "Voir les pages restreintes à 'Seulement moi' lors de la recherche",
     "page_listing_2": "Liste et recherche de pages<br>restreint au groupe utilisateur",
@@ -283,9 +290,9 @@
     "toggle_notification": "Paramètres mis à jour pour {{path}}",
     "not_found_global_notification_triggerid": "ID global de notification introuvable"
   },
-  "full_text_search_management": {
-    "full_text_search_management": "Moteur de recherche",
-    "elasticsearch_management": "Configuration Elasticsearch",
+  "elasticsearch_management": "Configuration Elasticsearch",
+  "page_data_index_management": {
+    "page_data_management": "Gestion des données de page",
     "connection_status": "Statut",
     "connection_status_label_unconfigured": "UNCONFIGURED",
     "connection_status_label_connected": "CONNECTED",
@@ -299,12 +306,17 @@
     "reconnect_button": "Reconnecter",
     "reconnect_description": "Faire un essai de connexion vers Elasticsearch.",
     "normalize": "Normaliser",
-    "normalize_button": "Normaliser les indices",
-    "normalize_description": "Réparer les indices cassés.",
+    "normalize_button": "Normaliser l'index des données de page",
+    "normalize_description": "Réparer l'index de données de page endommagé.",
+    "normalize_success": "L'index des données de page a été normalisé.",
     "rebuild": "Reconstruire",
-    "rebuild_button": "Reconstruire",
+    "rebuild_button": "Reconstruire l'index des données de page",
+    "rebuild_requested": "La reconstruction de l'index des données de page a été demandée.",
     "rebuild_description_1": "Reconstruire l'index et les données de pages",
-    "rebuild_description_2": "Cela peut prendre un certain temps."
+    "rebuild_description_2": "Cela peut prendre un certain temps.",
+    "rebuild_progress_processing": "En cours..",
+    "rebuild_progress_completed": "Terminé",
+    "rebuild_normalization_timeout": "La reconstruction est terminée mais la normalisation a expiré. Veuillez normaliser manuellement."
   },
   "mailer_setup_required": "La <a href='/admin/app'>configuration du SMTP</a> est requise.",
   "admin_top": {
@@ -336,6 +348,16 @@
     "header_upgrading_progress": "Progression de la conversion",
     "migration_succeeded": "Conversion réussie! Le mode maintenance peut être désactivée et GROWI utilisé.",
     "migration_failed": "Conversion échouée. Lire la documentation GROWI pour des informations supplémentaires."
+  },
+  "page_tree_repair": {
+    "page_tree_repair": "Réparation de l'arborescence des pages",
+    "repair_desc": "Supprime les pages vides orphelines et recalcule le nombre de pages descendantes de chaque page. À utiliser si l'arborescence affiche des dossiers vides sans aucun contenu, ou si le nombre de pages enfants ne correspond pas au nombre réel de pages. Cette opération est nécessaire sur les instances mises à niveau depuis une version qui supprimait les pages WIP via un index TTL MongoDB.",
+    "repair_note": "Note: le mode maintenance doit être activé. Cette opération parcourt toutes les pages et peut donc prendre du temps sur un wiki volumineux. La progression est écrite dans le journal du serveur.",
+    "repair_page_tree": "Réparer l'arborescence des pages",
+    "modal_repair_warning": "Ce processus parcourt et met à jour toutes les pages, ce qui peut prendre beaucoup de temps. Il est fortement recommandé que les administrateurs demandent aux utilisateurs de ne pas créer, modifier ou supprimer de pages pendant la réparation.",
+    "start_repair": "Démarrer la réparation de l'arborescence",
+    "successfully_started": "Réparation de l'arborescence des pages démarrée.",
+    "repair_in_progress": "La réparation de l'arborescence des pages est en cours en arrière-plan. Consulter le journal du serveur pour le résultat."
   },
   "news_delivery": {
     "section_title": "Diffusion des actualités",
@@ -941,6 +963,28 @@
       "force_update_parents_description": "Ajoute les utilisateurs manquants au groupe ancêtre si ils existent lors d'un changement de groupe parent."
     }
   },
+  "audit_log_index_management": {
+    "audit_log_index_management": "Gestion de l'index des journaux d'audit",
+    "settings_explanation": "Vous pouvez normaliser ou reconstruire l'index des journaux d'audit sur la page suivante",
+    "index_management_link": "Aller à {{destination}}",
+    "docs_url": {
+      "top": "https://docs.growi.org/en/admin-guide/management-cookbook/setup-search-system.html"
+    },
+    "normalize": "Normaliser",
+    "normalize_button": "Normaliser l'index des journaux d'audit",
+    "normalize_success": "L'index des journaux d'audit a été normalisé.",
+    "normalize_description": "Répare les index des journaux d'audit corrompus.",
+    "rebuild": "Reconstruire",
+    "rebuild_button": "Reconstruire l'index des journaux d'audit",
+    "rebuild_requested": "La reconstruction de l'index des journaux d'audit a été demandée.",
+    "rebuild_description_1": "Supprime et reconstruit tous les index des journaux d'audit.",
+    "rebuild_description_2": "Cette opération peut prendre un certain temps.",
+    "unsynced_events_warning": "Certains événements du journal d'audit n'ont pas pu être synchronisés avec Elasticsearch. Reconstruisez pour restaurer la cohérence.",
+    "rebuild_progress_processing": "En cours..",
+    "rebuild_progress_completed": "Terminé",
+    "rebuild_normalization_timeout": "La reconstruction est terminée mais la normalisation a expiré. Veuillez normaliser manuellement.",
+    "reconnect": "Reconnexion"
+  },
   "audit_log_management": {
     "audit_log": "Audit",
     "audit_log_settings": "Configuration des journaux d'audit",
@@ -976,7 +1020,43 @@
     "transfer_data_to_another_growi": "Transférer les données de ce GROWI vers un autre GROWI",
     "advanced_options": "Paramètres avancés",
     "start_transfer": "Démarrer transfert",
-    "paste_transfer_key": "Copier clé de transfert ici"
+    "paste_transfer_key": "Copier clé de transfert ici",
+    "transfer_method": {
+      "heading": "Méthode de transfert",
+      "migration": "Migration (remplacer toutes les données de la destination)",
+      "merge": "Ajouter aux données existantes (les données existantes de la destination sont conservées)"
+    },
+    "confirm_modal": {
+      "title": "Confirmer le transfert",
+      "description": "Le GROWI de destination contient actuellement les données suivantes. Démarrer ce transfert supprimera toutes ces données et les remplacera par les données de ce GROWI :",
+      "counts": {
+        "users": "Utilisateurs",
+        "user_groups": "Groupes d'utilisateurs",
+        "pages": "Pages"
+      },
+      "warnings_heading": "Avant de continuer :",
+      "warnings": {
+        "password_seed_mismatch": "Le GROWI source et le GROWI de destination ont des graines de mot de passe (password seed) différentes. Les utilisateurs migrés ne pourront pas se connecter avec leur mot de passe existant.",
+        "no_loginable_admin": "Le GROWI de destination n'a actuellement aucun administrateur pouvant se connecter. Après le transfert, il se peut que personne ne puisse se connecter.",
+        "sessions_not_invalidatable": "Le magasin de sessions du GROWI de destination ne peut pas invalider les sessions individuellement. Les sessions établies avant le transfert resteront valides.",
+        "local_auth_disabled_at_source": "Ce GROWI a désactivé l'authentification locale (identifiant/mot de passe). Même un administrateur de destination sauvegardé ne pourra pas se connecter avec un mot de passe."
+      }
+    },
+    "blockers": {
+      "version_mismatch": "Ce transfert ne peut pas continuer : le GROWI source et le GROWI de destination utilisent des versions différentes.",
+      "user_upper_limit": "Ce transfert ne peut pas continuer : le nombre d'utilisateurs actifs sur le GROWI source dépasse la limite d'utilisateurs du GROWI de destination.",
+      "file_upload_not_configured": "Ce transfert ne peut pas continuer : le téléversement de fichiers n'est pas configuré sur le GROWI source ou de destination.",
+      "destination_storage_not_writable": "Ce transfert ne peut pas continuer : le stockage du GROWI de destination n'est pas accessible en écriture.",
+      "file_upload_total_limit": "Ce transfert ne peut pas continuer : la taille totale des pièces jointes du GROWI source dépasse la limite de téléversement du GROWI de destination."
+    },
+    "rescue_outcome": {
+      "heading": "Le transfert a remplacé tous les utilisateurs de la destination. Les comptes administrateur suivants ont été conservés afin qu'une personne puisse encore se connecter :",
+      "renamed_from": "renommé depuis",
+      "email_removed": "Son adresse e-mail a été supprimée car elle entrait en conflit avec un utilisateur entrant.",
+      "slack_member_id_removed": "Son identifiant de membre Slack a été supprimé car il entrait en conflit avec un utilisateur entrant.",
+      "id_reassigned": "Un nouvel identifiant interne lui a été attribué car l'identifiant d'origine entrait en conflit avec un utilisateur entrant ; toute session de connexion antérieure au transfert a été perdue."
+    },
+    "failed_collections_heading": "Le GROWI de destination n'a pas pu importer les collections suivantes :"
   },
   "plugins": {
     "plugins": "Plugins",
@@ -1163,7 +1243,20 @@
   "g2g": {
     "transfer_success": "Transfert de GROWI vers GROWI complété!",
     "error_generate_growi_archive": "Échec de la création du fichier d'archive GROWI",
-    "error_send_growi_archive": "Échec de l'envoi du fichier d'archive GROWI vers l'autre GROWI"
+    "error_send_growi_archive": "Échec de l'envoi du fichier d'archive GROWI vers l'autre GROWI",
+    "error_data_conflict": "Transfert interrompu : certaines données transférées entrent en conflit avec des utilisateurs ou groupes d'utilisateurs déjà présents sur le GROWI de destination, rien n'a donc été importé. Résolvez les comptes ou groupes en conflit avant de réessayer, ou transférez vers un GROWI de destination dont la configuration initiale n'est pas encore terminée.",
+    "error_upload_attachment": "Échec du transfert des pièces jointes",
+    "error_import_in_progress": "Transfert interrompu : une autre importation de données est déjà en cours sur le GROWI de destination. Attendez qu'elle se termine, puis réessayez le transfert.",
+    "error_partial_import": "Transfert incomplet : le GROWI de destination n'a pas terminé le transfert proprement (l'importation d'une collection, le sauvetage d'un administrateur ou le nettoyage après importation a peut-être échoué), il se peut donc que sa base de données ne soit que partiellement transférée. Si la destination a été mise en mode maintenance pour ce transfert, elle reste inaccessible aux utilisateurs ordinaires jusqu'à ce que vous le désactiviez depuis Administration > Paramètres de l'application sur le GROWI de destination. Corrigez la cause puis relancez le transfert.",
+    "error_protected_collection": "Transfert interrompu : le GROWI de destination a refusé la requête car elle mentionnait des collections qu'un transfert ne doit pas transporter, rien n'a donc été importé. L'écran de transfert ne sélectionne jamais ces collections ; vérifiez que les deux GROWI utilisent la même version, puis signalez les noms de collections affichés ci-dessous.",
+    "error_mixed_import_methods": "Transfert annulé : le GROWI de destination a refusé la requête car son assignation de méthode d'import mélangeait le remplacement de certaines collections avec l'ajout à d'autres, donc rien n'a été importé. L'écran de transfert ne construit plus ce type de requête ; vérifiez que les deux GROWI utilisent la même version, puis relancez le transfert.",
+    "error_invalid_transfer_key": "Transfert interrompu : le GROWI de destination a rejeté la clé de transfert car elle est absente, expirée ou invalide. Publiez une nouvelle clé de transfert sur le GROWI de destination puis réessayez.",
+    "error_parse_failed": "Transfert interrompu : le GROWI de destination n'a pas pu analyser la requête de transfert. Vérifiez que les deux GROWI utilisent la même version, puis réessayez le transfert.",
+    "error_validation_failed": "Transfert interrompu : le GROWI de destination n'a pas pu valider le fichier d'archive GROWI envoyé. Il est peut-être corrompu ; essayez de régénérer et de renvoyer l'archive.",
+    "error_version_incompatible": "Transfert interrompu : le GROWI source et le GROWI de destination utilisent des versions différentes, rien n'a donc été importé. Mettez à jour le GROWI de destination pour qu'il corresponde à la source, puis réessayez le transfert.",
+    "error_import_settings_invalid": "Transfert interrompu : le GROWI de destination n'a pas pu construire des paramètres d'importation valides pour les collections demandées. Consultez la documentation GROWI pour plus de détails.",
+    "error_conflict_detection_failed": "Transfert interrompu : le GROWI de destination n'a pas pu déterminer si les données du transfert entraient en conflit avec ses données existantes, et a refusé d'importer plutôt que de deviner. Réessayez le transfert ; si cela persiste, vérifiez les journaux du GROWI de destination.",
+    "error_mongo_collection_import_failure": "Transfert incomplet : le GROWI de destination n'a pas réussi à écrire une ou plusieurs collections dans MongoDB pour une raison autre qu'un conflit de données. Consultez les journaux du GROWI de destination pour plus de détails."
   },
   "external_user_group": {
     "management": "Gestion des groupes externes",
@@ -1326,5 +1419,13 @@
         "description": "Réconcilie manuellement les incohérences de données entre les pages MongoDB et les arbres git du Vault sans effectuer une initialisation complète."
       }
     }
+  },
+  "maintenance_mode_notice": {
+    "title": "GROWI restera en mode maintenance",
+    "body_this_growi": "L'importation de la collection configs remplace tous les paramètres de ce GROWI par ceux de l'archive ; ce GROWI est donc placé en mode maintenance et y reste. Les utilisateurs ordinaires ne peuvent pas y accéder tant que vous ne le désactivez pas.",
+    "body_destination": "L'importation de la collection configs remplace tous les paramètres du GROWI de destination par ceux de ce GROWI ; la destination est donc placée en mode maintenance et y reste. Les utilisateurs ordinaires ne peuvent pas accéder à la destination tant que vous ne le désactivez pas. Les pièces jointes sont transférées après les collections, la destination reste donc incomplète tant que l'ensemble du transfert n'est pas terminé.",
+    "turn_it_off": "Désactivez le mode maintenance depuis Administration > Paramètres de l'application sur le GROWI qui a été fermé, une fois le résultat vérifié.",
+    "cancel": "Annuler",
+    "proceed": "Compris, continuer"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@growi/slackbot-proxy",
-  "version": "8.0.0-slackbot-proxy.0",
+  "version": "8.0.3-slackbot-proxy.0",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -47,7 +47,7 @@
     "@tsed/swagger": "=6.43.0",
     "@tsed/typeorm": "=6.43.0",
     "axios": "^1.16.0",
-    "body-parser": "^1.20.3",
+    "body-parser": "^1.20.6",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.5",
     "cross-env": "^7.0.0",

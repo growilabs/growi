@@ -1,0 +1,73 @@
+name: Check Changesets
+
+on:
+  pull_request:
+    paths:
+      - .changeset/**
+      # Included so that a PR which only touches this workflow still runs it, and can
+      # therefore prove its own change instead of merging unexercised.
+      - .github/workflows/check-changesets.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-changesets:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        # `changeset status` diffs against the base branch, so it needs the history
+        # both refs share. The default fetch-depth of 1 fetches only the merge ref.
+        fetch-depth: 0
+
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: '24'
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: |
+        pnpm install --frozen-lockfile
+
+    - name: Reject changesets that can never be consumed
+      run: |
+        # A CI checkout is a detached HEAD with remote-tracking refs only, so the bare
+        # branch name changesets uses by default (`git merge-base master HEAD`) does not
+        # resolve -- git looks up refs/remotes/master, not refs/remotes/origin/master.
+        # Passing the PR's own base rather than hardcoding master also keeps the check
+        # correct for PRs that target a release branch.
+        pnpm changeset status --since="origin/${{ github.base_ref }}" --output status.json
+
+        # A changeset whose packages are all listed in the 'ignore' section of
+        # .changeset/config.json bumps nothing, so `changeset version` neither releases
+        # anything nor deletes the file. Once on master it stays there forever and keeps
+        # changesets/action on the "create release PR" path, which blocks every
+        # subsequent npm publish.
+        #
+        # Detect it with changesets' own release plan instead of re-deriving the ignore
+        # rules: a changeset is dead when none of the packages it names is actually
+        # bumped. Ignored packages still show up in .releases as dependents with
+        # type "none", hence the filter. Empty changesets (no packages at all) are a
+        # supported marker and are consumed normally, so they are left alone.
+        DEAD_CHANGESETS=$(jq -r '
+          [.releases[] | select(.type != "none") | .name] as $bumped
+          | [ .changesets[]
+              | select((.releases | length) > 0)
+              | select(([.releases[].name] - $bumped) == [.releases[].name])
+              | .id ]
+          | join(" ")
+        ' status.json)
+        rm status.json
+
+        if [ -n "$DEAD_CHANGESETS" ]; then
+          for id in $DEAD_CHANGESETS; do
+            echo "::error file=.changeset/${id}.md::This changeset only targets packages listed in the 'ignore' section of .changeset/config.json, so it will never bump a version and will never be deleted by 'changeset version'. Remove it, or target a package that is actually published."
+          done
+          exit 1
+        fi

@@ -10,7 +10,7 @@ overrides:
   # whose getType/getExtension live on `.default`, so those top-level accesses are undefined
   # and mimeTypeOf/mimeExtensionOf throw "is not a function". mime v3's module.exports IS the
   # Mime instance, so the accesses work. Pin retained until @lykmapipo/common is dropped or
-  # ships ESM-aware mime access. (esm-migration Phase 5.2 — verified by phase5-smoke harness)
+  # ships ESM-aware mime access.
   '@lykmapipo/common>mime': 3.0.0
   # CVE-2026-40175 / GHSA-fvcv-3m26-pcqx: Unrestricted Cloud Metadata Exfiltration via CRLF
   # header-injection chain that combines Prototype Pollution from other deps with Axios'

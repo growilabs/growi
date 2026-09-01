@@ -1,0 +1,8 @@
+@use 'styles/variables' as var;
+
+// Anchor offset so that `scrollIntoView` lands the target news item below the
+// sticky page header instead of being clipped by it. Reuses the same offset
+// constant as Wiki headings and PageComment anchors.
+.news-item {
+  scroll-margin-top: var.$grw-scroll-margin-top-in-view;
+}

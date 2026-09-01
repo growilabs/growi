@@ -145,6 +145,7 @@ pnpm run build            # 4. Verify build (optional)
 | Search | `features/search/` | Elasticsearch full-text search |
 | Plugins | `features/growi-plugin/` | Plugin system |
 | OpenTelemetry | `features/opentelemetry/` | Monitoring/telemetry |
+| draw.io | `features/drawio/` | Diagram integration; related code also lives outside this directory (editor modal, viewer script, `packages/remark-drawio`) — the 関心マップ in [the spec](../../.kiro/specs/drawio/design.md) is the full map |
 
 ## Skills (Auto-Loaded)
 
@@ -168,4 +169,7 @@ The following rules in `.claude/rules/` are always applied when working in this 
 |------|-------------|
 | **package-dependencies** | Turbopack dependency classification — when to use `dependencies` vs `devDependencies`, verification procedure |
 | **import-convention** | Single no-extension import convention for `apps/app/src` (local → relative, cross-module → `~/`; `.js` added only at build emit) |
+| **esm-authoring** | Native-ESM traps that build/boot checks do not catch: JSON import attributes, `__dirname`, CJS default-import interop, TS2742 on exported route factories, the `.d.cts` pairing, the no-`Crowi`-import cycle invariant, erasable-syntax-only, ESM migrations |
 | **server-boot-imports** | Lazy-load conventions for config-gated heavy SDKs vs boot warmup for universal costs; required `no-eager-*-imports` drift specs (shared static-import-graph walker, two-root walk) |
+| **activity-recording** | Order-sensitive audit `Activity` recording: emit before the response is sent (or capture+re-arm the context for post-response emits); place `addActivity` after auth and before validators; decision criteria for what gets an `ACTION_UNSETTLED` attempt row (incl. anonymous abuse-sensitive endpoints) |
+| **page-write-action-403-404** | Any apiv3 page route (GET included, not just write/mutation) must not leak page existence via a distinguishable 403 vs 404 response unless a verified server-side or client-side reason requires it; default to a uniform 404 |

@@ -151,9 +151,13 @@ export const setup = (crowi) => {
   router.post(
     '/',
     checkPassportStrategyMiddleware,
+    // addActivity before the validators so anonymous abuse / DoS / enumeration
+    // attempts against this public endpoint are recorded as ACTION_UNSETTLED
+    // (user is null by design; the ip/endpoint trace is the point). See
+    // apps/app/.claude/rules/activity-recording.md.
+    addActivity,
     validator.email,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const { email } = req.body;
       const locale = configManager.getConfig('app:globalLang');
@@ -237,10 +241,14 @@ export const setup = (crowi) => {
   router.put(
     '/',
     checkPassportStrategyMiddleware,
+    // addActivity before the token/validators so anonymous abuse (invalid-token
+    // or malformed reset attempts against this public endpoint) is recorded as
+    // ACTION_UNSETTLED (user is null by design). See
+    // apps/app/.claude/rules/activity-recording.md.
+    addActivity,
     injectResetOrderByTokenMiddleware,
     validator.password,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const { passwordResetOrder } = req;
       const { email } = passwordResetOrder;

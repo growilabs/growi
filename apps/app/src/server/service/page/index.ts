@@ -31,6 +31,7 @@ import { pipeline } from 'stream/promises';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
+import type { revisions } from '~/generated/prisma/client';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
 import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
@@ -56,8 +57,6 @@ import {
   PageQueryBuilder,
   pushRevision,
 } from '~/server/models/page';
-import type { PageTagRelationDocument } from '~/server/models/page-tag-relation';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import type { UserGroupDocument } from '~/server/models/user-group';
 import {
   beginActivity,
@@ -68,14 +67,13 @@ import { collectAncestorPaths } from '~/server/util/collect-ancestor-paths';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
 import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
+import { prisma } from '~/utils/prisma';
 
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { PathAlreadyExistsError } from '../../models/errors';
 import type { PageOperationDocument } from '../../models/page-operation';
 import PageOperation from '../../models/page-operation';
 import PageRedirect from '../../models/page-redirect';
-import type { IRevisionDocument } from '../../models/revision';
-import { Revision } from '../../models/revision';
 import { serializePageSecurely } from '../../models/serializers/page-serializer';
 import Subscription from '../../models/subscription';
 import UserGroupRelation from '../../models/user-group-relation';
@@ -664,7 +662,6 @@ class PageService implements IPageService {
       this.activityEvent.emit('updated', activity, page, preNotify);
     }
 
-    this.disableAncestorPagesTtl(newPagePath);
     return renamedPage;
   }
 
@@ -1063,9 +1060,10 @@ class PageService implements IPageService {
     if (renamedPage == null) {
       throw new Error('Failed to rename page');
     }
-    await Revision.updateRevisionListByPageId(renamedPage._id, {
-      pageId: renamedPage._id,
-    });
+    await prisma.revisions.updateRevisionListByPageId(
+      renamedPage._id.toString(),
+      { pageId: renamedPage._id.toString() },
+    );
 
     if (createRedirectPage) {
       await PageRedirect.create({
@@ -1496,10 +1494,13 @@ class PageService implements IPageService {
 
     // 4. Take over tags
     const originTags = await page.findRelatedTagsById();
-    let savedTags: PageTagRelationDocument[] = [];
+    let savedTags: string[] = [];
     if (originTags.length !== 0) {
-      await PageTagRelation.updatePageTags(duplicatedTarget._id, originTags);
-      savedTags = await PageTagRelation.listTagNamesByPage(
+      await prisma.pagetagrelations.updatePageTags(
+        duplicatedTarget._id,
+        originTags,
+      );
+      savedTags = await prisma.pagetagrelations.listTagNamesByPage(
         duplicatedTarget._id,
       );
       this.tagEvent.emit('update', duplicatedTarget, savedTags);
@@ -1667,10 +1668,12 @@ class PageService implements IPageService {
 
     // take over tags
     const originTags = await page.findRelatedTagsById();
-    let savedTags: PageTagRelationDocument[] = [];
+    let savedTags: string[] = [];
     if (originTags != null) {
-      await PageTagRelation.updatePageTags(createdPage.id, originTags);
-      savedTags = await PageTagRelation.listTagNamesByPage(createdPage.id);
+      await prisma.pagetagrelations.updatePageTags(createdPage.id, originTags);
+      savedTags = await prisma.pagetagrelations.listTagNamesByPage(
+        createdPage.id,
+      );
       this.tagEvent.emit('update', createdPage, savedTags);
     }
     const result = serializePageSecurely(createdPage);
@@ -1684,38 +1687,30 @@ class PageService implements IPageService {
    * @param {Object} pageIdMapping e.g. key: oldPageId, value: newPageId
    */
   private async duplicateTags(pageIdMapping) {
-    // convert pageId from string to ObjectId
     const pageIds = Object.keys(pageIdMapping);
-    const stage = {
-      $or: pageIds.map((pageId) => {
-        return { relatedPage: new mongoose.Types.ObjectId(pageId) };
-      }),
-    };
 
-    const pagesAssociatedWithTag = await PageTagRelation.aggregate([
-      {
-        $match: stage,
-      },
-      {
-        $group: {
-          _id: '$relatedTag',
-          relatedPages: { $push: '$relatedPage' },
-        },
-      },
-    ]);
-
-    const newPageTagRelation: any[] = [];
-    pagesAssociatedWithTag.forEach(({ _id, relatedPages }) => {
-      // relatedPages
-      relatedPages.forEach((pageId) => {
-        newPageTagRelation.push({
-          relatedPage: pageIdMapping[pageId], // newPageId
-          relatedTag: _id,
-        });
-      });
+    const relations = await prisma.pagetagrelations.findMany({
+      where: { relatedPageId: { in: pageIds } },
+      select: { relatedPageId: true, relatedTagId: true },
     });
 
-    return PageTagRelation.insertMany(newPageTagRelation, { ordered: false });
+    // Deliberately one `create` per relation instead of a single `createMany`:
+    // the Mongoose implementation used `insertMany(..., { ordered: false })`,
+    // i.e. a duplicate hit on the relatedPage+relatedTag compound unique index
+    // must not abort the rest of the batch. Prisma's MongoDB connector has no
+    // `skipDuplicates`, so `createMany` would fail the whole batch on a single
+    // duplicate. `Promise.allSettled` keeps the "attempt every row, tolerate
+    // individual failures" semantics; no caller reads the return value.
+    return Promise.allSettled(
+      relations.map((relation) => {
+        return prisma.pagetagrelations.create({
+          data: {
+            relatedPageId: pageIdMapping[relation.relatedPageId], // newPageId
+            relatedTagId: relation.relatedTagId,
+          },
+        });
+      }),
+    );
   }
 
   private async duplicateDescendants(
@@ -1737,11 +1732,13 @@ class PageService implements IPageService {
 
     const Page = mongoose.model<PageDocument, PageModel>('Page');
 
-    const pageIds = pages.map((page) => page._id);
-    const revisions = await Revision.find({ pageId: { $in: pageIds } });
+    const pageIds = pages.map((page) => page._id.toString());
+    const revisions = await prisma.revisions.findMany({
+      where: { pageId: { in: pageIds } },
+    });
 
     // Mapping to set to the body of the new revision
-    const pageIdRevisionMapping: Record<string, IRevisionDocument> = {};
+    const pageIdRevisionMapping: Record<string, revisions> = {};
     revisions.forEach((revision) => {
       pageIdRevisionMapping[getIdStringForRef(revision.pageId)] = revision;
     });
@@ -1791,10 +1788,10 @@ class PageService implements IPageService {
           revision: revisionId,
         };
         newRevisions.push({
-          _id: revisionId,
-          pageId: newPageId,
+          id: revisionId.toString(),
+          pageId: newPageId.toString(),
           body: pageIdRevisionMapping[page._id.toString()].body,
-          author: user._id,
+          authorId: user._id.toString(),
           format: 'markdown',
         });
         newPages.push(newPage);
@@ -1803,7 +1800,7 @@ class PageService implements IPageService {
 
     await Page.insertMany(newPages, { ordered: false });
 
-    await Revision.insertMany(newRevisions, { ordered: false });
+    await prisma.revisions.createMany({ data: newRevisions });
     await this.duplicateTags(pageIdMapping);
   }
 
@@ -1815,11 +1812,13 @@ class PageService implements IPageService {
   ) {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
-    const pageIds = pages.map((page) => page._id);
-    const revisions = await Revision.find({ pageId: { $in: pageIds } });
+    const pageIds = pages.map((page) => page._id.toString());
+    const revisions = await prisma.revisions.findMany({
+      where: { pageId: { in: pageIds } },
+    });
 
     // Mapping to set to the body of the new revision
-    const pageIdRevisionMapping: Record<string, IRevisionDocument> = {};
+    const pageIdRevisionMapping: Record<string, revisions> = {};
     revisions.forEach((revision) => {
       pageIdRevisionMapping[getIdStringForRef(revision.pageId)] = revision;
     });
@@ -1850,16 +1849,16 @@ class PageService implements IPageService {
       });
 
       newRevisions.push({
-        _id: revisionId,
-        pageId: newPageId,
+        id: revisionId.toString(),
+        pageId: newPageId.toString(),
         body: pageIdRevisionMapping[page._id.toString()].body,
-        author: user._id,
+        authorId: user._id.toString(),
         format: 'markdown',
       });
     });
 
     await Page.insertMany(newPages, { ordered: false });
-    await Revision.insertMany(newRevisions, { ordered: false });
+    await prisma.revisions.createMany({ data: newRevisions });
     await this.duplicateTags(pageIdMapping);
   }
 
@@ -2151,10 +2150,10 @@ class PageService implements IPageService {
       { new: true },
     );
 
-    await PageTagRelation.updateMany(
-      { relatedPage: page._id },
-      { $set: { isPageTrashed: true } },
-    );
+    await prisma.pagetagrelations.updateMany({
+      where: { relatedPageId: page._id.toString() },
+      data: { isPageTrashed: true },
+    });
     try {
       await PageRedirect.create({ fromPath: page.path, toPath: newPath });
     } catch (err) {
@@ -2222,7 +2221,9 @@ class PageService implements IPageService {
     }
 
     // update Revisions
-    await Revision.updateRevisionListByPageId(page._id, { pageId: page._id });
+    await prisma.revisions.updateRevisionListByPageId(page._id.toString(), {
+      pageId: page._id.toString(),
+    });
     const deletedPage = await Page.findByIdAndUpdate(
       page._id,
       {
@@ -2235,10 +2236,10 @@ class PageService implements IPageService {
       },
       { new: true },
     );
-    await PageTagRelation.updateMany(
-      { relatedPage: page._id },
-      { $set: { isPageTrashed: true } },
-    );
+    await prisma.pagetagrelations.updateMany({
+      where: { relatedPageId: page._id.toString() },
+      data: { isPageTrashed: true },
+    });
 
     try {
       await PageRedirect.create({ fromPath: page.path, toPath: newPath });
@@ -2886,10 +2887,10 @@ class PageService implements IPageService {
         );
       }
 
-      await PageTagRelation.updateMany(
-        { relatedPage: page._id },
-        { $set: { isPageTrashed: false } },
-      );
+      await prisma.pagetagrelations.updateMany({
+        where: { relatedPageId: page._id.toString() },
+        data: { isPageTrashed: false },
+      });
 
       this.pageEvent.emit('revert', page, updatedPage, user);
 
@@ -3094,10 +3095,10 @@ class PageService implements IPageService {
       },
       { new: true },
     );
-    await PageTagRelation.updateMany(
-      { relatedPage: page._id },
-      { $set: { isPageTrashed: false } },
-    );
+    await prisma.pagetagrelations.updateMany({
+      where: { relatedPageId: page._id.toString() },
+      data: { isPageTrashed: false },
+    });
 
     this.pageEvent.emit('revert', page, updatedPage, user);
 
@@ -4448,7 +4449,12 @@ class PageService implements IPageService {
           const descendantCount = await Page.recountDescendantCount(
             document._id,
           );
-          await Page.findByIdAndUpdate(document._id, { descendantCount });
+          // Skip no-op writes: on a healthy tree almost every page is already
+          // correct, so this avoids rewriting the whole collection and shrinks the
+          // window in which a concurrent live edit could be clobbered.
+          if (descendantCount !== document.descendantCount) {
+            await Page.findByIdAndUpdate(document._id, { descendantCount });
+          }
         }
         callback();
       },
@@ -4475,10 +4481,37 @@ class PageService implements IPageService {
 
     await Page.incrementDescendantCountOfPageIds(ancestorPageIds, inc);
 
+    if (inc > 0) {
+      await this.clearWipExpirationOf(ancestorPageIds);
+    }
+
     const updateDescCountData: UpdateDescCountRawData = Object.fromEntries(
       ancestors.map((p) => [p._id.toString(), p.descendantCount + inc]),
     );
     this.emitUpdateDescCount(updateDescCountData);
+  }
+
+  /**
+   * A WIP page that gains a descendant must not auto-expire — deleting it would
+   * orphan that descendant. `makeWip()` already applies this rule at creation time
+   * via `disableTtl`, but that is a point-in-time snapshot; this keeps the invariant
+   * true for pages that acquire descendants later.
+   *
+   * Called from updateDescendantCountOfAncestors, which every descendant-adding
+   * path (create / rename / duplicate / revert / v5 migration) routes through — so
+   * "this page gained a descendant" and "this page must stop expiring" stay a single
+   * event. The ancestor ids are passed in rather than re-derived: the caller has
+   * already resolved them from the parent links.
+   */
+  private async clearWipExpirationOf(
+    ancestorPageIds: ObjectIdLike[],
+  ): Promise<void> {
+    const Page = mongoose.model<IPage, PageModel>('Page');
+
+    await Page.updateMany(
+      { _id: { $in: ancestorPageIds }, wipExpiredAt: { $ne: null } },
+      { $unset: { wipExpiredAt: true } },
+    );
   }
 
   private emitUpdateDescCount(data: UpdateDescCountRawData): void {
@@ -4895,6 +4928,28 @@ class PageService implements IPageService {
       throw Error('Cannot process create');
     }
 
+    // Clear the redirect for this path before anything is written. Page view
+    // resolves a requested path through its redirect without checking for a live
+    // page at it (resolvePathAndCheckIdentical), so a page created while its
+    // redirect survives is unreachable at its own path. Deleting first means a
+    // failure here leaves nothing half-done: the redirect is still in place and no
+    // page was created, so the operation is safe to retry. This used to run in
+    // createSubOperation, which the caller does not await and which logged a
+    // failure without acting on it, leaving that state permanently.
+    try {
+      const { deletedCount } = await PageRedirect.deleteOne({ fromPath: path });
+      if (deletedCount > 0) {
+        logger.info(
+          `Deleted the page redirect from "${path}" before creating a page there.`,
+        );
+      }
+    } catch (err) {
+      logger.error(`Failed to delete the PageRedirect from "${path}"`, err);
+      throw new Error(
+        `Could not create a page at "${path}": the redirect registered for that path could not be removed, and the page would not be reachable at that path while it remains.`,
+      );
+    }
+
     // Prepare a page document
     const shouldNew = isGrantRestricted;
     const page = await this.preparePageDocumentToCreate(path, shouldNew);
@@ -4916,15 +4971,18 @@ class PageService implements IPageService {
 
     // Make WIP
     if (options.wip) {
+      const wipExpirationSeconds = configManager.getConfig(
+        'app:wipPageExpirationSeconds',
+      );
       const hasChildren = await Page.exists({ parent: page._id });
-      page.makeWip(hasChildren != null); // disableTtl = hasChildren != null
+      page.makeWip(hasChildren != null, wipExpirationSeconds); // disableTtl = hasChildren != null
     }
 
     // Save
     let savedPage = await page.save();
 
     // Create revision
-    const newRevision = Revision.prepareRevision(
+    const newRevision = prisma.revisions.prepareRevision(
       savedPage,
       body,
       null,
@@ -4967,21 +5025,11 @@ class PageService implements IPageService {
     options: IOptionsForCreate,
     pageOpId: ObjectIdLike,
   ): Promise<void> {
-    await this.disableAncestorPagesTtl(page.path);
-
     // Update descendantCount
     await this.updateDescendantCountOfAncestors(page._id, 1, false);
 
-    // Delete PageRedirect if exists
-    try {
-      await PageRedirect.deleteOne({ fromPath: page.path });
-      logger.warn(
-        `Deleted page redirect after creating a new page at path "${page.path}".`,
-      );
-    } catch (err) {
-      // no throw
-      logger.error('Failed to delete PageRedirect');
-    }
+    // The redirect for this path is deleted in create(), before the page is
+    // written — not here, where a failure could not be acted on.
 
     // update scopes for descendants
     if (options.overwriteScopesOfDescendants) {
@@ -5032,7 +5080,7 @@ class PageService implements IPageService {
     page.applyScope(user, grant, grantUserGroupIds);
 
     let savedPage = await page.save();
-    const newRevision = Revision.prepareRevision(
+    const newRevision = prisma.revisions.prepareRevision(
       savedPage,
       body,
       null,
@@ -5062,21 +5110,6 @@ class PageService implements IPageService {
     },
   ): Promise<boolean> {
     return this.canProcessCreate(path, grantData, false);
-  }
-
-  private async disableAncestorPagesTtl(path: string): Promise<void> {
-    const Page = mongoose.model<PageDocument, PageModel>('Page');
-
-    const ancestorPaths = collectAncestorPaths(path);
-    const ancestorPageIds = await Page.aggregate([
-      { $match: { path: { $in: ancestorPaths, $nin: ['/'] }, isEmpty: false } },
-      { $project: { _id: 1 } },
-    ]);
-
-    await Page.updateMany(
-      { _id: { $in: ancestorPageIds } },
-      { $unset: { ttlTimestamp: true } },
-    );
   }
 
   /**
@@ -5154,7 +5187,7 @@ class PageService implements IPageService {
     const dummyUser: HasObjectId = {
       _id: new mongoose.Types.ObjectId().toString(),
     };
-    const newRevision = Revision.prepareRevision(
+    const newRevision = prisma.revisions.prepareRevision(
       savedPage,
       body,
       null,
@@ -5331,7 +5364,7 @@ class PageService implements IPageService {
 
     // Once updated it's exempt from automatic deletion
     if (options.wip == null) {
-      newPageData.ttlTimestamp = undefined;
+      newPageData.wipExpiredAt = undefined;
     } else if (options.wip) {
       newPageData.unpublish();
     } else {
@@ -5450,7 +5483,7 @@ class PageService implements IPageService {
     const shouldUpdateBody = isBodyPresent;
     if (shouldUpdateBody) {
       const origin = options.origin;
-      const newRevision = await Revision.prepareRevision(
+      const newRevision = prisma.revisions.prepareRevision(
         newPageData,
         body,
         previousBody,
@@ -5549,7 +5582,7 @@ class PageService implements IPageService {
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
     if (shouldUpdateBody) {
-      const newRevision = await Revision.prepareRevision(
+      const newRevision = prisma.revisions.prepareRevision(
         pageData,
         body,
         previousBody,
@@ -5608,44 +5641,6 @@ class PageService implements IPageService {
       hasYdocsNewerThanLatestRevision,
       awarenessStateSize: currentYdoc?.awareness.states.size,
     };
-  }
-
-  async createTtlIndex(): Promise<void> {
-    const wipPageExpirationSeconds =
-      configManager.getConfig('app:wipPageExpirationSeconds') ?? 172800;
-    const collection = mongoose.connection.collection('pages');
-
-    // DELETEME: migrations never runs on test environment (which should be fixed),
-    // until then, create collection if it does not exist to avoid the error when creating an index.
-    // MongoServerError: ns does not exist: growi_test_x.pages
-    await mongoose.connection.createCollection('pages').catch(() => {});
-
-    try {
-      const targetField = 'ttlTimestamp_1';
-
-      const indexes = await collection.indexes();
-      const foundTargetField = indexes.find((i) => i.name === targetField);
-
-      const isNotSpec =
-        foundTargetField?.expireAfterSeconds == null ||
-        foundTargetField?.expireAfterSeconds !== wipPageExpirationSeconds;
-      const shoudDropIndex = foundTargetField != null && isNotSpec;
-      const shoudCreateIndex = foundTargetField == null || shoudDropIndex;
-
-      if (shoudDropIndex) {
-        await collection.dropIndex(targetField);
-      }
-
-      if (shoudCreateIndex) {
-        await collection.createIndex(
-          { ttlTimestamp: 1 },
-          { expireAfterSeconds: wipPageExpirationSeconds },
-        );
-      }
-    } catch (err) {
-      logger.error('Failed to create TTL Index', err);
-      throw err;
-    }
   }
 }
 

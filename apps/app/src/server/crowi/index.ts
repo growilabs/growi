@@ -14,6 +14,7 @@ import uidSafe from 'uid-safe';
 import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
 import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
+import { AuditlogChangeStreamService } from '~/features/auditlog-es-sync/server';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { initializeVaultFeature } from '~/features/growi-vault/server';
@@ -145,6 +146,8 @@ class Crowi {
   passportService!: PassportService;
 
   searchService!: SearchService;
+
+  auditlogChangeStreamService: AuditlogChangeStreamService | null = null;
 
   slackIntegrationService!: SlackIntegrationService;
 
@@ -498,6 +501,13 @@ class Crowi {
     );
     new NewsCronService().startCron();
 
+    // Expired WIP page cleanup (the schedule defaults to daily and can be disabled
+    // with an empty app:wipPageCleanupCronSchedule)
+    const { startWipPageCleanupCronIfEnabled } = await import(
+      '~/server/service/page/wip-page-cleanup-cron'
+    );
+    startWipPageCleanupCronIfEnabled(this);
+
     // Periodic model-catalog refresh (no-op unless AI is enabled; the schedule
     // defaults to daily and can be disabled with an empty ai:modelCatalogRefreshCronSchedule)
     const { startModelCatalogRefreshCronIfEnabled } = await import(
@@ -542,6 +552,32 @@ class Crowi {
 
   async setupSearcher(): Promise<void> {
     this.searchService = await SearchService.create(this);
+
+    if (this.searchService.isConfigured) {
+      // Auditlog rebuild-on-boot is orchestrated here (not in the delegator) so that server-core
+      // stays free of the auditlog-es-sync feature. Whether the rebuild actually succeeded is then
+      // handed to the change-stream service, which reconciles the sync-status flag and resume token
+      // on its first start (a feature concern that belongs in that layer).
+      let didRebuildOnBoot = false;
+      if (
+        this.configManager.getConfig('app:elasticsearchAuditlogReindexOnBoot')
+      ) {
+        // No cross-instance guard (like the page-index reindexOnBoot): concurrent rebuilds race
+        // on the ES alias swap, so enable on a single instance.
+        try {
+          await this.searchService.rebuildAuditlogIndex();
+          didRebuildOnBoot = true;
+        } catch (err) {
+          logger.error('Rebuild auditlog index on boot failed', err);
+        }
+      }
+
+      this.auditlogChangeStreamService = new AuditlogChangeStreamService(
+        this.searchService.fullTextSearchDelegator,
+        didRebuildOnBoot,
+      );
+      void this.auditlogChangeStreamService.startWithRetry();
+    }
   }
 
   async setupMailer(): Promise<void> {
@@ -709,6 +745,7 @@ class Crowi {
       onSignal: async () => {
         logger.info('Server is starting cleanup');
 
+        await this.auditlogChangeStreamService?.close();
         await mongoose.disconnect();
         return;
       },
@@ -875,14 +912,13 @@ class Crowi {
     await growiPluginService.downloadNotExistPluginRepositories();
   }
 
-  async setupPageService(): Promise<void> {
+  setupPageService(): void {
     if (this.pageGrantService == null) {
       this.pageGrantService = new PageGrantService(this);
     }
     // initialize after pageGrantService since pageService uses pageGrantService in constructor
     if (this.pageService == null) {
       this.pageService = new PageService(this);
-      await this.pageService.createTtlIndex();
     }
     this.pageOperationService = instanciatePageOperationService(this);
   }
