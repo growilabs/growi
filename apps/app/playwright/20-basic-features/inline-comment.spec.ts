@@ -1,7 +1,53 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import type { CreatedPage } from '../utils/api';
-import { createPage, deletePagesCompletely } from '../utils/api';
+import { createPage, deletePagesCompletely, updatePage } from '../utils/api';
+
+/**
+ * Selects `text` inside the rendered page body via a Range set on the
+ * exact text-node offsets. A triple-click paragraph-select was tried
+ * first and rejected: `Selection.toString()` for a triple-click-selected
+ * `<p>` includes a trailing "\n" past the sentence's own text (a Chromium
+ * paragraph-select artifact), which corrupts the stored quote and makes
+ * every later re-match fail. A script-driven `Selection.addRange()` still
+ * fires the native `selectionchange` event `useTextSelection`
+ * (SelectionCapture's hook) listens for — it's a real Selection-object
+ * mutation, just not a mouse gesture — so this is a faithful trigger, not
+ * a bypass of the component under test.
+ *
+ * Hoisted to module scope (rather than declared per `describe` block) so
+ * both the happy-path suite and the best-effort-fallback suite below share
+ * one implementation.
+ */
+const selectTextInPageBody = async (
+  page: Page,
+  text: string,
+): Promise<void> => {
+  await page.evaluate((needle) => {
+    const container = document.querySelector('.wiki');
+    if (container == null) {
+      throw new Error('page body container (.wiki) not found');
+    }
+
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node != null) {
+      const index = node.textContent?.indexOf(needle) ?? -1;
+      if (index !== -1) {
+        const range = document.createRange();
+        range.setStart(node, index);
+        range.setEnd(node, index + needle.length);
+
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        return;
+      }
+      node = walker.nextNode();
+    }
+    throw new Error(`text not found in page body: ${needle}`);
+  }, text);
+};
 
 test.describe('Inline comment', () => {
   // Serial: comment creation is a real, non-idempotent backend write and later
@@ -35,48 +81,6 @@ test.describe('Inline comment', () => {
       await deletePagesCompletely(request, [createdPage]);
     }
   });
-
-  /**
-   * Selects `text` inside the rendered page body via a Range set on the
-   * exact text-node offsets. A triple-click paragraph-select was tried
-   * first and rejected: `Selection.toString()` for a triple-click-selected
-   * `<p>` includes a trailing "\n" past the sentence's own text (a Chromium
-   * paragraph-select artifact), which corrupts the stored quote and makes
-   * every later re-match fail. A script-driven `Selection.addRange()` still
-   * fires the native `selectionchange` event `useTextSelection`
-   * (SelectionCapture's hook) listens for — it's a real Selection-object
-   * mutation, just not a mouse gesture — so this is a faithful trigger, not
-   * a bypass of the component under test.
-   */
-  const selectTextInPageBody = async (
-    page: Page,
-    text: string,
-  ): Promise<void> => {
-    await page.evaluate((needle) => {
-      const container = document.querySelector('.wiki');
-      if (container == null) {
-        throw new Error('page body container (.wiki) not found');
-      }
-
-      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-      let node = walker.nextNode();
-      while (node != null) {
-        const index = node.textContent?.indexOf(needle) ?? -1;
-        if (index !== -1) {
-          const range = document.createRange();
-          range.setStart(node, index);
-          range.setEnd(node, index + needle.length);
-
-          const selection = window.getSelection();
-          selection?.removeAllRanges();
-          selection?.addRange(range);
-          return;
-        }
-        node = walker.nextNode();
-      }
-      throw new Error(`text not found in page body: ${needle}`);
-    }, text);
-  };
 
   test('Create a page containing the target text', async ({
     page,
@@ -181,5 +185,135 @@ test.describe('Inline comment', () => {
     const reply = item.getByTestId('inline-comment-reply');
     await expect(reply).toBeVisible();
     await expect(reply).toContainText(replyText);
+  });
+});
+
+test.describe('Inline comment - best-effort fallback after the anchored text is edited away', () => {
+  // Serial for the same reason as the suite above: the second test depends
+  // on the comment created by the first, real backend state.
+  test.describe.configure({ mode: 'serial' });
+
+  const fallbackPagePath = (retry: number) =>
+    `/inline-comment-e2e-fallback${retry}`;
+
+  // Long enough that even the fuzzy matcher's tolerance
+  // (`FUZZY_MATCH_ERROR_RATE = 0.2`, capped at `FUZZY_MATCH_MAX_ERRORS = 20`
+  // — see quote-matcher.ts) cannot bridge the gap to its replacement below.
+  const targetSentence =
+    'This sentence will be entirely removed from the page body after the comment is created, breaking its anchor on purpose.';
+  const pageBody = [
+    '# Inline comment E2E - fallback',
+    '',
+    'Some intro text before the target.',
+    '',
+    targetSentence,
+    '',
+    'Some trailing text after the target.',
+    '',
+  ].join('\n');
+
+  // A short, wholly unrelated replacement for `targetSentence`. Levenshtein
+  // distance is always at least the length difference between the two
+  // strings, so `targetSentence.length - replacementSentence.length` alone
+  // (119 - 10 = 109) already exceeds `matchQuote`'s worst-case tolerance of
+  // `min(ceil(119 * 0.2), 20) = 20` errors — independent of how much (or
+  // little) the wording happens to overlap. This makes the "quote is
+  // unrecoverable" outcome deterministic rather than a near-miss that could
+  // flip to a fuzzy match under an unlucky character overlap.
+  const replacementSentence = 'Unrelated.';
+
+  let createdPage: CreatedPage | undefined;
+
+  test.afterAll(async ({ request }) => {
+    if (createdPage != null) {
+      await deletePagesCompletely(request, [createdPage]);
+    }
+  });
+
+  test('Create a page, then create an inline comment on a sentence', async ({
+    page,
+    request,
+  }, testInfo) => {
+    createdPage = await createPage(request, {
+      path: fallbackPagePath(testInfo.retry),
+      body: pageBody,
+    });
+
+    await page.goto(createdPage.path);
+    await expect(page.locator('.wiki').first()).toContainText(targetSentence);
+    await expect(page.getByTestId('inline-comment-list')).toBeAttached();
+
+    await selectTextInPageBody(page, targetSentence);
+
+    const form = page.getByTestId('inline-comment-form');
+    await expect(form).toBeVisible();
+
+    await form
+      .locator('.cm-content')
+      .fill('a comment whose anchor will be lost');
+    await form.getByTestId('inline-comment-submit-button').click();
+    await expect(form).not.toBeVisible();
+
+    const item = page.getByTestId('inline-comment-item').first();
+    await expect(item).toBeVisible();
+
+    // Requirement 2.1/2.2: sanity-check the highlight is actually drawn
+    // before the edit — otherwise a "no highlight after edit" assertion
+    // later would be true for the wrong reason (it was never drawn at all).
+    await expect
+      .poll(async () =>
+        page.evaluate(
+          () => CSS.highlights.get('growi-inline-comment')?.size ?? 0,
+        ),
+      )
+      .toBeGreaterThan(0);
+  });
+
+  test('After the commented-on text is completely edited away and the page reloads, the highlight disappears but the comment remains listed', async ({
+    page,
+    request,
+  }) => {
+    if (createdPage == null) {
+      throw new Error('createdPage was not set by the previous test');
+    }
+
+    // Requirement 5.1/5.3: replace the whole paragraph that contained the
+    // quoted sentence with unrelated text — not merely shifted or
+    // reworded, but gone — so neither exact nor fuzzy matching in
+    // `matchQuote` can locate it in the freshly-rendered body.
+    const editedBody = pageBody.replace(targetSentence, replacementSentence);
+    createdPage = await updatePage(request, createdPage, editedBody);
+
+    await page.goto(createdPage.path);
+    await expect(page.locator('.wiki').first()).toContainText(
+      replacementSentence,
+    );
+    await expect(page.locator('.wiki').first()).not.toContainText(
+      targetSentence,
+    );
+
+    // Requirement 2.5: the comment is still in the list (not deleted, not
+    // hidden) even though its anchor could no longer be resolved.
+    const item = page.getByTestId('inline-comment-item').first();
+    await expect(item).toBeVisible();
+    await expect(item).toContainText('a comment whose anchor will be lost');
+
+    // Requirement 2.4/5.3: no highlight is drawn for the now-unresolvable
+    // anchor. `item` being visible already proves the inline-comment data
+    // (the same fetch `useAnchorResolver` reads its anchors from) has
+    // loaded, so by this point AnchorResolver's anchors-content-change
+    // effect (`use-anchor-resolver.ts`) has already run at least once against
+    // the freshly-rendered body — there is no later trigger that could still
+    // produce a highlight. The extra wait below only guards against a
+    // (self-healing) re-anchor via a second `useContainerSettle` tick
+    // within its `WATCH_TIMEOUT_MS` window flipping this from 0 to
+    // non-zero after the first check.
+    const highlightCount = () =>
+      page.evaluate(
+        () => CSS.highlights.get('growi-inline-comment')?.size ?? 0,
+      );
+    expect(await highlightCount()).toBe(0);
+    await page.waitForTimeout(1000);
+    expect(await highlightCount()).toBe(0);
   });
 });
