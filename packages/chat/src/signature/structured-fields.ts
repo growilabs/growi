@@ -10,7 +10,7 @@
 // package's HTTP header values take -- so the callers stay free of both the
 // union and the library.
 
-import { serializeDictionary } from 'structured-headers';
+import { serializeDictionary, serializeInnerList } from 'structured-headers';
 
 /**
  * A Structured Fields Dictionary (RFC 8941 section 3.2) whose every member is
@@ -44,3 +44,23 @@ export const serializeByteSequenceDictionary = (
       ]),
     ),
   );
+
+/**
+ * The parameters of an RFC 8941 Inner List, in serialization order. The value
+ * shapes are the two this package uses: an Integer and a String.
+ */
+export type InnerListParameters = ReadonlyMap<string, number | string>;
+
+/**
+ * Serializes an RFC 8941 Inner List (section 4.1.1.1) whose members are all
+ * bare Strings, followed by its parameters -- the shape RFC 9421's
+ * `@signature-params` takes, e.g. `("@method" "content-type");created=1;keyid="k"`.
+ */
+export const serializeStringInnerList = (
+  members: readonly string[],
+  parameters: InnerListParameters,
+): string =>
+  serializeInnerList([
+    members.map((member) => [member, new Map()]),
+    new Map(parameters),
+  ]);

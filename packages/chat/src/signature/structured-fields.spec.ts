@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { serializeByteSequenceDictionary } from './structured-fields.js';
+import {
+  serializeByteSequenceDictionary,
+  serializeStringInnerList,
+} from './structured-fields.js';
 
 describe('serializeByteSequenceDictionary', () => {
   it('serializes a single member as `key=:base64:` (RFC 8941 Byte Sequence)', () => {
@@ -40,5 +43,31 @@ describe('serializeByteSequenceDictionary', () => {
     expect(
       serializeByteSequenceDictionary(new Map([['k', new Uint8Array(0)]])),
     ).toBe('k=::');
+  });
+});
+
+describe('serializeStringInnerList', () => {
+  it('serializes the members as quoted Strings inside parentheses', () => {
+    expect(
+      serializeStringInnerList(['@method', 'content-type'], new Map()),
+    ).toBe('("@method" "content-type")');
+  });
+
+  it('appends the parameters in the given order, Integers bare and Strings quoted', () => {
+    expect(
+      serializeStringInnerList(
+        ['@method'],
+        new Map<string, number | string>([
+          ['created', 1618884473],
+          ['keyid', 'test-key'],
+        ]),
+      ),
+    ).toBe('("@method");created=1618884473;keyid="test-key"');
+  });
+
+  it('serializes an empty member list as `()`', () => {
+    expect(
+      serializeStringInnerList([], new Map([['created', 1618884473]])),
+    ).toBe('();created=1618884473');
   });
 });
