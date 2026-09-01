@@ -144,7 +144,7 @@
   - _Requirements: 9.2, 13.1_
   - _Boundary: UriGuard_
 
-- [ ] 4.3 (P) 鍵の失効を受け入れてよいかの判定を作る
+- [x] 4.3 (P) 鍵の失効を受け入れてよいかの判定を作る
   - **有効な鍵が 0 本になる失効の要求を断る**判定を、両側が使う純粋関数として置く。
     保管は各側の持ちものだが、**判定を両側に書き写すと片方だけ緩くなる**ため、ここに置く
   - **2.4 と同じく型に依存しない素の形にする** — 鍵名と有効期間の組の一覧と、
@@ -302,6 +302,7 @@
 
 - **1.2**: `packages/chat` の相対 import は、この monorepo の他パッケージ（`packages/slack` / `packages/core`）と同じく末尾に `.js` を付ける書き方（`from './foo.js'`）が実際の慣習。`src/public-surface.spec.ts` の静的 import 木の追跡は、拡張子なし・`.js` 付き・`~/` エイリアス（`tsconfig.json` の `paths`）の 3 通りすべてを解決できる必要がある（最初の実装は `.js` 付きと `~/` を見逃し、レビューで差し戻された）。以降のタスクで `index.ts` / `server.ts` から再輸出を追加する際は、書き方を変えても検査が黙って素通りしないことを確認すること。
 - **2.2**: design.md の `command-names.ts` コメントにある「書き込みは既定で不許可」は design.md 自身の 1 か所（`Security` という見出しは design.md に実在しない）にしか根拠が無く、requirements.md 11.1 は「コマンドごとに許可チャンネルを設定できる」までしか書いていない。4.1（チャンネル権限判定、既定は書き込み不許可・それ以外は許可）を実装する前に、この既定挙動が要件のどこで確定しているかを requirements.md で先に確認すること。
+- **4.3**: 「有効な鍵」は `validFrom <= now && revokedAt == null` の両軸で判定する（`revokedAt` の有無だけでは不足）。この軸は失効の**対象鍵自身**と**残数の数え方（対象を除いてから数える）**の両方に同じ述語を適用しないと片手落ちになる（レビューで2回、別々の半分の直し漏れが見つかった）。`validFrom`/`now` は同じ書式の UTC 表記（`Date#toISOString()`）である前提で文字列比較する — 書式を決めるのは 3.3 の `PublicKeyRegistration.validFrom` と app/proxy 側で、この関数はその前提に依存するだけ。
 - **4.2**: `judgeGrowiUri`（`url-guard/growi-uri-guard.ts`）は design.md の表に無い2点を、承認済み文書の意図から読んで実装している。(a) `allowList` が免除する scheme は http/https の内側に限る — design.md の免除の正当化段落が挙げているのは平文 http の構成（要件13.1）だけなので、`file:`・`gopher:` 等は allowList 経由でも通さない。(b) 私的帯の判定は design.md の列挙（RFC1918・169.254.0.0/16・loopback・IPv6 unique-local）に加えて `0.0.0.0/8`・IPv6 `::`・CGNAT `100.64.0.0/10`・IPv6 リンクローカル `fe80::/10`・非推奨サイトローカル `fec0::/10` も拒否する — これらはいずれもインターネット上を流れないアドレスで、official proxy が到達できる GROWI がそこに置かれることは無いため、拒否を広げても実構成を1つも塞がない（official proxy は allowList 設定を持たないので「allowList で逃がせる」は理由にならない点に注意）。4.3・`chat-integration-proxy` 側のタスクでこの2点を design.md の表と食い違うとして蒸し返さないこと。
 - **4.1（2.2 の注記を決着）**: 「書き込みは既定で不許可」は requirements.md 11.1〜11.5 に明文が無い。根拠は要件 11 の Objective（想定していないチャンネルからの書き込みを防ぐ）と要件 10.5・10.6（紐付いていない利用者の書き込みを実行しない）。design.md は承認済みの成果物であり、そこに書かれた既定をそのまま実装するのは正しい。4.2・4.3 でこの論点を蒸し返さないこと。
 - **3.2**: `packages/chat` の型のみのファイル（`.ts` に実行文が無いもの）は `pnpm vitest run` 単体では型崩れを検出しない（esbuild が型検査せずに剥がすだけのため）。`vite build`（`vite-plugin-dts`）も型エラーを画面に出すが**終了コードは 0** のままなので、CI やレビューで「落ちること」の根拠にはならない。型崩れを実際に止めるのは `pnpm lint`（`tsgo --noEmit`、終了コード 2）で、`.github/workflows/ci-app.yml` の `turbo run lint --filter=./packages/*` がこれを CI に繋いでいる。今後この種のタスクの RED_PHASE_OUTPUT を書く／確認するときは `pnpm lint` を根拠にすること。
