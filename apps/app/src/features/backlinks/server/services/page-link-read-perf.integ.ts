@@ -1,5 +1,6 @@
 import type { IUserHasId } from '@growi/core';
 import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
+import type { Document } from 'mongodb';
 import mongoose, { type Types } from 'mongoose';
 
 import { getInstance } from '^/test/setup/crowi';
@@ -7,10 +8,63 @@ import { getInstance } from '^/test/setup/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
+import { prisma } from '~/utils/prisma';
 
-import PageLink from '../models/page-link';
 import { buildVisibleSourcesQuery, findBacklinks } from './find-backlinks';
 import { syncOutboundLinks } from './page-link-sync';
+
+const PAGELINKS_COLLECTION = 'pagelinks';
+
+/**
+ * Raw driver handle — for the perf-critical bulk inserts and the collection-level
+ * inspection (indexes, explain) that need to bypass both ORMs.
+ */
+const rawPagelinksCollection = () => {
+  const db = mongoose.connection.db;
+  if (db == null) throw new Error('no mongoose connection');
+  return db.collection(PAGELINKS_COLLECTION);
+};
+
+/**
+ * The commands `fn` actually sent to the `pagelinks` collection, read off the database
+ * profiler.
+ *
+ * The plan and scoping assertions below are only worth anything if they describe the
+ * command *production* issues. A transcribed copy silently stops tracking the real one
+ * (it did exactly that when findBacklinkSources moved to Prisma), and a spy cannot reach
+ * the extension's closure-captured client. Observing the wire cannot drift.
+ */
+const capturePagelinkCommands = async (
+  fn: () => Promise<unknown>,
+): Promise<Document[]> => {
+  const db = mongoose.connection.db;
+  if (db == null) throw new Error('no mongoose connection');
+
+  const since = new Date();
+  await db.command({ profile: 2 });
+  try {
+    await fn();
+  } finally {
+    await db.command({ profile: 0 });
+  }
+
+  return db
+    .collection('system.profile')
+    .find({
+      ts: { $gte: since },
+      ns: `${db.databaseName}.${PAGELINKS_COLLECTION}`,
+    })
+    .sort({ ts: 1 })
+    .toArray();
+};
+
+/** Strip the session/routing envelope so a captured command can be fed back to `explain`. */
+const explainable = (command: Document): Document =>
+  Object.fromEntries(
+    Object.entries(command).filter(
+      ([key]) => !key.startsWith('$') && key !== 'lsid',
+    ),
+  );
 
 /*
  * B2.1 — read-path benchmark for backlinks retrieval at scale (requirement 3.4).
@@ -150,7 +204,7 @@ const describeCacheRegime = async (): Promise<{
   if (db == null) throw new Error('no mongoose connection');
   const [pages, links] = await Promise.all([
     db.command({ collStats: 'pages' }),
-    db.command({ collStats: PageLink.collection.collectionName }),
+    db.command({ collStats: PAGELINKS_COLLECTION }),
   ]);
   const bytes =
     pages.storageSize +
@@ -228,7 +282,9 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
       Page.deleteMany({ path: trashPathRe }),
       // A killed run's link rows: their fromPage ids died with the process, but every
       // seeded row's toPath carries the fixture prefix.
-      PageLink.deleteMany({ toPath: pathRe }),
+      prisma.pagelinks.deleteMany({
+        where: { toPath: { startsWith: PREFIX } },
+      }),
     ]);
   };
 
@@ -271,10 +327,11 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
       // Self-heal before seeding: see purgeFixtures.
       await purgeFixtures();
 
-      // syncIndexes(), not init(): init() only ever creates, and `growi_test_<workerId>`
-      // is reused across runs — so indexes B2.2 removed from the schema would survive and
-      // the inventory check below would flag a stale local database as a real gap.
-      await PageLink.syncIndexes();
+      // No index setup here: pagelinks is prisma-only, so its indexes come from
+      // migrations/20260901064500-add-indexes-to-pagelinks.js, which the harness has
+      // already applied (test/setup/migrate-mongo.ts). That is deliberately not
+      // re-created here — the inventory check below has to see what the migration
+      // really produced, or it would just be asserting its own setup back at itself.
 
       await User.insertMany(
         FIXTURE_USERNAMES.map((username) => ({
@@ -454,7 +511,7 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
         }
       }
 
-      await insertInBatches(PageLink.collection, linkDocs);
+      await insertInBatches(rawPagelinksCollection(), linkDocs);
 
       report(
         `[B2.1] seeded ${pageDocs.length} pages / ${linkDocs.length} link rows in ${Math.round(performance.now() - seedStarted)} ms`,
@@ -485,23 +542,27 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
         // biome-ignore lint/performance/noAwaitInLoops: batched to bound the delete size
         await Promise.all([
           Page.deleteMany({ _id: { $in: batch } }),
-          PageLink.deleteMany({ fromPage: { $in: batch } }),
+          prisma.pagelinks.deleteMany({
+            where: { fromPageId: { in: batch.map((id) => id.toString()) } },
+          }),
         ]);
       }
       // Guarded: a beforeAll that throws before hubPageId is assigned still runs this
-      // hook, and mongoose passes `{toPage: undefined}` through to the driver, which
-      // serializes it to `{toPage: null}` — matching every *unresolved* link row in the
-      // database, including rows this file never created (toPage defaults to null).
+      // hook. Unlike the Mongoose driver, Prisma's `toPageId: hubPageId.toString()`
+      // filter only ever matches that literal string — it cannot accidentally widen to
+      // "every unresolved row" the way `{toPage: undefined}` did over the raw driver.
       if (hubPageId != null) {
-        await PageLink.deleteMany({ toPage: hubPageId });
+        await prisma.pagelinks.deleteMany({
+          where: { toPageId: hubPageId.toString() },
+        });
       }
       await purgeFixtures();
     },
     10 * 60 * 1000,
   );
 
-  it('has exactly the two shipped indexes on pagelinks', async () => {
-    const indexes = await PageLink.collection.indexes();
+  it('has exactly the three shipped indexes on pagelinks', async () => {
+    const indexes = await rawPagelinksCollection().indexes();
     const byKey = new Map(indexes.map((idx) => [JSON.stringify(idx.key), idx]));
 
     // Closed set, not a presence check: every latency figure this file reports is only
@@ -510,16 +571,18 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
     // would otherwise leave every test in this file green (the distinct merely upgrades
     // to PROJECTION_COVERED <- DISTINCT_SCAN, still index-backed and still under target)
     // while the recorded numbers silently described a configuration that no longer
-    // exists. beforeAll's syncIndexes() drops indexes the schema no longer declares, so
-    // this asserts the schema itself rather than whatever a reused local database holds.
-    // `_id_` is included: it is in the inventory, though not one of the two "shipped".
+    // exists. What it reads is the migration's real output, so it doubles as that
+    // migration's drift test — and, since nothing reconciles indexes at connect any
+    // more, a `growi_test_<workerId>` left over from the mongoose era can fail here
+    // with a stale extra index. That is the intended signal, not a flake: drop the
+    // test database.
+    // `_id_` is included: it is in the inventory, though not one of the three "shipped".
     expect(indexes.map((idx) => idx.name).sort()).toEqual([
       '_id_', // implicit
       'fromPage_1_toPath_1', // replaceOutboundLinks' upsert filter and $nin delete
       'toPage_1', // what findBacklinkSources' distinct rides
+      'toPath_1', // repointInboundLinks' toPath-only filter (added by B4)
     ]);
-    // Subsumed by the set above, kept for the WHY: B2.2 dropped a standalone
-    // { fromPage } and { toPath } as unused — their absence is expected, not a gap.
 
     // Uniqueness is the one property the name set cannot express.
     const compound = byKey.get(JSON.stringify({ fromPage: 1, toPath: 1 }));
@@ -540,9 +603,9 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
 
     // Sub-steps, to locate the bottleneck rather than just observe the total.
     const distinctOnly = await measure(TIMED_RUNS, () =>
-      PageLink.findBacklinkSources(hubPageId),
+      prisma.pagelinks.findBacklinkSources(hubPageId),
     );
-    const sourceIds = await PageLink.findBacklinkSources(hubPageId);
+    const sourceIds = await prisma.pagelinks.findBacklinkSources(hubPageId);
     const filterOnly = await measure(TIMED_RUNS, async () => {
       // Production's own query builder, so this sub-step timing cannot drift away from
       // the query findBacklinks issues.
@@ -626,20 +689,24 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
     const db = mongoose.connection.db;
     if (db == null) throw new Error('no mongoose connection');
 
-    // distinct on { toPage } — explained via the command, since Model.distinct()
-    // has no .explain().
+    // Explain the command findBacklinkSources really sent, not a transcription of it.
+    const readCommands = await capturePagelinkCommands(() =>
+      prisma.pagelinks.findBacklinkSources(hubPageId),
+    );
+    expect(readCommands).toHaveLength(1);
+
     const distinctExplain = await db.command({
-      explain: {
-        distinct: PageLink.collection.collectionName,
-        key: 'fromPage',
-        query: { toPage: hubPageId },
-      },
+      explain: explainable(readCommands[0].command),
       verbosity: 'queryPlanner',
     });
     const distinctStages = collectStages(
       distinctExplain.queryPlanner?.winningPlan,
     );
 
+    report(
+      '[B2.1] read command:',
+      JSON.stringify(explainable(readCommands[0].command)),
+    );
     report('[B2.1] distinct winning plan stages:', distinctStages.join(' <- '));
     expect(distinctStages).not.toContain('COLLSCAN');
     // A covered distinct collapses to DISTINCT_SCAN; a plain index hit is IXSCAN.
@@ -649,7 +716,7 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
 
     // The viewer-filtered Page query, built by production — so this no-COLLSCAN
     // guarantee covers the query findBacklinks issues, not a copy of it.
-    const sourceIds = await PageLink.findBacklinkSources(hubPageId);
+    const sourceIds = await prisma.pagelinks.findBacklinkSources(hubPageId);
     const { query } = await buildVisibleSourcesQuery(sourceIds, viewer);
     // mongoose types explain() as resolving to the query's own result type; the real
     // shape is an untyped driver explain document, matching collectStages' parameter.
@@ -675,51 +742,57 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
     const untouchedPage = seededPageIds[2];
 
     const before = {
-      total: await PageLink.countDocuments(),
-      untouched: await PageLink.find({ fromPage: untouchedPage })
-        .select('toPath toPage -_id')
-        .sort({ toPath: 1 })
-        .lean(),
+      total: await prisma.pagelinks.count(),
+      untouched: await prisma.pagelinks.findMany({
+        where: { fromPageId: untouchedPage.toString() },
+        select: { toPath: true, toPageId: true },
+        orderBy: { toPath: 'asc' },
+      }),
     };
 
-    const bulkWriteSpy = vi.spyOn(PageLink, 'bulkWrite');
+    // Every write the save issued must be scoped to the edited page.
+    const writeCommands = await capturePagelinkCommands(() =>
+      syncOutboundLinks(editedPage, [
+        { fromPage: editedPage, toPath: `${PREFIX}/hub`, toPage: hubPageId },
+      ]),
+    );
+    expect(writeCommands.length).toBeGreaterThan(0);
 
-    await syncOutboundLinks(editedPage, [
-      { fromPage: editedPage, toPath: `${PREFIX}/hub`, toPage: hubPageId },
-    ]);
-
-    // Every operation the save issued must be scoped to the edited page.
-    expect(bulkWriteSpy).toHaveBeenCalledTimes(1);
-    const ops = bulkWriteSpy.mock.calls[0][0];
-    for (const op of ops) {
-      // replaceOutboundLinks issues only these two op kinds; anything else would be a
-      // new, unreviewed write shape and should fail this check rather than be skipped.
-      const filter =
-        'updateOne' in op
-          ? op.updateOne.filter
-          : 'deleteMany' in op
-            ? op.deleteMany.filter
-            : undefined;
-      expect(filter?.fromPage).toStrictEqual(editedPage);
+    for (const entry of writeCommands) {
+      const { command } = entry;
+      // The profiler logs each write statement on its own, or a batch envelope when the
+      // server groups them — accept either, reject anything else (a new, unreviewed write
+      // shape should fail here rather than be skipped).
+      const statements =
+        command.updates ??
+        command.deletes ??
+        (command.q != null ? [command] : undefined);
+      expect(
+        statements,
+        `unexpected command: ${JSON.stringify(command)}`,
+      ).toBeDefined();
+      for (const statement of statements) {
+        expect(statement.q?.fromPage?.toString()).toBe(editedPage.toString());
+      }
     }
-    bulkWriteSpy.mockRestore();
 
-    // And no other page's rows moved.
-    const afterUntouched = await PageLink.find({ fromPage: untouchedPage })
-      .select('toPath toPage -_id')
-      .sort({ toPath: 1 })
-      .lean();
+    // No other page's rows moved.
+    const afterUntouched = await prisma.pagelinks.findMany({
+      where: { fromPageId: untouchedPage.toString() },
+      select: { toPath: true, toPageId: true },
+      orderBy: { toPath: 'asc' },
+    });
     expect(afterUntouched).toStrictEqual(before.untouched);
     // The edited page dropped its EXTRA_LINKS_PER_PAGE rows and kept the hub row.
-    expect(await PageLink.countDocuments()).toBe(
+    expect(await prisma.pagelinks.count()).toBe(
       before.total - EXTRA_LINKS_PER_PAGE,
     );
 
     // The delete half filters { fromPage, toPath: { $nin } } — confirm that shape is
     // index-served too, so a save cannot degrade into a collection walk. Explained via
-    // the raw collection: it plans the literal filter (no mongoose casting in between)
-    // and its explain() is typed, unlike Query.explain().
-    const deleteExplain = await PageLink.collection
+    // the raw collection: it plans the literal filter (no ORM casting in between) and
+    // its explain() is typed, unlike Query.explain().
+    const deleteExplain = await rawPagelinksCollection()
       .find({
         fromPage: editedPage,
         toPath: { $nin: [`${PREFIX}/hub`] },

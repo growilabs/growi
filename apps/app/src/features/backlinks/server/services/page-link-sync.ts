@@ -1,9 +1,9 @@
 import type { Types } from 'mongoose';
 
 import PageRedirect from '~/server/models/page-redirect';
+import { prisma } from '~/utils/prisma';
 
 import type { IPageLink } from '../../interfaces/page-link';
-import PageLink from '../models/page-link';
 import {
   REDIRECT_CHAIN_MAX_DEPTH,
   resolveToPageIds,
@@ -30,7 +30,7 @@ export const syncOutboundLinks = async (
 ): Promise<void> => {
   const linksExceptSelf = dropSelfLinks(fromPageId, resolvedRows);
 
-  await PageLink.replaceOutboundLinks(fromPageId, linksExceptSelf);
+  await prisma.pagelinks.replaceOutboundLinks(fromPageId, linksExceptSelf);
 };
 
 /**
@@ -61,7 +61,7 @@ export const reResolveByToPath = async (toPath: string): Promise<void> => {
 
   await Promise.all(
     paths.map((path) =>
-      PageLink.repointInboundLinks(path, resolved.get(path) ?? null),
+      prisma.pagelinks.repointInboundLinks(path, resolved.get(path) ?? null),
     ),
   );
 };
