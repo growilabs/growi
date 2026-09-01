@@ -66,8 +66,8 @@ import {
   type OwnKey,
   type ProxySide,
   publicKeyRegistrationOf,
+  resolvePeerPublicKey,
   runPairing,
-  toPublicKeyObject,
 } from './pairing-harness.js';
 
 const GROWI_URI = 'https://growi.example.com';
@@ -220,10 +220,7 @@ describe('署名の代行窓口 -- pairing step 5 cannot be used to sign a produ
       headers: forged.headersWith(signatureBytes),
       body: forged.body,
       resolvePublicKey: async (ref) =>
-        ref.relationId === relationId &&
-        ref.keyId === relation.peerPublicKey.keyId
-          ? toPublicKeyObject(relation.peerPublicKey)
-          : null,
+        resolvePeerPublicKey(relation, ref, new Date()),
       consumeNonce: async () => true,
     });
   };
@@ -465,7 +462,7 @@ describe('別の口への流用 -- a signature made for one op is refused at eve
    * actually sends that op, and verifies it as the side that serves it.
    *
    * The direction is read from `OP_ENDPOINTS`, and the verifying side
-   * resolves the key from ITS OWN relation record's `peerPublicKey` -- never
+   * resolves the key from ITS OWN relation record's `peerKeys` -- never
    * from one shared table. `verify`'s own contract requires the peer's key
    * and only the peer's key, and getting that wrong here would be resolving
    * the caller's own key, the exact mistake that doc comment warns about.
@@ -507,10 +504,7 @@ describe('別の口への流用 -- a signature made for one op is refused at eve
       headers: { 'content-type': CONTENT_TYPE, ...signed.headers },
       body,
       resolvePublicKey: async (ref) =>
-        ref.relationId === relationId &&
-        ref.keyId === receiverRecord.peerPublicKey.keyId
-          ? toPublicKeyObject(receiverRecord.peerPublicKey)
-          : null,
+        resolvePeerPublicKey(receiverRecord, ref, new Date()),
       // Replay is task 7.5's subject; a fresh stub per call keeps this file
       // from looking as though it asserted anything about nonce state.
       consumeNonce: async () => true,

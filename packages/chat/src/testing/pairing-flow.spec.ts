@@ -75,17 +75,21 @@ describe('pairing procedure (steps 1-6)', () => {
     expect(proxyRelation).toBeDefined();
     expect(growiRelation).toBeDefined();
 
-    expect(proxyRelation?.peerPublicKey).toStrictEqual(submission.publicKey);
+    expect(proxyRelation?.peerKeys).toStrictEqual([
+      { ...submission.publicKey, revokedAt: null },
+    ]);
     expect(proxyRelation?.ownKey.keyId).toBe(proxy.ownKey.keyId);
     expect(proxyRelation?.peerUri).toBe(GROWI_URI);
 
-    expect(growiRelation?.peerPublicKey).toStrictEqual(result.publicKey);
+    expect(growiRelation?.peerKeys).toStrictEqual([
+      { ...result.publicKey, revokedAt: null },
+    ]);
     expect(growiRelation?.ownKey.keyId).toBe(growi.ownKey.keyId);
 
     // The two sides really exchanged keys -- neither stored its own key as
     // the peer's.
-    expect(proxyRelation?.peerPublicKey.keyId).toBe(growi.ownKey.keyId);
-    expect(growiRelation?.peerPublicKey.keyId).toBe(proxy.ownKey.keyId);
+    expect(proxyRelation?.peerKeys[0]?.keyId).toBe(growi.ownKey.keyId);
+    expect(growiRelation?.peerKeys[0]?.keyId).toBe(proxy.ownKey.keyId);
 
     // The registration code was consumed by the successful pairing.
     expect(proxy.pending.has(registrationCode)).toBe(false);
@@ -172,11 +176,11 @@ describe('pairing procedure (steps 1-6)', () => {
     if (result.status !== 'paired') {
       return;
     }
-    expect(proxy.relations.get(result.relationId)?.peerPublicKey).toStrictEqual(
-      submission.publicKey,
-    );
-    expect(growi.relations.get(result.relationId)?.peerPublicKey).toStrictEqual(
-      result.publicKey,
-    );
+    expect(proxy.relations.get(result.relationId)?.peerKeys).toStrictEqual([
+      { ...submission.publicKey, revokedAt: null },
+    ]);
+    expect(growi.relations.get(result.relationId)?.peerKeys).toStrictEqual([
+      { ...result.publicKey, revokedAt: null },
+    ]);
   });
 });

@@ -40,17 +40,23 @@ import {
 } from 'node:crypto';
 
 import {
+  type KeyOperationResult,
   type OwnershipChallenge,
   type PairingResult,
   type PairingSubmission,
   type PlatformName,
   type PublicKeyRegistration,
+  type PublicKeySet,
   parseChallengeResponse,
   parseOwnershipChallenge,
   parsePairingResult,
   parsePairingSubmission,
 } from '../index.js';
-import { pairingChallengePayload } from '../server.js';
+import {
+  judgeKeyRevocation,
+  type KeyRef,
+  pairingChallengePayload,
+} from '../server.js';
 
 /** How long an issued registration code stays usable, unless overridden. */
 export const DEFAULT_REGISTRATION_TTL_SEC = 600;
@@ -67,17 +73,31 @@ export interface OwnKey {
 }
 
 /**
+ * One peer key as a side stores it: the registration as it arrived, plus the
+ * instant it was revoked (`null` while it is still in force). This is exactly
+ * `PublicKeySet`'s member type -- the contract already declares the shape a
+ * side's key list takes on the wire, so it is reused here rather than
+ * re-declared.
+ */
+export type PeerKeyRecord = PublicKeySet['keys'][number];
+
+/**
  * What a side holds once pairing has completed.
  *
- * `ownKey` and `peerPublicKey` are SEPARATE fields on purpose: `KeyRef`
+ * `ownKey` and `peerKeys` are SEPARATE fields on purpose: `KeyRef`
  * carries no own/peer axis (tasks.md Implementation Note 2.4, design.md's
  * `VerifyParams.resolvePublicKey` note), so keeping the two apart is each
  * side's storage's job -- which is exactly what this record models.
+ *
+ * `peerKeys` is a LIST, not a single key: a rotation registers the new key
+ * before the old one is revoked, so both are valid at once and either may
+ * have signed the request being checked (Requirement 10.5, design.md Testing
+ * Strategy / Integration Tests "鍵の入れ替え").
  */
 export interface RelationRecord {
   readonly relationId: string;
   readonly ownKey: OwnKey;
-  readonly peerPublicKey: PublicKeyRegistration;
+  readonly peerKeys: ReadonlyArray<PeerKeyRecord>;
   /** The verified GROWI URI. Only the proxy side has one; GROWI stores null. */
   readonly peerUri: string | null;
 }
@@ -477,7 +497,7 @@ export const completePairing = (
   proxy.relations.set(relationId, {
     relationId,
     ownKey: proxy.ownKey,
-    peerPublicKey: submission.publicKey,
+    peerKeys: [{ ...submission.publicKey, revokedAt: null }],
     peerUri: submission.growiUri,
   });
   // The code is single-use: it is spent by the pairing it completed.
@@ -517,7 +537,7 @@ export const receivePairingResult = (
   growi.relations.set(parsed.relationId, {
     relationId: parsed.relationId,
     ownKey: growi.ownKey,
-    peerPublicKey: parsed.publicKey,
+    peerKeys: [{ ...parsed.publicKey, revokedAt: null }],
     peerUri: null,
   });
   growi.pendingRegistration = null;
@@ -571,5 +591,118 @@ export const runPairing = (
     submissionReceipt,
     result,
     resultReceipt,
+  };
+};
+
+// ---------------------------------------------------------------------------
+// After pairing: rotating the peer's keys.
+//
+// Both functions below are PURE -- they answer with the relation as it would
+// stand afterwards, and leave storing it to the caller. The pairing steps
+// above mutate their `Map` because they stand in for a database write at a
+// fixed point in a fixed procedure; a rotation, by contrast, is judged and
+// then either applied or refused, and keeping the judgement separate from the
+// write is what lets a test show that a refused revocation changed nothing.
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether a stored peer key may be used right now.
+ *
+ * **This mirrors `isCurrentlyValid` inside `signature/key-revocation.ts`,
+ * which is the authority on the predicate** (it is a local closure there, not
+ * an export, so it cannot be called from here). Both halves matter and both
+ * are pinned by a test in `key-rotation-and-replay.spec.ts`: a key whose
+ * `validFrom` is still in the future is NOT usable yet even though it has
+ * never been revoked, and a revoked key is not usable however long ago it
+ * became active (tasks.md Implementation Note 4.3 -- each half of this was
+ * missed separately during that task's own review).
+ */
+const isCurrentlyValid = (key: PeerKeyRecord, now: string): boolean =>
+  key.validFrom <= now && key.revokedAt == null;
+
+/**
+ * A `VerifyParams.resolvePublicKey` for one relation.
+ *
+ * Answers `null` -- never a key -- for every reference this relation cannot
+ * serve, which is what `verify` turns into `unknown-key`:
+ * - a `relationId` that is not this relation's (a `keyId` alone must never
+ *   resolve a key: design.md "鍵の識別子 -- 関係ごとに一意にする"),
+ * - a `keyId` this relation does not hold,
+ * - a key that is revoked or not active yet (design.md's
+ *   `VerifyParams.resolvePublicKey` note, Requirement 10.5, 10.6).
+ *
+ * Only ever reads `peerKeys`, so the side's OWN key can never come back --
+ * the mistake that same note warns about.
+ *
+ * `now` is a parameter rather than read from the clock here, following the
+ * convention `judgeGrowiUri` / `judgeKeyRevocation` set for this package.
+ */
+export const resolvePeerPublicKey = (
+  relation: RelationRecord,
+  ref: KeyRef,
+  now: Date,
+): KeyObject | null => {
+  if (ref.relationId !== relation.relationId) {
+    return null;
+  }
+  const key = relation.peerKeys.find((entry) => entry.keyId === ref.keyId);
+  if (key == null || !isCurrentlyValid(key, now.toISOString())) {
+    return null;
+  }
+  return toPublicKeyObject(key);
+};
+
+/**
+ * Applies a verified `KeyRegistrationRequest`'s key to the relation it names.
+ *
+ * The key is APPENDED: the peer registers its next key while the current one
+ * is still in use, so that both are valid at once and neither side has to cut
+ * over at the same instant (Requirement 10.5).
+ */
+export const withPeerKeyRegistered = (
+  relation: RelationRecord,
+  key: PublicKeyRegistration,
+): RelationRecord => ({
+  ...relation,
+  peerKeys: [...relation.peerKeys, { ...key, revokedAt: null }],
+});
+
+export interface PeerKeyRevocation {
+  /** Unchanged when `result` is a rejection. */
+  readonly relation: RelationRecord;
+  readonly result: KeyOperationResult;
+}
+
+/**
+ * Applies a verified `KeyRevocationRequest` to the relation it names.
+ *
+ * The verdict comes from `judgeKeyRevocation` -- this function does not
+ * re-derive "would this leave no valid key". That check living in one place
+ * is the whole reason `signature/key-revocation.ts` exists: written out again
+ * per side, one side drifting would make that side's guard quietly looser
+ * (Requirement 10.5, 10.6).
+ */
+export const withPeerKeyRevoked = (
+  relation: RelationRecord,
+  keyId: string,
+  now: Date,
+): PeerKeyRevocation => {
+  const revokedAt = now.toISOString();
+  const judgement = judgeKeyRevocation(relation.peerKeys, keyId, revokedAt);
+  if (!judgement.ok) {
+    return {
+      relation,
+      result: { status: 'rejected', reason: judgement.reason },
+    };
+  }
+
+  return {
+    relation: {
+      ...relation,
+      peerKeys: relation.peerKeys.map((key) =>
+        key.keyId === keyId ? { ...key, revokedAt } : key,
+      ),
+    },
+    result: { status: 'ok' },
   };
 };

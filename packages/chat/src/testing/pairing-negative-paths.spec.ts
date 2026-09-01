@@ -410,9 +410,9 @@ describe('a result naming a relationId GROWI already holds does not pair', () =>
 
     // Proxy A's relation is untouched -- not overwritten, not duplicated.
     expect(growi.relations.size).toBe(1);
-    expect(
-      growi.relations.get(resultA.relationId)?.peerPublicKey,
-    ).toStrictEqual(resultA.publicKey);
+    expect(growi.relations.get(resultA.relationId)?.peerKeys).toStrictEqual([
+      { ...resultA.publicKey, revokedAt: null },
+    ]);
     // The pairing with proxy B is left unfinished rather than half-applied:
     // GROWI still holds proxy B's pending registration.
     expect(growi.pendingRegistration?.registrationCode).toBe(codeB);

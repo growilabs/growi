@@ -287,7 +287,7 @@
   - _Requirements: 9.6, 10.1, 10.7_
   - _Depends: 7.2_
 
-- [ ] 7.5 鍵の入れ替えと再送の扱いが成立することを確かめる
+- [x] 7.5 鍵の入れ替えと再送の扱いが成立することを確かめる
   - 新旧の鍵が両方有効な間、どちらの署名でも検証が通ること
   - **有効な鍵が 0 本になる失効の要求が断られること**（4.3 の判定を通して）
   - **再送は識別子を据え置き、使い捨ての値と時刻を取り直した 2 回目が通る**こと。
@@ -302,6 +302,7 @@
 
 - **1.2**: `packages/chat` の相対 import は、この monorepo の他パッケージ（`packages/slack` / `packages/core`）と同じく末尾に `.js` を付ける書き方（`from './foo.js'`）が実際の慣習。`src/public-surface.spec.ts` の静的 import 木の追跡は、拡張子なし・`.js` 付き・`~/` エイリアス（`tsconfig.json` の `paths`）の 3 通りすべてを解決できる必要がある（最初の実装は `.js` 付きと `~/` を見逃し、レビューで差し戻された）。以降のタスクで `index.ts` / `server.ts` から再輸出を追加する際は、書き方を変えても検査が黙って素通りしないことを確認すること。
 - **2.2**: design.md の `command-names.ts` コメントにある「書き込みは既定で不許可」は design.md 自身の 1 か所（`Security` という見出しは design.md に実在しない）にしか根拠が無く、requirements.md 11.1 は「コマンドごとに許可チャンネルを設定できる」までしか書いていない。4.1（チャンネル権限判定、既定は書き込み不許可・それ以外は許可）を実装する前に、この既定挙動が要件のどこで確定しているかを requirements.md で先に確認すること。
+- **7.5（feature全体の検証／`/kiro-validate-impl` への申し送り、全タスク完了時点での最終まとめ）**: (a) 「今使える鍵か」の判定式（`validFrom <= now && revokedAt == null`）が `pairing-harness.ts` と `signature/key-revocation.ts` の2箇所にある — `key-revocation.ts` 側は局所関数で未輸出のため7.5の境界（`testing/`のみ）では寄せられなかった。この harness の形は `chat-integration-app`/`chat-integration-proxy` が本番resolverを書く際の雛形になるため、本番側で必要になった時点で `key-revocation.ts` から export する形に整理するのが望ましい。(b) 上限値300秒そのものは `MAX_ACCEPTED_EXPIRES_IN_SEC` 定数への参照でのみ確認されており、「上限が効いている」ことは示せるが「上限が300であること」自体はどのテストも固定していない（5.3由来、7.5の欠陥ではない）。(c) 過去タスクからの持ち越しで未解消のもの: design.mdのIntegration Tests一覧の番号重複（7.4）／GROWI側保留行への相手proxy+keyId記録という二重防御が harness に無い（7.3）／`already-paired`分岐が一度も到達しない（7.2・7.3）。
 - **7.4（feature全体の検証への申し送り）**: (a) design.md の Testing Strategy → Integration Tests 一覧の番号付けに誤りがある — 番号 `7` が2つあり、`#6` は要件を「9.6・10.6」と記すが tasks.md 7.4 は「9.6, 10.1, 10.7」を挙げていて対応が食い違う。文書側のずれで実装の欠陥ではないが、`/kiro-validate-impl` で確認すること。(b) `acceptEnvelope` の2つの拒否分岐（`relationId` 不一致・`op` 不一致）はどちらも同じ `{ok:false, failure:'malformed'}` を返すため、外側からの観測だけでは「`op` の比較が効いたのか `relationId` の比較が効いたのか」を区別できない。7.4 では変異試験（`op` 比較だけを外す）で個別に確認済みだが、将来この関数を触る際はこの見分けにくさを踏まえること。
 - **7.3（feature全体の検証／`/kiro-validate-impl` への申し送り）**: (a) design.md「⑤ が公開鍵を縛る理由」末尾は、`challengeSignature` に加えて「GROWI 側の保留の行に、送信先の proxy と自分が申告した keyId を記録し、⑤ で突き合わせる」という**二重目の防御**を求めているが、7.2 の作り物 `GrowiSide.pendingRegistration` は `{registrationCode, expiresAt}` の2項目のみでこの突き合わせが無く、本 spec のどのタスクでも試されていない。主たる署名検証（7.3で確認済み）とは別の話として feature全体の判定で拾うこと。(b) 要件8.5（同じGROWIの二重紐付け拒否）の**振る舞い**は `chat-integration-proxy` タスク5.4が担当、**型と形**は本パッケージの `contract/pairing.spec.ts`・`parse/parse-responses.spec.ts` が既に押さえている — 宙に浮いているのは作り物内の `already-paired` 分岐（`pairing-harness.ts:423-431`）が一度も到達しないことのみ。
 - **7.2 → 7.3/7.4/7.5 への申し送り**: 作り物は `packages/chat/src/testing/pairing-harness.ts`（+`pairing-flow.spec.ts`）。(a) `completePairing` は「保留が見つからない」と「失効した」を同じ `code-expired` で返す — 7.3 の失効の確認は、コードを一度発行してから `now` を `expiresAt` より後ろへ進める形で書くこと（未発行のまま呼ぶと失効判定が壊れていても通る）。(b) `already-paired` の枝（`growiUri` の文字列一致のみ、末尾スラッシュ・大文字小文字の揺れは別物扱い）は7.2では一度も通っておらず、要件8.5との突き合わせ未確認。(c) `RelationRecord.peerPublicKey` は公開鍵1本のみの形 — 7.5（鍵の入れ替え）はこの共有の型を広げる必要がある。(d) `DeliverChallenge` は同期関数（同一プロセス内なので正しい）。(e) 7.4「署名の代行窓口」は、RFC 9421の署名対象文字列はbase64urlでないため`parseOwnershipChallenge`の段階で400になる — 「署名が返らないこと」でなく「400で断られること」を確認する形になる。
