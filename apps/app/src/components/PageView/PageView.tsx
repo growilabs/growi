@@ -1,4 +1,4 @@
-import { type JSX, memo, useCallback, useId, useMemo, useRef } from 'react';
+import { type JSX, memo, useId, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { isDeepEquals } from '@growi/core/dist/utils/is-deep-equals';
 import { isUsersHomepage } from '@growi/core/dist/utils/page-path-utils';
@@ -225,7 +225,13 @@ const PageViewComponent = (props: Props): JSX.Element => {
       </>
     ) : null;
 
-  const Contents = useCallback(() => {
+  // NOTE: this MUST stay a memoized *element*, never a component defined in
+  // the render body. When it was `const Contents = useCallback(...)` rendered
+  // as `<Contents />`, every dependency change produced a new function
+  // identity, so React saw a different element `type` and unmounted/remounted
+  // this whole subtree — silently discarding SelectionCapture's in-progress
+  // inline-comment form.
+  const contents = useMemo(() => {
     if (isNotFound || page?.revision == null) {
       return <NotFoundPage path={pagePath} />;
     }
@@ -306,7 +312,7 @@ const PageViewComponent = (props: Props): JSX.Element => {
             <UserInfo author={page.creator} />
           )}
           <div id={contentContainerId} className="flex-expand-vert">
-            <Contents />
+            {contents}
           </div>
         </>
       )}

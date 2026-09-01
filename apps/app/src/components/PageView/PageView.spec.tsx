@@ -25,7 +25,8 @@
  */
 
 import type { ReactNode } from 'react';
-import { render, screen } from '@testing-library/react';
+import { useEffect, useState } from 'react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -94,11 +95,22 @@ type SelectionCaptureProps = {
   anchorOriginRevisionId: string;
 };
 const selectionCaptureSpy = vi.fn<(props: SelectionCaptureProps) => void>();
+// SelectionCapture owns the in-progress inline-comment state (its locked
+// anchor and the open form), so its mount/unmount count — not just its
+// presence — is the observable that the subtree-stability test below asserts
+// on: a remount silently discards a comment the user is in the middle of
+// writing.
+const selectionCaptureMountSpy = vi.fn();
+const selectionCaptureUnmountSpy = vi.fn();
 vi.mock(
   '~/features/inline-comment/client/components/SelectionCapture/SelectionCapture',
   () => ({
     SelectionCapture: (props: SelectionCaptureProps) => {
       selectionCaptureSpy(props);
+      useEffect(() => {
+        selectionCaptureMountSpy();
+        return () => selectionCaptureUnmountSpy();
+      }, []);
       return <div data-testid="selection-capture" />;
     },
   }),
@@ -285,6 +297,47 @@ describe('PageView', () => {
       expect(mockedUseAnchorResolver).toHaveBeenCalledWith(captureRef, [
         { id: inlineComments[0]?.id, anchor: inlineComments[0]?.anchor },
       ]);
+    });
+  });
+
+  describe('page-body subtree stability', () => {
+    it('keeps SelectionCapture mounted when useAnchorResolver hands back a new Map identity (as it does on every settle)', async () => {
+      mockedUseCurrentPageData.mockReturnValue(buildPage());
+
+      // Mirrors the real hook: resolveAll() always builds a BRAND NEW Map and
+      // setResolved() replaces the previous one, so this hook's return value
+      // takes a new identity on every settle event and on every
+      // anchors-content change — i.e. repeatedly during ordinary viewing.
+      let emitNewMap: (() => void) | undefined;
+      mockedUseAnchorResolver.mockImplementation(() => {
+        const [resolved, setResolved] = useState<
+          ReadonlyMap<string, ResolvedRange>
+        >(() => new Map());
+        emitNewMap = () => setResolved(new Map());
+        return resolved;
+      });
+
+      render(
+        <PageView pagePath="/test-page" rendererConfig={rendererConfig} />,
+      );
+
+      await screen.findByTestId('selection-capture');
+      await waitFor(() => {
+        expect(selectionCaptureMountSpy).toHaveBeenCalledTimes(1);
+      });
+
+      act(() => {
+        emitNewMap?.();
+      });
+
+      // The page body must be reconciled in place. Rendering it as a
+      // component whose identity changes with its dependencies (the old
+      // `const Contents = useCallback(...)` / `<Contents />` shape) made React
+      // treat it as a different element type and remount the whole subtree,
+      // throwing away SelectionCapture's in-progress inline comment.
+      expect(selectionCaptureUnmountSpy).not.toHaveBeenCalled();
+      expect(selectionCaptureMountSpy).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('selection-capture')).toBeInTheDocument();
     });
   });
 
