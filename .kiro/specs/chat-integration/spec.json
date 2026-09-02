@@ -1,0 +1,30 @@
+{
+  "feature_name": "chat-integration",
+  "created_at": "2026-08-25T00:00:00.000Z",
+  "updated_at": "2026-09-01T13:19:17.000Z",
+  "language": "ja",
+  "phase": "umbrella-active",
+  "kind": "umbrella",
+  "sub_specs": [
+    "chat-integration-protocol",
+    "chat-integration-proxy",
+    "chat-integration-app"
+  ],
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "delegated_to_sub_specs": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "delegated_to_sub_specs": true
+    }
+  },
+  "ready_for_implementation": true
+}
