@@ -8,7 +8,6 @@ import { prisma } from '~/utils/prisma';
 
 import { Attachment } from '../../models/attachment';
 import PageRedirect from '../../models/page-redirect';
-import ShareLink from '../../models/share-link';
 import {
   type ActivityActor,
   recordCascadeAttachmentRemovals,
@@ -84,7 +83,7 @@ export const deleteCompletelyOperation = async (
     }),
   ]);
 
-  // `pagetagrelations.relatedPage` and `revisions.page` are required relations
+  // `pagetagrelations.relatedPage`, `sharelinks.relatedPage` and `revisions.page` are required relations
   // to `pages` with `onDelete: NoAction`. Running their deleteMany() concurrently
   // with the page delete below is safe only because `Page.deleteMany` here still
   // goes through Mongoose, so Prisma's relation check never runs against it.
@@ -97,8 +96,13 @@ export const deleteCompletelyOperation = async (
     prisma.pagetagrelations.deleteMany({
       where: { relatedPageId: { in: pageIdStrings } },
     }),
-    ShareLink.deleteMany({ relatedPage: { $in: pageIds } }),
+    prisma.sharelinks.deleteMany({
+      where: { relatedPageId: { in: pageIdStrings } },
+    }),
     prisma.revisions.deleteMany({ where: { pageId: { in: pageIdStrings } } }),
+  ]);
+
+  await Promise.all([
     Page.deleteMany({ _id: { $in: pageIds } }),
     PageRedirect.deleteMany({
       $or: [{ fromPath: { $in: pagePaths } }, { toPath: { $in: pagePaths } }],
