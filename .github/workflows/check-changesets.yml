@@ -36,6 +36,17 @@ jobs:
         pnpm install --frozen-lockfile
 
     - name: Reject changesets that can never be consumed
+      # Skip when the PR's source branch is master itself (e.g. a release-promotion PR
+      # such as master -> release/current or master -> release/8.0.x). `changeset status`
+      # only sees changesets that are still present as files, and every changeset for
+      # content already on master has necessarily been consumed (deleted) by the "Version
+      # Packages" run that shipped it. So diffing a master-headed PR against its (often
+      # long-stale) release-branch base always finds changed packages with zero surviving
+      # changeset files, which is an unconditional false positive, not a real omission.
+      # This does assume every commit that reaches master went through this same check on
+      # its own feature PR; an admin merge that bypasses branch protection could still slip
+      # an un-changeset'd package change onto master undetected by this rule.
+      if: github.head_ref != 'master'
       run: |
         # A CI checkout is a detached HEAD with remote-tracking refs only, so the bare
         # branch name changesets uses by default (`git merge-base master HEAD`) does not
