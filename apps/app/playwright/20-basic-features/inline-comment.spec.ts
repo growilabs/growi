@@ -194,6 +194,148 @@ test.describe('Inline comment', () => {
   });
 });
 
+test.describe('Inline comment - action button lifecycle before the form opens', () => {
+  // Serial: the second test depends on the page created by the first, the
+  // same reasoning the other suites in this file use.
+  test.describe.configure({ mode: 'serial' });
+
+  const actionButtonPagePath = (retry: number) =>
+    `/inline-comment-e2e-action-button${retry}`;
+
+  const firstSentence =
+    'First target sentence for action button positioning tests.';
+  const secondSentence =
+    'Second target sentence for action button positioning tests, far below the first.';
+
+  // Enough filler paragraphs to put a large, reliable vertical gap between
+  // `firstSentence` and `secondSentence`, so a passing "the button moved"
+  // assertion below cannot be a false positive from sub-pixel layout noise.
+  const fillerParagraphs = Array.from(
+    { length: 20 },
+    (_, i) =>
+      `Filler paragraph ${i} pushes the second target sentence well below the first one.`,
+  );
+  const pageBody = [
+    '# Inline comment E2E - action button lifecycle',
+    '',
+    firstSentence,
+    '',
+    ...fillerParagraphs.flatMap((paragraph) => [paragraph, '']),
+    secondSentence,
+    '',
+  ].join('\n');
+
+  /**
+   * The bounding rect of the (single) current DOM Range, via the same
+   * `getBoundingClientRect()` mechanism Playwright's `Locator.boundingBox()`
+   * uses under the hood — confirmed empirically (a fixture with a scrolled
+   * page: both report identical, scroll-adjusted, viewport-relative
+   * coordinates) so the two are safe to diff directly below. Used to assert
+   * the action button is actually positioned near the selection
+   * (Requirement 1.1) rather than merely visible somewhere.
+   */
+  const getSelectionRect = (
+    targetPage: Page,
+  ): Promise<{ top: number; bottom: number } | null> => {
+    return targetPage.evaluate(() => {
+      const selection = window.getSelection();
+      if (selection == null || selection.rangeCount === 0) {
+        return null;
+      }
+      const rect = selection.getRangeAt(0).getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom };
+    });
+  };
+
+  const clearSelectionInPageBody = async (targetPage: Page): Promise<void> => {
+    await targetPage.evaluate(() => {
+      window.getSelection()?.removeAllRanges();
+    });
+  };
+
+  let createdPage: CreatedPage | undefined;
+
+  test.afterAll(async ({ request }) => {
+    if (createdPage != null) {
+      await deletePagesCompletely(request, [createdPage]);
+    }
+  });
+
+  test('Create a page containing two widely-separated target sentences', async ({
+    page,
+    request,
+  }, testInfo) => {
+    createdPage = await createPage(request, {
+      path: actionButtonPagePath(testInfo.retry),
+      body: pageBody,
+    });
+
+    await page.goto(createdPage.path);
+    await expect(page.locator('.wiki').first()).toContainText(firstSentence);
+    await expect(page.locator('.wiki').first()).toContainText(secondSentence);
+  });
+
+  test('The action button appears near a selection, tracks a changed selection, and disappears once the selection is cleared', async ({
+    page,
+  }, testInfo) => {
+    await page.goto(actionButtonPagePath(testInfo.retry));
+    await expect(page.locator('.wiki').first()).toContainText(firstSentence);
+    await expect(page.getByTestId('inline-comment-list')).toBeAttached();
+
+    const actionButton = page.getByTestId('selection-action-button');
+
+    // Requirement 1.2 (contrast case for the button appearing at all): no
+    // selection yet, so no action button.
+    await expect(actionButton).not.toBeVisible();
+
+    // Requirement 1.1: selecting non-empty text shows the action button near
+    // the selection — assert this quantitatively (the button's vertical
+    // position is close to the selection's own rect), not merely "visible".
+    await selectTextInPageBody(page, firstSentence);
+    await expect(actionButton).toBeVisible();
+
+    const firstButtonBox = await actionButton.boundingBox();
+    const firstSelectionRect = await getSelectionRect(page);
+    if (firstButtonBox == null || firstSelectionRect == null) {
+      throw new Error('expected both a button box and a selection rect');
+    }
+    // The popover sits directly above/below the selection (SelectionPopover's
+    // Popper placement) — well within a generous 200px tolerance, whereas the
+    // page has ~20 filler paragraphs of vertical room it would land in if
+    // positioning were broken (e.g. pinned to the viewport origin).
+    expect(Math.abs(firstButtonBox.y - firstSelectionRect.top)).toBeLessThan(
+      200,
+    );
+
+    // Requirement 1.3: changing the selection (without ever clicking the
+    // button) moves the action button to track the new selection. Poll
+    // because the reposition happens asynchronously (selectionchange →
+    // recapture → Popper recompute), not synchronously with the selection
+    // change itself.
+    await selectTextInPageBody(page, secondSentence);
+    await expect
+      .poll(async () => {
+        const box = await actionButton.boundingBox();
+        return box == null ? null : box.y - firstButtonBox.y;
+      })
+      .toBeGreaterThan(200);
+
+    const secondButtonBox = await actionButton.boundingBox();
+    const secondSelectionRect = await getSelectionRect(page);
+    if (secondButtonBox == null || secondSelectionRect == null) {
+      throw new Error('expected both a button box and a selection rect');
+    }
+    expect(Math.abs(secondButtonBox.y - secondSelectionRect.top)).toBeLessThan(
+      200,
+    );
+
+    // Requirement 1.4: clearing the selection before the button is chosen
+    // makes it disappear.
+    await clearSelectionInPageBody(page);
+    await expect(actionButton).not.toBeVisible();
+  });
+});
+
 test.describe('Inline comment - best-effort fallback after the anchored text is edited away', () => {
   // Serial for the same reason as the suite above: the second test depends
   // on the comment created by the first, real backend state.
