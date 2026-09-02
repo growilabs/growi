@@ -6,7 +6,7 @@
   - 観測できる完了条件：モック`Range`に対して`getBoundingClientRect()`の戻り値がそのまま仮想要素へ委譲されることをユニットテストで確認できる
   - _Requirements: 4.1_
 
-- [ ] 1.2 Popperのライフサイクルを管理するフックを実装する
+- [x] 1.2 Popperのライフサイクルを管理するフックを実装する
   - 仮想要素とポップオーバーのDOM要素を受け取り、`@popperjs/core`の`createPopper`を生成し、`flip`/`preventOverflow`/`offset`の標準modifierのみを設定する。アンマウント時に`destroy()`を呼ぶ
   - `apps/app`の`package.json`で`@popperjs/core`を`devDependencies`から`dependencies`へ移動する（`apps/app/.claude/rules/package-dependencies.md`の分類手順に従い、ビルド後`.next/node_modules/`に含まれることを確認する）
   - 観測できる完了条件：モックした`createPopper`に対して、マウント時に1回呼ばれ、アンマウント時に`destroy()`が1回呼ばれることをユニットテストで確認できる
@@ -40,6 +40,7 @@
   - 作成の起点が選ばれた瞬間の`Range`を`cloneRange()`で複製し、「入力フォームを表示中」の間はそのクローンを1.3のコンポーネントへ渡し続ける（以後、文書の選択状態が変化してもフォームの表示位置・表示継続には影響しない）
   - 送信または取消の通知を受けたら「選択なし」に戻し、複製した`Range`を破棄する
   - 共有リンク閲覧者向けの画面では、いずれの状態でも起点・フォームを描画しない（既存ガードを維持）
+  - `SelectionCapture`が1.3のコンポーネント（内部で1.2のフックを使う）を実際にレンダーツリーへ組み込む最初のタスクであるため、ビルド後に`@popperjs/core`が`apps/app/.next/node_modules/`に現れることを確認する（1.2完了時点ではまだ消費側が存在せずビルドグラフに到達しないため未確認だった。`apps/app/.claude/rules/package-dependencies.md`のStep 1に相当する実測確認をここで行う）
   - 観測できる完了条件：`useTextSelection`をモックし、「選択なし→作成の起点を表示中→入力フォームを表示中→選択なし」の一連の遷移と、「作成の起点を表示中」の間に選択が解除された場合に「選択なし」へ戻ることをユニットテストで確認できる
   - _Requirements: 1.1, 1.2, 1.4, 2.1, 2.3, 2.4, 4.2_
   - _Depends: 1.3, 2.1_
@@ -90,3 +91,7 @@
   - 観測できる完了条件：4画面分のスクリーンショットが揃い、モックアップとの比較結果（差異の有無・対応内容）がPRの説明に含められる状態になっている
   - _Requirements: 1.1, 2.1, 3.1, 4.1_
   - _Depends: 4.2, 4.3_
+
+## Implementation Notes
+
+- 1.2: `@popperjs/core`を`devDependencies`から`dependencies`へ移動したが、1.2完了時点では`use-popper-position.ts`を消費するコンポーネントが存在せず、Turbopackのビルドグラフに到達しないため`.next/node_modules/`での実測確認ができなかった（レビュー時に独立して確認済み）。設計判断自体は妥当（design.md/research.mdの決定通り、`ssr:false`はTurbopackの外部化を妨げないため）だが、実測確認は`SelectionPopover`（1.3のコンポーネント）が初めてレンダーツリーに組み込まれるタスク2.2の完了条件へ追加した。
