@@ -82,6 +82,8 @@
 
 **選定パターン**: 新規の要約専用Agent＋新規の単発起動ルートを追加する「Option B」（`suggestPathAgent` と同型の拡張パターン）。`post-message.ts` を要約用に分岐させる案（Option C）は、`/message` の「assistant-independent」という既存の不変条件と衝突するため採用しない。永続化された要約は、`Page` 本体と同じ権限ゲートを経由する既存のページ取得APIに相乗りさせ、要約専用の新しい閲覧APIは作らない。
 
+**ディレクトリ構成上の注記**: 本specの実装は、要約生成ロジックを `features/mastra` に、永続化・表示ロジックを `features/ai-summarize` に分割する。CLAUDE.md の「Create new features in features/{feature-name}/」原則の逸脱である。理由は、要約生成が既存の Mastraインスタンス基盤の一部（他の Agentと並列した新規Agent）であり、永続化は全く独立した新規ロジックであるため、責任分離の観点から分割することで、将来の機能変更時に `features/mastra` への影響を最小化する設計判断である。実装際には、両ディレクトリの相互依存を可能な限り制限し、それぞれの変更が他方に波及しない構造を保つこと。
+
 ```mermaid
 graph TB
     Trigger[Summary Trigger later PR]
@@ -221,8 +223,8 @@ sequenceDiagram
 
 **フロー上の意思決定**:
 - ページ**本文**の取得は、`summarizeAgent` のツール呼び出しループの中でのみ発生する。ルート層（`summarize-message.ts`）は本文を事前取得せず、`getPageContentTool` を経由しない本文読み取り経路を一切持たない。これにより閲覧権限のチェックが要約生成のたびに実行されることが構造的に保証される（4.1）。
-- ルート層は、上記の本文取得ループとは別に、既存の `Page.findByIdAndViewer`（Allowed Dependencies参照、無変更）を1回だけ呼び出し、その時点の `revision._id` を `sourceRevisionId` として取得する。これは本文を読まないメタデータ取得であり、`getPageContentTool` の権限チェックを代替するものではなく、要約完了後の永続化APIへ引き渡すための「生成時点の版」を記録する目的に限定される（7.2）。
-- `sourceRevisionId` はストリーム応答に `threadId` と併記してクライアントへ返す。永続化を選んだ場合、クライアントはこの値をそのまま `AiSummaryPersistenceRoute` の保存リクエストに渡す。保存ルート側で「保存ボタン押下時点」の revision を取り直すことはしない（7.2, 9.2）。
+- ルート層は、本文取得ループの開始直前に、既存の `Page.findByIdAndViewer`（Allowed Dependencies参照、無変更）を1回だけ呼び出し、その時点の `revision._id` を `sourceRevisionId` として取得する。これは本文を読まないメタデータ取得であり、`getPageContentTool` の権限チェックを代替するものではなく、「生成開始時点の版」を記録する目的に限定される（7.2）。実装上はツール呼び出しループの前に実行されるため、ページが生成中に更新される場合、`sourceRevisionId` は古い版を指すことになりうる。要件7.2の「生成時点の版」は「生成開始時点」と解釈される。
+- `sourceRevisionId` と `capturedAt`（生成完了時刻）はストリーム応答に `threadId` と併記してクライアントへ返す。永続化を選んだ場合、クライアントはこれらをそのまま `AiSummaryPersistenceRoute` の保存リクエストに渡す。保存ルート側で「保存ボタン押下時点」の値を取り直すことはしない（7.2, 9.2）。
 - 要約を開始する最初のユーザー発話は、クライアントの自由入力ではなく、`pageId`（または `pagePath`）からルート層が組み立てる固定形式のリクエストとする。これにより出力形式（3.1）と全文カバレッジ方針の適用対象（要約リクエストのみ、2.3）を安定させる。
 - 要約完了後の追質問は、新しく発行された `threadId` を使って既存の `/message` にそのまま送られる。`growiAgent` はスレッド履歴に前段の要約が含まれていることを意識する必要がなく、`growi-agent.ts` は無変更のままで成立する（1.4）。
   - **成立条件（`@mastra/core` 実装で裏取り済み）**: LLMプロバイダに送るツール名は、`Agent` の `tools` オプションに渡すレコードの**キー**であり、ツールの `id` フィールドではない（`Agent.__registerMastra` / `listAssignedTools` が `Object.entries(this.#tools)` のキーを `name` として `makeCoreTool` に渡す）。`Memory`（`lastMessages: 30`）はスレッド再生時にassistantのtool-callパートとtool-resultパートを両方含めてモデルへ送る。Mastraはtool-call/tool-resultの**ペア整合性**（`sanitizeOrphanedToolPairs`）のみをチェックし、**ツール名が現在のAgentの登録ツールに存在するかは検証・除去しない**（そのまま渡される）。したがって、`summarizeAgent` が本文取得ツールを `growiAgent` の登録キー `getPageContentTool` と**同じキー**で登録して初めて、`growiAgent` が引き継いだ際に再生される過去のtool-callが現在のツールセットに実在する名前と一致する。異なるキー（例: `limitedGetPageContentTool`）で登録すると、`growiAgent` は自身が持たないツール名のtool-callを履歴に含んだままプロバイダに送ることになる。
@@ -243,7 +245,7 @@ flowchart TD
     StepCap -->|yes, safety net| PartialSummary
 ```
 
-- **ハード上限（ツール呼び出し側、コードで強制）**: `summarizeAgent` は `getPageContentTool` を直接使わず、専用の `limitedGetPageContentTool`（`suggestPathAgent` の `limitedSearchTool` と同じラッパーパターン）経由でのみ本文を取得する。`RequestContext` の `pageReadBudget: { used: number; limit: number }` を1リクエストにつき1個生成し、`limit` は**1500行**（`getPageContentTool` のデフォルト`limit: 200`基準で5〜7回の呼び出し分に相当。読み取り量の上限が実際にコストの予測可能性を担保する値であることを優先し、目安ではなく固定値とする）。呼び出しのたびに返された `content` の行数を `used` に加算し、`used >= limit` の状態で呼ばれた場合は本文を取得せず `limit_exceeded` を返す。これが要件2.2の「最大読み取り量の上限」を実際に保証する機構である。`getPageContentTool` 自体は変更せず、ラップされる側として無変更のまま利用する。なおバジェット判定は呼び出し**前**に行うため、`used` が上限直前の状態から `getPageContentTool` の1回分（`limit` は最大500行）が通り、実効の読み取り量は最大で約2000行に達しうる。1500行はこの許容幅を含んだ上での上限値である。
+- **ハード上限（ツール呼び出し側、コードで強制）**: `summarizeAgent` は `getPageContentTool` を直接使わず、専用の `limitedGetPageContentTool`（`suggestPathAgent` の `limitedSearchTool` と同じラッパーパターン）経由でのみ本文を取得する。`RequestContext` の `pageReadBudget: { used: number; limit: number }` を1リクエストにつき1個生成し、`limit` は**1500行**（`getPageContentTool` のデフォルト`limit: 200`基準で5〜7回の呼び出し分に相当。読み取り量の上限が実際にコストの予測可能性を担保する値であることを優先し、目安ではなく固定値とする）。呼び出しのたびに返された `content` の行数を `used` に加算し、`used >= limit` の状態で呼ばれた場合は本文を取得せず `limit_exceeded` を返す。これが要件2.1の「最大読み取り量の上限」を実際に保証する機構である。`getPageContentTool` 自体は変更せず、ラップされる側として無変更のまま利用する。**注**: バジェット判定は呼び出し**前**に行うため、`used` が1000行以上の状態で呼ばれた場合でも `getPageContentTool` の1回分（最大500行）が通り得る。実効の読み取り量は最大で約1900行に達しうる可能性がある。この許容幅は、ツール層での強制メカニズムと instructions層・呼び出し層での複数の安全弁とのバランスを取った設計である。
 - **打ち切り時の振る舞い（instructions側）**: `summarizeAgent` のinstructionsは、`limitedGetPageContentTool` から `limit_exceeded` を受け取った時点で読み取りを止め、「読み取れた範囲からの要約である」ことを明示して要約を生成するよう指示する。上限値そのものはツール側が強制するため、instructionsは打ち切り後の振る舞いのみを規定すればよい。
 - **安全弁（呼び出し側）**: `/summary` ルートが `summarizeAgent.stream()` に渡す `maxSteps` は **15** に設定する（`post-message.ts` の `maxSteps: 10` Q&A用途とは独立）。根拠: pageReadBudget 上限1500行 ÷ getPageContentTool最大500行 = 最小3ステップ必要だが、instructionsが `limit_exceeded` を無視して続けようとした場合の安全弁として十分なマージンを確保。`limit_exceeded` を受け取ってもinstructionsに従わずツール呼び出しを続けようとした場合に確実に停止する。両者は別の呼び出し箇所のパラメータであるため、この値の変更が `growiAgent` の呼び出しに影響することはない（2.3）。
 
@@ -425,7 +427,7 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 ##### API Contract
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| POST | `/_api/v3/mastra/summary` | `{ pageId?: string; pagePath?: string; modelKey?: string }` | UI Message Stream（`threadId` と `sourceRevisionId` を含む）、`post-message.ts` と同形式 | 400（入力不正）, 403/404（`not_found_or_forbidden`）, 501（AI未設定/無効、`aiReadyGuard`）, 500（生成失敗） |
+| POST | `/_api/v3/mastra/summary` | `{ pageId?: string; pagePath?: string; modelKey?: string }` | UI Message Stream（`threadId`、`sourceRevisionId`、`capturedAt`、および `tokenMetrics: { inputTokens: number; outputTokens: number }` を含む）、`post-message.ts` と同形式 | 400（入力不正）, 403/404（`not_found_or_forbidden`）, 501（AI未設定/無効、`aiReadyGuard`）, 500（生成失敗） |
 
 **Implementation Notes**
 - Integration: `routes/index.ts` に `router.post('/summary', summarizeMessageHandlersFactory(crowi))` を追加し、`loadHandlersRouter` の動的importリストに `./summarize-message` を加える（既存の遅延ロードパターンを維持し、AI未使用インスタンスの起動コストを増やさない）。
@@ -507,7 +509,7 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 ##### API Contract
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| POST | `/_api/v3/page/{pageId}/ai-summary` | `{ body: string; sourceRevisionId: string; capturedAt: string }` | 保存後のページ情報（`aiSummary` を含む） | 400（入力不正）, 403/404（`not_found_or_forbidden`） |
+| POST | `/_api/v3/page/{pageId}/ai-summary` | `{ body: string; sourceRevisionId: ObjectId; capturedAt: Date }` | 保存後のページ情報（`aiSummary` を含む） | 400（入力不正）, 403/404（`not_found_or_forbidden`） |
 
 **Implementation Notes**
 - Integration: `features/ai-summarize/server/routes/` に新規ルートを追加し、既存のAPIルート登録パターンに沿って `routes/apiv3` 相当のマウント箇所に組み込む。
@@ -528,6 +530,7 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 - `aiSummary` が存在しない場合は何も描画しない。
 - マウント時に `localStorage` から当該 `pageId` の非表示フラグ（キー例: `growi.aiSummary.hidden.{pageId}`）を読む。フラグが立っていれば何も描画しない（9.3）。
 - `aiSummary.sourceRevisionId` とページの現在の `revision._id` を比較し、不一致であれば、控えめな鮮度ヒント（背景色を変える等の目立つ演出なし）を表示する（9.1, 9.2）。表示文言は `aiSummary.capturedAt` を使ったタイムスタンプベースの表現とし、revision IDそのものはUIに出さない。
+- `aiSummary.body`（LLM生成コンテンツ）をDOMへ挿入する前に、HTMLエスケープ・サニタイズを行う。秘密情報・スクリプト・不正なタグを含む可能性に対する防御（`.claude/rules/security.md`）を適用する。
 - 削除ボタンを表示し、クリックで `localStorage` に当該 `pageId` の非表示フラグを書き込み、以後この描画をスキップする。サーバへの書き込みは発生せず、`aiSummary` 自体・他の閲覧者の表示には一切影響しない（9.3）。再表示するUIは設けない（9.4）。
 - 表示位置はMarkdown本文のレンダリング箇所の外側とする（8.3）。
 - 見出し「AI要約」・鮮度ヒント文言・削除ボタンラベルは、既存の `react-i18next` パターンに沿って5ロケール分の翻訳キーを追加する。
