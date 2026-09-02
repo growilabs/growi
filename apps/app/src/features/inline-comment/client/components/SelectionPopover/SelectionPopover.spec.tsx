@@ -93,6 +93,30 @@ describe('SelectionPopover', () => {
     expect(container).not.toContainElement(child);
   });
 
+  // Regression guard: the portal is a direct child of `document.body`, so
+  // whether it paints above page content depends on stacking order, not DOM
+  // order — a page-layout ancestor elsewhere on the page can carry an
+  // explicit `z-index` that is not contained by any intervening stacking
+  // context, which then out-paints this portal's implicit z-index of 0 and
+  // makes the action button/form unclickable (observed live in Chromium via
+  // Playwright; jsdom has no layout/paint engine, so no test here can assert
+  // the actual hit-testing outcome — only that the style contract is set).
+  it('sets an explicit z-index on the portaled element so it reliably paints above page content', () => {
+    const range = mock<Range>({
+      getBoundingClientRect: vi.fn(() => VALID_RECT),
+    });
+
+    render(
+      <SelectionPopover range={range}>
+        <button type="button">Comment</button>
+      </SelectionPopover>,
+    );
+
+    const popperElement = mockCreatePopper.mock.calls[0][1] as HTMLElement;
+    expect(popperElement.style.zIndex).not.toBe('');
+    expect(Number(popperElement.style.zIndex)).toBeGreaterThan(0);
+  });
+
   it('passes a virtual element backed by the given range, and the portal DOM node, to createPopper', () => {
     const range = mock<Range>({
       getBoundingClientRect: vi.fn(() => VALID_RECT),

@@ -73,8 +73,18 @@ export const SelectionPopover = (
 
   return createPortal(
     // Popper positions this node itself (it writes `position` / `transform`
-    // inline via its applyStyles modifier), so it carries no styling of its own.
-    <div ref={setPopperElement}>{children}</div>,
+    // inline via its applyStyles modifier). `zIndex` is the one style this
+    // element owns: some page-layout flex items between `.wiki` and `body`
+    // set an explicit `z-index` (e.g. Bootstrap's `.z-1`) with no stacking
+    // context in between to contain it, so it escapes to the document root
+    // and would otherwise paint over this portal's implicit z-index of 0,
+    // making the action button/form unclickable. 1070 mirrors Bootstrap's
+    // `$zindex-popover` — no shared TS-side z-index scale exists in this
+    // codebase yet (`PageItemControl.tsx`/`BookmarkFolderItemControl.tsx`
+    // hardcode `1055` the same way for `$zindex-modal`).
+    <div ref={setPopperElement} style={{ zIndex: 1070 }}>
+      {children}
+    </div>,
     document.body,
   );
 };

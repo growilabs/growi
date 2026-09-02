@@ -112,7 +112,13 @@ test.describe('Inline comment', () => {
 
     await selectTextInPageBody(page, targetSentence);
 
-    // Requirement 1.1: a non-empty selection shows the create form.
+    // Requirement 1.1 (inline-comment-selection-ux): a non-empty selection
+    // shows only the lightweight create action first, not the form itself.
+    const actionButton = page.getByTestId('selection-action-button');
+    await expect(actionButton).toBeVisible();
+
+    // Requirement 2.1: choosing the action expands it into the input form.
+    await actionButton.click();
     const form = page.getByTestId('inline-comment-form');
     await expect(form).toBeVisible();
     await expect(form.locator('.inline-comment-form-quote')).toHaveText(
@@ -245,6 +251,8 @@ test.describe('Inline comment - best-effort fallback after the anchored text is 
 
     await selectTextInPageBody(page, targetSentence);
 
+    // Requirement 2.1: the create action must be chosen before the form opens.
+    await page.getByTestId('selection-action-button').click();
     const form = page.getByTestId('inline-comment-form');
     await expect(form).toBeVisible();
 
@@ -399,6 +407,8 @@ test.describe('Inline comment - highlight correctness on a page with an async ls
 
     await selectTextInPageBody(page, childBasename);
 
+    // Requirement 2.1: the create action must be chosen before the form opens.
+    await page.getByTestId('selection-action-button').click();
     const form = page.getByTestId('inline-comment-form');
     await expect(form).toBeVisible();
     await expect(form.locator('.inline-comment-form-quote')).toHaveText(
