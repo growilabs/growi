@@ -116,3 +116,38 @@ brief.mdの討論メモには「解決済みオフセットをキャッシュす
 - **`getMentionedUsers` の一般化は不要になった**（Option Bで見込んでいたコストが消えた）。同一テーブル・同一 `comment_id` 空間のため無改造で動く
 - **Prismaの名前付きリレーション制約への対応が必要になった**：`resolvedBy`（`comments`→`users`）を追加すると、既存の無名だった `creator` リレーションも明示的に名前を付けねばならない（advisorレビューで発覚。`prisma validate` が通らないまま見落とすところだった）
 - **`countCommentByPageId`（ページ末尾コメントの件数バッジに使用）にも同じ除外フィルタが必要**（advisorレビューで発覚。見落とすとインラインコメントの件数が通常コメントのバッジに混入するユーザー可視の不具合になる）
+
+## 選択→作成フローのUX見直し（amend spec `inline-comment-selection-ux` より統合）
+
+v1の実装後、ユーザー提供の実装UIモックアップ（テキスト選択時のポップアップ→展開フォーム→複数行→末尾コメント一覧への統合表示）をもとに、選択してから送信するまでの操作の流れを見直した。以下は、この見直しの過程で確定した決定事項。
+
+### 選択範囲近傍への配置手段: `@popperjs/core`を仮想要素パターンで採用（自前実装・reactstrap Popoverは不採用）
+
+作成の起点・入力フォームを選択範囲の近くに表示する手段として3案を検討した。
+
+| Option | 説明 | 採否 |
+|---|---|---|
+| 自前で`getBoundingClientRect`＋固定値計算 | Selectionの矩形を都度計算しCSSのtop/leftを自前算出 | 不採用（はみ出し防止・反転・スクロール追随をすべて自前実装する必要がある） |
+| reactstrap `Popover`（`target`にrefを渡す） | 既存UIライブラリのポップオーバーをそのまま使う | 不採用（`target`は永続的なDOM要素/refを要求し、テキスト選択という「実体を持たない対象」を直接指定できない） |
+| `@popperjs/core`＋仮想要素 | `getBoundingClientRect()`のみを実装したオブジェクトを`createPopper`の参照要素として渡す | **採用** |
+
+`@popperjs/core`はモノレポに既存の依存であり（`packages/editor`等では`dependencies`、`apps/app`では当初`devDependencies`）、`flip`/`preventOverflow`/`offset`の標準modifierだけでビューポート境界処理が完結する。DOM `Range`を`cloneRange()`して保持するだけでスクロール追随も自然に実現できる（クローンはドキュメントにアタッチされたまま位置を追跡し続けるため）。`apps/app`では`devDependencies`から`dependencies`への格上げが必要になり、`SelectionPopover`が実際にレンダーツリーへ組み込まれた時点でビルドグラフへの到達（`.next/node_modules/`にシンボリックリンクが生成されること）を実測確認した。
+
+### 選択のライフサイクルを二段階に分割: `idle`/`selecting`/`composing`
+
+当初のv1実装は「選択なし／ロック済み」の二値で、選択直後にいきなりフル入力フォームを表示していた。モックアップに合わせ、「選択なし」「作成の起点を表示中」「入力フォームを表示中」の3段階に拡張した。`selecting`段階ではライブな`Range`（`window.getSelection().getRangeAt(0)`から都度取得。`useTextSelection`自体はテキストデータのみを返すため、Rangeは別途取得する）を使い選択の変化に追随させ、作成の起点が選ばれた瞬間に`Range`を`cloneRange()`して`composing`段階の間ずっと使うことで、フォーム表示中にブラウザの選択状態が変化しても（例: 入力欄へのフォーカス移動）表示位置・表示継続に影響しないようにした。
+
+### メンション候補取得は`inline-comment`機能内で共通化するが`CommentEditor.tsx`側とは共有しない
+
+入力フォームに明示的なメンション選択ボタンを追加するにあたり、既存の`@`タイプ補完と新設のボタンが同じ`/users/`検索を必要とした。`inline-comment`機能内だけで見れば重複を避けられるため`fetchMentionUsers`として切り出したが、`CommentEditor.tsx`側の同種実装（既存タスク境界の判断で意図的に共通化されていない）には手を入れていない。
+
+### 実ブラウザでのみ顕在化した2つの不具合
+
+jsdomにはレイアウト・ペイントエンジインが無いため、ユニットテストでは検出できない種類の不具合が実ブラウザでの検証（統合タスク・E2Eタスク）で2件見つかった。
+
+- **`mousedown`の既定動作によるボタンの取りこぼし**: `SelectionActionButton`はポータル経由で本文コンテナの外（`document.body`直下）に描画される。`mousedown`の既定動作（文書選択の解除）を止めないと、`mousedown`と`click`の間に選択が消えて状態が`idle`に落ち、ボタンが外れて`onCommit`が発火しない。`SelectionActionButton`側のみ`preventDefault`でラップして対処した（`InlineCommentForm`側には適用せず、テキストエリアへのカーソル配置を妨げないようにしている）。
+- **スタッキングコンテキストの脱出によるクリック不能**: `SelectionPopover`のポータルは`document.body`直下に描画されるが、`.wiki`ページレイアウトの祖先要素（Bootstrapの`.z-1`クラスを持つflexアイテム。`position: static`でもflexアイテムとしてスタッキングコンテキストを形成する）の背後に回り込み、見た目は前面にあるのに実際にはクリック不能になっていた（`elementFromPoint`が背後の要素を指す）。ポータルの直下要素に`zIndex: 1070`（Bootstrapの`$zindex-popover`相当）を明示指定して解決した。
+
+### Visual Verification（モックアップとの目視比較）は自動ゲート化しない
+
+見た目の作り込みはモックアップ画像との目視比較で担保するが、これは自動合否判定（pixel diff等）ではなく、(a) 実装時にPlaywrightでスクリーンショットを撮り実装エージェント自身が見比べて明らかな差異があれば修正する自己修正ループ、(b) 最終的な見た目の合否は人間のレビュー（PRに添付したスクリーンショット）に委ねる、という2つの役割に限定した。`kiro-validate-impl`のGO/NO-GO判定の機械的チェックにも含めない——見た目の良し悪しは人間が最終判断する領域であり、自動ゲートで機能の完成をブロックしないという判断による。

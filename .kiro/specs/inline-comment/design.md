@@ -113,11 +113,15 @@ brief.mdの討論メモは「再アンカーに成功した場合の解決済み
 graph TB
     subgraph Client
         SelectionCapture[SelectionCapture]
+        SelectionActionButton[SelectionActionButton]
+        SelectionPopover[SelectionPopover]
         AnchorResolver[AnchorResolver]
         RenderedText[renderedTextOf]
         QuoteMatcher[quoteMatcher]
         HighlightOverlay[InlineCommentHighlight]
         InlineCommentForm[InlineCommentForm]
+        MentionPickerButton[MentionPickerButton]
+        FetchMentionUsers[fetchMentionUsers]
         InlineCommentList[InlineCommentList]
         InlineCommentStore[inline-comment SWR store]
     end
@@ -130,7 +134,13 @@ graph TB
         CommentsTable[(comments isInline true and false)]
     end
 
+    SelectionCapture --> SelectionActionButton
     SelectionCapture --> InlineCommentForm
+    SelectionActionButton --> SelectionPopover
+    InlineCommentForm --> SelectionPopover
+    InlineCommentForm --> MentionPickerButton
+    MentionPickerButton --> FetchMentionUsers
+    InlineCommentForm --> FetchMentionUsers
     InlineCommentForm --> InlineCommentStore
     InlineCommentStore --> InlineCommentRoutes
     InlineCommentRoutes --> InlineCommentService
@@ -160,6 +170,7 @@ graph TB
 | Data / Storage | 既存 Prisma モデル `comments` への拡張フィールド追加（MongoDB, `provider = "mongodb"`） | アンカー・解決状態の永続化 | Mongooseスキーマ（`comment.ts`）とPrismaスキーマの両方を同期させる（`.claude/rules/model.md`） |
 | フロント（マッチング） | `approx-string-match` `^2.0.0`（新規直接依存） | あいまい一致（文字列のみ、DOM非依存） | 能動的にメンテされている。`diff-match-patch` は不採用（下記参照） |
 | フロント（正規化・分割） | 標準 `String.prototype.normalize('NFC')`、`Intl.Segmenter`（`granularity: 'grapheme'`） | NFC比較・書記素クラスタ境界スナップ | Node 24/主要ブラウザとも追加パッケージ不要 |
+| フロント（配置） | `@popperjs/core` `^2.11.8`（`apps/app`では`dependencies`） | 作成の起点・入力フォームを選択範囲近傍に配置する（`flip`/`preventOverflow`/`offset`のみ使用） | `getBoundingClientRect()`のみを実装した仮想要素パターンで、DOM `Selection`/`Range`という実体を持たない対象に浮動要素を追随させる |
 
 **`diff-match-patch` を採用しなかった理由**（build-vs-adopt調査、`research.md` に詳細）: `Match_MaxBits = 32` はBitapの探索対象パターン（=選択されたクオート文字列そのもの）の長さ上限であり、超過すると `match_bitap_` が例外を送出する（黙って動作を諦めるのではない）。文中の1文を選択する程度でも32文字を超えるため、`match_main` を主要な検索経路として使うにはパターンの事前チャンク分割が必須になる。`approx-string-match` にはこの制約がなく、文字列のみを扱うため、DOM非依存で採用できる。`dom-anchor-text-quote`/`dom-anchor-text-position`（hypothes.is）は2017〜2020年で更新が止まっており、かつDOM Range結合のため不採用。
 
@@ -193,15 +204,21 @@ apps/app/src/features/inline-comment/
 └── client/
     ├── components/
     │   ├── SelectionCapture/
-    │   │   ├── SelectionCapture.tsx      # 本文コンテナをラップし選択イベントを監視、フォーム表示をトリガ
-    │   │   └── use-text-selection.ts     # 純粋フック：Selection → quote/prefix/suffix/おおよそのオフセット
+    │   │   ├── SelectionCapture.tsx      # 本文コンテナをラップし選択イベントを監視。idle/selecting/composingの3段階の状態機械を管理し、作成の起点・入力フォームの表示を切り替える
+    │   │   ├── use-text-selection.ts     # 純粋フック：Selection → quote/prefix/suffix/おおよそのオフセット
+    │   │   └── SelectionActionButton.tsx # 選択直後に現れる軽量な作成の起点（提示専用、onCommitのみを受け取る）
+    │   ├── SelectionPopover/
+    │   │   ├── SelectionPopover.tsx          # {range, children}を受け取り、document.body直下へのポータル経由で選択範囲近傍に配置する汎用コンポーネント
+    │   │   ├── use-popper-position.ts        # createPopperのライフサイクル（生成・更新・destroy）を管理するフック
+    │   │   └── selection-virtual-element.ts  # Range→Popper仮想要素への変換（純粋関数）
     │   ├── AnchorResolver/
     │   │   ├── use-anchor-resolver.ts    # (containerEl, anchors[]) → Map<id, ResolvedRange>。詳細契約は後述
     │   │   └── use-container-settle.ts   # GROWI_IS_CONTENT_RENDERING_ATTRプロトコルを使った「静定」検知フック（auto-scrollの仕組みを再利用）
     │   ├── InlineCommentHighlight/
     │   │   └── InlineCommentHighlight.tsx # ResolvedRangeを受け取りハイライトを描画
     │   ├── InlineCommentForm/
-    │   │   └── InlineCommentForm.tsx     # コメント作成フォーム。メンション対応テキストエリアはCommentEditor.tsxと同じ入力パターンを踏襲（コンポーネント自体は新規、既存コンポーネントは変更しない）
+    │   │   ├── InlineCommentForm.tsx     # コメント作成フォーム。メンション対応テキストエリアはCommentEditor.tsxと同じ入力パターンを踏襲（既存コンポーネントは変更しない）。MentionPickerButtonを組み込む
+    │   │   └── MentionPickerButton.tsx   # メンション相手をボタン操作で選び、選ばれたユーザー名をonInsertで通知する
     │   └── InlineCommentList/
     │       ├── InlineCommentList.tsx     # 一覧表示（作成日時順、解決/未解決を区別）
     │       └── InlineCommentReplies.tsx  # 返信のネスト表示。ReplyComments.tsxの表示パターンを踏襲（既存コンポーネントは変更しない）
@@ -210,14 +227,16 @@ apps/app/src/features/inline-comment/
     │   ├── quote-matcher.ts              # matchQuote(text, anchor) 純粋関数。approx-string-matchのラッパー
     │   ├── quote-matcher.spec.ts
     │   ├── normalized-offset-mapping.ts  # NFC正規化後オフセット→原文オフセットの逆変換
-    │   └── normalized-offset-mapping.spec.ts
+    │   ├── normalized-offset-mapping.spec.ts
+    │   └── fetch-mention-users.ts        # メンション候補取得（`/users/`検索）。`@`タイプ補完・MentionPickerButtonの双方から利用。CommentEditor.tsx側の同種実装とは共有しない
     └── stores/
         └── inline-comment.ts             # SWRフック（一覧取得・起点作成・返信作成・解決トグルのmutate）
 ```
 
 ### Modified Files
 - `apps/app/src/components/PageView/RevisionRenderer.tsx` — `ReactMarkdown` を包むコンテナ `div` に `ref` を転送するよう変更（新規rehype/remarkプラグインは追加しない）
-- `apps/app/src/components/PageView/PageView.tsx` — 転送されたrefを`AnchorResolver`/`SelectionCapture`/`InlineCommentList`に配線し、既存の `Comments` と並置する
+- `apps/app/src/components/PageView/PageView.tsx` — 転送されたrefを`AnchorResolver`/`SelectionCapture`/`InlineCommentList`に配線し、既存の `Comments` と並置する。共有リンク経由のページ表示（`!isSharedPageView`）では`SelectionCapture`/`InlineCommentHighlight`/`InlineCommentList`のいずれもレンダーしないガードもここに置く
+- `apps/app/package.json` — `@popperjs/core`を`dependencies`に追加（選択範囲近傍への配置に使用）
 - `apps/app/src/server/routes/apiv3/index.js` — `inline-comment` フィーチャーモジュールのルートファクトリをimportし、`/inline-comments` にマウントする（`revisions` と同じマウントパターン）
 - `apps/app/src/features/comment/server/models/comment.ts` — Mongooseスキーマに `isInline`／アンカー4フィールド／`anchorOriginRevisionId`／`resolvedById`／`resolvedAt` を追加。`findCommentsByPageId`／`findCommentsByRevisionId`／`countCommentByPageId` の `where` 条件に `isInline: { not: true }` を追加（無条件フィルタ。呼び出し元からオーバーライド不可）。`@@index([pageId, isInline])` の宣言を追加
 - `apps/app/prisma/schema.prisma` — `comments` モデルに同じフィールドを追加。既存の `creator` リレーション（現在は無名の暗黙リレーション）に `@relation("CommentCreator", ...)` と明示的な名前を付け、新設する `resolvedBy` リレーションと区別できるようにする（`comments`→`users` 間に2本のリレーションができるため、Prismaの制約でどちらも名前付けが必須になる）。`users` モデル側の `comments comments[]` も `@relation("CommentCreator")` を付け、新設する `resolvedInlineComments comments[] @relation("InlineCommentResolver")` を追加する
@@ -227,10 +246,14 @@ apps/app/src/features/inline-comment/
 
 ### 作成フロー（起点コメント）
 
+選択してから送信するまでは二段階になっている：選択直後は`SelectionActionButton`（軽量な作成の起点）だけが選択範囲近傍に表示され、これを選んで初めて`InlineCommentForm`へ展開する。両方の表示位置は`SelectionPopover`が担う。
+
 ```mermaid
 sequenceDiagram
     participant User
     participant SelectionCapture
+    participant SelectionPopover
+    participant SelectionActionButton
     participant InlineCommentForm
     participant Store as inline-comment store
     participant Route as apiv3 inline-comment routes
@@ -239,7 +262,13 @@ sequenceDiagram
     participant DB as comments (isInline true)
 
     User->>SelectionCapture: 本文中のテキストを選択
-    SelectionCapture->>InlineCommentForm: quote/prefix/suffix/offset を渡してフォーム表示
+    SelectionCapture->>SelectionPopover: stage=selecting, range=選択中のRange
+    SelectionPopover->>SelectionActionButton: 選択範囲近傍に配置して表示
+    User->>SelectionActionButton: 作成の起点を選ぶ
+    SelectionActionButton->>SelectionCapture: onCommit()
+    SelectionCapture->>SelectionCapture: range.cloneRange()をcommittedRangeとして保持
+    SelectionCapture->>SelectionPopover: stage=composing, range=committedRange
+    SelectionPopover->>InlineCommentForm: 選択範囲近傍に配置して表示（quote/prefix/suffix/offsetを渡す）
     User->>InlineCommentForm: コメント本文を入力し送信
     InlineCommentForm->>Store: create(pageId, revisionId, comment, anchor)
     Store->>Route: POST /inline-comments
@@ -299,6 +328,20 @@ flowchart TD
 | 6.1 | 共有リンク閲覧者へ行を返さない | apiv3 inline-comment routes（`certifySharedPage`を通さない） | — | — |
 | 6.2 | 共有リンク画面でUIを表示しない | SelectionCapture, InlineCommentList（share-link文脈では未マウント） | — | — |
 | 6.3 | 既存の一覧取得は共有リンクの有無によらず常に除外する | `findCommentsByPageId`／`findCommentsByRevisionId`（無条件`isInline`フィルタ） | — | — |
+| 7.1 | 選択時に作成の起点を表示 | SelectionCapture, SelectionActionButton, SelectionPopover | `useTextSelection` | 選択→作成起点 |
+| 7.2 | 空選択では起点を表示しない | SelectionCapture | `useTextSelection`が`null`を返す | — |
+| 7.3 | 選択変更に起点位置を追随 | SelectionPopover | ライブ`Range`の再取得 | 選択→作成起点 |
+| 7.4 | 展開前の選択解除で起点を消す | SelectionCapture | `stage: selecting → idle` | 状態遷移 |
+| 8.1 | 起点選択でフォームへ展開 | SelectionCapture, SelectionActionButton | `onCommit` | 作成起点→フォーム展開 |
+| 8.2 | 展開後も引用文を表示し続ける | InlineCommentForm | `anchor.quote` | — |
+| 8.3 | 入力欄フォーカスでフォームを閉じない | SelectionCapture | `committedRange`は選択状態と独立 | — |
+| 8.4 | 送信/取消でフォームを閉じる | SelectionCapture, InlineCommentForm | `onSubmitted`/`onCanceled` | 送信 |
+| 9.1 | メンション選択操作を別途用意 | InlineCommentForm, MentionPickerButton | — | メンション選択 |
+| 9.2 | 選択操作でユーザー一覧を表示 | MentionPickerButton | `fetchMentionUsers` | メンション選択 |
+| 9.3 | 一覧選択でメンションを本文に挿入 | MentionPickerButton, InlineCommentForm | `codeMirrorEditor.insertText` | メンション選択 |
+| 9.4 | 既存の`@`タイプ補完を維持 | InlineCommentForm | `createMentionCompletionExtension` | — |
+| 10.1 | 起点・フォームを選択範囲近くに表示 | SelectionPopover | `usePopperPosition`, `selection-virtual-element` | 全フロー |
+| 10.2 | 共有リンク画面では表示しない | SelectionCapture（`PageView.tsx`側の`!isSharedPageView`ガードにより未マウント） | — | — |
 
 ## Components and Interfaces
 
@@ -309,7 +352,13 @@ flowchart TD
 | quote-matcher (`matchQuote`) | Client / ロジック | 完全一致→NFCあいまい一致→逆変換 | 2.1-2.4, 5.1-5.3 | `approx-string-match`(P0), `Intl.Segmenter`(P0) | Service |
 | AnchorResolver (`useAnchorResolver`) | Client / ロジック | 静定イベントまたはanchors内容の変化のたびに全起点アンカーを再計算しResolvedRangeを供給 | 2.1-2.4, 5.1-5.3 | rendered-text(P0), quote-matcher(P0), use-container-settle(P0) | State |
 | use-text-selection | Client / ロジック | Selectionからアンカー候補（quote/prefix/suffix/offset）を構築 | 1.1-1.4, 1.7 | `Intl.Segmenter`(P1) | State |
-| SelectionCapture / InlineCommentForm / InlineCommentList / InlineCommentReplies / InlineCommentHighlight | Client / UI | 選択キャプチャ・作成フォーム・一覧・返信ネスト表示（読み取り表示でのメンションハイライト含む）・ハイライト描画（提示層） | 1.1-1.2, 1.8, 2.5-2.6, 3.1, 4.4 | 上記ロジック層 | — |
+| SelectionCapture | Client / State | 選択監視から入力フォームのクローズまでの状態機械（`idle`/`selecting`/`composing`の3段階）を管理する | 1.1-1.2, 1.7, 7.1-7.4, 8.1, 8.3-8.4, 10.2 | use-text-selection(P0), SelectionPopover(P0), SelectionActionButton(P0), InlineCommentForm(P0) | State |
+| SelectionActionButton | Client / UI | 選択直後に現れる軽量な作成の起点（提示専用、`onCommit`のみを受け取る） | 7.1, 8.1 | SelectionCapture(P0) | — |
+| SelectionPopover | Client / UI | 与えられた`Range`の近傍へ`children`を浮動配置する汎用コンポーネント。`@popperjs/core`の仮想要素パターンで位置計算し、ゼロ矩形時は直前の有効な位置を保持するフォールバックを持つ | 7.3, 10.1 | `@popperjs/core`(P0) | State |
+| InlineCommentForm | Client / UI | コメント入力・送信。メンション対応テキストエリアはCommentEditor.tsxと同じ入力パターンを踏襲し、`MentionPickerButton`を組み込む | 1.1-1.2, 1.8, 3.1, 8.2, 8.4, 9.1, 9.3-9.4 | useSWRxInlineComments(P0), MentionPickerButton(P1), fetchMentionUsers(P0) | Service |
+| MentionPickerButton | Client / UI | メンション相手をボタン操作で選び、選ばれたユーザー名を通知する（一覧内の絞り込み検索はしない） | 9.1-9.3 | fetchMentionUsers(P0), `codeMirrorEditor.insertText`(P0, 既存API) | Service |
+| fetchMentionUsers | Client / Service | `/users/`検索APIの呼び出し（`@`タイプ補完・メンションボタン一覧の双方から利用。`CommentEditor.tsx`側の同種実装とは共有しない） | 9.2 | `apiv3Get`(P0) | Service |
+| InlineCommentList / InlineCommentReplies / InlineCommentHighlight | Client / UI | 一覧・返信ネスト表示（読み取り表示でのメンションハイライト含む）・ハイライト描画（提示層） | 1.8, 2.5-2.6, 3.1, 4.4 | 上記ロジック層 | — |
 
 ### Server
 

@@ -94,6 +94,24 @@
   - _Requirements: 1.1, 2.1, 3.1, 4.1_
   - _Depends: 4.2, 4.3_
 
+- [x] 5. Port changes into the target spec and retire this spec
+- [x] 5.1 Rewrite the relevant section(s) of `inline-comment`'s design.md
+  - Amend target: `inline-comment`（本specは`inline-comment`のamend spec）
+  - Architecture diagram / Components and Interfaces / File Structure Plan / System Flowsに`SelectionPopover`/`SelectionActionButton`/`MentionPickerButton`/`fetchMentionUsers`を反映し、既存の単段階フロー・二値ロックの記述を二段階フローへ書き換えた
+  - Requirement 4.2に関する不正確な記述（共有リンク非表示ガードの所在を`SelectionCapture`内としていた誤り。実際は`PageView.tsx`の`!isSharedPageView`）を、正しい記述で書き戻した
+  - _Requirements: 全体_
+- [x] 5.2 `inline-comment`のrequirements.mdに新規要件を追記
+  - 既存Requirement 1〜6は改番せず、Requirement 7〜10として末尾に追記（`.claude/rules/spec-lifecycle.md`の「既存IDは改番しない」に従う）
+- [x] 5.3 design rationaleを`inline-comment`のresearch.mdへ移設
+  - 「選択→作成フローのUX見直し」節として、配置手段の比較検討・状態機械の二段階化・メンション候補取得の共通化範囲・実ブラウザ限定の2つの不具合・Visual Verificationの位置づけを記録した
+- [x] 5.4 `inline-comment`のspec.jsonを更新
+  - `updated_at`を更新（`phase`/`approvals`はそのまま）
+- [x] 5.5 roadmap.mdの確認
+  - `inline-comment`・`inline-comment-selection-ux`とも`roadmap.md`に掲載されておらず（単発spec）、削除対象の記載なし
+- [x] 5.6 このspecディレクトリを削除
+  - `.kiro/specs/inline-comment-selection-ux/`を削除する（本タスク完了後、親コントローラーが実行）
+  - _Requirements: 全体_
+
 ## Implementation Notes
 
 - 1.2: `@popperjs/core`を`devDependencies`から`dependencies`へ移動したが、1.2完了時点では`use-popper-position.ts`を消費するコンポーネントが存在せず、Turbopackのビルドグラフに到達しないため`.next/node_modules/`での実測確認ができなかった（レビュー時に独立して確認済み）。設計判断自体は妥当（design.md/research.mdの決定通り、`ssr:false`はTurbopackの外部化を妨げないため）だが、実測確認は`SelectionPopover`（1.3のコンポーネント）が初めてレンダーツリーに組み込まれるタスク2.2の完了条件へ追加した。
