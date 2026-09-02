@@ -16,7 +16,7 @@
 - 永続化された要約を、本文と同じ権限ゲート経由で、以後そのページを開く全閲覧者にデフォルト表示する。
 - 永続化された要約が保存後のページ更新によって古くなった可能性を、控えめに（背景色を変える等の目立つ演出なしに）示す。追加のLLM呼び出し・DBアクセスなしで判定できるようにする。
 - 永続化された要約を、閲覧者ごとに自分の画面上でのみ非表示にする手段を提供する（ページに紐づく永続データ自体は変更せず、他の閲覧者や同一ユーザーの別ブラウザ・別デバイスには影響しない。再表示機能は設けない）。
-- 長いページについて、既存の検索Q&A用途の読み取り方針を変えずに、要約時のみ全文カバレッジの読み取り方針を適用する。読み取り量の上限は、instructionsによる自己申告ではなくツール呼び出し側で強制する。
+- 長いページについて、既存の検索Q&A用途の読み取り方針を変えずに、要約時のみ全文カバレッジの読み取り方針を適用する。読み取り量の上限は、以下の3層構えで制御される：**(1) limitedGetPageContentTool がコード側で 1500行でカット（ハード上限）、(2) instructions が limit_exceeded 受領時に読み取り打ち切り（ソフト制御、LLM依存）、(3) maxSteps=15 が最大ステップ数を制限（安全弁、LLM依存）**。層1は完全に強制されるが、層2・3はLLM側の挙動に依存する。
 - 要約対象コンテンツの取得経路を既存の `getPageContentTool` に一本化し（読み取り量の上限を強制する専用ラッパー越しに呼び出す）、要約生成のたびに閲覧権限が再チェックされる構造を維持する。
 - 要約後、同一スレッド内で既存のチャット対話フローに合流し、追加の質問を継続できるようにする。
 - 利用状況をOpenTelemetryの既存カスタムメトリクス基盤にCounterとして計測する。
@@ -65,6 +65,7 @@
 - `growiAgent` のツール構成や `post-message.ts` のリクエストボディ契約（`threadId`/`modelKey`）が変わる場合、要約後にスレッドを引き継ぐ本設計の前提を再検証する。
 - スレッドの永続化方式（`memory` のバックエンド、`getOrCreateThread` の契約）が変わる場合、要約スレッドの生成・引き継ぎ処理を再検証する。
 - `Page` モデルがMongooseからPrismaへ移行される場合（`.claude/rules/model.md`）、永続化フィールドの追加方法・アクセス方法を再検証する。
+- `@mastra/core` のtool-call/tool-result 再生仕様（LLMプロバイダへ送るツール名がキー（ツール自身の`id`ではなく）であること、tool名が登録ツールセットに存在するか検証・除去しないこと）が変わる場合、クロスAgent スレッド共有（要約後に `growiAgent` が `summarizeAgent` のスレッドを引き継ぐ）を再検証する。
 
 ## Architecture
 
@@ -207,7 +208,7 @@ sequenceDiagram
         GetPageContentTool-->>SummarizeAgent: content or not_found_or_forbidden
     end
     SummarizeAgent-->>SummaryRoute: streamed summary text
-    SummaryRoute-->>Client: UI message stream plus threadId and sourceRevisionId
+    SummaryRoute-->>Client: UI message stream plus threadId, sourceRevisionId, and capturedAt (generation timestamp)
     SummaryRoute->>Memory: persist assistant message on same thread
     SummaryRoute->>SummaryRoute: increment usage counter on success
 
@@ -244,7 +245,7 @@ flowchart TD
 
 - **ハード上限（ツール呼び出し側、コードで強制）**: `summarizeAgent` は `getPageContentTool` を直接使わず、専用の `limitedGetPageContentTool`（`suggestPathAgent` の `limitedSearchTool` と同じラッパーパターン）経由でのみ本文を取得する。`RequestContext` の `pageReadBudget: { used: number; limit: number }` を1リクエストにつき1個生成し、`limit` は**1500行**（`getPageContentTool` のデフォルト`limit: 200`基準で5〜7回の呼び出し分に相当。読み取り量の上限が実際にコストの予測可能性を担保する値であることを優先し、目安ではなく固定値とする）。呼び出しのたびに返された `content` の行数を `used` に加算し、`used >= limit` の状態で呼ばれた場合は本文を取得せず `limit_exceeded` を返す。これが要件2.2の「最大読み取り量の上限」を実際に保証する機構である。`getPageContentTool` 自体は変更せず、ラップされる側として無変更のまま利用する。なおバジェット判定は呼び出し**前**に行うため、`used` が上限直前の状態から `getPageContentTool` の1回分（`limit` は最大500行）が通り、実効の読み取り量は最大で約2000行に達しうる。1500行はこの許容幅を含んだ上での上限値である。
 - **打ち切り時の振る舞い（instructions側）**: `summarizeAgent` のinstructionsは、`limitedGetPageContentTool` から `limit_exceeded` を受け取った時点で読み取りを止め、「読み取れた範囲からの要約である」ことを明示して要約を生成するよう指示する。上限値そのものはツール側が強制するため、instructionsは打ち切り後の振る舞いのみを規定すればよい。
-- **安全弁（呼び出し側）**: `/summary` ルートが `summarizeAgent.stream()` に渡す `maxSteps` は、`post-message.ts` の `maxSteps: 10`（Q&A用途、既存・無変更）とは独立した値を設定する。`pageReadBudget` に確実に到達できるだけの十分なステップ数を確保しつつ、`limit_exceeded` を受け取ってもinstructionsに従わずツール呼び出しを続けようとした場合の安全弁として機能する。両者は別の呼び出し箇所のパラメータであるため、この値の変更が `growiAgent` の呼び出しに影響することはない（2.3）。
+- **安全弁（呼び出し側）**: `/summary` ルートが `summarizeAgent.stream()` に渡す `maxSteps` は **15** に設定する（`post-message.ts` の `maxSteps: 10` Q&A用途とは独立）。根拠: pageReadBudget 上限1500行 ÷ getPageContentTool最大500行 = 最小3ステップ必要だが、instructionsが `limit_exceeded` を無視して続けようとした場合の安全弁として十分なマージンを確保。`limit_exceeded` を受け取ってもinstructionsに従わずツール呼び出しを続けようとした場合に確実に停止する。両者は別の呼び出し箇所のパラメータであるため、この値の変更が `growiAgent` の呼び出しに影響することはない（2.3）。
 
 ### 要約の永続化・共有表示・ローカル非表示
 
@@ -541,7 +542,7 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 **Implementation Notes**
 - Integration: `PageView.tsx` にMarkdown本文の描画箇所の外側で数行追加する。既存の翻訳ファイル（`locales/{locale}/translation.json` 相当）に本コンポーネントの文言キーを追加する。
 - Validation: `aiSummary` の有無・鮮度の一致/不一致・非表示フラグの有無それぞれで正しい表示になることをコンポーネントテストで検証する（`localStorage` はテスト用にモックする）。
-- Risks: `localStorage` が利用不可（プライベートブラウジング等）な場合、非表示状態が保存されないため毎回表示される可能性がある。読み書き失敗時は例外を握りつぶし「常に表示」側にフォールバックする（安全側のデフォルト）。
+- Risks: `localStorage` が利用不可（プライベートブラウジング等）な場合、非表示状態が保存されないため毎回表示される可能性がある。**エラーハンドリング**: read失敗時は非表示フラグなしとして常に表示する（機能喪失を避けるため安全側）。write失敗時は画面上の非表示化は反映するが次回訪問時に復活する可能性を容認する。mid-session quota超過時はページ再読み込みで リセット・再試行する。
 
 ## Data Models
 
