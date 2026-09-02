@@ -149,6 +149,28 @@
 - 5.4 (test through the production path): the Req 9 tests originally re-implemented `apply`'s dispatch in a local helper. That helper computed `replaceFromOffset` itself, so mutating the real `applyCommand` to ignore it left all 81 tests green — the feature's core could be deleted undetected. Driving the real completion source's `apply` instead makes that mutation fail 5 tests. Lesson: a helper that re-derives what production derives is not a test of production.
 - 5.3/5.4 (empty descriptions are a scaffold, not dead data): the 45 empty `slash_command.*.description` values are kept deliberately — they mark where descriptions will be written and keep the resolution path exercised. i18next returns `''` for them today, and the `detail` resolver additionally ignores a value equal to its own key, so the popup stays clean even if `returnEmptyString` is flipped or an entry is dropped.
 
+### Follow-up (deferred, unused-key audit — from #11838 CI; not blocking)
+`slash_command.*.{label,description}` を `i18next.config.ts` の
+`extract.preservePatterns` に宣言した（統合 PR #11838 の `lint:i18n` が
+`unused-key count 1648 exceeds baseline 1558` で落ちたため。18キー × 5ロケール = 90 の増加）。
+キーは packages/editor 側で `t(command.labelKey)` として解決されるため、`extract.input`
+（apps/app の `src/**` のみ）の範囲外であり、かつ実行時に組み立てられる。宣言後は
+`unused` が 1558（baseline ちょうど）に戻り、過剰抑制していないことも確認済み。
+
+ただし i18n-key-audit の design.md:394 のとおり、**宣言は「誤検出として報告しない」だけで
+「実在することを確認する」わけではない**。したがって今後 `SLASH_COMMANDS` にコマンドを
+追加したとき、対応する翻訳キーが5ロケールに無くても誰も検知しない盲点が残る。
+リポジトリの標準はこれを drift spec で埋める形（前例: `admin:g2g:*` の
+`g2g-error-keys-locale-drift.spec.ts`。その docstring に、この盲点が原因で
+`error_upload_attachment` の翻訳漏れが実際に起きたと記録されている）。
+
+#11838 のスコープを監査の修正だけに保つため、drift spec はここで繰り越す。最も安価な形は
+`slash-command-definitions.ts` の**ソーステキストを読んで** id を抽出し、各 id の
+label/description が5ロケールに実在することを検査するもの（g2g 前例と同じ方式）。
+`@growi/editor/dist` からの import は避ける: turbo の `test` タスクに `dependsOn: ["^build"]`
+が無く、`ci-app.yml` の Test ジョブにも build ステップが無いため（dist はキャッシュ復元のみ）、
+cold cache で壊れる。
+
 ### Design notes (from code review)
 - 5.1: in a table cell every one of the 9 commands is excluded, so the menu opens with zero options and closes immediately — observationally identical to suppressing it. Filtering (not suppression) is still the right mechanism, because the deferred inline commands (bold / link / inline code) are valid inside a table cell and will simply not declare `table` in `disallowedIn`.
 - 5.2: `replaceFromOffset` intentionally stays a RELATIVE offset instead of an absolute `replaceFrom`, so `SlashInsertion` keeps the position-free invariant documented on the type and `apply` remains the only place that builds a ChangeSpec.
