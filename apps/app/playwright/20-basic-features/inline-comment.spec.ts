@@ -194,6 +194,143 @@ test.describe('Inline comment', () => {
   });
 });
 
+test.describe('Inline comment - mention picker and multi-line submission', () => {
+  // Serial: the mention-picker and multi-line-submission tests both open a
+  // fresh form via a fresh page.goto, so they do not depend on each other's
+  // form state -- but they share one created page, the same reasoning the
+  // other suites in this file use for the page-creation test.
+  test.describe.configure({ mode: 'serial' });
+
+  const mentionPagePath = (retry: number) =>
+    `/inline-comment-e2e-mention${retry}`;
+
+  const targetSentence =
+    'This sentence anchors the mention-picker end-to-end test.';
+  const pageBody = [
+    '# Inline comment E2E - mention picker',
+    '',
+    targetSentence,
+    '',
+  ].join('\n');
+
+  let createdPage: CreatedPage | undefined;
+
+  test.afterAll(async ({ request }) => {
+    if (createdPage != null) {
+      await deletePagesCompletely(request, [createdPage]);
+    }
+  });
+
+  test('Create a page containing the target sentence', async ({
+    page,
+    request,
+  }, testInfo) => {
+    createdPage = await createPage(request, {
+      path: mentionPagePath(testInfo.retry),
+      body: pageBody,
+    });
+
+    await page.goto(createdPage.path);
+    await expect(page.locator('.wiki').first()).toContainText(targetSentence);
+  });
+
+  test('Choosing a candidate from the mention picker inserts "@<username> " at the cursor position, not merely appended', async ({
+    page,
+  }, testInfo) => {
+    await page.goto(mentionPagePath(testInfo.retry));
+    await expect(page.getByTestId('inline-comment-list')).toBeAttached();
+
+    await selectTextInPageBody(page, targetSentence);
+    await page.getByTestId('selection-action-button').click();
+    const form = page.getByTestId('inline-comment-form');
+    await expect(form).toBeVisible();
+
+    const commentEditor = form.locator('.cm-content');
+
+    // Requirement 3.3 says the picked mention is inserted into the comment
+    // body -- but "inserted" and "appended" would look identical if the
+    // cursor always happens to sit at the end of an empty editor. To prove
+    // this is a genuine at-cursor insertion (InlineCommentForm's
+    // `insertMention` calling `codeMirrorEditor.insertText`, not a
+    // textarea-level append), type text around the cursor first, then move
+    // the cursor to the middle before opening the picker: "AZ" -> ArrowLeft
+    // -> cursor sits between "A" and "Z".
+    await commentEditor.click();
+    await commentEditor.pressSequentially('AZ');
+    await page.keyboard.press('ArrowLeft');
+
+    // Requirement 3.1: the mention picker is a separate operation from the
+    // body input itself.
+    const mentionButton = form.getByTestId('mention-picker-button');
+    await mentionButton.click();
+
+    // Requirement 3.2: choosing the operation shows a list of mentionable
+    // users. The logged-in admin user (playwright/utils/login.ts) is always
+    // a real, mentionable user, so this list is never empty in this
+    // environment.
+    // Scoped to the mention picker's own dropdown menu (its sibling in the
+    // DOM), not just `.dropdown-item` anywhere in the form -- the comment
+    // editor's own toolbar renders several other, normally-hidden
+    // dropdown-item lists (table/drawio template menus) that a looser
+    // selector would match instead.
+    const mentionMenu = mentionButton.locator(
+      'xpath=following-sibling::div[contains(concat(" ", normalize-space(@class), " "), " dropdown-menu ")]',
+    );
+    const firstCandidate = mentionMenu.locator('.dropdown-item').first();
+    await expect(firstCandidate).toBeVisible();
+    const candidateUsername = await firstCandidate
+      .locator('span')
+      .first()
+      .innerText();
+
+    // Requirement 3.3: selecting the candidate inserts its mention into the
+    // comment body, at the cursor position recorded above -- landing between
+    // "A" and "Z", not after them.
+    await firstCandidate.click();
+    await expect(commentEditor).toHaveText(`A@${candidateUsername} Z`);
+  });
+
+  test('Submitting a multi-line comment body closes the form and the comment appears in the bottom list as an inline comment', async ({
+    page,
+  }, testInfo) => {
+    await page.goto(mentionPagePath(testInfo.retry));
+    await expect(page.getByTestId('inline-comment-list')).toBeAttached();
+
+    await selectTextInPageBody(page, targetSentence);
+    await page.getByTestId('selection-action-button').click();
+    const form = page.getByTestId('inline-comment-form');
+    await expect(form).toBeVisible();
+
+    const firstLine = 'a multi-line inline comment created by the e2e test';
+    const secondLine = 'its second line, typed via a real Enter keypress';
+    const commentEditor = form.locator('.cm-content');
+    // `.fill()` (used by the single-line scenarios elsewhere in this file)
+    // sets the whole editor value in one shot; typing the Enter keypress
+    // explicitly here is what actually exercises a multi-line body, the same
+    // technique `presentation.spec.ts` and `emacs-keymap.spec.ts` use for a
+    // multi-line `.cm-content` fill.
+    await commentEditor.fill(firstLine);
+    await commentEditor.press('End');
+    await commentEditor.press('Enter');
+    await commentEditor.pressSequentially(secondLine);
+    await expect(commentEditor).toContainText(firstLine);
+    await expect(commentEditor).toContainText(secondLine);
+
+    // Requirement 2.4: submitting closes the input form.
+    await form.getByTestId('inline-comment-submit-button').click();
+    await expect(form).not.toBeVisible();
+
+    // Requirement 3.1/2.5 continuity with the base `inline-comment` E2E: the
+    // comment shows up in the page's bottom inline-comment list, in the same
+    // "inline-comment-item contains the comment text" display format already
+    // established above (`inline-comment-item` -> `toContainText`).
+    const item = page.getByTestId('inline-comment-item').first();
+    await expect(item).toBeVisible();
+    await expect(item).toContainText(firstLine);
+    await expect(item).toContainText(secondLine);
+  });
+});
+
 test.describe('Inline comment - action button lifecycle before the form opens', () => {
   // Serial: the second test depends on the page created by the first, the
   // same reasoning the other suites in this file use.
