@@ -16,6 +16,7 @@ const codeMirrorEditorMock = vi.hoisted(() => ({
   getDocString: vi.fn(() => editorState.docText),
   initDoc: vi.fn(),
   appendExtensions: vi.fn(() => vi.fn()),
+  insertText: vi.fn(),
 }));
 
 vi.mock('@growi/editor', () => ({
@@ -37,8 +38,9 @@ vi.mock('@growi/editor/dist/client/components/CodeMirrorEditorComment', () => ({
   ),
 }));
 
+const createMentionCompletionExtension = vi.hoisted(() => vi.fn(() => ({})));
 vi.mock('@growi/editor/dist/client/services', () => ({
-  createMentionCompletionExtension: () => ({}),
+  createMentionCompletionExtension,
   mentionDecorationSettings: {},
 }));
 
@@ -57,6 +59,31 @@ vi.mock('~/client/util/apiv3-client', () => ({
 const create = vi.hoisted(() => vi.fn());
 vi.mock('../../stores/inline-comment', () => ({
   useSWRxInlineComments: () => ({ create }),
+}));
+
+// fetchMentionUsers is the shared service extracted in task 1.4. This test
+// asserts InlineCommentForm's mention-completion extension is wired to it
+// (rather than a local reimplementation) by checking the reference identity
+// below, and never actually invokes the mocked function's network path.
+const fetchMentionUsersMock = vi.hoisted(() => vi.fn());
+vi.mock('../../services/fetch-mention-users', () => ({
+  fetchMentionUsers: fetchMentionUsersMock,
+}));
+
+// MentionPickerButton (task 3.1) is mocked at the module boundary: this test
+// proves the InlineCommentForm -> onInsert -> codeMirrorEditor.insertText
+// wiring, not MentionPickerButton's own dropdown/fetch behavior (already
+// covered by MentionPickerButton.spec.tsx).
+vi.mock('./MentionPickerButton', () => ({
+  MentionPickerButton: (props: { onInsert: (username: string) => void }) => (
+    <button
+      type="button"
+      data-testid="mention-picker-button-mock"
+      onClick={() => props.onInsert('alice')}
+    >
+      @
+    </button>
+  ),
 }));
 
 const validAnchor = {
@@ -131,5 +158,34 @@ describe('InlineCommentForm', () => {
       });
     });
     await waitFor(() => expect(onSubmitted).toHaveBeenCalledTimes(1));
+  });
+
+  it('renders MentionPickerButton and inserts "@<username> " at the cursor on selection (Requirement 3.3)', () => {
+    render(
+      <InlineCommentForm
+        pageId="page-1"
+        anchorOriginRevisionId="rev-1"
+        anchor={validAnchor}
+      />,
+    );
+
+    const pickerButton = screen.getByTestId('mention-picker-button-mock');
+    fireEvent.click(pickerButton);
+
+    expect(codeMirrorEditorMock.insertText).toHaveBeenCalledWith('@alice ');
+  });
+
+  it('wires the mention-completion extension to the shared fetchMentionUsers service, not a local reimplementation (Requirement 3.4)', () => {
+    render(
+      <InlineCommentForm
+        pageId="page-1"
+        anchorOriginRevisionId="rev-1"
+        anchor={validAnchor}
+      />,
+    );
+
+    expect(createMentionCompletionExtension).toHaveBeenCalledWith(
+      fetchMentionUsersMock,
+    );
   });
 });

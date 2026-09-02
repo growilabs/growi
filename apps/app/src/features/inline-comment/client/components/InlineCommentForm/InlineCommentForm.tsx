@@ -21,16 +21,16 @@ import { useSetResolvedTheme } from '@growi/editor';
 import { CodeMirrorEditorComment } from '@growi/editor/dist/client/components/CodeMirrorEditorComment';
 import {
   createMentionCompletionExtension,
-  type FetchUsersFn,
   mentionDecorationSettings,
 } from '@growi/editor/dist/client/services';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
 import { useNextThemes } from '~/stores-universal/use-next-themes';
 
+import { fetchMentionUsers } from '../../services/fetch-mention-users';
 import { useSWRxInlineComments } from '../../stores/inline-comment';
 import type { CapturedSelection } from '../SelectionCapture/use-text-selection';
+import { MentionPickerButton } from './MentionPickerButton';
 
 type InlineCommentFormProps = {
   pageId: string;
@@ -42,28 +42,6 @@ type InlineCommentFormProps = {
   onSubmitted?: () => void;
   /** Called when the user cancels without submitting. */
   onCanceled?: () => void;
-};
-
-// Same shape as CommentEditor.tsx's own fetchUsers — kept local rather than
-// extracted to a shared util, since this task's boundary is InlineCommentForm
-// only and CommentEditor.tsx must not be touched.
-const fetchUsers: FetchUsersFn = async (query: string) => {
-  try {
-    const res = await apiv3Get<{
-      paginateResult: { docs: { username: string; name: string }[] };
-    }>('/users/', {
-      searchText: query,
-      sort: 'username',
-      sortOrder: 'asc',
-      page: 1,
-    });
-    return (res.data.paginateResult?.docs ?? []).map((user) => ({
-      username: user.username,
-      name: user.name,
-    }));
-  } catch {
-    return [];
-  }
 };
 
 export const InlineCommentForm = (
@@ -89,7 +67,7 @@ export const InlineCommentForm = (
   const [error, setError] = useState<string>();
 
   const mentionExtension = useMemo(
-    () => createMentionCompletionExtension(fetchUsers),
+    () => createMentionCompletionExtension(fetchMentionUsers),
     [],
   );
 
@@ -147,6 +125,16 @@ export const InlineCommentForm = (
     onSubmitted,
   ]);
 
+  // Requirement 3.3: inserts "@<username> " at the current cursor position in
+  // the comment body, via the same insertText API EmojiButton.tsx uses for
+  // its own "insert at cursor" pattern.
+  const insertMention = useCallback(
+    (username: string) => {
+      codeMirrorEditor?.insertText(`@${username} `);
+    },
+    [codeMirrorEditor],
+  );
+
   return (
     <div className="inline-comment-form" data-testid="inline-comment-form">
       <blockquote className="inline-comment-form-quote">
@@ -159,6 +147,7 @@ export const InlineCommentForm = (
       />
       {error != null && <span className="text-danger">{error}</span>}
       <div className="inline-comment-form-actions">
+        <MentionPickerButton onInsert={insertMention} />
         <button type="button" onClick={onCanceled}>
           Cancel
         </button>
