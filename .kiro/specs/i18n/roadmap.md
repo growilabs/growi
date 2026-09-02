@@ -85,7 +85,7 @@ SSR ペイロード肥大（`/me/*` で 513 KB、`/admin/{app,ai,vault}` で 347
 
 ## Specs (dependency order)
 
-- [ ] `i18n-key-audit` — 未使用キー / 言語間の欠損 / 存在しないキー参照を CI ゲート化し、discovery で見つかった実バグ 2 件を修正する。Dependencies: なし。Status: 2026-08-06 brief drafted（`.kiro/specs/i18n-key-audit/brief.md`）、requirements 以降は未着手
+- [ ] `i18n-key-audit` — 未使用キー / 言語間の欠損 / 存在しないキー参照を CI ゲート化し、discovery で見つかった実バグ 2 件を修正する。Dependencies: なし。Status: 2026-08-06 brief drafted（`.kiro/specs/i18n-key-audit/brief.md`）、2026-08-14 requirements/design/tasks 生成済み（design は `/kiro-validate-design` を7回ループさせ GO まで収束。バグ2は「移動」でなく `commons.json` への複製で決着、31件の真の不具合修正・除外でなく書き換えでの誤検出解消・既存ドリフトテスト2本の disposition もタスク化済み）。実装（`/kiro-impl`）は未着手
 - [ ] `i18n-community-translation` — POEditor を受け皿にしたコミュニティ翻訳の導線と同期経路。Dependencies: なし（ただしリポジトリ側のキーが整合してから同期を繋ぐ方が事故が少ないので、`i18n-key-audit` の後が望ましい）。Status: 2026-08-06 brief drafted（`.kiro/specs/i18n-community-translation/brief.md`）、requirements 以降は未着手
 
 ## 進める順序
@@ -139,7 +139,7 @@ discovery の途中でそう書いたが、正確ではない。**最も高価�
 
 `i18n-key-audit` と `i18n-community-translation` が回り始めたら、この論点に戻る。
 
-なお namespace 設計に起因するバグ 2（管理画面が本番でだけ生キーを表示する）は、整理の議論を待たずに `i18n-key-audit` の中で**狭く**直す（`admin` の ns リストに `translation` を足すか、共有ラベル 20 件を `commons` へ移す）。1,166 キーの組み替えには踏み込まない。
+なお namespace 設計に起因するバグ 2（管理画面が本番でだけ生キーを表示する）は、整理の議論を待たずに `i18n-key-audit` の中で**狭く**直す。設計段階で「`admin` の ns リストに `translation` を足す」「共有ラベル約20件を `commons` へ移す」の両案とも見送り、`translation.json` は変更せず `commons.json` へ**複製**する方式に決着した（移動すると管理画面外の約25ファイルを新たに壊すことが実測で判明したため）。1,166 キーの組み替えには踏み込まない。
 
 ---
 

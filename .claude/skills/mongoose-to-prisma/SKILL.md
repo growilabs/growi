@@ -25,7 +25,8 @@ If no path is given, ask for one before starting.
 
 GROWI migrates Mongoose → Prisma incrementally, one model at a time:
 
-- **Mongoose is kept** for collection and index creation until ALL models have migrated (then `prisma db push` takes over)
+- **Mongoose is kept** for collection and index creation until ALL models have migrated (then `prisma db push` takes over). This matters because Mongoose creates a model's indexes automatically on connect (`autoIndex`, enabled by default) — as long as the Mongoose schema file stays in the repo, its `index`/`unique`/`sparse` declarations keep being applied with no extra work. `schema.prisma`'s own `@@index`/`@@unique` attributes are inert until that eventual `prisma db push`; they do not create anything today.
+  - **If a model's Mongoose file is deleted instead of kept** (deviating from the standard flow above — e.g. because the collection is new and has never been read/written through Mongoose, as decided case-by-case in PR review), `autoIndex` no longer runs for it. All indexes that schema used to declare (including any `unique` constraint) must be created explicitly via a `migrate-mongo` migration using the native MongoDB driver (`collection.createIndex(...)`), or they silently stop existing. See `apps/app/src/migrations/20260619120000-add-unique-key-index-to-auditlog-es-sync-collections.js` and `apps/app/src/migrations/20260901064500-add-indexes-to-pagelinks.js` for precedent. Flag this explicitly to the developer before Step 6 if the model file is going to be removed rather than kept.
 - **Prisma extensions** (`Prisma.defineExtension`) replace Mongoose statics and instance methods
 - **No breaking API changes** — frontend is out of scope; method signatures must remain backward-compatible
 - `_id` and `__v` backward-compat fields are provided by `createPrisma()` in `apps/app/src/utils/prisma.ts` as computed fields; callers accessing `doc._id` or `doc.__v` require no changes
@@ -341,6 +342,8 @@ Ask: **"Proceed to Step 6?"**
 ## Step 6: Mongoose Cleanup
 
 Remove superseded Mongoose code from the model file now that the Prisma extension is in place and callers have been updated.
+
+The classification table below keeps the Mongoose schema block (simplified) specifically so `autoIndex` keeps creating this model's indexes — see the autoIndex note in Background. If the plan for this model is to delete the schema block/file entirely rather than keep it, stop and confirm with the developer that a `migrate-mongo` migration will create the indexes instead (see Background) before proceeding.
 
 ### 6-1: Classify every section
 
