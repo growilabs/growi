@@ -46,6 +46,17 @@ const VALID_RECT = buildRect({
   right: 110,
   bottom: 36,
 });
+/** The same selection after the page was scrolled — a second, distinct valid rect. */
+const SCROLLED_RECT = buildRect({
+  x: 10,
+  y: 300,
+  width: 100,
+  height: 16,
+  top: 300,
+  left: 10,
+  right: 110,
+  bottom: 316,
+});
 const ZERO_RECT = buildRect({ x: 42, y: 84, top: 84, left: 42 });
 
 /** The reference element Popper was constructed with (a Popper virtual element). */
@@ -106,6 +117,7 @@ describe('SelectionPopover', () => {
     const getBoundingClientRect = vi
       .fn<() => DOMRect>()
       .mockReturnValueOnce(VALID_RECT)
+      .mockReturnValueOnce(SCROLLED_RECT)
       .mockReturnValue(ZERO_RECT);
     const range = mock<Range>({ getBoundingClientRect });
 
@@ -120,11 +132,14 @@ describe('SelectionPopover', () => {
     // First read: the range still has a real rect, so it is used as-is.
     expect(reference.getBoundingClientRect()).toEqual(VALID_RECT);
 
+    // A cloned Range keeps tracking the live document position, so a later
+    // valid rect (e.g. after scrolling) must be used and remembered.
+    expect(reference.getBoundingClientRect()).toEqual(SCROLLED_RECT);
+
     // Subsequent reads collapse to a zero rect (e.g. the range's nodes were
     // replaced by a re-render) — the popover must not jump to that degenerate
-    // position and keeps the last valid rect instead.
-    expect(reference.getBoundingClientRect()).toEqual(VALID_RECT);
-    expect(reference.getBoundingClientRect()).not.toEqual(ZERO_RECT);
+    // position, and it falls back to the *latest* valid rect, not the first.
+    expect(reference.getBoundingClientRect()).toEqual(SCROLLED_RECT);
   });
 
   it('serves the range rect as-is when no valid rect has ever been observed', () => {
