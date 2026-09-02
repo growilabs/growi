@@ -136,7 +136,10 @@ export const InlineCommentForm = (
   );
 
   return (
-    <div className="inline-comment-form" data-testid="inline-comment-form">
+    <div
+      className="inline-comment-form bg-body border rounded shadow-sm p-2"
+      data-testid="inline-comment-form"
+    >
       <blockquote className="inline-comment-form-quote">
         {anchor.quote}
       </blockquote>
