@@ -21,7 +21,7 @@
   - _Depends: 1.1, 1.2_
   - _Boundary: SelectionPopover_
 
-- [ ] 1.4 (P) inline-comment機能内で閉じたメンション候補取得サービスを実装する
+- [x] 1.4 (P) inline-comment機能内で閉じたメンション候補取得サービスを実装する
   - 既存`InlineCommentForm.tsx`のローカル`fetchUsers`実装（`/users/`検索）と同じ内容を、inline-comment機能内の共通サービスとして切り出す。`CommentEditor.tsx`側の同種実装とは共通化しない
   - 観測できる完了条件：検索成功時のユーザー一覧マッピングと、API失敗時に空配列を返すことをユニットテストで確認できる
   - _Requirements: 3.2_
