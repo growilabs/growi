@@ -1,8 +1,6 @@
 /**
- * Explicit mention-target picker for `InlineCommentForm` (design.md's
- * `MentionPickerButton` component; Requirement 3.1-3.3). This is a standalone
- * component, not yet wired into `InlineCommentForm.tsx` — that wiring is a
- * later task (3.2) per this task's boundary.
+ * Explicit mention-target picker used by `InlineCommentForm` (design.md's
+ * `MentionPickerButton` component; Requirement 3.1-3.3).
  *
  * On press it fetches candidates via `fetchMentionUsers('')` (an empty query,
  * per design.md's Responsibilities) and shows them in a `reactstrap`

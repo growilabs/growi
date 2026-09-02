@@ -2,9 +2,8 @@
  * Presentation-only "start a comment" action shown next to a text selection
  * (design.md's SelectionActionButton: "「コメントする」ボタンの提示のみを担う"). It owns
  * no state, no positioning, and no selection logic — `SelectionCapture`
- * (task 2.2) decides when to render it and `SelectionPopover` (a later task)
- * decides where. This component's only job is to call `onCommit` once when
- * chosen.
+ * decides when to render it and `SelectionPopover` decides where. This
+ * component's only job is to call `onCommit` once when chosen.
  */
 
 import type { JSX } from 'react';
