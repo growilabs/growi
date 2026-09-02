@@ -59,9 +59,14 @@ const SCROLLED_RECT = buildRect({
 });
 const ZERO_RECT = buildRect({ x: 42, y: 84, top: 84, left: 42 });
 
-/** The reference element Popper was constructed with (a Popper virtual element). */
-const capturedReference = (): { getBoundingClientRect: () => DOMRect } => {
-  const call = mockCreatePopper.mock.calls[0];
+/**
+ * The reference element the n-th Popper instance was constructed with
+ * (a Popper virtual element).
+ */
+const capturedReference = (
+  callIndex = 0,
+): { getBoundingClientRect: () => DOMRect } => {
+  const call = mockCreatePopper.mock.calls[callIndex];
   expect(call).toBeDefined();
   return call[0] as { getBoundingClientRect: () => DOMRect };
 };
@@ -111,6 +116,36 @@ describe('SelectionPopover', () => {
     expect(popperElement).toContainElement(
       screen.getByRole('button', { name: 'Comment' }),
     );
+  });
+
+  // Requirement 1.3: the popover follows the selection as it changes — a new
+  // range must re-derive the position instead of keeping the first one.
+  it('re-positions against the new range when a different range is passed in', () => {
+    const rangeA = mock<Range>({
+      getBoundingClientRect: vi.fn(() => VALID_RECT),
+    });
+    const rangeB = mock<Range>({
+      getBoundingClientRect: vi.fn(() => SCROLLED_RECT),
+    });
+
+    const { rerender } = render(
+      <SelectionPopover range={rangeA}>
+        <button type="button">Comment</button>
+      </SelectionPopover>,
+    );
+
+    expect(mockCreatePopper).toHaveBeenCalledTimes(1);
+    expect(capturedReference(0).getBoundingClientRect()).toEqual(VALID_RECT);
+
+    rerender(
+      <SelectionPopover range={rangeB}>
+        <button type="button">Comment</button>
+      </SelectionPopover>,
+    );
+
+    expect(mockCreatePopper).toHaveBeenCalledTimes(2);
+    expect(capturedReference(1).getBoundingClientRect()).toEqual(SCROLLED_RECT);
+    expect(rangeB.getBoundingClientRect).toHaveBeenCalled();
   });
 
   it('keeps serving the last valid rect when the range starts reporting a zero rect', () => {
