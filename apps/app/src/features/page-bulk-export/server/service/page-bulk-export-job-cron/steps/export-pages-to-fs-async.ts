@@ -19,6 +19,7 @@ import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-sn
 import type { IPageBulkExportJobCronService } from '..';
 import { BulkExportJobStreamDestroyedByCleanupError } from '../errors';
 import { createBulkExportMarkdownRenderer } from '../markdown';
+import { embedAttachmentImages } from './embed-images';
 
 const logger = loggerFactory(
   'growi:features:page-bulk-export:export-pages-to-fs-async',
@@ -106,6 +107,12 @@ export async function getPageWritable(
             let htmlString: string;
             try {
               htmlString = await renderer.renderToHtml(markdownBody, cssHref);
+              htmlString = await embedAttachmentImages(
+                htmlString,
+                fileOutputPath,
+                outputDir,
+                this.crowi,
+              );
             } catch (renderErr) {
               logger.warn(
                 'BulkExportMarkdownRenderer failed for page %s: %o',
