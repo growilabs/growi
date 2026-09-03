@@ -66,7 +66,8 @@
 - スレッドの永続化方式（`memory` のバックエンド、`getOrCreateThread` の契約）が変わる場合、要約スレッドの生成・引き継ぎ処理を再検証する。
 - `Page` モデルがMongooseからPrismaへ移行される場合（`.claude/rules/model.md`）、永続化フィールドの追加方法・アクセス方法を再検証する。
 - `@mastra/core` のtool-call/tool-result 再生仕様（LLMプロバイダへ送るツール名がキー（ツール自身の`id`ではなく）であること、tool名が登録ツールセットに存在するか検証・除去しないこと）が変わる場合、クロスAgent スレッド共有（要約後に `growiAgent` が `summarizeAgent` のスレッドを引き継ぐ）を再検証する。
-  - **テスト必須**: `summarizeAgent` が本文取得ツールを `getPageContentTool`（`limitedGetPageContentTool` の実装を持つ）という**キー**で登録し、その後 `growiAgent`（`getPageContentTool` キーで異なる実装を持つ）が同じスレッドを再生した場合、過去の tool-call が正しく再生されることを unit/integ テストで確認する。Mastra が tool 名を検証・除去しないという仮定の実証が必須。
+  - **検証済み** (2026-09-03): GROWI のコード上で、`growi-agent.ts` (line 48-51) と `suggest-path-agent.ts` (line 28-32) の tools 登録パターンから、LLM に送られるツール名が tools オブジェクトのキー（`getPageContentTool`, `getPageContent` など）であることが確認された。`summarizeAgent` が `tools: { getPageContentTool: limitedGetPageContentTool }` で登録し、`growiAgent` が `tools: { getPageContentTool: getPageContentTool }` で登録された場合、両方で LLM プロバイダに送られるツール名は `getPageContentTool` となり、thread replay 時に正しくツール名が一致する。仮定は妥当。
+  - **テスト必須**: 実装時に、cross-agent thread replay が正しく動作することを unit/integ テストで確認する（先出の仮定が実装レベルで成立することを検証）。
 
 ## Architecture
 
