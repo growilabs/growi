@@ -1,0 +1,22 @@
+{
+  "feature_name": "plantuml-post-optin",
+  "created_at": "2026-07-31T09:30:17Z",
+  "updated_at": "2026-09-02T00:00:00Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": false
+}
