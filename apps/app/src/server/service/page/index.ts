@@ -57,7 +57,7 @@ import {
   PageQueryBuilder,
   pushRevision,
 } from '~/server/models/page';
-import type { IPageRedirect } from '~/server/models/page-redirect.js';
+import type { IPageRedirect } from '~/server/models/page-redirect';
 import type { UserGroupDocument } from '~/server/models/user-group';
 import {
   beginActivity,
