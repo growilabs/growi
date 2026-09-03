@@ -333,6 +333,23 @@ model pagebulkexportpagesnapshots {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 }
 
+model pagelinks {
+  // No `v`/`__v`: this collection is prisma-only and has never been written by
+  // mongoose, so it carries no optimistic-concurrency version key — same as the other
+  // prisma-only collections (auditlog_es_sync_status, changestream_resume_tokens).
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  fromPageId String? @map("fromPage") @db.ObjectId
+  toPath     String
+  toPageId   String? @map("toPage") @db.ObjectId
+
+  fromPage pages? @relation("PageLinkFromPage", fields: [fromPageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  toPage   pages? @relation("PageLinkToPage", fields: [toPageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([fromPageId, toPath], map: "fromPage_1_toPath_1")
+  @@index([toPath], map: "toPath_1")
+  @@index([toPageId], map: "toPage_1")
+}
+
 model pageoperations {
   id          String                @id @default(auto()) @map("_id") @db.ObjectId
   /// Field referred in an index, but found no data to define the type.
@@ -401,6 +418,8 @@ model pages {
   attachments      attachments[]
   bookmarks        bookmarks[]
   pagetagrelations pagetagrelations[]
+  pagelinksFrom    pagelinks[]        @relation("PageLinkFromPage")
+  pagelinksTo      pagelinks[]        @relation("PageLinkToPage")
 
   @@index([parentId], map: "parent_1")
   @@index([path], map: "path_1")

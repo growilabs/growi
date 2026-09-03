@@ -1,20 +1,7 @@
-import type { Document, Model, Types } from 'mongoose';
+import type { Types } from 'mongoose';
 
 export interface IPageLink {
   fromPage: Types.ObjectId;
   toPath: string;
   toPage: Types.ObjectId | null;
-}
-
-export interface PageLinkDocument extends IPageLink, Document {}
-export interface PageLinkModel extends Model<PageLinkDocument> {
-  replaceOutboundLinks(
-    fromPageId: Types.ObjectId,
-    resolvedRows: IPageLink[],
-  ): Promise<void>;
-  findBacklinkSources(toPageId: Types.ObjectId): Promise<Types.ObjectId[]>;
-  repointInboundLinks(
-    toPath: string,
-    toPage: Types.ObjectId | null,
-  ): Promise<void>;
 }
