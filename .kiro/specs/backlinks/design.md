@@ -14,8 +14,9 @@ before changing/renaming/deleting a page; spot their own broken outgoing links),
 feature introduces a new server-side directed **link graph** (`PageLink`), kept current through
 the existing page-lifecycle event bus and queried under the existing page-grant model. It adds
 storage, one service, one read endpoint, one panel, and a background backfill job; it changes no
-existing lifecycle, permission, or Markdown/wiki-link behavior. The `PageLink` indexes are created
-by Mongoose `autoIndex` at model registration (new collection — no migration needed).
+existing lifecycle, permission, or Markdown/wiki-link behavior. `pagelinks` is a **Prisma-only**
+collection, so its indexes are provisioned by a migrate-mongo index migration (there is no mongoose
+schema to build them on connect, and deploy never runs `prisma db push`).
 
 ### Goals
 
@@ -40,8 +41,9 @@ by Mongoose `autoIndex` at model registration (new collection — no migration n
     it is consistent with this non-goal.
 - A **blocking boot-time** backfill (a migrate-mongo data migration). Ruled out: it would take
   the wiki offline for the full backfill duration, which scales with page count and is
-  unacceptable for large instances. Index creation is not boot-blocking either — `autoIndex`
-  builds the indexes on a new, empty collection at model registration.
+  unacceptable for large instances. Index creation is not boot-blocking in practice either — the
+  index migration runs at boot but builds three indexes on a new, empty collection, which is
+  effectively instant; it is the *data* backfill that had to move off the boot path.
 - Indexing attachments or `/share/*` targets (only creatable GROWI pages are indexed).
 
 ## Boundary Commitments
@@ -56,8 +58,8 @@ by Mongoose `autoIndex` at model registration (new collection — no migration n
   following and direct `_id` resolution when `toPath` is a permalink.
 - Synchronization of `PageLink` rows in response to page-lifecycle events.
 - The one-time backfill: a background `CronService` job that populates rows for pre-existing pages
-  without taking the wiki offline. (The `PageLink` indexes themselves are created by `autoIndex`
-  at model registration, not by a migration.)
+  without taking the wiki offline. (The `pagelinks` indexes themselves come from the index
+  migration — cheap on an empty collection — not from this job.)
 - The read API + SWR hook + UI panel that present backlinks and forward-link health.
 
 ### Out of Boundary
@@ -178,7 +180,7 @@ graph TB
 | Frontend | React + SWR (existing) | Backlinks panel + data hook | New tab in `PageAccessoriesModal`; reuse `PageListItemS`/`PagePathLabel` |
 | Backend / Services | Express apiv3 + a new `PageLinkService` | Read endpoint + event listeners | Listener wired in `crowi` setup like `search.ts` |
 | Rendering | Existing unified remark/rehype plugins | Server-side link extraction | Node-compatible; trimmed processor (link plugins only) |
-| Data / Storage | MongoDB + Mongoose (existing) | `PageLink` collection + indexes | New model via `getOrCreateModel`; indexes built by `autoIndex` at model registration (new collection — no migration) |
+| Data / Storage | MongoDB via **Prisma** (`~/utils/prisma`) | `pagelinks` collection + indexes | Prisma-only collection: no mongoose schema, methods on a `Prisma.defineExtension` block; indexes provisioned by `migrations/20260901064500-add-indexes-to-pagelinks.js` (nothing runs `prisma db push`, so schema.prisma declares indexes but creates none) |
 | Messaging / Events | `crowi.events.page` (Node EventEmitter) | Sync triggers | Subscribe only |
 | Background job | `CronService` / node-cron (existing) | One-time backfill of pre-existing pages | Chunked + resumable + throttled; mirrors page-bulk-export job; admin Socket.IO progress |
 
@@ -193,10 +195,12 @@ not yet implemented and land with that story.
 apps/app/src/features/backlinks/
 ├── interfaces/
 │   ├── page-link.ts              # IPageLink + PageLinkDocument/PageLinkModel (statics declared as implemented)
-│   └── backlink.ts               # read DTOs: IBacklink, IBacklinkResponse (+ LinkTargetState B5.1, ILinkTarget B5.4)
+│   └── backlink.ts               # read DTOs: IBacklink, IBacklinkResponse (+ LinkTargetState B5.1, ILinkTarget B5.4, response.linkTargets B5.9)
 ├── server/
 │   ├── models/
-│   │   ├── page-link.ts          # Mongoose model (getOrCreateModel) + statics
+│   │   ├── page-link.ts          # Prisma extension (Prisma.defineExtension) — the pagelinks model methods
+│   │   ├── page-link-indexes.ts  # index declaration + ensurePageLinkIndexes (integ harness; production uses the migration)
+│   │   ├── throw-on-write-errors.ts    # $runCommandRaw replies carry writeErrors/writeConcernError inside ok:1 — throw on both
 │   │   └── page-link-backfill-job.ts   # (B3) Mongoose model: backfill progress marker + atomic claim (multi-instance)
 │   ├── services/
 │   │   ├── extract-internal-link-paths.ts  # pure: (markdown, pagePath, siteUrl?) => Promise<string[]> (resolved, deduped)
@@ -206,6 +210,8 @@ apps/app/src/features/backlinks/
 │   │   ├── page-link-upsert-queue.ts   # coalescing queue (Set<pageId> + duty-cycle paced drain) — requirement 3.5
 │   │   ├── upsert-queue-pacing.ts      # validates the configured pacing budget, per-value fallback to CONFIG_DEFINITIONS
 │   │   ├── find-backlinks.ts           # read query: backlink sources filtered by viewer grant
+│   │   ├── link-target-state.ts        # (B5.1) pure: (toPage, target status) => LinkTargetState
+│   │   ├── find-forward-link-health.ts # (B5.4) read query: a page's trashed/broken outbound targets, viewer-filtered
 │   │   ├── page-link-service.ts        # thin Crowi adapter: subscribes to crowi.events.page, owns config access, delegates
 │   │   └── page-link-backfill-cron.ts  # (B3) CronService: chunked, resumable, throttled backfill (in-memory path->id map)
 │   └── routes/
@@ -217,13 +223,19 @@ apps/app/src/features/backlinks/
         ├── BacklinksPanel.tsx          # incoming list + empty state (+ forward-health section — B5.6)
         └── BacklinkListItem.tsx        # one row (title + path + target-state badge — badge B5.5)
 
-# No migration file: PageLink indexes are created by Mongoose autoIndex at model
-# registration (new collection); the backfill is the cron job above.
+# Migration: apps/app/src/migrations/20260901064500-add-indexes-to-pagelinks.js provisions
+# the three pagelinks indexes. Required because pagelinks is a prisma-only collection — no
+# mongoose schema builds them on connect, and deploy never runs `prisma db push`. The
+# migration deliberately repeats the list in page-link-indexes.ts rather than importing it
+# (a migration is an immutable snapshot); the two are kept in step by the index-inventory
+# assertion in page-link-read-perf.integ.ts. The backfill remains the online cron job
+# above, not a migration.
 ```
 
 > **Outgoing-health types are declared by B5, not up front.** `interfaces/backlink.ts` holds only
 > `IBacklink` / `IBacklinkResponse` today; the `LinkTargetState` union arrives with its derivation
-> helper in **B5.1** and the `ILinkTarget` DTO with the forward-health read in **B5.4**. The target
+> helper in **B5.1**, the `ILinkTarget` DTO with the forward-health read in **B5.4**, and
+> `IBacklinkResponse.linkTargets` with the endpoint/hook wiring in **B5.9**. The target
 > shapes below (§ Data Models) are unchanged — only *when* they are declared moved. (The original plan
 > declared both in B1.1; B1 shipped without them, and keeping a type in the same change as its only
 > producer is the better trade than a type with no consumer.)
@@ -332,7 +344,7 @@ needs no write — derived state reads the restored page's status.
 | 3.3 | Deleted page not an active source | reconcile (permanent: remove rows; trashed: filtered at read) | Delete flow |
 | 3.4 | <~1s at ≥100k pages | indexes `{toPage}`, unique `{fromPage, toPath}` | — |
 | 3.5 | Bound extraction impact under save bursts | PageLinkService coalescing queue (`Set<pageId>` + paced drain) | Save flow |
-| 4.1 | One-time backfill | PageLinkBackfillCron (indexes via `autoIndex` at model registration) | Backfill flow |
+| 4.1 | One-time backfill | PageLinkBackfillCron (indexes via the `pagelinks` index migration) | Backfill flow |
 | 4.2 | Backfilled == post-enablement | backfill reuses `extractInternalLinkPaths`; emits same rows as the live path | Backfill flow |
 | 4.3 | Re-run / restart produces no duplicates | unique `{fromPage,toPath}` + upsert; resumable progress marker | Backfill flow |
 | 5.1 | Links survive rename/move | resolveToPageIds redirect-following + `_id`-stable cache | Reconcile notes |
@@ -342,18 +354,18 @@ needs no write — derived state reads the restored page's status.
 | 6.1 | Soft-delete target → trashed | derived state from target status | Delete flow |
 | 6.2 | Permanent-delete target → broken | reconcile nulls inbound `toPage` | Delete flow |
 | 6.3 | Restore → normal | derived state (no write) | Delete flow |
-| 6.4 | Indicate trashed/deleted target on viewed page | forward-health read (fromPage=X) + badge | Read flow |
+| 6.4 | Indicate trashed/deleted target on viewed page | forward-health read (fromPage=X) → `linkTargets` on the backlinks endpoint → `useSWRxBacklinks` → panel section + badge | Read flow |
 
 ## Components and Interfaces
 
 | Component | Layer | Intent | Req | Key Dependencies (P0/P1) | Contracts |
 |-----------|-------|--------|-----|--------------------------|-----------|
-| PageLink model | Data | Persist directed link edges | 1.5,3.x,4.3 | Mongoose, getOrCreateModel (P0) | State |
+| pagelinks (PageLink) model | Data | Persist directed link edges | 1.5,3.x,4.3 | Prisma client extension (P0), pagelinks index migration (P0) | State |
 | extractInternalLinkPaths | Server logic | Body+path+siteUrl → resolved internal paths | 1.2–1.6, 1.10, 1.11 | render plugins, isCreatablePage, normalizePath, isPermalink, app:siteUrl (P0) | Service |
 | resolveToPageIds | Server logic | paths → toPage ids, batched (incl. permalink by id) | 1.9, 5.x | Page.find by _id/path, PageRedirect.retrievePageRedirectEndpointsBatch, isPermalink (P0) | Service |
 | PageLinkService | Server service | Subscribe to events, sync index, query backlinks | 1.1,2.x,3.x,5,6 | events.page (P0), PageQueryBuilder.addViewerCondition (P0) | Service, Event |
-| getBacklinksHandlerFactory (routes/backlinks.ts) | API | Read endpoint | 1.1,1.7,2.x,6.4 | apiv3 middleware (P0), PageLinkService (P0) | API |
-| useSWRxBacklinks | Client store | Fetch backlinks | 1.1 | apiv3Get (P0) | Service |
+| getBacklinksHandlerFactory (routes/backlinks.ts) | API | Read endpoint — incoming backlinks **+ forward-link health** (B5.9) | 1.1,1.7,2.x,6.4 | apiv3 middleware (P0), PageLinkService (P0) | API |
+| useSWRxBacklinks | Client store | Fetch backlinks **+ link targets** (B5.9) | 1.1,6.4 | apiv3Get (P0) | Service |
 | BacklinksPanel / BacklinkListItem | UI | Render list, empty state, target-state badge | 1.1,1.7,1.8,6.4 | useSWRxBacklinks, PageListItemS (P1) | — |
 | PageLinkBackfillCron | Batch | Populate pre-existing pages (chunked, resumable, throttled, online) | 4.1,4.2,4.3 | CronService (P0), extractInternalLinkPaths (P0), Revision, in-memory path→id map (P0) | Batch, State |
 
@@ -377,7 +389,14 @@ needs no write — derived state reads the restored page's status.
 **Contracts**: State [x]
 
 ##### State Management
-- Schema (mirrors `PageTagRelation` conventions, `getOrCreateModel`):
+- **Prisma-only collection.** `pagelinks` is declared in `apps/app/prisma/schema.prisma` and its
+  model methods live in a `Prisma.defineExtension` block (`server/models/page-link.ts`) — there is no
+  mongoose schema and no `getOrCreateModel`. It joins the repo's prisma-only pattern
+  (`auditlog_es_sync_status`, `changestream_resume_tokens`) rather than the mongoose-schema-plus-
+  extension shape the `mongoose-to-prisma` skill produces for models that predate Prisma, because it
+  is greenfield and unshipped. No `__v`: nothing has ever written it through mongoose.
+- Row shape (`interfaces/page-link.ts`; `Types.ObjectId` is the id type the rest of the server passes
+  around, not a mongoose data-access dependency):
 ```typescript
 interface IPageLink {
   fromPage: ObjectId;        // ref Page, required
@@ -385,14 +404,25 @@ interface IPageLink {
   toPage: ObjectId | null;   // ref Page cache, default null
 }
 ```
-- Indexes: `{ fromPage: 1 }`, `{ toPath: 1 }`, `{ toPage: 1 }`, and unique `{ fromPage: 1, toPath: 1 }`.
-- Statics: `replaceOutboundLinks(fromPageId, resolvedRows)`, `findBacklinkSources(toPageId)`,
-  `reconcileDeletedPages(pageIds)`, `repointInboundLinks(toPath, toPage)`.
+- Indexes — **three**, provisioned by `migrations/20260901064500-add-indexes-to-pagelinks.js`
+  (`prisma db push` is never run, so schema.prisma's `@@index`/`@@unique` describe them but create
+  nothing): unique `fromPage_1_toPath_1`, `toPage_1`, `toPath_1`. There is deliberately **no
+  standalone `fromPage_1`** — `fromPage` is the compound's prefix, so every `fromPage`-only lookup
+  already rides it and a separate index would be dead weight. `fromPage_1_toPath_1` is a correctness
+  constraint, not tuning: `replaceOutboundLinks` upserts against that filter.
+- Model methods: `replaceOutboundLinks(fromPageId, resolvedRows)`, `findBacklinkSources(toPageId)`,
+  `repointInboundLinks(toPath, toPage)`, `reconcileDeletedPages(pageIds)` (B5.1).
+- **Raw-command rule.** Several of these use `client.$runCommandRaw` because Prisma's query API
+  cannot express what they need (no bulk-upsert API; `repointInboundLinks` needs a pipeline update).
+  MongoDB reports per-statement failures *inside* an `ok: 1` reply, so **every raw write passes its
+  reply through `throwOnWriteErrors`**, which throws on both `writeErrors` and `writeConcernError` —
+  parity with the `bulkWrite(..., { ordered: true })` these replaced, which threw on both. Do not add
+  try/catch at call sites; `PageLinkUpsertQueue` is the error boundary.
 - `repointInboundLinks` is the write half of re-resolve-by-path: it points the rows matching
   `toPath` at an already-resolved `toPage` (`null` = broken) and resolves nothing itself. The
   resolution lives in the `reResolveByToPath` **service** (page-link-sync), mirroring the
   `syncOutboundLinks` / `replaceOutboundLinks` split — so the derived `toPage` is always what the
-  shared resolver reports, never a value the caller supplies. The static **clears** the row whose own
+  shared resolver reports, never a value the caller supplies. The method **clears** the row whose own
   source is the target (a page is never its own backlink) rather than skipping it — skipping would
   preserve whatever page occupied the path when that source was last saved, leaving it listed as a
   backlink of a page its body no longer points to. The row itself is cleared, not deleted: row
@@ -403,10 +433,21 @@ interface IPageLink {
     row on the source's next save — so `findForwardLinkHealth` must not report it as broken (B5.4).
   - Both arguments are validated: `toPath` unless it is a non-empty string, `toPage` unless it is an
     ObjectId or null. Neither is protected downstream — `toPath` becomes a query filter where an
-    operator object would match every row, and `toPage` goes into an aggregation pipeline, which
-    mongoose does not cast, so an expression object there would be evaluated into the column.
+    operator object would match every row, and `toPage` goes into an aggregation pipeline, which is
+    not type-checked, so an expression object there would be evaluated into the column. (The
+    validation matters *more* under Prisma than it did under mongoose: this is a `$runCommandRaw`
+    pipeline update, so nothing casts either argument on the way to the server.)
   - The two writes are one pipeline update, so a row is never momentarily its own backlink and a
     failure cannot leave it that way.
+- `reconcileDeletedPages` (B5.1) is **two writes, not one**: delete the gone pages' outbound rows
+  (`fromPage $in ids`) and null every inbound cache pointing at them (`toPage $in ids` →
+  `toPage: null`). Neither half needs a pipeline update, so unlike `repointInboundLinks` both are
+  expressible through the Prisma query API (`deleteMany` / `updateMany`) — prefer that, and reach for
+  `$runCommandRaw` + `throwOnWriteErrors` only if a raw command turns out to be needed. No new index:
+  both filters ride existing indexes (`fromPage_1_toPath_1` by prefix, `toPage_1`). Not a
+  transaction: the index is a derived cache, the two halves are independently idempotent, and staying
+  single-command-per-write keeps the collection standalone-MongoDB compatible (the same trade
+  `replaceOutboundLinks` documents).
 
 #### extractInternalLinkPaths
 
@@ -603,6 +644,28 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTa
     private paths to anyone who can read the linking page. Resolution itself is grant-blind by
     design (it must match what a click does, and the live path lookup was always grant-blind), so
     the filter belongs on this read path, not in `resolveToPageIds`.
+  - **One query does both jobs.** Deriving `trashed` needs the target page's `status`, and the leak
+    fix needs the target pages run through the grant filter — that is the *same* set of documents, so
+    it is a single `Page` query, not a grant query plus a status round trip. Shape: the non-null
+    `toPage` ids → `PageQueryBuilder(Page.find({ _id: { $in: targetIds } }))` →
+    `addViewerCondition(user)` → `.select('_id path status')`, then derive each row's state from the
+    returned document. `broken` rows (`toPage == null`) are settled with no lookup at all.
+  - **It cannot reuse `buildVisibleSourcesQuery`.** That builder calls
+    `addConditionToExcludeTrashed()`, and trashed targets are exactly what this read reports — so
+    forward-health needs its own sibling builder that applies the grant condition **only**, and
+    selects `status` (which the backlinks read does not need). Deriving state in the same query is
+    what makes the difference load-bearing rather than incidental.
+  - **`path` is asymmetric by construction.** For a `trashed` (or `normal`) row it is the target
+    page's *current* `path` from that query; for a `broken` row there is no page, so it is the row's
+    own `toPath` — faithful to what the body actually links to. That is also why a broken row leaks
+    nothing: `toPath` is text the linking page's own author wrote.
+  - **A non-null `toPage` absent from the query result is omitted**, not reported as broken: "the
+    viewer may not read it" and "the document is gone" are indistinguishable from the result set, and
+    reporting the latter would leak the former's existence. A genuinely permanently-deleted target
+    becomes `broken` because the delete-family reconcile (B5.2) nulls the inbound cache.
+  - A **self row** (`fromPage == toPage`'s page, cleared to `null` by `repointInboundLinks`) also
+    reads as `broken` although its path resolves. It is transient and must **not** be reported — see
+    the `repointInboundLinks` note under § PageLink model.
 
 **Implementation Notes**
 - Integration: register in `crowi` page-service setup; never edit `PageService`.
@@ -626,20 +689,35 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTa
 ##### API Contract
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| GET | `/_api/v3/page/backlinks` | query: `pageId` (MongoId) | `{ backlinks: IBacklink[] }` | 400, 403, 500 |
+| GET | `/_api/v3/page/backlinks` | query: `pageId` (MongoId) | `{ backlinks: IBacklink[], linkTargets: ILinkTarget[] }` | 400, 403, 500 |
 
 - Middleware: `accessTokenParser([SCOPE.READ.FEATURES.PAGE])`, `loginRequired` (guest per ACL),
-  `apiV3FormValidator`; `req.user` is the viewer. Delegates to `PageLinkService.findBacklinks`.
+  `apiV3FormValidator`; `req.user` is the viewer. Delegates to `PageLinkService.findBacklinks` and
+  (B5.9) `PageLinkService.findForwardLinkHealth`.
 - Response carries only filtered pages (no count derived from unfiltered set) → 2.2.
+- **Forward-link health rides this endpoint rather than a second one** (B5.9). It is keyed on the
+  same `pageId`, has the same viewer and the same 403 semantics, and `BacklinksPanel` renders both
+  sections at once — a separate route would mean a second round trip on every panel open, a second
+  hook, and a second registration in `apiv3/index.js`, for no independent cacheability. The two
+  reads are issued concurrently (`Promise.all`) so the added field costs no extra latency; each
+  applies its own filter (sources for `backlinks`, targets for `linkTargets`).
 
 ### Client
 
 #### useSWRxBacklinks (summary)
 ```typescript
-useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklink[]>;
+// B5.9 widens the payload from IBacklink[] to the whole response, so the panel can read
+// both sections from one fetch. Today (B1) it resolves to r.data.backlinks.
+useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3[]>;
 ```
-- Key `['/page/backlinks', pageId, isGuestUser]`; fetch via `apiv3Get(...).then(r => r.data.backlinks)`.
-  `useSWRImmutable`; key `null` when `pageId == null`.
+- Key `['/page/backlinks', pageId, isGuestUser]`; fetch via `apiv3Get<IBacklinkResponse>(...)`.
+  Key `null` when `pageId == null`. Errors are `IErrorV3[]`, not `Error` — `apiv3Request` rejects
+  with the apiv3 error array.
+- **Plain `useSWR`, not `useSWRImmutable`**: grants can change while `pageId` and the user stay the
+  same, so a reopened panel must revalidate rather than serve a stale cache for the session.
+- Widening the return type is a **breaking change for `BacklinksPanel`** (it currently receives the
+  array directly). That churn is deliberately placed in B5.9/B5.6, which are rewriting the panel
+  anyway — it is not an unplanned break of B1.11.
 
 #### BacklinksPanel / BacklinkListItem (summary)
 - New tab in `PageAccessoriesModal`. `BacklinksPanel` renders the incoming list (empty state per
@@ -654,9 +732,9 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklink[]>;
 > A data migration that parses every page body would therefore make the wiki **offline for the
 > full backfill duration** — minutes on small wikis, but tens of minutes to hours on large-plan
 > instances. So the heavy data part runs **online** as a throttled background job after boot.
-> Nothing schema-related blocks boot either: `PageLink` is a new collection, so its indexes
-> (`{toPage}`, unique `{fromPage,toPath}`) are created by Mongoose
-> `autoIndex` at model registration — no migration is involved. Backlinks are simply incomplete
+> Nothing schema-related blocks boot either: the index migration that provisions the three
+> `pagelinks` indexes (unique `fromPage_1_toPath_1`, `toPage_1`, `toPath_1`) builds them on a new,
+> empty collection, which is effectively instant. Backlinks are simply incomplete
 > for pre-existing pages until the job finishes (acceptable per 4.2, which only requires
 > completeness *after* the process completes); newly edited pages index immediately via the event
 > listener.
@@ -695,7 +773,11 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklink[]>;
 - Input per chunk: a cursor page-batch (`Page.find(...).cursor({ batch_size })` +
   `createBatchStream`); body via `Revision.findById(page.revision).body`.
 - Per page: `extractInternalLinkPaths(body, page.path, siteUrl)` → resolve each path via the in-memory
-  map (or, for a permalink path, via the id-existence set) → `bulkWrite` upserts (`ordered:false`).
+  map (or, for a permalink path, via the id-existence set) → batched upserts. **`pagelinks` is a
+  Prisma-only collection with no mongoose model, so there is no `Model.bulkWrite`**: the chunk write
+  is either repeated `replaceOutboundLinks` calls or a new batched model method on the extension —
+  and if it uses `$runCommandRaw`, its reply must go through `throwOnWriteErrors` like every other
+  raw write here. B3 decides which; `ordered: false` remains the intent for a chunk.
 - Idempotency: unique `{fromPage,toPath}` + upsert; safe to re-run and to resume mid-chunk (4.3).
 - Progress/observability: emit count/total over the existing admin Socket.IO channel (as the
   Elasticsearch reindex does).
@@ -718,7 +800,9 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklink[]>;
   across rename/move/restore), so they satisfy 5.4 with no reconciliation.
 
 ### Derived target state (not stored)
-_Declared in B5.1, alongside the derivation helper (see § File Structure Plan)._
+_Declared in B5.1, alongside the derivation helper — a pure `link-target-state.ts` on the **read**
+path, not in `page-link-sync`: nothing on the write path derives this, and B5.4 folds the derivation
+into the grant-filtered target query it already has to issue (see § File Structure Plan)._
 ```typescript
 type LinkTargetState = 'normal' | 'trashed' | 'broken';
 // broken  := toPage == null
@@ -736,9 +820,18 @@ interface IBacklink {
 // Outgoing link health (findForwardLinkHealth): a page the subject links out to, plus its state.
 // Declared in B5.4, alongside the read query that produces it.
 interface ILinkTarget {
-  pageId: string;
+  // null exactly when targetState is 'broken': a broken row is `toPage == null`, so there
+  // is no page id to report. Non-null for 'trashed' (and 'normal', which this read never
+  // returns). Making it required-string would be unsatisfiable for the broken case.
+  pageId: string | null;
+  // The target page's CURRENT path when it exists; the row's own `toPath` when broken.
   path: string;
   targetState: LinkTargetState; // required — a health row is meaningless without it
+}
+
+interface IBacklinkResponse {
+  backlinks: IBacklink[];
+  linkTargets: ILinkTarget[]; // B5.9 — trashed/broken outbound targets of the same page
 }
 ```
 
@@ -882,24 +975,30 @@ interface ILinkTarget {
 
 ## Migration Strategy
 
-No migration: `PageLink` indexes are created by Mongoose `autoIndex` at model registration (new,
-empty collection). The only bulk step is the online throttled backfill job after boot.
+One index migration, no data migration: `migrations/20260901064500-add-indexes-to-pagelinks.js`
+provisions the three `pagelinks` indexes at boot (instant on an empty collection); the only bulk step
+is the online throttled backfill job after boot.
 
-> **`autoIndex` creates, it never drops.** Removing an index from the schema (as B2.2 did for the
-> redundant `{fromPage}` and `{toPath}`) leaves `fromPage_1` / `toPath_1` in place on any collection
-> that was already created with them — so a dev or staging instance that ran an earlier build keeps
-> paying their write cost until the collection is dropped. Harmless while the feature is unreleased,
-> which is why no migration ships here; **once `PageLink` has shipped, an index removal needs a
-> migrate-mongo migration with an explicit `dropIndex`**, not just a schema edit.
+> **Why the indexes need a migration at all.** `pagelinks` is Prisma-only — no mongoose schema means
+> no `autoIndex` on connect, and nothing in this repo runs `prisma db push`, so schema.prisma's
+> `@@index`/`@@unique` declarations describe the indexes but create none. The migration is the only
+> thing that creates them in production. `server/models/page-link-indexes.ts` repeats the same list
+> for the integration harness (which skips migrations on the default in-memory MongoDB); the
+> index-inventory assertion in `page-link-read-perf.integ.ts` fails on any drift between the two.
+>
+> **Leftover indexes from earlier builds.** A dev or staging instance created under the pre-Prisma
+> mongoose schema may still carry the redundant standalone `fromPage_1` that B2.2 dropped from the
+> schema — `createIndex` adds, it never removes. Harmless while the feature is unreleased; **once
+> `pagelinks` has shipped, an index removal needs its own migration with an explicit `dropIndex`.**
 
 ```mermaid
 graph TB
-    Boot[boot: model registration] --> Idx[autoIndex creates PageLink indexes]
+    Boot[boot: migrate-mongo] --> Idx[index migration creates pagelinks indexes]
     Idx --> Serve[app serves traffic]
     Serve --> Claim{atomic claim job doc}
     Claim -- not claimed/complete --> Tick[cron tick: process one chunk]
     Tick --> Map[resolve via in-memory path to id map]
-    Map --> Bulk[bulkWrite upsert PageLink ordered false]
+    Map --> Bulk[batched upsert pagelinks unordered]
     Bulk --> Save[persist progress marker]
     Save --> Done{all pages processed}
     Done -- no --> Idle[idle until next tick throttle]
@@ -907,7 +1006,7 @@ graph TB
     Done -- yes --> Mark[mark job complete]
 ```
 
-- **No boot downtime**: `autoIndex` on the empty `PageLink` collection is effectively instant. The
+- **No boot downtime**: the index migration on the empty `pagelinks` collection is effectively instant. The
   wiki is online throughout the backfill; pre-existing backlinks fill in progressively.
 - **Estimated backfill wall-clock** (≈5 ms/page CPU; in-memory resolution): ~10 min/100k pages at
   full speed, scaled up by the inverse duty cycle (e.g. ~40 min/100k at 25% duty) and by average

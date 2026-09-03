@@ -56,6 +56,15 @@ extraction and resolution for all of them as one unit; there is no separable "na
     (implemented in B5) now, but do not implement them here
   - Done when the model registers, its indexes exist, and a unit test confirms the unique index
     rejects a duplicate `{fromPage, toPath}` insert
+  - **Superseded after this task shipped (do not act on the Mongoose text above).** `pagelinks` was
+    moved to a **Prisma-only** model — `Prisma.defineExtension` in `server/models/page-link.ts`, no
+    mongoose schema, no `getOrCreateModel`. Consequently the "no migrate-mongo migration is needed"
+    claim is now false: `prisma db push` is never run, so the indexes are provisioned by
+    `migrations/20260901064500-add-indexes-to-pagelinks.js`, and `server/models/page-link-indexes.ts`
+    repeats the list for the integ harness (which skips migrations on in-memory MongoDB). Three
+    indexes exist, not four — unique `fromPage_1_toPath_1`, `toPage_1`, `toPath_1`; there is no
+    standalone `fromPage_1` (the compound's prefix serves it). See design.md § PageLink model
+    (State Management) for the current contract, and B5.1 for what this means for reconcile
   - _Requirements: 1.5, 3.4_
   - _Depends: B1.1_
 
@@ -598,15 +607,38 @@ B3/B5.
 forward-link-health read, and the UI that surfaces it. Restore needs no write — derived state reads
 the restored page's status. Independent of B3/B4.
 
-- [ ] B5.1 Add the reconcile static and target-state derivation
-  - Implement the reconcile-deleted static on the model (signature declared in B1.2) and the
-    `LinkTargetState` derivation helper (`toPage == null` → `broken`; target trashed → `trashed`; else
-    `normal`) — state is derived, never stored
+> **B5.9 is numbered out of sequence on purpose.** It was added after B5.1–B5.8 were written, to fill
+> the API/hook gap between the B5.4 server read and the B5.6 panel, and is listed below in its
+> dependency position (after B5.4) rather than at the end. B5.5–B5.8 keep their numbers because
+> already-completed B1 tasks cross-reference them by number; renumbering would break those
+> references.
+
+- [ ] B5.1 Add the reconcile model method and target-state derivation
+  - **The model is Prisma, not Mongoose** (B1.2's text is superseded — see its note). So this is not
+    a mongoose static: `reconcileDeletedPages(pageIds)` becomes a method in the
+    `Prisma.defineExtension` block in `server/models/page-link.ts`, alongside
+    `replaceOutboundLinks` / `findBacklinkSources` / `repointInboundLinks`
+  - Two writes, one per direction: delete the gone pages' outbound rows (`fromPage $in ids`) and
+    null every inbound cache pointing at them (`toPage $in ids` → `toPage: null`). **No new index** —
+    both filters ride indexes that already exist via
+    `migrations/20260901064500-add-indexes-to-pagelinks.js` (`fromPage_1_toPath_1` by prefix,
+    `toPage_1`)
+  - Unlike `repointInboundLinks`, neither half needs a pipeline update, so both are expressible
+    through the Prisma query API (`deleteMany` / `updateMany`) — prefer that. **If you do reach for
+    `$runCommandRaw`, its reply must go through `throwOnWriteErrors`** like every other raw write in
+    this feature: MongoDB resolves a raw write `ok: 1` with the failures inside `writeErrors` /
+    `writeConcernError`, so a discarded reply loses them silently. Not a transaction (derived cache,
+    idempotent halves, standalone-MongoDB compatible — the trade `replaceOutboundLinks` documents)
+  - Implement the `LinkTargetState` derivation helper (`toPage == null` → `broken`; target trashed →
+    `trashed`; else `normal`) — state is derived, never stored. It lands in a pure
+    `server/services/link-target-state.ts` on the **read** path, not in `page-link-sync`: nothing on
+    the write path derives this, and B5.4 consumes it inside the target query it already issues
   - **Declare the `LinkTargetState` union here** (deferred from B1.1) in `interfaces/backlink.ts`, in the
     shape the design's § Data Models DTO section specifies
-  - Done when unit tests cover the three derived states from `toPage`/target status
+  - Done when unit tests cover the three derived states from `toPage`/target status, and a test shows
+    reconcile removes the outbound rows and nulls the inbound caches for a batch of page ids
   - _Requirements: 6.1, 6.2, 6.3_
-  - _Boundary: PageLink, page-link-sync, interfaces/backlink.ts_
+  - _Boundary: pagelinks Prisma extension (page-link.ts), link-target-state.ts, interfaces/backlink.ts_
   - _Depends: B1.2_
 
 - [ ] B5.2 Implement the reconcile-deleted sync operation
@@ -639,29 +671,74 @@ the restored page's status. Independent of B3/B4.
 
 - [ ] B5.4 Implement the forward-link-health read query
   - **Declare the `ILinkTarget` DTO here** (deferred from B1.1) in `interfaces/backlink.ts`, in the shape
-    the design's § Data Models DTO section specifies — `targetState` required
+    the design's § Data Models DTO section specifies — `targetState` required, **`pageId` nullable**
+    (`string | null`). A `broken` row *is* `toPage == null`, so there is no page id to report; the
+    original `pageId: string` was unsatisfiable for exactly the case this read exists to surface
   - Implement `findForwardLinkHealth` (a page's outbound rows whose derived target state is
-    trashed/broken, mapped to `ILinkTarget`); derive target state from `toPage`/target status rather
-    than a stored flag
+    trashed/broken, mapped to `ILinkTarget`) in a new `server/services/find-forward-link-health.ts`,
+    sibling to `find-backlinks.ts`; derive target state via B5.1's helper from `toPage`/target status
+    rather than a stored flag
   - **Filter the targets through the shared viewer/grant filter.** `ILinkTarget` returns the
     target's `path`, and B4.1 made resolution follow the rename chain, so a `toPage` can point at a
     page that has since moved somewhere the viewer cannot read. Without this filter the endpoint
     leaks private paths to anyone who can read the linking page. `findBacklinks`' filter is on the
     *source* pages and does not cover this
+  - **One query, not two round trips.** Deriving `trashed` needs the target's `status` and the leak
+    fix needs the targets grant-filtered — the same documents — so issue a single
+    `PageQueryBuilder(Page.find({ _id: { $in: targetIds } }))` + `addViewerCondition(user)` +
+    `.select('_id path status')` and derive from its result. `broken` rows need no lookup at all
+  - **Do not reuse `buildVisibleSourcesQuery`**: it calls `addConditionToExcludeTrashed()`, and
+    trashed targets are precisely what this read reports. Add a sibling builder that applies the
+    grant condition only and selects `status` too
+  - Two shape rules the mapping must follow: `path` is the **target page's current path** for a
+    trashed row but the row's **own `toPath`** for a broken one (no page exists; and `toPath` is text
+    the linking author wrote, so it leaks nothing); and a **non-null `toPage` missing from the query
+    result is omitted, never reported as broken** — "unreadable" and "gone" are indistinguishable
+    there, and a truly permanently-deleted target becomes broken via B5.2's reconcile instead
   - A row whose own source is the target caches `null` (B4.2 clears it so a stale target cannot
     survive as a phantom backlink), so it reads as `broken` although the path resolves. Do **not**
     report it as a broken link — it is transient and `dropSelfLinks` removes the row on the source's
     next save
   - Done when an integration test shows forward health reports trashed/broken targets with the correct
-    state, **and** that a target the viewer cannot read is omitted, **and** that a self row is not
+    state, that a broken row carries `pageId: null` and its `toPath` as `path`, **and** that a target
+    the viewer cannot read is omitted (distinct from a broken one), **and** that a self row is not
     reported as broken
   - _Requirements: 5.3, 6.1, 6.2, 6.3, 6.4, 2.1_
-  - _Boundary: PageLinkService, interfaces/backlink.ts_
+  - _Boundary: find-forward-link-health.ts, PageLinkService, interfaces/backlink.ts_
   - _Depends: B5.1, B1.7_
+
+- [ ] B5.9 Expose forward-link health over the API and the client hook
+  - **Closes the gap between B5.4 (server read) and B5.6 (panel).** B5.4 produces `ILinkTarget[]` and
+    B5.6 renders it, but nothing carried it across the wire: the B1 endpoint returns
+    `{ backlinks }` only and `useSWRxBacklinks` resolves to `IBacklink[]`. Without this task B5.6 has
+    no data source
+  - **Extend the existing `GET /_api/v3/page/backlinks`, do not add a second route.** Same `pageId`,
+    same viewer, same 403 semantics, and the panel renders both sections together — a separate route
+    would cost a second round trip per panel open, a second hook, and a second registration in
+    `apiv3/index.js`, with no independent cacheability. Add `linkTargets: ILinkTarget[]` to
+    `IBacklinkResponse` and have the handler call `findBacklinks` and `findForwardLinkHealth`
+    concurrently (`Promise.all`) so the added field costs no extra latency
+  - Widen `useSWRxBacklinks` to return `IBacklinkResponse` instead of `IBacklink[]` (keep the
+    existing key and plain `useSWR` — grants change under a stable key, so it must stay revalidating).
+    `BacklinksPanel.tsx` is the only production consumer (verified), so the breaking call-site change
+    is absorbed by B5.6; the hook's own `backlinks.spec.tsx` and `BacklinksPanel.spec.tsx` mock the
+    old return shape and are updated here
+  - No new route registration and no new requirement: 6.4 already requires surfacing the indicator,
+    and 1.1/2.1 already govern this endpoint
+  - Done when an integration/route test shows the endpoint returns both `backlinks` and `linkTargets`
+    for a readable page (with the same 400/403 behavior as before), a viewer who cannot read a target
+    sees it omitted from `linkTargets` while `backlinks` is unaffected, and the hook test shows the
+    response object is returned and revalidates on page-id change
+  - _Requirements: 1.1, 2.1, 6.4_
+  - _Boundary: getBacklinksHandlerFactory (routes/backlinks.ts), useSWRxBacklinks, interfaces/backlink.ts_
+  - _Depends: B5.4_
 
 - [ ] B5.5 Add the target-state badge to the list-item
   - Extend `BacklinkListItem` (from B1.10) with a trashed/broken target-state badge
-  - Done when the component shows the badge for trashed/broken targets and renders unchanged for normal ones
+  - A **broken** row has `pageId: null` (B5.4) — there is no page to navigate to, so render its `path`
+    as plain text rather than a link. Only trashed and normal rows stay clickable
+  - Done when the component shows the badge for trashed/broken targets, renders a broken row's path
+    unlinked, and renders unchanged for normal ones
   - _Requirements: 6.4_
   - _Boundary: BacklinkListItem_
   - _Depends: B1.10_
@@ -669,10 +746,13 @@ the restored page's status. Independent of B3/B4.
 - [ ] B5.6 Add the forward-health section to the panel
   - Extend `BacklinksPanel` (from B1.11) with the secondary "outgoing links needing attention" section
     that flags trashed/broken outgoing links from the forward-health read
+  - Reads `linkTargets` off the B5.9 hook payload. B5.9 widens the hook's return type from
+    `IBacklink[]` to the whole response, so the incoming-list call site changes here too — deliberate
+    churn placed in the task that is already rewriting this panel, not an unplanned break of B1.11
   - Done when the panel flags trashed/broken outgoing links; the incoming list and empty state are unchanged
   - _Requirements: 6.4_
   - _Boundary: BacklinksPanel_
-  - _Depends: B5.4, B5.5, B1.11_
+  - _Depends: B5.9, B5.5, B1.11_
 
 - [ ] B5.7 Subscribe the delete-family lifecycle events
   - Extend the B1.12 subscription with delete/deleteCompletely/syncDescendantsDelete → the B5.3 handlers
