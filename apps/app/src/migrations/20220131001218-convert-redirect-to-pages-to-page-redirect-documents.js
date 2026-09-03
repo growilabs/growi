@@ -27,6 +27,7 @@ export async function up(db) {
           document: {
             fromPath: page.path,
             toPath: page.redirectTo,
+            __v: 0,
           },
         },
       };
