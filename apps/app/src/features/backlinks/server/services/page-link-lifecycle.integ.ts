@@ -8,7 +8,14 @@ import type { PageDocument, PageModel } from '~/server/models/page';
 import PageRedirect from '~/server/models/page-redirect';
 import { prisma } from '~/utils/prisma';
 
-import PageLink from '../models/page-link';
+import { ensurePageLinkIndexes } from '../models/page-link-indexes';
+
+// pagelinks is prisma-only, and the harness skips migrations on the in-memory MongoDB.
+beforeAll(async () => {
+  const db = mongoose.connection.db;
+  if (db == null) throw new Error('no mongoose connection');
+  await ensurePageLinkIndexes(db);
+});
 
 /*
  * B1.15 — Integration tests for the B1 slice.
@@ -90,10 +97,11 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
   };
 
   const outboundRows = (fromPage: Types.ObjectId) =>
-    PageLink.find({ fromPage })
-      .select('toPath toPage -_id')
-      .sort({ toPath: 1 })
-      .lean();
+    prisma.pagelinks.findMany({
+      where: { fromPageId: fromPage.toString() },
+      select: { toPath: true, toPageId: true },
+      orderBy: { toPath: 'asc' },
+    });
 
   // The service handles create/update asynchronously (fire-and-forget from the
   // emitter's view). Poll the outbound-row count — the observable write-path
@@ -104,7 +112,11 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
   ): Promise<void> =>
     vi.waitFor(
       async () => {
-        expect(await PageLink.countDocuments({ fromPage })).toBe(count);
+        expect(
+          await prisma.pagelinks.count({
+            where: { fromPageId: fromPage.toString() },
+          }),
+        ).toBe(count);
       },
       { timeout: 15000, interval: 100 },
     );
@@ -143,7 +155,9 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     const seededPaths = new RegExp(`^(/trash)?${PREFIX}/`);
     const pages = await Page.find({ path: seededPaths }).select('_id');
     const ids = pages.map((p) => p._id);
-    await PageLink.deleteMany({ fromPage: { $in: ids } });
+    await prisma.pagelinks.deleteMany({
+      where: { fromPageId: { in: ids.map((id) => id.toString()) } },
+    });
     await prisma.revisions.deleteMany({
       where: { pageId: { in: ids.map((id) => id.toString()) } },
     });
@@ -253,7 +267,7 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     // The repeated link collapses to a single outbound row.
     await waitForOutboundCount(source._id, 1);
     expect(await outboundRows(source._id)).toEqual([
-      { toPath: target.path, toPage: target._id },
+      { toPath: target.path, toPageId: target._id.toString() },
     ]);
 
     // And the read lists the source exactly once.
@@ -310,7 +324,7 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
 
     // Only the non-self link remains as an outbound row.
     expect(await outboundRows(selfLinker._id)).toEqual([
-      { toPath: other.path, toPage: other._id },
+      { toPath: other.path, toPageId: other._id.toString() },
     ]);
 
     // The page is not a backlink of itself.
@@ -353,8 +367,8 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
 
     // toPath still mirrors the body; toPage followed the rename.
     expect(await outboundRows(source._id)).toEqual([
-      { toPath: oldPath, toPage: target._id },
-      { toPath: witness.path, toPage: witness._id },
+      { toPath: oldPath, toPageId: target._id.toString() },
+      { toPath: witness.path, toPageId: witness._id.toString() },
     ]);
 
     // What the user sees: the renamed target still lists the source.

@@ -1,14 +1,32 @@
 import { Types } from 'mongoose';
+import { mockDeep } from 'vitest-mock-extended';
+
+import PageRedirect from '~/server/models/page-redirect';
+import type { PrismaClient } from '~/utils/prisma';
 
 import type { IPageLink } from '../../interfaces/page-link';
-// vi.mock is hoisted above these imports, so PageLink is the mocked default export.
-import PageLink from '../models/page-link';
-import { dropSelfLinks, syncOutboundLinks } from './page-link-sync';
+import {
+  dropSelfLinks,
+  reResolveByToPath,
+  syncOutboundLinks,
+} from './page-link-sync';
+import { resolveToPageIds } from './target-page-resolution';
 
-vi.mock('../models/page-link', () => ({
-  default: {
-    replaceOutboundLinks: vi.fn(),
+const mockPrisma = mockDeep<PrismaClient>();
+
+vi.mock('~/utils/prisma', () => ({
+  get prisma() {
+    return mockPrisma;
   },
+}));
+
+vi.mock('./target-page-resolution', () => ({
+  resolveToPageIds: vi.fn(),
+  REDIRECT_CHAIN_MAX_DEPTH: 50,
+}));
+
+vi.mock('~/server/models/page-redirect', () => ({
+  default: { retrieveFromPathsRedirectingTo: vi.fn() },
 }));
 
 const row = (toPage: Types.ObjectId | null, toPath = '/target'): IPageLink => ({
@@ -96,11 +114,11 @@ describe('syncOutboundLinks', () => {
 
     await syncOutboundLinks(fromPageId, [other, self, broken]);
 
-    expect(PageLink.replaceOutboundLinks).toHaveBeenCalledTimes(1);
-    expect(PageLink.replaceOutboundLinks).toHaveBeenCalledWith(fromPageId, [
-      other,
-      broken,
-    ]);
+    expect(mockPrisma.pagelinks.replaceOutboundLinks).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.pagelinks.replaceOutboundLinks).toHaveBeenCalledWith(
+      fromPageId,
+      [other, broken],
+    );
   });
 
   it('still calls replaceOutboundLinks with [] when every row is a self-link (clears stale rows)', async () => {
@@ -109,6 +127,93 @@ describe('syncOutboundLinks', () => {
 
     await syncOutboundLinks(fromPageId, [self]);
 
-    expect(PageLink.replaceOutboundLinks).toHaveBeenCalledWith(fromPageId, []);
+    expect(mockPrisma.pagelinks.replaceOutboundLinks).toHaveBeenCalledWith(
+      fromPageId,
+      [],
+    );
+  });
+});
+
+describe('reResolveByToPath', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(PageRedirect.retrieveFromPathsRedirectingTo).mockResolvedValue(
+      [],
+    );
+  });
+
+  it('repoints the path at the page the resolver reports for it', async () => {
+    const occupant = new Types.ObjectId();
+    // Two entries, so reading the wrong key fails instead of passing by luck.
+    vi.mocked(resolveToPageIds).mockResolvedValue(
+      new Map([
+        ['/other', new Types.ObjectId()],
+        ['/target', occupant],
+      ]),
+    );
+
+    await reResolveByToPath('/target');
+
+    // Pin the path handed to the resolver: without this, resolving the wrong
+    // path still reads '/target' out of the stubbed map and passes.
+    expect(resolveToPageIds).toHaveBeenCalledWith(['/target']);
+    expect(mockPrisma.pagelinks.repointInboundLinks).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.pagelinks.repointInboundLinks).toHaveBeenCalledWith(
+      '/target',
+      occupant,
+    );
+  });
+
+  it('repoints to null when nothing resolves at the path (rows become broken)', async () => {
+    // The resolver omits unresolvable inputs; an absent key must become a null
+    // write, not a skipped one.
+    vi.mocked(resolveToPageIds).mockResolvedValue(new Map());
+
+    await reResolveByToPath('/target');
+
+    expect(resolveToPageIds).toHaveBeenCalledWith(['/target']);
+    expect(mockPrisma.pagelinks.repointInboundLinks).toHaveBeenCalledWith(
+      '/target',
+      null,
+    );
+  });
+
+  it('resolves and writes the paths that redirect here, not just the path itself', async () => {
+    const occupant = new Types.ObjectId();
+    const elsewhere = new Types.ObjectId();
+    vi.mocked(PageRedirect.retrieveFromPathsRedirectingTo).mockResolvedValue([
+      '/old',
+      '/older',
+    ]);
+    // '/older' resolves elsewhere: a redirect reaching '/target' does not make the
+    // target the answer, so each candidate carries the resolver's own verdict.
+    vi.mocked(resolveToPageIds).mockResolvedValue(
+      new Map([
+        ['/target', occupant],
+        ['/old', occupant],
+        ['/older', elsewhere],
+      ]),
+    );
+
+    await reResolveByToPath('/target');
+
+    expect(resolveToPageIds).toHaveBeenCalledWith([
+      '/target',
+      '/old',
+      '/older',
+    ]);
+    expect(mockPrisma.pagelinks.repointInboundLinks).toHaveBeenCalledTimes(3);
+    expect(mockPrisma.pagelinks.repointInboundLinks).toHaveBeenCalledWith(
+      '/target',
+      occupant,
+    );
+    expect(mockPrisma.pagelinks.repointInboundLinks).toHaveBeenCalledWith(
+      '/old',
+      occupant,
+    );
+    expect(mockPrisma.pagelinks.repointInboundLinks).toHaveBeenCalledWith(
+      '/older',
+      elsewhere,
+    );
   });
 });

@@ -1,16 +1,24 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 
 import type { PageModel } from '~/server/models/page';
 import PageModelFactory from '~/server/models/page';
 import { prisma } from '~/utils/prisma';
 
-import PageLink from '../models/page-link';
+import { ensurePageLinkIndexes } from '../models/page-link-indexes';
 import { handlePageUpsertById } from './page-link-service-handlers';
+
+// pagelinks is prisma-only, and the harness skips migrations on the in-memory MongoDB.
+beforeAll(async () => {
+  const db = mongoose.connection.db;
+  if (db == null) throw new Error('no mongoose connection');
+  await ensurePageLinkIndexes(db);
+});
 
 // resolveToPageIds has its own coverage (target-page-resolution.spec.ts); mock it so this test
 // isolates the handler's contract against the real PageLink collection.
 const mocks = vi.hoisted(() => ({ resolveToPageIds: vi.fn() }));
-vi.mock('./target-page-resolution', () => ({
+vi.mock('./target-page-resolution', async (importOriginal) => ({
+  ...(await importOriginal()),
   resolveToPageIds: mocks.resolveToPageIds,
 }));
 
@@ -23,6 +31,7 @@ describe('handlePageUpsertById (integration)', () => {
   const siteUrl = 'https://wiki.example';
   const idByPath = new Map<string, Types.ObjectId>();
   const createdPageIds: Types.ObjectId[] = [];
+  const createdLinkIds: string[] = [];
 
   let Page: PageModel;
 
@@ -33,12 +42,20 @@ describe('handlePageUpsertById (integration)', () => {
   });
 
   afterEach(async () => {
-    await PageLink.deleteMany({ fromPage: { $in: createdPageIds } });
+    await prisma.pagelinks.deleteMany({
+      where: {
+        OR: [
+          { fromPageId: { in: createdPageIds.map((id) => id.toString()) } },
+          { id: { in: createdLinkIds } },
+        ],
+      },
+    });
     await Page.deleteMany({ _id: { $in: createdPageIds } });
     await prisma.revisions.deleteMany({
       where: { pageId: { in: createdPageIds.map((id) => id.toString()) } },
     });
     createdPageIds.length = 0;
+    createdLinkIds.length = 0;
   });
 
   beforeEach(() => {
@@ -81,10 +98,35 @@ describe('handlePageUpsertById (integration)', () => {
   };
 
   const outboundRowsOf = (pageId: Types.ObjectId) =>
-    PageLink.find({ fromPage: pageId })
-      .select('toPath toPage -_id')
-      .sort({ toPath: 1 })
-      .lean();
+    prisma.pagelinks.findMany({
+      where: { fromPageId: pageId.toString() },
+      select: { toPath: true, toPageId: true },
+      orderBy: { toPath: 'asc' },
+    });
+
+  // Stands in for a row some other, unrelated page already owns because it linked to this
+  // path before (or instead of) the page under test existing there.
+  const createInboundLink = async (
+    fromPage: Types.ObjectId,
+    toPath: string,
+    toPage: Types.ObjectId | null,
+  ): Promise<void> => {
+    const link = await prisma.pagelinks.create({
+      data: {
+        fromPageId: fromPage.toString(),
+        toPath,
+        toPageId: toPage?.toString() ?? null,
+      },
+    });
+    createdLinkIds.push(link.id);
+  };
+
+  const inboundRowsAt = (toPath: string) =>
+    prisma.pagelinks.findMany({
+      where: { toPath },
+      select: { fromPageId: true, toPageId: true },
+      orderBy: { fromPageId: 'asc' },
+    });
 
   it('records internal links from path links and same-wiki absolute URLs', async () => {
     const docsId = new Types.ObjectId();
@@ -100,8 +142,8 @@ describe('handlePageUpsertById (integration)', () => {
     await handlePageUpsertById(pageId.toString(), siteUrl);
 
     expect(await outboundRowsOf(pageId)).toEqual([
-      { toPath: '/company/deals', toPage: dealsId },
-      { toPath: '/docs/target', toPage: docsId },
+      { toPath: '/company/deals', toPageId: dealsId.toString() },
+      { toPath: '/docs/target', toPageId: docsId.toString() },
     ]);
   });
 
@@ -119,7 +161,7 @@ describe('handlePageUpsertById (integration)', () => {
     // The different-host URL is dropped: the full-set assertion fails if it is
     // recorded at all, with either an id or a null target.
     expect(await outboundRowsOf(pageId)).toEqual([
-      { toPath: '/company/deals', toPage: dealsId },
+      { toPath: '/company/deals', toPageId: dealsId.toString() },
     ]);
   });
 
@@ -135,7 +177,7 @@ describe('handlePageUpsertById (integration)', () => {
     await handlePageUpsertById(pageId.toString(), siteUrl);
 
     expect(await outboundRowsOf(pageId)).toEqual([
-      { toPath: '/other', toPage: otherId },
+      { toPath: '/other', toPageId: otherId.toString() },
     ]);
   });
 
@@ -151,7 +193,7 @@ describe('handlePageUpsertById (integration)', () => {
     await handlePageUpsertById(pageId.toString(), siteUrl);
 
     expect(await outboundRowsOf(pageId)).toEqual([
-      { toPath: '/b', toPage: bId },
+      { toPath: '/b', toPageId: bId.toString() },
     ]);
   });
 
@@ -169,8 +211,8 @@ describe('handlePageUpsertById (integration)', () => {
     await handlePageUpsertById(pageId.toString(), siteUrl);
 
     expect(await outboundRowsOf(pageId)).toEqual([
-      { toPath: '/a', toPage: aId },
-      { toPath: '/c', toPage: cId },
+      { toPath: '/a', toPageId: aId.toString() },
+      { toPath: '/c', toPageId: cId.toString() },
     ]);
   });
 
@@ -213,7 +255,11 @@ describe('handlePageUpsertById (integration)', () => {
     const extractionMs = await handlePageUpsertById(goneId.toString(), siteUrl);
 
     // A stale queue entry for a deleted source must not leave orphan rows behind.
-    expect(await PageLink.find({ fromPage: goneId }).lean()).toEqual([]);
+    expect(
+      await prisma.pagelinks.findMany({
+        where: { fromPageId: goneId.toString() },
+      }),
+    ).toEqual([]);
     // Nothing extracted, so no rest is owed.
     expect(extractionMs).toBe(0);
   });
@@ -247,7 +293,58 @@ describe('handlePageUpsertById (integration)', () => {
     await handlePageUpsertById(pageId.toString(), siteUrl);
 
     expect(await outboundRowsOf(pageId)).toEqual([
-      { toPath: '/a', toPage: targetId },
+      { toPath: '/a', toPageId: targetId.toString() },
+    ]);
+  });
+
+  // B4.3 — creating (or re-saving) a page must also re-resolve inbound rows recorded
+  // against its own path, not only sync its own outbound rows.
+  it('repoints an inbound row that referenced this page before it existed', async () => {
+    const inboundSource = new Types.ObjectId();
+    const targetPath = `${PREFIX}/re-resolve-target`;
+    await createInboundLink(inboundSource, targetPath, null);
+
+    const pageId = await createPage('/re-resolve-target', 'no links here');
+    // The mocked resolver stands in for the real one B4.1 exercises separately; it must report
+    // this page's id for its own path the same way a real lookup would.
+    idByPath.set(targetPath, pageId);
+    await handlePageUpsertById(pageId.toString(), siteUrl);
+
+    expect(await inboundRowsAt(targetPath)).toEqual([
+      { fromPageId: inboundSource.toString(), toPageId: pageId.toString() },
+    ]);
+  });
+
+  it('repoints an inbound row that still points at a since-gone prior occupant', async () => {
+    const inboundSource = new Types.ObjectId();
+    const priorOccupant = new Types.ObjectId();
+    const targetPath = `${PREFIX}/re-resolve-reused`;
+    // Not null — a stale (non-broken-looking) cached id, distinct from the "broken" case above.
+    await createInboundLink(inboundSource, targetPath, priorOccupant);
+
+    const pageId = await createPage('/re-resolve-reused', 'no links here');
+    idByPath.set(targetPath, pageId);
+    await handlePageUpsertById(pageId.toString(), siteUrl);
+
+    expect(await inboundRowsAt(targetPath)).toEqual([
+      { fromPageId: inboundSource.toString(), toPageId: pageId.toString() },
+    ]);
+  });
+
+  it('leaves inbound rows for other paths untouched', async () => {
+    const inboundSource = new Types.ObjectId();
+    const unrelatedPath = `${PREFIX}/unrelated`;
+    const unrelatedTarget = new Types.ObjectId();
+    await createInboundLink(inboundSource, unrelatedPath, unrelatedTarget);
+
+    const pageId = await createPage('/re-resolve-target-2', 'no links here');
+    await handlePageUpsertById(pageId.toString(), siteUrl);
+
+    expect(await inboundRowsAt(unrelatedPath)).toEqual([
+      {
+        fromPageId: inboundSource.toString(),
+        toPageId: unrelatedTarget.toString(),
+      },
     ]);
   });
 });

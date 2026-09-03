@@ -8,9 +8,17 @@ import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
+import { prisma } from '~/utils/prisma';
 
-import PageLink from '../models/page-link';
+import { ensurePageLinkIndexes } from '../models/page-link-indexes';
 import { PageLinkService } from './page-link-service';
+
+// pagelinks is prisma-only, and the harness skips migrations on the in-memory MongoDB.
+beforeAll(async () => {
+  const db = mongoose.connection.db;
+  if (db == null) throw new Error('no mongoose connection');
+  await ensurePageLinkIndexes(db);
+});
 
 /*
  * B1.7 — findBacklinks: permission-filtered backlinks read.
@@ -73,13 +81,15 @@ describe('PageLinkService.findBacklinks (integration)', () => {
     });
 
   const linkTo = (
-    source: PageDocument,
-    target: PageDocument,
+    source: HydratedDocument<PageDocument>,
+    target: HydratedDocument<PageDocument>,
   ): Promise<unknown> =>
-    PageLink.create({
-      fromPage: source._id,
-      toPath: target.path,
-      toPage: target._id,
+    prisma.pagelinks.create({
+      data: {
+        fromPageId: source._id.toString(),
+        toPath: target.path,
+        toPageId: target._id.toString(),
+      },
     });
 
   // --- lifecycle ---------------------------------------------------------
@@ -133,7 +143,9 @@ describe('PageLinkService.findBacklinks (integration)', () => {
       path: new RegExp(`^${PREFIX}/`),
     }).select('_id');
     const ids = pages.map((p) => p._id);
-    await PageLink.deleteMany({ fromPage: { $in: ids } });
+    await prisma.pagelinks.deleteMany({
+      where: { fromPageId: { in: ids.map((id) => id.toString()) } },
+    });
     await Page.deleteMany({ path: new RegExp(`^${PREFIX}/`) });
   });
 

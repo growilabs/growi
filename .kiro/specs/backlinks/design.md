@@ -233,7 +233,9 @@ apps/app/src/features/backlinks/
   (subscribe to events) in the page-service setup phase, mirroring `search.ts`; **(B3)** also register
   the backfill `CronService` (mirroring the page-bulk-export job-cron registration).
 - `apps/app/src/server/routes/apiv3/index.js` — register the backlinks route.
-- `apps/app/src/server/models/page-redirect.ts` — add the `retrievePageRedirectEndpointsBatch`
+- `apps/app/src/server/models/page-redirect.ts` — add `retrieveFromPathsRedirectingTo` (the reverse
+  walk: which paths reach a given one) and re-implement `removePageRedirectsByToPath` over it, so
+  that pipeline exists once as well. Add the `retrievePageRedirectEndpointsBatch`
   static (`$match: { fromPath: { $in } }` + the existing `$graphLookup`) and re-implement
   `retrievePageRedirectEndpoints` as a lookup over it. Adding it to the model rather than to this
   feature keeps one copy of the pipeline; the singular contract is unchanged for
@@ -385,7 +387,26 @@ interface IPageLink {
 ```
 - Indexes: `{ fromPage: 1 }`, `{ toPath: 1 }`, `{ toPage: 1 }`, and unique `{ fromPage: 1, toPath: 1 }`.
 - Statics: `replaceOutboundLinks(fromPageId, resolvedRows)`, `findBacklinkSources(toPageId)`,
-  `reconcileDeletedPages(pageIds)`, `reResolveByToPath(path)`.
+  `reconcileDeletedPages(pageIds)`, `repointInboundLinks(toPath, toPage)`.
+- `repointInboundLinks` is the write half of re-resolve-by-path: it points the rows matching
+  `toPath` at an already-resolved `toPage` (`null` = broken) and resolves nothing itself. The
+  resolution lives in the `reResolveByToPath` **service** (page-link-sync), mirroring the
+  `syncOutboundLinks` / `replaceOutboundLinks` split — so the derived `toPage` is always what the
+  shared resolver reports, never a value the caller supplies. The static **clears** the row whose own
+  source is the target (a page is never its own backlink) rather than skipping it — skipping would
+  preserve whatever page occupied the path when that source was last saved, leaving it listed as a
+  backlink of a page its body no longer points to. The row itself is cleared, not deleted: row
+  existence stays owned by `replaceOutboundLinks`, and `dropSelfLinks` removes it on the source's
+  next save.
+  - A self row therefore reads as `broken` under the derived target state below (`broken :=
+    toPage == null`), even though the path resolves. It is transient — `dropSelfLinks` removes the
+    row on the source's next save — so `findForwardLinkHealth` must not report it as broken (B5.4).
+  - Both arguments are validated: `toPath` unless it is a non-empty string, `toPage` unless it is an
+    ObjectId or null. Neither is protected downstream — `toPath` becomes a query filter where an
+    operator object would match every row, and `toPage` goes into an aggregation pipeline, which
+    mongoose does not cast, so an expression object there would be evaluated into the column.
+  - The two writes are one pipeline update, so a row is never momentarily its own backlink and a
+    failure cannot leave it that way.
 
 #### extractInternalLinkPaths
 
@@ -524,10 +545,12 @@ function resolveToPageIds(paths: string[]): Promise<Map<string, ObjectId>>;
 - Subscribed events (wired in `crowi` setup like `search.ts`):
   - `create (page, user)` → extract `page.revision.body` → `syncOutboundLinks` →
     `reResolveByToPath(page.path)` (correct stale caches from a prior occupant — match on
-    `toPath`, not `toPage:null`).
+    `toPath`, not `toPage:null`; and on every path whose redirect chain reaches it, since those
+    rows resolve here too).
   - `update (page, user)` → re-extract → `syncOutboundLinks`.
-  - Note: handlers call the `syncOutboundLinks` **service** (drops self-links, then
-    persists), never the raw `PageLink.replaceOutboundLinks` model static directly.
+  - Note: handlers call the `syncOutboundLinks` / `reResolveByToPath` **services** (which drop
+    self-links and resolve the target, then persist), never the raw
+    `PageLink.replaceOutboundLinks` / `PageLink.repointInboundLinks` model statics directly.
   - `delete (targetPage, deletedPage, user)`, `deleteCompletely (page, user)`,
     `syncDescendantsDelete (pages[], user)` → `reconcileDeletedPages(ids)`.
 - Ordering/delivery: listeners run asynchronously after the lifecycle op (fire-and-forget, like
@@ -762,6 +785,13 @@ interface ILinkTarget {
   regression net for the shared pipeline, and one of them pins that page view stays uncapped.
 - `reconcileDeletedPages`: trashed page → no-op; permanently-gone page → outbound removed and
   inbound `toPage` nulled (3.3, 6.2).
+- `reResolveByToPath`: forwards the target the resolver reports for the path, and forwards `null`
+  when the path is absent from the map (so a row can return to broken); resolves and writes the
+  paths that redirect to it as well, each carrying the resolver's own verdict rather than the
+  target's (5.1, 5.2).
+- `retrieveFromPathsRedirectingTo`: every `fromPath` whose chain reaches the path at any depth,
+  unrelated redirects excluded, empty when none, and a given cap stops the walk while the default
+  reaches the chain's real start.
 
 ### Integration Tests
 - create/update events drive `PageLink` rows so a page's links appear as backlinks on targets,
@@ -772,6 +802,14 @@ interface ILinkTarget {
   (2.1–2.3); grant change flips visibility on the next read (2.4).
 - Rename/move: inbound links continue resolving to the page at its new path without index
   writes; descendant move behaves identically (5.1, 5.2).
+- `repointInboundLinks` write semantics, driven through `reResolveByToPath` against a real
+  collection (there is no unit spec: the observable contract is the resulting rows, and asserting
+  the `updateMany` filter instead would spy on the mechanism). Rows at the path are repointed
+  (stale non-null cache → new occupant, and `null` → healed), rows at other paths untouched, and
+  the row whose own source is the target is cleared while the rest of the path is still repointed
+  (1.6, 5.1, 5.2). A `toPath` that is not a non-empty string is refused without writing anything.
+- Re-resolve reaches rows that name a redirecting path, not only exact `toPath` matches: a page
+  created at a path that another path redirects to repoints those rows too (5.1, 5.2).
 - Trash → derived `trashed`; permanent delete → `broken`; restore → `normal` (6.1–6.3).
 - Backfill: rows produced for pre-existing pages match the live create/update path (4.2); running
   the job twice, or resuming after an interrupted chunk, produces no duplicate rows (4.3); the

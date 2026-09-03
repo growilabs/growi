@@ -27,6 +27,10 @@ export interface PageRedirectModel extends Model<PageRedirectDocument> {
     fromPaths: string[],
     maxDepth?: number,
   ): Promise<Map<string, IPageRedirectEndpoints>>;
+  retrieveFromPathsRedirectingTo(
+    toPath: string,
+    maxDepth?: number,
+  ): Promise<string[]>;
   removePageRedirectsByToPath(toPath: string): Promise<void>;
 }
 
@@ -142,10 +146,20 @@ schema.statics.retrievePageRedirectEndpoints = async function (
   return endpoint.get(fromPath) ?? null;
 };
 
-schema.statics.removePageRedirectsByToPath = async function (
+/**
+ * One reverse walk: every redirect whose chain reaches `toPath`, at any depth.
+ *
+ * The mirror of the `retrievePageRedirectEndpointsBatch` pipeline — that walks
+ * forward from a path to where its chain ends, this walks back from a path to
+ * everything that reaches it. Shared so the two callers below cannot drift, each
+ * projecting what it needs from the same documents.
+ */
+const aggregateRedirectsReaching = async (
+  model: PageRedirectModel,
   toPath: string,
-): Promise<void> {
-  const aggResult: IPageRedirectWithChains[] = await this.aggregate([
+  maxDepth?: number,
+): Promise<IPageRedirectWithChains[]> =>
+  await model.aggregate([
     { $match: { toPath } },
     {
       $graphLookup: {
@@ -154,52 +168,54 @@ schema.statics.removePageRedirectsByToPath = async function (
         connectFromField: 'fromPath',
         connectToField: 'toPath',
         as: CHAINS_FIELD_NAME,
+        depthField: DEPTH_FIELD_NAME,
+        ...(maxDepth != null ? { maxDepth } : {}),
       },
     },
   ]);
-  /* ---------- aggResult example ----------
-  // 1
-  {
-    "_id" : ObjectId("62e565256134d37aa0935e80"),
-    "fromPath" : "/page3",
-    "toPath" : "/page4",
-    "chains" : [
-        {
-            "_id" : ObjectId("62e5651b6134d37aa0935e7a"),
-            "fromPath" : "/page2",
-            "toPath" : "/page3",
-            "depth" : NumberLong(0)
-        },
-        {
-            "_id" : ObjectId("62e5650d6134d37aa0935e6d"),
-            "fromPath" : "/page1",
-            "toPath" : "/page2",
-            "depth" : NumberLong(1)
-        }
-    ]
-  }
-  // 2
-  {
-    "_id" : ObjectId("62e5937a6134d37aa0936405"),
-    "fromPath" : "/org/page4",
-    "toPath" : "/page4",
-    "chains" : []
-  }
-  */
 
+/**
+ * Resolves every `fromPath` whose redirect chain reaches `toPath`.
+ *
+ * The result is **candidates only** — a longer chain can carry a candidate past
+ * `toPath`, so only the forward walk can say where one actually resolves.
+ *
+ * @param maxDepth - As on `retrievePageRedirectEndpointsBatch`: a cap the caller
+ *                   chooses, omitted to walk every chain to its real start.
+ */
+schema.statics.retrieveFromPathsRedirectingTo = async function (
+  toPath: string,
+  maxDepth?: number,
+): Promise<string[]> {
+  const aggResult = await aggregateRedirectsReaching(this, toPath, maxDepth);
+
+  return [
+    ...new Set(
+      aggResult.flatMap((redirectWithChains) => [
+        redirectWithChains.fromPath,
+        ...redirectWithChains[CHAINS_FIELD_NAME].map((doc) => doc.fromPath),
+      ]),
+    ),
+  ];
+};
+
+schema.statics.removePageRedirectsByToPath = async function (
+  toPath: string,
+): Promise<void> {
+  const aggResult = await aggregateRedirectsReaching(this, toPath);
   if (aggResult.length === 0) {
     return;
   }
 
-  const idsToRemove = aggResult.flatMap((redirectWithChains) => {
-    return [
-      redirectWithChains._id,
-      redirectWithChains[CHAINS_FIELD_NAME].map((doc) => doc._id),
-    ].flat();
-  });
+  // By `_id`, not `fromPath`: where the unique index build failed, two documents
+  // can share a `fromPath` while pointing at different targets, and only the one
+  // this walk reached should go.
+  const idsToRemove = aggResult.flatMap((redirectWithChains) => [
+    redirectWithChains._id,
+    ...redirectWithChains[CHAINS_FIELD_NAME].map((doc) => doc._id),
+  ]);
 
   await this.deleteMany({ _id: { $in: idsToRemove } });
-  return;
 };
 
 export default getOrCreateModel<PageRedirectDocument, PageRedirectModel>(
