@@ -127,7 +127,7 @@ apiv3に描画プロキシを新設。クライアントは図ソースをPOST�
 
 ## 設計への反映（実装時に確定させる細目）
 1. プロキシルートで **`loginRequiredFactory(crowi, true)`** を適用（Req 10.1）。
-2. ルートスコープの **`express.json({ limit: '<上限>' })`**（JSON `{source, darkMode}` 契約）で 413 を得る（Req 10.2）。グローバル 50mb はこの用途に過大なので必ずルート側で絞る。
+2. 本文サイズ超過の 413 は **ハンドラ内で `Content-Length` / パース後の `req.body` サイズを明示検査**して返す（Req 10.2）。⚠️ **ルートスコープの `express.json({ limit })` は効かない**: `express-init.js:116-117` のグローバル body parser（50mb）がルート到達前に本文を読み切っているため、ルート側で limit を絞っても 413 は発生しない（design.md の結論に統一）。
 3. レート制限は**グローバル適用で自動被覆**。必要なら `API_RATE_LIMIT_*` env でこのエンドポイントを厳格化（Req 10.2）。
 4. 上流呼び出しは `{ responseType: 'text', maxRedirects: 0, timeout }`（Req 9.3, 4.2, 10.2）。
 5. キャッシュキーは `createHash('sha256').update(source + darkMode).digest('hex')`（Req 5）。
@@ -163,12 +163,13 @@ Req 11（GET時・上限超過で、POST利用可能なら「自前サーバ＋P
 | Req | 必要な要素 | 既存/前提資産 | ギャップ |
 |---|---|---|---|
 | 11.1 | GET時・上限超過で「POSTで解決可」を案内 | large-diagram-get のエラーUI（`PlantUmlViewer`） | **Missing/Cross-spec**（エラーUIにPOST推奨行を追加） |
-| 11.1 | 「POST利用可能」の判定 | `plantumlHttpMethod` 伝播済み＋**Bのコード存在**そのものが“利用可能” | Low（`method==='get'` を Viewer に渡せば足る） |
-| 11.2 | POST未対応環境では出さない | B未マージ環境には本行のコードが無い＝自動的に非表示 | Low（コード存在で担保。実行時フラグ不要） |
+| 11.1 | 「URL長超過が疑わしい」の判定 | large-diagram-get の `consts.ts`（`PLANTUML_GET_URL_MAX_LENGTH`＋実測失敗点ベースの目安値 `PLANTUML_GET_URL_LIKELY_OVERSIZE_LENGTH`） | Low（`src.length` と2定数の比較） |
+| 11.2 | 「POST利用可能」の判定 | `plantumlUri` は `PlantUMLPluginParams` に伝播済み。公開 plantuml.com が POST 非対応であることは本 research で実測確認済み | **Missing**（送信先ホストを見る実行時判定 `isPlantumlPostCapableUri` を新設） |
+| 11.2 | POST未対応環境では出さない | ─（コード存在では担保できない） | **要注意**: 「Bのコード存在＝利用可能」は**誤り**。コードがマージされた GROWI.cloud 等では送信先が公開 plantuml.com のままで POST は原理的に使えず、常時表示＝実現不可能な対処の案内になる。**判定すべきは方式ではなく相手先**（`plantumlHttpMethod` で判定すると GET 時のみ表示する本メッセージが常に非表示になり 11.1 が死ぬ） |
 | 11.3 | i18n（5ロケール） | large-diagram-get と同じ locale 追加パターン | Low（B用キーを5ロケール追加） |
 
 ## 実装アプローチ（Extend・cross-spec 協調）
-- **推奨**: `plantuml.ts` の GET分岐で、Viewer に**送信方式（またはPOST可否）を `hProperties`（`data-*`）で渡す**（`sanitizeOption` に新属性追加）。`PlantUmlViewer` のエラーUI（large-diagram-get 実装）で **`method==='get'` の時だけ POST推奨行（`t()`）を追記**。
+- **推奨**: `plantuml.ts` の GET分岐で、Viewer に**送信方式と「POST可否（送信先由来）」を `hProperties`（`data-*`）で渡す**（`sanitizeOption` に新属性追加）。`PlantUmlViewer` のエラーUI（large-diagram-get 実装）で **`method==='get'` かつ POST可否=true かつ URL長超過が疑わしい時だけ POST推奨行（`t()`）を追記**。POST可否は `isPlantumlPostCapableUri(plantumlUri)`（空/解析不能・`plantuml.com` ドメイン → false）で remark 側が評価する。
 - POST推奨の文言キーは **B が5ロケールへ追加**（large-diagram-get の汎用文言とは別キー）。
 
 ## ⚠️ クロススペック依存（設計/実装で必ず扱う）
@@ -177,6 +178,7 @@ Req 11（GET時・上限超過で、POST利用可能なら「自前サーバ＋P
 - 代替（結合回避）: B が独自のエラーUIを持つ案もあるが、UIが二重化し保守が増えるため**非推奨**。相乗り方式が単純。
 
 ## Research Needed（設計へ）
-1. Viewer への「送信方式/POST可否」受け渡し方（`data-*` hProperty か、renderer 経由 prop か）を確定。
+1. Viewer への「送信方式/POST可否」受け渡し方（`data-*` hProperty か、renderer 経由 prop か）を確定。→ **決定: `data-*` hProperty**（`plantumlUri` は既に remark プラグインへ伝播済みで、追加の設定伝播が不要なため）。
 2. large-diagram-get 側エラーUIの**拡張点**（POST行を差し込むための構造）を design で合意（両spec整合）。
 3. POST推奨文言（対処: 管理者が自前サーバ＋POSTを設定）と5ロケール。
+4. 「POST利用可能」の実行時判定条件。→ **決定: 送信先ホストで判定**（`isPlantumlPostCapableUri`）。空/解析不能・`plantuml.com` ドメインは false。方式（`plantumlHttpMethod`）やコード存在では判定しない。

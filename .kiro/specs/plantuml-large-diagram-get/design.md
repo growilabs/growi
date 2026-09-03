@@ -35,6 +35,7 @@
 
 ### Revalidation Triggers
 - `PlantUmlViewer` の props 追加（もしあれば）→ `renderer.tsx` のマッピング／`PlantUmlViewer.spec.tsx`。
+- **（クロススペック）別spec `plantuml-post-optin` が `PlantUmlViewerProps.src` を `string` → `src?: string` に緩める** → 本specのプリチェック（`src.length`）は `src != null`（＝GETモード）でのみ評価するガードが必須。
 - 閾値定数の配置・値変更 → 参照箇所。
 - テーマ資産から削除した要素に依存していた図の見た目（ダーク/ライト）→ 目視回帰。
 
@@ -84,13 +85,16 @@ graph TB
 ## File Structure Plan
 
 ### 変更ファイル
-- `features/plantuml/themes/carbon-gray-common.puml.ts` — **軽量化の主対象**。**主レバー＝ミニファイ**: 行頭 `'`／`''` の PlantUML コメント行・行頭空白・空行を除去する（`!$VAR = '...'` のように `'` が行頭でない行は文字列リテラルなので残す）。着色・skinparam・`<style>` 定義は**一切削除しない**ため、全図種の見た目（ライト/ダーク）が不変。⚠️ **副次レバー（任意）**: なお追加削減が要る場合に限り、非UML系 `<style>` 定義（board/gantt/json/mindmap/salt/wbs/wire/yaml）の削除を検討できるが、**それらの図種はダーク配色を `<style>` でしか着色できず、削除するとダークモードで判読不能になる**（グローバル `defaultFontColor` は無く背景は transparent）。採用するなら「ダーク既定色フォールバックを1行追加」等の緩和とセットにする。`sequenceDiagram`(:452-458) と `timingDiagram`(:608-627) はUML図なので**常に残す**。
+- `features/plantuml/themes/carbon-gray-common.puml.ts` — **軽量化の主対象**。**主レバー＝ミニファイ**: 行頭 `'`／`''` の PlantUML コメント行・行頭空白・空行を除去する（`!$VAR = '...'` のように `'` が行頭でない行は文字列リテラルなので残す）。
+  - ⚠️ **削除ではなく「退避」が必要なコメントがある**: PlantUML コメントの中には、単なる説明ではなく**実装上のWHY（回避策・既知issue参照）**を記録したものが混ざっている。代表例が `ParticipantPadding`/`Padding` に関する注記（現行 `:45-49`）── 「これらを `skinparam` として宣言しないのは、宣言すると PlantUML が全図に "Please use CSS style instead of skinparam <name>" 警告を焼き込むため（#11258）。`ParticipantPadding` は下の `sequenceDiagram <style>` ルールで代替し、汎用 `Padding` は動作するCSS等価物が無い（plantuml/plantuml#2622）ため捨てている」という**消すと再発する類の知識**である。関連して `sequenceDiagram`(:448-449) の `Padding`/`Margin` 注記も同種。
+  - **方針**: この種のコメントはミニファイで**消してよいが、消す前に TypeScript コメントへ退避**する。テーマ資産は `const style = \`…\`; export default style;` という単一テンプレートリテラルであり、リテラル内部に TS コメントは書けないため、**ファイル先頭（リテラル外）の TSDoc ブロックに「テーマ不変条件」節としてまとめて移す**。これでソース上のWHYは保全され、**エンコード後ペイロードには一切載らない**（＝削減効果はそのまま）。
+  - **判定基準**: 「なぜこの定義がこう書かれているか／なぜこれを書かないか」を説明するコメントは退避対象。「何をしているか」を反復するだけのコメント（`' Colors` 等）は単に削除してよい。着色・skinparam・`<style>` 定義は**一切削除しない**ため、全図種の見た目（ライト/ダーク）が不変。⚠️ **副次レバー（任意）**: なお追加削減が要る場合に限り、非UML系 `<style>` 定義（board/gantt/json/mindmap/salt/wbs/wire/yaml）の削除を検討できるが、**それらの図種はダーク配色を `<style>` でしか着色できず、削除するとダークモードで判読不能になる**（グローバル `defaultFontColor` は無く背景は transparent）。採用するなら「ダーク既定色フォールバックを1行追加」等の緩和とセットにする。`sequenceDiagram`(:452-458) と `timingDiagram`(:608-627) はUML図なので**常に残す**。
 - `features/plantuml/themes/carbon-gray-light.puml.ts` / `carbon-gray-dark.puml.ts` — 同様にミニファイ。参照されていないパレット階調があれば整理してよいが（`$GRAY/$LIGHT/$DARK/$PRIMARY` 等の実使用分は残す＝ダークモード維持）、削減の主因はミニファイである。
 - `features/plantuml/components/PlantUmlViewer.tsx` — (1) `src.length > 閾値` のプリチェックで画像を出さずエラーUIへ、(2) `onError` を `handleLoaded` から分離し `useState` のエラーフラグ→エラーUI、(3) `useTranslation` でメッセージ、(4) `loggerFactory` で warn、(5) 成功/失敗/超過いずれも `GROWI_IS_CONTENT_RENDERING_ATTR` を `'false'` に遷移。
 - `apps/app/public/static/locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/translation.json` — エラーメッセージ用キーを5ロケール追加。
 
 ### 新規ファイル
-- `features/plantuml/consts.ts` — `PLANTUML_GET_URL_MAX_LENGTH`（固定・安全側の閾値）を定義（単一の出所）。
+- `features/plantuml/consts.ts` — 2定数を定義（単一の出所）: `PLANTUML_GET_URL_MAX_LENGTH`（**ブロック用**・固定・安全側の高い値）と `PLANTUML_GET_URL_LIKELY_OVERSIZE_LENGTH`（**文言選択用**の目安値・実測失敗点ベース≈8,000字。ブロックには使わない）。後者は別spec `plantuml-post-optin` の Req 11 からも参照される。
 
 > エラーUIは当面 `PlantUmlViewer.tsx` 内のプレースホルダ要素として実装（小規模）。肥大化する場合のみ小コンポーネントへ抽出。`plantuml.ts` は変更しない（テーマは中身のみ縮小、判定はViewer側）。
 
@@ -124,7 +128,7 @@ flowchart TD
 | 7.3 | console警告 | PlantUmlViewer, logger | error |
 | 7.4 | 他の図/本文を妨げない | PlantUmlViewer（図単位） | — |
 | 7.5 | メッセージのi18n(5ロケール) | locales | — |
-| 8.1/8.2 | 閾値=固定・安全側（onErrorが真判定） | consts, PlantUmlViewer | threshold |
+| 8.1/8.2 | 閾値=固定・安全側（onErrorが真判定）。ブロック閾値と文言用の目安値を分離 | consts, PlantUmlViewer | threshold |
 
 ## Components and Interfaces
 
@@ -145,18 +149,35 @@ flowchart TD
 **Implementation Notes**
 - Integration: `plantuml.ts` の import は不変。中身のみ縮小。
 - Validation: 削減後にライト/ダークで**全図種**（UML主要図種＋ミニファイでも残る非UML図種）の見た目回帰を目視確認。
-- Risks: ミニファイで `'` コメントと文字列リテラルを取り違えない（行頭判定）。副次レバー（非UML削除）を採る場合のみ当該図種の既定色化リスクがある。
+- Risks: ミニファイで `'` コメントと文字列リテラルを取り違えない（行頭判定）。**WHYコメント（`ParticipantPadding`/`Padding` の #11258・plantuml#2622 注記など）を退避せずに消すと、後任が「なぜ skinparam で書かないのか」を失って警告付きテーマへ戻してしまう**（退避先＝ファイル先頭の TSDoc）。副次レバー（非UML削除）を採る場合のみ当該図種の既定色化リスクがある。
 
 ### url-length threshold const — 新規
 ```typescript
 // features/plantuml/consts.ts
-export const PLANTUML_GET_URL_MAX_LENGTH: number; // 固定・極端に高い保険値。真の判定は onError。
+
+// (1) ブロック閾値: 固定・極端に高い保険値。真の判定は onError。
+export const PLANTUML_GET_URL_MAX_LENGTH: number;
+
+// (2) 目安値（ブロックしない）: 実測失敗点ベース。onError の原因が
+//     「URL長超過らしい」かを文言選択のためだけに判断する。
+export const PLANTUML_GET_URL_LIKELY_OVERSIZE_LENGTH: number;
 ```
-- 値は**どのGET環境でもまず通らない極端に大きい値**に置く（例: 16,000〜32,000字級）。⚠️ 8KB(8192)程度に下げると、**上限を上げた自前GETサーバでは正常な図を誤ブロック**し得るため不可（Req 8.2）。プリチェックは「明らかに巨大なURLの無駄リクエスト回避」に限り、**実際の失敗は onError が捕捉**（Req 6.1）。設定化はしない（Req 8.1）。
+
+**2つの定数を分ける理由（役割が違う）**:
+
+| 定数 | 値の水準 | 何をするか | 誤りのコスト |
+|---|---|---|---|
+| `PLANTUML_GET_URL_MAX_LENGTH` | 極端に高い（例 16,000〜32,000字級） | **リクエストをブロック**する | 誤検知＝**描画できる図が出なくなる**（重い）→ 安全側に高く |
+| `PLANTUML_GET_URL_LIKELY_OVERSIZE_LENGTH` | 実測失敗点ベース（**約8,000字**。Tomcat 既定 `maxHttpHeaderSize`=8192）。⚠️ 根拠となる実測値は spec 内で2つあり、**同じ指標かが未確定**: requirements.md「テーマ有り約8,014字→**400**」と design.md「フルURL **8,318**→6,882字」。前者は 414 ではなく 400 で、送信先/測定対象（エンコード部分長か全URL長か）が異なる可能性がある。**実装時に task 2.2 の実測で `src.length` 基準の失敗点を1つに確定させ、この定数値を最終決定する** | **既に失敗した後の文言を選ぶ**だけ | 誤りは**文言のニュアンスがずれる**のみ（軽い）→ 実測値に置ける |
+
+- ブロック閾値を実測失敗点（約8,000字）まで下げてはならない: **上限を上げた自前GETサーバでは正常な図を誤ブロック**する（Req 8.2）。プリチェックは「明らかに巨大なURLの無駄リクエスト回避」に限り、**実際の失敗は onError が捕捉**（Req 6.1）。設定化はしない（Req 8.1）。
+- ⚠️ **その結果、既定構成（公開plantuml.com / Tomcat 8192）で実際に起きる失敗は、ほぼすべて onError 経路を通る**（プリチェックはまず発火しない）。これは設計どおり ── プリチェックは保険であり、`oversize-precheck` 文言は「桁違いに巨大な図」専用の稀な経路である。実務上の主経路は `render-failed-generic`（ヘッジ文言）であり、その中で **`src.length >= PLANTUML_GET_URL_LIKELY_OVERSIZE_LENGTH` なら「URL長超過の可能性が高い」寄りのニュアンス**を選ぶ（Req 7.1-b。判定＝ブロックには使わない）。
+- 目安値は別spec `plantuml-post-optin` の Req 11（POST推奨メッセージの表示条件）からも参照される。**単一の出所は本specの `consts.ts`**（post-optin は import して使う）。
 
 ### PlantUmlViewer（拡張）— 変更
 **Responsibilities & Constraints**
 - props は現行の `src` を維持。内部で `src.length > PLANTUML_GET_URL_MAX_LENGTH` を判定（再エンコード不要）。
+- ⚠️ **クロススペック注記（`src` の任意化）**: 本spec単体では `src: string`（必須）のままでよいが、別spec `plantuml-post-optin` はPOSTモードで URL を組み立てないため `src` を付与せず、**`PlantUmlViewerProps.src` を `src?: string` へ広げる**（型変更の所有は post-optin 側）。そのため本specのプリチェックは、**post-optin がマージされた時点で `method==='get'` かつ `src != null` のガード下でのみ評価される**必要がある（さもないと POSTモードで `undefined.length` により実行時エラー）。本specの実装時点では、プリチェックを**「`src` が存在する場合のみ評価する」形（`src != null && src.length > 閾値`）で書いておく**と、後続の型緩和を無改修で受けられる。
 - 分岐: 超過 or `onError` → **エラーUI**（`t()` メッセージ＋対処）＋ `logger.warn`。正常 → `<img>`。
 - いずれの分岐でも `GROWI_IS_CONTENT_RENDERING_ATTR` を `'false'` に遷移（Req 6/8、auto-scroll非退行）。
 - 各Viewerは独立（1つの失敗が他の図・本文を妨げない、Req 7.4）。
@@ -171,7 +192,7 @@ export const PLANTUML_GET_URL_MAX_LENGTH: number; // 固定・極端に高い保
 ### oversize error message（i18n）— 変更
 - 5ロケール（en/ja/fr/ko/zh）の `translation.json` に**2種のメッセージキー**を追加する:
   - `oversize-precheck`: プリチェックで固定閾値を超えた場合（画像リクエスト前）。**「URL長上限により表示できない可能性が高い」**と断定寄りの文言（Req 7.1）。
-  - `render-failed-generic`: `<img>` の onError による失敗。クライアントは `<img>` のHTTPステータスを読めないため原因を断定できない。**「表示できない（原因: URL長上限の可能性・図の構文エラー・PlantUMLサーバ未到達 のいずれか）」**とヘッジする（Req 7.1-b）。`src.length` を目安に文言のニュアンスを選んでよいが判定には用いない。
+  - `render-failed-generic`: `<img>` の onError による失敗。クライアントは `<img>` のHTTPステータスを読めないため原因を断定できない。**「表示できない（原因: URL長上限の可能性・図の構文エラー・PlantUMLサーバ未到達 のいずれか）」**とヘッジする（Req 7.1-b）。`src.length >= PLANTUML_GET_URL_LIKELY_OVERSIZE_LENGTH`（実測失敗点ベースの目安値）なら「URL長上限の可能性が高い」寄りのニュアンスを選んでよいが、**ブロック判定には用いない**。既定構成の失敗はほぼこの経路を通る（プリチェックは桁違いに巨大な図専用の保険）。
 - いずれも**汎用の対処（図の分割・簡略化）**を併記（Req 7.2）。
 - **POST/自前サーバの推奨は本specに含めない**。POST推奨メッセージは別spec `plantuml-post-optin` が（POST利用可能な文脈で）担う。→ 本specは spec間の出荷順に依存しない。
 - 技術的原因（URL長超過の可能性）は console 警告（Req 7.3）側に出す。
@@ -185,6 +206,7 @@ export const PLANTUML_GET_URL_MAX_LENGTH: number; // 固定・極端に高い保
 
 ### Unit / Component
 - `plantuml.spec.ts`: 軽量化後テーマが**ミニファイされている**（行頭 `'` コメント行・空行が消え、`!$VAR = '...'` 等の文字列リテラル行と着色/skinparam/`<style>` 定義は残存 ── 例として `mindmapDiagram` 等の非UML `<style>` も**残っている**）／テーマ前置後の**ソース長が縮小**していること（light/dark両方、`it.each`）。※副次レバー（非UML削除）を採用した場合のみ、当該ブロックの消失をあわせて検証する。
+  - **退避したWHYは失われていないこと**は、テーマ文字列ではなく**ソースファイルの TSDoc に対する目視/レビューで担保**する（文字列に残っていないことが正なので、テストで文字列を検索してはならない）。`skinparam ParticipantPadding` / `skinparam Padding` が**テーマ文字列に復活していない**ことは回帰テストで固定できる（復活＝全図に警告が焼き込まれる #11258 の再発）。
 - `PlantUmlViewer.spec.tsx`:
   - 正常: `fireEvent.load` → `<img>` 表示、status='false'（現行維持, 4.1）。
   - onError: `fireEvent.error` → **エラーUI表示**＋status='false'（6.1, 7）。※現行はstatusのみ検証なので拡張。

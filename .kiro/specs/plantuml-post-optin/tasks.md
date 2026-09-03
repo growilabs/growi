@@ -16,8 +16,10 @@
 
 - [ ] 1.3 クライアント/サーバ共有の型・定数
   - 送信方式型、エンドポイントパス、本文サイズ上限・上流タイムアウトの定数を、両側から import できる形で定義する
-  - client/server 双方から解決できることを確認する
-  - _Requirements: 2.1, 10.2_
+  - **`isPlantumlPostCapableUri(plantumlUri: string): boolean`** を同ファイルに追加する（Req 11.2 の送信先判定）。空文字／URL解析不能 → `false`、ホスト名が `plantuml.com` または `*.plantuml.com`（既定値 `https://www.plantuml.com/plantuml` を含む）→ `false`、それ以外 → `true`
+  - ⚠️ ホスト名は**完全一致 or `.plantuml.com` サフィックス**で判定する（`example.com/plantuml.com-ish` のような部分一致で誤判定しないこと）
+  - client/server 双方から解決できること、上記の境界を `it.each` の unit で確認する
+  - _Requirements: 2.1, 10.2, 11.2_
 
 - [ ] 2. Core: サーバ側描画プロキシ
 - [ ] 2.1 (P) SVGキャッシュ
@@ -29,6 +31,8 @@
 
 - [ ] 2.2 (P) render-plantuml サービス
   - darkMode に応じテーマ（`themes/*.puml.ts` をサーバ import）を前置し、送信先を `plantumlUri` に固定して生テキストを上流へ POST する（responseType text, `maxRedirects: 0`, timeout）
+  - **`plantumlUri` が空文字/未設定なら上流へ送らず設定エラーで失敗**させる（プロキシは 502 で応答し、logger に「PLANTUML_URI 未設定」を記録）。⚠️ GET経路には既に `plantuml.ts:43` の `plantumlUri.length === 0` 早期returnがある。POST経路に同等ガードが無いと `urljoin('', '/svg')` が `'svg'`（先頭スラッシュ無しの相対パス）を返し、baseURL の無いサーバ側 axios で不正URLの実行時エラーになる（本当の原因＝未設定が伝わらない）
+  - 空 `plantumlUri` で上流が呼ばれず設定エラーになることを unit で観測する
   - **上流ステータスの class を保存して例外化**する（#5）: 上流4xxは `ClientDiagramError`（図ソース/構文エラー。`X-PlantUML-Diagram-Error` を保持可）、上流3xx（誤設定）/5xx（上流失敗）とタイムアウトは別クラス
   - 上流200でSVGを返し、上流400が `ClientDiagramError`・302/5xx/タイムアウトが別クラスで例外になることを観測する
   - _Requirements: 2.2, 2.3, 4.2, 6.3, 7.1, 7.2, 9.1, 9.3, 10.2_
@@ -54,8 +58,9 @@
 
 - [ ] 3.2 (P) remarkプラグインのGET/POST出力分岐
   - GET時は現行通り（テーマ前置＋encoded `src`）。POST時はテーマ非前置の生ソース＋darkMode属性を出力し `src` を付けない
+  - **`plantumlUri` 未設定時のガードをPOST分岐にも適用**する: GET分岐と同様、`plantumlUri.length === 0` なら `<plantuml>` 要素自体を生成しない（生成すると Viewer が未設定サーバ向けに無駄な POST を投げ 502 になるだけ）
   - `sanitizeOption` に POST用の新属性を許可する
-  - get=encoded src が不変、post=source属性かつsrc無し を観測する
+  - get=encoded src が不変、post=source属性かつsrc無し、**`plantumlUri: ''` では GET/POST いずれも要素を生成しない** を観測する
   - _Requirements: 1.2, 3.1_
   - _Boundary: plantuml.ts remark_
   - _Depends: 1.2_
@@ -67,11 +72,14 @@
   - _Boundary: locales_
 
 - [ ] 3.4 PlantUmlViewerのGET/POST描画分岐
+  - **props 型を緩める**: `PlantUmlViewerProps.src` を `string` → **`src?: string`（任意）** にし、送信方式（`method`）を必須プロパティとして受ける（POSTでは URL を組み立てないため `src` を渡さない）
+  - ⚠️ **large-diagram-get が実装した GET側プリチェック（`src.length > PLANTUML_GET_URL_MAX_LENGTH`）を `method==='get'` かつ `src != null` でガード**する。ガードが無いと POSTモードで `undefined.length` により実行時エラーになる
   - GETは現行の `<img src>` を維持。POSTは取得Blobから **mount単位の objectURL** を生成して `<img src>` に設定、`onLoad` で完了・`onError` でエラー状態、rendering-status属性を維持、**unmount で自身のURLのみ revoke**（メモ保持のBlobは revoke しない）。共有リンク文脈では `fetchPlantumlSvg(source, darkMode, { pageId, shareLinkId })` に id を渡す（#2）
+  - **エディタのライブプレビュー対策（POST固有）**: POST取得を **mount/ソース変更後の短いデバウンス（目安 300〜500ms）で開始**し、その間にアンマウント/ソース変更が起きたら `ctx.signal`（`AbortSignal`）で中断する。プレビューは debounce 100ms/throttle 150ms で再レンダリングする（`PageEditor.tsx:198-205`）ため、対策が無いと**打鍵中の中間ソースごとに** プロキシPOST＋上流描画＋サーバLRUエントリが発生し、二度と使われないゴミが有用なキャッシュを追い出す
   - **`fetchPlantumlSvg` が reject した場合（`<img>` 非生成で onLoad/onError 非発火）も `GROWI_IS_CONTENT_RENDERING_ATTR` を `'false'` へ遷移**させる（再スクロール暴走防止、#6/Req 8.2）
   - **POST失敗の文言を method＋プロキシHTTPステータス（413/422/502/504/ネットワーク reject）で分岐**し、GET向けの「URL長・分割」文言は出さない（#3-b/Req 6.3。文言・i18nは本specが所有。3.3のキーを使用）
   - 各Viewerが独立に描画・失敗すること
-  - post描画/失敗時エラー/**reject時に status='false'**/**method別の失敗文言**/**再mountで壊れない**/get不変 を観測する
+  - post描画/失敗時エラー/**reject時に status='false'**/**method別の失敗文言**/**再mountで壊れない**/get不変/**POSTモードで `src` 無しでも実行時エラーにならない**/**連続ソース変化でデバウンス期間内の中間ソースでは fetch されない・unmount で abort される** を観測する
   - _Requirements: 3.1, 4.1, 6.1, 6.2, 6.3, 8.1, 8.2_
   - _Boundary: PlantUmlViewer_
   - _Depends: 3.1, 3.2, 3.3_
@@ -92,7 +100,7 @@
   - _Depends: 2.3_
 
 - [ ] 5.2 (P) クライアント単体/コンポーネントテスト
-  - plantuml.spec（get/post分岐・sanitizeOption）、PlantUmlViewer.spec（post描画/エラー/**reject時status='false'**（#6）/**method別の失敗文言**（#3-b）/**再mount非破壊**/get不変）、fetch-plantuml-svg のメモ重複排除＋**max超過で最古追い出し**（#9）
+  - plantuml.spec（get/post分岐・sanitizeOption・**`plantumlUri: ''` で要素非生成**）、PlantUmlViewer.spec（post描画/エラー/**reject時status='false'**（#6）/**method別の失敗文言**（#3-b）/**再mount非破壊**/get不変/**POSTで `src` 無しでも壊れない**/**プレビュー連打時のデバウンス＋abort**）、fetch-plantuml-svg のメモ重複排除＋**max超過で最古追い出し**（#9）、**`isPlantumlPostCapableUri` の境界（空/解析不能/`plantuml.com`/`*.plantuml.com` → false、自前ホスト → true、部分一致で誤判定しない）**
   - （※ `PageContentRenderer` モック・config key スナップショットの更新はタスク1.2が所有。本タスクは新規テストケース追加に限定）
   - 上記が緑になることを観測する
   - _Requirements: 1.1, 1.2, 3.1, 4.1, 5.1, 6.1, 6.2, 6.3, 8.1, 8.2_
@@ -101,19 +109,25 @@
 
 - [ ] 5.3 手動E2E
   - 自前 plantuml-server ＋ `PLANTUML_HTTP_METHOD=post` で、GETでは414になる大きい図がリネームなしで描画されること、ライト/ダークでテーマ反映を確認する
-  - puppeteer 経由エクスポートでのPOST描画の可否を確認し、限界を文書化する
+  - ⚠️ **SSR／PDF一括エクスポートは検証対象外**（GET/POST を問わず現状そもそも PlantUML 図が出ていないため、本specの前後で比較する対象が無い）:
+    - SSR: `generateSSRViewOptions`（`services/renderer/renderer.tsx:148-180`）は plantuml プラグインを登録しない（grep 0 hit）。SSR 時は `PageContentRenderer.tsx:26-27` がこれにフォールバックするため、図は hydration 後にクライアントレンダラが引き継いで初めて描画される
+    - PDF一括エクスポート: `plantuml` は `ADOPTED_PLUGINS` に無く（`plugin-set.ts:139-142` の除外理由コメント）、`bulk-export-markdown-renderer.spec.ts:162-166` が `<pre>`/`<code>` 出力を固定
+    - よって「POSTモード固有の限界」として書かない。将来 SSR/エクスポートへ載せる際は「GET は同期変換なので SSR 可能／POST は非同期取得なので不可」という構造的な差を扱う（renderer-convergence フェーズ）
+  - **プレビュー負荷の実測**: エディタで大きい図を1分間編集し、プロキシが受けたリクエスト数を計測する。デバウンス（3.4）の効きを確認し、採用値の根拠として残す
   - ⚠️ Changeset は作成しない（`@growi/app` は `.changeset/config.json` の `ignore` 対象かつ private。追加すると release PR パスが張り付き publish に到達しない。commit `1d0a0d9f7a` 参照。app のリリースノートは release-drafter が担う）
   - _Requirements: 2.1, 2.2, 7.1, 7.2, 9.1_
   - _Depends: 4.1_
 
 - [ ] 6. Req 11: 大きい図へのPOST推奨メッセージ（クロススペック相乗り）
   > ⚠️ 本グループは別spec `plantuml-large-diagram-get` の **GET時エラーUI（`PlantUmlViewer`）完了・マージ済み**が前提。実装/PRは **large-diagram-get 先 → 本グループ後（or 同時）**。
-- [ ] 6.1 送信方式（POST可否）判定属性を Viewer へ渡す
-  - `plantuml.ts` の GET分岐で `<plantuml>` に送信方式（または POST 可否）を `hProperties`（`data-*`）で付与し、`sanitizeOption` に許可を追加する
-  - GET時に当該属性が要素へ付与され、sanitize を通過することを確認する
-  - _Requirements: 11.1_
+- [ ] 6.1 送信方式＋POST可否（送信先由来）の判定属性を Viewer へ渡す
+  - `plantuml.ts` の GET分岐で `<plantuml>` に **送信方式** と **POST可否** を `hProperties`（`data-*`）で付与し、`sanitizeOption` に許可を追加する
+  - **POST可否は `isPlantumlPostCapableUri(plantumlUri)`（1.3）で実行時に評価**する。`plantumlUri` は既に `PlantUMLPluginParams` にあるため追加の設定伝播は不要
+  - ⚠️ **`plantumlHttpMethod` で「POST利用可能」を判定してはならない**: 本メッセージは `method==='get'` の時だけ出るため、方式で判定すると常に false になり Req 11.1 が死ぬ。判定すべきは方式ではなく**相手先**
+  - GET時に両属性が要素へ付与され sanitize を通過すること、`plantumlUri` が公開 plantuml.com なら POST可否=false、自前ホストなら true になることを確認する
+  - _Requirements: 11.1, 11.2_
   - _Boundary: plantuml.ts remark_
-  - _Depends: 3.2_
+  - _Depends: 1.3, 3.2_
 
 - [ ] 6.2 POST推奨メッセージの i18n キーを5ロケール追加
   - `locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/translation.json` に、汎用文言とは別の**POST推奨キー**を追加する
@@ -123,15 +137,19 @@
   - _Boundary: locales_
 
 - [ ] 6.3 エラーUIへ POST推奨行を相乗り
-  - `plantuml-large-diagram-get` が新設したエラーUI（`PlantUmlViewer`）に、**`method==='get'` かつ URL長超過が疑わしい時（プリチェック超過 or `src.length` が大）だけ** POST推奨行（`t()`）を追記する。**構文エラー/サーバ停止等（原因がURL長でない失敗）では出さない**（POSTでは解決せず誤誘導になるため。Req 11.1）
-  - GET＋URL長超過疑い時に推奨行が表示され、**POSTモード／上限内の onError（構文エラー・サーバ停止想定）では表示されない**ことを確認する（B未マージ環境＝行が無い＝Req 11.2 も自然充足）
+  - `plantuml-large-diagram-get` が新設したエラーUI（`PlantUmlViewer`）に、次の**3条件すべてを満たす時だけ** POST推奨行（`t()`）を追記する:
+    1. `method==='get'`
+    2. URL長超過が疑わしい ── プリチェック超過（`src.length > PLANTUML_GET_URL_MAX_LENGTH`）、または onError かつ `src.length >= PLANTUML_GET_URL_LIKELY_OVERSIZE_LENGTH`（large-diagram-get の `consts.ts` が所有）。**構文エラー/サーバ停止等（目安値未満の onError）では出さない**（POSTでは解決せず誤誘導になるため。Req 11.1）
+    3. **POST可否属性（6.1）が true** ── 送信先が公開 plantuml.com のままの環境（GROWI.cloud 等、自前サーバを立てられない環境）では**実現できない対処**の案内になるため出さない（Req 11.2）
+  - ⚠️ 「本specのコードがマージされていること」を利用可能判定に使う旧案は**撤回**（コードがマージされても送信先が公開 plantuml.com なら POST は原理的に使えない）
+  - GET＋URL長超過疑い＋POST可否=true で推奨行が表示され、**POST可否=false／POSTモード／目安値未満の onError では表示されない**ことを確認する
   - _Requirements: 11.1, 11.2_
   - _Boundary: PlantUmlViewer_
   - _Depends: 6.1, 6.2_
   - <!-- クロススペック前提: large-diagram-get のエラーUI完了・マージ済み -->
 
 - [ ] 6.4 POST推奨行のテスト
-  - `PlantUmlViewer.spec.tsx` に、**GET＋URL長超過疑い（プリチェック超過 or src.length大）→推奨行表示／POSTモード・上限内の onError（＝構文エラー/サーバ停止想定）→非表示**／文言はi18n（`useTranslation` モック）を検証する
+  - `PlantUmlViewer.spec.tsx` に、**GET＋URL長超過疑い（プリチェック超過 or `src.length >= PLANTUML_GET_URL_LIKELY_OVERSIZE_LENGTH`）＋POST可否=true →推奨行表示／POST可否=false（公開plantuml.com）→非表示／POSTモード→非表示／目安値未満の onError（＝構文エラー/サーバ停止想定）→非表示**／文言はi18n（`useTranslation` モック）を検証する
   - 上記が緑であることを確認する
   - _Requirements: 11.1, 11.2, 11.3_
   - _Depends: 6.3_

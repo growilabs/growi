@@ -96,6 +96,11 @@ GROWIはPlantUML図の内容をエンコードしてURLに載せ、GET（`<img>`
 <!-- 別spec plantuml-large-diagram-get は「GET時の上限超過エラー」を汎用文言（分割・簡略化）で表示する。POST という解決策の案内は本specの責務としてここで扱う。 -->
 
 #### Acceptance Criteria
-1. Where 送信方式が GET（POST未使用）であり、かつ POST 機能が利用可能な状態である, when **URL長超過が疑わしい失敗が起きる（プリチェックで固定閾値超過、または `src.length` が十分大きい）**, the GROWI shall POST送信（自前サーバ前提）で解決できる旨を案内するメッセージを提示する。**ただし原因がURL長超過と考えにくい失敗（プリチェック未満かつ `src.length` が小さい＝構文エラー／サーバ停止等）では提示しない**（POSTでは解決せず誤誘導になるため）。
-2. Where POST 機能が存在しない/利用不可の環境である, the GROWI shall POST推奨メッセージを提示しない（未実装機能を案内しない）。
+1. Where 送信方式が GET（POST未使用）であり、かつ POST 機能が利用可能な状態である, when **URL長超過が疑わしい失敗が起きる（プリチェックで固定閾値超過、または `src.length` が「URL長超過が疑わしい」目安値以上）**, the GROWI shall POST送信（自前サーバ前提）で解決できる旨を案内するメッセージを提示する。**ただし原因がURL長超過と考えにくい失敗（プリチェック未満かつ `src.length` が目安値未満＝構文エラー／サーバ停止等）では提示しない**（POSTでは解決せず誤誘導になるため）。
+2. Where 送信先（`PLANTUML_URI`）が POST 非対応であることが分かっている環境である, the GROWI shall POST推奨メッセージを提示しない（実現できない対処を案内しない）。**判定は実行時に送信先で行う**: 送信先が公開 plantuml.com（`plantuml.com` ドメイン。POST非対応を実測確認済み）である、または送信先URIが未設定/解析不能で判定できない場合は提示しない。送信方式（`PLANTUML_HTTP_METHOD`）では判定しない ── 本メッセージは GET 時のみ出るため、方式で判定すると常に非表示になり要件 11.1 を満たせない。
 3. The GROWI shall POST推奨メッセージを対応ロケール（en/ja/fr/ko/zh）で提供する。
+
+<!-- 11.2 の補足: 「本specのコードがマージされていること」は判定条件として不十分。コードがマージされた
+     GROWI.cloud のように自前PlantUMLサーバを立てられない環境では、送信先が公開 plantuml.com のままで
+     あり、POSTは原理的に使えない（research.md「公開 plantuml.com は非対応（実測）」）。したがって
+     判定すべきは「方式」ではなく「相手先」である。 -->
