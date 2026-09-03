@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { Prisma } from '~/generated/prisma/client';
 
 import type { IPageLink } from '../../interfaces/page-link';
+import { throwOnWriteErrors } from './throw-on-write-errors';
 
 // Prisma-only collection: no mongoose schema, so its indexes are provisioned by
 // migrations/20260901064500-add-indexes-to-pagelinks.js rather than on connect.
@@ -36,7 +37,7 @@ export const extension = Prisma.defineExtension((client) => {
           // could interleave and drop rows — safe only because PageLinkUpsertQueue never
           // drains a page concurrently with itself.
           if (resolvedRows.length > 0) {
-            await client.$runCommandRaw({
+            const upsertResult = await client.$runCommandRaw({
               update: 'pagelinks',
               ordered: true,
               updates: resolvedRows.map((r) => ({
@@ -50,9 +51,10 @@ export const extension = Prisma.defineExtension((client) => {
                 upsert: true,
               })),
             });
+            throwOnWriteErrors(upsertResult, 'replaceOutboundLinks upsert');
           }
 
-          await client.$runCommandRaw({
+          const deleteResult = await client.$runCommandRaw({
             delete: 'pagelinks',
             deletes: [
               {
@@ -64,6 +66,7 @@ export const extension = Prisma.defineExtension((client) => {
               },
             ],
           });
+          throwOnWriteErrors(deleteResult, 'replaceOutboundLinks prune');
         },
 
         /**
@@ -130,7 +133,7 @@ export const extension = Prisma.defineExtension((client) => {
           // never its own backlink. Clearing it — rather than leaving it alone — is what
           // stops the path's previous occupant from staying cached there forever. The row
           // itself survives; `replaceOutboundLinks` owns row existence.
-          await client.$runCommandRaw({
+          const result = await client.$runCommandRaw({
             update: 'pagelinks',
             updates: [
               {
@@ -152,6 +155,7 @@ export const extension = Prisma.defineExtension((client) => {
               },
             ],
           });
+          throwOnWriteErrors(result, 'repointInboundLinks');
         },
       },
     },
