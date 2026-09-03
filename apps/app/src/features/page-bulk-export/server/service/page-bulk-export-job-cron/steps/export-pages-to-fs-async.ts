@@ -6,6 +6,7 @@ import {
   getParentPath,
   normalizePath,
 } from '@growi/core/dist/utils/path-utils';
+import mongoose from 'mongoose';
 
 import {
   PageBulkExportFormat,
@@ -71,6 +72,11 @@ export async function getPageWritable(
   // BulkExportMarkdownRenderer caches the unified pipeline at module level.
   const renderer = createBulkExportMarkdownRenderer();
 
+  // Resolved once per job (not per page): the user embedAttachmentImages
+  // runs its per-attachment permission check as.
+  const User = mongoose.model('User');
+  const exportingUser = await User.findById(pageBulkExportJob.user);
+
   // For pdf format, write the shared stylesheet once per job. Every page links
   // to it relatively, so the (~MB) CSS is not duplicated into each page's HTML.
   const cssFilePath = path.join(outputDir, SHARED_CSS_FILENAME);
@@ -107,12 +113,12 @@ export async function getPageWritable(
             let htmlString: string;
             try {
               htmlString = await renderer.renderToHtml(markdownBody, cssHref);
-              htmlString = await embedAttachmentImages(
-                htmlString,
+              htmlString = await embedAttachmentImages(htmlString, {
                 fileOutputPath,
                 outputDir,
-                this.crowi,
-              );
+                crowi: this.crowi,
+                exportingUser,
+              });
             } catch (renderErr) {
               logger.warn(
                 'BulkExportMarkdownRenderer failed for page %s: %o',

@@ -1,12 +1,29 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
+import { getIdStringForRef, type IPage, type IUser } from '@growi/core';
+import type { HydratedDocument } from 'mongoose';
+import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { ResponseMode } from '~/server/interfaces/attachment';
-import { Attachment } from '~/server/models/attachment';
+import {
+  Attachment,
+  type IAttachmentDocument,
+} from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:features:page-bulk-export:embed-images');
+
+// TODO: remove this local interface when models/page has typescriptized
+// (see the identical TODO in apps/app/src/server/routes/attachment/get.ts,
+// whose permission check this mirrors).
+interface PageModel {
+  isAccessiblePageByViewer: (
+    pageId: string,
+    user: HydratedDocument<IUser> | undefined,
+  ) => Promise<boolean>;
+}
 
 /**
  * Matches `<img ... src="/attachment/<24-char hex id>" ...>` — the app-root
@@ -45,18 +62,35 @@ const ASSETS_DIRNAME = '_bulk-export-assets';
  * but the page still converts). See growilabs/growi#<ISSUE_NUMBER> for
  * background and follow-up on those modes.
  *
- * @param htmlString rendered page HTML, before it is written to fileOutputPath
- * @param fileOutputPath absolute path the HTML will be written to (used to
- *   compute the relative href to `ASSETS_DIRNAME`)
- * @param outputDir the job's html output dir (ASSETS_DIRNAME lives directly
- *   under this, once per job — shared across pages, like the CSS file)
- * @param crowi crowi instance (for fileUploadService + Attachment lookups)
+ * Mirrors the same page-viewer permission check the `/attachment/:id` route
+ * enforces (see retrieveAttachmentFromIdParam in
+ * apps/app/src/server/routes/attachment/get.ts): an attachment ID parsed out
+ * of the rendered HTML could belong to a different, private page the
+ * exporting user isn't allowed to read, so each attachment's `page` is
+ * checked via `Page.isAccessiblePageByViewer` before it is fetched/embedded.
+ * Attachments with no `page` (e.g. profile images) skip this check, same as
+ * the attachment route does.
  */
 export async function embedAttachmentImages(
   htmlString: string,
-  fileOutputPath: string,
-  outputDir: string,
-  crowi: Crowi,
+  {
+    fileOutputPath,
+    outputDir,
+    crowi,
+    exportingUser,
+  }: {
+    /** absolute path the HTML will be written to (used to compute the
+     * relative href to ASSETS_DIRNAME) */
+    fileOutputPath: string;
+    /** the job's html output dir (ASSETS_DIRNAME lives directly under this,
+     * once per job — shared across pages, like the CSS file) */
+    outputDir: string;
+    /** crowi instance (for fileUploadService + Attachment lookups) */
+    crowi: Crowi;
+    /** the user who requested the export (pageBulkExportJob.user, resolved
+     * once per job by the caller) — permission checks run as this user */
+    exportingUser: HydratedDocument<IUser> | undefined;
+  },
 ): Promise<string> {
   const matches = [...htmlString.matchAll(ATTACHMENT_IMG_SRC)];
   if (matches.length === 0) {
@@ -75,15 +109,37 @@ export async function embedAttachmentImages(
   // De-dupe: the same attachment can appear more than once on a page.
   const uniqueIds = [...new Set(matches.map((m) => m[1]))];
 
+  // Batch-fetch instead of one findById per id.
+  const attachments = await Attachment.find({ _id: { $in: uniqueIds } });
+  const attachmentById = new Map<string, IAttachmentDocument>(
+    attachments.map((a) => [a._id.toString(), a]),
+  );
+
+  const Page = mongoose.model<IPage, PageModel>('Page');
+
   const replacements = new Map<string, string>();
 
   await Promise.all(
     uniqueIds.map(async (id) => {
       try {
-        const attachment = await Attachment.findById(id);
+        const attachment = attachmentById.get(id);
         if (attachment == null) return;
 
-        const readable = await fileUploadService.findDeliveryFile(attachment);
+        if (attachment.page != null) {
+          const isAccessible = await Page.isAccessiblePageByViewer(
+            getIdStringForRef(attachment.page),
+            exportingUser,
+          );
+          if (!isAccessible) {
+            logger.warn(
+              "Skipping attachment %s for bulk export: exporting user can't " +
+                'access the page it belongs to.',
+              id,
+            );
+            return;
+          }
+        }
+
         const assetFileName = `${id}${path.extname(attachment.fileName ?? '')}`;
         const assetFilePath = path.join(assetsDir, assetFileName);
 
@@ -91,13 +147,18 @@ export async function embedAttachmentImages(
         // attachment just reference the already-written file.
         if (!fs.existsSync(assetFilePath)) {
           await fs.promises.mkdir(assetsDir, { recursive: true });
+          const readable = await fileUploadService.findDeliveryFile(attachment);
           const writeStream = fs.createWriteStream(assetFilePath);
-          await new Promise<void>((resolve, reject) => {
-            readable.pipe(writeStream);
-            writeStream.on('finish', resolve);
-            writeStream.on('error', reject);
-            readable.on('error', reject);
-          });
+          try {
+            await pipeline(readable, writeStream);
+          } catch (streamErr) {
+            // Don't leave a truncated file behind — a later reference to the
+            // same attachment in this job would otherwise treat it as
+            // "already downloaded" via the fs.existsSync check above, and
+            // silently embed a corrupted image.
+            await fs.promises.rm(assetFilePath, { force: true });
+            throw streamErr;
+          }
         }
 
         const relativeHref = path
