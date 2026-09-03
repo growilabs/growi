@@ -93,8 +93,7 @@ describe('PageService.create with a redirect on the target path', () => {
   // Every delegate method on the `$extends`-wrapped `prisma` client --
   // built-in CRUD verbs and custom extension methods like `deleteByFromPath`
   // alike -- is exposed through a Proxy `get` trap rather than a real own
-  // property (see the note at `deleteByFromPath`'s definition in
-  // `page-redirect.ts`). `vi.spyOn` captures the "original" via
+  // property. `vi.spyOn` captures the "original" via
   // `Object.getOwnPropertyDescriptor`, which the Proxy reports as a fake
   // descriptor (`value: undefined`) for every such method, so
   // `mockRestore()`/`vi.restoreAllMocks()` reinstalls `undefined` instead of
