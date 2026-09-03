@@ -422,7 +422,11 @@ describe('receive route POST / — the import claim and the received archive', (
       },
       { timeout: 10_000 },
     );
-  });
+    // The default 5s test timeout is shorter than the vi.waitFor budget above,
+    // so this test can time out on its own even when everything it checks is
+    // working correctly. Match the outer budget to the inner one plus room for
+    // the rest of the test's own round-trips.
+  }, 15_000);
 
   test('deletes the received archive once the transfer has finished', async () => {
     const zipPath = await writeArchiveZip('cleanup.growi.zip', [FIRST_USER]);
