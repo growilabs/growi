@@ -613,38 +613,49 @@ the restored page's status. Independent of B3/B4.
 > already-completed B1 tasks cross-reference them by number; renumbering would break those
 > references.
 
-- [ ] B5.1 Add the reconcile model method and target-state derivation
+- [x] B5.1 Add the delete-side model primitive and target-state derivation
   - **The model is Prisma, not Mongoose** (B1.2's text is superseded — see its note). So this is not
-    a mongoose static: `reconcileDeletedPages(pageIds)` becomes a method in the
-    `Prisma.defineExtension` block in `server/models/page-link.ts`, alongside
-    `replaceOutboundLinks` / `findBacklinkSources` / `repointInboundLinks`
-  - Two writes, one per direction: delete the gone pages' outbound rows (`fromPage $in ids`) and
-    null every inbound cache pointing at them (`toPage $in ids` → `toPage: null`). **No new index** —
+    a mongoose static: it is a method in the `Prisma.defineExtension` block in
+    `server/models/page-link.ts`, alongside `replaceOutboundLinks` / `findBacklinkSources` /
+    `repointInboundLinks`
+  - **Named `removeLinksForPages(pageIds)`, not `reconcileDeletedPages`.** Like its two siblings the
+    primitive is named for its mechanism and writes unconditionally; the trashed-vs-gone *decision*
+    is B5.2's service op, which keeps the name `reconcileDeletedPages`. Same split as
+    `syncOutboundLinks` / `replaceOutboundLinks` and `reResolveByToPath` / `repointInboundLinks`
+  - Two writes, one per direction: delete the gone pages' outbound rows (`fromPage $in ids`) first —
+    they have lost their source and are what a reader could surface as a phantom backlink — then null
+    every inbound cache pointing at them (`toPage $in ids` → `toPage: null`). **No new index** —
     both filters ride indexes that already exist via
     `migrations/20260901064500-add-indexes-to-pagelinks.js` (`fromPage_1_toPath_1` by prefix,
     `toPage_1`)
-  - Unlike `repointInboundLinks`, neither half needs a pipeline update, so both are expressible
-    through the Prisma query API (`deleteMany` / `updateMany`) — prefer that. **If you do reach for
-    `$runCommandRaw`, its reply must go through `throwOnWriteErrors`** like every other raw write in
-    this feature: MongoDB resolves a raw write `ok: 1` with the failures inside `writeErrors` /
-    `writeConcernError`, so a discarded reply loses them silently. Not a transaction (derived cache,
+  - **The two halves cannot share an API.** The delete is `deleteMany` through the Prisma query API.
+    The inbound null **must** be `$runCommandRaw` + `throwOnWriteErrors`: `pagelinks.updateMany`'s
+    generated data input accepts only `toPath` (relation scalars are not settable through it, nor via
+    the relation), **and** `utils/prisma.ts`'s client-wide `$allModels.updateMany` extension injects
+    `v: { increment: 1 }`, which this prisma-only collection has no field for. Any query-API update on
+    `pagelinks` is therefore a `PrismaClientValidationError` — verified against the database, since no
+    `v`-less prisma-only model had ever been updated before. Not a transaction (derived cache,
     idempotent halves, standalone-MongoDB compatible — the trade `replaceOutboundLinks` documents)
-  - Implement the `LinkTargetState` derivation helper (`toPage == null` → `broken`; target trashed →
-    `trashed`; else `normal`) — state is derived, never stored. It lands in a pure
+  - Implement `deriveLinkTargetState` (`toPage == null` → `broken`, outranking any status passed
+    alongside; target status `deleted` → `trashed`; else `normal`, including a `null`/`undefined`
+    status, which is a v4-era published page) — state is derived, never stored. It lands in a pure
     `server/services/link-target-state.ts` on the **read** path, not in `page-link-sync`: nothing on
     the write path derives this, and B5.4 consumes it inside the target query it already issues
   - **Declare the `LinkTargetState` union here** (deferred from B1.1) in `interfaces/backlink.ts`, in the
     shape the design's § Data Models DTO section specifies
-  - Done when unit tests cover the three derived states from `toPage`/target status, and a test shows
-    reconcile removes the outbound rows and nulls the inbound caches for a batch of page ids
+  - Done when unit tests cover the derived states from `toPage`/target status, and an integration test
+    shows the primitive removes the outbound rows and nulls the inbound caches for a batch of page
+    ids while leaving unrelated rows alone
   - _Requirements: 6.1, 6.2, 6.3_
   - _Boundary: pagelinks Prisma extension (page-link.ts), link-target-state.ts, interfaces/backlink.ts_
   - _Depends: B1.2_
 
 - [ ] B5.2 Implement the reconcile-deleted sync operation
   - Implement the reconcile op deferred from B1.5: reconcile a deleted page by checking its current DB
-    state — still trashed → no-op (derived state shows trashed); truly gone → remove its outbound rows
-    and null inbound `toPage` (broken)
+    state — still trashed → no-op (derived state shows trashed); truly gone → delegate to B5.1's
+    `removeLinksForPages` (which removes the outbound rows and nulls inbound `toPage` → broken).
+    This op keeps the name `reconcileDeletedPages` because it owns the decision; the model primitive
+    it calls is named for the write
   - **Carried over from B2.2:** delete must supersede a pending coalesced upsert. B2.2 only stops the
     drain from writing *new* rows for a page that is now `STATUS_DELETED`; the rows the page already
     owned when it was trashed are still there, so this op is what actually settles them. The upsert

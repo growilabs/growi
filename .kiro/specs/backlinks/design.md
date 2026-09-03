@@ -411,7 +411,7 @@ interface IPageLink {
   already rides it and a separate index would be dead weight. `fromPage_1_toPath_1` is a correctness
   constraint, not tuning: `replaceOutboundLinks` upserts against that filter.
 - Model methods: `replaceOutboundLinks(fromPageId, resolvedRows)`, `findBacklinkSources(toPageId)`,
-  `repointInboundLinks(toPath, toPage)`, `reconcileDeletedPages(pageIds)` (B5.1).
+  `repointInboundLinks(toPath, toPage)`, `removeLinksForPages(pageIds)` (B5.1).
 - **Raw-command rule.** Several of these use `client.$runCommandRaw` because Prisma's query API
   cannot express what they need (no bulk-upsert API; `repointInboundLinks` needs a pipeline update).
   MongoDB reports per-statement failures *inside* an `ok: 1` reply, so **every raw write passes its
@@ -439,15 +439,32 @@ interface IPageLink {
     pipeline update, so nothing casts either argument on the way to the server.)
   - The two writes are one pipeline update, so a row is never momentarily its own backlink and a
     failure cannot leave it that way.
-- `reconcileDeletedPages` (B5.1) is **two writes, not one**: delete the gone pages' outbound rows
-  (`fromPage $in ids`) and null every inbound cache pointing at them (`toPage $in ids` →
-  `toPage: null`). Neither half needs a pipeline update, so unlike `repointInboundLinks` both are
-  expressible through the Prisma query API (`deleteMany` / `updateMany`) — prefer that, and reach for
-  `$runCommandRaw` + `throwOnWriteErrors` only if a raw command turns out to be needed. No new index:
-  both filters ride existing indexes (`fromPage_1_toPath_1` by prefix, `toPage_1`). Not a
-  transaction: the index is a derived cache, the two halves are independently idempotent, and staying
-  single-command-per-write keeps the collection standalone-MongoDB compatible (the same trade
-  `replaceOutboundLinks` documents).
+- `removeLinksForPages` (B5.1) is the delete-side primitive, and like the other two it is named for
+  its mechanism, not for the decision: it writes unconditionally, and the trashed-vs-gone decision
+  lives in the `reconcileDeletedPages` **service** (B5.2). Both names exist on purpose — same split
+  as `syncOutboundLinks` / `replaceOutboundLinks` and `reResolveByToPath` / `repointInboundLinks`.
+- It is **two writes, not one**: delete the gone pages' outbound rows (`fromPage $in ids`), then null
+  every inbound cache pointing at them (`toPage $in ids` → `toPage: null`), which is what makes those
+  rows read as `broken`. Outbound goes first because those are the rows that have lost their source
+  and could still be surfaced as a phantom backlink. No new index — both filters ride existing ones
+  (`fromPage_1_toPath_1` by prefix, `toPage_1`).
+  - **The two halves cannot use the same API, and this was measured, not assumed.** The delete is
+    plain `deleteMany` through the Prisma query API (verified working). The inbound null **must** be
+    `$runCommandRaw` + `throwOnWriteErrors`, for two independent reasons: `pagelinks.updateMany`'s
+    generated data input accepts **only `toPath`** — the relation scalars are not settable through it
+    (`Unknown argument 'toPageId'`), nor via the relation (`toPage: { disconnect: true }`) — **and**
+    the client-wide `$allModels.updateMany` extension in `utils/prisma.ts` injects
+    `v: { increment: 1 }` for mongoose optimistic-concurrency parity, a field this prisma-only
+    collection deliberately does not have. So *any* update on `pagelinks` through the query API is a
+    `PrismaClientValidationError`; the raw command is the only route, independent of whether a
+    pipeline update is needed. (No prisma-only, `v`-less model had ever been updated before this, so
+    the trap was unexercised.)
+  - No argument validation, unlike `repointInboundLinks`: every id is stringified and then wrapped as
+    `$oid` (or cast by Prisma), so an operator object from an untyped caller cannot reach a filter
+    position — it degrades to a malformed id the server rejects.
+  - Not a transaction: the index is a derived cache, the two halves are independently idempotent, and
+    staying single-command-per-write keeps the collection standalone-MongoDB compatible (the same
+    trade `replaceOutboundLinks` documents).
 
 #### extractInternalLinkPaths
 
@@ -800,7 +817,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   across rename/move/restore), so they satisfy 5.4 with no reconciliation.
 
 ### Derived target state (not stored)
-_Declared in B5.1, alongside the derivation helper — a pure `link-target-state.ts` on the **read**
+_Declared in B5.1, alongside `deriveLinkTargetState` — a pure `link-target-state.ts` on the **read**
 path, not in `page-link-sync`: nothing on the write path derives this, and B5.4 folds the derivation
 into the grant-filtered target query it already has to issue (see § File Structure Plan)._
 ```typescript
@@ -876,8 +893,12 @@ interface IBacklinkResponse {
   while the default walks the chain to its real end; two documents sharing a `fromPath` resolve to
   the first and log a warning. The existing `retrievePageRedirectEndpoints` tests double as the
   regression net for the shared pipeline, and one of them pins that page view stays uncapped.
-- `reconcileDeletedPages`: trashed page → no-op; permanently-gone page → outbound removed and
-  inbound `toPage` nulled (3.3, 6.2).
+- `reconcileDeletedPages` (service): trashed page → no-op; permanently-gone page → delegates to
+  `removeLinksForPages` (3.3, 6.2).
+- `deriveLinkTargetState`: `broken` when the row has no cached target (outranking any status handed
+  in alongside), `trashed` when the target's status is `deleted`, `normal` otherwise — including a
+  `null`/`undefined` status, which is a v4-era page that `addConditionToExcludeTrashed` counts as
+  published (6.1–6.3).
 - `reResolveByToPath`: forwards the target the resolver reports for the path, and forwards `null`
   when the path is absent from the map (so a row can return to broken); resolves and writes the
   paths that redirect to it as well, each carrying the resolver's own verdict rather than the
@@ -895,6 +916,11 @@ interface IBacklinkResponse {
   (2.1–2.3); grant change flips visibility on the next read (2.4).
 - Rename/move: inbound links continue resolving to the page at its new path without index
   writes; descendant move behaves identically (5.1, 5.2).
+- `removeLinksForPages` write semantics against a real collection (the observable contract is the
+  resulting rows): the gone pages' outbound rows are deleted, inbound caches pointing at them are
+  nulled while the rows and their `toPath` survive, unrelated rows are untouched, a batch is handled
+  including a row that is both a gone source and a gone target (deleted, not merely nulled), and it
+  is idempotent. Mutation-checked: an over-broad `deleteMany`/update filter fails the suite.
 - `repointInboundLinks` write semantics, driven through `reResolveByToPath` against a real
   collection (there is no unit spec: the observable contract is the resulting rows, and asserting
   the `updateMany` filter instead would spy on the mechanism). Rows at the path are repointed
