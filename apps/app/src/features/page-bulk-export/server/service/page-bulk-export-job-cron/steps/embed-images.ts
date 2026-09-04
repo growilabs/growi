@@ -1,9 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { getIdStringForRef, type IPage, type IUser } from '@growi/core';
+import type { IUser } from '@growi/core';
 import type { HydratedDocument } from 'mongoose';
-import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { ResponseMode } from '~/server/interfaces/attachment';
@@ -11,19 +10,10 @@ import {
   Attachment,
   type IAttachmentDocument,
 } from '~/server/models/attachment';
+import { isAttachmentAccessibleToViewer } from '~/server/service/attachment/resolve-accessible-attachment';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:features:page-bulk-export:embed-images');
-
-// TODO: remove this local interface when models/page has typescriptized
-// (see the identical TODO in apps/app/src/server/routes/attachment/get.ts,
-// whose permission check this mirrors).
-interface PageModel {
-  isAccessiblePageByViewer: (
-    pageId: string,
-    user: HydratedDocument<IUser> | undefined,
-  ) => Promise<boolean>;
-}
 
 /**
  * Matches `<img ... src="/attachment/<24-char hex id>" ...>` — the app-root
@@ -62,14 +52,13 @@ const ASSETS_DIRNAME = '_bulk-export-assets';
  * but the page still converts). See growilabs/growi#<ISSUE_NUMBER> for
  * background and follow-up on those modes.
  *
- * Mirrors the same page-viewer permission check the `/attachment/:id` route
- * enforces (see retrieveAttachmentFromIdParam in
- * apps/app/src/server/routes/attachment/get.ts): an attachment ID parsed out
- * of the rendered HTML could belong to a different, private page the
- * exporting user isn't allowed to read, so each attachment's `page` is
- * checked via `Page.isAccessiblePageByViewer` before it is fetched/embedded.
- * Attachments with no `page` (e.g. profile images) skip this check, same as
- * the attachment route does.
+ * Reuses `isAttachmentAccessibleToViewer` — the same page-viewer permission
+ * check the `/attachment/:id` route enforces via `resolveAccessibleAttachment`
+ * (see retrieveAttachmentFromIdParam in apps/app/src/server/routes/attachment/get.ts):
+ * an attachment ID parsed out of the rendered HTML could belong to a
+ * different, private page the exporting user isn't allowed to read, so each
+ * attachment is checked before it is fetched/embedded. Attachments with no
+ * `page` (e.g. profile images) skip this check, same as the attachment route.
  */
 export async function embedAttachmentImages(
   htmlString: string,
@@ -115,8 +104,6 @@ export async function embedAttachmentImages(
     attachments.map((a) => [a._id.toString(), a]),
   );
 
-  const Page = mongoose.model<IPage, PageModel>('Page');
-
   const replacements = new Map<string, string>();
 
   await Promise.all(
@@ -125,19 +112,17 @@ export async function embedAttachmentImages(
         const attachment = attachmentById.get(id);
         if (attachment == null) return;
 
-        if (attachment.page != null) {
-          const isAccessible = await Page.isAccessiblePageByViewer(
-            getIdStringForRef(attachment.page),
-            exportingUser,
+        const isAccessible = await isAttachmentAccessibleToViewer(
+          attachment,
+          exportingUser,
+          false,
+        );
+        if (!isAccessible) {
+          logger.warn(
+            "Skipping attachment %s for bulk export: exporting user can't access the page it belongs to.",
+            id,
           );
-          if (!isAccessible) {
-            logger.warn(
-              "Skipping attachment %s for bulk export: exporting user can't " +
-                'access the page it belongs to.',
-              id,
-            );
-            return;
-          }
+          return;
         }
 
         const assetFileName = `${id}${path.extname(attachment.fileName ?? '')}`;
