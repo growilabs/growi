@@ -1092,7 +1092,16 @@ export const setup = (crowi) => {
             offset,
             limit,
           });
-        return res.apiv3({ paginateResult });
+        // Prisma's `include: { user: true }` returns full user rows (password,
+        // passwordHash, apiToken, email). Serialize each nested user before
+        // responding so these secure attributes are not leaked to the client.
+        const serializedDocs = paginateResult.docs.map((doc) => ({
+          ...doc,
+          user: doc.user != null ? serializeUserSecurely(doc.user) : doc.user,
+        }));
+        return res.apiv3({
+          paginateResult: { ...paginateResult, docs: serializedDocs },
+        });
       } catch (err) {
         const msg = 'Error occurred in fetching external-account list  ';
         logger.error(msg, err);
@@ -1277,7 +1286,7 @@ export const setup = (crowi) => {
         activityEvent.emit('update', res.locals.activity._id, {
           action: SupportedAction.ACTION_ADMIN_USERS_PASSWORD_RESET,
         });
-        return res.apiv3({ newPassword, user });
+        return res.apiv3({ newPassword, user: serializeUserSecurely(user) });
       } catch (err) {
         logger.error('Error', err);
         return res.apiv3Err(new ErrorV3(err));

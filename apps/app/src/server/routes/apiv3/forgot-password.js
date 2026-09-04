@@ -1,20 +1,18 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
-import { format } from 'date-fns/format';
-import { subSeconds } from 'date-fns/subSeconds';
-import { join } from 'pathe';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import injectResetOrderByTokenMiddleware from '~/server/middlewares/inject-reset-order-by-token-middleware';
-import PasswordResetOrder from '~/server/models/password-reset-order';
 import { configManager } from '~/server/service/config-manager';
-import { growiInfoService } from '~/server/service/growi-info';
+import {
+  createAndSendPasswordResetOrder,
+  sendPasswordResetTemplateEmail,
+} from '~/server/service/password-reset';
 import loggerFactory from '~/utils/logger';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import httpErrorHandler from '../../middlewares/http-error-handler';
-import { resolveLocalePath } from '../../util/safe-path-utils';
 import { checkForgotPasswordEnabledMiddlewareFactory } from '../forgot-password';
 
 const logger = loggerFactory('growi:routes:apiv3:forgotPassword');
@@ -49,7 +47,6 @@ const router = express.Router();
  * @returns {import('express').Router} router
  */
 export const setup = (crowi) => {
-  const { appService, mailService } = crowi;
   const { User } = crowi.models;
 
   const addActivity = generateAddActivityMiddleware(crowi);
@@ -89,36 +86,6 @@ export const setup = (crowi) => {
 
   const checkPassportStrategyMiddleware =
     checkForgotPasswordEnabledMiddlewareFactory(crowi, true);
-  const ALLOWED_TEMPLATE_NAMES = ['passwordReset', 'passwordResetSuccessful'];
-
-  async function sendPasswordResetEmail(
-    templateFileName,
-    locale,
-    email,
-    url,
-    expiredAt,
-  ) {
-    if (!ALLOWED_TEMPLATE_NAMES.includes(templateFileName)) {
-      throw new Error(`Invalid template name: ${templateFileName}`);
-    }
-    const templatePath = resolveLocalePath(
-      locale,
-      crowi.localeDir,
-      `notifications/${templateFileName}.ejs`,
-    );
-
-    return mailService.send({
-      to: email,
-      subject: '[GROWI] Password Reset',
-      template: templatePath,
-      vars: {
-        appTitle: appService.getAppTitle(),
-        email,
-        url,
-        expiredAt,
-      },
-    });
-  }
 
   /**
    * @swagger
@@ -160,8 +127,6 @@ export const setup = (crowi) => {
     apiV3FormValidator,
     async (req, res) => {
       const { email } = req.body;
-      const locale = configManager.getConfig('app:globalLang');
-      const appUrl = growiInfoService.getSiteUrl();
 
       try {
         const user = await User.findOne({ email: { $eq: email } });
@@ -173,26 +138,11 @@ export const setup = (crowi) => {
           return res.apiv3();
         }
 
-        const passwordResetOrderData =
-          await PasswordResetOrder.createPasswordResetOrder(email);
-        const url = new URL(
-          `/forgot-password/${passwordResetOrderData.token}`,
-          appUrl,
-        );
-        const oneTimeUrl = url.href;
-        const grwTzoffsetSec = crowi.appService.getTzoffset() * 60;
-        const expiredAt = subSeconds(
-          passwordResetOrderData.expiredAt,
-          grwTzoffsetSec,
-        );
-        const formattedExpiredAt = format(expiredAt, 'yyyy/MM/dd HH:mm');
-        await sendPasswordResetEmail(
-          'passwordReset',
-          locale,
-          email,
-          oneTimeUrl,
-          formattedExpiredAt,
-        );
+        // Order creation + one-time URL + reset mail live in the shared
+        // password-reset service, which the downgrade-prep admin script also
+        // uses. Only the "is this an ACTIVE GROWI user" policy above is
+        // route-specific.
+        await createAndSendPasswordResetOrder(crowi, email);
 
         activityEvent.emit('update', res.locals.activity._id, {
           action: SupportedAction.ACTION_USER_FOGOT_PASSWORD,
@@ -267,7 +217,11 @@ export const setup = (crowi) => {
         const userData = await user.updatePassword(newPassword);
         const serializedUserData = serializeUserSecurely(userData);
         passwordResetOrder.revokeOneTimeToken();
-        await sendPasswordResetEmail('passwordResetSuccessful', i18n, email);
+        await sendPasswordResetTemplateEmail(crowi, {
+          templateName: 'passwordResetSuccessful',
+          locale: i18n,
+          email,
+        });
 
         activityEvent.emit('update', res.locals.activity._id, {
           action: SupportedAction.ACTION_USER_RESET_PASSWORD,
