@@ -72,6 +72,19 @@
   - **検証済み** (2026-09-03): GROWI のコード上で、`growi-agent.ts` (line 48-51) と `suggest-path-agent.ts` (line 28-32) の tools 登録パターンから、LLM に送られるツール名が tools オブジェクトのキー（`getPageContentTool`, `getPageContent` など）であることが確認された。`summarizeAgent` が `tools: { getPageContentTool: limitedGetPageContentTool }` で登録し、`growiAgent` が `tools: { getPageContentTool: getPageContentTool }` で登録された場合、両方で LLM プロバイダに送られるツール名は `getPageContentTool` となり、thread replay 時に正しくツール名が一致する。仮定は妥当。
   - **テスト必須**: 実装時に、cross-agent thread replay が正しく動作することを unit/integ テストで確認する（先出の仮定が実装レベルで成立することを検証）。
 
+### 実装検証マッピング（tasks.md 対応確認）
+
+本設計に記載された3つのクリティカル検証ポイントが tasks.md に確実に組み込まれていることを確認済み：
+
+| 検証ポイント | 対応するタスク | 詳細 |
+|-----------|------------|------|
+| **クロスAgent スレッド再生テスト**（§Revalidation Triggers 行71-73、要件1.4） | Task 4.2 | `summarizeAgent` のツール登録キーが `getPageContentTool` であり、`growiAgent` が引き継いだスレッド履歴の tool-call 名が一致することを end-to-end テストで確認 |
+| **バジェット許容幅テスト**（§全文カバレッジ制御 行282、要件2.1-2.2） | Tasks 3.2, 4.3, 4.4 | (3.2) 連続リクエスト間でのバジェット独立性、(4.3) 1500行超ページでの上限到達と打ち切り、(4.4) 同時リクエストの状態安全性 |
+| **権限ゲート維持検証**（§要約の開始から追質問への合流まで 行249-258、要件4.1） | Task 4.1 | ルート層の短絡（ストリーム未開始）、不存在と権限なしの区別なし、TOCTOU窓の二重防護（ルート層＋ツール層） |
+| **Prisma スキーマ検証** | Task 5 | Mongoose側の `aiSummary` フィールド追加、Prisma側への追加（`Json?` で既存 `grantedGroups` パターンに揃える）、型生成（`prisma generate` の成功確認）、Changeset 作成（@growi/core は公開パッケージ） |
+
+---
+
 ## Architecture
 
 ### Existing Architecture Analysis
