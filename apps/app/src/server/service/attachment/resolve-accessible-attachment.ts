@@ -16,11 +16,34 @@ export type ResolveAccessibleAttachmentResult =
   | { errorCode: 'not_found' | 'forbidden' };
 
 /**
- * Fetches an attachment by id and checks whether the viewer may access it.
+ * Checks whether the viewer may access an already-fetched attachment.
  *
  * Skips the check when the request is already certified via a valid share
  * link (isSharedPage), or when the attachment is not scoped to a page
  * (PROFILE_IMAGE, BRAND_LOGO, PAGE_BULK_EXPORT, AUDIT_LOG_BULK_EXPORT).
+ *
+ * Split out from resolveAccessibleAttachment so callers that fetch the
+ * attachment themselves (e.g. a batched `Attachment.find({ $in })`) can reuse
+ * the same permission check without a second per-id `findById`.
+ */
+export const isAttachmentAccessibleToViewer = async (
+  attachment: IAttachmentDocument,
+  user: IUser | undefined,
+  isSharedPage: boolean,
+): Promise<boolean> => {
+  if (isSharedPage || attachment.page == null) {
+    return true;
+  }
+
+  const Page = mongoose.model<IPage, PageModel>('Page');
+  return Page.isAccessiblePageByViewer(
+    getIdStringForRef(attachment.page),
+    user,
+  );
+};
+
+/**
+ * Fetches an attachment by id and checks whether the viewer may access it.
  */
 export const resolveAccessibleAttachment = async (
   attachmentId: string,
@@ -38,15 +61,13 @@ export const resolveAccessibleAttachment = async (
     return { errorCode: 'not_found' };
   }
 
-  if (!isSharedPage && attachment.page != null) {
-    const Page = mongoose.model<IPage, PageModel>('Page');
-    const isAccessible = await Page.isAccessiblePageByViewer(
-      getIdStringForRef(attachment.page),
-      user,
-    );
-    if (!isAccessible) {
-      return { errorCode: 'forbidden' };
-    }
+  const isAccessible = await isAttachmentAccessibleToViewer(
+    attachment,
+    user,
+    isSharedPage,
+  );
+  if (!isAccessible) {
+    return { errorCode: 'forbidden' };
   }
 
   return { attachment };
