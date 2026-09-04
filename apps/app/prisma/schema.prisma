@@ -404,9 +404,9 @@ model pages {
   revisionId               String?   @map("revision") @db.ObjectId
   seenUsers                String[]
   status                   String    @default("published")
-  ttlTimestamp             DateTime?
   updatedAt                DateTime  @default(now())
   wip                      Boolean?
+  wipExpiredAt             DateTime?
 
   creator          users?             @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   lastUpdateUser   users?             @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -420,6 +420,7 @@ model pages {
   pagetagrelations pagetagrelations[]
   pagelinksFrom    pagelinks[]        @relation("PageLinkFromPage")
   pagelinksTo      pagelinks[]        @relation("PageLinkToPage")
+  sharelinks       sharelinks[]
 
   @@index([parentId], map: "parent_1")
   @@index([path], map: "path_1")
@@ -428,7 +429,11 @@ model pages {
   @@index([creatorId], map: "creator_1")
   @@index([createdAt], map: "createdAt_1")
   @@index([updatedAt], map: "updatedAt_1")
-  @@index([ttlTimestamp], map: "ttlTimestamp_1")
+  // The mongoose schema declares this index as sparse; Prisma cannot express that,
+  // so once `prisma db push` takes over index creation (see .claude/rules/model.md)
+  // the sparse option has to be re-applied out of band. It must never regain
+  // expireAfterSeconds — see server/models/no-ttl-index-on-page.spec.ts.
+  @@index([wipExpiredAt], map: "wipExpiredAt_1")
 }
 
 model pagetagrelations {
@@ -491,11 +496,16 @@ model sessions {
 }
 
 model sharelinks {
-  id          String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  relatedPage Json?
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  v             Int       @default(0) @map("__v")
+  relatedPageId String    @map("relatedPage") @db.ObjectId
+  expiredAt     DateTime?
+  description   String?
+  createdAt     DateTime  @default(now())
 
-  @@index([relatedPage], map: "relatedPage_1")
+  relatedPage pages @relation(fields: [relatedPageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([relatedPageId], map: "relatedPage_1")
 }
 
 model slackappintegrations {

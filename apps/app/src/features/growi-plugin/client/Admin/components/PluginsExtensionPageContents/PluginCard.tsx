@@ -72,7 +72,7 @@ export const PluginCard = (props: Props): JSX.Element => {
           className="btn btn-primary"
           onClick={props.onDelete}
         >
-          {t('Delete')}
+          {t('commons:Delete')}
         </button>
       </div>
     );

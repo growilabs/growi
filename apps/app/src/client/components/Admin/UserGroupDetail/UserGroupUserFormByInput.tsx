@@ -120,7 +120,7 @@ export const UserGroupUserFormByInput: FC<Props> = (props) => {
           disabled={inputUser.length === 0}
           onClick={addUserBySubmit}
         >
-          {t('add')}
+          {t('commons:add')}
         </button>
       </div>
     </div>

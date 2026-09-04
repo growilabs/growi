@@ -7,7 +7,6 @@ import type { MockInstance } from 'vitest';
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
-import type { ShareLinkModel } from '~/server/models/share-link';
 import { prisma } from '~/utils/prisma';
 
 const { ObjectId } = Types;
@@ -42,7 +41,6 @@ describe('/comments.get share-link authorization (integration)', () => {
   // typed `any`, so there is no usable type to spy on here.
   // biome-ignore lint/suspicious/noExplicitAny: no usable type for Page (see above)
   let Page: any;
-  let ShareLink: ShareLinkModel;
   let certifySharedPage: RequestHandler;
 
   // Controllable request user, read by the injector middleware at request time.
@@ -62,8 +60,6 @@ describe('/comments.get share-link authorization (integration)', () => {
   beforeAll(async () => {
     crowi = await getInstance();
     Page = crowi.models.Page;
-
-    ShareLink = (await import('~/server/models/share-link')).default;
 
     // api.remove reads the comment with `include: { page: true }` (a required
     // relation), so the referenced pages must actually exist: Prisma throws on a
@@ -111,13 +107,17 @@ describe('/comments.get share-link authorization (integration)', () => {
     commentBId = commentB.id;
 
     // Share links related to page A: one valid, one expired.
-    const shareLinkA = await ShareLink.create({ relatedPage: pageAId });
-    const expiredShareLink = await ShareLink.create({
-      relatedPage: pageAId,
-      expiredAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    const shareLinkA = await prisma.sharelinks.create({
+      data: { relatedPageId: pageAId.toString() },
     });
-    shareLinkAId = shareLinkA._id;
-    expiredShareLinkId = expiredShareLink._id;
+    const expiredShareLink = await prisma.sharelinks.create({
+      data: {
+        relatedPageId: pageAId.toString(),
+        expiredAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      },
+    });
+    shareLinkAId = new ObjectId(shareLinkA.id);
+    expiredShareLinkId = new ObjectId(expiredShareLink.id);
 
     const apiV1FormValidator = (
       await import('~/server/middlewares/apiv1-form-validator')
@@ -199,15 +199,27 @@ describe('/comments.get share-link authorization (integration)', () => {
   });
 
   afterAll(async () => {
+    // comments also has a required relation to revisions (onDelete: NoAction),
+    // so it must be deleted first and alone. revisions/sharelinks then have no
+    // relation to each other -- only to pages -- so they can run concurrently.
+    // pages must be deleted last, and separately, or Prisma throws P2014 for
+    // deleting a page while a dependent still refers to it (see the same
+    // reasoning in delete-completely-operation.ts).
     await prisma.comments.deleteMany({
       where: { id: { in: [commentAId, commentBId] } },
     });
-    await prisma.revisions.deleteMany({ where: { id: revAId.toString() } });
+    await Promise.all([
+      prisma.revisions.deleteMany({ where: { id: revAId.toString() } }),
+      prisma.sharelinks.deleteMany({
+        where: {
+          id: {
+            in: [shareLinkAId.toString(), expiredShareLinkId.toString()],
+          },
+        },
+      }),
+    ]);
     await prisma.pages.deleteMany({
       where: { id: { in: [pageAId.toString(), pageBId.toString()] } },
-    });
-    await ShareLink.deleteMany({
-      _id: { $in: [shareLinkAId, expiredShareLinkId] },
     });
   });
 
