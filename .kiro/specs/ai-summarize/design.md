@@ -69,8 +69,20 @@
 - スレッドの永続化方式（`memory` のバックエンド、`getOrCreateThread` の契約）が変わる場合、要約スレッドの生成・引き継ぎ処理を再検証する。
 - `Page` モデルがMongooseからPrismaへ移行される場合（`.claude/rules/model.md`）、永続化フィールドの追加方法・アクセス方法を再検証する。
 - `@mastra/core` のtool-call/tool-result 再生仕様（LLMプロバイダへ送るツール名がキー（ツール自身の`id`ではなく）であること、tool名が登録ツールセットに存在するか検証・除去しないこと）が変わる場合、クロスAgent スレッド共有（要約後に `growiAgent` が `summarizeAgent` のスレッドを引き継ぐ）を再検証する。
-  - **検証済み** (2026-09-03): GROWI のコード上で、`growi-agent.ts` (line 48-51) と `suggest-path-agent.ts` (line 28-32) の tools 登録パターンから、LLM に送られるツール名が tools オブジェクトのキー（`getPageContentTool`, `getPageContent` など）であることが確認された。`summarizeAgent` が `tools: { getPageContentTool: limitedGetPageContentTool }` で登録し、`growiAgent` が `tools: { getPageContentTool: getPageContentTool }` で登録された場合、両方で LLM プロバイダに送られるツール名は `getPageContentTool` となり、thread replay 時に正しくツール名が一致する。仮定は妥当。
-  - **テスト必須**: 実装時に、cross-agent thread replay が正しく動作することを unit/integ テストで確認する（先出の仮定が実装レベルで成立することを検証）。
+  - **検証済み・根拠** (2026-09-03): 
+    - **コード確認**: GROWI のコード上で、`growi-agent.ts` (line 48-51) と `suggest-path-agent.ts` (line 28-32) の tools 登録パターンから、LLM に送られるツール名が tools オブジェクトの**キー**（`getPageContentTool`, `getPageContent` など）であることが確認された。
+    - **仮定**: `summarizeAgent` が `tools: { getPageContentTool: limitedGetPageContentTool }` で登録し、`growiAgent` が `tools: { getPageContentTool: getPageContentTool }` で登録された場合、両方で LLM プロバイダに送られるツール名は `getPageContentTool` となり、thread replay 時に正しくツール名が一致する。
+    - **「大丈夫そう」という見積もり**: Mastra の tool-pair sanitize ロジック（`sanitizeOrphanedToolPairs`）は、過去のtool-call/tool-resultペアを LLMプロバイダに**そのまま**送る（存在性チェックなし）。したがって、登録キー一致という前提があれば、thread replay は成立する。ただし、これは `@mastra/core` の内部実装仕様に依存し、バージョン差分・実装変更で壊れる可能性は低くない。
+    - **前例の欠落**: `suggestPathAgent` はmemory非接続であり、このリポジトリにクロスAgentスレッド共有の前例は存在しない。本specが最初の適用例である。
+  
+  - **テスト必須・失敗時の対応**: 実装時に、cross-agent thread replay が正しく動作することを unit/integ テストで確認する（先出の仮定が実装レベルで成立することを検証）。タスク 4.2 参照。
+    - **テストが GREEN の場合**：仮定が実装で確認され、スレッド共有が成立。要約後の追質問が正常に動作。仕様どおり実装を進める。
+    - **テストが RED の場合**（tool-call/tool-result 再生が想定通りに動かない場合）：このリスクは実装段階では対応できない。**設計フェーズに戻って判断が必須**（実装の判断ではない）。以下のいずれかを選択：
+      1. **ツール登録キーを分離する**：`summarizeAgent` のキーを `getPageContentTool_summarize` のように別にし、tool-name 不一致を許容する。その場合、`growiAgent` が要約スレッド内の tool-call を再生できないため、スレッド共有（要件1.4）が成立しなくなり、追質問フローの設計・要件の見直しが必須。
+      2. **スレッド共有を廃止する**：`summarizeAgent` のスレッドを新規作成するが、追質問は別の新規スレッドで `growiAgent` が開始する。要件1.4「同じ対話の中で追加の質問を続ける」が「独立した2つの対話」に変わり、ユーザー体験が悪化。
+      3. **中間レイヤー（スレッド正規化）を追加**：要約スレッドを `growiAgent` が読める形に正規化してから渡す。複雑度大幅増加・保守コスト増。
+      
+      いずれも要件への影響が大きく、優先度・トレードオフを改めて評価する必要がある。したがって、**テスト失敗 = 要件見直し・設計修正**として扱う。実装フェーズでは回避できない構造的な判断。
 
 ### 実装検証マッピング（tasks.md 対応確認）
 
