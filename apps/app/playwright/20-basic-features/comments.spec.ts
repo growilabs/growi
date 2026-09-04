@@ -41,7 +41,28 @@ test.describe('Comment', () => {
     await page.goto(commentPagePath(testInfo.retry));
 
     // Reply comment
-    await page.getByTestId('comment-reply-button').click();
+    //
+    // A single click on the reply button is not enough to guarantee the
+    // reply editor mounts: the click can land before its handler is
+    // attached (or before the showEditorIds state update that swaps the
+    // button for <CommentEditor> is flushed), in which case it is silently
+    // dropped and `.cm-content` never enters the DOM at all -- not merely
+    // slow to become visible (see issue #11785, `.fill()`'s own auto-wait
+    // already covers "slow", so a plain `toBeVisible()` gate before fill
+    // would time out identically). Retry the click itself until the editor
+    // is actually up. The reply button unmounts once the click succeeds, so
+    // guard re-clicking with isVisible() to avoid clicking a stale/gone
+    // locator on a later retry attempt.
+    const replyButton = page.getByTestId('comment-reply-button');
+    await expect(async () => {
+      if (await replyButton.isVisible()) {
+        await replyButton.click();
+      }
+      await expect(page.locator('.cm-content')).toBeVisible({
+        timeout: 2_000,
+      });
+    }).toPass({ timeout: 25_000 });
+
     await page.locator('.cm-content').fill(commentText);
     await page.getByTestId('comment-submit-button').first().click();
 

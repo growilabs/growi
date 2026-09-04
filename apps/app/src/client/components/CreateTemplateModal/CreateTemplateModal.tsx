@@ -71,7 +71,7 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
         await createTemplate?.(label);
         onClose();
       } catch (err) {
-        toastError(t('toaster.create_failed', { target: path }));
+        toastError(t('commons:toaster.create_failed', { target: path }));
       }
     },
     [createTemplate, onClose, path, t],

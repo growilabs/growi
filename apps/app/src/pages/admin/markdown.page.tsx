@@ -22,7 +22,7 @@ const AdminMarkdownPage: NextPageWithLayout<Props> = () => (
 );
 
 AdminMarkdownPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('markdown_settings.markdown_settings'),
+  title: (_p, t) => t('admin:markdown_settings.markdown_settings'),
   containerFactories: [
     async () => {
       const AdminMarkDownContainer =

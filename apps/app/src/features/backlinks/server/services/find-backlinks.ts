@@ -4,14 +4,15 @@ import mongoose from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { PageQueryBuilder } from '~/server/models/page';
+import { prisma } from '~/utils/prisma';
 
 import type { IBacklink } from '../../interfaces/backlink';
-import PageLink from '../models/page-link';
 
-// Intentionally unbounded: B2.1 measured this path against 100k pages with a
-// 5,000-inbound hub at a median 128 ms (192 ms at 20,000 inbound; 164 ms with a cache
-// 19x too small to hold the data), both plans index-backed, so no result cap or extra
-// index is warranted yet. Re-measure with page-link-read-perf.integ.ts before adding either.
+// Intentionally unbounded: B2.1 measures this path against 100k pages with a
+// 5,000-inbound hub at a median 29 ms (120 ms at 20,000 inbound), both plans
+// index-backed, so no result cap or extra index is warranted yet. Re-measure with
+// page-link-read-perf.integ.ts before adding either. Figures are devcontainer numbers
+// re-taken after the Prisma migration — don't read a trend across environments.
 type BacklinkSource = {
   _id: Types.ObjectId;
   path: string;
@@ -54,7 +55,7 @@ export const findBacklinks = async (
   toPageId: Types.ObjectId,
   user: IUser | null,
 ): Promise<IBacklink[]> => {
-  const backlinkIds = await PageLink.findBacklinkSources(toPageId);
+  const backlinkIds = await prisma.pagelinks.findBacklinkSources(toPageId);
 
   const { query } = await buildVisibleSourcesQuery(backlinkIds, user);
   const pages: BacklinkSource[] = await query.lean().exec();

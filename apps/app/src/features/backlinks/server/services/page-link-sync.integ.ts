@@ -4,33 +4,46 @@ import mongoose, { Types } from 'mongoose';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import PageModelFactory from '~/server/models/page';
 import PageRedirect from '~/server/models/page-redirect';
+import { prisma } from '~/utils/prisma';
 
 import type { IPageLink } from '../../interfaces/page-link';
-import PageLink from '../models/page-link';
+import { ensurePageLinkIndexes } from '../models/page-link-indexes';
 import { reResolveByToPath, syncOutboundLinks } from './page-link-sync';
+
+// pagelinks is prisma-only, and the harness skips migrations on the in-memory MongoDB,
+// so the unique index the idempotency assertions rely on has to be applied here.
+beforeAll(async () => {
+  const db = mongoose.connection.db;
+  if (db == null) throw new Error('no mongoose connection');
+  await ensurePageLinkIndexes(db);
+});
 
 describe('syncOutboundLinks (integration)', () => {
   const fromPage = new Types.ObjectId();
 
   beforeEach(async () => {
-    await PageLink.deleteMany({ fromPage });
+    await prisma.pagelinks.deleteMany({
+      where: { fromPageId: fromPage.toString() },
+    });
   });
 
   // Fetch this page's outbound rows in a stable, comparable shape.
   const outboundRows = () =>
-    PageLink.find({ fromPage })
-      .select('toPath toPage -_id')
-      .sort({ toPath: 1 })
-      .lean();
+    prisma.pagelinks.findMany({
+      where: { fromPageId: fromPage.toString() },
+      select: { toPath: true, toPageId: true },
+      orderBy: { toPath: 'asc' },
+    });
 
-  // Capture the persisted _id per toPath so churn (delete + re-insert) can be
-  // detected: an in-place update keeps the same _id, a re-insert changes it.
+  // Capture the persisted id per toPath so churn (delete + re-insert) can be
+  // detected: an in-place update keeps the same id, a re-insert changes it.
   const outboundIds = async () => {
-    const rows = await PageLink.find({ fromPage })
-      .select('toPath')
-      .sort({ toPath: 1 })
-      .lean();
-    return rows.map((row) => ({ toPath: row.toPath, id: row._id.toString() }));
+    const rows = await prisma.pagelinks.findMany({
+      where: { fromPageId: fromPage.toString() },
+      select: { toPath: true, id: true },
+      orderBy: { toPath: 'asc' },
+    });
+    return rows.map((row) => ({ toPath: row.toPath, id: row.id }));
   };
 
   it('is idempotent — running twice with the same set yields identical rows', async () => {
@@ -43,8 +56,8 @@ describe('syncOutboundLinks (integration)', () => {
     // Absolute expectation: the resolved target id is cached in toPage, and the
     // broken row is stored with a null target.
     const expected = [
-      { toPath: '/a', toPage: targetA },
-      { toPath: '/missing', toPage: null },
+      { toPath: '/a', toPageId: targetA.toString() },
+      { toPath: '/missing', toPageId: null },
     ];
 
     await syncOutboundLinks(fromPage, rows);
@@ -60,7 +73,7 @@ describe('syncOutboundLinks (integration)', () => {
     // ...and the second run changes nothing: no duplicate insert on the
     // { fromPage, toPath } upsert filter.
     expect(afterSecond).toEqual(expected);
-    // Every row keeps its original _id across runs, proving the rows are
+    // Every row keeps its original id across runs, proving the rows are
     // updated in place — no deletion+reinsert churn.
     expect(idsAfterSecond).toEqual(idsAfterFirst);
   });
@@ -84,8 +97,8 @@ describe('syncOutboundLinks (integration)', () => {
     const rows = await outboundRows();
     // Assert full rows: /a keeps its original target, /c is added, /b is gone.
     expect(rows).toEqual([
-      { toPath: '/a', toPage: targetA },
-      { toPath: '/c', toPage: targetC },
+      { toPath: '/a', toPageId: targetA.toString() },
+      { toPath: '/c', toPageId: targetC.toString() },
     ]);
   });
 
@@ -100,7 +113,7 @@ describe('syncOutboundLinks (integration)', () => {
 
     const rows = await outboundRows();
     // Only the non-self link survives, with its target cached.
-    expect(rows).toEqual([{ toPath: '/other', toPage: other }]);
+    expect(rows).toEqual([{ toPath: '/other', toPageId: other.toString() }]);
   });
 
   it('clears all outbound rows when the page has no links left', async () => {
@@ -119,7 +132,7 @@ describe('syncOutboundLinks (integration)', () => {
 describe('reResolveByToPath (integration)', () => {
   let Page: PageModel;
   let createdPages: Types.ObjectId[] = [];
-  let createdLinks: Types.ObjectId[] = [];
+  let createdLinks: string[] = [];
   let createdRedirects: Types.ObjectId[] = [];
 
   beforeAll(async () => {
@@ -129,7 +142,7 @@ describe('reResolveByToPath (integration)', () => {
 
   afterEach(async () => {
     await Page.deleteMany({ _id: { $in: createdPages } });
-    await PageLink.deleteMany({ _id: { $in: createdLinks } });
+    await prisma.pagelinks.deleteMany({ where: { id: { in: createdLinks } } });
     await PageRedirect.deleteMany({ _id: { $in: createdRedirects } });
     createdPages = [];
     createdLinks = [];
@@ -145,8 +158,14 @@ describe('reResolveByToPath (integration)', () => {
   };
 
   const createLink = async (row: IPageLink): Promise<void> => {
-    const link = await PageLink.create(row);
-    createdLinks.push(link._id);
+    const link = await prisma.pagelinks.create({
+      data: {
+        fromPageId: row.fromPage.toString(),
+        toPath: row.toPath,
+        toPageId: row.toPage?.toString() ?? null,
+      },
+    });
+    createdLinks.push(link.id);
   };
 
   /** Stands in for what a rename with "create redirect page" leaves behind. */
@@ -160,10 +179,11 @@ describe('reResolveByToPath (integration)', () => {
 
   // Whole row set, so a dropped or extra row fails too — not just a wrong target.
   const inboundRows = (toPath: string) =>
-    PageLink.find({ toPath })
-      .select('fromPage toPage -_id')
-      .sort({ fromPage: 1 })
-      .lean();
+    prisma.pagelinks.findMany({
+      where: { toPath },
+      select: { fromPageId: true, toPageId: true },
+      orderBy: { fromPageId: 'asc' },
+    });
 
   it('repoints a stale cache at the page that now occupies the path', async () => {
     const source = new Types.ObjectId();
@@ -178,7 +198,7 @@ describe('reResolveByToPath (integration)', () => {
     await reResolveByToPath('/re-resolve-integ/reused');
 
     expect(await inboundRows('/re-resolve-integ/reused')).toEqual([
-      { fromPage: source, toPage: occupant._id },
+      { fromPageId: source.toString(), toPageId: occupant._id.toString() },
     ]);
   });
 
@@ -194,7 +214,7 @@ describe('reResolveByToPath (integration)', () => {
     await reResolveByToPath('/re-resolve-integ/created-later');
 
     expect(await inboundRows('/re-resolve-integ/created-later')).toEqual([
-      { fromPage: source, toPage: page._id },
+      { fromPageId: source.toString(), toPageId: page._id.toString() },
     ]);
   });
 
@@ -209,7 +229,7 @@ describe('reResolveByToPath (integration)', () => {
     await reResolveByToPath('/re-resolve-integ/vanished');
 
     expect(await inboundRows('/re-resolve-integ/vanished')).toEqual([
-      { fromPage: source, toPage: null },
+      { fromPageId: source.toString(), toPageId: null },
     ]);
   });
 
@@ -240,12 +260,12 @@ describe('reResolveByToPath (integration)', () => {
     expect(rows).toHaveLength(2);
     expect(rows).toEqual(
       expect.arrayContaining([
-        { fromPage: sourceA, toPage: page._id },
-        { fromPage: sourceB, toPage: page._id },
+        { fromPageId: sourceA.toString(), toPageId: page._id.toString() },
+        { fromPageId: sourceB.toString(), toPageId: page._id.toString() },
       ]),
     );
     expect(await inboundRows('/re-resolve-integ/unrelated')).toEqual([
-      { fromPage: sourceA, toPage: untouchedTarget },
+      { fromPageId: sourceA.toString(), toPageId: untouchedTarget.toString() },
     ]);
   });
 
@@ -265,7 +285,7 @@ describe('reResolveByToPath (integration)', () => {
     await reResolveByToPath('/re-resolve-integ/old-name');
 
     expect(await inboundRows('/re-resolve-integ/old-name')).toEqual([
-      { fromPage: source, toPage: page._id },
+      { fromPageId: source.toString(), toPageId: page._id.toString() },
     ]);
   });
 
@@ -290,7 +310,7 @@ describe('reResolveByToPath (integration)', () => {
     await reResolveByToPath('/re-resolve-integ/redir-mid');
 
     expect(await inboundRows('/re-resolve-integ/redir-a')).toEqual([
-      { fromPage: source, toPage: newOccupant._id },
+      { fromPageId: source.toString(), toPageId: newOccupant._id.toString() },
     ]);
   });
 
@@ -331,35 +351,45 @@ describe('reResolveByToPath (integration)', () => {
     expect(rows).toEqual(
       expect.arrayContaining([
         // no self-backlink, and no stale target left behind
-        { fromPage: source._id, toPage: null },
+        { fromPageId: source._id.toString(), toPageId: null },
         // ...without holding back the rest of the path
-        { fromPage: otherSource, toPage: source._id },
+        { fromPageId: otherSource.toString(), toPageId: source._id.toString() },
       ]),
     );
     expect(await inboundRows('/re-resolve-integ/self-elsewhere')).toEqual([
-      { fromPage: source._id, toPage: unrelatedTarget },
+      {
+        fromPageId: source._id.toString(),
+        toPageId: unrelatedTarget.toString(),
+      },
     ]);
   });
 });
 
-describe('PageLink.repointInboundLinks (integration)', () => {
-  let createdLinks: Types.ObjectId[] = [];
+describe('prisma.pagelinks.repointInboundLinks (integration)', () => {
+  let createdLinks: string[] = [];
 
   afterEach(async () => {
-    await PageLink.deleteMany({ _id: { $in: createdLinks } });
+    await prisma.pagelinks.deleteMany({ where: { id: { in: createdLinks } } });
     createdLinks = [];
   });
 
   const createLink = async (row: IPageLink): Promise<void> => {
-    const link = await PageLink.create(row);
-    createdLinks.push(link._id);
+    const link = await prisma.pagelinks.create({
+      data: {
+        fromPageId: row.fromPage.toString(),
+        toPath: row.toPath,
+        toPageId: row.toPage?.toString() ?? null,
+      },
+    });
+    createdLinks.push(link.id);
   };
 
   const inboundRows = (toPath: string) =>
-    PageLink.find({ toPath })
-      .select('fromPage toPage -_id')
-      .sort({ fromPage: 1 })
-      .lean();
+    prisma.pagelinks.findMany({
+      where: { toPath },
+      select: { fromPageId: true, toPageId: true },
+      orderBy: { fromPageId: 'asc' },
+    });
 
   // A row at an unrelated path: its survival is what proves nothing was written.
   const seedBystander = async (): Promise<{
@@ -389,12 +419,12 @@ describe('PageLink.repointInboundLinks (integration)', () => {
 
     // Matched on the message: for the two inputs mongoose would ignore anyway,
     // this is the only assertion that tells the guard from an unrelated failure.
-    await expect(PageLink.repointInboundLinks(badToPath, null)).rejects.toThrow(
-      /non-empty path string/,
-    );
+    await expect(
+      prisma.pagelinks.repointInboundLinks(badToPath, null),
+    ).rejects.toThrow(/non-empty path string/);
 
     expect(await inboundRows('/repoint-guard/bystander')).toEqual([
-      { fromPage: source, toPage: target },
+      { fromPageId: source.toString(), toPageId: target.toString() },
     ]);
   });
 
@@ -404,13 +434,13 @@ describe('PageLink.repointInboundLinks (integration)', () => {
     // Unguarded this is written, not rejected: the update is a pipeline, which
     // mongoose does not cast, so the expression is evaluated into the column.
     await expect(
-      PageLink.repointInboundLinks('/repoint-guard/bystander', {
+      prisma.pagelinks.repointInboundLinks('/repoint-guard/bystander', {
         $literal: 'pwned',
       } as unknown as Types.ObjectId),
     ).rejects.toThrow(/ObjectId or null/);
 
     expect(await inboundRows('/repoint-guard/bystander')).toEqual([
-      { fromPage: source, toPage: target },
+      { fromPageId: source.toString(), toPageId: target.toString() },
     ]);
   });
 });

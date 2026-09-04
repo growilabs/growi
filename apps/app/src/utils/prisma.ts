@@ -1,3 +1,4 @@
+import { extension as PageLinkExtension } from '~/features/backlinks/server/models/page-link';
 import { extension as CommentExtension } from '~/features/comment/server';
 import { extension as MastraRefreshedModelCatalogExtension } from '~/features/mastra/server/models/refreshed-model-catalog';
 import {
@@ -10,6 +11,7 @@ import { extension as BookmarkFolderExtension } from '~/server/models/bookmark-f
 import { extension as ExternalAccountExtension } from '~/server/models/external-account';
 import { extension as PageTagRelationExtension } from '~/server/models/page-tag-relation';
 import { extension as RevisionExtension } from '~/server/models/revision';
+import { extension as ShareLinkExtension } from '~/server/models/share-link';
 import { extension as TagExtension } from '~/server/models/tag';
 import { extension as UserExtension } from '~/server/models/user/index.prisma';
 
@@ -102,7 +104,7 @@ export async function paginateLogic<T>(
 
   const page = Math.ceil((offset + 1) / limit);
   const pagingCounter = (page - 1) * limit + 1;
-  const totalPages = Math.ceil(totalDocs / limit);
+  const totalPages = Math.max(1, Math.ceil(totalDocs / limit));
 
   // mongoose-paginate-v2 compatible hasPrevPage/prevPage:
   // - page === 1 && offset !== 0: hasPrevPage=true, prevPage=1 (edge case)
@@ -218,7 +220,9 @@ export const createPrisma = (datasourceUrl?: string) =>
     .$extends(CommentExtension)
     .$extends(ExternalAccountExtension)
     .$extends(MastraRefreshedModelCatalogExtension)
+    .$extends(PageLinkExtension)
     .$extends(RevisionExtension)
+    .$extends(ShareLinkExtension)
     .$extends(UserExtension)
     // TagExtension must precede PageTagRelationExtension: the latter calls
     // client.tags.getIdToNameMap/findOrCreateMany (custom Tag methods) from
