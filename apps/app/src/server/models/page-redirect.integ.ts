@@ -1,54 +1,78 @@
-import PageRedirect from './page-redirect';
+import { prisma } from '~/utils/prisma';
 
 describe('PageRedirect', () => {
   beforeEach(async () => {
     // clear collection
-    await PageRedirect.deleteMany({});
+    await prisma.pageredirects.deleteMany({});
   });
 
   describe('.removePageRedirectsByToPath', () => {
     test('works fine', async () => {
       // setup:
-      await PageRedirect.insertMany([
-        { fromPath: '/org/path1', toPath: '/path1' },
-        { fromPath: '/org/path2', toPath: '/path2' },
-        { fromPath: '/org/path3', toPath: '/path3' },
-        { fromPath: '/org/path33', toPath: '/org/path333' },
-        { fromPath: '/org/path333', toPath: '/path3' },
-      ]);
+      await prisma.pageredirects.createMany({
+        data: [
+          { fromPath: '/org/path1', toPath: '/path1' },
+          { fromPath: '/org/path2', toPath: '/path2' },
+          { fromPath: '/org/path3', toPath: '/path3' },
+          { fromPath: '/org/path33', toPath: '/org/path333' },
+          { fromPath: '/org/path333', toPath: '/path3' },
+        ],
+      });
       expect(
-        await PageRedirect.findOne({ fromPath: '/org/path1' }),
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/org/path1' },
+        }),
       ).not.toBeNull();
       expect(
-        await PageRedirect.findOne({ fromPath: '/org/path2' }),
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/org/path2' },
+        }),
       ).not.toBeNull();
       expect(
-        await PageRedirect.findOne({ fromPath: '/org/path3' }),
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/org/path3' },
+        }),
       ).not.toBeNull();
       expect(
-        await PageRedirect.findOne({ fromPath: '/org/path33' }),
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/org/path33' },
+        }),
       ).not.toBeNull();
       expect(
-        await PageRedirect.findOne({ fromPath: '/org/path333' }),
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/org/path333' },
+        }),
       ).not.toBeNull();
 
       // when:
       // remove all documents that have { toPath: '/path/3' }
-      await PageRedirect.removePageRedirectsByToPath('/path3');
+      await prisma.pageredirects.removePageRedirectsByToPath('/path3');
 
       // then:
       expect(
-        await PageRedirect.findOne({ fromPath: '/org/path1' }),
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/org/path1' },
+        }),
       ).not.toBeNull();
       expect(
-        await PageRedirect.findOne({ fromPath: '/org/path2' }),
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/org/path2' },
+        }),
       ).not.toBeNull();
-      expect(await PageRedirect.findOne({ fromPath: '/org/path3' })).toBeNull();
       expect(
-        await PageRedirect.findOne({ fromPath: '/org/path33' }),
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/org/path3' },
+        }),
       ).toBeNull();
       expect(
-        await PageRedirect.findOne({ fromPath: '/org/path333' }),
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/org/path33' },
+        }),
+      ).toBeNull();
+      expect(
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/org/path333' },
+        }),
       ).toBeNull();
     });
   });
@@ -56,12 +80,16 @@ describe('PageRedirect', () => {
   describe('.retrievePageRedirectEndpoints', () => {
     test('shoud return null when data is not found', async () => {
       // setup:
-      expect(await PageRedirect.findOne({ fromPath: '/path1' })).toBeNull();
+      expect(
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/path1' },
+        }),
+      ).toBeNull();
 
       // when:
       // retrieve
       const endpoints =
-        await PageRedirect.retrievePageRedirectEndpoints('/path1');
+        await prisma.pageredirects.retrievePageRedirectEndpoints('/path1');
 
       // then:
       expect(endpoints).toBeNull();
@@ -69,13 +97,19 @@ describe('PageRedirect', () => {
 
     test('shoud return IPageRedirectEnds (start and end is the same)', async () => {
       // setup:
-      await PageRedirect.insertMany([{ fromPath: '/path1', toPath: '/path2' }]);
-      expect(await PageRedirect.findOne({ fromPath: '/path1' })).not.toBeNull();
+      await prisma.pageredirects.createMany({
+        data: [{ fromPath: '/path1', toPath: '/path2' }],
+      });
+      expect(
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/path1' },
+        }),
+      ).not.toBeNull();
 
       // when:
       // retrieve
       const endpoints =
-        await PageRedirect.retrievePageRedirectEndpoints('/path1');
+        await prisma.pageredirects.retrievePageRedirectEndpoints('/path1');
 
       // then:
       expect(endpoints).not.toBeNull();
@@ -89,19 +123,33 @@ describe('PageRedirect', () => {
 
     test('shoud return IPageRedirectEnds', async () => {
       // setup:
-      await PageRedirect.insertMany([
-        { fromPath: '/path1', toPath: '/path2' },
-        { fromPath: '/path2', toPath: '/path3' },
-        { fromPath: '/path3', toPath: '/path4' },
-      ]);
-      expect(await PageRedirect.findOne({ fromPath: '/path1' })).not.toBeNull();
-      expect(await PageRedirect.findOne({ fromPath: '/path2' })).not.toBeNull();
-      expect(await PageRedirect.findOne({ fromPath: '/path3' })).not.toBeNull();
+      await prisma.pageredirects.createMany({
+        data: [
+          { fromPath: '/path1', toPath: '/path2' },
+          { fromPath: '/path2', toPath: '/path3' },
+          { fromPath: '/path3', toPath: '/path4' },
+        ],
+      });
+      expect(
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/path1' },
+        }),
+      ).not.toBeNull();
+      expect(
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/path2' },
+        }),
+      ).not.toBeNull();
+      expect(
+        await prisma.pageredirects.findFirst({
+          where: { fromPath: '/path3' },
+        }),
+      ).not.toBeNull();
 
       // when:
       // retrieve
       const endpoints =
-        await PageRedirect.retrievePageRedirectEndpoints('/path1');
+        await prisma.pageredirects.retrievePageRedirectEndpoints('/path1');
 
       // then:
       expect(endpoints).not.toBeNull();
