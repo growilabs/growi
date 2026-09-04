@@ -221,6 +221,10 @@ const UsernameTypeaheadSubstance: ForwardRefRenderFunction<
         multiple
         delay={400}
         minLength={0}
+        // On a cache hit `AsyncTypeahead` skips `onSearch`, so `searchKeyword`
+        // freezes at the last fetched keyword and `filterBy` below hides every
+        // option as stale. SWR already caches these responses.
+        useCache={false}
         filterBy={filterBy}
         placeholder={placeholder}
         isLoading={isLoading}
