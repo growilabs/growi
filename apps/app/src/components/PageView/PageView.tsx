@@ -1,10 +1,14 @@
-import { type JSX, memo, useCallback, useId, useMemo, useRef } from 'react';
+import { type JSX, memo, useId, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { isDeepEquals } from '@growi/core/dist/utils/is-deep-equals';
 import { isUsersHomepage } from '@growi/core/dist/utils/page-path-utils';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 
 import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle';
+// biome-ignore lint/style/noRestrictedImports: client-only hook used in client-only component (must run unconditionally, so it cannot go through next/dynamic like the components below)
+import { useAnchorResolver } from '~/features/inline-comment/client/components/AnchorResolver/use-anchor-resolver';
+// biome-ignore lint/style/noRestrictedImports: client-only hook used in client-only component (must run unconditionally, so it cannot go through next/dynamic like the components below)
+import { useSWRxInlineComments } from '~/features/inline-comment/client/stores/inline-comment';
 import type { RendererConfig } from '~/interfaces/services/renderer';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
 import {
@@ -14,6 +18,7 @@ import {
   useIsIdenticalPath,
   useIsNotCreatable,
   usePageNotFound,
+  useShareLinkId,
 } from '~/states/page';
 import { useViewOptions } from '~/stores/renderer';
 
@@ -54,6 +59,27 @@ const PageContentsUtilities = dynamic(
 );
 const Comments = dynamic(
   () => import('~/client/components/Comments').then((mod) => mod.Comments),
+  { ssr: false },
+);
+const SelectionCapture = dynamic(
+  () =>
+    import(
+      '~/features/inline-comment/client/components/SelectionCapture/SelectionCapture'
+    ).then((mod) => mod.SelectionCapture),
+  { ssr: false },
+);
+const InlineCommentHighlight = dynamic(
+  () =>
+    import(
+      '~/features/inline-comment/client/components/InlineCommentHighlight/InlineCommentHighlight'
+    ).then((mod) => mod.InlineCommentHighlight),
+  { ssr: false },
+);
+const InlineCommentList = dynamic(
+  () =>
+    import(
+      '~/features/inline-comment/client/components/InlineCommentList/InlineCommentList'
+    ).then((mod) => mod.InlineCommentList),
   { ssr: false },
 );
 const UsersHomepageFooter = dynamic(
@@ -97,6 +123,15 @@ const arePropsEqual = (prevProps: Props, nextProps: Props): boolean =>
 
 const PageViewComponent = (props: Props): JSX.Element => {
   const commentsContainerRef = useRef<HTMLDivElement>(null);
+  // Wraps whichever of PageContentRenderer/SlideRenderer is rendered below,
+  // giving SelectionCapture/AnchorResolver/InlineCommentHighlight a container
+  // scoped to the page body only (excludes the sidebar and the comment
+  // threads). RevisionRenderer.tsx already forwards a ref to its own
+  // ReactMarkdown-wrapping div (task 5.1); this outer div reads the same
+  // rendered text since it contains nothing else, without requiring
+  // PageContentRenderer.tsx (a thin dynamic-import wrapper) to also forward
+  // a ref through next/dynamic.
+  const pageBodyContainerRef = useRef<HTMLDivElement>(null);
 
   const { pagePath, rendererConfig, className } = props;
 
@@ -124,6 +159,38 @@ const PageViewComponent = (props: Props): JSX.Element => {
 
   // Auto-scroll to URL hash target, handling lazy-rendered content
   useHashAutoScroll({ key: currentPageId, contentContainerId });
+
+  // Inline comments (Requirements 1.1, 2.1, 2.5, 6.2). PageView.tsx is only
+  // ever rendered by the normal page route (`pages/[[...path]]`) — the
+  // share-link route renders the separate `ShareLinkPageView` component
+  // instead, which this task does not touch, and only THAT route's
+  // `useHydratePageAtoms(..., { shareLinkId })` call ever sets
+  // `shareLinkIdAtom` (see `pages/share/[[...path]]/index.page.tsx` vs.
+  // `pages/[[...path]]/index.page.tsx`). So `useShareLinkId()` is always
+  // `undefined` on every route that actually renders this component today.
+  // The check below is still added as explicit defense-in-depth (mirrors
+  // the client-side `isSharedPage`-style guard other share-link-sensitive UI
+  // in this codebase uses) so that if PageView.tsx is ever reused under a
+  // share-link context in the future, the inline-comment UI — and the
+  // network request below — stay off by construction rather than by the
+  // routes happening to stay separate.
+  const shareLinkId = useShareLinkId();
+  const isSharedPageView = shareLinkId != null;
+  const { data: inlineComments } = useSWRxInlineComments(
+    isSharedPageView ? null : (page?._id ?? null),
+  );
+  const inlineCommentAnchors = useMemo(
+    () =>
+      (inlineComments ?? []).map((comment) => ({
+        id: comment.id,
+        anchor: comment.anchor,
+      })),
+    [inlineComments],
+  );
+  const resolvedInlineCommentRanges = useAnchorResolver(
+    pageBodyContainerRef,
+    inlineCommentAnchors,
+  );
 
   const specialContents = useMemo(() => {
     if (isIdenticalPathPage) {
@@ -158,7 +225,13 @@ const PageViewComponent = (props: Props): JSX.Element => {
       </>
     ) : null;
 
-  const Contents = useCallback(() => {
+  // NOTE: this MUST stay a memoized *element*, never a component defined in
+  // the render body. When it was `const Contents = useCallback(...)` rendered
+  // as `<Contents />`, every dependency change produced a new function
+  // identity, so React saw a different element `type` and unmounted/remounted
+  // this whole subtree — silently discarding SelectionCapture's in-progress
+  // inline-comment form.
+  const contents = useMemo(() => {
     if (isNotFound || page?.revision == null) {
       return <NotFoundPage path={pagePath} />;
     }
@@ -170,25 +243,40 @@ const PageViewComponent = (props: Props): JSX.Element => {
         <PageContentsUtilities />
 
         <div className="flex-expand-vert justify-content-between">
-          {isSlide != null ? (
-            <SlideRenderer marp={isSlide.marp} markdown={markdown} />
-          ) : (
-            <PageContentRenderer
-              rendererOptions={viewOptions}
-              rendererConfig={rendererConfig}
-              pagePath={pagePath}
-              markdown={markdown}
-            />
-          )}
-
-          {!isIdenticalPathPage && !isNotFound && (
-            <div id="comments-container" ref={commentsContainerRef}>
-              <Comments
-                pageId={page._id}
+          <div ref={pageBodyContainerRef}>
+            {isSlide != null ? (
+              <SlideRenderer marp={isSlide.marp} markdown={markdown} />
+            ) : (
+              <PageContentRenderer
+                rendererOptions={viewOptions}
+                rendererConfig={rendererConfig}
                 pagePath={pagePath}
-                revision={page.revision}
+                markdown={markdown}
               />
-            </div>
+            )}
+          </div>
+
+          {!isIdenticalPathPage && !isNotFound && !isSharedPageView && (
+            <>
+              <SelectionCapture
+                containerRef={pageBodyContainerRef}
+                pageId={page._id}
+                anchorOriginRevisionId={page.revision._id}
+              />
+              <InlineCommentHighlight
+                containerRef={pageBodyContainerRef}
+                resolvedRanges={resolvedInlineCommentRanges}
+              />
+
+              <div id="comments-container" ref={commentsContainerRef}>
+                <InlineCommentList pageId={page._id} />
+                <Comments
+                  pageId={page._id}
+                  pagePath={pagePath}
+                  revision={page.revision}
+                />
+              </div>
+            </>
           )}
         </div>
       </>
@@ -203,6 +291,8 @@ const PageViewComponent = (props: Props): JSX.Element => {
     isSlide,
     isIdenticalPathPage,
     page,
+    resolvedInlineCommentRanges,
+    isSharedPageView,
   ]);
 
   return (
@@ -222,7 +312,7 @@ const PageViewComponent = (props: Props): JSX.Element => {
             <UserInfo author={page.creator} />
           )}
           <div id={contentContainerId} className="flex-expand-vert">
-            <Contents />
+            {contents}
           </div>
         </>
       )}

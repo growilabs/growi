@@ -173,15 +173,26 @@ model comments {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  page     pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  creator  users?     @relation(fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  revision revisions? @relation(fields: [revisionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  replyTo  comments?  @relation("CommentToReply", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  replies  comments[] @relation("CommentToReply")
+  isInline               Boolean   @default(false)
+  quote                  String?
+  prefix                 String?
+  suffix                 String?
+  approxOffset           Int?
+  anchorOriginRevisionId String?   @db.ObjectId
+  resolvedById           String?   @db.ObjectId
+  resolvedAt             DateTime?
+
+  page       pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  creator    users?     @relation("CommentCreator", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  revision   revisions? @relation(fields: [revisionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replyTo    comments?  @relation("CommentToReply", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies    comments[] @relation("CommentToReply")
+  resolvedBy users?     @relation("InlineCommentResolver", fields: [resolvedById], references: [id])
 
   @@index([pageId], map: "page_1")
   @@index([creatorId], map: "creator_1")
   @@index([revisionId], map: "revision_1")
+  @@index([pageId, isInline])
 }
 
 model configs {
@@ -589,17 +600,18 @@ model users {
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
-  activities         activities[]
-  comments           comments[]
-  revisions          revisions[]
-  createdPages       pages[]            @relation("CreatedPages")
-  deletedPages       pages[]            @relation("DeletedPages")
-  lastUpdatedPages   pages[]            @relation("LastUpdatedPages")
-  imageAttachment    attachments?       @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
-  createdAttachments attachments[]      @relation("CreatedAttachments")
-  externalaccounts   externalaccounts[]
-  bookmarks          bookmarks[]
-  bookmarkfolders    bookmarkfolders[]
+  activities             activities[]
+  comments               comments[]         @relation("CommentCreator")
+  resolvedInlineComments comments[]         @relation("InlineCommentResolver")
+  revisions              revisions[]
+  createdPages           pages[]            @relation("CreatedPages")
+  deletedPages           pages[]            @relation("DeletedPages")
+  lastUpdatedPages       pages[]            @relation("LastUpdatedPages")
+  imageAttachment        attachments?       @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
+  createdAttachments     attachments[]      @relation("CreatedAttachments")
+  externalaccounts       externalaccounts[]
+  bookmarks              bookmarks[]
+  bookmarkfolders        bookmarkfolders[]
 
   @@index([name], map: "name_1")
   @@index([status], map: "status_1")
