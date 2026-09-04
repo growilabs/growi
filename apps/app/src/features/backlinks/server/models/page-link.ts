@@ -97,6 +97,49 @@ export const extension = Prisma.defineExtension((client) => {
         },
 
         /**
+         * Delete the given pages' outbound rows, and null any inbound cache pointing at
+         * them (which is what makes those rows' derived state `broken`).
+         *
+         * Low-level primitive: writes unconditionally. The trashed-vs-gone decision is
+         * the reconcile service's — a merely-trashed page needs no write at all, since
+         * its derived state already reads `trashed`. Do NOT call this from event handlers.
+         */
+        async removeLinksForPages(pageIds: Types.ObjectId[]): Promise<void> {
+          // Only saves two no-op round trips; the filters below narrow by id either way.
+          if (pageIds.length === 0) {
+            return;
+          }
+
+          const ids = pageIds.map((id) => id.toString());
+
+          // Outbound first: these rows have lost their source, so they are the ones a
+          // reader could still surface as a phantom backlink. Ids need no validation
+          // here or below — each is stringified then cast (or `$oid`-wrapped), so an
+          // operator object from an untyped caller degrades to a malformed id.
+          await client.pagelinks.deleteMany({
+            where: { fromPageId: { in: ids } },
+          });
+
+          // Raw because the query API cannot express this at all: `pagelinks.updateMany`
+          // accepts only `toPath` in `data` (relation scalars are not settable), and
+          // `utils/prisma.ts` injects `v: { increment: 1 }` into every update — a field
+          // this collection lacks. That block leaves `deleteMany` alone, hence the split.
+          //
+          // Clears only the cache; `toPath` stays faithful to the body.
+          const result = await client.$runCommandRaw({
+            update: 'pagelinks',
+            updates: [
+              {
+                q: { toPage: { $in: ids.map((id) => ({ $oid: id })) } },
+                u: { $set: { toPage: null } },
+                multi: true,
+              },
+            ],
+          });
+          throwOnWriteErrors(result, 'removeLinksForPages');
+        },
+
+        /**
          * Point every row whose `toPath` field equals `toPath` at `toPage` (null =
          * broken). One bulk update, matched by text — not per-source-page.
          *
