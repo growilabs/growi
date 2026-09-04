@@ -520,6 +520,8 @@
     },
     "editor": {
       "title": "Raccourcis d'édition",
+      "Slash Command": "Commande slash",
+      "Slash Command Desc": "(Afficher le menu des commandes)",
       "Indent": "Indentation",
       "Outdent": "Retrait",
       "Save Page": "Sauvegarder la page",
@@ -1094,5 +1096,43 @@
     "searching": "Recherche en cours...",
     "noResults": "Aucune page trouvée",
     "candidatesLabel": "Pages suggérées"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "Titre 1",
+      "description": ""
+    },
+    "heading2": {
+      "label": "Titre 2",
+      "description": ""
+    },
+    "heading3": {
+      "label": "Titre 3",
+      "description": ""
+    },
+    "bulletList": {
+      "label": "Liste à puces",
+      "description": ""
+    },
+    "numberedList": {
+      "label": "Liste numérotée",
+      "description": ""
+    },
+    "taskList": {
+      "label": "Liste de tâches",
+      "description": ""
+    },
+    "quote": {
+      "label": "Citation",
+      "description": ""
+    },
+    "codeBlock": {
+      "label": "Bloc de code",
+      "description": ""
+    },
+    "table": {
+      "label": "Tableau",
+      "description": ""
+    }
   }
 }

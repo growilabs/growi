@@ -558,6 +558,8 @@
     },
     "editor": {
       "title": "エディターショートカット",
+      "Slash Command": "スラッシュコマンド",
+      "Slash Command Desc": "(コマンドメニューを表示)",
       "Indent": "インデント",
       "Outdent": "左インデント",
       "Save Page": "保存",
@@ -1133,5 +1135,43 @@
     "searching": "検索中...",
     "noResults": "該当するページがありません",
     "candidatesLabel": "ページ候補"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "見出し1",
+      "description": ""
+    },
+    "heading2": {
+      "label": "見出し2",
+      "description": ""
+    },
+    "heading3": {
+      "label": "見出し3",
+      "description": ""
+    },
+    "bulletList": {
+      "label": "箇条書きリスト",
+      "description": ""
+    },
+    "numberedList": {
+      "label": "番号付きリスト",
+      "description": ""
+    },
+    "taskList": {
+      "label": "タスクリスト",
+      "description": ""
+    },
+    "quote": {
+      "label": "引用",
+      "description": ""
+    },
+    "codeBlock": {
+      "label": "コードブロック",
+      "description": ""
+    },
+    "table": {
+      "label": "テーブル",
+      "description": ""
+    }
   }
 }

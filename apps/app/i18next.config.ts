@@ -113,6 +113,18 @@ export default defineConfig({
       // AccessTokenScopeList.tsx:92 — the segment is a scope id with ':'
       // rewritten to '.' at runtime.
       'commons:accesstoken_scopes_desc.*',
+      // slash-command-definitions.ts — the command set lives in
+      // packages/editor (outside `extract.input`, which only scans apps/app's
+      // own `src/**`) and every key is read back through
+      // `t(command.labelKey)` in resolve-slash-commands.ts, so the key string
+      // is runtime-built as well. Both reasons independently put these keys
+      // beyond what static analysis here can see used.
+      // Wildcard, not enumerated: apps/app/src carries no static
+      // `t('slash_command…')` call that shares the prefix (so nothing is
+      // hidden by it), and the command set grows in packages/editor without
+      // this file being touched.
+      'slash_command.*.label',
+      'slash_command.*.description',
     ],
 
     primaryLanguage: 'en_US',
