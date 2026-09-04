@@ -112,6 +112,13 @@ describe('ImportService.import — what a finished run reports', () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
+  // `app-integration` has no project-level testTimeout override, so this runs under
+  // Vitest's 5000ms default. Unlike the other cases in this file, it drives real file
+  // I/O (write + streaming JSON parse) and a real Mongo write with no mocked delay — a
+  // fixed, tiny cost that occasionally exceeds 5s under CI's concurrent-worker
+  // contention rather than because of anything test-parameter-scaled here (fixture is a
+  // single tag record). Seen flaking in growilabs/growi#11858, where a sibling
+  // MongoDB-version matrix cell on the same commit passed, ruling out a code regression.
   test('names the collection that failed and still imports the others', async () => {
     await fs.writeFile(
       path.join(importsDir, TAGS_JSON),
@@ -138,7 +145,7 @@ describe('ImportService.import — what a finished run reports', () => {
     // And the screen must not be told it completed: that event is the operator's cue that
     // the wiki is whole and maintenance mode can come off.
     expect(terminateCount).toBe(0);
-  });
+  }, 15_000);
 
   test('reports nothing when every collection could be read', async () => {
     // The counterpart of the case above: without it, an implementation that always
