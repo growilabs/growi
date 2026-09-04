@@ -23,6 +23,13 @@
  *   documents alone are enough for the destination to restore the operator's plugins.
  * - `attachments` — attachment metadata is content and is transferred; only the payload
  *   collections below are excluded.
+ * - `pagelinks` — the backlink index. It is a cache derived from page bodies, so it looks
+ *   like a rebuildable artifact, but it is derived from content the transfer itself
+ *   carries and holds nothing but page references, which the transfer preserves — so the
+ *   rows stay valid at the destination, exactly as `pagetagrelations` does. Unlike
+ *   `yjs-writings` it does not regenerate on its own: rows are only rewritten when a page
+ *   is next saved, so skipping it would leave backlinks silently empty until every page
+ *   had been edited.
  */
 export const NON_TRANSFERABLE_COLLECTIONS: ReadonlySet<string> = new Set([
   // The key this very transfer authenticates with, plus the record of which migration
@@ -104,6 +111,7 @@ export const TRANSFERABLE_COLLECTIONS: ReadonlySet<string> = new Set([
   'namedqueries',
   'newsitems',
   'newsreadstatuses',
+  'pagelinks',
   'pageredirects',
   'pages',
   'pagetagrelations',

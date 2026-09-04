@@ -377,6 +377,10 @@ export const CONFIG_KEYS = [
 
   // Access Token Settings
   'accessToken:deletionCronExpression',
+
+  // Backlinks Settings
+  'backlinks:drainIntervalMs',
+  'backlinks:dutyCyclePercent',
 ] as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
@@ -1588,6 +1592,18 @@ export const CONFIG_DEFINITIONS = {
   'accessToken:deletionCronExpression': defineConfig<string>({
     envVarName: 'ACCESS_TOKEN_DELETION_CRON_EXPRESSION',
     defaultValue: '0 15 * * *',
+  }),
+
+  // Backlinks Settings
+  'backlinks:drainIntervalMs': defineConfig<number>({
+    envVarName: 'BACKLINKS_DRAIN_INTERVAL_MS',
+    defaultValue: 1000,
+  }),
+  // Share of the event loop the backlinks queue may occupy. A percent integer, not a fraction:
+  // numeric env vars go through a bare parseInt, which would read 0.2 as 0.
+  'backlinks:dutyCyclePercent': defineConfig<number>({
+    envVarName: 'BACKLINKS_DUTY_CYCLE_PERCENT',
+    defaultValue: 20,
   }),
 } as const;
 

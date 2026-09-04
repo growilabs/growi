@@ -15,6 +15,7 @@ import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit
 import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
 import { AuditlogChangeStreamService } from '~/features/auditlog-es-sync/server';
+import { PageLinkService } from '~/features/backlinks/server/services/page-link-service';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { initializeVaultFeature } from '~/features/growi-vault/server';
@@ -146,6 +147,8 @@ class Crowi {
   passportService!: PassportService;
 
   searchService!: SearchService;
+
+  pageLinkService!: PageLinkService;
 
   auditlogChangeStreamService: AuditlogChangeStreamService | null = null;
 
@@ -921,6 +924,9 @@ class Crowi {
       this.pageService = new PageService(this);
     }
     this.pageOperationService = instanciatePageOperationService(this);
+
+    // create() subscribes to page create/update events (like SearchService).
+    this.pageLinkService = PageLinkService.create(this);
   }
 
   setupInAppNotificationService(): void {
