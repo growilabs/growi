@@ -697,6 +697,132 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 - `aiSummary.body` はLLM生成コンテンツであり信頼できない入力として扱う。描画は既存のページ本文Markdownパイプ（`rehype-sanitize` を含む `rendererOptions`）に委譲し、本機能独自のサニタイズ・独自レンダラを新設しない。サニタイズロジックを重複させないことで、既存パイプの改善が要約表示にも自動的に及ぶ状態を保つ。
 - 「削除」導線はページに紐づく永続データを変更しない、閲覧者のブラウザ内 `localStorage` のみのローカルな非表示状態であるため、共有データへの書き込み権限を判定する必要がそもそも存在しない（9.3）。他の閲覧者のアクセス権限には一切影響しない。
 
+---
+
+# UI層の設計（トリガーボタン・保存ボタン）
+
+## UI層の概要
+
+**Purpose**: ページ上部の AI サイドバーのクイックメニューに「このページを要約」ボタンを追加し、生成された要約について「残す / 閉じる」の選択UIを提供する。API層（ai-summarize spec）で定義された生成・永続化エンドポイントを呼ぶクライアント側の実装。
+
+**Users**: ページ閲覧者が AiSidebar のクイックメニューをクリック → 要約生成 → 保存ボタンで永続化を選択。
+
+## UI層のアーキテクチャ
+
+### 既存との統合
+
+```
+AiSidebar（既存）
+├── QuickMenuItems（既存）
+│   └── [このページを要約]（NEW: AiSummarizeQuickMenuItem）
+│
+ChatSidebar（既存）
+├── ChatMessageList（既存）
+│   └── ChatMessage（既存）
+│       └── [残す / 閉じる]（NEW: AiSummarizePersistenceButtons）
+│
+PersistedSummaryView（既存の ai-summarize spec）
+└── [非表示にする]（NEW: HideButton in PersistedSummaryView）
+```
+
+### コンポーネント
+
+#### AiSummarizeQuickMenuItem
+
+**責務**:
+- AI設定・currentPageId確認（可視性制御）
+- クリック → `POST /_api/v3/mastra/summary` 呼び出し
+- ローディング状態管理・二重送信防止（`isGenerating`）
+- 新規チャットスレッド開始
+- エラー時は通知
+
+**Props**:
+```typescript
+interface AiSummarizeQuickMenuItemProps {
+  onStartGeneration?: (threadId: string, capturedAt: Date) => void;
+  onError?: (error: Error) => void;
+}
+```
+
+**可視性**:
+```typescript
+if (useAiReadyGuard() && useCurrentPageId() !== undefined) {
+  // 表示
+}
+```
+
+**実装上の注記**:
+- 見た目は「主張を強くしすぎない」
+- トークン消費を明示（ツールチップ or クイックメニュー説明文）
+- `isGenerating` フラグで二重送信防止
+
+#### AiSummarizePersistenceButtons
+
+**責務**:
+- 「残す / 閉じる」ボタン表示
+- 既存要約がある場合は確認ダイアログ
+- 「残す」クリック → `POST /_api/v3/page/{pageId}/ai-summary` 呼び出し
+- 保存中のローディング表示
+- 成功時はボタン非表示 + 通知
+- エラー時は通知 + ボタン再有効化
+
+**Props**:
+```typescript
+interface AiSummarizePersistenceButtonsProps {
+  pageId: string;
+  threadId: string;
+  capturedAt: Date;
+  summaryText: string;
+  onSuccess?: () => void;
+  onError?: (error: Error) => void;
+}
+```
+
+**実装上の注記**:
+- ページの currentAiSummary を事前確認
+- 確認ダイアログは既存パターン再利用
+- 成功時の「保存完了」は Toast で簡潔に
+- sourceRevisionId は ai-summarize spec で管理（UI では取扱わない）
+
+## UI層の多言語化
+
+**翻訳キー**（ja_JP を例）:
+```
+ai_sidebar.summarize_page: "このページを要約"
+ai_sidebar.summarize_tooltip: "AIでこのページを要約します（トークンを消費します）"
+ai_summarize.persistence.save_button: "残す"
+ai_summarize.persistence.close_button: "閉じる"
+ai_summarize.persistence.hide_button: "非表示にする"
+ai_summarize.persistence.confirm_title: "要約を上書きしますか？"
+ai_summarize.persistence.saved: "要約を保存しました"
+ai_summarize.persistence.hidden: "非表示にしました"
+ai_summarize.freshness.updated: "ページが更新されました"
+ai_summarize.error.network: "ネットワークに接続してください"
+ai_summarize.error.server: "サーバーエラーが発生しました"
+```
+
+## UI層のテスト戦略
+
+### Unit Tests
+- **AiSummarizeQuickMenuItem**: AI設定確認 → 表示/非表示の切り替え
+- **AiSummarizePersistenceButtons**: ボタンクリック → API呼び出し確認
+- ローディング状態遷移（クリック直後無効化、完了後有効化）
+- 二重送信防止（isGenerating フラグ）
+- エラー時の通知表示
+
+### Integration Tests
+- End-to-end: ページ表示 → ボタンクリック → 要約生成 → 保存
+- 既存要約がある場合の確認ダイアログ動作
+- 多言語表示確認（キー存在確認 + i18n連携）
+- localStorage の非表示フラグ動作
+
+## UI層のセキュリティ
+
+- トリガーボタンは AI 設定確認により制御（未ログイン時は表示しない）
+- API呼び出しは既存の認可層（`loginRequiredStrictly`, `excludeReadOnlyUser`）に従う
+- エラーメッセージに技術詳細は含めない（既存パターン準拠）
+- localStorage の非表示フラグはクライアント側操作のみ（サーバに影響なし）
+
 ## Optional Sections
 
 （Performance & Scalability, Migration Strategy は本featureの規模では該当なしのため省略）
