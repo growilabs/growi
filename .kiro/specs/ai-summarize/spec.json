@@ -1,0 +1,25 @@
+{
+  "feature_name": "ai-summarize",
+  "created_at": "2026-08-12T06:24:37Z",
+  "updated_at": "2026-09-04T23:59:00Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true,
+      "notes": "API層(Req1-9) + UI層(Req10-17) 統合。設計検証GO判定により承認"
+    },
+    "design": {
+      "generated": true,
+      "approved": true,
+      "notes": "API層(Section1-6) + UI層(Section7-12) 統合。設計検証GO判定により承認。UI層実装は本spec内で実現（トリガーボタン・保存UI・永続化表示を含む）"
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "notes": "API層(Task 1-6) + UI層(Task 7-12) + 統合テスト(Task 13) で構成。Req1-17全てマッピング済み。実装開始にはユーザー承認が必須。3つの必須テスト条件：Task 4.2(クロスAgent再生)、Task 4.3(バジェット境界値)、Task 3.2/6.2/6.4(権限ゲート)"
+    }
+  },
+  "ready_for_implementation": true
+}
