@@ -17,9 +17,9 @@
     },
     "tasks": {
       "generated": true,
-      "approved": false,
+      "approved": true,
       "notes": "API層(Task 1-6) + UI層(Task 7-12) + 統合テスト(Task 13) で構成。Req1-17全てマッピング済み。実装開始にはユーザー承認が必須。3つの必須テスト条件：Task 4.2(クロスAgent再生)、Task 4.3(バジェット境界値)、Task 3.2/6.2/6.4(権限ゲート)"
     }
   },
-  "ready_for_implementation": false
+  "ready_for_implementation": true
 }
