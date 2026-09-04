@@ -1,4 +1,4 @@
-import { createRef } from 'react';
+import { createRef, useEffect, useState } from 'react';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -32,6 +32,52 @@ const mockSuggestions = (
   suggestions = { activeUsernames, inactiveUsernames, isLoading: false };
 };
 
+/*
+ * A source that resolves asynchronously, unlike `useFakeSuggestions` above.
+ *
+ * The real sources (SWR-backed) flip `isLoading` true and then false for each
+ * new keyword, and that transition is precisely what makes `AsyncTypeahead`
+ * record the keyword in its internal query cache. A source that answers
+ * synchronously never arms that cache, so it cannot exercise a re-typed
+ * keyword at all.
+ */
+const KNOWN_USERNAMES = ['admin'];
+
+const searchedKeywords: string[] = [];
+
+const useAsyncFakeSuggestions = (keyword: string): UsernameSuggestions => {
+  const [resolved, setResolved] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    if (keyword === '' || keyword in resolved) {
+      return;
+    }
+    searchedKeywords.push(keyword);
+
+    // A microtask rather than a timer: what matters is only that the answer
+    // lands in a later render, not how long it takes to get there.
+    let isActive = true;
+    Promise.resolve().then(() => {
+      if (isActive) {
+        setResolved((prev) => ({
+          ...prev,
+          [keyword]: KNOWN_USERNAMES.filter((name) => name.startsWith(keyword)),
+        }));
+      }
+    });
+    return () => {
+      isActive = false;
+    };
+  }, [keyword, resolved]);
+
+  const usernames = resolved[keyword];
+  return {
+    activeUsernames: usernames ?? [],
+    inactiveUsernames: [],
+    isLoading: keyword !== '' && usernames == null,
+  };
+};
+
 const renderTypeahead = (initialUsernames?: string[]) =>
   render(
     <UsernameTypeahead
@@ -45,6 +91,7 @@ const renderTypeahead = (initialUsernames?: string[]) =>
 describe('UsernameTypeahead', () => {
   beforeEach(() => {
     suggestions = EMPTY_SUGGESTIONS;
+    searchedKeywords.length = 0;
   });
 
   // The `t` mock echoes the key, so asserting the full key locks in the
@@ -256,6 +303,50 @@ describe('UsernameTypeahead', () => {
 
   // Awaited because `AsyncTypeahead` debounces `onSearch` by `delay` before the
   // keyword reaches the source.
+  /**
+   * Author/editor filters are typed into repeatedly — narrow the keyword, back
+   * up, narrow again — so a keyword reaching the source only on its first
+   * appearance leaves the menu permanently empty for every keyword the user has
+   * already tried. `admd` in the middle matters: it is what moves the last
+   * fetched keyword away from `adm`, so returning to `adm` has something stale
+   * to be caught out by.
+   */
+  it('still suggests a username when its keyword is typed a second time', async () => {
+    render(
+      <UsernameTypeahead
+        onChange={vi.fn()}
+        useUsernameSuggestions={useAsyncFakeSuggestions}
+        placeholder="placeholder"
+      />,
+    );
+    const input = screen.getByRole('combobox');
+
+    await userEvent.type(input, 'adm');
+    expect(
+      await screen.findByRole('option', { name: 'admin' }),
+    ).toBeInTheDocument();
+
+    // Waiting on the source call, not just on the menu emptying: the menu goes
+    // empty the instant `admd` is typed, well before that keyword is searched
+    // for, and backspacing from there would pass without ever exercising a
+    // second visit to `adm`.
+    await userEvent.type(input, 'd');
+    await waitFor(() => {
+      expect(searchedKeywords).toContain('admd');
+    });
+    // Positive control for the final assertion: it asserts the suggestion is
+    // back, which only means something once the suggestion has actually gone
+    // away. Without this the test could hold by `admin` never having left.
+    expect(
+      screen.queryByRole('option', { name: 'admin' }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.type(input, '{backspace}');
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'admin' })).toBeInTheDocument();
+    });
+  });
+
   it('queries the injected source with the typed keyword', async () => {
     const spy = vi.fn(() => EMPTY_SUGGESTIONS);
 
