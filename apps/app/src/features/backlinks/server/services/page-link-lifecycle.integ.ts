@@ -46,8 +46,8 @@ beforeAll(async () => {
  * permalink-based backlink stays valid the same way. Each spec drives a real
  * crowi.pageService.renamePage() call — not a hand-written path update — specifically so
  * the 'rename' event PageLinkService does NOT subscribe to (B1.12) actually fires; a
- * hand-written update would leave that wiring completely unexercised. The `PageLink` row
- * is then asserted byte-for-byte unchanged (including its own `_id`), which catches a
+ * hand-written update would leave that wiring completely unexercised. The `pagelinks` row
+ * is then asserted byte-for-byte unchanged (including its own `id`), which catches a
  * rename-triggered write that lands a different value (proven by mutation testing during
  * review). It cannot distinguish "no write happened" from "a write landed the same
  * value" — the same limitation design.md already accepts for repointInboundLinks, for
@@ -117,11 +117,21 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
       orderBy: { toPath: 'asc' },
     });
 
-  // Full row including its own _id, for a byte-for-byte "this row was never written"
-  // comparison (B4.4) — outboundRows above deliberately drops _id since its callers only
-  // care about toPath/toPage content.
+  // Full row, identity included, for a byte-for-byte "this row was never written"
+  // comparison (B4.4) — outboundRows above selects only toPath/toPageId, since its
+  // callers care about that content rather than row identity.
+  //
+  // The four columns are selected explicitly rather than taking the whole row: the
+  // client-wide `result` extension in ~/utils/prisma attaches lazily-computed `_id`/`__v`
+  // mongoose aliases to every model, and they make two reads of one *unchanged* row fail
+  // toEqual against each other (pagelinks has no `v` column at all, so `__v` computes to
+  // undefined). An explicit select omits the aliases, keeping this assertion about the
+  // row's data instead of the Prisma client's object graph.
   const outboundRow = (fromPage: Types.ObjectId) =>
-    PageLink.findOne({ fromPage }).lean();
+    prisma.pagelinks.findFirst({
+      where: { fromPageId: fromPage.toString() },
+      select: { id: true, fromPageId: true, toPath: true, toPageId: true },
+    });
 
   // The service handles create/update asynchronously (fire-and-forget from the
   // emitter's view). Poll the outbound-row count — the observable write-path
@@ -420,15 +430,25 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     await waitForOutboundCount(source._id, 1);
     const before = await outboundRow(source._id);
 
+    const newTargetPath = `${PREFIX}/direct-rename-target-moved`;
     await crowi.pageService.renamePage(
       target,
-      `${PREFIX}/direct-rename-target-moved`,
+      newTargetPath,
       viewer,
       { createRedirectPage: true },
       renameActivityParams,
     );
 
-    // The row was never touched: same _id, same cached toPage.
+    // Guard the guard: renamePage awaits its own subject's path update (it only defers
+    // descendants), so no polling is needed here — but without this the two assertions
+    // below would both pass on a rename that silently no-opped. `toEqual(before)` would
+    // be trivially true, and findBacklinks matches on toPage, which is id-based and so
+    // rename-independent. Neither can see a rename that never happened.
+    expect((await Page.findOne({ _id: target._id }).select('path'))?.path).toBe(
+      newTargetPath,
+    );
+
+    // The row was never touched: same id, same cached toPageId.
     expect(await outboundRow(source._id)).toEqual(before);
 
     expect(
@@ -469,7 +489,7 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
       { timeout: 15000, interval: 100 },
     );
 
-    // The row was never touched: same _id, same cached toPage.
+    // The row was never touched: same id, same cached toPageId.
     expect(await outboundRow(source._id)).toEqual(before);
 
     expect(
@@ -492,12 +512,19 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     const before = await outboundRow(source._id);
     expect(before?.toPath).toBe(`/${target._id.toString()}`);
 
+    const newTargetPath = `${PREFIX}/permalink-rename-target-moved`;
     await crowi.pageService.renamePage(
       target,
-      `${PREFIX}/permalink-rename-target-moved`,
+      newTargetPath,
       viewer,
       { createRedirectPage: true },
       renameActivityParams,
+    );
+
+    // Guard the guard — see the direct-rename spec above: a no-op rename would satisfy
+    // both assertions below without the target ever having moved.
+    expect((await Page.findOne({ _id: target._id }).select('path'))?.path).toBe(
+      newTargetPath,
     );
 
     // The row was never touched: the permalink toPath never named a path to begin
