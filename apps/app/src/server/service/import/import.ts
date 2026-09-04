@@ -21,9 +21,14 @@ import { setupIndependentModels } from '~/server/crowi/setup-models';
 import type CollectionProgress from '~/server/models/vo/collection-progress';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import CollectionProgressingStatus from '../../models/vo/collection-progressing-status';
 import { createBatchStream } from '../../util/batch-stream';
+import {
+  assertIsArray,
+  normalizeAggregateRaw,
+} from '../../util/prisma-raw-normalize';
 import { configManager } from '../config-manager';
 import type { ConvertMap } from './construct-convert-map';
 import { constructConvertMap } from './construct-convert-map';
@@ -245,6 +250,11 @@ export class ImportService {
         importSettingsMap,
       );
 
+      // Runs once, after every collection has finished, rather than per-collection —
+      // `importCollections` runs its collections concurrently, so checking mid-run
+      // could race a `sharelinks` import that has not written its rows yet.
+      await this.pruneOrphanedShareLinks(collections);
+
       await configManager.loadConfigs();
 
       const currentIsV5Compatible =
@@ -376,6 +386,65 @@ export class ImportService {
     // return value, the response body, the source's failure notice, and the screen's
     // withheld completion). Swallowing it would report that run as a clean success.
     await configManager.updateConfig('app:isMaintenanceMode', true);
+  }
+
+  /**
+   * `sharelinks.relatedPage` is a required Prisma relation to `pages` — a ShareLink
+   * cannot represent "its page is gone," yet an import can produce exactly that in
+   * either direction:
+   *  - `pages` is replaced (`flushAndInsert`) with documents whose ids are unrelated
+   *    to what a pre-existing ShareLink's `relatedPage` pointed at, or
+   *  - `sharelinks` is replaced by an archive's own rows, whose `relatedPage` refers
+   *    to a page id that only ever existed on the source wiki.
+   * Both are reachable independently of which collections are selected together —
+   * the manual archive-import screen and a G2G merge transfer both allow `pages` and
+   * `sharelinks` to be imported out of lockstep, and neither direction is special to
+   * one particular import mode. Rather than special-case each combination, this runs
+   * once after every collection has finished importing and removes any ShareLink
+   * whose `relatedPage` matches no document in the (now final) `pages` collection —
+   * the same invariant ordinary page deletion already maintains, see
+   * `deleteCompletelyOperation`'s `prisma.sharelinks.deleteMany(...)`.
+   *
+   * `pagetagrelations.relatedPage` and `revisions.page` are required relations to
+   * `pages` too (see the comment above that same `deleteCompletelyOperation` call)
+   * and are just as reachable from this import path — `pagetagrelations` failed to
+   * import in local testing of this change. They are not pruned here; that is a
+   * follow-up, scoped out of this fix on purpose.
+   */
+  private async pruneOrphanedShareLinks(collections: string[]): Promise<void> {
+    if (!collections.includes('pages') && !collections.includes('sharelinks')) {
+      return;
+    }
+
+    // select sharelinks whose relatedPage does not exist in pages
+    const rawOrphans = await prisma.sharelinks.aggregateRaw({
+      pipeline: [
+        {
+          $lookup: {
+            from: 'pages',
+            localField: 'relatedPage',
+            foreignField: '_id',
+            as: 'page',
+          },
+        },
+        { $match: { page: { $size: 0 } } },
+        { $project: { _id: 1 } },
+      ],
+    });
+    assertIsArray(rawOrphans, 'orphaned sharelinks');
+    const orphanIds = (
+      normalizeAggregateRaw(rawOrphans) as { _id: string }[]
+    ).map((orphan) => orphan._id);
+
+    if (orphanIds.length === 0) {
+      return;
+    }
+
+    await prisma.sharelinks.deleteMany({ where: { id: { in: orphanIds } } });
+
+    logger.info(
+      `Pruned ${orphanIds.length} sharelinks document(s) whose relatedPage no longer exists after import.`,
+    );
   }
 
   /**

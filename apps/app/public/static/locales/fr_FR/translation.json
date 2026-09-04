@@ -64,7 +64,9 @@
   "Presentation Mode": "Présentation",
   "Not available for guest": "Indisponible pour les invités",
   "Not available in this version": "Indisponible dans cette version",
+  "Not available for read only user": "Indisponible pour les utilisateurs en lecture seule",
   "Not available when \"anyone with the link\" is selected": "Si \"Tous les utilisateurs disposant du lien\" est sélectionné, la portée ne peut pas être modifiée",
+  "No users have liked this yet": "Aucun utilisateur n'a aimé cette page.",
   "No users have liked this yet.": "Aucun utilisateur n'a aimé cette page.",
   "No users have bookmarked yet": "Aucun utilisateur n'a mis en favoris cette page",
   "Create Archive Page": "Créer page d'archive",
@@ -108,8 +110,11 @@
   "Connected": "Connecté",
   "Loading": "Chargement...",
   "Disclose E-mail": "Divulguer adresse courriel",
+  "Slack Member ID": "ID de membre Slack",
   "page exists": "cette page est déjà existante",
   "Error occurred": "Une erreur est survenue",
+  "Successfully updated": "Mise à jour réussie",
+  "Failed to update": "Échec de la mise à jour",
   "Input page name": "Nom de la page",
   "Input page name (optional)": "Nom de la page (optionnel)",
   "Input parent page path": "Chemin de la page parent",
@@ -515,6 +520,8 @@
     },
     "editor": {
       "title": "Raccourcis d'édition",
+      "Slash Command": "Commande slash",
+      "Slash Command Desc": "(Afficher le menu des commandes)",
       "Indent": "Indentation",
       "Outdent": "Retrait",
       "Save Page": "Sauvegarder la page",
@@ -1016,6 +1023,7 @@
     },
     "textstyle": {
       "copy_done": "Copié !",
+      "copy_failed": "Échec de la copie",
       "this": "Ceci est du",
       "is": "",
       "bold": "gras",
@@ -1070,6 +1078,7 @@
       "alert": "Alerte",
       "alert_with_custom_title": "Alerte avec étiquette",
       "alert_with_custom_title_text": "Titre personnalisé",
+      "alert_block": "Bloc d'alerte",
       "alert_unavailable": "Non disponible pour ce style",
       "badge": "Badge",
       "text_color": "Couleur du texte",
@@ -1087,5 +1096,43 @@
     "searching": "Recherche en cours...",
     "noResults": "Aucune page trouvée",
     "candidatesLabel": "Pages suggérées"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "Titre 1",
+      "description": ""
+    },
+    "heading2": {
+      "label": "Titre 2",
+      "description": ""
+    },
+    "heading3": {
+      "label": "Titre 3",
+      "description": ""
+    },
+    "bulletList": {
+      "label": "Liste à puces",
+      "description": ""
+    },
+    "numberedList": {
+      "label": "Liste numérotée",
+      "description": ""
+    },
+    "taskList": {
+      "label": "Liste de tâches",
+      "description": ""
+    },
+    "quote": {
+      "label": "Citation",
+      "description": ""
+    },
+    "codeBlock": {
+      "label": "Bloc de code",
+      "description": ""
+    },
+    "table": {
+      "label": "Tableau",
+      "description": ""
+    }
   }
 }

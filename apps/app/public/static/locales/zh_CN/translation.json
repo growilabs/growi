@@ -61,6 +61,7 @@
   "Presentation Mode": "演示文稿",
   "Not available for guest": "不提供给客人",
   "Not available in this version": "此版本中不提供",
+  "Not available for read only user": "只读用户无法使用",
   "Not available when \"anyone with the link\" is selected": "如果选择“任何人”，则无法覆盖范围",
   "No users have liked this yet": "还没有用户喜欢这个",
   "No users have bookmarked yet": "还没有用户加入书签",
@@ -113,8 +114,11 @@
   "Loading": "加载...",
   "Reset": "重置",
   "Disclose E-mail": "显示邮箱",
+  "Slack Member ID": "Slack 成员 ID",
   "page exists": "页面已存在",
   "Error occurred": "Error occurred",
+  "Successfully updated": "更新成功",
+  "Failed to update": "更新失败",
   "Input page name": "Input page name",
   "Input page name (optional)": "Input page name (optional)",
   "Input parent page path": "Input parent page path",
@@ -129,6 +133,7 @@
   "ChildUserGroup": "儿童用户组",
   "Basic Settings": "基础设置",
   "The contents entered here will be shown in the header etc": "此处输入的内容将显示在标题等中",
+  "Forbidden": "禁止访问",
   "Public": "公共",
   "Anyone with the link": "任何人",
   "Specified users only": "仅指定用户",
@@ -511,6 +516,8 @@
     },
     "editor": {
       "title": "编辑器快捷方式",
+      "Slash Command": "斜杠命令",
+      "Slash Command Desc": "(显示命令菜单)",
       "Indent": "缩进",
       "Outdent": "回退缩进",
       "Save Page": "保存页面",
@@ -1027,6 +1034,7 @@
     },
     "textstyle": {
       "copy_done": "已复制！",
+      "copy_failed": "复制失败",
       "this": "这是",
       "is": "效果",
       "bold": "加粗",
@@ -1081,6 +1089,7 @@
       "alert": "提示",
       "alert_with_custom_title": "带标签的提示",
       "alert_with_custom_title_text": "自定义标题",
+      "alert_block": "警告框",
       "alert_unavailable": "此样式不可用",
       "badge": "徽章",
       "text_color": "文本颜色",
@@ -1098,5 +1107,43 @@
     "searching": "搜索中...",
     "noResults": "未找到页面",
     "candidatesLabel": "页面候选"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "标题 1",
+      "description": ""
+    },
+    "heading2": {
+      "label": "标题 2",
+      "description": ""
+    },
+    "heading3": {
+      "label": "标题 3",
+      "description": ""
+    },
+    "bulletList": {
+      "label": "项目符号列表",
+      "description": ""
+    },
+    "numberedList": {
+      "label": "编号列表",
+      "description": ""
+    },
+    "taskList": {
+      "label": "任务列表",
+      "description": ""
+    },
+    "quote": {
+      "label": "引用",
+      "description": ""
+    },
+    "codeBlock": {
+      "label": "代码块",
+      "description": ""
+    },
+    "table": {
+      "label": "表格",
+      "description": ""
+    }
   }
 }

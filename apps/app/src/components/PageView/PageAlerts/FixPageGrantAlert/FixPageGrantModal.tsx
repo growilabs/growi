@@ -268,7 +268,7 @@ export const FixPageGrantModal = (props: ModalProps): JSX.Element => {
               </div>
               {shouldShowModalAlert && (
                 <p className="alert alert-warning">
-                  {t('fix_page_grant.modal.alert_message')}
+                  {t('fix_page_grant.modal.alert_message_select_group')}
                 </p>
               )}
             </div>

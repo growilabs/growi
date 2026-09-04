@@ -2,6 +2,12 @@
   "meta": {
     "display_name": "Français"
   },
+  "Page": "Page",
+  "Execute": "Exécuter",
+  "Enable": "Activer",
+  "Copied!": "Copié !",
+  "ExternalUserGroup": "Groupe utilisateur externe",
+  "something_went_wrong": "Une erreur est survenue. Veuillez réessayer.",
   "last_login": "Dernière connexion",
   "wiki_management_homepage": "Système",
   "public": "Public",
@@ -342,6 +348,16 @@
     "header_upgrading_progress": "Progression de la conversion",
     "migration_succeeded": "Conversion réussie! Le mode maintenance peut être désactivée et GROWI utilisé.",
     "migration_failed": "Conversion échouée. Lire la documentation GROWI pour des informations supplémentaires."
+  },
+  "page_tree_repair": {
+    "page_tree_repair": "Réparation de l'arborescence des pages",
+    "repair_desc": "Supprime les pages vides orphelines et recalcule le nombre de pages descendantes de chaque page. À utiliser si l'arborescence affiche des dossiers vides sans aucun contenu, ou si le nombre de pages enfants ne correspond pas au nombre réel de pages. Cette opération est nécessaire sur les instances mises à niveau depuis une version qui supprimait les pages WIP via un index TTL MongoDB.",
+    "repair_note": "Note: le mode maintenance doit être activé. Cette opération parcourt toutes les pages et peut donc prendre du temps sur un wiki volumineux. La progression est écrite dans le journal du serveur.",
+    "repair_page_tree": "Réparer l'arborescence des pages",
+    "modal_repair_warning": "Ce processus parcourt et met à jour toutes les pages, ce qui peut prendre beaucoup de temps. Il est fortement recommandé que les administrateurs demandent aux utilisateurs de ne pas créer, modifier ou supprimer de pages pendant la réparation.",
+    "start_repair": "Démarrer la réparation de l'arborescence",
+    "successfully_started": "Réparation de l'arborescence des pages démarrée.",
+    "repair_in_progress": "La réparation de l'arborescence des pages est en cours en arrière-plan. Consulter le journal du serveur pour le résultat."
   },
   "news_delivery": {
     "section_title": "Diffusion des actualités",

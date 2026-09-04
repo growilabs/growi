@@ -16,6 +16,7 @@
 | Umbrella spec | Status | Sub-spec roadmap |
 |---|---|---|
 | [growi-vault](../specs/growi-vault/) | resilience / reconcile 完了、ha は brief 段階 | [roadmap.md](../specs/growi-vault/roadmap.md) |
+| [editor-commands](../specs/editor-commands/) | spec 整備中（slash-command は tasks 生成済み、extended-elements / selection-palette は WIP） | [roadmap.md](../specs/editor-commands/roadmap.md) |
 | [i18n](../specs/i18n/) | discovery 完了、sub-spec 2 本とも brief 段階。翻訳ファイル構成の整理方式は未決 | [roadmap.md](../specs/i18n/roadmap.md) |
 
 ---

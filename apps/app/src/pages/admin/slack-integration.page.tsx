@@ -33,7 +33,7 @@ const AdminSlackIntegrationPage: NextPageWithLayout<Props> = (props: Props) => {
 };
 
 AdminSlackIntegrationPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('slack_integration.slack_integration'),
+  title: (_p, t) => t('admin:slack_integration.slack_integration'),
 });
 
 export const getServerSideProps: GetServerSideProps<Props> = async (

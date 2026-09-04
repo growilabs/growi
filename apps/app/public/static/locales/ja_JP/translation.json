@@ -61,6 +61,7 @@
   "Presentation Mode": "プレゼンテーション",
   "Not available for guest": "ゲストユーザーは利用できません",
   "Not available in this version": "このバージョンでは利用できません",
+  "Not available for read only user": "読み取り専用ユーザーは利用できません",
   "Not available when \"anyone with the link\" is selected": "「リンクを知っている人のみ」を選択している場合はスコープを上書きできません。",
   "No users have liked this yet": "いいねをしているユーザーはいません",
   "No users have bookmarked yet": "ブックマークしているユーザーはいません",
@@ -107,8 +108,11 @@
   "Hide": "非公開",
   "Loading": "読み込み中...",
   "Disclose E-mail": "メールアドレスの公開",
+  "Slack Member ID": "Slack メンバー ID",
   "page exists": "このページはすでに存在しています",
   "Error occurred": "エラーが発生しました",
+  "Successfully updated": "更新しました",
+  "Failed to update": "更新に失敗しました",
   "Input page name": "ページ名を入力",
   "Input page name (optional)": "ページ名を入力(空欄OK)",
   "Input parent page path": "親ページのパスを入力",
@@ -121,6 +125,7 @@
   "UserGroup": "グループ",
   "Basic Settings": "基本設定",
   "The contents entered here will be shown in the header etc": "ここに入力した内容は、ヘッダー等に表示されます。",
+  "Forbidden": "アクセスが禁止されています",
   "Public": "公開",
   "Anyone with the link": "リンクを知っている人のみ",
   "Specified users": "特定ユーザーのみ",
@@ -553,6 +558,8 @@
     },
     "editor": {
       "title": "エディターショートカット",
+      "Slash Command": "スラッシュコマンド",
+      "Slash Command Desc": "(コマンドメニューを表示)",
       "Indent": "インデント",
       "Outdent": "左インデント",
       "Save Page": "保存",
@@ -1055,6 +1062,7 @@
     },
     "textstyle": {
       "copy_done": "コピーしました！",
+      "copy_failed": "コピーに失敗しました",
       "this": "これは",
       "is": "です",
       "bold": "太字",
@@ -1109,6 +1117,7 @@
       "alert": "アラート",
       "alert_with_custom_title": "ラベル付きアラート",
       "alert_with_custom_title_text": "カスタムタイトル",
+      "alert_block": "アラートブロック",
       "alert_unavailable": "このスタイルでは使用できません",
       "badge": "バッジ",
       "text_color": "テキストカラー",
@@ -1126,5 +1135,43 @@
     "searching": "検索中...",
     "noResults": "該当するページがありません",
     "candidatesLabel": "ページ候補"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "見出し1",
+      "description": ""
+    },
+    "heading2": {
+      "label": "見出し2",
+      "description": ""
+    },
+    "heading3": {
+      "label": "見出し3",
+      "description": ""
+    },
+    "bulletList": {
+      "label": "箇条書きリスト",
+      "description": ""
+    },
+    "numberedList": {
+      "label": "番号付きリスト",
+      "description": ""
+    },
+    "taskList": {
+      "label": "タスクリスト",
+      "description": ""
+    },
+    "quote": {
+      "label": "引用",
+      "description": ""
+    },
+    "codeBlock": {
+      "label": "コードブロック",
+      "description": ""
+    },
+    "table": {
+      "label": "テーブル",
+      "description": ""
+    }
   }
 }
