@@ -525,6 +525,8 @@
     },
     "editor": {
       "title": "Editor shortcuts",
+      "Slash Command": "Slash Command",
+      "Slash Command Desc": "(Show the command menu)",
       "Indent": "Indent",
       "Outdent": "Outdent",
       "Save Page": "Save Page",
@@ -1102,5 +1104,43 @@
     "searching": "Searching...",
     "noResults": "No pages found",
     "candidatesLabel": "Page candidates"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "Heading 1",
+      "description": ""
+    },
+    "heading2": {
+      "label": "Heading 2",
+      "description": ""
+    },
+    "heading3": {
+      "label": "Heading 3",
+      "description": ""
+    },
+    "bulletList": {
+      "label": "Bulleted list",
+      "description": ""
+    },
+    "numberedList": {
+      "label": "Numbered list",
+      "description": ""
+    },
+    "taskList": {
+      "label": "Task list",
+      "description": ""
+    },
+    "quote": {
+      "label": "Quote",
+      "description": ""
+    },
+    "codeBlock": {
+      "label": "Code block",
+      "description": ""
+    },
+    "table": {
+      "label": "Table",
+      "description": ""
+    }
   }
 }

@@ -516,6 +516,8 @@
     },
     "editor": {
       "title": "编辑器快捷方式",
+      "Slash Command": "斜杠命令",
+      "Slash Command Desc": "(显示命令菜单)",
       "Indent": "缩进",
       "Outdent": "回退缩进",
       "Save Page": "保存页面",
@@ -1105,5 +1107,43 @@
     "searching": "搜索中...",
     "noResults": "未找到页面",
     "candidatesLabel": "页面候选"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "标题 1",
+      "description": ""
+    },
+    "heading2": {
+      "label": "标题 2",
+      "description": ""
+    },
+    "heading3": {
+      "label": "标题 3",
+      "description": ""
+    },
+    "bulletList": {
+      "label": "项目符号列表",
+      "description": ""
+    },
+    "numberedList": {
+      "label": "编号列表",
+      "description": ""
+    },
+    "taskList": {
+      "label": "任务列表",
+      "description": ""
+    },
+    "quote": {
+      "label": "引用",
+      "description": ""
+    },
+    "codeBlock": {
+      "label": "代码块",
+      "description": ""
+    },
+    "table": {
+      "label": "表格",
+      "description": ""
+    }
   }
 }
