@@ -1,24 +1,24 @@
 {
   "feature_name": "ai-summarize",
   "created_at": "2026-08-12T06:24:37Z",
-  "updated_at": "2026-09-04T07:00:00Z",
+  "updated_at": "2026-09-04T09:30:00Z",
   "language": "ja",
-  "phase": "design-expanded",
+  "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false,
-      "notes": "API層(Req1-9) + UI層(Req10-17) 統合、AI-summarize-ui specより吸収"
+      "approved": true,
+      "notes": "API層(Req1-9) + UI層(Req10-17) 統合、AI-summarize-ui specより吸収。設計検証GO判定により承認"
     },
     "design": {
       "generated": true,
-      "approved": false,
-      "notes": "API層(Section1-6) + UI層 統合、AI-summarize-ui specより吸収"
+      "approved": true,
+      "notes": "API層(Section1-6) + UI層 統合、AI-summarize-ui specより吸収。設計検証GO判定により承認"
     },
     "tasks": {
-      "generated": false,
+      "generated": true,
       "approved": false,
-      "notes": "UI統合後に/kiro-spec-tasksで再生成予定"
+      "notes": "API層(Task 1-7) + UI層(Task 8-13)統合完了。Req1-17全てマッピング済み。ユーザー承認待ち"
     }
   },
   "ready_for_implementation": false
