@@ -559,7 +559,7 @@ B3/B5.
   - _Boundary: PageLinkService_
   - _Depends: B4.2, B1.6_
 
-- [ ] B4.4 Integration tests (rename/move)
+- [x] B4.4 Integration tests (rename/move)
   - Cover: inbound links survive a target's rename/move (including descendant moves) with **no index
     writes** — resolution + `_id`-stable cache keep them valid; a permalink-based backlink keeps
     resolving after its target is renamed/moved with no index writes (5.4)
