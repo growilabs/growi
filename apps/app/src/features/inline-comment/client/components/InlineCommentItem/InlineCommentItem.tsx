@@ -151,7 +151,11 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
           <span className="ms-auto d-flex align-items-center gap-2">
             <span
               data-testid="inline-comment-status"
-              className={`badge ${isResolved ? 'bg-secondary' : 'bg-warning text-dark'}`}
+              className={`badge rounded-pill ${styles['inline-comment-status-badge']} ${
+                isResolved
+                  ? 'bg-success-subtle text-success-emphasis'
+                  : 'bg-warning-subtle text-warning-emphasis'
+              }`}
             >
               {isResolved
                 ? t('inline_comment.resolved')
@@ -159,7 +163,7 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
             </span>
             <button
               type="button"
-              className="btn btn-sm btn-outline-secondary"
+              className="btn btn-sm btn-outline-secondary rounded-pill"
               onClick={handleResolveToggle}
             >
               {isResolved

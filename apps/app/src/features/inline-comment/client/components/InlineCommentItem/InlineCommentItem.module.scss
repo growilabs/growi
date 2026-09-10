@@ -22,3 +22,19 @@
     border-left: 3px solid var(--grw-inline-comment-marker-bg);
   }
 }
+
+// Status-dot decoration for the resolved/unresolved badge (design.md: 状態バッジ).
+// Implemented as a ::before pseudo-element rather than an inline style so the
+// dot's color follows the badge's own text color (bg-warning-subtle /
+// bg-success-subtle already set text-warning-emphasis / text-success-emphasis).
+.inline-comment-status-badge {
+  &::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 0.25rem;
+    border-radius: 50%;
+    background-color: currentColor;
+  }
+}
