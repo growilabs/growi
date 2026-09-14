@@ -1133,6 +1133,14 @@
     "table": {
       "label": "Tableau",
       "description": ""
+    },
+    "link": {
+      "label": "Lien",
+      "description": ""
+    },
+    "tableBuilder": {
+      "label": "Générateur de tableau",
+      "description": ""
     }
   }
 }

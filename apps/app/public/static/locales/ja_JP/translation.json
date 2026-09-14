@@ -1172,6 +1172,48 @@
     "table": {
       "label": "テーブル",
       "description": ""
+    },
+    "plantuml": {
+      "label": "PlantUML",
+      "description": ""
+    },
+    "lsx": {
+      "label": "動的リスト（lsx）",
+      "description": ""
+    },
+    "drawio": {
+      "label": "図表（drawio）",
+      "description": ""
+    },
+    "link": {
+      "label": "リンク",
+      "description": ""
+    },
+    "tableBuilder": {
+      "label": "テーブルビルダー",
+      "description": ""
+    },
+    "callout": {
+      "note": {
+        "label": "コールアウト（Note）",
+        "description": ""
+      },
+      "tip": {
+        "label": "コールアウト（Tip）",
+        "description": ""
+      },
+      "important": {
+        "label": "コールアウト（Important）",
+        "description": ""
+      },
+      "warning": {
+        "label": "コールアウト（Warning）",
+        "description": ""
+      },
+      "caution": {
+        "label": "コールアウト（Caution）",
+        "description": ""
+      }
     }
   }
 }

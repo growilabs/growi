@@ -1,4 +1,5 @@
 export * from './accepted-upload-file-type.js';
+export * from './callout.js';
 export * from './growi-plugin.js';
 export * from './renderer.js';
 export * from './system.js';

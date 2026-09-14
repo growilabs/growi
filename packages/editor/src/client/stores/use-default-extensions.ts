@@ -20,10 +20,13 @@ import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
 import type { UseCodeMirrorEditor } from '../services/index.js';
+import type { SlashCommand } from '../services-internal/index.js';
 import {
   createSlashCommandSource,
   emojiAutocompletionSettings,
   resolveSlashCommands,
+  SLASH_COMMANDS,
+  useExtendedElementCommands,
 } from '../services-internal/index.js';
 
 // set new markdownKeymap instead of default one
@@ -81,9 +84,16 @@ const defaultExtensions: Extension[] = [
 // and break mention). Labels are resolved via `t`; no `/` keybinding is added, so
 // the slash menu fires from typed input and the global `/` (page search) is
 // preserved (Req 6.4).
-export const createSlashCommandExtension = (t: TFunction): Extension =>
+export const createSlashCommandExtension = (
+  t: TFunction,
+  extendedCommands: readonly SlashCommand[] = [],
+): Extension =>
   markdownLanguage.data.of({
-    autocomplete: createSlashCommandSource(resolveSlashCommands(t)),
+    autocomplete: createSlashCommandSource(
+      // Base commands + extended commands (static plantuml/callout and, when an
+      // editorKey is available, the run commands drawio/lsx/link/table-builder).
+      resolveSlashCommands(t, [...SLASH_COMMANDS, ...extendedCommands]),
+    ),
   });
 
 /**
@@ -101,12 +111,14 @@ export const buildDefaultExtensionsArg = (
 
 export const useDefaultExtensions = (
   codeMirrorEditor?: UseCodeMirrorEditor,
+  editorKey?: string,
 ): void => {
   const { t } = useTranslation('translation');
+  const extendedCommands = useExtendedElementCommands(editorKey);
 
   const slashCommandExtension = useMemo(
-    () => createSlashCommandExtension(t),
-    [t],
+    () => createSlashCommandExtension(t, extendedCommands),
+    [t, extendedCommands],
   );
 
   const view = codeMirrorEditor?.view;

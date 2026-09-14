@@ -1141,6 +1141,48 @@
     "table": {
       "label": "Table",
       "description": ""
+    },
+    "plantuml": {
+      "label": "PlantUML",
+      "description": ""
+    },
+    "lsx": {
+      "label": "Dynamic list (lsx)",
+      "description": ""
+    },
+    "drawio": {
+      "label": "Diagram (drawio)",
+      "description": ""
+    },
+    "link": {
+      "label": "Link",
+      "description": ""
+    },
+    "tableBuilder": {
+      "label": "Table builder",
+      "description": ""
+    },
+    "callout": {
+      "note": {
+        "label": "Callout (Note)",
+        "description": ""
+      },
+      "tip": {
+        "label": "Callout (Tip)",
+        "description": ""
+      },
+      "important": {
+        "label": "Callout (Important)",
+        "description": ""
+      },
+      "warning": {
+        "label": "Callout (Warning)",
+        "description": ""
+      },
+      "caution": {
+        "label": "Callout (Caution)",
+        "description": ""
+      }
     }
   }
 }

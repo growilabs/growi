@@ -1109,6 +1109,14 @@
     "table": {
       "label": "표",
       "description": ""
+    },
+    "link": {
+      "label": "링크",
+      "description": ""
+    },
+    "tableBuilder": {
+      "label": "표 빌더",
+      "description": ""
     }
   }
 }

@@ -1144,6 +1144,14 @@
     "table": {
       "label": "表格",
       "description": ""
+    },
+    "link": {
+      "label": "链接",
+      "description": ""
+    },
+    "tableBuilder": {
+      "label": "表格构建器",
+      "description": ""
     }
   }
 }
