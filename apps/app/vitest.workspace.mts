@@ -69,14 +69,20 @@ export default defineWorkspace([
       // deprecated workspace-file resolution does not apply a project-level
       // `poolOptions` from this file; the CLI flag does, so the cap lives there.)
       //
-      // EXPERIMENT (see #11752 / #11821): isolate=false reuses the module cache
-      // across files within a fork, so the per-file `beforeAll` guards in
-      // migrate-mongo.ts and crowi.ts (`migrationsRun`, `_instance`) actually work
-      // as a once-per-worker guard instead of resetting on every file — removing
-      // the redundant per-file migrate-mongo subprocess spawn and Crowi
+      // EXPERIMENT (see #11752 / #11821): the same limitation applies to
+      // `isolate` — a project-level `isolate: false` here is silently ignored
+      // when this project runs alongside another via `--project`, so the
+      // `--no-isolate` flag lives on the `test:integ` script instead (verified:
+      // setting it only here still logged one `dev:migrate:up` spawn per test
+      // file, not once per worker). Reusing the module cache across files
+      // within a fork lets the per-file `beforeAll` guards in migrate-mongo.ts
+      // and crowi.ts (`migrationsRun`, `_instance`) actually work as a
+      // once-per-worker guard instead of resetting on every file — removing the
+      // redundant per-file migrate-mongo subprocess spawn and Crowi
       // reinitialization that caused both hook timeouts. `app-integration-vault`
-      // already does this for the same reason (see below).
-      isolate: false,
+      // already relies on this (see below), invoked as a single `--project`
+      // with no sibling, so its project-level setting is not subject to this
+      // limitation.
       deps: {
         // Transform inline modules (allows ESM in require context)
         interopDefault: true,
@@ -131,8 +137,9 @@ export default defineWorkspace([
         './test/setup/mongo/index.ts',
         './test/setup/prisma.ts',
       ],
-      // EXPERIMENT: same rationale as app-integration above.
-      isolate: false,
+      // EXPERIMENT: same rationale as app-integration above — `--no-isolate`
+      // is set via the `test:integ` script (a project-level setting here would
+      // be silently ignored for the same reason `poolOptions` is above).
       deps: { interopDefault: true },
       server: {
         deps: {
