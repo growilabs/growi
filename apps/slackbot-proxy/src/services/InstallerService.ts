@@ -7,7 +7,6 @@ import { Inject, Service } from '@tsed/di';
 
 import { Installation } from '~/entities/installation';
 import { InstallationRepository } from '~/repositories/installation';
-import { resolveInstallationId } from '~/utils/resolve-installation-id';
 
 @Service()
 export class InstallerService {
@@ -44,17 +43,17 @@ export class InstallerService {
         storeInstallation: async (
           slackInstallation: SlackInstallation<'v1' | 'v2', boolean>,
         ) => {
-          const teamIdOrEnterpriseId = resolveInstallationId({
-            teamId: slackInstallation.team?.id,
-            enterpriseId: slackInstallation.enterprise?.id,
-          });
+          const teamId = slackInstallation.team?.id;
+          const enterpriseId = slackInstallation.enterprise?.id;
 
-          if (teamIdOrEnterpriseId == null) {
+          if (teamId == null && enterpriseId == null) {
             throw new Error('teamId or enterpriseId is required.');
           }
 
-          const existedInstallation =
-            await repository.findByTeamIdOrEnterpriseId(teamIdOrEnterpriseId);
+          const existedInstallation = await repository.findForUpsert(
+            teamId,
+            enterpriseId,
+          );
 
           if (existedInstallation != null) {
             existedInstallation.setData(slackInstallation);
@@ -68,10 +67,10 @@ export class InstallerService {
           return;
         },
         fetchInstallation: async (installQuery: InstallationQuery<boolean>) => {
-          const id = resolveInstallationId(installQuery);
-
-          // biome-ignore lint/style/noNonNullAssertion: id must be set --- IGNORE ---
-          const installation = await repository.findByTeamIdOrEnterpriseId(id!);
+          const installation = await repository.findByTeamIdOrEnterpriseId(
+            installQuery.teamId ?? undefined,
+            installQuery.enterpriseId ?? undefined,
+          );
 
           if (installation == null) {
             throw new Error('Failed fetching installation');

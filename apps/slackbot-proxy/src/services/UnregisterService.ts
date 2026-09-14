@@ -23,7 +23,6 @@ import { Installation } from '~/entities/installation';
 import { InstallationRepository } from '~/repositories/installation';
 import { RelationRepository } from '~/repositories/relation';
 import loggerFactory from '~/utils/logger';
-import { resolveInstallationId } from '~/utils/resolve-installation-id';
 
 const logger = loggerFactory('slackbot-proxy:services:UnregisterService');
 
@@ -46,11 +45,10 @@ export class UnregisterService
     authorizeResult: AuthorizeResult,
   ): Promise<void> {
     // get growi urls
-    const installationId = resolveInstallationId(authorizeResult);
     const installation =
       await this.installationRepository.findByTeamIdOrEnterpriseId(
-        // biome-ignore lint/style/noNonNullAssertion: installationId must be set --- IGNORE ---
-        installationId!,
+        authorizeResult.teamId,
+        authorizeResult.enterpriseId,
       );
     const relations = await this.relationRepository
       .createQueryBuilder('relation')
@@ -187,13 +185,12 @@ export class UnregisterService
       (selectedOption) => selectedOption.value,
     );
 
-    const installationId = resolveInstallationId(authorizeResult);
     let installation: Installation | undefined;
     try {
       installation =
         await this.installationRepository.findByTeamIdOrEnterpriseId(
-          // biome-ignore lint/style/noNonNullAssertion: installationId must be set --- IGNORE ---
-          installationId!,
+          authorizeResult.teamId,
+          authorizeResult.enterpriseId,
         );
     } catch (err) {
       logger.error('Unregisteration failed:\n', err);

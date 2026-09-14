@@ -16,7 +16,6 @@ import { Relation } from '~/entities/relation';
 import { InstallationRepository } from '~/repositories/installation';
 import { RelationRepository } from '~/repositories/relation';
 import loggerFactory from '~/utils/logger';
-import { resolveInstallationId } from '~/utils/resolve-installation-id';
 
 const logger = loggerFactory('slackbot-proxy:services:UnregisterService');
 
@@ -204,13 +203,12 @@ export class SelectGrowiService
       ],
     });
 
-    const installationId = resolveInstallationId(authorizeResult);
     let installation: Installation | undefined;
     try {
       installation =
         await this.installationRepository.findByTeamIdOrEnterpriseId(
-          // biome-ignore lint/style/noNonNullAssertion: installationId must be set --- IGNORE ---
-          installationId!,
+          authorizeResult.teamId,
+          authorizeResult.enterpriseId,
         );
     } catch (err) {
       logger.error('GROWI command failed: No installation found.\n', err);

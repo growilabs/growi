@@ -50,7 +50,6 @@ import { RelationsService } from '~/services/RelationsService';
 import { SelectGrowiService } from '~/services/SelectGrowiService';
 import { UnregisterService } from '~/services/UnregisterService';
 import loggerFactory from '~/utils/logger';
-import { resolveInstallationId } from '~/utils/resolve-installation-id';
 import {
   postInstallSuccessMessage,
   postWelcomeMessageOnce,
@@ -234,11 +233,10 @@ export class SlackCtrl {
     }
 
     // get relations
-    const installationId = resolveInstallationId(authorizeResult);
     const installation =
       await this.installationRepository.findByTeamIdOrEnterpriseId(
-        // biome-ignore lint/style/noNonNullAssertion: ignore
-        installationId!,
+        authorizeResult.teamId,
+        authorizeResult.enterpriseId,
       );
     const relations = await this.relationRepository
       .createQueryBuilder('relation')
@@ -441,11 +439,10 @@ export class SlackCtrl {
     }
 
     // check permission
-    const installationId = resolveInstallationId(authorizeResult);
     const installation =
       await this.installationRepository.findByTeamIdOrEnterpriseId(
-        // biome-ignore lint/style/noNonNullAssertion: ignore
-        installationId!,
+        authorizeResult.teamId,
+        authorizeResult.enterpriseId,
       );
     const relations = await this.relationRepository
       .createQueryBuilder('relation')

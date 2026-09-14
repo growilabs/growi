@@ -178,6 +178,10 @@ export class GrowiToSlackCtrl {
     if (relation != null) {
       logger.debug({ relation }, 'relation found');
 
+      if (relation.installation == null) {
+        throw createError(400, 'installation is invalid');
+      }
+
       const token = relation.installation.data.bot?.token;
       if (token == null) {
         throw createError(400, 'installation is invalid');
