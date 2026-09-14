@@ -256,3 +256,76 @@ R7〜R9 のスコープ追加により、R1〜R6 だけを見ていた当初の�
 
 - **推奨アプローチ**: Option B（新規の要約専用Agentを `suggestPathAgent` と同型パターンで追加）を基本線とし、統合方法（新規ルート vs 既存ルートへの薄い分岐＝Option C）は設計フェーズでUI連携の詳細と合わせて決定する。→ 7.2 で新規ルート（`POST /summary`）に決定済み。
 - **実装フェーズへの残課題（Research Needed のうち唯一残っているもの）**: クロスAgentスレッド再生（要約後に `growiAgent` が `summarizeAgent` のスレッドを引き継ぐ）は、`@mastra/core` のソース確認により成立条件を裏取り済み（7.6）だが、このリポジトリに前例がない。**統合テストでの実証が実装の必須条件**であり、テストダブルの組み方は `suggest-path-agentic-integration.spec.ts`（Mastraレジストリをモックし、偽Agentが実物のツールを呼んでループを再現する方式）を踏襲する。実物のツールはバレル経由ではなく直接ファイルからインポートする必要がある（バレル経由では `@mastra/core/agent` が引き込まれvitest下でロードできない既知の制約）。
+
+---
+
+## 9. 実装再開時点（Task 1.1〜1.3 完了後）の再ギャップ分析
+
+Task 1.1〜1.3（`LimitedGetPageContentTool`・instructions・`summarizeAgent`登録）が実装・コミット済みの状態で、残タスク（Task 2〜13）を対象に、requirements.md・design.md・tasks.mdの記述が現在のコードベースと整合しているかを再検証した。
+
+### 9.1 生成側（Task 2〜4）: ドリフトなし
+
+以下はいずれも、research.md 7章・tasks.mdの記述通りの状態を維持しており、追加の設計変更は不要:
+
+- `apps/app/src/server/models/page.ts` は既存のまま、`summary` フィールドは未追加（Task 5で追加予定の通り）。
+- `features/opentelemetry/server/custom-metrics/` は全て既存のObservable Gaugeファイルのみで、要約用Counterは未追加（Task 2で新規追加予定の通り）。
+- `features/rate-limiter/config/index.ts` の `defaultConfig` / `defaultConfigWithRegExp` の二層構造は健在（Task 6.3が想定する正規表現マップへの追加は引き続き妥当）。
+- `features/mastra/server/routes/index.ts` は `router.use(aiReadyGuard)` → 遅延ロードされたハンドラルーターという構造のままで、`/summary` ルート・`generateAddActivityMiddleware()` はまだ挿入されていない（Task 3.3が想定する挿入点は変更不要）。
+- `apps/app/src/interfaces/activity.ts` に `ACTION_ADMIN_AI_SETTING_UPDATE` が `SupportedAction` と `LargeActionGroup` の両方に存在し、Task 3.4が前例とする形は健在。
+- `apps/app/src/server/middlewares/add-activity.ts` は既存のまま。Task 3.2/3.4が想定する「ストリーム正常終了時点（レスポンス送信前）でのemit」は、`apps/app/.claude/rules/activity-recording.md` のRule 1（emitはres.apiv3()より前、finalizerクリア前）と整合しており、追加の設計変更は不要。
+
+### 9.2 新規発見: トリガー設置場所（Requirement 10 / Task 8）が、同じspec内の別記述と矛盾したまま未解決
+
+**矛盾の内容**:
+
+- requirements.mdのProject Description（1行目群）は「トリガー: ...ページ上部の操作メニュー（三点リーダー）から...AIサイドバーのクイックメニュー形式は採用しない（現状は並ぶ項目がなく単独では冗長なため）」「トリガーUIコンポーネント自体の実装は別PRで行い、本specはそこから呼ばれるAPI契約のみを定義する」と明記している。
+- design.md 27行目（Out of Scope）も同じ内容を再掲している：「要約トリガーのUIコンポーネント自体の実装。設置場所（ページ上部の操作メニュー。AIサイドバーのクイックメニュー形式は不採用）は決定済みだが、実装は別PRで行う」。
+- しかし同じdesign.mdの44行目・743〜793行目（In Scopeのセクション）は `AiSummarizeQuickMenuItem` というコンポーネント名で「AiSidebar のクイックメニューに『このページを要約』を追加」を**本spec内**で実装すると記述している。これはOut of Scopeの27行目と文字通り矛盾する（設置場所・別PRか否かの両面で）。
+- requirements.md Requirement 10〜15（UI層要件）およびtasks.md Task 8（未着手）は、design.mdのIn Scope側（AiSidebarクイックメニュー、本spec内実装）を引き継いでいる。
+
+**コードベース調査で判明した事実**:
+- `features/mastra/client/components/Sidebar/AiSidebarContent.tsx` に「クイックメニュー」に相当する概念は存在しない。現状はモーダル的な「新規チャット」ボタン1つとスレッド一覧のみで、複数項目を並べるメニュー構造自体がない。
+- `apps/app/src/client/components/PageControls/PageControls.tsx`（Project Descriptionが指す「ページ上部の操作メニュー（三点リーダー）」に該当すると見られるコンポーネント）は、`DropdownItem`（reactstrap）による既存の複数項目メニュー構造を持つ。
+- リポジトリ全体を検索しても「クイックメニュー」「quick menu」「QuickMenu」に該当する既存の概念・翻訳キーは1件もヒットしない。すなわちRequirement 10の「クイックメニュー」は、既存パターンの再利用ではなく、AiSidebar内に新規のメニュー構造そのものを発明する作業を伴う。
+
+**影響評価**:
+- Task 8はまだ未着手（tasks.md上未チェック）のため、今から矛盾を解消すれば実装への影響はない。
+- `.claude/rules/coding-style.md` の「筋の良い実装」の観点で見ると、Project Descriptionが本来想定していた「既存のPageControlsのDropdownItemパターンに1項目追加する」（Option A的な最小拡張）と、design.mdのIn Scope側が指示する「AiSidebarに新規メニュー構造を発明する」（Option B的な新規構築）とでは、実装コスト・複雑性が明確に異なる。後者を選ぶなら「なぜAiSidebar側に切り替えたか」の理由をどこにも明記しないまま実装に入ることになる。
+- どちらの記述が現時点の正であるかは、リポジトリの記述だけからは判断できない（本specはUI層をトリガーボタンごと本spec内実装する方針に転換済みだが、その転換が「別PRで作る」という判断を覆しただけなのか、「設置場所」の判断まで覆したのかが、spec内のどこにも明記されていない）。
+
+**解消（ユーザー確認済み）**: requirements.md/design.mdの「ページ上部の操作メニュー」「AIサイドバーのクイックメニュー形式は不採用」「実装は別PR」という記述は、UI層を本spec内で実装する方針（`ai_summarize_ui_scope_decision_2026_09_04`）へ転換した際の消し忘れであることを確認した。設置場所はAiSidebarのクイックメニューで確定であり、requirements.md（Project Description／非目的／Introduction／Boundary Context）・design.md（Non-Goals）の該当箇所は本ラウンドで修正済み。
+
+**なお残る事実確認事項**: design.mdの構成図が前提としていた`QuickMenuItems（既存）`はリポジトリに実在しない（`AiSidebarContent.tsx`は「新規チャット」ボタンとスレッド一覧のみ）。Task 8では既存メニューへの追加ではなく、メニュー構造自体を`AiSummarizeQuickMenuItem`側で新規に用意する前提でコストを見積もる必要がある。design.mdの構成図は本ラウンドでこの実態に合わせて修正済み。
+
+---
+
+## 10. 実装再開時点(Task 1.1〜1.3コミット後、2026-09-14再検証)
+
+Task 1.1〜1.3実装後、直近のコミット(トリガーUIスコープ矛盾の解消)を踏まえて、未着手のTask 2〜13がrequirements.md/design.md/tasks.mdの記述通り現在のコードベースと整合しているかを再検証した。
+
+### 10.1 ドリフトなしと確認できた前提(Task 2, 3, 5, 6, 7)
+
+以下は全てコード上で裏取りでき、追加の設計変更は不要:
+
+- `custom-metrics/` は引き続き全てObservable Gaugeのファイルのみで、要約用Counterは未追加(Task 2は新規パターン追加のまま妥当)。
+- `apps/app/src/interfaces/activity.ts` の `ACTION_ADMIN_AI_SETTING_UPDATE` は `SupportedAction`・`LargeActionGroup` の両方に存在し、Task 3.4が前例とする形は健在。
+- `apps/app/src/features/rate-limiter/config/index.ts` は `defaultConfig`(完全一致)/`defaultConfigWithRegExp`(正規表現)の二層構造のままで、Task 6.3が想定する追加先は変更不要。
+- `SCOPE.WRITE.FEATURES.PAGE`(`packages/core/src/interfaces/scope.ts`)は実在する(`features.page` が `SCOPE_SEED_USER` に定義済み)。Task 6.3の記述は妥当。
+- `apps/app/src/server/middlewares/login-required.ts` はデフォルトエクスポート `loginRequiredFactory` を提供し、`exclude-read-only-user.ts` は named export `excludeReadOnlyUser` を提供する。Task 6.3の記述と一致。
+- `apps/app/src/server/models/page.ts`・`apps/app/prisma/schema.prisma`(`model pages`)・`packages/core/src/interfaces/page.ts`(`IPage`)のいずれにも `summary` フィールドはまだ存在しない。Task 5の「三箇所に追加」という前提は変更不要。
+- `apps/app/src/components/PageView/RevisionRenderer.tsx` は `{ rendererOptions, markdown }` を受け取る現行シグネチャのままで、`~/stores/renderer.tsx` の `generateSimpleViewOptions` 系フックも健在。Task 7.1の再利用方針は変更不要。
+- `AiSidebarContent.tsx` は依然として「新規チャット」ボタン+`ThreadList`のみで、複数項目を並べるメニュー構造は存在しない。research.md 9.2の指摘(Task 8はメニュー構造自体を新規に用意する前提で見積もる必要がある)は現時点でも変わらず有効。
+
+### 10.2 新規に判明したギャップ: Task 8.1が参照する `useAiReadyGuard()` は存在しない
+
+**内容**: tasks.md Task 8.1は表示条件を「`useAiReadyGuard() === true` AND `useCurrentPageId() !== undefined`」と記述しているが、リポジトリ全体を検索しても `useAiReadyGuard` という名前のクライアント側フックは存在しない(`ai-ready-guard.ts` はサーバ側Expressミドルウェアのみで、対応するクライアントフックはこの名前では実装されていない)。
+
+**実際に存在する既存資産**: AIサイドバー自体の表示可否は、`aiEnabledAtom`(Jotai atom、`~/states/server-configurations`)を `useAtomValue(aiEnabledAtom)` で読む形で、既に `apps/app/src/client/components/Sidebar/SidebarNav/PrimaryItems.tsx` と `apps/app/src/client/components/Sidebar/SidebarContents.tsx` の両方で使われている(サーバ側 `crowi.isAiReady()` の値が `commonProps.aiEnabled` 経由でハイドレートされる)。Task 8.1が満たすべき「AI機能が有効化されている」という表示条件は、この既存の `aiEnabledAtom` をそのまま参照すれば足り、新規フックの発明は不要。
+
+**影響**: Task 8は未着手のため実装への影響はないが、tasks.md・design.mdの該当記述(`useAiReadyGuard()`)を実装前に `aiEnabledAtom` / `useAtomValue(aiEnabledAtom)` を使う形に修正しておかないと、実装者が存在しないフックを作ろうとする(新規の重複した可否判定ロジックを生む)リスクがある。`useCurrentPageId()` 側は `~/states/page/hooks.ts` に既存で問題ない。
+
+**解消**: tasks.md Task 8.1・design.md「AiSummarizeQuickMenuItem」の可視性記述を、いずれも `useAtomValue(aiEnabledAtom)`（`~/states/server-configurations`、既存）参照に修正済み。
+
+### 10.3 参考: 既存の `ai_sidebar` 翻訳名前空間
+
+Task 11.1は新規キーの追加先を明記していないが、`apps/app/public/static/locales/*/translation.json` には既に `ai_sidebar` 名前空間(`new_chat`, `recent_threads`, `error.*` 等)が存在する。tasks.md記載の `ai_sidebar.summarize_page` 等は、この既存の `ai_sidebar` オブジェクト配下に追加する(新しい別名前空間を作らない)ことが既存命名規約との整合上望ましい。ドリフトではないが、実装時に見落とされやすい点として記録する。
