@@ -73,14 +73,18 @@ export const EditLink = (props: EditLinkProps): JSX.Element => {
   );
 };
 
-type HeaderProps = {
-  children: React.ReactNode;
+// Extends JSX.IntrinsicElements['h1'] so react-markdown's original HTML attributes
+// (style, class, etc.) forward instead of being silently dropped.
+type HeaderProps = JSX.IntrinsicElements['h1'] & {
   node: Element;
-  id?: string;
 };
 
+// Narrowed to the tags Header is actually assigned to (h1-h6 in generateViewOptions),
+// so the {...rest} spread below stays assignable to CustomTag.
+type HeadingTagName = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+
 export const Header = (props: HeaderProps): JSX.Element => {
-  const { node, id, children } = props;
+  const { node, id, children, className, ...rest } = props;
 
   const isGuestUser = useIsGuestUser();
   const isReadOnlyUser = useIsReadOnlyUser();
@@ -93,7 +97,7 @@ export const Header = (props: HeaderProps): JSX.Element => {
 
   const [isActive, setActive] = useState(false);
 
-  const CustomTag = node.tagName as keyof JSX.IntrinsicElements;
+  const CustomTag = node.tagName as HeadingTagName;
 
   const activateByHash = useCallback(
     (url: string) => {
@@ -150,8 +154,9 @@ export const Header = (props: HeaderProps): JSX.Element => {
   return (
     <>
       <CustomTag
+        {...rest}
         id={id}
-        className={`position-relative ${moduleClass} ${isActive ? styles.blink : ''} `}
+        className={`position-relative ${moduleClass} ${isActive ? styles.blink : ''} ${className ?? ''}`}
       >
         <NextLink
           href={`#${id}`}
