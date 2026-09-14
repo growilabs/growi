@@ -36,6 +36,8 @@ export interface PoeditorClient {
     projectId: string;
     language: string;
     fileContent: string; // i18next JSON, stringified
+    syncTerms?: boolean; // default true: converge the whole project to fileContent (deletes absent keys)
+    tag?: string; // when set, tags every term in fileContent with this value
   }): Promise<Result<void, PoeditorApiError>>;
 
   exportTranslations(input: {
@@ -135,6 +137,8 @@ class PoeditorClientImpl implements PoeditorClient {
     projectId: string;
     language: string;
     fileContent: string;
+    syncTerms?: boolean;
+    tag?: string;
   }): Promise<Result<void, PoeditorApiError>> {
     return runCatchingNetworkError(async () => {
       await this.throttleUpload();
@@ -143,7 +147,16 @@ class PoeditorClientImpl implements PoeditorClient {
       form.set('id', input.projectId);
       form.set('updating', 'terms_translations');
       form.set('language', input.language);
-      form.set('sync_terms', '1');
+      // Only send sync_terms when syncing is enabled (default): POEditor
+      // treats a present sync_terms of any value as opting into deleting
+      // terms absent from the uploaded file, so a disabled sync must omit
+      // the parameter entirely rather than send '0'.
+      if (input.syncTerms ?? true) {
+        form.set('sync_terms', '1');
+      }
+      if (input.tag != null) {
+        form.set('tags', JSON.stringify({ all: input.tag }));
+      }
       form.set('api_token', this.apiToken);
       form.set(
         'file',

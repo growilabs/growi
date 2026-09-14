@@ -181,6 +181,69 @@ describe('createPoeditorClient', () => {
       }
     });
 
+    it('does not send a sync_terms parameter when syncTerms is false (deletion disabled)', async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse(200, { result: {} }));
+      const client = createPoeditorClient({
+        apiToken: API_TOKEN,
+        sleep: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const result = await client.uploadTerms({
+        projectId: PROJECT_ID,
+        language: 'en_US',
+        fileContent: '{"key":"value"}',
+        syncTerms: false,
+      });
+
+      expect(result.ok).toBe(true);
+      const [, init] = mockFetch.mock.calls[0];
+      const sentBody = init.body as FormData;
+      // A FormData key that was never set() returns null, distinct from ''.
+      // The absent-key check matters here: POEditor treats a present
+      // sync_terms of any value (including '0') as opting into deletion
+      // semantics, so the parameter must be genuinely unset, not sent as '0'.
+      expect(sentBody.get('sync_terms')).toBeNull();
+    });
+
+    it('still sends sync_terms=1 when syncTerms is omitted (default unchanged)', async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse(200, { result: {} }));
+      const client = createPoeditorClient({
+        apiToken: API_TOKEN,
+        sleep: vi.fn().mockResolvedValue(undefined),
+      });
+
+      await client.uploadTerms({
+        projectId: PROJECT_ID,
+        language: 'en_US',
+        fileContent: '{"key":"value"}',
+      });
+
+      const [, init] = mockFetch.mock.calls[0];
+      const sentBody = init.body as FormData;
+      expect(sentBody.get('sync_terms')).toBe('1');
+      expect(sentBody.get('tags')).toBeNull();
+    });
+
+    it('sends a tags parameter tagging every term when tag is specified', async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse(200, { result: {} }));
+      const client = createPoeditorClient({
+        apiToken: API_TOKEN,
+        sleep: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const result = await client.uploadTerms({
+        projectId: PROJECT_ID,
+        language: 'en_US',
+        fileContent: '{"key":"value"}',
+        tag: 'admin',
+      });
+
+      expect(result.ok).toBe(true);
+      const [, init] = mockFetch.mock.calls[0];
+      const sentBody = init.body as FormData;
+      expect(sentBody.get('tags')).toBe('{"all":"admin"}');
+    });
+
     it('does not read the API token from process.env', async () => {
       const original = process.env.POEDITOR_API_TOKEN;
       process.env.POEDITOR_API_TOKEN = 'env-token-should-not-be-used';

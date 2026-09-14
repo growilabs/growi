@@ -11,6 +11,8 @@
 
 ## 1. POEditor OSS プランの申請
 
+POEditor 上のプロジェクトは単一（後述の「2. 単一の POEditor プロジェクトを作成する」）なので、この OSS プラン申請も GROWI プロジェクト全体に対して一度だけ行えば済みます。namespace ごとに申請し直す必要はありません。
+
 ### 1.1 申請できる条件
 
 POEditor が公開している OSS プログラムの適用条件は「OSI 認定ライセンスであること」のみで、商用製品の有無を理由にした除外条項はありません（`.kiro/specs/i18n-community-translation/brief.md` の Approach 節）。GROWI は MIT ライセンスなので、この条件を満たします。
@@ -32,25 +34,23 @@ POEditor が公開している OSS プログラムの適用条件は「OSI 認�
 
 要件7.2により、却下された場合は同等規模（文字列数・言語数・貢献者数に実用上の上限がない）の代替プラン・代替サービスが確認できるまで本番運用に進みません。代替の検討は本ドキュメントの範囲外です（`.kiro/specs/i18n-community-translation/brief.md` の「他候補を落とした理由」に、検討済みの候補とその却下理由が記録されています。POEditor 自体が使えなくなった場合はこの記録を出発点に再検討してください）。
 
-## 2. namespace ごとに専用の POEditor プロジェクトを作成する
+## 2. 単一の POEditor プロジェクトを作成する
 
-### 2.1 なぜ3プロジェクトに分けるのか
+### 2.1 なぜ1プロジェクトで足りるのか
 
-POEditor の1プロジェクトは「フラットな用語リスト1本」であり、複数ファイル・複数 namespace を1プロジェクト内で構造的に分離する機能を持ちません。GROWI の翻訳ファイルは `admin.json` / `translation.json` / `commons.json` の3 namespace に分かれており、`commons.json` には他ファイルと同一のキー文字列が意図的に複製されているものがあります。これを1プロジェクトに混在させると、同一キー文字列が別の namespace で別の訳を持つケースで衝突が起きます。
+GROWI の翻訳ファイルは `admin.json` / `translation.json` / `commons.json` の3 namespace に分かれており、`commons.json` には他ファイルと同一のキー文字列が意図的に複製されているものがあります。以前はこの衝突を避けるため namespace ごとに POEditor プロジェクトを分ける設計でしたが、現在は同期ツール側（`apps/app/tools/i18n-sync/`）が各 namespace の用語を `{namespace: 内容}` という構造で包んでから POEditor に送るようになっており、同一キー文字列が別の namespace に存在してもツール側の仕組みで区別できます。そのため、POEditor 上のプロジェクトを namespace ごとに分ける必要がなくなり、単一のプロジェクトで全 namespace の内容をまとめて扱えます（詳しい実装は `.kiro/specs/i18n-community-translation-single-project/design.md` を参照してください。この手順書ではその詳細までは踏み込みません）。
 
-そのため、namespace ごとに独立した POEditor プロジェクトを作るという設計判断がすでに確定しています（`.kiro/specs/i18n-community-translation/research.md` の Design Decision「namespace ごとに独立した POEditor プロジェクトを作る」）。この手順ではその判断に従い、3つのプロジェクトを作成します。
+なお、GROWI 側で namespace ごとの絞り込み表示自体が不要になったわけではありません。同期ツールは用語を POEditor に送る際、その用語がどの namespace に属するかをタグとして付与します。貢献者は POEditor 画面上のタグ絞り込み機能を使うことで、関心のある namespace だけに絞って翻訳作業ができます（詳細は `docs/i18n-community-translation.md` の「参加方法」を参照してください）。
 
 ### 2.2 作成するプロジェクト
 
-以下の3プロジェクトを、POEditor の「New project」機能で作成します。
+POEditor の「New project」機能で、GROWI の翻訳全体を受け皿とするプロジェクトを1つ作成します。
 
-| namespace | 対応するリポジトリ側ファイル | プロジェクト名の例 |
-|---|---|---|
-| `admin` | `apps/app/public/static/locales/<lang>/admin.json` | GROWI - admin |
-| `translation` | `apps/app/public/static/locales/<lang>/translation.json`（`packages/editor` の `toolbar.*` キーもここに含まれる） | GROWI - translation |
-| `commons` | `apps/app/public/static/locales/<lang>/commons.json` | GROWI - commons |
+| 対応するリポジトリ側ファイル | プロジェクト名の例 |
+|---|---|
+| `apps/app/public/static/locales/<lang>/{admin,translation,commons}.json`（3 namespace すべて。`translation.json` には `packages/editor` の `toolbar.*` キーも含まれる） | GROWI |
 
-各プロジェクトで、対応する言語を追加します。基準言語（ソース言語）は `en_US`、翻訳対象言語は `ja_JP` / `zh_CN` / `fr_FR` / `ko_KR` の4言語です（`docs/i18n-community-translation.md` の「対応している言語」と同じ一覧）。
+このプロジェクトに、対応する言語を追加します。基準言語（ソース言語）は `en_US`、翻訳対象言語は `ja_JP` / `zh_CN` / `fr_FR` / `ko_KR` の4言語です（`docs/i18n-community-translation.md` の「対応している言語」と同じ一覧）。
 
 ### 2.3 初回の用語投入
 
@@ -58,23 +58,19 @@ POEditor の1プロジェクトは「フラットな用語リスト1本」であ
 
 ### 2.4 プロジェクト ID をリポジトリに反映する（後続の作業）
 
-3プロジェクトを作成すると、それぞれに POEditor 上のプロジェクト ID が割り当てられます。このプロジェクト ID は非公開情報ではなく、公開してよい情報です（トークンではないため）。
+プロジェクトを作成すると、POEditor 上のプロジェクト ID が割り当てられます。このプロジェクト ID は非公開情報ではなく、公開してよい情報です（トークンではないため）。
 
-`apps/app/tools/i18n-sync/sync-config.ts` の `SYNC_TARGETS` には、現在プレースホルダー値が入っています。
+`apps/app/tools/i18n-sync/sync-config.ts` の `SHARED_POEDITOR_PROJECT_ID` には、現在プレースホルダー値 `'PENDING_SHARED_PROJECT_ID'` が入っています。
 
-- `admin`: `PENDING_ADMIN_PROJECT_ID`
-- `translation`: `PENDING_TRANSLATION_PROJECT_ID`
-- `commons`: `PENDING_COMMONS_PROJECT_ID`
+プロジェクトの作成後、このプレースホルダーを実際のプロジェクト ID に置き換えるコード変更を行ってください。この置き換えは本ドキュメントの手順書という文書だけでは完結せず、`sync-config.ts` を編集してコミットする作業が別途必要です。
 
-3プロジェクトの作成後、これらのプレースホルダーを実際のプロジェクト ID に置き換えるコード変更を行ってください。この置き換えは本ドキュメントの手順書という文書だけでは完結せず、`sync-config.ts` を編集してコミットする作業が別途必要です。
+## 3. public join page を有効化する
 
-## 3. 各プロジェクトで public join page を有効化する
+貢献者向けの参加方法（`docs/i18n-community-translation.md` の「参加方法」）は、GitHub アカウントなしで POEditor プロジェクトに参加できることを前提にしています。これは POEditor プロジェクトの「public join page」機能で実現します（要件1.1: GitHub アカウントを要求せずに参加手段を提示する）。プロジェクトが単一になったことで、この設定も一度だけ行えば済みます。
 
-貢献者向けの参加方法（`docs/i18n-community-translation.md` の「参加方法」）は、GitHub アカウントなしで POEditor プロジェクトに参加できることを前提にしています。これは POEditor プロジェクトの「public join page」機能で実現します（要件1.1: GitHub アカウントを要求せずに参加手段を提示する）。
-
-1. 作成した3プロジェクトそれぞれについて、プロジェクトの設定画面を開きます。
+1. 作成したプロジェクトの設定画面を開きます。
 2. 「Public」または「Join」に相当する設定を有効化し、招待メールなしで誰でも参加できる公開参加リンク（public join page の URL）を発行します。
-3. 発行された参加リンクを控えます。3プロジェクト分（`admin` / `translation` / `commons`）、それぞれ別の URL になります。
+3. 発行された参加リンクを控えます。プロジェクトは1つなので、URL も1つです。
 4. 控えた参加リンクを `docs/i18n-community-translation.md` の「参加方法」セクションにある `（参加リンクをここに追記する。...）` の記載箇所に追記してください。これは `docs/i18n-community-translation.md` 自体の編集であり、本タスクの境界外（タスク4.1で作成済みの別ファイル）のため、別のコード変更として行ってください。
 
 参加した利用者は、POEditor アカウント自体は必要です（匿名投稿はできません）が、個別の招待メールを待つ必要はありません（`.kiro/specs/i18n-community-translation/brief.md` の Constraints 節）。
@@ -117,20 +113,20 @@ GitHub は PR 作成者自身による自己承認を拒否するため、「PR 
 
 ## 5. POEditor API トークンを用意する
 
-上記の3プロジェクト作成・public join page 有効化とは別に、同期ワークフロー（push/pull）が POEditor API を呼び出すための API トークンが必要です。POEditor のアカウント設定画面から API トークンを発行し、GitHub Actions のリポジトリシークレット `POEDITOR_API_TOKEN` として登録してください（`.kiro/specs/i18n-community-translation/design.md` の Security Considerations、および要件2〜3で参照される同期ワークフローの認証情報）。このトークンもログやコードに平文で出力しないでください。
+上記のプロジェクト作成・public join page 有効化とは別に、同期ワークフロー（push/pull）が POEditor API を呼び出すための API トークンが必要です。POEditor のアカウント設定画面から API トークンを発行し、GitHub Actions のリポジトリシークレット `POEDITOR_API_TOKEN` として登録してください（`.kiro/specs/i18n-community-translation/design.md` の Security Considerations、および要件2〜3で参照される同期ワークフローの認証情報）。このトークンもログやコードに平文で出力しないでください。
 
 ## 6. この手順の成果物を使う後続タスク
 
 この手順を実行すると、以下が用意された状態になります。
 
-- POEditor 上の3プロジェクト（`admin` / `translation` / `commons`）と、それぞれの public join page の URL
-- `apps/app/tools/i18n-sync/sync-config.ts` のプレースホルダー値を置き換えるためのプロジェクト ID
+- POEditor 上の1プロジェクトと、その public join page の URL
+- `apps/app/tools/i18n-sync/sync-config.ts` の `SHARED_POEDITOR_PROJECT_ID` プレースホルダー値を置き換えるためのプロジェクト ID
 - 承認ボットの ID とトークン（`I18N_SYNC_APPROVAL_TOKEN` として登録予定）
 - POEditor API トークン（`POEDITOR_API_TOKEN` として登録予定）
 
 これらは以下の後続タスクが直接使う前提です。
 
 - タスク5.1（push ワークフローの配線）・5.2（pull ワークフローの配線、承認ボット・GitHub 操作の実アダプタ実装）は、上記のシークレット（`POEDITOR_API_TOKEN` / `I18N_SYNC_APPROVAL_TOKEN`）と、置き換え済みのプロジェクト ID を前提に配線します。
-- タスク6.1（push 経路の実環境確認）・6.2（pull 経路の実環境確認）は、実際の POEditor プロジェクト（本番用の3プロジェクト、または OSS プラン承認前であればテスト用の POEditor プロジェクト）に対して動作確認を行うために、この手順で用意した環境を使います。
+- タスク6.1（push 経路の実環境確認）・6.2（pull 経路の実環境確認）は、実際の POEditor プロジェクト（本番用のプロジェクト、または OSS プラン承認前であればテスト用の POEditor プロジェクト）に対して動作確認を行うために、この手順で用意した環境を使います。
 
-OSS プラン承認前にタスク6.1・6.2を進める場合は、本ドキュメント冒頭の「この手順が満たすべき条件」に従い、本番の3プロジェクトではなくテスト用のプロジェクトを使ってください。
+OSS プラン承認前にタスク6.1・6.2を進める場合は、本ドキュメント冒頭の「この手順が満たすべき条件」に従い、本番のプロジェクトではなくテスト用のプロジェクトを使ってください。

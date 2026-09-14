@@ -87,3 +87,22 @@ GROWI は現在 5 言語（en_US / ja_JP / zh_CN / fr_FR / ko_KR）を提供し�
 #### Acceptance Criteria
 
 1. If Sync Workflow の実行がエラー（POEditor 側 API エラー、通信エラー等）で完了しなかった場合、the Sync Workflow shall その失敗をメンテナーに分かる形で知らせ、黙って結果をスキップしない
+
+### Requirement 9: namespace・機能単位のタグによる絞り込み
+
+**Objective:** As 翻訳に貢献する利用者, I want 単一の POEditor プロジェクトの中でも namespace や機能領域ごとに翻訳対象を絞り込めること, so that プロジェクトが1つにまとまっていても、自分が関心のある範囲だけに集中して翻訳できる
+
+#### Acceptance Criteria
+
+1. When 翻訳キーが POEditor プロジェクトへ同期されるとき、the Sync Workflow shall そのキーが由来する namespace が分かるタグを付与する
+2. When 貢献者が特定の namespace・機能領域の翻訳に取り組みたいとき、the Translation Program shall POEditor の画面上でそのタグによる絞り込み表示を利用できる状態にする
+3. The Translation Program shall namespace・機能単位の絞り込み体験を実現するために、GROWI 側で独自の画面や仕組みを新たに構築しない
+
+### Requirement 10: ロケールコードの対応
+
+**Objective:** As a GROWI メンテナー, I want GROWI のロケールコードと POEditor が受け付ける言語コードが正しく対応付けられること, so that push・pull の同期が実際の POEditor API 呼び出しで失敗しない
+
+#### Acceptance Criteria
+
+1. When Sync Workflow が POEditor API を呼び出すとき、the Sync Workflow shall GROWI のロケールコードを POEditor が受け付ける言語コードへ変換してから呼び出す
+2. The Sync Workflow shall GROWI が提供する5言語（en_US/ja_JP/zh_CN/fr_FR/ko_KR）それぞれについて、対応する POEditor 言語コードを持つ
