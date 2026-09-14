@@ -30,7 +30,7 @@ export class Installation {
   teamId?: string;
 
   // Not unique: a Grid workspace-level install shares its enterpriseId with
-  // every other workspace under the same organization (#189249).
+  // every other workspace under the same organization.
   @Column({ nullable: true })
   enterpriseId?: string;
 

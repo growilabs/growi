@@ -5,7 +5,7 @@
  * an enterpriseId at once. Always prefer teamId when present so every call
  * site agrees on the same key regardless of where it runs — mixing
  * priorities between save and lookup sites previously made installations
- * unfindable after being saved (#189249).
+ * unfindable after being saved.
  */
 export const resolveInstallationId = (ids: {
   teamId?: string | null;
