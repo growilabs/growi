@@ -24,8 +24,6 @@
 ### Non-Goals
 - 複数ページを横断した要約・比較、ページ階層／プロジェクト単位の要約。
 - 要約専用の新しいLLM呼び出しパイプライン、独自の権限モデル、独自のページ内容取得手段の新設。永続化された要約の閲覧権限判定も、既存のページ閲覧権限判定ロジックをそのまま利用する。
-- 要約トリガーのUIコンポーネント自体の実装。設置場所（ページ上部の操作メニュー。AIサイドバーのクイックメニュー形式は不採用）は決定済みだが、実装は別PRで行う。本設計は、そのUIから呼ばれるAPI契約のみを定義する。
-- 「残す」を選ぶ保存ボタンUI自体の実装。トリガーUIと同じ別PRで行う。本設計は、そのUIから呼ばれる保存APIの契約のみを定義する。
 - 本文更新時の要約自動再生成（手動再生成のみとする）、非表示にした要約を再表示する機能。
 - 永続化された要約そのものをサーバ側で削除する仕組み（「削除」導線はクライアントローカルな非表示状態として実現し、共有データを消す操作ではない。詳細は Requirement 9.3/9.4 参照）。
 
@@ -749,9 +747,9 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 ### 既存との統合
 
 ```
-AiSidebar（既存）
-├── QuickMenuItems（既存）
-│   └── [このページを要約]（NEW: AiSummarizeQuickMenuItem）
+AiSidebar（既存。現状は「新規チャット」ボタンとスレッド一覧のみで、複数項目を並べるメニュー構造はまだ無い）
+└── AiSidebarContent（既存）
+    └── [このページを要約]（NEW: AiSummarizeQuickMenuItem。メニュー構造自体も本コンポーネントで新規に用意する）
 │
 ChatSidebar（既存）
 ├── ChatMessageList（既存）
@@ -783,7 +781,9 @@ interface AiSummarizeQuickMenuItemProps {
 
 **可視性**:
 ```typescript
-if (useAiReadyGuard() && useCurrentPageId() !== undefined) {
+// aiEnabledAtom は既存（~/states/server-configurations）。PrimaryItems.tsx / SidebarContents.tsx
+// と同じ参照方法を踏襲する。新規のAI利用可否フックは発明しない。
+if (useAtomValue(aiEnabledAtom) && useCurrentPageId() !== undefined) {
   // 表示
 }
 ```
