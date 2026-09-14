@@ -77,4 +77,16 @@ describe('SUMMARIZE_INSTRUCTIONS', () => {
     // And the positive claim: totalLines is reference-only.
     expect(SUMMARIZE_INSTRUCTIONS).toMatch(/reference-only/i);
   });
+
+  it('instructs not to shortcut past reading the body just because the outline is available (design.md a-2/a-3)', () => {
+    // Two independent anti-shortcut sentences, one per point in the reading
+    // procedure. A mutation deleting either one (while leaving the generic
+    // "outline" mentions elsewhere intact) must turn this RED.
+    expect(SUMMARIZE_INSTRUCTIONS).toMatch(
+      /do not decide[\s\S]{0,15}the outline is enough/i,
+    );
+    expect(SUMMARIZE_INSTRUCTIONS).toMatch(
+      /do not stop early just because the outline/i,
+    );
+  });
 });
