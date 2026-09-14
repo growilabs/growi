@@ -56,12 +56,16 @@ export type CodeMirrorEditorProps = {
   onSave?: () => void;
   onUpload?: (files: File[]) => void;
   onScroll?: () => void;
+  /**
+   * Hide the toolbar (and its reserved space). Used by CodeMirrorEditorReadOnly
+   * and, via this public type, by CodeMirrorEditorComment.
+   */
+  hideToolbar?: boolean;
 };
 
 type Props = CodeMirrorEditorProps & {
   editorKey: string | GlobalCodeMirrorEditorKey;
   className?: string;
-  hideToolbar?: boolean;
 };
 
 export const CodeMirrorEditor = (props: Props): JSX.Element => {

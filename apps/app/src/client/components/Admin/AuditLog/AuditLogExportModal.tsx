@@ -8,9 +8,9 @@ import type { IAuditLogBulkExportRequestFilters } from '~/features/audit-log-bul
 import type { SupportedActionType } from '~/interfaces/activity';
 import { auditLogAvailableActionsAtom } from '~/states/server-configurations';
 
+import { AuditLogUsernameTypeahead } from './AuditLogUsernameTypeahead';
 import { DateRangePicker } from './DateRangePicker';
 import { DuplicateExportConfirmModal } from './DuplicateExportConfirmModal';
-import { SearchUsernameTypeahead } from './SearchUsernameTypeahead';
 import { SelectActionDropdown } from './SelectActionDropdown';
 import { useAuditLogExport } from './useAuditLogExport';
 
@@ -132,7 +132,7 @@ const AuditLogExportModalSubstance = ({
       <ModalBody>
         <div className="mb-3">
           <div className="form-label">{t('audit_log_management.username')}</div>
-          <SearchUsernameTypeahead
+          <AuditLogUsernameTypeahead
             onChange={setUsernamesHandler}
             initialUsernames={initialSelectedUsernames}
           />

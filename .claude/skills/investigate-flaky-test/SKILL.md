@@ -130,6 +130,16 @@ of this step, right before Step 3. This is a single rerun, not the 2-3
 tally used in the "second tier" below — that tally is a different budget
 for a different purpose (root-cause confidence), spent later, in Step 4/6.
 
+**This is a hard gate, not an optional courtesy — Step 3 may not start
+until it is satisfied.** Immediately after firing the command above, write
+down (in your own working notes, and later in the issue comment or PR body)
+one of exactly three outcomes: `rerun passed`, `rerun failed again`, or
+`rerun could not be attempted` (see below). Reaching Step 3 without one of
+these three recorded is the failure mode this gate exists to catch — a
+plausible-looking root cause already visible in the issue's existing
+evidence (e.g. matrix divergence) is not a substitute for actually firing
+this command, no matter how convincing that existing evidence looks.
+
 When you check back: if the rerun **passed** with no code change, that is
 empirical proof of flakiness — escalate the label before continuing:
 
@@ -143,6 +153,17 @@ data point — do not silently treat this as confirmed. Carry it into Step 4
 as an explicit caveat (same handling as "reruns failed 100% of the time" in
 that step's confidence table) rather than assuming the mining hit was
 correct.
+
+If the rerun **could not even be attempted** — `gh run rerun` itself
+errors out (e.g. 403 "Resource not accessible by integration" because this
+session's token lacks `actions:write`), as opposed to completing and
+failing — do not treat this as equivalent to "no rerun was needed" or
+quietly fold it into Step 6's later repeat-CI tally. A missing tool is not
+evidence of flakiness. Record the exact error, note explicitly that the
+one-time confirmation rerun this gate requires was never actually
+performed, and carry that into Step 4 (see its confidence table) as its own
+distinct situation — not the "reruns failed 100% of the time" row, which
+requires a rerun to have actually run and failed.
 
 ### Primary tier — CI log analysis (always available, no live services needed)
 
@@ -400,6 +421,7 @@ alternative explicitly rather than defaulting to the bump.
 | Root cause identified but fix touches product code with broader blast radius, or category is ambiguous between "shared state" and "product race" | MEDIUM |
 | Reruns failed 100% of the time (looks like a real regression, not a flake — see Step 2's note) | MEDIUM — flag this explicitly, do not silently treat it as a flaky-test fix |
 | Issue came in as `flaky/suspected` and its one confirmation rerun (Step 2) also failed | MEDIUM — the mining hit alone is not empirical proof; say explicitly that the confirmation rerun did not reproduce a pass, so this could be a real regression rather than a flake, and that only one rerun was budgeted (not the 100%-tally case above) |
+| Issue came in as `flaky/suspected` and its one confirmation rerun (Step 2) could not even be attempted (e.g. `actions:write` unavailable) | MEDIUM at best, never HIGH — a tooling gap is not proof of anything; say explicitly that the required confirmation rerun was never performed at all, distinct from "attempted and failed" above, and that existing static evidence (e.g. matrix divergence already in the issue) does not substitute for it |
 | Proposed fix is a bare timeout increase, with no check for whether the test's cost scales with a parameter (see the Step 3 guardrail) | MEDIUM at best — go back and check for a redesign before treating this as HIGH, even if the diff is small and clean |
 | CI evidence and reruns alone do not localize a cause | LOW |
 
@@ -531,6 +553,7 @@ what this skill's own execution environment supports.
 | All reruns green + lint passes + fix stayed in scope | HIGH |
 | All reruns green but fix touched product code beyond the originally suspected file | MEDIUM |
 | Any rerun still shows the original failure, or lint/type errors | LOW |
+| The repeat-rerun tally itself could not be attempted (e.g. `gh run rerun` 403s for lack of `actions:write`) | MEDIUM at best, never HIGH on this basis alone — a single initial green run plus a tooling gap is not the same evidence as a repeat-green tally; say so explicitly rather than treating the initial pass as sufficient |
 
 **Autonomous**: HIGH → mark the PR ready and update its body with the
 verification tally (see 6-D). MEDIUM/LOW → stop and ask, leaving the PR in
@@ -578,6 +601,19 @@ top of the repeat-CI tally above.)
   since Actions has no GraphQL API to begin with.
 - Issue is neither `flaky/confirmed` nor `flaky/suspected`: stop, do not
   investigate (see Precondition).
+- `gh run rerun` itself errors out (403 "Resource not accessible by
+  integration", or any other failure to even start the rerun — not the
+  rerun completing and failing) at Step 2 or Step 6-B: this is a **known
+  recurring constraint** in some execution environments (e.g. a
+  restricted-token cloud/bot session), not a rare edge case, and it is not
+  grounds to skip the gate or treat existing static evidence as a
+  substitute. Record the exact error, cap confidence at MEDIUM per the
+  Step 4 / Step 6-C tables above, and — in autonomous mode — stop and ask
+  rather than silently proceeding as if the rerun budget had been spent.
+  Do not defer mentioning this constraint until after a fix has already
+  been implemented and a PR opened; if the token cannot do this, that is
+  known from the very first rerun attempt, at Step 2, before any code is
+  written.
 - A human approves proceeding with a best-guess fix at a MEDIUM gate for an
   issue that came in as `flaky/suspected` and whose confirmation rerun
   failed (Step 2/Step 4): the label is still `flaky/suspected` at that

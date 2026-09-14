@@ -1,0 +1,90 @@
+name: Sync translations from POEditor (pull)
+
+# Exports every namespace x non-source-language combination from POEditor,
+# classifies each one as a translation-only or a structural change, and opens
+# at most two pull requests from the result: one that the sync bot approves
+# once the i18n gate passes, and one that waits for human review
+# (Requirement 3.1, 3.2, 3.3, 3.4, 8.1).
+#
+# Trigger scope is schedule + manual only. Unlike the push workflow there is
+# no repository content to react to -- the input lives in POEditor, so there
+# is nothing to watch for; running on a timer, plus on demand, is the whole
+# trigger surface (design.md PullTranslationSync Batch Contract).
+
+on:
+  schedule:
+    # Daily at 21:00 UTC (06:00 JST), outside working hours so a sync pull
+    # request is waiting at the start of the day rather than landing in the
+    # middle of one.
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+
+concurrency:
+  # Grouped by workflow alone, not by ref: a scheduled or manually dispatched
+  # run is not tied to a particular pushed ref the way the push workflow's
+  # runs are, and both sync branches are fixed names shared by every run.
+  group: ${{ github.workflow }}
+  # Deliberately NOT cancel-in-progress, which is where this differs from
+  # i18n-sync-push.yml. Push can cancel safely because each run uploads the
+  # complete current en_US state, so a superseding run makes a cancelled one
+  # redundant. Pull has no such argument: a run cancelled between the force
+  # push and the approving review leaves an unapproved pull request that only
+  # the next scheduled run repairs. Two overlapping runs converge on the same
+  # POEditor state anyway, so queueing costs nothing and cancelling buys
+  # nothing.
+  cancel-in-progress: false
+
+# Scopes the workflow's own GITHUB_TOKEN to what the sync job needs, and
+# nothing else (design.md Security Considerations). Note this does NOT scope
+# the approval bot's token: a personal access token / GitHub App installation
+# token carries the permissions it was minted with, which no workflow key can
+# narrow. That identity is limited to submitting approving reviews by (a) how
+# it is minted -- see docs/i18n-community-translation-setup.md -- and (b) the
+# code path in tools/i18n-sync/github-adapters.ts, where the approval token
+# reaches exactly one endpoint (POST /pulls/{n}/reviews) and no adapter that
+# holds it has any content-writing capability.
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  i18n-sync-pull:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The credential this token leaves behind is what `git push` uses,
+          # so it also decides which identity the sync branches are pushed
+          # under. A dedicated token is preferred over the workflow's own
+          # GITHUB_TOKEN because pushes made with GITHUB_TOKEN do not start
+          # further workflow runs -- the translation-only pull request would
+          # then never get the `ci-app-lint` check that .github/mergify.yml's
+          # queue conditions require, and would sit in the merge queue
+          # forever. The fallback keeps a manual dry run working in a fork,
+          # where nothing needs to merge.
+          token: ${{ secrets.I18N_SYNC_PUBLISH_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pull translations from POEditor and open the sync pull requests
+        working-directory: ./apps/app
+        env:
+          POEDITOR_API_TOKEN: ${{ secrets.POEDITOR_API_TOKEN }}
+          # Three separate secrets for three separate identities. The
+          # approval token must never be the same value as the publishing
+          # token: GitHub refuses a self-approval, and the CLI rejects the
+          # run outright if the two match.
+          I18N_SYNC_PUBLISH_TOKEN: ${{ secrets.I18N_SYNC_PUBLISH_TOKEN }}
+          I18N_SYNC_APPROVAL_TOKEN: ${{ secrets.I18N_SYNC_APPROVAL_TOKEN }}
+          # Not exposed to the process automatically, unlike GITHUB_REPOSITORY.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm run i18n:sync:pull

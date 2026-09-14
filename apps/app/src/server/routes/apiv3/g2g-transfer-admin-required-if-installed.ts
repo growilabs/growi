@@ -19,7 +19,8 @@ export const generateAdminRequiredIfInstalled = (
   isInstalled: () => boolean,
   adminRequired: Middleware,
 ): Middleware => {
-  return (req, res, next) => {
+  // Named so the authz snapshot tool can identify it in `app._router.stack`.
+  return function adminRequiredIfInstalled(req, res, next) {
     if (!isInstalled()) {
       next();
       return;

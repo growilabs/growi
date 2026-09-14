@@ -1,7 +1,7 @@
 import type { LeafGrowiPluginDirective } from '@growi/remark-growi-directive';
 import { remarkGrowiDirectivePluginType } from '@growi/remark-growi-directive';
 
-import { remarkPlugin } from './lsx.js';
+import { remarkPlugin, sanitizeOption } from './lsx.js';
 
 const createNode = (
   attributes: Record<string, string>,
@@ -58,6 +58,7 @@ describe('remarkPlugin', () => {
         ${'supported attribute stops joining'}            | ${{ '/foo': '', '/bar': '', depth: '1' }} | ${'/foo /bar'}
         ${'supported attribute with empty value stops'}   | ${{ '/foo': '', depth: '' }}              | ${'/foo'}
         ${'both conditions true (non-empty + supported)'} | ${{ '/foo': '', depth: '1' }}             | ${'/foo'}
+        ${'tag attribute with empty value stops joining'} | ${{ '/foo': '', tag: '' }}                | ${'/foo'}
       `('should handle $scenario', ({ attributes, expectedPrefix }) => {
         const node = createNode(attributes);
         runPlugin(node);
@@ -81,5 +82,22 @@ describe('remarkPlugin', () => {
         expect(node.data?.hProperties?.prefix).toBeUndefined();
       });
     });
+  });
+
+  describe('tag attribute passthrough', () => {
+    it('should keep the tag attribute in hProperties', () => {
+      const node = createNode({ prefix: '/path', tag: '議事録' });
+      runPlugin(node);
+      expect(node.data?.hProperties).toMatchObject({
+        prefix: '/path',
+        tag: '議事録',
+      });
+    });
+  });
+});
+
+describe('sanitizeOption', () => {
+  it('should allow the tag attribute on the lsx element', () => {
+    expect(sanitizeOption.attributes?.lsx).toContain('tag');
   });
 });

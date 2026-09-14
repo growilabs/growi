@@ -250,6 +250,10 @@
       }
     }
   },
+  "username_suggestion": {
+    "active_user": "Utilisateurs actifs",
+    "inactive_user": "Utilisateurs inactifs"
+  },
   "table_action": {
     "edit": "Modifier"
   }

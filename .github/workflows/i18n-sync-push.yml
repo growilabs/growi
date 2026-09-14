@@ -1,0 +1,55 @@
+name: Sync i18n source strings to POEditor (push)
+
+# Pushes the en_US (source language) locale files to POEditor whenever they
+# change on the default branch, so translators always work against the
+# latest source strings (Requirement 2.1, 2.2).
+#
+# Trigger scope is push-only (no pull_request): this workflow calls the real
+# PushSourceSync CLI, which uploads to the live POEditor project via
+# PoeditorClient.uploadTerms — it must never run against a PR head, only
+# against content that has actually landed on the default branch.
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - apps/app/public/static/locales/en_US/**
+      # Included so that a PR which only touches this workflow can still prove
+      # its own change on merge, per this repo's existing convention (see
+      # check-changesets.yml / release-pdf-converter.yml).
+      - .github/workflows/i18n-sync-push.yml
+
+concurrency:
+  # Scoped to the ref (always `refs/heads/master` here) rather than just the
+  # workflow name, matching this repo's push-triggered-workflow convention
+  # (see check-changesets.yml) — prevents two pushes to master in quick
+  # succession from racing overlapping POEditor uploads. Safe to cancel an
+  # in-flight run: push-source.ts always uploads the current en_US state in
+  # full (idempotent overwrite, design.md Push Flow), so a superseding run
+  # makes a cancelled one redundant, not incomplete.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  i18n-sync-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Push en_US source strings to POEditor
+        working-directory: ./apps/app
+        env:
+          POEDITOR_API_TOKEN: ${{ secrets.POEDITOR_API_TOKEN }}
+        run: pnpm run i18n:sync:push

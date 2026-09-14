@@ -4,6 +4,7 @@ export type LsxApiOptions = {
   depth?: string;
   filter?: string;
   except?: string;
+  tag?: string;
   sort?: string;
   reverse?: string;
 };

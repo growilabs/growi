@@ -5,6 +5,7 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
 import { debounce } from 'throttle-debounce';
 
+import type { InlineCommentWithReplies } from '~/features/inline-comment/interfaces';
 import { useCurrentUser } from '~/states/global';
 import { useIsTrashPage } from '~/states/page';
 import { useSWRxPageComment } from '~/stores/comment';
@@ -29,10 +30,43 @@ type CommentsProps = {
   revision: IRevisionHasId;
   isReadOnly?: boolean;
   onLoaded?: () => void;
+  /**
+   * Forwarded to `PageComment` unchanged: this is the caller's
+   * `useSWRxInlineComments` result bundled with `resolve`/`createReply`, not
+   * a plain array. `Comments` must not default a missing value to an empty
+   * list -- that would fabricate a "no inline comments" object without the
+   * accompanying callbacks.
+   */
+  inlineComments?: {
+    comments: InlineCommentWithReplies[];
+    resolve: (id: string, resolved: boolean) => Promise<unknown>;
+    createReply: (parentId: string, comment: string) => Promise<unknown>;
+    /** Persists an edited origin-comment body. */
+    update: (id: string, comment: string) => Promise<unknown>;
+    /** Deletes the origin comment, along with its replies. */
+    remove: (id: string) => Promise<unknown>;
+    /** Persists an edited reply body. */
+    updateReply: (id: string, comment: string) => Promise<unknown>;
+    /** Deletes a single reply. */
+    removeReply: (id: string) => Promise<unknown>;
+    /**
+     * Scrolls the page body to the highlighted range this comment anchors
+     * to; returns `false` when the range no longer resolves. Passed
+     * straight through to `PageComment` unchanged.
+     */
+    scrollToRange: (commentId: string) => boolean;
+  };
 };
 
 export const Comments = (props: CommentsProps): JSX.Element => {
-  const { pageId, pagePath, revision, isReadOnly = false, onLoaded } = props;
+  const {
+    pageId,
+    pagePath,
+    revision,
+    isReadOnly = false,
+    onLoaded,
+    inlineComments,
+  } = props;
 
   const { t } = useTranslation('');
 
@@ -93,6 +127,7 @@ export const Comments = (props: CommentsProps): JSX.Element => {
           revision={revision}
           currentUser={currentUser}
           isReadOnly={isReadOnly}
+          inlineComments={inlineComments}
         />
         {isReadOnly && hasNoComments && (
           <p className="text-muted mb-0" data-testid="comments-empty-state">

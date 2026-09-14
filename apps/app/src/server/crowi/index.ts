@@ -28,6 +28,7 @@ import { startCron as startAccessTokenCron } from '~/server/service/access-token
 import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 import { connectPrismaAtBoot } from '~/utils/prisma-connect';
 
 import ActivityEvent from '../events/activity';
@@ -757,7 +758,10 @@ class Crowi {
   }
 
   setupRoutesForPlugins(): void {
-    lsxRoutes(this, this.express);
+    lsxRoutes(this, this.express, {
+      resolveTagPageIds: (tagNames) =>
+        prisma.pagetagrelations.findPageIdsWithAllTags(tagNames),
+    });
     attachmentRoutes(this, this.express);
   }
 
