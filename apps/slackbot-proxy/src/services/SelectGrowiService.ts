@@ -16,6 +16,7 @@ import { Relation } from '~/entities/relation';
 import { InstallationRepository } from '~/repositories/installation';
 import { RelationRepository } from '~/repositories/relation';
 import loggerFactory from '~/utils/logger';
+import { resolveInstallationId } from '~/utils/resolve-installation-id';
 
 const logger = loggerFactory('slackbot-proxy:services:UnregisterService');
 
@@ -203,8 +204,7 @@ export class SelectGrowiService
       ],
     });
 
-    const installationId =
-      authorizeResult.enterpriseId || authorizeResult.teamId;
+    const installationId = resolveInstallationId(authorizeResult);
     let installation: Installation | undefined;
     try {
       installation =

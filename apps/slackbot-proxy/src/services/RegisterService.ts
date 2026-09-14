@@ -25,6 +25,7 @@ import { Inject, Service } from '@tsed/di';
 import { InstallationRepository } from '~/repositories/installation';
 import { OrderRepository } from '~/repositories/order';
 import loggerFactory from '~/utils/logger';
+import { resolveInstallationId } from '~/utils/resolve-installation-id';
 
 import { InvalidUrlError } from '../models/errors';
 
@@ -191,8 +192,7 @@ export class RegisterService
       throw new InvalidUrlError(growiUrl);
     }
 
-    const installationId =
-      authorizeResult.enterpriseId || authorizeResult.teamId;
+    const installationId = resolveInstallationId(authorizeResult);
     const installation =
       await this.installationRepository.findByTeamIdOrEnterpriseId(
         // biome-ignore lint/style/noNonNullAssertion: installationId must be set --- IGNORE ---

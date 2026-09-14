@@ -7,6 +7,7 @@ import { Inject, Service } from '@tsed/di';
 
 import { Installation } from '~/entities/installation';
 import { InstallationRepository } from '~/repositories/installation';
+import { resolveInstallationId } from '~/utils/resolve-installation-id';
 
 @Service()
 export class InstallerService {
@@ -43,8 +44,10 @@ export class InstallerService {
         storeInstallation: async (
           slackInstallation: SlackInstallation<'v1' | 'v2', boolean>,
         ) => {
-          const teamIdOrEnterpriseId =
-            slackInstallation.team?.id || slackInstallation.enterprise?.id;
+          const teamIdOrEnterpriseId = resolveInstallationId({
+            teamId: slackInstallation.team?.id,
+            enterpriseId: slackInstallation.enterprise?.id,
+          });
 
           if (teamIdOrEnterpriseId == null) {
             throw new Error('teamId or enterpriseId is required.');
@@ -65,7 +68,7 @@ export class InstallerService {
           return;
         },
         fetchInstallation: async (installQuery: InstallationQuery<boolean>) => {
-          const id = installQuery.enterpriseId || installQuery.teamId;
+          const id = resolveInstallationId(installQuery);
 
           // biome-ignore lint/style/noNonNullAssertion: id must be set --- IGNORE ---
           const installation = await repository.findByTeamIdOrEnterpriseId(id!);
