@@ -68,6 +68,15 @@ export default defineWorkspace([
       // `--poolOptions.forks.maxForks` flag, not here — see #11752. (Vitest's
       // deprecated workspace-file resolution does not apply a project-level
       // `poolOptions` from this file; the CLI flag does, so the cap lives there.)
+      //
+      // EXPERIMENT (see #11752 / #11821): isolate=false reuses the module cache
+      // across files within a fork, so the per-file `beforeAll` guards in
+      // migrate-mongo.ts and crowi.ts (`migrationsRun`, `_instance`) actually work
+      // as a once-per-worker guard instead of resetting on every file — removing
+      // the redundant per-file migrate-mongo subprocess spawn and Crowi
+      // reinitialization that caused both hook timeouts. `app-integration-vault`
+      // already does this for the same reason (see below).
+      isolate: false,
       deps: {
         // Transform inline modules (allows ESM in require context)
         interopDefault: true,
@@ -122,6 +131,8 @@ export default defineWorkspace([
         './test/setup/mongo/index.ts',
         './test/setup/prisma.ts',
       ],
+      // EXPERIMENT: same rationale as app-integration above.
+      isolate: false,
       deps: { interopDefault: true },
       server: {
         deps: {
