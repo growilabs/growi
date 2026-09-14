@@ -29,7 +29,9 @@ export class Installation {
   @Column({ nullable: true, unique: true })
   teamId?: string;
 
-  @Column({ nullable: true, unique: true })
+  // Not unique: a Grid workspace-level install shares its enterpriseId with
+  // every other workspace under the same organization (#189249).
+  @Column({ nullable: true })
   enterpriseId?: string;
 
   setData(slackInstallation: SlackInstallation): void {
