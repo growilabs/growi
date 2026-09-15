@@ -15,6 +15,7 @@ import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit
 import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
 import { AuditlogChangeStreamService } from '~/features/auditlog-es-sync/server';
+import { chatNotificationDispatchCronService } from '~/features/chat-integration/server/notification/notification-dispatch-cron';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { initializeVaultFeature } from '~/features/growi-vault/server';
@@ -495,6 +496,11 @@ class Crowi {
     auditLogBulkExportJobCleanUpCronService.startCron();
 
     startAccessTokenCron();
+
+    // Gen 2 chat integration: delivers queued notifications and retires
+    // unpaired relations past their retention (both take one row at a time
+    // with a conditional update, so every instance may run this).
+    chatNotificationDispatchCronService.startCron();
 
     // News feed sync cron
     const { NewsCronService } = await import(

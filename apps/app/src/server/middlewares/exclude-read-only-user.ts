@@ -4,6 +4,7 @@ import type { Request } from 'express-validator/src/base.js';
 
 import loggerFactory from '~/utils/logger';
 
+import { isReadOnlyUser } from '../models/user/predicates';
 import { configManager } from '../service/config-manager';
 
 const logger = loggerFactory('growi:middleware:exclude-read-only-user');
@@ -21,7 +22,7 @@ export const excludeReadOnlyUser = (
     return;
   }
 
-  if (user.readOnly) {
+  if (isReadOnlyUser(user)) {
     const message = 'This user is read only user';
     logger.warn(message);
 
@@ -49,7 +50,7 @@ export const excludeReadOnlyUserIfCommentNotAllowed = (
     return;
   }
 
-  if (user.readOnly && !isRomUserAllowedToComment) {
+  if (isReadOnlyUser(user) && !isRomUserAllowedToComment) {
     const message = 'This user is read only user and comment is not allowed';
     logger.warn(message);
 

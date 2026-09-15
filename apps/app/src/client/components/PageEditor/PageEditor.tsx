@@ -27,6 +27,7 @@ import {
 } from '~/client/services/update-page';
 import { uploadAttachments } from '~/client/services/upload-attachments';
 import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
+import type { IApiv3ChatIntegrationDestinationInput } from '~/interfaces/apiv3/page';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
 import { useCurrentPathname, useCurrentUser } from '~/states/global';
 import {
@@ -84,6 +85,14 @@ export type SaveOptions = {
   wip: boolean;
   slackChannels: string;
   isSlackEnabled: boolean;
+  /**
+   * Gen 2 chat-integration destinations chosen for THIS save (Requirement
+   * 2.2 of the chat-integration spec). Additive next to Gen 1's
+   * `slackChannels`/`isSlackEnabled` above, which are untouched; `save`
+   * spreads these options into the page-update payload, where the field is
+   * already declared (`IApiv3PageUpdateParams`).
+   */
+  chatIntegrationDestinations?: IApiv3ChatIntegrationDestinationInput[];
   overwriteScopesOfDescendants?: boolean;
 };
 export type Save = (

@@ -232,6 +232,11 @@ export const setup = (crowi, _app) => {
         }),
 
       body('slackNotificationForm.isSlackEnabled').isBoolean().exists(),
+      // Gen 2's save-time destinations (Requirement 2.2). Separate field --
+      // Gen 1's isSlackEnabled/slackChannels above are left completely intact.
+      body('slackNotificationForm.chatIntegrationDestinations')
+        .optional()
+        .isArray(),
     ];
     return validator;
   };
@@ -399,9 +404,12 @@ export const setup = (crowi, _app) => {
     }
 
     // slack notification
-    if (slackNotificationForm.isSlackEnabled) {
-      const { slackChannels } = slackNotificationForm;
-
+    const { slackChannels, chatIntegrationDestinations } =
+      slackNotificationForm;
+    const gen2Destinations = chatIntegrationDestinations ?? [];
+    // Gen 2 must be reachable even when Gen 1's isSlackEnabled is off
+    // (Requirement 12.1, 12.2, 12.3).
+    if (slackNotificationForm.isSlackEnabled || gen2Destinations.length > 0) {
       try {
         const results = await userNotificationService.fire(
           page,
@@ -410,6 +418,8 @@ export const setup = (crowi, _app) => {
           'comment',
           {},
           createdComment,
+          gen2Destinations,
+          slackNotificationForm.isSlackEnabled,
         );
         results.forEach((result) => {
           if (result.status === 'rejected') {

@@ -18,6 +18,7 @@ import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
+import type { Gen2Destination } from '~/features/chat-integration/server/notification';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
 import { subscribeRuleNames } from '~/interfaces/in-app-notification';
@@ -164,6 +165,12 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       .optional()
       .isString()
       .withMessage('slackChannels must be string'),
+    // Gen 2's save-time destinations (Requirement 2.2). Separate field --
+    // Gen 1's isSlackEnabled/slackChannels above are left completely intact.
+    body('chatIntegrationDestinations')
+      .optional()
+      .isArray()
+      .withMessage('chatIntegrationDestinations must be array'),
     body('wip').optional().isBoolean().withMessage('wip must be boolean'),
     body('origin')
       .optional()
@@ -264,14 +271,23 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     }
 
     // user notification
-    const { isSlackEnabled, slackChannels } = req.body;
-    if (isSlackEnabled) {
+    const { isSlackEnabled, slackChannels, chatIntegrationDestinations } =
+      req.body;
+    const gen2Destinations: Gen2Destination[] =
+      chatIntegrationDestinations ?? [];
+    // Gen 2 must be reachable even when Gen 1's isSlackEnabled is off
+    // (Requirement 12.1, 12.2, 12.3).
+    if (isSlackEnabled || gen2Destinations.length > 0) {
       try {
         const results = await crowi.userNotificationService.fire(
           createdPage,
           req.user,
           slackChannels,
           'create',
+          undefined,
+          {},
+          gen2Destinations,
+          isSlackEnabled,
         );
         results.forEach((result) => {
           if (result.status === 'rejected') {

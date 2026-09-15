@@ -110,6 +110,7 @@
     "@elastic/elasticsearch9": "npm:@elastic/elasticsearch@^9.0.3",
     "@godaddy/terminus": "^4.9.0",
     "@google-cloud/storage": "^5.8.5",
+    "@growi/chat": "workspace:^",
     "@growi/core": "workspace:^",
     "@growi/emoji-mart-data": "workspace:^",
     "@growi/logger": "workspace:*",
