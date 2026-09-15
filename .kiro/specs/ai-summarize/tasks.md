@@ -36,7 +36,7 @@
   - _Requirements: 1.1, 2.3_
   - _Depends: 1.1, 1.2_
 
-- [ ] 2. (P) AiSummarizeMetrics: 要約生成のたびにCounterがインクリメントされる
+- [x] 2. (P) AiSummarizeMetrics: 要約生成のたびにCounterがインクリメントされる
   - 既存の `custom-metrics/` ディレクトリのパターンに沿って、要約生成専用のCounterメトリクスを新規ファイルに実装する
   - **Counterはモジュールのトップレベルで生成しない**。`addAiSummarizeMetrics()` の内部で `metrics.getMeter()` を呼んでmeterを取得し、その中で `createCounter()` を実行してモジュールスコープの変数に束縛する。**このため、`addAiSummarizeMetrics()` が呼ばれるまで Counter は `undefined` のままであり、モジュール import だけでは `getMeter()` が実行されない**（モジュール評価時点ではOpenTelemetry SDKが未初期化のことがあり、トップレベルで取得すると no-op meter に永久に束縛されて計測が失われるため）
   - `setupCustomMetrics()` からの登録呼び出しを追加し、サーバ起動時（SDK初期化後）にCounterが初期化される
@@ -307,3 +307,4 @@
 ## Implementation Notes
 
 - ~~タスク1.2完了時点で、instructions.ts の「アウトラインだけで打ち切らず先頭から順に読み進める」（design.md a-2/a-3、`read forward from the start of the page` 文言・2箇所のアンチショートカット文）はユニットテストで文言拘束されていない（残存指摘、非ブロッキング）。~~ **解消済み**: `instructions.spec.ts` に2文それぞれを対象とする `toMatch` アサーションを追加し、mutation-check（各文を個別に削除してREDになることを確認→revert）で検証済み。
+- タスク2で判明した落とし穴: 「モジュールをimportするだけではトップレベルの副作用（`getMeter()`呼び出し等）が起きないこと」を検証するテストは、対象モジュールをspecファイル先頭で静的importしていると`beforeEach`の`vi.clearAllMocks()`より前にその副作用が発生し、モック呼び出し履歴が消えて常にパスしてしまう（リグレッションを検知できない）。`vi.resetModules()` + モックの`mockClear()` + `await import(...)`によるテスト内での動的再importで検証する必要がある。以降のタスクで同種の「トップレベルで生成しない」不変条件をテストする際はこのパターンを使う。

@@ -64,9 +64,9 @@ describe('setupCustomMetrics', () => {
     const { setupCustomMetrics } = await import('./index');
     await setupCustomMetrics();
 
-    // setupCustomMetrics() wires 7 modules, but addMongooseConnectionPoolMetrics()
-    // skips registration (no mongoose client in this unit test), so 6 call getMeter.
-    expect(metrics.getMeter).toHaveBeenCalledTimes(6);
+    // setupCustomMetrics() wires 8 modules, but addMongooseConnectionPoolMetrics()
+    // skips registration (no mongoose client in this unit test), so 7 call getMeter.
+    expect(metrics.getMeter).toHaveBeenCalledTimes(7);
   });
 
   it('should register growi.yjs.docs.count gauge (Req 4.1)', async () => {

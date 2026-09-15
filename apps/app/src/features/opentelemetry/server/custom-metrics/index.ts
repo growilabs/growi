@@ -1,3 +1,4 @@
+export { addAiSummarizeMetrics } from './ai-summarize-metrics';
 export { addApplicationMetrics } from './application-metrics';
 export { addInstalledAtMetrics } from './installed-at-metrics';
 export { addMongooseConnectionPoolMetrics } from './mongoose-connection-pool-metrics';
@@ -7,6 +8,7 @@ export { addUserCountsMetrics } from './user-counts-metrics';
 export { addYjsMetrics } from './yjs-metrics';
 
 export const setupCustomMetrics = async (): Promise<void> => {
+  const { addAiSummarizeMetrics } = await import('./ai-summarize-metrics');
   const { addApplicationMetrics } = await import('./application-metrics');
   const { addInstalledAtMetrics } = await import('./installed-at-metrics');
   const { addUserCountsMetrics } = await import('./user-counts-metrics');
@@ -18,6 +20,7 @@ export const setupCustomMetrics = async (): Promise<void> => {
   );
 
   // Add custom metrics
+  addAiSummarizeMetrics();
   addApplicationMetrics();
   addInstalledAtMetrics();
   addUserCountsMetrics();
