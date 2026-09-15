@@ -1,7 +1,10 @@
 /**
- * Exports each namespace x non-source language combination's translations
- * from POEditor, classifies each combination against the current repository
- * content via `DiffClassifier`, and groups the results into exactly two
+ * Exports each non-source language's translations from the single shared
+ * POEditor project — one export per language, carrying every namespace at
+ * once — splits that combined payload back into namespaces via
+ * `NamespaceEnvelope`, classifies each (namespace, language) combination
+ * against the current repository content via `DiffClassifier`, and groups
+ * the results into exactly two
  * collections: every combination that only changed translation values goes
  * into one pull request, and every combination that added or removed a key
  * goes into a separate one — a structural change must never ride along in
@@ -15,9 +18,11 @@
  * (`TranslationOnlyCombination` / `StructuralCombination`) so a structural
  * result cannot be pushed into the translation-only group (or vice versa)
  * without a type error, not just a runtime check. A combination whose
- * POEditor export failed to parse as JSON (`invalid_json`) is excluded from
- * both groups too, but — unlike a read/export failure — does not abort the
- * run; it is reported separately via the result's `skipped` list.
+ * content failed to parse as JSON (`invalid_json`) is excluded from both
+ * groups too, but — unlike a read/export failure — does not abort the run;
+ * it is reported separately via the result's `skipped` list. Since one
+ * export now serves every namespace of a language, an unparseable export
+ * skips all of that language's namespaces at once.
  *
  * `applyTranslationOnlyChanges` then takes the `translationOnly` group and
  * carries it all the way to an approved, auto-mergeable PR. The `structural`
@@ -37,12 +42,18 @@ import {
   createStructuralPrPublisher,
   createTranslationOnlyPrPublisher,
 } from './github-adapters.ts';
+import { toPoeditorLanguageCode } from './language-code-map.ts';
+import { extractNamespaceContent } from './namespace-envelope.ts';
 import {
   createPoeditorClient,
   type PoeditorApiError,
   type PoeditorClient,
 } from './poeditor-client.ts';
-import { type NamespaceSyncEntry, SYNC_TARGETS } from './sync-config.ts';
+import {
+  type NamespaceSyncEntry,
+  SHARED_POEDITOR_PROJECT_ID,
+  SYNC_TARGETS,
+} from './sync-config.ts';
 
 /**
  * The 4 non-source languages this CLI pulls translations for. en_US is
@@ -65,7 +76,7 @@ const APP_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 export interface CollectClassificationsOptions {
   readonly poeditorClient: PoeditorClient;
-  /** Declared namespace -> POEditor project mapping. Defaults to the real `SYNC_TARGETS`. */
+  /** Declared namespace -> locale file mapping. Defaults to the real `SYNC_TARGETS`. */
   readonly targets?: readonly NamespaceSyncEntry[];
   /** Non-source languages to pull. Defaults to the real `NON_SOURCE_LANGUAGES`. */
   readonly languages?: readonly string[];
@@ -166,11 +177,13 @@ export type CollectClassificationsResult =
       readonly structural: readonly StructuralCombination[];
       /**
        * (namespace, language) combinations excluded from classification
-       * because the POEditor export content failed to JSON.parse. Unlike
+       * because their content failed to JSON.parse. Unlike
        * `read_failed`/`export_failed`, this does not abort the run: export
-       * is read-only and never mutates the repository, so a single
-       * malformed combination is tolerated rather than blocking the other
-       * (up to 11) combinations.
+       * is read-only and never mutates the repository, so malformed content
+       * is tolerated rather than blocking the remaining combinations. A
+       * malformed *export* costs one language's namespaces at once (3 of
+       * the 12 today, leaving up to 9); a malformed committed locale file
+       * still costs only its own combination.
        */
       readonly skipped: readonly InvalidJsonFailure[];
     }
@@ -216,47 +229,109 @@ const safeJsonParse = (
 };
 
 /**
- * Reads the "before" (currently committed) content and exports the "after"
- * (POEditor) content for a single (namespace, language) combination. Reads
- * and the export call run concurrently since they are independent I/O
- * operations on unrelated systems; only `PoeditorClient.uploadTerms`
- * (a different method, used by `PushSourceSync`) is subject to POEditor's
- * upload rate limit — `exportTranslations` is not.
+ * One language's whole export from the shared project, already parsed:
+ * either the combined JSON covering every namespace, or the single reason
+ * none of that language's namespaces can be classified this run.
+ *
+ * The failure is carried without a `namespace` on purpose — it belongs to
+ * the language, not to any one namespace — and is fanned out to every
+ * namespace only when the per-combination failures are built.
  */
-interface ReadCombinationOptions {
-  readonly target: NamespaceSyncEntry;
+interface LanguageExport {
   readonly language: string;
+  readonly combined?: Readonly<Record<string, unknown>>;
+  readonly failure?:
+    | { readonly reason: 'export_failed'; readonly error: PoeditorApiError }
+    | { readonly reason: 'invalid_json'; readonly message: string };
+}
+
+/**
+ * Exports one language's translations from the shared POEditor project.
+ *
+ * Exactly one call per language: the shared project holds every namespace,
+ * so a single export already carries all of them (the caller splits the
+ * result per namespace via `extractNamespaceContent`). Calls for different
+ * languages may run concurrently — only `PoeditorClient.uploadTerms` (a
+ * different method, used by `PushSourceSync`) is subject to POEditor's
+ * upload rate limit, `exportTranslations` is not.
+ *
+ * `toPoeditorLanguageCode` is applied here and nowhere else: POEditor
+ * rejects GROWI's own locale codes (`ja_JP` -> "Wrong language code"), so
+ * the conversion belongs at the API boundary, while locale file paths keep
+ * being resolved from the GROWI locale code. It throws on an undeclared
+ * locale rather than being caught here — an unmapped locale is a caller
+ * misconfiguration, not a per-language outcome to report (same handling as
+ * `push-source.ts`'s `runPush`).
+ */
+const exportLanguage = async (
+  language: string,
+  poeditorClient: PoeditorClient,
+): Promise<LanguageExport> => {
+  const result = await poeditorClient.exportTranslations({
+    projectId: SHARED_POEDITOR_PROJECT_ID,
+    language: toPoeditorLanguageCode(language),
+  });
+
+  if (!result.ok) {
+    return {
+      language,
+      failure: { reason: 'export_failed', error: result.error },
+    };
+  }
+
+  try {
+    return {
+      language,
+      combined: JSON.parse(result.value) as Readonly<Record<string, unknown>>,
+    };
+  } catch (error) {
+    return {
+      language,
+      failure: {
+        reason: 'invalid_json',
+        message: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
+};
+
+/**
+ * Builds one (namespace, language) combination out of the local "before"
+ * (currently committed) file and that language's already-exported "after"
+ * content.
+ *
+ * The locale file path is resolved from the GROWI locale code, not the
+ * POEditor one: the repository's own directory layout
+ * (`locales/<growi locale>/<namespace>.json`) is what is being read here and
+ * written back to later, and it never learns about POEditor's codes.
+ */
+interface BuildCombinationOptions {
+  readonly target: NamespaceSyncEntry;
+  readonly languageExport: LanguageExport;
   readonly readNamespaceFile: ReadNamespaceFile;
-  readonly poeditorClient: PoeditorClient;
   readonly baseDir: string;
 }
 
-const readCombination = async ({
+const buildCombinationInput = async ({
   target,
-  language,
+  languageExport,
   readNamespaceFile,
-  poeditorClient,
   baseDir,
-}: ReadCombinationOptions): Promise<CombinationInput> => {
+}: BuildCombinationOptions): Promise<CombinationInput> => {
   const { namespace } = target;
+  const { language } = languageExport;
   const absolutePath = path.join(baseDir, target.localeFilePath(language));
 
-  const [beforeResult, afterResult] = await Promise.all([
-    readNamespaceFile(absolutePath)
-      .then((content) => ({ content }))
-      .catch((error: unknown) => ({
-        failure: {
-          namespace,
-          language,
-          reason: 'read_failed' as const,
-          message: error instanceof Error ? error.message : String(error),
-        },
-      })),
-    poeditorClient.exportTranslations({
-      projectId: target.poeditorProjectId,
-      language,
-    }),
-  ]);
+  const beforeResult = await readNamespaceFile(absolutePath)
+    .then((content) => ({ content }))
+    .catch((error: unknown) => ({
+      failure: {
+        namespace,
+        language,
+        reason: 'read_failed' as const,
+        message: error instanceof Error ? error.message : String(error),
+      },
+    }));
 
   if ('failure' in beforeResult) {
     return {
@@ -266,17 +341,16 @@ const readCombination = async ({
       failure: beforeResult.failure,
     };
   }
-  if (!afterResult.ok) {
+  if (languageExport.failure != null) {
+    // One export serves every namespace of this language, so its failure is
+    // reported once per namespace: `CombinationFailure` is (namespace,
+    // language) shaped, and attributing a whole language's failure to one
+    // arbitrary namespace would hide the others from the run's report.
     return {
       namespace,
       language,
       absoluteFilePath: absolutePath,
-      failure: {
-        namespace,
-        language,
-        reason: 'export_failed',
-        error: afterResult.error,
-      },
+      failure: { namespace, language, ...languageExport.failure },
     };
   }
 
@@ -289,42 +363,47 @@ const readCombination = async ({
       failure: beforeParsed.failure,
     };
   }
-  const afterParsed = safeJsonParse(namespace, language, afterResult.value);
-  if ('failure' in afterParsed) {
-    return {
-      namespace,
-      language,
-      absoluteFilePath: absolutePath,
-      failure: afterParsed.failure,
-    };
-  }
 
   return {
     namespace,
     language,
     absoluteFilePath: absolutePath,
     before: beforeParsed.value,
-    after: afterParsed.value,
+    // Safe: `languageExport.failure` was ruled out above, so `combined` is
+    // populated. A namespace absent from the export yields `{}` rather than
+    // throwing — that means POEditor holds nothing for it yet, which is an
+    // ordinary input to `classify`, not an error.
+    after: extractNamespaceContent(
+      languageExport.combined as Readonly<Record<string, unknown>>,
+      namespace,
+    ),
   };
 };
 
 /**
- * For every (namespace, language) combination, reads the current repository
- * content and exports the POEditor content, classifies the pair via
+ * Exports each language once from the shared project, splits every export
+ * into its namespaces, reads the matching repository file for each
+ * (namespace, language) combination, classifies the pair via
  * `DiffClassifier.classify`, then groups the classified combinations into
  * `translationOnly` / `structural` (see this file's header comment).
  *
+ * Only the export step is per language; everything downstream of it — the
+ * classification, the grouping, and the PR split the groups feed — is
+ * unchanged and stays per (namespace, language).
+ *
  * Mirrors `PushSourceSync.runPush`'s all-or-nothing error handling: if any
  * combination fails to read the current repository file (`read_failed`) or
- * export from POEditor (`export_failed`), the whole run reports failure and
- * no grouping is returned, so a caller can never build a PR out of a
- * partial result.
+ * its language fails to export from POEditor (`export_failed`), the whole
+ * run reports failure and no grouping is returned, so a caller can never
+ * build a PR out of a partial result.
  *
- * `invalid_json` (the exported content fails to `JSON.parse`) is the one
- * exception: export is read-only and never mutates the repository, so it
- * tolerates a single malformed combination rather than aborting. That
- * combination alone is excluded from `translationOnly`/`structural` and
- * reported via `skipped`; the rest of the run proceeds and groups normally.
+ * `invalid_json` (content that fails to `JSON.parse`) is the one exception:
+ * export is read-only and never mutates the repository, so malformed
+ * content is tolerated rather than aborting. The affected combinations are
+ * excluded from `translationOnly`/`structural` and reported via `skipped`;
+ * the rest of the run proceeds and groups normally. A malformed export
+ * takes down every namespace of its language at once, since that one
+ * payload was all of them.
  */
 export const collectClassifications = async (
   options: CollectClassificationsOptions,
@@ -335,14 +414,22 @@ export const collectClassifications = async (
     options.readNamespaceFile ?? defaultReadNamespaceFile;
   const baseDir = options.baseDir ?? APP_ROOT;
 
+  // One export per language, all in flight together: they are independent
+  // requests, and a failing language must neither block nor fail the others
+  // (its own failure travels with it into the combinations it covers).
+  const languageExports = await Promise.all(
+    languages.map((language) =>
+      exportLanguage(language, options.poeditorClient),
+    ),
+  );
+
   const combinationInputs = await Promise.all(
     targets.flatMap((target) =>
-      languages.map((language) =>
-        readCombination({
+      languageExports.map((languageExport) =>
+        buildCombinationInput({
           target,
-          language,
+          languageExport,
           readNamespaceFile,
-          poeditorClient: options.poeditorClient,
           baseDir,
         }),
       ),
@@ -350,8 +437,8 @@ export const collectClassifications = async (
   );
 
   // `read_failed` / `export_failed` still abort the whole run. `invalid_json`
-  // is handled separately below: it only excludes its own combination and
-  // lets the others continue.
+  // is handled separately below: it only excludes the combinations it covers
+  // and lets the others continue.
   const abortingFailures = combinationInputs
     .map((input) => input.failure)
     .filter(

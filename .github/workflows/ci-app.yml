@@ -8,6 +8,11 @@ on:
       - changeset-release/**
       - mergify/merge-queue/**
       - tmp-mergify/merge-queue/**
+      # Throwaway measurement branches pushed by the flaky-repro workflow
+      # (empty commits); excluded explicitly rather than relying on the
+      # `paths` filter's diff behavior for new branches. See design.md
+      # "CI Exclusion" in .kiro/specs/ci-flaky-test-detection.
+      - flaky-repro/**
     paths:
       - .github/mergify.yml
       - .github/workflows/ci-app.yml
@@ -169,6 +174,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Cross-reference: .github/workflows/flaky-repro.yml copies this job's
+      # whole setup span — pnpm/action-setup, setup-node (Node version, pnpm
+      # cache), the dist cache (same key / restore-keys format), the
+      # dependency install command, and the MongoDB / Elasticsearch start and
+      # wait steps — so that a repro run uses the same toolchain as the CI
+      # failure it is reproducing. Revalidation Trigger (design.md,
+      # .kiro/specs/ci-flaky-test-detection): when any of these actions, their
+      # versions, the Node / MongoDB / Elasticsearch versions, or the dist
+      # cache key format change here (the anchors are defined in the
+      # ci-app-test job above), change flaky-repro.yml in the same commit.
       - uses: pnpm/action-setup@v6
 
       - *setup-node-step

@@ -2,6 +2,11 @@ name: Node CI for app production
 
 on:
   push:
+    # This is an allowlist, so `flaky-repro/**` (throwaway measurement
+    # branches pushed by .github/workflows/flaky-repro.yml) can never match
+    # and is already excluded without needing `branches-ignore` (which
+    # cannot be combined with `branches` on the same event). See design.md
+    # "CI Exclusion" in .kiro/specs/ci-flaky-test-detection.
     branches:
       - master
       - dev/7.*.x

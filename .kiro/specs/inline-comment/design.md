@@ -1,5 +1,18 @@
 # Technical Design: inline-comment
 
+## この文書に何を書き、何を書かないか（Write / Don't-Write test）
+
+この設計文書を今後編集するときは、追加・維持する内容ごとに次の問いを当てる：**そのコードとテストファイルを読めば、読み手はこの内容を自分で再構築できるか？** できるなら、この文書には書かない。
+
+| 書く | 書かない |
+|---|---|
+| 実際に調査しないと分からない事実（コードをざっと読んだだけでは分からない挙動、外部ライブラリの隠れた仕様） | 関数シグネチャ・ファイル配置図・「どのファイルに何があるか」 |
+| 採用しなかった設計（特にどんな形を検討し、なぜ却下したか） | ありふれた実装のありふれた説明 |
+| 自動テストが**検出できない**残課題 | どのテストが何をカバーしているかの一覧（rot するのでテスト自体を読む） |
+| コードから再構築できない手動検証手順（再現環境の作り方、何を見るか、合否のしきい値） | 差分の有無・実装時期などの時点情報 |
+
+迷ったら書かない。コードから読み取れる内容を書いても、コードが変わった瞬間に静かに古くなり、文書全体の信頼性を損なう。
+
 ## Overview
 
 インラインコメント機能は、ページ本文の読み取り専用ビュー（`RevisionRenderer.tsx` がレンダリングした結果）に対して、閲覧者が選んだテキスト範囲を対象としたコメントを作成・閲覧できるようにする。位置情報はDOM XPathやmarkdownソースの文字オフセットではなく、レンダリング後のプレーンテキストに対する「選択文字列（exact quote）＋前後文脈（prefix/suffix）＋おおよそのオフセット」（W3C Web Annotation Data Model の TextQuoteSelector/TextPositionSelector 相当）として保存し、表示のたびにクライアント側で再検索してハイライトを復元する。
@@ -77,26 +90,22 @@
 - `comments` Prisma/Mongooseモデルは既存の通常コメント専用であり、`commentPosition`（常に`-1`）は事実上未使用。インラインコメントの位置情報の土台にはしない（`.kiro/specs/inline-comment/brief.md` で確定済み）。新設するアンカーフィールドは `commentPosition` とは独立した新しいフィールド群である。
 - `apps/app/prisma/schema.prisma` には、Mongooseからの移行に伴う機械的な `Json` フィールドは存在するが、意図的に設計された構造化フィールドの前例はない（`research.md` 参照）。本設計ではアンカーの各要素を独立したスカラーフィールドとして宣言し（`Json` にまとめない）、既存スキーマの一貫したフィールド宣言スタイルに合わせる。
 
-### アーキテクチャ選定：既存 `comments` モデルへの拡張＋新規ルート（設計レビューでの転換）
+### アーキテクチャ選定：既存 `comments` モデルへの拡張＋新規ルート
 
-設計レビュー時点では、共有リンク閲覧者への非公開（要件6）を構造的に保証しやすいという理由で、インラインコメント専用の新規Prismaモデルへ分離する案を採用していた。その後、ユーザーとの設計レビューで次の2点の指摘を受け、方針を転換した。
+インラインコメントは、専用の新規Prismaモデルに分離せず、既存の `comments` モデルに `isInline` を含む拡張フィールドを追加する形で同居させる。共有リンク閲覧者への非公開（要件6）は、`/_api/comments.get` が使う2つの取得メソッド（`findCommentsByPageId`／`findCommentsByRevisionId`）に、`isSharedPage` の値によらず**常に**適用する無条件フィルタ（`isInline: { not: true }`）で担保する。
 
-1. **既存の `comments` モデルに同居させても、`/_api/comments.get` を「共有リンクのときだけ」ではなく「常に」インラインコメントを除外するようにすれば、要件6は単純な1本のルールで満たせるのではないか**（`isSharedPage` に依存する条件付きフィルタではなく、無条件フィルタにする）
-2. **インラインコメントにも返信（スレッド化）を持たせたい**というユーザー需要があり、これは既存の `replyToId` の仕組みをそのまま使えば追加コストなしで実現できる
+この決定は、次の2つの利益が決め手になった：
 
-この指摘は妥当と判断し、方針を転換した。ただし、正直に言うと、この転換は**トレードオフの選び直し**であり、以前の設計が持っていた性質を無条件に上回るものではない：
+- **返信の再利用**: 既存の `replyToId` フィールドと、既存クライアントが確立した「ネストした返信一覧」の表示パターン（`ReplyComments.tsx`）をそのまま使える。新しいスキーマや新しいAPIを発明する必要がない。
+- **メンション通知の変更不要**: `getMentionedUsers`（`prisma.comments.findUnique` を直書き）の一般化が不要になる。同じテーブル・同じ `comment_id` 空間なので、変更なしでそのまま動く。
 
-- 新規モデルに分離する案の「共有リンク閲覧者へ返さない」という保証は、**物理的に別のコレクションであり、そこへ到達する経路（ルート）自体が存在しない**という意味で構造的だった。
-- 本設計（同居＋無条件フィルタ）の保証は、**`/_api/comments.get` が使う2つの取得メソッド（`findCommentsByPageId`／`findCommentsByRevisionId`）の中にある1本の `WHERE` 条件**に依存する。これは「誰も削除・回避してはいけないルール」であり、コレクションが存在しないこととは性質が異なる。
-- この2つのメソッドは通常コメントの唯一の読み取り経路であり、他に `comments` テーブルを読む経路を新設しない設計（本スペックの新規ルートは、常に `isInline: true` を明示的に指定してクエリする）にすることで、フィルタが必要な箇所を「この2メソッドの中だけ」に閉じ込めている。**条件が `isSharedPage` に依存しない（共有リンクの有無にかかわらず常に適用される）**ことが、以前のOption A/C案（`isSharedPage` 分岐の中だけにフィルタを足す案）との重要な違いであり、これによって「新しい呼び出し元がフィルタを書き忘れる」リスクの大部分は残るものの、「既存の `isSharedPage` 分岐が特別扱いを必要とする」という以前のリスクは解消されている。
+比較検討した代替案（新規モデルに分離する案）は、共有リンクへの非公開を「物理的に別のコレクションであり、そこへ到達する経路（ルート）自体が存在しない」という構造的な保証で満たせる点で優れていた。同居案の保証は、**`findCommentsByPageId`／`findCommentsByRevisionId` の中にある1本の `WHERE` 条件**に依存するルールベースの保証であり、両者は性質が異なる（誰も削除・回避してはいけないルールである点は同じだが、コレクションが存在しないこととは強さが違う）。この差を踏まえてもなお、上記2つの利益がそれを上回ると判断した。副作用として、`resolvedById`/`resolvedAt` が通常コメントの行に対して常に `null` の列として現れることも受け入れている。
+
+この保証の設計上の裏付け：
+
+- この2つのメソッドは通常コメントの唯一の読み取り経路であり、他に `comments` テーブルを読む経路を新設しない設計（本スペックの新規ルートは、常に `isInline: true` を明示的に指定してクエリする）にすることで、フィルタが必要な箇所を「この2メソッドの中だけ」に閉じ込めている。条件が `isSharedPage` に依存しない（共有リンクの有無にかかわらず常に適用される）ことにより、「既存の `isSharedPage` 分岐が特別扱いを必要とする」というリスクは生じない。ただし「新しい呼び出し元がフィルタを書き忘れる」リスクは残る。
 - この保証をテストで固定する：`/_api/comments.get` が `isInline: true` の行を一切返さないことを、共有リンク文脈・通常文脈の両方について結合テストで検証する（Testing Strategy参照）。このテストが、ルールが将来壊れていないことを継続的に保証する仕組みになる。
-- **正確に言うと、`comments` テーブルには `findCommentsByPageId`／`findCommentsByRevisionId` 以外にも読み取り経路が複数ある**（`getMentionedUsers` の `findUnique`、`comment.js` の更新・削除前 `findUnique`、`countCommentByPageId` 等）。このうち `/_api/comments.get` のレスポンスに直接影響するのは前者2メソッドのみだが、`countCommentByPageId`（ページ末尾コメントの件数バッジに使われる）もフィルタ漏れの対象になる——直さないと、インラインコメントの件数が通常コメントの件数バッジに混入してしまう（セキュリティ上の漏洩ではないが、利用者に見える不具合）。この設計では `countCommentByPageId` にも同じ `isInline: { not: true }` 条件を追加する。`getMentionedUsers` の `findUnique` は単一IDを指定した取得であり、一覧やカウントには影響しないため対象外（メンション通知はインラインコメントの行に対しても正しく動作する必要があるため、ここはむしろフィルタを入れてはいけない）。
-
-この性質の違いを踏まえてもなお同居案を選んだ理由は、**返信の再利用**と**メンション通知の変更不要**という具体的な利益が、保証の強さの違いを上回ると判断したためである：
-
-- 返信は既存の `replyToId` フィールドと、既存クライアントが確立した「ネストした返信一覧」の表示パターン（`ReplyComments.tsx`）をそのまま使える。新しいスキーマや新しいAPIを発明する必要がない。
-- `getMentionedUsers`（`prisma.comments.findUnique` を直書き）の一般化が不要になる。同じテーブル・同じ `comment_id` 空間なので、変更なしでそのまま動く。
-- 副作用として、`resolvedById`/`resolvedAt` が通常コメントの行に対して常に `null` の列として現れることは受け入れる（軽微な弊害として認識した上での判断）。
+- **`comments` テーブルには `findCommentsByPageId`／`findCommentsByRevisionId` 以外にも読み取り経路が複数ある**（`getMentionedUsers` の `findUnique`、`comment.js` の更新・削除前 `findUnique`、`countCommentByPageId` 等）。このうち `/_api/comments.get` のレスポンスに直接影響するのは前者2メソッドのみだが、`countCommentByPageId`（ページ末尾コメントの件数バッジに使われる）もフィルタ漏れの対象になる——直さないと、インラインコメントの件数が通常コメントの件数バッジに混入してしまう（セキュリティ上の漏洩ではないが、利用者に見える不具合）。この設計では `countCommentByPageId` にも同じ `isInline: { not: true }` 条件を追加する。`getMentionedUsers` の `findUnique` は単一IDを指定した取得であり、一覧やカウントには影響しないため対象外（メンション通知はインラインコメントの行に対しても正しく動作する必要があるため、ここはむしろフィルタを入れてはいけない）。
 
 ### データ所有権の分割（同一テーブルの明示的な分担）
 
@@ -203,129 +212,15 @@ graph TB
 
 ### Technology Stack
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|------------------|-------|
-| Backend / Services | 既存 `apiv3` ミドルウェアチェーン、`Prisma.defineExtension` | インラインコメントのCRUD（作成・返信・一覧・解決トグル） | `revision-diff` と同じ構成規約 |
-| Data / Storage | 既存 Prisma モデル `comments` への拡張フィールド追加（MongoDB, `provider = "mongodb"`） | アンカー・解決状態の永続化 | Mongooseスキーマ（`comment.ts`）とPrismaスキーマの両方を同期させる（`.claude/rules/model.md`） |
-| フロント（マッチング） | `approx-string-match` `^2.0.0`（新規直接依存） | あいまい一致（文字列のみ、DOM非依存） | 能動的にメンテされている。`diff-match-patch` は不採用（下記参照） |
-| フロント（正規化・分割） | 標準 `String.prototype.normalize('NFC')`、`Intl.Segmenter`（`granularity: 'grapheme'`） | NFC比較・書記素クラスタ境界スナップ | Node 24/主要ブラウザとも追加パッケージ不要 |
-| フロント（配置） | `@popperjs/core` `^2.11.8`（`apps/app`では`dependencies`） | 作成の起点・入力フォームを選択範囲近傍に配置する（`flip`/`preventOverflow`/`offset`のみ使用） | `getBoundingClientRect()`のみを実装した仮想要素パターンで、DOM `Selection`/`Range`という実体を持たない対象に浮動要素を追随させる |
-
-**`diff-match-patch` を採用しなかった理由**（build-vs-adopt調査、`research.md` に詳細）: `Match_MaxBits = 32` はBitapの探索対象パターン（=選択されたクオート文字列そのもの）の長さ上限であり、超過すると `match_bitap_` が例外を送出する（黙って動作を諦めるのではない）。文中の1文を選択する程度でも32文字を超えるため、`match_main` を主要な検索経路として使うにはパターンの事前チャンク分割が必須になる。`approx-string-match` にはこの制約がなく、文字列のみを扱うため、DOM非依存で採用できる。`dom-anchor-text-quote`/`dom-anchor-text-position`（hypothes.is）は2017〜2020年で更新が止まっており、かつDOM Range結合のため不採用。
+主要な技術選定（`approx-string-match` の採用、`diff-match-patch` の不採用とその理由）は `research.md`「Build vs Adopt」節を参照。バージョン等はpackage.jsonを参照。
 
 ## File Structure Plan
 
-### Directory Structure
-```
-apps/app/src/features/inline-comment/
-├── interfaces/
-│   ├── index.ts                          # IInlineComment, InlineCommentAnchor, ResolvedRange 型定義（client/server共有）
-│   └── dto/
-│       ├── index.ts                      # DTOバレル
-│       ├── create-inline-comment.ts      # POST（起点作成）リクエスト/レスポンスDTO
-│       ├── create-inline-comment-reply.ts # POST（返信作成）リクエスト/レスポンスDTO
-│       ├── list-inline-comments.ts       # GET リクエスト/レスポンスDTO（起点＋ネストした返信）
-│       ├── resolve-inline-comment.ts     # PUT (resolve/unresolve) リクエスト/レスポンスDTO
-│       ├── update-inline-comment.ts      # PUT（起点編集）リクエスト/レスポンスDTO
-│       └── update-inline-comment-reply.ts # PUT（返信編集）リクエスト/レスポンスDTO。削除にはDTOを持たない（リクエストは本文を持たずidはURLパラメータ、レスポンスも`res.apiv3({})`で意味のあるペイロードを持たない）
-├── server/
-│   ├── routes/
-│   │   ├── create.ts                     # POST /inline-comments ルートハンドラファクトリ（起点作成）
-│   │   ├── create.integ.ts
-│   │   ├── create-reply.ts               # POST /inline-comments/:id/replies ルートハンドラファクトリ
-│   │   ├── create-reply.integ.ts
-│   │   ├── list.ts                       # GET /inline-comments ルートハンドラファクトリ
-│   │   ├── list.integ.ts
-│   │   ├── resolve.ts                    # PUT /inline-comments/:id/resolve ルートハンドラファクトリ
-│   │   ├── resolve.integ.ts
-│   │   ├── update.ts                     # PUT /inline-comments/:id ルートハンドラファクトリ（起点コメント編集）
-│   │   ├── update.integ.ts
-│   │   ├── update-reply.ts               # PUT /inline-comments/replies/:id ルートハンドラファクトリ（返信編集）
-│   │   ├── update-reply.integ.ts
-│   │   ├── delete.ts                     # DELETE /inline-comments/:id ルートハンドラファクトリ（起点コメント削除、返信も道連れ削除）
-│   │   ├── delete.integ.ts
-│   │   ├── delete-reply.ts               # DELETE /inline-comments/replies/:id ルートハンドラファクトリ（返信削除）
-│   │   ├── delete-reply.integ.ts
-│   │   └── routing.integ.ts              # ルート構成・URL形状の結合テスト（revision-diffのroutingパターンに倣う）
-│   └── service/
-│       ├── inline-comment-service.ts     # 作成・返信・一覧・解決トグル・更新・削除のビジネスロジック、Prismaアクセス、Activity発行
-│       └── inline-comment-service.spec.ts
-└── client/
-    ├── components/
-    │   ├── SelectionCapture/
-    │   │   ├── SelectionCapture.tsx      # 本文コンテナをラップし選択イベントを監視。idle/selecting/composingの3段階の状態機械を管理し、作成の起点・入力フォームの表示を切り替える
-    │   │   ├── use-text-selection.ts     # 純粋フック：Selection → quote/prefix/suffix/おおよそのオフセット（本文テキスト・位置はrenderedTextOf経由で求める）
-    │   │   └── SelectionActionButton.tsx # 選択直後に現れる軽量な作成の起点（提示専用、onCommitのみを受け取る）
-    │   ├── SelectionPopover/
-    │   │   ├── SelectionPopover.tsx          # {range, children}を受け取り、document.body直下へのポータル経由で選択範囲近傍に配置する汎用コンポーネント
-    │   │   ├── use-popper-position.ts        # createPopperのライフサイクル（生成・更新・destroy）を管理するフック
-    │   │   └── selection-virtual-element.ts  # Range→Popper仮想要素への変換（純粋関数）
-    │   ├── AnchorResolver/
-    │   │   ├── use-anchor-resolver.ts    # (containerEl, anchors[]) → Map<id, ResolvedRange>。詳細契約は後述
-    │   │   └── use-container-settle.ts   # GROWI_IS_CONTENT_RENDERING_ATTRプロトコルを使った「静定」検知フック（auto-scrollの仕組みを再利用）＋`hasRenderingElements`判定の公開
-    │   ├── InlineCommentHighlight/
-    │   │   └── InlineCommentHighlight.tsx # ResolvedRangeを受け取り保存済みハイライトを描画。RangeそのものはresolvedRangeユーティリティ（servicesの`resolved-range.ts`）経由で構築する
-    │   ├── PendingSelectionHighlight/
-    │   │   └── PendingSelectionHighlight.tsx # 作成中（選択中・入力中）の範囲専用のハイライト。`::selection`と`::highlight(growi-inline-comment-pending)`の両方に、保存済みとは別のテーマ対応トークンを半透明で適用する。SelectionCaptureに組み込まれる
-    │   ├── InlineCommentBodyInteraction/
-    │   │   ├── InlineCommentBodyInteraction.tsx # 保存済みハイライトへのhover/click/tapに応じてInlineCommentPreviewPopoverの開閉・対象コメントを決める。クリックで開いた後は、外側クリック等の明示的な閉じる操作までポップオーバーを維持する「ピン留め」状態（`pinnedId`）もここが持つ。hoverの場合は出現・消失の双方に短い遅延（150ms/250ms）を設け、ポインタがポップオーバー自体に到達した時点で`pinnedId`へ昇格させる（以後はクリックで開いた場合と同じ挙動になる）
-    │   │   ├── use-highlight-hit-test.ts        # 純粋関数hitTestRanges()＋フックuseHighlightHitTest()。document上のpointermove/clickをコンテナ内判定でフィルタし、解決済みRangeのgetClientRects()との座標比較でコメントidを返す
-    │   │   ├── InlineCommentPreviewPopover.tsx  # 内容確認ポップオーバー本体。開閉・対象コメントの決定、引用の帯、`InlineCommentPopoverEntry`への配線を持つ
-    │   │   └── InlineCommentPopoverEntry.tsx    # ポップオーバー内の1件のコメント表示（起点・返信の両方をこれで描く）。編集・削除アイコンは常時表示（一覧側のホバー表示とは異なる）。解決する操作ボタンは起点コメントのみ持つ（一覧側の`InlineCommentItem`と同じ判定・見た目。状態バッジは持たない——このポップオーバーは未解決のコメントに対してしか開かれないため）。起点コメントの削除は返信も道連れに削除する。返信の編集・削除もここから行える
-    │   ├── InlineCommentForm/
-    │   │   ├── InlineCommentForm.tsx     # コメント作成フォーム。エディタ組み立て・送信・エラー表示はMentionAwareCommentInputに委譲する
-    │   │   └── MentionPickerButton.tsx   # メンション相手をボタン操作で選び、選ばれたユーザー名をonInsertで通知する
-    │   ├── MentionAwareCommentInput/
-    │   │   └── MentionAwareCommentInput.tsx # メンション対応コメント入力の共有部品（CodeMirrorEditorComment＋useCodeMirrorEditorIsolated＋メンション補完拡張＋送信・エラー表示）。任意prop`initialValue`を持ち、渡された場合はマウント時に一度だけ`codeMirrorEditor.initDoc(initialValue)`を適用する。InlineCommentFormの起点フォーム、InlineCommentRepliesの返信入力・編集、InlineCommentPreviewPopoverの起点コメント編集のいずれからも使われる。永続化そのものは持たず、呼び出し側がonSubmitで注入する（作成か編集かはコンポーネント自身は知らない）
-    │   └── InlineCommentItem/
-    │       ├── InlineCommentItem.tsx     # 一覧の1項目。起点コメントの本文・状態・アンカーの引用文を表示する。引用文は`<button>`で包み、クリックでPageViewから渡されたscrollToRange(comment.id)を呼ぶ。投稿者本人（`creatorId === currentUser?._id`、`NotAvailableIfReadOnlyUserNotAllowedToComment`でガード）向けの編集・削除アイコン（`CommentEditDeleteButtons`）・リビジョン履歴リンク（`CommentRevisionLink`）をヘッダー行の`headerEnd`スロットに持つ。ヘッダー行`ms-auto`グループの並びは 編集/削除アイコン → 解決トグル → 状態バッジ（カードの角）で、編集・削除アイコンと解決トグルはホバーでのみ表示される。編集モードでは`CommentCard`ごと`CommentEditor`に切り替わる。削除は`DeleteConfirmAlert`（インライン警告帯。モーダルは使わない）を経て確定する
-    │       └── InlineCommentReplies.tsx  # 返信のネスト表示＋「Reply...」⇄MentionAwareCommentInputのトグル式返信入力（`showEditorIds`パターンを踏襲したローカルなboolean状態）。返信にも同じ投稿者本人限定の編集・削除操作を持つ（編集は`CommentEditor`、削除は`DeleteConfirmAlert`）
-    ├── services/
-    │   ├── rendered-text.ts              # renderedTextOf(container) 純粋関数。詳細契約は後述
-    │   ├── quote-matcher.ts              # matchQuote(text, anchor) 純粋関数。approx-string-matchのラッパー
-    │   ├── quote-matcher.spec.ts
-    │   ├── normalized-offset-mapping.ts  # NFC正規化後オフセット→原文オフセットの逆変換
-    │   ├── normalized-offset-mapping.spec.ts
-    │   ├── resolved-range.ts             # rangeForResolved()／rangesById()。詳細契約は後述
-    │   ├── resolved-range.spec.ts
-    │   └── fetch-mention-users.ts        # メンション候補取得（`/users/`検索）。`@`タイプ補完・MentionPickerButtonの双方から利用。CommentEditor.tsx側の同種実装とは共有しない
-    └── stores/
-        └── inline-comment.ts             # SWRフック（一覧取得・起点作成・返信作成・解決トグル・起点更新・返信更新・起点削除・返信削除のmutate。update系はPUT、delete系はDELETE→mutate()→ペイロードを返す、既存のresolve/createReplyと同じ形）
-```
+`apps/app/src/features/inline-comment/` を新設し、既存の `revision-diff` フィーチャーモジュールと同じ構成規約（`interfaces/` + `server/{routes,service}/` + `client/{components,services,stores}/`）に従う。永続化・認可・通知連携（サーバー側）とアンカー計算アルゴリズム（クライアント側）を同一フィーチャー内の層で分離する、というドメイン境界の判断はArchitecture節の通り。ファイル単位の内訳は現在のディレクトリ構成を参照。
 
-### Modified Files
-- `apps/app/src/components/PageView/RevisionRenderer.tsx` — `ReactMarkdown` を包むコンテナ `div` に `ref` を転送するよう変更（新規rehype/remarkプラグインは追加しない）。テスト済みの機能として提供済みだが、実際の本文コンテナ参照の配線は`PageView.tsx`側の別経路（後述`PageView.tsx`の項参照）を使っており、この機能自体はこのrefを消費していない。他の呼び出し元（`Comment.tsx`等）が将来利用できる汎用の拡張として残す
-- `apps/app/src/components/PageView/PageView.tsx` — 本文サブツリー（`PageContentRenderer`/`SlideRenderer`の出力）を無名の`<div ref={pageBodyContainerRef}>`で包み、そのrefを`AnchorResolver`/`SelectionCapture`に配線する（`PageView.tsx`と`RevisionRenderer.tsx`の間に挟まる`PageContentRenderer.tsx`がrefを中継しない構造のため、`RevisionRenderer.tsx`が転送するrefは経由しない。このdivは他に何も内包しないため、`RevisionRenderer.tsx`自身のrefを取るのと同じテキストが得られる）。既存の `Comments` と並置する。共有リンク経由のページ表示（`!isSharedPageView`）では`SelectionCapture`/`InlineCommentHighlight`/`PendingSelectionHighlight`/`InlineCommentBodyInteraction`のいずれもレンダーしないガードもここに置く。`scrollToRange(commentId): boolean`（`rangesById()`で対象の`Range`を再構築できればスクロール＋一時的な強調ハイライト`growi-inline-comment-emphasis`の登録、できなければ既存の通知UIで知らせる）を実装し、`resolve`/`createReply`/`update`/`updateReply`/`remove`/`removeReply`とあわせて`inlineCommentsForComments`バンドルとして`Comments`に渡す。`inlineCommentAnchors`は解決済みを含む全件のまま`useAnchorResolver`に渡し（一覧クリックでの解決済みコメントへのスクロールナビゲーションを成立させるため）、別途`bodyInlineComments`（`.filter((c) => c.resolvedAt == null)`）で絞り込んだ`visibleResolvedRanges`を本文中のハイライト・当たり判定・ポップオーバー側にだけ渡す（一覧側は影響を受けない。詳細はArchitecture節「解決済みインラインコメントの本文中非表示は、アンカー解決を全件に対して行ったうえで表示側だけを絞り込む2段構えで実現する」参照）
-- `apps/app/src/client/components/ReactMarkdownComponents/Header.tsx` / `TableWithEditButton.tsx` / `DrawioViewerWithEditButton.tsx` — 条件付きで表示される編集ボタンのアイコン用 `<span>`（例: `<span className="material-symbols-outlined">edit_square</span>`）に `aria-hidden="true"` を追加する。表示条件・クリック時の振る舞い・見た目は変えない。この標準属性が、本文テキスト抽出の除外条件（Architecture節「本文テキストの抽出範囲」）から読み取られる
-- `apps/app/package.json` — `@popperjs/core`を`devDependencies`から`dependencies`へ移動（選択範囲近傍への配置に使用）。`approx-string-match`を`dependencies`に新規追加（あいまい一致の実装に採用。選定理由はArchitecture節参照）
-- `apps/app/turbo.json` — `test:components`タスクの`dependsOn`に`dev:pre:styles-commons`／`dev:pre:styles-components`を追加（ベンダースタイルの事前生成が揃わないまま`test:components`が走ると失敗するのを防ぐ）
-- `apps/app/src/server/routes/apiv3/index.js` — `inline-comment` フィーチャーモジュールのルートファクトリをimportし、`/inline-comments` にマウントする（`revisions` と同じマウントパターン）
-- `apps/app/src/features/comment/server/models/comment.ts` — Mongooseスキーマに `isInline`／アンカー4フィールド／`anchorOriginRevisionId`／`resolvedById`／`resolvedAt` を追加。`findCommentsByPageId`／`findCommentsByRevisionId`／`countCommentByPageId` の `where` 条件に `isInline: { not: true }` を追加（無条件フィルタ。呼び出し元からオーバーライド不可）。`@@index([pageId, isInline])` の宣言を追加
-- `apps/app/prisma/schema.prisma` — `comments` モデルに同じフィールドを追加。既存の `creator` リレーション（現在は無名の暗黙リレーション）に `@relation("CommentCreator", ...)` と明示的な名前を付け、新設する `resolvedBy` リレーションと区別できるようにする（`comments`→`users` 間に2本のリレーションができるため、Prismaの制約でどちらも名前付けが必須になる）。`users` モデル側の `comments comments[]` も `@relation("CommentCreator")` を付け、新設する `resolvedInlineComments comments[] @relation("InlineCommentResolver")` を追加する
-- `apps/app/src/interfaces/activity.ts` — `ACTION_INLINE_COMMENT_CREATE`／`ACTION_INLINE_COMMENT_REPLY`／`ACTION_INLINE_COMMENT_RESOLVE`／`ACTION_INLINE_COMMENT_UNRESOLVE`／`ACTION_INLINE_COMMENT_UPDATE`／`ACTION_INLINE_COMMENT_REPLY_UPDATE`／`ACTION_INLINE_COMMENT_DELETE`／`ACTION_INLINE_COMMENT_REPLY_DELETE` を追加
-- `apps/app/src/styles/_marker.scss` — `:root` に `--grw-inline-comment-marker-bg-pending` を追加（既定では保存済み用の `--grw-inline-comment-marker-bg` と異なるマーカー色ファミリーにフォールバックする）
-- `.../InlineCommentHighlight/InlineCommentHighlight.tsx` — Rangeの再構築ロジックを`resolved-range.ts`の`rangeForResolved()`へ委譲する（挙動は変えない）
-- `.../InlineCommentForm/InlineCommentForm.tsx` — エディタ組み立て・送信・エラー表示を`MentionAwareCommentInput`に委譲する（外部から見た挙動は変えない）
-- `.../InlineCommentItem/InlineCommentItem.tsx`（旧`InlineCommentList/InlineCommentList.tsx`から移動・構造を変更） — アンカーの引用文を`<button>`で包み、クリックで`scrollToRange(comment.id)`を呼ぶ
-- `.../InlineCommentItem/InlineCommentReplies.tsx` — 素の`<textarea>`ベースの返信欄を、`showEditorIds`パターンを踏襲した「Reply...」⇄`MentionAwareCommentInput`のトグルに置き換える
-- `apps/app/src/client/components/Comments.tsx` / `PageComment.tsx` — `inlineComments` prop の型に `scrollToRange: (commentId: string) => boolean` を追加し、そのまま素通しする（ロジック変更なし）。`InlineCommentItem` へ `pagePath` を配線する（`CommentRevisionLink` が必要とする）
-- `apps/app/public/static/locales/en_US/translation.json` — 一覧側の再アンカー失敗通知など、本文ハイライトのポップオーバー・一覧表示に必要な文言キーを追加（返信欄プレースホルダは検討したが、返信入力欄が`MentionAwareCommentInput`＝プレースホルダを持たないCodeMirrorエディタである以上不要と判明し追加しなかった）
-- `packages/editor/src/client/components-internal/CodeMirrorEditor/CodeMirrorEditor.tsx` — `hideToolbar`（既存、内部ラッパー限定の`Props`型にのみあった）を公開の`CodeMirrorEditorProps`型へ移動し、`CodeMirrorEditorComment`経由でこの機能の`MentionAwareCommentInput`からも渡せるようにする。挙動自体は変えない
-- `packages/editor/src/client/stores/codemirror-editor.ts`（`useCodeMirrorEditorIsolated`） — この機能の実装中に見つかった既存バグ2件を修正。(1) `@uiw/react-codemirror`がview/stateを`useState`経由で初期化するため、コンテナ接続直後の1レンダーは未初期化の値になるが、この未初期化値が共有atomの初回値としてそのまま公開されてしまっていた（一度きりの初期値適用を行う`MentionAwareCommentInput`がこの未初期化値に対して無駄なinitDocを行い、以後永久に初期値を適用する機会を失う）。(2) 発行元（`container`を持つ側、例: `CodeMirrorEditor`）がアンマウントしても共有atomがそのまま残り、同じkeyで再マウントした際に破棄済みの古いエディタを見てしまっていた（Cancel後に同じコメントを再度編集する操作で顕在化）。どちらも一般的な既存バグの修正であり、インラインコメント固有のNon-Goalには抵触しない
-- `apps/app/src/client/components/PageComment/DeleteConfirmAlert.tsx`（新規、+`.module.scss`） — 削除確認のインライン警告帯。通常コメント（`Comment.tsx`／`ReplyComments.tsx`）と一覧側インラインコメント（`InlineCommentItem.tsx`／`InlineCommentReplies.tsx`）で共用する。呼び出し元ごとに `testIdPrefix` で `data-testid` を切り替える。ボタンの並びは Cancel → Delete
-- `apps/app/src/client/components/PageComment/CommentEditDeleteButtons.tsx`（新規、+`.module.scss`） — 編集・削除アイコンボタンの組（32px四方、`opacity: 0.5`／ホバーで`0.75`）。通常コメント・一覧側インラインコメントで共用する。ホバーで出す仕組み自体（`visibility`切り替えのトリガーとなるラッパー）は各呼び出し元が持ち、この部品自体は持たない
-- `apps/app/src/client/components/PageComment/CommentRevisionLink.tsx`（新規） — リビジョン履歴へのリンク。通常コメント・一覧側インラインコメントで共用する。投稿日時の直後、`ms-2` で配置する
-- `apps/app/src/client/components/PageComment/Comment.tsx` — `CommentControl` をヘッダー行（`headerEnd` スロット）の `ms-auto` flowへ移す（`position: absolute` を撤去）。削除確認を `DeleteCommentModal` からローカルstate＋`DeleteConfirmAlert` に変更（削除APIの呼び出しは `PageComment.tsx` から渡される `onDeleteConfirmed` コールバックのまま）。編集・削除アイコンは `CommentEditDeleteButtons` を使う
-- `apps/app/src/client/components/PageComment/Comment.module.scss` — ホバー表示セレクタを直接の子（`>`）から子孫セレクタに変更する（`.page-comment-control` がもう `.page-comment-main` の直接の子ではないため）
-- `apps/app/src/client/components/PageComment/ReplyComments.tsx` — 返信の削除確認を `DeleteConfirmAlert` に、編集・削除アイコンを `CommentEditDeleteButtons` に置き換える
-- `apps/app/src/client/components/PageComment/DeleteCommentModal/` — 削除（`Comment.tsx`／`ReplyComments.tsx` とも `DeleteConfirmAlert` に移行したため不要）
-- `apps/app/src/client/components/PageComment/CommentCard/`（新規、`CommentCard.tsx` + `index.ts`） — Components and Interfaces節に記載の共有部品本体
-- `apps/app/src/client/components/PageComment/CommentControl.tsx` — `CommentEditDeleteButtons`／`DeleteConfirmAlert`への置き換えに伴う配線の調整（表示条件・クリック時の振る舞いは変えない）
-- `apps/app/src/client/components/PageComment/CommentEditor.tsx` — `MentionAwareCommentInput`が持つメンション補完ロジックとの整合を取るための小さな調整（メンション取得処理自体は意図的に共有せず、`fetch-mention-users.ts`側に独立した実装を持つ。理由はArchitecture節参照）
-- `apps/app/src/client/components/PageComment/_comment-inheritance.scss` — `InlineCommentItem`／`CommentCard`からも`@extend`できるよう`%bg-comment`／`%comment-section`／`%user-picture`を調整
-- `apps/app/src/components/User/Username.tsx` — `user` propの型に、インラインコメント一覧APIのレスポンスがすでに`serializeUserSecurely`を通した形で返す`IUserSerializedSecurely<IUserHasId>`を追加（`isPopulated`によるフォールバック挙動は変えない。通常コメント側の呼び出しには影響しない）
-- `apps/app/src/migrations/20260901160138-backfill-comments-isinline.js`（新規） — 既存コメント行に`isInline: false`を書き込む移行。Prisma/Mongoコネクタが`isInline`欠落行を`{ not: true }`にマッチさせないため必須（詳細は`comment.integ.ts`のコメント参照）
-- `apps/app/playwright/20-basic-features/inline-comment.spec.ts`（新規） — Requirement網羅のE2E一式（作成・表示・再アンカー・解決トグル・編集削除・見た目の視覚比較スクリーンショットを含む）
+既存ファイルへの変更は、通常コメント（`apps/app/src/client/components/PageComment/`）との見た目・部品共有（`CommentCard`／`DeleteConfirmAlert`／`CommentEditDeleteButtons`／`CommentRevisionLink`。理由はArchitecture節「`CommentCard`は自分のCSSモジュールを持たない」および research.md「見た目の刷新」参照）、本文レンダリング側への最小限の変更（`RevisionRenderer.tsx`へのref転送、`Header.tsx`等3ファイルへの`aria-hidden="true"`付与。理由はArchitecture節「本文テキストの抽出範囲」参照）、データモデル変更（`comment.ts`／`schema.prisma`。理由はData Models節参照）に集約される。個別ファイルの変更内容はコードの差分そのものから読み取れるため、ここには列挙しない。
+
+非自明な1件のみ記録する: `apps/app/turbo.json` の `test:components` タスクの `dependsOn` に `dev:pre:styles-commons`／`dev:pre:styles-components` を追加している。ベンダースタイルの事前生成が揃わないまま `test:components` が走ると失敗するためで、この経緯は他のどの文書にも残っていない。
 
 ## System Flows
 
@@ -453,135 +348,12 @@ sequenceDiagram
     end
 ```
 
-### 更新シーケンス（起点コメント。返信もルート・DTOが違うだけで同じ形）
+### 更新・削除フロー上の決定事項
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Item as InlineCommentItem
-    participant Store as useSWRxInlineComments
-    participant Route as update.ts
-    participant Service as InlineCommentService
+更新・削除の実際の呼び出し順（route → findUnique → service → prisma → mutate）はルートファイル・サービスファイル自体から読み取れるため、シーケンス図としては持たない。ここにはコードだけからは読み取れない決定だけを残す：
 
-    User->>Item: 編集を押す
-    Item->>Item: MentionAwareCommentInput(initialValue=comment.comment) を表示
-    User->>Item: 送信
-    Item->>Store: update(id, comment)
-    Store->>Route: PUT /_api/v3/inline-comments/:id
-    Route->>Route: findUnique -> ページ権限チェック -> 形状チェック（起点であること）
-    Route->>Service: updateComment(id, comment, actorId)
-    Service->>Service: 形状＋creatorId===actorIdを再検証
-    Service->>Service: prisma.comments.update + activity発行
-    Service-->>Route: IInlineComment
-    Route-->>Store: 200 { inlineComment }
-    Store->>Store: mutate()（一覧を再取得）
-    Store-->>Item: 反映完了
-```
-
-投稿者本人チェックは**2回**行う——1回はルート側（形状チェックと同じ `findUnique` で `creatorId` も一緒に取得できるので、そのついでに確認する）、もう1回はサービス側の内部（`setResolved()` がすでに行っている前提の再検証と同じ、多層防御）。両者は必ず一致するべきものであり、食い違えばそれはレースではなくバグである。ポップオーバーからの編集（15.5）も同じ `update` を呼ぶだけで、経路はこの図と同一になる。
-
-### 削除シーケンス（起点コメント。返信もルート・DTOが違うだけで同じ形）
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Item as InlineCommentItem
-    participant Store as useSWRxInlineComments
-    participant Route as delete.ts
-    participant Service as InlineCommentService
-
-    User->>Item: 削除を押す
-    Item->>Item: 削除確認手段を表示
-    User->>Item: 削除を確認
-    Item->>Store: remove(id)
-    Store->>Route: DELETE /_api/v3/inline-comments/:id
-    Route->>Route: findUnique -> ページ権限チェック -> 形状チェック（起点であること）
-    Route->>Service: deleteComment(id, actorId)
-    Service->>Service: 形状＋creatorId===actorIdを再検証
-    Service->>Service: prisma.comments.removeWithReplies(id) + activity発行（返信も道連れ削除）
-    Service-->>Route: void
-    Route-->>Store: 200 {}
-    Store->>Store: mutate()（一覧を再取得。resolvedAtに関わらずidごと消える）
-    Store-->>Item: 反映完了
-```
-
-起点コメントの削除は返信も道連れに削除する（`removeWithReplies`）。この再取得の結果、`PageView.tsx` の `inlineCommentAnchors` にも当該idが存在しなくなるため、本文中のハイライトも自然に消える（2.8）。返信削除は単純な単一行削除で、道連れ削除の対象を持たない。
-
-## Requirements Traceability
-
-| Requirement | Summary | Components | Interfaces | Flows |
-|---|---|---|---|---|
-| 1.1–1.2 | 範囲選択とアンカー保存 | SelectionCapture, use-text-selection, rendered-text, InlineCommentForm, InlineCommentService | `useTextSelection`, `RenderedText.textOffsetOf`, POST /inline-comments | 作成フロー |
-| 1.3 | 文字単位で開始・終了を扱う | use-text-selection | `CapturedSelection` | 作成フロー |
-| 1.4 | クオートを正規化せず保存 | use-text-selection, InlineCommentService | `InlineCommentAnchor.quote` | 作成フロー |
-| 1.5–1.6 | 権限・ログイン要求 | apiv3 inline-comment routes | `loginRequired`, `accessTokenParser` | 作成フロー |
-| 1.7 | 空選択時は作成操作を無効化 | SelectionCapture | `useTextSelection` が `null` を返す | — |
-| 1.8 | 返信を許可する | InlineCommentService, InlineCommentReplies | POST /inline-comments/:id/replies | 作成フロー（返信） |
-| 1.9 | 返信はアンカーを持たない | InlineCommentService, Data Models | `replyToId` 行の全アンカーフィールドが `null` | 作成フロー（返信） |
-| 1.10 | 作成・返信作成のリードオンリー制限をサーバー側で判定し、対応する操作起点を無効化する | create.ts, create-reply.ts, SelectionCapture, InlineCommentReplies, InlineCommentPreviewPopover | `excludeReadOnlyUserIfCommentNotAllowed`, `NotAvailableIfReadOnlyUserNotAllowedToComment` | — |
-| 2.1–2.4 | 完全一致→あいまい一致→ハイライトなしの3段階 | AnchorResolver, use-container-settle, rendered-text, quote-matcher | `useAnchorResolver`, `hasRenderingElements`, `matchQuote` | 表示・再アンカーフロー |
-| 2.5–2.6 | 一覧表示・作成日時順 | InlineCommentItem, inline-comment store | GET /inline-comments | — |
-| 2.7 | 解決済みは本文中で非表示（ハイライト・ポップオーバーとも） | PageView (`bodyInlineComments`, `visibleResolvedRanges`), InlineCommentBodyInteraction | `.filter((c) => c.resolvedAt == null)` | — |
-| 2.8 | 起点削除で本文中のハイライトも消える | PageView (`inlineCommentAnchors`) | SWR再取得 | 削除シーケンス |
-| 3.1–3.2 | メンションハイライト・通知の再利用 | InlineCommentForm・InlineCommentItem・InlineCommentReplies（いずれも既存remarkプラグインを利用）, InlineCommentService, CommentService | `prepareMentionNotifications` | 作成フロー |
-| 4.1–4.4 | 解決/未解決管理 | InlineCommentService, InlineCommentItem | PUT /inline-comments/:id/resolve | — |
-| 4.5 | 解決状態は起点のみが持つ | Data Models（`resolvedById`/`resolvedAt` は返信では常に`null`） | — | — |
-| 4.7 | 解決トグルのリードオンリー制限をサーバー側で判定し、対応する操作起点を無効化する | resolve.ts, InlineCommentItem, InlineCommentPreviewPopover | `excludeReadOnlyUserIfCommentNotAllowed`, `NotAvailableIfReadOnlyUserNotAllowedToComment` | — |
-| 5.1–5.3 | ベストエフォート再アンカー | AnchorResolver, use-container-settle, rendered-text, quote-matcher | `useAnchorResolver`, `hasRenderingElements` | 表示・再アンカーフロー |
-| 5.4–5.5 | アンカー起点リビジョンIDの不変記録 | InlineCommentService, Data Models | `InlineComment.anchorOriginRevisionId` | 作成フロー |
-| 6.1 | 共有リンク閲覧者へ行を返さない | apiv3 inline-comment routes（`certifySharedPage`を通さない） | — | — |
-| 6.2 | 共有リンク画面でUIを表示しない | SelectionCapture, InlineCommentItem（share-link文脈では未マウント） | — | — |
-| 6.3 | 既存の一覧取得は共有リンクの有無によらず常に除外する | `findCommentsByPageId`／`findCommentsByRevisionId`（無条件`isInline`フィルタ） | — | — |
-| 7.1 | 選択時に作成の起点を表示 | SelectionCapture, SelectionActionButton, SelectionPopover | `useTextSelection` | 選択→作成起点 |
-| 7.2 | 空選択では起点を表示しない | SelectionCapture | `useTextSelection`が`null`を返す | — |
-| 7.3 | 選択変更に起点位置を追随 | SelectionPopover | ライブ`Range`の再取得 | 選択→作成起点 |
-| 7.4 | 展開前の選択解除で起点を消す | SelectionCapture | `stage: selecting → idle` | 状態遷移 |
-| 8.1 | 起点選択でフォームへ展開 | SelectionCapture, SelectionActionButton | `onCommit` | 作成起点→フォーム展開 |
-| 8.2 | 展開後も引用文を表示し続ける | InlineCommentForm | `anchor.quote` | — |
-| 8.3 | 入力欄フォーカスでフォームを閉じない | SelectionCapture | `committedRange`は選択状態と独立 | — |
-| 8.4 | 送信/取消でフォームを閉じる | SelectionCapture, InlineCommentForm | `onSubmitted`/`onCanceled` | 送信 |
-| 9.1 | メンション選択操作を別途用意 | InlineCommentForm, MentionPickerButton | — | メンション選択 |
-| 9.2 | 選択操作でユーザー一覧を表示 | MentionPickerButton | `fetchMentionUsers` | メンション選択 |
-| 9.3 | 一覧選択でメンションを本文に挿入 | MentionPickerButton, InlineCommentForm | `codeMirrorEditor.insertText` | メンション選択 |
-| 9.4 | 既存の`@`タイプ補完を維持 | InlineCommentForm | `createMentionCompletionExtension` | — |
-| 10.1 | 起点・フォームを選択範囲近くに表示 | SelectionPopover | `usePopperPosition`, `selection-virtual-element` | 全フロー |
-| 10.2 | 共有リンク画面では表示しない | SelectionCapture（`PageView.tsx`側の`!isSharedPageView`ガードにより未マウント） | — | — |
-| 11.1–11.5 | 作成UIのBootstrap5クラス・テーマ追随 | SelectionActionButton, InlineCommentForm | Bootstrap 5クラス（色の直値を使わない） | — |
-| 11.6 | 表示文言の翻訳キー化 | SelectionActionButton, InlineCommentForm, InlineCommentItem | `translation.json` | — |
-| 12.1–12.3 | ハイライト色を単一のCSSカスタムプロパティから読む・既定は検索マーカー色 | InlineCommentHighlight, `_marker.scss` | `--grw-inline-comment-marker-bg`（既定 `--grw-marker-bg-yellow` 経由） | — |
-| 12.4–12.7 | 選択中・入力中・保存後の3状態でのハイライト表示 | PendingSelectionHighlight, InlineCommentHighlight | `::selection`, `::highlight()` | — |
-| 12.8, 12.9 | 作成中・保存済みの色分離と重なり時の視認性 | PendingSelectionHighlight, `_marker.scss` | `--grw-inline-comment-marker-bg-pending` | 詳細はRequirement 14として引き継がれている（上記12.8注記参照） |
-| 13.1, 13.2 | 通常コメントと同じ一覧・投稿日時順 | PageView (`inlineComments` props), PageComment | `scrollToRange`とあわせて渡す`inlineComments`バンドル | — |
-| 13.3, 13.4, 13.9 | 見た目の統一（箱・投稿者表示）・通常コメントの見た目維持 | CommentCard | `CommentCardProps` | — |
-| 13.5 | 一覧取得応答に投稿者情報を含める | InlineCommentService (`listByPageId`) | `serializeUserSecurely` | — |
-| 13.6, 13.10 | 引用文・種別見出し行 | InlineCommentItem | `beforeBody`, `headerEnd` | — |
-| 13.7 | 解決トグルを共通の箱の中に置く | InlineCommentItem, CommentCard | `headerEnd` | — |
-| 13.11, 9.5 | リビジョン履歴リンク／ポップオーバー返信フォームのメンションピッカー | InlineCommentItem, CommentRevisionLink, InlineCommentPopoverEntry | `headerEnd`（`CommentRevisionLink`）, `MentionPickerButton` | — |
-| 13.8 | 共有リンクでは一覧に含めない | PageView (`isSharedPageView`ガード), ShareLinkPageView | `inlineComments`を渡さない | — |
-| 14.1, 14.3, 14.4 | ハイライト色の分離・独立したテーマ上書き | `_marker.scss`, PendingSelectionHighlight | `--grw-inline-comment-marker-bg-pending` | — |
-| 14.2 | 重なったときの視認性 | PendingSelectionHighlight | `color-mix()`による半透明適用 | — |
-| 14.5 | 3時点を通じた一貫表示 | PendingSelectionHighlight, InlineCommentHighlight | 単一のカスタムプロパティを両者が参照 | — |
-| 15.1, 15.2 | hover/click/tapでの内容確認 | InlineCommentBodyInteraction, use-highlight-hit-test | `useHighlightHitTest` | 本文ハイライトのhover/click/tapフロー |
-| 15.3 | 簡易返信欄 | InlineCommentPreviewPopover | `createReply` | 同上 |
-| 15.4 | 外側クリックで閉じる | InlineCommentPreviewPopover | `mousedown`監視 | 同上 |
-| 15.5 | 起点コメントの投稿者本人に限り編集を提供 | InlineCommentPreviewPopover | `update` prop | 更新シーケンス |
-| 15.6 | 再アンカー失敗時はトリガーを提供しない | resolved-range (`rangesById`が対象を絞り込む) | — | 同上 |
-| 15.7, 15.8 | hover表示の遅延出現・遅延消失 | InlineCommentBodyInteraction | `hoverPreviewId`, `showTimerRef`/`hideTimerRef` | 同上 |
-| 15.9 | ポインタ到達後のロック | InlineCommentBodyInteraction, InlineCommentPreviewPopover | `handlePointerEnterPopover`（`pinnedId`へ昇格）, `onPointerEnter` | 同上 |
-| 15.10, 4.6 | ポップオーバーからの解決操作 | InlineCommentPopoverEntry | `resolve`（`InlineCommentItem`と同じ判定・見た目） | 同上 |
-| 15.14 | ポップオーバーからの返信編集 | InlineCommentPopoverEntry | `updateReply` | 更新シーケンス |
-| 15.15 | ポップオーバーからの起点コメント削除（返信も道連れ） | InlineCommentPopoverEntry | `remove` | 削除シーケンス |
-| 15.16 | ポップオーバーからの返信削除 | InlineCommentPopoverEntry | `removeReply` | 削除シーケンス |
-| 15.17 | ポップオーバーの返信表示順（古い順） | InlineCommentPreviewPopover | `[...comment.replies].reverse()` | — |
-| 15.11 | 引用の帯 | InlineCommentPreviewPopover | `comment.anchor.quote` | 同上 |
-| 15.12 | ポップオーバー表示中に対象が解決済みに変わったら閉じる | InlineCommentBodyInteraction | `inlineComments.find()` によるガード（既存の再アンカリング失敗と同じ仕組み）、`pinnedId`/`hoverPreviewId`のクリア | — |
-| 16.1 | 一覧からのスクロール | InlineCommentItem, PageView (`scrollToRange`) | `scrollToRange` | 一覧クリックからスクロールまでのフロー |
-| 16.2 | 再アンカー失敗時の通知 | PageView (`scrollToRange`) | 既存の通知UI | 同上 |
-| 16.3 | 一時的な強調表示 | PageView (`scrollToRange`) | `CSS.highlights`（`growi-inline-comment-emphasis`） | 同上 |
-| 17.1–17.5 | 返信UIの統一 | InlineCommentReplies, MentionAwareCommentInput | `createReply` | — |
-| 18.1–18.4 | 一覧からの編集（投稿者本人限定・拒否・リードオンリー制限） | InlineCommentItem, InlineCommentReplies, InlineCommentService | `update`/`updateReply`, `NotAvailableIfReadOnlyUserNotAllowedToComment`, `excludeReadOnlyUserIfCommentNotAllowed` | 更新シーケンス |
-| 18.5–18.8 | 一覧からの削除（確認・道連れ削除・拒否・リードオンリー制限） | InlineCommentItem, InlineCommentReplies, InlineCommentService | `remove`/`removeReply`, `removeWithReplies`, `excludeReadOnlyUserIfCommentNotAllowed` | 削除シーケンス |
-| 18.9 | 編集・削除の権限判定は通常コメントと同じ・最終判定はサーバー側 | update/delete系ルート群, InlineCommentService | `creatorId`比較, `excludeReadOnlyUserIfCommentNotAllowed` | 更新シーケンス／削除シーケンス |
+- 投稿者本人チェックは**2回**行う——1回はルート側（形状チェックと同じ `findUnique` で `creatorId` も一緒に取得できるので、そのついでに確認する）、もう1回はサービス側の内部（`setResolved()` がすでに行っている前提の再検証と同じ、多層防御）。両者は必ず一致するべきものであり、食い違えばそれはレースではなくバグである。ポップオーバーからの編集（15.5）も一覧側と同じ `update` を呼ぶだけで、経路は同一になる
+- 起点コメントの削除は返信も道連れに削除する（`removeWithReplies`）。削除後の一覧再取得の結果、`PageView.tsx` の `inlineCommentAnchors` にも当該idが存在しなくなるため、本文中のハイライトも自然に消える（2.8）。返信削除は単純な単一行削除で、道連れ削除の対象を持たない
 
 ## Components and Interfaces
 
@@ -928,39 +700,14 @@ model comments {
 
 ## Testing Strategy
 
-- **Unit Tests**:
-  - `quote-matcher`: 完全一致優先の分岐、`approxOffset` によるあいまい性解消（クオートがページ内に複数回出現するケース）、`maxErrors` の上限20キャップの境界、NFC正規化を要する結合文字ケース、正規化後オフセット→原文オフセットの逆変換（結合文字・互換分解を含むケース）
-  - `rendered-text`: `.katex` サブツリーおよび `aria-hidden="true"` サブツリーの除外、コードブロック・`lsx`/`drawio` 出力は除外されないことの確認、`textOffsetOf` と `resolveDomPosition` の往復（DOM位置→オフセット→DOM位置）が一致すること、除外済みサブツリー内部の境界が「その直前までの長さ」に丸められること
-  - `use-container-settle`: `hasRenderingElements` の単体動作、`GROWI_IS_CONTENT_RENDERING_SELECTOR` に一致する要素がある間は発火しないこと、そうした要素が存在しないまま目印を持たない要素の追加・削除が起きた場合にも発火すること、同一フレーム内の複数回の変化が1回の発火にまとまること（MutationObserverモックで検証）
-  - `use-text-selection`: 空選択で `null` を返すこと、書記素境界への内側スナップ、`fullText`／`startOffset`／`endOffset` が `renderedTextOf` 経由で求まること（数式の直後を選択した場合の `approxOffset` が解決時の座標系と一致すること）
-  - `use-anchor-resolver`: `anchors` の内容変化によるトリガーが、描画中の要素が残っている間は再計算せず、その後の静定シグナルで正しく再計算されること
-  - `InlineCommentService`: `updateComment`／`updateReply` は形状違いのidと投稿者本人以外のactorを拒否し、成功時は `comment` だけを更新し `anchor`／`resolvedAt` には触れないこと。`deleteComment` は（`removeWithReplies` 経由で）返信も削除し、`deleteReply` は自分自身だけを削除すること
-  - `InlineCommentItem`／`InlineCommentReplies`: 編集・削除操作は投稿者本人にだけ表示され、リードオンリー利用者の制限下では無効化されること。編集は本文が入った状態で送信され `update`／`updateReply` を呼ぶこと。キャンセルは更新を呼ばずに元に戻ること。削除は確認前に `remove`／`removeReply` を呼ばないこと
-  - `InlineCommentPreviewPopover` / `InlineCommentPopoverEntry`: 状態バッジが一切描画されないこと（退行防止。「正しい状態が表示される」ではなく「そもそも存在しない」ことを検証する）。編集手段が起点コメント・返信それぞれの本文を更新すること。削除手段が起点コメント（返信も道連れ）・返信それぞれを削除すること。返信が投稿日時の古い順に表示されること
-  - `InlineCommentBodyInteraction`: `inlineComments` から消えたid（解決・削除いずれのシミュレーションでも）に対して、それを指していた `pinnedId`／`hoverPreviewId` がクリアされ、ポップオーバーの描画が止まること
-  - `MentionAwareCommentInput`: `initialValue` がマウント時に一度だけエディタへ反映されること。渡さない場合は現状とまったく同じ挙動であること（退行防止）
-  - `PageView` の `visibleResolvedRanges`（または単体テスト可能な形に切り出した同等のもの）: 解決済みは除外され、未解決は含まれること。あわせて `inlineCommentAnchors`／`resolvedInlineCommentRanges`（`scrollToRange`が参照する側）は解決済みも含む全件であること（一覧クリックでの解決済みコメントへのスクロールナビゲーションの回帰防止）
-- **Integration Tests**:
-  - `POST /inline-comments` → `prepareMentionNotifications` が呼ばれメンション通知が発火すること（3.2）
-  - `POST /inline-comments` にログインなし・ページ権限なしでアクセスした場合に拒否されること（1.5, 1.6）
-  - `POST /inline-comments/:id/replies` が起点コメントに対しては成功し、返信IDに対しては400を返すこと（1.8, 1.9）
-  - `PUT /inline-comments/:id/resolve` の状態遷移（未解決→解決→未解決）と `resolvedBy`/`resolvedAt` の記録（4.2, 4.3）、返信IDに対しては400を返すこと（4.5）
-  - **既存 `/_api/comments.get` が `isInline: true` の行を一切返さないこと**を、通常文脈・共有リンク文脈の両方について検証する（6.1, 6.3。`isSharedPage` の値にかかわらず同じ結果になることを両方のケースで確認し、無条件フィルタが機能していることをテストで固定する）
-  - `update.ts`／`update-reply.ts`／`delete.ts`／`delete-reply.ts`: ルート全体の挙動——形状違いで400、投稿者本人以外で403、見つからず404、成功時は正しいレスポンス形。起点削除の結合テストでは、実行後に返信も消えていることまで確認する（18.1-18.9）
-- **E2E Tests**:
-  - テキスト選択→コメント作成→ページ再読み込み後にハイライトが復元されること
-  - インラインコメントへの返信を作成し、一覧上で起点コメントにネストして表示されること
-  - 起点コメントの編集（一覧側・ポップオーバー側の両方）が新しい本文を保持し、リロード後も反映されていること。返信の編集が新しい本文を保持すること
-  - 返信の削除がその返信だけを消し、起点コメントや他の返信はそのまま残ること。起点コメントの削除が、その起点・すべての返信・本文中のハイライト／ポップオーバーを消すこと
-  - 投稿者本人以外のブラウザセッションには他人のインラインコメントの編集・削除操作が一切見えないこと（クライアント側のガード）。直接APIを叩いた場合は403になること（サーバー側の認可。こちらは結合テストレベルで担保し、必ずしもE2Eでは検証しない）
-  - ポップオーバーを開いたまま解決すると、ポップオーバーが閉じること。コメント自体は（解決済みとして）一覧に引き続き表示されること
-  - 解決済みのコメントは、ページを開き直してもハイライト・ポップオーバーが一切出現しないこと。一覧側の項目は出現すること
-  - 本文編集後にページを再読み込みし、対象範囲が完全に失われた場合にハイライトが表示されずコメントが一覧に残ること（2.4, 5.3）
-  - `lsx` ブロックを含むページで、`lsx` の非同期解決（`GROWI_IS_CONTENT_RENDERING_ATTR` が `"false"` になるまで）を待ってからハイライトが正しい位置に付くこと（静定検知の実効性を検証する、このフィーチャー固有のリスクに対応するテスト）
-  - draw.io図を含むページで、図の描画完了を人為的に遅らせた場合も、完了後に図より後ろのコメントが正しい位置にハイライトされること（レンダリング状態属性プロトコルの参加範囲を固定する）
-  - 数式を含み、かつ同一文字列が複数回登場するページで、数式より後ろの重複文字列のうち、実際にコメントを付けた出現箇所にのみハイライトが表示されること（作成時と解決時の位置の数え方が一致していることの検証）
-  - 見出し直後にコメントを作成し、共同編集データの読み込みを人為的に遅らせた状態でページを表示しても、読み込み完了後に正しい位置にハイライトが復元されること
-  - ハイライト表示後、監視期間（マウント時点から10秒）の内側で、目印を持たない画面要素（見出しの編集ボタン等）が現れる・消える状況を作っても、ハイライトへのマウスオーバー・クリックで引き続きポップオーバーが開くこと（監視期間を過ぎてからの変化は静定シグナルが届かないため、このテストの対象外）
+各構成要素の網羅的なテスト内訳はテストファイル自体（`*.spec.ts`／`*.integ.ts`）とtasks.mdの完了条件を参照。ここには、テストファイルを読むだけでは再現手順が分からない、または要求される検証状況が非自明なE2Eの再現レシピだけを残す：
+
+- `lsx` ブロックを含むページで、`lsx` の非同期解決（`GROWI_IS_CONTENT_RENDERING_ATTR` が `"false"` になるまで）を待ってからハイライトが正しい位置に付くこと（静定検知の実効性を検証する、このフィーチャー固有のリスクに対応するテスト）
+- draw.io図を含むページで、**図の描画完了を人為的に遅らせた場合**も、完了後に図より後ろのコメントが正しい位置にハイライトされること（レンダリング状態属性プロトコルの参加範囲を固定する）
+- 数式を含み、かつ同一文字列が複数回登場するページで、数式より後ろの重複文字列のうち、実際にコメントを付けた出現箇所にのみハイライトが表示されること（作成時と解決時の位置の数え方が一致していることの検証）
+- 見出し直後にコメントを作成し、**共同編集データの読み込みを人為的に遅らせた**状態でページを表示しても、読み込み完了後に正しい位置にハイライトが復元されること
+- ハイライト表示後、監視期間（マウント時点から10秒）の内側で、目印を持たない画面要素（見出しの編集ボタン等）が現れる・消える状況を作っても、ハイライトへのマウスオーバー・クリックで引き続きポップオーバーが開くこと（監視期間を過ぎてからの変化は静定シグナルが届かないため、このテストの対象外）
+- 既存 `/_api/comments.get` が `isInline: true` の行を一切返さないことは、通常文脈・共有リンク文脈の**両方**について検証する（`isSharedPage` の値にかかわらず同じ結果になることを両方のケースで確認し、無条件フィルタが機能していることをテストで固定する）
 
 ## Security Considerations
 

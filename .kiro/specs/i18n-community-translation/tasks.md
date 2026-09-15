@@ -85,13 +85,13 @@
   - _Requirements: 1.3, 5.1, 5.2_
 
 - [ ] 4.2 (P) メンテナー向け運用手順書を作成し、その手順を実行して実運用環境を準備する
-  - [x] POEditor OSSプランの申請手順、namespaceごとに専用プロジェクトを作成する手順、各プロジェクトでpublic join pageを有効化する手順を記載する（`docs/i18n-community-translation-setup.md` として作成・レビュー承認済み）
+  - [x] POEditor OSSプランの申請手順、単一の共有プロジェクトを作成する手順、そのプロジェクトでpublic join pageを有効化する手順を記載する（`docs/i18n-community-translation-setup.md` として作成・レビュー承認済み。当初は「namespaceごとに専用プロジェクトを作成する」内容だったが、後日の見直しで単一の共有プロジェクトを全namespaceで使う方式に書き改めた）
   - [x] PR作成者とは別に承認レビューを送るための承認ボットアカウント（GitHub Appのインストール、または専用ボットアカウントの発行）を用意し、変更提案への承認レビューのみに限定した権限のトークンを発行する手順を記載する（同上ドキュメントに記載済み）
   - [x] OSSプランが承認されるまで本番運用（実際の同期起動）を進めないという条件を明記する（同上ドキュメント冒頭に明記済み）
-  - [ ] 手順書に沿って、3プロジェクト（またはテスト用のPOEditorプロジェクト）と承認ボットアカウントを実際に用意する。これは後続タスク（5.1・5.2・6.1・6.2）が使うシークレット・テスト環境の元になる
+  - [ ] 手順書に沿って、単一の共有プロジェクト（またはテスト用のPOEditorプロジェクト）と承認ボットアカウントを実際に用意する。これは後続タスク（5.1・5.2・6.1・6.2）が使うシークレット・テスト環境の元になる
   - 観測可能な完了状態: 手順書に記載された順序通りに作業すれば、プロジェクトと承認ボットアカウントが用意され、貢献者が参加可能な状態に至る
   - _Requirements: 1.1, 1.2, 7.1, 7.2_
-  - _Blocked: 実際のPOEditor OSSプラン申請・3プロジェクト作成・承認ボットアカウント発行・GitHub Actionsシークレット登録は、GROWI組織のPOEditorアカウント・GitHub組織権限を持つ人間のメンテナーによる実行が必要（エージェントが代行・捏造できる範囲外）。`docs/i18n-community-translation-setup.md` の手順1〜5に沿って実行し、完了後に `apps/app/tools/i18n-sync/sync-config.ts` のプレースホルダーと `docs/i18n-community-translation.md` の参加リンクを更新すること。_
+  - _Blocked: 実際のPOEditor OSSプラン申請・単一の共有プロジェクト作成・承認ボットアカウント発行・GitHub Actionsシークレット登録は、GROWI組織のPOEditorアカウント・GitHub組織権限を持つ人間のメンテナーによる実行が必要（エージェントが代行・捏造できる範囲外）。`docs/i18n-community-translation-setup.md` の手順1〜5に沿って実行し、完了後に `apps/app/tools/i18n-sync/sync-config.ts` のプレースホルダーと `docs/i18n-community-translation.md` の参加リンクを更新すること。_
 
 ## 5. Integration: ワークフローの配線
 
@@ -121,8 +121,10 @@
 - [ ] 6.1 push経路を実際のPOEditorテストプロジェクトに対して確認する
   - en_USのテスト用変更（キー追加・キー削除・文言変更）を含むファイルを用意し、push経路を実行する
   - POEditor側のテストプロジェクトに、追加・削除・文言変更が反映されていることを確認する
-  - 観測可能な完了状態: POEditorのテストプロジェクトを確認し、実行前後でキー構成と文言が意図通り変化している
-  - _Requirements: 2.1, 2.2, 2.3_
+  - 3 namespace分の実データ相当の内容で、全namespace統合アップロードとnamespaceごとのタグ付けアップロードを実行し、キー構成・値・タグが意図通り反映されていることを確認する
+  - namespaceごとのタグ付けアップロード（削除無効化）が、他namespaceの用語を`obsolete`扱いにしないことを確認する（単一namespaceしか存在しない状態での検証では、複数namespaceが同時に存在する場合の影響は確認できていないため、残された未確認事項として引き継ぐ）
+  - 観測可能な完了状態: POEditorのテストプロジェクトを確認し、実行前後でキー構成と文言が意図通り変化していること、および3 namespace分のキー構成・タグ付与状況が実プロジェクト上で意図通りであることが確認できる
+  - _Requirements: 2.1, 2.2, 2.3, 9.1_
   - _Depends: 5.1_
   - _Blocked: 4.2の実プロビジョニング（POEditorテストプロジェクト・`POEDITOR_API_TOKEN`シークレット）が人手待ちのため実行不可。`docs/i18n-community-translation-setup.md` の手順完了後、この手順を実行すること。_
 
@@ -158,4 +160,6 @@
 
 なおこのフォールバックにより、`I18N_SYNC_PUBLISH_TOKEN` を登録せず `GITHUB_TOKEN` のみで運用した場合、ワークフローは失敗せず実行できてしまうが、既定の `GITHUB_TOKEN` が作成したPRイベントは他のワークフロー実行を起動しないため `ci-app-lint` が付かず、承認されてもマージキューに永遠に留まる（早期の分かりやすい失敗が、後段の分かりにくい失敗に置き換わる）。6.2で実際にシークレットを揃える際、`I18N_SYNC_PUBLISH_TOKEN` の登録漏れがないか特に確認すること。
 - (6.3) `poeditor-client.spec.ts` の20秒スロットルテストを `vi.useFakeTimers()` で時計を凍結する形に書き換え、実時間ジッターによる間欠失敗を解消した（負荷をかけた状態で修正前は20回中4回失敗、修正後は20回中0回失敗を実測）。`turbo run lint/test/build --filter @growi/app` はすべて成功。ただしレビューで `turbo run test --filter @growi/app --force`（キャッシュ無視）を実行すると `src/features/growi-vault/__tests__/clone-e2e.integ.ts` が4件失敗することが分かった。今回の差分（`poeditor-client.spec.ts` 1ファイルのみ）とは無関係で、一時gitサーバーへの接続前提が整っていない環境依存の既知の失敗（本spec外、growi-vault機能側の話）。i18n-community-translation の完了判定には影響しない。
+- (amend spec `i18n-community-translation-single-project` タスク1.1〜3.1、後日の見直しで判明) タスク1.1（namespaceごとのPOEditorプロジェクトID宣言）・タスク2（namespaceごとの個別push）・タスク3.1（namespace×言語ごとの個別export、最大12通り）は、いずれもnamespaceごとに専用のPOEditorプロジェクトを持つ当初の3プロジェクト構成を前提に実装・完了したものであり、その時点では正しかった。後日、単一の共有プロジェクトを全namespaceで使う構成（単一の`SHARED_POEDITOR_PROJECT_ID`、全namespace統合アップロード1回＋namespaceごとの非破壊的タグ付けアップロードの2段階push、言語ごとの統合exportをnamespaceへ分割するpull）に置き換えられ、これらのタスクが実装したコード自体はその後書き換わっている。3プロジェクト構成の記述を持つ現在のタスク本文は、完了当時の実装内容の記録としてそのまま残す（書き換えない）。現在の正しいアーキテクチャは`design.md`を参照すること。
+- (amend spec `i18n-community-translation-single-project` タスク5.1実施時の発見) push CLI（タスク2）・pull CLI（タスク3.1）は、当初はGROWIの生のロケールコード（`en_US`等）をそのままPOEditor APIへ渡していた。実際にPOEditorへリクエストすると`en_US`は`"Wrong language code"`エラーで拒否され、正しくは`en`であることが実際のPOEditor APIに対するテストで判明した。これは3プロジェクト構成とは無関係な、既存のマージ済み実装の不具合であり、修正するまでは実運用のpushが毎回失敗する状態だった。`LanguageCodeMap`（GROWIロケールコード→POEditor言語コードの対応表）を新設し、push・pull双方のPOEditor API呼び出し直前でこの変換をかけることで解消した。現在の正しい対応関係はRequirement 10と`design.md`の`LanguageCodeMap`節を参照すること。タスク2・3.1自体は完了当時に正しく動作するものとして実装・レビューされたものであり、この発見によって再度やり直す必要はない（該当箇所は既に修正済み・コミット済み）。
 - (feature-level validate-impl, MANUAL_VERIFY_REQUIRED) `/kiro-validate-impl` を独立subagent（Opus）で実行。結論はGO/NO-GOではなくMANUAL_VERIFY_REQUIRED — 実装済みタスクは全て健全（承認ボット分離・PRの粒度不変条件・境界・依存方向とも問題なし）だが、4.2/6.1/6.2が人手待ちのままのため要件1.1/1.2/7.1/7.2が未充足、かつ2.x/3.x系もモック検証のみで実POEditor/実GitHub APIに対する検証が一度もない。検証で新たに1点判明: `I18N_SYNC_PUBLISH_TOKEN`未登録時のフォールバック（`||`）が警告を一切出さずGITHUB_TOKENへ切り替わっていたため、手順書通りに2つしか登録しないと「一見成功するが承認済みPRがキューに永遠に残る」という分かりにくい失敗になっていた。`readGitHubRunConfig`にフォールバック発生時の`console.error`警告を追加して修正済み（対応するテストも追加）。6.2で実シークレットを揃える前に、この警告が出ないこと（＝3つとも正しく登録されていること）を確認すること。
