@@ -1,3 +1,4 @@
+import { extension as PageLinkExtension } from '~/features/backlinks/server/models/page-link';
 import { extension as CommentExtension } from '~/features/comment/server';
 import { extension as MastraRefreshedModelCatalogExtension } from '~/features/mastra/server/models/refreshed-model-catalog';
 import {
@@ -219,6 +220,7 @@ export const createPrisma = (datasourceUrl?: string) =>
     .$extends(CommentExtension)
     .$extends(ExternalAccountExtension)
     .$extends(MastraRefreshedModelCatalogExtension)
+    .$extends(PageLinkExtension)
     .$extends(RevisionExtension)
     .$extends(ShareLinkExtension)
     .$extends(UserExtension)

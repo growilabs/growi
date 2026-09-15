@@ -1,4 +1,9 @@
 {
+  "backlinks": {
+    "failed_to_fetch": "Failed to fetch backlinks.",
+    "no_backlinks": "There are no backlinks yet.",
+    "panel": "Backlinks"
+  },
   "meta": {
     "display_name": "English"
   },

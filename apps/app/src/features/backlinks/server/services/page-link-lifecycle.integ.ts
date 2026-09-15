@@ -1,0 +1,538 @@
+import type { IUserHasId } from '@growi/core';
+import mongoose, { type HydratedDocument, type Types } from 'mongoose';
+
+import { getInstance } from '^/test/setup/crowi';
+
+import type Crowi from '~/server/crowi';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import PageRedirect from '~/server/models/page-redirect';
+import { prisma } from '~/utils/prisma';
+
+import { ensurePageLinkIndexes } from '../models/page-link-indexes';
+
+// pagelinks is prisma-only, and the harness skips migrations on the in-memory MongoDB.
+beforeAll(async () => {
+  const db = mongoose.connection.db;
+  if (db == null) throw new Error('no mongoose connection');
+  await ensurePageLinkIndexes(db);
+});
+
+/*
+ * B1.15 — Integration tests for the B1 slice.
+ *
+ * Exercises the whole vertical slice through the WIRED service: a create/update
+ * lifecycle event (emitted exactly as PageService does) drives the real
+ * extraction -> resolution -> outbound-row sync, and the permission-filtered
+ * read (findBacklinks) reflects the result. Unlike page-link-service-handlers.integ
+ * (which mocks resolveToPageIds) and page-link-service.integ (which seeds rows by
+ * hand), nothing here is mocked — the pageLinkService created by setupPageService
+ * is the object under test, and target pages are real so resolution runs for real.
+ *
+ * Covers (requirements 1.6, 2.1-2.4, 3.1, 3.2):
+ *  - create adds backlinks; a later update removes them
+ *  - a source the viewer cannot read is excluded; a grant change is reflected on re-read
+ *  - a source linking B->A more than once is listed once
+ *  - a page linking to its own permalink is excluded from its own backlinks
+ *  - a source trashed before its queued upsert ran is not indexed (3.5, B2.2)
+ *  - a backlink survives the target's rename across a later re-save of the source (5.1)
+ *
+ * B1 scope: the rest of trash/delete/restore (B5.8) is out of scope — the trash case
+ * below covers only B2.2's drain-time guard, not the B5.2 reconcile of rows the page
+ * already owned.
+ *
+ * B4.4 additionally covers (requirements 5.1, 5.2, 5.4), with no re-save of the source at
+ * all: a path-based backlink stays valid across the target's own rename and across a
+ * descendant move (the target's path changes because an ancestor moved), and a
+ * permalink-based backlink stays valid the same way. Each spec drives a real
+ * crowi.pageService.renamePage() call — not a hand-written path update — specifically so
+ * the 'rename' event PageLinkService does NOT subscribe to (B1.12) actually fires; a
+ * hand-written update would leave that wiring completely unexercised. The `pagelinks` row
+ * is then asserted byte-for-byte unchanged (including its own `id`), which catches a
+ * rename-triggered write that lands a different value (proven by mutation testing during
+ * review). It cannot distinguish "no write happened" from "a write landed the same
+ * value" — the same limitation design.md already accepts for repointInboundLinks, for
+ * the same reason: asserting against the write mechanism instead would spy on it.
+ */
+describe('Backlinks B1 slice (lifecycle integration)', () => {
+  const PREFIX = '/backlinks-b1-lifecycle-test';
+
+  let crowi: Crowi;
+  let Page: PageModel;
+  // biome-ignore lint/suspicious/noExplicitAny: the User model is an untyped JS model in GROWI; typing it precisely fights mongoose generics for no gain in a test.
+  let User: any;
+
+  let rootPage: PageDocument;
+
+  let viewer: IUserHasId; // the querying user
+  let foreignUser: IUserHasId; // a different user; owner of the restricted sources
+
+  // --- seeding helpers ---------------------------------------------------
+
+  type CreatePageOptions = {
+    grant?: number;
+    grantedUsers?: Types.ObjectId[] | null;
+    parent?: Types.ObjectId;
+  };
+
+  const createPage = (
+    path: string,
+    options: CreatePageOptions = {},
+  ): Promise<HydratedDocument<PageDocument>> =>
+    Page.create({
+      path: `${PREFIX}${path}`,
+      grant: options.grant ?? Page.GRANT_PUBLIC,
+      grantedUsers: options.grantedUsers ?? null,
+      isEmpty: false,
+      parent: options.parent ?? rootPage._id,
+    });
+
+  // Attach a body via a fresh revision, then emit the lifecycle event exactly as
+  // PageService does. The handler reads the body from the latest revision, so the
+  // revision reference is left unpopulated (an ObjectId) on purpose.
+  const emitUpsert = async (
+    event: 'create' | 'update',
+    page: HydratedDocument<PageDocument>,
+    body: string,
+  ): Promise<void> => {
+    const revision = await prisma.revisions.create({
+      data: { pageId: page._id.toString(), body },
+    });
+    const revisionId = new mongoose.Types.ObjectId(revision.id);
+    // Assign the ObjectId directly: this mirrors the unpopulated-revision path
+    // and avoids relying on populate() in the test.
+    page.revision = revisionId;
+    // Persist the pointer as well: the coalescing queue holds ids, so the drain
+    // re-reads the page from the DB (handlePageUpsertById) rather than using the
+    // emitted document. PageService likewise commits the revision (pushRevision)
+    // before emitting, so an in-memory-only assignment would leave the drain
+    // extracting from the previous revision.
+    await Page.updateOne({ _id: page._id }, { revision: revisionId });
+    crowi.events.page.emit(event, page);
+  };
+
+  const outboundRows = (fromPage: Types.ObjectId) =>
+    prisma.pagelinks.findMany({
+      where: { fromPageId: fromPage.toString() },
+      select: { toPath: true, toPageId: true },
+      orderBy: { toPath: 'asc' },
+    });
+
+  // Full row, identity included, for a byte-for-byte "this row was never written"
+  // comparison (B4.4) — outboundRows above selects only toPath/toPageId, since its
+  // callers care about that content rather than row identity.
+  //
+  // The four columns are selected explicitly rather than taking the whole row: the
+  // client-wide `result` extension in ~/utils/prisma attaches lazily-computed `_id`/`__v`
+  // mongoose aliases to every model, and they make two reads of one *unchanged* row fail
+  // toEqual against each other (pagelinks has no `v` column at all, so `__v` computes to
+  // undefined). An explicit select omits the aliases, keeping this assertion about the
+  // row's data instead of the Prisma client's object graph.
+  const outboundRow = (fromPage: Types.ObjectId) =>
+    prisma.pagelinks.findFirst({
+      where: { fromPageId: fromPage.toString() },
+      select: { id: true, fromPageId: true, toPath: true, toPageId: true },
+    });
+
+  // The service handles create/update asynchronously (fire-and-forget from the
+  // emitter's view). Poll the outbound-row count — the observable write-path
+  // result — until it settles to the expected value, then assert precisely.
+  const waitForOutboundCount = (
+    fromPage: Types.ObjectId,
+    count: number,
+  ): Promise<void> =>
+    vi.waitFor(
+      async () => {
+        expect(
+          await prisma.pagelinks.count({
+            where: { fromPageId: fromPage.toString() },
+          }),
+        ).toBe(count);
+      },
+      { timeout: 15000, interval: 100 },
+    );
+
+  // --- lifecycle ---------------------------------------------------------
+
+  beforeAll(async () => {
+    crowi = await getInstance();
+    // The B4.4 specs below drive real crowi.pageService.renamePage() calls and need the
+    // modern (non-V4) rename path — a fresh test crowi defaults this to false, which
+    // would silently exercise the legacy renamePageV4 branch instead.
+    await crowi.configManager.updateConfig('app:isV5Compatible', true);
+    Page = mongoose.model<PageDocument, PageModel>('Page');
+    User = mongoose.model('User');
+
+    const existingRoot = await Page.findOne({ path: '/' });
+    rootPage =
+      existingRoot ??
+      (await Page.create({ path: '/', grant: Page.GRANT_PUBLIC }));
+
+    await User.insertMany([
+      {
+        name: 'b1lc-viewer',
+        username: 'b1lc-viewer',
+        email: 'b1lc-viewer@example.com',
+      },
+      {
+        name: 'b1lc-foreign',
+        username: 'b1lc-foreign',
+        email: 'b1lc-foreign@example.com',
+      },
+    ]);
+    viewer = await User.findOne({ username: 'b1lc-viewer' });
+    foreignUser = await User.findOne({ username: 'b1lc-foreign' });
+  });
+
+  afterEach(async () => {
+    // Also matches /trash… : a soft delete rewrites the path in place, so a page trashed by a
+    // spec below would otherwise survive into the next one.
+    const seededPaths = new RegExp(`^(/trash)?${PREFIX}/`);
+    const pages = await Page.find({ path: seededPaths }).select('_id');
+    const ids = pages.map((p) => p._id);
+    await prisma.pagelinks.deleteMany({
+      where: { fromPageId: { in: ids.map((id) => id.toString()) } },
+    });
+    await prisma.revisions.deleteMany({
+      where: { pageId: { in: ids.map((id) => id.toString()) } },
+    });
+    await Page.deleteMany({ path: seededPaths });
+    await PageRedirect.deleteMany({ fromPath: seededPaths });
+  });
+
+  afterAll(async () => {
+    await User.deleteMany({
+      username: { $in: ['b1lc-viewer', 'b1lc-foreign'] },
+    });
+  });
+
+  // --- specs -------------------------------------------------------------
+
+  it('create adds a backlink, and a later update removes it (3.1, 3.2)', async () => {
+    const target = await createPage('/target');
+    const source = await createPage('/source');
+
+    // Create: the source links to the target.
+    await emitUpsert('create', source, `[to target](${target.path})`);
+    await waitForOutboundCount(source._id, 1);
+
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+
+    // Update: the link is removed from the body.
+    await emitUpsert('update', source, 'no links anymore');
+    await waitForOutboundCount(source._id, 0);
+
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([]);
+  });
+
+  it('excludes a source the viewer cannot read, but the owner sees it (2.1, 2.2, 2.3)', async () => {
+    const target = await createPage('/target');
+    const readable = await createPage('/readable');
+    const restricted = await createPage('/restricted', {
+      grant: Page.GRANT_OWNER,
+      grantedUsers: [new mongoose.Types.ObjectId(foreignUser._id)],
+    });
+
+    await emitUpsert('create', readable, `[t](${target.path})`);
+    await emitUpsert('create', restricted, `[t](${target.path})`);
+    await waitForOutboundCount(readable._id, 1);
+    await waitForOutboundCount(restricted._id, 1);
+
+    // The restricted source must not leak — neither its path nor its existence.
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: readable._id.toString(), path: readable.path }]);
+
+    // Positive control: the owner sees it, so the omission above is the grant
+    // filter's doing, not a missing row.
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, foreignUser),
+    ).toEqual(
+      expect.arrayContaining([
+        { pageId: restricted._id.toString(), path: restricted.path },
+      ]),
+    );
+  });
+
+  it('reflects a grant change on the next read (2.4)', async () => {
+    const target = await createPage('/target');
+    const source = await createPage('/flipping-source');
+
+    await emitUpsert('create', source, `[t](${target.path})`);
+    await waitForOutboundCount(source._id, 1);
+
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toHaveLength(1);
+
+    // Restrict the source to the foreign user; the row is unchanged but the
+    // read must now filter it out.
+    await Page.updateOne(
+      { _id: source._id },
+      {
+        grant: Page.GRANT_OWNER,
+        grantedUsers: [new mongoose.Types.ObjectId(foreignUser._id)],
+      },
+    );
+
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([]);
+
+    // Positive control: the row survived the grant change and is filtered by the
+    // read, not deleted — the new owner still sees the backlink.
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, foreignUser),
+    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+  });
+
+  it('lists a source once even when it links to the target more than once (1.6)', async () => {
+    const target = await createPage('/target');
+    const source = await createPage('/multi-source');
+
+    await emitUpsert(
+      'create',
+      source,
+      `[first](${target.path}) and again [second](${target.path})`,
+    );
+    // The repeated link collapses to a single outbound row.
+    await waitForOutboundCount(source._id, 1);
+    expect(await outboundRows(source._id)).toEqual([
+      { toPath: target.path, toPageId: target._id.toString() },
+    ]);
+
+    // And the read lists the source exactly once.
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+  });
+
+  it('does not index a source trashed before its queued upsert ran (3.5)', async () => {
+    const target = await createPage('/target');
+    const trashed = await createPage('/trashed-while-queued');
+    const control = await createPage('/queued-alongside');
+
+    // Trashed before the event, so the drain's status re-check is what decides and nothing depends
+    // on this write landing inside the drain interval. GROWI's soft delete rewrites path and status
+    // in place, so the id stays resolvable and the drain still finds the page — without the status
+    // check, `upsert: true` would index a source now living under /trash.
+    await Page.updateOne(
+      { _id: trashed._id },
+      { $set: { path: `/trash${trashed.path}`, status: Page.STATUS_DELETED } },
+    );
+
+    // The emitted document is deliberately the stale in-memory one, still reading as published at
+    // its original path: a drain that indexed the event payload instead of re-reading by id would
+    // write rows here.
+    await emitUpsert('create', trashed, `[t](${target.path})`);
+
+    // Enqueued alongside the trashed page, so its row appearing proves the drain ran — a positive
+    // signal, so the absence assertion below cannot pass vacuously.
+    await emitUpsert('create', control, `[t](${target.path})`);
+    await waitForOutboundCount(control._id, 1);
+
+    expect(await outboundRows(trashed._id)).toEqual([]);
+
+    // And the trashed page is not surfaced as a phantom backlink of the target.
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: control._id.toString(), path: control.path }]);
+  });
+
+  it('excludes a page linking to its own permalink from its own backlinks (1.6)', async () => {
+    const other = await createPage('/other');
+    const selfLinker = await createPage('/self-linker');
+
+    // The page links to its own permalink (/{id}) and to another page. The
+    // self-permalink row resolves back to the source and is dropped at sync;
+    // the link to /other survives.
+    await emitUpsert(
+      'create',
+      selfLinker,
+      `[myself](/${selfLinker._id.toString()}) [other](${other.path})`,
+    );
+    await waitForOutboundCount(selfLinker._id, 1);
+
+    // Only the non-self link remains as an outbound row.
+    expect(await outboundRows(selfLinker._id)).toEqual([
+      { toPath: other.path, toPageId: other._id.toString() },
+    ]);
+
+    // The page is not a backlink of itself.
+    expect(
+      await crowi.pageLinkService.findBacklinks(selfLinker._id, viewer),
+    ).toEqual([]);
+
+    // Positive control: the surviving link is recorded — /other lists the page.
+    expect(
+      await crowi.pageLinkService.findBacklinks(other._id, viewer),
+    ).toEqual([{ pageId: selfLinker._id.toString(), path: selfLinker.path }]);
+  });
+
+  it('keeps a backlink alive after the target is renamed and the source is re-saved (5.1)', async () => {
+    const target = await createPage('/rn-target');
+    const source = await createPage('/rn-source');
+    const witness = await createPage('/rn-witness');
+    const oldPath = target.path;
+
+    await emitUpsert('create', source, `[to target](${oldPath})`);
+    await waitForOutboundCount(source._id, 1);
+
+    // Rename the target. This reproduces exactly the state a rename with "create
+    // redirect page" leaves behind (PageService: path update + PageRedirect.create),
+    // which is all that link resolution reads. The source's body is untouched, so
+    // it still names the old path.
+    const newPath = `${PREFIX}/rn-target-moved`;
+    await Page.updateOne({ _id: target._id }, { $set: { path: newPath } });
+    await PageRedirect.create({ fromPath: oldPath, toPath: newPath });
+
+    // Re-save the source for an unrelated reason. The extra link to /rn-witness is
+    // what lets this wait on the *new* sync rather than passing on the pre-rename
+    // rows, which would otherwise be indistinguishable.
+    await emitUpsert(
+      'update',
+      source,
+      `[to target](${oldPath}) typo fixed [w](${witness.path})`,
+    );
+    await waitForOutboundCount(source._id, 2);
+
+    // toPath still mirrors the body; toPage followed the rename.
+    expect(await outboundRows(source._id)).toEqual([
+      { toPath: oldPath, toPageId: target._id.toString() },
+      { toPath: witness.path, toPageId: witness._id.toString() },
+    ]);
+
+    // What the user sees: the renamed target still lists the source.
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+  });
+
+  // B4.4 — none of the three specs below re-save the source, unlike the rename spec
+  // above, and none of them hand-write the target's `path` field: they drive a *real*
+  // crowi.pageService.renamePage() call. A hand-written path update emits no page event
+  // at all, so it could never exercise (or catch a regression in) the actual wiring —
+  // PageLinkService only subscribes to 'create'/'update' (B1.12); the point of these
+  // specs is that 'rename' and descendant-move traffic is invisible to it by construction.
+  const renameActivityParams = {
+    ip: '::ffff:127.0.0.1',
+    endpoint: '/_api/v3/pages/rename',
+  };
+
+  it('keeps a path-based backlink valid across a target rename, with no index write (5.1)', async () => {
+    const target = await createPage('/direct-rename-target');
+    const source = await createPage('/direct-rename-source');
+
+    await emitUpsert('create', source, `[to target](${target.path})`);
+    await waitForOutboundCount(source._id, 1);
+    const before = await outboundRow(source._id);
+
+    const newTargetPath = `${PREFIX}/direct-rename-target-moved`;
+    await crowi.pageService.renamePage(
+      target,
+      newTargetPath,
+      viewer,
+      { createRedirectPage: true },
+      renameActivityParams,
+    );
+
+    // Guard the guard: renamePage awaits its own subject's path update (it only defers
+    // descendants), so no polling is needed here — but without this the two assertions
+    // below would both pass on a rename that silently no-opped. `toEqual(before)` would
+    // be trivially true, and findBacklinks matches on toPage, which is id-based and so
+    // rename-independent. Neither can see a rename that never happened.
+    expect((await Page.findOne({ _id: target._id }).select('path'))?.path).toBe(
+      newTargetPath,
+    );
+
+    // The row was never touched: same id, same cached toPageId.
+    expect(await outboundRow(source._id)).toEqual(before);
+
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+  });
+
+  it('keeps a path-based backlink valid across a descendant move, with no index write (5.1, 5.2)', async () => {
+    const ancestor = await createPage('/desc-move-ancestor');
+    const target = await createPage('/desc-move-ancestor/target', {
+      parent: ancestor._id,
+    });
+    const source = await createPage('/desc-move-source');
+
+    await emitUpsert('create', source, `[to target](${target.path})`);
+    await waitForOutboundCount(source._id, 1);
+    const before = await outboundRow(source._id);
+
+    // Move the ancestor recursively — the target is never the rename's own subject,
+    // only a descendant carried along.
+    const newAncestorPath = `${PREFIX}/desc-move-ancestor-moved`;
+    await crowi.pageService.renamePage(
+      ancestor,
+      newAncestorPath,
+      viewer,
+      { isRecursively: true, createRedirectPage: true },
+      renameActivityParams,
+    );
+
+    // renamePage's descendant step (renameSubOperation) runs fire-and-forget — wait for
+    // the target's path to actually move before asserting anything about it, so the
+    // "unchanged" assertion below cannot pass merely because the move hadn't happened yet.
+    await vi.waitFor(
+      async () => {
+        const moved = await Page.findOne({ _id: target._id }).select('path');
+        expect(moved?.path).toBe(`${newAncestorPath}/target`);
+      },
+      { timeout: 15000, interval: 100 },
+    );
+
+    // The row was never touched: same id, same cached toPageId.
+    expect(await outboundRow(source._id)).toEqual(before);
+
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+  });
+
+  it('keeps a permalink-based backlink valid across a target rename/move, with no index write (5.4)', async () => {
+    const target = await createPage('/permalink-rename-target');
+    const source = await createPage('/permalink-rename-source');
+
+    // Link by permalink (/{id}), not by path — the case 5.4 calls out as immune by
+    // construction, since toPath already encodes the immutable _id.
+    await emitUpsert(
+      'create',
+      source,
+      `[to target](/${target._id.toString()})`,
+    );
+    await waitForOutboundCount(source._id, 1);
+    const before = await outboundRow(source._id);
+    expect(before?.toPath).toBe(`/${target._id.toString()}`);
+
+    const newTargetPath = `${PREFIX}/permalink-rename-target-moved`;
+    await crowi.pageService.renamePage(
+      target,
+      newTargetPath,
+      viewer,
+      { createRedirectPage: true },
+      renameActivityParams,
+    );
+
+    // Guard the guard — see the direct-rename spec above: a no-op rename would satisfy
+    // both assertions below without the target ever having moved.
+    expect((await Page.findOne({ _id: target._id }).select('path'))?.path).toBe(
+      newTargetPath,
+    );
+
+    // The row was never touched: the permalink toPath never named a path to begin
+    // with, so there is nothing for the rename to invalidate.
+    expect(await outboundRow(source._id)).toEqual(before);
+
+    expect(
+      await crowi.pageLinkService.findBacklinks(target._id, viewer),
+    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+  });
+});
