@@ -178,6 +178,10 @@ export class GrowiToSlackCtrl {
     if (relation != null) {
       logger.debug({ relation }, 'relation found');
 
+      if (relation.installation == null) {
+        throw createError(400, 'installation is invalid');
+      }
+
       const token = relation.installation.data.bot?.token;
       if (token == null) {
         throw createError(400, 'installation is invalid');
@@ -229,6 +233,11 @@ export class GrowiToSlackCtrl {
     }
 
     logger.debug({ order }, 'order found');
+
+    // order.installation may be missing if registration failed to link it.
+    if (order.installation == null) {
+      throw createError(400, 'installation is invalid');
+    }
 
     const token = order.installation.data.bot?.token;
     if (token == null) {
