@@ -42,6 +42,7 @@ consumes the output. Rows are added by the task that adds the script.
 | `newest-observation` | `--issue <number>` | — | `newest` (ISO-8601 UTC), `source` (`"body"`, or the id of the comment it came from) | `0` facts produced; `2` no `Date:` line could be read from the body's `### First observation` section or any `### Additional observation` / `### Backfilled observation` comment | `flaky-ci-routine.md` 4-B/4-D/4-E's close-vs-leave-open decision |
 | `awaiting-decision-rows` | `--issue <number>` (repeatable) | — | `rows[]`, one per `--issue`: `issue`, `pausedAt` (ISO-8601 UTC or `null`), `pausedAtStatus` (`"ok"` or `"unavailable"`), `recommendation` (string or `null`), `recommendationSource` (`"in-window"`, `"widened"` or `"none"`), `newObservations` (number or `null`) | `0` facts produced (a per-issue `pausedAtStatus: "unavailable"` never fails the whole call); `2` no `--issue` was given | `flaky-ci-routine.md` Step 5's `## Awaiting human decision` table cells — whether to prefix `(may be stale) ` (only when `recommendationSource` is `"widened"`) and the "never re-pick" stability rule stay in the procedure |
 | `lockfile-overlap` | `--sha <sha> --pr <number> --log-excerpt-file <path>` | — | `overlap[]`, `patchPackages[]`, `logPackages[]` (all sorted arrays) | `0` PR #`<number>` doesn't touch `pnpm-lock.yaml` (empty `overlap`/`patchPackages` — the common case) or touches it with no overlap; `2` PR #`<number>`'s changed files could not be fetched, or `--log-excerpt-file` could not be read | `detect-flaky-ci/SKILL.md`'s ① check — whether a non-empty `overlap` suppresses ① for this failure |
+| `parse-job-log` | none | one job log, whole | `vitest.failBlocks[]` (`project`, `specPath`, `testTitle` — `null` for a file-level FAIL line, `sharedSetupHook`, `excerpt`), `playwright.annotations[]` (`file`, `title`, both raw and either possibly `null`; repeats kept, in the order printed, so the reader can count *distinct* ones), `playwright.summary` (`failed`/`flaky`/`passed`/`skipped`, or `null` when the log carried no count line at all), `denylistHits[]` (`blockIndex`, `specPath`, `testTitle`, `pattern`, `needle`, `scope`) | `0` facts produced (no failure in the log is `ok:true` with empty arrays); `2` stdin was empty or whitespace only | `detect-flaky-ci/SKILL.md` Step 2's noise classification (a `scope: "failure"` hit drops that failure, a `scope: "job"` hit drops the job log) and Step 3's identity tier — plus where collateral and cascaded failures are folded |
 
 ## Shared library
 
@@ -54,7 +55,9 @@ barrel, and scripts import the file they need directly.
 | `gh.ts` | The single GitHub REST read entry point (`gh api -X GET`, paginated in JS) |
 | `constants.ts` | The fixed strings of the procedures, in machine-readable form |
 | `time.ts` | ISO-8601 (UTC) comparison, subtraction and day counts |
-| `ansi.ts` | Job-log normalization (ANSI sequences, end-of-line carriage returns) |
+| `ansi.ts` | Job-log normalization (ANSI sequences written as an ESC byte *or* as literal `^[` caret text, end-of-line carriage returns) |
+| `job-log.ts` | vitest failure blocks, Playwright `::error` annotations, and a shard's count summary (`null` when no count line was captured) |
+| `denylist.ts` | The infrastructure-noise list as data, and the per-failure match that says whether it reaches the failure or the whole job |
 | `repro-result.ts` | Parses one `### Repro result` comment body against a target commit SHA |
 | `lockfile.ts` | Extracts package names from a `pnpm-lock.yaml` diff and from a log excerpt's stack-trace frames, and intersects the two sets |
 

@@ -94,9 +94,31 @@ the same incident, not a different one glued on: its stack trace runs
 through `.pnpm/@codemirror+state@6.7.1/...`, the exact package/version the
 lockfile patch above changes.
 
-**Byte-level finding worth flagging for task 3.1**: this excerpt's "ANSI"
-codes are not real ESC (`0x1b`) bytes — they are the literal two-character
-text `^[`, verified at the byte level (see the fixture's own `.meta.md`).
-Neither of the two ANSI-stripping regexes `research.md` already reconciled
-into `lib/ansi.ts` matches this shape; it is a third, real-world input shape
-that `parse-job-log.ts` (task 3.1) will need to decide how to handle.
+**Byte-level finding, and how it was resolved**: this excerpt's "ANSI" codes
+are not real ESC (`0x1b`) bytes — they are the literal two-character text
+`^[`, verified at the byte level (see the fixture's own `.meta.md`). Neither
+of the two ANSI-stripping regexes `research.md` reconciled into `lib/ansi.ts`
+matches that shape. Task 3.1 handled it by teaching `ansi.strip` the second
+spelling rather than giving `parse-job-log.ts` a stripper of its own: both
+spellings are real production input (the job-log endpoint returns ESC bytes;
+an excerpt pasted into an issue comment by `flaky-repro` arrives as caret
+text), and two strippers would be the same drift `ansi.ts` was created to
+end. The reasoning is in that module's header comment.
+
+## Phase 2 material (`job-logs/`, task 3.1)
+
+`parse-job-log` added seven more log fixtures — four real, three constructed —
+each with its own `.meta.md` saying which it is and why:
+
+| File | Real? | What it pins |
+|---|---|---|
+| `ci-app-test-100952911197-excerpt.txt` | real | ESC bytes and timestamps; three `FAIL `-prefixed lines that are **not** vitest failures; vitest's own totals, which must not be read as a Playwright summary |
+| `11752-setup-hook-timeout-excerpt.txt` | real | file-level FAIL lines (no test title); the `test/setup/` frame printed once, under the last of three |
+| `11903-playwright-flaky-excerpt.txt` | real | one mid-line `::error` annotation; `0 failed / 1 flaky` |
+| `11914-playwright-flaky-excerpt.txt` | real | the shard summary echoed a second time under `##[notice]` — counting it twice would report `2 flaky` |
+| `constructed-97-failures-one-infra-noise-excerpt.txt` | constructed | 97 failures, exactly one infrastructure-noise hit, `scope: "failure"` — the per-failure-not-per-job rule |
+| `constructed-playwright-1-failed-0-flaky-excerpt.txt` | constructed | the mirror of #11903: a captured summary whose absent line reads as `0` |
+| `constructed-setup-hook-infra-noise-excerpt.txt` | constructed | a denylist string inside a `test/setup/` hook → `scope: "job"` |
+
+The searches that established "no real example exists" for the three
+constructed ones are recorded in their `.meta.md` files.

@@ -61,7 +61,7 @@
   - _Requirements: 1.5, 3.4_
 
 - [ ] 3. Phase 2: 残り 9 本の切り出し（同じく 1 本 = 1 コミット。各タスクで素材と旧手順の期待値も 1.3 と同じ要領で追加する）
-- [ ] 3.1 ジョブログの解析スクリプト（FAIL ブロック・Playwright の注釈と集計・denylist 一致）
+- [x] 3.1 ジョブログの解析スクリプト（FAIL ブロック・Playwright の注釈と集計・denylist 一致）
   - stdin のログ（タイムスタンプ前置き・ANSI 混じり）から、vitest の FAIL ブロック（spec パス・テスト題名・抜粋）、Playwright の `::error` 注釈（file / title）、集計行（failed / flaky / passed / skipped、無ければ `null`）、denylist 一致（FAIL ブロック単位、`test/setup/**` 内の一致は `scope: job`）を返す。stdin が空なら終了コード 2。denylist の一覧は純粋関数と同じ層（`lib`）にデータとして置き、スクリプトはそれを受け取って照合する（テストから直接呼べるようにする）
   - 素材: FAIL ブロック・共有 setup フックの timeout・`0 failed / 1 flaky`・`1 failed / 0 flaky`・集計欠落・denylist 語を 1 件だけ含む多数失敗のログ抜粋（実物からタイムスタンプと ANSI を残して切り出す）と、現在の grep 手順の出力
   - 観測可能な完了状態: `--help` が 0、素材 6 種（集計欠落は `summary: null`、「97 件中 1 件の denylist 一致が `scope: failure`」を含む）のテストが期待値と一致して通る。README に行がある。手順書はまだ触らない

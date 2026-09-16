@@ -31,6 +31,30 @@ describe('ansi.strip', () => {
     expect(strip(withCursorMoves)).toBe(strip(colourOnly));
   });
 
+  it('removes a sequence written as literal `^[` caret text, not as an ESC byte', () => {
+    // Real shape: an excerpt the `flaky-repro` workflow pastes into an issue
+    // comment carries no 0x1b byte at all — see
+    // `fixtures/job-logs/11849-repro-result-log-excerpt.txt.meta.md`.
+    expect(strip('^[[41m^[[1m FAIL ^[[22m^[[49m src/a.spec.ts')).toBe(
+      ' FAIL  src/a.spec.ts',
+    );
+  });
+
+  it('normalizes the ESC-byte and caret-text spellings of the same log to the same text', () => {
+    const escBytes = `${ESC}[41m${ESC}[1m FAIL ${ESC}[22m src/a.spec.ts`;
+    const caretText = '^[[41m^[[1m FAIL ^[[22m src/a.spec.ts';
+
+    expect(strip(caretText)).toBe(strip(escBytes));
+  });
+
+  it('leaves an ordinary caret that does not open a CSI sequence alone', () => {
+    // vitest's error pointer line (`   |     ^`) and a regex anchor are both
+    // plain text that must survive.
+    expect(strip('   |      ^\nexpected /^a[bc]/ to match')).toBe(
+      '   |      ^\nexpected /^a[bc]/ to match',
+    );
+  });
+
   it('removes a carriage return at the end of every line', () => {
     expect(strip('a\r\nb\r\nc\r')).toBe('a\nb\nc');
   });
