@@ -2,14 +2,22 @@ import { type FC, useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
+import type { SearchFilterState } from '../../../utils/search-query';
+import { SearchFilterPanel } from '../SearchFilterPanel';
+
 type Props = {
   isOpen: boolean;
   includeUserPages: boolean;
   includeTrashPages: boolean;
   disableUserPages: boolean;
+  // The filter panel is the mobile counterpart of the inline panel `SearchControl`
+  // renders on lg+ screens; on mobile it lives inside this option modal instead.
+  isEnableFilter?: boolean;
+  filters?: SearchFilterState;
   onClose?: () => void;
   onIncludeUserPagesSwitched?: (isChecked: boolean) => void;
   onIncludeTrashPagesSwitched?: (isChecked: boolean) => void;
+  onFiltersChange?: (filters: SearchFilterState) => void;
 };
 
 export const SearchOptionModal: FC<Props> = (props: Props) => {
@@ -20,9 +28,12 @@ export const SearchOptionModal: FC<Props> = (props: Props) => {
     includeUserPages,
     includeTrashPages,
     disableUserPages,
+    isEnableFilter,
+    filters,
     onClose,
     onIncludeUserPagesSwitched,
     onIncludeTrashPagesSwitched,
+    onFiltersChange,
   } = props;
 
   // Memoize event handlers
@@ -53,7 +64,7 @@ export const SearchOptionModal: FC<Props> = (props: Props) => {
   return (
     <Modal size="lg" isOpen={isOpen} toggle={onCloseModal} autoFocus={false}>
       <ModalHeader tag="h4" toggle={onCloseModal}>
-        Search Option
+        {t('search_result.search_option', 'Search Options')}
       </ModalHeader>
       <ModalBody>
         <div className="d-flex p-2">
@@ -85,6 +96,12 @@ export const SearchOptionModal: FC<Props> = (props: Props) => {
             </label>
           </div>
         </div>
+        {isEnableFilter && filters != null && onFiltersChange != null && (
+          <>
+            <hr className="my-1" />
+            <SearchFilterPanel filters={filters} onChange={onFiltersChange} />
+          </>
+        )}
       </ModalBody>
     </Modal>
   );

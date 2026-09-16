@@ -33,20 +33,24 @@ const ErrorFallback: React.FC<FallbackProps> = React.memo(
 );
 ErrorFallback.displayName = 'ErrorFallback';
 
-const RevisionRenderer = React.memo((props: Props): JSX.Element => {
-  const { rendererOptions, markdown, additionalClassName } = props;
+const RevisionRenderer = React.memo(
+  React.forwardRef<HTMLDivElement, Props>((props, ref): JSX.Element => {
+    const { rendererOptions, markdown, additionalClassName } = props;
 
-  return (
-    <ErrorBoundary FallbackComponent={ErrorFallback}>
-      <ReactMarkdown
-        {...rendererOptions}
-        className={`wiki ${additionalClassName ?? ''}`}
-      >
-        {markdown}
-      </ReactMarkdown>
-    </ErrorBoundary>
-  );
-});
+    return (
+      <ErrorBoundary FallbackComponent={ErrorFallback}>
+        <div ref={ref}>
+          <ReactMarkdown
+            {...rendererOptions}
+            className={`wiki ${additionalClassName ?? ''}`}
+          >
+            {markdown}
+          </ReactMarkdown>
+        </div>
+      </ErrorBoundary>
+    );
+  }),
+);
 RevisionRenderer.displayName = 'RevisionRenderer';
 
 export default RevisionRenderer;

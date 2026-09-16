@@ -344,6 +344,9 @@ importers:
       '@opentelemetry/semantic-conventions':
         specifier: ^1.34.0
         version: 1.40.0
+      '@popperjs/core':
+        specifier: ^2.11.8
+        version: 2.11.8
       '@prisma/client':
         specifier: ^6.19.2
         version: 6.19.2(prisma@6.19.2(magicast@0.3.5)(typescript@5.9.3))(typescript@5.9.3)
@@ -419,6 +422,9 @@ importers:
       ai:
         specifier: ^6.0.176
         version: 6.0.197(zod@4.4.3)
+      approx-string-match:
+        specifier: ^2.0.0
+        version: 2.0.0
       archiver:
         specifier: ^5.3.0
         version: 5.3.2
@@ -975,9 +981,6 @@ importers:
       '@growi/ui':
         specifier: workspace:^
         version: link:../../packages/ui
-      '@popperjs/core':
-        specifier: ^2.11.8
-        version: 2.11.8
       '@tailwindcss/postcss':
         specifier: ^4.1.14
         version: 4.3.0
@@ -7403,6 +7406,9 @@ packages:
 
   append-field@1.0.0:
     resolution: {integrity: sha512-klpgFSWLW1ZEs8svjfb7g4qWY0YS5imI82dTg+QahUvJ8YqAY0P10Uk8tTyh9ZGuYEZEMaeJYCF5BFuX552hsw==}
+
+  approx-string-match@2.0.0:
+    resolution: {integrity: sha512-03v8MsWnZYV4Svv82EYWoVw1RIKAJ/zubmhG1FYvhJwOsBnLPxx6CPHF2dXN/yW8uwHK+653j52IwiNluJR97w==}
 
   aproba@2.0.0:
     resolution: {integrity: sha512-lYe4Gx7QT+MKGbDsA+Z+he/Wtef0BiwDOlK/XkBrdfsh9J/jPPXbX0tE9x9cl27Tmu5gg3QUbUrQYa/y+KOHPQ==}
@@ -23340,6 +23346,8 @@ snapshots:
   app-root-path@3.1.0: {}
 
   append-field@1.0.0: {}
+
+  approx-string-match@2.0.0: {}
 
   aproba@2.0.0: {}
 

@@ -44,12 +44,19 @@ const INTERVAL_MS = 300_000;
 // ---------------------------------------------------------------------------
 
 function makePage(
-  overrides: Partial<{ _id: string; path: string; updatedAt: Date }> = {},
+  overrides: Partial<{
+    _id: string;
+    path: string;
+    updatedAt: Date;
+    revision: string | null;
+  }> = {},
 ) {
   return {
     _id: overrides._id ?? 'page-id-1',
     path: overrides.path ?? '/foo',
     updatedAt: overrides.updatedAt ?? new Date('2024-01-01T00:00:00Z'),
+    revision:
+      overrides.revision === undefined ? 'revision-id-1' : overrides.revision,
   };
 }
 
@@ -154,14 +161,45 @@ describe('DriftDetector', () => {
       // page2 → 2 namespaces → 2 instructions
       expect(mockVaultInstructionCreate).toHaveBeenCalledTimes(3);
 
-      // All instructions must use op=bulk-upsert
+      // All instructions must use op=bulk-upsert and carry the page's actual
+      // revisionId — the VaultInstruction schema marks revisionId required,
+      // so an empty sentinel would fail to persist in production.
       for (const [doc] of mockVaultInstructionCreate.mock.calls) {
         expect(doc.op).toBe('bulk-upsert');
+        expect(doc.payload.entries[0].revisionId).toBe('revision-id-1');
       }
 
       // Watermark updated to max(updatedAt) = page2.updatedAt
       const [, update] = mockVaultSyncStateUpdateOne.mock.calls[0];
       expect(update.$set.driftLastWatermark).toEqual(page2.updatedAt);
+      expect(update.$set.driftLastError).toBeNull();
+    });
+
+    it('skips pages without a revision instead of emitting an instruction with an empty revisionId', async () => {
+      const pageWithoutRevision = makePage({
+        _id: 'p-no-rev',
+        path: '/intermediate',
+        updatedAt: new Date('2024-01-02T00:00:00Z'),
+        revision: null,
+      });
+
+      mockVaultSyncStateFindOne.mockReturnValue({
+        lean: () => Promise.resolve(makeSyncState()),
+      });
+      mockPageFind.mockReturnValue(makePageCursor([pageWithoutRevision]));
+      mockComputePageNamespaces.mockReturnValue({ current: ['public'] });
+
+      const detector = createDetector();
+      await detector['_tick']();
+
+      // No instruction is emitted for a page without a revision.
+      expect(mockVaultInstructionCreate).not.toHaveBeenCalled();
+
+      // The watermark still advances past this page so it is not retried forever.
+      const [, update] = mockVaultSyncStateUpdateOne.mock.calls[0];
+      expect(update.$set.driftLastWatermark).toEqual(
+        pageWithoutRevision.updatedAt,
+      );
       expect(update.$set.driftLastError).toBeNull();
     });
 

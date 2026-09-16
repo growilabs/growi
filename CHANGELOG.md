@@ -1,8 +1,30 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v8.0.3...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.4...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v8.0.4](https://github.com/growilabs/compare/v8.0.3...v8.0.4) - 2026-09-14
+
+### 💎 Features
+
+* feat: Add inline comments on page body text selections (#11844) @yuki-takei
+* feat: UI for advanced search filters (#11597) @arvid-e
+
+### 🚀 Improvement
+
+* imprv(lsx): Add tag-based filtering to $lsx (#11883) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(turbo): generate vendor-styles.prebuilt files before component tests (#11882) @yuki-takei
+* fix: Preserve inline style and class on rendered headings (#11894) @yuki-takei
+* fix: Read-only users could publish/unpublish pages (#11895) @yuki-takei
+* fix(vault): Stop sending required revisionId as empty string (#11878) @yuki-takei
+
+### 🧰 Maintenance
+
+* support(i18n): Add community translation pipeline via POEditor (#11874) @yuki-takei
 
 ## [v8.0.3](https://github.com/growilabs/compare/v8.0.2...v8.0.3) - 2026-09-07
 

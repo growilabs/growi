@@ -14,11 +14,23 @@ const commentSchema = new Schema(
     comment: { type: String, required: true },
     commentPosition: { type: Number, default: -1 },
     replyTo: { type: Schema.Types.ObjectId },
+    isInline: { type: Boolean, default: false },
+    quote: { type: String },
+    prefix: { type: String },
+    suffix: { type: String },
+    approxOffset: { type: Number },
+    anchorOriginRevisionId: { type: Schema.Types.ObjectId, ref: 'Revision' },
+    resolvedById: { type: Schema.Types.ObjectId, ref: 'User' },
+    resolvedAt: { type: Date },
   },
   {
     timestamps: true,
   },
 );
+// Equivalent to Prisma's `@@index([pageId, isInline])` (schema.prisma).
+// Mongoose still owns index creation until every model has been migrated
+// to Prisma — see .claude/rules/model.md.
+commentSchema.index({ page: 1, isInline: 1 });
 getOrCreateModel('Comment', commentSchema);
 
 export const extension = Prisma.defineExtension((client) => {
@@ -72,12 +84,17 @@ export const extension = Prisma.defineExtension((client) => {
           const context =
             Prisma.getExtensionContext<typeof prisma.comments>(this);
           return context.findMany({
-            where: { pageId },
+            ...options,
+            // Unconditional: this is the only guard that keeps inline
+            // comments out of the existing comment thread, regardless of
+            // share-link context. Spread last so a caller cannot override it
+            // even if its `options` type (which omits `where`) is not
+            // enforced at the call site (e.g. a plain-JS caller).
+            where: { pageId, isInline: { not: true } },
             orderBy: {
               createdAt: 'desc',
               ...options.orderBy,
             },
-            ...options,
           });
         },
 
@@ -88,12 +105,13 @@ export const extension = Prisma.defineExtension((client) => {
           const context =
             Prisma.getExtensionContext<typeof prisma.comments>(this);
           return context.findMany({
-            where: { revisionId },
+            ...options,
+            // Unconditional — see findCommentsByPageId above.
+            where: { revisionId, isInline: { not: true } },
             orderBy: {
               createdAt: 'desc',
               ...options.orderBy,
             },
-            ...options,
           });
         },
 
@@ -114,7 +132,8 @@ export const extension = Prisma.defineExtension((client) => {
           const context =
             Prisma.getExtensionContext<typeof prisma.comments>(this);
           return context.count({
-            where: { pageId },
+            // Keeps inline comments out of the page-footer comment count badge.
+            where: { pageId, isInline: { not: true } },
           });
         },
 

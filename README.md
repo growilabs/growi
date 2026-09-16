@@ -126,6 +126,11 @@ Repository. If you would like to _implement_ a new feature, firstly please submi
   It also allows us to coordinate better, prevent duplication of work and help you to create the change so it can be successfully accepted into the project.
 - **Small Features** can be created and directly [submitted as a Pull Request][pulls].
 
+## Translations
+
+Want to help translate GROWI into your language? No GitHub account is required.
+See [Contributing to GROWI translations](./docs/i18n-community-translation.md) for how to join and submit translations.
+
 ## Language on GitHub
 
 You can write issues and PRs in English or Japanese.

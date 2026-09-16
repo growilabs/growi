@@ -21,9 +21,12 @@
   }
 }
 
+// `UserPicture`'s own size scale has no 30px step (lg 48 / md 24 / sm 18 / xs 14), so the size is
+// set from here; nested inside this block so it outranks the
+// `%user-picture` extend above on specificity rather than on source order.
 %user-picture {
-  width: 1.2em;
-  height: 1.2em;
+  width: 30px;
+  height: 30px;
 }
 
 $codemirror-default-height: 300px;

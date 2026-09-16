@@ -1,0 +1,90 @@
+// The comment box's own look is owned by `_comment-inheritance.scss`, shared
+// with the normal comment (`Comment.module.scss`) and the comment editor
+// (`CommentEditor.module.scss`). `CommentCard` deliberately carries no CSS
+// module of its own, so this file is the third container that extends those
+// placeholders — that is what keeps an inline comment's box identical to a
+// normal comment's without copying any of its values (design.md 決定2).
+//
+// `next.config.ts` sets `loadPaths: [<app>/src]`, which is what lets this
+// `@use` be written from anywhere under `src`.
+@use 'client/components/PageComment/comment-inheritance';
+
+.inline-comment-item-styles {
+  :global(.page-comment) {
+    :global(.bg-comment) { @extend %bg-comment; }
+    :global(.user-picture) { @extend %user-picture; }
+    :global(.page-comment-main) { @extend %comment-section; }
+  }
+
+  :global(.inline-comment-quote) {
+    border-left: 3px solid var(--grw-inline-comment-marker-bg);
+  }
+
+  // Every avatar inside a list item comes from the shared `%user-picture`
+  // size. The extend above only reaches the ones inside `.page-comment`, so
+  // the reply form's own avatar (which sits outside any comment card) kept
+  // `UserPicture`'s larger default and was the one odd size on screen.
+  :global(.inline-comment-reply-form) :global(.user-picture) {
+    @extend %user-picture;
+  }
+
+  // Edit/delete icon buttons (design.md: 編集・削除アイコン) and the
+  // revision-history link's wrapper are hidden by default and revealed only
+  // while hovering the card, matching CommentControl.tsx's "parent :hover +
+  // child visibility" pattern. `visibility` (not `display`) keeps the
+  // header row's layout stable while they're hidden.
+  //
+  // The hover trigger is `:global(.page-comment-main)` -- each `CommentCard`
+  // instance's own box (extended with `%comment-section` above) -- not `&`
+  // (this file's outer `.inline-comment-item-styles` wrapper, which contains
+  // the origin item AND every one of its replies). Scoping to the outer
+  // wrapper made hovering ANY row reveal EVERY row's buttons at once (the
+  // origin's and every reply's `.icon-button-container` together), unlike a
+  // normal comment/reply -- each is its own independent `Comment` instance
+  // with its own `.page-comment-main`, so hovering one never affects a
+  // sibling. Scoping to `.page-comment-main` here reaches the same
+  // per-instance box for both the origin (`InlineCommentItem.tsx`) and each
+  // reply (`InlineCommentReplies.tsx`'s `InlineCommentReplyItem`, itself a
+  // descendant of this wrapper -- see that file's own comment), matching
+  // normal comments' per-row reveal exactly (user request, 2026-09-11).
+  .icon-button-container {
+    visibility: hidden;
+  }
+
+  :global(.page-comment-main):hover .icon-button-container {
+    visibility: visible;
+  }
+}
+
+// The edit/delete icon buttons' own sizing/opacity (32px square, hover
+// opacity) moved to the shared `CommentEditDeleteButtons.module.scss`
+// (2026-09-11) -- both the origin (`InlineCommentItem.tsx`) and each reply
+// (`InlineCommentReplies.tsx`) render that shared component now, so this
+// file only owns `.icon-button-container` above (the hover-visibility
+// wrapper, which stays here since it is genuinely specific to this list's
+// per-row reveal mechanism).
+
+// Status-dot decoration for the resolved/unresolved badge (design.md: 状態バッジ).
+// Implemented as a ::before pseudo-element rather than an inline style so the
+// dot's color follows the badge's own text color (bg-warning-subtle /
+// bg-success-subtle already set text-warning-emphasis / text-success-emphasis).
+.inline-comment-status-badge {
+  // The mockup draws the status pill and the resolve toggle at nearly the
+  // same height (24.4px vs 26.4px). Bootstrap's default badge padding left
+  // the badge at 20px against the `btn-sm` toggle's 31px — visibly the
+  // shorter of the two. Set through Bootstrap's own `--bs-badge-padding-y`
+  // (rather than a `padding-block` declaration) so it feeds the `.badge`
+  // rule's existing `padding` shorthand and cannot lose a specificity race
+  // against it.
+  --bs-badge-padding-y: 0.5rem;
+
+  &::before {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 0.25rem;
+    content: '';
+    background-color: currentColor;
+    border-radius: 50%;
+  }
+}
