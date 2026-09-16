@@ -3,7 +3,7 @@
 監査の候補 14 件はスクリプト 13 本になる（#9 と #10 は 1 本のログ解析にまとめる）。各スクリプトのタスクは「純粋関数＋スクリプト＋テスト＋手順書の該当節の置き換え」を 1 コミットで行う。同じ手順書ファイルと `bin/flaky-ci/README.md` の契約表を複数タスクが書き換えるため、`(P)` は付けず順に実行する。
 
 - [ ] 1. Foundation: 実行環境の実測と `bin/flaky-ci/` の土台
-- [ ] 1.1 cloud routine の実行環境を実測して記録する
+- [x] 1.1 cloud routine の実行環境を実測して記録する
   - 測定だけを行う 1 回限りの実行を用意する: 既存 routine の実行 API に「`node --version`・`gh --version`・Write ツールの有無・`node` で `import` 付きの `.ts` を直接実行できるかを出力して終わる」プロンプトを 1 回だけ渡す（プロンプトの差し替えが API で通らなければ、同じ環境を指す一時的な予定実行を作って 1 回動かし、その後削除する）。通常の routine 処理は行わせない
   - 手元（devcontainer）の同じ値を並べて記録する
   - 観測可能な完了状態: 両環境の Node 版・`gh` 版・Write の可否・`.ts` 直接実行の可否が tasks.md の Implementation Notes に表として残り、Node 24 未満なら呼び出し行の方針（`--experimental-strip-types` か `.js` 出力か）が同じ表に決まっている。後続タスクはこの表を前提にする
@@ -155,3 +155,26 @@
 - [ ] 5.3 元 spec の spec.json の `updated_at` を更新し、`.kiro/specs/flaky-ci-script-extraction/` を削除する
   - 観測可能な完了状態: ディレクトリが存在せず、リポジトリ全体で `flaky-ci-script-extraction` への参照が 0 件
   - _Requirements: 5.4_
+
+## Implementation Notes
+
+### タスク 1.1: 実行環境の実測記録（2026-09-16）
+
+cloud routine（`/flaky-ci-routine` を無人実行する Anthropic cloud 側のセッション）に対して、このタスク専用の 1 回限りの診断プロンプトを実際に送り込む手段が、このタスクを実行しているセッションからは無かった。`schedule` スキルが案内する `RemoteTrigger` ツール（routine の一覧・`run` now・実行ログ取得）は、`ToolSearch` で明示的に検索しても見つからず、呼び出し可能な形では提供されていない。そのため cloud 側の値は実測できておらず、下表は devcontainer 側だけが実測値、cloud 側は間接証拠（過去に実際の cloud 実行で記録された値、または `package.json` の `engines` や workflow の Node 版指定からの推測）である。
+
+**追加確認: 実際の cloud routine セッションへの生の診断プローブも不可能だったこと**
+
+この実装者とは別に、親のオーケストレーター（インタラクティブなメインループのセッション）が `RemoteTrigger` ツールの `action: "list"` を使って、実際にスケジュール済みの `/flaky-ci-routine` cloud セッションを見つけ、そこに一回限りの診断プロンプトを直接送り込めないか試した。結果は、一覧に 20 件返ってきたがすべて `created_kind: "reminder"` で、タイトルもすべて「PR #11863 hourly check-in」という別件のリマインダーであり、`flaky-ci-routine` に関係するものは 1 件も含まれていなかった。結果に含まれていた `next_cursor` でページを送っても同じ 20 件が返ってきただけだった。つまり、実際の `flaky-ci-routine` の cron は、このアカウント・このセッションからは `RemoteTrigger` で列挙できる形では見えておらず（別の仕組みで登録されているか、別アカウント経由の可能性がある）、この経路からの生プローブは行き止まりであることが確認できた。これ以上、`RemoteTrigger` の別クエリや `CronList` 相当の手段を追加で試すことはしない。
+
+上記 2 つの独立した試み（本タスクの実装者によるツール探索、および親セッションによる実アカウントでの一覧取得）により、「cloud 側を今すぐ直接測る」経路は現時点でこのセッション環境からは塞がっていることを確認した。
+
+| 項目 | devcontainer（手元、今回実測） | cloud routine |
+|---|---|---|
+| Node バージョン | `v24.20.0`（`node --version` 実行結果、実測） | 未実測。間接証拠のみ: ルート `package.json` と `apps/app/package.json` の `engines.node` が `^24`、`.github/workflows/*.yml` の `node-version` 行が軒並み `24.x`（GitHub Actions ランナーの話であり、cloud routine が動く Anthropic cloud の CCR サンドボックスの Node 版そのものではない点に注意） |
+| `gh` バージョン | `gh version 2.100.0`（`gh --version` 実行結果、実測） | 測定済み（過去）: `research.md`（37 行目）に既存の実記録あり `gh 2.45.0`。これは以前の cloud 実行で実際に観測された値であり、今回新たに測ったものではない |
+| Write ツール（またはそれに相当する書き込み手段）の有無 | あり（Write/Edit ツールで本タスクのファイル編集を実行済み、実測） | 未実測。間接証拠のみ: `investigate-flaky-test/SKILL.md` の `allowed-tools` には `Write` が含まれ既に使われている前例があるが、`detect-flaky-ci/SKILL.md` にはまだ `Write` が無く、`research.md` の Risks 節でも「MCP 結果をファイルに落とす手順が cloud で使えない（Write ツールが無い等）」を未解消のリスクとして明記している |
+| `node` で `import` 付き `.ts` を直接実行できるか | できる（実測）。`import { strict as assert } from 'node:assert'` を含む一時ファイルを `node <file>.ts` で実行し、`ts-import-direct-exec: OK` を確認（実行後に一時ファイルは削除済み。リポジトリに残存物なし） | 未実測。間接証拠のみ: Node バージョンが `^24` 想定（上記行と同じ根拠）であれば `node <file>.ts` の素の直接実行に対応しているはずという推測に留まる |
+
+**呼び出し行の方針（タスク 1.1 時点・暫定、確定ではない）**: cloud 側の Node バージョンは実測できていないが、(a) このリポジトリ自身の `engines.node: "^24"` という制約（cloud 環境もこれを前提に用意されていると考えられる）と、(b) 全 CI workflow がすでに Node 24.x に固定されていること、という間接証拠の強さに基づき、**`--experimental-strip-types` のフォールバックを付けず、素の `node bin/flaky-ci/scripts/<name>.ts` 呼び出しを当面の既定とする**。
+
+この判断はあくまで暫定であり、リスクは低いものの実測による裏付けが無い。**確定させる場でなく確認する場はタスク 2.5**（「上位 4 本を入れた手順書で routine を 1 サイクル動かす」、design.md の Testing Strategy が実際の routine 環境で回す "run now" サイクルと位置付けている箇所）である。タスク 2.5 の実装者へ: もしこのサイクルでいずれかのスクリプトが Node バージョンや `.ts` インポート非対応が原因で cloud 環境で失敗した場合、それこそが呼び出し行を `--experimental-strip-types` 付きに切り替える、またはコンパイル済み `.js` へのフォールバックに切り替えるべき、という本物のシグナルである。タスク 2.5 は、本タスクのこの暫定判断が正しかったかどうかを実環境で確認する最初の機会として扱うこと。
