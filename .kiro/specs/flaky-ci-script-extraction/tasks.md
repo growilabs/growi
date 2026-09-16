@@ -74,7 +74,7 @@
   - _Depends: 3.1_
   - _Requirements: 1.1, 1.2, 1.4, 2.3, 2.4, 3.2, 3.4, 5.1, 5.2_
 
-- [ ] 3.3 識別キーの解析
+- [x] 3.3 識別キーの解析
   - issue 題名を受け、種別・ブラウザ・spec パス・テスト題名と、形（精密 / Playwright のジョブ単位 / 不正な vitest キー）を返す
   - 素材: 実在する flaky 追跡 issue の題名一覧（共有 setup フック・`:` を含む Playwright 題名・`.js` を含む題名を含む）と、現在の正規表現の出力
   - investigate Step 1 の解析規則（正規表現と 4 段の手順）を呼び出しに置き換える。3 つの形それぞれの扱いは残す
@@ -704,4 +704,75 @@ Error Handling 節の「ログが大きすぎてコンテキストに収まら�
 14 ファイル 221 件が変わらず通ることを確認した（本タスクは `bin/flaky-ci/`
 のコードを変更していないため、テスト内容自体に変化はない）。手順書の
 Markdown 変更のみのため `biome check` の対象外。
+
+### タスク 3.3: 識別キーの解析（2026-09-16）
+
+`bin/flaky-ci/lib/identity.ts`（`parse(title)`、純粋関数）と
+`bin/flaky-ci/scripts/parse-identity-key.ts`（`--title` を受けて
+`kind`/`browser`/`specPath`/`testTitle`/`shape` を返す CLI）を実装した。
+ロジックはすべて `lib/identity.ts` に置き、スクリプトは引数の受け取りと
+`lib/output.ts` 経由の出力だけを行う（既存スクリプトと同じ薄いラッパー
+構成）。
+
+**素材**: `flaky/*` の 4 ラベル（`confirmed`/`observing`/`suspected`/
+`needs-decision`）を持つ issue の題名を `gh api repos/growilabs/growi/issues
+--paginate -f state=all -f labels=<label>` で全件取得し、重複を除いて
+`bin/flaky-ci/fixtures/identity/flaky-issue-titles.json` に保存した
+（65 件、実データ。取得コマンドと内訳は同ファイルの `.meta.md`）。
+このうち task 3.3 が名指しする 3 件（#11752 の共有 setup フック、
+`:` を含む Playwright 題名、#11818 の `.js` を含む題名）を含む。もう 1 件、
+収集中に見つかった実データ側の癖として、ブラウザ区分を一切持たない
+`playwright:` 題名（`flaky:
+playwright:playwright/20-basic-features/comments.spec.ts:Successfully add
+comments`）があり、これも `shape: "precise"`・`browser: null` として
+正しく解析できることをテストに固定した。65 件全件を「現在の正規表現」
+（`investigate-flaky-test/SKILL.md` の旧 Step 1 が文章で説明していた
+`^([^:]+:)?(.+?\.(tsx?|jsx?)):(.*)$`、および vitest 用の browser 無し版）を
+そのまま素直に書き起こした小さな参照実装に通し、その出力を
+`bin/flaky-ci/fixtures/expected/parse-identity-key-titles.json`（1 題名
+1 行）として保存した——`lockfile-overlap`（task 2.4）と同じ事情で、旧
+Step 1 は実行可能なパイプラインではなく散文なので、「今の手書き実装の
+出力」を「変更前」の基準値として使っている。実測の結果、**65 件は全件
+`shape: "precise"`** で、`playwright-job-level`（ジョブ単位の代替キー）と
+`malformed`（不正な `vitest:` キー）の実例はリポジトリ全体を検索しても
+0 件だった（`gh api search/issues` でタイトル検索、`.meta.md` に検索
+コマンドを記録）。この 2 形は tasks.md の指示どおり構成データとして
+`bin/flaky-ci/fixtures/identity/constructed-titles.json` に追加し、
+「実例が無いため構成」と正直にラベル付けした（`lockfile.spec.ts` の
+leaf-package ケースや `parse-job-log` の 3 件の constructed フィクスチャと
+同じ流儀）。
+
+**手順書に残した判断**: `investigate-flaky-test/SKILL.md` Step 1 の旧・
+正規表現＋4 段の手順を `node bin/flaky-ci/scripts/parse-identity-key.ts
+--title "$TITLE"` の呼び出しに置き換え、3 つの `shape` それぞれの扱い
+——`precise` は Step 2 へ直進、`playwright-job-level` は「スペックを
+推測せず、リンクされた run の Playwright report を先に読む（見られなければ
+Step 4 で LOW と報告）」、`malformed` は「前提条件の失敗として報告し、
+パスを推測しない」——は散文としてそのまま残した（research.md の候補 #8
+注記「解析は機械的、戻り値の3分類後の扱いは判断」のとおり）。旧手順の
+「先頭/末尾の `:` で分割してはいけない（#11903 の題名は `:` を 2 つ持つ）」
+という注意書きは、分割そのものがスクリプト内部に移ったことで不要になった
+ため削除した。
+
+観測可能な完了状態の確認: 該当節に正規表現が無いことを `grep -n` で確認
+済み（旧節の `^([^:]+:)?...` は残っていない）。`--help` が終了コード 0、
+65 件の実題名と 2 件の構成題名が
+`fixtures/expected/parse-identity-key-titles.json` の期待値と一致する
+テストが通る（`bin/flaky-ci/lib/identity.spec.ts` 11 件、
+`bin/flaky-ci/scripts/parse-identity-key.spec.ts` 8 件）。`turbo run test
+--filter=./bin` で 23 ファイル 330 件が通ることを確認した。`biome check
+bin` は自動整形（1 行結合）を適用した上で通過（警告 0、エラー 0）。
+`README.md` の契約表に `parse-identity-key` の行と、`lib/` 表に
+`identity.ts` の行を追加した。
+
+行数・容量（`wc -l -c`、タスク 2.1 時点の値 1609 行 / 85676 バイトと比較。
+タスク 3.1・3.2 は `investigate-flaky-test/SKILL.md` を変更していないため、
+このタスクの直前値もタスク 2.1 の値のまま）:
+
+| ファイル | 変更前（タスク 2.1 時点、行/バイト） | 変更後（行/バイト） |
+|---|---:|---:|
+| `.claude/skills/investigate-flaky-test/SKILL.md` | 1609 / 85676 | 1591 / 84522 |
+
+`investigate-flaky-test/SKILL.md` は「毎回読まれる 2 本」（routine +
+detect）には含まれないため、5.3 の合計値には影響しない。
 

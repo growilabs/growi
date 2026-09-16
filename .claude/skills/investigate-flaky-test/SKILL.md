@@ -288,54 +288,36 @@ The first call gives `title`, `body`, `labels[].name`, `html_url`, `state`;
 the second gives every comment (each observation `detect-flaky-ci` appended
 after the first).
 
-The title is `flaky: {IDENTITY_KEY}` (set by `detect-flaky-ci`), where
-`IDENTITY_KEY` is one of:
-- `vitest:{SPEC_PATH}:{TEST_TITLE}` — reproduce with vitest, precise identity.
-- `playwright:{BROWSER}:{SPEC_PATH}:{TEST_TITLE}` — reproduce with Playwright,
-  precise identity. `{BROWSER}` is `chromium` / `firefox` / `webkit`, and it
-  is always present: the same spec can be flaky in one engine and not
-  another, so `detect-flaky-ci` Step 3 makes it part of the key.
-- `playwright:{BROWSER}` — a **job-level fallback identity**: `detect-flaky-ci`
-  could not isolate which spec was flaky from the CI log alone. The issue
-  body's evidence section will say so explicitly. In this case, do not guess
-  a spec — read the linked run's full Playwright report first (the run URL
-  in the "First observation" section) to find the actual flaky spec before
-  attempting Step 2 reproduction. If the report is no longer available
-  (artifact retention expired), report LOW confidence at Step 4 rather than
-  guessing.
+The title is `flaky: {IDENTITY_KEY}` (set by `detect-flaky-ci`). Parse it with:
 
-Parse the identity key from the title in this order — **do not** split on
-the first and last `:`, which gets both the browser segment and a title
-containing `:` wrong (#11903's title contains two of them):
+```bash
+node bin/flaky-ci/scripts/parse-identity-key.ts --title "$TITLE"
+```
 
-1. **Kind** — everything up to the first `:` (`vitest` or `playwright`).
-2. **Browser**, for `playwright` only — everything up to the next `:`.
-3. **Spec path** — the *shortest* following segment that ends in a
-   source-file extension (`.ts`, `.tsx`, `.js`, `.jsx`) **immediately followed
-   by `:`**. The extension-plus-colon is what anchors the split; nothing else
-   in the key is a reliable boundary. Run this on everything after the kind:
+This replaces the regex and 4-step split this section used to spell out —
+see `bin/flaky-ci/README.md`'s contract table for the exact fields
+(`kind`, `browser`, `specPath`, `testTitle`, `shape`). The script never
+fails (exit 2 is only a missing `--title`): a job-level fallback or a
+malformed key is itself the fact being reported, not an error. What to do
+with each of the three `shape` values is the judgment that stays here:
 
-   ```
-   ^([^:]+:)?(.+?\.(tsx?|jsx?)):(.*)$
-   ```
-
-   Group 1 (optional) absorbs the browser segment when there is one, group 2
-   is `{SPEC_PATH}`, and group 4 is `{TEST_TITLE}`. The extension list is
-   deliberately wider than `spec`/`integ` because one documented identity
-   class has a plain `.ts` path: the shared setup-hook key
-   `vitest:test/setup/migrate-mongo.ts:beforeAll … setup hook timeout (20000ms) during ci-app-test-integration`
-   (#11752) — its `{SPEC_PATH}` is the setup file, and the whole remainder is
-   the title. A title that itself mentions a file (`… Cannot find module
-   dev/bunyan-format.js (thread-stream worker)`, #11818) is safe because the
-   shortest match wins and that mention is not followed by `:`.
-4. **Test title** — everything after that path's `:`, **verbatim**,
-   including any further `:` it contains. Never trim or re-split it.
-
-If the regex does not match a `playwright:` key, the title is the job-level
-fallback key `playwright:{BROWSER}` described just above. Treat it as that,
-do not try to recover a spec path from it. A `vitest:` key that does not
-match is malformed (no `detect-flaky-ci` path produces one) — stop and report
-it as a precondition failure rather than guessing a path.
+- **`shape: "precise"`** — a `vitest:{SPEC_PATH}:{TEST_TITLE}` or
+  `playwright:{BROWSER}:{SPEC_PATH}:{TEST_TITLE}` key. `{BROWSER}` is
+  `chromium` / `firefox` / `webkit` and, for Playwright, is normally always
+  present: the same spec can be flaky in one engine and not another, so
+  `detect-flaky-ci` Step 3 makes it part of the key. Proceed straight to
+  Step 2 reproduction using `specPath` / `testTitle`.
+- **`shape: "playwright-job-level"`** (`kind` is always `"playwright"`,
+  `browser` holds the fallback's `{BROWSER}`, `specPath`/`testTitle` are
+  `null`) — `detect-flaky-ci` could not isolate which spec was flaky from the
+  CI log alone. The issue body's evidence section will say so explicitly. Do
+  not guess a spec — read the linked run's full Playwright report first (the
+  run URL in the "First observation" section) to find the actual flaky spec
+  before attempting Step 2 reproduction. If the report is no longer
+  available (artifact retention expired), report LOW confidence at Step 4
+  rather than guessing.
+- **`shape: "malformed"`** — no `detect-flaky-ci` path produces one. Stop and
+  report it as a precondition failure rather than guessing a path.
 
 Collect every observation block from the body and comments (run URLs,
 commits, log excerpts) — later

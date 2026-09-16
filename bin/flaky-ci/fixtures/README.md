@@ -122,3 +122,16 @@ each with its own `.meta.md` saying which it is and why:
 
 The searches that established "no real example exists" for the three
 constructed ones are recorded in their `.meta.md` files.
+
+## Phase 2 material (`identity/`, task 3.3)
+
+`parse-identity-key` added `identity/flaky-issue-titles.json` — all 65 issue
+titles currently carrying a `flaky/*` tracking label, real — and
+`identity/constructed-titles.json` — 2 constructed titles, one per shape
+that has no real example anywhere in `growilabs/growi`'s issue history
+(`playwright:{BROWSER}` job-level fallback, and a malformed `vitest:` key
+with no source-file extension). Both files' `.meta.md` record the exact
+searches. `expected/parse-identity-key-titles.json` and
+`expected/parse-identity-key.md` hold the per-title expectation (what the
+current regex-and-4-step procedure gives for each) that
+`lib/identity.spec.ts` checks against.
