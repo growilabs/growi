@@ -575,56 +575,39 @@ the request was rejected or the setup broke and nothing was measured.
 #### 2-D: read the tally from the `### Repro result` comment
 
 ```bash
-REPRO_RESULT_FILE="${TMPDIR:-/tmp}/flaky-repro-${ISSUE_NUMBER}.md"
+REPRO_RESULT_JSON="${TMPDIR:-/tmp}/flaky-repro-${ISSUE_NUMBER}.json"
 
-gh api "repos/growilabs/growi/issues/${ISSUE_NUMBER}/comments?per_page=100" --paginate --slurp \
-  | jq -r --arg sha "$REPRO_SHA" '
-      [ flatten[]
-        | select(.body | startswith("### Repro result"))
-        | select(.body | split("\n") | any(. == "- Commit: " + $sha)) ]
-      | last // empty | .body' > "$REPRO_RESULT_FILE"
-
-grep -m1 -E '^- Runs:' "$REPRO_RESULT_FILE"
-grep -m1 -E '^- Failed:' "$REPRO_RESULT_FILE"
+node bin/flaky-ci/scripts/read-repro-result.ts \
+  --issue "$ISSUE_NUMBER" --sha "$REPRO_SHA" > "$REPRO_RESULT_JSON"
+REPRO_RESULT_STATUS=$?
 ```
+
+- **Exit `0`**: `$REPRO_RESULT_JSON` holds one line of JSON with `runs`,
+  `failed`, `perRun`, `workflowRunUrl` and `commentUrl` (see
+  `bin/flaky-ci/README.md`'s contract table). Read the two values 2-E needs:
+  `runs=$(jq -r '.runs' "$REPRO_RESULT_JSON")` and
+  `failed=$(jq -r '.failed' "$REPRO_RESULT_JSON")`.
+- **Exit `2`**: no `### Repro result` comment on the issue carries
+  `- Commit: ${REPRO_SHA}` — treat as "confirmation not measured" (2-E's
+  third outcome).
 
 **The comment must be the one this push produced.** A tracking issue
 accumulates `### Repro result` comments — the confirmation measurement, a
 later rate measurement (second tier), the fix verification in Step 6 — so
-"the newest one" is not the same thing as "mine". Match on the
-`- Commit: ${REPRO_SHA}` line, the first of the result's fixed lines, and let
-an empty file mean "no result for this commit" rather than silently reading
-somebody else's tally. Among comments for the same commit take the **newest**
-(`last`), because a manually re-run job leaves a second one.
-
-Three details of that pipeline are load-bearing, each measured against this
-repo's real data:
-
-- `--slurp` and `-q` cannot be combined (gh 2.100.0 rejects it), hence the
-  pipe into `jq` rather than gh's own `-q`;
-- `--paginate -q` would apply the filter to **each page separately**, so no
-  aggregation (`last`, `[...]`) may live inside `-q` — `--slurp` plus
-  `flatten[]` is what makes the selection see every page at once;
-- `test("^- Commit: …"; "m")` does **not** anchor per line in jq 1.8.1, so
-  the `split("\n") | any(...)` form stays.
-
-`grep -m1` matters for the same reason: the comment ends with an excerpt of
-the failing run's output, and a vitest excerpt can itself contain a line
-beginning with `- Failed:`. The seven fixed `- Key: value` lines
-(`- Commit:`, `- Branch:`, `- Mode:`, `- Runs:`, `- Failed:`, `- Per-run:`,
-`- Workflow run:`) always come first, in that order, before any note or
-fenced excerpt.
+"the newest one" is not the same thing as "mine". The script matches on the
+`- Commit: ${REPRO_SHA}` line, not recency, and only when two comments name
+the *same* commit (a manually re-run job) does it fall back to picking the
+newer of the two.
 
 **A `success` conclusion on its own is not evidence that anything was
 measured.** The workflow posts the comment in a separate step that
 deliberately does not fail the job, so a comment that never arrived (a locked
 issue, a momentary GitHub outage) leaves the check-run green with only a
 warning annotation behind it. Require **both**: the check-run completed
-`success`, **and** a `### Repro result` comment carrying
-`- Commit: ${REPRO_SHA}` exists with a `- Runs:` value of at least 1 and a
-`- Failed:` line. If either is missing, the outcome is "confirmation not
-measured" — the job summary is for human readers, and the issue's existing
-static evidence is not a substitute.
+`success`, **and** `read-repro-result` (2-D) exits `0` for `${REPRO_SHA}` with
+a `runs` value of at least 1. If either is missing, the outcome is
+"confirmation not measured" — the job summary is for human readers, and the
+issue's existing static evidence is not a substitute.
 
 #### 2-E: decide, from the tally alone
 
@@ -632,7 +615,7 @@ static evidence is not a substitute.
 |---|---|
 | `Failed` < `Runs` — at least one run passed | **confirmed** |
 | `Failed` == `Runs` — every run failed | **possible genuine regression** |
-| check-run `failure`; or no `flaky-repro` check-run within ~5 min; or still unfinished after 30 min; or no `### Repro result` comment for this commit, no `- Runs:` line, or `- Runs: 0` | **confirmation not measured** |
+| check-run `failure`; or no `flaky-repro` check-run within ~5 min; or still unfinished after 30 min; or `read-repro-result` exits `2` for this commit, or returns `runs: 0` | **confirmation not measured** |
 
 **confirmed** — a spec that passes at least once on unchanged code, with a
 recorded CI failure behind it, is non-deterministic. Escalate the label
@@ -697,7 +680,7 @@ did not happen is not evidence of anything.
 git push origin --delete "$BRANCH"
 git switch -          # leave the throwaway ref before anything branches again
 git branch -D "$BRANCH"
-rm -f "$REPRO_RESULT_FILE"
+rm -f "$REPRO_RESULT_JSON"
 ```
 
 Do this on **every** exit path — including the ones where no result was ever
@@ -1236,7 +1219,7 @@ measurements on the fix commit, 6-B decides from them whether a PR is opened
 at all, and 6-C opens it — ready for review from the moment it is created.
 
 Step 5 and 6-A through 6-C share shell variables (`$ISSUE_NUMBER`,
-`$FIX_BRANCH`, `$FIX_SHA`, `$CHECKS_FILE`, `$REPRO_RESULT_FILE`, `$runs`,
+`$FIX_BRANCH`, `$FIX_SHA`, `$CHECKS_FILE`, `$REPRO_RESULT_JSON`, `$runs`,
 `$failed`). Run them as one script; in a fresh shell, re-establish
 `ISSUE_NUMBER` and `FIX_BRANCH` from the values 5-A used and `FIX_SHA` with
 `git rev-parse`, rather than inventing new ones. The one pair that must never
@@ -1324,33 +1307,24 @@ the loop leaves after `$STARTUP_GRACE` instead of burning the full 45:
   `paths` filter, so a fix touching nothing under `apps/app/**`, `packages/**`
   or the listed root files starts no run at all.
 
-Then read the tally **for this commit** — 2-D's pipeline with `$FIX_SHA`:
+Then read the tally **for this commit** — the same script as 2-D, with
+`$FIX_SHA`:
 
 ```bash
-REPRO_RESULT_FILE="${TMPDIR:-/tmp}/flaky-fix-repro-${ISSUE_NUMBER}.md"
+REPRO_RESULT_JSON="${TMPDIR:-/tmp}/flaky-fix-repro-${ISSUE_NUMBER}.json"
 
-gh api "repos/growilabs/growi/issues/${ISSUE_NUMBER}/comments?per_page=100" --paginate --slurp \
-  | jq -r --arg sha "$FIX_SHA" '
-      [ flatten[]
-        | select(.body | startswith("### Repro result"))
-        | select(.body | split("\n") | any(. == "- Commit: " + $sha)) ]
-      | last // empty | .body' > "$REPRO_RESULT_FILE"
-
-grep -m1 -E '^- Runs:' "$REPRO_RESULT_FILE"
-grep -m1 -E '^- Failed:' "$REPRO_RESULT_FILE"
+node bin/flaky-ci/scripts/read-repro-result.ts \
+  --issue "$ISSUE_NUMBER" --sha "$FIX_SHA" > "$REPRO_RESULT_JSON"
+REPRO_RESULT_STATUS=$?
 ```
 
+Same output fields and exit codes as 2-D (see `bin/flaky-ci/README.md`).
 Pinning on `- Commit: ${FIX_SHA}` matters more here than at 2-D. The issue
 already holds the confirmation measurement's result — a different commit,
-usually with a non-zero `- Failed:` — and reading "the newest comment" would
-report whichever of the two happened to land last. An **empty**
-`$REPRO_RESULT_FILE` is not an error: it is the "not measured" reading, and
-`grep` printing nothing is exactly how that shows up. The three `gh`/`jq`
-details behind this pipeline (`--slurp` cannot be combined with `-q`,
-`--paginate -q` filters each page separately, jq's `"m"` flag does not anchor
-per line) are documented at 2-D, and `grep -m1` is there for the same reason:
-the comment ends with an excerpt of the run's output, which can itself contain
-a line starting with `- Failed:`.
+usually with a non-zero `failed` — and reading "the newest comment" would
+report whichever of the two happened to land last. Exit `2` is not an error:
+it is the "not measured" reading, and 6-B's condition 1 (below) treats it as
+failing.
 
 ### 6-B: The PR gate — decided here, and only here
 
@@ -1371,8 +1345,13 @@ Anything else means **no PR**. There is no partial credit and no second place
 where this call is made: 6-C assumes the gate has already been passed.
 
 ```bash
-runs=$(grep -m1 -E '^- Runs:' "$REPRO_RESULT_FILE" | sed 's/^- Runs: *//')
-failed=$(grep -m1 -E '^- Failed:' "$REPRO_RESULT_FILE" | sed 's/^- Failed: *//')
+if [ "$REPRO_RESULT_STATUS" -eq 0 ]; then
+  runs=$(jq -r '.runs' "$REPRO_RESULT_JSON")
+  failed=$(jq -r '.failed' "$REPRO_RESULT_JSON")
+else
+  runs=""
+  failed=""
+fi
 ci_not_success=$(jq -r '[ .[] | select(.name | startswith("ci-app-"))
                           | select(.conclusion != "success")
                           | "\(.name)=\(.conclusion)" ] | join(", ")' "$CHECKS_FILE")
@@ -1450,7 +1429,7 @@ tool call starts a fresh one with no memory of it:
 
 ```bash
 PR_BODY_FILE="${TMPDIR:-/tmp}/flaky-fix-pr-body-${ISSUE_NUMBER}.md"
-REPRO_RUN_URL=$(grep -m1 -E '^- Workflow run:' "$REPRO_RESULT_FILE" | sed 's/^- Workflow run: *//')
+REPRO_RUN_URL=$(jq -r '.workflowRunUrl' "$REPRO_RESULT_JSON")
 CI_RUN_URL=$(gh api "repos/growilabs/growi/actions/workflows/ci-app.yml/runs?head_sha=${FIX_SHA}&per_page=1" \
   -q '.workflow_runs[0].html_url')
 

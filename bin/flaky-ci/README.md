@@ -38,7 +38,7 @@ consumes the output. Rows are added by the task that adds the script.
 
 | Script | Arguments | stdin | Output fields | Exit codes | Judgment that reads it |
 |---|---|---|---|---|---|
-| _(none yet)_ | | | | | |
+| `read-repro-result` | `--issue <number> --sha <sha>` | — | `runs`, `failed`, `perRun[]`, `workflowRunUrl`, `commentUrl` | `0` facts produced; `2` no `### Repro result` comment on the issue carries that commit | `investigate-flaky-test/SKILL.md` 2-E's tally table, and 6-B condition 1 |
 
 ## Shared library
 
@@ -52,6 +52,7 @@ barrel, and scripts import the file they need directly.
 | `constants.ts` | The fixed strings of the procedures, in machine-readable form |
 | `time.ts` | ISO-8601 (UTC) comparison, subtraction and day counts |
 | `ansi.ts` | Job-log normalization (ANSI sequences, end-of-line carriage returns) |
+| `repro-result.ts` | Parses one `### Repro result` comment body against a target commit SHA |
 
 Tests sit next to each module (`*.spec.ts`) and run with
 `turbo run test --filter=./bin`. `constants.spec.ts` checks every constant

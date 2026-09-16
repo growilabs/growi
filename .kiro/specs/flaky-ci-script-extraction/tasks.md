@@ -28,7 +28,7 @@
   - _Requirements: 1.3, 4.1, 4.3_
 
 - [ ] 2. Phase 1: 上位 4 本の切り出し（1 本 = 1 コミット、手順書の該当節も同時に置き換える）
-- [ ] 2.1 再現結果コメントの読み取り（`### Repro result` を commit で選ぶ）
+- [x] 2.1 再現結果コメントの読み取り（`### Repro result` を commit で選ぶ）
   - issue 番号と commit を受け、その commit の `- Commit:` 行を持つ結果コメントの `Runs / Failed / Per-run / Workflow run` とコメント URL を返す。同一 commit に複数あれば作成時刻→ID の順で最新を選ぶ。該当が無ければ終了コード 2
   - investigate の確認測定側（2-D）と修正検証側（6-A）にある二重の読み取り手順を、この 1 本の呼び出しに置き換え、`jq` の手順とそれに付随する注意書きを消す。判定表（2-E）と「check-run が success でも測ったことにならない」は残す
   - 観測可能な完了状態: 置き換えた 2 節に `gh api` / `jq` が無い。`--help` が終了コード 0、フィクスチャ（同一 commit 2 件）で 1.3 の期待値と一致、該当なしで終了コード 2 のテストが通る。README の契約表に自分の行がある。手順書の行数・容量の前後が Implementation Notes に記録されている
@@ -196,3 +196,32 @@ cloud routine（`/flaky-ci-routine` を無人実行する Anthropic cloud 側の
 **タスク 5.1（元 spec への移し戻し）への申し送り**: 現在の design.md には、上の実測と食い違う記述が 2 か所ある。(a) Components の `constants.ts` の説明と、(b) Testing Strategy の該当行で、どちらも「`constants.spec.ts` が `## Shared constants` 節だけを読んで全定数を突き合わせる」と読める書き方になっている。実際には tier ラベル・コメント見出し・`**Fix PR**: ` は `flaky-ci-routine.md` の同節ではない場所にあり、`### Repro result` の 7 行は手順書ではなく `.github/workflows/flaky-repro.yml` が定義元である。移し戻しの際は design.md の文言をそのまま写さず、この 2 か所を実際の定義元に合わせて書き直すこと。あわせて、`ci-bin.yml` の `paths` には `flaky-repro.yml` も入っている（これが無いと同ファイルだけを変える PR でドリフト検知のテストが走らない）ことを Revalidation Triggers に含める。
 
 なお `ci-bin.yml` の `paths` に足した 2 ファイル（`flaky-ci-routine.md` と `flaky-repro.yml`）は、`turbo.json` の `globalDependencies` にも `bin` パッケージの入力にも入っていない。つまり turbo から見ると、これらを変えても `test` タスクのハッシュは変わらない。現状は CI に remote cache の設定（`TURBO_TOKEN` 等）も `.turbo` の復元ステップも無く、毎回キャッシュが空の状態から走るので実害は無く、ジョブが起動すればテストは必ず実行される。ただし将来 remote cache を有効にするなら、この 2 ファイルを `globalDependencies` に宣言しないと、ジョブは起動するがキャッシュヒットでテストが走らない、という同じ見落としが一段下で再発する。
+
+### タスク 2.1: `read-repro-result` の切り出しと手順書の行数・容量（2026-09-16）
+
+`bin/flaky-ci/lib/repro-result.ts`（`parse(body, sha)`、1 コメント単体の判定のみ）と
+`bin/flaky-ci/scripts/read-repro-result.ts`（issue の全コメントを取得し、`parse` で
+絞り込んだ後に `created_at`→`id` の同着解決を行う）に分けた。設計の component
+境界どおり、複数コメントにまたがる同着解決はスクリプト側の責務とし、`parse` は
+1 コメントの判定だけに閉じた。
+
+`investigate-flaky-test/SKILL.md` の 2-D と 6-A の二重の読み取り手順（`gh api
+... --slurp | jq ...` と `grep -m1`）をこの 1 本の呼び出しに置き換えた。あわせて、
+同じ読み取り結果に依存していた 3 箇所（6-B の `runs`/`failed` 抽出、6-C の
+`REPRO_RUN_URL` 抽出、2-F の一時ファイル削除、Step 6 冒頭の共有変数一覧）を
+`$REPRO_RESULT_FILE`（Markdown ファイル）から `$REPRO_RESULT_JSON`（スクリプトの
+JSON 出力）に揃えて更新した。6-B の条件 1・2 の判定基準そのもの（`- Failed: 0`
+かつ `- Runs:` が既定回数以上、`ci-app-*` 全件 success）と 6-B の HIGH/MEDIUM/LOW
+の表は変更していない（タスク 3.9 の範囲）。2-E の判定表と「check-run が success
+でも測ったことにならない」の注記は文言のみ `runs`/`failed`/終了コードに合わせて
+更新し、判定基準自体は変えていない。
+
+行数・容量（`wc -l -c`、タスク 1.2 の基準値と比較）:
+
+| ファイル | 変更前（行/バイト） | 変更後（行/バイト） |
+|---|---:|---:|
+| `.claude/skills/investigate-flaky-test/SKILL.md` | 1630 / 87197 | 1609 / 85676 |
+
+`investigate-flaky-test/SKILL.md` は「毎回読まれる 2 本」（routine + detect）には
+含まれないため、5.3 の合計値には影響しない。
+

@@ -1,0 +1,82 @@
+/**
+ * Parsing of a single `### Repro result` comment (the comment
+ * `.github/workflows/flaky-repro.yml` posts) against one target commit SHA.
+ *
+ * A tracking issue accumulates one of these comments per repro run — the
+ * confirmation measurement, a later rate measurement, a fix verification — so
+ * "the newest one" is not the same thing as "the one for this commit". This
+ * module answers only "does this one comment, taken on its own, carry a
+ * `- Commit:` line naming this SHA, and what does it say" — deciding which of
+ * several same-commit comments wins (`created_at` then `id`, newest last) is
+ * the caller's job, because that requires comparing across comments, which a
+ * function scoped to one comment body cannot do.
+ */
+import { COMMENT_HEADINGS, REPRO_RESULT_LINE_PREFIXES } from './constants.ts';
+
+export type ReproResult = {
+  readonly runs: number;
+  readonly failed: number;
+  readonly perRun: readonly string[];
+  readonly workflowRunUrl: string;
+};
+
+const [
+  COMMIT_PREFIX,
+  ,
+  ,
+  RUNS_PREFIX,
+  FAILED_PREFIX,
+  PER_RUN_PREFIX,
+  WORKFLOW_RUN_PREFIX,
+] = REPRO_RESULT_LINE_PREFIXES;
+
+/**
+ * First matching line's value, mirroring `grep -m1`: the procedure's own
+ * comment ends with a failing-run excerpt that can itself contain a line
+ * starting with one of these prefixes, so only the first match counts.
+ */
+const firstLineValue = (
+  lines: readonly string[],
+  prefix: string,
+): string | undefined =>
+  lines.find((line) => line.startsWith(prefix))?.slice(prefix.length);
+
+const toInteger = (text: string | undefined): number | null => {
+  if (text == null) {
+    return null;
+  }
+  const value = Number.parseInt(text, 10);
+  return Number.isInteger(value) ? value : null;
+};
+
+/**
+ * `null` when the comment is not a `### Repro result` comment, or does not
+ * carry a `- Commit: <sha>` line, or is missing one of the fields this
+ * function reports.
+ */
+export const parse = (body: string, sha: string): ReproResult | null => {
+  if (!body.startsWith(COMMENT_HEADINGS.reproResult)) {
+    return null;
+  }
+  const lines = body.split('\n');
+  // Scanning every line (not just the first block) matches the procedure's
+  // former `split("\n") | any(. == "- Commit: " + $sha)` check.
+  if (!lines.includes(`${COMMIT_PREFIX}${sha}`)) {
+    return null;
+  }
+
+  const runs = toInteger(firstLineValue(lines, RUNS_PREFIX));
+  const failed = toInteger(firstLineValue(lines, FAILED_PREFIX));
+  const workflowRunUrl = firstLineValue(lines, WORKFLOW_RUN_PREFIX);
+  if (runs == null || failed == null || workflowRunUrl == null) {
+    return null;
+  }
+
+  const perRunText = firstLineValue(lines, PER_RUN_PREFIX);
+  const perRun =
+    perRunText == null || perRunText === ''
+      ? []
+      : perRunText.split(',').map((entry) => entry.trim());
+
+  return { runs, failed, perRun, workflowRunUrl };
+};
