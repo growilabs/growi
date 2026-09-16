@@ -152,6 +152,7 @@ describe('decideEsSyncForEvent', () => {
       windowStart,
       decision: 'pending',
       claimedAt: new Date(Date.now() - 10_000),
+      claimToken: 'stale-claimant-token',
     });
 
     const decision = await decideEsSyncForEvent(
@@ -182,6 +183,7 @@ describe('decideEsSyncForEvent', () => {
       windowStart,
       decision: 'pending',
       claimedAt: new Date(),
+      claimToken: 'fresh-claimant-token',
     });
 
     const decision = await decideEsSyncForEvent(
@@ -193,4 +195,70 @@ describe('decideEsSyncForEvent', () => {
 
     expect(decision).toBe('dropped');
   }, 10_000);
+
+  it('does not double-increment the counter when the claim is stolen while this call is about to finalize', async () => {
+    const activityId = newActivityId();
+    const threshold = 3;
+
+    // Simulate a call that successfully claimed the event but then stalled for long
+    // enough (e.g. a GC pause) that another process treated the claim as abandoned,
+    // stole it, and already decided + incremented the counter on its own — all
+    // between this call's claim and its own reconfirm-before-increment step.
+    type FindOneAndUpdateFn = typeof EsSyncDecision.findOneAndUpdate;
+    type LooseFindOneAndUpdate = (
+      filter: Record<string, unknown>,
+      update: Record<string, unknown>,
+      options?: Record<string, unknown>,
+    ) => Promise<unknown>;
+    const originalFindOneAndUpdate = EsSyncDecision.findOneAndUpdate.bind(
+      EsSyncDecision,
+    ) as LooseFindOneAndUpdate;
+    const spy = vi
+      .spyOn(EsSyncDecision, 'findOneAndUpdate')
+      .mockImplementation((async (
+        filter: Record<string, unknown>,
+        update: Record<string, unknown>,
+        options?: Record<string, unknown>,
+      ) => {
+        const isReconfirmCall = filter != null && 'claimToken' in filter;
+        if (isReconfirmCall) {
+          // A thief process stole the claim (fresh token, already decided) right
+          // before this call's own reconfirm executes.
+          await EsSyncDecision.updateOne(
+            { _id: activityId },
+            {
+              $set: {
+                claimToken: 'thief-token',
+                decision: 'admitted',
+              },
+            },
+          );
+          await AnonymousSyncCounter.findOneAndUpdate(
+            { endpoint, windowStart },
+            { $inc: { count: 1 } },
+            { upsert: true },
+          );
+        }
+        return originalFindOneAndUpdate(filter, update, options);
+      }) as FindOneAndUpdateFn);
+
+    try {
+      const decision = await decideEsSyncForEvent(
+        activityId,
+        endpoint,
+        windowStart,
+        threshold,
+      );
+
+      // Defers to the thief's own decision instead of forcing its own.
+      expect(decision).toBe('admitted');
+      // The counter was incremented once by the thief, and NOT a second time by this
+      // call after it lost the claim.
+      expect(
+        (await AnonymousSyncCounter.findOne({ endpoint, windowStart }))?.count,
+      ).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });

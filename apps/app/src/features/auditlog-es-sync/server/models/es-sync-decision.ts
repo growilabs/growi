@@ -22,6 +22,11 @@ export interface EsSyncDecisionDocument extends Document {
   // threshold (see decide-es-sync-for-event.ts) is assumed abandoned (the
   // claiming process crashed or stalled) and may be taken over.
   claimedAt: Date;
+  // Fencing token identifying the current claim holder. Every write a claimant makes
+  // (the counter $inc, the final decision write) is conditioned on this token still
+  // matching, so a claimant that stalled long enough for another process to steal the
+  // claim detects the loss instead of blindly acting as if it still owned it.
+  claimToken: string;
 }
 
 export interface EsSyncDecisionModel extends Model<EsSyncDecisionDocument> {}
@@ -40,6 +45,7 @@ const schema = new Schema<EsSyncDecisionDocument, EsSyncDecisionModel>({
     required: true,
   },
   claimedAt: { type: Date, required: true },
+  claimToken: { type: String, required: true },
 });
 
 export const EsSyncDecision = getOrCreateModel<

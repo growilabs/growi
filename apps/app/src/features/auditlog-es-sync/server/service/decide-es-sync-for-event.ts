@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import loggerFactory from '~/utils/logger';
 
 import { AnonymousSyncCounter } from '../models/anonymous-sync-counter';
@@ -55,6 +57,11 @@ export const decideEsSyncForEvent = async (
   threshold: number,
 ): Promise<EsSyncDecisionValue> => {
   const now = new Date();
+  // Fencing token for this call's claim. Every write this call makes while holding
+  // the claim is conditioned on this token, so a call that stalls long enough for
+  // another process to steal the claim (see STALE_CLAIM_MS) detects the loss instead
+  // of acting as if it still owned it.
+  const claimToken = randomUUID();
 
   let holdsClaim = false;
   try {
@@ -64,6 +71,7 @@ export const decideEsSyncForEvent = async (
       windowStart,
       decision: 'pending',
       claimedAt: now,
+      claimToken,
     });
     holdsClaim = true;
   } catch (err) {
@@ -79,13 +87,26 @@ export const decideEsSyncForEvent = async (
         decision: 'pending',
         claimedAt: { $lt: new Date(now.getTime() - STALE_CLAIM_MS) },
       },
-      { $set: { claimedAt: now } },
+      { $set: { claimedAt: now, claimToken } },
       { new: true },
     );
     holdsClaim = stolen != null;
   }
 
   if (!holdsClaim) {
+    return waitForDecision(activityId);
+  }
+
+  // Re-confirm ownership right before the increment, refreshing claimedAt as a
+  // heartbeat: if this call stalled between claiming above and reaching here for
+  // long enough that another process treated the claim as abandoned and stole it,
+  // this fails to match and we defer to the new holder instead of $inc-ing on
+  // behalf of a claim we no longer hold.
+  const reconfirmed = await EsSyncDecision.findOneAndUpdate(
+    { _id: activityId, claimToken },
+    { $set: { claimedAt: new Date() } },
+  );
+  if (reconfirmed == null) {
     return waitForDecision(activityId);
   }
 
@@ -110,6 +131,15 @@ export const decideEsSyncForEvent = async (
     );
   }
 
-  await EsSyncDecision.updateOne({ _id: activityId }, { $set: { decision } });
+  // Guard the same claim loss on this final write: if the claim was stolen in the
+  // narrow gap between the reconfirm above and here, the new holder's own $inc +
+  // decision write is the authoritative one — defer to it rather than overwrite it.
+  const settled = await EsSyncDecision.updateOne(
+    { _id: activityId, claimToken },
+    { $set: { decision } },
+  );
+  if (settled.matchedCount === 0) {
+    return waitForDecision(activityId);
+  }
   return decision;
 };

@@ -575,6 +575,7 @@ describe('AuditlogChangeStreamService', () => {
       const doc: Partial<ActivityDocument> = {
         _id: new Types.ObjectId(),
         endpoint: '/login',
+        createdAt: new Date(),
       };
 
       await pushAndFlush(doc);
@@ -587,6 +588,7 @@ describe('AuditlogChangeStreamService', () => {
       const doc: Partial<ActivityDocument> = {
         _id: new Types.ObjectId(),
         endpoint: '/login',
+        createdAt: new Date(),
       };
 
       await pushAndFlush(doc);
@@ -594,10 +596,33 @@ describe('AuditlogChangeStreamService', () => {
       expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledWith([doc], []);
     });
 
+    it("keys the gating window by the event's own createdAt, not the flush wall-clock time", async () => {
+      vi.mocked(decideEsSyncForEvent).mockResolvedValue('admitted');
+      // A backlog event from well outside the current minute (e.g. replayed after a
+      // resume-token rewind) must be gated against ITS OWN window, not "now".
+      const eventCreatedAt = new Date('2020-01-01T00:00:00.000Z');
+      const expectedWindowStart = new Date('2020-01-01T00:00:00.000Z');
+      const doc: Partial<ActivityDocument> = {
+        _id: new Types.ObjectId(),
+        endpoint: '/login',
+        createdAt: eventCreatedAt,
+      };
+
+      await pushAndFlush(doc);
+
+      expect(decideEsSyncForEvent).toHaveBeenCalledWith(
+        doc._id?.toString(),
+        '/login',
+        expectedWindowStart,
+        expect.any(Number),
+      );
+    });
+
     it('matches a dynamic path against its regex threshold key, ignoring the query string', async () => {
       const doc: Partial<ActivityDocument> = {
         _id: new Types.ObjectId(),
         endpoint: '/forgot-password/abc123token?access_token=secret',
+        createdAt: new Date(),
       };
 
       await pushAndFlush(doc);

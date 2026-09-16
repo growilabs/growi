@@ -278,13 +278,19 @@ export class AuditlogChangeStreamService {
   private async filterAdmittedUpserts(
     upserts: ActivityDocument[],
   ): Promise<ActivityDocument[]> {
-    const windowStart = new Date(Math.floor(Date.now() / 60_000) * 60_000);
-
     const admittedOrNull = await Promise.all(
       upserts.map(async (activity) => {
         if (activity.snapshot?.username != null) return activity;
         const thresholdKey = matchThresholdKey(activity.endpoint ?? '');
         if (thresholdKey == null) return activity;
+
+        // Keyed by the event's own occurrence time, not the flush wall-clock time: a
+        // backlog replayed after a restart (resume token rewound, or a cold start with
+        // no token) must land in the windows it actually happened in, not all get bucketed
+        // into "now" and exhaust the threshold for unrelated real-time traffic.
+        const windowStart = new Date(
+          Math.floor(activity.createdAt.getTime() / 60_000) * 60_000,
+        );
 
         const decision = await decideEsSyncForEvent(
           activity._id.toString(),
