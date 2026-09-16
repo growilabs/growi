@@ -7,6 +7,7 @@ import type { PrismaClient } from '~/utils/prisma';
 import type { IPageLink } from '../../interfaces/page-link';
 import {
   dropSelfLinks,
+  reconcileDeletedPages,
   reResolveByToPath,
   syncOutboundLinks,
 } from './page-link-sync';
@@ -28,6 +29,18 @@ vi.mock('./target-page-resolution', () => ({
 vi.mock('~/server/models/page-redirect', () => ({
   default: { retrieveFromPathsRedirectingTo: vi.fn() },
 }));
+
+const mocks = vi.hoisted(() => ({ pageFind: vi.fn() }));
+
+// Only `model` is stubbed: the specs below build real ObjectIds from `Types`, and the deep-mock
+// proxies vitest-mock-extended would put there break `.equals()` / `.toString()`.
+vi.mock('mongoose', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('mongoose')>();
+  return {
+    ...actual,
+    default: { ...actual.default, model: () => ({ find: mocks.pageFind }) },
+  };
+});
 
 const row = (toPage: Types.ObjectId | null, toPath = '/target'): IPageLink => ({
   fromPage: new Types.ObjectId(),
@@ -215,5 +228,85 @@ describe('reResolveByToPath', () => {
       '/older',
       elsewhere,
     );
+  });
+});
+
+/*
+ * B5.2 — contract: a page that still exists is left alone; only a truly gone one has its rows
+ * settled, and the whole batch settles in one call.
+ */
+describe('reconcileDeletedPages', () => {
+  /**
+   * What `Page.find(...).select('_id')` resolves to. Always fresh ObjectId instances: a real round
+   * trip never hands back the caller's own, and a survivor check keyed on instance identity rather
+   * than value passes against reused ones while reporting every page in the batch as gone.
+   */
+  const resolveFoundPages = (ids: Types.ObjectId[]): void => {
+    mocks.pageFind.mockReturnValue({
+      select: () =>
+        Promise.resolve(
+          ids.map((id) => ({ _id: new Types.ObjectId(id.toHexString()) })),
+        ),
+    });
+  };
+
+  /** Every id handed to removeLinksForPages, across all calls, as hex. */
+  const idsRemoved = (): string[] =>
+    mockPrisma.pagelinks.removeLinksForPages.mock.calls
+      .flatMap(([ids]) => ids)
+      .map((id) => id.toString());
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('leaves a page that still exists alone, even when it is only trashed', async () => {
+    // A soft delete keeps the document, so the page is found and its rows already read `trashed`.
+    const trashed = new Types.ObjectId();
+    resolveFoundPages([trashed]);
+
+    await reconcileDeletedPages([trashed]);
+
+    expect(idsRemoved()).toEqual([]);
+  });
+
+  it('settles the rows of a page that is truly gone', async () => {
+    const gone = new Types.ObjectId();
+    resolveFoundPages([]);
+
+    await reconcileDeletedPages([gone]);
+
+    expect(idsRemoved()).toEqual([gone.toString()]);
+  });
+
+  it('settles only the gone pages of a mixed batch', async () => {
+    const trashed = new Types.ObjectId();
+    const gone = new Types.ObjectId();
+    resolveFoundPages([trashed]);
+
+    await reconcileDeletedPages([trashed, gone]);
+
+    expect(idsRemoved()).toEqual([gone.toString()]);
+  });
+
+  it('settles the whole batch in a single call', async () => {
+    // removeLinksForPages sends every id in one command, so never an accumulated list.
+    const gone = [
+      new Types.ObjectId(),
+      new Types.ObjectId(),
+      new Types.ObjectId(),
+    ];
+    resolveFoundPages([]);
+
+    await reconcileDeletedPages(gone);
+
+    expect(mockPrisma.pagelinks.removeLinksForPages).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not touch either database for an empty batch', async () => {
+    await reconcileDeletedPages([]);
+
+    expect(mocks.pageFind).not.toHaveBeenCalled();
+    expect(mockPrisma.pagelinks.removeLinksForPages).not.toHaveBeenCalled();
   });
 });
