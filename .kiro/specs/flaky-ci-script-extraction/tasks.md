@@ -107,7 +107,7 @@
   - 観測可能な完了状態: 該当節に `compare` / `pulls` のシェル片が無い。`--help` が 0、祖先あり／なし × PR あり（一致／不一致）／なしのテストが期待値と一致して通る。README に行がある。行数・容量の前後を記録
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.4, 3.3, 3.4, 4.1, 4.4, 5.1, 5.2_
 
-- [ ] 3.8 check-run の事実（同名重複の除去）
+- [x] 3.8 check-run の事実（同名重複の除去）
   - commit を受け、同名の check-run を開始時刻→ID で最新だけに絞った一覧、`ci-app-*` の総数と非 success の一覧、`flaky-repro` の状態を返す（単発。待ち合わせはしない）。重複除去と集計は純粋関数として置き、3.9 が同じものを使う
   - investigate 2-C と 6-A の待ち合わせ手順を「短いループでこのスクリプトを呼ぶ」に置き換え、重複除去の `jq` を消す。「`ci-app-` 前置きで全部取る」「2 つの終わり方の意味」は残す
   - 観測可能な完了状態: 2 節に `group_by` の `jq` が無い。`--help` が 0、同名 2 件（同着含む）で最新が選ばれるテストが期待値と一致して通る。README に行がある。行数・容量の前後を記録
@@ -1163,3 +1163,111 @@ PR が 1 つも無い実コミット、2 PR に跨る実コミット（手順書
    将来 Mergify のマージキューを使う運用に変わった場合、実際のキュー
    コミットのメッセージ形式が構成データと一致するかは未確認のまま。
 
+
+### タスク 3.8: check-run の事実（同名重複の除去）（`check-runs-facts`、2026-09-16）
+
+`bin/flaky-ci/lib/check-runs.ts`（`dedupeNewestByName` — 同名 check-run の
+うち `startedAt`→`id` で最新だけを残す純粋関数、`aggregateCiApp` — deduped
+済みの一覧から `ci-app-*` の総数と非 success の一覧を作る純粋関数）と、
+それを呼ぶ `bin/flaky-ci/scripts/check-runs-facts.ts`（`--sha` を受け、
+`checks[]` / `ciApp` / `flakyRepro` を返す単発 CLI）を実装した。design.md
+の File Structure Plan が明記するとおり、重複排除と集計のロジックは
+`lib/check-runs.ts` に置き、`check-runs-facts.ts` はその呼び出しと
+`flaky-repro` という 1 個の名前を探すだけの薄いラッパーにした——タスク
+3.9 の `pr-gate-facts.ts` が同じ `dedupeNewestByName`/`aggregateCiApp` を
+再利用できるようにするためで、スクリプトファイル内に埋め込む他の多くの
+タスク（2.2・3.4・3.7 など、design.md がこのスクリプト専用の `lib/`
+モジュールを挙げていないケース）とは扱いを変えている。
+
+**同着（simultaneous timestamp）の tie-break**: `started_at` は秒精度
+なので、同名の 2 件が同じ秒に完了することは実際に起こり得る。
+`dedupeNewestByName` はこの場合に `id`（GitHub が後から発行した方が
+大きい）で決着させる。実装は `reduce` の類ではなく `Map<name,
+CheckRun>` に対して「候補が現在の最新より新しいときだけ置き換える」
+形にし、1 件しか無い名前（大半のケース）でも初期値の心配なく同じ
+コードパスを通ることをテストで確認した（`check-runs.spec.ts` の
+「1 件のみ」「複数件・同着含む」「入力順を反転しても結果が変わらない」
+の 3 系統）。
+
+**旧 `jq` の `group_by(.name) | map(sort_by(.started_at) | last)` との
+差**: 旧パイプラインは `sort_by` が安定ソートであることを前提に、同着
+グループ内の最後の1件（＝入力順で最後）を選んでいた——`id` を見ておらず、
+`gh api --paginate --slurp` がページをどの順で返すかに暗黙に依存して
+いた。新しい `dedupeNewestByName` は `id` を明示的な tie-break として
+使うため、入力順に依存しない。この振る舞いの違いを実際に確認するため、
+`constructed-simultaneous-timestamp.json`（構成データ、実データに同着の
+実例が見つからなかった——`0d1a319a`/`807c3628`/`235dd237`/`b9a64ded` の
+4 コミットを検索したが、同名 2 件が秒精度で完全一致する実例はゼロ
+だった）を入力順を反転させた両方向でテストし、常に `id` の大きい方が
+選ばれることを確認した。
+
+**6-B の条件 2 の 1 行を、このタスクの変更に合わせて調整した（境界を
+超えない最小限の追随）**: `investigate-flaky-test/SKILL.md` 6-B は
+`$CHECKS_FILE` を読む `ci_not_success=$(jq ... "$CHECKS_FILE")` という
+1 行を持っていたが、旧 `$CHECKS_FILE` は裸の配列（旧 `CHECKS_JQ` の
+出力そのもの）だった。本タスクで 6-A が `$CHECKS_FILE` の生成元を
+`check-runs-facts.ts` に置き換えたため、同じ変数名でも中身の形が
+オブジェクト（`{checks, ciApp, flakyRepro}`）に変わった。6-B の判定
+条件・HIGH/MEDIUM/LOW の表・条件 1・3 の判定手順（タスク 3.9 の範囲）
+には一切手を付けず、この 1 行だけを新しい形に合わせて
+`jq -r '[ .ciApp.notSuccess[] | "\(.name)=\(.conclusion)" ] | join(", ")'`
+に書き換えた。書き換えないと 6-A が生成した `$CHECKS_FILE` を 6-B が
+壊れた前提で読むことになり、Requirement 5.1（導入の前後で一貫した手順
+のまま routine が動くこと）に反するため、タスク 3.8 の変更が直接
+引き起こした不整合の最小限の是正として行った——6-B の判定ロジック自体
+（条件 1・3、HIGH/MEDIUM/LOW の表）はタスク 3.9 の範囲のまま触れて
+いない。
+
+観測可能な完了状態の確認: 2-C・6-A の該当節に `group_by` の `jq` が
+無いことを確認済み（`grep -n "group_by" .claude/skills/investigate-flaky-test/SKILL.md`
+で 0 件）。`--help` が終了コード 0、同名 2 件（同着含む、`id` の大小と
+入力順の両方を確認）で最新が選ばれるテストが期待値と一致して通る
+（`check-runs.spec.ts` 9 件、`check-runs-facts.spec.ts` 12 件、計 21 件）。
+RED（`check-runs.ts`/`check-runs-facts.ts` を一時的に退避し、モジュール
+未検出で失敗することを実行して確認）→ GREEN（21 passed）を実測した。
+`pnpm vitest run`（`bin/` 配下）で 29 ファイル 420 件が通ることを確認
+した。`biome check bin/flaky-ci` は最初 4 件のフィクスチャ JSON の整形
+エラー（`gh api` の生出力が 1 行で保存されていたため）が出たため
+`jq .` で整形し直し、その後は警告・エラーとも 0 件で通過した。
+`README.md` の契約表に `check-runs-facts` の行、共有ライブラリの表に
+`check-runs.ts` の行を追加した。
+
+**素材**: 実データとして、`0d1a319a`（`master` への単一 push、同名重複
+なし——重複が無いケースが壊れないことの確認）、`807c3628`（PR #11919、
+push + pull_request の 2 イベントで `ci-app-*` が全て重複、新しい方が
+`cancelled` になっている実例）、`235dd237`（別のコミットで `ci-app-*`
+が 2 回ずつ走り、dedup 後も 3 件が非 success のまま残る実例——
+`ciApp.notSuccess[]` の実データ根拠）、`b9a64ded`（`read-repro-result.
+spec.ts` の `CASE1_SHA` と同じコミット、`flaky-repro` の check-run を
+唯一実際に持つ実例）を `gh api repos/growilabs/growi/commits/{sha}/
+check-runs?per_page=100` で取得して使用した
+（`fixtures/api/check-runs/`）。同着 tie-break の実例は検索したが
+見つからなかったため、`constructed-simultaneous-timestamp.json` として
+構成した（`.meta.md` に検索範囲を記載）。
+
+行数・容量（`wc -l -c`、タスク 3.3 完了時点の値と比較）:
+
+| ファイル | 変更前（タスク 3.3 時点、行/バイト） | 変更後（行/バイト） |
+|---|---:|---:|
+| `.claude/skills/investigate-flaky-test/SKILL.md` | 1591 / 84522 | 1609 / 84968 |
+
+このタスクは行数・容量とも増えた（+18 行 / +446 バイト）。旧 2-C の
+`gh api ... -q 'select(...)'` は 1 行の単純なクエリで元々短く、6-A の
+`group_by` パイプラインも 1 行だったため、置き換え後のループ本体（
+ポーリング条件を明示的な `if` に開いた分）と、新しい出力欄
+（`.flakyRepro.status`/`.conclusion`、`.ciApp.total`/`.notSuccess`）の
+説明文を追加したことで、圧縮効果より説明の追加分の方が上回った。
+`investigate-flaky-test/SKILL.md` は「毎回読まれる 2 本」（routine +
+detect）には含まれないため、5.3 の合計値には影響しない。
+
+**CONCERNS（レビュアーへの申し送り）**:
+1. `checks[]` に含める欄を `id`/`name`/`status`/`conclusion`/`startedAt`
+   の 5 つに絞った（`html_url` などは含めていない）。design.md の
+   scripts 契約表は `checks[]` の中身欄までは規定していないため、手順書
+   側が今後デバッグ用に `html_url` を読みたくなった場合は、この欄構成を
+   拡張する必要がある。
+2. 6-B の 1 行（`ci_not_success` の抽出）を、このタスクが `$CHECKS_FILE`
+   の形を変えたことに合わせて最小限調整した（上記）。タスク 3.9 が
+   `pr-gate-facts.ts` を導入する際、この行自体が `pr-gate-facts.ts` の
+   呼び出しに置き換わることが想定されるため、3.9 の実装者はこの行が
+   タスク 3.8 由来の暫定的な適応であることを踏まえて置き換えること。

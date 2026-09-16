@@ -530,24 +530,46 @@ empty, do not guess and do not re-push: treat the measurement as
 a human decision**, and leave any `flaky-repro/issue-${ISSUE_NUMBER}-*`
 branches on `origin` for the human to inspect.
 
-When you come back, poll REST every 60 seconds, for at most 30 minutes from
-the push:
+When you come back, call `check-runs-facts.ts` every 60 seconds, for at most
+30 minutes from the push (see `bin/flaky-ci/README.md` for the full output
+contract):
 
 ```bash
-gh api "repos/growilabs/growi/commits/${REPRO_SHA}/check-runs" \
-  -q '.check_runs[] | select(.name == "flaky-repro") | {status, conclusion, html_url}'
+CHECKS_JSON="${TMPDIR:-/tmp}/flaky-repro-checks-${ISSUE_NUMBER}.json"
+STARTED=$(date +%s)
+STARTUP_GRACE=$(( STARTED + 5 * 60 ))
+DEADLINE=$(( STARTED + 30 * 60 ))
+
+while :; do
+  node bin/flaky-ci/scripts/check-runs-facts.ts --sha "$REPRO_SHA" > "$CHECKS_JSON"
+  repro_status=$(jq -r '.flakyRepro.status' "$CHECKS_JSON")
+  now=$(date +%s)
+
+  [ "$repro_status" = 'completed' ] && break
+  if [ "$repro_status" = 'absent' ] && [ "$now" -ge "$STARTUP_GRACE" ]; then
+    echo 'no flaky-repro check-run within 5 minutes — not measured'
+    break
+  fi
+  if [ "$now" -ge "$DEADLINE" ]; then
+    echo 'wait capped at 30 minutes'
+    break
+  fi
+  sleep 60
+done
 ```
 
-Three ways out of the poll:
+Three ways out of the loop:
 
-- the check-run reports `status == "completed"` → take its `conclusion` to 2-D;
-- **no check-run named `flaky-repro` has appeared within the first ~5
-  minutes** → the instrument never started. Stop polling now rather than
-  burning the full 30 minutes, and treat it as "confirmation not measured"
-  (2-E), naming the likely causes in the stop comment: the branch name did
-  not match `flaky-repro/**`, or the base commit predates `flaky-repro.yml`;
-- 30 minutes elapse with the check-run still `queued` / `in_progress` →
-  "confirmation not measured" as well.
+- `.flakyRepro.status` reads `"completed"` → take `.flakyRepro.conclusion`
+  (`jq -r '.flakyRepro.conclusion' "$CHECKS_JSON"`) to 2-D;
+- **`.flakyRepro.status` stays `"absent"` for the first ~5 minutes** — no
+  check-run named `flaky-repro` has appeared yet — → the instrument never
+  started. Stop polling now rather than burning the full 30 minutes, and
+  treat it as "confirmation not measured" (2-E), naming the likely causes in
+  the stop comment: the branch name did not match `flaky-repro/**`, or the
+  base commit predates `flaky-repro.yml`;
+- 30 minutes elapse with `.flakyRepro.status` still `"queued"` /
+  `"in_progress"` → "confirmation not measured" as well.
 
 The check-run's conclusion answers only "could a measurement be taken at
 all": `success` means the request was valid and the runs happened (the tests
@@ -1221,19 +1243,17 @@ STARTED=$(date +%s)
 STARTUP_GRACE=$(( STARTED + 5 * 60 ))
 DEADLINE=$(( STARTED + 45 * 60 ))
 
-# Newest check-run per name. A commit carries two entries per job once a PR
-# exists (push event + pull_request event), and a superseded push leaves
-# `cancelled` ones behind; evaluating every entry would let a stale one block
-# the gate with no way out but the timeout.
-CHECKS_JQ='[ flatten[] | .check_runs[] ] | group_by(.name) | map(sort_by(.started_at) | last)'
-
 while :; do
-  gh api "repos/growilabs/growi/commits/${FIX_SHA}/check-runs?per_page=100" \
-    --paginate --slurp | jq "$CHECKS_JQ" > "$CHECKS_FILE"
+  node bin/flaky-ci/scripts/check-runs-facts.ts --sha "$FIX_SHA" > "$CHECKS_FILE"
 
-  repro_status=$(jq -r '[ .[] | select(.name == "flaky-repro") ] | last | .status // "absent"' "$CHECKS_FILE")
-  ci_total=$(jq '[ .[] | select(.name | startswith("ci-app-")) ] | length' "$CHECKS_FILE")
-  ci_pending=$(jq '[ .[] | select(.name | startswith("ci-app-")) | select(.status != "completed") ] | length' "$CHECKS_FILE")
+  repro_status=$(jq -r '.flakyRepro.status' "$CHECKS_FILE")
+  ci_total=$(jq -r '.ciApp.total' "$CHECKS_FILE")
+  # Still-pending ci-app-* checks: check-runs-facts.ts already deduped to the
+  # newest per name (a commit carries two entries per job once a PR exists —
+  # a push event and a pull_request event — and a superseded push leaves a
+  # `cancelled` one behind), so `.checks[]` here can never double-count a
+  # stale entry the way reading every raw check-run would.
+  ci_pending=$(jq '[ .checks[] | select(.name | startswith("ci-app-")) | select(.status != "completed") ] | length' "$CHECKS_FILE")
   now=$(date +%s)
 
   if [ "$ci_total" -gt 0 ] && [ "$ci_pending" -eq 0 ] \
@@ -1261,7 +1281,7 @@ while :; do
   sleep 60
 done
 
-jq -r '.[] | select(.name == "flaky-repro" or (.name | startswith("ci-app-")))
+jq -r '.checks[] | select(.name == "flaky-repro" or (.name | startswith("ci-app-")))
        | "\(.name)\t\(.status)\t\(.conclusion)"' "$CHECKS_FILE"
 ```
 
@@ -1334,9 +1354,7 @@ else
   runs=""
   failed=""
 fi
-ci_not_success=$(jq -r '[ .[] | select(.name | startswith("ci-app-"))
-                          | select(.conclusion != "success")
-                          | "\(.name)=\(.conclusion)" ] | join(", ")' "$CHECKS_FILE")
+ci_not_success=$(jq -r '[ .ciApp.notSuccess[] | "\(.name)=\(.conclusion)" ] | join(", ")' "$CHECKS_FILE")
 git fetch origin master
 scope=$(git diff --name-only "origin/master...${FIX_SHA}")   # three dots: merge-base → fix
 
