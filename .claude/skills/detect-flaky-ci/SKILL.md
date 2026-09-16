@@ -150,81 +150,44 @@ before letting ① fire.** A dependency bump changes what the test actually
 runs against, so a diff that touches nothing but the lockfile is not
 evidence that the PR is innocent. Reading it as one has already caused a
 failure that was deterministic on its dependabot branch to be tracked as
-flaky across 13 observations. So whenever `pnpm-lock.yaml` is among the PR's
-changed files, fetch that one file's patch and compare package names both
-ways before concluding ① matched:
+flaky across 13 observations. So whenever the failing run has an associated
+PR, run:
 
 ```bash
-gh api repos/growilabs/growi/pulls/{PR_NUMBER}/files --paginate \
-  -q '.[] | select(.filename == "pnpm-lock.yaml") | .patch'
+node bin/flaky-ci/scripts/lockfile-overlap.ts \
+  --sha {HEAD_SHA} --pr {PR_NUMBER} --log-excerpt-file {LOG_EXCERPT_FILE}
 ```
 
-On a commit with no associated PR — the branch just above, which compares
-against the commit's own diff — run this check too, taking the patch from
-that same commit endpoint (`.files[]` carries `filename` and `patch` in the
-same shape as a PR's):
-`gh api repos/growilabs/growi/commits/{HEAD_SHA} -q '.files[] | select(.filename == "pnpm-lock.yaml") | .patch'`.
-A merge-queue commit that rolls up a dependabot PR lands here, so skipping
-it would leave exactly the case this check exists for unguarded.
+(`{LOG_EXCERPT_FILE}` is the same failure log excerpt already fetched for
+Step 3.) The script fetches PR #`{PR_NUMBER}`'s `pnpm-lock.yaml` diff
+itself and reports the package names on each side and their intersection
+(`overlap[]`, `patchPackages[]`, `logPackages[]`) — see
+`bin/flaky-ci/README.md`'s contract table for the exact fields. A PR that
+doesn't touch `pnpm-lock.yaml` at all (the common case — most failing PRs
+never touch the lockfile) is exit 0 with empty `overlap[]`/`patchPackages[]`,
+same as a PR that touches it with no overlapping packages: in both cases ①
+still runs its usual judgment, this check simply found nothing to suppress
+it with. Exit code 2 means the fetch itself failed — the PR's changed files
+could not be retrieved, or the log excerpt could not be read — treat that
+as "not measured" per Step 6, not as "no overlap".
 
-**Package names from the lockfile patch** — look only at `+`/`-` lines, and
-read the name out of whichever shape the line has:
+On a commit with no associated PR (a direct push to `master`, e.g. a
+merge-queue commit), there is no `{PR_NUMBER}` to pass and this check is
+skipped for that failure — that is not the same as proving the lockfile
+unaffected, it simply cannot be checked without a PR-scoped diff. A
+merge-queue commit that rolls up a dependabot PR lands here unguarded by
+this check; ② / ③ / ⑤ still apply as usual.
 
-| Line shape | Package name |
-|---|---|
-| `+  '@codemirror/state@6.7.4':` — quoted entry header (`packages:` / `snapshots:` sections) | the quoted token up to its **last** `@` → `@codemirror/state` |
-| `+  '@inquirer/checkbox@5.2.2(@types/node@24.13.4)':` — the same header with a **peer-resolution suffix** | strip the trailing `(…)` group **first**, then cut at the last `@` → `@inquirer/checkbox` |
-| `-      '@codemirror/state': 6.7.1` — dependency entry, `'name': version` | the quoted key → `@codemirror/state` |
-| `+  /@scope/name@version:` — unquoted header form written by older pnpm lockfile versions | the text between the leading `/` and the version → `@scope/name` |
-
-Two rules, applied in this order, are what make the table work:
-
-1. **Strip a trailing parenthesised group before anything else.** A
-   `snapshots:` entry records the peers a package was resolved against
-   inside `(…)`, and that group contains `@`s of its own — one real patch
-   carried 36 such `+`/`-` lines. Cutting at the last `@` without stripping
-   it first yields `@inquirer/checkbox@5.2.2(@types/node`, a name that
-   matches nothing. (The peers named inside the parentheses are resolution
-   context, not this entry's own name; a peer that genuinely changed has its
-   own entry line elsewhere in the same patch.)
-2. **Then split on the *last* `@`, not the first** — a leading `@` is the
-   scope marker, never the name/version separator.
-
-The first three shapes are what this repo's current lockfile actually
-produces; the fourth is a tolerated variant, not the expected one.
-
-**Package names from the failure's stack trace** — the frames printed under
-the error, in the log excerpt you already have:
-
-| Frame shape | Package name |
-|---|---|
-| `❯ inner ../../node_modules/.pnpm/@codemirror+state@6.7.1/node_modules/@codemirror/state/dist/index.js:2016:23` | the `.pnpm/` segment, cut at the first `_` (none here), then at its last `@`, then `+` → `/` → `@codemirror/state` |
-| `❯ .../node_modules/.pnpm/@uiw+react-codemirror@4.23.8_@babel+runtime@7.29.7_@codemirror+autocomplete@6.18.4_@cod_bc61e38c16b4d6c6ec98653a35cbfdb9/node_modules/…` — the same segment carrying **peer suffixes** | cut at the **first** `_` → `@uiw+react-codemirror@4.23.8`, then at the last `@`, then `+` → `/` → `@uiw/react-codemirror` |
-| `❯ .../node_modules/@uiw/react-codemirror/esm/useCodeMirror.js:80:124` — a plain `node_modules/` path, no `.pnpm/` | the segment(s) after `node_modules/` — two segments when the first starts with `@` → `@uiw/react-codemirror` |
-
-Two rules again, in this order, mirroring the lockfile side:
-
-1. **Cut the `.pnpm/` segment at the first `_`.** pnpm appends the peers a
-   package was resolved against, separated by `_`, and hashes the tail when
-   it gets long, so the segment carries several `@`s belonging to other
-   packages. Going straight to the last `@` on the second row above yields
-   `@uiw/react-codemirror@4.23.8_@babel/runtime@7.29.7_@codemirror/autocomplete`,
-   which is not a package at all. Each of those peers has its own `.pnpm/`
-   frame elsewhere in the trace if it is actually on the stack.
-2. **Then split on the last `@`, then turn `+` back into `/`** — pnpm
-   rewrites the `/` of a scoped name to `+` when naming store directories,
-   which is the only reason the same package is spelled two ways.
-
-An unscoped package works the same way: `react-dom@18.2.0_react@18.2.0` →
-first `_` → `react-dom@18.2.0` → last `@` → `react-dom`.
-
-**If any package name appears in both sets, ① does not fire for this
-failure.** Do not count it as a mining hit, do not name it in the Status
-line, and record why in the issue body (see the template in Step 4) as:
+**If `overlap` is non-empty, ① does not fire for this failure.** Do not
+count it as a mining hit, do not name it in the Status line, and record why
+in the issue body (see the template in Step 4) as:
 
 ```
-- ① not applicable: lockfile changed `@codemirror/state` (versions 6.7.1 → 6.7.4) and the failure's stack trace runs through it
+- ① not applicable: lockfile changed `{overlap[0]}` and the failure's stack trace runs through it
 ```
+
+(when `overlap` has more than one name, list all of them, comma-separated,
+in place of `{overlap[0]}`)
 
 Suppressing ① is **not** an exclusion — the failure still goes through
 Step 4 as usual. ② / ③ / ⑤ are evaluated and stand on their own if they
@@ -1268,8 +1231,8 @@ independent flakiness):
 - {SUITE} > {TITLE}
 - {SUITE} > {TITLE}"}
 
-{if ① was suppressed by the lockfile check (see ① in "Cheap Suspicion Mining"), add this line regardless of which tier this issue ends up at:
-"- ① not applicable: lockfile changed `{PKG}` (versions {OLD} → {NEW}) and the failure's stack trace runs through it"}
+{if ① was suppressed by the lockfile check (see ① in "Cheap Suspicion Mining"), add this line regardless of which tier this issue ends up at, naming every package in `lockfile-overlap`'s `overlap[]`, comma-separated:
+"- ① not applicable: lockfile changed `{PKG}` and the failure's stack trace runs through it"}
 
 {if suspected, include the specific mining evidence **for every check that matched, not just one** — one line per match, e.g.:
 "① PR #{N} changed {files}, none overlap this spec's path or stack trace"

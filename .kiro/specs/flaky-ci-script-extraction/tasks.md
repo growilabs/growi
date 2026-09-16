@@ -47,7 +47,7 @@
   - 観測可能な完了状態: 該当節に `date -d` / `jq` が無い。`--help` が 0、ラベル先行・コメント先行（旧手順の逆順、−1 秒）・付与時刻なしの 3 ケースが 1.3 の期待値と一致するテストが通る。README に行がある。行数・容量の前後を記録
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.3, 2.4, 3.3, 4.1, 4.3, 4.4, 5.1, 5.2_
 
-- [ ] 2.4 lockfile 差分とスタックトレースのパッケージ名の交差
+- [x] 2.4 lockfile 差分とスタックトレースのパッケージ名の交差
   - commit と PR 番号とログ抜粋を受け、PR の lockfile 差分に現れるパッケージ名（peer 接尾辞と `(…)` を落とす）とログ抜粋に現れるパッケージ名の 2 集合と交差を返す。PR が無い・files が取れないときは終了コード 2
   - detect の判定①の抽出手順（2 つの表と規則）を呼び出しに置き換える。「lockfile を既定で無関係にしない」「lockfile だけの PR は決定的失敗のことが多い」は残す
   - 観測可能な完了状態: 判定①の節に抽出手順が無い。`--help` が 0、`@codemirror/state` 二重化 PR のフィクスチャで交差が 1.3 の期待値と一致し、peer 接尾辞の切り落としのテストが通る。README に行がある。行数・容量の前後を記録
@@ -335,4 +335,97 @@ widened 探索で `(may be stale) ` 付与）の 3 ケースが
 | ファイル | 変更前（タスク 2.2 時点、行/バイト） | 変更後（行/バイト） |
 |---|---:|---:|
 | `.claude/commands/flaky-ci-routine.md` | 1043 / 53869 | 1016 / 51871 |
+
+### タスク 2.4: `lockfile-overlap` の切り出しと手順書の行数・容量（2026-09-16）
+
+`bin/flaky-ci/lib/lockfile.ts`（`packagesInPatch(patch)` / `packagesInLog(excerpt)` /
+`intersect(a, b)`、design.md の File Structure Plan に挙げられた専用モジュール）と
+`bin/flaky-ci/scripts/lockfile-overlap.ts`（`--sha --pr --log-excerpt-file` を
+受け、PR のファイル一覧を取得して `pnpm-lock.yaml` の diff を探し、`lib/lockfile.ts`
+で 2 集合と交差を作って返す CLI）に分けた。
+
+**leaf-package header 形の既知の食い違い（`fixtures/lockfile/
+11886-extracted-package-names.json.meta.md` が task 2.4 に判断を委ねていた点）
+への対応**: 旧手順の表は「コロンの後に何も無いか」で header 行（`'name@version':`）
+と dependency-entry 行（`'name': version`）を見分けていたが、pnpm の leaf-package
+（依存無し）header は 1 行形式 `'@marijn/find-cluster-break@1.0.4': {}` になり、
+コロンの後の `{}` が「何かある」と読めてしまうため、旧ルールはこれを
+dependency-entry と誤判定し、バージョン付きの `@marijn/find-cluster-break@1.0.4`
+をそのまま抽出していた（フィクスチャの 32 件中の既知バグとして `known_issues` に
+明記されていた）。`lib/lockfile.ts` は判定基準を「コロンの後」ではなく「クォート
+された key 自体（末尾の `(…)` を落とした後）がバージョンを内包しているか
+（`/@\d[\w.+-]*$/`）」に変更した。これにより同じ 1 行は header 形として正しく
+分類され、バージョンを落とした `@marijn/find-cluster-break` になる。これは同じ
+パッケージの別の dependency-entry 行（`'@marijn/find-cluster-break': 1.0.4`、
+既存ルールのままで正しく抽出済み）と同じ名前に収束するため、`packagesInPatch`
+が返す集合はフィクスチャの 32 件から 1 件減って 31 件になる（`@marijn/find-
+cluster-break@1.0.4` が消える）。`lib/lockfile.spec.ts` はこの食い違いを
+`fixture.packages` からその 1 件だけを明示的に取り除いた期待値と比較する形で
+固定し、テストのコメントで理由を説明している（フィクスチャ自体は書き換えて
+いない）。
+
+**「1 件だけの集約」バグ類への対応**: 判定対象は (a) PR のファイル一覧から
+`pnpm-lock.yaml` を 1 本見つける処理と (b) 2 集合の交差の 2 か所。(a) は
+`Array.prototype.find` を使い、見つからない場合（lockfile を含まない PR）を
+成功（`overlap: []` / `patchPackages: []`、`logPackages` はログ抜粋から通常
+通り計算）として返す。**初版はこれを「取得できなかった」と同じ終了コード 2
+で扱っていたが、独立レビューで契約違反として差し戻された**: 手順書の書き換え
+（本タスクの一部）は「lockfile が PR の変更ファイルに含まれるときだけ」という
+旧手順の前置きを外し、判定①のたびに無条件でこのスクリプトを呼ぶ形にしたため、
+lockfile を触らない PR（失敗する PR の大半）のほうが普通のケースになった。
+その普通のケースを終了コード 2 にすると、Step 6 の「スクリプト失敗」報告行が
+ほぼ毎回このスクリプトを「失敗」として載せてしまい、その行が本来拾うべき
+「測定できないという異常」を埋もれさせてしまう。design.md の他スクリプト
+（`list-candidate-runs` の 0 件成功、`awaiting-decision-rows` の行単位
+`unavailable`）と同じ形に合わせ、終了コード 2 は「ファイル一覧の取得自体が
+失敗した（`GhError`）」「ログ抜粋ファイルが読めない」の 2 つだけに絞った。
+lockfile を含まない・含んでいても交差が無い、どちらも判定①の節がそのまま
+読む「事実」であり、①の発火・不発火の判断はこれまで通り手順書側が行う。
+(b) は `intersect` に 2 要素以上の合成テストと `.pnpm/` の正規表現に
+`matchAll`/`g` フラグの使い回しに頼らず行ごとに新規マッチさせる実装を用い、
+複数一致時に最初の一致だけを拾う短絡が起きないことをテストで固定した。
+
+`.claude/skills/detect-flaky-ci/SKILL.md` の判定①のうち、「lockfile 差分の
+取得コマンド」「パッケージ名の抽出表 2 つとその規則」を `lockfile-overlap` の
+呼び出しに置き換えた。手順書に残した判断・注記:
+「lockfile を既定で無関係にしない」「lockfile だけの PR は決定的失敗のことが
+多い（`investigate-flaky-test` が閉じる）」「`overlap` が非空なら①は発火しない」
+「終了コード 2 は『測定できなかった』であり『交差なし』ではない」。**PR が無い
+commit（merge queue 等）のケースは、本スクリプトが `--pr` を持たず対応できない
+ため、旧手順のコマンド行は削除しつつ「その場合はこの判定をスキップする（未確認
+のまま、無関係と証明されたわけではない）」という短い散文として残した**（旧手順の
+「commit 自身の diff から同じ確認をする」という代替経路は、本タスクのフィク
+スチャにもスクリプトの引数にも無く、Phase 1 の対象外として先送りした。Requirement
+1.4 は「不要になった注意書き」だけを消してよいとしており、この代替経路の必要性
+は消えていないため、コード化はせず散文のまま残す判断とした)。Step 4 のテンプレー
+ト（`{PKG}` `(versions {OLD} → {NEW})`）も、スクリプトの出力にバージョン情報が
+無い（`overlap[]` は名前だけ）ことに合わせて `(versions {OLD} → {NEW})` を落とし、
+複数一致時は列挙する旨を注記した。
+
+観測可能な完了状態の確認: `--help` が終了コード 0、実 PR #11886（`@codemirror/state`
+二重化）とログ抜粋 #11849 のフィクスチャで交差が `{"@codemirror/state"}`
+（`fixtures/expected/lockfile-overlap.md` の期待値）と一致し、peer 接尾辞・
+複数の chained `(…)` の切り落とし・leaf-package header 形のテストが通る
+（`bin/flaky-ci/lib/lockfile.spec.ts` 19 件、`bin/flaky-ci/scripts/
+lockfile-overlap.spec.ts` 11 件）。`pnpm vitest run`（`bin/` 配下）で 18
+ファイル 265 件が通ることを確認した。`biome check bin` は自動整形を適用した
+上で通過（警告 0、エラー 0）。`README.md` の契約表に `lockfile-overlap` の行を
+末尾に追加した（登場順は導入順）。
+
+行数・容量（`wc -l -c`、タスク 1.2 の基準値と比較。このタスクが
+`detect-flaky-ci/SKILL.md` を初めて変更するため、判定①の変更は「毎回読まれる
+2 本」の合計にそのまま反映される）:
+
+| ファイル | 変更前（タスク 1.2 時点、行/バイト） | 変更後（行/バイト） |
+|---|---:|---:|
+| `.claude/skills/detect-flaky-ci/SKILL.md` | 1633 / 86011 | 1596 / 83119 |
+
+**申し送り（軽微、タスク範囲外）**: `.github/workflows/ci-bin.yml` の
+`paths` には `.claude/commands/flaky-ci-routine.md` と `flaky-repro.yml` は
+入っているが `.claude/skills/detect-flaky-ci/SKILL.md` は入っていない。
+このタスクのテストは `detect-flaky-ci/SKILL.md` の本文を読んで検証する
+ドリフト検知（`constants.spec.ts` のような仕組み）を持たないため今は実害
+無いが、この節の散文と `lockfile-overlap` の契約が将来ずれても push だけでは
+テストが走らない。task 1.2 の範囲（ci-bin.yml の paths 管理）に属するため
+このタスクでは変更していない。
 
