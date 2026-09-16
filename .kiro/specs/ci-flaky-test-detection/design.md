@@ -109,6 +109,12 @@ Actions ワークフロー `.github/workflows/flaky-repro.yml`。アプリケー
 - `apps/app` の vitest プロジェクト名と `package.json` のテストスクリプト名
   （`test:unit` / `test:components` / `test:integ`）— 読むだけ
 - RemoteTrigger cron — 定期起動の契機
+- `bin/flaky-ci/` のスクリプト群 — 手順書 3 本は、機械的な処理をここに置いた
+  小さな CLI の呼び出しとして書く。実行は Node 24 の型除去による
+  `node bin/flaky-ci/scripts/<name>.ts` の直接実行で、ビルド手順も外部 npm
+  依存も要らない。スクリプトが触る GitHub は `gh api -X GET` の読み取りだけ
+  （唯一の例外は `pr-gate-facts` のローカル `git diff`）。契約の定義は
+  `bin/flaky-ci/README.md`
 
 ### Revalidation Triggers
 - `ci-app.yml` / `ci-app-prod.yml` のファイル名変更、またはジョブ名の構造変更
@@ -120,9 +126,11 @@ Actions ワークフロー `.github/workflows/flaky-repro.yml`。アプリケー
 - `gh` CLI のメジャーバージョン更新による REST 応答フィールドの変化
 - **`flaky-ci-routine.md` の Shared constants ブロックのどれかが変わったとき**
   — `flaky/needs-decision`、`- Recommendation:` 行、停止の 2 手（ラベル →
-  コメント）の順序と現在の停止の時間幅、自動投稿の署名文言。このブロックが
-  唯一の定義場所で、両スキルとダッシュボードがそれぞれ一部を実装している
-  ので、変えるときは読み手をすべて直す
+  コメント）の順序と現在の停止の時間幅、自動投稿の署名文言。人が読む定義は
+  このブロックが唯一の場所で、両スキルとダッシュボードがそれぞれ一部を
+  実装しているので、変えるときは読み手をすべて直す。同じ文字列は
+  `bin/flaky-ci/lib/constants.ts` にも機械が読める形で置いてあり、片方だけを
+  変えると `constants.spec.ts` が落ちて知らせる
 - コメント見出しの文言の変更 — `### Additional observation` /
   `### Backfilled observation`（ダッシュボードの Occurrences 算出がこれに
   一致することへ依存）、`### Repro result`、`### Collateral candidate`、
@@ -142,6 +150,24 @@ Actions ワークフロー `.github/workflows/flaky-repro.yml`。アプリケー
   --dry-run` で確認できる）
 - vitest プロジェクト名の追加・改名、`test:*` スクリプトの変更（再現
   ワークフローの allowlist が持っている）
+- **スクリプトが返す JSON の欄名・型を変えたとき** — 手順書 3 本の該当節と
+  `bin/flaky-ci/README.md` の契約表を同じコミットで直す。欄名は手順書の散文
+  （「`ciApp.total` が 0 なら条件 2 は不成立」のような書き方）から直に参照
+  されているので、欄名だけを変えると手順書が存在しない欄を読み続ける
+- **固定文字列の定義元ごとの検証範囲** — `constants.ts` の各定数は、自分が
+  どのファイルと突き合わされるかを宣言している。`### Repro result` の 7 行は
+  `flaky-repro.yml`、`**Fix PR**: ` マーカーは
+  `investigate-flaky-test/SKILL.md` の 6-C（このマーカーを実際に書いている
+  のがそこだから）、残りは `flaky-ci-routine.md`。定義元を動かすときは
+  `constants.ts` の宣言も一緒に動かす
+- **`ci-bin.yml` の `paths` に入っているファイルだけがドリフト検知を起動
+  する** — 現在の `paths` は `bin/**`、`.claude/commands/flaky-ci-routine.md`、
+  `.github/workflows/flaky-repro.yml`。`investigate-flaky-test/SKILL.md` は
+  入っていないので、6-C の `**Fix PR**: ` マーカーだけを変える PR では
+  `constants.spec.ts` が走らない。`detect-flaky-ci/SKILL.md` からは定数を 1 つ
+  も取っていないので、そちらは検証の対象そのものが無い。どちらかの手順書を
+  検証対象にするなら、`paths` への追加と `constants.ts` の宣言の追加を
+  同じコミットで行う
 
 ## Architecture
 
@@ -207,15 +233,19 @@ flowchart TD
 
 ## File Structure Plan
 
-この spec はアプリケーションコードを持たず、Claude Code のスキル/コマンド
-定義（Markdown）と GitHub Actions ワークフロー（YAML）で構成される。
+この spec はアプリケーションコードを持たない。Claude Code のスキル/コマンド
+定義（Markdown）、GitHub Actions ワークフロー（YAML）、そして手順書が呼ぶ
+道具としての TypeScript（`bin/flaky-ci/`）と bash（`.github/scripts/
+flaky-repro/`）で構成される。判断と GitHub への書き込みは Markdown 側にしか
+無く、道具側は事実を返すだけ。
 
 ### 各ファイルの責務
 
 - `.github/workflows/flaky-repro.yml` — 測定器。head commit の trailer を
   読み、allowlist で検証し、対象 spec を指定回数実行して集計を追跡 issue の
   コメントとジョブサマリに書く。**テストの合否では job を落とさない**
-  （落とすのは前処理の失敗だけ）
+  （落とすのは前処理の失敗だけ）。処理の本体は下記の 3 本の bash に置き、
+  workflow 自身は step の並びと環境変数の受け渡しだけを持つ
 - `.github/workflows/ci-app.yml` — `on.push.branches-ignore` に
   `flaky-repro/**` を持つ。さらに `ci-app-test-integration` のセットアップ
   範囲の先頭に、`flaky-repro.yml` がその範囲を複製している旨の相互参照
@@ -233,6 +263,16 @@ flowchart TD
   一字一句合わせる文字列と、停止の 2 手の順序）の唯一の定義場所。Step 0 の
   起動確認から Step 6 の報告までの順番、対象の選択条件、自動クローズ、
   ダッシュボードの本文生成
+- `bin/flaky-ci/` — 手順書が呼ぶ道具。`scripts/` が CLI の入口（1 本 =
+  手順書の 1 節）、`lib/` が純粋関数と 2 つのアダプタ（`gh.ts` が REST 読み
+  取りの唯一の入口、`output.ts` が成功・失敗の唯一の書き方）、`fixtures/` が
+  実データ由来の入力と期待値、`README.md` が全スクリプトの契約表。テストは
+  各モジュールの隣（`*.spec.ts`）に置き、`@growi/bin` の vitest と
+  `.github/workflows/ci-bin.yml` が実行する
+- `.github/scripts/flaky-repro/{parse-request,run-repro,render-result}.sh` —
+  測定用ワークフローの中身。trailer の解析と検証、N 回の実行と集計、
+  `### Repro result` 7 行の整形をそれぞれ担う。`flaky-repro.yml` は最初の
+  ステップで `bash -n` を掛けてからこの 3 本を呼ぶだけ
 
 ### Prerequisite（ファイルの変更ではない）
 - GitHub ラベルを事前に作る: `flaky/dashboard`（ダッシュボード issue を他の
@@ -485,9 +525,84 @@ sequenceDiagram
 | Routine Discipline | flaky-ci-routine.md + investigate-flaky-test | 購読・通知・再起床の予約を禁じる | 9.5 | — | — |
 | Routine Report | flaky-ci-routine.md Step 6 | 実行サマリーの報告項目 | 11.3 | — | — |
 | Operations Config | 運用（リポジトリ外） | ラベル作成、クラウド routine のプロンプト | 9.1, 11.1, 11.2 | RemoteTrigger / REST labels (P0) | — |
+| Fact Scripts | 道具（`bin/flaky-ci/`） | 上の各コンポーネントのうち、判断を通らない機械的な処理を「事実を返す CLI」として持つ | 横断（下表の「呼ぶ節」が属する要件） | gh CLI (P0), Node 24 (P0), 手順書 3 本 (P0) | Batch |
 
 以下は、**ファイルをまたいで一致していなければ壊れる約束事**と、その形に
 した理由だけを書く。手順そのものは各コンポーネントが名指しするファイルが正。
+
+### 道具（`bin/flaky-ci/`）
+
+#### Fact Scripts
+
+| Field | Detail |
+|-------|--------|
+| Intent | 手順書から機械的な処理を外に出し、手順書には「呼ぶ・返ってきた事実を読む・判断する」だけを残す |
+| Requirements | 横断（各スクリプトが呼ばれる節の要件） |
+
+**Responsibilities & Constraints**
+- スクリプトは**事実だけを返し、結論を返さない**。tier を決める・issue を
+  閉じる・PR を開くといった判断と、GitHub への書き込みは、すべて手順書に
+  残る。`lib/gh.ts` は `gh api -X GET` しか持たないので、書き込みは構造的に
+  できない
+- 終わり方は 2 つだけ。事実が出せたら stdout に JSON 1 個で終了コード 0、
+  前提を満たせなければ stdout 空・stderr 1 行・終了コード 2。**0 件は成功**
+  （空配列）で、「読めなかった」が終了コード 2。想定外の例外は終了コード 1
+  で、手順書は 2 と同じに扱う
+- 複数行を返すスクリプトでは、1 行分の値が読めなかったことをその行の欄
+  （`pausedAtStatus: "unavailable"` など）で示し、呼び出し全体は成功にする。
+  1 件読めないだけで他の行まで出なくなるのを避けるため
+- **欄ごとの契約（引数・stdin・出力欄・終了コード・その欄を読む判断）は
+  `bin/flaky-ci/README.md` の表が唯一の定義**。ここに写すと 2 か所が
+  ずれるので、下の表は「どの節が呼び、何のために読むか」だけを持つ
+
+| スクリプト | 呼ぶ節 | 何のために読むか |
+|---|---|---|
+| `list-candidate-runs` | detect Step 1 | 時間窓内の完了済み run 一覧。同一 commit の attempt 反転を確定扱いにするか、打ち切り（`truncated`）を報告するか |
+| `fetch-flaky-issues` | detect Step 1.5、routine Step 5 item 1 | 既存の追跡 issue の本文・ラベル・コメント全文。run スキップ一覧の抽出、タイトル完全一致での照合、ダッシュボードの材料 |
+| `parse-job-log` | detect Step 2・Step 2b（出力欄は Step 3 でも読む） | ジョブログから vitest の FAIL ブロック・Playwright の注釈と集計・denylist 一致。ノイズの除外と識別の段位の決定 |
+| `lockfile-overlap` | detect の判定① | PR の lockfile 差分とログ抜粋のパッケージ名の交差。交差があれば①を発火させない |
+| `mining-signals` | detect の判定②③ | 挟み込みと matrix の食い違いの真偽と根拠 1 行。tier の付け方 |
+| `pr-owns-failure` | detect「Failures the PR itself owns」 | master との祖先関係・紐づく PR 全件・spec パス一致。追跡対象から外すか続行するか |
+| `parse-identity-key` | investigate Step 1 | issue 題名の分解と 3 つの形（`precise` / `playwright-job-level` / `malformed`）。形ごとに進み方が変わる |
+| `check-runs-facts` | investigate 2-C・6-A | commit の check-run を同名で重複排除した一覧と `ci-app-*` の集計。待ち続けるか諦めるか |
+| `read-repro-result` | investigate 2-D | `- Commit:` で選んだ `### Repro result` の集計。2-E の判定表 |
+| `pr-gate-facts` | investigate 6-B | ゲート条件 1・2 の材料（集計・`ci-app-*`・基準からの変更ファイル）。条件 3 と HIGH/MEDIUM/LOW の表は手順書に残る |
+| `newest-observation` | routine 4-B | issue の最新観測日時と出所。閉じるか閉じないか（読めなければ閉じない） |
+| `awaiting-decision-rows` | routine Step 5 item 2 | 判断待ち行の `Paused at` / `Recommendation` / 窓以降の観測数。`(may be stale) ` の解釈と再選択しない規則は手順書に残る |
+| `render-dashboard` | routine Step 5 item 3 | ダッシュボード issue の本文そのもの。何を載せるか（入力を組む側）と検索・作成・全置換は手順書に残る |
+
+**共有している内部モジュール**（同じ事実が 2 か所で別々に実装されないための
+もの。ここが「2 つの節が同じ数を見ている」ことの担保になっている）
+- `lib/check-runs.ts` の `dedupeNewestByName` / `aggregateCiApp` —
+  `check-runs-facts` と `pr-gate-facts` が共用。同名 check-run の解決は
+  `startedAt` → 同着なら大きい `id` で、入力の並び順に依存しない
+- `lib/repro-result.ts` の `selectNewestMatch` — `read-repro-result` と
+  `pr-gate-facts` が共用。同一 SHA に複数のコメントがあるときの解決
+  （`created_at` → `id`）はここ 1 か所
+- `lib/constants.ts` — 固定文字列の機械可読な定義。各定数が自分の検証元
+  （Revalidation Triggers 参照）を宣言する
+- `lib/dashboard.ts` — ダッシュボード本文の描画。行順・Occurrences の
+  数え方・`**Fix PR**: ` マーカーの読み取り・65536 字の切り詰めは、いま
+  ここが唯一の実装
+
+**Implementation Notes**
+- `mining-signals` の `--identity` は識別キーの文字列ではなく **JSON
+  ファイルのパス**。`specPath` / `testTitle` / `targetRun` /
+  `priorFailingRunIds[]` / `jobName` / `siblingJobs[]` を束ねる。③（matrix の
+  食い違い）はジョブ単位の兄弟の結論を要るのに、`list-candidate-runs` の
+  出力は run 単位の `conclusion` しか持たないため、手順書側が jobs 一覧を
+  フィルタ無しで取り直して組む。detect Step 2 の jobs 一覧は失敗ジョブだけに
+  絞っており、成功した兄弟の行が残っていないので再利用できない
+- `pr-owns-failure` は `ancestryStatus` が祖先（`identical` / `behind`）でも
+  `pulls[]` / `touchesSpec` を必ず計算する。1 回の呼び出しで全欄を返す形に
+  揃えるための選択で、その代わり祖先の commit でも PR 側の API 呼び出しが
+  失敗すれば終了コード 2 になる（fail open なので除外はせず、未確認として
+  Step 5 に載る）
+- `pr-gate-facts` の `changedFiles[]` だけがローカルの `git diff
+  <base>...<sha>`（3 点表記）を使う。6-A の時点で修正ブランチが checkout
+  されている前提が既にあるため
+
+**Contracts**: Batch [x]
 
 ### 測定
 
@@ -822,14 +937,21 @@ Requirement 7 が両立する仕組みで、折り畳みは照合の前段にあ
   無い（機能ブランチへの直接 push）なら除外する。(C) そのどれかの PR が
   失敗した spec ファイルを変更していれば除外し、issue も作らずコメントも
   付けず、実行サマリーに件数と PR 番号を報告する
+- (A)〜(C) の 3 段は `pr-owns-failure` が 1 回の呼び出しで全部返す。手順書に
+  残るのは、返ってきた `ancestryStatus` / `pulls[]` / `touchesSpec` / `noPr`
+  を読んで「除外する／続行する」を決める judgement だけ
 - (C) のパス比較は**後方一致**で行う。PR の `files[].filename` は
   リポジトリ起点、vitest の識別が持つ spec パスは `apps/app` 起点なので、
-  等値比較では 1 件も一致せず、この判定が黙って無効化される
+  等値比較では 1 件も一致せず、この判定が黙って無効化される。比較そのものは
+  スクリプトの中にあるが、`--spec-path` に `apps/app` 起点の形を渡すのは
+  呼ぶ側の責任なので、この事実は消えない
 - **判定は fail open** にする。compare が 404 を返す（マージキューの
   コミットはスキャンが届く前に回収されることがある）、PR やファイル一覧の
   取得に失敗した、といったときは**除外しない**。無人実行で本物の flake を
   API の一時的な失敗で失うほうが、人が後で閉じられる issue が 1 件増える
-  よりずっと悪い
+  よりずっと悪い。`pr-owns-failure` は祖先だと分かった commit でも PR 側の
+  呼び出しを省かないので、祖先の commit でも終了コード 2 になることがある。
+  その場合も扱いは同じで、除外せずに続行し、Step 5 に未確認として載せる
 - **ロックファイル差分の照合（8.2）** — 「PR の差分が該当箇所を触っていな
   い」という安価な判定は、差分が `pnpm-lock.yaml` だけのときに誤って成立
   する。依存の更新はテストが動く相手そのものを変えるので、ロックファイル
@@ -974,6 +1096,12 @@ issue の自動クローズ」に書いた。ここに加えるのは 2 点だ�
 - 本文は「1 行 1 テストの表」＋その下の 2 節という構成
 - Step 2 が作ったリストは使い回さず、この時点で取り直す（調査と自動
   クローズの間にラベルが変わっているため）
+- 以下の State Management に書く本文の形（行の並び、Occurrences の数え方、
+  First/Last seen の求め方、`**Fix PR**: ` マーカーの読み取り、65536 字の
+  切り詰め）は、`bin/flaky-ci/lib/dashboard.ts` が唯一の実装。手順書が持つ
+  のは「何を載せるか」（open の issue に絞る、判断待ちの候補を取り直す、
+  Step 4 が閉じた 3 リストを渡す）と、ダッシュボード issue の検索・作成・
+  全置換だけ
 
 **Contracts**: Batch [x] / State [x]
 
@@ -1163,6 +1291,24 @@ stateDiagram-v2
   （自動マージ・自動削除はしない）
 - 起動時に必要な GitHub API へのアクセスが確認できない → 追跡状態への変更
   を一切行う前に停止し、理由を報告する（Requirement 4.1）
+- **スクリプトが終了コード 2 で終わったとき**は、その節がもともと持っていた
+  「測定できなかった」「取得できなかった」の経路にそのまま入る（判断待ちに
+  する、除外せず続行する、その issue を飛ばす、など節ごとに決まっている）。
+  そのうえで routine Step 6 の報告に「スクリプト失敗: <名前> <理由>」を
+  1 行ずつ載せる（0 件なら `none`）
+- **「一部だけ読めた」は終了コード 0 の事実**であり、Step 6 のこの行には
+  現れない。`list-candidate-runs` の `truncated`、`fetch-flaky-issues` の
+  `labelFetchFailures` と `commentsStatus`、`awaiting-decision-rows` の
+  `pausedAtStatus` がこれにあたる。Step 6 の行は終了コードが非 0 の呼び出し
+  だけを数える契約なので、そこに混ぜると「測定できない」という本当の異常が
+  埋もれる。報告先は**呼んだ側の手順書が自分で持つ報告**（detect の Step 5、
+  routine の Step 5）で、そこに「どこが欠けたか」を書く
+
+  この区別は実害のある場面がある。`fetch-flaky-issues` が 1 つのラベルの
+  取得に失敗したとき、そのラベルの issue が `issues[]` から丸ごと落ちる。
+  Step 4 はタイトル完全一致で既存 issue を探すので、落ちた issue は
+  「存在しない」と読まれ、重複した追跡 issue が作られる。`labelFetchFailures`
+  が空でないときは、その回の照合が不完全であることを Step 5 で明示する
 
 ### Monitoring
 - 実行サマリー（Routine Report の 4 項目を含む）とダッシュボードの
@@ -1170,14 +1316,50 @@ stateDiagram-v2
 
 ## Testing Strategy
 
-この spec はアプリケーションコードを持たず、Claude Code スキル/コマンドの
-Markdown 手順と GitHub Actions の YAML として実装されるため、通常の単体/
-結合テストは適用できない。検証は、実際の `gh` / GitHub API 呼び出しと
-実際の workflow 実行を伴うシナリオ検証で行う。
+検証は 2 層に分かれる。
 
-つまり、**将来この手順書の文言が変わっても、それを機械的に検知して落ちる
-テストは存在しない**。以下は、その代わりに何をどう見れば合否が決まるかの
-記録。
+- **自動テストがある層** — `bin/flaky-ci/` のスクリプトが持つ機械的な処理と、
+  手順書の固定文字列。下の「スクリプトの自動テスト」と「固定文字列のドリフト
+  検知」がこれにあたる
+- **自動テストが無い層** — 判断の散文、GitHub への書き込み、測定用ワーク
+  フローの実走行。実際の `gh` / GitHub API 呼び出しと実際の workflow 実行を
+  伴うシナリオ検証で人が見る。下の「仕組みそのものの検証」「実在の issue を
+  使った検証」と、「文字列の一致」のうち機械が見ていない参照箇所がこれに
+  あたる
+
+**手順書の文言のうち、機械的に検知して落ちるのは固定文字列だけ**である。
+判断の散文が変わっても落ちるテストは無いので、そこは下の手順で人が見る。
+
+### スクリプトの自動テスト（`bin/flaky-ci/`）
+
+- 各モジュール（`lib/` の純粋関数と `scripts/` の CLI）の隣に `*.spec.ts`
+  を置き、`turbo run test --filter=./bin` と `.github/workflows/ci-bin.yml`
+  で実行する
+- 入力は `bin/flaky-ci/fixtures/` の**実データ由来**のもの — 実際の issue
+  とコメント、check-run、PR の files、lockfile の patch、ジョブログの抜粋、
+  実在するダッシュボード issue の本文。実例がリポジトリに 1 件も無かった
+  ものだけ構成データを使い、その旨と「どこを探して見つからなかったか」を
+  隣の `.meta.md` に正直に書く（同着の `started_at`、マージキューの commit、
+  同一 SHA の `### Repro result` 2 件、`playwright-job-level` と
+  `malformed` の識別キー）
+- 期待値は `fixtures/expected/` に、**スクリプト化する前のシェル片を同じ
+  素材に対して実際に実行した出力**として置いてある。散文でしか書かれて
+  いなかった処理（識別キーの正規表現、lockfile のパッケージ名の抽出）は、
+  その散文を素直に書き起こした参照実装の出力を基準値にした
+- 各 CLI は共通して 3 つを見る。`--help` が終了コード 0 で終わること
+  （型除去で落ちる構文の検知）、フィクスチャ入力で契約表どおりの欄が出る
+  こと、前提を満たさない入力で終了コード 2 かつ stdout が空であること
+- 事故として実際に起きた形は入力に含める — 別 attempt のログ取り違え、
+  `sort | tail -1` の同着、空の `PAUSED_AT`、候補 1 件のときに比較関数が
+  一度も評価されない `reduce`、97 件の失敗中 1 件だけの denylist 一致
+
+### 固定文字列のドリフト検知
+
+`bin/flaky-ci/lib/constants.spec.ts` が `lib/constants.ts` の定数を全件、
+それぞれが宣言した定義元のファイル本文と突き合わせる。片方だけを変えると
+このテストが落ちる。範囲と穴は Revalidation Triggers に書いたとおりで、
+検証の対象は `constants.ts` に宣言のある文字列だけ、走るのは `ci-bin.yml`
+の `paths` に載ったファイルを変えたときだけ。
 
 ### 仕組みそのものの検証（自己検証用ブランチで行う）
 - **測定器の 3 シナリオ** — 既知の安定した spec を `Repeat 3` で依頼すると
@@ -1194,6 +1376,10 @@ Markdown 手順と GitHub Actions の YAML として実装されるため、通�
   workflow が「trailer が無い」として拒否する（`flaky-repro/**` 側）。
   `fix/flaky-**` への trailer 無し push は exit 0 で終わり、後続ステップが
   skip される
+- **分割した bash の実走行** — `.github/scripts/flaky-repro/` の 3 本は
+  `bash -n` の構文検査までしか自動で見ていない。`flaky-repro/selftest-*`
+  ブランチで 1 回測定し、`### Repro result` の 7 行が固定の形と順で出る
+  ことを人が見る
 - 自己検証に使ったブランチは、確認が終わったら削除する
 
 ### 実在の issue を使った検証
@@ -1220,6 +1406,10 @@ Markdown 手順と GitHub Actions の YAML として実装されるため、通�
 
 ### 文字列の一致（毎回の確認項目）
 見出し・ラベル名・trailer 名・ブランチ名パターン・署名文言は、3 つの
-Markdown ファイルと `flaky-repro.yml` と本 design.md の 5 か所で一字一句
-同じでなければならない。どれか 1 つを変えるときは、grep で定義箇所と参照
-箇所を洗い出し、同じコミットで全部直す（Revalidation Triggers）。
+Markdown ファイルと `flaky-repro.yml`、`bin/flaky-ci/lib/constants.ts`、
+本 design.md の 6 か所で一字一句同じでなければならない。このうち
+`constants.ts` と、そこが名指しする定義元との一致は `constants.spec.ts` が
+見る。それ以外の参照箇所（judgement の散文が文字列を引用している場所、
+trailer 名、ブランチ名パターン）は機械が見ていないので、どれか 1 つを変え
+るときは grep で定義箇所と参照箇所を洗い出し、同じコミットで全部直す
+（Revalidation Triggers）。

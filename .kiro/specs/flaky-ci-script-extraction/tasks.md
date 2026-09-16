@@ -142,7 +142,7 @@
   - _Requirements: 6.1, 6.2, 6.3_
 
 - [ ] 5. 元 spec へ移し戻して、この spec を削除する（spec-lifecycle）
-- [ ] 5.1 `ci-flaky-test-detection` の design.md を現在の事実で書き直す
+- [x] 5.1 `ci-flaky-test-detection` の design.md を現在の事実で書き直す
   - File Structure Plan に `bin/flaky-ci/` の構成、Components にスクリプト 13 本と手順書のどの節が呼ぶかの表、Testing Strategy にフィクスチャ・旧手順の期待値・ドリフト検知、Revalidation Triggers にスクリプト契約と Shared constants と `ci-bin.yml` の連動を追記する。履歴の語りは書かない
   - 観測可能な完了状態: 元 spec の design.md に 13 本のスクリプトと呼び出し箇所の表があり、本文に「以前は〜」の履歴の語りが無い
   - _Requirements: 5.4_
