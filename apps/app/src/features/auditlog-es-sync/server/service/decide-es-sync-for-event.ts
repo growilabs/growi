@@ -1,6 +1,10 @@
+import loggerFactory from '~/utils/logger';
+
 import { AnonymousSyncCounter } from '../models/anonymous-sync-counter';
 import type { EsSyncDecisionValue } from '../models/es-sync-decision';
 import { EsSyncDecision } from '../models/es-sync-decision';
+
+const logger = loggerFactory('growi:service:decide-es-sync-for-event');
 
 // Grace period before a 'pending' claim is treated as abandoned (the process that
 // took it crashed, or stalled) and another process may take it over. Also the wait
@@ -95,6 +99,17 @@ export const decideEsSyncForEvent = async (
   );
   const decision: EsSyncDecisionValue =
     after.count <= threshold ? 'admitted' : 'dropped';
+
+  // Logged once per (endpoint, windowStart) — at the exact event that pushes the
+  // count past threshold — not on every subsequent 'dropped' event in the same
+  // window, so a sustained attack doesn't flood the log with one line per event.
+  if (after.count === threshold + 1) {
+    logger.warn(
+      { endpoint, windowStart, threshold },
+      'Anonymous log ES sync threshold reached; further anonymous logs for this endpoint in this window are dropped from ES (still recorded in MongoDB).',
+    );
+  }
+
   await EsSyncDecision.updateOne({ _id: activityId }, { $set: { decision } });
   return decision;
 };

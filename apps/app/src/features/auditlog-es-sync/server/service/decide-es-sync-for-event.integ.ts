@@ -4,6 +4,17 @@ import { AnonymousSyncCounter } from '../models/anonymous-sync-counter';
 import { EsSyncDecision } from '../models/es-sync-decision';
 import { decideEsSyncForEvent } from './decide-es-sync-for-event';
 
+const { mockWarn } = vi.hoisted(() => ({ mockWarn: vi.fn() }));
+
+vi.mock('~/utils/logger', () => ({
+  default: vi.fn(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: mockWarn,
+    error: vi.fn(),
+  })),
+}));
+
 describe('decideEsSyncForEvent', () => {
   const endpoint = '/login';
   const windowStart = new Date('2026-01-01T00:00:00Z');
@@ -11,6 +22,7 @@ describe('decideEsSyncForEvent', () => {
   afterEach(async () => {
     await AnonymousSyncCounter.deleteMany({});
     await EsSyncDecision.deleteMany({});
+    mockWarn.mockClear();
   });
 
   const newActivityId = (): string => new mongoose.Types.ObjectId().toString();
@@ -47,6 +59,34 @@ describe('decideEsSyncForEvent', () => {
       'dropped',
       'dropped',
     ]);
+  });
+
+  it('logs a warning exactly once, at the event that first crosses the threshold', async () => {
+    const threshold = 3;
+    for (let i = 0; i < 5; i++) {
+      // biome-ignore lint/performance/noAwaitInLoops: each call must see the prior one's committed count.
+      await decideEsSyncForEvent(
+        newActivityId(),
+        endpoint,
+        windowStart,
+        threshold,
+      );
+    }
+
+    // Not once per dropped event (2 of the 5 were dropped) — a sustained attack
+    // must not flood the log with one line per event.
+    expect(mockWarn).toHaveBeenCalledTimes(1);
+    expect(mockWarn).toHaveBeenCalledWith(
+      expect.objectContaining({ endpoint, windowStart, threshold }),
+      expect.any(String),
+    );
+  });
+
+  it('does not log when every event in the window is admitted', async () => {
+    await decideEsSyncForEvent(newActivityId(), endpoint, windowStart, 3);
+    await decideEsSyncForEvent(newActivityId(), endpoint, windowStart, 3);
+
+    expect(mockWarn).not.toHaveBeenCalled();
   });
 
   it('does not admit past the threshold for a different endpoint sharing the same window', async () => {
