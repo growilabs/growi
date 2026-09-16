@@ -94,7 +94,7 @@
   - 観測可能な完了状態: Step 1.5 に取得のシェル片が無い。`--help` が 0、記録済み応答のテストが期待値と一致して通る。README に行がある。行数・容量の前後を記録
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 3.3, 4.1, 4.4, 5.1, 5.2_
 
-- [ ] 3.6 判定②（挟み込み）③（matrix の食い違い）の材料
+- [x] 3.6 判定②（挟み込み）③（matrix の食い違い）の材料
   - run 一覧（3.4 の出力形式）と識別キーとジョブ結果を受け、②と③それぞれの真偽と根拠 1 行を返す（新しい API 呼び出しは無し）
   - detect の②③の節を呼び出しに置き換える。tier の付け方は残す
   - 観測可能な完了状態: ②③の節にシェル片が無い。`--help` が 0、挟み込みあり／なし、matrix 分岐あり／なしの 4 ケースが期待値と一致するテストが通る。README に行がある。行数・容量の前後を記録
@@ -953,4 +953,91 @@ Step 1.5（`labelFetchFailures` の意味）と Step 5（打ち切り・欠損�
 | ファイル | 是正前（行/バイト） | 是正後（行/バイト） |
 |---|---:|---:|
 | `.claude/skills/detect-flaky-ci/SKILL.md` | 1582 / 82544 | 1595 / 83417 |
+
+### タスク 3.6: 判定②（挟み込み）③（matrix の食い違い）の材料（`mining-signals`、2026-09-16）
+
+**design.md の契約表とタスク本文の食い違い、および解決**: design.md の
+scripts テーブル（`## Components and Interfaces` → `scripts（CLI）`）は
+`mining-signals` の入力を `--runs-file --identity` の 2 つとだけ書いている
+一方、tasks.md 本タスクの本文は「run 一覧（3.4 の出力形式）と識別キーと
+**ジョブ結果**を受け」と 3 つの入力を挙げている。実測で確認した事実:
+`list-candidate-runs.ts`（3.4）の `runs[]` は run（＝ workflow 実行）単位の
+`conclusion` しか持たず、ジョブ単位の結果（③の判定に要る「同じ commit の
+他の matrix セルの結論」）は含まれない。また detect-flaky-ci の Step 2 が
+既に呼んでいる `gh api repos/growilabs/growi/actions/runs/{RUN_ID}/jobs`
+（159 行目・608 行目）は `-q 'select(.conclusion == "failure")'` で失敗
+ジョブだけに絞っており、③に要る「成功した sibling」の行は残っていない。
+したがって `--runs-file --identity` の 2 引数だけでは③を計算できず、design
+の 2 引数は省略形（要約行）であり、tasks.md 本文の「ジョブ結果」を実体と
+みなすのが正しいと判断した。ただし CLI の引数自体は増やさず、design.md の
+文字どおりの `--runs-file --identity` の 2 フラグを維持し、`--identity` を
+単なる識別キー文字列ではなく JSON ファイル（`specPath`, `testTitle`,
+`targetRun`, `priorFailingRunIds[]`, `jobName`, `siblingJobs[]` を含む）に
+した。これにより design.md の CLI シグネチャの文言とタスク本文の「3つの
+入力」の両方を、フラグを増やさずに満たしている。**タスク 5.1（元 spec へ
+の移し戻し）への申し送り**: 元 spec の design.md にこの表を移すときは、
+`--identity` が生の識別キー文字列ではなく上記 JSON 構造を持つ旨を明記
+すること（現在の 2 行の要約のままでは③の計算根拠が読み取れない）。
+
+**`siblingJobs` の作り方（手順書側の追加呼び出し）**: 上記の理由により、
+`detect-flaky-ci/SKILL.md` の②③節には「Step 2 が既に呼んだ jobs 一覧を
+そのまま使う」ではなく「同じエンドポイントをフィルタ無しで呼び直す」と
+明記した（Step 2 のクエリはフィルタ済みで sibling の成功行を捨てている
+ため、そのまま再利用できない）。これは本スクリプト自身が新しい API
+呼び出しをすることはない（tasks.md の観測可能な完了状態が求めるのは
+このスクリプトが `gh` を呼ばないことであり、手順書側が 1 回追加で呼ぶこと
+自体は禁じられていない）という理解のもとの記述で、旧来「Get sibling job
+results from the Step 2 jobs-list call you already made」という言い回しが
+実は同じフィルタ済みクエリを指していて再利用できない、という置き換え前
+から存在した food-for-thought を、置き換えのついでに正直に書き直した
+（置き換え前の挙動を変えたわけではなく、置き換え前の文章が実態と食い違って
+いた箇所を訂正した）。
+
+**根拠 1 行のテンプレート整合**: `detect-flaky-ci/SKILL.md` の issue 本文
+テンプレート（1231-1234 行目、`"② same identity failed in run {A}, passed
+in intervening run {B}, failed again here"` / `"③ sibling matrix job {NAME}
+on the same commit passed"`）の文言に評価文字列を一致させた
+（`evaluateSandwich` / `evaluateMatrixSplit` の `evidence`）。この 2 か所は
+タスク範囲外（Step 4 のテンプレート自体は変更していない）だが、評価文字列
+の文言がこのテンプレートに直接埋め込まれる前提のため、事前に確認した。
+
+**単一候補・境界の短絡バグ（タスク 2.2/2.3 と同じ事故事例）への対応**:
+`priorFailingRunIds` が空配列のとき（同一 scan 内で他に一度もこの識別が
+現れていない）は比較を一切せず `hit:false` を返す分岐を先に置き、
+`priorFailingRunIds` が 1 件だけのときにその 1 件が正しく評価される
+（間に合格 run があれば hit、無ければ miss）ことをテストで固定した
+（`does not short-circuit on a single-element priorFailingRunIds array`）。
+また `targetRun` より新しい run ID が誤って `priorFailingRunIds` に渡された
+場合はそれを候補から除外する（未来の occurrence で過去の失敗を挟み込んだ
+ことにしない）。`runs[]` の並び順（`list-candidate-runs.ts` は新しい順だが、
+本スクリプトは並びを信用せず `createdAt` で都度比較する）が逆でも結果が
+変わらないことも別テストで固定した。
+
+**観測可能な完了状態の確認**: `.claude/skills/detect-flaky-ci/SKILL.md` の
+②③節（旧 209-225 行目）から `gh api .../pulls`・`jq` 相当の抽出手順が消え、
+呼び出し行＋出力欄の説明＋残す判断（tier の付け方、③の sibling 再取得の
+理由）だけになった。`node bin/flaky-ci/scripts/mining-signals.ts --help` が
+終了コード 0。挟み込みあり／なし、matrix 分岐あり／なしの主要 4 ケースに
+加え、単一候補・順序非依存・未来 ID 除外の回帰テストを含む
+`mining-signals.spec.ts`（20 件）が通る。RED（`evaluateSandwich` /
+`evaluateMatrixSplit` を固定値スタブに差し替えて実行）→GREEN を実測して
+確認した。`pnpm vitest run`（`bin/` 配下）で 26 ファイル 374 件が通ることを
+確認した（`constants.spec.ts` を含む既存全件に回帰無し）。`biome check bin`
+は自動整形を適用した上で通過（警告 0、エラー 0）。`README.md` の契約表に
+`mining-signals` の行を追加した。
+
+行数・容量（`wc -l -c`、タスク 3.5 是正後の値と比較）:
+
+| ファイル | 変更前（行/バイト） | 変更後（行/バイト） |
+|---|---:|---:|
+| `.claude/skills/detect-flaky-ci/SKILL.md` | 1595 / 83417 | 1617 / 84611 |
+
+このタスク単独では行数・容量とも増えている（+22 行 / +1194 バイト）。
+置き換え前の②③節はそれぞれ 8 行・8 行の短い散文（「Step 1 の再読み込み」
+「Step 2 のジョブ結果を使う」という一文で済んでいた）だったのに対し、
+置き換え後は `mining-signals.ts` の呼び出し方（2 つの入力ファイルの組み方、
+特に `--identity` の JSON 構造）を手順書内に明記する必要があり、タスク 3.5
+の Implementation Notes に記録した同種の理由（出力契約の説明の追記が
+削除できた行より大きい）がここでも同様に当てはまる。要件 5.3 の比較対象
+（毎回読まれる 2 本の合計）はタスク 3.11 でまとめて確認する。
 

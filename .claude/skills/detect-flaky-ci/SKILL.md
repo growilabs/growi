@@ -206,23 +206,45 @@ deterministic and closing the issue under
 `### Closed: deterministic cause, not flaky` is `investigate-flaky-test`'s
 job, not this skill's.
 
-**② Sandwich pattern.** Within the `--window-hours` window already fetched in
-Step 1, look for the same vitest identity key failing in two (or more) runs
-with a run of the *same job* in between that succeeded — a failure that
-disappears and reappears with an identical signature is stronger evidence of
-non-determinism than two failures with nothing but other failures between
-them. This needs no new API call: it is a re-read of the Step 1 run list plus
-the Step 2 job results already in hand, including run URLs and dates recorded
-on an existing `flaky/observing` issue's observation comments.
+**② Sandwich pattern** (this same identity failing, then a passing run of the
+same workflow, then failing again within the window) **and ③ matrix
+divergence** (a sibling matrix cell of the same job, on the same commit,
+that passed) are both computed by one call, `mining-signals.ts`, which makes
+no `gh api` call of its own — it is a pure re-read of data assembled from
+calls already made elsewhere: Step 1's run list, any other fresh failure of
+this identity already found this scan, an existing `flaky/observing` issue's
+recorded observation run URLs from Step 1.5, and `siblingJobs` below. For
+`siblingJobs` you need every job's conclusion on the commit, not just the
+failed ones Step 2's `-q 'select(.conclusion == "failure")'` query kept, so
+re-run `gh api repos/growilabs/growi/actions/runs/{RUN_ID}/jobs` without
+that filter (still the same endpoint Step 2 already calls, just unfiltered)
+rather than trying to recover the discarded rows:
 
-**③ Matrix divergence.** `ci-app-test-integration` runs a
-node/MongoDB-version matrix (see any recent job name, e.g.
-`ci-app-test-integration (24.x, 8.0, 8, 8.19.16)`). If the same commit's
-other matrix cells for the same job **passed** while this one failed, that is
-a same-commit, zero-wait signal. Get sibling job results from the Step 2
-jobs-list call you already made (`gh api
-repos/growilabs/growi/actions/runs/{RUN_ID}/jobs`) — filter by job name
-prefix, compare conclusions.
+```bash
+node bin/flaky-ci/scripts/mining-signals.ts \
+  --runs-file {STEP_1_RUNS_FILE} --identity {IDENTITY_FILE}
+```
+
+`{STEP_1_RUNS_FILE}` is Step 1's `list-candidate-runs.ts` output for this
+identity's workflow, saved as-is. `{IDENTITY_FILE}` is a small JSON file you
+assemble for this failure:
+
+```json
+{
+  "specPath": "{SPEC_PATH}", "testTitle": "{TEST_TITLE}",
+  "targetRun": { "id": {RUN_ID}, "headSha": "{HEAD_SHA}", "createdAt": "{CREATED_AT}", "url": "{RUN_HTML_URL}" },
+  "priorFailingRunIds": [{other run IDs within the window already known to have failed with this same identity — from another fresh failure this scan, or from an existing flaky/observing issue's observation comments}],
+  "jobName": "{THIS FAILING JOB'S NAME, e.g. ci-app-test-integration (24.x, 8.0, 8, 8.19.16)}",
+  "siblingJobs": [{jobs on the same commit, from gh api repos/growilabs/growi/actions/runs/{RUN_ID}/jobs — name and conclusion only}]
+}
+```
+
+Output: `sandwich: { hit, evidence }` and `matrixSplit: { hit, evidence }` —
+`hit: false` is a normal fact (nothing to report for that check), never a
+script failure. `priorFailingRunIds: []` (no other known occurrence this
+scan) always yields `sandwich.hit: false` without needing the run-list
+comparison — that is a fact worth reading as-is, not a reason to skip
+calling the script.
 
 **⑤ Setup-hook timeout with cross-file slowdown.** A failure whose error is
 `Hook timed out in Nms` on a hook registered in a Vitest **project's
