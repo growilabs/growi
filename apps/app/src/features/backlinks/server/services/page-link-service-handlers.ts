@@ -70,7 +70,7 @@ export const handlePageUpsertById = async (
   // A soft delete only rewrites path and status, so the check above does not catch it and a stale
   // upsert would index a source now under /trash. Keyed on STATUS_DELETED rather than
   // STATUS_PUBLISHED because a legacy page's null status means published. Clearing the rows such a
-  // page already owns is reconciliation (B5.2), not yet implemented.
+  // page already owns is `reconcileDeletedPages`'s job, not this one's.
   if (page.status === Page.STATUS_DELETED) return 0;
 
   return handlePageUpsert(page, siteUrl);
