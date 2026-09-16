@@ -67,7 +67,7 @@
   - 観測可能な完了状態: `--help` が 0、素材 6 種（集計欠落は `summary: null`、「97 件中 1 件の denylist 一致が `scope: failure`」を含む）のテストが期待値と一致して通る。README に行がある。手順書はまだ触らない
   - _Requirements: 1.3, 2.1, 3.2, 3.3, 4.1, 4.3, 4.4_
 
-- [ ] 3.2 ジョブログ解析への手順書の切り替え（detect Step 2・Step 3・取得経路・`allowed-tools`）
+- [x] 3.2 ジョブログ解析への手順書の切り替え（detect Step 2・Step 3・取得経路・`allowed-tools`）
   - detect の Step 2（ログ取得後の grep・ANSI 除去・FAIL 書式）、Step 3 の Playwright 事実の取り出し、denylist の一覧を 3.1 の呼び出しに置き換える。段位の決定・denylist の拡張・巻き添えと連鎖の畳み先は残す
   - MCP 経路に「結果を Write でファイルに保存してから流し込む」の 1 段を足し、`gh` 経路は「ファイルに保存して流し込む」に揃える。frontmatter の `allowed-tools` に `Write` と `mcp__github__get_job_logs` を追記する
   - 観測可能な完了状態: 該当節に grep のパターン一覧・ANSI の正規表現・denylist の一覧が無く、両経路が同じ呼び出し行に合流している。行数・容量の前後を記録
@@ -619,4 +619,89 @@ API 応答に対する契約の健全性の確認であり、このタスクが�
 呼び出し、または `flaky-ci-routine` / `detect-flaky-ci` / `investigate-flaky-test`
 の各 Skill 呼び出し）を許可するルールをこのセッションの設定に追加する
 必要がある。tasks.md のチェックボックスは変更していない（未完了のまま）。
+
+### タスク 3.2: ジョブログ解析への手順書の切り替え（2026-09-16）
+
+`.claude/skills/detect-flaky-ci/SKILL.md` の Step 2（失敗ジョブのログ取得後の
+`sed` による ANSI 除去と `grep -E` のパターン一覧）、Step 2b（成功した
+`run-playwright` ジョブを対象にした別の `grep -iE` パイプライン）、Step 3 の
+Playwright 事実の取り出し（`::error file=…,title=…` 注釈と集計行を生ログから
+読む手順）、および denylist の 7 項目の散文一覧を、すべて
+`node bin/flaky-ci/scripts/parse-job-log.ts < "$LOG_FILE"` の 1 回の呼び出しに
+置き換えた（タスク 3.1 で実装済みのスクリプト。本タスクではスクリプト・
+`lib/` は変更していない）。
+
+**取得経路の統一**: `gh` 経路は `gh api --allow-escape-sequences … > "$LOG_FILE"`
+というファイルへのリダイレクトに変更した（旧来は `sed` へパイプして標準出力に
+流していた）。MCP 経路には設計どおり「`mcp__github__get_job_logs` の結果を
+`Write` で同じ命名規則（`${TMPDIR:-/tmp}/flaky-job-{JOB_ID}.log`）のファイルに
+保存する」という 1 段を追加した。両経路とも同じ `node … < "$LOG_FILE"` 呼び出し
+に合流する（design.md の「ログ解析（両経路）」フローどおり）。frontmatter の
+`allowed-tools` に `Write` と `mcp__github__get_job_logs` を追記した。
+
+**残した判断（Requirement 2.3 の 7 点のうち本タスクに関わるもの）**:
+- Playwright の tier 1/tier 2 の識別ルール（`playwright.annotations` の
+  distinct 件数と `playwright.summary.flaky + .failed` の合計、
+  `playwright.summary` が `null` のときのフォールバック）と、識別キーの
+  正規化（`apps/app/` の除去、`[browser] › file:line:col › ` の除去、
+  ` › ` → ` > ` の書き換え）はそのまま残した——正規化は
+  `lib/job-log.ts` のコメントが明言するとおりスクリプトの責務外
+- denylist の拡張判断（「小さく・追加的に保つ、実際の誤検知が見つかった
+  ときだけ広げる」）と、`lib/denylist.ts` が意図的にパターン化していない
+  「curl のリトライ枯渇」1 件（固定文字列が無く、コード化すると通常の
+  失敗まで誤って一致させるため）は、手順書側の判断としてそのまま残した
+  （`lib/denylist.ts` 冒頭のコメントと同じ理由を手順書側にも明記）
+- denylist ヒットの `scope`（`"job"` / `"failure"`）の読み方——`"job"` は
+  `test/setup/**` 配下の共有 setup フックが原因でジョブログ全体を除外する
+  例外、`"failure"` はその失敗 1 件だけを除外——は判断としてそのまま残した
+- 巻き添え（collateral）・連鎖（cascade）の畳み先の判断（同一ジョブログ内の
+  他のタイムアウトをどの識別に畳むか、同一 spec ファイル内の後続失敗をどう
+  畳むか）は本タスクの対象外（タスク 3.2 の範囲は Step 2・Step 2b・Step 3 の
+  Playwright 事実抽出であり、collateral/cascade の節そのものは変更していない）
+
+**副次的な変更**: `vitest.failBlocks[]` に `sharedSetupHook`
+（真偽値、`test/setup/**` 配下のスタックフレームを持つかどうか）が
+`lib/job-log.ts` の `isSharedSetupHookBlock` としてすでに実装されていたため
+（タスク 3.1 の範囲）、Step 3 の「共有 setup フックの見分け方」節が生ログの
+スタックフレームを手で読む手順を重複して記述していた（Requirement 1.2
+違反）。この節をスクリプト出力の `sharedSetupHook` フィールドを読む形に
+書き換え、フレームの実例 2 つは判断の根拠としてそのまま残した（削除すると
+「なぜこのフィールドがこの値になるか」が読み手に伝わらなくなるため）。
+巻き添え・連鎖の節そのもの（畳み先の判断）は変更していない。
+
+Error Handling 節の「ログが大きすぎてコンテキストに収まらない場合は
+`grep -E` で `FAIL `/`::error`/`flaky`/集計行だけを抜き出す」という注意書きは、
+`parse-job-log.ts` がファイルを直接読み、JSON の事実だけを手順書側に返す
+ようになったことで前提が崩れた（生ログを手順書側が読むことがそもそも無く
+なった）ため削除し、代わりに「終了コード 2（stdin が空/読めない）は
+『測定できなかった』として Step 5 で報告する」という注意書きに置き換えた
+（Requirement 1.4・3.4）。
+
+**行数・容量が減らなかった理由（Requirement 5.2 への記録）**: このタスクは
+1 行の `grep -E` や 1 行の `sed` という、もともと短いシェル断片を、スクリプト
+呼び出し＋出力欄の説明＋残した判断の散文に置き換えるタスクであり、タスク
+2.1〜2.4（複数行の `jq` パイプラインを 1 呼び出しに圧縮していた）と違って、
+削除できるシェル片の分量がもとから小さい。加えて Requirement 2.4
+「どの出力欄をどの判断に使うかを手順書に明記する」を満たすため、
+`vitest.failBlocks[]` / `playwright.annotations[]` / `playwright.summary` /
+`denylistHits[]` の各フィールド名を判断の直前に明記する説明を新たに追加した。
+結果として行数・容量は**わずかに増加**した。
+
+行数・容量（`wc -l -c`、タスク 2.4 時点の値と比較）:
+
+| ファイル | 変更前（タスク 2.4 時点、行/バイト） | 変更後（行/バイト） |
+|---|---:|---:|
+| `.claude/skills/detect-flaky-ci/SKILL.md` | 1596 / 83119 | 1602 / 83788 |
+
+観測可能な完了状態の確認: 変更した節（Step 2・Step 2b・Step 3 の Playwright
+事実抽出・denylist 一覧）に `grep -E` / `grep -iE` / `sed -E` のシェル片が
+無いことを `grep -n` で確認済み（該当箇所以外——check ⑤ の per-file duration
+行の ANSI 除去、`.claude/skills/detect-flaky-ci/SKILL.md` の別節——には
+本タスクと無関係な既存の `sed` が 1 件残るが、これは per-file duration の
+抽出であり `parse-job-log.ts` の契約に含まれないため対象外）。両経路が
+同じ `node bin/flaky-ci/scripts/parse-job-log.ts < "$LOG_FILE"` 呼び出しに
+合流していることを目視で確認した。`pnpm vitest run`（`bin/` 配下）で
+14 ファイル 221 件が変わらず通ることを確認した（本タスクは `bin/flaky-ci/`
+のコードを変更していないため、テスト内容自体に変化はない）。手順書の
+Markdown 変更のみのため `biome check` の対象外。
 

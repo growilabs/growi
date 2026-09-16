@@ -1,7 +1,7 @@
 ---
 name: detect-flaky-ci
 description: Scan recent GROWI CI runs for flaky (non-deterministic) job/test failures and track them as GitHub issues. Detection only — never modifies source code. Usage - /detect-flaky-ci [--window-hours=N] [--vitest-threshold=N]
-allowed-tools: Bash, Read, Grep
+allowed-tools: Bash, Read, Grep, Write, mcp__github__get_job_logs
 argument-hint: "[--window-hours=32] [--vitest-threshold=2]"
 ---
 
@@ -525,11 +525,17 @@ whenever `-f`/`-F` is passed, `--paginate -q` folds per page). Do
 not try one and fall back to the other per log — the capability is a property
 of the environment, not of any individual log fetch.
 
+Both paths end the same way: the log lands in a file, and
+`node bin/flaky-ci/scripts/parse-job-log.ts` reads that file on stdin —
+never a path or a job id — which is exactly why the two fetch methods can
+converge on one call (Requirement 3.2). Neither path needs a separate ANSI
+strip or grep pass; the script does both internally.
+
 ```bash
 # gh path (devcontainer / any environment where the egress proxy allows
 # results-receiver.actions.githubusercontent.com and *.blob.core.windows.net)
-gh api --allow-escape-sequences "repos/growilabs/growi/actions/jobs/{JOB_ID}/logs" \
-  | sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g'
+LOG_FILE="${TMPDIR:-/tmp}/flaky-job-{JOB_ID}.log"
+gh api --allow-escape-sequences "repos/growilabs/growi/actions/jobs/{JOB_ID}/logs" > "$LOG_FILE"
 ```
 
 **Never use `gh run view --job {JOB_ID} --log-failed` to read a specific
@@ -542,30 +548,35 @@ destroying the same-SHA attempt flip above, the one gold-standard vitest
 signal this skill has. The `actions/jobs/{JOB_ID}/logs` endpoint is addressed
 by job id rather than by run, so it returns that job's own attempt.
 
-Two details of the command: `--allow-escape-sequences` is required, or `gh`
+`--allow-escape-sequences` is required on the `gh api` call above, or `gh`
 refuses with exit 1 and `the response contains terminal escape sequences;
-pass --allow-escape-sequences to output it anyway`; and the `sed` strips the
-ANSI colour codes that would otherwise break the literal string matching every
-step below does. This endpoint returns the **whole** job log, passing steps
-included, so grep it rather than reading it whole: three literal patterns —
-`FAIL `, `::error`, ` flaky` — plus `[0-9]+ (failed|flaky|passed|skipped)`,
-which needs `grep -E`.
-
-**That last pattern is what keeps Playwright's summary count lines.** Step
-3's tier-1 identity rule reads `N flaky` **and** `N failed` off the shard
-and requires them to sum to 1; the three literal patterns capture the
-`flaky` line but not the `failed` one, and without it the sum cannot be
-computed at all. The rule's "a missing line counts as 0" clause only holds
-once the summary has actually been captured — a line absent from an
-uncaptured summary is unknown, not zero, and must fall back to the coarse
-tier-2 identity rather than being read as 0.
+pass --allow-escape-sequences to output it anyway`.
 
 ```
 # MCP path (cloud routine — the blob-storage redirect above is Forbidden
 # through this environment's egress proxy; the MCP tool fetches server-side
-# instead)
+# instead). Save the tool's result to the same kind of file with Write —
+# parse-job-log.ts only ever reads a file on stdin, so this is the one extra
+# step the MCP path needs that the gh path (which already redirects to a
+# file above) does not.
 mcp__github__get_job_logs(owner="growilabs", repo="growi", job_id={JOB_ID}, failed_only=true)
+# → Write the returned text to "${TMPDIR:-/tmp}/flaky-job-{JOB_ID}.log"
 ```
+
+```bash
+node bin/flaky-ci/scripts/parse-job-log.ts < "$LOG_FILE"
+```
+
+Output fields (see `bin/flaky-ci/README.md`'s contract table for the exact
+shape): `vitest.failBlocks[]` (`project`, `specPath`, `testTitle`,
+`sharedSetupHook`, `excerpt`), `playwright.annotations[]` (`file`, `title`),
+`playwright.summary` (`failed`/`flaky`/`passed`/`skipped`, or `null` when the
+log carried no count line at all — Step 3's tier-1 rule below depends on
+telling that `null` apart from a captured `0`), `denylistHits[]`
+(`blockIndex`, `specPath`, `testTitle`, `pattern`, `needle`, `scope`). Exit
+code `2` means stdin was empty or unreadable — treat that job's evidence as
+"could not be measured" per Requirement 3.4 (report it in Step 5, do not
+guess at its content from anywhere else) rather than as "no failures".
 
 ### Step 2b: also check successful `run-playwright` jobs for in-run flakes
 
@@ -573,8 +584,9 @@ A shard where a test failed and then passed on retry ends the *job* as
 `success`, because Playwright's own retries absorbed it before the exit code
 was decided, so the failed-job scan above never sees it and misses most of
 Playwright's "free" flaky signal. Additionally scan successful
-`run-playwright` jobs from runs in the Step 1 list (any conclusion), grepping
-rather than reading the full log to keep this cheap.
+`run-playwright` jobs from runs in the Step 1 list (any conclusion) — cheap
+the same way as the failed-job scan above, since `parse-job-log.ts` returns
+only the extracted JSON facts, never the raw log, to this procedure.
 
 **Select those jobs with `contains("run-playwright")`, not a prefix match.**
 The job runs through the reusable `Reusable build and test app for
@@ -590,81 +602,71 @@ gh api repos/growilabs/growi/actions/runs/{RUN_ID}/jobs \
   -q '.jobs[] | select(.name | contains("run-playwright")) | select(.conclusion == "success") | {id, name}'
 ```
 
-```bash
-# gh path — same command and same two details as the failed-job fetch above
-gh api --allow-escape-sequences "repos/growilabs/growi/actions/jobs/{JOB_ID}/logs" \
-  | sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-  | grep -iE "flaky|Retry #|test-failed|error file="
+Use the same Step-0-decided method, the same file-then-`parse-job-log.ts`
+shape as the failed-job fetch above, and the same `LOG_FILE` naming
+(`${TMPDIR:-/tmp}/flaky-job-{JOB_ID}.log`):
 
-# MCP path — fetch then grep the returned text the same way
+```bash
+# gh path
+gh api --allow-escape-sequences "repos/growilabs/growi/actions/jobs/{JOB_ID}/logs" > "$LOG_FILE"
+# MCP path
 mcp__github__get_job_logs(owner="growilabs", repo="growi", job_id={JOB_ID}, failed_only=false)
+# → Write the returned text to "$LOG_FILE"
+
+node bin/flaky-ci/scripts/parse-job-log.ts < "$LOG_FILE"
 ```
 
-Use the same Step-0-decided method as the failed-job fetch above. Each
-alternative earns its place: `flaky` keeps the summary count line (`1 flaky`)
-Step 3 reads the shard's count from, `error file=` keeps the `::error`
-annotations Step 3 builds the precise identity out of, and `Retry #` /
-`test-failed` keep the retry and attachment lines for the evidence excerpt.
+If `playwright.annotations` is empty **and** `playwright.summary` is either
+`null` or has `flaky: 0`, the shard had no flakiness — move on. Otherwise
+proceed to Step 3's Playwright extraction using this same output (there is
+no separate excerpt to re-fetch — the whole log already went through the
+script once). Note for Step 3's count test: these jobs concluded `success`,
+and a test that is still failing after its last retry fails the job, so
+`N failed` is 0 by construction here and the shard's count sum is the
+`N flaky` number alone.
 
-**`error file=` is deliberately unanchored — do not add a `^`.** The
-`actions/jobs/{JOB_ID}/logs` endpoint prefixes every line with a timestamp
-(`2026-09-14T09:22:51.3976078Z …`), so a line-start anchor can never match;
-and the annotation is often printed mid-line anyway, right after the
-reporter's progress dots. Measured on one job: anchored, 0 matches;
-unanchored, 1 — the one annotation that shard's whole identity depended on.
-An anchored pattern therefore hands Step 3 an excerpt with no `title=` in it,
-which fires Step 3's own tier-2 fallback and turns every flake found through
-this step into a coarse `playwright:{BROWSER}` issue.
+For the issue body's Evidence section (Step 4's template), quote the lines
+around the matching annotation directly from `$LOG_FILE` — it is still on
+disk from the fetch above.
 
-**Do not add a retry-digit alternative either** (a pattern matching `retry0`,
-`retry1`, …). A previous version of this grep had one, and on that same job
-every one of its 12 matches was a `pw:api` debug line mentioning a test
-fixture whose name contains `retry0` — not one of them an attachment path.
-`test-failed` is what keeps the attachment paths.
+**Classify infrastructure noise first — do not track these as flaky.** Read
+`denylistHits[]` from `parse-job-log.ts`'s output (already fetched above; the
+list itself is not repeated here — see below) before treating anything as
+flaky. Each hit names the `blockIndex` of the `vitest.failBlocks[]` entry it
+matched, plus which `pattern` and `needle` fired. Log each hit in this run's
+report as "infra noise, skipped", naming its `pattern`.
 
-If this is empty, the shard had no flakiness — move on. If it has a
-` flaky` count > 0, proceed to Step 3's Playwright extraction using this
-grepped excerpt (it is sufficient; do not re-fetch the full log). Note for
-Step 3's count test: these jobs concluded `success`, and a test that is
-still failing after its last retry fails the job, so `N failed` is 0 by
-construction here and the shard's count sum is the `N flaky` number alone.
+**Read the hit's `scope` to know how far it reaches** — this is the one
+judgment the script does not make for you:
 
-**Classify infrastructure noise first — do not track these as flaky.** Match
-the failure against this denylist (case-insensitive substring match); if any
-pattern matches, log it in this run's report as "infra noise, skipped" and
-move on to the next failure in the same job (dropping the whole job is the
-`test/setup/**` exception below, and only that). Keep the list small and
-additive — extend it when a genuine false positive is found, never broaden
-matches speculatively:
+- `scope: "failure"` drops only that one failure. The script matches per
+  failure's own excerpt, never the whole job log, on purpose: matching the
+  whole log on one unrelated line would have dropped 96 unrelated failures
+  along with the one real infra failure (research.md → 「infra noise は失敗
+  ごとに判定する（ジョブログ全体で判定しない）」).
+- `scope: "job"` — the match is inside a hook registered under
+  `test/setup/**` (the shared setup-hook shape Step 3 defines) — means every
+  failure in this job log is noise, because that hook ran before all of them
+  and the whole job was starved by the same infrastructure problem. Nothing
+  else in a job log has that reach.
 
-- `ECONNREFUSED`
-- `getaddrinfo ENOTFOUND`
-- `No space left on device`
-- `SIGKILL` / `exit code 137` (OOM-killed)
-- `runner has received a shutdown signal` / `lost communication with the server`
-- `docker: Error response from daemon`
-- generic `curl` retry exhaustion (`--retry 60` blocks timing out, seen in
-  `ci-app.yml` / `reusable-app-prod.yml` service-wait steps)
-- `Failed to download file.` — a test that downloads a real file from
-  github.com over the public network (the plugin-install integ test, #11708);
-  the public network going missing says nothing about the product's
-  determinism
+**The list is data, in `bin/flaky-ci/lib/denylist.ts`'s `INFRA_NOISE_PATTERNS`
+— read it there, do not expect a copy in this procedure.** Widening it stays
+a judgment the script does not make: keep it small and additive, and add an
+entry only when a genuine false positive is found, never broaden matches
+speculatively.
 
-**Match per failure, not per job log.** A failure is infra noise when a
-denylist string appears in **that failure's own excerpt** — its `FAIL` block
-plus the error and stack lines printed under it — not merely somewhere in the
-same job log, since searching the whole log discards every failure in the job
-on the strength of one unrelated line. In the measured case that would have
-dropped 96 unrelated failures along with the one real infra failure
-(research.md → 「infra noise は失敗ごとに判定する（ジョブログ全体で判定しない）」).
+**One shape never became a literal pattern, and `denylistHits[]` will never
+report it: generic `curl` retry exhaustion** (`--retry 60` blocks timing out,
+seen in `ci-app.yml` / `reusable-app-prod.yml` service-wait steps). It names
+no fixed string a log can be matched against — inventing one (`curl`, or an
+exit-code number) would over-match ordinary product failures that merely
+mention curl over an unrelated retry. When a failure's own excerpt looks like
+this shape, classify it as infra noise by judgment, the same way as before;
+the script has nothing to say about it.
 
-**The one exception is a shared setup hook.** When the denylist string appears
-in the failure of a hook registered under `test/setup/**` (the shared
-setup-hook shape Step 3 defines), every failure in that job log is noise,
-because that hook ran before all of them and the whole job was starved by the
-same infrastructure problem. Nothing else in a job log has that reach.
-
-Everything that doesn't match is a candidate for Step 3.
+Everything that has no `denylistHits[]` entry and does not look like the
+curl-exhaustion shape above is a candidate for Step 3.
 
 ## Step 3: Extract Test Identity and Evidence
 
@@ -678,13 +680,14 @@ can be flaky in one engine and not another. Extract it from the job name, e.g.
 `test-prod-node24 / run-playwright (firefox, 1/2, 8.0)` → browser = `firefox`
 (the `test-prod-node24 / ` part is the reusable workflow's calling job).
 
-The reliable, structured signal is the trailing summary line (`N failed`,
-`N flaky`, `N passed`) and the `::error file=...,title=...` annotations.
-**Attributing a specific `flaky` count to a specific spec name from the raw
-log is not reliable**: the reporter interleaves `pw:api` debug traces with
-retry/attachment lines in a way that does not cleanly pair a `Retry #N` block
-with its spec, so a precise adjacency heuristic will misattribute. Use a
-two-tier approach instead.
+The reliable, structured signal is `parse-job-log.ts`'s `playwright.summary`
+(`failed`/`flaky`/`passed`/`skipped`, or `null` when the log carried no count
+line at all) and `playwright.annotations[]` (`file`, `title` — repeats kept,
+in the order printed). **Attributing a specific `flaky` count to a specific
+spec name from the raw log is not reliable**: the reporter interleaves
+`pw:api` debug traces with retry/attachment lines in a way that does not
+cleanly pair a `Retry #N` block with its spec, so a precise adjacency
+heuristic will misattribute. Use a two-tier approach instead.
 
 **A test that failed and then passed on retry is annotated too.** Playwright
 emits an `::error file=...,title=...` annotation for it just as it does for a
@@ -692,22 +695,23 @@ test that ended failed, and the summary line then reads `0 failed` /
 `1 flaky` — the *most common* shape of a Playwright flake, so the flaky test
 is in the annotation list, not left over beside it.
 
-1. **Precise identity (tier 1)** — use it when **both** of these hold in the
-   ANSI-stripped log of that one shard:
+1. **Precise identity (tier 1)** — use it when **both** of these hold in that
+   shard's `parse-job-log.ts` output:
 
-   - the log carries **exactly one distinct** `::error file=…,title=…`
-     annotation, and
-   - the shard's own summary counts add up to that single annotation: `N
-     flaky` plus `N failed` equals 1 (a missing line counts as 0 — a
-     successful shard prints no `failed` line at all). "Missing" means
-     **absent from a summary that was captured**. If the grep used to fetch
-     the log never matched the summary lines in the first place, both counts
-     are unknown rather than 0, and this test does not apply — fall back to
-     the job-level identity below instead of reading the gap as a zero.
+   - `playwright.annotations` contains **exactly one distinct** entry (by
+     `file` + `title` together), and
+   - `playwright.summary` is not `null`, and its `flaky` plus `failed` equals
+     1. `playwright.summary` being `null` means the log carried no count line
+     at all — both counts are unknown, not zero, and this test does not
+     apply; fall back to the job-level identity below rather than reading the
+     gap as a zero. A *captured* summary already carries `0` for any count
+     line the shard didn't print (a successful shard prints no `failed`
+     line), so once `playwright.summary` is non-`null` there is no separate
+     "missing line" case left to reason about.
 
    The two together are what make the attribution safe: the counts say the
    shard produced exactly one non-clean test result, and the single
-   annotation is the only thing in the log that names one.
+   annotation is the only thing that names one.
 
    **Do not require a retry attachment path.** `apps/app/playwright.config.ts`
    sets `screenshot: 'only-on-failure'`, so a test whose retry *passes*
@@ -720,17 +724,16 @@ is in the annotation list, not left over beside it.
    with both halves **normalized** — the annotation's raw values are not the
    identity:
 
-   - `{SPEC_PATH}` — the `file=` value with the leading `apps/app/` removed.
-   - `{TEST_TITLE}` — the `title=` value with the leading `[{browser}] › `
-     removed, then the `{path}:{line}:{col} › ` location segment that
-     follows it removed, then **every remaining ` › ` replaced by ` > `**.
+   - `{SPEC_PATH}` — the annotation's `file` field with the leading
+     `apps/app/` removed.
+   - `{TEST_TITLE}` — the annotation's `title` field with the leading
+     `[{browser}] › ` removed, then the `{path}:{line}:{col} › ` location
+     segment that follows it removed, then **every remaining ` › ` replaced
+     by ` > `**.
 
-   Worked example, the annotation that produced issue #11903:
-
-   ```
-   file=apps/app/playwright/20-basic-features/inline-comment.spec.ts
-   title=[chromium] › playwright/20-basic-features/inline-comment.spec.ts:4758:3 › Inline comment - visual refresh: mockup cross-check captures › Capture popover states 5 (normal) and 6 (edit mode) in DARK mode (Req 4.4)
-   ```
+   Worked example, the annotation that produced issue #11903
+   (`{file: "apps/app/playwright/20-basic-features/inline-comment.spec.ts",
+   title: "[chromium] › playwright/20-basic-features/inline-comment.spec.ts:4758:3 › Inline comment - visual refresh: mockup cross-check captures › Capture popover states 5 (normal) and 6 (edit mode) in DARK mode (Req 4.4)"}`):
 
    normalizes to this identity key (what #11903's title carries today):
 
@@ -754,14 +757,14 @@ is in the annotation list, not left over beside it.
    identity in each of these three cases, which are exactly the cases tier 1
    does not cover:
 
-   - **more than one distinct annotation** in the shard's log — several
+   - **more than one distinct entry in `playwright.annotations`** — several
      tests are named and which one the count refers to is genuinely unknown;
-   - **the counts do not add up to the annotation count** (`N flaky` + `N
-     failed` is not 1 against a single annotation) — the log is describing
-     more, or fewer, non-clean results than it names, so the one annotation
-     cannot be assumed to account for the shard's count;
-   - **the annotation carries no `title=` value** — there is then a file but
-     no test to name.
+   - **the counts do not add up to the annotation count** (`playwright.
+     summary.flaky` + `.failed` is not 1 against a single annotation) — the
+     log is describing more, or fewer, non-clean results than it names, so
+     the one annotation cannot be assumed to account for the shard's count;
+   - **the annotation's `title` is `null`** — there is then a file but no
+     test to name.
 
    Say so explicitly in the issue body: "flaky test detected in this shard's
    log (see excerpt below) but the specific spec could not be isolated from
@@ -789,13 +792,11 @@ Step 4.** Never record a failed-every-attempt Playwright result as
 
 ### Vitest jobs (`ci-app-test`, `ci-app-test-integration`)
 
-Search the log for Vitest's failure block format (seen directly in this
-repo's CI output):
-
-```
-FAIL {app-integration|...} {SPEC_PATH} > {SUITE} > {TEST_TITLE}
-{ErrorType}: {message}
-```
+Each entry in `parse-job-log.ts`'s `vitest.failBlocks[]` is one FAIL block:
+`project`, `specPath`, `testTitle` (`null` for a file-level FAIL line, which
+names no test at all), `sharedSetupHook` (see below), and `excerpt` (the
+`FAIL` line plus the error and stack lines printed under it — this is the
+evidence text the issue body quotes).
 
 Identity key: `vitest:{SPEC_PATH}:{TEST_TITLE}`.
 
@@ -826,27 +827,30 @@ separate flaky tests. (This is the same phenomenon mining check ⑤
 measures; ⑤ decides the *tier*, this decides the *identity*.)
 
 **How to tell a shared setup-hook timeout from a spec file's own hook:**
-read the stack frame printed directly under the error, not the `FAIL` line:
+read the FAIL block's `sharedSetupHook` field from `parse-job-log.ts`'s
+output — `true` when that block's own excerpt carries a stack frame
+resolving under `test/setup/` (the frame printed directly under the error,
+not the `FAIL` line), `false` otherwise. That frame is the only reliable
+discriminator (an example of each, for context — this is what the field is
+reading):
 
 ```
 Error: Hook timed out in 20000ms.
- ❯ test/setup/migrate-mongo.ts:52:1      ← under test/setup/ → shared setup hook
+ ❯ test/setup/migrate-mongo.ts:52:1      ← under test/setup/ → sharedSetupHook: true
 ```
 
 ```
 Error: Hook timed out in 10000ms.
- ❯ src/server/service/user-group.integ.ts:60:3   ← a spec file → NOT a shared setup hook
+ ❯ src/server/service/user-group.integ.ts:60:3   ← a spec file → sharedSetupHook: false
 ```
 
-The frame is the only reliable discriminator, and it decides the routing on
-its own:
+The field decides the routing on its own:
 
-- **Frame resolves under `test/setup/`** → shared setup-hook timeout. Every
-  spec file in this job log failing with the same error and the same frame
-  collapses into **one** identity. List the affected spec files inside the
-  issue body / observation comment's log excerpt; do not open one issue per
-  file.
-- **Frame resolves into a spec file** → this is that spec file's own
+- **`sharedSetupHook: true`** → shared setup-hook timeout. Every spec file in
+  this job log failing with the same error and the same frame collapses into
+  **one** identity. List the affected spec files inside the issue body /
+  observation comment's log excerpt; do not open one issue per file.
+- **`sharedSetupHook: false`** → this is that spec file's own
   `beforeAll`/`beforeEach` and **not** a shared setup-hook timeout, even when
   the hook body calls a helper defined under `test/setup/` (the
   `getInstance()` timeouts are exactly this case: the helper lives in
@@ -1568,11 +1572,13 @@ This is the only user-facing output — do not create files.
   environment constraint, not a reason to stop the run.
 - `gh api` rate limit hit: report how far the scan got and stop; do not retry
   in a tight loop.
-- A job log too large to fit in context: grep for `FAIL `, `::error`,
-  ` flaky` and the summary count lines (`[0-9]+ (failed|flaky|passed|skipped)`)
-  only — the same `grep -E` Step 2 uses — instead of reading it whole.
-  Dropping the count lines would make the Playwright tier-1 test read
-  "unknown" and fall back to the coarse identity (Step 3).
+- `parse-job-log.ts` exits `2` (stdin was empty or unreadable) for a job's
+  log: this job's evidence could not be measured, not "no failures" — report
+  it in Step 5 alongside any other script failure, and move on to the next
+  job rather than guessing at its content from the run/job metadata alone.
+  A job log this large no longer risks overflowing the model's own context,
+  since the script reads it directly from a file and only its JSON output
+  (never the raw log) reaches this procedure.
 - Ambiguous identity (test title changed between occurrences of the same
   underlying flake): do not attempt fuzzy matching — treat as a new issue.
   A missed dedupe is cheap; wrongly merging two different flakes is not.
