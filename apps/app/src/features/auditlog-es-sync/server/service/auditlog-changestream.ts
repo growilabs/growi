@@ -7,8 +7,10 @@ import mongoose from 'mongoose';
 
 import type { ActivityDocument } from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
+import { sanitizeEndpointForIndex } from '~/server/service/search-delegator/sanitize-endpoint-for-index';
 import loggerFactory from '~/utils/logger';
 
+import { anonymousSyncThresholds } from '../config/anonymous-sync-thresholds';
 import type { AuditlogEsWriter } from '../interfaces/auditlog-es-writer';
 import { AuditlogEsSyncStatus } from '../models/auditlog-es-sync-status';
 import {
@@ -16,8 +18,26 @@ import {
   markUnsyncedAndClearToken,
 } from '../models/auditlog-es-sync-tx';
 import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
+import { decideEsSyncForEvent } from './decide-es-sync-for-event';
 
 const logger = loggerFactory('growi:service:auditlog-changestream');
+
+// Anonymous-sync threshold keys, precompiled once (mirrors rate-limiter/middleware/
+// factory.ts's own regex-key matching). Anchored at both ends: '/login' matches only
+// '/login', while '/forgot-password/.*' still matches its dynamic token segment.
+const thresholdKeyPatterns = Object.keys(anonymousSyncThresholds).map(
+  (key) => [key, new RegExp(`^${key}$`)] as const,
+);
+
+// endpoint is req.originalUrl (see add-activity.ts), so strip the query string with the
+// same helper the ES delegator uses before matching against threshold keys — otherwise
+// every distinct query string (or /forgot-password/<token>) would miss the match.
+const matchThresholdKey = (endpoint: string): string | undefined => {
+  const sanitized = sanitizeEndpointForIndex(endpoint);
+  return thresholdKeyPatterns.find(([, pattern]) =>
+    pattern.test(sanitized),
+  )?.[0];
+};
 
 // Fixed key shared by every instance: all GROWI processes use the one resume-token doc.
 // Each process also runs its own consumer against this key, so events are written to ES
@@ -246,6 +266,41 @@ export class AuditlogChangeStreamService {
     }
   }
 
+  // Gate anonymous log events (no snapshot.username) whose endpoint matches a configured
+  // threshold key (see anonymous-sync-thresholds.ts). Authenticated logs and anonymous
+  // logs at unlisted endpoints bypass the gate entirely (always admitted) — this only
+  // caps the abuse-sensitive endpoints the threshold map names.
+  //
+  // Deliberately run inside flushBuffer()'s try/catch, not as a separate step: a failure
+  // here (e.g. a transient MongoDB error while claiming/deciding) is handled exactly like
+  // a bulkSyncAuditlogs failure — retried with backoff, eventually poison-pill-skipped —
+  // rather than silently syncing unthrottled or dropping everything.
+  private async filterAdmittedUpserts(
+    upserts: ActivityDocument[],
+  ): Promise<ActivityDocument[]> {
+    const windowStart = new Date(Math.floor(Date.now() / 60_000) * 60_000);
+
+    const admittedOrNull = await Promise.all(
+      upserts.map(async (activity) => {
+        if (activity.snapshot?.username != null) return activity;
+        const thresholdKey = matchThresholdKey(activity.endpoint ?? '');
+        if (thresholdKey == null) return activity;
+
+        const decision = await decideEsSyncForEvent(
+          activity._id.toString(),
+          thresholdKey,
+          windowStart,
+          anonymousSyncThresholds[thresholdKey],
+        );
+        return decision === 'admitted' ? activity : null;
+      }),
+    );
+
+    return admittedOrNull.filter(
+      (activity): activity is ActivityDocument => activity != null,
+    );
+  }
+
   // Send the buffered events as one ES bulk and persist the resume token at the batch
   // boundary. Returns false when the batch failed (token not advanced) and the stream must
   // restart to replay it; true when synced, poison-pill-skipped, or empty.
@@ -276,7 +331,8 @@ export class AuditlogChangeStreamService {
     const lastToken = batch[batch.length - 1]._id;
 
     try {
-      await this.esWriter.bulkSyncAuditlogs(upserts, deleteIds);
+      const admittedUpserts = await this.filterAdmittedUpserts(upserts);
+      await this.esWriter.bulkSyncAuditlogs(admittedUpserts, deleteIds);
       this.consecutiveEventFailures = 0;
       this.lastFailingToken = null;
       this.consecutiveRestarts = 0;
