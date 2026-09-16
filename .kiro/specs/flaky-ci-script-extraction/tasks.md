@@ -41,7 +41,7 @@
   - 観測可能な完了状態: 4-B に `jq` / `sort | tail -1` が無く、Step 6 に新項目がある。`--help` が 0、「本文のみ」「コメントあり」「日時なし → 終了コード 2」の 3 ケースが 1.3 の期待値と一致するテストが通る。README に行がある。行数・容量の前後を記録
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 3.3, 3.4, 4.1, 4.4, 5.1, 5.2_
 
-- [ ] 2.3 判断待ち一覧の行（Paused at・Recommendation・保留窓）の取得
+- [x] 2.3 判断待ち一覧の行（Paused at・Recommendation・保留窓）の取得
   - issue 番号（複数可）を受け、行ごとに `flaky/needs-decision` の最新の付与時刻、保留窓（付与時刻 − 120 秒以降）に入る自動コメントの最終行から `- Recommendation:` の値、窓に無ければ広げて取った旨（`in-window` / `widened` / `none`）、窓以降の観測コメント数を返す。付与時刻が読めない行は `pausedAtStatus: unavailable` で示し、一覧全体は成功とする（design の複数行スクリプトの規則）。1 行も作れなければ終了コード 2
   - routine Step 5 item 2〜3 の該当手順を呼び出しに置き換える。「`(may be stale) ` を付けるのは widened のときだけ」「件数が増えても再選択しない」「最終行を読む（4-B の先頭行と混同しない）」は手順書に残す
   - 観測可能な完了状態: 該当節に `date -d` / `jq` が無い。`--help` が 0、ラベル先行・コメント先行（旧手順の逆順、−1 秒）・付与時刻なしの 3 ケースが 1.3 の期待値と一致するテストが通る。README に行がある。行数・容量の前後を記録
@@ -268,4 +268,71 @@ SKILL.md` はタスク 2.1 の変更値のまま、このタスクでは未変�
 | `.claude/commands/flaky-ci-routine.md` | 1049 / 54171 | 1043 / 53869 |
 
 `README.md` の契約表に `newest-observation` の行を追加した。
+
+### タスク 2.3: `awaiting-decision-rows` の切り出しと手順書の行数・容量（2026-09-16）
+
+`bin/flaky-ci/scripts/awaiting-decision-rows.ts` に、複数の `--issue` を受けて
+行ごとの事実を返すロジックを実装した。issue ごとに `events`/`comments` の
+2 回の読み取りを行い、`flaky/needs-decision` の最新の `labeled` 事実
+（`pausedAt`）、保留窓（`pausedAt - 120 秒`以降）に入る自動コメントの最終行
+から取り出す `- Recommendation: ` の値、窓に無ければ全期間へ広げた結果
+（`recommendationSource: "in-window" / "widened" / "none"`）、窓以降の
+観測コメント件数（`newObservations`）を返す。design.md の File Structure
+Plan にはこのスクリプト専用の `lib/` モジュールが挙げられておらず、
+`newest-observation.ts`（タスク 2.2）と同じ位置づけでロジックをスクリプト
+ファイル内に留め、新しい `lib/` ファイルは追加していない。既存の
+`lib/constants.ts` の `LABELS.needsDecision` / `MARKERS.recommendation` /
+`SIGNATURES.*` / `COMMENT_HEADINGS.*` / `PAUSE_WINDOW_SECONDS` をそのまま
+参照し、値の重複定義はしていない。
+
+**複数行スクリプトの規則（design.md Error Handling）をこの実装がどう
+満たすか**: issue ごとの `events`/`comments` の取得はそれぞれ独立に
+`try/catch` し、`GhError` はその行を `pausedAtStatus: "unavailable"` /
+`recommendationSource: "none"` / `newObservations: null` に倒すだけで、
+他の行や呼び出し全体の成功（`ok:true`）には影響させない。`--issue` が
+1 つも指定されない場合だけ `parseArgv` が拒否し終了コード 2 になる
+（呼び出し側が明示した issue 番号ごとに必ず 1 行を作れるため、行を
+1 件も作れない状況は「引数が無い」以外に発生しない設計）。
+
+**単一候補の reduce 短絡バグ（タスク 2.2 の是正事項）への対応**:
+`newestNeedsDecisionLabelTime` と `newestCandidate` はどちらも
+`Array.prototype.reduce` を使うが、事前に `.length === 0` を判定して
+`undefined` を返す分岐を経由してから reduce するため、候補が 1 件しか
+無い配列でも reduce の比較関数が実際に評価される経路にはならない
+（1 件しかない場合は候補生成の時点で確定し、reduce はその 1 件を
+そのまま返す）。加えてテストに「窓内の適格コメントが厳密に 1 件」
+「`labeled` イベントが厳密に 1 件」の 2 ケースを明示的に含め、
+2.2 と同じ短絡が起きていないことを固定した。
+
+`flaky-ci-routine.md` の Step 5「Building the `## Awaiting human decision`
+section」の `PAUSED_AT`/`WINDOW_START`/`jq -s` の手順を、このスクリプトの
+呼び出しに置き換えた。手順書に残した判断・注記:
+「`(may be stale) ` を付けるのは `recommendationSource` が `widened` の
+ときだけ」「最終行を読む（4-B の `Date:` の先頭行ルールとは逆）」
+「件数が増えても再選択しない（スクリプトは毎回入力を読み直すだけで、
+前回の結果を記憶しない）」「非ゼロ件数は再選択の理由にならない
+（Step 2-B のみが再選択する）」。Step 2-B 自体（`PAUSED_AT` を別目的
+で使う手順）とタスク 3.10 の範囲である `render-dashboard` は変更して
+いない。
+
+観測可能な完了状態の確認: `--help` が終了コード 0、ラベル先行
+（issue #11823、フィクスチャ）・コメント先行（旧手順の逆順、−1 秒、
+issue #11914、フィクスチャ）・付与時刻なし（synthetic フィクスチャ、
+widened 探索で `(may be stale) ` 付与）の 3 ケースが
+`fixtures/expected/awaiting-decision-rows.md` の期待値と一致するテストが
+通る（`bin/flaky-ci/scripts/awaiting-decision-rows.spec.ts`、計 14 件。
+うち複数 issue・部分的な `GhError`・単一候補の reduce・観測コメント
+追加後の非再選択を検証する回帰テストを含む）。`pnpm vitest run`
+（`bin/` 配下）で 16 ファイル 228 件が通ることを確認した。`biome check bin`
+は自動整形を適用した上で通過（警告 0、エラー 0）。
+
+`README.md` の契約表に `awaiting-decision-rows` の行を追加した。
+
+行数・容量（`wc -l -c`、タスク 1.2 の基準値と比較。タスク 2.2 の
+「変更後」の値 1043 行 / 53869 バイトを実測で再確認し、ドリフトが
+無いことを先に確認してから今回分を測った）:
+
+| ファイル | 変更前（タスク 2.2 時点、行/バイト） | 変更後（行/バイト） |
+|---|---:|---:|
+| `.claude/commands/flaky-ci-routine.md` | 1043 / 53869 | 1016 / 51871 |
 

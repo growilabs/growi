@@ -841,87 +841,60 @@ investigation that stopped at a MEDIUM/LOW gate during this very run).
 gh api -X GET repos/growilabs/growi/issues -f state=open -f labels="flaky/needs-decision" --paginate -q '.[] | {number,title}'
 ```
 
-Columns: `Tracking issue | Paused at | Recommendation | New observations
-since pause`. One row per candidate, ordered by `Paused at`, **oldest
-first** — the longest-unanswered question is the one a human should see at
-the top. Rows whose `Paused at` is `—` (see below) sort **last**: there is no
-moment to order them by, and they are a data problem rather than a waiting
-decision.
+Then call, passing every candidate issue number as its own `--issue` (the
+script fetches each issue's events and comments itself — it does not matter
+whether item 1's tier fetch already returned the issue):
 
-Two of the cells below read this issue's comments, which item 2 has normally
-already fetched (a `flaky/needs-decision` issue also carries a tier label).
-**For a candidate item 1 did not return** — a hand-labeled issue that never
-got a tier label, or one caught mid-transition — fetch its comments with the
-same call item 2 uses and continue as below. Do not skip the row.
+```bash
+node bin/flaky-ci/scripts/awaiting-decision-rows.ts --issue {N} [--issue {M} …]
+```
+
+Output (`rows[]`, one entry per `--issue`, in the order given): `pausedAt`
+(ISO-8601 UTC or `null`), `pausedAtStatus` (`ok` / `unavailable`),
+`recommendation` (string or `null`), `recommendationSource` (`in-window` /
+`widened` / `none`), `newObservations` (number or `null`). A single issue
+whose label-add time cannot be read gets `pausedAtStatus: "unavailable"` on
+its own row — this never fails the whole call, per the multi-row exit-2 rule
+`bin/flaky-ci/README.md`'s Output contract states.
+
+Columns: `Tracking issue | Paused at | Recommendation | New observations
+since pause`. One row per candidate, ordered by `pausedAt`, **oldest
+first** — the longest-unanswered question is the one a human should see at
+the top. Rows whose `pausedAtStatus` is `unavailable` sort **last**: there is
+no moment to order them by, and they are a data problem rather than a
+waiting decision.
 
 - **Tracking issue** — a link to the issue, as in the table.
-- **Paused at** — the newest `labeled` event for `flaky/needs-decision`,
-  computed exactly as Step 2-B computes `PAUSED_AT`: same endpoint
-  (`/issues/{N}/events`), same shell-side fold. Follow that, do not restate
-  it.
-  If the value comes back empty, write `—` in this cell **and** `—` in
-  **New observations since pause** (there is no moment to count from), and
-  list the issue number in the Step 6 report — the same issue number Step 2-B
-  reports as "no `labeled` event could be read", which is the expected shape
-  rather than a double count.
-  **Recommendation is still filled in for such a row**, via the widened
-  search described below: skip the window computation entirely, take the
-  newest automated comment carrying the line regardless of time, and prefix
-  it `(may be stale) ` like any other widened result.
-  **Never run the window arithmetic on an empty `PAUSED_AT`.** `date -u -d
-  " - 120 seconds"` does not fail on an empty value — it reads the whole
-  expression as relative to *now* and returns now − 120 seconds, exit 0. The
-  row would then be filtered against a two-minute window ending at the
-  current moment, which almost nothing falls inside, and the handful of
-  comments that did would be accepted as if they were this pause's own. Both
-  outcomes look like ordinary results, with no error to notice.
-- **Recommendation** — read from this issue's comments (fetched as just
-  described; no extra call for the normal case). Among the comments that are
-  **automated** (see **Shared constants** → Automated-author signatures, and
-  evaluate both checks there) and whose `created_at` falls in this issue's
-  **current-pause window**, take the newest one whose **last non-empty line**
-  begins with `- Recommendation: `, strip that prefix, and put the rest of
-  the line in the cell verbatim.
-  - **The current-pause window** is defined — bounds, the pause-comment
-    ordering it pairs with, and the reason — in **Shared constants** → Pause
-    ordering; follow that, do not restate it. Compute its lower bound once,
-    the way 4-A computes `CUTOFF`, and compare every comment's `created_at`
-    against that single value:
-
-    ```bash
-    WINDOW_START="$(date -u -d "$PAUSED_AT - 120 seconds" +%Y-%m-%dT%H:%M:%SZ)"
-    # a comment qualifies when  "$created_at" > "$WINDOW_START"  (string
-    # comparison, sound for the fixed-width ISO-8601 reason Step 2-B gives)
-    ```
-
-    **Only run that `date` command on a non-empty `PAUSED_AT`** — see the
-    **Paused at** cell above for what to do when it is empty.
-  - **Last line, not first — deliberately the opposite of 4-B's rule for
-    `Date:`.** **Shared constants** pins this line as the pause comment's
-    *last* line, while 4-B takes the *first* `Date:` because a log excerpt
-    further down an observation comment can contain a line that looks like
-    one. The two contracts differ; do not "unify" the two rules.
-  - **If no comment falls in that window at all, widen the search once** to
-    the newest automated comment carrying the line at any time, and use it —
-    but write the cell as `(may be stale) {line}`, with that exact prefix.
-    The line it finds can be arbitrarily old, and the prefix is what carries
-    that caveat to a dashboard reader who never sees this procedure: the line
-    may predate the current pause, and the issue itself is the authority.
-    **Never apply the prefix to a line that did fall inside the window** — a
+- **Paused at** — the row's `pausedAt`. When `pausedAtStatus` is
+  `unavailable`, write `—` in this cell **and** `—` in **New observations
+  since pause** (there is no moment to count from), and note the issue
+  number in mind for Step 6 — its exit-2-per-row case is what the Script
+  failures line already covers, so it is not counted again separately here.
+- **Recommendation** — the row's `recommendation`, verbatim, when it is not
+  `null`.
+  - **Prefix `(may be stale) ` only when `recommendationSource` is
+    `"widened"`.** Never add it when the source is `"in-window"` — a
     correctly paused issue would then carry the warning on every run, the
-    opposite of what it means.
-  - If there is still none, write `—`. Never substitute a summary of the
-    comment: this cell is a verbatim copy of a line the investigation wrote,
-    or it is empty.
-- **New observations since pause** — Requirement 9.4. Count the comments
-  (again from item 2's fetch) whose **first line** begins with
-  `### Additional observation` or `### Backfilled observation` — the same two
-  headings item 3 counts, and only those — and whose date is **after Paused
-  at**. Use the comment's **first** `- Date:` line, per 4-B's rule (first
-  match only, because a log excerpt can carry a lookalike line); if a
-  comment has no `- Date:` line at all, fall back to its `created_at` for
-  this comparison only. Compare as strings, per **Shared constants** →
-  Reading conventions. Write a plain number, `0` included.
+    opposite of what it means. (The script derives this by first checking a
+    comment window keyed on `pausedAt`, then, only if nothing qualifies
+    there — including whenever `pausedAtStatus` is `unavailable`, since then
+    there is no window to check — widening to the newest qualifying comment
+    at any time. It also reads each candidate comment's **last** non-empty
+    line, deliberately the opposite of 4-B's rule for `Date:`, which takes
+    the *first* line because a log excerpt further down can contain a
+    lookalike.)
+  - If `recommendation` is `null` (`recommendationSource: "none"`), write
+    `—`. Never substitute a summary of the comment: this cell is a verbatim
+    copy of a line the script read, or it is empty.
+  - **Never re-pick when new observation comments arrive later.** The script
+    reads its input fresh on every call and does not remember a previous
+    run's answer; a later run choosing a different `recommendation` for the
+    same issue only happens if the underlying comments actually changed
+    (e.g. a human posted a new answer), not because more observations piled
+    up.
+- **New observations since pause** — Requirement 9.4. The row's
+  `newObservations`, written as a plain number (`0` included), or `—` per
+  the **Paused at** rule above.
   - **A non-zero count does not re-select the issue for investigation.**
     Step 2-B re-selects on a human's answer and on nothing else; new
     observations arriving change what this cell says and nothing more. The

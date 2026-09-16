@@ -40,6 +40,7 @@ consumes the output. Rows are added by the task that adds the script.
 |---|---|---|---|---|---|
 | `read-repro-result` | `--issue <number> --sha <sha>` | — | `runs`, `failed`, `perRun[]`, `workflowRunUrl`, `commentUrl` | `0` facts produced; `2` no `### Repro result` comment on the issue carries that commit | `investigate-flaky-test/SKILL.md` 2-E's tally table, and 6-B condition 1 |
 | `newest-observation` | `--issue <number>` | — | `newest` (ISO-8601 UTC), `source` (`"body"`, or the id of the comment it came from) | `0` facts produced; `2` no `Date:` line could be read from the body's `### First observation` section or any `### Additional observation` / `### Backfilled observation` comment | `flaky-ci-routine.md` 4-B/4-D/4-E's close-vs-leave-open decision |
+| `awaiting-decision-rows` | `--issue <number>` (repeatable) | — | `rows[]`, one per `--issue`: `issue`, `pausedAt` (ISO-8601 UTC or `null`), `pausedAtStatus` (`"ok"` or `"unavailable"`), `recommendation` (string or `null`), `recommendationSource` (`"in-window"`, `"widened"` or `"none"`), `newObservations` (number or `null`) | `0` facts produced (a per-issue `pausedAtStatus: "unavailable"` never fails the whole call); `2` no `--issue` was given | `flaky-ci-routine.md` Step 5's `## Awaiting human decision` table cells — whether to prefix `(may be stale) ` (only when `recommendationSource` is `"widened"`) and the "never re-pick" stability rule stay in the procedure |
 
 ## Shared library
 
