@@ -210,9 +210,12 @@ describe('decideEsSyncForEvent', () => {
       update: Record<string, unknown>,
       options?: Record<string, unknown>,
     ) => Promise<unknown>;
+    // Mongoose's findOneAndUpdate returns a lazily-executed Query (thenable, not a real
+    // Promise), so it cannot be cast directly to a Promise-returning function type —
+    // bridge via `unknown` as TypeScript's own overlap check suggests.
     const originalFindOneAndUpdate = EsSyncDecision.findOneAndUpdate.bind(
       EsSyncDecision,
-    ) as LooseFindOneAndUpdate;
+    ) as unknown as LooseFindOneAndUpdate;
     const spy = vi
       .spyOn(EsSyncDecision, 'findOneAndUpdate')
       .mockImplementation((async (
@@ -240,7 +243,7 @@ describe('decideEsSyncForEvent', () => {
           );
         }
         return originalFindOneAndUpdate(filter, update, options);
-      }) as FindOneAndUpdateFn);
+      }) as unknown as FindOneAndUpdateFn);
 
     try {
       const decision = await decideEsSyncForEvent(
