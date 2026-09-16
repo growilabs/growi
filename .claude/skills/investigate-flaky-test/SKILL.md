@@ -1223,7 +1223,7 @@ measurements on the fix commit, 6-B decides from them whether a PR is opened
 at all, and 6-C opens it — ready for review from the moment it is created.
 
 Step 5 and 6-A through 6-C share shell variables (`$ISSUE_NUMBER`,
-`$FIX_BRANCH`, `$FIX_SHA`, `$CHECKS_FILE`, `$REPRO_RESULT_JSON`, `$runs`,
+`$FIX_BRANCH`, `$FIX_SHA`, `$CHECKS_FILE`, `$GATE_FACTS_JSON`, `$runs`,
 `$failed`). Run them as one script; in a fresh shell, re-establish
 `ISSUE_NUMBER` and `FIX_BRANCH` from the values 5-A used and `FIX_SHA` with
 `git rev-parse`, rather than inventing new ones. The one pair that must never
@@ -1309,24 +1309,8 @@ the loop leaves after `$STARTUP_GRACE` instead of burning the full 45:
   `paths` filter, so a fix touching nothing under `apps/app/**`, `packages/**`
   or the listed root files starts no run at all.
 
-Then read the tally **for this commit** — the same script as 2-D, with
-`$FIX_SHA`:
-
-```bash
-REPRO_RESULT_JSON="${TMPDIR:-/tmp}/flaky-fix-repro-${ISSUE_NUMBER}.json"
-
-node bin/flaky-ci/scripts/read-repro-result.ts \
-  --issue "$ISSUE_NUMBER" --sha "$FIX_SHA" > "$REPRO_RESULT_JSON"
-REPRO_RESULT_STATUS=$?
-```
-
-Same output fields and exit codes as 2-D (see `bin/flaky-ci/README.md`).
-Pinning on `- Commit: ${FIX_SHA}` matters more here than at 2-D. The issue
-already holds the confirmation measurement's result — a different commit,
-usually with a non-zero `failed` — and reading "the newest comment" would
-report whichever of the two happened to land last. Exit `2` is not an error:
-it is the "not measured" reading, and 6-B's condition 1 (below) treats it as
-failing.
+6-B reads the repro tally itself (`pr-gate-facts.ts`, below) — nothing more
+is fetched here.
 
 ### 6-B: The PR gate — decided here, and only here
 
@@ -1347,27 +1331,42 @@ Anything else means **no PR**. There is no partial credit and no second place
 where this call is made: 6-C assumes the gate has already been passed.
 
 ```bash
-if [ "$REPRO_RESULT_STATUS" -eq 0 ]; then
-  runs=$(jq -r '.runs' "$REPRO_RESULT_JSON")
-  failed=$(jq -r '.failed' "$REPRO_RESULT_JSON")
-else
-  runs=""
-  failed=""
-fi
-ci_not_success=$(jq -r '[ .ciApp.notSuccess[] | "\(.name)=\(.conclusion)" ] | join(", ")' "$CHECKS_FILE")
 git fetch origin master
-scope=$(git diff --name-only "origin/master...${FIX_SHA}")   # three dots: merge-base → fix
+GATE_FACTS_JSON="${TMPDIR:-/tmp}/flaky-fix-gate-${ISSUE_NUMBER}.json"
 
-echo "repro:  Runs=${runs:-none}  Failed=${failed:-none}"
+node bin/flaky-ci/scripts/pr-gate-facts.ts \
+  --issue "$ISSUE_NUMBER" --sha "$FIX_SHA" --base origin/master > "$GATE_FACTS_JSON"
+GATE_FACTS_STATUS=$?
+
+runs=$(jq -r '.tally.runs // "none"' "$GATE_FACTS_JSON")
+failed=$(jq -r '.tally.failed // "none"' "$GATE_FACTS_JSON")
+ci_not_success=$(jq -r '[ .ciApp.notSuccess[] | "\(.name)=\(.conclusion)" ] | join(", ")' "$GATE_FACTS_JSON")
+scope=$(jq -r '.changedFiles[]' "$GATE_FACTS_JSON")
+
+echo "repro:  Runs=${runs}  Failed=${failed}"
 echo "ci-app not success: ${ci_not_success:-none}"
 echo "files changed by the fix:"; echo "$scope"
 ```
 
-Condition 3 is read from `$scope`, and the three-dot form matters: `A...B`
-lists what the fix commits changed since they left `master`, while the
-two-dot `A..B` (or `git diff A B`) also lists every file `master` gained
-after the branch point, which would fail the condition on any fix branch
-that is merely behind `master`.
+`pr-gate-facts.ts` fetches the repro comment and the check-runs itself (it
+does not read `$CHECKS_FILE` from 6-A's wait loop) — see
+`bin/flaky-ci/README.md`'s contract row for exactly which reading it
+produces for each case. Two readings its output can carry that are not
+failures of this call: `tally` is `null` (not the same as `$GATE_FACTS_STATUS`
+being non-zero) when the issue simply has no `### Repro result` comment
+pinned to `$FIX_SHA` yet — condition 1's own "not measured" row below reads
+that — and `ciApp.total: 0` when no `ci-app-*` check-run exists at all, which
+condition 2 treats as failing, not as an error. `$GATE_FACTS_STATUS` itself
+being non-zero (exit 2) means the call could not read anything at all — the
+comments fetch, the check-runs fetch, or the local `git diff` against
+`--base` failed outright — and none of conditions 1–3 can be read from
+`$GATE_FACTS_JSON` in that case.
+
+Condition 3 is read from `$scope` (`changedFiles[]`), computed as a
+three-dot diff against `origin/master` inside the script: what the fix
+commits changed since they left `master`, not also every file `master`
+gained after the branch point (which would fail the condition on any fix
+branch that is merely behind `master`).
 
 **Why the check-run's own conclusion cannot stand in for condition 1.** A push
 to `fix/flaky-**` whose commit carries no trailers is treated as "no request":
@@ -1390,7 +1389,8 @@ commit is the no-op `success` just described — ignore it.
 | Conditions 1 and 2 hold, condition 3 does not — the diff reached beyond what Step 3 identified | MEDIUM | no PR; pause per **Pausing for a human decision**, quoting the tally and naming the files outside the expected scope |
 | Condition 1 fails with `- Failed:` ≥ 1 — the spec still fails on the fixed code | LOW | no PR; the fix does not work. Quote the failing run's excerpt |
 | Condition 2 fails — some `ci-app-*` conclusion is not `success` (`failure`, `cancelled`, `timed_out`), or no `ci-app-*` check-run exists at all | LOW | no PR; the fix broke something, the push was superseded (measure the next push's SHA), or `ci-app.yml`'s `paths` filter never matched |
-| Condition 1 fails for want of a measurement — no `### Repro result` comment for `$FIX_SHA`, no `- Runs:` line, or `- Runs: 0`, including the 45-minute cap and 6-A's two early exits | MEDIUM at best, never HIGH | no PR; nothing was measured, which is evidence in neither direction |
+| Condition 1 fails for want of a measurement — `tally` is `null` (no `### Repro result` comment for `$FIX_SHA` yet), `- Runs: 0`, including the 45-minute cap and 6-A's two early exits | MEDIUM at best, never HIGH | no PR; nothing was measured, which is evidence in neither direction |
+| `$GATE_FACTS_STATUS` is non-zero — `pr-gate-facts.ts` itself failed (the comments fetch, the check-runs fetch, or the local `git diff`) | MEDIUM at best, never HIGH | no PR; none of conditions 1–3 could be read at all |
 | Playwright fix (condition 1 does not apply) with conditions 2 and 3 holding | HIGH | open the PR (6-C) |
 
 **Autonomous**: HIGH → 6-C. MEDIUM or LOW → no PR; pause as below.
@@ -1407,14 +1407,15 @@ pause comment; the block itself owns the two closing lines, the
 **Fix gate not passed** — no PR was opened.
 
 - Fix commit: `${FIX_SHA}` on `${FIX_BRANCH}`
-- Condition 1 (repro tally): {`- Runs:` / `- Failed:` for this commit, or "no result comment for this commit"} ({check-run URL})
+- Condition 1 (repro tally): {`- Runs:` / `- Failed:` for this commit, or "no result comment for this commit" when `tally` is `null`} ({check-run URL})
 - Condition 2 (normal CI): ${ci_not_success:-all ci-app-* success}
 - Condition 3 (scope): {the files the diff touches, against what Step 3 identified}
 - {one-line reading of which condition failed, pointing at the excerpt in the result comment when there is one}
 ```
 
-`$FIX_SHA`, `$FIX_BRANCH` and `$ci_not_success` are 6-A's and this step's own
-variables, so post it from the same shell they live in, with the same
+`$FIX_SHA`/`$FIX_BRANCH` are 6-A's variables and `$ci_not_success` is this
+step's own (read from `$GATE_FACTS_JSON`, not `$CHECKS_FILE`), so post it
+from the same shell they live in, with the same
 `gh api "…/comments" -X POST -f body="$(cat <<EOF … EOF)"` form 2-E uses —
 an **unquoted** `EOF` so those variables expand, which means the backticks
 above have to be escaped as `` \` `` inside it.
@@ -1429,7 +1430,7 @@ tool call starts a fresh one with no memory of it:
 
 ```bash
 PR_BODY_FILE="${TMPDIR:-/tmp}/flaky-fix-pr-body-${ISSUE_NUMBER}.md"
-REPRO_RUN_URL=$(jq -r '.workflowRunUrl' "$REPRO_RESULT_JSON")
+REPRO_RUN_URL=$(jq -r '.tally.workflowRunUrl' "$GATE_FACTS_JSON")
 CI_RUN_URL=$(gh api "repos/growilabs/growi/actions/workflows/ci-app.yml/runs?head_sha=${FIX_SHA}&per_page=1" \
   -q '.workflow_runs[0].html_url')
 

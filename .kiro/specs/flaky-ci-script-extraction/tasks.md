@@ -113,7 +113,7 @@
   - 観測可能な完了状態: 2 節に `group_by` の `jq` が無い。`--help` が 0、同名 2 件（同着含む）で最新が選ばれるテストが期待値と一致して通る。README に行がある。行数・容量の前後を記録
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.4, 3.3, 4.1, 4.3, 4.4, 5.1, 5.2_
 
-- [ ] 3.9 PR ゲートの条件 1・2 の事実
+- [x] 3.9 PR ゲートの条件 1・2 の事実
   - issue 番号・修正 commit・基準ブランチを受け、再現結果（2.1 の純粋関数）、`ci-app-*` の総数と非 success（3.8 の純粋関数）、基準からの変更ファイル一覧を返す
   - investigate 6-B の条件 1・2 の判定手順を呼び出しに置き換える。条件 3（差分の範囲）と HIGH/MEDIUM/LOW の表は残す
   - 観測可能な完了状態: 6-B に `grep -m1` の手順が無い。`--help` が 0、「総数 0 は条件 2 不成立」を含むテストが期待値と一致して通る。README に行がある。行数・容量の前後を記録
@@ -1271,3 +1271,125 @@ detect）には含まれないため、5.3 の合計値には影響しない。
    `pr-gate-facts.ts` を導入する際、この行自体が `pr-gate-facts.ts` の
    呼び出しに置き換わることが想定されるため、3.9 の実装者はこの行が
    タスク 3.8 由来の暫定的な適応であることを踏まえて置き換えること。
+
+### タスク 3.9: `pr-gate-facts` の切り出しと 6-B の書き換え（2026-09-16）
+
+`bin/flaky-ci/scripts/pr-gate-facts.ts`（`--issue --sha --base` を受け、
+`tally` / `ciApp` / `changedFiles[]` を返す単発 CLI）を実装した。design.md
+のスクリプト契約表が明記するとおり、`tally` は `read-repro-result` と、
+`ciApp` は `check-runs-facts` と同じ事実であることを、それぞれの純粋関数
+を再利用する形で担保した——新しい GitHub 呼び出しロジックを別に書き起こす
+のではなく:
+
+- **`tally`**: `lib/repro-result.ts` に `selectNewestMatch(comments, sha)`
+  を新設した。旧 `read-repro-result.ts` は「一致するコメントを集めて
+  `created_at`→`id` で最新を選ぶ」ロジックをスクリプトファイル内の
+  `Match`/`newest` として個別に持っていたが、これを `lib/repro-result.ts`
+  に移し、`read-repro-result.ts` 自身もこの関数を呼ぶように書き換えた
+  （ロジックの重複を先に解消してから `pr-gate-facts.ts` が同じ関数を
+  呼ぶ形にした——「その場しのぎで真似る」のではなく「共有関数を作って
+  両方が呼ぶ」を選んだ）。`read-repro-result.spec.ts` は `run`/`parseArgv`
+  だけを import しており、内部関数の移動による破壊は無い。
+- **`ciApp`**: タスク 3.8 が用意した `lib/check-runs.ts` の
+  `dedupeNewestByName`/`aggregateCiApp` をそのまま呼ぶ。`check-runs-facts.ts`
+  にだけあった `RawCheckRunsPage` 型を `lib/check-runs.ts` に移して
+  export し、両スクリプトがこの型を共有する（重複定義を避けた）。
+- **`changedFiles[]`**: ローカル `git diff --name-only <base>...<sha>`
+  （三点、`--base` 既定は `origin/master`）。design.md のスクリプト契約表が
+  引数に `--base origin/master`（`origin/` 付きのローカル参照名）を明記して
+  いること、6-A がすでに `git push`/`git rev-parse` でローカルの checkout
+  を前提にしていることから、GitHub の `compare` API（`pr-owns-failure.ts`
+  が使う経路）ではなく、旧 6-B が実行していた `git diff` コマンドをそのまま
+  スクリプト内に移す判断とした（`pr-owns-failure.ts`の`compare`API文字列
+  `master...${sha}`とは異なり、こちらは`origin/master`というローカル参照
+  そのものを渡す）。呼び出し・stdout 解析は `execFile('git', …)` を
+  `GitDiff` 型で注入可能にし（`lockfile-overlap.ts` の `readFile` 注入と
+  同じ形）、テストはこの注入関数にフェイクを渡すだけで実 git 状態を必要と
+  しない。
+
+**「見つからない」と「取得できない」の区別（タスク 2.4 の是正と同じ規則を
+適用）**: `tally` が該当コメント無しで `null` になること、`ciApp.total`
+が 0 になることは、いずれもこのスクリプトの失敗ではなく `ok:true` の中の
+事実として返す（該当コメント無しや `ci-app-*` 総数 0 は、6-B の条件 1・2
+がまさに判断すべき「不成立」の材料であって、測定失敗ではない）。終了コード
+2 は「issue のコメント取得」「check-runs 取得」「ローカル `git diff`」の
+いずれかが実際に失敗したときだけに絞った——これは task 2.4 の
+`lockfile-overlap` で独立レビューにより是正された規則（「普通のケースを
+exit 2 にすると、Step 6 の失敗報告行が本来拾うべき異常を埋もれさせる」）を
+最初から適用したもので、後から是正が必要になる回り道を避けた。
+
+`investigate-flaky-test/SKILL.md` 6-B の条件 1・2 の抽出手順を
+`pr-gate-facts.ts` の呼び出しに置き換えた。あわせて、タスク 3.8 が
+「3.9 の実装者へ」と明示的に申し送っていた 6-B の暫定 1 行
+（`$CHECKS_FILE` から `ciApp.notSuccess` を読む `ci_not_success=$(jq …)`）
+を、`$GATE_FACTS_JSON`（`pr-gate-facts.ts` の出力）から読む形に正式に
+置き換えた。加えて、6-A の末尾にあった「このコミットのタリーを読む」
+ブロック（`read-repro-result.ts` を呼んで `$REPRO_RESULT_JSON`/
+`$REPRO_RESULT_STATUS` を作る、6-B だけが読んでいた行）を削除した——
+6-B が `pr-gate-facts.ts` で `tally` を自前取得するようになったことで
+このブロックは完全に不要（呼び出す先の無い変数を残すことは Requirement
+1.2 の「置き換えた処理を手順書に重複記述しない」に反する）になったため。
+6-C が同じ値（`workflowRunUrl`）を読んでいた 1 行
+（`REPRO_RUN_URL=$(jq -r '.workflowRunUrl' "$REPRO_RESULT_JSON")`）も
+`$GATE_FACTS_JSON`（`.tally.workflowRunUrl`）を読む形に追随させた（削除
+した6-Aのブロックの唯一の他の読み手だったため、追随させないと6-Cが壊れる）。
+Step 6 の冒頭にある「Step 5 と 6-A〜6-C の共有シェル変数」一覧も
+`$REPRO_RESULT_JSON` を `$GATE_FACTS_JSON` に置き換えた。条件 3（差分の
+範囲）と HIGH/MEDIUM/LOW の表はこのタスクの範囲外として変更していない
+（`changedFiles[]` を読む先の変数名 `$scope` は据え置き、内容は
+`pr-gate-facts.ts` の出力に変わったことだけを注記した）。
+
+**`$GATE_FACTS_STATUS` が非 0 のときの扱い（新しく生じた分岐）**: 旧手順
+には無かった状態——`pr-gate-facts.ts` 自体が失敗し、`tally`/`ciApp`/
+`changedFiles` のいずれも読めない——を HIGH/MEDIUM/LOW の表に 1 行として
+明記した（「条件 1〜3 のいずれも読めない」→ MEDIUM 止まり、HIGH には
+ならない）。これは旧手順で `REPRO_RESULT_STATUS` 非 0 と `CHECKS_FILE`
+読み取り失敗が別々に起こり得た状態を、1 回の呼び出し失敗に一本化した
+副作用であり、条件 1・2 の個別の失敗読み（表の既存行）とは別に扱う必要が
+あったため追加した。
+
+観測可能な完了状態の確認: 6-B の節に `grep -m1` の手順が無いことを確認
+済み（`grep -n "grep -m1" .claude/skills/investigate-flaky-test/SKILL.md`
+が 6-B 範囲で 0 件）。`--help` が終了コード 0、「issue のコメント取得
+失敗」「check-runs 取得失敗」「ローカル git diff 失敗」の 3 種の exit 2、
+「該当コメント無しで `tally: null`」「`ci-app-*` 総数 0（＝条件 2 不成立）
+でも `ok:true`」を含むテストが期待値と一致して通る
+（`bin/flaky-ci/scripts/pr-gate-facts.spec.ts` 14 件、`lib/repro-result.ts`
+に追加した `selectNewestMatch` のテスト 4 件を含む `lib/repro-result.spec.ts`
+9 件）。RED（`pr-gate-facts.ts` を一時的に退避し、モジュール未検出で
+失敗することを実行して確認）→ GREEN（`pnpm vitest run`、`bin/` 配下で
+23 ファイル 348 件）を実測した。`biome check bin/flaky-ci` は自動整形
+（分割代入・アロー関数の複数行化）を適用し、`useAwait` の 1 件の警告
+（`async () => { throw error }`）を `() => Promise.reject(error)` に
+書き換えて解消、最終的にエラー・警告とも 0 件で通過した。`README.md` の
+`pr-gate-facts` 行を契約表に追加し、`read-repro-result`/`repro-result.ts`/
+`check-runs.ts` の既存行も、共有関数の追加と「6-B 条件 1」の記述先変更に
+合わせて更新した。
+
+行数・容量（`wc -l -c`、タスク 3.8 完了時点の値と比較）:
+
+| ファイル | 変更前（タスク 3.8 時点、行/バイト） | 変更後（行/バイト） |
+|---|---:|---:|
+| `.claude/skills/investigate-flaky-test/SKILL.md` | 1609 / 84968 | 1610 / 85631 |
+
+このタスクは行数はほぼ横ばい（+1 行）ながら容量は増えた（+663 バイト）。
+旧 6-A の「タリーを読む」ブロックと 6-B の抽出 1 行を削除できた一方、
+`pr-gate-facts.ts` が「1 回の呼び出しで 3 つの事実を返す・失敗と `null`/
+`0` を区別する」という新しい振る舞いを説明する散文（上記の 2 段落）と、
+新しい失敗分岐（`$GATE_FACTS_STATUS` 非 0）を表に 1 行追加したことが、
+削除できた行数を上回った。`investigate-flaky-test/SKILL.md` は「毎回
+読まれる 2 本」（routine + detect）には含まれないため、5.3 の合計値には
+影響しない。
+
+**CONCERNS（レビュアーへの申し送り）**:
+1. `changedFiles[]` はローカル `git diff` に依存する唯一のスクリプトで
+   ある（他の全スクリプトは `gh api` のみ）。design.md の Requirement 3.1
+   は GitHub 読み取りを REST のみに限定しているが、ローカル git の使用
+   自体は禁止しておらず、6-A がすでに同じ前提（fix ブランチの checkout・
+   `git push`）を置いている。cloud ルーティン環境でこの前提が崩れる
+   （fix ブランチが checkout されていない）ことは、少なくとも task 2.5 の
+   時点で確認された制約（GitHub への書き込みがブロックされる問題）とは
+   別の話であり、本タスクでは実測できていない。
+2. `--base` は design.md の引数表どおり `origin/master` を既定値とした
+   （CLI としては上書き可能）。手順書側は常に `--base origin/master` を
+   明示的に渡す形にしており、既定値に暗黙で依存していない。

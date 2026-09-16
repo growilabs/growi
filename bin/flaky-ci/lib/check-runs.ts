@@ -27,6 +27,11 @@ export type RawCheckRun = {
   readonly started_at: string;
 };
 
+/** One page of `GET commits/{sha}/check-runs`'s response shape. */
+export type RawCheckRunsPage = {
+  readonly check_runs: readonly RawCheckRun[];
+};
+
 export type CheckRun = {
   readonly id: number;
   readonly name: string;

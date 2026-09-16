@@ -12,12 +12,26 @@
  * function scoped to one comment body cannot do.
  */
 import { COMMENT_HEADINGS, REPRO_RESULT_LINE_PREFIXES } from './constants.ts';
+import { compareIso } from './time.ts';
 
 export type ReproResult = {
   readonly runs: number;
   readonly failed: number;
   readonly perRun: readonly string[];
   readonly workflowRunUrl: string;
+};
+
+/** The subset of a GitHub issue-comment object every caller of `selectNewestMatch` has in hand. */
+export type ReproComment = {
+  readonly id: number;
+  readonly created_at: string;
+  readonly body: string;
+  readonly html_url: string;
+};
+
+export type ReproMatch = {
+  readonly comment: ReproComment;
+  readonly result: ReproResult;
 };
 
 const [
@@ -79,4 +93,40 @@ export const parse = (body: string, sha: string): ReproResult | null => {
       : perRunText.split(',').map((entry) => entry.trim());
 
   return { runs, failed, perRun, workflowRunUrl };
+};
+
+/**
+ * The newest comment (by `created_at`, then the larger `id` on an exact tie)
+ * among `comments` whose body carries a `- Commit:` line naming `sha`, or
+ * `null` when none do. A tracking issue can carry more than one `### Repro
+ * result` comment for the same commit (a manually re-run repro job leaves a
+ * second one behind), so picking "the" tally for a commit means comparing
+ * across comments, not just parsing one — this is that comparison, shared by
+ * `read-repro-result.ts` and `pr-gate-facts.ts` (task 3.9) so the two scripts
+ * cannot drift on what "the tally for this commit" means.
+ */
+export const selectNewestMatch = (
+  comments: readonly ReproComment[],
+  sha: string,
+): ReproMatch | null => {
+  const matches: readonly ReproMatch[] = comments.flatMap((comment) => {
+    const result = parse(comment.body, sha);
+    return result == null ? [] : [{ comment, result }];
+  });
+  if (matches.length === 0) {
+    return null;
+  }
+  return matches.reduce((latest, candidate) => {
+    const byTime = compareIso(
+      candidate.comment.created_at,
+      latest.comment.created_at,
+    );
+    if (byTime > 0) {
+      return candidate;
+    }
+    if (byTime < 0) {
+      return latest;
+    }
+    return candidate.comment.id > latest.comment.id ? candidate : latest;
+  });
 };

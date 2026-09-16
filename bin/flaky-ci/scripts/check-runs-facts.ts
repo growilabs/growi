@@ -36,6 +36,7 @@ import {
   aggregateCiApp,
   dedupeNewestByName,
   type RawCheckRun,
+  type RawCheckRunsPage,
 } from '../lib/check-runs.ts';
 import { createGhApi, type GhApi, GhError } from '../lib/gh.ts';
 import { emit, type ScriptResult } from '../lib/output.ts';
@@ -75,10 +76,6 @@ export const parseArgv = (argv: readonly string[]): ParsedArgv => {
     return { kind: 'invalid', reason: '--sha is required' };
   }
   return { kind: 'args', value: { sha } };
-};
-
-type RawCheckRunsPage = {
-  readonly check_runs: readonly RawCheckRun[];
 };
 
 const PER_PAGE = 100;

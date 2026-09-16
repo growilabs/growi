@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parse } from './repro-result.ts';
+import { parse, selectNewestMatch } from './repro-result.ts';
 
 const CASE1_SHA = 'b9a64ded27e0ce4cc30a0563d5be5133db0f027a';
 const CASE1_BODY = [
@@ -79,5 +79,69 @@ describe('repro-result.parse', () => {
       '- Workflow run: https://github.com/growilabs/growi/actions/runs/34867613127',
     ].join('\n');
     expect(parse(body, CASE1_SHA)).toBeNull();
+  });
+});
+
+describe('repro-result.selectNewestMatch', () => {
+  const olderComment = {
+    id: 1,
+    created_at: '2026-09-10T00:00:00Z',
+    body: CASE1_BODY,
+    html_url: 'https://github.com/growilabs/growi/issues/1#issuecomment-1',
+  };
+  const newerComment = {
+    id: 2,
+    created_at: '2026-09-11T00:00:00Z',
+    body: CASE1_BODY,
+    html_url: 'https://github.com/growilabs/growi/issues/1#issuecomment-2',
+  };
+
+  it('returns null when no comment carries a - Commit: line for sha', () => {
+    expect(
+      selectNewestMatch(
+        [olderComment],
+        'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+      ),
+    ).toBeNull();
+  });
+
+  it('picks the single match when only one comment carries the sha', () => {
+    expect(selectNewestMatch([olderComment], CASE1_SHA)).toEqual({
+      comment: olderComment,
+      result: {
+        runs: 3,
+        failed: 0,
+        perRun: ['pass', 'pass', 'pass'],
+        workflowRunUrl:
+          'https://github.com/growilabs/growi/actions/runs/34867613127',
+      },
+    });
+  });
+
+  it('picks the newer of two matching comments by created_at', () => {
+    expect(selectNewestMatch([olderComment, newerComment], CASE1_SHA)).toEqual({
+      comment: newerComment,
+      result: expect.objectContaining({ runs: 3 }),
+    });
+    // Order of the input array must not matter.
+    expect(selectNewestMatch([newerComment, olderComment], CASE1_SHA)).toEqual({
+      comment: newerComment,
+      result: expect.objectContaining({ runs: 3 }),
+    });
+  });
+
+  it('breaks an exact created_at tie by the larger id', () => {
+    const tieA = {
+      ...olderComment,
+      id: 5,
+      created_at: newerComment.created_at,
+    };
+    const tieB = {
+      ...olderComment,
+      id: 9,
+      created_at: newerComment.created_at,
+    };
+    expect(selectNewestMatch([tieA, tieB], CASE1_SHA)?.comment.id).toBe(9);
+    expect(selectNewestMatch([tieB, tieA], CASE1_SHA)?.comment.id).toBe(9);
   });
 });

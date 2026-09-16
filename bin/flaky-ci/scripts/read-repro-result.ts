@@ -19,8 +19,7 @@ import { pathToFileURL } from 'node:url';
 
 import { createGhApi, type GhApi, GhError } from '../lib/gh.ts';
 import { emit, type ScriptResult } from '../lib/output.ts';
-import { parse, type ReproResult } from '../lib/repro-result.ts';
-import { compareIso } from '../lib/time.ts';
+import { type ReproComment, selectNewestMatch } from '../lib/repro-result.ts';
 
 const HELP = `Usage: node read-repro-result.ts --issue <number> --sha <sha>
 
@@ -58,38 +57,13 @@ export const parseArgv = (argv: readonly string[]): ParsedArgv => {
   return { kind: 'args', value: { issue, sha } };
 };
 
-type Comment = {
-  readonly id: number;
-  readonly created_at: string;
-  readonly body: string;
-  readonly html_url: string;
-};
-
-type Match = { readonly comment: Comment; readonly result: ReproResult };
-
-/** Newest by `created_at`, then by `id` — the same tie-break `research.md` records. */
-const newest = (candidates: readonly Match[]): Match =>
-  candidates.reduce((latest, candidate) => {
-    const byTime = compareIso(
-      candidate.comment.created_at,
-      latest.comment.created_at,
-    );
-    if (byTime > 0) {
-      return candidate;
-    }
-    if (byTime < 0) {
-      return latest;
-    }
-    return candidate.comment.id > latest.comment.id ? candidate : latest;
-  });
-
 export const run = async (
   ghApi: GhApi,
   args: CliArgs,
 ): Promise<ScriptResult> => {
-  let comments: readonly Comment[];
+  let comments: readonly ReproComment[];
   try {
-    comments = await ghApi.getAll<Comment>(
+    comments = await ghApi.getAll<ReproComment>(
       `repos/growilabs/growi/issues/${args.issue}/comments`,
     );
   } catch (error) {
@@ -101,12 +75,9 @@ export const run = async (
     return { ok: false, failure: { reason: error.message } };
   }
 
-  const matches: readonly Match[] = comments.flatMap((comment) => {
-    const result = parse(comment.body, args.sha);
-    return result == null ? [] : [{ comment, result }];
-  });
+  const winner = selectNewestMatch(comments, args.sha);
 
-  if (matches.length === 0) {
+  if (winner == null) {
     return {
       ok: false,
       failure: {
@@ -115,7 +86,6 @@ export const run = async (
     };
   }
 
-  const winner = newest(matches);
   return {
     ok: true,
     facts: {
