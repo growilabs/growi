@@ -81,7 +81,7 @@
   - 観測可能な完了状態: 該当節に正規表現が無い。`--help` が 0、題名一覧の全件が期待値と一致するテストが通る。README に行がある。行数・容量の前後を記録
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.4, 4.1, 4.3, 4.4, 5.1, 5.2_
 
-- [ ] 3.4 時間窓内の run 一覧
+- [x] 3.4 時間窓内の run 一覧
   - workflow 名・窓の時間・上限件数を受け、完了済み run の一覧（ID・結論・commit・作成時刻・URL・イベント・attempt）と打ち切りの有無を返す。1 件も取れない（API 失敗）ときは終了コード 2、0 件は成功
   - 素材: 記録済み応答 3 ページと、現在の手動ページング手順の出力
   - detect Step 1 の手動ページングの手順を呼び出しに置き換える。「打ち切りを報告する」「同一 commit の attempt 反転は確定扱い」は残す
@@ -775,4 +775,100 @@ bin` は自動整形（1 行結合）を適用した上で通過（警告 0、�
 
 `investigate-flaky-test/SKILL.md` は「毎回読まれる 2 本」（routine +
 detect）には含まれないため、5.3 の合計値には影響しない。
+
+### タスク 3.4: `list-candidate-runs` の切り出しと手順書の行数・容量（2026-09-16）
+
+`bin/flaky-ci/scripts/list-candidate-runs.ts` に、`--workflow --window-hours
+--max-runs` を受けて時間窓内の完了済み run 一覧（`id`, `conclusion`,
+`headSha`, `createdAt`, `url`, `event`, `attempt`）と打ち切りの有無
+（`truncated`）を返すロジックを実装した。design.md の File Structure Plan
+にはこのスクリプト専用の `lib/` モジュールが挙げられておらず、他のスクリプ
+トからも再利用されないため、`newest-observation.ts`（タスク 2.2）や
+`awaiting-decision-rows.ts`（タスク 2.3）と同じ位置づけでロジックをスクリプ
+トファイル内に留め、新しい `lib/` ファイルは追加していない。
+
+**`GhApi.getAll` を使わず `GhApi.get` でページングを自前に組んだ理由**:
+`getAll`（`lib/gh.ts`）は各ページの本体が裸の配列であることを前提にページを
+結合するが、workflow runs エンドポイントの本体は
+`{ total_count, workflow_runs: [...] }` というオブジェクトであり、
+`Array.isArray(body)` の検査に失敗して `GhError('invalid-json', ...)` を
+投げてしまう。加えてこのスクリプトは `--max-runs` 到達時・窓の外側に出た
+ページに到達した時点で早期に止まる必要があり、`getAll` にはその停止条件が
+無い。タスクの指示（「拡張するか、`get` で自前に組むか判断し、逸脱する場合
+は CONCERNS に書く」）どおり、`get` を使って `page += 1` の単純なループを
+組んだ。ページの終わりの判定は「空配列が返る」（旧手順の
+`[ "$count" -eq 0 ] && break` と同じ条件）だけを使い、「`per_page` 未満は
+最終ページ」という追加の早期終了は入れていない——本番の `per_page` は常に
+100 だが、テストのフィクスチャは実データを 5 件ずつのページで記録して
+おり、「短いページ＝最終ページ」という判定を入れるとフィクスチャの各ページ
+が本来より早く「最終ページ」と誤判定されてしまうため（実測してテストが
+落ちたので、この判定を外した）。
+
+**API 呼び出し自体が完全に失敗したときの終了コードの決定**: design.md の
+Error Handling は「1 件も取れない（API 失敗）は終了コード 2、0 件は成功」
+とだけ述べており、「途中のページまでは取れたが、その後のページの取得が
+失敗した」場合の扱いは明記していない。今回は「1 ページ目から失敗し、
+1 件も集まらなかった」場合だけを終了コード 2 とし、「いくつかのページは
+成功したが、途中のページの取得が失敗した」場合は `--max-runs` 到達時と
+同じ `truncated: true` を返す ` ok: true` の成功として扱う判断をした
+（`list-candidate-runs.spec.ts` の「途中のページが失敗しても
+`truncated: true` で成功扱いになる」テストで固定）。理由は、この場合すでに
+窓の一部について本物の run が読めており、「一部が読めた」という点で
+`--max-runs` 打ち切りと同じ性質の不完全さだから——新しい欄を契約表に増やす
+より、手順書側がすでに持っている「`truncated` を見たら打ち切りとして
+報告する」という既存の扱いに合流させたほうが手順書の変更が小さく済む。
+この判断は CONCERNS としてもレビュアーに申し送る。
+
+**素材**: 実際に `growilabs/growi` の "Node CI for app development"
+（`ci-app.yml`）ワークフローに対して `gh api -X GET
+repos/growilabs/growi/actions/workflows/ci-app.yml/runs -f status=completed
+-F per_page=5 -F page=<1|2|3>` を実行し、3 ページ分（計 15 run）を
+`bin/flaky-ci/fixtures/api/list-candidate-runs-ci-app-page{1,2,3}.json` に
+保存した（`per_page=5` は実データのままフィクスチャを小さく保つための
+値。取得コマンドと、旧手順の出力との突き合わせ方法は同ディレクトリの
+`list-candidate-runs.meta.md` に記録)。旧手順（手順書の `while` ループ +
+`jq`）を同じ 3 ページに対して手で適用した結果は、フィールド名
+`databaseId` → `id` の改名（design.md の契約表がそう定めているだけで、
+旧シェル変数名自体はどこにも依存されていなかったため Requirement 1.3 上の
+挙動変更ではない）を除いて完全に一致することを確認した。
+
+観測可能な完了状態の確認: 該当節（Step 1）に `gh api` / `jq` / `date -d`
+のシェル片が無いことを `grep -n` で確認済み（残った `gh api ...
+workflows -q` は Step 1 内の別目的の 1 行——ワークフローのファイル名を
+確認するためのヘルパーコマンドであり、run 一覧のページングとは無関係）。
+`--help` が終了コード 0、複数ページの結合と窓外の切り捨て（cutoff を
+ページ 2 の途中に置き、ページ 3 を一切呼ばないことを呼び出し引数の記録で
+確認）・`--max-runs` 到達による打ち切り・0 件成功・API 完全失敗による
+終了コード 2・途中失敗による `truncated: true` の 6 ケースが
+`list-candidate-runs.spec.ts`（12 件）で通る。`pnpm vitest run`
+（`bin/` 配下）で 24 ファイル 342 件が通ることを確認した。`biome check bin`
+は自動整形（改行）を適用した上で通過（警告 0、エラー 0）。`README.md` の
+契約表に `list-candidate-runs` の行を追加した。
+
+Step 1 から Step 2 への申し送り: Step 2 冒頭の「`{RUN_ID}` は Step 1 の
+`databaseId`」という記述を、フィールド名の改名に合わせて「Step 1 の
+`runs[]` の `id`」に更新した（Step 1 の出力契約が変わった直接の帰結であり、
+Step 2 の判断ロジック自体は変更していない）。
+
+行数・容量（`wc -l -c`、タスク 3.2 時点の値と比較）:
+
+| ファイル | 変更前（タスク 3.2 時点、行/バイト） | 変更後（行/バイト） |
+|---|---:|---:|
+| `.claude/skills/detect-flaky-ci/SKILL.md` | 1602 / 83788 | 1572 / 82165 |
+
+レビュー指摘の是正（`truncated: true` の報告先の誤り）: Step 1 の新規追記が
+「`truncated: true` は Step 6（`flaky-ci-routine.md` 側）の『Script failures』
+行で報告する」としていたが、その行は終了コード非 0 のスクリプト呼び出し
+だけを数える契約であり、`truncated: true` は終了コード 0（スクリプト自体は
+成功）で発生するため、この経路では報告先として機能しない。終了コード 2
+（1 件も取得できない）を Step 6 で報告する記述は妥当なため変更していない。
+`truncated: true` の報告先は本スキル自身の Step 5（既存の「打ち切りの有無を
+明示」の一文）であり、そちらに合流するよう Step 1 の文言を修正し、
+Step 5 側の一文にも「途中ページの取得失敗」という今回追加した打ち切り原因を
+書き加えた。コードの変更は無い（`list-candidate-runs.ts` 本体・テスト・
+fixture は変更対象外）。
+
+| ファイル | 是正前（行/バイト） | 是正後（行/バイト） |
+|---|---:|---:|
+| `.claude/skills/detect-flaky-ci/SKILL.md` | 1572 / 82165 | 1575 / 82403 |
 

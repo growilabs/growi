@@ -402,74 +402,46 @@ Query **each workflow separately** — do not pull the unfiltered
 workflows (CodeQL, Auto-labeling, Auto approve PR, …), so a generic window of
 recent runs can contain almost none of the two being watched.
 
-**Use `gh api` against the workflow's own runs endpoint, not
-`gh run list --json`**, which validates requested fields against a fixed,
-gh-CLI-version-specific struct and fails the whole command when it does not
-know one (the cloud routine's gh 2.45.0 rejects `attempt`). `gh api` is a thin
-passthrough to GitHub's REST response, which already includes `run_attempt`
-regardless of gh CLI version.
-
-**Page until you cross `--window-hours`, not a fixed count** (see "Why a
-Time Window, Not a Run Count" above). `per_page=100`, walk pages newest
-first, stop once a page's oldest run falls before the cutoff, and stop
-early (report why) if `--max-runs-per-workflow` is hit first:
+Call, once per watched workflow file (`ci-app.yml` = "Node CI for app
+development", `ci-app-prod.yml` = "Node CI for app production" — confirm with
+`gh api repos/growilabs/growi/actions/workflows -q '.workflows[] | {name,path}'`
+if these file names ever change):
 
 ```bash
-WINDOW_HOURS={window-hours, default 32}
-MAX_RUNS={max-runs-per-workflow, default 300}
-CUTOFF_EPOCH=$(( $(date -u +%s) - WINDOW_HOURS * 3600 ))
-
-for WORKFLOW in ci-app.yml ci-app-prod.yml; do
-  : > "/tmp/${WORKFLOW}-runs.jsonl"
-  page=1
-  total=0
-  while :; do
-    resp=$(gh api -X GET "repos/growilabs/growi/actions/workflows/${WORKFLOW}/runs" \
-      -f status=completed -F per_page=100 -F "page=${page}")
-    count=$(printf '%s\n' "$resp" | jq '.workflow_runs | length')
-    [ "$count" -eq 0 ] && break
-    printf '%s\n' "$resp" | jq -c '.workflow_runs[] | {databaseId: .id, conclusion, headSha: .head_sha, createdAt: .created_at, url: .html_url, event, attempt: .run_attempt}' \
-      >> "/tmp/${WORKFLOW}-runs.jsonl"
-    total=$((total + count))
-    oldest_epoch=$(printf '%s\n' "$resp" | jq -r '.workflow_runs[-1].created_at' | date -u -f - +%s 2>/dev/null || date -u -d "$(printf '%s\n' "$resp" | jq -r '.workflow_runs[-1].created_at')" +%s)
-    if [ "$oldest_epoch" -lt "$CUTOFF_EPOCH" ]; then break; fi
-    if [ "$total" -ge "$MAX_RUNS" ]; then
-      echo "TRUNCATED: ${WORKFLOW} hit --max-runs-per-workflow=${MAX_RUNS} before reaching the ${WINDOW_HOURS}h window boundary — report this explicitly in Step 5" >&2
-      break
-    fi
-    page=$((page + 1))
-  done
-done
+node bin/flaky-ci/scripts/list-candidate-runs.ts \
+  --workflow ci-app.yml \
+  --window-hours {window-hours, default 32} \
+  --max-runs {max-runs-per-workflow, default 300}
 ```
 
-**Feed JSON to `jq` with `printf '%s\n' "$var"`, never `echo "$var"`.** In
-`zsh` — which is the interactive shell this routine has actually been run
-from — the builtin `echo` expands backslash escapes, so the `\n` inside a
-JSON string value becomes a real newline before `jq` ever sees it and the
-parse dies with `Invalid string: control characters from U+0000 through
-U+001F must be escaped`. `printf '%s\n'` passes the bytes through unchanged
-in every shell. The same applies anywhere else in this file a JSON variable
-is piped into `jq`.
+Output fields (exit 0): `runs[]` — one per completed run created within the
+trailing `--window-hours`, newest first, each with `id`, `conclusion`,
+`headSha`, `createdAt`, `url`, `event`, `attempt` — and `truncated` (boolean).
+Exit 2: no run at all could be fetched for this workflow (the GitHub API
+failed before any page was read) — report it as a script failure in Step 6,
+the same as any other script's exit 2.
 
-(`ci-app.yml` = "Node CI for app development", `ci-app-prod.yml` = "Node CI
-for app production" — confirm with
-`gh api repos/growilabs/growi/actions/workflows -q '.workflows[] | {name,path}'`
-if these file names ever change. Adapt the date-parsing line to whatever
-`date` implementation the runtime actually has; the point is "epoch seconds
-of the oldest run's `created_at` in this page", however you get there.)
+**A `truncated: true` result is not a script failure** — the script still
+exits 0, so it does not belong in Step 6's "Script failures" line (that line
+is gated on non-zero exit; see Step 5 below for where this fact is reported
+instead). It means either `--max-runs-per-workflow` was reached before the
+`--window-hours` window was exhausted, or a later page failed after some
+runs were already read. Either way this workflow's candidate list may be
+missing older failures still inside the window, and the reader should treat
+it as an incomplete scan for this run of the routine, not an empty one.
 
 This naturally includes pull_request and merge-queue-triggered runs; a scan
 that only looked at "PR checks" would miss the failures that surface in the
 merge queue, which has happened.
 
-While you have this data, check for same-SHA reruns: group by `headSha` within
-each workflow's result set and look for one appearing more than once with
-`attempt > 1` on the later entry. If an earlier attempt failed and a later one
-succeeded, every job that flipped between them is a confirmed flaky occurrence
-(Step 3, "confirmed" path) — skip Step 2 classification for it, since a
-same-SHA pass/fail flip has no infra-vs-product ambiguity to resolve. This is
-rare (2 occurrences in the most recent 100 runs, measured), so a quick
-group-by over the JSON already fetched is enough; skip it under time pressure.
+While you have this data, check for same-SHA reruns: group `runs[]` by
+`headSha` within each workflow's result and look for one appearing more than
+once with `attempt > 1` on the later entry. If an earlier attempt failed and a
+later one succeeded, every job that flipped between them is a confirmed flaky
+occurrence (Step 3, "confirmed" path) — skip Step 2 classification for it,
+since a same-SHA pass/fail flip has no infra-vs-product ambiguity to resolve.
+This is rare (2 occurrences in the most recent 100 runs, measured), so a quick
+group-by over the returned `runs[]` is enough; skip it under time pressure.
 
 Keep only runs with `conclusion == "failure"` for the main Step 2 flow.
 
@@ -500,7 +472,7 @@ the way before the larger fresh-candidate loop.
 
 ## Step 2: Fetch Failed Jobs and Classify Noise
 
-`{RUN_ID}` below is the `databaseId` from Step 1. **Skip any `{RUN_ID}`
+`{RUN_ID}` below is the `id` from Step 1's `runs[]`. **Skip any `{RUN_ID}`
 already in Step 1.5's skip-list before doing anything else in this step** —
 its evidence is already recorded, so there is nothing new to extract from
 it.
@@ -1520,8 +1492,9 @@ affected, not issue creation or tracking.
 
 Print a short summary of this run: which job-log fetch method Step 0 chose
 (`gh` or `mcp`), the `--window-hours` covered and how many runs per workflow
-fell in it (and whether `--max-runs-per-workflow` truncated that — report it
-explicitly, never silently), how many runs were skipped via the Step 1.5
+fell in it (and whether `--max-runs-per-workflow` truncated that, or a later
+page's fetch failed after some runs were already read — report it explicitly,
+never silently), how many runs were skipped via the Step 1.5
 skip-list, how many jobs were scanned, how many **failures** were classified
 as infra noise and with which pattern (counted per `FAIL` block, per Step 2's
 granularity), and how many **whole jobs** were discarded on the
