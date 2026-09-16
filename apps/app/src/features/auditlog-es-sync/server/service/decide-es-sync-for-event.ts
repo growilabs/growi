@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
 
@@ -42,6 +43,11 @@ const waitForDecision = async (
   return 'dropped';
 };
 
+// Thrown inside the transaction below to abort it cleanly (no partial writes) when the
+// claim turns out to already be lost — distinguished from a genuine DB error so the
+// caller falls back to waitForDecision() instead of rethrowing.
+class ClaimLostError extends Error {}
+
 /**
  * Decide whether one anonymous-log event should sync to Elasticsearch, gated by a
  * per-(endpoint, windowStart) admission count. Safe to call redundantly from every
@@ -56,6 +62,19 @@ export const decideEsSyncForEvent = async (
   windowStart: Date,
   threshold: number,
 ): Promise<EsSyncDecisionValue> => {
+  // Cheap early-out: once a window is confidently past threshold, skip the per-event
+  // claim dance entirely (no EsSyncDecision write, no counter $inc). Strictly greater
+  // than threshold, not >=: the event that pushes the count to exactly threshold + 1
+  // must still go through the full path below, since that is the one 'dropped' event
+  // that logs the "threshold reached" warning (see after.count === threshold + 1).
+  const current = await AnonymousSyncCounter.findOne({
+    endpoint,
+    windowStart,
+  }).lean();
+  if (current != null && current.count > threshold) {
+    return 'dropped';
+  }
+
   const now = new Date();
   // Fencing token for this call's claim. Every write this call makes while holding
   // the claim is conditioned on this token, so a call that stalls long enough for
@@ -97,49 +116,61 @@ export const decideEsSyncForEvent = async (
     return waitForDecision(activityId);
   }
 
-  // Re-confirm ownership right before the increment, refreshing claimedAt as a
-  // heartbeat: if this call stalled between claiming above and reaching here for
-  // long enough that another process treated the claim as abandoned and stole it,
-  // this fails to match and we defer to the new holder instead of $inc-ing on
-  // behalf of a claim we no longer hold.
-  const reconfirmed = await EsSyncDecision.findOneAndUpdate(
-    { _id: activityId, claimToken },
-    { $set: { claimedAt: new Date() } },
-  );
-  if (reconfirmed == null) {
-    return waitForDecision(activityId);
+  // From here on, "reconfirm the claim, $inc the counter, and finalize the decision"
+  // must be all-or-nothing: if this call stalls between separate, unguarded writes,
+  // another process can steal the claim and complete its own full cycle in between,
+  // and this call would otherwise resume and $inc a second time for the same event
+  // (or overwrite the new holder's decision) without realizing it lost the claim.
+  // A transaction makes the three writes atomic instead of trying to fence each one
+  // individually.
+  const session = await mongoose.startSession();
+  let decision: EsSyncDecisionValue | undefined;
+  try {
+    await session.withTransaction(async () => {
+      const reconfirmed = await EsSyncDecision.findOneAndUpdate(
+        { _id: activityId, claimToken },
+        { $set: { claimedAt: new Date() } },
+        { session },
+      );
+      if (reconfirmed == null) {
+        throw new ClaimLostError();
+      }
+
+      // The only call site that should ever $inc the counter; runs at most once per
+      // distinct event (redundant processing from other GROWI processes either loses
+      // the claim race above, or aborts this same transaction via ClaimLostError).
+      const after = await AnonymousSyncCounter.findOneAndUpdate(
+        { endpoint, windowStart },
+        { $inc: { count: 1 }, $set: { updatedAt: new Date() } },
+        { upsert: true, new: true, session },
+      );
+      decision = after.count <= threshold ? 'admitted' : 'dropped';
+
+      // Logged once per (endpoint, windowStart) — at the exact event that pushes the
+      // count past threshold — not on every subsequent 'dropped' event in the same
+      // window, so a sustained attack doesn't flood the log with one line per event.
+      if (after.count === threshold + 1) {
+        logger.warn(
+          { endpoint, windowStart, threshold },
+          'Anonymous log ES sync threshold reached; further anonymous logs for this endpoint in this window are dropped from ES (still recorded in MongoDB).',
+        );
+      }
+
+      await EsSyncDecision.updateOne(
+        { _id: activityId, claimToken },
+        { $set: { decision, claimedAt: new Date() } },
+        { session },
+      );
+    });
+  } catch (err) {
+    if (err instanceof ClaimLostError) {
+      return waitForDecision(activityId);
+    }
+    throw err;
+  } finally {
+    await session.endSession();
   }
 
-  // Holding the claim: this is the only call site that should ever $inc the
-  // counter, and it runs at most once per distinct event (redundant processing
-  // from other GROWI processes loses the claim race above and never reaches here).
-  const after = await AnonymousSyncCounter.findOneAndUpdate(
-    { endpoint, windowStart },
-    { $inc: { count: 1 } },
-    { upsert: true, new: true },
-  );
-  const decision: EsSyncDecisionValue =
-    after.count <= threshold ? 'admitted' : 'dropped';
-
-  // Logged once per (endpoint, windowStart) — at the exact event that pushes the
-  // count past threshold — not on every subsequent 'dropped' event in the same
-  // window, so a sustained attack doesn't flood the log with one line per event.
-  if (after.count === threshold + 1) {
-    logger.warn(
-      { endpoint, windowStart, threshold },
-      'Anonymous log ES sync threshold reached; further anonymous logs for this endpoint in this window are dropped from ES (still recorded in MongoDB).',
-    );
-  }
-
-  // Guard the same claim loss on this final write: if the claim was stolen in the
-  // narrow gap between the reconfirm above and here, the new holder's own $inc +
-  // decision write is the authoritative one — defer to it rather than overwrite it.
-  const settled = await EsSyncDecision.updateOne(
-    { _id: activityId, claimToken },
-    { $set: { decision } },
-  );
-  if (settled.matchedCount === 0) {
-    return waitForDecision(activityId);
-  }
-  return decision;
+  // decision is always set once withTransaction resolves without throwing.
+  return decision as EsSyncDecisionValue;
 };

@@ -3,9 +3,7 @@ import { Schema } from 'mongoose';
 
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
-// Mirrors AnonymousSyncCounter's window lifetime: a decision only matters while
-// its window is still being gated, so it can expire alongside the counter.
-const WINDOW_TTL_SECONDS = 120;
+import { WINDOW_TTL_SECONDS } from './window-ttl';
 
 export type EsSyncDecisionValue = 'pending' | 'admitted' | 'dropped';
 
@@ -18,9 +16,13 @@ export interface EsSyncDecisionDocument extends Document {
   endpoint: string;
   windowStart: Date;
   decision: EsSyncDecisionValue;
-  // When the current 'pending' claim was taken. A claim older than the stale
-  // threshold (see decide-es-sync-for-event.ts) is assumed abandoned (the
-  // claiming process crashed or stalled) and may be taken over.
+  // When the current claim was last touched (created, stolen, reconfirmed, or
+  // finalized) — refreshed on every write, not just the initial claim. Doubles as:
+  // (1) the staleness check for 'pending' claims (a claim older than
+  //     STALE_CLAIM_MS is assumed abandoned and may be taken over), and
+  // (2) the TTL anchor (see below) — windowStart cannot be the TTL field, since
+  //     it is keyed off the event's own createdAt and a backlog replay would
+  //     carry an old windowStart, expiring the document almost immediately.
   claimedAt: Date;
   // Fencing token identifying the current claim holder. Every write a claimant makes
   // (the counter $inc, the final decision write) is conditioned on this token still
@@ -34,17 +36,17 @@ export interface EsSyncDecisionModel extends Model<EsSyncDecisionDocument> {}
 const schema = new Schema<EsSyncDecisionDocument, EsSyncDecisionModel>({
   _id: { type: String, required: true },
   endpoint: { type: String, required: true },
-  windowStart: {
-    type: Date,
-    required: true,
-    index: { expireAfterSeconds: WINDOW_TTL_SECONDS },
-  },
+  windowStart: { type: Date, required: true },
   decision: {
     type: String,
     enum: ['pending', 'admitted', 'dropped'],
     required: true,
   },
-  claimedAt: { type: Date, required: true },
+  claimedAt: {
+    type: Date,
+    required: true,
+    index: { expireAfterSeconds: WINDOW_TTL_SECONDS },
+  },
   claimToken: { type: String, required: true },
 });
 

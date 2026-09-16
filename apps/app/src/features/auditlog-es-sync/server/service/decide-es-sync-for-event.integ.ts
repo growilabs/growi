@@ -61,6 +61,49 @@ describe('decideEsSyncForEvent', () => {
     ]);
   });
 
+  it('skips the per-event claim entirely once the window is confidently past threshold', async () => {
+    const threshold = 3;
+    for (let i = 0; i < 4; i++) {
+      // biome-ignore lint/performance/noAwaitInLoops: each call must see the prior one's committed count.
+      await decideEsSyncForEvent(
+        newActivityId(),
+        endpoint,
+        windowStart,
+        threshold,
+      );
+    }
+    // The counter is now at 4 (> threshold), so the next call should take the
+    // cheap early-out path — no EsSyncDecision record created for it at all.
+    const skippedActivityId = newActivityId();
+    const decision = await decideEsSyncForEvent(
+      skippedActivityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    expect(decision).toBe('dropped');
+    expect(await EsSyncDecision.exists({ _id: skippedActivityId })).toBeNull();
+  });
+
+  it('does not double-increment when two processes race on the exact same event concurrently', async () => {
+    const activityId = newActivityId();
+    const threshold = 3;
+
+    const [first, second] = await Promise.all([
+      decideEsSyncForEvent(activityId, endpoint, windowStart, threshold),
+      decideEsSyncForEvent(activityId, endpoint, windowStart, threshold),
+    ]);
+
+    // Both calls are for the SAME event, so exactly one of them actually claims
+    // and increments; the other must read that same result back, never decide
+    // independently.
+    expect(first).toBe(second);
+    expect(
+      (await AnonymousSyncCounter.findOne({ endpoint, windowStart }))?.count,
+    ).toBe(1);
+  });
+
   it('logs a warning exactly once, at the event that first crosses the threshold', async () => {
     const threshold = 3;
     for (let i = 0; i < 5; i++) {
