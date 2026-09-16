@@ -9,7 +9,7 @@
   - 観測可能な完了状態: 両環境の Node 版・`gh` 版・Write の可否・`.ts` 直接実行の可否が tasks.md の Implementation Notes に表として残り、Node 24 未満なら呼び出し行の方針（`--experimental-strip-types` か `.js` 出力か）が同じ表に決まっている。後続タスクはこの表を前提にする
   - _Requirements: 3.1, 3.5_
 
-- [ ] 1.2 `bin/flaky-ci/` の共通基盤（出力・GitHub 読み取り・固定文字列・日時・ANSI）をテスト先行で作る
+- [x] 1.2 `bin/flaky-ci/` の共通基盤（出力・GitHub 読み取り・固定文字列・日時・ANSI）をテスト先行で作る
   - 成功は stdout に JSON 1 個で終了コード 0、前提不成立は stdout 空・stderr 1 行・終了コード 2 という唯一の書き方を用意し、テストで 0/2 の両方と「stdout が空であること」を検証する。複数行を返すスクリプト向けに「行ごとの読めなかった事実は欄で示し全体は成功」の書き方も同じ場所で用意する
   - GitHub 読み取りの入口を 1 つにし、REST の GET だけを子プロセスで呼び、ページングは自分で回す。テストでは子プロセスを差し替えて記録済み応答を流し、`gh` 不在・非 0 終了・JSON 不正が失敗として区別されることを検証する
   - 手順書の Shared constants にある固定文字列（ラベル名・コメント見出し・マーカー・署名・保留窓の秒数・`### Repro result` の 7 行）を機械可読に定義し、手順書の該当節と一致することを検証するテストを付ける
@@ -178,3 +178,21 @@ cloud routine（`/flaky-ci-routine` を無人実行する Anthropic cloud 側の
 **呼び出し行の方針（タスク 1.1 時点・暫定、確定ではない）**: cloud 側の Node バージョンは実測できていないが、(a) このリポジトリ自身の `engines.node: "^24"` という制約（cloud 環境もこれを前提に用意されていると考えられる）と、(b) 全 CI workflow がすでに Node 24.x に固定されていること、という間接証拠の強さに基づき、**`--experimental-strip-types` のフォールバックを付けず、素の `node bin/flaky-ci/scripts/<name>.ts` 呼び出しを当面の既定とする**。
 
 この判断はあくまで暫定であり、リスクは低いものの実測による裏付けが無い。**確定させる場でなく確認する場はタスク 2.5**（「上位 4 本を入れた手順書で routine を 1 サイクル動かす」、design.md の Testing Strategy が実際の routine 環境で回す "run now" サイクルと位置付けている箇所）である。タスク 2.5 の実装者へ: もしこのサイクルでいずれかのスクリプトが Node バージョンや `.ts` インポート非対応が原因で cloud 環境で失敗した場合、それこそが呼び出し行を `--experimental-strip-types` 付きに切り替える、またはコンパイル済み `.js` へのフォールバックに切り替えるべき、という本物のシグナルである。タスク 2.5 は、本タスクのこの暫定判断が正しかったかどうかを実環境で確認する最初の機会として扱うこと。
+
+### タスク 1.2: 手順書 3 本の基準値（2026-09-16、commit `14165274c0`）
+
+スクリプト化に着手する前の行数・バイト数。タスク 2.1 以降の各タスクと、タスク 3.11（Requirement 5.2 / 5.3 の増減の記録）はこの値と比べる。測り方は `wc -l -c <file>`（推定値ではなく実行結果）。
+
+| ファイル | 行数 | バイト数 |
+|---|---:|---:|
+| `.claude/commands/flaky-ci-routine.md` | 1049 | 54171 |
+| `.claude/skills/detect-flaky-ci/SKILL.md` | 1633 | 86011 |
+| `.claude/skills/investigate-flaky-test/SKILL.md` | 1630 | 87197 |
+| 合計 | 4312 | 227379 |
+| うち毎回読まれる 2 本（routine + detect） | 2682 | 140182 |
+
+**固定文字列の検証元について（タスク 1.2 の設計判断）**: `lib/constants.ts` の各定数は「どのファイル（Shared constants 群はどの節）と突き合わせるか」を自分で宣言し、`constants.spec.ts` がその宣言を全件検査する。tasks.md の当初の記述は「全定数が `## Shared constants` 節に現れること」を検査する形だったが、実際の同節が定義しているのは `flaky/needs-decision`・`- Recommendation: `・署名 2 種・保留窓 120 秒だけだった。tier ラベル・コメント見出し・`**Fix PR**: ` は同じファイルの別の場所、`### Repro result` の 7 行は `.github/workflows/flaky-repro.yml` が定義元である。手順書の本文はタスク 1.2 の範囲外なので書き換えず、定数を落とすこともせず、それぞれの実際の定義元に対して検査している。
+
+**タスク 5.1（元 spec への移し戻し）への申し送り**: 現在の design.md には、上の実測と食い違う記述が 2 か所ある。(a) Components の `constants.ts` の説明と、(b) Testing Strategy の該当行で、どちらも「`constants.spec.ts` が `## Shared constants` 節だけを読んで全定数を突き合わせる」と読める書き方になっている。実際には tier ラベル・コメント見出し・`**Fix PR**: ` は `flaky-ci-routine.md` の同節ではない場所にあり、`### Repro result` の 7 行は手順書ではなく `.github/workflows/flaky-repro.yml` が定義元である。移し戻しの際は design.md の文言をそのまま写さず、この 2 か所を実際の定義元に合わせて書き直すこと。あわせて、`ci-bin.yml` の `paths` には `flaky-repro.yml` も入っている（これが無いと同ファイルだけを変える PR でドリフト検知のテストが走らない）ことを Revalidation Triggers に含める。
+
+なお `ci-bin.yml` の `paths` に足した 2 ファイル（`flaky-ci-routine.md` と `flaky-repro.yml`）は、`turbo.json` の `globalDependencies` にも `bin` パッケージの入力にも入っていない。つまり turbo から見ると、これらを変えても `test` タスクのハッシュは変わらない。現状は CI に remote cache の設定（`TURBO_TOKEN` 等）も `.turbo` の復元ステップも無く、毎回キャッシュが空の状態から走るので実害は無く、ジョブが起動すればテストは必ず実行される。ただし将来 remote cache を有効にするなら、この 2 ファイルを `globalDependencies` に宣言しないと、ジョブは起動するがキャッシュヒットでテストが走らない、という同じ見落としが一段下で再発する。
