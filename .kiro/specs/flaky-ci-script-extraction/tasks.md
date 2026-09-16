@@ -88,7 +88,7 @@
   - 観測可能な完了状態: Step 1 にページングのシェル片が無い。`--help` が 0、結合と打ち切りのテストが期待値と一致して通る。README に行がある。行数・容量の前後を記録
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 3.3, 4.1, 4.4, 5.1, 5.2_
 
-- [ ] 3.5 flaky 追跡 issue の一括取得
+- [x] 3.5 flaky 追跡 issue の一括取得
   - ラベル名（既定 3 種）を受け、該当 issue の番号・題名・状態・本文・ラベル・コメント全文を返す（後段の 4 か所が読む欄をすべて含める）
   - detect Step 1.5 の取得手順を呼び出しに置き換える
   - 観測可能な完了状態: Step 1.5 に取得のシェル片が無い。`--help` が 0、記録済み応答のテストが期待値と一致して通る。README に行がある。行数・容量の前後を記録
@@ -871,4 +871,86 @@ fixture は変更対象外）。
 | ファイル | 是正前（行/バイト） | 是正後（行/バイト） |
 |---|---:|---:|
 | `.claude/skills/detect-flaky-ci/SKILL.md` | 1572 / 82165 | 1575 / 82403 |
+
+### タスク 3.5: flaky 追跡 issue の一括取得（`fetch-flaky-issues`）
+
+`bin/flaky-ci/scripts/fetch-flaky-issues.ts` を追加し、Step 1.5 が
+`gh api ... issues -f state=all -f labels=... --paginate -q '...'` を
+3 ラベル分手で書いていた取得（＋issue ごとの `gh api .../comments --paginate`
+呼び出し）を 1 回の呼び出しに置き換えた。
+
+- 引数は `--labels`（繰り返し可、既定は `constants.ts` の `LABELS.observing` /
+  `LABELS.suspected` / `LABELS.confirmed` の 3 種）。`GhApi.getAll` は
+  issues 一覧・コメント一覧のどちらもベア配列を返す前提と一致することを
+  実際に `gh api -X GET repos/growilabs/growi/issues -f state=all -f
+  labels=flaky/observing -f per_page=2` で確認済み（`list-candidate-runs`
+  の workflow-runs エンドポイントのような `{ workflow_runs: [...] }` の
+  ラップは無い）ので、`getAll` をそのまま使用しラベルごとの手書きページングは
+  行っていない。
+- 出力は `issues[]`（`number`, `title`, `state`, `body`, `labels[]`
+  （ラベル名の配列）, `comments[]`（各 `id`, `body` — 全文）,
+  `commentsStatus`）。複数行スクリプトの規約（design.md Error Handling）に
+  従い、1 件のコメント取得失敗はその行の `commentsStatus: "unavailable"` /
+  `comments: []` として扱い、他の行・全体の `ok:true` は維持する。
+- ラベル一覧そのものの取得失敗（`GhError`）は、当初「1 ラベルでも取得できれば
+  その issue は結果に含め、全ラベルが失敗したときだけ終了コード 2」という
+  判断だけを実装し、`list-candidate-runs` の `truncated` に相当する欄を
+  設けていなかった。レビューでこの欠落を指摘され是正した（下記参照）。
+- 同一 issue が複数のティアラベルを同時に持つ場合（理論上あり得る）は
+  issue 番号でまとめて重複排除し、番号昇順に整列して返す。
+- テストは実データ由来の fixture（2026-09-16 に `gh api` で取得、
+  `bin/flaky-ci/fixtures/api/issues/fetch-flaky-issues-*.json` および
+  既存の `11914-comments.json`）を使い、複数ラベルの統合・重複排除・
+  1 ラベル失敗時の部分成功・全ラベル失敗時の失敗・1 issue のコメント取得
+  失敗時の行単位 `unavailable` を検証する（`fetch-flaky-issues.spec.ts`
+  11 件）。RED（未実装のスタブに差し替えて実行）→GREEN を実測して確認した。
+- 手順書（`detect-flaky-ci/SKILL.md` Step 1.5）を書き換え、3 本の
+  `gh api --paginate -q` 呼び出しと「コメントを別途取得する」という記述を
+  スクリプト呼び出し 1 行＋出力欄の説明に置き換えた。Step 1.5 を参照する
+  他の 4 箇所（setup-hook のタイトル・state 一致、`### Collateral candidate`
+  行の再読み込み、identity-key の完全一致検索、Step 5 のスキップ件数）は
+  いずれも `title` / `state` / `body` / `comments[].body` を読むだけで、
+  出力欄の名称・意味を変えていないため文言修正は不要だった。
+- `README.md` の契約表に `fetch-flaky-issues` の行を追加した。
+- `pnpm vitest run`（`bin/` 配下、`cd bin && pnpm vitest run`）で
+  25 ファイル 353 件が通ることを確認した。`biome check bin` は fixture
+  JSON の自動整形を適用した上で通過（警告 0、エラー 0）。
+
+行数・容量（`wc -l -c`、タスク 3.4 完了時点の値と比較）:
+
+| ファイル | 変更前（行/バイト） | 変更後（行/バイト） |
+|---|---:|---:|
+| `.claude/skills/detect-flaky-ci/SKILL.md` | 1575 / 82403 | 1582 / 82544 |
+
+このタスク単独では行数・容量とも減っていない（+7 行 / +141 バイト）。
+削除できたのは `gh api` 呼び出し 3 行と「コメントを別途取得する」という
+1 文だけなのに対し、置き換え後は `fetch-flaky-issues.ts` の出力契約
+（`issues[]` の各欄の意味、`commentsStatus` の扱い）を手順書内に明記する
+必要があり、そちらの追記の方が大きかったため。要件 5.3 が求める比較対象は
+「毎回読まれる 2 本（`flaky-ci-routine.md` と `detect-flaky-ci/SKILL.md`）の
+合計」であり、このタスク単独の増減が要件不適合を意味するものではないが、
+このタスク時点でこのファイル単体は減っていないという事実を正直に記録する。
+
+レビュー指摘の是正（ラベル単位の取得失敗が issues[] から静かに消える欠落）:
+`--labels` を複数指定したとき、1 ラベルの一覧取得が失敗した場合に
+「そのティアには issue が 0 件だった」（正常な事実）と「そのティアの
+取得自体が失敗して issues[] に本来あるはずの行が欠けている」（データ
+欠損）が `ok:true` の同一出力の中で区別できなかった。これはタスク 3.4
+（`list-candidate-runs` の `truncated`）が対処したのと同じ種類の欠落で、
+Step 4（`detect-flaky-ci/SKILL.md`）が既存の追跡 issue をタイトル完全一致で
+探す際、取得漏れの issue が見つからず重複 issue を作成しうるという実害が
+ある。対処として `fetch-flaky-issues.ts` の出力に行単位ではなく一覧単位の
+事実として `labelFetchFailures`（取得に失敗したラベル名の配列。何も失敗
+していなければ空配列）を追加した。全ラベル失敗時のみ終了コード 2 とする
+既存の判断は変更していない。テストは既存の「1 ラベル失敗時も他ラベルの
+issue は返す」ケースを拡張して `labelFetchFailures` の内容を検証し、
+「全ラベル成功時は空配列」のケースを新規追加した
+（`fetch-flaky-issues.spec.ts` 12 件、`pnpm vitest run` で確認）。
+`README.md` の契約表の該当行、および `detect-flaky-ci/SKILL.md` の
+Step 1.5（`labelFetchFailures` の意味）と Step 5（打ち切り・欠損の報告文に
+今回の原因を追記）を更新した。`biome check bin` は警告 0、エラー 0。
+
+| ファイル | 是正前（行/バイト） | 是正後（行/バイト） |
+|---|---:|---:|
+| `.claude/skills/detect-flaky-ci/SKILL.md` | 1582 / 82544 | 1595 / 83417 |
 

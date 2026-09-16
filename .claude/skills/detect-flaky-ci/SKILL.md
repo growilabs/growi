@@ -451,19 +451,37 @@ Fetch the existing flaky issues now (Step 4 needs this list anyway — do it
 here instead so it's available before the expensive part of Step 2):
 
 ```bash
-gh api -X GET repos/growilabs/growi/issues -f state=all -f labels="flaky/observing" --paginate -q '.[] | {number,title,state,body}'
-gh api -X GET repos/growilabs/growi/issues -f state=all -f labels="flaky/suspected" --paginate -q '.[] | {number,title,state,body}'
-gh api -X GET repos/growilabs/growi/issues -f state=all -f labels="flaky/confirmed" --paginate -q '.[] | {number,title,state,body}'
+node bin/flaky-ci/scripts/fetch-flaky-issues.ts
 ```
 
-For each, also fetch its comments (`gh api repos/growilabs/growi/issues/{NUMBER}/comments --paginate`)
-and extract every `actions/runs/{id}` URL appearing anywhere in the body or
-comments into one set — the skip-list. In Step 2, if a failed run's `RUN_ID`
-is already in this set, **do not re-fetch its job log at all**: its evidence
-is already recorded on some issue, so exclude it from Step 2 onward. This is
-what keeps a frequent cron cadence cheap, since every overlapping window would
-otherwise re-fetch the same job logs. (④'s backfill does its own equivalent
-check per-issue — the two skip-lists serve different loops.)
+Output fields (exit 0): `issues[]` — one per issue currently carrying
+`flaky/observing`, `flaky/suspected` or `flaky/confirmed` (both open and
+closed — the default `--labels`), each with `number`, `title`, `state`,
+`body`, `labels[]` (label names), `comments[]` (each `id`, `body` — full
+text, not an excerpt), `commentsStatus` (`"ok"`, or `"unavailable"` when
+that one issue's comments could not be read — treat its `comments[]` as
+incomplete, not as "no comments", and do not drop the row); `labelFetchFailures[]`
+— which of the three labels' list fetch failed outright. Exit 2: no issue
+could be fetched for any of the three labels.
+
+**A non-empty `labelFetchFailures` means `issues[]` is incomplete, not that
+the named tier genuinely has zero issues right now** — a label whose fetch
+failed contributes no rows at all, so any tracking issue that only carries
+that label is silently missing from `issues[]` for the rest of this run
+(the skip-list below, and Step 4's exact-title lookup, both read from
+`issues[]`). This still exits 0, so it does not belong in Step 6's "Script
+failures" line (that line is gated on non-zero exit) — report it via Step
+5's incomplete-data sentence instead, the same place `list-candidate-runs`'s
+`truncated` is reported.
+
+For each issue, extract every `actions/runs/{id}` URL appearing anywhere in
+its `body` or any `comments[].body` into one set — the skip-list. In Step 2,
+if a failed run's `RUN_ID` is already in this set, **do not re-fetch its job
+log at all**: its evidence is already recorded on some issue, so exclude it
+from Step 2 onward. This is what keeps a frequent cron cadence cheap, since
+every overlapping window would otherwise re-fetch the same job logs. (④'s
+backfill does its own equivalent check per-issue — the two skip-lists serve
+different loops.)
 
 **Run ④'s targeted backfill now**, filtering this same issue list down to open
 `flaky/observing` ones — see "Cheap Suspicion Mining" ④ above. It is
@@ -1492,10 +1510,12 @@ affected, not issue creation or tracking.
 
 Print a short summary of this run: which job-log fetch method Step 0 chose
 (`gh` or `mcp`), the `--window-hours` covered and how many runs per workflow
-fell in it (and whether `--max-runs-per-workflow` truncated that, or a later
-page's fetch failed after some runs were already read — report it explicitly,
-never silently), how many runs were skipped via the Step 1.5
-skip-list, how many jobs were scanned, how many **failures** were classified
+fell in it (and whether `--max-runs-per-workflow` truncated that, a later
+page's fetch failed after some runs were already read, or Step 1.5's
+`fetch-flaky-issues` reported a non-empty `labelFetchFailures` — meaning the
+known-issue list itself is missing one tier's rows — report whichever of
+these happened explicitly, never silently), how many runs were skipped via
+the Step 1.5 skip-list, how many jobs were scanned, how many **failures** were classified
 as infra noise and with which pattern (counted per `FAIL` block, per Step 2's
 granularity), and how many **whole jobs** were discarded on the
 `test/setup/**` exception. Then: how many new issues created, how many
