@@ -20,7 +20,7 @@
   - 観測可能な完了状態: `turbo run test --filter=./bin` でこれらのテストが実行されて通り、`biome check bin` が通る。契約表の雛形（スクリプト名・引数・stdin・出力欄・終了コード・使う判断の列）が `bin/flaky-ci/README.md` にあり、Implementation Notes に基準値の表がある
   - _Requirements: 1.2, 2.1, 2.2, 3.1, 3.3, 4.2, 4.4, 5.2_
 
-- [ ] 1.3 Phase 1 で使う実データ由来のフィクスチャを集め、旧手順の出力を控える
+- [x] 1.3 Phase 1 で使う実データ由来のフィクスチャを集め、旧手順の出力を控える
   - API 応答の記録: `### Repro result` が同一 commit に 2 件ある issue のコメント一覧、観測コメントと本文だけの issue、`flaky/needs-decision` のラベル付与イベントとその前後のコメント（ラベル先行と、旧手順のコメント先行の両方）、lockfile 差分を含む PR の files
   - lockfile 差分に対応するログ抜粋（スタックトレースにパッケージ名が現れるもの）
   - **置き換え前の出力を控える**: 各素材に対して、手順書に今ある該当のシェル片をそのまま実行し、返った値（Runs/Failed、最新観測日時、Paused at と Recommendation、パッケージ名の交差）を期待値ファイルとして保存する。以降のタスクのテストはこの期待値と比較する
