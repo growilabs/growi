@@ -126,8 +126,10 @@ describe('ElasticsearchDelegator.addAllAuditlogs()', () => {
     await insertActivities([
       { _id: withName, username: 'alice' },
       { _id: new mongoose.Types.ObjectId(), username: null },
-      // Activity.createByParameters defaults both fields to '', so '' — not
-      // undefined — is the real shape of an activity with neither.
+      // Activity.createByParameters defaults endpoint to '' but leaves
+      // username undefined (stored as null) when the caller omits it — so ''
+      // for endpoint, not username, is the real shape of an activity with
+      // neither an authenticated operator nor an endpoint.
       { _id: new mongoose.Types.ObjectId(), username: '', endpoint: '' },
     ]);
 

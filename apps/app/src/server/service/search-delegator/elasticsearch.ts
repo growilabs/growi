@@ -708,7 +708,7 @@ class ElasticsearchDelegator
    * `syncAuditlogMapping` need. Keeps the version-dispatch skeleton in one place
    * so the two call sites cannot drift out of sync with each other.
    */
-  private runForAuditlogClient<T>(handlers: {
+  private async runForAuditlogClient<T>(handlers: {
     es8: (client: ES8ClientDelegator) => Promise<T>;
     es9: (client: ES9ClientDelegator) => Promise<T>;
   }): Promise<T> {
