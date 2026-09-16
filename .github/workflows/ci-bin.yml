@@ -17,6 +17,7 @@ on:
       - .claude/commands/flaky-ci-routine.md
       # constants.spec.ts reads the seven `### Repro result` body lines from
       # this file, which is where they are defined.
+      - .github/scripts/flaky-repro/run-repro.sh
       - .github/workflows/flaky-repro.yml
   pull_request:
     types: [opened, reopened, synchronize]
@@ -25,6 +26,7 @@ on:
       - pnpm-lock.yaml
       - bin/**
       - .claude/commands/flaky-ci-routine.md
+      - .github/scripts/flaky-repro/run-repro.sh
       - .github/workflows/flaky-repro.yml
 
 concurrency:

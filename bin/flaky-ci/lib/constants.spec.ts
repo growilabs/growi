@@ -21,7 +21,9 @@ import {
 // dashboard's zero-state lines are defined elsewhere in the same file, the
 // `**Fix PR**: ` marker by the skill that writes it
 // (`investigate-flaky-test/SKILL.md` 6-C), and the `### Repro result` line
-// headings by `flaky-repro.yml`. So each
+// headings by `.github/scripts/flaky-repro/run-repro.sh` (moved out of
+// `flaky-repro.yml`'s inline `run:` block by the flaky-repro.yml script
+// split). So each
 // constant declares which file (and, for the Shared constants group, which
 // section) it is checked against, and this spec checks all of them — nothing is
 // dropped, and nothing is asserted against a place it was never written.
@@ -31,7 +33,7 @@ const repoRoot = new URL('../../../', import.meta.url);
 const SOURCE_FILES: Readonly<Record<ConstantSource, string>> = {
   'routine-shared-constants': '.claude/commands/flaky-ci-routine.md',
   'routine-doc': '.claude/commands/flaky-ci-routine.md',
-  'flaky-repro-workflow': '.github/workflows/flaky-repro.yml',
+  'flaky-repro-workflow': '.github/scripts/flaky-repro/run-repro.sh',
   'investigate-doc': '.claude/skills/investigate-flaky-test/SKILL.md',
 };
 

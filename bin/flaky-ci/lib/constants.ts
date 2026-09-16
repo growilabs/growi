@@ -6,8 +6,9 @@
  * in `.claude/commands/flaky-ci-routine.md` for the pause contract, the rest of
  * that file for the tier labels, comment headings and the dashboard's
  * zero-state lines, `.claude/skills/investigate-flaky-test/SKILL.md` for the
- * Fix PR marker it writes, and `.github/workflows/flaky-repro.yml` for the
- * `### Repro result` lines it writes. Each constant below declares which of those it is verified against,
+ * Fix PR marker it writes, and `.github/scripts/flaky-repro/run-repro.sh`
+ * (called from `.github/workflows/flaky-repro.yml`) for the `### Repro
+ * result` lines it writes. Each constant below declares which of those it is verified against,
  * and `constants.spec.ts` checks every declaration — so changing a string in a
  * procedure without changing it here fails the test rather than going unnoticed.
  */
@@ -17,7 +18,7 @@ export type ConstantSource =
   | 'routine-shared-constants'
   /** Anywhere in `.claude/commands/flaky-ci-routine.md`. */
   | 'routine-doc'
-  /** `.github/workflows/flaky-repro.yml`, which writes the result comment. */
+  /** `.github/scripts/flaky-repro/run-repro.sh`, which writes the result comment. */
   | 'flaky-repro-workflow'
   /** `.claude/skills/investigate-flaky-test/SKILL.md`, which writes the marker. */
   | 'investigate-doc';
