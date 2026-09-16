@@ -465,29 +465,18 @@ an observation, so none may keep an issue alive.
 so an issue unobserved for a month can still look fresh, and `created_at`
 misses a backfilled observation that predates the issue.
 
-Take the **first** `- Date:` line of each qualifying comment and stop there.
-The log excerpt further down an observation comment can contain a line that
-looks like one, so reading the last match would pick up text out of a CI log
-(the same hazard as reading `- Runs:` / `- Failed:` out of a
-`### Repro result` excerpt).
-
 ```bash
-# body: the Date: line inside ### First observation, first match only
-BODY_DATE="$(gh api repos/growilabs/growi/issues/{N} -q '.body' \
-  | awk '/^### First observation/{f=1;next} /^### /{f=0} f && /^-?[[:space:]]*Date:/{sub(/^-?[[:space:]]*Date:[[:space:]]*/,"");print;exit}')"
+NEWEST_OBSERVATION_JSON="${TMPDIR:-/tmp}/flaky-newest-observation-{N}.json"
 
-# observation comments: one Date: per qualifying comment, first match only
-COMMENT_DATES="$(gh api -X GET repos/growilabs/growi/issues/{N}/comments --paginate \
-  -q '.[] | select(.body | split("\n")[0] | (startswith("### Additional observation") or startswith("### Backfilled observation")))
-          | [ .body | split("\n")[] | select(test("^-?[ \t]*Date:")) ][0] // empty
-          | sub("^-?[ \t]*Date:[ \t]*"; "")')"
-
-NEWEST="$(printf '%s\n%s\n' "$BODY_DATE" "$COMMENT_DATES" | grep -v '^[[:space:]]*$' | sort | tail -1)"
+node bin/flaky-ci/scripts/newest-observation.ts --issue {N} > "$NEWEST_OBSERVATION_JSON"
+NEWEST_OBSERVATION_STATUS=$?
 ```
 
-The fold happens in the shell rather than inside `-q`, and `sort | tail -1`
-compares the timestamps as strings — both per **Shared constants** → Reading
-conventions.
+- **Exit `0`**: `$NEWEST_OBSERVATION_JSON` holds one line of JSON with
+  `newest` (ISO-8601 UTC) and `source` (`"body"`, or the id of the comment it
+  came from — see `bin/flaky-ci/README.md`'s contract table).
+  `NEWEST=$(jq -r '.newest' "$NEWEST_OBSERVATION_JSON")`.
+- **Exit `2`**: no `Date:` line could be read anywhere on the issue — see 4-D.
 
 ### 4-C — Skip an issue a human reopened after this step closed it
 
@@ -540,13 +529,12 @@ it to 4-F.
 
 ### 4-D — A date that cannot be read is never a reason to close
 
-If `NEWEST` comes out empty (a hand-labeled `flaky/observing` issue with no
-`### First observation` section and no observation comments), or the value
-found is not fixed-width ISO-8601 UTC ending in `Z` — in which case comparing
-it against `CUTOFF` in 4-E would be meaningless — leave the issue **open and
-untouched** and note its number in the Step 6 report. Closing an issue because
-its date could not be parsed is the one failure of this step a human would
-have to undo by hand, so never close on missing data.
+If `newest-observation` exits `2` (a hand-labeled `flaky/observing` issue with
+no `### First observation` section and no observation comments — nothing a
+`Date:` could be read from), leave the issue **open and untouched** and note
+its number under the Step 6 report's script-failure line (see Step 6).
+Closing an issue because its date could not be read is the one failure of
+this step a human would have to undo by hand, so never close on missing data.
 
 ### 4-E — Close the ones at or past the threshold
 
@@ -568,18 +556,14 @@ named after the cutoff and reduces the test to `[ "$NEWEST" ]`, which is true
 for every issue — the step would then close nothing and report "0
 auto-closed" with no error to show for it.
 
-For a stale issue, first post the record, then close the issue.
-**Print `${NEWEST}` and `${STALE_DAYS}` and confirm both are non-empty in
-the very shell that runs the heredoc, immediately before posting.** This
-heredoc interpolates them, so an empty variable posts a comment reading
-`- Newest observation:` with nothing after it — no error, nothing to notice,
-and the only repair is a `PATCH` on the comment afterwards, which has been
-needed for real.
-
-**If either value is empty, do not post and do not close.** Leave the issue
-**open and untouched**, exactly as 4-D does, and list its number in the Step
-6 report under `Skipped (observation date unreadable)` — the same list 4-D
-feeds, since neither case is a reason to comment on an issue or close it:
+For a stale issue, first post the record, then close the issue. **Print
+`${NEWEST}` and `${STALE_DAYS}` in the very shell that runs the heredoc,
+immediately before posting**, so an interpolation mistake is visible rather
+than silently posting `- Newest observation:` with nothing after it — the
+only repair otherwise is a `PATCH` on the comment afterwards, which has been
+needed for real. (`newest-observation`'s exit code `2` already keeps an
+unreadable `NEWEST` out of this step entirely — see 4-D — so this print is a
+guard against a shell interpolation slip, not against an empty value.)
 
 ```bash
 gh api -X POST repos/growilabs/growi/issues/{N}/comments -f body="$(cat <<EOF
@@ -639,8 +623,8 @@ The output of this step is three lists:
 - the `{issue number, newest observation date}` pairs **actually closed** —
   for Step 5's `## Auto-closed this run` section and Step 6's count;
 - the issues **kept open by a human reopen** (4-C), by number;
-- the issues **skipped because no usable date was in hand** (4-D, plus 4-E's
-  empty-`${NEWEST}`/`${STALE_DAYS}` guard), by number.
+- the issues **skipped because no usable date was in hand** — `newest-observation`
+  exited `2` (4-D) — by number.
 
 Step 6 lists all three. If a list is empty, say so explicitly rather than
 omitting it.
@@ -1003,14 +987,24 @@ many were investigated in Step 3, how many resulted in a PR, how many were
 left pending human decision (and why), and how many were quarantined. Report
 Step 4's outcome: how many observing issues were auto-closed, with their
 numbers, plus the numbers of any left open because a human reopened them
-after an earlier auto-close and any whose observation date could not be read.
-Also report Step 5's outcome: whether the dashboard issue was created or
+after an earlier auto-close (any left open because `newest-observation`
+exited `2` are covered by the Script failures line below, not repeated
+here). Also report Step 5's outcome: whether the dashboard issue was created or
 updated, how many rows it now lists, and whether any rows were truncated (and
 if so, how many).
 
-Then report these four, which come from outside Step 3's own accounting
-(Requirement 11.3). Report every one of them on every run — a `0` is a
-result, an omitted line is a gap:
+Then report these five, which come from outside Step 3's own accounting
+(Requirement 11.3, plus script failures below). Report every one of them on
+every run — a `0` (or `none`) is a result, an omitted line is a gap:
+
+- **Script failures** — every `bin/flaky-ci/scripts/*.ts` call that exited
+  non-zero this run, as `<script name> <reason>` (`<reason>` is the line the
+  script wrote to stderr), one per failing call; report `none` when every
+  call this run exited `0`. Every section above that names a script's exit
+  code `2` outcome (4-D's unreadable-date issues today; any script this
+  routine calls later, the same way) folds into this one line instead of its
+  own separate count — the exit code is what routes the outcome here, so
+  nothing else needs to track it per section.
 
 - **Repro measurements and their CI cost** — how many `flaky-repro`
   measurements this run requested, and their total CI time in minutes.

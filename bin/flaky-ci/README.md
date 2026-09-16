@@ -39,6 +39,7 @@ consumes the output. Rows are added by the task that adds the script.
 | Script | Arguments | stdin | Output fields | Exit codes | Judgment that reads it |
 |---|---|---|---|---|---|
 | `read-repro-result` | `--issue <number> --sha <sha>` | — | `runs`, `failed`, `perRun[]`, `workflowRunUrl`, `commentUrl` | `0` facts produced; `2` no `### Repro result` comment on the issue carries that commit | `investigate-flaky-test/SKILL.md` 2-E's tally table, and 6-B condition 1 |
+| `newest-observation` | `--issue <number>` | — | `newest` (ISO-8601 UTC), `source` (`"body"`, or the id of the comment it came from) | `0` facts produced; `2` no `Date:` line could be read from the body's `### First observation` section or any `### Additional observation` / `### Backfilled observation` comment | `flaky-ci-routine.md` 4-B/4-D/4-E's close-vs-leave-open decision |
 
 ## Shared library
 

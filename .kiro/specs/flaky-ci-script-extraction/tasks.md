@@ -34,7 +34,7 @@
   - 観測可能な完了状態: 置き換えた 2 節に `gh api` / `jq` が無い。`--help` が終了コード 0、フィクスチャ（同一 commit 2 件）で 1.3 の期待値と一致、該当なしで終了コード 2 のテストが通る。README の契約表に自分の行がある。手順書の行数・容量の前後が Implementation Notes に記録されている
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.4, 3.3, 3.4, 4.1, 4.4, 5.1, 5.2_
 
-- [ ] 2.2 放置クローズの最終観測日時の取得と、報告項目の追加
+- [x] 2.2 放置クローズの最終観測日時の取得と、報告項目の追加
   - issue 番号を受け、本文の最初の観測日と観測コメント（`### Additional observation` / `### Backfilled observation`）の作成時刻から最新の観測日時と出所を返す。日時が 1 つも読めなければ終了コード 2
   - routine の 4-B の手順を呼び出しに置き換える。4-D「読めなければ閉じない」、4-C の再オープン保護、4-E の書き込みは手順書に残す（4-E の空値ガードはスクリプトの終了コード 2 で担保されるので、その注意書きを短くする）
   - routine の Step 6 の報告項目に「スクリプト失敗: <名前> <理由>」の行（0 件なら `none`）を追加し、各節の「終了コード 2 のときの扱い」がこの行に集約されることを書く
@@ -224,4 +224,48 @@ JSON 出力）に揃えて更新した。6-B の条件 1・2 の判定基準そ�
 
 `investigate-flaky-test/SKILL.md` は「毎回読まれる 2 本」（routine + detect）には
 含まれないため、5.3 の合計値には影響しない。
+
+### タスク 2.2: `newest-observation` の切り出しと手順書の行数・容量（2026-09-16）
+
+`bin/flaky-ci/scripts/newest-observation.ts` に、issue 本文の `### First
+observation` セクションの `Date:` 行と、`### Additional observation` /
+`### Backfilled observation` で始まる各コメントの `Date:` 行を読み、
+`compareIso`（`lib/time.ts`）で最大値を選ぶロジックを実装した。design.md の
+File Structure Plan にはこのスクリプト専用の `lib/` モジュールが挙げられて
+おらず、他のスクリプトからも再利用されないため、日付抽出のロジックは
+`read-repro-result.ts` の `newest`（同着解決）と同じ位置づけでスクリプト
+ファイル内の関数に留め、新しい `lib/` ファイルは追加していない。
+
+`flaky-ci-routine.md` の 4-B（`awk` と `jq --paginate` によるシェル片）を
+このスクリプトの呼び出しに置き換えた。4-D（「読めなければ閉じない」）と
+4-C（再オープン保護）はそのまま残し、4-D はスクリプトの終了コード 2 を
+指す形に文言だけ更新した。4-E の「`${NEWEST}`/`${STALE_DAYS}` が空でない
+ことを確認する」注意書きは、`NEWEST` が空になり得るケースがスクリプトの
+終了コード 2（4-D で処理済み・4-E には到達しない）に置き換わったことで
+不要になったため、シェル展開ミスに対する印字だけを残す形に短くした。
+4-F の三分類の説明文もスクリプトの終了コードを指す表現に更新した。
+
+Step 6 の報告項目に「スクリプト失敗（Script failures）」の行を追加し
+（失敗が 0 件なら `none`）、4-D の観測日時が読めなかった issue の報告は
+この 1 行に集約される旨を明記した。Step 4 の概要文からは同じ内容の重複
+記載（「any whose observation date could not be read」）を削除し、この
+新しい行を指す注記に置き換えた。
+
+観測可能な完了状態の確認: `--help` が終了コード 0、本文のみ（issue
+#11900 フィクスチャ）・観測コメントあり（issue #11821 フィクスチャ、
+コメントの日時が本文より新しい）・日時が 1 つも無い（synthetic フィクス
+チャ）の 3 ケースが `fixtures/expected/newest-observation.md` の期待値と
+一致するテストが通る（`bin/flaky-ci/scripts/newest-observation.spec.ts`、
+計 11 件）。`turbo run test --filter=./bin` 相当の `pnpm vitest run`
+（`bin/` 配下）で 15 ファイル 212 件が通ることを確認した。`biome check`
+は自動整形（import 順・フォーマット）を適用した上で通過。
+
+行数・容量（`wc -l -c`、タスク 1.2 の基準値と比較。`investigate-flaky-test/
+SKILL.md` はタスク 2.1 の変更値のまま、このタスクでは未変更）:
+
+| ファイル | 変更前（行/バイト） | 変更後（行/バイト） |
+|---|---:|---:|
+| `.claude/commands/flaky-ci-routine.md` | 1049 / 54171 | 1043 / 53869 |
+
+`README.md` の契約表に `newest-observation` の行を追加した。
 
