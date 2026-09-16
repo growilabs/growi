@@ -1,0 +1,6 @@
+{
+  "sha": "cccccccccccccccccccccccccccccccccccccc",
+  "commit": {
+    "message": "Merge of #12345\n\nSome squashed body text.\nRefs #999 (must not be captured as a PR number).\nFixes #1 (must not be captured as a PR number)."
+  }
+}

@@ -101,7 +101,7 @@
   - _Depends: 3.4_
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.4, 4.1, 4.4, 5.1, 5.2_
 
-- [ ] 3.7 「PR 自身の失敗」判定の材料
+- [x] 3.7 「PR 自身の失敗」判定の材料
   - commit と spec パスを受け、既定ブランチとの祖先関係、紐づく PR の一覧、各 PR の変更ファイルが spec パスと一致するか、PR が 1 つも無いか、を返す。API が失敗したら終了コード 2
   - detect の該当節（Step A〜C）を呼び出しに置き換える。「失敗時は除外しない」は「終了コード 2 のときは除外せず続行する」として、「`.[0]` でなく全 PR を見る」の結論は残す
   - 観測可能な完了状態: 該当節に `compare` / `pulls` のシェル片が無い。`--help` が 0、祖先あり／なし × PR あり（一致／不一致）／なしのテストが期待値と一致して通る。README に行がある。行数・容量の前後を記録
@@ -1040,4 +1040,126 @@ on the same commit passed"`）の文言に評価文字列を一致させた
 の Implementation Notes に記録した同種の理由（出力契約の説明の追記が
 削除できた行より大きい）がここでも同様に当てはまる。要件 5.3 の比較対象
 （毎回読まれる 2 本の合計）はタスク 3.11 でまとめて確認する。
+
+### タスク 3.7: 「PR 自身の失敗」判定の材料（`pr-owns-failure`、2026-09-16）
+
+`bin/flaky-ci/scripts/pr-owns-failure.ts`（`--sha --spec-path` を受け、
+`ancestryStatus` / `pulls[]` / `touchesSpec` / `noPr` を返す CLI）を実装した。
+design.md の File Structure Plan にこのスクリプト専用の `lib/` モジュールが
+挙げられておらず、他のスクリプトからも再利用されないため、他の多くの
+スクリプト（2.2・2.3・3.4 など）と同じ位置づけでロジックをスクリプト
+ファイル内に留め、新しい `lib/` ファイルは追加していない。
+
+**Step B のマージキュー経路をスクリプト側に含めた判断**: design.md の
+scripts 契約表は入力を `--sha --spec-path`、出力を `ancestryStatus,
+pulls[], touchesSpec, noPr` とだけ書いており、旧手順の Step B が持っていた
+「`commits/{sha}/pulls` が空なら `commits/{sha}` のコミットメッセージから
+`Merge of #{N}` を抜き出す」というマージキューの代替経路をスクリプトに
+含めるかどうかは明記していなかった。実装前に advisor に相談し、「`--sha`
+だけで完結する（`--pr` が要る commit 自身の diff の代替経路とは違い、
+契約の外に出る理由が無い）」「タスク本文の『紐づく PR の一覧』という表現も
+Step B が同じ事実への 2 つ目の経路として提示しているだけで別の判断では
+ない」という助言を得て、マージキュー抽出（`Merge of #{N}` の行だけに一致
+させ、`Refs #...` 等の無関係なトークンは拾わない）を `pr-owns-failure.ts`
+内の `extractMergeQueuePrNumbers` として実装した。マージキュー経由で見つ
+かった PR は `base: null, state: null` とし（手順書はどちらも判断に使わ
+ない——「base で絞り込まない」——ため、`base`/`state` を埋めるためだけの
+追加 `GET pulls/{n}` 呼び出しを増やして失敗経路を増やす理由が無い）、
+`GET pulls/{n}/files` は spec パス一致の判定にのみ使う。
+
+**Requirement 1.3 の 1 か所のトレードオフ（意図的、CONCERNS 参照）**:
+このスクリプトは他の多くのスクリプトと同じく「1 回の呼び出しで全欄を
+常に計算する」設計にし、`ancestryStatus` が `identical`/`behind`（祖先）
+であっても `pulls[]`/`touchesSpec` の計算（`commits/pulls` 呼び出しと
+必要なら PR ごとの `files` 呼び出し）を省略しない。この結果、旧手順の
+Step A が `identical`/`behind` なら B/C を一切呼ばずに確定回答していた
+ケースで、置き換え後は B/C 相当の呼び出しが失敗すると終了コード 2
+（「未確認」として Step 5 へ）になる——同じ入力でも失敗の有無によって
+最終的な扱いが変わりうる、という Requirement 1.3 上の一貫性のわずかな
+ずれである。design.md がこのスクリプトに部分成功の欄を定義していない
+ため、新しい欄を増やすより「他スクリプトと同じ常時計算」という一貫性を
+優先する判断をした。CONCERNS として明記する。
+
+**「`.[0]` でなく全 PR を見る」の結論と、Step C の①への相互参照の再検証
+（タスク 3.6 と同じ「古い主張が今も成立するか」の確認）**: advisor から
+「タスク 2.4 で①がファイル一覧の抽出を `lockfile-overlap.ts` に移した後、
+Step C の『① が読んだファイル一覧を再利用する』という一文は実行不能に
+なっていないか確認せよ」という指摘を受けたため、①の節（125-146 行目、
+本タスクの範囲外）を実際に読み直した。結果、①の「diff / PR-description
+mismatch」チェック自体は `gh api .../pulls/{PR_NUMBER}/files --paginate
+-q '.[].filename'` を今も手順書自身が直接呼んでおり（157-159 行目の
+`lockfile-overlap.ts` 呼び出しはこれとは別の、lockfile 差分だけを見る
+呼び出し）、タスク 2.4 が置き換えたのは lockfile のパッケージ名抽出だけ
+だった。したがって Step C のこの相互参照は**古びていなかった**——タスク
+3.6 の sibling-jobs の事例とは異なり、今回は実際に確認した結果「主張は
+今も成立する」という結論になったので、書き換えは行っていない（今回の
+置き換え後の文言では「`pulls[]` の全件を見る」という結論をスクリプトの
+契約説明として書き直しただけで、①への相互参照そのものは削除した——
+スクリプトが全 PR を自分で処理するため、手順書側で「①が読んだファイルを
+再利用し、残りだけ追加取得する」という段取り自体が不要になったため）。
+
+**path rooting の事実の移し先**: 旧 Step C の「path suffix で比較する
+（equality にしない）」という読者向けの注意書き自体はスクリプト内部に
+移ったため手順書からは削除したが、advisor の指摘どおり「PR の
+`files[].filename` はリポジトリルート相対、`--spec-path` は `apps/app`
+相対」という事実は `--spec-path` に何を渡すべきかを左右する契約情報
+なので、`README.md` の契約表の行に残した（手順書には短い一文だけ残す）。
+
+観測可能な完了状態の確認: 該当節（旧 Step A〜C）に `compare` / `pulls`
+のシェル片が無いことを確認済み（`grep -n "gh api\|compare/master"` で
+該当節内は 0 件）。`--help` が終了コード 0、祖先あり／なし × PR あり
+（一致／不一致）／なしの 6 ケース、全 PR を見る回帰（2 PR のうち後半だけ
+一致）、マージキュー（単発・バッチ 2 件）、Playwright job-level
+（`--spec-path ''` でファイル取得自体をスキップ）、5 種の失敗経路
+（compare / commits-pulls / commit-message フォールバック / PR files /
+非 `GhError` の再送出）が `pr-owns-failure.spec.ts`（25 件）で通る。
+RED（`run`/`extractMergeQueuePrNumbers`/`matchesSpecPath` を `not
+implemented` で投げるスタブに差し替えて実行、19 failed / 6 passed）→
+GREEN（25 passed）を実測して確認した。`pnpm vitest run`（`bin/` 配下）で
+27 ファイル 399 件が通ることを確認した。`biome check bin` は自動整形
+（複数行の分割、`async` の除去）を適用した上で通過（警告 0、エラー 0）。
+`README.md` の契約表に `pr-owns-failure` の行を追加した。
+
+**素材**: 実データとして、祖先ありの例に `master` の直近コミット
+`0d1a319a106b2a791e883170782e856f88b0e178`（PR #11920、`base: master`,
+`state: closed`）、祖先なしの例に open な PR #11919 の head commit
+`807c3628fc85bbf29335840d004660ce8c195f64`（`base:
+feat/185872-backlinks`, `state: open`）を実際に `gh api` で取得して
+使用した（`fixtures/api/compare/`, `fixtures/api/commits/`,
+`fixtures/api/pulls/11919-files.json`, `11920-files.json`）。
+「実行前の手順の出力」は `fixtures/expected/pr-owns-failure.md` に
+実際に実行した `gh api ... -q .status` / `-q '.[] | {number, base,
+state}'` / `-q '.[].filename'` の出力とともに記録した。一方、マージ
+キューコミット（`git log --all --grep='^Merge of #'` で 0 件）と、
+PR が 1 つも無い実コミット、2 PR に跨る実コミット（手順書が過去の実
+インシデントとして名指ししているが sha の記録が残っていない）は、
+このリポジトリでは実例を見つけられなかったため、tasks 2.4/3.3 と同じ
+流儀で「実例が無いため構成」と明記した構成フィクスチャ（各 `.meta.md`
+に理由を記載）を用いた。
+
+行数・容量（`wc -l -c`、タスク 3.6 完了時点の値と比較）:
+
+| ファイル | 変更前（タスク 3.6 時点、行/バイト） | 変更後（行/バイト） |
+|---|---:|---:|
+| `.claude/skills/detect-flaky-ci/SKILL.md` | 1617 / 84611 | 1586 / 83617 |
+
+このタスクは行数・容量とも減った（-31 行 / -994 バイト）。タスク 3.5・
+3.6 と異なり、旧 Step A〜C 自体が複数行にまたがる `gh api` 呼び出しと
+分岐の説明を多く含む節だったため、呼び出し 1 行＋出力欄の説明＋判断の
+散文に圧縮した効果が、新規に追加した契約説明（`ancestryStatus` の 4 値、
+`pulls[]` の各欄、マージキューの経路説明）を上回った。
+
+**CONCERNS（レビュアーへの申し送り）**:
+1. 上記「Requirement 1.3 の 1 か所のトレードオフ」——`ancestryStatus` が
+   祖先を示していても `pulls[]`/`touchesSpec` を常に計算するため、旧手順
+   なら 0 回で済んだはずの API 呼び出しが失敗すると終了コード 2 になり、
+   同じ入力でも API の一時的な失敗の有無で最終的な扱い（Step 4 へ進む
+   か「未確認」として Step 5 に載るか）が変わりうる。他スクリプトと同じ
+   「1 回の呼び出しで全欄を常に計算する」設計との一貫性を優先した意図的
+   な選択であり、design.md がこのスクリプトに部分成功の概念を定義して
+   いないため新しい欄は増やしていない。
+2. マージキュー・no-PR・2-PR-with-later-match の 3 パターンは実例が
+   見つからず構成データで検証した（実データでの直接確認はできていない）。
+   将来 Mergify のマージキューを使う運用に変わった場合、実際のキュー
+   コミットのメッセージ形式が構成データと一致するかは未確認のまま。
 

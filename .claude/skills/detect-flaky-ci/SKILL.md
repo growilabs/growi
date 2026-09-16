@@ -1079,96 +1079,65 @@ does not, and only the first is excluded. Cascaded followers and collateral
 entries are already folded away, so they live or die with the identity they
 were folded into.
 
-**Step A — is the failing commit on `master` at all?**
-
 ```bash
-gh api -X GET repos/growilabs/growi/compare/master...{HEAD_SHA} -q .status
+node bin/flaky-ci/scripts/pr-owns-failure.ts \
+  --sha {HEAD_SHA} --spec-path {SPEC_PATH}
 ```
 
-- `behind` or `identical` → the commit **is** an ancestor of `master`; the
-  failure happened on code that actually shipped. Skip the rest of this
-  check and go to Step 4 normally.
-- `ahead` or `diverged` → the commit is **not** an ancestor of `master`
+For a Playwright job-level fallback identity (`playwright:{BROWSER}`, no
+spec path), pass `--spec-path ''` — see below. `--spec-path` takes the
+`apps/app`-relative form a vitest identity's `{SPEC_PATH}` already is; the
+script itself receives PR files in the repository-root-relative form GitHub
+returns and matches by suffix, never equality, so passing the
+repository-root-relative form here would silently make `touchesSpec` false
+forever.
+
+Output fields: `ancestryStatus` (GitHub's raw `compare` status —
+`identical` / `behind` / `ahead` / `diverged`), `pulls[]` (one entry per PR
+associated with the commit: `number`, `base`, `state`, `touchesSpec`),
+`touchesSpec` (`true` when any entry in `pulls[]` has `touchesSpec: true`),
+`noPr` (`true` when `pulls[]` is empty).
+
+- **`identical` or `behind`** → the commit **is** an ancestor of `master`;
+  the failure happened on code that actually shipped. Go to Step 4 normally.
+- **`ahead` or `diverged`** → the commit is **not** an ancestor of `master`
   (`ahead` = it carries commits `master` doesn't; `diverged` = both sides
-  carry their own). Continue with Step B.
-
-**Step B — find every PR the commit belongs to.**
-
-```bash
-gh api repos/growilabs/growi/commits/{HEAD_SHA}/pulls \
-  -q '.[] | {number, base: .base.ref, state}'
-```
-
-Consider **every** PR this returns, not `.[0]` — ①'s `-q '.[0].number'` is
-fine for picking one description to read, but it is wrong here. A real
-failing commit belonged to two PRs at once, one based on `master` and one on
-a feature branch, both of which changed the failing spec; `.[0]` would have
-reported only one of them. Do **not** filter by base branch either — a PR
-targeting a feature branch is exactly the case this rule exists for.
-
-If the endpoint returns nothing, the commit may still belong to a PR by
-another route:
-
-- **Merge-queue commits.** Mergify names the branch
-  `mergify/merge-queue/{hash}` — a hash, **not** the PR number — and the
-  commit drops its PR association once the queue entry is done, so
-  `commits/{sha}/pulls` comes back empty (verified on a real queue commit).
-  The PR number is in the commit message instead:
-
-  ```bash
-  gh api repos/growilabs/growi/commits/{HEAD_SHA} -q '.commit.message'
-  ```
-
-  Its first line reads `Merge of #{PR_NUMBER}`. Match only that literal
-  `Merge of #{N}` pattern, and take every occurrence — Mergify can batch
-  several PRs into one queue commit. Do **not** scrape arbitrary `#{N}`
-  tokens from the rest of the message: a squashed body's `Refs #...` /
-  `Fixes #...` names an issue or an unrelated PR, and fetching that PR's
-  files would exclude a real flake. A merge-queue commit is never an ancestor
-  of `master`, so treat it like any other non-ancestor commit.
-- **Still no PR.** A direct push to a feature branch. Skip Step C and
-  **exclude** the failure: the commit is not on `master` and there is no PR
-  whose files could vindicate it, so there is nothing a tracking issue could
-  ever be checked against. Report it in Step 5 with the head branch name in
-  place of a PR number.
-
-**Step C — did any of those PRs change the failing spec file?**
-
-```bash
-gh api repos/growilabs/growi/pulls/{PR_NUMBER}/files --paginate -q '.[].filename'
-```
-
-Reuse the files already fetched for the PR ① looked at; fetch
-`pulls/{n}/files` for any other PR the commit belongs to. ① only ever reads
-`.[0]`'s files, so on a commit with more than one associated PR — the
-two-PR case above — the others have not been fetched yet.
-
-**Match by path suffix, not by equality.** The two sides are rooted
-differently: PR `files[].filename` is relative to the repository root
-(`apps/app/src/features/backlinks/server/services/page-link-lifecycle.integ.ts`),
-while a vitest identity's `{SPEC_PATH}` is what the reporter prints, which is
-relative to `apps/app`
-(`src/features/backlinks/server/services/page-link-lifecycle.integ.ts`). A
-PR file matches when its filename **equals `{SPEC_PATH}` or ends with
-`/{SPEC_PATH}`**. Comparing the two for equality finds nothing and quietly
-turns this whole check into a no-op — do not "simplify" it to `==`.
-
-- **Any PR changed the failing spec file** → **exclude**. Create no issue,
-  post no comment on an existing issue for this identity, change no label and
-  add no occurrence: it does not enter Step 4 at all. Count it in Step 5 and
-  list the PR number(s) that matched.
-- **No PR changed it** → go to Step 4 normally. (A dependency bump that broke
-  the spec without touching it lands here — see ①'s lockfile check, which
-  stops ① from calling such a failure "unrelated" but does not exclude it.)
+  carry their own). `pulls[]` is gathered two ways: first `GET
+  commits/{sha}/pulls` directly; only when that comes back empty, every
+  `Merge of #{N}` line in the commit's own message (a Mergify merge-queue
+  commit drops its direct PR association once the queue entry is done, but
+  its message's first line still reads `Merge of #{PR_NUMBER}` — Mergify can
+  batch several PRs into one queue commit, and the script takes every such
+  line, never an arbitrary `#{N}` token elsewhere in a squashed body).
+- **`noPr: true`** → no PR by either route — a direct push to a feature
+  branch. **Exclude** the failure: the commit is not on `master` and there
+  is no PR whose files could vindicate it, so there is nothing a tracking
+  issue could ever be checked against. Report it in Step 5 with the head
+  branch name in place of a PR number.
+- **`touchesSpec: true`** → **exclude**. Create no issue, post no comment on
+  an existing issue for this identity, change no label and add no
+  occurrence: it does not enter Step 4 at all. Count it in Step 5 and list
+  the `pulls[]` entries whose own `touchesSpec` is `true`. The script checks
+  **every** PR in `pulls[]`, not just one — a real failing commit belonged to
+  two PRs at once, one based on `master` and one on a feature branch, both of
+  which changed the failing spec; stopping at the first would have missed
+  the second. `base` is informational only — never filter on it, a PR
+  targeting a feature branch is exactly the case this check exists for.
+- **`touchesSpec: false`** → go to Step 4 normally. (A dependency bump that
+  broke the spec without touching it lands here — see ①'s lockfile check,
+  which stops ① from calling such a failure "unrelated" but does not exclude
+  it.)
 - **A Playwright job-level fallback identity** (`playwright:{BROWSER}`, no
-  spec path) has nothing to match against, so Step C can never exclude it.
-  Let it through to Step 4.
+  spec path — `--spec-path ''`) always gets `touchesSpec: false`: there is
+  nothing to match against, so this check can never exclude it. Let it
+  through to Step 4.
 
-**Fail open.** If Step A's compare returns an error (a merge-queue commit can
-be garbage-collected before the scan reaches it, giving `404`) or the
-PR/files fetch fails, **do not exclude** — go to Step 4 as usual and note the
-unresolved check in Step 5. Losing a real flake to an API hiccup on an
-unattended run is far worse than carrying one issue a human can close.
+**Fail open.** Exit code 2 (the compare, PR-list, commit-message, or
+PR-files fetch failed — a merge-queue commit can be garbage-collected before
+the scan reaches it, giving `404`) — **do not exclude**, go to Step 4 as
+usual and note the unresolved check in Step 5. Losing a real flake to an API
+hiccup on an unattended run is far worse than carrying one issue a human can
+close.
 
 ## Step 4: Reconcile Against Existing Issues
 
