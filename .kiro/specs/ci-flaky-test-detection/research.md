@@ -549,6 +549,207 @@ routine の運用値を決める — この 6 つ（Requirement 6〜11）につ�
   check-run が 1 件以上あってすべて success、差分が原因調査で特定した範囲に収まる）
   を REST だけで通し、追跡 issue の `**Fix PR**` マーカーとラベル遷移まで到達した。
 
+## スクリプト抽出の設計決定（Requirement 5）
+
+手順書（`.claude/commands/flaky-ci-routine.md` と 2 本の `SKILL.md`）のうち、判断を
+通らない機械的な処理を `bin/flaky-ci/` の TypeScript スクリプトへ切り出した。以下は
+その置き場・実装方式・契約・共通化の決定と、それぞれの理由・根拠。
+
+### 置き場は `bin/flaky-ci/`（既存 package `@growi/bin`）
+
+- **決定**: スクリプト・純粋関数・フィクスチャを `.claude/skills/<skill>/scripts/`
+  ではなく、既存の `@growi/bin` package の一部として `bin/flaky-ci/{scripts,lib,
+  fixtures}/` に置く。手順書からはリポジトリ root を cwd として
+  `node bin/flaky-ci/scripts/<name>.ts` の形で呼ぶ。
+- **理由**: `vitest.workspace.mts`・`biome check bin`・`.github/workflows/ci-bin.yml`
+  が `bin/` を対象に含んでおり、追加の配線なしにテスト・lint・CI が効く。一方
+  `.claude/` 配下は `vitest.workspace.mts`（`apps/*`・`bin`・`packages/*` のみ）・
+  `biome.json`（`!.claude` で除外）・CI の path filter のいずれからも見えない。
+- **根拠となった実測**: `.claude/skills/suggest-path-evaluator/scripts/*.ts` という
+  前例は `node` 直接実行の手段が確立されていることを示す一方、テスト・lint の配線が
+  無いことも実測で確認した。`bin/` に置く案（root package.json が `"type":"module"`
+  であることも含め）は追加設定なしで `turbo run test --filter=./bin` に乗ることを
+  確認済み。
+- **トレードオフ**: スキルディレクトリとスクリプトの置き場が離れる。契約は
+  `bin/flaky-ci/README.md` の契約表と各スクリプト先頭の説明で補い、手順書側は
+  そこを指す形にした。
+- **採らなかった案**: `.claude/` 直下に新しい package を作る案、skill ごとに
+  package を作る案（いずれもテスト・lint・CI の配線を個別に追加する必要がある）、
+  root に vitest config を足す案（root には `test` script も対応する turbo task も
+  無く、そもそも走らない）。
+
+### 実装言語は TypeScript のみ、`node` で直接実行する
+
+- **決定**: 全スクリプトを `#!/usr/bin/env node` の `.ts` として書き、コンパイルや
+  トランスパイラを挟まず `node` で直接実行する。外部ライブラリには依存せず Node
+  標準ライブラリのみを使う。`enum`・パラメータプロパティ・namespace など、Node の
+  型除去実行で `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX` になる構文は使わない。
+- **理由**: 手順書の Bash ツール内実行と、実際の bash スクリプト実行では**別の
+  プログラムが動く**（`grep` は Bash ツール内で ugrep 7.8.4、スクリプト内では GNU
+  grep 3.12。`date`/`head`/`sort`/`cut`/`tr`/`wc` は uutils coreutils 0.8.0、`awk`
+  は mawk 1.3.4、シェル自体も zsh 5.9）。日時計算・文字列処理・ページングを JS に
+  寄せれば、この環境差そのものが消える。
+- **根拠となった実測**: devcontainer で `node --version`（`v24.20.0`）・
+  `import` 付き `.ts` の `node` 直接実行（成功）を実測。`date -d ""` が
+  「今日 0 時 UTC」を返して終了コード 0 になるなど、手順書の既存の注意書きが
+  想定していたのとは別の `date` 実装が実際には動いていたことも実測で確認した。
+- **トレードオフ**: cloud routine 側の Node バージョンは実測できておらず
+  （`RemoteTrigger` 相当のツールで実際の cloud セッションへ診断プロンプトを
+  送り込む経路が無かった）、`^24` という `engines` 指定と全 CI workflow が
+  Node 24.x に固定されている、という間接証拠だけを根拠に「素の `node <file>.ts`
+  呼び出しをフォールバックなしの既定にする」と暫定判断している。cloud 環境で
+  実際に routine を 1 サイクル動かして確認するまでは、この判断は確定ではない。
+  Node 24 未満だった場合は `--experimental-strip-types` 付きの呼び出しに
+  切り替える設計余地を残してある。
+- **採らなかった案**: bash（+ `jq`）での実装も検討したが採らなかった。理由は
+  上記「GitHub からの読み取りは `gh api -X GET` を子プロセスで呼ぶアダプタ
+  1 つに集約する」の**理由**欄で述べた `jq` の落とし穴（`--paginate -q` が
+  ページごとに評価される、`--slurp` と `-q` が併用できない）と同根で、
+  日時・文字列処理・ページングを bash に残す限りこの環境差と落とし穴は
+  消えない。
+
+### スクリプトは事実だけを返し、書き込みは行わない。失敗は終了コード 2
+
+- **決定**: 各スクリプトは stdout に JSON 1 個（`{ "ok": true, ...facts }`）を
+  出して終了コード 0 で終わる。前提を満たせない（API 呼び出し自体が失敗する等）
+  ときは stdout を空にし、stderr に理由を 1 行書いて終了コード 2 で終わる。
+  終了コード 1 は想定外の例外用に空けておく。複数行（複数 issue 等）を返す
+  スクリプトでは、行単位で読めなかった事実だけを「読めなかった」欄で示し、
+  呼び出し全体は成功として扱う。
+- **理由**: 手順書側は「0 なら事実を読む、2 なら『測定・取得できなかった』の
+  既存経路へ回す」という 2 分岐だけで済むようになる。GitHub への issue・
+  コメント・ラベルの書き込みは判断を伴うため手順書側に残し、スクリプトは
+  読み取りと機械的な変換だけを行う。
+- **根拠となった実測**: 空配列や 0 件が「成功」に見えてしまう事故（監査で
+  指摘された、読み取り結果が空のまま次の判断へ進んでしまうパターン）を、
+  「取れなかった＝終了コード 2」と「0 件で正常＝`ok:true` で空配列」を型として
+  区別することで構造的に防いだ。実装（`lockfile-overlap`）では、いったん
+  「lockfile を含まない PR」を終了コード 2 で扱う初版を作ったところ、独立
+  レビューで「本来異常でないケースを異常扱いすると、Step 6 の『スクリプト
+  失敗』報告行が本物の異常を埋もれさせる」と指摘され、契約違反として差し
+  戻された。以後、終了コード 2 は「取得そのものが失敗した」場合だけに限定
+  している。
+- **トレードオフ**: 「0 件で正常」と「取得できなかった」を区別する責任が
+  スクリプト側の設計に移る。各スクリプトの契約（README の契約表）で
+  `ok:true` かつ空配列の意味を明記する必要がある。
+
+### GitHub からの読み取りは `gh api -X GET` を子プロセスで呼ぶアダプタ 1 つに集約する
+
+- **決定**: `lib/gh.ts` に `GhApi`（`get(path, params)` で単発、`getAll(path,
+  params)` でページ番号を自分で回して結合）を実装し、内部は `execFile('gh',
+  ['api', '-X', 'GET', …])` の子プロセス呼び出しにする。全スクリプトはこの
+  1 つのアダプタ経由でのみ GitHub を読む。テストでは子プロセスを差し替えて
+  記録済み応答を注入する。
+- **理由**: 認証と outbound proxy の扱いは `gh` に任せたまま、`--paginate -q`
+  がページごとに評価される・`--slurp` と `-q` が併用できない、といった
+  `gh` の落とし穴を JS 側のページ結合ロジックに閉じ込められる。GraphQL は
+  routine の実行環境の outbound proxy が遮断するため、REST の GET 以外は
+  最初から選択肢に入れていない。
+- **採らなかった案**: Node の `fetch` で `api.github.com` を直接呼ぶ案も
+  検討したが採らなかった。認証トークンの取り回しと outbound proxy の扱いが
+  `gh` を経由する場合と別物になり（`gh` は認証・proxy 越しの通信を自分で
+  面倒を見るが、直接 `fetch` するとその面倒をスクリプト側が肩代わりする
+  必要が生まれる）、`gh api --paginate` 案と同様に見送った。
+- **根拠となった実測**: `gh pr ready`（draft → Ready、内部で GraphQL の
+  `markPullRequestReadyForReview` を呼ぶ）が遮断されて失敗することを実測済み
+  （閉ループ化の設計決定「GitHub への書き込みは REST だけで行う」と同根）。
+  読み取り側でも `gh api --paginate --slurp | jq` が `-q` と併用できない・
+  `-q` がページごとに当たる、という実測済みの落とし穴があり、ページ結合を
+  スクリプト側の JS ロジックに移すことでこれらを踏まなくなる。
+- **トレードオフ**: `gh` プロセス起動のオーバーヘッド（数十 ms/回）が乗るが、
+  routine 全体の所要時間に対しては無視できる範囲。
+
+### ログ解析は stdin 1 本のパーサ `parse-job-log.ts` に統合する
+
+- **決定**: 生のジョブログ（タイムスタンプ前置き・ANSI 混じり）を stdin で
+  受け取り、ANSI 制御列と行末 `\r` の除去を 1 つの正規表現に統一したうえで、
+  `{ vitest: { failBlocks[] }, playwright: { annotations[], summary: { failed,
+  flaky, passed, skipped } | null }, denylistHits[] }` を 1 回のパースで返す。
+  段位（tier）の決定や denylist の一覧を広げる判断はこのパーサでは行わず、
+  手順書側に残す。
+- **理由**: 事実の取り出し（FAIL ブロック・Playwright 注釈・集計行・denylist
+  一致）と、その後の判断（段位判定・denylist 拡張・巻き添え/連鎖の切り分け）
+  を明確に分離する。`summary: null` を「集計行が取れなかった＝不明」として
+  明示的に返すことで、`0` （全部通った）と区別できるようにした。
+- **根拠となった実測**: 実装前の調査で、ログ解析にあたる処理（旧 #9・#10 の
+  候補）が手順書内の 3 か所に分散し、ANSI 除去の正規表現が `[0-9;]*m` と
+  `[0-9;]*[A-Za-z]` の 2 種類に割れていた（後者を正とした。色以外の制御列も
+  落とすため）ことを確認済み。1 本のパーサへ統合することでこの重複と表記
+  揺れを解消した。
+- **トレードオフ**: denylist の**一覧そのもの**はデータとして `lib/
+  denylist.ts` に置くが、一覧を広げる（新しい infra noise パターンを追加する）
+  判断は手順書側の運用判断として残る。
+
+### 固定文字列は `lib/constants.ts` を機械可読な定義とし、手順書との一致をテストで検証する
+
+- **決定**: `### Repro result`・`### Additional observation`・
+  `**Fix PR**: `・各ラベル名・自動投稿の署名など、手順書とスクリプトの
+  双方が使う固定文字列を `lib/constants.ts` に定義する。`constants.spec.ts`
+  が、各定数について「どのファイル（またはどの節）と突き合わせるか」を
+  定数ごとに宣言し、その宣言に基づいて手順書側の実際の記述と一致することを
+  検証する（ドリフト検知）。
+- **理由**: 「定義は 1 か所」という原則を、人が読む手順書と機械が読む定数の
+  両方に対して保ちつつ、二重定義がずれた場合はテストが落ちる形にする。
+- **根拠となった実測**: 当初は「全定数が `.claude/commands/flaky-ci-
+  routine.md` の `## Shared constants` 節に現れること」を一律に検証する
+  設計を想定していたが、実装時に、同節が実際に定義しているのは
+  `flaky/needs-decision`・`- Recommendation: `・署名 2 種・保留窓 120 秒
+  だけであることが判明した。tier ラベル・コメント見出し・`**Fix PR**: ` は
+  同じファイルの別の場所に、`### Repro result` の 7 行は手順書ではなく
+  `.github/workflows/flaky-repro.yml` に定義されている。そのため定数ごとに
+  実際の定義元を検査する形に設計を修正した。この経緯とその是正内容は本
+  spec の design.md（Components・Testing Strategy）にも反映済み。
+- **トレードオフ**: 手順書・workflow ファイルの節構造や記述位置が変わると
+  `constants.spec.ts` も追随して直す必要がある（本 spec の design.md の
+  Revalidation Triggers に記載）。`.github/workflows/ci-bin.yml` の `paths`
+  には `.claude/commands/flaky-ci-routine.md` と `flaky-repro.yml` を追加し、
+  これらの変更でも一致検証が走るようにした。
+
+### `flaky-repro.yml` の `run:` の分割は任意タスクとし、bash のまま切り出す
+
+- **決定**: `flaky-repro.yml` の `run:` の中身（trailer の解析・検証、N 回
+  実行と集計、結果の整形）は TypeScript に書き直さず、bash のまま
+  `.github/scripts/flaky-repro/{parse-request,run-repro,render-result}.sh`
+  へそのまま移す。workflow は各スクリプトを呼ぶだけにし、最初のステップで
+  `bash -n` による構文検査を行う。この切り出し自体を実施するかどうかは
+  運用者の任意判断とする。
+- **理由**: `flaky-repro.yml` は GitHub Actions runner（GNU bash・GNU
+  coreutils）上でのみ動き、routine の実行環境（zsh・ugrep・uutils・mawk）
+  との環境差の問題が最初から存在しない。TypeScript に書き直すと、既存の
+  bash 実装との振る舞い同一性を検証するコストの方が上回る。
+- **根拠となった実測**: 分割を実施する場合は `flaky-repro/selftest-*`
+  ブランチで実際に 1 回測定し、`### Repro result` の 7 行が分割前と
+  同一であることを確認する、という受け入れ条件で設計した。
+- **トレードオフ**: 分割してもしなくても、「測定中の依頼が push 済み
+  ブランチ上のファイルに依存する」という前提そのものは変わらない。
+
+### `Date:` 抽出の正規表現とコメント見出し照合ロジックは、3 か所への重複を許容する
+
+- **決定**: `Date:` 行を取り出す正規表現 `/^-?\s*Date:\s*(.+)$/` と、
+  それに先立つ観測見出し（`### First observation` / `### Additional
+  observation` / `### Backfilled observation`）の判定ロジックは、
+  `bin/flaky-ci/scripts/newest-observation.ts`・`bin/flaky-ci/scripts/
+  awaiting-decision-rows.ts`・`bin/flaky-ci/lib/dashboard.ts` の 3 か所に
+  同一のコードとして重複させる。これらを 1 つの共有 `lib/` モジュールへ
+  くくり出すことはしない。
+- **理由**: 本 spec の design.md の File Structure Plan は、このロジック用の
+  共有 `lib/` モジュールを計画に含めていない。3 か所とも、見出し文字列
+  そのものは `lib/constants.ts` の `COMMENT_HEADINGS.*` を共通で参照して
+  おり、重複しているのは日付抽出の正規表現という 1 行のロジックだけで、
+  見出し文字列という「事実の定義」自体は既に単一の場所（`lib/
+  constants.ts`）に集約されている。この重複の程度であれば、新しい共有
+  モジュールを追加する複雑さに見合わないと判断した。
+- **トレードオフ**: 3 か所のうちどこか 1 か所の `Date:` 抽出ロジックを
+  将来変更する場合（例えば `Date:` の書式が変わる、タイムゾーン表記に
+  対応する等）、残り 2 か所も同じ変更が必要かどうかを必ず確認する必要が
+  ある。見出し文字列自体は `lib/constants.ts` を通じて自動的に追随するが、
+  正規表現部分は手動での横展開が要る。将来この 3 か所のいずれかに触れる
+  変更が入るときは、この横展開の要否を確認すること。**注**: 2026-09-16
+  時点で本 spec の design.md の Revalidation Triggers には、この 3 ファイル
+  の組を対象とする項目がまだ無い（`newest-observation` / `awaiting-
+  decision-rows` / `dashboard.ts` はそれぞれ別々の行で説明されているのみ）。
+  追加する場合は次に design.md を更新する機会に反映すること。
+
 ## 未解決のまま残っている論点（今後の改善候補）
 
 `brief.md` の Scope には含めていないが、この調査・実運用の過程で見つかった

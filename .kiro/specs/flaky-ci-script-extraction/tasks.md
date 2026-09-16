@@ -147,7 +147,7 @@
   - 観測可能な完了状態: 元 spec の design.md に 13 本のスクリプトと呼び出し箇所の表があり、本文に「以前は〜」の履歴の語りが無い
   - _Requirements: 5.4_
 
-- [ ] 5.2 本 spec の research.md の設計決定を元 spec の research.md に移す
+- [x] 5.2 本 spec の research.md の設計決定を元 spec の research.md に移す
   - 置き場（`bin/`）、TypeScript 直接実行、事実だけを返す契約、`gh api` アダプタ、stdin パーサ、固定文字列のドリフト検知、任意の workflow 分割、の各決定を「決定 / 理由 / 根拠」で移す
   - 観測可能な完了状態: 元 spec の research.md に上記 7 決定の見出しがある
   - _Requirements: 5.4_
