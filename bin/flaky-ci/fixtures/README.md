@@ -13,6 +13,7 @@ under the same layout as they land.
 fixtures/
 ├── api/
 │   ├── issues/    # gh api issue / comments / events responses
+│   ├── dashboard/ # the real dashboard issue's body, and the input it was built from
 │   └── pulls/     # gh api pulls/{n}/files responses
 ├── lockfile/      # a PR's pnpm-lock.yaml patch, plus a derived package-name list
 ├── job-logs/      # a job-log excerpt, byte-for-byte as GitHub stored it
@@ -135,3 +136,21 @@ searches. `expected/parse-identity-key-titles.json` and
 `expected/parse-identity-key.md` hold the per-title expectation (what the
 current regex-and-4-step procedure gives for each) that
 `lib/identity.spec.ts` checks against.
+
+## Phase 2 material (`api/dashboard/`, task 3.10)
+
+`render-dashboard` is checked against the real thing: `11720-body.md` is the
+body issue **#11720** (`flaky-ci-routine: dashboard`) carried after the
+2026-09-16T00:12:47Z run, and `render-dashboard-input.json` is the material
+that run had in hand, captured with the two scripts that now feed the
+renderer (`fetch-flaky-issues` filtered to `state: "open"`, and
+`awaiting-decision-rows` over the 13 open `flaky/needs-decision` issues).
+`lib/dashboard.spec.ts` renders the input and compares it to the body
+character for character; it matches exactly. Each file's `.meta.md` records
+how it was captured, and `expected/render-dashboard.md` says what the pair
+pins.
+
+The three zero states and the character-limit truncation have no real example
+— the dashboard has never had an empty table, and no body has come near 65536
+characters — so they are covered by constructed inputs inside
+`lib/dashboard.spec.ts` rather than by a fixture file.

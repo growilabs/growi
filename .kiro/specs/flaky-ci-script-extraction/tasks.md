@@ -120,7 +120,7 @@
   - _Depends: 2.1, 3.8_
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.3, 2.4, 3.3, 4.1, 4.4, 5.1, 5.2_
 
-- [ ] 3.10 ダッシュボード本文の描画
+- [x] 3.10 ダッシュボード本文の描画
   - issue 一覧・判断待ち行・自動クローズの 3 リストを stdin の JSON で受け、表（tier → issue 番号順）、`## Awaiting human decision`、`## Auto-closed this run`、決まり文句 3 つ、65536 字の切り詰め（表の行だけを上から残し節は落とさない）を持つ本文を返す
   - routine Step 5 の描画手順を呼び出しに置き換える。何を載せるか（入力を組む側）と、ダッシュボード issue の検索・作成・全置換の書き込みは手順書に残す
   - 観測可能な完了状態: Step 5 に表の組み立て手順が無い。`--help` が 0、空状態 3 種・行順・切り詰め（節が残る）のテストが期待値（現在のダッシュボード本文）と一致して通る。README に行がある。行数・容量の前後を記録
@@ -1393,3 +1393,132 @@ Step 6 の冒頭にある「Step 5 と 6-A〜6-C の共有シェル変数」一�
 2. `--base` は design.md の引数表どおり `origin/master` を既定値とした
    （CLI としては上書き可能）。手順書側は常に `--base origin/master` を
    明示的に渡す形にしており、既定値に暗黙で依存していない。
+
+### タスク 3.10: ダッシュボード本文の描画（`render-dashboard`、2026-09-16）
+
+`bin/flaky-ci/lib/dashboard.ts` に純粋な `render(input) → string` を、
+`bin/flaky-ci/scripts/render-dashboard.ts` に stdin の JSON を読んで
+`body` を返す薄い CLI を置いた。
+
+**入力の形（design.md が明記していなかったので、ここで決めた）**:
+`updatedAt` / `issues[]` / `awaitingDecision[]` / `autoClosed` の 4 つが必須、
+`notes[]` / `paragraph` / `limit` は任意。`issues[]` は
+`fetch-flaky-issues.ts` の出力の行をそのまま（`number` `title` `labels[]`
+`body` `comments[].body`）、`awaitingDecision[]` は
+`awaiting-decision-rows.ts` の `rows[]` をそのまま渡せる形にした
+（design.md 397 行目の「他スクリプトの出力をそのまま渡せる形にする」）。
+
+**表の列の算出まで `render` の担当にした理由**: tasks.md の観測可能な完了状態
+が「Step 5 に表の組み立て手順が無い」であり、出現回数の数え方・`Date:` 行から
+の First/Last seen・`**Fix PR**: ` マーカーの読み取りは、まさに表の組み立て
+手順そのものだから。これらを手順書に残すと完了条件を満たさない。したがって
+`render` は生の issue（body とコメント本文）を受け取り、tier ラベルの最強
+選択、`flaky: ` 接頭辞の除去、出現回数、日付、Fix PR、並べ替え、描画、
+切り詰めまでを行う。手順書に残したのは「何を載せるか」（item 1 の open 限定、
+item 2 の判断待ち候補の取得）と、ダッシュボード issue の検索・作成・全置換
+（item 4）だけ。
+
+**`updatedAt` を入力欄にした理由（「スクリプトは時計を読まない」と両立する）**:
+65536 字の判定は本文全体（`_Updated:_` 行を含む）に掛かるので、`render` が
+出力しない行があると測定が狂う。時計を読むのは呼び出し側のままで、読んだ値を
+JSON で渡す形にした。末尾の `---` ＋ Claude Code 署名も同じ理由で `render` が
+出力する（実際のダッシュボード本文には常に付いているが、Step 5 item 5 の
+書式一覧には書かれていなかった。今回 item 3 に「verbatim で書く」と明記した）。
+
+**`(may be stale) ` の接頭辞は `render` では付けない（タスク文からの意図的な
+逸脱）**: `awaiting-decision-rows.ts` の `computeRecommendation` が
+`recommendationSource: "widened"` のときすでに `recommendation` 文字列の先頭に
+付けている。`render` 側でも付けると実パイプラインで二重になる。よって cell は
+verbatim で書き、二重付与が起きないことを専用のテストで固定した（実物の
+ダッシュボード本文には `widened` の行が無いので、実データ照合では捕まらない）。
+
+**切り詰めの実装**: 表の行数を 1 行ずつ減らしながら本文全体を組み直して長さを
+測る（注記行も長さに入るため、表だけを測ると足りない）。表を 0 行まで削っても
+入らないときだけ `## Awaiting human decision` の行を下（新しい `Paused at`）
+から削る。節の見出しと決まり文句は決して落とさない。**切り詰めの結果 0 行に
+なった表・節には決まり文句を書かない** — 決まり文句は「この状態のものが 1 件も
+無い」という別の事実を指すので、切り詰めた結果として書くと嘘になる。ここは
+一番間違えやすいので、表側・判断待ち側それぞれに、行数が正真正銘 0 になるまで
+切り詰めさせる入力（少数件・長いタイトル/推奨文＋小さい `limit`）を使ったテスト
+を置き、「決まり文句が書かれていない」「見出しと空ヘッダーだけの表が残る」
+「両方の節と切り詰め注記が残る」を確認している。最初に書いたテストは
+`manyIssues(20)` を大きめの `limit` で切り詰めるだけで、実際には表に 1 行以上
+残ったまま通ってしまっていた（レビュー時のミューテーションテストで、
+ガード条件の `!tableTruncated` / `!awaitingTruncated` を外しても 22 件全部
+green のままだったことで発覚）。今のテストは同じミューテーションを当てると
+確実に red になることを確認済み。
+
+**固定文字列**: 決まり文句 3 つは `lib/constants.ts` に存在していなかったので
+`ZERO_STATE` として追加し、`CONSTANT_GROUPS` と `CONSTANT_DECLARATIONS` の
+両方に入れた（source は `routine-doc`）。65536 も `BODY_CHAR_LIMIT` として
+`PAUSE_WINDOW_SECONDS` と同じ扱いで追加し、手順書の「~65536-character」と
+突き合わせるテストを足した。あわせて `MARKERS.fixPr` の検証元を `routine-doc`
+から新しい `investigate-doc`（`investigate-flaky-test/SKILL.md`）に移した:
+Step 5 の書き換えで `**Fix PR**: ` が手順書から消えたが、この文字列を実際に
+**書いている**のは investigate 6-C なので、そちらと突き合わせるのが本来の
+検証元である（ドリフト検知を緩めたのではなく、正しい定義元に向け直した）。
+
+**Step 6 への報告義務の扱い**: 旧 item 3 が持っていた「観測日が 1 つも
+読めなかった issue の番号を Step 6 に載せる」という指示は、日付の描画を
+スクリプトに移しても消えない義務なので item 1 の注記として残した。旧
+「Building the …」節にあった「`Paused at` が `—` の行は Script failures 行が
+カバーする」という記述は**そのまま戻していない** — スクリプトはその行を
+`pausedAtStatus: "unavailable"` にして終了コード `0` で返すため、Script
+failures 行には現れないからである（元の記述が誤っていた）。同じ注記に
+まとめて「Step 6 に番号を載せる」と書き直した。
+
+**手順書の書き換え（Step 5）**: item 1 は `fetch-flaky-issues.ts` の呼び出しに
+置き換え、`state: "open"` で絞る指示だけを残した（旧 item 1 の 3 本の tier
+クエリと重複排除、旧 item 2 のコメント取得はこの 1 本に吸収された）。旧 item 3
+（表の組み立て）・item 5（本文の書式）・item 6（切り詰め）と、2 つの
+「Building the … section」節は、item 3 の `render-dashboard` 呼び出しに
+置き換えた。判断として残したもの: 「active とは open のこと」「Step 2 の一覧を
+再利用しない」「判断待ち候補は毎回取り直す」「タスク 2.3 が残した 4 つの注記
+（接頭辞は付与済みなので verbatim、最終行を読む、再選択しない、件数が増えても
+再選択しない）」「自動クローズは 4-F の 3 リストであって closed issue の
+再取得ではない」、そして item 4 の検索・作成・全置換。
+
+**他ファイルからの参照の付け替え**: Step 5 の item 番号を指していた参照を
+実際の定義元に向け直した — routine 2-B の重複排除（→ `fetch-flaky-issues`）、
+4-B の観測の定義（→ `lib/dashboard.ts`）、4-E の最強 tier、Shared constants の
+2 か所、および `detect-flaky-ci/SKILL.md` の「出現回数の定義」
+（→ `bin/flaky-ci/lib/dashboard.ts`）。
+
+**期待値の照合**: 実物のダッシュボード issue **#11720** の本文
+（2026-09-16T00:12:47Z の run が書いたもの）を
+`fixtures/api/dashboard/11720-body.md` に、その run が持っていた材料を
+2 本のスクリプトで採り直したものを
+`fixtures/api/dashboard/render-dashboard-input.json` に置き、
+`render` の出力が 1 文字も違わないことをテストで固定した（Requirement 1.3）。
+実行時のドリフトは無く、期待値を調整する必要は生じなかった。
+
+観測可能な完了状態の確認: `--help` が終了コード 0。空状態 3 種・行順・
+切り詰め（節が残る／決まり文句を書かない）・実物本文の一致を含む
+`lib/dashboard.spec.ts` 23 件と `scripts/render-dashboard.spec.ts` 8 件が通る。
+`pnpm vitest run`（`bin/` 配下）で 32 ファイル 476 件が通ることを確認した。
+`biome check bin` は自動整形を適用した上で通過。`README.md` の契約表に
+`render-dashboard` の行を、Shared library の表に `dashboard.ts` の行を足した。
+
+**申し送り（タスク 5.1 の design.md 書き直しへ）**: `Date:` 行の抽出と観測
+コメントの見出し判定は、いま `newest-observation.ts`・
+`awaiting-decision-rows.ts`・`lib/dashboard.ts` の 3 か所に同じ形で存在する。
+今回は design.md の File Structure Plan に無い `lib/` モジュールを増やさない
+ことを優先して共通化していない。共通モジュールに畳むなら、その 3 か所を
+同時に直す必要がある。
+
+**Identity セルの `|` をエスケープしていないこと（意図的）**: issue 題名に
+`|` が入ると Markdown の表が崩れるが、現在の手順書も題名をそのまま書くので、
+エスケープを入れると同じ入力に対する出力が旧手順と変わる（Requirement 1.3）。
+実在する 65 件の題名に `|` は無い。将来エスケープを入れるなら、期待値の
+`11720-body.md` との照合も同時に更新する必要がある。
+
+行数・容量（`wc -l -c`。親から渡された「変更前 1043 / 53869」はタスク 2.2 の
+終了値で 1 つ古く、タスク 2.3 の終了値 1016 / 51871 が正しい基準値であることを
+コミット済みファイルで実測してから測った）:
+
+| ファイル | 変更前（行/バイト） | 変更後（行/バイト） |
+|---|---:|---:|
+| `.claude/commands/flaky-ci-routine.md` | 1016 / 51871 | 871 / 44178 |
+| `.claude/skills/detect-flaky-ci/SKILL.md` | 1586 / 83617 | 1587 / 83663 |
+
+detect 側の +1 行は、上記の参照の付け替え 1 か所だけによるもの。

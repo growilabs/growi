@@ -1050,8 +1050,9 @@ Two limits keep this from swallowing real evidence:
 
 ### Which comment headings count as an occurrence
 
-`.claude/commands/flaky-ci-routine.md` Step 5 item 3 defines the count: **1**
-for the issue body, plus the comments whose **first line** prefix-matches
+`bin/flaky-ci/lib/dashboard.ts`, which `.claude/commands/flaky-ci-routine.md`
+Step 5 item 3 calls, defines the count: **1** for the issue body, plus the
+comments whose **first line** prefix-matches
 `### Additional observation` or `### Backfilled observation`. Two
 consequences the rules above depend on, which must not be "simplified" away:
 

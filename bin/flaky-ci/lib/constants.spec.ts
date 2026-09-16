@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  BODY_CHAR_LIMIT,
   CONSTANT_DECLARATIONS,
   CONSTANT_GROUPS,
   type ConstantSource,
@@ -17,8 +18,10 @@ import {
 // `## Shared constants` section. That section defines only the needs-decision
 // label, the Recommendation line, the two automated-author signatures and the
 // 120-second pause window. The tier labels, the comment headings and the
-// `**Fix PR**: ` marker are defined elsewhere in the same file, and the
-// `### Repro result` line headings are defined by `flaky-repro.yml`. So each
+// dashboard's zero-state lines are defined elsewhere in the same file, the
+// `**Fix PR**: ` marker by the skill that writes it
+// (`investigate-flaky-test/SKILL.md` 6-C), and the `### Repro result` line
+// headings by `flaky-repro.yml`. So each
 // constant declares which file (and, for the Shared constants group, which
 // section) it is checked against, and this spec checks all of them — nothing is
 // dropped, and nothing is asserted against a place it was never written.
@@ -29,6 +32,7 @@ const SOURCE_FILES: Readonly<Record<ConstantSource, string>> = {
   'routine-shared-constants': '.claude/commands/flaky-ci-routine.md',
   'routine-doc': '.claude/commands/flaky-ci-routine.md',
   'flaky-repro-workflow': '.github/workflows/flaky-repro.yml',
+  'investigate-doc': '.claude/skills/investigate-flaky-test/SKILL.md',
 };
 
 const readRepoFile = (relativePath: string): string =>
@@ -90,6 +94,10 @@ describe('constants — drift detection against the procedure documents', () => 
     expect(sourceText('routine-shared-constants')).toContain(
       `${PAUSE_WINDOW_SECONDS} seconds`,
     );
+  });
+
+  it('states the dashboard body limit with the same number of characters as the procedure', () => {
+    expect(sourceText('routine-doc')).toContain(`${BODY_CHAR_LIMIT}-character`);
   });
 
   it('keeps the `### Repro result` seven line headings in the workflow order', () => {
