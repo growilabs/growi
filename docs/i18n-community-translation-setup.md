@@ -58,7 +58,19 @@ POEditor の「New project」機能で、GROWI の翻訳全体を受け皿とす
 
 プロジェクト作成直後は用語（キー）が空です。初回投入は、後続タスク5.1で配線される `i18n-sync-push` ワークフロー（または `apps/app/tools/i18n-sync/` のスクリプトを手動実行する形）で、リポジトリ側の `en_US` の JSON ファイルをアップロードして行います。この初回投入自体は本ドキュメントの手順の範囲外です（後続タスクの担当）。
 
-**ソース言語（en_US）だけでなく、既存の ja_JP / zh_CN / fr_FR / ko_KR の訳文も初回に投入してください。** push ワークフローは `en_US` しかアップロードしないため、これを行わないと POEditor 上でこれら4言語が実際には翻訳済みであるにもかかわらず0%のまま表示され、翻訳者に「何も翻訳されていない」という誤った状態を見せてしまいます。この初回投入も本ドキュメントの手順の範囲外です（後続タスクの担当）。
+**ソース言語（en_US）だけでなく、既存の ja_JP / zh_CN / fr_FR / ko_KR の訳文も初回に投入してください。** push ワークフローは `en_US` しかアップロードしないため、これを行わないと POEditor 上でこれら4言語が実際には翻訳済みであるにもかかわらず0%のまま表示され、翻訳者に「何も翻訳されていない」という誤った状態を見せてしまいます。
+
+この投入には `apps/app/tools/i18n-sync/seed-existing-translations.ts`（`pnpm run i18n:sync:seed`）を使います。`POEDITOR_API_TOKEN` と `I18N_SYNC_SEED_LANGUAGE`（`ja_JP` / `zh_CN` / `fr_FR` / `ko_KR` のいずれか1つ）を環境変数に設定し、4言語それぞれについて1回ずつ実行してください（`uploadTerms`のレート制限により1回の実行につき1言語のみを扱う設計です）。
+
+```bash
+cd apps/app
+POEDITOR_API_TOKEN=<token> I18N_SYNC_SEED_LANGUAGE=ja_JP pnpm run i18n:sync:seed
+POEDITOR_API_TOKEN=<token> I18N_SYNC_SEED_LANGUAGE=zh_CN pnpm run i18n:sync:seed
+POEDITOR_API_TOKEN=<token> I18N_SYNC_SEED_LANGUAGE=fr_FR pnpm run i18n:sync:seed
+POEDITOR_API_TOKEN=<token> I18N_SYNC_SEED_LANGUAGE=ko_KR pnpm run i18n:sync:seed
+```
+
+この処理は非破壊（`syncTerms: false`）なので、途中で失敗しても再実行して問題ありません。
 
 ### 2.4 プロジェクト ID をリポジトリに反映する（後続の作業）
 
