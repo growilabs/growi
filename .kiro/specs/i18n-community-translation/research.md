@@ -145,7 +145,7 @@
 - **Selected Approach**: `seed-existing-translations.ts` の `runSeed` を、対象言語のファイルに加えて en_US のファイルも読み込むよう変更し、`DiffClassifier.filterToKnownKeys(en_US側の内容, 対象言語側の内容)`（新設の純粋関数）でアップロード前に en_US の既存キーだけへ絞り込む
 - **Rationale**: POEditorのterm一覧は push（en_US由来）が権威を持つ唯一の情報源であるべきで、翻訳ファイル側だけに存在するキーをterm一覧に紛れ込ませると、次回の通常push（`sync_terms=1`、en_USのみ基準）でそれらのtermが削除され、その後のpullが「削除された」と誤って構造変更PRを提案する結果になる
 - **Trade-offs**: 翻訳ファイル側にあってen_US側に無いキー（リポジトリの既存ドリフト。今回の実測では `translation.json` 単体で ja側36件・en側15件）は投入対象から外れる。これは元々POEditorのterm一覧に載る資格が無いキーであり、この施策のスコープ外（別問題）として扱う
-- **Follow-up**: 既に ja_JP 投入で作成された44件（内訳は上記Findings参照）の孤立termをどう扱うか（POEditor UIで手動削除するか、次回pushでの自動削除→後続pullでの構造変更PR発生を許容するか）は human review 待ち。同様の絞り込み前提で試算すると、`zh_CN` は25件（admin 8・translation 15・commons 2）、`fr_FR` は5件（admin 2・translation 3・commons 0）、`ko_KR` は0件の孤立termを生んでいたはずで、修正後のツールで実行すればこれらは発生しない。`zh_CN`/`fr_FR`/`ko_KR` の投入は、この修正が反映されたツールで行うこと（既に投入済みの `ja_JP` を再実行する必要はない）
+- **Follow-up**: 既に ja_JP 投入で作成された44件（内訳は上記Findings参照）の孤立termは、実プロジェクトからAPI経由の一括削除で対応済み。同様の絞り込み前提で試算すると、`zh_CN` は25件（admin 8・translation 15・commons 2）、`fr_FR` は5件（admin 2・translation 3・commons 0）、`ko_KR` は0件の孤立termを生んでいたはずで、修正後のツールで実行すればこれらは発生しない。`zh_CN`/`fr_FR`/`ko_KR` の投入は、この修正が反映されたツールで行うこと（既に投入済みの `ja_JP` を再実行する必要はない）
 
 ## Risks & Mitigations
 - POEditor OSS プランの申請が承認されない可能性 — 承認されるまで本番運用（実際の同期起動）を進めない。requirements.md 要件7.2で明示済み
@@ -156,7 +156,7 @@
 - タグ付けアップロード（`sync_terms`無効）が他namespaceのキーを`tags`の`obsolete`スコープの対象にしてしまわないかは、実プロジェクトでの実測では他namespaceの内容が存在しない状態でのテストに留まり、確認できていない — 本番運用開始前の実環境確認（複数namespaceが実データで共存する状態でのタグ付けアップロード）で必ず確認すること
 - POEditor プロジェクトの Fallback Language 設定が誤って有効化されると、未翻訳キーの export値が別言語の文言で埋まり、`DiffClassifier`が「訳文が変更された」と誤判定して既存の正しい翻訳を上書きしうる（task 6.2の実環境確認で実際に発生し、生成されたPRはマージせずclose済み） — `DiffClassifier.classify`が空文字列を「情報なし」として無視する実装に修正済み（上記Decision参照）だが、Fallback Language自体は引き続き「未設定」運用が前提。プロジェクト設定が意図せず変わっていないか、定期的な実環境確認（tasks.md 6.x）で確認すること
 - POEditorが ja/zh/fr/ko の既存翻訳を1件も持っていない（push が en_US しかアップロードしないため）状態が続くと、翻訳者が参加してもPOEditor上は0%表示のままになり、体験を損なう — 既存翻訳の初回投入をタスク化して対応する（`docs/i18n-community-translation-setup.md` §2.3）
-- 既存翻訳投入ツールは `sync_terms:false` でも新規termを作成しうる（上記Decision参照）。ja_JP投入時にen_USに無い44件のtermが作成された — ツールをen_USの既存キーへの絞り込みに修正済みだが、既に作成された44件の孤立termの後始末（削除するか、次回pushでの自動削除に伴う構造変更PRを許容するか）は human review 待ち
+- 既存翻訳投入ツールは `sync_terms:false` でも新規termを作成しうる（上記Decision参照）。ja_JP投入時にen_USに無い44件のtermが作成されたが、ツールをen_USの既存キーへの絞り込みに修正し、作成済みだった44件のtermはAPI経由の一括削除で対応済み
 
 ## References
 - [POEditor API Reference](https://poeditor.com/docs/api) — upload/export のパラメータ、レート制限、対応フォーマットの一次情報。`terms/add`/`terms/update`の用語一意性（term+context）と、`projects/upload`（一括アップロード）にはcontextを個別指定する手段が無いことも、この一次情報から確認した
