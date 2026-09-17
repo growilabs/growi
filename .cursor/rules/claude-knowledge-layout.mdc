@@ -17,11 +17,18 @@ files — never maintain a parallel copy of instructions, skills, or rules.
 | `.claude/skills/**/SKILL.md` | Offered as Agent Skills — read and follow when relevant |
 | `apps/app/.claude/skills/**/SKILL.md` | Same, when working under `apps/app/` |
 
-## Bridged via `.cursor/rules/*.mdc`
+## Bridged via `sessionStart` hook (not `@` includes)
 
-Claude Code auto-injects `.claude/rules/`. Cursor does not. Thin bridge `.mdc` files
-`@`-include those markdown files. **Edit only `.claude/rules/` (and package-scoped
-equivalents); update bridge file lists when adding/removing a rule file.**
+Claude Code auto-injects `.claude/rules/`. Cursor does **not**.
+
+Cursor docs claim `@filename` inside `.mdc` rules attaches file contents, but that
+mechanism does not work yet. Copying rule bodies into `.cursor/rules/` would be
+dual management — do not do that.
+
+Instead, `.cursor/hooks.json` runs `sessionStart` →
+`.cursor/hooks/inject-claude-rules.mjs`, which reads the canonical markdown under
+`.claude/rules/` and `apps/app/.claude/rules/` and returns them as
+`additional_context`. **Edit only the `.claude/` sources.**
 
 ## When to load more
 
