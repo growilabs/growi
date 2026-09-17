@@ -93,7 +93,7 @@
     の対象になり、どれがならないかが分かる
   - _Requirements: 5.3_
 
-- [ ] 5. Validation: 実際のワークフローを1回動かし、issue起票と重複防止が設計どおり動くことを確認する
+- [x] 5. Validation: 実際のワークフローを1回動かし、issue起票と重複防止が設計どおり動くことを確認する
   - 自己検証用の使い捨てissue・ブランチ等を用い、`workflow_dispatch` で
     手動起動する。意図的に未配線のダミーfixtureを1件仕込んだ状態と、
     仕込まない状態の両方で1回ずつ実行する
@@ -275,3 +275,30 @@ GitHubの仕様上、`workflow_dispatch` はワークフローファイルがデ
 issueは「使い捨て」ではなく、四半期routineが実際に最初に検知した本番の
 結果になる見込み（現時点で `bin/flaky-ci/fixtures/expected/*.md` 等、
 実際に未配線のfixtureが存在するため）。
+
+### タスク5: 実測結果と、実測で見つかったもう1つの実バグ（GH_TOKEN未設定）
+
+PR #11929 のmasterマージ後、`workflow_dispatch` で2回実行して実測した。
+
+1回目の実行（run 35221816827）で `checked: 0` となり、`check-fixture-drift.ts`
+内の全ての `gh api` 呼び出しが `GH_TOKEN environment variable` エラーで
+失敗していることが判明。devcontainerでは `gh` が事前認証済みのため
+気づけなかったが、GitHub Actionsランナーでは `gh` に `GH_TOKEN` を明示的に
+渡す必要がある（issue起票側のステップには既に設定されていたが、
+`check-fixture-drift.ts` を呼ぶステップだけ漏れていた）。失敗自体は
+`unchecked` に正しく振り分けられ「乖離なし」という誤った成功にはならな
+かった（Requirement 5.1が意図どおり機能）が、ドリフト検知そのものが
+一度も実行されていなかった。この時作られたissue #11934はクローズ済み。
+
+修正（PR #11936、`GH_TOKEN: ${{ github.token }}` を追加、マージ済み）後に
+再実行した2回の結果:
+
+- 1回目（run 35222762606）: `checked: 18, drift: 0, unchecked: 28`（タスク3の
+  stubベースの想定と一致）、`unwired: 9`。issue #11937 を新規作成
+- 2回目（run 35222896965）: 同じ集計値。issue番号は #11937 のまま増えず、
+  コメントが1件追記された（重複起票なし、Requirement 4.2どおり）
+
+意図的な未配線ダミーfixtureは仕込まなかった（このリポジトリには既に
+`expected/*.md` 等の実際の未配線fixtureが存在し、それ自体が
+findings>0の実データとして使えたため）。issue #11937 は使い捨てではなく、
+四半期routineが実際に検知した最初の本番結果として残す。
