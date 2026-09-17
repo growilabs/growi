@@ -90,12 +90,6 @@ describe('classify', () => {
     });
   });
 
-  // POEditor exports an untranslated term as an empty string once the
-  // project's Fallback Language is unset (verified against the live
-  // project: an untranslated fr term exported as "" rather than being
-  // omitted or filled with another language's text). An empty string must
-  // never be treated as this key's actual value -- it means "no
-  // translation yet", not "translation removed" or "translation is blank".
   it('ignores an existing key whose after value is empty (no translation yet, not a removal)', () => {
     const before = { editor_guide: { decoration: 'Decoration' } };
     const after = { editor_guide: { decoration: '' } };
@@ -147,11 +141,6 @@ describe('classify', () => {
 });
 
 describe('mergeTranslations', () => {
-  // This is the content that actually gets written to disk (pull-translations.ts
-  // writes `mergeTranslations(before, after)`, never the raw export) — classify()
-  // only decides what to *report*, this decides what to *write*. An export value
-  // of '' must never reach the file: it means "no translation yet", so the
-  // existing before-value must survive untouched.
   it('keeps the existing value for a key POEditor has not translated yet (after is empty)', () => {
     const before = { a: { k1: '既存の訳1', k2: '既存の訳2' } };
     const after = { a: { k1: '新しい訳1', k2: '' } };
@@ -198,10 +187,6 @@ describe('mergeTranslations', () => {
   });
 
   it('omits a brand-new nested object whose every leaf is empty, rather than writing an empty group', () => {
-    // A namespace group that is entirely new (absent from before) but whose
-    // every leaf is still untranslated must not appear in the merged result
-    // at all -- keeping it as `{}` would change the key set with nothing in
-    // classify()'s addedKeys to justify it (found in review).
     const before = { k1: 'existing' };
     const after = { k1: 'existing', grp: { a: '', b: '' } };
 

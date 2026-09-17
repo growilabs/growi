@@ -391,11 +391,6 @@ describe('collectClassifications', () => {
   });
 
   it('preserves an existing translation for a key POEditor has not translated yet, even when another key in the same file genuinely changed (translation_only)', async () => {
-    // Regression for the incident this guards against: a live pull against
-    // a mostly-untranslated language proposed overwriting every existing
-    // translation with empty strings the moment ANY key in the same
-    // namespace changed. `k2`/`k3` here must survive untouched -- only `k1`
-    // (a real, non-empty change) may be written.
     const poeditorClient = mock<PoeditorClient>();
     poeditorClient.exportTranslations.mockResolvedValue({
       ok: true,
@@ -436,10 +431,6 @@ describe('collectClassifications', () => {
   });
 
   it('preserves an existing translation for a key POEditor has not translated yet, on the structural (key-added) path too', async () => {
-    // Same regression as the translation_only test above, mirrored onto
-    // exportedContent: an added key makes the combination structural, but
-    // k2 (untranslated in POEditor) must still keep its existing value
-    // rather than being blanked.
     const poeditorClient = mock<PoeditorClient>();
     poeditorClient.exportTranslations.mockResolvedValue({
       ok: true,

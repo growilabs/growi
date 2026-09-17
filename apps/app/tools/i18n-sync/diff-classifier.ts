@@ -71,12 +71,8 @@ export const classify = (input: DiffClassifierInput): ClassificationResult => {
   const changedKeys: string[] = [];
 
   for (const [path, afterValue] of afterLeaves) {
-    // POEditor exports an untranslated term as an empty string (once the
-    // project's Fallback Language is unset) rather than omitting it. An
-    // empty string here means "no translation yet", not "translation is
-    // now blank" or "key removed" -- skip it so a run with many
-    // still-untranslated terms never overwrites or deletes existing
-    // content based on their absence of a translation.
+    // '' means "not yet translated in POEditor", never a real value (see
+    // research.md's fallback-language Decision).
     if (afterValue === '') {
       continue;
     }
@@ -110,31 +106,14 @@ export const classify = (input: DiffClassifierInput): ClassificationResult => {
 };
 
 /**
- * Produces the nested JSON that should actually be written to the
- * repository after a pull -- `before` with `after`'s real (non-empty)
- * values applied over it, recursively. This is the write-side counterpart
- * to `classify`'s read-side skip rule: `classify` only decides what to
- * *report* (an empty `after` leaf is never a change or an addition), and
- * this function is what makes that decision hold at the byte level too. The
- * raw `after` export must never be written directly -- it can carry empty
- * strings for every not-yet-translated term, which would silently blank
- * existing translations the moment any other key in the same file actually
- * changed (see `research.md`'s "POEditor の未翻訳キーは export の空文字列で判定し、
- * fallback言語には頼らない" Decision for the incident this fixes).
+ * The write-side counterpart to `classify`'s read-side skip rule: `before`
+ * with `after`'s non-empty leaves applied over it, recursively. Writing the
+ * raw `after` export instead would blank existing translations wherever a
+ * term is still untranslated (see research.md's fallback-language Decision).
  *
- * - A leaf present in `after` with a non-empty value always wins (new or
- *   changed content).
- * - A leaf present in `after` as `''` keeps `before`'s existing value if
- *   there was one, and is otherwise omitted (nothing to add yet).
- * - A leaf genuinely absent from `after` (not merely empty) is dropped --
- *   this only happens when POEditor's term itself was deleted, matching
- *   `classify`'s `removedKeys`.
- * - A nested object that is brand new in `after` (absent from `before`) but
- *   whose every leaf turned out to be `''` merges down to `{}` and is
- *   omitted entirely, for the same reason a single new-but-empty leaf is:
- *   there is nothing real to add yet. Keeping an empty object would still
- *   change the key set with no corresponding entry in `classify`'s
- *   `addedKeys` -- exactly the mismatch this function exists to prevent.
+ * A newly-added nested object whose every leaf is `''` is omitted rather
+ * than kept as `{}`, so it never changes the key set without a matching
+ * entry in `classify`'s `addedKeys`.
  */
 export const mergeTranslations = (
   before: Readonly<Record<string, unknown>>,
