@@ -650,7 +650,7 @@ the restored page's status. Independent of B3/B4.
   - _Boundary: pagelinks Prisma extension (page-link.ts), link-target-state.ts, interfaces/backlink.ts_
   - _Depends: B1.2_
 
-- [ ] B5.2 Implement the reconcile-deleted sync operation
+- [x] B5.2 Implement the reconcile-deleted sync operation
   - Implement the reconcile op deferred from B1.5: reconcile a deleted page by checking its current DB
     state — still trashed → no-op (derived state shows trashed); truly gone → delegate to B5.1's
     `removeLinksForPages` (which removes the outbound rows and nulls inbound `toPage` → broken).
@@ -669,9 +669,11 @@ the restored page's status. Independent of B3/B4.
     delete-family events fire. The primitives stay unchunked on purpose — see design.md § *Batching is
     the caller's job* for the posture and for what would flip it
   - Done when unit tests show reconcile no-ops a trashed page and nulls inbound `toPage` for a
-    permanently-gone page, a delete landing while an upsert is pending ends in the reconciled
-    state rather than a re-created row, and the op issues one `removeLinksForPages` call per event
-    payload rather than an accumulated id list
+    permanently-gone page, and the op issues one `removeLinksForPages` call per event payload
+    rather than an accumulated id list. The pending-upsert criterion is an **integration**
+    assertion instead (`page-link-service-handlers.integ.ts`) — against a mocked prisma a unit
+    test can only show that the two calls happened, not that the rows ended up settled, and
+    "rather than a re-created row" is a claim about the stored rows
   - _Requirements: 3.3, 3.5, 6.1, 6.2_
   - _Boundary: page-link-sync_
   - _Depends: B5.1_
