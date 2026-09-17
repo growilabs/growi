@@ -35,6 +35,9 @@
 
     :global(.page-list-meta) {
       font-size: 0.9em;
+      // Restore muted meta color that theme apply-colors used to set via
+      // --color-page-list-group-item-meta (gray-500) before themes were removed.
+      color: var(--bs-secondary-color);
 
       > span {
         margin-right: 0.3rem;
@@ -42,6 +45,12 @@
 
       i {
         margin-right: 2px;
+      }
+
+      :global(.material-symbols-outlined) {
+        font-size: 1.15em;
+        line-height: 1;
+        vertical-align: text-bottom;
       }
 
       :global(.seen-users-count) {
