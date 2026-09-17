@@ -85,7 +85,11 @@ describe('check-fixture-drift.checkFixtureDrift', () => {
 
     expect(result).toEqual({ checked: 1, drift: [], unchecked: [] });
     expect(calls).toEqual([
-      { method: 'get', path: 'issues/1/comments', params: {} },
+      {
+        method: 'get',
+        path: 'repos/growilabs/growi/issues/1/comments',
+        params: {},
+      },
     ]);
   });
 
@@ -209,7 +213,11 @@ describe('check-fixture-drift.checkFixtureDrift', () => {
     const result = await checkFixtureDrift(ghApi, fixturesDir);
 
     expect(calls).toEqual([
-      { method: 'getAll', path: 'issues/1/comments', params: {} },
+      {
+        method: 'getAll',
+        path: 'repos/growilabs/growi/issues/1/comments',
+        params: {},
+      },
     ]);
     expect(result).toEqual({ checked: 1, drift: [], unchecked: [] });
   });
@@ -233,7 +241,11 @@ describe('check-fixture-drift.checkFixtureDrift', () => {
 
     expect(result).toEqual({ checked: 1, drift: [], unchecked: [] });
     expect(calls).toEqual([
-      { method: 'get', path: 'pulls/1/files', params: {} },
+      {
+        method: 'get',
+        path: 'repos/growilabs/growi/pulls/1/files',
+        params: {},
+      },
     ]);
   });
 });

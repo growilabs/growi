@@ -16,7 +16,7 @@ describe('parseMetaSource', () => {
       const text = readFixture('api/commits/0d1a319a-pulls.json.meta.md');
       expect(parseMetaSource(text)).toEqual({
         kind: 'real-checkable',
-        path: 'commits/0d1a319a106b2a791e883170782e856f88b0e178/pulls',
+        path: 'repos/growilabs/growi/commits/0d1a319a106b2a791e883170782e856f88b0e178/pulls',
         params: {},
         paginate: false,
       });
@@ -26,7 +26,7 @@ describe('parseMetaSource', () => {
       const text = readFixture('api/issues/11821-comments.json.meta.md');
       expect(parseMetaSource(text)).toEqual({
         kind: 'real-checkable',
-        path: 'issues/11821/comments',
+        path: 'repos/growilabs/growi/issues/11821/comments',
         params: {},
         paginate: true,
       });
@@ -38,7 +38,7 @@ describe('parseMetaSource', () => {
       );
       expect(parseMetaSource(text)).toEqual({
         kind: 'real-checkable',
-        path: 'issues',
+        path: 'repos/growilabs/growi/issues',
         params: {
           state: 'all',
           labels: 'flaky/confirmed',
@@ -53,10 +53,49 @@ describe('parseMetaSource', () => {
       const text = readFixture('api/pulls/11919-files.json.meta.md');
       expect(parseMetaSource(text)).toEqual({
         kind: 'real-checkable',
-        path: 'pulls/11919/files',
+        path: 'repos/growilabs/growi/pulls/11919/files',
         params: {},
         paginate: true,
       });
+    });
+
+    it('always returns a path that starts with the repos/growilabs/growi/ prefix, for every cataloged real-checkable fixture (task 1 catalog: 18 real-checkable fixtures) — regression test for the dropped-prefix bug found during task 4.1 review', () => {
+      // Without this prefix, downstream `gh api -X GET <path>` calls resolve
+      // against the wrong GitHub route: e.g. a path of `issues` (missing the
+      // `repos/growilabs/growi/` prefix) hits the *global*
+      // "issues assigned to the authenticated user" endpoint instead of this
+      // repo's issue list, returns 200 with unrelated data, and gets
+      // silently recorded as "checked, no drift" without ever validating
+      // anything against the fixture's real source.
+      const realCheckableFixtures = [
+        'api/commits/0d1a319a-pulls.json.meta.md',
+        'api/commits/807c3628-pulls.json.meta.md',
+        'api/issues/11821-comments.json.meta.md',
+        'api/issues/11821-issue.json.meta.md',
+        'api/issues/11823-comments.json.meta.md',
+        'api/issues/11823-events.json.meta.md',
+        'api/issues/11900-comments.json.meta.md',
+        'api/issues/11900-issue.json.meta.md',
+        'api/issues/11914-comments.json.meta.md',
+        'api/issues/11914-events.json.meta.md',
+        'api/issues/fetch-flaky-issues-11800-comments.json.meta.md',
+        'api/issues/fetch-flaky-issues-11862-comments.json.meta.md',
+        'api/issues/fetch-flaky-issues-11903-comments.json.meta.md',
+        'api/issues/fetch-flaky-issues-confirmed-page1.json.meta.md',
+        'api/issues/fetch-flaky-issues-observing-page1.json.meta.md',
+        'api/pulls/11886-files.json.meta.md',
+        'api/pulls/11919-files.json.meta.md',
+        'api/pulls/11920-files.json.meta.md',
+      ];
+
+      for (const relativePath of realCheckableFixtures) {
+        const text = readFixture(relativePath);
+        const result = parseMetaSource(text);
+        expect(result.kind).toBe('real-checkable');
+        if (result.kind === 'real-checkable') {
+          expect(result.path).toMatch(/^repos\/growilabs\/growi\//);
+        }
+      }
     });
   });
 

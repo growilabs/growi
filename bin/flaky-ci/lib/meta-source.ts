@@ -53,6 +53,19 @@ export type MetaSource =
 const REAL_CHECKABLE_COMMAND_RE =
   /`gh api -X GET repos\/growilabs\/growi\/([^`]+)`/;
 
+/**
+ * The fixed prefix `REAL_CHECKABLE_COMMAND_RE`'s capture group deliberately
+ * excludes (so the regex itself stays readable). It must be prepended back
+ * onto `parseCommandTail`'s `path` before returning a `MetaSource`, because
+ * every downstream consumer (`lib/gh.ts`'s `GhApi.get`/`getAll`, via
+ * `scripts/check-fixture-drift.ts`) passes `path` straight into
+ * `gh api -X GET <path>` — a prefix-less path like `issues` resolves to a
+ * different, unrelated GitHub endpoint (the authenticated user's own issues,
+ * not this repo's) instead of 404ing, so the mistake fails silently rather
+ * than loudly. See task 2.1 regression fix (found during task 4.1 review).
+ */
+const REPO_API_PATH_PREFIX = 'repos/growilabs/growi/';
+
 /** `**Synthetic.**` at the start of a bullet line (Requirement 1.4). */
 const SYNTHETIC_MARKER_RE = /^-\s+\*\*Synthetic\.\*\*/m;
 
@@ -106,7 +119,7 @@ const parseCommandTail = (commandTail: string): RealCheckableFields | null => {
     return null;
   }
 
-  return { path, params, paginate };
+  return { path: `${REPO_API_PATH_PREFIX}${path}`, params, paginate };
 };
 
 /**
