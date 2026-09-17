@@ -1,163 +1,293 @@
 {
-  "Show": "표시",
-  "View": "보기",
-  "Hide": "숨기기",
-  "Add": "추가",
-  "Insert": "삽입",
-  "Reset": "재설정",
-  "Sign out": "로그아웃",
-  "New": "새로 만들기",
-  "Send": "전송",
-  "Clear": "지우기",
-  "Delete": "삭제",
-  "Cancel": "취소",
-  "Close": "닫기",
-  "Confirm": "확인",
-  "Create": "생성",
-  "Created": "생성됨",
-  "Description": "설명",
-  "Done": "완료",
-  "Edit": "편집",
-  "Email": "이메일",
-  "Error occurred": "오류 발생",
-  "Help": "도움말",
-  "Name": "이름",
-  "Password": "비밀번호",
-  "Update": "업데이트",
-  "User": "사용자",
-  "UserGroup": "사용자 그룹",
-  "V5 Page Migration": "V5 호환성으로 변환",
-  "Warning": "경고",
-  "add": "추가",
-  "eg": "예:",
-  "username": "사용자 이름",
+  "Show": "Show",
+  "View": "View",
+  "Hide": "Hide",
+  "Add": "Add",
+  "Insert": "Insert",
+  "Reset": "Reset",
+  "Sign out": "Logout",
+  "New": "New",
+  "Send": "Send",
+  "Clear": "Clear",
+  "Delete": "Delete",
+  "Cancel": "Cancel",
+  "Close": "Close",
+  "Confirm": "Confirm",
+  "Create": "Create",
+  "Created": "Created",
+  "Description": "Description",
+  "Done": "Done",
+  "Edit": "Edit",
+  "Email": "Email",
+  "Error occurred": "Error occurred",
+  "Help": "Help",
+  "Name": "Name",
+  "Password": "Password",
+  "Update": "Update",
+  "User": "User",
+  "UserGroup": "UserGroup",
+  "V5 Page Migration": "Convert To V5 Compatibility",
+  "Warning": "Warning",
+  "add": "Add",
+  "eg": "e.g.",
+  "username": "Username",
   "meta": {
-    "display_name": "한국어"
+    "display_name": "English"
   },
   "toaster": {
-    "add_succeeded": "{{target}} 추가 성공",
-    "create_failed": "{{target}} 생성 실패",
-    "create_succeeded": "{{target}} 생성 성공",
-    "delete_succeeded": "{{target}} 삭제 성공",
-    "remove_share_link": "{{count}}개 공유 링크 제거 성공",
-    "remove_share_link_success": "{{shareLinkId}} 제거 성공",
-    "update_failed": "{{target}} 업데이트 실패",
-    "update_successed": "{{target}} 업데이트 성공"
+    "add_succeeded": "Succeeded to add {{target}}",
+    "create_failed": "Failed to create {{target}}",
+    "create_succeeded": "Succeeded to create {{target}}",
+    "delete_succeeded": "Succeeded to delete {{target}}",
+    "remove_share_link": "Succeeded to remove {{count}} share links",
+    "remove_share_link_success": "Succeeded to remove {{shareLinkId}}",
+    "update_failed": "Failed to update {{target}}",
+    "update_successed": "Succeeded to update {{target}}"
   },
   "alert": {
-    "siteUrl_is_not_set": "'사이트 URL'이 설정되지 않았습니다. {{link}}에서 설정하십시오.",
-    "please_enable_mailer": "먼저 메일러를 설정하십시오.",
-    "password_reset_please_enable_mailer": "먼저 메일러를 설정하십시오.",
-    "email_is_already_in_use": "이 이메일 주소는 이미 사용 중입니다."
+    "siteUrl_is_not_set": "'Site URL' is NOT set. Set it from the {{link}}",
+    "please_enable_mailer": "Please setup mailer first.",
+    "password_reset_please_enable_mailer": "Please setup mailer first.",
+    "email_is_already_in_use": "The email address is already in use."
   },
   "headers": {
-    "app_settings": "앱 설정"
+    "app_settings": "App Settings"
   },
   "header_search_box": {
     "label": {
-      "All pages": "모든 페이지",
-      "This tree": "이 트리"
+      "All pages": "All pages",
+      "This tree": "This tree"
     },
     "item_label": {
-      "All pages": "모든 페이지",
-      "This tree": "이 트리의 하위 항목만"
+      "All pages": "All pages",
+      "This tree": "Only children of this tree"
     }
   },
   "search_method_menu_item": {
-    "search_in_all": "모두 검색",
-    "only_children_of_this_tree": "이 트리의 하위 항목만",
-    "exact_mutch": "정확히 일치"
+    "search_in_all": "Search in all",
+    "only_children_of_this_tree": "Only children of this tree",
+    "exact_mutch": "Exact match"
   },
   "share_links": {
-    "Share Link": "공유 링크",
-    "Page Path": "페이지 경로",
-    "expire": "만료",
-    "description": "설명"
+    "Share Link": "Share Link",
+    "Page Path": "Page Path",
+    "expire": "Expiration",
+    "description": "Description"
   },
   "in_app_notification": {
-    "notification_list": "앱 내 알림 목록",
-    "see_all": "모두 보기",
-    "no_notification": "알림이 없습니다.",
-    "all": "모두",
-    "unopend": "읽지 않음",
-    "mark_all_as_read": "모두 읽음으로 표시",
-    "no_unread_messages": "읽지 않은 메시지 없음",
-    "only_unread": "읽지 않은 메시지만",
-    "news": "공지사항",
-    "notifications": "알림",
-    "filter_all": "전체",
-    "no_news": "공지사항이 없습니다",
-    "view_detail": "자세히 보기"
+    "notification_list": "In-App Notification List",
+    "see_all": "See All",
+    "no_notification": "You don't have any notificatios.",
+    "all": "All",
+    "unopend": "Unread",
+    "mark_all_as_read": "Mark all as read",
+    "no_unread_messages": "no_unread_messages",
+    "only_unread": "Only unread",
+    "news": "News",
+    "notifications": "Notifications",
+    "filter_all": "All",
+    "no_news": "No news available",
+    "view_detail": "View details"
   },
   "personal_dropdown": {
-    "home": "홈",
-    "settings": "설정",
-    "color_mode": "색상 모드",
-    "sidebar_mode": "사이드바 모드",
-    "sidebar_mode_editor": "편집기 사이드바 모드",
-    "use_os_settings": "OS 설정 사용",
-    "feedback": "피드백"
+    "home": "Home",
+    "settings": "Settings",
+    "color_mode": "Color mode",
+    "sidebar_mode": "Sidebar mode",
+    "sidebar_mode_editor": "Sidebar mode on editor",
+    "use_os_settings": "Use OS settings",
+    "feedback": "Feedback"
   },
   "create_page_dropdown": {
-    "new_page": "새 페이지 생성",
-    "open_page_create_modal": "새 페이지 생성 모달 열기",
+    "new_page": "Create New Page",
+    "open_page_create_modal": "Open new page create modal",
     "todays": {
-      "desc": "오늘의 메모 생성",
-      "memo": "메모"
+      "desc": "Create today's memo",
+      "memo": "memo"
     },
     "template": {
-      "desc": "템플릿 페이지 생성/편집",
-      "children": "하위 항목용 템플릿",
-      "descendants": "하위 항목용 템플릿"
+      "desc": "Create/Edit template page",
+      "children": "Template for children",
+      "descendants": "Template for descendants"
     }
   },
   "copy_to_clipboard": {
-    "Copy to clipboard": "클립보드에 복사",
-    "Page path": "페이지 경로",
-    "Page URL": "페이지 URL",
-    "Permanent link": "영구 링크",
-    "Page path and permanent link": "페이지 경로 및 영구 링크",
-    "Markdown link": "마크다운 링크",
-    "Append params": "매개변수 추가"
+    "Copy to clipboard": "Copy to clipboard",
+    "Page path": "Page path",
+    "Page URL": "Page URL",
+    "Markdown URL": "Markdown URL (.md)",
+    "Permanent link": "Permanent link",
+    "Page path and permanent link": "Page path and permanent link",
+    "Markdown link": "Markdown link",
+    "Append params": "Append params"
   },
   "crop_image_modal": {
-    "image_crop": "이미지 자르기",
-    "crop": "자르기",
-    "save": "저장",
-    "cancel": "취소"
+    "image_crop": "Image Crop",
+    "crop": "Crop",
+    "save": "Save",
+    "cancel": "Cancel"
   },
   "handsontable_modal": {
-    "title": "테이블 편집",
-    "data_import": "데이터 가져오기",
-    "save": "저장",
-    "cancel": "취소",
-    "done": "완료",
+    "title": "Edit Table",
+    "data_import": "Data Import",
+    "save": "Save",
+    "cancel": "Cancel",
+    "done": "Done",
     "data_import_form": {
-      "select_data_format": "데이터 형식 선택",
-      "import_data": "데이터 가져오기",
-      "paste_table_data": "테이블 데이터 붙여넣기",
-      "parse_error": "구문 분석 오류",
-      "cancel": "취소",
-      "import": "가져오기"
+      "select_data_format": "Select Data Format",
+      "import_data": "Import Data",
+      "paste_table_data": "Paste table data",
+      "parse_error": "Parse Error",
+      "cancel": "Cancel",
+      "import": "Import"
     }
   },
   "not_found_page": {
-    "page_not_exist": "이 페이지는 존재하지 않습니다."
+    "page_not_exist": "This page does not exist."
   },
   "g2g_data_transfer": {
-    "tab": "데이터 전송",
-    "data_transfer": "데이터 전송",
-    "transfer_data_to_this_growi": "다른 GROWI에서 이 GROWI로 데이터 전송",
-    "publish_transfer_key": "전송 키 게시",
-    "transfer_key_limit": "전송 키는 발급 후 1시간 동안 유효합니다.",
-    "once_transfer_key_used": "전송 키가 전송에 사용되면 다른 전송에는 사용할 수 없습니다.",
-    "transfer_to_growi_cloud": "자세한 내용은 <a href='{{documentationUrl}}en/admin-guide/management-cookbook/g2g-transfer.html'>여기를 클릭하십시오.</a>"
+    "tab": "Data transfer",
+    "data_transfer": "Data Transfer",
+    "transfer_data_to_this_growi": "Transfer data from another GROWI to this GROWI",
+    "publish_transfer_key": "Publish transfer key",
+    "transfer_key_limit": "Transfer keys are valid for 1 hour after issuance.",
+    "once_transfer_key_used": "Once the transfer key is used for transfer, it cannot be used for any other transfer.",
+    "transfer_to_growi_cloud": "For more details, please click <a href='{{documentationUrl}}en/admin-guide/management-cookbook/g2g-transfer.html'>here.</a>"
+  },
+  "accesstoken_scopes_desc": {
+    "read": {
+      "all": "Grants permission to view all content.",
+      "admin": {
+        "all": "Grants permission to view admin features.",
+        "top": "Grants permission to view Wiki management top.",
+        "app": "Grants permission to view app settings.",
+        "ai": "Grants permission to view AI settings.",
+        "security": "Grants permission to view security settings.",
+        "markdown": "Grants permission to view markdown settings.",
+        "customize": "Grants permission to view customization settings.",
+        "import_data": "Grants permission to view data import settings.",
+        "export_data": "Grants permission to view data archive settings.",
+        "data_transfer": "Grants permission to view data transfer settings.",
+        "external_notification": "Grants permission to view external notification settings.",
+        "slack_integration": "Grants permission to view Slack integration settings.",
+        "legacy_slack_integration": "Grants permission to view legacy Slack integration settings.",
+        "user_management": "Grants permission to view user management.",
+        "user_group_management": "Grants permission to view user group management.",
+        "audit_log": "Grants permission to view audit logs.",
+        "plugin": "Grants permission to view plugin settings.",
+        "full_text_search": "Grants permission to view full text search management."
+      },
+      "user_settings": {
+        "all": "Grants permission to view user settings.",
+        "info": "Grants permission to view user information.",
+        "external_account": "Grants permission to view external accounts.",
+        "password": "Grants permission to view password settings.",
+        "api": {
+          "all": "Grants permission to view API settings.",
+          "api_token": "Grants permission to view API token settings.",
+          "access_token": "Grants permission to view access token settings."
+        },
+        "in_app_notification": "Grants permission to view in-app notification settings.",
+        "other": "Grants permission to view other settings."
+      },
+      "features": {
+        "all": "Grants permission to view features.",
+        "ai": "Grants permission to view AI assistant features.",
+        "page": "Grants permission to view page features.",
+        "share_link": "Grants permission to view share link features.",
+        "bookmark": "Grants permission to view bookmark features.",
+        "attachment": "Grants permission to view attachment features.",
+        "page_bulk_export": "Grants permission to view page bulk export features.",
+        "in_app_notification": "Grants permission to view in-app notification features.",
+        "user": "Grants permission to view user information features.",
+        "user_group": "Grants permission to view user group member features."
+      }
+    },
+    "write": {
+      "all": "Grants permission to edit all content.",
+      "admin": {
+        "all": "Grants permission to edit admin features.",
+        "top": "Grants permission to edit Wiki management top.",
+        "app": "Grants permission to edit app settings.",
+        "ai": "Grants permission to edit AI settings.",
+        "security": "Grants permission to edit security settings.",
+        "markdown": "Grants permission to edit markdown settings.",
+        "customize": "Grants permission to edit customization settings.",
+        "import_data": "Grants permission to edit data import settings.",
+        "export_data": "Grants permission to edit data archive settings.",
+        "data_transfer": "Grants permission to edit data transfer settings.",
+        "external_notification": "Grants permission to edit external notification settings.",
+        "slack_integration": "Grants permission to edit Slack integration settings.",
+        "legacy_slack_integration": "Grants permission to edit legacy Slack integration settings.",
+        "user_management": "Grants permission to edit user management.",
+        "user_group_management": "Grants permission to edit user group management.",
+        "audit_log": "Grants permission to edit audit logs.",
+        "plugin": "Grants permission to edit plugin settings.",
+        "full_text_search": "Grants permission to edit full text search management."
+      },
+      "user_settings": {
+        "all": "Grants permission to edit user settings.",
+        "info": "Grants permission to edit user information.",
+        "external_account": "Grants permission to edit external accounts.",
+        "password": "Grants permission to edit password settings.",
+        "api": {
+          "all": "Grants permission to edit API settings.",
+          "api_token": "Grants permission to edit API token settings.",
+          "access_token": "Grants permission to edit access token settings."
+        },
+        "in_app_notification": "Grants permission to edit in-app notification settings.",
+        "other": "Grants permission to edit other settings."
+      },
+      "features": {
+        "all": "Grants permission to edit features.",
+        "ai": "Grants permission to edit AI assistant features.",
+        "page": "Grants permission to edit page features.",
+        "share_link": "Grants permission to edit share link features.",
+        "bookmark": "Grants permission to edit bookmark features.",
+        "attachment": "Grants permission to edit attachment features.",
+        "page_bulk_export": "Grants permission to edit page bulk export features.",
+        "in_app_notification": "Grants permission to edit in-app notification features.",
+        "user": "Grants permission to edit user information features.",
+        "user_group": "Grants permission to edit user group member features."
+      }
+    }
+  },
+  "growi-vault": {
+    "reconcile": {
+      "section": {
+        "title": "Reconcile"
+      },
+      "rejected": {
+        "invalid-target": "Invalid target path specified.",
+        "bootstrap-not-done": "Vault is not ready. Please wait for bootstrap to complete and try again.",
+        "page-count-exceeds-user-limit": "The target contains too many pages. Please narrow the scope or ask an administrator to run the reconcile.",
+        "page-count-exceeds-admin-limit": "The target contains too many pages. Please narrow the scope or consider using VAULT_BOOTSTRAP_ON_START=force for a full re-bootstrap.",
+        "user-concurrency-limit": "You already have a reconcile in progress. Please wait for it to complete before starting another.",
+        "system-concurrency-limit": "The system reconcile limit has been reached. Please wait for a reconcile to complete before starting another."
+      },
+      "accepted": {
+        "message": "Reconcile started successfully."
+      },
+      "target-type": {
+        "legend": "Target Type",
+        "page": "Page (single page only)",
+        "sub-tree": "Sub-tree (page and all descendants)"
+      },
+      "target-path": {
+        "label": "Target Path"
+      },
+      "submit": {
+        "submitting": "Submitting…",
+        "start": "Start Reconcile"
+      },
+      "cancel": "Cancel"
+    }
   },
   "username_suggestion": {
-    "active_user": "활성 사용자",
-    "inactive_user": "비활성 사용자"
+    "active_user": "Active User",
+    "inactive_user": "Inactive User"
   },
   "table_action": {
-    "edit": "편집"
+    "edit": "Edit"
   }
 }

@@ -1,1149 +1,1162 @@
 {
   "meta": {
-    "display_name": "Français"
+    "display_name": "English"
   },
-  "Help": "Aide",
-  "View": "Voir",
-  "Edit": "Modifier",
-  "Delete": "Supprimer",
-  "delete_all": "Tout supprimer",
-  "Duplicate": "Dupliquer",
-  "PathRecovery": "Récupération de chemin",
-  "Copy": "Copier",
-  "preview": "Prévisualiser",
-  "desktop": "Ordinateur",
-  "phone": "Téléphone",
-  "tablet": "Tablette",
-  "Click to copy": "Cliquer pour copier",
-  "Rename": "Renommer",
-  "Move/Rename": "Déplacer",
-  "Redirected": "Redirigé",
-  "Unlinked": "Délié",
-  "unlink_redirection": "Délier la redirection",
-  "Done": "Terminer",
-  "Cancel": "Annuler",
-  "Create": "Créer",
+  "Help": "Help",
+  "view": "View",
+  "Edit": "Edit",
+  "Delete": "Delete",
+  "delete_all": "Delete all",
+  "Duplicate": "Duplicate",
+  "PathRecovery": "Path recovery",
+  "Copy": "Copy",
+  "preview": "Preview",
+  "desktop": "Desktop",
+  "phone": "Smartphone",
+  "tablet": "Tablet",
+  "Click to copy": "Click to copy",
+  "Rename": "Rename",
+  "Move/Rename": "Move/Rename",
+  "Redirected": "Redirected",
+  "Unlinked": "Unlinked",
+  "unlink_redirection": "Unlink redirection",
+  "Done": "Done",
+  "Cancel": "Cancel",
+  "Create": "Create",
   "Description": "Description",
-  "Admin": "Administration",
-  "administrator": "Administrateur",
-  "Tag": "Étiquette",
-  "Tags": "Étiquettes",
-  "Close": "Fermer",
-  "Shortcuts": "Raccourcis",
-  "Custom Sidebar": "Navigation latérale",
+  "Admin": "Admin",
+  "administrator": "Admin",
+  "Tag": "Tag",
+  "Tags": "Tags",
+  "Close": "Close",
+  "Shortcuts": "Shortcuts",
+  "Custom Sidebar": "Custom Sidebar",
   "eg": "e.g.",
-  "add": "Ajouter",
-  "Undo": "Annuler",
+  "add": "Add",
+  "Undo": "Undo",
   "Article": "Article",
-  "Page Path": "Chemin de page",
-  "Category": "Catégorie",
-  "User": "Utilisateur",
-  "account_id": "Identifiant de compte",
-  "Update": "Enregistrer",
-  "Update Page": "Mettre à jour la page",
-  "Error": "Erreur",
-  "Warning": "Avertissement",
-  "Sign in": "Connexion",
-  "Sign in with External auth": "Se connecter avec {{signin}}",
-  "Sign up is here": "Inscription",
-  "Sign in is here": "Connexion",
-  "Sign up": "S'inscrire",
-  "or": "ou",
-  "Sign up with Google Account": "S'inscrire avec Google",
-  "Sign in with Google Account": "Se connecter avec Google",
-  "Sign up with this Google Account": "S'inscrire avec ce compte Google",
-  "Select": "Sélectionner",
-  "Required": "Requis",
-  "Example": "Exemple",
+  "Page Path": "Page path",
+  "Category": "Category",
+  "User": "User",
+  "account_id": "Account Id",
+  "Update": "Update",
+  "Update Page": "Update Page",
+  "Error": "Error",
+  "Warning": "Warning",
+  "Sign in": "Sign in",
+  "Sign in with External auth": "Sign in with {{signin}}",
+  "Sign up is here": "Sign up",
+  "Sign in is here": "Sign in",
+  "Sign up": "Sign up",
+  "or": "or",
+  "Sign up with Google Account": "Sign up with Google Account",
+  "Sign in with Google Account": "Sign in with Google Account",
+  "Sign up with this Google Account": "Sign up with this Google Account",
+  "Select": "Select",
+  "Required": "Required",
+  "Example": "Example",
   "Taro Yamada": "John Doe",
-  "List View": "Liste",
-  "Timeline View": "Chronologie",
-  "History": "Historique",
-  "attachment_data": "Pièces jointes",
-  "No_attachments_yet": "Aucune pièce jointe.",
-  "Presentation Mode": "Présentation",
-  "Not available for guest": "Indisponible pour les invités",
-  "Not available in this version": "Indisponible dans cette version",
-  "Not available for read only user": "Indisponible pour les utilisateurs en lecture seule",
-  "Not available when \"anyone with the link\" is selected": "Si \"Tous les utilisateurs disposant du lien\" est sélectionné, la portée ne peut pas être modifiée",
-  "No users have liked this yet": "Aucun utilisateur n'a aimé cette page.",
-  "No users have liked this yet.": "Aucun utilisateur n'a aimé cette page.",
-  "No users have bookmarked yet": "Aucun utilisateur n'a mis en favoris cette page",
-  "Create Archive Page": "Créer page d'archive",
-  "Create Sidebar Page": "Créer la page <strong>/Sidebar</strong>",
-  "File type": "Type de fichier",
-  "Target page": "Page cible",
-  "Include Attachment File": "Inclure le fichier de pièces jointes",
-  "Include Comment": "Inclure les commentaires",
-  "Include Subordinated Page": "Inclure les pages subordonnées",
-  "Include Subordinated Target Page": "inclure {{target}}",
-  "All Subordinated Page": "Toutes les pages subordonnées",
-  "Specify Hierarchy": "Spécifier hiérarchie",
-  "Submitted the request to create the archive": "Création d'archive en cours",
-  "username": "Nom d'utilisateur",
-  "Created": "Crée le",
-  "Last updated": "Modifié le",
-  "Share": "Partager",
-  "Markdown Link": "Lien Markdown",
-  "Create/Edit Template": "Créer/Modifier page modèle",
-  "Go to this version": "Voir cette version",
-  "View diff": "Voir le diff",
-  "No diff": "Aucune différence",
-  "Latest": "Dernière version",
-  "User ID": "Identifiant utilisateur",
-  "User Settings": "Paramètres utilisateur",
-  "User Information": "Mon compte",
-  "User Activation": "Activation utilisateur",
-  "Basic Info": "Informations du compte",
-  "Name": "Nom",
-  "Email": "Adresse courriel",
-  "Language": "Langue",
-  "English": "Anglais",
-  "Japanese": "Japonais",
-  "Set Profile Image": "Photo de profil",
-  "Upload Image": "Photo personalisée",
-  "Current Image": "Photo actuelle",
-  "Delete Image": "Supprimer photo",
-  "Delete this image?": "Supprimer cette photo?",
-  "Updated": "Modifié",
-  "Upload new image": "Téléverser une photo",
-  "Connected": "Connecté",
-  "Loading": "Chargement...",
-  "Disclose E-mail": "Divulguer adresse courriel",
-  "Slack Member ID": "ID de membre Slack",
-  "page exists": "cette page est déjà existante",
-  "Error occurred": "Une erreur est survenue",
-  "Successfully updated": "Mise à jour réussie",
-  "Failed to update": "Échec de la mise à jour",
-  "Input page name": "Nom de la page",
-  "Input page name (optional)": "Nom de la page (optionnel)",
-  "Input parent page path": "Chemin de la page parent",
-  "New Page": "Nouvelle page",
-  "Create under": "Créer la page sous:",
-  "V5 Page Migration": "Convertir vers la V5",
-  "GROWI.5.0_new_schema": "Nouveau schéma GROWI.5.0",
-  "See_more_detail_on_new_schema": "Plus de détails sur <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html#about-the-new-v5-compatible-format' target='_blank'>{{title}}</a><span class='growi-custom-icons'>external_link</span> ",
-  "external_account_management": "Gestion des comptes externes",
-  "UserGroup": "Groupe utilisateur",
-  "Basic Settings": "Paramètres de base",
-  "The contents entered here will be shown in the header etc": "Le contenu entré ici sera visible dans l'en-tête",
-  "Browsing of this page is restricted": "Le contenu de cette page est restreint.",
-  "Forbidden": "Accès interdit",
-  "Public": "Tout le monde",
-  "Anyone with the link": "Tous les utilisateurs disposant du lien",
-  "Specified users only": "Utilisateurs spécifiés",
-  "Only me": "Seulement moi",
-  "Only inside the group": "Utilisateurs du groupe",
-  "page_list": "Pages enfants",
-  "comments": "Commentaires",
-  "Reselect the group": "Resélectionner ce groupe",
-  "Shareable link": "Lien partageable",
-  "The whitelist of registration permission E-mail address": "Les adresses courriel permises lors de l'inscription",
-  "Add tags for this page": "Ajouter des étiquettes",
-  "tag_list": "Étiquettes",
-  "popular_tags": "Étiquettes fréquentes",
-  "Check All tags": "Toutes les étiquettes",
-  "You have no tag, You can set tags on pages": "Aucune étiquette existante.",
-  "Show latest": "Voir le plus récent",
-  "Load latest": "Charger le plus récent",
-  "edited this page": "à modifié cette page.",
-  "List Drafts": "Brouillons",
-  "Deleted Pages": "Pages supprimées",
-  "Disassociate": "Dissocier",
-  "No bookmarks yet": "Aucuns favoris",
-  "add_bookmark": "Ajouter aux favoris",
-  "remove_bookmark": "Retirer des favoris",
-  "wide_view": "Affichage large",
-  "Recent Changes": "Modifications récentes",
-  "Page Tree": "Arborescence",
-  "Bookmarks": "Favoris",
+  "List View": "List",
+  "Timeline View": "Timeline",
+  "History": "History",
+  "attachment_data": "Attachment Data",
+  "No_attachments_yet": "No attachments yet.",
+  "Presentation Mode": "Presentation",
+  "Not available for guest": "Not available for guest",
+  "Not available in this version": "Not available in this version",
+  "Not available for read only user": "Not available for read only user",
+  "Not available when \"anyone with the link\" is selected": "If \"anyone with the link\" is selected, the scope cannot be overridden.",
+  "No users have liked this yet": "No users have liked this yet",
+  "No users have liked this yet.": "No users have liked this yet.",
+  "No users have bookmarked yet": "No users have bookmarked yet",
+  "Create Archive Page": "Create Archive Page",
+  "Create Sidebar Page": "Create <strong>/Sidebar</strong> Page",
+  "File type": "File type",
+  "Target page": "Target page",
+  "Include Attachment File": "Include Attachment File",
+  "Include Comment": "Include Comment",
+  "Include Subordinated Page": "Include Subordinated Page",
+  "Include Subordinated Target Page": "include {{target}}",
+  "All Subordinated Page": "All Subordinated Page",
+  "Specify Hierarchy": "Specify Hierarchy",
+  "Submitted the request to create the archive": "Submitted the request to create the archive",
+  "username": "Username",
+  "Created": "Created",
+  "Last updated": "Updated",
+  "Share": "Share",
+  "Markdown Link": "Markdown Link",
+  "Create/Edit Template": "Create/Edit template page",
+  "Go to this version": "View this version",
+  "View diff": "View diff",
+  "No diff": "No diff",
+  "Latest": "Latest",
+  "User ID": "User ID",
+  "User Settings": "User Settings",
+  "User Information": "User information",
+  "User Activation": "User Activation",
+  "Basic Info": "Basic info",
+  "Name": "Name",
+  "Email": "Email",
+  "Language": "Language",
+  "English": "English",
+  "Japanese": "Japanese",
+  "Set Profile Image": "Set profile image",
+  "Upload Image": "Upload image",
+  "Current Image": "Current image",
+  "Delete Image": "Delete Image",
+  "Delete this image?": "Delete this image?",
+  "Updated": "Updated",
+  "Upload new image": "Upload new image",
+  "Connected": "Connected",
+  "Loading": "Loading...",
+  "Disclose E-mail": "Disclose E-mail",
+  "Slack Member ID": "Slack Member ID",
+  "page exists": "this page already exists",
+  "Error occurred": "Error occurred",
+  "Successfully updated": "Successfully updated",
+  "Failed to update": "Failed to update",
+  "Input page name": "Input page name",
+  "Input page name (optional)": "Input page name (optional)",
+  "Input parent page path": "Input parent page path",
+  "New Page": "New page",
+  "Create under": "Create page under below:",
+  "V5 Page Migration": "Convert To V5 Compatibility",
+  "GROWI.5.0_new_schema": "GROWI.5.0 new schema",
+  "See_more_detail_on_new_schema": "See more detail on <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html#about-the-new-v5-compatible-format' target='_blank'>{{title}}</a> <span class='growi-custom-icons'>external_link</span> ",
+  "external_account_management": "External Account Management",
+  "UserGroup": "UserGroup",
+  "Basic Settings": "Basic Settings",
+  "The contents entered here will be shown in the header etc": "The contents entered here will be shown in the header etc",
+  "Forbidden": "Forbidden",
+  "Public": "Public",
+  "Anyone with the link": "Anyone with the link",
+  "Specified users only": "Specified users only",
+  "Only me": "Only me",
+  "Only inside the group": "Only inside the group",
+  "page_list": "Page List",
+  "comments": "Comments",
+  "Reselect the group": "Reselect the group",
+  "Shareable link": "Shareable link",
+  "The whitelist of registration permission E-mail address": "The whitelist of registration permission E-mail address",
+  "Add tags for this page": "Add tags for this page",
+  "tag_list": "Tag list",
+  "popular_tags": "Popular tags",
+  "Check All tags": "check all tags",
+  "You have no tag, You can set tags on pages": "You have no tag, You can set tags on pages",
+  "Show latest": "Show latest",
+  "Load latest": "Load latest",
+  "edited this page": "edited this page.",
+  "List Drafts": "Drafts",
+  "Deleted Pages": "Deleted Pages",
+  "Disassociate": "Disassociate",
+  "No bookmarks yet": "No bookmarks yet",
+  "add_bookmark": "Add to Bookmarks",
+  "remove_bookmark": "Remove from Bookmarks",
+  "wide_view": "Wide View",
+  "Recent Changes": "Recent Changes",
+  "Page Tree": "Page Tree",
+  "Bookmarks": "Bookmarks",
   "In-App Notification": "Notifications",
   "GROWI AI Agent": "GROWI AI Agent",
-  "original_path": "Chemin originel",
-  "new_path": "Nouveau chemin",
-  "duplicated_path": "Chemin dupliqué",
-  "Link sharing is disabled": "Le partage est désactivé",
-  "successfully_saved_the_page": "Page sauvegardée",
-  "you_can_not_create_page_with_this_name_or_hierarchy": "Vous ne pouvez pas créer de page avec ce nom ou cette hiérarchie de pages",
-  "not_allowed_to_see_this_page": "Vous ne pouvez pas voir cette page",
-  "Confirm": "Confirmer",
-  "Successfully requested": "Demande envoyée.",
+  "original_path": "Original path",
+  "new_path": "New path",
+  "duplicated_path": "Duplicated path",
+  "Link sharing is disabled": "Link sharing is disabled",
+  "successfully_saved_the_page": "Successfully saved the page",
+  "you_can_not_create_page_with_this_name_or_hierarchy": "You can not create page with this name or page hierarchy",
+  "not_allowed_to_see_this_page": "You cannot see this page",
+  "Confirm": "Confirm",
+  "Successfully requested": "Successfully requested.",
   "source": "Source",
   "input_validation": {
     "target": {
-      "page_name": "Nom de la page",
-      "folder_name": "Nom du dossier",
-      "field": "champ"
+      "page_name": "Page name",
+      "folder_name": "Folder name",
+      "field": "field"
     },
     "message": {
-      "error_message": "Des champs sont invalides",
-      "required": "'{{param}}' est requis",
-      "invalid_syntax": "La syntaxe de {{syntax}} est invalide.",
-      "title_required": "Titre requis.",
-      "field_required": "{{target}} est requis"
+      "error_message": "Some values ​​are incorrect",
+      "required": "'{{param}}' is required",
+      "invalid_syntax": "The syntax of {{syntax}} is invalid.",
+      "title_required": "Title is required.",
+      "field_required": "{{target}} is required"
     }
   },
   "not_creatable_page": {
-    "message": "Vous ne pouvez pas créer cette page dans ce chemin."
+    "message": "Page contents cannot be created in this path."
   },
   "custom_navigation": {
-    "no_pages_under_this_page": "Il n'y a aucune page sous celle-ci."
+    "no_pages_under_this_page": "There are no pages under this page."
   },
   "author_info": {
-    "created_at": "Crée le",
-    "created_by": "Créé par",
-    "last_revision_posted_at": "Dernière révision le",
-    "updated_by": "Mis à jour par"
+    "created_at": "Created at",
+    "created_by": "Created by",
+    "last_revision_posted_at": "Last revision posted at",
+    "updated_by": "Updated by"
   },
   "installer": {
-    "tab": "Créer compte",
-    "title": "Configuration",
-    "setup": "Configuration initiale",
-    "create_initial_account": "Créer un compte",
-    "initial_account_will_be_administrator_automatically": "Ce compte sera administrateur par défaut.",
-    "unavaliable_user_id": "Cet 'Identifiant utilisateur' est indisponible.",
-    "failed_to_install": "Échec de l'installation. Réessayer.",
-    "failed_to_login_after_install": "Connexion échouée. Redirection vers le formulaire de connexion..."
+    "tab": "Create account",
+    "title": "Installer",
+    "setup": "Setup",
+    "create_initial_account": "Create an initial account",
+    "initial_account_will_be_administrator_automatically": "The initial account will be administrator automatically.",
+    "unavaliable_user_id": "This 'User ID' is unavailable.",
+    "failed_to_install": "Failed to install GROWI. Please try again.",
+    "failed_to_login_after_install": "Failed to login after installation. Redirecting to the login form ..."
   },
   "breaking_changes": {
-    "v346_using_basic_auth": "Le protocole Basic Authentication <strong>ne sera plus disponible</strong>. Retirer les paramètres de %s"
+    "v346_using_basic_auth": "Basic Authentication currently in use will <strong>no longer be available</strong> in the near future. Remove settings from %s"
   },
   "page_register": {
-    "send_email": "Envoyer courriel",
+    "send_email": "Send email",
     "notice": {
-      "restricted": "Approbation requise.",
-      "restricted_defail": "Lorsque un administrateur aura approuvé votre accès, vous pourrez vous connecter."
+      "restricted": "Admin approval required.",
+      "restricted_defail": "Once the admin approves your sign up, you'll be able to access this wiki."
     },
     "form_help": {
-      "email": "Votre adresse courriel doit faire partie de la liste autorisée.",
-      "password": "Votre mot de passe doit posséder un minimun de {{target}} caractères.",
-      "user_id": "L'URL des pages crées contient votre identifiant utilisateur. L'identifiant utilisateur peut contenir des lettres, chiffres et certains symboles."
+      "email": "You must have email address which listed below to sign up to this wiki.",
+      "password": "Your password must be at least {{target}} characters long.",
+      "user_id": "The URL of pages you create will contain your User ID. Your User ID can consist of letters, numbers, and some symbols."
     }
   },
   "page_me": {
     "form_help": {
-      "profile_image1": "Configuration du téléversement des images incomplète.",
-      "profile_image2": "Configurer AWS ou activer le stockage local."
+      "profile_image1": "Image upload settings not completed.",
+      "profile_image2": "Set up AWS or enable local uploads."
     }
   },
-  "API Token Settings": "Jetons d'API",
-  "Current API Token": "Mon jeton d'API",
-  "Update API Token": "Regénérer",
+  "API Token Settings": "API token settings",
+  "Current API Token": "Current API token",
+  "Update API Token": "Update API token",
   "page_me_apitoken": {
-    "api_token": "Jeton API",
+    "api_token": "API Token",
     "notice": {
-      "apitoken_issued": "Aucun jeton d'API existant.",
-      "update_token1": "Un nouveau jeton peut être généré.",
-      "update_token2": "Modifiez le jeton aux endroits où celui-ci est utilisé, car l'ancien sera invalide."
-    },
-    "form_help": {}
+      "apitoken_issued": "API token is not issued.",
+      "update_token1": "You can update to generate a new API token.",
+      "update_token2": "You will need to update the API token in any existing processes."
+    }
   },
-  "Access Token Settings": "Jeton d'accès",
+  "Access Token Settings": "Access token settings",
   "page_me_access_token": {
-    "access_token": "Jeton d'accès",
-    "expiredAt": "Date d'expiration",
+    "access_token": "Access token",
+    "expiredAt": "Expiration date",
     "description": "Description",
-    "scope": "Portée",
-    "scope_read": "Lecture",
+    "scope": "Scope",
+    "scope_read": "Read",
     "action": "Action",
-    "create_token": "Créer un jeton",
-    "no_tokens_found": "Aucun jeton d'accès trouvé",
+    "create_token": "Create Token",
+    "no_tokens_found": "No access tokens found",
     "new_token": {
-      "title": "Nouveau jeton d'accès",
-      "copy_to_clipboard": "Copier dans le presse-papiers",
-      "message": "Ce jeton ne sera affiché qu'une seule fois. Veuillez le sauvegarder en lieu sûr."
+      "title": "New access token",
+      "copy_to_clipboard": "Copy to clipboard",
+      "message": "This token will only be displayed once. Please save it securely."
     },
     "modal": {
-      "message": "Êtes-vous sûr de vouloir supprimer ce jeton d'accès ?",
-      "alert": "Cette action ne peut pas être annulée.",
-      "delete_token": "Supprimer le jeton"
+      "message": "Are you sure you want to delete this access token?",
+      "alert": "This action cannot be undone.",
+      "delete_token": "Delete Token"
     },
     "form": {
-      "title": "Créer un nouveau jeton d'accès",
-      "expiredAt_desc": "Sélectionnez la date d'expiration de ce jeton d'accès.",
-      "description_desc": "Fournissez une description pour vous aider à identifier ce jeton ultérieurement.",
-      "description_max_length": "Veuillez saisir jusqu'à {{length}} caractères.",
-      "scope_desc": "Sélectionnez la portée du jeton d'accès."
+      "title": "Create New Access Token",
+      "expiredAt_desc": "Select when this access token should expire.",
+      "description_desc": "Provide a description to help you identify this token later",
+      "description_max_length": "Description must be less than {{length}} characters",
+      "scope_desc": "Select the scope of the access token."
     },
-    "copy_to_clipboard": "Copier dans le presse-papiers"
+    "copy_to_clipboard": "Copy to clipboard"
   },
-  "Password": "Mot de passe",
-  "Password Settings": "Sécurité",
+  "Password": "Password",
+  "Password Settings": "Password settings",
   "personal_settings": {
-    "disassociate_external_account": "Dissocier compte externe",
-    "disassociate_external_account_desc": "Dissocier le compte externe <strong>{{providerType}}</strong> <strong>{{accountId}}</strong>?",
-    "set_new_password": "Modifier mot de passe",
-    "update_password": "Modifier mot de passe",
-    "current_password": "Mot de passe actuel",
-    "new_password": "Nouveau mot de passe",
-    "new_password_confirm": "Saisir de nouveau",
-    "password_is_not_set": "Mot de passe non saisi"
+    "disassociate_external_account": "Disassociate External Account",
+    "disassociate_external_account_desc": "Are you sure to disassociate the <strong>{{providerType}}</strong> account <strong>{{accountId}}</strong>?",
+    "set_new_password": "Set new Password",
+    "update_password": "Update password",
+    "current_password": "Current password",
+    "new_password": "New password",
+    "new_password_confirm": "Re-enter new password",
+    "password_is_not_set": "Password is not set"
   },
   "share_links": {
-    "Shere this page link to public": "Partager cette page publiquement",
-    "share_link_list": "Liens de partage",
-    "share_link_management": "Liens de partage",
-    "delete_all_share_links": "Supprimer tout les liens de partage",
+    "Shere this page link to public": "Shere this page link to public",
+    "share_link_list": "Share link list",
+    "share_link_management": "Share Link Management",
+    "delete_all_share_links": "Delete all share links",
     "expire": "Expiration",
-    "Days": "Jour",
-    "Custom": "Autre",
+    "Days": "Days",
+    "Custom": "Custom",
     "description": "Description",
-    "enter_desc": "Entrer description",
-    "Unlimited": "illimité",
-    "Issue": "Partager",
-    "share_settings": "Paramètres de partage",
-    "Invalid_Number_of_Date": "Valeurs invalides",
-    "link_sharing_is_disabled": "Le partage est désactivé"
+    "enter_desc": "Enter description",
+    "Unlimited": "unlimited",
+    "Issue": "Issue",
+    "share_settings": "Share settings",
+    "Invalid_Number_of_Date": "You entered invalid value",
+    "link_sharing_is_disabled": "Link sharing is disabled"
   },
-  "API Settings": "API GROWI",
-  "Other Settings": "Autres paramètres",
+  "API Settings": "API settings",
+  "Other Settings": "Other Settings",
   "in_app_notification_settings": {
-    "in_app_notification_settings": "Notifications",
-    "subscribe_settings": "Notifications d'application",
+    "in_app_notification_settings": "In-App Notification Settings",
+    "subscribe_settings": "Settings to automatically subscribe (Receive notifications) to pages",
     "default_subscribe_rules": {
-      "page_create": "Abonne systématiquement aux notifications de modification d'une page lors de sa création."
+      "page_create": "Subscribe to the page when you create it."
     }
   },
   "ui_settings": {
-    "ui_settings": "Interface",
+    "ui_settings": "UI Settings",
     "side_bar_mode": {
-      "settings": "Paramètres navigation latérale",
-      "side_bar_mode_setting": "Épingler la barre latérale",
-      "description": "Épingle sur l'écran la barre de navigation latérale. Si la résolution de l'écran est trop faible, la barre latérale ne sera plus épinglée."
+      "settings": "Sidebar mode settings",
+      "side_bar_mode_setting": "Set the sidebar mode",
+      "description": "You can set whether or not the sidebar will always be open when the screen width is large. If the screen width is small, the sidebar will always be closed."
     }
   },
   "color_mode_settings": {
-    "light": "Clair",
-    "dark": "Sombre",
-    "system": "Système",
-    "settings": "Thème",
-    "description": "Affichage en mode clair, sombre ou selon les paramètres système.<br>Seuls les thèmes supportés seront modifiés."
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "settings": "Color mode settings",
+    "description": "Select whether to display in light mode, dark mode, or a system-specific display.<br>Only supported themes can be switched."
   },
   "editor_settings": {
-    "editor_settings": "Paramètres de l'éditeur"
+    "editor_settings": "Editor Settings"
   },
   "search_help": {
-    "title": "Aide",
+    "title": "Searching Help",
     "and": {
-      "syntax help": "séparer avec un espace",
-      "desc": "Pages incluant {{word1}}, {{word2}} dans le titre ou le corps"
+      "syntax help": "divide with space",
+      "desc": "Search pages that include both {{word1}}, {{word2}} in the title or body"
     },
     "exclude": {
-      "desc": "Pages excluant {{word}} dans le titre ou le corps"
+      "desc": "Exclude pages that include {{word}} in the title or body"
     },
     "phrase": {
-      "syntax help": "entourer de guillemets",
-      "desc": "Pages incluant \"{{phrase}}\""
+      "syntax help": "surround with double quotes",
+      "desc": "Search pages that include the phrase \"{{phrase}}\""
     },
     "prefix": {
-      "desc": "Pages dont le titre débute par {{path}}"
+      "desc": "Search only the pages that the title start with {{path}}"
     },
     "exclude_prefix": {
-      "desc": "Pages dont le titre ne débute pas par {{path}}"
+      "desc": "Exclude the pages that the title start with {{path}}"
     },
     "tag": {
-      "desc": "Pages ayant l'étiquette {{tag}}"
+      "desc": "Search for pages with {{tag}} tag"
     },
     "exclude_tag": {
-      "desc": "Pages n'ayant pas l'étiquette {{tag}}"
+      "desc": "Exclude pages with {{tag}} tag"
     },
     "author": {
-      "desc": "Rechercher les pages créées par {{author}}"
+      "desc": "Search for pages created by {{author}}"
     },
     "exclude_author": {
-      "desc": "Exclure les pages créées par {{author}}"
+      "desc": "Exclude pages created by {{author}}"
     },
     "editor": {
-      "desc": "Rechercher les pages dernièrement modifiées par {{editor}}"
+      "desc": "Search for pages last edited by {{editor}}"
     },
     "exclude_editor": {
-      "desc": "Exclure les pages modifiées par {{editor}}"
+      "desc": "Exclude pages edited by {{editor}}"
     },
     "group": {
-      "desc": "Rechercher les pages accordées au groupe {{group}}"
+      "desc": "Search for pages granted to group {{group}}"
     },
     "exclude_group": {
-      "desc": "Exclure les pages accordées au groupe {{group}}"
+      "desc": "Exclude pages granted to group {{group}}"
     },
     "quoted_value": {
-      "desc": "Entourez toute valeur de filtre de guillemets doubles si elle contient un espace (par ex. un nom de groupe ou un chemin de page)"
+      "desc": "Wrap any filter value in double quotes when it contains a space (e.g. a group name or page path)"
     }
   },
   "search": {
-    "search page bodies": "Faire la touche [Enter] pour de la recherche textuelle"
+    "search page bodies": "Hit [Enter] key to full-text search"
   },
   "page_page": {
     "notice": {
-      "version": "Version historique de la page.",
-      "redirected": "Redirection depuis",
+      "version": "This is not the current version.",
+      "redirected": "You are redirected from",
       "redirected_period": ".",
-      "unlinked": "Les pages de redirection à cette page ont été supprimées.",
-      "restricted": "L'accès à cette page est restreint",
-      "stale": "Plus de {{count}} an est passé depuis la dernière mise à jour.",
-      "stale_plural": "Plus de {{count}} années sont passées depuis la dernière mise à jour.",
-      "expiration": "Ce lien expirera <strong>{{expiredAt}}</strong>.",
-      "no_deadline": "Cette page n'a pas de date d'expiration",
-      "not_indexed1": "Cette page n'est peut-être pas indexée par les moteurs de recherche Full-Text.",
-      "not_indexed2": "Le corps de la page dépasse le seuil spécifié par {{threshold}}."
+      "unlinked": "Redirect pages to this page have been deleted.",
+      "restricted": "Access to this page is restricted",
+      "stale": "More than {{count}} year has passed since last update.",
+      "stale_plural": "More than {{count}} years has passed since last update.",
+      "expiration": "This share link will expire at <strong>{{expiredAt}}</strong>.",
+      "no_deadline": "This page has no expiration date",
+      "not_indexed1": "This page may not be indexed by Full-Text search engines.",
+      "not_indexed2": "Page body exceeds the threshold specified by {{threshold}}."
     }
   },
   "page_edit": {
-    "input_channels": "Canal Slack...",
-    "theme": "Thème",
-    "keymap": "Raccourcis",
-    "indent": "Indentation",
+    "input_channels": "Slack channel name...",
+    "theme": "Theme",
+    "keymap": "Keymap",
+    "indent": "Indent",
     "paste": {
-      "title": "Collage",
-      "both": "Texte et fichier",
-      "text": "Texte seulement",
-      "file": "Fichier seulement"
+      "title": "Paste behavior",
+      "both": "Both",
+      "text": "Text only",
+      "file": "File only"
     },
-    "editor_config": "Préférences de l'éditeur",
-    "Show active line": "Surligner la ligne active",
-    "auto_format_table": "Formatter les tableaux",
-    "overwrite_scopes": "{{operation}} et écraser les permissions des pages enfants",
+    "editor_config": "Editor Config",
+    "Show active line": "Show active line",
+    "auto_format_table": "Auto format table",
+    "overwrite_scopes": "{{operation}} and Overwrite scopes of all descendants",
     "notice": {
-      "conflict": "Sauvegarde impossible, la page est en cours de modification par un autre utilisateur. Recharger la page."
+      "conflict": "Couldn't save the changes you made because someone else was editing this page. Please re-edit the affected section after reloading the page."
     },
-    "changes_not_saved": "Les modifications n'ont pas été sauvegardées. Fermer?"
+    "changes_not_saved": "Changes you made may not be saved. Are you sure you want to move?"
   },
   "page_comment": {
-    "comments": "Commentaires",
-    "comment": "Créer",
-    "preview": "Visualiser",
-    "write": "Rédaction",
-    "add_a_comment": "Nouveau commentaire",
-    "display_the_page_when_posting_this_comment": "Afficher la page en postant le commentaire",
-    "no_user_found": "Aucun utilisateur trouvé",
-    "reply": "Répondre",
-    "delete_comment": "Supprimer?",
-    "comment_management_is_not_allowed": "La gestion des commentaires n'est pas autorisée.",
-    "no_comments": "Il n'y a aucun commentaire."
+    "comments": "Commments",
+    "comment": "Commment",
+    "preview": "Preview",
+    "write": "Write",
+    "add_a_comment": "Add a comment",
+    "display_the_page_when_posting_this_comment": "Display the page when posting this comment",
+    "no_user_found": "No user found",
+    "reply": "Reply",
+    "delete_comment": "Delete comment?",
+    "comment_management_is_not_allowed": "Comment management is not allowed.",
+    "no_comments": "There are no comments yet."
+  },
+  "inline_comment": {
+    "start_comment": "Comment",
+    "resolved": "Resolved",
+    "unresolved": "Unresolved",
+    "resolve": "Resolve",
+    "reopen": "Reopen",
+    "range_not_found": "The commented text could not be found on this page. It may have been edited or removed."
   },
   "page_api_error": {
-    "notfound_or_forbidden": "Page originale introuvable ou accès restreint.",
-    "already_exists": "Une page avec ce chemin existe déjà.",
-    "outdated": "Page obsolète.",
-    "invalid_body": "La requête n'indique pas à quelle révision de la page elle s'applique.",
-    "user_not_admin": "Seul un administrateur peut supprimer la page",
-    "single_deletion_empty_pages": "Une page vide ne peut pas être supprimée",
-    "complete_deletion_not_allowed_for_user": "Vous n'êtes pas autorisé à supprimer cette page"
+    "notfound_or_forbidden": "Original page is not found or forbidden.",
+    "already_exists": "Page with the path already exists.",
+    "outdated": "Page is updated someone and now outdated.",
+    "invalid_body": "The request does not tell which version of the page it applies to.",
+    "user_not_admin": "Only admin user can delete",
+    "single_deletion_empty_pages": "Empty pages cannot be single deleted",
+    "complete_deletion_not_allowed_for_user": "You are not allowed to delete this page completely"
   },
   "page_history": {
-    "revision_list": "Historique des modifications",
-    "revision": "Révision",
+    "revision_list": "Revision list",
+    "revision": "version",
     "comparing_source": "Source",
-    "comparing_target": "Cible",
-    "comparing_revisions": "Historique des modifications",
-    "compare_latest": "Comparer avec la version la plus récente",
-    "compare_previous": "Comparer avec la version précédente"
+    "comparing_target": "Target",
+    "comparing_revisions": "Comparing the difference",
+    "compare_latest": "Compare latest revision",
+    "compare_previous": "Compare previous revision"
   },
   "modal_rename": {
     "label": {
-      "Move/Rename page": "Déplacer ou renommer la page",
-      "New page name": "Nouvel emplacement",
-      "Failed to get subordinated pages": "échec de récupération des pages subordinnées",
-      "Failed to get exist path": "échec de la récupération du chemin",
-      "Current page name": "Emplacement actuel",
-      "Rename this page only": "Renommer cette page",
-      "Force rename all child pages": "Forcer le renommage des pages",
-      "Other options": "Autres options",
-      "Do not update metadata": "Conserver les métadonnées",
-      "Redirect": "Redirection"
+      "Move/Rename page": "Move/Rename page",
+      "New page name": "New page name",
+      "Failed to get subordinated pages": "Failed to get subordinated pages",
+      "Failed to get exist path": "Failed to get exist path",
+      "Current page name": "Current page name",
+      "Rename this page only": "Rename this page only",
+      "Force rename all child pages": "Force rename all pages",
+      "Other options": "Other options",
+      "Do not update metadata": "Do not update metadata",
+      "Redirect": "Redirect"
     },
     "help": {
-      "redirect": "Redirige automatiquement vers le nouveau chemin de la page.",
-      "metadata": "Conserve les métadonnées d'édition de la page",
-      "recursive": "Déplacer/renommer les pages enfants récursivement"
+      "redirect": "Redirect to new page if someone accesses under this path",
+      "metadata": "Last update user and updated date will remain the same",
+      "recursive": "Move/Rename children of under this path recursively"
     }
   },
-  "Put Back": "Annuler",
-  "Delete Completely": "Supprimer définitivement",
-  "page_has_been_reverted": "{{path}} déplacement annulé",
+  "Put Back": "Put back",
+  "Delete Completely": "Delete completely",
+  "page_has_been_reverted": "{{path}} has been reverted",
   "modal_delete": {
-    "delete_page": "Supprimer la page",
-    "deleting_page": "Suppression de la page",
-    "delete_recursively": "Supprimer les pages enfants.",
-    "delete_completely": "Supprimer définitivement",
-    "delete_completely_restriction": "Vous n'êtes pas autorisé à supprimer définitivement les pages",
-    "recursively": "Supprime toutes les pages sous ce chemin.",
-    "completely": "Supprime définitivement la page."
+    "delete_page": "Delete page",
+    "deleting_page": "Deleting page",
+    "delete_recursively": "Delete child pages recursively.",
+    "delete_completely": "Delete completely",
+    "delete_completely_restriction": "You don't have the authority to delete pages completely.",
+    "recursively": "Delete pages under this path recursively.",
+    "completely": "Delete completely instead of putting it into trash."
   },
-  "deleted_page": "Déplacée dans la corbeille",
-  "deleted_pages": "{{path}} supprimées",
-  "deleted_pages_completely": "{{path}} supprimées définitivement",
-  "renamed_pages": "{{path}} renommée",
-  "empty_trash": "Corbeille vidée",
+  "deleted_page": "Moved to the trash",
+  "deleted_pages": "{{path}} has been deleted",
+  "deleted_pages_completely": "{{path}} has been deleted completely",
+  "renamed_pages": "{{path}} has been renamed",
+  "empty_trash": "The trash has been emptied",
   "modal_empty": {
-    "empty_the_trash": "Vider la corbeille",
-    "empty_the_trash_button": "Vider",
-    "not_deletable_notice": "Certaines pages ne peuvent pas être supprimées",
-    "notice": "Les pages supprimées définitivement ne sont pas récupérables."
+    "empty_the_trash": "Empty The Trash",
+    "empty_the_trash_button": "Empty The Trash",
+    "not_deletable_notice": "Some pages cannot be removed due to lack of permission.",
+    "notice": "The pages deleted completely are unrecoverable."
   },
   "modal_duplicate": {
     "label": {
-      "Duplicate page": "Dupliquer la page",
-      "New page name": "Emplacement de la nouvelle page",
-      "Failed to get subordinated pages": "échec de récupération des pages subordinnées",
-      "Current page name": "Emplacement actuel",
-      "Recursively": "Récursif",
-      "Duplicate without exist path": "Dupliquer sans le chemin existant",
-      "Same page already exists": "Une page avec ce chemin existe déjà",
-      "Only duplicate user related pages": "Hériter les permissions"
+      "Duplicate page": "Duplicate page",
+      "New page name": "New page name",
+      "Failed to get subordinated pages": "Failed to get subordinated pages",
+      "Current page name": "Current page name",
+      "Recursively": "Recursively",
+      "Duplicate without exist path": "Duplicate without exist path",
+      "Same page already exists": "Same page already exists",
+      "Only duplicate user related pages": "Only duplicate pages you can access"
     },
     "help": {
-      "recursive": "Duplique également les pages enfants.",
-      "only_inherit_user_related_groups": "Les pages restreintes a un groupe hériteront des permissions assignées."
+      "recursive": "Duplicate children of under this path recursively",
+      "only_inherit_user_related_groups": "If the page privilege is set to \"Only inside the group\", groups you do not belong to will lose access to the duplicated page"
     }
   },
-  "duplicated_pages": "{{fromPath}} dupliquée",
+  "duplicated_pages": "{{fromPath}} has been duplicated",
+  "modal_granted_groups_inheritance_select": {
+    "select_granted_groups": "Select groups that can access page",
+    "inherit_all_granted_groups_from_parent": "Inherit all groups that can access page from parent",
+    "only_inherit_related_groups": "Only inherit groups that you belong to from parent",
+    "create_page": "Create Page"
+  },
   "modal_putback": {
     "label": {
-      "Put Back Page": "Annuler déplacement",
-      "recursively": "Annuler récursivement"
+      "Put Back Page": "Put back page",
+      "recursively": "Put back recursively"
     },
     "help": {
-      "recursively": "Annuler récursivement pour les pages enfants"
+      "recursively": "Put back page under this path recursively"
     }
   },
   "modal_shortcuts": {
     "global": {
-      "title": "Raccourcis clavier",
-      "Open/Close shortcut help": "Ouvrir/fermer<br> l'aide aux raccourcis",
-      "Edit Page": "Modifier page",
-      "Create Page": "Créer page",
-      "Search": "Rechercher",
-      "Show Contributors": "Voir contributeurs",
-      "MirrorMode": "Mode miroir",
-      "Konami Code": "Code Konami",
-      "konami_code_url": "https://fr.wikipedia.org/wiki/Code_Konami"
+      "title": "Global shortcuts",
+      "Open/Close shortcut help": "Open/Close Shortcut Help",
+      "Edit Page": "Edit Page",
+      "Create Page": "Create Page",
+      "Search": "Search",
+      "Show Contributors": "Show Contributors",
+      "MirrorMode": "Mirror Mode",
+      "Konami Code": "Konami Code",
+      "konami_code_url": "https://en.wikipedia.org/wiki/Konami_Code"
     },
     "editor": {
-      "title": "Raccourcis d'édition",
-      "Slash Command": "Commande slash",
-      "Slash Command Desc": "(Afficher le menu des commandes)",
-      "Indent": "Indentation",
-      "Outdent": "Retrait",
-      "Save Page": "Sauvegarder la page",
-      "Only Editor": "(Éditeur uniquement)",
-      "Delete Line": "Supprimer la ligne",
-      "Search in Editor": "Rechercher dans l'éditeur",
-      "Move Line": "Déplacer la ligne",
-      "Copy Line": "Copier la ligne",
-      "Insert Line": "Insérer une ligne",
-      "Post Comment": "(Publier le commentaire)",
-      "Multiple Cursors": "Curseurs multiples",
-      "Or Alt Click": "ou Alt + Clic"
+      "title": "Editor shortcuts",
+      "Slash Command": "Slash Command",
+      "Slash Command Desc": "(Show the command menu)",
+      "Indent": "Indent",
+      "Outdent": "Outdent",
+      "Save Page": "Save Page",
+      "Only Editor": "(Editor Only)",
+      "Delete Line": "Delete Line",
+      "Search in Editor": "Search in Editor",
+      "Move Line": "Move Line",
+      "Copy Line": "Copy Line",
+      "Insert Line": "Insert Line",
+      "Post Comment": "(Post Comment)",
+      "Multiple Cursors": "Multiple Cursors",
+      "Or Alt Click": "or Alt + Click"
     },
     "format": {
-      "title": "Paramètres de format (Éditeur)",
-      "Bold": "Gras",
-      "Italic": "Italique",
-      "Strikethrough": "Barré",
-      "Code Text": "Texte de code",
-      "Hyperlink": "Lien hypertexte"
+      "title": "Format Settings (Editor)",
+      "Bold": "Bold",
+      "Italic": "Italic",
+      "Strikethrough": "Strikethrough",
+      "Code Text": "Code Text",
+      "Hyperlink": "Hyperlink"
     },
     "line_settings": {
-      "title": "Paramètres de ligne (Éditeur)",
-      "Bullet List": "Liste à puces",
-      "Numbered List": "Liste numérotée",
-      "Quote": "Citation",
-      "Code Block": "Bloc de code",
-      "Comment Out": "Masquer",
-      "Comment Out Desc": "(Commenter)"
+      "title": "Line Settings (Editor)",
+      "Bullet List": "Bullet List",
+      "Numbered List": "Numbered List",
+      "Quote": "Quote",
+      "Code Block": "Code Block",
+      "Comment Out": "Comment Out",
+      "Comment Out Desc": "(Hide)"
     },
-    "Other Shortcuts": "Autres raccourcis"
+    "Other Shortcuts": "Other Shortcuts"
   },
   "modal_resolve_conflict": {
-    "file_conflicting_with_newer_remote": "Ce fichier est en conflit avec une autre version",
-    "resolve_conflict_message": "Sélectionner le corps de la page",
-    "resolve_conflict": "Résoudre le conflit",
-    "resolve_and_save": "Résoudre et sauvegarder",
-    "select_revision": "Sélectionner {{revision}}",
-    "requested_revision": "moi",
-    "origin_revision": "origine",
-    "latest_revision": "les autres",
-    "selected_editable_revision": "Corps de page sélectionné (Modifiable)"
+    "conflicts_with_new_body_on_server_side": "Conflict with new body on server side. Please select or edit the page body to resolve the conflict.",
+    "file_conflicting_with_newer_remote": "This file is conflicting with newer remote file",
+    "resolve_conflict_message": "Please select page body",
+    "resolve_conflict": "Resolve Conflict",
+    "resolve_and_save": "Resolve and save",
+    "select_revision": "Select {{revision}}",
+    "requested_revision": "mine",
+    "latest_revision": "theirs",
+    "selected_editable_revision": "Selected Page Body (Editable)"
   },
   "ai_unavailable": {
-    "open_admin_settings_to_enable": "Configurez les paramètres AI sur la page d'administration pour activer l'intégration AI",
-    "to_admin_ai_settings": "Ouvrir les paramètres AI",
-    "contact_admin_to_enable": "L'intégration AI n'est pas activée. Veuillez contacter votre administrateur."
+    "open_admin_settings_to_enable": "Configure AI settings on the admin page to enable AI integration",
+    "to_admin_ai_settings": "Open AI Settings",
+    "contact_admin_to_enable": "AI integration is not enabled. Please contact your administrator."
   },
   "ai_sidebar": {
-    "new_chat": "Nouvelle discussion",
-    "recent_threads": "Éléments récents",
-    "accuracy_notice": "Vérifiez les pages référencées pour vous assurer de l'exactitude des informations.",
-    "sources": "{{count}} pages référencées",
-    "sources_one": "{{count}} page référencée",
-    "sources_other": "{{count}} pages référencées",
+    "new_chat": "New Chat",
+    "recent_threads": "Recent Items",
+    "accuracy_notice": "Check the referenced pages to verify the information.",
+    "sources": "{{count}} pages referenced",
     "error": {
-      "title": "Une erreur s'est produite",
-      "retry": "Réessayer",
-      "dismiss": "Fermer"
+      "title": "An error occurred",
+      "retry": "Retry",
+      "dismiss": "Dismiss"
     },
     "incomplete": {
-      "length": "La réponse s'est arrêtée car elle a atteint la longueur maximale.",
-      "tool_calls": "La réponse s'est arrêtée après avoir atteint la limite d'étapes de traitement.",
-      "content_filter": "La réponse a été arrêtée par la politique de contenu.",
-      "error": "La réponse s'est arrêtée en raison d'une erreur.",
-      "unknown": "La réponse s'est arrêtée avant d'être terminée."
+      "length": "The response stopped because it reached the maximum length.",
+      "tool_calls": "The response stopped after reaching the processing-step limit.",
+      "content_filter": "The response was stopped by the content policy.",
+      "error": "The response stopped because an error occurred.",
+      "unknown": "The response stopped before completing."
     },
     "toaster": {
-      "thread_deleted_success": "Discussion supprimée",
-      "thread_deleted_failed": "Échec de la suppression de la discussion"
+      "thread_deleted_success": "Thread deleted",
+      "thread_deleted_failed": "Failed to delete thread"
     }
   },
   "link_edit": {
-    "edit_link": "Modifier lien",
-    "set_link_and_label": "Ajouter lien et étiquette",
-    "link": "Lien",
-    "placeholder_of_link_input": "Chemin de la page ou URL",
-    "label": "Étiquette",
-    "path_format": "Format",
-    "use_relative_path": "Chemin relatif",
-    "use_permanent_link": "Lien permanent",
+    "edit_link": "Edit Link",
+    "set_link_and_label": "Set link and label",
+    "link": "Link",
+    "placeholder_of_link_input": "Input page path or URL",
+    "label": "Label",
+    "path_format": "Path format",
+    "use_relative_path": "Use relative path",
+    "use_permanent_link": "Use permanent link",
     "notation": "Notation",
     "markdown": "Markdown",
     "GROWI_original": "GROWI original",
     "pukiwiki": "Pukiwiki",
-    "preview": "Prévisualiser",
-    "page_not_found_in_preview": "\"{{path}}\" n'est pas une page GROWI."
+    "preview": "Preview",
+    "page_not_found_in_preview": "\"{{path}}\" is not a GROWI page."
   },
   "toaster": {
-    "file_upload_failed": "Échec du téléversement.",
-    "initialize_successed": "Initialisation de {{target}} réussie",
-    "remove_share_link_success": "Suppression de {{shareLinkId}} réussie",
-    "issue_share_link": "Lien de partage ajouté",
-    "remove_share_link": "{{count}} liens supprimés",
-    "switch_disable_link_sharing_success": "Paramètres des liens de partage modifiés",
-    "failed_to_reset_password": "Échec de la réinitialisation du mot de passe",
-    "save_succeeded": "Sauvegarde réussie"
+    "file_upload_failed": "File upload failed.",
+    "initialize_successed": "Succeeded to initialize {{target}}",
+    "remove_share_link_success": "Succeeded to remove {{shareLinkId}}",
+    "issue_share_link": "Succeeded to issue new share link",
+    "remove_share_link": "Succeeded to remove {{count}} share links",
+    "switch_disable_link_sharing_success": "Succeeded to update share link setting",
+    "failed_to_reset_password": "Failed to reset password",
+    "save_succeeded": "Saved successfully"
   },
   "template": {
     "modal_label": {
-      "Select template": "Sélectionner modèle",
-      "Create/Edit Template Page": "Créer un modèle",
-      "Create template under": "Créer une page modèle enfant"
+      "Select template": "Select template",
+      "Create/Edit Template Page": "Create/Edit template page",
+      "Create template under": "Create template page under this page"
     },
     "option_label": {
-      "create/edit": "Modèle",
-      "select": "Sélectionner type de page modèle"
+      "create/edit": "Create/Edit template page..",
+      "select": "Select template page type"
     },
     "children": {
-      "label": "Modèle pour page enfant",
-      "desc": "Le modèle est appliqué aux pages du même niveau dans l'arbre."
+      "label": "Template for children",
+      "desc": "Applies only to the same level pages which the template exists"
     },
     "descendants": {
-      "label": "Modèle pour descendants",
-      "desc": "Le modèle est appliqué à toutes les pages enfants."
+      "label": "Template for descendants",
+      "desc": "Applies to all decendant pages"
     }
   },
   "sandbox": {
-    "header": "En-tête",
-    "header_x": "En-tête {{index}}",
-    "block": "Paragraphe",
-    "block_detail": "fait un paragraphe",
-    "empty_line": "Ligne vide",
-    "line_break": "Saut de ligne",
-    "line_break_detail": "(2 espaces) fait un saut de ligne",
-    "typography": "Typographie",
-    "italics": "Italique",
-    "bold": "Gras",
-    "italic_bold": "Gras italique",
-    "strikethrough": "Barré",
-    "link": "Lien",
-    "code_highlight": "Surlignage de code",
-    "list": "Liste",
-    "unordered_list_x": "Liste non ordonnée {{index}}",
-    "ordered_list_x": "Liste ordonnée {{index}}",
-    "task": "Tâche",
-    "task_checked": "Coché",
-    "task_unchecked": "Décoché",
-    "quote": "Citation",
-    "quote1": "Il est possible d'écrire ",
-    "quote2": "des citations sur plusieurs lignes",
-    "quote_nested": "Citation imbriquée",
+    "header": "Header",
+    "header_x": "Header {{index}}",
+    "block": "Paragraph",
+    "block_detail": "makes a paragraph",
+    "empty_line": "Empty Line",
+    "line_break": "Line Break",
+    "line_break_detail": "(2 spaces) make a line break",
+    "typography": "Typography",
+    "italics": "Italics",
+    "bold": "Bold",
+    "italic_bold": "Italic Bold",
+    "strikethrough": "strikethrough",
+    "link": "Link",
+    "code_highlight": "Code Highlight",
+    "list": "List",
+    "unordered_list_x": "Unordered List {{index}}",
+    "ordered_list_x": "Ordered List {{index}}",
+    "task": "Task",
+    "task_checked": "Checked",
+    "task_unchecked": "Unchecked",
+    "quote": "Quote",
+    "quote1": "You can write",
+    "quote2": "multi-line quotations",
+    "quote_nested": "Nested Quote",
     "table": "Table",
     "image": "Image",
-    "alt_text": "Texte alternatif",
-    "insert_image": "insère une image",
-    "open_sandbox": "Ouvrir le bac à sable"
+    "alt_text": "Alt Text",
+    "insert_image": "inserts an image",
+    "open_sandbox": "Open Sandbox"
   },
   "slack_notification": {
-    "popover_title": "Notifications Slack",
-    "popover_desc": "Entrer le nom du canal. Plusieurs canaux peuvent être notifiés en entrant leur noms séparés d'une virgule",
+    "popover_title": "Slack Notification",
+    "popover_desc": "Input channel name. You can notify multiple channels by entering a comma-separated list.",
     "input_channels": "Input channels"
   },
   "search_result": {
-    "title": "Recherche",
-    "result_meta": "Résultats de recherche pour:",
-    "deletion_mode_btn_lavel": "Sélectionner et supprimer la page",
-    "cancel": "Annuler",
-    "delete": "Supprimer",
-    "check_all": "Tout cocher",
-    "deletion_modal_header": "Supprimer page",
-    "delete_completely": "Supprimer définitivement",
-    "include_certain_path": "Inclure le chemin {{pathToInclude}} ",
-    "delete_all_selected_page": "Tout supprimer",
-    "select_all": "Tout sélectionner",
-    "delete_selected_pages": "Supprimer les pages sélectionnées",
-    "currently_not_implemented": "Non implémenté",
-    "search_again": "Rechercher",
-    "number_of_list_to_display": "Afficher",
+    "title": "Search",
+    "result_meta": "Search results for:",
+    "deletion_mode_btn_lavel": "Select and delete page",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "check_all": "Check all",
+    "deletion_modal_header": "Delete page",
+    "delete_completely": "Delete completely",
+    "include_certain_path": "Include {{pathToInclude}} path ",
+    "delete_all_selected_page": "Delete All",
+    "select_all": "Select all",
+    "delete_selected_pages": "Delete selected pages",
+    "currently_not_implemented": "This is not currently implemented",
+    "search_again": "Search again",
+    "number_of_list_to_display": "Display",
     "page_number_unit": "pages",
-    "hit_number_unit": "trouvé",
-    "filter": "Filtres",
-    "search_option": "Options de recherche",
-    "filter_remove": "Supprimer",
-    "filter_clear": "Tout effacer",
-    "filter_author": "Auteur",
-    "filter_by_author": "Filtrer par auteur",
-    "filter_editor": "Éditeur",
-    "filter_by_editor": "Filtrer par éditeur",
-    "filter_tag": "Étiquette",
-    "filter_group": "Groupe",
-    "filter_group_select": "Sélectionner des groupes",
-    "filter_group_none": "Aucun groupe disponible",
+    "hit_number_unit": "hit",
+    "filter": "Filters",
+    "search_option": "Search Options",
+    "filter_remove": "Remove",
+    "filter_clear": "Clear all",
+    "filter_author": "Author",
+    "filter_by_author": "Filter by author",
+    "filter_editor": "Editor",
+    "filter_by_editor": "Filter by editor",
+    "filter_tag": "Tag",
+    "filter_group": "Group",
+    "filter_group_select": "Select groups",
+    "filter_group_none": "No groups available",
     "sort_axis": {
-      "relationScore": "Trier par pertinence",
-      "createdAt": "Date de création",
-      "updatedAt": "Dernière modification"
+      "relationScore": "Sort by relevance",
+      "createdAt": "Creation date",
+      "updatedAt": "Last update date"
     }
   },
   "help_dropdown": {
-    "show_shortcuts": "Afficher les raccourcis",
-    "growi_cloud_help": "Aide GROWI.cloud",
-    "growi_version": "Version GROWI"
+    "show_shortcuts": "Show shortcuts",
+    "growi_cloud_help": "GROWI.cloud Help",
+    "growi_version": "GROWI version"
   },
   "private_legacy_pages": {
-    "title": "Anciennes pages privées",
-    "bulk_operation": "Opération de masse",
-    "convert_all_selected_pages": "Convertir au nouveau format V5",
-    "input_path_to_convert": "Entrer un chemin pour convertir les pages",
-    "alert_title": "Des pages au format V4 existent",
-    "alert_desc1": "Sélectionner les pages à convertir vers le format V5 avec le bouton \"Opération de masse\".",
-    "nopages_title": "GROWI V5 est maintenant utilisable!",
-    "nopages_desc1": "Toutes les pages ont été converties au format V5.",
-    "detail_info": "Pour plus de détails, voir <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html' target='_blank' class='alert-link'>Convertir vers GROWI v5.0.x <span class='growi-custom-icons'>external_link</span></a>.",
+    "title": "Private Legacy Pages",
+    "bulk_operation": "Bulk operation",
+    "convert_all_selected_pages": "Convert all to new v5 compatible format",
+    "input_path_to_convert": "Input a path to convert pages",
+    "alert_title": "Old v4 compatible format private pages exist.",
+    "alert_desc1": "On this page, you can select pages with the checkbox and batch convert to the new v5 compatible format from the \"Bulk operation\" button at the top of the screen.",
+    "nopages_title": "Congratulations. Ready to use GROWI v5!",
+    "nopages_desc1": "Now all the pages you can manage seem to be in v5 compatible format.",
+    "detail_info": "See the detail information from <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html' target='_blank' class='alert-link'>Upgrading GROWI to v5.0.x <span class='growi-custom-icons'>external_link</span></a>.",
     "modal": {
-      "title": "Convertir au format V5",
-      "converting_pages": "Conversion des pages",
-      "convert_recursively_label": "Convertir les pages enfants récursivement",
-      "convert_recursively_desc": "Convertir les pages sous ce chemin récursivement.",
-      "button_label": "Convertir"
+      "title": "Convert to new v5 compatible format",
+      "converting_pages": "Converting pages",
+      "convert_recursively_label": "Convert child pages recursively.",
+      "convert_recursively_desc": "Convert pages under this path recursively.",
+      "button_label": "Convert"
     },
     "toaster": {
-      "page_migration_succeeded": "Conversion des pages sélectionnées au format V5 réussie.",
-      "page_migration_failed_with_paths": "Conversion de {{paths}} au format V5 échouée.",
-      "page_migration_failed": "Échec de la conversion au format V5."
+      "page_migration_succeeded": "Conversion of selected page to v5 has been successfully completed.",
+      "page_migration_failed_with_paths": "Conversion of {{paths}} to v5 has been failed.",
+      "page_migration_failed": "Conversion of page to v5 has been failed."
     },
     "by_path_modal": {
-      "title": "Convertir au format V5",
-      "alert": "Cette opération est irréversible et il est possible que certaines pages non visible soit traitées.",
-      "checkbox_label": "Compris",
-      "description": "Entrer un chemin, toutes les pages sous ce chemin seront converties au format V5.",
-      "button_label": "Convertir",
-      "success": "Demande de conversion envoyée.",
-      "error": "Échec de la demande de conversion.",
-      "error_grant_invalid": "Les permissions de la page sont invalides.",
-      "error_page_not_found": "Page introuvable.",
-      "error_duplicate_pages_found": "Plusieurs pages au même chemin ont été trouvées, renommez ou supprimez puis réessayez."
+      "title": "Convert to new v5 compatible format",
+      "alert": "This operation cannot be undone, and pages that the user cannot view are also subject to processing.",
+      "checkbox_label": "Understood",
+      "description": "Enter a path and all pages under that path will be converted to v5 compatible format.",
+      "button_label": "Convert",
+      "success": "Successfully requested conversion.",
+      "error": "Failed to request conversion.",
+      "error_grant_invalid": "Page permissions are incorrect. Please correct it and try again.",
+      "error_page_not_found": "Page not found.",
+      "error_duplicate_pages_found": "Multiple pages with the same path name were found. Please rename or delete and try again."
     }
   },
   "login": {
-    "title": "Connexion",
-    "sign_in_error": "Erreur de connexion",
-    "registration_successful": "Inscription réussie. Demander l'approbation d'un administrateur.",
-    "Setup": "Configuration",
-    "enabled_ldap_has_configuration_problem": "LDAP actif, vérifier la configuration.",
-    "set_env_var_for_logs": "(Remplir les variables d'environnement <code>DEBUG=crowi:service:PassportService</code> pour obtenir les journaux d'erreur)"
+    "title": "Login",
+    "sign_in_error": "Login error",
+    "registration_successful": "Registration successful. Please wait for administrator approval.",
+    "Setup": "Setup",
+    "enabled_ldap_has_configuration_problem": "LDAP is enabled but the configuration has something wrong.",
+    "set_env_var_for_logs": "(Please set the environment variables <code>DEBUG=crowi:service:PassportService</code> to get the logs)"
   },
   "invited": {
-    "title": "Invité",
-    "discription_heading": "Créer un compte",
-    "discription": "Créer un compte avec votre adresse courriel invitée"
+    "title": "Invited",
+    "discription_heading": "Create Account",
+    "discription": "Create an your account with the invited email address"
   },
   "page_export": {
-    "failed_to_export": "Échec de l'export",
-    "failed_to_count_pages": "Échec du compte des pages",
-    "export_page_markdown": "Exporter",
-    "export_page_pdf": "Exporter la page en PDF",
-    "bulk_export": "Exporter les pages enfants",
-    "bulk_export_download_explanation": "Une notification sera envoyée lorsque l’exportation sera terminée. Pour télécharger le fichier exporté, cliquez sur la notification.",
-    "bulk_export_exec_time_warning": "Si le nombre de pages est important, l'exportation peut prendre un certain temps.",
-    "large_bulk_export_warning": "Pour préserver les ressources du système, veuillez éviter d'exporter un grand nombre de pages consécutivement.",
+    "failed_to_export": "Failed to export",
+    "failed_to_count_pages": "Failed to count pages",
+    "export_page_markdown": "Export page as Markdown",
+    "export_page_pdf": "Export page as PDF",
+    "bulk_export": "Export page and all child pages",
+    "bulk_export_download_explanation": "A notification will be sent when the export is complete. To download the exported file, click the notification.",
+    "bulk_export_exec_time_warning": "If the number of pages is large, it may take a while to export",
+    "large_bulk_export_warning": "To conserve system resources, please refrain from exporting a large number of pages consecutively",
     "markdown": "Markdown",
-    "choose_export_format": "Format de l'export",
-    "bulk_export_started": "Patientez s'il-vous-plait...",
-    "bulk_export_download_expired": "La période de téléchargement a expiré",
-    "bulk_export_job_expired": "Le traitement a été interrompu car le temps d'exportation était trop long",
-    "export_in_progress": "Exportation en cours",
-    "export_in_progress_explanation": "L'exportation avec le même format est déjà en cours. Souhaitez-vous redémarrer pour exporter le dernier contenu de la page ?",
-    "export_cancel_warning": "Les exportations suivantes en cours seront annulées",
-    "restart": "Redémarrage",
+    "choose_export_format": "Select export format",
+    "bulk_export_started": "Please wait a moment...",
+    "bulk_export_download_expired": "Download period has expired",
+    "bulk_export_job_expired": "Export process was canceled because it took too long",
+    "export_in_progress": "Export in progress",
+    "export_in_progress_explanation": "Export with the same format is already in progress. Would you like to restart to export the latest page contents?",
+    "export_cancel_warning": "The following export in progress will be canceled",
+    "restart": "Restart",
     "format": "Format",
-    "started_on": "Commencé le",
-    "file_upload_not_configured": "Les paramètres de téléchargement de fichiers ne sont pas configurés"
+    "started_on": "Started on",
+    "file_upload_not_configured": "File upload settings are not configured"
   },
   "audit_log_bulk_export": {
-    "download_expired": "La période de téléchargement a expiré",
-    "job_expired": "Le processus d'exportation a été annulé car il a pris trop de temps",
-    "no_results": "Aucun journal d'audit ne correspondait aux filtres spécifiés"
+    "download_expired": "Download period has expired",
+    "job_expired": "Export process was canceled because it took too long",
+    "no_results": "No audit logs matched the specified filters"
   },
   "message": {
-    "successfully_connected": "Connecté!",
-    "fail_to_save_access_token": "Échec de la sauvegarde de access_token.",
-    "fail_to_fetch_access_token": "Échec de la récupération de access_token.",
-    "successfully_disconnected": "Déconnecté!",
-    "strategy_has_not_been_set_up": "{{strategy}} n'est pas configuré",
-    "ldap_user_not_valid": "Utilisateur LDAP invalide",
-    "external_account_not_exist": "Compte externe introuvable",
-    "maximum_number_of_users": "Le nombre maximum d'utilisateurs est atteint.",
-    "sign_in_failure": "Échec de la connexion.",
-    "aws_sttings_required": "La configuration AWS est requise pour utiliser cette fonctionnalité.",
-    "application_already_installed": "Application déja installée.",
-    "email_address_could_not_be_used": "Cette adresse e-mail ne peut pas être utilisée sur ce wiki. Veuillez contacter votre administrateur.",
-    "user_id_is_not_available": "Cet identifiant utilisateur est indisponible.",
-    "username_should_not_be_null": "Le nom d'utilisateur est requis",
-    "email_address_is_already_registered": "Cette adresse courriel est indisponible.",
-    "can_not_register_maximum_number_of_users": "Le nombre maximum d'utilisateurs est atteint.",
-    "email_settings_is_not_setup": "La configuration d'envoi de courriels est incomplète.",
-    "email_authentication_is_not_enabled": "L'authentification par adresse courriel est désactivée.",
-    "failed_to_register": "Échec de l'inscription.",
-    "successfully_created": "Utilisateur {{username}} crée.",
-    "can_not_activate_maximum_number_of_users": "Ne peut activer au dessus du nombre maximal d'utilisateur.",
-    "failed_to_activate": "Échec de l'activation.",
-    "unable_to_use_this_user": "Impossible d'utiliser cet utilisateur",
-    "complete_to_install1": "Complétez pour installer GROWI! Connectez vous en tant qu'administrateur",
-    "complete_to_install2": "Complétez pour installer GROWI! Vérifier les paramètres de la page.",
-    "failed_to_create_admin_user": "Échec de création de l'administrateur. {{errMessage}}",
-    "successfully_send_email_auth": "Un courriel a été envoyé {{email}}. Ouvrez l'URL dans ce courriel et complétez l'inscription.",
-    "incorrect_token_or_expired_url": "Le jeton est invalide ou l'URL est expirée.",
-    "user_already_logged_in": "Vous ne pouvez pas créer de nouveau compte en étant connecté.",
-    "registration_closed": "Création de nouveau compte non-autorisée.",
-    "Username has invalid characters": "Le nom d'utilisateur contient des caractères invalides.",
-    "Username field is required": "Identifiant utilisateur requis.",
-    "Name field is required": "Nom requis.",
-    "Email format is invalid": "Format d'adresse courriel invalide.",
-    "Email field is required": "Adresse courriel requise.",
-    "Password has invalid character": "Le mot de passe contient des caractères invalides",
-    "Password minimum character should be more than n characters": "Le mot de passe doit contenir plus de {{number}} caractères.",
-    "Password field is required": "Mot de passe requis.",
-    "Username or E-mail has invalid characters": "Le nom d'utilisateur ou l'adresse courriel contient des caractères invalides",
-    "user_not_found": "Utilisateur introuvable.",
-    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>DuplicatedUsernameException</strong></p><p class='mb-0'> L'authentification est réussie pour {{ failedProviderForDuplicatedUsernameException }} , mais la création d'un utilisateur a échouée. Voir <a href='https://github.com/growilabs/growi/issues/193'>#193</a>.</p>"
+    "successfully_connected": "Successfully Connected!",
+    "fail_to_save_access_token": "Failed to save access_token. Please try again.",
+    "fail_to_fetch_access_token": "Failed to fetch access_token. Please do connect again.",
+    "successfully_disconnected": "Successfully Disconnected!",
+    "strategy_has_not_been_set_up": "{{strategy}} has not been set up",
+    "ldap_user_not_valid": "Ldap user is no valid",
+    "external_account_not_exist": "Failed to find or create External account",
+    "maximum_number_of_users": "Can not register more than the maximum number of users.",
+    "sign_in_failure": "Sign in failure.",
+    "aws_sttings_required": "AWS settings required to use this function. Please ask the administrator.",
+    "application_already_installed": "Application already installed.",
+    "email_address_could_not_be_used": "This email address cannot be used on this wiki. Please contact your administrator.",
+    "user_id_is_not_available": "This User ID is not available.",
+    "username_should_not_be_null": "Username should not be null. Please check Authentication Mechanism Settings on admin page",
+    "email_address_is_already_registered": "This email address is already registered.",
+    "can_not_register_maximum_number_of_users": "Can not register more than the maximum number of users.",
+    "email_settings_is_not_setup": "E-mail settings is not set up. Please ask the administrator.",
+    "email_authentication_is_not_enabled": "Email authentication is not enabled. Please ask the administrator.",
+    "failed_to_register": "Failed to register.",
+    "successfully_created": "The user {{username}} is successfully created.",
+    "can_not_activate_maximum_number_of_users": "Can not activate more than the maximum number of users.",
+    "failed_to_activate": "Failed to activate.",
+    "unable_to_use_this_user": "Unable to use this user.",
+    "complete_to_install1": "Complete to Install GROWI ! Please login as admin account.",
+    "complete_to_install2": "Complete to Install GROWI ! Please check each settings on this page first.",
+    "failed_to_create_admin_user": "Failed to create admin user. {{errMessage}}",
+    "successfully_send_email_auth": "We sent an email to {{email}}. Please click the URL in the email and complete the registration.",
+    "incorrect_token_or_expired_url": "The token is incorrect or the URL has expired.",
+    "user_already_logged_in": "You cannot create a new account when you are logged in.",
+    "registration_closed": "You are not authorized to create a new account.",
+    "Username has invalid characters": "Username has invalid characters.",
+    "Username field is required": "User ID field is required.",
+    "Name field is required": "Name field is required.",
+    "Email format is invalid": "Email format is invalid.",
+    "Email field is required": "Email field is required.",
+    "Password has invalid character": "Password has invalid character.",
+    "Password minimum character should be more than n characters": "Password minimum character should be more than {{number}} characters.",
+    "Password field is required": "Password field is required.",
+    "Username or E-mail has invalid characters": "Username or E-mail has invalid characters.",
+    "user_not_found": "User not found.",
+    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>DuplicatedUsernameException occured</strong></p><p class='mb-0'> Your {{ failedProviderForDuplicatedUsernameException }} authentication was succeeded, but a new user could not be created. See the issue <a href='https://github.com/growilabs/growi/issues/193'>#193</a>.</p>"
   },
   "grid_edit": {
-    "create_bootstrap_4_grid": "Créer grille Bootstrap 4",
-    "grid_settings": "Paramètres de la grille",
-    "grid_pattern": "Motif de grille",
+    "create_bootstrap_4_grid": "Create Bootstrap 4 Grid",
+    "grid_settings": "Grid Settings",
+    "grid_pattern": "Grid Pattern",
     "division": "Divisions",
-    "smart_no": "Mobile / Pas de point d'arrêt",
-    "break_point": "Point d'arrêt par taille d'écran"
+    "smart_no": "Smartphone / No Break",
+    "break_point": "Break point by display size"
   },
   "validation": {
-    "aws_region": "Entrer la région AWS ex):us-east-1",
-    "aws_custom_endpoint": "Pour l'option personnalisée, spécifier le protocole http(s)://.",
-    "failed_to_send_a_test_email": "Échec de l'envoi du courriel d'essai, vérifier la configuration."
+    "aws_region": "For the region, enter the AWS region name. ex):us-east-1",
+    "aws_custom_endpoint": "For the custom endpoint, specify the URL that starts with http(s)://. Also, the trailing slash is not required.",
+    "failed_to_send_a_test_email": "Failed to send a test email using SMTP. Please check your settings."
   },
   "forgot_password": {
-    "forgot_password": "Mot de passe oublié?",
-    "send": "Envoyer",
-    "return_to_login": "Retour vers la connexion",
-    "reset_password": "Réinitialiser mot de passe",
-    "sign_in_instead": "Se connecter",
-    "password_reset_request_desc": "Le mot de passe est réinitialisable ici.",
-    "password_reset_excecution_desc": "Entrer un nouveau mot de passe",
-    "new_password": "Nouveau mot de passe",
-    "confirm_new_password": "Confirmer le nouveau mot de passe",
-    "email_is_required": "Adresse courriel requise",
-    "success_to_send_email": "Courriel envoyé",
-    "feature_is_unavailable": "Fonctionnalité indisponible.",
-    "incorrect_token_or_expired_url": "Le jeton est invalide ou l'URL est expirée. Effectuer une nouvelle réinitialisation via le lien ci-dessous.",
-    "password_and_confirm_password_does_not_match": "Le mot de passe ne correspond pas",
-    "please_enable_mailer_alert": "La réinitialisation de mot de passe est désactivée, car la configuration d'envois de courriels est incomplète."
+    "forgot_password": "Forgot Password?",
+    "send": "Send",
+    "return_to_login": "Return to login",
+    "reset_password": "Reset Password",
+    "sign_in_instead": "Sign in instead",
+    "password_reset_request_desc": "You can reset your password here.",
+    "password_reset_excecution_desc": "Enter a new password",
+    "new_password": "New Password",
+    "confirm_new_password": "Confirm the new password",
+    "email_is_required": "Email is required",
+    "success_to_send_email": "Success to send email",
+    "feature_is_unavailable": "This feature is unavailable.",
+    "incorrect_token_or_expired_url": "The token is incorrect or the URL has expired. Please resend a password reset request via the link below.",
+    "password_and_confirm_password_does_not_match": "Password and confirm password does not match",
+    "please_enable_mailer_alert": "The password reset feature is disabled because email setup has not been completed. Please ask administrator to complete the email setup."
   },
   "maintenance_mode": {
-    "maintenance_mode": "Mode maintenance",
-    "growi_is_under_maintenance": "GROWI est actuellement en maintenance.",
-    "admin_page": "Administration",
-    "login": "Connexion",
-    "logout": "Déconnexion"
+    "maintenance_mode": "Maintenance Mode",
+    "growi_is_under_maintenance": "GROWI is under maintenance. Please wait until it ends.",
+    "admin_page": "Admin Page",
+    "login": "Login",
+    "logout": "Logout"
   },
   "pagetree": {
-    "cannot_rename_a_title_that_contains_slash": "Renommage impossible lorsque le titre contient '/'",
-    "you_cannot_move_this_page_now": "Déplacement de la page impossible",
-    "something_went_wrong_with_moving_page": "Échec de déplacement de la page",
-    "error_retrieving_the_pagetree": "Une erreur s'est produite lors de la récupération de l'arbre des pages"
+    "cannot_rename_a_title_that_contains_slash": "Cannot rename a title that contains '/'",
+    "you_cannot_move_this_page_now": "You cannot move this page now",
+    "something_went_wrong_with_moving_page": "Something went wrong with moving page",
+    "error_retrieving_the_pagetree": "Error occurred while retrieving the PageTree"
   },
   "duplicated_page_alert": {
-    "same_page_name_exists": "Une page avec ce nom 「{{pageName}}」 existe déjà",
-    "same_page_name_exists_at_path": "Une page avec ce nom {{pageName}} existe déjà {{path}} ",
-    "select_page_to_see": "Sélectionner une page"
+    "same_page_name_exists": "Same page name exits as「{{pageName}}」",
+    "same_page_name_exists_at_path": "Same page name as {{pageName}} exists at {{path}} ",
+    "select_page_to_see": "Select a page to see"
   },
   "user_group": {
-    "select_group": "Groupes autorisés",
-    "belonging_to_no_group": "Vous n'appartenez à aucun groupe.",
-    "manage_user_groups": "Gestion des groupes",
-    "only_yourself": "Vous seulement"
+    "select_group": "Select group",
+    "belonging_to_no_group": "Could not find the groups you belong to.",
+    "manage_user_groups": "Manage user groups",
+    "only_yourself": "Only you"
   },
   "fix_page_grant": {
     "modal": {
-      "no_grant_available": "La liste de permissions est introuvable. Modifier les permissions de la page parent et réessayer.",
-      "need_to_fix_grant": "Les permissions associées a la page doivent être modifiées. <br> Sélectionner parmi les options ci-dessous.",
+      "no_grant_available": "The list of selectable permissions could not be found. Please modify the permissions on the parent page first and try again.",
+      "need_to_fix_grant": "The permissions associated with this page must be modified in order to use the functionality correctly. <br> Please select from the options below to make the change.",
       "grant_label": {
         "public": "Public",
-        "isForbidden": "Non autorisé",
-        "currentPageGrantLabel": "Autorisations de la page: ",
-        "parentPageGrantLabel": "Autorité de la page parent: ",
-        "docLink": "Pour plus d'informations sur la modifications de permissions, se référer <a href='https://docs.growi.org/en/guide/features/authority.html#permissions-for-subordinate-pages'>こちらのリンク</a>"
+        "isForbidden": "Authority not allowed to view",
+        "currentPageGrantLabel": "Authorization for this page: ",
+        "parentPageGrantLabel": "Authority of parent page: ",
+        "docLink": "For more information on modifying permissions, please refer to <a href='https://docs.growi.org/en/guide/features/authority.html#permissions-for-subordinate-pages'>こちらのリンク</a>"
       },
       "radio_btn": {
-        "restrected": "Avec le lien",
-        "only_me": "seulement moi",
-        "grant_group": "Seulement les groupes spécifiés"
+        "restrected": "Only those who know the link",
+        "only_me": "only to oneself",
+        "grant_group": "Only specific groups"
       },
-      "select_group_default_text": "Sélectionner groupe",
-      "alert_message_select_group": "Aucun groupe sélectionné",
+      "select_group_default_text": "Select Group",
+      "alert_message_select_group": "No group selected",
       "btn_label": "Conversion",
-      "title": "Modifier autorité"
+      "title": "Modify authority"
     },
     "alert": {
-      "description": "Les permissions de cette page doivent être modifiées.",
-      "btn_label": "Révision"
+      "description": "You need to modify the permission settings for this page.",
+      "btn_label": "Revision"
     }
   },
   "tooltip": {
-    "like": "Aimer",
-    "cancel_like": "Annuler",
-    "bookmark": "Ajouter aux favoris",
-    "cancel_bookmark": "Retirer des favoris",
-    "receive_notifications": "S'abonner",
-    "stop_notification": "Se désabonner",
-    "footprints": "Lecteurs",
-    "login_required": "Connexion requise",
+    "like": "Like!",
+    "cancel_like": "Cancel Like",
+    "bookmark": "Bookmark",
+    "cancel_bookmark": "Cancel Bookmark",
+    "receive_notifications": "Receive Notifications",
+    "stop_notification": "Stop Notification",
+    "footprints": "Footprints",
+    "login_required": "Login required",
     "operation": {
       "attention": {
-        "rename": "Échec du renommage du chemin des pages descendantes, ouvrir le menu du lecteur 3-points et sélectionner 'Récupération du chemin'"
+        "rename": "Renaming paths of descendant pages was not successful, please open the menu from the 3-point reader and select 'Path recovery'"
       }
     }
   },
   "page_operation": {
-    "paths_recovered": "Chemin récupéré",
-    "path_recovery_failed": "Échec de la récupération du chemin"
+    "paths_recovered": "Paths recovered successfully",
+    "path_recovery_failed": "Path recovery failed"
   },
   "user_home_page": {
-    "bookmarks": "Favoris",
-    "contribution_graph": "Graphe de contribution",
-    "contribution_migration_in_progress": "Préparation de vos données de contribution. Actualisez dans un instant pour les voir.",
-    "recently_created": "Pages récentes",
-    "recent_activity": "Modifications récentes",
-    "unknown_action": "a effectué une modification non spécifiée",
-    "page_create": "a créé une page",
-    "page_update": "a mis à jour une page",
-    "page_delete": "a supprimé une page",
-    "page_delete_completely": "a supprimé complètement une page",
-    "page_rename": "a renommé une page",
-    "page_revert": "a restauré une page",
-    "page_duplicate": "a dupliqué une page",
-    "page_like": "a aimé une page",
-    "comment_create": "a publié un commentaire"
+    "bookmarks": "Bookmarks",
+    "contribution_graph": "Contribution Graph",
+    "contribution_migration_in_progress": "Preparing your contribution data. Refresh in a moment to see it.",
+    "recently_created": "Recently Created",
+    "recent_activity": "Recent Activity",
+    "unknown_action": "made an unspecified change",
+    "page_create": "created a page",
+    "page_update": "updated a page",
+    "page_delete": "deleted a page",
+    "page_delete_completely": "deleted a page",
+    "page_rename": "renamed a page",
+    "page_revert": "reverted a page",
+    "page_like": "liked a page",
+    "page_duplicate": "duplicated a page",
+    "comment_create": "posted a comment"
   },
   "bookmark_folder": {
-    "bookmark_folder": "dossier de favoris",
-    "bookmark": "favoris",
+    "bookmark_folder": "bookmark folder",
+    "bookmark": "bookmark",
     "delete_modal": {
-      "modal_header_label": "Supprimer dossier de favoris",
-      "modal_body_description": "Supprimer le dossier de favoris et son contenu",
-      "modal_body_alert": "Le contenu d'un dossier supprimé n'est pas récupérable",
-      "modal_footer_button": "Supprimer dossier"
+      "modal_header_label": "Delete Bookmark Folder",
+      "modal_body_description": "Delete this bookmark folder and its contents",
+      "modal_body_alert": "Deleted folder and its contents cannot be recovered",
+      "modal_footer_button": "Delete Folder"
     },
-    "input_placeholder": "Nom du dossier",
-    "new_folder": "Nouveau dossier",
-    "delete": "Supprimer dossier",
-    "drop_item_here": "Glisser-déposer ici",
-    "cancel_bookmark": "Retirer le favori",
-    "move_to_root": "Déplacer à la racine",
-    "root": "racine (par défaut)"
+    "input_placeholder": "Input folder name",
+    "new_folder": "New Folder",
+    "delete": "Delete Folder",
+    "drop_item_here": "Drag and drop item here",
+    "cancel_bookmark": "Un-bookmark this page",
+    "move_to_root": "Move to the root",
+    "root": "root (default)"
   },
   "v5_page_migration": {
-    "page_tree_not_avaliable": "Cette fonctionnalité n'est pas encore disponible.",
-    "go_to_settings": "Activer cette fonctionnalité dans les paramètres"
+    "page_tree_not_avaliable": "Page tree feature is not available yet.",
+    "go_to_settings": "Go to settings to enable the feature"
   },
   "tag_edit_modal": {
-    "edit_tags": "Étiquettes",
-    "done": "Assigner",
+    "edit_tags": "Edit Tags",
+    "done": "Done",
     "tags_input": {
-      "tag_name": "Choisir ou créer une étiquette"
+      "tag_name": "tag name"
     }
   },
   "delete_attachment_modal": {
-    "confirm_delete_attachment": "Supprimer pièce jointe?"
+    "confirm_delete_attachment": "Delete attachment?"
   },
   "rich_attachment": {
-    "attachment_not_be_found": "Pièce jointe introuvable"
+    "attachment_not_be_found": "The attachment could not be found"
   },
   "page_select_modal": {
-    "select_page_location": "Sélectionner emplacement de la page"
+    "select_page_location": "Select page location"
   },
   "wip_page": {
-    "save_as_wip": "Enregistrer comme brouillon",
-    "success_save_as_wip": "Sauvegardée en tant que brouillon",
-    "fail_save_as_wip": "Échec de la sauvegarde du brouillon",
-    "alert": "Page en cours d'écriture.",
-    "publish_page": "Publier",
-    "success_publish_page": "Page publiée",
-    "fail_publish_page": "Échec de publication de la page"
+    "save_as_wip": "Save as WIP (still being written)",
+    "success_save_as_wip": "Successfully saved as a WIP page",
+    "fail_save_as_wip": "Failed to save as a WIP page",
+    "alert": "This page is still being written",
+    "publish_page": "Publish page",
+    "success_publish_page": "Page has been published",
+    "fail_publish_page": "Failed to publish the Page"
   },
   "sidebar_header": {
-    "show_wip_page": "Inclure les brouillons",
-    "compact_view": "Vue compacte"
+    "show_wip_page": "Show WIP",
+    "compact_view": "Compact View"
+  },
+  "create_page": {
+    "untitled": "Untitled"
   },
   "sync-latest-revision-body": {
-    "menuitem": "Synchroniser avec la dernière révision",
-    "confirm": "Le contenu non enregistré sera écrasé. Synchroniser?",
-    "alert": "Certaines modifications n'ont pas été enregistrées. Veuillez rafraîchir votre onglet de navigateur.",
-    "success-toaster": "Dernière révision synchronisée",
-    "skipped-toaster": "Le mode édition doit être activé pour déclencher la synchronisation. Synchronisation annulée.",
-    "error-toaster": "Synchronisation échouée"
+    "menuitem": "Sync the editor text with the latest revision body",
+    "confirm": "Delete the draft data being entered into the editor and synchronize the latest text. Are you sure you want to run it?",
+    "alert": "The latest text may not have been synchronized. Please reload and check again.",
+    "success-toaster": "Latest text synchronized",
+    "skipped-toaster": "Skipped synchronizing since the editor is not activated. Please open the editor and try again.",
+    "error-toaster": "Synchronization of the latest text failed"
   },
   "toolbar": {
-    "attachments": "Pièces jointes",
-    "bold": "Gras",
-    "bullet_list": "Liste à puces",
-    "checklist": "Liste de contrôle",
+    "attachments": "Attachments",
+    "bold": "Bold",
+    "bullet_list": "Bullet List",
+    "checklist": "Checklist",
     "code": "Code",
-    "diagram": "Diagramme",
-    "editor_guide": "Guide de l'Éditeur",
+    "diagram": "Diagram",
+    "editor_guide": "Editor Guide",
     "emoji": "Emoji",
-    "heading": "Titre",
-    "italic": "Italique",
-    "numbered_list": "Liste numérotée",
-    "quote": "Citation",
-    "strikethrough": "Barré",
-    "table": "Tableau",
-    "template": "Modèle",
-    "text_formatting": "Mise en forme du texte"
+    "heading": "Heading",
+    "italic": "Italic",
+    "numbered_list": "Numbered List",
+    "quote": "Quote",
+    "strikethrough": "Strikethrough",
+    "table": "Table",
+    "template": "Template",
+    "text_formatting": "Text Formatting"
   },
   "editor_guide": {
-    "title": "Guide de l'Éditeur",
+    "title": "Editor Guide",
     "tabs": {
-      "textstyle": "Style de Texte",
-      "layout": "Mise en Page",
-      "decoration": "Décoration"
+      "textstyle": "Text Style",
+      "layout": "Layout",
+      "decoration": "Decoration"
     },
     "textstyle": {
-      "copy_done": "Copié !",
-      "copy_failed": "Échec de la copie",
-      "this": "Ceci est du",
+      "copy_done": "Copied!",
+      "copy_failed": "Failed to copy",
+      "this": "This is",
       "is": "",
-      "bold": "gras",
-      "italic": "italique",
-      "strikethrough": "barré",
-      "inline_code": "code en ligne",
-      "bold_italic": "Tout en gras ou italique",
-      "emoji": "Émoticône",
-      "sub_sup": "Indice / Exposant",
-      "link_label": "Lien avec étiquette",
-      "link_docs": "Documentation GROWI",
-      "link_growi": "Lien GROWI",
-      "link_sandbox": "La page bac à sable est ici",
-      "all_important": "Tout ce texte est\nimportant",
-      "sub_text": "indice",
-      "sup_text": "exposant",
-      "is_text": "Ceci est du {{val}}"
+      "bold": "bold",
+      "italic": "italic",
+      "strikethrough": "strikethrough",
+      "inline_code": "inline code",
+      "bold_italic": "Bold or italic all",
+      "emoji": "Emoji",
+      "sub_sup": "Subscript / Superscript",
+      "link_label": "Link with label",
+      "link_docs": "GROWI Documentation",
+      "link_growi": "GROWI Link",
+      "link_sandbox": "Sandbox page is here",
+      "all_important": "This text is all\nimportant",
+      "sub_text": "subscript",
+      "sup_text": "superscript",
+      "is_text": "This is {{val}}"
     },
     "layout": {
-      "copy_done": "Copié !",
-      "header": "En-têtes",
-      "header_text": "Titre",
-      "list": "Liste à puces",
-      "list_text": "Ceci est un élément de liste",
-      "ordered_list": "Liste ordonnée",
-      "ordered_list_text": "Ceci est un élément numéroté",
-      "checkbox": "Cases à cocher",
-      "task": "Tâche ",
-      "quote": "Citations",
-      "quote_text": "Citation",
-      "multi_quote": "Citation imbriquée",
-      "hr": "Ligne horizontale",
-      "br": "Saut de ligne",
-      "br_code": "Ajoutez deux espaces  pour\nrompre la ligne",
-      "br_preview_1": "Ajoutez deux espaces pour",
-      "br_preview_2": "rompre la ligne",
-      "code_block": "Blocs de code",
-      "code_block_text": "Insérez le code ici",
-      "table": "Tableaux",
-      "left": "Aligner à gauche",
-      "right": "Aligner à droite",
-      "center": "Aligner au centre",
-      "row_text": "Cette colonne est",
-      "row_display": "alignée",
-      "footnote": "Notes de bas de page",
-      "footnote_label": "Texte avec note",
-      "footnote_desc": "Écrivez le contenu de la note comme ceci"
+      "copy_done": "Copied!",
+      "header": "Headers",
+      "header_text": "Heading",
+      "list": "Unordered List",
+      "list_text": "This is a list item",
+      "ordered_list": "Ordered List",
+      "ordered_list_text": "This is a numbered item",
+      "checkbox": "Checkboxes",
+      "task": "Task ",
+      "quote": "Blockquotes",
+      "quote_text": "Quote",
+      "multi_quote": "Nested Quote",
+      "hr": "Horizontal Rule",
+      "br": "Line Break",
+      "br_code": "Add two spaces  to break\nthe line",
+      "br_preview_1": "Add two spaces to",
+      "br_preview_2": "break the line",
+      "code_block": "Code Blocks",
+      "code_block_text": "Insert code here",
+      "table": "Tables",
+      "left": "Align Left",
+      "right": "Align Right",
+      "center": "Align Center",
+      "row_text": "This column is",
+      "row_display": "aligned",
+      "footnote": "Footnotes",
+      "footnote_label": "Footnote text",
+      "footnote_desc": "Write the note content like this"
     },
     "decoration": {
-      "copy_done": "Copié dans le presse-papiers !",
+      "copy_done": "Copied to clipboard!",
       "style": "Style",
-      "alert": "Alerte",
-      "alert_with_custom_title": "Alerte avec étiquette",
-      "alert_with_custom_title_text": "Titre personnalisé",
-      "alert_block": "Bloc d'alerte",
-      "alert_unavailable": "Non disponible pour ce style",
+      "alert": "Alert",
+      "alert_with_custom_title": "Alert with label",
+      "alert_with_custom_title_text": "Custom Title",
+      "alert_block": "Alert Block",
+      "alert_unavailable": "Unavailable in this style",
       "badge": "Badge",
-      "text_color": "Couleur du texte",
-      "back_color": "Couleur d'arrière-plan",
-      "placeholder": "Le texte s'affiche ici",
-      "docs_title": "Documentation officielle de Bootstrap 5",
-      "docs_badge": "En savoir plus sur les Badges",
-      "docs_color": "En savoir plus sur les Couleurs",
-      "docs_alert": "En savoir plus sur les Blocs d'alerte"
+      "text_color": "Text Color",
+      "back_color": "Background Color",
+      "placeholder": "Sample text goes here",
+      "docs_title": "Bootstrap 5 Official Documentation",
+      "docs_badge": "Learn more about Badges",
+      "docs_color": "Learn more about Colors",
+      "docs_alert": "Learn more about Alert Blocks"
     }
   },
   "pageMention": {
-    "placeholder": "Saisissez un message... (@ pour mentionner une page)",
-    "hint": "Saisissez un nom de page pour rechercher",
-    "searching": "Recherche en cours...",
-    "noResults": "Aucune page trouvée",
-    "candidatesLabel": "Pages suggérées"
+    "placeholder": "Type a message... (@ to mention a page)",
+    "hint": "Type a page name to search",
+    "searching": "Searching...",
+    "noResults": "No pages found",
+    "candidatesLabel": "Page candidates"
   },
   "slash_command": {
     "heading1": {
-      "label": "Titre 1",
+      "label": "Heading 1",
       "description": ""
     },
     "heading2": {
-      "label": "Titre 2",
+      "label": "Heading 2",
       "description": ""
     },
     "heading3": {
-      "label": "Titre 3",
+      "label": "Heading 3",
       "description": ""
     },
     "bulletList": {
-      "label": "Liste à puces",
+      "label": "Bulleted list",
       "description": ""
     },
     "numberedList": {
-      "label": "Liste numérotée",
+      "label": "Numbered list",
       "description": ""
     },
     "taskList": {
-      "label": "Liste de tâches",
+      "label": "Task list",
       "description": ""
     },
     "quote": {
-      "label": "Citation",
+      "label": "Quote",
       "description": ""
     },
     "codeBlock": {
-      "label": "Bloc de code",
+      "label": "Code block",
       "description": ""
     },
     "table": {
-      "label": "Tableau",
+      "label": "Table",
       "description": ""
     }
   }

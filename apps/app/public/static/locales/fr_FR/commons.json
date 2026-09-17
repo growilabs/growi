@@ -1,260 +1,293 @@
 {
-  "Show": "Afficher",
-  "View": "Lecture",
-  "Edit": "Écriture",
-  "Hide": "Cacher",
-  "Add": "Ajouter",
-  "Insert": "Insérer",
-  "Reset": "Réinitialiser",
-  "Sign out": "Déconnexion",
-  "New": "Nouveau",
-  "Send": "Envoyer",
-  "Clear": "Vider",
-  "Delete": "Supprimer",
-  "Cancel": "Annuler",
-  "Close": "Fermer",
-  "Confirm": "Confirmer",
-  "Create": "Créer",
-  "Created": "Crée le",
+  "Show": "Show",
+  "View": "View",
+  "Hide": "Hide",
+  "Add": "Add",
+  "Insert": "Insert",
+  "Reset": "Reset",
+  "Sign out": "Logout",
+  "New": "New",
+  "Send": "Send",
+  "Clear": "Clear",
+  "Delete": "Delete",
+  "Cancel": "Cancel",
+  "Close": "Close",
+  "Confirm": "Confirm",
+  "Create": "Create",
+  "Created": "Created",
   "Description": "Description",
-  "Done": "Terminer",
-  "Email": "Adresse courriel",
-  "Error occurred": "Une erreur est survenue",
-  "Help": "Aide",
-  "Name": "Nom",
-  "Password": "Mot de passe",
-  "Update": "Enregistrer",
-  "User": "Utilisateur",
-  "UserGroup": "Groupe utilisateur",
-  "V5 Page Migration": "Convertir vers la V5",
-  "Warning": "Avertissement",
-  "add": "Ajouter",
+  "Done": "Done",
+  "Edit": "Edit",
+  "Email": "Email",
+  "Error occurred": "Error occurred",
+  "Help": "Help",
+  "Name": "Name",
+  "Password": "Password",
+  "Update": "Update",
+  "User": "User",
+  "UserGroup": "UserGroup",
+  "V5 Page Migration": "Convert To V5 Compatibility",
+  "Warning": "Warning",
+  "add": "Add",
   "eg": "e.g.",
-  "username": "Nom d'utilisateur",
+  "username": "Username",
   "meta": {
-    "display_name": "Français"
+    "display_name": "English"
   },
   "toaster": {
-    "add_succeeded": "Succès de l'ajout de {{target}} ",
-    "create_failed": "Échec de création de {{target}}",
-    "create_succeeded": "Succès de la création de {{target}}",
-    "delete_succeeded": "{{target}} supprimé",
-    "remove_share_link": "{{count}} liens de partage supprimés",
-    "remove_share_link_success": "Lien de partage {{shareLinkId}} supprimé",
-    "update_failed": "Échec de mise à jour de {{target}}",
-    "update_successed": "Succès de mise à jour de {{target}}"
+    "add_succeeded": "Succeeded to add {{target}}",
+    "create_failed": "Failed to create {{target}}",
+    "create_succeeded": "Succeeded to create {{target}}",
+    "delete_succeeded": "Succeeded to delete {{target}}",
+    "remove_share_link": "Succeeded to remove {{count}} share links",
+    "remove_share_link_success": "Succeeded to remove {{shareLinkId}}",
+    "update_failed": "Failed to update {{target}}",
+    "update_successed": "Succeeded to update {{target}}"
   },
   "alert": {
-    "siteUrl_is_not_set": "'URL du site' n'est pas renseigné. Remplir depuis {{link}}",
-    "please_enable_mailer": "La configuration SMTP est requise.",
-    "password_reset_please_enable_mailer": "La configuration SMTP est requise.",
-    "email_is_already_in_use": "La configuration SMTP est déjà faite."
+    "siteUrl_is_not_set": "'Site URL' is NOT set. Set it from the {{link}}",
+    "please_enable_mailer": "Please setup mailer first.",
+    "password_reset_please_enable_mailer": "Please setup mailer first.",
+    "email_is_already_in_use": "The email address is already in use."
   },
   "headers": {
-    "app_settings": "Application"
+    "app_settings": "App Settings"
   },
   "header_search_box": {
     "label": {
-      "All pages": "Toutes les pages",
-      "This tree": "Cette arbre"
+      "All pages": "All pages",
+      "This tree": "This tree"
     },
     "item_label": {
-      "All pages": "Toutes les pages",
-      "This tree": "Enfants de cette arbre"
+      "All pages": "All pages",
+      "This tree": "Only children of this tree"
     }
   },
   "search_method_menu_item": {
-    "search_in_all": "Rechercher dans tout",
-    "only_children_of_this_tree": "Enfants de cet arbre",
-    "exact_mutch": "Correspondance exacte"
+    "search_in_all": "Search in all",
+    "only_children_of_this_tree": "Only children of this tree",
+    "exact_mutch": "Exact match"
   },
   "share_links": {
-    "Share Link": "Liens de partage",
-    "Page Path": "Chemin de la page",
+    "Share Link": "Share Link",
+    "Page Path": "Page Path",
     "expire": "Expiration",
     "description": "Description"
   },
   "in_app_notification": {
-    "notification_list": "Notifications d'application",
-    "see_all": "Voir tout",
-    "no_notification": "Aucune notification.",
-    "all": "Toutes",
-    "unopend": "Non-lues",
-    "mark_all_as_read": "Tout marquer comme lu",
-    "no_unread_messages": "aucun message non lu",
-    "news": "Actualités",
+    "notification_list": "In-App Notification List",
+    "see_all": "See All",
+    "no_notification": "You don't have any notificatios.",
+    "all": "All",
+    "unopend": "Unread",
+    "mark_all_as_read": "Mark all as read",
+    "no_unread_messages": "no_unread_messages",
+    "only_unread": "Only unread",
+    "news": "News",
     "notifications": "Notifications",
-    "filter_all": "Tout",
-    "no_news": "Aucune actualité disponible",
-    "view_detail": "Voir les détails"
+    "filter_all": "All",
+    "no_news": "No news available",
+    "view_detail": "View details"
   },
   "personal_dropdown": {
-    "home": "Accueil",
-    "settings": "Paramètres",
-    "color_mode": "Couleur",
-    "sidebar_mode": "Navigation latérale",
-    "sidebar_mode_editor": "Navigation latérale dans l'éditeur",
-    "use_os_settings": "Utiliser les paramètres système",
-    "feedback": "Sondage"
+    "home": "Home",
+    "settings": "Settings",
+    "color_mode": "Color mode",
+    "sidebar_mode": "Sidebar mode",
+    "sidebar_mode_editor": "Sidebar mode on editor",
+    "use_os_settings": "Use OS settings",
+    "feedback": "Feedback"
   },
   "create_page_dropdown": {
-    "new_page": "Nouvelle page",
-    "open_page_create_modal": "Modale de création de page",
+    "new_page": "Create New Page",
+    "open_page_create_modal": "Open new page create modal",
     "todays": {
-      "desc": "Mémo du jour",
-      "memo": "mémo"
+      "desc": "Create today's memo",
+      "memo": "memo"
     },
     "template": {
-      "desc": "Modèles",
-      "children": "Modèle pour page enfant",
-      "descendants": "Modèle pour page adjacentes"
+      "desc": "Create/Edit template page",
+      "children": "Template for children",
+      "descendants": "Template for descendants"
     }
   },
   "copy_to_clipboard": {
-    "Copy to clipboard": "Copier dans le presse-papier",
-    "Page path": "Chemin de la page",
-    "Page URL": "URL de la page",
-    "Permanent link": "Lien permanent",
-    "Page path and permanent link": "Chemin de la page et lien permanent",
-    "Markdown link": "Lien Markdown",
-    "Append params": "Affixer les paramètres"
+    "Copy to clipboard": "Copy to clipboard",
+    "Page path": "Page path",
+    "Page URL": "Page URL",
+    "Markdown URL": "Markdown URL (.md)",
+    "Permanent link": "Permanent link",
+    "Page path and permanent link": "Page path and permanent link",
+    "Markdown link": "Markdown link",
+    "Append params": "Append params"
   },
   "crop_image_modal": {
-    "image_crop": "Recadrage d'image",
-    "crop": "Recadrer",
-    "save": "Sauvegarder",
-    "cancel": "Annuler"
+    "image_crop": "Image Crop",
+    "crop": "Crop",
+    "save": "Save",
+    "cancel": "Cancel"
   },
   "handsontable_modal": {
-    "title": "Tableau",
-    "data_import": "Importer des données",
-    "save": "Sauvegarder",
-    "cancel": "Annuler",
-    "done": "Mettre à jour",
+    "title": "Edit Table",
+    "data_import": "Data Import",
+    "save": "Save",
+    "cancel": "Cancel",
+    "done": "Done",
     "data_import_form": {
-      "select_data_format": "Format",
-      "import_data": "Données du fichier",
-      "paste_table_data": "Coller les données de la fichier",
-      "parse_error": "Erreur lors de l'importation des données",
-      "cancel": "Annuler",
-      "import": "Importer"
+      "select_data_format": "Select Data Format",
+      "import_data": "Import Data",
+      "paste_table_data": "Paste table data",
+      "parse_error": "Parse Error",
+      "cancel": "Cancel",
+      "import": "Import"
     }
   },
   "not_found_page": {
-    "page_not_exist": "Cette page est introuvable."
+    "page_not_exist": "This page does not exist."
   },
   "g2g_data_transfer": {
-    "tab": "Transfert de données",
-    "data_transfer": "Transfert de données",
-    "transfer_data_to_this_growi": "Transférer les données d'un autre GROWI vers ce GROWI",
-    "publish_transfer_key": "Publier la clé de transfert",
-    "transfer_key_limit": "Les clés de transfert sont valides durant une heure.",
-    "once_transfer_key_used": "Les clés de transfert sont à usage unique.",
-    "transfer_to_growi_cloud": "Pour plus de détails, veuillez cliquer <a href='{{documentationUrl}}en/admin-guide/management-cookbook/g2g-transfer.html'>ici.</a>"
+    "tab": "Data transfer",
+    "data_transfer": "Data Transfer",
+    "transfer_data_to_this_growi": "Transfer data from another GROWI to this GROWI",
+    "publish_transfer_key": "Publish transfer key",
+    "transfer_key_limit": "Transfer keys are valid for 1 hour after issuance.",
+    "once_transfer_key_used": "Once the transfer key is used for transfer, it cannot be used for any other transfer.",
+    "transfer_to_growi_cloud": "For more details, please click <a href='{{documentationUrl}}en/admin-guide/management-cookbook/g2g-transfer.html'>here.</a>"
   },
   "accesstoken_scopes_desc": {
     "read": {
-      "all": "Accorde la permission de voir tout le contenu.",
+      "all": "Grants permission to view all content.",
       "admin": {
-        "all": "Accorde la permission de voir les fonctionnalités d'administration.",
-        "top": "Accorde la permission de voir la page principale de gestion du Wiki.",
-        "app": "Accorde la permission de voir les paramètres de l'application.",
-        "ai": "Accorde la permission de voir les paramètres IA.",
-        "security": "Accorde la permission de voir les paramètres de sécurité.",
-        "markdown": "Accorde la permission de voir les paramètres markdown.",
-        "customize": "Accorde la permission de voir les paramètres de personnalisation.",
-        "import_data": "Accorde la permission de voir les paramètres d'importation de données.",
-        "export_data": "Accorde la permission de voir les paramètres d'archivage de données.",
-        "data_transfer": "Accorde la permission de voir les paramètres de transfert de données.",
-        "external_notification": "Accorde la permission de voir les paramètres de notification externe.",
-        "slack_integration": "Accorde la permission de voir les paramètres d'intégration Slack.",
-        "legacy_slack_integration": "Accorde la permission de voir les paramètres d'intégration Slack (ancien).",
-        "user_management": "Accorde la permission de voir la gestion des utilisateurs.",
-        "user_group_management": "Accorde la permission de voir la gestion des groupes d'utilisateurs.",
-        "audit_log": "Accorde la permission de voir les journaux d'audit.",
-        "plugin": "Accorde la permission de voir les paramètres des plugins.",
-        "full_text_search": "Accorde la permission de voir la gestion de la recherche en texte intégral."
+        "all": "Grants permission to view admin features.",
+        "top": "Grants permission to view Wiki management top.",
+        "app": "Grants permission to view app settings.",
+        "ai": "Grants permission to view AI settings.",
+        "security": "Grants permission to view security settings.",
+        "markdown": "Grants permission to view markdown settings.",
+        "customize": "Grants permission to view customization settings.",
+        "import_data": "Grants permission to view data import settings.",
+        "export_data": "Grants permission to view data archive settings.",
+        "data_transfer": "Grants permission to view data transfer settings.",
+        "external_notification": "Grants permission to view external notification settings.",
+        "slack_integration": "Grants permission to view Slack integration settings.",
+        "legacy_slack_integration": "Grants permission to view legacy Slack integration settings.",
+        "user_management": "Grants permission to view user management.",
+        "user_group_management": "Grants permission to view user group management.",
+        "audit_log": "Grants permission to view audit logs.",
+        "plugin": "Grants permission to view plugin settings.",
+        "full_text_search": "Grants permission to view full text search management."
       },
       "user_settings": {
-        "all": "Accorde la permission de voir les paramètres utilisateur.",
-        "info": "Accorde la permission de voir les informations utilisateur.",
-        "external_account": "Accorde la permission de voir les comptes externes.",
-        "password": "Accorde la permission de voir les paramètres de mot de passe.",
+        "all": "Grants permission to view user settings.",
+        "info": "Grants permission to view user information.",
+        "external_account": "Grants permission to view external accounts.",
+        "password": "Grants permission to view password settings.",
         "api": {
-          "all": "Accorde la permission de voir les paramètres API.",
-          "api_token": "Accorde la permission de voir les paramètres de jeton API.",
-          "access_token": "Accorde la permission de voir les paramètres de jeton d'accès."
+          "all": "Grants permission to view API settings.",
+          "api_token": "Grants permission to view API token settings.",
+          "access_token": "Grants permission to view access token settings."
         },
-        "in_app_notification": "Accorde la permission de voir les paramètres de notification dans l'application.",
-        "other": "Accorde la permission de voir les autres paramètres."
+        "in_app_notification": "Grants permission to view in-app notification settings.",
+        "other": "Grants permission to view other settings."
       },
       "features": {
-        "all": "Accorde la permission de voir les fonctionnalités.",
-        "ai": "Accorde la permission de voir les fonctionnalités d'assistant IA.",
-        "page": "Accorde la permission de voir les fonctionnalités de page.",
-        "share_link": "Accorde la permission de voir les fonctionnalités de lien de partage.",
-        "bookmark": "Accorde la permission de voir les fonctionnalités de signet.",
-        "attachment": "Accorde la permission de voir les fonctionnalités de pièce jointe.",
-        "page_bulk_export": "Accorde la permission de voir les fonctionnalités d'exportation en masse de pages.",
-        "in_app_notification": "Accorde la permission de voir les fonctionnalités de notification intégrée à l'application.",
-        "user": "Accorde la permission de voir les fonctionnalités d'informations utilisateur.",
-        "user_group": "Accorde la permission de voir les fonctionnalités de membres de groupe d'utilisateurs."
+        "all": "Grants permission to view features.",
+        "ai": "Grants permission to view AI assistant features.",
+        "page": "Grants permission to view page features.",
+        "share_link": "Grants permission to view share link features.",
+        "bookmark": "Grants permission to view bookmark features.",
+        "attachment": "Grants permission to view attachment features.",
+        "page_bulk_export": "Grants permission to view page bulk export features.",
+        "in_app_notification": "Grants permission to view in-app notification features.",
+        "user": "Grants permission to view user information features.",
+        "user_group": "Grants permission to view user group member features."
       }
     },
     "write": {
-      "all": "Accorde la permission de modifier tout le contenu.",
+      "all": "Grants permission to edit all content.",
       "admin": {
-        "all": "Accorde la permission de modifier les fonctionnalités d'administration.",
-        "top": "Accorde la permission de modifier la page principale de gestion du Wiki.",
-        "app": "Accorde la permission de modifier les paramètres de l'application.",
-        "ai": "Accorde la permission de modifier les paramètres IA.",
-        "security": "Accorde la permission de modifier les paramètres de sécurité.",
-        "markdown": "Accorde la permission de modifier les paramètres markdown.",
-        "customize": "Accorde la permission de modifier les paramètres de personnalisation.",
-        "import_data": "Accorde la permission de modifier les paramètres d'importation de données.",
-        "export_data": "Accorde la permission de modifier les paramètres d'archivage de données.",
-        "data_transfer": "Accorde la permission de modifier les paramètres de transfert de données.",
-        "external_notification": "Accorde la permission de modifier les paramètres de notification externe.",
-        "slack_integration": "Accorde la permission de modifier les paramètres d'intégration Slack.",
-        "legacy_slack_integration": "Accorde la permission de modifier les paramètres d'intégration Slack (ancien).",
-        "user_management": "Accorde la permission de modifier la gestion des utilisateurs.",
-        "user_group_management": "Accorde la permission de modifier la gestion des groupes d'utilisateurs.",
-        "audit_log": "Accorde la permission de modifier les journaux d'audit.",
-        "plugin": "Accorde la permission de modifier les paramètres des plugins.",
-        "full_text_search": "Accorde la permission de modifier la gestion de la recherche en texte intégral."
+        "all": "Grants permission to edit admin features.",
+        "top": "Grants permission to edit Wiki management top.",
+        "app": "Grants permission to edit app settings.",
+        "ai": "Grants permission to edit AI settings.",
+        "security": "Grants permission to edit security settings.",
+        "markdown": "Grants permission to edit markdown settings.",
+        "customize": "Grants permission to edit customization settings.",
+        "import_data": "Grants permission to edit data import settings.",
+        "export_data": "Grants permission to edit data archive settings.",
+        "data_transfer": "Grants permission to edit data transfer settings.",
+        "external_notification": "Grants permission to edit external notification settings.",
+        "slack_integration": "Grants permission to edit Slack integration settings.",
+        "legacy_slack_integration": "Grants permission to edit legacy Slack integration settings.",
+        "user_management": "Grants permission to edit user management.",
+        "user_group_management": "Grants permission to edit user group management.",
+        "audit_log": "Grants permission to edit audit logs.",
+        "plugin": "Grants permission to edit plugin settings.",
+        "full_text_search": "Grants permission to edit full text search management."
       },
       "user_settings": {
-        "all": "Accorde la permission de modifier les paramètres utilisateur.",
-        "info": "Accorde la permission de modifier les informations utilisateur.",
-        "external_account": "Accorde la permission de modifier les comptes externes.",
-        "password": "Accorde la permission de modifier les paramètres de mot de passe.",
+        "all": "Grants permission to edit user settings.",
+        "info": "Grants permission to edit user information.",
+        "external_account": "Grants permission to edit external accounts.",
+        "password": "Grants permission to edit password settings.",
         "api": {
-          "all": "Accorde la permission de modifier les paramètres API.",
-          "api_token": "Accorde la permission de modifier les paramètres de jeton API.",
-          "access_token": "Accorde la permission de modifier les paramètres de jeton d'accès."
+          "all": "Grants permission to edit API settings.",
+          "api_token": "Grants permission to edit API token settings.",
+          "access_token": "Grants permission to edit access token settings."
         },
-        "in_app_notification": "Accorde la permission de modifier les paramètres de notification dans l'application.",
-        "other": "Accorde la permission de modifier les autres paramètres."
+        "in_app_notification": "Grants permission to edit in-app notification settings.",
+        "other": "Grants permission to edit other settings."
       },
       "features": {
-        "all": "Accorde la permission de modifier les fonctionnalités.",
-        "ai": "Accorde la permission de modifier les fonctionnalités d'assistant IA.",
-        "page": "Accorde la permission de modifier les fonctionnalités de page.",
-        "share_link": "Accorde la permission de modifier les fonctionnalités de lien de partage.",
-        "bookmark": "Accorde la permission de modifier les fonctionnalités de signet.",
-        "attachment": "Accorde la permission de modifier les fonctionnalités de pièce jointe.",
-        "page_bulk_export": "Accorde la permission de modifier les fonctionnalités d'exportation en masse de pages.",
-        "in_app_notification": "Accorde la permission de modifier les fonctionnalités de notification intégrée à l'application.",
-        "user": "Accorde la permission de modifier les fonctionnalités d'informations utilisateur.",
-        "user_group": "Accorde la permission de modifier les fonctionnalités de membres de groupe d'utilisateurs."
+        "all": "Grants permission to edit features.",
+        "ai": "Grants permission to edit AI assistant features.",
+        "page": "Grants permission to edit page features.",
+        "share_link": "Grants permission to edit share link features.",
+        "bookmark": "Grants permission to edit bookmark features.",
+        "attachment": "Grants permission to edit attachment features.",
+        "page_bulk_export": "Grants permission to edit page bulk export features.",
+        "in_app_notification": "Grants permission to edit in-app notification features.",
+        "user": "Grants permission to edit user information features.",
+        "user_group": "Grants permission to edit user group member features."
       }
     }
   },
+  "growi-vault": {
+    "reconcile": {
+      "section": {
+        "title": "Reconcile"
+      },
+      "rejected": {
+        "invalid-target": "Invalid target path specified.",
+        "bootstrap-not-done": "Vault is not ready. Please wait for bootstrap to complete and try again.",
+        "page-count-exceeds-user-limit": "The target contains too many pages. Please narrow the scope or ask an administrator to run the reconcile.",
+        "page-count-exceeds-admin-limit": "The target contains too many pages. Please narrow the scope or consider using VAULT_BOOTSTRAP_ON_START=force for a full re-bootstrap.",
+        "user-concurrency-limit": "You already have a reconcile in progress. Please wait for it to complete before starting another.",
+        "system-concurrency-limit": "The system reconcile limit has been reached. Please wait for a reconcile to complete before starting another."
+      },
+      "accepted": {
+        "message": "Reconcile started successfully."
+      },
+      "target-type": {
+        "legend": "Target Type",
+        "page": "Page (single page only)",
+        "sub-tree": "Sub-tree (page and all descendants)"
+      },
+      "target-path": {
+        "label": "Target Path"
+      },
+      "submit": {
+        "submitting": "Submitting…",
+        "start": "Start Reconcile"
+      },
+      "cancel": "Cancel"
+    }
+  },
   "username_suggestion": {
-    "active_user": "Utilisateurs actifs",
-    "inactive_user": "Utilisateurs inactifs"
+    "active_user": "Active User",
+    "inactive_user": "Inactive User"
   },
   "table_action": {
-    "edit": "Modifier"
+    "edit": "Edit"
   }
 }
