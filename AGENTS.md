@@ -42,10 +42,13 @@ Cursor natively loads `AGENTS.md` / nested `AGENTS.md`, and discovers skills und
 `.claude/skills/` and `apps/app/.claude/skills/`. It does **not** auto-inject
 `.claude/rules/` the way Claude Code does.
 
-Thin bridge files in `.cursor/rules/*.mdc` `@`-include the canonical `.claude/rules/`
-(and `apps/app/.claude/rules/`) markdown. **Edit rules only under `.claude/`; when
-adding or removing a rule file, update the matching bridge list.** Do not copy rule
-bodies into `.cursor/`.
+Cursor's documented `@filename` include inside `.mdc` rules does **not** expand file
+contents into agent context yet, and copying bodies into `.cursor/rules/` would be
+dual management. Instead, a project `sessionStart` hook
+(`.cursor/hooks/inject-claude-rules.mjs`) reads the canonical
+`.claude/rules/` and `apps/app/.claude/rules/` markdown and injects them as
+`additional_context`. **Edit rules only under `.claude/`.** Do not hand-maintain
+rule bodies under `.cursor/`.
 
 ### Always-Loaded Context
 
