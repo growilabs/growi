@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Foundation: 既存の `.meta.md` 全件を分類し、典型形・非典型形の実例をテスト用に確保する
+- [x] 1. Foundation: 既存の `.meta.md` 全件を分類し、典型形・非典型形の実例をテスト用に確保する
   - `bin/flaky-ci/fixtures/{api,lockfile,job-logs}/**/*.meta.md` を全件確認し、
     `real-checkable`（`-q` を含まない典型形の `gh api -X GET` コマンドを含む）・
     `synthetic`・`unrecognized`（`-q` 付き・ローカル派生物・
@@ -103,3 +103,63 @@
     なし）が実際のGitHub上で確認され、確認後にダミーfixture・使い捨て
     issue・ブランチを片付けてある
   - _Requirements: 3.1, 3.2, 4.1, 4.2, 4.3, 5.1, 5.2_
+
+## Implementation Notes
+
+### タスク1: `.meta.md` 全件の分類カタログ（後続タスク2.1のテスト入力）
+
+`bin/flaky-ci/fixtures/{api,lockfile,job-logs}/**/*.meta.md` 全50件を確認し、
+design.md `meta-source.ts` の分類ルール（典型形の `gh api -X GET
+repos/growilabs/growi/<path>[?query][ --paginate][ -f k=v ...]`、`-q` を
+含まないもの限定）と research.md Decision 1 に沿って3分類に振り分けた。
+`api/dashboard/` 配下2件は `# Source` ではなく `` # `<filename>` `` 見出し
+（`<name>.md.meta.md` 命名）を使うため典型形の正規表現に一致せず、
+Decision 1 のとおり unrecognized に分類される。個別の実例として下記にも
+挙げてある。
+
+以下の各行はファイルの `# Source` 節の該当行をそのまま引用している。
+
+#### real-checkable（典型形に完全一致 — `-X GET` あり・`-q` なし）
+
+- `api/commits/0d1a319a-pulls.json.meta.md` — 引用:
+  `` - **Real.** `gh api -X GET repos/growilabs/growi/commits/0d1a319a106b2a791e883170782e856f88b0e178/pulls`. ``
+  → `-X GET` + パス、クエリなし・`--paginate` なし・`-q` なしの最小形。
+- `api/issues/11821-comments.json.meta.md` — 引用:
+  `` - **Real.** `gh api -X GET repos/growilabs/growi/issues/11821/comments --paginate`. ``
+  → 典型形 + `--paginate`。
+- `api/issues/fetch-flaky-issues-confirmed-page1.json.meta.md` — 引用:
+  `` - **Real.** `gh api -X GET repos/growilabs/growi/issues -f state=all -f labels=flaky/confirmed -f per_page=3 -f page=1` against `growilabs/growi`. ``
+  → 典型形 + 複数の `-f key=value`。
+- `api/pulls/11919-files.json.meta.md` — 引用:
+  `` - **Real.** `gh api -X GET repos/growilabs/growi/pulls/11919/files --paginate`. ``
+  → 典型形 + `--paginate`（別エンドポイント種別の確認用）。
+
+#### synthetic（`# Source` が `**Synthetic.**` で始まる）
+
+- `api/issues/synthetic-no-date-issue.json.meta.md` — 引用:
+  `- **Synthetic.** No real flaky-tracking issue lacks a \`Date:\` line: every open/closed \`flaky/*\` issue checked was filed by \`detect-flaky-ci\`'s template...`
+  → 冒頭が `**Synthetic.**` で始まる典型例。
+- `api/issues/synthetic-duplicate-sha-repro-result.slurp.json.meta.md` — 引用:
+  `- **Synthetic.** Task 1.3 searched for a real issue with two \`### Repro result\` comments naming the *same* commit SHA...`
+  → 冒頭が `**Synthetic.**`、実データの一部を手で改変して合成した例。
+- `api/issues/synthetic-no-labeled-event-11823-events.json.meta.md` — 引用:
+  `- **Synthetic.** No open \`flaky/needs-decision\` issue currently has a missing/truncated \`labeled\` event...`
+  → 冒頭が `**Synthetic.**`。
+
+#### unrecognized（典型形に一致しない・`-q` 付き・別語彙・別書式）
+
+- `lockfile/11886-pnpm-lock.patch.meta.md` — 引用:
+  `` - **Real.** Extracted with `gh api -X GET repos/growilabs/growi/pulls/11886/files --paginate -q '.[] | select(.filename=="pnpm-lock.yaml") | .patch'` ``
+  → 実データの `gh api -X GET` だが `-q` jqフィルタを含むため典型形から除外（design.mdが明示的にunrecognizedとする条件）。
+- `lockfile/11886-extracted-package-names.json.meta.md` — 引用:
+  `- **Derived, not raw API data.** This is the full set of package names extracted from \`11886-pnpm-lock.patch\` by hand-applying the two rules...`
+  → 冒頭が `**Derived, not raw API data.**`。再取得すべき `gh api` エンドポイントが存在しない派生物。
+- `api/commits/constructed-empty-pulls.json.meta.md` — 引用:
+  `` - **Constructed.** `GET commits/{sha}/pulls` returning `[]` is the shape every "no PR yet found by the direct route" branch needs... ``
+  → 冒頭が `**Constructed.**`（`**Synthetic.**` とは異なる語彙）。
+- `api/dashboard/11720-body.md.meta.md` — 引用:
+  `` # `11720-body.md` `` （見出し行そのもの。本文は `- **Source**: real. Issue **#11720**...`）
+  → `# Source` ではなく `` # `<filename>` `` 見出しを使う `api/dashboard/` 配下の別書式（ファイル名も `<name>.md.meta.md`）。
+- `api/check-runs/0d1a319a-check-runs.json.meta.md` — 引用:
+  `` - **Real**: `gh api repos/growilabs/growi/commits/0d1a319a106b2a791e883170782e856f88b0e178/check-runs?per_page=100`. ``
+  → 実際にはGETだが `-X GET` の記述自体が無く、典型形の正規表現に文字どおり一致しないエッジケース。
