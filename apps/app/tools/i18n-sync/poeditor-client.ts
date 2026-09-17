@@ -38,6 +38,7 @@ export interface PoeditorClient {
     fileContent: string; // i18next JSON, stringified
     syncTerms?: boolean; // default true: converge the whole project to fileContent (deletes absent keys)
     tag?: string; // when set, tags every term in fileContent with this value
+    overwrite?: boolean; // default false (POEditor's own default): replace an existing term's translation with fileContent's value
   }): Promise<Result<void, PoeditorApiError>>;
 
   exportTranslations(input: {
@@ -173,6 +174,7 @@ class PoeditorClientImpl implements PoeditorClient {
     fileContent: string;
     syncTerms?: boolean;
     tag?: string;
+    overwrite?: boolean;
   }): Promise<Result<void, PoeditorApiError>> {
     return runCatchingNetworkError(async () => {
       await this.throttleUpload();
@@ -187,6 +189,14 @@ class PoeditorClientImpl implements PoeditorClient {
       // the parameter entirely rather than send '0'.
       if (input.syncTerms ?? true) {
         form.set('sync_terms', '1');
+      }
+      // POEditor defaults `overwrite` to 0 (never replace an existing
+      // translation) when the parameter is omitted -- confirmed by a
+      // real-world case where a source-string wording change never reached
+      // POEditor (see research.md's overwrite-default Decision). Only send
+      // it when the caller explicitly opts in.
+      if (input.overwrite) {
+        form.set('overwrite', '1');
       }
       if (input.tag != null) {
         form.set('tags', JSON.stringify({ all: input.tag }));

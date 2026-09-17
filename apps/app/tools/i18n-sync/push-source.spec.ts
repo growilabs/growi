@@ -69,6 +69,10 @@ describe('runPush', () => {
     expect(combinedCall.projectId).toBe(SHARED_POEDITOR_PROJECT_ID);
     expect(combinedCall.language).toBe(POEDITOR_SOURCE_LANGUAGE);
     expect(combinedCall.tag).toBeUndefined();
+    // en_US is authoritative: a wording change to an existing key must
+    // replace POEditor's copy (POEditor's own default is to keep the old
+    // value -- see research.md's overwrite-default Decision).
+    expect(combinedCall.overwrite).toBe(true);
     // The combined payload must stay nested per namespace. A flat merge would
     // let commons' `shared_key` overwrite translation's — exactly the
     // collision Requirement 1.2 exists to prevent.
@@ -90,6 +94,9 @@ describe('runPush', () => {
       expect(input.projectId).toBe(SHARED_POEDITOR_PROJECT_ID);
       expect(input.language).toBe(POEDITOR_SOURCE_LANGUAGE);
       expect(input.syncTerms).toBe(false);
+      // The combined upload already wrote the authoritative value moments
+      // earlier; the tagging upload only needs to assign a tag.
+      expect(input.overwrite).toBeUndefined();
     }
     expect(JSON.parse(tagCalls[0].fileContent)).toEqual({
       admin: { admin_key: 'Admin' },
