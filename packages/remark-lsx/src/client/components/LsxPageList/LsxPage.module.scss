@@ -3,29 +3,3 @@
     opacity: 0.6;
   }
 }
-
-// Bullet-style row: left icon stays on the first line; wrapped lines indent
-// under the title (not under the icon). Path + meta share one inline context
-// so comment/lock badges follow the last line of text.
-.lsx-page-row {
-  display: flex;
-  align-items: flex-start;
-  column-gap: 0.25rem;
-}
-
-.lsx-page-bullet {
-  flex: 0 0 auto;
-  line-height: inherit;
-
-  :global(.material-symbols-outlined) {
-    // Match title line box so the glyph lines up with the first line of text
-    font-size: 1.25em;
-    line-height: inherit;
-    vertical-align: top;
-  }
-}
-
-.lsx-page-body {
-  flex: 1 1 auto;
-  min-width: 0;
-}
