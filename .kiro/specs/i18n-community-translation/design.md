@@ -407,6 +407,7 @@ type PoeditorApiError =
 **Responsibilities & Constraints**
 - I/O を一切持たない。ファイル読み込み・API呼び出しは呼び出し元（`PullTranslationSync`）の責務
 - ネストしたリーフキーのパス集合を比較する（例: `a.b.c` が両方に存在するか）
+- `after` 側の leaf 値が空文字列 `""` の場合、そのキーは「POEditor側で未翻訳（今回情報が無い）」とみなし、追加・削除・変更のいずれにも数えない（`before` の既存値をそのまま保持させる）。POEditorはプロジェクトのFallback Languageが未設定であれば未翻訳キーを空文字列でexportする（キー自体を省略するわけではない）ため、空文字列と「キーが本当に存在しない」を区別して扱う。空文字列ではなく `after` にキー自体が存在しない場合（POEditor側でtermそのものが削除された場合）のみ、従来通り`removedKeys`に含める（`research.md`の「POEditor の未翻訳キーは export の空文字列で判定し、fallback言語には頼らない」Decision参照。task 6.2の実環境確認で、この扱いをしないと未翻訳キーが軒並み「削除」または「変更」と誤判定され、既存の正しい翻訳を上書き・削除する致命的な不具合になることが判明した）
 
 **Contracts**: Service [x]
 

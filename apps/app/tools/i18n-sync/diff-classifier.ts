@@ -71,6 +71,16 @@ export const classify = (input: DiffClassifierInput): ClassificationResult => {
   const changedKeys: string[] = [];
 
   for (const [path, afterValue] of afterLeaves) {
+    // POEditor exports an untranslated term as an empty string (once the
+    // project's Fallback Language is unset) rather than omitting it. An
+    // empty string here means "no translation yet", not "translation is
+    // now blank" or "key removed" -- skip it so a run with many
+    // still-untranslated terms never overwrites or deletes existing
+    // content based on their absence of a translation.
+    if (afterValue === '') {
+      continue;
+    }
+
     if (!beforeLeaves.has(path)) {
       addedKeys.push(path);
       continue;

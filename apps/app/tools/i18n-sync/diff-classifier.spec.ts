@@ -89,4 +89,59 @@ describe('classify', () => {
       removedKeys: [],
     });
   });
+
+  // POEditor exports an untranslated term as an empty string once the
+  // project's Fallback Language is unset (verified against the live
+  // project: an untranslated fr term exported as "" rather than being
+  // omitted or filled with another language's text). An empty string must
+  // never be treated as this key's actual value -- it means "no
+  // translation yet", not "translation removed" or "translation is blank".
+  it('ignores an existing key whose after value is empty (no translation yet, not a removal)', () => {
+    const before = { editor_guide: { decoration: 'Decoration' } };
+    const after = { editor_guide: { decoration: '' } };
+
+    const result = classify({ before, after });
+
+    expect(result).toEqual({ kind: 'no_change' });
+  });
+
+  it('ignores a newly-termed key whose after value is empty (no translation yet, not an addition)', () => {
+    const before = { editor_guide: { decoration: 'Decoration' } };
+    const after = { editor_guide: { decoration: 'Decoration', outline: '' } };
+
+    const result = classify({ before, after });
+
+    expect(result).toEqual({ kind: 'no_change' });
+  });
+
+  it('still reports a real translation_only change alongside other keys left empty (untranslated)', () => {
+    const before = {
+      editor_guide: { decoration: 'Decoration', outline: 'Outline' },
+    };
+    const after = {
+      editor_guide: { decoration: 'Décoration', outline: '' },
+    };
+
+    const result = classify({ before, after });
+
+    expect(result).toEqual({
+      kind: 'translation_only',
+      changedKeys: ['editor_guide.decoration'],
+    });
+  });
+
+  it('still reports a genuine removal when a key is truly absent from after (not merely empty)', () => {
+    const before = {
+      editor_guide: { decoration: 'Decoration', outline: 'Outline' },
+    };
+    const after = { editor_guide: { decoration: '' } };
+
+    const result = classify({ before, after });
+
+    expect(result).toEqual({
+      kind: 'structural',
+      addedKeys: [],
+      removedKeys: ['editor_guide.outline'],
+    });
+  });
 });
