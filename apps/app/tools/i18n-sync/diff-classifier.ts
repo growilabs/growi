@@ -108,3 +108,53 @@ export const classify = (input: DiffClassifierInput): ClassificationResult => {
 
   return { kind: 'no_change' };
 };
+
+/**
+ * Produces the nested JSON that should actually be written to the
+ * repository after a pull -- `before` with `after`'s real (non-empty)
+ * values applied over it, recursively. This is the write-side counterpart
+ * to `classify`'s read-side skip rule: `classify` only decides what to
+ * *report* (an empty `after` leaf is never a change or an addition), and
+ * this function is what makes that decision hold at the byte level too. The
+ * raw `after` export must never be written directly -- it can carry empty
+ * strings for every not-yet-translated term, which would silently blank
+ * existing translations the moment any other key in the same file actually
+ * changed (see `research.md`'s "POEditor の未翻訳キーは export の空文字列で判定し、
+ * fallback言語には頼らない" Decision for the incident this fixes).
+ *
+ * - A leaf present in `after` with a non-empty value always wins (new or
+ *   changed content).
+ * - A leaf present in `after` as `''` keeps `before`'s existing value if
+ *   there was one, and is otherwise omitted (nothing to add yet).
+ * - A leaf genuinely absent from `after` (not merely empty) is dropped --
+ *   this only happens when POEditor's term itself was deleted, matching
+ *   `classify`'s `removedKeys`.
+ */
+export const mergeTranslations = (
+  before: Readonly<Record<string, unknown>>,
+  after: Readonly<Record<string, unknown>>,
+): Record<string, unknown> => {
+  const result: Record<string, unknown> = {};
+
+  for (const [key, afterValue] of Object.entries(after)) {
+    if (isPlainObject(afterValue)) {
+      const beforeValue = before[key];
+      result[key] = mergeTranslations(
+        isPlainObject(beforeValue) ? beforeValue : {},
+        afterValue,
+      );
+      continue;
+    }
+
+    if (afterValue === '') {
+      if (key in before) {
+        result[key] = before[key];
+      }
+      continue;
+    }
+
+    result[key] = afterValue;
+  }
+
+  return result;
+};

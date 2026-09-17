@@ -1,4 +1,4 @@
-import { classify } from './diff-classifier';
+import { classify, mergeTranslations } from './diff-classifier';
 
 describe('classify', () => {
   it('returns no_change when before and after are identical', () => {
@@ -143,5 +143,64 @@ describe('classify', () => {
       addedKeys: [],
       removedKeys: ['editor_guide.outline'],
     });
+  });
+});
+
+describe('mergeTranslations', () => {
+  // This is the content that actually gets written to disk (pull-translations.ts
+  // writes `mergeTranslations(before, after)`, never the raw export) — classify()
+  // only decides what to *report*, this decides what to *write*. An export value
+  // of '' must never reach the file: it means "no translation yet", so the
+  // existing before-value must survive untouched.
+  it('keeps the existing value for a key POEditor has not translated yet (after is empty)', () => {
+    const before = { a: { k1: '既存の訳1', k2: '既存の訳2' } };
+    const after = { a: { k1: '新しい訳1', k2: '' } };
+
+    expect(mergeTranslations(before, after)).toEqual({
+      a: { k1: '新しい訳1', k2: '既存の訳2' },
+    });
+  });
+
+  it('does not insert a brand-new key whose only value is an empty string', () => {
+    const before = { a: { k1: 'x' } };
+    const after = { a: { k1: 'x', k2: '' } };
+
+    expect(mergeTranslations(before, after)).toEqual({ a: { k1: 'x' } });
+  });
+
+  it('inserts a brand-new key that has a real (non-empty) value', () => {
+    const before = { a: { k1: 'x' } };
+    const after = { a: { k1: 'x', k2: 'y' } };
+
+    expect(mergeTranslations(before, after)).toEqual({
+      a: { k1: 'x', k2: 'y' },
+    });
+  });
+
+  it('drops a key genuinely absent from after (a real POEditor term deletion)', () => {
+    const before = { a: { k1: 'x', k2: 'y' } };
+    const after = { a: { k1: 'x' } };
+
+    expect(mergeTranslations(before, after)).toEqual({ a: { k1: 'x' } });
+  });
+
+  it('recurses into nested namespace objects rather than replacing them wholesale', () => {
+    const before = {
+      a: { nested: { k1: '既存1', k2: '既存2' } },
+    };
+    const after = {
+      a: { nested: { k1: '新規1', k2: '' } },
+    };
+
+    expect(mergeTranslations(before, after)).toEqual({
+      a: { nested: { k1: '新規1', k2: '既存2' } },
+    });
+  });
+
+  it('matches the raw export when nothing is empty (no behavior change for the fully-translated case)', () => {
+    const before = { a: { k1: 'old' } };
+    const after = { a: { k1: 'new', k2: 'added' } };
+
+    expect(mergeTranslations(before, after)).toEqual(after);
   });
 });

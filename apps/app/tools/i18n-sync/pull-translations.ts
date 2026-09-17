@@ -34,7 +34,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { classify } from './diff-classifier.ts';
+import { classify, mergeTranslations } from './diff-classifier.ts';
 import {
   createApprovalReviewer,
   createBaseRefResolver,
@@ -479,7 +479,11 @@ export const collectClassifications = async (
         language: input.language,
         changedKeys: result.changedKeys,
         absoluteFilePath: input.absoluteFilePath,
-        content: after,
+        // Never the raw `after` export: an untranslated term exports as
+        // `''` (see diff-classifier.ts's `mergeTranslations` doc comment),
+        // and writing that verbatim would blank every not-yet-translated
+        // key the moment any other key in the same file changed.
+        content: mergeTranslations(before, after),
       });
       continue;
     }
@@ -490,7 +494,7 @@ export const collectClassifications = async (
         addedKeys: result.addedKeys,
         removedKeys: result.removedKeys,
         filePath: input.absoluteFilePath,
-        exportedContent: after,
+        exportedContent: mergeTranslations(before, after),
       });
     }
     // 'no_change' combinations are intentionally excluded from both groups —
@@ -663,9 +667,14 @@ const PR_TITLE = 'chore(i18n): apply translation-only updates from POEditor';
  * write → publish branch → create-or-update the PR → run the gate → approve.
  *
  * **Why writing whole files is safe.** `translation_only` means the two leaf
- * key sets are identical, so overwriting the file with the exported content
+ * key sets are identical, so overwriting the file with `combination.content`
  * can only change values, never the key set — the property that makes this
- * change eligible for the no-human-review path in the first place.
+ * change eligible for the no-human-review path in the first place. This only
+ * holds because `combination.content` is `mergeTranslations(before, after)`,
+ * not the raw POEditor export: an untranslated term exports as `''`
+ * (diff-classifier.ts), and writing that verbatim would both change a value
+ * (blanking it) and, for a brand-new term, change the key set — silently
+ * defeating the invariant this paragraph relies on. See `collectClassifications`.
  *
  * On a gate failure nothing is approved and the PR is deliberately left open
  * with its failing check; the failure is returned so the caller can fail the
