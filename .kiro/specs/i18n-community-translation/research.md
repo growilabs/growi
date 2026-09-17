@@ -147,6 +147,15 @@
 - **Trade-offs**: 翻訳ファイル側にあってen_US側に無いキー（リポジトリの既存ドリフト。今回の実測では `translation.json` 単体で ja側36件・en側15件）は投入対象から外れる。これは元々POEditorのterm一覧に載る資格が無いキーであり、この施策のスコープ外（別問題）として扱う
 - **Follow-up**: 既に ja_JP 投入で作成された44件（内訳は上記Findings参照）の孤立termは、実プロジェクトからAPI経由の一括削除で対応済み。同様の絞り込み前提で試算すると、`zh_CN` は25件（admin 8・translation 15・commons 2）、`fr_FR` は5件（admin 2・translation 3・commons 0）、`ko_KR` は0件の孤立termを生んでいたはずで、修正後のツールで実行すればこれらは発生しない。`zh_CN`/`fr_FR`/`ko_KR` の投入は、この修正が反映されたツールで行うこと（既に投入済みの `ja_JP` を再実行する必要はない）
 
+### Decision: `PoeditorClient` は HTTP ステータスだけでなくレスポンス本文の `response.status` も確認する
+- **Context**: `zh_CN`/`fr_FR`/`ko_KR` を修正後ツールで投入したところ、`fr_FR`/`ko_KR` はCLI上「成功」と表示されたにもかかわらず、POEditor上では0%（実際には何も書き込まれていない）ままだった
+- **Sources Consulted**: 実プロジェクトに対する診断用アップロード（同じペイロードを直接呼び出し、レスポンス本文を生のまま出力）
+- **Findings**: `PoeditorClient.uploadTerms`/`exportTranslations`/`listLanguages` はいずれもHTTPステータスが2xxかどうかしか見ておらず、POEditor自身が返すレスポンス本文の `response.status` フィールド（`"success"`か否か）を確認していなかった。診断用アップロードを実行したところ、同じペイロードが`{"response":{"status":"success",...},"result":{"translations":{"added":2253,"updated":0}}}`という形で正しく書き込まれた（=このアップロード自体は成功する内容だった）。つまり直前の本番実行時は、何らかの理由でPOEditorがHTTP 200のまま論理的な失敗を返し、それをコード側が検知できなかったと考えられる。手順書が `zh_CN`→`fr_FR`→`ko_KR` を別プロセスの連続実行として案内しており、`PoeditorClient`のアップロード20秒スロットルはプロセス内state（`lastUploadAt`）にしか依存しないため、プロセスをまたいだ間隔は保証されない ― POEditor側のレート制限に引っかかった可能性が高いが、実際に失敗した時のレスポンス本文そのものは取得できておらず、原因はここまでで確定はしていない
+- **Selected Approach**: `PoeditorClient`内部に`parseSuccessBody`を新設し、HTTPステータスが2xxでも本文の`response.status`が`"success"`以外なら失敗として扱うよう修正した（`response.status`自体が無い応答は互換のため成功扱いのまま）。原因（レート制限か否か）が確定していないため、`rate_limited`への分類は行わず、常に`invalid_request`としてメッセージ付きで返す
+- **Rationale**: 原因を推測で決め打ちして`rate_limited`に分類すると、実際には別の原因だった場合に誤った対処（待って再実行すれば直るという誤解）を招く。今わかっている事実だけを反映し、未確定の原因を憶測で埋めない
+- **Trade-offs**: プロセスをまたいだ20秒間隔の保証はまだ実装していない。複数言語を続けて実行する場合は、実行者が手動で間隔を空けるか、`docs/i18n-community-translation-setup.md`の手順に注意書きを追加する必要がある
+- **Follow-up**: `fr_FR`/`ko_KR`は診断用アップロードで実際には正しく書き込み済み（`translations.added:2253`）だが、これは本番のseedツール経由ではなく診断スクリプトからの直接呼び出しだったため、修正済みツールで正式に再実行し、CLIの「成功」表示とPOEditor上の進捗表示が一致することを確認すること
+
 ## Risks & Mitigations
 - POEditor OSS プランの申請が承認されない可能性 — 承認されるまで本番運用（実際の同期起動）を進めない。requirements.md 要件7.2で明示済み
 - upload のレート制限（20秒に1回）を超過すると同期が失敗する — 呼び出し間に待機を入れて直列実行する設計とする
@@ -157,6 +166,7 @@
 - POEditor プロジェクトの Fallback Language 設定が誤って有効化されると、未翻訳キーの export値が別言語の文言で埋まり、`DiffClassifier`が「訳文が変更された」と誤判定して既存の正しい翻訳を上書きしうる（task 6.2の実環境確認で実際に発生し、生成されたPRはマージせずclose済み） — `DiffClassifier.classify`が空文字列を「情報なし」として無視する実装に修正済み（上記Decision参照）だが、Fallback Language自体は引き続き「未設定」運用が前提。プロジェクト設定が意図せず変わっていないか、定期的な実環境確認（tasks.md 6.x）で確認すること
 - POEditorが ja/zh/fr/ko の既存翻訳を1件も持っていない（push が en_US しかアップロードしないため）状態が続くと、翻訳者が参加してもPOEditor上は0%表示のままになり、体験を損なう — 既存翻訳の初回投入をタスク化して対応する（`docs/i18n-community-translation-setup.md` §2.3）
 - 既存翻訳投入ツールは `sync_terms:false` でも新規termを作成しうる（上記Decision参照）。ja_JP投入時にen_USに無い44件のtermが作成されたが、ツールをen_USの既存キーへの絞り込みに修正し、作成済みだった44件のtermはAPI経由の一括削除で対応済み
+- `PoeditorClient`はHTTPステータスしか見ておらず、POEditorがHTTP 200のまま論理的な失敗を返すケース（`fr_FR`/`ko_KR`投入時に実際に発生、原因未確定だがプロセスをまたいだ20秒レート制限が濃厚）を検知できていなかった（上記Decision参照）。`response.status`確認を追加して修正済みだが、プロセスをまたいだ間隔保証はまだ無いため、複数言語を連続実行する際は手動で間隔を空けること
 
 ## References
 - [POEditor API Reference](https://poeditor.com/docs/api) — upload/export のパラメータ、レート制限、対応フォーマットの一次情報。`terms/add`/`terms/update`の用語一意性（term+context）と、`projects/upload`（一括アップロード）にはcontextを個別指定する手段が無いことも、この一次情報から確認した
