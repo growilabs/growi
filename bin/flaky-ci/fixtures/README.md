@@ -64,8 +64,7 @@ to have a **real** example:
   is real: the comment carrying `- Recommendation: ...` was posted at
   `2026-09-14T19:45:44Z`, and the `flaky/needs-decision` "labeled" event
   fired one second later, at `2026-09-14T19:45:45Z` — see
-  `api/issues/11914-comments.json` / `11914-events.json` and
-  `expected/awaiting-decision-rows.md`.
+  `api/issues/11914-comments.json` / `11914-events.json`.
 
 One more synthetic fixture was added because no real flaky-tracking issue
 lacks a `### First observation` `Date:` line (every one of them was created
@@ -137,11 +136,9 @@ titles currently carrying a `flaky/*` tracking label, real — and
 that has no real example anywhere in `growilabs/growi`'s issue history
 (`playwright:{BROWSER}` job-level fallback, and a malformed `vitest:` key
 with no source-file extension). Both files' `.meta.md` record the exact
-searches. `expected/parse-identity-key-titles.json` and
-`expected/parse-identity-key.md` hold the per-title expectation (what the
-current regex-and-4-step procedure gives for each). `lib/identity.spec.ts`
-loads the `.json` file directly and checks against it; the `.md` file is the
-same expectation in human-readable prose, not read by the test.
+searches. `expected/parse-identity-key-titles.json` holds the per-title
+expectation (what the current regex-and-4-step procedure gives for each);
+`lib/identity.spec.ts` loads it directly and checks against it.
 
 ## Phase 2 material (`api/dashboard/`, task 3.10)
 
@@ -153,8 +150,7 @@ renderer (`fetch-flaky-issues` filtered to `state: "open"`, and
 `awaiting-decision-rows` over the 13 open `flaky/needs-decision` issues).
 `lib/dashboard.spec.ts` renders the input and compares it to the body
 character for character; it matches exactly. Each file's `.meta.md` records
-how it was captured, and `expected/render-dashboard.md` says what the pair
-pins.
+how it was captured.
 
 The three zero states and the character-limit truncation have no real example
 — the dashboard has never had an empty table, and no body has come near 65536
