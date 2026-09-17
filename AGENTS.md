@@ -36,6 +36,17 @@ Both tiers use the same layout: `rules/` (always loaded), `skills/` (loaded on d
 the Skill tool), `agents/`, `commands/`. Each tier's rule inventory is tabulated below
 (root) and in `apps/app/AGENTS.md` (apps/app).
 
+### Cursor Agent (no dual management)
+
+Cursor natively loads `AGENTS.md` / nested `AGENTS.md`, and discovers skills under
+`.claude/skills/` and `apps/app/.claude/skills/`. It does **not** auto-inject
+`.claude/rules/` the way Claude Code does.
+
+Thin bridge files in `.cursor/rules/*.mdc` `@`-include the canonical `.claude/rules/`
+(and `apps/app/.claude/rules/`) markdown. **Edit rules only under `.claude/`; when
+adding or removing a rule file, update the matching bridge list.** Do not copy rule
+bodies into `.cursor/`.
+
 ### Always-Loaded Context
 
 **Rules** (`.claude/rules/`) — loaded into every session automatically:

@@ -1,0 +1,19 @@
+---
+description: Bridge — apps/app package rules from apps/app/.claude/rules (canonical source; do not duplicate)
+globs: apps/app/**
+alwaysApply: false
+---
+
+# Claude Code rule bridge (apps/app)
+
+Canonical agent knowledge for the main app lives under `apps/app/.claude/`.
+Do **not** copy rule bodies here — edit `apps/app/.claude/rules/*.md` instead.
+
+@apps/app/.claude/rules/package-dependencies.md
+@apps/app/.claude/rules/import-convention.md
+@apps/app/.claude/rules/esm-authoring.md
+@apps/app/.claude/rules/server-boot-imports.md
+@apps/app/.claude/rules/activity-recording.md
+@apps/app/.claude/rules/page-write-action-403-404.md
+@apps/app/.claude/rules/mongo-test-setup.md
+@apps/app/.claude/rules/ui-pitfalls.md
