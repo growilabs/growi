@@ -1,0 +1,145 @@
+name: Flaky-CI fixture freshness
+
+# Quarterly, unattended check that bin/flaky-ci/fixtures/ (~21,000 lines of
+# real GitHub API responses, PR #11921) has not silently rotted:
+#   1. check-fixture-drift.ts   — real-data fixtures whose `.meta.md` records
+#      a re-fetchable `gh api -X GET` source are re-fetched and their shape
+#      (top-level key construction / value types, not values) is compared
+#      against the fixture on disk.
+#   2. check-fixture-wiring.ts  — every fixture data file is checked for
+#      being referenced by at least one bin/flaky-ci/**/*.spec.ts.
+#
+# Both scripts only ever report facts; this workflow does not fix anything.
+# Deciding whether to open a GitHub issue for the findings is a separate
+# concern (see the "Recorded results" step below) — this workflow's own job
+# is to run the checks and make sure the result is recorded even when there
+# is nothing to report (Requirement 3.2, 5.2).
+#
+# Contract (design.md `flaky-ci-fixture-freshness.yml` in
+# .kiro/specs/ci-flaky-fixture-freshness): reuse `lib/gh.ts`'s `GhApi` as the
+# only GitHub read path, and follow flaky-repro.yml's `issues: write`
+# permission pattern (kept here even though this workflow does not yet open
+# issues itself, since that is the very next task in this spec).
+
+on:
+  schedule:
+    # 00:00 UTC on the 1st of January, April, July and October.
+    - cron: '0 0 1 1,4,7,10 *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  fixture-freshness:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # ----------------------------------------------------------------------
+      # Cross-reference: same toolchain ci-bin.yml uses to run bin/ scripts
+      # (pnpm + Node 24 + a frozen-lockfile install). `turbo` is deliberately
+      # not installed here, unlike ci-bin.yml: that job runs `turbo run test`,
+      # while this workflow runs the two scripts directly with
+      # `node <script>.ts` (bin/flaky-ci/README.md's documented invocation —
+      # no build step, no dependency beyond Node 24 and the `gh` CLI), so
+      # there is no turbo task to invoke.
+      #
+      # Revalidation Trigger: when ci-bin.yml changes its pnpm/Node setup
+      # steps, mirror the change here so both workflows run the scripts under
+      # the same toolchain.
+      # ----------------------------------------------------------------------
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Each script's full JSON contract lives in bin/flaky-ci/README.md and
+      # the scripts' own doc comments. Non-zero exit means the script itself
+      # could not run (missing `gh` auth, an unexpected exception, ...) —
+      # distinct from `unchecked`, which is how the script reports individual
+      # fixtures it could not confirm while still succeeding overall. Do not
+      # swallow a non-zero exit here: a script failure must fail this step
+      # loudly rather than be recorded as "0 checked, 0 drift".
+      - name: Run check-fixture-drift.ts
+        id: drift
+        run: node bin/flaky-ci/scripts/check-fixture-drift.ts | tee drift.json
+
+      - name: Run check-fixture-wiring.ts
+        id: wiring
+        run: node bin/flaky-ci/scripts/check-fixture-wiring.ts | tee wiring.json
+
+      # Recorded unconditionally (Requirement 3.2, 5.2): this step has no
+      # `if:` condition on the finding counts, only `if: always()` so it
+      # still runs (and still records what it can) even if a prior step
+      # failed.
+      #
+      # drift.json / wiring.json are left on disk, and each script's counts
+      # are also exposed as this step's outputs, so a later task (4.2: issue
+      # creation/dedup on the label `flaky-ci/fixture-freshness`) can add a
+      # step here that reads `steps.summary.outputs.*` or the two JSON files
+      # without this task inventing any issue-creation logic itself.
+      - name: Record results to the job summary
+        id: summary
+        if: always()
+        run: |
+          set -euo pipefail
+
+          {
+            echo "## Flaky-CI fixture freshness"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -s drift.json ]; then
+            DRIFT_CHECKED=$(jq -r '.checked' drift.json)
+            DRIFT_COUNT=$(jq -r '.drift | length' drift.json)
+            DRIFT_UNCHECKED_COUNT=$(jq -r '.unchecked | length' drift.json)
+
+            {
+              echo "### Drift check"
+              echo "- checked: ${DRIFT_CHECKED}"
+              echo "- drift: ${DRIFT_COUNT}"
+              echo "- unchecked: ${DRIFT_UNCHECKED_COUNT}"
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            {
+              echo "drift_checked=${DRIFT_CHECKED}"
+              echo "drift_count=${DRIFT_COUNT}"
+              echo "drift_unchecked_count=${DRIFT_UNCHECKED_COUNT}"
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "### Drift check"
+              echo "- did not produce output (see the \`Run check-fixture-drift.ts\` step above for why)"
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ -s wiring.json ]; then
+            WIRING_CHECKED=$(jq -r '.checked' wiring.json)
+            WIRING_UNWIRED_COUNT=$(jq -r '.unwired | length' wiring.json)
+
+            {
+              echo "### Wiring check"
+              echo "- checked: ${WIRING_CHECKED}"
+              echo "- unwired: ${WIRING_UNWIRED_COUNT}"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            {
+              echo "wiring_checked=${WIRING_CHECKED}"
+              echo "wiring_unwired_count=${WIRING_UNWIRED_COUNT}"
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "### Wiring check"
+              echo "- did not produce output (see the \`Run check-fixture-wiring.ts\` step above for why)"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

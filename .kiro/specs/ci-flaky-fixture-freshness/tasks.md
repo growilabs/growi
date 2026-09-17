@@ -58,7 +58,7 @@
   - _Depends: 2.1, 2.2_
 
 - [ ] 4. Integration: 定期実行ワークフローの実装
-- [ ] 4.1 四半期に1回、両スクリプトを実行し結果を記録するワークフローを作成する
+- [x] 4.1 四半期に1回、両スクリプトを実行し結果を記録するワークフローを作成する
   - `.github/workflows/flaky-repro.yml` の `permissions` パターン
     （`contents: read`, `issues: write`）を踏襲し、`on: schedule`（四半期cron）
     と `workflow_dispatch` の両方で起動できるワークフローを作成する
@@ -223,3 +223,26 @@ unchecked（`.meta.md` が典型形でない、または取得失敗、Requireme
 実行）: `checked: 18, drift: 0, unchecked: 28`。50件の実データ`.meta.md`が
 18 real-checkable / 4 synthetic / 28 unrecognized に分かれることをタスク1の
 カタログと独立に再確認済み。
+
+### タスク4.1レビューで発覚した重大バグ（タスク2.1由来、修正必須）
+
+タスク4.1のレビューで、実際の `gh` CLI（stubでない）を使って
+`check-fixture-drift.ts` を実行すると `checked: 2` にまで落ち込み、
+タスク3時点のstubベースの実測（`checked: 18`）と大きく食い違うことが判明。
+原因は `lib/meta-source.ts` の `REAL_CHECKABLE_COMMAND_RE` が
+`repos/growilabs/growi/` というプレフィックスをキャプチャグループの外に
+置いており、`source.path` にこのプレフィックスが含まれない状態で
+`GhApi.get()`/`getAll()` に渡っていたこと。結果、ほとんどの実取得が
+404になり `unchecked` に回るだけでなく、`issues -f state=all -f
+labels=...` のケースは `repos/growilabs/growi/issues` ではなく
+**無関係な別エンドポイント `GET /issues`**（認証ユーザー宛てのissue一覧、
+このリポジトリとは無関係）に到達してしまい、たまたま `200 OK` で空配列
+`[]` が返るため `fixture-shape.ts` の配列比較が「乖離なし」と**誤って
+成功扱い**していた。stubを使ったタスク3・そのレビューでは、stub自身が
+同じプレフィックス無しのパスをキーにして自分のデータを返していたため、
+このバグは一切顕在化しなかった。
+
+tasks.md の元のタスク一覧にはこの修正専用のタスクが無いため、タスク5
+（実測検証）の前提を壊さないよう、タスク4.2に進む前に `lib/meta-source.ts`
+の `path` 抽出を修正し、実際の `gh` CLI 経由で `checked` が18件前後に戻る
+ことを再確認してから先に進む。
