@@ -247,7 +247,7 @@ jobs:
                 echo
                 echo "Fixtures whose real GitHub API response shape no longer matches what's on disk:"
                 echo
-                jq -r '.drift[] | "- `" + .file + "` — diff at: " + (.diffPaths | join(", "))' drift.json
+                jq -r '.drift[] | "- `" + .file + "` (source: `" + .source + "`) — diff at: " + (.diffPaths | join(", "))' drift.json
               fi
 
               # Requirement 4.1 asks the issue body to say what went

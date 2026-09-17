@@ -31,8 +31,9 @@
  *
  * Usage: node check-fixture-drift.ts
  *
- * Output fields (exit 0): checked (number), drift (DriftFinding[]),
- * unchecked (UncheckedFinding[])
+ * Output fields (exit 0): checked (number), drift (DriftFinding[], each
+ * carrying the re-fetched `source` path alongside the diff), unchecked
+ * (UncheckedFinding[])
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -73,6 +74,13 @@ export const parseArgv = (argv: readonly string[]): ParsedArgv => {
 
 export type DriftFinding = {
   readonly file: string;
+  /**
+   * The exact `repos/growilabs/growi/...` path that was re-fetched (from
+   * `MetaSource`'s `real-checkable.path`), so a reader of the resulting
+   * GitHub issue knows which `gh api` call to re-run themselves to
+   * investigate the drift.
+   */
+  readonly source: string;
   readonly diffPaths: readonly string[];
 };
 export type UncheckedFinding = {
@@ -171,7 +179,7 @@ export const checkFixtureDrift = async (
     );
     checked += 1;
     if (diffPaths.length > 0) {
-      drift.push({ file: dataRelPath, diffPaths });
+      drift.push({ file: dataRelPath, source: source.path, diffPaths });
     }
   }
 

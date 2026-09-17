@@ -317,9 +317,11 @@ export const diffShapes: (a: Shape, b: Shape) => readonly string[];
 - Trigger: `flaky-ci-fixture-freshness.yml` からの `node` 呼び出し
 - Input / validation: 引数なし（`bin/flaky-ci/fixtures/` を直接スキャン）
 - Output / destination: stdout へ JSON
-  `{ checked: number, drift: DriftFinding[], unchecked: UncheckedFinding[] }`
-  （`DriftFinding = { file: string, diffPaths: readonly string[] }`,
-  `UncheckedFinding = { file: string, reason: string }`）
+  `{ checked: number, drift: DriftFinding[], unchecked: UncheckedFinding[] }`。
+  `DriftFinding = { file: string, source: string, diffPaths: readonly string[] }`
+  ── `source` は再取得した `repos/growilabs/growi/...` パスで、issue本文の
+  drift件からどの `gh api` 呼び出しを追試すればよいかが分かる。
+  `UncheckedFinding = { file: string, reason: string }`
 - Idempotency & recovery: 副作用なし（GitHub GETのみ）。何度実行しても同じ
   入力に対して同じ結果
 
