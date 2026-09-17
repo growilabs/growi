@@ -66,8 +66,12 @@ const matchesWhere = (
 ): boolean =>
   Object.entries(where).every(([key, expected]) => {
     const actual = row[key as keyof InstallationRow];
-    // The repository only builds IsNull() conditions.
     if (expected instanceof FindOperator) {
+      // Fail loudly rather than silently accepting a condition this fake does
+      // not implement, so swapping IsNull() for another operator is caught.
+      if (expected.type !== 'isNull') {
+        throw new Error(`unsupported operator on "${key}": ${expected.type}`);
+      }
       return actual == null;
     }
     return actual === expected;
