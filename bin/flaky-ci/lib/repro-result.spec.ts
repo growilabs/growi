@@ -130,6 +130,16 @@ describe('repro-result.selectNewestMatch', () => {
     });
   });
 
+  it('throws instead of reporting a fabricated success when the ONLY match has a malformed created_at', () => {
+    // `Array.prototype.reduce` with no seed never invokes the comparator
+    // when the array has exactly one element, so a lone malformed candidate
+    // used to sail through uncompared and come back as a normal match.
+    const malformedComment = { ...olderComment, created_at: '2026-09-10' };
+    expect(() => selectNewestMatch([malformedComment], CASE1_SHA)).toThrow(
+      /not a fixed-width ISO-8601 UTC timestamp/,
+    );
+  });
+
   it('breaks an exact created_at tie by the larger id', () => {
     const tieA = {
       ...olderComment,

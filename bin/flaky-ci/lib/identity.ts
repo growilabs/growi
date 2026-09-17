@@ -18,9 +18,9 @@
  * three shapes leads to which next step (read the linked run's Playwright
  * report before Step 2, stop and report a precondition failure, proceed to
  * reproduction) is a judgment left in `investigate-flaky-test/SKILL.md`, not
- * moved here (research.md §"14 候補の現在位置" on candidate #8: "解析は
- * 機械的、戻り値の3分類後の扱いは判断" — the parse is mechanical, what
- * happens after is judgment).
+ * moved here (research.md §"14 候補の現在位置" (current disposition of the
+ * 14 candidates), on candidate #8: "the parse is mechanical, what the
+ * three-way return value leads to afterward is judgment").
  *
  * `{SPEC_PATH}` is anchored on the *shortest* following segment ending in a
  * source-file extension immediately followed by `:` — not on splitting at

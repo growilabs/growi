@@ -19,7 +19,12 @@ fixtures/
 ├── job-logs/      # a job-log excerpt, byte-for-byte as GitHub stored it
 └── expected/      # "before" output: what the CURRENT shell-based procedure
                     # returns for each fixture above, plus the exact pipeline
-                    # run to get it. Tasks 2.1-2.4's tests diff against these.
+                    # run to get it. Tasks 2.1-2.4's tests hardcode these same
+                    # values as their `expect(...)` literals — the .md files
+                    # here are the human-readable derivation record, not
+                    # something the tests read at run time (the one exception
+                    # is `expected/parse-identity-key-titles.json`, which
+                    # `lib/identity.spec.ts` does load directly).
 ```
 
 Every data file under `api/`, `lockfile/`, `job-logs/` has a sibling
@@ -134,8 +139,9 @@ that has no real example anywhere in `growilabs/growi`'s issue history
 with no source-file extension). Both files' `.meta.md` record the exact
 searches. `expected/parse-identity-key-titles.json` and
 `expected/parse-identity-key.md` hold the per-title expectation (what the
-current regex-and-4-step procedure gives for each) that
-`lib/identity.spec.ts` checks against.
+current regex-and-4-step procedure gives for each). `lib/identity.spec.ts`
+loads the `.json` file directly and checks against it; the `.md` file is the
+same expectation in human-readable prose, not read by the test.
 
 ## Phase 2 material (`api/dashboard/`, task 3.10)
 

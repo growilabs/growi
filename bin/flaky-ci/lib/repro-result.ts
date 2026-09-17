@@ -116,6 +116,14 @@ export const selectNewestMatch = (
   if (matches.length === 0) {
     return null;
   }
+  // Validate every candidate's created_at up front: `Array.prototype.reduce`
+  // never calls the comparator below when `matches` has exactly one element,
+  // so a single malformed timestamp would otherwise sail through uncompared
+  // and come back as a fabricated success (same failure mode documented in
+  // `newest-observation.ts` and `check-runs.ts`).
+  for (const match of matches) {
+    compareIso(match.comment.created_at, match.comment.created_at);
+  }
   return matches.reduce((latest, candidate) => {
     const byTime = compareIso(
       candidate.comment.created_at,
