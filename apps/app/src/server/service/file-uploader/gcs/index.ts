@@ -11,7 +11,10 @@ import {
   type RespondOptions,
   ResponseMode,
 } from '~/server/interfaces/attachment';
-import type { IAttachmentDocument } from '~/server/models/attachment';
+import type {
+  AttachmentDraft,
+  AttachmentWithComputed,
+} from '~/server/models/attachment';
 import axios from '~/utils/axios';
 import loggerFactory from '~/utils/logger';
 
@@ -51,12 +54,12 @@ function getGcsInstance() {
   return storage;
 }
 
-function getFilePathOnStorage(attachment: IAttachmentDocument) {
+function getFilePathOnStorage(attachment: AttachmentDraft) {
   const namespace = configManager.getConfig('gcs:uploadNamespace');
   let dirName: string;
   if (attachment.attachmentType === AttachmentType.PAGE_BULK_EXPORT) {
     dirName = FilePathOnStoragePrefix.pageBulkExport;
-  } else if (attachment.page != null) {
+  } else if (attachment.pageId != null) {
     dirName = FilePathOnStoragePrefix.attachment;
   } else {
     dirName = FilePathOnStoragePrefix.user;
@@ -108,7 +111,7 @@ class GcsFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override async deleteFile(attachment: IAttachmentDocument): Promise<void> {
+  override async deleteFile(attachment: AttachmentWithComputed): Promise<void> {
     const filePath = getFilePathOnStorage(attachment);
     return this.deleteFilesByFilePaths([filePath]);
   }
@@ -117,7 +120,7 @@ class GcsFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override async deleteFiles(
-    attachments: IAttachmentDocument[],
+    attachments: AttachmentWithComputed[],
   ): Promise<void> {
     const filePaths = attachments.map((attachment) => {
       return getFilePathOnStorage(attachment);
@@ -157,7 +160,7 @@ class GcsFileUploader extends AbstractFileUploader {
    */
   override async uploadAttachment(
     readable: Readable,
-    attachment: IAttachmentDocument,
+    attachment: AttachmentDraft,
   ): Promise<void> {
     if (!this.getIsUploadable()) {
       throw new Error('GCS is not configured.');
@@ -214,7 +217,7 @@ class GcsFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override async findDeliveryFile(
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
   ): Promise<NodeJS.ReadableStream> {
     if (!this.getIsReadable()) {
       throw new Error('GCS is not configured.');
@@ -247,7 +250,7 @@ class GcsFileUploader extends AbstractFileUploader {
    * @inheritDoc
    */
   override async generateTemporaryUrl(
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
     opts?: RespondOptions,
   ): Promise<TemporaryUrl> {
     if (!this.getIsUploadable()) {

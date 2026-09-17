@@ -66,7 +66,6 @@ import { AttachmentMethodType } from '~/interfaces/attachment';
 import type Crowi from '~/server/crowi';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
-import { Attachment } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
@@ -161,15 +160,17 @@ describe('GET /api/v3/activity — response for activities produced by the real 
     originalName: string;
     fileSize: number;
   }) {
-    return await Attachment.create({
-      page: pageId,
-      creator: testUserId,
-      // fileName is globally unique — suffix with a fresh ObjectId
-      fileName: `activity-real-add-download-response-integ-${new Types.ObjectId().toHexString()}.dat`,
-      fileFormat: 'application/octet-stream',
-      fileSize: overrides.fileSize,
-      originalName: overrides.originalName,
-      attachmentType: AttachmentType.WIKI_PAGE,
+    return await prisma.attachments.create({
+      data: {
+        pageId: pageId.toString(),
+        creatorId: testUserId.toString(),
+        // fileName is globally unique — suffix with a fresh ObjectId
+        fileName: `activity-real-add-download-response-integ-${new Types.ObjectId().toHexString()}.dat`,
+        fileFormat: 'application/octet-stream',
+        fileSize: overrides.fileSize,
+        originalName: overrides.originalName,
+        attachmentType: AttachmentType.WIKI_PAGE,
+      },
     });
   }
 
@@ -337,7 +338,9 @@ describe('GET /api/v3/activity — response for activities produced by the real 
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
     // Remove attachments uploaded/created by this suite through the real
     // service so the GridFS blobs are deleted along with the metadata docs.
-    const remaining = await Attachment.find({ creator: testUserId });
+    const remaining = await prisma.attachments.findMany({
+      where: { creatorId: testUserId.toString() },
+    });
     await Promise.all(
       remaining.map((attachment) =>
         crowi.attachmentService.removeAttachment(attachment._id),

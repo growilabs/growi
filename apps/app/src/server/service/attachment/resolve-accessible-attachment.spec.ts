@@ -3,13 +3,14 @@ import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
-import { Attachment, type IAttachmentDocument } from '../../models/attachment';
+import { prisma } from '~/utils/prisma';
+
 import type { PageModel } from './resolve-accessible-attachment';
 import { resolveAccessibleAttachment } from './resolve-accessible-attachment';
 
-vi.mock('../../models/attachment', () => ({
-  Attachment: { findById: vi.fn() },
-}));
+type FindUniqueResult = Awaited<
+  ReturnType<typeof prisma.attachments.findUnique>
+>;
 
 describe('resolveAccessibleAttachment', () => {
   const pageId = '000000000000000000000001';
@@ -18,10 +19,10 @@ describe('resolveAccessibleAttachment', () => {
     vi.restoreAllMocks();
   });
 
-  const buildAttachment = (hasPage: boolean): IAttachmentDocument =>
-    mock<IAttachmentDocument>({
+  const buildAttachment = (hasPage: boolean): FindUniqueResult =>
+    mock<NonNullable<FindUniqueResult>>({
       id: 'attachment1',
-      page: hasPage ? pageId : undefined,
+      pageId: hasPage ? pageId : null,
     });
 
   const mockIsAccessiblePageByViewer = (isAccessible: boolean) => {
@@ -38,7 +39,7 @@ describe('resolveAccessibleAttachment', () => {
   };
 
   it('reports not_found when no attachment exists for the id', async () => {
-    vi.mocked(Attachment.findById).mockResolvedValue(null);
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(null);
 
     const result = await resolveAccessibleAttachment(
       'missing',
@@ -50,7 +51,9 @@ describe('resolveAccessibleAttachment', () => {
   });
 
   it('reports forbidden when the viewer cannot access the owning page', async () => {
-    vi.mocked(Attachment.findById).mockResolvedValue(buildAttachment(true));
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
+      buildAttachment(true),
+    );
     const isAccessiblePageByViewer = mockIsAccessiblePageByViewer(false);
     const user = mock<HydratedDocument<IUser>>();
 
@@ -66,7 +69,7 @@ describe('resolveAccessibleAttachment', () => {
 
   it('returns the attachment when the viewer can access the owning page', async () => {
     const attachment = buildAttachment(true);
-    vi.mocked(Attachment.findById).mockResolvedValue(attachment);
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(attachment);
     mockIsAccessiblePageByViewer(true);
 
     const result = await resolveAccessibleAttachment(
@@ -80,7 +83,7 @@ describe('resolveAccessibleAttachment', () => {
 
   it('skips the viewer check for an attachment with no owning page', async () => {
     const attachment = buildAttachment(false);
-    vi.mocked(Attachment.findById).mockResolvedValue(attachment);
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(attachment);
     const modelSpy = vi.spyOn(mongoose, 'model');
 
     const result = await resolveAccessibleAttachment(
@@ -95,7 +98,7 @@ describe('resolveAccessibleAttachment', () => {
 
   it('skips the viewer check when the request is via a certified share link', async () => {
     const attachment = buildAttachment(true);
-    vi.mocked(Attachment.findById).mockResolvedValue(attachment);
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(attachment);
     const isAccessiblePageByViewer = mockIsAccessiblePageByViewer(false);
 
     const result = await resolveAccessibleAttachment(
@@ -108,19 +111,22 @@ describe('resolveAccessibleAttachment', () => {
     expect(result).toEqual({ attachment });
   });
 
-  it('passes the requested field to findById as a populate option', async () => {
+  it('passes `include: { creator: true }` to findUnique when creator is requested', async () => {
     const attachment = buildAttachment(false);
-    vi.mocked(Attachment.findById).mockResolvedValue(attachment);
+    const findUniqueSpy = vi
+      .spyOn(prisma.attachments, 'findUnique')
+      .mockResolvedValue(attachment);
 
     const result = await resolveAccessibleAttachment(
       'attachment1',
       undefined,
       false,
-      'creator',
+      { creator: true },
     );
 
-    expect(Attachment.findById).toHaveBeenCalledWith('attachment1', undefined, {
-      populate: 'creator',
+    expect(findUniqueSpy).toHaveBeenCalledWith({
+      where: { id: 'attachment1' },
+      include: { creator: true },
     });
     expect(result).toEqual({ attachment });
   });

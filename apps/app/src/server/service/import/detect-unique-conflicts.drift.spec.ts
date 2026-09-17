@@ -1,11 +1,6 @@
 import mongoose from 'mongoose';
 
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
-// Imported for its side effect only: the module body registers the `ExternalAccount`
-// schema (`getOrCreateModel`), which is what makes the registry lookup below resolve
-// instead of throwing MissingSchemaError. The model has no default export to import.
-import '~/server/models/external-account';
-
 import userModelFactory from '~/server/models/user';
 import UserGroup from '~/server/models/user-group';
 

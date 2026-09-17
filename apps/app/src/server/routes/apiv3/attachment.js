@@ -9,13 +9,13 @@ import { MODEL_ATTACHMENT, SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { Attachment } from '~/server/models/attachment';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
 } from '~/server/models/serializers';
 import { buildAttachmentSnapshot } from '~/server/service/attachment/attachment-snapshot';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
@@ -143,7 +143,7 @@ import { body, param, query } from 'express-validator';
 export const setup = (crowi) => {
   const loginRequired = loginRequiredFactory(crowi, true);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
-  const { Page, User } = crowi.models;
+  const { Page } = crowi.models;
   const { attachmentService } = crowi;
   const uploads = multer({ dest: `${crowi.tmpDir}uploads` });
   const addActivity = generateAddActivityMiddleware(crowi);
@@ -246,19 +246,25 @@ export const setup = (crowi) => {
 
         // directly get paging-size from db. not to delivery from client side.
 
-        const paginateResult = await Attachment.paginate(
-          { page: pageId },
-          {
-            limit,
-            offset,
-            populate: 'creator',
-          },
-        );
+        const paginateResult = await prisma.attachments.paginate({
+          where: { pageId },
+          limit,
+          offset,
+          include: { creator: true },
+        });
 
-        paginateResult.docs.forEach((doc) => {
-          if (doc.creator != null && doc.creator instanceof User) {
-            doc.creator = serializeUserSecurely(doc.creator);
-          }
+        paginateResult.docs = paginateResult.docs.map((doc) => {
+          return {
+            ...doc,
+            page: doc.pageId,
+            creator:
+              doc.creator != null
+                ? serializeUserSecurely({
+                    ...doc.creator,
+                    imageAttachment: doc.creator.imageAttachmentId,
+                  })
+                : doc.creator,
+          };
         });
 
         return res.apiv3({ paginateResult });
@@ -419,20 +425,21 @@ export const setup = (crowi) => {
         const result = {
           page: serializePageSecurely(page),
           revision: serializeRevisionSecurely(page.revision),
-          attachment: attachment.toObject({ virtuals: true }),
+          attachment: {
+            ...attachment,
+            page: attachment.pageId,
+            creator: attachment.creatorId,
+          },
         };
 
         // The page is already loaded in this route; pass page.path directly
         // instead of re-fetching it (requirement 6.1, no extra page lookup).
         const snapshot = buildAttachmentSnapshot(
           {
-            _id: attachment._id.toString(),
+            _id: attachment._id,
             originalName: attachment.originalName,
             fileSize: attachment.fileSize,
-            // the Mongoose attachment holds the page reference as `page` (ObjectId);
-            // the builder expects it as `pageId` (see AttachmentLike NOTE)
-            pageId:
-              attachment.page != null ? attachment.page.toString() : undefined,
+            pageId: attachment.pageId,
           },
           page.path,
           req.user.username,
@@ -494,7 +501,7 @@ export const setup = (crowi) => {
           attachmentId,
           req.user,
           isSharedPage ?? false,
-          'creator',
+          { creator: true },
         );
 
         if ('errorCode' in result) {
@@ -504,11 +511,19 @@ export const setup = (crowi) => {
 
         const { attachment } = result;
 
-        if (attachment.creator != null && attachment.creator instanceof User) {
-          attachment.creator = serializeUserSecurely(attachment.creator);
-        }
+        const serializedAttachment = {
+          ...attachment,
+          page: attachment.pageId,
+          creator:
+            attachment.creator != null
+              ? serializeUserSecurely({
+                  ...attachment.creator,
+                  imageAttachment: attachment.creator.imageAttachmentId,
+                })
+              : attachment.creator,
+        };
 
-        return res.apiv3({ attachment });
+        return res.apiv3({ attachment: serializedAttachment });
       } catch (err) {
         logger.error('Attachment retrieval failed', err);
         return res.apiv3Err(err, 500);

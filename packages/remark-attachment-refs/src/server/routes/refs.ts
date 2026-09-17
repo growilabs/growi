@@ -1,4 +1,4 @@
-import type { IAttachment, IPage, IUser } from '@growi/core/dist/interfaces';
+import type { IPage, IUser } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import type { AccessTokenParser } from '@growi/core/dist/interfaces/server';
 import { serializeAttachmentSecurely } from '@growi/core/dist/models/serializers';
@@ -7,7 +7,7 @@ import { loggerFactory } from '@growi/logger';
 import type { Request } from 'express';
 import { Router } from 'express';
 import type { HydratedDocument, Model } from 'mongoose';
-import mongoose, { model, Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { FilterXSS } from 'xss';
 
 const logger = loggerFactory('growi:remark-attachment-refs:routes:refs');
@@ -75,6 +75,8 @@ export const routesFactory = (crowi): Router => {
 
   const accessTokenParser: AccessTokenParser = crowi.accessTokenParser;
 
+  const prisma = crowi.prisma;
+
   const router = Router();
 
   const ObjectId = Types.ObjectId;
@@ -126,15 +128,17 @@ export const routesFactory = (crowi): Router => {
       // convert ObjectId
       // biome-ignore lint/suspicious/noExplicitAny: ignore
       const orConditions: any[] = [{ originalName: fileNameOrId }];
-      if (fileNameOrId != null && ObjectId.isValid(fileNameOrId.toString())) {
-        orConditions.push({ _id: new ObjectId(fileNameOrId.toString()) });
+      if (fileNameOrId != null && ObjectId.isValid(fileNameOrId)) {
+        orConditions.push({ id: fileNameOrId });
       }
 
-      const Attachment = model<IAttachment>('Attachment');
-      const attachment = await Attachment.findOne({
-        page: page._id,
-        $or: orConditions,
-      }).populate('creator');
+      const attachment = await prisma.attachments.findFirst({
+        where: {
+          pageId: page._id.toString(),
+          OR: orConditions,
+        },
+        include: { creator: true },
+      });
 
       // not found
       if (attachment == null) {
@@ -152,20 +156,30 @@ export const routesFactory = (crowi): Router => {
 
       // forbidden
       const isAccessible = await Page.isAccessiblePageByViewer(
-        attachment.page,
+        attachment.pageId,
         user,
       );
       if (!isAccessible) {
         logger.debug(
           `attachment '${attachment.id}' is forbidden for user '${user?.username}'`,
         );
-        res.status(403).send(`page '${attachment.page}' is forbidden.`);
+        res.status(403).send(`page '${attachment.pageId}' is forbidden.`);
         return;
       }
 
-      res
-        .status(200)
-        .send({ attachment: serializeAttachmentSecurely(attachment) });
+      res.status(200).send({
+        attachment: serializeAttachmentSecurely({
+          ...attachment,
+          page: attachment.pageId,
+          creator:
+            attachment.creator != null
+              ? {
+                  ...attachment.creator,
+                  imageAttachment: attachment.creator.imageAttachmentId,
+                }
+              : attachment.creator,
+        }),
+      });
     },
   );
 
@@ -243,21 +257,34 @@ export const routesFactory = (crowi): Router => {
 
       logger.debug('retrieve attachments for pages:', pageIds);
 
-      // create query to find
-      const Attachment = model<IAttachment>('Attachment');
-      let query = Attachment.find({
-        page: { $in: pageIds },
+      const attachments = await prisma.attachments.findMany({
+        where: { pageId: { in: pageIds } },
+        include: { creator: true },
       });
-      // add regex condition
-      if (regex != null) {
-        query = query.and([{ originalName: { $regex: regex } }]);
-      }
 
-      const attachments = await query.populate('creator').exec();
+      // regex filtering happens in-process: Prisma's Mongo connector has no
+      // arbitrary-RegExp filter (only contains/startsWith/mode:'insensitive'),
+      // and `findRaw` would drop the `creator` include and computed fields.
+      const filteredAttachments =
+        regex != null
+          ? attachments.filter((attachment) =>
+              regex.test(attachment.originalName ?? ''),
+            )
+          : attachments;
 
       res.status(200).send({
-        attachments: attachments.map((attachment) =>
-          serializeAttachmentSecurely(attachment),
+        attachments: filteredAttachments.map((attachment) =>
+          serializeAttachmentSecurely({
+            ...attachment,
+            page: attachment.pageId,
+            creator:
+              attachment.creator != null
+                ? {
+                    ...attachment.creator,
+                    imageAttachment: attachment.creator.imageAttachmentId,
+                  }
+                : attachment.creator,
+          }),
         ),
       });
     },

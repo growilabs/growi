@@ -28,7 +28,8 @@ import { startCron as startAccessTokenCron } from '~/server/service/access-token
 import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
-import { prisma } from '~/utils/prisma';
+import type { PrismaClient } from '~/utils/prisma';
+import * as prismaUtils from '~/utils/prisma';
 import { connectPrismaAtBoot } from '~/utils/prisma-connect';
 
 import ActivityEvent from '../events/activity';
@@ -119,6 +120,16 @@ class Crowi {
   accessTokenParser: AccessTokenParser;
 
   loginRequiredFactory: typeof loginRequiredFactory;
+
+  // Lazily reads `prismaUtils.prisma` (a getter, not a top-level binding read
+  // at import time) -- see test/setup/prisma.ts: it defers PrismaClient
+  // instantiation until MONGO_URI is set by the mongo setup file, and a
+  // module-scope destructured `import { prisma }` here was observed to
+  // resolve that binding during test collection (before MONGO_URI is set),
+  // permanently caching a broken client for the whole test file.
+  get prisma(): PrismaClient {
+    return prismaUtils.prisma;
+  }
 
   nextApp!: ReturnType<typeof next>;
 
@@ -760,7 +771,7 @@ class Crowi {
   setupRoutesForPlugins(): void {
     lsxRoutes(this, this.express, {
       resolveTagPageIds: (tagNames) =>
-        prisma.pagetagrelations.findPageIdsWithAllTags(tagNames),
+        this.prisma.pagetagrelations.findPageIdsWithAllTags(tagNames),
     });
     attachmentRoutes(this, this.express);
   }

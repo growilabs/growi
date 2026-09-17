@@ -3,8 +3,8 @@ import { AttachmentType } from '~/server/interfaces/attachment';
 import { buildAttachmentRemoveSnapshot } from '~/server/service/attachment/attachment-removal-snapshot';
 import { resolveAttachmentPagePath } from '~/server/service/attachment/attachment-snapshot';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
-import { Attachment } from '../../models/attachment';
 import { validateImageContentType } from './image-content-type-validator';
 
 const logger = loggerFactory('growi:routes:attachment');
@@ -146,17 +146,16 @@ export const routesFactory = (crowi) => {
    */
   async function isDeletableByUser(user, attachment) {
     // deletable if creator is null
-    if (attachment.creator == null) {
+    if (attachment.creatorId == null) {
       return true;
     }
 
-    const ownerId = attachment.creator._id || attachment.creator;
-    if (attachment.page == null) {
+    if (attachment.pageId == null) {
       // when profile image
-      return user.id === ownerId.toString();
+      return user.id === attachment.creatorId;
     }
 
-    return await Page.isAccessiblePageByViewer(attachment.page, user);
+    return await Page.isAccessiblePageByViewer(attachment.pageId, user);
   }
 
   const actions = {};
@@ -269,7 +268,11 @@ export const routesFactory = (crowi) => {
     }
 
     const result = {
-      attachment: attachment.toObject({ virtuals: true }),
+      attachment: {
+        ...attachment,
+        creator: attachment.creatorId,
+        page: attachment.pageId,
+      },
     };
 
     return res.json(ApiResponse.success(result));
@@ -315,7 +318,9 @@ export const routesFactory = (crowi) => {
   api.remove = async (req, res) => {
     const id = req.body.attachment_id;
 
-    const attachment = await Attachment.findOne({ _id: { $eq: id } });
+    const attachment = await prisma.attachments.findUnique({
+      where: { id },
+    });
 
     if (attachment == null) {
       return res.json(ApiResponse.error('attachment not found'));
@@ -334,25 +339,23 @@ export const routesFactory = (crowi) => {
     // because the attachment document is deleted afterwards (requirements 2.1, 2.2).
     // The shared resolver warns and yields undefined when the page cannot be
     // resolved, so the snapshot is recorded without pagePath (requirement 2.3).
-    const pagePath = await resolveAttachmentPagePath(attachment.page, {
-      attachmentId: attachment._id,
-    });
+    const pagePath = await resolveAttachmentPagePath(
+      attachment.pageId ?? undefined,
+      { attachmentId: attachment.id },
+    );
     const snapshot = buildAttachmentRemoveSnapshot(
       {
-        _id: attachment._id.toString(),
-        originalName: attachment.originalName,
+        _id: attachment.id,
+        originalName: attachment.originalName ?? undefined,
         fileSize: attachment.fileSize,
-        // the Mongoose attachment holds the page reference as `page` (ObjectId);
-        // the builder expects it as `pageId` (see AttachmentLike NOTE)
-        pageId:
-          attachment.page != null ? attachment.page.toString() : undefined,
+        pageId: attachment.pageId ?? undefined,
       },
       pagePath,
       req.user.username,
     );
 
     try {
-      await attachmentService.removeAttachment(attachment);
+      await attachmentService.removeAttachment(attachment.id);
     } catch (err) {
       logger.error(err);
       return res
@@ -406,7 +409,9 @@ export const routesFactory = (crowi) => {
    */
   api.removeProfileImage = async (req, res) => {
     const user = req.user;
-    const attachment = await Attachment.findById(user.imageAttachment);
+    const attachment = await prisma.attachments.findUnique({
+      where: { id: user.imageAttachment.toString() },
+    });
 
     if (attachment == null) {
       return res.json(ApiResponse.error('attachment not found'));
