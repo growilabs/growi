@@ -22,7 +22,7 @@
   - _Requirements: 1.1, 1.4, 5.3_
   - _Boundary: meta-source.ts_
 
-- [ ] 2.2 (P) JSON値の「形」を計算し、2つの形を比較するロジックを実装する
+- [x] 2.2 (P) JSON値の「形」を計算し、2つの形を比較するロジックを実装する
   - オブジェクトはキーごとに再帰的に、配列は要素0個目だけを代表として、
     値ではなく型のみを保持する「形」を計算する純粋関数を実装する
     （design.md `fixture-shape.ts` の Service Interface契約）
