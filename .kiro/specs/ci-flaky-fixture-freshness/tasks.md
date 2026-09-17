@@ -247,18 +247,6 @@ tasks.md の元のタスク一覧にはこの修正専用のタスクが無い�
 の `path` 抽出を修正し、実際の `gh` CLI 経由で `checked` が18件前後に戻る
 ことを再確認してから先に進んだ（修正済み・コミット634407f131）。
 
-### タスク4.2: 既知の制約（drift findingsに出典が無い）
-
-`check-fixture-drift.ts` の `DriftFinding` は `{ file, diffPaths }` のみで、
-再取得先のGitHub APIエンドポイント（出典）を持たない。そのためissue本文の
-drift件の行には対象fixtureと差分キーは出るが出典は出ない
-（`unchecked` 件のほうは `{ file, reason }` を持つため出典相当の情報は出る）。
-これはタスク3で承認済みの `DriftFinding` の形の制約であり、このタスクの
-境界（ワークフローYAML）では直せない。要件4.1の文字どおりの要求からは
-小さな未達だが、fixtureのパスから `.meta.md` を辿れば出典は追える。
-将来対応するなら `check-fixture-drift.ts` 側の変更が必要で、それは
-tasks.mdに無い別タスクになる。
-
 ### タスク5: `workflow_dispatch` はデフォルトブランチ（master）にマージされたワークフローでしか使えない
 
 `.github/workflows/flaky-repro.yml` は `push` トリガー（`flaky-repro/**`
@@ -302,3 +290,10 @@ PR #11929 のmasterマージ後、`workflow_dispatch` で2回実行して実測�
 `expected/*.md` 等の実際の未配線fixtureが存在し、それ自体が
 findings>0の実データとして使えたため）。issue #11937 は使い捨てではなく、
 四半期routineが実際に検知した最初の本番結果として残す。
+
+### フォローアップ: drift findingsへの出典追加
+
+タスク5のライブ検証後のフォローアップとして、`DriftFinding` に `source`
+（再取得した `repos/growilabs/growi/...` パス）を追加した。issue本文の
+drift件から、読者がどの `gh api` 呼び出しを追試すればよいか分かるように
+なる。

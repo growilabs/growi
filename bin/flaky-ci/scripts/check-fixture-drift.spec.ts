@@ -117,6 +117,9 @@ describe('check-fixture-drift.checkFixtureDrift', () => {
     expect(result.unchecked).toEqual([]);
     expect(result.drift).toHaveLength(1);
     expect(result.drift[0]?.file).toBe('api/issue-1-comments.json');
+    expect(result.drift[0]?.source).toBe(
+      'repos/growilabs/growi/issues/1/comments',
+    );
     expect(result.drift[0]?.diffPaths.length).toBeGreaterThan(0);
   });
 

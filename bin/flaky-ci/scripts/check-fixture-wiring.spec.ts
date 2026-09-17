@@ -179,28 +179,25 @@ describe('check-fixture-wiring.checkFixtureWiring — the real bin/flaky-ci fixt
     );
   });
 
-  it('still reports a genuinely unreferenced fixture as unwired', () => {
+  it('still reports a genuinely unreferenced fixture as unwired, even scanned against the real spec corpus', () => {
     const scriptsDir = fileURLToPath(new URL('.', import.meta.url));
     const flakyCiDir = path.join(scriptsDir, '..');
     const fixturesDir = path.join(flakyCiDir, 'fixtures');
 
-    const result = checkFixtureWiring(fixturesDir, flakyCiDir);
-
-    // The two-part (directory + basename) check must not itself hide a
-    // genuinely unwired file: none of the md files under the "expected"
-    // fixtures subdirectory are read by any *.spec.ts.
-    //
-    // NB: both the directory word and the filename are kept out of any
-    // "fixtures/<dir>/" or quoted-basename shape anywhere in this file
-    // (including comments) on purpose — this spec file is itself scanned
-    // by checkFixtureWiring (it lives under bin/flaky-ci), so writing
-    // either check's trigger shape here would make this spec file wrongly
-    // wire the fixture away, breaking this negative-control assertion.
-    const unreferencedDir = 'exp' + 'ected';
-    const unreferencedFile = 'render-dash' + 'board.md';
-    expect(result.unwired).toContain(
-      [unreferencedDir, unreferencedFile].join('/'),
-    );
+    // Plant a throwaway fixture nothing references, run the check against
+    // the real fixtures/spec tree, then remove it — this exercises the
+    // two-part (directory + basename) check against real, complex spec
+    // files without depending on any currently-unreferenced fixture
+    // happening to still exist in the tree.
+    const probeName = `probe-${Date.now()}-unreferenced.json`;
+    const probePath = path.join(fixturesDir, 'api', probeName);
+    writeFileSync(probePath, '{"ok":true}');
+    try {
+      const result = checkFixtureWiring(fixturesDir, flakyCiDir);
+      expect(result.unwired).toContain(`api/${probeName}`);
+    } finally {
+      rmSync(probePath);
+    }
   });
 });
 
