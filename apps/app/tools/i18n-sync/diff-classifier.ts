@@ -71,6 +71,12 @@ export const classify = (input: DiffClassifierInput): ClassificationResult => {
   const changedKeys: string[] = [];
 
   for (const [path, afterValue] of afterLeaves) {
+    // '' means "not yet translated in POEditor", never a real value (see
+    // research.md's fallback-language Decision).
+    if (afterValue === '') {
+      continue;
+    }
+
     if (!beforeLeaves.has(path)) {
       addedKeys.push(path);
       continue;
@@ -97,4 +103,47 @@ export const classify = (input: DiffClassifierInput): ClassificationResult => {
   }
 
   return { kind: 'no_change' };
+};
+
+/**
+ * The write-side counterpart to `classify`'s read-side skip rule: `before`
+ * with `after`'s non-empty leaves applied over it, recursively. Writing the
+ * raw `after` export instead would blank existing translations wherever a
+ * term is still untranslated (see research.md's fallback-language Decision).
+ *
+ * A newly-added nested object whose every leaf is `''` is omitted rather
+ * than kept as `{}`, so it never changes the key set without a matching
+ * entry in `classify`'s `addedKeys`.
+ */
+export const mergeTranslations = (
+  before: Readonly<Record<string, unknown>>,
+  after: Readonly<Record<string, unknown>>,
+): Record<string, unknown> => {
+  const result: Record<string, unknown> = {};
+
+  for (const [key, afterValue] of Object.entries(after)) {
+    if (isPlainObject(afterValue)) {
+      const beforeValue = before[key];
+      const mergedNested = mergeTranslations(
+        isPlainObject(beforeValue) ? beforeValue : {},
+        afterValue,
+      );
+      if (!(key in before) && Object.keys(mergedNested).length === 0) {
+        continue;
+      }
+      result[key] = mergedNested;
+      continue;
+    }
+
+    if (afterValue === '') {
+      if (key in before) {
+        result[key] = before[key];
+      }
+      continue;
+    }
+
+    result[key] = afterValue;
+  }
+
+  return result;
 };

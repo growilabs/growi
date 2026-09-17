@@ -126,6 +126,18 @@
 - **Trade-offs**: 案1は「PR 作成 identity」と「承認 identity」という2つの identity を用意・運用する手間が要る（`docs/i18n-community-translation-setup.md` §4 参照）。ただしこの手間は、GitHub App の private key だけを長期保存し installation token は workflow 実行のたびに発行する設計にすることで、人が手作業で token を作り直す必要が無いところまで軽減できる
 - **Follow-up**: `.github/mergify.yml` は変更しない。今後この trade-off が再検討される場合は、この Decision を起点に議論すること
 
+### Decision: POEditor の未翻訳キーは export の空文字列で判定し、fallback言語には頼らない
+- **Context**: task 6.2（pull経路の実環境確認）で、実プロジェクト（ja/zh/fr/ko がほぼ0%翻訳の状態）に対して実際に pull を実行したところ、既存の正しい訳文が軒並み English に置き換わる致命的な PR（#11925、マージせず close 済み）が生成された
+- **Sources Consulted**: https://poeditor.com/kb/fallback-languages 、実プロジェクトでの実測（Fallback Language を「未設定」に変更した上での fr export）
+- **Findings**:
+  - 原因は POEditor プロジェクトの Fallback Language 設定。設定されていると、ある言語で未翻訳のキーは export 時にフォールバック言語（本件では English）の文言で埋められる
+  - Fallback Language を「未設定（None）」にすると、未翻訳のキーは export 上で**キーごと消えるのではなく、値が空文字列 `""` になる**ことを実測で確認した（`{"admin": {"Page": "", ...}}` のような形。省略されるのではない点が重要）
+  - `filters=translated`（POEditor API の export フィルタ。未翻訳の用語を export から除外する）を試したが、これは逆効果と判明した。未翻訳キーが export から丸ごと消えるため、`DiffClassifier.classify` がリポジトリ側の既存キーを「削除された」と誤判定し、より広範囲の削除を提案する構造変更PRになってしまう（一時的にコードへ入れたが検証後に取り消し済み）
+- **Selected Approach**: `DiffClassifier.classify` で、export側の値が空文字列 `""` の leaf は「今回POEditorから得られる情報が無い（未翻訳）」として、追加・削除・変更のいずれにも数えず読み飛ばす。空文字列ではなく leaf 自体が export に存在しない場合（push の `sync_terms=1` によってPOEditor側のterm自体が本当に削除された場合）のみ、従来通り `removedKeys` として扱う。**ただし `classify` は「何を報告するか」を決めるだけで、実際にファイルへ書き込む内容は別物である。** 最初の実装レビューで、`PullTranslationSync` が分類結果に添える書き込み対象コンテンツとして生の `after`（空文字列を含む export そのもの）をそのまま使っていたことが判明した。これでは `classify` が正しく空文字列を無視しても、書き込み時には空文字列が実際にファイルへ入ってしまい、しかもtranslation_only（人レビュー不要の自動反映）経路でも起きるため、修正前より発見しにくい形で同じ不具合が再現する。この指摘を受け、`mergeTranslations(before, after)`（`before` を土台に `after` の非空leafだけを上書きする純粋関数）を新設し、分類結果に添えるコンテンツをこの関数の戻り値に統一した
+- **Rationale**: 「未翻訳（空文字列）」と「値が空であることが意図された変更」「キー自体の削除」を区別できる唯一の手がかりが、値が空文字列かどうかとPOEditor側にkeyが存在するかどうかの組み合わせだった。空文字列を「情報なし」として扱うことで、リポジトリ側の既存翻訳を誤って上書き・削除する経路を塞げる
+- **Trade-offs**: 翻訳者が意図的に訳文を空文字列にしたい場合（UI文言を意図的に空にする等）は今の実装では区別できず、常に「未翻訳」として無視される。この用途は稀とみなし、今回は対応しない（将来必要になれば別の明示的なマーカーの検討が要る）
+- **Follow-up**: POEditor プロジェクトの Fallback Language は必ず「未設定」で運用すること（`docs/i18n-community-translation-setup.md` §2.2 に明記済み）。加えて、POEditor が ja/zh/fr/ko の既存翻訳を1件も持っていない（push が en_US しかアップロードしないため）という別の未解決事項がある。既存翻訳を初回投入するまでは、翻訳者が参加してもPOEditor上は0%表示のままになる（`docs/i18n-community-translation-setup.md` §2.3 に記載済み。実装はタスク化して別途対応する）
+
 ## Risks & Mitigations
 - POEditor OSS プランの申請が承認されない可能性 — 承認されるまで本番運用（実際の同期起動）を進めない。requirements.md 要件7.2で明示済み
 - upload のレート制限（20秒に1回）を超過すると同期が失敗する — 呼び出し間に待機を入れて直列実行する設計とする
@@ -133,6 +145,8 @@
 - 統合アップロード（`sync_terms=1`）とnamespace別タグ付けアップロードの間で失敗が起きた場合、プロジェクトの内容（統合アップロード分）は既に正しく反映済みだが、一部namespaceのタグ付けが未完了のまま終わる可能性がある — タグは翻訳者向け絞り込み表示にのみ影響し、キー内容の正しさには影響しない。ワークフロー再実行で回復できる（統合アップロードは冪等、タグ付けアップロードも`sync_terms`無効で非破壊的なため再実行安全）
 - 言語ごとの統合exportが不正な形式だった場合、その言語の全namespaceがまとめてスキップされる（namespace単位の独立性が3プロジェクト構成より粗くなる） — export専用のリスクであり、リポジトリへの書き込みには影響しない
 - タグ付けアップロード（`sync_terms`無効）が他namespaceのキーを`tags`の`obsolete`スコープの対象にしてしまわないかは、実プロジェクトでの実測では他namespaceの内容が存在しない状態でのテストに留まり、確認できていない — 本番運用開始前の実環境確認（複数namespaceが実データで共存する状態でのタグ付けアップロード）で必ず確認すること
+- POEditor プロジェクトの Fallback Language 設定が誤って有効化されると、未翻訳キーの export値が別言語の文言で埋まり、`DiffClassifier`が「訳文が変更された」と誤判定して既存の正しい翻訳を上書きしうる（task 6.2の実環境確認で実際に発生し、生成されたPRはマージせずclose済み） — `DiffClassifier.classify`が空文字列を「情報なし」として無視する実装に修正済み（上記Decision参照）だが、Fallback Language自体は引き続き「未設定」運用が前提。プロジェクト設定が意図せず変わっていないか、定期的な実環境確認（tasks.md 6.x）で確認すること
+- POEditorが ja/zh/fr/ko の既存翻訳を1件も持っていない（push が en_US しかアップロードしないため）状態が続くと、翻訳者が参加してもPOEditor上は0%表示のままになり、体験を損なう — 既存翻訳の初回投入をタスク化して対応する（`docs/i18n-community-translation-setup.md` §2.3）
 
 ## References
 - [POEditor API Reference](https://poeditor.com/docs/api) — upload/export のパラメータ、レート制限、対応フォーマットの一次情報。`terms/add`/`terms/update`の用語一意性（term+context）と、`projects/upload`（一括アップロード）にはcontextを個別指定する手段が無いことも、この一次情報から確認した
