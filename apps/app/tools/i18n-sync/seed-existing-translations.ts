@@ -8,17 +8,20 @@
  * already has real translations for them
  * (`docs/i18n-community-translation-setup.md` §2.3).
  *
- * Deliberately non-destructive (`syncTerms: false`, no `tag`): this must
- * never create or delete a term, or touch namespace tags. Term
- * existence/deletion and tagging are `PushSourceSync`'s job alone; this
- * module only ever fills in translations for terms that already exist,
- * exactly like `PushSourceSync`'s own per-namespace tagging stage.
+ * Deliberately non-destructive (`syncTerms: false`, no `tag`) and restricted
+ * to the repository's own `en_US` key set (see research.md's
+ * `sync_terms`-addition Decision): this must never create a term the
+ * repository's `en_US` files don't have, delete a term, or touch namespace
+ * tags. Term existence/deletion and tagging are `PushSourceSync`'s job
+ * alone; this module only ever fills in translations for terms `en_US`
+ * already established there.
  */
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { filterToKnownKeys } from './diff-classifier.ts';
 import { toPoeditorLanguageCode } from './language-code-map.ts';
 import { combineNamespaceContents } from './namespace-envelope.ts';
 import {
@@ -26,6 +29,7 @@ import {
   type PoeditorApiError,
   type PoeditorClient,
 } from './poeditor-client.ts';
+import { SOURCE_LANGUAGE } from './push-source.ts';
 import {
   type NamespaceSyncEntry,
   SHARED_POEDITOR_PROJECT_ID,
@@ -63,7 +67,7 @@ type NamespaceReadFailure = {
 };
 
 export type SeedResult =
-  | { readonly ok: true }
+  | { readonly ok: true; readonly skippedKeyCount: number }
   /** Covers both an unreadable file and one whose content is not valid JSON: either way the namespace's content is unusable and nothing is uploaded. */
   | {
       readonly ok: false;
@@ -112,9 +116,10 @@ const readNamespaceSource = async (
 };
 
 /**
- * Reads every declared namespace's file for `options.language` first, then
- * uploads once. Reading everything before uploading anything mirrors
- * `PushSourceSync.runPush`'s "abort before any upload" guarantee.
+ * Reads every declared namespace's file for `options.language` and for
+ * `SOURCE_LANGUAGE` first, then uploads once. Reading everything before
+ * uploading anything mirrors `PushSourceSync.runPush`'s "abort before any
+ * upload" guarantee.
  */
 export const runSeed = async (options: RunSeedOptions): Promise<SeedResult> => {
   const targets = options.targets ?? SYNC_TARGETS;
@@ -122,13 +127,30 @@ export const runSeed = async (options: RunSeedOptions): Promise<SeedResult> => {
     options.readNamespaceFile ?? defaultReadNamespaceFile;
   const baseDir = options.baseDir ?? APP_ROOT;
 
-  const readOutcomes = await Promise.all(
-    targets.map((target) =>
-      readNamespaceSource(target, options.language, baseDir, readNamespaceFile),
+  const [languageOutcomes, sourceOutcomes] = await Promise.all([
+    Promise.all(
+      targets.map((target) =>
+        readNamespaceSource(
+          target,
+          options.language,
+          baseDir,
+          readNamespaceFile,
+        ),
+      ),
     ),
-  );
+    Promise.all(
+      targets.map((target) =>
+        readNamespaceSource(
+          target,
+          SOURCE_LANGUAGE,
+          baseDir,
+          readNamespaceFile,
+        ),
+      ),
+    ),
+  ]);
 
-  const readFailures = readOutcomes
+  const readFailures = [...languageOutcomes, ...sourceOutcomes]
     .map((outcome) => outcome.failure)
     .filter((failure) => failure != null);
 
@@ -137,9 +159,26 @@ export const runSeed = async (options: RunSeedOptions): Promise<SeedResult> => {
   }
 
   // Safe: readFailures.length === 0 above means every outcome carries a source.
-  const sources = readOutcomes.map(
-    (outcome) => outcome.source as NamespaceSource,
+  const sourceContentByNamespace = new Map(
+    sourceOutcomes.map((outcome) => [
+      (outcome.source as NamespaceSource).namespace,
+      (outcome.source as NamespaceSource).content,
+    ]),
   );
+  let skippedKeyCount = 0;
+  const sources = languageOutcomes.map((outcome) => {
+    const { namespace, content } = outcome.source as NamespaceSource;
+    // Restricts the upload to en_US's own key set (research.md's
+    // `sync_terms`-addition Decision): `syncTerms: false` prevents
+    // deletion but does NOT prevent POEditor from creating a term for a
+    // key that only exists in `options.language`'s file.
+    const filtered = filterToKnownKeys(
+      sourceContentByNamespace.get(namespace) ?? {},
+      content,
+    );
+    skippedKeyCount += countLeaves(content) - countLeaves(filtered);
+    return { namespace, content: filtered };
+  });
 
   // POEditor rejects GROWI's locale codes, so the conversion happens here,
   // at the API boundary -- everything above (file paths, namespace
@@ -160,7 +199,20 @@ export const runSeed = async (options: RunSeedOptions): Promise<SeedResult> => {
     return { ok: false, reason: 'upload_failed', error: uploadResult.error };
   }
 
-  return { ok: true };
+  return { ok: true, skippedKeyCount };
+};
+
+/** Counts the leaf (non-object) values in a nested locale object. */
+const countLeaves = (obj: Readonly<Record<string, unknown>>): number => {
+  let count = 0;
+  for (const value of Object.values(obj)) {
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      count += countLeaves(value as Record<string, unknown>);
+      continue;
+    }
+    count += 1;
+  }
+  return count;
 };
 
 const formatFailure = (result: Extract<SeedResult, { ok: false }>): string => {
@@ -227,7 +279,7 @@ export const main = async (): Promise<void> => {
   if (result.ok) {
     // biome-ignore lint/suspicious/noConsole: this is a CI script, console output is expected.
     console.log(
-      `Seeded ${language}'s existing translations into the shared POEditor project (${SYNC_TARGETS.length} namespace(s), non-destructive).`,
+      `Seeded ${language}'s existing translations into the shared POEditor project (${SYNC_TARGETS.length} namespace(s), non-destructive). Skipped ${result.skippedKeyCount} key(s) absent from en_US.`,
     );
     return;
   }

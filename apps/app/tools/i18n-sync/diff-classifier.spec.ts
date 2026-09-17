@@ -1,4 +1,8 @@
-import { classify, mergeTranslations } from './diff-classifier';
+import {
+  classify,
+  filterToKnownKeys,
+  mergeTranslations,
+} from './diff-classifier';
 
 describe('classify', () => {
   it('returns no_change when before and after are identical', () => {
@@ -207,5 +211,43 @@ describe('mergeTranslations', () => {
     const after = { a: { k1: 'new', k2: 'added' } };
 
     expect(mergeTranslations(before, after)).toEqual(after);
+  });
+});
+
+describe('filterToKnownKeys', () => {
+  it('drops a candidate leaf whose path does not exist in reference', () => {
+    const reference = { a: { k1: 'Admin' } };
+    const candidate = { a: { k1: '管理', k2: '日本語のみ' } };
+
+    expect(filterToKnownKeys(reference, candidate)).toEqual({
+      a: { k1: '管理' },
+    });
+  });
+
+  it('keeps a candidate leaf whose path exists in reference, regardless of value', () => {
+    const reference = { a: { k1: 'Admin' } };
+    const candidate = { a: { k1: '管理' } };
+
+    expect(filterToKnownKeys(reference, candidate)).toEqual({
+      a: { k1: '管理' },
+    });
+  });
+
+  it('omits a nested object that has no surviving leaves', () => {
+    const reference = { a: { k1: 'Admin' } };
+    const candidate = { a: { k1: '管理' }, grp: { onlyInJa: '日本語のみ' } };
+
+    expect(filterToKnownKeys(reference, candidate)).toEqual({
+      a: { k1: '管理' },
+    });
+  });
+
+  it('recurses into nested objects that partially survive', () => {
+    const reference = { a: { k1: 'Admin', k2: 'Second' } };
+    const candidate = { a: { k1: '管理', k2: '2番目', k3: '日本語のみ' } };
+
+    expect(filterToKnownKeys(reference, candidate)).toEqual({
+      a: { k1: '管理', k2: '2番目' },
+    });
   });
 });

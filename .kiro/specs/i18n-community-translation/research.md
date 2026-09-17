@@ -17,7 +17,7 @@
 - **Context**: brief.md が「POEditor の1プロジェクトが namespace ファイル1個に対応するのか」を設計前の要確認事項として明記していたため調査
 - **Sources Consulted**: https://poeditor.com/docs/api （projects/upload, projects/export, languages/list, languages/add, contributors/add の各節）
 - **Findings**:
-  - `projects/upload`: `id`（プロジェクトID） / `updating`（`terms` | `terms_translations` | `translations`） / `file` / `language` / `overwrite` / `sync_terms`（0|1、非一致キーの削除＋新規キーの追加） / `tags` を受け付ける。ファイル形式は `i18next` を含む多数をサポート
+  - `projects/upload`: `id`（プロジェクトID） / `updating`（`terms` | `terms_translations` | `translations`） / `file` / `language` / `overwrite` / `sync_terms`（0|1） / `tags` を受け付ける。ファイル形式は `i18next` を含む多数をサポート。**`sync_terms` が制御するのは削除のみ**（アップロードしたファイルに無い既存キーの削除）で、ファイルに新しく含まれるキーの追加は `sync_terms` の値に関わらず常に行われる（詳細は下記「`sync_terms:false` でも新規termが作成される」参照）
   - `projects/export`: `id` / `language`（必須） / `type`（`i18next` 含む） / `filters` / `tags` / `options` を受け付け、10分で失効するダウンロードURLを返す
   - レート制限: upload は「20秒に1リクエスト」と明記。export には明文化された制限の記載なし（念のため逐次実行する）
   - プロジェクト構造: 1プロジェクト＝1つのフラットな用語リスト。複数ファイル/namespaceの分離機能は無い。同一キー文字列が別namespaceで別訳を持つ場合（例: `commons.json` への複製キー）、1プロジェクトに混在させると衝突する
@@ -138,6 +138,15 @@
 - **Trade-offs**: 翻訳者が意図的に訳文を空文字列にしたい場合（UI文言を意図的に空にする等）は今の実装では区別できず、常に「未翻訳」として無視される。この用途は稀とみなし、今回は対応しない（将来必要になれば別の明示的なマーカーの検討が要る）
 - **Follow-up**: POEditor プロジェクトの Fallback Language は必ず「未設定」で運用すること（`docs/i18n-community-translation-setup.md` §2.2 に明記済み）。加えて、POEditor が ja/zh/fr/ko の既存翻訳を1件も持っていない（push が en_US しかアップロードしないため）という別の未解決事項がある。既存翻訳を初回投入するまでは、翻訳者が参加してもPOEditor上は0%表示のままになる（`docs/i18n-community-translation-setup.md` §2.3 に記載済み。実装はタスク化して別途対応する）
 
+### Decision: 既存翻訳投入（`seed-existing-translations.ts`）は en_US の既存キーだけを対象にする
+- **Context**: task 5.5 で ja_JP を実プロジェクトへ投入した直後、POEditor上のterm数が想定より43件多いことが判明した。当初の実装は `syncTerms: false`（削除しない設定）を根拠に「termの新規作成も一切起きない」と誤って仮定していた
+- **Sources Consulted**: 実プロジェクトでの実測（ja_JP投入前後のterm数比較、en_US にしか無いキーとen_US・ja_JP双方にしかないキーの照合）
+- **Findings**: `sync_terms` が制御するのは「アップロードしたファイルに無い既存キーの削除」のみで、ファイルに新しく含まれるキーの追加は `sync_terms` の値に関わらず常に行われる。ja_JP の翻訳ファイルには en_US に存在しないキーが44件ある（`admin.json` 8件・`translation.json` 36件・`commons.json` 0件）。これらが `syncTerms: false` のまま新規termとしてPOEditorに作成されてしまった。実測したterm増加数は43件で、44件との1件の差は原因未特定のまま残る
+- **Selected Approach**: `seed-existing-translations.ts` の `runSeed` を、対象言語のファイルに加えて en_US のファイルも読み込むよう変更し、`DiffClassifier.filterToKnownKeys(en_US側の内容, 対象言語側の内容)`（新設の純粋関数）でアップロード前に en_US の既存キーだけへ絞り込む
+- **Rationale**: POEditorのterm一覧は push（en_US由来）が権威を持つ唯一の情報源であるべきで、翻訳ファイル側だけに存在するキーをterm一覧に紛れ込ませると、次回の通常push（`sync_terms=1`、en_USのみ基準）でそれらのtermが削除され、その後のpullが「削除された」と誤って構造変更PRを提案する結果になる
+- **Trade-offs**: 翻訳ファイル側にあってen_US側に無いキー（リポジトリの既存ドリフト。今回の実測では `translation.json` 単体で ja側36件・en側15件）は投入対象から外れる。これは元々POEditorのterm一覧に載る資格が無いキーであり、この施策のスコープ外（別問題）として扱う
+- **Follow-up**: 既に ja_JP 投入で作成された44件（内訳は上記Findings参照）の孤立termをどう扱うか（POEditor UIで手動削除するか、次回pushでの自動削除→後続pullでの構造変更PR発生を許容するか）は human review 待ち。同様の絞り込み前提で試算すると、`zh_CN` は25件（admin 8・translation 15・commons 2）、`fr_FR` は5件（admin 2・translation 3・commons 0）、`ko_KR` は0件の孤立termを生んでいたはずで、修正後のツールで実行すればこれらは発生しない。`zh_CN`/`fr_FR`/`ko_KR` の投入は、この修正が反映されたツールで行うこと（既に投入済みの `ja_JP` を再実行する必要はない）
+
 ## Risks & Mitigations
 - POEditor OSS プランの申請が承認されない可能性 — 承認されるまで本番運用（実際の同期起動）を進めない。requirements.md 要件7.2で明示済み
 - upload のレート制限（20秒に1回）を超過すると同期が失敗する — 呼び出し間に待機を入れて直列実行する設計とする
@@ -147,6 +156,7 @@
 - タグ付けアップロード（`sync_terms`無効）が他namespaceのキーを`tags`の`obsolete`スコープの対象にしてしまわないかは、実プロジェクトでの実測では他namespaceの内容が存在しない状態でのテストに留まり、確認できていない — 本番運用開始前の実環境確認（複数namespaceが実データで共存する状態でのタグ付けアップロード）で必ず確認すること
 - POEditor プロジェクトの Fallback Language 設定が誤って有効化されると、未翻訳キーの export値が別言語の文言で埋まり、`DiffClassifier`が「訳文が変更された」と誤判定して既存の正しい翻訳を上書きしうる（task 6.2の実環境確認で実際に発生し、生成されたPRはマージせずclose済み） — `DiffClassifier.classify`が空文字列を「情報なし」として無視する実装に修正済み（上記Decision参照）だが、Fallback Language自体は引き続き「未設定」運用が前提。プロジェクト設定が意図せず変わっていないか、定期的な実環境確認（tasks.md 6.x）で確認すること
 - POEditorが ja/zh/fr/ko の既存翻訳を1件も持っていない（push が en_US しかアップロードしないため）状態が続くと、翻訳者が参加してもPOEditor上は0%表示のままになり、体験を損なう — 既存翻訳の初回投入をタスク化して対応する（`docs/i18n-community-translation-setup.md` §2.3）
+- 既存翻訳投入ツールは `sync_terms:false` でも新規termを作成しうる（上記Decision参照）。ja_JP投入時にen_USに無い44件のtermが作成された — ツールをen_USの既存キーへの絞り込みに修正済みだが、既に作成された44件の孤立termの後始末（削除するか、次回pushでの自動削除に伴う構造変更PRを許容するか）は human review 待ち
 
 ## References
 - [POEditor API Reference](https://poeditor.com/docs/api) — upload/export のパラメータ、レート制限、対応フォーマットの一次情報。`terms/add`/`terms/update`の用語一意性（term+context）と、`projects/upload`（一括アップロード）にはcontextを個別指定する手段が無いことも、この一次情報から確認した
