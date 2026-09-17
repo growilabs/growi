@@ -224,6 +224,11 @@ export class GrowiToSlackCtrl {
       throw createError(400, 'order has expired or does not exist.');
     }
 
+    // order.installation may be missing if registration failed to link it.
+    if (order.installation == null) {
+      throw createError(400, 'installation is invalid');
+    }
+
     // Access the GROWI URL saved in the Order record and check if the GtoP token is valid.
     try {
       await this.urlVerificationRequestToGrowi(order.growiUrl, order.tokenPtoG);
@@ -233,11 +238,6 @@ export class GrowiToSlackCtrl {
     }
 
     logger.debug({ order }, 'order found');
-
-    // order.installation may be missing if registration failed to link it.
-    if (order.installation == null) {
-      throw createError(400, 'installation is invalid');
-    }
 
     const token = order.installation.data.bot?.token;
     if (token == null) {
