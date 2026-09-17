@@ -44,7 +44,7 @@
   - _Requirements: 2.1, 2.2, 2.3_
   - _Boundary: check-fixture-wiring.ts_
 
-- [ ] 3. Core: 実データfixtureについて、分類結果に応じてGitHub APIを再取得し形を比較するCLIを実装する
+- [x] 3. Core: 実データfixtureについて、分類結果に応じてGitHub APIを再取得し形を比較するCLIを実装する
   - タスク2.1の分類結果が `real-checkable` のものだけ、既存の
     `lib/gh.ts` の `GhApi.get()` で再取得し、タスク2.2の形比較にかける
   - `synthetic` は再取得対象から除外し、`unrecognized` は再取得せず
@@ -206,3 +206,20 @@ fixtureでは、synthetic な `.meta.md` の本文中に `repos/growilabs/growi/
 1件（今回のレビューで新たに見つかった、どの `.spec.ts` からも参照されて
 いない実データfixture）。どちらも本物の検知であり、タスク4.2でissue化
 される対象になる（意図どおり）。
+
+### タスク3: `checked` の数え方の確定、実データでの実測結果
+
+Requirements/design.md が明示していなかった `checked` の数え方を、
+`check-fixture-drift.ts` 実装時に確定した: `checked` は real-checkable と
+分類され、GitHub取得が成功し形比較まで行われたfixtureの件数（乖離が
+見つかったものも含む）。synthetic（そもそも対象外、Requirement 1.4）と
+unchecked（`.meta.md` が典型形でない、または取得失敗、Requirement 5.1/5.3）
+は含めない。タスク2.3の `check-fixture-wiring.ts` の `checked`（実際に
+検証を行った対象の件数）と同じ考え方。タスク4.1で「対象件数」を出す際は
+`checked + unchecked.length`（synthetic除く）を使えばRequirement 3.2の
+意図を満たせる。
+
+実データでの実測（stub `GhApi` で自分自身のfixtureをラウンドトリップさせた
+実行）: `checked: 18, drift: 0, unchecked: 28`。50件の実データ`.meta.md`が
+18 real-checkable / 4 synthetic / 28 unrecognized に分かれることをタスク1の
+カタログと独立に再確認済み。
