@@ -95,6 +95,13 @@ jobs:
   ci-app-test:
     runs-on: ubuntu-latest
 
+    # Skipped for the i18n sync bot's translation-only branch: its diff is
+    # always a subset of apps/app/public/static/locales/** values already
+    # validated by `pnpm run lint:i18n` before the pull request was opened
+    # (see .github/mergify.yml's i18n-sync-translation-only queue, which
+    # only requires ci-app-lint for this branch).
+    if: github.head_ref != 'i18n-sync/translation-only'
+
     strategy:
       matrix:
         node-version: [24.x]
@@ -160,6 +167,9 @@ jobs:
 
   ci-app-test-integration:
     runs-on: ubuntu-latest
+
+    # See ci-app-test's comment above.
+    if: github.head_ref != 'i18n-sync/translation-only'
 
     strategy:
       matrix:
@@ -234,6 +244,9 @@ jobs:
 
   ci-app-launch-dev:
     runs-on: ubuntu-latest
+
+    # See ci-app-test's comment above.
+    if: github.head_ref != 'i18n-sync/translation-only'
 
     strategy:
       matrix:

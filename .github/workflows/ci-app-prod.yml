@@ -52,6 +52,7 @@ jobs:
         || github.base_ref == 'dev/8.*.x'
         || startsWith( github.base_ref, 'release/' )
         || startsWith( github.head_ref, 'mergify/merge-queue/' ))
+      && github.head_ref != 'i18n-sync/translation-only'
     with:
       node-version: 24.x
       skip-e2e-test: ${{ contains( github.event.pull_request.labels.*.name, 'dependencies' ) }}

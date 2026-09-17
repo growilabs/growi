@@ -512,6 +512,16 @@ export const collectClassifications = async (
  */
 export const TRANSLATION_ONLY_BRANCH = 'i18n-sync/translation-only';
 
+/**
+ * Applied to every translation-only pull request at creation. Also lets
+ * `.github/workflows/auto-labeling.yml`'s existing `check-title`/
+ * `auto-labeling` jobs skip themselves (both already exempt this label),
+ * and lets `.github/mergify.yml` route this branch into a lighter queue
+ * (see its own comment for why the full queue's checks are unnecessary
+ * here).
+ */
+export const EXCLUDE_FROM_CHANGELOG_LABEL = 'flag/exclude-from-changelog';
+
 /** Injectable file-writing function, mirroring `ReadNamespaceFile`. */
 export type WriteLocaleFile = (
   absolutePath: string,
@@ -1164,8 +1174,10 @@ const createGitHubCollaborators = (
   };
 
   return {
-    translationOnlyPrPublisher:
-      createTranslationOnlyPrPublisher(publisherOptions),
+    translationOnlyPrPublisher: createTranslationOnlyPrPublisher({
+      ...publisherOptions,
+      labels: [EXCLUDE_FROM_CHANGELOG_LABEL],
+    }),
     structuralPrPublisher: createStructuralPrPublisher(publisherOptions),
     approvalReviewer: createApprovalReviewer({
       approvalToken: config.approvalToken,

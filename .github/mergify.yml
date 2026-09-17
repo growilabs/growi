@@ -30,14 +30,41 @@ queue_rules:
       - -check-failure ~= test-prod-node24 / run-playwright
       - -check-failure ~= test-prod-node24 / report-playwright
 
+  # Content-only pull requests from the i18n sync bot (translation-only
+  # branch, see pull-translations.ts's TRANSLATION_ONLY_BRANCH): the diff is
+  # always a subset of `apps/app/public/static/locales/**` values already
+  # validated by `pnpm run lint:i18n` inside the pull workflow before this
+  # pull request was even opened (Requirement 3.3/3.4), so the full app
+  # test/build/Playwright matrix verifies nothing this diff could break.
+  # ci-app-lint alone still catches a malformed-JSON regression.
+  - name: i18n-sync-translation-only
+    queue_conditions:
+      - check-success ~= ci-app-lint
+      - -check-failure ~= ci-app-lint
+    merge_conditions:
+      - check-success ~= ci-app-lint
+      - -check-failure ~= ci-app-lint
+
 pull_request_rules:
   - name: Automatic queue to merge
     conditions:
       - '#approved-reviews-by >= 1'
       - '#changes-requested-reviews-by = 0'
       - '#review-requested = 0'
+      # Routed to the lightweight queue below instead.
+      - -head = i18n-sync/translation-only
     actions:
       queue:
+
+  - name: Automatic queue to merge (i18n-sync translation-only)
+    conditions:
+      - head = i18n-sync/translation-only
+      - '#approved-reviews-by >= 1'
+      - '#changes-requested-reviews-by = 0'
+      - '#review-requested = 0'
+    actions:
+      queue:
+        name: i18n-sync-translation-only
 
   - name: Automatic merge for Preparing next version
     conditions:
