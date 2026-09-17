@@ -160,3 +160,24 @@ The three zero states and the character-limit truncation have no real example
 — the dashboard has never had an empty table, and no body has come near 65536
 characters — so they are covered by constructed inputs inside
 `lib/dashboard.spec.ts` rather than by a fixture file.
+
+## Automated drift check — and its blind spot
+
+`bin/flaky-ci/scripts/check-fixture-drift.ts` runs quarterly (via
+`.github/workflows/flaky-ci-fixture-freshness.yml`) and re-fetches each real
+fixture's `# Source` endpoint through `gh api`, then compares the response's
+*shape* (top-level keys and value types, never the values themselves) against
+the fixture on disk.
+
+This only works for a `.meta.md` `# Source` written in the typical form:
+
+```
+`gh api -X GET repos/growilabs/growi/<path>` (optionally with `--paginate` / `-f k=v`, never `-q`)
+```
+
+Anything else — a `-q`-filtered command, `**Derived, not raw API data.**`,
+`**Constructed.**`, or the different-format `api/dashboard/` files — is not
+re-fetched by the automated check. It's not silently skipped either: the
+workflow reports it as "unchecked" so the gap stays visible, but nobody
+confirms these are still accurate. If you add a new real fixture and want it
+covered going forward, write its `# Source` line in the typical form above.

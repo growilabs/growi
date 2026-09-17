@@ -86,7 +86,7 @@
   - _Requirements: 4.1, 4.2, 4.3_
   - _Depends: 4.1_
 
-- [ ] 4.3 `bin/flaky-ci/fixtures/README.md` に、典型形以外の `.meta.md` は自動チェック対象外になる旨を追記する
+- [x] 4.3 `bin/flaky-ci/fixtures/README.md` に、典型形以外の `.meta.md` は自動チェック対象外になる旨を追記する
   - タスク2.1で確定した典型形の書式と、それ以外（`-q` 付き・派生物・別書式）が
     `unrecognized`（未確認）として扱われることを短く追記する
   - 観測可能な完了状態: READMEを読むと、どの `.meta.md` の書き方が自動チェック
