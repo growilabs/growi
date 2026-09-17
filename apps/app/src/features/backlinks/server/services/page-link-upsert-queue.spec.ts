@@ -384,3 +384,95 @@ describe('PageLinkUpsertQueue (duty-cycle pacing)', () => {
     expect(mocks.handlePageUpsertById).toHaveBeenCalledTimes(2);
   });
 });
+
+/*
+ * B5.3 — contract: once abandoned, an id is never handed to handlePageUpsertById again unless
+ * something re-enqueues it.
+ */
+describe('PageLinkUpsertQueue (abandoning deleted pages)', () => {
+  const siteUrl = 'https://wiki.example';
+  const DRAIN_INTERVAL_MS = 500;
+  const RETRY_BACKOFF_MS = 5000;
+
+  /** 100% duty cycle: no rest between pages, so one timer advance covers a whole drain. */
+  const createQueue = () =>
+    new PageLinkUpsertQueue(() => siteUrl, {
+      drainIntervalMs: DRAIN_INTERVAL_MS,
+      dutyCyclePercent: 100,
+    });
+
+  const idsExtracted = (): string[] =>
+    mocks.handlePageUpsertById.mock.calls.map(([id]) => id);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mocks.handlePageUpsertById.mockReset();
+    mocks.handlePageUpsertById.mockResolvedValue(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('never extracts a page abandoned before the drain runs', async () => {
+    const queue = createQueue();
+    const kept = new Types.ObjectId().toString();
+    const deleted = new Types.ObjectId().toString();
+
+    queue.enqueue(kept);
+    queue.enqueue(deleted);
+    queue.abandon([deleted]);
+    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS + RETRY_BACKOFF_MS);
+
+    expect(idsExtracted()).toEqual([kept]);
+  });
+
+  it('never extracts a page abandoned while an earlier page is still in flight', async () => {
+    // Snapshotting the dirty set instead of iterating it live breaks this, and nothing else.
+    const queue = createQueue();
+    const first = new Types.ObjectId().toString();
+    const deleted = new Types.ObjectId().toString();
+    mocks.handlePageUpsertById.mockImplementation((id: string) => {
+      if (id === first) queue.abandon([deleted]);
+      return Promise.resolve(0);
+    });
+
+    queue.enqueue(first);
+    queue.enqueue(deleted);
+    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS + RETRY_BACKOFF_MS);
+
+    expect(idsExtracted()).toEqual([first]);
+  });
+
+  it('does not let the drain re-queue a page abandoned after it had already failed', async () => {
+    // A drain re-queues its retry set when it ends; a page abandoned after failing earlier in
+    // that same drain must not come back with it.
+    const queue = createQueue();
+    const failing = new Types.ObjectId().toString();
+    const later = new Types.ObjectId().toString();
+    mocks.handlePageUpsertById.mockImplementation((id: string) => {
+      if (id === failing) return Promise.reject(new Error('transient'));
+      queue.abandon([failing]);
+      return Promise.resolve(0);
+    });
+
+    queue.enqueue(failing);
+    queue.enqueue(later);
+    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS + RETRY_BACKOFF_MS * 4);
+
+    expect(idsExtracted()).toEqual([failing, later]);
+  });
+
+  it('extracts a page again when it is re-enqueued after being abandoned', async () => {
+    // Not a tombstone: a page recreated at the same id must still get indexed.
+    const queue = createQueue();
+    const pageId = new Types.ObjectId().toString();
+
+    queue.enqueue(pageId);
+    queue.abandon([pageId]);
+    queue.enqueue(pageId);
+    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS + RETRY_BACKOFF_MS);
+
+    expect(idsExtracted()).toEqual([pageId]);
+  });
+});
