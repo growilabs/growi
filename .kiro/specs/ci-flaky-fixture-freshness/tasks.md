@@ -11,7 +11,7 @@
   - _Requirements: 1.1, 1.4, 5.3_
 
 - [ ] 2. Core: 分類・形比較・参照配線チェックの実装
-- [ ] 2.1 (P) `.meta.md` の `# Source` 節を解析し、real-checkable / synthetic / unrecognized を判定するロジックを実装する
+- [x] 2.1 (P) `.meta.md` の `# Source` 節を解析し、real-checkable / synthetic / unrecognized を判定するロジックを実装する
   - タスク1で確保した実例を入力に、3分類を返す純粋関数を実装する
     （design.md `meta-source.ts` の Service Interface契約）
   - `real-checkable` と判定するのは、典型形（`-q` を含まない
@@ -163,3 +163,17 @@ Decision 1 のとおり unrecognized に分類される。個別の実例とし�
 - `api/check-runs/0d1a319a-check-runs.json.meta.md` — 引用:
   `` - **Real**: `gh api repos/growilabs/growi/commits/0d1a319a106b2a791e883170782e856f88b0e178/check-runs?per_page=100`. ``
   → 実際にはGETだが `-X GET` の記述自体が無く、典型形の正規表現に文字どおり一致しないエッジケース。
+
+### タスク2.1: `meta-source.ts` レビューで見つかった非ブロッキングの懸念
+
+`parseMetaSource` は real-checkable 判定の正規表現を `.meta.md` 全文に対して
+先に試し、`**Synthetic.**` マーカーの確認より先に行う。現在存在する全
+fixtureでは、synthetic な `.meta.md` の本文中に `repos/growilabs/growi/...`
+形式のGETコマンドが（別の話題として）埋め込まれることが無いため誤判定は
+起きないが、これは現在のfixtureの内容がたまたまそうなっているだけで、
+コード側に「一致したコマンドがそのfixture自身の出典であること」を保証する
+チェックは無い。将来 synthetic な fixture が同じ形式のコマンドを本文中に
+引用するようになった場合、real-checkable に誤判定される可能性がある。
+対応が必要になったら、synthetic マーカーの確認を real-checkable の正規表現
+より先に行う、または一致箇所が `# Source` の最初の箇条書きに限られることを
+要求する、のいずれかで直せる（現時点では対応不要、要件を満たしている）。
