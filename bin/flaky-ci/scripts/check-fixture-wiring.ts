@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 /**
  * Checks whether every fixture file under `bin/flaky-ci/fixtures/` is
- * actually read by some test, so a fixture that stops being referenced (the
- * way `fixtures/expected/*.md` silently did before PR #11921's review caught
- * it — fixed in commit 51483394a2) is reported instead of quietly rotting.
+ * actually read by some test, so a fixture that stops being referenced is
+ * reported instead of quietly rotting.
  *
  * The reference check is a plain substring search, not an AST-aware analysis
  * (design.md `check-fixture-wiring.ts` Implementation Notes). Most existing
@@ -21,55 +20,20 @@
  * source both DECLARES a local helper whose own definition mentions the
  * fixture's parent directory (a `fixtures/<dir>/` substring, any `../`
  * depth), AND CALLS that same helper (by the identifier it was declared
- * under) with the fixture's basename as a quoted string argument. See
- * `isWiredViaHelperPattern` for the mechanism and why it correlates the two
- * halves by identifier rather than just checking they both occur somewhere
- * in the file. Both checks stay textual/mechanical, per the same non-AST
- * constraint.
+ * under) with the fixture's basename as a quoted string argument. Both
+ * halves must be tied to the same identifier — a directory mention and an
+ * unrelated quoted basename merely co-occurring somewhere in a file (in
+ * different declarations, comments, or calls to unrelated functions) must
+ * not count as wiring; see `isWiredViaHelperPattern` for the mechanism.
+ * Both checks stay textual/mechanical, per the same non-AST constraint.
  *
- * This helper-pattern check went through three rounds before landing on
- * identifier correlation, each fixing a false "wired" verdict the previous
- * round produced:
- *   1. Bare corpus-wide co-occurrence (directory mention anywhere in the
- *      concatenation of ALL spec files, basename mention anywhere in the
- *      concatenation) — an unrelated file mentioning the directory and a
- *      completely different file mentioning the basename combined into a
- *      false positive.
- *   2. Per-file co-occurrence (both halves required in the SAME file, but
- *      unscoped within it) — a directory mention in a comment/doc string
- *      and an unrelated quoted basename anywhere else in that same file
- *      still combined.
- *   3. Per-file, basename scoped to "quoted string immediately inside
- *      parentheses" (looks like a call argument) — but still not checked
- *      against a specific helper: a plain non-function constant mentioning
- *      the directory, plus an unrelated `expect(x).toBe('other.txt')` call
- *      elsewhere in the same file, still combined into a false positive
- *      because neither side was verified to be part of the SAME call.
- * Round 4 fixed this by extracting the identifiers of local declarations
- * whose own body mentions the directory, then requiring the basename to
- * appear as an argument to a call naming one of those SPECIFIC identifiers.
- *   5. Property/method-access false correlation (round 4's own regex used a
- *      plain `\b` word boundary before the identifier alternation, but `\b`
- *      also fires right after a `.`) — an unrelated
- *      `someOtherModule.readFixture('basename.txt')` property access on a
- *      completely different object, merely sharing a name with a local
- *      helper that was never itself called, satisfied the pattern as if the
- *      local helper had actually been invoked. Round 5 first tried a
- *      `(?<!\.)` negative lookbehind immediately before the identifier
- *      alternation, but that only rejects a `.` in the character
- *      IMMEDIATELY preceding the identifier — whitespace or a newline
- *      between the `.` and the identifier (`obj. readFixture(...)`, or a
- *      `.` at end of line with the call on the next line) still slipped
- *      through and reproduced the same false "wired" verdict.
- *   6. Round 5's own fix was too narrow for the same reason: it stopped only
- *      the zero-whitespace case, not `obj.\n  readFixture(...)` or
- *      `obj. readFixture(...)`.
- * The current mechanism (round 6) widens the lookbehind to `(?<!\.\s*)`, a
- * variable-length negative lookbehind (supported by V8) that rejects a `.`
- * followed by any amount of whitespace (including none, and including
- * newlines) immediately before the identifier — still requiring a bare call
- * rather than a property/method access, and still correctly rejecting
- * optional chaining (`?.`, `?.\n  `, ...) for the same reason.
+ * The helper-pattern's call-site match must be a BARE invocation of the
+ * matched identifier, never a property/method access on some other object
+ * that merely shares its name (`someOtherModule.readFixture(...)` must not
+ * count as a call to a locally-declared `readFixture` helper, nor should
+ * `obj.\n  readFixture(...)` with a newline inserted after the `.`, nor
+ * optional chaining `?.readFixture(...)`) — see the lookbehind in
+ * `isWiredViaHelperPattern` for how that is enforced.
  *
  * Both checks — the full-path substring and the two-part helper pattern —
  * are evaluated PER FILE, and a fixture counts as wired if ANY single spec
@@ -194,8 +158,9 @@ const extractHelperIdentifiers = (
 
 /**
  * Checks the `readFixture(name)`-style helper pattern (see module doc
- * comment) against a SINGLE spec file's own source. Unlike a bare
- * co-occurrence check, this correlates the two halves by identifier:
+ * comment) against a SINGLE spec file's own source. This correlates the two
+ * halves by identifier, rather than checking they merely co-occur somewhere
+ * in the file:
  *
  *   1. Find every locally-declared identifier whose OWN declaration body
  *      mentions the fixture's parent directory as a `fixtures/<dir>/`
@@ -209,9 +174,8 @@ const extractHelperIdentifiers = (
  *
  * A directory mention and a quoted basename that merely occur somewhere in
  * the same file — in unrelated declarations, comments, or calls to
- * unrelated functions — no longer combine into a false "wired" verdict; see
- * the module doc comment for the three rounds of false positives this
- * replaces.
+ * unrelated functions — must not combine into a false "wired" verdict; see
+ * the module doc comment for the invariant this protects.
  */
 const isWiredViaHelperPattern = (
   relativePath: string,
@@ -237,20 +201,19 @@ const isWiredViaHelperPattern = (
   //   )
   //
   // `(?<!\.\s*)` immediately before the identifier alternation requires a
-  // BARE call, not a property/method access: `\b` alone fires right after
-  // `.` too (it is a non-word character), so `someOtherModule.readFixture(...)`
-  // — a call on some OTHER object that merely happens to share the name of a
-  // locally-declared helper — would otherwise satisfy the pattern exactly as
-  // if the local helper had actually been invoked. The lookbehind is
-  // variable-length (`\s*`, not a fixed single character) on purpose: a `.`
-  // immediately before the identifier is not the only property-access shape
-  // — `obj. readFixture(...)` and `obj.\n  readFixture(...)` are the same
-  // property access with whitespace/a newline inserted after the `.`, and a
-  // fixed-width `(?<!\.)` lookbehind (round 5) only rejected the
-  // zero-whitespace case, leaving those still falsely correlated. This also
-  // correctly rejects optional chaining (`?.readFixture(...)`, `?.\n  readFixture(...)`),
-  // since that too ends in `.` before the (possibly whitespace-separated)
-  // identifier.
+  // BARE call, not a property/method access: a plain `\b` word boundary
+  // alone also fires right after `.` (a non-word character), so
+  // `someOtherModule.readFixture(...)` — a call on some OTHER object that
+  // merely happens to share the name of a locally-declared helper — would
+  // otherwise satisfy the pattern as if the local helper had actually been
+  // invoked. The lookbehind is variable-length (`\s*`, not a fixed single
+  // character) because a `.` immediately before the identifier is not the
+  // only property-access shape: `obj. readFixture(...)` and
+  // `obj.\n  readFixture(...)` are the same property access with
+  // whitespace/a newline inserted after the `.`, and must be rejected the
+  // same way. This also correctly rejects optional chaining
+  // (`?.readFixture(...)`, `?.\n  readFixture(...)`), since that too ends in
+  // `.` before the (possibly whitespace-separated) identifier.
   const correlatedCallPattern = new RegExp(
     `(?<!\\.\\s*)\\b(?:${helperIdentifiers.map(escapeForRegex).join('|')})\\s*\\(\\s*(['"\`])${escapeForRegex(baseName)}\\1\\s*,?\\s*\\)`,
   );

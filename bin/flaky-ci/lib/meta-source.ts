@@ -9,19 +9,13 @@
  * buckets does it fall into, and — for the real-checkable case — which
  * `gh api -X GET` call would re-fetch it.
  *
- * Design decision (research.md Decision 1): `.meta.md` is free-form prose,
- * and writing a general-purpose parser for it would be over-investment (and
- * risks silently treating a `-q`-filtered value as "the response shape",
- * which would violate Requirement 1.3 — only shape, never value, is
- * compared). So this module recognizes exactly one narrow, literal form and
- * calls everything else `unrecognized` rather than guessing:
+ * Only the one narrow, literal form below counts as real-checkable; anything
+ * else, including a `-q`-filtered command or a plain `gh api <path>` with no
+ * explicit `-X GET`, is `unrecognized` rather than guessed at (see
+ * research.md's Decision 1 for why a general-purpose parser is not used
+ * here):
  *
  *   `gh api -X GET repos/growilabs/growi/<path>[?query][ --paginate][ -f k=v ...]`
- *
- * with no `-q` anywhere. `-X GET` must appear literally (a real fixture can
- * be fetched with plain `gh api <path>`, which is still a GET by default,
- * but that form is deliberately left `unrecognized` rather than inferred —
- * see design.md's `check-runs` example).
  *
  * `**Synthetic.**` at the start of a bullet is the other explicit signal
  * (Requirement 1.4): hand-built data that must never be re-fetched. A
@@ -32,7 +26,7 @@
  *
  * This is a pure function: it never calls `gh` or the network, and it never
  * throws — anything it cannot confidently classify becomes `unrecognized`
- * with a `reason`, never a guess (design.md meta-source.ts Postconditions).
+ * with a `reason`, never a guess.
  */
 
 export type MetaSource =
@@ -61,8 +55,8 @@ const REAL_CHECKABLE_COMMAND_RE =
  * `scripts/check-fixture-drift.ts`) passes `path` straight into
  * `gh api -X GET <path>` — a prefix-less path like `issues` resolves to a
  * different, unrelated GitHub endpoint (the authenticated user's own issues,
- * not this repo's) instead of 404ing, so the mistake fails silently rather
- * than loudly. See task 2.1 regression fix (found during task 4.1 review).
+ * not this repo's) instead of 404ing, so a missing prefix fails silently
+ * rather than loudly.
  */
 const REPO_API_PATH_PREFIX = 'repos/growilabs/growi/';
 

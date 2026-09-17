@@ -123,7 +123,7 @@ describe('check-fixture-wiring.checkFixtureWiring — the real bin/flaky-ci fixt
 
     // identity/flaky-issue-titles.json is read by lib/identity.spec.ts via a
     // literal relative-path string (see that file), so it must never appear
-    // in unwired — the actual regression this task guards against.
+    // in unwired.
     expect(result.checked).toBeGreaterThan(0);
     expect(result.unwired).not.toContain('identity/flaky-issue-titles.json');
     expect(result.unwired).not.toContain(
@@ -141,8 +141,8 @@ describe('check-fixture-wiring.checkFixtureWiring — the real bin/flaky-ci fixt
     // These are never present as one contiguous "job-logs/<file>" substring
     // anywhere in lib/job-log.spec.ts: the directory is baked into a
     // template literal and the filename is passed separately as a plain
-    // string argument to readFixture(). The reviewer-verified bug reported
-    // all of these as unwired.
+    // string argument to readFixture(), so only the helper-pattern check
+    // (not the full-path substring check) can find them.
     //
     // NB: the path segments below are joined at runtime, not written as one
     // contiguous literal, on purpose — this spec file is itself scanned by
@@ -186,10 +186,9 @@ describe('check-fixture-wiring.checkFixtureWiring — the real bin/flaky-ci fixt
 
     const result = checkFixtureWiring(fixturesDir, flakyCiDir);
 
-    // The two-part (directory + basename) check does not itself defeat
-    // detection of genuinely unwired files: none of the md files under the
-    // "expected" fixtures subdirectory are read by any *.spec.ts, and the
-    // fix must not silently swallow that.
+    // The two-part (directory + basename) check must not itself hide a
+    // genuinely unwired file: none of the md files under the "expected"
+    // fixtures subdirectory are read by any *.spec.ts.
     //
     // NB: both the directory word and the filename are kept out of any
     // "fixtures/<dir>/" or quoted-basename shape anywhere in this file
@@ -226,18 +225,15 @@ describe('check-fixture-wiring.checkFixtureWiring — readFixture(name)-style he
   it('does not report a fixture referenced only through a readFixture(name)-style helper, where the directory is baked into a template literal and the filename is passed as a separate string argument', () => {
     const { fixturesDir, specSourceDir } = makeTempTree();
 
-    // NB: this fixture is deliberately NOT named the same as the reviewer's
-    // own manual real-tree probe filename for the cross-context
-    // contamination bug this task fixes (a "helper-referenced" dot-txt file
-    // under fixtures/job-logs). This spec file (check-fixture-wiring.spec.ts)
-    // is itself scanned by checkFixtureWiring when the real fixtures tree is
-    // checked (it lives under bin/flaky-ci), so writing that exact filename
-    // as a quoted-and-parenthesized readFixture argument right here — inside
-    // a job-logs-directory-referencing helperSpecSource string — would make
-    // THIS spec file's own source satisfy the helper pattern for any real
-    // fixture of that same name, silently defeating the manual probe. Note
-    // this paragraph itself avoids writing that filename as a quoted,
-    // parenthesized literal for the same reason.
+    // NB: this synthetic fixture's name is chosen so it does not collide
+    // with any real fixture under fixtures/job-logs. This spec file
+    // (check-fixture-wiring.spec.ts) is itself scanned by checkFixtureWiring
+    // when the real fixtures tree is checked (it lives under bin/flaky-ci),
+    // so writing a real fixture's filename as a quoted-and-parenthesized
+    // readFixture argument here — inside a job-logs-directory-referencing
+    // helperSpecSource string — would make this spec file's own source
+    // satisfy the helper pattern for that fixture regardless of whether it
+    // is actually wired elsewhere.
     const syntheticFixtureName = 'synthetic-readfixture-helper-test.txt';
     writeFileSync(
       path.join(fixturesDir, 'job-logs', syntheticFixtureName),
@@ -302,10 +298,9 @@ const WIRED = readFixture('wired.txt');`,
     // Fixture B: NOT read by any test anywhere. Its basename happens to
     // appear as a quoted string in a completely different, unrelated spec
     // file — but only inside a comment/constant, never as the argument to a
-    // fixture-reading call. Before the per-file fix, this quoted basename
-    // (from unrelated.spec.ts) could combine with the `fixtures/job-logs/`
-    // directory reference (from wired.spec.ts) via the concatenated-blob
-    // check and falsely report fixture B as wired.
+    // fixture-reading call. The directory reference and the quoted basename
+    // live in different files, so they must not combine into a false
+    // "wired" verdict for fixture B.
     writeFileSync(
       path.join(fixturesDir, 'job-logs', 'contaminated.txt'),
       'log contents',
@@ -321,7 +316,7 @@ const WIRED = readFixture('wired.txt');`,
     expect(result.unwired).not.toContain('job-logs/wired.txt');
   });
 
-  it('does not let a plain (non-function) declaration mentioning the fixtures directory combine with an unrelated quoted basename elsewhere in the SAME file to falsely mark a fixture wired (round-3 regression: parenthesized-but-uncorrelated co-occurrence)', () => {
+  it('does not let a plain (non-function) declaration mentioning the fixtures directory combine with an unrelated quoted basename elsewhere in the SAME file to falsely mark a fixture wired', () => {
     const { fixturesDir, specSourceDir } = makeTempTree();
 
     writeFileSync(
@@ -331,10 +326,11 @@ const WIRED = readFixture('wired.txt');`,
     // LOG_DIR_DOC mentions the fixtures/job-logs/ directory shape, but it is
     // a plain string constant, not a helper call — it never reads any
     // fixture. Elsewhere in the same file, an unrelated expect() call
-    // happens to have a quoted string immediately inside parentheses. Before
-    // the identifier-correlation fix, the directory half and the "quoted
-    // basename in parens" half could both match this one file's source
-    // without ever being the same call, producing a false "wired" verdict.
+    // happens to have a quoted string immediately inside parentheses. The
+    // directory mention and the quoted basename must be tied to the SAME
+    // call (via identifier correlation) to count as wired — merely
+    // co-occurring in one file's source, unparenthesized to the same call,
+    // must not produce a false "wired" verdict.
     const source = `const LOG_DIR_DOC = '../fixtures/job-logs/README';
 expect(x).toBe('not-actually-read.txt');`;
     writeFileSync(path.join(specSourceDir, 'round3.spec.ts'), source);
@@ -400,7 +396,7 @@ const CONTENT = readJobLog('shared-name.txt');`;
     expect(result.unwired).toContain('api/shared-name.txt');
   });
 
-  it('does not let a property/method-access call on an unrelated object satisfy the correlated-call pattern for a same-named local helper that is never itself invoked (round-4 regression: `\\b` matches right after `.`)', () => {
+  it('does not let a property/method-access call on an unrelated object satisfy the correlated-call pattern for a same-named local helper that is never itself invoked', () => {
     const { fixturesDir, specSourceDir } = makeTempTree();
 
     writeFileSync(
@@ -412,10 +408,9 @@ const CONTENT = readJobLog('shared-name.txt');`;
     // but it is NEVER called as a bare invocation anywhere in this file.
     // `someOtherModule.readFixture(...)` is a property/method access on a
     // completely different object that merely happens to share the name
-    // `readFixture`; it must not count as a call to the local helper. Before
-    // this fix, `\b` in the correlated-call pattern matched right after the
-    // `.` (a non-word character), so this property access satisfied the
-    // pattern exactly as if the local helper had been invoked directly.
+    // `readFixture`; it must not count as a call to the local helper, so the
+    // correlated-call pattern must reject any identifier match immediately
+    // preceded by a `.`.
     const source = `const readFixture = (name: string): string =>
   readFileSync(
     fileURLToPath(new URL(\`../fixtures/job-logs/\${name}\`, import.meta.url)),
@@ -429,20 +424,20 @@ const RESULT = someOtherModule.readFixture('never-actually-read.txt');`;
     expect(result.unwired).toContain('job-logs/never-actually-read.txt');
   });
 
-  it('does not let a property/method-access call with whitespace or a newline between the `.` and the identifier satisfy the correlated-call pattern (round-5 regression: a fixed-width `(?<!\\.)` lookbehind only rejects zero-whitespace adjacency)', () => {
+  it('does not let a property/method-access call with whitespace or a newline between the `.` and the identifier satisfy the correlated-call pattern', () => {
     const { fixturesDir, specSourceDir } = makeTempTree();
 
     writeFileSync(
       path.join(fixturesDir, 'job-logs', 'never-actually-read-either.txt'),
       'log contents',
     );
-    // Same shape as the round-4 regression above, but with a newline and
-    // indentation inserted between the `.` and the identifier — a property
-    // access on `someOtherModule`, not a call to the local `readFixture`
-    // helper declared below. A fixed-width `(?<!\.)` lookbehind (round 5)
-    // only rejects a `.` immediately adjacent to the identifier, so this
-    // still falsely satisfied the pattern; the variable-length `(?<!\.\s*)`
-    // lookbehind (round 6) must reject it too.
+    // Same shape as the property-access case above, but with a newline and
+    // indentation inserted between the `.` and the identifier — still a
+    // property access on `someOtherModule`, not a call to the local
+    // `readFixture` helper declared below. The correlated-call pattern's
+    // lookbehind must reject a `.` separated from the identifier by any
+    // amount of whitespace (including a newline), not just a `.` immediately
+    // adjacent to it.
     const source = `const readFixture = (name: string): string =>
   readFileSync(
     fileURLToPath(new URL(\`../fixtures/job-logs/\${name}\`, import.meta.url)),

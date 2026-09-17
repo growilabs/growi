@@ -59,7 +59,7 @@ describe('parseMetaSource', () => {
       });
     });
 
-    it('always returns a path that starts with the repos/growilabs/growi/ prefix, for every cataloged real-checkable fixture (task 1 catalog: 18 real-checkable fixtures) — regression test for the dropped-prefix bug found during task 4.1 review', () => {
+    it('always returns a path that starts with the repos/growilabs/growi/ prefix, for every cataloged real-checkable fixture', () => {
       // Without this prefix, downstream `gh api -X GET <path>` calls resolve
       // against the wrong GitHub route: e.g. a path of `issues` (missing the
       // `repos/growilabs/growi/` prefix) hits the *global*
