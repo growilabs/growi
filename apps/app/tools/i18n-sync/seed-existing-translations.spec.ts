@@ -43,6 +43,9 @@ const FILE_CONTENTS: Readonly<Record<string, string>> = {
   // (Requirement 1.2), so the assertions below prove the combined payload
   // keeps them apart per namespace rather than collapsing them.
   '/base/locales/ja_JP/commons.json': '{"shared_key":"共通"}',
+  '/base/locales/en_US/admin.json': '{"admin_key":"Admin"}',
+  '/base/locales/en_US/translation.json': '{"shared_key":"Shared"}',
+  '/base/locales/en_US/commons.json': '{"shared_key":"Shared"}',
 };
 
 /** The POEditor language code ja_JP must be converted to before any API call (Requirement 4.1). */
@@ -69,7 +72,7 @@ describe('runSeed', () => {
       baseDir: '/base',
     });
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, skippedKeyCount: 0 });
 
     // Exactly one upload for the whole language, unlike push's combined +
     // per-namespace tagging uploads: tags were already set when en_US was
@@ -115,6 +118,67 @@ describe('runSeed', () => {
         {
           namespace: 'commons',
           filePath: 'locales/ja_JP/commons.json',
+          message: 'ENOENT: no such file',
+        },
+      ],
+    });
+    expect(poeditorClient.uploadTerms).not.toHaveBeenCalled();
+  });
+
+  it('drops a key that only exists in the target language, never uploading a term en_US does not have', async () => {
+    const poeditorClient = okClient();
+    const fileContents: Readonly<Record<string, string>> = {
+      ...FILE_CONTENTS,
+      '/base/locales/ja_JP/translation.json':
+        '{"shared_key":"翻訳","ja_only_key":"日本語のみ"}',
+    };
+
+    const result = await runSeed({
+      poeditorClient,
+      language: 'ja_JP',
+      targets: TEST_TARGETS,
+      readNamespaceFile: vi.fn(
+        async (absolutePath: string) => fileContents[absolutePath],
+      ),
+      baseDir: '/base',
+    });
+
+    expect(result).toEqual({ ok: true, skippedKeyCount: 1 });
+    const [call] = poeditorClient.uploadTerms.mock.calls[0];
+    const uploaded = JSON.parse(call.fileContent);
+    expect(uploaded).toEqual({
+      admin: { admin_key: '管理' },
+      translation: { shared_key: '翻訳' },
+      commons: { shared_key: '共通' },
+    });
+    expect(uploaded.translation).not.toHaveProperty('ja_only_key');
+  });
+
+  it('aborts before uploading anything when the en_US file fails to read', async () => {
+    const poeditorClient = okClient();
+    // biome-ignore lint/suspicious/useAwait: must match ReadNamespaceFile's Promise-returning signature.
+    const readNamespaceFile = vi.fn(async (absolutePath: string) => {
+      if (absolutePath === '/base/locales/en_US/translation.json') {
+        throw new Error('ENOENT: no such file');
+      }
+      return FILE_CONTENTS[absolutePath];
+    });
+
+    const result = await runSeed({
+      poeditorClient,
+      language: 'ja_JP',
+      targets: TEST_TARGETS,
+      readNamespaceFile,
+      baseDir: '/base',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'read_failed',
+      failures: [
+        {
+          namespace: 'translation',
+          filePath: 'locales/en_US/translation.json',
           message: 'ENOENT: no such file',
         },
       ],

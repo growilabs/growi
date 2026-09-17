@@ -128,13 +128,13 @@ apps/app/tools/i18n-sync/
 ├── language-code-map.spec.ts
 ├── poeditor-client.ts           # POEditor API v2 の薄いラッパー（upload/export/languages。sync_terms/tags に対応）
 ├── poeditor-client.spec.ts
-├── diff-classifier.ts           # pure function: 旧/新JSONのキー集合を比較し translation-only / structural を判定。空文字列leafの無視判定（classify）と、実際に書き込む内容を作る非破壊マージ（mergeTranslations）の両方を持つ
+├── diff-classifier.ts           # pure function: 旧/新JSONのキー集合を比較し translation-only / structural を判定。空文字列leafの無視判定（classify）、実際に書き込む内容を作る非破壊マージ（mergeTranslations）、キー集合を絞り込む filterToKnownKeys（seed-existing-translations.tsが使用）を持つ
 ├── diff-classifier.spec.ts
 ├── push-source.ts               # CLI: en_US を統合アップロード1回 + namespace別タグ付けの2段階で POEditor へ push
 ├── push-source.spec.ts
 ├── pull-translations.ts         # CLI: POEditor から言語ごとに export し、namespaceへ分割して分類結果に応じてファイルを書き換える
 ├── pull-translations.spec.ts
-├── seed-existing-translations.ts # CLI: 非ソース言語1つの既存翻訳を、プロジェクト新規作成時など一度限り（または再実行）でPOEditorへ非破壊アップロードする
+├── seed-existing-translations.ts # CLI: 非ソース言語1つの既存翻訳を、en_USの既存キー集合へ絞り込んだ上で、プロジェクト新規作成時など一度限り（または再実行）でPOEditorへ非破壊アップロードする（絞り込みが必要な理由は research.md 参照）
 ├── seed-existing-translations.spec.ts
 └── no-runtime-dependency.spec.ts # drift test: apps/app/src 配下に POEditor 呼び出しが無いことを保証（Requirement 4）
 
@@ -411,6 +411,7 @@ type PoeditorApiError =
 - ネストしたリーフキーのパス集合を比較する（例: `a.b.c` が両方に存在するか）
 - `after` 側の leaf 値が空文字列 `""` の場合、そのキーは「POEditor側で未翻訳（今回情報が無い）」とみなし、追加・削除・変更のいずれにも数えない。POEditorはプロジェクトのFallback Languageが未設定であれば未翻訳キーを空文字列でexportする（キー自体を省略するわけではない）ため、空文字列と「キーが本当に存在しない」を区別して扱う。空文字列ではなく `after` にキー自体が存在しない場合（POEditor側でtermそのものが削除された場合）のみ、従来通り`removedKeys`に含める（`research.md`の「POEditor の未翻訳キーは export の空文字列で判定し、fallback言語には頼らない」Decision参照。task 6.2の実環境確認で、この扱いをしないと未翻訳キーが軒並み「削除」または「変更」と誤判定され、既存の正しい翻訳を上書き・削除する致命的な不具合になることが判明した）
 - `classify` は「何を報告するか」だけを決め、「実際に何を書き込むか」は別に `mergeTranslations(before, after)` が決める。`before` を土台に、`after` 側の非空の leaf だけを上書きした新しいJSONを返す純粋関数で、`PullTranslationSync` は分類結果に添えるコンテンツ（`TranslationOnlyCombination.content` / `StructuralCombination.exportedContent`）としてこの結果を使う。生の `after`（空文字列を含む）をそのまま書き込む実装は、`classify` 自体は正しくても、同じファイル内の別キーが実際に変更された瞬間に未翻訳キーを空文字列で上書きしてしまう不具合になることが実装レビューで判明した（`classify`が「報告」を正しくしても「書き込み」が別に生の値を使っていれば意味が無い）
+- `filterToKnownKeys(reference, candidate)` は `candidate` を `reference` のキー集合だけへ絞り込む純粋関数。`seed-existing-translations.ts` が、非ソース言語のファイルをアップロードする前にen_USのキー集合へ絞り込むために使う（`sync_terms:false` でも新規term作成は防げないため。`research.md`のDecision参照）
 
 **Contracts**: Service [x]
 

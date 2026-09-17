@@ -147,3 +147,43 @@ export const mergeTranslations = (
 
   return result;
 };
+
+/**
+ * Keeps only the leaves of `candidate` whose full path also exists as a
+ * leaf in `reference`, recursively -- e.g. filtering a non-source
+ * language's file down to the key set `en_US` actually declares (see
+ * research.md's `sync_terms`-addition Decision).
+ */
+export const filterToKnownKeys = (
+  reference: Readonly<Record<string, unknown>>,
+  candidate: Readonly<Record<string, unknown>>,
+): Record<string, unknown> => {
+  const referenceLeaves = flattenToLeafPaths(reference);
+
+  const walk = (
+    obj: Readonly<Record<string, unknown>>,
+    prefix: string,
+  ): Record<string, unknown> => {
+    const result: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(obj)) {
+      const path = prefix === '' ? key : `${prefix}.${key}`;
+
+      if (isPlainObject(value)) {
+        const nested = walk(value, path);
+        if (Object.keys(nested).length > 0) {
+          result[key] = nested;
+        }
+        continue;
+      }
+
+      if (referenceLeaves.has(path)) {
+        result[key] = value;
+      }
+    }
+
+    return result;
+  };
+
+  return walk(candidate, '');
+};
