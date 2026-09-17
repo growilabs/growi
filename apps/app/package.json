@@ -56,6 +56,7 @@
     "i18n:baseline:update": "node tools/i18n-audit/run-audit.ts --update-baseline",
     "i18n:sync:push": "node tools/i18n-sync/push-source.ts",
     "i18n:sync:pull": "node tools/i18n-sync/pull-translations.ts",
+    "i18n:sync:seed": "node tools/i18n-sync/seed-existing-translations.ts",
     "prelint:typecheck": "next typegen",
     "prelint:openapi:apiv3": "pnpm run openapi:generate-spec:apiv3",
     "prelint:openapi:apiv1": "pnpm run openapi:generate-spec:apiv1",

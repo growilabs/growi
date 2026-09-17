@@ -390,6 +390,85 @@ describe('collectClassifications', () => {
     }
   });
 
+  it('preserves an existing translation for a key POEditor has not translated yet, even when another key in the same file genuinely changed (translation_only)', async () => {
+    const poeditorClient = mock<PoeditorClient>();
+    poeditorClient.exportTranslations.mockResolvedValue({
+      ok: true,
+      value: JSON.stringify(
+        Object.fromEntries(
+          TEST_TARGETS.map((target) => [
+            target.namespace,
+            { k1: 'CHANGED', k2: '', k3: '' },
+          ]),
+        ),
+      ),
+    });
+    const readNamespaceFile = vi.fn(
+      async () => '{"k1":"既存1","k2":"既存2","k3":"既存3"}',
+    );
+
+    const result = await collectClassifications({
+      poeditorClient,
+      targets: TEST_TARGETS,
+      languages: TEST_LANGUAGES,
+      readNamespaceFile,
+      baseDir: '/base',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    for (const combination of result.translationOnly) {
+      expect(combination.changedKeys).toEqual(['k1']);
+      expect(combination.content).toEqual({
+        k1: 'CHANGED',
+        k2: '既存2',
+        k3: '既存3',
+      });
+    }
+    expect(result.structural).toEqual([]);
+  });
+
+  it('preserves an existing translation for a key POEditor has not translated yet, on the structural (key-added) path too', async () => {
+    const poeditorClient = mock<PoeditorClient>();
+    poeditorClient.exportTranslations.mockResolvedValue({
+      ok: true,
+      value: JSON.stringify(
+        Object.fromEntries(
+          TEST_TARGETS.map((target) => [
+            target.namespace,
+            { k1: '既存1', k2: '', k3: 'NEW' },
+          ]),
+        ),
+      ),
+    });
+    const readNamespaceFile = vi.fn(async () => '{"k1":"既存1","k2":"既存2"}');
+
+    const result = await collectClassifications({
+      poeditorClient,
+      targets: TEST_TARGETS,
+      languages: TEST_LANGUAGES,
+      readNamespaceFile,
+      baseDir: '/base',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    for (const combination of result.structural) {
+      expect(combination.addedKeys).toEqual(['k3']);
+      expect(combination.removedKeys).toEqual([]);
+      expect(combination.exportedContent).toEqual({
+        k1: '既存1',
+        k2: '既存2',
+        k3: 'NEW',
+      });
+    }
+    expect(result.translationOnly).toEqual([]);
+  });
+
   it('aborts the whole run (reports failure, no grouping) when one combination fails to read', async () => {
     const poeditorClient = buildPoeditorClient();
     // biome-ignore lint/suspicious/useAwait: must match ReadNamespaceFile's Promise-returning signature.

@@ -36,6 +36,20 @@ Both tiers use the same layout: `rules/` (always loaded), `skills/` (loaded on d
 the Skill tool), `agents/`, `commands/`. Each tier's rule inventory is tabulated below
 (root) and in `apps/app/AGENTS.md` (apps/app).
 
+### Cursor Agent (no dual management)
+
+Cursor natively loads `AGENTS.md` / nested `AGENTS.md`, and discovers skills under
+`.claude/skills/` and `apps/app/.claude/skills/`. It does **not** auto-inject
+`.claude/rules/` the way Claude Code does.
+
+Cursor's documented `@filename` include inside `.mdc` rules does **not** expand file
+contents into agent context yet, and copying bodies into `.cursor/rules/` would be
+dual management. Instead, a project `sessionStart` hook
+(`.cursor/hooks/inject-claude-rules.mjs`) reads the canonical
+`.claude/rules/` and `apps/app/.claude/rules/` markdown and injects them as
+`additional_context`. **Edit rules only under `.claude/`.** Do not hand-maintain
+rule bodies under `.cursor/`.
+
 ### Always-Loaded Context
 
 **Rules** (`.claude/rules/`) — loaded into every session automatically:
