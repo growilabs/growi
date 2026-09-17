@@ -717,9 +717,14 @@ routine の運用値を決める — この 6 つ（Requirement 6〜11）につ�
   coreutils）上でのみ動き、routine の実行環境（zsh・ugrep・uutils・mawk）
   との環境差の問題が最初から存在しない。TypeScript に書き直すと、既存の
   bash 実装との振る舞い同一性を検証するコストの方が上回る。
-- **根拠となった実測**: 分割を実施する場合は `flaky-repro/selftest-*`
-  ブランチで実際に 1 回測定し、`### Repro result` の 7 行が分割前と
-  同一であることを確認する、という受け入れ条件で設計した。
+- **実測**: 2026-09-17、`flaky-repro/selftest-script-split` ブランチから
+  実際に repro を1回依頼し（`Flaky-Repro-Spec:
+  src/lib/empty-module.spec.ts`、使い捨て issue #11922 宛て）、分割後の
+  `flaky-repro.yml`（`.github/scripts/flaky-repro/*.sh` 呼び出し）が
+  `### Repro result` の7行を分割前と同一の形と順序で投稿することを確認
+  した（workflow run
+  https://github.com/growilabs/growi/actions/runs/35199716890）。確認後、
+  ブランチと issue はどちらも削除・クローズ済み。
 - **トレードオフ**: 分割してもしなくても、「測定中の依頼が push 済み
   ブランチ上のファイルに依存する」という前提そのものは変わらない。
 
