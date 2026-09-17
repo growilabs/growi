@@ -108,7 +108,7 @@
   "Updated": "업데이트됨",
   "Upload new image": "새 이미지 업로드",
   "Connected": "연결됨",
-  "Loading": "로딩 중...",
+  "Loading": "테스트",
   "Disclose E-mail": "이메일 공개",
   "Slack Member ID": "Slack 멤버 ID",
   "page exists": "이 페이지는 이미 존재합니다.",
@@ -225,14 +225,16 @@
       "profile_image2": "AWS를 설정하거나 로컬 업로드를 활성화하십시오."
     }
   },
+  "API Token Settings": "API 토큰 설정",
+  "Current API Token": "현재 API 토큰",
+  "Update API Token": "API 토큰 업데이트",
   "page_me_apitoken": {
     "api_token": "API 토큰",
     "notice": {
       "apitoken_issued": "API 토큰이 발급되지 않았습니다.",
       "update_token1": "새 API 토큰을 생성하도록 업데이트할 수 있습니다.",
       "update_token2": "기존 프로세스에서 API 토큰을 업데이트해야 합니다."
-    },
-    "form_help": {}
+    }
   },
   "Password": "비밀번호",
   "Password Settings": "비밀번호 설정",
@@ -264,9 +266,6 @@
   },
   "API Settings": "API 설정",
   "Other Settings": "기타 설정",
-  "API Token Settings": "API 토큰 설정",
-  "Current API Token": "현재 API 토큰",
-  "Update API Token": "API 토큰 업데이트",
   "in_app_notification_settings": {
     "in_app_notification_settings": "앱 내 알림 설정",
     "subscribe_settings": "페이지 자동 구독 (알림 수신) 설정",
@@ -920,8 +919,8 @@
     "page_delete_completely": "페이지를 완전히 삭제했습니다",
     "page_rename": "페이지 이름을 변경했습니다",
     "page_revert": "페이지를 되돌렸습니다",
-    "page_duplicate": "페이지를 복제했습니다",
     "page_like": "페이지에 좋아요를 눌렀습니다",
+    "page_duplicate": "페이지를 복제했습니다",
     "comment_create": "댓글을 게시했습니다"
   },
   "bookmark_folder": {
