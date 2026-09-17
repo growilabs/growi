@@ -10,7 +10,7 @@
     最低2件ずつ手元にあり、次のタスクでそのままテストの入力に使える
   - _Requirements: 1.1, 1.4, 5.3_
 
-- [ ] 2. Core: 分類・形比較・参照配線チェックの実装
+- [x] 2. Core: 分類・形比較・参照配線チェックの実装
 - [x] 2.1 (P) `.meta.md` の `# Source` 節を解析し、real-checkable / synthetic / unrecognized を判定するロジックを実装する
   - タスク1で確保した実例を入力に、3分類を返す純粋関数を実装する
     （design.md `meta-source.ts` の Service Interface契約）
@@ -57,7 +57,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 5.1, 5.3_
   - _Depends: 2.1, 2.2_
 
-- [ ] 4. Integration: 定期実行ワークフローの実装
+- [x] 4. Integration: 定期実行ワークフローの実装
 - [x] 4.1 四半期に1回、両スクリプトを実行し結果を記録するワークフローを作成する
   - `.github/workflows/flaky-repro.yml` の `permissions` パターン
     （`contents: read`, `issues: write`）を踏襲し、`on: schedule`（四半期cron）
