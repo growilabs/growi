@@ -1,4 +1,8 @@
 {
+  "_task61_probe": {
+    "push_only": "Probe: push add/delete test",
+    "wording_change": "Probe: original wording"
+  },
   "meta": {
     "display_name": "English"
   },
