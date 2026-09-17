@@ -237,7 +237,27 @@ Prefer `async/await` over `.then()` chains.
 
 ## Comments
 
-**Write comments in English.** Only comment when the WHY is non-obvious (hidden constraints, invariants, workarounds). Do not restate what the code does — let naming do that work.
+**Write comments in English.** Only comment when the WHY is non-obvious (hidden constraints, invariants, workarounds). Do not restate what the code does — let naming do that work. If a reader can already tell what a module or function does from its name and shape, spelling that out again in a comment only adds a second thing to keep in sync with the code; the extra comment always drifts out of date first.
+
+**Don't duplicate a spec's WHY in code.** When the reasoning behind a piece of code is already recorded in a spec (`design.md`/`research.md`'s Decisions, Findings, or an incident writeup), point to it instead of re-explaining it in the comment. Two copies of the same rationale means one of them goes stale silently.
+
+```typescript
+// ❌ WRONG: re-explains a decision already written out in research.md
+// POEditor exports an untranslated term as an empty string (once the
+// project's Fallback Language is unset) rather than omitting it. An
+// empty string here means "no translation yet", not "translation is
+// now blank" or "key removed" -- skip it so a run with many
+// still-untranslated terms never overwrites or deletes existing
+// content based on their absence of a translation.
+if (afterValue === '') { continue; }
+
+// ✅ CORRECT: one line, points to the spec for the full reasoning
+// '' means "not yet translated in POEditor", never a real value (see
+// research.md's fallback-language Decision).
+if (afterValue === '') { continue; }
+```
+
+**Don't narrate the task, review, or incident that produced the code.** "Regression for the incident where..." or "found in review" belongs in the commit message and PR description — that history is already in git, and restating it as standing prose in the file just rots once a reader lacks that context. A test name that already states the behavior under test needs no comment restating it on top.
 
 ## Test File Placement
 
@@ -287,7 +307,7 @@ Before marking work complete:
 - [ ] No `console.log` (use logger)
 - [ ] No mutation (immutable patterns used)
 - [ ] Named exports (except Next.js pages)
-- [ ] English comments
+- [ ] English comments, none restating WHAT the code does, none duplicating a WHY already written in a spec's design.md/research.md, none narrating the task/review/incident that produced the change
 - [ ] Co-located tests
 - [ ] Non-trivial logic extracted as pure functions from framework wrappers
 - [ ] No hard-coded mode/variant checks in consumers (use declared metadata)
