@@ -445,7 +445,7 @@ interface DiffClassifierService {
 **Contracts**: Batch [x]
 
 ##### Batch / Job Contract
-- Trigger: `.github/workflows/i18n-sync-push.yml`（`apps/app/public/static/locales/en_US/**` への push）
+- Trigger: `.github/workflows/i18n-sync-push.yml`（`apps/app/public/static/locales/en_US/**` への push、または `workflow_dispatch`）
 - Input / validation: 3 namespace分の en_US JSON ファイルが読み込めること
 - Output / destination: 単一の共有POEditorプロジェクト
 - Idempotency & recovery: 統合アップロード（`sync_terms=1`）は毎回「現在のen_USの状態」に収束させる操作なので冪等。タグ付けアップロード（`sync_terms` 無効）も非破壊的で冪等。失敗時はワークフロー再実行で復旧する
