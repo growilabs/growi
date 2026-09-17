@@ -55,16 +55,15 @@ export class InstallerService {
             enterpriseId,
           );
 
-          if (existedInstallation != null) {
-            existedInstallation.setData(slackInstallation);
-            await repository.save(existedInstallation);
-            return;
-          }
-
-          const installation = new Installation();
+          const installation = existedInstallation ?? new Installation();
           installation.setData(slackInstallation);
           await repository.save(installation);
-          return;
+
+          if (slackInstallation.isEnterpriseInstall && enterpriseId != null) {
+            await repository.deactivateWorkspaceLevelInstallations(
+              enterpriseId,
+            );
+          }
         },
         fetchInstallation: async (installQuery: InstallationQuery<boolean>) => {
           const installation = await repository.findByTeamIdOrEnterpriseId(

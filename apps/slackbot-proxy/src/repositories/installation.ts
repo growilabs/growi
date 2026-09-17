@@ -1,4 +1,4 @@
-import { EntityRepository, Repository } from 'typeorm';
+import { EntityRepository, IsNull, Repository } from 'typeorm';
 
 import { Installation } from '~/entities/installation';
 
@@ -16,14 +16,20 @@ export class InstallationRepository extends Repository<Installation> {
     enterpriseId?: string,
   ): Promise<Installation | undefined> {
     if (teamId != null) {
-      const installation = await this.findOne({ where: { teamId } });
+      const installation = await this.findOne({
+        where: { teamId, deactivatedAt: IsNull() },
+      });
       if (installation != null) {
         return installation;
       }
     }
     if (enterpriseId != null) {
       return this.findOne({
-        where: { enterpriseId, isEnterpriseInstall: true },
+        where: {
+          enterpriseId,
+          isEnterpriseInstall: true,
+          deactivatedAt: IsNull(),
+        },
       });
     }
     return undefined;
@@ -31,6 +37,8 @@ export class InstallationRepository extends Repository<Installation> {
 
   // Falling back to the enterprise-wide row here would let a per-workspace
   // save overwrite it, so upsert must match the exact row for this install.
+  // Deactivated rows are included on purpose: re-installing on a workspace
+  // reuses its row, which restores the relations that were registered on it.
   findForUpsert(
     teamId?: string,
     enterpriseId?: string,
@@ -44,5 +52,22 @@ export class InstallationRepository extends Repository<Installation> {
       });
     }
     return Promise.resolve(undefined);
+  }
+
+  // An org-wide install supersedes every workspace-level install under the same
+  // organization. Their rows are kept rather than deleted so that re-installing
+  // on a workspace restores the relations registered on it.
+  async deactivateWorkspaceLevelInstallations(
+    enterpriseId: string,
+  ): Promise<void> {
+    await this.createQueryBuilder()
+      .update()
+      .set({ deactivatedAt: new Date() })
+      .where('enterpriseId = :enterpriseId', { enterpriseId })
+      .andWhere('isEnterpriseInstall = :isEnterpriseInstall', {
+        isEnterpriseInstall: false,
+      })
+      .andWhere('deactivatedAt IS NULL')
+      .execute();
   }
 }
