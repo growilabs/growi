@@ -1,11 +1,21 @@
 import { mock } from 'vitest-mock-extended';
 
 import type { PoeditorClient } from './poeditor-client.ts';
-import { runSeed } from './seed-existing-translations.ts';
+import { NON_SOURCE_LANGUAGES } from './pull-translations.ts';
+import { runSeed, SEEDABLE_LANGUAGES } from './seed-existing-translations.ts';
 import {
   type NamespaceSyncEntry,
   SHARED_POEDITOR_PROJECT_ID,
 } from './sync-config.ts';
+
+// seed-existing-translations.ts deliberately does not import
+// NON_SOURCE_LANGUAGES from pull-translations.ts (see SEEDABLE_LANGUAGES'
+// doc comment: importing it would pull pull-only dependencies into a
+// script that has nothing to do with them). This test is the drift guard
+// for that intentional duplication -- only the test needs both modules.
+it('SEEDABLE_LANGUAGES stays in sync with pull-translations.ts NON_SOURCE_LANGUAGES', () => {
+  expect(SEEDABLE_LANGUAGES).toEqual(NON_SOURCE_LANGUAGES);
+});
 
 // A small 3-entry fixture mirroring the shape of the real SYNC_TARGETS
 // (admin/translation/commons), injected via `targets` so this test never

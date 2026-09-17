@@ -435,6 +435,49 @@ describe('collectClassifications', () => {
     expect(result.structural).toEqual([]);
   });
 
+  it('preserves an existing translation for a key POEditor has not translated yet, on the structural (key-added) path too', async () => {
+    // Same regression as the translation_only test above, mirrored onto
+    // exportedContent: an added key makes the combination structural, but
+    // k2 (untranslated in POEditor) must still keep its existing value
+    // rather than being blanked.
+    const poeditorClient = mock<PoeditorClient>();
+    poeditorClient.exportTranslations.mockResolvedValue({
+      ok: true,
+      value: JSON.stringify(
+        Object.fromEntries(
+          TEST_TARGETS.map((target) => [
+            target.namespace,
+            { k1: '既存1', k2: '', k3: 'NEW' },
+          ]),
+        ),
+      ),
+    });
+    const readNamespaceFile = vi.fn(async () => '{"k1":"既存1","k2":"既存2"}');
+
+    const result = await collectClassifications({
+      poeditorClient,
+      targets: TEST_TARGETS,
+      languages: TEST_LANGUAGES,
+      readNamespaceFile,
+      baseDir: '/base',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    for (const combination of result.structural) {
+      expect(combination.addedKeys).toEqual(['k3']);
+      expect(combination.removedKeys).toEqual([]);
+      expect(combination.exportedContent).toEqual({
+        k1: '既存1',
+        k2: '既存2',
+        k3: 'NEW',
+      });
+    }
+    expect(result.translationOnly).toEqual([]);
+  });
+
   it('aborts the whole run (reports failure, no grouping) when one combination fails to read', async () => {
     const poeditorClient = buildPoeditorClient();
     // biome-ignore lint/suspicious/useAwait: must match ReadNamespaceFile's Promise-returning signature.

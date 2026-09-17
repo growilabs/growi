@@ -129,6 +129,12 @@ export const classify = (input: DiffClassifierInput): ClassificationResult => {
  * - A leaf genuinely absent from `after` (not merely empty) is dropped --
  *   this only happens when POEditor's term itself was deleted, matching
  *   `classify`'s `removedKeys`.
+ * - A nested object that is brand new in `after` (absent from `before`) but
+ *   whose every leaf turned out to be `''` merges down to `{}` and is
+ *   omitted entirely, for the same reason a single new-but-empty leaf is:
+ *   there is nothing real to add yet. Keeping an empty object would still
+ *   change the key set with no corresponding entry in `classify`'s
+ *   `addedKeys` -- exactly the mismatch this function exists to prevent.
  */
 export const mergeTranslations = (
   before: Readonly<Record<string, unknown>>,
@@ -139,10 +145,14 @@ export const mergeTranslations = (
   for (const [key, afterValue] of Object.entries(after)) {
     if (isPlainObject(afterValue)) {
       const beforeValue = before[key];
-      result[key] = mergeTranslations(
+      const mergedNested = mergeTranslations(
         isPlainObject(beforeValue) ? beforeValue : {},
         afterValue,
       );
+      if (!(key in before) && Object.keys(mergedNested).length === 0) {
+        continue;
+      }
+      result[key] = mergedNested;
       continue;
     }
 

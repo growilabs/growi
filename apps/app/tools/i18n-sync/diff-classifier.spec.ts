@@ -197,6 +197,26 @@ describe('mergeTranslations', () => {
     });
   });
 
+  it('omits a brand-new nested object whose every leaf is empty, rather than writing an empty group', () => {
+    // A namespace group that is entirely new (absent from before) but whose
+    // every leaf is still untranslated must not appear in the merged result
+    // at all -- keeping it as `{}` would change the key set with nothing in
+    // classify()'s addedKeys to justify it (found in review).
+    const before = { k1: 'existing' };
+    const after = { k1: 'existing', grp: { a: '', b: '' } };
+
+    expect(mergeTranslations(before, after)).toEqual({ k1: 'existing' });
+  });
+
+  it('keeps a nested object that already existed in before, even if every leaf merges to empty', () => {
+    const before = { grp: { a: 'existing' } };
+    const after = { grp: { a: '' } };
+
+    expect(mergeTranslations(before, after)).toEqual({
+      grp: { a: 'existing' },
+    });
+  });
+
   it('matches the raw export when nothing is empty (no behavior change for the fully-translated case)', () => {
     const before = { a: { k1: 'old' } };
     const after = { a: { k1: 'new', k2: 'added' } };

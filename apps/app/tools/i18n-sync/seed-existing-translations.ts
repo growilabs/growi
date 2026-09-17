@@ -146,6 +146,14 @@ export const runSeed = async (options: RunSeedOptions): Promise<SeedResult> => {
   // handling) keeps using GROWI's own code.
   const language = toPoeditorLanguageCode(options.language);
 
+  // No `overwrite` param: `PoeditorClient.uploadTerms` never sends one, so
+  // this relies on POEditor's server-side default for an existing
+  // translation. "Safe to re-run" (this module's whole idempotency
+  // argument, and what the setup doc tells a maintainer) holds only as long
+  // as that default does not overwrite a translation a contributor has
+  // since entered through POEditor itself. If `uploadTerms` ever grows an
+  // `overwrite` option, it must default to leaving existing translations
+  // alone, or this call must explicitly opt out.
   const uploadResult = await options.poeditorClient.uploadTerms({
     projectId: SHARED_POEDITOR_PROJECT_ID,
     language,
