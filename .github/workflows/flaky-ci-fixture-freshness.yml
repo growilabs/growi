@@ -10,16 +10,17 @@ name: Flaky-CI fixture freshness
 #      being referenced by at least one bin/flaky-ci/**/*.spec.ts.
 #
 # Both scripts only ever report facts; this workflow does not fix anything.
-# Deciding whether to open a GitHub issue for the findings is a separate
-# concern (see the "Recorded results" step below) — this workflow's own job
-# is to run the checks and make sure the result is recorded even when there
-# is nothing to report (Requirement 3.2, 5.2).
+# It records the result unconditionally (Requirement 3.2, 5.2), then — only
+# when there is a drift or unwired finding — opens or comments on a GitHub
+# issue labeled `flaky-ci/fixture-freshness`, deduplicating by that label so
+# repeat runs never pile up duplicate issues (Requirement 4.1-4.3).
 #
 # Contract (design.md `flaky-ci-fixture-freshness.yml` in
-# .kiro/specs/ci-flaky-fixture-freshness): reuse `lib/gh.ts`'s `GhApi` as the
-# only GitHub read path, and follow flaky-repro.yml's `issues: write`
-# permission pattern (kept here even though this workflow does not yet open
-# issues itself, since that is the very next task in this spec).
+# .kiro/specs/ci-flaky-fixture-freshness): the two check scripts reuse
+# `lib/gh.ts`'s `GhApi` as their only GitHub read path; this workflow's own
+# issue search/create/comment steps are a separate call path (plain `gh`
+# subcommands, not `lib/gh.ts` — that module is read-only by design) and
+# follow flaky-repro.yml's `issues: write` permission pattern.
 
 on:
   schedule:
@@ -82,10 +83,9 @@ jobs:
       # failed.
       #
       # drift.json / wiring.json are left on disk, and each script's counts
-      # are also exposed as this step's outputs, so a later task (4.2: issue
-      # creation/dedup on the label `flaky-ci/fixture-freshness`) can add a
-      # step here that reads `steps.summary.outputs.*` or the two JSON files
-      # without this task inventing any issue-creation logic itself.
+      # are also exposed as this step's outputs, so the issue creation/dedup
+      # steps below can read `steps.summary.outputs.*` or the two JSON files
+      # directly instead of re-deriving the counts.
       - name: Record results to the job summary
         id: summary
         if: always()
@@ -142,4 +142,160 @@ jobs:
               echo "### Wiring check"
               echo "- did not produce output (see the \`Run check-fixture-wiring.ts\` step above for why)"
             } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # ----------------------------------------------------------------------
+      # Issue creation / dedup (Requirement 4.1-4.3). Deliberately its own
+      # step, separate from "Record results to the job summary" above: the
+      # summary step's job is "always record what happened" (Req 3.2/5.2) and
+      # must never be skipped, while this step's job is conditional
+      # reporting. Mixing them would make a future change to one risk
+      # breaking the other's unconditional guarantee.
+      #
+      # No `if: always()` here on purpose: if either check script failed
+      # non-zero, the job already failed and everything after "Record
+      # results" is skipped by GitHub Actions' default behavior — which is
+      # what we want. Opening/commenting on an issue from a run that could
+      # not even finish computing the counts would report on data we don't
+      # trust.
+      # ----------------------------------------------------------------------
+      - name: Determine whether there are any findings to report
+        id: findings
+        run: |
+          set -euo pipefail
+
+          # steps.summary.outputs.* is empty (unset) rather than "0" when its
+          # source JSON file was missing (see the `else` branches above), so
+          # default with `:-0` instead of comparing the raw string.
+          DRIFT_COUNT="${DRIFT_COUNT:-0}"
+          WIRING_UNWIRED_COUNT="${WIRING_UNWIRED_COUNT:-0}"
+
+          if [ "$DRIFT_COUNT" -gt 0 ] || [ "$WIRING_UNWIRED_COUNT" -gt 0 ]; then
+            echo "has_findings=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_findings=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          DRIFT_COUNT: ${{ steps.summary.outputs.drift_count }}
+          WIRING_UNWIRED_COUNT: ${{ steps.summary.outputs.wiring_unwired_count }}
+
+      # Idempotent on purpose: `gh label create` fails non-zero if the label
+      # already exists, and this is the first workflow in the repo to use
+      # this label (flaky-repro.yml, the sibling workflow, uses no labels at
+      # all — see this file's header comment), so there is no pre-existing
+      # label to rely on. `|| true` keeps a second/third quarterly run from
+      # failing the job just because the label is already there; the
+      # alternative (check-then-create) buys nothing extra here since a
+      # `gh label create` on an existing label has no side effect on the
+      # label GitHub already has (no `--force`, so it is not overwritten).
+      #
+      # Guarded by `has_findings`, not run unconditionally: creating a label
+      # that then never gets attached to anything (the 0-findings runs are
+      # the common case, quarterly) would only add clutter to the repo's
+      # label list for no benefit.
+      - name: Ensure the fixture-freshness label exists
+        if: steps.findings.outputs.has_findings == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh label create flaky-ci/fixture-freshness \
+            --color 5319e7 \
+            --description "Findings from the quarterly bin/flaky-ci fixture-freshness check" \
+            || true
+
+      # Decision 3 (research.md): dedup is by fixed label + state:open, not
+      # by title/content matching. `gh api -X GET search/issues` (not the
+      # `gh issue list` subcommand) mirrors design.md's System Flows exactly
+      # and keeps the *search* on the same REST GET path `lib/gh.ts` uses for
+      # this repo's other GitHub reads.
+      - name: Search for an existing open fixture-freshness issue
+        id: search
+        if: steps.findings.outputs.has_findings == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          NUMBER=$(gh api -X GET search/issues \
+            -f q="repo:${GITHUB_REPOSITORY} label:flaky-ci/fixture-freshness state:open" \
+            --jq '.items[0].number // empty')
+          echo "number=${NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Render the findings summary
+        id: render
+        if: steps.findings.outputs.has_findings == 'true'
+        run: |
+          set -euo pipefail
+
+          {
+            echo "Detected by the quarterly [fixture-freshness check](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})."
+            echo
+
+            if [ -s drift.json ]; then
+              DRIFT_CHECKED=$(jq -r '.checked' drift.json)
+              DRIFT_COUNT=$(jq -r '.drift | length' drift.json)
+              DRIFT_UNCHECKED_COUNT=$(jq -r '.unchecked | length' drift.json)
+
+              echo "### Drift check"
+              echo "- checked: ${DRIFT_CHECKED}"
+              echo "- drift: ${DRIFT_COUNT}"
+              echo "- unchecked: ${DRIFT_UNCHECKED_COUNT}"
+
+              if [ "$DRIFT_COUNT" -gt 0 ]; then
+                echo
+                echo "Fixtures whose real GitHub API response shape no longer matches what's on disk:"
+                echo
+                jq -r '.drift[] | "- `" + .file + "` — diff at: " + (.diffPaths | join(", "))' drift.json
+              fi
+
+              # Requirement 4.1 asks the issue body to say what went
+              # unconfirmed, not just how many — so list each unchecked
+              # fixture with its reason (`.meta.md` unrecognized, or the
+              # `gh api` re-fetch itself failed), not only the count above.
+              if [ "$DRIFT_UNCHECKED_COUNT" -gt 0 ]; then
+                echo
+                echo "<details><summary>${DRIFT_UNCHECKED_COUNT} fixture(s) not confirmed (not counted as drift-free)</summary>"
+                echo
+                jq -r '.unchecked[] | "- `" + .file + "` — " + .reason' drift.json
+                echo
+                echo "</details>"
+              fi
+              echo
+            fi
+
+            if [ -s wiring.json ]; then
+              WIRING_CHECKED=$(jq -r '.checked' wiring.json)
+              WIRING_UNWIRED_COUNT=$(jq -r '.unwired | length' wiring.json)
+
+              echo "### Wiring check"
+              echo "- checked: ${WIRING_CHECKED}"
+              echo "- unwired: ${WIRING_UNWIRED_COUNT}"
+
+              if [ "$WIRING_UNWIRED_COUNT" -gt 0 ]; then
+                echo
+                echo "Fixture files not referenced by any \`bin/flaky-ci/**/*.spec.ts\`:"
+                echo
+                jq -r '.unwired[] | "- `" + . + "`"' wiring.json
+              fi
+            fi
+          } > findings-body.md
+
+      # Comment on the existing issue rather than opening a new one whenever
+      # the search above found one (Requirement 4.2). `--body-file` (not
+      # `--body`) so the multi-line rendered summary survives shell quoting
+      # unchanged.
+      - name: Comment on or create the tracking issue
+        if: steps.findings.outputs.has_findings == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ steps.search.outputs.number }}
+        run: |
+          set -euo pipefail
+          if [ -n "$ISSUE_NUMBER" ]; then
+            gh issue comment "$ISSUE_NUMBER" --body-file findings-body.md
+          else
+            gh issue create \
+              --title "Flaky-CI fixture freshness: findings detected" \
+              --label flaky-ci/fixture-freshness \
+              --body-file findings-body.md
           fi

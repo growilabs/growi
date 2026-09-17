@@ -70,7 +70,7 @@
   - _Requirements: 3.1, 3.2, 5.2_
   - _Depends: 3, 2.3_
 
-- [ ] 4.2 検知結果に応じたissue起票・重複防止ロジックを実装する
+- [x] 4.2 検知結果に応じたissue起票・重複防止ロジックを実装する
   - 前提として、issue起票・検索に使うラベル `flaky-ci/fixture-freshness` が
     リポジトリに存在しない場合は作成する（`gh label create` は既存ラベルに
     対して失敗するため、存在確認または `|| true` 相当の扱いで冪等にする —
@@ -245,4 +245,16 @@ labels=...` のケースは `repos/growilabs/growi/issues` ではなく
 tasks.md の元のタスク一覧にはこの修正専用のタスクが無いため、タスク5
 （実測検証）の前提を壊さないよう、タスク4.2に進む前に `lib/meta-source.ts`
 の `path` 抽出を修正し、実際の `gh` CLI 経由で `checked` が18件前後に戻る
-ことを再確認してから先に進む。
+ことを再確認してから先に進んだ（修正済み・コミット634407f131）。
+
+### タスク4.2: 既知の制約（drift findingsに出典が無い）
+
+`check-fixture-drift.ts` の `DriftFinding` は `{ file, diffPaths }` のみで、
+再取得先のGitHub APIエンドポイント（出典）を持たない。そのためissue本文の
+drift件の行には対象fixtureと差分キーは出るが出典は出ない
+（`unchecked` 件のほうは `{ file, reason }` を持つため出典相当の情報は出る）。
+これはタスク3で承認済みの `DriftFinding` の形の制約であり、このタスクの
+境界（ワークフローYAML）では直せない。要件4.1の文字どおりの要求からは
+小さな未達だが、fixtureのパスから `.meta.md` を辿れば出典は追える。
+将来対応するなら `check-fixture-drift.ts` 側の変更が必要で、それは
+tasks.mdに無い別タスクになる。
