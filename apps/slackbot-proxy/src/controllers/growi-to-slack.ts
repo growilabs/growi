@@ -390,6 +390,13 @@ export class GrowiToSlackCtrl {
       );
     }
 
+    if (relation.installation == null) {
+      return res.simulateWebAPIPlatformError(
+        'installation is invalid',
+        'invalid_installation',
+      );
+    }
+
     const token = relation.installation.data.bot?.token;
     if (token == null) {
       return res.simulateWebAPIPlatformError(
