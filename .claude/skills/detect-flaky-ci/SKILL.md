@@ -1,7 +1,7 @@
 ---
 name: detect-flaky-ci
 description: Scan recent GROWI CI runs for flaky (non-deterministic) job/test failures and track them as GitHub issues. Detection only — never modifies source code. Usage - /detect-flaky-ci [--window-hours=N] [--vitest-threshold=N]
-allowed-tools: Bash, Read, Grep
+allowed-tools: Bash, Read, Grep, Write, mcp__github__get_job_logs
 argument-hint: "[--window-hours=32] [--vitest-threshold=2]"
 ---
 
@@ -150,81 +150,44 @@ before letting ① fire.** A dependency bump changes what the test actually
 runs against, so a diff that touches nothing but the lockfile is not
 evidence that the PR is innocent. Reading it as one has already caused a
 failure that was deterministic on its dependabot branch to be tracked as
-flaky across 13 observations. So whenever `pnpm-lock.yaml` is among the PR's
-changed files, fetch that one file's patch and compare package names both
-ways before concluding ① matched:
+flaky across 13 observations. So whenever the failing run has an associated
+PR, run:
 
 ```bash
-gh api repos/growilabs/growi/pulls/{PR_NUMBER}/files --paginate \
-  -q '.[] | select(.filename == "pnpm-lock.yaml") | .patch'
+node bin/flaky-ci/scripts/lockfile-overlap.ts \
+  --sha {HEAD_SHA} --pr {PR_NUMBER} --log-excerpt-file {LOG_EXCERPT_FILE}
 ```
 
-On a commit with no associated PR — the branch just above, which compares
-against the commit's own diff — run this check too, taking the patch from
-that same commit endpoint (`.files[]` carries `filename` and `patch` in the
-same shape as a PR's):
-`gh api repos/growilabs/growi/commits/{HEAD_SHA} -q '.files[] | select(.filename == "pnpm-lock.yaml") | .patch'`.
-A merge-queue commit that rolls up a dependabot PR lands here, so skipping
-it would leave exactly the case this check exists for unguarded.
+(`{LOG_EXCERPT_FILE}` is the same failure log excerpt already fetched for
+Step 3.) The script fetches PR #`{PR_NUMBER}`'s `pnpm-lock.yaml` diff
+itself and reports the package names on each side and their intersection
+(`overlap[]`, `patchPackages[]`, `logPackages[]`) — see
+`bin/flaky-ci/README.md`'s contract table for the exact fields. A PR that
+doesn't touch `pnpm-lock.yaml` at all (the common case — most failing PRs
+never touch the lockfile) is exit 0 with empty `overlap[]`/`patchPackages[]`,
+same as a PR that touches it with no overlapping packages: in both cases ①
+still runs its usual judgment, this check simply found nothing to suppress
+it with. Exit code 2 means the fetch itself failed — the PR's changed files
+could not be retrieved, or the log excerpt could not be read — treat that
+as "not measured" per Step 6, not as "no overlap".
 
-**Package names from the lockfile patch** — look only at `+`/`-` lines, and
-read the name out of whichever shape the line has:
+On a commit with no associated PR (a direct push to `master`, e.g. a
+merge-queue commit), there is no `{PR_NUMBER}` to pass and this check is
+skipped for that failure — that is not the same as proving the lockfile
+unaffected, it simply cannot be checked without a PR-scoped diff. A
+merge-queue commit that rolls up a dependabot PR lands here unguarded by
+this check; ② / ③ / ⑤ still apply as usual.
 
-| Line shape | Package name |
-|---|---|
-| `+  '@codemirror/state@6.7.4':` — quoted entry header (`packages:` / `snapshots:` sections) | the quoted token up to its **last** `@` → `@codemirror/state` |
-| `+  '@inquirer/checkbox@5.2.2(@types/node@24.13.4)':` — the same header with a **peer-resolution suffix** | strip the trailing `(…)` group **first**, then cut at the last `@` → `@inquirer/checkbox` |
-| `-      '@codemirror/state': 6.7.1` — dependency entry, `'name': version` | the quoted key → `@codemirror/state` |
-| `+  /@scope/name@version:` — unquoted header form written by older pnpm lockfile versions | the text between the leading `/` and the version → `@scope/name` |
-
-Two rules, applied in this order, are what make the table work:
-
-1. **Strip a trailing parenthesised group before anything else.** A
-   `snapshots:` entry records the peers a package was resolved against
-   inside `(…)`, and that group contains `@`s of its own — one real patch
-   carried 36 such `+`/`-` lines. Cutting at the last `@` without stripping
-   it first yields `@inquirer/checkbox@5.2.2(@types/node`, a name that
-   matches nothing. (The peers named inside the parentheses are resolution
-   context, not this entry's own name; a peer that genuinely changed has its
-   own entry line elsewhere in the same patch.)
-2. **Then split on the *last* `@`, not the first** — a leading `@` is the
-   scope marker, never the name/version separator.
-
-The first three shapes are what this repo's current lockfile actually
-produces; the fourth is a tolerated variant, not the expected one.
-
-**Package names from the failure's stack trace** — the frames printed under
-the error, in the log excerpt you already have:
-
-| Frame shape | Package name |
-|---|---|
-| `❯ inner ../../node_modules/.pnpm/@codemirror+state@6.7.1/node_modules/@codemirror/state/dist/index.js:2016:23` | the `.pnpm/` segment, cut at the first `_` (none here), then at its last `@`, then `+` → `/` → `@codemirror/state` |
-| `❯ .../node_modules/.pnpm/@uiw+react-codemirror@4.23.8_@babel+runtime@7.29.7_@codemirror+autocomplete@6.18.4_@cod_bc61e38c16b4d6c6ec98653a35cbfdb9/node_modules/…` — the same segment carrying **peer suffixes** | cut at the **first** `_` → `@uiw+react-codemirror@4.23.8`, then at the last `@`, then `+` → `/` → `@uiw/react-codemirror` |
-| `❯ .../node_modules/@uiw/react-codemirror/esm/useCodeMirror.js:80:124` — a plain `node_modules/` path, no `.pnpm/` | the segment(s) after `node_modules/` — two segments when the first starts with `@` → `@uiw/react-codemirror` |
-
-Two rules again, in this order, mirroring the lockfile side:
-
-1. **Cut the `.pnpm/` segment at the first `_`.** pnpm appends the peers a
-   package was resolved against, separated by `_`, and hashes the tail when
-   it gets long, so the segment carries several `@`s belonging to other
-   packages. Going straight to the last `@` on the second row above yields
-   `@uiw/react-codemirror@4.23.8_@babel/runtime@7.29.7_@codemirror/autocomplete`,
-   which is not a package at all. Each of those peers has its own `.pnpm/`
-   frame elsewhere in the trace if it is actually on the stack.
-2. **Then split on the last `@`, then turn `+` back into `/`** — pnpm
-   rewrites the `/` of a scoped name to `+` when naming store directories,
-   which is the only reason the same package is spelled two ways.
-
-An unscoped package works the same way: `react-dom@18.2.0_react@18.2.0` →
-first `_` → `react-dom@18.2.0` → last `@` → `react-dom`.
-
-**If any package name appears in both sets, ① does not fire for this
-failure.** Do not count it as a mining hit, do not name it in the Status
-line, and record why in the issue body (see the template in Step 4) as:
+**If `overlap` is non-empty, ① does not fire for this failure.** Do not
+count it as a mining hit, do not name it in the Status line, and record why
+in the issue body (see the template in Step 4) as:
 
 ```
-- ① not applicable: lockfile changed `@codemirror/state` (versions 6.7.1 → 6.7.4) and the failure's stack trace runs through it
+- ① not applicable: lockfile changed `{overlap[0]}` and the failure's stack trace runs through it
 ```
+
+(when `overlap` has more than one name, list all of them, comma-separated,
+in place of `{overlap[0]}`)
 
 Suppressing ① is **not** an exclusion — the failure still goes through
 Step 4 as usual. ② / ③ / ⑤ are evaluated and stand on their own if they
@@ -243,23 +206,45 @@ deterministic and closing the issue under
 `### Closed: deterministic cause, not flaky` is `investigate-flaky-test`'s
 job, not this skill's.
 
-**② Sandwich pattern.** Within the `--window-hours` window already fetched in
-Step 1, look for the same vitest identity key failing in two (or more) runs
-with a run of the *same job* in between that succeeded — a failure that
-disappears and reappears with an identical signature is stronger evidence of
-non-determinism than two failures with nothing but other failures between
-them. This needs no new API call: it is a re-read of the Step 1 run list plus
-the Step 2 job results already in hand, including run URLs and dates recorded
-on an existing `flaky/observing` issue's observation comments.
+**② Sandwich pattern** (this same identity failing, then a passing run of the
+same workflow, then failing again within the window) **and ③ matrix
+divergence** (a sibling matrix cell of the same job, on the same commit,
+that passed) are both computed by one call, `mining-signals.ts`, which makes
+no `gh api` call of its own — it is a pure re-read of data assembled from
+calls already made elsewhere: Step 1's run list, any other fresh failure of
+this identity already found this scan, an existing `flaky/observing` issue's
+recorded observation run URLs from Step 1.5, and `siblingJobs` below. For
+`siblingJobs` you need every job's conclusion on the commit, not just the
+failed ones Step 2's `-q 'select(.conclusion == "failure")'` query kept, so
+re-run `gh api repos/growilabs/growi/actions/runs/{RUN_ID}/jobs` without
+that filter (still the same endpoint Step 2 already calls, just unfiltered)
+rather than trying to recover the discarded rows:
 
-**③ Matrix divergence.** `ci-app-test-integration` runs a
-node/MongoDB-version matrix (see any recent job name, e.g.
-`ci-app-test-integration (24.x, 8.0, 8, 8.19.16)`). If the same commit's
-other matrix cells for the same job **passed** while this one failed, that is
-a same-commit, zero-wait signal. Get sibling job results from the Step 2
-jobs-list call you already made (`gh api
-repos/growilabs/growi/actions/runs/{RUN_ID}/jobs`) — filter by job name
-prefix, compare conclusions.
+```bash
+node bin/flaky-ci/scripts/mining-signals.ts \
+  --runs-file {STEP_1_RUNS_FILE} --identity {IDENTITY_FILE}
+```
+
+`{STEP_1_RUNS_FILE}` is Step 1's `list-candidate-runs.ts` output for this
+identity's workflow, saved as-is. `{IDENTITY_FILE}` is a small JSON file you
+assemble for this failure:
+
+```json
+{
+  "specPath": "{SPEC_PATH}", "testTitle": "{TEST_TITLE}",
+  "targetRun": { "id": {RUN_ID}, "headSha": "{HEAD_SHA}", "createdAt": "{CREATED_AT}", "url": "{RUN_HTML_URL}" },
+  "priorFailingRunIds": [{other run IDs within the window already known to have failed with this same identity — from another fresh failure this scan, or from an existing flaky/observing issue's observation comments}],
+  "jobName": "{THIS FAILING JOB'S NAME, e.g. ci-app-test-integration (24.x, 8.0, 8, 8.19.16)}",
+  "siblingJobs": [{jobs on the same commit, from gh api repos/growilabs/growi/actions/runs/{RUN_ID}/jobs — name and conclusion only}]
+}
+```
+
+Output: `sandwich: { hit, evidence }` and `matrixSplit: { hit, evidence }` —
+`hit: false` is a normal fact (nothing to report for that check), never a
+script failure. `priorFailingRunIds: []` (no other known occurrence this
+scan) always yields `sandwich.hit: false` without needing the run-list
+comparison — that is a fact worth reading as-is, not a reason to skip
+calling the script.
 
 **⑤ Setup-hook timeout with cross-file slowdown.** A failure whose error is
 `Hook timed out in Nms` on a hook registered in a Vitest **project's
@@ -439,74 +424,46 @@ Query **each workflow separately** — do not pull the unfiltered
 workflows (CodeQL, Auto-labeling, Auto approve PR, …), so a generic window of
 recent runs can contain almost none of the two being watched.
 
-**Use `gh api` against the workflow's own runs endpoint, not
-`gh run list --json`**, which validates requested fields against a fixed,
-gh-CLI-version-specific struct and fails the whole command when it does not
-know one (the cloud routine's gh 2.45.0 rejects `attempt`). `gh api` is a thin
-passthrough to GitHub's REST response, which already includes `run_attempt`
-regardless of gh CLI version.
-
-**Page until you cross `--window-hours`, not a fixed count** (see "Why a
-Time Window, Not a Run Count" above). `per_page=100`, walk pages newest
-first, stop once a page's oldest run falls before the cutoff, and stop
-early (report why) if `--max-runs-per-workflow` is hit first:
+Call, once per watched workflow file (`ci-app.yml` = "Node CI for app
+development", `ci-app-prod.yml` = "Node CI for app production" — confirm with
+`gh api repos/growilabs/growi/actions/workflows -q '.workflows[] | {name,path}'`
+if these file names ever change):
 
 ```bash
-WINDOW_HOURS={window-hours, default 32}
-MAX_RUNS={max-runs-per-workflow, default 300}
-CUTOFF_EPOCH=$(( $(date -u +%s) - WINDOW_HOURS * 3600 ))
-
-for WORKFLOW in ci-app.yml ci-app-prod.yml; do
-  : > "/tmp/${WORKFLOW}-runs.jsonl"
-  page=1
-  total=0
-  while :; do
-    resp=$(gh api -X GET "repos/growilabs/growi/actions/workflows/${WORKFLOW}/runs" \
-      -f status=completed -F per_page=100 -F "page=${page}")
-    count=$(printf '%s\n' "$resp" | jq '.workflow_runs | length')
-    [ "$count" -eq 0 ] && break
-    printf '%s\n' "$resp" | jq -c '.workflow_runs[] | {databaseId: .id, conclusion, headSha: .head_sha, createdAt: .created_at, url: .html_url, event, attempt: .run_attempt}' \
-      >> "/tmp/${WORKFLOW}-runs.jsonl"
-    total=$((total + count))
-    oldest_epoch=$(printf '%s\n' "$resp" | jq -r '.workflow_runs[-1].created_at' | date -u -f - +%s 2>/dev/null || date -u -d "$(printf '%s\n' "$resp" | jq -r '.workflow_runs[-1].created_at')" +%s)
-    if [ "$oldest_epoch" -lt "$CUTOFF_EPOCH" ]; then break; fi
-    if [ "$total" -ge "$MAX_RUNS" ]; then
-      echo "TRUNCATED: ${WORKFLOW} hit --max-runs-per-workflow=${MAX_RUNS} before reaching the ${WINDOW_HOURS}h window boundary — report this explicitly in Step 5" >&2
-      break
-    fi
-    page=$((page + 1))
-  done
-done
+node bin/flaky-ci/scripts/list-candidate-runs.ts \
+  --workflow ci-app.yml \
+  --window-hours {window-hours, default 32} \
+  --max-runs {max-runs-per-workflow, default 300}
 ```
 
-**Feed JSON to `jq` with `printf '%s\n' "$var"`, never `echo "$var"`.** In
-`zsh` — which is the interactive shell this routine has actually been run
-from — the builtin `echo` expands backslash escapes, so the `\n` inside a
-JSON string value becomes a real newline before `jq` ever sees it and the
-parse dies with `Invalid string: control characters from U+0000 through
-U+001F must be escaped`. `printf '%s\n'` passes the bytes through unchanged
-in every shell. The same applies anywhere else in this file a JSON variable
-is piped into `jq`.
+Output fields (exit 0): `runs[]` — one per completed run created within the
+trailing `--window-hours`, newest first, each with `id`, `conclusion`,
+`headSha`, `createdAt`, `url`, `event`, `attempt` — and `truncated` (boolean).
+Exit 2: no run at all could be fetched for this workflow (the GitHub API
+failed before any page was read) — report it as a script failure in Step 6,
+the same as any other script's exit 2.
 
-(`ci-app.yml` = "Node CI for app development", `ci-app-prod.yml` = "Node CI
-for app production" — confirm with
-`gh api repos/growilabs/growi/actions/workflows -q '.workflows[] | {name,path}'`
-if these file names ever change. Adapt the date-parsing line to whatever
-`date` implementation the runtime actually has; the point is "epoch seconds
-of the oldest run's `created_at` in this page", however you get there.)
+**A `truncated: true` result is not a script failure** — the script still
+exits 0, so it does not belong in Step 6's "Script failures" line (that line
+is gated on non-zero exit; see Step 5 below for where this fact is reported
+instead). It means either `--max-runs-per-workflow` was reached before the
+`--window-hours` window was exhausted, or a later page failed after some
+runs were already read. Either way this workflow's candidate list may be
+missing older failures still inside the window, and the reader should treat
+it as an incomplete scan for this run of the routine, not an empty one.
 
 This naturally includes pull_request and merge-queue-triggered runs; a scan
 that only looked at "PR checks" would miss the failures that surface in the
 merge queue, which has happened.
 
-While you have this data, check for same-SHA reruns: group by `headSha` within
-each workflow's result set and look for one appearing more than once with
-`attempt > 1` on the later entry. If an earlier attempt failed and a later one
-succeeded, every job that flipped between them is a confirmed flaky occurrence
-(Step 3, "confirmed" path) — skip Step 2 classification for it, since a
-same-SHA pass/fail flip has no infra-vs-product ambiguity to resolve. This is
-rare (2 occurrences in the most recent 100 runs, measured), so a quick
-group-by over the JSON already fetched is enough; skip it under time pressure.
+While you have this data, check for same-SHA reruns: group `runs[]` by
+`headSha` within each workflow's result and look for one appearing more than
+once with `attempt > 1` on the later entry. If an earlier attempt failed and a
+later one succeeded, every job that flipped between them is a confirmed flaky
+occurrence (Step 3, "confirmed" path) — skip Step 2 classification for it,
+since a same-SHA pass/fail flip has no infra-vs-product ambiguity to resolve.
+This is rare (2 occurrences in the most recent 100 runs, measured), so a quick
+group-by over the returned `runs[]` is enough; skip it under time pressure.
 
 Keep only runs with `conclusion == "failure"` for the main Step 2 flow.
 
@@ -516,19 +473,37 @@ Fetch the existing flaky issues now (Step 4 needs this list anyway — do it
 here instead so it's available before the expensive part of Step 2):
 
 ```bash
-gh api -X GET repos/growilabs/growi/issues -f state=all -f labels="flaky/observing" --paginate -q '.[] | {number,title,state,body}'
-gh api -X GET repos/growilabs/growi/issues -f state=all -f labels="flaky/suspected" --paginate -q '.[] | {number,title,state,body}'
-gh api -X GET repos/growilabs/growi/issues -f state=all -f labels="flaky/confirmed" --paginate -q '.[] | {number,title,state,body}'
+node bin/flaky-ci/scripts/fetch-flaky-issues.ts
 ```
 
-For each, also fetch its comments (`gh api repos/growilabs/growi/issues/{NUMBER}/comments --paginate`)
-and extract every `actions/runs/{id}` URL appearing anywhere in the body or
-comments into one set — the skip-list. In Step 2, if a failed run's `RUN_ID`
-is already in this set, **do not re-fetch its job log at all**: its evidence
-is already recorded on some issue, so exclude it from Step 2 onward. This is
-what keeps a frequent cron cadence cheap, since every overlapping window would
-otherwise re-fetch the same job logs. (④'s backfill does its own equivalent
-check per-issue — the two skip-lists serve different loops.)
+Output fields (exit 0): `issues[]` — one per issue currently carrying
+`flaky/observing`, `flaky/suspected` or `flaky/confirmed` (both open and
+closed — the default `--labels`), each with `number`, `title`, `state`,
+`body`, `labels[]` (label names), `comments[]` (each `id`, `body` — full
+text, not an excerpt), `commentsStatus` (`"ok"`, or `"unavailable"` when
+that one issue's comments could not be read — treat its `comments[]` as
+incomplete, not as "no comments", and do not drop the row); `labelFetchFailures[]`
+— which of the three labels' list fetch failed outright. Exit 2: no issue
+could be fetched for any of the three labels.
+
+**A non-empty `labelFetchFailures` means `issues[]` is incomplete, not that
+the named tier genuinely has zero issues right now** — a label whose fetch
+failed contributes no rows at all, so any tracking issue that only carries
+that label is silently missing from `issues[]` for the rest of this run
+(the skip-list below, and Step 4's exact-title lookup, both read from
+`issues[]`). This still exits 0, so it does not belong in Step 6's "Script
+failures" line (that line is gated on non-zero exit) — report it via Step
+5's incomplete-data sentence instead, the same place `list-candidate-runs`'s
+`truncated` is reported.
+
+For each issue, extract every `actions/runs/{id}` URL appearing anywhere in
+its `body` or any `comments[].body` into one set — the skip-list. In Step 2,
+if a failed run's `RUN_ID` is already in this set, **do not re-fetch its job
+log at all**: its evidence is already recorded on some issue, so exclude it
+from Step 2 onward. This is what keeps a frequent cron cadence cheap, since
+every overlapping window would otherwise re-fetch the same job logs. (④'s
+backfill does its own equivalent check per-issue — the two skip-lists serve
+different loops.)
 
 **Run ④'s targeted backfill now**, filtering this same issue list down to open
 `flaky/observing` ones — see "Cheap Suspicion Mining" ④ above. It is
@@ -537,7 +512,7 @@ the way before the larger fresh-candidate loop.
 
 ## Step 2: Fetch Failed Jobs and Classify Noise
 
-`{RUN_ID}` below is the `databaseId` from Step 1. **Skip any `{RUN_ID}`
+`{RUN_ID}` below is the `id` from Step 1's `runs[]`. **Skip any `{RUN_ID}`
 already in Step 1.5's skip-list before doing anything else in this step** —
 its evidence is already recorded, so there is nothing new to extract from
 it.
@@ -562,11 +537,17 @@ whenever `-f`/`-F` is passed, `--paginate -q` folds per page). Do
 not try one and fall back to the other per log — the capability is a property
 of the environment, not of any individual log fetch.
 
+Both paths end the same way: the log lands in a file, and
+`node bin/flaky-ci/scripts/parse-job-log.ts` reads that file on stdin —
+never a path or a job id — which is exactly why the two fetch methods can
+converge on one call (Requirement 3.2). Neither path needs a separate ANSI
+strip or grep pass; the script does both internally.
+
 ```bash
 # gh path (devcontainer / any environment where the egress proxy allows
 # results-receiver.actions.githubusercontent.com and *.blob.core.windows.net)
-gh api --allow-escape-sequences "repos/growilabs/growi/actions/jobs/{JOB_ID}/logs" \
-  | sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g'
+LOG_FILE="${TMPDIR:-/tmp}/flaky-job-{JOB_ID}.log"
+gh api --allow-escape-sequences "repos/growilabs/growi/actions/jobs/{JOB_ID}/logs" > "$LOG_FILE"
 ```
 
 **Never use `gh run view --job {JOB_ID} --log-failed` to read a specific
@@ -579,30 +560,35 @@ destroying the same-SHA attempt flip above, the one gold-standard vitest
 signal this skill has. The `actions/jobs/{JOB_ID}/logs` endpoint is addressed
 by job id rather than by run, so it returns that job's own attempt.
 
-Two details of the command: `--allow-escape-sequences` is required, or `gh`
+`--allow-escape-sequences` is required on the `gh api` call above, or `gh`
 refuses with exit 1 and `the response contains terminal escape sequences;
-pass --allow-escape-sequences to output it anyway`; and the `sed` strips the
-ANSI colour codes that would otherwise break the literal string matching every
-step below does. This endpoint returns the **whole** job log, passing steps
-included, so grep it rather than reading it whole: three literal patterns —
-`FAIL `, `::error`, ` flaky` — plus `[0-9]+ (failed|flaky|passed|skipped)`,
-which needs `grep -E`.
-
-**That last pattern is what keeps Playwright's summary count lines.** Step
-3's tier-1 identity rule reads `N flaky` **and** `N failed` off the shard
-and requires them to sum to 1; the three literal patterns capture the
-`flaky` line but not the `failed` one, and without it the sum cannot be
-computed at all. The rule's "a missing line counts as 0" clause only holds
-once the summary has actually been captured — a line absent from an
-uncaptured summary is unknown, not zero, and must fall back to the coarse
-tier-2 identity rather than being read as 0.
+pass --allow-escape-sequences to output it anyway`.
 
 ```
 # MCP path (cloud routine — the blob-storage redirect above is Forbidden
 # through this environment's egress proxy; the MCP tool fetches server-side
-# instead)
+# instead). Save the tool's result to the same kind of file with Write —
+# parse-job-log.ts only ever reads a file on stdin, so this is the one extra
+# step the MCP path needs that the gh path (which already redirects to a
+# file above) does not.
 mcp__github__get_job_logs(owner="growilabs", repo="growi", job_id={JOB_ID}, failed_only=true)
+# → Write the returned text to "${TMPDIR:-/tmp}/flaky-job-{JOB_ID}.log"
 ```
+
+```bash
+node bin/flaky-ci/scripts/parse-job-log.ts < "$LOG_FILE"
+```
+
+Output fields (see `bin/flaky-ci/README.md`'s contract table for the exact
+shape): `vitest.failBlocks[]` (`project`, `specPath`, `testTitle`,
+`sharedSetupHook`, `excerpt`), `playwright.annotations[]` (`file`, `title`),
+`playwright.summary` (`failed`/`flaky`/`passed`/`skipped`, or `null` when the
+log carried no count line at all — Step 3's tier-1 rule below depends on
+telling that `null` apart from a captured `0`), `denylistHits[]`
+(`blockIndex`, `specPath`, `testTitle`, `pattern`, `needle`, `scope`). Exit
+code `2` means stdin was empty or unreadable — treat that job's evidence as
+"could not be measured" per Requirement 3.4 (report it in Step 5, do not
+guess at its content from anywhere else) rather than as "no failures".
 
 ### Step 2b: also check successful `run-playwright` jobs for in-run flakes
 
@@ -610,8 +596,9 @@ A shard where a test failed and then passed on retry ends the *job* as
 `success`, because Playwright's own retries absorbed it before the exit code
 was decided, so the failed-job scan above never sees it and misses most of
 Playwright's "free" flaky signal. Additionally scan successful
-`run-playwright` jobs from runs in the Step 1 list (any conclusion), grepping
-rather than reading the full log to keep this cheap.
+`run-playwright` jobs from runs in the Step 1 list (any conclusion) — cheap
+the same way as the failed-job scan above, since `parse-job-log.ts` returns
+only the extracted JSON facts, never the raw log, to this procedure.
 
 **Select those jobs with `contains("run-playwright")`, not a prefix match.**
 The job runs through the reusable `Reusable build and test app for
@@ -627,81 +614,71 @@ gh api repos/growilabs/growi/actions/runs/{RUN_ID}/jobs \
   -q '.jobs[] | select(.name | contains("run-playwright")) | select(.conclusion == "success") | {id, name}'
 ```
 
-```bash
-# gh path — same command and same two details as the failed-job fetch above
-gh api --allow-escape-sequences "repos/growilabs/growi/actions/jobs/{JOB_ID}/logs" \
-  | sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-  | grep -iE "flaky|Retry #|test-failed|error file="
+Use the same Step-0-decided method, the same file-then-`parse-job-log.ts`
+shape as the failed-job fetch above, and the same `LOG_FILE` naming
+(`${TMPDIR:-/tmp}/flaky-job-{JOB_ID}.log`):
 
-# MCP path — fetch then grep the returned text the same way
+```bash
+# gh path
+gh api --allow-escape-sequences "repos/growilabs/growi/actions/jobs/{JOB_ID}/logs" > "$LOG_FILE"
+# MCP path
 mcp__github__get_job_logs(owner="growilabs", repo="growi", job_id={JOB_ID}, failed_only=false)
+# → Write the returned text to "$LOG_FILE"
+
+node bin/flaky-ci/scripts/parse-job-log.ts < "$LOG_FILE"
 ```
 
-Use the same Step-0-decided method as the failed-job fetch above. Each
-alternative earns its place: `flaky` keeps the summary count line (`1 flaky`)
-Step 3 reads the shard's count from, `error file=` keeps the `::error`
-annotations Step 3 builds the precise identity out of, and `Retry #` /
-`test-failed` keep the retry and attachment lines for the evidence excerpt.
+If `playwright.annotations` is empty **and** `playwright.summary` is either
+`null` or has `flaky: 0`, the shard had no flakiness — move on. Otherwise
+proceed to Step 3's Playwright extraction using this same output (there is
+no separate excerpt to re-fetch — the whole log already went through the
+script once). Note for Step 3's count test: these jobs concluded `success`,
+and a test that is still failing after its last retry fails the job, so
+`N failed` is 0 by construction here and the shard's count sum is the
+`N flaky` number alone.
 
-**`error file=` is deliberately unanchored — do not add a `^`.** The
-`actions/jobs/{JOB_ID}/logs` endpoint prefixes every line with a timestamp
-(`2026-09-14T09:22:51.3976078Z …`), so a line-start anchor can never match;
-and the annotation is often printed mid-line anyway, right after the
-reporter's progress dots. Measured on one job: anchored, 0 matches;
-unanchored, 1 — the one annotation that shard's whole identity depended on.
-An anchored pattern therefore hands Step 3 an excerpt with no `title=` in it,
-which fires Step 3's own tier-2 fallback and turns every flake found through
-this step into a coarse `playwright:{BROWSER}` issue.
+For the issue body's Evidence section (Step 4's template), quote the lines
+around the matching annotation directly from `$LOG_FILE` — it is still on
+disk from the fetch above.
 
-**Do not add a retry-digit alternative either** (a pattern matching `retry0`,
-`retry1`, …). A previous version of this grep had one, and on that same job
-every one of its 12 matches was a `pw:api` debug line mentioning a test
-fixture whose name contains `retry0` — not one of them an attachment path.
-`test-failed` is what keeps the attachment paths.
+**Classify infrastructure noise first — do not track these as flaky.** Read
+`denylistHits[]` from `parse-job-log.ts`'s output (already fetched above; the
+list itself is not repeated here — see below) before treating anything as
+flaky. Each hit names the `blockIndex` of the `vitest.failBlocks[]` entry it
+matched, plus which `pattern` and `needle` fired. Log each hit in this run's
+report as "infra noise, skipped", naming its `pattern`.
 
-If this is empty, the shard had no flakiness — move on. If it has a
-` flaky` count > 0, proceed to Step 3's Playwright extraction using this
-grepped excerpt (it is sufficient; do not re-fetch the full log). Note for
-Step 3's count test: these jobs concluded `success`, and a test that is
-still failing after its last retry fails the job, so `N failed` is 0 by
-construction here and the shard's count sum is the `N flaky` number alone.
+**Read the hit's `scope` to know how far it reaches** — this is the one
+judgment the script does not make for you:
 
-**Classify infrastructure noise first — do not track these as flaky.** Match
-the failure against this denylist (case-insensitive substring match); if any
-pattern matches, log it in this run's report as "infra noise, skipped" and
-move on to the next failure in the same job (dropping the whole job is the
-`test/setup/**` exception below, and only that). Keep the list small and
-additive — extend it when a genuine false positive is found, never broaden
-matches speculatively:
+- `scope: "failure"` drops only that one failure. The script matches per
+  failure's own excerpt, never the whole job log, on purpose: matching the
+  whole log on one unrelated line would have dropped 96 unrelated failures
+  along with the one real infra failure (research.md → 「infra noise は失敗
+  ごとに判定する（ジョブログ全体で判定しない）」).
+- `scope: "job"` — the match is inside a hook registered under
+  `test/setup/**` (the shared setup-hook shape Step 3 defines) — means every
+  failure in this job log is noise, because that hook ran before all of them
+  and the whole job was starved by the same infrastructure problem. Nothing
+  else in a job log has that reach.
 
-- `ECONNREFUSED`
-- `getaddrinfo ENOTFOUND`
-- `No space left on device`
-- `SIGKILL` / `exit code 137` (OOM-killed)
-- `runner has received a shutdown signal` / `lost communication with the server`
-- `docker: Error response from daemon`
-- generic `curl` retry exhaustion (`--retry 60` blocks timing out, seen in
-  `ci-app.yml` / `reusable-app-prod.yml` service-wait steps)
-- `Failed to download file.` — a test that downloads a real file from
-  github.com over the public network (the plugin-install integ test, #11708);
-  the public network going missing says nothing about the product's
-  determinism
+**The list is data, in `bin/flaky-ci/lib/denylist.ts`'s `INFRA_NOISE_PATTERNS`
+— read it there, do not expect a copy in this procedure.** Widening it stays
+a judgment the script does not make: keep it small and additive, and add an
+entry only when a genuine false positive is found, never broaden matches
+speculatively.
 
-**Match per failure, not per job log.** A failure is infra noise when a
-denylist string appears in **that failure's own excerpt** — its `FAIL` block
-plus the error and stack lines printed under it — not merely somewhere in the
-same job log, since searching the whole log discards every failure in the job
-on the strength of one unrelated line. In the measured case that would have
-dropped 96 unrelated failures along with the one real infra failure
-(research.md → 「infra noise は失敗ごとに判定する（ジョブログ全体で判定しない）」).
+**One shape never became a literal pattern, and `denylistHits[]` will never
+report it: generic `curl` retry exhaustion** (`--retry 60` blocks timing out,
+seen in `ci-app.yml` / `reusable-app-prod.yml` service-wait steps). It names
+no fixed string a log can be matched against — inventing one (`curl`, or an
+exit-code number) would over-match ordinary product failures that merely
+mention curl over an unrelated retry. When a failure's own excerpt looks like
+this shape, classify it as infra noise by judgment, the same way as before;
+the script has nothing to say about it.
 
-**The one exception is a shared setup hook.** When the denylist string appears
-in the failure of a hook registered under `test/setup/**` (the shared
-setup-hook shape Step 3 defines), every failure in that job log is noise,
-because that hook ran before all of them and the whole job was starved by the
-same infrastructure problem. Nothing else in a job log has that reach.
-
-Everything that doesn't match is a candidate for Step 3.
+Everything that has no `denylistHits[]` entry and does not look like the
+curl-exhaustion shape above is a candidate for Step 3.
 
 ## Step 3: Extract Test Identity and Evidence
 
@@ -715,13 +692,14 @@ can be flaky in one engine and not another. Extract it from the job name, e.g.
 `test-prod-node24 / run-playwright (firefox, 1/2, 8.0)` → browser = `firefox`
 (the `test-prod-node24 / ` part is the reusable workflow's calling job).
 
-The reliable, structured signal is the trailing summary line (`N failed`,
-`N flaky`, `N passed`) and the `::error file=...,title=...` annotations.
-**Attributing a specific `flaky` count to a specific spec name from the raw
-log is not reliable**: the reporter interleaves `pw:api` debug traces with
-retry/attachment lines in a way that does not cleanly pair a `Retry #N` block
-with its spec, so a precise adjacency heuristic will misattribute. Use a
-two-tier approach instead.
+The reliable, structured signal is `parse-job-log.ts`'s `playwright.summary`
+(`failed`/`flaky`/`passed`/`skipped`, or `null` when the log carried no count
+line at all) and `playwright.annotations[]` (`file`, `title` — repeats kept,
+in the order printed). **Attributing a specific `flaky` count to a specific
+spec name from the raw log is not reliable**: the reporter interleaves
+`pw:api` debug traces with retry/attachment lines in a way that does not
+cleanly pair a `Retry #N` block with its spec, so a precise adjacency
+heuristic will misattribute. Use a two-tier approach instead.
 
 **A test that failed and then passed on retry is annotated too.** Playwright
 emits an `::error file=...,title=...` annotation for it just as it does for a
@@ -729,22 +707,23 @@ test that ended failed, and the summary line then reads `0 failed` /
 `1 flaky` — the *most common* shape of a Playwright flake, so the flaky test
 is in the annotation list, not left over beside it.
 
-1. **Precise identity (tier 1)** — use it when **both** of these hold in the
-   ANSI-stripped log of that one shard:
+1. **Precise identity (tier 1)** — use it when **both** of these hold in that
+   shard's `parse-job-log.ts` output:
 
-   - the log carries **exactly one distinct** `::error file=…,title=…`
-     annotation, and
-   - the shard's own summary counts add up to that single annotation: `N
-     flaky` plus `N failed` equals 1 (a missing line counts as 0 — a
-     successful shard prints no `failed` line at all). "Missing" means
-     **absent from a summary that was captured**. If the grep used to fetch
-     the log never matched the summary lines in the first place, both counts
-     are unknown rather than 0, and this test does not apply — fall back to
-     the job-level identity below instead of reading the gap as a zero.
+   - `playwright.annotations` contains **exactly one distinct** entry (by
+     `file` + `title` together), and
+   - `playwright.summary` is not `null`, and its `flaky` plus `failed` equals
+     1. `playwright.summary` being `null` means the log carried no count line
+     at all — both counts are unknown, not zero, and this test does not
+     apply; fall back to the job-level identity below rather than reading the
+     gap as a zero. A *captured* summary already carries `0` for any count
+     line the shard didn't print (a successful shard prints no `failed`
+     line), so once `playwright.summary` is non-`null` there is no separate
+     "missing line" case left to reason about.
 
    The two together are what make the attribution safe: the counts say the
    shard produced exactly one non-clean test result, and the single
-   annotation is the only thing in the log that names one.
+   annotation is the only thing that names one.
 
    **Do not require a retry attachment path.** `apps/app/playwright.config.ts`
    sets `screenshot: 'only-on-failure'`, so a test whose retry *passes*
@@ -757,17 +736,16 @@ is in the annotation list, not left over beside it.
    with both halves **normalized** — the annotation's raw values are not the
    identity:
 
-   - `{SPEC_PATH}` — the `file=` value with the leading `apps/app/` removed.
-   - `{TEST_TITLE}` — the `title=` value with the leading `[{browser}] › `
-     removed, then the `{path}:{line}:{col} › ` location segment that
-     follows it removed, then **every remaining ` › ` replaced by ` > `**.
+   - `{SPEC_PATH}` — the annotation's `file` field with the leading
+     `apps/app/` removed.
+   - `{TEST_TITLE}` — the annotation's `title` field with the leading
+     `[{browser}] › ` removed, then the `{path}:{line}:{col} › ` location
+     segment that follows it removed, then **every remaining ` › ` replaced
+     by ` > `**.
 
-   Worked example, the annotation that produced issue #11903:
-
-   ```
-   file=apps/app/playwright/20-basic-features/inline-comment.spec.ts
-   title=[chromium] › playwright/20-basic-features/inline-comment.spec.ts:4758:3 › Inline comment - visual refresh: mockup cross-check captures › Capture popover states 5 (normal) and 6 (edit mode) in DARK mode (Req 4.4)
-   ```
+   Worked example, the annotation that produced issue #11903
+   (`{file: "apps/app/playwright/20-basic-features/inline-comment.spec.ts",
+   title: "[chromium] › playwright/20-basic-features/inline-comment.spec.ts:4758:3 › Inline comment - visual refresh: mockup cross-check captures › Capture popover states 5 (normal) and 6 (edit mode) in DARK mode (Req 4.4)"}`):
 
    normalizes to this identity key (what #11903's title carries today):
 
@@ -791,14 +769,14 @@ is in the annotation list, not left over beside it.
    identity in each of these three cases, which are exactly the cases tier 1
    does not cover:
 
-   - **more than one distinct annotation** in the shard's log — several
+   - **more than one distinct entry in `playwright.annotations`** — several
      tests are named and which one the count refers to is genuinely unknown;
-   - **the counts do not add up to the annotation count** (`N flaky` + `N
-     failed` is not 1 against a single annotation) — the log is describing
-     more, or fewer, non-clean results than it names, so the one annotation
-     cannot be assumed to account for the shard's count;
-   - **the annotation carries no `title=` value** — there is then a file but
-     no test to name.
+   - **the counts do not add up to the annotation count** (`playwright.
+     summary.flaky` + `.failed` is not 1 against a single annotation) — the
+     log is describing more, or fewer, non-clean results than it names, so
+     the one annotation cannot be assumed to account for the shard's count;
+   - **the annotation's `title` is `null`** — there is then a file but no
+     test to name.
 
    Say so explicitly in the issue body: "flaky test detected in this shard's
    log (see excerpt below) but the specific spec could not be isolated from
@@ -826,13 +804,11 @@ Step 4.** Never record a failed-every-attempt Playwright result as
 
 ### Vitest jobs (`ci-app-test`, `ci-app-test-integration`)
 
-Search the log for Vitest's failure block format (seen directly in this
-repo's CI output):
-
-```
-FAIL {app-integration|...} {SPEC_PATH} > {SUITE} > {TEST_TITLE}
-{ErrorType}: {message}
-```
+Each entry in `parse-job-log.ts`'s `vitest.failBlocks[]` is one FAIL block:
+`project`, `specPath`, `testTitle` (`null` for a file-level FAIL line, which
+names no test at all), `sharedSetupHook` (see below), and `excerpt` (the
+`FAIL` line plus the error and stack lines printed under it — this is the
+evidence text the issue body quotes).
 
 Identity key: `vitest:{SPEC_PATH}:{TEST_TITLE}`.
 
@@ -863,27 +839,30 @@ separate flaky tests. (This is the same phenomenon mining check ⑤
 measures; ⑤ decides the *tier*, this decides the *identity*.)
 
 **How to tell a shared setup-hook timeout from a spec file's own hook:**
-read the stack frame printed directly under the error, not the `FAIL` line:
+read the FAIL block's `sharedSetupHook` field from `parse-job-log.ts`'s
+output — `true` when that block's own excerpt carries a stack frame
+resolving under `test/setup/` (the frame printed directly under the error,
+not the `FAIL` line), `false` otherwise. That frame is the only reliable
+discriminator (an example of each, for context — this is what the field is
+reading):
 
 ```
 Error: Hook timed out in 20000ms.
- ❯ test/setup/migrate-mongo.ts:52:1      ← under test/setup/ → shared setup hook
+ ❯ test/setup/migrate-mongo.ts:52:1      ← under test/setup/ → sharedSetupHook: true
 ```
 
 ```
 Error: Hook timed out in 10000ms.
- ❯ src/server/service/user-group.integ.ts:60:3   ← a spec file → NOT a shared setup hook
+ ❯ src/server/service/user-group.integ.ts:60:3   ← a spec file → sharedSetupHook: false
 ```
 
-The frame is the only reliable discriminator, and it decides the routing on
-its own:
+The field decides the routing on its own:
 
-- **Frame resolves under `test/setup/`** → shared setup-hook timeout. Every
-  spec file in this job log failing with the same error and the same frame
-  collapses into **one** identity. List the affected spec files inside the
-  issue body / observation comment's log excerpt; do not open one issue per
-  file.
-- **Frame resolves into a spec file** → this is that spec file's own
+- **`sharedSetupHook: true`** → shared setup-hook timeout. Every spec file in
+  this job log failing with the same error and the same frame collapses into
+  **one** identity. List the affected spec files inside the issue body /
+  observation comment's log excerpt; do not open one issue per file.
+- **`sharedSetupHook: false`** → this is that spec file's own
   `beforeAll`/`beforeEach` and **not** a shared setup-hook timeout, even when
   the hook body calls a helper defined under `test/setup/` (the
   `getInstance()` timeouts are exactly this case: the helper lives in
@@ -1071,8 +1050,9 @@ Two limits keep this from swallowing real evidence:
 
 ### Which comment headings count as an occurrence
 
-`.claude/commands/flaky-ci-routine.md` Step 5 item 3 defines the count: **1**
-for the issue body, plus the comments whose **first line** prefix-matches
+`bin/flaky-ci/lib/dashboard.ts`, which `.claude/commands/flaky-ci-routine.md`
+Step 5 item 3 calls, defines the count: **1** for the issue body, plus the
+comments whose **first line** prefix-matches
 `### Additional observation` or `### Backfilled observation`. Two
 consequences the rules above depend on, which must not be "simplified" away:
 
@@ -1100,96 +1080,65 @@ does not, and only the first is excluded. Cascaded followers and collateral
 entries are already folded away, so they live or die with the identity they
 were folded into.
 
-**Step A — is the failing commit on `master` at all?**
-
 ```bash
-gh api -X GET repos/growilabs/growi/compare/master...{HEAD_SHA} -q .status
+node bin/flaky-ci/scripts/pr-owns-failure.ts \
+  --sha {HEAD_SHA} --spec-path {SPEC_PATH}
 ```
 
-- `behind` or `identical` → the commit **is** an ancestor of `master`; the
-  failure happened on code that actually shipped. Skip the rest of this
-  check and go to Step 4 normally.
-- `ahead` or `diverged` → the commit is **not** an ancestor of `master`
+For a Playwright job-level fallback identity (`playwright:{BROWSER}`, no
+spec path), pass `--spec-path ''` — see below. `--spec-path` takes the
+`apps/app`-relative form a vitest identity's `{SPEC_PATH}` already is; the
+script itself receives PR files in the repository-root-relative form GitHub
+returns and matches by suffix, never equality, so passing the
+repository-root-relative form here would silently make `touchesSpec` false
+forever.
+
+Output fields: `ancestryStatus` (GitHub's raw `compare` status —
+`identical` / `behind` / `ahead` / `diverged`), `pulls[]` (one entry per PR
+associated with the commit: `number`, `base`, `state`, `touchesSpec`),
+`touchesSpec` (`true` when any entry in `pulls[]` has `touchesSpec: true`),
+`noPr` (`true` when `pulls[]` is empty).
+
+- **`identical` or `behind`** → the commit **is** an ancestor of `master`;
+  the failure happened on code that actually shipped. Go to Step 4 normally.
+- **`ahead` or `diverged`** → the commit is **not** an ancestor of `master`
   (`ahead` = it carries commits `master` doesn't; `diverged` = both sides
-  carry their own). Continue with Step B.
-
-**Step B — find every PR the commit belongs to.**
-
-```bash
-gh api repos/growilabs/growi/commits/{HEAD_SHA}/pulls \
-  -q '.[] | {number, base: .base.ref, state}'
-```
-
-Consider **every** PR this returns, not `.[0]` — ①'s `-q '.[0].number'` is
-fine for picking one description to read, but it is wrong here. A real
-failing commit belonged to two PRs at once, one based on `master` and one on
-a feature branch, both of which changed the failing spec; `.[0]` would have
-reported only one of them. Do **not** filter by base branch either — a PR
-targeting a feature branch is exactly the case this rule exists for.
-
-If the endpoint returns nothing, the commit may still belong to a PR by
-another route:
-
-- **Merge-queue commits.** Mergify names the branch
-  `mergify/merge-queue/{hash}` — a hash, **not** the PR number — and the
-  commit drops its PR association once the queue entry is done, so
-  `commits/{sha}/pulls` comes back empty (verified on a real queue commit).
-  The PR number is in the commit message instead:
-
-  ```bash
-  gh api repos/growilabs/growi/commits/{HEAD_SHA} -q '.commit.message'
-  ```
-
-  Its first line reads `Merge of #{PR_NUMBER}`. Match only that literal
-  `Merge of #{N}` pattern, and take every occurrence — Mergify can batch
-  several PRs into one queue commit. Do **not** scrape arbitrary `#{N}`
-  tokens from the rest of the message: a squashed body's `Refs #...` /
-  `Fixes #...` names an issue or an unrelated PR, and fetching that PR's
-  files would exclude a real flake. A merge-queue commit is never an ancestor
-  of `master`, so treat it like any other non-ancestor commit.
-- **Still no PR.** A direct push to a feature branch. Skip Step C and
-  **exclude** the failure: the commit is not on `master` and there is no PR
-  whose files could vindicate it, so there is nothing a tracking issue could
-  ever be checked against. Report it in Step 5 with the head branch name in
-  place of a PR number.
-
-**Step C — did any of those PRs change the failing spec file?**
-
-```bash
-gh api repos/growilabs/growi/pulls/{PR_NUMBER}/files --paginate -q '.[].filename'
-```
-
-Reuse the files already fetched for the PR ① looked at; fetch
-`pulls/{n}/files` for any other PR the commit belongs to. ① only ever reads
-`.[0]`'s files, so on a commit with more than one associated PR — the
-two-PR case above — the others have not been fetched yet.
-
-**Match by path suffix, not by equality.** The two sides are rooted
-differently: PR `files[].filename` is relative to the repository root
-(`apps/app/src/features/backlinks/server/services/page-link-lifecycle.integ.ts`),
-while a vitest identity's `{SPEC_PATH}` is what the reporter prints, which is
-relative to `apps/app`
-(`src/features/backlinks/server/services/page-link-lifecycle.integ.ts`). A
-PR file matches when its filename **equals `{SPEC_PATH}` or ends with
-`/{SPEC_PATH}`**. Comparing the two for equality finds nothing and quietly
-turns this whole check into a no-op — do not "simplify" it to `==`.
-
-- **Any PR changed the failing spec file** → **exclude**. Create no issue,
-  post no comment on an existing issue for this identity, change no label and
-  add no occurrence: it does not enter Step 4 at all. Count it in Step 5 and
-  list the PR number(s) that matched.
-- **No PR changed it** → go to Step 4 normally. (A dependency bump that broke
-  the spec without touching it lands here — see ①'s lockfile check, which
-  stops ① from calling such a failure "unrelated" but does not exclude it.)
+  carry their own). `pulls[]` is gathered two ways: first `GET
+  commits/{sha}/pulls` directly; only when that comes back empty, every
+  `Merge of #{N}` line in the commit's own message (a Mergify merge-queue
+  commit drops its direct PR association once the queue entry is done, but
+  its message's first line still reads `Merge of #{PR_NUMBER}` — Mergify can
+  batch several PRs into one queue commit, and the script takes every such
+  line, never an arbitrary `#{N}` token elsewhere in a squashed body).
+- **`noPr: true`** → no PR by either route — a direct push to a feature
+  branch. **Exclude** the failure: the commit is not on `master` and there
+  is no PR whose files could vindicate it, so there is nothing a tracking
+  issue could ever be checked against. Report it in Step 5 with the head
+  branch name in place of a PR number.
+- **`touchesSpec: true`** → **exclude**. Create no issue, post no comment on
+  an existing issue for this identity, change no label and add no
+  occurrence: it does not enter Step 4 at all. Count it in Step 5 and list
+  the `pulls[]` entries whose own `touchesSpec` is `true`. The script checks
+  **every** PR in `pulls[]`, not just one — a real failing commit belonged to
+  two PRs at once, one based on `master` and one on a feature branch, both of
+  which changed the failing spec; stopping at the first would have missed
+  the second. `base` is informational only — never filter on it, a PR
+  targeting a feature branch is exactly the case this check exists for.
+- **`touchesSpec: false`** → go to Step 4 normally. (A dependency bump that
+  broke the spec without touching it lands here — see ①'s lockfile check,
+  which stops ① from calling such a failure "unrelated" but does not exclude
+  it.)
 - **A Playwright job-level fallback identity** (`playwright:{BROWSER}`, no
-  spec path) has nothing to match against, so Step C can never exclude it.
-  Let it through to Step 4.
+  spec path — `--spec-path ''`) always gets `touchesSpec: false`: there is
+  nothing to match against, so this check can never exclude it. Let it
+  through to Step 4.
 
-**Fail open.** If Step A's compare returns an error (a merge-queue commit can
-be garbage-collected before the scan reaches it, giving `404`) or the
-PR/files fetch fails, **do not exclude** — go to Step 4 as usual and note the
-unresolved check in Step 5. Losing a real flake to an API hiccup on an
-unattended run is far worse than carrying one issue a human can close.
+**Fail open.** Exit code 2 (the compare, PR-list, commit-message, or
+PR-files fetch failed — a merge-queue commit can be garbage-collected before
+the scan reaches it, giving `404`) — **do not exclude**, go to Step 4 as
+usual and note the unresolved check in Step 5. Losing a real flake to an API
+hiccup on an unattended run is far worse than carrying one issue a human can
+close.
 
 ## Step 4: Reconcile Against Existing Issues
 
@@ -1268,8 +1217,8 @@ independent flakiness):
 - {SUITE} > {TITLE}
 - {SUITE} > {TITLE}"}
 
-{if ① was suppressed by the lockfile check (see ① in "Cheap Suspicion Mining"), add this line regardless of which tier this issue ends up at:
-"- ① not applicable: lockfile changed `{PKG}` (versions {OLD} → {NEW}) and the failure's stack trace runs through it"}
+{if ① was suppressed by the lockfile check (see ① in "Cheap Suspicion Mining"), add this line regardless of which tier this issue ends up at, naming every package in `lockfile-overlap`'s `overlap[]`, comma-separated:
+"- ① not applicable: lockfile changed `{PKG}` and the failure's stack trace runs through it"}
 
 {if suspected, include the specific mining evidence **for every check that matched, not just one** — one line per match, e.g.:
 "① PR #{N} changed {files}, none overlap this spec's path or stack trace"
@@ -1553,9 +1502,12 @@ affected, not issue creation or tracking.
 
 Print a short summary of this run: which job-log fetch method Step 0 chose
 (`gh` or `mcp`), the `--window-hours` covered and how many runs per workflow
-fell in it (and whether `--max-runs-per-workflow` truncated that — report it
-explicitly, never silently), how many runs were skipped via the Step 1.5
-skip-list, how many jobs were scanned, how many **failures** were classified
+fell in it (and whether `--max-runs-per-workflow` truncated that, a later
+page's fetch failed after some runs were already read, or Step 1.5's
+`fetch-flaky-issues` reported a non-empty `labelFetchFailures` — meaning the
+known-issue list itself is missing one tier's rows — report whichever of
+these happened explicitly, never silently), how many runs were skipped via
+the Step 1.5 skip-list, how many jobs were scanned, how many **failures** were classified
 as infra noise and with which pattern (counted per `FAIL` block, per Step 2's
 granularity), and how many **whole jobs** were discarded on the
 `test/setup/**` exception. Then: how many new issues created, how many
@@ -1605,11 +1557,13 @@ This is the only user-facing output — do not create files.
   environment constraint, not a reason to stop the run.
 - `gh api` rate limit hit: report how far the scan got and stop; do not retry
   in a tight loop.
-- A job log too large to fit in context: grep for `FAIL `, `::error`,
-  ` flaky` and the summary count lines (`[0-9]+ (failed|flaky|passed|skipped)`)
-  only — the same `grep -E` Step 2 uses — instead of reading it whole.
-  Dropping the count lines would make the Playwright tier-1 test read
-  "unknown" and fall back to the coarse identity (Step 3).
+- `parse-job-log.ts` exits `2` (stdin was empty or unreadable) for a job's
+  log: this job's evidence could not be measured, not "no failures" — report
+  it in Step 5 alongside any other script failure, and move on to the next
+  job rather than guessing at its content from the run/job metadata alone.
+  A job log this large no longer risks overflowing the model's own context,
+  since the script reads it directly from a file and only its JSON output
+  (never the raw log) reaches this procedure.
 - Ambiguous identity (test title changed between occurrences of the same
   underlying flake): do not attempt fuzzy matching — treat as a new issue.
   A missed dedupe is cheap; wrongly merging two different flakes is not.

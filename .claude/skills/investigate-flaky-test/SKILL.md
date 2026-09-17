@@ -288,54 +288,36 @@ The first call gives `title`, `body`, `labels[].name`, `html_url`, `state`;
 the second gives every comment (each observation `detect-flaky-ci` appended
 after the first).
 
-The title is `flaky: {IDENTITY_KEY}` (set by `detect-flaky-ci`), where
-`IDENTITY_KEY` is one of:
-- `vitest:{SPEC_PATH}:{TEST_TITLE}` — reproduce with vitest, precise identity.
-- `playwright:{BROWSER}:{SPEC_PATH}:{TEST_TITLE}` — reproduce with Playwright,
-  precise identity. `{BROWSER}` is `chromium` / `firefox` / `webkit`, and it
-  is always present: the same spec can be flaky in one engine and not
-  another, so `detect-flaky-ci` Step 3 makes it part of the key.
-- `playwright:{BROWSER}` — a **job-level fallback identity**: `detect-flaky-ci`
-  could not isolate which spec was flaky from the CI log alone. The issue
-  body's evidence section will say so explicitly. In this case, do not guess
-  a spec — read the linked run's full Playwright report first (the run URL
-  in the "First observation" section) to find the actual flaky spec before
-  attempting Step 2 reproduction. If the report is no longer available
-  (artifact retention expired), report LOW confidence at Step 4 rather than
-  guessing.
+The title is `flaky: {IDENTITY_KEY}` (set by `detect-flaky-ci`). Parse it with:
 
-Parse the identity key from the title in this order — **do not** split on
-the first and last `:`, which gets both the browser segment and a title
-containing `:` wrong (#11903's title contains two of them):
+```bash
+node bin/flaky-ci/scripts/parse-identity-key.ts --title "$TITLE"
+```
 
-1. **Kind** — everything up to the first `:` (`vitest` or `playwright`).
-2. **Browser**, for `playwright` only — everything up to the next `:`.
-3. **Spec path** — the *shortest* following segment that ends in a
-   source-file extension (`.ts`, `.tsx`, `.js`, `.jsx`) **immediately followed
-   by `:`**. The extension-plus-colon is what anchors the split; nothing else
-   in the key is a reliable boundary. Run this on everything after the kind:
+This replaces the regex and 4-step split this section used to spell out —
+see `bin/flaky-ci/README.md`'s contract table for the exact fields
+(`kind`, `browser`, `specPath`, `testTitle`, `shape`). The script never
+fails (exit 2 is only a missing `--title`): a job-level fallback or a
+malformed key is itself the fact being reported, not an error. What to do
+with each of the three `shape` values is the judgment that stays here:
 
-   ```
-   ^([^:]+:)?(.+?\.(tsx?|jsx?)):(.*)$
-   ```
-
-   Group 1 (optional) absorbs the browser segment when there is one, group 2
-   is `{SPEC_PATH}`, and group 4 is `{TEST_TITLE}`. The extension list is
-   deliberately wider than `spec`/`integ` because one documented identity
-   class has a plain `.ts` path: the shared setup-hook key
-   `vitest:test/setup/migrate-mongo.ts:beforeAll … setup hook timeout (20000ms) during ci-app-test-integration`
-   (#11752) — its `{SPEC_PATH}` is the setup file, and the whole remainder is
-   the title. A title that itself mentions a file (`… Cannot find module
-   dev/bunyan-format.js (thread-stream worker)`, #11818) is safe because the
-   shortest match wins and that mention is not followed by `:`.
-4. **Test title** — everything after that path's `:`, **verbatim**,
-   including any further `:` it contains. Never trim or re-split it.
-
-If the regex does not match a `playwright:` key, the title is the job-level
-fallback key `playwright:{BROWSER}` described just above. Treat it as that,
-do not try to recover a spec path from it. A `vitest:` key that does not
-match is malformed (no `detect-flaky-ci` path produces one) — stop and report
-it as a precondition failure rather than guessing a path.
+- **`shape: "precise"`** — a `vitest:{SPEC_PATH}:{TEST_TITLE}` or
+  `playwright:{BROWSER}:{SPEC_PATH}:{TEST_TITLE}` key. `{BROWSER}` is
+  `chromium` / `firefox` / `webkit` and, for Playwright, is normally always
+  present: the same spec can be flaky in one engine and not another, so
+  `detect-flaky-ci` Step 3 makes it part of the key. Proceed straight to
+  Step 2 reproduction using `specPath` / `testTitle`.
+- **`shape: "playwright-job-level"`** (`kind` is always `"playwright"`,
+  `browser` holds the fallback's `{BROWSER}`, `specPath`/`testTitle` are
+  `null`) — `detect-flaky-ci` could not isolate which spec was flaky from the
+  CI log alone. The issue body's evidence section will say so explicitly. Do
+  not guess a spec — read the linked run's full Playwright report first (the
+  run URL in the "First observation" section) to find the actual flaky spec
+  before attempting Step 2 reproduction. If the report is no longer
+  available (artifact retention expired), report LOW confidence at Step 4
+  rather than guessing.
+- **`shape: "malformed"`** — no `detect-flaky-ci` path produces one. Stop and
+  report it as a precondition failure rather than guessing a path.
 
 Collect every observation block from the body and comments (run URLs,
 commits, log excerpts) — later
@@ -548,24 +530,46 @@ empty, do not guess and do not re-push: treat the measurement as
 a human decision**, and leave any `flaky-repro/issue-${ISSUE_NUMBER}-*`
 branches on `origin` for the human to inspect.
 
-When you come back, poll REST every 60 seconds, for at most 30 minutes from
-the push:
+When you come back, call `check-runs-facts.ts` every 60 seconds, for at most
+30 minutes from the push (see `bin/flaky-ci/README.md` for the full output
+contract):
 
 ```bash
-gh api "repos/growilabs/growi/commits/${REPRO_SHA}/check-runs" \
-  -q '.check_runs[] | select(.name == "flaky-repro") | {status, conclusion, html_url}'
+CHECKS_JSON="${TMPDIR:-/tmp}/flaky-repro-checks-${ISSUE_NUMBER}.json"
+STARTED=$(date +%s)
+STARTUP_GRACE=$(( STARTED + 5 * 60 ))
+DEADLINE=$(( STARTED + 30 * 60 ))
+
+while :; do
+  node bin/flaky-ci/scripts/check-runs-facts.ts --sha "$REPRO_SHA" > "$CHECKS_JSON"
+  repro_status=$(jq -r '.flakyRepro.status' "$CHECKS_JSON")
+  now=$(date +%s)
+
+  [ "$repro_status" = 'completed' ] && break
+  if [ "$repro_status" = 'absent' ] && [ "$now" -ge "$STARTUP_GRACE" ]; then
+    echo 'no flaky-repro check-run within 5 minutes — not measured'
+    break
+  fi
+  if [ "$now" -ge "$DEADLINE" ]; then
+    echo 'wait capped at 30 minutes'
+    break
+  fi
+  sleep 60
+done
 ```
 
-Three ways out of the poll:
+Three ways out of the loop:
 
-- the check-run reports `status == "completed"` → take its `conclusion` to 2-D;
-- **no check-run named `flaky-repro` has appeared within the first ~5
-  minutes** → the instrument never started. Stop polling now rather than
-  burning the full 30 minutes, and treat it as "confirmation not measured"
-  (2-E), naming the likely causes in the stop comment: the branch name did
-  not match `flaky-repro/**`, or the base commit predates `flaky-repro.yml`;
-- 30 minutes elapse with the check-run still `queued` / `in_progress` →
-  "confirmation not measured" as well.
+- `.flakyRepro.status` reads `"completed"` → take `.flakyRepro.conclusion`
+  (`jq -r '.flakyRepro.conclusion' "$CHECKS_JSON"`) to 2-D;
+- **`.flakyRepro.status` stays `"absent"` for the first ~5 minutes** — no
+  check-run named `flaky-repro` has appeared yet — → the instrument never
+  started. Stop polling now rather than burning the full 30 minutes, and
+  treat it as "confirmation not measured" (2-E), naming the likely causes in
+  the stop comment: the branch name did not match `flaky-repro/**`, or the
+  base commit predates `flaky-repro.yml`;
+- 30 minutes elapse with `.flakyRepro.status` still `"queued"` /
+  `"in_progress"` → "confirmation not measured" as well.
 
 The check-run's conclusion answers only "could a measurement be taken at
 all": `success` means the request was valid and the runs happened (the tests
@@ -575,56 +579,39 @@ the request was rejected or the setup broke and nothing was measured.
 #### 2-D: read the tally from the `### Repro result` comment
 
 ```bash
-REPRO_RESULT_FILE="${TMPDIR:-/tmp}/flaky-repro-${ISSUE_NUMBER}.md"
+REPRO_RESULT_JSON="${TMPDIR:-/tmp}/flaky-repro-${ISSUE_NUMBER}.json"
 
-gh api "repos/growilabs/growi/issues/${ISSUE_NUMBER}/comments?per_page=100" --paginate --slurp \
-  | jq -r --arg sha "$REPRO_SHA" '
-      [ flatten[]
-        | select(.body | startswith("### Repro result"))
-        | select(.body | split("\n") | any(. == "- Commit: " + $sha)) ]
-      | last // empty | .body' > "$REPRO_RESULT_FILE"
-
-grep -m1 -E '^- Runs:' "$REPRO_RESULT_FILE"
-grep -m1 -E '^- Failed:' "$REPRO_RESULT_FILE"
+node bin/flaky-ci/scripts/read-repro-result.ts \
+  --issue "$ISSUE_NUMBER" --sha "$REPRO_SHA" > "$REPRO_RESULT_JSON"
+REPRO_RESULT_STATUS=$?
 ```
+
+- **Exit `0`**: `$REPRO_RESULT_JSON` holds one line of JSON with `runs`,
+  `failed`, `perRun`, `workflowRunUrl` and `commentUrl` (see
+  `bin/flaky-ci/README.md`'s contract table). Read the two values 2-E needs:
+  `runs=$(jq -r '.runs' "$REPRO_RESULT_JSON")` and
+  `failed=$(jq -r '.failed' "$REPRO_RESULT_JSON")`.
+- **Exit `2`**: no `### Repro result` comment on the issue carries
+  `- Commit: ${REPRO_SHA}` — treat as "confirmation not measured" (2-E's
+  third outcome).
 
 **The comment must be the one this push produced.** A tracking issue
 accumulates `### Repro result` comments — the confirmation measurement, a
 later rate measurement (second tier), the fix verification in Step 6 — so
-"the newest one" is not the same thing as "mine". Match on the
-`- Commit: ${REPRO_SHA}` line, the first of the result's fixed lines, and let
-an empty file mean "no result for this commit" rather than silently reading
-somebody else's tally. Among comments for the same commit take the **newest**
-(`last`), because a manually re-run job leaves a second one.
-
-Three details of that pipeline are load-bearing, each measured against this
-repo's real data:
-
-- `--slurp` and `-q` cannot be combined (gh 2.100.0 rejects it), hence the
-  pipe into `jq` rather than gh's own `-q`;
-- `--paginate -q` would apply the filter to **each page separately**, so no
-  aggregation (`last`, `[...]`) may live inside `-q` — `--slurp` plus
-  `flatten[]` is what makes the selection see every page at once;
-- `test("^- Commit: …"; "m")` does **not** anchor per line in jq 1.8.1, so
-  the `split("\n") | any(...)` form stays.
-
-`grep -m1` matters for the same reason: the comment ends with an excerpt of
-the failing run's output, and a vitest excerpt can itself contain a line
-beginning with `- Failed:`. The seven fixed `- Key: value` lines
-(`- Commit:`, `- Branch:`, `- Mode:`, `- Runs:`, `- Failed:`, `- Per-run:`,
-`- Workflow run:`) always come first, in that order, before any note or
-fenced excerpt.
+"the newest one" is not the same thing as "mine". The script matches on the
+`- Commit: ${REPRO_SHA}` line, not recency, and only when two comments name
+the *same* commit (a manually re-run job) does it fall back to picking the
+newer of the two.
 
 **A `success` conclusion on its own is not evidence that anything was
 measured.** The workflow posts the comment in a separate step that
 deliberately does not fail the job, so a comment that never arrived (a locked
 issue, a momentary GitHub outage) leaves the check-run green with only a
 warning annotation behind it. Require **both**: the check-run completed
-`success`, **and** a `### Repro result` comment carrying
-`- Commit: ${REPRO_SHA}` exists with a `- Runs:` value of at least 1 and a
-`- Failed:` line. If either is missing, the outcome is "confirmation not
-measured" — the job summary is for human readers, and the issue's existing
-static evidence is not a substitute.
+`success`, **and** `read-repro-result` (2-D) exits `0` for `${REPRO_SHA}` with
+a `runs` value of at least 1. If either is missing, the outcome is
+"confirmation not measured" — the job summary is for human readers, and the
+issue's existing static evidence is not a substitute.
 
 #### 2-E: decide, from the tally alone
 
@@ -632,7 +619,7 @@ static evidence is not a substitute.
 |---|---|
 | `Failed` < `Runs` — at least one run passed | **confirmed** |
 | `Failed` == `Runs` — every run failed | **possible genuine regression** |
-| check-run `failure`; or no `flaky-repro` check-run within ~5 min; or still unfinished after 30 min; or no `### Repro result` comment for this commit, no `- Runs:` line, or `- Runs: 0` | **confirmation not measured** |
+| check-run `failure`; or no `flaky-repro` check-run within ~5 min; or still unfinished after 30 min; or `read-repro-result` exits `2` for this commit, or returns `runs: 0` | **confirmation not measured** |
 
 **confirmed** — a spec that passes at least once on unchanged code, with a
 recorded CI failure behind it, is non-deterministic. Escalate the label
@@ -697,7 +684,7 @@ did not happen is not evidence of anything.
 git push origin --delete "$BRANCH"
 git switch -          # leave the throwaway ref before anything branches again
 git branch -D "$BRANCH"
-rm -f "$REPRO_RESULT_FILE"
+rm -f "$REPRO_RESULT_JSON"
 ```
 
 Do this on **every** exit path — including the ones where no result was ever
@@ -1236,7 +1223,7 @@ measurements on the fix commit, 6-B decides from them whether a PR is opened
 at all, and 6-C opens it — ready for review from the moment it is created.
 
 Step 5 and 6-A through 6-C share shell variables (`$ISSUE_NUMBER`,
-`$FIX_BRANCH`, `$FIX_SHA`, `$CHECKS_FILE`, `$REPRO_RESULT_FILE`, `$runs`,
+`$FIX_BRANCH`, `$FIX_SHA`, `$CHECKS_FILE`, `$GATE_FACTS_JSON`, `$runs`,
 `$failed`). Run them as one script; in a fresh shell, re-establish
 `ISSUE_NUMBER` and `FIX_BRANCH` from the values 5-A used and `FIX_SHA` with
 `git rev-parse`, rather than inventing new ones. The one pair that must never
@@ -1256,19 +1243,17 @@ STARTED=$(date +%s)
 STARTUP_GRACE=$(( STARTED + 5 * 60 ))
 DEADLINE=$(( STARTED + 45 * 60 ))
 
-# Newest check-run per name. A commit carries two entries per job once a PR
-# exists (push event + pull_request event), and a superseded push leaves
-# `cancelled` ones behind; evaluating every entry would let a stale one block
-# the gate with no way out but the timeout.
-CHECKS_JQ='[ flatten[] | .check_runs[] ] | group_by(.name) | map(sort_by(.started_at) | last)'
-
 while :; do
-  gh api "repos/growilabs/growi/commits/${FIX_SHA}/check-runs?per_page=100" \
-    --paginate --slurp | jq "$CHECKS_JQ" > "$CHECKS_FILE"
+  node bin/flaky-ci/scripts/check-runs-facts.ts --sha "$FIX_SHA" > "$CHECKS_FILE"
 
-  repro_status=$(jq -r '[ .[] | select(.name == "flaky-repro") ] | last | .status // "absent"' "$CHECKS_FILE")
-  ci_total=$(jq '[ .[] | select(.name | startswith("ci-app-")) ] | length' "$CHECKS_FILE")
-  ci_pending=$(jq '[ .[] | select(.name | startswith("ci-app-")) | select(.status != "completed") ] | length' "$CHECKS_FILE")
+  repro_status=$(jq -r '.flakyRepro.status' "$CHECKS_FILE")
+  ci_total=$(jq -r '.ciApp.total' "$CHECKS_FILE")
+  # Still-pending ci-app-* checks: check-runs-facts.ts already deduped to the
+  # newest per name (a commit carries two entries per job once a PR exists —
+  # a push event and a pull_request event — and a superseded push leaves a
+  # `cancelled` one behind), so `.checks[]` here can never double-count a
+  # stale entry the way reading every raw check-run would.
+  ci_pending=$(jq '[ .checks[] | select(.name | startswith("ci-app-")) | select(.status != "completed") ] | length' "$CHECKS_FILE")
   now=$(date +%s)
 
   if [ "$ci_total" -gt 0 ] && [ "$ci_pending" -eq 0 ] \
@@ -1296,7 +1281,7 @@ while :; do
   sleep 60
 done
 
-jq -r '.[] | select(.name == "flaky-repro" or (.name | startswith("ci-app-")))
+jq -r '.checks[] | select(.name == "flaky-repro" or (.name | startswith("ci-app-")))
        | "\(.name)\t\(.status)\t\(.conclusion)"' "$CHECKS_FILE"
 ```
 
@@ -1324,33 +1309,8 @@ the loop leaves after `$STARTUP_GRACE` instead of burning the full 45:
   `paths` filter, so a fix touching nothing under `apps/app/**`, `packages/**`
   or the listed root files starts no run at all.
 
-Then read the tally **for this commit** — 2-D's pipeline with `$FIX_SHA`:
-
-```bash
-REPRO_RESULT_FILE="${TMPDIR:-/tmp}/flaky-fix-repro-${ISSUE_NUMBER}.md"
-
-gh api "repos/growilabs/growi/issues/${ISSUE_NUMBER}/comments?per_page=100" --paginate --slurp \
-  | jq -r --arg sha "$FIX_SHA" '
-      [ flatten[]
-        | select(.body | startswith("### Repro result"))
-        | select(.body | split("\n") | any(. == "- Commit: " + $sha)) ]
-      | last // empty | .body' > "$REPRO_RESULT_FILE"
-
-grep -m1 -E '^- Runs:' "$REPRO_RESULT_FILE"
-grep -m1 -E '^- Failed:' "$REPRO_RESULT_FILE"
-```
-
-Pinning on `- Commit: ${FIX_SHA}` matters more here than at 2-D. The issue
-already holds the confirmation measurement's result — a different commit,
-usually with a non-zero `- Failed:` — and reading "the newest comment" would
-report whichever of the two happened to land last. An **empty**
-`$REPRO_RESULT_FILE` is not an error: it is the "not measured" reading, and
-`grep` printing nothing is exactly how that shows up. The three `gh`/`jq`
-details behind this pipeline (`--slurp` cannot be combined with `-q`,
-`--paginate -q` filters each page separately, jq's `"m"` flag does not anchor
-per line) are documented at 2-D, and `grep -m1` is there for the same reason:
-the comment ends with an excerpt of the run's output, which can itself contain
-a line starting with `- Failed:`.
+6-B reads the repro tally itself (`pr-gate-facts.ts`, below) — nothing more
+is fetched here.
 
 ### 6-B: The PR gate — decided here, and only here
 
@@ -1371,24 +1331,42 @@ Anything else means **no PR**. There is no partial credit and no second place
 where this call is made: 6-C assumes the gate has already been passed.
 
 ```bash
-runs=$(grep -m1 -E '^- Runs:' "$REPRO_RESULT_FILE" | sed 's/^- Runs: *//')
-failed=$(grep -m1 -E '^- Failed:' "$REPRO_RESULT_FILE" | sed 's/^- Failed: *//')
-ci_not_success=$(jq -r '[ .[] | select(.name | startswith("ci-app-"))
-                          | select(.conclusion != "success")
-                          | "\(.name)=\(.conclusion)" ] | join(", ")' "$CHECKS_FILE")
 git fetch origin master
-scope=$(git diff --name-only "origin/master...${FIX_SHA}")   # three dots: merge-base → fix
+GATE_FACTS_JSON="${TMPDIR:-/tmp}/flaky-fix-gate-${ISSUE_NUMBER}.json"
 
-echo "repro:  Runs=${runs:-none}  Failed=${failed:-none}"
+node bin/flaky-ci/scripts/pr-gate-facts.ts \
+  --issue "$ISSUE_NUMBER" --sha "$FIX_SHA" --base origin/master > "$GATE_FACTS_JSON"
+GATE_FACTS_STATUS=$?
+
+runs=$(jq -r '.tally.runs // "none"' "$GATE_FACTS_JSON")
+failed=$(jq -r '.tally.failed // "none"' "$GATE_FACTS_JSON")
+ci_not_success=$(jq -r '[ .ciApp.notSuccess[] | "\(.name)=\(.conclusion)" ] | join(", ")' "$GATE_FACTS_JSON")
+scope=$(jq -r '.changedFiles[]' "$GATE_FACTS_JSON")
+
+echo "repro:  Runs=${runs}  Failed=${failed}"
 echo "ci-app not success: ${ci_not_success:-none}"
 echo "files changed by the fix:"; echo "$scope"
 ```
 
-Condition 3 is read from `$scope`, and the three-dot form matters: `A...B`
-lists what the fix commits changed since they left `master`, while the
-two-dot `A..B` (or `git diff A B`) also lists every file `master` gained
-after the branch point, which would fail the condition on any fix branch
-that is merely behind `master`.
+`pr-gate-facts.ts` fetches the repro comment and the check-runs itself (it
+does not read `$CHECKS_FILE` from 6-A's wait loop) — see
+`bin/flaky-ci/README.md`'s contract row for exactly which reading it
+produces for each case. Two readings its output can carry that are not
+failures of this call: `tally` is `null` (not the same as `$GATE_FACTS_STATUS`
+being non-zero) when the issue simply has no `### Repro result` comment
+pinned to `$FIX_SHA` yet — condition 1's own "not measured" row below reads
+that — and `ciApp.total: 0` when no `ci-app-*` check-run exists at all, which
+condition 2 treats as failing, not as an error. `$GATE_FACTS_STATUS` itself
+being non-zero (exit 2) means the call could not read anything at all — the
+comments fetch, the check-runs fetch, or the local `git diff` against
+`--base` failed outright — and none of conditions 1–3 can be read from
+`$GATE_FACTS_JSON` in that case.
+
+Condition 3 is read from `$scope` (`changedFiles[]`), computed as a
+three-dot diff against `origin/master` inside the script: what the fix
+commits changed since they left `master`, not also every file `master`
+gained after the branch point (which would fail the condition on any fix
+branch that is merely behind `master`).
 
 **Why the check-run's own conclusion cannot stand in for condition 1.** A push
 to `fix/flaky-**` whose commit carries no trailers is treated as "no request":
@@ -1411,7 +1389,8 @@ commit is the no-op `success` just described — ignore it.
 | Conditions 1 and 2 hold, condition 3 does not — the diff reached beyond what Step 3 identified | MEDIUM | no PR; pause per **Pausing for a human decision**, quoting the tally and naming the files outside the expected scope |
 | Condition 1 fails with `- Failed:` ≥ 1 — the spec still fails on the fixed code | LOW | no PR; the fix does not work. Quote the failing run's excerpt |
 | Condition 2 fails — some `ci-app-*` conclusion is not `success` (`failure`, `cancelled`, `timed_out`), or no `ci-app-*` check-run exists at all | LOW | no PR; the fix broke something, the push was superseded (measure the next push's SHA), or `ci-app.yml`'s `paths` filter never matched |
-| Condition 1 fails for want of a measurement — no `### Repro result` comment for `$FIX_SHA`, no `- Runs:` line, or `- Runs: 0`, including the 45-minute cap and 6-A's two early exits | MEDIUM at best, never HIGH | no PR; nothing was measured, which is evidence in neither direction |
+| Condition 1 fails for want of a measurement — `tally` is `null` (no `### Repro result` comment for `$FIX_SHA` yet), `- Runs: 0`, including the 45-minute cap and 6-A's two early exits | MEDIUM at best, never HIGH | no PR; nothing was measured, which is evidence in neither direction |
+| `$GATE_FACTS_STATUS` is non-zero — `pr-gate-facts.ts` itself failed (the comments fetch, the check-runs fetch, or the local `git diff`) | MEDIUM at best, never HIGH | no PR; none of conditions 1–3 could be read at all |
 | Playwright fix (condition 1 does not apply) with conditions 2 and 3 holding | HIGH | open the PR (6-C) |
 
 **Autonomous**: HIGH → 6-C. MEDIUM or LOW → no PR; pause as below.
@@ -1428,14 +1407,15 @@ pause comment; the block itself owns the two closing lines, the
 **Fix gate not passed** — no PR was opened.
 
 - Fix commit: `${FIX_SHA}` on `${FIX_BRANCH}`
-- Condition 1 (repro tally): {`- Runs:` / `- Failed:` for this commit, or "no result comment for this commit"} ({check-run URL})
+- Condition 1 (repro tally): {`- Runs:` / `- Failed:` for this commit, or "no result comment for this commit" when `tally` is `null`} ({check-run URL})
 - Condition 2 (normal CI): ${ci_not_success:-all ci-app-* success}
 - Condition 3 (scope): {the files the diff touches, against what Step 3 identified}
 - {one-line reading of which condition failed, pointing at the excerpt in the result comment when there is one}
 ```
 
-`$FIX_SHA`, `$FIX_BRANCH` and `$ci_not_success` are 6-A's and this step's own
-variables, so post it from the same shell they live in, with the same
+`$FIX_SHA`/`$FIX_BRANCH` are 6-A's variables and `$ci_not_success` is this
+step's own (read from `$GATE_FACTS_JSON`, not `$CHECKS_FILE`), so post it
+from the same shell they live in, with the same
 `gh api "…/comments" -X POST -f body="$(cat <<EOF … EOF)"` form 2-E uses —
 an **unquoted** `EOF` so those variables expand, which means the backticks
 above have to be escaped as `` \` `` inside it.
@@ -1450,7 +1430,7 @@ tool call starts a fresh one with no memory of it:
 
 ```bash
 PR_BODY_FILE="${TMPDIR:-/tmp}/flaky-fix-pr-body-${ISSUE_NUMBER}.md"
-REPRO_RUN_URL=$(grep -m1 -E '^- Workflow run:' "$REPRO_RESULT_FILE" | sed 's/^- Workflow run: *//')
+REPRO_RUN_URL=$(jq -r '.tally.workflowRunUrl' "$GATE_FACTS_JSON")
 CI_RUN_URL=$(gh api "repos/growilabs/growi/actions/workflows/ci-app.yml/runs?head_sha=${FIX_SHA}&per_page=1" \
   -q '.workflow_runs[0].html_url')
 
