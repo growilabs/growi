@@ -258,3 +258,20 @@ drift件の行には対象fixtureと差分キーは出るが出典は出ない
 小さな未達だが、fixtureのパスから `.meta.md` を辿れば出典は追える。
 将来対応するなら `check-fixture-drift.ts` 側の変更が必要で、それは
 tasks.mdに無い別タスクになる。
+
+### タスク5: `workflow_dispatch` はデフォルトブランチ（master）にマージされたワークフローでしか使えない
+
+`.github/workflows/flaky-repro.yml` は `push` トリガー（`flaky-repro/**`
+ブランチへのpush）だったため、機能ブランチのままセルフテストできた
+（`ci-flaky-test-detection` の研究ログ参照）。本specの
+`flaky-ci-fixture-freshness.yml` は `on: schedule` と `on: workflow_dispatch`
+のみで、`push` トリガーを持たない。`gh workflow run ... --ref
+feat/ci-flaky-fixture-freshness` を試したところ
+`HTTP 404: workflow ... not found on the default branch` で失敗した ──
+GitHubの仕様上、`workflow_dispatch` はワークフローファイルがデフォルト
+ブランチに存在しないと呼び出せない。このため、タスク5（1回目のissue起票・
+2回目の重複防止コメントの実測）は、このPRがmasterへマージされ、ワーク
+フローファイルがデフォルトブランチに乗ってから実施する。マージ後に作られる
+issueは「使い捨て」ではなく、四半期routineが実際に最初に検知した本番の
+結果になる見込み（現時点で `bin/flaky-ci/fixtures/expected/*.md` 等、
+実際に未配線のfixtureが存在するため）。
