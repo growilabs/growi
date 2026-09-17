@@ -126,10 +126,10 @@
   - _Requirements: 3.3, 3.4, 8.1_
   - _Depends: 4.2, 5.2_
 
-- [ ] 5.5 非ソース言語の既存翻訳をPOEditorへ初回投入するツールを作る（6.2の実環境確認で発見した必要性への対応）
+- [x] 5.5 非ソース言語の既存翻訳をPOEditorへ初回投入するツールを作る（6.2の実環境確認で発見した必要性への対応）
   - [x] `apps/app/tools/i18n-sync/seed-existing-translations.ts`（`pnpm run i18n:sync:seed`）を新設する。指定した非ソース言語1つについて、全namespaceの現在のリポジトリ内容をen_USの既存キー集合へ絞り込んだ上で統合し、`syncTerms: false`・タグ無しのアップロードを1回行う（タグ付けはPushSourceSyncの責務のまま変更しない。term作成の絞り込みが必要になった経緯は`research.md`のDecision参照）
   - [x] `docs/i18n-community-translation-setup.md` §2.3に、4言語それぞれについて1回ずつ実行する手順（環境変数 `I18N_SYNC_SEED_LANGUAGE` で対象言語を指定）を記載する
-  - [ ] 実プロジェクト（839626）に対して ja_JP / zh_CN / fr_FR / ko_KR の4言語分を実行する（`fr_FR`/`ko_KR`はCLI上は成功と表示されたがPOEditor上0%のままだったことが判明し、`[ ]`へ差し戻し。`PoeditorClient`の応答本文未検証バグを修正済みなので、修正後のツールで`fr_FR`/`ko_KR`を再実行し、POEditor上の進捗が実際に反映されることを確認すること）
+  - [x] 実プロジェクト（839626）に対して ja_JP / zh_CN / fr_FR / ko_KR の4言語分を実行する
   - 観測可能な完了状態: 実プロジェクトに対して4言語分実行し、POEditor上でja_JP/zh_CN/fr_FR/ko_KRの翻訳進捗が実際のリポジトリの翻訳状況を反映した値になる（0%のまま残らない）
   - _Requirements: 1.1_
   - _Depends: 5.1_
@@ -185,4 +185,5 @@
 - (5.5, ja_JP実行後の安全確認で発見) ja_JPを実プロジェクトへ投入した直後、POEditor上のterm数が想定より43件多いことが判明した。原因は`syncTerms: false`の誤解: `sync_terms`が制御するのは既存キーの削除のみで、ファイルに新しく含まれるキーの追加は`sync_terms`の値に関わらず常に行われる。ja_JPの翻訳ファイルにはen_USに存在しないキーが44件（admin 8・translation 36・commons 0）あり、これらが新規termとしてPOEditorに作成されてしまっていた（実測の43件との1件の差は原因未特定）。`runSeed`を、対象言語のファイルに加えてen_USのファイルも読み込み、`DiffClassifier.filterToKnownKeys`（新設）でen_USの既存キーだけへ絞り込んでからアップロードするよう修正した（回帰テスト追加、mutation checkで修正前は実際に落ちることを確認済み）。既に作成された44件の孤立termは、実プロジェクトからAPI経由の一括削除で対応済み。`zh_CN`/`fr_FR`/`ko_KR`はこの修正後のツールで実行すること。
 - (5.5, 修正後ツールでの4言語実行完了) 修正済みツールで `zh_CN`/`fr_FR`/`ko_KR` を実プロジェクトへ投入した。ログ上の除外キー数（en_USに存在しないため投入対象から外れたキー数）は事前の試算通り `zh_CN` 25件・`fr_FR` 5件・`ko_KR` 0件で一致し、孤立termは新たに作られなかった。`ja_JP`と合わせて4言語すべての既存翻訳投入が完了し、5.5全体を完了とする。
 - (5.5, 上記「4言語実行完了」の訂正) `fr_FR`/`ko_KR`はCLI上「成功」と表示されていたが、実際にはPOEditor上0%のまま何も書き込まれていなかったことが後から判明した。原因調査のため、同じペイロードを直接アップロードする診断スクリプトを実行したところ、`{"response":{"status":"success",...},"result":{"translations":{"added":2253,...}}}`という正常なレスポンスが返り、そのペイロード自体は正しく書き込めることを確認した。一方 `PoeditorClient.uploadTerms`/`exportTranslations`/`listLanguages` はいずれもHTTPステータス（2xx）しか見ておらず、POEditorがHTTP 200のまま論理的な失敗を返すケースを検知できていなかったことが判明したため、`parseSuccessBody`を新設してレスポンス本文の`response.status`も確認するよう修正した（回帰テスト追加、mutation checkで修正前は実際に落ちることを確認済み）。実際に失敗した時のレスポンス本文そのものは取得できておらず、原因がPOEditor側のレート制限（手順書が`zh_CN`→`fr_FR`→`ko_KR`を別プロセスの連続実行として案内しており、アップロードの20秒スロットルがプロセス内stateにしか依存しないため、プロセスをまたいだ間隔は未保証）だったのかは推測の域を出ない（`research.md`のDecision参照）。5.5の「4言語分を実行する」チェックボックスは`[ ]`へ差し戻した。`fr_FR`/`ko_KR`は修正後のツールで再実行し、POEditor上の進捗が実際に反映されることを確認すること。
+- (5.5, `PoeditorClient`修正後の再実行で完了) `PoeditorClient`のHTTP 200誤判定バグ修正後、`fr_FR`/`ko_KR`を実プロジェクトへ再実行した（今回は各コマンドの間を20秒以上空けて実行）。CLIの成功表示だけでなく、POEditorの画面上でも全言語（ja_JP/zh_CN/fr_FR/ko_KR）が90%以上の翻訳進捗を示すことを確認し、5.5を完了とする。
 - (feature-level validate-impl, MANUAL_VERIFY_REQUIRED) `/kiro-validate-impl` を独立subagent（Opus）で実行。結論はGO/NO-GOではなくMANUAL_VERIFY_REQUIRED — 実装済みタスクは全て健全（承認ボット分離・PRの粒度不変条件・境界・依存方向とも問題なし）だが、4.2/6.1/6.2が人手待ちのままのため要件1.1/1.2/7.1/7.2が未充足、かつ2.x/3.x系もモック検証のみで実POEditor/実GitHub APIに対する検証が一度もない。検証で新たに1点判明: `I18N_SYNC_PUBLISH_TOKEN`未登録時のフォールバック（`||`）が警告を一切出さずGITHUB_TOKENへ切り替わっていたため、手順書通りに2つしか登録しないと「一見成功するが承認済みPRがキューに永遠に残る」という分かりにくい失敗になっていた。`readGitHubRunConfig`にフォールバック発生時の`console.error`警告を追加して修正済み（対応するテストも追加）。6.2で実シークレットを揃える前に、この警告が出ないこと（＝3つとも正しく登録されていること）を確認すること。
