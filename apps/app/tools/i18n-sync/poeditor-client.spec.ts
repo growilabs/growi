@@ -277,6 +277,43 @@ describe('createPoeditorClient', () => {
       expect(sentBody.get('tags')).toBe('{"all":"admin"}');
     });
 
+    it('does not send an overwrite parameter by default (POEditor keeps an existing translation)', async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse(200, { result: {} }));
+      const client = createPoeditorClient({
+        apiToken: API_TOKEN,
+        sleep: vi.fn().mockResolvedValue(undefined),
+      });
+
+      await client.uploadTerms({
+        projectId: PROJECT_ID,
+        language: 'en_US',
+        fileContent: '{"key":"value"}',
+      });
+
+      const [, init] = mockFetch.mock.calls[0];
+      const sentBody = init.body as FormData;
+      expect(sentBody.get('overwrite')).toBeNull();
+    });
+
+    it('sends overwrite=1 when overwrite is explicitly true', async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse(200, { result: {} }));
+      const client = createPoeditorClient({
+        apiToken: API_TOKEN,
+        sleep: vi.fn().mockResolvedValue(undefined),
+      });
+
+      await client.uploadTerms({
+        projectId: PROJECT_ID,
+        language: 'en_US',
+        fileContent: '{"key":"value"}',
+        overwrite: true,
+      });
+
+      const [, init] = mockFetch.mock.calls[0];
+      const sentBody = init.body as FormData;
+      expect(sentBody.get('overwrite')).toBe('1');
+    });
+
     it('does not read the API token from process.env', async () => {
       const original = process.env.POEDITOR_API_TOKEN;
       process.env.POEDITOR_API_TOKEN = 'env-token-should-not-be-used';

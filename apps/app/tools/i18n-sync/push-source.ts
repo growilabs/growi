@@ -172,6 +172,10 @@ export const runPush = async (options: RunPushOptions): Promise<PushResult> => {
     projectId: SHARED_POEDITOR_PROJECT_ID,
     language,
     fileContent: JSON.stringify(combineNamespaceContents(sources)),
+    // en_US is the authoritative source: a wording change to an existing
+    // key must always replace POEditor's copy (research.md's
+    // overwrite-default Decision -- POEditor otherwise keeps the old value).
+    overwrite: true,
   });
   if (!combinedResult.ok) {
     return {

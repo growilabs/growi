@@ -442,7 +442,7 @@ interface DiffClassifierService {
 
 **Responsibilities & Constraints**
 - `SyncConfig` が宣言する全 namespace の en_US ファイルをまず全部読み込む。1つでも読み込み・JSONパースに失敗した場合、アップロードを一度も行わずに中止し、非ゼロ終了コードでワークフローを失敗させる（Requirement 8.1。プロジェクトが一部の namespace だけの状態へ収束することを避ける）
-- 読み込みに全て成功したら、`NamespaceEnvelope.combineNamespaceContents` で1つのJSONに統合し、`PoeditorClient.uploadTerms`（`syncTerms` 既定の `true`、タグなし）を**1回だけ**呼ぶ
+- 読み込みに全て成功したら、`NamespaceEnvelope.combineNamespaceContents` で1つのJSONに統合し、`PoeditorClient.uploadTerms`（`syncTerms` 既定の `true`、`overwrite: true`、タグなし）を**1回だけ**呼ぶ。`overwrite: true`が無いと、POEditor側の`overwrite`既定値（0＝上書きしない）により、既存キーの文言変更がPOEditorへ反映されない（`research.md`のDecision参照）
 - 続けて namespace ごとに `NamespaceEnvelope.wrapSingleNamespace` でラップし、`PoeditorClient.uploadTerms({ syncTerms: false, tag: namespace })` を呼ぶ（削除は発生しない）。統合アップロードまたはいずれかのタグ付けアップロードが失敗した時点で以降の呼び出しを中止する
 - アップロードは直列に呼ぶ。20秒以上の間隔は `PoeditorClient.uploadTerms` 自身が保証するため、ここで待ち時間を二重に持たない
 - POEditor API を呼ぶ直前に `LanguageCodeMap.toPoeditorLanguageCode` で言語コードを変換する
