@@ -156,6 +156,15 @@
 - **Trade-offs**: プロセスをまたいだ20秒間隔の保証はまだ実装していない。複数言語を続けて実行する場合は、実行者が手動で間隔を空けるか、`docs/i18n-community-translation-setup.md`の手順に注意書きを追加する必要がある
 - **Follow-up**: `fr_FR`/`ko_KR`は診断用アップロードで実際には正しく書き込み済み（`translations.added:2253`）だが、これは本番のseedツール経由ではなく診断スクリプトからの直接呼び出しだったため、修正済みツールで正式に再実行し、CLIの「成功」表示とPOEditor上の進捗表示が一致することを確認すること
 
+### Decision: pushの統合アップロードは `overwrite: true` を明示的に送る
+- **Context**: task 6.1の実環境確認で、en_USの既存キーの文言を変更してpushしても、POEditor側の値が更新されないことが判明した
+- **Sources Consulted**: https://poeditor.com/kb/import-options 、https://poeditor.com/docs/api （`projects/upload`の`overwrite`パラメータ）
+- **Findings**: `overwrite`パラメータの既定値は`0`（既存の翻訳を上書きしない）である。`PoeditorClient.uploadTerms`はこのパラメータを一度も送っていなかったため、新規キーの追加は反映される一方、既存キーの文言変更だけがPOEditor側に一切反映されない状態だった。この既定値は、翻訳者が既に入力した訳文を誤って上書きしないための保護であり、非ソース言語向けの`seed-existing-translations.ts`にとっては望ましい既定動作だが、en_US自身の内容を反映するpushの統合アップロードにとっては逆に不都合だった
+- **Selected Approach**: `PoeditorClient.uploadTerms`に`overwrite`オプションを追加し、`PushSourceSync`の統合アップロード（en_USが権威を持つソース）だけで`overwrite: true`を明示的に送る。namespaceごとのタグ付けアップロード、および`seed-existing-translations.ts`は既定値（上書きしない）のまま変更しない
+- **Rationale**: en_USはリポジトリ側が唯一の真実（source of truth）であり、pushのたびに全内容を反映すべきなので、既存キーであっても常に上書きしてよい。一方、非ソース言語の翻訳はコミュニティの翻訳者が入力するものであり、機械的なアップロード処理がそれを不用意に上書きしてはならない
+- **Trade-offs**: 特になし。`overwrite: true`はpushの統合アップロードのみに限定しているため、他の非破壊アップロード（タグ付け・seed）の安全性には影響しない
+- **Follow-up**: この修正は実プロジェクトに対する再pushで検証済み（テスト用キーの文言変更が正しく反映されることを確認）
+
 ## Risks & Mitigations
 - POEditor OSS プランの申請が承認されない可能性 — 承認されるまで本番運用（実際の同期起動）を進めない。requirements.md 要件7.2で明示済み
 - upload のレート制限（20秒に1回）を超過すると同期が失敗する — 呼び出し間に待機を入れて直列実行する設計とする
