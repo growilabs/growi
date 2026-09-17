@@ -1,0 +1,11 @@
+---
+description: Bridge — Mongoose→Prisma model migration rules from .claude/rules/model.md
+globs: apps/app/src/server/models/**/*.js,apps/app/src/server/models/**/*.ts
+alwaysApply: false
+---
+
+# Claude Code rule bridge (models)
+
+Canonical source: `.claude/rules/model.md`. Edit that file, not this bridge.
+
+@.claude/rules/model.md
