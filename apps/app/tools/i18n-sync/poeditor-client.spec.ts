@@ -143,6 +143,39 @@ describe('createPoeditorClient', () => {
       }
     });
 
+    it('treats an HTTP 200 response whose body reports a non-success status as a failure', async () => {
+      // Real-world case that motivated this: POEditor answered an upload
+      // silently ignored under its rate limit with HTTP 200, not a non-2xx
+      // status (see research.md's upload-silent-failure Decision).
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse(200, {
+          response: {
+            status: 'fail',
+            code: '4901',
+            message: 'Too many requests',
+          },
+        }),
+      );
+      const client = createPoeditorClient({
+        apiToken: API_TOKEN,
+        sleep: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const result = await client.uploadTerms({
+        projectId: PROJECT_ID,
+        language: 'en_US',
+        fileContent: '{}',
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toEqual<PoeditorApiError>({
+          type: 'invalid_request',
+          message: 'Too many requests',
+        });
+      }
+    });
+
     it('waits at least 20 seconds between consecutive upload calls (fakeable via injected sleep)', async () => {
       // The throttle computes the remaining wait from real Date.now() deltas
       // (see throttleUpload in poeditor-client.ts), so measuring it against
@@ -338,6 +371,33 @@ describe('createPoeditorClient', () => {
         });
       }
     });
+
+    it('treats an HTTP 200 response whose body reports a non-success status as a failure', async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse(200, {
+          response: { status: 'fail', message: 'Invalid language' },
+        }),
+      );
+      const client = createPoeditorClient({
+        apiToken: API_TOKEN,
+        sleep: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const result = await client.exportTranslations({
+        projectId: PROJECT_ID,
+        language: 'xx_XX',
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toEqual<PoeditorApiError>({
+          type: 'invalid_request',
+          message: 'Invalid language',
+        });
+      }
+      // Must never attempt the download when the export request itself failed.
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('listLanguages', () => {
@@ -402,6 +462,48 @@ describe('createPoeditorClient', () => {
           type: 'invalid_request',
           message: 'Invalid project id',
         });
+      }
+    });
+
+    it('treats an HTTP 200 response whose body reports a non-success status as a failure', async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse(200, {
+          response: { status: 'fail', message: 'Invalid project id' },
+        }),
+      );
+      const client = createPoeditorClient({
+        apiToken: API_TOKEN,
+        sleep: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const result = await client.listLanguages({ projectId: PROJECT_ID });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toEqual<PoeditorApiError>({
+          type: 'invalid_request',
+          message: 'Invalid project id',
+        });
+      }
+    });
+
+    it('resolves the language list on success even when the body explicitly reports response.status "success"', async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse(200, {
+          response: { status: 'success', code: '200', message: 'OK' },
+          result: { languages: [{ code: 'fr', percentage: 97 }] },
+        }),
+      );
+      const client = createPoeditorClient({
+        apiToken: API_TOKEN,
+        sleep: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const result = await client.listLanguages({ projectId: PROJECT_ID });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value).toEqual([{ code: 'fr', percentage: 97 }]);
       }
     });
   });
