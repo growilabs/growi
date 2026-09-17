@@ -71,6 +71,8 @@ jobs:
       # loudly rather than be recorded as "0 checked, 0 drift".
       - name: Run check-fixture-drift.ts
         id: drift
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: node bin/flaky-ci/scripts/check-fixture-drift.ts | tee drift.json
 
       - name: Run check-fixture-wiring.ts
