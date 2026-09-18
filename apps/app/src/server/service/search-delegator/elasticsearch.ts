@@ -35,6 +35,11 @@ import type {
   UpdateOrInsertPagesOpts,
 } from '../interfaces/search';
 import { aggregatePipelineToIndex } from './aggregate-to-index';
+import {
+  type AuditlogSyncFields,
+  createAuditlogIndex as createAuditlogIndexForClient,
+  syncAuditlogMapping as syncAuditlogMappingForClient,
+} from './auditlog-mapping-sync';
 import type {
   AggregatedPage,
   BulkWriteBody,
@@ -50,6 +55,7 @@ import {
   isES9ClientDelegator,
   type SearchQuery,
 } from './elasticsearch-client-delegator';
+import { sanitizeEndpointForIndex } from './sanitize-endpoint-for-index';
 
 const logger = loggerFactory('growi:service:search-delegator:elasticsearch');
 
@@ -513,6 +519,7 @@ class ElasticsearchDelegator
     indexName: string,
     aliasName: string,
     createFn: () => Promise<unknown>,
+    syncMappingFn?: () => Promise<unknown>,
   ): Promise<void> {
     const { client } = this;
     const tmpIndexName = `${indexName}-tmp`;
@@ -537,6 +544,11 @@ class ElasticsearchDelegator
     if (!isExistsAlias) {
       await client.indices.putAlias({ name: aliasName, index: indexName });
     }
+
+    // Last, so a rejected mapping update cannot leave the alias detached. An index
+    // created just above already carries the current mapping, but pushing it again
+    // is a no-op on the server and keeps the upgrade path a single code path.
+    await syncMappingFn?.();
   }
 
   async normalizeIndices(): Promise<void> {
@@ -550,6 +562,15 @@ class ElasticsearchDelegator
       this.auditlogIndexName,
       this.auditlogAliasName,
       () => this.createAuditlogIndex(this.auditlogIndexName),
+      () => this.syncAuditlogMapping(this.auditlogIndexName),
+    );
+  }
+
+  private syncAuditlogMapping(index: string): Promise<void> {
+    return syncAuditlogMappingForClient(
+      this.client,
+      this.elasticsearchVersion,
+      index,
     );
   }
 
@@ -571,7 +592,7 @@ class ElasticsearchDelegator
     const totalCount = shouldEmitProgress ? await Activity.countDocuments() : 0;
 
     const readStream = Activity.find()
-      .select('snapshot.username')
+      .select('snapshot.username endpoint')
       .lean()
       .cursor();
     const batchStream = createBatchStream(bulkSize);
@@ -656,21 +677,15 @@ class ElasticsearchDelegator
     }
   }
 
-  async createAuditlogIndex(
+  createAuditlogIndex(
     index: string,
   ): Promise<
     Awaited<ReturnType<ElasticsearchClientDelegator['indices']['create']>>
   > {
-    if (isES8ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-auditlog-es8');
-      return this.client.indices.create({ index, ...mappings });
-    }
-    if (isES9ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-auditlog-es9');
-      return this.client.indices.create({ index, ...mappings });
-    }
-    throw new Error(
-      `Unsupported Elasticsearch version: ${this.elasticsearchVersion}`,
+    return createAuditlogIndexForClient(
+      this.client,
+      this.elasticsearchVersion,
+      index,
     );
   }
 
@@ -725,15 +740,21 @@ class ElasticsearchDelegator
   }
 
   private prepareBodyForAuditlog(
-    activity: Pick<ActivityDocument, '_id' | 'snapshot'>,
-  ): [] | [{ index: { _index: string; _id: string } }, { username: string }] {
-    const username = activity.snapshot?.username;
-    if (username == null || username === '') return [];
+    activity: Pick<ActivityDocument, '_id' | 'snapshot' | 'endpoint'>,
+  ): [] | [{ index: { _index: string; _id: string } }, AuditlogSyncFields] {
+    const username = activity.snapshot?.username || undefined;
+    const endpoint =
+      sanitizeEndpointForIndex(activity.endpoint ?? '') || undefined;
+    if (username == null && endpoint == null) return [];
+
     return [
       {
         index: { _index: this.auditlogIndexName, _id: activity._id.toString() },
       },
-      { username },
+      {
+        ...(username != null && { username }),
+        ...(endpoint != null && { endpoint }),
+      },
     ];
   }
 
