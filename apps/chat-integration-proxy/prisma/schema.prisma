@@ -1,0 +1,245 @@
+// Data model for chat-integration-proxy's own tables
+// (design.md's "Data Models（proxy / PostgreSQL）").
+//
+// Model names are PascalCase and fields are camelCase so the generated client
+// reads like the rest of this app's TypeScript (`types/relation.ts`), while
+// `@@map` / `@map` keep the emitted SQL on design.md's snake_case names --
+// the table/column names in design.md are the contract, not the client's.
+//
+// The Chat SDK's own state (subscriptions, distributed locks, dedup) lives in
+// the separate `chat_sdk` schema owned by `@chat-adapter/state-pg` and reached
+// through `CHAT_SDK_DATABASE_URL`. Nothing here declares, references, or
+// migrates anything in that schema (design.md: "触らない").
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+
+  // This package is `"type": "module"` compiled by plain `tsc`, which emits
+  // import statements verbatim, so every relative specifier the generated
+  // client contains needs a `.js` extension for Node to resolve it at runtime
+  // (same convention as this app's hand-written sources).
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // The app's own tables only. Deliberately NOT `CHAT_SDK_DATABASE_URL`.
+  url      = env("DATABASE_URL")
+}
+
+// A chat workspace this proxy is installed into.
+model Installation {
+  id               String    @id @default(uuid()) @db.Uuid
+  // One of `PlatformName` (`@growi/chat`). Kept as a plain string rather than
+  // a database enum so the list of supported chat services has exactly one
+  // declaration (the TypeScript union) and adding a service does not need a
+  // migration.
+  platform         String
+  workspaceId      String    @map("workspace_id")
+  workspaceName    String    @map("workspace_name")
+  // Encrypted at rest: this column always holds ciphertext of an
+  // `InstallationCredentials` value. The encryption itself belongs to the
+  // application (`runtime/config.ts` hands other layers a decrypt function),
+  // so at this layer it is an opaque string.
+  credentials      String
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  // Set every time a full channel-inventory refresh (listChannels()) completes,
+  // regardless of whether it found any channels. NULL means "never refreshed
+  // yet" — that state must be distinguished from "refreshed, found zero
+  // channels" (installation_channel has no rows either way), because the
+  // former must answer `inventory-not-ready`, not `channel-not-in-installation`.
+  channelsSyncedAt DateTime? @map("channels_synced_at") @db.Timestamptz(3)
+
+  channels      InstallationChannel[]
+  relations     Relation[]
+  pairingOrders PairingOrder[]
+
+  @@unique([platform, workspaceId])
+  @@map("installation")
+}
+
+// One proxy <-> GROWI pairing.
+model Relation {
+  // Unguessable on purpose: this value travels outward as the `keyid`
+  // parameter of the request signature header, so a sequential id would leak
+  // how many relations exist and let one be guessed from another.
+  id              String   @id @default(uuid()) @db.Uuid
+  installationId  String   @map("installation_id") @db.Uuid
+  growiUri        String   @map("growi_uri")
+  growiLabel      String   @map("growi_label")
+  searchWeight    Int      @map("search_weight")
+  settingsVersion Int      @map("settings_version")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id], onDelete: Restrict)
+
+  peerKeys                     PeerKey[]
+  ownKeys                      OwnKey[]
+  requestNonces                RequestNonce[]
+  processedNotificationTargets ProcessedNotificationTarget[]
+  channelPermissions           ChannelPermission[]
+  pendingCollections           PendingCollection[]
+  pairingOrders                PairingOrder[]
+
+  @@unique([installationId, growiUri])
+  @@map("relation")
+}
+
+// The GROWI side's public keys for one relation.
+model PeerKey {
+  id           String    @id @default(uuid()) @db.Uuid
+  relationId   String    @map("relation_id") @db.Uuid
+  // Chosen by the key's owner; unique within the relation.
+  keyId        String    @map("key_id")
+  // A `JsonWebKey` object (protocol spec's `PublicKeyRegistration`).
+  publicKeyJwk Json      @map("public_key_jwk")
+  validFrom    DateTime  @map("valid_from") @db.Timestamptz(3)
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(3)
+
+  relation Relation @relation(fields: [relationId], references: [id], onDelete: Restrict)
+
+  @@unique([relationId, keyId])
+  @@map("peer_key")
+}
+
+// This proxy's own signing keys. One set per relation, so a leaked key cannot
+// be used against any other GROWI.
+model OwnKey {
+  id                String    @id @default(uuid()) @db.Uuid
+  relationId        String    @map("relation_id") @db.Uuid
+  keyId             String    @map("key_id")
+  // Encrypted at rest, like `installation.credentials` above.
+  privateKeyPem     String    @map("private_key_pem")
+  validFrom         DateTime  @map("valid_from") @db.Timestamptz(3)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(3)
+  // Key rotation in progress: the `key_id` this row is replacing. Holds a
+  // logical key name (the sibling `keyId` column's vocabulary), not this
+  // table's row id, so it is not modelled as a self-reference.
+  supersededKeyId   String?   @map("superseded_key_id")
+  // When the GROWI side accepted this new key.
+  deliveredToPeerAt DateTime? @map("delivered_to_peer_at") @db.Timestamptz(3)
+
+  relation Relation @relation(fields: [relationId], references: [id], onDelete: Restrict)
+
+  @@unique([relationId, keyId])
+  @@map("own_key")
+}
+
+// A registration code handed to a GROWI administrator.
+model PairingOrder {
+  id             String    @id @default(uuid()) @db.Uuid
+  installationId String    @map("installation_id") @db.Uuid
+  codeHash       String    @unique @map("code_hash")
+  attempts       Int       @default(0)
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(3)
+  consumedAt     DateTime? @map("consumed_at") @db.Timestamptz(3)
+  // Set once the code is consumed, so submitting the same code a second time
+  // can return the same `PairingResult` instead of creating a new relation.
+  relationId     String?   @map("relation_id") @db.Uuid
+
+  installation Installation @relation(fields: [installationId], references: [id], onDelete: Restrict)
+  // Not part of the unpairing deletion sequence (design.md): a pairing order
+  // survives its relation being unpaired, kept as history with `relationId`
+  // cleared, rather than being deleted alongside it.
+  relation     Relation?    @relation(fields: [relationId], references: [id], onDelete: SetNull)
+
+  @@map("pairing_order")
+}
+
+// Single-use values already seen on an incoming signed request.
+model RequestNonce {
+  relationId String   @map("relation_id") @db.Uuid
+  keyId      String   @map("key_id")
+  nonce      String
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(3)
+
+  // Deliberately not in the unpairing deletion sequence (design.md): a nonce
+  // row is left to expire naturally rather than being explicitly deleted, so
+  // it must cascade instead of blocking the relation's deletion.
+  relation Relation @relation(fields: [relationId], references: [id], onDelete: Cascade)
+
+  @@id([relationId, keyId, nonce])
+  @@map("request_nonce")
+}
+
+// What already happened for one notification request, recorded per
+// destination so a retry skips the destinations already posted to.
+// Deliberately a separate table from anything command-shaped: the primary key
+// means something different here.
+model ProcessedNotificationTarget {
+  relationId  String   @map("relation_id") @db.Uuid
+  requestId   String   @map("request_id")
+  platform    String
+  channelId   String   @map("channel_id")
+  status      String
+  detail      String?
+  processedAt DateTime @map("processed_at") @db.Timestamptz(3)
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(3)
+
+  relation Relation @relation(fields: [relationId], references: [id], onDelete: Restrict)
+
+  @@id([relationId, requestId, platform, channelId])
+  @@map("processed_notification_target")
+}
+
+// The channels of one installation, refreshed periodically. The only material
+// used to judge a notification's destination. Per installation, not per
+// relation, so unpairing one relation never removes rows here.
+model InstallationChannel {
+  installationId String   @map("installation_id") @db.Uuid
+  platform       String
+  channelId      String   @map("channel_id")
+  channelName    String   @map("channel_name")
+  isPrivate      Boolean  @map("is_private")
+  refreshedAt    DateTime @map("refreshed_at") @db.Timestamptz(3)
+
+  installation Installation @relation(fields: [installationId], references: [id], onDelete: Restrict)
+
+  @@id([installationId, channelId])
+  @@map("installation_channel")
+}
+
+// Which channels may run one command. No `scope` column (that follows from
+// `COMMAND_TRAITS`' `targeting`) and no per-row `updated_at` (there is one
+// version per relation: `relation.settings_version`).
+model ChannelPermission {
+  id          String   @id @default(uuid()) @db.Uuid
+  relationId  String   @map("relation_id") @db.Uuid
+  commandName String   @map("command_name")
+  channels    String[]
+  // `RelationSettings.allowedChannels` has three values -- `'all'`, `'none'`
+  // and a list of channel ids -- and `channels` alone can only carry two of
+  // them. An empty list already means `'none'` (nothing matches), so storing
+  // `'all'` as an empty list would read back as its exact opposite, and
+  // deleting the row instead reads as `'no-settings'`, which `judge()` turns
+  // into a DENIAL for write commands. This flag is the third value.
+  allowAll    Boolean  @default(false) @map("allow_all")
+
+  relation Relation @relation(fields: [relationId], references: [id], onDelete: Restrict)
+
+  @@unique([relationId, commandName])
+  @@map("channel_permission")
+}
+
+// A command invocation waiting for more input (a modal submission, a
+// follow-up answer, or a choice of which GROWI to act on).
+model PendingCollection {
+  correlationId  String   @id @map("correlation_id")
+  // Empty while the GROWI destination is still being chosen.
+  relationId     String?  @map("relation_id") @db.Uuid
+  platform       String
+  channelId      String   @map("channel_id")
+  actorAccountId String   @map("actor_account_id")
+  commandName    String   @map("command_name")
+  invocation     Json
+  collected      Json
+  offeredOptions Json     @map("offered_options")
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(3)
+
+  relation Relation? @relation(fields: [relationId], references: [id], onDelete: Restrict)
+
+  @@index([platform, channelId, actorAccountId])
+  @@map("pending_collection")
+}

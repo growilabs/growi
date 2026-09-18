@@ -15,6 +15,7 @@ import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
+import type { Gen2Destination } from '~/features/chat-integration/server/notification';
 import type { revisions } from '~/generated/prisma/client';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import {
@@ -99,6 +100,12 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       .optional()
       .isString()
       .withMessage('slackChannels must be string'),
+    // Gen 2's save-time destinations (Requirement 2.2). Separate field --
+    // Gen 1's isSlackEnabled/slackChannels above are left completely intact.
+    body('chatIntegrationDestinations')
+      .optional()
+      .isArray()
+      .withMessage('chatIntegrationDestinations must be array'),
     body('origin')
       .optional()
       .isIn(allOrigin)
@@ -203,8 +210,13 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     }
 
     // user notification
-    const { isSlackEnabled, slackChannels } = req.body;
-    if (isSlackEnabled) {
+    const { isSlackEnabled, slackChannels, chatIntegrationDestinations } =
+      req.body;
+    const gen2Destinations: Gen2Destination[] =
+      chatIntegrationDestinations ?? [];
+    // Gen 2 must be reachable even when Gen 1's isSlackEnabled is off
+    // (Requirement 12.1, 12.2, 12.3).
+    if (isSlackEnabled || gen2Destinations.length > 0) {
       try {
         const option =
           previousRevision != null ? { previousRevision } : undefined;
@@ -214,6 +226,9 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
           slackChannels,
           'update',
           option,
+          {},
+          gen2Destinations,
+          isSlackEnabled,
         );
         for (const result of results) {
           if (result.status === 'rejected') {
