@@ -95,6 +95,19 @@ jobs:
   ci-app-test:
     runs-on: ubuntu-latest
 
+    # Skipped when `flag/skip-heavy-ci` is present (currently only the i18n
+    # sync bot's translation-only pull request, see pull-translations.ts's
+    # SKIP_HEAVY_CI_LABEL): its diff is always a subset of
+    # apps/app/public/static/locales/** values already validated by
+    # `pnpm run lint:i18n` before the pull request was opened (see
+    # .github/mergify.yml's i18n-sync-translation-only queue, which only
+    # requires ci-app-lint for this branch). Label-based rather than
+    # head-branch-based so the skip also holds on Mergify's merge-queue
+    # revalidation branch, whose head_ref differs from the original PR's
+    # (see mergify-merge-queue-labels-copier.yml).
+    if: |
+      !contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
+
     strategy:
       matrix:
         node-version: [24.x]
@@ -160,6 +173,10 @@ jobs:
 
   ci-app-test-integration:
     runs-on: ubuntu-latest
+
+    # See ci-app-test's comment above.
+    if: |
+      !contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
 
     strategy:
       matrix:
@@ -234,6 +251,10 @@ jobs:
 
   ci-app-launch-dev:
     runs-on: ubuntu-latest
+
+    # See ci-app-test's comment above.
+    if: |
+      !contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
 
     strategy:
       matrix:

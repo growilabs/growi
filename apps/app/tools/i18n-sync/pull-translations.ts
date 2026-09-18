@@ -512,6 +512,30 @@ export const collectClassifications = async (
  */
 export const TRANSLATION_ONLY_BRANCH = 'i18n-sync/translation-only';
 
+/**
+ * Applied to every translation-only pull request at creation. Also lets
+ * `.github/workflows/auto-labeling.yml`'s existing `check-title`/
+ * `auto-labeling` jobs skip themselves (both already exempt this label).
+ * `.github/mergify.yml` routes this branch into a lighter merge queue by
+ * head branch name, not by this label.
+ */
+export const EXCLUDE_FROM_CHANGELOG_LABEL = 'flag/exclude-from-changelog';
+
+/**
+ * Applied alongside `EXCLUDE_FROM_CHANGELOG_LABEL`, kept as a distinct label
+ * (not reused) because it means something different: `ci-app.yml`/
+ * `ci-app-prod.yml` skip their heavy test/build/Playwright jobs when this
+ * label is present. Label-based, not head-branch-based, because Mergify's
+ * merge queue revalidates a queued pull request on a temporary
+ * `mergify/merge-queue/**` branch whose `head_ref` is not
+ * `i18n-sync/translation-only` -- a head-branch check would stop skipping
+ * those jobs on exactly the run that matters most. Mergify does not copy a
+ * pull request's labels onto that temporary branch by default, which is why
+ * `.github/workflows/mergify-merge-queue-labels-copier.yml` exists: it
+ * copies this label onto the temporary branch's own pull request.
+ */
+export const SKIP_HEAVY_CI_LABEL = 'flag/skip-heavy-ci';
+
 /** Injectable file-writing function, mirroring `ReadNamespaceFile`. */
 export type WriteLocaleFile = (
   absolutePath: string,
@@ -1164,8 +1188,10 @@ const createGitHubCollaborators = (
   };
 
   return {
-    translationOnlyPrPublisher:
-      createTranslationOnlyPrPublisher(publisherOptions),
+    translationOnlyPrPublisher: createTranslationOnlyPrPublisher({
+      ...publisherOptions,
+      labels: [EXCLUDE_FROM_CHANGELOG_LABEL, SKIP_HEAVY_CI_LABEL],
+    }),
     structuralPrPublisher: createStructuralPrPublisher(publisherOptions),
     approvalReviewer: createApprovalReviewer({
       approvalToken: config.approvalToken,

@@ -52,6 +52,10 @@ jobs:
         || github.base_ref == 'dev/8.*.x'
         || startsWith( github.base_ref, 'release/' )
         || startsWith( github.head_ref, 'mergify/merge-queue/' ))
+      # See ci-app.yml's ci-app-test job comment: label-based (not
+      # head-branch-based) so the skip also holds on Mergify's merge-queue
+      # revalidation branch.
+      && !contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
     with:
       node-version: 24.x
       skip-e2e-test: ${{ contains( github.event.pull_request.labels.*.name, 'dependencies' ) }}
