@@ -14,7 +14,6 @@
   "desktop": "电脑",
   "phone": "手机",
   "tablet": "平板",
-  "Login": "登录",
   "Click to copy": "点击复制",
   "Rename": "重命名",
   "Move/Rename": "移动/重命名",
@@ -35,7 +34,6 @@
   "add": "添加",
   "Undo": "撤销",
   "account_id": "用户Id",
-  "Initialize": "初始化",
   "Update": "更新",
   "Update Page": "更新本页",
   "Error": "误差",
@@ -49,10 +47,10 @@
   "Sign up with Google Account": "Sign up with Google Account",
   "Sign in with Google Account": "Sign in with Google Account",
   "Sign up with this Google Account": "Sign up with this Google Account",
-  "Example": "例如",
-  "Taro Yamada": "John Doe",
   "Select": "请选择",
   "Required": "必需的",
+  "Example": "例如",
+  "Taro Yamada": "John Doe",
   "List View": "列表",
   "Timeline View": "时间线",
   "History": "历史",
@@ -80,17 +78,13 @@
   "Created": "创建",
   "Last updated": "上次更新",
   "Share": "分享",
-  "Share Link": "分享链接",
   "Markdown Link": "Markdown链接",
   "Create/Edit Template": "创建/编辑 模板页面",
-  "Unportalize": "未启动",
   "Go to this version": "查看此版本",
   "View diff": "查看差异",
   "No diff": "无差异",
   "Latest": "最新",
   "User ID": "用户ID",
-  "Home": "首页",
-  "My Drafts": "My Drafts",
   "User Settings": "用户设置",
   "User Information": "用户信息",
   "User Activation": "用户激活",
@@ -100,7 +94,6 @@
   "Language": "语言",
   "English": "英语",
   "Japanese": "日语",
-  "Chinese": "简体中文",
   "Set Profile Image": "头像",
   "Upload Image": "上传图片",
   "Current Image": "当前图片",
@@ -109,10 +102,7 @@
   "Updated": "更新",
   "Upload new image": "上传新图像",
   "Connected": "Connected",
-  "Show": "显示",
-  "Hide": "隐藏",
   "Loading": "加载...",
-  "Reset": "重置",
   "Disclose E-mail": "显示邮箱",
   "Slack Member ID": "Slack 成员 ID",
   "page exists": "页面已存在",
@@ -127,10 +117,8 @@
   "V5 Page Migration": "转换为V5的兼容性",
   "GROWI.5.0_new_schema": "GROWI.5.0 new schema",
   "See_more_detail_on_new_schema": "更多详情请见<a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html#about-the-new-v5-compatible-format' target='_blank'> {{title}}</a> <span class='growi-custom-icons'>external_link</span> ",
-  "Markdown Settings": "Markdown设置",
   "external_account_management": "外部账户管理",
   "UserGroup": "用户组",
-  "ChildUserGroup": "儿童用户组",
   "Basic Settings": "基础设置",
   "The contents entered here will be shown in the header etc": "此处输入的内容将显示在标题等中",
   "Forbidden": "禁止访问",
@@ -173,7 +161,6 @@
   "not_allowed_to_see_this_page": "你不能看到这个页面",
   "Confirm": "确定",
   "Successfully requested": "进程成功接受",
-  "copied_to_clipboard": "它已复制到剪贴板。",
   "source": "消息来源",
   "input_validation": {
     "target": {
@@ -226,7 +213,6 @@
       "user_id": "您创建的网页的URL将包含您的用户ID。您的用户ID可以由字母、数字和一些符号组成。"
     }
   },
-  "Settings": "设置",
   "page_me": {
     "form_help": {
       "profile_image1": "图像上传设置未完成。",
@@ -242,8 +228,7 @@
       "apitoken_issued": "API token 未发布。",
       "update_token1": "您可以更新以生成新的API令牌。",
       "update_token2": "您需要更新任何现有进程中的API令牌。"
-    },
-    "form_help": {}
+    }
   },
   "Access Token Settings": "Access token 设置",
   "page_me_access_token": {
@@ -285,6 +270,22 @@
     "new_password": "新密码",
     "new_password_confirm": "重复新密码",
     "password_is_not_set": "密码未设置"
+  },
+  "share_links": {
+    "Shere this page link to public": "Shere this page link to public",
+    "share_link_list": "Share link list",
+    "share_link_management": "Share Link Management",
+    "delete_all_share_links": "Delete all share links",
+    "expire": "Expiration",
+    "Days": "Days",
+    "Custom": "Custom",
+    "description": "description",
+    "enter_desc": "Enter description",
+    "Unlimited": "unlimited",
+    "Issue": "Issue",
+    "share_settings": "Share settings",
+    "Invalid_Number_of_Date": "You entered invalid value",
+    "link_sharing_is_disabled": "链接共享已被禁用"
   },
   "API Settings": "API设置",
   "Other Settings": "其他设置",
@@ -607,10 +608,10 @@
   "toaster": {
     "file_upload_failed": "文件上传失败",
     "initialize_successed": "Succeeded to initialize {{target}}",
+    "issue_share_link": "Succeeded to issue new share link",
     "switch_disable_link_sharing_success": "成功更新分享链接设置",
     "failed_to_reset_password": "Failed to reset password",
-    "save_succeeded": "已成功保存",
-    "issue_share_link": "Succeeded to issue new share link"
+    "save_succeeded": "已成功保存"
   },
   "template": {
     "modal_label": {
@@ -666,22 +667,6 @@
     "popover_title": "Slack Notification",
     "popover_desc": "Input channel name. You can notify multiple channels by entering a comma-separated list.",
     "input_channels": "Input channels"
-  },
-  "share_links": {
-    "Shere this page link to public": "Shere this page link to public",
-    "share_link_list": "Share link list",
-    "share_link_management": "Share Link Management",
-    "delete_all_share_links": "Delete all share links",
-    "expire": "Expiration",
-    "Days": "Days",
-    "Custom": "Custom",
-    "description": "description",
-    "enter_desc": "Enter description",
-    "Unlimited": "unlimited",
-    "Issue": "Issue",
-    "share_settings": "Share settings",
-    "Invalid_Number_of_Date": "You entered invalid value",
-    "link_sharing_is_disabled": "链接共享已被禁用"
   },
   "search_result": {
     "title": "搜索",
@@ -768,7 +753,6 @@
     "set_env_var_for_logs": "(请设置环境变量 <code>DEBUG=crowi:service:PassportService</code> 以获得日志。)"
   },
   "invited": {
-    "invited": "邀请函",
     "discription_heading": "创建账户",
     "discription": "用被邀请的电子邮件地址创建一个你的账户"
   },
@@ -954,8 +938,8 @@
     "page_delete_completely": "彻底删除了页面",
     "page_rename": "重命名了页面",
     "page_revert": "还原了页面",
-    "page_duplicate": "复制了页面",
     "page_like": "赞了页面",
+    "page_duplicate": "复制了页面",
     "comment_create": "发布了评论"
   },
   "bookmark_folder": {
