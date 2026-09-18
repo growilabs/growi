@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "node .cursor/hooks/inject-claude-rules.mjs",
+        "timeout": 15
+      }
+    ]
+  }
+}

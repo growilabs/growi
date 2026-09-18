@@ -416,7 +416,7 @@ export const CommentEditorPre = (props: CommentEditorProps): JSX.Element => {
           <NotAvailableIfReadOnlyUserNotAllowedToComment>
             <button
               type="button"
-              className="btn btn-outline-primary w-100 text-start py-3"
+              className="btn btn-outline-primary w-100 text-start py-3 d-flex align-items-center"
               onClick={() => setIsReadyToUse(true)}
               data-testid="open-comment-editor-button"
             >

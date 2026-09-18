@@ -36,6 +36,9 @@ export interface PoeditorClient {
     projectId: string;
     language: string;
     fileContent: string; // i18next JSON, stringified
+    syncTerms?: boolean; // default true: converge the whole project to fileContent (deletes absent keys)
+    tag?: string; // when set, tags every term in fileContent with this value
+    overwrite?: boolean; // default false (POEditor's own default): replace an existing term's translation with fileContent's value
   }): Promise<Result<void, PoeditorApiError>>;
 
   exportTranslations(input: {
@@ -97,6 +100,40 @@ async function mapErrorResponse(res: Response): Promise<PoeditorApiError> {
   return { type: 'invalid_request', message };
 }
 
+type PoeditorEnvelope = {
+  response?: { status?: string; message?: string };
+};
+
+/**
+ * Parses a 2xx POEditor response body and checks its own `response.status`
+ * field before trusting the call succeeded. POEditor can answer a logical
+ * failure (confirmed real-world case: an upload silently ignored under its
+ * upload rate limit) with HTTP 200 rather than a non-2xx status, so `res.ok`
+ * alone is not sufficient (see research.md's upload-silent-failure Decision).
+ * A response missing `response.status` entirely is treated as success, so
+ * this stays compatible with any endpoint that omits the envelope.
+ */
+async function parseSuccessBody<T>(
+  res: Response,
+  extractValue: (body: PoeditorEnvelope & Record<string, unknown>) => T,
+): Promise<Result<T, PoeditorApiError>> {
+  if (!res.ok) {
+    return { ok: false, error: await mapErrorResponse(res) };
+  }
+  const body = (await res.json()) as PoeditorEnvelope & Record<string, unknown>;
+  if (body.response?.status != null && body.response.status !== 'success') {
+    return {
+      ok: false,
+      error: {
+        type: 'invalid_request',
+        message:
+          body.response.message ?? 'POEditor reported a non-success response',
+      },
+    };
+  }
+  return { ok: true, value: extractValue(body) };
+}
+
 /**
  * Run a POEditor call, catching any thrown/rejected error (network failure,
  * timeout, etc.) and turning it into a network_error Result rather than
@@ -135,6 +172,9 @@ class PoeditorClientImpl implements PoeditorClient {
     projectId: string;
     language: string;
     fileContent: string;
+    syncTerms?: boolean;
+    tag?: string;
+    overwrite?: boolean;
   }): Promise<Result<void, PoeditorApiError>> {
     return runCatchingNetworkError(async () => {
       await this.throttleUpload();
@@ -143,7 +183,24 @@ class PoeditorClientImpl implements PoeditorClient {
       form.set('id', input.projectId);
       form.set('updating', 'terms_translations');
       form.set('language', input.language);
-      form.set('sync_terms', '1');
+      // Only send sync_terms when syncing is enabled (default): POEditor
+      // treats a present sync_terms of any value as opting into deleting
+      // terms absent from the uploaded file, so a disabled sync must omit
+      // the parameter entirely rather than send '0'.
+      if (input.syncTerms ?? true) {
+        form.set('sync_terms', '1');
+      }
+      // POEditor defaults `overwrite` to 0 (never replace an existing
+      // translation) when the parameter is omitted -- confirmed by a
+      // real-world case where a source-string wording change never reached
+      // POEditor (see research.md's overwrite-default Decision). Only send
+      // it when the caller explicitly opts in.
+      if (input.overwrite) {
+        form.set('overwrite', '1');
+      }
+      if (input.tag != null) {
+        form.set('tags', JSON.stringify({ all: input.tag }));
+      }
       form.set('api_token', this.apiToken);
       form.set(
         'file',
@@ -158,10 +215,7 @@ class PoeditorClientImpl implements PoeditorClient {
 
       this.lastUploadAt = Date.now();
 
-      if (!res.ok) {
-        return { ok: false, error: await mapErrorResponse(res) };
-      }
-      return { ok: true, value: undefined };
+      return parseSuccessBody(res, () => undefined);
     });
   }
 
@@ -181,12 +235,15 @@ class PoeditorClientImpl implements PoeditorClient {
         body: form,
       });
 
-      if (!res.ok) {
-        return { ok: false, error: await mapErrorResponse(res) };
+      const urlResult = await parseSuccessBody(
+        res,
+        (body) => (body as { result: { url: string } }).result.url,
+      );
+      if (!urlResult.ok) {
+        return urlResult;
       }
 
-      const body = (await res.json()) as { result: { url: string } };
-      const downloadRes = await fetch(body.result.url);
+      const downloadRes = await fetch(urlResult.value);
       if (!downloadRes.ok) {
         return { ok: false, error: await mapErrorResponse(downloadRes) };
       }
@@ -210,14 +267,15 @@ class PoeditorClientImpl implements PoeditorClient {
         body: form,
       });
 
-      if (!res.ok) {
-        return { ok: false, error: await mapErrorResponse(res) };
-      }
-
-      const body = (await res.json()) as {
-        result: { languages: { code: string; percentage: number }[] };
-      };
-      return { ok: true, value: body.result.languages };
+      return parseSuccessBody(
+        res,
+        (body) =>
+          (
+            body as {
+              result: { languages: { code: string; percentage: number }[] };
+            }
+          ).result.languages,
+      );
     });
   }
 

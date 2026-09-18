@@ -18,25 +18,25 @@ import {
   type TranslationOnlyPrPublisher,
   type WriteLocaleFile,
 } from './pull-translations.ts';
-import type { NamespaceSyncEntry } from './sync-config.ts';
+import {
+  type NamespaceSyncEntry,
+  SHARED_POEDITOR_PROJECT_ID,
+} from './sync-config.ts';
 
 // A small 3-entry fixture mirroring the shape of the real SYNC_TARGETS
 // (admin/translation/commons), injected via `targets` so this test never
-// depends on the real POEditor project IDs declared in sync-config.ts.
+// depends on the real locale file paths declared in sync-config.ts.
 const TEST_TARGETS: readonly NamespaceSyncEntry[] = [
   {
     namespace: 'admin',
-    poeditorProjectId: 'project-admin',
     localeFilePath: (lang) => `locales/${lang}/admin.json`,
   },
   {
     namespace: 'translation',
-    poeditorProjectId: 'project-translation',
     localeFilePath: (lang) => `locales/${lang}/translation.json`,
   },
   {
     namespace: 'commons',
-    poeditorProjectId: 'project-commons',
     localeFilePath: (lang) => `locales/${lang}/commons.json`,
   },
 ];
@@ -83,25 +83,62 @@ const AFTER_BY_NAMESPACE_LANGUAGE: Readonly<
   },
 };
 
-const PROJECT_ID_TO_NAMESPACE: Readonly<Record<string, string>> = {
-  'project-admin': 'admin',
-  'project-translation': 'translation',
-  'project-commons': 'commons',
+/**
+ * The POEditor language code each GROWI locale must be converted to before
+ * any API call (Requirement 4.1). The shared project holds every namespace,
+ * so the export fixtures below are keyed by these codes -- not by a
+ * per-namespace project ID, which no longer exists.
+ */
+const POEDITOR_LANGUAGE_BY_GROWI_LOCALE: Readonly<Record<string, string>> = {
+  ja_JP: 'ja',
+  zh_CN: 'zh-CN',
+  fr_FR: 'fr',
+  ko_KR: 'ko',
 };
 
-/** Builds a poeditorClient double whose exportTranslations resolves per (projectId, language) from AFTER_BY_NAMESPACE_LANGUAGE. */
-const buildPoeditorClient = (): PoeditorClient => {
+/**
+ * One language's whole export as the shared project really returns it: a
+ * single JSON object keyed by namespace (NamespaceEnvelope's wire format),
+ * assembled from the same per-namespace fixtures the classification
+ * expectations are written against.
+ */
+const COMBINED_EXPORT_BY_POEDITOR_LANGUAGE: Readonly<Record<string, string>> =
+  Object.fromEntries(
+    TEST_LANGUAGES.map((language) => [
+      POEDITOR_LANGUAGE_BY_GROWI_LOCALE[language],
+      JSON.stringify(
+        Object.fromEntries(
+          TEST_TARGETS.map((target) => [
+            target.namespace,
+            JSON.parse(
+              AFTER_BY_NAMESPACE_LANGUAGE[target.namespace][language],
+            ) as unknown,
+          ]),
+        ),
+      ),
+    ]),
+  );
+
+/**
+ * Builds a poeditorClient double whose exportTranslations resolves one
+ * combined JSON per POEditor language code.
+ *
+ * An unrecognized language resolves to an empty envelope rather than
+ * throwing: a test that asserts "the wrong language code was passed" must
+ * fail on that assertion, not crash inside the fixture before reaching it.
+ *
+ * The return type is left inferred (rather than annotated `PoeditorClient`)
+ * so callers keep access to `exportTranslations.mock.calls` — the recorded
+ * arguments are what prove the project ID and language code passed to each
+ * export call, not just how many calls were made.
+ */
+const buildPoeditorClient = () => {
   const poeditorClient = mock<PoeditorClient>();
-  poeditorClient.exportTranslations.mockImplementation(
-    // biome-ignore lint/suspicious/useAwait: must match PoeditorClient's Promise-returning signature.
-    async ({ projectId, language }) => {
-      const namespace = PROJECT_ID_TO_NAMESPACE[projectId];
-      const content = AFTER_BY_NAMESPACE_LANGUAGE[namespace]?.[language];
-      if (content == null) {
-        throw new Error(`no fixture for ${projectId}/${language}`);
-      }
-      return { ok: true, value: content };
-    },
+  poeditorClient.exportTranslations.mockImplementation(({ language }) =>
+    Promise.resolve({
+      ok: true,
+      value: COMBINED_EXPORT_BY_POEDITOR_LANGUAGE[language] ?? '{}',
+    }),
   );
   return poeditorClient;
 };
@@ -120,7 +157,12 @@ const buildReadNamespaceFile = () =>
   });
 
 describe('collectClassifications', () => {
-  it('reads and exports all 3 namespace x 4 language combinations (12 total) and classifies each', async () => {
+  it('exports once per language (4 calls, not 12) from the shared project, while still reading all 12 local locale files', async () => {
+    // The shared project holds every namespace, so one export per language
+    // already carries all 3 namespaces -- exporting per (namespace, language)
+    // would be 3x the API calls for the same data. The local "before" files
+    // are still one per combination: they live in the repository, one file
+    // per namespace per language.
     const poeditorClient = buildPoeditorClient();
     const readNamespaceFile = buildReadNamespaceFile();
 
@@ -133,8 +175,84 @@ describe('collectClassifications', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(poeditorClient.exportTranslations).toHaveBeenCalledTimes(12);
+    expect(poeditorClient.exportTranslations).toHaveBeenCalledTimes(4);
     expect(readNamespaceFile).toHaveBeenCalledTimes(12);
+
+    // A bare call count would also pass if all 4 calls asked for the same
+    // language, so assert the actual set of languages requested -- exactly
+    // the 4 non-source languages, each exactly once.
+    const requestedLanguages = poeditorClient.exportTranslations.mock.calls
+      .map(([input]) => input.language)
+      .sort();
+    expect(requestedLanguages).toEqual(['fr', 'ja', 'ko', 'zh-CN']);
+
+    for (const [input] of poeditorClient.exportTranslations.mock.calls) {
+      expect(input.projectId).toBe(SHARED_POEDITOR_PROJECT_ID);
+    }
+  });
+
+  it("passes POEditor's own language codes, never GROWI's locale codes, to exportTranslations (Requirement 4.1)", async () => {
+    // POEditor rejects `ja_JP` with "Wrong language code", so every export
+    // call must carry the converted code. Asserting "no underscore" catches
+    // any raw GROWI locale leaking through, not just the ja_JP case.
+    const poeditorClient = buildPoeditorClient();
+
+    await collectClassifications({
+      poeditorClient,
+      targets: TEST_TARGETS,
+      languages: TEST_LANGUAGES,
+      readNamespaceFile: buildReadNamespaceFile(),
+      baseDir: '/base',
+    });
+
+    for (const [input] of poeditorClient.exportTranslations.mock.calls) {
+      expect(input.language).not.toContain('_');
+    }
+  });
+
+  it("splits one language's combined export into per-namespace content, classifying each namespace against its own locale file", async () => {
+    // The whole correctness risk of the per-language export: three
+    // namespaces now arrive in one payload, so a cross-wired split would
+    // classify `admin`'s exported content against `commons`'s committed
+    // file. The fixtures give each namespace distinguishable keys (k*/t*/c*),
+    // so any mix-up turns every combination structural.
+    const poeditorClient = buildPoeditorClient();
+
+    const result = await collectClassifications({
+      poeditorClient,
+      targets: TEST_TARGETS,
+      languages: ['ja_JP'],
+      readNamespaceFile: buildReadNamespaceFile(),
+      baseDir: '/base',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    // ja_JP per the fixture: admin translation_only, translation structural,
+    // commons no_change -- three different outcomes out of a single export.
+    expect(result.translationOnly).toEqual([
+      {
+        namespace: 'admin',
+        language: 'ja_JP',
+        changedKeys: ['k1'],
+        absoluteFilePath: '/base/locales/ja_JP/admin.json',
+        content: { k1: 'CHANGED', k2: 'v2' },
+      },
+    ]);
+    expect(result.structural).toEqual([
+      {
+        namespace: 'translation',
+        language: 'ja_JP',
+        addedKeys: ['t3'],
+        removedKeys: [],
+        filePath: '/base/locales/ja_JP/translation.json',
+        exportedContent: { t1: 'a', t2: 'b', t3: 'c' },
+      },
+    ]);
+    expect(result.skipped).toEqual([]);
   });
 
   it('separates translation_only and structural combinations into two disjoint groups with no mixing, from a 12-combination input mixing all 3 classification kinds', async () => {
@@ -246,7 +364,14 @@ describe('collectClassifications', () => {
     const poeditorClient = mock<PoeditorClient>();
     poeditorClient.exportTranslations.mockResolvedValue({
       ok: true,
-      value: '{"only_key":"same"}',
+      value: JSON.stringify(
+        Object.fromEntries(
+          TEST_TARGETS.map((target) => [
+            target.namespace,
+            { only_key: 'same' },
+          ]),
+        ),
+      ),
     });
     const readNamespaceFile = vi.fn(async () => '{"only_key":"same"}');
 
@@ -263,6 +388,85 @@ describe('collectClassifications', () => {
       expect(result.translationOnly).toEqual([]);
       expect(result.structural).toEqual([]);
     }
+  });
+
+  it('preserves an existing translation for a key POEditor has not translated yet, even when another key in the same file genuinely changed (translation_only)', async () => {
+    const poeditorClient = mock<PoeditorClient>();
+    poeditorClient.exportTranslations.mockResolvedValue({
+      ok: true,
+      value: JSON.stringify(
+        Object.fromEntries(
+          TEST_TARGETS.map((target) => [
+            target.namespace,
+            { k1: 'CHANGED', k2: '', k3: '' },
+          ]),
+        ),
+      ),
+    });
+    const readNamespaceFile = vi.fn(
+      async () => '{"k1":"既存1","k2":"既存2","k3":"既存3"}',
+    );
+
+    const result = await collectClassifications({
+      poeditorClient,
+      targets: TEST_TARGETS,
+      languages: TEST_LANGUAGES,
+      readNamespaceFile,
+      baseDir: '/base',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    for (const combination of result.translationOnly) {
+      expect(combination.changedKeys).toEqual(['k1']);
+      expect(combination.content).toEqual({
+        k1: 'CHANGED',
+        k2: '既存2',
+        k3: '既存3',
+      });
+    }
+    expect(result.structural).toEqual([]);
+  });
+
+  it('preserves an existing translation for a key POEditor has not translated yet, on the structural (key-added) path too', async () => {
+    const poeditorClient = mock<PoeditorClient>();
+    poeditorClient.exportTranslations.mockResolvedValue({
+      ok: true,
+      value: JSON.stringify(
+        Object.fromEntries(
+          TEST_TARGETS.map((target) => [
+            target.namespace,
+            { k1: '既存1', k2: '', k3: 'NEW' },
+          ]),
+        ),
+      ),
+    });
+    const readNamespaceFile = vi.fn(async () => '{"k1":"既存1","k2":"既存2"}');
+
+    const result = await collectClassifications({
+      poeditorClient,
+      targets: TEST_TARGETS,
+      languages: TEST_LANGUAGES,
+      readNamespaceFile,
+      baseDir: '/base',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    for (const combination of result.structural) {
+      expect(combination.addedKeys).toEqual(['k3']);
+      expect(combination.removedKeys).toEqual([]);
+      expect(combination.exportedContent).toEqual({
+        k1: '既存1',
+        k2: '既存2',
+        k3: 'NEW',
+      });
+    }
+    expect(result.translationOnly).toEqual([]);
   });
 
   it('aborts the whole run (reports failure, no grouping) when one combination fails to read', async () => {
@@ -298,17 +502,22 @@ describe('collectClassifications', () => {
     }
   });
 
-  it('aborts the whole run (reports failure, no grouping) when one combination fails to export from POEditor', async () => {
+  it("aborts the whole run (reports failure, no grouping) when one language's export fails, listing every namespace that language covered", async () => {
+    // One export now serves all 3 namespaces of a language, so a failed
+    // export takes all 3 combinations down with it. They are reported
+    // individually because `CombinationFailure` is (namespace, language)
+    // shaped -- naming one arbitrary namespace would hide the other two.
     const poeditorClient = mock<PoeditorClient>();
     poeditorClient.exportTranslations.mockImplementation(
       // biome-ignore lint/suspicious/useAwait: must match PoeditorClient's Promise-returning signature.
-      async ({ projectId, language }) => {
-        if (projectId === 'project-translation' && language === 'zh_CN') {
+      async ({ language }) => {
+        if (language === 'zh-CN') {
           return { ok: false, error: { type: 'rate_limited' } };
         }
-        const namespace = PROJECT_ID_TO_NAMESPACE[projectId];
-        const content = AFTER_BY_NAMESPACE_LANGUAGE[namespace]?.[language];
-        return { ok: true, value: content ?? '{}' };
+        return {
+          ok: true,
+          value: COMBINED_EXPORT_BY_POEDITOR_LANGUAGE[language] ?? '{}',
+        };
       },
     );
     const readNamespaceFile = buildReadNamespaceFile();
@@ -323,7 +532,23 @@ describe('collectClassifications', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.failures).toEqual([
+      expect(
+        [...result.failures].sort((a, b) =>
+          a.namespace.localeCompare(b.namespace),
+        ),
+      ).toEqual([
+        {
+          namespace: 'admin',
+          language: 'zh_CN',
+          reason: 'export_failed',
+          error: { type: 'rate_limited' },
+        },
+        {
+          namespace: 'commons',
+          language: 'zh_CN',
+          reason: 'export_failed',
+          error: { type: 'rate_limited' },
+        },
         {
           namespace: 'translation',
           language: 'zh_CN',
@@ -334,23 +559,25 @@ describe('collectClassifications', () => {
     }
   });
 
-  it('does not abort the run when one combination has invalid-JSON export content -- only that combination is skipped, the rest classify normally', async () => {
-    // Unlike read_failed/export_failed, invalid_json only excludes its own
-    // (namespace, language) combination -- export is read-only, so a single
-    // malformed combination is tolerated rather than aborting the whole run.
+  it("does not abort the run when one language's combined export is invalid JSON -- that language's namespaces are all skipped, the other languages classify normally", async () => {
+    // Unlike read_failed/export_failed, invalid_json does not abort: export
+    // is read-only, so a malformed payload is tolerated. The granularity is
+    // now per language, because one unparseable export is all there is for
+    // every namespace of that language.
     const poeditorClient = mock<PoeditorClient>();
     poeditorClient.exportTranslations.mockImplementation(
       // biome-ignore lint/suspicious/useAwait: must match PoeditorClient's Promise-returning signature.
-      async ({ projectId, language }) => {
-        if (projectId === 'project-translation' && language === 'zh_CN') {
+      async ({ language }) => {
+        if (language === 'zh-CN') {
           // Malformed JSON -- triggers invalid_json, not export_failed
           // (PoeditorClient itself reports `ok: true`; the content is what's
           // broken).
           return { ok: true, value: '{not valid json' };
         }
-        const namespace = PROJECT_ID_TO_NAMESPACE[projectId];
-        const content = AFTER_BY_NAMESPACE_LANGUAGE[namespace]?.[language];
-        return { ok: true, value: content ?? '{}' };
+        return {
+          ok: true,
+          value: COMBINED_EXPORT_BY_POEDITOR_LANGUAGE[language] ?? '{}',
+        };
       },
     );
     const readNamespaceFile = buildReadNamespaceFile();
@@ -369,11 +596,9 @@ describe('collectClassifications', () => {
       return;
     }
 
-    // (b) the other 11 combinations are still classified normally. Per the
-    // fixture (see AFTER_BY_NAMESPACE_LANGUAGE), translation/zh_CN was
-    // translation_only before being replaced with invalid JSON here, so the
-    // expected translationOnly group loses exactly that one entry versus
-    // the "separates ... into two disjoint groups" test above.
+    // (b) the other 3 languages' 9 combinations are still classified
+    // normally. Versus the "separates ... into two disjoint groups" test
+    // above, the expected groups lose exactly the zh_CN entries.
     const translationOnlyKeys = result.translationOnly
       .map((c) => `${c.namespace}/${c.language}`)
       .sort();
@@ -382,27 +607,26 @@ describe('collectClassifications', () => {
       .sort();
 
     expect(translationOnlyKeys).toEqual(
-      ['admin/ja_JP', 'admin/ko_KR', 'commons/ko_KR', 'commons/zh_CN'].sort(),
+      ['admin/ja_JP', 'admin/ko_KR', 'commons/ko_KR'].sort(),
     );
     expect(structuralKeys).toEqual(
-      [
-        'admin/zh_CN',
-        'commons/fr_FR',
-        'translation/fr_FR',
-        'translation/ja_JP',
-      ].sort(),
+      ['commons/fr_FR', 'translation/fr_FR', 'translation/ja_JP'].sort(),
     );
 
-    // (c) the invalid_json combination is surfaced via `skipped`, and is
-    // absent from both classification groups.
-    expect(result.skipped).toHaveLength(1);
-    expect(result.skipped[0]).toMatchObject({
-      namespace: 'translation',
-      language: 'zh_CN',
-      reason: 'invalid_json',
-    });
-    expect(translationOnlyKeys).not.toContain('translation/zh_CN');
-    expect(structuralKeys).not.toContain('translation/zh_CN');
+    // (c) every namespace of the failed language is surfaced via `skipped`,
+    // and none of them appears in either classification group.
+    expect(
+      [...result.skipped]
+        .map((failure) => `${failure.namespace}/${failure.language}`)
+        .sort(),
+    ).toEqual(['admin/zh_CN', 'commons/zh_CN', 'translation/zh_CN']);
+    for (const failure of result.skipped) {
+      expect(failure.reason).toBe('invalid_json');
+    }
+    for (const key of ['admin/zh_CN', 'translation/zh_CN', 'commons/zh_CN']) {
+      expect(translationOnlyKeys).not.toContain(key);
+      expect(structuralKeys).not.toContain(key);
+    }
   });
 });
 
