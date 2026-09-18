@@ -1,12 +1,16 @@
 import { performance } from 'node:perf_hooks';
 import { getIdForRef } from '@growi/core';
-import mongoose from 'mongoose';
+import mongoose, { type Types } from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { prisma } from '~/utils/prisma';
 
 import { extractInternalLinkPaths } from './extract-internal-link-paths';
-import { reResolveByToPath, syncOutboundLinks } from './page-link-sync';
+import {
+  reconcileDeletedPages,
+  reResolveByToPath,
+  syncOutboundLinks,
+} from './page-link-sync';
 import { resolveToPageIds } from './target-page-resolution';
 
 // The only caller reads the page with a projection and never populates, so the revision is always
@@ -74,4 +78,15 @@ export const handlePageUpsertById = async (
   if (page.status === Page.STATUS_DELETED) return 0;
 
   return handlePageUpsert(page, siteUrl);
+};
+
+/**
+ * Reconciles deleted pages.
+ *
+ * @param pageIds - Page IDs of pages that have been deleted.
+ */
+export const handlePagesDelete = async (
+  pageIds: Types.ObjectId[],
+): Promise<void> => {
+  await reconcileDeletedPages(pageIds);
 };
