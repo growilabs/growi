@@ -9,7 +9,6 @@ import type { ActivityDocument } from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
-import { anonymousSyncThresholds } from '../config/anonymous-sync-thresholds';
 import type { AuditlogEsWriter } from '../interfaces/auditlog-es-writer';
 import { AuditlogEsSyncStatus } from '../models/auditlog-es-sync-status';
 import {
@@ -17,18 +16,9 @@ import {
   markUnsyncedAndClearToken,
 } from '../models/auditlog-es-sync-tx';
 import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
-import { decideEsSyncForEvent } from './decide-es-sync-for-event';
-import {
-  compileThresholdKeyPatterns,
-  matchThresholdKey,
-} from './match-threshold-key';
+import { filterAdmittedUpserts } from './filter-admitted-upserts';
 
 const logger = loggerFactory('growi:service:auditlog-changestream');
-
-// Precompiled once per process — see match-threshold-key.ts for matching semantics.
-const thresholdKeyPatterns = compileThresholdKeyPatterns(
-  Object.keys(anonymousSyncThresholds),
-);
 
 // Fixed key shared by every instance: all GROWI processes use the one resume-token doc.
 // Each process also runs its own consumer against this key, so events are written to ES
@@ -257,50 +247,6 @@ export class AuditlogChangeStreamService {
     }
   }
 
-  // Gate anonymous log events (no snapshot.username) whose endpoint matches a configured
-  // threshold key (see anonymous-sync-thresholds.ts). Authenticated logs and anonymous
-  // logs at unlisted endpoints bypass the gate entirely (always admitted) — this only
-  // caps the abuse-sensitive endpoints the threshold map names.
-  //
-  // Deliberately run inside flushBuffer()'s try/catch, not as a separate step: a failure
-  // here (e.g. a transient MongoDB error while claiming/deciding) is handled exactly like
-  // a bulkSyncAuditlogs failure — retried with backoff, eventually poison-pill-skipped —
-  // rather than silently syncing unthrottled or dropping everything.
-  private async filterAdmittedUpserts(
-    upserts: ActivityDocument[],
-  ): Promise<ActivityDocument[]> {
-    const admittedOrNull = await Promise.all(
-      upserts.map(async (activity) => {
-        if (activity.snapshot?.username != null) return activity;
-        const thresholdKey = matchThresholdKey(
-          thresholdKeyPatterns,
-          activity.endpoint ?? '',
-        );
-        if (thresholdKey == null) return activity;
-
-        // Keyed by the event's own occurrence time, not the flush wall-clock time: a
-        // backlog replayed after a restart (resume token rewound, or a cold start with
-        // no token) must land in the windows it actually happened in, not all get bucketed
-        // into "now" and exhaust the threshold for unrelated real-time traffic.
-        const windowStart = new Date(
-          Math.floor(activity.createdAt.getTime() / 60_000) * 60_000,
-        );
-
-        const decision = await decideEsSyncForEvent(
-          activity._id.toString(),
-          thresholdKey,
-          windowStart,
-          anonymousSyncThresholds[thresholdKey],
-        );
-        return decision === 'admitted' ? activity : null;
-      }),
-    );
-
-    return admittedOrNull.filter(
-      (activity): activity is ActivityDocument => activity != null,
-    );
-  }
-
   // Send the buffered events as one ES bulk and persist the resume token at the batch
   // boundary. Returns false when the batch failed (token not advanced) and the stream must
   // restart to replay it; true when synced, poison-pill-skipped, or empty.
@@ -331,7 +277,12 @@ export class AuditlogChangeStreamService {
     const lastToken = batch[batch.length - 1]._id;
 
     try {
-      const admittedUpserts = await this.filterAdmittedUpserts(upserts);
+      // Deliberately run inside this try/catch, not as a separate step: a failure in
+      // filterAdmittedUpserts (e.g. a transient MongoDB error while claiming/deciding)
+      // is handled exactly like a bulkSyncAuditlogs failure — retried with backoff,
+      // eventually poison-pill-skipped — rather than silently syncing unthrottled or
+      // dropping everything.
+      const admittedUpserts = await filterAdmittedUpserts(upserts);
       await this.esWriter.bulkSyncAuditlogs(admittedUpserts, deleteIds);
       this.consecutiveEventFailures = 0;
       this.lastFailingToken = null;

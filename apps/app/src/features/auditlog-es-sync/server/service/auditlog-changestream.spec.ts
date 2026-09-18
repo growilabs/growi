@@ -14,7 +14,7 @@ import {
 } from '../models/auditlog-es-sync-tx';
 import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
 import { AuditlogChangeStreamService } from './auditlog-changestream';
-import { decideEsSyncForEvent } from './decide-es-sync-for-event';
+import { filterAdmittedUpserts } from './filter-admitted-upserts';
 
 const { mockError } = vi.hoisted(() => ({
   mockError: vi.fn(),
@@ -63,11 +63,11 @@ vi.mock(
   }),
 );
 
-// The gating decision itself (threshold math, multi-process race handling) is
-// decide-es-sync-for-event.integ.ts's contract, not this file's — mocked here so
-// flushBuffer() tests only exercise how its result is used.
-vi.mock('./decide-es-sync-for-event', () => ({
-  decideEsSyncForEvent: vi.fn(),
+// The admission-gating logic itself (threshold matching, window keying, sequential
+// processing) is filter-admitted-upserts.spec.ts's contract, not this file's — mocked
+// here so flushBuffer() tests only exercise how its result is used.
+vi.mock('./filter-admitted-upserts', () => ({
+  filterAdmittedUpserts: vi.fn(),
 }));
 
 // Minimal fake ChangeStream driven by push(). On close(), rejects any pending next().
@@ -196,8 +196,11 @@ describe('AuditlogChangeStreamService', () => {
     esWriter.bulkSyncAuditlogs.mockResolvedValue(undefined);
     // Default: no activities exist (fresh install). Tests that need a backlog override this.
     vi.spyOn(Activity, 'exists').mockResolvedValue(null);
-    // Default: admit. Gating tests that need a 'dropped' outcome override this.
-    vi.mocked(decideEsSyncForEvent).mockResolvedValue('admitted');
+    // Default: pass every upsert through unfiltered. Wiring tests that need to see a
+    // drop override this.
+    vi.mocked(filterAdmittedUpserts).mockImplementation(
+      async (upserts) => upserts,
+    );
   });
 
   afterEach(async () => {
@@ -525,113 +528,39 @@ describe('AuditlogChangeStreamService', () => {
     });
   });
 
-  // ─── Anonymous-log threshold gating ────────────────────────────────────────
+  // ─── Admission-gating wiring ────────────────────────────────────────────────
+  // The gating logic itself (threshold matching, window keying, sequential
+  // processing) is filter-admitted-upserts.spec.ts's contract; this only checks
+  // that flushBuffer() routes upserts through it and syncs its result.
 
-  describe('filterAdmittedUpserts() / anonymous-log threshold gating', () => {
-    const pushAndFlush = async (
-      doc: Partial<ActivityDocument>,
-    ): Promise<void> => {
+  describe('flushBuffer() / admission gating wiring', () => {
+    it('syncs only the upserts filterAdmittedUpserts admits', async () => {
+      const admittedDoc: Partial<ActivityDocument> = {
+        _id: new Types.ObjectId(),
+      };
+      const droppedDoc: Partial<ActivityDocument> = {
+        _id: new Types.ObjectId(),
+      };
+      vi.mocked(filterAdmittedUpserts).mockResolvedValue([
+        admittedDoc as ActivityDocument,
+      ]);
+
       const fakeStream = new FakeChangeStream();
       vi.spyOn(Activity, 'watch').mockReturnValue(
         fakeStream as unknown as ChangeStream<ActivityDocument>,
       );
       service = new AuditlogChangeStreamService(esWriter);
       await service.start();
-      fakeStream.push(makeInsertEvent(doc, 'tok1'));
+
+      fakeStream.push(makeInsertEvent(droppedDoc, 'tok1'));
+
       await vi.waitFor(() =>
         expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledOnce(),
       );
-    };
-
-    it('bypasses the gate for an authenticated log, even at a gated endpoint', async () => {
-      vi.mocked(decideEsSyncForEvent).mockResolvedValue('dropped');
-      const doc: Partial<ActivityDocument> = {
-        _id: new Types.ObjectId(),
-        endpoint: '/login',
-        snapshot: { username: 'someone' },
-      };
-
-      await pushAndFlush(doc);
-
-      expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledWith([doc], []);
-      expect(decideEsSyncForEvent).not.toHaveBeenCalled();
-    });
-
-    it('bypasses the gate for an anonymous log at an endpoint with no configured threshold', async () => {
-      vi.mocked(decideEsSyncForEvent).mockResolvedValue('dropped');
-      const doc: Partial<ActivityDocument> = {
-        _id: new Types.ObjectId(),
-        endpoint: '/some-unlisted-path',
-      };
-
-      await pushAndFlush(doc);
-
-      expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledWith([doc], []);
-      expect(decideEsSyncForEvent).not.toHaveBeenCalled();
-    });
-
-    it('excludes an anonymous log at a gated endpoint when decideEsSyncForEvent drops it', async () => {
-      vi.mocked(decideEsSyncForEvent).mockResolvedValue('dropped');
-      const doc: Partial<ActivityDocument> = {
-        _id: new Types.ObjectId(),
-        endpoint: '/login',
-        createdAt: new Date(),
-      };
-
-      await pushAndFlush(doc);
-
-      expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledWith([], []);
-    });
-
-    it('includes an anonymous log at a gated endpoint when decideEsSyncForEvent admits it', async () => {
-      vi.mocked(decideEsSyncForEvent).mockResolvedValue('admitted');
-      const doc: Partial<ActivityDocument> = {
-        _id: new Types.ObjectId(),
-        endpoint: '/login',
-        createdAt: new Date(),
-      };
-
-      await pushAndFlush(doc);
-
-      expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledWith([doc], []);
-    });
-
-    it("keys the gating window by the event's own createdAt, not the flush wall-clock time", async () => {
-      vi.mocked(decideEsSyncForEvent).mockResolvedValue('admitted');
-      // A backlog event from well outside the current minute (e.g. replayed after a
-      // resume-token rewind) must be gated against ITS OWN window, not "now".
-      const eventCreatedAt = new Date('2020-01-01T00:00:00.000Z');
-      const expectedWindowStart = new Date('2020-01-01T00:00:00.000Z');
-      const doc: Partial<ActivityDocument> = {
-        _id: new Types.ObjectId(),
-        endpoint: '/login',
-        createdAt: eventCreatedAt,
-      };
-
-      await pushAndFlush(doc);
-
-      expect(decideEsSyncForEvent).toHaveBeenCalledWith(
-        doc._id?.toString(),
-        '/login',
-        expectedWindowStart,
-        expect.any(Number),
-      );
-    });
-
-    it('matches a dynamic path against its regex threshold key, ignoring the query string', async () => {
-      const doc: Partial<ActivityDocument> = {
-        _id: new Types.ObjectId(),
-        endpoint: '/forgot-password/abc123token?access_token=secret',
-        createdAt: new Date(),
-      };
-
-      await pushAndFlush(doc);
-
-      expect(decideEsSyncForEvent).toHaveBeenCalledWith(
-        doc._id?.toString(),
-        '/forgot-password/.*',
-        expect.any(Date),
-        expect.any(Number),
+      expect(filterAdmittedUpserts).toHaveBeenCalledWith([droppedDoc]);
+      expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledWith(
+        [admittedDoc],
+        [],
       );
     });
   });

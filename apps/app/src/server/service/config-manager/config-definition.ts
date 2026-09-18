@@ -80,6 +80,10 @@ export const CONFIG_KEYS = [
   'app:auditLogActionGroupSize',
   'app:auditLogAdditionalActions',
   'app:auditLogExcludeActions',
+  'app:auditLogEsSyncAnonymousThresholdLogin',
+  'app:auditLogEsSyncAnonymousThresholdRegister',
+  'app:auditLogEsSyncAnonymousThresholdForgotPassword',
+  'app:auditLogEsSyncAnonymousThresholdInstaller',
   'app:serviceType',
   'app:deploymentType',
   'app:ssrMaxRevisionBodyLength',
@@ -555,6 +559,28 @@ export const CONFIG_DEFINITIONS = {
   'app:auditLogExcludeActions': defineConfig<string | undefined>({
     envVarName: 'AUDIT_LOG_EXCLUDE_ACTIONS',
     defaultValue: undefined,
+  }),
+  // Per-endpoint cap (admitted anonymous-log events per 1-minute window, all IPs
+  // combined) on syncing anonymous audit logs to Elasticsearch — see
+  // features/auditlog-es-sync/server/service/decide-es-sync-for-event.ts.
+  // 100 is a launch placeholder, not a tuned value: it reuses
+  // app:elasticsearchReindexBulkSize's own default, i.e. the chunk size ES already
+  // handles routinely in a single bulk write during a full reindex.
+  'app:auditLogEsSyncAnonymousThresholdLogin': defineConfig<number>({
+    envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_LOGIN',
+    defaultValue: 100,
+  }),
+  'app:auditLogEsSyncAnonymousThresholdRegister': defineConfig<number>({
+    envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_REGISTER',
+    defaultValue: 100,
+  }),
+  'app:auditLogEsSyncAnonymousThresholdForgotPassword': defineConfig<number>({
+    envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_FORGOT_PASSWORD',
+    defaultValue: 100,
+  }),
+  'app:auditLogEsSyncAnonymousThresholdInstaller': defineConfig<number>({
+    envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_INSTALLER',
+    defaultValue: 100,
   }),
   'app:serviceType': defineConfig<GrowiServiceType>({
     envVarName: 'SERVICE_TYPE',

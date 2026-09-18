@@ -1,48 +1,50 @@
-const ENV_VAR_NAME = 'ANONYMOUS_ES_SYNC_THRESHOLD_LOGIN';
-const DEFAULT_THRESHOLD = 100;
+import { configManager } from '~/server/service/config-manager';
 
-// The module reads process.env once at import time, so each test needs a fresh
-// module instance to observe a different env var state.
-const importThresholds = async () => {
-  const mod = await import('./anonymous-sync-thresholds');
-  return mod.anonymousSyncThresholds;
-};
+import {
+  anonymousSyncThresholdConfigKeys,
+  getAnonymousSyncThreshold,
+} from './anonymous-sync-thresholds';
 
-describe('anonymousSyncThresholds', () => {
-  beforeEach(() => {
-    vi.resetModules();
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: { getConfig: vi.fn() },
+}));
+
+describe('anonymousSyncThresholdConfigKeys', () => {
+  it('declares the real req.originalUrl shape for each abuse-sensitive endpoint', () => {
+    // Activity.endpoint is req.originalUrl, always carrying GROWI's /_api/v3 prefix —
+    // a bare route path like '/login' never matches real traffic.
+    expect(Object.keys(anonymousSyncThresholdConfigKeys)).toEqual([
+      '/_api/v3/login',
+      '/_api/v3/register',
+      '/_api/v3/forgot-password',
+      '/_api/v3/installer',
+    ]);
   });
+});
 
+describe('getAnonymousSyncThreshold', () => {
   afterEach(() => {
-    delete process.env[ENV_VAR_NAME];
+    vi.clearAllMocks();
   });
 
-  it('defaults every configured endpoint to the same launch placeholder when unset', async () => {
-    const thresholds = await importThresholds();
+  it('resolves the threshold through configManager, keyed by the matched endpoint', () => {
+    vi.mocked(configManager.getConfig).mockReturnValue(500);
 
-    expect(thresholds['/login']).toBe(DEFAULT_THRESHOLD);
-    expect(thresholds['/register']).toBe(DEFAULT_THRESHOLD);
-    expect(thresholds['/forgot-password/.*']).toBe(DEFAULT_THRESHOLD);
+    const threshold = getAnonymousSyncThreshold('/_api/v3/login');
+
+    expect(threshold).toBe(500);
+    expect(configManager.getConfig).toHaveBeenCalledWith(
+      'app:auditLogEsSyncAnonymousThresholdLogin',
+    );
   });
 
-  it('uses the env var value when it is a valid positive number', async () => {
-    process.env[ENV_VAR_NAME] = '500';
+  it('reads a distinct configManager key per endpoint', () => {
+    vi.mocked(configManager.getConfig).mockReturnValue(100);
 
-    const thresholds = await importThresholds();
+    getAnonymousSyncThreshold('/_api/v3/forgot-password');
 
-    expect(thresholds['/login']).toBe(500);
-  });
-
-  it.each([
-    ['zero', '0'],
-    ['negative', '-5'],
-    ['non-numeric', 'not-a-number'],
-    ['empty string', ''],
-  ])('falls back to the default for a %s env var value', async (_label, raw) => {
-    process.env[ENV_VAR_NAME] = raw;
-
-    const thresholds = await importThresholds();
-
-    expect(thresholds['/login']).toBe(DEFAULT_THRESHOLD);
+    expect(configManager.getConfig).toHaveBeenCalledWith(
+      'app:auditLogEsSyncAnonymousThresholdForgotPassword',
+    );
   });
 });

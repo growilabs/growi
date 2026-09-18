@@ -48,6 +48,168 @@ const waitForDecision = async (
 // caller falls back to waitForDecision() instead of rethrowing.
 class ClaimLostError extends Error {}
 
+// Cheap early-out: once a window is confidently past threshold, skip the per-event
+// claim dance entirely (no EsSyncDecision write, no counter $inc). Strictly greater
+// than threshold, not >=: the event that pushes the count to exactly threshold + 1
+// must still go through the full path below, since that is the one 'dropped' event
+// that logs the "threshold reached" warning (see commitAdmissionDecision).
+const isWindowConfidentlyOverThreshold = async (
+  endpoint: string,
+  windowStart: Date,
+  threshold: number,
+): Promise<boolean> => {
+  const current = await AnonymousSyncCounter.findOne({
+    endpoint,
+    windowStart,
+  }).lean();
+  return current != null && current.count > threshold;
+};
+
+// Groups one call's identifying parameters so acquireClaim/commitAdmissionDecision/
+// runClaimedTransaction stay under the max-params lint threshold.
+interface AdmissionClaim {
+  activityId: string;
+  endpoint: string;
+  windowStart: Date;
+  threshold: number;
+  claimToken: string;
+}
+
+// Create a fresh claim, or take over one that looks abandoned. Returns whether this
+// call now holds the claim; false means another process is actively (or recently)
+// working it, and the caller should wait for its result instead.
+const acquireClaim = async (
+  claim: AdmissionClaim,
+  now: Date,
+): Promise<boolean> => {
+  const { activityId, endpoint, windowStart, claimToken } = claim;
+  try {
+    await EsSyncDecision.create({
+      _id: activityId,
+      endpoint,
+      windowStart,
+      decision: 'pending',
+      claimedAt: now,
+      claimToken,
+    });
+    return true;
+  } catch (err) {
+    if (!isDuplicateKeyError(err)) throw err;
+  }
+
+  const stolen = await EsSyncDecision.findOneAndUpdate(
+    {
+      _id: activityId,
+      decision: 'pending',
+      claimedAt: { $lt: new Date(now.getTime() - STALE_CLAIM_MS) },
+    },
+    { $set: { claimedAt: now, claimToken } },
+    { new: true },
+  );
+  return stolen != null;
+};
+
+interface AdmissionOutcome {
+  decision: EsSyncDecisionValue;
+  thresholdJustReached: boolean;
+}
+
+// Reconfirm the claim, $inc the counter, and finalize the decision. Runs inside the
+// caller's transaction, so all three writes commit or roll back together — otherwise
+// a call that stalls between separate, unguarded writes could resume after another
+// process stole the claim and completed its own cycle, and would $inc a second time
+// for the same event (or overwrite the new holder's decision) without realizing it
+// lost the claim.
+const commitAdmissionDecision = async (
+  session: mongoose.ClientSession,
+  claim: AdmissionClaim,
+): Promise<AdmissionOutcome> => {
+  const { activityId, endpoint, windowStart, threshold, claimToken } = claim;
+
+  const reconfirmed = await EsSyncDecision.findOneAndUpdate(
+    { _id: activityId, claimToken },
+    { $set: { claimedAt: new Date() } },
+    { session },
+  );
+  if (reconfirmed == null) {
+    throw new ClaimLostError();
+  }
+
+  // The only call site that should ever $inc the counter; runs at most once per
+  // distinct event (redundant processing from other GROWI processes either loses
+  // the claim race above, or aborts this same transaction via ClaimLostError).
+  const after = await AnonymousSyncCounter.findOneAndUpdate(
+    { endpoint, windowStart },
+    { $inc: { count: 1 }, $set: { updatedAt: new Date() } },
+    { upsert: true, new: true, session },
+  );
+  const decision: EsSyncDecisionValue =
+    after.count <= threshold ? 'admitted' : 'dropped';
+
+  await EsSyncDecision.updateOne(
+    { _id: activityId, claimToken },
+    { $set: { decision, claimedAt: new Date() } },
+    { session },
+  );
+
+  // Recorded once per (endpoint, windowStart) — at the exact event that pushes the
+  // count past threshold — not on every subsequent 'dropped' event in the same
+  // window, so a sustained attack doesn't flood the log with one line per event.
+  return { decision, thresholdJustReached: after.count === threshold + 1 };
+};
+
+// A genuine (non-claim-loss) failure inside the transaction never commits, so
+// commitAdmissionDecision's reconfirm/$inc/finalize never took effect — but the claim
+// row from acquireClaim() was written outside this transaction and survives the
+// rollback. Left alone it would sit as an orphaned 'pending' row until STALE_CLAIM_MS,
+// so an immediate retry can neither steal it nor create a fresh one, and instead times
+// out via waitForDecision() and wrongly returns 'dropped'. Release it so a retry can
+// claim fresh instead.
+const releaseOrphanedClaim = async (
+  activityId: string,
+  claimToken: string,
+): Promise<void> => {
+  try {
+    await EsSyncDecision.deleteOne({
+      _id: activityId,
+      claimToken,
+      decision: 'pending',
+    });
+  } catch (cleanupErr) {
+    logger.error(
+      { err: cleanupErr, activityId },
+      'Failed to release orphaned pending EsSyncDecision claim after a transaction error.',
+    );
+  }
+};
+
+// Runs commitAdmissionDecision inside a transaction. withTransaction may re-invoke its
+// callback in full on a retryable driver error (e.g. a WriteConflict from a concurrent
+// $inc), so `outcome` is reassigned fresh on every invocation and only the value from
+// the attempt that actually commits is read after the call returns.
+const runClaimedTransaction = async (
+  claim: AdmissionClaim,
+): Promise<AdmissionOutcome | 'claim-lost'> => {
+  const session = await mongoose.startSession();
+  let outcome: AdmissionOutcome | undefined;
+  try {
+    await session.withTransaction(async () => {
+      outcome = await commitAdmissionDecision(session, claim);
+    });
+  } catch (err) {
+    if (err instanceof ClaimLostError) {
+      return 'claim-lost';
+    }
+    await releaseOrphanedClaim(claim.activityId, claim.claimToken);
+    throw err;
+  } finally {
+    await session.endSession();
+  }
+
+  // outcome is always set once withTransaction resolves without throwing.
+  return outcome as AdmissionOutcome;
+};
+
 /**
  * Decide whether one anonymous-log event should sync to Elasticsearch, gated by a
  * per-(endpoint, windowStart) admission count. Safe to call redundantly from every
@@ -62,16 +224,9 @@ export const decideEsSyncForEvent = async (
   windowStart: Date,
   threshold: number,
 ): Promise<EsSyncDecisionValue> => {
-  // Cheap early-out: once a window is confidently past threshold, skip the per-event
-  // claim dance entirely (no EsSyncDecision write, no counter $inc). Strictly greater
-  // than threshold, not >=: the event that pushes the count to exactly threshold + 1
-  // must still go through the full path below, since that is the one 'dropped' event
-  // that logs the "threshold reached" warning (see after.count === threshold + 1).
-  const current = await AnonymousSyncCounter.findOne({
-    endpoint,
-    windowStart,
-  }).lean();
-  if (current != null && current.count > threshold) {
+  if (
+    await isWindowConfidentlyOverThreshold(endpoint, windowStart, threshold)
+  ) {
     return 'dropped';
   }
 
@@ -80,110 +235,30 @@ export const decideEsSyncForEvent = async (
   // the claim is conditioned on this token, so a call that stalls long enough for
   // another process to steal the claim (see STALE_CLAIM_MS) detects the loss instead
   // of acting as if it still owned it.
-  const claimToken = randomUUID();
+  const claim: AdmissionClaim = {
+    activityId,
+    endpoint,
+    windowStart,
+    threshold,
+    claimToken: randomUUID(),
+  };
 
-  let holdsClaim = false;
-  try {
-    await EsSyncDecision.create({
-      _id: activityId,
-      endpoint,
-      windowStart,
-      decision: 'pending',
-      claimedAt: now,
-      claimToken,
-    });
-    holdsClaim = true;
-  } catch (err) {
-    if (!isDuplicateKeyError(err)) throw err;
-  }
-
-  if (!holdsClaim) {
-    // A claim already exists for this event. Take it over only if it looks
-    // abandoned; otherwise its owner is still (or was recently) working on it.
-    const stolen = await EsSyncDecision.findOneAndUpdate(
-      {
-        _id: activityId,
-        decision: 'pending',
-        claimedAt: { $lt: new Date(now.getTime() - STALE_CLAIM_MS) },
-      },
-      { $set: { claimedAt: now, claimToken } },
-      { new: true },
-    );
-    holdsClaim = stolen != null;
-  }
-
+  const holdsClaim = await acquireClaim(claim, now);
   if (!holdsClaim) {
     return waitForDecision(activityId);
   }
 
-  // From here on, "reconfirm the claim, $inc the counter, and finalize the decision"
-  // must be all-or-nothing: if this call stalls between separate, unguarded writes,
-  // another process can steal the claim and complete its own full cycle in between,
-  // and this call would otherwise resume and $inc a second time for the same event
-  // (or overwrite the new holder's decision) without realizing it lost the claim.
-  // A transaction makes the three writes atomic instead of trying to fence each one
-  // individually.
-  const session = await mongoose.startSession();
-  let decision: EsSyncDecisionValue | undefined;
-  // withTransaction may re-invoke its callback in full on a retryable driver error
-  // (e.g. a WriteConflict from a concurrent $inc below), so a side effect like
-  // logger.warn cannot live inside it without risking a double log. This flag is
-  // reset on every callback invocation and only its value from the attempt that
-  // actually commits survives to be read below.
-  let thresholdJustReached = false;
-  try {
-    await session.withTransaction(async () => {
-      thresholdJustReached = false;
-
-      const reconfirmed = await EsSyncDecision.findOneAndUpdate(
-        { _id: activityId, claimToken },
-        { $set: { claimedAt: new Date() } },
-        { session },
-      );
-      if (reconfirmed == null) {
-        throw new ClaimLostError();
-      }
-
-      // The only call site that should ever $inc the counter; runs at most once per
-      // distinct event (redundant processing from other GROWI processes either loses
-      // the claim race above, or aborts this same transaction via ClaimLostError).
-      const after = await AnonymousSyncCounter.findOneAndUpdate(
-        { endpoint, windowStart },
-        { $inc: { count: 1 }, $set: { updatedAt: new Date() } },
-        { upsert: true, new: true, session },
-      );
-      decision = after.count <= threshold ? 'admitted' : 'dropped';
-
-      // Recorded once per (endpoint, windowStart) — at the exact event that pushes the
-      // count past threshold — not on every subsequent 'dropped' event in the same
-      // window, so a sustained attack doesn't flood the log with one line per event.
-      // The actual logger.warn call happens after the transaction commits (see below).
-      if (after.count === threshold + 1) {
-        thresholdJustReached = true;
-      }
-
-      await EsSyncDecision.updateOne(
-        { _id: activityId, claimToken },
-        { $set: { decision, claimedAt: new Date() } },
-        { session },
-      );
-    });
-  } catch (err) {
-    if (err instanceof ClaimLostError) {
-      return waitForDecision(activityId);
-    }
-    throw err;
-  } finally {
-    await session.endSession();
+  const outcome = await runClaimedTransaction(claim);
+  if (outcome === 'claim-lost') {
+    return waitForDecision(activityId);
   }
 
-  if (thresholdJustReached) {
+  if (outcome.thresholdJustReached) {
     logger.warn(
       { endpoint, windowStart, threshold },
       'Anonymous log ES sync threshold reached; further anonymous logs for this endpoint in this window are dropped from ES (still recorded in MongoDB).',
     );
   }
 
-  // decision is always set once withTransaction resolves without throwing.
-  return decision as EsSyncDecisionValue;
+  return outcome.decision;
 };

@@ -307,4 +307,36 @@ describe('decideEsSyncForEvent', () => {
       spy.mockRestore();
     }
   });
+
+  it('releases an orphaned pending claim after a genuine transaction error, so an immediate retry can succeed', async () => {
+    const activityId = newActivityId();
+    const threshold = 3;
+
+    const spy = vi
+      .spyOn(AnonymousSyncCounter, 'findOneAndUpdate')
+      .mockImplementationOnce(() => {
+        throw new Error('simulated transient driver error');
+      });
+
+    await expect(
+      decideEsSyncForEvent(activityId, endpoint, windowStart, threshold),
+    ).rejects.toThrow('simulated transient driver error');
+    spy.mockRestore();
+
+    // The failed attempt must not leave its claim behind: if it did, an immediate
+    // retry (well within STALE_CLAIM_MS) could neither steal it nor create a fresh
+    // one, and would time out via waitForDecision() into a wrong 'dropped' default
+    // instead of actually deciding.
+    const decision = await decideEsSyncForEvent(
+      activityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    expect(decision).toBe('admitted');
+    expect(
+      (await AnonymousSyncCounter.findOne({ endpoint, windowStart }))?.count,
+    ).toBe(1);
+  }, 10_000);
 });

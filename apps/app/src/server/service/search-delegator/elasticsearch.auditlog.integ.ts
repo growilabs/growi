@@ -197,4 +197,30 @@ describe('ElasticsearchDelegator.addAllAuditlogs()', () => {
 
     expect(mockES8Client.bulk).toHaveBeenCalledTimes(2);
   });
+
+  it('excludes an anonymous log at a gated endpoint once its threshold is exceeded', async () => {
+    // A full reindex must apply the same admission gate the live change-stream
+    // consumer applies (filter-admitted-upserts.ts) — it must not bulk-sync an
+    // anonymous log past its endpoint's configured threshold.
+    vi.mocked(configManager.getConfig).mockImplementation((key) => {
+      if (key === 'app:elasticsearchVersion') return 8;
+      if (key === 'app:elasticsearchReindexBulkSize') return 100;
+      if (key === 'app:auditLogEsSyncAnonymousThresholdLogin') return 0;
+      return false;
+    });
+    const id = new mongoose.Types.ObjectId();
+    await mongoose.connection.collection('activities').insertMany([
+      {
+        _id: id,
+        action: `test-action-${actionSeq++}`,
+        snapshot: { username: null },
+        endpoint: '/_api/v3/login',
+        createdAt: new Date(),
+      },
+    ]);
+
+    await delegator.addAllAuditlogs();
+
+    expect(mockES8Client.bulk).not.toHaveBeenCalled();
+  });
 });
