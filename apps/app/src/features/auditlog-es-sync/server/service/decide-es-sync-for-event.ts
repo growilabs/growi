@@ -125,8 +125,16 @@ export const decideEsSyncForEvent = async (
   // individually.
   const session = await mongoose.startSession();
   let decision: EsSyncDecisionValue | undefined;
+  // withTransaction may re-invoke its callback in full on a retryable driver error
+  // (e.g. a WriteConflict from a concurrent $inc below), so a side effect like
+  // logger.warn cannot live inside it without risking a double log. This flag is
+  // reset on every callback invocation and only its value from the attempt that
+  // actually commits survives to be read below.
+  let thresholdJustReached = false;
   try {
     await session.withTransaction(async () => {
+      thresholdJustReached = false;
+
       const reconfirmed = await EsSyncDecision.findOneAndUpdate(
         { _id: activityId, claimToken },
         { $set: { claimedAt: new Date() } },
@@ -146,14 +154,12 @@ export const decideEsSyncForEvent = async (
       );
       decision = after.count <= threshold ? 'admitted' : 'dropped';
 
-      // Logged once per (endpoint, windowStart) — at the exact event that pushes the
+      // Recorded once per (endpoint, windowStart) — at the exact event that pushes the
       // count past threshold — not on every subsequent 'dropped' event in the same
       // window, so a sustained attack doesn't flood the log with one line per event.
+      // The actual logger.warn call happens after the transaction commits (see below).
       if (after.count === threshold + 1) {
-        logger.warn(
-          { endpoint, windowStart, threshold },
-          'Anonymous log ES sync threshold reached; further anonymous logs for this endpoint in this window are dropped from ES (still recorded in MongoDB).',
-        );
+        thresholdJustReached = true;
       }
 
       await EsSyncDecision.updateOne(
@@ -169,6 +175,13 @@ export const decideEsSyncForEvent = async (
     throw err;
   } finally {
     await session.endSession();
+  }
+
+  if (thresholdJustReached) {
+    logger.warn(
+      { endpoint, windowStart, threshold },
+      'Anonymous log ES sync threshold reached; further anonymous logs for this endpoint in this window are dropped from ES (still recorded in MongoDB).',
+    );
   }
 
   // decision is always set once withTransaction resolves without throwing.

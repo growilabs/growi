@@ -35,6 +35,11 @@ import type {
   UpdateOrInsertPagesOpts,
 } from '../interfaces/search';
 import { aggregatePipelineToIndex } from './aggregate-to-index';
+import {
+  type AuditlogSyncFields,
+  createAuditlogIndex as createAuditlogIndexForClient,
+  syncAuditlogMapping as syncAuditlogMappingForClient,
+} from './auditlog-mapping-sync';
 import type {
   AggregatedPage,
   BulkWriteBody,
@@ -50,8 +55,6 @@ import {
   isES9ClientDelegator,
   type SearchQuery,
 } from './elasticsearch-client-delegator';
-import type { ES8ClientDelegator } from './elasticsearch-client-delegator/es8-client-delegator';
-import type { ES9ClientDelegator } from './elasticsearch-client-delegator/es9-client-delegator';
 import { sanitizeEndpointForIndex } from './sanitize-endpoint-for-index';
 
 const logger = loggerFactory('growi:service:search-delegator:elasticsearch');
@@ -90,19 +93,6 @@ const AVAILABLE_KEYS = [
 ];
 
 type Data = any;
-
-// Syncing a new field to the auditlog index takes four coordinated changes:
-//   1. this type,
-//   2. prepareBodyForAuditlog(), which reads it off the activity,
-//   3. the .select() in addAllAuditlogs() — omitting it makes the field appear
-//      in live sync but vanish after a rebuild,
-//   4. mappings/mappings-auditlog-properties.ts, so it is not dynamically mapped.
-// Also confirm the field is immutable after creation; see the 'update' note in
-// auditlog-changestream.ts.
-type AuditlogSyncFields = Partial<{
-  username: string;
-  endpoint: string;
-}>;
 
 class ElasticsearchDelegator
   implements SearchDelegator<Data, ESTermsKey, ESQueryTerms>
@@ -576,27 +566,12 @@ class ElasticsearchDelegator
     );
   }
 
-  /**
-   * Push the current auditlog mapping onto an index that already exists.
-   *
-   * The index is created once and never re-created on upgrade, so a field added
-   * to the mapping would otherwise only reach fresh installs — on an upgraded
-   * instance Elasticsearch would dynamically map it as `text` and break the
-   * `keyword` aggregations it was added for. Adding a field is a compatible
-   * mapping update; changing an existing field's type is not, and Elasticsearch
-   * rejects it — the boot and rebuild paths log such a failure instead of aborting.
-   */
-  private async syncAuditlogMapping(index: string): Promise<void> {
-    await this.runForAuditlogClient({
-      es8: async (client) => {
-        const { mappings } = await import('./mappings/mappings-auditlog-es8');
-        return client.indices.putMapping({ index, ...mappings.mappings });
-      },
-      es9: async (client) => {
-        const { mappings } = await import('./mappings/mappings-auditlog-es9');
-        return client.indices.putMapping({ index, ...mappings.mappings });
-      },
-    });
+  private syncAuditlogMapping(index: string): Promise<void> {
+    return syncAuditlogMappingForClient(
+      this.client,
+      this.elasticsearchVersion,
+      index,
+    );
   }
 
   async addAllAuditlogs(
@@ -702,42 +677,16 @@ class ElasticsearchDelegator
     }
   }
 
-  /**
-   * Dispatch to the ES8- or ES9-specific handler for `this.client`, throwing the
-   * same "unsupported version" error both `createAuditlogIndex` and
-   * `syncAuditlogMapping` need. Keeps the version-dispatch skeleton in one place
-   * so the two call sites cannot drift out of sync with each other.
-   */
-  private async runForAuditlogClient<T>(handlers: {
-    es8: (client: ES8ClientDelegator) => Promise<T>;
-    es9: (client: ES9ClientDelegator) => Promise<T>;
-  }): Promise<T> {
-    if (isES8ClientDelegator(this.client)) {
-      return handlers.es8(this.client);
-    }
-    if (isES9ClientDelegator(this.client)) {
-      return handlers.es9(this.client);
-    }
-    throw new Error(
-      `Unsupported Elasticsearch version: ${this.elasticsearchVersion}`,
-    );
-  }
-
   createAuditlogIndex(
     index: string,
   ): Promise<
     Awaited<ReturnType<ElasticsearchClientDelegator['indices']['create']>>
   > {
-    return this.runForAuditlogClient({
-      es8: async (client) => {
-        const { mappings } = await import('./mappings/mappings-auditlog-es8');
-        return client.indices.create({ index, ...mappings });
-      },
-      es9: async (client) => {
-        const { mappings } = await import('./mappings/mappings-auditlog-es9');
-        return client.indices.create({ index, ...mappings });
-      },
-    });
+    return createAuditlogIndexForClient(
+      this.client,
+      this.elasticsearchVersion,
+      index,
+    );
   }
 
   /**
