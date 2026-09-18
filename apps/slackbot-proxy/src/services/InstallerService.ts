@@ -43,32 +43,28 @@ export class InstallerService {
         storeInstallation: async (
           slackInstallation: SlackInstallation<'v1' | 'v2', boolean>,
         ) => {
-          const teamIdOrEnterpriseId =
-            slackInstallation.team?.id || slackInstallation.enterprise?.id;
+          const teamId = slackInstallation.team?.id;
+          const enterpriseId = slackInstallation.enterprise?.id;
 
-          if (teamIdOrEnterpriseId == null) {
+          if (teamId == null && enterpriseId == null) {
             throw new Error('teamId or enterpriseId is required.');
           }
 
-          const existedInstallation =
-            await repository.findByTeamIdOrEnterpriseId(teamIdOrEnterpriseId);
+          const existedInstallation = await repository.findForUpsert(
+            teamId,
+            enterpriseId,
+          );
 
-          if (existedInstallation != null) {
-            existedInstallation.setData(slackInstallation);
-            await repository.save(existedInstallation);
-            return;
-          }
-
-          const installation = new Installation();
+          const installation = existedInstallation ?? new Installation();
           installation.setData(slackInstallation);
           await repository.save(installation);
-          return;
         },
         fetchInstallation: async (installQuery: InstallationQuery<boolean>) => {
-          const id = installQuery.enterpriseId || installQuery.teamId;
-
-          // biome-ignore lint/style/noNonNullAssertion: id must be set --- IGNORE ---
-          const installation = await repository.findByTeamIdOrEnterpriseId(id!);
+          const installation = await repository.findByTeamIdOrEnterpriseId(
+            installQuery.teamId ?? undefined,
+            installQuery.enterpriseId ?? undefined,
+            installQuery.isEnterpriseInstall,
+          );
 
           if (installation == null) {
             throw new Error('Failed fetching installation');
