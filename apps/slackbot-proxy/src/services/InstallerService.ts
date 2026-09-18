@@ -58,19 +58,6 @@ export class InstallerService {
           const installation = existedInstallation ?? new Installation();
           installation.setData(slackInstallation);
           await repository.save(installation);
-
-          // This store also runs on token refresh, where nothing was installed.
-          // Only a newly stored org-wide install supersedes the workspace-level
-          // ones; otherwise a refresh would undo a workspace re-installed since.
-          if (
-            existedInstallation == null &&
-            slackInstallation.isEnterpriseInstall &&
-            enterpriseId != null
-          ) {
-            await repository.deactivateWorkspaceLevelInstallations(
-              enterpriseId,
-            );
-          }
         },
         fetchInstallation: async (installQuery: InstallationQuery<boolean>) => {
           const installation = await repository.findByTeamIdOrEnterpriseId(

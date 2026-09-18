@@ -1,4 +1,4 @@
-import { EntityRepository, IsNull, Repository } from 'typeorm';
+import { EntityRepository, Repository } from 'typeorm';
 
 import { Installation } from '~/entities/installation';
 
@@ -8,37 +8,33 @@ export class InstallationRepository extends Repository<Installation> {
     return this.findOne(id);
   }
 
-  // An org-wide install's stored row has no teamId, but a request from one of
-  // its workspaces still carries that workspace's real teamId. Try teamId
-  // first and fall back to the enterprise-wide row when it doesn't match.
+  // An org-wide install covers every workspace of its organization, so it is
+  // tried first and the workspace-level row is only reached when the
+  // organization has none. Slack keeps both rows alive -- a workspace-level
+  // install stays valid after an org-wide one, and a workspace installed
+  // afterwards inherits the org-wide scopes -- so coexistence is permanent and
+  // the org-wide token is the one to use once it exists.
+  // https://docs.slack.dev/enterprise/migrating-to-organization-wide-deployment
   async findByTeamIdOrEnterpriseId(
     teamId?: string,
     enterpriseId?: string,
   ): Promise<Installation | undefined> {
-    if (teamId != null) {
-      const installation = await this.findOne({
-        where: { teamId, deactivatedAt: IsNull() },
+    if (enterpriseId != null) {
+      const orgWideInstallation = await this.findOne({
+        where: { enterpriseId, isEnterpriseInstall: true },
       });
-      if (installation != null) {
-        return installation;
+      if (orgWideInstallation != null) {
+        return orgWideInstallation;
       }
     }
-    if (enterpriseId != null) {
-      return this.findOne({
-        where: {
-          enterpriseId,
-          isEnterpriseInstall: true,
-          deactivatedAt: IsNull(),
-        },
-      });
+    if (teamId != null) {
+      return this.findOne({ where: { teamId } });
     }
     return undefined;
   }
 
   // Falling back to the enterprise-wide row here would let a per-workspace
   // save overwrite it, so upsert must match the exact row for this install.
-  // Deactivated rows are included on purpose: re-installing on a workspace
-  // reuses its row, which restores the relations that were registered on it.
   findForUpsert(
     teamId?: string,
     enterpriseId?: string,
@@ -52,22 +48,5 @@ export class InstallationRepository extends Repository<Installation> {
       });
     }
     return Promise.resolve(undefined);
-  }
-
-  // An org-wide install supersedes every workspace-level install under the same
-  // organization. Their rows are kept rather than deleted so that re-installing
-  // on a workspace restores the relations registered on it.
-  async deactivateWorkspaceLevelInstallations(
-    enterpriseId: string,
-  ): Promise<void> {
-    await this.createQueryBuilder()
-      .update()
-      .set({ deactivatedAt: new Date() })
-      .where('enterpriseId = :enterpriseId', { enterpriseId })
-      .andWhere('isEnterpriseInstall = :isEnterpriseInstall', {
-        isEnterpriseInstall: false,
-      })
-      .andWhere('deactivatedAt IS NULL')
-      .execute();
   }
 }

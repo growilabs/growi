@@ -18,9 +18,11 @@ vi.mock('~/entities/installation', () => ({
  *   B. Grid, workspace-level install  teamId and enterpriseId, isEnterpriseInstall=false
  *   C. Grid, org-wide install         enterpriseId only, isEnterpriseInstall=true
  *
- * A request originating from a workspace under an org-wide install still carries
- * that workspace's real teamId, even though the stored row (C) has none. That is
- * why the lookup has to fall back from teamId to enterpriseId.
+ * B and C coexist permanently: Slack keeps workspace-level installs working after
+ * an org-wide one, so the lookup cannot assume the workspace rows are gone. It
+ * resolves the org-wide row first and reaches a workspace-level row only when the
+ * organization has no org-wide install. A request always carries the originating
+ * workspace's real teamId, even when the row that serves it (C) has none.
  */
 
 type InstallationRow = {
@@ -28,7 +30,6 @@ type InstallationRow = {
   teamId?: string;
   enterpriseId?: string;
   isEnterpriseInstall: boolean;
-  deactivatedAt?: Date | null;
 };
 
 const TEAM_SOLO = 'T_SOLO';
@@ -52,13 +53,6 @@ const orgWide: InstallationRow = {
   enterpriseId: ENTERPRISE,
   isEnterpriseInstall: true,
 };
-const deactivatedGridWorkspace: InstallationRow = {
-  id: 4,
-  teamId: TEAM_GRID_WORKSPACE,
-  enterpriseId: ENTERPRISE,
-  isEnterpriseInstall: false,
-  deactivatedAt: new Date('2026-01-01'),
-};
 
 const matchesWhere = (
   row: InstallationRow,
@@ -68,11 +62,8 @@ const matchesWhere = (
     const actual = row[key as keyof InstallationRow];
     if (expected instanceof FindOperator) {
       // Fail loudly rather than silently accepting a condition this fake does
-      // not implement, so swapping IsNull() for another operator is caught.
-      if (expected.type !== 'isNull') {
-        throw new Error(`unsupported operator on "${key}": ${expected.type}`);
-      }
-      return actual == null;
+      // not implement, so a new operator in a where clause is caught here.
+      throw new Error(`unsupported operator on "${key}": ${expected.type}`);
     }
     return actual === expected;
   });
@@ -105,9 +96,9 @@ describe('InstallationRepository.findByTeamIdOrEnterpriseId', () => {
     expect(result).toBe(soloWorkspace);
   });
 
-  it('should resolve a Grid workspace-level install by its teamId, not by its enterpriseId', async () => {
+  it('should resolve a Grid workspace-level install when its organization has no org-wide install', async () => {
     // Arrange
-    const repository = setupRepository([soloWorkspace, gridWorkspace, orgWide]);
+    const repository = setupRepository([soloWorkspace, gridWorkspace]);
 
     // Act
     const result = await repository.findByTeamIdOrEnterpriseId(
@@ -119,7 +110,7 @@ describe('InstallationRepository.findByTeamIdOrEnterpriseId', () => {
     expect(result).toBe(gridWorkspace);
   });
 
-  it('should fall back to the org-wide install when the incoming teamId matches no row', async () => {
+  it('should resolve the org-wide install for a request from a workspace it covers', async () => {
     // Arrange: an org-wide install stores no teamId, yet the request carries one
     const repository = setupRepository([soloWorkspace, orgWide]);
 
@@ -133,9 +124,11 @@ describe('InstallationRepository.findByTeamIdOrEnterpriseId', () => {
     expect(result).toBe(orgWide);
   });
 
-  it('should not resolve a deactivated row', async () => {
-    // Arrange: the workspace-level install was superseded by an org-wide install
-    const repository = setupRepository([deactivatedGridWorkspace, orgWide]);
+  it('should prefer the org-wide install over a workspace-level install of the same team', async () => {
+    // Arrange: Slack leaves the workspace-level install in place after an
+    // org-wide one, so both rows are live and the org-wide token is the one
+    // that now covers this workspace
+    const repository = setupRepository([gridWorkspace, orgWide]);
 
     // Act
     const result = await repository.findByTeamIdOrEnterpriseId(
@@ -147,13 +140,13 @@ describe('InstallationRepository.findByTeamIdOrEnterpriseId', () => {
     expect(result).toBe(orgWide);
   });
 
-  it('should return undefined when only a deactivated row matches', async () => {
-    // Arrange
-    const repository = setupRepository([deactivatedGridWorkspace]);
+  it('should not resolve another workspace of the same organization through its enterpriseId', async () => {
+    // Arrange: a sibling workspace is installed, this one is not
+    const repository = setupRepository([gridWorkspace]);
 
     // Act
     const result = await repository.findByTeamIdOrEnterpriseId(
-      TEAM_GRID_WORKSPACE,
+      TEAM_UNDER_ORG_WIDE,
       ENTERPRISE,
     );
 
@@ -214,20 +207,6 @@ describe('InstallationRepository.findForUpsert', () => {
 
     // Assert
     expect(result).toBe(orgWide);
-  });
-
-  it('should find a deactivated row, so re-installing restores the relations on it', async () => {
-    // Arrange
-    const repository = setupRepository([deactivatedGridWorkspace, orgWide]);
-
-    // Act
-    const result = await repository.findForUpsert(
-      TEAM_GRID_WORKSPACE,
-      ENTERPRISE,
-    );
-
-    // Assert
-    expect(result).toBe(deactivatedGridWorkspace);
   });
 
   it('should return undefined when neither id is given', async () => {

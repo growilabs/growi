@@ -34,17 +34,11 @@ export class Installation {
   @Column({ nullable: true })
   enterpriseId?: string;
 
-  // Set when an org-wide install supersedes this workspace-level install. The
-  // row is kept so that re-installing on the workspace restores its relations.
-  @Column({ type: 'timestamp', nullable: true })
-  deactivatedAt?: Date | null;
-
   setData(slackInstallation: SlackInstallation): void {
     this.data = slackInstallation;
 
     this.isEnterpriseInstall = slackInstallation.isEnterpriseInstall;
     this.teamId = slackInstallation.team?.id;
     this.enterpriseId = slackInstallation.enterprise?.id;
-    this.deactivatedAt = null;
   }
 }
