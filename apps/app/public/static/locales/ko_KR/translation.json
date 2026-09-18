@@ -1,4 +1,9 @@
 {
+  "backlinks": {
+    "failed_to_fetch": "백링크를 가져오지 못했습니다.",
+    "no_backlinks": "아직 백링크가 없습니다.",
+    "panel": "백링크"
+  },
   "meta": {
     "display_name": "한국어"
   },
