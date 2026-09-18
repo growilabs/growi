@@ -167,6 +167,37 @@ describe('InstallationRepository.findByTeamIdOrEnterpriseId', () => {
     // Assert
     expect(result).toBeUndefined();
   });
+
+  it('should skip the org-wide row when Slack marks the request as not org-wide', async () => {
+    // Arrange: Slack's own signal for this request says it is not org-wide,
+    // even though an org-wide row exists for the same enterpriseId
+    const repository = setupRepository([gridWorkspace, orgWide]);
+
+    // Act
+    const result = await repository.findByTeamIdOrEnterpriseId(
+      TEAM_GRID_WORKSPACE,
+      ENTERPRISE,
+      false,
+    );
+
+    // Assert
+    expect(result).toBe(gridWorkspace);
+  });
+
+  it('should still resolve the org-wide row when Slack marks the request as org-wide', async () => {
+    // Arrange
+    const repository = setupRepository([gridWorkspace, orgWide]);
+
+    // Act
+    const result = await repository.findByTeamIdOrEnterpriseId(
+      TEAM_GRID_WORKSPACE,
+      ENTERPRISE,
+      true,
+    );
+
+    // Assert
+    expect(result).toBe(orgWide);
+  });
 });
 
 describe('InstallationRepository.findForUpsert', () => {
