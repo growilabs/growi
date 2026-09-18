@@ -2,14 +2,7 @@
   "meta": {
     "display_name": "简体中文"
   },
-  "Update": "更新",
-  "Delete": "删除",
-  "User": "用户",
-  "Name": "姓名",
-  "Created": "创建",
   "Page": "页面",
-  "Edit": "编辑",
-  "Description": "描述",
   "Execute": "执行",
   "Enable": "启用",
   "Copied!": "已复制！",
@@ -28,10 +21,10 @@
     "security_settings": "安全设置",
     "scope_of_page_disclosure": "页面公开范围",
     "set_point": "设定值",
-    "always_displayed": "始终显示",
-    "always_hidden": "总是隐藏",
     "Guest Users Access": "来宾用户访问",
     "readonly_users_access": "只浏览用户的访问",
+    "always_hidden": "总是隐藏",
+    "always_displayed": "始终显示",
     "Fixed by env var": "这是由env var<code>%s=%s</code>修复的。",
     "register_limitation": "注册限制",
     "register_limitation_desc": "限制新用户注册",
@@ -325,6 +318,28 @@
     "rebuild_progress_completed": "已完成",
     "rebuild_normalization_timeout": "重建完成，但规范化超时。请手动规范化。"
   },
+  "audit_log_index_management": {
+    "audit_log_index_management": "审计日志索引管理",
+    "settings_explanation": "审计日志索引的规范化与重建可在以下页面进行",
+    "index_management_link": "前往 {{destination}}",
+    "docs_url": {
+      "top": "https://docs.growi.org/en/admin-guide/management-cookbook/setup-search-system.html"
+    },
+    "normalize": "规范化",
+    "normalize_button": "规范化审计日志索引",
+    "normalize_success": "审计日志索引规范化成功。",
+    "normalize_description": "修复损坏的审计日志索引。",
+    "rebuild": "重建",
+    "rebuild_button": "重建审计日志索引",
+    "rebuild_requested": "审计日志索引重建请求已接受。",
+    "rebuild_description_1": "删除并重建所有审计日志索引。",
+    "rebuild_description_2": "此操作可能需要一些时间。",
+    "unsynced_events_warning": "部分审计日志事件未能同步到 Elasticsearch。请重建以恢复一致性。",
+    "rebuild_progress_processing": "处理中..",
+    "rebuild_progress_completed": "已完成",
+    "rebuild_normalization_timeout": "重建完成，但规范化超时。请手动规范化。",
+    "reconnect": "重新连接"
+  },
   "mailer_setup_required": "<a href='/admin/app'>Email settings</a> are required to send.",
   "admin_top": {
     "management_wiki": "管理Wiki",
@@ -417,6 +432,7 @@
     "update": "更新",
     "mail_settings": "邮件设置",
     "mailer_is_not_set_up": "邮件设置尚未完成。",
+    "from_e-mail_address": "邮件发出地址",
     "transmission_method": "传送方法",
     "smtp_label": "SMTP",
     "ses_label": "SES(AWS)",
@@ -429,7 +445,6 @@
     "oauth2_refresh_token": "刷新令牌",
     "oauth2_refresh_token_help": "从 OAuth 2.0 授权流程获得的刷新令牌",
     "placeholder_leave_blank": "留空以保留现有值",
-    "from_e-mail_address": "邮件发出地址",
     "send_test_email": "发送测试邮件",
     "success_to_send_test_email": "成功发送了一封测试邮件",
     "smtp_settings": "SMTP 设置",
@@ -446,6 +461,7 @@
     "file_delivery_method_relay": "Internal System Relay",
     "file_delivery_method_redirect_info": "Redirect: It redirects to a signed URL without GROWI server, it gives excellent performance.",
     "file_delivery_method_relay_info": "Internal System Relay: The GROWI server delivers to clients, it provides complete security.",
+    "fixed_by_env_var": "这是由env var 修复的 <code>{{envKey}}={{envVar}}</code>.",
     "gcs_label": "GCP(GCS)",
     "aws_label": "AWS(S3)",
     "local_label": "Local",
@@ -458,7 +474,6 @@
     "azure_storage_container_name": "Container Name",
     "azure_note_for_the_only_env_option": "The Azure Settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> .",
     "azure_note_for_the_only_env_option_cloud": "Azure 设置可以从 GROWI.cloud 管理页面进行更改。",
-    "fixed_by_env_var": "这是由env var 修复的 <code>{{envKey}}={{envVar}}</code>.",
     "file_upload": "This is for uploading file settings. If you complete file upload settings, file upload function, profile picture function etc will be enabled.",
     "test_connection": "测试邮件服务器连接",
     "change_setting": "注意：如果你更改此设置未完成，您将无法访问迄今为止上传的文件。",
@@ -660,7 +675,6 @@
     "page_path": "相对路径",
     "beta_warning": "这个函数是Beta。",
     "import_from": "Import from {{from}}",
-    "import_archive_data": "导入存档数据",
     "error": {
       "only_upsert_available": "Only 'Upsert' option is available for pages collection."
     },
@@ -862,9 +876,9 @@
       "emails": "电子邮件",
       "description1": "通过电子邮件地址临时发布新用户。",
       "description2": "将为首次登录生成一个临时密码。",
+      "invite_thru_email": "发送邀请电子邮件",
       "mail_setting_link": "<span class='material-symbols-outlined me-2'>settings</span><a href='/admin/app'>Email settings</a>",
       "valid_email": "需要有效的电子邮件地址",
-      "invite_thru_email": "发送邀请电子邮件",
       "temporary_password": "创建的用户具有临时密码",
       "send_new_password": "请将新密码发送给用户。",
       "send_temporary_password": "如果你没有发送电子邮件邀请，请复制此屏幕上的临时密码并联系邀请人。",
@@ -970,28 +984,6 @@
       "force_update_parents_label": "强行添加失踪的用户",
       "force_update_parents_description": "激活这个选项，如果在父组改变后，在祖先组中有缺失的用户，可以强制添加这些用户"
     }
-  },
-  "audit_log_index_management": {
-    "audit_log_index_management": "审计日志索引管理",
-    "settings_explanation": "审计日志索引的规范化与重建可在以下页面进行",
-    "index_management_link": "前往 {{destination}}",
-    "docs_url": {
-      "top": "https://docs.growi.org/en/admin-guide/management-cookbook/setup-search-system.html"
-    },
-    "normalize": "规范化",
-    "normalize_button": "规范化审计日志索引",
-    "normalize_success": "审计日志索引规范化成功。",
-    "normalize_description": "修复损坏的审计日志索引。",
-    "rebuild": "重建",
-    "rebuild_button": "重建审计日志索引",
-    "rebuild_requested": "审计日志索引重建请求已接受。",
-    "rebuild_description_1": "删除并重建所有审计日志索引。",
-    "rebuild_description_2": "此操作可能需要一些时间。",
-    "unsynced_events_warning": "部分审计日志事件未能同步到 Elasticsearch。请重建以恢复一致性。",
-    "rebuild_progress_processing": "处理中..",
-    "rebuild_progress_completed": "已完成",
-    "rebuild_normalization_timeout": "重建完成，但规范化超时。请手动规范化。",
-    "reconnect": "重新连接"
   },
   "audit_log_management": {
     "audit_log": "审计日志",
