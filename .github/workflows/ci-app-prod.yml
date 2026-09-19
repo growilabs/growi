@@ -23,7 +23,7 @@ on:
       - '!apps/app/docker/**'
       - packages/**
   pull_request:
-    types: [opened, reopened, synchronize]
+    types: [opened, reopened, synchronize, labeled]
     paths:
       - .github/mergify.yml
       - .github/workflows/ci-app-prod.yml
@@ -54,7 +54,8 @@ jobs:
         || startsWith( github.head_ref, 'mergify/merge-queue/' ))
       # See ci-app.yml's ci-app-test job comment: label-based (not
       # head-branch-based) so the skip also holds on Mergify's merge-queue
-      # revalidation branch.
+      # revalidation branch, and `labeled` is in the trigger types above so
+      # a run actually exists that sees the label once it lands.
       && !contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
     with:
       node-version: 24.x
