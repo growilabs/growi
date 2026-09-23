@@ -3,7 +3,6 @@
     "display_name": "Français"
   },
   "Help": "Aide",
-  "View": "Voir",
   "Edit": "Modifier",
   "Delete": "Supprimer",
   "delete_all": "Tout supprimer",
@@ -127,7 +126,6 @@
   "UserGroup": "Groupe utilisateur",
   "Basic Settings": "Paramètres de base",
   "The contents entered here will be shown in the header etc": "Le contenu entré ici sera visible dans l'en-tête",
-  "Browsing of this page is restricted": "Le contenu de cette page est restreint.",
   "Forbidden": "Accès interdit",
   "Public": "Tout le monde",
   "Anyone with the link": "Tous les utilisateurs disposant du lien",
@@ -235,8 +233,7 @@
       "apitoken_issued": "Aucun jeton d'API existant.",
       "update_token1": "Un nouveau jeton peut être généré.",
       "update_token2": "Modifiez le jeton aux endroits où celui-ci est utilisé, car l'ancien sera invalide."
-    },
-    "form_help": {}
+    }
   },
   "Access Token Settings": "Jeton d'accès",
   "page_me_access_token": {
@@ -561,7 +558,6 @@
     "resolve_and_save": "Résoudre et sauvegarder",
     "select_revision": "Sélectionner {{revision}}",
     "requested_revision": "moi",
-    "origin_revision": "origine",
     "latest_revision": "les autres",
     "selected_editable_revision": "Corps de page sélectionné (Modifiable)"
   },
@@ -575,8 +571,6 @@
     "recent_threads": "Éléments récents",
     "accuracy_notice": "Vérifiez les pages référencées pour vous assurer de l'exactitude des informations.",
     "sources": "{{count}} pages référencées",
-    "sources_one": "{{count}} page référencée",
-    "sources_other": "{{count}} pages référencées",
     "error": {
       "title": "Une erreur s'est produite",
       "retry": "Réessayer",
@@ -946,8 +940,8 @@
     "page_delete_completely": "a supprimé complètement une page",
     "page_rename": "a renommé une page",
     "page_revert": "a restauré une page",
-    "page_duplicate": "a dupliqué une page",
     "page_like": "a aimé une page",
+    "page_duplicate": "a dupliqué une page",
     "comment_create": "a publié un commentaire"
   },
   "bookmark_folder": {
