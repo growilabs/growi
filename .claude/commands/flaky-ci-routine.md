@@ -420,6 +420,29 @@ a wake-up.
 **The session ends when Step 6's report is written.** There is no
 "waiting for" state after that.
 
+### Never `rm`, `mv`, or edit files outside the repo checkout
+
+`mcp__github__get_job_logs` (used whenever `JOB_LOG_METHOD=mcp`) writes large
+results to a file under the harness's own session directory — a path like
+`~/.claude/projects/<project>/<session-id>/tool-results/*.txt`, **outside**
+`/home/user/growi`. That directory is harness-owned state, not scratch space
+this routine created.
+
+Do not `rm`, `mv`, or `Edit` anything under it, even to "clean up" a large
+file once its content has been extracted. A write there is treated as
+touching a sensitive file and triggers an interactive permission prompt —
+and this routine runs unattended, so nothing ever answers that prompt. The
+session then sits blocked until a later cron fire happens to create a fresh
+environment and move past it, which has cost this routine as long as a full
+day of silence on a single run (observed 2026-09-04 → 2026-09-08 and
+2026-09-09, both stalled on an `rm` of a `tool-results/*.txt` file).
+
+If a fetched log is too large to keep around, copy the piece you need into
+this run's own scratchpad or `/tmp` and read from there — never write back to
+or delete the original `tool-results` file. Leaving it in place costs nothing
+this routine needs to reclaim; disk cleanup for that directory is the
+harness's job, not this routine's.
+
 ## Step 4 — Auto-close stale observing issues
 
 An identity that was seen once and never again should not stay on the
