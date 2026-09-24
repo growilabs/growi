@@ -154,7 +154,7 @@ describe('getSearchInfiniteKey', () => {
 });
 
 describe('mutateSearching', () => {
-  it('revalidates both the paginated and the infinite-scroll caches', async () => {
+  it('revalidates only the paginated caches', async () => {
     await mutateSearching();
 
     // capture the key-matcher predicate handed to swr's global mutate
@@ -163,7 +163,10 @@ describe('mutateSearching', () => {
     ) => boolean;
 
     expect(predicate(['/search', 'growi', {}])).toBe(true);
-    expect(predicate(['/search/infinite', 'growi', 0, {}])).toBe(true);
+    // Infinite-scroll per-page caches are not targeted: revalidating them
+    // cannot refresh the list (SWR skips the `$inf$` key the hook subscribes
+    // to), so the infinite-scroll caller updates its own response (A-1).
+    expect(predicate(['/search/infinite', 'growi', 0, {}])).toBe(false);
     // unrelated caches and non-array keys must not match
     expect(predicate(['/pages/recent'])).toBe(false);
     expect(predicate('/search')).toBe(false);

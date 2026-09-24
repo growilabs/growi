@@ -32,6 +32,7 @@ import {
 import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
 import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
 
+import type { SearchItemMutation } from '../../util/apply-search-item-mutation';
 // Do not import with next/dynamic
 // see: https://github.com/growilabs/growi/pull/7923
 import { SearchResultList } from './SearchResultList';
@@ -89,12 +90,12 @@ type Props = {
   // numbered pager is suppressed. When omitted, legacy pager rendering is kept.
   infiniteScroll?: SearchPageBaseInfiniteProps;
 
-  // Called after a single-row page operation (duplicate / rename / delete) so
-  // the caller can revalidate ITS OWN active SWR response. The global
-  // `mutateSearching()` cannot reach an active `useSWRInfinite` subscription
-  // (SWR's filtered `mutate` explicitly skips `$inf$`-prefixed keys), so the
-  // infinite-scroll caller must pass its own bound `mutate` here (A-1).
-  onItemMutated?: () => void;
+  // Called after a single-row rename / delete with what changed, so the caller
+  // can update ITS OWN active SWR response. The global `mutateSearching()`
+  // cannot reach an active `useSWRInfinite` subscription (SWR's filtered
+  // `mutate` explicitly skips `$inf$`-prefixed keys), so the infinite-scroll
+  // caller must apply the change itself (A-1).
+  onItemMutated?: (mutation: SearchItemMutation) => void;
 };
 
 const SearchResultContent = dynamic(

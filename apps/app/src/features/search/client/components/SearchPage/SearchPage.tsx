@@ -18,9 +18,14 @@ import {
   DEFAULT_SEARCH_CHUNK_SIZE,
   type ISearchConditions,
   type ISearchConfigurations,
+  mutateSearchInfiniteChunks,
   useSWRINFxSearch,
 } from '~/stores/search';
 
+import {
+  applySearchItemMutation,
+  type SearchItemMutation,
+} from '../../util/apply-search-item-mutation';
 import { mergeInfiniteSearchResult } from '../../util/infinite-search-result';
 import { OperateAllControl } from './OperateAllControl';
 import SearchControl from './SearchControl';
@@ -125,7 +130,7 @@ export const SearchPage = (): JSX.Element => {
   // useSWRInfinite returns a fresh object every render; destructure its stable
   // members so the callbacks below keep stable identities (and their memoized
   // consumers, e.g. searchControl, are not recomputed on every append).
-  const { data: swrData, error: swrError, setSize, mutate } = swr;
+  const { data: swrData, error: swrError, size, setSize, mutate } = swr;
 
   // Accumulated, render-ready result derived from the infinite-scroll chunks.
   const merged = useMemo(
@@ -143,14 +148,24 @@ export const SearchPage = (): JSX.Element => {
   const reachedResultWindowLimit =
     (loadedChunks + 1) * chunkSize > ES_MAX_RESULT_WINDOW;
 
-  // NOTE: an argument-less `mutate()` on `useSWRInfinite` force-revalidates
-  // EVERY already-loaded chunk sequentially (`revalidateFirstPage: false` only
-  // skips revalidating the FIRST page on mount/key-change, it does not limit a
-  // manual `mutate()`). After loading e.g. 40 chunks, a single failed chunk's
-  // Retry click re-fetches all 40 (+1) chunks, not just the failed one (A-4).
+  // Re-request the current size instead of calling `mutate()`: an
+  // argument-less `mutate()` force-revalidates EVERY loaded chunk, whereas
+  // `setSize` revalidates with the cached data, so only the chunk without a
+  // cache entry — the failed one — is fetched again (A-4).
   const onRetry = useCallback(() => {
-    mutate();
-  }, [mutate]);
+    setSize(size);
+  }, [setSize, size]);
+
+  // Apply a single-row rename / delete to the cached chunks in place (A-1).
+  // Revalidating instead would re-fetch every loaded chunk for one row.
+  const itemMutatedHandler = useCallback(
+    (mutation: SearchItemMutation) => {
+      mutateSearchInfiniteChunks(mutate, (chunk) =>
+        applySearchItemMutation(chunk, mutation),
+      );
+    },
+    [mutate],
+  );
 
   // Identity of the current search. Derived WITHOUT offset/size/pageIndex so it
   // stays stable across infinite-scroll appends and changes only on a new
@@ -358,10 +373,9 @@ export const SearchPage = (): JSX.Element => {
       onSelectedPagesByCheckboxesChanged={
         selectedPagesByCheckboxesChangedHandler
       }
-      // Revalidate THIS active useSWRInfinite response after a single-row
-      // duplicate / rename / delete — the global mutateSearching() cannot reach
-      // it (A-1).
-      onItemMutated={mutate}
+      // Update THIS active useSWRInfinite response after a single-row rename /
+      // delete — the global mutateSearching() cannot reach it (A-1).
+      onItemMutated={itemMutatedHandler}
       // Components
       searchControl={searchControl}
       searchResultListHead={searchResultListHead}

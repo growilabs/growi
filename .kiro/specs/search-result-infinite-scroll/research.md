@@ -92,7 +92,7 @@
 分析日: 2026-07-24 / discovery: light（Extension）
 
 ## Research 項目の確定（RN1–RN5）
-- **RN1 追加読込失敗**: `isReachingEnd = 累積>=total || hasError` でエラー時に自動 `setSize` を停止（タイトなリトライループ防止）。`endingIndicator` にエラー＋「再試行」ボタンを出し、`mutate()` で復帰。要件 1.6 の「再試行できる状態を維持」を満たす。
+- **RN1 追加読込失敗**: `isReachingEnd = 累積>=total || hasError` でエラー時に自動 `setSize` を停止（タイトなリトライループ防止）。`endingIndicator` にエラー＋「再試行」ボタンを出し、`setSize(size)` で失敗チャンクのみ再取得して復帰（引数なし `mutate()` は読込済み全チャンクを再取得するため不採用、A-4）。要件 1.6 の「再試行できる状態を維持」を満たす。
 - **RN2 チャンクサイズ**: `showPageLimitationL ?? INITIAL_PAGIONG_SIZE(20)` を固定チャンクとして採用。既存の admin config を尊重しつつ既定 20・セレクタ非提供（要件 3.1/3.2 と整合。3.1 の「20」は config 未設定時の既定）。
 - **RN3 新旧両立**: モード名ハードコードを避け、`SearchPageBase` に `resetKey`（データ駆動）を導入。リセット系 effect を `[pages]`→`[resetKey]` へ。削除後の選択クリアは削除完了ハンドラで明示実行し、`[pages]` 依存を排除。
 - **RN4 IntersectionObserver × レイアウト**: `InfiniteScroll` を既存 `overflow-y-scroll` コンテナ内に配置（`RecentChanges` 先例）。2ペイン構成での交差は実機確認を Validation Hook 化。

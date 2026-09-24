@@ -20,7 +20,7 @@
 - 「検索ヒット全件（未読み込み分を含む `total` 全件）」の一括選択（Gmail 式全件選択バナー）
 - infinite scroll と番号ページャの切替式提供
 - 検索モーダル・タイプアヘッド・AI アシスタント検索の表示方式（`useSWRxSearch` 消費者）の変更
-- **累積結果の描画仮想化（既知の制約 / 後続対応）**: `SearchResultList` は累積 `pages` を全件 DOM に展開する。数千件までスクロールすると重い `PageListItemL`（ドロップダウン・チェックボックス・スニペット）が無制限に増え、終盤でスクロールがもたつく。仮想スクロール（`react-window`/`react-virtuoso` 等）は本スペックでは導入せず、後続タスク/issue とする（P2-3）。
+- **累積結果の描画仮想化（既知の制約 / 後続対応）**: `SearchResultList` は累積 `pages` を全件 DOM に展開する。数千件までスクロールすると重い `PageListItemL`（ドロップダウン・チェックボックス・スニペット）が無制限に増え、終盤でスクロールがもたつく。仮想スクロール（`react-window`/`react-virtuoso` 等）は本スペックでは導入せず、後続タスク/issue とする（P2-3）。あわせて `PageListItemL` の `memo` も現状効いていない（(1) `SearchResultList` の `injectedPages` が毎レンダー `pages.map()` で作り直され `page` prop が常に不一致、(2) `SearchPageBase` の `onPageSelected` がインライン関数で `checkboxChangedHandler` も `useCallback` なし）ため、右ペインのプレビュー切替 1 回で累積全行が再描画される。この 2 点は仮想化と同じ後続タスクで同時に解消する。
 - **付随情報取得の差分化（既知の制約 / 後続対応）**: 各行のスニペット/ブックマーク数等は `useSWRxPageInfoForList(pageIds)` が GET クエリで取得する。infinite scroll では `pages` が append で伸びるため、追記のたびに「累積 ID 全件」を再取得し（差分ではない）、スクロール全体で O(n²) の転送・DB 参照になる。ID を数百件溜めるとクエリ長が 8KB を超え 414/431 で失敗し得る。差分取得（新規追加分の ID のみ問い合わせ）への変更は本スペックでは行わず、後続タスク/issue とする（P2-2）。
 
 ## Boundary Commitments
@@ -132,7 +132,7 @@ apps/app/src/features/search/client/util/
 ### Modified Files
 - `apps/app/src/stores/search.tsx` — `useSWRINFxSearch`（新規フック）と `getSearchInfiniteKey`（純粋な getKey、テスト用に export）を追加。`useSWRxSearch` は**変更しない**。チャンクサイズ定数を共有化。
 - `apps/app/src/stores/search.spec.ts`（無ければ新規） — `getSearchInfiniteKey` のユニットテスト。
-- `apps/app/src/features/search/client/components/SearchPage/SearchPage.tsx` — `useSWRINFxSearch` に切替。`searchPager`/`PaginationWrapper` を廃止し `InfiniteScroll` を配線。累積 `pages` と `resetKey` を `SearchPageBase` へ渡す。追加読込失敗時の `hasError`/`onRetry` と、削除完了時の `setSize(1)+mutate`+選択クリアを実装。
+- `apps/app/src/features/search/client/components/SearchPage/SearchPage.tsx` — `useSWRINFxSearch` に切替。`searchPager`/`PaginationWrapper` を廃止し `InfiniteScroll` を配線。累積 `pages` と `resetKey` を `SearchPageBase` へ渡す。追加読込失敗時の `hasError`/`onRetry`（`setSize(size)`）、削除完了時の `setSize(1)+mutate`+選択クリア、行単位リネーム/削除のキャッシュ直接更新（`onItemMutated`）を実装。
 - `apps/app/src/features/search/client/components/SearchPage/SearchPageBase.tsx` — props に `resetKey`（必須）と `infiniteScroll`（任意）を追加。リセット系 `useEffect` の依存を `[pages]` から `resetKey` へ変更。`infiniteScroll` 指定時は `SearchResultList` を `InfiniteScroll` でラップ、未指定時は従来どおり `searchPager` を描画。`usePageDeleteModalForBulkDeletion` の第1引数を `IPageWithSearchMeta[] | undefined`（累積リスト）へ一般化。
 - `apps/app/src/features/search/client/components/PrivateLegacyPages.tsx` — `SearchPageBase` の新 props に追随（`resetKey = keyword|sort|order|offset` を渡す／削除フックへ `data?.data` を渡す）。番号ページャ挙動は維持。
 - `apps/app/src/features/search/client/components/SearchPage/SearchPage.spec.tsx`（無ければ新規） — 主要ふるまいのコンポーネントテスト。
@@ -166,7 +166,7 @@ sequenceDiagram
         SP-->>IS: isReachingEnd = true 相当 (hasError で自動読込停止)
         IS-->>U: endingIndicator にエラー + 再試行ボタン
         U->>SP: 再試行クリック
-        SP->>H: mutate() で再検証 → 復帰後 isReachingEnd = false で継続
+        SP->>H: setSize(size) で失敗チャンクのみ再取得 → 復帰後 isReachingEnd = false で継続
     end
 ```
 
@@ -196,7 +196,7 @@ stateDiagram-v2
 | 1.3 | 読込中インジケータ | InfiniteScroll | loadingIndicator | 追加読込 |
 | 1.4 | total 到達で停止 | mergeInfiniteSearchResult | isReachingEnd | 追加読込 |
 | 1.5 | 0件表示・追加読込しない | SearchResultListHead, merge | isEmpty | 追加読込 |
-| 1.6 | 失敗時エラー通知・再試行維持 | SearchPage, InfiniteScroll | hasError, onRetry, mutate | 追加読込(失敗) |
+| 1.6 | 失敗時エラー通知・再試行維持 | SearchPage, InfiniteScroll | hasError, onRetry, setSize | 追加読込(失敗) |
 | 2.1 | 番号ページャ非表示 | SearchPage, SearchPageBase | infiniteScroll slot | — |
 | 2.2 | 超過分はスクロール提供 | InfiniteScroll | setSize | 追加読込 |
 | 3.1 | 1回 showPageLimitationL 件（config 既定50、防御的既定20） | useSWRINFxSearch | chunkSize = showPageLimitationL ?? DEFAULT_SEARCH_CHUNK_SIZE(20) | 追加読込 |
@@ -387,7 +387,12 @@ export const usePageDeleteModalForBulkDeletion: (
 - 検索実行/条件変更時: `setSize(1)`（累積破棄・先頭再読込）
 - 一括削除完了時: `setSize(1)` + `mutate()` + `resetAfterMutation()`（選択クリア**かつ右ペインプレビューのクリア**）
 - 削除ボタンは `selectedCount === 0` で無効
-- 行単位の複製/リネーム/削除（`SearchResultList` 経由）は `mutateSearching()` に加え、`onItemMutated`（このコンポーネントが保持する `swr.mutate`）を呼び、アクティブな `useSWRInfinite` 購読を確実に再検証する（`mutateSearching()` のフィルタ付き `mutate` は `$inf$` 接頭辞キーを対象外とするため単独では効かない）
+- 行単位のリネーム/削除（`SearchResultList` 経由）は `mutateSearching()` に加え、`onItemMutated` で変更内容（`SearchItemMutation`）を受け取り、**再取得せず**読込済みチャンクのキャッシュを直接書き換える（`mutateSearchInfiniteChunks` + `applySearchItemMutation`、`revalidate: false`）。`mutateSearching()` のフィルタ付き `mutate` は `$inf$` 接頭辞キーを対象外とするため単独では効かず、引数なし `mutate()` での再検証は読込済み全チャンクを再取得してしまう（A-1）
+  - 削除: 該当行を除去。再帰削除では子孫（`path + '/'` 前方一致）も除去
+  - リネーム: 該当行と子孫の `path` を新パスへ置換し、旧パス由来の `highlightedPath` を破棄（新パスは `OnRenamedFunction` の第 2 引数で受け取る）
+  - 複製: 既存行は変わらないため何もしない
+  - `useSWRInfinite` は結合キャッシュとは別にチャンクごとのキャッシュを持つ。結合側だけを書き換えると次回の追加読込で差分のあるチャンクが再取得されるため、両方を同じ内容に書き換える
+  - `meta`（`total`/`hitsCount`）は書き換えない（`hitsCount` は終端判定に使うため ES の返却数を保つ）。削除後はサーバ側の offset が詰まるため、以降の追加読込で境界の結果が 1 件ずつ読み飛ばされうる（全件再取得を避けるためのトレードオフとして許容）
 
 **Contracts**: State [x]
 
@@ -399,7 +404,7 @@ export const usePageDeleteModalForBulkDeletion: (
 ## Error Handling
 
 ### Error Strategy
-- **追加読込失敗（システムエラー 5xx/ネットワーク）**: `swrInfiniteResponse.error` を検知し `hasError` を立てる。`isReachingEnd` に OR して自動 `setSize` を停止（リトライループ防止）。`endingIndicator` にエラーメッセージ＋「再試行」ボタンを表示。再試行は `mutate()` で再検証し、成功後はスクロール追加読込が再開する。
+- **追加読込失敗（システムエラー 5xx/ネットワーク）**: `swrInfiniteResponse.error` を検知し `hasError` を立てる。`isReachingEnd` に OR して自動 `setSize` を停止（リトライループ防止）。`endingIndicator` にエラーメッセージ＋「再試行」ボタンを表示。再試行は現在と同じ size での `setSize(size)` とし、キャッシュを持たない失敗チャンクのみを再取得する（引数なし `mutate()` は読込済み全チャンクを再取得するため使わない、A-4）。成功後はスクロール追加読込が再開する。
 - **検索サービス未設定/到達不能**: 既存 `SearchPageBase` の案内表示（`isSearchServiceConfigured` / `isSearchServiceReachable`）をそのまま維持。
 - **0 件**: エラーではなく `isEmpty` として 0 件表示（既存 `SearchResultListHead`）。
 
@@ -416,7 +421,7 @@ export const usePageDeleteModalForBulkDeletion: (
 - `SearchPageBase`: `resetKey` 不変のまま `pages` を追加 → 選択状態・プレビュー選択が維持される（4.3/6.3）。`resetKey` 変更 → 選択クリア・先頭プレビュー（7.2/6.1）。`selectAll` で累積全件が選択される（4.1）。
 - `SearchPageBase` プレビュー2段構成: `resetKey` 変化直後（新 `pages` 未到着）はプレビューがクリアされ、その後の初回データ到着で `pages[0]` が選択される。append（同一 `resetKey`）では再選択されない（6.1/6.3）。
 - `SearchPageBase` 全選択 append 追従: 全件選択済み（checked）状態で未選択の `pages` を追記 → select-all が indeterminate に遷移する（4.5）。追記分も選択済みなら checked を維持（4.6）。
-- `SearchPage`: (1) 番号ページャ（`PaginationWrapper`）が描画されない（2.1）、(2) 追加読込エラー時にエラー＋再試行が表示され自動読込が止まる、再試行で `mutate` 呼出（1.6）、(3) 一括削除は選択済み読込分のみをモーダルに渡し、`selectedCount===0` で削除ボタン無効（5.1/5.2）、(4) 削除完了で `setSize(1)`＋`resetAfterMutation()`（選択クリア**および右ペインプレビューのクリア**、5.3/7.2）、(5) `SearchPage` は自身の `swr.mutate` を `onItemMutated` として `SearchPageBase`（→ `SearchResultList`）に渡し、行単位の複製/リネーム/削除後に呼ばれることを確認。
+- `SearchPage`: (1) 番号ページャ（`PaginationWrapper`）が描画されない（2.1）、(2) 追加読込エラー時にエラー＋再試行が表示され自動読込が止まる、再試行で `setSize(size)` 呼出・`mutate` 非呼出（1.6）、(3) 一括削除は選択済み読込分のみをモーダルに渡し、`selectedCount===0` で削除ボタン無効（5.1/5.2）、(4) 削除完了で `setSize(1)`＋`resetAfterMutation()`（選択クリア**および右ペインプレビューのクリア**、5.3/7.2）、(5) `onItemMutated` で受けた行単位のリネーム/削除を、自身の `swr.mutate` を対象に再検証なしでキャッシュへ適用することを確認。
 - IntersectionObserver をモックし、センチネル交差で `setSize(size+1)` が呼ばれる（1.2）。
 
 ### 非回帰（Regression）

@@ -48,15 +48,12 @@ const createSearchQuery = (
   return query;
 };
 
+// Revalidates the paginated ('/search') caches only. It does NOT refresh the
+// infinite-scroll list: SWR's filtered `mutate` skips the `$inf$`-prefixed key
+// that `useSWRInfinite` subscribes to, so the infinite-scroll caller must update
+// its own response itself (see `SearchPage`'s `onItemMutated`).
 export const mutateSearching = async (): Promise<void[]> => {
-  // Match both the paginated ('/search') and the infinite-scroll
-  // ('/search/infinite') caches, so item-level page operations (delete / rename
-  // / duplicate) in SearchResultList refresh whichever list is shown.
-  return mutate(
-    (key) =>
-      Array.isArray(key) &&
-      (key[0] === '/search' || key[0] === '/search/infinite'),
-  );
+  return mutate((key) => Array.isArray(key) && key[0] === '/search');
 };
 
 export const useSWRxSearch = (
@@ -162,6 +159,31 @@ export const getSearchInfiniteKey = (
 
   const offset = pageIndex * chunkSize;
   return ['/search/infinite', keyword, offset, configurations] as const;
+};
+
+/**
+ * Rewrite the cached infinite-scroll chunks in place, without re-fetching.
+ *
+ * `useSWRInfinite` keeps each chunk in its own per-page cache besides the
+ * combined `$inf$` cache that `infiniteMutate` (the bound `mutate`) writes.
+ * Rewriting only the combined cache leaves the two disagreeing, and on the next
+ * load SWR re-fetches every chunk whose per-page cache differs — so both are
+ * rewritten here. The per-page rewrite reaches every '/search/infinite' chunk,
+ * which is also correct for other cached searches showing the same page.
+ */
+export const mutateSearchInfiniteChunks = async (
+  infiniteMutate: SWRInfiniteResponse<IFormattedSearchResult, Error>['mutate'],
+  updater: (chunk: IFormattedSearchResult) => IFormattedSearchResult,
+): Promise<void> => {
+  await Promise.all([
+    mutate(
+      (key) => Array.isArray(key) && key[0] === '/search/infinite',
+      (chunk: IFormattedSearchResult | undefined) =>
+        chunk == null ? chunk : updater(chunk),
+      { revalidate: false },
+    ),
+    infiniteMutate((chunks) => chunks?.map(updater), { revalidate: false }),
+  ]);
 };
 
 export const useSWRINFxSearch = (

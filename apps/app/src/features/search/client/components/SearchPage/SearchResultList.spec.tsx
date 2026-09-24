@@ -12,7 +12,7 @@ import type { IPageWithSearchMeta } from '~/interfaces/search';
 type CapturedPageListItemLProps = {
   page: IPageWithSearchMeta;
   onPageDuplicated?: (fromPath: string, toPath: string) => void;
-  onPageRenamed?: (path: string) => void;
+  onPageRenamed?: (path: string, newPath: string) => void;
   onPageDeleted?: (
     path: string | string[],
     isRecursively?: boolean,
@@ -72,17 +72,16 @@ const createPage = (id: string): IPageWithSearchMeta =>
 
 // A-1: mutateSearching()'s filtered mutate() never reaches an active
 // useSWRInfinite subscription (SWR skips `$inf$`-prefixed keys), so the
-// infinite-scroll page must also revalidate via its OWN bound `mutate`,
-// passed down as `onItemMutated`. These tests pin the contract that
-// SearchResultList invokes it (in addition to mutateSearching()) on every
-// single-row mutation, so a future refactor cannot silently drop it again.
+// infinite-scroll page applies each row change to its own cache. These tests
+// pin the contract that SearchResultList reports WHAT changed (in addition to
+// mutateSearching()), so the caller can update rows without re-fetching.
 describe('SearchResultList item-mutation wiring (A-1)', () => {
   beforeEach(() => {
     pageListItemLSpy.propsByPageId.clear();
     vi.clearAllMocks();
   });
 
-  it('calls onItemMutated (in addition to mutateSearching) when a page is duplicated', () => {
+  it('reports the old and new path when a page is renamed', () => {
     const onItemMutated = vi.fn();
     render(
       <SearchResultList
@@ -91,13 +90,17 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
       />,
     );
 
-    pageListItemLSpy.lastProps?.onPageDuplicated?.('/from', '/to');
+    pageListItemLSpy.lastProps?.onPageRenamed?.('/page/a', '/moved/a');
 
     expect(mutateSearchingSpy).toHaveBeenCalledTimes(1);
-    expect(onItemMutated).toHaveBeenCalledTimes(1);
+    expect(onItemMutated).toHaveBeenCalledExactlyOnceWith({
+      type: 'renamed',
+      fromPath: '/page/a',
+      toPath: '/moved/a',
+    });
   });
 
-  it('calls onItemMutated (in addition to mutateSearching) when a page is renamed', () => {
+  it('reports the deleted path and whether descendants were deleted too', () => {
     const onItemMutated = vi.fn();
     render(
       <SearchResultList
@@ -106,13 +109,17 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
       />,
     );
 
-    pageListItemLSpy.lastProps?.onPageRenamed?.('/renamed');
+    pageListItemLSpy.lastProps?.onPageDeleted?.('/page/a', true, false);
 
     expect(mutateSearchingSpy).toHaveBeenCalledTimes(1);
-    expect(onItemMutated).toHaveBeenCalledTimes(1);
+    expect(onItemMutated).toHaveBeenCalledExactlyOnceWith({
+      type: 'deleted',
+      path: '/page/a',
+      isRecursively: true,
+    });
   });
 
-  it('calls onItemMutated (in addition to mutateSearching) when a page is deleted', () => {
+  it('reports a non-recursive delete as such', () => {
     const onItemMutated = vi.fn();
     render(
       <SearchResultList
@@ -121,10 +128,28 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
       />,
     );
 
-    pageListItemLSpy.lastProps?.onPageDeleted?.('/deleted', false, false);
+    pageListItemLSpy.lastProps?.onPageDeleted?.('/page/a', false, false);
+
+    expect(onItemMutated).toHaveBeenCalledExactlyOnceWith({
+      type: 'deleted',
+      path: '/page/a',
+      isRecursively: false,
+    });
+  });
+
+  it('does not report a duplication, which changes no existing row', () => {
+    const onItemMutated = vi.fn();
+    render(
+      <SearchResultList
+        pages={[createPage('a')]}
+        onItemMutated={onItemMutated}
+      />,
+    );
+
+    pageListItemLSpy.lastProps?.onPageDuplicated?.('/page/a', '/page/a-copy');
 
     expect(mutateSearchingSpy).toHaveBeenCalledTimes(1);
-    expect(onItemMutated).toHaveBeenCalledTimes(1);
+    expect(onItemMutated).not.toHaveBeenCalled();
   });
 
   it('does not throw when onItemMutated is not provided (legacy callers)', () => {

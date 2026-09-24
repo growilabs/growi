@@ -11,6 +11,8 @@ import type {
   IPageWithSearchMeta,
 } from '~/interfaces/search';
 
+import type { SearchItemMutation } from '../../util/apply-search-item-mutation';
+
 // --- Capture the props SearchPage hands to SearchPageBase ---------------------
 // SearchPageBase itself is exercised by its own spec; here it is a passthrough
 // stub that records the props so SearchPage's wiring can be asserted.
@@ -25,7 +27,7 @@ type CapturedSearchPageBaseProps = {
     onRetry?: () => void;
   };
   onSelectedPagesByCheckboxesChanged?: (a: number, b: number) => void;
-  onItemMutated?: () => void;
+  onItemMutated?: (mutation: SearchItemMutation) => void;
   searchControl?: React.ReactNode;
 };
 
@@ -63,10 +65,12 @@ const searchStoreSpy = vi.hoisted(() => ({
   infiniteResponse: undefined as
     | SWRInfiniteResponse<IFormattedSearchResult, Error>
     | undefined,
+  mutateSearchInfiniteChunks: vi.fn(),
 }));
 
 vi.mock('~/stores/search', () => ({
   useSWRINFxSearch: vi.fn(() => searchStoreSpy.infiniteResponse),
+  mutateSearchInfiniteChunks: searchStoreSpy.mutateSearchInfiniteChunks,
   DEFAULT_SEARCH_CHUNK_SIZE: 20,
 }));
 
@@ -141,6 +145,7 @@ const createInfiniteResponse = (
 ): SWRInfiniteResponse<IFormattedSearchResult, Error> =>
   mock<SWRInfiniteResponse<IFormattedSearchResult, Error>>({
     data,
+    size: data?.length ?? 1,
     setSize: vi.fn(),
     mutate: vi.fn(),
     error,
@@ -261,18 +266,26 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
     expect(searchPageBaseSpy.lastProps?.pages).toHaveLength(2);
   });
 
-  it('revalidates via swr.mutate when onRetry is invoked', () => {
-    searchStoreSpy.infiniteResponse = createInfiniteResponse(
-      [createChunk(['a', 'b'])],
-      new Error('load failed'),
-    );
+  // A-4: an argument-less mutate() would re-fetch every loaded chunk;
+  // re-requesting the current size re-fetches only the failed one (the
+  // resulting request count is pinned against real SWR in
+  // search.infinite-cache.spec.tsx).
+  it('retries by re-requesting the current size, without revalidating every chunk (A-4)', () => {
+    searchStoreSpy.infiniteResponse = {
+      ...createInfiniteResponse(
+        [createChunk(['a', 'b']), createChunk(['c', 'd'])],
+        new Error('load failed'),
+      ),
+      size: 3,
+    };
 
     render(<SearchPage />);
 
     const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
     infiniteScroll?.onRetry?.();
 
-    expect(searchStoreSpy.infiniteResponse?.mutate).toHaveBeenCalledTimes(1);
+    expect(searchStoreSpy.infiniteResponse?.setSize).toHaveBeenCalledWith(3);
+    expect(searchStoreSpy.infiniteResponse?.mutate).not.toHaveBeenCalled();
   });
 
   it('allows auto-load when there is no error and the end is not reached', () => {
@@ -386,14 +399,31 @@ describe('SearchPage bulk-delete orchestration (Req 5.1/5.3/7.2)', () => {
   });
 
   // A-1: mutateSearching()'s filtered mutate() never reaches an active
-  // useSWRInfinite subscription, so SearchPage must hand its OWN bound `mutate`
-  // down as `onItemMutated` for row-level operations to actually revalidate.
-  it('passes its own swr.mutate down as onItemMutated (A-1)', () => {
+  // useSWRInfinite subscription, so SearchPage must apply a row change to its
+  // OWN cache — in place, since revalidating would re-fetch every loaded chunk.
+  it('applies a row change to its own cached chunks without revalidating (A-1)', () => {
     render(<SearchPage />);
 
-    expect(searchPageBaseSpy.lastProps?.onItemMutated).toBe(
-      searchStoreSpy.infiniteResponse?.mutate,
-    );
+    act(() => {
+      searchPageBaseSpy.lastProps?.onItemMutated?.({
+        type: 'deleted',
+        path: '/page/a',
+        isRecursively: false,
+      });
+    });
+
+    const swr = searchStoreSpy.infiniteResponse;
+    const [boundMutate, updater] =
+      searchStoreSpy.mutateSearchInfiniteChunks.mock.calls.at(-1) ?? [];
+    // Rewrites THIS response's cache...
+    expect(boundMutate).toBe(swr?.mutate);
+    // ...with the reported change applied...
+    const updated = updater?.(createChunk(['a', 'b']));
+    expect(
+      updated?.data.map((page: IPageWithSearchMeta) => page.data._id),
+    ).toEqual(['b']);
+    // ...and never through a revalidating mutate().
+    expect(swr?.mutate).not.toHaveBeenCalled();
   });
 });
 
