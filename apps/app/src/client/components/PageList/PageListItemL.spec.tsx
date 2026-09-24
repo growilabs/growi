@@ -1,13 +1,12 @@
 import type { IPageHasId } from '@growi/core';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { mock } from 'vitest-mock-extended';
 
 import type { IPageWithSearchMeta } from '~/interfaces/search';
 
 // --- Mock hooks/stores consumed by PageListItemL ---
 // These are UI-state / server-state hooks unrelated to the ancestor-path
 // rendering under test; stubbing them keeps the tests focused on the
-// isPathTruncationEnabled branching (Requirement 7, 8, 9).
+// renderTruncatedAncestorPath branching (Requirement 7, 8, 9).
 vi.mock('~/states/ui/device', () => ({
   useDeviceLargerThanLg: vi.fn(() => [true]),
 }));
@@ -34,20 +33,34 @@ vi.mock('next-i18next', () => ({
   useTranslation: vi.fn(() => ({ t: (key: string) => key })),
 }));
 
-import { PageListItemL } from './PageListItemL';
+import {
+  PageListItemL,
+  type TruncatedAncestorPathRenderer,
+} from './PageListItemL';
 
-const createPageData = (overrides: Partial<IPageHasId> = {}): IPageHasId =>
-  mock<IPageHasId>({
-    _id: 'page123',
-    path: '/A/B/C',
-    liker: [],
-    seenUsers: [],
-    commentCount: 0,
-    grant: 1,
-    updatedAt: new Date('2024-01-01T00:00:00.000Z'),
-    lastUpdateUser: undefined,
-    ...overrides,
-  });
+// A plain data object (not mock<T>()) so fields the component starts reading
+// later are not silently backed by truthy auto-stubs.
+const createPageData = (overrides: Partial<IPageHasId> = {}): IPageHasId => ({
+  _id: 'page123',
+  path: '/A/B/C',
+  status: 'published',
+  tags: [],
+  createdAt: new Date('2024-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+  seenUsers: [],
+  parent: null,
+  descendantCount: 0,
+  isEmpty: false,
+  grant: 1,
+  grantedUsers: [],
+  grantedGroups: [],
+  liker: [],
+  commentCount: 0,
+  slackChannels: '',
+  deleteUser: 'user123',
+  deletedAt: new Date('2024-01-01T00:00:00.000Z'),
+  ...overrides,
+});
 
 const createPageWithMeta = (
   pageData: IPageHasId,
@@ -60,57 +73,59 @@ const createPageWithMeta = (
   },
 });
 
+const em = (text: string): string =>
+  `<em class="highlighted-keyword">${text}</em>`;
+
+// Echoes what PageListItemL hands to the injected renderer.
+const renderAncestorPathStub: TruncatedAncestorPathRenderer = (
+  path,
+  highlightedPath,
+) => <span>{`ancestor-row:${path}|${highlightedPath ?? ''}`}</span>;
+
+// The title row links to the page's permalink (returnPathForURL).
+const getTitleLink = (container: HTMLElement, pageId: string) =>
+  container.querySelector(`a[href="/${pageId}"]`);
+
 describe('PageListItemL', () => {
-  describe('when isPathTruncationEnabled is omitted (default)', () => {
-    it('renders the ancestor path via PagePathHierarchicalLink', () => {
-      const pageData = createPageData({ path: '/A/B/C' });
-      const { container } = render(
+  describe('when renderTruncatedAncestorPath is omitted (default)', () => {
+    it('renders every ancestor as its own link', () => {
+      render(
         <PageListItemL
-          page={createPageWithMeta(pageData)}
+          page={createPageWithMeta(createPageData({ path: '/A/B/C' }))}
           isReadOnlyUser={false}
         />,
       );
 
-      expect(
-        container.querySelector('#grw-page-path-hierarchical-link'),
-      ).not.toBeNull();
-    });
-
-    it('does not render SearchResultAncestorPath (no full-path title tooltip)', () => {
-      const pageData = createPageData({ path: '/A/B/C' });
-      const { container } = render(
-        <PageListItemL
-          page={createPageWithMeta(pageData)}
-          isReadOnlyUser={false}
-        />,
+      expect(screen.getByRole('link', { name: 'A' })).toHaveAttribute(
+        'href',
+        '/A',
       );
-
-      expect(container.querySelector('[title="/A/B/C"]')).toBeNull();
+      expect(screen.getByRole('link', { name: 'B' })).toHaveAttribute(
+        'href',
+        '/A/B',
+      );
     });
 
     it('renders the checkbox and reports the checked state via onCheckboxChanged', () => {
-      const pageData = createPageData({ path: '/A/B/C' });
       const onCheckboxChanged = vi.fn();
       render(
         <PageListItemL
-          page={createPageWithMeta(pageData)}
+          page={createPageWithMeta(createPageData())}
           isReadOnlyUser={false}
           onCheckboxChanged={onCheckboxChanged}
         />,
       );
 
-      const checkbox = screen.getByTestId('cb-select');
-      fireEvent.click(checkbox);
+      fireEvent.click(screen.getByTestId('cb-select'));
 
       expect(onCheckboxChanged).toHaveBeenCalledWith(true, 'page123');
     });
 
     it('triggers onClickItem when the row is clicked', () => {
-      const pageData = createPageData({ path: '/A/B/C' });
       const onClickItem = vi.fn();
       render(
         <PageListItemL
-          page={createPageWithMeta(pageData)}
+          page={createPageWithMeta(createPageData())}
           isReadOnlyUser={false}
           onClickItem={onClickItem}
         />,
@@ -122,110 +137,126 @@ describe('PageListItemL', () => {
     });
 
     it('shows the old (non-bundled) page name for a date-suffixed path', () => {
-      const pageData = createPageData({ _id: 'p1', path: '/A/B/2024/01/15' });
       const { container } = render(
         <PageListItemL
-          page={createPageWithMeta(pageData)}
+          page={createPageWithMeta(
+            createPageData({ _id: 'p1', path: '/A/B/2024/01/15' }),
+          )}
           isReadOnlyUser={false}
         />,
       );
 
-      const titleLink = container.querySelector('a[href="/p1"]');
-      expect(titleLink?.textContent).toBe('15');
+      expect(getTitleLink(container, 'p1')?.textContent).toBe('15');
+    });
+
+    it('keeps the page-name highlight when an ancestor is highlighted too', () => {
+      // Requirement 8.1: the opt-in page-name logic must not leak into the default path.
+      const { container } = render(
+        <PageListItemL
+          page={createPageWithMeta(
+            createPageData({ _id: 'p5', path: '/foo/bar/foo' }),
+            `/${em('foo')}/bar/${em('foo')}`,
+          )}
+          isReadOnlyUser={false}
+        />,
+      );
+
+      const highlight = getTitleLink(container, 'p5')?.querySelector('em');
+      expect(highlight?.textContent).toBe('foo');
     });
   });
 
-  describe('when isPathTruncationEnabled is explicitly false', () => {
-    it('renders identically to the omitted case', () => {
-      const pageData = createPageData({ path: '/A/B/C' });
-      const { container } = render(
+  describe('when renderTruncatedAncestorPath is provided', () => {
+    it('renders the ancestor path through the injected renderer instead of per-ancestor links', () => {
+      render(
         <PageListItemL
-          page={createPageWithMeta(pageData)}
+          page={createPageWithMeta(
+            createPageData({ path: '/A/B/C' }),
+            `/A/${em('B')}/C`,
+          )}
           isReadOnlyUser={false}
-          isPathTruncationEnabled={false}
+          renderTruncatedAncestorPath={renderAncestorPathStub}
         />,
       );
 
       expect(
-        container.querySelector('#grw-page-path-hierarchical-link'),
-      ).not.toBeNull();
-      expect(container.querySelector('[title="/A/B/C"]')).toBeNull();
-    });
-  });
-
-  describe('when isPathTruncationEnabled is true', () => {
-    it('renders SearchResultAncestorPath instead of PagePathHierarchicalLink', () => {
-      const pageData = createPageData({ path: '/A/B/C' });
-      const { container } = render(
-        <PageListItemL
-          page={createPageWithMeta(pageData)}
-          isReadOnlyUser={false}
-          isPathTruncationEnabled
-        />,
-      );
-
-      expect(container.querySelector('[title="/A/B/C"]')).not.toBeNull();
-      expect(
-        container.querySelector('#grw-page-path-hierarchical-link'),
-      ).toBeNull();
+        screen.getByText(`ancestor-row:/A/B/C|/A/${em('B')}/C`),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'A' })).toBeNull();
     });
 
     it('bundles a trailing date into a single page name in the title row', () => {
-      const pageData = createPageData({ _id: 'p2', path: '/A/B/2024/01/15' });
       const { container } = render(
         <PageListItemL
-          page={createPageWithMeta(pageData)}
+          page={createPageWithMeta(
+            createPageData({ _id: 'p2', path: '/A/B/2024/01/15' }),
+          )}
           isReadOnlyUser={false}
-          isPathTruncationEnabled
+          renderTruncatedAncestorPath={renderAncestorPathStub}
         />,
       );
 
-      const titleLink = container.querySelector('a[href="/p2"]');
-      expect(titleLink?.textContent).toBe('2024/01/15');
+      expect(getTitleLink(container, 'p2')?.textContent).toBe('2024/01/15');
     });
 
-    it('falls back to the plain bundled page name when a search highlight lands on the date suffix', () => {
-      // Requirement 6/7 regression: an ES <em> landing on/inside a trailing
-      // date used to break the date-bundling regex on the highlighted string
-      // only, desyncing the page name from the ancestor row (which reads the
-      // plain path) -- see tasks.md/design.md notes on this bug.
-      const pageData = createPageData({ _id: 'p3', path: '/A/B/2024/01/15' });
+    it('keeps the page-name highlight when an ancestor is highlighted too (Requirement 6.1)', () => {
       const { container } = render(
         <PageListItemL
-          page={createPageWithMeta(pageData, '/A/B/<em>2024</em>/01/15')}
+          page={createPageWithMeta(
+            createPageData({ _id: 'p6', path: '/foo/bar/foo' }),
+            `/${em('foo')}/bar/${em('foo')}`,
+          )}
           isReadOnlyUser={false}
-          isPathTruncationEnabled
+          renderTruncatedAncestorPath={renderAncestorPathStub}
         />,
       );
 
-      const titleLink = container.querySelector('a[href="/p3"]');
-      expect(titleLink?.textContent).toBe('2024/01/15');
+      const highlight = getTitleLink(container, 'p6')?.querySelector('em');
+      expect(highlight?.textContent).toBe('foo');
     });
 
-    it('falls back to the plain bundled page name when the whole date is highlighted (no orphaned closing tag)', () => {
-      const pageData = createPageData({ _id: 'p4', path: '/A/B/2024/01/15' });
+    it('keeps the highlight inside a bundled date page name', () => {
       const { container } = render(
         <PageListItemL
-          page={createPageWithMeta(pageData, '/A/B/<em>2024/01/15</em>')}
+          page={createPageWithMeta(
+            createPageData({ _id: 'p3', path: '/A/B/2024/01/15' }),
+            `/A/B/${em('2024')}/01/15`,
+          )}
           isReadOnlyUser={false}
-          isPathTruncationEnabled
+          renderTruncatedAncestorPath={renderAncestorPathStub}
         />,
       );
 
-      const titleLink = container.querySelector('a[href="/p4"]');
+      const titleLink = getTitleLink(container, 'p3');
       expect(titleLink?.textContent).toBe('2024/01/15');
-      expect(titleLink?.innerHTML).not.toContain('</em>');
+      expect(titleLink?.querySelector('em')?.textContent).toBe('2024');
+    });
+
+    it('falls back to the plain bundled page name when the highlight spans the date separators', () => {
+      const { container } = render(
+        <PageListItemL
+          page={createPageWithMeta(
+            createPageData({ _id: 'p4', path: '/A/B/2024/01/15' }),
+            `/A/B/${em('2024/01/15')}`,
+          )}
+          isReadOnlyUser={false}
+          renderTruncatedAncestorPath={renderAncestorPathStub}
+        />,
+      );
+
+      const titleLink = getTitleLink(container, 'p4');
+      expect(titleLink?.textContent).toBe('2024/01/15');
+      expect(titleLink?.querySelector('em')).toBeNull();
     });
 
     it('still supports checkbox selection and row click', () => {
-      const pageData = createPageData({ path: '/A/B/C' });
       const onCheckboxChanged = vi.fn();
       const onClickItem = vi.fn();
       render(
         <PageListItemL
-          page={createPageWithMeta(pageData)}
+          page={createPageWithMeta(createPageData())}
           isReadOnlyUser={false}
-          isPathTruncationEnabled
+          renderTruncatedAncestorPath={renderAncestorPathStub}
           onCheckboxChanged={onCheckboxChanged}
           onClickItem={onClickItem}
         />,
