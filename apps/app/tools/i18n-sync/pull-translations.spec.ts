@@ -47,10 +47,30 @@ const TEST_LANGUAGES = ['ja_JP', 'zh_CN', 'fr_FR', 'ko_KR'] as const;
 // `/base/locales/<lang>/<namespace>.json` -- identical across all 4
 // languages for a given namespace, mirroring how a real locale file only
 // differs from language to language in its values, not its base shape.
+//
+// `admin`'s `legacy_only` key is deliberately absent from every language's
+// `AFTER_BY_NAMESPACE_LANGUAGE` fixture below, simulating a key that
+// predates the POEditor sync and that POEditor's export has never carried
+// for any language -- the exact shape of PR #11935's regression. It stays
+// in `EN_US_BY_NAMESPACE.admin`, so `restoreKeysStillInSource` must keep it
+// out of every combination's `removedKeys` and preserve its existing value.
 const BEFORE_BY_NAMESPACE: Readonly<Record<string, string>> = {
-  admin: '{"k1":"v1","k2":"v2"}',
+  admin: '{"k1":"v1","k2":"v2","legacy_only":"vieux"}',
   translation: '{"t1":"a","t2":"b"}',
   commons: '{"c1":"a","c2":"b"}',
+};
+
+// This namespace's current en_US (source language) content -- the reference
+// `restoreKeysStillInSource` uses to tell "POEditor hasn't caught up yet"
+// apart from "genuinely removed". `admin.k2`/`translation.t1`/`commons.c2`
+// are deliberately absent here too, so the existing removal-detection
+// scenarios below (zh_CN/fr_FR structural, removing exactly those keys)
+// stay genuine removals; `admin.legacy_only` is the one exception, kept
+// here to exercise the restore path.
+const EN_US_BY_NAMESPACE: Readonly<Record<string, string>> = {
+  admin: '{"k1":"v1","legacy_only":"legacy-en"}',
+  translation: '{"t2":"b"}',
+  commons: '{"c1":"a"}',
 };
 
 // "after" (POEditor export) content per namespace+language, deliberately
@@ -146,10 +166,15 @@ const buildPoeditorClient = () => {
 const buildReadNamespaceFile = () =>
   // biome-ignore lint/suspicious/useAwait: must match ReadNamespaceFile's Promise-returning signature.
   vi.fn(async (absolutePath: string) => {
-    const match = /\/base\/locales\/[^/]+\/(\w+)\.json$/.exec(absolutePath);
-    const namespace = match?.[1];
+    const match = /\/base\/locales\/([^/]+)\/(\w+)\.json$/.exec(absolutePath);
+    const locale = match?.[1];
+    const namespace = match?.[2];
     const content =
-      namespace != null ? BEFORE_BY_NAMESPACE[namespace] : undefined;
+      namespace == null
+        ? undefined
+        : locale === 'en_US'
+          ? EN_US_BY_NAMESPACE[namespace]
+          : BEFORE_BY_NAMESPACE[namespace];
     if (content == null) {
       throw new Error(`no fixture for ${absolutePath}`);
     }
@@ -157,12 +182,14 @@ const buildReadNamespaceFile = () =>
   });
 
 describe('collectClassifications', () => {
-  it('exports once per language (4 calls, not 12) from the shared project, while still reading all 12 local locale files', async () => {
+  it('exports once per language (4 calls, not 12) from the shared project, while still reading all 12 local locale files plus 3 en_US reference files', async () => {
     // The shared project holds every namespace, so one export per language
     // already carries all 3 namespaces -- exporting per (namespace, language)
     // would be 3x the API calls for the same data. The local "before" files
     // are still one per combination: they live in the repository, one file
-    // per namespace per language.
+    // per namespace per language. On top of that, `restoreKeysStillInSource`
+    // needs each namespace's current en_US content once (not once per
+    // language, since it does not vary by language) -- 3 more reads.
     const poeditorClient = buildPoeditorClient();
     const readNamespaceFile = buildReadNamespaceFile();
 
@@ -176,7 +203,7 @@ describe('collectClassifications', () => {
 
     expect(result.ok).toBe(true);
     expect(poeditorClient.exportTranslations).toHaveBeenCalledTimes(4);
-    expect(readNamespaceFile).toHaveBeenCalledTimes(12);
+    expect(readNamespaceFile).toHaveBeenCalledTimes(15);
 
     // A bare call count would also pass if all 4 calls asked for the same
     // language, so assert the actual set of languages requested -- exactly
@@ -239,7 +266,10 @@ describe('collectClassifications', () => {
         language: 'ja_JP',
         changedKeys: ['k1'],
         absoluteFilePath: '/base/locales/ja_JP/admin.json',
-        content: { k1: 'CHANGED', k2: 'v2' },
+        // `legacy_only` is missing from ja_JP's POEditor export but still
+        // declared in en_US, so it is restored from `before` rather than
+        // dropped (see `restoreKeysStillInSource`).
+        content: { k1: 'CHANGED', k2: 'v2', legacy_only: 'vieux' },
       },
     ]);
     expect(result.structural).toEqual([
@@ -336,12 +366,16 @@ describe('collectClassifications', () => {
       namespace: 'admin',
       language: 'zh_CN',
       addedKeys: ['k3'],
+      // k2 is genuinely gone (absent from en_US too) and stays flagged;
+      // `legacy_only` is also missing from zh_CN's export but still
+      // declared in en_US, so it must NOT appear here (PR #11935's
+      // regression -- see `restoreKeysStillInSource`).
       removedKeys: ['k2'],
       // Same reasoning as translationOnly's absoluteFilePath/content above,
       // under different field names (see StructuralCombination's doc
       // comment).
       filePath: '/base/locales/zh_CN/admin.json',
-      exportedContent: { k1: 'v1', k3: 'v3' },
+      exportedContent: { k1: 'v1', k3: 'v3', legacy_only: 'vieux' },
     });
 
     const adminJaJp = result.translationOnly.find(
@@ -356,7 +390,7 @@ describe('collectClassifications', () => {
       // (`applyTranslationOnlyChanges`) writes precisely what
       // `DiffClassifier` approved -- see that function's doc comment.
       absoluteFilePath: '/base/locales/ja_JP/admin.json',
-      content: { k1: 'CHANGED', k2: 'v2' },
+      content: { k1: 'CHANGED', k2: 'v2', legacy_only: 'vieux' },
     });
   });
 
@@ -467,6 +501,88 @@ describe('collectClassifications', () => {
       });
     }
     expect(result.translationOnly).toEqual([]);
+  });
+
+  it('does not propose removing a key still declared in en_US, and preserves its existing translation, even though POEditor has not exported it for this language (PR #11935 regression)', async () => {
+    const poeditorClient = mock<PoeditorClient>();
+    // POEditor's export for every language is missing `stale_but_still_source`
+    // entirely -- not an empty string (that is the separate
+    // "not yet translated" case), but the key is simply absent, the exact
+    // shape of a POEditor project that predates this key's addition to the
+    // repository.
+    poeditorClient.exportTranslations.mockResolvedValue({
+      ok: true,
+      value: JSON.stringify(
+        Object.fromEntries(
+          TEST_TARGETS.map((target) => [target.namespace, {}]),
+        ),
+      ),
+    });
+    // biome-ignore lint/suspicious/useAwait: must match ReadNamespaceFile's Promise-returning signature.
+    const readNamespaceFile = vi.fn(async (absolutePath: string) => {
+      if (absolutePath.includes('/en_US/')) {
+        return '{"stale_but_still_source":"still declared in source"}';
+      }
+      return '{"stale_but_still_source":"valeur française existante"}';
+    });
+
+    const result = await collectClassifications({
+      poeditorClient,
+      targets: TEST_TARGETS,
+      languages: TEST_LANGUAGES,
+      readNamespaceFile,
+      baseDir: '/base',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    // No structural change is proposed: the key is missing from POEditor's
+    // export, but since en_US still declares it, `classify` never sees it
+    // as removed.
+    expect(result.structural).toEqual([]);
+    expect(result.translationOnly).toEqual([]);
+  });
+
+  it('still proposes removing a key that is genuinely gone from en_US too', async () => {
+    const poeditorClient = mock<PoeditorClient>();
+    poeditorClient.exportTranslations.mockResolvedValue({
+      ok: true,
+      value: JSON.stringify(
+        Object.fromEntries(
+          TEST_TARGETS.map((target) => [target.namespace, {}]),
+        ),
+      ),
+    });
+    // biome-ignore lint/suspicious/useAwait: must match ReadNamespaceFile's Promise-returning signature.
+    const readNamespaceFile = vi.fn(async (absolutePath: string) => {
+      // en_US no longer declares `truly_gone` either -- a real removal.
+      if (absolutePath.includes('/en_US/')) {
+        return '{}';
+      }
+      return '{"truly_gone":"valeur française obsolète"}';
+    });
+
+    const result = await collectClassifications({
+      poeditorClient,
+      targets: TEST_TARGETS,
+      languages: TEST_LANGUAGES,
+      readNamespaceFile,
+      baseDir: '/base',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.structural).toHaveLength(
+      TEST_TARGETS.length * TEST_LANGUAGES.length,
+    );
+    for (const combination of result.structural) {
+      expect(combination.removedKeys).toEqual(['truly_gone']);
+      expect(combination.exportedContent).toEqual({});
+    }
   });
 
   it('aborts the whole run (reports failure, no grouping) when one combination fails to read', async () => {
