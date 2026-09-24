@@ -47,6 +47,6 @@
     "@types/dotenv-flow": "^3.2.0",
     "@types/express": "^4.17.21",
     "@types/node": "^20.18.3",
-    "vitest": "^2.0.0"
+    "vitest": "^4.1.11"
   }
 }
