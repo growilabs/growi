@@ -95,7 +95,7 @@ describe('SearchResultAncestorPath', () => {
     });
 
     it('renders the trash icon followed by a "/" linking to the top page', () => {
-      render(<SearchResultAncestorPath path="/trash" />);
+      render(<SearchResultAncestorPath path="/trash/foo" />);
 
       expect(screen.getByText('delete').closest('a')).toHaveAttribute(
         'href',
@@ -103,6 +103,13 @@ describe('SearchResultAncestorPath', () => {
       );
       expect(screen.queryByText('home')).toBeNull();
       expect(screen.getByText('/').closest('a')).toHaveAttribute('href', '/');
+    });
+
+    it('renders the home icon for the /trash page itself, which sits under the top page', () => {
+      render(<SearchResultAncestorPath path="/trash" />);
+
+      expect(screen.getByText('home')).toBeInTheDocument();
+      expect(screen.queryByText('delete')).toBeNull();
     });
 
     it('renders the trash root before the ancestors of a trashed page', () => {

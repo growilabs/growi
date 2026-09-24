@@ -12,7 +12,7 @@ import { PathSeparator } from './PathSeparator';
 
 import styles from './SearchResultAncestorPath.module.scss';
 
-const { isTrashPage } = pagePathUtils;
+const { isTrashPage, isTrashTopPage } = pagePathUtils;
 
 interface SearchResultAncestorPathProps {
   readonly path: string;
@@ -72,7 +72,9 @@ export const SearchResultAncestorPath = memo(
       () => buildAncestorPathNodes(path, highlightedPath),
       [path, highlightedPath],
     );
-    const isInTrash = isTrashPage(path);
+    // Like PageListItemL's legacy row, the trash icon marks pages *inside*
+    // /trash; the /trash page itself sits directly under the top page.
+    const isInTrash = isTrashPage(path) && !isTrashTopPage(path);
 
     return (
       <span className={styles['search-result-ancestor-path']} title={fullPath}>

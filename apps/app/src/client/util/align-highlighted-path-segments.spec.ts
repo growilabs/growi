@@ -57,10 +57,10 @@ describe('alignHighlightedPathSegments', () => {
     undefined,
     null,
     '',
-  ])('uses the path itself when highlightedPath is %j', (highlightedPath) => {
+  ])('returns no markup when highlightedPath is %j', (highlightedPath) => {
     expect(alignHighlightedPathSegments('/A/B', highlightedPath)).toEqual([
-      'A',
-      'B',
+      undefined,
+      undefined,
     ]);
   });
 

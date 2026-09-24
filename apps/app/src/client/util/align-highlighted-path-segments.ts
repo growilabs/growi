@@ -35,19 +35,20 @@ const isHighlightOf = (plainSegment: string, highlighted: string): boolean =>
  * Segments are split on `/` outside tags and each pairing is verified by
  * text, so an `<em>` never shifts the correspondence (unlike re-running
  * `DevidedPagePath` on the markup, whose regexes can match the `/` of `</em>`).
- * When `highlightedPath` is absent, `path` itself stands in for it, mirroring
- * the long-standing `highlightedPath || path` fallback in `PageListItemL`.
  */
 export const alignHighlightedPathSegments = (
   path: string,
   highlightedPath?: string | null,
 ): readonly (string | undefined)[] => {
   const plainSegments = toSegments(normalizePath(path), '/');
+  if (!highlightedPath) {
+    return plainSegments.map(() => undefined);
+  }
+
   const highlightedSegments = toSegments(
-    highlightedPath || path,
+    highlightedPath,
     SEPARATOR_OUTSIDE_TAG_PATTERN,
   );
-
   if (plainSegments.length !== highlightedSegments.length) {
     return plainSegments.map(() => undefined);
   }
