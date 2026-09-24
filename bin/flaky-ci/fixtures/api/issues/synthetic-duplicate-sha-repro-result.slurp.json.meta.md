@@ -7,7 +7,7 @@
   That search returns only 3 issues repo-wide that have ever carried such a
   comment (#11819, #11823, #11849); none has a same-SHA duplicate.
 - Built by taking the real comment object `id: 5667125454` from
-  `11823-repro-result-comments.slurp.json` (verbatim shape: every field,
+  `11823-comments.json` (verbatim shape: every field,
   type and nesting is real) and adding a second comment for the *same*
   `- Commit: b9a64ded...` line, changed `id`/`created_at`/`body`
   (`- Failed: 1`, `- Per-run: pass, fail, pass`) only, to simulate a manual

@@ -10,7 +10,7 @@
     最低2件ずつ手元にあり、次のタスクでそのままテストの入力に使える
   - _Requirements: 1.1, 1.4, 5.3_
 
-- [ ] 2. Core: 分類・形比較・参照配線チェックの実装
+- [x] 2. Core: 分類・形比較・参照配線チェックの実装
 - [x] 2.1 (P) `.meta.md` の `# Source` 節を解析し、real-checkable / synthetic / unrecognized を判定するロジックを実装する
   - タスク1で確保した実例を入力に、3分類を返す純粋関数を実装する
     （design.md `meta-source.ts` の Service Interface契約）
@@ -57,7 +57,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 5.1, 5.3_
   - _Depends: 2.1, 2.2_
 
-- [ ] 4. Integration: 定期実行ワークフローの実装
+- [x] 4. Integration: 定期実行ワークフローの実装
 - [x] 4.1 四半期に1回、両スクリプトを実行し結果を記録するワークフローを作成する
   - `.github/workflows/flaky-repro.yml` の `permissions` パターン
     （`contents: read`, `issues: write`）を踏襲し、`on: schedule`（四半期cron）
@@ -93,7 +93,7 @@
     の対象になり、どれがならないかが分かる
   - _Requirements: 5.3_
 
-- [ ] 5. Validation: 実際のワークフローを1回動かし、issue起票と重複防止が設計どおり動くことを確認する
+- [x] 5. Validation: 実際のワークフローを1回動かし、issue起票と重複防止が設計どおり動くことを確認する
   - 自己検証用の使い捨てissue・ブランチ等を用い、`workflow_dispatch` で
     手動起動する。意図的に未配線のダミーfixtureを1件仕込んだ状態と、
     仕込まない状態の両方で1回ずつ実行する
@@ -247,18 +247,6 @@ tasks.md の元のタスク一覧にはこの修正専用のタスクが無い�
 の `path` 抽出を修正し、実際の `gh` CLI 経由で `checked` が18件前後に戻る
 ことを再確認してから先に進んだ（修正済み・コミット634407f131）。
 
-### タスク4.2: 既知の制約（drift findingsに出典が無い）
-
-`check-fixture-drift.ts` の `DriftFinding` は `{ file, diffPaths }` のみで、
-再取得先のGitHub APIエンドポイント（出典）を持たない。そのためissue本文の
-drift件の行には対象fixtureと差分キーは出るが出典は出ない
-（`unchecked` 件のほうは `{ file, reason }` を持つため出典相当の情報は出る）。
-これはタスク3で承認済みの `DriftFinding` の形の制約であり、このタスクの
-境界（ワークフローYAML）では直せない。要件4.1の文字どおりの要求からは
-小さな未達だが、fixtureのパスから `.meta.md` を辿れば出典は追える。
-将来対応するなら `check-fixture-drift.ts` 側の変更が必要で、それは
-tasks.mdに無い別タスクになる。
-
 ### タスク5: `workflow_dispatch` はデフォルトブランチ（master）にマージされたワークフローでしか使えない
 
 `.github/workflows/flaky-repro.yml` は `push` トリガー（`flaky-repro/**`
@@ -275,3 +263,37 @@ GitHubの仕様上、`workflow_dispatch` はワークフローファイルがデ
 issueは「使い捨て」ではなく、四半期routineが実際に最初に検知した本番の
 結果になる見込み（現時点で `bin/flaky-ci/fixtures/expected/*.md` 等、
 実際に未配線のfixtureが存在するため）。
+
+### タスク5: 実測結果と、実測で見つかったもう1つの実バグ（GH_TOKEN未設定）
+
+PR #11929 のmasterマージ後、`workflow_dispatch` で2回実行して実測した。
+
+1回目の実行（run 35221816827）で `checked: 0` となり、`check-fixture-drift.ts`
+内の全ての `gh api` 呼び出しが `GH_TOKEN environment variable` エラーで
+失敗していることが判明。devcontainerでは `gh` が事前認証済みのため
+気づけなかったが、GitHub Actionsランナーでは `gh` に `GH_TOKEN` を明示的に
+渡す必要がある（issue起票側のステップには既に設定されていたが、
+`check-fixture-drift.ts` を呼ぶステップだけ漏れていた）。失敗自体は
+`unchecked` に正しく振り分けられ「乖離なし」という誤った成功にはならな
+かった（Requirement 5.1が意図どおり機能）が、ドリフト検知そのものが
+一度も実行されていなかった。この時作られたissue #11934はクローズ済み。
+
+修正（PR #11936、`GH_TOKEN: ${{ github.token }}` を追加、マージ済み）後に
+再実行した2回の結果:
+
+- 1回目（run 35222762606）: `checked: 18, drift: 0, unchecked: 28`（タスク3の
+  stubベースの想定と一致）、`unwired: 9`。issue #11937 を新規作成
+- 2回目（run 35222896965）: 同じ集計値。issue番号は #11937 のまま増えず、
+  コメントが1件追記された（重複起票なし、Requirement 4.2どおり）
+
+意図的な未配線ダミーfixtureは仕込まなかった（このリポジトリには既に
+`expected/*.md` 等の実際の未配線fixtureが存在し、それ自体が
+findings>0の実データとして使えたため）。issue #11937 は使い捨てではなく、
+四半期routineが実際に検知した最初の本番結果として残す。
+
+### フォローアップ: drift findingsへの出典追加
+
+タスク5のライブ検証後のフォローアップとして、`DriftFinding` に `source`
+（再取得した `repos/growilabs/growi/...` パス）を追加した。issue本文の
+drift件から、読者がどの `gh api` 呼び出しを追試すればよいか分かるように
+なる。

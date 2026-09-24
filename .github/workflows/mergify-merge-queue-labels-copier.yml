@@ -1,0 +1,22 @@
+name: Mergify merge-queue labels copier
+
+# Mergify's merge queue does not copy a queued pull request's labels onto the
+# temporary `mergify/merge-queue/**` pull request it creates to revalidate
+# CI before merging (this is why Mergify publishes this action at all -- see
+# its own repo). Without this, a label-gated CI skip (ci-app.yml/
+# ci-app-prod.yml's `flag/skip-heavy-ci` check) would only take effect on the
+# original pull request, not on the queue's own revalidation pass.
+
+on:
+  pull_request_target:
+    types:
+      - opened
+
+jobs:
+  mergify-merge-queue-labels-copier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Mergifyio/gha-mergify-merge-queue-labels-copier@v6
+        with:
+          labels: flag/skip-heavy-ci
+          token: ${{ github.token }}
