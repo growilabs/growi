@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => {
   return {
     accessTokenParser: vi.fn(() => passthrough),
     loginRequiredFactory: vi.fn(() => passthrough),
+    isPageReadableByViewer: vi.fn(),
   };
 });
 
@@ -31,6 +32,12 @@ vi.mock('~/server/middlewares/access-token-parser', () => ({
 
 vi.mock('~/server/middlewares/login-required', () => ({
   default: mocks.loginRequiredFactory,
+}));
+
+// The grant check itself is Page.countByIdAndViewer's contract; what this endpoint owns
+// is refusing to answer for a page the viewer cannot read.
+vi.mock('../services/is-page-readable-by-viewer', () => ({
+  isPageReadableByViewer: mocks.isPageReadableByViewer,
 }));
 
 // Imported after the middleware mocks so the route picks up the passthroughs.
@@ -85,6 +92,7 @@ describe('GET /page/backlinks', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isPageReadableByViewer.mockResolvedValue(true);
   });
 
   describe('success', () => {
@@ -137,6 +145,40 @@ describe('GET /page/backlinks', () => {
       // `?? null` because null and undefined are the same "no viewer" to the grant filter;
       // what must not happen is a guest being served as some user.
       const [, user] = findBacklinks.mock.calls[0];
+      expect(user ?? null).toBeNull();
+    });
+  });
+
+  describe('page readability', () => {
+    it('answers 404 without querying the service when the viewer cannot read the page', async () => {
+      mocks.isPageReadableByViewer.mockResolvedValue(false);
+
+      const res = await get(buildApp(mock<Viewer>()), { pageId: validPageId });
+
+      expect(res.status).toBe(404);
+      expect(res.body.errors[0]).toMatchObject({
+        code: 'notfound_or_forbidden',
+      });
+      expect(findBacklinks).not.toHaveBeenCalled();
+    });
+
+    it('checks readability of the page the client named, for the requesting viewer', async () => {
+      findBacklinks.mockResolvedValue([]);
+      const viewer = mock<Viewer>();
+
+      await get(buildApp(viewer), { pageId: validPageId });
+
+      const [pageId, user] = mocks.isPageReadableByViewer.mock.calls[0];
+      expect(String(pageId)).toBe(validPageId);
+      expect(user).toBe(viewer);
+    });
+
+    it('checks readability as a guest for an unauthenticated request', async () => {
+      findBacklinks.mockResolvedValue([]);
+
+      await get(buildApp(), { pageId: validPageId });
+
+      const [, user] = mocks.isPageReadableByViewer.mock.calls[0];
       expect(user ?? null).toBeNull();
     });
   });
