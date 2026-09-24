@@ -18,7 +18,7 @@
   - _Depends: 1.1_
 
 - [ ] 2. Core: 頻度データを取得する2本のCLIスクリプトを実装する
-- [ ] 2.1 (P) 1件のissueの発生頻度を出力するCLIスクリプトを実装する
+- [x] 2.1 (P) 1件のissueの発生頻度を出力するCLIスクリプトを実装する
   - `bin/flaky-ci/scripts/occurrence-summary.ts` を、既存スクリプト（`awaiting-decision-rows.ts`）と同じ `GhApi` 注入・`emit`/`ScriptResult` 出力の型番で実装する
   - `--issue <number>` を1件受け取り、そのissueの本文・コメントを取得して 1.1 の関数に渡し、`{firstSeen, lastSeen, occurrences}` をJSONで標準出力する
   - `--issue` が省略された場合は exit 2 で終了することをテストで確認する
