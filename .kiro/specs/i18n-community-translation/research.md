@@ -154,7 +154,7 @@
 - **Selected Approach**: `PoeditorClient`内部に`parseSuccessBody`を新設し、HTTPステータスが2xxでも本文の`response.status`が`"success"`以外なら失敗として扱うよう修正した（`response.status`自体が無い応答は互換のため成功扱いのまま）。原因（レート制限か否か）が確定していないため、`rate_limited`への分類は行わず、常に`invalid_request`としてメッセージ付きで返す
 - **Rationale**: 原因を推測で決め打ちして`rate_limited`に分類すると、実際には別の原因だった場合に誤った対処（待って再実行すれば直るという誤解）を招く。今わかっている事実だけを反映し、未確定の原因を憶測で埋めない
 - **Trade-offs**: プロセスをまたいだ20秒間隔の保証はまだ実装していない。複数言語を続けて実行する場合は、実行者が手動で間隔を空けるか、`docs/i18n-community-translation-setup.md`の手順に注意書きを追加する必要がある
-- **Follow-up**: `fr_FR`/`ko_KR`は診断用アップロードで実際には正しく書き込み済み（`translations.added:2253`）だが、これは本番のseedツール経由ではなく診断スクリプトからの直接呼び出しだったため、修正済みツールで正式に再実行し、CLIの「成功」表示とPOEditor上の進捗表示が一致することを確認すること
+- **Follow-up**: 修正後のツールで`fr_FR`/`ko_KR`を再実行（今回は各コマンドの間を20秒以上空けて実行）し、CLIの成功表示に加えてPOEditor上でも全言語が90%以上の進捗を示すことを確認済み
 
 ### Decision: pushの統合アップロードは `overwrite: true` を明示的に送る
 - **Context**: task 6.1の実環境確認で、en_USの既存キーの文言を変更してpushしても、POEditor側の値が更新されないことが判明した
