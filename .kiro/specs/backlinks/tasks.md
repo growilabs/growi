@@ -687,7 +687,7 @@ the restored page's status. Independent of B3/B4.
   - _Boundary: PageLinkService_
   - _Depends: B5.2, B1.6_
 
-- [ ] B5.4 Implement the forward-link-health read query
+- [x] B5.4 Implement the forward-link-health read query
   - **Declare the `ILinkTarget` DTO here** (deferred from B1.1) in `interfaces/backlink.ts`, in the shape
     the design's § Data Models DTO section specifies — `targetState` required, **`pageId` nullable**
     (`string | null`). A `broken` row *is* `toPage == null`, so there is no page id to report; the
