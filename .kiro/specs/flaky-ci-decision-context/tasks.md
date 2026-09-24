@@ -9,7 +9,7 @@
   - _Requirements: 1.2, 1.3_
   - _Boundary: occurrence-summary (lib)_
 
-- [ ] 1.2 `dashboard.ts` を抽出済みの関数を使う形に書き換える
+- [x] 1.2 `dashboard.ts` を抽出済みの関数を使う形に書き換える
   - `dashboard.ts` 内の重複した観測日抽出・回数集計ロジックを削除し、1.1 の関数を呼び出す形にする
   - 抽出前後でダッシュボードのMarkdown出力が一字一句変わらないことを、既存の `dashboard.spec.ts` のゴールデン出力テストで確認する
   - 観測可能な完了状態: `dashboard.spec.ts` の既存テストが変更なしで全てパスする
