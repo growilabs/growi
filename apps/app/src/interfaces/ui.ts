@@ -37,7 +37,7 @@ export type OnDeletedFunction = (
   isRecursively: Nullable<true>,
   isCompletely: Nullable<true>,
 ) => void;
-export type OnRenamedFunction = (path: string) => void;
+export type OnRenamedFunction = (path: string, newPath: string) => void;
 export type OnDuplicatedFunction = (fromPath: string, toPath: string) => void;
 export type OnPutBackedFunction = (path: string) => void;
 export type onDeletedBookmarkFolderFunction = (

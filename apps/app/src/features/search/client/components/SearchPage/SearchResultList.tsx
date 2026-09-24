@@ -19,6 +19,7 @@ import type {
 } from '~/client/interfaces/selectable-all';
 import { toastSuccess } from '~/client/util/toastr';
 import type { IPageSearchMeta, IPageWithSearchMeta } from '~/interfaces/search';
+import type { OnRenamedFunction } from '~/interfaces/ui';
 import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
 import {
   mutatePageTree,
@@ -27,19 +28,42 @@ import {
 } from '~/stores/page-listing';
 import { mutateSearching } from '~/stores/search';
 
+import type { SearchItemMutation } from '../../util/apply-search-item-mutation';
+
 type Props = {
   pages: IPageWithSearchMeta[];
   selectedPageId?: string;
   forceHideMenuItems?: ForceHideMenuItems;
   onPageSelected?: (page?: IPageWithSearchMeta) => void;
   onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
+  // Called in addition to `mutateSearching()` after a single-row rename /
+  // delete, describing what changed. `mutateSearching()`'s filtered `mutate`
+  // never reaches an active `useSWRInfinite` subscription (SWR skips
+  // `$inf$`-prefixed keys), so the infinite-scroll caller applies the change to
+  // its own cache here (A-1). Duplication is not reported: it never changes an
+  // existing row.
+  onItemMutated?: (mutation: SearchItemMutation) => void;
+  // Called when the row deleted via its OWN dropdown menu is the one currently
+  // shown in the right-pane preview (`selectedPageId`). The preview is keyed
+  // off a snapshot object independent of `pages`, so revalidating the list
+  // (mutateSearching/onItemMutated) removes the row but never clears a preview
+  // pointing at data that no longer exists — the right pane would keep
+  // rendering a page that is gone from the results.
+  onPreviewedPageDeleted?: () => void;
 };
 
 const SearchResultListSubstance: ForwardRefRenderFunction<
   ISelectableAll,
   Props
 > = (props: Props, ref) => {
-  const { pages, selectedPageId, forceHideMenuItems, onPageSelected } = props;
+  const {
+    pages,
+    selectedPageId,
+    forceHideMenuItems,
+    onPageSelected,
+    onItemMutated,
+    onPreviewedPageDeleted,
+  } = props;
 
   const { t } = useTranslation();
 
@@ -127,15 +151,16 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
     [t],
   );
 
-  const renamedHandler = useCallback(
-    (path) => {
+  const renamedHandler = useCallback<OnRenamedFunction>(
+    (path, newPath) => {
       toastSuccess(t('renamed_pages', { path }));
 
       mutatePageTree();
       mutateRecentlyUpdated();
       mutateSearching();
+      onItemMutated?.({ type: 'renamed', fromPath: path, toPath: newPath });
     },
-    [t],
+    [t, onItemMutated],
   );
 
   const deletedHandler = useCallback(
@@ -154,8 +179,20 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
       mutatePageTree();
       mutateRecentlyUpdated();
       mutateSearching();
+      onItemMutated?.({
+        type: 'deleted',
+        path,
+        isRecursively: isRecursively === true,
+      });
+
+      const previewedPage = pages.find(
+        (page) => page.data._id === selectedPageId,
+      );
+      if (previewedPage?.data.path === path) {
+        onPreviewedPageDeleted?.();
+      }
     },
-    [t],
+    [t, onItemMutated, onPreviewedPageDeleted, pages, selectedPageId],
   );
 
   return (
