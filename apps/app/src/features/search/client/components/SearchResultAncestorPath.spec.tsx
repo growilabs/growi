@@ -78,30 +78,39 @@ describe('SearchResultAncestorPath', () => {
     });
   });
 
-  describe('zero ancestors (Requirement 2.2 equivalent)', () => {
-    it('renders only the home icon, with no ancestor links', () => {
+  describe('root icon and separators (Requirement 2.2: same as PagePathHierarchicalLink)', () => {
+    it('renders a "/" after the home icon even with zero ancestors, as part of the top-page link', () => {
       const { container } = render(<SearchResultAncestorPath path="/A" />);
 
-      const homeIcon = screen.getByText('home');
-      expect(homeIcon).toBeInTheDocument();
-
-      // Only the home link itself is present; no other ancestor links exist.
-      const links = container.querySelectorAll('a');
-      expect(links).toHaveLength(1);
-      expect(links[0]).toHaveAttribute('href', '/');
+      const homeLink = screen.getByText('home').closest('a');
+      expect(homeLink).toHaveAttribute('href', '/');
+      expect(homeLink?.textContent).toBe('home/');
+      expect(container.querySelectorAll('a')).toHaveLength(1);
     });
-  });
 
-  describe('trash page (mirrors PagePathHierarchicalLink isInTrash)', () => {
-    it('renders the trash icon instead of the home icon', () => {
-      const { container } = render(<SearchResultAncestorPath path="/trash" />);
+    it('separates the root icon and every ancestor with exactly one "/"', () => {
+      const { container } = render(<SearchResultAncestorPath path="/A/B/C" />);
 
-      expect(screen.getByText('delete')).toBeInTheDocument();
+      expect(container.textContent).toBe('home/A/B');
+    });
+
+    it('renders the trash icon followed by a "/" linking to the top page', () => {
+      render(<SearchResultAncestorPath path="/trash" />);
+
+      expect(screen.getByText('delete').closest('a')).toHaveAttribute(
+        'href',
+        '/trash',
+      );
       expect(screen.queryByText('home')).toBeNull();
+      expect(screen.getByText('/').closest('a')).toHaveAttribute('href', '/');
+    });
 
-      const links = container.querySelectorAll('a');
-      expect(links).toHaveLength(1);
-      expect(links[0]).toHaveAttribute('href', '/trash');
+    it('renders the trash root before the ancestors of a trashed page', () => {
+      const { container } = render(
+        <SearchResultAncestorPath path="/trash/foo/bar" />,
+      );
+
+      expect(container.textContent).toBe('delete/trash/foo');
     });
   });
 });

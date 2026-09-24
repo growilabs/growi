@@ -1,5 +1,5 @@
-import type { FC, JSX } from 'react';
-import { Fragment } from 'react';
+import type { JSX } from 'react';
+import { Fragment, memo, useMemo } from 'react';
 import Link from 'next/link';
 import { pagePathUtils } from '@growi/core/dist/utils';
 
@@ -17,17 +17,18 @@ interface SearchResultAncestorPathProps {
   readonly highlightedPath?: string | null;
 }
 
-// Mirrors PagePathHierarchicalLink's `isRoot` branch (home/trash icon + link).
-// Deliberately duplicated rather than shared/extracted — PagePathHierarchicalLink
-// is treated as stable/unmodified by this spec (see research.md "Root-icon
-// duplication vs. extraction").
+// Mirrors PagePathHierarchicalLink's `isRoot` branch, which always ends with
+// a "/" linking to the top page -- inside the home link, or as its own link
+// after the trash icon. Deliberately duplicated rather than shared/extracted —
+// PagePathHierarchicalLink is treated as stable/unmodified by this spec (see
+// research.md "Root-icon duplication vs. extraction").
 const RootIcon = ({
   isInTrash,
 }: {
   readonly isInTrash: boolean;
 }): JSX.Element =>
   isInTrash ? (
-    <span className="path-segment">
+    <>
       <Link href="/trash" prefetch={false}>
         <span
           className={`material-symbols-outlined ${styles['material-symbols-outlined']}`}
@@ -35,17 +36,19 @@ const RootIcon = ({
           delete
         </span>
       </Link>
-    </span>
-  ) : (
-    <span className="path-segment">
       <Link href="/" prefetch={false}>
-        <span
-          className={`material-symbols-outlined ${styles['material-symbols-outlined']}`}
-        >
-          home
-        </span>
+        <PathSeparator className={styles.separator} />
       </Link>
-    </span>
+    </>
+  ) : (
+    <Link href="/" prefetch={false}>
+      <span
+        className={`material-symbols-outlined ${styles['material-symbols-outlined']}`}
+      >
+        home
+      </span>
+      <PathSeparator className={styles.separator} />
+    </Link>
   );
 
 // A surviving ancestor segment (`link`) is rendered as a next/link, either as
@@ -91,26 +94,24 @@ const nodeKey = (node: AncestorPathNode): string =>
  * `title` attribute so it can be inspected on hover, regardless of whether the
  * row is currently truncated.
  */
-export const SearchResultAncestorPath: FC<SearchResultAncestorPathProps> = ({
-  path,
-  highlightedPath,
-}) => {
-  const { hasAncestors, nodes, fullPath } = buildAncestorPathNodes(
-    path,
-    highlightedPath,
-  );
-  const isInTrash = isTrashPage(path);
+export const SearchResultAncestorPath = memo(
+  ({ path, highlightedPath }: SearchResultAncestorPathProps): JSX.Element => {
+    const { nodes, fullPath } = useMemo(
+      () => buildAncestorPathNodes(path, highlightedPath),
+      [path, highlightedPath],
+    );
+    const isInTrash = isTrashPage(path);
 
-  return (
-    <span className={styles['search-result-ancestor-path']} title={fullPath}>
-      <RootIcon isInTrash={isInTrash} />
-      {hasAncestors &&
-        nodes.map((node) => (
+    return (
+      <span className={styles['search-result-ancestor-path']} title={fullPath}>
+        <RootIcon isInTrash={isInTrash} />
+        {nodes.map((node, index) => (
           <Fragment key={nodeKey(node)}>
-            <PathSeparator className={styles.separator} />
+            {index > 0 && <PathSeparator className={styles.separator} />}
             <AncestorNode node={node} />
           </Fragment>
         ))}
-    </span>
-  );
-};
+      </span>
+    );
+  },
+);
