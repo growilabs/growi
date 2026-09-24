@@ -25,7 +25,7 @@ on:
       - '!apps/app/docker/**'
       - packages/**
   pull_request:
-    types: [opened, reopened, synchronize, labeled]
+    types: [opened, reopened, synchronize]
     paths:
       - .github/mergify.yml
       - .github/workflows/ci-app.yml
@@ -95,22 +95,25 @@ jobs:
   ci-app-test:
     runs-on: ubuntu-latest
 
-    # Skipped when `flag/skip-heavy-ci` is present (currently only the i18n
-    # sync bot's translation-only pull request, see pull-translations.ts's
-    # SKIP_HEAVY_CI_LABEL): its diff is always a subset of
-    # apps/app/public/static/locales/** values already validated by
-    # `pnpm run lint:i18n` before the pull request was opened (see
+    # Skipped when `flag/skip-heavy-ci` is present, or when this is the i18n
+    # sync bot's translation-only pull request (see pull-translations.ts's
+    # SKIP_HEAVY_CI_LABEL and TRANSLATION_ONLY_BRANCH): its diff is always a
+    # subset of apps/app/public/static/locales/** values already validated
+    # by `pnpm run lint:i18n` before the pull request was opened (see
     # .github/mergify.yml's i18n-sync-translation-only queue, which only
-    # requires ci-app-lint for this branch). Label-based rather than
-    # head-branch-based so the skip also holds on Mergify's merge-queue
-    # revalidation branch, whose head_ref differs from the original PR's
-    # (see mergify-merge-queue-labels-copier.yml). `labeled` is in the
-    # trigger types above because the label lands after the PR's `opened`
-    # event fires (via a separate API call), so only a run triggered by the
-    # later `labeled` event actually sees it; the existing concurrency
-    # group cancels the earlier, unskipped run.
+    # requires ci-app-lint for this branch). The head-ref check exists
+    # alongside the label check because the label lands after the PR's
+    # `opened` event via a separate API call, so a run triggered by `opened`
+    # never sees it -- the head ref, unlike the label, is already final at
+    # `opened` time. (An earlier version of this condition added `labeled`
+    # to the trigger types instead; that let a mid-flight labeling event
+    # cancel an in-flight run via the concurrency group below, and Mergify's
+    # `check-failure` treats that resulting `cancelled` conclusion as a
+    # failure -- risking ejecting *any* PR from the merge queue over an
+    # unrelated label change. Reverted in favor of this race-free check.)
     if: |
-      !contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
+      !( contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
+         || github.event.pull_request.head.ref == 'i18n-sync/translation-only' )
 
     strategy:
       matrix:
@@ -180,7 +183,8 @@ jobs:
 
     # See ci-app-test's comment above.
     if: |
-      !contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
+      !( contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
+         || github.event.pull_request.head.ref == 'i18n-sync/translation-only' )
 
     strategy:
       matrix:
@@ -258,7 +262,8 @@ jobs:
 
     # See ci-app-test's comment above.
     if: |
-      !contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
+      !( contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
+         || github.event.pull_request.head.ref == 'i18n-sync/translation-only' )
 
     strategy:
       matrix:

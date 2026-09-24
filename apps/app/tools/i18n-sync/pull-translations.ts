@@ -525,14 +525,30 @@ export const EXCLUDE_FROM_CHANGELOG_LABEL = 'flag/exclude-from-changelog';
  * Applied alongside `EXCLUDE_FROM_CHANGELOG_LABEL`, kept as a distinct label
  * (not reused) because it means something different: `ci-app.yml`/
  * `ci-app-prod.yml` skip their heavy test/build/Playwright jobs when this
- * label is present. Label-based, not head-branch-based, because Mergify's
- * merge queue revalidates a queued pull request on a temporary
- * `mergify/merge-queue/**` branch whose `head_ref` is not
- * `i18n-sync/translation-only` -- a head-branch check would stop skipping
- * those jobs on exactly the run that matters most. Mergify does not copy a
- * pull request's labels onto that temporary branch by default, which is why
- * `.github/workflows/mergify-merge-queue-labels-copier.yml` exists: it
- * copies this label onto the temporary branch's own pull request.
+ * label is present. Those workflows also check the pull request's head
+ * branch directly (`head.ref == TRANSLATION_ONLY_BRANCH`) alongside this
+ * label, because the label lands after the pull request's `opened` event
+ * fires (via this separate label-attach call), so a run triggered by
+ * `opened` never sees it -- the head ref, unlike the label, is already
+ * final at `opened` time.
+ *
+ * This label alone still matters for Mergify's merge-queue revalidation: it
+ * runs the queued pull request on a temporary `mergify/merge-queue/**`
+ * branch whose `head.ref` is not `TRANSLATION_ONLY_BRANCH`, so the
+ * head-branch check does not fire there. Mergify does not copy labels onto
+ * that temporary branch, so this label is simply absent on it -- the heavy
+ * jobs run there once per merge attempt. That is a real but bounded cost,
+ * not a correctness problem: the `i18n-sync-translation-only` queue's own
+ * `merge_conditions` in `.github/mergify.yml` only require `ci-app-lint`,
+ * so the heavy jobs' outcome on that temporary branch never gates the
+ * merge. (An earlier revision instead added `labeled` to the CI workflows'
+ * trigger types and a `mergify-merge-queue-labels-copier.yml` workflow to
+ * copy this label onto that branch. Reverted: a `labeled` event on *any*
+ * pull request's own branch could cancel an in-flight heavy-CI run via the
+ * existing `concurrency: cancel-in-progress` group, and Mergify's
+ * `check-failure` condition treats that run's `cancelled` conclusion as a
+ * failure -- risking ejecting an unrelated pull request from the queue over
+ * nothing more than a label change.)
  */
 export const SKIP_HEAVY_CI_LABEL = 'flag/skip-heavy-ci';
 
