@@ -329,3 +329,24 @@ Elasticsearch 9 のセルでしか出ない非決定性は、この手段では�
 1. The flaky-ci-routine shall スキャン窓を、実際の起動間隔のうち最長のものの 2 倍以上にする（起動間隔が不均一な場合は最長間隔を基準とする）。
 2. The 汎用 issue 調査ルーティン shall flaky 追跡 issue（flaky 系のラベルを持つ issue）を調査対象から除外する。
 3. When ルーティンの実行が完了した場合, the flaky-ci-routine shall 実行サマリーに、確認実行の回数と消費した CI 時間、判断待ちの件数、自動クローズの件数を含める。
+
+### Requirement 12: 判断待ちコメントへの発生頻度の明示
+
+**Objective:** GROWI のメンテナーとして、`flaky/needs-decision` が付いた issue を開いたときに、そのテストが過去何回・いつ発生しているかがその場で分かってほしい。それにより、ダッシュボード issue を別途開いて突き合わせなくても、発生頻度を踏まえた判断ができる。
+
+#### Acceptance Criteria
+
+1. When 調査が中程度または低い確信度で停止し人の判断待ちのコメントを投稿する場合, the flaky-ci-routine shall そのissueの発生回数・初回観測日・直近観測日を、ダッシュボードが使うのと同じ計算結果から1行にまとめてコメントに含める。
+2. The flaky-ci-routine shall 発生頻度の計算をこの判断待ちコメント用に別途実装せず、ダッシュボードが使う既存の計算結果を再利用する。
+3. If 発生頻度の計算に必要な観測記録が1件も読み取れない場合, the flaky-ci-routine shall 頻度の行を省略せず、値が不明であることを明示する。
+
+### Requirement 13: 未測定のまま滞留した suspected issue の可視化
+
+**Objective:** GROWI のメンテナーとして、まだ再現測定が一度も行われていない `flaky/suspected` issue が長期間放置されていないかを、毎回の実行レポートで把握したい。それにより、自動調査のパイプラインが詰まっていることに早く気づける。
+
+#### Acceptance Criteria
+
+1. When 実行のレポートを作成する場合, the flaky-ci-routine shall `flaky/suspected`のまま設定済みの日数（Requirement 10と共有する`--stale-days`）を超えて再現測定の記録が一度も無いissueを一覧し、その番号を報告する。
+2. The flaky-ci-routine shall 前項の一覧に含まれるissueを自動でクローズしない。
+3. If 該当するissueが1件も無い場合, the flaky-ci-routine shall その行を省略せず、0件であることを明示する。
+4. The flaky-ci-routine shall `flaky/suspected` と `flaky/confirmed` が自動クローズの対象外であるという既存の設計（Requirement 10）を変更しない。
