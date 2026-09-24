@@ -149,6 +149,69 @@ export const mergeTranslations = (
 };
 
 /**
+ * Returns `after` with any leaf that exists in `before` but is missing from
+ * `after` added back (using `before`'s own value), whenever that leaf still
+ * exists in `sourceLanguageContent` (en_US, the source language).
+ *
+ * `classify`/`mergeTranslations` cannot themselves tell "the translator
+ * genuinely deleted this key" apart from "POEditor's export for this
+ * language just hasn't caught up with a key en_US still declares" -- both
+ * look identical as "missing from `after`". Feeding `classify` and
+ * `mergeTranslations` this function's output instead of the raw POEditor
+ * export folds that distinction in up front: a key still declared in en_US
+ * is left unchanged rather than proposed for removal, so a lagging POEditor
+ * export can never turn into a proposed deletion of a key the source
+ * language still has (see PR #11935, where `ai_sidebar.sources_one` /
+ * `ai_sidebar.sources_other` were nearly deleted from `fr_FR` this way even
+ * though `en_US` -- and the code that reads them -- still had them).
+ *
+ * A leaf missing from both `after` and `sourceLanguageContent` is left
+ * missing: that is a genuine removal (the key is gone from the source
+ * language too), which `classify` must still report.
+ */
+export const restoreKeysStillInSource = (
+  before: Readonly<Record<string, unknown>>,
+  after: Readonly<Record<string, unknown>>,
+  sourceLanguageContent: Readonly<Record<string, unknown>>,
+): Record<string, unknown> => {
+  const afterLeaves = flattenToLeafPaths(after);
+  const sourceLeaves = flattenToLeafPaths(sourceLanguageContent);
+
+  const walk = (
+    beforeObj: Readonly<Record<string, unknown>>,
+    afterObj: Readonly<Record<string, unknown>>,
+    prefix: string,
+  ): Record<string, unknown> => {
+    const result: Record<string, unknown> = { ...afterObj };
+
+    for (const [key, beforeValue] of Object.entries(beforeObj)) {
+      const path = prefix === '' ? key : `${prefix}.${key}`;
+
+      if (isPlainObject(beforeValue)) {
+        const afterNested = isPlainObject(afterObj[key])
+          ? (afterObj[key] as Record<string, unknown>)
+          : {};
+        const merged = walk(beforeValue, afterNested, path);
+        if (Object.keys(merged).length > 0) {
+          result[key] = merged;
+        }
+        continue;
+      }
+
+      if (afterLeaves.has(path) || !sourceLeaves.has(path)) {
+        continue;
+      }
+
+      result[key] = beforeValue;
+    }
+
+    return result;
+  };
+
+  return walk(before, after, '');
+};
+
+/**
  * Keeps only the leaves of `candidate` whose full path also exists as a
  * leaf in `reference`, recursively -- e.g. filtering a non-source
  * language's file down to the key set `en_US` actually declares (see
