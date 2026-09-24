@@ -210,7 +210,6 @@ apps/app/src/features/backlinks/
 │   │   ├── page-link-upsert-queue.ts   # coalescing queue (Set<pageId> + duty-cycle paced drain) — requirement 3.5
 │   │   ├── upsert-queue-pacing.ts      # validates the configured pacing budget, per-value fallback to CONFIG_DEFINITIONS
 │   │   ├── find-backlinks.ts           # read query: backlink sources filtered by viewer grant
-│   │   ├── link-target-state.ts        # (B5.1) pure: (toPage, target status) => LinkTargetState
 │   │   ├── find-forward-link-health.ts # (B5.4) read query: a page's trashed/broken outbound targets, viewer-filtered
 │   │   ├── page-link-service.ts        # thin Crowi adapter: subscribes to crowi.events.page, owns config access, delegates
 │   │   └── page-link-backfill-cron.ts  # (B3) CronService: chunked, resumable, throttled backfill (in-memory path->id map)
@@ -675,17 +674,17 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTa
     private paths to anyone who can read the linking page. Resolution itself is grant-blind by
     design (it must match what a click does, and the live path lookup was always grant-blind), so
     the filter belongs on this read path, not in `resolveToPageIds`.
-  - **One query does both jobs.** Deriving `trashed` needs the target page's `status`, and the leak
-    fix needs the target pages run through the grant filter — that is the *same* set of documents, so
-    it is a single `Page` query, not a grant query plus a status round trip. Shape: the non-null
-    `toPage` ids → `PageQueryBuilder(Page.find({ _id: { $in: targetIds } }))` →
-    `addViewerCondition(user)` → `.select('_id path status')`, then derive each row's state from the
-    returned document. `broken` rows (`toPage == null`) are settled with no lookup at all.
+  - **One query does both jobs.** Finding `trashed` targets needs the target page's `status`, and
+    the leak fix needs the target pages run through the grant filter — that is the *same* set of
+    documents, so it is a single `Page` query, not a grant query plus a status round trip. Shape: the
+    non-null `toPage` ids → `PageQueryBuilder(Page.find({ _id: { $in: targetIds }, status: deleted }))`
+    → `addViewerCondition(user)` → `.select('_id path')`. Every returned document is a `trashed`
+    target; the status condition runs in the query so healthy targets — usually nearly all of them —
+    are never sent back. `broken` rows (`toPage == null`) are settled with no lookup at all.
   - **It cannot reuse `buildVisibleSourcesQuery`.** That builder calls
     `addConditionToExcludeTrashed()`, and trashed targets are exactly what this read reports — so
-    forward-health needs its own sibling builder that applies the grant condition **only**, and
-    selects `status` (which the backlinks read does not need). Deriving state in the same query is
-    what makes the difference load-bearing rather than incidental.
+    forward-health builds its own query that applies the grant condition **only**, plus the
+    trashed-status condition. It lives in `find-forward-link-health.ts`, its only consumer.
   - **`path` is asymmetric by construction.** For a `trashed` (or `normal`) row it is the target
     page's *current* `path` from that query; for a `broken` row there is no page, so it is the row's
     own `toPath` — faithful to what the body actually links to. That is also why a broken row leaks
@@ -694,6 +693,15 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTa
     viewer may not read it" and "the document is gone" are indistinguishable from the result set, and
     reporting the latter would leak the former's existence. A genuinely permanently-deleted target
     becomes `broken` because the delete-family reconcile (B5.2) nulls the inbound cache.
+  - **"Anyone with the link" targets count as readable** (`addViewerCondition(user, null, true)`),
+    unlike `findBacklinks`' sources: the viewer holds the link — it is in the subject's body — and
+    following it opens the page, so hiding its trashed state would only hide a fixable link.
+  - **Known gap — a target that is an empty page is never reported.** `PageQueryBuilder` excludes
+    empty pages by default, so such a row is neither `trashed` nor `broken`. Accepted as rare: path
+    resolution already skips empty pages, and pages never become empty in place
+    (`createEmptyPage` makes a new document), which leaves only a permalink `/{id}` naming an empty
+    page's id. If it shows up, the fix belongs in the resolver (`findPagesById` skipping empty
+    pages, as `findPagesByPath` does), so the row caches `null` and reads `broken` with no change here.
   - A **self row** (`fromPage == toPage`'s page, cleared to `null` by `repointInboundLinks`) also
     reads as `broken` although its path resolves. It is transient and must **not** be reported — see
     the `repointInboundLinks` note under § PageLink model.
@@ -720,14 +728,14 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTa
 ##### API Contract
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| GET | `/_api/v3/page/backlinks` | query: `pageId` (MongoId) | `{ backlinks: IBacklink[], linkTargets: ILinkTarget[] }` | 400, 403, 500 |
+| GET | `/_api/v3/page/backlinks` | query: `pageId` (MongoId) | `{ backlinks: IBacklink[], linkTargets: ILinkTarget[] }` | 400, 404, 500 |
 
 - Middleware: `accessTokenParser([SCOPE.READ.FEATURES.PAGE])`, `loginRequired` (guest per ACL),
   `apiV3FormValidator`; `req.user` is the viewer. Delegates to `PageLinkService.findBacklinks` and
   (B5.9) `PageLinkService.findForwardLinkHealth`.
 - Response carries only filtered pages (no count derived from unfiltered set) → 2.2.
 - **Forward-link health rides this endpoint rather than a second one** (B5.9). It is keyed on the
-  same `pageId`, has the same viewer and the same 403 semantics, and `BacklinksPanel` renders both
+  same `pageId`, has the same viewer and the same 404 semantics, and `BacklinksPanel` renders both
   sections at once — a separate route would mean a second round trip on every panel open, a second
   hook, and a second registration in `apiv3/index.js`, for no independent cacheability. The two
   reads are issued concurrently (`Promise.all`) so the added field costs no extra latency; each
@@ -831,9 +839,10 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   across rename/move/restore), so they satisfy 5.4 with no reconciliation.
 
 ### Derived target state (not stored)
-_Declared in B5.1, alongside `deriveLinkTargetState` — a pure `link-target-state.ts` on the **read**
-path, not in `page-link-sync`: nothing on the write path derives this, and B5.4 folds the derivation
-into the grant-filtered target query it already has to issue (see § File Structure Plan)._
+_The union is declared in B5.1. No standalone derivation helper exists: nothing on the write path
+derives state, and the one reader (B5.4's `findForwardLinkHealth`) settles `broken` from
+`toPage == null` and `trashed` with a status condition in the grant-filtered target query it already
+has to issue._
 ```typescript
 type LinkTargetState = 'normal' | 'trashed' | 'broken';
 // broken  := toPage == null
@@ -871,11 +880,16 @@ interface IBacklinkResponse {
 ### Error Strategy
 - Extraction/sync failures are logged with `{ pageId, path }` context and never propagate to
   break the originating save (listener is decoupled from the save transaction).
-- Read endpoint returns `403` if the viewer cannot read the **subject** page, and otherwise
-  returns only permission-filtered results (never partial-leak on error).
+- Read endpoint returns `404` if the subject page does not exist **or** the viewer cannot read it
+  — one status for both, so the endpoint is no existence oracle
+  (`apps/app/.claude/rules/page-write-action-403-404.md`) — and otherwise returns only
+  permission-filtered results (never partial-leak on error). The check is load-bearing for
+  forward-link health: a broken row's `path` is text from the subject page's body, which "leaks
+  nothing" only because the viewer can read that body. Readability is `Page.countByIdAndViewer`
+  (anyone-with-the-link included, empty pages included), the same answer a page view gets.
 
 ### Error Categories and Responses
-- **User errors (4xx)**: invalid/missing `pageId` → 400 via validator; no access to subject page → 403.
+- **User errors (4xx)**: invalid/missing `pageId` → 400 via validator; subject page missing or not readable → 404 (one status for both).
 - **System errors (5xx)**: DB/resolution failure → 500 with generic message; details logged only.
 - **Business-logic**: an unresolved `toPath` is **not** an error — it is the `broken` state.
 
@@ -909,10 +923,6 @@ interface IBacklinkResponse {
   regression net for the shared pipeline, and one of them pins that page view stays uncapped.
 - `reconcileDeletedPages` (service): trashed page → no-op; permanently-gone page → delegates to
   `removeLinksForPages` (3.3, 6.2).
-- `deriveLinkTargetState`: `broken` when the row has no cached target (outranking any status handed
-  in alongside), `trashed` when the target's status is `deleted`, `normal` otherwise — including a
-  `null`/`undefined` status, which is a v4-era page that `addConditionToExcludeTrashed` counts as
-  published (6.1–6.3).
 - `reResolveByToPath`: forwards the target the resolver reports for the path, and forwards `null`
   when the path is absent from the map (so a row can return to broken); resolves and writes the
   paths that redirect to it as well, each carrying the resolver's own verdict rather than the
