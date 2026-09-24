@@ -63,7 +63,6 @@ export class InstallerService {
           const installation = await repository.findByTeamIdOrEnterpriseId(
             installQuery.teamId ?? undefined,
             installQuery.enterpriseId ?? undefined,
-            installQuery.isEnterpriseInstall,
           );
 
           if (installation == null) {
