@@ -5,8 +5,9 @@ import type Crowi from '~/server/crowi';
 import type { PageDocument } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
-import type { IBacklink } from '../../interfaces/backlink';
+import type { IBacklink, ILinkTarget } from '../../interfaces/backlink';
 import { findBacklinks } from './find-backlinks';
+import { findForwardLinkHealth } from './find-forward-link-health';
 import { PageLinkUpsertQueue } from './page-link-upsert-queue';
 import { resolveUpsertQueuePacing } from './upsert-queue-pacing';
 
@@ -72,5 +73,12 @@ export class PageLinkService {
     user: IUser | null,
   ): Promise<IBacklink[]> {
     return findBacklinks(toPageId, user);
+  }
+
+  findForwardLinkHealth(
+    fromPageId: Types.ObjectId,
+    user: IUser | null,
+  ): Promise<ILinkTarget[]> {
+    return findForwardLinkHealth(fromPageId, user);
   }
 }
