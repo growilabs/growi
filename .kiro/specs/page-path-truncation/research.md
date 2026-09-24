@@ -48,6 +48,7 @@
   2. Duplicate the ~15-line root-icon JSX block into the new component.
 - **Selected Approach**: Option 2 (duplicate).
 - **Rationale**: The block is small, has no independent behavior to unit-test beyond what `PagePathHierarchicalLink`'s existing tests already cover, and avoids touching a component the spec explicitly treats as stable/unmodified. Per the Simplification lens, introducing a shared abstraction for two call sites of a ~15-line static block is not justified.
+- **Follow-up (revised after PR #11743 review)**: The copy drifted (it lost the `/` after the icon). Replaced by rendering `PagePathHierarchicalLink` itself with the root node, which reuses it without modifying it.
 - **Trade-off**: If the icon block changes in the future, both places need updating. Acceptable given its size and low change frequency (it hasn't changed across the `search-modal-path-truncation` effort).
 
 ## Architecture Pattern Evaluation
@@ -90,7 +91,7 @@
 - **Context**: Requirement 8 — non-search consumers of `PageListItemL` must be unaffected by default.
 - **Selected Approach**: Add `isPathTruncationEnabled?: boolean` to `PageListItemL`'s `Props`, defaulting to `false` when omitted. Only `SearchResultList.tsx` passes `true`. When `true`, `PageListItemL` also switches `evalDatePath` to `true` for the `DevidedPagePath` calls that back both the ancestor row and the existing page-name row (Requirement 7's unification applies to both, since they are two views over the same former/latter split).
 - **Rationale**: A single flag keeps the two Requirement-7-driven behavior changes (breadcrumb truncation, date-bundled page name) consistently gated together, matching "opt-in wholesale for `/_search`" rather than introducing two independently-toggleable flags nothing in requirements asks for.
-- **Follow-up (revised after PR #11743 review)**: The boolean was replaced by a render prop, `renderTruncatedAncestorPath?: (path, highlightedPath) => ReactNode`. With the boolean, the shared `PageListItemL` had to statically import `SearchResultAncestorPath` from `features/search`, inverting the dependency direction (`features/search` already imports `PageListItemL`) and shipping search code in every page-list bundle. The render prop keeps the same single opt-in switch (its presence gates both behavior changes together) while `SearchResultList` injects the component.
+- **Follow-up (revised after PR #11743 review)**: The boolean became a render prop, `renderTruncatedAncestorPath`. The flag forced the shared `PageListItemL` to import `features/search`, inverting the dependency direction. The prop is still the single opt-in switch.
 
 ## Risks & Mitigations
 - **Risk**: The row-1/row-2 scope reading (see Research Log) turns out not to match reviewer intent. — **Mitigation**: Called out explicitly in `design.md` boundary section for confirmation before/at `/kiro-validate-design`.
