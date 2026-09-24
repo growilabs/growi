@@ -2,6 +2,7 @@ import express from 'express';
 
 import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
 import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3';
+import { createChatIntegrationRouter } from '~/features/chat-integration/server';
 import { setup as setupExternalUserGroup } from '~/features/external-user-group/server/routes/apiv3/external-user-group';
 import { setup as setupExternalUserGroupRelation } from '~/features/external-user-group/server/routes/apiv3/external-user-group-relation';
 import { setup as growiPlugin } from '~/features/growi-plugin/server/routes/apiv3/admin';
@@ -280,6 +281,7 @@ export const setup = (crowi, app) => {
   router.use('/templates', setupTemplates(crowi));
   router.use('/page-bulk-export', setupPageBulkExport(crowi));
   router.use('/audit-log-bulk-export', auditLogBulkExportRouteFactory(crowi));
+  router.use('/chat-integration', createChatIntegrationRouter(crowi));
 
   router.use('/mastra', mastraRouteFactory(crowi));
 

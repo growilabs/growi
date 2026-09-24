@@ -6,7 +6,7 @@ import { createRedirectToForUnauthenticated } from '~/server/util/createRedirect
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
-import { UserStatus } from '../models/user/conts';
+import { isActiveUserStatus } from '../models/user/predicates';
 
 const logger = loggerFactory('growi:middleware:login-required');
 
@@ -43,7 +43,7 @@ const loginRequiredFactory = (
   ) {
     // check the user logged in
     if (req.user != null && req.user instanceof Object && '_id' in req.user) {
-      if (req.user.status === UserStatus.STATUS_ACTIVE) {
+      if (isActiveUserStatus(req.user.status)) {
         // Active の人だけ先に進める
         return next();
       }
