@@ -2,22 +2,17 @@ import { buildAncestorPathNodes } from './build-ancestor-path-nodes';
 
 describe('buildAncestorPathNodes', () => {
   describe('when the path is the root', () => {
-    it.each([
-      '/',
-      '',
-    ])('returns hasAncestors: false and no nodes for %j', (path) => {
+    it.each(['/', ''])('returns no nodes for %j', (path) => {
       const result = buildAncestorPathNodes(path);
 
-      expect(result.hasAncestors).toBe(false);
       expect(result.nodes).toEqual([]);
     });
   });
 
   describe('when the path has no ancestors (only a page name)', () => {
-    it('returns hasAncestors: false and no nodes', () => {
+    it('returns no nodes', () => {
       const result = buildAncestorPathNodes('/A');
 
-      expect(result.hasAncestors).toBe(false);
       expect(result.nodes).toEqual([]);
       expect(result.fullPath).toBe('/A');
     });
@@ -25,15 +20,11 @@ describe('buildAncestorPathNodes', () => {
 
   describe('when the unit count is 3 or fewer (no truncation)', () => {
     it('returns every ancestor as a link node, in root-to-leaf order', () => {
-      // No highlightedPath given: the highlighted chain falls back to `path` itself,
-      // so its length always matches the plain chain and highlightedHtml mirrors the
-      // plain text (mirrors PageListItemL's existing unconditional dual-tree pattern).
       const result = buildAncestorPathNodes('/A/B/C');
 
-      expect(result.hasAncestors).toBe(true);
       expect(result.nodes).toEqual([
-        { type: 'link', href: '/A', text: 'A', highlightedHtml: 'A' },
-        { type: 'link', href: '/A/B', text: 'B', highlightedHtml: 'B' },
+        { type: 'link', href: '/A', text: 'A' },
+        { type: 'link', href: '/A/B', text: 'B' },
       ]);
       expect(result.fullPath).toBe('/A/B/C');
     });
@@ -43,11 +34,10 @@ describe('buildAncestorPathNodes', () => {
     it('returns only the first ancestor and the immediate parent, with an ellipsis between them', () => {
       const result = buildAncestorPathNodes('/A/B/C/D');
 
-      expect(result.hasAncestors).toBe(true);
       expect(result.nodes).toEqual([
-        { type: 'link', href: '/A', text: 'A', highlightedHtml: 'A' },
+        { type: 'link', href: '/A', text: 'A' },
         { type: 'ellipsis' },
-        { type: 'link', href: '/A/B/C', text: 'C', highlightedHtml: 'C' },
+        { type: 'link', href: '/A/B/C', text: 'C' },
       ]);
       expect(result.fullPath).toBe('/A/B/C/D');
     });
@@ -58,7 +48,7 @@ describe('buildAncestorPathNodes', () => {
       const result = buildAncestorPathNodes('/A/B/C/D', '/A/B/<em>C</em>/D');
 
       expect(result.nodes).toEqual([
-        { type: 'link', href: '/A', text: 'A', highlightedHtml: 'A' },
+        { type: 'link', href: '/A', text: 'A' },
         { type: 'ellipsis' },
         {
           type: 'link',
@@ -69,7 +59,7 @@ describe('buildAncestorPathNodes', () => {
       ]);
     });
 
-    it('applies highlightedHtml across every surviving node in the untruncated case', () => {
+    it('sets highlightedHtml only on the segments that carry a highlight', () => {
       const result = buildAncestorPathNodes(
         '/foo/bar/baz',
         '/<em>foo</em>/bar/baz',
@@ -82,7 +72,7 @@ describe('buildAncestorPathNodes', () => {
           text: 'foo',
           highlightedHtml: '<em>foo</em>',
         },
-        { type: 'link', href: '/foo/bar', text: 'bar', highlightedHtml: 'bar' },
+        { type: 'link', href: '/foo/bar', text: 'bar' },
       ]);
     });
   });
@@ -95,7 +85,7 @@ describe('buildAncestorPathNodes', () => {
       );
 
       expect(result.nodes).toEqual([
-        { type: 'link', href: '/A', text: 'A', highlightedHtml: 'A' },
+        { type: 'link', href: '/A', text: 'A' },
         { type: 'ellipsis' },
         { type: 'link', href: '/A/B/C', text: 'C' },
       ]);
@@ -117,12 +107,7 @@ describe('buildAncestorPathNodes', () => {
           highlightedHtml: "<em class='highlighted-keyword'>daily</em>",
         },
         { type: 'ellipsis' },
-        {
-          type: 'link',
-          href: '/daily/2024/01',
-          text: '01',
-          highlightedHtml: '01',
-        },
+        { type: 'link', href: '/daily/2024/01', text: '01' },
       ]);
     });
   });

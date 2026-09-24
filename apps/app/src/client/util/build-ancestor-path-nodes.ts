@@ -11,7 +11,7 @@ import { formatTruncatedPagePath } from './format-truncated-page-path';
 /**
  * A single rendered unit of the ancestor-path breadcrumb.
  * - `link`: a surviving ancestor segment. `highlightedHtml` is set only when
- *   that segment's highlight markup was reliably resolved.
+ *   that segment carries a reliably resolved search highlight.
  * - `ellipsis`: the collapsed range of intermediate ancestors. Never a link.
  */
 export type AncestorPathNode =
@@ -24,8 +24,7 @@ export type AncestorPathNode =
   | { readonly type: 'ellipsis' };
 
 export interface AncestorPathPlan {
-  /** false => caller renders home/trash icon only, `nodes` is empty. */
-  readonly hasAncestors: boolean;
+  /** Empty when the page has no ancestors. */
   readonly nodes: readonly AncestorPathNode[];
   /** Full path including the page name, for the hover tooltip. */
   readonly fullPath: string;
@@ -56,7 +55,10 @@ const toLinkNode = (
   type: 'link',
   href: buildLinkedPagePathHref(plainNode),
   text: plainNode.pathName,
-  ...(highlightedHtml != null ? { highlightedHtml } : {}),
+  // Markup identical to the plain text carries no highlight; render it as text.
+  ...(highlightedHtml != null && highlightedHtml !== plainNode.pathName
+    ? { highlightedHtml }
+    : {}),
 });
 
 /**
@@ -83,7 +85,7 @@ export const buildAncestorPathNodes = (
   const ancestorParts = truncated.parts.slice(0, -1);
 
   if (ancestorParts.length === 0) {
-    return { hasAncestors: false, nodes: [], fullPath: truncated.fullPath };
+    return { nodes: [], fullPath: truncated.fullPath };
   }
 
   const plainChain = buildRootFirstChain(
@@ -111,5 +113,5 @@ export const buildAncestorPathNodes = (
     return toLinkNode(plainChain[chainIndex], highlightedSegments[chainIndex]);
   });
 
-  return { hasAncestors: true, nodes, fullPath: truncated.fullPath };
+  return { nodes, fullPath: truncated.fullPath };
 };

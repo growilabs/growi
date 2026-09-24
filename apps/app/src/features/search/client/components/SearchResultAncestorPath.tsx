@@ -5,6 +5,8 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 
 import type { AncestorPathNode } from '~/client/util/build-ancestor-path-nodes';
 import { buildAncestorPathNodes } from '~/client/util/build-ancestor-path-nodes';
+import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink';
+import { LinkedPagePath } from '~/models/linked-page-path';
 
 import { PathSeparator } from './PathSeparator';
 
@@ -17,39 +19,9 @@ interface SearchResultAncestorPathProps {
   readonly highlightedPath?: string | null;
 }
 
-// Mirrors PagePathHierarchicalLink's `isRoot` branch, which always ends with
-// a "/" linking to the top page -- inside the home link, or as its own link
-// after the trash icon. Deliberately duplicated rather than shared/extracted —
-// PagePathHierarchicalLink is treated as stable/unmodified by this spec (see
-// research.md "Root-icon duplication vs. extraction").
-const RootIcon = ({
-  isInTrash,
-}: {
-  readonly isInTrash: boolean;
-}): JSX.Element =>
-  isInTrash ? (
-    <>
-      <Link href="/trash" prefetch={false}>
-        <span
-          className={`material-symbols-outlined ${styles['material-symbols-outlined']}`}
-        >
-          delete
-        </span>
-      </Link>
-      <Link href="/" prefetch={false}>
-        <PathSeparator className={styles.separator} />
-      </Link>
-    </>
-  ) : (
-    <Link href="/" prefetch={false}>
-      <span
-        className={`material-symbols-outlined ${styles['material-symbols-outlined']}`}
-      >
-        home
-      </span>
-      <PathSeparator className={styles.separator} />
-    </Link>
-  );
+// PagePathHierarchicalLink renders only its root branch (home/trash icon and
+// the "/" after it) for the root node, so it is reused as-is for the row head.
+const ROOT_LINKED_PAGE_PATH = new LinkedPagePath('/');
 
 // A surviving ancestor segment (`link`) is rendered as a next/link, either as
 // plain text or, when a corresponding highlight was resolved, with the
@@ -104,7 +76,10 @@ export const SearchResultAncestorPath = memo(
 
     return (
       <span className={styles['search-result-ancestor-path']} title={fullPath}>
-        <RootIcon isInTrash={isInTrash} />
+        <PagePathHierarchicalLink
+          linkedPagePath={ROOT_LINKED_PAGE_PATH}
+          isInTrash={isInTrash}
+        />
         {nodes.map((node, index) => (
           <Fragment key={nodeKey(node)}>
             {index > 0 && <PathSeparator className={styles.separator} />}

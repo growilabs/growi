@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -146,15 +147,27 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
 
   const highlightedPath = elasticSearchResult?.highlightedPath;
 
-  const dPagePath: DevidedPagePath = new DevidedPagePath(pageData.path, false);
-  const dPagePathHighlighted: DevidedPagePath = new DevidedPagePath(
-    highlightedPath || pageData.path,
-    true,
-  );
-
-  const pageName = isPathTruncationEnabled
-    ? buildHighlightedPageName(pageData.path, highlightedPath)
-    : new LinkedPagePath(dPagePathHighlighted.latter).pathName;
+  // Memoized so PagePathHierarchicalLink (memo) receives stable props.
+  const { pageName, legacyAncestorPath } = useMemo(() => {
+    if (isPathTruncationEnabled) {
+      return {
+        pageName: buildHighlightedPageName(pageData.path, highlightedPath),
+        legacyAncestorPath: null,
+      };
+    }
+    const dPagePath = new DevidedPagePath(pageData.path, false);
+    const dPagePathHighlighted = new DevidedPagePath(
+      highlightedPath || pageData.path,
+      true,
+    );
+    return {
+      pageName: new LinkedPagePath(dPagePathHighlighted.latter).pathName,
+      legacyAncestorPath: {
+        linkedPagePath: new LinkedPagePath(dPagePath.former),
+        linkedPagePathByHtml: new LinkedPagePath(dPagePathHighlighted.former),
+      },
+    };
+  }, [isPathTruncationEnabled, pageData.path, highlightedPath]);
 
   const lastUpdateDate = format(
     new Date(pageData.updatedAt),
@@ -298,22 +311,22 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
             >
               <div className="d-flex justify-content-between">
                 {/* page path */}
-                {renderTruncatedAncestorPath != null ? (
+                {legacyAncestorPath == null ? (
                   // Let the path take the remaining width and shrink below its content
                   // size; min-width:0 is what actually enables the 1-line ellipsis inside
                   // the rendered ancestor path (no Bootstrap min-width-0 utility). Mirrors
                   // the same wrapper used for SearchResultPagePath in SearchResultMenuItem.
                   <span className="flex-grow-1" style={{ minWidth: 0 }}>
-                    {renderTruncatedAncestorPath(
+                    {renderTruncatedAncestorPath?.(
                       pageData.path,
                       highlightedPath,
                     )}
                   </span>
                 ) : (
                   <PagePathHierarchicalLink
-                    linkedPagePath={new LinkedPagePath(dPagePath.former)}
+                    linkedPagePath={legacyAncestorPath.linkedPagePath}
                     linkedPagePathByHtml={
-                      new LinkedPagePath(dPagePathHighlighted.former)
+                      legacyAncestorPath.linkedPagePathByHtml
                     }
                   />
                 )}
