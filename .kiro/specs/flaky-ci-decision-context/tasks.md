@@ -26,7 +26,7 @@
   - _Requirements: 1.1, 1.2, 1.3_
   - _Boundary: occurrence-summary (script)_
 
-- [ ] 2.2 (P) 未測定のまま滞留した suspected issue を列挙するCLIスクリプトを実装する
+- [x] 2.2 (P) 未測定のまま滞留した suspected issue を列挙するCLIスクリプトを実装する
   - `bin/flaky-ci/scripts/stale-suspected.ts` を実装する。対象は state=open かつ `flaky/suspected` ラベルを持つissueのみ
   - 各issueについて 1.1 の関数で `firstSeen` を求め、いずれのコメントにも `### Repro result`（`COMMENT_HEADINGS.reproResult`）を含まないものを「未測定」と判定する
   - `--stale-days`（省略時は既定14）を超えて未測定のissueだけを `{staleDays, staleIssues: [{number, firstSeen, daysSince}]}` として出力する。ラベル変更・クローズは一切行わない
@@ -72,4 +72,5 @@
 
 ## Implementation Notes
 
+- (2.2) `stale-suspected.ts`'s per-issue comments-fetch failure is surfaced as `unavailableIssues: number[]` (a sibling array to `staleIssues`), per `lib/output.ts`'s multi-row convention — an initial draft silently dropped the issue instead, rejected in review. The `firstSeen === null` case (comments read fine, date unparseable) is deliberately NOT in `unavailableIssues` — it's a different, narrower, pre-existing edge case (measurement state is known; only the date isn't), out of this fix's scope.
 - (1.1) `computeOccurrenceSummary`'s `occurrences` is a straight port of `dashboard.ts`'s existing `countOccurrences` — `1 + count of matching observation comments`, unconditional of whether any individual event's `Date:` line actually parses. It is a *separate* computation from `firstSeen`/`lastSeen` (which come only from parseable dates), not derived from it. `occurrences` can never be `0` under this real, unmodified formula (the body always counts as one event). design.md's Service Interface postcondition text ("観測日が1件も読めない場合は `{firstSeen: null, lastSeen: null, occurrences: 0}` を返す") is therefore misleading as written — port that correction back into the target spec (`ci-flaky-test-detection`) at task 5, so a future reader doesn't treat the literal wording as authoritative over the verified real behavior.
