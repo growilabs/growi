@@ -4,16 +4,14 @@ import {
   buildLinkedPagePathHref,
   LinkedPagePath,
 } from '~/models/linked-page-path';
-import loggerFactory from '~/utils/logger';
 
+import { alignHighlightedPathSegments } from './align-highlighted-path-segments';
 import { formatTruncatedPagePath } from './format-truncated-page-path';
-
-const logger = loggerFactory('growi:client:build-ancestor-path-nodes');
 
 /**
  * A single rendered unit of the ancestor-path breadcrumb.
- * - `link`: a surviving ancestor segment. `highlightedHtml` is set only when a
- *   corresponding highlighted node was resolved (see `buildAncestorPathNodes`).
+ * - `link`: a surviving ancestor segment. `highlightedHtml` is set only when
+ *   that segment's highlight markup was reliably resolved.
  * - `ellipsis`: the collapsed range of intermediate ancestors. Never a link.
  */
 export type AncestorPathNode =
@@ -53,37 +51,26 @@ const buildRootFirstChain = (topmost: LinkedPagePath): LinkedPagePath[] => {
 
 const toLinkNode = (
   plainNode: LinkedPagePath,
-  highlightedNode: LinkedPagePath | undefined,
-  isHighlightReliable: boolean,
-): AncestorPathNode => {
-  const highlightedHtml =
-    isHighlightReliable && highlightedNode != null
-      ? highlightedNode.pathName
-      : undefined;
-
-  return {
-    type: 'link',
-    href: buildLinkedPagePathHref(plainNode),
-    text: plainNode.pathName,
-    ...(highlightedHtml != null ? { highlightedHtml } : {}),
-  };
-};
+  highlightedHtml: string | undefined,
+): AncestorPathNode => ({
+  type: 'link',
+  href: buildLinkedPagePathHref(plainNode),
+  text: plainNode.pathName,
+  ...(highlightedHtml != null ? { highlightedHtml } : {}),
+});
 
 /**
- * Bridge `formatTruncatedPagePath`'s truncation decision with the plain and
- * highlighted `LinkedPagePath` chains, returning a React-agnostic display
- * plan for the ancestor-only portion of a page path (the page name itself is
- * dropped; callers render it separately).
+ * Bridge `formatTruncatedPagePath`'s truncation decision with the plain
+ * `LinkedPagePath` chain and the per-segment highlight markup, returning a
+ * React-agnostic display plan for the ancestor-only portion of a page path
+ * (the page name itself is dropped; callers render it separately).
  *
- * The truncated-ancestor-parts shape from `formatTruncatedPagePath` is always
- * either (a) every ancestor, in order, or (b) exactly [first, ellipsis, last].
- * This function relies on that fixed shape rather than a generic sliding
- * window or text-matching algorithm (see research.md).
+ * Surviving parts are mapped back to chain positions by counting from the head
+ * for parts before the ellipsis and from the tail for parts after it, so this
+ * works for any truncation shape with at most one ellipsis.
  *
- * If the plain and highlighted chains resolve to a different total length,
- * partial index correspondence cannot be trusted (there is no reliable way to
- * know which index caused the drift), so the entire ancestor path falls back
- * to plain text with no `highlightedHtml` on any node.
+ * Highlight markup is resolved per segment by `alignHighlightedPathSegments`;
+ * a segment whose markup cannot be trusted is rendered as plain text.
  *
  * Pure function: no React, no DOM, no network. Never throws on a valid string input.
  */
@@ -99,54 +86,30 @@ export const buildAncestorPathNodes = (
     return { hasAncestors: false, nodes: [], fullPath: truncated.fullPath };
   }
 
-  // `skipNormalize: true` for the highlighted variant mirrors the existing
-  // dual-tree pattern in PageListItemL/PagePathHierarchicalLink: the
-  // highlighted string embeds <em> markup that normalization must not touch.
-  const plainFormer = new DevidedPagePath(path, false, true).former;
-  const highlightedFormer = new DevidedPagePath(
-    highlightedPath ?? path,
-    true,
-    true,
-  ).former;
-
-  const plainChain = buildRootFirstChain(new LinkedPagePath(plainFormer));
-  const highlightedChain = buildRootFirstChain(
-    new LinkedPagePath(highlightedFormer),
+  const plainChain = buildRootFirstChain(
+    new LinkedPagePath(new DevidedPagePath(path, false, true).former),
+  );
+  // Ancestors are the leading segments of the path, so chain index === segment index.
+  const highlightedSegments = alignHighlightedPathSegments(
+    path,
+    highlightedPath,
   );
 
-  const isHighlightReliable = plainChain.length === highlightedChain.length;
-  const isTruncated = ancestorParts.some((part) => part.type === 'ellipsis');
+  const ellipsisIndex = ancestorParts.findIndex(
+    (part) => part.type === 'ellipsis',
+  );
+  const toChainIndex = (partIndex: number): number =>
+    ellipsisIndex === -1 || partIndex < ellipsisIndex
+      ? partIndex
+      : plainChain.length - (ancestorParts.length - partIndex);
 
-  // Defensive invariant: this function hardcodes formatTruncatedPagePath's two
-  // known truncation shapes (all ancestors, or exactly [first, ellipsis, last])
-  // rather than deriving kept positions generically (see the module doc
-  // comment above). If that upstream shape ever changes, this won't throw or
-  // fail type-checking on its own -- it would silently render the wrong
-  // ancestors. Surface that loudly during development instead of staying silent.
-  const hasExpectedShape = isTruncated
-    ? ancestorParts.length === 3
-    : ancestorParts.length === plainChain.length;
-  if (!hasExpectedShape) {
-    logger.error(
-      'formatTruncatedPagePath returned an unexpected truncation shape ' +
-        `(ancestorParts.length=${ancestorParts.length}, plainChain.length=${plainChain.length}, isTruncated=${isTruncated}). ` +
-        "buildAncestorPathNodes assumes a fixed [first, ellipsis, last] or all-ancestors shape; update it if formatTruncatedPagePath's algorithm changed.",
-    );
-  }
-
-  const nodes: AncestorPathNode[] = isTruncated
-    ? [
-        toLinkNode(plainChain[0], highlightedChain[0], isHighlightReliable),
-        ELLIPSIS,
-        toLinkNode(
-          plainChain[plainChain.length - 1],
-          highlightedChain[plainChain.length - 1],
-          isHighlightReliable,
-        ),
-      ]
-    : plainChain.map((node, index) =>
-        toLinkNode(node, highlightedChain[index], isHighlightReliable),
-      );
+  const nodes: AncestorPathNode[] = ancestorParts.map((part, partIndex) => {
+    if (part.type === 'ellipsis') {
+      return ELLIPSIS;
+    }
+    const chainIndex = toChainIndex(partIndex);
+    return toLinkNode(plainChain[chainIndex], highlightedSegments[chainIndex]);
+  });
 
   return { hasAncestors: true, nodes, fullPath: truncated.fullPath };
 };

@@ -87,17 +87,43 @@ describe('buildAncestorPathNodes', () => {
     });
   });
 
-  describe('when the plain and highlighted chains have a different total length', () => {
-    it('falls back to the plain ancestor path with no highlightedHtml on any node', () => {
-      const result = buildAncestorPathNodes('/A/B/C/D', '/X/Y');
+  describe('when the highlight markup contains a "/" of its own', () => {
+    it('renders only the segments whose <em> is cut by a "/" as plain text', () => {
+      const result = buildAncestorPathNodes(
+        '/A/B/C/D',
+        "/A/<em class='highlighted-keyword'>B/C</em>/D",
+      );
 
-      expect(result.hasAncestors).toBe(true);
       expect(result.nodes).toEqual([
-        { type: 'link', href: '/A', text: 'A' },
+        { type: 'link', href: '/A', text: 'A', highlightedHtml: 'A' },
         { type: 'ellipsis' },
         { type: 'link', href: '/A/B/C', text: 'C' },
       ]);
-      expect(result.fullPath).toBe('/A/B/C/D');
+    });
+
+    it('keeps an ancestor highlight on a date-suffixed path', () => {
+      // The `/` of `</em>` used to be picked up by the date-bundling regex,
+      // desyncing the highlighted chain and dropping every ancestor highlight.
+      const result = buildAncestorPathNodes(
+        '/daily/2024/01/02',
+        "/<em class='highlighted-keyword'>daily</em>/2024/01/02",
+      );
+
+      expect(result.nodes).toEqual([
+        {
+          type: 'link',
+          href: '/daily',
+          text: 'daily',
+          highlightedHtml: "<em class='highlighted-keyword'>daily</em>",
+        },
+        { type: 'ellipsis' },
+        {
+          type: 'link',
+          href: '/daily/2024/01',
+          text: '01',
+          highlightedHtml: '01',
+        },
+      ]);
     });
   });
 
