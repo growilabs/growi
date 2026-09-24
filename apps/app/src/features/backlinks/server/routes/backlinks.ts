@@ -13,6 +13,8 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import { isPageReadableByViewer } from '../services/is-page-readable-by-viewer';
+
 const logger = loggerFactory('growi:routes:apiv3:backlink');
 
 const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
@@ -28,9 +30,25 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
       );
     }
     try {
+      const pageObjectId = new mongoose.Types.ObjectId(pageId);
+      const viewer = req.user ?? null;
+
+      // Both reads assume the viewer can read this page: forward-link health returns
+      // paths from its body. One 404 for "missing" and "forbidden" alike — see
+      // rules/page-write-action-403-404.md.
+      if (!(await isPageReadableByViewer(pageObjectId, viewer))) {
+        return res.apiv3Err(
+          new ErrorV3(
+            `Page '${pageId}' is not found or forbidden`,
+            'notfound_or_forbidden',
+          ),
+          404,
+        );
+      }
+
       const backlinks = await crowi.pageLinkService.findBacklinks(
-        new mongoose.Types.ObjectId(pageId),
-        req.user ?? null,
+        pageObjectId,
+        viewer,
       );
       return res.apiv3({ backlinks });
     } catch (err) {
@@ -84,6 +102,8 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
  *                            example: /Sandbox/source
  *          400:
  *            description: pageId is missing or is not a MongoDB ID.
+ *          404:
+ *            description: The page does not exist or the requesting user cannot read it.
  *          500:
  *            description: Internal server error.
  */
