@@ -44,7 +44,7 @@
   - _Requirements: 1.1, 1.3_
   - _Boundary: investigate-flaky-test (doc)_
 
-- [ ] 3.2 (P) Step 6のレポートに Stale suspected 項目を追加する
+- [x] 3.2 (P) Step 6のレポートに Stale suspected 項目を追加する
   - `.claude/commands/flaky-ci-routine.md` Step 6 の「これら五つを毎回報告する」リストに、6つ目として「Stale suspected」を追加する
   - Step 4 で確定済みの `STALE_DAYS` の値をそのまま `stale-suspected.ts --stale-days ${STALE_DAYS}` に渡す指示を書く
   - 該当issueが0件の場合は既存の五項目と同じ規約で「none」と明示的に報告することを明記する
@@ -72,5 +72,6 @@
 
 ## Implementation Notes
 
+- (2.2/3.2) design.md's Batch/Job Contract for `stale-suspected.ts` (line ~274) still documents the output shape as `{staleDays, staleIssues: [...]}` without `unavailableIssues` — port that field into the target spec's design doc at task 5.
 - (2.2) `stale-suspected.ts`'s per-issue comments-fetch failure is surfaced as `unavailableIssues: number[]` (a sibling array to `staleIssues`), per `lib/output.ts`'s multi-row convention — an initial draft silently dropped the issue instead, rejected in review. The `firstSeen === null` case (comments read fine, date unparseable) is deliberately NOT in `unavailableIssues` — it's a different, narrower, pre-existing edge case (measurement state is known; only the date isn't), out of this fix's scope.
 - (1.1) `computeOccurrenceSummary`'s `occurrences` is a straight port of `dashboard.ts`'s existing `countOccurrences` — `1 + count of matching observation comments`, unconditional of whether any individual event's `Date:` line actually parses. It is a *separate* computation from `firstSeen`/`lastSeen` (which come only from parseable dates), not derived from it. `occurrences` can never be `0` under this real, unmodified formula (the body always counts as one event). design.md's Service Interface postcondition text ("観測日が1件も読めない場合は `{firstSeen: null, lastSeen: null, occurrences: 0}` を返す") is therefore misleading as written — port that correction back into the target spec (`ci-flaky-test-detection`) at task 5, so a future reader doesn't treat the literal wording as authoritative over the verified real behavior.
