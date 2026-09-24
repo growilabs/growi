@@ -1,0 +1,22 @@
+{
+  "feature_name": "flaky-ci-decision-context",
+  "created_at": "2026-09-24T11:10:10Z",
+  "updated_at": "2026-09-24T11:55:00Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

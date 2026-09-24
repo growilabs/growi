@@ -894,7 +894,7 @@ every run — a `0` (or `none`) is a result, an omitted line is a gap:
   (do not ask for or compute a second threshold):
 
   ```bash
-  node stale-suspected.ts --stale-days ${STALE_DAYS}
+  node bin/flaky-ci/scripts/stale-suspected.ts --stale-days ${STALE_DAYS}
   ```
 
   List the numbers in `staleIssues[]`, or report `none` when the array is

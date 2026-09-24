@@ -53,7 +53,7 @@
   - _Boundary: flaky-ci-routine (doc)_
 
 - [ ] 4. Validation: 一連の変更を通しで確認する
-- [ ] 4.1 lib・scripts全体のテストスイートと手順書の整合を確認する
+- [x] 4.1 lib・scripts全体のテストスイートと手順書の整合を確認する
   - `bin/flaky-ci/` 配下の全テスト（`occurrence-summary.spec.ts` × 2、`stale-suspected.spec.ts`、`dashboard.spec.ts`）を実行し、全てパスすることを確認する
   - `.claude/skills/investigate-flaky-test/SKILL.md` と `.claude/commands/flaky-ci-routine.md` の該当箇所を読み直し、頻度行の挿入順序（頻度→署名→Recommendation）と Stale suspected の報告書式が設計通りであることを目視確認する
   - 観測可能な完了状態: `pnpm vitest run` で対象spec群が全て green、かつ両手順書の該当節に矛盾がない
@@ -72,6 +72,8 @@
 
 ## Implementation Notes
 
+- (4.1) design.md's Error Handling section (around line 295) justifies omitting the pause-comment frequency line on a fetch failure by calling it "falling back to Requirement 1.3's 'unknown value' display" (`Requirement 1.3の「値不明」表示に倒す`) — but Req 1.3's actual text says the opposite: don't omit the line, make the unknown value explicit. Omitting the line on total fetch failure is a reasonable real-world choice (matches SKILL.md's shipped behavior and design.md's own Boundary Commitments), but the design.md sentence connecting it to Req 1.3 is self-contradictory as written. Port a corrected justification back into the target spec's design.md at task 5 (e.g., "a total fetch failure omits the line, which stays a UX choice distinct from Req 1.3's null-field 'unknown' rendering — the two are different failure modes, not the same fallback").
+- (4.1) `flaky-ci-routine.md` Step 6's `stale-suspected.ts` invocation was missing its `bin/flaky-ci/scripts/` path prefix (every other script call in both edited docs uses the full path) — fixed directly during the 4.1 checkpoint, no port-back needed since it's a pure bugfix, not a design decision.
 - (2.2/3.2) design.md's Batch/Job Contract for `stale-suspected.ts` (line ~274) still documents the output shape as `{staleDays, staleIssues: [...]}` without `unavailableIssues` — port that field into the target spec's design doc at task 5.
 - (2.2) `stale-suspected.ts`'s per-issue comments-fetch failure is surfaced as `unavailableIssues: number[]` (a sibling array to `staleIssues`), per `lib/output.ts`'s multi-row convention — an initial draft silently dropped the issue instead, rejected in review. The `firstSeen === null` case (comments read fine, date unparseable) is deliberately NOT in `unavailableIssues` — it's a different, narrower, pre-existing edge case (measurement state is known; only the date isn't), out of this fix's scope.
 - (1.1) `computeOccurrenceSummary`'s `occurrences` is a straight port of `dashboard.ts`'s existing `countOccurrences` — `1 + count of matching observation comments`, unconditional of whether any individual event's `Date:` line actually parses. It is a *separate* computation from `firstSeen`/`lastSeen` (which come only from parseable dates), not derived from it. `occurrences` can never be `0` under this real, unmodified formula (the body always counts as one event). design.md's Service Interface postcondition text ("観測日が1件も読めない場合は `{firstSeen: null, lastSeen: null, occurrences: 0}` を返す") is therefore misleading as written — port that correction back into the target spec (`ci-flaky-test-detection`) at task 5, so a future reader doesn't treat the literal wording as authoritative over the verified real behavior.
