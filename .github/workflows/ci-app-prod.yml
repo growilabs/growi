@@ -52,6 +52,16 @@ jobs:
         || github.base_ref == 'dev/8.*.x'
         || startsWith( github.base_ref, 'release/' )
         || startsWith( github.head_ref, 'mergify/merge-queue/' ))
+      # Skip heavy CI when `flag/skip-heavy-ci` is present, or when this is
+      # the i18n sync bot's translation-only pull request. The head-ref
+      # check (not just the label) matters because the label lands after
+      # the PR's `opened` event via a separate API call -- the head ref,
+      # unlike the label, is already final at `opened` time, so checking it
+      # directly avoids a race that a `labeled` trigger would otherwise need
+      # (and which risks cancelling an in-flight run into a `cancelled`
+      # conclusion that Mergify's `check-failure` treats as a failure).
+      && !( contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
+            || github.event.pull_request.head.ref == 'i18n-sync/translation-only' )
     with:
       node-version: 24.x
       skip-e2e-test: ${{ contains( github.event.pull_request.labels.*.name, 'dependencies' ) }}
