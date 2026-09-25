@@ -18,6 +18,8 @@ type CapturedPageListItemLProps = {
   page: IPageWithSearchMeta;
   listItemRef?: React.Ref<HTMLLIElement>;
   listItemIndex?: number;
+  isSelected?: boolean;
+  isInitiallyChecked?: boolean;
   onPageDuplicated?: (fromPath: string, toPath: string) => void;
   onPageRenamed?: (path: string, newPath: string) => void;
   onPageDeleted?: (
@@ -59,13 +61,38 @@ vi.mock('~/client/components/PageList/PageListItemL', () => ({
         const pageId = props.page.data._id;
         pageListItemLSpy.propsByPageId.set(pageId, props);
         increment(pageListItemLSpy.renderCountByPageId, pageId);
+        const checkboxRef = React.useRef<HTMLInputElement>(null);
         React.useImperativeHandle(ref, () => ({
-          select: () => increment(pageListItemLSpy.selectCallsByPageId, pageId),
-          deselect: () =>
-            increment(pageListItemLSpy.deselectCallsByPageId, pageId),
+          select: () => {
+            increment(pageListItemLSpy.selectCallsByPageId, pageId);
+            if (checkboxRef.current != null) {
+              checkboxRef.current.checked = true;
+            }
+          },
+          deselect: () => {
+            increment(pageListItemLSpy.deselectCallsByPageId, pageId);
+            if (checkboxRef.current != null) {
+              checkboxRef.current.checked = false;
+            }
+          },
         }));
-        // A real <li> so the virtualizer can measure the row.
-        return <li ref={props.listItemRef} data-index={props.listItemIndex} />;
+        // A real <li> so the virtualizer can measure the row. Like the real
+        // row, the checkbox is uncontrolled (its initial state comes from
+        // `isInitiallyChecked`) and `isSelected` shows as the `active` class.
+        return (
+          <li
+            ref={props.listItemRef}
+            data-index={props.listItemIndex}
+            className={props.isSelected ? 'active' : undefined}
+          >
+            <input
+              ref={checkboxRef}
+              type="checkbox"
+              aria-label={pageId}
+              defaultChecked={props.isInitiallyChecked}
+            />
+          </li>
+        );
       },
     ),
   ),
@@ -538,5 +565,112 @@ describe('SearchResultList virtualization', () => {
     );
 
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
+  });
+});
+
+// Req 9.1/9.2/9.4: a row scrolled out of the rendered range is unmounted, so
+// its checkbox and preview highlight must be restored when it is rendered again.
+describe('SearchResultList state of rows re-rendered by scrolling', () => {
+  const VIEWPORT_HEIGHT = 500;
+  const ROW_HEIGHT = 50;
+  const pages = Array.from({ length: 300 }, (_, i) => createPage(`p${i}`));
+  // Far enough that the first rows (and their overscan) leave the range.
+  const FAR_SCROLL_TOP = ROW_HEIGHT * 100;
+
+  beforeEach(() => {
+    pageListItemLSpy.clear();
+    pageInfoStub.idToPageInfo = undefined;
+    vi.clearAllMocks();
+    layout.restore();
+    layout = stubVirtualListLayout({
+      viewportHeight: VIEWPORT_HEIGHT,
+      rowHeight: ROW_HEIGHT,
+    });
+  });
+
+  const checkboxOf = (pageId: string): HTMLInputElement =>
+    screen.getByRole('checkbox', { name: pageId });
+
+  const listItemOf = (pageId: string): HTMLElement | null =>
+    checkboxOf(pageId).closest('li');
+
+  it('renders rows in the selected set checked and the others unchecked', () => {
+    render(
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={pages}
+        selectedPageIds={new Set(['p1'])}
+      />,
+    );
+
+    expect(checkboxOf('p1')).toBeChecked();
+    expect(checkboxOf('p2')).not.toBeChecked();
+  });
+
+  it('keeps a checked row checked and an unchecked row unchecked after scrolling out and back', () => {
+    render(
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={pages}
+        selectedPageIds={new Set(['p1'])}
+      />,
+    );
+
+    layout.scrollTo(FAR_SCROLL_TOP);
+    expect(screen.queryByRole('checkbox', { name: 'p1' })).toBeNull();
+    layout.scrollTo(0);
+
+    expect(checkboxOf('p1')).toBeChecked();
+    expect(checkboxOf('p2')).not.toBeChecked();
+  });
+
+  it('keeps the preview highlight on the previewed row after scrolling out and back', () => {
+    render(
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={pages}
+        selectedPageId="p1"
+      />,
+    );
+
+    layout.scrollTo(FAR_SCROLL_TOP);
+    expect(screen.queryByRole('checkbox', { name: 'p1' })).toBeNull();
+    layout.scrollTo(0);
+
+    expect(listItemOf('p1')).toHaveClass('active');
+    expect(listItemOf('p2')).not.toHaveClass('active');
+  });
+
+  it('renders rows checked that are first rendered by scrolling after selectAll', () => {
+    const ref = React.createRef<ISelectableAll>();
+    // Kept as the same instance and updated by the caller, as SearchPageBase does.
+    const selectedPageIds = new Set<string>();
+    render(
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        ref={ref}
+        pages={pages}
+        selectedPageIds={selectedPageIds}
+      />,
+    );
+    const renderedPageIds = (): string[] =>
+      screen
+        .getAllByRole('checkbox')
+        .map((checkbox) => checkbox.getAttribute('aria-label') ?? '');
+    const initiallyRenderedPageIds = new Set(renderedPageIds());
+
+    ref.current?.selectAll();
+    pages.forEach((page) => {
+      selectedPageIds.add(page.data._id);
+    });
+    layout.scrollTo(FAR_SCROLL_TOP);
+
+    const newlyRenderedPageIds = renderedPageIds().filter(
+      (pageId) => !initiallyRenderedPageIds.has(pageId),
+    );
+    expect(newlyRenderedPageIds.length).toBeGreaterThan(0);
+    newlyRenderedPageIds.forEach((pageId) => {
+      expect(checkboxOf(pageId)).toBeChecked();
+    });
   });
 });

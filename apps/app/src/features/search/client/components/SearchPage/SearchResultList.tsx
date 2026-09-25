@@ -52,6 +52,10 @@ type Props = {
   // The element that scrolls the list. No rows are rendered while it is null.
   scrollElement: HTMLElement | null;
   selectedPageId?: string;
+  // Checked pages, including rows outside the rendered range. Rows scrolled
+  // back into range remount and take their initial checkbox state from it, so
+  // the caller must keep it current (selectAll/deselectAll reach mounted rows only).
+  selectedPageIds?: ReadonlySet<string>;
   forceHideMenuItems?: ForceHideMenuItems;
   onPageSelected?: (page?: IPageWithSearchMeta) => void;
   onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
@@ -79,6 +83,7 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
     pages,
     scrollElement,
     selectedPageId,
+    selectedPageIds,
     forceHideMenuItems,
     onPageSelected,
     onItemMutated,
@@ -311,6 +316,7 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
               isEnableActions={!isGuestUser}
               isReadOnlyUser={!!isReadOnlyUser}
               isSelected={page.data._id === selectedPageId}
+              isInitiallyChecked={selectedPageIds?.has(page.data._id)}
               forceHideMenuItems={forceHideMenuItems}
               onClickItem={clickItemHandler}
               onCheckboxChanged={props.onCheckboxChanged}

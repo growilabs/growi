@@ -1,3 +1,4 @@
+import { act } from '@testing-library/react';
 import { vi } from 'vitest';
 
 // happy-dom performs no layout: every offsetHeight/offsetTop is 0 and its
@@ -22,6 +23,8 @@ type VirtualListLayout = {
 export type VirtualListLayoutStub = {
   // Attached to document.body; pass it to SearchResultList as `scrollElement`.
   scrollElement: HTMLDivElement;
+  // Scrolls the scroll element as a user would, letting the list re-render.
+  scrollTo: (scrollTop: number) => void;
   restore: () => void;
 };
 
@@ -51,6 +54,12 @@ export const stubVirtualListLayout = ({
 
   return {
     scrollElement,
+    scrollTo: (scrollTop) => {
+      act(() => {
+        scrollElement.scrollTop = scrollTop;
+        scrollElement.dispatchEvent(new Event('scroll'));
+      });
+    },
     restore: () => {
       offsetHeightSpy.mockRestore();
       offsetTopSpy.mockRestore();
