@@ -107,9 +107,9 @@ export const extension = Prisma.defineExtension((client) => {
          * Precondition: `pageIds` is an already-batched set. Both writes send the whole
          * array in a single command, so an unbounded one approaches MongoDB's 16MB
          * command cap and is then rejected whole (the write throws; rows stay stale
-         * until the next save or a backfill). Every recursive delete path in PageService
-         * funnels through `createBatchStream(BULK_REINDEX_SIZE)`, so today's callers
-         * cannot exceed 100 — a caller that assembles ids some other way must chunk.
+         * until the next save or a backfill). Delete-family event payloads are not all
+         * bounded — group deletion sends every affected page at once — so the
+         * delete-family handlers must chunk to `BULK_REINDEX_SIZE` before reconciling.
          */
         async removeLinksForPages(pageIds: Types.ObjectId[]): Promise<void> {
           // Only saves two no-op round trips; the filters below narrow by id either way.
