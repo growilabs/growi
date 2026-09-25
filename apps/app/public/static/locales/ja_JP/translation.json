@@ -35,7 +35,6 @@
   "add": "追加",
   "Undo": "元に戻す",
   "account_id": "アカウントID",
-  "Initialize": "初期化",
   "Update": "更新",
   "Update Page": "ページを更新",
   "Error": "エラー",
@@ -67,8 +66,8 @@
   "No users have bookmarked yet": "ブックマークしているユーザーはいません",
   "Create Archive Page": "アーカイブページの作成",
   "Create Sidebar Page": "<strong>/Sidebar</strong> ページを作成する",
-  "Target page": "対象ページ",
   "File type": "ファイル形式",
+  "Target page": "対象ページ",
   "Include Attachment File": "添付ファイルも含める",
   "Include Comment": "コメントも含める",
   "Include Subordinated Page": "配下ページも含める",
@@ -104,8 +103,6 @@
   "Updated": "更新しました",
   "Upload new image": "新しい画像をアップロード",
   "Connected": "接続されています",
-  "Show": "公開",
-  "Hide": "非公開",
   "Loading": "読み込み中...",
   "Disclose E-mail": "メールアドレスの公開",
   "Slack Member ID": "Slack メンバー ID",
@@ -128,7 +125,6 @@
   "Forbidden": "アクセスが禁止されています",
   "Public": "公開",
   "Anyone with the link": "リンクを知っている人のみ",
-  "Specified users": "特定ユーザーのみ",
   "Only me": "自分のみ",
   "Only inside the group": "特定グループのみ",
   "page_list": "ページリスト",
@@ -147,9 +143,6 @@
   "List Drafts": "下書き一覧",
   "Deleted Pages": "削除済みページ",
   "Disassociate": "連携解除",
-  "Color mode": "カラーモード",
-  "Sidebar mode": "サイドバーモード",
-  "Sidebar mode on Editor": "サイドバーモード(編集時)",
   "No bookmarks yet": "No bookmarks yet",
   "add_bookmark": "ブックマークに追加",
   "remove_bookmark": "ブックマークから削除",
@@ -235,8 +228,7 @@
       "apitoken_issued": "API Token が設定されていません。",
       "update_token1": "API Token を更新すると、自動的に新しい Token が生成されます。",
       "update_token2": "現在の Token を利用している処理は動かなくなります。"
-    },
-    "form_help": {}
+    }
   },
   "Access Token Settings": "Access token 設定",
   "page_me_access_token": {
@@ -320,40 +312,7 @@
     "description": "ライトモードかダークモード、もしくはシステム合わせた表示をするか選択します。<br>対応したテーマのみ切り替えることができます。"
   },
   "editor_settings": {
-    "editor_settings": "エディター設定",
-    "common_settings": {
-      "common_settings": "共通設定",
-      "common_misspellings": "ウィキペディアから一般的なスペルミスを見つけます。",
-      "max_comma": "文の読点（,）を最大10個に制限します。初期値: 4。",
-      "sentence_length": "文の最大文字数を制限します。初期値: 100。",
-      "en_capitalization": "英文の大文字化をチェックします",
-      "no_unmatched_pair": "（ と ] のような一致しないペアをチェックします",
-      "date_weekday_mismatch": "日付と平日の不一致を検出します。",
-      "no_kangxi_radicals": "康熙帝の部首の使用を防ぎます。",
-      "no_surrogate_pair": "文中のサロゲートペア（D800-DBFFおよびDC00-DFFF）を検出します。",
-      "no_zero_width_spaces": "ゼロ幅スペースを許可しません。",
-      "period_in_list_item": "リストアイテムのピリオドの有無をチェックします。",
-      "use_si_units": "SI単位系以外の使用を禁止します。"
-    },
-    "japanese_settings": {
-      "japanese_settings": "日本語設定",
-      "ja_hiragana_keishikimeishi": "漢字よりひらがなで書かれた読みやすい形式名詞をチェックします。",
-      "ja_no_abusage": "よくある誤用をチェックします。",
-      "ja_no_inappropriate_words": "不適切表現をチェックします。",
-      "ja_no_mixed_period": "パラグラフの末尾に必ず句点記号を付けていることをチェックします。",
-      "ja_no_redundant_expression": "冗長な表現を禁止します。冗長な表現とは、その文から省いても意味が通じるような表現を示しています。",
-      "max_kanji_continuous_len": "漢字が連続する最大文字数を制限します。初期値: 5。",
-      "max_ten": "一文に利用できる、の数を制限します。一文の読点の数が多いと冗長で読みにくい文章となるため、読点の数を一定数以下にするルールです。 読点の数を減らすためには、句点(。)で文を区切る必要があります。",
-      "no_double_negative_ja": "二重否定を検出します。",
-      "no_doubled_conjunction": "同じ接続詞が連続して出現していないかどうかをチェックします。",
-      "no_doubled_joshi": "1つの文中に同じ助詞が連続して出てくるのをチェックします。",
-      "no_dropping_the_ra": "ら抜き言葉を検出します。",
-      "no_hankaku_kana": "半角カナの利用を禁止します。",
-      "prefer_tari_tari": "「〜たり〜たりする」をチェックします。",
-      "ja_unnatural_alphabet": "不自然なアルファベットを検知します。",
-      "no_mixed_zenkaku_and_hankaku_alphabet": "全角と半角アルファベットを混在をチェックします。",
-      "no_nfd": "UTF8-MAC濁点のようなNFDの使用を禁止します。"
-    }
+    "editor_settings": "エディター設定"
   },
   "search_help": {
     "title": "検索のヘルプ",
@@ -663,8 +622,8 @@
       "Create template under": "配下にテンプレートページを作成"
     },
     "option_label": {
-      "select": "テンプレートタイプを選択してください",
-      "create/edit": "テンプレートページの作成/編集.."
+      "create/edit": "テンプレートページの作成/編集..",
+      "select": "テンプレートタイプを選択してください"
     },
     "children": {
       "label": "同一階層テンプレート",
@@ -699,8 +658,8 @@
     "quote": "引用",
     "quote1": "複数行の引用文を",
     "quote2": "書くことができます",
-    "table": "テーブル",
     "quote_nested": "多重引用",
+    "table": "テーブル",
     "image": "画像",
     "alt_text": "Alt文字列",
     "insert_image": "で画像を挿入できます",
@@ -982,8 +941,8 @@
     "page_delete_completely": "ページを完全に削除しました",
     "page_rename": "ページの名前を変更しました",
     "page_revert": "ページを元に戻しました",
-    "page_duplicate": "ページを複製しました",
     "page_like": "ページをいいねしました",
+    "page_duplicate": "ページを複製しました",
     "comment_create": "コメントを投稿しました"
   },
   "bookmark_folder": {

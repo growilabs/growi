@@ -1,0 +1,4 @@
+{
+  "playwrightJobLevel": "flaky: playwright:chromium",
+  "malformedVitest": "flaky: vitest:no-extension-anywhere-in-this-title"
+}

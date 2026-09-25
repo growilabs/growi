@@ -1,7 +1,10 @@
 /**
- * Exports each namespace x non-source language combination's translations
- * from POEditor, classifies each combination against the current repository
- * content via `DiffClassifier`, and groups the results into exactly two
+ * Exports each non-source language's translations from the single shared
+ * POEditor project — one export per language, carrying every namespace at
+ * once — splits that combined payload back into namespaces via
+ * `NamespaceEnvelope`, classifies each (namespace, language) combination
+ * against the current repository content via `DiffClassifier`, and groups
+ * the results into exactly two
  * collections: every combination that only changed translation values goes
  * into one pull request, and every combination that added or removed a key
  * goes into a separate one — a structural change must never ride along in
@@ -15,9 +18,11 @@
  * (`TranslationOnlyCombination` / `StructuralCombination`) so a structural
  * result cannot be pushed into the translation-only group (or vice versa)
  * without a type error, not just a runtime check. A combination whose
- * POEditor export failed to parse as JSON (`invalid_json`) is excluded from
- * both groups too, but — unlike a read/export failure — does not abort the
- * run; it is reported separately via the result's `skipped` list.
+ * content failed to parse as JSON (`invalid_json`) is excluded from both
+ * groups too, but — unlike a read/export failure — does not abort the run;
+ * it is reported separately via the result's `skipped` list. Since one
+ * export now serves every namespace of a language, an unparseable export
+ * skips all of that language's namespaces at once.
  *
  * `applyTranslationOnlyChanges` then takes the `translationOnly` group and
  * carries it all the way to an approved, auto-mergeable PR. The `structural`
@@ -29,7 +34,11 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { classify } from './diff-classifier.ts';
+import {
+  classify,
+  mergeTranslations,
+  restoreKeysStillInSource,
+} from './diff-classifier.ts';
 import {
   createApprovalReviewer,
   createBaseRefResolver,
@@ -37,12 +46,19 @@ import {
   createStructuralPrPublisher,
   createTranslationOnlyPrPublisher,
 } from './github-adapters.ts';
+import { toPoeditorLanguageCode } from './language-code-map.ts';
+import { extractNamespaceContent } from './namespace-envelope.ts';
 import {
   createPoeditorClient,
   type PoeditorApiError,
   type PoeditorClient,
 } from './poeditor-client.ts';
-import { type NamespaceSyncEntry, SYNC_TARGETS } from './sync-config.ts';
+import { SOURCE_LANGUAGE } from './push-source.ts';
+import {
+  type NamespaceSyncEntry,
+  SHARED_POEDITOR_PROJECT_ID,
+  SYNC_TARGETS,
+} from './sync-config.ts';
 
 /**
  * The 4 non-source languages this CLI pulls translations for. en_US is
@@ -65,7 +81,7 @@ const APP_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 export interface CollectClassificationsOptions {
   readonly poeditorClient: PoeditorClient;
-  /** Declared namespace -> POEditor project mapping. Defaults to the real `SYNC_TARGETS`. */
+  /** Declared namespace -> locale file mapping. Defaults to the real `SYNC_TARGETS`. */
   readonly targets?: readonly NamespaceSyncEntry[];
   /** Non-source languages to pull. Defaults to the real `NON_SOURCE_LANGUAGES`. */
   readonly languages?: readonly string[];
@@ -166,11 +182,13 @@ export type CollectClassificationsResult =
       readonly structural: readonly StructuralCombination[];
       /**
        * (namespace, language) combinations excluded from classification
-       * because the POEditor export content failed to JSON.parse. Unlike
+       * because their content failed to JSON.parse. Unlike
        * `read_failed`/`export_failed`, this does not abort the run: export
-       * is read-only and never mutates the repository, so a single
-       * malformed combination is tolerated rather than blocking the other
-       * (up to 11) combinations.
+       * is read-only and never mutates the repository, so malformed content
+       * is tolerated rather than blocking the remaining combinations. A
+       * malformed *export* costs one language's namespaces at once (3 of
+       * the 12 today, leaving up to 9); a malformed committed locale file
+       * still costs only its own combination.
        */
       readonly skipped: readonly InvalidJsonFailure[];
     }
@@ -216,47 +234,112 @@ const safeJsonParse = (
 };
 
 /**
- * Reads the "before" (currently committed) content and exports the "after"
- * (POEditor) content for a single (namespace, language) combination. Reads
- * and the export call run concurrently since they are independent I/O
- * operations on unrelated systems; only `PoeditorClient.uploadTerms`
- * (a different method, used by `PushSourceSync`) is subject to POEditor's
- * upload rate limit — `exportTranslations` is not.
+ * One language's whole export from the shared project, already parsed:
+ * either the combined JSON covering every namespace, or the single reason
+ * none of that language's namespaces can be classified this run.
+ *
+ * The failure is carried without a `namespace` on purpose — it belongs to
+ * the language, not to any one namespace — and is fanned out to every
+ * namespace only when the per-combination failures are built.
  */
-interface ReadCombinationOptions {
-  readonly target: NamespaceSyncEntry;
+interface LanguageExport {
   readonly language: string;
-  readonly readNamespaceFile: ReadNamespaceFile;
-  readonly poeditorClient: PoeditorClient;
-  readonly baseDir: string;
+  readonly combined?: Readonly<Record<string, unknown>>;
+  readonly failure?:
+    | { readonly reason: 'export_failed'; readonly error: PoeditorApiError }
+    | { readonly reason: 'invalid_json'; readonly message: string };
 }
 
-const readCombination = async ({
+/**
+ * Exports one language's translations from the shared POEditor project.
+ *
+ * Exactly one call per language: the shared project holds every namespace,
+ * so a single export already carries all of them (the caller splits the
+ * result per namespace via `extractNamespaceContent`). Calls for different
+ * languages may run concurrently — only `PoeditorClient.uploadTerms` (a
+ * different method, used by `PushSourceSync`) is subject to POEditor's
+ * upload rate limit, `exportTranslations` is not.
+ *
+ * `toPoeditorLanguageCode` is applied here and nowhere else: POEditor
+ * rejects GROWI's own locale codes (`ja_JP` -> "Wrong language code"), so
+ * the conversion belongs at the API boundary, while locale file paths keep
+ * being resolved from the GROWI locale code. It throws on an undeclared
+ * locale rather than being caught here — an unmapped locale is a caller
+ * misconfiguration, not a per-language outcome to report (same handling as
+ * `push-source.ts`'s `runPush`).
+ */
+const exportLanguage = async (
+  language: string,
+  poeditorClient: PoeditorClient,
+): Promise<LanguageExport> => {
+  const result = await poeditorClient.exportTranslations({
+    projectId: SHARED_POEDITOR_PROJECT_ID,
+    language: toPoeditorLanguageCode(language),
+  });
+
+  if (!result.ok) {
+    return {
+      language,
+      failure: { reason: 'export_failed', error: result.error },
+    };
+  }
+
+  try {
+    return {
+      language,
+      combined: JSON.parse(result.value) as Readonly<Record<string, unknown>>,
+    };
+  } catch (error) {
+    return {
+      language,
+      failure: {
+        reason: 'invalid_json',
+        message: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
+};
+
+/**
+ * Builds one (namespace, language) combination out of the local "before"
+ * (currently committed) file and that language's already-exported "after"
+ * content.
+ *
+ * The locale file path is resolved from the GROWI locale code, not the
+ * POEditor one: the repository's own directory layout
+ * (`locales/<growi locale>/<namespace>.json`) is what is being read here and
+ * written back to later, and it never learns about POEditor's codes.
+ */
+interface BuildCombinationOptions {
+  readonly target: NamespaceSyncEntry;
+  readonly languageExport: LanguageExport;
+  readonly readNamespaceFile: ReadNamespaceFile;
+  readonly baseDir: string;
+  /** This namespace's current en_US content — see `restoreKeysStillInSource`'s doc comment for why it is needed here. */
+  readonly sourceLanguageContent: Readonly<Record<string, unknown>>;
+}
+
+const buildCombinationInput = async ({
   target,
-  language,
+  languageExport,
   readNamespaceFile,
-  poeditorClient,
   baseDir,
-}: ReadCombinationOptions): Promise<CombinationInput> => {
+  sourceLanguageContent,
+}: BuildCombinationOptions): Promise<CombinationInput> => {
   const { namespace } = target;
+  const { language } = languageExport;
   const absolutePath = path.join(baseDir, target.localeFilePath(language));
 
-  const [beforeResult, afterResult] = await Promise.all([
-    readNamespaceFile(absolutePath)
-      .then((content) => ({ content }))
-      .catch((error: unknown) => ({
-        failure: {
-          namespace,
-          language,
-          reason: 'read_failed' as const,
-          message: error instanceof Error ? error.message : String(error),
-        },
-      })),
-    poeditorClient.exportTranslations({
-      projectId: target.poeditorProjectId,
-      language,
-    }),
-  ]);
+  const beforeResult = await readNamespaceFile(absolutePath)
+    .then((content) => ({ content }))
+    .catch((error: unknown) => ({
+      failure: {
+        namespace,
+        language,
+        reason: 'read_failed' as const,
+        message: error instanceof Error ? error.message : String(error),
+      },
+    }));
 
   if ('failure' in beforeResult) {
     return {
@@ -266,17 +349,16 @@ const readCombination = async ({
       failure: beforeResult.failure,
     };
   }
-  if (!afterResult.ok) {
+  if (languageExport.failure != null) {
+    // One export serves every namespace of this language, so its failure is
+    // reported once per namespace: `CombinationFailure` is (namespace,
+    // language) shaped, and attributing a whole language's failure to one
+    // arbitrary namespace would hide the others from the run's report.
     return {
       namespace,
       language,
       absoluteFilePath: absolutePath,
-      failure: {
-        namespace,
-        language,
-        reason: 'export_failed',
-        error: afterResult.error,
-      },
+      failure: { namespace, language, ...languageExport.failure },
     };
   }
 
@@ -289,42 +371,132 @@ const readCombination = async ({
       failure: beforeParsed.failure,
     };
   }
-  const afterParsed = safeJsonParse(namespace, language, afterResult.value);
-  if ('failure' in afterParsed) {
-    return {
-      namespace,
-      language,
-      absoluteFilePath: absolutePath,
-      failure: afterParsed.failure,
-    };
-  }
 
   return {
     namespace,
     language,
     absoluteFilePath: absolutePath,
     before: beforeParsed.value,
-    after: afterParsed.value,
+    // Safe: `languageExport.failure` was ruled out above, so `combined` is
+    // populated. A namespace absent from the export yields `{}` rather than
+    // throwing — that means POEditor holds nothing for it yet, which is an
+    // ordinary input to `classify`, not an error.
+    //
+    // Restored via `restoreKeysStillInSource` before `classify`/
+    // `mergeTranslations` ever see it, so a key en_US still declares is
+    // never proposed for removal just because this language's export
+    // hasn't caught up with it yet (see that function's doc comment).
+    after: restoreKeysStillInSource(
+      beforeParsed.value,
+      extractNamespaceContent(
+        languageExport.combined as Readonly<Record<string, unknown>>,
+        namespace,
+      ),
+      sourceLanguageContent,
+    ),
   };
 };
 
 /**
- * For every (namespace, language) combination, reads the current repository
- * content and exports the POEditor content, classifies the pair via
+ * Reads and parses every declared namespace's en_US (source language) file,
+ * used by `buildCombinationInput` as `restoreKeysStillInSource`'s reference
+ * -- see that function's doc comment for why the pull side needs en_US's
+ * *current committed content* at all.
+ *
+ * A read or parse failure aborts the whole run, the same severity as a
+ * target-language `read_failed`: en_US is the repository's own source of
+ * truth and is expected to always exist and parse. Mirrors
+ * `PushSourceSync.runPush`'s "read everything before doing anything"
+ * ordering for the same reason (see that function's doc comment).
+ */
+const readSourceLanguageContents = async ({
+  targets,
+  readNamespaceFile,
+  baseDir,
+}: {
+  readonly targets: readonly NamespaceSyncEntry[];
+  readonly readNamespaceFile: ReadNamespaceFile;
+  readonly baseDir: string;
+}): Promise<
+  | {
+      readonly ok: true;
+      readonly value: ReadonlyMap<
+        NamespaceSyncEntry['namespace'],
+        Readonly<Record<string, unknown>>
+      >;
+    }
+  | { readonly ok: false; readonly failures: readonly AbortingFailure[] }
+> => {
+  const outcomes = await Promise.all(
+    targets.map(async (target) => {
+      const absolutePath = path.join(
+        baseDir,
+        target.localeFilePath(SOURCE_LANGUAGE),
+      );
+      try {
+        const content = await readNamespaceFile(absolutePath);
+        return {
+          namespace: target.namespace,
+          value: JSON.parse(content) as Readonly<Record<string, unknown>>,
+        };
+      } catch (error) {
+        return {
+          namespace: target.namespace,
+          failure: {
+            namespace: target.namespace,
+            language: SOURCE_LANGUAGE,
+            reason: 'read_failed' as const,
+            message: error instanceof Error ? error.message : String(error),
+          },
+        };
+      }
+    }),
+  );
+
+  const failures = outcomes
+    .map((outcome) => ('failure' in outcome ? outcome.failure : undefined))
+    .filter((failure): failure is AbortingFailure => failure != null);
+
+  if (failures.length > 0) {
+    return { ok: false, failures };
+  }
+
+  return {
+    ok: true,
+    value: new Map(
+      outcomes.map((outcome) => [
+        outcome.namespace,
+        // Safe: `failures` was empty above, so every outcome carries `value`.
+        (outcome as { value: Readonly<Record<string, unknown>> }).value,
+      ]),
+    ),
+  };
+};
+
+/**
+ * Exports each language once from the shared project, splits every export
+ * into its namespaces, reads the matching repository file for each
+ * (namespace, language) combination, classifies the pair via
  * `DiffClassifier.classify`, then groups the classified combinations into
  * `translationOnly` / `structural` (see this file's header comment).
  *
+ * Only the export step is per language; everything downstream of it — the
+ * classification, the grouping, and the PR split the groups feed — is
+ * unchanged and stays per (namespace, language).
+ *
  * Mirrors `PushSourceSync.runPush`'s all-or-nothing error handling: if any
  * combination fails to read the current repository file (`read_failed`) or
- * export from POEditor (`export_failed`), the whole run reports failure and
- * no grouping is returned, so a caller can never build a PR out of a
- * partial result.
+ * its language fails to export from POEditor (`export_failed`), the whole
+ * run reports failure and no grouping is returned, so a caller can never
+ * build a PR out of a partial result.
  *
- * `invalid_json` (the exported content fails to `JSON.parse`) is the one
- * exception: export is read-only and never mutates the repository, so it
- * tolerates a single malformed combination rather than aborting. That
- * combination alone is excluded from `translationOnly`/`structural` and
- * reported via `skipped`; the rest of the run proceeds and groups normally.
+ * `invalid_json` (content that fails to `JSON.parse`) is the one exception:
+ * export is read-only and never mutates the repository, so malformed
+ * content is tolerated rather than aborting. The affected combinations are
+ * excluded from `translationOnly`/`structural` and reported via `skipped`;
+ * the rest of the run proceeds and groups normally. A malformed export
+ * takes down every namespace of its language at once, since that one
+ * payload was all of them.
  */
 export const collectClassifications = async (
   options: CollectClassificationsOptions,
@@ -335,23 +507,45 @@ export const collectClassifications = async (
     options.readNamespaceFile ?? defaultReadNamespaceFile;
   const baseDir = options.baseDir ?? APP_ROOT;
 
+  const sourceLanguageContents = await readSourceLanguageContents({
+    targets,
+    readNamespaceFile,
+    baseDir,
+  });
+  if (!sourceLanguageContents.ok) {
+    return { ok: false, failures: sourceLanguageContents.failures };
+  }
+
+  // One export per language, all in flight together: they are independent
+  // requests, and a failing language must neither block nor fail the others
+  // (its own failure travels with it into the combinations it covers).
+  const languageExports = await Promise.all(
+    languages.map((language) =>
+      exportLanguage(language, options.poeditorClient),
+    ),
+  );
+
   const combinationInputs = await Promise.all(
     targets.flatMap((target) =>
-      languages.map((language) =>
-        readCombination({
+      languageExports.map((languageExport) =>
+        buildCombinationInput({
           target,
-          language,
+          languageExport,
           readNamespaceFile,
-          poeditorClient: options.poeditorClient,
           baseDir,
+          // Safe: `readSourceLanguageContents` reads every declared target,
+          // so this namespace always has an entry.
+          sourceLanguageContent: sourceLanguageContents.value.get(
+            target.namespace,
+          ) as Readonly<Record<string, unknown>>,
         }),
       ),
     ),
   );
 
   // `read_failed` / `export_failed` still abort the whole run. `invalid_json`
-  // is handled separately below: it only excludes its own combination and
-  // lets the others continue.
+  // is handled separately below: it only excludes the combinations it covers
+  // and lets the others continue.
   const abortingFailures = combinationInputs
     .map((input) => input.failure)
     .filter(
@@ -392,7 +586,7 @@ export const collectClassifications = async (
         language: input.language,
         changedKeys: result.changedKeys,
         absoluteFilePath: input.absoluteFilePath,
-        content: after,
+        content: mergeTranslations(before, after),
       });
       continue;
     }
@@ -403,7 +597,7 @@ export const collectClassifications = async (
         addedKeys: result.addedKeys,
         removedKeys: result.removedKeys,
         filePath: input.absoluteFilePath,
-        exportedContent: after,
+        exportedContent: mergeTranslations(before, after),
       });
     }
     // 'no_change' combinations are intentionally excluded from both groups —
@@ -424,6 +618,46 @@ export const collectClassifications = async (
  * state instead of accumulating one artifact per run.
  */
 export const TRANSLATION_ONLY_BRANCH = 'i18n-sync/translation-only';
+
+/**
+ * Applied to every translation-only pull request at creation. Also lets
+ * `.github/workflows/auto-labeling.yml`'s existing `check-title`/
+ * `auto-labeling` jobs skip themselves (both already exempt this label).
+ * `.github/mergify.yml` routes this branch into a lighter merge queue by
+ * head branch name, not by this label.
+ */
+export const EXCLUDE_FROM_CHANGELOG_LABEL = 'flag/exclude-from-changelog';
+
+/**
+ * Applied alongside `EXCLUDE_FROM_CHANGELOG_LABEL`, kept as a distinct label
+ * (not reused) because it means something different: `ci-app.yml`/
+ * `ci-app-prod.yml` skip their heavy test/build/Playwright jobs when this
+ * label is present. Those workflows also check the pull request's head
+ * branch directly (`head.ref == TRANSLATION_ONLY_BRANCH`) alongside this
+ * label, because the label lands after the pull request's `opened` event
+ * fires (via this separate label-attach call), so a run triggered by
+ * `opened` never sees it -- the head ref, unlike the label, is already
+ * final at `opened` time.
+ *
+ * This label alone still matters for Mergify's merge-queue revalidation: it
+ * runs the queued pull request on a temporary `mergify/merge-queue/**`
+ * branch whose `head.ref` is not `TRANSLATION_ONLY_BRANCH`, so the
+ * head-branch check does not fire there. Mergify does not copy labels onto
+ * that temporary branch, so this label is simply absent on it -- the heavy
+ * jobs run there once per merge attempt. That is a real but bounded cost,
+ * not a correctness problem: the `i18n-sync-translation-only` queue's own
+ * `merge_conditions` in `.github/mergify.yml` only require `ci-app-lint`,
+ * so the heavy jobs' outcome on that temporary branch never gates the
+ * merge. (An earlier revision instead added `labeled` to the CI workflows'
+ * trigger types and a `mergify-merge-queue-labels-copier.yml` workflow to
+ * copy this label onto that branch. Reverted: a `labeled` event on *any*
+ * pull request's own branch could cancel an in-flight heavy-CI run via the
+ * existing `concurrency: cancel-in-progress` group, and Mergify's
+ * `check-failure` condition treats that run's `cancelled` conclusion as a
+ * failure -- risking ejecting an unrelated pull request from the queue over
+ * nothing more than a label change.)
+ */
+export const SKIP_HEAVY_CI_LABEL = 'flag/skip-heavy-ci';
 
 /** Injectable file-writing function, mirroring `ReadNamespaceFile`. */
 export type WriteLocaleFile = (
@@ -576,9 +810,10 @@ const PR_TITLE = 'chore(i18n): apply translation-only updates from POEditor';
  * write → publish branch → create-or-update the PR → run the gate → approve.
  *
  * **Why writing whole files is safe.** `translation_only` means the two leaf
- * key sets are identical, so overwriting the file with the exported content
- * can only change values, never the key set — the property that makes this
- * change eligible for the no-human-review path in the first place.
+ * key sets are identical, so overwriting the file with `combination.content`
+ * (`mergeTranslations(before, after)`, not the raw export -- see
+ * diff-classifier.ts) can only change values, never the key set — the
+ * property that makes this change eligible for the no-human-review path.
  *
  * On a gate failure nothing is approved and the PR is deliberately left open
  * with its failing check; the failure is returned so the caller can fail the
@@ -989,40 +1224,21 @@ const readGitHubRunConfig = (
     };
   }
 
-  // A dedicated publishing identity is preferred over the workflow's own
-  // GITHUB_TOKEN: events created by GITHUB_TOKEN do not start further
-  // workflow runs, so a pull request opened with it would never get the
-  // `ci-app-lint` check that `.github/mergify.yml`'s queue conditions
-  // require, and would sit in the queue forever. The fallback is kept so a
-  // dry run in a fork still works, where nothing needs to merge.
-  // `||`, not `??`: GitHub Actions exports an unregistered secret as an
-  // empty string, not as unset, so `??` (which only falls back on
-  // null/undefined) would keep the empty value and never reach GITHUB_TOKEN.
-  const dedicatedPublishToken = env.I18N_SYNC_PUBLISH_TOKEN;
-  const publishToken =
-    dedicatedPublishToken && dedicatedPublishToken !== ''
-      ? dedicatedPublishToken
-      : env.GITHUB_TOKEN;
+  // No GITHUB_TOKEN fallback: a pull request opened under the workflow's own
+  // GITHUB_TOKEN does not trigger further workflow runs, so it would never
+  // get the `ci-app-lint` check that `.github/mergify.yml`'s queue
+  // conditions require, and would sit in the queue forever -- see
+  // docs/i18n-community-translation-setup.md §4.4's "no `||`
+  // secrets.GITHUB_TOKEN fallback" rule for the same reasoning applied to
+  // the App-token minting step. Fail loudly and immediately instead of
+  // degrading into that silently-stuck state.
+  const publishToken = env.I18N_SYNC_PUBLISH_TOKEN;
   if (publishToken == null || publishToken === '') {
     return {
       ok: false,
       message:
-        'Cannot pull translations: neither I18N_SYNC_PUBLISH_TOKEN nor GITHUB_TOKEN is set in the environment.',
+        'Cannot pull translations: I18N_SYNC_PUBLISH_TOKEN (the publishing bot identity) is not set in the environment.',
     };
-  }
-  if (dedicatedPublishToken == null || dedicatedPublishToken === '') {
-    // Not a fatal misconfiguration (a fork dry run has no reason to hold a
-    // dedicated publish token), but a run that reaches production this way
-    // will open a PR that never gets `ci-app-lint` and sits in the merge
-    // queue forever -- see the comment above. Warn loudly rather than let
-    // that failure stay silent until someone notices a stuck PR.
-    // biome-ignore lint/suspicious/noConsole: this is a CI script, console output is expected.
-    console.error(
-      'Warning: I18N_SYNC_PUBLISH_TOKEN is not set; falling back to GITHUB_TOKEN. ' +
-        'A pull request authored by GITHUB_TOKEN will not trigger ci-app-lint and will ' +
-        'never satisfy the Mergify queue condition -- register I18N_SYNC_PUBLISH_TOKEN ' +
-        'per docs/i18n-community-translation-setup.md before relying on this in production.',
-    );
   }
 
   const approvalToken = env.I18N_SYNC_APPROVAL_TOKEN;
@@ -1076,8 +1292,10 @@ const createGitHubCollaborators = (
   };
 
   return {
-    translationOnlyPrPublisher:
-      createTranslationOnlyPrPublisher(publisherOptions),
+    translationOnlyPrPublisher: createTranslationOnlyPrPublisher({
+      ...publisherOptions,
+      labels: [EXCLUDE_FROM_CHANGELOG_LABEL, SKIP_HEAVY_CI_LABEL],
+    }),
     structuralPrPublisher: createStructuralPrPublisher(publisherOptions),
     approvalReviewer: createApprovalReviewer({
       approvalToken: config.approvalToken,

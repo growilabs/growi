@@ -1,0 +1,217 @@
+name: Flaky repro
+
+# Measuring instrument for the flaky-test routine.
+#
+# The routine's execution environment has no `actions: write`, so it cannot
+# re-run CI to decide whether a failure is non-deterministic. Instead it pushes
+# a commit carrying a `Flaky-Repro-*` git trailer block, and this workflow runs
+# the requested spec and reports the tally. The check-run conclusion says only
+# whether the measurement could be taken:
+#   success — the request was valid and the run happened (tests may have failed)
+#   failure — the request was rejected or the setup broke; nothing was measured
+#
+# Contract: `Repro Request / Result` in .kiro/specs/ci-flaky-test-detection.
+# The trailers must form ONE trailer block, i.e. the last paragraph of the head
+# commit message.
+
+on:
+  push:
+    branches:
+      - flaky-repro/**
+      - fix/flaky-**
+  # No `pull_request` trigger on purpose: a fork must not be able to start this.
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  # The job id is the check-run name the routine polls for. Do not add a
+  # `strategy.matrix` here: that would rename the check-run to
+  # `flaky-repro (<value>)` and the routine's exact-name lookup would miss it.
+  flaky-repro:
+    runs-on: ubuntu-latest
+    # Sized to the worst shape this job takes: `suite` mode on the integration
+    # projects (service startup + the full `test:integ` script). `file` mode,
+    # which is what the routine actually uses, finishes in a few minutes.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # Syntax-checks the scripts this workflow calls below. This step's own
+      # failure means one of those scripts has a shell syntax error; it is
+      # unrelated to the repro request itself, so it always runs first and
+      # unconditionally (no `if:` — a broken script must fail loudly here
+      # rather than surface later as an unexplained step failure).
+      - name: Syntax-check the flaky-repro scripts
+        run: bash -n .github/scripts/flaky-repro/*.sh
+
+      - name: Parse and validate the repro request
+        id: request
+        run: bash .github/scripts/flaky-repro/parse-request.sh
+
+      # ----------------------------------------------------------------------
+      # Cross-reference: every step from here through "Wait for Elasticsearch
+      # to be ready" is a copy of the setup steps of `ci-app-test-integration`
+      # in ci-app.yml, so that a repro runs on the same toolchain as the CI job
+      # whose failure it is reproducing.
+      #
+      # Revalidation Trigger (design.md in .kiro/specs/ci-flaky-test-detection):
+      # when ci-app.yml changes the setup
+      # actions, their versions, the Node version, or the dist cache key,
+      # change this file in the same commit. Keep the matching cross-reference
+      # comment in ci-app.yml pointing back here.
+      #
+      # Three deliberate differences:
+      #
+      # 1. The dist cache is restore-only here. Repro branches are throwaway
+      #    and push often, so saving under the shared `dist-ci-app-*` key would
+      #    churn the repository cache quota and evict ci-app.yml's own entries.
+      #    The key and restore-keys stay identical so that this workflow still
+      #    reads those entries.
+      # 2. ci-app.yml fans its versions out over a `strategy.matrix`; this job
+      #    must stay matrix-free (see the job comment above), so each version is
+      #    pinned to one cell of that matrix — MongoDB 8.0 and the Elasticsearch
+      #    8 cell. A repro therefore measures those two cells only.
+      # 3. Elasticsearch starts only for the integration projects, because only
+      #    they use it — see the comment on that step. Every other setup step
+      #    runs for all four projects, as in ci-app.yml.
+      # ----------------------------------------------------------------------
+      #
+      # Every step below is skipped when the push carried no repro request
+      # (`requested=false`, see the validation step).
+      - uses: pnpm/action-setup@v6
+        if: steps.request.outputs.requested == 'true'
+
+      - uses: actions/setup-node@v6
+        if: steps.request.outputs.requested == 'true'
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+
+      - name: Restore dist
+        if: steps.request.outputs.requested == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            **/.turbo
+            **/dist
+            **/node_modules/.cache/turbo
+          key: dist-ci-app-${{ runner.OS }}-node24.x-${{ github.sha }}
+          restore-keys: |
+            dist-ci-app-${{ runner.OS }}-node24.x-
+
+      - name: Install dependencies
+        if: steps.request.outputs.requested == 'true'
+        run: |
+          pnpm add turbo --global
+          pnpm install --frozen-lockfile
+
+      # MongoDB runs for every project, not just the integration ones: the CI
+      # job that covers app-unit / app-components (`ci-app-test`) starts it too
+      # and hands the tests a `MONGO_URI`. A self-contained spec prefers that
+      # URI over an embedded mongodb-memory-server (see
+      # apps/app/test/setup/mongo/self-contained-connection.ts), so a repro
+      # without the service would exercise a different code path than the CI
+      # failure it is reproducing — and would report a stable spec as failing.
+      - name: Start MongoDB (replica set)
+        if: steps.request.outputs.requested == 'true'
+        uses: supercharge/mongodb-github-action@1.12.1
+        with:
+          mongodb-version: '8.0'
+          mongodb-replica-set: rs0
+
+      # Elasticsearch, by contrast, is only ever used by the integration
+      # projects (apps/app/test/setup/elasticsearch.ts is in their setupFiles
+      # and nowhere else), so unit and component repros do not pay for starting
+      # it.
+      - name: Start Elasticsearch with plugins
+        if: steps.request.outputs.requested == 'true' && startsWith(steps.request.outputs.project, 'app-integration')
+        uses: elastic/elastic-github-actions/elasticsearch@master
+        with:
+          stack-version: '8.19.16'
+          plugins: |
+            analysis-kuromoji
+            analysis-icu
+          security-enabled: false
+
+      - name: Wait for Elasticsearch to be ready
+        if: steps.request.outputs.requested == 'true' && startsWith(steps.request.outputs.project, 'app-integration')
+        run: |
+          curl \
+            --no-progress-meter \
+            -X GET \
+            --retry 60 \
+            --retry-delay 1 \
+            --retry-connrefused \
+            http://localhost:9200/_cluster/health?wait_for_status=green
+
+      - name: Build the prerequisites of the test script
+        if: steps.request.outputs.requested == 'true'
+        # Validated values are passed as environment variables, never
+        # interpolated into the script body: a `${{ }}` expression is expanded
+        # into the shell source before bash sees it, so its content would be
+        # executable. Keep this shape when adding steps.
+        env:
+          PROJECT: ${{ steps.request.outputs.project }}
+        run: |
+          set -euo pipefail
+
+          # ci-app.yml reaches the tests through `turbo run test:*`, which
+          # builds these first. Here the tests are invoked directly (turbo would
+          # cache a test result, and `file` mode needs a fresh process per run),
+          # so the same generated artifacts have to be produced explicitly.
+          # They are not optional: the dist cache is restore-only above, so on a
+          # cache miss `**/dist` is empty and vitest cannot resolve `@growi/*`.
+          #
+          # Revalidation Trigger (design.md in .kiro/specs/ci-flaky-test-detection): keep in sync with the `dependsOn`
+          # of the `test:*` tasks in apps/app/turbo.json. Check with
+          # `turbo run test:unit --filter=@growi/app --dry-run`.
+
+          # `^dev` — the dist of every workspace package apps/app depends on.
+          turbo run dev --filter='@growi/app^...' --env-mode=loose
+
+          case "$PROJECT" in
+            app-components)
+              turbo run dev:pre:styles-commons dev:pre:styles-components pre:styles-bulk-export \
+                --filter=@growi/app --env-mode=loose
+              ;;
+            *)
+              turbo run pre:styles-bulk-export --filter=@growi/app --env-mode=loose
+              ;;
+          esac
+
+      - name: Run the repro and tally the results
+        id: repro
+        if: steps.request.outputs.requested == 'true'
+        working-directory: apps/app
+        env:
+          SPEC: ${{ steps.request.outputs.spec }}
+          PROJECT: ${{ steps.request.outputs.project }}
+          MODE: ${{ steps.request.outputs.mode }}
+          REPEAT: ${{ steps.request.outputs.repeat }}
+          # Same values ci-app.yml gives its Test steps. The Elasticsearch pair
+          # is set unconditionally because only the integration projects' setup
+          # file reads it; for the others it is inert.
+          MONGO_URI: mongodb://localhost:27017/growi_test?replicaSet=rs0
+          VITE_ELASTICSEARCH_URI: http://localhost:9200/growi
+          VITE_ELASTICSEARCH_VERSION: 8
+        run: bash "${GITHUB_WORKSPACE}/.github/scripts/flaky-repro/run-repro.sh"
+
+      # Delivery, kept separate from the measurement above so that a problem
+      # reaching GitHub can never be read as a problem taking the measurement.
+      #
+      # Skipped when the request named no issue (`Flaky-Repro-Issue` is
+      # optional — the result then lives in the job summary alone), and, because
+      # a failed step stops the ones after it, skipped as well when the
+      # measurement itself gave up ("nothing was measured"): a rejected or
+      # unmeasurable request must leave no comment behind.
+      - name: Post the result to the tracking issue
+        id: comment
+        if: steps.request.outputs.requested == 'true' && steps.request.outputs.issue != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ steps.request.outputs.issue }}
+          RESULT_PATH: ${{ steps.repro.outputs.result_path }}
+        run: bash .github/scripts/flaky-repro/render-result.sh

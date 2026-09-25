@@ -1,17 +1,27 @@
 import { MongoBinary } from 'mongodb-memory-server-core';
 
-import { MONGOMS_BINARY_OPTS } from './utils';
+import { runMigrations, TEMPLATE_DB_NAME } from './template-db';
+import { MONGOMS_BINARY_OPTS, replaceMongoDbName } from './utils';
 
 /**
- * Global setup: pre-download the MongoDB binary before any workers start.
- * This prevents lock-file race conditions when multiple Vitest workers try to
- * download the binary concurrently on the first run.
+ * Global setup, run once before any worker starts.
+ *
+ * - External MongoDB (CI): migrate a single template database
+ *   (TEMPLATE_DB_NAME) once. Each test file then clones it instead of
+ *   running migrate-mongo itself (#11752 -- migrate-mongo ran once per file,
+ *   ~150 times in CI, saturating the runner).
+ * - MongoMemoryServer (local dev): unchanged -- pre-download the binary to
+ *   avoid concurrent workers racing the download on first run. Each worker
+ *   still starts its own server and skips migrations entirely, as before.
  */
 export async function setup(): Promise<void> {
-  // Skip if using an external MongoDB (e.g. CI with GitHub Actions services)
-  if (process.env.MONGO_URI != null) {
+  const mongoUri = process.env.MONGO_URI;
+
+  if (mongoUri == null) {
+    await MongoBinary.getPath(MONGOMS_BINARY_OPTS);
     return;
   }
 
-  await MongoBinary.getPath(MONGOMS_BINARY_OPTS);
+  const templateUri = replaceMongoDbName(mongoUri, TEMPLATE_DB_NAME);
+  runMigrations(templateUri);
 }
