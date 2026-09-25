@@ -59,6 +59,12 @@ pull_request_rules:
   - name: Automatic queue to merge (i18n-sync translation-only)
     conditions:
       - head = i18n-sync/translation-only
+      # Restricts the lightweight queue to PRs actually authored by the sync
+      # bot. Without this, any PR opened from a branch named
+      # i18n-sync/translation-only -- by anyone with push access, not just
+      # the bot -- would qualify for merge on ci-app-lint alone instead of
+      # the full test/build/Playwright matrix.
+      - author = growi-i18n-pr-publisher[bot]
       - '#approved-reviews-by >= 1'
       - '#changes-requested-reviews-by = 0'
       - '#review-requested = 0'
