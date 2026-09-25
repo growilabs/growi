@@ -725,36 +725,67 @@ class PageService implements IPageService {
     }
 
     // 1. Take target off from tree
+    //
+    // This commits `parent: null` on its own, and no mongo session wraps the steps
+    // below, so steps 2-3 are not atomic with it. Remember the original parent: if
+    // either of them throws, the page has to be put back, otherwise it is stranded
+    // off-tree at its old path and drops out of the page tree entirely -- present in
+    // the database but absent from the sidebar and from any parent-based lookup.
+    // See https://github.com/growilabs/growi/issues/9755
+    const exParentId = page.parent;
     await Page.takeOffFromTree(page._id);
 
-    // 2. Find new parent
     let newParent: PageDocument | undefined;
-    // If renaming to under target, run getParentAndforceCreateEmptyTree to fill new ancestors
-    if (this.isRenamingToUnderTarget(page.path, newPagePathSanitized)) {
-      newParent = await this.getParentAndforceCreateEmptyTree(
-        page,
-        newPagePathSanitized,
-      );
-    } else {
-      newParent = await this.getParentAndFillAncestorsByUser(
-        user,
-        newPagePathSanitized,
-      );
-    }
+    let renamedPage: PageDocument | null = null;
+    try {
+      // 2. Find new parent
+      // If renaming to under target, run getParentAndforceCreateEmptyTree to fill new ancestors
+      if (this.isRenamingToUnderTarget(page.path, newPagePathSanitized)) {
+        newParent = await this.getParentAndforceCreateEmptyTree(
+          page,
+          newPagePathSanitized,
+        );
+      } else {
+        newParent = await this.getParentAndFillAncestorsByUser(
+          user,
+          newPagePathSanitized,
+        );
+      }
 
-    // 3. Put back target page to tree (also update the other attrs)
-    const update: Partial<IPage> = {};
-    update.path = newPagePathSanitized;
-    update.parent = newParent?._id;
-    if (updateMetadata) {
-      update.lastUpdateUser = user;
-      update.updatedAt = new Date();
+      // 3. Put back target page to tree (also update the other attrs)
+      const update: Partial<IPage> = {};
+      update.path = newPagePathSanitized;
+      update.parent = newParent?._id;
+      if (updateMetadata) {
+        update.lastUpdateUser = user;
+        update.updatedAt = new Date();
+      }
+      renamedPage = await Page.findByIdAndUpdate(
+        page._id,
+        { $set: update },
+        { new: true },
+      );
+    } catch (err) {
+      // Undo step 1 only. The rename still fails and the caller still sees the
+      // error -- what changes is that the page stays where it was instead of
+      // vanishing from the tree. Steps after this block run only once step 3 has
+      // committed the new parent, so they must not be covered by this rollback.
+      try {
+        await Page.findByIdAndUpdate(page._id, {
+          $set: { parent: exParentId },
+        });
+      } catch (rollbackErr) {
+        // Log and fall through: the original error is the one worth propagating,
+        // but the page is now off-tree and needs Admin > App Settings > V5 page
+        // migration to be reattached, so that must not be swallowed silently.
+        logger.error(
+          `Failed to reattach "${page.path}" to its original parent after a failed rename. ` +
+            'The page is off-tree and will not appear in the page tree until it is normalized.',
+          rollbackErr,
+        );
+      }
+      throw err;
     }
-    const renamedPage = await Page.findByIdAndUpdate(
-      page._id,
-      { $set: update },
-      { new: true },
-    );
 
     // 5.increase parent's descendantCount.
     // see: https://dev.growi.org/62149d019311629d4ecd91cf#Handling%20of%20descendantCount%20in%20case%20of%20unexpected%20process%20interruption
