@@ -755,6 +755,46 @@ routine の運用値を決める — この 6 つ（Requirement 6〜11）につ�
   decision-rows` / `dashboard.ts` はそれぞれ別々の行で説明されているのみ）。
   追加する場合は次に design.md を更新する機会に反映すること。
 
+### 頻度計算ロジックを `occurrence-summary.ts` として独立させる（Requirement 12）
+
+- **決定**: `dashboard.ts` が内部に持っていた観測日抽出・回数集計のロジック
+  （旧 `observationDates` / `countOccurrences` / `toTableRow` の日付処理部分）
+  を `bin/flaky-ci/lib/occurrence-summary.ts` の `computeOccurrenceSummary` へ
+  切り出し、`dashboard.ts` 自身もこれを呼ぶ形に書き換えた。
+- **採らなかった案**: (1) `dashboard.ts` 内に残したまま `export` だけ付ける、
+  (2) 判断待ちコメント生成側で日付を独自に拾い直す。
+- **理由**: 「ダッシュボード描画」と「観測頻度の計算」は別の関心事で、後者は
+  ダッシュボード以外（判断待ちコメント、滞留判定）からも呼ばれる。(1) は
+  `dashboard.ts` という単一責任のファイルに無関係な公開 API を混ぜることに
+  なり、(2) は計算ロジックの二重管理・ドリフトのリスクを持ち込む
+  （Requirement 12.2 が明示的に禁止）。既存の `lib/` の構成（`gh.ts` /
+  `time.ts` / `constants.ts` 等、各ファイルが一つの関心事を持つ）にも合致する。
+- **実装時に判明した訂正**: `occurrences` は `dashboard.ts` の既存の
+  `countOccurrences` をそのまま移した「本文1件 + 一致する観測コメント数」で
+  あり、個々の `Date:` 行が実際に読めるかとは無関係に数える。first seen /
+  last seen とは別系統の集計で、そちらから導出されているわけではない。その
+  ため `occurrences` がこの実装で `0` になることはない（本文が常に1件として
+  数えられるため）。観測日が1件も読めない場合に欠損するのは first seen /
+  last seen だけで、呼び出し側はその2つが欠損のときだけ「値不明」と表示する。
+- **トレードオフ**: `dashboard.ts` の差分が抽出の分だけ増え、既存のテスト
+  （`dashboard.spec.ts` の計算ロジック部分）を `occurrence-summary.spec.ts`
+  へ移す必要があった。抽出前後でダッシュボードの Markdown 出力が一字一句
+  変わらないことは、既存のゴールデン出力テストで確認済み。
+
+### 「未測定滞留」の閾値は新しいフラグを作らず既存の `--stale-days` を再利用する（Requirement 13）
+
+- **決定**: `flaky/suspected` のまま再現測定が一度も行われず滞留している
+  issue を報告する際の閾値に、Requirement 10（`flaky/observing` の自動
+  クローズ）が既に持つ `--stale-days`（既定14日）をそのまま使う。新しい
+  `--stale-suspected-days` のようなフラグは追加しない。
+- **採らなかった案**: 独立した新しい閾値フラグを追加する。
+- **理由**: 「どれくらい放置されたら注意を促すか」という意味論はどちらも
+  同じで、閾値を分ける明確な理由が無い。既存の値を再利用する方が
+  `flaky-ci-routine.md` の CLI 引数を増やさず理解しやすい。
+- **トレードオフ**: 将来「suspected の滞留は observing より早く気づきたい」
+  というニーズが出た場合は、この決定を見直して閾値を分離する必要がある
+  （design.md の Revalidation Triggers に記載）。
+
 ## 未解決のまま残っている論点（今後の改善候補）
 
 `brief.md` の Scope には含めていないが、この調査・実運用の過程で見つかった

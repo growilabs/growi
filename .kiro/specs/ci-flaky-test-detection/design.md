@@ -56,6 +56,8 @@ Actions ワークフロー `.github/workflows/flaky-repro.yml`。アプリケー
 - 判断待ちを状態として持ち、人の返答で自動的に再開する（Requirement 9）
 - 再発しない issue を自動で閉じる（Requirement 10）
 - 起動間隔と隣接ルーティンを整合させる（Requirement 11）
+- 判断待ちコメントと毎回の実行報告に、既に計算済みの発生頻度データを追加で
+  表示する（Requirement 12・13）
 - 追加する状態はすべて GitHub の issue / label / comment に載せ、新しい永続
   ストアや外部サービスを持ち込まない
 
@@ -84,6 +86,9 @@ Actions ワークフロー `.github/workflows/flaky-repro.yml`。アプリケー
 - 再発しない観測中 issue の自動クローズ
 - クラウド routine 2 つ（`growi-flaky-ci-routine`、`Investigate GROWI
   Issues`）のプロンプト文言
+- 発生頻度の計算ロジック（`computeOccurrenceSummary`）を独立した公開関数として
+  提供し、ダッシュボード・判断待ちコメント・滞留判定の3か所から同じ計算結果を
+  再利用させること
 
 ### Out of Boundary
 - CI インフラ自体の信頼性（ネットワーク・OOM 等）向上
@@ -168,6 +173,13 @@ Actions ワークフロー `.github/workflows/flaky-repro.yml`。アプリケー
   も取っていないので、そちらは検証の対象そのものが無い。どちらかの手順書を
   検証対象にするなら、`paths` への追加と `constants.ts` の宣言の追加を
   同じコミットで行う
+- `DashboardIssue` 型（`number`/`title`/`labels`/`body`/`comments`）の形状が
+  変わった場合、`computeOccurrenceSummary` を呼ぶ3か所（ダッシュボード・
+  判断待ちコメント・滞留判定）の入力契約を合わせて再確認する
+- `--stale-days` の既定値や意味を変えた場合、Requirement 10（observing の
+  自動クローズ）と Requirement 13（suspected の滞留可視化）は同じ値を共有
+  しているため、両方の意味に合うか確認する。合わなくなったら閾値を分ける
+  判断を個別のspecで行う
 
 ## Architecture
 
@@ -428,6 +440,14 @@ sequenceDiagram
   そのまま推奨欄に写す。停止コメント以外のコメントは署名が最終行で、
   `**Fix PR**: ` マーカーだけは署名を付けない（ダッシュボードが完全一致で
   照合する 1 行なので、何も足さない）
+- 停止コメントには、この2行より**前**に発生頻度（発生回数・初回観測日・
+  直近観測日）を1行加える（Requirement 12）。`- Recommendation:` が
+  「コメントの最後の非空行」という契約を壊さないための位置固定で、値は
+  `occurrence-summary`（`computeOccurrenceSummary` を1件のissue番号に対して
+  呼ぶCLI）が返す。取得そのものが失敗した場合は行ごと省略してコメント投稿を
+  続行する。この省略は、観測記録はあるが日付が読めないときに「値不明」と
+  明示する Requirement 12.3 とは別の失敗の種類（取得の失敗と、値の欠損は
+  別モードで、どちらも実害を「不明」に倒すが理由が違う）
 - 再開の条件は**人の新しいコメントだけ**。新しい観測が増えたことや、時間が
   経ったことでは再開しない。止まった理由が「人の判断が無い」ことなので、
   判断が来ないまま再開しても同じ場所で止まり、CI 時間だけ使う
@@ -483,6 +503,36 @@ sequenceDiagram
 - 人が手で再オープンした issue を、次の実行が再びクローズしない。この Step
   が最後にクローズした時刻より後に `reopened` イベントがあれば対象外にする
 
+#### Stale Suspected Visibility
+
+| Field | Detail |
+|-------|--------|
+| Intent | 再現測定を一度も受けていない `flaky/suspected` issue の滞留を、クローズせず報告だけする |
+| Requirements | 13.1–13.4 |
+
+- 対象は open かつ `flaky/suspected` ラベルを持つ issue のみ。`flaky/observing`
+  は Stale Auto-close が、`flaky/confirmed` は既に調査対象なので、ここでは
+  扱わない
+- 「未測定」の判定は、いずれのコメントにも `### Repro result`
+  （`COMMENT_HEADINGS.reproResult`）が無いこと。再現測定が行われると必ず
+  この見出しのコメントが付く（`.github/scripts/flaky-repro/run-repro.sh` が
+  書く）ので、これが無ければまだ測定されていない
+- 閾値は Requirement 10 の自動クローズと同じ `--stale-days`（既定 14 日）を
+  再利用する。新しい設定値は追加しない（Revalidation Triggers 参照）
+- クローズ・ラベル変更は一切行わない。`stale-suspected` は読み取り専用の
+  Fact Script で、列挙した番号を Step 6 のレポートにそのまま報告するだけ
+- 該当が 0 件でも、その行を省略せず「none」と明示する（既存の Routine
+  Report の 4 項目と同じ規約）
+- 個々の issue のコメント取得が失敗した場合は、その issue 番号を一覧から
+  落とさず `unavailableIssues`（一覧とは別の欄）に載せる。`fetch-flaky-issues`
+  の `labelFetchFailures` や `awaiting-decision-rows` の `pausedAtStatus` と
+  同じ「1件読めないだけで他の行まで消さない」規約に従う（Error Handling
+  参照）。firstSeen の日付だけが読めない場合（コメント自体は読めている）は
+  この欄に含めない — それは測定状態が分かっている別の既知の残課題であり、
+  取得の失敗とは区別する
+
+**Contracts**: Batch [x]
+
 ### 決定的な原因と分かったときのクローズ（Requirement 8.4）
 
 - 依存関係の重複、生成物の不足、ビルド順序、マージキュー上だけの不整合など、
@@ -525,6 +575,8 @@ sequenceDiagram
 | Routine Discipline | flaky-ci-routine.md + investigate-flaky-test | 購読・通知・再起床の予約を禁じる | 9.5 | — | — |
 | Routine Report | flaky-ci-routine.md Step 6 | 実行サマリーの報告項目 | 11.3 | — | — |
 | Operations Config | 運用（リポジトリ外） | ラベル作成、クラウド routine のプロンプト | 9.1, 11.1, 11.2 | RemoteTrigger / REST labels (P0) | — |
+| Pause Frequency Line | investigate-flaky-test（判断待ちコメント） | 停止コメントに発生頻度を1行含める | 12.1, 12.2, 12.3 | computeOccurrenceSummary (P0) | State |
+| Stale Suspected Visibility | flaky-ci-routine.md Step 6 | 未測定のまま滞留した suspected issue を報告する | 13.1–13.4 | fetch-flaky-issues のロジック (P0), computeOccurrenceSummary (P0) | Batch |
 | Fact Scripts | 道具（`bin/flaky-ci/`） | 上の各コンポーネントのうち、判断を通らない機械的な処理を「事実を返す CLI」として持つ | 横断（下表の「呼ぶ節」が属する要件） | gh CLI (P0), Node 24 (P0), 手順書 3 本 (P0) | Batch |
 
 以下は、**ファイルをまたいで一致していなければ壊れる約束事**と、その形に
@@ -570,6 +622,8 @@ sequenceDiagram
 | `newest-observation` | routine 4-B | issue の最新観測日時と出所。閉じるか閉じないか（読めなければ閉じない） |
 | `awaiting-decision-rows` | routine Step 5 item 2 | 判断待ち行の `Paused at` / `Recommendation` / 窓以降の観測数。`(may be stale) ` の解釈と再選択しない規則は手順書に残る |
 | `render-dashboard` | routine Step 5 item 3 | ダッシュボード issue の本文そのもの。何を載せるか（入力を組む側）と検索・作成・全置換は手順書に残る |
+| `occurrence-summary` | investigate-flaky-test の判断待ちコメント投稿直前 | 1件のissueの発生回数・初回観測日・直近観測日。停止コメントへ1行として埋め込む値 |
+| `stale-suspected` | routine Step 6 | `flaky/suspected`のまま`--stale-days`を超えて`### Repro result`が一度も付いていないissueの一覧。自動クローズはしない |
 
 **共有している内部モジュール**（同じ事実が 2 か所で別々に実装されないための
 もの。ここが「2 つの節が同じ数を見ている」ことの担保になっている）
@@ -581,9 +635,21 @@ sequenceDiagram
   （`created_at` → `id`）はここ 1 か所
 - `lib/constants.ts` — 固定文字列の機械可読な定義。各定数が自分の検証元
   （Revalidation Triggers 参照）を宣言する
-- `lib/dashboard.ts` — ダッシュボード本文の描画。行順・Occurrences の
-  数え方・`**Fix PR**: ` マーカーの読み取り・65536 字の切り詰めは、いま
-  ここが唯一の実装
+- `lib/dashboard.ts` — ダッシュボード本文の描画。行順・`**Fix PR**: ` マーカー
+  の読み取り・65536 字の切り詰めは、いまここが唯一の実装。発生頻度
+  （First seen / Last seen / Occurrences）の計算そのものは `lib/
+  occurrence-summary.ts` の `computeOccurrenceSummary` に移し、`dashboard.ts`
+  はそれを呼ぶだけにしてある — 「ダッシュボード描画」と「観測頻度の計算」は
+  別の関心事で、後者はダッシュボード以外（判断待ちコメント、滞留判定）からも
+  呼ばれるため
+- `lib/occurrence-summary.ts` の `computeOccurrenceSummary` — issue の本文・
+  コメントから発生頻度を計算する唯一の実装。ネットワーク I/O を行わない
+  純粋関数で、`dashboard.ts` / `scripts/occurrence-summary.ts` /
+  `scripts/stale-suspected.ts` の3か所から呼ばれる。観測日が1件も読めない
+  ときは first seen / last seen を欠損値として返すが、occurrences は
+  「本文1件 + 観測コメントの一致件数」という別系統の集計なので、この場合も
+  0にはならない（本文自体が常に1件として数えられるため）。呼び出し側は
+  first seen / last seen が欠損のときだけ「値不明」と表示する
 
 **Implementation Notes**
 - `mining-signals` の `--identity` は識別キーの文字列ではなく **JSON
@@ -1009,7 +1075,7 @@ Requirement 7 が両立する仕組みで、折り畳みは照合の前段にあ
 | Field | Detail |
 |-------|--------|
 | Intent | 判断待ちをラベルと推奨 1 行で表す |
-| Requirements | 6.5, 6.6, 9.1 |
+| Requirements | 6.5, 6.6, 9.1, 12.1, 12.2, 12.3 |
 
 - ラベル `flaky/needs-decision`。tier（`flaky/*`）と phase（`phase/*`）は
   そのまま残す — 判断待ちは tier とも phase とも別の軸で、issue は 3 つを
@@ -1291,6 +1357,12 @@ stateDiagram-v2
   （自動マージ・自動削除はしない）
 - 起動時に必要な GitHub API へのアクセスが確認できない → 追跡状態への変更
   を一切行う前に停止し、理由を報告する（Requirement 4.1）
+- **判断待ちコメントの発生頻度取得が丸ごと失敗した場合**（`occurrence-summary`
+  が終了コード 2）→ 頻度の行を省略してコメント投稿を続行する。これは
+  Requirement 12.3 の「観測記録はあるが日付が読めないので値不明と明示する」
+  とは別の失敗モードである。前者は取得そのものができず行を出せない場合、
+  後者は取得はできて `occurrence-summary` が実行できているが日付が拾えな
+  かった場合を指し、片方をもう片方の代わりとして扱わない
 - **スクリプトが終了コード 2 で終わったとき**は、その節がもともと持っていた
   「測定できなかった」「取得できなかった」の経路にそのまま入る（判断待ちに
   する、除外せず続行する、その issue を飛ばす、など節ごとに決まっている）。
@@ -1299,7 +1371,9 @@ stateDiagram-v2
 - **「一部だけ読めた」は終了コード 0 の事実**であり、Step 6 のこの行には
   現れない。`list-candidate-runs` の `truncated`、`fetch-flaky-issues` の
   `labelFetchFailures` と `commentsStatus`、`awaiting-decision-rows` の
-  `pausedAtStatus` がこれにあたる。Step 6 の行は終了コードが非 0 の呼び出し
+  `pausedAtStatus`、`stale-suspected` の `unavailableIssues`（コメント取得に
+  失敗した issue 番号を一覧とは別の欄に載せ、他の issue の判定は続行する）
+  がこれにあたる。Step 6 の行は終了コードが非 0 の呼び出し
   だけを数える契約なので、そこに混ぜると「測定できない」という本当の異常が
   埋もれる。報告先は**呼んだ側の手順書が自分で持つ報告**（detect の Step 5、
   routine の Step 5）で、そこに「どこが欠けたか」を書く
