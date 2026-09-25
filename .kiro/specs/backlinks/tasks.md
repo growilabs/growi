@@ -650,7 +650,7 @@ the restored page's status. Independent of B3/B4.
   - _Boundary: pagelinks Prisma extension (page-link.ts), link-target-state.ts, interfaces/backlink.ts_
   - _Depends: B1.2_
 
-- [ ] B5.2 Implement the reconcile-deleted sync operation
+- [x] B5.2 Implement the reconcile-deleted sync operation
   - Implement the reconcile op deferred from B1.5: reconcile a deleted page by checking its current DB
     state — still trashed → no-op (derived state shows trashed); truly gone → delegate to B5.1's
     `removeLinksForPages` (which removes the outbound rows and nulls inbound `toPage` → broken).
@@ -664,14 +664,17 @@ the restored page's status. Independent of B3/B4.
   - **Raised in review of B5.1 — pass the batch through, do not accumulate it.** `removeLinksForPages`
     sends all of `pageIds` in one command, so an unbounded array would approach MongoDB's 16MB command
     cap and be rejected whole. This op must hand it the ids of the event payload it was called with and
-    nothing more; it must not collect ids across events/batches into one call. That is safe because
-    every recursive delete path funnels through `createBatchStream(BULK_REINDEX_SIZE)` (100) before the
-    delete-family events fire. The primitives stay unchunked on purpose — see design.md § *Batching is
-    the caller's job* for the posture and for what would flip it
+    nothing more; it must not collect ids across events/batches into one call. Bounding each call is
+    the caller's job: recursive delete and empty-trash payloads are already capped at
+    `BULK_REINDEX_SIZE` (100), but group deletion's are not, so B5.3's handler chunks before calling
+    this op. The primitives stay unchunked on purpose — see design.md § *Batching is the caller's
+    job* and § *Delete-family payloads are not uniformly bounded*
   - Done when unit tests show reconcile no-ops a trashed page and nulls inbound `toPage` for a
-    permanently-gone page, a delete landing while an upsert is pending ends in the reconciled
-    state rather than a re-created row, and the op issues one `removeLinksForPages` call per event
-    payload rather than an accumulated id list
+    permanently-gone page, and the op issues one `removeLinksForPages` call per event payload
+    rather than an accumulated id list. The pending-upsert criterion is an **integration**
+    assertion instead (`page-link-service-handlers.integ.ts`) — against a mocked prisma a unit
+    test can only show that the two calls happened, not that the rows ended up settled, and
+    "rather than a re-created row" is a claim about the stored rows
   - _Requirements: 3.3, 3.5, 6.1, 6.2_
   - _Boundary: page-link-sync_
   - _Depends: B5.1_
@@ -682,8 +685,15 @@ the restored page's status. Independent of B3/B4.
   - Also drop the page id from `PageLinkUpsertQueue`'s dirty set here, so a pending upsert is
     abandoned rather than merely declined at drain time (the queue side of B5.2's carried-over
     criterion)
+  - **Raised in review of B5.2 — chunk the `syncDescendantsDelete` payload.** Group deletion
+    (`PageService.handlePrivatePagesForGroupsToDelete`, action `delete`) hands
+    `deleteMultipleCompletely` every private page of the deleted groups in one call, unbatched, so
+    one `syncDescendantsDelete` payload can hold thousands of pages. Split the payload into chunks
+    of `BULK_REINDEX_SIZE` and call `reconcileDeletedPages` once per chunk. See design.md § *Delete-family payloads are
+    not uniformly bounded*
   - Done when unit tests invoke each handler with a fake event payload and assert the resulting row
-    changes (removed/nulled)
+    changes (removed/nulled), and a `syncDescendantsDelete` payload larger than `BULK_REINDEX_SIZE`
+    reaches `reconcileDeletedPages` as several calls of at most `BULK_REINDEX_SIZE` ids each
   - _Requirements: 3.3, 6.1, 6.2_
   - _Boundary: PageLinkService_
   - _Depends: B5.2, B1.6_

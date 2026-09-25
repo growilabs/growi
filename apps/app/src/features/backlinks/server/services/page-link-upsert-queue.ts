@@ -47,6 +47,17 @@ export class PageLinkUpsertQueue {
   private pagesToUpsert: Set<string>;
   private drainTimer: NodeJS.Timeout | null;
   private draining: boolean;
+  /**
+   * The in-flight drain's retry set, or null between drains. On the instance so `abandon()` can
+   * reach it: the drain re-queues this set wholesale on the way out, which would otherwise
+   * resurrect an id abandoned mid-drain.
+   */
+  private failedThisDrain: Set<string> | null = null;
+  /**
+   * Ids abandoned during the in-flight drain, or null between drains. A call already running when
+   * its page was abandoned cannot be recalled, but its failure must not re-queue the id.
+   */
+  private abandonedThisDrain: Set<string> | null = null;
   /** Rest milliseconds owed per millisecond worked. */
   private restRatio: number;
   /** Failures so far per page; cleared on success or on giving up. */
@@ -67,10 +78,28 @@ export class PageLinkUpsertQueue {
 
   enqueue(pageId: string): void {
     this.pagesToUpsert.add(pageId);
+    this.abandonedThisDrain?.delete(pageId);
     // A save is new work, not another attempt at the same work: counting it against the retry
     // budget would abandon a page that is merely being edited while writes are failing.
     this.attemptsByPage.delete(pageId);
     this.scheduleDrain();
+  }
+
+  /**
+   * Drop pending work for pages a delete-family event just removed: the upsert path uses
+   * `upsert: true`, so a stale drain would re-create rows for a gone source.
+   *
+   * Narrows the window, does not close it — an id already in flight cannot be recalled.
+   */
+  abandon(pageIds: string[]): void {
+    for (const id of pageIds) {
+      this.pagesToUpsert.delete(id);
+      this.attemptsByPage.delete(id);
+      this.abandonedThisDrain?.add(id);
+      // Else the drain re-queues it and the delete is merely declined next drain, not abandoned.
+      this.failedThisDrain?.delete(id);
+    }
+    // No scheduleDrain(): abandoning never creates work.
   }
 
   private scheduleDrain(delayMs = this.pacing.drainIntervalMs): void {
@@ -120,10 +149,13 @@ export class PageLinkUpsertQueue {
     this.drainTimer = null;
     this.draining = true;
 
-    // Per drain: kept on the instance, one failure would re-queue the page on every later drain.
     const failed = new Set<string>();
+    this.failedThisDrain = failed;
+    this.abandonedThisDrain = new Set<string>();
 
     try {
+      // Live Set, not a snapshot: `abandon()` deletes from it mid-drain, and an id not yet
+      // visited must then be skipped.
       for (const id of this.pagesToUpsert) {
         this.pagesToUpsert.delete(id);
 
@@ -157,7 +189,12 @@ export class PageLinkUpsertQueue {
         } catch (err) {
           // A failure after a completed extraction never reports its cost, so charge elapsed.
           extractionMs = performance.now() - startedAt;
-          if (this.registerFailure(id, err)) failed.add(id);
+          if (
+            !this.abandonedThisDrain?.has(id) &&
+            this.registerFailure(id, err)
+          ) {
+            failed.add(id);
+          }
         }
 
         const restMs = this.restMsFor(extractionMs);
@@ -166,6 +203,8 @@ export class PageLinkUpsertQueue {
     } finally {
       for (const id of failed) this.pagesToUpsert.add(id);
 
+      this.abandonedThisDrain = null;
+      this.failedThisDrain = null;
       this.draining = false;
       if (this.pagesToUpsert.size > 0) {
         this.scheduleDrain(failed.size > 0 ? RETRY_BACKOFF_MS : undefined);

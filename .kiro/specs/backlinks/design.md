@@ -471,14 +471,22 @@ interface IPageLink {
   A large enough work-set therefore approaches MongoDB's 16MB command cap (and, for
   `replaceOutboundLinks`, the 100,000-statement batch cap), and the command is rejected whole: the
   write throws and the rows stay stale until the next save or a backfill — loud, and self-healing,
-  but a real gap in the meantime. None of the primitives chunk internally, deliberately: every
-  recursive delete path in `PageService` already funnels through
-  `createBatchStream(BULK_REINDEX_SIZE)` (100), so the delete-family handlers (B5.3) can only ever
-  hand over a batch of that size, and a chunk loop would be an untestable branch guarding a caller
-  that does not exist. **The precondition, not the loop, is the contract** — it is stated on
-  `removeLinksForPages`' JSDoc for the next caller to find. If a future caller assembles page ids
-  outside a batch stream (a backfill, a migration, a group-deletion sweep), chunk **both** primitives
-  at that point, with a threshold that caller's measured size justifies. (Raised in review of B5.1.)
+  but a real gap in the meantime. None of the primitives chunk internally, deliberately: **the
+  precondition, not the loop, is the contract** — it is stated on `removeLinksForPages`' JSDoc for
+  the next caller to find — and chunking belongs to whichever caller can see the payload size.
+  (Raised in review of B5.1.)
+- **Delete-family payloads are not uniformly bounded, so the B5.3 handlers chunk.** The recursive
+  complete-delete and empty-trash paths in `PageService` funnel through
+  `createBatchStream(BULK_REINDEX_SIZE)` (100) before `deleteMultipleCompletely` fires
+  `syncDescendantsDelete`, so their payloads are capped. Group deletion is not:
+  `handlePrivatePagesForGroupsToDelete` (action `delete`) loads every private page granted to the
+  deleted groups with an unbounded `Page.find` and passes them to `deleteMultipleCompletely` in one
+  call, so a single `syncDescendantsDelete` payload can carry thousands of pages. The B5.3
+  `syncDescendantsDelete` handler therefore splits its payload into chunks of `BULK_REINDEX_SIZE`
+  and calls `reconcileDeletedPages` once per chunk. Chunking in the handler rather than batching
+  `handlePrivatePagesForGroupsToDelete` keeps the guard inside this feature and independent of how
+  each `PageService` caller assembles its pages; the unbounded `Page.find` itself is a
+  `PageService` memory concern outside this feature's boundary. (Raised in review of B5.2.)
 
 #### extractInternalLinkPaths
 
