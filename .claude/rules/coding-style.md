@@ -259,28 +259,6 @@ if (afterValue === '') { continue; }
 
 **Don't narrate the task, review, or incident that produced the code.** "Regression for the incident where..." or "found in review" belongs in the commit message and PR description — that history is already in git, and restating it as standing prose in the file just rots once a reader lacks that context. A test name that already states the behavior under test needs no comment restating it on top.
 
-### GitHub Actions: never put a comment inside an `if: |` block
-
-In a workflow YAML, `if: |` is a **literal block scalar** — everything indented
-under it, `#`-prefixed lines included, is literal text handed straight to the
-GitHub Actions expression parser. It is not YAML comment syntax there, unlike a
-comment placed anywhere else in the file.
-
-This matters because prose with a possessive or contraction (`bot's`, `PR's`,
-`Mergify's`) has an odd number of `'` characters. Inside `if: |`, that opens a
-single-quoted string literal that never closes, and the **entire workflow file**
-fails to parse — every run of that workflow shows zero jobs with GitHub's
-"workflow file issue" banner, on every trigger, until the file is fixed. This
-already broke `ci-app-prod.yml` in production for about a day (see
-`.github/workflows/ci-app-prod.yml`'s `test-prod-node24` job history around PR
-#11974) before anyone noticed the run's displayed name had silently fallen back
-to the raw file path.
-
-Put rationale comments **above** the `if:` key, as an ordinary job-level YAML
-comment, and keep the `if: |` scalar itself down to bare expression syntax — see
-`ci-app.yml`'s `ci-app-test` job for the pattern already used correctly
-elsewhere in this repo.
-
 ## Test File Placement
 
 Co-locate tests with source files.
