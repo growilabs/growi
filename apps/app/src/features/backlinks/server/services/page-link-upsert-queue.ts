@@ -53,6 +53,11 @@ export class PageLinkUpsertQueue {
    * resurrect an id abandoned mid-drain.
    */
   private failedThisDrain: Set<string> | null = null;
+  /**
+   * Ids abandoned during the in-flight drain, or null between drains. A call already running when
+   * its page was abandoned cannot be recalled, but its failure must not re-queue the id.
+   */
+  private abandonedThisDrain: Set<string> | null = null;
   /** Rest milliseconds owed per millisecond worked. */
   private restRatio: number;
   /** Failures so far per page; cleared on success or on giving up. */
@@ -73,6 +78,7 @@ export class PageLinkUpsertQueue {
 
   enqueue(pageId: string): void {
     this.pagesToUpsert.add(pageId);
+    this.abandonedThisDrain?.delete(pageId);
     // A save is new work, not another attempt at the same work: counting it against the retry
     // budget would abandon a page that is merely being edited while writes are failing.
     this.attemptsByPage.delete(pageId);
@@ -89,6 +95,7 @@ export class PageLinkUpsertQueue {
     for (const id of pageIds) {
       this.pagesToUpsert.delete(id);
       this.attemptsByPage.delete(id);
+      this.abandonedThisDrain?.add(id);
       // Else the drain re-queues it and the delete is merely declined next drain, not abandoned.
       this.failedThisDrain?.delete(id);
     }
@@ -144,6 +151,7 @@ export class PageLinkUpsertQueue {
 
     const failed = new Set<string>();
     this.failedThisDrain = failed;
+    this.abandonedThisDrain = new Set<string>();
 
     try {
       // Live Set, not a snapshot: `abandon()` deletes from it mid-drain, and an id not yet
@@ -181,7 +189,12 @@ export class PageLinkUpsertQueue {
         } catch (err) {
           // A failure after a completed extraction never reports its cost, so charge elapsed.
           extractionMs = performance.now() - startedAt;
-          if (this.registerFailure(id, err)) failed.add(id);
+          if (
+            !this.abandonedThisDrain?.has(id) &&
+            this.registerFailure(id, err)
+          ) {
+            failed.add(id);
+          }
         }
 
         const restMs = this.restMsFor(extractionMs);
@@ -190,6 +203,7 @@ export class PageLinkUpsertQueue {
     } finally {
       for (const id of failed) this.pagesToUpsert.add(id);
 
+      this.abandonedThisDrain = null;
       this.failedThisDrain = null;
       this.draining = false;
       if (this.pagesToUpsert.size > 0) {

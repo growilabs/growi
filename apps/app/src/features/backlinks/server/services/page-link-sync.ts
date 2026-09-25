@@ -1,11 +1,11 @@
-import mongoose, { type Types } from 'mongoose';
+import type { Types } from 'mongoose';
 
-import type { PageDocument, PageModel } from '~/server/models/page';
 import PageRedirect from '~/server/models/page-redirect';
 import { prisma } from '~/utils/prisma';
 
 import type { IPageLink } from '../../interfaces/page-link';
 import {
+  findPagesById,
   REDIRECT_CHAIN_MAX_DEPTH,
   resolveToPageIds,
 } from './target-page-resolution';
@@ -83,9 +83,7 @@ export const reconcileDeletedPages = async (
     return;
   }
 
-  const Page = mongoose.model<PageDocument, PageModel>('Page');
-
-  const foundPages = await Page.find({ _id: { $in: pageIds } }).select('_id');
+  const foundPages = await findPagesById(pageIds);
   const surviving = new Set(foundPages.map((page) => page._id.toString()));
 
   await prisma.pagelinks.removeLinksForPages(

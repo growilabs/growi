@@ -11,7 +11,7 @@ import {
   reResolveByToPath,
   syncOutboundLinks,
 } from './page-link-sync';
-import { resolveToPageIds } from './target-page-resolution';
+import { findPagesById, resolveToPageIds } from './target-page-resolution';
 
 const mockPrisma = mockDeep<PrismaClient>();
 
@@ -22,6 +22,7 @@ vi.mock('~/utils/prisma', () => ({
 }));
 
 vi.mock('./target-page-resolution', () => ({
+  findPagesById: vi.fn(),
   resolveToPageIds: vi.fn(),
   REDIRECT_CHAIN_MAX_DEPTH: 50,
 }));
@@ -29,18 +30,6 @@ vi.mock('./target-page-resolution', () => ({
 vi.mock('~/server/models/page-redirect', () => ({
   default: { retrieveFromPathsRedirectingTo: vi.fn() },
 }));
-
-const mocks = vi.hoisted(() => ({ pageFind: vi.fn() }));
-
-// Only `model` is stubbed: the specs below build real ObjectIds from `Types`, and the deep-mock
-// proxies vitest-mock-extended would put there break `.equals()` / `.toString()`.
-vi.mock('mongoose', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('mongoose')>();
-  return {
-    ...actual,
-    default: { ...actual.default, model: () => ({ find: mocks.pageFind }) },
-  };
-});
 
 const row = (toPage: Types.ObjectId | null, toPath = '/target'): IPageLink => ({
   fromPage: new Types.ObjectId(),
@@ -237,17 +226,14 @@ describe('reResolveByToPath', () => {
  */
 describe('reconcileDeletedPages', () => {
   /**
-   * What `Page.find(...).select('_id')` resolves to. Always fresh ObjectId instances: a real round
+   * What `findPagesById` resolves to. Always fresh ObjectId instances: a real round
    * trip never hands back the caller's own, and a survivor check keyed on instance identity rather
    * than value passes against reused ones while reporting every page in the batch as gone.
    */
   const resolveFoundPages = (ids: Types.ObjectId[]): void => {
-    mocks.pageFind.mockReturnValue({
-      select: () =>
-        Promise.resolve(
-          ids.map((id) => ({ _id: new Types.ObjectId(id.toHexString()) })),
-        ),
-    });
+    vi.mocked(findPagesById).mockResolvedValue(
+      ids.map((id) => ({ _id: new Types.ObjectId(id.toHexString()) })),
+    );
   };
 
   /** Every id handed to removeLinksForPages, across all calls, as hex. */
@@ -306,7 +292,7 @@ describe('reconcileDeletedPages', () => {
   it('does not touch either database for an empty batch', async () => {
     await reconcileDeletedPages([]);
 
-    expect(mocks.pageFind).not.toHaveBeenCalled();
+    expect(findPagesById).not.toHaveBeenCalled();
     expect(mockPrisma.pagelinks.removeLinksForPages).not.toHaveBeenCalled();
   });
 });
