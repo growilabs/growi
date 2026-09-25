@@ -9,6 +9,11 @@ import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchic
 import { LinkedPagePath } from '~/models/linked-page-path';
 
 import { PathSeparator } from './PathSeparator';
+import {
+  FIXED_PART_CLASS_NAME,
+  ROW_CLASS_NAME,
+  SEGMENT_CLASS_NAME,
+} from './truncated-path-row-classes';
 
 import styles from './SearchResultAncestorPath.module.scss';
 
@@ -33,11 +38,15 @@ const AncestorNode = ({
   readonly node: AncestorPathNode;
 }): JSX.Element => {
   if (node.type === 'ellipsis') {
-    return <span className={`${styles.ellipsis} text-muted`}>…</span>;
+    return <span className={`${FIXED_PART_CLASS_NAME} text-muted`}>…</span>;
   }
 
   return (
-    <Link href={node.href} prefetch={false} className={styles.segment}>
+    <Link
+      href={node.href}
+      prefetch={false}
+      className={`${styles.segment} ${SEGMENT_CLASS_NAME}`}
+    >
       {node.highlightedHtml != null ? (
         <span
           // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight markup is sanitized
@@ -77,7 +86,10 @@ export const SearchResultAncestorPath = memo(
     const isInTrash = isTrashPage(path) && !isTrashTopPage(path);
 
     return (
-      <span className={styles['search-result-ancestor-path']} title={fullPath}>
+      <span
+        className={`${styles['search-result-ancestor-path']} ${ROW_CLASS_NAME}`}
+        title={fullPath}
+      >
         <PagePathHierarchicalLink
           linkedPagePath={ROOT_LINKED_PAGE_PATH}
           isInTrash={isInTrash}

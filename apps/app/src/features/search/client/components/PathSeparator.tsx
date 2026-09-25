@@ -1,5 +1,7 @@
 import type { JSX } from 'react';
 
+import { FIXED_PART_CLASS_NAME } from './truncated-path-row-classes';
+
 interface PathSeparatorProps {
   /** The caller's own CSS-module-scoped class for the `.separator` rule. */
   readonly className: string;
@@ -14,5 +16,5 @@ interface PathSeparatorProps {
 export const PathSeparator = ({
   className,
 }: PathSeparatorProps): JSX.Element => (
-  <span className={`${className} text-muted`}>/</span>
+  <span className={`${className} ${FIXED_PART_CLASS_NAME} text-muted`}>/</span>
 );

@@ -2,7 +2,7 @@ import { type FC, type JSX, memo, useCallback } from 'react';
 import Link from 'next/link';
 
 import type { LinkedPagePath } from '~/models/linked-page-path';
-import { buildLinkedPagePathHref } from '~/models/linked-page-path';
+import { buildLinkedPagePathHref } from '~/utils/build-linked-page-path-href';
 
 import styles from './PagePathHierarchicalLink.module.scss';
 

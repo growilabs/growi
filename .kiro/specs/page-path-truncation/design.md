@@ -33,7 +33,8 @@
 - 上記表示コンポーネント専用の CSS（1 行固定・オーバーフロー安全網）。
 
 ### Out of Boundary
-- `PagePathHierarchicalLink`・`LinkedPagePath`・`DevidedPagePath` の実装変更（利用のみ）。
+- `LinkedPagePath`・`DevidedPagePath` の実装変更（利用のみ）。
+- `PagePathHierarchicalLink` の振る舞い変更。変更は、href 生成を `buildAncestorPathNodes` と共有する `buildLinkedPagePathHref`（`~/utils/`）の呼び出しに置き換えることのみ。
 - `PageList.tsx`・`IdenticalPathPage.tsx` の呼び出し内容（prop を渡さないことで現状維持。ファイル自体への変更もなし）。
 - `PageListItemL` のページ名表示行（H5 タイトル、`UserPicture`、`PageListMeta`、`PageItemControl`）の構造・マークアップ。
 - 検索結果のデータ取得・追加ネットワークリクエスト。
@@ -113,8 +114,15 @@ apps/app/src/
 │   └── components/PageList/
 │       ├── PageListItemL.tsx                    # 変更: オプトイン prop 追加
 │       └── PageListItemL.spec.tsx               # 新規: prop 配線の統合テスト
+├── utils/
+│   ├── build-linked-page-path-href.ts           # 新規: LinkedPagePath から表示用 href を組み立てる（PagePathHierarchicalLink と buildAncestorPathNodes で共用）。PagePathHierarchicalLink（components/）から import するため、client/ ではなく汎用の utils/ に置く
+│   └── build-linked-page-path-href.spec.ts      # 新規
+├── components/Common/PagePathHierarchicalLink/
+│   └── PagePathHierarchicalLink.tsx             # 変更: href 生成を buildLinkedPagePathHref に置換（振る舞い変更なし）
 └── features/search/client/
     ├── components/
+    │   ├── _truncated-path-row.scss              # 新規: 1 行省略レシピのうち Bootstrap に相当ユーティリティがない部分（min-width / flex-shrink 優先度）の共通 mixin
+    │   ├── truncated-path-row-classes.ts         # 新規: 同レシピの Bootstrap ユーティリティ部分（d-flex・text-truncate 等）のクラス名定数。SCSS 側と対で 2 つの描画コンポーネントに共有
     │   ├── SearchResultPagePath.tsx              # 変更: import 元のみ更新（移設追随）
     │   ├── SearchResultAncestorPath.tsx           # 新規: 検索結果一覧専用の祖先パス描画コンポーネント
     │   ├── SearchResultAncestorPath.module.scss   # 新規: 1 行固定・オーバーフロー安全網 CSS
@@ -126,7 +134,8 @@ apps/app/src/
 ### Modified Files
 - `apps/app/src/client/components/PageList/PageListItemL.tsx` — `renderTruncatedAncestorPath?`（既定 未指定）を追加。指定時は祖先パス描画をその戻り値に切り替え、ページ名を `evalDatePath` 有効で決定する。
 - `apps/app/src/features/search/client/components/SearchPage/SearchResultList.tsx` — `renderTruncatedAncestorPath` に `SearchResultAncestorPath` を渡す。
-- `apps/app/src/features/search/client/components/SearchResultPagePath.tsx` — `formatTruncatedPagePath` の import パスを `~/client/util/format-truncated-page-path` に更新するのみ。
+- `apps/app/src/features/search/client/components/SearchResultPagePath.tsx` — `formatTruncatedPagePath` の import パスを `~/client/util/format-truncated-page-path` に更新し、1 行省略レシピを共通 mixin・クラス名定数から適用する（表示は変更なし）。
+- `apps/app/src/components/Common/PagePathHierarchicalLink/PagePathHierarchicalLink.tsx` — href 生成を `buildLinkedPagePathHref` の呼び出しに置き換える（生成される href は変更なし）。
 
 ### Removed Files
 - `apps/app/src/features/search/client/utils/format-truncated-page-path.ts`
@@ -171,7 +180,7 @@ flowchart TD
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|---------------|---------------------------|-----------|
-| `formatTruncatedPagePath` | Shared util | プレーンパス文字列から中間省略済み表示パーツ列を決定する（既存・移設のみ） | 1, 2, 7 | `DevidedPagePath`（P0） | Service |
+| `formatTruncatedPagePath` | Shared util | プレーンパス文字列から中間省略済み表示パーツ列と祖先部分を決定する（既存を移設し、戻り値に `ancestorPath` を追加） | 1, 2, 7 | `DevidedPagePath`（P0） | Service |
 | `alignHighlightedPathSegments` | Shared util（`client/util/`） | ハイライト markup をプレーンパスのセグメントに対応付ける（祖先行・ページ名行で共用） | 6, 7 | `normalizePath`（P0） | Service |
 | `buildAncestorPathNodes` | Shared util（`client/util/`） | 中間省略判定と `LinkedPagePath`・ハイライトを橋渡しし、React 非依存のレンダリング計画を返す | 2, 5, 6 | `formatTruncatedPagePath`（P0）, `LinkedPagePath`（P0）, `alignHighlightedPathSegments`（P0） | Service |
 | `SearchResultAncestorPath` | `features/search` component | 検索結果一覧の祖先パス部分を 1 行・リンク付き・ハイライト付きで描画する | 1, 2, 3, 4, 5, 6 | `buildAncestorPathNodes`（P0） | State（Presentational） |
@@ -179,7 +188,7 @@ flowchart TD
 
 ### Shared Util
 
-#### `formatTruncatedPagePath`（移設のみ、契約変更なし）
+#### `formatTruncatedPagePath`（移設、戻り値に `ancestorPath` を追加）
 
 | Field | Detail |
 |-------|--------|
@@ -202,6 +211,8 @@ export interface TruncatedPagePath {
   readonly isRoot: boolean;
   readonly parts: readonly PagePathPart[];
   readonly fullPath: string;
+  /** 日付束ね後の祖先部分（DevidedPagePath.former）。buildAncestorPathNodes が同じパスを再分割せずに祖先チェーンを組むために使う */
+  readonly ancestorPath: string;
 }
 
 export const formatTruncatedPagePath: (path: string) => TruncatedPagePath;

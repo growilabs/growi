@@ -17,12 +17,6 @@
   flex-shrink: 1;
 }
 
-// Separators and the ellipsis must never shrink or wrap.
-.separator,
-.ellipsis {
-  @include t.separator-and-ellipsis;
-}
-
 .separator {
   padding: 0 0.15rem;
 }

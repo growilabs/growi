@@ -2,18 +2,17 @@
 // container whose ancestor/page-name segments each truncate individually
 // with an ellipsis before the row itself is allowed to overflow.
 //
+// Only the properties Bootstrap has no utility for live here; the rest of the
+// recipe is applied as utility classes in the markup (see ROW_CLASS_NAME /
+// SEGMENT_CLASS_NAME / FIXED_PART_CLASS_NAME in truncated-path-row-classes.ts).
+//
 // Consumed by SearchResultPagePath.module.scss (search modal) and
-// SearchResultAncestorPath.module.scss (search results list) via `@use`, so
-// the two independent truncated-path renderers can't silently drift on the
-// shared flex-shrink recipe. Not a CSS module itself (leading underscore) --
-// each consumer still declares its own module-scoped class names.
+// SearchResultAncestorPath.module.scss (search results list) via `@use`. Not a
+// CSS module itself (leading underscore) -- each consumer still declares its
+// own module-scoped class names.
 
 @mixin row {
-  display: flex;
-  align-items: baseline;
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
 }
 
 @mixin segment {
@@ -21,12 +20,4 @@
   // before the ellipsis marker or separators (which never shrink).
   flex-shrink: 100;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@mixin separator-and-ellipsis {
-  flex-shrink: 0;
-  white-space: nowrap;
 }

@@ -15,13 +15,6 @@
   @include t.segment;
 }
 
-// Separators and the ellipsis marker must never shrink or wrap — they are the
-// smallest, most meaningful fixed-width pieces of the row.
-.separator,
-.ellipsis {
-  @include t.separator-and-ellipsis;
-}
-
 .separator {
   padding: 0 0.15rem;
 }

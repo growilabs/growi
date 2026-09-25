@@ -5,6 +5,11 @@ import type { PagePathPart } from '~/client/util/format-truncated-page-path';
 import { formatTruncatedPagePath } from '~/client/util/format-truncated-page-path';
 
 import { PathSeparator } from './PathSeparator';
+import {
+  FIXED_PART_CLASS_NAME,
+  ROW_CLASS_NAME,
+  SEGMENT_CLASS_NAME,
+} from './truncated-path-row-classes';
 
 import styles from './SearchResultPagePath.module.scss';
 
@@ -45,7 +50,10 @@ export const SearchResultPagePath = ({
   const { isRoot, parts, fullPath } = formatTruncatedPagePath(path);
 
   return (
-    <span className={styles['search-result-page-path']} title={fullPath}>
+    <span
+      className={`${styles['search-result-page-path']} ${ROW_CLASS_NAME}`}
+      title={fullPath}
+    >
       {isRoot ? (
         <PathSeparator className={styles.separator} />
       ) : (
@@ -55,13 +63,17 @@ export const SearchResultPagePath = ({
           <Fragment key={key}>
             <PathSeparator className={styles.separator} />
             {part.type === 'ellipsis' ? (
-              <span className={`${styles.ellipsis} text-muted`}>…</span>
+              <span className={`${FIXED_PART_CLASS_NAME} text-muted`}>…</span>
             ) : part.isPageName ? (
-              <strong className={`${styles.segment} ${styles['page-name']}`}>
+              <strong
+                className={`${styles.segment} ${styles['page-name']} ${SEGMENT_CLASS_NAME}`}
+              >
                 {part.text}
               </strong>
             ) : (
-              <span className={styles.segment}>{part.text}</span>
+              <span className={`${styles.segment} ${SEGMENT_CLASS_NAME}`}>
+                {part.text}
+              </span>
             )}
           </Fragment>
         ))

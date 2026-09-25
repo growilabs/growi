@@ -1,9 +1,5 @@
-import { DevidedPagePath } from '@growi/core/dist/models';
-
-import {
-  buildLinkedPagePathHref,
-  LinkedPagePath,
-} from '~/models/linked-page-path';
+import { LinkedPagePath } from '~/models/linked-page-path';
+import { buildLinkedPagePathHref } from '~/utils/build-linked-page-path-href';
 
 import { alignHighlightedPathSegments } from './align-highlighted-path-segments';
 import { formatTruncatedPagePath } from './format-truncated-page-path';
@@ -89,7 +85,7 @@ export const buildAncestorPathNodes = (
   }
 
   const plainChain = buildRootFirstChain(
-    new LinkedPagePath(new DevidedPagePath(path, false, true).former),
+    new LinkedPagePath(truncated.ancestorPath),
   );
   // Ancestors are the leading segments of the path, so chain index === segment index.
   const highlightedSegments = alignHighlightedPathSegments(
