@@ -13,6 +13,7 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import { findUserGroupIdsForViewer } from '../services/find-user-group-ids-for-viewer';
 import { isPageReadableByViewer } from '../services/is-page-readable-by-viewer';
 
 const logger = loggerFactory('growi:routes:apiv3:backlink');
@@ -33,10 +34,19 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
       const pageObjectId = new mongoose.Types.ObjectId(pageId);
       const viewer = req.user ?? null;
 
+      // Resolved once and shared by every viewer-filtered read below.
+      const userGroups = await findUserGroupIdsForViewer(viewer);
+
       // Both reads assume the viewer can read this page: forward-link health returns
       // paths from its body. One 404 for "missing" and "forbidden" alike — see
       // rules/page-write-action-403-404.md.
-      if (!(await isPageReadableByViewer(pageObjectId, viewer))) {
+      const isReadable = await isPageReadableByViewer(
+        pageObjectId,
+        viewer,
+        userGroups,
+      );
+
+      if (!isReadable) {
         return res.apiv3Err(
           new ErrorV3(
             `Page '${pageId}' is not found or forbidden`,
@@ -49,6 +59,7 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
       const backlinks = await crowi.pageLinkService.findBacklinks(
         pageObjectId,
         viewer,
+        userGroups,
       );
       return res.apiv3({ backlinks });
     } catch (err) {

@@ -9,6 +9,7 @@ import PageRedirect from '~/server/models/page-redirect';
 import { prisma } from '~/utils/prisma';
 
 import { ensurePageLinkIndexes } from '../models/page-link-indexes';
+import { findUserGroupIdsForViewer } from './find-user-group-ids-for-viewer';
 
 // pagelinks is prisma-only, and the harness skips migrations on the in-memory MongoDB.
 beforeAll(async () => {
@@ -65,6 +66,17 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
 
   let viewer: IUserHasId; // the querying user
   let foreignUser: IUserHasId; // a different user; owner of the restricted sources
+
+  // As the route does: resolve the viewer's groups once, then read.
+  const readBacklinks = async (
+    toPageId: Types.ObjectId,
+    user: IUserHasId | null,
+  ) =>
+    crowi.pageLinkService.findBacklinks(
+      toPageId,
+      user,
+      await findUserGroupIdsForViewer(user),
+    );
 
   // --- seeding helpers ---------------------------------------------------
 
@@ -215,17 +227,15 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     await emitUpsert('create', source, `[to target](${target.path})`);
     await waitForOutboundCount(source._id, 1);
 
-    expect(
-      await crowi.pageLinkService.findBacklinks(target._id, viewer),
-    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+    expect(await readBacklinks(target._id, viewer)).toEqual([
+      { pageId: source._id.toString(), path: source.path },
+    ]);
 
     // Update: the link is removed from the body.
     await emitUpsert('update', source, 'no links anymore');
     await waitForOutboundCount(source._id, 0);
 
-    expect(
-      await crowi.pageLinkService.findBacklinks(target._id, viewer),
-    ).toEqual([]);
+    expect(await readBacklinks(target._id, viewer)).toEqual([]);
   });
 
   it('excludes a source the viewer cannot read, but the owner sees it (2.1, 2.2, 2.3)', async () => {
@@ -242,15 +252,13 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     await waitForOutboundCount(restricted._id, 1);
 
     // The restricted source must not leak — neither its path nor its existence.
-    expect(
-      await crowi.pageLinkService.findBacklinks(target._id, viewer),
-    ).toEqual([{ pageId: readable._id.toString(), path: readable.path }]);
+    expect(await readBacklinks(target._id, viewer)).toEqual([
+      { pageId: readable._id.toString(), path: readable.path },
+    ]);
 
     // Positive control: the owner sees it, so the omission above is the grant
     // filter's doing, not a missing row.
-    expect(
-      await crowi.pageLinkService.findBacklinks(target._id, foreignUser),
-    ).toEqual(
+    expect(await readBacklinks(target._id, foreignUser)).toEqual(
       expect.arrayContaining([
         { pageId: restricted._id.toString(), path: restricted.path },
       ]),
@@ -264,9 +272,7 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     await emitUpsert('create', source, `[t](${target.path})`);
     await waitForOutboundCount(source._id, 1);
 
-    expect(
-      await crowi.pageLinkService.findBacklinks(target._id, viewer),
-    ).toHaveLength(1);
+    expect(await readBacklinks(target._id, viewer)).toHaveLength(1);
 
     // Restrict the source to the foreign user; the row is unchanged but the
     // read must now filter it out.
@@ -278,15 +284,13 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
       },
     );
 
-    expect(
-      await crowi.pageLinkService.findBacklinks(target._id, viewer),
-    ).toEqual([]);
+    expect(await readBacklinks(target._id, viewer)).toEqual([]);
 
     // Positive control: the row survived the grant change and is filtered by the
     // read, not deleted — the new owner still sees the backlink.
-    expect(
-      await crowi.pageLinkService.findBacklinks(target._id, foreignUser),
-    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+    expect(await readBacklinks(target._id, foreignUser)).toEqual([
+      { pageId: source._id.toString(), path: source.path },
+    ]);
   });
 
   it('lists a source once even when it links to the target more than once (1.6)', async () => {
@@ -305,9 +309,9 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     ]);
 
     // And the read lists the source exactly once.
-    expect(
-      await crowi.pageLinkService.findBacklinks(target._id, viewer),
-    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+    expect(await readBacklinks(target._id, viewer)).toEqual([
+      { pageId: source._id.toString(), path: source.path },
+    ]);
   });
 
   it('does not index a source trashed before its queued upsert ran (3.5)', async () => {
@@ -337,9 +341,9 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     expect(await outboundRows(trashed._id)).toEqual([]);
 
     // And the trashed page is not surfaced as a phantom backlink of the target.
-    expect(
-      await crowi.pageLinkService.findBacklinks(target._id, viewer),
-    ).toEqual([{ pageId: control._id.toString(), path: control.path }]);
+    expect(await readBacklinks(target._id, viewer)).toEqual([
+      { pageId: control._id.toString(), path: control.path },
+    ]);
   });
 
   it('excludes a page linking to its own permalink from its own backlinks (1.6)', async () => {
@@ -362,14 +366,12 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     ]);
 
     // The page is not a backlink of itself.
-    expect(
-      await crowi.pageLinkService.findBacklinks(selfLinker._id, viewer),
-    ).toEqual([]);
+    expect(await readBacklinks(selfLinker._id, viewer)).toEqual([]);
 
     // Positive control: the surviving link is recorded — /other lists the page.
-    expect(
-      await crowi.pageLinkService.findBacklinks(other._id, viewer),
-    ).toEqual([{ pageId: selfLinker._id.toString(), path: selfLinker.path }]);
+    expect(await readBacklinks(other._id, viewer)).toEqual([
+      { pageId: selfLinker._id.toString(), path: selfLinker.path },
+    ]);
   });
 
   it('keeps a backlink alive after the target is renamed and the source is re-saved (5.1)', async () => {
@@ -406,9 +408,9 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     ]);
 
     // What the user sees: the renamed target still lists the source.
-    expect(
-      await crowi.pageLinkService.findBacklinks(target._id, viewer),
-    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+    expect(await readBacklinks(target._id, viewer)).toEqual([
+      { pageId: source._id.toString(), path: source.path },
+    ]);
   });
 
   // B4.4 — none of the three specs below re-save the source, unlike the rename spec
@@ -451,9 +453,9 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     // The row was never touched: same id, same cached toPageId.
     expect(await outboundRow(source._id)).toEqual(before);
 
-    expect(
-      await crowi.pageLinkService.findBacklinks(target._id, viewer),
-    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+    expect(await readBacklinks(target._id, viewer)).toEqual([
+      { pageId: source._id.toString(), path: source.path },
+    ]);
   });
 
   it('keeps a path-based backlink valid across a descendant move, with no index write (5.1, 5.2)', async () => {
@@ -492,9 +494,9 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     // The row was never touched: same id, same cached toPageId.
     expect(await outboundRow(source._id)).toEqual(before);
 
-    expect(
-      await crowi.pageLinkService.findBacklinks(target._id, viewer),
-    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+    expect(await readBacklinks(target._id, viewer)).toEqual([
+      { pageId: source._id.toString(), path: source.path },
+    ]);
   });
 
   it('keeps a permalink-based backlink valid across a target rename/move, with no index write (5.4)', async () => {
@@ -531,8 +533,8 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     // with, so there is nothing for the rename to invalidate.
     expect(await outboundRow(source._id)).toEqual(before);
 
-    expect(
-      await crowi.pageLinkService.findBacklinks(target._id, viewer),
-    ).toEqual([{ pageId: source._id.toString(), path: source.path }]);
+    expect(await readBacklinks(target._id, viewer)).toEqual([
+      { pageId: source._id.toString(), path: source.path },
+    ]);
   });
 });

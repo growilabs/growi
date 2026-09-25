@@ -2,6 +2,7 @@ import type { IUser } from '@growi/core';
 import type { Types } from 'mongoose';
 
 import type Crowi from '~/server/crowi';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageDocument } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
@@ -71,8 +72,9 @@ export class PageLinkService {
   findBacklinks(
     toPageId: Types.ObjectId,
     user: IUser | null,
+    userGroups: ObjectIdLike[] | null,
   ): Promise<IBacklink[]> {
-    return findBacklinks(toPageId, user);
+    return findBacklinks(toPageId, user, userGroups);
   }
 
   findForwardLinkHealth(
