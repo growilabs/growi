@@ -1483,38 +1483,20 @@ describe('main', () => {
     );
   });
 
-  it('accepts the workflow-provided GITHUB_TOKEN as the publishing identity when no dedicated publish token is configured, and warns about it', async () => {
+  it('refuses to run when I18N_SYNC_PUBLISH_TOKEN is not set, even when GITHUB_TOKEN is present', async () => {
     // GitHub Actions exports an unregistered secret as an empty string, not
     // as an unset variable -- `delete` does not model what Actions actually
     // produces here.
     process.env.I18N_SYNC_PUBLISH_TOKEN = '';
     process.env.GITHUB_TOKEN = 'workflow-token';
-    const collectClassificationsFn = vi.fn(async () => ({
-      ok: true as const,
-      translationOnly: [],
-      structural: [],
-      skipped: [],
-    }));
-    const consoleErrorSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => undefined);
+    const collectClassificationsFn = vi.fn();
 
-    await main({
-      collectClassificationsFn,
-      applyTranslationOnlyChangesFn: vi.fn(async () => ({
-        ok: true as const,
-        outcome: 'no_changes' as const,
-      })),
-      applyStructuralChangesFn: vi.fn(async () => ({
-        ok: true as const,
-        outcome: 'no_changes' as const,
-      })),
-    });
+    await main({ collectClassificationsFn });
 
-    expect(process.exitCode).toBeUndefined();
-    expect(collectClassificationsFn).toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+    expect(collectClassificationsFn).not.toHaveBeenCalled();
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('I18N_SYNC_PUBLISH_TOKEN is not set'),
+      expect.stringContaining('I18N_SYNC_PUBLISH_TOKEN'),
     );
   });
 

@@ -111,9 +111,17 @@ jobs:
     # `check-failure` treats that resulting `cancelled` conclusion as a
     # failure -- risking ejecting *any* PR from the merge queue over an
     # unrelated label change. Reverted in favor of this race-free check.)
+    #
+    # The branch-name check alone would let any PR from this repo -- not
+    # just the sync bot's -- skip the full test/build matrix by naming its
+    # branch i18n-sync/translation-only. The head.repo.full_name check
+    # limits that to PRs whose head lives in this repository (not a fork),
+    # matching .github/mergify.yml's author restriction on the same branch
+    # name for the merge queue itself.
     if: |
       !( contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
-         || github.event.pull_request.head.ref == 'i18n-sync/translation-only' )
+         || ( github.event.pull_request.head.ref == 'i18n-sync/translation-only'
+              && github.event.pull_request.head.repo.full_name == github.repository ) )
 
     strategy:
       matrix:
@@ -184,7 +192,8 @@ jobs:
     # See ci-app-test's comment above.
     if: |
       !( contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
-         || github.event.pull_request.head.ref == 'i18n-sync/translation-only' )
+         || ( github.event.pull_request.head.ref == 'i18n-sync/translation-only'
+              && github.event.pull_request.head.repo.full_name == github.repository ) )
 
     strategy:
       matrix:
@@ -263,7 +272,8 @@ jobs:
     # See ci-app-test's comment above.
     if: |
       !( contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
-         || github.event.pull_request.head.ref == 'i18n-sync/translation-only' )
+         || ( github.event.pull_request.head.ref == 'i18n-sync/translation-only'
+              && github.event.pull_request.head.repo.full_name == github.repository ) )
 
     strategy:
       matrix:

@@ -43,7 +43,7 @@ GROWI は5言語の翻訳ファイルを `apps/app/public/static/locales/` に�
 - リポジトリの翻訳ファイル（`apps/app/public/static/locales/*/{admin,translation,commons}.json`）と単一の共有 POEditor プロジェクト間の双方向同期ロジック（push/pull それぞれの GitHub Actions ワークフローとその実装コード）
 - 取り込む変更が「訳文のみ」か「キー構造の変更」かを判定するロジックと、それに応じた反映経路（自動反映 or 人レビュー必須の変更提案）の分岐
 - POEditor 側のプロジェクト構成（全 namespace を単一の共有プロジェクトへ集約する）の決定と、単一プロジェクト内で namespace を区別する方法（JSON 構造での namespace ラップ、翻訳者向けの namespace タグ付け）
-- GROWI のロケールコード（`en_US` 等）と POEditor が受け付ける言語コード（`en` 等）の対応付け
+- GROWI のロケールコード（`en_US` 等）と POEditor が受け付ける言語コード（`en-us` 等）の対応付け
 - 貢献者向けガイド文書の設置場所と内容
 
 ### Out of Boundary
@@ -57,7 +57,7 @@ GROWI は5言語の翻訳ファイルを `apps/app/public/static/locales/` に�
 - 既存の i18n CI ゲート（`pnpm run lint:i18n` / `apps/app/tools/i18n-audit/`）: 同期が取り込む変更の合否判定に使う。呼び出すだけで内部には依存しない
 - POEditor API v2（`https://api.poeditor.com/v2/*`）: `projects/upload` / `projects/export` / `languages/list` を使う
 - リポジトリの既存 CI 慣習（`paths:` トリガー、`concurrency` グループ、`secrets.*` によるトークン注入）
-- `.github/mergify.yml` の既存ルール「Automatic queue to merge」（条件: `#approved-reviews-by >= 1` かつ変更要求レビューが無いこと）。**このルール自体は変更しない。** 人レビューなしで反映する経路は、このルールに乗せるために「PR作成者とは別のIDが承認レビューを送る」ことで実現する（GitHub は PR 作成者自身による自己承認を拒否するため）。もう一方の既存ルール「Automatic merge for Preparing next version」は `queue_rules` のCI条件（`ci-app-lint` 等）を経由しない direct merge であり、Requirement 3.4（CIゲートを迂回しない）に反するため使わない
+- `.github/mergify.yml` の既存ルール「Automatic queue to merge」（条件: `#approved-reviews-by >= 1` かつ変更要求レビューが無いこと）は承認1件以上の条件をそのまま保つ。人レビューなしで反映する経路は、このルールに乗せるために「PR作成者とは別のIDが承認レビューを送る」ことで実現する（GitHub は PR 作成者自身による自己承認を拒否するため）。さらに、訳文のみのボットPR（ブランチ名 `i18n-sync/translation-only`）だけは、承認1件以上の条件を保ったまま `ci-app-lint` の成功のみを条件にする軽量キュー `i18n-sync-translation-only` へ振り分ける（フルの test/build/Playwright を通す必要が無いほど診断済みの差分のため）。対象は `author = growi-i18n-pr-publisher[bot]`（このボット以外が同じブランチ名を名乗っても対象外）と、変更ファイルが `apps/app/public/static/locales/` 配下に限られることの両方で絞る。もう一方の既存ルール「Automatic merge for Preparing next version」は `queue_rules` のCI条件（`ci-app-lint` 等）を経由しない direct merge であり、Requirement 3.4（CIゲートを迂回しない）に反するため使わない
 
 ### 承認ボットの必要性（新しい依存）
 - 上記の「別ID承認」を実現するには、同期ワークフローの既定の `GITHUB_TOKEN` とは別に、レビュー承認を送れるボットID（GitHub App のインストールトークン、または専用ボットアカウントの PAT）が要る。これは本 spec が新たに用意する依存であり、`Security Considerations` に持ち越して扱う
@@ -157,7 +157,7 @@ sequenceDiagram
 - タグ付けアップロード（`syncTerms: false`）は namespace ごとに行い、削除を発生させずにタグだけを付与する。これにより翻訳者は共有プロジェクトの中を namespace で絞り込める
 - アップロードは直列に実行し、POEditor の20秒レート制限を守るために呼び出し間隔を空ける
 - いずれかの namespace ファイルが読み込めない場合、アップロードを一切行わずに中止する（プロジェクトが一部の namespace だけの状態へ収束してしまうことを避ける）。統合アップロードとタグ付けアップロードのいずれかが失敗した場合も、以降の呼び出しを中止する
-- POEditor は GROWI のロケールコード（`en_US`）を受け付けないため、`LanguageCodeMap.toPoeditorLanguageCode` で POEditor の言語コード（`en`）へ変換してから `PoeditorClient` を呼ぶ。変換は API 呼び出しの直前だけで行い、ファイルパスの解決や namespace の処理は GROWI のロケールコードのまま扱う
+- POEditor は GROWI のロケールコード（`en_US`）を受け付けないため、`LanguageCodeMap.toPoeditorLanguageCode` で POEditor の言語コード（`en-us`）へ変換してから `PoeditorClient` を呼ぶ。変換は API 呼び出しの直前だけで行い、ファイルパスの解決や namespace の処理は GROWI のロケールコードのまま扱う
 - 統合アップロードは `overwrite: true` を明示して呼ぶ。POEditor 側の `overwrite` パラメータの既定値は 0（上書きしない）で、これを送らないと既存キーの文言変更が反映されない（`research.md` のDecision参照）
 
 ### Pull: 翻訳の取り込みと分岐（Requirement 3）
@@ -173,14 +173,14 @@ flowchart TD
     GatePR --> Gate1[ci-app-lint runs including lint colon i18n]
     Gate1 -->|pass| BotApprove[Approval bot submits approving review]
     Gate1 -->|fail| Block[Block and surface failure to maintainers]
-    BotApprove --> Queue[Existing Mergify rule Automatic queue to merge]
-    Queue --> Merged[Merged once queue conditions pass]
-    ReviewPR --> HumanReview[Awaits human approval, then same queue rule]
+    BotApprove --> Queue[Lightweight Mergify queue i18n-sync-translation-only]
+    Queue --> Merged[Merged once ci-app-lint passes]
+    ReviewPR --> HumanReview[Awaits human approval, then existing Automatic queue to merge rule]
 ```
 - export は namespace ごとではなく**言語ごとに1回**行う。単一の共有プロジェクトなので、1回の export で全 namespace を含む統合JSONが得られる。これを namespace ごとに分割してから分類する
 - 判定基準: namespace×言語ごとに、取り込み前後のキー集合（ネストしたリーフパス）が完全一致すれば「訳文のみ」、1件でも増減があれば「構造変更」
 - **PRの粒度（不変条件）**: 1回のpull実行で対象になる最大12通り（namespace3×非ソース言語4）の判定結果は、**必ず2本以下のPRに分ける**。「訳文のみ」の組み合わせは1本のPRにまとめ、「構造変更」の組み合わせは（本 spec では）別の1本のPRにまとめる。**同一PRの中に構造変更の組み合わせを1件でも含めてはならない。** これに違反すると、構造変更が人レビューを経ずに反映されてしまい Requirement 3.2 を破る
-- 「訳文のみ」PRは人レビューを要求しないが、必ず PR を経由し既存の i18n CI ゲート（`ci-app-lint` が包含する `lint:i18n`）を通過させる。通過した場合のみ、PR作成者とは別のID（承認ボット、`Security Considerations`参照）が承認レビューを送り、既存の `.github/mergify.yml` の「Automatic queue to merge」ルール（`#approved-reviews-by >= 1`）にそのまま乗せる。ゲートに失敗した場合は承認を送らず、default branch には反映しない（Requirement 3.3, 3.4）
+- 「訳文のみ」PRは人レビューを要求しないが、必ず PR を経由し既存の i18n CI ゲート（`ci-app-lint` が包含する `lint:i18n`）を通過させる。通過した場合のみ、PR作成者とは別のID（承認ボット、`Security Considerations`参照）が承認レビューを送り、承認1件以上の条件を保ったまま `ci-app-lint` の成功のみを条件にする軽量キュー `i18n-sync-translation-only`（`.github/mergify.yml`、`author = growi-i18n-pr-publisher[bot]` かつ変更ファイルが `apps/app/public/static/locales/` 配下に限定されることで対象を絞る）に乗せる。ゲートに失敗した場合は承認を送らず、default branch には反映しない（Requirement 3.3, 3.4）
 - 「構造変更」PRは通常の人レビュー待ちとし、承認ボットは関与しない。人が承認すれば同じ「Automatic queue to merge」ルールでキューに乗る
 - POEditor の未翻訳キーは export 結果で空文字列 `""` として現れる（キー自体は省略されない）。この空文字列は「POEditor側で未翻訳（情報なし）」を意味するため、分類（追加・削除・変更のどれにも数えない）でも、実際にファイルへ書き込む内容の合成でも、既存の非空の値を上書きしないよう扱う。生の値をそのまま書き込むと、同じファイル内の別キーが実際に変更されただけで未翻訳キーが空文字列に上書きされる、より発見しにくい不具合になる（実装レビューで発見。`research.md` のDecision参照）
 
@@ -240,6 +240,8 @@ flowchart TD
 ## Security Considerations
 
 - POEditor APIトークンは GitHub Actions の `secrets.POEDITOR_API_TOKEN` として注入し、コード・ログに平文で出力しない(`security.md`のSecret Management原則に準拠)
-- 同期ワークフローに付与するGitHub側の権限(`contents: write` / `pull-requests: write`)は同期ジョブに必要な範囲に限定し、他のワークフロー権限を流用しない
-- 「訳文のみ」PRを承認するボットID(専用GitHub Appのインストールトークン、または専用ボットアカウントのPAT)は、`secrets.I18N_SYNC_APPROVAL_TOKEN`のような専用シークレットとして注入し、他の用途と共有しない。このIDに付与する権限は「PRへの承認レビュー(pull-requests: write相当)」に限定し、`contents: write`のような書き込み権限は持たせない(承認だけができれば十分で、それ以上の権限は攻撃対象を広げるだけのため)
+- 「PRを作る identity」と「PRを承認する identity」は、2つの別々の GitHub App（publish 用・approval 用）として用意する。長期保存するのは各Appの秘密鍵（`secrets.I18N_SYNC_PUBLISH_APP_PRIVATE_KEY` / `secrets.I18N_SYNC_APPROVAL_APP_PRIVATE_KEY`）と App ID（非秘密の repository variables）のみで、短命な installation token は保存せず、ワークフロー実行のたびに `actions/create-github-app-token` でその場で発行する。publish 用 App には `contents: write` / `pull-requests: write`、approval 用 App には `pull-requests: write` のみを付与し、`contents: write` は持たせない（承認だけができれば十分で、それ以上の権限は攻撃対象を広げるだけのため）。詳細な手順は `docs/i18n-community-translation-setup.md` §4 を参照
+- 同期ワークフロー自体（`i18n-sync-push.yml` / `i18n-sync-pull.yml`）の既定の `GITHUB_TOKEN` は `permissions: contents: read` に限定する。実際の push・PR作成・承認は上記の App が発行したトークンで行うため、ワークフロー自身のデフォルトトークンに書き込み権限を持たせる必要はない
+- Appの秘密鍵登録が漏れていた場合に `|| secrets.GITHUB_TOKEN` のようなフォールバックへ静かに切り替わることを避けるため、token発行ステップにフォールバックは書かない。登録漏れはその場で失敗させる（`docs/i18n-community-translation-setup.md` §4.4）
+- 「訳文のみ」PRの軽量マージ経路（`.github/mergify.yml` の `i18n-sync-translation-only` キュー）は、publish App の秘密鍵が万一漏れた場合に任意のコードを含むPRが軽量経路に乗ることを防ぐため、`author = growi-i18n-pr-publisher[bot]` と、変更ファイルが `apps/app/public/static/locales/` 配下に限られることの両方で対象を絞る
 - POEditorから取り込む翻訳文字列はそのままJSONファイルへ書き込まれる。GROWI側での表示時のサニタイズは既存のi18next/Reactのレンダリング経路にすでに存在するため、本機能側で追加のサニタイズは行わない(Non-Goal)

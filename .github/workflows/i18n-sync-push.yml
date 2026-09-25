@@ -36,6 +36,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# This workflow only reads the checkout and calls the POEditor API with
+# POEDITOR_API_TOKEN; it never pushes, opens a PR, or otherwise writes to the
+# repository, so the default GITHUB_TOKEN is scoped to read-only.
+permissions:
+  contents: read
+
 jobs:
   i18n-sync-push:
     runs-on: ubuntu-latest
