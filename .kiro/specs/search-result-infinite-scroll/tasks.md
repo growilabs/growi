@@ -162,7 +162,7 @@
   - _Boundary: SearchPageBase, SearchResultList_
 
 - [ ] 9. Validation: 非回帰と実機確認
-- [ ] 9.1 非回帰の確認
+- [x] 9.1 非回帰の確認
   - 検索結果ページ・旧形式ページ一覧・行部品の利用箇所に関わる既存テスト、型チェック、lint を通す（旧形式ページ一覧の経路は既存の共通部品テスト〈番号ページャ・resetKey によるリセット〉で確認する）
   - 行ごとの操作（複製・リネーム・削除の一覧反映、先頭からの取り直しをしないこと）の既存テストが通ることを確認する
   - 完了時: `turbo run lint --filter @growi/app` と `turbo run test --filter @growi/app` がグリーン
@@ -197,3 +197,4 @@
 - 7.2(#190441): happy-dom はレイアウトしないため、仮想化のテストは `SearchPage/test-utils/virtual-list-layout-stub.ts`（`offsetHeight` / `offsetTop` をスタブ、テストごとに restore）を使う。スクロール要素は `overflow-y-scroll` クラスで判定する。推定行高 100px は実機（9.2）で確認する。
 - 7.3(#190441): 選択済み集合は同じ Set を書き換えて使うため、行が最新の状態を読むのは一覧が再描画されたときだけ。スクロールによる再マウントでは一覧が再描画されるので問題ない。8.1 の配線でも同じ Set インスタンスを渡し続けること。
 - 8.2(#190441): 既存の `PageListItemL` はチェックボックスが `role="button"`（`onClick`）の中にあるため、大画面ではチェックのクリックがプレビュー切り替えも起こす（09fe889bc7 から。本フィーチャー以前）。このとき直前のプレビュー行も再描画されるので、実機では要件 10.2 の字面上は 1 行多くなる。件数に依存しない（最大 1 行）ので要件 10 の目的は満たす。バブリングを止めるかどうかはユーザー判断（本スペックの範囲外）。
+- 9.1(#190441): dev サーバ（`turbo run dev`）起動中に `turbo run test --filter @growi/app` を実行すると `@growi/core#dev` のビルドが `dist` の削除で競合（ENOTEMPTY）し、`dist` が壊れる。`apps/app` で `pnpm run test` を直接実行する。`@growi/core` / `@growi/remark-drawio` 等の `dist` を再ビルドすると、typecheck のベースラインエラーは 0 件になった。`pnpm run lint` は exit 0。全体テストでは検索・PageList 関連はすべてグリーン。残る失敗は変更と無関係なサーバ側 integration（DB/ES 環境依存）と vault（vault-manager の dist 未ビルド）のみ。負荷下でタイムアウトした 3 件は単独実行でグリーン。
