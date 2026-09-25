@@ -218,24 +218,31 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     },
   }));
 
-  const checkboxChangedHandler = (isChecked: boolean, pageId: string) => {
-    if (pages == null || pages.length === 0) {
-      return;
-    }
+  // Memoized (no `onSelectedPagesByCheckboxesChanged` dep, read via ref) so a
+  // checkbox change does not hand every memoized row a new handler (Req 10.2).
+  const checkboxChangedHandler = useCallback(
+    (isChecked: boolean, pageId: string) => {
+      if (pages == null || pages.length === 0) {
+        return;
+      }
 
-    if (isChecked) {
-      selectedPageIdsByCheckboxes.add(pageId);
-    } else {
-      selectedPageIdsByCheckboxes.delete(pageId);
-    }
+      if (isChecked) {
+        selectedPageIdsByCheckboxes.add(pageId);
+      } else {
+        selectedPageIdsByCheckboxes.delete(pageId);
+      }
 
-    if (onSelectedPagesByCheckboxesChanged != null) {
-      onSelectedPagesByCheckboxesChanged(
+      onSelectedChangedRef.current?.(
         selectedPageIdsByCheckboxes.size,
         pages.length,
       );
-    }
-  };
+    },
+    [pages, selectedPageIdsByCheckboxes],
+  );
+
+  const previewedPageDeletedHandler = useCallback(() => {
+    setSelectedPageWithMeta(undefined);
+  }, []);
 
   // The last `pages` reference effect (b) below has actually processed. Used to
   // detect a `keepPreviousData` (legacy number-pager) holdover: when `resetKey`
@@ -351,6 +358,13 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
           ?.map((keyword) => keyword.replace(/^"(.*)"$/, '$1')) ?? undefined)
       : undefined;
 
+  // -1 (unknown total, WAI-ARIA) while more results can still be loaded, so a
+  // screen reader is not told a smaller count than there is.
+  const listSize =
+    infiniteScroll != null && !infiniteScroll.isReachingEnd
+      ? -1
+      : pages?.length;
+
   // Selection wiring on SearchResultList is IDENTICAL across the infinite-scroll
   // and legacy branches; only the wrapping (InfiniteScroll vs. numbered pager)
   // differs (P3-5: computed here instead of an IIFE inside the JSX below).
@@ -361,11 +375,13 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
         pages={pages}
         scrollElement={scrollElement}
         selectedPageId={selectedPageWithMeta?.data._id}
+        selectedPageIds={selectedPageIdsByCheckboxes}
+        listSize={listSize}
         forceHideMenuItems={forceHideMenuItems}
-        onPageSelected={(page) => setSelectedPageWithMeta(page)}
+        onPageSelected={setSelectedPageWithMeta}
         onCheckboxChanged={checkboxChangedHandler}
         onItemMutated={onItemMutated}
-        onPreviewedPageDeleted={() => setSelectedPageWithMeta(undefined)}
+        onPreviewedPageDeleted={previewedPageDeletedHandler}
       />
     </div>
   );

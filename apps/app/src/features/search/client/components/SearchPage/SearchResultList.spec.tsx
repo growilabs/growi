@@ -18,6 +18,7 @@ type CapturedPageListItemLProps = {
   page: IPageWithSearchMeta;
   listItemRef?: React.Ref<HTMLLIElement>;
   listItemIndex?: number;
+  listSize?: number;
   isSelected?: boolean;
   isInitiallyChecked?: boolean;
   onPageDuplicated?: (fromPath: string, toPath: string) => void;
@@ -83,6 +84,7 @@ vi.mock('~/client/components/PageList/PageListItemL', () => ({
           <li
             ref={props.listItemRef}
             data-index={props.listItemIndex}
+            aria-setsize={props.listSize}
             className={props.isSelected ? 'active' : undefined}
           >
             <input
@@ -550,6 +552,28 @@ describe('SearchResultList virtualization', () => {
     expect(renderRowCount()).toBe(
       rowCountWithoutHeader - headerHeight / ROW_HEIGHT,
     );
+  });
+
+  it('gives each row the list size from listSize, or the loaded count by default', () => {
+    const pages = createPages(30);
+    const setSizesOfRows = (): string[] =>
+      screen
+        .getAllByRole('listitem')
+        .map((row) => row.getAttribute('aria-setsize') ?? '');
+
+    const { rerender } = render(
+      <SearchResultList scrollElement={layout.scrollElement} pages={pages} />,
+    );
+    expect(new Set(setSizesOfRows())).toEqual(new Set(['30']));
+
+    rerender(
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={pages}
+        listSize={-1}
+      />,
+    );
+    expect(new Set(setSizesOfRows())).toEqual(new Set(['-1']));
   });
 
   it('renders no rows until the scroll element is available', () => {

@@ -98,8 +98,12 @@ const searchResultListSpy = vi.hoisted(() => ({
     | {
         selectedPageId?: string;
         pages: IPageWithSearchMeta[];
+        scrollElement: HTMLElement | null;
+        selectedPageIds?: ReadonlySet<string>;
+        listSize?: number;
         onPageSelected?: (page?: IPageWithSearchMeta) => void;
         onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
+        onPreviewedPageDeleted?: () => void;
       }
     | undefined,
 }));
@@ -113,8 +117,12 @@ vi.mock('./SearchResultList', () => ({
     {
       selectedPageId?: string;
       pages: IPageWithSearchMeta[];
+      scrollElement: HTMLElement | null;
+      selectedPageIds?: ReadonlySet<string>;
+      listSize?: number;
       onPageSelected?: (page?: IPageWithSearchMeta) => void;
       onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
+      onPreviewedPageDeleted?: () => void;
     }
   >((props, ref) => {
     searchResultListSpy.lastProps = props;
@@ -745,6 +753,223 @@ describe('SearchPageBase infinite-scroll rendering slot', () => {
     );
 
     expect(queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+});
+
+// #190441: SearchResultList renders only the rows around the viewport and
+// memoizes each row, so SearchPageBase must hand it stable handlers, the live
+// selection Set and the row count for `aria-setsize`.
+describe('SearchPageBase wiring for the virtualized result list', () => {
+  const createPages = (count: number): IPageWithSearchMeta[] =>
+    Array.from({ length: count }, (_, i) => createPage(`p${i}`));
+
+  beforeEach(() => {
+    searchResultListSpy.lastProps = undefined;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('hands the scroll container to the list once mounted', () => {
+    render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(2)}
+        {...noopControls}
+      />,
+    );
+
+    const scrollElement = searchResultListSpy.lastProps?.scrollElement;
+    expect(scrollElement).toBeInstanceOf(HTMLElement);
+    expect(scrollElement?.classList.contains('overflow-y-scroll')).toBe(true);
+  });
+
+  it('keeps passing the same live selection Set across preview switches, checkbox changes and appends', () => {
+    const ref = createRef<SelectableRef>();
+    const pages = createPages(3);
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={pages}
+        {...noopControls}
+      />,
+    );
+    const initialSet = searchResultListSpy.lastProps?.selectedPageIds;
+    expect(initialSet).toBeDefined();
+
+    act(() => {
+      searchResultListSpy.lastProps?.onPageSelected?.(pages[1]);
+    });
+    act(() => {
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'p2');
+    });
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={[...pages, createPage('p3')]}
+        {...noopControls}
+      />,
+    );
+
+    const currentSet = searchResultListSpy.lastProps?.selectedPageIds;
+    expect(currentSet).toBe(initialSet);
+    // It is the live selection, so remounted rows see the current state.
+    expect(currentSet?.has('p2')).toBe(true);
+    expect(ref.current?.getSelectedPageIds?.()).toBe(currentSet);
+  });
+
+  it('keeps the row handlers identical across a preview switch and a checkbox change', () => {
+    const pages = createPages(3);
+
+    render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={pages}
+        onSelectedPagesByCheckboxesChanged={vi.fn()}
+        {...noopControls}
+      />,
+    );
+    const before = searchResultListSpy.lastProps;
+    expect(before?.onPageSelected).toBeDefined();
+    expect(before?.onCheckboxChanged).toBeDefined();
+    expect(before?.onPreviewedPageDeleted).toBeDefined();
+
+    act(() => {
+      before?.onPageSelected?.(pages[2]);
+    });
+    // The preview switch did re-render the list with the new preview.
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('p2');
+    act(() => {
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'p1');
+    });
+
+    const after = searchResultListSpy.lastProps;
+    expect(after?.onPageSelected).toBe(before?.onPageSelected);
+    expect(after?.onCheckboxChanged).toBe(before?.onCheckboxChanged);
+    expect(after?.onPreviewedPageDeleted).toBe(before?.onPreviewedPageDeleted);
+  });
+
+  it('still clears the preview through the stable onPreviewedPageDeleted handler', () => {
+    const pages = createPages(2);
+
+    render(
+      <SearchPageBase resetKey="search-1" pages={pages} {...noopControls} />,
+    );
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('p0');
+
+    act(() => {
+      searchResultListSpy.lastProps?.onPreviewedPageDeleted?.();
+    });
+
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBeUndefined();
+  });
+
+  it('counts and bulk-deletes selections of rows the list does not render (Req 9.3)', () => {
+    const ref = createRef<SelectableRef>();
+    const onChanged = vi.fn();
+    const pages = createPages(300);
+
+    render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={pages}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    // A row near the top and one far below any rendered range.
+    act(() => {
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'p0');
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'p250');
+    });
+    expect(onChanged).toHaveBeenLastCalledWith(2, 300);
+
+    const { result } = renderHook(() =>
+      usePageDeleteModalForBulkDeletion(pages, ref),
+    );
+    act(() => {
+      result.current();
+    });
+    expect(deleteModalSpy.open).toHaveBeenCalledWith(
+      [pages[0], pages[250]],
+      expect.anything(),
+    );
+  });
+
+  it('selectAll selects every loaded page even though the list reaches only mounted rows (Req 9.2)', () => {
+    const ref = createRef<SelectableRef>();
+
+    render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={createPages(300)}
+        {...noopControls}
+      />,
+    );
+
+    act(() => {
+      ref.current?.selectAll();
+    });
+
+    expect(ref.current?.getSelectedPageIds?.().size).toBe(300);
+    expect(searchResultListSpy.lastProps?.selectedPageIds?.has('p299')).toBe(
+      true,
+    );
+  });
+
+  it('passes an unknown list size (-1) while more results can still be loaded', () => {
+    render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(20)}
+        infiniteScroll={createInfiniteScrollProps({ isReachingEnd: false })}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.listSize).toBe(-1);
+  });
+
+  it('passes the loaded count as the list size once the end is reached', () => {
+    const { rerender } = render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(20)}
+        infiniteScroll={createInfiniteScrollProps({ isReachingEnd: false })}
+        {...noopControls}
+      />,
+    );
+
+    rerender(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(25)}
+        infiniteScroll={createInfiniteScrollProps({ isReachingEnd: true })}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.listSize).toBe(25);
+  });
+
+  it('passes the loaded count as the list size on the legacy pager path', () => {
+    render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(20)}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.listSize).toBe(20);
   });
 });
 

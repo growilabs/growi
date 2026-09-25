@@ -56,6 +56,9 @@ type Props = {
   // back into range remount and take their initial checkbox state from it, so
   // the caller must keep it current (selectAll/deselectAll reach mounted rows only).
   selectedPageIds?: ReadonlySet<string>;
+  // Each row's `aria-setsize`: -1 while the total is still unknown. Defaults to
+  // the loaded count.
+  listSize?: number;
   forceHideMenuItems?: ForceHideMenuItems;
   onPageSelected?: (page?: IPageWithSearchMeta) => void;
   onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
@@ -84,6 +87,7 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
     scrollElement,
     selectedPageId,
     selectedPageIds,
+    listSize = pages.length,
     forceHideMenuItems,
     onPageSelected,
     onItemMutated,
@@ -311,7 +315,7 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
               ref={getItemRefCallback(page.data._id)}
               listItemRef={virtualizer.measureElement}
               listItemIndex={virtualItem.index}
-              listSize={pages.length}
+              listSize={listSize}
               page={page}
               isEnableActions={!isGuestUser}
               isReadOnlyUser={!!isReadOnlyUser}
