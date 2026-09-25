@@ -21,6 +21,12 @@ export interface TruncatedPagePath {
   readonly parts: readonly PagePathPart[];
   /** Normalized full path, used for the hover tooltip. */
   readonly fullPath: string;
+  /**
+   * Ancestor portion of the path as split with trailing-date bundling
+   * (`DevidedPagePath.former`), so callers can walk the ancestors without
+   * re-parsing the same path.
+   */
+  readonly ancestorPath: string;
 }
 
 const toSegment = (text: string, isPageName: boolean): PagePathPart => ({
@@ -48,7 +54,12 @@ export const formatTruncatedPagePath = (path: string): TruncatedPagePath => {
   const devided = new DevidedPagePath(path, false, true);
 
   if (devided.isRoot) {
-    return { isRoot: true, parts: [], fullPath: '/' };
+    return {
+      isRoot: true,
+      parts: [],
+      fullPath: '/',
+      ancestorPath: devided.former,
+    };
   }
 
   const pageName = devided.latter;
@@ -59,6 +70,7 @@ export const formatTruncatedPagePath = (path: string): TruncatedPagePath => {
   // Display units = ancestor segments + the page name.
   const units = ancestors.length + 1;
   const fullPath = normalizePath(path);
+  const ancestorPath = devided.former;
 
   if (units <= MAX_UNITS_WITHOUT_TRUNCATION) {
     return {
@@ -68,6 +80,7 @@ export const formatTruncatedPagePath = (path: string): TruncatedPagePath => {
         toSegment(pageName, true),
       ],
       fullPath,
+      ancestorPath,
     };
   }
 
@@ -82,5 +95,6 @@ export const formatTruncatedPagePath = (path: string): TruncatedPagePath => {
       toSegment(pageName, true),
     ],
     fullPath,
+    ancestorPath,
   };
 };

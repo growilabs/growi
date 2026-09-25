@@ -1,10 +1,11 @@
-import type { ForwardRefRenderFunction, JSX } from 'react';
+import type { ForwardRefRenderFunction, JSX, ReactNode } from 'react';
 import React, {
   forwardRef,
   memo,
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -25,6 +26,7 @@ import { Input } from 'reactstrap';
 
 import type { ISelectable } from '~/client/interfaces/selectable-all';
 import { bookmark, unbookmark, unlink } from '~/client/services/page-operation';
+import { buildHighlightedPageName } from '~/client/util/align-highlighted-path-segments';
 import { toastError } from '~/client/util/toastr';
 import type { IPageSearchMeta, IPageWithSearchMeta } from '~/interfaces/search';
 import { isIPageSearchMeta } from '~/interfaces/search';
@@ -47,6 +49,15 @@ import { useSWRMUTxPageInfo, useSWRxPageInfo } from '../../../stores/page';
 import type { ForceHideMenuItems } from '../Common/Dropdown/PageItemControl';
 import { PageItemControl } from '../Common/Dropdown/PageItemControl';
 
+/**
+ * Renders the single-line, middle-truncated ancestor path of a row. Injected by
+ * the caller so this shared component does not depend on a feature module.
+ */
+export type TruncatedAncestorPathRenderer = (
+  path: string,
+  highlightedPath?: string | null,
+) => ReactNode;
+
 type Props = {
   page:
     | IPageWithSearchMeta
@@ -56,6 +67,7 @@ type Props = {
   isReadOnlyUser: boolean;
   forceHideMenuItems?: ForceHideMenuItems;
   showPageUpdatedTime?: boolean; // whether to show page's updated time at the top-right corner of item
+  renderTruncatedAncestorPath?: TruncatedAncestorPathRenderer; // opt-in: render the ancestor path with this and bundle trailing dates into the page name (see design.md Requirement 7-9)
   onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
   onClickItem?: (pageId: string) => void;
   onPageDuplicated?: OnDuplicatedFunction;
@@ -81,7 +93,10 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
     onPageRenamed,
     onPageDeleted,
     onPagePutBacked,
+    renderTruncatedAncestorPath,
   } = props;
+
+  const isPathTruncationEnabled = renderTruncatedAncestorPath != null;
 
   const { returnPathForURL } = pathUtils;
 
@@ -130,19 +145,29 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
     ? pageMeta.revisionShortBody
     : null;
 
-  const dPagePath: DevidedPagePath = new DevidedPagePath(pageData.path, false);
-  const linkedPagePathFormer = new LinkedPagePath(dPagePath.former);
+  const highlightedPath = elasticSearchResult?.highlightedPath;
 
-  const dPagePathHighlighted: DevidedPagePath = new DevidedPagePath(
-    elasticSearchResult?.highlightedPath || pageData.path,
-    true,
-  );
-  const linkedPagePathHighlightedFormer = new LinkedPagePath(
-    dPagePathHighlighted.former,
-  );
-  const linkedPagePathHighlightedLatter = new LinkedPagePath(
-    dPagePathHighlighted.latter,
-  );
+  // Memoized so PagePathHierarchicalLink (memo) receives stable props.
+  const { pageName, legacyAncestorPath } = useMemo(() => {
+    if (isPathTruncationEnabled) {
+      return {
+        pageName: buildHighlightedPageName(pageData.path, highlightedPath),
+        legacyAncestorPath: null,
+      };
+    }
+    const dPagePath = new DevidedPagePath(pageData.path, false);
+    const dPagePathHighlighted = new DevidedPagePath(
+      highlightedPath || pageData.path,
+      true,
+    );
+    return {
+      pageName: new LinkedPagePath(dPagePathHighlighted.latter).pathName,
+      legacyAncestorPath: {
+        linkedPagePath: new LinkedPagePath(dPagePath.former),
+        linkedPagePathByHtml: new LinkedPagePath(dPagePathHighlighted.former),
+      },
+    };
+  }, [isPathTruncationEnabled, pageData.path, highlightedPath]);
 
   const lastUpdateDate = format(
     new Date(pageData.updatedAt),
@@ -272,13 +297,30 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
               </div>
             )}
 
-            <div className="flex-grow-1 px-2 px-md-4">
+            <div
+              className="flex-grow-1 px-2 px-md-4"
+              // Every flex ancestor of the truncated path needs min-width:0 to shrink
+              // (see page-path-truncation tasks.md, Task 5).
+              style={isPathTruncationEnabled ? { minWidth: 0 } : undefined}
+            >
               <div className="d-flex justify-content-between">
                 {/* page path */}
-                <PagePathHierarchicalLink
-                  linkedPagePath={linkedPagePathFormer}
-                  linkedPagePathByHtml={linkedPagePathHighlightedFormer}
-                />
+                {legacyAncestorPath == null ? (
+                  // min-width:0 enables the 1-line ellipsis (no Bootstrap utility for it).
+                  <span className="flex-grow-1" style={{ minWidth: 0 }}>
+                    {renderTruncatedAncestorPath?.(
+                      pageData.path,
+                      highlightedPath,
+                    )}
+                  </span>
+                ) : (
+                  <PagePathHierarchicalLink
+                    linkedPagePath={legacyAncestorPath.linkedPagePath}
+                    linkedPagePathByHtml={
+                      legacyAncestorPath.linkedPagePathByHtml
+                    }
+                  />
+                )}
                 {showPageUpdatedTime && (
                   <span className="page-list-updated-at text-muted">
                     Last update: {lastUpdateDate}
@@ -304,11 +346,11 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
                           <span
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight markup is sanitized
                             dangerouslySetInnerHTML={{
-                              __html: linkedPagePathHighlightedLatter.pathName,
+                              __html: pageName,
                             }}
                           />
                         ) : (
-                          linkedPagePathHighlightedLatter.pathName
+                          pageName
                         )}
                       </Link>
                     </span>
