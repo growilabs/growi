@@ -41,9 +41,15 @@ queue_rules:
     queue_conditions:
       - check-success ~= ci-app-lint
       - -check-failure ~= ci-app-lint
+      # Enforces the "diff is always a subset of locale JSON" assumption
+      # this queue relies on, rather than just asserting it in the comment
+      # above: a PR containing any file outside that path cannot enter this
+      # queue, regardless of who authored it or how the branch was made.
+      - -files~=^(?!apps/app/public/static/locales/)
     merge_conditions:
       - check-success ~= ci-app-lint
       - -check-failure ~= ci-app-lint
+      - -files~=^(?!apps/app/public/static/locales/)
 
 pull_request_rules:
   - name: Automatic queue to merge
