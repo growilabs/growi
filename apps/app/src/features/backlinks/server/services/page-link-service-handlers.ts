@@ -3,6 +3,8 @@ import { getIdForRef } from '@growi/core';
 import mongoose, { type Types } from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
+import { BULK_REINDEX_SIZE } from '~/server/service/page/consts';
+import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import { extractInternalLinkPaths } from './extract-internal-link-paths';
@@ -12,6 +14,10 @@ import {
   syncOutboundLinks,
 } from './page-link-sync';
 import { resolveToPageIds } from './target-page-resolution';
+
+const logger = loggerFactory(
+  'growi:features:backlinks:page-link-service-handlers',
+);
 
 // The only caller reads the page with a projection and never populates, so the revision is always
 // a ref here.
@@ -81,12 +87,26 @@ export const handlePageUpsertById = async (
 };
 
 /**
- * Reconciles deleted pages.
+ * Reconciles deleted pages in chunks of `BULK_REINDEX_SIZE`, the batch size `removeLinksForPages`
+ * requires. Group deletion hands `syncDescendantsDelete` every affected page at once, so a
+ * payload is not bounded on its own. A failed chunk is logged and the rest still settle.
  *
  * @param pageIds - Page IDs of pages that have been deleted.
  */
 export const handlePagesDelete = async (
   pageIds: Types.ObjectId[],
 ): Promise<void> => {
-  await reconcileDeletedPages(pageIds);
+  for (let i = 0; i < pageIds.length; i += BULK_REINDEX_SIZE) {
+    const chunk = pageIds.slice(i, i + BULK_REINDEX_SIZE);
+
+    try {
+      // biome-ignore lint/performance/noAwaitInLoops: one bounded command at a time is the point
+      await reconcileDeletedPages(chunk);
+    } catch (err) {
+      logger.error(
+        { err, pageIds: chunk },
+        'backlinks delete reconcile failed',
+      );
+    }
+  }
 };
