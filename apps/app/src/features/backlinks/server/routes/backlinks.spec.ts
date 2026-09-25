@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => {
     accessTokenParser: vi.fn(() => passthrough),
     loginRequiredFactory: vi.fn(() => passthrough),
     isPageReadableByViewer: vi.fn(),
+    findUserGroupIdsForViewer: vi.fn(),
   };
 });
 
@@ -34,10 +35,16 @@ vi.mock('~/server/middlewares/login-required', () => ({
   default: mocks.loginRequiredFactory,
 }));
 
-// The grant check itself is Page.countByIdAndViewer's contract; what this endpoint owns
-// is refusing to answer for a page the viewer cannot read.
+// The grant check itself is Page.isAccessiblePageByViewer's contract; what this endpoint
+// owns is refusing to answer for a page the viewer cannot read.
 vi.mock('../services/is-page-readable-by-viewer', () => ({
   isPageReadableByViewer: mocks.isPageReadableByViewer,
+}));
+
+// The group lookup is its own module's contract (find-user-group-ids-for-viewer.integ.ts);
+// what this endpoint owns is resolving it once and sharing it between both reads.
+vi.mock('../services/find-user-group-ids-for-viewer', () => ({
+  findUserGroupIdsForViewer: mocks.findUserGroupIdsForViewer,
 }));
 
 // Imported after the middleware mocks so the route picks up the passthroughs.
@@ -93,6 +100,7 @@ describe('GET /page/backlinks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isPageReadableByViewer.mockResolvedValue(true);
+    mocks.findUserGroupIdsForViewer.mockResolvedValue(null);
   });
 
   describe('success', () => {
@@ -180,6 +188,36 @@ describe('GET /page/backlinks', () => {
 
       const [, user] = mocks.isPageReadableByViewer.mock.calls[0];
       expect(user ?? null).toBeNull();
+    });
+  });
+
+  describe('viewer groups', () => {
+    it("looks the viewer's groups up once and hands the same ids to both reads", async () => {
+      const groupIds = ['507f1f77bcf86cd799439031', '507f1f77bcf86cd799439032'];
+      mocks.findUserGroupIdsForViewer.mockResolvedValue(groupIds);
+      findBacklinks.mockResolvedValue([]);
+      const viewer = mock<Viewer>();
+
+      await get(buildApp(viewer), { pageId: validPageId });
+
+      expect(mocks.findUserGroupIdsForViewer).toHaveBeenCalledTimes(1);
+      const [lookedUpFor] = mocks.findUserGroupIdsForViewer.mock.calls[0];
+      expect(lookedUpFor).toBe(viewer);
+
+      const [, , groupsForReadability] =
+        mocks.isPageReadableByViewer.mock.calls[0];
+      const [, , groupsForBacklinks] = findBacklinks.mock.calls[0];
+      expect(groupsForReadability).toBe(groupIds);
+      expect(groupsForBacklinks).toBe(groupIds);
+    });
+
+    it('answers 500 without querying the service when the group lookup fails', async () => {
+      mocks.findUserGroupIdsForViewer.mockRejectedValue(new Error('db down'));
+
+      const res = await get(buildApp(mock<Viewer>()), { pageId: validPageId });
+
+      expect(res.status).toBe(500);
+      expect(findBacklinks).not.toHaveBeenCalled();
     });
   });
 
