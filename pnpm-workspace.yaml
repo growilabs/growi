@@ -48,17 +48,6 @@ overrides:
   '@lezer/common': ^1.5.2
   '@lezer/lr': ^1.4.10
   '@codemirror/language': ^6.12.3
-  # Dedupe @codemirror/state and @codemirror/view to a single copy each. CodeMirror
-  # flattens an extension set with `instanceof` checks against its own StateEffect/
-  # Facet classes; when a transitive consumer pulls a second copy of @codemirror/state
-  # alongside our direct one, those checks fail across the copy boundary and CodeMirror
-  # throws "Unrecognized extension value in extension set" (growilabs/growi#11849).
-  # A dependabot-regenerated lockfile has already reintroduced this twice (bumping
-  # @codemirror/state to 6.7.4 via #11846-family PRs, then to 6.7.5 via #11888 bumping
-  # `next`) even though direct deps pin ^6.6.0 — nothing here forced a single resolution
-  # the way the @lezer/@codemirror/language pins above do for their packages.
-  '@codemirror/state': ^6.7.1
-  '@codemirror/view': ^6.43.9
 
 packageExtensions:
   # @orval/core bundles @stoplight/json-ref-resolver which requires lodash/get at runtime,
