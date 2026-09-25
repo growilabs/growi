@@ -475,4 +475,39 @@ describe('PageLinkUpsertQueue (abandoning deleted pages)', () => {
 
     expect(idsExtracted()).toEqual([pageId]);
   });
+
+  it('does not retry a page abandoned while its own extraction was in flight', async () => {
+    // The abandon runs inside the mock because that is the only point where the drain has already
+    // taken the id off the dirty set but not yet seen the call's outcome.
+    const queue = createQueue();
+    const deleted = new Types.ObjectId().toString();
+    mocks.handlePageUpsertById.mockImplementationOnce(() => {
+      queue.abandon([deleted]);
+      return Promise.reject(new Error('transient'));
+    });
+
+    queue.enqueue(deleted);
+    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS + RETRY_BACKOFF_MS * 4);
+
+    expect(idsExtracted()).toEqual([deleted]);
+  });
+
+  it('keeps retrying a page saved again after being abandoned mid-flight', async () => {
+    // The save re-queues the id, so the drain revisits it either way; only a second failure shows
+    // whether that save lifted the abandonment, since a still-abandoned id would then be dropped.
+    const queue = createQueue();
+    const pageId = new Types.ObjectId().toString();
+    mocks.handlePageUpsertById
+      .mockImplementationOnce(() => {
+        queue.abandon([pageId]);
+        queue.enqueue(pageId);
+        return Promise.reject(new Error('transient'));
+      })
+      .mockRejectedValueOnce(new Error('transient'));
+
+    queue.enqueue(pageId);
+    await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS + RETRY_BACKOFF_MS * 4);
+
+    expect(idsExtracted()).toEqual([pageId, pageId, pageId]);
+  });
 });
