@@ -3,7 +3,14 @@ import type {
   ForwardRefRenderFunction,
   RefAttributes,
 } from 'react';
-import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+} from 'react';
 import {
   type IPageInfoForListing,
   type IPageWithMeta,
@@ -82,25 +89,56 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
     true,
   );
 
-  const itemsRef = useRef<(ISelectable | null)[]>([]);
+  // Mounted rows keyed by pageId. Each row gets a ref callback created once per
+  // pageId: PageListItemL is `memo(forwardRef(...))`, and React compares `ref`
+  // identity too, so an inline callback would re-render every row every time.
+  // The callback must outlive null calls: PageListItemL's no-deps
+  // useImperativeHandle detaches (null) and re-attaches the ref on every
+  // re-render of the row, not only on unmount.
+  const itemsRef = useRef(new Map<string, ISelectable>());
+  const itemRefCallbacksRef = useRef(
+    new Map<string, (item: ISelectable | null) => void>(),
+  );
+
+  const getItemRefCallback = useCallback((pageId: string) => {
+    const callbacks = itemRefCallbacksRef.current;
+    const existing = callbacks.get(pageId);
+    if (existing != null) {
+      return existing;
+    }
+
+    const callback = (item: ISelectable | null) => {
+      if (item != null) {
+        itemsRef.current.set(pageId, item);
+        return;
+      }
+      itemsRef.current.delete(pageId);
+    };
+    callbacks.set(pageId, callback);
+    return callback;
+  }, []);
+
+  // Bound the callback cache to the rows that can still be rendered.
+  useEffect(() => {
+    const pageIds = new Set(pages.map((page) => page.data._id));
+    itemRefCallbacksRef.current.forEach((_callback, pageId) => {
+      if (!pageIds.has(pageId)) {
+        itemRefCallbacksRef.current.delete(pageId);
+      }
+    });
+  }, [pages]);
 
   // publish selectAll()
   useImperativeHandle(ref, () => ({
     selectAll: () => {
-      const items = itemsRef.current;
-      if (items != null) {
-        items.forEach((item) => {
-          item?.select();
-        });
-      }
+      itemsRef.current.forEach((item) => {
+        item.select();
+      });
     },
     deselectAll: () => {
-      const items = itemsRef.current;
-      if (items != null) {
-        items.forEach((item) => {
-          item?.deselect();
-        });
-      }
+      itemsRef.current.forEach((item) => {
+        item.deselect();
+      });
     },
   }));
 
@@ -114,31 +152,35 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
     [onPageSelected, pages],
   );
 
-  let injectedPages:
-    | (
-        | IPageWithSearchMeta
-        | IPageWithMeta<IPageInfoForListing & IPageSearchMeta>
-      )[]
-    | undefined;
   // inject data to list
-  if (idToPageInfo != null) {
-    injectedPages = pages.map((page) => {
-      const pageInfo = idToPageInfo[page.data._id];
+  const injectedPages = useMemo(() => {
+    if (idToPageInfo == null) {
+      return undefined;
+    }
 
-      if (!isIPageInfoForListing(pageInfo)) {
-        // return as is
-        return page;
-      }
+    return pages.map(
+      (
+        page,
+      ):
+        | IPageWithSearchMeta
+        | IPageWithMeta<IPageInfoForListing & IPageSearchMeta> => {
+        const pageInfo = idToPageInfo[page.data._id];
 
-      return {
-        data: page.data,
-        meta: {
-          ...page.meta,
-          ...pageInfo,
-        },
-      } satisfies IPageWithMeta<IPageInfoForListing & IPageSearchMeta>;
-    });
-  }
+        if (!isIPageInfoForListing(pageInfo)) {
+          // return as is
+          return page;
+        }
+
+        return {
+          data: page.data,
+          meta: {
+            ...page.meta,
+            ...pageInfo,
+          },
+        } satisfies IPageWithMeta<IPageInfoForListing & IPageSearchMeta>;
+      },
+    );
+  }, [pages, idToPageInfo]);
 
   const duplicatedHandler = useCallback(
     (fromPath, _toPath) => {
@@ -163,6 +205,13 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
     [t, onItemMutated],
   );
 
+  // Read by deletedHandler instead of listing them as deps: otherwise every
+  // preview switch would hand a new handler to (and so re-render) every row.
+  const latestPagesRef = useRef(pages);
+  latestPagesRef.current = pages;
+  const latestSelectedPageIdRef = useRef(selectedPageId);
+  latestSelectedPageIdRef.current = selectedPageId;
+
   const deletedHandler = useCallback(
     (pathOrPathsToDelete, isRecursively, isCompletely) => {
       if (typeof pathOrPathsToDelete !== 'string') {
@@ -185,14 +234,14 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
         isRecursively: isRecursively === true,
       });
 
-      const previewedPage = pages.find(
-        (page) => page.data._id === selectedPageId,
+      const previewedPage = latestPagesRef.current.find(
+        (page) => page.data._id === latestSelectedPageIdRef.current,
       );
       if (previewedPage?.data.path === path) {
         onPreviewedPageDeleted?.();
       }
     },
-    [t, onItemMutated, onPreviewedPageDeleted, pages, selectedPageId],
+    [t, onItemMutated, onPreviewedPageDeleted],
   );
 
   return (
@@ -200,13 +249,11 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
       data-testid="search-result-list"
       className="page-list-ul list-group list-group-flush"
     >
-      {(injectedPages ?? pages).map((page, i) => {
+      {(injectedPages ?? pages).map((page) => {
         return (
           <PageListItemL
             key={page.data._id}
-            ref={(c) => {
-              itemsRef.current[i] = c;
-            }}
+            ref={getItemRefCallback(page.data._id)}
             page={page}
             isEnableActions={!isGuestUser}
             isReadOnlyUser={!!isReadOnlyUser}

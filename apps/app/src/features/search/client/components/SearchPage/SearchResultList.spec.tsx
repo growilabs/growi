@@ -1,9 +1,14 @@
 import React from 'react';
 import type { IPageHasId } from '@growi/core';
+import type { IPageInfoForListing } from '@growi/core/dist/interfaces';
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
+import type {
+  ISelectable,
+  ISelectableAll,
+} from '~/client/interfaces/selectable-all';
 import type { IPageWithSearchMeta } from '~/interfaces/search';
 
 // --- Capture the props PageListItemL receives, and allow invoking its
@@ -25,24 +30,52 @@ const pageListItemLSpy = vi.hoisted(() => ({
   // (e.g. "delete row b while row a is previewed") without one row's props
   // clobbering another's.
   propsByPageId: new Map<string, CapturedPageListItemLProps>(),
+  renderCountByPageId: new Map<string, number>(),
+  selectCallsByPageId: new Map<string, number>(),
+  deselectCallsByPageId: new Map<string, number>(),
   get lastProps(): CapturedPageListItemLProps | undefined {
     return [...pageListItemLSpy.propsByPageId.values()].at(-1);
   },
+  clear(): void {
+    pageListItemLSpy.propsByPageId.clear();
+    pageListItemLSpy.renderCountByPageId.clear();
+    pageListItemLSpy.selectCallsByPageId.clear();
+    pageListItemLSpy.deselectCallsByPageId.clear();
+  },
 }));
 
+const increment = (counts: Map<string, number>, pageId: string): void => {
+  counts.set(pageId, (counts.get(pageId) ?? 0) + 1);
+};
+
+// Mirrors the real component's `memo(forwardRef(...))`: a row re-renders only
+// when one of its props (including `ref`) changes identity.
 vi.mock('~/client/components/PageList/PageListItemL', () => ({
-  PageListItemL: React.forwardRef(
-    (props: CapturedPageListItemLProps, _ref: React.Ref<unknown>) => {
-      pageListItemLSpy.propsByPageId.set(props.page.data._id, props);
-      return null;
-    },
+  PageListItemL: React.memo(
+    React.forwardRef(
+      (props: CapturedPageListItemLProps, ref: React.Ref<ISelectable>) => {
+        const pageId = props.page.data._id;
+        pageListItemLSpy.propsByPageId.set(pageId, props);
+        increment(pageListItemLSpy.renderCountByPageId, pageId);
+        React.useImperativeHandle(ref, () => ({
+          select: () => increment(pageListItemLSpy.selectCallsByPageId, pageId),
+          deselect: () =>
+            increment(pageListItemLSpy.deselectCallsByPageId, pageId),
+        }));
+        return null;
+      },
+    ),
   ),
+}));
+
+const pageInfoStub = vi.hoisted(() => ({
+  idToPageInfo: undefined as Record<string, unknown> | undefined,
 }));
 
 vi.mock('~/stores/page-listing', () => ({
   mutatePageTree: vi.fn(),
   mutateRecentlyUpdated: vi.fn(),
-  useSWRxPageInfoForList: vi.fn(() => ({ data: undefined })),
+  useSWRxPageInfoForList: vi.fn(() => ({ data: pageInfoStub.idToPageInfo })),
 }));
 
 const mutateSearchingSpy = vi.hoisted(() => vi.fn());
@@ -59,8 +92,11 @@ vi.mock('~/client/util/toastr', () => ({
   toastSuccess: vi.fn(),
 }));
 
+// Stable across renders like the real (memoized) `t`, so handlers depending on
+// it keep their identity and the row memo can be observed.
+const translate = vi.hoisted(() => (key: string) => key);
 vi.mock('next-i18next', () => ({
-  useTranslation: vi.fn(() => ({ t: (key: string) => key })),
+  useTranslation: vi.fn(() => ({ t: translate })),
 }));
 
 import { SearchResultList } from './SearchResultList';
@@ -77,7 +113,7 @@ const createPage = (id: string): IPageWithSearchMeta =>
 // mutateSearching()), so the caller can update rows without re-fetching.
 describe('SearchResultList item-mutation wiring (A-1)', () => {
   beforeEach(() => {
-    pageListItemLSpy.propsByPageId.clear();
+    pageListItemLSpy.clear();
     vi.clearAllMocks();
   });
 
@@ -169,7 +205,7 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
 // caller to clear it.
 describe('SearchResultList onPreviewedPageDeleted wiring', () => {
   beforeEach(() => {
-    pageListItemLSpy.propsByPageId.clear();
+    pageListItemLSpy.clear();
     vi.clearAllMocks();
   });
 
@@ -221,5 +257,106 @@ describe('SearchResultList onPreviewedPageDeleted wiring', () => {
       ?.onPageDeleted?.('/page/a', false, false);
 
     expect(onPreviewedPageDeleted).not.toHaveBeenCalled();
+  });
+});
+
+// Req 10.1: switching the previewed page must not re-render unrelated rows.
+// PageListItemL is memo'd, so this holds only while every prop SearchResultList
+// passes to a row (page, ref, handlers) keeps its identity across the switch.
+describe('SearchResultList row re-render scope on preview switch (Req 10.1)', () => {
+  const pages = ['a', 'b', 'c', 'd'].map(createPage);
+
+  beforeEach(() => {
+    pageListItemLSpy.clear();
+    pageInfoStub.idToPageInfo = undefined;
+    vi.clearAllMocks();
+  });
+
+  const switchPreviewAndCountRenders = (): Record<string, number> => {
+    const { rerender } = render(
+      <SearchResultList pages={pages} selectedPageId="a" />,
+    );
+    pageListItemLSpy.renderCountByPageId.clear();
+
+    rerender(<SearchResultList pages={pages} selectedPageId="c" />);
+
+    return Object.fromEntries(pageListItemLSpy.renderCountByPageId);
+  };
+
+  it('re-renders only the previously and newly previewed rows', () => {
+    expect(switchPreviewAndCountRenders()).toEqual({ a: 1, c: 1 });
+  });
+
+  it('re-renders only those two rows when page info is injected into rows', () => {
+    pageInfoStub.idToPageInfo = Object.fromEntries(
+      pages.map((page) => [
+        page.data._id,
+        mock<IPageInfoForListing>({ isEmpty: false, revisionShortBody: '' }),
+      ]),
+    );
+
+    expect(switchPreviewAndCountRenders()).toEqual({ a: 1, c: 1 });
+  });
+
+  // A re-rendered row's ref is detached and re-attached (no-deps
+  // useImperativeHandle), so a row touched by one switch must still skip
+  // re-rendering on the following switches.
+  it('keeps re-rendering only the two affected rows across repeated switches', () => {
+    const { rerender } = render(
+      <SearchResultList pages={pages} selectedPageId="a" />,
+    );
+    const switchTo = (selectedPageId: string): Record<string, number> => {
+      pageListItemLSpy.renderCountByPageId.clear();
+      rerender(
+        <SearchResultList pages={pages} selectedPageId={selectedPageId} />,
+      );
+      return Object.fromEntries(pageListItemLSpy.renderCountByPageId);
+    };
+
+    expect(switchTo('c')).toEqual({ a: 1, c: 1 });
+    expect(switchTo('b')).toEqual({ c: 1, b: 1 });
+    expect(switchTo('d')).toEqual({ b: 1, d: 1 });
+  });
+});
+
+describe('SearchResultList selectAll / deselectAll', () => {
+  beforeEach(() => {
+    pageListItemLSpy.clear();
+    pageInfoStub.idToPageInfo = undefined;
+    vi.clearAllMocks();
+  });
+
+  it('selects and deselects every mounted row', () => {
+    const ref = React.createRef<ISelectableAll>();
+    render(
+      <SearchResultList ref={ref} pages={['a', 'b', 'c'].map(createPage)} />,
+    );
+
+    ref.current?.selectAll();
+    ref.current?.deselectAll();
+
+    const expected = { a: 1, b: 1, c: 1 };
+    expect(Object.fromEntries(pageListItemLSpy.selectCallsByPageId)).toEqual(
+      expected,
+    );
+    expect(Object.fromEntries(pageListItemLSpy.deselectCallsByPageId)).toEqual(
+      expected,
+    );
+  });
+
+  it('no longer reaches a row after it is removed from the list', () => {
+    const ref = React.createRef<ISelectableAll>();
+    const [a, b, c] = ['a', 'b', 'c'].map(createPage);
+    const { rerender } = render(
+      <SearchResultList ref={ref} pages={[a, b, c]} />,
+    );
+
+    rerender(<SearchResultList ref={ref} pages={[a, c]} />);
+    ref.current?.selectAll();
+
+    expect(Object.fromEntries(pageListItemLSpy.selectCallsByPageId)).toEqual({
+      a: 1,
+      c: 1,
+    });
   });
 });
