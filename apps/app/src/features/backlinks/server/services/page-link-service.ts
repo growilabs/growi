@@ -2,11 +2,13 @@ import type { IUser } from '@growi/core';
 import type { Types } from 'mongoose';
 
 import type Crowi from '~/server/crowi';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageDocument } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
-import type { IBacklink } from '../../interfaces/backlink';
+import type { IBacklink, ILinkTarget } from '../../interfaces/backlink';
 import { findBacklinks } from './find-backlinks';
+import { findForwardLinkHealth } from './find-forward-link-health';
 import { PageLinkUpsertQueue } from './page-link-upsert-queue';
 import { resolveUpsertQueuePacing } from './upsert-queue-pacing';
 
@@ -70,7 +72,15 @@ export class PageLinkService {
   findBacklinks(
     toPageId: Types.ObjectId,
     user: IUser | null,
+    userGroups: ObjectIdLike[] | null,
   ): Promise<IBacklink[]> {
-    return findBacklinks(toPageId, user);
+    return findBacklinks(toPageId, user, userGroups);
+  }
+
+  findForwardLinkHealth(
+    fromPageId: Types.ObjectId,
+    user: IUser | null,
+  ): Promise<ILinkTarget[]> {
+    return findForwardLinkHealth(fromPageId, user);
   }
 }

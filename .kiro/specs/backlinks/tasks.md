@@ -140,8 +140,9 @@ extraction and resolution for all of them as one unit; there is no separable "na
 - [x] B1.8 Add the backlinks read endpoint
   - Add an authenticated apiv3 GET route that validates a page id, resolves the viewer from the
     request, and returns the permission-filtered backlinks for that page
-  - Done when the endpoint returns backlinks for a readable page and 400/403 for invalid id /
-    no-access, delegating filtering to the service
+  - Done when the endpoint returns backlinks for a readable page, 400 for an invalid id, and 404
+    for a page the viewer cannot read or that does not exist (one status for both — see
+    `apps/app/.claude/rules/page-write-action-403-404.md`), delegating filtering to the service
   - _Requirements: 1.1, 2.1, 6.4_
   - _Boundary: getBacklinksHandlerFactory (routes/backlinks.ts)_
   - _Depends: B1.7_
@@ -636,18 +637,16 @@ the restored page's status. Independent of B3/B4.
     `pagelinks` is therefore a `PrismaClientValidationError` — verified against the database, since no
     `v`-less prisma-only model had ever been updated before. Not a transaction (derived cache,
     idempotent halves, standalone-MongoDB compatible — the trade `replaceOutboundLinks` documents)
-  - Implement `deriveLinkTargetState` (`toPage == null` → `broken`, outranking any status passed
-    alongside; target status `deleted` → `trashed`; else `normal`, including a `null`/`undefined`
-    status, which is a v4-era published page) — state is derived, never stored. It lands in a pure
-    `server/services/link-target-state.ts` on the **read** path, not in `page-link-sync`: nothing on
-    the write path derives this, and B5.4 consumes it inside the target query it already issues
+  - State is derived, never stored (`toPage == null` → `broken`; target status `deleted` →
+    `trashed`; else `normal`, including a `null`/`undefined` status, which is a v4-era published
+    page). No standalone helper: B5.4, the only reader, derives it inside the target query it
+    already issues
   - **Declare the `LinkTargetState` union here** (deferred from B1.1) in `interfaces/backlink.ts`, in the
     shape the design's § Data Models DTO section specifies
-  - Done when unit tests cover the derived states from `toPage`/target status, and an integration test
-    shows the primitive removes the outbound rows and nulls the inbound caches for a batch of page
+  - Done when an integration test shows the primitive removes the outbound rows and nulls the inbound caches for a batch of page
     ids while leaving unrelated rows alone
   - _Requirements: 6.1, 6.2, 6.3_
-  - _Boundary: pagelinks Prisma extension (page-link.ts), link-target-state.ts, interfaces/backlink.ts_
+  - _Boundary: pagelinks Prisma extension (page-link.ts), interfaces/backlink.ts_
   - _Depends: B1.2_
 
 - [ ] B5.2 Implement the reconcile-deleted sync operation
@@ -688,15 +687,15 @@ the restored page's status. Independent of B3/B4.
   - _Boundary: PageLinkService_
   - _Depends: B5.2, B1.6_
 
-- [ ] B5.4 Implement the forward-link-health read query
+- [x] B5.4 Implement the forward-link-health read query
   - **Declare the `ILinkTarget` DTO here** (deferred from B1.1) in `interfaces/backlink.ts`, in the shape
     the design's § Data Models DTO section specifies — `targetState` required, **`pageId` nullable**
     (`string | null`). A `broken` row *is* `toPage == null`, so there is no page id to report; the
     original `pageId: string` was unsatisfiable for exactly the case this read exists to surface
   - Implement `findForwardLinkHealth` (a page's outbound rows whose derived target state is
     trashed/broken, mapped to `ILinkTarget`) in a new `server/services/find-forward-link-health.ts`,
-    sibling to `find-backlinks.ts`; derive target state via B5.1's helper from `toPage`/target status
-    rather than a stored flag
+    sibling to `find-backlinks.ts`; derive target state from `toPage`/target status rather than a
+    stored flag
   - **Filter the targets through the shared viewer/grant filter.** `ILinkTarget` returns the
     target's `path`, and B4.1 made resolution follow the rename chain, so a `toPage` can point at a
     page that has since moved somewhere the viewer cannot read. Without this filter the endpoint
@@ -704,11 +703,12 @@ the restored page's status. Independent of B3/B4.
     *source* pages and does not cover this
   - **One query, not two round trips.** Deriving `trashed` needs the target's `status` and the leak
     fix needs the targets grant-filtered — the same documents — so issue a single
-    `PageQueryBuilder(Page.find({ _id: { $in: targetIds } }))` + `addViewerCondition(user)` +
-    `.select('_id path status')` and derive from its result. `broken` rows need no lookup at all
+    `PageQueryBuilder(Page.find({ _id: { $in: targetIds }, status: deleted }))` +
+    `addViewerCondition(user)` + `.select('_id path')`; every result is a trashed target. `broken`
+    rows need no lookup at all
   - **Do not reuse `buildVisibleSourcesQuery`**: it calls `addConditionToExcludeTrashed()`, and
-    trashed targets are precisely what this read reports. Add a sibling builder that applies the
-    grant condition only and selects `status` too
+    trashed targets are precisely what this read reports. Build a separate query that applies the
+    grant condition only, plus the trashed-status condition
   - Two shape rules the mapping must follow: `path` is the **target page's current path** for a
     trashed row but the row's **own `toPath`** for a broken one (no page exists; and `toPath` is text
     the linking author wrote, so it leaks nothing); and a **non-null `toPage` missing from the query
@@ -732,7 +732,7 @@ the restored page's status. Independent of B3/B4.
     `{ backlinks }` only and `useSWRxBacklinks` resolves to `IBacklink[]`. Without this task B5.6 has
     no data source
   - **Extend the existing `GET /_api/v3/page/backlinks`, do not add a second route.** Same `pageId`,
-    same viewer, same 403 semantics, and the panel renders both sections together — a separate route
+    same viewer, same 404 semantics, and the panel renders both sections together — a separate route
     would cost a second round trip per panel open, a second hook, and a second registration in
     `apiv3/index.js`, with no independent cacheability. Add `linkTargets: ILinkTarget[]` to
     `IBacklinkResponse` and have the handler call `findBacklinks` and `findForwardLinkHealth`
@@ -745,7 +745,7 @@ the restored page's status. Independent of B3/B4.
   - No new route registration and no new requirement: 6.4 already requires surfacing the indicator,
     and 1.1/2.1 already govern this endpoint
   - Done when an integration/route test shows the endpoint returns both `backlinks` and `linkTargets`
-    for a readable page (with the same 400/403 behavior as before), a viewer who cannot read a target
+    for a readable page (with the same 400/404 behavior as before), a viewer who cannot read a target
     sees it omitted from `linkTargets` while `backlinks` is unaffected, and the hook test shows the
     response object is returned and revalidates on page-id change
   - _Requirements: 1.1, 2.1, 6.4_

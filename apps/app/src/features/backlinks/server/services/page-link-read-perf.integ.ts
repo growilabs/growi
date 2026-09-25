@@ -11,6 +11,7 @@ import UserGroupRelation from '~/server/models/user-group-relation';
 import { prisma } from '~/utils/prisma';
 
 import { buildVisibleSourcesQuery, findBacklinks } from './find-backlinks';
+import { findUserGroupIdsForViewer } from './find-user-group-ids-for-viewer';
 import { syncOutboundLinks } from './page-link-sync';
 
 const PAGELINKS_COLLECTION = 'pagelinks';
@@ -225,6 +226,10 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
 
   let viewer: IUserHasId;
   let foreignUser: IUserHasId;
+
+  // The request's full read: the handler resolves the viewer's groups once, then reads.
+  const readAsViewer = async () =>
+    findBacklinks(hubPageId, viewer, await findUserGroupIdsForViewer(viewer));
 
   let hubPageId: Types.ObjectId;
   /** Sources that the viewer must actually get back — the assertion this benchmark also proves. */
@@ -594,22 +599,25 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
   it(`returns the hub page's backlinks in under ${TARGET_MS} ms`, async () => {
     // Warm-up: excluded from the samples so the first call's connection/plan-cache
     // priming is not reported as read latency.
-    const warm = await findBacklinks(hubPageId, viewer);
+    const warm = await readAsViewer();
     expect(warm).toHaveLength(expectedVisibleCount);
 
-    const full = await measure(TIMED_RUNS, () =>
-      findBacklinks(hubPageId, viewer),
-    );
+    const full = await measure(TIMED_RUNS, () => readAsViewer());
 
     // Sub-steps, to locate the bottleneck rather than just observe the total.
     const distinctOnly = await measure(TIMED_RUNS, () =>
       prisma.pagelinks.findBacklinkSources(hubPageId),
     );
     const sourceIds = await prisma.pagelinks.findBacklinkSources(hubPageId);
+    const viewerGroups = await findUserGroupIdsForViewer(viewer);
     const filterOnly = await measure(TIMED_RUNS, async () => {
       // Production's own query builder, so this sub-step timing cannot drift away from
       // the query findBacklinks issues.
-      const { query } = await buildVisibleSourcesQuery(sourceIds, viewer);
+      const { query } = await buildVisibleSourcesQuery(
+        sourceIds,
+        viewer,
+        viewerGroups,
+      );
       return query.lean().exec();
     });
 
@@ -644,13 +652,11 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
         // No warm-up discard here — the first read under cache pressure is the
         // interesting one, so it is reported separately from the settled runs.
         const firstStarted = performance.now();
-        const first = await findBacklinks(hubPageId, viewer);
+        const first = await readAsViewer();
         const firstMs = performance.now() - firstStarted;
         expect(first).toHaveLength(expectedVisibleCount);
 
-        const settled = await measure(TIMED_RUNS, () =>
-          findBacklinks(hubPageId, viewer),
-        );
+        const settled = await measure(TIMED_RUNS, () => readAsViewer());
 
         report(`[B2.1][cold] first read: ${firstMs.toFixed(1)} ms`);
         report(`[B2.1][cold] settled:    ${fmt(settled)}`);
@@ -717,7 +723,11 @@ describe.skipIf(!isEnabled)('B2.1 backlinks read-path benchmark', () => {
     // The viewer-filtered Page query, built by production — so this no-COLLSCAN
     // guarantee covers the query findBacklinks issues, not a copy of it.
     const sourceIds = await prisma.pagelinks.findBacklinkSources(hubPageId);
-    const { query } = await buildVisibleSourcesQuery(sourceIds, viewer);
+    const { query } = await buildVisibleSourcesQuery(
+      sourceIds,
+      viewer,
+      await findUserGroupIdsForViewer(viewer),
+    );
     // mongoose types explain() as resolving to the query's own result type; the real
     // shape is an untyped driver explain document, matching collectStages' parameter.
     // biome-ignore lint/suspicious/noExplicitAny: driver explain output has no type
