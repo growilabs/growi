@@ -138,6 +138,11 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
   const [selectedPageIdsByCheckboxes] = useState<Set<string>>(new Set());
   // const [allPageIds] = useState<Set<string>>(new Set());
 
+  // Held in state (not a ref) so SearchResultList re-renders once it is set.
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(
+    null,
+  );
+
   const [selectedPageWithMeta, setSelectedPageWithMeta] = useState<
     IPageWithSearchMeta | undefined
   >();
@@ -354,6 +359,7 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       <SearchResultList
         ref={searchResultListRef}
         pages={pages}
+        scrollElement={scrollElement}
         selectedPageId={selectedPageWithMeta?.data._id}
         forceHideMenuItems={forceHideMenuItems}
         onPageSelected={(page) => setSelectedPageWithMeta(page)}
@@ -406,7 +412,10 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       >
         {searchControl}
 
-        <div className="overflow-y-scroll">
+        <div
+          ref={setScrollElement}
+          className="overflow-y-scroll position-relative"
+        >
           {/* Loading */}
           {pages == null && (
             <div className="mw-0 flex-grow-1 flex-basis-0 m-5 text-muted text-center">

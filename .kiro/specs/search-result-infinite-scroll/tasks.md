@@ -125,7 +125,7 @@
   - _Requirements: 10.1, 11.1, 11.2, 11.3, 11.4_
   - _Boundary: SearchResultList_
 
-- [ ] 7.2 一覧を仮想化し、共通部品からスクロール要素を渡す（統合）
+- [x] 7.2 一覧を仮想化し、共通部品からスクロール要素を渡す（統合）
   - 受け取ったスクロール要素を基準に、表示領域とその前後の一定件数だけを描画する。行の高さは推定値から始めて実測で補正し、行の識別はページ ID で行う。スクロール要素が未取得の間は行を描画しない
   - 全件分の高さを持つ入れ物の中に、描画範囲の先頭位置までずらした一覧を置く。位置指定は Bootstrap のユーティリティクラスを使い、インラインの style は高さとずらす量だけにする
   - 一覧上部のヘッダの高さを描画範囲の計算に反映する（一覧の開始位置を測って渡す）
@@ -194,3 +194,4 @@
   7. 一括削除後に先頭チャンクから再表示・選択クリアされること。0件クエリで「0 件」表示。
 - 6(#190441): `pnpm run lint:typecheck` はベースラインで 22 件のエラーがある（`features/growi-vault`・`features/mastra`・`DrawioCommunicationHelper.ts`・`suggest-path`。原因は `@growi/core` / `@growi/remark-drawio` の dist が古いこと）。各タスクでは変更ファイルに関するエラーが増えていないことで判定する。
 - 7.1(#190441): `PageListItemL` は deps なしの `useImperativeHandle` のため、行が再描画されるたびに ref コールバックへ `null`→新ハンドルが渡る（アンマウントではない）。`null` でキャッシュ済みコールバックを捨てると次の描画で ref が変わり memo が壊れる。`null` では登録簿の項目だけを消し、コールバックは `pages` から消えた pageId だけを掃除する。
+- 7.2(#190441): happy-dom はレイアウトしないため、仮想化のテストは `SearchPage/test-utils/virtual-list-layout-stub.ts`（`offsetHeight` / `offsetTop` をスタブ、テストごとに restore）を使う。スクロール要素は `overflow-y-scroll` クラスで判定する。推定行高 100px は実機（9.2）で確認する。

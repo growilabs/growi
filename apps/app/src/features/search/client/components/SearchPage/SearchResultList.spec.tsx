@@ -1,8 +1,8 @@
 import React from 'react';
 import type { IPageHasId } from '@growi/core';
 import type { IPageInfoForListing } from '@growi/core/dist/interfaces';
-import { render } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
 import type {
@@ -16,6 +16,8 @@ import type { IPageWithSearchMeta } from '~/interfaces/search';
 // wiring under test; the row component itself is exercised by its own spec).
 type CapturedPageListItemLProps = {
   page: IPageWithSearchMeta;
+  listItemRef?: React.Ref<HTMLLIElement>;
+  listItemIndex?: number;
   onPageDuplicated?: (fromPath: string, toPath: string) => void;
   onPageRenamed?: (path: string, newPath: string) => void;
   onPageDeleted?: (
@@ -62,7 +64,8 @@ vi.mock('~/client/components/PageList/PageListItemL', () => ({
           deselect: () =>
             increment(pageListItemLSpy.deselectCallsByPageId, pageId),
         }));
-        return null;
+        // A real <li> so the virtualizer can measure the row.
+        return <li ref={props.listItemRef} data-index={props.listItemIndex} />;
       },
     ),
   ),
@@ -99,7 +102,23 @@ vi.mock('next-i18next', () => ({
   useTranslation: vi.fn(() => ({ t: translate })),
 }));
 
-import { SearchResultList } from './SearchResultList';
+import {
+  ESTIMATED_SEARCH_RESULT_ROW_HEIGHT,
+  SearchResultList,
+} from './SearchResultList';
+import {
+  stubVirtualListLayout,
+  type VirtualListLayoutStub,
+} from './test-utils/virtual-list-layout-stub';
+
+// Tall enough that every row of the small lists below is rendered.
+let layout: VirtualListLayoutStub;
+beforeEach(() => {
+  layout = stubVirtualListLayout({ viewportHeight: 1000, rowHeight: 50 });
+});
+afterEach(() => {
+  layout.restore();
+});
 
 const createPage = (id: string): IPageWithSearchMeta =>
   mock<IPageWithSearchMeta>({
@@ -121,6 +140,7 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
     const onItemMutated = vi.fn();
     render(
       <SearchResultList
+        scrollElement={layout.scrollElement}
         pages={[createPage('a')]}
         onItemMutated={onItemMutated}
       />,
@@ -140,6 +160,7 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
     const onItemMutated = vi.fn();
     render(
       <SearchResultList
+        scrollElement={layout.scrollElement}
         pages={[createPage('a')]}
         onItemMutated={onItemMutated}
       />,
@@ -159,6 +180,7 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
     const onItemMutated = vi.fn();
     render(
       <SearchResultList
+        scrollElement={layout.scrollElement}
         pages={[createPage('a')]}
         onItemMutated={onItemMutated}
       />,
@@ -177,6 +199,7 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
     const onItemMutated = vi.fn();
     render(
       <SearchResultList
+        scrollElement={layout.scrollElement}
         pages={[createPage('a')]}
         onItemMutated={onItemMutated}
       />,
@@ -189,7 +212,12 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
   });
 
   it('does not throw when onItemMutated is not provided (legacy callers)', () => {
-    render(<SearchResultList pages={[createPage('a')]} />);
+    render(
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={[createPage('a')]}
+      />,
+    );
 
     expect(() =>
       pageListItemLSpy.lastProps?.onPageDeleted?.('/deleted', false, false),
@@ -213,6 +241,7 @@ describe('SearchResultList onPreviewedPageDeleted wiring', () => {
     const onPreviewedPageDeleted = vi.fn();
     render(
       <SearchResultList
+        scrollElement={layout.scrollElement}
         pages={[createPage('a'), createPage('b')]}
         selectedPageId="b"
         onPreviewedPageDeleted={onPreviewedPageDeleted}
@@ -230,6 +259,7 @@ describe('SearchResultList onPreviewedPageDeleted wiring', () => {
     const onPreviewedPageDeleted = vi.fn();
     render(
       <SearchResultList
+        scrollElement={layout.scrollElement}
         pages={[createPage('a'), createPage('b')]}
         selectedPageId="b"
         onPreviewedPageDeleted={onPreviewedPageDeleted}
@@ -247,6 +277,7 @@ describe('SearchResultList onPreviewedPageDeleted wiring', () => {
     const onPreviewedPageDeleted = vi.fn();
     render(
       <SearchResultList
+        scrollElement={layout.scrollElement}
         pages={[createPage('a')]}
         onPreviewedPageDeleted={onPreviewedPageDeleted}
       />,
@@ -274,11 +305,21 @@ describe('SearchResultList row re-render scope on preview switch (Req 10.1)', ()
 
   const switchPreviewAndCountRenders = (): Record<string, number> => {
     const { rerender } = render(
-      <SearchResultList pages={pages} selectedPageId="a" />,
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={pages}
+        selectedPageId="a"
+      />,
     );
     pageListItemLSpy.renderCountByPageId.clear();
 
-    rerender(<SearchResultList pages={pages} selectedPageId="c" />);
+    rerender(
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={pages}
+        selectedPageId="c"
+      />,
+    );
 
     return Object.fromEntries(pageListItemLSpy.renderCountByPageId);
   };
@@ -303,12 +344,20 @@ describe('SearchResultList row re-render scope on preview switch (Req 10.1)', ()
   // re-rendering on the following switches.
   it('keeps re-rendering only the two affected rows across repeated switches', () => {
     const { rerender } = render(
-      <SearchResultList pages={pages} selectedPageId="a" />,
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={pages}
+        selectedPageId="a"
+      />,
     );
     const switchTo = (selectedPageId: string): Record<string, number> => {
       pageListItemLSpy.renderCountByPageId.clear();
       rerender(
-        <SearchResultList pages={pages} selectedPageId={selectedPageId} />,
+        <SearchResultList
+          scrollElement={layout.scrollElement}
+          pages={pages}
+          selectedPageId={selectedPageId}
+        />,
       );
       return Object.fromEntries(pageListItemLSpy.renderCountByPageId);
     };
@@ -329,7 +378,11 @@ describe('SearchResultList selectAll / deselectAll', () => {
   it('selects and deselects every mounted row', () => {
     const ref = React.createRef<ISelectableAll>();
     render(
-      <SearchResultList ref={ref} pages={['a', 'b', 'c'].map(createPage)} />,
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        ref={ref}
+        pages={['a', 'b', 'c'].map(createPage)}
+      />,
     );
 
     ref.current?.selectAll();
@@ -348,15 +401,142 @@ describe('SearchResultList selectAll / deselectAll', () => {
     const ref = React.createRef<ISelectableAll>();
     const [a, b, c] = ['a', 'b', 'c'].map(createPage);
     const { rerender } = render(
-      <SearchResultList ref={ref} pages={[a, b, c]} />,
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        ref={ref}
+        pages={[a, b, c]}
+      />,
     );
 
-    rerender(<SearchResultList ref={ref} pages={[a, c]} />);
+    rerender(
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        ref={ref}
+        pages={[a, c]}
+      />,
+    );
     ref.current?.selectAll();
 
     expect(Object.fromEntries(pageListItemLSpy.selectCallsByPageId)).toEqual({
       a: 1,
       c: 1,
     });
+  });
+});
+
+// Req 8.1/8.2/8.4: only the viewport plus a fixed overscan is rendered, while
+// the list keeps the full height of every loaded row.
+describe('SearchResultList virtualization', () => {
+  const VIEWPORT_HEIGHT = 500;
+  const ROW_HEIGHT = 50;
+  const ROWS_IN_VIEWPORT = VIEWPORT_HEIGHT / ROW_HEIGHT;
+
+  const createPages = (count: number): IPageWithSearchMeta[] =>
+    Array.from({ length: count }, (_, i) => createPage(`p${i}`));
+
+  beforeEach(() => {
+    pageListItemLSpy.clear();
+    pageInfoStub.idToPageInfo = undefined;
+    vi.clearAllMocks();
+    // Replace the roomy default layout with a small viewport; the top-level
+    // afterEach restores whichever stub `layout` holds.
+    layout.restore();
+    layout = stubVirtualListLayout({
+      viewportHeight: VIEWPORT_HEIGHT,
+      rowHeight: ROW_HEIGHT,
+    });
+  });
+
+  it('renders only the rows around the viewport out of several hundred', () => {
+    render(
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={createPages(300)}
+      />,
+    );
+
+    const rowCount = screen.getAllByRole('listitem').length;
+    expect(rowCount).toBeGreaterThanOrEqual(ROWS_IN_VIEWPORT);
+    expect(rowCount).toBeLessThan(ROWS_IN_VIEWPORT * 3);
+  });
+
+  it('does not render more rows when more pages are loaded', () => {
+    const { rerender } = render(
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={createPages(300)}
+      />,
+    );
+    const rowCountBefore = screen.getAllByRole('listitem').length;
+
+    rerender(
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={createPages(600)}
+      />,
+    );
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(rowCountBefore);
+  });
+
+  it('sizes the list to every loaded row, measured or estimated', () => {
+    const pageCount = 300;
+    render(
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={createPages(pageCount)}
+      />,
+    );
+
+    const measuredRowCount = screen.getAllByRole('listitem').length;
+    const container = screen.getByTestId('search-result-list').parentElement;
+    expect(container?.style.height).toBe(
+      `${
+        measuredRowCount * ROW_HEIGHT +
+        (pageCount - measuredRowCount) * ESTIMATED_SEARCH_RESULT_ROW_HEIGHT
+      }px`,
+    );
+  });
+
+  it('accounts for the content above the list when choosing rows', () => {
+    const renderRowCount = (): number => {
+      const { unmount } = render(
+        <SearchResultList
+          scrollElement={layout.scrollElement}
+          pages={createPages(300)}
+        />,
+      );
+      const rowCount = screen.getAllByRole('listitem').length;
+      unmount();
+      return rowCount;
+    };
+    const rowCountWithoutHeader = renderRowCount();
+
+    layout.restore();
+    const headerHeight = ROW_HEIGHT * 4;
+    layout = stubVirtualListLayout({
+      viewportHeight: VIEWPORT_HEIGHT,
+      rowHeight: ROW_HEIGHT,
+      listOffsetTop: headerHeight,
+    });
+
+    expect(renderRowCount()).toBe(
+      rowCountWithoutHeader - headerHeight / ROW_HEIGHT,
+    );
+  });
+
+  it('renders no rows until the scroll element is available', () => {
+    const pages = createPages(3);
+    const { rerender } = render(
+      <SearchResultList scrollElement={null} pages={pages} />,
+    );
+
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+
+    rerender(
+      <SearchResultList scrollElement={layout.scrollElement} pages={pages} />,
+    );
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
   });
 });

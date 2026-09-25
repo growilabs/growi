@@ -8,14 +8,17 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import {
   type IPageInfoForListing,
   type IPageWithMeta,
   isIPageInfoForListing,
 } from '@growi/core/dist/interfaces';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useTranslation } from 'next-i18next';
 
 import type { ForceHideMenuItems } from '~/client/components/Common/Dropdown/PageItemControl';
@@ -37,8 +40,17 @@ import { mutateSearching } from '~/stores/search';
 
 import type { SearchItemMutation } from '../../util/apply-search-item-mutation';
 
+// A typical row: path, title and a two-line snippet. Rendered rows are
+// re-measured, so this only affects rows that have not been rendered yet.
+export const ESTIMATED_SEARCH_RESULT_ROW_HEIGHT = 100;
+const OVERSCAN_ROW_COUNT = 5;
+
+const estimateRowSize = (): number => ESTIMATED_SEARCH_RESULT_ROW_HEIGHT;
+
 type Props = {
   pages: IPageWithSearchMeta[];
+  // The element that scrolls the list. No rows are rendered while it is null.
+  scrollElement: HTMLElement | null;
   selectedPageId?: string;
   forceHideMenuItems?: ForceHideMenuItems;
   onPageSelected?: (page?: IPageWithSearchMeta) => void;
@@ -65,6 +77,7 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
 > = (props: Props, ref) => {
   const {
     pages,
+    scrollElement,
     selectedPageId,
     forceHideMenuItems,
     onPageSelected,
@@ -244,30 +257,71 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
     [t, onItemMutated, onPreviewedPageDeleted],
   );
 
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  // Where the list starts inside the scroll element (below the result header).
+  const [scrollMargin, setScrollMargin] = useState(0);
+  useLayoutEffect(() => {
+    setScrollMargin(listContainerRef.current?.offsetTop ?? 0);
+  });
+
+  const getScrollElement = useCallback(() => scrollElement, [scrollElement]);
+  const getItemKey = useCallback(
+    (index: number) => pages[index].data._id,
+    [pages],
+  );
+
+  const virtualizer = useVirtualizer({
+    count: pages.length,
+    getScrollElement,
+    estimateSize: estimateRowSize,
+    overscan: OVERSCAN_ROW_COUNT,
+    getItemKey,
+    scrollMargin,
+  });
+
+  // Empty until the scroll element is available.
+  const virtualItems = virtualizer.getVirtualItems();
+  const renderedRangeOffset =
+    virtualItems.length > 0 ? virtualItems[0].start - scrollMargin : 0;
+  const rows = injectedPages ?? pages;
+
   return (
-    <ul
-      data-testid="search-result-list"
-      className="page-list-ul list-group list-group-flush"
+    <div
+      ref={listContainerRef}
+      className="position-relative"
+      style={{ height: `${virtualizer.getTotalSize()}px` }}
     >
-      {(injectedPages ?? pages).map((page) => {
-        return (
-          <PageListItemL
-            key={page.data._id}
-            ref={getItemRefCallback(page.data._id)}
-            page={page}
-            isEnableActions={!isGuestUser}
-            isReadOnlyUser={!!isReadOnlyUser}
-            isSelected={page.data._id === selectedPageId}
-            forceHideMenuItems={forceHideMenuItems}
-            onClickItem={clickItemHandler}
-            onCheckboxChanged={props.onCheckboxChanged}
-            onPageDuplicated={duplicatedHandler}
-            onPageRenamed={renamedHandler}
-            onPageDeleted={deletedHandler}
-          />
-        );
-      })}
-    </ul>
+      <ul
+        data-testid="search-result-list"
+        className="page-list-ul list-group list-group-flush position-absolute top-0 start-0 w-100"
+        style={{
+          transform: `translateY(${renderedRangeOffset}px)`,
+        }}
+      >
+        {virtualItems.map((virtualItem) => {
+          const page = rows[virtualItem.index];
+          return (
+            <PageListItemL
+              key={virtualItem.key}
+              ref={getItemRefCallback(page.data._id)}
+              listItemRef={virtualizer.measureElement}
+              listItemIndex={virtualItem.index}
+              listSize={pages.length}
+              page={page}
+              isEnableActions={!isGuestUser}
+              isReadOnlyUser={!!isReadOnlyUser}
+              isSelected={page.data._id === selectedPageId}
+              forceHideMenuItems={forceHideMenuItems}
+              onClickItem={clickItemHandler}
+              onCheckboxChanged={props.onCheckboxChanged}
+              onPageDuplicated={duplicatedHandler}
+              onPageRenamed={renamedHandler}
+              onPageDeleted={deletedHandler}
+            />
+          );
+        })}
+      </ul>
+    </div>
   );
 };
 
