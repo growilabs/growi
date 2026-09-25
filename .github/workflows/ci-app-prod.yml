@@ -60,8 +60,14 @@ jobs:
       # directly avoids a race that a `labeled` trigger would otherwise need
       # (and which risks cancelling an in-flight run into a `cancelled`
       # conclusion that Mergify's `check-failure` treats as a failure).
+      # `github.event.pull_request` does not exist on a `push` event -- gate
+      # the head-ref comparison on `pull_request` explicitly, since this
+      # job (unlike a plain job) calls a reusable workflow via `uses:` and
+      # fails to even start (zero jobs) rather than evaluate the dangling
+      # property access as falsy.
       && !( contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
-            || github.event.pull_request.head.ref == 'i18n-sync/translation-only' )
+            || ( github.event_name == 'pull_request'
+                 && github.event.pull_request.head.ref == 'i18n-sync/translation-only' ) )
     with:
       node-version: 24.x
       skip-e2e-test: ${{ contains( github.event.pull_request.labels.*.name, 'dependencies' ) }}
