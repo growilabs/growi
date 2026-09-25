@@ -9,7 +9,7 @@
   - upload エンドポイントには「20秒に1リクエスト」という明文化されたレート制限があり、逐次呼び出しはこの間隔を空ける必要がある
   - POEditor の GitHub 連携は存在せず、API 呼び出しを自作する前提（brief.md の判断と一致）
   - `master` の branch protection は classic Required Pull Request Reviews を有効化しておらず、Mergify アプリと merge queue に委ねている。「翻訳のみの変更は自動反映」は、既存の `.github/mergify.yml` にある「Automatic queue to merge」ルール（`#approved-reviews-by >= 1` 条件）にそのまま乗せて実現する。この条件を回避する新しい Mergify ルールを追加する案も検討したが、人レビューを経ずにマージできる経路を新設することになるため採用しない（詳細は下記「既存 `master` の branch protection / マージ経路」参照）。承認は「PR を作る identity とは別の identity」から出す設計（design.md）で満たす
-  - POEditor は言語コードとして GROWI のロケールコード（`en_US`/`ja_JP`/`zh_CN`/`fr_FR`/`ko_KR`）をそのままでは受け付けない。`en_US` を渡すと `"Wrong language code"` エラーになる。正しくは `en-us`/`ja`/`zh-CN`/`fr`/`ko` へ変換する必要があり、これを行わない実装は push のたびに失敗する（実プロジェクトでの実測により判明。ただし `en_US` に対応する具体的なコードは実測時点では単なる `en` としていたが、PRレビューでの指摘を受け `en-us`（English (US)、POEditor公式の言語コード一覧に別掲）へ修正した。`en` のままだとPOEditor画面上でイギリス国旗アイコンが表示されるため。`en-us` 自体は実際のプロジェクトでまだ実行時検証していない — 単なる `en` は実測で受理されることを確認済みだが、`en-us` は公式ドキュメントの一覧に基づく変更であり、実プロビジョニング後の動作確認（tasks.md 6.1/6.2）で改めて確認すること）
+  - POEditor は言語コードとして GROWI のロケールコード（`en_US`/`ja_JP`/`zh_CN`/`fr_FR`/`ko_KR`）をそのままでは受け付けない。`en_US` を渡すと `"Wrong language code"` エラーになる。正しくは `en-us`/`ja`/`zh-CN`/`fr`/`ko` へ変換する必要があり、これを行わない実装は push のたびに失敗する（実プロジェクトでの実測により判明。`en_US` に対応する具体的なコードは実測当初は単なる `en` としていたが、PRレビューでの指摘を受け `en-us`（English (US)、POEditor公式の言語コード一覧に別掲）へ修正した。`en` のままだとPOEditor画面上でイギリス国旗アイコンが表示されるため。`en-us` への変更後、task 6.1/6.2の実環境確認で実際に push/pull が成功することを確認済み）
 
 ## Research Log
 
@@ -102,7 +102,7 @@
 - **Selected Approach**: 1回のpush実行につき、全namespaceを1つのJSONにまとめた`sync_terms=1`呼び出しを1回だけ行い、その後にnamespaceごとの追加タグ付けアップロード（`sync_terms`を無効にし、削除を発生させない）を行う
 - **Rationale**: `sync_terms`の削除挙動を1回の統合呼び出しに閉じ込めることで、致命的なデータ消失バグを防げる
 - **Trade-offs**: アップロード呼び出しが1回（3プロジェクト構成の直列3回）から4回（統合1回＋タグ付け3回）に増え、pushにかかる時間が約60秒から約80秒に伸びる。ただしCIジョブの非同期実行であり許容範囲。一方でpull側のexport呼び出しは`3 namespace × 4 言語 = 12回`から`4回`（言語ごと）へ減るため、全体としてAPI呼び出し回数は増えない
-- **Follow-up**: タグ付けアップロード（`sync_terms`無効）が他namespaceのキーを`tags`の`obsolete`スコープの対象にしないかは、実測では他namespaceの内容が空の状態でのテストに留まり未確認のまま残る。本番運用開始前の実環境確認で引き続き確認する（Risks & Mitigations参照）
+- **Follow-up**: タグ付けアップロード（`sync_terms`無効）が他namespaceのキーを`tags`の`obsolete`スコープの対象にしないかは、当初は他namespaceの内容が空の状態でのテストに留まり未確認だったが、task 6.1の実環境確認（3 namespace分の実データが同時に存在する状態）で解消済み。POEditorのTagsフィルターにはそもそも`obsolete`という項目自体が存在せず、`admin`タグで絞り込んでも他namespaceのtermが混ざらないことを目視で確認した
 
 ### Decision: pull は言語ごとに1回の統合exportを行い、クライアント側でnamespaceに分割する
 - **Context**: 単一プロジェクトになったことで、namespaceごとに個別exportする必要が無くなった
@@ -154,7 +154,7 @@
 - **Selected Approach**: `PoeditorClient`内部に`parseSuccessBody`を新設し、HTTPステータスが2xxでも本文の`response.status`が`"success"`以外なら失敗として扱うよう修正した（`response.status`自体が無い応答は互換のため成功扱いのまま）。原因（レート制限か否か）が確定していないため、`rate_limited`への分類は行わず、常に`invalid_request`としてメッセージ付きで返す
 - **Rationale**: 原因を推測で決め打ちして`rate_limited`に分類すると、実際には別の原因だった場合に誤った対処（待って再実行すれば直るという誤解）を招く。今わかっている事実だけを反映し、未確定の原因を憶測で埋めない
 - **Trade-offs**: プロセスをまたいだ20秒間隔の保証はまだ実装していない。複数言語を続けて実行する場合は、実行者が手動で間隔を空けるか、`docs/i18n-community-translation-setup.md`の手順に注意書きを追加する必要がある
-- **Follow-up**: `fr_FR`/`ko_KR`は診断用アップロードで実際には正しく書き込み済み（`translations.added:2253`）だが、これは本番のseedツール経由ではなく診断スクリプトからの直接呼び出しだったため、修正済みツールで正式に再実行し、CLIの「成功」表示とPOEditor上の進捗表示が一致することを確認すること
+- **Follow-up**: 修正後のツールで`fr_FR`/`ko_KR`を再実行（今回は各コマンドの間を20秒以上空けて実行）し、CLIの成功表示に加えてPOEditor上でも全言語が90%以上の進捗を示すことを確認済み
 
 ### Decision: pushの統合アップロードは `overwrite: true` を明示的に送る
 - **Context**: task 6.1の実環境確認で、en_USの既存キーの文言を変更してpushしても、POEditor側の値が更新されないことが判明した
@@ -171,7 +171,7 @@
 - `sync_terms=1` はキー削除も行うため、リポジトリ側の一時的なファイル欠損や取得漏れがあると POEditor 側の翻訳を誤って削除しうる — push 対象ファイルの読み込みに失敗した場合は同期自体を中止する（部分実行しない）
 - 統合アップロード（`sync_terms=1`）とnamespace別タグ付けアップロードの間で失敗が起きた場合、プロジェクトの内容（統合アップロード分）は既に正しく反映済みだが、一部namespaceのタグ付けが未完了のまま終わる可能性がある — タグは翻訳者向け絞り込み表示にのみ影響し、キー内容の正しさには影響しない。ワークフロー再実行で回復できる（統合アップロードは冪等、タグ付けアップロードも`sync_terms`無効で非破壊的なため再実行安全）
 - 言語ごとの統合exportが不正な形式だった場合、その言語の全namespaceがまとめてスキップされる（namespace単位の独立性が3プロジェクト構成より粗くなる） — export専用のリスクであり、リポジトリへの書き込みには影響しない
-- タグ付けアップロード（`sync_terms`無効）が他namespaceのキーを`tags`の`obsolete`スコープの対象にしてしまわないかは、実プロジェクトでの実測では他namespaceの内容が存在しない状態でのテストに留まり、確認できていない — 本番運用開始前の実環境確認（複数namespaceが実データで共存する状態でのタグ付けアップロード）で必ず確認すること
+- タグ付けアップロード（`sync_terms`無効）が他namespaceのキーを`tags`の`obsolete`スコープの対象にしてしまわないかは、当初は他namespaceの内容が存在しない状態でのテストに留まっていたが、task 6.1の実環境確認（複数namespaceが実データで共存する状態）で問題が無いことを確認済み
 - POEditor プロジェクトの Fallback Language 設定が誤って有効化されると、未翻訳キーの export値が別言語の文言で埋まり、`DiffClassifier`が「訳文が変更された」と誤判定して既存の正しい翻訳を上書きしうる（task 6.2の実環境確認で実際に発生し、生成されたPRはマージせずclose済み） — `DiffClassifier.classify`が空文字列を「情報なし」として無視する実装に修正済み（上記Decision参照）だが、Fallback Language自体は引き続き「未設定」運用が前提。プロジェクト設定が意図せず変わっていないか、定期的な実環境確認（tasks.md 6.x）で確認すること
 - POEditorが ja/zh/fr/ko の既存翻訳を1件も持っていない（push が en_US しかアップロードしないため）状態が続くと、翻訳者が参加してもPOEditor上は0%表示のままになり、体験を損なう — 既存翻訳の初回投入をタスク化して対応する（`docs/i18n-community-translation-setup.md` §2.3）
 - 既存翻訳投入ツールは `sync_terms:false` でも新規termを作成しうる（上記Decision参照）。ja_JP投入時にen_USに無い44件のtermが作成されたが、ツールをen_USの既存キーへの絞り込みに修正し、作成済みだった44件のtermはAPI経由の一括削除で対応済み

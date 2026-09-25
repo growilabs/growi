@@ -2,6 +2,7 @@ import {
   classify,
   filterToKnownKeys,
   mergeTranslations,
+  restoreKeysStillInSource,
 } from './diff-classifier';
 
 describe('classify', () => {
@@ -249,5 +250,73 @@ describe('filterToKnownKeys', () => {
     expect(filterToKnownKeys(reference, candidate)).toEqual({
       a: { k1: '管理', k2: '2番目' },
     });
+  });
+});
+
+describe('restoreKeysStillInSource', () => {
+  it('restores a leaf missing from after when it still exists in the source language (PR #11935 regression)', () => {
+    const before = { ai_sidebar: { sources_one: '{{count}} page référencée' } };
+    const after = {};
+    const sourceLanguageContent = {
+      ai_sidebar: { sources_one: '{{count}} page referenced' },
+    };
+
+    expect(
+      restoreKeysStillInSource(before, after, sourceLanguageContent),
+    ).toEqual({
+      ai_sidebar: { sources_one: '{{count}} page référencée' },
+    });
+  });
+
+  it('leaves a leaf missing from after when it is also gone from the source language (genuine removal)', () => {
+    const before = { old_key: 'valeur obsolète' };
+    const after = {};
+    const sourceLanguageContent = {};
+
+    expect(
+      restoreKeysStillInSource(before, after, sourceLanguageContent),
+    ).toEqual({});
+  });
+
+  it('does not touch a leaf that after already has', () => {
+    const before = { a: 'old' };
+    const after = { a: 'new' };
+    const sourceLanguageContent = { a: 'new-en' };
+
+    expect(
+      restoreKeysStillInSource(before, after, sourceLanguageContent),
+    ).toEqual({ a: 'new' });
+  });
+
+  it('keeps a leaf that after adds, even when before/source never had it', () => {
+    const before = {};
+    const after = { a: 'new' };
+    const sourceLanguageContent = { a: 'new' };
+
+    expect(
+      restoreKeysStillInSource(before, after, sourceLanguageContent),
+    ).toEqual({ a: 'new' });
+  });
+
+  it('recurses into nested objects, restoring only the leaves the source language still declares', () => {
+    const before = {
+      grp: { still_in_source: 'v-old', truly_removed: 'v-gone' },
+    };
+    const after = { grp: {} };
+    const sourceLanguageContent = { grp: { still_in_source: 'v-en' } };
+
+    expect(
+      restoreKeysStillInSource(before, after, sourceLanguageContent),
+    ).toEqual({ grp: { still_in_source: 'v-old' } });
+  });
+
+  it('omits a nested object with no surviving leaves at all', () => {
+    const before = { grp: { truly_removed: 'v-gone' } };
+    const after = {};
+    const sourceLanguageContent = {};
+
+    expect(
+      restoreKeysStillInSource(before, after, sourceLanguageContent),
+    ).toEqual({});
   });
 });

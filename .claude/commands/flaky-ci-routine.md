@@ -420,6 +420,29 @@ a wake-up.
 **The session ends when Step 6's report is written.** There is no
 "waiting for" state after that.
 
+### Never `rm`, `mv`, or edit files outside the repo checkout
+
+`mcp__github__get_job_logs` (used whenever `JOB_LOG_METHOD=mcp`) writes large
+results to a file under the harness's own session directory — a path like
+`~/.claude/projects/<project>/<session-id>/tool-results/*.txt`, **outside**
+`/home/user/growi`. That directory is harness-owned state, not scratch space
+this routine created.
+
+Do not `rm`, `mv`, or `Edit` anything under it, even to "clean up" a large
+file once its content has been extracted. A write there is treated as
+touching a sensitive file and triggers an interactive permission prompt —
+and this routine runs unattended, so nothing ever answers that prompt. The
+session then sits blocked until a later cron fire happens to create a fresh
+environment and move past it, which has cost this routine as long as a full
+day of silence on a single run (observed 2026-09-04 → 2026-09-08 and
+2026-09-09, both stalled on an `rm` of a `tool-results/*.txt` file).
+
+If a fetched log is too large to keep around, copy the piece you need into
+this run's own scratchpad or `/tmp` and read from there — never write back to
+or delete the original `tool-results` file. Leaving it in place costs nothing
+this routine needs to reclaim; disk cleanup for that directory is the
+harness's job, not this routine's.
+
 ## Step 4 — Auto-close stale observing issues
 
 An identity that was seen once and never again should not stay on the
@@ -821,7 +844,7 @@ here). Also report Step 5's outcome: whether the dashboard issue was created or
 updated, how many rows it now lists, and whether any rows were truncated (and
 if so, how many).
 
-Then report these five, which come from outside Step 3's own accounting
+Then report these six, which come from outside Step 3's own accounting
 (Requirement 11.3, plus script failures below). Report every one of them on
 every run — a `0` (or `none`) is a result, an omitted line is a gap:
 
@@ -867,5 +890,19 @@ every run — a `0` (or `none`) is a result, an omitted line is a gap:
   separately for this. These failures were **not** excluded (they were tracked
   like any other observation), so keep this number on its own line and never
   fold it into the exclusion count above.
+- **Stale suspected** — run, reusing Step 4's already-resolved `STALE_DAYS`
+  (do not ask for or compute a second threshold):
+
+  ```bash
+  node bin/flaky-ci/scripts/stale-suspected.ts --stale-days ${STALE_DAYS}
+  ```
+
+  List the numbers in `staleIssues[]`, or report `none` when the array is
+  empty — same convention as the other five items above. If the script's
+  `unavailableIssues[]` is non-empty, name those issue numbers too, next to
+  a note that their comments could not be read so their staleness is unknown
+  (a call that exits non-zero instead — e.g. because the `flaky/suspected`
+  list itself could not be fetched — is a Script failures entry, not this
+  line).
 
 This is the routine's output — nothing else needs to be written.

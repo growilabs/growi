@@ -43,6 +43,31 @@ concurrency:
 
 jobs:
 
+  # Skip heavy CI when `flag/skip-heavy-ci` is present, or when this is the
+  # i18n sync bot's translation-only pull request. The head-ref check (not
+  # just the label) matters because the label lands after the PR's `opened`
+  # event via a separate API call -- the head ref, unlike the label, is
+  # already final at `opened` time, so checking it directly avoids a race
+  # that a `labeled` trigger would otherwise need (and which risks ejecting
+  # any PR from the merge queue over an unrelated label change: Mergify's
+  # `check-failure` treats a run cancelled that way as a failure).
+  #
+  # Uses the top-level `github.head_ref` (already used below for the
+  # merge-queue check, always present as an empty string on non-PR events),
+  # not `github.event.pull_request.head.ref` -- that nested property does
+  # not exist on a `push` event.
+  #
+  # IMPORTANT: keep this comment block outside the `if: |` scalar below.
+  # `if: |` is a YAML literal block, so a `#` inside it is NOT a YAML
+  # comment -- it becomes literal text fed to the GitHub Actions expression
+  # parser. Prose there (this repo's PR/commit-message style leans on
+  # possessives and contractions) reliably contains an odd number of `'`
+  # characters, which opens a single-quoted string literal that never
+  # closes, and the entire workflow file fails to parse -- every run shows
+  # zero jobs with "This run likely failed because of a workflow file
+  # issue," even on `push` events that don't touch this job's condition.
+  # ci-app.yml's equivalent jobs already avoid this by keeping their
+  # rationale comments above `if:`, as this one now does.
   test-prod-node24:
     uses: ./.github/workflows/reusable-app-prod.yml
     if: |
@@ -52,6 +77,8 @@ jobs:
         || github.base_ref == 'dev/8.*.x'
         || startsWith( github.base_ref, 'release/' )
         || startsWith( github.head_ref, 'mergify/merge-queue/' ))
+      && !( contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
+            || github.head_ref == 'i18n-sync/translation-only' )
     with:
       node-version: 24.x
       skip-e2e-test: ${{ contains( github.event.pull_request.labels.*.name, 'dependencies' ) }}
