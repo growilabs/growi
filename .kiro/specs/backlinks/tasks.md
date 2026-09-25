@@ -689,17 +689,18 @@ the restored page's status. Independent of B3/B4.
     (`PageService.handlePrivatePagesForGroupsToDelete`, action `delete`) hands
     `deleteMultipleCompletely` every private page of the deleted groups in one call, unbatched, so
     one `syncDescendantsDelete` payload can hold thousands of pages. Split the payload into chunks
-    of `BULK_REINDEX_SIZE` and call `reconcileDeletedPages` once per chunk. See design.md § *Delete-family payloads are
-    not uniformly bounded*
+    of `BULK_REINDEX_SIZE` and call `reconcileDeletedPages` once per chunk. See design.md
+    § *Delete-family payloads are not uniformly bounded*
   - Done when unit tests invoke each handler with a fake event payload and assert the resulting row
-    changes (removed/nulled)
-  - **Met one layer down, deliberately.** The three handlers collapsed into one `handlePagesDelete`,
-    a pass-through to B5.2's `reconcileDeletedPages`; a test that invokes the wrapper to prove it
-    delegates is a mechanism spy (essential-test-design). The row changes are asserted against real
-    rows in `page-link-service-handlers.integ.ts` and `page-link.integ.ts`, the gone/trashed decision
-    in `page-link-sync.spec.ts`, and the queue side in `page-link-upsert-queue.spec.ts`
     changes (removed/nulled), and a `syncDescendantsDelete` payload larger than `BULK_REINDEX_SIZE`
     reaches `reconcileDeletedPages` as several calls of at most `BULK_REINDEX_SIZE` ids each
+  - **How the criterion is met.** The three handlers collapsed into one `handlePagesDelete`, which
+    chunks the payload and reconciles one chunk at a time; a failed chunk is logged and the rest
+    still settle. Its own contract — no call above `BULK_REINDEX_SIZE`, every id exactly once, a
+    failed chunk being logged without stopping the rest — is asserted in `page-link-service-handlers.spec.ts`. The
+    row changes are asserted one layer down, against real rows, in
+    `page-link-service-handlers.integ.ts` and `page-link.integ.ts`; the gone/trashed decision in
+    `page-link-sync.spec.ts`; the queue side in `page-link-upsert-queue.spec.ts`
   - _Requirements: 3.3, 6.1, 6.2_
   - _Boundary: PageLinkService_
   - _Depends: B5.2, B1.6_
