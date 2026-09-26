@@ -412,9 +412,12 @@ export const routesFactory = (crowi) => {
    */
   api.removeProfileImage = async (req, res) => {
     const user = req.user;
-    const attachment = await prisma.attachments.findUnique({
-      where: { id: user.imageAttachment.toString() },
-    });
+    const attachment =
+      user.imageAttachment != null
+        ? await prisma.attachments.findUnique({
+            where: { id: user.imageAttachment.toString() },
+          })
+        : null;
 
     if (attachment == null) {
       return res.json(ApiResponse.error('attachment not found'));
