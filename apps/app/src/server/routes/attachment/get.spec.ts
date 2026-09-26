@@ -24,7 +24,7 @@ describe('retrieveAttachmentFromIdParam', () => {
 
   const mockFindUniqueAttachment = (hasPage: boolean) => {
     const attachment = mock<AttachmentWithComputed>({
-      id: 'attachment1',
+      id: '0000000000000000000000a1',
       pageId: hasPage ? pageId : null,
     });
     vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(attachment);
@@ -44,7 +44,7 @@ describe('retrieveAttachmentFromIdParam', () => {
     isSharedPage?: boolean;
   }) => {
     const req = mock<TestRequest>({
-      params: { id: 'attachment1' },
+      params: { id: '0000000000000000000000a1' },
       user: overrides.user,
       isSharedPage: overrides.isSharedPage,
     });

@@ -1,4 +1,5 @@
 import type { IPage, IUser } from '@growi/core';
+import { objectIdUtils } from '@growi/core/dist/utils';
 import mongoose from 'mongoose';
 
 import type { attachments, Prisma } from '~/generated/prisma/client';
@@ -74,6 +75,11 @@ export const resolveAccessibleAttachment = async <
   isSharedPage: boolean,
   include?: T,
 ): Promise<ResolveAccessibleAttachmentResult<T>> => {
+  // Prisma throws on a non-24-hex ObjectId instead of returning null
+  if (!objectIdUtils.isValidObjectId(attachmentId)) {
+    return { errorCode: 'not_found' };
+  }
+
   // This call's own inferred return type and `AttachmentWithInclude<T>` are
   // two separate instantiations of the same distributive conditional type
   // (Prisma's payload type) and are not structurally unified by the compiler

@@ -3,11 +3,12 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import type { AccessTokenParser } from '@growi/core/dist/interfaces/server';
 import { serializeAttachmentSecurely } from '@growi/core/dist/models/serializers';
 import { OptionParser } from '@growi/core/dist/remark-plugins';
+import { objectIdUtils } from '@growi/core/dist/utils';
 import { loggerFactory } from '@growi/logger';
 import type { Request } from 'express';
 import { Router } from 'express';
 import type { HydratedDocument, Model } from 'mongoose';
-import mongoose, { Types } from 'mongoose';
+import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
 const logger = loggerFactory('growi:remark-attachment-refs:routes:refs');
@@ -79,8 +80,6 @@ export const routesFactory = (crowi): Router => {
 
   const router = Router();
 
-  const ObjectId = Types.ObjectId;
-
   // biome-ignore lint/suspicious/noExplicitAny: ignore
   const Page = mongoose.model<HydratedDocument<IPage>, Model<any> & any>(
     'Page',
@@ -125,10 +124,11 @@ export const routesFactory = (crowi): Router => {
         return;
       }
 
-      // convert ObjectId
       // biome-ignore lint/suspicious/noExplicitAny: ignore
       const orConditions: any[] = [{ originalName: fileNameOrId }];
-      if (fileNameOrId != null && ObjectId.isValid(fileNameOrId)) {
+      // Prisma throws on a non-24-hex ObjectId, and ObjectId.isValid accepts
+      // any 12-character string such as `image001.png`
+      if (objectIdUtils.isValidObjectId(fileNameOrId?.toString())) {
         orConditions.push({ id: fileNameOrId });
       }
 

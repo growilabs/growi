@@ -14,6 +14,7 @@ type FindUniqueResult = Awaited<
 
 describe('resolveAccessibleAttachment', () => {
   const pageId = '000000000000000000000001';
+  const attachmentId = '0000000000000000000000a1';
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -21,7 +22,7 @@ describe('resolveAccessibleAttachment', () => {
 
   const buildAttachment = (hasPage: boolean): FindUniqueResult =>
     mock<NonNullable<FindUniqueResult>>({
-      id: 'attachment1',
+      id: attachmentId,
       pageId: hasPage ? pageId : null,
     });
 
@@ -42,7 +43,7 @@ describe('resolveAccessibleAttachment', () => {
     vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(null);
 
     const result = await resolveAccessibleAttachment(
-      'missing',
+      '0000000000000000000000ff',
       undefined,
       false,
     );
@@ -57,11 +58,7 @@ describe('resolveAccessibleAttachment', () => {
     const isAccessiblePageByViewer = mockIsAccessiblePageByViewer(false);
     const user = mock<HydratedDocument<IUser>>();
 
-    const result = await resolveAccessibleAttachment(
-      'attachment1',
-      user,
-      false,
-    );
+    const result = await resolveAccessibleAttachment(attachmentId, user, false);
 
     expect(isAccessiblePageByViewer).toHaveBeenCalledWith(pageId, user);
     expect(result).toEqual({ errorCode: 'forbidden' });
@@ -73,7 +70,7 @@ describe('resolveAccessibleAttachment', () => {
     mockIsAccessiblePageByViewer(true);
 
     const result = await resolveAccessibleAttachment(
-      'attachment1',
+      attachmentId,
       mock<HydratedDocument<IUser>>(),
       false,
     );
@@ -87,7 +84,7 @@ describe('resolveAccessibleAttachment', () => {
     const modelSpy = vi.spyOn(mongoose, 'model');
 
     const result = await resolveAccessibleAttachment(
-      'attachment1',
+      attachmentId,
       undefined,
       false,
     );
@@ -102,7 +99,7 @@ describe('resolveAccessibleAttachment', () => {
     const isAccessiblePageByViewer = mockIsAccessiblePageByViewer(false);
 
     const result = await resolveAccessibleAttachment(
-      'attachment1',
+      attachmentId,
       undefined,
       true,
     );
@@ -118,14 +115,14 @@ describe('resolveAccessibleAttachment', () => {
       .mockResolvedValue(attachment);
 
     const result = await resolveAccessibleAttachment(
-      'attachment1',
+      attachmentId,
       undefined,
       false,
       { creator: true },
     );
 
     expect(findUniqueSpy).toHaveBeenCalledWith({
-      where: { id: 'attachment1' },
+      where: { id: attachmentId },
       include: { creator: true },
     });
     expect(result).toEqual({ attachment });

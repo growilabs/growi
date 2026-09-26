@@ -1,3 +1,5 @@
+import { objectIdUtils } from '@growi/core/dist/utils';
+
 import { MODEL_ATTACHMENT, SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import { buildAttachmentRemoveSnapshot } from '~/server/service/attachment/attachment-removal-snapshot';
@@ -318,9 +320,10 @@ export const routesFactory = (crowi) => {
   api.remove = async (req, res) => {
     const id = req.body.attachment_id;
 
-    const attachment = await prisma.attachments.findUnique({
-      where: { id },
-    });
+    // Prisma throws on a non-24-hex ObjectId instead of returning null
+    const attachment = objectIdUtils.isValidObjectId(id)
+      ? await prisma.attachments.findUnique({ where: { id } })
+      : null;
 
     if (attachment == null) {
       return res.json(ApiResponse.error('attachment not found'));
