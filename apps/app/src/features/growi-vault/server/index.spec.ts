@@ -608,6 +608,60 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
       expect(dispatcherOnPageChanged).not.toHaveBeenCalled();
     });
   });
+
+  // -------------------------------------------------------------------------
+  // 'syncDescendantsDelete' — bulk descendant delete (recursive page delete)
+  // -------------------------------------------------------------------------
+
+  describe("'syncDescendantsDelete' event", () => {
+    it('dispatches a delete per descendant page so each is removed from the vault', async () => {
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+
+      const pages = [
+        { _id: { toString: () => 'p1' }, path: '/parent/child1' },
+        { _id: { toString: () => 'p2' }, path: '/parent/child2' },
+      ];
+
+      crowi.events.page.emit('syncDescendantsDelete', pages, { _id: 'u1' });
+      await flush();
+
+      expect(dispatcherOnPageChanged).toHaveBeenCalledTimes(2);
+      expect(dispatcherOnPageChanged).toHaveBeenCalledWith({
+        type: 'delete',
+        page: pages[0],
+      });
+      expect(dispatcherOnPageChanged).toHaveBeenCalledWith({
+        type: 'delete',
+        page: pages[1],
+      });
+    });
+
+    it('does nothing for an empty pages list', async () => {
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+
+      crowi.events.page.emit('syncDescendantsDelete', [], { _id: 'u1' });
+      await flush();
+
+      expect(dispatcherOnPageChanged).not.toHaveBeenCalled();
+    });
+
+    it('does not crash on a malformed payload', async () => {
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+
+      expect(() =>
+        crowi.events.page.emit('syncDescendantsDelete'),
+      ).not.toThrow();
+      expect(() =>
+        crowi.events.page.emit('syncDescendantsDelete', null, { _id: 'u1' }),
+      ).not.toThrow();
+      await flush();
+
+      expect(dispatcherOnPageChanged).not.toHaveBeenCalled();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
