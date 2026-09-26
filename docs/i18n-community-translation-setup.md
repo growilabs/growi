@@ -30,7 +30,11 @@ POEditor が公開している OSS プログラムの適用条件は「OSI 認�
    - プロジェクトの簡単な説明（GROWI がチーム向け Wiki プラットフォームであること）
 4. 申請後は POEditor からの返信を待ちます。承認・却下いずれの通知が来ても、このドキュメントの「1. この手順が満たすべき条件」に戻り、次のステップに進んでよいかを確認してください。
 
-### 1.3 却下された場合
+### 1.3 承認の確認
+
+2026-09-25 時点で、POEditor のプロジェクト画面上に "Open Source Project (Request approved)" と表示されていることを確認した。1.2 の申請自体がいつ行われたかの記録は残っていないが、この表示により申請が承認されていることは確認できている。本番運用（5.1・5.2 のワークフロー配線、6.1・6.2 の実環境確認）を進めてよい状態にある。
+
+### 1.4 却下された場合
 
 要件7.2により、却下された場合は同等規模（文字列数・言語数・貢献者数に実用上の上限がない）の代替プラン・代替サービスが確認できるまで本番運用に進みません。代替の検討は本ドキュメントの範囲外です（`.kiro/specs/i18n-community-translation/brief.md` の「他候補を落とした理由」に、検討済みの候補とその却下理由が記録されています。POEditor 自体が使えなくなった場合はこの記録を出発点に再検討してください）。
 
@@ -95,7 +99,7 @@ POEDITOR_API_TOKEN=<token> I18N_SYNC_SEED_LANGUAGE=ko_KR pnpm run i18n:sync:seed
 
 ### 4.1 なぜ必要か
 
-「訳文のみ」の変更提案 PR は、既存の i18n CI ゲート（`lint:i18n`、`ci-app-lint` に含まれる）を通過した場合に限り、人レビューを待たずに反映されます。この経路は、既存の `.github/mergify.yml` にある「Automatic queue to merge」ルール（`#approved-reviews-by >= 1` かつ変更要求レビューが無いこと）にそのまま乗せることで実現します。このルール自体は変更しません。
+「訳文のみ」の変更提案 PR は、既存の i18n CI ゲート（`lint:i18n`、`ci-app-lint` に含まれる）を通過した場合に限り、人レビューを待たずに反映されます。承認1件以上・変更要求レビュー無しという既存の条件は保ったまま、この訳文のみPR（ブランチ名 `i18n-sync/translation-only`）だけを `ci-app-lint` の成功のみを条件にする軽量な Mergify キュー（`.github/mergify.yml` の `i18n-sync-translation-only`）へ振り分けます。対象はボット自身が作った PR（`author = growi-i18n-pr-publisher[bot]`）かつ変更ファイルが翻訳ロケール配下に限られる場合だけに絞っており、それ以外の PR は通常の「Automatic queue to merge」ルール（フルの test/build/Playwright を要求）に残ります。
 
 GitHub は PR 作成者自身による自己承認を拒否するため、「PR を作る ID」とは別の ID が承認レビューを送る必要があります。この別 ID が、ここで用意する承認ボットアカウントです（`.kiro/specs/i18n-community-translation/design.md` の Boundary Commitments「承認ボットの必要性」、および Security Considerations）。
 
