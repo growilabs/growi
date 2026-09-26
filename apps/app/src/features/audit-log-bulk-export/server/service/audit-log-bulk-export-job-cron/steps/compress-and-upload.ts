@@ -1,5 +1,7 @@
+import type { IUser } from '@growi/core';
 import type { Archiver } from 'archiver';
 import archiver from 'archiver';
+import type { HydratedDocument } from 'mongoose';
 
 import { AuditLogBulkExportJobStatus } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import { SupportedAction } from '~/interfaces/activity';
@@ -63,7 +65,7 @@ async function postProcess(
  */
 export async function compressAndUpload(
   this: IAuditLogBulkExportJobCronService,
-  user,
+  user: HydratedDocument<IUser>,
   job: AuditLogBulkExportJobDocument,
 ): Promise<void> {
   const auditLogArchiver = setUpAuditLogArchiver.bind(this)();

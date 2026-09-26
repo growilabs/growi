@@ -253,7 +253,7 @@ export const setup = (crowi) => {
           include: { creator: true },
         });
 
-        paginateResult.docs = paginateResult.docs.map((doc) => {
+        const docs = paginateResult.docs.map((doc) => {
           return {
             ...doc,
             page: doc.pageId,
@@ -267,7 +267,7 @@ export const setup = (crowi) => {
           };
         });
 
-        return res.apiv3({ paginateResult });
+        return res.apiv3({ paginateResult: { ...paginateResult, docs } });
       } catch (err) {
         logger.error('Attachment not found', err);
         return res.apiv3Err(err, 500);

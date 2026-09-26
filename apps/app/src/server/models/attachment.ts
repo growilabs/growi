@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { addSeconds } from 'date-fns/addSeconds';
-import { Schema } from 'mongoose';
+import { Schema, type Types } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 import path from 'pathe';
@@ -131,12 +131,12 @@ export const extension = Prisma.defineExtension((client) => {
       attachments: {
         createWithoutSave(
           pageId: string | null,
-          user: { _id: string },
+          user: { _id: string | Types.ObjectId },
           originalName: string,
           fileFormat: string,
           fileSize: number,
           attachmentType: AttachmentType,
-        ) {
+        ): AttachmentDraft {
           const extname = path.extname(originalName);
           let fileName = generateFileHash(originalName);
           if (extname.length > 1) {
@@ -146,7 +146,7 @@ export const extension = Prisma.defineExtension((client) => {
 
           return {
             pageId,
-            creatorId: user._id,
+            creatorId: user._id.toString(),
             filePath: null,
             fileName,
             fileFormat,

@@ -121,12 +121,8 @@ class Crowi {
 
   loginRequiredFactory: typeof loginRequiredFactory;
 
-  // Lazily reads `prismaUtils.prisma` (a getter, not a top-level binding read
-  // at import time) -- see test/setup/prisma.ts: it defers PrismaClient
-  // instantiation until MONGO_URI is set by the mongo setup file, and a
-  // module-scope destructured `import { prisma }` here was observed to
-  // resolve that binding during test collection (before MONGO_URI is set),
-  // permanently caching a broken client for the whole test file.
+  // Read lazily: a module-scope `import { prisma }` would resolve before
+  // test/setup/prisma.ts has MONGO_URI and cache a broken client.
   get prisma(): PrismaClient {
     return prismaUtils.prisma;
   }

@@ -1,32 +1,11 @@
 /**
- * Integration test for the attachmentType backfill migration.
+ * `attachments` are seeded and read back through a plain `mongodb` driver
+ * client (not mongoose / Prisma) so the pre-migration legacy shape (no
+ * `attachmentType`) can be represented without schema validation.
  *
- * Runs against the real (in-memory) MongoDB test database wired by the
- * `app-integration-exclusive` Vitest project (see vitest.workspace.mts) —
- * mongoose and prisma are NOT mocked (and this file never imports `mongoose`
- * or `prisma` itself); `up()` executes for real against that database.
- * `attachments` documents are seeded and read back through a plain `mongodb`
- * driver `MongoClient` connected to the same per-worker test database,
- * bypassing model-level / Prisma schema validation so the pre-migration
- * legacy document shape (no `attachmentType`) can be represented directly —
- * exactly how the migration itself finds them in production.
- *
- * WHY the `exclusive` project: `up()`'s `$runCommandRaw` update matches every
- * document in the `attachments` collection with a missing `attachmentType`,
- * not just documents this file inserted. Sharing a database with the
- * ordinary integration tests would let this file silently backfill (and thus
- * mutate) any legacy-shaped attachment fixture another file in the same
- * worker left behind.
- *
- * Contract under test (implementation-agnostic — asserts observable DB
- * state):
- *  - a legacy attachment with "page" set and no "attachmentType" gets
- *    attachmentType = AttachmentType.WIKI_PAGE;
- *  - a legacy attachment with "page" null and no "attachmentType" gets
- *    attachmentType = AttachmentType.PROFILE_IMAGE;
- *  - an attachment that already has an attachmentType is left untouched,
- *    regardless of its "page" value;
- *  - re-running is a no-op (idempotent).
+ * Runs in the `exclusive` project because `up()` backfills every attachment
+ * missing `attachmentType`, which would mutate fixtures other files in a
+ * shared database leave behind.
  */
 import type { Collection, Db } from 'mongodb';
 import { MongoClient, ObjectId } from 'mongodb';
