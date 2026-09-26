@@ -6,12 +6,10 @@ import type { HydratedDocument } from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { ResponseMode } from '~/server/interfaces/attachment';
-import {
-  Attachment,
-  type IAttachmentDocument,
-} from '~/server/models/attachment';
+import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { isAttachmentAccessibleToViewer } from '~/server/service/attachment/resolve-accessible-attachment';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 const logger = loggerFactory('growi:features:page-bulk-export:embed-images');
 
@@ -99,9 +97,11 @@ export async function embedAttachmentImages(
   const uniqueIds = [...new Set(matches.map((m) => m[1]))];
 
   // Batch-fetch instead of one findById per id.
-  const attachments = await Attachment.find({ _id: { $in: uniqueIds } });
-  const attachmentById = new Map<string, IAttachmentDocument>(
-    attachments.map((a) => [a._id.toString(), a]),
+  const attachments = await prisma.attachments.findMany({
+    where: { id: { in: uniqueIds } },
+  });
+  const attachmentById = new Map<string, AttachmentWithComputed>(
+    attachments.map((a) => [a.id, a]),
   );
 
   const replacements = new Map<string, string>();

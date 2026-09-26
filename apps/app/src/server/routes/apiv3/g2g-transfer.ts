@@ -50,11 +50,11 @@ import {
 import { deriveReplaceTargets } from '~/server/service/import/replace-target-collections';
 import { summarizeUniqueConflicts } from '~/server/service/import/summarize-unique-conflicts';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 import { TransferKey } from '~/utils/vo/transfer-key';
 
 import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import { Attachment } from '../../models/attachment';
 import { isPathWithinBase } from '../../util/safe-path-utils';
 import { generateAdminRequiredIfInstalled } from './g2g-transfer-admin-required-if-installed';
 import { validateAttachmentMetadata } from './g2g-transfer-attachment-metadata';
@@ -902,7 +902,9 @@ export const setup = (crowi: Crowi): Router => {
         }
 
         const { fileName, fileSize } = attachmentMap;
-        const count = await Attachment.countDocuments({ fileName, fileSize });
+        const count = await prisma.attachments.count({
+          where: { fileName, fileSize },
+        });
         if (count === 0) {
           logger.warn(
             { fileName, fileSize },

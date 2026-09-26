@@ -1,23 +1,28 @@
-import type { IAttachment, IPage, IUser } from '@growi/core/dist/interfaces';
+import type { IPage, IUser } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import type { AccessTokenParser } from '@growi/core/dist/interfaces/server';
 import { serializeAttachmentSecurely } from '@growi/core/dist/models/serializers';
 import { OptionParser } from '@growi/core/dist/remark-plugins';
+import { objectIdUtils } from '@growi/core/dist/utils';
 import { loggerFactory } from '@growi/logger';
 import type { Request } from 'express';
 import { Router } from 'express';
 import type { HydratedDocument, Model } from 'mongoose';
-import mongoose, { model, Types } from 'mongoose';
+import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
 const logger = loggerFactory('growi:remark-attachment-refs:routes:refs');
+
+// `g` / `y` make RegExp#test stateful via lastIndex, which skips matches when
+// one instance filters many strings; MongoDB `$regex` never honored them either.
+const STATEFUL_FLAGS = /[gy]/g;
 
 function generateRegexp(expression: string): RegExp {
   // https://regex101.com/r/uOrwqt/2
   const matches = expression.match(/^\/(.+)\/(.*)?$/);
 
   return matches != null
-    ? new RegExp(matches[1], matches[2])
+    ? new RegExp(matches[1], matches[2]?.replace(STATEFUL_FLAGS, ''))
     : new RegExp(expression);
 }
 
@@ -75,9 +80,9 @@ export const routesFactory = (crowi): Router => {
 
   const accessTokenParser: AccessTokenParser = crowi.accessTokenParser;
 
-  const router = Router();
+  const prisma = crowi.prisma;
 
-  const ObjectId = Types.ObjectId;
+  const router = Router();
 
   // biome-ignore lint/suspicious/noExplicitAny: ignore
   const Page = mongoose.model<HydratedDocument<IPage>, Model<any> & any>(
@@ -123,18 +128,21 @@ export const routesFactory = (crowi): Router => {
         return;
       }
 
-      // convert ObjectId
       // biome-ignore lint/suspicious/noExplicitAny: ignore
       const orConditions: any[] = [{ originalName: fileNameOrId }];
-      if (fileNameOrId != null && ObjectId.isValid(fileNameOrId.toString())) {
-        orConditions.push({ _id: new ObjectId(fileNameOrId.toString()) });
+      // Prisma throws on a non-24-hex ObjectId, and ObjectId.isValid accepts
+      // any 12-character string such as `image001.png`
+      if (objectIdUtils.isValidObjectId(fileNameOrId?.toString())) {
+        orConditions.push({ id: fileNameOrId });
       }
 
-      const Attachment = model<IAttachment>('Attachment');
-      const attachment = await Attachment.findOne({
-        page: page._id,
-        $or: orConditions,
-      }).populate('creator');
+      const attachment = await prisma.attachments.findFirst({
+        where: {
+          pageId: page._id.toString(),
+          OR: orConditions,
+        },
+        include: { creator: true },
+      });
 
       // not found
       if (attachment == null) {
@@ -152,20 +160,30 @@ export const routesFactory = (crowi): Router => {
 
       // forbidden
       const isAccessible = await Page.isAccessiblePageByViewer(
-        attachment.page,
+        attachment.pageId,
         user,
       );
       if (!isAccessible) {
         logger.debug(
           `attachment '${attachment.id}' is forbidden for user '${user?.username}'`,
         );
-        res.status(403).send(`page '${attachment.page}' is forbidden.`);
+        res.status(403).send(`page '${attachment.pageId}' is forbidden.`);
         return;
       }
 
-      res
-        .status(200)
-        .send({ attachment: serializeAttachmentSecurely(attachment) });
+      res.status(200).send({
+        attachment: serializeAttachmentSecurely({
+          ...attachment,
+          page: attachment.pageId,
+          creator:
+            attachment.creator != null
+              ? {
+                  ...attachment.creator,
+                  imageAttachment: attachment.creator.imageAttachmentId,
+                }
+              : attachment.creator,
+        }),
+      });
     },
   );
 
@@ -243,21 +261,36 @@ export const routesFactory = (crowi): Router => {
 
       logger.debug('retrieve attachments for pages:', pageIds);
 
-      // create query to find
-      const Attachment = model<IAttachment>('Attachment');
-      let query = Attachment.find({
-        page: { $in: pageIds },
+      const attachments = await prisma.attachments.findMany({
+        where: { pageId: { in: pageIds } },
+        include: { creator: true },
       });
-      // add regex condition
-      if (regex != null) {
-        query = query.and([{ originalName: { $regex: regex } }]);
-      }
 
-      const attachments = await query.populate('creator').exec();
+      // regex filtering happens in-process: Prisma's Mongo connector has no
+      // arbitrary-RegExp filter (only contains/startsWith/mode:'insensitive'),
+      // and `findRaw` would drop the `creator` include and computed fields.
+      const filteredAttachments =
+        regex != null
+          ? attachments.filter(
+              (attachment) =>
+                attachment.originalName != null &&
+                regex.test(attachment.originalName),
+            )
+          : attachments;
 
       res.status(200).send({
-        attachments: attachments.map((attachment) =>
-          serializeAttachmentSecurely(attachment),
+        attachments: filteredAttachments.map((attachment) =>
+          serializeAttachmentSecurely({
+            ...attachment,
+            page: attachment.pageId,
+            creator:
+              attachment.creator != null
+                ? {
+                    ...attachment.creator,
+                    imageAttachment: attachment.creator.imageAttachmentId,
+                  }
+                : attachment.creator,
+          }),
         ),
       });
     },

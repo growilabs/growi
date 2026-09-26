@@ -62,7 +62,6 @@ import { AttachmentMethodType } from '~/interfaces/attachment';
 import { PageActionOnGroupDelete } from '~/interfaces/user-group';
 import type Crowi from '~/server/crowi';
 import { AttachmentType } from '~/server/interfaces/attachment';
-import { Attachment } from '~/server/models/attachment';
 import type { PageModel } from '~/server/models/page';
 import UserGroup from '~/server/models/user-group';
 import { configManager } from '~/server/service/config-manager';
@@ -107,7 +106,7 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
   // (IUserHasId types _id as string while the doc actually holds ObjectId).
   let contentCreatorId: Types.ObjectId;
 
-  const createdAttachmentIds: Types.ObjectId[] = [];
+  const createdAttachmentIds: string[] = [];
 
   /** Create a metadata-only attachment doc and register it for cleanup. */
   async function arrangeAttachment(overrides: {
@@ -115,17 +114,19 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
     originalName: string;
     fileSize: number;
   }) {
-    const attachment = await Attachment.create({
-      page: overrides.page,
-      creator: contentCreatorId,
-      // fileName is globally unique — suffix with a fresh ObjectId
-      fileName: `trash-group-cascade-activity-integ-${new Types.ObjectId().toHexString()}.dat`,
-      fileFormat: 'application/octet-stream',
-      fileSize: overrides.fileSize,
-      originalName: overrides.originalName,
-      attachmentType: AttachmentType.WIKI_PAGE,
+    const attachment = await prisma.attachments.create({
+      data: {
+        pageId: overrides.page.toString(),
+        creatorId: contentCreatorId.toString(),
+        // fileName is globally unique — suffix with a fresh ObjectId
+        fileName: `trash-group-cascade-activity-integ-${new Types.ObjectId().toHexString()}.dat`,
+        fileFormat: 'application/octet-stream',
+        fileSize: overrides.fileSize,
+        originalName: overrides.originalName,
+        attachmentType: AttachmentType.WIKI_PAGE,
+      },
     });
-    createdAttachmentIds.push(attachment._id);
+    createdAttachmentIds.push(attachment.id);
     return attachment;
   }
 
@@ -202,7 +203,9 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
 
   afterAll(async () => {
     await deleteThisSuitesActivities();
-    await Attachment.deleteMany({ _id: { $in: createdAttachmentIds } });
+    await prisma.attachments.deleteMany({
+      where: { id: { in: createdAttachmentIds } },
+    });
     await Page.deleteMany({
       path: { $in: [TRASH_PAGE_PATH, GROUP_PAGE_PATH] },
     });
@@ -330,8 +333,10 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
       // are gone, while the snapshots read back above still hold the
       // pre-deletion data (freeze-before-removal, req 3.4 upstream).
       expect(
-        await Attachment.countDocuments({
-          _id: { $in: attachments.map((attachment) => attachment._id) },
+        await prisma.attachments.count({
+          where: {
+            id: { in: attachments.map((attachment) => attachment._id) },
+          },
         }),
       ).toBe(0);
       expect(await Page.findById(trashedPage._id)).toBeNull();
@@ -406,7 +411,9 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
 
       // The real deletion completed: the attachment doc and the private
       // page are gone from the DB.
-      expect(await Attachment.findById(attachment._id)).toBeNull();
+      expect(
+        await prisma.attachments.findUnique({ where: { id: attachment._id } }),
+      ).toBeNull();
       expect(await Page.findById(privatePage._id)).toBeNull();
     }, 30_000);
   });

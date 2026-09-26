@@ -148,7 +148,7 @@
     "publish_transfer_key": "发布迁移密钥",
     "transfer_key_limit": "迁移密钥在签发后一小时内有效。",
     "once_transfer_key_used": "一旦迁移密钥被用于迁移，它将不再可用于进一步的迁移。",
-    "transfer_to_growi_cloud": "有关更多详情，请点击<a href='{{documentationUrl}}en/admin-guide/management-cookbook/g2g-transfer.html'>此处</a>。"
+    "transfer_to_growi_cloud": "有关更多详情，请点击<a href='{{documentationUrl}}/en/admin-guide/management-cookbook/g2g-transfer.html'>此处</a>。"
   },
   "accesstoken_scopes_desc": {
     "read": {
