@@ -88,9 +88,7 @@ vi.mock('@growi/core', () => ({
 }));
 
 vi.mock('@growi/core/dist/models/serializers', () => ({
-  serializeAttachmentSecurely: vi
-    .fn()
-    .mockImplementation((attachment) => attachment),
+  serializeAttachmentSecurely: (attachment) => attachment,
 }));
 
 vi.mock('@growi/core/dist/remark-plugins', () => ({
@@ -173,6 +171,11 @@ describe('useSWRxRef and useSWRxRefs integration tests', () => {
         });
       });
     }
+  });
+
+  beforeEach(() => {
+    mockFindFirstAttachment.mockResolvedValue(mockAttachment);
+    mockFindManyAttachments.mockResolvedValue([mockAttachment]);
   });
 
   afterEach(() => {
@@ -271,6 +274,38 @@ describe('useSWRxRef and useSWRxRefs integration tests', () => {
 
       expect(result.current.data).toBeDefined();
       expect(result.current.error).toBeUndefined();
+
+      axiosGetSpy.mockRestore();
+    });
+
+    it.each([
+      '/png/g',
+      '/png/y',
+    ])('returns every attachment whose originalName matches the regex option %s', async (regex) => {
+      const withName = (originalName: string | null) => ({
+        ...mockAttachment,
+        originalName,
+      });
+      mockFindManyAttachments.mockResolvedValueOnce([
+        withName('a.png'),
+        withName('b.png'),
+        withName('c.jpg'),
+        withName('d.png'),
+        withName(null),
+      ]);
+      const axiosGetSpy = setupAxiosSpy();
+
+      const { result } = renderHook(() =>
+        useSWRxRefs('/test-page', undefined, { regex }, false),
+      );
+
+      await waitFor(() => expect(result.current.data).toBeDefined(), {
+        timeout: 5000,
+      });
+
+      expect(
+        result.current.data?.map((attachment) => attachment.originalName),
+      ).toEqual(['a.png', 'b.png', 'd.png']);
 
       axiosGetSpy.mockRestore();
     });

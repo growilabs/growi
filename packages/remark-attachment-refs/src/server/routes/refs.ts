@@ -13,12 +13,16 @@ import { FilterXSS } from 'xss';
 
 const logger = loggerFactory('growi:remark-attachment-refs:routes:refs');
 
+// `g` / `y` make RegExp#test stateful via lastIndex, which skips matches when
+// one instance filters many strings; MongoDB `$regex` never honored them either.
+const STATEFUL_FLAGS = /[gy]/g;
+
 function generateRegexp(expression: string): RegExp {
   // https://regex101.com/r/uOrwqt/2
   const matches = expression.match(/^\/(.+)\/(.*)?$/);
 
   return matches != null
-    ? new RegExp(matches[1], matches[2])
+    ? new RegExp(matches[1], matches[2]?.replace(STATEFUL_FLAGS, ''))
     : new RegExp(expression);
 }
 
@@ -267,8 +271,10 @@ export const routesFactory = (crowi): Router => {
       // and `findRaw` would drop the `creator` include and computed fields.
       const filteredAttachments =
         regex != null
-          ? attachments.filter((attachment) =>
-              regex.test(attachment.originalName ?? ''),
+          ? attachments.filter(
+              (attachment) =>
+                attachment.originalName != null &&
+                regex.test(attachment.originalName),
             )
           : attachments;
 
