@@ -127,6 +127,41 @@ describe('handleGetPasswordHashMigrationStatus', () => {
     expect(apiv3.mock.calls[0][0].isCleanupCompleted).toBe(true);
   });
 
+  it('does not report completion when nobody has migrated yet', async () => {
+    // Regression: `both` is 0 here only because not a single user has migrated,
+    // so every stored credential is still old-format. Deriving completion from
+    // `both` alone reported that instance as already hardened.
+    countMock.mockResolvedValue(
+      buildDistribution({ both: 0, legacyOnly: 5, legacyOnlyActive: 5 }),
+    );
+    const { res, apiv3 } = buildRes();
+
+    await handleGetPasswordHashMigrationStatus(req, res as Response as never);
+
+    expect(apiv3.mock.calls[0][0].isCleanupCompleted).toBe(false);
+    expect(apiv3.mock.calls[0][0].isCleanupRunnable).toBe(false);
+  });
+
+  it('does not report completion while only non-active users remain unmigrated', async () => {
+    // There is nothing for the cleanup to remove, but old-format data is still
+    // stored — the cleanup cannot touch it, because it is those users' only
+    // credential. That is not the same as being finished.
+    countMock.mockResolvedValue(
+      buildDistribution({
+        both: 0,
+        legacyOnly: 2,
+        legacyOnlyActive: 0,
+        legacyOnlyNonActive: 2,
+      }),
+    );
+    const { res, apiv3 } = buildRes();
+
+    await handleGetPasswordHashMigrationStatus(req, res as Response as never);
+
+    expect(apiv3.mock.calls[0][0].isCleanupCompleted).toBe(false);
+    expect(apiv3.mock.calls[0][0].isCleanupRunnable).toBe(true);
+  });
+
   it('answers with an error instead of throwing when the count fails', async () => {
     countMock.mockRejectedValue(new Error('db down'));
     const { res, apiv3, apiv3Err } = buildRes();

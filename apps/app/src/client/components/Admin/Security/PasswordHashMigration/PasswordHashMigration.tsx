@@ -2,7 +2,10 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import type { IPasswordHashFormatDistribution } from '~/interfaces/password-hash-migration';
+import type {
+  IPasswordHashFormatDistribution,
+  IResPasswordHashMigrationStatus,
+} from '~/interfaces/password-hash-migration';
 import {
   postPasswordHashCleanup,
   useSWRxPasswordHashMigrationStatus,
@@ -64,6 +67,57 @@ const DistributionTable = (props: {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+};
+
+/**
+ * Which of the four states the instance is in.
+ *
+ * Order matters. "Blocked" is checked first because it is the only state that
+ * names an action the administrator can take, and it can coexist with there being
+ * something to remove. Completion is checked against old-format data existing
+ * ANYWHERE — not against the cleanup having nothing to do — because a `legacyOnly`
+ * user still holds old-format data the cleanup cannot touch.
+ */
+const StatusBanner = (props: {
+  status: IResPasswordHashMigrationStatus;
+}): JSX.Element => {
+  const { distribution, isCleanupRunnable, isCleanupCompleted } = props.status;
+  const { t } = useTranslation('admin');
+
+  if (!isCleanupRunnable) {
+    return (
+      <div className="alert alert-warning">
+        {t('security_settings.password_hash_migration.blocked', {
+          count: distribution.legacyOnlyActive,
+        })}
+      </div>
+    );
+  }
+
+  if (isCleanupCompleted) {
+    return (
+      <div className="alert alert-success">
+        <span className="material-symbols-outlined me-1">check_circle</span>
+        {t('security_settings.password_hash_migration.already_completed')}
+      </div>
+    );
+  }
+
+  if (distribution.both > 0) {
+    return (
+      <div className="alert alert-info">
+        {t('security_settings.password_hash_migration.ready_to_cleanup')}
+      </div>
+    );
+  }
+
+  // Nothing for the cleanup to remove, yet old-format data remains: the only
+  // unmigrated users are non-active ones, whom the cleanup cannot help.
+  return (
+    <div className="alert alert-info">
+      {t('security_settings.password_hash_migration.nothing_to_remove')}
     </div>
   );
 };
@@ -133,24 +187,7 @@ export const PasswordHashMigration = (): JSX.Element => {
         <>
           <DistributionTable distribution={data.distribution} />
 
-          {data.isCleanupCompleted ? (
-            <div className="alert alert-success">
-              <span className="material-symbols-outlined me-1">
-                check_circle
-              </span>
-              {t('security_settings.password_hash_migration.already_completed')}
-            </div>
-          ) : data.isCleanupRunnable ? (
-            <div className="alert alert-info">
-              {t('security_settings.password_hash_migration.ready_to_cleanup')}
-            </div>
-          ) : (
-            <div className="alert alert-warning">
-              {t('security_settings.password_hash_migration.blocked', {
-                count: data.distribution.legacyOnlyActive,
-              })}
-            </div>
-          )}
+          <StatusBanner status={data} />
 
           {data.distribution.legacyOnlyNonActive > 0 && (
             <p className="text-muted small">
@@ -163,7 +200,7 @@ export const PasswordHashMigration = (): JSX.Element => {
           <button
             type="button"
             className="btn btn-danger"
-            disabled={!data.isCleanupRunnable || data.isCleanupCompleted}
+            disabled={!data.isCleanupRunnable || data.distribution.both === 0}
             onClick={() => setModalOpen(true)}
           >
             {t('security_settings.password_hash_migration.cleanup_button')}

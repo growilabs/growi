@@ -57,7 +57,13 @@ export const handleGetPasswordHashMigrationStatus = async (
       // users block it. Sending it explicitly keeps the UI from re-deriving (and
       // drifting from) the rule the server actually enforces.
       isCleanupRunnable: distribution.legacyOnlyActive === 0,
-      isCleanupCompleted: distribution.both === 0,
+      // Completion means no old-format credential is left ANYWHERE, which is not
+      // the same as "nothing for the cleanup to remove". A `legacyOnly` user holds
+      // old-format data too — the cleanup simply cannot touch it, because it is
+      // that user's only credential. Deriving this from `both` alone would report
+      // an instance where nobody has migrated yet as already hardened.
+      isCleanupCompleted:
+        distribution.both === 0 && distribution.legacyOnly === 0,
     };
 
     res.apiv3(status);

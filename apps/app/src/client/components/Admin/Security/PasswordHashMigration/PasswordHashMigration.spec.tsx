@@ -46,7 +46,8 @@ const buildStatus = (
   return {
     distribution,
     isCleanupRunnable: distribution.legacyOnlyActive === 0,
-    isCleanupCompleted: distribution.both === 0,
+    isCleanupCompleted:
+      distribution.both === 0 && distribution.legacyOnly === 0,
     ...flags,
   };
 };
@@ -105,6 +106,41 @@ describe('PasswordHashMigration', () => {
 
     expect(cleanupButton()).toBeDisabled();
     expect(screen.getByText(`${K}.already_completed`)).toBeInTheDocument();
+  });
+
+  it('does not claim completion when nobody has migrated yet', () => {
+    // Regression: with no migrated users at all there is nothing for the cleanup
+    // to remove, which previously rendered as "already complete" even though every
+    // stored credential was still old-format.
+    mockStatus(buildStatus({ legacyOnly: 5, legacyOnlyActive: 5 }));
+
+    render(<PasswordHashMigration />);
+
+    expect(
+      screen.queryByText(`${K}.already_completed`),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(`${K}.blocked`)).toBeInTheDocument();
+    expect(cleanupButton()).toBeDisabled();
+  });
+
+  it('says there is nothing to remove when only non-active users are unmigrated', () => {
+    // Not blocked and nothing to delete, but old-format data is still stored, so
+    // this is neither "ready" nor "complete".
+    mockStatus(
+      buildStatus({
+        legacyOnly: 3,
+        legacyOnlyActive: 0,
+        legacyOnlyNonActive: 3,
+      }),
+    );
+
+    render(<PasswordHashMigration />);
+
+    expect(screen.getByText(`${K}.nothing_to_remove`)).toBeInTheDocument();
+    expect(
+      screen.queryByText(`${K}.already_completed`),
+    ).not.toBeInTheDocument();
+    expect(cleanupButton()).toBeDisabled();
   });
 
   it('does not run the cleanup until the irreversibility is acknowledged', async () => {

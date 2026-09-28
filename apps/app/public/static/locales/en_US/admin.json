@@ -250,6 +250,7 @@
       "cleanup_target": "To be removed",
       "already_completed": "All old-format data has been removed. The hardening is complete.",
       "ready_to_cleanup": "The old-format data can be removed. Running this completes the hardening.",
+      "nothing_to_remove": "There is nothing to remove. The hardening is not complete yet, though, because some users have not migrated.",
       "blocked": "{{count}} active user(s) have not migrated yet. This cannot run until every one of them has logged in once.",
       "non_active_note": "{{count}} non-active user(s) (suspended, invited, etc.) have not migrated either. They do not block this operation, because they cannot be compelled to log in.",
       "cleanup_button": "Remove old-format data",

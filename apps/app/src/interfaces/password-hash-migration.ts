@@ -30,7 +30,12 @@ export interface IResPasswordHashMigrationStatus {
   distribution: IPasswordHashFormatDistribution;
   /** true when no ACTIVE `legacyOnly` user remains, so the cleanup would not abort. */
   isCleanupRunnable: boolean;
-  /** true when no `both` user remains, i.e. there is nothing left to remove. */
+  /**
+   * true when no old-format credential is left anywhere (`both` and `legacyOnly`
+   * are both zero). Deliberately NOT "nothing left for the cleanup to remove": a
+   * `legacyOnly` user still holds old-format data that the cleanup cannot touch,
+   * so an instance where nobody has migrated yet is not complete.
+   */
   isCleanupCompleted: boolean;
 }
 

@@ -250,6 +250,7 @@
       "cleanup_target": "À supprimer",
       "already_completed": "Toutes les données à l'ancien format ont été supprimées. Le renforcement est terminé.",
       "ready_to_cleanup": "Les données à l'ancien format peuvent être supprimées. Cette opération achève le renforcement.",
+      "nothing_to_remove": "Il n'y a rien à supprimer. Le renforcement n'est cependant pas terminé, car certains utilisateurs n'ont pas migré.",
       "blocked": "{{count}} utilisateur(s) actif(s) n'ont pas encore migré. L'opération est impossible tant qu'ils ne se sont pas tous connectés une fois.",
       "non_active_note": "{{count}} utilisateur(s) non actif(s) (suspendus, invités, etc.) n'ont pas migré non plus. Ils ne bloquent pas l'opération, car on ne peut pas les contraindre à se connecter.",
       "cleanup_button": "Supprimer les données à l'ancien format",
