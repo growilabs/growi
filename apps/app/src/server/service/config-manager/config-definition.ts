@@ -563,24 +563,25 @@ export const CONFIG_DEFINITIONS = {
   // Per-endpoint cap (admitted anonymous-log events per 1-minute window, all IPs
   // combined) on syncing anonymous audit logs to Elasticsearch — see
   // features/auditlog-es-sync/server/service/decide-es-sync-for-event.ts.
-  // 100 is a launch placeholder, not a tuned value: it reuses
-  // app:elasticsearchReindexBulkSize's own default, i.e. the chunk size ES already
-  // handles routinely in a single bulk write during a full reindex.
+  //
+  // Launch placeholders pending GROWI.cloud's own traffic measurement, each set
+  // to 10x the endpoint's existing rate-limiter allowance for a single IP
+  // (features/rate-limiter/config/index.ts).
   'app:auditLogEsSyncAnonymousThresholdLogin': defineConfig<number>({
     envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_LOGIN',
-    defaultValue: 100,
+    defaultValue: 5000,
   }),
   'app:auditLogEsSyncAnonymousThresholdRegister': defineConfig<number>({
     envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_REGISTER',
-    defaultValue: 100,
+    defaultValue: 1000,
   }),
   'app:auditLogEsSyncAnonymousThresholdForgotPassword': defineConfig<number>({
     envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_FORGOT_PASSWORD',
-    defaultValue: 100,
+    defaultValue: 250,
   }),
   'app:auditLogEsSyncAnonymousThresholdInstaller': defineConfig<number>({
     envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_INSTALLER',
-    defaultValue: 100,
+    defaultValue: 50,
   }),
   'app:serviceType': defineConfig<GrowiServiceType>({
     envVarName: 'SERVICE_TYPE',
