@@ -92,6 +92,9 @@ describe('formatTruncatedPagePath', () => {
         { type: 'segment', text: '2024/01/01', isPageName: true },
       ]);
       expect(result.fullPath).toBe('/Projects/team/notes/2024/01/01');
+      // The ancestor portion excludes the bundled date, so callers walking the
+      // ancestors never see '2024' / '01' as ancestors.
+      expect(result.ancestorPath).toBe('/Projects/team/notes');
     });
 
     it('does NOT bundle a trailing date when only one ancestor segment precedes it', () => {
@@ -107,6 +110,7 @@ describe('formatTruncatedPagePath', () => {
         { type: 'segment', text: '01', isPageName: true },
       ]);
       expect(result.fullPath).toBe('/notes/2024/01/01');
+      expect(result.ancestorPath).toBe('/notes/2024/01');
     });
 
     it('treats a short trailing-year path as two units without bundling (/notes/2024)', () => {
