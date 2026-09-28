@@ -28,7 +28,6 @@ import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
@@ -36,6 +35,7 @@ import {
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
@@ -207,9 +207,9 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     pageTags: string[];
   }) {
     const tagEvent = crowi.events.tag;
-    await PageTagRelation.updatePageTags(createdPage.id, pageTags);
+    await prisma.pagetagrelations.updatePageTags(createdPage.id, pageTags);
     tagEvent.emit('update', createdPage, pageTags);
-    return PageTagRelation.listTagNamesByPage(createdPage.id);
+    return prisma.pagetagrelations.listTagNamesByPage(createdPage.id);
   }
 
   /**

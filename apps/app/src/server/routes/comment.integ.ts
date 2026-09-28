@@ -7,7 +7,6 @@ import type { MockInstance } from 'vitest';
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
-import type { ShareLinkModel } from '~/server/models/share-link';
 import { prisma } from '~/utils/prisma';
 
 const { ObjectId } = Types;
@@ -42,7 +41,6 @@ describe('/comments.get share-link authorization (integration)', () => {
   // typed `any`, so there is no usable type to spy on here.
   // biome-ignore lint/suspicious/noExplicitAny: no usable type for Page (see above)
   let Page: any;
-  let ShareLink: ShareLinkModel;
   let certifySharedPage: RequestHandler;
 
   // Controllable request user, read by the injector middleware at request time.
@@ -56,14 +54,13 @@ describe('/comments.get share-link authorization (integration)', () => {
   const revBId = new ObjectId();
   let commentAId: string;
   let commentBId: string;
+  let inlineCommentAId: string;
   let shareLinkAId: Types.ObjectId;
   let expiredShareLinkId: Types.ObjectId;
 
   beforeAll(async () => {
     crowi = await getInstance();
     Page = crowi.models.Page;
-
-    ShareLink = (await import('~/server/models/share-link')).default;
 
     // api.remove reads the comment with `include: { page: true }` (a required
     // relation), so the referenced pages must actually exist: Prisma throws on a
@@ -110,14 +107,35 @@ describe('/comments.get share-link authorization (integration)', () => {
     commentAId = commentA.id;
     commentBId = commentB.id;
 
-    // Share links related to page A: one valid, one expired.
-    const shareLinkA = await ShareLink.create({ relatedPage: pageAId });
-    const expiredShareLink = await ShareLink.create({
-      relatedPage: pageAId,
-      expiredAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    // An inline comment on page A, seeded alongside the normal comment above.
+    // `prisma.comments.add` never writes `isInline`, so this is created
+    // directly through `prisma.comments.create` (task 1.3: the read paths
+    // exercised below must exclude this row unconditionally).
+    const inlineCommentA = await prisma.comments.create({
+      data: {
+        pageId: pageAId.toString(),
+        creatorId: new ObjectId().toString(),
+        revisionId: revAId.toString(),
+        comment: 'inline comment on page A',
+        commentPosition: -1,
+        isInline: true,
+        quote: 'quoted text',
+      },
     });
-    shareLinkAId = shareLinkA._id;
-    expiredShareLinkId = expiredShareLink._id;
+    inlineCommentAId = inlineCommentA.id;
+
+    // Share links related to page A: one valid, one expired.
+    const shareLinkA = await prisma.sharelinks.create({
+      data: { relatedPageId: pageAId.toString() },
+    });
+    const expiredShareLink = await prisma.sharelinks.create({
+      data: {
+        relatedPageId: pageAId.toString(),
+        expiredAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      },
+    });
+    shareLinkAId = new ObjectId(shareLinkA.id);
+    expiredShareLinkId = new ObjectId(expiredShareLink.id);
 
     const apiV1FormValidator = (
       await import('~/server/middlewares/apiv1-form-validator')
@@ -199,15 +217,27 @@ describe('/comments.get share-link authorization (integration)', () => {
   });
 
   afterAll(async () => {
+    // comments also has a required relation to revisions (onDelete: NoAction),
+    // so it must be deleted first and alone. revisions/sharelinks then have no
+    // relation to each other -- only to pages -- so they can run concurrently.
+    // pages must be deleted last, and separately, or Prisma throws P2014 for
+    // deleting a page while a dependent still refers to it (see the same
+    // reasoning in delete-completely-operation.ts).
     await prisma.comments.deleteMany({
-      where: { id: { in: [commentAId, commentBId] } },
+      where: { id: { in: [commentAId, commentBId, inlineCommentAId] } },
     });
-    await prisma.revisions.deleteMany({ where: { id: revAId.toString() } });
+    await Promise.all([
+      prisma.revisions.deleteMany({ where: { id: revAId.toString() } }),
+      prisma.sharelinks.deleteMany({
+        where: {
+          id: {
+            in: [shareLinkAId.toString(), expiredShareLinkId.toString()],
+          },
+        },
+      }),
+    ]);
     await prisma.pages.deleteMany({
       where: { id: { in: [pageAId.toString(), pageBId.toString()] } },
-    });
-    await ShareLink.deleteMany({
-      _id: { $in: [shareLinkAId, expiredShareLinkId] },
     });
   });
 
@@ -416,6 +446,47 @@ describe('/comments.get share-link authorization (integration)', () => {
 
       expect(res.status).toBe(403);
       expect(res.body.comments).toBeUndefined();
+    });
+  });
+
+  /**
+   * Requirements 6.1 / 6.3: `/comments.get` must never return an
+   * `isInline: true` row, in either the shared-link context or the normal
+   * (non-shared) context. Page A carries both a normal comment
+   * (`commentAId`) and an inline comment (`inlineCommentAId`) seeded above;
+   * every assertion below checks the response contains only the normal one.
+   */
+  describe('GET /comments.get — inline comments are excluded (6.1, 6.3)', () => {
+    it('excludes isInline rows in the share-link context', async () => {
+      const res = await request(app).get('/comments.get').query({
+        page_id: pageAId.toString(),
+        shareLinkId: shareLinkAId.toString(),
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      const ids = res.body.comments.map(
+        (comment: { _id: string }) => comment._id,
+      );
+      expect(ids).toContain(commentAId.toString());
+      expect(ids).not.toContain(inlineCommentAId.toString());
+    });
+
+    it('excludes isInline rows in the normal (non-shared) context', async () => {
+      currentUser = { _id: new ObjectId() };
+      accessSpy.mockResolvedValue(true);
+
+      const res = await request(app)
+        .get('/comments.get')
+        .query({ page_id: pageAId.toString() });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      const ids = res.body.comments.map(
+        (comment: { _id: string }) => comment._id,
+      );
+      expect(ids).toContain(commentAId.toString());
+      expect(ids).not.toContain(inlineCommentAId.toString());
     });
   });
 

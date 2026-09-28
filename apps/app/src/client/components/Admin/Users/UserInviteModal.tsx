@@ -298,7 +298,7 @@ const UserInviteModalFC = ({ adminUsersContainer }: Props): JSX.Element => {
             className="btn btn-outline-secondary me-2"
             onClick={onToggleModal}
           >
-            {t('Cancel')}
+            {t('commons:Cancel')}
           </button>
           <button
             type="button"
@@ -331,7 +331,7 @@ const UserInviteModalFC = ({ adminUsersContainer }: Props): JSX.Element => {
           className="btn btn-outline-secondary"
           onClick={onToggleModal}
         >
-          {t('Close')}
+          {t('commons:Close')}
         </button>
       </>
     );

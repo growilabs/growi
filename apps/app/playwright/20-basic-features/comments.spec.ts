@@ -4,16 +4,25 @@ test.describe('Comment', () => {
   // make tests run in serial
   test.describe.configure({ mode: 'serial' });
 
-  test('Create comment page', async ({ page }) => {
-    await page.goto('/comment');
+  // A serial group's retry re-runs every test in the group from the top, but
+  // comment creation below is a real, non-idempotent backend write. Reusing
+  // a fixed page path across retries lets an earlier attempt's comments
+  // leak into the next one, so a locator with no index (`.page-comment-body`,
+  // `getByTestId('comment-reply-button')`) hits a strict-mode "resolved to
+  // 2 elements" violation once duplicates pile up. Scoping the path by
+  // testInfo.retry gives every attempt its own comment-free page.
+  const commentPagePath = (retry: number) => `/comment-retry${retry}`;
+
+  test('Create comment page', async ({ page }, testInfo) => {
+    await page.goto(commentPagePath(testInfo.retry));
     await page.getByTestId('editor-button').click();
     await page.getByTestId('save-page-btn').click();
     await expect(page.locator('.page-meta')).toBeVisible();
   });
 
-  test('Successfully add comments', async ({ page }) => {
+  test('Successfully add comments', async ({ page }, testInfo) => {
     const commentText = 'add comment';
-    await page.goto('/comment');
+    await page.goto(commentPagePath(testInfo.retry));
 
     // Add comment
     await page.getByTestId('page-comment-button').click();
@@ -27,12 +36,33 @@ test.describe('Comment', () => {
     ).toHaveText('1');
   });
 
-  test('Successfully reply comments', async ({ page }) => {
+  test('Successfully reply comments', async ({ page }, testInfo) => {
     const commentText = 'reply comment';
-    await page.goto('/comment');
+    await page.goto(commentPagePath(testInfo.retry));
 
     // Reply comment
-    await page.getByTestId('comment-reply-button').click();
+    //
+    // A single click on the reply button is not enough to guarantee the
+    // reply editor mounts: the click can land before its handler is
+    // attached (or before the showEditorIds state update that swaps the
+    // button for <CommentEditor> is flushed), in which case it is silently
+    // dropped and `.cm-content` never enters the DOM at all -- not merely
+    // slow to become visible (see issue #11785, `.fill()`'s own auto-wait
+    // already covers "slow", so a plain `toBeVisible()` gate before fill
+    // would time out identically). Retry the click itself until the editor
+    // is actually up. The reply button unmounts once the click succeeds, so
+    // guard re-clicking with isVisible() to avoid clicking a stale/gone
+    // locator on a later retry attempt.
+    const replyButton = page.getByTestId('comment-reply-button');
+    await expect(async () => {
+      if (await replyButton.isVisible()) {
+        await replyButton.click();
+      }
+      await expect(page.locator('.cm-content')).toBeVisible({
+        timeout: 2_000,
+      });
+    }).toPass({ timeout: 25_000 });
+
     await page.locator('.cm-content').fill(commentText);
     await page.getByTestId('comment-submit-button').first().click();
 
@@ -44,9 +74,9 @@ test.describe('Comment', () => {
     ).toHaveText('2');
   });
 
-  test('Successfully edit comments', async ({ page }) => {
+  test('Successfully edit comments', async ({ page }, testInfo) => {
     const editedText = 'edited comment';
-    await page.goto('/comment');
+    await page.goto(commentPagePath(testInfo.retry));
 
     const firstComment = page.locator('.page-comment').first();
     await firstComment.hover();
@@ -72,8 +102,8 @@ test.describe('Comment', () => {
 
   //   await page.getByTestId('page-comment-button').click();
   //   await page.getByTestId('comment-delete-button').first().click({ force: true });
-  //   await expect(page.getByTestId('page-comment-delete-modal')).toBeVisible();
-  //   await page.getByTestId('delete-comment-button').click();
+  //   await expect(page.getByTestId('comment-delete-confirm')).toBeVisible();
+  //   await page.getByTestId('comment-delete-confirm-button').click();
 
   //   await expect(page.getByTestId('page-comment-button').locator('.grw-count-badge')).toHaveText('0');
   // });

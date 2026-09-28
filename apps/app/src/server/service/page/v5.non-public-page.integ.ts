@@ -15,14 +15,12 @@ import ExternalUserGroup from '~/features/external-user-group/server/models/exte
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { PageActionType } from '~/interfaces/page-operation';
-import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
   PageOperationModel,
 } from '~/server/models/page-operation';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { generalXssFilter } from '~/services/general-xss-filter';
@@ -1056,18 +1054,20 @@ describe('PageService page operations with non-public pages', () => {
       ],
     });
 
-    await PageTagRelation.insertMany([
-      {
-        relatedPage: pageIdRevert1,
-        relatedTag: tagIdRevert1,
-        isPageTrashed: true,
-      },
-      {
-        relatedPage: pageIdRevert2,
-        relatedTag: tagIdRevert2,
-        isPageTrashed: true,
-      },
-    ]);
+    await prisma.pagetagrelations.createMany({
+      data: [
+        {
+          relatedPageId: pageIdRevert1.toString(),
+          relatedTagId: tagIdRevert1.toString(),
+          isPageTrashed: true,
+        },
+        {
+          relatedPageId: pageIdRevert2.toString(),
+          relatedTagId: tagIdRevert2.toString(),
+          isPageTrashed: true,
+        },
+      ],
+    });
 
     /*
      * Revert - dedicated GRANT_RESTRICTED page for the v4-process activity
@@ -2222,10 +2222,12 @@ describe('PageService page operations with non-public pages', () => {
       const tag = await prisma.tags.findUnique({
         where: { name: 'np_revertTag1' },
       });
-      const deletedPageTagRelation = await PageTagRelation.findOne({
-        relatedPage: trashedPage?._id,
-        relatedTag: tag?._id,
-        isPageTrashed: true,
+      const deletedPageTagRelation = await prisma.pagetagrelations.findFirst({
+        where: {
+          relatedPageId: trashedPage?._id.toString(),
+          relatedTagId: tag?._id,
+          isPageTrashed: true,
+        },
       });
       expect(trashedPage).toBeTruthy();
       expect(revision).toBeTruthy();
@@ -2241,9 +2243,11 @@ describe('PageService page operations with non-public pages', () => {
       const deltedPageBeforeRevert = await Page.findOne({
         path: '/trash/np_revert1',
       });
-      const pageTagRelation = await PageTagRelation.findOne<IPageTagRelation>({
-        relatedPage: revertedPage?._id,
-        relatedTag: tag?._id,
+      const pageTagRelation = await prisma.pagetagrelations.findFirst({
+        where: {
+          relatedPageId: revertedPage?._id.toString(),
+          relatedTagId: tag?._id,
+        },
       });
       expect(revertedPage).toBeTruthy();
       expect(pageTagRelation).toBeTruthy();
@@ -2269,10 +2273,12 @@ describe('PageService page operations with non-public pages', () => {
       const tag = await prisma.tags.findUnique({
         where: { name: 'np_revertTag2' },
       });
-      const deletedPageTagRelation = await PageTagRelation.findOne({
-        relatedPage: trashedPage?._id,
-        relatedTag: tag?._id,
-        isPageTrashed: true,
+      const deletedPageTagRelation = await prisma.pagetagrelations.findFirst({
+        where: {
+          relatedPageId: trashedPage?._id.toString(),
+          relatedTagId: tag?._id,
+          isPageTrashed: true,
+        },
       });
       expect(trashedPage).toBeTruthy();
       expect(revision).toBeTruthy();
@@ -2286,9 +2292,11 @@ describe('PageService page operations with non-public pages', () => {
 
       const revertedPage = await Page.findOne({ path: '/np_revert2' });
       const trashedPageBR = await Page.findOne({ path: beforeRevertPath });
-      const pageTagRelation = await PageTagRelation.findOne<IPageTagRelation>({
-        relatedPage: revertedPage?._id,
-        relatedTag: tag?._id,
+      const pageTagRelation = await prisma.pagetagrelations.findFirst({
+        where: {
+          relatedPageId: revertedPage?._id.toString(),
+          relatedTagId: tag?._id,
+        },
       });
       expect(revertedPage).toBeTruthy();
       expect(pageTagRelation).toBeTruthy();

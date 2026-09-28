@@ -17,6 +17,7 @@ import type UserEvent from '~/server/events/user';
 import { G2GTransferReceiverService } from './g2g-transfer';
 import { GrowiBridgeService } from './growi-bridge';
 import { initializeImportService } from './import';
+import type { UniqueConflictReport } from './import/detect-unique-conflicts';
 
 // The receive route hands over exactly this shape (fileName / collectionName / size);
 // keeping `size` here pins that the method accepts what the route already has.
@@ -48,15 +49,41 @@ const DECOY_USER = {
 
 const EXISTING_GROUP_NAME = 'g2g-recv-existing-group';
 
+// `providerType`+`accountId` is the composite unique key (models/external-account.ts);
+// neither field alone identifies a conflict.
+const EXISTING_EXTERNAL_ACCOUNT = {
+  providerType: 'saml',
+  accountId: 'g2g-recv-existing-account-id',
+} as const;
+
 // The archive stores `_id` as a hex string, and these ids are deliberately different from
 // anything Mongo would generate for the seeded documents.
 const ARCHIVE_USER_ID = '0123456789abcdef01240001';
 const ARCHIVE_GROUP_ID = '0123456789abcdef01240002';
 const DECOY_USER_ID = '0123456789abcdef01240003';
+const ARCHIVE_EXTERNAL_ACCOUNT_ID = '0123456789abcdef01240004';
+
+// A conflict report may carry no entry at all for a collection that was not part of the
+// transfer (see detect-unique-conflicts.ts `isActive`), so every read goes through these
+// helpers rather than indexing `conflictsByCollection` directly — the same convention
+// `detect-unique-conflicts.integ.ts` established for its own assertions.
+const getUserConflicts = (report: UniqueConflictReport): readonly unknown[] =>
+  report.conflictsByCollection.get('users') ?? [];
+const getGroupConflicts = (report: UniqueConflictReport): readonly unknown[] =>
+  report.conflictsByCollection.get('usergroups') ?? [];
+const getExternalAccountConflicts = (
+  report: UniqueConflictReport,
+): readonly unknown[] =>
+  report.conflictsByCollection.get('externalaccounts') ?? [];
 
 describe('G2GTransferReceiverService.detectImportConflicts', () => {
   let User: Model<IUser>;
   let UserGroup: Model<IUserGroup>;
+  // `ExternalAccount` has no exported interface / default export (models/external-account.ts
+  // keeps it Mongoose-registered only for index creation while its behavior lives in a
+  // Prisma extension); fetched from the model registry untyped, exactly like the caller
+  // (g2g-transfer.ts `detectImportConflicts`) already does.
+  let ExternalAccount: Model<Record<string, unknown>>;
   let receiverService: G2GTransferReceiverService;
   let tmpDir: string;
   let importsDir: string;
@@ -85,6 +112,19 @@ describe('G2GTransferReceiverService.detectImportConflicts', () => {
     return String(created._id);
   };
 
+  // `user` is a required ref on the ExternalAccount schema (models/external-account.ts);
+  // its value is irrelevant to the providerType+accountId conflict under test, so it is
+  // pointed at a real user to satisfy the schema without adding meaning to the fixture.
+  const seedExistingExternalAccount = async (
+    userId: string,
+  ): Promise<string> => {
+    const created = await ExternalAccount.create({
+      ...EXISTING_EXTERNAL_ACCOUNT,
+      user: userId,
+    });
+    return String(created._id);
+  };
+
   const removeFixtures = async (): Promise<void> => {
     await User.deleteMany({
       $or: [
@@ -108,6 +148,15 @@ describe('G2GTransferReceiverService.detectImportConflicts', () => {
         { _id: { $in: [ARCHIVE_GROUP_ID] } },
       ],
     });
+    await ExternalAccount.deleteMany({
+      $or: [
+        {
+          providerType: EXISTING_EXTERNAL_ACCOUNT.providerType,
+          accountId: EXISTING_EXTERNAL_ACCOUNT.accountId,
+        },
+        { _id: { $in: [ARCHIVE_EXTERNAL_ACCOUNT_ID] } },
+      ],
+    });
     // Each test declares the archive files it expects to be there, so the unzip directory
     // is emptied too — otherwise a file one test wrote could satisfy the next one.
     const leftovers = await fs.readdir(importsDir);
@@ -124,6 +173,7 @@ describe('G2GTransferReceiverService.detectImportConflicts', () => {
       'usergroups',
       'usergrouprelations',
       'pages',
+      'externalaccounts',
     ];
     const snapshots = await Promise.all(
       collectionNames.map((collectionName) =>
@@ -164,6 +214,7 @@ describe('G2GTransferReceiverService.detectImportConflicts', () => {
 
     User = mongoose.model<IUser>('User');
     UserGroup = mongoose.model<IUserGroup>('UserGroup');
+    ExternalAccount = mongoose.model('ExternalAccount');
 
     receiverService = new G2GTransferReceiverService(crowi);
 
@@ -201,7 +252,7 @@ describe('G2GTransferReceiverService.detectImportConflicts', () => {
 
     const report = await receiverService.detectImportConflicts(innerFileStats);
 
-    expect(report.userConflicts).toEqual([
+    expect(getUserConflicts(report)).toEqual([
       {
         collection: 'users',
         field: 'email',
@@ -210,7 +261,7 @@ describe('G2GTransferReceiverService.detectImportConflicts', () => {
         existingId: existingUserId,
       },
     ]);
-    expect(report.groupConflicts).toEqual([
+    expect(getGroupConflicts(report)).toEqual([
       {
         collection: 'usergroups',
         field: 'name',
@@ -249,7 +300,7 @@ describe('G2GTransferReceiverService.detectImportConflicts', () => {
 
     const report = await receiverService.detectImportConflicts(innerFileStats);
 
-    expect(report.userConflicts).toEqual([
+    expect(getUserConflicts(report)).toEqual([
       {
         collection: 'users',
         field: 'username',
@@ -277,8 +328,8 @@ describe('G2GTransferReceiverService.detectImportConflicts', () => {
       const report =
         await receiverService.detectImportConflicts(innerFileStats);
 
-      expect(report.userConflicts).toEqual([]);
-      expect(report.groupConflicts).toEqual([
+      expect(getUserConflicts(report)).toEqual([]);
+      expect(getGroupConflicts(report)).toEqual([
         {
           collection: 'usergroups',
           field: 'name',
@@ -309,8 +360,8 @@ describe('G2GTransferReceiverService.detectImportConflicts', () => {
       const report =
         await receiverService.detectImportConflicts(innerFileStats);
 
-      expect(report.groupConflicts).toEqual([]);
-      expect(report.userConflicts).toEqual([
+      expect(getGroupConflicts(report)).toEqual([]);
+      expect(getUserConflicts(report)).toEqual([
         {
           collection: 'users',
           field: 'email',
@@ -338,7 +389,7 @@ describe('G2GTransferReceiverService.detectImportConflicts', () => {
       const report =
         await receiverService.detectImportConflicts(innerFileStats);
 
-      expect(report).toEqual({ userConflicts: [], groupConflicts: [] });
+      expect(report.conflictsByCollection.size).toBe(0);
     });
   });
 
@@ -376,12 +427,79 @@ describe('G2GTransferReceiverService.detectImportConflicts', () => {
     const after = await snapshotDestination();
 
     // Guard against a vacuous read-only check: this run must really have found something.
-    expect(report.userConflicts).toHaveLength(3);
-    expect(report.groupConflicts).toHaveLength(1);
+    expect(getUserConflicts(report)).toHaveLength(3);
+    expect(getGroupConflicts(report)).toHaveLength(1);
     expect(after).toEqual(before);
     // The archive documents must not have been imported.
     expect(await User.findById(ARCHIVE_USER_ID)).toBeNull();
     expect(await UserGroup.findById(ARCHIVE_GROUP_ID)).toBeNull();
+  });
+
+  test('detects an externalaccounts unique-constraint conflict and interrupts the receive flow before anything is written', async () => {
+    // Requirements 2.1, 2.2, 2.4, 3.2 — the same non-destructive gate the users/usergroups
+    // tests above prove, exercised for the composite {providerType, accountId} key so that
+    // externalaccounts (this spec's addition) is proven wired end-to-end into the receive
+    // flow, not only unit-tested in isolation (detect-unique-conflicts.integ.ts covers the
+    // detection logic itself under task 8.1).
+    const existingUserId = await seedExistingUser();
+    const existingExternalAccountId =
+      await seedExistingExternalAccount(existingUserId);
+
+    // Same providerType+accountId as the existing document, but a different `_id` — a
+    // genuine conflict, not a re-import of the same document (requirement 1.5).
+    await writeArchiveJson('externalaccounts-conflict.json', [
+      {
+        _id: ARCHIVE_EXTERNAL_ACCOUNT_ID,
+        providerType: EXISTING_EXTERNAL_ACCOUNT.providerType,
+        accountId: EXISTING_EXTERNAL_ACCOUNT.accountId,
+        user: existingUserId,
+      },
+    ]);
+
+    const innerFileStats: InnerFileStat[] = [
+      {
+        fileName: 'externalaccounts-conflict.json',
+        collectionName: 'externalaccounts',
+        size: 1,
+      },
+    ];
+
+    const before = await snapshotDestination();
+
+    const report = await receiverService.detectImportConflicts(innerFileStats);
+
+    const after = await snapshotDestination();
+
+    // Requirement 3.2 — same report shape/fields as the users/usergroups conflicts above,
+    // with the composite key reported as a `field+field` label and a stringified tuple.
+    expect(getExternalAccountConflicts(report)).toEqual([
+      {
+        collection: 'externalaccounts',
+        field: 'providerType+accountId',
+        value: JSON.stringify([
+          EXISTING_EXTERNAL_ACCOUNT.providerType,
+          EXISTING_EXTERNAL_ACCOUNT.accountId,
+        ]),
+        archiveId: ARCHIVE_EXTERNAL_ACCOUNT_ID,
+        existingId: existingExternalAccountId,
+      },
+    ]);
+
+    // Requirement 2.1/2.4 — no collection was written to at all, not just externalaccounts.
+    expect(after).toEqual(before);
+    // The archive document must not have been imported.
+    expect(
+      await ExternalAccount.findById(ARCHIVE_EXTERNAL_ACCOUNT_ID),
+    ).toBeNull();
+    // Requirement 2.4 — the pre-existing document is completely unchanged.
+    const existingAfter = await ExternalAccount.findById(
+      existingExternalAccountId,
+    ).lean();
+    expect(existingAfter?.providerType).toBe(
+      EXISTING_EXTERNAL_ACCOUNT.providerType,
+    );
+    expect(existingAfter?.accountId).toBe(EXISTING_EXTERNAL_ACCOUNT.accountId);
+    expect(String(existingAfter?.user)).toBe(existingUserId);
   });
 
   test('rejects when a declared archive file is missing from the unzipped directory', async () => {

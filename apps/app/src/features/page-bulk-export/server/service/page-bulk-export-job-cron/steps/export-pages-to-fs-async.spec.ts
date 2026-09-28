@@ -46,6 +46,27 @@ vi.mock('../../../models/page-bulk-export-page-snapshot', () => {
 });
 
 // ---------------------------------------------------------------------------
+// getPageWritable resolves the exporting user once per job via
+// `mongoose.model('User')` (User isn't registered in this unit-test process).
+// None of the fixtures below embed an attachment image, so the returned user
+// is never read.
+// ---------------------------------------------------------------------------
+vi.mock('mongoose', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('mongoose')>();
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+      model: (name: string, ...rest: unknown[]) =>
+        name === 'User'
+          ? { findById: vi.fn().mockResolvedValue(undefined) }
+          : // biome-ignore lint/suspicious/noExplicitAny: forwarding to the real mongoose.model overload set
+            (actual.default.model as any)(name, ...rest),
+    },
+  };
+});
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

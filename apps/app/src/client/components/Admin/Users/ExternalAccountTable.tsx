@@ -85,7 +85,9 @@ const ExternalAccountTable = (
               </div>
             </th>
             <th style={{ width: '100px' }}>
-              <div className="d-flex align-items-center">{t('Created')}</div>
+              <div className="d-flex align-items-center">
+                {t('commons:Created')}
+              </div>
             </th>
             <th style={{ width: '70px' }}></th>
           </tr>
@@ -140,7 +142,7 @@ const ExternalAccountTable = (
                           <span className="material-symbols-outlined text-danger">
                             delete_forever
                           </span>{' '}
-                          {t('Delete')}
+                          {t('commons:Delete')}
                         </button>
                       </ul>
                     </div>

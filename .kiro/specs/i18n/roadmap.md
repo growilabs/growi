@@ -70,20 +70,31 @@ SSR ペイロード肥大（`/me/*` で 513 KB、`/admin/{app,ai,vault}` で 347
 
 ## 直接実装（spec なし）
 
-- [ ] **`preloadAllLang` の是正** — 5 ファイル。SSR の `__NEXT_DATA__` に 200〜513 KB を注入しているが、他言語から実際に読んでいるキーは `meta.display_name` の 1 個だけ（言語ピッカーの表示名）。しかもそれは `translation` / `admin` / `commons` の全 3 namespace × 全 5 言語に既に存在する。`pages/admin/ai.page.tsx` と `pages/admin/vault.page.tsx` は言語ピッカー自体が無いのでフラグ削除だけでよい（347 KB → 62 KB）。残る `installer` / `me` / `admin/app` は表示名 5 件を props で渡す形に置き換える。翻訳ファイル構成の整理を待つ必要がなく、最小の工数で最大の削減が取れる。
+- [x] **`preloadAllLang` の是正（3/5 ファイル、2026-08-13 実施）** — SSR の `__NEXT_DATA__` に 200〜513 KB を注入していたが、他言語から実際に読んでいるキーは `meta.display_name` の 1 個だけ（言語ピッカーの表示名）だった。対応したのは `pages/admin/ai.page.tsx` / `pages/admin/vault.page.tsx`（言語ピッカー自体が無いのでフラグ削除のみ、347 KB → 62 KB）と `pages/admin/app.page.tsx`（表示名 5 件をサーバー側で読んで Jotai atom 経由で渡す形に変更）。
+
+### 訂正: `installer` と `me` は対象外（changeLanguage への依存を見落としていた）
+
+着手前の想定は「残る `installer` / `me` / `admin/app` も表示名 5 件を渡す形に置き換えれば済む」だったが、実装直前の確認で誤りだと分かった。この 2 ページの言語ピッカーは表示名を出すだけでなく、**その場でアプリ全体の言語を切り替える**（`i18n.changeLanguage(...)` を呼ぶ）:
+
+- `InstallerForm.tsx` — 言語ドロップダウンをクリックした瞬間に切り替える
+- `stores/personal-settings.tsx` の `useUpdateBasicInfo` — 「Me」ページで基本情報を保存した直後に、選んだ言語へ切り替える
+
+`i18n.changeLanguage()` は、切り替え先の言語のリソース（`translation` / `admin` / `commons` 各 namespace）が既にクライアント側に読み込まれていることを前提にしている。ところが本番環境では i18next のクライアント側に「読み込み元」(backend) が一つも登録されていない（`config/next-i18next.config.mjs` の `use: isDev ? (...) : []`）。つまり本番では、読み込まれていない言語に切り替えようとしても後から取りに行く手段が無く、`fallbackLng`（`en_US`）に静かに戻ってしまう。`preloadAllLang: true` を外すと、まさにこの「取りに行けない」状況を作ってしまう。
+
+このため `installer` / `me` は今回の是正から除外し、`admin/ai` / `admin/vault` / `admin/app` の 3 ファイルのみ実施した。この 2 ページ本来の対応は、本番でも i18next クライアントに読み込み元を持たせる（または別の切り替え方式にする）という、翻訳ファイル構成の整理と同じくらい重さのある別課題であり、本ロードマップの「進める順序」に別項目として積み残す。
 
 ## Specs (dependency order)
 
-- [ ] `i18n-key-audit` — 未使用キー / 言語間の欠損 / 存在しないキー参照を CI ゲート化し、discovery で見つかった実バグ 2 件を修正する。Dependencies: なし。Status: 2026-08-06 brief drafted（`.kiro/specs/i18n-key-audit/brief.md`）、requirements 以降は未着手
-- [ ] `i18n-community-translation` — POEditor を受け皿にしたコミュニティ翻訳の導線と同期経路。Dependencies: なし（ただしリポジトリ側のキーが整合してから同期を繋ぐ方が事故が少ないので、`i18n-key-audit` の後が望ましい）。Status: 2026-08-06 brief drafted（`.kiro/specs/i18n-community-translation/brief.md`）、requirements 以降は未着手
+- [x] `i18n-key-audit` — 未使用キー / 言語間の欠損 / 存在しないキー参照を CI ゲート化し、discovery で見つかった実バグ 2 件を修正する。Dependencies: なし。Status: 実装完了（全タスク done、`pnpm run lint:i18n` として `apps/app/tools/i18n-audit/` に実装済み、CI の `ci-app-lint` に組み込み済み）。**ただし `spec.json` の `phase` が `tasks-approved` のまま更新されておらず、`/kiro-spec-cleanup` も未実施** — 次にこの spec に触るときは phase の訂正とクリーンアップを先に行うこと
+- [x] `i18n-community-translation` — POEditor を受け皿にしたコミュニティ翻訳の導線と同期経路。Dependencies: なし。Status: 同期の仕組み（`apps/app/tools/i18n-sync/`、`.github/workflows/i18n-sync-{push,pull}.yml`）は実装・動作確認済み。**ただし POEditor プロジェクトの public join page はメンテナー判断でまだ非公開**であり、GitHub アカウント無しで参加できる導線（要件1.1/1.3）が無い状態。2026-09-25 の `/kiro-validate-impl` 再検証はこれを理由に NO-GO — 公開を決めたら参加リンクを `docs/i18n-community-translation.md` に反映し、再検証すること
 
 ## 進める順序
 
-1. `preloadAllLang` の是正（直接実装、5 ファイル）
-2. `i18n-key-audit`（CI ゲート＋実バグ 2 件を狭く修正）
-3. `i18n-community-translation`（POEditor 申請と同期）
+1. `preloadAllLang` の是正（直接実装、3/5 ファイル、実施済み。残る `installer` / `me` は上記「訂正」の通り別課題として積み残し）
+2. `i18n-key-audit`（CI ゲート＋実バグ 2 件を狭く修正）— 完了
+3. `i18n-community-translation`（POEditor 申請と同期）— 完了
 
-**3 つともライブラリ選択に依存しない。** これらを進めたうえで、翻訳ファイル構成の整理をどちらの案で行うかを改めて判断する。そのときには CI ゲートのおかげでドリフト・未使用キーの実態が数字で見えており、POEditor 運用の実感もあるので、判断材料が今より良くなっている。
+**3 つともライブラリ選択に依存しなかった。** 3 つとも完了したいま、翻訳ファイル構成の整理をどちらの案で行うかを改めて判断する番になっている。CI ゲートのおかげでドリフト・未使用キーの実態が数字で見えており、POEditor 運用の実感もあるので、判断材料は discovery 時点より良くなっている。
 
 判断を早めるべき兆候: `i18n-key-audit` が出す数字が人手で回らない規模だったとき、または翻訳ファイルの構成が原因の不具合が繰り返し出たとき。
 
@@ -128,7 +139,7 @@ discovery の途中でそう書いたが、正確ではない。**最も高価�
 
 `i18n-key-audit` と `i18n-community-translation` が回り始めたら、この論点に戻る。
 
-なお namespace 設計に起因するバグ 2（管理画面が本番でだけ生キーを表示する）は、整理の議論を待たずに `i18n-key-audit` の中で**狭く**直す（`admin` の ns リストに `translation` を足すか、共有ラベル 20 件を `commons` へ移す）。1,166 キーの組み替えには踏み込まない。
+なお namespace 設計に起因するバグ 2（管理画面が本番でだけ生キーを表示する）は、整理の議論を待たずに `i18n-key-audit` の中で**狭く**直す。設計段階で「`admin` の ns リストに `translation` を足す」「共有ラベル約20件を `commons` へ移す」の両案とも見送り、`translation.json` は変更せず `commons.json` へ**複製**する方式に決着した（移動すると管理画面外の約25ファイルを新たに壊すことが実測で判明したため）。1,166 キーの組み替えには踏み込まない。
 
 ---
 
@@ -204,4 +215,4 @@ Next.js 16.3 + React 18 + Turbopack + Paraglide 2.23.1 の最小 Pages Router �
 
 ---
 
-_Updated: 2026-08-06. discovery による初版。`.kiro/steering/roadmap.md` に直接書いていた内容を umbrella spec へ移設した。TMS は POEditor に確定、Lingui は Turbopack 非互換で除外、キーの typo 検出は CI のみと決定。翻訳ファイル構成の整理方式と Paraglide 採否は未決として保持する。この 2 点については判断を 2 度言い直している（検証成功を「GO」と書いたのが 1 度目の誤り、その反省で「推奨しない」と書いたのが 2 度目の誤り）ため、経緯を本文に残した。_
+_Updated: 2026-09-25. `i18n-key-audit` / `i18n-community-translation` の両 sub-spec が実装完了していたにもかかわらず「Specs」節と「進める順序」節が discovery 時点の「未着手」のまま止まっていたため、実態（両方とも完了、成果物は `apps/app/tools/i18n-audit/` と `apps/app/tools/i18n-sync/`）に合わせて訂正した。あわせて `i18n-key-audit` の `spec.json` が `phase: tasks-approved` のまま `/kiro-spec-cleanup` 未実施であることを記録した（次にこの spec に触る際の TODO）。未決の 2 論点（翻訳ファイル構成の整理方式、Paraglide 採否）は変更していない。Prior: 2026-08-06. discovery による初版。`.kiro/steering/roadmap.md` に直接書いていた内容を umbrella spec へ移設した。TMS は POEditor に確定、Lingui は Turbopack 非互換で除外、キーの typo 検出は CI のみと決定。翻訳ファイル構成の整理方式と Paraglide 採否は未決として保持する。この 2 点については判断を 2 度言い直している（検証成功を「GO」と書いたのが 1 度目の誤り、その反省で「推奨しない」と書いたのが 2 度目の誤り）ため、経緯を本文に残した。_

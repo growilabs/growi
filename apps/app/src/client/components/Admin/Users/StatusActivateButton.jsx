@@ -21,7 +21,7 @@ class StatusActivateButton extends React.Component {
       const username = await this.props.adminUsersContainer.activateUser(
         this.props.user._id,
       );
-      toastSuccess(t('toaster.activate_user_success', { username }));
+      toastSuccess(t('admin:toaster.activate_user_success', { username }));
     } catch (err) {
       toastError(err);
     }
@@ -39,7 +39,7 @@ class StatusActivateButton extends React.Component {
         }}
       >
         <span className="material-symbols-outlined me-1">person_add</span>
-        {t('user_management.user_table.accept')}
+        {t('admin:user_management.user_table.accept')}
       </button>
     );
   }

@@ -64,6 +64,10 @@ export default defineWorkspace([
         './test/setup/mongo/index.ts',
         './test/setup/prisma.ts',
       ],
+      // Fork concurrency is capped in CI via the `test:integ` script's
+      // `--poolOptions.forks.maxForks` flag, not here — see #11752. (Vitest's
+      // deprecated workspace-file resolution does not apply a project-level
+      // `poolOptions` from this file; the CLI flag does, so the cap lives there.)
       deps: {
         // Transform inline modules (allows ESM in require context)
         interopDefault: true,

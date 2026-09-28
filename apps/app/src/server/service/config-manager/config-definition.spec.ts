@@ -369,4 +369,27 @@ describe('config-definition multi-provider ai keys', () => {
       expect(aiGroup?.targetKeys).not.toContain('ai:allowedModels');
     });
   });
+
+  describe('env-only group env:useOnlyEnvVars:gcs', () => {
+    const gcsGroup = ENV_ONLY_GROUPS.find(
+      (group) => group.controlKey === 'env:useOnlyEnvVars:gcs',
+    );
+
+    it('is defined', () => {
+      expect(gcsGroup).toBeDefined();
+    });
+
+    // Regression: gcs:referenceFileWithRelayMode was omitted from this
+    // group, so a GROWI.cloud hosted-GCS admin could still change and
+    // persist the file-delivery method even though env-only mode is meant
+    // to lock every GCS setting to the infra-provided env vars.
+    it('targets the delivery-relay-mode key alongside the credential/bucket keys', () => {
+      expect(gcsGroup?.targetKeys).toEqual([
+        'gcs:apiKeyJsonPath',
+        'gcs:bucket',
+        'gcs:uploadNamespace',
+        'gcs:referenceFileWithRelayMode',
+      ]);
+    });
+  });
 });

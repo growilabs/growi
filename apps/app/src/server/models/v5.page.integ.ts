@@ -14,7 +14,6 @@ import { ExternalGroupProviderType } from '~/features/external-user-group/interf
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { PageActionType } from '~/interfaces/page-operation';
-import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
@@ -25,8 +24,6 @@ import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 
 import type { IPageService } from '../service/page';
-import type { IPageRedirect, PageRedirectModel } from './page-redirect';
-import type { ShareLinkModel } from './share-link';
 
 describe('Page', () => {
   let crowi: Crowi;
@@ -34,8 +31,6 @@ describe('Page', () => {
 
   let Page: PageModel;
   let User: Model<IUser>;
-  let ShareLink: ShareLinkModel;
-  let PageRedirect: PageRedirectModel;
   let PageOperation: PageOperationModel;
 
   let rootPage: PageDocument;
@@ -558,10 +553,6 @@ describe('Page', () => {
     vi.restoreAllMocks();
     User = mongoose.model('User');
     Page = mongoose.model('Page') as PageModel;
-    ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
-    PageRedirect = mongoose.model<IPageRedirect, PageRedirectModel>(
-      'PageRedirect',
-    );
     PageOperation = mongoose.model<IPageOperation, PageOperationModel>(
       'PageOperation',
     );

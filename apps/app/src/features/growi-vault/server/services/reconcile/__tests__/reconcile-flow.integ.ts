@@ -153,6 +153,35 @@ function waitForReconcileStatus(
   });
 }
 
+/**
+ * Poll `auditEvents` until it contains `action`. The orchestrator emits its
+ * final audit event *after* writing the terminal status to the DB, so
+ * waiting only for the DB status (as `waitForReconcileStatus` does) does not
+ * guarantee the corresponding audit event has been pushed yet — a fixed
+ * sleep is not a reliable substitute for actually observing the event.
+ */
+function waitForAuditEvent(
+  auditEvents: string[],
+  action: string,
+  timeoutMs = 10000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      if (auditEvents.includes(action)) {
+        resolve();
+        return;
+      }
+      if (Date.now() >= deadline) {
+        reject(new Error(`Timeout waiting for audit event "${action}"`));
+        return;
+      }
+      setTimeout(tick, 50);
+    };
+    tick();
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -356,9 +385,10 @@ describe('Scenario (b): user sub-tree + partial ACL exclusion → partial-acl-fi
 
     await waitForReconcileStatus(reconcileId, ['completed']);
     // The DB status update and the final emitAudit('completed') are sequential
-    // awaits in the orchestrator. The polling above resolves on the DB write;
-    // give the audit emit a short window to complete before asserting.
-    await new Promise((r) => setTimeout(r, 100));
+    // awaits in the orchestrator, so the DB write is observable slightly
+    // before the audit event is pushed. Wait for the event itself rather
+    // than an arbitrary fixed delay.
+    await waitForAuditEvent(auditEvents, 'vault.reconcile.completed');
 
     expect(auditEvents).toContain('vault.reconcile.partial-acl-filtered');
     expect(auditEvents).toContain('vault.reconcile.completed');

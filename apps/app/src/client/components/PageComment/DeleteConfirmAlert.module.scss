@@ -1,0 +1,8 @@
+// The delete confirmation's left accent. Not the `border-start border-3`
+// utility pair: those set `border-left-color` to the neutral
+// `--bs-border-color` with `!important`, which overrode `alert-danger`'s own
+// tone and painted the accent grey. No utility can say "strong danger left
+// border, the alert's own subtle border elsewhere".
+.delete-confirm-alert {
+  border-left: 3px solid var(--bs-danger);
+}

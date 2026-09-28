@@ -3,7 +3,6 @@
     "display_name": "Français"
   },
   "Help": "Aide",
-  "View": "Voir",
   "Edit": "Modifier",
   "Delete": "Supprimer",
   "delete_all": "Tout supprimer",
@@ -64,7 +63,9 @@
   "Presentation Mode": "Présentation",
   "Not available for guest": "Indisponible pour les invités",
   "Not available in this version": "Indisponible dans cette version",
+  "Not available for read only user": "Indisponible pour les utilisateurs en lecture seule",
   "Not available when \"anyone with the link\" is selected": "Si \"Tous les utilisateurs disposant du lien\" est sélectionné, la portée ne peut pas être modifiée",
+  "No users have liked this yet": "Aucun utilisateur n'a aimé cette page.",
   "No users have liked this yet.": "Aucun utilisateur n'a aimé cette page.",
   "No users have bookmarked yet": "Aucun utilisateur n'a mis en favoris cette page",
   "Create Archive Page": "Créer page d'archive",
@@ -108,8 +109,11 @@
   "Connected": "Connecté",
   "Loading": "Chargement...",
   "Disclose E-mail": "Divulguer adresse courriel",
+  "Slack Member ID": "ID de membre Slack",
   "page exists": "cette page est déjà existante",
   "Error occurred": "Une erreur est survenue",
+  "Successfully updated": "Mise à jour réussie",
+  "Failed to update": "Échec de la mise à jour",
   "Input page name": "Nom de la page",
   "Input page name (optional)": "Nom de la page (optionnel)",
   "Input parent page path": "Chemin de la page parent",
@@ -122,7 +126,6 @@
   "UserGroup": "Groupe utilisateur",
   "Basic Settings": "Paramètres de base",
   "The contents entered here will be shown in the header etc": "Le contenu entré ici sera visible dans l'en-tête",
-  "Browsing of this page is restricted": "Le contenu de cette page est restreint.",
   "Forbidden": "Accès interdit",
   "Public": "Tout le monde",
   "Anyone with the link": "Tous les utilisateurs disposant du lien",
@@ -230,8 +233,7 @@
       "apitoken_issued": "Aucun jeton d'API existant.",
       "update_token1": "Un nouveau jeton peut être généré.",
       "update_token2": "Modifiez le jeton aux endroits où celui-ci est utilisé, car l'ancien sera invalide."
-    },
-    "form_help": {}
+    }
   },
   "Access Token Settings": "Jeton d'accès",
   "page_me_access_token": {
@@ -419,6 +421,7 @@
     "notfound_or_forbidden": "Page originale introuvable ou accès restreint.",
     "already_exists": "Une page avec ce chemin existe déjà.",
     "outdated": "Page obsolète.",
+    "invalid_body": "La requête n'indique pas à quelle révision de la page elle s'applique.",
     "user_not_admin": "Seul un administrateur peut supprimer la page",
     "single_deletion_empty_pages": "Une page vide ne peut pas être supprimée",
     "complete_deletion_not_allowed_for_user": "Vous n'êtes pas autorisé à supprimer cette page"
@@ -514,6 +517,8 @@
     },
     "editor": {
       "title": "Raccourcis d'édition",
+      "Slash Command": "Commande slash",
+      "Slash Command Desc": "(Afficher le menu des commandes)",
       "Indent": "Indentation",
       "Outdent": "Retrait",
       "Save Page": "Sauvegarder la page",
@@ -553,7 +558,6 @@
     "resolve_and_save": "Résoudre et sauvegarder",
     "select_revision": "Sélectionner {{revision}}",
     "requested_revision": "moi",
-    "origin_revision": "origine",
     "latest_revision": "les autres",
     "selected_editable_revision": "Corps de page sélectionné (Modifiable)"
   },
@@ -685,6 +689,18 @@
     "number_of_list_to_display": "Afficher",
     "page_number_unit": "pages",
     "hit_number_unit": "trouvé",
+    "filter": "Filtres",
+    "search_option": "Options de recherche",
+    "filter_remove": "Supprimer",
+    "filter_clear": "Tout effacer",
+    "filter_author": "Auteur",
+    "filter_by_author": "Filtrer par auteur",
+    "filter_editor": "Éditeur",
+    "filter_by_editor": "Filtrer par éditeur",
+    "filter_tag": "Étiquette",
+    "filter_group": "Groupe",
+    "filter_group_select": "Sélectionner des groupes",
+    "filter_group_none": "Aucun groupe disponible",
     "sort_axis": {
       "relationScore": "Trier par pertinence",
       "createdAt": "Date de création",
@@ -926,8 +942,8 @@
     "page_delete_completely": "a supprimé complètement une page",
     "page_rename": "a renommé une page",
     "page_revert": "a restauré une page",
-    "page_duplicate": "a dupliqué une page",
     "page_like": "a aimé une page",
+    "page_duplicate": "a dupliqué une page",
     "comment_create": "a publié un commentaire"
   },
   "bookmark_folder": {
@@ -1015,6 +1031,7 @@
     },
     "textstyle": {
       "copy_done": "Copié !",
+      "copy_failed": "Échec de la copie",
       "this": "Ceci est du",
       "is": "",
       "bold": "gras",
@@ -1069,6 +1086,7 @@
       "alert": "Alerte",
       "alert_with_custom_title": "Alerte avec étiquette",
       "alert_with_custom_title_text": "Titre personnalisé",
+      "alert_block": "Bloc d'alerte",
       "alert_unavailable": "Non disponible pour ce style",
       "badge": "Badge",
       "text_color": "Couleur du texte",
@@ -1086,5 +1104,43 @@
     "searching": "Recherche en cours...",
     "noResults": "Aucune page trouvée",
     "candidatesLabel": "Pages suggérées"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "Titre 1",
+      "description": ""
+    },
+    "heading2": {
+      "label": "Titre 2",
+      "description": ""
+    },
+    "heading3": {
+      "label": "Titre 3",
+      "description": ""
+    },
+    "bulletList": {
+      "label": "Liste à puces",
+      "description": ""
+    },
+    "numberedList": {
+      "label": "Liste numérotée",
+      "description": ""
+    },
+    "taskList": {
+      "label": "Liste de tâches",
+      "description": ""
+    },
+    "quote": {
+      "label": "Citation",
+      "description": ""
+    },
+    "codeBlock": {
+      "label": "Bloc de code",
+      "description": ""
+    },
+    "table": {
+      "label": "Tableau",
+      "description": ""
+    }
   }
 }

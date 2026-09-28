@@ -262,7 +262,7 @@ class ImportCollectionConfigurationModal extends React.Component {
             className="btn btn-sm btn-primary"
             onClick={this.updateOption}
           >
-            {t('Update')}
+            {t('commons:Update')}
           </button>
         </ModalFooter>
       </Modal>

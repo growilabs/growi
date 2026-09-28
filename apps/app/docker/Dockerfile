@@ -110,7 +110,16 @@ RUN set -eu; \
   ln -sfn "libquery_engine-${target}.so.node" "$dir/libquery_engine-active.so.node"
 
 # Stage artifacts into a clean directory for COPY --from
+#
+# apps/app/tmp/* is gitignored except for .keep placeholders (cache/,
+# downloads/, googlecache/, imports/, plugins/, uploads/), and `turbo prune
+# --docker` drops gitignored paths from its output entirely — even the
+# tracked .keep files — so apps/app/tmp does not exist in this stage's
+# source tree. Recreate the runtime-required subdirectories explicitly
+# instead of relying on `cp -a apps/app/tmp` to produce them.
 RUN mkdir -p /tmp/release/apps/app && \
+  mkdir -p apps/app/tmp/cache apps/app/tmp/downloads apps/app/tmp/googlecache \
+           apps/app/tmp/imports apps/app/tmp/plugins apps/app/tmp/uploads && \
   cp package.json /tmp/release/ && \
   cp -a node_modules /tmp/release/ && \
   cp -a apps/app/.next apps/app/config apps/app/dist apps/app/public \

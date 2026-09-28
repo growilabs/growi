@@ -2,15 +2,12 @@
   "meta": {
     "display_name": "日本語"
   },
-  "Update": "更新",
-  "Delete": "削除",
-  "User": "ユーザー",
-  "Name": "名前",
   "Page": "ページ",
-  "Created": "作成日",
-  "Edit": "編集",
-  "Description": "説明",
   "Execute": "実行",
+  "Enable": "有効化",
+  "Copied!": "コピーしました！",
+  "ExternalUserGroup": "外部グループ",
+  "something_went_wrong": "問題が発生しました。もう一度お試しください。",
   "last_login": "最終ログイン",
   "wiki_management_homepage": "Wiki管理トップ",
   "public": "「公開」のページ",
@@ -187,7 +184,6 @@
       "attr_based_login_control_detail": "SAMLの <code>&lt;saml:AttributeStatement&gt;</code> 要素に含まれる <code>&lt;saml:Attribute&gt;</code> 要素と、その子要素 <code>&lt;saml:AttributeValue&gt;</code> を利用してログインの可否を制御します。",
       "attr_based_login_control_rule_help": "<h5>利用可能なクエリ:</h5><ul><li>Terms</li><li>Fields</li><li>AND/NOT/OR Operator</li><li>Grouping</li></ul><h5>利用不可なクエリ:</h5><ul><li>Wildcard, Fuzzy, Proximity, Range and Boosting</li><li>+/- Operator</li><li>Field Grouping</li></ul><h5>特殊文字のエスケープ</h5>次の特殊文字はエスケープする必要があります。<code>+ - && || ! ( ) { } [ ] ^ &quot; &tilde; * ? : &#92;</code> and <code>/</code>",
       "attr_based_login_control_rule_example1": "<h5>条件式の例</h5>ルールに <code>(Department: A || Department: B) && Position: Leader</code> を指定した場合, <code>Department: A</code> または <code>Department: B</code> のどちらかに該当し、かつ <code>Position: Leader</code> を持つユーザーにログインを<strong>許可</strong>します。",
-      "attr_based_login_control_rule_exampl2": "<h5>エスケープの例</h5>ルールに URL を利用したい場合は、次のようにエスケープしてください:<br><code>http&#92;:&#92;/&#92;/schemas.example.com&#92;/ws&#92;/2005&#92;/05&#92;/identity&#92;/claims&#92;/emailaddress: &quot;myname@example.com&quot;</code>",
       "updated_saml": "Succeeded to update SAML setting"
     },
     "OAuth": {
@@ -374,6 +370,16 @@
     "migration_succeeded": "アップグレードが正常に完了しました！メンテナンスモードを終了して、GROWI を使用することができます。",
     "migration_failed": "アップグレードが失敗しました。失敗した場合の対処法は GROWI docs を参照してください。"
   },
+  "page_tree_repair": {
+    "page_tree_repair": "ページツリーの修復",
+    "repair_desc": "不要になった空ページを削除し、全ページの子孫ページ数を再計算します。ページツリーに中身のない空のフォルダが表示される場合や、子ページ数が実際の数と一致しない場合に実行してください。MongoDB の TTL インデックスで WIP ページを削除していたバージョンからアップグレードしたインスタンスで必要になります。",
+    "repair_note": "注意: メンテナンスモードを有効にする必要があります。全ページを走査するため、規模の大きい Wiki では時間がかかることがあります。進捗はサーバーログに出力されます。",
+    "repair_page_tree": "ページツリーを修復する",
+    "modal_repair_warning": "この処理は全ページを走査・更新するため、長時間かかることがあります。修復中はユーザーにページの作成・編集・削除を行わないよう周知することを強く推奨します。",
+    "start_repair": "ページツリーの修復を開始する",
+    "successfully_started": "ページツリーの修復を開始しました",
+    "repair_in_progress": "ページツリーの修復をバックグラウンドで実行しています。結果はサーバーログを確認してください。"
+  },
   "news_delivery": {
     "section_title": "ニュース配信",
     "label": "ニュース配信",
@@ -454,6 +460,7 @@
     "file_delivery_method_relay": "内部システム中継",
     "file_delivery_method_redirect_info": "リダイレクト： GROWIサーバーを介さずに署名付きURLにリダイレクトされるため、優れたパフォーマンスを出します。",
     "file_delivery_method_relay_info": "内部システム中継： GROWIサーバーがクライアントに配信するため、完全なセキュリティーを提供します。",
+    "fixed_by_env_var": "環境変数 <code>{{envKey}}={{envVar}}</code> により固定されています。",
     "gcs_label": "GCP(GCS)",
     "aws_label": "AWS(S3)",
     "local_label": "Local",
@@ -466,7 +473,6 @@
     "azure_storage_container_name": "コンテナ名",
     "azure_note_for_the_only_env_option": "現在Azure設定は環境変数の値によって制限されています<br>この設定を変更する場合は環境変数 <code>{{env}}</code> の値をfalseに変更もしくは削除してください",
     "azure_note_for_the_only_env_option_cloud": "Azure の設定は GROWI.cloud の管理画面から変更できます",
-    "fixed_by_env_var": "環境変数 <code>{{envKey}}={{envVar}}</code> により固定されています。",
     "file_upload": "ファイルをアップロードするための設定を行います。ファイルアップロードの設定を完了させると、ファイルアップロード機能、プロフィール写真機能などが有効になります。",
     "test_connection": "接続テスト",
     "change_setting": "この設定を途中で変更すると、これまでにアップロードしたファイル等へのアクセスができなくなりますのでご注意下さい。",
@@ -578,9 +584,9 @@
       "inline_header": "インライン MIMEタイプ",
       "attachment_header": "添付ファイル MIMEタイプ",
       "inline_button": "インライン",
+      "attachment_button": "添付ファイル",
       "no_inline": "設定済みのインラインタイプはありません。",
       "no_attachment": "設定済みの添付ファイルタイプはありません。",
-      "attachment_button": "添付ファイル",
       "remove_button": "削除"
     }
   },
@@ -1014,7 +1020,43 @@
     "transfer_data_to_another_growi": "このGROWIのデータを別GROWIへ移行する",
     "advanced_options": "詳細オプション",
     "start_transfer": "移行を開始する",
-    "paste_transfer_key": "移行キーをここにペースト"
+    "paste_transfer_key": "移行キーをここにペースト",
+    "transfer_method": {
+      "heading": "移行方法",
+      "migration": "移行(移行先の全データを置き換える)",
+      "merge": "既存データに追加(移行先の既存データは保持される)"
+    },
+    "confirm_modal": {
+      "title": "移行内容の確認",
+      "description": "移行先のGROWIには現在以下のデータがあります。この移行を開始すると、これらはすべて削除され、このGROWIのデータに置き換わります:",
+      "counts": {
+        "users": "ユーザー",
+        "user_groups": "ユーザーグループ",
+        "pages": "ページ"
+      },
+      "warnings_heading": "続行する前に:",
+      "warnings": {
+        "password_seed_mismatch": "移行元と移行先のGROWIでパスワードシードが異なります。移行されたユーザーは既存のパスワードでログインできなくなります。",
+        "no_loginable_admin": "移行先のGROWIには現在ログイン可能な管理者がいません。移行後、誰もログインできなくなる可能性があります。",
+        "sessions_not_invalidatable": "移行先のGROWIのセッションストアは個々のセッションを無効化できません。移行前に確立されたセッションはそのまま有効な状態が続きます。",
+        "local_auth_disabled_at_source": "このGROWIではローカル(ID/パスワード)認証が無効になっています。救済された移行先の管理者であっても、パスワードでログインすることはできません。"
+      }
+    },
+    "blockers": {
+      "version_mismatch": "この移行は実行できません: 移行元と移行先のGROWIのバージョンが異なります。",
+      "user_upper_limit": "この移行は実行できません: 移行元のアクティブユーザー数が、移行先GROWIのユーザー数上限を超えています。",
+      "file_upload_not_configured": "この移行は実行できません: 移行元または移行先のGROWIでファイルアップロードが設定されていません。",
+      "destination_storage_not_writable": "この移行は実行できません: 移行先GROWIのストレージに書き込めません。",
+      "file_upload_total_limit": "この移行は実行できません: 移行元GROWIの添付ファイルの合計サイズが、移行先GROWIのファイルアップロード上限を超えています。"
+    },
+    "rescue_outcome": {
+      "heading": "この移行により、移行先のすべてのユーザーが置き換えられました。誰かがログインできるよう、以下の管理者アカウントは保持されました:",
+      "renamed_from": "変更前の名前",
+      "email_removed": "移行してきたユーザーとメールアドレスが競合したため、メールアドレスは削除されました。",
+      "slack_member_id_removed": "移行してきたユーザーとSlackメンバーIDが競合したため、Slackメンバー IDは削除されました。",
+      "id_reassigned": "元の内部識別子が移行してきたユーザーと競合したため、新しい内部識別子が割り当てられました。移行前に確立されたログインセッションは失われました。"
+    },
+    "failed_collections_heading": "移行先が以下のコレクションを取り込めませんでした:"
   },
   "plugins": {
     "plugins": "プラグイン",
@@ -1201,7 +1243,20 @@
   "g2g": {
     "transfer_success": "G2G移行が完了しました",
     "error_generate_growi_archive": "GROWI アーカイブファイルの作成に失敗しました",
-    "error_send_growi_archive": "GROWI アーカイブファイルの送信に失敗しました"
+    "error_send_growi_archive": "GROWI アーカイブファイルの送信に失敗しました",
+    "error_data_conflict": "移行が中止されました: 移行対象のデータの一部が、移行先にすでに存在するユーザーまたはユーザーグループと衝突したため、何もインポートされませんでした。競合しているアカウントやグループを解消してから再試行するか、初期セットアップが完了していない移行先へ移行してください。",
+    "error_upload_attachment": "添付ファイルの移行に失敗しました",
+    "error_import_in_progress": "移行が中止されました: 移行先で別のデータのインポートがすでに実行中です。完了を待ってから移行を再試行してください。",
+    "error_partial_import": "移行が完全には終わりませんでした: 移行先のGROWIがコレクションのインポート・管理者の救済・インポート後の後処理のいずれかに失敗した可能性があり、そのためデータベースが一部だけ移行された状態のままになっているかもしれません。この移行のために移行先がメンテナンスモードになっていた場合、移行先のGROWIの管理 > アプリ設定でメンテナンスモードを解除するまで、一般ユーザーはアクセスできません。原因を解決してから、もう一度移行を実行してください。",
+    "error_protected_collection": "移行が中止されました: 移行してはならないコレクションが指定されていたため、移行先が要求を拒否し、何もインポートされませんでした。移行画面ではそれらのコレクションを選択できないため、移行元と移行先のGROWIが同じバージョンで動作しているか確認したうえで、下に表示されたコレクション名を報告してください。",
+    "error_mixed_import_methods": "移行が中止されました: 移行先のGROWIが、一部のコレクションを置き換え・別のコレクションを追加するという異なるインポート方法が混在したリクエストを拒否したため、何もインポートされませんでした。移行画面はそのようなリクエストを作成しないため、移行元と移行先のGROWIが同じバージョンで動作しているか確認してから、もう一度移行を実行してください。",
+    "error_invalid_transfer_key": "移行が中止されました: 移行先が移行キーを未指定・期限切れ・不正のいずれかとして拒否しました。移行先で新しい移行キーを発行し、再試行してください。",
+    "error_parse_failed": "移行が中止されました: 移行先が移行のリクエストを解析できませんでした。移行元と移行先のGROWIが同じバージョンで動作しているか確認したうえで、移行を再試行してください。",
+    "error_validation_failed": "移行が中止されました: 移行先がアップロードされたGROWIアーカイブファイルを検証できませんでした。ファイルが壊れている可能性があるため、アーカイブの生成と送信をやり直してください。",
+    "error_version_incompatible": "移行が中止されました: 移行元と移行先のGROWIのバージョンが異なるため、何もインポートされませんでした。移行先のGROWIを移行元と同じバージョンにアップグレードしてから、移行を再試行してください。",
+    "error_import_settings_invalid": "移行が中止されました: 移行先が要求されたコレクションのインポート設定を正しく組み立てられませんでした。詳細はGROWIのドキュメントを参照してください。",
+    "error_conflict_detection_failed": "移行が中止されました: 移行先が移行データと既存データの衝突の有無を判定できず、推測でインポートを進めることを拒否しました。移行を再試行してください。繰り返し発生する場合は、移行先のGROWIのログを確認してください。",
+    "error_mongo_collection_import_failure": "移行が完全には終わりませんでした: データの衝突以外の理由で、移行先が1つ以上のコレクションをMongoDBへ書き込めませんでした。詳細は移行先のGROWIのログを確認してください。"
   },
   "external_user_group": {
     "management": "外部グループ管理",
@@ -1365,5 +1420,13 @@
         "description": "データ初期化を行わずに、MongoDB のページと Vault の git ツリー間のデータ不整合の手動修復を試みます。"
       }
     }
+  },
+  "maintenance_mode_notice": {
+    "title": "GROWIはメンテナンスモードのままになります",
+    "body_this_growi": "configsコレクションをインポートすると、このGROWIのすべての設定がアーカイブの内容で置き換えられるため、このGROWIはメンテナンスモードになり、そのままの状態になります。解除するまで、一般利用者はアクセスできません。",
+    "body_destination": "configsコレクションをインポートすると、移行先GROWIのすべての設定がこのGROWIの内容で置き換えられるため、移行先はメンテナンスモードになり、そのままの状態になります。解除するまで、一般利用者は移行先にアクセスできません。添付ファイルはコレクションの後に移行されるため、移行全体が完了するまで移行先は不完全な状態です。",
+    "turn_it_off": "結果を確認したら、閉じられた側のGROWIの管理 > アプリ設定からメンテナンスモードを解除してください。",
+    "cancel": "キャンセル",
+    "proceed": "理解した上で続行する"
   }
 }

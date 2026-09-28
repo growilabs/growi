@@ -50,8 +50,8 @@ interface RequestWithAuth extends Request {
  *              application/json:
  *                schema:
  *                  $ref: '#/components/schemas/PageInfoExt'
- *          403:
- *            description: Page is forbidden.
+ *          404:
+ *            description: Page is not found or forbidden.
  *          500:
  *            description: Internal server error.
  */
@@ -92,18 +92,15 @@ export const getPageInfoHandlerFactory = (crowi: Crowi): RequestHandler[] => {
         );
 
         if (isIPageNotFoundInfo(meta)) {
-          // Return error only when the page is forbidden
-          if (meta.isForbidden) {
-            return res.apiv3Err(
-              new ErrorV3(
-                'Page is forbidden',
-                'page-is-forbidden',
-                undefined,
-                meta,
-              ),
-              403,
-            );
-          }
+          // Always respond 404 regardless of forbidden vs not-found — see
+          // apps/app/.claude/rules/page-write-action-403-404.md
+          return res.apiv3Err(
+            new ErrorV3(
+              'Page is not found or forbidden',
+              'notfound_or_forbidden',
+            ),
+            404,
+          );
         }
 
         // Empty pages (isEmpty: true) should return page info for UI operations

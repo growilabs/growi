@@ -95,7 +95,7 @@ const UserTable = (props: UserTableProps) => {
             </th>
             <th>
               <div className="d-flex align-items-center">
-                <div className="me-3">{t('Name')}</div>
+                <div className="me-3">{t('commons:Name')}</div>
                 <SortIcons
                   isSelected={adminUsersContainer.state.sort === 'name'}
                   isAsc={isCurrentSortOrderAsc}
@@ -107,7 +107,7 @@ const UserTable = (props: UserTableProps) => {
             </th>
             <th>
               <div className="d-flex align-items-center">
-                <div className="me-3">{t('Email')}</div>
+                <div className="me-3">{t('commons:Email')}</div>
                 <SortIcons
                   isSelected={adminUsersContainer.state.sort === 'email'}
                   isAsc={isCurrentSortOrderAsc}
@@ -119,7 +119,7 @@ const UserTable = (props: UserTableProps) => {
             </th>
             <th style={{ width: '100px' }}>
               <div className="d-flex align-items-center">
-                <div className="me-3">{t('Created')}</div>
+                <div className="me-3">{t('commons:Created')}</div>
                 <SortIcons
                   isSelected={adminUsersContainer.state.sort === 'createdAt'}
                   isAsc={isCurrentSortOrderAsc}

@@ -40,7 +40,7 @@ const AdminSecuritySettingsPage: NextPageWithLayout<Props> = (props: Props) => {
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem dynamic import
 AdminSecuritySettingsPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('security_settings.security_settings'),
+  title: (_p, t) => t('admin:security_settings.security_settings'),
   containerFactories: [
     async () => {
       const { default: C } = await import(

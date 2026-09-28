@@ -4,12 +4,9 @@ import mongoose from 'mongoose';
 import type Crowi from '~/server/crowi';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageModel } from '~/server/models/page';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import { prisma } from '~/utils/prisma';
 
 import { Attachment } from '../../models/attachment';
-import PageRedirect from '../../models/page-redirect';
-import ShareLink from '../../models/share-link';
 import {
   type ActivityActor,
   recordCascadeAttachmentRemovals,
@@ -85,13 +82,31 @@ export const deleteCompletelyOperation = async (
     }),
   ]);
 
+  // `pagetagrelations.relatedPage`, `sharelinks.relatedPage` and `revisions.page` are required relations
+  // to `pages` with `onDelete: NoAction`. Running their deleteMany() concurrently
+  // with the page delete below is safe only because `Page.deleteMany` here still
+  // goes through Mongoose, so Prisma's relation check never runs against it.
+  // Once `Page.deleteMany` is replaced with `prisma.pages.deleteMany`/`delete`,
+  // this Promise.all will start throwing P2014 (empirically confirmed:
+  // reliably reproducible when the two run concurrently, never when run
+  // sequentially). At that point, move pagetagrelations/revisions
+  // deletion ahead of the pages delete.
   await Promise.all([
-    PageTagRelation.deleteMany({ relatedPage: { $in: pageIds } }),
-    ShareLink.deleteMany({ relatedPage: { $in: pageIds } }),
+    prisma.pagetagrelations.deleteMany({
+      where: { relatedPageId: { in: pageIdStrings } },
+    }),
+    prisma.sharelinks.deleteMany({
+      where: { relatedPageId: { in: pageIdStrings } },
+    }),
     prisma.revisions.deleteMany({ where: { pageId: { in: pageIdStrings } } }),
+  ]);
+
+  await Promise.all([
     Page.deleteMany({ _id: { $in: pageIds } }),
-    PageRedirect.deleteMany({
-      $or: [{ fromPath: { $in: pagePaths } }, { toPath: { $in: pagePaths } }],
+    prisma.pageredirects.deleteMany({
+      where: {
+        OR: [{ fromPath: { in: pagePaths } }, { toPath: { in: pagePaths } }],
+      },
     }),
     attachmentService.removeAllAttachments(attachments),
 

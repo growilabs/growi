@@ -62,7 +62,7 @@ test('should not be cleared and should prevent GrantSelector from modified', asy
 
   // Expect grant not to be reset after uploading an attachment
   await expect(page.getByTestId('page-grant-alert')).toContainText(
-    'Browsing of this page is restricted',
+    'Access to this page is restricted',
   );
 });
 

@@ -136,6 +136,32 @@ describe('NewsCronService', () => {
       ]);
     });
 
+    test('should carry bodyFormat through to the upsert input', async () => {
+      const feed = {
+        version: '1.0',
+        items: [
+          {
+            id: 'md-item',
+            title: { ja_JP: 'Markdown' },
+            publishedAt: '2026-01-01T00:00:00Z',
+            bodyFormat: 'markdown',
+          },
+          {
+            id: 'plain-item',
+            title: { ja_JP: 'Plain' },
+            publishedAt: '2026-01-02T00:00:00Z',
+          },
+        ],
+      };
+      mocks.mockFetch.mockResolvedValue(mockResponse(feed));
+
+      await service.executeJob();
+
+      const inputs = mocks.upsertNewsItems.mock.calls[0][0];
+      expect(inputs[0].bodyFormat).toBe('markdown');
+      expect(inputs[1].bodyFormat).toBeUndefined();
+    });
+
     test('should NOT update DB when fetch fails', async () => {
       mocks.mockFetch.mockResolvedValue({ ok: false, status: 500 });
 

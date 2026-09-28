@@ -89,59 +89,68 @@ export const SelectGroupModal = ({
 
     return (
       <div className="d-flex flex-column">
-        {userRelatedGroups.map((group) => {
-          const isGroupGranted = selectedGrant?.userRelatedGrantedGroups?.some(
-            (grantedGroup) => getIdForRef(grantedGroup.item) === group.id,
-          );
-          const cannotGrantGroup =
-            group.status === UserGroupPageGrantStatus.cannotGrant;
-          const activeClass = isGroupGranted ? 'active' : '';
+        <div className="list-group">
+          {userRelatedGroups.map((group) => {
+            const isGroupGranted =
+              selectedGrant?.userRelatedGrantedGroups?.some(
+                (grantedGroup) => getIdForRef(grantedGroup.item) === group.id,
+              );
+            const cannotGrantGroup =
+              group.status === UserGroupPageGrantStatus.cannotGrant;
+            const activeClass = isGroupGranted ? 'active' : '';
 
-          return (
-            <button
-              className={`btn btn-outline-primary d-flex justify-content-start mb-3 mx-4 align-items-center p-3 ${activeClass}`}
-              type="button"
+            return (
+              <label
+                className={`list-group-item d-flex gap-3 ${activeClass}`}
+                key={group.id}
+              >
+                <input
+                  type="checkbox"
+                  className="form-check-input flex-shrink-0 mt-1"
+                  checked={isGroupGranted}
+                  disabled={cannotGrantGroup}
+                  onChange={() => groupListItemClickHandler(group)}
+                />
+                <span style={{ minWidth: 0 }}>
+                  <span className="text-primary">{group.name}</span>
+                  {group.type === GroupType.externalUserGroup && (
+                    <span className="ms-2 badge badge-pill badge-info">
+                      {group.provider}
+                    </span>
+                  )}
+                  <GroupMembersLabel
+                    members={membersByGroupId?.[group.id] ?? []}
+                    currentUsername={currentUser?.username}
+                  />
+                </span>
+              </label>
+            );
+          })}
+          {nonUserRelatedGrantedGroups.map((group) => (
+            <label
+              className="list-group-item d-flex gap-3 active"
               key={group.id}
-              onClick={() => groupListItemClickHandler(group)}
-              disabled={cannotGrantGroup}
             >
               <input
                 type="checkbox"
-                checked={isGroupGranted}
-                disabled={cannotGrantGroup}
+                className="form-check-input flex-shrink-0 mt-1"
+                checked
+                disabled
               />
-              <p className="ms-3 mb-0">{group.name}</p>
-              {group.type === GroupType.externalUserGroup && (
-                <span className="ms-2 badge badge-pill badge-info">
-                  {group.provider}
-                </span>
-              )}
-              <GroupMembersLabel
-                members={membersByGroupId?.[group.id] ?? []}
-                currentUsername={currentUser?.username}
-              />
-            </button>
-          );
-        })}
-        {nonUserRelatedGrantedGroups.map((group) => (
-          <button
-            className="btn btn-outline-primary d-flex justify-content-start mb-3 mx-4 align-items-center p-3 active"
-            type="button"
-            key={group.id}
-            disabled
-          >
-            <input type="checkbox" checked disabled />
-            <p className="ms-3 mb-0">{group.name}</p>
-            {group.type === GroupType.externalUserGroup && (
-              <span className="ms-2 badge badge-pill badge-info">
-                {group.provider}
+              <span style={{ minWidth: 0 }}>
+                <span className="text-primary">{group.name}</span>
+                {group.type === GroupType.externalUserGroup && (
+                  <span className="ms-2 badge badge-pill badge-info">
+                    {group.provider}
+                  </span>
+                )}
               </span>
-            )}
-          </button>
-        ))}
+            </label>
+          ))}
+        </div>
         <button
           type="button"
-          className="btn btn-primary mt-2 mx-auto"
+          className="btn btn-primary mt-3 mx-auto"
           onClick={onClose}
         >
           {t('Done')}

@@ -1,5 +1,3 @@
-import path from 'node:path';
-import { dynamicImport } from '@cspell/dynamic-import';
 import type * as HastUtilSanitize from 'hast-util-sanitize';
 
 import { loadPlugins } from './esm-plugin-loader';
@@ -39,33 +37,21 @@ let cachedProcessor: Awaited<ReturnType<typeof buildProcessor>> | undefined;
 
 /**
  * Build the sanitize schema by loading hast-util-sanitize and
- * services/renderer/recommended-whitelist.ts via dynamicImport so that the
- * bulk-export renderer shares a single source of truth with the web renderer.
+ * services/renderer/recommended-whitelist.ts so that the bulk-export renderer
+ * shares a single source of truth with the web renderer.
  *
  * Design: design.md § Security Considerations — "許可リストの単一出所"
- *
- * @param baseDir - Resolution base for dynamicImport (caller's __dirname).
  */
-async function buildSanitizeOptions(
-  baseDir: string,
-): Promise<HastUtilSanitize.Schema> {
-  const { defaultSchema } = await dynamicImport<typeof HastUtilSanitize>(
-    'hast-util-sanitize',
-    baseDir,
+async function buildSanitizeOptions(): Promise<HastUtilSanitize.Schema> {
+  const { defaultSchema }: typeof HastUtilSanitize = await import(
+    'hast-util-sanitize'
   );
 
   // Single source of truth: load tagNames and attributes from the web
-  // renderer's whitelist. dynamicImport (via import-meta-resolve + statSync)
-  // requires the full path including extension for TypeScript source files.
-  // ts-node handles the actual transpilation at import time.
-  const whitelistPath = path.resolve(
-    baseDir,
-    '../../../../../../services/renderer/recommended-whitelist.ts',
+  // renderer's whitelist.
+  const { tagNames, attributes } = await import(
+    '~/services/renderer/recommended-whitelist'
   );
-  const { tagNames, attributes } = await dynamicImport<{
-    tagNames: string[];
-    attributes: NonNullable<HastUtilSanitize.Schema['attributes']>;
-  }>(whitelistPath, baseDir);
 
   return {
     ...defaultSchema,
@@ -77,18 +63,18 @@ async function buildSanitizeOptions(
 /**
  * Build the unified processor by iterating the plugins declared in
  * plugin-set.ts (the single source of truth) in order. The pipeline — including
- * the reused web `add-class` plugin (loaded by relative path) — is fully data
- * driven; nothing is wired by hand here, so adding/removing/reordering a plugin
- * is a one-file change in plugin-set.ts.
+ * the reused web `add-class` plugin (loaded via a dynamic import() thunk) — is
+ * fully data driven; nothing is wired by hand here, so adding/removing/reordering
+ * a plugin is a one-file change in plugin-set.ts.
  *
  * The one runtime-computed input is rehype-sanitize's schema (buildSanitizeOptions),
  * which the renderer supplies as that plugin's options.
  *
  * Design: design.md § System Flows
  */
-async function buildProcessor(baseDir: string) {
-  const { unified, plugins } = await loadPlugins(baseDir, ADOPTED_PLUGINS);
-  const sanitizeOptions = await buildSanitizeOptions(baseDir);
+async function buildProcessor() {
+  const { unified, plugins } = await loadPlugins(ADOPTED_PLUGINS);
+  const sanitizeOptions = await buildSanitizeOptions();
 
   // unified().use() mutates the processor in place and returns `this`, so we
   // call it for its side effect on a single instance. (Reassigning would force
@@ -113,13 +99,8 @@ async function buildProcessor(baseDir: string) {
  *
  * The unified pipeline is built once on first call to renderToHtml and cached
  * at module level for reuse across all pages in a bulk-export job.
- *
- * @param baseDir - Resolution base for dynamicImport; pass __dirname from the
- *                  call site so that module resolution is anchored correctly.
  */
-export function createBulkExportMarkdownRenderer(
-  baseDir: string,
-): BulkExportMarkdownRenderer {
+export function createBulkExportMarkdownRenderer(): BulkExportMarkdownRenderer {
   const styleProvider = createBulkExportStyleProvider();
   return {
     getCss(): string {
@@ -127,7 +108,7 @@ export function createBulkExportMarkdownRenderer(
     },
     async renderToHtml(markdownBody: string, cssHref: string): Promise<string> {
       if (cachedProcessor == null) {
-        cachedProcessor = await buildProcessor(baseDir);
+        cachedProcessor = await buildProcessor();
       }
       const htmlFragment = String(await cachedProcessor.process(markdownBody));
       return styleProvider.wrap(htmlFragment, cssHref);

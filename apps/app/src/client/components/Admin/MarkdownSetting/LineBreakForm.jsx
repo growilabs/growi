@@ -25,7 +25,7 @@ class LineBreakForm extends React.Component {
       await this.props.adminMarkDownContainer.updateLineBreakSetting();
       toastSuccess(
         t('toaster.update_successed', {
-          target: t('markdown_settings.lineBreak_header'),
+          target: t('admin:markdown_settings.lineBreak_header'),
           ns: 'commons',
         }),
       );
@@ -40,7 +40,9 @@ class LineBreakForm extends React.Component {
     const { isEnabledLinebreaks } = adminMarkDownContainer.state;
 
     const helpLineBreak = {
-      __html: t('markdown_settings.lineBreak_options.enable_lineBreak_desc'),
+      __html: t(
+        'admin:markdown_settings.lineBreak_options.enable_lineBreak_desc',
+      ),
     };
 
     return (
@@ -61,7 +63,7 @@ class LineBreakForm extends React.Component {
             className="form-label form-check-label"
             htmlFor="isEnabledLinebreaks"
           >
-            {t('markdown_settings.lineBreak_options.enable_lineBreak')}
+            {t('admin:markdown_settings.lineBreak_options.enable_lineBreak')}
           </label>
         </div>
         <p
@@ -79,7 +81,7 @@ class LineBreakForm extends React.Component {
 
     const helpLineBreakInComment = {
       __html: t(
-        'markdown_settings.lineBreak_options.enable_lineBreak_for_comment_desc',
+        'admin:markdown_settings.lineBreak_options.enable_lineBreak_for_comment_desc',
       ),
     };
 
@@ -102,7 +104,7 @@ class LineBreakForm extends React.Component {
             htmlFor="isEnabledLinebreaksInComments"
           >
             {t(
-              'markdown_settings.lineBreak_options.enable_lineBreak_for_comment',
+              'admin:markdown_settings.lineBreak_options.enable_lineBreak_for_comment',
             )}
           </label>
         </div>

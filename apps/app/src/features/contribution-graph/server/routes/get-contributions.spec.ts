@@ -1,8 +1,13 @@
 import type { IUser } from '@growi/core';
 import type { Request } from 'express';
-import { MongoMemoryServer } from 'mongodb-memory-server-core';
+import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 import { mockClear, mockDeep } from 'vitest-mock-extended';
+
+import {
+  connectSelfContainedMongo,
+  disconnectSelfContainedMongo,
+} from '^/test/setup/mongo/self-contained-connection';
 
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { configManager } from '~/server/service/config-manager';
@@ -36,17 +41,16 @@ describe('getContributionsHandler', () => {
   const mockRes = mockDeep<ApiV3Response>();
   const targetUserId = new mongoose.Types.ObjectId();
 
-  let mongod: MongoMemoryServer;
+  let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
-    mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri());
+    ({ mongod } = await connectSelfContainedMongo(
+      'growi_test_unit_get_contributions',
+    ));
   });
 
   afterAll(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-    await mongod.stop();
+    await disconnectSelfContainedMongo(mongod);
   });
 
   beforeEach(async () => {

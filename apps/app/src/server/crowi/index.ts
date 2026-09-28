@@ -28,6 +28,7 @@ import { startCron as startAccessTokenCron } from '~/server/service/access-token
 import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 import { connectPrismaAtBoot } from '~/utils/prisma-connect';
 
 import ActivityEvent from '../events/activity';
@@ -501,6 +502,13 @@ class Crowi {
     );
     new NewsCronService().startCron();
 
+    // Expired WIP page cleanup (the schedule defaults to daily and can be disabled
+    // with an empty app:wipPageCleanupCronSchedule)
+    const { startWipPageCleanupCronIfEnabled } = await import(
+      '~/server/service/page/wip-page-cleanup-cron'
+    );
+    startWipPageCleanupCronIfEnabled(this);
+
     // Periodic model-catalog refresh (no-op unless AI is enabled; the schedule
     // defaults to daily and can be disabled with an empty ai:modelCatalogRefreshCronSchedule)
     const { startModelCatalogRefreshCronIfEnabled } = await import(
@@ -750,7 +758,10 @@ class Crowi {
   }
 
   setupRoutesForPlugins(): void {
-    lsxRoutes(this, this.express);
+    lsxRoutes(this, this.express, {
+      resolveTagPageIds: (tagNames) =>
+        prisma.pagetagrelations.findPageIdsWithAllTags(tagNames),
+    });
     attachmentRoutes(this, this.express);
   }
 
@@ -905,14 +916,13 @@ class Crowi {
     await growiPluginService.downloadNotExistPluginRepositories();
   }
 
-  async setupPageService(): Promise<void> {
+  setupPageService(): void {
     if (this.pageGrantService == null) {
       this.pageGrantService = new PageGrantService(this);
     }
     // initialize after pageGrantService since pageService uses pageGrantService in constructor
     if (this.pageService == null) {
       this.pageService = new PageService(this);
-      await this.pageService.createTtlIndex();
     }
     this.pageOperationService = instanciatePageOperationService(this);
   }

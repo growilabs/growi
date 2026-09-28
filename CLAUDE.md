@@ -56,6 +56,7 @@ Skills are located in `.claude/skills/kiro-*/SKILL.md`
 - 3-phase approval workflow: Requirements → Design → Tasks → Implementation
 - Human review required each phase; use `-y` only for intentional fast-track
 - Keep steering current and verify alignment with `/kiro-spec-status`
+- A spec that changes an already-completed spec's contract (an amend spec) is a temporary vehicle: it merges its content back into the amended spec and deletes itself as its final task. Rules: [spec-lifecycle](.claude/rules/spec-lifecycle.md)
 - Follow the user's instructions precisely, and within that scope act autonomously: gather the necessary context and complete the requested work end-to-end in this run, asking questions only when essential information is missing or the instructions are critically ambiguous.
 
 ## Steering Configuration

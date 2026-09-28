@@ -110,7 +110,7 @@ const CustomizeLayoutSetting = (): JSX.Element => {
               className="btn btn-primary"
               onClick={onClickSubmit}
             >
-              {t('Update')}
+              {t('commons:Update')}
             </button>
           </div>
         </div>

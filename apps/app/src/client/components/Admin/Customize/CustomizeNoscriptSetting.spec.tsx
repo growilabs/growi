@@ -75,7 +75,7 @@ describe('CustomizeNoscriptSetting', () => {
 
     const { getByRole } = renderSetting(container);
 
-    await userEvent.click(getByRole('button', { name: 'Update' }));
+    await userEvent.click(getByRole('button', { name: 'commons:Update' }));
 
     await waitFor(() => {
       expect(mockedApiv3Put).toHaveBeenCalledWith(
@@ -96,7 +96,7 @@ describe('CustomizeNoscriptSetting', () => {
 
     const { getByRole } = renderSetting(container);
 
-    await userEvent.click(getByRole('button', { name: 'Update' }));
+    await userEvent.click(getByRole('button', { name: 'commons:Update' }));
 
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledTimes(1);
@@ -112,6 +112,6 @@ describe('CustomizeNoscriptSetting', () => {
 
     const { getByRole } = renderSetting(container);
 
-    expect(getByRole('button', { name: 'Update' })).toBeDisabled();
+    expect(getByRole('button', { name: 'commons:Update' })).toBeDisabled();
   });
 });

@@ -457,6 +457,62 @@ describe('ReconcileOrchestrator', () => {
     });
   });
 
+  describe('page without a revision (e.g. auto-generated intermediate path page)', () => {
+    it('skips the page instead of completing with an empty revisionId, and still completes the run', async () => {
+      // VaultInstruction.payload.entries[].revisionId is a required schema
+      // field — sending '' as a fallback fails to persist and previously
+      // threw, discarding every other buffered page in this batch.
+      const pageWithoutRevision = { _id: 'p-no-rev', path: '/intermediate' };
+      const pages = [
+        buildMockPage('p1', '/page-1'),
+        pageWithoutRevision,
+        buildMockPage('p2', '/page-2'),
+      ];
+      const deps = buildDeps(pages, { chunkSize: 10 });
+
+      const orchestrator = createReconcileOrchestrator({
+        pageModel: deps.pageModel as never,
+        vaultInstruction: deps.vaultInstruction as never,
+        vaultNamespaceMapper: deps.vaultNamespaceMapper as never,
+        vaultReconcileLog: deps.vaultReconcileLog as never,
+        createActivity: deps.createActivity,
+        chunkSize: deps.chunkSize,
+      });
+
+      await orchestrator.run({ ...BASE_OPTS, plannedPageCount: 5 });
+
+      // The revision-less page is excluded from the entries sent onward.
+      expect(deps.vaultInstruction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            entries: expect.arrayContaining([
+              expect.objectContaining({ pageId: 'p1' }),
+              expect.objectContaining({ pageId: 'p2' }),
+            ]),
+          }),
+        }),
+      );
+      const [emittedDoc] = (
+        deps.vaultInstruction.create as ReturnType<typeof vi.fn>
+      ).mock.calls[0];
+      expect(emittedDoc.payload.entries).not.toContainEqual(
+        expect.objectContaining({ pageId: 'p-no-rev' }),
+      );
+
+      // The other pages in the same batch still complete successfully.
+      const calls = (
+        deps.vaultReconcileLog.updateOne as ReturnType<typeof vi.fn>
+      ).mock.calls;
+      const completedCall = calls.find(
+        (c: [unknown, { $set: { status?: string } }]) =>
+          c[1].$set?.status === 'completed',
+      );
+      expect(completedCall).toBeDefined();
+      // biome-ignore lint/style/noNonNullAssertion: defined by expect above
+      expect(completedCall![1].$set.processedCount).toBe(3);
+    });
+  });
+
   // -------------------------------------------------------------------------
   // 6. Chunk flush: buffer reaches chunkSize → intermediate flush
   // -------------------------------------------------------------------------

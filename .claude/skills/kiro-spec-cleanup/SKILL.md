@@ -21,6 +21,8 @@ Lifecycle position:
 discovery → init → requirements → design → tasks → impl → validate-impl → **spec-cleanup**
 ```
 
+This is orthogonal to [spec-lifecycle](../../rules/spec-lifecycle.md): that rule governs a spec that amends an already-completed spec's contract and must fold itself back and delete itself, while this skill trims a single spec's own documents after its own implementation lands. Run cleanup on every spec once it ships; run spec-lifecycle's final task only when the spec being closed out was itself an amend spec.
+
 ## Core Mission
 - **Success Criteria**:
   - Implementation details (testing procedures, deployment checklists) removed

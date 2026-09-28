@@ -154,7 +154,12 @@ export function createDriftDetector(deps: DriftDetectorDeps): DriftDetector {
     // Step 4: Query pages updated after watermark (fetch maxPagesPerTick+1 to
     //         detect scope-out without loading the whole collection)
     // ------------------------------------------------------------------
-    let pages: Array<{ _id: unknown; path: string; updatedAt: Date }>;
+    let pages: Array<{
+      _id: unknown;
+      path: string;
+      updatedAt: Date;
+      revision?: { toString(): string } | null;
+    }>;
     try {
       pages = await pageModel
         .find({ updatedAt: { $gt: watermark } })
@@ -235,6 +240,14 @@ export function createDriftDetector(deps: DriftDetectorDeps): DriftDetector {
         return;
       }
 
+      // Skip pages without a revision (e.g. auto-generated intermediate path
+      // pages) — VaultInstruction.payload.entries[].revisionId is a required
+      // field, so there is nothing valid to send, and there is no content to
+      // sync anyway. Mirrors the same guard in bootstrap-runner.ts.
+      if (page.revision == null) {
+        continue;
+      }
+
       detectedCount += 1;
 
       for (const namespace of namespaces) {
@@ -247,9 +260,7 @@ export function createDriftDetector(deps: DriftDetectorDeps): DriftDetector {
               {
                 pageId: String(page._id),
                 pagePath: page.path,
-                // revisionId is not available at this layer; use empty string as
-                // a sentinel so vault-manager fetches the latest revision.
-                revisionId: '',
+                revisionId: page.revision.toString(),
               },
             ],
           },

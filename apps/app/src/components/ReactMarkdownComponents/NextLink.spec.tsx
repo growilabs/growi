@@ -67,6 +67,14 @@ describe('NextLink', () => {
       ${'/Sandbox/日本語'}                                    | ${'non-ASCII page path written literally'}
       ${'/Sandbox/mail%40example'}                            | ${'percent-encoded reserved character'}
       ${'/Sandbox/a%2Fb'}                                     | ${'percent-encoded path separator'}
+      ${'/user/admin'}                                        | ${'user homepage root'}
+      ${'/tags'}                                              | ${'the tags page'}
+      ${'/trash'}                                             | ${'the trash page'}
+      ${'/_search'}                                           | ${'the search page'}
+      ${'/share/abc'}                                         | ${'a shared-link page'}
+      ${'/admin'}                                             | ${'the admin top page'}
+      ${'/me'}                                                | ${'the user settings page'}
+      ${'/user/%E6%97%A5%E6%9C%AC%E8%AA%9E'}                  | ${'user homepage root hidden behind percent-encoding'}
     `('routes $pathDescription through next/link', ({ href }) => {
       const { isClientSideTransition, anchor } = renderLink(href);
       expect(isClientSideTransition).toBe(true);
@@ -77,17 +85,20 @@ describe('NextLink', () => {
 
   describe('links that must NOT transition client-side', () => {
     it.each`
-      href                                   | reason
-      ${'#heading'}                          | ${'in-page anchor'}
-      ${'/attachment/653a1f1b'}              | ${'path served outside the page router'}
-      ${'/user/admin'}                       | ${'user homepage root'}
-      ${'/Sandbox/Bootstrap5/edit'}          | ${'path reserved by the editor'}
-      ${'/Sandbox/Bootstrap5.md'}            | ${'path reserved for the markdown endpoint'}
-      ${'/%E6%97%A5%E6%9C%AC%E8%AA%9E.md'}   | ${'reserved suffix hidden behind percent-encoding'}
-      ${'/user/%E6%97%A5%E6%9C%AC%E8%AA%9E'} | ${'user homepage root hidden behind percent-encoding'}
-      ${'/%61ttachment/653a1f1b'}            | ${'reserved prefix hidden behind percent-encoding'}
-      ${'/Sandbox/broken%ZZ'}                | ${'malformed percent-encoding'}
-      ${'/Sandbox/50%25off'}                 | ${'literal percent sign in the path'}
+      href                                 | reason
+      ${'#heading'}                        | ${'in-page anchor'}
+      ${'/attachment/653a1f1b'}            | ${'path served outside the page router'}
+      ${'/vault.git/info/refs'}            | ${'GROWI Vault git gateway, served outside the page router'}
+      ${'/passport/google'}                | ${'an OAuth entry point, served outside the page router'}
+      ${'/ogp/653a1f1b'}                   | ${'OGP image rendering, served outside the page router'}
+      ${'/download/653a1f1b'}              | ${'an attachment download, served outside the page router'}
+      ${'/uploads/653a1f1b.png'}           | ${'a raw upload path, served outside the page router'}
+      ${'/Sandbox/Bootstrap5/edit'}        | ${'path reserved by the editor'}
+      ${'/Sandbox/Bootstrap5.md'}          | ${'path reserved for the markdown endpoint'}
+      ${'/%E6%97%A5%E6%9C%AC%E8%AA%9E.md'} | ${'reserved suffix hidden behind percent-encoding'}
+      ${'/%61ttachment/653a1f1b'}          | ${'reserved prefix hidden behind percent-encoding'}
+      ${'/Sandbox/broken%ZZ'}              | ${'malformed percent-encoding'}
+      ${'/Sandbox/50%25off'}               | ${'literal percent sign in the path'}
     `('keeps $reason on a plain anchor', ({ href }) => {
       const { isClientSideTransition, anchor } = renderLink(href);
       expect(isClientSideTransition).toBe(false);

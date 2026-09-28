@@ -1,12 +1,25 @@
 # Technical Design Document
 
+## Write / Don't-Write Test
+
+このドキュメントを将来編集するときの判定基準。**読者がコードとテストファイルを読めば再現できる内容は書かない**。
+
+| 書く | 書かない |
+|---|---|
+| 調査して初めてわかった事実(コードをざっと読んだだけでは自明でない挙動、外部ライブラリの隠れた振る舞い) | 関数シグネチャ・ファイル配置図・「どのファイルに何があるか」 |
+| 異例な設計を選んだ理由(**特に、試して却下した案とその理由**) | 素直な実装の素直な説明 |
+| 自動テストが**カバーできない**残差 | どのテストが何をカバーしているかの一覧(spec/testファイルを読めばわかる。書くと陳腐化する) |
+| コードから再現できない手動検証の手順(再現環境の作り方、確認する観点、合否を分ける基準値) | 差分の有無・実装時期などの時点情報 |
+
+迷ったら書かない。
+
 ## Overview
 
 **Purpose**: G2G 転送に「引っ越し（移行先を置き換える）」を既定の意味として与え、初期セットアップ済みの移行先へも転送が完了するようにする。置き換えなら移行元の識別子がそのまま入るため、ユーザー・グループ・グループ関係・ページの対応が保たれ、一意制約の衝突は原理的に発生しない。
 
 **Users**: G2G 転送で GROWI 間のデータ移行を行う管理者。転送を開始する前に、移行先で削除されるものとログインできなくなる条件を知り、承知したうえで実行する。
 
-**Impact**: 転送の既定の意味が「移行先に追加する」から「移行先を置き換える」へ変わる。**引っ越しモードでは転送対象コレクションの選択も取り込み方法の選択も操作者に求めない**（1 つの意味に固定する）。従来の「既存データに追加する」は今の自由度をそのまま維持し、既存の衝突検知ゲート（spec `g2g-import-conflict-detection`）はそちらの番人として働き続ける。
+**Impact**: 転送の既定の意味が「移行先に追加する」から「移行先を置き換える」へ変わる。**引っ越しモードでは転送対象コレクションの選択も取り込み方法の選択も操作者に求めない**（1 つの意味に固定する）。従来の「既存データに追加する」は、対象コレクションの選択の自由度をそのまま維持する。取り込み方法の選択だけは、判定の対象になるコレクションから置き換えを外す（要件 1.4。これが無いと画面が提示した組み合わせをサーバが断る状態になる）。既存の衝突検知ゲート（spec `g2g-import-conflict-detection`）は従来モードの番人として働き続ける。
 
 ### Goals
 
@@ -14,7 +27,7 @@
 - 引っ越しモードで、移行先の既存データを取り除いてから取り込み、移行元のアクセス権の対応関係を保ったまま転送を完了させる。
 - 移行先の管理者アカウントとそのアクセストークンを救済し、取り込みが失敗しても移行先に管理者が残る状態を保つ。
 - 転送を開始する前に、削除される件数とログインできなくなる条件を提示し、明示的な確認を得る。
-- 従来モードの挙動と、そこに入れた衝突検知ゲートを維持する。
+- 従来モードの挙動と、そこに入れた衝突検知ゲートを維持する。ただし要件 1.4 のとおり、判定の対象になるコレクションでは取り込み方法から置き換えを外す（要件 6.1 が挙げる 2 つ目の意図的な変更）。
 
 ### Non-Goals
 
@@ -46,7 +59,8 @@
 - 衝突検知の判定そのもの（`collectConflicts`）。本設計は「どのコレクションを検知対象にするか」を渡すだけで、判定の意味は変えない。
 - **保守モードの判定の仕組み**（`isMaintenanceMode()` と 2 つの middleware）。既存のまま使う。呼び出し元も変更しない。
 - 認証・認可の仕組み。preflight は既存の認可（押す側は管理者、受信側は転送キー）に載せる。
-- 従来モードの取り込み方法・コレクション選択の自由度。新しい規則を適用しない。
+- 従来モードの**コレクション選択**の自由度。どのコレクションを転送するかは今のまま操作者が選ぶ。
+  - **取り込み方法の選択は範囲内**（要件 1.4）。判定の対象になるコレクション（`configs` と `pages` 以外）から置き換えを外す。絞るのは G2G の画面だけで、手動 zip 取り込み画面の選択肢は変えない（それは上の Non-Goals のまま）。
 
 ### Allowed Dependencies
 
@@ -111,7 +125,7 @@ graph LR
 
 ### 主要な設計判断
 
-- **D1: 引っ越しモードから選択肢を取り除く。** 転送対象は「転送可能なコレクションすべて」に固定し、取り込み方法は全て置き換えに固定する。依存し合うコレクション（users / usergroups / usergrouprelations / externalaccounts）を一緒に選ばせる規則も、混在を避ける規則も、操作者からは見えなくなる（システムが常に満たす）。従来モードには新しい規則を適用しない。
+- **D1: 引っ越しモードから選択肢を取り除く。** 転送対象は「転送可能なコレクションすべて」に固定し、取り込み方法は全て置き換えに固定する。依存し合うコレクション（users / usergroups / usergrouprelations / externalaccounts）を一緒に選ばせる規則も、混在を避ける規則も、操作者からは見えなくなる（システムが常に満たす）。従来モードでは対象の選択の自由度を残すが、**混在を避ける規則だけは従来モードにも及ぶ**（要件 1.4）。画面から置き換えを外して混在を作れなくし、受信側の判定は画面を通らない呼び出しへの安全網として置く（要件 1.5）。
 - **D2: 整合条件は、取り込み方法がシステム側で強制されるコレクションを除いて判定する。** 除かないと、従来モードの通常の転送（`configs` は置き換え・`users` は追加）が混在と判定されて止まる。
 - **D3: 取り込みを直列化しない。** 要件 4.8 は、`importCollections` が `import()` の呼び出しを **`try/finally` で包み、救済・セッション破棄・設定の復元・保守モードの後始末を `finally` 側に置く**ことで満たす。`import()` はコレクション単位の例外を内部で捕捉するが、取り込み後の `normalizeAllPublicPages()` は捕捉していないため、「`import()` は必ず正常終了する」に依存してはならない。
 - **D4: 受信側に preset を送らない。** wire に乗るのは従来どおり `collections` と `optionsMap` だけ。受信側は取り込み設定から置き換え対象集合を導く。
@@ -195,50 +209,13 @@ graph LR
 
 **あわせて受信の一時ファイル名を要求ごとに一意にする**（multer の `filename` に乱数を足し、ハンドラは `req.file.path` を使う）。旗と合わせて二重の守りになる。
 
-### Technology Stack
-
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Frontend | React 18 / Next.js 16 Pages Router | preset の選択、確認モーダル、救済結果の通知表示 | 既存の管理画面に追加。新規依存なし |
-| Backend | Express（apiv3） | preflight、転送対象の保護、救済と保守モードの手順の実行 | 既存ルートの拡張。新規依存なし |
-| Data | MongoDB / Mongoose ^6 | 件数の取得、管理者とトークンの退避・再投入 | スキーマ変更なし |
-| Session | express-session store（connect-mongo または connect-redis） | 置き換えられたユーザーのセッション無効化 | 保存先ごとに経路が違う。Redis は store API、MongoDB は `sessions` を直接扱う |
-| Crypto | Node 標準 `crypto`（sha256） | パスワードの種の指紋生成 | 既存 `generatePassword` と同じ標準ライブラリ |
-
 ## File Structure Plan
 
-### Directory Structure
+新規に足すのは 5 つの純関数モジュール(preset の組み立てと整合条件判定、置き換え対象集合の算出、救済内容の算出、点検の判定、セッション無効化)と、確認モーダルのコンポーネント 1 つ。純関数はいずれも I/O を持たず、既存のサービス層・ルートがそれを呼ぶだけの薄いアダプタになる(上記 Architecture Pattern のとおり)。各モジュールの責務と要件対応は下の Components and Interfaces に記載する。
 
-```
-apps/app/src/
-├── models/admin/
-│   └── g2g-transfer-preset.ts               # 新規（純）: preset -> 転送計画（対象 + 方法）、整合条件の判定
-├── server/service/import/
-│   └── non-transferable-collections.ts      # 新規（宣言）: 転送対象に含めないコレクションの唯一の宣言と判定
-├── server/service/
-│   ├── g2g-transfer-transferability.ts      # 新規（純）: 中断事由と警告の算出
-│   ├── g2g-transfer-session-invalidation.ts # 新規（I/O）: 救済対象以外のセッションを store API で破棄
-│   └── import/
-│       ├── replace-target-collections.ts    # 新規（純）: importSettingsMap -> 置き換え対象集合
-│       └── rescue-admins.ts                 # 新規（純）: 管理者とトークン -> 再投入内容と通知
-└── client/components/Admin/
-    └── G2GTransferConfirmModal.tsx          # 新規: 削除件数と警告の提示、明示的な確認
-```
+既存ファイルの変更は、受信側サービス(管理者とトークンの退避・救済の再投入・保守モードの入切・置き換え対象集合の受け渡し)、押す側ルート(preflight の追加)、取り込み共通処理(保守モードの書き戻し・同時実行の拒否・失敗一覧の返却)、衝突検知(置き換え対象集合の受け取りとアーカイブ側一意フィールドの公開)、管理画面(preset の選択・確認モーダル・救済結果の表示)に及ぶ。個々のファイルの変更点はコードと該当タスクの Boundary 注記を読めば分かるため、ここには列挙しない。
 
-### Modified Files
-
-- `apps/app/src/server/service/g2g-transfer.ts` — 受信側に「管理者とトークンの退避」「救済の再投入」「保守モードを立てる／後始末する」「置き換え対象集合の受け渡し」「サイト URL の復元」を追加。押す側の `getTransferability` を判定モジュールへの委譲に置き換え、`answerGROWIInfo` に件数・種の指紋・パスワードを持たない管理者の数・セッションの列挙可否を追加。`startTransfer` は受信側の応答本体を読み、救済結果を通知に載せる。
-- `apps/app/src/server/routes/apiv3/g2g-transfer.ts` — 押す側に preflight を追加。受信側で転送対象の保護と整合条件を検証し、検知に置き換え対象集合を渡す。救済結果を応答本体に含める。
-- `apps/app/src/server/routes/apiv3/import-executor.ts` — `ImportRunner.import` の戻り値の型を `Promise<ImportResult>` に合わせる。この最小限の型定義を更新しないと、戻り値を変えた `ImportService` が代入できずビルドが通らない（`Promise<X>` は `Promise<void>` に代入できない）。あわせて `import-executor.spec.ts:25` のモック（`importService.import.mockResolvedValue(undefined)`）を戻り値の形に追随させる。同ファイル 54-55 行の `mockRejectedValue` と `import-executor.integ.ts:116` の型引数なしの `vi.fn()` は、戻り値の型が変わっても代入可能性が崩れないので修正は要らない。
-- `apps/app/src/server/service/import/import.ts` — 3 点だけ変更する。設定の取り込みの後に保守モードを DB へ書き戻す（成否に関わらず）。取り込みが走っている間に別の取り込みを開始できないようにする。失敗したコレクション名を戻り値で返す。いずれも G2G 固有ではなく、管理画面からの zip 取り込みにも効く。
-- `apps/app/src/server/service/import/detect-unique-conflicts.ts` — 検知の入口に置き換え対象集合を引数で受け、その集合のコレクションを検知対象から外す。あわせて、**アーカイブ側の `username` / `email` / `_id` の集合を返す公開関数を追加する**（現在は抽出処理が非公開で、公開 API の戻り値には衝突した組しか現れないため、救済の付け替え名を保証できない）。
-- `apps/app/src/client/components/Admin/G2GDataTransfer.tsx` — 自前の除外リストを削除し、下記の G2G 専用の一覧取得を使う。
-- **`/mongo/collections` は変更しない。** この API はバックアップ用のエクスポート画面（`stores/admin/export.ts` の `useSWRxExportCollections`）からも呼ばれており、あちらは自前の 4 件だけを除いた一覧を出してバックアップに含められるようにしている。ここをサーバ側で G2G の宣言で絞ると、G2G と無関係なバックアップ機能から選べるコレクションが減る（要件が Out of scope としている手動 zip 画面の劣化になる）。エクスポート画面は現状のまま据え置く。
-- `apps/app/src/interfaces/g2g-transfer.ts` — 進捗の型に救済結果を載せる領域を追加。
-- `apps/app/src/server/models/vo/g2g-transfer-error.ts` — 新しい中断事由のコードを追加（取り込み設定の混在、保護対象コレクションの混入）。
-- `apps/app/src/client/components/Admin/G2GDataTransfer.tsx` — preset の選択、確認モーダルの起動、救済結果の表示。
-- `apps/app/src/client/components/Admin/G2GDataTransferExportForm.tsx` — 引っ越しでは対象選択・方法選択のいずれも描画しない。
-- `apps/app/public/static/locales/en_US/admin.json` — preset の見出し、確認文、警告文、救済結果、取り込みに失敗して保守モードのまま残った場合の説明（英語のみ。他言語は後続）。
+決めておく必要があるのは 1 点だけ:「**`/mongo/collections` は変更しない**」。この API はバックアップ用のエクスポート画面(`stores/admin/export.ts` の `useSWRxExportCollections`)からも呼ばれており、あちらは自前の 4 件だけを除いた一覧を出してバックアップに含められるようにしている。ここをサーバ側で G2G の宣言で絞ると、G2G と無関係なバックアップ機能から選べるコレクションが減る(要件が Out of scope としている手動 zip 画面の劣化になる)。G2G の画面には別の専用の一覧取得口を新設し、エクスポート画面は現状のまま据え置く。
 
 ## System Flows
 
@@ -288,56 +265,6 @@ graph TB
 
 `Finally` の 3 つと `Decide` は `import()` が例外を投げた場合も実行する（要件 4.8）。さらに **これらの処理が失敗しても応答は成功として返す**（失敗はログと通知に落とす）。押す側は応答が成功しないと添付転送に進まないため、後処理の失敗で添付が 1 件も転送されない事態を避ける（要件 5.2）。
 
-## Requirements Traceability
-
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1 | preset を 2 択で提示し引っ越しを初期選択 | G2GDataTransfer | `TransferPreset` | 点検と確認 |
-| 1.2 | 引っ越しでは対象選択も方法選択も提示しない | G2GDataTransferExportForm, g2g-transfer-preset | `buildMigrationTransferPlan` | 点検と確認 |
-| 1.3 | 混在を指定できない（強制モードは対象外） | g2g-transfer-preset, 受信ルート | `isCoherentOptionsMap` | 置き換えの手順 |
-| 1.4 | 従来モードでは方法を選べる | G2GDataTransferExportForm | `TransferPreset` | — |
-| 2.1 | 取り除いた後に取り込む | g2g-transfer-preset, ImportService（既存） | `buildMigrationTransferPlan` | 置き換えの手順 |
-| 2.2 | グループ公開ページが閲覧できる | g2g-transfer-preset（対象を固定）, 既存の取り込み挙動 | `buildMigrationTransferPlan` | 置き換えの手順 |
-| 2.3 | 置き換え対象では衝突で中断しない | replace-target-collections, detect-unique-conflicts | `deriveReplaceTargets` | 置き換えの手順 |
-| 2.4 | 途中の状態を利用者に見せない | ReceiverService（立てる）, ImportService（設定取り込み後に DB へ書き戻す） | `startMaintenanceMode` | 置き換えの手順 |
-| 2.5 | 失敗と中途状態を通知する | ReceiverService, PusherService | `admin:g2gError` | 置き換えの手順 |
-| 2.6 | 依存するコレクションを常に一緒に含める | g2g-transfer-preset（対象を固定） | `buildMigrationTransferPlan` | 置き換えの手順 |
-| 2.7 | 取り込みの同時実行を拒否する | ImportService（入口）, 受信ルート（入口） | `import`, `ImportResult` | 置き換えの手順 |
-| 2.8 | 失敗が無ければ通常の状態へ戻し、あれば残して通知 | ImportService（失敗一覧を返す）, ReceiverService, PusherService | `ImportResult.failedCollections`, `admin:g2gError` | 置き換えの手順 |
-| 3.1 | 削除される件数を提示 | answerGROWIInfo, preflight | `IDataGROWIInfo.destinationCounts` | 点検と確認 |
-| 3.2 | 確認まで生成も送信もしない | G2GTransferConfirmModal, G2GDataTransfer | — | 点検と確認 |
-| 3.3 | 確認しなければ移行先のデータは無変更 | preflight（DB のデータは読み取りのみ。キーの寿命は延び、既存の書き込み試験のファイルが残る） | `preflight` | 点検と確認 |
-| 3.4 | 種の不一致を警告して続行可 | g2g-transfer-transferability | `TransferWarning` | 点検と確認 |
-| 3.5 | パスワード無しの管理者を警告 | g2g-transfer-transferability, answerGROWIInfo | `TransferWarning` | 点検と確認 |
-| 3.6 | 種そのものを送らない | answerGROWIInfo | `passwordSeedFingerprint` | 点検と確認 |
-| 3.7 | セッションを無効化できないことを警告 | g2g-transfer-transferability, answerGROWIInfo | `TransferWarning` | 点検と確認 |
-| 4.1 | 管理者を転送後も残す | rescue-admins, ReceiverService | `planAdminRescue` | 置き換えの手順 |
-| 4.2 | 同じパスワードでログインできる | rescue-admins（ハッシュを保持） | `planAdminRescue` | 置き換えの手順 |
-| 4.3 | 識別子を保ちセッションが生きる | rescue-admins, session-invalidation | `planAdminRescue`, `invalidateSessionsExcept` | 置き換えの手順 |
-| 4.4 | 衝突する username を付け替える | rescue-admins | `planAdminRescue` | 置き換えの手順 |
-| 4.5 | 衝突する email を外す | rescue-admins | `planAdminRescue` | 置き換えの手順 |
-| 4.6 | 付け替えを通知する | ReceiverService（応答本体）, PusherService, クライアント | `ImportCollectionsResult`, `G2GProgress.rescue` | 置き換えの手順 |
-| 4.7 | 移行元のグループ関係を付与しない | rescue-admins（関係を作らない） | `planAdminRescue` | 置き換えの手順 |
-| 4.8 | 失敗しても管理者が残る | ReceiverService（`try/finally`） | `importCollections` | 置き換えの手順 |
-| 4.9 | アクセストークンが使える | rescue-admins（トークンも退避・再投入） | `planAdminRescue` | 置き換えの手順 |
-| 4.10 | 識別子衝突時は再割り当てして通知 | rescue-admins, ReceiverService | `RescuedAdmin.idReassigned` | 置き換えの手順 |
-| 5.1 | 転送キーを失わせない（消失と失効の両方） | non-transferable-collections, 受信ルートの保護, キー検証で寿命を延ばす（D10） | `NON_TRANSFERABLE_COLLECTIONS`, `validateTransferKey` | 置き換えの手順 |
-| 5.2 | 添付転送を完走させる | ReceiverService（後処理の失敗を応答に伝えない） | `importCollections` | 置き換えの手順 |
-| 5.3 | アップロード設定を変えない | ReceiverService（既存の条件付きの枠） | `UPLOAD_CONFIG_KEYS` | 置き換えの手順 |
-| 5.4 | サイト URL を変えない | ReceiverService（無条件の独立ステップ） | `DESTINATION_OWNED_CONFIG_KEYS` | 置き換えの手順 |
-| 5.5 | セッションを無効化（列挙できる場合） | g2g-transfer-session-invalidation | `invalidateSessionsExcept` | 置き換えの手順 |
-| 5.6 | 運用状態を持つコレクションを転送しない | non-transferable-collections | `NON_TRANSFERABLE_COLLECTIONS` | 置き換えの手順 |
-| 5.7 | 宣言を 1 か所に置き参照する（エクスポート画面は据え置き） | non-transferable-collections, 押す側ルート, G2GDataTransfer | `selectTransferableCollections` | 置き換えの手順 |
-| 5.8 | 宣言されたコレクションを選んでも除いて続行する | 押す側ルート（`startTransfer` の起動前に除く） | `selectTransferableCollections` | 置き換えの手順 |
-| 6.1 | 従来モードの挙動を変えない | g2g-transfer-preset（強制モードを除外, wire 契約不変） | `isCoherentOptionsMap` | — |
-| 6.2 | 従来モードでは衝突で中断する | detect-unique-conflicts（既存） | `detectUniqueConflicts` | 置き換えの手順 |
-| 6.3 | キー保護と種の警告はモードに関わらず適用 | non-transferable-collections, 受信ルートの保護, transferability | `NON_TRANSFERABLE_COLLECTIONS`, `TransferWarning` | 双方 |
-| 7.1 | 置き換えと救済を実 DB で検証 | 結合試験 | — | — |
-| 7.2 | グループ ID の解決を実 DB で検証 | 結合試験 | — | — |
-| 7.3 | 救済後のログインを実 DB で検証 | 結合試験（`isPasswordValid`） | — | — |
-| 7.4 | 転送キーの生存を検証（消失と失効） | 結合試験（寿命を超えた状態を作る） | `validateTransferKey` | — |
-| 7.5 | 宣言と実コレクションの突き合わせを検証 | drift 試験（実 DB） | `NON_TRANSFERABLE_COLLECTIONS` | — |
-
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
@@ -382,68 +309,7 @@ graph TB
 
 ##### Service Interface
 
-```typescript
-type TransferPreset = 'migration' | 'merge';
-
-/** ページ用の追加オプション。受信側の取り込み設定の生成が存在を必須とする */
-interface PagesImportOption {
-  readonly mode: ImportMode;
-  readonly isOverwriteAuthorWithCurrentUser: boolean;
-  readonly makePublicForGrant2: boolean;
-  readonly makePublicForGrant4: boolean;
-  readonly makePublicForGrant5: boolean;
-  readonly initPageMetadatas: boolean;
-}
-
-/** リビジョン用の追加オプション */
-interface RevisionsImportOption {
-  readonly mode: ImportMode;
-  readonly isOverwriteAuthorWithCurrentUser: boolean;
-}
-
-interface ImportOptionsMap {
-  readonly [collectionName: string]:
-    | { readonly mode: ImportMode }
-    | PagesImportOption
-    | RevisionsImportOption;
-}
-
-interface TransferPlan {
-  readonly collections: readonly string[];
-  readonly optionsMap: ImportOptionsMap;
-}
-
-/**
- * 整合条件の判定から外すコレクション。
- * `configs` は置き換えのみ、`pages` は追加が不可（置き換えと upsert の 2 つが許される）。
- * 「方法が 1 つに強制される対応」とは別の宣言にする。Map では `pages` を表現できない。
- */
-const COLLECTIONS_EXCLUDED_FROM_COHERENCE: ReadonlySet<string>;
-
-/** 方法が 1 つに強制されるコレクションの対応（引っ越しの計画で使う） */
-const FORCED_MODE_COLLECTIONS: ReadonlyMap<string, ImportMode>;
-
-/** 引っ越し: 転送可能なコレクションすべてを置き換え対象にする */
-function buildMigrationTransferPlan(
-  transferableCollections: readonly string[],
-): TransferPlan;
-
-/** 従来: 操作者の選択をそのまま計画にする */
-function buildMergeTransferPlan(
-  selectedCollections: readonly string[],
-  optionsMap: ImportOptionsMap,
-): TransferPlan;
-
-/**
- * 強制モードのコレクションを除いて「すべて置き換え」か「置き換えを含まない」かを判定する。
- * 判定は `collections` に含まれるキーだけを見る（転送対象から外したコレクションの
- * 指定が `optionsMap` に残っていても、混在と誤判定しない）。
- */
-function isCoherentOptionsMap(
-  optionsMap: ImportOptionsMap,
-  collections: readonly string[],
-): boolean;
-```
+preset(`'migration' | 'merge'`)から転送計画(対象コレクションと `optionsMap`)を組み立てる 2 つの関数(`buildMigrationTransferPlan` / `buildMergeTransferPlan`)と、整合条件を判定する `isCoherentOptionsMap`、判定から外すコレクションの宣言(`COLLECTIONS_EXCLUDED_FROM_COHERENCE`)と強制モードの対応(`FORCED_MODE_COLLECTIONS`)を公開する。`ImportOptionsMap` は `pages` / `revisions` について追加オプションのキーを必須で持つ(上記の理由により)。型・シグネチャの詳細は実装ファイルを参照。
 
 - Preconditions: `transferableCollections` は宣言されたコレクションを取り除いた一覧。
 - Postconditions: どちらの `build*` の出力も `isCoherentOptionsMap` を満たす。`pages` / `revisions` が対象に含まれるとき、その要素は追加オプションのキーをすべて持つ。
@@ -463,11 +329,7 @@ function isCoherentOptionsMap(
 
 **Contracts**: Service [x]
 
-```typescript
-function deriveReplaceTargets(
-  importSettingsMap: ReadonlyMap<string, ImportSettings>,
-): ReadonlySet<string>;
-```
+公開関数は `deriveReplaceTargets`(取り込み設定の Map を受け取り、置き換え対象のコレクション名の集合を返す)の 1 つのみ。
 
 #### rescue-admins
 
@@ -497,38 +359,7 @@ function deriveReplaceTargets(
 
 **Contracts**: Service [x]
 
-```typescript
-/** キーは USER_UNIQUE_FIELDS を単一の出所として導く（索引が増えたら自動で増える形にする） */
-interface ArchiveUserIdentity {
-  readonly usernames: ReadonlySet<string>;
-  readonly emails: ReadonlySet<string>;
-  readonly slackMemberIds: ReadonlySet<string>;
-  readonly ids: ReadonlySet<string>;
-}
-
-interface RescuedAdmin {
-  readonly user: IUserHasId;
-  /** 退避した値そのもの。Mongoose の実ドキュメント型（IAccessTokenDocument）は使わない */
-  readonly accessTokens: readonly (IAccessToken & HasObjectId)[];
-  readonly originalUsername: string;
-  readonly rescuedUsername: string;
-  readonly emailRemoved: boolean;
-  readonly slackMemberIdRemoved: boolean;
-  readonly idReassigned: boolean;
-}
-
-interface AdminRescuePlan {
-  readonly rescued: readonly RescuedAdmin[];
-  /** ログインできない管理者の username（パスワード無し、または有効でない状態。要件 3.5 の警告の裏付け） */
-  readonly notLoginable: readonly string[];
-}
-
-function planAdminRescue(
-  destinationAdmins: readonly IUserHasId[],
-  destinationAccessTokens: readonly (IAccessToken & HasObjectId)[],
-  archiveIdentity: ArchiveUserIdentity,
-): AdminRescuePlan;
-```
+公開関数は `planAdminRescue`(移行先の管理者・アクセストークン・アーカイブ側の一意フィールド集合を受け取り、救済計画を返す)。救済計画は救済後の各管理者(付け替え後の `username`・除去した項目・識別子再割り当ての有無・トークンを含む)と、ログインできない管理者の一覧を持つ。一意フィールドの集合は `USER_UNIQUE_FIELDS`(`detect-unique-conflicts.ts`)を単一の出所として導く。
 
 - Postconditions: `rescuedUsername` は `archiveIdentity.usernames` に含まれない。`user` は入力のハッシュと `admin` を保持する。`accessTokens` の `user` は `user._id` と一致する。
 
@@ -548,44 +379,7 @@ function planAdminRescue(
 
 **Contracts**: Service [x]
 
-```typescript
-type TransferBlocker =
-  | { readonly type: 'version_mismatch'; readonly src: string; readonly dest: string }
-  | { readonly type: 'user_upper_limit'; readonly activeUsers: number; readonly limit: number }
-  | { readonly type: 'file_upload_not_configured'; readonly side: 'src' | 'dest' }
-  | { readonly type: 'destination_storage_not_writable' }
-  | { readonly type: 'file_upload_total_limit'; readonly required: number; readonly limit: number };
-
-type TransferWarning =
-  | { readonly type: 'password_seed_mismatch' }
-  /** 移行先にログインできる状態の管理者が 1 人も居ない（loginableAdminCount === 0） */
-  | { readonly type: 'no_loginable_admin' }
-  | { readonly type: 'sessions_not_invalidatable' }
-  /** 移行元がローカル認証を無効にしている。救済した管理者もパスワードでログインできない */
-  | { readonly type: 'local_auth_disabled_at_source' };
-
-interface TransferabilityReport {
-  readonly blockers: readonly TransferBlocker[];
-  readonly warnings: readonly TransferWarning[];
-}
-
-/** 表示・通知用の文字列に変換する（既存の reason: string を組み立てる唯一の場所） */
-function describeBlocker(blocker: TransferBlocker): string;
-function describeWarning(warning: TransferWarning): string;
-
-function evaluateTransferability(
-  src: {
-    readonly version: string;
-    readonly activeUsers: number;
-    readonly totalFileSize: number;
-    readonly fileUploadType: string;
-    readonly passwordSeedFingerprint: string;
-    /** 移行元のローカル認証の有効・無効。`local_auth_disabled_at_source` の判定に必要 */
-    readonly isLocalAuthEnabled: boolean;
-  },
-  dest: IDataGROWIInfo,
-): TransferabilityReport;
-```
+`evaluateTransferability(src, dest)` が中断事由(`TransferBlocker`。バージョン不一致・利用者数上限・アップロード設定・保存先の書き込み可否・総容量)と警告(`TransferWarning`。種の不一致・ログインできる管理者が 0 人・セッション無効化不可・移行元のローカル認証無効)をそれぞれ判別可能な値の配列として返す。`describeBlocker` / `describeWarning` が唯一の文字列化の場所で、既存の `reason: string` はこれを通して組み立てる。
 
 ### import（宣言）
 
@@ -612,15 +406,7 @@ function evaluateTransferability(
 
 **Contracts**: Service [x]
 
-```typescript
-/** 転送対象に含めないコレクション（基準: その環境の運用状態を持つもの） */
-const NON_TRANSFERABLE_COLLECTIONS: ReadonlySet<string>;
-
-/** 実データベースのコレクション一覧から、転送してよいものだけを返す */
-function selectTransferableCollections(
-  allCollectionNames: readonly string[],
-): readonly string[];
-```
+転送対象に含めないコレクションの宣言(`NON_TRANSFERABLE_COLLECTIONS`)と、実データベースのコレクション一覧から転送してよいものだけを返す `selectTransferableCollections` を公開する。
 
 **Implementation Notes**
 
@@ -652,14 +438,7 @@ function selectTransferableCollections(
 
 **Contracts**: Service [x]
 
-```typescript
-interface ImportResult {
-  /** 取り込みに失敗したコレクション名（握って続行した分をすべて含む） */
-  readonly failedCollections: readonly string[];
-}
-
-// 変更: import(...): Promise<void> → Promise<ImportResult>
-```
+`import(...)` の戻り値を `Promise<void>` から `Promise<ImportResult>`(`failedCollections: readonly string[]` を持つ)に変える。
 
 **Implementation Notes**
 
@@ -686,32 +465,11 @@ interface ImportResult {
 
 **Contracts**: Service [x]
 
-```typescript
-interface SessionInvalidationResult {
-  readonly destroyed: number;
-  readonly skipped: number;
-  readonly unsupported: boolean;
-}
+`resolveSessionAccess(store)` が設定された store から手段を選び、`SessionAccess` として返す(コレクションへの到達手段を運ぶ MongoDB 用、`store` の `all`/`destroy` で足りる Redis 用、対応しない場合の 3 種を判別可能な値として分ける)。`invalidateSessionsExcept(access, keepUserIds)` が実際に破棄する。`canSelectSessions(access)` は `resolveSessionAccess` が選んだ手段だけを見て判定する(`all` の有無では判定しない)。
 
-/**
- * store だけでは MongoDB 経路を書けない（`connect-mongo` は `all()` でセッション ID を返さず、
- * store から `sessions` コレクションへ到達する公開 API も無い）。
- * したがってコレクションへの到達手段も受け取る。
- */
-interface SessionAccess {
-  readonly store: import('express-session').Store;
-  /** MongoDB のときだけ渡す。`session` フィールドは既定で文字列なので JSON として解析する */
-  readonly sessionsCollection?: import('mongodb').Collection;
-}
+**当初は `{ store, sessionsCollection? }` という 1 つの型にしていたが却下した**。その形だと Redis 構成が `sessionsCollection == null` になるため、`canSelectSessions` が「これは Redis か」をもう一度判定しないと真を返せず、上の Responsibilities が禁じている 2 回目の判定が復活してしまう。種類で分けた判別可能な型にすると「対応していると申告できるのに破棄する手段が無い」状態を型として作れなくなる。
 
-function invalidateSessionsExcept(
-  access: SessionAccess,
-  keepUserIds: readonly string[],
-): Promise<SessionInvalidationResult>;
-
-/** 「セッション ID 付きで対象を選べるか」で判定する（`all` の有無で判定しない） */
-function canSelectSessions(access: SessionAccess): boolean;
-```
+**残す利用者の識別子は `ObjectId` でも受ける**。救済対象の管理者を `lean()` で読むと手元にあるのは `ObjectId` になるため、文字列だけを受ける形にすると呼び出し側が `.toString()` を忘れた瞬間に 1 件も一致せず、静かに 0 件破棄で成功を返してしまう。型で `ObjectId` も受けて内側で文字列にそろえることで、この取り違えを起こせなくする。
 
 **Implementation Notes**
 
@@ -730,14 +488,14 @@ function canSelectSessions(access: SessionAccess): boolean;
 
 - 置き換え対象集合を算出し、検知に渡す。自分で「モード」を判断しない。
 - **3 つの関心を 1 つの条件で駆動してはならない。** 必要になる場面が違うので、それぞれの条件を分ける。
-  - **保護（保守モードを立てる）**: 強制モードのコレクションを除いた置き換え対象集合が空でないとき。素の集合を条件にすると、`configs` は置き換えに強制されるので（`service/g2g-transfer.ts:794-801`）**どの転送でも必ず真**になり、従来モードでも移行先が保守モードに入る（要件 6.1 違反）。
+  - **保護（保守モードを立てる）**: **取り込み方法がシステム側で制約されるコレクション（`COLLECTIONS_EXCLUDED_FROM_COHERENCE` = `configs` と `pages`）を除いた**置き換え対象集合が空でないとき。素の集合を条件にすると、`configs` は置き換えに強制されるので（`service/g2g-transfer.ts:794-801`）**どの転送でも必ず真**になり、従来モードでも移行先が保守モードに入る（要件 6.1 違反）。
+    - **`configs` だけを引く（`FORCED_MODE_COLLECTIONS`）のでは足りない**（9.3 の実装とレビューで確定）。`pages` は従来モードでも置き換えを選べるので、タスク 11.2 が求める「ページを置き換え ＋ 他は追加」の転送で保守モードが立ってしまい、同じ 6.1 の退行になる。9.1 の整合ゲートが読む宣言と同じものを単一の出所として使う。
   - **救済**: **`users` が置き換え対象に含まれるときだけ**。置き換え対象集合の空でなさを条件にすると、従来モードで「`pages` を置き換え ＋ 他は追加」（`MODE_RESTRICTED_COLLECTION.pages` が置き換えを許すので選べる）を選んだときに救済が走る。`users` は空になっていないので、**まだ存在する同じ管理者を入れ直そうとして `_id` と `username` で必ず失敗し**、`rescueApplied` が false になって保守モードが残り、成功した転送が失敗として通知される（要件 6.1 / 4.1 違反）。
   - **設定の復元（アップロード設定・サイト URL）**: **条件に関わらず常に走る**。既存の無条件の処理（`service/g2g-transfer.ts:854-885`）なので、新しい条件を被せてはならない。被せると従来モードで移行先のアップロード設定が移行元の値に置き換わる（要件 5.3 / 6.1 の退行）。
-- 判断に使う集合も書き分ける。**検知を外す用**は素の置き換え対象集合（`configs` を含んでよい）。**保護を起こす用**は強制モードを除いた集合。**救済を起こす用**は `users` が含まれるか。
-- 保護の条件を満たす取り込みでは、`import()` の前に保守モードを立てる（要件 2.4）。設定の取り込みで DB から旗が消える分は `ImportService` が取り込み前の値で書き戻す。
+- 判断に使う集合も書き分ける。**検知を外す用**は素の置き換え対象集合（`configs` を含んでよい）。**保護を起こす用**は `COLLECTIONS_EXCLUDED_FROM_COHERENCE` を除いた集合。**救済を起こす用**は `users` が含まれるか。
+- 保護の条件を満たす取り込みでは、`import()` の前に保守モードを立てる（要件 2.4）。設定コレクションを含む取り込みでは `ImportService` が設定の取り込み後に**常に `true`** で書き戻す（要件 2.9）。
 - 管理者とアクセストークンの退避は `import()` の前。**`import()` の呼び出しは `try/finally` で包み、救済の再投入・セッション破棄・設定の復元・保守モードの後始末を `finally` 側に置く**（D3、要件 4.8）。
-- **この節の後始末の記述は、後から入った要件 2.9（設定を取り込んだら操作者が解除するまで開かない）と未整合のまま残している。** D5 の保留（「9.3 の設計時に決める」）がその判断の入口で、9.3 に着手する者はそちらを先に読むこと。以下は 2.9 が入る前の記述である。
-- 保守モードの後始末は**解除ではなく復元**。`startMaintenanceMode()` を呼ぶ前に `isMaintenanceMode()` を控え、**自分が立てたときだけ、控えた値へ戻す**。取り込みに失敗したコレクションが 1 つ以上あれば戻さず**立てたまま残して通知する**（要件 2.8）。
+- 保護の条件を満たした転送についての後始末は**解除ではなく復元**。`startMaintenanceMode()` を呼ぶ前に `isMaintenanceMode()` を控え、**自分が立てたときだけ、控えた値へ戻す**。取り込みに失敗したコレクションがある・救済の再投入が失敗した・**設定コレクションが置き換え対象に含まれていた**、のいずれか 1 つでも該当すれば戻さず**立てたまま残して通知する**（要件 2.8, 2.9）。設定コレクションは強制モードで常に置き換えられるため、実際に復元まで進むのは設定コレクションを転送対象から外した取り込みだけになる。
   - 無条件の解除にしてはならない。理由は 2 つある。従来モードでは保護の条件が偽なので旗を立てないが、後始末の条件が「失敗の有無」だけだと**移行先の管理者が自分で立てていた保守モードを勝手に下ろす**（要件 6.1 の退行）。引っ越しでも、転送前から保守モードだった移行先が開いてしまう（GROWI は破壊的なデータ操作の前に保守モードを要求する作りなので、立てているのは十分ありうる）。
   - **保護を起こさなかった転送では、旗に一切触れない。**
   - **この復元は添付ファイルの転送より前に起きる**（受信ルートは取り込みを待って応答し、押す側はその応答を見てから添付へ進む）。つまり移行先は添付が 1 件も届いていない状態で通常利用者に開く。受信側には「転送が全部終わった」合図が届かないので構造的に避けにくい。**受け入れるリスクとして記録する**（合図を足すのは本 spec の範囲外）。
@@ -755,27 +513,7 @@ function canSelectSessions(access: SessionAccess): boolean;
 
 **Contracts**: Service [x]
 
-```typescript
-/** 移行先の値を無条件に保つ設定キー（アップロード設定とは別枠） */
-const DESTINATION_OWNED_CONFIG_KEYS: readonly string[]; // 'app:siteUrl' を含む
-
-// 現行の署名は (collections, importSettingsMap, sourceGROWIUploadConfigs)。
-// 救済の算出にはアーカイブ側の一意フィールドの集合が必要なので、
-// その取得元である innerFileStats を引数に足す（検知の呼び出しと同じ入力）。
-
-interface ImportCollectionsResult {
-  readonly rescue: AdminRescuePlan | null;
-  /** 救済を計画したとおりに再投入できたか。false なら保守モードを残す */
-  readonly rescueApplied: boolean;
-  readonly sessionInvalidation: SessionInvalidationResult | null;
-  /** 取り込みに失敗したコレクション名（1 つ以上あれば保守モードを残す） */
-  readonly failedCollections: readonly string[];
-  /** finally 側で失敗した後処理のラベル（応答は成功のまま、通知に載せる） */
-  readonly postProcessFailures: readonly string[];
-  /** 取り込み後に保守モードを解除したか */
-  readonly maintenanceModeReleased: boolean;
-}
-```
+移行先の値を無条件に保つ設定キー(`DESTINATION_OWNED_CONFIG_KEYS`。`app:siteUrl` を含む)を宣言する。`importCollections` の呼び出しには、救済の算出に必要なアーカイブ側の一意フィールド集合の取得元(`innerFileStats`。検知の呼び出しと同じ入力)を引数に足す。戻り値(`ImportCollectionsResult`)は、救済計画とその適用可否(`rescueApplied`。false なら保守モードを残す)、セッション無効化の結果、失敗したコレクション名、`finally` 側で失敗した後処理のラベル、保守モードを解除したかを持つ。
 
 #### PusherService
 
@@ -852,60 +590,12 @@ interface ImportCollectionsResult {
 
 ## Testing Strategy
 
-### Unit Tests
+各純関数モジュール(preset の組み立て・整合条件・置き換え対象集合・救済計画・点検の判定)を単体試験で固定し、受信側の統括処理(保守モードの入切・同時実行の拒否・救済の再投入・従来モードの非回帰)を実 DB(レプリカセット rs0)の結合試験で検証する。UI は preset の出し分けと確認モーダルの E2E で確認する。どの受け入れ基準をどの試験がカバーするかは spec/test ファイルを参照。
 
-- `buildMigrationTransferPlan` が、転送可能なコレクションすべてを対象にし、すべてに置き換えを割り当てる（1.2, 2.1, 2.2, 2.6）。
-- `buildMigrationTransferPlan` の出力が、`pages` と `revisions` について追加オプションのキーをすべて持つ。**この出力をそのまま受信側の取り込み設定の生成に通して例外が出ない**ことを固定する（キーの有無を見るガードなので、型だけの確認では守れない）（1.2, 2.1）。
-- `isCoherentOptionsMap` が、`configs`=置き換え ＋ `users`=追加（従来モードの通常の形）を**整合と判定する**。置き換えと追加が強制対象以外で混在する形を拒否する（1.3, 6.1）。
-- `isCoherentOptionsMap` が、`collections` に含まれないキー（転送対象から外したコレクションの指定が `optionsMap` に残っている場合）を**無視する**（5.8）。
-- `deriveReplaceTargets` が取り込み設定から集合を導き、モード名に依存しない（2.3）。
-- `planAdminRescue` が、衝突する `username` を付け替え、衝突する `email` を外し、ハッシュと `admin` と識別子を保持し、当該ユーザーのアクセストークンを伴わせ、識別子衝突時に再割り当てを立ててトークンの参照も合わせる（4.1–4.5, 4.7, 4.9, 4.10）。
-- `evaluateTransferability` が既存の中断事由を維持しつつ、4 つの警告を返す（3.4, 3.5, 3.7）。
-- `evaluateTransferability` が、**移行元のローカル認証が無効なら警告を出し**、有効なら出さない（3.5）。**ログインできる管理者が 1 人でも居れば `no_loginable_admin` を出さず、0 人のときだけ出す**（数だけを見て偽陽性を出さないことの確認）（3.5）。
-- `selectTransferableCollections` が、宣言に含まれるコレクションを除いた一覧を返す（5.6, 5.7）。
-- `planAdminRescue` が、有効でない状態の管理者を救済対象にせず、`notLoginable` に載せる（4.1, 3.5）。
+結合試験を書くうえで押さえておくべき、コードから再現できない制約が 2 つある。
 
-### Integration Tests（実 DB、レプリカセット rs0）
-
-> **前提**: 置き換え系の試験は「コレクションを丸ごと空にする」ため、per-worker で共有される試験用 DB（`test/setup/mongo/utils.ts` が worker ごとに `growi_test_<workerId>` を割り当てる）で、同じ worker に割り当てられた他ファイルの fixture を消してしまう。既存の `detect-unique-conflicts.integ.ts` が使う「固有プレフィックスの fixture を `$in` で消す」方式は成立しない。
->
-> **`pool: 'forks'` / `singleFork` はファイル内から指定できない**（vitest のプロジェクト単位の設定）。したがって実装作業は「置き換え系を専用ファイルに切り出す」だけでは足りず、**`vitest.workspace.mts` に専用のプロジェクトを 1 つ追加し、既存の `app-integration` の `exclude` に同じ glob を足す**必要がある（`growi-vault` の E2E が同じ形で worker を専有している）。これを書かないと、専用ファイルを作っただけでは専有できず、無関係な試験が間欠的に落ちる。
-
-- 引っ越しの取り込みで移行先の既存ユーザー・グループが取り除かれ、移行元の識別子で入る。取り込みの前後で衝突による中断が起きない（2.1, 2.3）。
-- 取り込み後に、あるユーザーに紐づくグループ ID 集合が移行元と同じ対応になる（2.2, 7.2）。
-- 救済された管理者について、**DB から読み直したユーザー**で `isPasswordValid` が救済前のパスワードを通す。**取り込み前に本物の平文トークンを発行して確保しておき**、置き換え後にその平文で `findUserIdByToken` が解決できる（`tokenHash` が残っているだけでは「使える」ことの証明にならない）（4.2, 4.3, 4.9, 7.3）。
-- **特定のコレクションだけを失敗させたとき**、`failedCollections` にそのコレクション名が載り、救済が実行され、管理者が 1 人以上残り、**応答は成功で返り**、保守モードは立ったまま残る（2.8, 4.8, 5.2）。
-  - **失敗の作り方を指定する**。閉じ括弧が無いだけの JSON では例外にならない（JSONStream はエラーも完了も出さずに文書を出すのを止め、読み取りは EOF で正常終了する。だからこそ `detect-unique-conflicts.ts:154-167` に `assertCompleteJsonArray` が置かれている）。確実に例外にするには、取り込み設定のファイル名を存在しないファイルにする（ENOENT）か、`[{"a":}]` のようにトークン自体が不正な JSON を置く。
-  - 対の確認として「失敗を仕込まなければ `failedCollections` が空である」ことも見る（Arrange が効いていることの証明）。
-- **設定の取り込みの後、他のコレクションがまだ取り込み中の間に、DB 上の保守モードの旗が立っている**。設定より時間のかかるコレクションを同時に含めて `import()` を待たずに開始し、確定前に確認してから待つ。
-  - **`isMaintenanceMode()` で確かめてはならない**。あれはメモリ上の値を返すだけなので（`app.ts:101-102`、`config-manager.ts:65-91`）、取り込み前に旗を立てた時点で真になり、設定コレクションを空にしても落ちない。**書き戻しの実装を丸ごと削っても緑のまま通る**＝何も守らない試験になる。`loadConfigs({ source: 'db' })` の後に DB 由来の値を読むか、設定コレクションを生ドライバで直接読むこと。
-  - コミット前に書き戻しを外して赤くなることを確認する（ガード試験の作法）（2.4）。
-- **設定の取り込み自体を失敗させても** DB 上の旗が立っている（`finally` で書き戻している）（2.4）。
-- **救済の再投入だけを失敗させたとき**、保守モードが残り、押す側の通知が失敗になる（2.8, 4.8）。
-- 取り込みに失敗したコレクションが無ければ保守モードが解除される（2.8）。
-- 1 本目の取り込みを待たずに 2 本目を開始すると拒否され、**2 本目の副作用（救済の再投入・保守モードの解除）が一切起きず**、1 本目の結果が壊れない（2.7）。
-- **宣言されたコレクション（転送キー・移行スクリプトの適用記録など）を操作者が選んだ状態で転送しても、そのコレクションは転送されず、残りの転送は成功する**。転送キーと移行スクリプトの適用記録が取り込みの前後で変わらない（5.1, 5.6, 5.8, 7.4）。
-- 受信側の安全網として、宣言されたコレクションが含まれた要求は取り込みを開始せず 400 を返す（通常経路では押す側が除くため到達しない）（5.1）。
-- **転送キーの寿命を超えた状態でも、進行中の転送の後続の要求が通る**。キーの `expireAt` を過去へ寄せた状態を作り、添付の受信が 403 にならないことを確かめる（5.1, 5.2, 7.4）。
-- **バックアップ用のエクスポート画面から選べるコレクションが減っていない**（`/mongo/collections` を変えていないことの確認）（5.7）。
-- **一部のコレクションが失敗した転送で、移行元の管理者に届く通知が完了ではなく失敗になる**（応答本体の `failedCollections` を移行元が読んでいることの確認）。移行元と移行先を跨いで固定する（2.5, 2.8）。
-- 従来モードで一意制約衝突があるとき、どのコレクションも取り込まれず 409 になる。衝突がなければ従来どおり成功する（6.1, 6.2）。
-- **設定を含む転送の後、移行先が保守モードのまま残る**。従来モードでも、移行先が転送前に保守モードでなくても残る（要件 2.9。以前は移行元の値が入るので開いたままになりえた）（2.9, 6.1）。
-- **転送前から保守モードだった移行先が、転送の後も保守モードのまま**（後始末が解除ではなく復元であることの確認）。引っ越しと従来モードの両方で確かめる（6.1, 2.8）。第 1 段では 2.9 により、転送前の状態に関わらず保守モードで残る。
-- **1 本目の取り込みが走っている間に 2 本目のアーカイブを送っても、1 本目の展開済みファイルが上書きされない**（状態が zip の受信より前にあることの確認）。管理画面からの zip 取り込みでも同じく拒否される（2.7, 2.1）。
-- **`.zip` 以外のファイルを送った後、およびアップロードを中断した後に、次の取り込みが受け付けられる**（`res` の `close` で解放していることの確認。解放が漏れると以後すべての取り込みが永久に拒否される）（2.7）。
-- **エクスポートがキーの寿命より長くかかっても、アーカイブの受信が 403 にならない**（押す側の延長の確認）（5.1, 5.2, 7.4）。
-- **従来モードで「`pages` を置き換え ＋ 他は追加」を選んでも、救済が走らず、保守モードが立たず、アップロード設定とサイト URL が変わらない**（起動条件を関心ごとに分けたことの確認）（6.1, 4.1, 5.3）。
-- 置き換え後に、`store.get` で救済対象以外のセッションが取得できず、救済対象のセッションが取得できる（`destroy` の呼び出し回数を数える形にしない）（4.3, 5.5）。
-- preflight の呼び出しの前後で、移行先のスナップショット（既存の `snapshotDestination()` が見る 4 コレクション）が一致する。転送キーは寿命が延びるので対象に含めない（3.3）。
-- 取り込みの前後で移行先のアップロード設定とサイト URL が変わらない（5.3, 5.4）。
-- 宣言と実データベースのコレクション一覧を突き合わせ、宣言に無い新しいコレクションを検出する（7.5）。
-
-### E2E/UI Tests
-
-- 引っ越しを選ぶと転送対象の選択も取り込み方法の選択も表示されず、従来を選ぶと両方表示される（1.1, 1.2, 1.4）。
-- 転送を開始しようとすると削除件数と警告が提示され、承知するまで送信が始まらない（3.1, 3.2, 3.3）。
-- 転送完了の通知に、付け替え後の `username` が表示される（4.6, 4.10）。
+- **置き換え系の試験は per-worker 共有 DB の他ファイルを壊す**。「コレクションを丸ごと空にする」試験は、既存の `detect-unique-conflicts.integ.ts` が使う「固有プレフィックスの fixture を `$in` で消す」方式と両立しない。`pool: 'forks'` / `singleFork` はファイル内から指定できない（vitest のプロジェクト単位の設定）ため、専用ファイルへの切り出しに加えて **`vitest.workspace.mts` に専用プロジェクトを追加し、既存の `app-integration` の `exclude` に同じ glob を足す**必要がある（`growi-vault` の E2E が同じ形で worker を専有している）。
+- **保守モードの旗が立っていることを `isMaintenanceMode()` で確かめてはならない**。あれはメモリ上の値を返すだけなので、書き戻しの実装を丸ごと削っても緑のまま通る（何も守らない試験になる）。DB 由来の値を読む形にすること。同様に、コレクション単位の失敗を仕込むには「閉じ括弧が無いだけの JSON」では例外にならない（JSONStream が黙って正常終了する）ため、存在しないファイル名（ENOENT）かトークン自体が不正な JSON を使う。
 
 ### 試験で固定できない事項（受け入れるリスク）
 

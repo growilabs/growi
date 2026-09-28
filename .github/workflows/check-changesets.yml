@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - .changeset/**
+      # Included so that a PR which only touches this workflow still runs it, and can
+      # therefore prove its own change instead of merging unexercised.
+      - .github/workflows/check-changesets.yml
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,6 +19,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        # `changeset status` diffs against the base branch, so it needs the history
+        # both refs share. The default fetch-depth of 1 fetches only the merge ref.
+        fetch-depth: 0
 
     - uses: pnpm/action-setup@v6
 
@@ -29,8 +36,24 @@ jobs:
         pnpm install --frozen-lockfile
 
     - name: Reject changesets that can never be consumed
+      # Skip when the PR's source branch is master itself (e.g. a release-promotion PR
+      # such as master -> release/current or master -> release/8.0.x). `changeset status`
+      # only sees changesets that are still present as files, and every changeset for
+      # content already on master has necessarily been consumed (deleted) by the "Version
+      # Packages" run that shipped it. So diffing a master-headed PR against its (often
+      # long-stale) release-branch base always finds changed packages with zero surviving
+      # changeset files, which is an unconditional false positive, not a real omission.
+      # This does assume every commit that reaches master went through this same check on
+      # its own feature PR; an admin merge that bypasses branch protection could still slip
+      # an un-changeset'd package change onto master undetected by this rule.
+      if: github.head_ref != 'master'
       run: |
-        pnpm changeset status --output status.json
+        # A CI checkout is a detached HEAD with remote-tracking refs only, so the bare
+        # branch name changesets uses by default (`git merge-base master HEAD`) does not
+        # resolve -- git looks up refs/remotes/master, not refs/remotes/origin/master.
+        # Passing the PR's own base rather than hardcoding master also keeps the check
+        # correct for PRs that target a release branch.
+        pnpm changeset status --since="origin/${{ github.base_ref }}" --output status.json
 
         # A changeset whose packages are all listed in the 'ignore' section of
         # .changeset/config.json bumps nothing, so `changeset version` neither releases

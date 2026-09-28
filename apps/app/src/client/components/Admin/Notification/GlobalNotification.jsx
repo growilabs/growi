@@ -114,7 +114,7 @@ const GlobalNotification = (props) => {
             onClick={onClickSubmit}
             disabled={adminNotificationContainer.state.retrieveError}
           >
-            {t('Update')}
+            {t('commons:Update')}
           </button>
         </div>
       </div>

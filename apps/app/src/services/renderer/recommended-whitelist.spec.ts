@@ -1,6 +1,19 @@
 import assert from 'assert';
+import type { Element, Root } from 'hast';
+import { sanitize } from 'hast-util-sanitize';
 
 import { attributes, tagNames } from './recommended-whitelist';
+
+// Mirrors the schema `getCommonSanitizeOption` builds in renderer.tsx.
+const sanitizeHtmlElement = (element: Element): Element => {
+  const tree: Root = { type: 'root', children: [element] };
+  const result = sanitize(tree, {
+    tagNames,
+    attributes,
+    clobberPrefix: '',
+  }) as Root;
+  return result.children[0] as Element;
+};
 
 describe('recommended-whitelist', () => {
   test('.tagNames should return iframe tag', () => {
@@ -79,6 +92,25 @@ describe('recommended-whitelist', () => {
       'className',
       'data-footnote-backref',
     ]);
+  });
+
+  test('sanitizing an h2 with a non-"sr-only" class should keep that class, not strip it', () => {
+    const sanitized = sanitizeHtmlElement({
+      type: 'element',
+      tagName: 'h2',
+      properties: {
+        className: ['h6', 'font-weight-bold', 'mb-3'],
+        style: 'color: #ff0000;',
+      },
+      children: [{ type: 'text', value: 'Heading' }],
+    });
+
+    expect(sanitized.properties.className).toEqual([
+      'h6',
+      'font-weight-bold',
+      'mb-3',
+    ]);
+    expect(sanitized.properties.style).toBe('color: #ff0000;');
   });
 
   // Tests for restored semantic HTML tags

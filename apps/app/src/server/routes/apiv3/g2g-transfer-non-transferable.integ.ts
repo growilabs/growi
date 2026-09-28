@@ -129,7 +129,12 @@ describe('non-transferable collections at the transfer routes', () => {
     await User.deleteMany({ _id: CLEAN_USER._id });
     const leftovers = await fs.readdir(importsDir);
     await Promise.all(
-      leftovers.map((fileName) => fs.rm(path.join(importsDir, fileName))),
+      // `{ force: true }`: the server's own `finally` block (g2g-transfer.ts)
+      // may have already deleted the same file by the time this runs, which
+      // is not an error here either (see #11722).
+      leftovers.map((fileName) =>
+        fs.rm(path.join(importsDir, fileName), { force: true }),
+      ),
     );
   };
 

@@ -12,20 +12,12 @@ import { getInstance } from '^/test/setup/crowi';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
-import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
-import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
   PageOperationModel,
 } from '~/server/models/page-operation';
-import type {
-  IPageRedirect,
-  PageRedirectModel,
-} from '~/server/models/page-redirect';
-import PageTagRelation from '~/server/models/page-tag-relation';
-import type { ShareLinkModel } from '~/server/models/share-link';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import { prisma } from '~/utils/prisma';
 
@@ -44,8 +36,6 @@ describe('PageService page operations with only public pages', () => {
   let crowi: Crowi;
   let Page: PageModel;
   let User: Model<IUser>;
-  let ShareLink: ShareLinkModel;
-  let PageRedirect: PageRedirectModel;
   let PageOperation: PageOperationModel;
   let generalXssFilterProcessSpy: ReturnType<typeof vi.spyOn>;
 
@@ -85,10 +75,6 @@ describe('PageService page operations with only public pages', () => {
 
     User = mongoose.model('User');
     Page = mongoose.model<IPage, PageModel>('Page');
-    ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
-    PageRedirect = mongoose.model<IPageRedirect, PageRedirectModel>(
-      'PageRedirect',
-    );
     PageOperation = mongoose.model<IPageOperation, PageOperationModel>(
       'PageOperation',
     );
@@ -801,10 +787,18 @@ describe('PageService page operations with only public pages', () => {
       ],
     });
 
-    await PageTagRelation.insertMany([
-      { relatedPage: pageIdForDuplicate10, relatedTag: tagForDuplicate1 },
-      { relatedPage: pageIdForDuplicate10._id, relatedTag: tagForDuplicate2 },
-    ]);
+    await prisma.pagetagrelations.createMany({
+      data: [
+        {
+          relatedPageId: pageIdForDuplicate10.toString(),
+          relatedTagId: tagForDuplicate1.toString(),
+        },
+        {
+          relatedPageId: pageIdForDuplicate10.toString(),
+          relatedTagId: tagForDuplicate2.toString(),
+        },
+      ],
+    });
 
     await prisma.comments.create({
       data: {
@@ -904,10 +898,18 @@ describe('PageService page operations with only public pages', () => {
       ],
     });
 
-    await PageTagRelation.insertMany([
-      { relatedPage: pageIdForDelete3, relatedTag: tagIdForDelete1 },
-      { relatedPage: pageIdForDelete3, relatedTag: tagIdForDelete2 },
-    ]);
+    await prisma.pagetagrelations.createMany({
+      data: [
+        {
+          relatedPageId: pageIdForDelete3.toString(),
+          relatedTagId: tagIdForDelete1.toString(),
+        },
+        {
+          relatedPageId: pageIdForDelete3.toString(),
+          relatedTagId: tagIdForDelete2.toString(),
+        },
+      ],
+    });
 
     /**
      * Delete completely
@@ -1038,16 +1040,18 @@ describe('PageService page operations with only public pages', () => {
       ],
     });
 
-    await PageTagRelation.insertMany([
-      {
-        relatedPage: pageIdForDeleteCompletely2,
-        relatedTag: tagForDeleteCompletely1,
-      },
-      {
-        relatedPage: pageIdForDeleteCompletely4,
-        relatedTag: tagForDeleteCompletely2,
-      },
-    ]);
+    await prisma.pagetagrelations.createMany({
+      data: [
+        {
+          relatedPageId: pageIdForDeleteCompletely2.toString(),
+          relatedTagId: tagForDeleteCompletely1.toString(),
+        },
+        {
+          relatedPageId: pageIdForDeleteCompletely4.toString(),
+          relatedTagId: tagForDeleteCompletely2.toString(),
+        },
+      ],
+    });
 
     await prisma.bookmarks.createMany({
       data: [
@@ -1072,31 +1076,35 @@ describe('PageService page operations with only public pages', () => {
       },
     });
 
-    await PageRedirect.insertMany([
-      {
-        fromPath: '/from/v5_PageForDeleteCompletely2',
-        toPath: '/v5_PageForDeleteCompletely2',
-      },
-      {
-        fromPath:
-          '/from/v5_PageForDeleteCompletely2/v5_PageForDeleteCompletely3/v5_PageForDeleteCompletely4',
-        toPath:
-          '/v5_PageForDeleteCompletely2/v5_PageForDeleteCompletely3/v5_PageForDeleteCompletely4',
-      },
-    ]);
+    await prisma.pageredirects.createMany({
+      data: [
+        {
+          fromPath: '/from/v5_PageForDeleteCompletely2',
+          toPath: '/v5_PageForDeleteCompletely2',
+        },
+        {
+          fromPath:
+            '/from/v5_PageForDeleteCompletely2/v5_PageForDeleteCompletely3/v5_PageForDeleteCompletely4',
+          toPath:
+            '/v5_PageForDeleteCompletely2/v5_PageForDeleteCompletely3/v5_PageForDeleteCompletely4',
+        },
+      ],
+    });
 
-    await ShareLink.insertMany([
-      {
-        relatedPage: pageIdForDeleteCompletely2,
-        expiredAt: null,
-        description: 'sharlink_v5PageForDeleteCompletely2',
-      },
-      {
-        relatedPage: pageIdForDeleteCompletely4,
-        expiredAt: null,
-        description: 'sharlink_v5PageForDeleteCompletely4',
-      },
-    ]);
+    await prisma.sharelinks.createMany({
+      data: [
+        {
+          relatedPageId: pageIdForDeleteCompletely2.toString(),
+          expiredAt: null,
+          description: 'sharlink_v5PageForDeleteCompletely2',
+        },
+        {
+          relatedPageId: pageIdForDeleteCompletely4.toString(),
+          expiredAt: null,
+          description: 'sharlink_v5PageForDeleteCompletely4',
+        },
+      ],
+    });
 
     /**
      * Revert
@@ -1170,13 +1178,15 @@ describe('PageService page operations with only public pages', () => {
       data: [{ id: tagIdRevert1.toString(), name: 'revertTag1' }],
     });
 
-    await PageTagRelation.insertMany([
-      {
-        relatedPage: pageIdForRevert1,
-        relatedTag: tagIdRevert1,
-        isPageTrashed: true,
-      },
-    ]);
+    await prisma.pagetagrelations.createMany({
+      data: [
+        {
+          relatedPageId: pageIdForRevert1.toString(),
+          relatedTagId: tagIdRevert1.toString(),
+          isPageTrashed: true,
+        },
+      ],
+    });
 
     /*
      * Revert - dedicated pages for activity/contribution assertions.
@@ -1581,9 +1591,8 @@ describe('PageService page operations with only public pages', () => {
         },
       );
       assert(renamedPage != null);
-      const pageRedirect = await PageRedirect.findOne({
-        fromPath: oldPath,
-        toPath: renamedPage.path,
+      const pageRedirect = await prisma.pageredirects.findFirst({
+        where: { fromPath: oldPath, toPath: renamedPage.path },
       });
 
       expect(generalXssFilterProcessSpy).toHaveBeenCalled();
@@ -2324,11 +2333,11 @@ describe('PageService page operations with only public pages', () => {
       const tag2 = await prisma.tags.findUnique({
         where: { name: 'duplicate_Tag2' },
       });
-      const basePageTagRelation1 = await PageTagRelation.findOne({
-        relatedTag: tag1?._id,
+      const basePageTagRelation1 = await prisma.pagetagrelations.findFirst({
+        where: { relatedTagId: tag1?._id },
       });
-      const basePageTagRelation2 = await PageTagRelation.findOne({
-        relatedTag: tag2?._id,
+      const basePageTagRelation2 = await prisma.pagetagrelations.findFirst({
+        where: { relatedTagId: tag2?._id },
       });
       expect(basePage).toBeTruthy();
       expect(tag1).toBeTruthy();
@@ -2343,8 +2352,8 @@ describe('PageService page operations with only public pages', () => {
         dummyUser1,
         false,
       );
-      const duplicatedTagRelations = await PageTagRelation.find({
-        relatedPage: duplicatedPage._id,
+      const duplicatedTagRelations = await prisma.pagetagrelations.findMany({
+        where: { relatedPageId: duplicatedPage._id.toString() },
       });
 
       expect(generalXssFilterProcessSpy).toHaveBeenCalled();
@@ -2615,11 +2624,11 @@ describe('PageService page operations with only public pages', () => {
       const tag2 = await prisma.tags.findUnique({
         where: { name: 'TagForDelete2' },
       });
-      const pageRelation1 = await PageTagRelation.findOne({
-        relatedTag: tag1?._id,
+      const pageRelation1 = await prisma.pagetagrelations.findFirst({
+        where: { relatedTagId: tag1?._id },
       });
-      const pageRelation2 = await PageTagRelation.findOne({
-        relatedTag: tag2?._id,
+      const pageRelation2 = await prisma.pagetagrelations.findFirst({
+        where: { relatedTagId: tag2?._id },
       });
       expect(pageToDelete).toBeTruthy();
       expect(tag1).toBeTruthy();
@@ -2637,14 +2646,12 @@ describe('PageService page operations with only public pages', () => {
         },
       );
       const page = await Page.findOne({ path: '/v5_PageForDelete6' });
-      const deletedTagRelation1 =
-        await PageTagRelation.findOne<IPageTagRelation>({
-          _id: pageRelation1?._id,
-        });
-      const deletedTagRelation2 =
-        await PageTagRelation.findOne<IPageTagRelation>({
-          _id: pageRelation2?._id,
-        });
+      const deletedTagRelation1 = await prisma.pagetagrelations.findFirst({
+        where: { id: pageRelation1?._id },
+      });
+      const deletedTagRelation2 = await prisma.pagetagrelations.findFirst({
+        where: { id: pageRelation2?._id },
+      });
 
       expect(page).toBe(null);
       expect(deletedPage.status).toBe(Page.STATUS_DELETED);
@@ -2746,11 +2753,11 @@ describe('PageService page operations with only public pages', () => {
       const tag2 = await prisma.tags.findUnique({
         where: { name: 'TagForDeleteCompletely2' },
       });
-      const pageTagRelation1 = await PageTagRelation.findOne({
-        relatedPage: parentPage?._id,
+      const pageTagRelation1 = await prisma.pagetagrelations.findFirst({
+        where: { relatedPageId: parentPage?._id.toString() },
       });
-      const pageTagRelation2 = await PageTagRelation.findOne({
-        relatedPage: grandchildPage?._id,
+      const pageTagRelation2 = await prisma.pagetagrelations.findFirst({
+        where: { relatedPageId: grandchildPage?._id.toString() },
       });
       const bookmark = await prisma.bookmarks.findFirst({
         where: { pageId: parentPage?._id.toString() },
@@ -2758,17 +2765,17 @@ describe('PageService page operations with only public pages', () => {
       const comment = await prisma.comments.findFirst({
         where: { pageId: parentPage?._id.toString() },
       });
-      const pageRedirect1 = await PageRedirect.findOne({
-        toPath: parentPage?.path,
+      const pageRedirect1 = await prisma.pageredirects.findFirst({
+        where: { toPath: parentPage?.path },
       });
-      const pageRedirect2 = await PageRedirect.findOne({
-        toPath: grandchildPage?.path,
+      const pageRedirect2 = await prisma.pageredirects.findFirst({
+        where: { toPath: grandchildPage?.path },
       });
-      const shareLink1 = await ShareLink.findOne({
-        relatedPage: parentPage?._id,
+      const shareLink1 = await prisma.sharelinks.findFirst({
+        where: { relatedPageId: parentPage?._id.toString() },
       });
-      const shareLink2 = await ShareLink.findOne({
-        relatedPage: grandchildPage?._id,
+      const shareLink2 = await prisma.sharelinks.findFirst({
+        where: { relatedPageId: grandchildPage?._id.toString() },
       });
       expect(parentPage).toBeTruthy();
       expect(childPage).toBeTruthy();
@@ -2807,8 +2814,14 @@ describe('PageService page operations with only public pages', () => {
           },
         },
       });
-      const deletedPageTagRelations = await PageTagRelation.find({
-        _id: { $in: [pageTagRelation1?._id, pageTagRelation2?._id] },
+      const deletedPageTagRelations = await prisma.pagetagrelations.findMany({
+        where: {
+          id: {
+            in: [pageTagRelation1?._id, pageTagRelation2?._id].filter(
+              (id) => id != null,
+            ),
+          },
+        },
       });
       const remainingBookmarks = await prisma.bookmarks.findMany({
         where: { id: bookmark?.id },
@@ -2816,11 +2829,21 @@ describe('PageService page operations with only public pages', () => {
       const deletedComments = await prisma.comments.findMany({
         where: { id: comment?.id },
       });
-      const deletedPageRedirects = await PageRedirect.find({
-        _id: { $in: [pageRedirect1?._id, pageRedirect2?._id] },
+      const deletedPageRedirects = await prisma.pageredirects.findMany({
+        where: {
+          id: {
+            in: [pageRedirect1?.id, pageRedirect2?.id].filter(
+              (id) => id != null,
+            ),
+          },
+        },
       });
-      const deletedShareLinks = await ShareLink.find({
-        _id: { $in: [shareLink1?._id, shareLink2?._id] },
+      const deletedShareLinks = await prisma.sharelinks.findMany({
+        where: {
+          id: {
+            in: [shareLink1?.id, shareLink2?.id].filter((id) => id != null),
+          },
+        },
       });
 
       // page should be null
@@ -2949,10 +2972,12 @@ describe('PageService page operations with only public pages', () => {
       const tag = await prisma.tags.findUnique({
         where: { name: 'revertTag1' },
       });
-      const deletedPageTagRelation = await PageTagRelation.findOne({
-        relatedPage: deletedPage?._id,
-        relatedTag: tag?._id,
-        isPageTrashed: true,
+      const deletedPageTagRelation = await prisma.pagetagrelations.findFirst({
+        where: {
+          relatedPageId: deletedPage?._id.toString(),
+          relatedTagId: tag?._id,
+          isPageTrashed: true,
+        },
       });
       expect(deletedPage).toBeTruthy();
       expect(revision).toBeTruthy();
@@ -2969,9 +2994,11 @@ describe('PageService page operations with only public pages', () => {
           endpoint: '/_api/v3/pages/revert',
         },
       );
-      const pageTagRelation = await PageTagRelation.findOne<IPageTagRelation>({
-        relatedPage: deletedPage?._id,
-        relatedTag: tag?._id,
+      const pageTagRelation = await prisma.pagetagrelations.findFirst({
+        where: {
+          relatedPageId: deletedPage?._id.toString(),
+          relatedTagId: tag?._id,
+        },
       });
 
       expect(revertedPage.parent).toStrictEqual(rootPage._id);

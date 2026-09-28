@@ -13,9 +13,9 @@ import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 import { SocketEventName } from '~/interfaces/websocket';
 import type { ActivityDocument } from '~/server/models/activity';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import type { SocketIoService } from '~/server/service/socket-io';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type {
   ESQueryTerms,
@@ -820,10 +820,10 @@ class ElasticsearchDelegator
     const appendTagNamesStream = new Transform({
       objectMode: true,
       async transform(chunk, encoding, callback) {
-        const pageIds = chunk.map((doc) => doc._id);
+        const pageIds = chunk.map((doc) => doc._id.toString());
 
         const idToTagNamesMap =
-          await PageTagRelation.getIdToTagNamesMap(pageIds);
+          await prisma.pagetagrelations.getIdToTagNamesMap(pageIds);
         const idsHavingTagNames = Object.keys(idToTagNamesMap);
 
         // append tagNames

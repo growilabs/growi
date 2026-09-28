@@ -32,7 +32,7 @@ describe('AuditLogSettings', () => {
     render(<AuditLogSettings />);
 
     const helpLink = screen
-      .getAllByRole('link', { name: 'Help' })
+      .getAllByRole('link', { name: 'commons:Help' })
       .find(
         (link) =>
           link.getAttribute('href') ===
@@ -48,7 +48,7 @@ describe('AuditLogSettings', () => {
     render(<AuditLogSettings />);
 
     const helpLink = screen
-      .getAllByRole('link', { name: 'Help' })
+      .getAllByRole('link', { name: 'commons:Help' })
       .find(
         (link) =>
           link.getAttribute('href') ===

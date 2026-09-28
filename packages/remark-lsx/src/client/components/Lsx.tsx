@@ -20,6 +20,7 @@ type Props = {
   reverse?: string;
   filter?: string;
   except?: string;
+  tag?: string;
 
   isImmutable?: boolean;
   isSharedPage?: boolean;
@@ -34,6 +35,7 @@ const LsxSubstance = React.memo(
     reverse,
     filter,
     except,
+    tag,
     isImmutable,
   }: Props): JSX.Element => {
     const lsxContext = useMemo(() => {
@@ -44,9 +46,10 @@ const LsxSubstance = React.memo(
         reverse,
         filter,
         except,
+        tag,
       };
       return new LsxContext(prefix, options);
-    }, [depth, filter, num, prefix, reverse, sort, except]);
+    }, [depth, filter, num, prefix, reverse, sort, except, tag]);
 
     const { data, error, isLoading, setSize } = useSWRxLsx(
       lsxContext.pagePath,

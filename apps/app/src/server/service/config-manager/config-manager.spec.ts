@@ -440,5 +440,55 @@ describe('ConfigManager test', () => {
         expect(configManager.getConfig('app:title')).toBe('db-title');
       });
     });
+
+    describe('env-only mode for GCS settings (env:useOnlyEnvVars:gcs)', () => {
+      // GROWI.cloud's hosted GCS tenants set this control key so the
+      // infra-provided GCS settings (credentials, bucket, and — since this
+      // fix — the file-delivery relay/redirect mode) cannot be overridden
+      // from the admin UI. gcs:referenceFileWithRelayMode was missing from
+      // this group before this fix, so a hosted-GCS admin could still
+      // persist a DB value that getConfig would then honor.
+      const gcsEnvOnlyKeys = [
+        'gcs:apiKeyJsonPath',
+        'gcs:bucket',
+        'gcs:uploadNamespace',
+        'gcs:referenceFileWithRelayMode',
+      ] as const;
+
+      const dbValues: Partial<TestConfigData> = {
+        'gcs:apiKeyJsonPath': { value: 'db-key-path' },
+        'gcs:bucket': { value: 'db-bucket' },
+        'gcs:uploadNamespace': { value: 'db-namespace' },
+        'gcs:referenceFileWithRelayMode': { value: true },
+      };
+      const envValues: Partial<TestConfigData> = {
+        'gcs:apiKeyJsonPath': { value: 'env-key-path' },
+        'gcs:bucket': { value: 'env-bucket' },
+        'gcs:uploadNamespace': { value: 'env-namespace' },
+        'gcs:referenceFileWithRelayMode': { value: false },
+      };
+
+      test('returns env value only (ignoring db) for every GCS key when control key is true', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:gcs': { value: true },
+        });
+
+        for (const key of gcsEnvOnlyKeys) {
+          expect(configManager.getConfig(key)).toEqual(envValues[key]?.value);
+        }
+      });
+
+      test('returns db value (env as fallback default) for every GCS key when control key is false', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:gcs': { value: false },
+        });
+
+        for (const key of gcsEnvOnlyKeys) {
+          expect(configManager.getConfig(key)).toEqual(dbValues[key]?.value);
+        }
+      });
+    });
   });
 });

@@ -29,6 +29,11 @@ const NewsItemSchema = new Schema<NewsItemDocument, NewsItemModel>({
     type: Map,
     of: String,
   },
+  // No enum constraint: an unknown value must persist and degrade to plain
+  // text at render, not be rejected. Render branches on `=== 'markdown'`.
+  bodyFormat: {
+    type: String,
+  },
   emoji: {
     type: String,
   },
