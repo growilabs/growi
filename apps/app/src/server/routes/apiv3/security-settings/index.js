@@ -23,6 +23,10 @@ import {
 } from '~/utils/page-delete-config';
 
 import { checkSetupStrategiesHasAdmin } from './checkSetupStrategiesHasAdmin';
+import {
+  handleGetPasswordHashMigrationStatus,
+  handlePasswordHashCleanup,
+} from './password-hash';
 import { handleSamlUpdate, samlAuthValidator } from './saml';
 
 const logger = loggerFactory('growi:routes:apiv3:security-setting');
@@ -1772,6 +1776,53 @@ export const setup = (crowi) => {
         return res.apiv3Err(new ErrorV3(msg, 'update-githubOAuth-failed'));
       }
     },
+  );
+
+  /**
+   * @swagger
+   *
+   *  /security-setting/password-hash/migration-status:
+   *    get:
+   *      tags: [SecuritySetting]
+   *      security:
+   *        - cookieAuth: []
+   *      summary: /security-setting/password-hash/migration-status
+   *      description: Report how many users hold each password-hash format
+   *      responses:
+   *        200:
+   *          description: the format distribution and whether the cleanup can run
+   */
+  router.get(
+    '/password-hash/migration-status',
+    accessTokenParser([SCOPE.READ.ADMIN.SECURITY]),
+    loginRequiredStrictly,
+    adminRequired,
+    handleGetPasswordHashMigrationStatus,
+  );
+
+  /**
+   * @swagger
+   *
+   *  /security-setting/password-hash/cleanup:
+   *    post:
+   *      tags: [SecuritySetting]
+   *      security:
+   *        - cookieAuth: []
+   *      summary: /security-setting/password-hash/cleanup
+   *      description: Remove the legacy SHA-256 password field from migrated users
+   *      responses:
+   *        200:
+   *          description: number of documents the legacy field was removed from
+   *        409:
+   *          description: aborted because ACTIVE not-yet-migrated users remain
+   */
+  router.post(
+    '/password-hash/cleanup',
+    accessTokenParser([SCOPE.WRITE.ADMIN.SECURITY]),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    handlePasswordHashCleanup(crowi),
   );
 
   return router;
