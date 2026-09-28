@@ -25,8 +25,8 @@ export const REDIRECT_CHAIN_MAX_DEPTH = 50;
 // registers the Page schema, and mongoose.model() throws then.
 const getPageModel = () => mongoose.model<PageDocument, PageModel>('Page');
 
-const findPagesById = async (
-  ids: string[],
+export const findPagesById = async (
+  ids: string[] | Types.ObjectId[],
 ): Promise<{ _id: Types.ObjectId }[]> => {
   return await getPageModel()
     .find({ _id: { $in: ids } })
