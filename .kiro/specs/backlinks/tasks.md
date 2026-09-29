@@ -726,7 +726,7 @@ the restored page's status. Independent of B3/B4.
   - _Boundary: find-forward-link-health.ts, PageLinkService, interfaces/backlink.ts_
   - _Depends: B5.1, B1.7_
 
-- [ ] B5.9 Expose forward-link health over the API and the client hook
+- [x] B5.9 Expose forward-link health over the API and the client hook
   - **Closes the gap between B5.4 (server read) and B5.6 (panel).** B5.4 produces `ILinkTarget[]` and
     B5.6 renders it, but nothing carried it across the wire: the B1 endpoint returns
     `{ backlinks }` only and `useSWRxBacklinks` resolves to `IBacklink[]`. Without this task B5.6 has
