@@ -8,6 +8,7 @@ import type { Request, RequestHandler } from 'express';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
 import { incrementAiSummarizeGeneratedCount } from '~/features/opentelemetry/server/custom-metrics/ai-summarize-metrics';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
@@ -216,6 +217,14 @@ export const summarizeMessageHandlersFactory: SummarizeMessageHandlersFactory =
 
               if (!hasErrorChunk && finishReason !== 'error') {
                 incrementAiSummarizeGeneratedCount();
+                // Emitted inside execute, i.e. before the response finishes —
+                // see rules/activity-recording.md.
+                crowi.events.activity.emit('update', res.locals.activity._id, {
+                  action: SupportedAction.ACTION_PAGE_AI_SUMMARIZE,
+                  targetModel: SupportedTargetModel.MODEL_PAGE,
+                  target: page,
+                  contributor: req.user,
+                });
               }
             },
           });

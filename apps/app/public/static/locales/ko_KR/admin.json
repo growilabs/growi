@@ -1133,6 +1133,7 @@
     "PAGE_SUBSCRIBE": "페이지 구독",
     "PAGE_UNSUBSCRIBE": "페이지 구독 취소",
     "PAGE_EXPORT": "페이지 내보내기",
+    "PAGE_AI_SUMMARIZE": "AI로 페이지 요약",
     "TAG_UPDATE": "태그 업데이트",
     "IN_APP_NOTIFICATION_ALL_STATUSES_OPEN": "모든 앱 내 알림 읽음",
     "COMMENT_CREATE": "댓글 생성",

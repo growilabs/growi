@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 import request from 'supertest';
 import { mock } from 'vitest-mock-extended';
 
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 
@@ -43,6 +44,7 @@ const mocks = vi.hoisted(() => ({
   stream: vi.fn(),
   incrementCount: vi.fn(),
   addActivity: vi.fn(),
+  emitActivity: vi.fn(),
   currentUser: undefined as unknown,
   // pageId -> body, read by the populateDataToShowRevision mock
   bodiesByPageId: new Map<string, string>(),
@@ -372,7 +374,10 @@ describe('POST /summary (summarize-message handler)', () => {
     const { summarizeMessageHandlersFactory } = await import(
       './summarize-message'
     );
-    app.post('/summary', summarizeMessageHandlersFactory(mock<Crowi>()));
+    const crowi = mock<Crowi>({
+      events: { activity: { emit: mocks.emitActivity } },
+    });
+    app.post('/summary', summarizeMessageHandlersFactory(crowi));
   });
 
   describe('successful summary on a viewable page', () => {
@@ -467,6 +472,60 @@ describe('POST /summary (summarize-message handler)', () => {
   });
 
   describe('activity recording', () => {
+    it('emits PAGE_AI_SUMMARIZE once for the summarized page when the stream completes normally', async () => {
+      await request(app)
+        .post('/summary')
+        .send({ pageId: shortPage._id.toString() })
+        .expect(200);
+
+      expect(mocks.emitActivity).toHaveBeenCalledTimes(1);
+      expect(mocks.emitActivity).toHaveBeenCalledWith('update', 'activity-id', {
+        action: SupportedAction.ACTION_PAGE_AI_SUMMARIZE,
+        targetModel: SupportedTargetModel.MODEL_PAGE,
+        target: expect.objectContaining({ _id: shortPage._id }),
+        contributor: viewer,
+      });
+    });
+
+    it('does not emit when the stream ends with an error chunk', async () => {
+      mocks.stream.mockResolvedValueOnce({
+        uiChunks: [
+          { type: 'start' },
+          { type: 'error', errorText: 'model test-model was not found.' },
+        ],
+        usage: Promise.resolve({}),
+        finishReason: Promise.resolve('error'),
+        steps: Promise.resolve([]),
+      });
+
+      await request(app)
+        .post('/summary')
+        .send({ pageId: shortPage._id.toString() })
+        .expect(200);
+
+      expect(mocks.emitActivity).not.toHaveBeenCalled();
+    });
+
+    it('does not emit when generation fails before the stream starts', async () => {
+      mocks.stream.mockRejectedValueOnce(new Error('boom'));
+
+      await request(app)
+        .post('/summary')
+        .send({ pageId: shortPage._id.toString() })
+        .expect(500);
+
+      expect(mocks.emitActivity).not.toHaveBeenCalled();
+    });
+
+    it('does not emit when the viewer cannot see the page', async () => {
+      await request(app)
+        .post('/summary')
+        .send({ pageId: ownerOnlyPage._id.toString() })
+        .expect(404);
+
+      expect(mocks.emitActivity).not.toHaveBeenCalled();
+    });
+
     it('passes addActivity before rejecting an invalid body, so the failed attempt is audited', async () => {
       await request(app).post('/summary').send({}).expect(400);
 

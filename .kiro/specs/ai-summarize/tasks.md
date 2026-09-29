@@ -47,7 +47,7 @@
   - _Requirements: 6.1, 6.2_
   - _Boundary: AiSummarizeMetrics_
 
-- [ ] 3. SummarizeMessageRoute: 要約を1回起動し既存の対話に合流できる
+- [x] 3. SummarizeMessageRoute: 要約を1回起動し既存の対話に合流できる
 - [x] 3.1 要約リクエストの妥当性が検証される
   - `pageId` と `pagePath` のいずれか一方が必須であることを検証するバリデータを実装する
   - `modelKey` に `post-message-validator.ts` と同じ型・長さ制約を課す
@@ -79,7 +79,7 @@
   - AI未設定・無効時に本ルートが501を返すことを統合テストで確認できる（既存の `aiReadyGuard` の回帰確認）
   - _Requirements: 5.1_
 
-- [ ] 3.4 要約の生成イベントがAudit Logに記録される
+- [x] 3.4 要約の生成イベントがAudit Logに記録される
   - `apps/app/src/interfaces/activity.ts` に `ACTION_PAGE_AI_SUMMARIZE = 'PAGE_AI_SUMMARIZE'` を追加し、`SupportedAction` と `LargeActionGroup` に登録する（既存の `ACTION_ADMIN_AI_SETTING_UPDATE` 追加時と同じ形。カテゴリ分類は `PAGE_` プレフィックスにより既存の正規表現判定で自動的に `PageActions` に含まれるため、新規カテゴリの追加は不要）
   - 要約ハンドラ（タスク3.2）で、ストリームが正常終了した時点（レスポンス送信前）に `crowi.events.activity.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_PAGE_AI_SUMMARIZE, targetModel: SupportedTargetModel.MODEL_PAGE, target: page, contributor: req.user })` を呼ぶ（既存の `create-page.ts` と同じ呼び出し形）。エラー終了時は呼ばない
   - `apps/app/public/static/locales/{en_US,fr_FR,ja_JP,ko_KR,zh_CN}/admin.json` に `audit_log_action.PAGE_AI_SUMMARIZE` の表示ラベルを5ロケール分追加する（`/admin/audit-log` での表示用）
