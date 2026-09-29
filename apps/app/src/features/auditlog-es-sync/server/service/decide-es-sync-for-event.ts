@@ -6,6 +6,7 @@ import loggerFactory from '~/utils/logger';
 import { AnonymousSyncCounter } from '../models/anonymous-sync-counter';
 import type { EsSyncDecisionValue } from '../models/es-sync-decision';
 import { EsSyncDecision } from '../models/es-sync-decision';
+import { ANCHOR_REFRESH_INTERVAL_SECONDS } from '../models/window-ttl';
 
 const logger = loggerFactory('growi:service:decide-es-sync-for-event');
 
@@ -26,17 +27,26 @@ const sleep = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
-// Refreshes the TTL anchor on every read, so a batch retried over and over keeps its
-// decisions alive as long as each retry comes within WINDOW_TTL_SECONDS of the last.
+const anchorRefreshCutoff = (now: Date): Date =>
+  new Date(now.getTime() - ANCHOR_REFRESH_INTERVAL_SECONDS * 1000);
+
+// Refreshes the TTL anchor when stale, so a batch retried over and over keeps its
+// decisions alive (see window-ttl.ts for the retry gap this tolerates).
 const findSettledDecision = async (
   activityId: string,
 ): Promise<EsSyncDecisionValue | undefined> => {
-  const doc = await EsSyncDecision.findOneAndUpdate(
-    { _id: activityId, decision: { $ne: 'pending' } },
-    { $set: { claimedAt: new Date() } },
-    { new: true },
-  );
-  return doc?.decision;
+  const doc = await EsSyncDecision.findById(activityId).lean();
+  if (doc == null || doc.decision === 'pending') return undefined;
+
+  const now = new Date();
+  const cutoff = anchorRefreshCutoff(now);
+  if (doc.claimedAt < cutoff) {
+    await EsSyncDecision.updateOne(
+      { _id: activityId, claimedAt: { $lt: cutoff } },
+      { $set: { claimedAt: now } },
+    );
+  }
+  return doc.decision;
 };
 
 // Poll for the claiming process's result. Returns undefined if it never resolves
@@ -65,18 +75,28 @@ class ClaimLostError extends Error {}
 // than threshold, not >=: the event that pushes the count to exactly threshold + 1
 // must still go through the full path below, since that is the one 'dropped' event
 // that logs the "threshold reached" warning (see commitAdmissionDecision).
-// Refreshes the counter's TTL anchor even though it skips the $inc, or the counter
-// would expire mid-window under a sustained attack and restart admitting from 0.
+// Refreshes the counter's TTL anchor when stale even though it skips the $inc, or the
+// counter would expire mid-window under a sustained attack and restart admitting from 0.
 const isWindowConfidentlyOverThreshold = async (
   endpoint: string,
   windowStart: Date,
   threshold: number,
 ): Promise<boolean> => {
-  const { matchedCount } = await AnonymousSyncCounter.updateOne(
-    { endpoint, windowStart, count: { $gt: threshold } },
-    { $set: { updatedAt: new Date() } },
-  );
-  return matchedCount > 0;
+  const current = await AnonymousSyncCounter.findOne({
+    endpoint,
+    windowStart,
+  }).lean();
+  if (current == null || current.count <= threshold) return false;
+
+  const now = new Date();
+  const cutoff = anchorRefreshCutoff(now);
+  if (current.updatedAt < cutoff) {
+    await AnonymousSyncCounter.updateOne(
+      { _id: current._id, updatedAt: { $lt: cutoff } },
+      { $set: { updatedAt: now } },
+    );
+  }
+  return true;
 };
 
 // Groups one call's identifying parameters so acquireClaim/commitAdmissionDecision/

@@ -148,7 +148,63 @@ describe('decideEsSyncForEvent', () => {
     expect(counter?.updatedAt.getTime()).toBeGreaterThan(staleAnchor.getTime());
   });
 
-  it('keeps a settled decision alive while its event keeps being re-processed', async () => {
+  it('does not rewrite a fresh counter anchor on every over-threshold event', async () => {
+    const threshold = 1;
+    for (let i = 0; i < 2; i++) {
+      // biome-ignore lint/performance/noAwaitInLoops: each call must see the prior one's committed count.
+      await decideEsSyncForEvent(
+        newActivityId(),
+        endpoint,
+        windowStart,
+        threshold,
+      );
+    }
+    const before = await AnonymousSyncCounter.findOne({
+      endpoint,
+      windowStart,
+    }).lean();
+
+    await decideEsSyncForEvent(
+      newActivityId(),
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    const after = await AnonymousSyncCounter.findOne({
+      endpoint,
+      windowStart,
+    }).lean();
+    expect(after?.updatedAt).toEqual(before?.updatedAt);
+  });
+
+  it('keeps a settled decision alive while its event keeps being re-processed under threshold', async () => {
+    const threshold = 3;
+    const activityId = newActivityId();
+    await decideEsSyncForEvent(activityId, endpoint, windowStart, threshold);
+    await EsSyncDecision.updateOne(
+      { _id: activityId },
+      { $set: { claimedAt: staleAnchor } },
+    );
+
+    const redecided = await decideEsSyncForEvent(
+      activityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    expect(redecided).toBe('admitted');
+    const decision = await EsSyncDecision.findById(activityId).lean();
+    expect(decision?.claimedAt.getTime()).toBeGreaterThan(
+      staleAnchor.getTime(),
+    );
+    expect(
+      (await AnonymousSyncCounter.findOne({ endpoint, windowStart }))?.count,
+    ).toBe(1);
+  });
+
+  it('keeps a settled decision alive while its event keeps being re-processed over threshold', async () => {
     const threshold = 1;
     const admittedActivityId = newActivityId();
     await decideEsSyncForEvent(

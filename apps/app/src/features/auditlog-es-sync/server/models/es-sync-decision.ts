@@ -17,8 +17,8 @@ export interface EsSyncDecisionDocument extends Document {
   windowStart: Date;
   decision: EsSyncDecisionValue;
   // When the current claim was last touched (created, stolen, reconfirmed, or
-  // finalized) — refreshed on every write, and on every read of a settled decision,
-  // not just the initial claim. Doubles as:
+  // finalized) — refreshed on every write, and on reads of a settled decision while
+  // stale (see window-ttl.ts), not just the initial claim. Doubles as:
   // (1) the staleness check for 'pending' claims (a claim older than
   //     STALE_CLAIM_MS is assumed abandoned and may be taken over), and
   // (2) the TTL anchor (see below) — windowStart cannot be the TTL field, since

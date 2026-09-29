@@ -13,8 +13,8 @@ export interface AnonymousSyncCounterDocument extends Document {
   // increment. Never $inc this from anywhere else, or duplicate change-stream
   // processing across GROWI processes will double-count the same event.
   count: number;
-  // TTL anchor, refreshed on every event in the window (not just creation),
-  // including over-threshold events that skip the $inc.
+  // TTL anchor, refreshed by every $inc and, while stale, by over-threshold events
+  // that skip the $inc (see window-ttl.ts).
   // windowStart cannot be the TTL field: it is keyed off each event's own
   // createdAt (see filterAdmittedUpserts), so a backlog replayed long after the
   // fact would carry an old windowStart and expire almost immediately if the TTL
