@@ -21,8 +21,10 @@ export const buildSummarizeMessageValidator = (): ValidationChain[] => [
     return true;
   }),
 
+  // `.if(...)` rather than `.optional()`, which only skips undefined: an empty
+  // pageId must defer to pagePath exactly as the handler does.
   body('pageId')
-    .optional()
+    .if((value: unknown) => !isAbsent(value))
     .isString()
     .withMessage('pageId must be a string')
     .isMongoId()
