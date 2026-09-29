@@ -73,7 +73,7 @@
   - _Requirements: 1.1, 1.2, 2.2, 4.1, 4.2, 7.2_
   - _Depends: 1.3, 2_
 
-- [ ] 3.3 要約ルートがExpressに登録され、AI未設定時は既存ガードで利用不可になる
+- [x] 3.3 要約ルートがExpressに登録され、AI未設定時は既存ガードで利用不可になる
   - `routes/index.ts` の遅延ロードパターンに沿って `POST /_api/v3/mastra/summary` を追加登録する（既存の `router.use(aiReadyGuard)` の適用範囲内）
   - `generateAddActivityMiddleware()`（既存、`apps/app/src/server/middlewares/add-activity.ts`）を、認可ミドルウェアの後・バリデータの前に挟む
   - AI未設定・無効時に本ルートが501を返すことを統合テストで確認できる（既存の `aiReadyGuard` の回帰確認）

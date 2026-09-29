@@ -10,6 +10,7 @@ import mongoose, { type HydratedDocument } from 'mongoose';
 import { incrementAiSummarizeGeneratedCount } from '~/features/opentelemetry/server/custom-metrics/ai-summarize-metrics';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { PageDocument, PageModel } from '~/server/models/page';
@@ -75,12 +76,15 @@ const buildSummarizeRequest = (
 export const summarizeMessageHandlersFactory: SummarizeMessageHandlersFactory =
   (crowi) => {
     const loginRequiredStrictly = loginRequiredFactory(crowi);
+    const addActivity = generateAddActivityMiddleware();
 
     return [
       accessTokenParser([SCOPE.WRITE.FEATURES.AI], {
         acceptLegacy: true,
       }),
       loginRequiredStrictly,
+      // After auth, before validators — see rules/activity-recording.md.
+      addActivity,
       ...buildSummarizeMessageValidator(),
       apiV3FormValidator,
       async (req: Req, res: ApiV3Response) => {

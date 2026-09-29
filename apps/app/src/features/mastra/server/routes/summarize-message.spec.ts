@@ -42,6 +42,7 @@ const mocks = vi.hoisted(() => ({
   getAgent: vi.fn(),
   stream: vi.fn(),
   incrementCount: vi.fn(),
+  addActivity: vi.fn(),
   currentUser: undefined as unknown,
   // pageId -> body, read by the populateDataToShowRevision mock
   bodiesByPageId: new Map<string, string>(),
@@ -58,6 +59,15 @@ vi.mock('~/server/middlewares/login-required', () => ({
     Object.assign(req, { user: mocks.currentUser });
     next();
   },
+}));
+
+vi.mock('~/server/middlewares/add-activity', () => ({
+  generateAddActivityMiddleware:
+    () => (_req: Request, res: Response, next: NextFunction) => {
+      mocks.addActivity();
+      res.locals.activity = { _id: 'activity-id' };
+      next();
+    },
 }));
 
 vi.mock('~/features/mastra/server/services/mastra-modules', () => ({
@@ -453,6 +463,15 @@ describe('POST /summary (summarize-message handler)', () => {
         .expect(200);
 
       expect(mocks.incrementCount).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('activity recording', () => {
+    it('passes addActivity before rejecting an invalid body, so the failed attempt is audited', async () => {
+      await request(app).post('/summary').send({}).expect(400);
+
+      expect(mocks.addActivity).toHaveBeenCalledTimes(1);
+      expect(mocks.stream).not.toHaveBeenCalled();
     });
   });
 
