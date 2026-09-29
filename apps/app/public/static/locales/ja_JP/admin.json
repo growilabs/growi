@@ -266,7 +266,7 @@
       "cleanup_button": "旧形式のデータを削除する",
       "cleanup_confirm_title": "旧形式のデータを削除しますか?",
       "cleanup_confirm_body": "移行済みユーザーから旧形式のデータを削除します。この操作は取り消せません。",
-      "cleanup_confirm_downgrade_warning": "実行後、移行済みのユーザーは既存のパスワードでは旧バージョンにログインできなくなります。ダウングレードする場合は、事前に downgrade-prep スクリプトで全員にパスワードリセットを送る必要があります。",
+      "cleanup_confirm_downgrade_warning": "実行後、移行済みのユーザーは既存のパスワードでは旧バージョンにログインできなくなります。旧バージョンへ戻す場合は、全ユーザーにパスワードの再設定が必要になります。",
       "cleanup_consent": "ダウングレード時に全ユーザーのパスワード再設定が必要になることを理解しました",
       "cleanup_execute": "削除する",
       "cleanup_succeeded": "{{count}} 人のユーザーから旧形式のデータを削除しました。"

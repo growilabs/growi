@@ -257,7 +257,7 @@
       "cleanup_button": "Supprimer les données à l'ancien format",
       "cleanup_confirm_title": "Supprimer les données à l'ancien format ?",
       "cleanup_confirm_body": "Cette action supprime les données à l'ancien format de tous les utilisateurs migrés. Elle est irréversible.",
-      "cleanup_confirm_downgrade_warning": "Après cette opération, les utilisateurs migrés ne pourront plus se connecter à une version antérieure avec leur mot de passe actuel. Pour rétrograder, vous devrez d'abord leur envoyer à tous une réinitialisation de mot de passe à l'aide du script downgrade-prep.",
+      "cleanup_confirm_downgrade_warning": "Après cette opération, les utilisateurs migrés ne pourront plus se connecter à une version antérieure avec leur mot de passe actuel. Revenir à une version antérieure obligerait chaque utilisateur à définir un nouveau mot de passe.",
       "cleanup_consent": "Je comprends que rétrograder obligera chaque utilisateur à définir un nouveau mot de passe",
       "cleanup_execute": "Supprimer",
       "cleanup_succeeded": "Données à l'ancien format supprimées pour {{count}} utilisateur(s)."
