@@ -6,10 +6,7 @@ import { Transform, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { URL } from 'url';
 
-import {
-  AuditlogEsSyncStatus,
-  filterAdmittedUpserts,
-} from '~/features/auditlog-es-sync/server';
+import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
 import type { AuditlogSuggestionField } from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
@@ -594,14 +591,17 @@ class ElasticsearchDelegator
       : undefined;
     const totalCount = shouldEmitProgress ? await Activity.countDocuments() : 0;
 
+    // The anonymous-log ES sync threshold is intentionally not applied here. It caps
+    // attack-time write load on the live path, but a reindex writes one bulk at a
+    // time regardless of event time, so the threshold would only cut volume, at a
+    // per-event MongoDB round-trip cost (see filter-admitted-upserts.ts).
     const readStream = Activity.find()
-      .select('snapshot.username endpoint createdAt')
+      .select('snapshot.username endpoint')
       .lean()
       .cursor();
     const batchStream = createBatchStream(bulkSize);
 
     // Counts activities read, not documents indexed — some are skipped by
-    // filterAdmittedUpserts (anonymous logs past their endpoint's threshold) or by
     // prepareBodyForAuditlog, which would leave count short of totalCount.
     let count = 0;
     const writeStream = new Writable({
@@ -609,24 +609,20 @@ class ElasticsearchDelegator
       async write(batch, _encoding, callback) {
         count += batch.length;
 
+        const body = batch.flatMap((activity) =>
+          prepareBodyForAuditlog(activity),
+        );
+
+        if (body.length === 0) {
+          socket?.emit(SocketEventName.AddAuditlogProgress, {
+            totalCount,
+            count,
+          });
+          callback();
+          return;
+        }
+
         try {
-          // Same admission gate the live change-stream consumer applies (see
-          // filter-admitted-upserts.ts) — a full reindex must not bulk-sync the
-          // entire historical backlog of anonymous logs unthrottled.
-          const admittedBatch = await filterAdmittedUpserts(batch);
-          const body = admittedBatch.flatMap((activity) =>
-            prepareBodyForAuditlog(activity),
-          );
-
-          if (body.length === 0) {
-            socket?.emit(SocketEventName.AddAuditlogProgress, {
-              totalCount,
-              count,
-            });
-            callback();
-            return;
-          }
-
           const bulkResponse = await bulkWrite({ body });
 
           if (bulkResponse.errors) {

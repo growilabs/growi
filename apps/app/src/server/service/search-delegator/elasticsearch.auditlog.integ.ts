@@ -198,29 +198,29 @@ describe('ElasticsearchDelegator.addAllAuditlogs()', () => {
     expect(mockES8Client.bulk).toHaveBeenCalledTimes(2);
   });
 
-  it('excludes an anonymous log at a gated endpoint once its threshold is exceeded', async () => {
-    // A full reindex must apply the same admission gate the live change-stream
-    // consumer applies (filter-admitted-upserts.ts) — it must not bulk-sync an
-    // anonymous log past its endpoint's configured threshold.
+  it('indexes anonymous logs at a threshold-gated endpoint regardless of the live-sync threshold', async () => {
+    // The anonymous-log threshold gates only the live change-stream sync; a reindex
+    // must index every such log even when the threshold would admit none.
     vi.mocked(configManager.getConfig).mockImplementation((key) => {
       if (key === 'app:elasticsearchVersion') return 8;
       if (key === 'app:elasticsearchReindexBulkSize') return 100;
       if (key === 'app:auditLogEsSyncAnonymousThresholdLogin') return 0;
       return false;
     });
-    const id = new mongoose.Types.ObjectId();
-    await mongoose.connection.collection('activities').insertMany([
-      {
-        _id: id,
-        action: `test-action-${actionSeq++}`,
-        snapshot: { username: null },
-        endpoint: '/_api/v3/login',
-        createdAt: new Date(),
-      },
+    const id1 = new mongoose.Types.ObjectId();
+    const id2 = new mongoose.Types.ObjectId();
+    await insertActivities([
+      { _id: id1, username: null, endpoint: '/_api/v3/login' },
+      { _id: id2, username: null, endpoint: '/_api/v3/login' },
     ]);
 
     await delegator.addAllAuditlogs();
 
-    expect(mockES8Client.bulk).not.toHaveBeenCalled();
+    expect(mockES8Client.bulk).toHaveBeenCalledWith({
+      body: expect.arrayContaining([
+        { index: { _index: 'auditlogs', _id: id1.toString() } },
+        { index: { _index: 'auditlogs', _id: id2.toString() } },
+      ]),
+    });
   });
 });

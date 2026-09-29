@@ -25,9 +25,9 @@ type AdmittableActivity = Pick<
 // logs at unlisted endpoints bypass the gate entirely (always admitted) — this only
 // caps the abuse-sensitive endpoints the threshold map names.
 //
-// Shared by the live change-stream consumer (auditlog-changestream.ts) and the
-// full-corpus reindex (elasticsearch.ts's addAllAuditlogs), so both paths enforce the
-// same admission policy instead of the reindex bypassing it.
+// Used only by the live change-stream consumer (auditlog-changestream.ts). The
+// full-corpus reindex (elasticsearch.ts's addAllAuditlogs) deliberately skips it;
+// see the comment there.
 //
 // Events are processed sequentially, not via Promise.all: two anonymous events at the
 // same (endpoint, windowStart) admitted in parallel would each open a Mongo
