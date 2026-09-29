@@ -41,6 +41,7 @@ type SelectionState =
       stage: 'composing';
       committedAnchor: CapturedSelection;
       committedRange: Range;
+      cursorEdge: SelectionEdge;
     };
 
 const IDLE_STATE: SelectionState = { stage: 'idle' };
@@ -108,6 +109,7 @@ export const SelectionCapture = (
         // live selection, so the form stays put no matter what the user
         // selects (or de-selects) next.
         committedRange: current.liveRange.cloneRange(),
+        cursorEdge: current.cursorEdge,
       };
     });
   }, []);
@@ -156,7 +158,10 @@ export const SelectionCapture = (
         range={state.committedRange}
         containerRef={containerRef}
       />
-      <SelectionPopover range={state.committedRange}>
+      <SelectionPopover
+        range={state.committedRange}
+        cursorEdge={state.cursorEdge}
+      >
         <InlineCommentForm
           pageId={pageId}
           anchorOriginRevisionId={anchorOriginRevisionId}

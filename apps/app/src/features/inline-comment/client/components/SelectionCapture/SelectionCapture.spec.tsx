@@ -146,6 +146,8 @@ const buildLiveRange = (rect: DOMRect = LIVE_RECT) => {
     // No collapsed-caret rect, so the edge position falls back to the line rects.
     getClientRects: vi.fn(() => [] as unknown as DOMRectList),
   });
+  // The form derives its cursor-edge position from the clone, so the clone must be clonable too.
+  vi.mocked(cloned.cloneRange).mockReturnValue(cloned);
   const live = mock<Range>({
     getBoundingClientRect: vi.fn(() => rect),
     getClientRects: vi.fn(() => [rect] as unknown as DOMRectList),
@@ -332,7 +334,33 @@ describe('SelectionCapture', () => {
       });
     });
 
-    it('keeps the form below the committed range', () => {
+    it('places the form above the committed range, like the button', () => {
+      const { live } = buildLiveRange();
+      setLiveSelection(live, 'forward');
+      textSelectionStore.captured = ANCHOR;
+
+      renderCapture();
+      fireEvent.click(screen.getByTestId('selection-action-button'));
+
+      expect(lastPopperOptions().placement).toBe('top');
+    });
+
+    it('anchors the form to the right edge after a left-to-right drag', () => {
+      const { live } = buildLiveRange();
+      setLiveSelection(live, 'forward');
+      textSelectionStore.captured = ANCHOR;
+
+      renderCapture();
+      fireEvent.click(screen.getByTestId('selection-action-button'));
+
+      expect(
+        capturedReference(
+          mockCreatePopper.mock.calls.length - 1,
+        ).getBoundingClientRect(),
+      ).toMatchObject({ left: CLONED_RECT.right, width: 0 });
+    });
+
+    it('anchors the form to the left edge after a right-to-left drag', () => {
       const { live } = buildLiveRange();
       setLiveSelection(live, 'backward');
       textSelectionStore.captured = ANCHOR;
@@ -340,7 +368,11 @@ describe('SelectionCapture', () => {
       renderCapture();
       fireEvent.click(screen.getByTestId('selection-action-button'));
 
-      expect(lastPopperOptions().placement).toBe('bottom');
+      expect(
+        capturedReference(
+          mockCreatePopper.mock.calls.length - 1,
+        ).getBoundingClientRect(),
+      ).toMatchObject({ left: CLONED_RECT.left, width: 0 });
     });
   });
 
@@ -427,7 +459,10 @@ describe('SelectionCapture', () => {
     const formReference = capturedReference(
       mockCreatePopper.mock.calls.length - 1,
     );
-    expect(formReference.getBoundingClientRect()).toEqual(CLONED_RECT);
+    expect(formReference.getBoundingClientRect()).toMatchObject({
+      top: CLONED_RECT.top,
+      bottom: CLONED_RECT.bottom,
+    });
     expect(cloned.getBoundingClientRect).toHaveBeenCalled();
 
     // The live selection changing afterwards leaves the form's position alone.
@@ -440,7 +475,7 @@ describe('SelectionCapture', () => {
       capturedReference(
         mockCreatePopper.mock.calls.length - 1,
       ).getBoundingClientRect(),
-    ).toEqual(CLONED_RECT);
+    ).toMatchObject({ top: CLONED_RECT.top, bottom: CLONED_RECT.bottom });
   });
 
   // Requirement 2.4

@@ -7,10 +7,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePopperPosition } from './use-popper-position';
 
 const mockDestroy = vi.fn();
+const mockUpdate = vi.fn();
 const mockCreatePopper = vi.fn(
   (_reference: unknown, _popper: unknown, _options: unknown) => ({
     destroy: mockDestroy,
-    update: vi.fn(),
+    update: mockUpdate,
     setOptions: vi.fn(),
   }),
 );
@@ -41,6 +42,8 @@ describe('usePopperPosition', () => {
   beforeEach(() => {
     mockCreatePopper.mockClear();
     mockDestroy.mockClear();
+    mockUpdate.mockClear();
+    vi.unstubAllGlobals();
   });
 
   it('creates a Popper instance once when both a virtual element and a popper element are provided at mount', () => {
@@ -114,5 +117,65 @@ describe('usePopperPosition', () => {
     unmount();
 
     expect(mockDestroy).toHaveBeenCalledTimes(1);
+  });
+
+  describe('when the popper element is resized', () => {
+    const stubResizeObserver = () => {
+      const observed: { callback: () => void; disconnect: () => void }[] = [];
+      const disconnect = vi.fn();
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(callback: () => void) {
+            observed.push({ callback, disconnect });
+          }
+          observe() {}
+          unobserve() {}
+          disconnect = disconnect;
+        },
+      );
+      return { observed, disconnect };
+    };
+
+    it('recomputes the position, so a form that grows keeps its anchored edge', () => {
+      const { observed } = stubResizeObserver();
+
+      renderHook(() =>
+        usePopperPosition(
+          buildVirtualElement(),
+          document.createElement('div'),
+          'top',
+        ),
+      );
+      mockUpdate.mockClear();
+      observed[0].callback();
+
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops observing on unmount', () => {
+      const { disconnect } = stubResizeObserver();
+
+      const { unmount } = renderHook(() =>
+        usePopperPosition(buildVirtualElement(), document.createElement('div')),
+      );
+      unmount();
+
+      expect(disconnect).toHaveBeenCalled();
+    });
+
+    it('still works in an environment without ResizeObserver', () => {
+      vi.stubGlobal('ResizeObserver', undefined);
+
+      expect(() =>
+        renderHook(() =>
+          usePopperPosition(
+            buildVirtualElement(),
+            document.createElement('div'),
+          ),
+        ),
+      ).not.toThrow();
+      expect(mockCreatePopper).toHaveBeenCalledTimes(1);
+    });
   });
 });

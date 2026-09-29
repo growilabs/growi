@@ -108,11 +108,16 @@ export const InlineCommentForm = (
     <div
       ref={formRef}
       className="inline-comment-form bg-body border rounded shadow-sm p-2"
-      // Explicit width: Popper sizes this box via shrink-to-fit, but nothing
-      // inside has intrinsic width once the quote is hidden, so it would
-      // collapse to a sliver. Capped against viewport width since Popper's
+      // Nothing inside has intrinsic width once the quote is hidden (the editor
+      // item is flex-basis 0), so a shrink-to-fit box would collapse: width is
+      // max-content, floored by min-width (the former fixed width) and capped by
+      // max-width. Both are capped against viewport width since Popper's
       // preventOverflow shifts but doesn't shrink this box.
-      style={{ width: 'min(24rem, calc(100vw - 2rem))' }}
+      style={{
+        width: 'max-content',
+        minWidth: 'min(24rem, calc(100vw - 2rem))',
+        maxWidth: 'min(40rem, calc(100vw - 2rem))',
+      }}
       data-testid="inline-comment-form"
     >
       {/* Plain class, not CSS-module: the Playwright suite locates the quote by this selector. */}

@@ -10,6 +10,10 @@ import {
  * the reference (a virtual element, e.g. from `rangeToVirtualElement`) and
  * the popper DOM element are available, and destroys it on cleanup.
  *
+ * A ResizeObserver re-runs Popper's position computation when the popper
+ * element changes size, so content that grows (a multi-line form) stays
+ * anchored on the reference side instead of spilling over it.
+ *
  * Only the standard `flip` / `preventOverflow` / `offset` modifiers are used (no custom modifiers).
  *
  * `virtualElement` and `popperElement` are expected to change identity
@@ -39,7 +43,16 @@ export function usePopperPosition(
       ],
     });
 
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            void instance.update();
+          });
+    resizeObserver?.observe(popperElement);
+
     return () => {
+      resizeObserver?.disconnect();
       instance.destroy();
     };
   }, [virtualElement, popperElement, placement]);
