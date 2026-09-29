@@ -94,6 +94,22 @@ describe('middlewareFactory', () => {
     }
   });
 
+  it('limits AI chat messages more tightly than the global default', async () => {
+    const configs = await configsUsedFor('/_api/v3/mastra/message', 'POST');
+
+    for (const config of configs) {
+      expect(config?.maxRequests).toBeLessThan(DEFAULT_MAX_REQUESTS);
+    }
+  });
+
+  it('assumes more users per IP than the default for AI chat messages', async () => {
+    const calls = await consumeCallsFor('/_api/v3/mastra/message', 'POST');
+
+    for (const { ipMultiplier } of calls) {
+      expect(ipMultiplier).toBeGreaterThan(DEFAULT_USERS_PER_IP_PROSPECTION);
+    }
+  });
+
   it('assumes more users per IP than the default for AI summary generation', async () => {
     const calls = await consumeCallsFor('/_api/v3/mastra/summary', 'POST');
 

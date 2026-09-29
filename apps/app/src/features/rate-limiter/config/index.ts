@@ -72,6 +72,13 @@ export const defaultConfig: IApiRateLimitEndpointMap = {
     maxRequests: MAX_REQUESTS_TIER_4,
     usersPerIpProspection: 20,
   },
+  // One chat turn (up to 10 LLM steps) per request; the chat UI blocks sending
+  // while a response is in flight (see ai-summarize research.md 7.11).
+  '/_api/v3/mastra/message': {
+    method: 'POST',
+    maxRequests: MAX_REQUESTS_TIER_2,
+    usersPerIpProspection: 20,
+  },
   // One summary run (up to 15 LLM steps) per request; per-IP prospection
   // raised for shared egress IPs (see ai-summarize research.md 7.10).
   '/_api/v3/mastra/summary': {
