@@ -319,11 +319,17 @@ Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.u
 
 `DeleteCommentModal`／`DeleteCommentModalSubstance` を再利用する代わりに、インラインコメント専用の新しい削除確認UIを使うことにした。`DeleteCommentModal` は通常コメント自身のstore・型（`ICommentHasId`）に強く結びついており、この機能の既存の方針（`inline-comment-popover-refinement` の「解決トグルのマークアップを共有化しない」判断と同じ）は、小さく型の異なるUIは無理に共有コンポーネント化しないというものである。
 
-### 解決済みインラインコメントの本文中非表示を `inlineCommentAnchors` 1箇所でフィルタする理由
+### 解決済みインラインコメントの本文中非表示を `visibleResolvedRanges` 1箇所への絞り込みで実現する理由
 
-「解決済みコメントにはハイライトを付けない」（Requirement 2.7）をどこで実装するかについて、(1) 各消費者（`InlineCommentHighlight`、`InlineCommentBodyInteraction`）がそれぞれ独立にフィルタする案と、(2) `PageView.tsx` の `inlineCommentAnchors`（すべての消費者が `resolvedRanges` を介して間接的に読み取っている唯一の起点）で一度だけフィルタする案を検討し、(2) を選んだ。`resolvedRanges`（`useAnchorResolver` の出力）はすでに `InlineCommentHighlight` と `InlineCommentBodyInteraction` の両方が消費している唯一の絞り込みポイントであり、解決済みコメントはそもそも `Range` が計算されないだけなので、両方の消費者は解決状態を自分で意識する必要が一切なくなる（`.claude/rules/coding-style.md` の「単一の情報源を持ち、消費者ごとに個別分岐しない」原則）。
+「解決済みコメントにはハイライトを付けない」（Requirement 2.7）をどこで実装するかについて、次の3案を検討した。
 
-ポップオーバーを開いたまま対象が解決済みに変わった場合（Requirement 15.12）についても、`InlineCommentBodyInteraction` に `comment?.resolvedAt` を監視する新しい `useEffect` を追加する案と、すでにある「`comment == null` ならなにも描画しない」というガード（再アンカリング失敗のケース、Requirement 15.6ですでに使われている）に任せる案を検討し、後者を選んだ。`InlineCommentBodyInteraction` はidで `inlineComments` を検索しているため、フィルタ後は解決済みコメントもこのガードに引っかかって自然に対象外になる——新しい監視effectを足す必要がない。ただし、表示中のidに対応するコメントが `inlineComments` から消えて `comment` が `null` になった時点で、`pinnedId`／`hoverPreviewId` もあわせてクリアする小さなeffectを追加している。そうしないと、消えたidを指したままのstateが残ってしまう（同じidが二度と現れなくなる以上実害はないが、`handleClose` がすでに保っている「`pinnedId` は表示中のコメントが存在することを含意する」という不変条件を、この経路でも保つため）。コメントがこの経路で単に消えた場合、ポップオーバー自身の `onClose`／`suppressedHit` の後始末は走らない（`handleClose` を経由したときだけ走る）——解決済みである限り当たり判定がそのidを二度と報告しないため、抑制すべきものが残らず問題ない。
+1. 各消費者（`InlineCommentHighlight`、`InlineCommentBodyInteraction`）がそれぞれ独立にフィルタする案。
+2. `PageView.tsx` の `inlineCommentAnchors`（アンカー解決の入力）で一度だけフィルタする案。
+3. アンカー解決は全件に対して行い、本文中の表示側だけを `visibleResolvedRanges` に絞り込む案。
+
+3 を選んだ。2 は消費者の分岐が要らない点では単純だが、解決済みコメントの `Range` がそもそも計算されなくなり、一覧クリックでの本文へのスクロール（Requirement 16.1）が解決済みコメントに対して働かなくなる。3 なら、消費者ごとの分岐を避けたまま（`.claude/rules/coding-style.md` の「単一の情報源を持ち、消費者ごとに個別分岐しない」原則）、スクロールも成立する。構成の詳細は design.md の該当節を参照。
+
+ポップオーバーを開いたまま対象が解決済みに変わった場合（Requirement 15.12）についても、`InlineCommentBodyInteraction` に `comment?.resolvedAt` を監視する新しい `useEffect` を追加する案と、すでにある「`comment == null` ならなにも描画しない」というガード（再アンカリング失敗のケース、Requirement 15.6ですでに使われている）に任せる案を検討し、後者を選んだ。`InlineCommentBodyInteraction` は解決済みを除いた `bodyInlineComments` からidで検索しているため、解決済みコメントもこのガードに引っかかって自然に対象外になる——新しい監視effectを足す必要がない。ただし、表示中のidに対応するコメントが `bodyInlineComments` から消えて `comment` が `null` になった時点で、`pinnedId`／`hoverPreviewId` もあわせてクリアする小さなeffectを追加している。そうしないと、消えたidを指したままのstateが残ってしまう（同じidが二度と現れなくなる以上実害はないが、`handleClose` がすでに保っている「`pinnedId` は表示中のコメントが存在することを含意する」という不変条件を、この経路でも保つため）。コメントがこの経路で単に消えた場合、ポップオーバー自身の `onClose`／`suppressedHit` の後始末は走らない（`handleClose` を経由したときだけ走る）——解決済みである限り当たり判定がそのidを二度と報告しないため、抑制すべきものが残らず問題ない。
 
 ### Risks & Mitigations
 
