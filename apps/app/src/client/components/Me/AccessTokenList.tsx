@@ -55,10 +55,7 @@ export const AccessTokenList = React.memo(
                     <tr key={token._id}>
                       <td className="text-break">{token.description}</td>
                       <td>
-                        {dateFnsFormat(
-                          token.expiredAt,
-                          'yyyy-MM-dd (EEE) HH:mm',
-                        )}
+                        {dateFnsFormat(token.expiredAt, 'yyyy-MM-dd HH:mm')}
                       </td>
                       <td>{token.scopes.join(', ')}</td>
                       <td>
