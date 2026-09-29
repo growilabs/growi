@@ -80,7 +80,8 @@ export class PageLinkService {
   findForwardLinkHealth(
     fromPageId: Types.ObjectId,
     user: IUser | null,
+    userGroups: ObjectIdLike[] | null,
   ): Promise<ILinkTarget[]> {
-    return findForwardLinkHealth(fromPageId, user);
+    return findForwardLinkHealth(fromPageId, user, userGroups);
   }
 }

@@ -1,6 +1,7 @@
 import { type IUser, PageStatus } from '@growi/core';
 import mongoose, { Types } from 'mongoose';
 
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { PageQueryBuilder } from '~/server/models/page';
 import { prisma } from '~/utils/prisma';
@@ -34,13 +35,14 @@ const findOutboundRows = (
 const findReadableTrashedPages = async (
   pageIds: Types.ObjectId[],
   user: IUser | null,
+  userGroups: ObjectIdLike[] | null,
 ): Promise<{ _id: Types.ObjectId; path: string }[]> => {
   const Page = mongoose.model<PageDocument, PageModel>('Page');
   const builder = new PageQueryBuilder(
     Page.find({ _id: { $in: pageIds }, status: PageStatus.STATUS_DELETED }),
   );
 
-  await builder.addViewerCondition(user, null, true);
+  await builder.addViewerCondition(user, userGroups, true);
 
   return await builder.query.select('_id path').lean().exec();
 };
@@ -56,6 +58,7 @@ const findReadableTrashedPages = async (
 const findTrashedTargets = async (
   rows: OutboundRow[],
   user: IUser | null,
+  userGroups: ObjectIdLike[] | null,
 ): Promise<ILinkTarget[]> => {
   const targetIds = rows.flatMap((row) =>
     row.toPageId != null ? [new Types.ObjectId(row.toPageId)] : [],
@@ -64,7 +67,11 @@ const findTrashedTargets = async (
     return [];
   }
 
-  const trashedPages = await findReadableTrashedPages(targetIds, user);
+  const trashedPages = await findReadableTrashedPages(
+    targetIds,
+    user,
+    userGroups,
+  );
 
   return trashedPages.map((page) => ({
     pageId: page._id.toString(),
@@ -121,15 +128,19 @@ const findBrokenTargets = async (
 /**
  * `fromPageId`'s outbound links whose target needs the editor's attention — `trashed`
  * or `broken` — among the targets `user` may read.
+ *
+ * `userGroups` is the viewer's group ids from `findUserGroupIdsForViewer`, resolved
+ * once by the caller and shared with its other viewer-filtered reads.
  */
 export const findForwardLinkHealth = async (
   fromPageId: Types.ObjectId,
   user: IUser | null,
+  userGroups: ObjectIdLike[] | null,
 ): Promise<ILinkTarget[]> => {
   const rows = await findOutboundRows(fromPageId);
 
   const [trashed, broken] = await Promise.all([
-    findTrashedTargets(rows, user),
+    findTrashedTargets(rows, user, userGroups),
     findBrokenTargets(fromPageId, rows),
   ]);
 
