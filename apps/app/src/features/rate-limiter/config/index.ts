@@ -72,9 +72,8 @@ export const defaultConfig: IApiRateLimitEndpointMap = {
     maxRequests: MAX_REQUESTS_TIER_4,
     usersPerIpProspection: 20,
   },
-  // One LLM call per request (see ai-summarize design.md "SummarizeMessageRoute").
-  // Any logged-in user can call it, so the per-IP allowance is raised for the
-  // same shared-egress-IP reason as the username endpoint above.
+  // One summary run (up to 15 LLM steps) per request; per-IP prospection
+  // raised for shared egress IPs (see ai-summarize research.md 7.10).
   '/_api/v3/mastra/summary': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
