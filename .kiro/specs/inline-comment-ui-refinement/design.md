@@ -90,7 +90,7 @@ graph TB
 |---|---|---|---|
 | Frontend | React 18 + reactstrap `Dropdown` | 折りたたみの表示切り替え、三点メニュー | 新しい依存は追加しない |
 | State | React state（`PageComment` 内） | 展開済み id の集合 | 保存しない（Requirement 20.5） |
-| i18n | `inline_comment.*` の英語キーのみ追加 | 展開・折りたたみ・メニューの文言 | 他言語は後続タスク（方針） |
+| i18n | `inline_comment.*` に4キーを、5言語（en_US・ja_JP・zh_CN・fr_FR・ko_KR）すべてへ追加 | 展開・折りたたみ・メニューの文言 | 翻訳もこの spec の範囲。翻訳の抜けの基準値（`baseline.json`）は引き上げない |
 
 ## File Structure Plan
 
@@ -115,9 +115,10 @@ apps/app/src/features/inline-comment/client/
 
 ### Modified Files
 
-- `apps/app/src/client/components/PageComment.tsx` — 折りたたみ状態の hook を使い、各 `InlineCommentItem` に折りたたみ中か・操作を渡す。`resolve` を包み、未解決に戻したときに展開済みの記録を消す。一覧の右端にメニューを置く（インラインコメントが1件以上のとき）
-- `apps/app/public/static/locales/en_US/translation.json` — `inline_comment` に `expand`, `collapse`, `expand_all_resolved`, `list_menu` を追加
+- `apps/app/src/client/components/PageComment.tsx` — 折りたたみ状態の hook を使い、各 `InlineCommentItem` に折りたたみ中か・操作を渡す。`resolve` を包み、解決／未解決の切り替えが成功したら展開済みの記録を消す。一覧の先頭に、右寄せの1行としてメニューを置く（インラインコメントが1件以上のとき）。新しい hook は、途中で描画を終える分岐（`items.length === 0 || rendererOptions == null` の早期 return）より前で呼ぶ（Rules of Hooks）
+- `apps/app/public/static/locales/{en_US,ja_JP,zh_CN,fr_FR,ko_KR}/translation.json` — `inline_comment` に `expand`, `collapse`, `expand_all_resolved`, `list_menu` を追加（5言語すべて）
 - `apps/app/src/features/inline-comment/client/i18n-keys.spec.ts` — 追加キーを守りのテストに加える
+- `apps/app/src/client/components/PageComment.spec.tsx` — `InlineCommentItem` の差し替え（mock）が `collapsed` などの新しい props を受け取る形に広げる
 - `apps/app/playwright/20-basic-features/inline-comment.spec.ts` — 折りたたみ・展開のブラウザ確認を追加
 
 （Requirement 19・23 の実装済みファイルは `SelectionCapture.tsx`、`SelectionPopover/*`、`InlineCommentForm.tsx` など。書き戻し時に inline-comment の design.md へ反映する。）
@@ -136,7 +137,7 @@ stateDiagram-v2
   Unresolved --> Collapsed: 解決済みにした
 ```
 
-- 解決済みにした直後は、そのコメントは折りたたまれる（既定の状態が「解決済み＝折りたたみ」のため）。未解決に戻したときに展開済みの記録を消すので、再び解決済みにしても展開されたままにならない
+- 解決済みにした直後は、そのコメントは折りたたまれる（既定の状態が「解決済み＝折りたたみ」のため）。解決／未解決の切り替えが成功するたびに展開済みの記録を消すので、未解決に戻したあとで再び解決済みにしても、展開されたままにならない
 - 展開済みの集合は `PageComment` の state なので、ページを開き直すと空に戻る（Requirement 20.5）
 
 ## Requirements Traceability
@@ -206,8 +207,9 @@ onExpand: () => void;
 onCollapse: () => void;
 ```
 
-- `collapsed` が真のとき: 見出しには投稿者・日時・解決済みの札・展開ボタンだけを出す（履歴リンク・編集/削除・解決の切り替えは出さない）。引用文は残し、行数を絞って省略する。本文と返信（返信フォームを含む）は描かない
-- 解決済みで `collapsed` が偽のとき: 従来の描画に、札の左隣の折りたたみボタンを足す
+- `collapsed` が真のとき: 見出しには投稿者・日時・解決済みの札・展開ボタンだけを出す（履歴リンク・編集/削除・解決の切り替えは出さない）。引用文は残し、行数を絞って省略する。本文と返信（返信フォームを含む）は描かない。`CommentCard` の `children`（必須）には `null` を渡す。返信の一覧（`InlineCommentReplies`）は `CommentCard` の外で描かれているので、折りたたみ中は描かない分岐を別に置く
+- 折りたたみ中も引用文は押せる。押すと本文中の該当箇所へスクロールする（Requirement 16）。位置は解決済みも含めた全件で持っているので、失敗のトーストは出ない
+- 解決済みで `collapsed` が偽のとき: 従来の描画に、札の左隣の折りたたみボタンを足す。ただし削除の確認（`isDeleteConfirmOpen`）を開いている間は、折りたたみボタンを出さない（折りたたむと確認の状態だけが残り、展開し直したときに確認が再び現れるため）
 - 未解決のとき: 展開・折りたたみのボタンは出さない
 
 ### `InlineCommentListMenu`
@@ -226,6 +228,7 @@ type InlineCommentListMenuProps = {
 ```
 
 - 項目は `inline-comment-list-menu-items.ts` の `buildInlineCommentListMenuItems({ hasResolved, onExpandAllResolved })` が作る。項目を足すときはこの関数だけを変える
+- 置き場所は `PageComment` の先頭で、右寄せの1行にする。見出し「Comments」は `PageComment` の外（`Comments.tsx`）にあるので、見出しの下に右寄せの1行が増える見た目になる。これで「一覧のエリアの右端」（Requirement 22.1）を満たす。編集モードでは見出しごと `d-edit-none` で隠れる
 - 三点ボタンは reactstrap の `Dropdown` を使い、`MentionPickerButton` と同じく `color="link"` にする（テーマに追従させるため）。`useId()` の値を `target` に渡さない（`ui-pitfalls.md`）
 
 ## Data Models
@@ -244,8 +247,10 @@ TDD（先に落ちるテストを書く）で進める。テストの観点は e
 - **hook**: 展開済み集合が state に載り、`forget` で再び折りたたまれる（20.4 の続きの挙動）
 - **コンポーネント**: `InlineCommentItem` — 折りたたみ中に本文・返信・編集/削除/解決の操作が出ず、投稿者・日時・札・引用文・展開ボタンが出る（20.2）／展開ボタンで `onExpand`（21.1）／展開中の解決済みに折りたたみボタン（21.3）／展開中は未解決と同じ操作が出る（21.4）／未解決にはボタンが出ない（20.3）
 - **コンポーネント**: `InlineCommentListMenu` — 三点ボタンでメニューが開き、項目を選ぶと `onSelect` が呼ばれる（22.2, 22.3）／`disabled` の項目は選べない（22.5）／項目を足しても表示側の変更が不要（22.6）
+- **コンポーネント**: `InlineCommentItem` の追加確認 — 折りたたみ中も引用文が押せる／削除の確認を開いている間は折りたたみボタンが出ない
 - **コンポーネント**: `PageComment` — インラインコメントが1件以上のときだけメニューが出る（22.1）／リードオンリー利用者にも出る（22.7）／「全て展開」で解決済みの全件が展開される（22.4）／未解決に戻すと展開され、再び解決済みにすると折りたたまれる（20.4）
 - **守りのテスト**: `i18n-keys.spec.ts` に新キー、`no-literal-colors.spec.ts`（既存）が SCSS の色の直書きを止める
+- **翻訳の検査**: 5言語すべてに4キーがあること（`i18n-keys.spec.ts`）。`pnpm run lint:i18n` を、`baseline.json` を変えずに通す（基準値を上げて通してはならない）
 - **ブラウザ（E2E）**: 解決済みコメントのあるページを開くと折りたたまれ、個別展開・一括展開ができる。ページを開き直すと折りたたみに戻る（20.1, 20.5, 21, 22）
 
 手動確認（自動化しにくい）: 引用文が長いときの省略の見た目、狭い画面での三点メニューの位置、ダークテーマでの三点ボタンの見た目。
