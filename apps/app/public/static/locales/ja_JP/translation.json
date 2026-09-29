@@ -2,7 +2,11 @@
   "backlinks": {
     "failed_to_fetch": "被リンクの取得に失敗しました。",
     "no_backlinks": "被リンクはまだありません。",
-    "panel": "被リンク"
+    "panel": "被リンク",
+    "target_state": {
+      "broken": "リンク切れ",
+      "trashed": "ゴミ箱"
+    }
   },
   "meta": {
     "display_name": "日本語"

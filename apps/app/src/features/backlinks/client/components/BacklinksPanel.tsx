@@ -44,7 +44,7 @@ export const BacklinksPanel = (): JSX.Element => {
   return (
     <ul className="list-group" data-testid="backlinks-list">
       {backlinks.map((backlink) => (
-        <BacklinkListItem key={backlink.pageId} backlink={backlink} />
+        <BacklinkListItem key={backlink.pageId} {...backlink} />
       ))}
     </ul>
   );
