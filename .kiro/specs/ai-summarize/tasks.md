@@ -149,7 +149,7 @@
   - `loginRequiredStrictly` は export された名前ではなく、`import loginRequiredFactory from '~/server/middlewares/login-required';` のデフォルトエクスポートから `loginRequiredFactory(crowi)` でハンドラファクトリ内にローカル生成する（第2引数 `isGuestAllowed` の既定値 `false` が「strictly」の意味）
   - `excludeReadOnlyUser` は `~/server/middlewares/exclude-read-only-user` の named export をそのまま使う
   - `findByIdAndViewer` は**閲覧**権限しか判定しないため、これらのミドルウェアの代替にはならないことをコードレビュー観点として明記する
-  - **レート制限を `apps/app/src/features/rate-limiter/config/index.ts` の `defaultConfigWithRegExp` にエントリ追加で実装する**（`pageId` を含む動的パスのため完全一致マップ `defaultConfig` ではなく正規表現マップを使う。`/_api/v3/page/[^/]+/ai-summary`、`POST`、`MAX_REQUESTS_TIER_1`）。GROWIのレート制限は `app.use(rateLimiterFactory())` として全体に1回適用される方式であり、ルートにミドルウェアを差し込む実装にはしない。独自の数値をハードコードせず既存のティア定数を使う
+  - **レート制限を `apps/app/src/features/rate-limiter/config/index.ts` の `defaultConfigWithRegExp` にエントリ追加で実装する**（`pageId` を含む動的パスのため完全一致マップ `defaultConfig` ではなく正規表現マップを使う。`/_api/v3/page/[^/]+/ai-summary`、`POST`、`MAX_REQUESTS_TIER_1`、`usersPerIpProspection: 20`。倍率の根拠は research.md 7.10）。GROWIのレート制限は `app.use(rateLimiterFactory())` として全体に1回適用される方式であり、ルートにミドルウェアを差し込む実装にはしない。独自の数値をハードコードせず既存のティア定数を使う
   - **統合テスト**: 未ログイン（ゲスト）からの保存が拒否されること、読み取り専用ユーザーからの保存が403で拒否されること、いずれの場合も `Page.summary` が書き込まれていないことを確認できる
   - **統合テスト（レート制限）**: 設定した上限を超える回数の保存リクエストを短時間に送ると、上限超過分が **429** を返し、上限内のリクエストは正常に処理されることを確認できる
   - _Requirements: 7.1_

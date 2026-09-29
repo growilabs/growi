@@ -493,7 +493,7 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
   4. バリデータ（`summarize-message-validator.ts`）＋ `apiV3FormValidator`。
   5. 本体ハンドラ。
   - **理由**: これを欠くと未ログインのゲストがLLM呼び出しルートを直接叩けてしまい、トークンコストを外部から任意に発生させられる。加えて `getPageContentTool` は `RequestContext` の `user` が無い場合 `context_error` を返すため、`req.user` が確定していない経路では要約自体が成立しない。ハンドラは `req.user` が存在することを前提にできる（`post-message.ts` の `Req` 型と同じ扱い）。
-- **レート制限**: 本ルートはLLM呼び出しを伴い1リクエストあたりのコストが大きいため、永続化ルートと同様に `features/rate-limiter` の設定マップにエントリを追加する。パスは固定（`/_api/v3/mastra/summary`）であるため、正規表現マップではなく**完全一致マップ `defaultConfig`** に `{ method: 'POST', maxRequests: MAX_REQUESTS_TIER_1 }` を追加する（`DEFAULT_DURATION_SEC` 60秒に対して1ユーザーあたり5回）。超過時は `res.sendStatus(429)`。
+- **レート制限**: 本ルートはLLM呼び出しを伴い1リクエストあたりのコストが大きいため、永続化ルートと同様に `features/rate-limiter` の設定マップにエントリを追加する。パスは固定（`/_api/v3/mastra/summary`）であるため、正規表現マップではなく**完全一致マップ `defaultConfig`** に `{ method: 'POST', maxRequests: MAX_REQUESTS_TIER_1, usersPerIpProspection: 20 }` を追加する（`DEFAULT_DURATION_SEC` 60秒に対して1ユーザーあたり5回）。IP単位の上限（`maxRequests × usersPerIpProspection`）は、同一egress IPを共有する閲覧者がユーザー単位の上限より先に429を受けないように引き上げる（research.md 7.10）。超過時は `res.sendStatus(429)`。
 - リクエストボディは `{ pageId?: string; pagePath?: string; modelKey?: string }` とし、`pageId`／`pagePath` のいずれか一方を必須とする（`post-message-validator.ts` と対になる `summarize-message-validator.ts` で検証）。`pageId`/`pagePath` を運ぶことで「現在ページを開いていない」状態はリクエスト不成立として扱われる（1.3）。
 - ハンドラは、クライアントの自由入力を受け取らず、`pageId`／`pagePath` からサーバ側で固定形式の初期ユーザー発話を組み立てて `summarizeAgent.stream(...)` に渡す。
 - ハンドラは、`summarizeAgent.stream(...)` を呼ぶ前に `Page.findByIdAndViewer`（既存、無変更）を1回呼び出す。これが**権限なし時の唯一の応答経路**である: 結果が `null` の場合は**ストリームを開始せず**、不存在と権限なしを区別しない単一の応答（**403 または 404 のいずれか一方に統一、ステータスコードと応答本文の両者を区別しない**）でその場で短絡する。ストリームは一切開始されず、`summarizeAgent.stream()` が呼ばれない状態になる（4.2）。結果が得られた場合は、その時点の **`page.revision`（populate されていないため ObjectId そのもの。`page.revision._id` ではない）** を `sourceRevisionId` として保持する（7.2。詳細は「フロー上の意思決定」の (b) を参照）。
@@ -597,8 +597,9 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 - **レート制限**: 本エンドポイントにレート制限を適用する。GROWIのレート制限は**ルートにミドルウェアを差し込む方式ではなく**、`app.use(rateLimiterFactory())` として全体に1回適用され（`apps/app/src/server/routes/index.js`）、エンドポイント単位の上限は `apps/app/src/features/rate-limiter/config/index.ts` の設定マップで宣言される方式である。したがって本specは**設定マップへのエントリ追加**として実装する。
   - 本エンドポイントのパスは `pageId` を含む動的パスであるため、完全一致マップ `defaultConfig` ではなく**正規表現マップ `defaultConfigWithRegExp`** にエントリを追加する（`/_api/v3/page/[^/]+/ai-summary` 相当。キーは `/_api/v3/...` 接頭辞で書く）。
   - 上限値は既存のティア定数 **`MAX_REQUESTS_TIER_1`（5リクエスト）／`DEFAULT_DURATION_SEC`（60秒）= 1ユーザーあたり1分間に5回** とする。独自の数値をハードコードせず既存の定数を使うことで、ティアの見直しが行われた際に自動的に追随する。要約の保存は人間の操作に紐づく低頻度の操作であり、正常利用がこの上限に触れることはない。
+  - IP単位の倍率は **`usersPerIpProspection: 20`** とする。生成ルートと同じく、同一egress IPを共有する閲覧者がユーザー単位の上限より先に429を受けないようにするため（research.md 7.10）。
   - 制限超過時、レート制限ミドルウェアは `res.sendStatus(429)` を返す（既存実装の挙動）。
-- **注**: 生成側の `POST /_api/v3/mastra/summary` はLLM呼び出しを伴い1リクエストあたりのコストが本ルートより大きいため、`features/rate-limiter/config/index.ts` の`defaultConfig`（完全一致マップ）に **`/_api/v3/mastra/summary`, `POST`, `MAX_REQUESTS_TIER_1`** のエントリを追加する（パスが固定であるため）。超過時は `res.sendStatus(429)`。
+- **注**: 生成側の `POST /_api/v3/mastra/summary` はLLM呼び出しを伴い1リクエストあたりのコストが本ルートより大きいため、`features/rate-limiter/config/index.ts` の`defaultConfig`（完全一致マップ）に **`/_api/v3/mastra/summary`, `POST`, `MAX_REQUESTS_TIER_1`, `usersPerIpProspection: 20`** のエントリを追加する（パスが固定であるため）。超過時は `res.sendStatus(429)`。
 - 保存は、書き込み前に `Page.findByIdAndViewer`（既存、無変更）を経由して閲覧権限を確認する。要約専用の権限判定は導入しない。
 - 保存時、クライアントから受け取った `sourceRevisionId`（要約生成時に `SummarizeMessageRoute` が発行した値）と `capturedAt`（生成時刻）をそのまま記録する。保存ルート自身が現在のページ状態から新たにrevisionや日時を導出することはしない（7.2）。既に永続化済みの要約がある場合は上書きする（7.4）。
 - 削除用のエンドポイントは持たない。「削除」導線はクライアントの `localStorage` のみで完結する（PersistedSummaryView参照、9.3, 9.4）。
