@@ -762,7 +762,7 @@ the restored page's status. Independent of B3/B4.
   - _Boundary: BacklinkListItem_
   - _Depends: B1.10_
 
-- [ ] B5.6 Add the forward-health section to the panel
+- [x] B5.6 Add the forward-health section to the panel
   - Extend `BacklinksPanel` (from B1.11) with the secondary "outgoing links needing attention" section
     that flags trashed/broken outgoing links from the forward-health read
   - Reads `linkTargets` off the B5.9 hook payload. B5.9 widens the hook's return type from
