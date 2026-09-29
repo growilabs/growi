@@ -5,6 +5,7 @@ export interface IBacklink {
 
 export interface IBacklinkResponse {
   backlinks: IBacklink[];
+  linkTargets: ILinkTarget[];
 }
 
 export interface ILinkTarget {
