@@ -653,14 +653,16 @@ function resolveToPageIds(paths: string[]): Promise<Map<string, ObjectId>>;
 ##### Service Interface
 ```typescript
 interface IBacklinkResult { backlinks: IBacklink[]; }
-findBacklinks(toPageId: ObjectId, user: IUser | null): Promise<IBacklink[]>;
-findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTarget[]>;
+findBacklinks(toPageId: ObjectId, user: IUser | null, userGroups: ObjectIdLike[] | null): Promise<IBacklink[]>;
+findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null, userGroups: ObjectIdLike[] | null): Promise<ILinkTarget[]>;
 ```
 - `findBacklinks`: `findBacklinkSources(toPageId)` → ids → route them through the shared
   viewer/grant filter (`PageQueryBuilder.addViewerCondition` — the same grant logic
   `findByIdsAndViewer` runs internally, unioning the viewer's normal and external user groups) with
-  `addConditionToExcludeTrashed` to **exclude trashed source pages in-query**, then `.select('_id path').lean()`
-  and map to `IBacklink` (2.1–2.3). Empty array when none (1.7). The builder is used directly rather
+  `addConditionToExcludeTrashed` to **exclude trashed source pages in-query** — and, while
+  `security:disableUserPages` is on, `addConditionToListByNotMatchPathAndChildren('/user')`, since that
+  setting sits outside the grant model and a public user page would otherwise still be listed — then
+  `.select('_id path').lean()` and map to `IBacklink` (2.1–2.3). Empty array when none (1.7). The builder is used directly rather
   than the `findByIdsAndViewer` static so trashed exclusion happens in the DB (see risk note below)
   and so only the two fields the DTO needs are hydrated — this keeps the read to the two indexed
   queries described under Performance & Scalability.
@@ -678,7 +680,7 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTa
     the leak fix needs the target pages run through the grant filter — that is the *same* set of
     documents, so it is a single `Page` query, not a grant query plus a status round trip. Shape: the
     non-null `toPage` ids → `PageQueryBuilder(Page.find({ _id: { $in: targetIds }, status: deleted }))`
-    → `addViewerCondition(user)` → `.select('_id path')`. Every returned document is a `trashed`
+    → `addViewerCondition(user, userGroups, true)` → `.select('_id path')`. Every returned document is a `trashed`
     target; the status condition runs in the query so healthy targets — usually nearly all of them —
     are never sent back. `broken` rows (`toPage == null`) are settled with no lookup at all.
   - **It cannot reuse `buildVisibleSourcesQuery`.** That builder calls
@@ -693,9 +695,14 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTa
     viewer may not read it" and "the document is gone" are indistinguishable from the result set, and
     reporting the latter would leak the former's existence. A genuinely permanently-deleted target
     becomes `broken` because the delete-family reconcile (B5.2) nulls the inbound cache.
-  - **"Anyone with the link" targets count as readable** (`addViewerCondition(user, null, true)`),
+  - **"Anyone with the link" targets count as readable** (`addViewerCondition(user, userGroups, true)`),
     unlike `findBacklinks`' sources: the viewer holds the link — it is in the subject's body — and
     following it opens the page, so hiding its trashed state would only hide a fixable link.
+  - **No `security:disableUserPages` condition, unlike `findBacklinks`.** Every reported target is
+    trashed, so its path is `/trash/...`, and the setting (keyed on `isUserPage` of the current path)
+    hides `/trash/user/...` nowhere in the app: the page view and the trash listing both show it.
+    Filtering it here would make the report stricter than the page the link opens, and hide a link
+    the editor could fix.
   - **Known gap — a target that is an empty page is never reported.** `PageQueryBuilder` excludes
     empty pages by default, so such a row is neither `trashed` nor `broken`. Accepted as rare: path
     resolution already skips empty pages, and pages never become empty in place
@@ -885,8 +892,10 @@ interface IBacklinkResponse {
   (`apps/app/.claude/rules/page-write-action-403-404.md`) — and otherwise returns only
   permission-filtered results (never partial-leak on error). The check is load-bearing for
   forward-link health: a broken row's `path` is text from the subject page's body, which "leaks
-  nothing" only because the viewer can read that body. Readability is `Page.countByIdAndViewer`
-  (anyone-with-the-link included, empty pages included), the same answer a page view gets.
+  nothing" only because the viewer can read that body. Readability is `Page.isAccessiblePageByViewer`
+  (anyone-with-the-link included, empty pages included, user pages hidden under
+  `security:disableUserPages`), the same answer a page view gets. The viewer's group ids are resolved
+  once per request (`findUserGroupIdsForViewer`) and passed to both this check and `findBacklinks`.
 
 ### Error Categories and Responses
 - **User errors (4xx)**: invalid/missing `pageId` → 400 via validator; subject page missing or not readable → 404 (one status for both).
@@ -974,7 +983,9 @@ interface IBacklinkResponse {
   shared viewer/grant filter (`PageQueryBuilder.addViewerCondition`, the same filter
   `findByIdsAndViewer` applies) and **never return raw `PageLink` paths**. `toPath` strings are page
   paths and could reveal restricted pages' existence if returned unfiltered — so the DTO is built
-  solely from permission-filtered page documents (only their `_id`/`path` are read).
+  solely from permission-filtered page documents (only their `_id`/`path` are read). User pages are
+  also dropped while `security:disableUserPages` is on — that setting is not part of the grant
+  condition, so the grant filter alone does not hide them.
 - `pageId` is validated as a MongoId; no regex is built from user input for MongoDB.
 
 ## Performance & Scalability
