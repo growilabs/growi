@@ -1,5 +1,9 @@
 import { useEffect } from 'react';
-import { createPopper, type VirtualElement } from '@popperjs/core';
+import {
+  createPopper,
+  type Placement,
+  type VirtualElement,
+} from '@popperjs/core';
 
 /**
  * Manages the lifecycle of a `@popperjs/core` instance: creates it once both
@@ -19,6 +23,7 @@ import { createPopper, type VirtualElement } from '@popperjs/core';
 export function usePopperPosition(
   virtualElement: VirtualElement | null,
   popperElement: HTMLElement | null,
+  placement: Placement = 'bottom',
 ): void {
   useEffect(() => {
     if (virtualElement == null || popperElement == null) {
@@ -26,6 +31,7 @@ export function usePopperPosition(
     }
 
     const instance = createPopper(virtualElement, popperElement, {
+      placement,
       modifiers: [
         { name: 'flip' },
         { name: 'preventOverflow' },
@@ -36,5 +42,5 @@ export function usePopperPosition(
     return () => {
       instance.destroy();
     };
-  }, [virtualElement, popperElement]);
+  }, [virtualElement, popperElement, placement]);
 }

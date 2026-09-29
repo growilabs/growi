@@ -57,6 +57,34 @@ describe('usePopperPosition', () => {
     );
   });
 
+  it('places the popper below the reference by default', () => {
+    renderHook(() =>
+      usePopperPosition(buildVirtualElement(), document.createElement('div')),
+    );
+
+    expect(mockCreatePopper).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ placement: 'bottom' }),
+    );
+  });
+
+  it('places the popper where the caller asks', () => {
+    renderHook(() =>
+      usePopperPosition(
+        buildVirtualElement(),
+        document.createElement('div'),
+        'top',
+      ),
+    );
+
+    expect(mockCreatePopper).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ placement: 'top' }),
+    );
+  });
+
   it('does not create a Popper instance when the popper element is not yet available', () => {
     const virtualElement = buildVirtualElement();
 

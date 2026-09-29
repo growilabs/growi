@@ -26,6 +26,15 @@ vi.mock('~/client/components/NotAvailableForReadOnlyUser', () => ({
   },
 }));
 
+// Direction detection is covered by selection-cursor-edge.spec.ts; here it is
+// a controllable input, so this spec only proves the result reaches the popover.
+const cursorEdgeStore = vi.hoisted(() => ({
+  edge: 'end' as 'start' | 'end',
+}));
+vi.mock('./selection-cursor-edge', () => ({
+  cursorEdgeOf: () => cursorEdgeStore.edge,
+}));
+
 const textSelectionStore = vi.hoisted(() => ({
   captured: null as CapturedSelection | null,
 }));
@@ -134,15 +143,24 @@ const removeAllRanges = vi.fn();
 const buildLiveRange = (rect: DOMRect = LIVE_RECT) => {
   const cloned = mock<Range>({
     getBoundingClientRect: vi.fn(() => CLONED_RECT),
+    // No collapsed-caret rect, so the edge position falls back to the line rects.
+    getClientRects: vi.fn(() => [] as unknown as DOMRectList),
   });
   const live = mock<Range>({
     getBoundingClientRect: vi.fn(() => rect),
+    getClientRects: vi.fn(() => [rect] as unknown as DOMRectList),
     cloneRange: vi.fn(() => cloned),
   });
   return { live, cloned };
 };
 
-const setLiveSelection = (range: Range | null): void => {
+type DragDirection = 'forward' | 'backward';
+
+const setLiveSelection = (
+  range: Range | null,
+  direction: DragDirection = 'forward',
+): void => {
+  cursorEdgeStore.edge = direction === 'forward' ? 'end' : 'start';
   const selection =
     range == null
       ? mock<Selection>({ rangeCount: 0, removeAllRanges })
@@ -240,7 +258,10 @@ describe('SelectionCapture', () => {
 
     expect(screen.getByTestId('selection-action-button')).toBeInTheDocument();
     expect(screen.queryByTestId('inline-comment-form')).not.toBeInTheDocument();
-    expect(capturedReference(0).getBoundingClientRect()).toEqual(LIVE_RECT);
+    expect(capturedReference(0).getBoundingClientRect()).toMatchObject({
+      top: LIVE_RECT.top,
+      bottom: LIVE_RECT.bottom,
+    });
     // The idle-only marker is not rendered once selecting — that stage
     // already has an observable DOM footprint of its own.
     expect(
@@ -255,16 +276,72 @@ describe('SelectionCapture', () => {
     textSelectionStore.captured = ANCHOR;
 
     const { rerender } = renderCapture();
-    expect(capturedReference(0).getBoundingClientRect()).toEqual(LIVE_RECT);
+    expect(capturedReference(0).getBoundingClientRect()).toMatchObject({
+      top: LIVE_RECT.top,
+    });
 
     const second = buildLiveRange(EXTENDED_LIVE_RECT);
     setLiveSelection(second.live);
     textSelectionStore.captured = { ...ANCHOR, quote: 'hello world!' };
     rerenderCapture(rerender);
 
-    expect(capturedReference(1).getBoundingClientRect()).toEqual(
-      EXTENDED_LIVE_RECT,
-    );
+    expect(capturedReference(1).getBoundingClientRect()).toMatchObject({
+      top: EXTENDED_LIVE_RECT.top,
+    });
+  });
+
+  // Improvement: the action button sits above the selection, centred on the
+  // end the user's cursor is at.
+  describe('action button placement', () => {
+    const lastPopperOptions = (): { placement?: string } =>
+      mockCreatePopper.mock.calls.at(-1)?.[2] as { placement?: string };
+
+    it('places the button above the selection', () => {
+      const { live } = buildLiveRange();
+      setLiveSelection(live);
+      textSelectionStore.captured = ANCHOR;
+
+      renderCapture();
+
+      expect(lastPopperOptions().placement).toBe('top');
+    });
+
+    it('anchors the button to the right edge after a left-to-right drag', () => {
+      const { live } = buildLiveRange();
+      setLiveSelection(live, 'forward');
+      textSelectionStore.captured = ANCHOR;
+
+      renderCapture();
+
+      expect(capturedReference(0).getBoundingClientRect()).toMatchObject({
+        left: LIVE_RECT.right,
+        width: 0,
+      });
+    });
+
+    it('anchors the button to the left edge after a right-to-left drag', () => {
+      const { live } = buildLiveRange();
+      setLiveSelection(live, 'backward');
+      textSelectionStore.captured = ANCHOR;
+
+      renderCapture();
+
+      expect(capturedReference(0).getBoundingClientRect()).toMatchObject({
+        left: LIVE_RECT.left,
+        width: 0,
+      });
+    });
+
+    it('keeps the form below the committed range', () => {
+      const { live } = buildLiveRange();
+      setLiveSelection(live, 'backward');
+      textSelectionStore.captured = ANCHOR;
+
+      renderCapture();
+      fireEvent.click(screen.getByTestId('selection-action-button'));
+
+      expect(lastPopperOptions().placement).toBe('bottom');
+    });
   });
 
   // Requirement 1.4: releasing the selection before expanding removes the button.

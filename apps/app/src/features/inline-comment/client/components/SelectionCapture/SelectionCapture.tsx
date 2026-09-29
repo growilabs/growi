@@ -13,7 +13,9 @@ import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '~/client/componen
 import { InlineCommentForm } from '../InlineCommentForm/InlineCommentForm';
 import { PendingSelectionHighlight } from '../PendingSelectionHighlight/PendingSelectionHighlight';
 import { SelectionPopover } from '../SelectionPopover/SelectionPopover';
+import type { SelectionEdge } from '../SelectionPopover/selection-virtual-element';
 import { SelectionActionButton } from './SelectionActionButton';
+import { cursorEdgeOf } from './selection-cursor-edge';
 import type { CapturedSelection } from './use-text-selection';
 import { useTextSelection } from './use-text-selection';
 
@@ -28,7 +30,12 @@ type SelectionCaptureProps = {
 type SelectionState =
   | { stage: 'idle' }
   /** A non-empty selection exists; the create action is offered, nothing committed yet. */
-  | { stage: 'selecting'; anchor: CapturedSelection; liveRange: Range }
+  | {
+      stage: 'selecting';
+      anchor: CapturedSelection;
+      liveRange: Range;
+      cursorEdge: SelectionEdge;
+    }
   /** The create action was chosen; the range is frozen for as long as the form is open. */
   | {
       stage: 'composing';
@@ -38,18 +45,23 @@ type SelectionState =
 
 const IDLE_STATE: SelectionState = { stage: 'idle' };
 
+type LiveSelection = { range: Range; cursorEdge: SelectionEdge };
+
 /**
- * The live document selection's first range. `useTextSelection` intentionally
- * exposes only the captured anchor data (quote/prefix/suffix/offset), not the
- * `Range` itself, so the range is read here instead.
+ * The live document selection's first range and the end the cursor is at.
+ * `useTextSelection` intentionally exposes only the captured anchor data
+ * (quote/prefix/suffix/offset), not the `Range` itself, so both are read here.
  */
-const readLiveRange = (): Range | null => {
+const readLiveSelection = (): LiveSelection | null => {
   const selection =
     typeof window === 'undefined' ? null : window.getSelection();
   if (selection == null || selection.rangeCount === 0) {
     return null;
   }
-  return selection.getRangeAt(0);
+  return {
+    range: selection.getRangeAt(0),
+    cursorEdge: cursorEdgeOf(selection),
+  };
 };
 
 export const SelectionCapture = (
@@ -69,13 +81,18 @@ export const SelectionCapture = (
         return current;
       }
 
-      const liveRange = captured == null ? null : readLiveRange();
-      if (captured == null || liveRange == null) {
+      const live = captured == null ? null : readLiveSelection();
+      if (captured == null || live == null) {
         return current.stage === 'idle' ? current : IDLE_STATE;
       }
 
       // A fresh `selecting` state on every capture, so the popover re-positions as the selection grows.
-      return { stage: 'selecting', anchor: captured, liveRange };
+      return {
+        stage: 'selecting',
+        anchor: captured,
+        liveRange: live.range,
+        cursorEdge: live.cursorEdge,
+      };
     });
   }, [captured]);
 
@@ -116,7 +133,7 @@ export const SelectionCapture = (
           range={state.liveRange}
           containerRef={containerRef}
         />
-        <SelectionPopover range={state.liveRange}>
+        <SelectionPopover range={state.liveRange} cursorEdge={state.cursorEdge}>
           {/* mousedown's default action collapses the selection before click fires,
               which would unmount this button mid-gesture. Not applied to the form
               below, where the user must be able to put the caret into the textarea. */}
