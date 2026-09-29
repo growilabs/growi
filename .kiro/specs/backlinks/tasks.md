@@ -752,7 +752,7 @@ the restored page's status. Independent of B3/B4.
   - _Boundary: getBacklinksHandlerFactory (routes/backlinks.ts), useSWRxBacklinks, interfaces/backlink.ts_
   - _Depends: B5.4_
 
-- [ ] B5.5 Add the target-state badge to the list-item
+- [x] B5.5 Add the target-state badge to the list-item
   - Extend `BacklinkListItem` (from B1.10) with a trashed/broken target-state badge
   - A **broken** row has `pageId: null` (B5.4) — there is no page to navigate to, so render its `path`
     as plain text rather than a link. Only trashed and normal rows stay clickable
