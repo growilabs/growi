@@ -6,6 +6,7 @@ import { useCurrentPageId } from '~/states/page';
 
 import { useSWRxBacklinks } from '../stores/backlinks';
 import { BacklinkListItem } from './BacklinkListItem';
+import { LinkTargetsSection } from './LinkTargetsSection';
 
 export const BacklinksPanel = (): JSX.Element => {
   const { t } = useTranslation();
@@ -13,6 +14,7 @@ export const BacklinksPanel = (): JSX.Element => {
 
   const { data, error, isLoading } = useSWRxBacklinks(pageId ?? null);
   const backlinks = data?.backlinks;
+  const linkTargets = data?.linkTargets;
 
   if (error != null) {
     return (
@@ -33,19 +35,26 @@ export const BacklinksPanel = (): JSX.Element => {
     );
   }
 
-  if (backlinks == null || backlinks.length === 0) {
-    return (
-      <div className="text-muted" data-testid="backlinks-empty">
-        {t('backlinks.no_backlinks')}
-      </div>
-    );
-  }
+  const hasBacklinks = backlinks != null && backlinks.length > 0;
+  const hasLinkTargets = linkTargets != null && linkTargets.length > 0;
 
+  // The empty state is not an early return: a page nothing links to can still
+  // link out to a trashed or broken target
   return (
-    <ul className="list-group" data-testid="backlinks-list">
-      {backlinks.map((backlink) => (
-        <BacklinkListItem key={backlink.pageId} {...backlink} />
-      ))}
-    </ul>
+    <>
+      {hasBacklinks ? (
+        <ul className="list-group" data-testid="backlinks-list">
+          {backlinks.map((backlink) => (
+            <BacklinkListItem key={backlink.pageId} {...backlink} />
+          ))}
+        </ul>
+      ) : (
+        <div className="text-muted" data-testid="backlinks-empty">
+          {t('backlinks.no_backlinks')}
+        </div>
+      )}
+
+      {hasLinkTargets && <LinkTargetsSection linkTargets={linkTargets} />}
+    </>
   );
 };
