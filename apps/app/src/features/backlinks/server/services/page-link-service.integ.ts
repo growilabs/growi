@@ -1,4 +1,5 @@
 import { GroupType, type IUserHasId } from '@growi/core';
+import { ConfigSource } from '@growi/core/dist/interfaces';
 import mongoose, { type HydratedDocument, type Types } from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
@@ -8,6 +9,7 @@ import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
+import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
 import { ensurePageLinkIndexes } from '../models/page-link-indexes';
@@ -233,6 +235,23 @@ describe('PageLinkService.findBacklinks (integration)', () => {
     ]);
   });
 
+  it('decides a group-restricted source by the group ids it is handed', async () => {
+    const unrelatedGroupId = new mongoose.Types.ObjectId();
+    const target = await createPage('/target', { grant: Page.GRANT_PUBLIC });
+    const groupSource = await createPage('/handed-group-restricted', {
+      grant: Page.GRANT_USER_GROUP,
+      grantedGroups: [{ item: unrelatedGroupId, type: GroupType.userGroup }],
+    });
+    await linkTo(groupSource, target);
+
+    // No one belongs to unrelatedGroupId in the database, so a listed source can only
+    // come from the ids the caller passed — not from a lookup of its own.
+    expect(
+      await service().findBacklinks(target._id, viewer, [unrelatedGroupId]),
+    ).toEqual([{ pageId: groupSource._id.toString(), path: groupSource.path }]);
+    expect(await service().findBacklinks(target._id, viewer, [])).toEqual([]);
+  });
+
   it('omits a trashed source page', async () => {
     const target = await createPage('/target', { grant: Page.GRANT_PUBLIC });
     const live = await createPage('/live', { grant: Page.GRANT_PUBLIC });
@@ -307,5 +326,63 @@ describe('PageLinkService.findBacklinks (integration)', () => {
     const backlinks = await readBacklinks(target._id, viewer);
 
     expect(backlinks).toEqual([]);
+  });
+
+  describe('with security:disableUserPages', () => {
+    let disableUserPagesInDbBefore: boolean | undefined;
+
+    beforeAll(() => {
+      disableUserPagesInDbBefore = configManager.getConfig(
+        'security:disableUserPages',
+        ConfigSource.db,
+      );
+    });
+
+    afterEach(async () => {
+      await configManager.updateConfigs(
+        { 'security:disableUserPages': disableUserPagesInDbBefore },
+        { removeIfUndefined: true },
+      );
+    });
+
+    it('omits a user-page source while the setting is on, as the rest of the app hides it', async () => {
+      const target = await createPage('/target', { grant: Page.GRANT_PUBLIC });
+      const regularSource = await createPage('/regular-source', {
+        grant: Page.GRANT_PUBLIC,
+      });
+      // Public on purpose: the setting, not the grant, is what must hide it.
+      const userPageSource = await Page.create({
+        path: `/user/${viewer.username}/backlinks-source`,
+        grant: Page.GRANT_PUBLIC,
+        isEmpty: false,
+        parent: rootPage._id,
+      });
+      await linkTo(regularSource, target);
+      await linkTo(userPageSource, target);
+
+      try {
+        await configManager.updateConfig('security:disableUserPages', true);
+        expect(await readBacklinks(target._id, viewer)).toEqual([
+          { pageId: regularSource._id.toString(), path: regularSource.path },
+        ]);
+
+        // Positive control: the setting is what hides it, not a missing row.
+        await configManager.updateConfig('security:disableUserPages', false);
+        expect(await readBacklinks(target._id, viewer)).toEqual(
+          expect.arrayContaining([
+            {
+              pageId: userPageSource._id.toString(),
+              path: userPageSource.path,
+            },
+          ]),
+        );
+      } finally {
+        // Outside PREFIX, so the suite's afterEach does not clean it up.
+        await prisma.pagelinks.deleteMany({
+          where: { fromPageId: userPageSource._id.toString() },
+        });
+        await Page.deleteOne({ _id: userPageSource._id });
+      }
+    });
   });
 });

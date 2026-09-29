@@ -1,4 +1,4 @@
-import type { IUserHasId } from '@growi/core';
+import { GroupType, type IUserHasId } from '@growi/core';
 import mongoose, { type HydratedDocument, type Types } from 'mongoose';
 
 import { getInstance } from '^/test/setup/crowi';
@@ -9,6 +9,7 @@ import { prisma } from '~/utils/prisma';
 
 import { ensurePageLinkIndexes } from '../models/page-link-indexes';
 import { findForwardLinkHealth } from './find-forward-link-health';
+import { findUserGroupIdsForViewer } from './find-user-group-ids-for-viewer';
 
 // pagelinks is prisma-only, and the harness skips migrations on the in-memory MongoDB.
 beforeAll(async () => {
@@ -40,11 +41,17 @@ describe('findForwardLinkHealth (integration)', () => {
   type CreatePageOptions = {
     trashed?: boolean;
     grantedTo?: IUserHasId;
+    grantedGroup?: Types.ObjectId;
     linkShared?: boolean;
   };
 
-  const grantOf = ({ grantedTo, linkShared }: CreatePageOptions): number => {
+  const grantOf = ({
+    grantedTo,
+    grantedGroup,
+    linkShared,
+  }: CreatePageOptions): number => {
     if (grantedTo != null) return Page.GRANT_OWNER;
+    if (grantedGroup != null) return Page.GRANT_USER_GROUP;
     if (linkShared) return Page.GRANT_RESTRICTED;
     return Page.GRANT_PUBLIC;
   };
@@ -54,12 +61,16 @@ describe('findForwardLinkHealth (integration)', () => {
     path: string,
     options: CreatePageOptions = {},
   ): Promise<HydratedDocument<PageDocument>> => {
-    const { trashed = false, grantedTo } = options;
+    const { trashed = false, grantedTo, grantedGroup } = options;
     return Page.create({
       path: `${trashed ? TRASH_PREFIX : PREFIX}${path}`,
       grant: grantOf(options),
       grantedUsers:
         grantedTo != null ? [new mongoose.Types.ObjectId(grantedTo._id)] : null,
+      grantedGroups:
+        grantedGroup != null
+          ? [{ type: GroupType.userGroup, item: grantedGroup }]
+          : [],
       status: trashed ? Page.STATUS_DELETED : Page.STATUS_PUBLISHED,
       isEmpty: false,
       parent: rootPage._id,
@@ -84,8 +95,16 @@ describe('findForwardLinkHealth (integration)', () => {
     target: HydratedDocument<PageDocument>,
   ): Promise<unknown> => addRow(source, target.path, target);
 
-  const health = (source: { _id: Types.ObjectId }, user: IUserHasId | null) =>
-    findForwardLinkHealth(source._id, user);
+  // As the route does: resolve the viewer's groups once, then read.
+  const health = async (
+    source: { _id: Types.ObjectId },
+    user: IUserHasId | null,
+  ) =>
+    findForwardLinkHealth(
+      source._id,
+      user,
+      await findUserGroupIdsForViewer(user),
+    );
 
   // --- lifecycle ---------------------------------------------------------
 
@@ -207,6 +226,27 @@ describe('findForwardLinkHealth (integration)', () => {
         targetState: 'trashed',
       },
     ]);
+  });
+
+  it('decides a group-granted trashed target by the group ids it is handed', async () => {
+    const groupId = new mongoose.Types.ObjectId();
+    const source = await createPage('/source');
+    const groupOnly = await createPage('/group-only', {
+      trashed: true,
+      grantedGroup: groupId,
+    });
+    await linkTo(source, groupOnly);
+
+    // `viewer` belongs to no group in the database, so a report can only come from the
+    // ids the caller passed — not from a lookup of its own.
+    expect(await findForwardLinkHealth(source._id, viewer, [groupId])).toEqual([
+      {
+        pageId: groupOnly._id.toString(),
+        path: groupOnly.path,
+        targetState: 'trashed',
+      },
+    ]);
+    expect(await findForwardLinkHealth(source._id, viewer, [])).toEqual([]);
   });
 
   it('reports a trashed "anyone with the link" target, since the viewer holds the link', async () => {
