@@ -26,11 +26,17 @@ const sleep = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
+// Refreshes the TTL anchor on every read, so a batch retried over and over keeps its
+// decisions alive as long as each retry comes within WINDOW_TTL_SECONDS of the last.
 const findSettledDecision = async (
   activityId: string,
 ): Promise<EsSyncDecisionValue | undefined> => {
-  const doc = await EsSyncDecision.findById(activityId).lean();
-  return doc != null && doc.decision !== 'pending' ? doc.decision : undefined;
+  const doc = await EsSyncDecision.findOneAndUpdate(
+    { _id: activityId, decision: { $ne: 'pending' } },
+    { $set: { claimedAt: new Date() } },
+    { new: true },
+  );
+  return doc?.decision;
 };
 
 // Poll for the claiming process's result. Returns undefined if it never resolves
@@ -59,16 +65,18 @@ class ClaimLostError extends Error {}
 // than threshold, not >=: the event that pushes the count to exactly threshold + 1
 // must still go through the full path below, since that is the one 'dropped' event
 // that logs the "threshold reached" warning (see commitAdmissionDecision).
+// Refreshes the counter's TTL anchor even though it skips the $inc, or the counter
+// would expire mid-window under a sustained attack and restart admitting from 0.
 const isWindowConfidentlyOverThreshold = async (
   endpoint: string,
   windowStart: Date,
   threshold: number,
 ): Promise<boolean> => {
-  const current = await AnonymousSyncCounter.findOne({
-    endpoint,
-    windowStart,
-  }).lean();
-  return current != null && current.count > threshold;
+  const { matchedCount } = await AnonymousSyncCounter.updateOne(
+    { endpoint, windowStart, count: { $gt: threshold } },
+    { $set: { updatedAt: new Date() } },
+  );
+  return matchedCount > 0;
 };
 
 // Groups one call's identifying parameters so acquireClaim/commitAdmissionDecision/

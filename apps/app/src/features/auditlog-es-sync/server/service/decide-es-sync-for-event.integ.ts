@@ -114,6 +114,74 @@ describe('decideEsSyncForEvent', () => {
     expect(redecided).toBe('admitted');
   });
 
+  // The TTL index expires documents by these anchors, so a stale anchor after the
+  // call means the document would be deleted while it is still needed.
+  const staleAnchor = new Date(Date.now() - 60_000);
+
+  it('keeps the counter alive while over-threshold events keep arriving', async () => {
+    const threshold = 1;
+    for (let i = 0; i < 2; i++) {
+      // biome-ignore lint/performance/noAwaitInLoops: each call must see the prior one's committed count.
+      await decideEsSyncForEvent(
+        newActivityId(),
+        endpoint,
+        windowStart,
+        threshold,
+      );
+    }
+    await AnonymousSyncCounter.updateOne(
+      { endpoint, windowStart },
+      { $set: { updatedAt: staleAnchor } },
+    );
+
+    await decideEsSyncForEvent(
+      newActivityId(),
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    const counter = await AnonymousSyncCounter.findOne({
+      endpoint,
+      windowStart,
+    }).lean();
+    expect(counter?.updatedAt.getTime()).toBeGreaterThan(staleAnchor.getTime());
+  });
+
+  it('keeps a settled decision alive while its event keeps being re-processed', async () => {
+    const threshold = 1;
+    const admittedActivityId = newActivityId();
+    await decideEsSyncForEvent(
+      admittedActivityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+    await decideEsSyncForEvent(
+      newActivityId(),
+      endpoint,
+      windowStart,
+      threshold,
+    );
+    await EsSyncDecision.updateOne(
+      { _id: admittedActivityId },
+      { $set: { claimedAt: staleAnchor } },
+    );
+
+    const redecided = await decideEsSyncForEvent(
+      admittedActivityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    expect(redecided).toBe('admitted');
+    const decision = await EsSyncDecision.findById(admittedActivityId).lean();
+    expect(decision?.claimedAt.getTime()).toBeGreaterThan(
+      staleAnchor.getTime(),
+    );
+  });
+
   it('does not double-increment when two processes race on the exact same event concurrently', async () => {
     const activityId = newActivityId();
     const threshold = 3;
