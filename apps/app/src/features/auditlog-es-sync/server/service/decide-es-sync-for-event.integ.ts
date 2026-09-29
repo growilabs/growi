@@ -86,6 +86,34 @@ describe('decideEsSyncForEvent', () => {
     expect(await EsSyncDecision.exists({ _id: skippedActivityId })).toBeNull();
   });
 
+  it('keeps an already-admitted event admitted when it is re-processed after its window filled up', async () => {
+    const threshold = 1;
+    const admittedActivityId = newActivityId();
+    await decideEsSyncForEvent(
+      admittedActivityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+    await decideEsSyncForEvent(
+      newActivityId(),
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    // e.g. flushBuffer retrying a batch whose ES bulk write failed, or a reindex
+    // running shortly after live traffic filled the window.
+    const redecided = await decideEsSyncForEvent(
+      admittedActivityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    expect(redecided).toBe('admitted');
+  });
+
   it('does not double-increment when two processes race on the exact same event concurrently', async () => {
     const activityId = newActivityId();
     const threshold = 3;
@@ -214,12 +242,12 @@ describe('decideEsSyncForEvent', () => {
     ).toBe(1);
   });
 
-  it('fails safe to dropped when a fresh pending claim never resolves', async () => {
+  it('takes over a fresh pending claim that never resolves once it goes stale', async () => {
     const activityId = newActivityId();
-    // A claim that is NOT stale yet (just made) and is never finalized — e.g. its
-    // owning process is still mid-flight, or died after claiming but within the
-    // grace period. A waiter must not hang forever or throw; it fails toward
-    // "not synced to ES" (MongoDB already has the full record either way).
+    // A claim that is NOT stale yet (just made) and is never finalized — its owning
+    // process died after claiming, within the grace period. Every other process
+    // reaching the event must not just give up on it: they all advance the shared
+    // resume token past it, so nobody would ever sync it.
     await EsSyncDecision.create({
       _id: activityId,
       endpoint,
@@ -236,7 +264,10 @@ describe('decideEsSyncForEvent', () => {
       /* threshold */ 3,
     );
 
-    expect(decision).toBe('dropped');
+    expect(decision).toBe('admitted');
+    expect(
+      (await AnonymousSyncCounter.findOne({ endpoint, windowStart }))?.count,
+    ).toBe(1);
   }, 10_000);
 
   it('does not double-increment the counter when the claim is stolen while this call is about to finalize', async () => {

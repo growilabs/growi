@@ -14,6 +14,14 @@ describe('matchThresholdKey', () => {
     expect(matchThresholdKey(patterns, '/login')).toBe('/login');
   });
 
+  it('matches regardless of case, as Express routing does', () => {
+    expect(matchThresholdKey(patterns, '/LOGIN')).toBe('/login');
+  });
+
+  it('matches with a trailing slash, as Express routing does', () => {
+    expect(matchThresholdKey(patterns, '/login/')).toBe('/login');
+  });
+
   it('does not match a key as a prefix', () => {
     expect(matchThresholdKey(patterns, '/login/callback')).toBeUndefined();
   });

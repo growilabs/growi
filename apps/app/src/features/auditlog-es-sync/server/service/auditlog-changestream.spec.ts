@@ -535,15 +535,9 @@ describe('AuditlogChangeStreamService', () => {
 
   describe('flushBuffer() / admission gating wiring', () => {
     it('syncs only the upserts filterAdmittedUpserts admits', async () => {
-      const admittedDoc: Partial<ActivityDocument> = {
-        _id: new Types.ObjectId(),
-      };
-      const droppedDoc: Partial<ActivityDocument> = {
-        _id: new Types.ObjectId(),
-      };
-      vi.mocked(filterAdmittedUpserts).mockResolvedValue([
-        admittedDoc as ActivityDocument,
-      ]);
+      const admittedDoc = mock<ActivityDocument>({ _id: new Types.ObjectId() });
+      const droppedDoc = mock<ActivityDocument>({ _id: new Types.ObjectId() });
+      vi.mocked(filterAdmittedUpserts).mockResolvedValue([admittedDoc]);
 
       const fakeStream = new FakeChangeStream();
       vi.spyOn(Activity, 'watch').mockReturnValue(

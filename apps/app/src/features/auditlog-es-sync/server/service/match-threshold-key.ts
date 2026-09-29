@@ -11,10 +11,14 @@ export type ThresholdKeyPattern = readonly [string, RegExp];
 // side's matching behavior on a live, security-relevant request path (auth rate
 // limiting) without a dedicated review of that behavior change — keep them separate
 // and update both if the underlying matching need ever changes.
+//
+// Case-insensitive with an optional trailing slash, mirroring Express's default
+// (non-strict, case-insensitive) routing: `/_api/v3/LOGIN` and `/_api/v3/login/`
+// still reach the login route, so they must not slip past the threshold.
 export const compileThresholdKeyPatterns = (
   keys: readonly string[],
 ): readonly ThresholdKeyPattern[] =>
-  keys.map((key) => [key, new RegExp(`^${key}$`)] as const);
+  keys.map((key) => [key, new RegExp(`^${key}/?$`, 'i')] as const);
 
 /**
  * Find which configured threshold key (if any) matches the given endpoint.

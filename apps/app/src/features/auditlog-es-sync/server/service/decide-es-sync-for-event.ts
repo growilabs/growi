@@ -26,21 +26,27 @@ const sleep = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
-// Poll for the claiming process's result. Falls back to 'dropped' if it never
-// resolves within the same grace period a stale claim would be stolen after —
-// MongoDB already has the full event, so failing toward "not synced to ES" costs
-// nothing but a slower search, and never blocks the batch indefinitely.
+const findSettledDecision = async (
+  activityId: string,
+): Promise<EsSyncDecisionValue | undefined> => {
+  const doc = await EsSyncDecision.findById(activityId).lean();
+  return doc != null && doc.decision !== 'pending' ? doc.decision : undefined;
+};
+
+// Poll for the claiming process's result. Returns undefined if it never resolves
+// within the same grace period a stale claim would be stolen after, so the caller
+// can take the now-stale claim over instead of blocking the batch indefinitely.
 const waitForDecision = async (
   activityId: string,
-): Promise<EsSyncDecisionValue> => {
+): Promise<EsSyncDecisionValue | undefined> => {
   const deadline = Date.now() + STALE_CLAIM_MS;
   while (Date.now() < deadline) {
     // biome-ignore lint/performance/noAwaitInLoops: intentional poll with a bounded deadline.
-    const doc = await EsSyncDecision.findById(activityId).lean();
-    if (doc != null && doc.decision !== 'pending') return doc.decision;
+    const decision = await findSettledDecision(activityId);
+    if (decision != null) return decision;
     await sleep(WAIT_POLL_INTERVAL_MS);
   }
-  return 'dropped';
+  return undefined;
 };
 
 // Thrown inside the transaction below to abort it cleanly (no partial writes) when the
@@ -210,6 +216,33 @@ const runClaimedTransaction = async (
   return outcome as AdmissionOutcome;
 };
 
+// Claim the event and decide it. Returns undefined when another process holds (or
+// just took) the claim, so the caller should wait for that process's result instead.
+const tryDecideAsClaimant = async (
+  target: Omit<AdmissionClaim, 'claimToken'>,
+): Promise<EsSyncDecisionValue | undefined> => {
+  // Fencing token for this attempt's claim. Every write made while holding the claim
+  // is conditioned on this token, so an attempt that stalls long enough for another
+  // process to steal the claim (see STALE_CLAIM_MS) detects the loss instead of
+  // acting as if it still owned it.
+  const claim: AdmissionClaim = { ...target, claimToken: randomUUID() };
+
+  if (!(await acquireClaim(claim, new Date()))) return undefined;
+
+  const outcome = await runClaimedTransaction(claim);
+  if (outcome === 'claim-lost') return undefined;
+
+  const { endpoint, windowStart, threshold } = target;
+  if (outcome.thresholdJustReached) {
+    logger.warn(
+      { endpoint, windowStart, threshold },
+      'Anonymous log ES sync threshold reached; further anonymous logs for this endpoint in this window are dropped from ES (still recorded in MongoDB).',
+    );
+  }
+
+  return outcome.decision;
+};
+
 /**
  * Decide whether one anonymous-log event should sync to Elasticsearch, gated by a
  * per-(endpoint, windowStart) admission count. Safe to call redundantly from every
@@ -227,38 +260,26 @@ export const decideEsSyncForEvent = async (
   if (
     await isWindowConfidentlyOverThreshold(endpoint, windowStart, threshold)
   ) {
-    return 'dropped';
+    // An event re-processed after its window filled up (a retried batch, a reindex
+    // shortly after live traffic) keeps the decision it already got.
+    return (await findSettledDecision(activityId)) ?? 'dropped';
   }
 
-  const now = new Date();
-  // Fencing token for this call's claim. Every write this call makes while holding
-  // the claim is conditioned on this token, so a call that stalls long enough for
-  // another process to steal the claim (see STALE_CLAIM_MS) detects the loss instead
-  // of acting as if it still owned it.
-  const claim: AdmissionClaim = {
-    activityId,
-    endpoint,
-    windowStart,
-    threshold,
-    claimToken: randomUUID(),
-  };
+  const target = { activityId, endpoint, windowStart, threshold };
 
-  const holdsClaim = await acquireClaim(claim, now);
-  if (!holdsClaim) {
-    return waitForDecision(activityId);
-  }
+  const decided = await tryDecideAsClaimant(target);
+  if (decided != null) return decided;
 
-  const outcome = await runClaimedTransaction(claim);
-  if (outcome === 'claim-lost') {
-    return waitForDecision(activityId);
-  }
+  const waited = await waitForDecision(activityId);
+  if (waited != null) return waited;
 
-  if (outcome.thresholdJustReached) {
-    logger.warn(
-      { endpoint, windowStart, threshold },
-      'Anonymous log ES sync threshold reached; further anonymous logs for this endpoint in this window are dropped from ES (still recorded in MongoDB).',
-    );
-  }
+  // Still unresolved after STALE_CLAIM_MS, so the claim is stale by now: take it
+  // over once rather than dropping an event whose claimant died. Dropping it here
+  // would let the shared resume token move past it with no unsynced flag set.
+  const retried = await tryDecideAsClaimant(target);
+  if (retried != null) return retried;
 
-  return outcome.decision;
+  // Someone else took the claim over first. MongoDB already has the full event, so
+  // failing toward "not synced to ES" never blocks the batch indefinitely.
+  return (await waitForDecision(activityId)) ?? 'dropped';
 };

@@ -1,4 +1,10 @@
 import { configManager } from '~/server/service/config-manager';
+import { CONFIG_DEFINITIONS } from '~/server/service/config-manager/config-definition';
+import loggerFactory from '~/utils/logger';
+
+const logger = loggerFactory(
+  'growi:auditlog-es-sync:anonymous-sync-thresholds',
+);
 
 // A narrow union (not the full ConfigKey) so configManager.getConfig(...) resolves to
 // `number` below without a cast — widening this to ConfigKey would make the lookup
@@ -34,5 +40,29 @@ export const anonymousSyncThresholdConfigKeys: AnonymousSyncThresholdConfigKeyMa
     '/_api/v3/installer': 'app:auditLogEsSyncAnonymousThresholdInstaller',
   };
 
-export const getAnonymousSyncThreshold = (thresholdKey: string): number =>
-  configManager.getConfig(anonymousSyncThresholdConfigKeys[thresholdKey]);
+const isValidThreshold = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0;
+
+// Config keys already reported as invalid. This is called once per anonymous event,
+// so logging on every call would flood the log during exactly the attack traffic the
+// threshold exists for.
+const reportedInvalidConfigKeys = new Set<AnonymousSyncThresholdConfigKey>();
+
+// A non-numeric value (e.g. `abc` via parseInt) becomes NaN, which silently drops
+// every anonymous event at the endpoint: every `count <= NaN` comparison is false.
+// Fall back to the default instead.
+export const getAnonymousSyncThreshold = (thresholdKey: string): number => {
+  const configKey = anonymousSyncThresholdConfigKeys[thresholdKey];
+  const value: unknown = configManager.getConfig(configKey);
+  if (isValidThreshold(value)) return value;
+
+  const { defaultValue } = CONFIG_DEFINITIONS[configKey];
+  if (!reportedInvalidConfigKeys.has(configKey)) {
+    reportedInvalidConfigKeys.add(configKey);
+    logger.error(
+      { configKey, value, defaultValue },
+      'Invalid anonymous log ES sync threshold; falling back to the default.',
+    );
+  }
+  return defaultValue;
+};

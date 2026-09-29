@@ -5,8 +5,19 @@ import {
   getAnonymousSyncThreshold,
 } from './anonymous-sync-thresholds';
 
+const { mockError } = vi.hoisted(() => ({ mockError: vi.fn() }));
+
 vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig: vi.fn() },
+}));
+
+vi.mock('~/utils/logger', () => ({
+  default: vi.fn(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: mockError,
+  })),
 }));
 
 describe('anonymousSyncThresholdConfigKeys', () => {
@@ -46,5 +57,30 @@ describe('getAnonymousSyncThreshold', () => {
     expect(configManager.getConfig).toHaveBeenCalledWith(
       'app:auditLogEsSyncAnonymousThresholdForgotPassword',
     );
+  });
+
+  // The set of already-reported keys is module-level, so each test below uses a
+  // distinct endpoint to stay independent of the others.
+
+  it('falls back to the default when the configured value is not a number (e.g. parseInt of "abc")', () => {
+    vi.mocked(configManager.getConfig).mockReturnValue(Number.NaN);
+
+    expect(getAnonymousSyncThreshold('/_api/v3/login')).toBe(5000);
+  });
+
+  it('falls back to the default when the configured value is negative', () => {
+    vi.mocked(configManager.getConfig).mockReturnValue(-1);
+
+    expect(getAnonymousSyncThreshold('/_api/v3/register')).toBe(1000);
+  });
+
+  it('reports an invalid value only once, not on every event', () => {
+    vi.mocked(configManager.getConfig).mockReturnValue(Number.NaN);
+
+    getAnonymousSyncThreshold('/_api/v3/installer');
+    getAnonymousSyncThreshold('/_api/v3/installer');
+    getAnonymousSyncThreshold('/_api/v3/installer');
+
+    expect(mockError).toHaveBeenCalledOnce();
   });
 });
