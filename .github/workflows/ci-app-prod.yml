@@ -68,6 +68,16 @@ jobs:
   # issue," even on `push` events that don't touch this job's condition.
   # ci-app.yml's equivalent jobs already avoid this by keeping their
   # rationale comments above `if:`, as this one now does.
+  #
+  # The branch-name check alone would let any PR from this repo -- not just
+  # the sync bot's -- skip this job by naming its branch
+  # i18n-sync/translation-only. The head.repo.full_name check limits that to
+  # PRs whose head lives in this repository (not a fork), matching
+  # .github/mergify.yml's author restriction on the same branch name for the
+  # merge queue itself. It only matters on `pull_request` events -- on
+  # `push`, `github.event.pull_request` is absent and the comparison is
+  # simply false, which is harmless since `github.head_ref` is already empty
+  # there.
   test-prod-node24:
     uses: ./.github/workflows/reusable-app-prod.yml
     if: |
@@ -78,7 +88,8 @@ jobs:
         || startsWith( github.base_ref, 'release/' )
         || startsWith( github.head_ref, 'mergify/merge-queue/' ))
       && !( contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
-            || github.head_ref == 'i18n-sync/translation-only' )
+            || ( github.head_ref == 'i18n-sync/translation-only'
+                 && github.event.pull_request.head.repo.full_name == github.repository ) )
     with:
       node-version: 24.x
       skip-e2e-test: ${{ contains( github.event.pull_request.labels.*.name, 'dependencies' ) }}

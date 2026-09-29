@@ -47,7 +47,7 @@
   - `{"_amend_probe": {"dummy_key": "..."}}` としてアップロードし `type=i18next` でexportしたところ、`_amend_probe` というトップレベルキーの下に入れ子構造のまま返ってきた。namespaceラップの入れ子保持は実証済み
   - `_amend_probe` が存在する状態で、別namespace `_amend_probe_2` だけを含むファイルを `sync_terms=1` でアップロードしたところ、レスポンスに `"deleted": 1` と出て `_amend_probe` が実際に削除された。namespaceごとに `sync_terms=1` を呼ぶと相互に削除し合うという懸念は、実際に起きる不具合であることが実証された
   - POEditor内部の用語モデルは、i18nextの入れ子構造から term（末端のキー）と context（親キーパス、`"_amend_probe_2"` のように引用符ごと文字列化された形）を自動的に導出していた（`terms/list`で確認）。ただしこれは内部表現の詳細であり、export（`type=i18next`）の入出力契約には影響しない
-  - この検証の過程で、POEditorが言語コードとして `en_US` を受け付けず `"Wrong language code"` エラーになることを発見した。この場では代わりに単なる `en` が受理されることを実測で確認したが、後日のPRレビューで「`en` だとPOEditor画面上でイギリス国旗アイコンが表示されて紛らわしい」との指摘を受け、POEditor公式の言語コード一覧にある `en-us`（English (US)）に変更した（`ja`/`zh-CN`/`fr`/`ko` は変更なし）。`en-us` 自体は実プロジェクトでの実測はまだ行っていない
+  - この検証の過程で、POEditorが言語コードとして `en_US` を受け付けず `"Wrong language code"` エラーになることを発見した。この場では代わりに単なる `en` が受理されることを実測で確認したが、後日のPRレビューで「`en` だとPOEditor画面上でイギリス国旗アイコンが表示されて紛らわしい」との指摘を受け、POEditor公式の言語コード一覧にある `en-us`（English (US)）に変更した（`ja`/`zh-CN`/`fr`/`ko` は変更なし）。`en-us` は task 6.1/6.2 の実環境確認（PR #11943・#11945）で実際に push/pull が成功することも確認済み
 - **Implications**: namespaceラップの入れ子保持、および namespaceごとの `sync_terms=1` が相互削除を起こすことの2点は、どちらも確認済みとしてリスクから除去できる。言語コード変換（GROWIロケール→POEditor言語コードの対応表）は新たに必要な実装項目として追加する
 
 ### 既存 `master` の branch protection / マージ経路

@@ -41,9 +41,15 @@ queue_rules:
     queue_conditions:
       - check-success ~= ci-app-lint
       - -check-failure ~= ci-app-lint
+      # Enforces the "diff is always a subset of locale JSON" assumption
+      # this queue relies on, rather than just asserting it in the comment
+      # above: a PR containing any file outside that path cannot enter this
+      # queue, regardless of who authored it or how the branch was made.
+      - -files~=^(?!apps/app/public/static/locales/)
     merge_conditions:
       - check-success ~= ci-app-lint
       - -check-failure ~= ci-app-lint
+      - -files~=^(?!apps/app/public/static/locales/)
 
 pull_request_rules:
   - name: Automatic queue to merge
@@ -59,6 +65,12 @@ pull_request_rules:
   - name: Automatic queue to merge (i18n-sync translation-only)
     conditions:
       - head = i18n-sync/translation-only
+      # Restricts the lightweight queue to PRs actually authored by the sync
+      # bot. Without this, any PR opened from a branch named
+      # i18n-sync/translation-only -- by anyone with push access, not just
+      # the bot -- would qualify for merge on ci-app-lint alone instead of
+      # the full test/build/Playwright matrix.
+      - author = growi-i18n-pr-publisher[bot]
       - '#approved-reviews-by >= 1'
       - '#changes-requested-reviews-by = 0'
       - '#review-requested = 0'

@@ -150,7 +150,6 @@
   - 観測可能な完了状態: 2種類のテストケースそれぞれについて、意図した種類の変更提案が実際のリポジトリ上に作られている
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
   - _Depends: 5.2_
-  - _Blocked: 4.2の実プロビジョニングに加え、publish用・approval用の2つのGitHub App（それぞれの private key を `I18N_SYNC_PUBLISH_APP_PRIVATE_KEY` / `I18N_SYNC_APPROVAL_APP_PRIVATE_KEY` として、App ID を `I18N_SYNC_PUBLISH_APP_ID` / `I18N_SYNC_APPROVAL_APP_ID` として登録すること。`docs/i18n-community-translation-setup.md` §4.3参照）の実登録が人手待ちのため実行不可。`I18N_SYNC_PUBLISH_TOKEN` / `I18N_SYNC_APPROVAL_TOKEN` という名前の値そのものはrepository secretとして登録しない（5.3でworkflow実行時にmintする方式へ変更済み）。_
 
 - [x] 6.3 リポジトリ全体のlint・test・buildが green であることを確認する
   - 新規追加したツール・ワークフローが、既存の `turbo run lint` / `turbo run test` / `turbo run build`（`@growi/app`）に悪影響を与えていないことを確認する
