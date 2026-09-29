@@ -28,13 +28,16 @@ type ConsumeCall = {
  * the middleware would also make the user-keyed consume, which carries no
  * multiplier. Anonymous leaves only the per-IP call, the one under test here.
  */
-const consumeCallsFor = async (path: string): Promise<ConsumeCall[]> => {
+const consumeCallsFor = async (
+  path: string,
+  method = 'GET',
+): Promise<ConsumeCall[]> => {
   consumePoints.mockReset();
   consumePoints.mockResolvedValue(undefined);
 
   const req = mock<Request & { user?: IUserHasId }>({
     path,
-    method: 'GET',
+    method,
     ip: '127.0.0.1',
     user: undefined,
   });
@@ -53,8 +56,9 @@ const consumeCallsFor = async (path: string): Promise<ConsumeCall[]> => {
 
 const configsUsedFor = async (
   path: string,
+  method?: string,
 ): Promise<(IApiRateLimitConfig | undefined)[]> =>
-  (await consumeCallsFor(path)).map(({ config }) => config);
+  (await consumeCallsFor(path, method)).map(({ config }) => config);
 
 describe('middlewareFactory', () => {
   it('limits the username-suggestion endpoint more tightly than the global default', async () => {
@@ -77,6 +81,16 @@ describe('middlewareFactory', () => {
 
     for (const { ipMultiplier } of calls) {
       expect(ipMultiplier).toBeGreaterThan(DEFAULT_USERS_PER_IP_PROSPECTION);
+    }
+  });
+
+  // Each summary is an LLM call over up to ~2000 page lines, so the route is
+  // held to the tightest tier (design.md "SummarizeMessageRoute").
+  it('limits AI summary generation to 5 POSTs per window', async () => {
+    const configs = await configsUsedFor('/_api/v3/mastra/summary', 'POST');
+
+    for (const config of configs) {
+      expect(config).toEqual({ method: 'POST', maxRequests: 5 });
     }
   });
 
