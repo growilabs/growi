@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IErrorV3 } from '~/interfaces/errors/v3-error';
 import { useCurrentPageId } from '~/states/page';
 
-import type { IBacklink } from '../../interfaces/backlink';
+import type { IBacklink, IBacklinkResponse } from '../../interfaces/backlink';
 import { useSWRxBacklinks } from '../stores/backlinks';
 import { BacklinksPanel } from './BacklinksPanel';
 
@@ -25,12 +25,17 @@ vi.mock('../stores/backlinks', () => ({
 // member with a (truthy) mock function -- an unset `error` would then look like a
 // real error. Only the plain object keeps "not provided" == undefined.
 const mockBacklinks = (
-  overrides: Partial<SWRResponse<IBacklink[], IErrorV3[]>>,
+  overrides: Partial<SWRResponse<IBacklinkResponse, IErrorV3[]>>,
 ): void => {
   vi.mocked(useSWRxBacklinks).mockReturnValue(
-    overrides as SWRResponse<IBacklink[], IErrorV3[]>,
+    overrides as SWRResponse<IBacklinkResponse, IErrorV3[]>,
   );
 };
+
+const responseOf = (backlinks: IBacklink[]): IBacklinkResponse => ({
+  backlinks,
+  linkTargets: [],
+});
 
 describe('BacklinksPanel', () => {
   beforeEach(() => {
@@ -41,10 +46,10 @@ describe('BacklinksPanel', () => {
   it('lists an item per incoming backlink', () => {
     // Arrange
     mockBacklinks({
-      data: [
+      data: responseOf([
         { pageId: 'p-a', path: '/foo' },
         { pageId: 'p-b', path: '/bar' },
-      ],
+      ]),
       isLoading: false,
     });
 
@@ -60,7 +65,7 @@ describe('BacklinksPanel', () => {
 
   it('shows the empty state when there are no backlinks', () => {
     // Arrange
-    mockBacklinks({ data: [], isLoading: false });
+    mockBacklinks({ data: responseOf([]), isLoading: false });
 
     // Act
     render(<BacklinksPanel />);

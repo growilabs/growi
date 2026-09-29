@@ -7,7 +7,7 @@ import { mock } from 'vitest-mock-extended';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
 
-import type { IBacklink } from '../../interfaces/backlink';
+import type { IBacklink, ILinkTarget } from '../../interfaces/backlink';
 import type { PageLinkService } from '../services/page-link-service';
 
 type Viewer = NonNullable<CrowiRequest['user']>;
@@ -51,16 +51,20 @@ vi.mock('../services/find-user-group-ids-for-viewer', () => ({
 import { getBacklinksHandlerFactory } from './backlinks';
 
 /*
- * B1.13 — the read endpoint is reachable over HTTP.
- * Contract (design.md § Read flow; requirements 1.1, 1.7): GET /_api/v3/page/backlinks
- * validates pageId, delegates to PageLinkService.findBacklinks for the requesting viewer,
- * and answers with { backlinks: IBacklink[] }.
- * Permission filtering itself is the service's contract — see page-link-service.integ.ts.
+ * B1.13 / B5.9 — the read endpoint is reachable over HTTP.
+ * Contract (design.md § Read flow; requirements 1.1, 1.7, 6.4): GET /_api/v3/page/backlinks
+ * validates pageId, delegates to PageLinkService.findBacklinks and
+ * PageLinkService.findForwardLinkHealth for the requesting viewer, and answers with
+ * { backlinks: IBacklink[], linkTargets: ILinkTarget[] }.
+ * Permission filtering itself is the services' contract — see page-link-service.integ.ts
+ * and find-forward-link-health.integ.ts.
  */
 describe('GET /page/backlinks', () => {
   const validPageId = '507f1f77bcf86cd799439011';
 
   const findBacklinks = vi.fn<PageLinkService['findBacklinks']>();
+  const findForwardLinkHealth =
+    vi.fn<PageLinkService['findForwardLinkHealth']>();
 
   beforeAll(async () => {
     // Install the real res.apiv3 / res.apiv3Err helpers (as server/routes/apiv3/index.js does)
@@ -74,7 +78,9 @@ describe('GET /page/backlinks', () => {
   });
 
   const buildApp = (viewer?: Viewer) => {
-    const crowi = mock<Crowi>({ pageLinkService: { findBacklinks } });
+    const crowi = mock<Crowi>({
+      pageLinkService: { findBacklinks, findForwardLinkHealth },
+    });
 
     const app = express();
 
@@ -101,48 +107,65 @@ describe('GET /page/backlinks', () => {
     vi.clearAllMocks();
     mocks.isPageReadableByViewer.mockResolvedValue(true);
     mocks.findUserGroupIdsForViewer.mockResolvedValue(null);
+    findForwardLinkHealth.mockResolvedValue([]);
   });
 
   describe('success', () => {
-    it('answers 200 with the backlinks returned by the service', async () => {
+    it('answers 200 with the backlinks and link targets returned by the services', async () => {
       const backlinks: IBacklink[] = [
         { pageId: '507f1f77bcf86cd799439021', path: '/source-a' },
         { pageId: '507f1f77bcf86cd799439022', path: '/source-b' },
       ];
+      const linkTargets: ILinkTarget[] = [
+        {
+          pageId: '507f1f77bcf86cd799439041',
+          path: '/trash/target-a',
+          targetState: 'trashed',
+        },
+        { pageId: null, path: '/missing', targetState: 'broken' },
+      ];
       findBacklinks.mockResolvedValue(backlinks);
+      findForwardLinkHealth.mockResolvedValue(linkTargets);
 
       const res = await get(buildApp(), { pageId: validPageId });
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ backlinks });
+      expect(res.body).toEqual({ backlinks, linkTargets });
     });
 
-    it('answers 200 with an empty list when the page has no backlinks (1.7)', async () => {
+    it('answers 200 with empty lists when the page has no backlinks and no outbound links needing attention (1.7)', async () => {
       findBacklinks.mockResolvedValue([]);
+      findForwardLinkHealth.mockResolvedValue([]);
 
       const res = await get(buildApp(), { pageId: validPageId });
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ backlinks: [] });
+      expect(res.body).toEqual({ backlinks: [], linkTargets: [] });
     });
 
-    it('asks the service about the page the client named', async () => {
+    // One pageId serves both reads: it is the link target for backlinks and the link
+    // source for forward-link health.
+    it('asks both services about the page the client named', async () => {
       findBacklinks.mockResolvedValue([]);
 
       await get(buildApp(), { pageId: validPageId });
 
       const [toPageId] = findBacklinks.mock.calls[0];
+      const [fromPageId] = findForwardLinkHealth.mock.calls[0];
       expect(String(toPageId)).toBe(validPageId);
+      expect(String(fromPageId)).toBe(validPageId);
     });
 
-    it('asks the service on behalf of the authenticated viewer', async () => {
+    it('asks both services on behalf of the authenticated viewer', async () => {
       findBacklinks.mockResolvedValue([]);
       const viewer = mock<Viewer>();
 
       await get(buildApp(viewer), { pageId: validPageId });
 
-      const [, user] = findBacklinks.mock.calls[0];
-      expect(user).toBe(viewer);
+      const [, backlinksUser] = findBacklinks.mock.calls[0];
+      const [, forwardLinkUser] = findForwardLinkHealth.mock.calls[0];
+      expect(backlinksUser).toBe(viewer);
+      expect(forwardLinkUser).toBe(viewer);
     });
 
     it('substitutes no viewer identity for an unauthenticated request', async () => {
@@ -152,8 +175,10 @@ describe('GET /page/backlinks', () => {
 
       // `?? null` because null and undefined are the same "no viewer" to the grant filter;
       // what must not happen is a guest being served as some user.
-      const [, user] = findBacklinks.mock.calls[0];
-      expect(user ?? null).toBeNull();
+      const [, backlinksUser] = findBacklinks.mock.calls[0];
+      const [, forwardLinkUser] = findForwardLinkHealth.mock.calls[0];
+      expect(backlinksUser ?? null).toBeNull();
+      expect(forwardLinkUser ?? null).toBeNull();
     });
   });
 
@@ -168,6 +193,26 @@ describe('GET /page/backlinks', () => {
         code: 'notfound_or_forbidden',
       });
       expect(findBacklinks).not.toHaveBeenCalled();
+      expect(findForwardLinkHealth).not.toHaveBeenCalled();
+    });
+
+    // linkTargets echoes link paths written in the page's body, so answering with it
+    // for an unreadable page would disclose that page's content.
+    it("does not disclose the page's outbound link paths when the viewer cannot read the page", async () => {
+      mocks.isPageReadableByViewer.mockResolvedValue(false);
+      findBacklinks.mockResolvedValue([]);
+      findForwardLinkHealth.mockResolvedValue([
+        {
+          pageId: null,
+          path: '/hr/salary-review-draft',
+          targetState: 'broken',
+        },
+      ]);
+
+      const res = await get(buildApp(mock<Viewer>()), { pageId: validPageId });
+
+      expect(res.status).toBe(404);
+      expect(JSON.stringify(res.body)).not.toContain('/hr/salary-review-draft');
     });
 
     it('checks readability of the page the client named, for the requesting viewer', async () => {
@@ -207,8 +252,10 @@ describe('GET /page/backlinks', () => {
       const [, , groupsForReadability] =
         mocks.isPageReadableByViewer.mock.calls[0];
       const [, , groupsForBacklinks] = findBacklinks.mock.calls[0];
+      const [, , groupsForForwardLinks] = findForwardLinkHealth.mock.calls[0];
       expect(groupsForReadability).toBe(groupIds);
       expect(groupsForBacklinks).toBe(groupIds);
+      expect(groupsForForwardLinks).toBe(groupIds);
     });
 
     it('answers 500 without querying the service when the group lookup fails', async () => {
@@ -218,6 +265,7 @@ describe('GET /page/backlinks', () => {
 
       expect(res.status).toBe(500);
       expect(findBacklinks).not.toHaveBeenCalled();
+      expect(findForwardLinkHealth).not.toHaveBeenCalled();
     });
   });
 
@@ -227,6 +275,7 @@ describe('GET /page/backlinks', () => {
 
       expect(res.status).toBe(400);
       expect(findBacklinks).not.toHaveBeenCalled();
+      expect(findForwardLinkHealth).not.toHaveBeenCalled();
     });
 
     it('answers 400 without querying the service when pageId is empty', async () => {
@@ -234,6 +283,7 @@ describe('GET /page/backlinks', () => {
 
       expect(res.status).toBe(400);
       expect(findBacklinks).not.toHaveBeenCalled();
+      expect(findForwardLinkHealth).not.toHaveBeenCalled();
     });
 
     it('answers 400 without querying the service when pageId is not a Mongo ID', async () => {
@@ -241,6 +291,7 @@ describe('GET /page/backlinks', () => {
 
       expect(res.status).toBe(400);
       expect(findBacklinks).not.toHaveBeenCalled();
+      expect(findForwardLinkHealth).not.toHaveBeenCalled();
     });
 
     // A repeated query param arrives as an array, and isMongoId() validates its members
@@ -253,6 +304,7 @@ describe('GET /page/backlinks', () => {
 
       expect(res.status).toBe(400);
       expect(findBacklinks).not.toHaveBeenCalled();
+      expect(findForwardLinkHealth).not.toHaveBeenCalled();
     });
   });
 
@@ -282,13 +334,26 @@ describe('GET /page/backlinks', () => {
   });
 
   describe('error handling', () => {
-    it('answers 500 when the service throws', async () => {
+    it('answers 500 when the backlinks read throws', async () => {
       findBacklinks.mockRejectedValue(new Error('unexpected failure'));
 
       const res = await get(buildApp(), { pageId: validPageId });
 
       expect(res.status).toBe(500);
       expect(res.body).toHaveProperty('errors');
+    });
+
+    // A partial 200 with backlinks alone would render as "no outbound problems".
+    it('answers 500, not a partial 200, when the forward-link read throws', async () => {
+      findBacklinks.mockResolvedValue([]);
+      findForwardLinkHealth.mockRejectedValue(new Error('unexpected failure'));
+
+      const res = await get(buildApp(), { pageId: validPageId });
+
+      expect(res.status).toBe(500);
+      expect(res.body.errors[0]).toMatchObject({
+        code: 'failed-to-get-backlinks',
+      });
     });
 
     // apiv3Err turns a raw Error into ErrorV3(err.message), and `message` is an

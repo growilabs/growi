@@ -5,7 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useIsGuestUser } from '~/states/context';
 
-import type { IBacklink } from '../../interfaces/backlink';
+import type {
+  IBacklink,
+  IBacklinkResponse,
+  ILinkTarget,
+} from '../../interfaces/backlink';
 import { useSWRxBacklinks } from './backlinks';
 
 // Wrap an untyped mock so mockResolvedValue is not constrained to AxiosResponse.
@@ -44,18 +48,26 @@ describe('useSWRxBacklinks', () => {
     vi.mocked(useIsGuestUser).mockReturnValue(false);
   });
 
-  it('fetches the backlinks endpoint with pageId and returns the backlink list', async () => {
+  it('fetches the backlinks endpoint with pageId and returns the whole response', async () => {
     // Arrange
-    const backlinks = backlinksOf('/foo', '/bar');
-    mockApiv3Get.mockResolvedValue({ data: { backlinks } });
+    const linkTargets: ILinkTarget[] = [
+      { pageId: 'id-t', path: '/trash/baz', targetState: 'trashed' },
+      { pageId: null, path: '/missing', targetState: 'broken' },
+    ];
+    const response: IBacklinkResponse = {
+      backlinks: backlinksOf('/foo', '/bar'),
+      linkTargets,
+    };
+    mockApiv3Get.mockResolvedValue({ data: response });
 
     // Act
     const { result } = renderHook(() => useSWRxBacklinks('page-1'), {
       wrapper,
     });
 
-    // Assert: the request carries pageId, and the hook exposes only the array
-    await waitFor(() => expect(result.current.data).toEqual(backlinks));
+    // Assert: the request carries pageId, and the hook exposes both lists --
+    // the panel renders incoming backlinks and outgoing link health together
+    await waitFor(() => expect(result.current.data).toEqual(response));
     expect(mockApiv3Get).toHaveBeenCalledWith('/page/backlinks', {
       pageId: 'page-1',
     });
@@ -73,7 +85,9 @@ describe('useSWRxBacklinks', () => {
     // Arrange: a SHARED cache across renders so a second fetch can only happen
     // if the cache key actually changed with the page id.
     const sharedWrapper = createSharedCacheWrapper();
-    mockApiv3Get.mockResolvedValue({ data: { backlinks: [] } });
+    mockApiv3Get.mockResolvedValue({
+      data: { backlinks: [], linkTargets: [] },
+    });
 
     // Act
     const { rerender } = renderHook(({ id }) => useSWRxBacklinks(id), {
@@ -94,7 +108,9 @@ describe('useSWRxBacklinks', () => {
   it('separates the cache by guest state (refetches after login)', async () => {
     // Arrange: shared cache; only a changed key can cause a second fetch.
     const sharedWrapper = createSharedCacheWrapper();
-    mockApiv3Get.mockResolvedValue({ data: { backlinks: [] } });
+    mockApiv3Get.mockResolvedValue({
+      data: { backlinks: [], linkTargets: [] },
+    });
 
     vi.mocked(useIsGuestUser).mockReturnValue(true);
     const { rerender } = renderHook(() => useSWRxBacklinks('page-1'), {
@@ -113,7 +129,9 @@ describe('useSWRxBacklinks', () => {
   it('revalidates a warm cache on remount, so a reopened panel reads fresh data', async () => {
     // Arrange: warm the shared cache with a first mount
     const sharedWrapper = createSharedCacheWrapper();
-    mockApiv3Get.mockResolvedValue({ data: { backlinks: [] } });
+    mockApiv3Get.mockResolvedValue({
+      data: { backlinks: [], linkTargets: [] },
+    });
 
     const first = renderHook(() => useSWRxBacklinks('page-1'), {
       wrapper: sharedWrapper,
