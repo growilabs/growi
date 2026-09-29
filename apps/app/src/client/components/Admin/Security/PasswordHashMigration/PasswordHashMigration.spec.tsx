@@ -79,6 +79,9 @@ describe('PasswordHashMigration', () => {
 
     expect(cleanupButton()).toBeDisabled();
     expect(screen.getByText(`${K}.blocked`)).toBeInTheDocument();
+    // Without this note an admin cannot explain a user who signs in daily through
+    // LDAP/OAuth yet still counts as unmigrated.
+    expect(screen.getByText(`${K}.migration_trigger_note`)).toBeInTheDocument();
   });
 
   it('offers the cleanup once no ACTIVE user is left unmigrated', () => {
@@ -97,6 +100,9 @@ describe('PasswordHashMigration', () => {
     expect(screen.getByText(`${K}.ready_to_cleanup`)).toBeInTheDocument();
     // Non-active stragglers are surfaced but explicitly do not block.
     expect(screen.getByText(`${K}.non_active_note`)).toBeInTheDocument();
+    expect(
+      screen.queryByText(`${K}.migration_trigger_note`),
+    ).not.toBeInTheDocument();
   });
 
   it('reports completion and offers nothing once no legacy hash remains', () => {

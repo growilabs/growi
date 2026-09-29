@@ -189,6 +189,14 @@ export const PasswordHashMigration = (): JSX.Element => {
 
           <StatusBanner status={data} />
 
+          {data.distribution.legacyOnlyActive > 0 && (
+            <p className="text-muted small">
+              {t(
+                'security_settings.password_hash_migration.migration_trigger_note',
+              )}
+            </p>
+          )}
+
           {data.distribution.legacyOnlyNonActive > 0 && (
             <p className="text-muted small">
               {t('security_settings.password_hash_migration.non_active_note', {
