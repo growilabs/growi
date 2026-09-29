@@ -54,7 +54,7 @@
   - 両方欠落時にリクエストが400相当で拒否され、片方のみ指定時は通過することをユニットテストで確認できる
   - _Requirements: 1.3_
 
-- [ ] 3.2 要約リクエストが新規スレッドでSummarizeAgentのストリーム応答を返せる
+- [x] 3.2 要約リクエストが新規スレッドでSummarizeAgentのストリーム応答を返せる
   - `summarizeAgent.stream()` を呼ぶ前に `Page.findByIdAndViewer`（既存、無変更）を1回呼び出す。これが**権限なし時の唯一の応答経路**であり、結果が `null` の場合は**ストリームを開始せず**、不存在と権限なしを区別しない単一の応答（403/404 のいずれか一方に統一）でその場で短絡する（検証はタスク4.1）
   - 結果が得られた場合は、その時点の `page.revision`（populate されていないため ObjectId そのもの。populate 済みの場合は `revision._id`）を `sourceRevisionId` として保持する
   - **`capturedAt` を、`sourceRevisionId` を取得するのと同じ時点（生成開始時点）に `new Date()` でサーバ側に生成する**（クライアントから受け取った日時は使わない）。ストリーム応答に含める
