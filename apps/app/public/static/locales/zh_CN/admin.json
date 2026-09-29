@@ -266,8 +266,8 @@
       "cleanup_button": "删除旧格式的数据",
       "cleanup_confirm_title": "要删除旧格式的数据吗？",
       "cleanup_confirm_body": "将从所有已迁移的用户中删除旧格式的数据。此操作无法撤销。",
-      "cleanup_confirm_downgrade_warning": "执行后，此实例将无法降级到旧版本。如需降级，必须向所有已迁移的用户发送密码重置。",
-      "cleanup_consent": "我已了解将无法再降级",
+      "cleanup_confirm_downgrade_warning": "执行后，已迁移的用户将无法使用现有密码登录旧版本。如需降级，必须先通过 downgrade-prep 脚本向所有用户发送密码重置。",
+      "cleanup_consent": "我已了解降级时需要所有用户重新设置密码",
       "cleanup_execute": "删除",
       "cleanup_succeeded": "已从 {{count}} 位用户中删除旧格式的数据。"
     }

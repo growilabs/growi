@@ -257,8 +257,8 @@
       "cleanup_button": "Remove old-format data",
       "cleanup_confirm_title": "Remove the old-format data?",
       "cleanup_confirm_body": "This removes the old-format data from every migrated user. The operation cannot be undone.",
-      "cleanup_confirm_downgrade_warning": "After this runs, this instance can no longer be downgraded to an older version. Downgrading would require sending a password reset to every migrated user.",
-      "cleanup_consent": "I understand that downgrading will no longer be possible",
+      "cleanup_confirm_downgrade_warning": "After this runs, migrated users can no longer sign in to an older version with their existing password. To downgrade, you must first send a password reset to all of them with the downgrade-prep script.",
+      "cleanup_consent": "I understand that downgrading will require every user to set a new password",
       "cleanup_execute": "Remove",
       "cleanup_succeeded": "Removed old-format data from {{count}} user(s)."
     }

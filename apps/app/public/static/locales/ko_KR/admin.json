@@ -257,8 +257,8 @@
       "cleanup_button": "이전 형식 데이터 삭제",
       "cleanup_confirm_title": "이전 형식의 데이터를 삭제하시겠습니까?",
       "cleanup_confirm_body": "마이그레이션된 모든 사용자에게서 이전 형식의 데이터를 삭제합니다. 이 작업은 되돌릴 수 없습니다.",
-      "cleanup_confirm_downgrade_warning": "실행 후에는 이 인스턴스를 이전 버전으로 다운그레이드할 수 없습니다. 다운그레이드하려면 마이그레이션된 모든 사용자에게 비밀번호 재설정을 보내야 합니다.",
-      "cleanup_consent": "다운그레이드가 불가능해진다는 점을 이해했습니다",
+      "cleanup_confirm_downgrade_warning": "실행 후에는 마이그레이션된 사용자가 기존 비밀번호로 이전 버전에 로그인할 수 없습니다. 다운그레이드하려면 먼저 downgrade-prep 스크립트로 모든 사용자에게 비밀번호 재설정을 보내야 합니다.",
+      "cleanup_consent": "다운그레이드 시 모든 사용자가 비밀번호를 다시 설정해야 한다는 점을 이해했습니다",
       "cleanup_execute": "삭제",
       "cleanup_succeeded": "{{count}}명의 사용자에게서 이전 형식의 데이터를 삭제했습니다."
     }
