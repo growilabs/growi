@@ -1,5 +1,7 @@
 import React from 'react';
 import type { Scope } from '@growi/core/dist/interfaces';
+import { endOfDay } from 'date-fns/endOfDay';
+import { parse } from 'date-fns/parse';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
@@ -43,8 +45,11 @@ export const AccessTokenForm = React.memo(
     });
 
     const onSubmit = (data: FormInputs) => {
-      const expiredAtDate = new Date(data.expiredAt);
-      expiredAtDate.setHours(23, 59, 59, 999);
+      // Parse as a local date: `new Date('yyyy-MM-dd')` is UTC midnight, which is
+      // already the previous day in time zones west of UTC.
+      const expiredAtDate = endOfDay(
+        parse(data.expiredAt, 'yyyy-MM-dd', new Date()),
+      );
       const scopes: Scope[] = data.scopes ? data.scopes : [];
 
       submitHandler({

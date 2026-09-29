@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { format as dateFnsFormat } from 'date-fns/format';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
@@ -53,7 +54,12 @@ export const AccessTokenList = React.memo(
                   {accessTokens.map((token) => (
                     <tr key={token._id}>
                       <td className="text-break">{token.description}</td>
-                      <td>{token.expiredAt.toString().split('T')[0]}</td>
+                      <td>
+                        {dateFnsFormat(
+                          token.expiredAt,
+                          'yyyy-MM-dd (EEE) HH:mm',
+                        )}
+                      </td>
                       <td>{token.scopes.join(', ')}</td>
                       <td>
                         <button
