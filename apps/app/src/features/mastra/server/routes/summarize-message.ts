@@ -16,6 +16,10 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import {
+  pendingActivityContext,
+  recordFailsafeAttempt,
+} from '~/server/service/activity/index';
 import loggerFactory from '~/utils/logger';
 
 import type { CustomUIMessageMetadata } from '../../interfaces/chat-message';
@@ -72,6 +76,16 @@ const buildSummarizeRequest = (
       ? `\nWrite the summary in the language of the locale "${lang}".`
       : '';
   return `Summarize the wiki page (pageId: ${pageId}, path: ${JSON.stringify(pagePath)}).${languageLine}`;
+};
+
+// A failure inside the 200 stream is not a failure to the fail-safe
+// finalizer — see rules/activity-recording.md. take() yields the context at
+// most once, so repeated calls record at most one row.
+const recordUnsettledAttempt = (activityId: string): void => {
+  const context = pendingActivityContext.take(activityId);
+  if (context != null) {
+    void recordFailsafeAttempt(activityId, context);
+  }
 };
 
 export const summarizeMessageHandlersFactory: SummarizeMessageHandlersFactory =
@@ -139,6 +153,18 @@ export const summarizeMessageHandlersFactory: SummarizeMessageHandlersFactory =
             limit: PAGE_READ_LIMIT,
           });
 
+          // Stops the LLM run when the client disconnects mid-stream.
+          const abortController = new AbortController();
+          res.on('close', () => {
+            if (!res.writableFinished) {
+              abortController.abort();
+            }
+          });
+          // 'close' may already have fired during the awaits above.
+          if (res.destroyed) {
+            abortController.abort();
+          }
+
           const stream = await summarizeAgent.stream(
             buildSummarizeRequest(
               page._id.toString(),
@@ -153,6 +179,7 @@ export const summarizeMessageHandlersFactory: SummarizeMessageHandlersFactory =
                 resource: thread.resourceId,
               },
               providerOptions: getProviderOptionsForModel(effectiveModelKey),
+              abortSignal: abortController.signal,
             },
           );
 
@@ -164,8 +191,12 @@ export const summarizeMessageHandlersFactory: SummarizeMessageHandlersFactory =
             return resolveChatErrorMessage(error);
           };
 
+          const activityId = res.locals.activity._id;
           const uiMessageStream = createUIMessageStream({
-            onError: onChatError,
+            onError: (error) => {
+              recordUnsettledAttempt(activityId);
+              return onChatError(error);
+            },
             execute: async ({ writer }) => {
               const summarizeMetadata: CustomUIMessageMetadata = {
                 threadId: thread.id,
@@ -185,6 +216,7 @@ export const summarizeMessageHandlersFactory: SummarizeMessageHandlersFactory =
               }).getReader();
 
               let hasErrorChunk = false;
+              let hasText = false;
               while (true) {
                 // biome-ignore lint/performance/noAwaitInLoops: necessary to read stream sequentially
                 const { value, done } = await reader.read();
@@ -192,7 +224,17 @@ export const summarizeMessageHandlersFactory: SummarizeMessageHandlersFactory =
                 if (value.type === 'error') {
                   hasErrorChunk = true;
                 }
+                if (value.type === 'text-delta' && value.delta.trim() !== '') {
+                  hasText = true;
+                }
                 writer.write(value);
+              }
+
+              // res.destroyed also covers a disconnect before the close
+              // listener above was registered; the fail-safe finalizer has
+              // recorded that attempt.
+              if (res.destroyed) {
+                return;
               }
 
               const [usage, finishReason, steps] = await Promise.all([
@@ -215,17 +257,22 @@ export const summarizeMessageHandlersFactory: SummarizeMessageHandlersFactory =
                 'Summarize stream finished',
               );
 
-              if (!hasErrorChunk && finishReason !== 'error') {
-                incrementAiSummarizeGeneratedCount();
-                // Emitted inside execute, i.e. before the response finishes —
-                // see rules/activity-recording.md.
-                crowi.events.activity.emit('update', res.locals.activity._id, {
-                  action: SupportedAction.ACTION_PAGE_AI_SUMMARIZE,
-                  targetModel: SupportedTargetModel.MODEL_PAGE,
-                  target: page,
-                  contributor: req.user,
-                });
+              // 'tool-calls' (maxSteps exhausted) and 'length' (truncated)
+              // end without a complete summary.
+              if (hasErrorChunk || finishReason !== 'stop' || !hasText) {
+                recordUnsettledAttempt(activityId);
+                return;
               }
+
+              incrementAiSummarizeGeneratedCount();
+              // Emitted inside execute, i.e. before the response finishes —
+              // see rules/activity-recording.md.
+              crowi.events.activity.emit('update', activityId, {
+                action: SupportedAction.ACTION_PAGE_AI_SUMMARIZE,
+                targetModel: SupportedTargetModel.MODEL_PAGE,
+                target: page,
+                contributor: req.user,
+              });
             },
           });
 

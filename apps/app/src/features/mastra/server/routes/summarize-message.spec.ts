@@ -1,3 +1,5 @@
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import type { IUserHasId } from '@growi/core';
 import type { MastraMemory, StorageThreadType } from '@mastra/core/memory';
 import type { RequestContext } from '@mastra/core/request-context';
@@ -45,6 +47,9 @@ const mocks = vi.hoisted(() => ({
   incrementCount: vi.fn(),
   addActivity: vi.fn(),
   emitActivity: vi.fn(),
+  takeActivityContext: vi.fn(),
+  recordFailsafeAttempt: vi.fn(),
+  responseClosed: vi.fn(),
   currentUser: undefined as unknown,
   // pageId -> body, read by the populateDataToShowRevision mock
   bodiesByPageId: new Map<string, string>(),
@@ -72,12 +77,26 @@ vi.mock('~/server/middlewares/add-activity', () => ({
     },
 }));
 
+vi.mock('~/server/service/activity/pending-activity-context', () => ({
+  set: vi.fn(),
+  take: mocks.takeActivityContext,
+  clear: vi.fn(),
+}));
+
+vi.mock('~/server/service/activity/record-failsafe-attempt', () => ({
+  recordFailsafeAttempt: mocks.recordFailsafeAttempt,
+}));
+
 vi.mock('~/features/mastra/server/services/mastra-modules', () => ({
   mastra: { getAgent: mocks.getAgent },
 }));
 
 vi.mock('@mastra/ai-sdk', () => ({
-  toAISdkStream: (stream: { uiChunks: unknown[] }) =>
+  toAISdkStream: (stream: {
+    uiChunks: unknown[];
+    uiStream?: ReadableStream<unknown>;
+  }) =>
+    stream.uiStream ??
     new ReadableStream({
       start(controller) {
         for (const chunk of stream.uiChunks) {
@@ -200,6 +219,12 @@ const registerFakePageModel = (): void => {
   mongoose.model('Page', schema);
 };
 
+const activityContext = {
+  userId: viewer._id.toString(),
+  username: viewer.username,
+  createdAt: new Date(),
+};
+
 const FINAL_TEXT =
   'This page is a test fixture.\n- point one\n- point two\n- point three';
 
@@ -215,6 +240,7 @@ type StreamOptions = {
   requestContext: SummarizeRequestContext;
   maxSteps: number;
   memory: { thread: string; resource: string };
+  abortSignal: AbortSignal;
 };
 
 type StreamCall = {
@@ -300,6 +326,27 @@ const parseSse = (text: string): UiChunk[] =>
     .filter((data) => data !== '[DONE]')
     .map((data) => JSON.parse(data) as UiChunk);
 
+const buildStreamResult = (uiChunks: unknown[], finishReason: string) => ({
+  uiChunks,
+  usage: Promise.resolve({}),
+  finishReason: Promise.resolve(finishReason),
+  steps: Promise.resolve([]),
+});
+
+// A raw request, so a test can disconnect mid-flight (supertest cannot).
+const openSummaryRequest = (server: http.Server): http.ClientRequest => {
+  const { port } = server.address() as AddressInfo;
+  const clientRequest = http.request({
+    port,
+    path: '/summary',
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+  });
+  clientRequest.on('error', () => {});
+  clientRequest.end(JSON.stringify({ pageId: shortPage._id.toString() }));
+  return clientRequest;
+};
+
 // Merged the way the client merges successive message-metadata chunks.
 const mergedMetadata = (chunks: UiChunk[]): Record<string, unknown> =>
   Object.assign(
@@ -315,6 +362,7 @@ describe('POST /summary (summarize-message handler)', () => {
   let app: express.Application;
   let streamCalls: StreamCall[];
   let threads: StorageThreadType[];
+  let memory: MastraMemory;
 
   beforeAll(() => {
     registerFakePageModel();
@@ -325,11 +373,12 @@ describe('POST /summary (summarize-message handler)', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mocks.takeActivityContext.mockReturnValue(activityContext);
     mocks.currentUser = viewer;
     streamCalls = [];
     threads = [];
 
-    const memory = mock<MastraMemory>({
+    memory = mock<MastraMemory>({
       createThread: vi.fn(({ resourceId, threadId }) => {
         const thread: StorageThreadType = {
           id: threadId ?? 'missing-thread-id',
@@ -371,6 +420,10 @@ describe('POST /summary (summarize-message handler)', () => {
     addCustomFunctionToResponse(express);
     app = express();
     app.use(express.json());
+    app.use((_req: Request, res: Response, next: NextFunction) => {
+      res.on('close', mocks.responseClosed);
+      next();
+    });
     const { summarizeMessageHandlersFactory } = await import(
       './summarize-message'
     );
@@ -485,17 +538,88 @@ describe('POST /summary (summarize-message handler)', () => {
         target: expect.objectContaining({ _id: shortPage._id }),
         contributor: viewer,
       });
+      expect(mocks.recordFailsafeAttempt).not.toHaveBeenCalled();
     });
 
-    it('does not emit when the stream ends with an error chunk', async () => {
+    it('records an UNSETTLED attempt instead of emitting when the stream ends with an error chunk', async () => {
+      mocks.stream.mockResolvedValueOnce(
+        buildStreamResult(
+          [
+            { type: 'start' },
+            { type: 'error', errorText: 'model test-model was not found.' },
+          ],
+          'error',
+        ),
+      );
+
+      await request(app)
+        .post('/summary')
+        .send({ pageId: shortPage._id.toString() })
+        .expect(200);
+
+      expect(mocks.emitActivity).not.toHaveBeenCalled();
+      expect(mocks.recordFailsafeAttempt).toHaveBeenCalledTimes(1);
+      expect(mocks.recordFailsafeAttempt).toHaveBeenCalledWith(
+        'activity-id',
+        activityContext,
+      );
+    });
+
+    it.each([
+      ['tool-calls', 'maxSteps ran out while still calling tools'],
+      ['length', 'the output was truncated'],
+    ])('treats finishReason %s (%s) as a failed attempt, not a summary', async (finishReason) => {
+      mocks.stream.mockResolvedValueOnce(
+        buildStreamResult(
+          [
+            { type: 'start' },
+            { type: 'text-start', id: 'text-1' },
+            { type: 'text-delta', id: 'text-1', delta: 'Partial sum' },
+            { type: 'text-end', id: 'text-1' },
+            { type: 'finish' },
+          ],
+          finishReason,
+        ),
+      );
+
+      await request(app)
+        .post('/summary')
+        .send({ pageId: shortPage._id.toString() })
+        .expect(200);
+
+      expect(mocks.incrementCount).not.toHaveBeenCalled();
+      expect(mocks.emitActivity).not.toHaveBeenCalled();
+      expect(mocks.recordFailsafeAttempt).toHaveBeenCalledWith(
+        'activity-id',
+        activityContext,
+      );
+    });
+
+    it('treats a stop with no summary text as a failed attempt', async () => {
+      mocks.stream.mockResolvedValueOnce(
+        buildStreamResult([{ type: 'start' }, { type: 'finish' }], 'stop'),
+      );
+
+      await request(app)
+        .post('/summary')
+        .send({ pageId: shortPage._id.toString() })
+        .expect(200);
+
+      expect(mocks.incrementCount).not.toHaveBeenCalled();
+      expect(mocks.emitActivity).not.toHaveBeenCalled();
+      expect(mocks.recordFailsafeAttempt).toHaveBeenCalledWith(
+        'activity-id',
+        activityContext,
+      );
+    });
+
+    it('records an UNSETTLED attempt when the stream throws after it has started', async () => {
       mocks.stream.mockResolvedValueOnce({
-        uiChunks: [
-          { type: 'start' },
-          { type: 'error', errorText: 'model test-model was not found.' },
-        ],
-        usage: Promise.resolve({}),
-        finishReason: Promise.resolve('error'),
-        steps: Promise.resolve([]),
+        ...buildStreamResult([{ type: 'start' }], 'stop'),
+        // Lazy, like Mastra's DelayedPromise, so the rejection is observed.
+        get finishReason() {
+          return Promise.reject(new Error('provider failed'));
+        },
       });
 
       await request(app)
@@ -504,6 +628,11 @@ describe('POST /summary (summarize-message handler)', () => {
         .expect(200);
 
       expect(mocks.emitActivity).not.toHaveBeenCalled();
+      expect(mocks.recordFailsafeAttempt).toHaveBeenCalledTimes(1);
+      expect(mocks.recordFailsafeAttempt).toHaveBeenCalledWith(
+        'activity-id',
+        activityContext,
+      );
     });
 
     it('does not emit when generation fails before the stream starts', async () => {
@@ -531,6 +660,103 @@ describe('POST /summary (summarize-message handler)', () => {
 
       expect(mocks.addActivity).toHaveBeenCalledTimes(1);
       expect(mocks.stream).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('client disconnect', () => {
+    it('aborts the agent run and neither counts nor emits the late-finishing summary', async () => {
+      let markDrained: () => void = () => {};
+      const drained = new Promise<void>((resolve) => {
+        markDrained = resolve;
+      });
+      mocks.stream.mockImplementationOnce(
+        (_prompt: unknown, { abortSignal }: StreamOptions) => {
+          const uiStream = new ReadableStream({
+            start(controller) {
+              controller.enqueue({ type: 'start' });
+              // The agent still completes normally after the abort; the route
+              // must not treat that completion as a delivered summary.
+              abortSignal.addEventListener('abort', () => {
+                controller.enqueue({ type: 'text-start', id: 'text-1' });
+                controller.enqueue({
+                  type: 'text-delta',
+                  id: 'text-1',
+                  delta: FINAL_TEXT,
+                });
+                controller.enqueue({ type: 'text-end', id: 'text-1' });
+                controller.enqueue({ type: 'finish' });
+                controller.close();
+                markDrained();
+              });
+            },
+          });
+          return Promise.resolve({
+            ...buildStreamResult([], 'stop'),
+            uiStream,
+          });
+        },
+      );
+
+      const server = app.listen(0);
+      try {
+        const clientRequest = openSummaryRequest(server);
+        await new Promise<void>((resolve) => {
+          clientRequest.on('response', (response) => {
+            response.once('data', () => {
+              clientRequest.destroy();
+              resolve();
+            });
+          });
+        });
+
+        await drained;
+        await new Promise(setImmediate);
+      } finally {
+        server.close();
+      }
+
+      expect(mocks.incrementCount).not.toHaveBeenCalled();
+      expect(mocks.emitActivity).not.toHaveBeenCalled();
+      expect(mocks.recordFailsafeAttempt).not.toHaveBeenCalled();
+    });
+
+    it('neither counts nor emits when the client left before the stream began', async () => {
+      let markReached: () => void = () => {};
+      const reachedGetMemory = new Promise<void>((resolve) => {
+        markReached = resolve;
+      });
+      let markClosed: () => void = () => {};
+      const responseClosed = new Promise<void>((resolve) => {
+        markClosed = resolve;
+      });
+      mocks.responseClosed.mockImplementationOnce(() => markClosed());
+      mocks.getAgent.mockImplementationOnce(() => ({
+        getMemory: async () => {
+          markReached();
+          await responseClosed;
+          return memory;
+        },
+        stream: mocks.stream,
+      }));
+
+      const server = app.listen(0);
+      try {
+        const clientRequest = openSummaryRequest(server);
+        await reachedGetMemory;
+        clientRequest.destroy();
+        await responseClosed;
+        await vi.waitFor(() => expect(streamCalls).toHaveLength(1));
+        for (let i = 0; i < 5; i++) {
+          // biome-ignore lint/performance/noAwaitInLoops: lets the handler drain the finished stream
+          await new Promise(setImmediate);
+        }
+      } finally {
+        server.close();
+      }
+
+      expect(streamCalls[0].options.abortSignal.aborted).toBe(true);
+      expect(mocks.incrementCount).not.toHaveBeenCalled();
+      expect(mocks.emitActivity).not.toHaveBeenCalled();
     });
   });
 
