@@ -762,7 +762,7 @@ the restored page's status. Independent of B3/B4.
   - _Boundary: getBacklinksHandlerFactory (routes/backlinks.ts), useSWRxBacklinks, interfaces/backlink.ts_
   - _Depends: B5.4_
 
-- [ ] B5.5 Add the target-state badge to the list-item
+- [x] B5.5 Add the target-state badge to the list-item
   - Extend `BacklinkListItem` (from B1.10) with a trashed/broken target-state badge
   - A **broken** row has `pageId: null` (B5.4) — there is no page to navigate to, so render its `path`
     as plain text rather than a link. Only trashed and normal rows stay clickable
@@ -772,7 +772,7 @@ the restored page's status. Independent of B3/B4.
   - _Boundary: BacklinkListItem_
   - _Depends: B1.10_
 
-- [ ] B5.6 Add the forward-health section to the panel
+- [x] B5.6 Add the forward-health section to the panel
   - Extend `BacklinksPanel` (from B1.11) with the secondary "outgoing links needing attention" section
     that flags trashed/broken outgoing links from the forward-health read
   - Reads `linkTargets` off the B5.9 hook payload. B5.9 widens the hook's return type from

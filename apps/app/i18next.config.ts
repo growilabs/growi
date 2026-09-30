@@ -124,6 +124,14 @@ export default defineConfig({
       // without this call site being touched.
       'commons:username_suggestion.active_user',
       'commons:username_suggestion.inactive_user',
+      // BacklinkListItem.tsx:50 — `t(badge.labelKey)`, where TARGET_STATE_BADGES
+      // (BacklinkListItem.tsx:14) maps a link's target state, read from the
+      // backlinks API payload, to a whole key string. Enumerated, not
+      // `backlinks.target_state.*`: the value set is exactly the two
+      // non-`normal` `LinkTargetState` values (interfaces/backlink.ts), a
+      // closed map that cannot grow without this call site being touched.
+      'backlinks.target_state.broken',
+      'backlinks.target_state.trashed',
       // slash-command-definitions.ts — the command set lives in
       // packages/editor (outside `extract.input`, which only scans apps/app's
       // own `src/**`) and every key is read back through

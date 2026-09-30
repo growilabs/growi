@@ -2,7 +2,12 @@
   "backlinks": {
     "failed_to_fetch": "Failed to fetch backlinks.",
     "no_backlinks": "There are no backlinks yet.",
-    "panel": "Backlinks"
+    "outgoing_needing_attention": "Outgoing links needing attention",
+    "panel": "Backlinks",
+    "target_state": {
+      "broken": "Broken link",
+      "trashed": "In trash"
+    }
   },
   "meta": {
     "display_name": "English"
