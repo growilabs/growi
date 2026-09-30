@@ -5221,6 +5221,28 @@ test.describe('Inline comment - resolved comments are collapsed by default, expa
     expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(375);
     expect(buttonBox.x + buttonBox.width / 2).toBeGreaterThan(375 / 2);
 
+    const expectBadgeInsideCard = async (item: Locator): Promise<void> => {
+      const badge = item.getByTestId('inline-comment-status');
+      await badge.scrollIntoViewIfNeeded();
+      const badgeBox = await badge.boundingBox();
+      const cardBox = await item.locator('.page-comment-main').boundingBox();
+      expect(badgeBox).not.toBeNull();
+      expect(cardBox).not.toBeNull();
+      if (badgeBox == null || cardBox == null) return;
+      expect(badgeBox.x + badgeBox.width).toBeLessThanOrEqual(
+        cardBox.x + cardBox.width + 0.5,
+      );
+    };
+    const collapsedResolved = listItemFor(page, shortResolvedSentence);
+    const unresolved = listItemFor(page, unresolvedSentence);
+    await expectBadgeInsideCard(collapsedResolved);
+    await expectBadgeInsideCard(unresolved);
+    await collapsedResolved.getByTestId('inline-comment-expand-button').click();
+    await expect(
+      collapsedResolved.getByTestId('inline-comment-collapse-button'),
+    ).toBeVisible();
+    await expectBadgeInsideCard(collapsedResolved);
+
     await menuButton.click();
     const menuItem = page.getByRole('menuitem', { name: expandAllName });
     await expect(menuItem).toBeVisible();
