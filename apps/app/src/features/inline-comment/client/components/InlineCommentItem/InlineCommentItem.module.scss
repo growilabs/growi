@@ -20,6 +20,15 @@
     border-left: 3px solid var(--grw-inline-comment-marker-bg);
   }
 
+  // The collapsed display's quote (`CollapsedInlineCommentItem`). No
+  // Bootstrap utility expresses a line clamp.
+  :global(.inline-comment-quote-clamped) {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
   // Every avatar inside a list item comes from the shared `%user-picture`
   // size. The extend above only reaches the ones inside `.page-comment`, so
   // the reply form's own avatar (which sits outside any comment card) kept

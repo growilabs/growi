@@ -27,6 +27,10 @@
  * the same component `CommentControl.tsx` uses for a normal comment.
  * Deleting opens the `DeleteConfirmAlert` shown in place, the same
  * confirmation a normal comment uses.
+ *
+ * A collapsed resolved comment renders `CollapsedInlineCommentItem` instead;
+ * the quote and the status badge are shared parts, so the two displays
+ * cannot drift apart.
  */
 import { type FC, type JSX, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,7 +46,10 @@ import type { RendererOptions } from '~/interfaces/renderer-options';
 import { useCurrentUser } from '~/states/global';
 
 import type { InlineCommentWithReplies } from '../../../interfaces';
+import { CollapsedInlineCommentItem } from './CollapsedInlineCommentItem';
+import { InlineCommentQuote } from './InlineCommentQuote';
 import { InlineCommentReplies } from './InlineCommentReplies';
+import { InlineCommentStatusBadge } from './InlineCommentStatusBadge';
 
 import styles from './InlineCommentItem.module.scss';
 
@@ -71,6 +78,10 @@ type InlineCommentItemProps = {
    * is handled entirely inside `scrollToRange` itself.
    */
   scrollToRange: (commentId: string) => boolean;
+  /** Owned by the list; only ever true for a resolved comment. */
+  collapsed: boolean;
+  onExpand: () => void;
+  onCollapse: () => void;
 };
 
 export const InlineCommentItem: FC<InlineCommentItemProps> = (
@@ -87,6 +98,9 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
     updateReply,
     removeReply,
     scrollToRange,
+    collapsed,
+    onExpand,
+    onCollapse,
   } = props;
   const { t } = useTranslation();
   const currentUser = useCurrentUser();
@@ -95,6 +109,19 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string>();
+
+  // Branching after the hooks keeps this component mounted while collapsed,
+  // so its local state survives a collapse/expand round trip.
+  if (collapsed) {
+    return (
+      <CollapsedInlineCommentItem
+        comment={comment}
+        onExpand={onExpand}
+        onQuoteClick={() => scrollToRange(comment.id)}
+      />
+    );
+  }
+
   const isResolved = comment.resolvedAt != null;
   const isOwnComment = currentUser?._id === comment.creatorId;
 
@@ -205,52 +232,44 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
                     />
                   </span>
                 )}
-                <span className={styles['icon-button-container']}>
-                  <NotAvailableIfReadOnlyUserNotAllowedToComment>
-                    <button
-                      type="button"
-                      data-testid="inline-comment-resolve-toggle-button"
-                      className="btn btn-sm btn-outline-secondary rounded-pill"
-                      onClick={handleResolveToggle}
-                    >
-                      {isResolved
-                        ? t('inline_comment.reopen')
-                        : t('inline_comment.resolve')}
-                    </button>
-                  </NotAvailableIfReadOnlyUserNotAllowedToComment>
-                </span>
-                <span
-                  data-testid="inline-comment-status"
-                  className={`badge rounded-pill ${styles['inline-comment-status-badge']} ${
-                    isResolved
-                      ? 'bg-success-subtle text-success-emphasis'
-                      : 'bg-warning-subtle text-warning-emphasis'
-                  }`}
-                >
-                  {isResolved
-                    ? t('inline_comment.resolved')
-                    : t('inline_comment.unresolved')}
-                </span>
+                {/* Neither the resolve toggle nor the collapse button while the
+                    delete confirm is open: resolving collapses the item, and
+                    the still-set confirm would reappear on the next expand. */}
+                {!isDeleteConfirmOpen && (
+                  <span className={styles['icon-button-container']}>
+                    <NotAvailableIfReadOnlyUserNotAllowedToComment>
+                      <button
+                        type="button"
+                        data-testid="inline-comment-resolve-toggle-button"
+                        className="btn btn-sm btn-outline-secondary rounded-pill"
+                        onClick={handleResolveToggle}
+                      >
+                        {isResolved
+                          ? t('inline_comment.reopen')
+                          : t('inline_comment.resolve')}
+                      </button>
+                    </NotAvailableIfReadOnlyUserNotAllowedToComment>
+                  </span>
+                )}
+                {isResolved && !isDeleteConfirmOpen && (
+                  <button
+                    type="button"
+                    data-testid="inline-comment-collapse-button"
+                    className="btn btn-sm btn-link text-secondary text-decoration-none p-0"
+                    onClick={onCollapse}
+                  >
+                    {t('inline_comment.collapse')}
+                  </button>
+                )}
+                <InlineCommentStatusBadge isResolved={isResolved} />
               </span>
             </>
           }
           beforeBody={
-            <>
-              {/* `inline-comment-quote` is `:global(...)` in the CSS module, so it's
-                  referenced as a plain class name -- styles['inline-comment-quote']
-                  would be undefined. A real <button> (not a div with role="button")
-                  wraps the quote for default keyboard accessibility, reset to
-                  plain-text styling so it still reads as the quote. */}
-              <button
-                type="button"
-                className="btn p-0 border-0 bg-transparent text-start w-100"
-                onClick={handleQuoteClick}
-              >
-                <blockquote className="inline-comment-quote bg-body-tertiary rounded-end small text-body-secondary my-2 p-2">
-                  {comment.anchor.quote}
-                </blockquote>
-              </button>
-            </>
+            <InlineCommentQuote
+              quote={comment.anchor.quote}
+              onClick={handleQuoteClick}
+            />
           }
           footer={
             <>

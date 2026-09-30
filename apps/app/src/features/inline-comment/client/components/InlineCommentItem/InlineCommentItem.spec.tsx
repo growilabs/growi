@@ -185,6 +185,12 @@ const originComment = (
   ...overrides,
 });
 
+type CollapseView = {
+  collapsed?: boolean;
+  onExpand?: () => void;
+  onCollapse?: () => void;
+};
+
 const renderItem = (
   overrides: Partial<InlineCommentWithReplies> = {},
   handlers: {
@@ -196,6 +202,7 @@ const renderItem = (
     removeReply?: (id: string) => Promise<unknown>;
     scrollToRange?: (commentId: string) => boolean;
   } = {},
+  view: CollapseView = {},
 ) =>
   render(
     <InlineCommentItem
@@ -209,6 +216,9 @@ const renderItem = (
       updateReply={handlers.updateReply ?? vi.fn().mockResolvedValue(undefined)}
       removeReply={handlers.removeReply ?? vi.fn().mockResolvedValue(undefined)}
       scrollToRange={handlers.scrollToRange ?? vi.fn(() => true)}
+      collapsed={view.collapsed ?? false}
+      onExpand={view.onExpand ?? vi.fn()}
+      onCollapse={view.onCollapse ?? vi.fn()}
     />,
   );
 
@@ -597,6 +607,9 @@ describe('InlineCommentItem', () => {
           updateReply={vi.fn()}
           removeReply={vi.fn()}
           scrollToRange={vi.fn(() => true)}
+          collapsed={false}
+          onExpand={vi.fn()}
+          onCollapse={vi.fn()}
         />,
       );
 
@@ -928,6 +941,264 @@ describe('InlineCommentItem', () => {
       ).toBe(true);
       // display is never used for the hover toggle (would cause layout shift).
       expect(iconButtonContainer).not.toHaveStyle({ display: 'none' });
+    });
+  });
+
+  describe('collapsing a resolved comment (Req 20.2 / 20.3 / 21.1 / 21.3 / 21.4)', () => {
+    const resolved = {
+      resolvedById: 'user2',
+      resolvedAt: new Date('2026-01-02T00:00:00.000Z'),
+    };
+
+    describe('while collapsed', () => {
+      it('shows the author, date, resolved badge, quote and expand button', () => {
+        const { container } = renderItem(resolved, {}, { collapsed: true });
+
+        expect(
+          container.querySelector(
+            '.inline-comment-item-styles .page-comment .page-comment-main',
+          ),
+        ).not.toBeNull();
+        expect(screen.getByTestId('username')).toBeInTheDocument();
+        expect(
+          screen.getByTestId('formatted-distance-date'),
+        ).toBeInTheDocument();
+        expect(screen.getByTestId('inline-comment-status')).toHaveTextContent(
+          'inline_comment.resolved',
+        );
+        expect(
+          container.querySelector('blockquote.inline-comment-quote'),
+        ).toHaveTextContent('the quoted range');
+        expect(
+          screen.getByRole('button', { name: 'inline_comment.expand' }),
+        ).toBeInTheDocument();
+      });
+
+      it("hides the body, replies, resolve toggle, edit/delete and revision link, even for the viewer's own comment", () => {
+        currentUserRef.current = { _id: 'user1' };
+        const { container } = renderItem(
+          { ...resolved, creatorId: 'user1', comment: 'a distinctive body' },
+          {},
+          { collapsed: true },
+        );
+
+        expect(screen.getByTestId('inline-comment-item')).not.toHaveTextContent(
+          'a distinctive body',
+        );
+        expect(
+          screen.queryByTestId('inline-comment-replies'),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId('inline-comment-resolve-toggle-button'),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId('inline-comment-edit-button'),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId('inline-comment-delete-button'),
+        ).not.toBeInTheDocument();
+        expect(
+          container.querySelector('#page-comment-revision-comment1'),
+        ).toBeNull();
+        expect(
+          screen.queryByRole('button', { name: 'inline_comment.collapse' }),
+        ).not.toBeInTheDocument();
+      });
+
+      it('scrolls to the anchored range when the quote is clicked', async () => {
+        const scrollToRange = vi.fn(() => true);
+        const { container } = renderItem(
+          resolved,
+          { scrollToRange },
+          { collapsed: true },
+        );
+
+        await userEvent.click(
+          container.querySelector('blockquote.inline-comment-quote') as Element,
+        );
+
+        expect(scrollToRange).toHaveBeenCalledWith('comment1');
+      });
+
+      it('calls onExpand when the expand button is clicked', async () => {
+        const onExpand = vi.fn();
+        renderItem(resolved, {}, { collapsed: true, onExpand });
+
+        await userEvent.click(
+          screen.getByRole('button', { name: 'inline_comment.expand' }),
+        );
+
+        expect(onExpand).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('while expanded', () => {
+      it('shows the same content and controls as an unresolved comment, plus the collapse button', async () => {
+        currentUserRef.current = { _id: 'user1' };
+        const { container } = renderItem(
+          { ...resolved, creatorId: 'user1', comment: 'a distinctive body' },
+          {},
+          { collapsed: false },
+        );
+
+        await waitFor(() => {
+          expect(
+            getMain(container)?.querySelector('.page-comment-body'),
+          ).toHaveTextContent('a distinctive body');
+        });
+        expect(
+          container.querySelector('blockquote.inline-comment-quote'),
+        ).not.toBeNull();
+        expect(
+          screen.getByTestId('inline-comment-replies'),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole('button', { name: 'inline_comment.reopen' }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByTestId('inline-comment-edit-button'),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByTestId('inline-comment-delete-button'),
+        ).toBeInTheDocument();
+        expect(
+          container.querySelector('#page-comment-revision-comment1'),
+        ).not.toBeNull();
+        expect(
+          screen.getByRole('button', { name: 'inline_comment.collapse' }),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByRole('button', { name: 'inline_comment.expand' }),
+        ).not.toBeInTheDocument();
+      });
+
+      it('does not truncate the quote', () => {
+        const { container } = renderItem(resolved, {}, { collapsed: false });
+
+        expect(
+          container.querySelector('blockquote.inline-comment-quote'),
+        ).not.toHaveClass('inline-comment-quote-clamped');
+      });
+
+      it('places the collapse button immediately to the left of the badge, where the expand button sits when collapsed', () => {
+        renderItem(resolved, {}, { collapsed: false });
+
+        const collapseButton = screen.getByRole('button', {
+          name: 'inline_comment.collapse',
+        });
+        const badge = screen.getByTestId('inline-comment-status');
+
+        expect(collapseButton.nextElementSibling).toBe(badge);
+        expect(collapseButton.closest('.icon-button-container')).toBeNull();
+      });
+
+      it('calls onCollapse when the collapse button is clicked', async () => {
+        const onCollapse = vi.fn();
+        renderItem(resolved, {}, { collapsed: false, onCollapse });
+
+        await userEvent.click(
+          screen.getByRole('button', { name: 'inline_comment.collapse' }),
+        );
+
+        expect(onCollapse).toHaveBeenCalledTimes(1);
+      });
+
+      it('hides the collapse button while the delete confirmation is open', async () => {
+        currentUserRef.current = { _id: 'user1' };
+        renderItem(
+          { ...resolved, creatorId: 'user1' },
+          {},
+          { collapsed: false },
+        );
+        expect(
+          screen.getByRole('button', { name: 'inline_comment.collapse' }),
+        ).toBeInTheDocument();
+
+        await userEvent.click(
+          screen.getByTestId('inline-comment-delete-button'),
+        );
+
+        expect(
+          screen.getByTestId('inline-comment-delete-confirm'),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByRole('button', { name: 'inline_comment.collapse' }),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it('hides the resolve toggle while the delete confirmation is open, so the confirmation cannot outlive a collapse', async () => {
+      currentUserRef.current = { _id: 'user1' };
+      renderItem({ creatorId: 'user1' }, {}, { collapsed: false });
+      expect(
+        screen.getByTestId('inline-comment-resolve-toggle-button'),
+      ).toBeInTheDocument();
+
+      await userEvent.click(screen.getByTestId('inline-comment-delete-button'));
+
+      expect(
+        screen.getByTestId('inline-comment-delete-confirm'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('inline-comment-resolve-toggle-button'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows neither the expand nor the collapse button on an unresolved comment', () => {
+      renderItem({}, {}, { collapsed: false });
+
+      expect(
+        screen.queryByRole('button', { name: 'inline_comment.expand' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'inline_comment.collapse' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('keeps its own state across collapsing and expanding again', async () => {
+      const handlers = {
+        resolve: vi.fn().mockRejectedValue(new Error('network down')),
+        createReply: vi.fn(),
+        update: vi.fn(),
+        remove: vi.fn(),
+        updateReply: vi.fn(),
+        removeReply: vi.fn(),
+        scrollToRange: vi.fn(() => true),
+      };
+      const itemWith = (collapsed: boolean) => (
+        <InlineCommentItem
+          comment={originComment(resolved)}
+          pagePath="/page1"
+          rendererOptions={rendererOptions}
+          {...handlers}
+          collapsed={collapsed}
+          onExpand={vi.fn()}
+          onCollapse={vi.fn()}
+        />
+      );
+      const { rerender } = render(itemWith(false));
+
+      await userEvent.click(
+        screen.getByRole('button', { name: 'inline_comment.reopen' }),
+      );
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('inline-comment-resolve-error'),
+        ).toHaveTextContent('network down');
+      });
+
+      rerender(itemWith(true));
+      expect(
+        screen.queryByTestId('inline-comment-resolve-error'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'inline_comment.expand' }),
+      ).toBeInTheDocument();
+
+      rerender(itemWith(false));
+      expect(
+        screen.getByTestId('inline-comment-resolve-error'),
+      ).toHaveTextContent('network down');
     });
   });
 });

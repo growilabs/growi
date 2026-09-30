@@ -213,7 +213,7 @@ onCollapse: () => void;
 
 - `collapsed` が真のとき: `InlineCommentItem` は hook を呼んだ直後に `CollapsedInlineCommentItem` を返す（この分岐は1回だけ）。`CollapsedInlineCommentItem` は、見出しに投稿者・日時・解決済みの札・展開ボタンだけを出す（履歴リンク・編集/削除・解決の切り替えは出さない）。引用文は残し、行数を絞って省略する。本文と返信（返信フォームを含む）は描かない。`CommentCard` の `children`（必須）には `null` を渡す。返信の一覧（`InlineCommentReplies`）は `CommentCard` の外で描かれるが、折りたたみ用の部品はそもそも描かない
 - 折りたたみ中も引用文は押せる。押すと本文中の該当箇所へスクロールする（Requirement 16）。位置は解決済みも含めた全件で持っているので、失敗のトーストは出ない
-- 解決済みで `collapsed` が偽のとき: 従来の描画に、札の左隣の折りたたみボタンを足す。ただし削除の確認（`isDeleteConfirmOpen`）を開いている間は、折りたたみボタンを出さない。`InlineCommentItem` は折りたたみ中も画面に残る（アンマウントされない）ので、削除の確認の状態が残り、展開し直したときに確認が再び現れるのを避けるため
+- 解決済みで `collapsed` が偽のとき: 従来の描画に、札の左隣の折りたたみボタンを足す。ただし削除の確認（`isDeleteConfirmOpen`）を開いている間は、折りたたみボタンと解決／未解決の切り替えボタンを出さない。`InlineCommentItem` は折りたたみ中も画面に残る（アンマウントされない）ので、削除の確認の状態が残り、展開し直したときに確認が再び現れるのを避けるため
 - 未解決のとき: 展開・折りたたみのボタンは出さない
 
 ### `InlineCommentListMenu`

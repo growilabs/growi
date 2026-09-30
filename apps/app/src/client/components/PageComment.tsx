@@ -265,6 +265,9 @@ export const PageComment: FC<PageCommentProps> = memo(
                       updateReply={inline.updateReply}
                       removeReply={inline.removeReply}
                       scrollToRange={inline.scrollToRange}
+                      collapsed={false}
+                      onExpand={() => {}}
+                      onCollapse={() => {}}
                     />
                   </div>
                 );
