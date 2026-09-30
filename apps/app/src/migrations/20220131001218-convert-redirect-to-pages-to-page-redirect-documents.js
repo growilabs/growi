@@ -1,12 +1,4 @@
-import mongoose from 'mongoose';
-
-import PageRedirectModel from '~/server/models/page-redirect';
 import { createBatchStream } from '~/server/util/batch-stream';
-import {
-  getModelSafely,
-  getMongoUri,
-  mongoOptions,
-} from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
@@ -15,10 +7,9 @@ const logger = loggerFactory(
 
 const BATCH_SIZE = 100;
 
-export async function up(db, client) {
-  await mongoose.connect(getMongoUri(), mongoOptions);
-  const pageCollection = await db.collection('pages');
-  const PageRedirect = getModelSafely('PageRedirect') || PageRedirectModel;
+export async function up(db) {
+  const pageCollection = db.collection('pages');
+  const pageRedirectCollection = db.collection('pageredirects');
 
   const cursor = pageCollection
     .find(
@@ -36,13 +27,14 @@ export async function up(db, client) {
           document: {
             fromPath: page.path,
             toPath: page.redirectTo,
+            __v: 0,
           },
         },
       };
     });
 
     try {
-      await PageRedirect.bulkWrite(insertPageRedirectOperations);
+      await pageRedirectCollection.bulkWrite(insertPageRedirectOperations);
     } catch (err) {
       if (err.code !== 11000) {
         throw Error(`Failed to migrate: ${err}`);
@@ -55,12 +47,11 @@ export async function up(db, client) {
   logger.info('Migration has successfully applied');
 }
 
-export async function down(db, client) {
-  await mongoose.connect(getMongoUri(), mongoOptions);
-  const pageCollection = await db.collection('pages');
-  const PageRedirect = getModelSafely('PageRedirect') || PageRedirectModel;
+export async function down(db) {
+  const pageCollection = db.collection('pages');
+  const pageRedirectCollection = db.collection('pageredirects');
 
-  const cursor = PageRedirect.find().lean().cursor();
+  const cursor = pageRedirectCollection.find().stream();
   const batchStream = createBatchStream(BATCH_SIZE);
 
   // PageRedirect => redirectTo
@@ -85,7 +76,7 @@ export async function down(db, client) {
     }
   }
 
-  await PageRedirect.deleteMany();
+  await pageRedirectCollection.deleteMany({});
 
   logger.info('Migration down has successfully applied');
 }

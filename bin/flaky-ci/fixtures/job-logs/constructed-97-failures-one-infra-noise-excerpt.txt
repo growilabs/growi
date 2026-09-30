@@ -1,0 +1,582 @@
+2026-09-04T07:59:07.1000000Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-01/feature-01.integ.ts[2m > [22mfeature-1 suite[2m > [22mcase 1 keeps its own identity
+2026-09-04T07:59:07.1000137Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:07.1000274Z [90m [2m❯[22m src/server/service/feature-01/feature-01.integ.ts:[2m41:7[22m[39m
+2026-09-04T07:59:07.1000411Z 
+2026-09-04T07:59:07.1000548Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[1/97]⎯[22m[39m
+2026-09-04T07:59:07.1000685Z 
+2026-09-04T07:59:07.1000822Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-02/feature-02.integ.ts[2m > [22mfeature-2 suite[2m > [22mcase 2 keeps its own identity
+2026-09-04T07:59:07.1000959Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:07.1001096Z [90m [2m❯[22m src/server/service/feature-02/feature-02.integ.ts:[2m42:7[22m[39m
+2026-09-04T07:59:07.1001233Z 
+2026-09-04T07:59:07.1001370Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[2/97]⎯[22m[39m
+2026-09-04T07:59:07.1001507Z 
+2026-09-04T07:59:07.1001644Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-03/feature-03.integ.ts[2m > [22mfeature-3 suite[2m > [22mcase 3 keeps its own identity
+2026-09-04T07:59:07.1001781Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:07.1001918Z [90m [2m❯[22m src/server/service/feature-03/feature-03.integ.ts:[2m43:7[22m[39m
+2026-09-04T07:59:07.1002055Z 
+2026-09-04T07:59:07.1002192Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[3/97]⎯[22m[39m
+2026-09-04T07:59:07.1002329Z 
+2026-09-04T07:59:07.1002466Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-04/feature-04.integ.ts[2m > [22mfeature-4 suite[2m > [22mcase 4 keeps its own identity
+2026-09-04T07:59:07.1002603Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:07.1002740Z [90m [2m❯[22m src/server/service/feature-04/feature-04.integ.ts:[2m44:7[22m[39m
+2026-09-04T07:59:07.1002877Z 
+2026-09-04T07:59:07.1003014Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[4/97]⎯[22m[39m
+2026-09-04T07:59:07.1003151Z 
+2026-09-04T07:59:07.1003288Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-05/feature-05.integ.ts[2m > [22mfeature-5 suite[2m > [22mcase 5 keeps its own identity
+2026-09-04T07:59:07.1003425Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:07.1003562Z [90m [2m❯[22m src/server/service/feature-05/feature-05.integ.ts:[2m45:7[22m[39m
+2026-09-04T07:59:07.1003699Z 
+2026-09-04T07:59:07.1003836Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[5/97]⎯[22m[39m
+2026-09-04T07:59:07.1003973Z 
+2026-09-04T07:59:07.1004110Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-06/feature-06.integ.ts[2m > [22mfeature-6 suite[2m > [22mcase 6 keeps its own identity
+2026-09-04T07:59:07.1004247Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:07.1004384Z [90m [2m❯[22m src/server/service/feature-06/feature-06.integ.ts:[2m46:7[22m[39m
+2026-09-04T07:59:07.1004521Z 
+2026-09-04T07:59:07.1004658Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[6/97]⎯[22m[39m
+2026-09-04T07:59:07.1004795Z 
+2026-09-04T07:59:07.1004932Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-07/feature-07.integ.ts[2m > [22mfeature-7 suite[2m > [22mcase 7 keeps its own identity
+2026-09-04T07:59:07.1005069Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:07.1005206Z [90m [2m❯[22m src/server/service/feature-07/feature-07.integ.ts:[2m47:7[22m[39m
+2026-09-04T07:59:07.1005343Z 
+2026-09-04T07:59:07.1005480Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[7/97]⎯[22m[39m
+2026-09-04T07:59:07.1005617Z 
+2026-09-04T07:59:07.1005754Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-08/feature-08.integ.ts[2m > [22mfeature-8 suite[2m > [22mcase 8 keeps its own identity
+2026-09-04T07:59:07.1005891Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:07.1006028Z [90m [2m❯[22m src/server/service/feature-08/feature-08.integ.ts:[2m48:7[22m[39m
+2026-09-04T07:59:07.1006165Z 
+2026-09-04T07:59:07.1006302Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[8/97]⎯[22m[39m
+2026-09-04T07:59:07.1006439Z 
+2026-09-04T07:59:07.1006576Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-09/feature-09.integ.ts[2m > [22mfeature-9 suite[2m > [22mcase 9 keeps its own identity
+2026-09-04T07:59:07.1006713Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:07.1006850Z [90m [2m❯[22m src/server/service/feature-09/feature-09.integ.ts:[2m49:7[22m[39m
+2026-09-04T07:59:07.1006987Z 
+2026-09-04T07:59:07.1007124Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[9/97]⎯[22m[39m
+2026-09-04T07:59:07.1007261Z 
+2026-09-04T07:59:07.1007398Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-10/feature-10.integ.ts[2m > [22mfeature-10 suite[2m > [22mcase 10 keeps its own identity
+2026-09-04T07:59:07.1007535Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:07.1007672Z [90m [2m❯[22m src/server/service/feature-10/feature-10.integ.ts:[2m50:7[22m[39m
+2026-09-04T07:59:07.1007809Z 
+2026-09-04T07:59:07.1007946Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[10/97]⎯[22m[39m
+2026-09-04T07:59:07.1008083Z 
+2026-09-04T07:59:08.1008220Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-11/feature-11.integ.ts[2m > [22mfeature-11 suite[2m > [22mcase 11 keeps its own identity
+2026-09-04T07:59:08.1008357Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:08.1008494Z [90m [2m❯[22m src/server/service/feature-11/feature-11.integ.ts:[2m51:7[22m[39m
+2026-09-04T07:59:08.1008631Z 
+2026-09-04T07:59:08.1008768Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[11/97]⎯[22m[39m
+2026-09-04T07:59:08.1008905Z 
+2026-09-04T07:59:08.1009042Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-12/feature-12.integ.ts[2m > [22mfeature-12 suite[2m > [22mcase 12 keeps its own identity
+2026-09-04T07:59:08.1009179Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:08.1009316Z [90m [2m❯[22m src/server/service/feature-12/feature-12.integ.ts:[2m52:7[22m[39m
+2026-09-04T07:59:08.1009453Z 
+2026-09-04T07:59:08.1009590Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[12/97]⎯[22m[39m
+2026-09-04T07:59:08.1009727Z 
+2026-09-04T07:59:08.1009864Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-13/feature-13.integ.ts[2m > [22mfeature-13 suite[2m > [22mcase 13 keeps its own identity
+2026-09-04T07:59:08.1010001Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:08.1010138Z [90m [2m❯[22m src/server/service/feature-13/feature-13.integ.ts:[2m53:7[22m[39m
+2026-09-04T07:59:08.1010275Z 
+2026-09-04T07:59:08.1010412Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[13/97]⎯[22m[39m
+2026-09-04T07:59:08.1010549Z 
+2026-09-04T07:59:08.1010686Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-14/feature-14.integ.ts[2m > [22mfeature-14 suite[2m > [22mcase 14 keeps its own identity
+2026-09-04T07:59:08.1010823Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:08.1010960Z [90m [2m❯[22m src/server/service/feature-14/feature-14.integ.ts:[2m54:7[22m[39m
+2026-09-04T07:59:08.1011097Z 
+2026-09-04T07:59:08.1011234Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[14/97]⎯[22m[39m
+2026-09-04T07:59:08.1011371Z 
+2026-09-04T07:59:08.1011508Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-15/feature-15.integ.ts[2m > [22mfeature-15 suite[2m > [22mcase 15 keeps its own identity
+2026-09-04T07:59:08.1011645Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:08.1011782Z [90m [2m❯[22m src/server/service/feature-15/feature-15.integ.ts:[2m55:7[22m[39m
+2026-09-04T07:59:08.1011919Z 
+2026-09-04T07:59:08.1012056Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[15/97]⎯[22m[39m
+2026-09-04T07:59:08.1012193Z 
+2026-09-04T07:59:08.1012330Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-16/feature-16.integ.ts[2m > [22mfeature-16 suite[2m > [22mcase 16 keeps its own identity
+2026-09-04T07:59:08.1012467Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:08.1012604Z [90m [2m❯[22m src/server/service/feature-16/feature-16.integ.ts:[2m56:7[22m[39m
+2026-09-04T07:59:08.1012741Z 
+2026-09-04T07:59:08.1012878Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[16/97]⎯[22m[39m
+2026-09-04T07:59:08.1013015Z 
+2026-09-04T07:59:08.1013152Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-17/feature-17.integ.ts[2m > [22mfeature-17 suite[2m > [22mcase 17 keeps its own identity
+2026-09-04T07:59:08.1013289Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:08.1013426Z [90m [2m❯[22m src/server/service/feature-17/feature-17.integ.ts:[2m57:7[22m[39m
+2026-09-04T07:59:08.1013563Z 
+2026-09-04T07:59:08.1013700Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[17/97]⎯[22m[39m
+2026-09-04T07:59:08.1013837Z 
+2026-09-04T07:59:08.1013974Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-18/feature-18.integ.ts[2m > [22mfeature-18 suite[2m > [22mcase 18 keeps its own identity
+2026-09-04T07:59:08.1014111Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:08.1014248Z [90m [2m❯[22m src/server/service/feature-18/feature-18.integ.ts:[2m58:7[22m[39m
+2026-09-04T07:59:08.1014385Z 
+2026-09-04T07:59:08.1014522Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[18/97]⎯[22m[39m
+2026-09-04T07:59:08.1014659Z 
+2026-09-04T07:59:08.1014796Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-19/feature-19.integ.ts[2m > [22mfeature-19 suite[2m > [22mcase 19 keeps its own identity
+2026-09-04T07:59:08.1014933Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:08.1015070Z [90m [2m❯[22m src/server/service/feature-19/feature-19.integ.ts:[2m59:7[22m[39m
+2026-09-04T07:59:08.1015207Z 
+2026-09-04T07:59:08.1015344Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[19/97]⎯[22m[39m
+2026-09-04T07:59:08.1015481Z 
+2026-09-04T07:59:08.1015618Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-20/feature-20.integ.ts[2m > [22mfeature-20 suite[2m > [22mcase 20 keeps its own identity
+2026-09-04T07:59:08.1015755Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:08.1015892Z [90m [2m❯[22m src/server/service/feature-20/feature-20.integ.ts:[2m60:7[22m[39m
+2026-09-04T07:59:08.1016029Z 
+2026-09-04T07:59:08.1016166Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[20/97]⎯[22m[39m
+2026-09-04T07:59:08.1016303Z 
+2026-09-04T07:59:09.1016440Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-21/feature-21.integ.ts[2m > [22mfeature-21 suite[2m > [22mcase 21 keeps its own identity
+2026-09-04T07:59:09.1016577Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:09.1016714Z [90m [2m❯[22m src/server/service/feature-21/feature-21.integ.ts:[2m61:7[22m[39m
+2026-09-04T07:59:09.1016851Z 
+2026-09-04T07:59:09.1016988Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[21/97]⎯[22m[39m
+2026-09-04T07:59:09.1017125Z 
+2026-09-04T07:59:09.1017262Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-22/feature-22.integ.ts[2m > [22mfeature-22 suite[2m > [22mcase 22 keeps its own identity
+2026-09-04T07:59:09.1017399Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:09.1017536Z [90m [2m❯[22m src/server/service/feature-22/feature-22.integ.ts:[2m62:7[22m[39m
+2026-09-04T07:59:09.1017673Z 
+2026-09-04T07:59:09.1017810Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[22/97]⎯[22m[39m
+2026-09-04T07:59:09.1017947Z 
+2026-09-04T07:59:09.1018084Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-23/feature-23.integ.ts[2m > [22mfeature-23 suite[2m > [22mcase 23 keeps its own identity
+2026-09-04T07:59:09.1018221Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:09.1018358Z [90m [2m❯[22m src/server/service/feature-23/feature-23.integ.ts:[2m63:7[22m[39m
+2026-09-04T07:59:09.1018495Z 
+2026-09-04T07:59:09.1018632Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[23/97]⎯[22m[39m
+2026-09-04T07:59:09.1018769Z 
+2026-09-04T07:59:09.1018906Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-24/feature-24.integ.ts[2m > [22mfeature-24 suite[2m > [22mcase 24 keeps its own identity
+2026-09-04T07:59:09.1019043Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:09.1019180Z [90m [2m❯[22m src/server/service/feature-24/feature-24.integ.ts:[2m64:7[22m[39m
+2026-09-04T07:59:09.1019317Z 
+2026-09-04T07:59:09.1019454Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[24/97]⎯[22m[39m
+2026-09-04T07:59:09.1019591Z 
+2026-09-04T07:59:09.1019728Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-25/feature-25.integ.ts[2m > [22mfeature-25 suite[2m > [22mcase 25 keeps its own identity
+2026-09-04T07:59:09.1019865Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:09.1020002Z [90m [2m❯[22m src/server/service/feature-25/feature-25.integ.ts:[2m65:7[22m[39m
+2026-09-04T07:59:09.1020139Z 
+2026-09-04T07:59:09.1020276Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[25/97]⎯[22m[39m
+2026-09-04T07:59:09.1020413Z 
+2026-09-04T07:59:09.1020550Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-26/feature-26.integ.ts[2m > [22mfeature-26 suite[2m > [22mcase 26 keeps its own identity
+2026-09-04T07:59:09.1020687Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:09.1020824Z [90m [2m❯[22m src/server/service/feature-26/feature-26.integ.ts:[2m66:7[22m[39m
+2026-09-04T07:59:09.1020961Z 
+2026-09-04T07:59:09.1021098Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[26/97]⎯[22m[39m
+2026-09-04T07:59:09.1021235Z 
+2026-09-04T07:59:09.1021372Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-27/feature-27.integ.ts[2m > [22mfeature-27 suite[2m > [22mcase 27 keeps its own identity
+2026-09-04T07:59:09.1021509Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:09.1021646Z [90m [2m❯[22m src/server/service/feature-27/feature-27.integ.ts:[2m67:7[22m[39m
+2026-09-04T07:59:09.1021783Z 
+2026-09-04T07:59:09.1021920Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[27/97]⎯[22m[39m
+2026-09-04T07:59:09.1022057Z 
+2026-09-04T07:59:09.1022194Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-28/feature-28.integ.ts[2m > [22mfeature-28 suite[2m > [22mcase 28 keeps its own identity
+2026-09-04T07:59:09.1022331Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:09.1022468Z [90m [2m❯[22m src/server/service/feature-28/feature-28.integ.ts:[2m68:7[22m[39m
+2026-09-04T07:59:09.1022605Z 
+2026-09-04T07:59:09.1022742Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[28/97]⎯[22m[39m
+2026-09-04T07:59:09.1022879Z 
+2026-09-04T07:59:09.1023016Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-29/feature-29.integ.ts[2m > [22mfeature-29 suite[2m > [22mcase 29 keeps its own identity
+2026-09-04T07:59:09.1023153Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:09.1023290Z [90m [2m❯[22m src/server/service/feature-29/feature-29.integ.ts:[2m69:7[22m[39m
+2026-09-04T07:59:09.1023427Z 
+2026-09-04T07:59:09.1023564Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[29/97]⎯[22m[39m
+2026-09-04T07:59:09.1023701Z 
+2026-09-04T07:59:09.1023838Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-30/feature-30.integ.ts[2m > [22mfeature-30 suite[2m > [22mcase 30 keeps its own identity
+2026-09-04T07:59:09.1023975Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:09.1024112Z [90m [2m❯[22m src/server/service/feature-30/feature-30.integ.ts:[2m70:7[22m[39m
+2026-09-04T07:59:09.1024249Z 
+2026-09-04T07:59:09.1024386Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[30/97]⎯[22m[39m
+2026-09-04T07:59:09.1024523Z 
+2026-09-04T07:59:10.1024660Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-31/feature-31.integ.ts[2m > [22mfeature-31 suite[2m > [22mcase 31 keeps its own identity
+2026-09-04T07:59:10.1024797Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:10.1024934Z [90m [2m❯[22m src/server/service/feature-31/feature-31.integ.ts:[2m71:7[22m[39m
+2026-09-04T07:59:10.1025071Z 
+2026-09-04T07:59:10.1025208Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[31/97]⎯[22m[39m
+2026-09-04T07:59:10.1025345Z 
+2026-09-04T07:59:10.1025482Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-32/feature-32.integ.ts[2m > [22mfeature-32 suite[2m > [22mcase 32 keeps its own identity
+2026-09-04T07:59:10.1025619Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:10.1025756Z [90m [2m❯[22m src/server/service/feature-32/feature-32.integ.ts:[2m72:7[22m[39m
+2026-09-04T07:59:10.1025893Z 
+2026-09-04T07:59:10.1026030Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[32/97]⎯[22m[39m
+2026-09-04T07:59:10.1026167Z 
+2026-09-04T07:59:10.1026304Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-33/feature-33.integ.ts[2m > [22mfeature-33 suite[2m > [22mcase 33 keeps its own identity
+2026-09-04T07:59:10.1026441Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:10.1026578Z [90m [2m❯[22m src/server/service/feature-33/feature-33.integ.ts:[2m73:7[22m[39m
+2026-09-04T07:59:10.1026715Z 
+2026-09-04T07:59:10.1026852Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[33/97]⎯[22m[39m
+2026-09-04T07:59:10.1026989Z 
+2026-09-04T07:59:10.1027126Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-34/feature-34.integ.ts[2m > [22mfeature-34 suite[2m > [22mcase 34 keeps its own identity
+2026-09-04T07:59:10.1027263Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:10.1027400Z [90m [2m❯[22m src/server/service/feature-34/feature-34.integ.ts:[2m74:7[22m[39m
+2026-09-04T07:59:10.1027537Z 
+2026-09-04T07:59:10.1027674Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[34/97]⎯[22m[39m
+2026-09-04T07:59:10.1027811Z 
+2026-09-04T07:59:10.1027948Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-35/feature-35.integ.ts[2m > [22mfeature-35 suite[2m > [22mcase 35 keeps its own identity
+2026-09-04T07:59:10.1028085Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:10.1028222Z [90m [2m❯[22m src/server/service/feature-35/feature-35.integ.ts:[2m75:7[22m[39m
+2026-09-04T07:59:10.1028359Z 
+2026-09-04T07:59:10.1028496Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[35/97]⎯[22m[39m
+2026-09-04T07:59:10.1028633Z 
+2026-09-04T07:59:10.1028770Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-36/feature-36.integ.ts[2m > [22mfeature-36 suite[2m > [22mcase 36 keeps its own identity
+2026-09-04T07:59:10.1028907Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:10.1029044Z [90m [2m❯[22m src/server/service/feature-36/feature-36.integ.ts:[2m76:7[22m[39m
+2026-09-04T07:59:10.1029181Z 
+2026-09-04T07:59:10.1029318Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[36/97]⎯[22m[39m
+2026-09-04T07:59:10.1029455Z 
+2026-09-04T07:59:10.1029592Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-37/feature-37.integ.ts[2m > [22mfeature-37 suite[2m > [22mcase 37 keeps its own identity
+2026-09-04T07:59:10.1029729Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:10.1029866Z [90m [2m❯[22m src/server/service/feature-37/feature-37.integ.ts:[2m77:7[22m[39m
+2026-09-04T07:59:10.1030003Z 
+2026-09-04T07:59:10.1030140Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[37/97]⎯[22m[39m
+2026-09-04T07:59:10.1030277Z 
+2026-09-04T07:59:10.1030414Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-38/feature-38.integ.ts[2m > [22mfeature-38 suite[2m > [22mcase 38 keeps its own identity
+2026-09-04T07:59:10.1030551Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:10.1030688Z [90m [2m❯[22m src/server/service/feature-38/feature-38.integ.ts:[2m78:7[22m[39m
+2026-09-04T07:59:10.1030825Z 
+2026-09-04T07:59:10.1030962Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[38/97]⎯[22m[39m
+2026-09-04T07:59:10.1031099Z 
+2026-09-04T07:59:10.1031236Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-39/feature-39.integ.ts[2m > [22mfeature-39 suite[2m > [22mcase 39 keeps its own identity
+2026-09-04T07:59:10.1031373Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:10.1031510Z [90m [2m❯[22m src/server/service/feature-39/feature-39.integ.ts:[2m79:7[22m[39m
+2026-09-04T07:59:10.1031647Z 
+2026-09-04T07:59:10.1031784Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[39/97]⎯[22m[39m
+2026-09-04T07:59:10.1031921Z 
+2026-09-04T07:59:10.1032058Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-40/feature-40.integ.ts[2m > [22mfeature-40 suite[2m > [22mcase 40 keeps its own identity
+2026-09-04T07:59:10.1032195Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:10.1032332Z [90m [2m❯[22m src/server/service/feature-40/feature-40.integ.ts:[2m80:7[22m[39m
+2026-09-04T07:59:10.1032469Z 
+2026-09-04T07:59:10.1032606Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[40/97]⎯[22m[39m
+2026-09-04T07:59:10.1032743Z 
+2026-09-04T07:59:11.1032880Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-41/feature-41.integ.ts[2m > [22mfeature-41 suite[2m > [22mcase 41 keeps its own identity
+2026-09-04T07:59:11.1033017Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:11.1033154Z [90m [2m❯[22m src/server/service/feature-41/feature-41.integ.ts:[2m81:7[22m[39m
+2026-09-04T07:59:11.1033291Z 
+2026-09-04T07:59:11.1033428Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[41/97]⎯[22m[39m
+2026-09-04T07:59:11.1033565Z 
+2026-09-04T07:59:11.1033702Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-42/feature-42.integ.ts[2m > [22mfeature-42 suite[2m > [22mcase 42 keeps its own identity
+2026-09-04T07:59:11.1033839Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:11.1033976Z [90m [2m❯[22m src/server/service/feature-42/feature-42.integ.ts:[2m82:7[22m[39m
+2026-09-04T07:59:11.1034113Z 
+2026-09-04T07:59:11.1034250Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[42/97]⎯[22m[39m
+2026-09-04T07:59:11.1034387Z 
+2026-09-04T07:59:11.1034524Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-43/feature-43.integ.ts[2m > [22mfeature-43 suite[2m > [22mcase 43 keeps its own identity
+2026-09-04T07:59:11.1034661Z [31m[1mError[22m: getaddrinfo ENOTFOUND elasticsearch[39m
+2026-09-04T07:59:11.1034798Z [90m [2m❯[22m GET src/server/service/feature-43/feature-43.integ.ts:[2m88:5[22m[39m
+2026-09-04T07:59:11.1034935Z 
+2026-09-04T07:59:11.1035072Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[43/97]⎯[22m[39m
+2026-09-04T07:59:11.1035209Z 
+2026-09-04T07:59:11.1035346Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-44/feature-44.integ.ts[2m > [22mfeature-44 suite[2m > [22mcase 44 keeps its own identity
+2026-09-04T07:59:11.1035483Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:11.1035620Z [90m [2m❯[22m src/server/service/feature-44/feature-44.integ.ts:[2m84:7[22m[39m
+2026-09-04T07:59:11.1035757Z 
+2026-09-04T07:59:11.1035894Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[44/97]⎯[22m[39m
+2026-09-04T07:59:11.1036031Z 
+2026-09-04T07:59:11.1036168Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-45/feature-45.integ.ts[2m > [22mfeature-45 suite[2m > [22mcase 45 keeps its own identity
+2026-09-04T07:59:11.1036305Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:11.1036442Z [90m [2m❯[22m src/server/service/feature-45/feature-45.integ.ts:[2m85:7[22m[39m
+2026-09-04T07:59:11.1036579Z 
+2026-09-04T07:59:11.1036716Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[45/97]⎯[22m[39m
+2026-09-04T07:59:11.1036853Z 
+2026-09-04T07:59:11.1036990Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-46/feature-46.integ.ts[2m > [22mfeature-46 suite[2m > [22mcase 46 keeps its own identity
+2026-09-04T07:59:11.1037127Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:11.1037264Z [90m [2m❯[22m src/server/service/feature-46/feature-46.integ.ts:[2m86:7[22m[39m
+2026-09-04T07:59:11.1037401Z 
+2026-09-04T07:59:11.1037538Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[46/97]⎯[22m[39m
+2026-09-04T07:59:11.1037675Z 
+2026-09-04T07:59:11.1037812Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-47/feature-47.integ.ts[2m > [22mfeature-47 suite[2m > [22mcase 47 keeps its own identity
+2026-09-04T07:59:11.1037949Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:11.1038086Z [90m [2m❯[22m src/server/service/feature-47/feature-47.integ.ts:[2m87:7[22m[39m
+2026-09-04T07:59:11.1038223Z 
+2026-09-04T07:59:11.1038360Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[47/97]⎯[22m[39m
+2026-09-04T07:59:11.1038497Z 
+2026-09-04T07:59:11.1038634Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-48/feature-48.integ.ts[2m > [22mfeature-48 suite[2m > [22mcase 48 keeps its own identity
+2026-09-04T07:59:11.1038771Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:11.1038908Z [90m [2m❯[22m src/server/service/feature-48/feature-48.integ.ts:[2m88:7[22m[39m
+2026-09-04T07:59:11.1039045Z 
+2026-09-04T07:59:11.1039182Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[48/97]⎯[22m[39m
+2026-09-04T07:59:11.1039319Z 
+2026-09-04T07:59:11.1039456Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-49/feature-49.integ.ts[2m > [22mfeature-49 suite[2m > [22mcase 49 keeps its own identity
+2026-09-04T07:59:11.1039593Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:11.1039730Z [90m [2m❯[22m src/server/service/feature-49/feature-49.integ.ts:[2m89:7[22m[39m
+2026-09-04T07:59:11.1039867Z 
+2026-09-04T07:59:11.1040004Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[49/97]⎯[22m[39m
+2026-09-04T07:59:11.1040141Z 
+2026-09-04T07:59:11.1040278Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-50/feature-50.integ.ts[2m > [22mfeature-50 suite[2m > [22mcase 50 keeps its own identity
+2026-09-04T07:59:11.1040415Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:11.1040552Z [90m [2m❯[22m src/server/service/feature-50/feature-50.integ.ts:[2m90:7[22m[39m
+2026-09-04T07:59:11.1040689Z 
+2026-09-04T07:59:11.1040826Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[50/97]⎯[22m[39m
+2026-09-04T07:59:11.1040963Z 
+2026-09-04T07:59:12.1041100Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-51/feature-51.integ.ts[2m > [22mfeature-51 suite[2m > [22mcase 51 keeps its own identity
+2026-09-04T07:59:12.1041237Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:12.1041374Z [90m [2m❯[22m src/server/service/feature-51/feature-51.integ.ts:[2m91:7[22m[39m
+2026-09-04T07:59:12.1041511Z 
+2026-09-04T07:59:12.1041648Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[51/97]⎯[22m[39m
+2026-09-04T07:59:12.1041785Z 
+2026-09-04T07:59:12.1041922Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-52/feature-52.integ.ts[2m > [22mfeature-52 suite[2m > [22mcase 52 keeps its own identity
+2026-09-04T07:59:12.1042059Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:12.1042196Z [90m [2m❯[22m src/server/service/feature-52/feature-52.integ.ts:[2m92:7[22m[39m
+2026-09-04T07:59:12.1042333Z 
+2026-09-04T07:59:12.1042470Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[52/97]⎯[22m[39m
+2026-09-04T07:59:12.1042607Z 
+2026-09-04T07:59:12.1042744Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-53/feature-53.integ.ts[2m > [22mfeature-53 suite[2m > [22mcase 53 keeps its own identity
+2026-09-04T07:59:12.1042881Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:12.1043018Z [90m [2m❯[22m src/server/service/feature-53/feature-53.integ.ts:[2m93:7[22m[39m
+2026-09-04T07:59:12.1043155Z 
+2026-09-04T07:59:12.1043292Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[53/97]⎯[22m[39m
+2026-09-04T07:59:12.1043429Z 
+2026-09-04T07:59:12.1043566Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-54/feature-54.integ.ts[2m > [22mfeature-54 suite[2m > [22mcase 54 keeps its own identity
+2026-09-04T07:59:12.1043703Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:12.1043840Z [90m [2m❯[22m src/server/service/feature-54/feature-54.integ.ts:[2m94:7[22m[39m
+2026-09-04T07:59:12.1043977Z 
+2026-09-04T07:59:12.1044114Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[54/97]⎯[22m[39m
+2026-09-04T07:59:12.1044251Z 
+2026-09-04T07:59:12.1044388Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-55/feature-55.integ.ts[2m > [22mfeature-55 suite[2m > [22mcase 55 keeps its own identity
+2026-09-04T07:59:12.1044525Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:12.1044662Z [90m [2m❯[22m src/server/service/feature-55/feature-55.integ.ts:[2m95:7[22m[39m
+2026-09-04T07:59:12.1044799Z 
+2026-09-04T07:59:12.1044936Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[55/97]⎯[22m[39m
+2026-09-04T07:59:12.1045073Z 
+2026-09-04T07:59:12.1045210Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-56/feature-56.integ.ts[2m > [22mfeature-56 suite[2m > [22mcase 56 keeps its own identity
+2026-09-04T07:59:12.1045347Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:12.1045484Z [90m [2m❯[22m src/server/service/feature-56/feature-56.integ.ts:[2m96:7[22m[39m
+2026-09-04T07:59:12.1045621Z 
+2026-09-04T07:59:12.1045758Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[56/97]⎯[22m[39m
+2026-09-04T07:59:12.1045895Z 
+2026-09-04T07:59:12.1046032Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-57/feature-57.integ.ts[2m > [22mfeature-57 suite[2m > [22mcase 57 keeps its own identity
+2026-09-04T07:59:12.1046169Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:12.1046306Z [90m [2m❯[22m src/server/service/feature-57/feature-57.integ.ts:[2m97:7[22m[39m
+2026-09-04T07:59:12.1046443Z 
+2026-09-04T07:59:12.1046580Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[57/97]⎯[22m[39m
+2026-09-04T07:59:12.1046717Z 
+2026-09-04T07:59:12.1046854Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-58/feature-58.integ.ts[2m > [22mfeature-58 suite[2m > [22mcase 58 keeps its own identity
+2026-09-04T07:59:12.1046991Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:12.1047128Z [90m [2m❯[22m src/server/service/feature-58/feature-58.integ.ts:[2m98:7[22m[39m
+2026-09-04T07:59:12.1047265Z 
+2026-09-04T07:59:12.1047402Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[58/97]⎯[22m[39m
+2026-09-04T07:59:12.1047539Z 
+2026-09-04T07:59:12.1047676Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-59/feature-59.integ.ts[2m > [22mfeature-59 suite[2m > [22mcase 59 keeps its own identity
+2026-09-04T07:59:12.1047813Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:12.1047950Z [90m [2m❯[22m src/server/service/feature-59/feature-59.integ.ts:[2m99:7[22m[39m
+2026-09-04T07:59:12.1048087Z 
+2026-09-04T07:59:12.1048224Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[59/97]⎯[22m[39m
+2026-09-04T07:59:12.1048361Z 
+2026-09-04T07:59:12.1048498Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-60/feature-60.integ.ts[2m > [22mfeature-60 suite[2m > [22mcase 60 keeps its own identity
+2026-09-04T07:59:12.1048635Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:12.1048772Z [90m [2m❯[22m src/server/service/feature-60/feature-60.integ.ts:[2m100:7[22m[39m
+2026-09-04T07:59:12.1048909Z 
+2026-09-04T07:59:12.1049046Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[60/97]⎯[22m[39m
+2026-09-04T07:59:12.1049183Z 
+2026-09-04T07:59:13.1049320Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-61/feature-61.integ.ts[2m > [22mfeature-61 suite[2m > [22mcase 61 keeps its own identity
+2026-09-04T07:59:13.1049457Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:13.1049594Z [90m [2m❯[22m src/server/service/feature-61/feature-61.integ.ts:[2m101:7[22m[39m
+2026-09-04T07:59:13.1049731Z 
+2026-09-04T07:59:13.1049868Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[61/97]⎯[22m[39m
+2026-09-04T07:59:13.1050005Z 
+2026-09-04T07:59:13.1050142Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-62/feature-62.integ.ts[2m > [22mfeature-62 suite[2m > [22mcase 62 keeps its own identity
+2026-09-04T07:59:13.1050279Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:13.1050416Z [90m [2m❯[22m src/server/service/feature-62/feature-62.integ.ts:[2m102:7[22m[39m
+2026-09-04T07:59:13.1050553Z 
+2026-09-04T07:59:13.1050690Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[62/97]⎯[22m[39m
+2026-09-04T07:59:13.1050827Z 
+2026-09-04T07:59:13.1050964Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-63/feature-63.integ.ts[2m > [22mfeature-63 suite[2m > [22mcase 63 keeps its own identity
+2026-09-04T07:59:13.1051101Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:13.1051238Z [90m [2m❯[22m src/server/service/feature-63/feature-63.integ.ts:[2m103:7[22m[39m
+2026-09-04T07:59:13.1051375Z 
+2026-09-04T07:59:13.1051512Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[63/97]⎯[22m[39m
+2026-09-04T07:59:13.1051649Z 
+2026-09-04T07:59:13.1051786Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-64/feature-64.integ.ts[2m > [22mfeature-64 suite[2m > [22mcase 64 keeps its own identity
+2026-09-04T07:59:13.1051923Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:13.1052060Z [90m [2m❯[22m src/server/service/feature-64/feature-64.integ.ts:[2m104:7[22m[39m
+2026-09-04T07:59:13.1052197Z 
+2026-09-04T07:59:13.1052334Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[64/97]⎯[22m[39m
+2026-09-04T07:59:13.1052471Z 
+2026-09-04T07:59:13.1052608Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-65/feature-65.integ.ts[2m > [22mfeature-65 suite[2m > [22mcase 65 keeps its own identity
+2026-09-04T07:59:13.1052745Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:13.1052882Z [90m [2m❯[22m src/server/service/feature-65/feature-65.integ.ts:[2m105:7[22m[39m
+2026-09-04T07:59:13.1053019Z 
+2026-09-04T07:59:13.1053156Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[65/97]⎯[22m[39m
+2026-09-04T07:59:13.1053293Z 
+2026-09-04T07:59:13.1053430Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-66/feature-66.integ.ts[2m > [22mfeature-66 suite[2m > [22mcase 66 keeps its own identity
+2026-09-04T07:59:13.1053567Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:13.1053704Z [90m [2m❯[22m src/server/service/feature-66/feature-66.integ.ts:[2m106:7[22m[39m
+2026-09-04T07:59:13.1053841Z 
+2026-09-04T07:59:13.1053978Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[66/97]⎯[22m[39m
+2026-09-04T07:59:13.1054115Z 
+2026-09-04T07:59:13.1054252Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-67/feature-67.integ.ts[2m > [22mfeature-67 suite[2m > [22mcase 67 keeps its own identity
+2026-09-04T07:59:13.1054389Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:13.1054526Z [90m [2m❯[22m src/server/service/feature-67/feature-67.integ.ts:[2m107:7[22m[39m
+2026-09-04T07:59:13.1054663Z 
+2026-09-04T07:59:13.1054800Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[67/97]⎯[22m[39m
+2026-09-04T07:59:13.1054937Z 
+2026-09-04T07:59:13.1055074Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-68/feature-68.integ.ts[2m > [22mfeature-68 suite[2m > [22mcase 68 keeps its own identity
+2026-09-04T07:59:13.1055211Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:13.1055348Z [90m [2m❯[22m src/server/service/feature-68/feature-68.integ.ts:[2m108:7[22m[39m
+2026-09-04T07:59:13.1055485Z 
+2026-09-04T07:59:13.1055622Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[68/97]⎯[22m[39m
+2026-09-04T07:59:13.1055759Z 
+2026-09-04T07:59:13.1055896Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-69/feature-69.integ.ts[2m > [22mfeature-69 suite[2m > [22mcase 69 keeps its own identity
+2026-09-04T07:59:13.1056033Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:13.1056170Z [90m [2m❯[22m src/server/service/feature-69/feature-69.integ.ts:[2m109:7[22m[39m
+2026-09-04T07:59:13.1056307Z 
+2026-09-04T07:59:13.1056444Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[69/97]⎯[22m[39m
+2026-09-04T07:59:13.1056581Z 
+2026-09-04T07:59:13.1056718Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-70/feature-70.integ.ts[2m > [22mfeature-70 suite[2m > [22mcase 70 keeps its own identity
+2026-09-04T07:59:13.1056855Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:13.1056992Z [90m [2m❯[22m src/server/service/feature-70/feature-70.integ.ts:[2m110:7[22m[39m
+2026-09-04T07:59:13.1057129Z 
+2026-09-04T07:59:13.1057266Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[70/97]⎯[22m[39m
+2026-09-04T07:59:13.1057403Z 
+2026-09-04T07:59:14.1057540Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-71/feature-71.integ.ts[2m > [22mfeature-71 suite[2m > [22mcase 71 keeps its own identity
+2026-09-04T07:59:14.1057677Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:14.1057814Z [90m [2m❯[22m src/server/service/feature-71/feature-71.integ.ts:[2m111:7[22m[39m
+2026-09-04T07:59:14.1057951Z 
+2026-09-04T07:59:14.1058088Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[71/97]⎯[22m[39m
+2026-09-04T07:59:14.1058225Z 
+2026-09-04T07:59:14.1058362Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-72/feature-72.integ.ts[2m > [22mfeature-72 suite[2m > [22mcase 72 keeps its own identity
+2026-09-04T07:59:14.1058499Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:14.1058636Z [90m [2m❯[22m src/server/service/feature-72/feature-72.integ.ts:[2m112:7[22m[39m
+2026-09-04T07:59:14.1058773Z 
+2026-09-04T07:59:14.1058910Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[72/97]⎯[22m[39m
+2026-09-04T07:59:14.1059047Z 
+2026-09-04T07:59:14.1059184Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-73/feature-73.integ.ts[2m > [22mfeature-73 suite[2m > [22mcase 73 keeps its own identity
+2026-09-04T07:59:14.1059321Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:14.1059458Z [90m [2m❯[22m src/server/service/feature-73/feature-73.integ.ts:[2m113:7[22m[39m
+2026-09-04T07:59:14.1059595Z 
+2026-09-04T07:59:14.1059732Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[73/97]⎯[22m[39m
+2026-09-04T07:59:14.1059869Z 
+2026-09-04T07:59:14.1060006Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-74/feature-74.integ.ts[2m > [22mfeature-74 suite[2m > [22mcase 74 keeps its own identity
+2026-09-04T07:59:14.1060143Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:14.1060280Z [90m [2m❯[22m src/server/service/feature-74/feature-74.integ.ts:[2m114:7[22m[39m
+2026-09-04T07:59:14.1060417Z 
+2026-09-04T07:59:14.1060554Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[74/97]⎯[22m[39m
+2026-09-04T07:59:14.1060691Z 
+2026-09-04T07:59:14.1060828Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-75/feature-75.integ.ts[2m > [22mfeature-75 suite[2m > [22mcase 75 keeps its own identity
+2026-09-04T07:59:14.1060965Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:14.1061102Z [90m [2m❯[22m src/server/service/feature-75/feature-75.integ.ts:[2m115:7[22m[39m
+2026-09-04T07:59:14.1061239Z 
+2026-09-04T07:59:14.1061376Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[75/97]⎯[22m[39m
+2026-09-04T07:59:14.1061513Z 
+2026-09-04T07:59:14.1061650Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-76/feature-76.integ.ts[2m > [22mfeature-76 suite[2m > [22mcase 76 keeps its own identity
+2026-09-04T07:59:14.1061787Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:14.1061924Z [90m [2m❯[22m src/server/service/feature-76/feature-76.integ.ts:[2m116:7[22m[39m
+2026-09-04T07:59:14.1062061Z 
+2026-09-04T07:59:14.1062198Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[76/97]⎯[22m[39m
+2026-09-04T07:59:14.1062335Z 
+2026-09-04T07:59:14.1062472Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-77/feature-77.integ.ts[2m > [22mfeature-77 suite[2m > [22mcase 77 keeps its own identity
+2026-09-04T07:59:14.1062609Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:14.1062746Z [90m [2m❯[22m src/server/service/feature-77/feature-77.integ.ts:[2m117:7[22m[39m
+2026-09-04T07:59:14.1062883Z 
+2026-09-04T07:59:14.1063020Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[77/97]⎯[22m[39m
+2026-09-04T07:59:14.1063157Z 
+2026-09-04T07:59:14.1063294Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-78/feature-78.integ.ts[2m > [22mfeature-78 suite[2m > [22mcase 78 keeps its own identity
+2026-09-04T07:59:14.1063431Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:14.1063568Z [90m [2m❯[22m src/server/service/feature-78/feature-78.integ.ts:[2m118:7[22m[39m
+2026-09-04T07:59:14.1063705Z 
+2026-09-04T07:59:14.1063842Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[78/97]⎯[22m[39m
+2026-09-04T07:59:14.1063979Z 
+2026-09-04T07:59:14.1064116Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-79/feature-79.integ.ts[2m > [22mfeature-79 suite[2m > [22mcase 79 keeps its own identity
+2026-09-04T07:59:14.1064253Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:14.1064390Z [90m [2m❯[22m src/server/service/feature-79/feature-79.integ.ts:[2m119:7[22m[39m
+2026-09-04T07:59:14.1064527Z 
+2026-09-04T07:59:14.1064664Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[79/97]⎯[22m[39m
+2026-09-04T07:59:14.1064801Z 
+2026-09-04T07:59:14.1064938Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-80/feature-80.integ.ts[2m > [22mfeature-80 suite[2m > [22mcase 80 keeps its own identity
+2026-09-04T07:59:14.1065075Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:14.1065212Z [90m [2m❯[22m src/server/service/feature-80/feature-80.integ.ts:[2m120:7[22m[39m
+2026-09-04T07:59:14.1065349Z 
+2026-09-04T07:59:14.1065486Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[80/97]⎯[22m[39m
+2026-09-04T07:59:14.1065623Z 
+2026-09-04T07:59:15.1065760Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-81/feature-81.integ.ts[2m > [22mfeature-81 suite[2m > [22mcase 81 keeps its own identity
+2026-09-04T07:59:15.1065897Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:15.1066034Z [90m [2m❯[22m src/server/service/feature-81/feature-81.integ.ts:[2m121:7[22m[39m
+2026-09-04T07:59:15.1066171Z 
+2026-09-04T07:59:15.1066308Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[81/97]⎯[22m[39m
+2026-09-04T07:59:15.1066445Z 
+2026-09-04T07:59:15.1066582Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-82/feature-82.integ.ts[2m > [22mfeature-82 suite[2m > [22mcase 82 keeps its own identity
+2026-09-04T07:59:15.1066719Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:15.1066856Z [90m [2m❯[22m src/server/service/feature-82/feature-82.integ.ts:[2m122:7[22m[39m
+2026-09-04T07:59:15.1066993Z 
+2026-09-04T07:59:15.1067130Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[82/97]⎯[22m[39m
+2026-09-04T07:59:15.1067267Z 
+2026-09-04T07:59:15.1067404Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-83/feature-83.integ.ts[2m > [22mfeature-83 suite[2m > [22mcase 83 keeps its own identity
+2026-09-04T07:59:15.1067541Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:15.1067678Z [90m [2m❯[22m src/server/service/feature-83/feature-83.integ.ts:[2m123:7[22m[39m
+2026-09-04T07:59:15.1067815Z 
+2026-09-04T07:59:15.1067952Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[83/97]⎯[22m[39m
+2026-09-04T07:59:15.1068089Z 
+2026-09-04T07:59:15.1068226Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-84/feature-84.integ.ts[2m > [22mfeature-84 suite[2m > [22mcase 84 keeps its own identity
+2026-09-04T07:59:15.1068363Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:15.1068500Z [90m [2m❯[22m src/server/service/feature-84/feature-84.integ.ts:[2m124:7[22m[39m
+2026-09-04T07:59:15.1068637Z 
+2026-09-04T07:59:15.1068774Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[84/97]⎯[22m[39m
+2026-09-04T07:59:15.1068911Z 
+2026-09-04T07:59:15.1069048Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-85/feature-85.integ.ts[2m > [22mfeature-85 suite[2m > [22mcase 85 keeps its own identity
+2026-09-04T07:59:15.1069185Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:15.1069322Z [90m [2m❯[22m src/server/service/feature-85/feature-85.integ.ts:[2m125:7[22m[39m
+2026-09-04T07:59:15.1069459Z 
+2026-09-04T07:59:15.1069596Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[85/97]⎯[22m[39m
+2026-09-04T07:59:15.1069733Z 
+2026-09-04T07:59:15.1069870Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-86/feature-86.integ.ts[2m > [22mfeature-86 suite[2m > [22mcase 86 keeps its own identity
+2026-09-04T07:59:15.1070007Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:15.1070144Z [90m [2m❯[22m src/server/service/feature-86/feature-86.integ.ts:[2m126:7[22m[39m
+2026-09-04T07:59:15.1070281Z 
+2026-09-04T07:59:15.1070418Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[86/97]⎯[22m[39m
+2026-09-04T07:59:15.1070555Z 
+2026-09-04T07:59:15.1070692Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-87/feature-87.integ.ts[2m > [22mfeature-87 suite[2m > [22mcase 87 keeps its own identity
+2026-09-04T07:59:15.1070829Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:15.1070966Z [90m [2m❯[22m src/server/service/feature-87/feature-87.integ.ts:[2m127:7[22m[39m
+2026-09-04T07:59:15.1071103Z 
+2026-09-04T07:59:15.1071240Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[87/97]⎯[22m[39m
+2026-09-04T07:59:15.1071377Z 
+2026-09-04T07:59:15.1071514Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-88/feature-88.integ.ts[2m > [22mfeature-88 suite[2m > [22mcase 88 keeps its own identity
+2026-09-04T07:59:15.1071651Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:15.1071788Z [90m [2m❯[22m src/server/service/feature-88/feature-88.integ.ts:[2m128:7[22m[39m
+2026-09-04T07:59:15.1071925Z 
+2026-09-04T07:59:15.1072062Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[88/97]⎯[22m[39m
+2026-09-04T07:59:15.1072199Z 
+2026-09-04T07:59:15.1072336Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-89/feature-89.integ.ts[2m > [22mfeature-89 suite[2m > [22mcase 89 keeps its own identity
+2026-09-04T07:59:15.1072473Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:15.1072610Z [90m [2m❯[22m src/server/service/feature-89/feature-89.integ.ts:[2m129:7[22m[39m
+2026-09-04T07:59:15.1072747Z 
+2026-09-04T07:59:15.1072884Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[89/97]⎯[22m[39m
+2026-09-04T07:59:15.1073021Z 
+2026-09-04T07:59:15.1073158Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-90/feature-90.integ.ts[2m > [22mfeature-90 suite[2m > [22mcase 90 keeps its own identity
+2026-09-04T07:59:15.1073295Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:15.1073432Z [90m [2m❯[22m src/server/service/feature-90/feature-90.integ.ts:[2m130:7[22m[39m
+2026-09-04T07:59:15.1073569Z 
+2026-09-04T07:59:15.1073706Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[90/97]⎯[22m[39m
+2026-09-04T07:59:15.1073843Z 
+2026-09-04T07:59:16.1073980Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-91/feature-91.integ.ts[2m > [22mfeature-91 suite[2m > [22mcase 91 keeps its own identity
+2026-09-04T07:59:16.1074117Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:16.1074254Z [90m [2m❯[22m src/server/service/feature-91/feature-91.integ.ts:[2m131:7[22m[39m
+2026-09-04T07:59:16.1074391Z 
+2026-09-04T07:59:16.1074528Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[91/97]⎯[22m[39m
+2026-09-04T07:59:16.1074665Z 
+2026-09-04T07:59:16.1074802Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-92/feature-92.integ.ts[2m > [22mfeature-92 suite[2m > [22mcase 92 keeps its own identity
+2026-09-04T07:59:16.1074939Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:16.1075076Z [90m [2m❯[22m src/server/service/feature-92/feature-92.integ.ts:[2m132:7[22m[39m
+2026-09-04T07:59:16.1075213Z 
+2026-09-04T07:59:16.1075350Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[92/97]⎯[22m[39m
+2026-09-04T07:59:16.1075487Z 
+2026-09-04T07:59:16.1075624Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-93/feature-93.integ.ts[2m > [22mfeature-93 suite[2m > [22mcase 93 keeps its own identity
+2026-09-04T07:59:16.1075761Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:16.1075898Z [90m [2m❯[22m src/server/service/feature-93/feature-93.integ.ts:[2m133:7[22m[39m
+2026-09-04T07:59:16.1076035Z 
+2026-09-04T07:59:16.1076172Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[93/97]⎯[22m[39m
+2026-09-04T07:59:16.1076309Z 
+2026-09-04T07:59:16.1076446Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-94/feature-94.integ.ts[2m > [22mfeature-94 suite[2m > [22mcase 94 keeps its own identity
+2026-09-04T07:59:16.1076583Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:16.1076720Z [90m [2m❯[22m src/server/service/feature-94/feature-94.integ.ts:[2m134:7[22m[39m
+2026-09-04T07:59:16.1076857Z 
+2026-09-04T07:59:16.1076994Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[94/97]⎯[22m[39m
+2026-09-04T07:59:16.1077131Z 
+2026-09-04T07:59:16.1077268Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-95/feature-95.integ.ts[2m > [22mfeature-95 suite[2m > [22mcase 95 keeps its own identity
+2026-09-04T07:59:16.1077405Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:16.1077542Z [90m [2m❯[22m src/server/service/feature-95/feature-95.integ.ts:[2m135:7[22m[39m
+2026-09-04T07:59:16.1077679Z 
+2026-09-04T07:59:16.1077816Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[95/97]⎯[22m[39m
+2026-09-04T07:59:16.1077953Z 
+2026-09-04T07:59:16.1078090Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-96/feature-96.integ.ts[2m > [22mfeature-96 suite[2m > [22mcase 96 keeps its own identity
+2026-09-04T07:59:16.1078227Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:16.1078364Z [90m [2m❯[22m src/server/service/feature-96/feature-96.integ.ts:[2m136:7[22m[39m
+2026-09-04T07:59:16.1078501Z 
+2026-09-04T07:59:16.1078638Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[96/97]⎯[22m[39m
+2026-09-04T07:59:16.1078775Z 
+2026-09-04T07:59:16.1078912Z [41m[1m FAIL [22m[49m [30m[42m app-integration [49m[39m src/server/service/feature-97/feature-97.integ.ts[2m > [22mfeature-97 suite[2m > [22mcase 97 keeps its own identity
+2026-09-04T07:59:16.1079049Z [31m[1mAssertionError[22m: expected 200 to be 201 // Object.is equality[39m
+2026-09-04T07:59:16.1079186Z [90m [2m❯[22m src/server/service/feature-97/feature-97.integ.ts:[2m137:7[22m[39m
+2026-09-04T07:59:16.1079323Z 
+2026-09-04T07:59:16.1079460Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯[97/97]⎯[22m[39m
+2026-09-04T07:59:16.1079597Z 

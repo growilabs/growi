@@ -23,11 +23,8 @@ import {
 } from '~/features/page-markdown';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import type {
-  IPageRedirect,
-  PageRedirectModel,
-} from '~/server/models/page-redirect';
 import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
+import { prisma } from '~/utils/prisma';
 
 import type { CommonEachProps } from '../common-props';
 import type {
@@ -45,7 +42,6 @@ type PathResolutionResult = {
 
 let mongooseModel: typeof model;
 let Page: PageModel;
-let PageRedirect: PageRedirectModel;
 
 async function initModels(): Promise<void> {
   if (mongooseModel == null) {
@@ -53,11 +49,6 @@ async function initModels(): Promise<void> {
   }
   if (Page == null) {
     Page = mongooseModel<IPage, PageModel>('Page');
-  }
-  if (PageRedirect == null) {
-    PageRedirect = mongooseModel<IPageRedirect, PageRedirectModel>(
-      'PageRedirect',
-    );
   }
 }
 
@@ -73,7 +64,8 @@ async function resolvePathAndCheckIdentical(
   let isIdenticalPathPage = false;
 
   if (!isPermalink) {
-    const chains = await PageRedirect.retrievePageRedirectEndpoints(path);
+    const chains =
+      await prisma.pageredirects.retrievePageRedirectEndpoints(path);
     if (chains != null) {
       resolvedPagePath = chains.end.toPath;
       redirectFrom = chains.start.fromPath;
