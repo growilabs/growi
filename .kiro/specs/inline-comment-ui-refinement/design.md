@@ -38,7 +38,7 @@
 
 - 作成の起点・入力フォームの配置と幅（実装済み。`SelectionPopover` の配置指定、`SelectionCapture` の選択方向の受け渡し、`InlineCommentForm` の幅指定）
 - 解決済みインラインコメントの折りたたみ状態（画面だけの状態）と、その表示の切り替え
-- 一覧右端のメニュー（表示部品と、項目を宣言する形）
+- 一覧右端のメニュー（項目の配列を受け取って描く表示部品）
 
 ### Out of Boundary
 
@@ -50,7 +50,7 @@
 ### Allowed Dependencies
 
 - `CommentCard`（枠と見出しの行。スロットで差し込む）、reactstrap の `Dropdown` 系（`MentionPickerButton` と同じ使い方）、`@popperjs/core`（既存）
-- 依存の向きは `PageComment` → `InlineCommentItem` / メニュー部品。`InlineCommentItem` は折りたたみ状態を自分では持たず、親から受け取る
+- 依存の向きは `PageComment` → `InlineCommentItem` / メニュー部品。`InlineCommentItem` は折りたたみ状態を自分では持たず、親から受け取る。`InlineCommentItem` → `CollapsedInlineCommentItem`（折りたたみ中の表示）
 
 ### Revalidation Triggers
 
@@ -74,22 +74,28 @@ graph TB
   PageComment --> useResolvedCollapse
   PageComment --> InlineCommentListMenu
   PageComment --> InlineCommentItem
-  useResolvedCollapse -->|expandedIds| PageComment
-  InlineCommentListMenu -->|items| buildMenuItems
-  buildMenuItems -->|expandAll| useResolvedCollapse
+  useResolvedCollapse -->|isCollapsed, resolve, listMenuItems| PageComment
+  useResolvedCollapse -->|items| InlineCommentListMenu
+  InlineCommentItem -->|collapsed| CollapsedInlineCommentItem
   InlineCommentItem --> CommentCard
+  InlineCommentItem --> InlineCommentQuote
+  InlineCommentItem --> InlineCommentStatusBadge
+  CollapsedInlineCommentItem --> CommentCard
+  CollapsedInlineCommentItem --> InlineCommentQuote
+  CollapsedInlineCommentItem --> InlineCommentStatusBadge
 ```
 
 - **折りたたみ状態は `PageComment` が持つ**。理由は、一括展開が「全件に同時に効く」ため、各行が自分の状態を持つと親から操作できないから
 - **状態は「展開済みの id の集合」**とし、折りたたみ中かどうかは「解決済み かつ 集合にない」で導く。未解決に戻ったコメントは集合の有無に関わらず展開されて見える（Requirement 20.4 が自然に満たされる）
-- **メニュー項目は宣言（データ）として渡す**。メニュー部品は項目の配列を受け取って描くだけで、個々の項目の中身を知らない。項目を足すときは宣言側の1か所だけを変える（Requirement 22.6）
+- **折りたたみ中の表示は別の部品に分ける**。`InlineCommentItem` は hook を呼んだ直後に、折りたたみ中なら `CollapsedInlineCommentItem` を返す分岐を1回だけ置く。分岐が履歴リンク・編集ボタン・引用文・削除確認・返信の一覧に散らばるのを避けるため。引用文と札は、両方の表示で食い違わないよう小さな共有部品（`InlineCommentQuote`・`InlineCommentStatusBadge`）にする
+- **メニュー項目は配列（データ）として渡す**。メニュー部品は項目の配列を受け取って描くだけで、個々の項目の中身を知らない（Requirement 22.6）。配列は、処理を持つ `use-resolved-collapse` の中で組み立てる。項目を足すときは、この配列に要素を足すだけでよく、メニュー部品と `PageComment` は変わらない
 
 ### Technology Stack
 
 | Layer | Choice | Role | Notes |
 |---|---|---|---|
 | Frontend | React 18 + reactstrap `Dropdown` | 折りたたみの表示切り替え、三点メニュー | 新しい依存は追加しない |
-| State | React state（`PageComment` 内） | 展開済み id の集合 | 保存しない（Requirement 20.5） |
+| State | React state（`use-resolved-collapse` hook 内。hook は `PageComment` が呼ぶ） | 展開済み id の集合 | 保存しない（Requirement 20.5） |
 | i18n | `inline_comment.*` に4キーを、5言語（en_US・ja_JP・zh_CN・fr_FR・ko_KR）すべてへ追加 | 展開・折りたたみ・メニューの文言 | 翻訳もこの spec の範囲。翻訳の抜けの基準値（`baseline.json`）は引き上げない |
 
 ## File Structure Plan
@@ -98,24 +104,24 @@ graph TB
 
 ```
 apps/app/src/features/inline-comment/client/
-├── services/
-│   └── resolved-collapse.ts               # 新規: 展開済み id の集合に対する純粋関数（展開・折りたたみ・一括展開・折りたたみ中かの判定）
 ├── hooks/
-│   └── use-resolved-collapse.ts           # 新規: 上の純粋関数を React state に載せる薄い hook
+│   └── use-resolved-collapse.ts           # 新規: 展開済み id の集合の state、折りたたみ中かの判定（isCollapsed を export）、resolve の包み、メニュー項目の配列
 └── components/
     ├── InlineCommentItem/
-    │   ├── InlineCommentItem.tsx          # 変更: 折りたたみ表示と展開・折りたたみの操作を追加
+    │   ├── InlineCommentItem.tsx          # 変更: hook の直後に、折りたたみ中なら CollapsedInlineCommentItem を返す分岐を1回置く。展開中の解決済みには折りたたむボタンを足す
+    │   ├── CollapsedInlineCommentItem.tsx # 新規: 折りたたみ中の表示（投稿者・日時・札・引用文・展開ボタンだけ）
+    │   ├── InlineCommentQuote.tsx         # 新規: 引用文（両方の表示で共有。折りたたみ中は行数を絞って省略）
+    │   ├── InlineCommentStatusBadge.tsx   # 新規: 解決済み／未解決の札（両方の表示で共有）
     │   └── InlineCommentItem.module.scss  # 変更: 折りたたみ中の引用文の省略表示を追加
     └── InlineCommentListMenu/
-        ├── InlineCommentListMenu.tsx      # 新規: 三点ボタン＋ドロップダウン。項目の配列を受け取って描く
-        └── inline-comment-list-menu-items.ts  # 新規: メニュー項目の宣言（現在は「全ての解決済みのコメントを展開する」のみ）
+        └── InlineCommentListMenu.tsx      # 新規: 三点ボタン＋ドロップダウン。項目の配列を受け取って描く
 ```
 
 `hooks/` は inline-comment の client 配下に初めて作るディレクトリ。`features/{name}/client/hooks/` は apps/app の標準構成（AGENTS.md）に沿う。
 
 ### Modified Files
 
-- `apps/app/src/client/components/PageComment.tsx` — 折りたたみ状態の hook を使い、各 `InlineCommentItem` に折りたたみ中か・操作を渡す。`resolve` を包み、解決／未解決の切り替えが成功したら展開済みの記録を消す。一覧の先頭に、右寄せの1行としてメニューを置く（インラインコメントが1件以上のとき）。新しい hook は、途中で描画を終える分岐（`items.length === 0 || rendererOptions == null` の早期 return）より前で呼ぶ（Rules of Hooks）
+- `apps/app/src/client/components/PageComment.tsx` — 折りたたみ状態の hook に `resolve` を渡し、包まれた `resolve`（切り替えが成功したら展開済みの記録を消す）と折りたたみ中かの判定を受け取って、各 `InlineCommentItem` に渡す。一覧の先頭に、右寄せの1行としてメニューを置く（インラインコメントが1件以上のとき）。新しい hook は、途中で描画を終える分岐（`items.length === 0 || rendererOptions == null` の早期 return）より前で呼ぶ（Rules of Hooks）
 - `apps/app/public/static/locales/{en_US,ja_JP,zh_CN,fr_FR,ko_KR}/translation.json` — `inline_comment` に `expand`, `collapse`, `expand_all_resolved`, `list_menu` を追加（5言語すべて）
 - `apps/app/src/features/inline-comment/client/i18n-keys.spec.ts` — 追加キーを守りのテストに加える
 - `apps/app/src/client/components/PageComment.spec.tsx` — `InlineCommentItem` の差し替え（mock）が `collapsed` などの新しい props を受け取る形に広げる
@@ -146,17 +152,17 @@ stateDiagram-v2
 |---|---|---|---|
 | 19.1, 19.2, 19.3, 19.4 | 作成の起点を上側・カーソル側の端に、余白がなければ下に | `SelectionPopover`（上向き配置＋端の位置を返す仮想要素）、`SelectionCapture`（選択方向を保持） | 実装済み |
 | 19.5, 19.6, 19.7 | フォームも同じ基準で、上方向に伸び、余白がなければ下に | `SelectionCapture`（composing 状態に選択方向を持ち越す）、`use-popper-position`（サイズ変化で再配置） | 実装済み |
-| 20.1 | 解決済みは既定で折りたたみ | `resolved-collapse`（折りたたみ中の判定）、`PageComment`、`InlineCommentItem` | |
-| 20.2 | 折りたたみ中は投稿者・日時・札・引用文・展開の操作だけ | `InlineCommentItem`（本文・返信・返信フォーム・編集/削除/解決の操作を出さない）、SCSS（引用文の省略） | 引用文は残す |
-| 20.3 | 未解決・通常コメントは常に展開 | `resolved-collapse`（未解決は常に展開と判定）、`PageComment`（通常コメントは対象外） | |
+| 20.1 | 解決済みは既定で折りたたみ | `use-resolved-collapse`（`isCollapsed`）、`PageComment`、`InlineCommentItem` | |
+| 20.2 | 折りたたみ中は投稿者・日時・札・引用文・展開の操作だけ | `CollapsedInlineCommentItem`（本文・返信・返信フォーム・編集/削除/解決の操作を出さない）、`InlineCommentQuote`、SCSS（引用文の省略） | 引用文は残す |
+| 20.3 | 未解決・通常コメントは常に展開 | `use-resolved-collapse`（`isCollapsed` は未解決なら常に偽）、`PageComment`（通常コメントは対象外） | |
 | 20.4 | 未解決に戻したら展開して見せる | 判定が「解決済み かつ 集合にない」であること | 追加の処理は不要 |
-| 20.5 | 状態を保存しない | 展開済み集合が `PageComment` の React state のみ | |
-| 21.1, 21.2 | 個別の展開操作、他は変えない | `InlineCommentItem`（展開ボタン）、`use-resolved-collapse`（1件だけ集合に足す） | |
-| 21.3 | 展開中は同じ場所に折りたたむ操作 | `InlineCommentItem`（バッジの左隣に、展開・折りたたみのボタンを同じ位置で出し分け） | |
+| 20.5 | 状態を保存しない | 展開済み集合が `use-resolved-collapse` の React state のみ | |
+| 21.1, 21.2 | 個別の展開操作、他は変えない | `CollapsedInlineCommentItem`（展開ボタン）、`use-resolved-collapse`（1件だけ集合に足す） | |
+| 21.3 | 展開中は同じ場所に折りたたむ操作 | `InlineCommentItem`（札の左隣に折りたたむボタン）、`CollapsedInlineCommentItem`（同じ位置に展開ボタン） | |
 | 21.4 | 展開中は未解決と同じ内容・操作 | `InlineCommentItem`（展開中は従来の描画をそのまま使う） | Requirement 4・16・18 の既存動作 |
-| 22.1, 22.2, 22.3 | 右端の三点メニュー、ドロップダウン、1項目 | `InlineCommentListMenu`、`inline-comment-list-menu-items`、`PageComment`（インラインコメントが1件以上のとき配置） | |
-| 22.4 | 一括展開 | `resolved-collapse`（解決済み全件の id を集合に足す） | |
-| 22.5 | 解決済みがなければ項目を無効に | `inline-comment-list-menu-items`（項目の `disabled`） | |
+| 22.1, 22.2, 22.3 | 右端の三点メニュー、ドロップダウン、1項目 | `InlineCommentListMenu`、`use-resolved-collapse`（`listMenuItems`）、`PageComment`（インラインコメントが1件以上のとき配置） | |
+| 22.4 | 一括展開 | `use-resolved-collapse`（解決済み全件の id を集合に足す。メニュー項目の処理） | |
+| 22.5 | 解決済みがなければ項目を無効に | `use-resolved-collapse`（`listMenuItems` の項目の `disabled`） | |
 | 22.6 | 項目を今後足せる | `InlineCommentListMenu` が項目の配列を受け取る形 | |
 | 22.7 | リードオンリー利用者にも表示・操作可 | 一覧メニューは書き込み権限の判定を通さない | データを変えないため |
 | 23.1, 23.2, 23.3, 23.4, 23.5 | フォームの幅の下限・上限・画面幅への追従・再配置 | `InlineCommentForm`（幅の指定）、`use-popper-position`（サイズ変化の監視） | 実装済み |
@@ -165,39 +171,37 @@ stateDiagram-v2
 
 | Component | 責務 | 主な要件 |
 |---|---|---|
-| `resolved-collapse`（純粋関数） | 展開済み id の集合に対する操作と、折りたたみ中かの判定 | 20.1, 20.3, 20.4, 21.2, 22.4 |
-| `use-resolved-collapse`（hook） | 上を React state に載せる。`PageComment` から使う | 20.5 |
-| `InlineCommentItem` | 折りたたみ中／展開中の描き分け | 20.2, 21.1, 21.3, 21.4 |
-| `InlineCommentListMenu` | 三点ボタンとドロップダウン。項目の配列を描く | 22.1, 22.2, 22.3, 22.6 |
-| `inline-comment-list-menu-items` | 項目の宣言。現状は1項目 | 22.3, 22.5 |
-
-### `resolved-collapse`
-
-```typescript
-type ExpandedIds = ReadonlySet<string>;
-
-export const isCollapsed = (comment: Pick<InlineCommentWithReplies, 'id' | 'resolvedAt'>, expanded: ExpandedIds): boolean;
-export const expand = (expanded: ExpandedIds, id: string): ExpandedIds;
-export const collapse = (expanded: ExpandedIds, id: string): ExpandedIds;
-export const forget = (expanded: ExpandedIds, id: string): ExpandedIds;
-export const expandAllResolved = (expanded: ExpandedIds, comments: readonly Pick<InlineCommentWithReplies, 'id' | 'resolvedAt'>[]): ExpandedIds;
-```
-
-- どの関数も引数の集合を書き換えず、新しい集合を返す（イミュータブル。`coding-style.md`）
-- `isCollapsed` は `resolvedAt != null && !expanded.has(id)`。未解決は常に `false`
+| `use-resolved-collapse`（hook） | 展開済み id の集合の state、折りたたみ中かの判定、`resolve` の包み、メニュー項目の配列。`PageComment` から使う | 20.1, 20.3, 20.4, 20.5, 21.2, 22.3, 22.4, 22.5 |
+| `InlineCommentItem` | 展開中の描画。折りたたみ中は `CollapsedInlineCommentItem` へ分岐する | 21.3, 21.4 |
+| `CollapsedInlineCommentItem` | 折りたたみ中の描画（投稿者・日時・札・引用文・展開ボタンだけ） | 20.2, 21.1 |
+| `InlineCommentQuote` / `InlineCommentStatusBadge` | 引用文と札。上の2つで共有する | 20.2 |
+| `InlineCommentListMenu` | 三点ボタンとドロップダウン。項目の配列を描く | 22.1, 22.2, 22.6 |
 
 ### `use-resolved-collapse`
 
 ```typescript
-export const useResolvedCollapse = (comments: readonly InlineCommentWithReplies[]): {
+export const isCollapsed = (
+  comment: Pick<InlineCommentWithReplies, 'id' | 'resolvedAt'>,
+  expanded: ReadonlySet<string>,
+): boolean;
+
+export const useResolvedCollapse = (
+  comments: readonly InlineCommentWithReplies[],
+  resolve: (id: string, resolved: boolean) => Promise<unknown>,
+): {
   isCollapsed: (comment: InlineCommentWithReplies) => boolean;
   expand: (id: string) => void;
   collapse: (id: string) => void;
-  forget: (id: string) => void;
-  expandAllResolved: () => void;
-  hasResolved: boolean;
+  resolve: (id: string, resolved: boolean) => Promise<unknown>;
+  listMenuItems: readonly InlineCommentListMenuItem[];
 };
 ```
+
+- `isCollapsed` は `resolvedAt != null && !expanded.has(id)`。未解決は常に `false`。判定の規則が1か所に集まるよう純粋関数として export し、単体テストする
+- 展開済みの集合は `useState<ReadonlySet<string>>` で持つ。更新は新しい集合を作って差し替える（元の集合を書き換えない。`coding-style.md`）
+- `collapse(id)` は集合から id を消す。折りたたむ操作と、切り替え成功後の記録の消去の両方がこれを使う
+- 返す `resolve` は、渡された `resolve` を包み、成功したら `collapse(id)` を呼ぶ。渡された `resolve` はデータの再取得を待ってから返るので、記録を消す時点では新しいデータが届いている
+- `listMenuItems` は、現状は「全ての解決済みのコメントを展開する」の1項目。解決済みが1件もないときは `disabled`。項目を足すときはこの配列に要素を足す
 
 ### `InlineCommentItem` に足す props
 
@@ -207,9 +211,9 @@ onExpand: () => void;
 onCollapse: () => void;
 ```
 
-- `collapsed` が真のとき: 見出しには投稿者・日時・解決済みの札・展開ボタンだけを出す（履歴リンク・編集/削除・解決の切り替えは出さない）。引用文は残し、行数を絞って省略する。本文と返信（返信フォームを含む）は描かない。`CommentCard` の `children`（必須）には `null` を渡す。返信の一覧（`InlineCommentReplies`）は `CommentCard` の外で描かれているので、折りたたみ中は描かない分岐を別に置く
+- `collapsed` が真のとき: `InlineCommentItem` は hook を呼んだ直後に `CollapsedInlineCommentItem` を返す（この分岐は1回だけ）。`CollapsedInlineCommentItem` は、見出しに投稿者・日時・解決済みの札・展開ボタンだけを出す（履歴リンク・編集/削除・解決の切り替えは出さない）。引用文は残し、行数を絞って省略する。本文と返信（返信フォームを含む）は描かない。`CommentCard` の `children`（必須）には `null` を渡す。返信の一覧（`InlineCommentReplies`）は `CommentCard` の外で描かれるが、折りたたみ用の部品はそもそも描かない
 - 折りたたみ中も引用文は押せる。押すと本文中の該当箇所へスクロールする（Requirement 16）。位置は解決済みも含めた全件で持っているので、失敗のトーストは出ない
-- 解決済みで `collapsed` が偽のとき: 従来の描画に、札の左隣の折りたたみボタンを足す。ただし削除の確認（`isDeleteConfirmOpen`）を開いている間は、折りたたみボタンを出さない（折りたたむと確認の状態だけが残り、展開し直したときに確認が再び現れるため）
+- 解決済みで `collapsed` が偽のとき: 従来の描画に、札の左隣の折りたたみボタンを足す。ただし削除の確認（`isDeleteConfirmOpen`）を開いている間は、折りたたみボタンを出さない。`InlineCommentItem` は折りたたみ中も画面に残る（アンマウントされない）ので、削除の確認の状態が残り、展開し直したときに確認が再び現れるのを避けるため
 - 未解決のとき: 展開・折りたたみのボタンは出さない
 
 ### `InlineCommentListMenu`
@@ -227,7 +231,7 @@ type InlineCommentListMenuProps = {
 };
 ```
 
-- 項目は `inline-comment-list-menu-items.ts` の `buildInlineCommentListMenuItems({ hasResolved, onExpandAllResolved })` が作る。項目を足すときはこの関数だけを変える
+- 項目の配列は `use-resolved-collapse` の `listMenuItems` が返す。メニュー部品は個々の項目の中身を知らない
 - 置き場所は `PageComment` の先頭で、右寄せの1行にする。見出し「Comments」は `PageComment` の外（`Comments.tsx`）にあるので、見出しの下に右寄せの1行が増える見た目になる。これで「一覧のエリアの右端」（Requirement 22.1）を満たす。編集モードでは見出しごと `d-edit-none` で隠れる
 - 三点ボタンは reactstrap の `Dropdown` を使い、`MentionPickerButton` と同じく `color="link"` にする（テーマに追従させるため）。`useId()` の値を `target` に渡さない（`ui-pitfalls.md`）
 
@@ -243,11 +247,11 @@ type InlineCommentListMenuProps = {
 
 TDD（先に落ちるテストを書く）で進める。テストの観点は essential-test-design に従い、内部の呼び出しではなく見える結果を確かめる。
 
-- **単体**: `resolved-collapse` — 未解決は常に展開／解決済みは既定で折りたたみ／展開・折りたたみが対象の1件だけを変える／一括展開が解決済みの全件を足し未解決は足さない／元の集合を書き換えない（20.1, 20.3, 20.4, 21.2, 22.4）
-- **hook**: 展開済み集合が state に載り、`forget` で再び折りたたまれる（20.4 の続きの挙動）
-- **コンポーネント**: `InlineCommentItem` — 折りたたみ中に本文・返信・編集/削除/解決の操作が出ず、投稿者・日時・札・引用文・展開ボタンが出る（20.2）／展開ボタンで `onExpand`（21.1）／展開中の解決済みに折りたたみボタン（21.3）／展開中は未解決と同じ操作が出る（21.4）／未解決にはボタンが出ない（20.3）
+- **単体**: `isCollapsed`（`use-resolved-collapse.ts` が export する判定関数） — 未解決は常に展開／解決済みは既定で折りたたみ／展開済み集合に入っていれば展開（20.1, 20.3, 20.4）
+- **hook**: `useResolvedCollapse` — 展開・折りたたみが対象の1件だけを変え、元の集合を書き換えない（21.2）／包んだ `resolve` が成功すると記録が消えて再び折りたたまれ、失敗したら消えない（20.4 の続きの挙動）／一括展開の項目が解決済みの全件を足し未解決は足さない（22.4）／解決済みが0件のとき項目が `disabled`（22.5）
+- **コンポーネント**: `CollapsedInlineCommentItem` — 本文・返信・編集/削除/解決の操作が出ず、投稿者・日時・札・引用文・展開ボタンが出る（20.2）／展開ボタンで `onExpand`（21.1）／引用文が押せる
+- **コンポーネント**: `InlineCommentItem` — 折りたたみ中は `CollapsedInlineCommentItem` になる（20.1）／展開中の解決済みに折りたたみボタン（21.3）／展開中は未解決と同じ操作が出る（21.4）／未解決にはボタンが出ない（20.3）／削除の確認を開いている間は折りたたみボタンが出ない
 - **コンポーネント**: `InlineCommentListMenu` — 三点ボタンでメニューが開き、項目を選ぶと `onSelect` が呼ばれる（22.2, 22.3）／`disabled` の項目は選べない（22.5）／項目を足しても表示側の変更が不要（22.6）
-- **コンポーネント**: `InlineCommentItem` の追加確認 — 折りたたみ中も引用文が押せる／削除の確認を開いている間は折りたたみボタンが出ない
 - **コンポーネント**: `PageComment` — インラインコメントが1件以上のときだけメニューが出る（22.1）／リードオンリー利用者にも出る（22.7）／「全て展開」で解決済みの全件が展開される（22.4）／未解決に戻すと展開され、再び解決済みにすると折りたたまれる（20.4）
 - **守りのテスト**: `i18n-keys.spec.ts` に新キー、`no-literal-colors.spec.ts`（既存）が SCSS の色の直書きを止める
 - **翻訳の検査**: 5言語すべてに4キーがあること（`i18n-keys.spec.ts`）。`pnpm run lint:i18n` を、`baseline.json` を変えずに通す（基準値を上げて通してはならない）
