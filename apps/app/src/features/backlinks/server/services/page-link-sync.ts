@@ -1,6 +1,5 @@
 import type { Types } from 'mongoose';
 
-import PageRedirect from '~/server/models/page-redirect';
 import { prisma } from '~/utils/prisma';
 
 import type { IPageLink } from '../../interfaces/page-link';
@@ -51,10 +50,11 @@ export const reResolveByToPath = async (toPath: string): Promise<void> => {
   // rows go stale on the same event and nothing else revisits them. The reverse
   // walk only nominates candidates — `resolveToPageIds` decides where each one
   // actually lands, which for a longer chain may be somewhere else entirely.
-  const redirectingPaths = await PageRedirect.retrieveFromPathsRedirectingTo(
-    toPath,
-    REDIRECT_CHAIN_MAX_DEPTH,
-  );
+  const redirectingPaths =
+    await prisma.pageredirects.retrieveFromPathsRedirectingTo(
+      toPath,
+      REDIRECT_CHAIN_MAX_DEPTH,
+    );
   const paths = [...new Set([toPath, ...redirectingPaths])];
 
   const resolved = await resolveToPageIds(paths);

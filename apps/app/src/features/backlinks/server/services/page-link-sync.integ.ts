@@ -3,7 +3,6 @@ import mongoose, { Types } from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
 import PageModelFactory from '~/server/models/page';
-import PageRedirect from '~/server/models/page-redirect';
 import { prisma } from '~/utils/prisma';
 
 import type { IPageLink } from '../../interfaces/page-link';
@@ -133,7 +132,7 @@ describe('reResolveByToPath (integration)', () => {
   let Page: PageModel;
   let createdPages: Types.ObjectId[] = [];
   let createdLinks: string[] = [];
-  let createdRedirects: Types.ObjectId[] = [];
+  let createdRedirects: string[] = [];
 
   beforeAll(async () => {
     await PageModelFactory(null);
@@ -143,7 +142,9 @@ describe('reResolveByToPath (integration)', () => {
   afterEach(async () => {
     await Page.deleteMany({ _id: { $in: createdPages } });
     await prisma.pagelinks.deleteMany({ where: { id: { in: createdLinks } } });
-    await PageRedirect.deleteMany({ _id: { $in: createdRedirects } });
+    await prisma.pageredirects.deleteMany({
+      where: { id: { in: createdRedirects } },
+    });
     createdPages = [];
     createdLinks = [];
     createdRedirects = [];
@@ -173,8 +174,10 @@ describe('reResolveByToPath (integration)', () => {
     fromPath: string,
     toPath: string,
   ): Promise<void> => {
-    const redirect = await PageRedirect.create({ fromPath, toPath });
-    createdRedirects.push(redirect._id);
+    const redirect = await prisma.pageredirects.create({
+      data: { fromPath, toPath },
+    });
+    createdRedirects.push(redirect.id);
   };
 
   // Whole row set, so a dropped or extra row fails too — not just a wrong target.

@@ -326,6 +326,53 @@ describe('createTranslationOnlyPrPublisher', () => {
       expect(sent).not.toHaveProperty('reviewers');
       expect(sent).not.toHaveProperty('team_reviewers');
     });
+
+    it('does not call the labels endpoint when no labels are configured', async () => {
+      const { translationOnly, fetchFn } = buildPublishers();
+      fetchFn.mockResolvedValueOnce(jsonResponse(201, { number: 99 }));
+
+      await translationOnly.createPr({
+        headBranch: 'i18n-sync/translation-only',
+        title: 'title',
+        body: 'body',
+      });
+
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('applies the configured labels to a newly-created pull request', async () => {
+      const { runCommand } = createRunCommandFake();
+      const fetchFn = vi.fn();
+      const resolveBaseRef = createBaseRefResolver({ runCommand });
+      const publisher = createTranslationOnlyPrPublisher({
+        publishToken: PUBLISH_TOKEN,
+        repository: REPOSITORY,
+        baseBranch: 'master',
+        resolveBaseRef,
+        runCommand,
+        fetchFn: fetchFn as unknown as typeof fetch,
+        labels: ['flag/exclude-from-changelog'],
+      });
+      fetchFn
+        .mockResolvedValueOnce(jsonResponse(201, { number: 99 }))
+        .mockResolvedValueOnce(jsonResponse(200, []));
+
+      await publisher.createPr({
+        headBranch: 'i18n-sync/translation-only',
+        title: 'title',
+        body: 'body',
+      });
+
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+      const [url, init] = fetchFn.mock.calls[1];
+      expect(String(url)).toBe(
+        `${API_BASE_URL}/repos/${REPOSITORY}/issues/99/labels`,
+      );
+      expect(init.method).toBe('POST');
+      expect(JSON.parse(init.body as string)).toEqual({
+        labels: ['flag/exclude-from-changelog'],
+      });
+    });
   });
 
   describe('updatePr', () => {

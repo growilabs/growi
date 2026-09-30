@@ -4,10 +4,14 @@ name: Sync i18n source strings to POEditor (push)
 # change on the default branch, so translators always work against the
 # latest source strings (Requirement 2.1, 2.2).
 #
-# Trigger scope is push-only (no pull_request): this workflow calls the real
-# PushSourceSync CLI, which uploads to the live POEditor project via
-# PoeditorClient.uploadTerms — it must never run against a PR head, only
-# against content that has actually landed on the default branch.
+# Trigger scope deliberately excludes pull_request: this workflow calls the
+# real PushSourceSync CLI, which uploads to the live POEditor project via
+# PoeditorClient.uploadTerms — it must never run against a PR head, since that
+# would let any external contributor's unmerged content reach the live
+# project. workflow_dispatch is not the same risk: it requires repo write
+# access to trigger, the same trust level as pushing to master directly, and
+# lets a maintainer re-run or verify the push path (e.g. after rotating
+# POEDITOR_API_TOKEN) without needing to land a throwaway content change.
 
 on:
   push:
@@ -19,6 +23,7 @@ on:
       # its own change on merge, per this repo's existing convention (see
       # check-changesets.yml / release-pdf-converter.yml).
       - .github/workflows/i18n-sync-push.yml
+  workflow_dispatch:
 
 concurrency:
   # Scoped to the ref (always `refs/heads/master` here) rather than just the
@@ -30,6 +35,12 @@ concurrency:
   # makes a cancelled one redundant, not incomplete.
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+# This workflow only reads the checkout and calls the POEditor API with
+# POEDITOR_API_TOKEN; it never pushes, opens a PR, or otherwise writes to the
+# repository, so the default GITHUB_TOKEN is scoped to read-only.
+permissions:
+  contents: read
 
 jobs:
   i18n-sync-push:
