@@ -1,12 +1,5 @@
-/**
- * #9755: a rename that fails midway must not leave the page detached from the tree.
- *
- * renameMainOperation detaches the page (`parent: null`) before resolving the new
- * parent, with no session around the two. A trashed destination parent makes that
- * resolution throw: it is public with `parent: null` and `status: deleted`, so
- * createEmptyPagesByPaths treats it as existing, while connectPageTree, which
- * requires STATUS_PUBLISHED, never re-parents it.
- */
+// A rename that fails midway must not leave the page off the tree.
+// See https://github.com/growilabs/growi/issues/9755
 
 import pathlib from 'node:path';
 import type { Model } from 'mongoose';
@@ -81,6 +74,47 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     return { path: page?.path, parentPath: parent?.path };
   };
 
+  const snapshotTree = async () =>
+    (
+      await Page.find({ path: new RegExp(`^${base}`) }).sort({
+        path: 1,
+        _id: 1,
+      })
+    ).map((p) => ({
+      path: p.path,
+      parent: p.parent?.toString() ?? null,
+      isEmpty: p.isEmpty ?? false,
+    }));
+
+  // Fails the write that moves the page to `newPath`, the last step of the rename.
+  // `applied: true` lets the server apply it first, as a lost acknowledgement would.
+  const renameWithFailingFinalWrite = async (
+    page: PageDocument,
+    newPath: string,
+    { applied }: { applied: boolean },
+  ) => {
+    const originalFindByIdAndUpdate = Page.findByIdAndUpdate;
+    const fault = new Error('simulated failure of the final write');
+    const spy = vi
+      .spyOn(Page, 'findByIdAndUpdate')
+      .mockImplementation(function (this: PageModel, ...args) {
+        const [, update] = args;
+        const query = originalFindByIdAndUpdate.apply(this, args);
+        if (update?.$set?.path !== newPath) return query;
+        const failed = applied
+          ? query.then(() => Promise.reject(fault))
+          : Promise.reject(fault);
+        // the caller only awaits the result, so a thenable can stand in for the Query
+        return failed as unknown as typeof query;
+      });
+    try {
+      const err = await rename(page, newPath);
+      return { err, fault };
+    } finally {
+      spy.mockRestore();
+    }
+  };
+
   beforeAll(async () => {
     crowi = await getInstance();
     await crowi.configManager.updateConfig('app:isV5Compatible', true);
@@ -122,8 +156,9 @@ describe('a failed rename must not orphan the page (#9755)', () => {
 
     const err = await rename(target, `${trashed?.path}/moved`);
 
-    // The rename may fail or succeed; either way the page must hang under the
-    // page at its parent path.
+    // The real-world trigger. The rename may fail or succeed once the trashed-page
+    // handling is fixed, so this only checks the page stays on the tree; the
+    // injected-fault tests below are what prove the rollback runs.
     const { path, parentPath } = await findPathAndParentPath(target._id);
     expect(path).toBeDefined();
     expect(
@@ -139,34 +174,86 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     const target = await create(`${base}/ex-parent/target`, 'body');
     const newPath = `${base}/new-parent/moved`;
 
-    // The server applies the write that moves the page, but the caller sees an error
-    const originalFindByIdAndUpdate = Page.findByIdAndUpdate;
-    const lostAck = new Error('simulated lost acknowledgement');
-    const spy = vi
-      .spyOn(Page, 'findByIdAndUpdate')
-      .mockImplementation(function (this: PageModel, ...args) {
-        const [, update] = args;
-        const query = originalFindByIdAndUpdate.apply(this, args);
-        if (update?.$set?.path !== newPath) return query;
-        // the caller only awaits the result, so a thenable can stand in for the Query
-        return query.then(() => {
-          throw lostAck;
-        }) as unknown as typeof query;
-      });
+    const { err, fault } = await renameWithFailingFinalWrite(target, newPath, {
+      applied: true,
+    });
 
+    // otherwise the fault never fired and the assertion below proves nothing
+    expect(err).toBe(fault);
+    expect(await findPathAndParentPath(target._id)).toEqual({
+      path: newPath,
+      parentPath: `${base}/new-parent`,
+    });
+  });
+
+  it('puts the page back under its old parent when renaming to a new location fails', async () => {
+    await create(base, 'base body');
+    await create(`${base}/ex-parent`, 'body');
+    await create(`${base}/new-parent`, 'body');
+    const target = await create(`${base}/ex-parent/target`, 'body');
+
+    const { err, fault } = await renameWithFailingFinalWrite(
+      target,
+      `${base}/new-parent/not-yet-existing/moved`,
+      { applied: false },
+    );
+
+    expect(err).toBe(fault);
+    expect(await findPathAndParentPath(target._id)).toEqual({
+      path: `${base}/ex-parent/target`,
+      parentPath: `${base}/ex-parent`,
+    });
+  });
+
+  it('restores the tree unchanged when renaming a page to under itself fails', async () => {
+    await create(base, 'base body');
+    const target = await create(`${base}/target`, 'body');
+    await create(`${base}/target/child`, 'body');
+    const before = await snapshotTree();
+
+    const { err, fault } = await renameWithFailingFinalWrite(
+      target,
+      `${base}/target/not-yet-existing/moved`,
+      { applied: false },
+    );
+
+    expect(err).toBe(fault);
+    expect(await snapshotTree()).toEqual(before);
+  });
+
+  it('restores the tree unchanged when linking the new ancestors fails midway', async () => {
+    await create(base, 'base body');
+    const target = await create(`${base}/target`, 'body');
+    const before = await snapshotTree();
+
+    const fault = new Error(
+      'simulated failure while linking the new ancestors',
+    );
+    const spy = vi.spyOn(Page, 'bulkWrite').mockRejectedValueOnce(fault);
     let err: Error | null;
     try {
-      err = await rename(target, newPath);
+      err = await rename(target, `${base}/target/not-yet-existing/moved`);
     } finally {
       spy.mockRestore();
     }
 
-    // otherwise the fault never fired and the assertion below proves nothing
-    expect(err).toBe(lostAck);
+    expect(err).toBe(fault);
+    expect(await snapshotTree()).toEqual(before);
+  });
 
+  it('keeps the new ancestors when renaming to under itself commits but its acknowledgement is lost', async () => {
+    await create(base, 'base body');
+    const target = await create(`${base}/target`, 'body');
+    const newPath = `${base}/target/not-yet-existing/moved`;
+
+    const { err, fault } = await renameWithFailingFinalWrite(target, newPath, {
+      applied: true,
+    });
+
+    expect(err).toBe(fault);
     expect(await findPathAndParentPath(target._id)).toEqual({
       path: newPath,
-      parentPath: `${base}/new-parent`,
+      parentPath: `${base}/target/not-yet-existing`,
     });
   });
 });

@@ -731,15 +731,17 @@ class PageService implements IPageService {
     await Page.takeOffFromTree(page._id);
 
     let newParent: PageDocument | undefined;
+    let insertedEmptyPageIds: PageDocument['_id'][] = [];
     let renamedPage: PageDocument | null = null;
     try {
       // 2. Find new parent
       // If renaming to under target, run getParentAndforceCreateEmptyTree to fill new ancestors
       if (this.isRenamingToUnderTarget(page.path, newPagePathSanitized)) {
-        newParent = await this.getParentAndforceCreateEmptyTree(
-          page,
-          newPagePathSanitized,
-        );
+        ({ newParent, insertedPageIds: insertedEmptyPageIds } =
+          await this.getParentAndforceCreateEmptyTree(
+            page,
+            newPagePathSanitized,
+          ));
       } else {
         newParent = await this.getParentAndFillAncestorsByUser(
           user,
@@ -761,11 +763,13 @@ class PageService implements IPageService {
         { new: true },
       );
     } catch (err) {
-      // Undo step 1, but only while the page is still in the state it left behind.
+      // Undo steps 1-2, but only while the page is still in the state it left behind.
       // The driver can report an error for a write the server applied (lost ack,
       // writeConcernError), so neither `renamedPage` nor a flag proves that step 3
       // did not commit.
       try {
+        // `path` alone catches a committed step 3; `parent: null` guards against a
+        // writer that bypasses the PageOperation lock
         const { matchedCount } = await Page.updateOne(
           { _id: page._id, parent: null, path: page.path },
           { $set: { parent: exParentId } },
@@ -775,12 +779,20 @@ class PageService implements IPageService {
             `Skipped reattaching "${page.path}" to its original parent after a failed rename: ` +
               'the page is no longer detached at its original path.',
           );
+        } else {
+          // Drop the empty pages step 2 inserted: one sits at the page's own path
+          // and would duplicate it. Only after a matched rollback, since if step 3
+          // committed they are the page's new ancestors.
+          await Page.deleteMany({
+            _id: { $in: insertedEmptyPageIds },
+            isEmpty: true,
+          });
         }
       } catch (rollbackErr) {
         // Propagate the original error, not this one
         logger.error(
-          `Failed to reattach "${page.path}" to its original parent after a failed rename. ` +
-            'The page is off-tree and will not appear in the page tree until it is normalized.',
+          `Failed to roll back the failed rename of "${page.path}". ` +
+            'The page may be off-tree or duplicated by an empty page until it is normalized.',
           rollbackErr,
         );
       }
@@ -1020,6 +1032,7 @@ class PageService implements IPageService {
       }),
     );
 
+    const insertedPageIds = insertedPages.map((p) => p._id);
     const pages = [...insertedPages, originalParent];
 
     const ancestorsMap = new Map<string, PageDocument & { _id: any }>(
@@ -1045,10 +1058,15 @@ class PageService implements IPageService {
 
       return op;
     });
-    await Page.bulkWrite(operations);
+    try {
+      await Page.bulkWrite(operations);
+    } catch (err) {
+      await Page.deleteMany({ _id: { $in: insertedPageIds } });
+      throw err;
+    }
 
     const newParent = ancestorsMap.get(newParentPath);
-    return newParent;
+    return { newParent, insertedPageIds };
   }
 
   private async renamePageV4(page, newPagePath, user, options) {
