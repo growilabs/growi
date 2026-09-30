@@ -204,6 +204,27 @@ describe('decideEsSyncForEvent', () => {
     ).toBe(1);
   });
 
+  it('keeps the counter alive while an under-threshold window keeps being re-processed', async () => {
+    const threshold = 3;
+    const activityId = newActivityId();
+    await decideEsSyncForEvent(activityId, endpoint, windowStart, threshold);
+    // Only the counter is stale: a decision refreshed moments ago must not hold
+    // back the counter's own refresh.
+    await AnonymousSyncCounter.updateOne(
+      { endpoint, windowStart },
+      { $set: { updatedAt: staleAnchor } },
+    );
+
+    await decideEsSyncForEvent(activityId, endpoint, windowStart, threshold);
+
+    const counter = await AnonymousSyncCounter.findOne({
+      endpoint,
+      windowStart,
+    }).lean();
+    expect(counter?.updatedAt.getTime()).toBeGreaterThan(staleAnchor.getTime());
+    expect(counter?.count).toBe(1);
+  });
+
   it('keeps a settled decision alive while its event keeps being re-processed over threshold', async () => {
     const threshold = 1;
     const admittedActivityId = newActivityId();

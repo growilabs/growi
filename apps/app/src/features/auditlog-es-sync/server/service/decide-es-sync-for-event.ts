@@ -31,7 +31,11 @@ const anchorRefreshCutoff = (now: Date): Date =>
   new Date(now.getTime() - ANCHOR_REFRESH_INTERVAL_SECONDS * 1000);
 
 // Refreshes the TTL anchor when stale, so a batch retried over and over keeps its
-// decisions alive (see window-ttl.ts for the retry gap this tolerates).
+// decisions alive (see window-ttl.ts for the retry gap this tolerates). The window's
+// counter is refreshed too: a retried under-threshold window never $incs, so without
+// this its counter would expire while its decisions survive, and the window would
+// start admitting from 0 again. Its staleness is checked on its own anchor, not the
+// decision's, or it could go up to one refresh interval longer untouched.
 const findSettledDecision = async (
   activityId: string,
 ): Promise<EsSyncDecisionValue | undefined> => {
@@ -40,12 +44,21 @@ const findSettledDecision = async (
 
   const now = new Date();
   const cutoff = anchorRefreshCutoff(now);
-  if (doc.claimedAt < cutoff) {
-    await EsSyncDecision.updateOne(
-      { _id: activityId, claimedAt: { $lt: cutoff } },
-      { $set: { claimedAt: now } },
-    );
-  }
+  await Promise.all([
+    doc.claimedAt < cutoff &&
+      EsSyncDecision.updateOne(
+        { _id: activityId, claimedAt: { $lt: cutoff } },
+        { $set: { claimedAt: now } },
+      ),
+    AnonymousSyncCounter.updateOne(
+      {
+        endpoint: doc.endpoint,
+        windowStart: doc.windowStart,
+        updatedAt: { $lt: cutoff },
+      },
+      { $set: { updatedAt: now } },
+    ),
+  ]);
   return doc.decision;
 };
 
