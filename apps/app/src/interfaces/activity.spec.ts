@@ -8,12 +8,14 @@ import type {
   ISnapshot,
 } from './activity';
 import {
+  AllLargeGroupActions,
   AllSupportedActions,
   isAttachmentAddActivity,
   isAttachmentDownloadActivity,
   isAttachmentRemoveActivity,
   isAuditlogSuggestionField,
   MODEL_ATTACHMENT,
+  PageActions,
   SupportedAction,
   SupportedTargetModel,
 } from './activity';
@@ -149,6 +151,21 @@ describe('SupportedAction - admin AI setting update action', () => {
 
   it('includes the AI setting update action in AllSupportedActions', () => {
     expect(AllSupportedActions).toContain('ADMIN_AI_SETTING_UPDATE');
+  });
+});
+
+describe('SupportedAction - page AI summarize action', () => {
+  it('exports ACTION_PAGE_AI_SUMMARIZE with the expected value', () => {
+    expect(SupportedAction.ACTION_PAGE_AI_SUMMARIZE).toBe('PAGE_AI_SUMMARIZE');
+  });
+
+  it('is recorded at the Large audit log level', () => {
+    expect(AllSupportedActions).toContain('PAGE_AI_SUMMARIZE');
+    expect(AllLargeGroupActions).toContain('PAGE_AI_SUMMARIZE');
+  });
+
+  it('is filterable as a page action', () => {
+    expect(PageActions).toContain('PAGE_AI_SUMMARIZE');
   });
 });
 

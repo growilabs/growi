@@ -203,8 +203,9 @@ apps/app/prisma/
 └── schema.prisma                          # 変更: `model pages` に `summary` を追加（Mongoose と二重管理。`.claude/rules/model.md`）
 packages/core/src/interfaces/
 └── page.ts                                # 変更: `IPage` に `summary` の型を追加（Changeset対象）
-apps/app/src/features/rate-limiter/config/
-└── index.ts                               # 変更: `defaultConfigWithRegExp` に永続化ルートのレート制限エントリを1件追加
+apps/app/src/features/rate-limiter/
+├── config/index.ts                        # 変更: 生成ルート・`/message`（`defaultConfig`）と永続化ルート（`defaultConfigWithRegExp`）のレート制限エントリを追加
+└── middleware/factory.ts                  # 変更: エンドポイントの照合とカウンタのキーを、大文字小文字・末尾スラッシュを無視する形に正規化
 apps/app/src/components/PageView/
 ├── PersistedSummaryView.tsx               # 新規: 永続化された要約の表示（RevisionRendererによるMarkdown描画・鮮度表示・閲覧者ごとのローカル非表示ボタンを含む）
 └── PageView.tsx                           # 変更: PersistedSummaryView をMarkdown本文の外側に描画（数行追加）
@@ -219,7 +220,7 @@ apps/app/src/components/PageView/
 - `apps/app/src/server/models/page.ts` — `summary: { body: String, sourceRevisionId: ObjectId, capturedAt: Date }`（既定値 `null`）をスキーマに追加する。既存のフィールド・インデックス・staticsは変更しない。
 - `apps/app/prisma/schema.prisma` — `model pages`（既存、Mongooseのpagesコレクションからintrospectされたもの）に `summary` フィールドを追加する。`Page` モデルはMongooseからPrismaへの移行途上にあり（`.claude/rules/model.md`）、Mongoose側だけを更新すると型不整合が後から表面化するため、両方を同時に更新する。埋め込みオブジェクトの表現は、同スキーマ内の既存の埋め込みフィールド（`grantedGroups` が `Json?` として表現されている）と同じ扱いに揃える。追加後に Prisma の型生成（`generator` の出力先 `src/generated/prisma`）が成功することを確認する。
 - `packages/core/src/interfaces/page.ts` — `IPage` に `summary` の型を追加する（クライアントが `summary` を参照するために必須。Changeset対象）。
-- `apps/app/src/features/rate-limiter/config/index.ts` — `defaultConfigWithRegExp` に永続化ルート（`/_api/v3/page/[^/]+/ai-summary`、`POST`、`MAX_REQUESTS_TIER_1`）のエントリを1件追加する。レート制限はルートへのミドルウェア適用ではなく、この設定マップへの宣言で有効になる。
+- `apps/app/src/features/rate-limiter/config/index.ts` — `defaultConfigWithRegExp` に永続化ルート（`/_api/v3/page/[^/]+/ai-summary`、`POST`、`MAX_REQUESTS_TIER_1`、`usersPerIpProspection: 20`。倍率の根拠は research.md 7.10）のエントリを1件追加する。レート制限はルートへのミドルウェア適用ではなく、この設定マップへの宣言で有効になる。
 - `apps/app/src/components/PageView/PageView.tsx` — `PersistedSummaryView` をMarkdown本文の描画箇所の外側に追加する。
 - `apps/app/src/features/mastra/interfaces/chat-message.ts` — `CustomUIMessageMetadata` に `threadId` / `sourceRevisionId` / `capturedAt` を追加する。現状は `{ finishReason?: string }` のみであり、`/summary` がこれらをストリームメタデータ（`writer.write({ type: 'message-metadata', ... })`）で返すには拡張が必須。サーバとクライアントが共有する型であるため、既存の `finishReason` は optional のまま維持し、追加分も optional にして `/message` 側の互換を壊さない。
 - `apps/app/src/features/mastra/interfaces/chat-tools.ts` — `GrowiChatTools.getPageContentTool.output` の型を、`limitedGetPageContentTool` が返す `limit_exceeded` を含む形に広げる。`summarizeAgent` は本文取得ツールを `getPageContentTool` という**キー**で登録するため（1.4の成立条件）、要約ストリームの `tool-getPageContentTool` パートの `output` には `limit_exceeded` が現れうる。現状の型は `GetPageContentToolOutput`（`limit_exceeded` を含まない）のみであり、クライアントが型安全に読むには拡張が必要。
@@ -227,7 +228,8 @@ apps/app/src/components/PageView/
 - `apps/app/src/server/routes/apiv3/page/index.ts` — ページ取得APIのレスポンスに `summary` を含める。加えて、永続化ルート `POST /:pageId/ai-summary` を同ルータに登録する（`apiv3/index.js:194` の `router.use('/page', setupPage(crowi))` 配下）。
   - **注**: 共有表示（8.1, 8.2）は SSR とAPIの**両経路**が `summary` を返して初めて成立する。片方の漏れは「ある閲覧者には見えて別の閲覧者には見えない」形で表面化するため、両方を必ず対応する。
 - `apps/app/public/static/locales/{en_US,fr_FR,ja_JP,ko_KR,zh_CN}/translation.json` — `PersistedSummaryView` の文言（見出し「AI要約」・鮮度ヒント・削除ボタンラベル）の翻訳キーを5ロケール分追加する。
-- `apps/app/src/features/rate-limiter/config/index.ts` — 生成ルート（`/_api/v3/mastra/summary`、完全一致マップ `defaultConfig`）と永続化ルート（正規表現マップ `defaultConfigWithRegExp`）の2エントリを追加する。
+- `apps/app/src/features/rate-limiter/config/index.ts` — 生成ルート（`/_api/v3/mastra/summary`）と追加質問の合流先（`/_api/v3/mastra/message`、research.md 7.11）を完全一致マップ `defaultConfig` に、永続化ルートを正規表現マップ `defaultConfigWithRegExp` に追加する（計3エントリ）。
+- `apps/app/src/features/rate-limiter/middleware/factory.ts` — エンドポイントの照合とカウンタのキーを、大文字小文字・末尾スラッシュを無視する形に正規化する。Expressのルーティングは既定でこれらを区別しないため、正規化しないと `/_api/v3/mastra/Summary` のような表記で上限をすり抜けられる。
 
 いずれも「既存の列挙・スキーマに1項目追加する」形の変更であり、既存ファイルの他のロジックは書き換えない。
 
@@ -493,7 +495,7 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
   4. バリデータ（`summarize-message-validator.ts`）＋ `apiV3FormValidator`。
   5. 本体ハンドラ。
   - **理由**: これを欠くと未ログインのゲストがLLM呼び出しルートを直接叩けてしまい、トークンコストを外部から任意に発生させられる。加えて `getPageContentTool` は `RequestContext` の `user` が無い場合 `context_error` を返すため、`req.user` が確定していない経路では要約自体が成立しない。ハンドラは `req.user` が存在することを前提にできる（`post-message.ts` の `Req` 型と同じ扱い）。
-- **レート制限**: 本ルートはLLM呼び出しを伴い1リクエストあたりのコストが大きいため、永続化ルートと同様に `features/rate-limiter` の設定マップにエントリを追加する。パスは固定（`/_api/v3/mastra/summary`）であるため、正規表現マップではなく**完全一致マップ `defaultConfig`** に `{ method: 'POST', maxRequests: MAX_REQUESTS_TIER_1 }` を追加する（`DEFAULT_DURATION_SEC` 60秒に対して1ユーザーあたり5回）。超過時は `res.sendStatus(429)`。
+- **レート制限**: 本ルートはLLM呼び出しを伴い1リクエストあたりのコストが大きいため、永続化ルートと同様に `features/rate-limiter` の設定マップにエントリを追加する。パスは固定（`/_api/v3/mastra/summary`）であるため、正規表現マップではなく**完全一致マップ `defaultConfig`** に `{ method: 'POST', maxRequests: MAX_REQUESTS_TIER_1, usersPerIpProspection: 20 }` を追加する（`DEFAULT_DURATION_SEC` 60秒に対して1ユーザーあたり5回）。IP単位の上限（`maxRequests × usersPerIpProspection`）は、同一egress IPを共有する閲覧者がユーザー単位の上限より先に429を受けないように引き上げる（research.md 7.10）。超過時は `res.sendStatus(429)`。
 - リクエストボディは `{ pageId?: string; pagePath?: string; modelKey?: string }` とし、`pageId`／`pagePath` のいずれか一方を必須とする（`post-message-validator.ts` と対になる `summarize-message-validator.ts` で検証）。`pageId`/`pagePath` を運ぶことで「現在ページを開いていない」状態はリクエスト不成立として扱われる（1.3）。
 - ハンドラは、クライアントの自由入力を受け取らず、`pageId`／`pagePath` からサーバ側で固定形式の初期ユーザー発話を組み立てて `summarizeAgent.stream(...)` に渡す。
 - ハンドラは、`summarizeAgent.stream(...)` を呼ぶ前に `Page.findByIdAndViewer`（既存、無変更）を1回呼び出す。これが**権限なし時の唯一の応答経路**である: 結果が `null` の場合は**ストリームを開始せず**、不存在と権限なしを区別しない単一の応答（**403 または 404 のいずれか一方に統一、ステータスコードと応答本文の両者を区別しない**）でその場で短絡する。ストリームは一切開始されず、`summarizeAgent.stream()` が呼ばれない状態になる（4.2）。結果が得られた場合は、その時点の **`page.revision`（populate されていないため ObjectId そのもの。`page.revision._id` ではない）** を `sourceRevisionId` として保持する（7.2。詳細は「フロー上の意思決定」の (b) を参照）。
@@ -501,8 +503,11 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 - `summarizeAgent.stream()` に渡す `RequestContext` は**リクエスト毎に新規生成**し、その中の `pageReadBudget` も毎回 `{ used: 0, limit: 1500 }` の新規オブジェクトとする。モジュールスコープやAgentインスタンスに保持されたコンテキスト／バジェットを再利用してはならない。これにより複数同時リクエスト間でバジェットが漏れない（1.5 の状態安全性）。
 - `capturedAt` を、`sourceRevisionId` を取得するのと**同じ時点（生成開始時点、`findByIdAndViewer` 直後）**に `new Date()` でサーバ側に生成し、`threadId`・`sourceRevisionId` と併せてストリーム応答に含める。クライアントから受け取った日時は使わない（7.2）。両者が同一の瞬間を指すことで、鮮度表示と生成時刻表示の基準時刻が一致する。
 - ストリーミング応答の構築（`createUIMessageStream` / `toAISdkStream` / `pipeUIMessageStreamToResponse`）は `post-message.ts` と同型のパターンを踏襲し、`CustomUIMessage`（既存の型）と互換のストリームを返す。将来のトリガーUIが、既存のチャット表示コンポーネント（`ChatSidebar` のメッセージレンダリング）をそのまま再利用できるようにするため。
-- ストリームが正常終了した時点で `AiSummarizeMetrics` のCounterをインクリメントする（6.1）。エラー終了時はインクリメントしない。
-- 同じくストリームが正常終了した時点（レスポンス送信前）で、`crowi.events.activity.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_PAGE_AI_SUMMARIZE, targetModel: SupportedTargetModel.MODEL_PAGE, target: page, contributor: req.user })` を呼び、Audit Logに記録する（18.1）。既存の `create-page.ts` と同じ呼び出し形。`emit` はレスポンス送信より前に完了させる必要がある（既存規約: 送信後に呼ぶと記録の `user` が欠落する）。エラー終了時は記録しない（Counterと同じ扱い）。永続化ルート（`AiSummaryPersistenceRoute`）にはこの `emit` を追加しない（18.3）。
+- 「正常終了」は、error チャンクがなく、`finishReason === 'stop'` で、空白でない本文テキストが1つ以上届いた場合に限る。`'tool-calls'`（`maxSteps` を使い切った）や `'length'`（出力の打ち切り）は要約が完成していないため正常終了に含めない。
+- ストリームが正常終了した時点で `AiSummarizeMetrics` のCounterをインクリメントする（6.1）。正常終了以外ではインクリメントしない。
+- 同じくストリームが正常終了した時点（レスポンス送信前）で、`crowi.events.activity.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_PAGE_AI_SUMMARIZE, targetModel: SupportedTargetModel.MODEL_PAGE, target: page, contributor: req.user })` を呼び、Audit Logに記録する（18.1）。既存の `create-page.ts` と同じ呼び出し形。`emit` はレスポンス送信より前に完了させる必要がある（既存規約: 送信後に呼ぶと記録の `user` が欠落する）。永続化ルート（`AiSummaryPersistenceRoute`）にはこの `emit` を追加しない（18.3）。
+- 正常終了以外で終わった場合は `PAGE_AI_SUMMARIZE` を記録せず、代わりに `ACTION_UNSETTLED` の試行記録を1件残す（`pendingActivityContext.take()` → `recordFailsafeAttempt()`、レスポンス送信前）。ストリーム内の失敗は 200 応答の中で届き、`add-activity` の fail-safe finalizer（`statusCode >= 400` またはクライアント切断のみを失敗とみなす）では記録されないため。
+- クライアント切断時（`res` の `close` で `writableFinished === false`）は `AbortController` で `summarizeAgent.stream` の `abortSignal` を中断する。試行記録は fail-safe finalizer が残すので、ハンドラ側はそれ以降Counterのインクリメントも Audit Log への記録も行わない。
 - 重複生成の抑止（1.5）は、サーバ側の新しい排他制御を追加せず、`ChatSidebar` の `handleSubmit` が既に用いている「送信中は再送信しない」という状態ガードと同じ考え方をトリガーUIコンポーネント側（別PR）に適用する前提とする。要約はページ側の状態やページに紐づく永続データを書き換えないため、二重送信が発生してもページの内容・閲覧権限に不整合は生じない。ただし要約対話自体は毎回新規スレッドとして`Memory`に永続化されるため、二重送信は「無駄なリクエスト」に加えて「使われない要約スレッドがMongoDBに残る」という無駄も生む。この判断のトレードオフは research.md 7.5 に記録済み。
 
 **Dependencies**
@@ -597,8 +602,9 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 - **レート制限**: 本エンドポイントにレート制限を適用する。GROWIのレート制限は**ルートにミドルウェアを差し込む方式ではなく**、`app.use(rateLimiterFactory())` として全体に1回適用され（`apps/app/src/server/routes/index.js`）、エンドポイント単位の上限は `apps/app/src/features/rate-limiter/config/index.ts` の設定マップで宣言される方式である。したがって本specは**設定マップへのエントリ追加**として実装する。
   - 本エンドポイントのパスは `pageId` を含む動的パスであるため、完全一致マップ `defaultConfig` ではなく**正規表現マップ `defaultConfigWithRegExp`** にエントリを追加する（`/_api/v3/page/[^/]+/ai-summary` 相当。キーは `/_api/v3/...` 接頭辞で書く）。
   - 上限値は既存のティア定数 **`MAX_REQUESTS_TIER_1`（5リクエスト）／`DEFAULT_DURATION_SEC`（60秒）= 1ユーザーあたり1分間に5回** とする。独自の数値をハードコードせず既存の定数を使うことで、ティアの見直しが行われた際に自動的に追随する。要約の保存は人間の操作に紐づく低頻度の操作であり、正常利用がこの上限に触れることはない。
+  - IP単位の倍率は **`usersPerIpProspection: 20`** とする。生成ルートと同じく、同一egress IPを共有する閲覧者がユーザー単位の上限より先に429を受けないようにするため（research.md 7.10）。
   - 制限超過時、レート制限ミドルウェアは `res.sendStatus(429)` を返す（既存実装の挙動）。
-- **注**: 生成側の `POST /_api/v3/mastra/summary` はLLM呼び出しを伴い1リクエストあたりのコストが本ルートより大きいため、`features/rate-limiter/config/index.ts` の`defaultConfig`（完全一致マップ）に **`/_api/v3/mastra/summary`, `POST`, `MAX_REQUESTS_TIER_1`** のエントリを追加する（パスが固定であるため）。超過時は `res.sendStatus(429)`。
+- **注**: 生成側の `POST /_api/v3/mastra/summary` はLLM呼び出しを伴い1リクエストあたりのコストが本ルートより大きいため、`features/rate-limiter/config/index.ts` の`defaultConfig`（完全一致マップ）に **`/_api/v3/mastra/summary`, `POST`, `MAX_REQUESTS_TIER_1`, `usersPerIpProspection: 20`** のエントリを追加する（パスが固定であるため）。超過時は `res.sendStatus(429)`。
 - 保存は、書き込み前に `Page.findByIdAndViewer`（既存、無変更）を経由して閲覧権限を確認する。要約専用の権限判定は導入しない。
 - 保存時、クライアントから受け取った `sourceRevisionId`（要約生成時に `SummarizeMessageRoute` が発行した値）と `capturedAt`（生成時刻）をそのまま記録する。保存ルート自身が現在のページ状態から新たにrevisionや日時を導出することはしない（7.2）。既に永続化済みの要約がある場合は上書きする（7.4）。
 - 削除用のエンドポイントは持たない。「削除」導線はクライアントの `localStorage` のみで完結する（PersistedSummaryView参照、9.3, 9.4）。
@@ -708,7 +714,7 @@ export const limitedGetPageContentTool: Tool; // used only by summarizeAgent
 - **権限なし／存在しないページへのリクエストが 403（または404、実装で統一した側）で短絡すること**: ルート層の `Page.findByIdAndViewer` が `null` を返した時点でエラー応答となり、**ストリームが開始されない**こと（`summarizeAgent.stream()` のモックが呼ばれていないこと、およびレスポンスがUIメッセージストリーム形式でないこと）。権限なしと存在しないページの2ケースで**同一のステータスコード・同一の応答本文**になり、ページの存在有無が判別できないこと（4.2）。
 - **`RequestContext` と `pageReadBudget` がリクエスト毎に新規生成されること**: 連続する2リクエストで捕捉した `requestContext` が別インスタンスであり、2回目の `pageReadBudget.used` が0から始まること（1回目の消費が漏れていないこと）。
 - **`capturedAt` がサーバ側で生成され、ストリーム応答に含まれること**: 応答に含まれる `capturedAt` が有効なISO Date Stringであり、リクエスト時刻の近傍であること。
-- **Audit Logへの記録**（18.1）: ストリームが正常終了したとき、`crowi.events.activity.emit` が `action: SupportedAction.ACTION_PAGE_AI_SUMMARIZE`、`targetModel: SupportedTargetModel.MODEL_PAGE`、対象ページ、`req.user` を引数として1回呼ばれること（`mock<Crowi>({ events: { activity: { emit } } })` で検証。既存の `put-ai-settings.spec.ts` と同じ検証パターン）。エラー終了時は呼ばれないこと。永続化ルート（`ai-summary-persistence`）のテストでは、この `emit` が呼ばれないことを確認する（18.3）。
+- **Audit Logへの記録**（18.1）: ストリームが正常終了したとき、`crowi.events.activity.emit` が `action: SupportedAction.ACTION_PAGE_AI_SUMMARIZE`、`targetModel: SupportedTargetModel.MODEL_PAGE`、対象ページ、`req.user` を引数として1回呼ばれること（`mock<Crowi>({ events: { activity: { emit } } })` で検証。既存の `put-ai-settings.spec.ts` と同じ検証パターン）。error チャンク、`finishReason` が `'tool-calls'` / `'length'`、本文なしの `'stop'` のいずれでも `emit` もCounterも呼ばれず、`ACTION_UNSETTLED` の試行記録が1回残ること。クライアント切断後にエージェントが完了しても、`emit`・Counter・試行記録のいずれも行われないこと。永続化ルート（`ai-summary-persistence`）のテストでは、この `emit` が呼ばれないことを確認する（18.3）。
 - 要約後、同じ `threadId` を使って既存の `POST /message` に追質問を送ると、`growiAgent` がスレッド履歴（要約メッセージ）を認識して応答できること（1.4 のE2E相当の検証）。
 - AI未設定・無効時に `POST /summary` が501を返すこと（`aiReadyGuard` の既存挙動の回帰確認）。
 - 閲覧権限のあるページに要約を永続化すると、以後の `GET` でその要約が返り、権限のない別ユーザーの `GET` には含まれないこと（8.1, 8.2）。

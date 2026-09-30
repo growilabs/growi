@@ -9,9 +9,17 @@ import type { GrowiChatTools } from './chat-tools';
  * in the post-message route, and surfaced on the client as `message.metadata`.
  * `finishReason` mirrors the resolved `stream.finishReason`, which the agent
  * stream types as `string | undefined`.
+ *
+ * `threadId` / `sourceRevisionId` / `capturedAt` are written only by the
+ * summarize route, at the start of its stream. The client hands
+ * `sourceRevisionId` / `capturedAt` back unchanged when persisting the summary.
  */
 export type CustomUIMessageMetadata = {
   finishReason?: string;
+  threadId?: string;
+  sourceRevisionId?: string;
+  // ISO 8601, generated server-side at generation start.
+  capturedAt?: string;
 };
 
 /**

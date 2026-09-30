@@ -21,6 +21,7 @@ const loaded = vi.hoisted(() => ({
   deleteThread: false,
   getMessages: false,
   getModels: false,
+  summarizeMessage: false,
 }));
 
 const aiState = vi.hoisted(() => ({ enabled: false, configured: false }));
@@ -74,6 +75,13 @@ vi.mock('./get-models', () => {
       res.status(200).json({ route: 'get-models' }),
   };
 });
+vi.mock('./summarize-message', () => {
+  loaded.summarizeMessage = true;
+  return {
+    summarizeMessageHandlersFactory: () => (_req: Request, res: Response) =>
+      res.status(200).json({ route: 'summarize-message' }),
+  };
+});
 
 import express, {
   type NextFunction,
@@ -88,8 +96,8 @@ import type Crowi from '~/server/crowi';
 import { factory } from './index';
 
 const allLoaded = () => Object.values(loaded);
-const NONE_LOADED = [false, false, false, false, false];
-const ALL_LOADED = [true, true, true, true, true];
+const NONE_LOADED = [false, false, false, false, false, false];
+const ALL_LOADED = [true, true, true, true, true, true];
 
 // Let the microtask queue drain so that any eagerly-started dynamic import
 // would have completed before we assert "not loaded". Without this, a
@@ -156,6 +164,7 @@ describe('mastra routes factory (lazy handler loading)', () => {
       ['delete-thread', () => request(app).delete('/_api/v3/mastra/thread/t1')],
       ['get-messages', () => request(app).get('/_api/v3/mastra/messages/t1')],
       ['get-models', () => request(app).get('/_api/v3/mastra/models')],
+      ['summarize-message', () => request(app).post('/_api/v3/mastra/summary')],
     ];
     for (const [route, send] of cases) {
       const res = await send();
@@ -174,6 +183,22 @@ describe('mastra routes factory (lazy handler loading)', () => {
     aiState.enabled = false;
     const after = await request(app).get('/_api/v3/mastra/threads');
     expect(after.status).toBe(501);
+  });
+
+  it('rejects POST /summary with 501 while AI is disabled or not configured', async () => {
+    const app = buildApp();
+
+    aiState.enabled = false;
+    aiState.configured = true;
+    const whileDisabled = await request(app).post('/_api/v3/mastra/summary');
+    expect(whileDisabled.status).toBe(501);
+
+    aiState.enabled = true;
+    aiState.configured = false;
+    const whileUnconfigured = await request(app).post(
+      '/_api/v3/mastra/summary',
+    );
+    expect(whileUnconfigured.status).toBe(501);
   });
 
   it('builds the handler chain once and reuses it across requests', async () => {

@@ -47,14 +47,14 @@
   - _Requirements: 6.1, 6.2_
   - _Boundary: AiSummarizeMetrics_
 
-- [ ] 3. SummarizeMessageRoute: 要約を1回起動し既存の対話に合流できる
-- [ ] 3.1 要約リクエストの妥当性が検証される
+- [x] 3. SummarizeMessageRoute: 要約を1回起動し既存の対話に合流できる
+- [x] 3.1 要約リクエストの妥当性が検証される
   - `pageId` と `pagePath` のいずれか一方が必須であることを検証するバリデータを実装する
   - `modelKey` に `post-message-validator.ts` と同じ型・長さ制約を課す
   - 両方欠落時にリクエストが400相当で拒否され、片方のみ指定時は通過することをユニットテストで確認できる
   - _Requirements: 1.3_
 
-- [ ] 3.2 要約リクエストが新規スレッドでSummarizeAgentのストリーム応答を返せる
+- [x] 3.2 要約リクエストが新規スレッドでSummarizeAgentのストリーム応答を返せる
   - `summarizeAgent.stream()` を呼ぶ前に `Page.findByIdAndViewer`（既存、無変更）を1回呼び出す。これが**権限なし時の唯一の応答経路**であり、結果が `null` の場合は**ストリームを開始せず**、不存在と権限なしを区別しない単一の応答（403/404 のいずれか一方に統一）でその場で短絡する（検証はタスク4.1）
   - 結果が得られた場合は、その時点の `page.revision`（populate されていないため ObjectId そのもの。populate 済みの場合は `revision._id`）を `sourceRevisionId` として保持する
   - **`capturedAt` を、`sourceRevisionId` を取得するのと同じ時点（生成開始時点）に `new Date()` でサーバ側に生成する**（クライアントから受け取った日時は使わない）。ストリーム応答に含める
@@ -73,13 +73,13 @@
   - _Requirements: 1.1, 1.2, 2.2, 4.1, 4.2, 7.2_
   - _Depends: 1.3, 2_
 
-- [ ] 3.3 要約ルートがExpressに登録され、AI未設定時は既存ガードで利用不可になる
+- [x] 3.3 要約ルートがExpressに登録され、AI未設定時は既存ガードで利用不可になる
   - `routes/index.ts` の遅延ロードパターンに沿って `POST /_api/v3/mastra/summary` を追加登録する（既存の `router.use(aiReadyGuard)` の適用範囲内）
   - `generateAddActivityMiddleware()`（既存、`apps/app/src/server/middlewares/add-activity.ts`）を、認可ミドルウェアの後・バリデータの前に挟む
   - AI未設定・無効時に本ルートが501を返すことを統合テストで確認できる（既存の `aiReadyGuard` の回帰確認）
   - _Requirements: 5.1_
 
-- [ ] 3.4 要約の生成イベントがAudit Logに記録される
+- [x] 3.4 要約の生成イベントがAudit Logに記録される
   - `apps/app/src/interfaces/activity.ts` に `ACTION_PAGE_AI_SUMMARIZE = 'PAGE_AI_SUMMARIZE'` を追加し、`SupportedAction` と `LargeActionGroup` に登録する（既存の `ACTION_ADMIN_AI_SETTING_UPDATE` 追加時と同じ形。カテゴリ分類は `PAGE_` プレフィックスにより既存の正規表現判定で自動的に `PageActions` に含まれるため、新規カテゴリの追加は不要）
   - 要約ハンドラ（タスク3.2）で、ストリームが正常終了した時点（レスポンス送信前）に `crowi.events.activity.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_PAGE_AI_SUMMARIZE, targetModel: SupportedTargetModel.MODEL_PAGE, target: page, contributor: req.user })` を呼ぶ（既存の `create-page.ts` と同じ呼び出し形）。エラー終了時は呼ばない
   - `apps/app/public/static/locales/{en_US,fr_FR,ja_JP,ko_KR,zh_CN}/admin.json` に `audit_log_action.PAGE_AI_SUMMARIZE` の表示ラベルを5ロケール分追加する（`/admin/audit-log` での表示用）
@@ -149,7 +149,7 @@
   - `loginRequiredStrictly` は export された名前ではなく、`import loginRequiredFactory from '~/server/middlewares/login-required';` のデフォルトエクスポートから `loginRequiredFactory(crowi)` でハンドラファクトリ内にローカル生成する（第2引数 `isGuestAllowed` の既定値 `false` が「strictly」の意味）
   - `excludeReadOnlyUser` は `~/server/middlewares/exclude-read-only-user` の named export をそのまま使う
   - `findByIdAndViewer` は**閲覧**権限しか判定しないため、これらのミドルウェアの代替にはならないことをコードレビュー観点として明記する
-  - **レート制限を `apps/app/src/features/rate-limiter/config/index.ts` の `defaultConfigWithRegExp` にエントリ追加で実装する**（`pageId` を含む動的パスのため完全一致マップ `defaultConfig` ではなく正規表現マップを使う。`/_api/v3/page/[^/]+/ai-summary`、`POST`、`MAX_REQUESTS_TIER_1`）。GROWIのレート制限は `app.use(rateLimiterFactory())` として全体に1回適用される方式であり、ルートにミドルウェアを差し込む実装にはしない。独自の数値をハードコードせず既存のティア定数を使う
+  - **レート制限を `apps/app/src/features/rate-limiter/config/index.ts` の `defaultConfigWithRegExp` にエントリ追加で実装する**（`pageId` を含む動的パスのため完全一致マップ `defaultConfig` ではなく正規表現マップを使う。`/_api/v3/page/[^/]+/ai-summary`、`POST`、`MAX_REQUESTS_TIER_1`、`usersPerIpProspection: 20`。倍率の根拠は research.md 7.10）。GROWIのレート制限は `app.use(rateLimiterFactory())` として全体に1回適用される方式であり、ルートにミドルウェアを差し込む実装にはしない。独自の数値をハードコードせず既存のティア定数を使う
   - **統合テスト**: 未ログイン（ゲスト）からの保存が拒否されること、読み取り専用ユーザーからの保存が403で拒否されること、いずれの場合も `Page.summary` が書き込まれていないことを確認できる
   - **統合テスト（レート制限）**: 設定した上限を超える回数の保存リクエストを短時間に送ると、上限超過分が **429** を返し、上限内のリクエストは正常に処理されることを確認できる
   - _Requirements: 7.1_
@@ -308,3 +308,5 @@
 
 - ~~タスク1.2完了時点で、instructions.ts の「アウトラインだけで打ち切らず先頭から順に読み進める」（design.md a-2/a-3、`read forward from the start of the page` 文言・2箇所のアンチショートカット文）はユニットテストで文言拘束されていない（残存指摘、非ブロッキング）。~~ **解消済み**: `instructions.spec.ts` に2文それぞれを対象とする `toMatch` アサーションを追加し、mutation-check（各文を個別に削除してREDになることを確認→revert）で検証済み。
 - タスク2で判明した落とし穴: 「モジュールをimportするだけではトップレベルの副作用（`getMeter()`呼び出し等）が起きないこと」を検証するテストは、対象モジュールをspecファイル先頭で静的importしていると`beforeEach`の`vi.clearAllMocks()`より前にその副作用が発生し、モック呼び出し履歴が消えて常にパスしてしまう（リグレッションを検知できない）。`vi.resetModules()` + モックの`mockClear()` + `await import(...)`によるテスト内での動的再importで検証する必要がある。以降のタスクで同種の「トップレベルで生成しない」不変条件をテストする際はこのパターンを使う。
+- タスク3.1で判明した落とし穴: express-validator v6 の `.optional()` はチェーン内の位置に関係なくそのチェーン全体をスキップする。「いずれか一方が必須」のような横断チェックは `.optional()` を持たない別チェーンに置く必要がある。また標準バリデータは配列を要素ごとに検証するため、`isMongoId()` 等の前に `isString()` を置かないと配列入力がすり抜ける。
+- タスク3.2への引き継ぎ: バリデータは `{ pageId: 有効値, pagePath: '' }` を通過させる。ハンドラ側で `pageId`/`pagePath` 両方存在時の優先順位を決め、空の `pagePath` を参照先として使わないこと。

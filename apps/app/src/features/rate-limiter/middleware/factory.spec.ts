@@ -28,13 +28,16 @@ type ConsumeCall = {
  * the middleware would also make the user-keyed consume, which carries no
  * multiplier. Anonymous leaves only the per-IP call, the one under test here.
  */
-const consumeCallsFor = async (path: string): Promise<ConsumeCall[]> => {
+const consumeCallsFor = async (
+  path: string,
+  method = 'GET',
+): Promise<ConsumeCall[]> => {
   consumePoints.mockReset();
   consumePoints.mockResolvedValue(undefined);
 
   const req = mock<Request & { user?: IUserHasId }>({
     path,
-    method: 'GET',
+    method,
     ip: '127.0.0.1',
     user: undefined,
   });
@@ -53,8 +56,9 @@ const consumeCallsFor = async (path: string): Promise<ConsumeCall[]> => {
 
 const configsUsedFor = async (
   path: string,
+  method?: string,
 ): Promise<(IApiRateLimitConfig | undefined)[]> =>
-  (await consumeCallsFor(path)).map(({ config }) => config);
+  (await consumeCallsFor(path, method)).map(({ config }) => config);
 
 describe('middlewareFactory', () => {
   it('limits the username-suggestion endpoint more tightly than the global default', async () => {
@@ -77,6 +81,75 @@ describe('middlewareFactory', () => {
 
     for (const { ipMultiplier } of calls) {
       expect(ipMultiplier).toBeGreaterThan(DEFAULT_USERS_PER_IP_PROSPECTION);
+    }
+  });
+
+  // Each summary is an LLM call over up to ~2000 page lines, so the route is
+  // held to the tightest tier (design.md "SummarizeMessageRoute").
+  it('limits AI summary generation to 5 POSTs per window', async () => {
+    const configs = await configsUsedFor('/_api/v3/mastra/summary', 'POST');
+
+    for (const config of configs) {
+      expect(config).toMatchObject({ method: 'POST', maxRequests: 5 });
+    }
+  });
+
+  it('limits AI chat messages more tightly than the global default', async () => {
+    const configs = await configsUsedFor('/_api/v3/mastra/message', 'POST');
+
+    for (const config of configs) {
+      expect(config?.maxRequests).toBeLessThan(DEFAULT_MAX_REQUESTS);
+    }
+  });
+
+  it('assumes more users per IP than the default for AI chat messages', async () => {
+    const calls = await consumeCallsFor('/_api/v3/mastra/message', 'POST');
+
+    for (const { ipMultiplier } of calls) {
+      expect(ipMultiplier).toBeGreaterThan(DEFAULT_USERS_PER_IP_PROSPECTION);
+    }
+  });
+
+  it('assumes more users per IP than the default for AI summary generation', async () => {
+    const calls = await consumeCallsFor('/_api/v3/mastra/summary', 'POST');
+
+    for (const { ipMultiplier } of calls) {
+      expect(ipMultiplier).toBeGreaterThan(DEFAULT_USERS_PER_IP_PROSPECTION);
+    }
+  });
+
+  // Express routes these to the same handler, so they must share the entry and
+  // the counter, or each spelling would get its own fresh allowance.
+  it.each([
+    '/_api/v3/mastra/summary/',
+    '/_api/v3/mastra/Summary',
+    '/_API/V3/MASTRA/SUMMARY/',
+  ])('treats %s as the same endpoint as /_api/v3/mastra/summary', async (variant) => {
+    const canonical = await consumeCallsFor('/_api/v3/mastra/summary', 'POST');
+    const canonicalKeys = consumePoints.mock.calls.map(([, key]) => key);
+
+    const variantCalls = await consumeCallsFor(variant, 'POST');
+    const variantKeys = consumePoints.mock.calls.map(([, key]) => key);
+
+    expect(variantCalls).toEqual(canonical);
+    expect(variantKeys).toEqual(canonicalKeys);
+  });
+
+  it('matches a mixed-case config key regardless of the request casing', async () => {
+    const configs = await configsUsedFor('/_api/login/testldap', 'POST');
+
+    for (const config of configs) {
+      expect(config?.maxRequests).toBeLessThan(DEFAULT_MAX_REQUESTS);
+    }
+  });
+
+  it('matches a RegExp config key case-insensitively', async () => {
+    const configs = await configsUsedFor(
+      '/Attachment/507f1f77bcf86cd799439011',
+    );
+
+    for (const config of configs) {
+      expect(config?.maxRequests).toBeLessThan(DEFAULT_MAX_REQUESTS);
     }
   });
 

@@ -8,6 +8,7 @@ import loggerFactory from '~/utils/logger';
 import {
   DEFAULT_USERS_PER_IP_PROSPECTION,
   type IApiRateLimitConfig,
+  type IApiRateLimitEndpointMap,
 } from '../config';
 import { generateApiRateLimitConfig } from '../utils/config-generator';
 import { consumePoints } from './consume-points';
@@ -19,13 +20,24 @@ const logger = loggerFactory('growi:middleware:api-rate-limit');
 // API_RATE_LIMIT_010_FOO_METHODS=GET,POST
 // API_RATE_LIMIT_010_FOO_MAX_REQUESTS=10
 
+// Express routing ignores case and a trailing slash by default, so the limiter
+// must too: otherwise `/Login/` reaches the same handler as `/login` while
+// falling back to the default limit and a separate counter.
+const normalizeEndpoint = (path: string): string =>
+  path.toLowerCase().replace(/\/+$/, '') || '/';
+
 // generate ApiRateLimitConfig for api rate limiter
 const apiRateLimitConfig = generateApiRateLimitConfig();
-const configWithoutRegExp = apiRateLimitConfig.withoutRegExp;
+const configWithoutRegExp: IApiRateLimitEndpointMap = Object.fromEntries(
+  Object.entries(apiRateLimitConfig.withoutRegExp).map(([key, config]) => [
+    normalizeEndpoint(key),
+    config,
+  ]),
+);
 const configWithRegExp = apiRateLimitConfig.withRegExp;
-const allRegExp = new RegExp(Object.keys(configWithRegExp).join('|'));
+const allRegExp = new RegExp(Object.keys(configWithRegExp).join('|'), 'i');
 const keysWithRegExp = Object.keys(configWithRegExp).map(
-  (key) => new RegExp(`^${key}`),
+  (key) => new RegExp(`^${key}`, 'i'),
 );
 const valuesWithRegExp = Object.values(configWithRegExp);
 
@@ -36,7 +48,7 @@ const valuesWithRegExp = Object.values(configWithRegExp);
  * @param customizedConfig
  * @returns
  */
-const consumePointsByUser = async (
+const consumePointsByUser = (
   method: string,
   key: string | null,
   customizedConfig?: IApiRateLimitConfig,
@@ -51,7 +63,7 @@ const consumePointsByUser = async (
  * @param customizedConfig
  * @returns
  */
-const consumePointsByIp = async (
+const consumePointsByIp = (
   method: string,
   key: string | null,
   customizedConfig?: IApiRateLimitConfig,
@@ -63,7 +75,7 @@ const consumePointsByIp = async (
 
 export const middlewareFactory = (): Handler => {
   return async (req: Request & { user?: IUserHasId }, res, next) => {
-    const endpoint = req.path;
+    const endpoint = normalizeEndpoint(req.path);
 
     // determine keys
     const keyForUser: string | null =
