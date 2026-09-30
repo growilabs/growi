@@ -8,11 +8,10 @@
  * POEditor project ID for the single shared project all namespaces sync
  * into. Public, non-secret data — safe to commit (it is not a token).
  *
- * Placeholder value: the shared POEditor project has not been created yet.
- * Replace with the real ID once
- * `docs/i18n-community-translation-setup.md`'s provisioning steps run.
+ * This is the "GROWI" POEditor project (id 839626) provisioned per
+ * `docs/i18n-community-translation-setup.md`.
  */
-export const SHARED_POEDITOR_PROJECT_ID = 'PENDING_SHARED_PROJECT_ID';
+export const SHARED_POEDITOR_PROJECT_ID = '839626';
 
 export interface NamespaceSyncEntry {
   readonly namespace: 'admin' | 'translation' | 'commons';

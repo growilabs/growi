@@ -18,8 +18,12 @@ vi.mock('mongoose', async (importOriginal) => {
   };
 });
 
-vi.mock('~/server/models/page-redirect', () => ({
-  default: { retrievePageRedirectEndpointsBatch: mocks.retrieveEndpoints },
+vi.mock('~/utils/prisma', () => ({
+  prisma: {
+    pageredirects: {
+      retrievePageRedirectEndpointsBatch: mocks.retrieveEndpoints,
+    },
+  },
 }));
 
 /** A one-hop redirect as the static returns it: no chain, so `end` is `start`. */

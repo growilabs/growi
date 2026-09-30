@@ -1,7 +1,6 @@
 import { Types } from 'mongoose';
 import { mockDeep } from 'vitest-mock-extended';
 
-import PageRedirect from '~/server/models/page-redirect';
 import type { PrismaClient } from '~/utils/prisma';
 
 import type { IPageLink } from '../../interfaces/page-link';
@@ -25,10 +24,6 @@ vi.mock('./target-page-resolution', () => ({
   findPagesById: vi.fn(),
   resolveToPageIds: vi.fn(),
   REDIRECT_CHAIN_MAX_DEPTH: 50,
-}));
-
-vi.mock('~/server/models/page-redirect', () => ({
-  default: { retrieveFromPathsRedirectingTo: vi.fn() },
 }));
 
 const row = (toPage: Types.ObjectId | null, toPath = '/target'): IPageLink => ({
@@ -139,7 +134,7 @@ describe('syncOutboundLinks', () => {
 describe('reResolveByToPath', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(PageRedirect.retrieveFromPathsRedirectingTo).mockResolvedValue(
+    mockPrisma.pageredirects.retrieveFromPathsRedirectingTo.mockResolvedValue(
       [],
     );
   });
@@ -183,7 +178,7 @@ describe('reResolveByToPath', () => {
   it('resolves and writes the paths that redirect here, not just the path itself', async () => {
     const occupant = new Types.ObjectId();
     const elsewhere = new Types.ObjectId();
-    vi.mocked(PageRedirect.retrieveFromPathsRedirectingTo).mockResolvedValue([
+    mockPrisma.pageredirects.retrieveFromPathsRedirectingTo.mockResolvedValue([
       '/old',
       '/older',
     ]);

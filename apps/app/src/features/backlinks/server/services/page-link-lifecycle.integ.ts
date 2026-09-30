@@ -5,7 +5,6 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import PageRedirect from '~/server/models/page-redirect';
 import { prisma } from '~/utils/prisma';
 
 import { ensurePageLinkIndexes } from '../models/page-link-indexes';
@@ -196,7 +195,14 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
       where: { pageId: { in: ids.map((id) => id.toString()) } },
     });
     await Page.deleteMany({ path: seededPaths });
-    await PageRedirect.deleteMany({ fromPath: seededPaths });
+    await prisma.pageredirects.deleteMany({
+      where: {
+        OR: [
+          { fromPath: { startsWith: `${PREFIX}/` } },
+          { fromPath: { startsWith: `/trash${PREFIX}/` } },
+        ],
+      },
+    });
   });
 
   afterAll(async () => {
@@ -382,12 +388,14 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     await waitForOutboundCount(source._id, 1);
 
     // Rename the target. This reproduces exactly the state a rename with "create
-    // redirect page" leaves behind (PageService: path update + PageRedirect.create),
+    // redirect page" leaves behind (PageService: path update + a pageredirects row),
     // which is all that link resolution reads. The source's body is untouched, so
     // it still names the old path.
     const newPath = `${PREFIX}/rn-target-moved`;
     await Page.updateOne({ _id: target._id }, { $set: { path: newPath } });
-    await PageRedirect.create({ fromPath: oldPath, toPath: newPath });
+    await prisma.pageredirects.create({
+      data: { fromPath: oldPath, toPath: newPath },
+    });
 
     // Re-save the source for an unrelated reason. The extra link to /rn-witness is
     // what lets this wait on the *new* sync rather than passing on the pre-rename

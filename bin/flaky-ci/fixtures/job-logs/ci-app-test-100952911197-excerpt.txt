@@ -1,0 +1,108 @@
+2026-09-04T07:59:07.1664466Z OK zh_CN missing-key count 0 <= baseline 0
+2026-09-04T07:59:07.1664718Z OK fr_FR missing-key count 0 <= baseline 0
+2026-09-04T07:59:07.1664981Z OK ko_KR missing-key count 0 <= baseline 0
+2026-09-04T07:59:07.1665297Z FAIL unused-key count 80 exceeds baseline 10 (Requirement 2)
+2026-09-04T07:59:07.1665492Z 
+2026-09-04T07:59:07.1666481Z [90mstderr[2m | tools/i18n-audit/run-audit.spec.ts[2m > [22m[2mrunNormalMode / runUpdateBaselineMode (fixture baseline.json + fixture i18next-cli stdout)[2m > [22m[2mrunUpdateBaselineMode refuses to write when a check errors (parse failure), and never treats it as pass
+2026-09-04T07:59:07.1667819Z [22m[39mFAIL status --unused: Failed to parse unused-key count: expected a "Summary: Found N unused key(s)" line was not found in `status --unused` output. (failed on all 3 attempts)
+2026-09-04T07:59:07.1668490Z Aborting baseline update: measurement failed, baseline.json not written.
+2026-09-04T07:59:07.1668720Z 
+2026-09-04T07:59:07.1670053Z [90mstdout[2m | tools/i18n-audit/run-audit.spec.ts[2m > [22m[2mrunNormalMode / runUpdateBaselineMode (fixture baseline.json + fixture i18next-cli stdout)[2m > [22m[2mretries a transient truncated-stdout parse failure and still passes once a later attempt returns clean output (reproduces the mergify ci-app-lint 32968568349 failure)
+2026-09-04T07:59:07.1671919Z [22m[39mOK default-language missing-key count is 0
+2026-09-04T07:59:07.1672322Z OK unused-key count 80 <= baseline 80
+2026-09-04T07:59:07.1672700Z OK ja_JP missing-key count 0 <= baseline 0
+2026-09-04T07:59:07.1673077Z OK zh_CN missing-key count 0 <= baseline 0
+2026-09-04T07:59:07.1673448Z OK fr_FR missing-key count 0 <= baseline 0
+2026-09-04T07:59:07.1673818Z OK ko_KR missing-key count 0 <= baseline 0
+2026-09-04T07:59:07.1674024Z 
+2026-09-04T07:59:07.1675687Z [90mstderr[2m | tools/i18n-audit/run-audit.spec.ts[2m > [22m[2mrunNormalMode / runUpdateBaselineMode (fixture baseline.json + fixture i18next-cli stdout)[2m > [22m[2mreports a failure (never a silent pass) when every retry attempt keeps returning truncated/unparseable stdout
+2026-09-04T07:59:07.1678165Z [22m[39mFAIL status ko_KR: Failed to parse per-locale missing-key count for "ko_KR": expected a "Summary: Found N incomplete translations for "ko_KR" — [X untranslated,] N absent" line was not found in `status ko_KR` output. (failed on all 3 attempts)
+2026-09-04T07:59:07.1679437Z Aborting baseline update: measurement failed, baseline.json not written.
+2026-09-04T07:59:07.1679770Z 
+2026-09-04T07:59:07.1680425Z  [32m✓[39m [30m[42m app-unit [49m[39m src/server/service/mail/mail.spec.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 253[2mms[22m[39m
+2026-09-04T07:59:07.1681718Z  [32m✓[39m [30m[42m app-unit [49m[39m tools/i18n-audit/run-audit.spec.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+2026-09-04T07:59:07.2157417Z [41m[1m FAIL [22m[49m [30m[42m app-unit [49m[39m src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.spec.ts[2m > [22mexport-pages-to-fs-async: getPageWritable[2m > [22mPDF format smoke test (Requirements 5.1, 2.1)[2m > [22mlinks the shared stylesheet and wraps content in .wiki, writing the CSS once per job
+2026-09-04T07:59:07.2158623Z [31m[1mMissingSchemaError[22m: Schema hasn't been registered for model "User".
+2026-09-04T07:59:07.2159017Z Use mongoose.model(name, schema)[39m
+2026-09-04T07:59:07.2159733Z [90m [2m❯[22m Mongoose.model ../../node_modules/.pnpm/mongoose@6.13.9_@aws-sdk+client-sso-oidc@3.600.0/node_modules/mongoose/lib/index.js:[2m554:13[22m[39m
+2026-09-04T07:59:07.2160721Z [36m [2m❯[22m Proxy.getPageWritable src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.ts:[2m77:25[22m[39m
+2026-09-04T07:59:07.2161543Z     [90m 75| [39m  // Resolved once per job (not per page): the user embedAttachmentIma…
+2026-09-04T07:59:07.2162016Z     [90m 76| [39m  [90m// runs its per-attachment permission check as.[39m
+2026-09-04T07:59:07.2162575Z     [90m 77| [39m  [35mconst[39m [33mUser[39m [33m=[39m mongoose[33m.[39m[34mmodel[39m([32m'User'[39m)[33m;[39m
+2026-09-04T07:59:07.2163032Z     [90m   | [39m                        [31m^[39m
+2026-09-04T07:59:07.2163659Z     [90m 78| [39m  [35mconst[39m exportingUser [33m=[39m [35mawait[39m [33mUser[39m[33m.[39m[34mfindById[39m(pageBulkExportJob[33m.[39muser)[33m;[39m
+2026-09-04T07:59:07.2164134Z     [90m 79| [39m
+2026-09-04T07:59:07.2164781Z [90m [2m❯[22m src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.spec.ts:[2m134:46[22m[39m
+2026-09-04T07:59:07.2165191Z 
+2026-09-04T07:59:07.2165379Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯[22m[39m
+2026-09-04T07:59:07.2165540Z 
+2026-09-04T07:59:07.2166709Z [41m[1m FAIL [22m[49m [30m[42m app-unit [49m[39m src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.spec.ts[2m > [22mexport-pages-to-fs-async: getPageWritable[2m > [22mMD format smoke test (Requirement 5.2)[2m > [22mwrites raw Markdown (no HTML rendering) for md format
+2026-09-04T07:59:07.2167800Z [31m[1mMissingSchemaError[22m: Schema hasn't been registered for model "User".
+2026-09-04T07:59:07.2168197Z Use mongoose.model(name, schema)[39m
+2026-09-04T07:59:07.2168895Z [90m [2m❯[22m Mongoose.model ../../node_modules/.pnpm/mongoose@6.13.9_@aws-sdk+client-sso-oidc@3.600.0/node_modules/mongoose/lib/index.js:[2m554:13[22m[39m
+2026-09-04T07:59:07.2169884Z [36m [2m❯[22m Proxy.getPageWritable src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.ts:[2m77:25[22m[39m
+2026-09-04T07:59:07.2170595Z     [90m 75| [39m  // Resolved once per job (not per page): the user embedAttachmentIma…
+2026-09-04T07:59:07.2171142Z     [90m 76| [39m  [90m// runs its per-attachment permission check as.[39m
+2026-09-04T07:59:07.2171700Z     [90m 77| [39m  [35mconst[39m [33mUser[39m [33m=[39m mongoose[33m.[39m[34mmodel[39m([32m'User'[39m)[33m;[39m
+2026-09-04T07:59:07.2172152Z     [90m   | [39m                        [31m^[39m
+2026-09-04T07:59:07.2172892Z     [90m 78| [39m  [35mconst[39m exportingUser [33m=[39m [35mawait[39m [33mUser[39m[33m.[39m[34mfindById[39m(pageBulkExportJob[33m.[39muser)[33m;[39m
+2026-09-04T07:59:07.2173369Z     [90m 79| [39m
+2026-09-04T07:59:07.2174013Z [90m [2m❯[22m src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.spec.ts:[2m168:46[22m[39m
+2026-09-04T07:59:07.2174419Z 
+2026-09-04T07:59:07.2174610Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯[22m[39m
+2026-09-04T07:59:07.2174772Z 
+2026-09-04T07:59:07.2176278Z [41m[1m FAIL [22m[49m [30m[42m app-unit [49m[39m src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.spec.ts[2m > [22mexport-pages-to-fs-async: getPageWritable[2m > [22merror handling: conversion reject → write callback receives error (Requirement 3.2)[2m > [22mcalls the write callback with the render error when renderToHtml rejects
+2026-09-04T07:59:07.2177539Z [31m[1mMissingSchemaError[22m: Schema hasn't been registered for model "User".
+2026-09-04T07:59:07.2177936Z Use mongoose.model(name, schema)[39m
+2026-09-04T07:59:07.2178631Z [90m [2m❯[22m Mongoose.model ../../node_modules/.pnpm/mongoose@6.13.9_@aws-sdk+client-sso-oidc@3.600.0/node_modules/mongoose/lib/index.js:[2m554:13[22m[39m
+2026-09-04T07:59:07.2179617Z [36m [2m❯[22m Proxy.getPageWritable src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.ts:[2m77:25[22m[39m
+2026-09-04T07:59:07.2180327Z     [90m 75| [39m  // Resolved once per job (not per page): the user embedAttachmentIma…
+2026-09-04T07:59:07.2180797Z     [90m 76| [39m  [90m// runs its per-attachment permission check as.[39m
+2026-09-04T07:59:07.2181427Z     [90m 77| [39m  [35mconst[39m [33mUser[39m [33m=[39m mongoose[33m.[39m[34mmodel[39m([32m'User'[39m)[33m;[39m
+2026-09-04T07:59:07.2181875Z     [90m   | [39m                        [31m^[39m
+2026-09-04T07:59:07.2182494Z     [90m 78| [39m  [35mconst[39m exportingUser [33m=[39m [35mawait[39m [33mUser[39m[33m.[39m[34mfindById[39m(pageBulkExportJob[33m.[39muser)[33m;[39m
+2026-09-04T07:59:07.2182974Z     [90m 79| [39m
+2026-09-04T07:59:07.2183602Z [90m [2m❯[22m src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.spec.ts:[2m210:46[22m[39m
+2026-09-04T07:59:07.2184006Z 
+2026-09-04T07:59:07.2184190Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯[22m[39m
+2026-09-04T07:59:07.2184348Z 
+2026-09-04T07:59:07.2185493Z [41m[1m FAIL [22m[49m [30m[42m app-unit [49m[39m src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.spec.ts[2m > [22mexport-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3)[2m > [22mqueries pages with $gt filter when lastExportedPagePath is set
+2026-09-04T07:59:07.2186580Z [31m[1mMissingSchemaError[22m: Schema hasn't been registered for model "User".
+2026-09-04T07:59:07.2186965Z Use mongoose.model(name, schema)[39m
+2026-09-04T07:59:07.2187766Z [90m [2m❯[22m Mongoose.model ../../node_modules/.pnpm/mongoose@6.13.9_@aws-sdk+client-sso-oidc@3.600.0/node_modules/mongoose/lib/index.js:[2m554:13[22m[39m
+2026-09-04T07:59:07.2188747Z [36m [2m❯[22m Proxy.getPageWritable src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.ts:[2m77:25[22m[39m
+2026-09-04T07:59:07.2189452Z     [90m 75| [39m  // Resolved once per job (not per page): the user embedAttachmentIma…
+2026-09-04T07:59:07.2189909Z     [90m 76| [39m  [90m// runs its per-attachment permission check as.[39m
+2026-09-04T07:59:07.2190548Z     [90m 77| [39m  [35mconst[39m [33mUser[39m [33m=[39m mongoose[33m.[39m[34mmodel[39m([32m'User'[39m)[33m;[39m
+2026-09-04T07:59:07.2191073Z     [90m   | [39m                        [31m^[39m
+2026-09-04T07:59:07.2191700Z     [90m 78| [39m  [35mconst[39m exportingUser [33m=[39m [35mawait[39m [33mUser[39m[33m.[39m[34mfindById[39m(pageBulkExportJob[33m.[39muser)[33m;[39m
+2026-09-04T07:59:07.2192180Z     [90m 79| [39m
+2026-09-04T07:59:07.2192896Z [90m [2m❯[22m Proxy.exportPagesToFsAsync src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.ts:[2m181:56[22m[39m
+2026-09-04T07:59:07.2193881Z [90m [2m❯[22m src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.spec.ts:[2m274:34[22m[39m
+2026-09-04T07:59:07.2194285Z 
+2026-09-04T07:59:07.2194464Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯[22m[39m
+2026-09-04T07:59:07.2194624Z 
+2026-09-04T07:59:07.2195795Z [41m[1m FAIL [22m[49m [30m[42m app-unit [49m[39m src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.spec.ts[2m > [22mexport-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3)[2m > [22mqueries all pages (no $gt filter) when lastExportedPagePath is not set
+2026-09-04T07:59:07.2196888Z [31m[1mMissingSchemaError[22m: Schema hasn't been registered for model "User".
+2026-09-04T07:59:07.2197291Z Use mongoose.model(name, schema)[39m
+2026-09-04T07:59:07.2197976Z [90m [2m❯[22m Mongoose.model ../../node_modules/.pnpm/mongoose@6.13.9_@aws-sdk+client-sso-oidc@3.600.0/node_modules/mongoose/lib/index.js:[2m554:13[22m[39m
+2026-09-04T07:59:07.2198953Z [36m [2m❯[22m Proxy.getPageWritable src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.ts:[2m77:25[22m[39m
+2026-09-04T07:59:07.2199675Z     [90m 75| [39m  // Resolved once per job (not per page): the user embedAttachmentIma…
+2026-09-04T07:59:07.2200151Z     [90m 76| [39m  [90m// runs its per-attachment permission check as.[39m
+2026-09-04T07:59:07.2200705Z     [90m 77| [39m  [35mconst[39m [33mUser[39m [33m=[39m mongoose[33m.[39m[34mmodel[39m([32m'User'[39m)[33m;[39m
+2026-09-04T07:59:07.2201226Z     [90m   | [39m                        [31m^[39m
+2026-09-04T07:59:07.2201850Z     [90m 78| [39m  [35mconst[39m exportingUser [33m=[39m [35mawait[39m [33mUser[39m[33m.[39m[34mfindById[39m(pageBulkExportJob[33m.[39muser)[33m;[39m
+2026-09-04T07:59:07.2202333Z     [90m 79| [39m
+2026-09-04T07:59:07.2203052Z [90m [2m❯[22m Proxy.exportPagesToFsAsync src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.ts:[2m181:56[22m[39m
+2026-09-04T07:59:07.2204041Z [90m [2m❯[22m src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.spec.ts:[2m309:34[22m[39m
+2026-09-04T07:59:07.2204449Z 
+2026-09-04T07:59:07.2204632Z [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯[22m[39m
+2026-09-04T07:59:07.2204789Z 
+2026-09-04T07:59:07.2204799Z 
+2026-09-04T07:59:07.2205133Z [2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m309 passed[39m[22m[90m (310)[39m
+2026-09-04T07:59:07.2205720Z [2m      Tests [22m [1m[31m5 failed[39m[22m[2m | [22m[1m[32m4151 passed[39m[22m[90m (4156)[39m
+2026-09-04T07:59:07.2206224Z [2m   Start at [22m 07:58:06
+2026-09-04T07:59:07.2206782Z [2m   Duration [22m 60.19s[2m (transform 10.38s, setup 0ms, collect 59.98s, tests 19.37s, environment 1.80s, prepare 31.10s)[22m
+2026-09-04T07:59:07.2207106Z 
+2026-09-04T07:59:07.2207110Z 
+2026-09-04T07:59:07.2214270Z ##[error]MissingSchemaError: Schema hasn't been registered for model "User".

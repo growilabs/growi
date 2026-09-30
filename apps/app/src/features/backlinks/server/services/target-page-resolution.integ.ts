@@ -3,14 +3,14 @@ import mongoose, { type Types } from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
 import PageModelFactory from '~/server/models/page';
-import PageRedirect from '~/server/models/page-redirect';
+import { prisma } from '~/utils/prisma';
 
 import { resolveToPageIds } from './target-page-resolution';
 
 describe('resolveToPageIds (integration)', () => {
   let Page: PageModel;
   let created: Types.ObjectId[] = [];
-  let createdRedirects: Types.ObjectId[] = [];
+  let createdRedirects: string[] = [];
 
   beforeAll(async () => {
     await PageModelFactory(null);
@@ -19,7 +19,9 @@ describe('resolveToPageIds (integration)', () => {
 
   afterEach(async () => {
     await Page.deleteMany({ _id: { $in: created } });
-    await PageRedirect.deleteMany({ _id: { $in: createdRedirects } });
+    await prisma.pageredirects.deleteMany({
+      where: { id: { in: createdRedirects } },
+    });
     created = [];
     createdRedirects = [];
   });
@@ -37,8 +39,10 @@ describe('resolveToPageIds (integration)', () => {
     fromPath: string,
     toPath: string,
   ): Promise<void> => {
-    const redirect = await PageRedirect.create({ fromPath, toPath });
-    createdRedirects.push(redirect._id);
+    const redirect = await prisma.pageredirects.create({
+      data: { fromPath, toPath },
+    });
+    createdRedirects.push(redirect.id);
   };
 
   it('resolves a regular path to its page id', async () => {
