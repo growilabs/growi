@@ -80,6 +80,11 @@ export const CONFIG_KEYS = [
   'app:auditLogActionGroupSize',
   'app:auditLogAdditionalActions',
   'app:auditLogExcludeActions',
+  'app:auditLogEsSyncAnonymousThresholdLogin',
+  'app:auditLogEsSyncAnonymousThresholdRegister',
+  'app:auditLogEsSyncAnonymousThresholdForgotPassword',
+  'app:auditLogEsSyncAnonymousThresholdInstaller',
+  'app:auditLogEsSyncAnonymousThresholdOther',
   'app:serviceType',
   'app:deploymentType',
   'app:ssrMaxRevisionBodyLength',
@@ -555,6 +560,36 @@ export const CONFIG_DEFINITIONS = {
   'app:auditLogExcludeActions': defineConfig<string | undefined>({
     envVarName: 'AUDIT_LOG_EXCLUDE_ACTIONS',
     defaultValue: undefined,
+  }),
+  // Per-endpoint cap (admitted anonymous-log events per 1-minute window, all IPs
+  // combined) on syncing anonymous audit logs to Elasticsearch — see
+  // features/auditlog-es-sync/server/service/decide-es-sync-for-event.ts.
+  //
+  // Launch placeholders pending GROWI.cloud's own traffic measurement, each set
+  // to 10x the endpoint's existing rate-limiter allowance for a single IP
+  // (features/rate-limiter/config/index.ts).
+  'app:auditLogEsSyncAnonymousThresholdLogin': defineConfig<number>({
+    envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_LOGIN',
+    defaultValue: 5000,
+  }),
+  'app:auditLogEsSyncAnonymousThresholdRegister': defineConfig<number>({
+    envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_REGISTER',
+    defaultValue: 1000,
+  }),
+  'app:auditLogEsSyncAnonymousThresholdForgotPassword': defineConfig<number>({
+    envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_FORGOT_PASSWORD',
+    defaultValue: 250,
+  }),
+  'app:auditLogEsSyncAnonymousThresholdInstaller': defineConfig<number>({
+    envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_INSTALLER',
+    defaultValue: 50,
+  }),
+  // Shared by every endpoint not listed in anonymous-sync-thresholds.ts. Those have
+  // no dedicated rate-limiter entry, so the base is the rate-limiter default
+  // (DEFAULT_MAX_REQUESTS x DEFAULT_USERS_PER_IP_PROSPECTION).
+  'app:auditLogEsSyncAnonymousThresholdOther': defineConfig<number>({
+    envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_OTHER',
+    defaultValue: 25000,
   }),
   'app:serviceType': defineConfig<GrowiServiceType>({
     envVarName: 'SERVICE_TYPE',

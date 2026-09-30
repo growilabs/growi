@@ -16,6 +16,7 @@ import {
   markUnsyncedAndClearToken,
 } from '../models/auditlog-es-sync-tx';
 import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
+import { filterAdmittedUpserts } from './filter-admitted-upserts';
 
 const logger = loggerFactory('growi:service:auditlog-changestream');
 
@@ -257,8 +258,9 @@ export class AuditlogChangeStreamService {
     const upserts: ActivityDocument[] = [];
     const deleteIds: mongoose.Types.ObjectId[] = [];
     for (const event of batch) {
-      // 'update' is ignored: ES holds only snapshot.username, fixed at creation.
-      // Index a mutable field in the auditlog mapping and 'update' must be handled too.
+      // 'update' is ignored: ES holds only the fields listed in AuditlogSyncFields
+      // (snapshot.username, endpoint), all of which are fixed at creation.
+      // Sync a mutable field and 'update' must be handled too.
       if (
         event.operationType === 'insert' &&
         'fullDocument' in event &&
@@ -275,7 +277,13 @@ export class AuditlogChangeStreamService {
     const lastToken = batch[batch.length - 1]._id;
 
     try {
-      await this.esWriter.bulkSyncAuditlogs(upserts, deleteIds);
+      // Deliberately run inside this try/catch, not as a separate step: a failure in
+      // filterAdmittedUpserts (e.g. a transient MongoDB error while claiming/deciding)
+      // is handled exactly like a bulkSyncAuditlogs failure — retried with backoff,
+      // eventually poison-pill-skipped — rather than silently syncing unthrottled or
+      // dropping everything.
+      const admittedUpserts = await filterAdmittedUpserts(upserts);
+      await this.esWriter.bulkSyncAuditlogs(admittedUpserts, deleteIds);
       this.consecutiveEventFailures = 0;
       this.lastFailingToken = null;
       this.consecutiveRestarts = 0;

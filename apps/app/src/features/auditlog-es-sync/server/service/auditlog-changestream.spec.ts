@@ -14,6 +14,7 @@ import {
 } from '../models/auditlog-es-sync-tx';
 import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
 import { AuditlogChangeStreamService } from './auditlog-changestream';
+import { filterAdmittedUpserts } from './filter-admitted-upserts';
 
 const { mockError } = vi.hoisted(() => ({
   mockError: vi.fn(),
@@ -61,6 +62,13 @@ vi.mock(
     markUnsyncedAndClearToken: vi.fn(),
   }),
 );
+
+// The admission-gating logic itself (threshold matching, window keying, sequential
+// processing) is filter-admitted-upserts.spec.ts's contract, not this file's — mocked
+// here so flushBuffer() tests only exercise how its result is used.
+vi.mock('./filter-admitted-upserts', () => ({
+  filterAdmittedUpserts: vi.fn(),
+}));
 
 // Minimal fake ChangeStream driven by push(). On close(), rejects any pending next().
 class FakeChangeStream {
@@ -188,6 +196,11 @@ describe('AuditlogChangeStreamService', () => {
     esWriter.bulkSyncAuditlogs.mockResolvedValue(undefined);
     // Default: no activities exist (fresh install). Tests that need a backlog override this.
     vi.spyOn(Activity, 'exists').mockResolvedValue(null);
+    // Default: pass every upsert through unfiltered. Wiring tests that need to see a
+    // drop override this.
+    vi.mocked(filterAdmittedUpserts).mockImplementation(
+      async (upserts) => upserts,
+    );
   });
 
   afterEach(async () => {
@@ -512,6 +525,37 @@ describe('AuditlogChangeStreamService', () => {
       );
       const [upserts] = esWriter.bulkSyncAuditlogs.mock.calls[0];
       expect(upserts).toHaveLength(100);
+    });
+  });
+
+  // ─── Admission-gating wiring ────────────────────────────────────────────────
+  // The gating logic itself (threshold matching, window keying, sequential
+  // processing) is filter-admitted-upserts.spec.ts's contract; this only checks
+  // that flushBuffer() routes upserts through it and syncs its result.
+
+  describe('flushBuffer() / admission gating wiring', () => {
+    it('syncs only the upserts filterAdmittedUpserts admits', async () => {
+      const admittedDoc = mock<ActivityDocument>({ _id: new Types.ObjectId() });
+      const droppedDoc = mock<ActivityDocument>({ _id: new Types.ObjectId() });
+      vi.mocked(filterAdmittedUpserts).mockResolvedValue([admittedDoc]);
+
+      const fakeStream = new FakeChangeStream();
+      vi.spyOn(Activity, 'watch').mockReturnValue(
+        fakeStream as unknown as ChangeStream<ActivityDocument>,
+      );
+      service = new AuditlogChangeStreamService(esWriter);
+      await service.start();
+
+      fakeStream.push(makeInsertEvent(droppedDoc, 'tok1'));
+
+      await vi.waitFor(() =>
+        expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledOnce(),
+      );
+      expect(filterAdmittedUpserts).toHaveBeenCalledWith([droppedDoc]);
+      expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledWith(
+        [admittedDoc],
+        [],
+      );
     });
   });
 

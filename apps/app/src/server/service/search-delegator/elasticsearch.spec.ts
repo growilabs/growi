@@ -19,10 +19,15 @@ import ElasticsearchDelegator from './elasticsearch';
 import { injectClient } from './elasticsearch.testing';
 import type { ElasticsearchClientDelegator } from './elasticsearch-client-delegator';
 import type { ES8ClientDelegator } from './elasticsearch-client-delegator/es8-client-delegator';
+import { getClient } from './elasticsearch-client-delegator/get-client';
 
 vi.mock('~/server/service/config-manager/config-manager', () => ({
   default: { getConfig: vi.fn() },
   configManager: { getConfig: vi.fn() },
+}));
+
+vi.mock('./elasticsearch-client-delegator/get-client', () => ({
+  getClient: vi.fn(),
 }));
 
 vi.mock('~/features/auditlog-es-sync/server', () => ({
@@ -576,6 +581,45 @@ describe('ElasticsearchDelegator', () => {
 
       expect(mockES8Client.indices.putAlias).not.toHaveBeenCalled();
     });
+
+    // The auditlog index is created once and never re-created, so this is the only
+    // path by which a mapping added after the index existed reaches an upgraded instance.
+    it('pushes the current mapping onto the index', async () => {
+      givenIndexState({
+        tmpExists: false,
+        indexExists: true,
+        aliasExists: true,
+      });
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(mockES8Client.indices.putMapping).toHaveBeenCalledWith({
+        index: 'auditlogs',
+        properties: {
+          username: { type: 'keyword' },
+          endpoint: { type: 'keyword' },
+        },
+      });
+    });
+
+    it('attaches the alias even when the mapping update is rejected', async () => {
+      givenIndexState({
+        tmpExists: false,
+        indexExists: true,
+        aliasExists: false,
+      });
+      mockES8Client.indices.putMapping.mockRejectedValue(
+        new Error('illegal_argument_exception'),
+      );
+
+      await expect(delegator.normalizeAuditlogIndices()).rejects.toThrow(
+        'illegal_argument_exception',
+      );
+      expect(mockES8Client.indices.putAlias).toHaveBeenCalledWith({
+        name: 'auditlogs-alias',
+        index: 'auditlogs',
+      });
+    });
   });
 
   describe('rebuildAuditlogIndex()', () => {
@@ -948,16 +992,21 @@ describe('ElasticsearchDelegator', () => {
   });
 
   describe('bulkSyncAuditlogs()', () => {
-    let mockES8Client: MockProxy<ES8ClientDelegator>;
+    let mockES8Client: DeepMockProxy<ES8ClientDelegator>;
 
-    const makeActivity = (username?: string) =>
+    const makeActivity = (username?: string, endpoint?: string) =>
       mock<ActivityDocument>({
         _id: new mongoose.Types.ObjectId(),
         snapshot: { username },
+        endpoint,
       });
 
     beforeEach(() => {
-      mockES8Client = mock<ES8ClientDelegator>({ delegatorVersion: 8 });
+      mockES8Client = mockDeep<ES8ClientDelegator>({ delegatorVersion: 8 });
+      mockES8Client.indices.exists.mockImplementation((params) =>
+        Promise.resolve(params.index !== 'auditlogs-tmp'),
+      );
+      mockES8Client.indices.existsAlias.mockResolvedValue(true);
       mockES8Client.bulk.mockResolvedValue(
         mock<Awaited<ReturnType<typeof mockES8Client.bulk>>>({
           errors: false,
@@ -965,6 +1014,158 @@ describe('ElasticsearchDelegator', () => {
         }),
       );
       injectClient(delegator, mockES8Client);
+    });
+
+    describe('when boot could not push the mapping', () => {
+      beforeEach(() => {
+        mockES8Client.indices.putMapping.mockRejectedValueOnce(
+          new Error('connection reset'),
+        );
+      });
+
+      // A write before the mapping lands makes ES dynamically map endpoint as text,
+      // which no later putMapping can turn back into keyword.
+      it('does not write anything while the mapping still cannot be pushed', async () => {
+        await delegator.normalizeAuditlogIndices().catch(() => {});
+        mockES8Client.indices.putMapping.mockRejectedValueOnce(
+          new Error('connection reset'),
+        );
+
+        await expect(
+          delegator.bulkSyncAuditlogs([makeActivity('alice', '/login')], []),
+        ).rejects.toThrow('connection reset');
+        expect(mockES8Client.bulk).not.toHaveBeenCalled();
+      });
+
+      it('pushes the mapping before writing once it can', async () => {
+        await delegator.normalizeAuditlogIndices().catch(() => {});
+
+        await delegator.bulkSyncAuditlogs(
+          [makeActivity('alice', '/login')],
+          [],
+        );
+
+        expect(mockES8Client.indices.putMapping).toHaveBeenCalledTimes(2);
+        expect(
+          mockES8Client.indices.putMapping.mock.invocationCallOrder[1],
+        ).toBeLessThan(mockES8Client.bulk.mock.invocationCallOrder[0]);
+      });
+
+      // A rebuild may be running (on this or another instance) while live batches
+      // arrive; deleting or creating indices here would wreck it.
+      it('retries only the mapping push, without deleting or creating indices', async () => {
+        await delegator.normalizeAuditlogIndices().catch(() => {});
+        mockES8Client.indices.exists.mockResolvedValue(true);
+        mockES8Client.indices.delete.mockClear();
+        mockES8Client.indices.create.mockClear();
+
+        await delegator.bulkSyncAuditlogs(
+          [makeActivity('alice', '/login')],
+          [],
+        );
+
+        expect(mockES8Client.indices.delete).not.toHaveBeenCalled();
+        expect(mockES8Client.indices.create).not.toHaveBeenCalled();
+      });
+    });
+
+    // No retry can fix these (a conflicting field type, or missing privileges), so
+    // holding writes back would only stop the sync for nothing.
+    it.each([
+      400, 401, 403,
+    ])('writes with the existing mapping when ES rejects the mapping with %i', async (statusCode) => {
+      const rejection = Object.assign(new Error('rejected'), { statusCode });
+      mockES8Client.indices.putMapping.mockRejectedValue(rejection);
+      await delegator.normalizeAuditlogIndices().catch(() => {});
+
+      await delegator.bulkSyncAuditlogs([makeActivity('alice', '/login')], []);
+
+      expect(mockES8Client.bulk).toHaveBeenCalled();
+    });
+
+    const givenReconnectableConfig = () => {
+      vi.mocked(configManager.getConfig).mockImplementation((key) => {
+        if (key === 'app:elasticsearchVersion') return 8;
+        if (key === 'app:elasticsearchUri') return 'http://es:9200/growi';
+        return false;
+      });
+    };
+
+    it('does not mark a newly connected cluster as synced by a push to the old one', async () => {
+      givenReconnectableConfig();
+      let finishOldPush: () => void = () => {};
+      mockES8Client.indices.putMapping.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishOldPush = () => resolve(mock());
+        }),
+      );
+      const oldPush = delegator.normalizeAuditlogIndices();
+      await vi.waitFor(() =>
+        expect(mockES8Client.indices.putMapping).toHaveBeenCalled(),
+      );
+
+      const newClient = mockDeep<ES8ClientDelegator>({ delegatorVersion: 8 });
+      newClient.bulk.mockResolvedValue(
+        mock<Awaited<ReturnType<typeof newClient.bulk>>>({
+          errors: false,
+          items: [],
+        }),
+      );
+      vi.mocked(getClient).mockResolvedValue(newClient);
+      await delegator.initClient();
+      finishOldPush();
+      await oldPush;
+
+      await delegator.bulkSyncAuditlogs([makeActivity('alice')], []);
+
+      expect(newClient.indices.putMapping).toHaveBeenCalled();
+    });
+
+    it('does not write to a newly connected cluster when the reconnect happened mid-push', async () => {
+      givenReconnectableConfig();
+      let finishOldPush: () => void = () => {};
+      mockES8Client.indices.putMapping.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishOldPush = () => resolve(mock());
+        }),
+      );
+      const pendingWrite = delegator.bulkSyncAuditlogs(
+        [makeActivity('alice', '/login')],
+        [],
+      );
+      await vi.waitFor(() =>
+        expect(mockES8Client.indices.putMapping).toHaveBeenCalled(),
+      );
+
+      const newClient = mockDeep<ES8ClientDelegator>({ delegatorVersion: 8 });
+      vi.mocked(getClient).mockResolvedValue(newClient);
+      await delegator.initClient();
+      finishOldPush();
+
+      await expect(pendingWrite).rejects.toThrow();
+      expect(newClient.bulk).not.toHaveBeenCalled();
+    });
+
+    it('pushes the mapping again after reconnecting to ES', async () => {
+      givenReconnectableConfig();
+      vi.mocked(getClient).mockResolvedValue(mockES8Client);
+      await delegator.normalizeAuditlogIndices();
+
+      await delegator.initClient();
+      await delegator.bulkSyncAuditlogs([makeActivity('alice')], []);
+
+      expect(mockES8Client.indices.putMapping).toHaveBeenCalledTimes(2);
+      expect(
+        mockES8Client.indices.putMapping.mock.invocationCallOrder[1],
+      ).toBeLessThan(mockES8Client.bulk.mock.invocationCallOrder[0]);
+    });
+
+    it('does not push the mapping again once boot has pushed it', async () => {
+      await delegator.normalizeAuditlogIndices();
+
+      await delegator.bulkSyncAuditlogs([makeActivity('alice')], []);
+
+      expect(mockES8Client.indices.putMapping).toHaveBeenCalledTimes(1);
     });
 
     it('indexes upserts into the concrete index, not the alias', async () => {
@@ -990,7 +1191,79 @@ describe('ElasticsearchDelegator', () => {
       });
     });
 
-    it('skips upserts that have no username', async () => {
+    it('includes endpoint alongside username when both are present', async () => {
+      const activity = makeActivity('alice', '/_api/v3/pages/revert');
+
+      await delegator.bulkSyncAuditlogs([activity], []);
+
+      expect(mockES8Client.bulk).toHaveBeenCalledWith({
+        body: [
+          { index: { _index: 'auditlogs', _id: activity._id.toString() } },
+          { username: 'alice', endpoint: '/_api/v3/pages/revert' },
+        ],
+      });
+    });
+
+    it('indexes upserts that have an endpoint but no username', async () => {
+      const activity = makeActivity(undefined, '/_api/v3/pages/revert');
+
+      await delegator.bulkSyncAuditlogs([activity], []);
+
+      expect(mockES8Client.bulk).toHaveBeenCalledWith({
+        body: [
+          { index: { _index: 'auditlogs', _id: activity._id.toString() } },
+          { endpoint: '/_api/v3/pages/revert' },
+        ],
+      });
+    });
+
+    it('strips the query string from endpoint so credentials passed as access_token are not indexed', async () => {
+      const activity = makeActivity(
+        'alice',
+        '/_api/v3/pages/list?access_token=secret&path=/',
+      );
+
+      await delegator.bulkSyncAuditlogs([activity], []);
+
+      expect(mockES8Client.bulk).toHaveBeenCalledWith({
+        body: [
+          { index: { _index: 'auditlogs', _id: activity._id.toString() } },
+          { username: 'alice', endpoint: '/_api/v3/pages/list' },
+        ],
+      });
+    });
+
+    // Activity.createByParameters defaults endpoint to '', so '' — not undefined —
+    // is what an activity without an endpoint actually carries.
+    it('omits endpoint when it is an empty string', async () => {
+      const activity = makeActivity('alice', '');
+
+      await delegator.bulkSyncAuditlogs([activity], []);
+
+      expect(mockES8Client.bulk).toHaveBeenCalledWith({
+        body: [
+          { index: { _index: 'auditlogs', _id: activity._id.toString() } },
+          { username: 'alice' },
+        ],
+      });
+    });
+
+    it('skips upserts whose username and endpoint are both empty strings', async () => {
+      await delegator.bulkSyncAuditlogs([makeActivity('', '')], []);
+
+      expect(mockES8Client.bulk).not.toHaveBeenCalled();
+    });
+
+    it('skips upserts whose endpoint is nothing but a query string', async () => {
+      await delegator.bulkSyncAuditlogs(
+        [makeActivity('', '?access_token=secret')],
+        [],
+      );
+
+      expect(mockES8Client.bulk).not.toHaveBeenCalled();
+    });
+
+    it('skips upserts that have neither username nor endpoint', async () => {
       await delegator.bulkSyncAuditlogs([makeActivity()], []);
 
       expect(mockES8Client.bulk).not.toHaveBeenCalled();

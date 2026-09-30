@@ -1,0 +1,518 @@
+import mongoose from 'mongoose';
+
+import { AnonymousSyncCounter } from '../models/anonymous-sync-counter';
+import { EsSyncDecision } from '../models/es-sync-decision';
+import { decideEsSyncForEvent } from './decide-es-sync-for-event';
+
+const { mockWarn } = vi.hoisted(() => ({ mockWarn: vi.fn() }));
+
+vi.mock('~/utils/logger', () => ({
+  default: vi.fn(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: mockWarn,
+    error: vi.fn(),
+  })),
+}));
+
+describe('decideEsSyncForEvent', () => {
+  const endpoint = '/login';
+  const windowStart = new Date('2026-01-01T00:00:00Z');
+
+  afterEach(async () => {
+    await AnonymousSyncCounter.deleteMany({});
+    await EsSyncDecision.deleteMany({});
+    mockWarn.mockClear();
+  });
+
+  const newActivityId = (): string => new mongoose.Types.ObjectId().toString();
+
+  it('admits an event when the window is under threshold', async () => {
+    const decision = await decideEsSyncForEvent(
+      newActivityId(),
+      endpoint,
+      windowStart,
+      /* threshold */ 3,
+    );
+
+    expect(decision).toBe('admitted');
+  });
+
+  it('admits exactly up to the threshold and drops beyond it', async () => {
+    const threshold = 3;
+    const decisions: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      // biome-ignore lint/performance/noAwaitInLoops: each call must see the prior one's committed count.
+      const decision = await decideEsSyncForEvent(
+        newActivityId(),
+        endpoint,
+        windowStart,
+        threshold,
+      );
+      decisions.push(decision);
+    }
+
+    expect(decisions).toEqual([
+      'admitted',
+      'admitted',
+      'admitted',
+      'dropped',
+      'dropped',
+    ]);
+  });
+
+  it('skips the per-event claim entirely once the window is confidently past threshold', async () => {
+    const threshold = 3;
+    for (let i = 0; i < 4; i++) {
+      // biome-ignore lint/performance/noAwaitInLoops: each call must see the prior one's committed count.
+      await decideEsSyncForEvent(
+        newActivityId(),
+        endpoint,
+        windowStart,
+        threshold,
+      );
+    }
+    // The counter is now at 4 (> threshold), so the next call should take the
+    // cheap early-out path — no EsSyncDecision record created for it at all.
+    const skippedActivityId = newActivityId();
+    const decision = await decideEsSyncForEvent(
+      skippedActivityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    expect(decision).toBe('dropped');
+    expect(await EsSyncDecision.exists({ _id: skippedActivityId })).toBeNull();
+  });
+
+  it('keeps an already-admitted event admitted when it is re-processed after its window filled up', async () => {
+    const threshold = 1;
+    const admittedActivityId = newActivityId();
+    await decideEsSyncForEvent(
+      admittedActivityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+    await decideEsSyncForEvent(
+      newActivityId(),
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    // e.g. flushBuffer retrying a batch whose ES bulk write failed, or a reindex
+    // running shortly after live traffic filled the window.
+    const redecided = await decideEsSyncForEvent(
+      admittedActivityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    expect(redecided).toBe('admitted');
+  });
+
+  // The TTL index expires documents by these anchors, so a stale anchor after the
+  // call means the document would be deleted while it is still needed.
+  const staleAnchor = new Date(Date.now() - 60_000);
+
+  it('keeps the counter alive while over-threshold events keep arriving', async () => {
+    const threshold = 1;
+    for (let i = 0; i < 2; i++) {
+      // biome-ignore lint/performance/noAwaitInLoops: each call must see the prior one's committed count.
+      await decideEsSyncForEvent(
+        newActivityId(),
+        endpoint,
+        windowStart,
+        threshold,
+      );
+    }
+    await AnonymousSyncCounter.updateOne(
+      { endpoint, windowStart },
+      { $set: { updatedAt: staleAnchor } },
+    );
+
+    await decideEsSyncForEvent(
+      newActivityId(),
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    const counter = await AnonymousSyncCounter.findOne({
+      endpoint,
+      windowStart,
+    }).lean();
+    expect(counter?.updatedAt.getTime()).toBeGreaterThan(staleAnchor.getTime());
+  });
+
+  it('does not rewrite a fresh counter anchor on every over-threshold event', async () => {
+    const threshold = 1;
+    for (let i = 0; i < 2; i++) {
+      // biome-ignore lint/performance/noAwaitInLoops: each call must see the prior one's committed count.
+      await decideEsSyncForEvent(
+        newActivityId(),
+        endpoint,
+        windowStart,
+        threshold,
+      );
+    }
+    const before = await AnonymousSyncCounter.findOne({
+      endpoint,
+      windowStart,
+    }).lean();
+
+    await decideEsSyncForEvent(
+      newActivityId(),
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    const after = await AnonymousSyncCounter.findOne({
+      endpoint,
+      windowStart,
+    }).lean();
+    expect(after?.updatedAt).toEqual(before?.updatedAt);
+  });
+
+  it('keeps a settled decision alive while its event keeps being re-processed under threshold', async () => {
+    const threshold = 3;
+    const activityId = newActivityId();
+    await decideEsSyncForEvent(activityId, endpoint, windowStart, threshold);
+    await EsSyncDecision.updateOne(
+      { _id: activityId },
+      { $set: { claimedAt: staleAnchor } },
+    );
+
+    const redecided = await decideEsSyncForEvent(
+      activityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    expect(redecided).toBe('admitted');
+    const decision = await EsSyncDecision.findById(activityId).lean();
+    expect(decision?.claimedAt.getTime()).toBeGreaterThan(
+      staleAnchor.getTime(),
+    );
+    expect(
+      (await AnonymousSyncCounter.findOne({ endpoint, windowStart }))?.count,
+    ).toBe(1);
+  });
+
+  it('keeps the counter alive while an under-threshold window keeps being re-processed', async () => {
+    const threshold = 3;
+    const activityId = newActivityId();
+    await decideEsSyncForEvent(activityId, endpoint, windowStart, threshold);
+    // Only the counter is stale: a decision refreshed moments ago must not hold
+    // back the counter's own refresh.
+    await AnonymousSyncCounter.updateOne(
+      { endpoint, windowStart },
+      { $set: { updatedAt: staleAnchor } },
+    );
+
+    await decideEsSyncForEvent(activityId, endpoint, windowStart, threshold);
+
+    const counter = await AnonymousSyncCounter.findOne({
+      endpoint,
+      windowStart,
+    }).lean();
+    expect(counter?.updatedAt.getTime()).toBeGreaterThan(staleAnchor.getTime());
+    expect(counter?.count).toBe(1);
+  });
+
+  it('keeps a settled decision alive while its event keeps being re-processed over threshold', async () => {
+    const threshold = 1;
+    const admittedActivityId = newActivityId();
+    await decideEsSyncForEvent(
+      admittedActivityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+    await decideEsSyncForEvent(
+      newActivityId(),
+      endpoint,
+      windowStart,
+      threshold,
+    );
+    await EsSyncDecision.updateOne(
+      { _id: admittedActivityId },
+      { $set: { claimedAt: staleAnchor } },
+    );
+
+    const redecided = await decideEsSyncForEvent(
+      admittedActivityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    expect(redecided).toBe('admitted');
+    const decision = await EsSyncDecision.findById(admittedActivityId).lean();
+    expect(decision?.claimedAt.getTime()).toBeGreaterThan(
+      staleAnchor.getTime(),
+    );
+  });
+
+  it('does not double-increment when two processes race on the exact same event concurrently', async () => {
+    const activityId = newActivityId();
+    const threshold = 3;
+
+    const [first, second] = await Promise.all([
+      decideEsSyncForEvent(activityId, endpoint, windowStart, threshold),
+      decideEsSyncForEvent(activityId, endpoint, windowStart, threshold),
+    ]);
+
+    // Both calls are for the SAME event, so exactly one of them actually claims
+    // and increments; the other must read that same result back, never decide
+    // independently.
+    expect(first).toBe(second);
+    expect(
+      (await AnonymousSyncCounter.findOne({ endpoint, windowStart }))?.count,
+    ).toBe(1);
+  });
+
+  it('logs a warning exactly once, at the event that first crosses the threshold', async () => {
+    const threshold = 3;
+    for (let i = 0; i < 5; i++) {
+      // biome-ignore lint/performance/noAwaitInLoops: each call must see the prior one's committed count.
+      await decideEsSyncForEvent(
+        newActivityId(),
+        endpoint,
+        windowStart,
+        threshold,
+      );
+    }
+
+    // Not once per dropped event (2 of the 5 were dropped) — a sustained attack
+    // must not flood the log with one line per event.
+    expect(mockWarn).toHaveBeenCalledTimes(1);
+    expect(mockWarn).toHaveBeenCalledWith(
+      expect.objectContaining({ endpoint, windowStart, threshold }),
+      expect.any(String),
+    );
+  });
+
+  it('does not log when every event in the window is admitted', async () => {
+    await decideEsSyncForEvent(newActivityId(), endpoint, windowStart, 3);
+    await decideEsSyncForEvent(newActivityId(), endpoint, windowStart, 3);
+
+    expect(mockWarn).not.toHaveBeenCalled();
+  });
+
+  it('does not admit past the threshold for a different endpoint sharing the same window', async () => {
+    const threshold = 1;
+    await decideEsSyncForEvent(
+      newActivityId(),
+      '/login',
+      windowStart,
+      threshold,
+    );
+    const otherEndpointDecision = await decideEsSyncForEvent(
+      newActivityId(),
+      '/register',
+      windowStart,
+      threshold,
+    );
+
+    // '/register' has its own counter, so it is unaffected by '/login' already
+    // being at capacity — this is the whole point of keying the counter by endpoint.
+    expect(otherEndpointDecision).toBe('admitted');
+  });
+
+  it('is idempotent for the same event decided more than once (redundant multi-process processing)', async () => {
+    const activityId = newActivityId();
+    const threshold = 1;
+
+    const first = await decideEsSyncForEvent(
+      activityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+    // A second GROWI process independently processing the same change-stream event
+    // for the same activity — this must not consume a second slot in the counter.
+    const second = await decideEsSyncForEvent(
+      activityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    expect(first).toBe('admitted');
+    expect(second).toBe('admitted');
+
+    // A distinct event at the same (already-exhausted) threshold must be dropped —
+    // proving the counter was only ever incremented once for the duplicate above,
+    // not twice.
+    const distinctEventDecision = await decideEsSyncForEvent(
+      newActivityId(),
+      endpoint,
+      windowStart,
+      threshold,
+    );
+    expect(distinctEventDecision).toBe('dropped');
+  });
+
+  it('recovers a stale pending claim (the original claimant crashed before finalizing)', async () => {
+    const activityId = newActivityId();
+    // Simulate an abandoned claim: a process inserted 'pending' but never finalized it.
+    await EsSyncDecision.create({
+      _id: activityId,
+      endpoint,
+      windowStart,
+      decision: 'pending',
+      claimedAt: new Date(Date.now() - 10_000),
+      claimToken: 'stale-claimant-token',
+    });
+
+    const decision = await decideEsSyncForEvent(
+      activityId,
+      endpoint,
+      windowStart,
+      /* threshold */ 3,
+    );
+
+    // A real decision ('admitted', not the timeout fallback 'dropped') proves this
+    // call took over the stale claim and ran the actual admit/drop logic itself,
+    // rather than merely waiting out the poll timeout.
+    expect(decision).toBe('admitted');
+    expect(
+      (await AnonymousSyncCounter.findOne({ endpoint, windowStart }))?.count,
+    ).toBe(1);
+  });
+
+  it('takes over a fresh pending claim that never resolves once it goes stale', async () => {
+    const activityId = newActivityId();
+    // A claim that is NOT stale yet (just made) and is never finalized — its owning
+    // process died after claiming, within the grace period. Every other process
+    // reaching the event must not just give up on it: they all advance the shared
+    // resume token past it, so nobody would ever sync it.
+    await EsSyncDecision.create({
+      _id: activityId,
+      endpoint,
+      windowStart,
+      decision: 'pending',
+      claimedAt: new Date(),
+      claimToken: 'fresh-claimant-token',
+    });
+
+    const decision = await decideEsSyncForEvent(
+      activityId,
+      endpoint,
+      windowStart,
+      /* threshold */ 3,
+    );
+
+    expect(decision).toBe('admitted');
+    expect(
+      (await AnonymousSyncCounter.findOne({ endpoint, windowStart }))?.count,
+    ).toBe(1);
+  }, 10_000);
+
+  it('does not double-increment the counter when the claim is stolen while this call is about to finalize', async () => {
+    const activityId = newActivityId();
+    const threshold = 3;
+
+    // Simulate a call that successfully claimed the event but then stalled for long
+    // enough (e.g. a GC pause) that another process treated the claim as abandoned,
+    // stole it, and already decided + incremented the counter on its own — all
+    // between this call's claim and its own reconfirm-before-increment step.
+    type FindOneAndUpdateFn = typeof EsSyncDecision.findOneAndUpdate;
+    type LooseFindOneAndUpdate = (
+      filter: Record<string, unknown>,
+      update: Record<string, unknown>,
+      options?: Record<string, unknown>,
+    ) => Promise<unknown>;
+    // Mongoose's findOneAndUpdate returns a lazily-executed Query (thenable, not a real
+    // Promise), so it cannot be cast directly to a Promise-returning function type —
+    // bridge via `unknown` as TypeScript's own overlap check suggests.
+    const originalFindOneAndUpdate = EsSyncDecision.findOneAndUpdate.bind(
+      EsSyncDecision,
+    ) as unknown as LooseFindOneAndUpdate;
+    const spy = vi
+      .spyOn(EsSyncDecision, 'findOneAndUpdate')
+      .mockImplementation((async (
+        filter: Record<string, unknown>,
+        update: Record<string, unknown>,
+        options?: Record<string, unknown>,
+      ) => {
+        const isReconfirmCall = filter != null && 'claimToken' in filter;
+        if (isReconfirmCall) {
+          // A thief process stole the claim (fresh token, already decided) right
+          // before this call's own reconfirm executes.
+          await EsSyncDecision.updateOne(
+            { _id: activityId },
+            {
+              $set: {
+                claimToken: 'thief-token',
+                decision: 'admitted',
+              },
+            },
+          );
+          await AnonymousSyncCounter.findOneAndUpdate(
+            { endpoint, windowStart },
+            { $inc: { count: 1 } },
+            { upsert: true },
+          );
+        }
+        return originalFindOneAndUpdate(filter, update, options);
+      }) as unknown as FindOneAndUpdateFn);
+
+    try {
+      const decision = await decideEsSyncForEvent(
+        activityId,
+        endpoint,
+        windowStart,
+        threshold,
+      );
+
+      // Defers to the thief's own decision instead of forcing its own.
+      expect(decision).toBe('admitted');
+      // The counter was incremented once by the thief, and NOT a second time by this
+      // call after it lost the claim.
+      expect(
+        (await AnonymousSyncCounter.findOne({ endpoint, windowStart }))?.count,
+      ).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('releases an orphaned pending claim after a genuine transaction error, so an immediate retry can succeed', async () => {
+    const activityId = newActivityId();
+    const threshold = 3;
+
+    const spy = vi
+      .spyOn(AnonymousSyncCounter, 'findOneAndUpdate')
+      .mockImplementationOnce(() => {
+        throw new Error('simulated transient driver error');
+      });
+
+    await expect(
+      decideEsSyncForEvent(activityId, endpoint, windowStart, threshold),
+    ).rejects.toThrow('simulated transient driver error');
+    spy.mockRestore();
+
+    // The failed attempt must not leave its claim behind: if it did, an immediate
+    // retry (well within STALE_CLAIM_MS) could neither steal it nor create a fresh
+    // one, and would time out via waitForDecision() into a wrong 'dropped' default
+    // instead of actually deciding.
+    const decision = await decideEsSyncForEvent(
+      activityId,
+      endpoint,
+      windowStart,
+      threshold,
+    );
+
+    expect(decision).toBe('admitted');
+    expect(
+      (await AnonymousSyncCounter.findOne({ endpoint, windowStart }))?.count,
+    ).toBe(1);
+  }, 10_000);
+});

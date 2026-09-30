@@ -35,6 +35,11 @@ import type {
   UpdateOrInsertPagesOpts,
 } from '../interfaces/search';
 import { aggregatePipelineToIndex } from './aggregate-to-index';
+import {
+  type AuditlogSyncFields,
+  createAuditlogIndex as createAuditlogIndexForClient,
+  syncAuditlogMapping as syncAuditlogMappingForClient,
+} from './auditlog-mapping-sync';
 import type {
   AggregatedPage,
   BulkWriteBody,
@@ -50,6 +55,7 @@ import {
   isES9ClientDelegator,
   type SearchQuery,
 } from './elasticsearch-client-delegator';
+import { sanitizeEndpointForIndex } from './sanitize-endpoint-for-index';
 
 const logger = loggerFactory('growi:service:search-delegator:elasticsearch');
 
@@ -88,6 +94,20 @@ const AVAILABLE_KEYS = [
 
 type Data = any;
 
+// 400: the mapping conflicts with the index (a field already has another type).
+// 401/403: the credentials lack the privilege to update mappings.
+// Other failures (404 missing index, 429, 5xx, network) may clear up on retry.
+const PERMANENT_MAPPING_REJECTION_STATUSES: readonly unknown[] = [
+  400, 401, 403,
+];
+
+const isPermanentMappingRejection = (err: unknown): boolean =>
+  err instanceof Error &&
+  'statusCode' in err &&
+  PERMANENT_MAPPING_REJECTION_STATUSES.includes(
+    (err as { statusCode: unknown }).statusCode,
+  );
+
 class ElasticsearchDelegator
   implements SearchDelegator<Data, ESTermsKey, ESQueryTerms>
 {
@@ -109,6 +129,11 @@ class ElasticsearchDelegator
 
   private readonly auditlogIndexName = 'auditlogs';
   private readonly auditlogAliasName = 'auditlogs-alias';
+
+  // Gates live writes (see bulkSyncAuditlogs): a document written before the current
+  // mapping is pushed makes ES dynamically map its new fields, and that wrong type
+  // cannot be corrected afterwards without a rebuild.
+  private isAuditlogMappingSynced = false;
 
   constructor(socketIoService: SocketIoService) {
     this.name = SearchDelegatorName.DEFAULT;
@@ -176,6 +201,8 @@ class ElasticsearchDelegator
       rejectUnauthorized,
     });
     this.indexName = indexName;
+    // A reconnect may point at a wiped or replaced cluster.
+    this.isAuditlogMappingSynced = false;
   }
 
   /**
@@ -513,6 +540,7 @@ class ElasticsearchDelegator
     indexName: string,
     aliasName: string,
     createFn: () => Promise<unknown>,
+    syncMappingFn?: () => Promise<unknown>,
   ): Promise<void> {
     const { client } = this;
     const tmpIndexName = `${indexName}-tmp`;
@@ -537,6 +565,11 @@ class ElasticsearchDelegator
     if (!isExistsAlias) {
       await client.indices.putAlias({ name: aliasName, index: indexName });
     }
+
+    // Last, so a rejected mapping update cannot leave the alias detached. An index
+    // created just above already carries the current mapping, but pushing it again
+    // is a no-op on the server and keeps the upgrade path a single code path.
+    await syncMappingFn?.();
   }
 
   async normalizeIndices(): Promise<void> {
@@ -550,7 +583,32 @@ class ElasticsearchDelegator
       this.auditlogIndexName,
       this.auditlogAliasName,
       () => this.createAuditlogIndex(this.auditlogIndexName),
+      () => this.syncAuditlogMapping(),
     );
+  }
+
+  // A permanent rejection (see isPermanentMappingRejection) cannot be fixed by retrying,
+  // so holding writes back would only stop the sync for nothing: live writes are
+  // released, and the error still propagates for the caller to log.
+  // The flag is only set for the client the push went to, so a push that finishes
+  // after a reconnect cannot mark the new cluster as synced.
+  private async syncAuditlogMapping(): Promise<void> {
+    const { client } = this;
+    try {
+      await syncAuditlogMappingForClient(
+        client,
+        this.elasticsearchVersion,
+        this.auditlogIndexName,
+      );
+    } catch (err) {
+      if (isPermanentMappingRejection(err) && client === this.client) {
+        this.isAuditlogMappingSynced = true;
+      }
+      throw err;
+    }
+    if (client === this.client) {
+      this.isAuditlogMappingSynced = true;
+    }
   }
 
   async addAllAuditlogs(
@@ -570,8 +628,12 @@ class ElasticsearchDelegator
       : undefined;
     const totalCount = shouldEmitProgress ? await Activity.countDocuments() : 0;
 
+    // The anonymous-log ES sync threshold is intentionally not applied here. It caps
+    // attack-time write load on the live path, but a reindex writes one bulk at a
+    // time regardless of event time, so the threshold would only cut volume, at a
+    // per-event MongoDB round-trip cost (see filter-admitted-upserts.ts).
     const readStream = Activity.find()
-      .select('snapshot.username')
+      .select('snapshot.username endpoint')
       .lean()
       .cursor();
     const batchStream = createBatchStream(bulkSize);
@@ -656,21 +718,15 @@ class ElasticsearchDelegator
     }
   }
 
-  async createAuditlogIndex(
+  createAuditlogIndex(
     index: string,
   ): Promise<
     Awaited<ReturnType<ElasticsearchClientDelegator['indices']['create']>>
   > {
-    if (isES8ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-auditlog-es8');
-      return this.client.indices.create({ index, ...mappings });
-    }
-    if (isES9ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-auditlog-es9');
-      return this.client.indices.create({ index, ...mappings });
-    }
-    throw new Error(
-      `Unsupported Elasticsearch version: ${this.elasticsearchVersion}`,
+    return createAuditlogIndexForClient(
+      this.client,
+      this.elasticsearchVersion,
+      index,
     );
   }
 
@@ -725,15 +781,21 @@ class ElasticsearchDelegator
   }
 
   private prepareBodyForAuditlog(
-    activity: Pick<ActivityDocument, '_id' | 'snapshot'>,
-  ): [] | [{ index: { _index: string; _id: string } }, { username: string }] {
-    const username = activity.snapshot?.username;
-    if (username == null || username === '') return [];
+    activity: Pick<ActivityDocument, '_id' | 'snapshot' | 'endpoint'>,
+  ): [] | [{ index: { _index: string; _id: string } }, AuditlogSyncFields] {
+    const username = activity.snapshot?.username || undefined;
+    const endpoint =
+      sanitizeEndpointForIndex(activity.endpoint ?? '') || undefined;
+    if (username == null && endpoint == null) return [];
+
     return [
       {
         index: { _index: this.auditlogIndexName, _id: activity._id.toString() },
       },
-      { username },
+      {
+        ...(username != null && { username }),
+        ...(endpoint != null && { endpoint }),
+      },
     ];
   }
 
@@ -945,6 +1007,28 @@ class ElasticsearchDelegator
       })),
     ];
     if (body.length === 0) return;
+
+    // Boot logs a failed normalization and carries on, so retry the mapping push here.
+    // Only the push: a full normalization deletes and creates indices, which would
+    // wreck a rebuild in progress. Throwing on failure (including a missing index)
+    // leaves the batch to the change stream's backoff retry.
+    if (!this.isAuditlogMappingSynced) {
+      try {
+        await this.syncAuditlogMapping();
+      } catch (err) {
+        if (!this.isAuditlogMappingSynced) throw err;
+        logger.error(
+          'Auditlog mapping was rejected; syncing with the existing mapping.',
+          err,
+        );
+      }
+      // Still unsynced after a successful push: the client was replaced mid-push.
+      if (!this.isAuditlogMappingSynced) {
+        throw new Error(
+          'Elasticsearch client was replaced while pushing the auditlog mapping',
+        );
+      }
+    }
 
     const bulkResponse = await this.client.bulk({ body });
     if (bulkResponse.errors) {

@@ -52,6 +52,10 @@ export class ES9ClientDelegator {
       params: estypes.IndicesPutAliasRequest,
     ): Promise<estypes.IndicesPutAliasResponse> =>
       this.client.indices.putAlias(params),
+    putMapping: (
+      params: estypes.IndicesPutMappingRequest,
+    ): Promise<estypes.IndicesPutMappingResponse> =>
+      this.client.indices.putMapping(params),
     getAlias: (
       params: estypes.IndicesGetAliasRequest,
     ): Promise<estypes.IndicesGetAliasResponse> =>
