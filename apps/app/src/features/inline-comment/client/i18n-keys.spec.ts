@@ -31,6 +31,13 @@ import * as path from 'node:path';
  * placeholder. No acceptance criterion calls for placeholder text, so the
  * key was never wired up; removed as unused (caught by `lint:i18n`'s
  * unused-key check).
+ *
+ * Task 2.1 of inline-comment-ui-refinement (Requirements 21.1, 21.3, 22.3)
+ * adds four keys ahead of the components that will consume them (tasks 2.2,
+ * 3.2, 4.1): the resolved-comment expand/collapse labels, the bulk "expand
+ * all resolved" action, and the list menu button's accessible name. Unlike
+ * the keys above, these must be translated in all five locales as part of
+ * that task, so they are checked per locale.
  */
 
 const INLINE_COMMENT_KEYS = [
@@ -42,15 +49,28 @@ const INLINE_COMMENT_KEYS = [
   'range_not_found',
 ] as const;
 
-const translationJsonPath = path.resolve(
-  import.meta.dirname,
-  '../../../../public/static/locales/en_US/translation.json',
-);
+const REFINEMENT_KEYS = [
+  'expand',
+  'collapse',
+  'expand_all_resolved',
+  'list_menu',
+] as const;
+
+const LOCALES = ['en_US', 'ja_JP', 'zh_CN', 'fr_FR', 'ko_KR'] as const;
+
+const readTranslation = (locale: string): Record<string, unknown> =>
+  JSON.parse(
+    fs.readFileSync(
+      path.resolve(
+        import.meta.dirname,
+        `../../../../public/static/locales/${locale}/translation.json`,
+      ),
+      'utf-8',
+    ),
+  ) as Record<string, unknown>;
 
 describe('en_US translation.json has the inline_comment.* keys', () => {
-  const translation = JSON.parse(
-    fs.readFileSync(translationJsonPath, 'utf-8'),
-  ) as Record<string, unknown>;
+  const translation = readTranslation('en_US');
 
   it.each(
     INLINE_COMMENT_KEYS,
@@ -63,4 +83,38 @@ describe('en_US translation.json has the inline_comment.* keys', () => {
     expect(typeof value).toBe('string');
     expect((value as string).trim().length).toBeGreaterThan(0);
   });
+});
+
+describe.each(
+  LOCALES,
+)('%s translation.json has the refinement inline_comment.* keys', (locale) => {
+  const translation = readTranslation(locale);
+  const englishTranslation = readTranslation('en_US');
+
+  it.each(
+    REFINEMENT_KEYS,
+  )('inline_comment.%s resolves to a non-empty string', (key) => {
+    const namespace = translation.inline_comment as
+      | Record<string, unknown>
+      | undefined;
+    const value = namespace?.[key];
+
+    expect(typeof value).toBe('string');
+    expect((value as string).trim().length).toBeGreaterThan(0);
+  });
+
+  if (locale !== 'en_US') {
+    it.each(
+      REFINEMENT_KEYS,
+    )('inline_comment.%s is translated, not an English copy', (key) => {
+      const value = (translation.inline_comment as Record<string, unknown>)?.[
+        key
+      ];
+      const english = (
+        englishTranslation.inline_comment as Record<string, unknown>
+      )[key];
+
+      expect(value).not.toBe(english);
+    });
+  }
 });
