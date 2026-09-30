@@ -26,7 +26,7 @@ test('Vist User settings', async ({ page }) => {
   ).toBeVisible();
 
   // Click UserSettingsMenu
-  page.getByTestId('grw-personal-dropdown-menu-user-settings').click();
+  await page.getByTestId('grw-personal-dropdown-menu-user-settings').click();
   await expect(page.getByTestId('grw-user-settings')).toBeVisible();
 });
 

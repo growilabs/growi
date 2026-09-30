@@ -18,10 +18,6 @@ import type {
   IPageOperation,
   PageOperationModel,
 } from '~/server/models/page-operation';
-import type {
-  IPageRedirect,
-  PageRedirectModel,
-} from '~/server/models/page-redirect';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import { prisma } from '~/utils/prisma';
 
@@ -40,7 +36,6 @@ describe('PageService page operations with only public pages', () => {
   let crowi: Crowi;
   let Page: PageModel;
   let User: Model<IUser>;
-  let PageRedirect: PageRedirectModel;
   let PageOperation: PageOperationModel;
   let generalXssFilterProcessSpy: ReturnType<typeof vi.spyOn>;
 
@@ -80,9 +75,6 @@ describe('PageService page operations with only public pages', () => {
 
     User = mongoose.model('User');
     Page = mongoose.model<IPage, PageModel>('Page');
-    PageRedirect = mongoose.model<IPageRedirect, PageRedirectModel>(
-      'PageRedirect',
-    );
     PageOperation = mongoose.model<IPageOperation, PageOperationModel>(
       'PageOperation',
     );
@@ -1084,18 +1076,20 @@ describe('PageService page operations with only public pages', () => {
       },
     });
 
-    await PageRedirect.insertMany([
-      {
-        fromPath: '/from/v5_PageForDeleteCompletely2',
-        toPath: '/v5_PageForDeleteCompletely2',
-      },
-      {
-        fromPath:
-          '/from/v5_PageForDeleteCompletely2/v5_PageForDeleteCompletely3/v5_PageForDeleteCompletely4',
-        toPath:
-          '/v5_PageForDeleteCompletely2/v5_PageForDeleteCompletely3/v5_PageForDeleteCompletely4',
-      },
-    ]);
+    await prisma.pageredirects.createMany({
+      data: [
+        {
+          fromPath: '/from/v5_PageForDeleteCompletely2',
+          toPath: '/v5_PageForDeleteCompletely2',
+        },
+        {
+          fromPath:
+            '/from/v5_PageForDeleteCompletely2/v5_PageForDeleteCompletely3/v5_PageForDeleteCompletely4',
+          toPath:
+            '/v5_PageForDeleteCompletely2/v5_PageForDeleteCompletely3/v5_PageForDeleteCompletely4',
+        },
+      ],
+    });
 
     await prisma.sharelinks.createMany({
       data: [
@@ -1597,9 +1591,8 @@ describe('PageService page operations with only public pages', () => {
         },
       );
       assert(renamedPage != null);
-      const pageRedirect = await PageRedirect.findOne({
-        fromPath: oldPath,
-        toPath: renamedPage.path,
+      const pageRedirect = await prisma.pageredirects.findFirst({
+        where: { fromPath: oldPath, toPath: renamedPage.path },
       });
 
       expect(generalXssFilterProcessSpy).toHaveBeenCalled();
@@ -2772,11 +2765,11 @@ describe('PageService page operations with only public pages', () => {
       const comment = await prisma.comments.findFirst({
         where: { pageId: parentPage?._id.toString() },
       });
-      const pageRedirect1 = await PageRedirect.findOne({
-        toPath: parentPage?.path,
+      const pageRedirect1 = await prisma.pageredirects.findFirst({
+        where: { toPath: parentPage?.path },
       });
-      const pageRedirect2 = await PageRedirect.findOne({
-        toPath: grandchildPage?.path,
+      const pageRedirect2 = await prisma.pageredirects.findFirst({
+        where: { toPath: grandchildPage?.path },
       });
       const shareLink1 = await prisma.sharelinks.findFirst({
         where: { relatedPageId: parentPage?._id.toString() },
@@ -2836,8 +2829,14 @@ describe('PageService page operations with only public pages', () => {
       const deletedComments = await prisma.comments.findMany({
         where: { id: comment?.id },
       });
-      const deletedPageRedirects = await PageRedirect.find({
-        _id: { $in: [pageRedirect1?._id, pageRedirect2?._id] },
+      const deletedPageRedirects = await prisma.pageredirects.findMany({
+        where: {
+          id: {
+            in: [pageRedirect1?.id, pageRedirect2?.id].filter(
+              (id) => id != null,
+            ),
+          },
+        },
       });
       const deletedShareLinks = await prisma.sharelinks.findMany({
         where: {
