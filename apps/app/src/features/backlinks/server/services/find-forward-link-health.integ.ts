@@ -4,7 +4,6 @@ import mongoose, { type HydratedDocument, type Types } from 'mongoose';
 import { getInstance } from '^/test/setup/crowi';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
-import PageRedirect from '~/server/models/page-redirect';
 import { prisma } from '~/utils/prisma';
 
 import { ensurePageLinkIndexes } from '../models/page-link-indexes';
@@ -143,7 +142,9 @@ describe('findForwardLinkHealth (integration)', () => {
       where: { fromPageId: { in: pages.map((p) => p._id.toString()) } },
     });
     await Page.deleteMany(ownPages);
-    await PageRedirect.deleteMany({ fromPath: new RegExp(`^${PREFIX}/`) });
+    await prisma.pageredirects.deleteMany({
+      where: { fromPath: { startsWith: `${PREFIX}/` } },
+    });
   });
 
   afterAll(async () => {
@@ -273,9 +274,8 @@ describe('findForwardLinkHealth (integration)', () => {
     // repointInboundLinks leaves a self row with no target; a path redirecting into the
     // source (left by a rename) is cleared the same way.
     await addRow(source, source.path, null);
-    await PageRedirect.create({
-      fromPath: `${PREFIX}/source-old-name`,
-      toPath: source.path,
+    await prisma.pageredirects.create({
+      data: { fromPath: `${PREFIX}/source-old-name`, toPath: source.path },
     });
     await addRow(source, `${PREFIX}/source-old-name`, null);
     // Positive control: a genuinely broken row next to them is still reported.
