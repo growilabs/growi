@@ -203,8 +203,9 @@ apps/app/prisma/
 └── schema.prisma                          # 変更: `model pages` に `summary` を追加（Mongoose と二重管理。`.claude/rules/model.md`）
 packages/core/src/interfaces/
 └── page.ts                                # 変更: `IPage` に `summary` の型を追加（Changeset対象）
-apps/app/src/features/rate-limiter/config/
-└── index.ts                               # 変更: `defaultConfigWithRegExp` に永続化ルートのレート制限エントリを1件追加
+apps/app/src/features/rate-limiter/
+├── config/index.ts                        # 変更: 生成ルート・`/message`（`defaultConfig`）と永続化ルート（`defaultConfigWithRegExp`）のレート制限エントリを追加
+└── middleware/factory.ts                  # 変更: エンドポイントの照合とカウンタのキーを、大文字小文字・末尾スラッシュを無視する形に正規化
 apps/app/src/components/PageView/
 ├── PersistedSummaryView.tsx               # 新規: 永続化された要約の表示（RevisionRendererによるMarkdown描画・鮮度表示・閲覧者ごとのローカル非表示ボタンを含む）
 └── PageView.tsx                           # 変更: PersistedSummaryView をMarkdown本文の外側に描画（数行追加）
@@ -219,7 +220,7 @@ apps/app/src/components/PageView/
 - `apps/app/src/server/models/page.ts` — `summary: { body: String, sourceRevisionId: ObjectId, capturedAt: Date }`（既定値 `null`）をスキーマに追加する。既存のフィールド・インデックス・staticsは変更しない。
 - `apps/app/prisma/schema.prisma` — `model pages`（既存、Mongooseのpagesコレクションからintrospectされたもの）に `summary` フィールドを追加する。`Page` モデルはMongooseからPrismaへの移行途上にあり（`.claude/rules/model.md`）、Mongoose側だけを更新すると型不整合が後から表面化するため、両方を同時に更新する。埋め込みオブジェクトの表現は、同スキーマ内の既存の埋め込みフィールド（`grantedGroups` が `Json?` として表現されている）と同じ扱いに揃える。追加後に Prisma の型生成（`generator` の出力先 `src/generated/prisma`）が成功することを確認する。
 - `packages/core/src/interfaces/page.ts` — `IPage` に `summary` の型を追加する（クライアントが `summary` を参照するために必須。Changeset対象）。
-- `apps/app/src/features/rate-limiter/config/index.ts` — `defaultConfigWithRegExp` に永続化ルート（`/_api/v3/page/[^/]+/ai-summary`、`POST`、`MAX_REQUESTS_TIER_1`）のエントリを1件追加する。レート制限はルートへのミドルウェア適用ではなく、この設定マップへの宣言で有効になる。
+- `apps/app/src/features/rate-limiter/config/index.ts` — `defaultConfigWithRegExp` に永続化ルート（`/_api/v3/page/[^/]+/ai-summary`、`POST`、`MAX_REQUESTS_TIER_1`、`usersPerIpProspection: 20`。倍率の根拠は research.md 7.10）のエントリを1件追加する。レート制限はルートへのミドルウェア適用ではなく、この設定マップへの宣言で有効になる。
 - `apps/app/src/components/PageView/PageView.tsx` — `PersistedSummaryView` をMarkdown本文の描画箇所の外側に追加する。
 - `apps/app/src/features/mastra/interfaces/chat-message.ts` — `CustomUIMessageMetadata` に `threadId` / `sourceRevisionId` / `capturedAt` を追加する。現状は `{ finishReason?: string }` のみであり、`/summary` がこれらをストリームメタデータ（`writer.write({ type: 'message-metadata', ... })`）で返すには拡張が必須。サーバとクライアントが共有する型であるため、既存の `finishReason` は optional のまま維持し、追加分も optional にして `/message` 側の互換を壊さない。
 - `apps/app/src/features/mastra/interfaces/chat-tools.ts` — `GrowiChatTools.getPageContentTool.output` の型を、`limitedGetPageContentTool` が返す `limit_exceeded` を含む形に広げる。`summarizeAgent` は本文取得ツールを `getPageContentTool` という**キー**で登録するため（1.4の成立条件）、要約ストリームの `tool-getPageContentTool` パートの `output` には `limit_exceeded` が現れうる。現状の型は `GetPageContentToolOutput`（`limit_exceeded` を含まない）のみであり、クライアントが型安全に読むには拡張が必要。
@@ -227,7 +228,8 @@ apps/app/src/components/PageView/
 - `apps/app/src/server/routes/apiv3/page/index.ts` — ページ取得APIのレスポンスに `summary` を含める。加えて、永続化ルート `POST /:pageId/ai-summary` を同ルータに登録する（`apiv3/index.js:194` の `router.use('/page', setupPage(crowi))` 配下）。
   - **注**: 共有表示（8.1, 8.2）は SSR とAPIの**両経路**が `summary` を返して初めて成立する。片方の漏れは「ある閲覧者には見えて別の閲覧者には見えない」形で表面化するため、両方を必ず対応する。
 - `apps/app/public/static/locales/{en_US,fr_FR,ja_JP,ko_KR,zh_CN}/translation.json` — `PersistedSummaryView` の文言（見出し「AI要約」・鮮度ヒント・削除ボタンラベル）の翻訳キーを5ロケール分追加する。
-- `apps/app/src/features/rate-limiter/config/index.ts` — 生成ルート（`/_api/v3/mastra/summary`、完全一致マップ `defaultConfig`）と永続化ルート（正規表現マップ `defaultConfigWithRegExp`）の2エントリを追加する。
+- `apps/app/src/features/rate-limiter/config/index.ts` — 生成ルート（`/_api/v3/mastra/summary`）と追加質問の合流先（`/_api/v3/mastra/message`、research.md 7.11）を完全一致マップ `defaultConfig` に、永続化ルートを正規表現マップ `defaultConfigWithRegExp` に追加する（計3エントリ）。
+- `apps/app/src/features/rate-limiter/middleware/factory.ts` — エンドポイントの照合とカウンタのキーを、大文字小文字・末尾スラッシュを無視する形に正規化する。Expressのルーティングは既定でこれらを区別しないため、正規化しないと `/_api/v3/mastra/Summary` のような表記で上限をすり抜けられる。
 
 いずれも「既存の列挙・スキーマに1項目追加する」形の変更であり、既存ファイルの他のロジックは書き換えない。
 
