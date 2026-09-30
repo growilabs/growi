@@ -5,6 +5,7 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
+import PageOperation from '~/server/models/page-operation';
 import { prisma } from '~/utils/prisma';
 
 import { ensurePageLinkIndexes } from '../models/page-link-indexes';
@@ -432,6 +433,29 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     endpoint: '/_api/v3/pages/rename',
   };
 
+  // renamePage does not await its sub-operation; wait until it deletes its PageOperation,
+  // or it outlives the spec and runs into afterEach's cleanup and the worker's disconnect.
+  const renameAndSettle = async (
+    page: HydratedDocument<PageDocument>,
+    newPagePath: string,
+    options: { isRecursively?: boolean; createRedirectPage: boolean },
+  ): Promise<void> => {
+    const fromPath = page.path;
+    await crowi.pageService.renamePage(
+      page,
+      newPagePath,
+      viewer,
+      options,
+      renameActivityParams,
+    );
+    await vi.waitFor(
+      async () => {
+        expect(await PageOperation.findOne({ fromPath })).toBeNull();
+      },
+      { timeout: 15000, interval: 100 },
+    );
+  };
+
   it('keeps a path-based backlink valid across a target rename, with no index write (5.1)', async () => {
     const target = await createPage('/direct-rename-target');
     const source = await createPage('/direct-rename-source');
@@ -441,13 +465,7 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     const before = await outboundRow(source._id);
 
     const newTargetPath = `${PREFIX}/direct-rename-target-moved`;
-    await crowi.pageService.renamePage(
-      target,
-      newTargetPath,
-      viewer,
-      { createRedirectPage: true },
-      renameActivityParams,
-    );
+    await renameAndSettle(target, newTargetPath, { createRedirectPage: true });
 
     // Guard the guard: renamePage awaits its own subject's path update (it only defers
     // descendants), so no polling is needed here — but without this the two assertions
@@ -480,13 +498,10 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     // Move the ancestor recursively — the target is never the rename's own subject,
     // only a descendant carried along.
     const newAncestorPath = `${PREFIX}/desc-move-ancestor-moved`;
-    await crowi.pageService.renamePage(
-      ancestor,
-      newAncestorPath,
-      viewer,
-      { isRecursively: true, createRedirectPage: true },
-      renameActivityParams,
-    );
+    await renameAndSettle(ancestor, newAncestorPath, {
+      isRecursively: true,
+      createRedirectPage: true,
+    });
 
     // renamePage's descendant step (renameSubOperation) runs fire-and-forget — wait for
     // the target's path to actually move before asserting anything about it, so the
@@ -523,13 +538,7 @@ describe('Backlinks B1 slice (lifecycle integration)', () => {
     expect(before?.toPath).toBe(`/${target._id.toString()}`);
 
     const newTargetPath = `${PREFIX}/permalink-rename-target-moved`;
-    await crowi.pageService.renamePage(
-      target,
-      newTargetPath,
-      viewer,
-      { createRedirectPage: true },
-      renameActivityParams,
-    );
+    await renameAndSettle(target, newTargetPath, { createRedirectPage: true });
 
     // Guard the guard — see the direct-rename spec above: a no-op rename would satisfy
     // both assertions below without the target ever having moved.
