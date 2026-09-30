@@ -1,6 +1,6 @@
 # Implementation Plan
 
-> このタスク一覧は最初の実装（Requirement 1〜6）だけを対象にしている。Requirement 7〜18 は別スペックで実装され、内容は requirements.md／design.md／research.md に取り込み済みで、対応するタスクはここには残していない。
+> このタスク一覧は最初の実装（Requirement 1〜6）だけを対象にしている。Requirement 7〜23 は別スペックで実装され、内容は requirements.md／design.md／research.md に取り込み済みで、対応するタスクはここには残していない。
 
 - [x] 1. データモデル基盤：既存commentsモデルの拡張と読み取り経路の隔離
 - [x] 1.1 `comments` Prismaモデルにインラインコメント用フィールドを追加する

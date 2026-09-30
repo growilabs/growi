@@ -63,16 +63,16 @@
   - _Depends: 4.1_
 
 - [ ] 6. この spec を inline-comment へ書き戻して削除する
-- [ ] 6.1 inline-comment の requirements.md と design.md を書き換える
+- [x] 6.1 inline-comment の requirements.md と design.md を書き換える
   - requirements.md の末尾に Requirement 19〜23 を、番号を変えずに追記する
   - design.md の該当箇所（`SelectionPopover` の行、選択から作成までの流れ、`InlineCommentItem` と一覧まわり、`Revalidation Triggers`、既知の制約）を、この変更が最初からあったものとして書き直す。「以前は〜だった」という経緯の文は残さない
   - 観測できる完了条件：inline-comment の本文に、この spec への参照と「変更した」という経緯の記述が残っていない
-- [ ] 6.2 設計上の理由を inline-comment の research.md へ移す
+- [x] 6.2 設計上の理由を inline-comment の research.md へ移す
   - この spec の research.md にある判断（状態の持ち方、記録を消す条件、折りたたみ中の見せ方、メニュー項目を配列で渡す理由、折りたたみ中の表示を別部品にする理由、配置と幅の方針）を、inline-comment の research.md へ移す
   - 観測できる完了条件：この spec を削除しても、各判断の理由が inline-comment の research.md から読める
-- [ ] 6.3 inline-comment の spec.json の更新日時を更新する
+- [x] 6.3 inline-comment の spec.json の更新日時を更新する
   - `updated_at` だけを更新し、`phase` と `approvals` には触れない
-- [ ] 6.4 roadmap に載っていれば、この spec の行を消す
+- [x] 6.4 roadmap に載っていれば、この spec の行を消す
   - roadmap にこの spec の記載がなければ何もしない
 - [ ] 6.5 この spec のディレクトリを削除する
   - 観測できる完了条件：この spec のディレクトリが存在せず、steering からこのディレクトリのファイルを名前で参照している箇所もない

@@ -32,12 +32,10 @@ import * as path from 'node:path';
  * key was never wired up; removed as unused (caught by `lint:i18n`'s
  * unused-key check).
  *
- * Task 2.1 of inline-comment-ui-refinement (Requirements 21.1, 21.3, 22.3)
- * adds four keys ahead of the components that will consume them (tasks 2.2,
- * 3.2, 4.1): the resolved-comment expand/collapse labels, the bulk "expand
- * all resolved" action, and the list menu button's accessible name. Unlike
- * the keys above, these must be translated in all five locales as part of
- * that task, so they are checked per locale.
+ * The resolved-comment expand/collapse labels, the bulk "expand all
+ * resolved" action, and the list menu button's accessible name (Requirements
+ * 21.1, 21.3, 22.3) must be translated in all five locales, so they are
+ * checked per locale.
  */
 
 const INLINE_COMMENT_KEYS = [

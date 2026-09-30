@@ -110,7 +110,7 @@ export const InlineCommentForm = (
       className="inline-comment-form bg-body border rounded shadow-sm p-2"
       // Nothing inside has intrinsic width once the quote is hidden (the editor
       // item is flex-basis 0), so a shrink-to-fit box would collapse: width is
-      // max-content, floored by min-width (the former fixed width) and capped by
+      // max-content, floored by min-width and capped by
       // max-width. Both are capped against viewport width since Popper's
       // preventOverflow shifts but doesn't shrink this box.
       style={{
