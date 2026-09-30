@@ -1,4 +1,5 @@
 import type { Extension } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
 
 import type { EditorTheme } from '../../../consts/index.js';
 
@@ -8,8 +9,15 @@ export const getEditorTheme = async (
   switch (themeName) {
     case 'eclipse':
       return (await import('./eclipse.js')).eclipse;
-    case 'basic':
-      return (await import('cm6-theme-basic-light')).basicLight;
+    case 'basic': {
+      const { basicLight } = await import('cm6-theme-basic-light');
+      const basicLightOverride = EditorView.theme({
+        '.cm-tooltip.cm-tooltip-autocomplete': {
+          backgroundColor: '#ffffff',
+        },
+      });
+      return [basicLight, basicLightOverride];
+    }
     case 'ayu':
       return (await import('./ayu.js')).ayu;
     case 'rosepine':

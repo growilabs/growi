@@ -45,12 +45,21 @@ const markdownHighlighting = HighlightStyle.define([
 ]);
 
 const completionMenuTheme = EditorView.baseTheme({
-  '.cm-tooltip-autocomplete .cm-completionLabel': {
+  '&light .cm-tooltip-autocomplete .cm-completionLabel': {
     color: 'var(--bs-gray-800)',
   },
-  '.cm-tooltip-autocomplete .cm-completionDetail': {
+  '&light .cm-tooltip-autocomplete .cm-completionDetail': {
     color: 'var(--bs-gray-600)',
   },
+  // 選択中の行：全テーマで乳白色＋濃い文字に統一
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+    backgroundColor: '#e8e6df',
+    color: 'var(--bs-gray-800)',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail':
+    {
+      color: 'var(--bs-gray-600)',
+    },
 });
 
 // The defaults MINUS feature-specific extensions (emoji) — keeps the shared facility.
