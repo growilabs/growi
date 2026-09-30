@@ -725,13 +725,8 @@ class PageService implements IPageService {
     }
 
     // 1. Take target off from tree
-    //
-    // This commits `parent: null` on its own, and no mongo session wraps the steps
-    // below, so steps 2-3 are not atomic with it. Remember the original parent: if
-    // either of them throws, the page has to be put back, otherwise it is stranded
-    // off-tree at its old path and drops out of the page tree entirely -- present in
-    // the database but absent from the sidebar and from any parent-based lookup.
-    // See https://github.com/growilabs/growi/issues/9755
+    // No session makes this atomic with steps 2-3: if they throw, the catch below
+    // must reattach the page or it is stranded off the tree. See #9755
     const exParentId = page.parent;
     await Page.takeOffFromTree(page._id);
 
@@ -766,18 +761,23 @@ class PageService implements IPageService {
         { new: true },
       );
     } catch (err) {
-      // Undo step 1 only. The rename still fails and the caller still sees the
-      // error -- what changes is that the page stays where it was instead of
-      // vanishing from the tree. Steps after this block run only once step 3 has
-      // committed the new parent, so they must not be covered by this rollback.
+      // Undo step 1, but only while the page is still in the state it left behind.
+      // The driver can report an error for a write the server applied (lost ack,
+      // writeConcernError), so neither `renamedPage` nor a flag proves that step 3
+      // did not commit.
       try {
-        await Page.findByIdAndUpdate(page._id, {
-          $set: { parent: exParentId },
-        });
+        const { matchedCount } = await Page.updateOne(
+          { _id: page._id, parent: null, path: page.path },
+          { $set: { parent: exParentId } },
+        );
+        if (matchedCount === 0) {
+          logger.warn(
+            `Skipped reattaching "${page.path}" to its original parent after a failed rename: ` +
+              'the page is no longer detached at its original path.',
+          );
+        }
       } catch (rollbackErr) {
-        // Log and fall through: the original error is the one worth propagating,
-        // but the page is now off-tree and needs Admin > App Settings > V5 page
-        // migration to be reattached, so that must not be swallowed silently.
+        // Propagate the original error, not this one
         logger.error(
           `Failed to reattach "${page.path}" to its original parent after a failed rename. ` +
             'The page is off-tree and will not appear in the page tree until it is normalized.',
