@@ -84,6 +84,7 @@ export const CONFIG_KEYS = [
   'app:auditLogEsSyncAnonymousThresholdRegister',
   'app:auditLogEsSyncAnonymousThresholdForgotPassword',
   'app:auditLogEsSyncAnonymousThresholdInstaller',
+  'app:auditLogEsSyncAnonymousThresholdOther',
   'app:serviceType',
   'app:deploymentType',
   'app:ssrMaxRevisionBodyLength',
@@ -582,6 +583,13 @@ export const CONFIG_DEFINITIONS = {
   'app:auditLogEsSyncAnonymousThresholdInstaller': defineConfig<number>({
     envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_INSTALLER',
     defaultValue: 50,
+  }),
+  // Shared by every endpoint not listed in anonymous-sync-thresholds.ts. Those have
+  // no dedicated rate-limiter entry, so the base is the rate-limiter default
+  // (DEFAULT_MAX_REQUESTS x DEFAULT_USERS_PER_IP_PROSPECTION).
+  'app:auditLogEsSyncAnonymousThresholdOther': defineConfig<number>({
+    envVarName: 'ANONYMOUS_ES_SYNC_THRESHOLD_OTHER',
+    defaultValue: 25000,
   }),
   'app:serviceType': defineConfig<GrowiServiceType>({
     envVarName: 'SERVICE_TYPE',

@@ -3,6 +3,7 @@ import { configManager } from '~/server/service/config-manager';
 import {
   anonymousSyncThresholdConfigKeys,
   getAnonymousSyncThreshold,
+  OTHER_ENDPOINTS_THRESHOLD_KEY,
 } from './anonymous-sync-thresholds';
 
 const { mockError } = vi.hoisted(() => ({ mockError: vi.fn() }));
@@ -56,6 +57,17 @@ describe('getAnonymousSyncThreshold', () => {
 
     expect(configManager.getConfig).toHaveBeenCalledWith(
       'app:auditLogEsSyncAnonymousThresholdForgotPassword',
+    );
+  });
+
+  it('resolves the shared key for unlisted endpoints to its own configManager key', () => {
+    vi.mocked(configManager.getConfig).mockReturnValue(25000);
+
+    const threshold = getAnonymousSyncThreshold(OTHER_ENDPOINTS_THRESHOLD_KEY);
+
+    expect(threshold).toBe(25000);
+    expect(configManager.getConfig).toHaveBeenCalledWith(
+      'app:auditLogEsSyncAnonymousThresholdOther',
     );
   });
 

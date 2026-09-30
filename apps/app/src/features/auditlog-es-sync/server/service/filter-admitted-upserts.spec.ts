@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 
 import type { ActivityDocument } from '~/server/models/activity';
 
+import { OTHER_ENDPOINTS_THRESHOLD_KEY } from '../config/anonymous-sync-thresholds';
 import { decideEsSyncForEvent } from './decide-es-sync-for-event';
 import { filterAdmittedUpserts } from './filter-admitted-upserts';
 
@@ -58,8 +59,27 @@ describe('filterAdmittedUpserts', () => {
     expect(admitted).toEqual([]);
   });
 
-  it('bypasses the gate for an anonymous log at an endpoint with no configured threshold', async () => {
-    const activity = makeActivity({ endpoint: '/some-unlisted-path' });
+  it.each([
+    '/passport/google/callback?code=x',
+    '/_api/v3/complete-registration',
+    '/_api/v3/logout',
+  ])('gates an anonymous log at unlisted endpoint %s under the shared key', async (endpoint) => {
+    vi.mocked(decideEsSyncForEvent).mockResolvedValue('dropped');
+    const activity = makeActivity({ endpoint });
+
+    const admitted = await filterAdmittedUpserts([activity]);
+
+    expect(admitted).toEqual([]);
+    expect(decideEsSyncForEvent).toHaveBeenCalledWith(
+      activity._id.toString(),
+      OTHER_ENDPOINTS_THRESHOLD_KEY,
+      expect.any(Date),
+      expect.any(Number),
+    );
+  });
+
+  it('bypasses the gate for an anonymous log with no endpoint, which is never indexed', async () => {
+    const activity = makeActivity({ endpoint: '' });
 
     const admitted = await filterAdmittedUpserts([activity]);
 

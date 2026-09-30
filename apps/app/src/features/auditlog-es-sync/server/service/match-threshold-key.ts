@@ -24,7 +24,7 @@ export const compileThresholdKeyPatterns = (
  * Find which configured threshold key (if any) matches the given endpoint.
  * `endpoint` is expected to be `req.originalUrl` (see add-activity.ts) and is
  * sanitized with the same helper the ES delegator uses before matching, so a
- * query string or a `/forgot-password/<token>` dynamic segment doesn't miss.
+ * query string doesn't make it miss.
  */
 export const matchThresholdKey = (
   patterns: readonly ThresholdKeyPattern[],

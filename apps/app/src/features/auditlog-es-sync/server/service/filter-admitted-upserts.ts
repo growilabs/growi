@@ -3,6 +3,7 @@ import type { ActivityDocument } from '~/server/models/activity';
 import {
   anonymousSyncThresholdConfigKeys,
   getAnonymousSyncThreshold,
+  OTHER_ENDPOINTS_THRESHOLD_KEY,
 } from '../config/anonymous-sync-thresholds';
 import { decideEsSyncForEvent } from './decide-es-sync-for-event';
 import {
@@ -20,10 +21,10 @@ type AdmittableActivity = Pick<
   '_id' | 'snapshot' | 'endpoint' | 'createdAt'
 >;
 
-// Gate anonymous log events (empty snapshot.username) whose endpoint matches a configured
-// threshold key (see anonymous-sync-thresholds.ts). Authenticated logs and anonymous
-// logs at unlisted endpoints bypass the gate entirely (always admitted) — this only
-// caps the abuse-sensitive endpoints the threshold map names.
+// Gate anonymous log events (empty snapshot.username): a listed endpoint is counted
+// under its own threshold key, any other endpoint under the shared
+// OTHER_ENDPOINTS_THRESHOLD_KEY (see anonymous-sync-thresholds.ts). Authenticated logs
+// bypass the gate entirely (always admitted).
 //
 // Used only by the live change-stream consumer (auditlog-changestream.ts). The
 // full-corpus reindex (elasticsearch.ts's addAllAuditlogs) deliberately skips it;
@@ -47,14 +48,16 @@ export const filterAdmittedUpserts = async <T extends AdmittableActivity>(
       continue;
     }
 
-    const thresholdKey = matchThresholdKey(
-      thresholdKeyPatterns,
-      activity.endpoint ?? '',
-    );
-    if (thresholdKey == null) {
+    // Never indexed (prepareBodyForAuditlog drops a log with neither username nor
+    // endpoint), so counting it would only consume the shared budget.
+    if (!activity.endpoint) {
       admitted.push(activity);
       continue;
     }
+
+    const thresholdKey =
+      matchThresholdKey(thresholdKeyPatterns, activity.endpoint) ??
+      OTHER_ENDPOINTS_THRESHOLD_KEY;
 
     // Keyed by the event's own occurrence time, not the flush wall-clock time: a
     // backlog replayed after a restart (resume token rewound, or a cold start with

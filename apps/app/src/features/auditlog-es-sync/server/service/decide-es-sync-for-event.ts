@@ -277,7 +277,7 @@ const tryDecideAsClaimant = async (
   if (outcome.thresholdJustReached) {
     logger.warn(
       { endpoint, windowStart, threshold },
-      'Anonymous log ES sync threshold reached; further anonymous logs for this endpoint in this window are dropped from ES (still recorded in MongoDB).',
+      'Anonymous log ES sync threshold reached; further anonymous logs for this threshold key in this window are dropped from ES (still recorded in MongoDB). Key "*" covers every endpoint without its own threshold.',
     );
   }
 
