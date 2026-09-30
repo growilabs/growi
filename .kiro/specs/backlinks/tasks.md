@@ -679,7 +679,7 @@ the restored page's status. Independent of B3/B4.
   - _Boundary: page-link-sync_
   - _Depends: B5.1_
 
-- [ ] B5.3 Implement the delete-family lifecycle handlers
+- [x] B5.3 Implement the delete-family lifecycle handlers
   - Implement the service handlers deferred from B1.6: delete/deleteCompletely/syncDescendantsDelete
     all route to the state-based reconcile. Idempotent; tolerate already-removed pages
   - Also drop the page id from `PageLinkUpsertQueue`'s dirty set here, so a pending upsert is
@@ -689,11 +689,18 @@ the restored page's status. Independent of B3/B4.
     (`PageService.handlePrivatePagesForGroupsToDelete`, action `delete`) hands
     `deleteMultipleCompletely` every private page of the deleted groups in one call, unbatched, so
     one `syncDescendantsDelete` payload can hold thousands of pages. Split the payload into chunks
-    of `BULK_REINDEX_SIZE` and call `reconcileDeletedPages` once per chunk. See design.md § *Delete-family payloads are
-    not uniformly bounded*
+    of `BULK_REINDEX_SIZE` and call `reconcileDeletedPages` once per chunk. See design.md
+    § *Delete-family payloads are not uniformly bounded*
   - Done when unit tests invoke each handler with a fake event payload and assert the resulting row
     changes (removed/nulled), and a `syncDescendantsDelete` payload larger than `BULK_REINDEX_SIZE`
     reaches `reconcileDeletedPages` as several calls of at most `BULK_REINDEX_SIZE` ids each
+  - **How the criterion is met.** The three handlers collapsed into one `handlePagesDelete`, which
+    chunks the payload and reconciles one chunk at a time; a failed chunk is logged and the rest
+    still settle. Its own contract — no call above `BULK_REINDEX_SIZE`, every id exactly once, a
+    failed chunk being logged without stopping the rest — is asserted in `page-link-service-handlers.spec.ts`. The
+    row changes are asserted one layer down, against real rows, in
+    `page-link-service-handlers.integ.ts` and `page-link.integ.ts`; the gone/trashed decision in
+    `page-link-sync.spec.ts`; the queue side in `page-link-upsert-queue.spec.ts`
   - _Requirements: 3.3, 6.1, 6.2_
   - _Boundary: PageLinkService_
   - _Depends: B5.2, B1.6_
@@ -783,8 +790,13 @@ the restored page's status. Independent of B3/B4.
   - _Boundary: BacklinksPanel_
   - _Depends: B5.9, B5.5, B1.11_
 
-- [ ] B5.7 Subscribe the delete-family lifecycle events
+- [x] B5.7 Subscribe the delete-family lifecycle events
   - Extend the B1.12 subscription with delete/deleteCompletely/syncDescendantsDelete → the B5.3 handlers
+  - **Pin each event's payload shape here.** `EventEmitter.on` types its listener `(...args: any[])`,
+    so the shape a listener declares is unverified: `syncDescendantsDelete` carries an **array**
+    (both `server/service/page/index.ts:2309` and `:2407`) while `delete`/`deleteCompletely` carry a
+    single document, and reading the array as one document settles nothing, silently. Covered in
+    `page-link-service.spec.ts` — B5.8's real delete operations would catch it only incidentally
   - Done when deleting a page through the app reconciles `PageLink` rows accordingly
   - _Requirements: 3.3, 6.1, 6.2_
   - _Boundary: crowi setup, PageLinkService_
