@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type { IPageRedirectEndpoints } from '~/server/models/page-redirect';
-import PageRedirect from '~/server/models/page-redirect';
+import { prisma } from '~/utils/prisma';
 
 // Match findByPath: exclude empty pages ({ isEmpty: null } for v4 compat).
 // Trashed pages are deliberately NOT excluded — a link whose target is in the
@@ -25,8 +25,8 @@ export const REDIRECT_CHAIN_MAX_DEPTH = 50;
 // registers the Page schema, and mongoose.model() throws then.
 const getPageModel = () => mongoose.model<PageDocument, PageModel>('Page');
 
-const findPagesById = async (
-  ids: string[],
+export const findPagesById = async (
+  ids: string[] | Types.ObjectId[],
 ): Promise<{ _id: Types.ObjectId }[]> => {
   return await getPageModel()
     .find({ _id: { $in: ids } })
@@ -89,7 +89,7 @@ export const resolveToPageIds = async (
     permalinkIds.length ? findPagesById(permalinkIds) : [],
     normalPaths.length ? findPagesByPath(normalPaths) : [],
     normalPaths.length
-      ? PageRedirect.retrievePageRedirectEndpointsBatch(
+      ? prisma.pageredirects.retrievePageRedirectEndpointsBatch(
           normalPaths,
           REDIRECT_CHAIN_MAX_DEPTH,
         )

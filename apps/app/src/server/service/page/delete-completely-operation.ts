@@ -7,7 +7,6 @@ import type { PageModel } from '~/server/models/page';
 import { prisma } from '~/utils/prisma';
 
 import { Attachment } from '../../models/attachment';
-import PageRedirect from '../../models/page-redirect';
 import {
   type ActivityActor,
   recordCascadeAttachmentRemovals,
@@ -104,8 +103,10 @@ export const deleteCompletelyOperation = async (
 
   await Promise.all([
     Page.deleteMany({ _id: { $in: pageIds } }),
-    PageRedirect.deleteMany({
-      $or: [{ fromPath: { $in: pagePaths } }, { toPath: { $in: pagePaths } }],
+    prisma.pageredirects.deleteMany({
+      where: {
+        OR: [{ fromPath: { in: pagePaths } }, { toPath: { in: pagePaths } }],
+      },
     }),
     attachmentService.removeAllAttachments(attachments),
 

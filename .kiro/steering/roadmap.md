@@ -17,7 +17,7 @@
 |---|---|---|
 | [growi-vault](../specs/growi-vault/) | resilience / reconcile 完了、ha は brief 段階 | [roadmap.md](../specs/growi-vault/roadmap.md) |
 | [editor-commands](../specs/editor-commands/) | spec 整備中（slash-command は tasks 生成済み、extended-elements / selection-palette は WIP） | [roadmap.md](../specs/editor-commands/roadmap.md) |
-| [i18n](../specs/i18n/) | discovery 完了、sub-spec 2 本とも brief 段階。翻訳ファイル構成の整理方式は未決 | [roadmap.md](../specs/i18n/roadmap.md) |
+| [i18n](../specs/i18n/) | sub-spec 2 本（検出ゲート・コミュニティ翻訳導線）は実装完了。翻訳ファイル構成の整理方式（namespace 再編かコンパイラ移行か）が未決のまま残っており、umbrella はその判断待ちで継続中 | [roadmap.md](../specs/i18n/roadmap.md) |
 
 ---
-_Updated: 2026-08-07. 完了済みの activity log ファミリー（`activity-log` / `activity-log-snapshot` / `activity-log-snapshot-viewer`、3 spec とも master にマージ済み）の節を削除した。PR 番号・実装ファイルパス・将来課題は各 `spec.json` の `increment_note` と flagship の `brief.md`（関心マップ）に既にあり、そこにしか無かった「spec 分割・改名の経緯」は削除前に flagship の brief へ移設済み。あわせて footer に溜まっていた編集履歴を落とし、「ここに書くもの / 書かないもの」を本文の方針として明示した。_
+_Updated: 2026-09-25. i18n の行を実態に合わせて更新した（前回記載時は「sub-spec 2 本とも brief 段階」だったが、実際には `i18n-key-audit` は全タスク完了、`i18n-community-translation` は実装完了かつクリーンアップ済みまで進んでいた）。翻訳ファイル構成の整理方式が未決のまま残っているため、行自体はまだ削除せず継続中として残した。Prior: 2026-08-07. 完了済みの activity log ファミリー（`activity-log` / `activity-log-snapshot` / `activity-log-snapshot-viewer`、3 spec とも master にマージ済み）の節を削除した。PR 番号・実装ファイルパス・将来課題は各 `spec.json` の `increment_note` と flagship の `brief.md`（関心マップ）に既にあり、そこにしか無かった「spec 分割・改名の経緯」は削除前に flagship の brief へ移設済み。あわせて footer に溜まっていた編集履歴を落とし、「ここに書くもの / 書かないもの」を本文の方針として明示した。_

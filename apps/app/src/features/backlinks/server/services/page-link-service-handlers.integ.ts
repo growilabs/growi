@@ -6,6 +6,7 @@ import { prisma } from '~/utils/prisma';
 
 import { ensurePageLinkIndexes } from '../models/page-link-indexes';
 import { handlePageUpsertById } from './page-link-service-handlers';
+import { reconcileDeletedPages } from './page-link-sync';
 
 // pagelinks is prisma-only, and the harness skips migrations on the in-memory MongoDB.
 beforeAll(async () => {
@@ -346,5 +347,77 @@ describe('handlePageUpsertById (integration)', () => {
         toPageId: unrelatedTarget.toString(),
       },
     ]);
+  });
+
+  /*
+   * B5.2 — `replaceOutboundLinks` upserts, so a drain landing after a delete would rebuild the
+   * rows from the body that was still queued. The drain is called directly here, standing in for
+   * an id `PageLinkUpsertQueue.abandon()` did not catch — it narrows that window, not closes it.
+   * Whether the queue drops an abandoned id is covered in page-link-upsert-queue.spec.ts.
+   */
+  describe('a delete landing while an upsert is pending', () => {
+    it('leaves a permanently deleted source no rows, and breaks the rows that pointed at it', async () => {
+      const targetId = new Types.ObjectId();
+      idByPath.set('/a', targetId);
+
+      const sourcePath = `${PREFIX}/deleted-source`;
+      const pageId = await createPage('/deleted-source', '[a](/a)');
+      // Unmapped, the first drain's re-resolve would null the inbound row itself and prove nothing.
+      idByPath.set(sourcePath, pageId);
+      const inboundSource = new Types.ObjectId();
+      await createInboundLink(inboundSource, sourcePath, pageId);
+
+      await handlePageUpsertById(pageId.toString(), siteUrl);
+
+      // Pre-state: the end state below must not be able to pass on rows that never existed.
+      expect(await outboundRowsOf(pageId)).toEqual([
+        { toPath: '/a', toPageId: targetId.toString() },
+      ]);
+      expect(await inboundRowsAt(sourcePath)).toEqual([
+        { fromPageId: inboundSource.toString(), toPageId: pageId.toString() },
+      ]);
+
+      // deleteCompletely keeps no document, so the page stops resolving.
+      await Page.deleteOne({ _id: pageId });
+      await reconcileDeletedPages([pageId]);
+      await handlePageUpsertById(pageId.toString(), siteUrl);
+
+      expect(await outboundRowsOf(pageId)).toEqual([]);
+      // Kept as a row, cache cleared: that is what a reader derives as broken.
+      expect(await inboundRowsAt(sourcePath)).toEqual([
+        { fromPageId: inboundSource.toString(), toPageId: null },
+      ]);
+    });
+
+    it('keeps the rows a trashed source already owned, without indexing its queued body', async () => {
+      const aId = new Types.ObjectId();
+      const bId = new Types.ObjectId();
+      idByPath.set('/a', aId);
+      idByPath.set('/b', bId);
+
+      const pageId = await createPage('/trashed-with-rows', '[a](/a)');
+      await handlePageUpsertById(pageId.toString(), siteUrl);
+
+      // Still queued when the trash lands; a different link makes an indexed body distinguishable.
+      await setRevision(pageId, '[b](/b)');
+      await Page.updateOne(
+        { _id: pageId },
+        {
+          $set: {
+            path: `/trash${PREFIX}/trashed-with-rows`,
+            status: 'deleted',
+          },
+        },
+      );
+
+      // A soft delete keeps the document, so reconcile writes nothing: the rows stay because
+      // buildVisibleSourcesQuery drops a trashed source at read time, so a restore needs no re-index.
+      await reconcileDeletedPages([pageId]);
+      await handlePageUpsertById(pageId.toString(), siteUrl);
+
+      expect(await outboundRowsOf(pageId)).toEqual([
+        { toPath: '/a', toPageId: aId.toString() },
+      ]);
+    });
   });
 });
