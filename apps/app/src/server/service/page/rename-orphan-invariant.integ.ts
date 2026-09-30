@@ -86,6 +86,23 @@ describe('a failed rename must not orphan the page (#9755)', () => {
       isEmpty: p.isEmpty ?? false,
     }));
 
+  const findPathsOffTree = async () => {
+    const pages = await Page.find({ path: new RegExp(`^${base}`) });
+    const parents = await Page.find({
+      _id: { $in: pages.map((p) => p.parent) },
+    });
+    const parentPathById = new Map(
+      parents.map((p) => [p._id.toString(), p.path]),
+    );
+    return pages
+      .filter(
+        (p) =>
+          parentPathById.get(p.parent?.toString() ?? '') !==
+          pathlib.dirname(p.path),
+      )
+      .map((p) => p.path);
+  };
+
   // Fails the write that moves the page to `newPath`, the last step of the rename.
   // `applied: true` lets the server apply it first, as a lost acknowledgement would.
   const renameWithFailingFinalWrite = async (
@@ -184,6 +201,7 @@ describe('a failed rename must not orphan the page (#9755)', () => {
       path: newPath,
       parentPath: `${base}/new-parent`,
     });
+    expect(await findPathsOffTree()).toEqual([]);
   });
 
   it('puts the page back under its old parent when renaming to a new location fails', async () => {
@@ -229,15 +247,29 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     const fault = new Error(
       'simulated failure while linking the new ancestors',
     );
-    const spy = vi.spyOn(Page, 'bulkWrite').mockRejectedValueOnce(fault);
+    const newPath = `${base}/target/not-yet-existing/moved`;
+    let emptyAncestorsAtFault: string[] = [];
+    const spy = vi.spyOn(Page, 'bulkWrite').mockImplementationOnce(async () => {
+      const empties = await Page.find({
+        path: new RegExp(`^${base}/`),
+        isEmpty: true,
+      });
+      emptyAncestorsAtFault = empties.map((p) => p.path).sort();
+      throw fault;
+    });
     let err: Error | null;
     try {
-      err = await rename(target, `${base}/target/not-yet-existing/moved`);
+      err = await rename(target, newPath);
     } finally {
       spy.mockRestore();
     }
 
     expect(err).toBe(fault);
+    // the fault must hit after the empty ancestors were inserted, or nothing is left to clean up
+    expect(emptyAncestorsAtFault).toEqual([
+      `${base}/target`,
+      `${base}/target/not-yet-existing`,
+    ]);
     expect(await snapshotTree()).toEqual(before);
   });
 
@@ -255,5 +287,6 @@ describe('a failed rename must not orphan the page (#9755)', () => {
       path: newPath,
       parentPath: `${base}/target/not-yet-existing`,
     });
+    expect(await findPathsOffTree()).toEqual([]);
   });
 });
