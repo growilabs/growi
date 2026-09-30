@@ -726,7 +726,8 @@ class PageService implements IPageService {
 
     // 1. Take target off from tree
     // No session makes this atomic with steps 2-3: if they throw, the catch below
-    // must reattach the page or it is stranded off the tree. See #9755
+    // must reattach the page or it is stranded off the tree.
+    // See https://github.com/growilabs/growi/issues/9755
     const exParentId = page.parent;
     await Page.takeOffFromTree(page._id);
 
