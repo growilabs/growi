@@ -49,6 +49,15 @@ describe('filterAdmittedUpserts', () => {
     expect(decideEsSyncForEvent).not.toHaveBeenCalled();
   });
 
+  it('gates a log with an empty-string username as anonymous', async () => {
+    vi.mocked(decideEsSyncForEvent).mockResolvedValue('dropped');
+    const activity = makeActivity({ snapshot: { username: '' } });
+
+    const admitted = await filterAdmittedUpserts([activity]);
+
+    expect(admitted).toEqual([]);
+  });
+
   it('bypasses the gate for an anonymous log at an endpoint with no configured threshold', async () => {
     const activity = makeActivity({ endpoint: '/some-unlisted-path' });
 

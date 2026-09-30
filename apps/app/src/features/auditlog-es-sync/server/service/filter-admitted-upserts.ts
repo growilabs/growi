@@ -20,7 +20,7 @@ type AdmittableActivity = Pick<
   '_id' | 'snapshot' | 'endpoint' | 'createdAt'
 >;
 
-// Gate anonymous log events (no snapshot.username) whose endpoint matches a configured
+// Gate anonymous log events (empty snapshot.username) whose endpoint matches a configured
 // threshold key (see anonymous-sync-thresholds.ts). Authenticated logs and anonymous
 // logs at unlisted endpoints bypass the gate entirely (always admitted) — this only
 // caps the abuse-sensitive endpoints the threshold map names.
@@ -40,7 +40,9 @@ export const filterAdmittedUpserts = async <T extends AdmittableActivity>(
 ): Promise<T[]> => {
   const admitted: T[] = [];
   for (const activity of upserts) {
-    if (activity.snapshot?.username != null) {
+    // Truthy, not `!= null`: '' counts as anonymous, matching how elasticsearch.ts
+    // builds the indexed document.
+    if (activity.snapshot?.username) {
       admitted.push(activity);
       continue;
     }
