@@ -9,6 +9,8 @@ import { useTranslation } from 'next-i18next';
 import { apiPost } from '~/client/util/apiv1-client';
 import { toastError } from '~/client/util/toastr';
 import { InlineCommentItem } from '~/features/inline-comment/client/components/InlineCommentItem/InlineCommentItem';
+import { InlineCommentListMenu } from '~/features/inline-comment/client/components/InlineCommentListMenu/InlineCommentListMenu';
+import { useResolvedCollapse } from '~/features/inline-comment/client/hooks/use-resolved-collapse';
 import type { InlineCommentWithReplies } from '~/features/inline-comment/interfaces';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 import { useSWRMUTxPageInfo } from '~/stores/page';
@@ -81,6 +83,11 @@ type CommentListItem =
 const toSortKey = (createdAt: Date | string): number =>
   (typeof createdAt === 'string' ? parseISO(createdAt) : createdAt).valueOf();
 
+// Stable fallbacks for callers that supply no inline comments, so the collapse
+// hook (which must always be called) sees unchanged arguments across renders.
+const NO_INLINE_COMMENTS: InlineCommentWithReplies[] = [];
+const resolveNothing = async (): Promise<void> => undefined;
+
 export const PageComment: FC<PageCommentProps> = memo(
   (props: PageCommentProps): JSX.Element => {
     const {
@@ -130,6 +137,11 @@ export const PageComment: FC<PageCommentProps> = memo(
           ),
         ].sort((a, b) => a.sortKey - b.sortKey),
       [commentsExceptReply, inline?.comments],
+    );
+
+    const collapse = useResolvedCollapse(
+      inline?.comments ?? NO_INLINE_COMMENTS,
+      inline?.resolve ?? resolveNothing,
     );
 
     const allReplies = {};
@@ -240,6 +252,12 @@ export const PageComment: FC<PageCommentProps> = memo(
         className={`${styles['page-comment-styles']} page-comments-row comment-list`}
       >
         <div className="page-comments">
+          {/* Not gated on write permission: it only changes what is shown. */}
+          {inline != null && inline.comments.length > 0 && (
+            <div className="d-flex justify-content-end mb-2">
+              <InlineCommentListMenu items={collapse.listMenuItems} />
+            </div>
+          )}
           <div className="page-comments-list mb-3" id="page-comments-list">
             {items.map((item) => {
               // An inline comment brings its own box, quote and replies, so it
@@ -258,16 +276,16 @@ export const PageComment: FC<PageCommentProps> = memo(
                       comment={item.comment}
                       pagePath={pagePath}
                       rendererOptions={rendererOptions}
-                      resolve={inline.resolve}
+                      resolve={collapse.resolve}
                       createReply={inline.createReply}
                       update={inline.update}
                       remove={inline.remove}
                       updateReply={inline.updateReply}
                       removeReply={inline.removeReply}
                       scrollToRange={inline.scrollToRange}
-                      collapsed={false}
-                      onExpand={() => {}}
-                      onCollapse={() => {}}
+                      collapsed={collapse.isCollapsed(item.comment)}
+                      onExpand={() => collapse.expand(item.comment.id)}
+                      onCollapse={() => collapse.collapse(item.comment.id)}
                     />
                   </div>
                 );
