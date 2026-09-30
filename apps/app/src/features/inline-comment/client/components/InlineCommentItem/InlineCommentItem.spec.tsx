@@ -1076,8 +1076,8 @@ describe('InlineCommentItem', () => {
         const { container } = renderItem(resolved, {}, { collapsed: false });
 
         expect(
-          container.querySelector('blockquote.inline-comment-quote'),
-        ).not.toHaveClass('inline-comment-quote-clamped');
+          container.querySelector('.inline-comment-quote-clamped'),
+        ).not.toBeInTheDocument();
       });
 
       it('places the collapse button immediately to the left of the badge, where the expand button sits when collapsed', () => {

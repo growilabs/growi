@@ -4662,6 +4662,8 @@ test.describe('Inline comment - visual refresh: mockup cross-check captures', ()
     await expect(item.getByTestId('inline-comment-status')).toHaveText(
       'Resolved',
     );
+    // Resolving collapses the item; this state captures the expanded card.
+    await item.getByTestId('inline-comment-expand-button').click();
     await card.hover();
     await expect(editButton).toBeVisible();
 
@@ -4921,6 +4923,8 @@ test.describe('Inline comment - visual refresh: mockup cross-check captures', ()
     await expect(item.getByTestId('inline-comment-status')).toHaveText(
       'Resolved',
     );
+    // Resolving collapses the item; this state captures the expanded card.
+    await item.getByTestId('inline-comment-expand-button').click();
     await card.hover();
     await expect(editButton).toBeVisible();
 
@@ -4943,5 +4947,362 @@ test.describe('Inline comment - visual refresh: mockup cross-check captures', ()
     await expect(item.getByTestId('inline-comment-status')).toHaveText(
       'Unresolved',
     );
+  });
+});
+
+test.describe('Inline comment - resolved comments are collapsed by default, expand one by one or all at once from the list menu, and collapse again on reload (Req 20.1, 20.2, 20.5, 21.1-21.3, 22.1, 22.4)', () => {
+  // Serial: the comments created (and resolved) by the first tests are the
+  // fixture every later test reads, same reasoning as the other suites here.
+  test.describe.configure({ mode: 'serial' });
+
+  const collapsePagePath = (retry: number) =>
+    `/inline-comment-e2e-collapse${retry}`;
+
+  // Long enough to wrap onto well over two lines at every viewport this
+  // suite uses, so the two-line clamp visibly cuts it off.
+  const longResolvedSentence = Array.from(
+    { length: 12 },
+    (_, i) => `Long resolved anchor segment number ${i + 1} keeps growing.`,
+  ).join(' ');
+  const shortResolvedSentence =
+    'This short sentence anchors the second resolved comment.';
+  const unresolvedSentence =
+    'This sentence anchors the comment that stays unresolved.';
+
+  const longResolvedBody = 'body of the first resolved comment';
+  const shortResolvedBody = 'body of the second resolved comment';
+  const unresolvedBody = 'body of the unresolved comment';
+
+  const pageBody = [
+    '# Inline comment E2E - collapse',
+    '',
+    longResolvedSentence,
+    '',
+    shortResolvedSentence,
+    '',
+    unresolvedSentence,
+    '',
+  ].join('\n');
+
+  // The en_US values of `inline_comment.list_menu` / `expand_all_resolved`.
+  const listMenuName = 'Comment list menu';
+  const expandAllName = 'Expand all resolved comments';
+
+  let createdPage: CreatedPage | undefined;
+
+  test.afterAll(async ({ request }) => {
+    if (createdPage != null) {
+      await deletePagesCompletely(request, [createdPage]);
+    }
+  });
+
+  const listItemFor = (page: Page, anchorText: string): Locator =>
+    page
+      .getByTestId('inline-comment-item')
+      .filter({ hasText: anchorText.slice(0, 40) });
+
+  const createInlineComment = async (
+    page: Page,
+    anchorText: string,
+    bodyText: string,
+  ): Promise<void> => {
+    await selectTextInPageBody(page, anchorText);
+    await page.getByTestId('selection-action-button').click();
+    const form = page.getByTestId('inline-comment-form');
+    await expect(form).toBeVisible();
+    await form.locator('.cm-content').fill(bodyText);
+    await form.getByTestId('inline-comment-submit-button').click();
+    await expect(form).not.toBeVisible();
+    await expect(listItemFor(page, anchorText)).toContainText(bodyText);
+  };
+
+  const gotoCollapsePage = async (page: Page, retry: number): Promise<void> => {
+    await page.goto(collapsePagePath(retry));
+    await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+    await expect(page.getByTestId('inline-comment-item')).toHaveCount(3);
+  };
+
+  const expectCollapsed = async (
+    item: Locator,
+    body: string,
+  ): Promise<void> => {
+    await expect(
+      item.getByTestId('inline-comment-expand-button'),
+    ).toBeVisible();
+    await expect(
+      item.getByTestId('inline-comment-collapse-button'),
+    ).toHaveCount(0);
+    await expect(item.locator('blockquote.inline-comment-quote')).toBeVisible();
+    await expect(item.getByText(body)).not.toBeVisible();
+  };
+
+  const expectExpanded = async (item: Locator, body: string): Promise<void> => {
+    await expect(item.getByText(body)).toBeVisible();
+    await expect(
+      item.getByTestId('inline-comment-collapse-button'),
+    ).toBeVisible();
+    await expect(item.getByTestId('inline-comment-expand-button')).toHaveCount(
+      0,
+    );
+  };
+
+  const expectUnresolvedUntouched = async (page: Page): Promise<void> => {
+    const item = listItemFor(page, unresolvedSentence);
+    await expect(item.getByText(unresolvedBody)).toBeVisible();
+    await expect(item.getByTestId('inline-comment-expand-button')).toHaveCount(
+      0,
+    );
+    await expect(
+      item.getByTestId('inline-comment-collapse-button'),
+    ).toHaveCount(0);
+  };
+
+  test('Create a page, save three inline comments, and resolve two of them: each resolved comment collapses right away', async ({
+    page,
+    request,
+  }, testInfo) => {
+    createdPage = await createPage(request, {
+      path: collapsePagePath(testInfo.retry),
+      body: pageBody,
+    });
+
+    await page.goto(createdPage.path);
+    await expect(page.locator('.wiki').first()).toContainText(
+      unresolvedSentence,
+    );
+    await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+
+    await createInlineComment(page, longResolvedSentence, longResolvedBody);
+    await createInlineComment(page, shortResolvedSentence, shortResolvedBody);
+    await createInlineComment(page, unresolvedSentence, unresolvedBody);
+
+    const resolveAndExpectCollapsed = async (
+      sentence: string,
+      body: string,
+    ): Promise<void> => {
+      const item = listItemFor(page, sentence);
+      // The resolve toggle is revealed only while the card is hovered.
+      await item.locator('.page-comment').first().hover();
+      await item.getByTestId('inline-comment-resolve-toggle-button').click();
+      // Requirement 20.1: resolving collapses the item without a reload.
+      await expectCollapsed(item, body);
+    };
+    await resolveAndExpectCollapsed(longResolvedSentence, longResolvedBody);
+    await resolveAndExpectCollapsed(shortResolvedSentence, shortResolvedBody);
+    await expectUnresolvedUntouched(page);
+  });
+
+  test('Req 20.1, 20.2, 20.5: after a reload the resolved comments are collapsed (quote visible, body hidden) and the unresolved one is expanded', async ({
+    page,
+  }, testInfo) => {
+    await gotoCollapsePage(page, testInfo.retry);
+
+    await expectCollapsed(
+      listItemFor(page, longResolvedSentence),
+      longResolvedBody,
+    );
+    await expectCollapsed(
+      listItemFor(page, shortResolvedSentence),
+      shortResolvedBody,
+    );
+    await expectUnresolvedUntouched(page);
+  });
+
+  test('Req 21.1-21.3: expanding one resolved comment expands only that one, and its collapse button folds it back in the same place', async ({
+    page,
+  }, testInfo) => {
+    await gotoCollapsePage(page, testInfo.retry);
+
+    const target = listItemFor(page, shortResolvedSentence);
+    const other = listItemFor(page, longResolvedSentence);
+
+    await target.getByTestId('inline-comment-expand-button').click();
+    await expectExpanded(target, shortResolvedBody);
+    await expectCollapsed(other, longResolvedBody);
+    await expectUnresolvedUntouched(page);
+
+    await target.getByTestId('inline-comment-collapse-button').click();
+    await expectCollapsed(target, shortResolvedBody);
+    await expectCollapsed(other, longResolvedBody);
+  });
+
+  test('Req 22.1, 22.4, 20.5: the list menu expands every resolved comment and leaves the unresolved one alone; a reload collapses them again', async ({
+    page,
+  }, testInfo) => {
+    await gotoCollapsePage(page, testInfo.retry);
+
+    await page.getByRole('button', { name: listMenuName }).click();
+    await page.getByRole('menuitem', { name: expandAllName }).click();
+
+    await expectExpanded(
+      listItemFor(page, longResolvedSentence),
+      longResolvedBody,
+    );
+    await expectExpanded(
+      listItemFor(page, shortResolvedSentence),
+      shortResolvedBody,
+    );
+    await expectUnresolvedUntouched(page);
+
+    await page.reload();
+    await expect(page.getByTestId('inline-comment-item')).toHaveCount(3);
+    await expectCollapsed(
+      listItemFor(page, longResolvedSentence),
+      longResolvedBody,
+    );
+    await expectCollapsed(
+      listItemFor(page, shortResolvedSentence),
+      shortResolvedBody,
+    );
+    await expectUnresolvedUntouched(page);
+  });
+
+  test('Req 20.2: a long quote is cut off at two lines while collapsed, and shows in full once expanded', async ({
+    page,
+  }, testInfo) => {
+    await gotoCollapsePage(page, testInfo.retry);
+
+    const item = listItemFor(page, longResolvedSentence);
+    const quote = item.locator('blockquote.inline-comment-quote');
+    await quote.scrollIntoViewIfNeeded();
+
+    // The clamp sits on an element inside the padded blockquote, so its box
+    // is exactly the visible text area (no padding to leak a third line into).
+    const clamp = quote.locator('.inline-comment-quote-clamped');
+    const collapsedQuoteHeight = (await quote.boundingBox())?.height ?? 0;
+
+    const clampMetrics = await clamp.evaluate((el) => {
+      const style = window.getComputedStyle(el);
+      return {
+        lineClamp: style.getPropertyValue('-webkit-line-clamp'),
+        clientHeight: el.clientHeight,
+        scrollHeight: el.scrollHeight,
+        lineHeight: Number.parseFloat(style.lineHeight),
+        verticalPadding:
+          Number.parseFloat(style.paddingTop) +
+          Number.parseFloat(style.paddingBottom),
+      };
+    });
+    expect(clampMetrics.lineClamp).toBe('2');
+    expect(clampMetrics.verticalPadding).toBe(0);
+    // Cut off: there is more text than the visible box shows ...
+    expect(clampMetrics.scrollHeight).toBeGreaterThan(
+      clampMetrics.clientHeight,
+    );
+    // ... and the visible box holds no more than two lines.
+    expect(clampMetrics.clientHeight).toBeLessThanOrEqual(
+      clampMetrics.lineHeight * 2 + 1,
+    );
+
+    await item.screenshot({
+      path: testInfo.outputPath('long-quote-collapsed.png'),
+    });
+
+    await item.getByTestId('inline-comment-expand-button').click();
+    await expect(quote.locator('.inline-comment-quote-clamped')).toHaveCount(0);
+    const expandedQuoteHeight = (await quote.boundingBox())?.height ?? 0;
+    expect(expandedQuoteHeight).toBeGreaterThan(collapsedQuoteHeight);
+  });
+
+  test('Req 22.1: on a 375px-wide screen the list menu button stays inside the viewport at the right side, and its dropdown does not run off either edge', async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 375, height: 800 });
+    await gotoCollapsePage(page, testInfo.retry);
+
+    const menuButton = page.getByRole('button', { name: listMenuName });
+    await menuButton.scrollIntoViewIfNeeded();
+    await expect(menuButton).toBeVisible();
+
+    const buttonBox = await menuButton.boundingBox();
+    expect(buttonBox).not.toBeNull();
+    if (buttonBox == null) return;
+    expect(buttonBox.x).toBeGreaterThanOrEqual(0);
+    expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(375);
+    expect(buttonBox.x + buttonBox.width / 2).toBeGreaterThan(375 / 2);
+
+    await menuButton.click();
+    const menuItem = page.getByRole('menuitem', { name: expandAllName });
+    await expect(menuItem).toBeVisible();
+    const itemBox = await menuItem.boundingBox();
+    expect(itemBox).not.toBeNull();
+    if (itemBox == null) return;
+    expect(itemBox.x).toBeGreaterThanOrEqual(0);
+    expect(itemBox.x + itemBox.width).toBeLessThanOrEqual(375);
+
+    await page.screenshot({ path: testInfo.outputPath('narrow-375-menu.png') });
+  });
+
+  test('Req 22.1: in the dark theme the three-dot button stays legible against its surroundings and its dropdown follows the theme', async ({
+    page,
+  }, testInfo) => {
+    await gotoCollapsePage(page, testInfo.retry);
+    await page.addStyleTag({
+      content:
+        '*, *::before, *::after { transition: none !important; animation: none !important; }',
+    });
+
+    const menuButton = page.getByRole('button', { name: listMenuName });
+    await menuButton.scrollIntoViewIfNeeded();
+
+    // The icon color against the first opaque background found walking up
+    // from the button, as a WCAG contrast ratio.
+    const readContrast = (): Promise<number> =>
+      menuButton.evaluate((el) => {
+        const parse = (value: string): number[] =>
+          (value.match(/[\d.]+/g) ?? []).map(Number);
+        const luminance = ([r, g, b]: number[]): number => {
+          const [lr, lg, lb] = [r, g, b].map((c) => {
+            const v = c / 255;
+            return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+          });
+          return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+        };
+        let surface: Element | null = el.parentElement;
+        while (surface != null) {
+          const bg = parse(getComputedStyle(surface).backgroundColor);
+          if (bg.length >= 3 && (bg[3] ?? 1) > 0.99) break;
+          surface = surface.parentElement;
+        }
+        const surfaceColor = parse(
+          surface == null
+            ? 'rgb(255, 255, 255)'
+            : getComputedStyle(surface).backgroundColor,
+        );
+        const iconColor = parse(getComputedStyle(el).color);
+        const [hi, lo] = [luminance(iconColor), luminance(surfaceColor)].sort(
+          (a, b) => b - a,
+        );
+        return (hi + 0.05) / (lo + 0.05);
+      });
+    const dropdownBackground = (dropdown: Locator): Promise<string> =>
+      dropdown.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    await menuButton.click();
+    const dropdown = page
+      .getByRole('menuitem', { name: expandAllName })
+      .locator('..');
+    await expect(dropdown).toBeVisible();
+    const lightDropdownBackground = await dropdownBackground(dropdown);
+    await menuButton.click();
+    await expect(dropdown).not.toBeVisible();
+
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-bs-theme', 'dark');
+    });
+    // 3:1 is the WCAG minimum for a non-text UI component such as an icon button.
+    expect(await readContrast()).toBeGreaterThanOrEqual(3);
+
+    await menuButton.click();
+    await expect(dropdown).toBeVisible();
+    expect(await dropdownBackground(dropdown)).not.toBe(
+      lightDropdownBackground,
+    );
+
+    await page
+      .getByTestId('inline-comment-item')
+      .first()
+      .scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath('dark-menu-open.png') });
   });
 });

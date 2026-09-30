@@ -116,7 +116,11 @@ describe('CollapsedInlineCommentItem', () => {
 
       const quote = document.querySelector('blockquote.inline-comment-quote');
       expect(quote).toHaveTextContent('a distinctive quoted range');
-      expect(quote).toHaveClass('inline-comment-quote-clamped');
+      // The clamp (overflow: hidden) must sit inside the padded blockquote;
+      // on the blockquote itself the padding would show a sliver of line 3.
+      expect(quote).not.toHaveClass('inline-comment-quote-clamped');
+      const clamp = quote?.querySelector('.inline-comment-quote-clamped');
+      expect(clamp).toHaveTextContent('a distinctive quoted range');
     });
 
     it('places the expand button immediately to the left of the badge, outside the hover-reveal container', () => {
