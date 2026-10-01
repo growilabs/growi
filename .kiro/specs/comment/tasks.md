@@ -178,7 +178,7 @@
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.6_
   - _Depends: 5.1, 3.1, 3.2_
 
-- [ ] 6.2 リポジトリ全体の品質確認を行う
+- [x] 6.2 リポジトリ全体の品質確認を行う
   - `pnpm run lint`(ルートの規約の検査を含む)、`pnpm run test`、`pnpm run build` を実行する
   - 公開仕様の検証(apiv3 と apiv1 の両方)が通る
   - 完了の状態: すべて成功する。失敗があれば、出力を記録して直す
@@ -214,3 +214,4 @@
 - 4.5: 5.1 の「説明のコメントを直す」対象に、`features/inline-comment/client/components/AnchorResolver/use-anchor-resolver.ts`(58〜63 行目付近。「再取得のたびに新しい配列を返す」は、いまは「共有の一覧が変わったときに新しい配列になる」が正しい)と、`use-anchor-resolver.spec.tsx`(138 / 307 行目付近)を足す。`IInlineComment.creator` の JSDoc(`listByPageId()` でのみ埋まる)、`dto/list-inline-comments.ts` と `dto/index.ts` の再 export も 5.1 で整理する。
 - 5.1: apiv3 のルーターには「見つからない」の受け皿がなく、登録を消しただけでは未登録の GET が Next のページ処理へ流れる(ログインなしと PAT は 302、ログインセッションは 200 の HTML になる)。廃止した `GET /_api/v3/inline-comments` は、index.js の明示的な JSON 404 で受ける。
 - 6.1: 画面の通しの確認は、開発サーバーで E2E `apps/app/playwright/20-basic-features/comment-list-integration.spec.ts`(8 件、chromium と firefox で通過)を実行して行った。確かめた内容は、インラインコメントの作成と解決でハイライト・末尾のスレッド・ページ側面の件数が一緒に変わること(1→2→3、解決後も 3)、共有リンクの画面と検索結果のプレビューにインラインコメントが出ないこと。共有リンク経由の API はインラインの行も返す(要件 3.3)ので、隠しているのは `useSWRxPageComment` の `isInline` の除外。ページ側面ではなく「最近の更新」の件数は API でのみ確認した。
+- 6.2: HEAD a18a47a4fe で `pnpm run lint`(apiv1 と apiv3 の公開仕様の検証を含む)と `pnpm run build` が成功し、全体テストは 6828 件が通った。失敗した 2 ファイル(`growi-vault` の `clone-e2e.integ.ts` と `vault-gateway.integ.ts`)は、このフィーチャーが触れていない範囲の既存の失敗。
