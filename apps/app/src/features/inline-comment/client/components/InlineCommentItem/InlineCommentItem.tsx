@@ -199,12 +199,14 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
       {
         id: 'edit',
         labelKey: 'Edit',
+        icon: 'edit',
         disabled: isCommentActionBlocked,
         onSelect: () => setIsEditing(true),
       },
       {
         id: 'delete',
         labelKey: 'Delete',
+        icon: 'delete',
         disabled: isCommentActionBlocked,
         onSelect: () => setIsDeleteConfirmOpen(true),
       },
@@ -214,6 +216,7 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
     {
       id: 'resolve',
       labelKey: isResolved ? 'inline_comment.reopen' : 'inline_comment.resolve',
+      icon: isResolved ? 'undo' : 'check_circle',
       disabled: isCommentActionBlocked,
       onSelect: () => {
         void handleResolveToggle();
@@ -222,6 +225,7 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
     {
       id: 'view-at-posting',
       labelKey: 'inline_comment.view_at_posting',
+      icon: 'history',
       disabled: false,
       onSelect: () => {
         void router.push(revisionHref);

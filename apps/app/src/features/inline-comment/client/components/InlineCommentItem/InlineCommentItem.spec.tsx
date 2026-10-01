@@ -1256,6 +1256,26 @@ describe('InlineCommentItem', () => {
           name: 'inline_comment.view_at_posting',
         }),
       ).toBeVisible();
+      expect(
+        screen
+          .getByRole('menuitem', { name: 'Edit' })
+          .querySelector('.material-symbols-outlined'),
+      ).toHaveTextContent('edit');
+      expect(
+        screen
+          .getByRole('menuitem', { name: 'Delete' })
+          .querySelector('.material-symbols-outlined'),
+      ).toHaveTextContent('delete');
+      expect(
+        screen
+          .getByRole('menuitem', { name: 'inline_comment.resolve' })
+          .querySelector('.material-symbols-outlined'),
+      ).toHaveTextContent('check_circle');
+      expect(
+        screen
+          .getByRole('menuitem', { name: 'inline_comment.view_at_posting' })
+          .querySelector('.material-symbols-outlined'),
+      ).toHaveTextContent('history');
     });
 
     it('omits edit/delete from the menu when the viewer is not the author', async () => {

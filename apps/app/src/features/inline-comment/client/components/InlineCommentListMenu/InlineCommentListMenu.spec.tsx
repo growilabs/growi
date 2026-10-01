@@ -86,15 +86,16 @@ describe('InlineCommentListMenu', () => {
     expect(screen.getByText('label.extra')).toBeInTheDocument();
   });
 
-  it('renders the toggle as a theme-following link button, not the default btn-secondary (Requirement 22.1)', () => {
+  it('renders the toggle as a transparent button, not the default btn-secondary (Requirement 22.1)', () => {
     render(<InlineCommentListMenu items={[buildItem()]} />);
 
     const toggle = screen.getByRole('button', {
       name: 'inline_comment.list_menu',
     });
-    expect(toggle).toHaveClass('btn', 'btn-link');
+    expect(toggle).toHaveClass('btn', 'btn-transparent');
     expect(toggle).not.toHaveClass('btn-secondary');
   });
+
   it('aligns the opened menu to the right edge of the button (Requirement 22.1)', () => {
     render(<InlineCommentListMenu items={[buildItem()]} />);
 
@@ -113,5 +114,19 @@ describe('InlineCommentListMenu', () => {
     expect(
       screen.getByRole('button', { name: 'inline_comment.item_menu' }),
     ).toBeInTheDocument();
+  });
+
+  it('renders an optional icon before the item label', () => {
+    render(
+      <InlineCommentListMenu items={[buildItem({ icon: 'expand_all' })]} />,
+    );
+
+    openMenu();
+    const item = screen.getByRole('menuitem', {
+      name: 'inline_comment.expand_all_resolved',
+    });
+    const icon = item.querySelector('.material-symbols-outlined');
+    expect(icon).not.toBeNull();
+    expect(icon).toHaveTextContent('expand_all');
   });
 });

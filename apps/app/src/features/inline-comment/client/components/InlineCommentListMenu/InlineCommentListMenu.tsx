@@ -13,6 +13,8 @@ export type InlineCommentListMenuItem = {
   labelKey: string;
   disabled: boolean;
   onSelect: () => void;
+  /** Material Symbols ligature shown before the label when set. */
+  icon?: string;
 };
 
 type InlineCommentListMenuProps = {
@@ -40,12 +42,12 @@ export const InlineCommentListMenu = (
 
   return (
     <Dropdown isOpen={isOpen} toggle={() => setIsOpen((prev) => !prev)}>
-      {/* `color="link"` instead of the default `secondary`, whose background
-          does not follow the active theme (same as `MentionPickerButton`). */}
+      {/* `transparent` matches PageItemControl / bookmark menus — theme-
+          following with no filled background. */}
       <DropdownToggle
         type="button"
-        color="link"
-        className="btn-sm btn-outline-neutral-secondary border-0"
+        color="transparent"
+        className="btn-sm border-0 d-inline-flex align-items-center justify-content-center p-1"
         aria-label={t(ariaLabelKey)}
         data-testid={toggleTestId}
       >
@@ -60,6 +62,14 @@ export const InlineCommentListMenu = (
             disabled={item.disabled}
             onClick={item.onSelect}
           >
+            {item.icon != null && (
+              <span
+                className="material-symbols-outlined me-1"
+                aria-hidden="true"
+              >
+                {item.icon}
+              </span>
+            )}
             {t(item.labelKey)}
           </DropdownItem>
         ))}
