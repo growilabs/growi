@@ -54,7 +54,12 @@ export const listCommentsRouteHandlersFactory = (
     query('shareLinkId').optional().isString().bail().isMongoId(),
   ];
 
+  // Trust only the flag set by certifySharedPage, which verified that the
+  // share link belongs to this pageId; never the raw shareLinkId query.
   const canViewPage = async (req: Req): Promise<boolean> => {
+    if (req.isSharedPage === true) {
+      return true;
+    }
     const { meta } = await findPageAndMetaDataByViewer(
       pageService,
       pageGrantService,
@@ -63,10 +68,11 @@ export const listCommentsRouteHandlersFactory = (
     return !isIPageNotFoundInfo(meta);
   };
 
-  const toListInput = (req: Req): ListCommentsInput => ({
-    pageId: req.query.pageId,
-    revisionId: req.query.revisionId,
-  });
+  // revisionId is dropped on share-link access (see design.md, list route).
+  const toListInput = (req: Req): ListCommentsInput =>
+    req.isSharedPage === true
+      ? { pageId: req.query.pageId }
+      : { pageId: req.query.pageId, revisionId: req.query.revisionId };
 
   return [
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),

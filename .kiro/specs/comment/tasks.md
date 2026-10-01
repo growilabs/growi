@@ -62,7 +62,7 @@
   - _Depends: 2.1_
   - _Boundary: list route_
 
-- [ ] 2.3 コメント一覧のルートを共有リンク経由で使えるようにする
+- [x] 2.3 コメント一覧のルートを共有リンク経由で使えるようにする
   - 共有リンクが有効でページが一致するときは、ページの閲覧権限の確認を省き、通常コメントとインラインコメントの両方を読み取り専用で返す
   - 共有リンク経由のときは、指定された版を取得サービスに渡さない(別ページの版を指定して読まれるのを防ぐ)
   - 共有リンクの ID とページが一致しないときは、共有リンクとして認められず、通常のアクセスとして判定される(未ログインでゲスト閲覧が許可されていなければ、コメントを返さない)
@@ -206,3 +206,4 @@
 
 - 1.1: `ICommentCreator`(整形後の投稿者の型)には実行時にある `_id` / `__v` が無く、`name` が null を許す。`Ref<IUser>`(`_id` 必須)や `IInlineComment.creator` にはそのまま代入できないため、4.3 / 4.4 / 4.5 で投稿者の型も合わせて広げる。`_id` を `as` なしで載せるには `CommentListRow` を拡張済み prisma クライアントの結果型から作る方法がある。
 - 1.1: 投稿者の安全化は `serializeUserSecurely` を使わず `toCreator` で自前実装(Prisma の行は `IUser` に合わない)。`isEmailPublished` が真なら `email`(null 含む)を残す、旧 API と同じ挙動。
+- 2.3: `certifySharedPage` は `shareLinkId` を `req.query || req.body` から読む(route の検証は query のみ)。照会は `relatedPageId` に検証済みの query の `pageId` を結び付けるため悪用はできない。2.4 で登録するときは `router.get` のみ(3.8 の読み取り専用)にする。

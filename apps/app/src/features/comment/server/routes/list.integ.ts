@@ -44,6 +44,15 @@ describe('GET /_api/v3/comments', () => {
   let regularCommentId: string;
   let inlineCommentId: string;
 
+  // A GRANT_OWNER page reachable only through its share link, with two
+  // revisions so a revision-scoped request returns a strict subset.
+  let sharedPageId: string;
+  let sharedOldRevisionId: string;
+  let sharedOldRegularCommentId: string;
+  let sharedNewInlineCommentId: string;
+  let shareLinkId: string;
+  let expiredShareLinkId: string;
+
   let pageReadToken: string;
   let wrongScopeToken: string;
 
@@ -59,7 +68,7 @@ describe('GET /_api/v3/comments', () => {
     const ownerName = `comment-list-route-owner-${WORKER_ID}`;
     await User.deleteMany({ username: { $in: [viewerName, ownerName] } });
     await Page.deleteMany({
-      path: { $in: [`${BASE}/public`, `${BASE}/private`] },
+      path: { $in: [`${BASE}/public`, `${BASE}/private`, `${BASE}/shared`] },
     });
 
     viewer = await User.create({
@@ -145,6 +154,75 @@ describe('GET /_api/v3/comments', () => {
       },
     });
 
+    const sharedPage = await Page.create({
+      path: `${BASE}/shared`,
+      grant: PageGrant.GRANT_OWNER,
+      grantedUsers: [owner._id],
+      creator: owner._id,
+      lastUpdateUser: owner._id,
+      isEmpty: true,
+    });
+    sharedPageId = String(sharedPage._id);
+    // Explicit timestamps: old revision < old comment < new revision < new comment.
+    const sharedOldRevision = await prisma.revisions.create({
+      data: {
+        pageId: sharedPageId,
+        body: 'shared old body',
+        format: 'markdown',
+        authorId: String(owner._id),
+        createdAt: new Date('2020-01-01T00:00:00Z'),
+      },
+    });
+    await prisma.revisions.create({
+      data: {
+        pageId: sharedPageId,
+        body: 'shared new body',
+        format: 'markdown',
+        authorId: String(owner._id),
+        createdAt: new Date('2020-01-03T00:00:00Z'),
+      },
+    });
+    sharedOldRevisionId = sharedOldRevision.id;
+    sharedOldRegularCommentId = (
+      await prisma.comments.create({
+        data: {
+          pageId: sharedPageId,
+          creatorId: String(owner._id),
+          revisionId: sharedOldRevisionId,
+          comment: 'shared old regular comment',
+          isInline: false,
+          createdAt: new Date('2020-01-02T00:00:00Z'),
+        },
+      })
+    ).id;
+    sharedNewInlineCommentId = (
+      await prisma.comments.create({
+        data: {
+          pageId: sharedPageId,
+          creatorId: String(owner._id),
+          comment: 'shared new inline comment',
+          isInline: true,
+          quote: 'shared quote',
+          prefix: '',
+          suffix: '',
+          approxOffset: 0,
+          anchorOriginRevisionId: sharedOldRevisionId,
+          createdAt: new Date('2020-01-04T00:00:00Z'),
+        },
+      })
+    ).id;
+    shareLinkId = (
+      await prisma.sharelinks.create({ data: { relatedPageId: sharedPageId } })
+    ).id;
+    expiredShareLinkId = (
+      await prisma.sharelinks.create({
+        data: {
+          relatedPageId: sharedPageId,
+          expiredAt: new Date(Date.now() - 1000 * 60 * 60 * 24),
+        },
+      })
+    ).id;
+
     const oneDayLater = new Date(Date.now() + 1000 * 60 * 60 * 24);
     pageReadToken = (
       await AccessToken.generateToken(viewer._id, oneDayLater, [
@@ -177,13 +255,13 @@ describe('GET /_api/v3/comments', () => {
   }, 120_000);
 
   afterAll(async () => {
-    await prisma.comments.deleteMany({
-      where: { pageId: { in: [publicPageId, forbiddenPageId] } },
+    const pageIds = [publicPageId, forbiddenPageId, sharedPageId];
+    await prisma.comments.deleteMany({ where: { pageId: { in: pageIds } } });
+    await prisma.revisions.deleteMany({ where: { pageId: { in: pageIds } } });
+    await prisma.sharelinks.deleteMany({
+      where: { relatedPageId: { in: pageIds } },
     });
-    await prisma.revisions.deleteMany({
-      where: { pageId: { in: [publicPageId, forbiddenPageId] } },
-    });
-    await Page.deleteMany({ _id: { $in: [publicPageId, forbiddenPageId] } });
+    await Page.deleteMany({ _id: { $in: pageIds } });
     await AccessToken.deleteAllTokensByUserId(viewer._id);
     await User.deleteMany({ _id: { $in: [viewer._id, owner._id] } });
   }, 30_000);
@@ -310,6 +388,131 @@ describe('GET /_api/v3/comments', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.comments).toHaveLength(2);
+    });
+  });
+
+  describe('share-link access (Requirement 3.3, 3.4, 2.5)', () => {
+    const commentIds = (res: request.Response): string[] => {
+      const comments: ICommentListItem[] = res.body.comments;
+      return comments.map((c) => c.id).sort();
+    };
+
+    it('returns both regular and inline comments of the shared page to a guest, even when guest read is disallowed', async () => {
+      vi.spyOn(crowi.aclService, 'isGuestAllowedToRead').mockReturnValue(false);
+
+      const res = await getComments({ pageId: sharedPageId, shareLinkId });
+
+      expect(res.status).toBe(200);
+      expect(commentIds(res)).toEqual(
+        [sharedOldRegularCommentId, sharedNewInlineCommentId].sort(),
+      );
+      const comments: ICommentListItem[] = res.body.comments;
+      expect(
+        comments.find((c) => c.id === sharedNewInlineCommentId),
+      ).toMatchObject({ isInline: true, quote: 'shared quote' });
+    });
+
+    it('scopes to the old revision for a non-shared viewer (control for the revision-ignored cases)', async () => {
+      currentUser = owner;
+
+      const res = await getComments({
+        pageId: sharedPageId,
+        revisionId: sharedOldRevisionId,
+      });
+
+      expect(res.status).toBe(200);
+      expect(commentIds(res)).toEqual([sharedOldRegularCommentId]);
+    });
+
+    it.each([
+      ['an old revision of the page', () => sharedOldRevisionId],
+      ['a nonexistent revision', () => String(new Types.ObjectId())],
+      ['a revision of a private page', () => forbiddenRevisionId],
+      ['a revision of another page', () => publicRevisionId],
+    ])('ignores revisionId set to %s and returns the whole page', async (_label, revisionIdOf) => {
+      vi.spyOn(crowi.aclService, 'isGuestAllowedToRead').mockReturnValue(false);
+      const latest = await getComments({ pageId: sharedPageId, shareLinkId });
+
+      const res = await getComments({
+        pageId: sharedPageId,
+        shareLinkId,
+        revisionId: revisionIdOf(),
+      });
+
+      expect(res.status).toBe(200);
+      expect(commentIds(res)).toEqual(commentIds(latest));
+      expect(commentIds(res)).toHaveLength(2);
+      expect(JSON.stringify(res.body)).not.toContain(
+        'PRIVATE-COMMENT-MUST-NOT-LEAK',
+      );
+    });
+
+    describe('a share link that is not honored falls back to normal access (Requirement 3.4)', () => {
+      it('returns 403 to a guest using the share link of another page when guest read is disallowed', async () => {
+        vi.spyOn(crowi.aclService, 'isGuestAllowedToRead').mockReturnValue(
+          false,
+        );
+
+        const res = await getComments({ pageId: forbiddenPageId, shareLinkId });
+
+        expect(res.status).toBe(403);
+        expect(res.body.comments).toBeUndefined();
+      });
+
+      it.each([
+        ['a guest (guest read allowed)', false],
+        ['a logged-in viewer', true],
+      ])('returns 404 to %s using the share link of another page', async (_label, loggedIn) => {
+        vi.spyOn(crowi.aclService, 'isGuestAllowedToRead').mockReturnValue(
+          true,
+        );
+        currentUser = loggedIn ? viewer : undefined;
+
+        const res = await getComments({ pageId: forbiddenPageId, shareLinkId });
+
+        expect(res.status).toBe(404);
+        expect(JSON.stringify(res.body)).not.toContain(
+          'PRIVATE-COMMENT-MUST-NOT-LEAK',
+        );
+      });
+
+      it('does not honor a share link certified through page_id while pageId names another page', async () => {
+        currentUser = viewer;
+
+        const res = await getComments({
+          pageId: forbiddenPageId,
+          page_id: sharedPageId,
+          shareLinkId,
+        });
+
+        expect(res.status).toBe(404);
+        expect(JSON.stringify(res.body)).not.toContain(
+          'PRIVATE-COMMENT-MUST-NOT-LEAK',
+        );
+      });
+
+      it.each([
+        ['an expired share link', () => expiredShareLinkId],
+        ['a nonexistent share link', () => String(new Types.ObjectId())],
+      ])('treats %s as not shared', async (_label, shareLinkIdOf) => {
+        const query = { pageId: sharedPageId, shareLinkId: shareLinkIdOf() };
+        const isGuestAllowedToRead = vi.spyOn(
+          crowi.aclService,
+          'isGuestAllowedToRead',
+        );
+
+        isGuestAllowedToRead.mockReturnValue(false);
+        const withoutGuestRead = await getComments(query);
+        isGuestAllowedToRead.mockReturnValue(true);
+        const withGuestRead = await getComments(query);
+
+        expect(withoutGuestRead.status).toBe(403);
+        expect(withGuestRead.status).toBe(404);
+        for (const res of [withoutGuestRead, withGuestRead]) {
+          expect(res.body.comments).toBeUndefined();
+          expect(JSON.stringify(res.body)).not.toContain('shared old regular');
+        }
+      });
     });
   });
 
