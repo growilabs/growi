@@ -79,6 +79,8 @@ type InlineCommentUpdateResult = Prisma.Result<
 export interface InlineCommentServiceDeps {
   prisma: Pick<PrismaClient, 'comments' | 'activities'>;
   commentService: Pick<CommentService, 'prepareMentionNotifications'>;
+  /** Recomputes `Page.commentCount`; failures must never undo the comment write. */
+  updateCommentCount: (pageId: string) => Promise<void>;
 }
 
 type InlineCommentReplyUpdateResult = Prisma.Result<
@@ -301,6 +303,15 @@ export class InlineCommentService {
     this.deps = deps;
   }
 
+  // Best-effort: a count refresh failure must not undo the comment write.
+  private async refreshCommentCount(pageId: string): Promise<void> {
+    try {
+      await this.deps.updateCommentCount(pageId);
+    } catch (err) {
+      logger.error(`Failed to update comment count of page '${pageId}'`, err);
+    }
+  }
+
   /**
    * Creates an origin (anchored) inline comment. `anchor.quote`/`prefix`/
    * `suffix` are persisted exactly as given, with no normalization.
@@ -367,6 +378,8 @@ export class InlineCommentService {
       logger.error('Mention notification failed for inline comment', err);
     }
 
+    await this.refreshCommentCount(input.pageId);
+
     return toIInlineComment(created);
   }
 
@@ -426,6 +439,8 @@ export class InlineCommentService {
     } catch (err) {
       logger.error('Mention notification failed for inline comment reply', err);
     }
+
+    await this.refreshCommentCount(parent.pageId);
 
     return toInlineCommentReply(created);
   }
@@ -643,6 +658,8 @@ export class InlineCommentService {
       event: target.id,
       eventModel: SupportedEventModel.MODEL_COMMENT,
     });
+
+    await this.refreshCommentCount(target.pageId);
   }
 
   /** Deletes a single reply — no cascade needed, unlike `deleteComment()`. */
@@ -675,5 +692,7 @@ export class InlineCommentService {
       event: target.id,
       eventModel: SupportedEventModel.MODEL_COMMENT,
     });
+
+    await this.refreshCommentCount(target.pageId);
   }
 }

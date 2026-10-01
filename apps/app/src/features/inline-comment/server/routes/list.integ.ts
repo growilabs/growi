@@ -20,6 +20,7 @@ import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 import { prisma } from '~/utils/prisma';
 
 import { InlineCommentService } from '../service/inline-comment-service';
+import { updatePageCommentCount } from '../update-page-comment-count';
 import { listInlineCommentsRouteHandlersFactory } from './list';
 
 type AuthenticatedRequest = Request & {
@@ -105,6 +106,7 @@ describe('GET /_api/v3/inline-comments', () => {
     const inlineCommentService = new InlineCommentService({
       prisma,
       commentService: crowi.commentService,
+      updateCommentCount: updatePageCommentCount,
     });
     const originA = await inlineCommentService.create(
       {

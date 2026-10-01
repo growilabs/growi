@@ -239,6 +239,11 @@ describe('DELETE /_api/v3/inline-comments/replies/:id', () => {
   it('deletes only the target reply, leaving the origin and sibling reply intact (200)', async () => {
     const { originId, targetReplyId, siblingReplyId } =
       await createOriginWithReplies();
+    // A stale stored value, so only the post-write refresh can make it match.
+    await crowi.models.Page.updateOne(
+      { _id: publicPage._id },
+      { commentCount: 999 },
+    );
 
     const res = await request(app).delete(
       `/_api/v3/inline-comments/replies/${targetReplyId}`,
@@ -262,5 +267,13 @@ describe('DELETE /_api/v3/inline-comments/replies/:id', () => {
     expect(targetReplyRow).toBeNull();
     expect(originRow).not.toBeNull();
     expect(siblingReplyRow).not.toBeNull();
+
+    const total = await prisma.comments.count({
+      where: { pageId: String(publicPage._id) },
+    });
+    const stored = await crowi.models.Page.findById(publicPage._id).select(
+      'commentCount',
+    );
+    expect(stored?.commentCount).toBe(total);
   });
 });

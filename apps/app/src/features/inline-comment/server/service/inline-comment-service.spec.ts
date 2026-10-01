@@ -171,7 +171,11 @@ function makeDeps(
       notify: vi.fn().mockResolvedValue(undefined),
     }),
   });
-  return { prisma, commentService };
+  return {
+    prisma,
+    commentService,
+    updateCommentCount: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 /**
@@ -198,7 +202,11 @@ function makeReplyDeps(
       notify: vi.fn().mockResolvedValue(undefined),
     }),
   });
-  return { prisma, commentService };
+  return {
+    prisma,
+    commentService,
+    updateCommentCount: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 /**
@@ -220,7 +228,11 @@ function makeSetResolvedDeps(
     },
   });
   const commentService = mock<PickedCommentService>({});
-  return { prisma, commentService };
+  return {
+    prisma,
+    commentService,
+    updateCommentCount: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 /**
@@ -244,7 +256,11 @@ function makeUpdateDeps(
     },
   });
   const commentService = mock<PickedCommentService>({});
-  return { prisma, commentService };
+  return {
+    prisma,
+    commentService,
+    updateCommentCount: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 /**
@@ -265,7 +281,11 @@ function makeDeleteCommentDeps(
     },
   });
   const commentService = mock<PickedCommentService>({});
-  return { prisma, commentService };
+  return {
+    prisma,
+    commentService,
+    updateCommentCount: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 /**
@@ -286,7 +306,11 @@ function makeDeleteReplyDeps(
     },
   });
   const commentService = mock<PickedCommentService>({});
-  return { prisma, commentService };
+  return {
+    prisma,
+    commentService,
+    updateCommentCount: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 /**
@@ -311,7 +335,11 @@ function makeListDeps(
     },
   });
   const commentService = mock<PickedCommentService>({});
-  return { prisma, commentService };
+  return {
+    prisma,
+    commentService,
+    updateCommentCount: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -555,7 +583,11 @@ describe('InlineCommentService.createReply', () => {
         const commentService = mock<PickedCommentService>({
           prepareMentionNotifications: vi.fn(),
         });
-        const service = new InlineCommentService({ prisma, commentService });
+        const service = new InlineCommentService({
+          prisma,
+          commentService,
+          updateCommentCount: vi.fn().mockResolvedValue(undefined),
+        });
 
         await expect(
           service.createReply({ parentId: makeId(), comment: 'x' }, makeId()),
@@ -994,7 +1026,11 @@ describe('InlineCommentService.setResolved', () => {
       },
     });
     const commentService = mock<PickedCommentService>({});
-    const service = new InlineCommentService({ prisma, commentService });
+    const service = new InlineCommentService({
+      prisma,
+      commentService,
+      updateCommentCount: vi.fn().mockResolvedValue(undefined),
+    });
 
     const resolvedResult = await service.setResolved(id, true, actorId);
     expect(resolvedResult.resolvedById).toBe(actorId);
@@ -1301,5 +1337,138 @@ describe('InlineCommentService.deleteReply', () => {
       SupportedAction.ACTION_INLINE_COMMENT_REPLY_DELETE,
     );
     expect(activityParams.user).toBe(creatorId);
+  });
+});
+
+describe('InlineCommentService page comment count refresh', () => {
+  const originInput = (pageId: string) => ({
+    pageId,
+    anchorOriginRevisionId: makeId(),
+    comment: 'c',
+    anchor: { quote: 'q', prefix: '', suffix: '', approxOffset: 0 },
+  });
+
+  const rejectCount = (deps: InlineCommentServiceDeps) => {
+    vi.mocked(deps.updateCommentCount).mockRejectedValue(new Error('db down'));
+  };
+
+  it('create は成功後に、そのページの件数更新を完了まで待って呼ぶ', async () => {
+    const pageId = makeId();
+    const deps = makeDeps(makeCreatedRow({ pageId }));
+    let settled = false;
+    vi.mocked(deps.updateCommentCount).mockImplementation(async () => {
+      await Promise.resolve();
+      settled = true;
+    });
+
+    await new InlineCommentService(deps).create(originInput(pageId), makeId());
+
+    expect(deps.updateCommentCount).toHaveBeenCalledWith(pageId);
+    expect(settled).toBe(true);
+  });
+
+  it('create の入力検証で失敗したときは件数更新を呼ばない', async () => {
+    const deps = makeDeps(makeCreatedRow());
+    await expect(
+      new InlineCommentService(deps).create(
+        {
+          ...originInput(makeId()),
+          anchor: { quote: '', prefix: '', suffix: '', approxOffset: 0 },
+        },
+        makeId(),
+      ),
+    ).rejects.toThrow();
+    expect(deps.updateCommentCount).not.toHaveBeenCalled();
+  });
+
+  it('件数更新が失敗しても create は作成結果を返す', async () => {
+    const createdRow = makeCreatedRow();
+    const deps = makeDeps(createdRow);
+    rejectCount(deps);
+
+    const result = await new InlineCommentService(deps).create(
+      originInput(createdRow.pageId),
+      makeId(),
+    );
+
+    expect(result.id).toBe(createdRow.id);
+  });
+
+  it('createReply は親のページの件数更新を呼び、失敗しても返信を返す', async () => {
+    const parentRow = makeParentRow();
+    const replyRow = makeReplyRow({ pageId: parentRow.pageId });
+    const deps = makeReplyDeps(parentRow, replyRow);
+    rejectCount(deps);
+
+    const result = await new InlineCommentService(deps).createReply(
+      { parentId: parentRow.id, comment: 'r' },
+      makeId(),
+    );
+
+    expect(deps.updateCommentCount).toHaveBeenCalledWith(parentRow.pageId);
+    expect(result.id).toBe(replyRow.id);
+  });
+
+  it('deleteComment は削除後に件数更新を呼び、失敗しても削除は成功する', async () => {
+    const creatorId = makeId();
+    const targetRow = makeOriginRow({ creatorId });
+    const deps = makeDeleteCommentDeps(targetRow);
+    rejectCount(deps);
+
+    await expect(
+      new InlineCommentService(deps).deleteComment(targetRow.id, creatorId),
+    ).resolves.toBeUndefined();
+
+    expect(deps.updateCommentCount).toHaveBeenCalledWith(targetRow.pageId);
+  });
+
+  it('deleteReply は削除後に件数更新を呼び、失敗しても削除は成功する', async () => {
+    const creatorId = makeId();
+    const targetRow = makeReplyRow({ creatorId });
+    const deps = makeDeleteReplyDeps(targetRow);
+    rejectCount(deps);
+
+    await expect(
+      new InlineCommentService(deps).deleteReply(targetRow.id, creatorId),
+    ).resolves.toBeUndefined();
+
+    expect(deps.updateCommentCount).toHaveBeenCalledWith(targetRow.pageId);
+  });
+
+  it('削除の前提条件に失敗したときは件数更新を呼ばない', async () => {
+    const deps = makeDeleteCommentDeps(null);
+    await expect(
+      new InlineCommentService(deps).deleteComment(makeId(), makeId()),
+    ).rejects.toThrow();
+    expect(deps.updateCommentCount).not.toHaveBeenCalled();
+  });
+
+  it('解決の切り替えと編集では件数更新を呼ばない', async () => {
+    const creatorId = makeId();
+    const origin = makeOriginRow({ creatorId });
+    const reply = makeReplyRow({ creatorId });
+
+    const resolveDeps = makeSetResolvedDeps(origin, origin);
+    await new InlineCommentService(resolveDeps).setResolved(
+      origin.id,
+      true,
+      creatorId,
+    );
+    const updateDeps = makeUpdateDeps(origin, origin);
+    await new InlineCommentService(updateDeps).updateComment(
+      origin.id,
+      'edited',
+      creatorId,
+    );
+    const replyDeps = makeUpdateDeps(reply, reply);
+    await new InlineCommentService(replyDeps).updateReply(
+      reply.id,
+      'edited',
+      creatorId,
+    );
+
+    expect(resolveDeps.updateCommentCount).not.toHaveBeenCalled();
+    expect(updateDeps.updateCommentCount).not.toHaveBeenCalled();
+    expect(replyDeps.updateCommentCount).not.toHaveBeenCalled();
   });
 });
