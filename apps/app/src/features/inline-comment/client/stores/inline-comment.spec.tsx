@@ -4,21 +4,13 @@ import type { PropsWithChildren } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { SWRConfig } from 'swr';
 
+import type { ICommentListItem } from '~/features/comment/interfaces';
+
 import type { InlineCommentWithReplies } from '../../interfaces';
-import type {
-  CreateInlineCommentReplyResponseBody,
-  CreateInlineCommentResponseBody,
-  ListInlineCommentsResponseBody,
-  ResolveInlineCommentResponseBody,
-  UpdateInlineCommentReplyResponseBody,
-  UpdateInlineCommentResponseBody,
-} from '../../interfaces/dto';
 import { useSWRxInlineComments } from './inline-comment';
 
-// Mock the API boundary — the contract under test is "list/create/createReply/
-// resolve/update/updateReply/remove/removeReply talk to
-// apiv3Get/apiv3Post/apiv3Put/apiv3Delete and a write causes the list to be
-// refetched", not any SWR internals.
+// The API boundary is the observable contract: which endpoints are read and
+// written, and that a write is followed by the right refetches.
 const apiv3Get = vi.fn();
 const apiv3Post = vi.fn();
 const apiv3Put = vi.fn();
@@ -37,7 +29,68 @@ const wrapper = ({ children }: PropsWithChildren): JSX.Element => (
   </SWRConfig>
 );
 
-const originComment = (
+const createdAt = new Date('2026-01-01T00:00:00.000Z');
+
+const listItem = (
+  overrides: Partial<ICommentListItem> = {},
+): ICommentListItem => ({
+  _id: 'comment1',
+  id: 'comment1',
+  page: 'page1',
+  pageId: 'page1',
+  creator: null,
+  creatorId: 'user1',
+  revision: null,
+  revisionId: null,
+  replyTo: null,
+  replyToId: null,
+  comment: 'first comment',
+  commentPosition: -1,
+  createdAt,
+  updatedAt: createdAt,
+  isInline: true,
+  quote: 'quoted text',
+  prefix: '',
+  suffix: '',
+  approxOffset: 0,
+  anchorOriginRevisionId: 'revision1',
+  resolvedById: null,
+  resolvedAt: null,
+  ...overrides,
+});
+
+const replyItem = (
+  overrides: Partial<ICommentListItem> = {},
+): ICommentListItem =>
+  listItem({
+    _id: 'reply1',
+    id: 'reply1',
+    creatorId: 'user2',
+    comment: 'a reply',
+    replyTo: 'comment1',
+    replyToId: 'comment1',
+    quote: null,
+    prefix: null,
+    suffix: null,
+    approxOffset: null,
+    anchorOriginRevisionId: null,
+    ...overrides,
+  });
+
+const ordinaryItem = (): ICommentListItem =>
+  listItem({
+    _id: 'ordinary1',
+    id: 'ordinary1',
+    comment: 'an ordinary comment',
+    isInline: false,
+    quote: null,
+    prefix: null,
+    suffix: null,
+    approxOffset: null,
+    anchorOriginRevisionId: null,
+  });
+
+const expectedOrigin = (
   overrides: Partial<InlineCommentWithReplies> = {},
 ): InlineCommentWithReplies => ({
   id: 'comment1',
@@ -49,39 +102,94 @@ const originComment = (
   anchor: { quote: 'quoted text', prefix: '', suffix: '', approxOffset: 0 },
   resolvedById: null,
   resolvedAt: null,
-  createdAt: new Date('2026-01-01T00:00:00.000Z'),
-  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  createdAt,
+  updatedAt: createdAt,
   replies: [],
   ...overrides,
 });
+
+/**
+ * Serves the shared comment list from a queue (the last entry repeats) and an
+ * empty page info, so a test can observe which endpoints were refetched.
+ */
+const serveCommentLists = (...lists: ICommentListItem[][]): void => {
+  const queue = [...lists];
+  apiv3Get.mockImplementation((endpoint: string) => {
+    if (endpoint === '/comments') {
+      const comments = queue.length > 1 ? queue.shift() : queue[0];
+      return Promise.resolve({ data: { comments } });
+    }
+    return Promise.resolve({ data: {} });
+  });
+};
+
+const callsTo = (endpoint: string): unknown[][] =>
+  apiv3Get.mock.calls.filter(([calledEndpoint]) => calledEndpoint === endpoint);
 
 beforeEach(() => {
   apiv3Get.mockReset();
   apiv3Post.mockReset();
   apiv3Put.mockReset();
   apiv3Delete.mockReset();
+  apiv3Post.mockResolvedValue({
+    data: { inlineComment: {}, inlineCommentReply: {} },
+  });
+  apiv3Put.mockResolvedValue({
+    data: { inlineComment: {}, inlineCommentReply: {} },
+  });
+  apiv3Delete.mockResolvedValue({ data: {} });
 });
 
 describe('useSWRxInlineComments', () => {
-  it('fetches the page-scoped list via apiv3Get, keyed by pageId', async () => {
-    const list = [originComment()];
-    apiv3Get.mockResolvedValue({
-      data: { inlineComments: list } satisfies ListInlineCommentsResponseBody,
-    });
+  it('reads the shared comment list and returns only inline comments, grouped as origins with replies', async () => {
+    serveCommentLists([ordinaryItem(), listItem(), replyItem()]);
 
     const { result } = renderHook(() => useSWRxInlineComments('page1'), {
       wrapper,
     });
 
     await waitFor(() => {
-      expect(result.current.data).toEqual(list);
+      expect(result.current.data).toEqual([
+        expectedOrigin({
+          replies: [
+            {
+              id: 'reply1',
+              pageId: 'page1',
+              creatorId: 'user2',
+              creator: null,
+              comment: 'a reply',
+              replyToId: 'comment1',
+              createdAt,
+              updatedAt: createdAt,
+            },
+          ],
+        }),
+      ]);
     });
-    expect(apiv3Get).toHaveBeenCalledWith('/inline-comments', {
-      pageId: 'page1',
-    });
+    expect(apiv3Get).toHaveBeenCalledWith('/comments', { pageId: 'page1' });
+    expect(apiv3Get).not.toHaveBeenCalledWith(
+      '/inline-comments',
+      expect.anything(),
+    );
   });
 
-  it('does not fetch when pageId is null', async () => {
+  it('keeps the same data reference across re-renders while the shared list is unchanged', async () => {
+    serveCommentLists([listItem()]);
+
+    const { result, rerender } = renderHook(
+      () => useSWRxInlineComments('page1'),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.data).toHaveLength(1));
+
+    const first = result.current.data;
+    rerender();
+    expect(result.current.data).toBe(first);
+  });
+
+  it('does not fetch anything when pageId is null (the share-link view passes null)', async () => {
+    serveCommentLists([listItem()]);
+
     const { result } = renderHook(() => useSWRxInlineComments(null), {
       wrapper,
     });
@@ -96,15 +204,19 @@ describe('useSWRxInlineComments', () => {
   });
 
   it('keys the list by pageId, so switching pages fetches and returns a different list', async () => {
-    const listForPage1 = [originComment({ id: 'comment1', pageId: 'page1' })];
-    const listForPage2 = [originComment({ id: 'comment2', pageId: 'page2' })];
     apiv3Get.mockImplementation(
       (_endpoint: string, params: { pageId: string }) =>
         Promise.resolve({
           data: {
-            inlineComments:
-              params.pageId === 'page1' ? listForPage1 : listForPage2,
-          } satisfies ListInlineCommentsResponseBody,
+            comments: [
+              listItem({
+                _id: `comment-${params.pageId}`,
+                id: `comment-${params.pageId}`,
+                page: params.pageId,
+                pageId: params.pageId,
+              }),
+            ],
+          },
         }),
     );
 
@@ -112,307 +224,184 @@ describe('useSWRxInlineComments', () => {
       ({ pageId }: { pageId: string }) => useSWRxInlineComments(pageId),
       { wrapper, initialProps: { pageId: 'page1' } },
     );
-    await waitFor(() => expect(result.current.data).toEqual(listForPage1));
+    await waitFor(() =>
+      expect(result.current.data?.[0]?.id).toBe('comment-page1'),
+    );
 
     rerender({ pageId: 'page2' });
-    await waitFor(() => expect(result.current.data).toEqual(listForPage2));
-
-    expect(apiv3Get).toHaveBeenCalledWith('/inline-comments', {
-      pageId: 'page1',
-    });
-    expect(apiv3Get).toHaveBeenCalledWith('/inline-comments', {
-      pageId: 'page2',
-    });
-  });
-
-  it('revalidates the list after create() succeeds', async () => {
-    const firstList = [originComment()];
-    const secondList = [originComment(), originComment({ id: 'comment2' })];
-    apiv3Get
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: firstList,
-        } satisfies ListInlineCommentsResponseBody,
-      })
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: secondList,
-        } satisfies ListInlineCommentsResponseBody,
-      });
-    apiv3Post.mockResolvedValue({
-      data: {
-        inlineComment: originComment({ id: 'comment2' }),
-      } satisfies CreateInlineCommentResponseBody,
-    });
-
-    const { result } = renderHook(() => useSWRxInlineComments('page1'), {
-      wrapper,
-    });
-    await waitFor(() => expect(result.current.data).toEqual(firstList));
-
-    await act(async () => {
-      await result.current.create({
-        pageId: 'page1',
-        anchorOriginRevisionId: 'revision1',
-        comment: 'second comment',
-        anchor: { quote: 'q', prefix: '', suffix: '', approxOffset: 0 },
-      });
-    });
-
-    expect(apiv3Post).toHaveBeenCalledWith(
-      '/inline-comments',
-      expect.objectContaining({ pageId: 'page1', comment: 'second comment' }),
+    await waitFor(() =>
+      expect(result.current.data?.[0]?.id).toBe('comment-page2'),
     );
-    // The defining behavior under test: a write is followed by a refetch of
-    // the SAME list — not merely that the POST succeeded.
-    expect(apiv3Get).toHaveBeenCalledTimes(2);
-    await waitFor(() => expect(result.current.data).toEqual(secondList));
   });
 
-  it('revalidates the list after createReply() succeeds', async () => {
-    const firstList = [originComment()];
-    const secondList = [
-      originComment({
-        replies: [
-          {
-            id: 'reply1',
-            pageId: 'page1',
-            creatorId: 'user2',
-            creator: null,
-            comment: 'a reply',
-            replyToId: 'comment1',
-            createdAt: new Date('2026-01-02T00:00:00.000Z'),
-            updatedAt: new Date('2026-01-02T00:00:00.000Z'),
-          },
-        ],
-      }),
-    ];
-    apiv3Get
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: firstList,
-        } satisfies ListInlineCommentsResponseBody,
-      })
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: secondList,
-        } satisfies ListInlineCommentsResponseBody,
+  describe('writes that change the comment count refetch the shared list and the page info', () => {
+    it('create()', async () => {
+      serveCommentLists([], [listItem()]);
+      const { result } = renderHook(() => useSWRxInlineComments('page1'), {
+        wrapper,
       });
-    apiv3Post.mockResolvedValue({
-      data: {
-        inlineCommentReply: secondList[0].replies[0],
-      } satisfies CreateInlineCommentReplyResponseBody,
+      await waitFor(() => expect(result.current.data).toEqual([]));
+
+      await act(async () => {
+        await result.current.create({
+          pageId: 'page1',
+          anchorOriginRevisionId: 'revision1',
+          comment: 'first comment',
+          anchor: { quote: 'q', prefix: '', suffix: '', approxOffset: 0 },
+        });
+      });
+
+      expect(apiv3Post).toHaveBeenCalledWith(
+        '/inline-comments',
+        expect.objectContaining({ pageId: 'page1', comment: 'first comment' }),
+      );
+      expect(callsTo('/comments')).toHaveLength(2);
+      expect(apiv3Get).toHaveBeenCalledWith('/page/info', { pageId: 'page1' });
+      await waitFor(() =>
+        expect(result.current.data).toEqual([expectedOrigin()]),
+      );
     });
 
-    const { result } = renderHook(() => useSWRxInlineComments('page1'), {
-      wrapper,
-    });
-    await waitFor(() => expect(result.current.data).toEqual(firstList));
+    it('createReply()', async () => {
+      serveCommentLists([listItem()], [listItem(), replyItem()]);
+      const { result } = renderHook(() => useSWRxInlineComments('page1'), {
+        wrapper,
+      });
+      await waitFor(() => expect(result.current.data).toHaveLength(1));
 
-    await act(async () => {
-      await result.current.createReply('comment1', { comment: 'a reply' });
+      await act(async () => {
+        await result.current.createReply('comment1', { comment: 'a reply' });
+      });
+
+      expect(apiv3Post).toHaveBeenCalledWith(
+        '/inline-comments/comment1/replies',
+        { comment: 'a reply' },
+      );
+      expect(callsTo('/comments')).toHaveLength(2);
+      expect(apiv3Get).toHaveBeenCalledWith('/page/info', { pageId: 'page1' });
+      await waitFor(() =>
+        expect(result.current.data?.[0]?.replies).toHaveLength(1),
+      );
     });
 
-    expect(apiv3Post).toHaveBeenCalledWith(
-      '/inline-comments/comment1/replies',
-      {
-        comment: 'a reply',
-      },
-    );
-    expect(apiv3Get).toHaveBeenCalledTimes(2);
-    await waitFor(() => expect(result.current.data).toEqual(secondList));
+    it('remove()', async () => {
+      serveCommentLists([listItem()], []);
+      const { result } = renderHook(() => useSWRxInlineComments('page1'), {
+        wrapper,
+      });
+      await waitFor(() => expect(result.current.data).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.remove('comment1');
+      });
+
+      expect(apiv3Delete).toHaveBeenCalledWith('/inline-comments/comment1');
+      expect(callsTo('/comments')).toHaveLength(2);
+      expect(apiv3Get).toHaveBeenCalledWith('/page/info', { pageId: 'page1' });
+      await waitFor(() => expect(result.current.data).toEqual([]));
+    });
+
+    it('removeReply()', async () => {
+      serveCommentLists([listItem(), replyItem()], [listItem()]);
+      const { result } = renderHook(() => useSWRxInlineComments('page1'), {
+        wrapper,
+      });
+      await waitFor(() =>
+        expect(result.current.data?.[0]?.replies).toHaveLength(1),
+      );
+
+      await act(async () => {
+        await result.current.removeReply('reply1');
+      });
+
+      expect(apiv3Delete).toHaveBeenCalledWith(
+        '/inline-comments/replies/reply1',
+      );
+      expect(callsTo('/comments')).toHaveLength(2);
+      expect(apiv3Get).toHaveBeenCalledWith('/page/info', { pageId: 'page1' });
+      await waitFor(() =>
+        expect(result.current.data?.[0]?.replies).toEqual([]),
+      );
+    });
   });
 
-  it('revalidates the list after resolve() succeeds', async () => {
-    const firstList = [originComment()];
-    const resolved = originComment({
-      resolvedById: 'user1',
-      resolvedAt: new Date('2026-01-03T00:00:00.000Z'),
-    });
-    const secondList = [resolved];
-    apiv3Get
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: firstList,
-        } satisfies ListInlineCommentsResponseBody,
-      })
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: secondList,
-        } satisfies ListInlineCommentsResponseBody,
+  describe('writes that keep the comment count refetch only the shared list', () => {
+    it('resolve()', async () => {
+      const resolvedAt = new Date('2026-01-03T00:00:00.000Z');
+      serveCommentLists(
+        [listItem()],
+        [listItem({ resolvedById: 'user1', resolvedAt })],
+      );
+      const { result } = renderHook(() => useSWRxInlineComments('page1'), {
+        wrapper,
       });
-    apiv3Put.mockResolvedValue({
-      data: {
-        inlineComment: resolved,
-      } satisfies ResolveInlineCommentResponseBody,
-    });
+      await waitFor(() => expect(result.current.data).toHaveLength(1));
 
-    const { result } = renderHook(() => useSWRxInlineComments('page1'), {
-      wrapper,
-    });
-    await waitFor(() => expect(result.current.data).toEqual(firstList));
-
-    await act(async () => {
-      await result.current.resolve('comment1', true);
-    });
-
-    expect(apiv3Put).toHaveBeenCalledWith('/inline-comments/comment1/resolve', {
-      resolved: true,
-    });
-    expect(apiv3Get).toHaveBeenCalledTimes(2);
-    await waitFor(() => expect(result.current.data).toEqual(secondList));
-  });
-
-  it('revalidates the list after update() succeeds', async () => {
-    const firstList = [originComment()];
-    const updated = originComment({ comment: 'edited comment' });
-    const secondList = [updated];
-    apiv3Get
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: firstList,
-        } satisfies ListInlineCommentsResponseBody,
-      })
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: secondList,
-        } satisfies ListInlineCommentsResponseBody,
+      await act(async () => {
+        await result.current.resolve('comment1', true);
       });
-    apiv3Put.mockResolvedValue({
-      data: {
-        inlineComment: updated,
-      } satisfies UpdateInlineCommentResponseBody,
+
+      expect(apiv3Put).toHaveBeenCalledWith(
+        '/inline-comments/comment1/resolve',
+        { resolved: true },
+      );
+      expect(callsTo('/comments')).toHaveLength(2);
+      expect(callsTo('/page/info')).toHaveLength(0);
+      await waitFor(() =>
+        expect(result.current.data?.[0]?.resolvedAt).toEqual(resolvedAt),
+      );
     });
 
-    const { result } = renderHook(() => useSWRxInlineComments('page1'), {
-      wrapper,
-    });
-    await waitFor(() => expect(result.current.data).toEqual(firstList));
-
-    await act(async () => {
-      await result.current.update('comment1', 'edited comment');
-    });
-
-    expect(apiv3Put).toHaveBeenCalledWith('/inline-comments/comment1', {
-      comment: 'edited comment',
-    });
-    expect(apiv3Get).toHaveBeenCalledTimes(2);
-    await waitFor(() => expect(result.current.data).toEqual(secondList));
-  });
-
-  it('revalidates the list after updateReply() succeeds', async () => {
-    const reply = {
-      id: 'reply1',
-      pageId: 'page1',
-      creatorId: 'user2',
-      creator: null,
-      comment: 'edited reply',
-      replyToId: 'comment1',
-      createdAt: new Date('2026-01-02T00:00:00.000Z'),
-      updatedAt: new Date('2026-01-02T00:00:00.000Z'),
-    };
-    const firstList = [originComment()];
-    const secondList = [originComment({ replies: [reply] })];
-    apiv3Get
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: firstList,
-        } satisfies ListInlineCommentsResponseBody,
-      })
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: secondList,
-        } satisfies ListInlineCommentsResponseBody,
+    it('update()', async () => {
+      serveCommentLists(
+        [listItem()],
+        [listItem({ comment: 'edited comment' })],
+      );
+      const { result } = renderHook(() => useSWRxInlineComments('page1'), {
+        wrapper,
       });
-    apiv3Put.mockResolvedValue({
-      data: {
-        inlineCommentReply: reply,
-      } satisfies UpdateInlineCommentReplyResponseBody,
-    });
+      await waitFor(() => expect(result.current.data).toHaveLength(1));
 
-    const { result } = renderHook(() => useSWRxInlineComments('page1'), {
-      wrapper,
-    });
-    await waitFor(() => expect(result.current.data).toEqual(firstList));
-
-    await act(async () => {
-      await result.current.updateReply('reply1', 'edited reply');
-    });
-
-    expect(apiv3Put).toHaveBeenCalledWith('/inline-comments/replies/reply1', {
-      comment: 'edited reply',
-    });
-    expect(apiv3Get).toHaveBeenCalledTimes(2);
-    await waitFor(() => expect(result.current.data).toEqual(secondList));
-  });
-
-  it('revalidates the list after remove() succeeds', async () => {
-    const firstList = [originComment()];
-    const secondList: InlineCommentWithReplies[] = [];
-    apiv3Get
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: firstList,
-        } satisfies ListInlineCommentsResponseBody,
-      })
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: secondList,
-        } satisfies ListInlineCommentsResponseBody,
+      await act(async () => {
+        await result.current.update('comment1', 'edited comment');
       });
-    apiv3Delete.mockResolvedValue({ data: {} });
 
-    const { result } = renderHook(() => useSWRxInlineComments('page1'), {
-      wrapper,
-    });
-    await waitFor(() => expect(result.current.data).toEqual(firstList));
-
-    await act(async () => {
-      await result.current.remove('comment1');
-    });
-
-    expect(apiv3Delete).toHaveBeenCalledWith('/inline-comments/comment1');
-    expect(apiv3Get).toHaveBeenCalledTimes(2);
-    await waitFor(() => expect(result.current.data).toEqual(secondList));
-  });
-
-  it('revalidates the list after removeReply() succeeds', async () => {
-    const reply = {
-      id: 'reply1',
-      pageId: 'page1',
-      creatorId: 'user2',
-      creator: null,
-      comment: 'a reply',
-      replyToId: 'comment1',
-      createdAt: new Date('2026-01-02T00:00:00.000Z'),
-      updatedAt: new Date('2026-01-02T00:00:00.000Z'),
-    };
-    const firstList = [originComment({ replies: [reply] })];
-    const secondList = [originComment({ replies: [] })];
-    apiv3Get
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: firstList,
-        } satisfies ListInlineCommentsResponseBody,
-      })
-      .mockResolvedValueOnce({
-        data: {
-          inlineComments: secondList,
-        } satisfies ListInlineCommentsResponseBody,
+      expect(apiv3Put).toHaveBeenCalledWith('/inline-comments/comment1', {
+        comment: 'edited comment',
       });
-    apiv3Delete.mockResolvedValue({ data: {} });
-
-    const { result } = renderHook(() => useSWRxInlineComments('page1'), {
-      wrapper,
-    });
-    await waitFor(() => expect(result.current.data).toEqual(firstList));
-
-    await act(async () => {
-      await result.current.removeReply('reply1');
+      expect(callsTo('/comments')).toHaveLength(2);
+      expect(callsTo('/page/info')).toHaveLength(0);
+      await waitFor(() =>
+        expect(result.current.data?.[0]?.comment).toBe('edited comment'),
+      );
     });
 
-    expect(apiv3Delete).toHaveBeenCalledWith('/inline-comments/replies/reply1');
-    expect(apiv3Get).toHaveBeenCalledTimes(2);
-    await waitFor(() => expect(result.current.data).toEqual(secondList));
+    it('updateReply()', async () => {
+      serveCommentLists(
+        [listItem(), replyItem()],
+        [listItem(), replyItem({ comment: 'edited reply' })],
+      );
+      const { result } = renderHook(() => useSWRxInlineComments('page1'), {
+        wrapper,
+      });
+      await waitFor(() =>
+        expect(result.current.data?.[0]?.replies).toHaveLength(1),
+      );
+
+      await act(async () => {
+        await result.current.updateReply('reply1', 'edited reply');
+      });
+
+      expect(apiv3Put).toHaveBeenCalledWith('/inline-comments/replies/reply1', {
+        comment: 'edited reply',
+      });
+      expect(callsTo('/comments')).toHaveLength(2);
+      expect(callsTo('/page/info')).toHaveLength(0);
+      await waitFor(() =>
+        expect(result.current.data?.[0]?.replies[0]?.comment).toBe(
+          'edited reply',
+        ),
+      );
+    });
   });
 });

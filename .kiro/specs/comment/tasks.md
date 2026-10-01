@@ -142,7 +142,7 @@
   - _Depends: 4.1, 4.3_
   - _Boundary: useSWRxPageComment_
 
-- [ ] 4.5 本文のインラインコメントのフックを共有の取得に切り替える
+- [x] 4.5 本文のインラインコメントのフックを共有の取得に切り替える
   - インラインコメントのフックが、共有の一覧を 4.2 の関数に通して、従来と同じ親子の形で返す。戻り値の型は変えない
   - 作成、返信の作成、解決、編集、削除、返信の編集、返信の削除の各関数のあとで、共有の一覧を再取得する
   - 作成、返信の作成、削除、返信の削除のあとは、ページ情報も再取得する(通常コメントの書き込みと同じように、ページ側面の件数を更新するため)
@@ -211,3 +211,4 @@
 - 4.1: `normalizeShareLinkId` は新フック内に非公開で複製してある。4.4 で `useSWRxPageComment` を切り替えるときに、`apps/app/src/stores/comment.tsx` の旧 `normalizeShareLinkId` / `buildCommentGetParams` が使われなくなったら削除する。
 - 4.2: 投稿者の型を整えた。`ICommentCreator` は `_id` / `__v` を持ち、画面が読む 4 項目だけの `ICommentCreatorSummary`(`_id` / `username` / `name` / `imageUrlCached`)を `IInlineComment` と返信の `creator`、`CommentCard`、`Username`、`@growi/ui` の `UserPicture` が受ける。4.3 で通常コメントの型を広げるときは `creator: Ref<IUser> | ICommentCreatorSummary | null` にすれば、4.4 で `ICommentListItem` を `as` なしで渡せる。
 - 4.2: `apps/app` の型検査は `@growi/ui` の `dist` を読むため、新しい checkout では先に `turbo run build --filter @growi/ui` が要る。
+- 4.5: 5.1 の「説明のコメントを直す」対象に、`features/inline-comment/client/components/AnchorResolver/use-anchor-resolver.ts`(58〜63 行目付近。「再取得のたびに新しい配列を返す」は、いまは「共有の一覧が変わったときに新しい配列になる」が正しい)と、`use-anchor-resolver.spec.tsx`(138 / 307 行目付近)を足す。`IInlineComment.creator` の JSDoc(`listByPageId()` でのみ埋まる)、`dto/list-inline-comments.ts` と `dto/index.ts` の再 export も 5.1 で整理する。
