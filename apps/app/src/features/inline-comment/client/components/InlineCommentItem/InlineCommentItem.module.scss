@@ -14,6 +14,12 @@
     :global(.bg-comment) { @extend %bg-comment; }
     :global(.user-picture) { @extend %user-picture; }
     :global(.page-comment-main) { @extend %comment-section; }
+
+    // Same gray as normal comments' date / history link
+    // (`Comment.module.scss` extends the same placeholder).
+    :global(.page-comment-revision) {
+      @extend %page-comment-revision;
+    }
   }
 
   :global(.inline-comment-quote) {
