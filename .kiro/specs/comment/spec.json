@@ -1,0 +1,22 @@
+{
+  "feature_name": "comment",
+  "created_at": "2026-10-01T11:30:22Z",
+  "updated_at": "2026-10-01T12:14:38Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}
