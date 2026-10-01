@@ -95,12 +95,14 @@
 }
 
 // Truncated body preview under the quote. Line-clamp + bottom fade have no
-// Bootstrap utility equivalents.
+// Bootstrap utility equivalents. `pre-line` keeps author newlines visible
+// (default `normal` collapses them to spaces in a plain-text peek).
 .inline-comment-collapsed-peek-text {
   display: -webkit-box;
   overflow: hidden;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  white-space: pre-line;
   mask-image: linear-gradient(to bottom, #000 40%, transparent);
   -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent);
 }

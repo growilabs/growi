@@ -154,6 +154,20 @@ describe('CollapsedInlineCommentItem', () => {
       ).not.toBeInTheDocument();
     });
 
+    it('keeps author newlines in the body peek (styled with white-space: pre-line)', () => {
+      const { container } = renderCollapsed(
+        {},
+        { comment: 'first line\nsecond line' },
+      );
+
+      const peekText = container.querySelector(
+        '.inline-comment-collapsed-peek-text',
+      );
+      // textContent retains \n; CSS pre-line on this class makes them visible.
+      expect(peekText?.textContent).toBe('first line\nsecond line');
+      expect(peekText).toHaveClass('inline-comment-collapsed-peek-text');
+    });
+
     it('does not show the resolve toggle, edit/delete buttons or the revision link', () => {
       const { container } = renderCollapsed();
 
