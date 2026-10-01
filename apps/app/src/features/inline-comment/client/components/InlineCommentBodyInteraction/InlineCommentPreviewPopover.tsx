@@ -332,7 +332,7 @@ export const InlineCommentPreviewPopover: FC<
             like the list view's reply toggle -- it's always shown -- so the
             whole form is wrapped, not just the send button. */}
         <NotAvailableIfReadOnlyUserNotAllowedToComment>
-          <div className="inline-comment-preview-popover-reply-form d-flex align-items-start border border-primary-subtle rounded p-2 gap-2">
+          <div className="inline-comment-preview-popover-reply-form d-flex align-items-start border border-primary-subtle rounded mt-3 p-2 gap-2">
             <UserPicture user={currentUser} className="ms-2" noLink noTooltip />
             <MentionAwareCommentInput
               editorKey={replyEditorKey}
