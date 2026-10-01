@@ -178,6 +178,10 @@ export class GrowiToSlackCtrl {
     if (relation != null) {
       logger.debug({ relation }, 'relation found');
 
+      if (relation.installation == null) {
+        throw createError(400, 'installation is invalid');
+      }
+
       const token = relation.installation.data.bot?.token;
       if (token == null) {
         throw createError(400, 'installation is invalid');
@@ -218,6 +222,11 @@ export class GrowiToSlackCtrl {
 
     if (order == null || order.isExpired()) {
       throw createError(400, 'order has expired or does not exist.');
+    }
+
+    // order.installation may be missing if registration failed to link it.
+    if (order.installation == null) {
+      throw createError(400, 'installation is invalid');
     }
 
     // Access the GROWI URL saved in the Order record and check if the GtoP token is valid.
@@ -378,6 +387,13 @@ export class GrowiToSlackCtrl {
       return res.simulateWebAPIPlatformError(
         'relation is invalid',
         'invalid_relation',
+      );
+    }
+
+    if (relation.installation == null) {
+      return res.simulateWebAPIPlatformError(
+        'installation is invalid',
+        'invalid_installation',
       );
     }
 
