@@ -2,6 +2,8 @@ import type { JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CommentCard } from '~/client/components/PageComment/CommentCard';
+import RevisionRenderer from '~/components/PageView/RevisionRenderer';
+import type { RendererOptions } from '~/interfaces/renderer-options';
 
 import type { InlineCommentWithReplies } from '../../../interfaces';
 import { InlineCommentQuote } from './InlineCommentQuote';
@@ -11,21 +13,26 @@ import styles from './InlineCommentItem.module.scss';
 
 type CollapsedInlineCommentItemProps = {
   comment: InlineCommentWithReplies;
+  /**
+   * Undefined while the caller's renderer options are still loading — the
+   * peek then falls back to plain text, matching the expanded item.
+   */
+  rendererOptions: RendererOptions | undefined;
   onExpand: () => void;
   onQuoteClick: () => void;
 };
 
 /**
  * The collapsed display of a resolved inline comment: author, date, badge,
- * the (clamped) quote, a faded peek of the body, the header expand chevron,
- * and a bottom-edge "More" expand control.
+ * the (clamped) quote, a height-clipped rendered body peek, the header
+ * expand chevron, and a bottom-edge "More" expand control.
  * Renders the same outer wrapper as `InlineCommentItem`'s expanded display,
  * so the module styles that give the card its look still apply.
  */
 export const CollapsedInlineCommentItem = (
   props: CollapsedInlineCommentItemProps,
 ): JSX.Element => {
-  const { comment, onExpand, onQuoteClick } = props;
+  const { comment, rendererOptions, onExpand, onQuoteClick } = props;
   const { t } = useTranslation();
   const isResolved = comment.resolvedAt != null;
 
@@ -89,14 +96,22 @@ export const CollapsedInlineCommentItem = (
           </div>
         }
       >
-        {/* Plain-text peek (not RevisionRenderer): enough to show there is a
-            body without mounting the full markdown tree while collapsed. */}
-        <div data-testid="inline-comment-collapsed-peek" className="mt-1">
-          <div
-            className={`small text-body-secondary ${styles['inline-comment-collapsed-peek-text']}`}
-          >
-            {comment.comment}
-          </div>
+        {/* Same remark render as the expanded item; clipped by max-height so
+            markdown block structure (lists, headings) still paints correctly
+            under the fade, rather than a line-clamp on plain text. */}
+        <div
+          data-testid="inline-comment-collapsed-peek"
+          className={`mt-1 ${styles['inline-comment-collapsed-peek']}`}
+        >
+          {rendererOptions != null ? (
+            <RevisionRenderer
+              rendererOptions={rendererOptions}
+              markdown={comment.comment}
+              additionalClassName="comment"
+            />
+          ) : (
+            <span>{comment.comment}</span>
+          )}
         </div>
       </CommentCard>
     </div>

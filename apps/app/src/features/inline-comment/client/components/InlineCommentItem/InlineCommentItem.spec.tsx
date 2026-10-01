@@ -38,7 +38,7 @@ vi.mock('./InlineCommentItem.module.scss', () => ({
   default: {
     'inline-comment-item-styles': 'inline-comment-item-styles',
     'inline-comment-item-collapsed': 'inline-comment-item-collapsed',
-    'inline-comment-collapsed-peek-text': 'inline-comment-collapsed-peek-text',
+    'inline-comment-collapsed-peek': 'inline-comment-collapsed-peek',
     'inline-comment-collapsed-more': 'inline-comment-collapsed-more',
     'inline-comment-status-badge': 'inline-comment-status-badge',
     'icon-button-container': 'icon-button-container',

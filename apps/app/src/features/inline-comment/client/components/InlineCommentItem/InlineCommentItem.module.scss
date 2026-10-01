@@ -94,17 +94,15 @@
   }
 }
 
-// Truncated body preview under the quote. Line-clamp + bottom fade have no
-// Bootstrap utility equivalents. `pre-line` keeps author newlines visible
-// (default `normal` collapses them to spaces in a plain-text peek).
-.inline-comment-collapsed-peek-text {
-  display: -webkit-box;
+// Height-clipped rendered body peek. Clip by pixels (max-height), not
+// line-clamp: remark output has block structure that line-clamp mishandles.
+// ~3rem ≈ two lines of comment body at the usual size; the mask fades the
+// cut edge so "there is more" reads without counting lines.
+.inline-comment-collapsed-peek {
+  max-height: 3rem;
   overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  white-space: pre-line;
-  mask-image: linear-gradient(to bottom, #000 40%, transparent);
-  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent);
+  mask-image: linear-gradient(to bottom, #000 45%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent);
 }
 
 // Bootstrap has no min-width utility for a rem size; keep only that here

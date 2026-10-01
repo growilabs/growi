@@ -137,6 +137,7 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
     return (
       <CollapsedInlineCommentItem
         comment={comment}
+        rendererOptions={rendererOptions}
         onExpand={onExpand}
         onQuoteClick={() => scrollToRange(comment.id)}
       />

@@ -5033,8 +5033,7 @@ test.describe('Inline comment - resolved comments are collapsed by default, expa
       item.getByTestId('inline-comment-collapse-button'),
     ).toHaveCount(0);
     await expect(item.locator('blockquote.inline-comment-quote')).toBeVisible();
-    // Collapsed shows a plain-text peek of the body, not the full rendered
-    // markdown tree — still enough to assert the text is present.
+    // Collapsed shows a height-clipped rendered peek of the body.
     await expect(
       item.getByTestId('inline-comment-collapsed-peek'),
     ).toContainText(body);

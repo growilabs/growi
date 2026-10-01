@@ -9,7 +9,7 @@ vi.mock('./InlineCommentItem.module.scss', () => ({
   default: {
     'inline-comment-item-styles': 'inline-comment-item-styles',
     'inline-comment-item-collapsed': 'inline-comment-item-collapsed',
-    'inline-comment-collapsed-peek-text': 'inline-comment-collapsed-peek-text',
+    'inline-comment-collapsed-peek': 'inline-comment-collapsed-peek',
     'inline-comment-collapsed-more': 'inline-comment-collapsed-more',
     'inline-comment-status-badge': 'inline-comment-status-badge',
     'icon-button-container': 'icon-button-container',
@@ -32,7 +32,23 @@ vi.mock('~/client/components/FormattedDistanceDate', () => ({
   FormattedDistanceDate: () => <span data-testid="formatted-distance-date" />,
 }));
 
+vi.mock('~/components/PageView/RevisionRenderer', () => ({
+  default: ({
+    markdown,
+    additionalClassName,
+  }: {
+    markdown: string;
+    additionalClassName?: string;
+  }) => (
+    <div className={`wiki ${additionalClassName ?? ''}`.trim()}>{markdown}</div>
+  ),
+}));
+
+import type { RendererOptions } from '~/interfaces/renderer-options';
+
 import { CollapsedInlineCommentItem } from './CollapsedInlineCommentItem';
+
+const rendererOptions = {} as RendererOptions;
 
 const resolvedComment = (
   overrides: Partial<InlineCommentWithReplies> = {},
@@ -60,10 +76,14 @@ const resolvedComment = (
 const renderCollapsed = (
   handlers: { onExpand?: () => void; onQuoteClick?: () => void } = {},
   overrides: Partial<InlineCommentWithReplies> = {},
+  options: { rendererOptions?: RendererOptions | undefined } = {},
 ) =>
   render(
     <CollapsedInlineCommentItem
       comment={resolvedComment(overrides)}
+      rendererOptions={
+        'rendererOptions' in options ? options.rendererOptions : rendererOptions
+      }
       onExpand={handlers.onExpand ?? vi.fn()}
       onQuoteClick={handlers.onQuoteClick ?? vi.fn()}
     />,
@@ -143,29 +163,29 @@ describe('CollapsedInlineCommentItem', () => {
       expect(expandButton.closest('.icon-button-container')).toBeNull();
     });
 
-    it('shows a faded one-to-two-line peek of the comment body (not the full rendered body)', () => {
-      renderCollapsed();
+    it('shows a height-clipped rendered peek of the comment body', () => {
+      const { container } = renderCollapsed();
 
       const peek = screen.getByTestId('inline-comment-collapsed-peek');
-      expect(peek).toHaveTextContent('a distinctive comment body');
+      expect(peek).toHaveClass('inline-comment-collapsed-peek');
+      expect(peek.querySelector('.wiki.comment')).toHaveTextContent(
+        'a distinctive comment body',
+      );
       // No replies / resolve / edit controls while collapsed.
       expect(
         screen.queryByTestId('inline-comment-resolve-toggle-button'),
       ).not.toBeInTheDocument();
+      expect(
+        container.querySelector('.inline-comment-collapsed-peek-text'),
+      ).toBeNull();
     });
 
-    it('keeps author newlines in the body peek (styled with white-space: pre-line)', () => {
-      const { container } = renderCollapsed(
-        {},
-        { comment: 'first line\nsecond line' },
-      );
+    it('falls back to plain text when renderer options are still loading', () => {
+      renderCollapsed({}, {}, { rendererOptions: undefined });
 
-      const peekText = container.querySelector(
-        '.inline-comment-collapsed-peek-text',
-      );
-      // textContent retains \n; CSS pre-line on this class makes them visible.
-      expect(peekText?.textContent).toBe('first line\nsecond line');
-      expect(peekText).toHaveClass('inline-comment-collapsed-peek-text');
+      const peek = screen.getByTestId('inline-comment-collapsed-peek');
+      expect(peek.querySelector('.wiki')).toBeNull();
+      expect(peek).toHaveTextContent('a distinctive comment body');
     });
 
     it('does not show the resolve toggle, edit/delete buttons or the revision link', () => {
