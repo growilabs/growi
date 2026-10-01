@@ -9,7 +9,7 @@
 | **R3 既存メンション機構の再利用** | `crowi.commentService.prepareMentionNotifications`（`apps/app/src/server/service/comment.ts`）は `comment_id + actionUserId + activityId + page` のみを要求する汎用的な作りで、そのまま呼び出し可能。メンションのハイライト表示は本文テキストに対するremarkプラグインなのでストレージ方式に依存しない | **Constraint**: `getMentionedUsers` 内部は `prisma.comments.findUnique(...)` を直書きしており、インラインコメントを別モデルに保存する場合はこの呼び出しの一般化が必要になる（同一 `comments` モデルに保存する場合は変更不要）。**Constraint**: `prepareMentionNotifications` は `activityId`（`res.locals.activity._id`）を要求するため、インラインコメント作成経路も既存の通常コメント作成時と同様に `Activity` レコード（新しい `SupportedAction` 定数を伴う）を発行する必要がある。「そのまま呼び出せる」は入力の型の話であり、呼び出し元がActivity発行という前提を満たす必要がある点は設計フェーズで明記すること。 |
 | **R4 解決/未解決の管理** | なし | **Missing**: `resolvedBy`/`resolvedAt` 相当のフィールドはコードベース全体に存在せず、完全新規。操作可能な利用者の範囲（作成者限定か、ページへのコメント権限を持つ全員か）も要件では汎用的にしか定義されていない。 |
 | **R5 ベストエフォート再アンカリング** | 既存の `revisionId`（`ref Revision`）フィールドの実装パターンは、新設する不変フィールド「アンカー起点リビジョンID」の型・リレーション定義の参考になる | **Missing**: 不変な起点リビジョンIDフィールドと、それとは別に保持する「解決済みオフセットのキャッシュ」フィールド。**Missing**: 再アンカーアルゴリズム自体（R2と同じギャップ）。 |
-| **R6 共有リンク閲覧者へのデータ非公開** | `apps/app/src/server/routes/comment.js` の `api.get` に既存の `req.isSharedPage` 分岐がある（ただし現状はこの分岐が通常コメントの全フィールドをそのまま返しており、インラインコメント用フィールドを同じ経路に載せた場合、そのままでは**漏洩する側の前例**になる点に注意） | **Missing**: レスポンスシリアライズ時にインラインコメント固有フィールド（quote/prefix/suffix/offset/アンカー起点リビジョンID）を `isSharedPage` 時に除外するロジック。既存の `isSharedPage` 分岐が `revision_id` を無視して `page_id` のみでスコープを絞っている点は、除外ロジックの設計における狭いスコープ確定の前例として参考になる。 |
+| **R6 共有リンク画面での扱い** | 共有リンクのページは別コンポーネント（`ShareLinkPageView.tsx`）が描画しており、通常ページの `PageView.tsx` とはルートが分かれている | **Constraint**: 共有リンク画面にインラインコメントのUIを出さない。共有リンク経由でのコメントの取得（インラインコメントを含むか）は `comment` スペックが持つ。インラインコメントの行を旧式の `/_api/comments.get` が返さないようにする除外（`findCommentsByPageId`／`findCommentsByRevisionId`）は必要になる。 |
 
 ## 実装アプローチの選択肢
 
@@ -21,7 +21,6 @@
 - ✅ 1ページ分の「全コメント」を単一クエリで取得できる
 - ❌ `resolvedBy`/`resolvedAt` は通常のスレッドコメントの行では常にnullの列になる（意味を持たないカラムが増える）
 - ❌ 既存の `comment.js`（作成・更新・削除・返信をすべて扱う）にさらに責務が積み増しされ、単一責任の観点で肥大化する
-- ❌ 既存の `api.get` の `isSharedPage` 分岐が既に「全フィールドをそのまま返す」実装のため、除外漏れのリスクが最も高い選択肢
 
 ### Option B: 新規モデル・新規 `apiv3` フィーチャーモジュールとして分離
 
@@ -29,13 +28,12 @@
 
 - ✅ 既存コーディング規約（apiv3が現行の標準、レガシー dot-style は拡張しない）に最も素直に沿う
 - ✅ 通常コメントに `resolvedBy`/`resolvedAt` のような無意味な列が増えない
-- ✅ 共有リンク経由の除外は「新設ルート自体が `isSharedPage` を一切扱わない」設計にすれば構造的に単純になる
 - ❌ `getMentionedUsers` の `prisma.comments.findUnique` 直書きを一般化またはインラインコメント用に複製する必要がある
 - ❌ 「本文コメント」と「インラインコメント」という2つの概念が別モデルに分かれ、将来UIで両者を統合表示する際の結合コストが増える
 
 ### Option C: ハイブリッド（同一モデル＋新規ルート）
 
-インラインコメントは既存の `comments` モデルの行として保存し（メンション通知・認可・返信チェーンの再利用を維持）つつ、作成（アンカー付き）・解決トグルなどインラインコメント固有の操作は新設の apiv3 ルートモジュールに切り出す。アンカー系フィールド（例: 構造化された `anchor` フィールド）の有無で通常コメントとインラインコメントを判別する。既存の `/_api/comments.get` は、共有リンク時にアンカー系フィールドを除外するようその読み取りシリアライズ部分だけ小さく変更する。
+インラインコメントは既存の `comments` モデルの行として保存し（メンション通知・認可・返信チェーンの再利用を維持）つつ、作成（アンカー付き）・解決トグルなどインラインコメント固有の操作は新設の apiv3 ルートモジュールに切り出す。アンカー系フィールド（例: 構造化された `anchor` フィールド）の有無で通常コメントとインラインコメントを判別する。既存の `/_api/comments.get` は、インラインコメントの行を返さないよう読み取り部分だけ小さく変更する。
 
 - ✅ メンション通知・認可・返信ロジックを無変更で再利用
 - ✅ 新規の作成・解決ロジックは新しいファイルに切り出され、レガシー `comment.js` への変更は読み取り時の除外処理という最小限に抑えられる
@@ -43,9 +41,7 @@
 - ❌ レガシー dot-style ルート（`comment.js`）と新設 apiv3 ルートが同一テーブルに対して混在することになり、将来の保守者が「`comments` コレクションは1つのルータが扱っている」と誤解しないよう明記が必要
 - ❌ インラインコメントに `replyTo`（返信）を許すかどうかが要件で定義されておらず、同一テーブル共有ゆえに設計判断を先送りできない
 
-brief.md の Boundary Candidates が「既存の通常コメントAPIとどこまで共有し、どこから分けるかが設計判断のしどころ」と明記している通り、この3択自体が brief の時点で認識されていた論点である。Option C は R3（メンション再利用）と R6（共有リンク除外）の両方の要件が既に踏まえている既存コードの形（`getMentionedUsers`・`isSharedPage` 分岐）に最も自然に接続するが、最終判断は設計フェーズに委ねる。
-
-**R6が行単位の除外である点への影響**（brief.md L73「インラインコメント行が…返らないように」、requirements.md R6 AC1）: R6は特定フィールドのマスキングではなく、インラインコメントの行そのものを共有リンク経由のレスポンスから除外することを求めている。Option A/Cのように通常コメントとインラインコメントを同一 `comments` テーブルに同居させる場合、`/comments.get` の `isSharedPage` 分岐は「アンカーフィールドを持つ行を丸ごと除外する」行フィルタを実装する必要があり、単純なフィールド単位のシリアライズ変更では済まない（Option Cの節で述べた「レガシー `comment.js` への変更は最小限」という利点は、行フィルタが必要になる分だけ縮小する）。Option Bはインラインコメントを別モデルに分離するため、共有リンク到達可能なルートにそもそも読み取り経路を追加しないという設計で構造的にこの要件を満たしやすい。この点を踏まえてもなお、R3の再利用性やAPI構成の一貫性を優先してOption Cを選ぶか、R6の実装単純さを優先してOption Bへ倒すかは、設計フェーズで明示的に比較検討すること。
+brief.md の Boundary Candidates が「既存の通常コメントAPIとどこまで共有し、どこから分けるかが設計判断のしどころ」と明記している通り、この3択自体が brief の時点で認識されていた論点である。Option C は R3（メンション再利用）が踏まえている既存コードの形（`getMentionedUsers`）に最も自然に接続するが、最終判断は設計フェーズに委ねる。
 
 ## Research Needed（設計フェーズへの持ち越し事項）
 
@@ -53,11 +49,10 @@ brief.md の Boundary Candidates が「既存の通常コメントAPIとどこ�
 2. インラインコメントの永続化先: 既存 `comments` モデルに同居させる（Option A/C）か、新規モデルに分離する（Option B）か。`getMentionedUsers` の一般化要否に直結する。
 3. インラインコメントに返信（`replyTo`）を許すか: 要件では明示されていない。同一モデル共有案（Option A/C）を取る場合は設計フェーズで明示的に決定する必要がある。
 4. 選択キャプチャ用のrefをどこに追加するか: `RevisionRenderer.tsx` は現状 `ReactMarkdown` をrefなしでラップしているため、どの選択肢を取ってもこの小さな変更（コンテナへのref転送）は共通して必要になる。
-5. 共有リンク除外の実装箇所: 既存の `/_api/comments.get` の `isSharedPage` 分岐に除外処理を追加する（Option A/C）か、インラインコメント用の読み取り経路自体を共有リンクから到達不可能な設計にする（Option B）か。
 
 ## Effort & Risk
 
-- **Effort: L（1〜2週間）** — 新規アンカーフィールドの二重スキーマ同期、初導入となるあいまい一致アルゴリズム（`Intl.Segmenter` 含む）、クライアント側の選択キャプチャ・ハイライト描画UI、解決/未解決トグルUI、共有リンク除外、と複数の独立したワークフローにまたがる。apiv3モジュール構成・dual-schema同期の型自体は `revision-diff-api`/`mongoose-to-prisma` skill として確立済みパターンがあるため XL までは見込まない。
+- **Effort: L（1〜2週間）** — 新規アンカーフィールドの二重スキーマ同期、初導入となるあいまい一致アルゴリズム（`Intl.Segmenter` 含む）、クライアント側の選択キャプチャ・ハイライト描画UI、解決/未解決トグルUI、旧式の取得からの除外、と複数の独立したワークフローにまたがる。apiv3モジュール構成・dual-schema同期の型自体は `revision-diff-api`/`mongoose-to-prisma` skill として確立済みパターンがあるため XL までは見込まない。
 - **Risk: Medium-High（あいまい一致サブシステムに集中）** — brief 自身が「最も技術的不確実性が高い部分」と明記している通り、正規化後オフセット→原文オフセットの逆変換や書記素クラスタスナップは実装ミスがハイライトのズレとして静かに現れやすく、テストで検出しづらい。永続化・APIレイヤーは確立パターンに乗るため Medium、UIレイヤーは2023年試作の `TextSelectionTools`/`useRenderedObserver` が参考にできるため Low-Medium。
 
 ## Recommendations for Design Phase
@@ -67,20 +62,19 @@ brief.md の Boundary Candidates が「既存の通常コメントAPIとどこ�
 
 ---
 
-## アーキテクチャ決定：既存 `comments` モデルへの同居＋無条件フィルタ
+## アーキテクチャ決定：既存 `comments` モデルへの同居＋書き込み専用の新規ルート
 
-設計フェーズでの検討・advisor（Opusレビュー）を経て確定した最終決定は、インラインコメントを既存 `comments` テーブルに同居させ、共有リンクへの非公開は `/_api/comments.get` が使う取得メソッド群への無条件フィルタ（`isSharedPage` の値によらず常に適用）で担保する、というもの（詳細・比較根拠は `design.md`「アーキテクチャ選定：既存 `comments` モデルへの拡張＋新規ルート」節）。
+設計フェーズでの検討・advisor（Opusレビュー）を経て確定した最終決定は、インラインコメントを既存 `comments` テーブルに同居させ、作成・返信・解決トグル・編集・削除だけを新規の apiv3 ルートに切り出す、というもの（詳細・比較根拠は `design.md`「アーキテクチャ選定：既存 `comments` モデルへの拡張＋新規ルート」節）。読み取りは `comment` スペックのコメント一覧 API が通常コメントとまとめて返す。
 
-上記「実装アプローチの選択肢」のOption A/B/Cのうち、当初は要件6（共有リンク非公開）を構造的に保証しやすいOption B（新規モデルへの分離）に寄せていたが、次の2点から最終的にOption A/Cに近い「同居＋無条件フィルタ」へ倒した：
+上記「実装アプローチの選択肢」のOption A/B/Cのうち、Option B（新規モデルへの分離）ではなく、Option A/Cに近い「同居」を選んだ理由は次の通り。Option Bの利点（通常コメントに意味を持たない列が増えない）より、こちらを重く見た：
 
-1. `/comments.get` の除外フィルタを `isSharedPage` 依存にせず常に適用すれば、同居させても要件6は（構造的にではないが）実用上十分な強さで満たせる
-2. インラインコメントにも返信を持たせたい需要があり、同居させれば既存の `replyTo` 機構・`getMentionedUsers` をそのまま使え、Option Bで見込んでいた「新規モデル分離のコスト」（`getMentionedUsers`の一般化）を払わずに済む
+1. インラインコメントにも返信を持たせたい需要があり、同居させれば既存の `replyTo` 機構・`getMentionedUsers` をそのまま使え、Option Bで見込んでいた「新規モデル分離のコスト」（`getMentionedUsers`の一般化）を払わずに済む
+2. 同じテーブルにあれば、通常コメントとインラインコメントを1回の問い合わせで返せる
 
-両案の保証の性質は異なる——新規モデル分離案の「共有リンクに返らない」は物理的にコレクションが存在しないことによる構造的な保証だったのに対し、同居＋無条件フィルタ案は `findCommentsByPageId`／`findCommentsByRevisionId`／`countCommentByPageId` という3つのメソッドの中にある `WHERE` 条件に依存するルールベースの保証である。この差を踏まえた上で、返信の再利用とメンション通知の無改造という利益がそれを上回ると判断した。
+旧式の `/_api/comments.get` の応答を通常コメントだけに保つため、`findCommentsByPageId`／`findCommentsByRevisionId` の2メソッドには、共有リンクかどうかによらず常に `isInline: { not: true }` を付ける（契約は `comment` スペックの要件 5.2）。
 
-この決定に伴い、advisorレビューで次の2点が発覚し対応した：
+この決定に伴い、advisorレビューで次の点が発覚し対応した：
 - **Prismaの名前付きリレーション制約**：`resolvedBy`（`comments`→`users`）を追加すると、既存の無名だった `creator` リレーションも明示的に名前を付けねばならない（`prisma validate` が通らないまま見落とすところだった）
-- **`countCommentByPageId`（ページ末尾コメントの件数バッジに使用）にも同じ除外フィルタが必要**（見落とすとインラインコメントの件数が通常コメントのバッジに混入するユーザー可視の不具合になる）
 
 ### Build vs Adopt: あいまい一致は `approx-string-match` を採用、`diff-match-patch` は不採用
 
@@ -169,15 +163,15 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 - `creator`が`null`／未populateでも`UserPicture`／`Username`を無条件に描く。既存の`Comment.tsx`は「投稿者情報が無い場合に何も表示しない」のではなく、`UserPicture`は既定アイコン、`Username`は"(anyone)"という代替表示をする作りに既になっている。`CommentCard`側で`creator != null`条件を追加して丸ごと隠すと、投稿者が未populateの既存コメントの見た目が変わり、Requirement 13.9（通常コメントの見た目を変えない）に違反する。
 - `headerEnd`（見出し行の右側の差し込み）に共通の余白（`ms-auto`等）を`CommentCard`側で固定しない。通常コメントの右端（リビジョンリンク）とインラインコメントの右端（解決トグル）とで必要な余白が異なる（前者は投稿日時のすぐ右に`ms-2`、後者は行の右端に寄せる`ms-auto`）ため、余白は各呼び出し側が`headerEnd`に渡すReactNode自身に付ける。
 
-実際に実装された`CommentCardProps.creator`の型は、当初案（`IUserHasId | Ref<IUser> | null | undefined`）よりも広く、`IUserSerializedSecurely<IUserHasId>`を含む。インラインコメント側の`listByPageId()`応答はサーバー側で既に`serializeUserSecurely`を通しており、その形をそのまま`CommentCard`まで運ぶとこの型が必要になったため（タスク境界を超える変更だが、コンパイルを通すために必須だった）。
+実際に実装された`CommentCardProps.creator`の型は、当初案（`IUserHasId | Ref<IUser> | null | undefined`）よりも広く、`IUserSerializedSecurely<IUserHasId>`を含む。インラインコメントの投稿者は、`comment` スペックの整形でメールアドレスなどを除いた形で届き、その形をそのまま`CommentCard`まで運ぶとこの型が必要になるため（画面が読む4項目だけの`ICommentCreatorSummary`も受ける）。
 
 ### インラインコメントは`PageComment`自身で取得せず、`PageView`からpropsで渡す
 
-`Comments`（`apps/app/src/client/components/Comments.tsx`）は`ShareLinkPageView.tsx`からも読み込まれている。`PageComment`の中で`useSWRxInlineComments(pageId)`を呼ぶと、共有リンク画面でもその取得が走ってしまう。APIは`certifySharedPage`を通していないので実データは返らないが、「共有リンク画面にインラインコメントのUIを一切出さない」ことを構造として保証できなくなる。
+`Comments`（`apps/app/src/client/components/Comments.tsx`）は`ShareLinkPageView.tsx`からも読み込まれている。`PageComment`の中で`useSWRxInlineComments(pageId)`を呼ぶと、共有リンク画面でもインラインコメントの親子が組み立てられてしまう。コメント一覧 API は共有リンク経由でもインラインコメントを返す（`comment` スペックの要件 3.3）ため、「共有リンク画面にインラインコメントのUIを一切出さない」ことは、取得したデータを画面に渡さないことでしか保証できない。
 
 そこで取得は`PageView.tsx`側の1箇所（既存の`useSWRxInlineComments(isSharedPageView ? null : page._id)`）に閉じ、値として`Comments`／`PageComment`に渡す形にした。`ShareLinkPageView.tsx`は渡さない。
 
-実際に渡す形は、当初案（`InlineCommentWithReplies[]`の素の配列）とは異なり、`{ comments, resolve, createReply }`という束になっている。一覧のスクロールナビゲーション（`scrollToRange`）・解決トグル・返信作成のいずれも`PageView.tsx`側の状態・関数に依存するため、配列だけを渡すとこれらを別途伝える経路が必要になり、`PageComment`が`PageView`の関数を「知らずに」使えるという構造上の利点（Requirement 13.8の共有リンク非公開保証の土台）が薄れる。束にして1本のpropsで渡すことで、`ShareLinkPageView.tsx`はこのprops自体を渡さない（空配列を渡すのではなく、prop省略時のフォールバックに委ねる）だけで済む。
+実際に渡す形は、当初案（`InlineCommentWithReplies[]`の素の配列）とは異なり、`{ comments, resolve, createReply }`という束になっている。一覧のスクロールナビゲーション（`scrollToRange`）・解決トグル・返信作成のいずれも`PageView.tsx`側の状態・関数に依存するため、配列だけを渡すとこれらを別途伝える経路が必要になり、`PageComment`が`PageView`の関数を「知らずに」使えるという構造上の利点（Requirement 13.8の「共有リンク画面の一覧にインラインコメントを出さない」の土台）が薄れる。束にして1本のpropsで渡すことで、`ShareLinkPageView.tsx`はこのprops自体を渡さない（空配列を渡すのではなく、prop省略時のフォールバックに委ねる）だけで済む。
 
 ### 既知の限界（実装時に軽微・許容と判断し先送り）
 
@@ -285,7 +279,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.update`／`comments.remove`）とまったく同じ権限モデルにすることを求めている。通常コメント側の実装（`Comment.tsx`／`CommentControl.tsx`／`DeleteCommentModal`／`apps/app/src/server/routes/comment.js`）を調査した結果、編集は `Comment.tsx` の `isReEdit` state が `CommentCard` を `CommentEditor` に切り替える形、削除は `CommentControl` → `PageComment.tsx` のモーダルstate → `DeleteCommentModal`／`DeleteCommentModalSubstance` という形で実装されており、どちらも apiv1 のプレーンな `Error` ベースのレスポンス（`ApiResponse.error`）を使っている。サーバー側はどちらも `prisma.comments.findUnique` → 未発見チェック → `Page.isAccessiblePageByViewer` → **投稿者本人チェック**（`creatorId` 比較）という順で処理し、削除は `removeWithReplies(commentId)`（トランザクション内で返信をすべて削除してから本体を削除）を呼ぶ。
 
-*権限のルール*（投稿者本人限定、`creatorId` 比較、サーバー側が最終判断）と*カスケード削除の部品*（`removeWithReplies`）はそのまま持ってきたが、*通信の作法*は持ってこなかった——インラインコメント自身の既存ルート（`create.ts`／`create-reply.ts`／`list.ts`／`resolve.ts`）はすべて apiv3 なので、新しい更新・削除ルートも apiv1 風のペアを別に持ち込むのではなく、この既存の apiv3 の作法（ファクトリ関数、`ErrorV3`、`res.apiv3Err`／`res.apiv3`）に従っている。`creatorId`（ただの文字列）はどのエンドポイントが生成したオブジェクトであっても必ず入っている投稿者特定フィールドだが、`creator`（populatedなユーザーオブジェクト）は `listByPageId()` の出力以外では `null` になる。権限判定（クライアント側の表示切り替えであれ、サーバー側の認可であれ）は必ず `creatorId` で比較し、`creator` では比較しない。
+*権限のルール*（投稿者本人限定、`creatorId` 比較、サーバー側が最終判断）と*カスケード削除の部品*（`removeWithReplies`）はそのまま持ってきたが、*通信の作法*は持ってこなかった——インラインコメント自身の既存ルート（`create.ts`／`create-reply.ts`／`resolve.ts`）はすべて apiv3 なので、新しい更新・削除ルートも apiv1 風のペアを別に持ち込むのではなく、この既存の apiv3 の作法（ファクトリ関数、`ErrorV3`、`res.apiv3Err`／`res.apiv3`）に従っている。`creatorId`（ただの文字列）はどのエンドポイントが生成したオブジェクトであっても必ず入っている投稿者特定フィールドだが、`creator`（populatedなユーザーオブジェクト）は共有のコメント一覧（`comment` スペック）の応答から作った値以外では `null` になる。権限判定（クライアント側の表示切り替えであれ、サーバー側の認可であれ）は必ず `creatorId` で比較し、`creator` では比較しない。
 
 ### 更新・削除は操作ごとに1つの共有サービスメソッドとし、起点／返信で重複実装しない
 
@@ -377,7 +371,7 @@ Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.u
 
 ### 返信の表示順は各利用側の責務
 
-`InlineCommentService.listByPageId()` はサーバーの取得順（`createdAt: 'desc'`、新しい順）のまま返し、表示順を整えない。一覧側（`InlineCommentReplies.tsx`）は自前で `reverse()` して古い順にしていたが、ポップオーバーにはそれが無かったため新しい順に表示されていた（一覧と逆）。ポップオーバー側にも同じ `reverse()` を足して揃えた。新しく返信を表示する画面を作るときは、サーバーの順序に依存せず必ず自分で表示順を決める必要がある。
+共有のコメント一覧はサーバーの取得順（`createdAt: 'desc'`、新しい順）で届き、`groupInlineComments` もその順を保つだけで、表示順を整えない。一覧側（`InlineCommentReplies.tsx`）は自前で `reverse()` して古い順にしていたが、ポップオーバーにはそれが無かったため新しい順に表示されていた（一覧と逆）。ポップオーバー側にも同じ `reverse()` を足して揃えた。新しく返信を表示する画面を作るときは、サーバーの順序に依存せず必ず自分で表示順を決める必要がある。
 
 ### ポップオーバーは `CommentCard` を流用しなかった
 

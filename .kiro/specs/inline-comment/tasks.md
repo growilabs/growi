@@ -14,12 +14,12 @@
   - 観測できる完了条件：新規デプロイ環境でコレクション作成・インデックス作成が完走する（結合テストまたはローカルの `mongosh`/Nodeスクリプトでインデックス一覧に `pageId_1_isInline_1` 相当が存在することを確認する）
   - _Requirements: 1.2, 1.4, 4.1, 4.5, 5.4, 5.5_
 
-- [x] 1.3 既存の読み取り経路にインラインコメント除外フィルタを追加する
-  - `findCommentsByPageId`／`findCommentsByRevisionId`／`countCommentByPageId`（`comment.ts` のPrisma拡張メソッド）の `where` 条件に `isInline: { not: true }` を無条件で（`isSharedPage` の値によらず）追加する
+- [x] 1.3 旧式の取得メソッドにインラインコメント除外フィルタを追加する
+  - `findCommentsByPageId`／`findCommentsByRevisionId`（`comment.ts` のPrisma拡張メソッド）の `where` 条件に `isInline: { not: true }` を無条件で（共有リンクかどうかによらず）追加する（旧式 `/_api/comments.get` の応答を通常コメントだけに保つ。契約は `comment` スペックの要件 5.2）
   - `/_api/comments.get` を通常文脈・共有リンク文脈の両方で呼び出し、`isInline: true` の行が一切レスポンスに含まれないことを確認する結合テストを追加する
-  - `countCommentByPageId` を使うページ末尾コメントの件数バッジが、インラインコメントを作成してもカウントに含めないことを確認する結合テストを追加する
-  - 観測できる完了条件：新設した結合テストが2件ともgreenになる
-  - _Requirements: 6.1, 6.3_
+  - ページのコメント件数（`countCommentByPageId`）の数え方は `comment` スペックが持つ（インラインコメントも数える）
+  - 観測できる完了条件：新設した結合テストがgreenになる
+  - _Requirements: 6.3_
   - _Depends: 1.1, 1.2_
 
 - [x] 1.4 インラインコメント用の `SupportedAction` 定数を追加する
@@ -81,10 +81,9 @@
   - _Requirements: 1.8, 1.9, 3.2_
   - _Depends: 3.1_
 
-- [x] 3.3 ページ単位の一覧取得ロジックを実装する
-  - 指定ページの起点インラインコメントと、それに紐づく返信を取得し、`replyToId` でネスト構造を組み立てる（既存の拡張メソッドに流用できるものはないため自前で実装する）
-  - 作成日時順に並べる
-  - 観測できる完了条件：返信を持つ起点コメントを含むフィクスチャに対して、ネストした配列が正しい順序で返ることをユニットテストで確認できる
+- [x] 3.3 ページ単位の一覧取得は `comment` スペックの取得を使う
+  - 一覧の取得（`GET /_api/v3/comments`）と、平らな一覧を起点コメントと返信の親子に組み直す処理（`groupInlineComments`）は `comment` スペックが持つ。このスペックはサーバー側に一覧取得のロジックを持たない
+  - 観測できる完了条件：返信を持つ起点コメントが、親子の形で作成日時順に得られる（テストは `comment` スペック側の `group-inline-comments.spec.ts`）
   - _Requirements: 2.5, 2.6_
   - _Depends: 3.2_
 
@@ -96,16 +95,16 @@
   - _Depends: 3.2_
 
 - [x] 3.5 apiv3ルートを実装し配線する
-  - `POST /_api/v3/inline-comments`（3.1）、`POST /_api/v3/inline-comments/:id/replies`（3.2）、`GET /_api/v3/inline-comments`（3.3）、`PUT /_api/v3/inline-comments/:id/resolve`（3.4）を実装する
+  - `POST /_api/v3/inline-comments`（3.1）、`POST /_api/v3/inline-comments/:id/replies`（3.2）、`PUT /_api/v3/inline-comments/:id/resolve`（3.4）を実装する（一覧の取得は `comment` スペックの `GET /_api/v3/comments` を使う）
   - すべてのルートに `accessTokenParser` → `loginRequired` → express-validatorチェーン → `apiV3FormValidator` を適用し、`certifySharedPage` はいずれのルートにも適用しない
   - `apps/app/src/server/routes/apiv3/index.js` に新規ルートをマウントする
   - 観測できる完了条件：ログインなし・ページ権限なしでのアクセスがそれぞれ401/403で拒否されることを結合テストで確認できる
-  - _Requirements: 1.5, 1.6, 6.1_
+  - _Requirements: 1.5, 1.6_
   - _Depends: 3.1, 3.2, 3.3, 3.4_
 
 - [x] 4. クライアントUI・状態管理
 - [x] 4.1 インラインコメント用のSWRストアを実装する
-  - ページの一覧取得、起点作成、返信作成、解決トグルをラップするSWRフックを実装する（3.5のAPIを呼び出す）
+  - 起点作成、返信作成、解決トグル（3.5のAPIを呼び出す）をラップするSWRフックを実装する。一覧の取得と、書き込み後に再取得する共有のキーは `comment` スペックが持つ（3.3）
   - 観測できる完了条件：作成・返信作成・解決トグルの呼び出し後に一覧が再取得されることを確認できる
   - _Requirements: 2.5, 2.6_
   - _Depends: 3.5_
@@ -182,7 +181,7 @@
 - 3.2で判明（3.3/3.4にも適用）：`InlineCommentServiceDeps.prisma` の型は**手書きインターフェースを作らず**、`import type { PrismaClient } from '~/utils/prisma'` を型のみ取り込みして `Pick<PrismaClient, 'comments' | 'activities'>` のように絞り込む。行の型が要る場合も `Prisma.Result<PrismaClient['comments'], {...}, 'create'>`（`import type { Prisma } from '~/generated/prisma/client'`）のように実体から導出する。手書き型を本物のPrismaクライアントに合わせ込もうとすると（オーバーロード／ユニオン型／実行時ガードいずれも）代入不能や実行時の誤判定を繰り返す（3.2で3ラウンド分のレビュー往復の原因になった）。既存の参考実装は `apps/app/src/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron/steps/activity-export-cursor.ts` とその `.spec.ts`（`mock<PrismaClient>({...})` によるモック）。
 - 3.2〜3.4：`create()`/`createReply()`/`setResolved()` の事前条件エラーは、いずれも区別のない汎用 `Error` を投げる（対象なし・非インライン行・返信ID指定、いずれも同じ形）。**3.5でルートを配線する際、design.md の API Contract（400 vs 404 の使い分け）をそのままには実現できない** — サービス側は現状「例外を投げるか投げないか」しか教えないため、400/404を分けたいならルート層で対象行を再取得するか、サービス側にエラー種別を持たせる変更が必要（後者は3.2〜3.4の再オープンになるため、3.5側での対応を推奨）。
 - 3.4：`comments` テーブルは通常コメントとインラインコメントの共有テーブルであり、通常コメント行も `replyToId: null` を持つ。起点コメントかどうかの事前条件チェックは `replyToId === null` だけでなく **`isInline === true` も必ず確認する**（`setResolved`/`createReply` とも同じ理由でこのチェックが必要）。
-- 3.5：`create()`（3.1）が `replyToId` を明示的に `null` セットしていなかったため、MongoDB上でフィールド自体が欠落し、`listByPageId()`（3.3）の `where: { replyToId: null }` に一致しない不具合を発見・修正した（Prismaの Mongo コネクタは `null` フィルタを「欠落」ではなく「明示的なnull」にのみマッチさせる。生ドライバの `null` フィルタは欠落にもマッチするため挙動が異なる点に注意）。`create()` の `data` に `replyToId: null` を追加する1行修正のみ。400/404 の使い分けは `create-reply.ts`/`resolve.ts` がルート側で対象行を `findUnique` により事前取得することで実現（サービス層は変更していない）。ページ権限チェックは `findPageAndMetaDataByViewer` を使い、`apps/app/.claude/rules/page-write-action-403-404.md` に従って403/404を常に404に統一している（design.mdのAPI Contract表が403としている箇所も含む）。未ログイン時はこのリポジトリの `loginRequiredFactory` がapiv3全体で403を返す仕様のため、要件文の「401」はこのタスクでは403として実現されている（コードベース全体の既存挙動）。
+- 3.5：`create()`（3.1）が `replyToId` を明示的に `null` セットしていなかったため、MongoDB上でフィールド自体が欠落し、起点コメントを `where: { replyToId: null }` で絞り込む取得に一致しない不具合を発見・修正した（Prismaの Mongo コネクタは `null` フィルタを「欠落」ではなく「明示的なnull」にのみマッチさせる。生ドライバの `null` フィルタは欠落にもマッチするため挙動が異なる点に注意）。`create()` の `data` に `replyToId: null` を追加する1行修正のみ。400/404 の使い分けは `create-reply.ts`/`resolve.ts` がルート側で対象行を `findUnique` により事前取得することで実現（サービス層は変更していない）。ページ権限チェックは `findPageAndMetaDataByViewer` を使い、`apps/app/.claude/rules/page-write-action-403-404.md` に従って403/404を常に404に統一している（design.mdのAPI Contract表が403としている箇所も含む）。未ログイン時はこのリポジトリの `loginRequiredFactory` がapiv3全体で403を返す仕様のため、要件文の「401」はこのタスクでは403として実現されている（コードベース全体の既存挙動）。
 - 4.2（未着手のフォローアップ、ブロッキングではない）：`SelectionCapture.tsx` はフォーム表示中に別のテキストを選択し直しても、既にロックされたアンカーを更新しない（フォームを閉じる/送信するまで新しい選択を無視する）。ブラウザのネイティブ選択ハイライトは新しい選択に移動するが、フォームの引用文・送信内容は古いアンカーのままになりうる。要件1.1/1.2/1.7やタスクの完了条件そのものは満たしているため4.2はブロックしていないが、UXとして改善の余地があり、別タスク化を検討。
 - 5.2：`PageContentRenderer.tsx`（`PageView.tsx` と `RevisionRenderer.tsx` の間にある薄い `next/dynamic` ラッパー）は design.md の File Structure Plan（既存ファイルへの変更範囲）に含まれていないため変更していない。代わりに `PageView.tsx` 側で `PageContentRenderer`/`SlideRenderer` の出力を無名の `<div ref={pageBodyContainerRef}>` で包み、その ref を `SelectionCapture`/`useAnchorResolver`/`InlineCommentHighlight` に渡している（この div は他に何も内包しないため、`RevisionRenderer.tsx` 自身の ref を取るのと同じテキストが得られる。`.flex-expand-vert` に子要素セレクタ依存のCSSがないことを確認済み）。スライド表示（`isSlide`）時もこの div が使われるため、Marp出力に対して `useAnchorResolver`/`renderedTextOf` が走る（一致しなければ `not_found` にフォールバックするだけで実害はないが、スライドページでのインラインコメント運用は未検討）。
 - 5.2：共有リンク閲覧者向けのUI非表示（要件6.2）は、`PageView.tsx` が通常ページルート（`pages/[[...path]]/index.page.tsx`）専用であり、共有リンクルート（`pages/share/[[...path]]/index.page.tsx`）は別コンポーネント `ShareLinkPageView.tsx`（本タスクでは変更していない）を描画するという、ルート分離そのものによって既に構造的に満たされている。その上で `useShareLinkId()`（`shareLinkIdAtom` を読む。`pages/share/[[...path]]` の `useHydratePageAtoms(..., { shareLinkId })` でのみセットされ、通常ルートでは常に `undefined`）を明示的な追加ガードとして `SelectionCapture`/`InlineCommentHighlight`/`InlineCommentList` のマウント条件と `useSWRxInlineComments` の呼び出し引数（共有リンク時は `null` を渡し、fetch自体を発生させない）の両方に効かせている。現状のルート構成では発火しない防御だが、`PageView.tsx` が将来共有リンク文脈で再利用された場合にも構造ではなくこのガードで止まるようにする意図。

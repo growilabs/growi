@@ -18,7 +18,7 @@
 インラインコメント機能は、ページ本文の読み取り専用ビュー（`RevisionRenderer.tsx` がレンダリングした結果）に対して、閲覧者が選んだテキスト範囲を対象としたコメントを作成・閲覧できるようにする。位置情報はDOM XPathやmarkdownソースの文字オフセットではなく、レンダリング後のプレーンテキストに対する「選択文字列（exact quote）＋前後文脈（prefix/suffix）＋おおよそのオフセット」（W3C Web Annotation Data Model の TextQuoteSelector/TextPositionSelector 相当）として保存し、表示のたびにクライアント側で再検索してハイライトを復元する。
 
 **Users**: ページ閲覧者・編集者が、本文の特定範囲について議論するために利用する。
-**Impact**: 既存のページ末尾コメントスレッド（`apps/app/src/features/comment/`、`/_api/comments.*`）の**投稿・編集・削除・通知の挙動は変更しない**。データは既存の `comments` Prisma/Mongooseモデルに新しいフィールドを追加する形で共存させ、新しい種類の行（インラインコメント）を区別するための識別フィールドを1つ追加する。既存の一覧取得（`/_api/comments.get`）には、この新しい種類の行を結果から除外するフィルタを追加する（これは既存機能の挙動変更ではなく、新しいデータ種別が増えたことに伴う最小限の対応）。既存の `RevisionRenderer.tsx` に対する変更は「コンテナへのref転送」1点のみに限定する。本文レンダリング用コンポーネントのうち `Header.tsx`／`TableWithEditButton.tsx`／`DrawioViewerWithEditButton.tsx` の3つには、条件付き表示の編集ボタンのアイコン要素へ `aria-hidden="true"` を付与する変更が入る（本文テキストの抽出範囲を安定させるための標準属性の付与であり、これらのコンポーネントの表示条件・振る舞い・見た目は変えない）。既存の `PageView.tsx` に対する変更は、本文コンテナへの参照を得るための配線と、この機能のクライアントコンポーネント3つ（`SelectionCapture`／`InlineCommentHighlight`／`InlineCommentBodyInteraction`。いずれも `next/dynamic(..., { ssr: false })` 経由）およびフック2つ（`useAnchorResolver`／`useSWRxInlineComments`）の組み込みで構成される（タスク5.2）。`InlineCommentForm` はこの一覧に含まれない——`SelectionCapture` の内部で描画される子コンポーネントであり、`PageView.tsx` が直接組み込むわけではない。また `PageView.tsx` には、この配線とは別にもう1点、既存の不具合修正が入っている——本文サブツリーが `useCallback` を要素の型として使っていたため、依存が変わるたびに（本機能が加えたアンカー再計算の依存を含め）サブツリー全体が再マウントされてしまう問題があり、`useMemo` で値をレンダーする形に直した（経緯は tasks.md の Implementation Notes と `PageView.tsx` 内のコメントを参照）。
+**Impact**: 既存のページ末尾コメントスレッド（`apps/app/src/features/comment/`、`/_api/comments.*`）の**投稿・編集・削除・通知の挙動は変更しない**。データは既存の `comments` Prisma/Mongooseモデルに新しいフィールドを追加する形で共存させ、新しい種類の行（インラインコメント）を区別するための識別フィールドを1つ追加する。旧式の一覧取得（`/_api/comments.get`）は、この新しい種類の行を返さない。旧式の一覧取得が使う取得関数（`findCommentsByPageId`／`findCommentsByRevisionId`）がインラインコメントの行を除いて返し、この約束は `comment` スペックの要件 5.2 が定める。インラインコメントを画面に出すための取得と、ページのコメント件数は、`comment` スペックが持つ（`GET /_api/v3/comments` が通常コメントとインラインコメントを1つの平らな一覧で返し、件数はインラインコメントも合算する）。既存の `RevisionRenderer.tsx` に対する変更は「コンテナへのref転送」1点のみに限定する。本文レンダリング用コンポーネントのうち `Header.tsx`／`TableWithEditButton.tsx`／`DrawioViewerWithEditButton.tsx` の3つには、条件付き表示の編集ボタンのアイコン要素へ `aria-hidden="true"` を付与する変更が入る（本文テキストの抽出範囲を安定させるための標準属性の付与であり、これらのコンポーネントの表示条件・振る舞い・見た目は変えない）。既存の `PageView.tsx` に対する変更は、本文コンテナへの参照を得るための配線と、この機能のクライアントコンポーネント3つ（`SelectionCapture`／`InlineCommentHighlight`／`InlineCommentBodyInteraction`。いずれも `next/dynamic(..., { ssr: false })` 経由）およびフック2つ（`useAnchorResolver`／`useSWRxInlineComments`）の組み込みで構成される（タスク5.2）。`InlineCommentForm` はこの一覧に含まれない——`SelectionCapture` の内部で描画される子コンポーネントであり、`PageView.tsx` が直接組み込むわけではない。また `PageView.tsx` には、この配線とは別にもう1点、既存の不具合修正が入っている——本文サブツリーが `useCallback` を要素の型として使っていたため、依存が変わるたびに（本機能が加えたアンカー再計算の依存を含め）サブツリー全体が再マウントされてしまう問題があり、`useMemo` で値をレンダーする形に直した（経緯は tasks.md の Implementation Notes と `PageView.tsx` 内のコメントを参照）。
 
 ### Goals
 - 文字単位で選択したテキスト範囲にインラインコメントを作成・表示できる（1.1–2.6）
@@ -26,32 +26,34 @@
 - 本文編集後もベストエフォートで対象範囲を再アンカーし、失敗時はハイライトなしでコメントを保持する（5.1–5.5）
 - 既存のメンション通知・ハイライト機構をそのまま再利用する（3.1–3.2）
 - 解決/未解決を管理できる（4.1–4.5）
-- 共有リンク閲覧者にインラインコメント（起点・返信とも）の内容が一切返らないことを保証する（6.1–6.3）
+- 共有リンク画面にインラインコメントのUIを出さない（6.2）
 - 起点コメント・返信の投稿者本人が、通常コメントと同じ権限モデルで編集・削除できる。解決済みのインラインコメントは本文中から見えなくなる（一覧には残る）（18.1–18.9, 2.7–2.8, 15.5, 15.12）
 
 ### Non-Goals
 - エディタ（Yjs共同編集セッション）内でのインラインコメント作成・表示
-- 共有リンク経由でのインラインコメント閲覧・作成
+- 共有リンク画面でのインラインコメントの表示・作成
+- コメントの取得（一覧）とページのコメント件数の数え方（`comment` スペックが持つ）
 - @メンション機能自体の変更
 
 ## Boundary Commitments
 
 ### This Spec Owns
-- 既存 `comments` Prisma/Mongooseモデルへの拡張フィールド（`isInline`／アンカー4項目／`anchorOriginRevisionId`／`resolvedById`／`resolvedAt`）と、それらが `true` である行（インラインコメントのスレッド。起点・返信とも）に対する作成・一覧取得・解決トグル・更新・削除を提供する新規 `apiv3` ルート（`/_api/v3/inline-comments*`）
+- 既存 `comments` Prisma/Mongooseモデルへの拡張フィールド（`isInline`／アンカー4項目／`anchorOriginRevisionId`／`resolvedById`／`resolvedAt`）と、それらが `true` である行（インラインコメントのスレッド。起点・返信とも）に対する作成・解決トグル・更新・削除を提供する新規 `apiv3` ルート（`/_api/v3/inline-comments*`）。読み取りのルートは持たない（後述のOut of Boundary参照）
 - 起点コメント・返信の編集・削除を、投稿者本人限定で（通常コメントと同じ権限判定に従い）画面最下部の一覧および本文中プレビューポップオーバー（編集のみ）から提供する
 - クライアント側のテキスト選択キャプチャ、アンカー計算（quote/prefix/suffix/おおよそのオフセット）、表示時の再アンカー（完全一致→あいまい一致→ハイライトなし）、ハイライト描画
 - 解決/未解決状態とその操作者・日時の記録（起点コメントのみが状態を持つ）
-- 既存の一覧取得（`/_api/comments.get` が使う `findCommentsByPageId`／`findCommentsByRevisionId`）から `isInline: true` の行を除外するフィルタの追加（後述の通り、これは共有リンクかどうかによらず常に適用する）
 - 通常コメントとの共通部品（`apps/app/src/client/components/PageComment/DeleteConfirmAlert.tsx`／`CommentEditDeleteButtons.tsx`／`CommentRevisionLink.tsx`）の新設と、それに伴う `Comment.tsx`／`CommentControl.tsx`／`Comment.module.scss`／`ReplyComments.tsx`／`PageComment.tsx` の見た目・マークアップの変更（削除確認方式のモーダルからインライン警告帯への変更、編集・削除アイコンの共通化、`.page-comment-control` の配置をヘッダー行の`ms-auto`flowへ）
 
 ### Out of Boundary
 - 既存コメント（`isInline` が `true` でない行）の投稿・編集・削除・通知に関する**機能・データフロー**の変更 — 既存の呼び出し元から見た振る舞い・API契約は変わらない（見た目・マークアップの共通化は上記This Spec Ownsの対象）
 - エディタ（Yjs共同編集セッション）内でのインラインコメント作成・表示、CodeMirror/Yjsのドキュメントモデルやawareness機構への変更
-- 共有リンク経由でのインラインコメント閲覧・作成
+- 共有リンク画面でのインラインコメントの表示・作成
+- コメントの取得と件数。`comment` スペックが持つ：コメント一覧 API（`GET /_api/v3/comments`。共有リンク経由でもインラインコメントを含めて返す）、画面側の取得（共有の取得フック `useSWRxCommentList`（キー `['/comments', pageId, shareLinkId]`）と、それを起点コメントと返信の親子にして返す `useSWRxInlineComments` の取得部分・`groupInlineComments`。ファイルは `features/inline-comment/client/` にある）、旧式 `/_api/comments.get` がインラインコメントを返さないこと（`findCommentsByPageId`／`findCommentsByRevisionId` の除外）、ページのコメント件数（`Page.commentCount`）の数え方と、インラインコメントの書き込みに伴う件数の更新
 - 本文レンダリングパイプライン（rehype/remarkプラグイン構成、`generateViewOptions`）自体の変更。`RevisionRenderer.tsx` へのref転送以外、レンダリングパイプラインには一切触れない。本文レンダリング用コンポーネントのうち、条件付きで表示される操作ボタンのアイコン要素に `aria-hidden="true"` を付与する3ファイル（`Header.tsx`／`TableWithEditButton.tsx`／`DrawioViewerWithEditButton.tsx`）のみ例外とする——これは標準属性の付与であり、表示条件・クリック時の振る舞い・見た目はいずれも変更しない（後述「本文テキストの抽出範囲」参照）
 - 解決済みオフセットの永続キャッシュ（設計の簡素化として意図的に見送り。詳細はArchitecture節参照）
 
 ### Allowed Dependencies
+- `comment` スペックが持つ画面側の取得：`useSWRxInlineComments` が返す、起点コメントと返信の親子の一覧（`InlineCommentWithReplies[]`）と、その元になる共有の取得フック `useSWRxCommentList`・型 `ICommentListItem`。本文のハイライトと末尾の一覧は、この親子の一覧を使って描く。依存の向きは「`inline-comment` → `comment`」のみ。`InlineCommentService` は、ページのコメント件数を更新する関数（`updateCommentCount`）を依存として受け取り、作成・返信の作成・削除・返信の削除のあとに呼ぶ（呼ぶ条件と失敗時の扱いは `comment` スペックが定める）
 - 既存 `comments` Prisma/Mongooseモデルへの直接的なフィールド追加。`.claude/rules/model.md` の通り、Mongooseスキーマ（`apps/app/src/features/comment/server/models/comment.ts`）と `apps/app/prisma/schema.prisma` の両方を同期させる
 - 既存の `replyToId` フィールドと、返信のネスト構造を返す取得パターン（既存クライアントの `ReplyComments.tsx` が確立した表示パターンを参考にする）
 - `crowi.commentService.prepareMentionNotifications`（`apps/app/src/server/service/comment.ts`）— メンション通知経路の再利用。同一 `comments` テーブル・同一 `comment_id` 空間を使うため、**変更なしでそのまま呼び出せる**
@@ -66,18 +68,17 @@
 
 ### Revalidation Triggers
 - `comments` Prisma/Mongooseスキーマの構造変更、特に `isInline` の意味・型・デフォルト値の変更
-- `findCommentsByPageId`／`findCommentsByRevisionId` のシグネチャ変更（インラインコメント除外フィルタの実装箇所）
+- `comment` スペックの `ICommentListItem` のインライン用の項目（`isInline`／`replyToId`／アンカー4項目／`anchorOriginRevisionId`／`resolvedAt`／`resolvedById`）や、共有の取得フックのキー `['/comments', pageId, shareLinkId]` が変わる場合。`groupInlineComments` の起点と返信の見分け方と、書き込み後の再取得で本文のハイライトと末尾の一覧が一緒に更新される前提を再確認する
 - `getMentionedUsers`（`prisma.comments.findUnique` を直書き）のクエリ対象コレクションが変わる場合
 - `SupportedAction` の値の削除・リネーム
 - `RevisionRenderer.tsx` のprops・DOM構造の変更（refの転送方法に影響する場合）
-- [share-link-comments](../share-link-comments/) の認可モデル変更（`certify-shared-page.js`／`req.isSharedPage` の意味が変わる場合）
 - `GROWI_IS_CONTENT_RENDERING_ATTR` プロトコルに参加するコンポーネントの追加・変更。添付ファイル埋め込み（Ref/Refs/RefImg/RefsImg/Gallery、RichAttachment）は [auto-scroll](../auto-scroll/) スペックの時点でこのプロトコルへの参加が見送られており、これらを含むページでは埋め込みの内容が確定する前のテキストに対してマッチングが走ることがある。埋め込みが確定する際のDOM変化そのものは静定シグナルを発火させるため（後述 `use-container-settle`）、その変化が監視期間（マウント時点から10秒）の内側で起きれば、誤ったマッチング結果はその発火による再計算で自己修復する。ただしこれらの埋め込みはレンダリング状態属性プロトコルに参加しておらず、確定までの時間はネットワーク次第であるため、監視期間の内側に収まる保証はない。監視期間を過ぎてから確定した場合はハイライトのズレがページを開き直すまで残るため、残存するリスクとして扱う
 - 静定シグナルの発火条件（`use-container-settle` が「描画が落ち着いた」と判定する条件）が変わる場合、`useAnchorResolver` の再計算タイミング全体に影響する
 - `renderedTextOf` の除外条件（`.katex` または `aria-hidden="true"`）が変わる場合、その変更以前に作成されたアンカーの再アンカー成否に影響しうる。KaTeX（数式）のDOM出力構造（`.katex` クラス）が変わる場合も同様に前提が崩れる
 - `.wiki` 配下に、条件付きで表示される操作用の画面要素（アイコン用の素のテキストノードを持つもの）が新たに追加された場合、同じ `aria-hidden="true"` の付与を横展開する必要がある
 - `_comment-inheritance.scss` の `%bg-comment`／`%comment-section`／`%user-picture` の中身が変わったとき（通常コメントの箱とインラインコメントの箱の両方が同時に変わる、共有の抽象のため）
 - `packages/core-styles/scss/bootstrap/theming/_root.scss` のprimary/secondary限定の絞り込みが外れたとき（`--bs-warning-*` 等がテーマ対応になれば、専用のカスタムプロパティを持つ理由が薄れる）
-- `Comments`／`PageComment` の呼び出し元が増えたとき（共有リンク画面（`ShareLinkPageView.tsx`）に `inlineComments` が渡らないことを再確認する。取得は `PageView.tsx` 側の1箇所に閉じており、`Comments`／`PageComment` 自身はインラインコメントを取得しない）
+- `Comments`／`PageComment` の呼び出し元が増えたとき（共有リンク画面（`ShareLinkPageView.tsx`）に `inlineComments` が渡らないことを再確認する。`PageComment` が使う `useSWRxPageComment` は共有の一覧を取得するが、`isInline` が `true` の行を除いて返すため、インラインコメントは `PageView.tsx` から `inlineComments` として渡されたときだけ表示される。共有リンク経由の API はインラインコメントも返すので、画面に出さないことは、次の2点だけで実現している：共有リンク画面が `inlineComments` を渡さないこと（`PageView.tsx` も共有リンクの文脈では `useSWRxInlineComments` に `null` を渡す）と、`useSWRxPageComment` の除外）
 - `PageView.tsx` の `inlineCommentAnchors`／`bodyInlineComments`／`visibleResolvedRanges` が別の理由で変更された場合、「アンカー解決とスクロールナビゲーションは解決済みコメントも含めた全件に対して行う（`inlineCommentAnchors`は未フィルタのまま）」「本文中のハイライト・当たり判定・ポップオーバーだけを解決済み除外した`visibleResolvedRanges`経由で描画する」という2段構えの分離が保たれているか再確認する必要がある。`inlineCommentAnchors`自体を`.filter((c) => c.resolvedAt == null)`してしまうと、一覧クリックでの解決済みコメントへのスクロールナビゲーション（Requirement 16.1）が壊れる（当初案がこれで、`scrollToRange`が機能しなくなったため2段構えに直した経緯がある）
 - `removeWithReplies` の挙動（例えば `isInline` によるフィルタが追加される等）が変わった場合、起点コメント削除時の返信道連れ削除が引き続き機能するか再確認する必要がある
 - `IInlineComment`／`InlineCommentReply` の形（フィールドの追加・削除）が変わった場合、更新用DTOとサービス側の行形状チェック（起点／返信の判別）を再確認する必要がある
@@ -92,20 +93,20 @@
 
 ### アーキテクチャ選定：既存 `comments` モデルへの拡張＋新規ルート
 
-インラインコメントは、専用の新規Prismaモデルに分離せず、既存の `comments` モデルに `isInline` を含む拡張フィールドを追加する形で同居させる。共有リンク閲覧者への非公開（要件6）は、`/_api/comments.get` が使う2つの取得メソッド（`findCommentsByPageId`／`findCommentsByRevisionId`）に、`isSharedPage` の値によらず**常に**適用する無条件フィルタ（`isInline: { not: true }`）で担保する。
+インラインコメントは、専用の新規Prismaモデルに分離せず、既存の `comments` モデルに `isInline` を含む拡張フィールドを追加する形で同居させる。書き込み（作成・返信の作成・解決トグル・編集・削除）は新規の `apiv3` ルート（`/_api/v3/inline-comments*`）が受け持つ。読み取りは、`comment` スペックのコメント一覧 API（`GET /_api/v3/comments`）が通常コメントとまとめて返す。
 
-この決定は、次の2つの利益が決め手になった：
+この決定は、次の3つの利益が決め手になった：
 
 - **返信の再利用**: 既存の `replyToId` フィールドと、既存クライアントが確立した「ネストした返信一覧」の表示パターン（`ReplyComments.tsx`）をそのまま使える。新しいスキーマや新しいAPIを発明する必要がない。
 - **メンション通知の変更不要**: `getMentionedUsers`（`prisma.comments.findUnique` を直書き）の一般化が不要になる。同じテーブル・同じ `comment_id` 空間なので、変更なしでそのまま動く。
+- **取得を1本にできる**: 同じテーブルにあるので、1回の問い合わせで通常コメントとインラインコメントを返せる。画面側は、`isInline` と `replyToId` を見て、起点コメントと返信を組み直す（`groupInlineComments`）。
 
-比較検討した代替案（新規モデルに分離する案）は、共有リンクへの非公開を「物理的に別のコレクションであり、そこへ到達する経路（ルート）自体が存在しない」という構造的な保証で満たせる点で優れていた。同居案の保証は、**`findCommentsByPageId`／`findCommentsByRevisionId` の中にある1本の `WHERE` 条件**に依存するルールベースの保証であり、両者は性質が異なる（誰も削除・回避してはいけないルールである点は同じだが、コレクションが存在しないこととは強さが違う）。この差を踏まえてもなお、上記2つの利益がそれを上回ると判断した。副作用として、`resolvedById`/`resolvedAt` が通常コメントの行に対して常に `null` の列として現れることも受け入れている。
+比較検討した代替案（新規モデルに分離する案）は、通常コメントの行に意味を持たない列が増えない点で優れていた。しかし、`getMentionedUsers` の一般化が必要になり、通常コメントとインラインコメントを1つの一覧で読むことも難しくなる。上記3つの利益がそれを上回ると判断した。副作用として、`resolvedById`/`resolvedAt` が通常コメントの行に対して常に `null` の列として現れることも受け入れている。
 
-この保証の設計上の裏付け：
+同じテーブルを読む経路について、次の2点を守る：
 
-- この2つのメソッドは通常コメントの唯一の読み取り経路であり、他に `comments` テーブルを読む経路を新設しない設計（本スペックの新規ルートは、常に `isInline: true` を明示的に指定してクエリする）にすることで、フィルタが必要な箇所を「この2メソッドの中だけ」に閉じ込めている。条件が `isSharedPage` に依存しない（共有リンクの有無にかかわらず常に適用される）ことにより、「既存の `isSharedPage` 分岐が特別扱いを必要とする」というリスクは生じない。ただし「新しい呼び出し元がフィルタを書き忘れる」リスクは残る。
-- この保証をテストで固定する：`/_api/comments.get` が `isInline: true` の行を一切返さないことを、共有リンク文脈・通常文脈の両方について結合テストで検証する（Testing Strategy参照）。このテストが、ルールが将来壊れていないことを継続的に保証する仕組みになる。
-- **`comments` テーブルには `findCommentsByPageId`／`findCommentsByRevisionId` 以外にも読み取り経路が複数ある**（`getMentionedUsers` の `findUnique`、`comment.js` の更新・削除前 `findUnique`、`countCommentByPageId` 等）。このうち `/_api/comments.get` のレスポンスに直接影響するのは前者2メソッドのみだが、`countCommentByPageId`（ページ末尾コメントの件数バッジに使われる）もフィルタ漏れの対象になる——直さないと、インラインコメントの件数が通常コメントの件数バッジに混入してしまう（セキュリティ上の漏洩ではないが、利用者に見える不具合）。この設計では `countCommentByPageId` にも同じ `isInline: { not: true }` 条件を追加する。`getMentionedUsers` の `findUnique` は単一IDを指定した取得であり、一覧やカウントには影響しないため対象外（メンション通知はインラインコメントの行に対しても正しく動作する必要があるため、ここはむしろフィルタを入れてはいけない）。
+- 旧式の `/_api/comments.get` が使う `findCommentsByPageId`／`findCommentsByRevisionId` は、`isInline: { not: true }` を無条件に付けて、インラインコメントの行を返さない（契約は `comment` スペックの要件 5.2）。
+- `getMentionedUsers` の `findUnique` は、IDを1つ指定して取得する経路である。メンション通知はインラインコメントの行に対しても正しく動く必要があるため、ここに `isInline` の除外を入れてはいけない。
 
 ### データ所有権の分割（同一テーブルの明示的な分担）
 
@@ -113,7 +114,7 @@
 
 - **`isInline` フィールドが唯一の判別子。** 既存コメント機能（`comment.js`、`CommentEditor.tsx` 等）は `isInline` を常に `false`（省略時のデフォルト）で書き込み、`isInline: true` の行を作成・更新することはない。本スペックの新規ルートは常に `isInline: true` を明示して書き込み、`isInline` が `false`／未設定の行を作成・更新することはない。
 - **起点コメント（アンカーを持つ）と返信は、どちらも `isInline: true`。** アンカー4フィールド（`quote`/`prefix`/`suffix`/`approxOffset`）と `anchorOriginRevisionId`／`resolvedById`／`resolvedAt` は起点コメントにのみ値を持ち、返信では常に `null`。「このコメントがどのスレッドに属するか」は `isInline` で、「起点か返信か」は `replyToId` の有無で判定する（既存コメントの返信判定と同じロジックを流用できる）。
-- **既存の読み取り経路（`findCommentsByPageId`／`findCommentsByRevisionId`）は `isInline: true` の行を常に除外し、本スペックの新規読み取り経路は `isInline: true` の行のみを対象にする。** 2つの経路が同じ行を返すことはない。
+- **本スペックは読み取りの経路を持たない。** 旧式の取得メソッド（`findCommentsByPageId`／`findCommentsByRevisionId`）は `isInline: true` の行を常に除き、`comment` スペックのコメント一覧 API は両方の行を返す。どちらの行かは、応答の `isInline` で見分ける。
 
 ### レンダリングパイプラインへの意図的な非依存（クライアント側マッチング）
 
@@ -172,6 +173,8 @@ graph TB
         FetchMentionUsers[fetchMentionUsers]
         InlineCommentItem[InlineCommentItem]
         InlineCommentStore[inline-comment SWR store]
+        GroupInline[comment spec groupInlineComments]
+        SharedCommentList[comment spec useSWRxCommentList]
     end
 
     subgraph Server
@@ -179,6 +182,7 @@ graph TB
         InlineCommentService[InlineCommentService]
         CommentService[CommentService prepareMentionNotifications]
         LegacyCommentRoutes[legacy comment.js routes]
+        CommentListApi[comment spec GET comments]
         CommentsTable[(comments isInline true and false)]
     end
 
@@ -191,6 +195,10 @@ graph TB
     InlineCommentForm --> FetchMentionUsers
     InlineCommentForm --> InlineCommentStore
     InlineCommentStore --> InlineCommentRoutes
+    InlineCommentStore --> SharedCommentList
+    InlineCommentStore --> GroupInline
+    SharedCommentList --> CommentListApi
+    CommentListApi --> CommentsTable
     InlineCommentRoutes --> InlineCommentService
     InlineCommentService --> CommentsTable
     InlineCommentService --> CommentService
@@ -258,7 +266,7 @@ sequenceDiagram
     CommentSvc-->>Service: 通知準備完了
     Service-->>Route: 作成結果
     Route-->>Store: 201
-    Store-->>InlineCommentForm: 一覧を再取得
+    Store-->>InlineCommentForm: 共有のコメント一覧を再取得
 ```
 
 返信作成フローも同じ形だが、`Service` は `isInline: true, replyToId: <起点id>` を挿入し、アンカー4フィールド・`anchorOriginRevisionId`・`resolvedById`・`resolvedAt` はすべて `null` のまま作成する（要件1.9）。
@@ -278,7 +286,7 @@ flowchart TD
     end
 
     subgraph トリガー2[トリガー2 anchors の内容変化]
-        Fetch[インラインコメント一覧取得 起点+ネスト返信] --> Guard{描画中の目印付き要素が残っているか}
+        Fetch[共有のコメント一覧を取得し groupInlineComments で起点+返信に組み直す] --> Guard{描画中の目印付き要素が残っているか}
         Guard -- はい --> Defer[今回は再計算せず 次の静定シグナルに委ねる]
     end
 
@@ -359,7 +367,7 @@ sequenceDiagram
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |---|---|---|---|---|---|
-| InlineCommentService | Server | 作成・返信・一覧・解決トグル・編集・削除の永続化とActivity発行 | 1.1-1.6, 1.8-1.9, 18.1-18.9, 3.2, 4.1-4.5, 5.4-5.5, 6.1, 6.3 | `prisma.comments`(P0), `CommentService`(P0), `removeWithReplies`(P0) | Service, API |
+| InlineCommentService | Server | 作成・返信・解決トグル・編集・削除の永続化とActivity発行 | 1.1-1.6, 1.8-1.9, 18.1-18.9, 3.2, 4.1-4.5, 5.4-5.5 | `prisma.comments`(P0), `CommentService`(P0), `removeWithReplies`(P0) | Service, API |
 | rendered-text (`renderedTextOf`) | Client / ロジック | 除外対象を除いたプレーンテキストと、テキストオフセット⇄DOM位置の双方向マッピングを構築（本文テキストの唯一の情報源） | 1.2-1.3, 2.1-2.4, 5.1-5.3 | DOMコンテナ(P0) | State |
 | quote-matcher (`matchQuote`) | Client / ロジック | 完全一致→NFCあいまい一致→逆変換 | 2.1-2.4, 5.1-5.3 | `approx-string-match`(P0), `Intl.Segmenter`(P0) | Service |
 | AnchorResolver (`useAnchorResolver`) | Client / ロジック | 静定シグナル、またはanchors内容の変化（描画中でないことを確認したうえで）のたびに全起点アンカーを再計算しResolvedRangeを供給 | 2.1-2.4, 5.1-5.3 | rendered-text(P0), quote-matcher(P0), use-container-settle(P0) | State |
@@ -389,14 +397,14 @@ sequenceDiagram
 
 | Field | Detail |
 |---|---|
-| Intent | インラインコメント（起点・返信）の作成・一覧取得・解決トグル・編集・削除の永続化、メンション通知の起動、Activity記録 |
-| Requirements | 1.1, 1.2, 1.5, 1.6, 1.8, 1.9, 18.1-18.9, 3.2, 4.1, 4.2, 4.3, 4.5, 5.4, 5.5, 6.1, 6.3, 15.5, 15.12 |
+| Intent | インラインコメント（起点・返信）の作成・解決トグル・編集・削除の永続化、メンション通知の起動、Activity記録 |
+| Requirements | 1.1, 1.2, 1.5, 1.6, 1.8, 1.9, 18.1-18.9, 3.2, 4.1, 4.2, 4.3, 4.5, 5.4, 5.5, 15.5, 15.12 |
 
 **Responsibilities & Constraints**
 - `comments` テーブルのうち `isInline: true` の行に対する唯一の書き込み経路。作成後は `anchorOriginRevisionId` を再アンカーの成否にかかわらず書き換えない（5.5）。編集で更新されるのは `comment` 本文フィールドのみで、アンカー関連フィールド・`resolvedAt`／`resolvedById` は編集・削除いずれの操作でも変更しない
 - 作成・返信作成それぞれで `Activity` レコードを発行してから `CommentService.prepareMentionNotifications` を呼び出す（`prepareMentionNotifications` が `activityId` を要求するため）
 - 解決トグルの認可は、ページへのコメント権限を持つログイン済みユーザーであれば作成者に限定しない（4.2, 4.3の文言通り）。解決トグルは起点コメントに対してのみ行える（返信のIDを渡された場合は400を返す）
-- `listByPageId` は起点コメントと返信を別々に取得し、`replyToId` で紐付けてネスト構造を組み立てる責務を**自前で持つ**。既存の `comments` 拡張メソッド群には「返信込みで取得する」ヘルパーは存在しない（`removeWithReplies` は削除専用）ため、流用できるものはない
+- 一覧の取得は持たない。画面は、`useSWRxInlineComments` の取得部分（`comment` スペックが持つ）から、起点コメントと返信の親子の一覧を受け取る（取得と組み直しの規則は `comment` スペックの design.md を参照）。同じフックが返す書き込みの関数（作成・解決トグル・編集・削除）は本スペックが持つ（タスク 4.1）
 - `updateComment`／`updateReply` は形状（起点／返信）と `creatorId === actorId` を再検証してから `comment` を更新する（編集・削除の認可は投稿者本人限定。通常コメントの `comments.update`／`comments.remove` と同じ規律に従う）。`deleteComment` は形状・投稿者を検証したうえで `removeWithReplies(id)` を呼び返信も道連れに削除し、`deleteReply` は単純な単一行削除を行う
 
 **Dependencies**
@@ -424,7 +432,6 @@ interface CreateInlineCommentReplyInput {
 interface InlineCommentService {
   create(input: CreateInlineCommentInput, creatorId: string): Promise<InlineComment>;
   createReply(input: CreateInlineCommentReplyInput, creatorId: string): Promise<InlineCommentReply>;
-  listByPageId(pageId: string): Promise<InlineComment[]>; // 各要素が返信のネスト配列を含み、投稿者情報（serializeUserSecurely済み）も含む
   setResolved(id: string, resolved: boolean, actorId: string): Promise<InlineComment>;
   updateComment(id: string, comment: string, actorId: string): Promise<InlineComment>;
   updateReply(id: string, comment: string, actorId: string): Promise<InlineCommentReply>;
@@ -441,7 +448,6 @@ interface InlineCommentService {
 |---|---|---|---|---|
 | POST | `/_api/v3/inline-comments` | `CreateInlineCommentInput` | `InlineComment` | 400（空クオート・不正なpageId、または読み取り専用利用者にコメントが許可されていない）, 404（ページが存在しない、または閲覧権限がない。両者を区別しない一様な404。`apps/app/.claude/rules/page-write-action-403-404.md`）, 500 |
 | POST | `/_api/v3/inline-comments/:id/replies` | `CreateInlineCommentReplyInput` | `InlineCommentReply` | 400（`:id`が起点コメントでない、または読み取り専用利用者にコメントが許可されていない）, 404（`:id`が存在しない、または親ページの閲覧権限がない。一様な404）, 500 |
-| GET | `/_api/v3/inline-comments?pageId=...` | `{ pageId: string }` | `InlineComment[]`（作成日時順、各要素に返信のネスト配列を含む） | 400, 404（ページが存在しない、または閲覧権限がない。一様な404）, 500 |
 | PUT | `/_api/v3/inline-comments/:id/resolve` | `{ resolved: boolean }` | `InlineComment` | 400（`:id`が返信、または読み取り専用利用者にコメントが許可されていない）, 404（`:id`が存在しない、または閲覧権限がない。一様な404）, 500 |
 | PUT | `/_api/v3/inline-comments/:id` | `{ comment: string }` | `{ inlineComment: InlineComment }` | 400（`:id`が起点コメントでない、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない）, 404（`:id`が存在しない。閲覧権限がない場合も同じ404）, 500 |
 | PUT | `/_api/v3/inline-comments/replies/:id` | `{ comment: string }` | `{ inlineCommentReply: InlineCommentReply }` | 400（`:id`が返信でない、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない）, 404（`:id`が存在しない。閲覧権限がない場合も同じ404）, 500 |
@@ -450,7 +456,7 @@ interface InlineCommentService {
 
 すべてのルートで、ページ（または対象コメントが属するページ）が存在しない場合と、存在するが閲覧権限がない場合を区別せず、一様に404を返す（`apps/app/.claude/rules/page-write-action-403-404.md`——ページの存在をレスポンスから漏らさないための既存規則。当初の設計ではこのケースを403としていたが、実装時にこの規則に従って404へ訂正した）。表中で403として残っているのは「対象は見つかったが投稿者本人でない」場合のみで、こちらは意図的に区別している。未ログインのアクセスは、この実装が使う `loginRequiredFactory` がapiv3リクエストに対して常に403を返すため（401ではない）、当初の設計では401を想定していたが、実際の挙動と異なっていたため訂正した（タスク3.5／6.2のE2Eテストで実際の挙動として確認済み）。
 
-すべてのエンドポイントは `accessTokenParser` → `loginRequired` → express-validator → `apiV3FormValidator` のチェーンを通す。**`certifySharedPage` ミドルウェアはこれらのルートに一切適用しない**（要件6.1/6.2）。書き込み系の7ルート（`create.ts`／`create-reply.ts`／`resolve.ts`／`update.ts`／`update-reply.ts`／`delete.ts`／`delete-reply.ts`）はすべて、`loginRequired` の直後・express-validatorより前に `excludeReadOnlyUserIfCommentNotAllowed` を通す（apiv1の `/comments.add`／`/comments.update`／`/comments.remove` と同じ位置）。読み取り専用利用者にコメントが許可されていない場合、この時点で400を返す（要件1.4/1.5、18.4／18.8／18.9）。編集・削除ルートの投稿者本人チェックはルート側（`findUnique` で `creatorId` を取得するのと同じタイミング）とサービス側内部（多層防御としての再検証）の2回行う。
+すべてのエンドポイントは `accessTokenParser` → `loginRequired` → express-validator → `apiV3FormValidator` のチェーンを通す。**`certifySharedPage` ミドルウェアはこれらのルートに一切適用しない**（すべて書き込みのルートであり、共有リンク閲覧者には書き込みの手段を与えないため）。インラインコメントの読み取りはこの表に無い。`comment` スペックの `GET /_api/v3/comments` を使う。書き込み系の7ルート（`create.ts`／`create-reply.ts`／`resolve.ts`／`update.ts`／`update-reply.ts`／`delete.ts`／`delete-reply.ts`）はすべて、`loginRequired` の直後・express-validatorより前に `excludeReadOnlyUserIfCommentNotAllowed` を通す（apiv1の `/comments.add`／`/comments.update`／`/comments.remove` と同じ位置）。読み取り専用利用者にコメントが許可されていない場合、この時点で400を返す（要件1.4/1.5、18.4／18.8／18.9）。編集・削除ルートの投稿者本人チェックはルート側（`findUnique` で `creatorId` を取得するのと同じタイミング）とサービス側内部（多層防御としての再検証）の2回行う。
 
 ## Client / ロジック層
 
@@ -675,15 +681,15 @@ model comments {
   comments               comments[] @relation("CommentCreator")
   resolvedInlineComments comments[] @relation("InlineCommentResolver")
 ```
-- `isInline` はデフォルト `false`。`findCommentsByPageId`／`findCommentsByRevisionId`／`countCommentByPageId` 側のフィルタは `isInline: { not: true }` とする。ただし、既存の通常コメント行はこのフィールドを一切書き込んでいない（フィールド自体が存在しない）ため、PrismaのMongoコネクタの `{ not: true }`（および同等の `NOT`/`OR` 条件）は「フィールドが存在しない」ドキュメントにはマッチしない——マッチするのは「明示的に `false` 等の非true値が格納されている」ドキュメントのみである。このため、既存データに対して `isInline: false` を書き込むバックフィル用migration（`20260901160138-backfill-comments-isinline`）が必須であり、これを行わないと既存コメントが一覧・件数バッジから全消失する
+- `isInline` はデフォルト `false`。旧式の取得メソッド（`findCommentsByPageId`／`findCommentsByRevisionId`）のフィルタは `isInline: { not: true }` とする。ただし、既存の通常コメント行はこのフィールドを一切書き込んでいない（フィールド自体が存在しない）ため、PrismaのMongoコネクタの `{ not: true }`（および同等の `NOT`/`OR` 条件）は「フィールドが存在しない」ドキュメントにはマッチしない——マッチするのは「明示的に `false` 等の非true値が格納されている」ドキュメントのみである。このため、既存データに対して `isInline: false` を書き込むバックフィル用migration（`20260901160138-backfill-comments-isinline`）が必須であり、これを行わないと既存コメントが旧式の一覧取得（`/_api/comments.get`）から全消失する
 - `quote`/`prefix`/`suffix`/`approxOffset` はそれぞれ独立したスカラーフィールドとして宣言する（`Json` 型の構造化フィールドという前例のない選択肢は避け、既存スキーマの一貫したフィールド宣言スタイルに合わせる）。起点コメントのみ値を持ち、返信・通常コメントでは `null`
-- `@@index([pageId, isInline])` を新設する。既存の一覧取得（`isInline` を除外）・新規の一覧取得（`isInline` のみ）の両方が `pageId` 起点で `isInline` により分岐するため。**このインデックス作成もMongooseスキーマ側で宣言する必要がある**（`.claude/rules/model.md`：Mongooseがインデックス作成を引き続き所有するため）
+- `@@index([pageId, isInline])` を新設する。旧式の取得メソッドが、`pageId` を起点に `isInline` で絞り込むため。**このインデックス作成もMongooseスキーマ側で宣言する必要がある**（`.claude/rules/model.md`：Mongooseがインデックス作成を引き続き所有するため）
 
 ### Data Contracts & Integration
 
 - **API Data Transfer**: リクエスト/レスポンスは上記 Service Interface の型をそのままJSONへシリアライズする。`quote`/`prefix`/`suffix` は正規化前の原文のままシリアライズし、クライアント側での再選択・再表示に使う
-- **一覧応答への投稿者情報の付与**: `listByPageId` は `prisma.comments.findMany` に `include: { creator: true }` を付けて起点・返信の投稿者を取得し、通常コメントの一覧取得と同じ `serializeUserSecurely()` を通してからレスポンスに含める（13.5）。これは秘匿処理を経ない生のユーザー情報を返さないための必須の変換であり、`InlineCommentService` の型シグネチャだけからは読み取れない
-- **既存レスポンスからの除外**: `/_api/comments.get` が使う `findCommentsByPageId`／`findCommentsByRevisionId` は、`isSharedPage` の値によらず常に `isInline: { not: true }` を条件に含める。この2メソッドが `/_api/comments.get` に影響する読み取り経路であるため、この条件がインラインコメント非公開の実体になる（`comments` テーブルには他にもid指定の読み取り経路があるが、`/_api/comments.get` には影響しない——詳細はSecurity Considerations節参照）
+- **一覧の取得と投稿者情報**: インラインコメントの一覧は、`comment` スペックのコメント一覧 API の応答（`ICommentListItem` の平らな一覧）から作る。投稿者の情報からメールアドレスなどを除く処理は、`comment` スペックの整形（`toCommentListItem`）が行う（13.5、`comment` の要件 1.7）
+- **旧式の取得からの除外**: `/_api/comments.get` が使う `findCommentsByPageId`／`findCommentsByRevisionId` は、共有リンクかどうかによらず常に `isInline: { not: true }` を条件に含める。旧式の取得の応答を通常コメントだけに保つためで、契約は `comment` スペックの要件 5.2 が持つ
 - **編集・削除のDTO**: `UpdateInlineCommentRequestBody`/`ResponseBody`・`UpdateInlineCommentReplyRequestBody`/`ResponseBody`（いずれも `interfaces/dto/` 配下）はリクエスト・レスポンスとも `comment: string` 1フィールドのみを持つ。削除にはリクエスト本文がなく（idはURLパラメータ）、レスポンスにも意味のあるペイロードがない（`res.apiv3({})`）ため、DTOファイルは追加しない
 
 ## Error Handling
@@ -707,14 +713,11 @@ model comments {
 - 数式を含み、かつ同一文字列が複数回登場するページで、数式より後ろの重複文字列のうち、実際にコメントを付けた出現箇所にのみハイライトが表示されること（作成時と解決時の位置の数え方が一致していることの検証）
 - 見出し直後にコメントを作成し、**共同編集データの読み込みを人為的に遅らせた**状態でページを表示しても、読み込み完了後に正しい位置にハイライトが復元されること
 - ハイライト表示後、監視期間（マウント時点から10秒）の内側で、目印を持たない画面要素（見出しの編集ボタン等）が現れる・消える状況を作っても、ハイライトへのマウスオーバー・クリックで引き続きポップオーバーが開くこと（監視期間を過ぎてからの変化は静定シグナルが届かないため、このテストの対象外）
-- 既存 `/_api/comments.get` が `isInline: true` の行を一切返さないことは、通常文脈・共有リンク文脈の**両方**について検証する（`isSharedPage` の値にかかわらず同じ結果になることを両方のケースで確認し、無条件フィルタが機能していることをテストで固定する）
 
 ## Security Considerations
 
 - 認可はすべて既存の `apiv3` ミドルウェアチェーン（`accessTokenParser` → `loginRequired`）を再利用し、独自の認可ロジックを新設しない。書き込み系の7ルート（作成・返信作成・解決トグル・編集2・削除2）はすべて、これに加えて `excludeReadOnlyUserIfCommentNotAllowed` も既存ミドルウェアとして再利用し、読み取り専用利用者の制限をサーバー側で最終判定する（要件1.4/1.5、18.9）
-- 共有リンク閲覧者への非公開は、`findCommentsByPageId`／`findCommentsByRevisionId` に追加する無条件フィルタによって担保される。新規の `inline-comment` ルートは `certifySharedPage` を一切経由しないため、共有リンク経由でこれらのルートに到達する経路自体も存在しない（Architecture節参照。この保証の性質——コレクション分離ほど強くはない——は同節で明記している）。
-  - **`comments` テーブルには、このフィルタが効かない読み取り経路が他にも存在する**： `apps/app/src/server/routes/comment.js`（コメントの更新前・削除前の `findUnique`、495行目付近と605行目付近）、`apps/app/src/server/service/comment.ts`（`getMentionedUsers` の `findUnique`、73行目付近）の3箇所である。これらはいずれも**特定の既知の `commentId` を1件だけ指定して取得する経路**であり、ページ単位の一覧取得（`findCommentsByPageId`等）とは性質が異なる。共有リンク閲覧者は自分がまだ知らないインラインコメントの `commentId` を持ち得ないため、これらの経路から共有リンク文脈で到達されることはなく、`isInline` フィルタを追加する必要はない（`getMentionedUsers` はむしろインラインコメントの行に対しても正しく動作する必要があるため、ここにフィルタを入れてはいけない——Architecture節参照）。
-  - **上記3経路とは別に、`findCreatorsByPage`（`apps/app/src/features/comment/server/models/comment.ts`）も `isInline` フィルタが効かない、ページ単位（`where: { pageId }`）の読み取り経路である。** これは id 指定ではなくページ丸ごとの一覧取得であるため、上記3経路と同じ「共有リンク閲覧者は commentId を知らない」という理由付けは適用できない。ただし現時点でこのメソッドを呼び出しているコードはリポジトリ全体に存在せず（未使用）、実際の漏えい経路にはなっていない。将来「このページにコメントした人一覧」のような機能でこのメソッドが使われる場合は、`isInline: { not: true }` を追加するか、追加しない理由を明示すること。
+- 新規の `inline-comment` ルートはすべて書き込みのルートで、`certifySharedPage` を一切経由しない。共有リンク経由でインラインコメントを作成・編集・削除・解決する経路は無い。共有リンク経由でインラインコメントを読めるかどうか（読める。読み取り専用）と、その根拠は `comment` スペック（要件 3.3、`research.md`）が持つ。共有リンク画面にインラインコメントを出さないこと（要件6.2）は、画面側の表示の範囲の決定であり、データを隠すための仕組みではない
 - 解決トグルはページへのコメント権限を持つ任意のログイン済みユーザーが行える（作成者限定ではない）。これは要件4.2/4.3の文言通りの決定であり、将来「作成者限定にすべきか」が論点になった場合は要件フェーズに立ち戻って明示的に決定する
 - 編集・削除は解決トグルとは異なり投稿者本人限定（`creatorId === actorId`）である。クライアント側の `creatorId === currentUser?._id` チェックはそれ自体では認可の境界にならず（クライアント側のstateは古い可能性・偽装される可能性がある）、`comments.update`／`comments.remove` とまったく同じく、サーバー側のルート・サービスが変更前に投稿者本人であることを独立に再検証する
 

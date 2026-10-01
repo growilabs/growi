@@ -1,6 +1,6 @@
 # Brief: inline-comment
 
-> この文書は discovery（起票）時点の記録であり、以後更新していない。実装後の現在の仕様は `design.md`／`requirements.md` を正とする（例: 本文書の Scope は編集・削除をv1対象外としているが、実装では対象内に拡張されている。経緯は `research.md` の該当節を参照）。
+> この文書は discovery（起票）時点の記録である。実装後の現在の仕様は `design.md`／`requirements.md` を正とする（例: 本文書の Scope は編集・削除をv1対象外としているが、実装では対象内に拡張されている。経緯は `research.md` の該当節を参照）。
 
 ## Problem
 
@@ -60,7 +60,7 @@
   - 解決/未解決トグル（当時のドキュメントにあった `resolvedBy` / `resolvedAt` 相当の状態管理）
 - **Out**（v1では扱わない）:
   - コメントの編集・削除（既存の通常コメント機構が持つ機能を、インラインコメントにも将来展開するかは後続タスク）
-  - 共有リンク経由でのインラインコメント閲覧（[share-link-comments](../share-link-comments/) の対象範囲拡張）
+  - 共有リンク画面でのインラインコメントの表示・作成
 
 ## Boundary Candidates
 
@@ -72,7 +72,7 @@
 ## Out of Boundary
 
 - **エディタ（Yjs共同編集セッション）内でのインラインコメント作成・表示。** インラインコメントは読み取り専用のレンダリング済みページビューに対して付けるものとし、CodeMirror／Yjsのドキュメントモデルやカーソル・awareness機構には一切触れない。将来「編集中に対象範囲をハイライトする」「Y.RelativePositionでリアルタイムに追従させる」といった拡張が欲しくなった場合は、別スペックとして扱う。
-- **共有リンク経由の閲覧**（上記Scope参照）。ただし `/comments.get` は既に `share-link-comments` によって共有リンク閲覧者にも開放されているため、**このスペックの実装で、インラインコメント行（アンカーのクオート文字列等を含む）が共有リンク閲覧者に意図せず返らないようにする**（UIを出さないだけでなく、レスポンスからも除外する）ことは本スペックのスコープに含める。単なるUI非表示では防げないデータ露出の問題のため。
+- **共有リンク画面でのインラインコメントの表示・作成**（上記Scope参照）。共有リンク画面にインラインコメントの UI を出さないことは本スペックの範囲に含める。共有リンク経由の API が何を返すか（インラインコメントも読み取り専用で返す）は [comment](../comment/) スペックが定める。
 - **通常コメント（ページ末尾スレッド）の編集・削除・通知まわりの仕様変更。** 既存のまま。
 - **`@メンション`機能自体の追加要件**（自動補完の仕組み変更など）。[comment-mention](../comment-mention/) の既存実装を利用するのみ。
 
@@ -83,7 +83,6 @@
   - ページレンダリングパイプライン（`RevisionRenderer.tsx`、react-markdown、rehypeプラグイン群）
   - [comment-mention](../comment-mention/) のメンションハイライト・通知経路（利用するのみ、変更しない）
 - **Downstream**:
-  - [share-link-comments](../share-link-comments/)（将来、共有リンク閲覧者へのインラインコメント公開を検討する場合の拡張先）
   - 「エディタ内でのインラインコメント表示」（将来、必要になれば新規スペックとして着手）
 
 ## Existing Spec Touchpoints
@@ -91,7 +90,7 @@
 - **Extends**: なし（新規スペック）
 - **Adjacent**:
   - [comment-mention](../comment-mention/) — メンションハイライト・通知の依存先。本文中の位置指定という関心事は重複しない。
-  - [share-link-comments](../share-link-comments/) — 共有リンク閲覧時のコメントアクセス制御の確立パターン（`certify-shared-page.js`・`isSharedPage`）。v1では露出を防ぐ側で触れるのみ。
+  - [share-link-comments](../share-link-comments/) — 共有リンク閲覧時のコメントアクセス制御の確立パターン（`certify-shared-page.js`・`isSharedPage`）。本スペックは、共有リンク画面にインラインコメントの UI を出さないという形でのみ関わる。
   - [collaborative-editor](../collaborative-editor/) / [collaborative-editor-awareness](../collaborative-editor-awareness/) — Yjs共同編集。本スペックは意図的に非依存（Out of Boundary参照）。
 
 ## Constraints
