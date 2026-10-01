@@ -1,4 +1,4 @@
-import { type JSX, useEffect, useMemo, useRef } from 'react';
+import { type JSX, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { IRevisionHasId } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
@@ -76,6 +76,9 @@ export const Comments = (props: CommentsProps): JSX.Element => {
   const currentUser = useCurrentUser();
 
   const pageCommentParentRef = useRef<HTMLDivElement>(null);
+  // Callback-ref state so PageComment can portal the list menu onto this
+  // heading row once the slot mounts (and re-render when it does).
+  const [listMenuSlot, setListMenuSlot] = useState<HTMLDivElement | null>(null);
 
   const onLoadedDebounced = useMemo(
     () => debounce(500, () => onLoaded?.()),
@@ -115,7 +118,10 @@ export const Comments = (props: CommentsProps): JSX.Element => {
 
   return (
     <div className="page-comments-row mt-5 py-4 border-top d-edit-none d-print-none">
-      <h4 className="mb-3">{t('page_comment.comments')}</h4>
+      <div className="d-flex align-items-center justify-content-between gap-2 mb-3">
+        <h4 className="mb-0">{t('page_comment.comments')}</h4>
+        <div ref={setListMenuSlot} />
+      </div>
       <div
         id="page-comments-list"
         className="page-comments-list"
@@ -128,6 +134,7 @@ export const Comments = (props: CommentsProps): JSX.Element => {
           currentUser={currentUser}
           isReadOnly={isReadOnly}
           inlineComments={inlineComments}
+          listMenuSlot={listMenuSlot}
         />
         {isReadOnly && hasNoComments && (
           <p className="text-muted mb-0" data-testid="comments-empty-state">

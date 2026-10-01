@@ -560,6 +560,43 @@ describe('PageComment — folding resolved inline comments', () => {
     expect(renderedItemIds(container)).toEqual(['normal-1']);
   });
 
+  it('portals the list menu into the supplied slot so it can share a row with the Comments heading (Requirement 22.1)', () => {
+    const slot = document.createElement('div');
+    document.body.appendChild(slot);
+
+    const { container } = render(
+      <PageComment
+        // biome-ignore lint/suspicious/noExplicitAny: RevisionRenderer is not exercised here
+        rendererOptions={{} as any}
+        pageId="page1"
+        pagePath="/path/to/page"
+        revision="revision1"
+        currentUser={{ username: 'alice' }}
+        isReadOnly
+        listMenuSlot={slot}
+        inlineComments={{
+          comments: [inlineComment('open-1', '2024-01-01T00:00:00.000Z')],
+          resolve: resolveInlineComment,
+          createReply: createInlineCommentReply,
+          update: updateInlineComment,
+          remove: removeInlineComment,
+          updateReply: updateInlineCommentReply,
+          removeReply: removeInlineCommentReply,
+          scrollToRange: vi.fn(() => true),
+        }}
+      />,
+    );
+
+    expect(
+      within(container).queryByRole('button', { name: LIST_MENU_LABEL }),
+    ).toBeNull();
+    expect(
+      within(slot).getByRole('button', { name: LIST_MENU_LABEL }),
+    ).toBeInTheDocument();
+
+    slot.remove();
+  });
+
   it('shows an expanded comment as expanded after it is set back to unresolved, and folds it again once it is resolved again (Requirement 20.4)', async () => {
     commentStore.data = [];
     const open = inlineComment('c-1', '2024-01-01T00:00:00.000Z');

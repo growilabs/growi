@@ -37,7 +37,7 @@ export const InlineCommentListMenu = (
         aria-label={t('inline_comment.list_menu')}
       >
         <span className="material-symbols-outlined" aria-hidden="true">
-          more_horiz
+          more_vert
         </span>
       </DropdownToggle>
       <DropdownMenu end>

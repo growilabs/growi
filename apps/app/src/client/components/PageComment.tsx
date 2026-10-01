@@ -5,6 +5,7 @@ import { getIdStringForRef, isPopulated } from '@growi/core';
 import { UserPicture } from '@growi/ui/dist/components';
 import { parseISO } from 'date-fns/parseISO';
 import { useTranslation } from 'next-i18next';
+import { createPortal } from 'react-dom';
 
 import { apiPost } from '~/client/util/apiv1-client';
 import { toastError } from '~/client/util/toastr';
@@ -63,6 +64,13 @@ type PageCommentProps = {
      */
     scrollToRange: (commentId: string) => boolean;
   };
+  /**
+   * Mount point for the list menu, supplied by `Comments` so the menu sits
+   * on the same row as the "Comments" heading. Callers that do not own that
+   * heading (unit tests, search-result preview) omit this and the menu
+   * renders above the list instead.
+   */
+  listMenuSlot?: HTMLElement | null;
 };
 
 /**
@@ -98,6 +106,7 @@ export const PageComment: FC<PageCommentProps> = memo(
       currentUser,
       isReadOnly,
       inlineComments: inline,
+      listMenuSlot,
     } = props;
 
     const { data: comments, mutate } = useSWRxPageComment(pageId);
@@ -247,17 +256,23 @@ export const PageComment: FC<PageCommentProps> = memo(
       />
     );
 
+    // Not gated on write permission: it only changes what is shown.
+    const listMenu =
+      inline != null && inline.comments.length > 0 ? (
+        <InlineCommentListMenu items={collapse.listMenuItems} />
+      ) : null;
+
     return (
       <div
         className={`${styles['page-comment-styles']} page-comments-row comment-list`}
       >
         <div className="page-comments">
-          {/* Not gated on write permission: it only changes what is shown. */}
-          {inline != null && inline.comments.length > 0 && (
-            <div className="d-flex justify-content-end mb-2">
-              <InlineCommentListMenu items={collapse.listMenuItems} />
-            </div>
-          )}
+          {listMenu != null &&
+            (listMenuSlot != null ? (
+              createPortal(listMenu, listMenuSlot)
+            ) : (
+              <div className="d-flex justify-content-end mb-2">{listMenu}</div>
+            ))}
           <div className="page-comments-list mb-3" id="page-comments-list">
             {items.map((item) => {
               // An inline comment brings its own box, quote and replies, so it
