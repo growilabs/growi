@@ -53,6 +53,7 @@ export class PageLinkService {
     const pageEvent = this.crowi.events.page;
     pageEvent.on('create', (page: PageDocument) => this.onUpsert(page));
     pageEvent.on('update', (page: PageDocument) => this.onUpsert(page));
+    pageEvent.on('revert', (page: PageDocument) => this.onUpsert(page));
     pageEvent.on('delete', (page: PageDocument) => this.onDelete([page]));
     pageEvent.on('deleteCompletely', (page: PageDocument) =>
       this.onDelete([page]),
