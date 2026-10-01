@@ -335,22 +335,29 @@ export const getPageSchema = (crowi) => {
    * return whether the user is accessible to the page
    * @param {string} id ObjectId
    * @param {User} user
+   * @param {import('../interfaces/mongoose-utils').ObjectIdLike[] | null} [userGroups] ids of the groups `user` belongs to; looked up when omitted
+   * @param {boolean} [includeEmpty] whether an empty page counts as accessible
    */
-  pageSchema.statics.isAccessiblePageByViewer = async function (id, user) {
+  pageSchema.statics.isAccessiblePageByViewer = async function (
+    id,
+    user,
+    userGroups = null,
+    includeEmpty = false,
+  ) {
     const baseQuery = this.findOne({ _id: id }).select('path');
 
-    const userGroups =
-      user != null
+    const relatedUserGroups =
+      user != null && userGroups == null
         ? [
             ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
             ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
               user,
             )),
           ]
-        : [];
+        : userGroups;
 
-    const queryBuilder = new this.PageQueryBuilder(baseQuery);
-    queryBuilder.addConditionToFilteringByViewer(user, userGroups, true);
+    const queryBuilder = new this.PageQueryBuilder(baseQuery, includeEmpty);
+    queryBuilder.addConditionToFilteringByViewer(user, relatedUserGroups, true);
 
     const page = await queryBuilder.query.exec();
 
