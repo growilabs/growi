@@ -17,9 +17,9 @@ export type CommentCardProps = {
    * back for a missing/unpopulated creator), so CommentCard never decides to
    * hide them itself. A normal comment passes `undefined` or an unpopulated
    * `Ref<IUser>`; an inline comment passes an already-serialized
-   * `IUserSerializedSecurely<IUserHasId>` (or `null`), since its
-   * `listByPageId()` response already ran the row through
-   * `serializeUserSecurely` server-side.
+   * `IUserSerializedSecurely<IUserHasId>` (or `null`), since the
+   * shared comment list already ran the row through `serializeUserSecurely`
+   * server-side.
    */
   creator:
     | IUserHasId

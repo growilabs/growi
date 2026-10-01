@@ -35,10 +35,10 @@ export interface IInlineComment {
   pageId: string;
   creatorId: string;
   /**
-   * Populated only by `listByPageId()`, run through `serializeUserSecurely`
-   * (the same sanitization the ordinary comment list applies). `null` when
-   * the user could not be resolved, or when produced by
-   * `create()`/`setResolved()` (neither fetches the creator relation).
+   * Populated from the shared comment list (GET /comments), which runs the
+   * creator through `serializeUserSecurely`. `null` when the user could not
+   * be resolved, or when produced by the write routes' responses (they do not
+   * fetch the creator relation).
    */
   creator: ICommentCreatorSummary | null;
   comment: string;
@@ -61,7 +61,7 @@ export interface InlineCommentReply {
   id: string;
   pageId: string;
   creatorId: string;
-  /** Populated only by `listByPageId()`, mirroring `IInlineComment.creator` above. */
+  /** Populated from the shared comment list, mirroring `IInlineComment.creator` above. */
   creator: ICommentCreatorSummary | null;
   comment: string;
   /** The origin inline comment this reply belongs to. */

@@ -25,18 +25,19 @@
  *
  * The "no page permission" case (authenticated, but lacking view permission
  * on the target page) is covered per-route in create.integ.ts /
- * create-reply.integ.ts / list.integ.ts / resolve.integ.ts, each asserting a
+ * create-reply.integ.ts / resolve.integ.ts, each asserting a
  * uniform 404 per apps/app/.claude/rules/page-write-action-403-404.md.
  *
- * update.ts/update-reply.ts/delete.ts/delete-reply.ts (the origin-comment and
- * reply edit/delete routes) are included below for the same "no login"
- * real-auth-chain coverage the original four routes already had -- this
- * suite previously covered only create/create-reply/list/resolve, leaving
- * the four newer routes' real-chain rejection unverified.
+ * Every write route (create, create-reply, resolve, update, update-reply,
+ * delete, delete-reply) gets the same "no login" real-auth-chain check. The
+ * list URL (GET /inline-comments) is not served and answers with a JSON 404.
  *
  * Requirements: 1.5, 1.6, 6.1, 18.3, 18.7
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 import { Types } from 'mongoose';
 import request from 'supertest';
@@ -44,13 +45,13 @@ import request from 'supertest';
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 
 import { createInlineCommentRouteHandlersFactory } from './create';
 import { createInlineCommentReplyRouteHandlersFactory } from './create-reply';
 import { deleteInlineCommentRouteHandlersFactory } from './delete';
 import { deleteInlineCommentReplyRouteHandlersFactory } from './delete-reply';
-import { listInlineCommentsRouteHandlersFactory } from './list';
 import { resolveInlineCommentRouteHandlersFactory } from './resolve';
 import { updateInlineCommentRouteHandlersFactory } from './update';
 import { updateInlineCommentReplyRouteHandlersFactory } from './update-reply';
@@ -88,10 +89,6 @@ describe('inline-comment routes — real auth chain, no login', () => {
       '/:id/replies',
       createInlineCommentReplyRouteHandlersFactory(crowi),
     );
-    inlineCommentsRouter.get(
-      '/',
-      listInlineCommentsRouteHandlersFactory(crowi),
-    );
     inlineCommentsRouter.put(
       '/:id/resolve',
       resolveInlineCommentRouteHandlersFactory(crowi),
@@ -113,6 +110,11 @@ describe('inline-comment routes — real auth chain, no login', () => {
       deleteInlineCommentReplyRouteHandlersFactory(crowi),
     );
     app.use(MOUNT_PREFIX, inlineCommentsRouter);
+    // Mirrors the explicit 404 registered right after the router mount in
+    // apps/app/src/server/routes/apiv3/index.js.
+    app.get(MOUNT_PREFIX, (_req, res: ApiV3Response) =>
+      res.apiv3Err(new ErrorV3('Not found', 'not_found'), 404),
+    );
   }, 120_000);
 
   it('POST /inline-comments without login is rejected with 403', async () => {
@@ -134,11 +136,30 @@ describe('inline-comment routes — real auth chain, no login', () => {
     expect(res.status).toBe(403);
   });
 
-  it('GET /inline-comments without login is rejected with 403', async () => {
+  it('answers GET /inline-comments with a JSON 404', async () => {
     const res = await request(app)
       .get(MOUNT_PREFIX)
       .query({ pageId: String(new Types.ObjectId()) });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
+    expect(res.body.errors[0].code).toBe('not_found');
+  });
+
+  // apiv3 has no catch-all, so without the explicit 404 an unmatched GET falls
+  // through to the Next.js page delegation (302 to /login or an HTML 200).
+  it('registers the explicit 404 for GET /inline-comments and no list handler in production', () => {
+    const source = readFileSync(
+      path.resolve(__dirname, '../../../../server/routes/apiv3/index.js'),
+      'utf8',
+    );
+    expect(source).toContain(
+      "router.use('/inline-comments', inlineCommentsRouter)",
+    );
+    expect(source).toMatch(
+      /router\.get\(\s*'\/inline-comments'[\s\S]*?apiv3Err\([\s\S]*?404/,
+    );
+    expect(source).not.toMatch(/inlineCommentsRouter\.get\(/);
+    expect(source).not.toContain('inline-comment/server/routes/list');
+    expect(source).not.toContain('listInlineCommentsRouteHandlersFactory');
   });
 
   it('PUT /inline-comments/:id/resolve without login is rejected with 403', async () => {

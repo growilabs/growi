@@ -156,7 +156,7 @@
   - _Boundary: useSWRxInlineComments_
 
 - [ ] 5. Integration: インライン専用の一覧取得の廃止
-- [ ] 5.1 インライン専用の一覧取得を廃止する
+- [x] 5.1 インライン専用の一覧取得を廃止する
   - 一覧取得のルートと、その登録、import を削除する
   - インラインコメントのサービスの一覧取得(`listByPageId`)と、一覧専用の行の変換、その応答の型を削除する
   - 一覧取得のルートの結合テストと、サービスの一覧取得のテストを削除する
@@ -212,3 +212,4 @@
 - 4.2: 投稿者の型を整えた。`ICommentCreator` は `_id` / `__v` を持ち、画面が読む 4 項目だけの `ICommentCreatorSummary`(`_id` / `username` / `name` / `imageUrlCached`)を `IInlineComment` と返信の `creator`、`CommentCard`、`Username`、`@growi/ui` の `UserPicture` が受ける。4.3 で通常コメントの型を広げるときは `creator: Ref<IUser> | ICommentCreatorSummary | null` にすれば、4.4 で `ICommentListItem` を `as` なしで渡せる。
 - 4.2: `apps/app` の型検査は `@growi/ui` の `dist` を読むため、新しい checkout では先に `turbo run build --filter @growi/ui` が要る。
 - 4.5: 5.1 の「説明のコメントを直す」対象に、`features/inline-comment/client/components/AnchorResolver/use-anchor-resolver.ts`(58〜63 行目付近。「再取得のたびに新しい配列を返す」は、いまは「共有の一覧が変わったときに新しい配列になる」が正しい)と、`use-anchor-resolver.spec.tsx`(138 / 307 行目付近)を足す。`IInlineComment.creator` の JSDoc(`listByPageId()` でのみ埋まる)、`dto/list-inline-comments.ts` と `dto/index.ts` の再 export も 5.1 で整理する。
+- 5.1: apiv3 のルーターには「見つからない」の受け皿がなく、登録を消しただけでは未登録の GET が Next のページ処理へ流れる(ログインなしと PAT は 302、ログインセッションは 200 の HTML になる)。廃止した `GET /_api/v3/inline-comments` は、index.js の明示的な JSON 404 で受ける。

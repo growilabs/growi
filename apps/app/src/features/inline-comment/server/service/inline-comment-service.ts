@@ -3,8 +3,7 @@
  * Activity recording, and mention-notification kickoff for inline comments.
  */
 
-import type { IPageHasId, IUserHasId } from '@growi/core';
-import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import type { IPageHasId } from '@growi/core';
 import { Types } from 'mongoose';
 
 import type { Prisma } from '~/generated/prisma/client';
@@ -21,7 +20,6 @@ import type {
   IInlineComment,
   InlineCommentAnchor,
   InlineCommentReply,
-  InlineCommentWithReplies,
 } from '../../interfaces';
 
 const logger = loggerFactory('growi:features:inline-comment:service');
@@ -63,12 +61,6 @@ type InlineCommentReplyCreateResult = Prisma.Result<
   object,
   'create'
 >;
-
-type InlineCommentListRow = Prisma.Result<
-  PrismaClient['comments'],
-  { include: { creator: true } },
-  'findMany'
->[number];
 
 type InlineCommentUpdateResult = Prisma.Result<
   PrismaClient['comments'],
@@ -127,7 +119,7 @@ function toIInlineComment(row: InlineCommentCreateResult): IInlineComment {
     id: row.id,
     pageId: row.pageId,
     creatorId: row.creatorId,
-    creator: null, // no `creator` include on this insert; the client re-fetches the list right after create()
+    creator: null, // no `creator` include on this insert; the creator is filled in by the shared GET /comments list
     comment: row.comment,
     anchorOriginRevisionId: row.anchorOriginRevisionId,
     anchor: {
@@ -157,77 +149,6 @@ function toInlineCommentReply(
     pageId: row.pageId,
     creatorId: row.creatorId,
     creator: null, // no `creator` include on this insert
-    comment: row.comment,
-    replyToId: row.replyToId,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
-}
-
-/**
- * Returns `null` (rather than throwing) for a row missing a required anchor
- * field, instead of failing the whole page's comment list for every viewer
- * over one malformed row (manual DB edit, write-path bug, schema drift).
- */
-function toIInlineCommentFromListRow(
-  row: InlineCommentListRow,
-): IInlineComment | null {
-  if (
-    row.creatorId == null ||
-    row.quote == null ||
-    row.prefix == null ||
-    row.suffix == null ||
-    row.approxOffset == null ||
-    row.anchorOriginRevisionId == null
-  ) {
-    logger.warn(
-      `Skipping malformed inline comment row '${row.id}': missing required anchor field(s)`,
-    );
-    return null;
-  }
-
-  return {
-    id: row.id,
-    pageId: row.pageId,
-    creatorId: row.creatorId,
-    creator:
-      row.creator != null
-        ? serializeUserSecurely(row.creator as IUserHasId)
-        : null,
-    comment: row.comment,
-    anchorOriginRevisionId: row.anchorOriginRevisionId,
-    anchor: {
-      quote: row.quote,
-      prefix: row.prefix,
-      suffix: row.suffix,
-      approxOffset: row.approxOffset,
-    },
-    resolvedById: row.resolvedById,
-    resolvedAt: row.resolvedAt,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
-}
-
-/** Reply-row counterpart of `toIInlineCommentFromListRow` — same null-on-malformed-row behavior. */
-function toInlineCommentReplyFromListRow(
-  row: InlineCommentListRow,
-): InlineCommentReply | null {
-  if (row.creatorId == null || row.replyToId == null) {
-    logger.warn(
-      `Skipping malformed inline comment reply row '${row.id}': missing required field(s)`,
-    );
-    return null;
-  }
-
-  return {
-    id: row.id,
-    pageId: row.pageId,
-    creatorId: row.creatorId,
-    creator:
-      row.creator != null
-        ? serializeUserSecurely(row.creator as IUserHasId)
-        : null,
     comment: row.comment,
     replyToId: row.replyToId,
     createdAt: row.createdAt,
@@ -338,8 +259,8 @@ export class InlineCommentService {
         isInline: true,
         // Explicit null, not omitted: an omitted field is absent from the
         // MongoDB document, and Prisma's MongoDB connector does not match an
-        // absent field against `where: { replyToId: null }` — the filter
-        // listByPageId() uses to select origin comments.
+        // absent field against `where: { replyToId: null }`, so an origin-comment
+        // filter would silently skip this row.
         replyToId: null,
         quote: input.anchor.quote,
         prefix: input.anchor.prefix,
@@ -443,54 +364,6 @@ export class InlineCommentService {
     await this.refreshCommentCount(parent.pageId);
 
     return toInlineCommentReply(created);
-  }
-
-  /**
-   * Lists every inline comment for a page, with each origin comment's
-   * replies nested under it. Fetches origins and replies in two `findMany()`
-   * calls (one round trip for all replies, not one per origin). Both queries
-   * order by `createdAt: 'desc'`; display order is a client-side concern
-   * (see `InlineCommentReplies.tsx`, which reverses `replies` before render).
-   */
-  async listByPageId(pageId: string): Promise<InlineCommentWithReplies[]> {
-    const originRows = await this.deps.prisma.comments.findMany({
-      where: { pageId, isInline: true, replyToId: null },
-      include: { creator: true },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (originRows.length === 0) {
-      return [];
-    }
-
-    const replyRows = await this.deps.prisma.comments.findMany({
-      where: {
-        isInline: true,
-        replyToId: { in: originRows.map((row) => row.id) },
-      },
-      include: { creator: true },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const repliesByOriginId = replyRows.reduce((map, row) => {
-      const reply = toInlineCommentReplyFromListRow(row);
-      if (reply == null) {
-        return map;
-      }
-      const existing = map.get(reply.replyToId) ?? [];
-      map.set(reply.replyToId, [...existing, reply]);
-      return map;
-    }, new Map<string, InlineCommentReply[]>());
-
-    return originRows
-      .map((row) => {
-        const comment = toIInlineCommentFromListRow(row);
-        if (comment == null) {
-          return null;
-        }
-        return { ...comment, replies: repliesByOriginId.get(row.id) ?? [] };
-      })
-      .filter((entry): entry is InlineCommentWithReplies => entry != null);
   }
 
   /**

@@ -1,3 +1,4 @@
+import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 
 import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
@@ -14,7 +15,6 @@ import { createInlineCommentRouteHandlersFactory } from '~/features/inline-comme
 import { createInlineCommentReplyRouteHandlersFactory } from '~/features/inline-comment/server/routes/create-reply';
 import { deleteInlineCommentRouteHandlersFactory } from '~/features/inline-comment/server/routes/delete';
 import { deleteInlineCommentReplyRouteHandlersFactory } from '~/features/inline-comment/server/routes/delete-reply';
-import { listInlineCommentsRouteHandlersFactory } from '~/features/inline-comment/server/routes/list';
 import { resolveInlineCommentRouteHandlersFactory } from '~/features/inline-comment/server/routes/resolve';
 import { updateInlineCommentRouteHandlersFactory } from '~/features/inline-comment/server/routes/update';
 import { updateInlineCommentReplyRouteHandlersFactory } from '~/features/inline-comment/server/routes/update-reply';
@@ -223,10 +223,6 @@ export const setup = (crowi, app) => {
       '/:id/replies',
       createInlineCommentReplyRouteHandlersFactory(crowi),
     );
-    inlineCommentsRouter.get(
-      '/',
-      listInlineCommentsRouteHandlersFactory(crowi),
-    );
     inlineCommentsRouter.put(
       '/:id/resolve',
       resolveInlineCommentRouteHandlersFactory(crowi),
@@ -248,6 +244,11 @@ export const setup = (crowi, app) => {
       deleteInlineCommentReplyRouteHandlersFactory(crowi),
     );
     router.use('/inline-comments', inlineCommentsRouter);
+    // apiv3 has no catch-all, so an unmatched GET would be delegated to the
+    // Next.js pages (302 to /login or an HTML 200) instead of a JSON error.
+    router.get('/inline-comments', (req, res) =>
+      res.apiv3Err(new ErrorV3('Not found', 'not_found'), 404),
+    );
   }
 
   {

@@ -20,9 +20,9 @@
  * spacing (scoped to `.wiki.comment`) never reaches an inline comment.
  *
  * Edit/delete: shown only to the comment's own creator (`comment.creatorId
- * === currentUser?._id` — `creator` is not used for this check since it's
- * only ever populated by `listByPageId()`, and the popover cannot rely on a
- * populated `creator` either). The buttons themselves, and the read-only-user
+ * === currentUser?._id` — `creator` is not used for this check since a
+ * write route's response carries no populated `creator`, and the popover
+ * cannot rely on one either). The buttons themselves, and the read-only-user
  * gating around them, come from the shared `CommentEditDeleteButtons` --
  * the same component `CommentControl.tsx` uses for a normal comment.
  * Deleting opens the `DeleteConfirmAlert` shown in place, the same
