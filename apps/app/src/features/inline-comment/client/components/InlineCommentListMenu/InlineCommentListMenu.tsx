@@ -17,12 +17,24 @@ export type InlineCommentListMenuItem = {
 
 type InlineCommentListMenuProps = {
   items: readonly InlineCommentListMenuItem[];
+  /**
+   * i18n key for the toggle's accessible name. Defaults to the list-wide
+   * menu label; the per-item actions menu on narrow viewports passes its
+   * own key (Requirement 24).
+   */
+  ariaLabelKey?: string;
+  /** Optional test id for the toggle button. */
+  toggleTestId?: string;
 };
 
 export const InlineCommentListMenu = (
   props: InlineCommentListMenuProps,
 ): JSX.Element => {
-  const { items } = props;
+  const {
+    items,
+    ariaLabelKey = 'inline_comment.list_menu',
+    toggleTestId,
+  } = props;
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -34,7 +46,8 @@ export const InlineCommentListMenu = (
         type="button"
         color="link"
         className="btn-sm btn-outline-neutral-secondary border-0"
-        aria-label={t('inline_comment.list_menu')}
+        aria-label={t(ariaLabelKey)}
+        data-testid={toggleTestId}
       >
         <span className="material-symbols-outlined" aria-hidden="true">
           more_vert

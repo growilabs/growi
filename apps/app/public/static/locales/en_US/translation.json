@@ -430,7 +430,9 @@
     "collapse": "Collapse",
     "more": "More",
     "expand_all_resolved": "Expand all resolved comments",
-    "list_menu": "Comment list menu"
+    "list_menu": "Comment list menu",
+    "item_menu": "Comment actions",
+    "view_at_posting": "View page at posting"
   },
   "page_api_error": {
     "notfound_or_forbidden": "Original page is not found or forbidden.",

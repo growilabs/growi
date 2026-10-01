@@ -53,6 +53,8 @@ const REFINEMENT_KEYS = [
   'more',
   'expand_all_resolved',
   'list_menu',
+  'item_menu',
+  'view_at_posting',
 ] as const;
 
 const LOCALES = ['en_US', 'ja_JP', 'zh_CN', 'fr_FR', 'ko_KR'] as const;

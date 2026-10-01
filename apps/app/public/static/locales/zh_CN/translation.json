@@ -416,7 +416,9 @@
     "collapse": "折叠",
     "more": "更多",
     "expand_all_resolved": "展开所有已解决的评论",
-    "list_menu": "评论列表菜单"
+    "list_menu": "评论列表菜单",
+    "item_menu": "评论操作",
+    "view_at_posting": "查看发表时的页面"
   },
   "page_api_error": {
     "notfound_or_forbidden": "未找到或禁止原始页。",

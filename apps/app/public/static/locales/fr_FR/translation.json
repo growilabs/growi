@@ -422,7 +422,9 @@
     "collapse": "Réduire",
     "more": "Plus",
     "expand_all_resolved": "Développer tous les commentaires résolus",
-    "list_menu": "Menu de la liste des commentaires"
+    "list_menu": "Menu de la liste des commentaires",
+    "item_menu": "Actions du commentaire",
+    "view_at_posting": "Voir la page au moment de la publication"
   },
   "page_api_error": {
     "notfound_or_forbidden": "Page originale introuvable ou accès restreint.",

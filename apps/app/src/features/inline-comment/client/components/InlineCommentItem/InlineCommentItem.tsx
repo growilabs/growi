@@ -31,11 +31,21 @@
  * A collapsed resolved comment renders `CollapsedInlineCommentItem` instead;
  * the quote and the status badge are shared parts, so the two displays
  * cannot drift apart.
+ *
+ * On viewports narrower than `md`, edit/delete/resolve/history collapse into
+ * a three-dot menu (Requirement 24) — hover-reveal is useless on touch, and
+ * the pill row wraps. Collapse and the status badge stay outside the menu.
  */
 import { type FC, type JSX, useState } from 'react';
+import { useRouter } from 'next/router';
+import * as pathUtils from '@growi/core/dist/utils/path-utils';
 import { useTranslation } from 'react-i18next';
+import urljoin from 'url-join';
 
-import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '~/client/components/NotAvailableForReadOnlyUser';
+import {
+  NotAvailableIfReadOnlyUserNotAllowedToComment,
+  useIsCommentActionBlockedForReadOnlyUser,
+} from '~/client/components/NotAvailableForReadOnlyUser';
 import { CommentCard } from '~/client/components/PageComment/CommentCard';
 import { CommentEditDeleteButtons } from '~/client/components/PageComment/CommentEditDeleteButtons';
 import { CommentEditor } from '~/client/components/PageComment/CommentEditor';
@@ -44,8 +54,13 @@ import { DeleteConfirmAlert } from '~/client/components/PageComment/DeleteConfir
 import RevisionRenderer from '~/components/PageView/RevisionRenderer';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 import { useCurrentUser } from '~/states/global';
+import { useDeviceLargerThanMd } from '~/states/ui/device';
 
 import type { InlineCommentWithReplies } from '../../../interfaces';
+import {
+  InlineCommentListMenu,
+  type InlineCommentListMenuItem,
+} from '../InlineCommentListMenu/InlineCommentListMenu';
 import { CollapsedInlineCommentItem } from './CollapsedInlineCommentItem';
 import { InlineCommentQuote } from './InlineCommentQuote';
 import { InlineCommentReplies } from './InlineCommentReplies';
@@ -103,12 +118,18 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
     onCollapse,
   } = props;
   const { t } = useTranslation();
+  const router = useRouter();
   const currentUser = useCurrentUser();
+  const [isLargerThanMd] = useDeviceLargerThanMd();
+  const isCommentActionBlocked = useIsCommentActionBlockedForReadOnlyUser();
 
   const [resolveError, setResolveError] = useState<string>();
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string>();
+
+  const isResolved = comment.resolvedAt != null;
+  const isOwnComment = currentUser?._id === comment.creatorId;
 
   // Branching after the hooks keeps this component mounted while collapsed,
   // so its local state survives a collapse/expand round trip.
@@ -121,9 +142,6 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
       />
     );
   }
-
-  const isResolved = comment.resolvedAt != null;
-  const isOwnComment = currentUser?._id === comment.creatorId;
 
   // `opacity-75` is what makes a resolved comment recede, mirroring the
   // mockup's `.ic-item[data-resolved="true"] { opacity: .8 }`. Besides the
@@ -169,6 +187,133 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
     }
   };
 
+  const { returnPathForURL } = pathUtils;
+  const revisionHref = urljoin(
+    returnPathForURL(pagePath, comment.pageId),
+    `?revisionId=${comment.anchorOriginRevisionId}`,
+  );
+
+  const narrowMenuItems: InlineCommentListMenuItem[] = [];
+  if (isOwnComment) {
+    narrowMenuItems.push(
+      {
+        id: 'edit',
+        labelKey: 'Edit',
+        disabled: isCommentActionBlocked,
+        onSelect: () => setIsEditing(true),
+      },
+      {
+        id: 'delete',
+        labelKey: 'Delete',
+        disabled: isCommentActionBlocked,
+        onSelect: () => setIsDeleteConfirmOpen(true),
+      },
+    );
+  }
+  narrowMenuItems.push(
+    {
+      id: 'resolve',
+      labelKey: isResolved ? 'inline_comment.reopen' : 'inline_comment.resolve',
+      disabled: isCommentActionBlocked,
+      onSelect: () => {
+        void handleResolveToggle();
+      },
+    },
+    {
+      id: 'view-at-posting',
+      labelKey: 'inline_comment.view_at_posting',
+      disabled: false,
+      onSelect: () => {
+        void router.push(revisionHref);
+      },
+    },
+  );
+
+  const collapseButton =
+    isResolved && !isDeleteConfirmOpen ? (
+      <button
+        type="button"
+        data-testid="inline-comment-collapse-button"
+        className="btn btn-sm btn-link text-secondary text-decoration-none p-0 d-inline-flex align-items-center lh-1"
+        aria-label={t('inline_comment.collapse')}
+        onClick={onCollapse}
+      >
+        <span className="material-symbols-outlined" aria-hidden="true">
+          expand_less
+        </span>
+      </button>
+    ) : null;
+
+  const statusBadge = <InlineCommentStatusBadge isResolved={isResolved} />;
+
+  const desktopHeaderEnd = (
+    <>
+      {/* Same position as a normal comment's own history link:
+          right after the date, not part of the `ms-auto` group
+          below. */}
+      <span className={`ms-2 ${styles['icon-button-container']}`}>
+        <CommentRevisionLink
+          id={comment.id}
+          pagePath={pagePath}
+          pageId={comment.pageId}
+          revisionId={comment.anchorOriginRevisionId}
+        />
+      </span>
+      {/* Order left-to-right: edit/delete, resolve/reopen, collapse (resolved
+          only), status badge. Edit/delete and resolve share
+          `.icon-button-container` (hover-revealed). The badge stays outside
+          and always visible. */}
+      <span className="ms-auto d-flex align-items-center gap-2">
+        {isOwnComment && !isDeleteConfirmOpen && (
+          <span
+            className={`d-flex align-items-center gap-1 ${styles['icon-button-container']}`}
+          >
+            <CommentEditDeleteButtons
+              testIdPrefix="inline-comment"
+              onClickEditBtn={() => setIsEditing(true)}
+              onClickDeleteBtn={() => setIsDeleteConfirmOpen(true)}
+            />
+          </span>
+        )}
+        {/* Neither the resolve toggle nor the collapse button while the
+            delete confirm is open: resolving collapses the item, and
+            the still-set confirm would reappear on the next expand. */}
+        {!isDeleteConfirmOpen && (
+          <span className={styles['icon-button-container']}>
+            <NotAvailableIfReadOnlyUserNotAllowedToComment>
+              <button
+                type="button"
+                data-testid="inline-comment-resolve-toggle-button"
+                className="btn btn-sm btn-outline-secondary rounded-pill"
+                onClick={handleResolveToggle}
+              >
+                {isResolved
+                  ? t('inline_comment.reopen')
+                  : t('inline_comment.resolve')}
+              </button>
+            </NotAvailableIfReadOnlyUserNotAllowedToComment>
+          </span>
+        )}
+        {collapseButton}
+        {statusBadge}
+      </span>
+    </>
+  );
+
+  const narrowHeaderEnd = (
+    <span className="ms-auto d-flex align-items-center gap-2">
+      {!isDeleteConfirmOpen && (
+        <InlineCommentListMenu
+          items={narrowMenuItems}
+          ariaLabelKey="inline_comment.item_menu"
+          toggleTestId="inline-comment-item-menu-toggle"
+        />
+      )}
+      {collapseButton}
+      {statusBadge}
+    </span>
+  );
+
   return (
     <div
       data-testid="inline-comment-item"
@@ -198,79 +343,7 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
           creator={comment.creator}
           createdAt={comment.createdAt}
           rootClassName={resolvedRootClassName}
-          headerEnd={
-            <>
-              {/* Same position as a normal comment's own history link:
-                  right after the date, not part of the `ms-auto` group
-                  below. */}
-              <span className={`ms-2 ${styles['icon-button-container']}`}>
-                <CommentRevisionLink
-                  id={comment.id}
-                  pagePath={pagePath}
-                  pageId={comment.pageId}
-                  revisionId={comment.anchorOriginRevisionId}
-                />
-              </span>
-              {/* 2026-09-11 (user request): order left-to-right is
-                  edit/delete, resolve/reopen, then the status badge, so the
-                  badge sits at the row's very corner. The resolve/reopen
-                  button now shares `.icon-button-container` with
-                  edit/delete, hover-revealed the same way -- previously
-                  always visible, inconsistent with edit/delete's
-                  hover-reveal right next to it. The badge stays outside
-                  `.icon-button-container` and always visible, since it is
-                  the item's own status, not an action button. */}
-              <span className="ms-auto d-flex align-items-center gap-2">
-                {isOwnComment && !isDeleteConfirmOpen && (
-                  <span
-                    className={`d-flex align-items-center gap-1 ${styles['icon-button-container']}`}
-                  >
-                    <CommentEditDeleteButtons
-                      testIdPrefix="inline-comment"
-                      onClickEditBtn={() => setIsEditing(true)}
-                      onClickDeleteBtn={() => setIsDeleteConfirmOpen(true)}
-                    />
-                  </span>
-                )}
-                {/* Neither the resolve toggle nor the collapse button while the
-                    delete confirm is open: resolving collapses the item, and
-                    the still-set confirm would reappear on the next expand. */}
-                {!isDeleteConfirmOpen && (
-                  <span className={styles['icon-button-container']}>
-                    <NotAvailableIfReadOnlyUserNotAllowedToComment>
-                      <button
-                        type="button"
-                        data-testid="inline-comment-resolve-toggle-button"
-                        className="btn btn-sm btn-outline-secondary rounded-pill"
-                        onClick={handleResolveToggle}
-                      >
-                        {isResolved
-                          ? t('inline_comment.reopen')
-                          : t('inline_comment.resolve')}
-                      </button>
-                    </NotAvailableIfReadOnlyUserNotAllowedToComment>
-                  </span>
-                )}
-                {isResolved && !isDeleteConfirmOpen && (
-                  <button
-                    type="button"
-                    data-testid="inline-comment-collapse-button"
-                    className="btn btn-sm btn-link text-secondary text-decoration-none p-0 d-inline-flex align-items-center lh-1"
-                    aria-label={t('inline_comment.collapse')}
-                    onClick={onCollapse}
-                  >
-                    <span
-                      className="material-symbols-outlined"
-                      aria-hidden="true"
-                    >
-                      expand_less
-                    </span>
-                  </button>
-                )}
-                <InlineCommentStatusBadge isResolved={isResolved} />
-              </span>
-            </>
-          }
+          headerEnd={isLargerThanMd ? desktopHeaderEnd : narrowHeaderEnd}
           beforeBody={
             <InlineCommentQuote
               quote={comment.anchor.quote}

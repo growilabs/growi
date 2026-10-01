@@ -102,4 +102,16 @@ describe('InlineCommentListMenu', () => {
 
     expect(screen.getByRole('menu')).toHaveClass('dropdown-menu-end');
   });
+
+  it('uses a custom aria-label when ariaLabelKey is passed (Requirement 24)', () => {
+    render(
+      <InlineCommentListMenu
+        items={[buildItem()]}
+        ariaLabelKey="inline_comment.item_menu"
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: 'inline_comment.item_menu' }),
+    ).toBeInTheDocument();
+  });
 });

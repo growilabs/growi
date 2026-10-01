@@ -416,7 +416,9 @@
     "collapse": "折りたたみ",
     "more": "続きを表示",
     "expand_all_resolved": "全ての解決済みのコメントを展開する",
-    "list_menu": "コメント一覧のメニュー"
+    "list_menu": "コメント一覧のメニュー",
+    "item_menu": "コメントの操作",
+    "view_at_posting": "投稿時のページを表示"
   },
   "page_api_error": {
     "notfound_or_forbidden": "元のページが見つからないか、アクセス権がありません。",

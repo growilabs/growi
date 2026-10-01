@@ -127,6 +127,19 @@ vi.mock('~/client/components/NotAvailableForReadOnlyUser', () => ({
       </fieldset>
     );
   },
+  useIsCommentActionBlockedForReadOnlyUser: () => isDisabledRef.current,
+}));
+
+// Default to desktop (`md`+) so existing hover-reveal assertions keep their
+// layout; narrow-viewport cases flip this to false (Requirement 24).
+const isLargerThanMdRef = vi.hoisted(() => ({ current: true }));
+vi.mock('~/states/ui/device', () => ({
+  useDeviceLargerThanMd: () => [isLargerThanMdRef.current, vi.fn()] as const,
+}));
+
+const routerPushMock = vi.hoisted(() => vi.fn());
+vi.mock('next/router', () => ({
+  useRouter: () => ({ push: routerPushMock }),
 }));
 
 // 2026-09-11: the origin comment's edit mode now uses the literal same
@@ -238,6 +251,8 @@ describe('InlineCommentItem', () => {
   beforeEach(() => {
     currentUserRef.current = undefined;
     isDisabledRef.current = false;
+    isLargerThanMdRef.current = true;
+    routerPushMock.mockReset();
     commentEditorProps.current = undefined;
   });
 
@@ -1202,6 +1217,125 @@ describe('InlineCommentItem', () => {
       expect(
         screen.getByTestId('inline-comment-resolve-error'),
       ).toHaveTextContent('network down');
+    });
+  });
+
+  describe('narrow viewport action menu (Requirement 24)', () => {
+    beforeEach(() => {
+      isLargerThanMdRef.current = false;
+    });
+
+    it('shows a three-dot menu instead of the hover-revealed action row, and keeps the status badge outside the menu', async () => {
+      currentUserRef.current = { _id: 'user1' };
+      renderItem(originComment());
+
+      expect(
+        screen.getByTestId('inline-comment-item-menu-toggle'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('inline-comment-resolve-toggle-button'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('inline-comment-edit-button'),
+      ).not.toBeInTheDocument();
+      expect(
+        document.getElementById('page-comment-revision-comment1'),
+      ).toBeNull();
+      expect(screen.getByTestId('inline-comment-status')).toBeInTheDocument();
+
+      await userEvent.click(
+        screen.getByTestId('inline-comment-item-menu-toggle'),
+      );
+      expect(screen.getByRole('menuitem', { name: 'Edit' })).toBeVisible();
+      expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
+      expect(
+        screen.getByRole('menuitem', { name: 'inline_comment.resolve' }),
+      ).toBeVisible();
+      expect(
+        screen.getByRole('menuitem', {
+          name: 'inline_comment.view_at_posting',
+        }),
+      ).toBeVisible();
+    });
+
+    it('omits edit/delete from the menu when the viewer is not the author', async () => {
+      currentUserRef.current = { _id: 'someone-else' };
+      renderItem(originComment());
+
+      await userEvent.click(
+        screen.getByTestId('inline-comment-item-menu-toggle'),
+      );
+      expect(
+        screen.queryByRole('menuitem', { name: 'Edit' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('menuitem', { name: 'inline_comment.resolve' }),
+      ).toBeVisible();
+    });
+
+    it('keeps the collapse control outside the menu for an expanded resolved comment', () => {
+      renderItem(
+        originComment({
+          resolvedAt: new Date('2026-01-02T00:00:00.000Z'),
+          resolvedById: 'user1',
+        }),
+      );
+
+      expect(
+        screen.getByRole('button', { name: 'inline_comment.collapse' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId('inline-comment-item-menu-toggle'),
+      ).toBeInTheDocument();
+    });
+
+    it('hides the menu while delete confirmation is open', async () => {
+      currentUserRef.current = { _id: 'user1' };
+      renderItem(originComment());
+
+      await userEvent.click(
+        screen.getByTestId('inline-comment-item-menu-toggle'),
+      );
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+
+      expect(
+        screen.getByTestId('inline-comment-delete-confirm'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('inline-comment-item-menu-toggle'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('navigates to the posting revision when the history menu item is chosen', async () => {
+      renderItem(originComment());
+
+      await userEvent.click(
+        screen.getByTestId('inline-comment-item-menu-toggle'),
+      );
+      await userEvent.click(
+        screen.getByRole('menuitem', {
+          name: 'inline_comment.view_at_posting',
+        }),
+      );
+
+      expect(routerPushMock).toHaveBeenCalledTimes(1);
+      expect(routerPushMock.mock.calls[0][0]).toContain('revisionId=revision1');
+    });
+
+    it('disables edit/delete/resolve menu items when comment actions are blocked for a read-only user', async () => {
+      currentUserRef.current = { _id: 'user1' };
+      isDisabledRef.current = true;
+      renderItem(originComment());
+
+      await userEvent.click(
+        screen.getByTestId('inline-comment-item-menu-toggle'),
+      );
+      // reactstrap drops role="menuitem" on disabled items — assert via text.
+      expect(screen.getByText('Edit').closest('button')).toBeDisabled();
+      expect(screen.getByText('Delete').closest('button')).toBeDisabled();
+      expect(
+        screen.getByText('inline_comment.resolve').closest('button'),
+      ).toBeDisabled();
     });
   });
 });

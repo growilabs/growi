@@ -188,6 +188,15 @@ brief.mdの討論メモは「再アンカーに成功した場合の解決済み
 - **メニューは、インラインコメントが1件以上あるときだけ、見出し「Comments」と同じ行の右端に置く。** `Comments.tsx` が見出し行にスロットを用意し、`PageComment` が `createPortal` でメニューを差し込む（Requirement 22.1）。見出しを持たない呼び出し元（単体テスト・検索結果プレビュー）では、一覧の先頭に右寄せの1行として置く。三点ボタンは reactstrap の `Dropdown` を `MentionPickerButton` と同じく `color="link"` で使い（テーマに追従させるため）、メニューは右端に合わせて開く（`end`）。このメニューは表示の状態を変えるだけでデータに触れないため、`NotAvailableIfReadOnlyUserNotAllowedToComment` などの権限判定で包まない（Requirement 22.7）。折りたたみ中の展開ボタン・展開中の折りたたむボタンも同じ理由で包まない
 - `PageComment` は `useResolvedCollapse` を、途中で描画を終える分岐（コメント0件などの早期 return）より前で常に呼ぶ。インラインコメントを渡されない呼び出し元（共有リンク画面）でも、モジュールに置いた固定の空配列と何もしない `resolve` を渡すので、描画のたびに引数が変わらない
 
+### 狭い画面では起点コメントの操作を三点メニューにまとめる
+
+タッチ端末ではホバー開示が使えず、編集／削除／解決／履歴を横並びにするとヘッダーが折り返す（Requirement 24）。
+
+- **分岐は `useDeviceLargerThanMd`（本文ヒット判定と同じ `md`）。** `md` 以上は従来どおり（履歴は日付の直後、編集／削除／解決はホバー開示、折りたたみと札は常時）。`md` 未満は編集・削除・解決／未解決・履歴を三点メニューにまとめ、折りたたみと札だけをメニューの外に常時出す
+- **メニュー部品は一覧右端と同じ `InlineCommentListMenu`。** `ariaLabelKey` だけ起点用（`inline_comment.item_menu`）に差し替える。項目配列は `InlineCommentItem` が組み立てる（本人以外は編集・削除を載せない、リードオンリー制限時は解決を `disabled`、履歴は `router.push` で `CommentRevisionLink` と同じ URL へ）
+- **削除確認中はメニューごと出さない**（広い画面で解決／折りたたみを隠すのと同じ理由）
+- 返信行・本文ポップオーバーはこの Requirement の対象外（起点コメントの一覧ヘッダーのみ）
+
 ### Architecture Pattern & Boundary Map
 
 ```mermaid
@@ -430,11 +439,11 @@ stateDiagram-v2
 | InlineCommentForm | Client / UI | コメント入力・送信。エディタ組み立て・送信・エラー表示は`MentionAwareCommentInput`に委譲し、`MentionPickerButton`を組み込む。幅は`max-content`を最小24rem・最大40rem（どちらも画面幅から左右の余白を引いた値で頭打ち）で挟む | 1.1-1.2, 1.8, 3.1, 8.2, 8.4, 9.1, 9.3-9.4, 23.1-23.4 | useSWRxInlineComments(P0), MentionAwareCommentInput(P0), MentionPickerButton(P1) | Service |
 | MentionPickerButton | Client / UI | メンション相手をボタン操作で選び、選ばれたユーザー名を通知する（一覧内の絞り込み検索はしない） | 9.1-9.3 | fetchMentionUsers(P0), `codeMirrorEditor.insertText`(P0, 既存API) | Service |
 | fetchMentionUsers | Client / Service | `/users/`検索APIの呼び出し（`@`タイプ補完・メンションボタン一覧の双方から利用。`CommentEditor.tsx`側の同種実装とは共有しない） | 9.2 | `apiv3Get`(P0) | Service |
-| InlineCommentItem / InlineCommentReplies / InlineCommentHighlight | Client / UI | 一覧の起点コメント・返信ネスト表示（読み取り表示でのメンションハイライト含む）・保存済みハイライト描画（提示層）。`InlineCommentItem`のアンカー引用文クリックが`scrollToRange`を呼ぶ。投稿者本人限定の編集・削除操作（`CommentEditor`への切り替え、`DeleteConfirmAlert`による削除確認）とリビジョン履歴リンク（`CommentRevisionLink`）を持つ。ヘッダー行`headerEnd`の`ms-auto`グループは 編集/削除アイコン→解決トグル→折りたたむボタン（展開中の解決済みのみ）→状態バッジ（カードの角）の順で、編集/削除アイコンと解決トグルはホバーでのみ表示する。削除の確認を開いている間は解決トグルと折りたたむボタンを出さない。折りたたみの状態は持たず`collapsed`/`onExpand`/`onCollapse`を親から受け取り、フックを呼んだ直後に`collapsed`なら`CollapsedInlineCommentItem`を返す | 1.8, 18.1-18.9, 2.5-2.6, 3.1, 4.4, 13.11, 14.1, 14.3-14.4, 16.1, 20.3, 21.3-21.4 | 上記ロジック層, resolved-range(P0), CommentEditor(P0), DeleteConfirmAlert(P0), CommentEditDeleteButtons(P0), CommentRevisionLink(P0), useCurrentUser(P0), NotAvailableIfReadOnlyUserNotAllowedToComment(P0) | State |
+| InlineCommentItem / InlineCommentReplies / InlineCommentHighlight | Client / UI | 一覧の起点コメント・返信ネスト表示（読み取り表示でのメンションハイライト含む）・保存済みハイライト描画（提示層）。`InlineCommentItem`のアンカー引用文クリックが`scrollToRange`を呼ぶ。投稿者本人限定の編集・削除操作（`CommentEditor`への切り替え、`DeleteConfirmAlert`による削除確認）とリビジョン履歴リンク（`CommentRevisionLink`）を持つ。ヘッダー行`headerEnd`は画面幅で切り替える：`md`以上は編集/削除アイコン→解決トグル→折りたたむボタン（展開中の解決済みのみ）→状態バッジ（カードの角）の順で、編集/削除と解決はホバーでのみ表示；`md`未満は編集・削除・解決・履歴を三点メニューにまとめ、折りたたみと札だけを常時出す（Requirement 24）。削除の確認を開いている間は解決トグル・折りたたむボタン・狭い画面のメニューを出さない。折りたたみの状態は持たず`collapsed`/`onExpand`/`onCollapse`を親から受け取り、フックを呼んだ直後に`collapsed`なら`CollapsedInlineCommentItem`を返す | 1.8, 18.1-18.9, 2.5-2.6, 3.1, 4.4, 13.11, 14.1, 14.3-14.4, 16.1, 20.3, 21.3-21.4, 24.1-24.5 | 上記ロジック層, resolved-range(P0), CommentEditor(P0), DeleteConfirmAlert(P0), CommentEditDeleteButtons(P0), CommentRevisionLink(P0), InlineCommentListMenu(P0), useDeviceLargerThanMd(P0), useCurrentUser(P0), NotAvailableIfReadOnlyUserNotAllowedToComment(P0) | State |
 | use-resolved-collapse (`useResolvedCollapse`, `isCollapsed`) | Client / State | 一覧の折りたたみ状態（展開済みのコメント id の集合）を持つ。折りたたみ中かの判定（解決済み かつ 集合にない）、1件の展開・折りたたみ、`resolve`の包み（成功したらそのidの記録を消す）、一覧メニューの項目の配列（`listMenuItems`）を返す。`PageComment`が呼ぶ | 20.1, 20.3-20.5, 21.2, 22.3-22.5 | React state(P0) | State |
 | CollapsedInlineCommentItem | Client / UI | 折りたたみ中の解決済みインラインコメントの表示。投稿者・投稿日時・札・引用文（1行で省略、押すとスクロール）・本文の覗き見（最大2行＋下端フェード）・展開アイコン（`expand_more`）を出し、返信・各操作は出さない。カードはコンパクト余白 | 20.2, 21.1, 21.3 | CommentCard(P0), InlineCommentQuote(P0), InlineCommentStatusBadge(P0) | — |
 | InlineCommentQuote / InlineCommentStatusBadge | Client / UI | 引用文（押せるボタン。`clamped`で省略表示）と解決済み／未解決の札。`InlineCommentItem`と`CollapsedInlineCommentItem`の両方から使い、2つの表示の見た目を揃える | 20.2 | — | — |
-| InlineCommentListMenu | Client / UI | 一覧右端の三点ボタンとドロップダウン。項目の配列（`InlineCommentListMenuItem`）を受け取って描くだけで、個々の項目の中身を知らない。`PageComment`がインラインコメント1件以上のときに、`Comments` が見出し行に用意したスロットへ portal で差し込む（見出しのない呼び出し元では一覧先頭の右寄せ）。権限判定では包まない | 22.1-22.2, 22.6-22.7 | reactstrap `Dropdown`(P0) | — |
+| InlineCommentListMenu | Client / UI | 三点ボタンとドロップダウン。項目の配列（`InlineCommentListMenuItem`）を受け取って描くだけで、個々の項目の中身を知らない。一覧右端（一括展開）と、狭い画面の起点コメント操作の両方から使う。`ariaLabelKey`でボタンのaccessible nameを差し替える（既定は一覧用）。権限判定では包まない | 22.1-22.2, 22.6-22.7, 24.1 | reactstrap `Dropdown`(P0) | — |
 | resolved-range (`rangeForResolved`, `rangesById`) | Client / ロジック | 解決済みオフセット（`ResolvedRange`）からDOM `Range`を再構築する共有ユーティリティ。`InlineCommentHighlight`・`InlineCommentBodyInteraction`・`PageView.scrollToRange`の3箇所から使われる | 14.2, 15.1-15.2, 15.6, 16.1 | rendered-text(P0) | State |
 | PendingSelectionHighlight | Client / UI | 作成中（選択中・入力中）の範囲を、保存済みとは別のテーマ対応トークン（半透明）で描画する | 14.1, 14.2, 14.3, 14.4 | `--grw-inline-comment-marker-bg-pending`(P0) | — |
 | use-highlight-hit-test (`useHighlightHitTest`) | Client / ロジック | document上のpointermove/clickの座標を、`resolved-range`が返す各`Range`の`getClientRects()`と比較し、当たったコメントidと発生源（hover/click）を返す | 15.1, 15.2, 15.6 | resolved-range(P0), `useDeviceLargerThanMd`(P0) | State |
