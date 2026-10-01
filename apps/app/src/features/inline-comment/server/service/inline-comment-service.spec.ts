@@ -1188,6 +1188,69 @@ describe('InlineCommentService page comment count refresh', () => {
     expect(deps.updateCommentCount).toHaveBeenCalledWith(targetRow.pageId);
   });
 
+  describe('アクティビティの記録が失敗しても、書き込み済みのコメントの件数は更新される', () => {
+    const activityError = new Error('activity down');
+    const rejectActivity = (deps: InlineCommentServiceDeps) => {
+      vi.mocked(deps.prisma.activities.createByParameters).mockRejectedValue(
+        activityError,
+      );
+    };
+
+    it('create', async () => {
+      const pageId = makeId();
+      const deps = makeDeps(makeCreatedRow({ pageId }));
+      rejectActivity(deps);
+
+      await expect(
+        new InlineCommentService(deps).create(originInput(pageId), makeId()),
+      ).rejects.toBe(activityError);
+
+      expect(deps.updateCommentCount).toHaveBeenCalledWith(pageId);
+    });
+
+    it('createReply', async () => {
+      const parentRow = makeParentRow();
+      const replyRow = makeReplyRow({ pageId: parentRow.pageId });
+      const deps = makeReplyDeps(parentRow, replyRow);
+      rejectActivity(deps);
+
+      await expect(
+        new InlineCommentService(deps).createReply(
+          { parentId: parentRow.id, comment: 'r' },
+          makeId(),
+        ),
+      ).rejects.toBe(activityError);
+
+      expect(deps.updateCommentCount).toHaveBeenCalledWith(parentRow.pageId);
+    });
+
+    it('deleteComment', async () => {
+      const creatorId = makeId();
+      const targetRow = makeOriginRow({ creatorId });
+      const deps = makeDeleteCommentDeps(targetRow);
+      rejectActivity(deps);
+
+      await expect(
+        new InlineCommentService(deps).deleteComment(targetRow.id, creatorId),
+      ).rejects.toBe(activityError);
+
+      expect(deps.updateCommentCount).toHaveBeenCalledWith(targetRow.pageId);
+    });
+
+    it('deleteReply', async () => {
+      const creatorId = makeId();
+      const targetRow = makeReplyRow({ creatorId });
+      const deps = makeDeleteReplyDeps(targetRow);
+      rejectActivity(deps);
+
+      await expect(
+        new InlineCommentService(deps).deleteReply(targetRow.id, creatorId),
+      ).rejects.toBe(activityError);
+
+      expect(deps.updateCommentCount).toHaveBeenCalledWith(targetRow.pageId);
+    });
+  });
+
   it('削除の前提条件に失敗したときは件数更新を呼ばない', async () => {
     const deps = makeDeleteCommentDeps(null);
     await expect(

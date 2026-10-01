@@ -271,6 +271,9 @@ export class InlineCommentService {
       include: { page: true },
     });
 
+    // Before the activity write: an activity failure must not leave the count stale.
+    await this.refreshCommentCount(input.pageId);
+
     const activityId = new Types.ObjectId().toString();
 
     // Mints the activity itself (no request context here, so ip/endpoint
@@ -298,8 +301,6 @@ export class InlineCommentService {
     } catch (err) {
       logger.error('Mention notification failed for inline comment', err);
     }
-
-    await this.refreshCommentCount(input.pageId);
 
     return toIInlineComment(created);
   }
@@ -335,6 +336,9 @@ export class InlineCommentService {
       },
     });
 
+    // Same ordering as create().
+    await this.refreshCommentCount(parent.pageId);
+
     const activityId = new Types.ObjectId().toString();
 
     await this.deps.prisma.activities.createByParameters({
@@ -360,8 +364,6 @@ export class InlineCommentService {
     } catch (err) {
       logger.error('Mention notification failed for inline comment reply', err);
     }
-
-    await this.refreshCommentCount(parent.pageId);
 
     return toInlineCommentReply(created);
   }
@@ -520,6 +522,8 @@ export class InlineCommentService {
 
     await this.deps.prisma.comments.removeWithReplies(id);
 
+    await this.refreshCommentCount(target.pageId);
+
     const activityId = new Types.ObjectId().toString();
 
     await this.deps.prisma.activities.createByParameters({
@@ -531,8 +535,6 @@ export class InlineCommentService {
       event: target.id,
       eventModel: SupportedEventModel.MODEL_COMMENT,
     });
-
-    await this.refreshCommentCount(target.pageId);
   }
 
   /** Deletes a single reply — no cascade needed, unlike `deleteComment()`. */
@@ -554,6 +556,8 @@ export class InlineCommentService {
 
     await this.deps.prisma.comments.delete({ where: { id } });
 
+    await this.refreshCommentCount(target.pageId);
+
     const activityId = new Types.ObjectId().toString();
 
     await this.deps.prisma.activities.createByParameters({
@@ -565,7 +569,5 @@ export class InlineCommentService {
       event: target.id,
       eventModel: SupportedEventModel.MODEL_COMMENT,
     });
-
-    await this.refreshCommentCount(target.pageId);
   }
 }
