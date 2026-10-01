@@ -73,7 +73,7 @@
   - _Depends: 2.2_
   - _Boundary: list route_
 
-- [ ] 2.4 コメント一覧のルートを登録し、公開仕様に載せる
+- [x] 2.4 コメント一覧のルートを登録し、公開仕様に載せる
   - ルートを `/comments` として登録する
   - 公開仕様の記述(入力、応答の項目、エラー)をルートに書く。通常コメントとインラインコメントを区別する項目、インライン用の項目の意味を説明する。応答のスキーマは、旧 API の `Comment` と名前が重ならないように別名にする
   - 公開仕様の生成スクリプトの対象に、このルートのディレクトリを足す
@@ -207,3 +207,4 @@
 - 1.1: `ICommentCreator`(整形後の投稿者の型)には実行時にある `_id` / `__v` が無く、`name` が null を許す。`Ref<IUser>`(`_id` 必須)や `IInlineComment.creator` にはそのまま代入できないため、4.3 / 4.4 / 4.5 で投稿者の型も合わせて広げる。`_id` を `as` なしで載せるには `CommentListRow` を拡張済み prisma クライアントの結果型から作る方法がある。
 - 1.1: 投稿者の安全化は `serializeUserSecurely` を使わず `toCreator` で自前実装(Prisma の行は `IUser` に合わない)。`isEmailPublished` が真なら `email`(null 含む)を残す、旧 API と同じ挙動。
 - 2.3: `certifySharedPage` は `shareLinkId` を `req.query || req.body` から読む(route の検証は query のみ)。照会は `relatedPageId` に検証済みの query の `pageId` を結び付けるため悪用はできない。2.4 で登録するときは `router.get` のみ(3.8 の読み取り専用)にする。
+- 2.4: 応答の各項目には Prisma の行由来の `v`(`__v`)も含まれるが、旧 API の出力を変えない方針(1.2)と揃えており、公開仕様には載せていない(`additionalProperties` は閉じていない)。
