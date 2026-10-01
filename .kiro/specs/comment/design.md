@@ -25,7 +25,7 @@
 
 ### This Spec Owns
 - `GET /_api/v3/comments` の契約(入力、応答、認可、版を指定したときの意味、エラー)
-- コメント1件の応答の形(`ICommentListItem`)と、その整形(旧 API と共有する)
+- コメント1件の応答の形(`ICommentListItem`)と、その整形(共通の項目の整形は旧 API と共有し、投稿者の整形だけを API ごとに分ける)
 - ページのコメント件数(`Page.commentCount`)の数え方と、インラインコメントの書き込みに伴う更新、既存ページの再計算
 - 画面側のコメント一覧の取得(共有の取得フックと、通常コメント用、インラインコメント用の2つの見え方)
 
@@ -43,6 +43,7 @@
 
 ### Revalidation Triggers
 - `ICommentListItem` の項目の追加、削除、名前の変更(MCP、SDK、画面、外部利用者に影響する)
+- 新 API の `creator` に返す項目の追加(共有リンクのゲストにも届く。要件 1.9)
 - 画面の取得フックのキー `['/comments', pageId, shareLinkId]` の変更(末尾のスレッドと本文のインラインコメントが一緒に更新される前提が壊れる)
 - 件数の数え方の変更(サイドバー、ページ側面、Slack の展開に影響する)
 - 版を指定したときの意味の変更(Requirement 2)
@@ -97,7 +98,7 @@ graph TB
 
 **Architecture Integration**:
 - 採用する形: 既存の apiv3 の機能別構成(`features/comment/` に `interfaces`、`server`、`client`)。
-- 整形は `toCommentListItem` を1つだけ持ち、旧 API と新 API が共有する。
+- 整形の共通部分は1つの関数(`createCommentListItemMapper`)にまとめ、投稿者の整形のしかたを引数で受け取る。新 API は `toCommentListItem`、旧 API は `toLegacyCommentListItem` を使う。
 - 依存の向き(サーバー): `interfaces` → `server/serializers` → `server/service` → `server/routes`。
 - 依存の向き(画面): `interfaces` → `client/stores/comment-list` → 各 feature の store → 部品。
 - 新しい部品が必要な理由は、すべて要件に対応する。投機的な抽象は入れない。
@@ -121,7 +122,7 @@ apps/app/src/features/comment/
 │   └── index.ts                   # barrel
 ├── server/
 │   ├── serializers/
-│   │   └── to-comment-list-item.ts   # 行 → 応答の1件(旧 API と共有する純粋関数)と、入力の行の型 CommentListRow
+│   │   └── to-comment-list-item.ts   # 行 → 応答の1件(新 API 用と旧 API 用。共通部分は1か所)と、入力の行の型 CommentListRow
 │   ├── service/
 │   │   └── comment-list.ts           # listComments: 版の範囲の決定と取得
 │   └── routes/
@@ -141,7 +142,7 @@ apps/app/src/migrations/
 ### Modified Files
 - `apps/app/src/features/comment/server/models/comment.ts` — `countCommentByPageId` から `isInline` の除外を外す。`findCommentsByPageId` / `findCommentsByRevisionId` の除外は変えない
 - `apps/app/src/features/comment/server/models/comment.integ.ts` — 件数のテストを新しい数え方に更新する
-- `apps/app/src/server/routes/comment.js` — 応答の整形を `toCommentListItem` に置き換える。`@swagger` に `deprecated: true` と置き換え先の案内を足す
+- `apps/app/src/server/routes/comment.js` — 応答の整形を `toLegacyCommentListItem` に置き換える。`@swagger` に `deprecated: true` と置き換え先の案内を足す
 - `apps/app/src/server/routes/apiv3/index.js` — `/comments` を登録し、インライン一覧の登録と import を削除する
 - `apps/app/bin/openapi/generate-spec-apiv3.sh` — `src/features/comment/server/routes/*.ts` を足す
 - `apps/app/src/features/inline-comment/server/service/inline-comment-service.ts` — 依存に `updateCommentCount` を足し、作成、返信の作成、削除、返信の削除のあとに呼ぶ。`listByPageId` と、一覧専用の行変換を削除する
@@ -193,6 +194,7 @@ sequenceDiagram
 |-------------|---------|------------|------------|-------|
 | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7 | 通常とインラインの一括取得、項目、並び順、安全な投稿者 | listComments、toCommentListItem、list route | API Contract、ICommentListItem | System Flows |
 | 1.8 | ページ ID の形式検証 | list route(express-validator) | API Contract(400) | — |
+| 1.9 | 投稿者は画面が使う4項目だけ | toCommentListItem(投稿者の整形 `toCreatorSummary`) | ICommentCreatorSummary、OpenAPI(CommentListItem.creator) | — |
 | 2.1, 2.2, 2.3 | 次の版より前のコメント | listComments | listComments のサービスの仕様 | 版の範囲の決定 |
 | 2.4 | 版が存在しない、または別ページ | listComments、list route | API Contract(404) | System Flows |
 | 2.5 | 共有リンクでは版を無視 | list route | API Contract | 版の範囲の決定 |
@@ -201,7 +203,7 @@ sequenceDiagram
 | 3.6 | 未認証 | list route(loginRequired) | API Contract(403) | — |
 | 3.9 | 予期しない失敗 | list route | API Contract(500) | — |
 | 4.1, 4.2, 4.3 | 公開仕様、SDK、項目の意味 | list route の @swagger、生成スクリプト | OpenAPI(CommentListItem) | — |
-| 5.1, 5.2 | 旧 API の挙動を変えない | comment.js、toCommentListItem | 旧 API の契約 | — |
+| 5.1, 5.2, 5.4 | 旧 API の挙動を変えない(投稿者の項目も含む) | comment.js、toLegacyCommentListItem | 旧 API の契約 | — |
 | 5.3 | 非推奨の明示 | comment.js の @swagger | OpenAPI(deprecated) | — |
 | 6.1, 6.2 | 末尾のスレッド | useSWRxPageComment、useSWRxCommentList | 取得フック | — |
 | 6.3 | 本文のインラインコメント | useSWRxInlineComments、groupInlineComments | 取得フック | — |
@@ -219,7 +221,7 @@ sequenceDiagram
 |-----------|--------------|--------|--------------|--------------------------|-----------|
 | list route | Server / Route | 入力検証、認証、閲覧権限、応答 | 1.8, 2.4, 2.5, 3.x, 4.x | certifySharedPage(P0)、loginRequired(P0)、listComments(P0) | API |
 | listComments | Server / Service | 版の範囲を決め、コメントを取得する | 1.1-1.6, 2.1-2.4 | Prisma(P0) | Service |
-| toCommentListItem | Server / Serializer | 行を応答の1件に整形する | 1.2, 1.3, 1.7, 5.1, 5.2 | なし | Service |
+| toCommentListItem / toLegacyCommentListItem | Server / Serializer | 行を応答の1件に整形する | 1.2, 1.3, 1.7, 1.9, 5.1, 5.2, 5.4 | なし | Service |
 | countCommentByPageId | Server / Model | 件数に全コメントを数える | 7.1-7.3, 7.6 | Prisma(P0) | Service |
 | InlineCommentService の拡張 | Server / Service | 書き込み後に件数を更新する | 7.4 | updateCommentCount(P1) | Service |
 | 再計算の移行 | Server / Migration | 既存ページの件数を直す | 7.5 | Prisma(P0) | Batch |
@@ -290,21 +292,37 @@ export const listComments = (
 - Validation: 版は `revisions.findUnique({ where: { id } })` で取り、`pageId` が一致しなければ `revision-not-found`
 - Risks: ページあたりのコメント数に上限は無い(旧 API、旧インライン一覧と同じ。ページネーションは範囲外)
 
-#### toCommentListItem
+#### toCommentListItem / toLegacyCommentListItem
 
 | Field | Detail |
 |-------|--------|
-| Intent | 行を応答の1件に整形する純粋関数 |
-| Requirements | 1.2, 1.3, 1.7, 5.1, 5.2 |
+| Intent | 行を応答の1件に整形する純粋関数(新 API 用と旧 API 用) |
+| Requirements | 1.2, 1.3, 1.7, 1.9, 5.1, 5.2, 5.4 |
 
 **Contracts**: Service [x]
 
 ##### Service Interface
 ```typescript
-export const toCommentListItem = (row: CommentListRow): ICommentListItem;
+type CommentListItemWith<TCreator> = Omit<ICommentListItem, 'creator'> & {
+  creator: TCreator | string | null;
+};
+
+// Shared by both APIs; only the creator formatting differs.
+const createCommentListItemMapper: <TCreator>(
+  formatCreator: (user: CreatorRow) => TCreator,
+) => (row: CommentListRow) => CommentListItemWith<TCreator>;
+
+// GET /_api/v3/comments
+export const toCommentListItem: (row: CommentListRow) => ICommentListItem;
+// GET /_api/comments.get
+export const toLegacyCommentListItem: (
+  row: CommentListRow,
+) => CommentListItemWith<LegacyCommentCreator>;
 ```
-- 旧 API の整形と同じ出力にする: 行のすべての列 + `page`(= `pageId`)、`revision`(= `revisionId`)、`replyTo`(= `replyToId`)、`creator`(あれば `toCreator` で整形したもの、なければ `creatorId`)
-- 旧 API(`comment.js`)も、この関数を使う。出力は変わらない
+- 共通の出力: 行のすべての列 + `page`(= `pageId`)、`revision`(= `revisionId`)、`replyTo`(= `replyToId`)、`creator`。投稿者の行が無いときの `creator` は `creatorId`(投稿者の無いコメントでは `null`)
+- `toCommentListItem` の投稿者の整形(`toCreatorSummary`)は、`_id`、`username`、`name`、`imageUrlCached` の4つだけを、項目を1つずつ指定して取り出す(行を展開してから項目を除く書き方はしない。ユーザーの列が増えても応答に漏れないようにするため)
+- `toLegacyCommentListItem` の投稿者の整形(`toLegacyCreator`)は、ユーザーの行からパスワード、API トークン、メールアドレスを除き、本人がメールアドレスを公開しているときだけ `email` を戻す(`null` でも戻す)。旧 API(`comment.js`)はこちらを使う(要件 5.1、5.4)
+- 4つの項目を残す理由は、画面がそれぞれを読むため。`username` は `Username`(ユーザーのページへのリンク)、`UserPicture`(リンクとツールチップ)、`Comment.tsx` の自分のコメントかどうかの判定が読む。`name` は `Username` と `UserPicture` が表示名として読む。`imageUrlCached` は `UserPicture` が画像の URL として読む。`_id` は画面が実行時には読まないが、`Username` が受ける型と `isPopulated` による型の絞り込みが `_id` を持つオブジェクトを前提にしており、API の利用者がユーザーを識別するのにも使う。画面はコメントの持ち主の判定に `creatorId` を使い、`creator` の他の項目(アカウントの状態、Gravatar の設定など)は読まない
 
 #### countCommentByPageId(モデルの拡張)
 - `where: { pageId }` にする(`isInline` の除外を外す)。返信も1行として数える。解決済みも数える
@@ -406,9 +424,10 @@ export interface ListCommentsResponseBody {
   comments: ICommentListItem[];
 }
 ```
-- `ICommentListItem` の旧 API 由来の項目(`page`、`revision`、`replyTo`、`creator`、`commentPosition`、`_id`、`createdAt`、`updatedAt`、`comment`)は、旧 API の出力と同じ値を持つ。型は単独で定義する(`ICommentHasId` を継承しない)。理由は、`ICommentHasId` の `revision` は null を許さず、`replyTo` は省略可能な文字列だが、実データでは `revisionId` も `replyToId` も null になりうるため
+- `ICommentListItem` の旧 API 由来の項目(`page`、`revision`、`replyTo`、`commentPosition`、`_id`、`createdAt`、`updatedAt`、`comment`)は、旧 API の出力と同じ値を持つ。`creator` だけは、旧 API より項目が少ない(下記)。型は単独で定義する(`ICommentHasId` を継承しない)。理由は、`ICommentHasId` の `revision` は null を許さず、`replyTo` は省略可能な文字列だが、実データでは `revisionId` も `replyToId` も null になりうるため
 - 型の食い違いは `as` で隠さない。`ICommentHasId` 側の型を実データに合わせて広げ(`revision` に null を許す、など)、影響する箇所は型検査で洗い出す
 - 通常コメントでは、インライン用の項目は `null`(`isInline` は `false`)
+- `creator` の型は `ICommentCreatorSummary | string | null`。`ICommentCreatorSummary` は `{ _id: string; username: string; name: string | null; imageUrlCached: string | null }` で、`features/comment/interfaces` に置く。画面のコメント部品(`CommentCard`、`IInlineComment` と返信の `creator`、`ICommentHasId.creator`)はこの型を受ける。旧 API の投稿者の型(`LegacyCommentCreator`)は整形のファイルの中だけで使い、公開しない
 - スキーマ(`comments`、`revisions`)に変更は無い。`pages.commentCount` の値の意味が変わる
 
 ## Error Handling
@@ -422,16 +441,18 @@ export interface ListCommentsResponseBody {
 テストは、`essential-test-design`(振る舞いの契約を確かめる)と `essential-test-patterns`(Vitest、型付きモック)に従って書く。
 
 ### Unit Tests
-- `toCommentListItem`: 通常コメントとインラインコメントの行が、旧 API と同じ別名の項目を持ち、`creator` が安全化され(メールが出ない)、`creator` が無いときは `creatorId` になる
+- `toCommentListItem`: 通常コメントとインラインコメントの行が、旧 API と同じ別名の項目を持つ。`creator` は4つの項目だけを持つ(投稿者の行に外部サービスの ID、最終ログイン日時、管理者かどうかの値があっても出ない。メールアドレスは本人が公開していても出ない)。`creator` が無いときは `creatorId` になる
+- `toLegacyCommentListItem`: 共通の項目が `toCommentListItem` と同じになる。`creator` はパスワード、API トークン、非公開のメールアドレスだけを除いた形になり、公開しているメールアドレス(`null` を含む)は残る
 - `groupInlineComments`: 起点と返信が親子になる。入力の順が保たれる。壊れた起点と親の無い返信が除かれる。通常コメントの行は無視される
 - `useSWRxPageComment`: インラインコメントの行を混ぜない(`isInline` が `true` の行を除く)
 
 ### Integration Tests
 - `GET /comments`: 通常コメント、インラインコメント、返信、解決済みが、新しい順で全部返る(1.1-1.6)
 - `GET /comments`: 版の指定。次の版より前だけ返る。最新の版なら全件。別ページの版と存在しない版は 404。通常コメント、インラインコメント、返信のどれにも同じ規則が効く(2.1-2.4)
+- `GET /comments`: 投稿者の項目。ログイン済みの利用者と共有リンクのゲストのどちらへの応答でも、`creator` の項目が4つだけで、投稿者に入れた外部サービスの ID、最終ログイン日時、メールアドレスが応答のどこにも出ない(1.9)
 - `GET /comments`: 共有リンク。ゲストにも両方が返る。別ページの共有リンクは無効扱いになり、未ログインなら 403。`revisionId` は無視される(3.3, 3.4, 2.5)
 - `GET /comments`: ログイン済み、アクセストークン、未認証(ゲスト閲覧の許可あり、なし)。見えないページと存在しないページが同じ応答になる。不正な ID は 400(3.1, 3.2, 3.5, 3.6, 3.7, 1.8)
-- 旧 `comments.get`: インラインコメントを返さない。応答の形が変わらない(5.1, 5.2)。既存の `comment.integ.ts` を残す
+- 旧 `comments.get`: インラインコメントを返さない。応答の形が変わらない(5.1, 5.2)。投稿者の外部サービスの ID、最終ログイン日時、管理者かどうか、アカウントの状態を返す(5.4)。既存の `comment.integ.ts` を残す
 - 件数: `countCommentByPageId` が通常、インライン、返信、解決済みを全部数える。`InlineCommentService` の作成、返信、削除、返信の削除のあとに、`Page.commentCount` が合計に一致する(`updateCommentCount` が書き込みの完了を待つので、待ち合わせなしで確かめられる)。更新の失敗でもコメントの書き込みは成功する(7.1-7.4)
 - 移行: インラインコメントを持つページの件数が直り、持たないページは変わらない。2回実行しても同じ(7.5)
 - 廃止: `GET /_api/v3/inline-comments` が 404 を返す。作成、編集、削除、解決のルートは残る(8.1-8.3)
@@ -446,7 +467,8 @@ export interface ListCommentsResponseBody {
 
 ## Security Considerations
 - 共有リンクの判定は `certifySharedPage` に任せ、新しい認可を並行して作らない。閲覧権限の確認を省くのは、ID が一致する共有リンクが確認できたときだけ
-- 応答の投稿者は `toCommentListItem` 内の `toCreator` で整形する(パスワード・API トークン・非公開のメールアドレスを出さない。旧 API と同じ出力)
+- 新 API の応答の投稿者は、`toCreatorSummary` で4つの項目(ID、ユーザー名、表示名、プロフィール画像の URL)だけにする。新 API は共有リンクのゲストにも投稿者を返すので、メールアドレス、外部サービスのアカウントの ID(`googleId`、`slackMemberId`)、最終ログイン日時、管理者かどうか、アカウントの状態などを、ページの閲覧者に渡さない(要件 1.9。理由は `research.md`)
+- 旧 API の応答の投稿者は、`toLegacyCreator` でパスワード、API トークン、非公開のメールアドレスだけを除く。旧 API の出力を変えないため(要件 5.1、5.4)で、それ以外のユーザーの項目は旧 API からは読める
 - 共有リンクでインラインコメントを返すことの可否は、要件 3.3 で決めた。根拠は、共有リンクの閲覧者が `GET /_api/v3/revisions/*` から過去の版の本文をすでに読めること(`research.md`)。UI で過去の版が見えない作りと API の差は、本 spec の範囲外
 
 ## Migration Strategy

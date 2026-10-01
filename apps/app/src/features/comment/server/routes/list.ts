@@ -90,13 +90,33 @@ const notFoundOrForbidden = (): ErrorV3 =>
  *          creator:
  *            nullable: true
  *            description: >
- *              The author with credentials removed (the email address appears only
- *              when the author publishes it). Falls back to the author's ID string
- *              when the user record no longer exists, and is null when the
- *              comment has no author.
+ *              The author, limited to the fields needed to display them (no email
+ *              address, external account IDs, login history, or role). Falls back
+ *              to the author's ID string when the user record no longer exists,
+ *              and is null when the comment has no author.
  *            oneOf:
  *              - type: object
- *                additionalProperties: true
+ *                additionalProperties: false
+ *                required:
+ *                  - _id
+ *                  - username
+ *                  - name
+ *                  - imageUrlCached
+ *                properties:
+ *                  _id:
+ *                    type: string
+ *                    description: User ID (same value as `creatorId`).
+ *                  username:
+ *                    type: string
+ *                    description: Username, used for the user's home page path.
+ *                  name:
+ *                    type: string
+ *                    nullable: true
+ *                    description: Display name.
+ *                  imageUrlCached:
+ *                    type: string
+ *                    nullable: true
+ *                    description: URL of the profile image. Null when not cached yet.
  *              - type: string
  *          creatorId:
  *            type: string
@@ -177,16 +197,17 @@ const notFoundOrForbidden = (): ErrorV3 =>
  *        tags: [Comments]
  *        summary: List the comments of a page
  *        description: >
- *          Returns the regular comments and the inline comments of a page, including
- *          replies, newest first (by creation time). Use `isInline` to tell them apart.
- *          When `revisionId` is given, only the comments created before the next
- *          revision of the page (the oldest revision created after the given one) are
- *          returned, whichever revision they were posted on. If the given revision is
- *          the latest one, all comments are returned. Access is allowed to a user who
- *          can view the page, or to anyone holding a valid `shareLinkId` for the page (in which
- *          case `revisionId` is ignored; `revisionId` yields 404 `notfound_or_forbidden`
- *          if the revision does not exist or belongs to another page). Authentication with an access token requires the scope
- *          `read:features:page`.
+ *          Returns the regular comments and the inline comments of a page,
+ *          including replies, newest first (by creation time). Use `isInline` to
+ *          tell them apart. When `revisionId` is given, only the comments created
+ *          before the next revision of the page (the oldest revision created after
+ *          the given one) are returned, whichever revision they were posted on. If
+ *          the given revision is the latest one, all comments are returned. If the
+ *          given revision does not exist or belongs to another page, the response
+ *          is 404 `notfound_or_forbidden`. Access is allowed to a user who can
+ *          view the page, or to anyone holding a valid `shareLinkId` for the page
+ *          (in which case `revisionId` is ignored). Authentication with an access
+ *          token requires the scope `read:features:page`.
  *        parameters:
  *          - in: query
  *            name: pageId
@@ -198,12 +219,17 @@ const notFoundOrForbidden = (): ErrorV3 =>
  *            name: revisionId
  *            schema:
  *              type: string
- *            description: ID of a revision of the page. Return only the comments created before the page's next revision after this one. Responds with 404 if the revision does not exist or belongs to another page.
+ *            description: >
+ *              ID of a revision of the page. Return only the comments created
+ *              before the page's next revision after this one. Responds with 404
+ *              if the revision does not exist or belongs to another page.
  *          - in: query
  *            name: shareLinkId
  *            schema:
  *              type: string
- *            description: ID of a share link for the page. Used only to authorize access for users who cannot view the page directly.
+ *            description: >
+ *              ID of a share link for the page. Used only to authorize access for
+ *              users who cannot view the page directly.
  *        responses:
  *          200:
  *            description: The comments of the page, newest first.

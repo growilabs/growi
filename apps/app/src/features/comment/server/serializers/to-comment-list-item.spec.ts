@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { type CommentListRow, toCommentListItem } from './to-comment-list-item';
+import {
+  type CommentListRow,
+  toCommentListItem,
+  toLegacyCommentListItem,
+} from './to-comment-list-item';
 
 const createdAt = new Date('2026-01-01T00:00:00.000Z');
 
@@ -116,17 +120,70 @@ describe('toCommentListItem', () => {
     });
   });
 
-  it('returns the creator without private fields', () => {
-    const item = toCommentListItem(baseRow);
+  it('returns only the creator fields the screens use', () => {
+    const item = toCommentListItem({
+      ...baseRow,
+      creator: {
+        ...creatorRow,
+        googleId: 'google-sentinel',
+        slackMemberId: 'slack-sentinel',
+        lastLoginAt: createdAt,
+        admin: true,
+        imageUrlCached: '/images/alice.png',
+      },
+    });
 
-    expect(item.creator).toMatchObject({ username: 'alice', name: 'Alice' });
+    expect(item.creator).toEqual({
+      _id: 'user-1',
+      username: 'alice',
+      name: 'Alice',
+      imageUrlCached: '/images/alice.png',
+    });
+  });
+
+  it('does not return the creator email even when the user publishes it', () => {
+    const item = toCommentListItem({
+      ...baseRow,
+      creator: { ...creatorRow, isEmailPublished: true },
+    });
+
+    expect(item.creator).not.toHaveProperty('email');
+  });
+
+  it('falls back to the creator id when the creator row is missing', () => {
+    const item = toCommentListItem({ ...baseRow, creator: null });
+
+    expect(item.creator).toBe('user-1');
+  });
+});
+
+describe('toLegacyCommentListItem', () => {
+  it('formats the common fields the same way as toCommentListItem', () => {
+    expect(toLegacyCommentListItem(baseRow)).toEqual({
+      ...toCommentListItem(baseRow),
+      creator: expect.any(Object),
+    });
+  });
+
+  it('returns every creator column except the credentials and the private email', () => {
+    const item = toLegacyCommentListItem(baseRow);
+
+    expect(item.creator).toMatchObject({
+      username: 'alice',
+      name: 'Alice',
+      googleId: null,
+      slackMemberId: null,
+      lastLoginAt: null,
+      admin: false,
+      status: 2,
+    });
     expect(item.creator).not.toHaveProperty('email');
     expect(item.creator).not.toHaveProperty('password');
     expect(item.creator).not.toHaveProperty('apiToken');
   });
 
   it('exposes the creator email when the user publishes it', () => {
-    const item = toCommentListItem({
+    const item = toLegacyCommentListItem({
       ...baseRow,
       creator: { ...creatorRow, isEmailPublished: true },
     });
@@ -137,7 +194,7 @@ describe('toCommentListItem', () => {
   });
 
   it('keeps a null email key when the user publishes a missing email', () => {
-    const item = toCommentListItem({
+    const item = toLegacyCommentListItem({
       ...baseRow,
       creator: { ...creatorRow, isEmailPublished: true, email: null },
     });
@@ -146,7 +203,7 @@ describe('toCommentListItem', () => {
   });
 
   it('falls back to the creator id when the creator row is missing', () => {
-    const item = toCommentListItem({ ...baseRow, creator: null });
+    const item = toLegacyCommentListItem({ ...baseRow, creator: null });
 
     expect(item.creator).toBe('user-1');
   });

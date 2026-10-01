@@ -4,7 +4,7 @@
 - **Feature**: `comment`
 - **Discovery Scope**: Extension(既存のコメント機能への拡張。軽い調査)
 - **Key Findings**:
-  - 旧 API `comments.get` は、返すコメントを整形する式(Prisma の行 + `page`/`revision`/`replyTo` の別名 + 安全化した `creator`)を持っている。この式の出力には、インラインコメント用の列(`isInline`、`quote` など)がすでに全部入る。つまり、新 API の項目は「この式の出力をそのまま使う」だけで、旧 API の上位集合になる。
+  - 旧 API `comments.get` は、返すコメントを整形する式(Prisma の行 + `page`/`revision`/`replyTo` の別名 + 安全化した `creator`)を持っている。この式の出力には、インラインコメント用の列(`isInline`、`quote` など)がすでに全部入る。つまり、新 API の項目は「この式の出力をそのまま使う」だけで、旧 API の上位集合になる。ただし `creator` だけは、新 API では画面が使う4項目に絞る(下の「新 API の `creator` は、画面が使う項目だけにする」)。
   - OpenAPI の生成スクリプト(`bin/openapi/generate-spec-apiv3.sh`)は、ルートのディレクトリを**明示的に並べている**。新しい `features/comment/server/routes/` を足さない限り、新 API は公開仕様に載らない。インライン用の既存ルートに `@swagger` が無く、MCP から見えなかった理由も同じ。
   - ページ下部のコメント欄は、すでに通常コメントとインラインコメントを投稿日時順に並べて表示している(`PageComment.tsx`)。画面の「見え方」を変える必要はなく、変えるのは取得経路だけ。
   - コメント件数は `Page.commentCount`(保存値)。更新されるのは、通常コメントの追加と削除のコメントイベントのときだけで、インラインコメントの書き込みでは更新されない。
@@ -52,7 +52,7 @@
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
 |--------|-------------|-----------|---------------------|-------|
-| A. 新 API の項目を旧 API の上位集合にする(採用) | 旧 API と同じ整形式を共有し、インライン用の列が足される | 画面の通常コメント側が変更不要。外部利用者の移行が容易。整形の持ち主が1つ | 別名の項目(`page` / `revision` / `replyTo`)が新 API にも残る | apiv1 を廃止するときに、別名を外す別件を検討 |
+| A. 新 API の項目を旧 API の上位集合にする(採用。`creator` を除く) | 旧 API と同じ整形式を共有し、インライン用の列が足される | 画面の通常コメント側が変更不要。外部利用者の移行が容易。整形の持ち主が1つ | 別名の項目(`page` / `revision` / `replyTo`)が新 API にも残る | apiv1 を廃止するときに、別名を外す別件を検討 |
 | B. 新 API をきれいな項目名で作り直す | `pageId` / `revisionId` / `replyToId` だけを返す | 新 API の形が整う | 画面側の通常コメント部品で、項目名の変換が要る。整形の式が2つに分かれる | 変換の部品が増える |
 
 ## Design Decisions
@@ -62,10 +62,21 @@
 - **Alternatives Considered**:
   1. 旧 API と同じ整形式を共有する(Option A)
   2. きれいな項目名で作り直す(Option B)
-- **Selected Approach**: `toCommentListItem` を1つ作り、旧 API(`comment.js`)と新 API の両方が使う。
-- **Rationale**: 整形の持ち主が1つになり、2つの API の出力が食い違わない。画面の通常コメント部品は、項目名を変えずに済む。
+- **Selected Approach**: 共通の項目の整形を1つの関数にまとめ、旧 API(`comment.js`)と新 API の両方が使う。投稿者(`creator`)の整形だけは引数で受け取り、API ごとに分ける(次の Decision)。
+- **Rationale**: 共通の項目の整形の持ち主が1つになり、2つの API の出力が `creator` 以外で食い違わない。画面の通常コメント部品は、項目名を変えずに済む。
 - **Trade-offs**: 別名の項目が新 API に残る。旧 API を廃止するときに外せる。
 - **Follow-up**: 旧 API の廃止を決めたときに、別名の整理を検討する。
+
+### Decision: 新 API の `creator` は、画面が使う項目だけにする
+- **Context**: 旧 API の整形は、ユーザーの行からパスワード、API トークン、非公開のメールアドレスだけを除き、残りの列をすべて返す。新 API は共有リンク経由でログインしていないゲストにも投稿者を返す(要件 3.3)。旧 API と同じ整形のままだと、外部サービスのアカウントの ID(`googleId`、`slackMemberId`)、最終ログイン日時(`lastLoginAt`)、管理者かどうか(`admin`)、アカウントの状態(`status`)などが、共有リンクを知っている誰にでも読めてしまう。また、新 API は MCP や SDK から使われる公開の契約になるので、利用者が使い始めると、あとから項目を減らすのが難しくなる。
+- **Alternatives Considered**:
+  1. 旧 API と同じ整形を使い続ける
+  2. 旧 API の整形から、危ない項目をさらに除く(除く項目を並べる方式)
+  3. 画面が読む項目だけを、1つずつ指定して取り出す(残す項目を並べる方式)
+- **Selected Approach**: 3。新 API の `creator` は `_id`、`username`、`name`、`imageUrlCached` だけを返す。メールアドレスは本人が公開していても返さない。旧 API は要件 5.1 のとおり出力を変えず、従来の整形を使い続ける(要件 5.4)。
+- **Rationale**: 画面のコメント部品(`Username`、`UserPicture`、`Comment.tsx` の自分のコメントかどうかの判定)が読むのは、この4項目だけである(項目ごとの根拠は design.md の toCommentListItem)。コメントの持ち主の判定は `creatorId` で行うので、`creator` に他の項目は要らない。2 の方式では、ユーザーの列が今後増えたときに、その列が新 API にそのまま出てしまう。3 なら、増えた列は出ない。MCP や SDK が新 API を使い始める前に、契約を狭くしておける。
+- **Trade-offs**: 新 API と旧 API で `creator` の形が違う。旧 API から新 API へ移る利用者が、`creator` の4項目以外(公開しているメールアドレスなど)を使っていた場合は、別の API(ユーザーの API)から取る必要がある。旧 API からは、引き続き4項目以外のユーザーの項目を読める。旧 API を廃止するときに、この差は無くなる。
+- **Follow-up**: 画面が投稿者の新しい項目を表示するようになったら、要件 1.9 と `toCreatorSummary` に、その項目を1つずつ足す。
 
 ### Decision: 一覧の取得は、画面側の共有の取得フック1本にまとめる
 - **Context**: 末尾のスレッド(通常コメント)と、本文のインラインコメントが、同じページの同じ一覧を別々に取得する。

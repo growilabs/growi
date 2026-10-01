@@ -676,4 +676,72 @@ describe('/comments.get share-link authorization (integration)', () => {
       expect(stored?.comment).toBe('edited body');
     });
   });
+
+  describe('GET /comments.get — creator output is the full sanitized user row (5.1, 5.4)', () => {
+    const workerId = process.env.VITEST_WORKER_ID ?? '1';
+    const pageCId = new ObjectId();
+    const lastLoginAt = new Date('2021-02-03T04:05:06.000Z');
+    let authorId: string;
+    let commentCId: string;
+
+    beforeAll(async () => {
+      await prisma.pages.create({
+        data: { id: pageCId.toString(), path: '/comment-integ-c', v: 0 },
+      });
+      const author = await prisma.users.create({
+        data: {
+          username: `comment-integ-author-${workerId}`,
+          name: 'Comment Author',
+          email: `comment-integ-author-${workerId}@example.com`,
+          isEmailPublished: false,
+          password: 'hashed-password',
+          googleId: 'legacy-google-id',
+          slackMemberId: `legacy-slack-member-id-${workerId}`,
+          lastLoginAt,
+          admin: true,
+          status: 2,
+        },
+      });
+      authorId = author.id;
+      commentCId = (
+        await prisma.comments.add(
+          pageCId.toString(),
+          authorId,
+          revAId.toString(),
+          'comment on page C',
+          -1,
+        )
+      ).id;
+    });
+
+    afterAll(async () => {
+      await prisma.comments.deleteMany({ where: { id: commentCId } });
+      await prisma.users.deleteMany({ where: { id: authorId } });
+      await prisma.pages.deleteMany({ where: { id: pageCId.toString() } });
+    });
+
+    it('keeps every non-credential creator column, unlike the v3 list', async () => {
+      currentUser = { _id: new ObjectId() };
+      accessSpy.mockResolvedValue(true);
+
+      const res = await request(app)
+        .get('/comments.get')
+        .query({ page_id: pageCId.toString() });
+
+      expect(res.status).toBe(200);
+      const [comment] = res.body.comments;
+      expect(comment.creator).toMatchObject({
+        _id: authorId,
+        username: `comment-integ-author-${workerId}`,
+        googleId: 'legacy-google-id',
+        slackMemberId: `legacy-slack-member-id-${workerId}`,
+        lastLoginAt: lastLoginAt.toISOString(),
+        admin: true,
+        status: 2,
+      });
+      expect(comment.creator).not.toHaveProperty('password');
+      expect(comment.creator).not.toHaveProperty('apiToken');
+      expect(comment.creator).not.toHaveProperty('email');
+    });
+  });
 });

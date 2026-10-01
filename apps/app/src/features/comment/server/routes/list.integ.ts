@@ -26,6 +26,14 @@ const BASE = `/comment-list-route-integ-${WORKER_ID}`;
 const MOUNT_PATH = '/_api/v3/comments';
 // Fixed literal so the validation table (built at collection time) never depends on beforeAll state.
 const VALID_ID = '6512f0c0a1b2c3d4e5f60718';
+// Values seeded on the comment author that the list response must never carry.
+const CREATOR_SECRETS = {
+  googleId: 'google-id-must-not-leak',
+  // slackMemberId has a unique index, so keep it distinct per worker.
+  slackMemberId: `slack-member-id-must-not-leak-${WORKER_ID}`,
+  lastLoginAt: new Date('2021-02-03T04:05:06.000Z'),
+};
+const CREATOR_SUMMARY_KEYS = ['_id', 'imageUrlCached', 'name', 'username'];
 
 describe('GET /_api/v3/comments', () => {
   let crowi: Crowi;
@@ -81,6 +89,7 @@ describe('GET /_api/v3/comments', () => {
       username: ownerName,
       email: `${ownerName}@example.com`,
       isEmailPublished: false,
+      ...CREATOR_SECRETS,
     });
 
     // isEmpty: constructBasicPageInfo() only dereferences page.revision for
@@ -270,6 +279,20 @@ describe('GET /_api/v3/comments', () => {
     currentUser = undefined;
   });
 
+  const expectOnlyCreatorSummaries = (res: request.Response): void => {
+    const comments: ICommentListItem[] = res.body.comments;
+    expect(comments.length).toBeGreaterThan(0);
+    for (const { creator } of comments) {
+      expect(typeof creator).toBe('object');
+      expect(Object.keys(creator ?? {}).sort()).toEqual(CREATOR_SUMMARY_KEYS);
+    }
+    const body = JSON.stringify(res.body);
+    expect(body).not.toContain(CREATOR_SECRETS.googleId);
+    expect(body).not.toContain(CREATOR_SECRETS.slackMemberId);
+    expect(body).not.toContain(CREATOR_SECRETS.lastLoginAt.toISOString());
+    expect(body).not.toContain('@example.com');
+  };
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -292,10 +315,13 @@ describe('GET /_api/v3/comments', () => {
         isInline: true,
         quote: 'quoted',
       });
-      expect(inline?.creator).toMatchObject({ username: owner.username });
-      expect(JSON.stringify(res.body)).not.toContain(
-        `${owner.username}@example.com`,
-      );
+      expect(inline?.creator).toEqual({
+        _id: String(owner._id),
+        username: owner.username,
+        name: owner.name,
+        imageUrlCached: owner.imageUrlCached ?? null,
+      });
+      expectOnlyCreatorSummaries(res);
     });
 
     it('returns comments for a Bearer access token with the page-read scope, even when guest read is disallowed', async () => {
@@ -410,6 +436,7 @@ describe('GET /_api/v3/comments', () => {
       expect(
         comments.find((c) => c.id === sharedNewInlineCommentId),
       ).toMatchObject({ isInline: true, quote: 'shared quote' });
+      expectOnlyCreatorSummaries(res);
     });
 
     it('scopes to the old revision for a non-shared viewer (control for the revision-ignored cases)', async () => {

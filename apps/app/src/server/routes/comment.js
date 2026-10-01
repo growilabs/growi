@@ -3,7 +3,7 @@ import { body, query, validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 
 import { CommentEvent, commentEvent } from '~/features/comment/server';
-import { toCommentListItem } from '~/features/comment/server/serializers/to-comment-list-item';
+import { toLegacyCommentListItem } from '~/features/comment/server/serializers/to-comment-list-item';
 import {
   SupportedAction,
   SupportedEventModel,
@@ -169,7 +169,7 @@ export const setup = (crowi, _app) => {
 
     res.json(
       ApiResponse.success({
-        comments: comments.map(toCommentListItem),
+        comments: comments.map(toLegacyCommentListItem),
       }),
     );
   };

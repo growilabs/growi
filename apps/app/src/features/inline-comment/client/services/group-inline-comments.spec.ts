@@ -1,5 +1,5 @@
 import type {
-  ICommentCreator,
+  ICommentCreatorSummary,
   ICommentListItem,
 } from '~/features/comment/interfaces';
 
@@ -192,31 +192,11 @@ describe('groupInlineComments', () => {
 
   describe('creator', () => {
     it('is kept as is when the list item carries the creator object', () => {
-      const creator: ICommentCreator = {
+      const creator: ICommentCreatorSummary = {
         _id: 'user1',
-        id: 'user1',
-        __v: 0,
-        v: 0,
-        userId: null,
-        image: null,
-        imageAttachmentId: null,
-        imageUrlCached: '/images/user1.png',
-        isGravatarEnabled: false,
-        isEmailPublished: false,
-        googleId: null,
-        name: null,
         username: 'alice',
-        slackMemberId: null,
-        introduction: null,
-        lang: 'en_US',
-        status: 2,
-        lastLoginAt: null,
-        contributionsMigratedAt: null,
-        admin: false,
-        readOnly: false,
-        isInvitationEmailSended: false,
-        createdAt: new Date('2025-01-01T00:00:00Z'),
-        updatedAt: new Date('2025-01-01T00:00:00Z'),
+        name: null,
+        imageUrlCached: '/images/user1.png',
       };
 
       const result = groupInlineComments([

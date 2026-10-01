@@ -35,10 +35,10 @@ export interface IInlineComment {
   pageId: string;
   creatorId: string;
   /**
-   * Populated from the shared comment list (GET /comments), which maps the
-   * creator to `ICommentCreatorSummary` (password, apiToken and private email removed). `null` when the user could not
-   * be resolved, or when produced by the write routes' responses (they do not
-   * fetch the creator relation).
+   * Populated from the shared comment list (GET /comments), whose creator
+   * carries only the `ICommentCreatorSummary` fields. `null` when the user
+   * could not be resolved, or when produced by the write routes' responses
+   * (they do not fetch the creator relation).
    */
   creator: ICommentCreatorSummary | null;
   comment: string;
