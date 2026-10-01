@@ -12,7 +12,11 @@ import { useMemo, useRef, useState } from 'react';
 import type { VirtualElement } from '@popperjs/core';
 import { createPortal } from 'react-dom';
 
-import { rangeToVirtualElement } from './selection-virtual-element';
+import type { SelectionEdge } from './selection-virtual-element';
+import {
+  rangeToEdgeVirtualElement,
+  rangeToVirtualElement,
+} from './selection-virtual-element';
 import { usePopperPosition } from './use-popper-position';
 
 type ReferenceRect = ReturnType<VirtualElement['getBoundingClientRect']>;
@@ -23,13 +27,19 @@ const isZeroRect = (rect: ReferenceRect): boolean =>
 type SelectionPopoverProps = {
   /** The range the popover is positioned against. */
   range: Range;
+  /**
+   * When given, the popover sits above the selection, centred on that end of
+   * it (where the user's cursor is). Without it, it sits below the selection,
+   * centred on the whole range.
+   */
+  cursorEdge?: SelectionEdge;
   children: ReactNode;
 };
 
 export const SelectionPopover = (
   props: SelectionPopoverProps,
 ): JSX.Element | null => {
-  const { range, children } = props;
+  const { range, cursorEdge, children } = props;
 
   // A state-backed callback ref, not useRef: `usePopperPosition` takes the
   // popper element as an effect dependency, so the element becoming available
@@ -44,10 +54,13 @@ export const SelectionPopover = (
   // would collapse it to the viewport origin.
   const lastValidRectRef = useRef<ReferenceRect | null>(null);
 
-  // Memoized per range because `usePopperPosition` recreates the Popper
+  // Memoized per range and edge because `usePopperPosition` recreates the Popper
   // instance whenever the reference identity changes.
   const virtualElement = useMemo<VirtualElement>(() => {
-    const rangeElement = rangeToVirtualElement(range);
+    const rangeElement =
+      cursorEdge == null
+        ? rangeToVirtualElement(range)
+        : rangeToEdgeVirtualElement(range, cursorEdge);
 
     return {
       getBoundingClientRect: () => {
@@ -63,9 +76,13 @@ export const SelectionPopover = (
         return rect;
       },
     };
-  }, [range]);
+  }, [range, cursorEdge]);
 
-  usePopperPosition(virtualElement, popperElement);
+  usePopperPosition(
+    virtualElement,
+    popperElement,
+    cursorEdge == null ? 'bottom' : 'top',
+  );
 
   return createPortal(
     // zIndex is the one style this element owns (Popper writes position/transform
