@@ -33,7 +33,7 @@ export const InlineCommentListMenu = (
       <DropdownToggle
         type="button"
         color="link"
-        className="btn-sm btn-outline-neutral-secondary"
+        className="btn-sm btn-outline-neutral-secondary border-0"
         aria-label={t('inline_comment.list_menu')}
       >
         <span className="material-symbols-outlined" aria-hidden="true">
