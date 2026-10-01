@@ -24,10 +24,10 @@
 
 - [x] 2. useSWRxPageComment の改善
 - [x] 2.1 (P) コメント取得フックに共有リンク文脈を伝播する
-  - 内部で `useShareLinkId()` を取得し、SWR キャッシュキーに `shareLinkId` を含める
-  - `shareLinkId` が非null のときのみ取得クエリに `shareLinkId` を付与する（既存 `page_id` は維持。**別 `pageId` は併送しない** — 単一 ID 不変条件）
-  - `shareLinkId` が null（通常ページ）のときは従来クエリのまま。`update` / `post` は変更しない
-  - 完了: 共有ページではフックが `page_id` + `shareLinkId` を送信し（`pageId` は送らない）、通常ページでは従来どおり `page_id` のみ送信する
+  - 取得は `comment` スペックの各画面が共通で使うコメント一覧の取得フック `useSWRxCommentList` が担う。このフックが `useShareLinkId()` を読み、SWR のキー `['/comments', pageId, shareLinkId]` に `shareLinkId` を含める（キーと取得の契約は `comment` スペックが持つ）
+  - `shareLinkId` が非null のときのみ、`GET /_api/v3/comments` の取得クエリに `pageId` と並べて `shareLinkId` を付ける（**`page_id` は併送しない** — 単一 ID 不変条件）
+  - `shareLinkId` が null（通常ページ）のときは `pageId` だけを送る。`update` / `post`（`/comments.update` / `/comments.add`）は変更しない
+  - 完了: 共有ページではフックが `pageId` + `shareLinkId` を送信し（`page_id` は送らない）、通常ページでは `pageId` のみ送信する
   - _Requirements: 3.1, 5.2_
   - _Boundary: useSWRxPageComment_
 
@@ -45,7 +45,7 @@
   - `!req.isSharedPage && !(await isAccessiblePageByViewer(page_id))` のときのみ拒否する（`revisions.js` と同形）
   - **共有文脈（`isSharedPage`）では `revision_id` 分岐を使わず、検証済み `page_id` でのみ取得する**（CRITICAL-2 の閉塞）。非共有経路の `revision_id` 取得は従来どおり維持
   - 入力検証はルート段の `apiV1FormValidator` が担うため、ハンドラ内に重複チェックは置かない（既存 `api.add` の `validationResult(req.body)` は実質 no-op のため踏襲しない）
-  - 投稿者情報は既存の `serializeUserSecurely` を維持する
+  - 投稿者情報は、メールアドレスなどの非公開の項目を除いた形で返す（整形は `comment` スペックの `toCommentListItem`）
   - 完了: 共有文脈のゲストが検証済みページのコメントを取得でき、共有文脈なしのゲストは従来どおり拒否される。共有文脈で別ページの `revision_id` を渡してもそのコメントは返らない
   - _Requirements: 3.1, 3.2, 3.3, 4.1, 4.2, 5.2_
   - _Depends: 3.1_

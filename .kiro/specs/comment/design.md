@@ -37,7 +37,7 @@
 - 共有リンク画面と検索結果プレビューでのインラインコメント UI
 
 ### Allowed Dependencies
-- Prisma の `comments` と `revisions`、`certifySharedPage`、`accessTokenParser`、`loginRequired`、`apiV3FormValidator`、`findPageAndMetaDataByViewer`、`serializeUserSecurely`
+- Prisma の `comments` と `revisions`、`certifySharedPage`、`accessTokenParser`、`loginRequired`、`apiV3FormValidator`、`findPageAndMetaDataByViewer`
 - `inline-comment` の型(`InlineCommentWithReplies` など)。依存の向きは「`inline-comment` → `comment`」のみ。`comment` が `inline-comment` を import してはいけない
 - `InlineCommentService` から件数を更新するときは、`Page` モデルを import せず、依存として渡された関数を呼ぶ
 
@@ -47,7 +47,7 @@
 - 件数の数え方の変更(サイドバー、ページ側面、Slack の展開に影響する)
 - 版を指定したときの意味の変更(Requirement 2)
 - 共有リンク経由で返す範囲の変更(`share-link-comments` の契約に影響する)
-- `share-link-comments` の design.md は、`useSWRxPageComment` の SWR キーの構造が変わることを再検証の条件に挙げている。本設計はキーを `['/comments.get', …]` から `['/comments', …]` に変えるので、この条件に該当する。移管元の書き直し(最終タスク)で、`share-link-comments` 側の記述を更新する
+- `share-link-comments` の design.md も、このキーと `useSWRxPageComment` の戻り値の型を再検証の条件に挙げている。共有リンクの画面のコメント欄は、このキーで取得し、通常コメントだけを表示する。キーを変えるときは、共有リンクの画面が `shareLinkId` を付けて取得できることも確かめ直す
 
 ## Architecture
 
@@ -218,7 +218,7 @@ sequenceDiagram
 |-----------|--------------|--------|--------------|--------------------------|-----------|
 | list route | Server / Route | 入力検証、認証、閲覧権限、応答 | 1.8, 2.4, 2.5, 3.x, 4.x | certifySharedPage(P0)、loginRequired(P0)、listComments(P0) | API |
 | listComments | Server / Service | 版の範囲を決め、コメントを取得する | 1.1-1.6, 2.1-2.4 | Prisma(P0) | Service |
-| toCommentListItem | Server / Serializer | 行を応答の1件に整形する | 1.2, 1.3, 1.7, 5.1, 5.2 | serializeUserSecurely(P0) | Service |
+| toCommentListItem | Server / Serializer | 行を応答の1件に整形する | 1.2, 1.3, 1.7, 5.1, 5.2 | なし | Service |
 | countCommentByPageId | Server / Model | 件数に全コメントを数える | 7.1-7.3, 7.6 | Prisma(P0) | Service |
 | InlineCommentService の拡張 | Server / Service | 書き込み後に件数を更新する | 7.4 | updateCommentCount(P1) | Service |
 | 再計算の移行 | Server / Migration | 既存ページの件数を直す | 7.5 | Prisma(P0) | Batch |
@@ -302,7 +302,7 @@ export const listComments = (
 ```typescript
 export const toCommentListItem = (row: CommentListRow): ICommentListItem;
 ```
-- 旧 API の整形と同じ出力にする: 行のすべての列 + `page`(= `pageId`)、`revision`(= `revisionId`)、`replyTo`(= `replyToId`)、`creator`(あれば `serializeUserSecurely`、なければ `creatorId`)
+- 旧 API の整形と同じ出力にする: 行のすべての列 + `page`(= `pageId`)、`revision`(= `revisionId`)、`replyTo`(= `replyToId`)、`creator`(あれば `toCreator` で整形したもの、なければ `creatorId`)
 - 旧 API(`comment.js`)も、この関数を使う。出力は変わらない
 
 #### countCommentByPageId(モデルの拡張)
@@ -445,7 +445,7 @@ export interface ListCommentsResponseBody {
 
 ## Security Considerations
 - 共有リンクの判定は `certifySharedPage` に任せ、新しい認可を並行して作らない。閲覧権限の確認を省くのは、ID が一致する共有リンクが確認できたときだけ
-- 応答の投稿者は `serializeUserSecurely` を通す(メールアドレスなどを出さない)
+- 応答の投稿者は `toCommentListItem` 内の `toCreator` で整形する(パスワード・API トークン・非公開のメールアドレスを出さない。旧 API と同じ出力)
 - 共有リンクでインラインコメントを返すことの可否は、要件 3.3 で決めた。根拠は、共有リンクの閲覧者が `GET /_api/v3/revisions/*` から過去の版の本文をすでに読めること(`research.md`)。UI で過去の版が見えない作りと API の差は、本 spec の範囲外
 
 ## Migration Strategy
@@ -458,4 +458,3 @@ export interface ListCommentsResponseBody {
 - `pages.commentCount` を読む Slack のリンク展開は、インラインを含む値に変わる。要件 7.1 の結果として許容する。検索の索引は、もともと `comments` を `isInline` で絞らずに数えているので、本変更で値は変わらない
 - 新 API に、別名の項目(`page`、`revision`、`replyTo`)が残る。旧 API を廃止するときに、整理を検討する
 - MCP の `getComments` は、MCP 側を新 API に切り替えるまで、インラインコメントを取得できない(範囲外)
-- 移管元スペック(`inline-comment`、`share-link-comments`)の書き直しは、最終タスクで行う(`brief.md` の「移管元」)

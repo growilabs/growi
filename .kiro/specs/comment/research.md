@@ -17,7 +17,7 @@
 - **Findings**:
   - `certifySharedPage` は `pageId`(camelCase)と `page_id`(snake_case)の両方を受ける。両方あって値が違えば、認証しない(検証する ID と取得する ID がずれる問題を防ぐため)。
   - `shareLinkId` と、ページの ID が一致する共有リンクが有効なら、`req.isSharedPage = true` を立てる。
-  - 画面側(`stores/comment.tsx`)は、`page_id` だけを送る方針を取っている(別の ID を併送しない)。
+  - 旧 API を呼ぶ側は、`page_id` だけを送り、別の ID を併送しない(理由は `share-link-comments` の research.md「認可設計の改訂」)。
 - **Implications**: 新 API は `pageId` だけを受け付ける。クライアントは `page_id` を送らない。
 
 ### 版(リビジョン)を指定したときの旧 API の挙動
