@@ -21,7 +21,8 @@
   }
 
   // The collapsed display's quote (`CollapsedInlineCommentItem`). No
-  // Bootstrap utility expresses a line clamp.
+  // Bootstrap utility expresses a line clamp. Default is 2 lines; the
+  // compact collapsed row below tightens it to 1.
   :global(.inline-comment-quote-clamped) {
     display: -webkit-box;
     overflow: hidden;
@@ -63,6 +64,45 @@
   :global(.page-comment-main):hover .icon-button-container {
     visibility: visible;
   }
+}
+
+// Compact silhouette for a collapsed resolved comment: denser padding, a
+// one-line quote, and a faded body peek — so "folded, more inside" reads at
+// a glance without relying on opacity alone.
+.inline-comment-item-collapsed {
+  :global(.page-comment-main) {
+    padding: 0.5em 0.75em;
+
+    &::before {
+      top: 1em;
+    }
+  }
+
+  :global(.inline-comment-quote) {
+    margin-block: 0.35rem 0;
+    padding: 0.25rem 0.5rem;
+  }
+
+  :global(.inline-comment-quote-clamped) {
+    -webkit-line-clamp: 1;
+  }
+}
+
+// Truncated body preview under the quote. Line-clamp + bottom fade have no
+// Bootstrap utility equivalents.
+.inline-comment-collapsed-peek-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  mask-image: linear-gradient(to bottom, #000 40%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent);
+}
+
+// Bootstrap has no min-width utility for a rem size; keep only that here
+// (sized for the longest locale label — ja「続きを表示»).
+.inline-comment-collapsed-more {
+  min-width: 7.5rem;
 }
 
 // The edit/delete icon buttons' own sizing/opacity (32px square, hover

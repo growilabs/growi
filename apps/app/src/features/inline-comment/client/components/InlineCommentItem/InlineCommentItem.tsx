@@ -255,10 +255,16 @@ export const InlineCommentItem: FC<InlineCommentItemProps> = (
                   <button
                     type="button"
                     data-testid="inline-comment-collapse-button"
-                    className="btn btn-sm btn-link text-secondary text-decoration-none p-0"
+                    className="btn btn-sm btn-link text-secondary text-decoration-none p-0 d-inline-flex align-items-center lh-1"
+                    aria-label={t('inline_comment.collapse')}
                     onClick={onCollapse}
                   >
-                    {t('inline_comment.collapse')}
+                    <span
+                      className="material-symbols-outlined"
+                      aria-hidden="true"
+                    >
+                      expand_less
+                    </span>
                   </button>
                 )}
                 <InlineCommentStatusBadge isResolved={isResolved} />

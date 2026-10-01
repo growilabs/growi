@@ -37,6 +37,9 @@ import type { InlineCommentWithReplies } from '../../../interfaces';
 vi.mock('./InlineCommentItem.module.scss', () => ({
   default: {
     'inline-comment-item-styles': 'inline-comment-item-styles',
+    'inline-comment-item-collapsed': 'inline-comment-item-collapsed',
+    'inline-comment-collapsed-peek-text': 'inline-comment-collapsed-peek-text',
+    'inline-comment-collapsed-more': 'inline-comment-collapsed-more',
     'inline-comment-status-badge': 'inline-comment-status-badge',
     'icon-button-container': 'icon-button-container',
   },
@@ -974,7 +977,7 @@ describe('InlineCommentItem', () => {
         ).toBeInTheDocument();
       });
 
-      it("hides the body, replies, resolve toggle, edit/delete and revision link, even for the viewer's own comment", () => {
+      it("hides replies, resolve toggle, edit/delete and revision link while showing only a body peek, even for the viewer's own comment", () => {
         currentUserRef.current = { _id: 'user1' };
         const { container } = renderItem(
           { ...resolved, creatorId: 'user1', comment: 'a distinctive body' },
@@ -982,9 +985,9 @@ describe('InlineCommentItem', () => {
           { collapsed: true },
         );
 
-        expect(screen.getByTestId('inline-comment-item')).not.toHaveTextContent(
-          'a distinctive body',
-        );
+        expect(
+          screen.getByTestId('inline-comment-collapsed-peek'),
+        ).toHaveTextContent('a distinctive body');
         expect(
           screen.queryByTestId('inline-comment-replies'),
         ).not.toBeInTheDocument();

@@ -5033,7 +5033,11 @@ test.describe('Inline comment - resolved comments are collapsed by default, expa
       item.getByTestId('inline-comment-collapse-button'),
     ).toHaveCount(0);
     await expect(item.locator('blockquote.inline-comment-quote')).toBeVisible();
-    await expect(item.getByText(body)).not.toBeVisible();
+    // Collapsed shows a plain-text peek of the body, not the full rendered
+    // markdown tree — still enough to assert the text is present.
+    await expect(
+      item.getByTestId('inline-comment-collapsed-peek'),
+    ).toContainText(body);
   };
 
   const expectExpanded = async (item: Locator, body: string): Promise<void> => {
@@ -5092,7 +5096,7 @@ test.describe('Inline comment - resolved comments are collapsed by default, expa
     await expectUnresolvedUntouched(page);
   });
 
-  test('Req 20.1, 20.2, 20.5: after a reload the resolved comments are collapsed (quote visible, body hidden) and the unresolved one is expanded', async ({
+  test('Req 20.1, 20.2, 20.5: after a reload the resolved comments are collapsed (quote and body peek visible) and the unresolved one is expanded', async ({
     page,
   }, testInfo) => {
     await gotoCollapsePage(page, testInfo.retry);
@@ -5157,7 +5161,7 @@ test.describe('Inline comment - resolved comments are collapsed by default, expa
     await expectUnresolvedUntouched(page);
   });
 
-  test('Req 20.2: a long quote is cut off at two lines while collapsed, and shows in full once expanded', async ({
+  test('Req 20.2: a long quote is cut off at one line while collapsed, and shows in full once expanded', async ({
     page,
   }, testInfo) => {
     await gotoCollapsePage(page, testInfo.retry);
@@ -5167,7 +5171,7 @@ test.describe('Inline comment - resolved comments are collapsed by default, expa
     await quote.scrollIntoViewIfNeeded();
 
     // The clamp sits on an element inside the padded blockquote, so its box
-    // is exactly the visible text area (no padding to leak a third line into).
+    // is exactly the visible text area (no padding to leak the next line into).
     const clamp = quote.locator('.inline-comment-quote-clamped');
     const collapsedQuoteHeight = (await quote.boundingBox())?.height ?? 0;
 
@@ -5183,15 +5187,15 @@ test.describe('Inline comment - resolved comments are collapsed by default, expa
           Number.parseFloat(style.paddingBottom),
       };
     });
-    expect(clampMetrics.lineClamp).toBe('2');
+    expect(clampMetrics.lineClamp).toBe('1');
     expect(clampMetrics.verticalPadding).toBe(0);
     // Cut off: there is more text than the visible box shows ...
     expect(clampMetrics.scrollHeight).toBeGreaterThan(
       clampMetrics.clientHeight,
     );
-    // ... and the visible box holds no more than two lines.
+    // ... and the visible box holds no more than one line.
     expect(clampMetrics.clientHeight).toBeLessThanOrEqual(
-      clampMetrics.lineHeight * 2 + 1,
+      clampMetrics.lineHeight * 1 + 1,
     );
 
     await item.screenshot({

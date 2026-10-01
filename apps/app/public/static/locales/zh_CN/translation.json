@@ -414,6 +414,7 @@
   "inline_comment": {
     "expand": "展开",
     "collapse": "折叠",
+    "more": "更多",
     "expand_all_resolved": "展开所有已解决的评论",
     "list_menu": "评论列表菜单"
   },

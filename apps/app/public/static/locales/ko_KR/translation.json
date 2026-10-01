@@ -392,6 +392,7 @@
   "inline_comment": {
     "expand": "펼치기",
     "collapse": "접기",
+    "more": "더보기",
     "expand_all_resolved": "해결된 댓글 모두 펼치기",
     "list_menu": "댓글 목록 메뉴"
   },

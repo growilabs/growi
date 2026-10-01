@@ -420,6 +420,7 @@
   "inline_comment": {
     "expand": "Développer",
     "collapse": "Réduire",
+    "more": "Plus",
     "expand_all_resolved": "Développer tous les commentaires résolus",
     "list_menu": "Menu de la liste des commentaires"
   },

@@ -50,6 +50,7 @@ const INLINE_COMMENT_KEYS = [
 const REFINEMENT_KEYS = [
   'expand',
   'collapse',
+  'more',
   'expand_all_resolved',
   'list_menu',
 ] as const;

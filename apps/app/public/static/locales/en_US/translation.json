@@ -428,6 +428,7 @@
     "range_not_found": "The commented text could not be found on this page. It may have been edited or removed.",
     "expand": "Expand",
     "collapse": "Collapse",
+    "more": "More",
     "expand_all_resolved": "Expand all resolved comments",
     "list_menu": "Comment list menu"
   },

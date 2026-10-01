@@ -414,6 +414,7 @@
   "inline_comment": {
     "expand": "展開",
     "collapse": "折りたたみ",
+    "more": "続きを表示",
     "expand_all_resolved": "全ての解決済みのコメントを展開する",
     "list_menu": "コメント一覧のメニュー"
   },

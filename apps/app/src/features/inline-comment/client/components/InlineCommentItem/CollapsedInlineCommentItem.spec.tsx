@@ -8,6 +8,9 @@ import type { InlineCommentWithReplies } from '../../../interfaces';
 vi.mock('./InlineCommentItem.module.scss', () => ({
   default: {
     'inline-comment-item-styles': 'inline-comment-item-styles',
+    'inline-comment-item-collapsed': 'inline-comment-item-collapsed',
+    'inline-comment-collapsed-peek-text': 'inline-comment-collapsed-peek-text',
+    'inline-comment-collapsed-more': 'inline-comment-collapsed-more',
     'inline-comment-status-badge': 'inline-comment-status-badge',
     'icon-button-container': 'icon-button-container',
   },
@@ -73,7 +76,11 @@ describe('CollapsedInlineCommentItem', () => {
 
       const item = screen.getByTestId('inline-comment-item');
       expect(item).toHaveAttribute('data-resolved', 'true');
-      expect(item).toHaveClass('inline-comment-item', 'mb-3');
+      expect(item).toHaveClass(
+        'inline-comment-item',
+        'mb-2',
+        'inline-comment-item-collapsed',
+      );
       expect(
         container.querySelector(
           '.inline-comment-item-styles .page-comment.inline-comment-item-resolved .page-comment-main',
@@ -136,15 +143,15 @@ describe('CollapsedInlineCommentItem', () => {
       expect(expandButton.closest('.icon-button-container')).toBeNull();
     });
 
-    it('does not show the comment body', () => {
+    it('shows a faded one-to-two-line peek of the comment body (not the full rendered body)', () => {
       renderCollapsed();
 
+      const peek = screen.getByTestId('inline-comment-collapsed-peek');
+      expect(peek).toHaveTextContent('a distinctive comment body');
+      // No replies / resolve / edit controls while collapsed.
       expect(
-        screen.queryByText('a distinctive comment body'),
+        screen.queryByTestId('inline-comment-resolve-toggle-button'),
       ).not.toBeInTheDocument();
-      expect(screen.getByTestId('inline-comment-item')).not.toHaveTextContent(
-        'a distinctive comment body',
-      );
     });
 
     it('does not show the resolve toggle, edit/delete buttons or the revision link', () => {
@@ -162,8 +169,8 @@ describe('CollapsedInlineCommentItem', () => {
       expect(
         container.querySelector('#page-comment-revision-comment1'),
       ).toBeNull();
-      // Only the quote and the expand button are operable.
-      expect(screen.getAllByRole('button')).toHaveLength(2);
+      // Quote, header expand chevron, and bottom "More" are operable.
+      expect(screen.getAllByRole('button')).toHaveLength(3);
     });
   });
 
@@ -174,6 +181,17 @@ describe('CollapsedInlineCommentItem', () => {
 
       await userEvent.click(
         screen.getByRole('button', { name: 'inline_comment.expand' }),
+      );
+
+      expect(onExpand).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onExpand when the bottom More control is clicked', async () => {
+      const onExpand = vi.fn();
+      renderCollapsed({ onExpand });
+
+      await userEvent.click(
+        screen.getByTestId('inline-comment-expand-more-button'),
       );
 
       expect(onExpand).toHaveBeenCalledTimes(1);
