@@ -169,7 +169,7 @@
   - _Boundary: inline-comment list route, InlineCommentService, apiv3 routing_
 
 - [ ] 6. Validation: 全体の確認
-- [ ] 6.1 画面の通しの確認を行う
+- [x] 6.1 画面の通しの確認を行う
   - 末尾のコメント欄に、通常コメントとインラインコメントが投稿日時順に並び、件数が合算されること
   - インラインコメントを作成して解決すると、本文のハイライトと末尾のスレッドとページ側面の件数が一緒に更新されること
   - 共有リンクの画面と検索結果のプレビューに、インラインコメントが出ないこと
@@ -213,3 +213,4 @@
 - 4.2: `apps/app` の型検査は `@growi/ui` の `dist` を読むため、新しい checkout では先に `turbo run build --filter @growi/ui` が要る。
 - 4.5: 5.1 の「説明のコメントを直す」対象に、`features/inline-comment/client/components/AnchorResolver/use-anchor-resolver.ts`(58〜63 行目付近。「再取得のたびに新しい配列を返す」は、いまは「共有の一覧が変わったときに新しい配列になる」が正しい)と、`use-anchor-resolver.spec.tsx`(138 / 307 行目付近)を足す。`IInlineComment.creator` の JSDoc(`listByPageId()` でのみ埋まる)、`dto/list-inline-comments.ts` と `dto/index.ts` の再 export も 5.1 で整理する。
 - 5.1: apiv3 のルーターには「見つからない」の受け皿がなく、登録を消しただけでは未登録の GET が Next のページ処理へ流れる(ログインなしと PAT は 302、ログインセッションは 200 の HTML になる)。廃止した `GET /_api/v3/inline-comments` は、index.js の明示的な JSON 404 で受ける。
+- 6.1: 画面の通しの確認は、開発サーバーで E2E `apps/app/playwright/20-basic-features/comment-list-integration.spec.ts`(8 件、chromium と firefox で通過)を実行して行った。確かめた内容は、インラインコメントの作成と解決でハイライト・末尾のスレッド・ページ側面の件数が一緒に変わること(1→2→3、解決後も 3)、共有リンクの画面と検索結果のプレビューにインラインコメントが出ないこと。共有リンク経由の API はインラインの行も返す(要件 3.3)ので、隠しているのは `useSWRxPageComment` の `isInline` の除外。ページ側面ではなく「最近の更新」の件数は API でのみ確認した。
