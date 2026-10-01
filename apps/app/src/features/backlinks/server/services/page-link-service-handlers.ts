@@ -119,7 +119,7 @@ const tryReconcileDeletedPages = async (
 /**
  * Reconciles deleted pages in chunks of `BULK_REINDEX_SIZE`, the batch size `removeLinksForPages`
  * requires. Group deletion hands `syncDescendantsDelete` every affected page at once, so a
- * payload is not bounded on its own. A failed chunk is logged and the rest still settle.
+ * payload is not bounded on its own. A failed chunk is retried and logged after failing after allowed attempts.
  *
  * @param pageIds - Page IDs of pages that have been deleted.
  */
