@@ -31,3 +31,8 @@ export async function up() {
     recountedPages: inlinePages.length,
   });
 }
+
+export async function down() {
+  // Irreversible: the pre-change counts cannot be restored. The stored value is
+  // corrected by the next comment write or by re-running `up`.
+}

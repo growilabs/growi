@@ -16,10 +16,9 @@ export type CommentCardProps = {
    * The author, forwarded as-is to UserPicture / Username (both already fall
    * back for a missing/unpopulated creator), so CommentCard never decides to
    * hide them itself. A normal comment passes `undefined` or an unpopulated
-   * `Ref<IUser>`; an inline comment passes an already-serialized
-   * `IUserSerializedSecurely<IUserHasId>` (or `null`), since the
-   * shared comment list already ran the row through `serializeUserSecurely`
-   * server-side.
+   * `Ref<IUser>`; an inline comment passes an `ICommentCreatorSummary`
+   * (or `null`) from the shared comment list, which already removed password,
+   * apiToken and private email server-side.
    */
   creator:
     | IUserHasId

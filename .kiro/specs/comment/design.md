@@ -52,7 +52,7 @@
 ## Architecture
 
 ### Existing Architecture Analysis
-- 旧 API は apiv1 の `comment.api.get`。取得は `findCommentsByPageId` / `findCommentsByRevisionId` で、`isInline: { not: true }` を固定で付ける。この固定の除外が、インラインコメントを共有リンクと旧 API から締め出している。本 spec は、この除外に触れない。
+- 旧 API は apiv1 の `comment.api.get`。取得は `findCommentsByPageId` / `findCommentsByRevisionId` で、`isInline: { not: true }` を固定で付ける。この固定の除外は旧 API だけがインラインコメントを返さない理由であり、新 API は共有リンク経由でも通常コメントとインラインコメントの両方を返す。旧 API の除外は変えない。
 - インライン専用の一覧取得は `features/inline-comment/server/routes/list.ts` と `InlineCommentService.listByPageId`。起点コメントと返信を別々に取り、返信を `replies` にまとめて返す。
 - 画面は、末尾のスレッド(`stores/comment.tsx` の `useSWRxPageComment`)と本文(`features/inline-comment/client/stores/inline-comment.ts` の `useSWRxInlineComments`)で、別々の API から取得している。
 - 共有リンクの前例は `apiv3/revisions.js`。`certifySharedPage` が `req.isSharedPage` を立て、ページの閲覧権限の確認を省く。
@@ -147,6 +147,7 @@ apps/app/src/migrations/
 - `apps/app/src/features/inline-comment/server/service/inline-comment-service.ts` — 依存に `updateCommentCount` を足し、作成、返信の作成、削除、返信の削除のあとに呼ぶ。`listByPageId` と、一覧専用の行変換を削除する
 - `apps/app/src/features/inline-comment/server/routes/{create,create-reply,update,update-reply,delete,delete-reply,resolve}.ts` — サービスの構築時に `updateCommentCount` を渡す(依存を必須にするので、構築している7か所すべて)
 - `apps/app/src/features/inline-comment/server/routes/routing.integ.ts` — 削除する `list.ts` の import を外し、廃止した一覧取得が 404 になることを確かめるテスト(8.3)の置き場所にする
+- `apps/app/src/features/inline-comment/server/update-page-comment-count.ts` — 新規。`InlineCommentService` の `updateCommentCount` 依存として各ルートが渡す、Page モデルを取得して `Page.updateCommentCount` を呼ぶ薄い関数
 - `apps/app/src/server/models/obsolete-page.js` — `Page.updateCommentCount` が、書き込みの完了を待って結果を返すようにする(`this.update(…, callback)` を `await this.updateOne(…)` に置き換える)
 - `apps/app/src/features/inline-comment/client/stores/inline-comment.ts` — 取得を `useSWRxCommentList` + `groupInlineComments` に置き換える。作成、返信の作成、削除、返信の削除のあとに、一覧に加えてページ情報(`useSWRMUTxPageInfo`)も再取得する
 - `apps/app/src/features/inline-comment/client/stores/inline-comment.spec.tsx` — 旧 API の取得を前提にした部分を、新しい取得に合わせて書き直す
@@ -321,10 +322,10 @@ export interface InlineCommentServiceDeps {
 ```
 - `create`、`createReply`、`deleteComment`、`deleteReply` の成功後に、`await` して呼ぶ。`try/catch` で `logger.error` に記録して続行する
 - `Page.updateCommentCount`(`obsolete-page.js`)は、いまは書き込みをコールバック方式で呼び、その完了を待たずに戻る。このままだと、`await` しても書き込みの完了を待てず、書き込みの失敗が呼び出し元の `try/catch` に届かない(コールバック内で `throw` されるため)。そこで、書き込みを `await` して結果を返す形に直す。通常コメントのルート(`comment.js`)とコメントイベントの購読も同じ関数を使うので、同じ競争が一緒に解消される
-- ルートは `(pageId) => crowi.models.Page.updateCommentCount(pageId)` を渡す
+- `InlineCommentService` は `updateCommentCount` を依存として受け取る。各ルートは `features/inline-comment/server/update-page-comment-count.ts` の `updatePageCommentCount` を渡す。これは Mongoose の Page モデルを呼び出しのたびに取得して `Page.updateCommentCount` を呼ぶ薄い関数である(`crowi.models.Page` の型が `Model<any>` なので、型の付いたモデルを直接取得する)
 
 #### 再計算の移行
-- Trigger: アプリ起動時の migrate-mongo(`up` だけを export する ESM。既存の `20260901160138-backfill-comments-isinline.js` と同じ形)
+- Trigger: アプリ起動時の migrate-mongo(ESM。`up` は再計算を行い、`down` は何もしない。移行前の件数は復元できず、保存値は次のコメント書き込みか `up` の再実行で正しくなる)
 - Input: `isInline: true` の行を持つページ ID の一覧(`comments.groupBy({ by: ['pageId'], where: { isInline: true } })`)
 - Output: 各ページの `pages.commentCount` を `countCommentByPageId` の結果に更新する
 - Idempotency: 何度実行しても同じ結果。インラインコメントを持たないページには触れない

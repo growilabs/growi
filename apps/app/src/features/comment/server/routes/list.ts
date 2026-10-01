@@ -179,10 +179,13 @@ const notFoundOrForbidden = (): ErrorV3 =>
  *        description: >
  *          Returns the regular comments and the inline comments of a page, including
  *          replies, newest first (by creation time). Use `isInline` to tell them apart.
- *          When `revisionId` is given, only comments posted against that revision are
- *          returned. Access is allowed to a user who can view the page, or to anyone
- *          holding a valid `shareLinkId` for the page (in which case `revisionId` is
- *          ignored). Authentication with an access token requires the scope
+ *          When `revisionId` is given, only the comments created before the next
+ *          revision of the page (the oldest revision created after the given one) are
+ *          returned, whichever revision they were posted on. If the given revision is
+ *          the latest one, all comments are returned. Access is allowed to a user who
+ *          can view the page, or to anyone holding a valid `shareLinkId` for the page (in which
+ *          case `revisionId` is ignored; `revisionId` yields 404 `notfound_or_forbidden`
+ *          if the revision does not exist or belongs to another page). Authentication with an access token requires the scope
  *          `read:features:page`.
  *        parameters:
  *          - in: query
@@ -195,7 +198,7 @@ const notFoundOrForbidden = (): ErrorV3 =>
  *            name: revisionId
  *            schema:
  *              type: string
- *            description: Return only the comments posted against this revision.
+ *            description: ID of a revision of the page. Return only the comments created before the page's next revision after this one. Responds with 404 if the revision does not exist or belongs to another page.
  *          - in: query
  *            name: shareLinkId
  *            schema:
