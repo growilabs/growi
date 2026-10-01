@@ -4,10 +4,10 @@
 - **Feature**: `comment`
 - **Discovery Scope**: Extension(既存のコメント機能への拡張。軽い調査)
 - **Key Findings**:
-  - 旧 API `comments.get` は、返すコメントを整形する式(Prisma の行 + `page`/`revision`/`replyTo` の別名 + 安全化した `creator`)を持っている。この式の出力には、インラインコメント用の列(`isInline`、`quote` など)がすでに全部入る。つまり、新 API の項目は「この式の出力をそのまま使う」だけで、旧 API の上位集合になる。ただし `creator` だけは、新 API では画面が使う4項目に絞る(下の「新 API の `creator` は、画面が使う項目だけにする」)。
-  - OpenAPI の生成スクリプト(`bin/openapi/generate-spec-apiv3.sh`)は、ルートのディレクトリを**明示的に並べている**。新しい `features/comment/server/routes/` を足さない限り、新 API は公開仕様に載らない。インライン用の既存ルートに `@swagger` が無く、MCP から見えなかった理由も同じ。
-  - ページ下部のコメント欄は、すでに通常コメントとインラインコメントを投稿日時順に並べて表示している(`PageComment.tsx`)。画面の「見え方」を変える必要はなく、変えるのは取得経路だけ。
-  - コメント件数は `Page.commentCount`(保存値)。更新されるのは、通常コメントの追加と削除のコメントイベントのときだけで、インラインコメントの書き込みでは更新されない。
+  - 旧 API `comments.get` が返すコメントの形は、Prisma の行 + `page`/`revision`/`replyTo` の別名 + 安全化した `creator` である。この形には、インラインコメント用の列(`isInline`、`quote` など)も全部入る。そこで整形の共通部分を `features/comment/server/serializers/to-comment-list-item.ts` の1か所にまとめ、新 API と旧 API の両方が使う。新 API の項目は旧 API の上位集合になる。ただし `creator` だけは、新 API では画面が使う4項目に絞る(下の「新 API の `creator` は、画面が使う項目だけにする」)。
+  - OpenAPI の生成スクリプト(`bin/openapi/generate-spec-apiv3.sh`)は、ルートのディレクトリを**明示的に並べている**。新 API が公開仕様に載るのは、`features/comment/server/routes/*.ts` をこの一覧に入れているため。
+  - ページ下部のコメント欄(`PageComment.tsx`)は、通常コメントとインラインコメントを投稿日時順に並べて表示する。新 API への切り替えで画面の「見え方」は変わらず、変わるのは取得経路だけである。
+  - コメント件数は `Page.commentCount`(保存値)。通常コメントの追加と削除ではコメントイベントの購読者が、インラインコメントの作成、返信の作成、削除、返信の削除では `InlineCommentService` が直接、`Page.updateCommentCount` を呼んで更新する。
 
 ## Research Log
 
@@ -34,7 +34,7 @@
 - **Sources Consulted**: `bin/openapi/generate-spec-apiv3.sh`、`bin/openapi/generate-operation-ids/`
 - **Findings**:
   - 生成対象のディレクトリは、スクリプトに明示されている(`features/revision-diff/server/routes/*.ts` など)。
-  - `Comment` スキーマは `comment.js` の中(旧 API の仕様)にだけ定義されていて、apiv3 の仕様には無い。
+  - `Comment` スキーマは `comment.js` の中(旧 API の仕様)に定義されている。apiv3 の仕様では、新 API のルートファイル(`list.ts`)に `CommentListItem` を定義する。
   - `operationId` は、生成後の処理で自動付与される。
 - **Implications**: 新 API の仕様では、別名のスキーマ(`CommentListItem`)を新 API のルートファイル内に定義する。生成スクリプトに、新しいルートのディレクトリを足す。
 
@@ -45,7 +45,7 @@
   - 件数は `Page.updateCommentCount(pageId)` が、`countCommentByPageId` の結果を `pages.commentCount` に書いて更新する。
   - この呼び出しは、コメントイベント(`CommentEvent.CREATE` / `DELETE`)の購読者(`CommentService`)から行われる。
   - 同じイベントを、検索サービス(`search.ts`)も購読していて、ページを再索引する。
-  - インラインコメントの書き込みは、このイベントを出していない。
+  - インラインコメントの書き込みは、このイベントを出さない。
 - **Implications**: インラインの書き込みからイベントを出すと、検索の再索引まで動き始め、要件の範囲を超える。件数の更新だけを、直接呼ぶ。
 
 ## Architecture Pattern Evaluation

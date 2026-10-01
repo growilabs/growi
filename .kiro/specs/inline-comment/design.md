@@ -18,7 +18,7 @@
 インラインコメント機能は、ページ本文の読み取り専用ビュー（`RevisionRenderer.tsx` がレンダリングした結果）に対して、閲覧者が選んだテキスト範囲を対象としたコメントを作成・閲覧できるようにする。位置情報はDOM XPathやmarkdownソースの文字オフセットではなく、レンダリング後のプレーンテキストに対する「選択文字列（exact quote）＋前後文脈（prefix/suffix）＋おおよそのオフセット」（W3C Web Annotation Data Model の TextQuoteSelector/TextPositionSelector 相当）として保存し、表示のたびにクライアント側で再検索してハイライトを復元する。
 
 **Users**: ページ閲覧者・編集者が、本文の特定範囲について議論するために利用する。
-**Impact**: 既存のページ末尾コメントスレッド（`apps/app/src/features/comment/`、`/_api/comments.*`）の**投稿・編集・削除・通知の挙動は変更しない**。データは既存の `comments` Prisma/Mongooseモデルに新しいフィールドを追加する形で共存させ、新しい種類の行（インラインコメント）を区別するための識別フィールドを1つ追加する。旧式の一覧取得（`/_api/comments.get`）は、この新しい種類の行を返さない。旧式の一覧取得が使う取得関数（`findCommentsByPageId`／`findCommentsByRevisionId`）がインラインコメントの行を除いて返し、この約束は `comment` スペックの要件 5.2 が定める。インラインコメントを画面に出すための取得と、ページのコメント件数は、`comment` スペックが持つ（`GET /_api/v3/comments` が通常コメントとインラインコメントを1つの平らな一覧で返し、件数はインラインコメントも合算する）。既存の `RevisionRenderer.tsx` に対する変更は「コンテナへのref転送」1点のみに限定する。本文レンダリング用コンポーネントのうち `Header.tsx`／`TableWithEditButton.tsx`／`DrawioViewerWithEditButton.tsx` の3つには、条件付き表示の編集ボタンのアイコン要素へ `aria-hidden="true"` を付与する変更が入る（本文テキストの抽出範囲を安定させるための標準属性の付与であり、これらのコンポーネントの表示条件・振る舞い・見た目は変えない）。既存の `PageView.tsx` に対する変更は、本文コンテナへの参照を得るための配線と、この機能のクライアントコンポーネント3つ（`SelectionCapture`／`InlineCommentHighlight`／`InlineCommentBodyInteraction`。いずれも `next/dynamic(..., { ssr: false })` 経由）およびフック2つ（`useAnchorResolver`／`useSWRxInlineComments`）の組み込みで構成される（タスク5.2）。`InlineCommentForm` はこの一覧に含まれない——`SelectionCapture` の内部で描画される子コンポーネントであり、`PageView.tsx` が直接組み込むわけではない。また `PageView.tsx` には、この配線とは別にもう1点、既存の不具合修正が入っている——本文サブツリーが `useCallback` を要素の型として使っていたため、依存が変わるたびに（本機能が加えたアンカー再計算の依存を含め）サブツリー全体が再マウントされてしまう問題があり、`useMemo` で値をレンダーする形に直した（経緯は tasks.md の Implementation Notes と `PageView.tsx` 内のコメントを参照）。
+**Impact**: 既存のページ末尾コメントスレッド（`apps/app/src/features/comment/`、`/_api/comments.*`）の**投稿・編集・削除・通知の挙動は変更しない**。データは既存の `comments` Prisma/Mongooseモデルに新しいフィールドを追加する形で共存させ、新しい種類の行（インラインコメント）を区別するための識別フィールドを1つ追加する。旧式の一覧取得（`/_api/comments.get`）は、この新しい種類の行を返さない。旧式の一覧取得が使う取得関数（`findCommentsByPageId`／`findCommentsByRevisionId`）がインラインコメントの行を除いて返し、この約束は `comment` スペックの要件 5.2 が定める。インラインコメントを画面に出すための取得と、ページのコメント件数は、`comment` スペックが持つ（`GET /_api/v3/comments` が通常コメントとインラインコメントを1つの平らな一覧で返し、件数はインラインコメントも合算する）。既存の `RevisionRenderer.tsx` に対する変更は「コンテナへのref転送」1点のみに限定する。本文レンダリング用コンポーネントのうち `Header.tsx`／`TableWithEditButton.tsx`／`DrawioViewerWithEditButton.tsx` の3つには、条件付き表示の編集ボタンのアイコン要素へ `aria-hidden="true"` を付与する変更が入る（本文テキストの抽出範囲を安定させるための標準属性の付与であり、これらのコンポーネントの表示条件・振る舞い・見た目は変えない）。既存の `PageView.tsx` に対する変更は、本文コンテナへの参照を得るための配線と、この機能のクライアントコンポーネント3つ（`SelectionCapture`／`InlineCommentHighlight`／`InlineCommentBodyInteraction`。いずれも `next/dynamic(..., { ssr: false })` 経由）およびフック2つ（`useAnchorResolver`／`useSWRxInlineComments`）の組み込みで構成される（タスク5.2）。`InlineCommentForm` はこの一覧に含まれない——`SelectionCapture` の内部で描画される子コンポーネントであり、`PageView.tsx` が直接組み込むわけではない。また `PageView.tsx` には、この配線とは別にもう1点、既存の不具合修正が入っている——本文サブツリーは、`useMemo` で作った要素（値）としてレンダーしている。`useCallback` で作った関数を要素の型にすると、依存が変わるたびにサブツリー全体が再マウントされ、`SelectionCapture` の入力途中のフォームが消えてしまうためである。
 
 ### Goals
 - 文字単位で選択したテキスト範囲にインラインコメントを作成・表示できる（1.1–2.6）
@@ -79,7 +79,7 @@
 - `_comment-inheritance.scss` の `%bg-comment`／`%comment-section`／`%user-picture` の中身が変わったとき（通常コメントの箱とインラインコメントの箱の両方が同時に変わる、共有の抽象のため）
 - `packages/core-styles/scss/bootstrap/theming/_root.scss` のprimary/secondary限定の絞り込みが外れたとき（`--bs-warning-*` 等がテーマ対応になれば、専用のカスタムプロパティを持つ理由が薄れる）
 - `Comments`／`PageComment` の呼び出し元が増えたとき（共有リンク画面（`ShareLinkPageView.tsx`）に `inlineComments` が渡らないことを再確認する。`PageComment` が使う `useSWRxPageComment` は共有の一覧を取得するが、`isInline` が `true` の行を除いて返すため、インラインコメントは `PageView.tsx` から `inlineComments` として渡されたときだけ表示される。共有リンク経由の API はインラインコメントも返すので、画面に出さないことは、次の2点だけで実現している：共有リンク画面が `inlineComments` を渡さないこと（`PageView.tsx` も共有リンクの文脈では `useSWRxInlineComments` に `null` を渡す）と、`useSWRxPageComment` の除外）
-- `PageView.tsx` の `inlineCommentAnchors`／`bodyInlineComments`／`visibleResolvedRanges` が別の理由で変更された場合、「アンカー解決とスクロールナビゲーションは解決済みコメントも含めた全件に対して行う（`inlineCommentAnchors`は未フィルタのまま）」「本文中のハイライト・当たり判定・ポップオーバーだけを解決済み除外した`visibleResolvedRanges`経由で描画する」という2段構えの分離が保たれているか再確認する必要がある。`inlineCommentAnchors`自体を`.filter((c) => c.resolvedAt == null)`してしまうと、一覧クリックでの解決済みコメントへのスクロールナビゲーション（Requirement 16.1）が壊れる（当初案がこれで、`scrollToRange`が機能しなくなったため2段構えに直した経緯がある）
+- `PageView.tsx` の `inlineCommentAnchors`／`bodyInlineComments`／`visibleResolvedRanges` が別の理由で変更された場合、「アンカー解決とスクロールナビゲーションは解決済みコメントも含めた全件に対して行う（`inlineCommentAnchors`は未フィルタのまま）」「本文中のハイライト・当たり判定・ポップオーバーだけを解決済み除外した`visibleResolvedRanges`経由で描画する」という2段構えの分離が保たれているか再確認する必要がある。`inlineCommentAnchors`自体を`.filter((c) => c.resolvedAt == null)`してしまうと、一覧クリックでの解決済みコメントへのスクロールナビゲーション（Requirement 16.1）が壊れる（`scrollToRange` が解決済みコメントを見つけられなくなる）
 - `removeWithReplies` の挙動（例えば `isInline` によるフィルタが追加される等）が変わった場合、起点コメント削除時の返信道連れ削除が引き続き機能するか再確認する必要がある
 - `IInlineComment`／`InlineCommentReply` の形（フィールドの追加・削除）が変わった場合、更新用DTOとサービス側の行形状チェック（起点／返信の判別）を再確認する必要がある
 - `packages/editor` の `useCodeMirrorEditorIsolated`（共有atomのライフサイクル）が変わる場合、`MentionAwareCommentInput` の一度きりの`initialValue`適用（マウント時1回だけ`initDoc`）が引き続き成立するか再確認する必要がある。この機能の実装中に見つけた2件の既存バグ修正（未初期化エディタをatomの初回値にしない／発行元アンマウント時にatomをクリアする）は`packages/editor`側の一般的な修正であり、他の`CodeMirrorEditorComment`利用箇所（通常コメントの返信・編集）にも影響する
@@ -88,7 +88,7 @@
 
 ### Existing Architecture Analysis
 
-- `comments` Prisma/Mongooseモデルは既存の通常コメント専用であり、`commentPosition`（常に`-1`）は事実上未使用。インラインコメントの位置情報の土台にはしない（`.kiro/specs/inline-comment/brief.md` で確定済み）。新設するアンカーフィールドは `commentPosition` とは独立した新しいフィールド群である。
+- `comments` Prisma/Mongooseモデルは既存の通常コメント専用であり、`commentPosition`（常に`-1`）は事実上未使用。インラインコメントの位置情報の土台にはしない（`brief.md` の Constraints）。新設するアンカーフィールドは `commentPosition` とは独立した新しいフィールド群である。
 - `apps/app/prisma/schema.prisma` には、Mongooseからの移行に伴う機械的な `Json` フィールドは存在するが、意図的に設計された構造化フィールドの前例はない（`research.md` 参照）。本設計ではアンカーの各要素を独立したスカラーフィールドとして宣言し（`Json` にまとめない）、既存スキーマの一貫したフィールド宣言スタイルに合わせる。
 
 ### アーキテクチャ選定：既存 `comments` モデルへの拡張＋新規ルート
@@ -118,7 +118,7 @@
 
 ### レンダリングパイプラインへの意図的な非依存（クライアント側マッチング）
 
-2023年当時のB案（`data-line` 機構を文字オフセットまで拡張する案）は、brief.mdの時点で「(a) 読み取りパス全体へのレンダリングパイプライン変更が必要」「(b) sanitizeより前の段階に新しいhastウォーカーを差し込む必要があり本文レンダリングの他機能にも影響しうる」という理由で却下されている。本設計もサーバー側でレンダリング済みプレーンテキストを取得する案（SSR中に抽出する案）を検討したが、以下の理由で同じ却下理由に該当すると判断し、採用しなかった：
+`data-line` 機構を文字オフセットまで拡張する案は、「(a) 読み取りパス全体へのレンダリングパイプライン変更が必要」「(b) sanitizeより前の段階に新しいhastウォーカーを差し込む必要があり本文レンダリングの他機能にも影響しうる」という理由で採らない（`brief.md` の Approach）。サーバー側でレンダリング済みプレーンテキストを取得する案（SSR中に抽出する案）も、次の理由で採らない：
 
 - `PageContentRenderer` は `{ ssr: true }` でサーバーレンダリングされる（`PageView.tsx`）が、本文中の `lsx`（子ページ一覧）ブロックは `packages/remark-lsx/src/client/` 配下のSWRフックによって**クライアント側でのみ**解決される。サーバーが構築するAST由来のプレーンテキストは、閲覧者が実際に見るテキストと一致しない。
 - したがって、アンカーの計算・再検索は**クライアント側で、レンダリング（および非同期ウィジェットの解決）が完了した後のDOMに対して**行う。
@@ -139,13 +139,13 @@
 
 ### 解決済みオフセットキャッシュを持たない判断
 
-brief.mdの討論メモは「再アンカーに成功した場合の解決済みオフセットを、アンカー起点リビジョンIDとは別の場所にキャッシュする」ことに触れているが、`requirements.md` の要件5（5.1–5.5）にはキャッシュ永続化を求める受け入れ基準は存在しない。持続的なキャッシュを実装すると、(a) 新しい永続フィールド、(b) リビジョン一致判定によるキャッシュ無効化ロジック、(c) 本文編集直後に複数閲覧者が同時に閲覧した場合の再計算競合、という3つのコストが生じる一方、得られるのは「クライアント側での文字列検索1回分の節約」という未計測の効果でしかない。設計をシンプルに保つため、v1ではキャッシュを持たず、**ページ表示のたびにクライアント側で再計算する**（後述のAnchorResolverが冪等な再計算として扱う）。将来、実際の計測でボトルネックと判明した場合にキャッシュ導入を検討する（`research.md` に持ち越し事項として記録）。
+再アンカーに成功した場合の解決済みオフセットをキャッシュとして永続化することは、`requirements.md` の要件5（5.1–5.5）が求めていない。持続的なキャッシュを実装すると、(a) 新しい永続フィールド、(b) リビジョン一致判定によるキャッシュ無効化ロジック、(c) 本文編集直後に複数閲覧者が同時に閲覧した場合の再計算競合、という3つのコストが生じる一方、得られるのは「クライアント側での文字列検索1回分の節約」という未計測の効果でしかない。設計をシンプルに保つため、キャッシュを持たず、**ページ表示のたびにクライアント側で再計算する**（後述のAnchorResolverが冪等な再計算として扱う）。将来、実際の計測でボトルネックと判明した場合にキャッシュ導入を検討する（`research.md` の「解決済みオフセットの永続キャッシュは見送り」の項を参照）。
 
 `anchorOriginRevisionId`（既存の `revisionId` とは別に保持する不変フィールド）は、この決定により**再アンカーのオフセット計算やキャッシュ無効化には使われない**。役割は「このアンカーがどの本文に対して作られたものかを、diffを行わずに判定できるようにする」provenance（来歴）情報のみであり、作成後は再アンカーの成否にかかわらず書き換えない。
 
 ### 解決済みインラインコメントの本文中非表示は、アンカー解決を全件に対して行ったうえで表示側だけを絞り込む2段構えで実現する
 
-「解決済みコメントには本文中でハイライトを付けない」（Requirement 2.7）と「一覧クリックでの解決済みコメントへのスクロールナビゲーション」（Requirement 16.1）は両立する必要がある。当初案は `PageView.tsx` の `inlineCommentAnchors`（アンカー解決の入力そのもの）に `.filter((c) => c.resolvedAt == null)` を1つ加えるだけの単純な形だったが、これだと解決済みコメントの `Range` がそもそも計算されなくなり、一覧からのスクロールナビゲーション（`scrollToRange`）が解決済みコメントに対して機能しなくなる。そのため実装は次の2段構えを取る：
+「解決済みコメントには本文中でハイライトを付けない」（Requirement 2.7）と「一覧クリックでの解決済みコメントへのスクロールナビゲーション」（Requirement 16.1）は両立する必要がある。`PageView.tsx` の `inlineCommentAnchors`（アンカー解決の入力そのもの）を `.filter((c) => c.resolvedAt == null)` で絞ると、解決済みコメントの `Range` がそもそも計算されず、一覧からのスクロールナビゲーション（`scrollToRange`）が解決済みコメントに対して機能しない。そのため次の2段構えを取る：
 
 - `inlineCommentAnchors`（→ `useAnchorResolver` への入力）は**未フィルタのまま**、解決済みを含む全件を渡す。これにより `resolvedInlineCommentRanges`（全件分の`Range`）と、それを参照する `scrollToRange` は解決済みコメントに対しても機能する
 - `bodyInlineComments`（`inlineComments.filter((c) => c.resolvedAt == null)`）と、それで`resolvedInlineCommentRanges`を絞り込んだ `visibleResolvedRanges` を新たに導出し、本文中のハイライト・当たり判定・ポップオーバーはこちらだけを参照する
@@ -228,7 +228,7 @@ graph TB
 
 既存ファイルへの変更は、通常コメント（`apps/app/src/client/components/PageComment/`）との見た目・部品共有（`CommentCard`／`DeleteConfirmAlert`／`CommentEditDeleteButtons`／`CommentRevisionLink`。理由はArchitecture節「`CommentCard`は自分のCSSモジュールを持たない」および research.md「見た目の刷新」参照）、本文レンダリング側への最小限の変更（`RevisionRenderer.tsx`へのref転送、`Header.tsx`等3ファイルへの`aria-hidden="true"`付与。理由はArchitecture節「本文テキストの抽出範囲」参照）、データモデル変更（`comment.ts`／`schema.prisma`。理由はData Models節参照）に集約される。個別ファイルの変更内容はコードの差分そのものから読み取れるため、ここには列挙しない。
 
-非自明な1件のみ記録する: `apps/app/turbo.json` の `test:components` タスクの `dependsOn` に `dev:pre:styles-commons`／`dev:pre:styles-components` を追加している。ベンダースタイルの事前生成が揃わないまま `test:components` が走ると失敗するためで、この経緯は他のどの文書にも残っていない。
+非自明な1件のみ記録する: `apps/app/turbo.json` の `test:components` タスクの `dependsOn` に `dev:pre:styles-commons`／`dev:pre:styles-components` を追加している。ベンダースタイルの事前生成が揃わないまま `test:components` が走ると失敗するためである。
 
 ## System Flows
 
@@ -446,15 +446,17 @@ interface InlineCommentService {
 ##### API Contract
 | Method | Endpoint | Request | Response | Errors |
 |---|---|---|---|---|
-| POST | `/_api/v3/inline-comments` | `CreateInlineCommentInput` | `InlineComment` | 400（空クオート・不正なpageId、または読み取り専用利用者にコメントが許可されていない）, 404（ページが存在しない、または閲覧権限がない。両者を区別しない一様な404。`apps/app/.claude/rules/page-write-action-403-404.md`）, 500 |
-| POST | `/_api/v3/inline-comments/:id/replies` | `CreateInlineCommentReplyInput` | `InlineCommentReply` | 400（`:id`が起点コメントでない、または読み取り専用利用者にコメントが許可されていない）, 404（`:id`が存在しない、または親ページの閲覧権限がない。一様な404）, 500 |
-| PUT | `/_api/v3/inline-comments/:id/resolve` | `{ resolved: boolean }` | `InlineComment` | 400（`:id`が返信、または読み取り専用利用者にコメントが許可されていない）, 404（`:id`が存在しない、または閲覧権限がない。一様な404）, 500 |
-| PUT | `/_api/v3/inline-comments/:id` | `{ comment: string }` | `{ inlineComment: InlineComment }` | 400（`:id`が起点コメントでない、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない）, 404（`:id`が存在しない。閲覧権限がない場合も同じ404）, 500 |
-| PUT | `/_api/v3/inline-comments/replies/:id` | `{ comment: string }` | `{ inlineCommentReply: InlineCommentReply }` | 400（`:id`が返信でない、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない）, 404（`:id`が存在しない。閲覧権限がない場合も同じ404）, 500 |
-| DELETE | `/_api/v3/inline-comments/:id` | — | `{}` | 400（読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない）, 404（`:id`が存在しない。閲覧権限がない場合も同じ404）, 500 |
-| DELETE | `/_api/v3/inline-comments/replies/:id` | — | `{}` | 400（読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない）, 404（`:id`が存在しない。閲覧権限がない場合も同じ404）, 500 |
+| POST | `/_api/v3/inline-comments` | `CreateInlineCommentInput` | `{ inlineComment: InlineComment }`（ステータス201） | 400（入力の検証エラー、サービスの失敗〔空クオートなど。コード `inline-comment-create-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 404（ページが存在しない、または閲覧権限がない。両者を区別しない一様な404。コード `notfound_or_forbidden`。`apps/app/.claude/rules/page-write-action-403-404.md`） |
+| POST | `/_api/v3/inline-comments/:id/replies` | `CreateInlineCommentReplyInput` | `{ inlineCommentReply: InlineCommentReply }`（ステータス201） | 400（入力の検証エラー、`:id`が起点コメントでない〔`inline-comment-not-origin`〕、サービスの失敗〔`inline-comment-reply-create-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 404（`:id`が存在しない〔`inline-comment-not-found`〕、または親ページの閲覧権限がない〔`notfound_or_forbidden`〕。一様な404） |
+| PUT | `/_api/v3/inline-comments/:id/resolve` | `{ resolved: boolean }` | `{ inlineComment: InlineComment }` | 400（入力の検証エラー、`:id`が返信〔`inline-comment-not-origin`〕、サービスの失敗〔`inline-comment-resolve-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 404（`:id`が存在しない〔`inline-comment-not-found`〕、または閲覧権限がない〔`notfound_or_forbidden`〕。一様な404） |
+| PUT | `/_api/v3/inline-comments/:id` | `{ comment: string }` | `{ inlineComment: InlineComment }` | 400（入力の検証エラー、`:id`が起点コメントでない〔`inline-comment-not-origin`〕、サービスの失敗〔`inline-comment-update-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕。閲覧権限がない場合も同じ404） |
+| PUT | `/_api/v3/inline-comments/replies/:id` | `{ comment: string }` | `{ inlineCommentReply: InlineCommentReply }` | 400（入力の検証エラー、`:id`が返信でない〔`inline-comment-not-reply`〕、サービスの失敗〔`inline-comment-update-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕。閲覧権限がない場合も同じ404） |
+| DELETE | `/_api/v3/inline-comments/:id` | — | `{}` | 400（入力の検証エラー、`:id`が起点コメントでない〔`inline-comment-not-origin`〕、サービスの失敗〔`inline-comment-delete-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕。閲覧権限がない場合も同じ404） |
+| DELETE | `/_api/v3/inline-comments/replies/:id` | — | `{}` | 400（入力の検証エラー、`:id`が返信でない〔`inline-comment-not-reply`〕、サービスの失敗〔`inline-comment-delete-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕。閲覧権限がない場合も同じ404） |
 
-すべてのルートで、ページ（または対象コメントが属するページ）が存在しない場合と、存在するが閲覧権限がない場合を区別せず、一様に404を返す（`apps/app/.claude/rules/page-write-action-403-404.md`——ページの存在をレスポンスから漏らさないための既存規則。当初の設計ではこのケースを403としていたが、実装時にこの規則に従って404へ訂正した）。表中で403として残っているのは「対象は見つかったが投稿者本人でない」場合のみで、こちらは意図的に区別している。未ログインのアクセスは、この実装が使う `loginRequiredFactory` がapiv3リクエストに対して常に403を返すため（401ではない）、当初の設計では401を想定していたが、実際の挙動と異なっていたため訂正した（タスク3.5／6.2のE2Eテストで実際の挙動として確認済み）。
+どのルートも500を明示的には返さない（サービスが投げた例外はすべて、上記の `*-failed` コードの400として返す）。
+
+すべてのルートで、ページ（または対象コメントが属するページ）が存在しない場合と、存在するが閲覧権限がない場合を区別せず、一様に404を返す（`apps/app/.claude/rules/page-write-action-403-404.md`——ページの存在をレスポンスから漏らさないための既存規則）。表中で403として残っているのは「対象は見つかったが投稿者本人でない」場合のみで、こちらは意図的に区別している。未ログインのアクセスには403を返す。この実装が使う `loginRequiredFactory` は、apiv3リクエストに対して常に403を返す（401ではない。タスク3.5／6.2のE2Eテストで確認済み）。
 
 すべてのエンドポイントは `accessTokenParser` → `loginRequired` → express-validator → `apiV3FormValidator` のチェーンを通す。**`certifySharedPage` ミドルウェアはこれらのルートに一切適用しない**（すべて書き込みのルートであり、共有リンク閲覧者には書き込みの手段を与えないため）。インラインコメントの読み取りはこの表に無い。`comment` スペックの `GET /_api/v3/comments` を使う。書き込み系の7ルート（`create.ts`／`create-reply.ts`／`resolve.ts`／`update.ts`／`update-reply.ts`／`delete.ts`／`delete-reply.ts`）はすべて、`loginRequired` の直後・express-validatorより前に `excludeReadOnlyUserIfCommentNotAllowed` を通す（apiv1の `/comments.add`／`/comments.update`／`/comments.remove` と同じ位置）。読み取り専用利用者にコメントが許可されていない場合、この時点で400を返す（要件1.4/1.5、18.4／18.8／18.9）。編集・削除ルートの投稿者本人チェックはルート側（`findUnique` で `creatorId` を取得するのと同じタイミング）とサービス側内部（多層防御としての再検証）の2回行う。
 
@@ -553,7 +555,7 @@ function renderedTextOf(container: HTMLElement): RenderedText;
 
 | Field | Detail |
 |---|---|
-| Intent | クオート＋前後文脈を、完全一致→NFCあいまい一致の順で `RenderedText.text` に対して検索する |
+| Intent | 選択したテキスト（クオート）だけを `RenderedText.text` から探す。まず完全一致を試し、見つからなければNFC正規化後のあいまい一致を試す。同じ文字列が複数ある場合は、記録した `approxOffset` に最も近い候補を選ぶ。`prefix`／`suffix` は検索に使わない |
 | Requirements | 2.1, 2.2, 2.3, 5.1, 5.2, 5.3 |
 
 **Contracts**: Service [x] / API [ ] / Event [ ] / Batch [ ] / State [ ]
@@ -568,13 +570,14 @@ interface QuoteMatchResult {
 function matchQuote(text: string, anchor: InlineCommentAnchor): QuoteMatchResult;
 ```
 
-**アルゴリズム契約（brief.mdの討論で確定した設計要求を具体化）**:
+**アルゴリズム契約（brief.md の Constraints を具体化）**:
 1. まず正規化前の `text` に対して `anchor.quote` の完全一致箇所を**すべて**列挙する（`String.prototype.indexOf` を使った反復検索）。1件以上見つかれば、`anchor.approxOffset` に最も近い開始位置を持つ候補を選び、`status: 'exact'` としてそのオフセットを返す（クオートがページ内に複数回出現する場合の曖昧性を、作成時に記録したおおよその位置で解消する。`approxOffset` はこの目的のためだけに保存・使用し、他の用途では読まない）
-2. 完全一致が0件であれば、`text` と `anchor.quote`／`anchor.prefix`／`anchor.suffix` の両方を `String.prototype.normalize('NFC')` で正規化し、`approx-string-match` の `search(normalizedText, normalizedQuote, maxErrors)` を実行する。`maxErrors` は `Math.min(Math.ceil(quote.length * 0.2), 20)`（クオート長の20%、ただし20編集を上限とするキャップ付き。長いクオートほど誤差を甘くしすぎないための固定上限であり、実装時にチューニング可能なパラメータとして切り出す）
-3. `prefix`/`suffix` の文脈窓は、選択位置周辺のテキストに対して `Intl.Segmenter(locale, { granularity: 'grapheme' })` を走査し、目標窓サイズに収まる直近の書記素境界へ**内側に**スナップして構築する。各セグメントの `index` はコード単位オフセットであり、そのままスライス境界として使う（`approx-string-match` はコード単位でエラーをカウントするため、書記素境界でスナップした文字列をそのまま渡せば単位変換は不要——スナップの時点で単位変換は完結している）
-4. `approx-string-match` が複数の候補を返した場合は、`anchor.approxOffset` を同じNFC正規化後の座標系に変換した上で、最も近い開始位置を持つ候補を選ぶ（ステップ1と同じ曖昧性解消の考え方）
-5. 選ばれた候補の一致位置は正規化後の `normalizedText` 上のオフセットである。これを正規化前の `text` 上のオフセットへ逆変換する（`normalized-offset-mapping.ts`）。逆変換は、正規化前後の文字列を先頭から並行して走査し、各正規化ステップが何コード単位を消費・生成したかを記録することで実装する（結合文字・互換分解でコード単位数が変わりうるため、単純な差分オフセットの流用はしない）。この関数はステップ4の `approxOffset` 変換にも同じロジックを使う
-6. あいまい一致でも見つからなければ `status: 'not_found'` を返す（2.4, 5.3）
+2. 完全一致が0件であれば、`text` と `anchor.quote` の両方を `String.prototype.normalize('NFC')` で正規化し（`anchor.prefix`／`anchor.suffix` は使わない。理由は research.md）、`approx-string-match` の `search(normalizedText, normalizedQuote, maxErrors)` を実行する。`maxErrors` は `Math.min(Math.ceil(quote.length * 0.2), 20)`（クオート長の20%、ただし20編集を上限とするキャップ付き。長いクオートほど誤差を甘くしすぎないための固定上限であり、実装時にチューニング可能なパラメータとして切り出す）
+3. `approx-string-match` が複数の候補を返した場合は、`anchor.approxOffset` を同じNFC正規化後の座標系に変換した上で、最も近い開始位置を持つ候補を選ぶ（ステップ1と同じ曖昧性解消の考え方）
+4. 選ばれた候補の一致位置は正規化後の `normalizedText` 上のオフセットである。これを正規化前の `text` 上のオフセットへ逆変換する（`normalized-offset-mapping.ts`）。逆変換は、正規化前後の文字列を先頭から並行して走査し、各正規化ステップが何コード単位を消費・生成したかを記録することで実装する（結合文字・互換分解でコード単位数が変わりうるため、単純な差分オフセットの流用はしない）。この関数はステップ3の `approxOffset` 変換にも同じロジックを使う。逆変換の前に、一致の終了位置を `snapToGraphemeEnd` で書記素境界まで後ろへ延ばす（終了位置が NFC で書き換えられた文字の途中に当たると、逆変換でその文字の先頭へ丸められ、文字が一致から落ちるため。NFC は書記素の境界をまたいで書き換えないので、書記素境界は逆変換で正確に戻せる）
+5. あいまい一致でも見つからなければ `status: 'not_found'` を返す（2.4, 5.3）
+
+`matchQuote` は選択したテキスト（クオート）だけを探し、`anchor.prefix`／`anchor.suffix` は使わない。`prefix`／`suffix` の文脈窓は `matchQuote` ではなく、選択を取り込む側の `use-text-selection.ts`（`buildPrefixWindow`／`buildSuffixWindow`）がコメント作成時に作る。選択位置の周辺のテキストに対して `Intl.Segmenter(locale, { granularity: 'grapheme' })` で書記素境界を求め、目標の窓サイズに収まる最も近い境界へ**内側に**スナップする。各セグメントの `index` はコード単位オフセットであり、そのままスライスの境界に使うため、単位の変換は要らない。
 
 #### `resolved-range` (`rangeForResolved`, `rangesById`)
 
@@ -593,7 +596,7 @@ function rangesById(
   resolvedRanges: ReadonlyMap<string, ResolvedRange>,
 ): ReadonlyMap<string, Range>;
 ```
-- `rangeForResolved` は `InlineCommentHighlight` が元々持っていた非公開の `rangeFor()` と同じロジック（`resolved.status === 'not_found'` または DOM位置に解決できない場合は `null`）。`InlineCommentHighlight` はこの関数を呼ぶ形に書き換えられており、実行時の挙動は変えていない
+- `rangeForResolved` は `resolved.status === 'not_found'` の場合、または DOM位置に解決できない場合は `null` を返す。`InlineCommentHighlight` はこの関数を使ってハイライトの `Range` を作る
 - `rangesById` は `resolvedRanges` の各エントリに対して `rangeForResolved` を呼び、解決できたものだけを同じidキーの `Map` に詰めて返す（`not_found` は結果に含まれない）
 - `Range` オブジェクトは呼び出しのたびに `container` の現在のDOMから再構築し、キャッシュしない（rendered-text/quote-matcherと同じ方針）
 - 3つの呼び出し元がある: `InlineCommentHighlight`（保存済みハイライトの描画）、`InlineCommentBodyInteraction`（当たり判定・ポップオーバーの位置決め）、`PageView.scrollToRange`（一覧からのスクロール・一時的強調のためのRange取得）
@@ -688,7 +691,7 @@ model comments {
 ### Data Contracts & Integration
 
 - **API Data Transfer**: リクエスト/レスポンスは上記 Service Interface の型をそのままJSONへシリアライズする。`quote`/`prefix`/`suffix` は正規化前の原文のままシリアライズし、クライアント側での再選択・再表示に使う
-- **一覧の取得と投稿者情報**: インラインコメントの一覧は、`comment` スペックのコメント一覧 API の応答（`ICommentListItem` の平らな一覧）から作る。投稿者の情報からメールアドレスなどを除く処理は、`comment` スペックの整形（`toCommentListItem`）が行う（13.5、`comment` の要件 1.7）
+- **一覧の取得と投稿者情報**: インラインコメントの一覧は、`comment` スペックのコメント一覧 API の応答（`ICommentListItem` の平らな一覧）から作る。投稿者の情報は、`comment` スペックの整形（`toCommentListItem`）が ID・ユーザー名・表示名・プロフィール画像の URL の4項目（`ICommentCreatorSummary`）だけにする（13.5、`comment` の要件 1.7、1.9）。`IInlineComment.creator` と返信の `creator` の型は `ICommentCreatorSummary | null`
 - **旧式の取得からの除外**: `/_api/comments.get` が使う `findCommentsByPageId`／`findCommentsByRevisionId` は、共有リンクかどうかによらず常に `isInline: { not: true }` を条件に含める。旧式の取得の応答を通常コメントだけに保つためで、契約は `comment` スペックの要件 5.2 が持つ
 - **編集・削除のDTO**: `UpdateInlineCommentRequestBody`/`ResponseBody`・`UpdateInlineCommentReplyRequestBody`/`ResponseBody`（いずれも `interfaces/dto/` 配下）はリクエスト・レスポンスとも `comment: string` 1フィールドのみを持つ。削除にはリクエスト本文がなく（idはURLパラメータ）、レスポンスにも意味のあるペイロードがない（`res.apiv3({})`）ため、DTOファイルは追加しない
 
@@ -733,5 +736,5 @@ model comments {
 ## Supporting References
 
 - あいまい一致ライブラリの比較調査（`dom-anchor-text-quote`／`approx-string-match`／`diff-match-patch` の詳細な比較、`Match_MaxBits` の挙動検証）は `research.md` を参照
-- 実装アプローチの検討経緯（新規モデル分離案からの転換を含む）の全文は `research.md` の「実装アプローチの選択肢」節を参照
+- 実装アプローチの選択肢の比較は `research.md` の「実装アプローチの選択肢」節を参照
 - [Inline Comment Redesign (Artifact)](https://claude.ai/code/artifact/d19799da-fedc-4687-ad14-24d134bc7e89) — 一覧アイテム・ポップオーバーの見た目刷新に使った承認済みデザインモックアップ

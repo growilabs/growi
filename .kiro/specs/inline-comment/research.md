@@ -1,15 +1,11 @@
-# Gap Analysis: inline-comment
+# Research & Design Decisions: inline-comment
 
-## Requirement-to-Asset Map
+## 設計の前提として確かめた既存の仕組み
 
-| 要件 | 再利用可能な既存資産 | ギャップ |
-|---|---|---|
-| **R1 範囲選択による作成**（文字単位・原文保持・認可） | 既存 `Comment` モデル（page/creator/revision/comment フィールド）、apiv3 の `accessTokenParser → loginRequired → express-validator → apiV3FormValidator → res.apiv3()` という認可・検証チェーン（`revision-diff-api` で確立済み） | **Missing**: アンカー用の構造化フィールド（quote/prefix/suffix/offset/アンカー起点リビジョンID）。**Missing**: 本文レンダリング結果に対して `window.getSelection()` を取得するクライアント側の選択キャプチャ層（2023年試作の `TextSelectionTools` 一式は現行のコンポーネント構成では失効しており参考にしかならない）。**Constraint**: 新規フィールドは Mongoose スキーマ・Prisma スキーマの両方に同期させる必要がある（`.claude/rules/model.md`）。 |
-| **R2 表示**（完全一致→あいまい一致→ハイライトなし） | `diff`（v5、`apps/app/package.json` に直接依存として既存）はサーバー側の行単位diff用途で使われているが文字レベルのあいまい一致には使っていない | **Missing**: あいまい一致（fuzzy re-anchor）マッチャー自体。**Missing**: `Intl.Segmenter` の使用例（現行コードにゼロ件、初導入になる）。**Missing**: レンダリング済み本文中の一致範囲を `<mark>`/`<span>` 等で囲むハイライト表示の前例（`revision-diff-api` は差分のHTML化をクライアント責務として明示的にスコープ外にしており、参考にできる実装は見つからなかった）。**Missing**: `RevisionRenderer.tsx` は `ReactMarkdown` を素で包むのみで、外部にrefを渡さないため、選択キャプチャ・ハイライト描画のためのコンテナref自体が現状ない。 |
-| **R3 既存メンション機構の再利用** | `crowi.commentService.prepareMentionNotifications`（`apps/app/src/server/service/comment.ts`）は `comment_id + actionUserId + activityId + page` のみを要求する汎用的な作りで、そのまま呼び出し可能。メンションのハイライト表示は本文テキストに対するremarkプラグインなのでストレージ方式に依存しない | **Constraint**: `getMentionedUsers` 内部は `prisma.comments.findUnique(...)` を直書きしており、インラインコメントを別モデルに保存する場合はこの呼び出しの一般化が必要になる（同一 `comments` モデルに保存する場合は変更不要）。**Constraint**: `prepareMentionNotifications` は `activityId`（`res.locals.activity._id`）を要求するため、インラインコメント作成経路も既存の通常コメント作成時と同様に `Activity` レコード（新しい `SupportedAction` 定数を伴う）を発行する必要がある。「そのまま呼び出せる」は入力の型の話であり、呼び出し元がActivity発行という前提を満たす必要がある点は設計フェーズで明記すること。 |
-| **R4 解決/未解決の管理** | なし | **Missing**: `resolvedBy`/`resolvedAt` 相当のフィールドはコードベース全体に存在せず、完全新規。操作可能な利用者の範囲（作成者限定か、ページへのコメント権限を持つ全員か）も要件では汎用的にしか定義されていない。 |
-| **R5 ベストエフォート再アンカリング** | 既存の `revisionId`（`ref Revision`）フィールドの実装パターンは、新設する不変フィールド「アンカー起点リビジョンID」の型・リレーション定義の参考になる | **Missing**: 不変な起点リビジョンIDフィールドと、それとは別に保持する「解決済みオフセットのキャッシュ」フィールド。**Missing**: 再アンカーアルゴリズム自体（R2と同じギャップ）。 |
-| **R6 共有リンク画面での扱い** | 共有リンクのページは別コンポーネント（`ShareLinkPageView.tsx`）が描画しており、通常ページの `PageView.tsx` とはルートが分かれている | **Constraint**: 共有リンク画面にインラインコメントのUIを出さない。共有リンク経由でのコメントの取得（インラインコメントを含むか）は `comment` スペックが持つ。インラインコメントの行を旧式の `/_api/comments.get` が返さないようにする除外（`findCommentsByPageId`／`findCommentsByRevisionId`）は必要になる。 |
+- **メンション通知**: `crowi.commentService.prepareMentionNotifications`（`apps/app/src/server/service/comment.ts`）は `comment_id`・`actionUserId`・`activityId`・`page` だけを受ける。内部の `getMentionedUsers` は `prisma.comments.findUnique(...)` でコメントを読むため、インラインコメントを同じ `comments` モデルに置けばそのまま使える。`activityId` が要るので、インラインコメントの作成でも `Activity` を記録する（専用の `SupportedAction` を使う）。
+- **メンションのハイライト**: 本文テキストに対する remark プラグインなので、保存の方式に依存しない。
+- **スキーマ**: `comments` は Prisma モデルで、コレクションとインデックスを作るための Mongoose スキーマも残っている。フィールドを足すときは両方をそろえる（`.claude/rules/model.md`）。
+- **共有リンク画面**: 共有リンクのページは `ShareLinkPageView.tsx` が描画し、通常ページの `PageView.tsx` とは別のコンポーネントである。
 
 ## 実装アプローチの選択肢
 
@@ -41,24 +37,7 @@
 - ❌ レガシー dot-style ルート（`comment.js`）と新設 apiv3 ルートが同一テーブルに対して混在することになり、将来の保守者が「`comments` コレクションは1つのルータが扱っている」と誤解しないよう明記が必要
 - ❌ インラインコメントに `replyTo`（返信）を許すかどうかが要件で定義されておらず、同一テーブル共有ゆえに設計判断を先送りできない
 
-brief.md の Boundary Candidates が「既存の通常コメントAPIとどこまで共有し、どこから分けるかが設計判断のしどころ」と明記している通り、この3択自体が brief の時点で認識されていた論点である。Option C は R3（メンション再利用）が踏まえている既存コードの形（`getMentionedUsers`）に最も自然に接続するが、最終判断は設計フェーズに委ねる。
-
-## Research Needed（設計フェーズへの持ち越し事項）
-
-1. あいまい一致マッチャーの実装方式: `diff-match-patch` を新規直接依存として追加する（brief が名指ししている `Match_MaxBits=32` 制約は「採用する場合」の前提）か、NFC正規化＋書記素クラスタ境界を自前で扱う軽量な部分文字列マッチャーを実装するか。現状どちらも未着手（`diff-match-patch` はロックファイル上 `jsondiffpatch` 経由の間接依存としてのみ存在し、apps/app からは未import）。
-2. インラインコメントの永続化先: 既存 `comments` モデルに同居させる（Option A/C）か、新規モデルに分離する（Option B）か。`getMentionedUsers` の一般化要否に直結する。
-3. インラインコメントに返信（`replyTo`）を許すか: 要件では明示されていない。同一モデル共有案（Option A/C）を取る場合は設計フェーズで明示的に決定する必要がある。
-4. 選択キャプチャ用のrefをどこに追加するか: `RevisionRenderer.tsx` は現状 `ReactMarkdown` をrefなしでラップしているため、どの選択肢を取ってもこの小さな変更（コンテナへのref転送）は共通して必要になる。
-
-## Effort & Risk
-
-- **Effort: L（1〜2週間）** — 新規アンカーフィールドの二重スキーマ同期、初導入となるあいまい一致アルゴリズム（`Intl.Segmenter` 含む）、クライアント側の選択キャプチャ・ハイライト描画UI、解決/未解決トグルUI、旧式の取得からの除外、と複数の独立したワークフローにまたがる。apiv3モジュール構成・dual-schema同期の型自体は `revision-diff-api`/`mongoose-to-prisma` skill として確立済みパターンがあるため XL までは見込まない。
-- **Risk: Medium-High（あいまい一致サブシステムに集中）** — brief 自身が「最も技術的不確実性が高い部分」と明記している通り、正規化後オフセット→原文オフセットの逆変換や書記素クラスタスナップは実装ミスがハイライトのズレとして静かに現れやすく、テストで検出しづらい。永続化・APIレイヤーは確立パターンに乗るため Medium、UIレイヤーは2023年試作の `TextSelectionTools`/`useRenderedObserver` が参考にできるため Low-Medium。
-
-## Recommendations for Design Phase
-
-- 上記 Option A/B/C のいずれを採るか、上記 Research Needed の5項目を含めて設計フェーズで確定する。brief・要件の記述からは Option C（ハイブリッド）が最も抵抗が少ないが、最終決定は設計フェーズの判断に委ねる。
-- あいまい一致マッチャーは、外部ライブラリ追加 vs 自前実装のトレードオフ（依存追加コスト vs 32文字制約・書記素境界スナップの自前実装コスト）を設計フェーズで具体的に比較検討すること。
+この3択は、既存の通常コメントの API とどこまで共有し、どこから分けるかという論点である。採ったのは Option C に近い形で、理由は下の「アーキテクチャ決定」節。
 
 ---
 
@@ -84,15 +63,15 @@ brief.md の Boundary Candidates が「既存の通常コメントAPIとどこ�
 
 ### あいまい一致は `prefix`／`suffix` を使わず、クオートと `approxOffset` のみで行う（実装済み）
 
-討論で確定した設計要求は「クオート＋前後文脈」で再検索することだったが、`quote-matcher.ts` の実装は前後文脈（`prefix`／`suffix`）を保存するのみで、あいまい一致（`matchApproximately`）ではクオート単体と `approxOffset` しか使わない（`quote-matcher.ts:108-109` に「意図的に未使用」と明記）。
+設計の検討段階では「クオート＋前後文脈」で再検索する案だったが、`quote-matcher.ts` の実装は前後文脈（`prefix`／`suffix`）を保存するのみで、あいまい一致（`matchApproximately`）ではクオート単体と `approxOffset` しか使わない（`quote-matcher.ts:108-109` に「意図的に未使用」と明記）。
 
-理由は採用した `approx-string-match` のAPIが `search(text, pattern, maxErrors)` という単一パターンでの近似検索であり、`prefix + quote + suffix` を1つのパターンとして渡す場合、一致した範囲から「どこからどこまでがクオート本体か」を書記素境界を保ったまま逆算する必要が生じる（`prefix`/`suffix`それぞれの長さがあいまい一致の許容誤差の分だけ伸縮しうるため、単純な文字数オフセットでは戻せない）。ここに手を入れると、brief.md が既に指摘していた `Match_MaxBits=32`（`diff-match-patch`不採用の理由）と同種の、パターン長に起因する制約に新たに向き合う必要が生まれる。v1では、同じクオートがページ内に複数回出現する場合の絞り込みを `approxOffset`（作成時に記録したおおよその位置に最も近い候補を選ぶ）だけで代替し、前後文脈は「将来この絞り込みを強化する余地」として保存だけしておく形にとどめた。
+理由は採用した `approx-string-match` のAPIが `search(text, pattern, maxErrors)` という単一パターンでの近似検索であり、`prefix + quote + suffix` を1つのパターンとして渡す場合、一致した範囲から「どこからどこまでがクオート本体か」を書記素境界を保ったまま逆算する必要が生じる（`prefix`/`suffix`それぞれの長さがあいまい一致の許容誤差の分だけ伸縮しうるため、単純な文字数オフセットでは戻せない）。ここに手を入れると、上の「Build vs Adopt」で挙げた `Match_MaxBits=32`（`diff-match-patch`不採用の理由）と同種の、パターン長に起因する制約に新たに向き合う必要が生まれる。v1では、同じクオートがページ内に複数回出現する場合の絞り込みを `approxOffset`（作成時に記録したおおよその位置に最も近い候補を選ぶ）だけで代替し、前後文脈は「将来この絞り込みを強化する余地」として保存だけしておく形にとどめた。
 
 この単純化が安全な範囲は「解決済みオフセットの永続キャッシュは見送り」の項が説明する `approxOffset` の役割（同上）と同じ——クオートがページ内で一意でない場合の絞り込み精度が下がるだけで、ハイライトが完全に外れることはない。requirements.md の要件2.1／5.1は、この実装済みの挙動（クオート＋おおよその位置での再検索）に合わせて記述している。
 
 ### 解決済みオフセットの永続キャッシュは見送り（Simplification）
 
-brief.mdの討論メモには「解決済みオフセットをキャッシュする」という記述があったが、`requirements.md` の要件5（5.1–5.5）にはキャッシュ永続化を求める受け入れ基準がない。持続的なキャッシュは (a) 新しい永続フィールド、(b) リビジョン一致判定によるキャッシュ無効化ロジック、(c) 本文編集直後の複数閲覧者による再計算競合という3つのコストを生む一方、得られるのは「クライアント側での文字列検索1回分の節約」という未計測の効果でしかないため、v1では持たない。マッチングをクライアント側に倒したことで、この決定はキャッシュの書き込み経路そのものを消す（サーバー側の状態変更なし）という副次的な単純化にもつながった。`anchorOriginRevisionId` はオフセット計算やキャッシュ無効化には使われず、provenance（来歴）情報としての役割のみを持つ。
+設計の検討段階では「解決済みオフセットをキャッシュする」案もあったが、`requirements.md` の要件5（5.1–5.5）にはキャッシュ永続化を求める受け入れ基準がない。持続的なキャッシュは (a) 新しい永続フィールド、(b) リビジョン一致判定によるキャッシュ無効化ロジック、(c) 本文編集直後の複数閲覧者による再計算競合という3つのコストを生む一方、得られるのは「クライアント側での文字列検索1回分の節約」という未計測の効果でしかないため、v1では持たない。マッチングをクライアント側に倒したことで、この決定はキャッシュの書き込み経路そのものを消す（サーバー側の状態変更なし）という副次的な単純化にもつながった。`anchorOriginRevisionId` はオフセット計算やキャッシュ無効化には使われず、provenance（来歴）情報としての役割のみを持つ。
 
 ### マッチングはクライアント側で実行（サーバー側SSR中の抽出は不採用）
 
@@ -163,7 +142,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 - `creator`が`null`／未populateでも`UserPicture`／`Username`を無条件に描く。既存の`Comment.tsx`は「投稿者情報が無い場合に何も表示しない」のではなく、`UserPicture`は既定アイコン、`Username`は"(anyone)"という代替表示をする作りに既になっている。`CommentCard`側で`creator != null`条件を追加して丸ごと隠すと、投稿者が未populateの既存コメントの見た目が変わり、Requirement 13.9（通常コメントの見た目を変えない）に違反する。
 - `headerEnd`（見出し行の右側の差し込み）に共通の余白（`ms-auto`等）を`CommentCard`側で固定しない。通常コメントの右端（リビジョンリンク）とインラインコメントの右端（解決トグル）とで必要な余白が異なる（前者は投稿日時のすぐ右に`ms-2`、後者は行の右端に寄せる`ms-auto`）ため、余白は各呼び出し側が`headerEnd`に渡すReactNode自身に付ける。
 
-実際に実装された`CommentCardProps.creator`の型は、当初案（`IUserHasId | Ref<IUser> | null | undefined`）よりも広く、`IUserSerializedSecurely<IUserHasId>`を含む。インラインコメントの投稿者は、`comment` スペックの整形でメールアドレスなどを除いた形で届き、その形をそのまま`CommentCard`まで運ぶとこの型が必要になるため（画面が読む4項目だけの`ICommentCreatorSummary`も受ける）。
+`CommentCardProps.creator`の型は `Ref<IUser> | ICommentCreatorSummary | null | undefined` である。どちらの種類のコメントも、`comment` スペックのコメント一覧 API が返す `ICommentCreatorSummary`（`_id`／`username`／`name`／`imageUrlCached` の4項目）を渡す。`Ref<IUser>` を残しているのは、通常コメントの型 `ICommentHasId.creator`（`Ref<IUser> | ICommentCreatorSummary | null`）をそのまま受けるため。通常コメントは投稿者が取れないとき `undefined`、インラインコメントは `null` を渡す。
 
 ### インラインコメントは`PageComment`自身で取得せず、`PageView`からpropsで渡す
 
@@ -254,6 +233,10 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 - **`quote` だけは選択時の原文のまま**（`Range.toString()` 由来）で、本文テキスト（`renderedTextOf` の `text`）とは別の座標系に乗っている。そのため、除外対象のサブツリー（`.katex` や `aria-hidden="true"`）の内側にある、またはそれを跨ぐ範囲を選択すると、`quote` に本文テキストには存在しない文字が混ざり、完全一致・あいまい一致のどちらも当たらず「ハイライトなし」に落ちる（design.md の「フロー上の決定事項」参照）。直さなかったのは、誤った位置にハイライトを出すのではなく素直に「ハイライトなし」へ落ちる壊れ方であり、要件2.4/5.3のフォールバックで吸収できるためである。将来これを直す場合は、アンカーのデータ構造（`quote` も `renderedTextOf` ベースの文字列にする——ただし保存済みの全 `quote` が一致しなくなる）か、一致判定の側（マッチャーが除外対象由来の文字を吸収する）のどちらを動かすかを先に決める必要があり、どちらもこの機能の中心的な契約に触れる。
 - **監視期間の打ち切りと、2つ目のトリガーの描画中ガードが重なる隙間**。`use-container-settle` は監視期間（10秒）を過ぎると監視をやめ、フォールバックの静定シグナルを1回出して終わる。その後に「描画中」の目印付き要素が残ったまま `anchors` が変化すると、ガードは再計算を見送るが、それを引き受ける静定シグナルはもう来ない——このとき、新しく投稿されたコメントはページを開き直すまでハイライトされない。「見送った再計算は静定シグナルが引き受ける」という設計どおりの帰結であり、10秒以上「描画中」の目印を出しっぱなしにする上流側の不具合が前提になるため、頻度は低いと判断して直さなかった。もし実際に起きるようになった場合は、ガードで見送ったことを記録して打ち切り時に一度だけ拾う、という形が素直な直し方になる。
+
+### Risks & Mitigations
+
+- Risk: あいまい一致は NFC 正規化した文字列の上で探すため、`normalized-offset-mapping.ts` が正規化後の位置を元の本文の位置に戻す対応づけを誤ると、ハイライトが少しだけずれる。ずれは目で見ても気づきにくく、テストでも見つけにくい。— Mitigation: この対応づけは `normalized-offset-mapping.ts` の1か所にまとめ、`normalized-offset-mapping.spec.ts` で単独に検証している
 
 ## プレビューポップオーバーの改修（amend spec `inline-comment-popover-refinement` より統合）
 

@@ -1,7 +1,6 @@
 import type { JSX, ReactNode } from 'react';
 import Link from 'next/link';
-import type { IUser, IUserHasId, Ref } from '@growi/core';
-import type { IUserSerializedSecurely } from '@growi/core/dist/models/serializers';
+import type { IUser, Ref } from '@growi/core';
 import { UserPicture } from '@growi/ui/dist/components';
 
 import { Username } from '~/components/User/Username';
@@ -19,13 +18,7 @@ export type CommentCardProps = {
    * from the shared comment list; a normal comment passes `undefined` and an
    * inline comment `null` when the author could not be resolved.
    */
-  creator:
-    | IUserHasId
-    | Ref<IUser>
-    | IUserSerializedSecurely<IUserHasId>
-    | ICommentCreatorSummary
-    | null
-    | undefined;
+  creator: Ref<IUser> | ICommentCreatorSummary | null | undefined;
   /**
    * Declared as Date but actually arrives as an ISO string. Forwarded to
    * FormattedDistanceDate as-is; this component never parses or converts it.
@@ -83,8 +76,7 @@ export const CommentCard = (props: CommentCardProps): JSX.Element => {
           <UserPicture user={creator} size="md" className="me-2" />
           <div className="small fw-bold me-3">
             {/*
-             * Username's prop type doesn't include `null` (only `IUserHasId
-             * | Ref<IUser> | undefined`), but treats null/undefined/unpopulated
+             * Username's prop type doesn't include `null`, but treats null/undefined/unpopulated
              * identically at runtime (falls back to "(anyone)"), so normalizing
              * null to undefined here changes nothing observable.
              */}

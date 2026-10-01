@@ -4,21 +4,20 @@
 共有リンク（`/share/{shareLinkId}`）ページでコメントを表示できるようにする機能。
 
 ### 背景・目的
-現在、共有リンクページ（`ShareLinkPageView`）にはコメント欄がまったく描画されていない。通常ページ（`PageView`）では `Comments` コンポーネントでコメントの表示・投稿ができるが、共有リンク経由（ゲスト/未ログイン）では表示すらできない。これを、添付ファイル（attachment）が既に採用している「referer を見て共有ページからのアクセスを許可する」方式と同様の仕組みで、ゲストでもコメントを表示できるようにする。
+通常ページ（`PageView`）では、`Comments` コンポーネントでコメントの表示と投稿ができる。共有リンクページ（`ShareLinkPageView`）でも、共有リンク経由の閲覧者（未ログインのゲストを含む）が、同じ `Comments` コンポーネントでコメントを読めるようにする。
 
 ### スコープの方針
-- 共有リンクからは「コメントの**閲覧（表示）のみ**」可能。投稿・更新・削除はできない（read-only）。`comments.add` / `comments.update` / `comments.remove` はゲスト不可のまま据え置く。
+- 共有リンクからは「コメントの**閲覧（表示）のみ**」できる。投稿・更新・削除はできない（read-only）。`comments.add` / `comments.update` / `comments.remove` はゲストに使わせない。
 
-### 関連コード（現状分析済み）
-- 共有ページエントリ: `apps/app/src/pages/share/[[...path]]/index.page.tsx`
-- 共有ページ本体（コメント欄なし）: `apps/app/src/components/ShareLinkPageView/ShareLinkPageView.tsx`
-- 手本となる通常ページ: `apps/app/src/components/PageView/PageView.tsx`（`next/dynamic` で `Comments` を描画）
-- コメントコンポーネント: `apps/app/src/client/components/Comments.tsx`
-- コメント取得 SWR フック: `apps/app/src/stores/comment.tsx`（`useSWRxPageComment` → `GET /_api/comments.get?page_id=...`）
-- コメント取得サーバールート: `apps/app/src/server/routes/index.js`（`/comments.get` に `loginRequired` と `comment.api.get`）
-- コメント取得ハンドラ: `apps/app/src/server/routes/comment.js`（`comment.api.get` 内で `Page.isAccessiblePageByViewer(pageId, req.user)` によりゲストを弾く）
-- 手本となる referer 認可ミドルウェア（添付用）: `apps/app/src/server/middlewares/certify-shared-page-attachment/`（`certifySharedPageAttachmentMiddleware` が referer→ShareLink→リソース帰属を検証し `req.isSharedPage = true` をセット）
-- ゲスト許可ロジック: `apps/app/src/server/middlewares/login-required.ts`（`isGuestAllowed && req.isSharedPage` なら通す）
+### 関連コード
+- 共有ページの入口: `apps/app/src/pages/share/[[...path]]/index.page.tsx`
+- 共有ページ本体: `apps/app/src/components/ShareLinkPageView/ShareLinkPageView.tsx`（`next/dynamic` で読み込んだ `Comments` を `isReadOnly` 付きで描画する）
+- 通常ページ: `apps/app/src/components/PageView/PageView.tsx`（`next/dynamic` で `Comments` を描画する）
+- コメントコンポーネント: `apps/app/src/client/components/Comments.tsx`（`isReadOnly` のとき投稿フォームを出さず、0件なら空状態の案内を出す）
+- コメント取得フック: `apps/app/src/stores/comment.tsx` の `useSWRxPageComment`。`comment` スペックの `useSWRxCommentList`（`apps/app/src/features/comment/client/stores/comment-list.ts`）を通して `GET /_api/v3/comments?pageId=...&shareLinkId=...` から取得し、通常コメントだけを返す
+- 共有リンクの判定: `apps/app/src/server/middlewares/certify-shared-page.js`（`pageId` または `page_id` と `shareLinkId` を、`prisma.sharelinks` の共有リンクと照合し、有効なら `req.isSharedPage = true` を立てる）
+- ゲスト許可: `apps/app/src/server/middlewares/login-required.ts`（`isGuestAllowed && req.isSharedPage` なら通す）
+- 旧式のコメント取得 API: `apps/app/src/server/routes/index.js` の `/comments.get` と、`apps/app/src/server/routes/comment.js` の `comment.api.get`。外部の API 利用者のために残っている非推奨の API で、画面からは呼ばない。共有リンク経由のときは `Page.isAccessiblePageByViewer` による閲覧権限の確認を省く
 
 ## Introduction
 
@@ -26,10 +25,10 @@
 
 共有リンクページは、`comment` スペックのコメント一覧 API（`GET /_api/v3/comments`）からコメントを取得し、通常コメントだけを表示する。この API が共有リンク経由で何を返すか（通常コメントとインラインコメントの両方を読み取り専用で返す）は `comment` スペックが定める。
 
-Redmine チケットとの対応のため、実装は大きく次の3群に整理される（タスクフェーズで詳細化）:
+Redmine チケットとの対応のため、実装は次の3群に分かれる（詳細は tasks.md）:
 1. Comments コンポーネントの有効化（閲覧専用での描画）
-2. `useSWRxPageComment` の改善（共有リンク経由での取得を正常動作させる）
-3. `isAccessiblePageByViewer` 問題の解決（共有リンク閲覧者を拒否しないアクセス制御）
+2. `useSWRxPageComment` が共有リンクの ID を付けて取得すること
+3. 旧式の `/comments.get` で、共有リンク閲覧者を `isAccessiblePageByViewer` で拒否しないこと
 
 ## Boundary Context
 
@@ -75,7 +74,7 @@ Redmine チケットとの対応のため、実装は大きく次の3群に整�
 #### Acceptance Criteria
 1. When 有効な共有リンクの文脈で共有対象ページのコメント取得が要求されたとき, the コメント取得 API shall ログイン状態に関わらず当該ページのコメント一覧を返す。
 2. When 共有対象ページが閲覧者の通常権限では閲覧不可であっても有効な共有リンクの文脈で取得が要求されたとき, the コメント取得 API shall 通常のアクセス権判定によって拒否せず、コメント一覧を返す。
-3. While 共有リンクの文脈で取得されたコメントを返す状態のとき, the コメント取得 API shall コメント投稿者の個人情報を安全な形（既存の利用者情報シリアライズと同等）で返す。
+3. While 共有リンクの文脈で取得されたコメントを返す状態のとき, the コメント取得 API shall コメント投稿者の個人情報を安全な形で返す。項目の範囲は `comment` スペックが定める（画面が使う `GET /_api/v3/comments` は ID・ユーザー名・表示名・プロフィール画像の URL の4項目だけ（`comment` 要件 1.9）、旧式の `/comments.get` はパスワード・API トークン・非公開のメールアドレスを除いた形（`comment` 要件 5.4））。
 
 ### Requirement 4: 不正・無効アクセスの拒否（セキュリティ境界）
 **Objective:** 運営者として、共有リンクを根拠としたコメント閲覧を、許可された文脈だけに限定したい。非公開ページの情報が意図しない経路で漏れることを防ぐため。

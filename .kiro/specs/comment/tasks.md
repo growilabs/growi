@@ -33,7 +33,7 @@
   - _Boundary: countCommentByPageId_
 
 - [x] 1.4 ページのコメント件数の更新が、書き込みの完了を待つようにする
-  - 件数を更新する関数(`Page.updateCommentCount`)が、保存値の書き込みを `await` して結果を返す形に直す。いまはコールバック方式で、完了を待たずに戻り、失敗の例外も呼び出し元に届かない
+  - 件数を更新する関数(`Page.updateCommentCount`)が、保存値の書き込みを `await` して結果を返す形に直す。直す前はコールバック方式で、完了を待たずに戻り、失敗の例外も呼び出し元に届かない
   - 通常コメントの追加と削除のコメントイベントの購読、通常コメントのルートも、同じ関数を使うので、同じ競争が一緒に解消される
   - 先に、関数の完了後すぐに保存値が合計と一致することを確かめる結合テストを書く(待ち合わせなし)
   - 完了の状態: 結合テストが通り、通常コメントの追加と削除の既存のテストも通る
@@ -204,15 +204,15 @@
 
 ## Implementation Notes
 
-- 1.1: `ICommentCreator`(整形後の投稿者の型)には実行時にある `_id` / `__v` が無く、`name` が null を許す。`Ref<IUser>`(`_id` 必須)や `IInlineComment.creator` にはそのまま代入できないため、4.3 / 4.4 / 4.5 で投稿者の型も合わせて広げる。`_id` を `as` なしで載せるには `CommentListRow` を拡張済み prisma クライアントの結果型から作る方法がある。
-- 1.1: 投稿者の安全化は `serializeUserSecurely` を使わず `toCreator` で自前実装(Prisma の行は `IUser` に合わない)。`isEmailPublished` が真なら `email`(null 含む)を残す、旧 API と同じ挙動。
+- 1.1: 投稿者の型は `ICommentCreatorSummary`(`features/comment/interfaces`)。`_id` を `as` なしで載せるため、`CommentListRow` は拡張済み prisma クライアントの結果型(`Prisma.Result<PrismaClient['comments'], { include: { creator: true } }, 'findMany'>`)から作る。
+- 1.1: 旧 API 用の投稿者の整形 `toLegacyCreator` は `serializeUserSecurely` を使わず、同じ項目(パスワード、API トークン、メールアドレス)を自前で除く(`serializeUserSecurely` は Mongoose 時代の `IUser` 向けの型で、`name` が null になりうる Prisma の行は合わない)。`isEmailPublished` が真なら `email`(null を含む)を残す。新 API 用の `toCreatorSummary` は4項目だけを取り出す。
 - 2.3: `certifySharedPage` は `shareLinkId` を `req.query || req.body` から読む(route の検証は query のみ)。照会は `relatedPageId` に検証済みの query の `pageId` を結び付けるため悪用はできない。2.4 で登録するときは `router.get` のみ(3.8 の読み取り専用)にする。
 - 2.4: 応答の各項目には Prisma の行由来の `v`(`__v`)も含まれるが、旧 API の出力を変えない方針(1.2)と揃えており、公開仕様には載せていない(`additionalProperties` は閉じていない)。
-- 4.1: `normalizeShareLinkId` は新フック内に非公開で複製してある。4.4 で `useSWRxPageComment` を切り替えるときに、`apps/app/src/stores/comment.tsx` の旧 `normalizeShareLinkId` / `buildCommentGetParams` が使われなくなったら削除する。
-- 4.2: 投稿者の型を整えた。`ICommentCreator` は `_id` / `__v` を持ち、画面が読む 4 項目だけの `ICommentCreatorSummary`(`_id` / `username` / `name` / `imageUrlCached`)を `IInlineComment` と返信の `creator`、`CommentCard`、`Username`、`@growi/ui` の `UserPicture` が受ける。4.3 で通常コメントの型を広げるときは `creator: Ref<IUser> | ICommentCreatorSummary | null` にすれば、4.4 で `ICommentListItem` を `as` なしで渡せる。
+- 4.1: `normalizeShareLinkId` は `features/comment/client/stores/comment-list.ts` の中にだけある非公開の関数。`apps/app/src/stores/comment.tsx` は共有リンクの ID を扱わず、`useSWRxCommentList` に任せる。
+- 4.2: 画面が読む 4 項目だけの `ICommentCreatorSummary`(`_id` / `username` / `name` / `imageUrlCached`)を、`IInlineComment` と返信の `creator`(`ICommentCreatorSummary | null`)、`ICommentHasId.creator`(`Ref<IUser> | ICommentCreatorSummary | null`)、`CommentCard` の `creator`(`Ref<IUser> | ICommentCreatorSummary | null | undefined`)が受ける。`Username` と `@growi/ui` の `UserPicture` は、`name`(`UserPicture` は `imageUrlCached` も)が null の Prisma の行の形も受ける。これにより `ICommentListItem` を `as` なしで画面の部品に渡せる。
 - 4.2: `apps/app` の型検査は `@growi/ui` の `dist` を読むため、新しい checkout では先に `turbo run build --filter @growi/ui` が要る。
 - 4.5: 5.1 の「説明のコメントを直す」対象に、`features/inline-comment/client/components/AnchorResolver/use-anchor-resolver.ts`(58〜63 行目付近。「再取得のたびに新しい配列を返す」は、いまは「共有の一覧が変わったときに新しい配列になる」が正しい)と、`use-anchor-resolver.spec.tsx`(138 / 307 行目付近)を足す。`IInlineComment.creator` の JSDoc(`listByPageId()` でのみ埋まる)、`dto/list-inline-comments.ts` と `dto/index.ts` の再 export も 5.1 で整理する。
 - 5.1: apiv3 のルーターには「見つからない」の受け皿がなく、登録を消しただけでは未登録の GET が Next のページ処理へ流れる(ログインなしと PAT は 302、ログインセッションは 200 の HTML になる)。廃止した `GET /_api/v3/inline-comments` は、index.js の明示的な JSON 404 で受ける。
 - 6.1: 画面の通しの確認は、開発サーバーで E2E `apps/app/playwright/20-basic-features/comment-list-integration.spec.ts`(8 件、chromium と firefox で通過)を実行して行った。確かめた内容は、インラインコメントの作成と解決でハイライト・末尾のスレッド・ページ側面の件数が一緒に変わること(1→2→3、解決後も 3)、共有リンクの画面と検索結果のプレビューにインラインコメントが出ないこと。共有リンク経由の API はインラインの行も返す(要件 3.3)ので、隠しているのは `useSWRxPageComment` の `isInline` の除外。ページ側面ではなく「最近の更新」の件数は API でのみ確認した。
 - 6.2: HEAD a18a47a4fe で `pnpm run lint`(apiv1 と apiv3 の公開仕様の検証を含む)と `pnpm run build` が成功し、全体テストは 6828 件が通った。失敗した 2 ファイル(`growi-vault` の `clone-e2e.integ.ts` と `vault-gateway.integ.ts`)は、このフィーチャーが触れていない範囲の既存の失敗。
-- 1.1 / 1.2 の補足(要件 1.9、5.4): 新 API の `creator` は `toCommentListItem` の `toCreatorSummary` が 4 項目(`_id` / `username` / `name` / `imageUrlCached`)だけを返し、旧 API は `toLegacyCommentListItem` で上の 1.1 の `toCreator` と同じ出力を返す。両者は `createCommentListItemMapper` に投稿者の整形を渡して作るので、共通の項目の整形は 1 か所にあり、上の 4.2 の `ICommentCreator` は整形のファイル内の非公開の型 `LegacyCommentCreator` にあたる。
+- 1.1 / 1.2 の補足(要件 1.9、5.4): 新 API の `creator` は `toCommentListItem` の `toCreatorSummary` が 4 項目(`_id` / `username` / `name` / `imageUrlCached`)だけを返し、旧 API は `toLegacyCommentListItem`(投稿者の整形は上の `toLegacyCreator`、型は整形のファイル内の非公開の型 `LegacyCommentCreator`)を使う。両者は `createCommentListItemMapper` に投稿者の整形を渡して作るので、共通の項目の整形は 1 か所にある。

@@ -6,7 +6,7 @@
 
 **Users**: MCP と外部スクリプトは `GET /_api/v3/comments` を呼ぶ。GROWI の画面は、末尾のコメント欄と本文のインラインコメントの取得を、この API に切り替える。
 
-**Impact**: 画面の取得経路が変わるだけで、見え方は変えない。旧 `GET /_api/comments.get` は挙動を変えずに非推奨にする。インライン専用の一覧取得 `GET /_api/v3/inline-comments` は廃止する。`Page.commentCount` の意味が「通常コメント数」から「通常コメントとインラインコメントの合計」に変わる。
+**Impact**: 画面は新 API でコメントを取得し、見え方は旧 API の画面と同じである。旧 `GET /_api/comments.get` の応答の形は固定で、非推奨である。インライン専用の一覧取得 `GET /_api/v3/inline-comments` はなく、404 を返す。`Page.commentCount` は「通常コメントとインラインコメントの合計」である。
 
 ### Goals
 - 通常コメントとインラインコメントを返す、apiv3 の一覧取得 API を1本にする(1.x、2.x、3.x、4.x)
@@ -53,9 +53,9 @@
 ## Architecture
 
 ### Existing Architecture Analysis
-- 旧 API は apiv1 の `comment.api.get`。取得は `findCommentsByPageId` / `findCommentsByRevisionId` で、`isInline: { not: true }` を固定で付ける。この固定の除外は旧 API だけがインラインコメントを返さない理由であり、新 API は共有リンク経由でも通常コメントとインラインコメントの両方を返す。旧 API の除外は変えない。
-- インライン専用の一覧取得は `features/inline-comment/server/routes/list.ts` と `InlineCommentService.listByPageId`。起点コメントと返信を別々に取り、返信を `replies` にまとめて返す。
-- 画面は、末尾のスレッド(`stores/comment.tsx` の `useSWRxPageComment`)と本文(`features/inline-comment/client/stores/inline-comment.ts` の `useSWRxInlineComments`)で、別々の API から取得している。
+- 旧 API は apiv1 の `comment.api.get`。取得は `findCommentsByPageId` / `findCommentsByRevisionId` で、`isInline: { not: true }` を固定で付ける。この固定の除外が、旧 API だけがインラインコメントを返さない理由である。新 API は共有リンク経由でも通常コメントとインラインコメントの両方を返す。
+- インラインコメントの API(`features/inline-comment/server/routes/`)は書き込み(作成、返信、編集、削除、解決)だけを持つ。一覧の取得は新 API が担う。
+- 画面は、末尾のスレッド(`stores/comment.tsx` の `useSWRxPageComment`)と本文(`features/inline-comment/client/stores/inline-comment.ts` の `useSWRxInlineComments`)の両方が、共有の取得フック `useSWRxCommentList` を通して新 API から取得する。
 - 共有リンクの前例は `apiv3/revisions.js`。`certifySharedPage` が `req.isSharedPage` を立て、ページの閲覧権限の確認を省く。
 
 ### Architecture Pattern & Boundary Map
@@ -140,20 +140,19 @@ apps/app/src/migrations/
 各ファイルには、同じディレクトリに `*.spec.ts` または `*.integ.ts` を置く(co-location)。
 
 ### Modified Files
-- `apps/app/src/features/comment/server/models/comment.ts` — `countCommentByPageId` から `isInline` の除外を外す。`findCommentsByPageId` / `findCommentsByRevisionId` の除外は変えない
-- `apps/app/src/features/comment/server/models/comment.integ.ts` — 件数のテストを新しい数え方に更新する
-- `apps/app/src/server/routes/comment.js` — 応答の整形を `toLegacyCommentListItem` に置き換える。`@swagger` に `deprecated: true` と置き換え先の案内を足す
-- `apps/app/src/server/routes/apiv3/index.js` — `/comments` を登録し、インライン一覧の登録と import を削除する
-- `apps/app/bin/openapi/generate-spec-apiv3.sh` — `src/features/comment/server/routes/*.ts` を足す
-- `apps/app/src/features/inline-comment/server/service/inline-comment-service.ts` — 依存に `updateCommentCount` を足し、作成、返信の作成、削除、返信の削除のあとに呼ぶ。`listByPageId` と、一覧専用の行変換を削除する
-- `apps/app/src/features/inline-comment/server/routes/{create,create-reply,update,update-reply,delete,delete-reply,resolve}.ts` — サービスの構築時に `updateCommentCount` を渡す(依存を必須にするので、構築している7か所すべて)
-- `apps/app/src/features/inline-comment/server/routes/routing.integ.ts` — 削除する `list.ts` の import を外し、廃止した一覧取得が 404 になることを確かめるテスト(8.3)の置き場所にする
-- `apps/app/src/features/inline-comment/server/update-page-comment-count.ts` — 新規。`InlineCommentService` の `updateCommentCount` 依存として各ルートが渡す、Page モデルを取得して `Page.updateCommentCount` を呼ぶ薄い関数
-- `apps/app/src/server/models/obsolete-page.js` — `Page.updateCommentCount` が、書き込みの完了を待って結果を返すようにする(`this.update(…, callback)` を `await this.updateOne(…)` に置き換える)
-- `apps/app/src/features/inline-comment/client/stores/inline-comment.ts` — 取得を `useSWRxCommentList` + `groupInlineComments` に置き換える。作成、返信の作成、削除、返信の削除のあとに、一覧に加えてページ情報(`useSWRMUTxPageInfo`)も再取得する
-- `apps/app/src/features/inline-comment/client/stores/inline-comment.spec.tsx` — 旧 API の取得を前提にした部分を、新しい取得に合わせて書き直す
-- `apps/app/src/stores/comment.tsx` — `useSWRxPageComment` の取得を `useSWRxCommentList` に置き換え、通常コメントだけを返す
-- 削除: `features/inline-comment/server/routes/list.ts`、`list.integ.ts`、`interfaces/dto/list-inline-comments.ts`(と `dto/index.ts` の export)、`inline-comment-service.spec.ts` の `listByPageId` のテスト
+- `apps/app/src/features/comment/server/models/comment.ts` — `countCommentByPageId` は `isInline` で絞らず、インラインコメントも数える。`findCommentsByPageId` / `findCommentsByRevisionId` は `isInline` が `true` の行を除いて返す
+- `apps/app/src/features/comment/server/models/comment.integ.ts` — インラインコメントを含む件数のテストを持つ
+- `apps/app/src/server/routes/comment.js` — `comments.get` の応答を `toLegacyCommentListItem` で整形する。`@swagger` に `deprecated: true` と置き換え先の案内がある
+- `apps/app/src/server/routes/apiv3/index.js` — `/comments` を登録している。インラインコメントの一覧を返すルートは無く、`GET /inline-comments` は JSON の 404(`not_found`)を返す
+- `apps/app/bin/openapi/generate-spec-apiv3.sh` — `src/features/comment/server/routes/*.ts` を OpenAPI の生成対象に含める
+- `apps/app/src/features/inline-comment/server/service/inline-comment-service.ts` — 依存に `updateCommentCount` を持ち、作成、返信の作成、削除、返信の削除のあとに呼ぶ。一覧を返す機能は持たない
+- `apps/app/src/features/inline-comment/server/routes/{create,create-reply,update,update-reply,delete,delete-reply,resolve}.ts` — サービスを作るときに `updateCommentCount` を渡す(依存は必須なので、7つのルートすべてが渡す)
+- `apps/app/src/features/inline-comment/server/routes/routing.integ.ts` — 一覧取得(`GET /inline-comments`)が JSON の 404 を返すことを確かめるテスト(8.3)を持つ
+- `apps/app/src/features/inline-comment/server/update-page-comment-count.ts` — `InlineCommentService` の `updateCommentCount` 依存として各ルートが渡す、Page モデルを取得して `Page.updateCommentCount` を呼ぶ薄い関数
+- `apps/app/src/server/models/obsolete-page.js` — `Page.updateCommentCount` は `await this.updateOne(…)` で書き込みの完了を待ち、その結果を返す
+- `apps/app/src/features/inline-comment/client/stores/inline-comment.ts` — `useSWRxCommentList` + `groupInlineComments` で取得する。作成、返信の作成、削除、返信の削除のあとに、一覧に加えてページ情報(`useSWRMUTxPageInfo`)も再取得する
+- `apps/app/src/features/inline-comment/client/stores/inline-comment.spec.tsx` — `useSWRxCommentList` による取得を前提にしたテストを持つ
+- `apps/app/src/stores/comment.tsx` — `useSWRxPageComment` は `useSWRxCommentList` で取得し、通常コメントだけを返す
 
 ## System Flows
 
@@ -186,7 +185,7 @@ sequenceDiagram
 - 共有リンクのときは、ルートが `revisionId` を渡さない(別ページの版を指定して読まれるのを防ぐ、旧 API と同じ考え方)。
 
 **件数の更新**:
-- `InlineCommentService` の4つの書き込み(作成、返信の作成、削除、返信の削除)のコメントの書き込みが成功した直後、アクティビティの記録より前に、`updateCommentCount(pageId)` を呼ぶ。アクティビティの記録が失敗して例外になっても、書き込み済みのコメントの件数は更新済みである。件数の更新の失敗は記録して続行する(メンション通知と同じ扱い)。アクティビティの記録の失敗は、従来どおり呼び出し元へ伝える。解決の切り替えと編集は件数を変えないので、呼ばない。
+- `InlineCommentService` の4つの書き込み(作成、返信の作成、削除、返信の削除)のコメントの書き込みが成功した直後、アクティビティの記録より前に、`updateCommentCount(pageId)` を呼ぶ。アクティビティの記録が失敗して例外になっても、書き込み済みのコメントの件数は更新済みである。件数の更新の失敗は記録して続行する(メンション通知と同じ扱い)。アクティビティの記録の失敗は、呼び出し元へ伝える。解決の切り替えと編集は件数を変えないので、呼ばない。
 
 ## Requirements Traceability
 
@@ -213,7 +212,7 @@ sequenceDiagram
 | 7.1, 7.2, 7.3, 7.6 | 件数の合算と、画面ごとに同じ値 | countCommentByPageId、useSWRxInlineComments(ページ情報の再取得) | モデルの拡張、取得フック | — |
 | 7.4 | 作成、削除での更新 | InlineCommentService、Page.updateCommentCount の修正 | サービスの依存 | 件数の更新 |
 | 7.5 | 既存ページの再計算 | 再計算の移行 | 移行 | — |
-| 8.1, 8.2, 8.3 | インライン一覧の廃止 | apiv3/index.js、削除するファイル | ルーティング | — |
+| 8.1, 8.2, 8.3 | インライン一覧の廃止 | apiv3/index.js、routing.integ.ts | ルーティング | — |
 
 ## Components and Interfaces
 
@@ -325,7 +324,7 @@ export const toLegacyCommentListItem: (
 - 4つの項目を残す理由は、画面がそれぞれを読むため。`username` は `Username`(ユーザーのページへのリンク)、`UserPicture`(リンクとツールチップ)、`Comment.tsx` の自分のコメントかどうかの判定が読む。`name` は `Username` と `UserPicture` が表示名として読む。`imageUrlCached` は `UserPicture` が画像の URL として読む。`_id` は画面が実行時には読まないが、`Username` が受ける型と `isPopulated` による型の絞り込みが `_id` を持つオブジェクトを前提にしており、API の利用者がユーザーを識別するのにも使う。画面はコメントの持ち主の判定に `creatorId` を使い、`creator` の他の項目(アカウントの状態、Gravatar の設定など)は読まない
 
 #### countCommentByPageId(モデルの拡張)
-- `where: { pageId }` にする(`isInline` の除外を外す)。返信も1行として数える。解決済みも数える
+- `where: { pageId }` にする(件数の集計は `isInline` で絞らない)。返信も1行として数える。解決済みも数える
 - `findCommentsByPageId` / `findCommentsByRevisionId` の除外は変えない(旧 API の固定の保証を守る)
 - 呼び出し元は `Page.updateCommentCount` だけ
 
@@ -339,7 +338,7 @@ export interface InlineCommentServiceDeps {
 }
 ```
 - `create`、`createReply`、`deleteComment`、`deleteReply` の成功後に、`await` して呼ぶ。`try/catch` で `logger.error` に記録して続行する
-- `Page.updateCommentCount`(`obsolete-page.js`)は、いまは書き込みをコールバック方式で呼び、その完了を待たずに戻る。このままだと、`await` しても書き込みの完了を待てず、書き込みの失敗が呼び出し元の `try/catch` に届かない(コールバック内で `throw` されるため)。そこで、書き込みを `await` して結果を返す形に直す。通常コメントのルート(`comment.js`)とコメントイベントの購読も同じ関数を使うので、同じ競争が一緒に解消される
+- `Page.updateCommentCount`(`obsolete-page.js`)は、保存値の書き込み(`updateOne`)を `await` して結果を返す。呼び出し元が `await` すれば書き込みの完了まで待て、書き込みの失敗も呼び出し元の `try/catch` に届く。通常コメントのルート(`comment.js`)とコメントイベントの購読も同じ関数を使う
 - `InlineCommentService` は `updateCommentCount` を依存として受け取る。各ルートは `features/inline-comment/server/update-page-comment-count.ts` の `updatePageCommentCount` を渡す。これは Mongoose の Page モデルを呼び出しのたびに取得して `Page.updateCommentCount` を呼ぶ薄い関数である(`crowi.models.Page` の型が `Model<any>` なので、型の付いたモデルを直接取得する)
 
 #### 再計算の移行
@@ -356,21 +355,21 @@ export const useSWRxCommentList = (
   pageId: Nullable<string>,
 ): SWRResponse<ICommentListItem[], Error>;
 ```
-- キー: `pageId` が `null` なら `null`。それ以外は `['/comments', pageId, shareLinkId]`(`shareLinkId` は前後の空白を除き、空なら `undefined`。現在の `normalizeShareLinkId` をここへ移す)
+- キー: `pageId` が `null` なら `null`。それ以外は `['/comments', pageId, shareLinkId]`(`shareLinkId` は前後の空白を除き、空なら `undefined`。`comment-list.ts` の中の非公開の関数 `normalizeShareLinkId` が行う)
 - 取得: `apiv3Get<ListCommentsResponseBody>('/comments', { pageId, ...(shareLinkId != null && { shareLinkId }) })`。`page_id` は送らない(`certifySharedPage` の検証と取得の ID を分けないため)
 - 同じキーなので、末尾のスレッドと本文のインラインコメントが同時に使っても、取得は1回になる。どちらの書き込みも、この一覧を再取得する
 - 通常コメントの書き込みは、一覧に加えてページ情報(`useSWRMUTxPageInfo`)も再取得して、ページ側面の件数を更新している。インラインコメントの書き込みでも同じことを行う(`useSWRxInlineComments` の各書き込み関数の中。要件 7.6)
 - `useSWRxPageComment` と `useSWRxInlineComments` が返す加工後の一覧は、共有の一覧を依存にした `useMemo` で作る(描画のたびに新しい配列を作らない)
 
-#### useSWRxPageComment(変更)
+#### useSWRxPageComment
 - 戻り値の型は変えない(`SWRResponse<ICommentHasIdList, Error> & CommentOperation`)
-- `data` は共有の一覧から `isInline !== true` の行だけを取り出して作る。共有リンクの画面と検索のプレビューも、この除外により、従来どおりインラインコメントを表示しない
+- `data` は共有の一覧から `isInline !== true` の行だけを取り出して作る。共有リンクの画面と検索のプレビューも、この除外により、インラインコメントを表示しない
 - 投稿、更新(旧 API)のあとの `mutate()` は、共有のキーを再取得する
 
-#### useSWRxInlineComments(変更)
+#### useSWRxInlineComments
 - 戻り値の型は変えない(`SWRResponseWithUtils<…, InlineCommentWithReplies[], Error>`)
 - `data` は共有の一覧を `groupInlineComments` に通して作る。書き込みの各関数(`create`、`createReply`、`resolve`、`update`、`remove`、…)の後の再取得は、共有のキーに対して行う
-- 共有リンクの画面では、従来どおり `null` を渡されるので取得しない
+- 共有リンクの画面では `null` を渡されるので取得しない
 
 #### groupInlineComments
 
@@ -389,9 +388,9 @@ export const groupInlineComments = (
 ```
 - 起点: `isInline === true` かつ `replyToId == null`。`creatorId`、`quote`、`prefix`、`suffix`、`approxOffset`、`anchorOriginRevisionId` のどれかが `null` なら、壊れた行として除く
 - 返信: `isInline === true` かつ `replyToId != null` かつ `creatorId != null`。親の起点が結果に無ければ除く
-- 順序: 入力の順を保つ(起点も返信も。サーバーが新しい順で返すため、従来の `listByPageId` と同じ並びになる)
+- 順序: 入力の順を保つ(起点も返信も。サーバーが新しい順で返すので、起点も返信も新しい順になる)
 - `creator` は、オブジェクトならそのまま、`creatorId` の文字列なら `null`
-- 日付は変換しない(従来どおり)
+- 日付は変換しない
 
 ## Data Models
 
@@ -424,8 +423,8 @@ export interface ListCommentsResponseBody {
   comments: ICommentListItem[];
 }
 ```
-- `ICommentListItem` の旧 API 由来の項目(`page`、`revision`、`replyTo`、`commentPosition`、`_id`、`createdAt`、`updatedAt`、`comment`)は、旧 API の出力と同じ値を持つ。`creator` だけは、旧 API より項目が少ない(下記)。型は単独で定義する(`ICommentHasId` を継承しない)。理由は、`ICommentHasId` の `revision` は null を許さず、`replyTo` は省略可能な文字列だが、実データでは `revisionId` も `replyToId` も null になりうるため
-- 型の食い違いは `as` で隠さない。`ICommentHasId` 側の型を実データに合わせて広げ(`revision` に null を許す、など)、影響する箇所は型検査で洗い出す
+- `ICommentListItem` の旧 API 由来の項目(`page`、`revision`、`replyTo`、`commentPosition`、`_id`、`createdAt`、`updatedAt`、`comment`)は、旧 API の出力と同じ値を持つ。`creator` だけは、旧 API より項目が少ない(下記)。型は単独で定義する(`ICommentHasId` を継承しない)。`ICommentHasId` は画面の通常コメント部品の型で、`page` や `revision` を `Ref` で持ち、インライン用の項目を持たないため
+- 型の食い違いは `as` で隠さない。`ICommentHasId` は実データに合わせて、`revision` と `replyTo` に null を許し、`creator` を `Ref<IUser> | ICommentCreatorSummary | null` にしてある。これにより `ICommentListItem` を `as` なしで通常コメントの部品に渡せる
 - 通常コメントでは、インライン用の項目は `null`(`isInline` は `false`)
 - `creator` の型は `ICommentCreatorSummary | string | null`。`ICommentCreatorSummary` は `{ _id: string; username: string; name: string | null; imageUrlCached: string | null }` で、`features/comment/interfaces` に置く。画面のコメント部品(`CommentCard`、`IInlineComment` と返信の `creator`、`ICommentHasId.creator`)はこの型を受ける。旧 API の投稿者の型(`LegacyCommentCreator`)は整形のファイルの中だけで使い、公開しない
 - スキーマ(`comments`、`revisions`)に変更は無い。`pages.commentCount` の値の意味が変わる
@@ -458,7 +457,7 @@ export interface ListCommentsResponseBody {
 - 廃止: `GET /_api/v3/inline-comments` が 404 を返す。作成、編集、削除、解決のルートは残る(8.1-8.3)
 
 ### E2E/UI Tests
-- 末尾のコメント欄に、通常コメントとインラインコメントが投稿日時順に並ぶ(従来と同じ)。件数が合算される(6.1, 6.2, 7.1)
+- 末尾のコメント欄に、通常コメントとインラインコメントが投稿日時順に並ぶ。件数が合算される(6.1, 6.2, 7.1)
 - インラインコメントを作成して解決すると、本文のハイライトと末尾のスレッドが一緒に更新される(6.3, 6.4)
 - 共有リンクの画面にインラインコメントが出ない(6.5)
 
@@ -478,6 +477,6 @@ export interface ListCommentsResponseBody {
 
 ## Open Questions / Risks
 - 版の指定で、`getAppliedAtForRevisionFilter`(過去の移行で壊れた版を隠す処理)を使わない。実装時に結合テストで確かめる
-- `pages.commentCount` を読む Slack のリンク展開は、インラインを含む値に変わる。要件 7.1 の結果として許容する。検索の索引は、もともと `comments` を `isInline` で絞らずに数えているので、本変更で値は変わらない
+- `pages.commentCount` を読む Slack のリンク展開は、インラインを含む値に変わる。要件 7.1 の結果として許容する。検索の索引は `comments` を `isInline` で絞らずに数えるので、索引の値は変わらない
 - 新 API に、別名の項目(`page`、`revision`、`replyTo`)が残る。旧 API を廃止するときに、整理を検討する
 - MCP の `getComments` は、MCP 側を新 API に切り替えるまで、インラインコメントを取得できない(範囲外)
