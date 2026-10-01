@@ -32,7 +32,7 @@
   - _Boundary: useSWRxPageComment_
 
 - [ ] 3. isAccessiblePageByViewer 問題の解決（認可 + テスト）
-  - 認可は「単一 ID 化（検証対象＝取得対象）」で行う。理由は research.md「認可設計の改訂」、仕組みは design.md「認可境界の単一 ID 不変条件」参照。
+  - 認可は「単一 ID 化（検証対象＝取得対象）」で行う。理由は research.md「認可設計（単一 ID 化）」、仕組みは design.md「認可境界の単一 ID 不変条件」参照。
 
 - [x] 3.1 (P) certify-shared-page を一般化し comments.get に結線する
   - `certify-shared-page.js` を `pageId`（camelCase）と `page_id`（snake_case）の両方を読むようにする（既存の呼び出し元は `pageId` を送るので、従来どおり動く）。**両方の ID が送られ、値が異なるリクエストは、どちらの ID が正しいか決められない。このときは `isSharedPage` を立てずに次の処理へ渡す。そうしないと、検証した ID と取得する ID が食い違い、他人のページを読まれる恐れがある**（片方の ID を優先して選ぶ実装にはしない）

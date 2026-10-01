@@ -54,6 +54,8 @@ const notFoundOrForbidden = (): ErrorV3 =>
  *        required:
  *          - _id
  *          - id
+ *          - v
+ *          - __v
  *          - page
  *          - pageId
  *          - creator
@@ -81,6 +83,12 @@ const notFoundOrForbidden = (): ErrorV3 =>
  *          id:
  *            type: string
  *            description: Comment ID.
+ *          v:
+ *            type: integer
+ *            description: Document version counter. Not meaningful to clients.
+ *          __v:
+ *            type: integer
+ *            description: Same value as `v`, under the mongoose-style field name.
  *          page:
  *            type: string
  *            description: ID of the page the comment belongs to (same value as `pageId`).
@@ -88,7 +96,6 @@ const notFoundOrForbidden = (): ErrorV3 =>
  *            type: string
  *            description: ID of the page the comment belongs to.
  *          creator:
- *            nullable: true
  *            description: >
  *              The author, limited to the fields needed to display them (no email
  *              address, external account IDs, login history, or role). Falls back
@@ -118,6 +125,8 @@ const notFoundOrForbidden = (): ErrorV3 =>
  *                    nullable: true
  *                    description: URL of the profile image. Null when not cached yet.
  *              - type: string
+ *                nullable: true
+ *                description: The author ID when the user record no longer exists; null when the comment has no author.
  *          creatorId:
  *            type: string
  *            nullable: true

@@ -43,7 +43,7 @@
 
 ## アーキテクチャ決定：既存 `comments` モデルへの同居＋書き込み専用の新規ルート
 
-設計フェーズでの検討・advisor（Opusレビュー）を経て確定した最終決定は、インラインコメントを既存 `comments` テーブルに同居させ、作成・返信・解決トグル・編集・削除だけを新規の apiv3 ルートに切り出す、というもの（詳細・比較根拠は `design.md`「アーキテクチャ選定：既存 `comments` モデルへの拡張＋新規ルート」節）。読み取りは `comment` スペックのコメント一覧 API が通常コメントとまとめて返す。
+インラインコメントは既存 `comments` テーブルに同居させ、作成・返信・解決トグル・編集・削除だけを新規の apiv3 ルートに切り出す（詳細・比較根拠は `design.md`「アーキテクチャ選定：既存 `comments` モデルへの拡張＋新規ルート」節）。読み取りは `comment` スペックのコメント一覧 API が通常コメントとまとめて返す。
 
 上記「実装アプローチの選択肢」のOption A/B/Cのうち、Option B（新規モデルへの分離）ではなく、Option A/Cに近い「同居」を選んだ理由は次の通り。Option Bの利点（通常コメントに意味を持たない列が増えない）より、こちらを重く見た：
 
@@ -52,8 +52,8 @@
 
 旧式の `/_api/comments.get` の応答を通常コメントだけに保つため、`findCommentsByPageId`／`findCommentsByRevisionId` の2メソッドには、共有リンクかどうかによらず常に `isInline: { not: true }` を付ける（契約は `comment` スペックの要件 5.2）。
 
-この決定に伴い、advisorレビューで次の点が発覚し対応した：
-- **Prismaの名前付きリレーション制約**：`resolvedBy`（`comments`→`users`）を追加すると、既存の無名だった `creator` リレーションも明示的に名前を付けねばならない（`prisma validate` が通らないまま見落とすところだった）
+この決定に伴う制約：
+- **Prismaの名前付きリレーション制約**：`comments` から `users` へのリレーションが `creator` と `resolvedBy` の2本あるため、両方に名前を付ける必要がある（`creator` は `"CommentCreator"`、`resolvedBy` は `"InlineCommentResolver"`）。名前が無いと `prisma validate` が通らない
 
 ### Build vs Adopt: あいまい一致は `approx-string-match` を採用、`diff-match-patch` は不採用
 
@@ -75,7 +75,7 @@
 
 ### マッチングはクライアント側で実行（サーバー側SSR中の抽出は不採用）
 
-`PageContentRenderer` は `{ ssr: true }` だが、本文中の `lsx`（子ページ一覧）ブロックは `packages/remark-lsx/src/client/` 配下のSWRフックによってクライアント側でのみ解決される。サーバーが構築するAST由来のプレーンテキストは閲覧者が実際に見るテキストと一致しないため、サーバー側でのアンカー計算は「アンカー作成時と別の文字列に対してマッチングする」ことになり不採用。この確認（`PageView.tsx` の `dynamic()` オプション、`packages/remark-lsx/src/client/` の存在）はadvisorの指摘を受けて実施した。
+`PageContentRenderer` は `{ ssr: true }` だが、本文中の `lsx`（子ページ一覧）ブロックは `packages/remark-lsx/src/client/` 配下のSWRフックによってクライアント側でのみ解決される。サーバーが構築するAST由来のプレーンテキストは閲覧者が実際に見るテキストと一致しないため、サーバー側でのアンカー計算は「アンカー作成時と別の文字列に対してマッチングする」ことになり不採用（根拠は `PageView.tsx` の `dynamic()` オプションと、`packages/remark-lsx/src/client/` のクライアント側のフック）。
 
 ### 静定検知: 新規ヒューリスティックではなく既存の `GROWI_IS_CONTENT_RENDERING_ATTR` プロトコルを再利用
 
@@ -97,11 +97,11 @@ v1の実装後、ユーザー提供の実装UIモックアップ（テキスト�
 | reactstrap `Popover`（`target`にrefを渡す） | 既存UIライブラリのポップオーバーをそのまま使う | 不採用（`target`は永続的なDOM要素/refを要求し、テキスト選択という「実体を持たない対象」を直接指定できない） |
 | `@popperjs/core`＋仮想要素 | `getBoundingClientRect()`のみを実装したオブジェクトを`createPopper`の参照要素として渡す | **採用** |
 
-`@popperjs/core`はモノレポに既存の依存であり（`packages/editor`等では`dependencies`、`apps/app`では当初`devDependencies`）、`flip`/`preventOverflow`/`offset`の標準modifierだけでビューポート境界処理が完結する。DOM `Range`を`cloneRange()`して保持するだけでスクロール追随も自然に実現できる（クローンはドキュメントにアタッチされたまま位置を追跡し続けるため）。`apps/app`では`devDependencies`から`dependencies`への格上げが必要になり、`SelectionPopover`が実際にレンダーツリーへ組み込まれた時点でビルドグラフへの到達（`.next/node_modules/`にシンボリックリンクが生成されること）を実測確認した。
+`@popperjs/core`はモノレポに既存の依存であり（`apps/app`では`dependencies`、`packages/editor`と`apps/slackbot-proxy`では`devDependencies`）、`flip`/`preventOverflow`/`offset`の標準modifierだけでビューポート境界処理が完結する。DOM `Range`を`cloneRange()`して保持するだけでスクロール追随も自然に実現できる（クローンはドキュメントにアタッチされたまま位置を追跡し続けるため）。`apps/app`で`dependencies`に置くのは、`SelectionPopover`がレンダーツリーに入るとビルドの依存関係に含まれ、`.next/node_modules/`にシンボリックリンクが生成されるため（`apps/app/.claude/rules/package-dependencies.md`）。
 
 ### 選択のライフサイクルを二段階に分割: `idle`/`selecting`/`composing`
 
-当初のv1実装は「選択なし／ロック済み」の二値で、選択直後にいきなりフル入力フォームを表示していた。モックアップに合わせ、「選択なし」「作成の起点を表示中」「入力フォームを表示中」の3段階に拡張した。`selecting`段階ではライブな`Range`（`window.getSelection().getRangeAt(0)`から都度取得。`useTextSelection`自体はテキストデータのみを返すため、Rangeは別途取得する）を使い選択の変化に追随させ、作成の起点が選ばれた瞬間に`Range`を`cloneRange()`して`composing`段階の間ずっと使うことで、フォーム表示中にブラウザの選択状態が変化しても（例: 入力欄へのフォーカス移動）表示位置・表示継続に影響しないようにした。
+選択のライフサイクルは、モックアップに合わせて「選択なし」「作成の起点を表示中」「入力フォームを表示中」の3段階を持つ（選択直後にいきなり入力フォームを出さない）。`selecting`段階ではライブな`Range`（`window.getSelection().getRangeAt(0)`から都度取得。`useTextSelection`自体はテキストデータのみを返すため、Rangeは別途取得する）を使い選択の変化に追随させ、作成の起点が選ばれた瞬間に`Range`を`cloneRange()`して`composing`段階の間ずっと使うことで、フォーム表示中にブラウザの選択状態が変化しても（例: 入力欄へのフォーカス移動）表示位置・表示継続に影響しないようにした。
 
 ### メンション候補取得は`inline-comment`機能内で共通化するが`CommentEditor.tsx`側とは共有しない
 
@@ -126,7 +126,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 `--grw-inline-comment-marker-bg`を検索マーカー色`--grw-marker-bg`に直接束縛せず、`var(--grw-marker-bg, var(--grw-marker-bg-yellow))`という1段の間接参照にした。テーマは検索マーカーの色を目的に`--grw-marker-bg`を上書きしていることがあり（16テーマ中12テーマがcyan/red/blue/greenに変更）、インラインコメントのハイライトを直接そこに縛ると「検索マーカーは変えたいが、インラインコメントは既定の黄色のままにしたい」という指定ができなくなる。1段挟むことで、既定では要望どおり検索マーカーと同じ色になり、必要なテーマだけ個別に上書きできる。
 
-作成中用の`--grw-inline-comment-marker-bg-pending`も同じ理由で1段挟み、既定値は保存済み側と別系統の色（`--grw-marker-bg-blue`）にして、テーマがどちらも上書きしていない場合でも両者が見分けられるようにした（この2トークン化と半透明化の詳細な経緯は、後発の「操作性の改善」節（次節）を参照。あちらはこちらで確定した2トークンの土台をさらに、選択中・入力中・保存後の3状態を1つの仕組みで一貫させる形に発展させたもの）。
+作成中用の`--grw-inline-comment-marker-bg-pending`も同じ理由で1段挟み、既定値は保存済み側と別系統の色（`--grw-marker-bg-blue`）にして、テーマがどちらも上書きしていない場合でも両者が見分けられるようにした（2つのトークンと半透明化の詳細は「操作性の改善」節を参照。あちらは、この2つのトークンを土台にして、選択中・入力中・保存後の3つの状態を1つの仕組みで扱う）。
 
 検索マーカーの「ペンで塗った」ような`linear-gradient`の見た目は、`::highlight()`が`background-image`を指定できない（`color`/`background-color`/文字装飾/影に限られる）ため引き継げず、平らな塗りにした。共通化したのは色の値だけである。
 
@@ -138,7 +138,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 `Comment.tsx`自体を共有部品として使わず、枠だけを切り出したのは、`Comment.tsx`が本文の編集・削除・リビジョンへのリンク・返信の扱いを一緒に抱えているため。インラインコメントは`revision: Ref<IRevision>`を持たず（持つのは`anchorOriginRevisionId: string`）、v1では編集・削除の対象外なので、`Comment.tsx`をそのまま使うと使わない分岐を通すことになる。一方でクラス名だけを写し取る並行実装にすると、`_comment-inheritance.scss`を直したときに片方だけ変わる状態が起きても、型でもテストでも結びついていないため気付けない。差が出るのは見出し行の右端と本文の前後の中身だけで、箱そのものは同一なので、差し込み口付きの共有コンポーネントを1つ持つ形が最小だった。
 
-設計レビューで見つかった2点の訂正（実装は最初からレビュー後の形で行われている）:
+`CommentCard` の作りで守る2つの点:
 - `creator`が`null`／未populateでも`UserPicture`／`Username`を無条件に描く。既存の`Comment.tsx`は「投稿者情報が無い場合に何も表示しない」のではなく、`UserPicture`は既定アイコン、`Username`は"(anyone)"という代替表示をする作りに既になっている。`CommentCard`側で`creator != null`条件を追加して丸ごと隠すと、投稿者が未populateの既存コメントの見た目が変わり、Requirement 13.9（通常コメントの見た目を変えない）に違反する。
 - `headerEnd`（見出し行の右側の差し込み）に共通の余白（`ms-auto`等）を`CommentCard`側で固定しない。通常コメントの右端（リビジョンリンク）とインラインコメントの右端（解決トグル）とで必要な余白が異なる（前者は投稿日時のすぐ右に`ms-2`、後者は行の右端に寄せる`ms-auto`）ため、余白は各呼び出し側が`headerEnd`に渡すReactNode自身に付ける。
 
@@ -150,13 +150,13 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 そこで取得は`PageView.tsx`側の1箇所（既存の`useSWRxInlineComments(isSharedPageView ? null : page._id)`）に閉じ、値として`Comments`／`PageComment`に渡す形にした。`ShareLinkPageView.tsx`は渡さない。
 
-実際に渡す形は、当初案（`InlineCommentWithReplies[]`の素の配列）とは異なり、`{ comments, resolve, createReply }`という束になっている。一覧のスクロールナビゲーション（`scrollToRange`）・解決トグル・返信作成のいずれも`PageView.tsx`側の状態・関数に依存するため、配列だけを渡すとこれらを別途伝える経路が必要になり、`PageComment`が`PageView`の関数を「知らずに」使えるという構造上の利点（Requirement 13.8の「共有リンク画面の一覧にインラインコメントを出さない」の土台）が薄れる。束にして1本のpropsで渡すことで、`ShareLinkPageView.tsx`はこのprops自体を渡さない（空配列を渡すのではなく、prop省略時のフォールバックに委ねる）だけで済む。
+渡す形は`InlineCommentWithReplies[]`の素の配列ではなく、`{ comments, resolve, createReply, update, remove, updateReply, removeReply, scrollToRange }`という束である（型は`Comments.tsx`／`PageComment.tsx`の`inlineComments` prop）。`comments`以外は、解決トグル・返信作成・起点コメントの編集と削除・返信の編集と削除・一覧から本文のハイライトへの移動（`scrollToRange`）を行う関数で、いずれも`PageView.tsx`側の状態・関数に依存するため、配列だけを渡すとこれらを別途伝える経路が必要になり、`PageComment`が`PageView`の関数を「知らずに」使えるという構造上の利点（Requirement 13.8の「共有リンク画面の一覧にインラインコメントを出さない」の土台）が薄れる。束にして1本のpropsで渡すことで、`ShareLinkPageView.tsx`はこのprops自体を渡さない（空配列を渡すのではなく、prop省略時のフォールバックに委ねる）だけで済む。
 
 ### 既知の限界（実装時に軽微・許容と判断し先送り）
 
 - **`InlineCommentItem.module.scss`の`.inline-comment-quote`は`:global`宣言の中にある。** `styles['inline-comment-quote']`のようにCSSモジュール経由で参照すると`undefined`になる（クラス名は素の文字列`inline-comment-quote`のまま使う必要がある）。この規則を将来リファクタリングする際に踏みやすい罠なので明記しておく。
-- **`playwright.config.ts`の`devices[\`Desktop ${browser}\`]`は`browser`が小文字（`'firefox'`/`'webkit'`）のため、実際のPlaywright `devices`辞書のキー（`'Desktop Firefox'`/`'Desktop Webkit'`）と一致しない既存バグがある。** firefox/webkitプロジェクトは実質Chromiumにフォールバックしており、このスペックのE2Eによるテーマ切り替え・ハイライト色の検証はすべてChromiumでのみ実証されている（本amendの実装時に発見。修正は本amendの対象外）。
-- `Comments.tsx`と`PageComment.tsx`の両方が`id="page-comments-list"`を持つ（本amend以前からの既存の重複。将来のE2Eも同じ罠を踏みうるため、直すなら別issueで）。
+- **`playwright.config.ts`の`devices[\`Desktop ${browser}\`]`は`browser`が小文字（`'firefox'`/`'webkit'`）のため、実際のPlaywright `devices`辞書のキー（`'Desktop Firefox'`/`'Desktop Webkit'`）と一致しない既存バグがある。** firefox/webkitプロジェクトは実質Chromiumにフォールバックしており、このスペックのE2Eによるテーマ切り替え・ハイライト色の検証はすべてChromiumでのみ実証されている（修正はこのスペックの範囲外）。
+- `Comments.tsx`と`PageComment.tsx`の両方が`id="page-comments-list"`を持つ（このスペックの範囲外の既存の重複。E2Eでこの id を使うと2つの要素に一致するので注意する）。
 - 未解決・解決済みの札の配色（`bg-warning text-dark`）はテーマごとに再生成されない`--bs-warning-*`をそのまま使っており、Requirement 11の「テーマに追随する」の対象外として意図的に据え置いた（この配色を変える受け入れ基準を立てていないため）。
 
 ## 操作性の改善（amend spec `inline-comment-interaction-ux` より統合）
@@ -191,7 +191,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 ### i18nキーの新規追加とbaselineの整合
 
-`inline_comment.reply_placeholder`（ポップオーバーの返信欄）・`inline_comment.range_not_found`（再アンカー失敗時の通知）をen_US専用キーとして追加した（本プロジェクトの英語ファースト方針により、他言語は未翻訳のまま据え置き）。`apps/app/tools/i18n-audit/baseline.json`の`missingByLocale`（ja_JP/zh_CN/fr_FR/ko_KR）を各+8引き上げているが、この内訳は「新規2キー×4言語」ではない（それでは+2にしかならない）。実際は、先行するamend spec `inline-comment-visual-consistency`が追加した`inline_comment.start_comment/resolved/unresolved/resolve/reopen/label`の6キー分のbaseline引き上げが漏れていた分と、本amendの新規2キー分の合計8。つまりこのブランチの`pnpm run lint:i18n`は本amend着手前から既に失敗しており、今回の引き上げがその積み残しも一緒に解消した。各言語のbaseline値は実測値と完全に一致しており、余裕はない。
+`inline_comment.range_not_found`（再アンカー失敗時の通知。`PageView.tsx` が使う）は en_US にだけあるキーで、ほかの言語には無い。未翻訳のキーの数は `apps/app/tools/i18n-audit/baseline.json` の `missingByLocale`（ja_JP/zh_CN/fr_FR/ko_KR）で管理し、`pnpm run lint:i18n` が実測値と比べる。
 
 ## ハイライト復元の精度改善（amend spec `inline-comment-highlight-fix` より統合）
 
@@ -201,7 +201,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 コメント作成時（`use-text-selection` の `captureSelection`）とハイライト解決時（`useAnchorResolver`）が、それぞれ別のやり方で本文の文字数を数えることもできる。その場合、両者の差（たとえば数式の読み上げ用テキストのぶん）を数えて `approxOffset` を補正する必要があるが、この案は採らなかった。補正するには「何を除外対象とみなすか」という定義を2箇所目に複製することになり、除外条件を変えるたびに2箇所を同時に直さなければならない。数え方の定義が2箇所に分かれていること自体が、位置がずれる原因になる。
 
-そこで `renderedTextOf` を「このコンテナに今どんな文字が存在するか」を答える唯一の関数とし、作成時・解決時の両方がそれを通る形にした（`.claude/rules/coding-style.md` の「単一の情報源」）。この形を成り立たせるために、テキストオフセットからDOM位置を求める向き（`resolveDomPosition`）だけでは足りず、DOM境界点からテキストオフセットを求める逆向き（`textOffsetOf`）を足す必要があった。代わりに、選択が変わるたびにコストが増える——`textOffsetOf` は境界点までの部分木を `Range.cloneContents()` で複製したうえで走査するため、単なる走査よりも重く、`captureSelection` は開始・終了の2回分これを呼ぶ。長いページでのドラッグ選択で体感の重さが報告された場合は、まずここを疑うとよい。解決側は以前から都度走査しており（永続キャッシュを持たない方針）、走査そのものは既に受け入れているコストだが、複製を伴う点は選択側に新しく足された負担である。
+そこで `renderedTextOf` を「このコンテナに今どんな文字が存在するか」を答える唯一の関数とし、作成時・解決時の両方がそれを通る形にした（`.claude/rules/coding-style.md` の「単一の情報源」）。この形を成り立たせるために、テキストオフセットからDOM位置を求める向き（`resolveDomPosition`）だけでは足りず、DOM境界点からテキストオフセットを求める逆向き（`textOffsetOf`）を足す必要があった。代わりに、選択が変わるたびにコストが増える——`textOffsetOf` は境界点までの部分木を `Range.cloneContents()` で複製したうえで走査するため、単なる走査よりも重く、`captureSelection` は開始・終了の2回分これを呼ぶ。長いページでのドラッグ選択で体感の重さが報告された場合は、まずここを疑うとよい。解決側も毎回走査しており（永続キャッシュを持たない方針）、走査そのものは受け入れているコストだが、複製を伴う点は選択側だけにある負担である。
 
 除外条件を変える改修を入れる際に、それ以前に保存された `approxOffset` を再計算するマイグレーションは行わない（design.md の「フロー上の決定事項」で方針として明記済み）。この判断が安全なのは、`approxOffset` の用途が「同じクオートがページ内に複数回出てくるときにどれを選ぶか」だけに限られているためである。したがって影響が残るのは「クオートがページ内で一意でなく、かつページ冒頭からそのクオートまでの間に除外対象の要素がある」という狭い組み合わせだけで、それも「ハイライトなし」より軽い劣化にとどまる。
 
@@ -310,11 +310,9 @@ Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.u
 
 ### 読み取り専用利用者の制限は書き込み系7ルートすべてにサーバー側で適用する
 
-編集・削除の4ルート（`update.ts`／`update-reply.ts`／`delete.ts`／`delete-reply.ts`）は当初から、`comments.update`／`comments.remove`（apiv1）と同じ `excludeReadOnlyUserIfCommentNotAllowed` ミドルウェアを持ち、読み取り専用利用者の制限をサーバー側で最終判定していた（要件18.9）。
+書き込み系の7ルート（`create.ts`／`create-reply.ts`／`resolve.ts`／`update.ts`／`update-reply.ts`／`delete.ts`／`delete-reply.ts`）はすべて、apiv1 の `comments.add`／`comments.update`／`comments.remove` と同じ `excludeReadOnlyUserIfCommentNotAllowed` ミドルウェアを持ち、読み取り専用利用者の制限をサーバー側で最終判定する（要件1.10、4.7、18.9）。画面側の表示制御だけでは、API を直接呼ばれたときに制限が効かないためである。
 
-作成・返信作成・解決トグルの3ルート（`create.ts`／`create-reply.ts`／`resolve.ts`）にはこのミドルウェアが無く、読み取り専用利用者の制限がクライアント側の表示制御にしか存在しない期間があった——`inline-comment` 機能が最初にこの3ルートを実装した時点からの既存の欠落で、編集・削除の追加時にも対象範囲外として意図的に見送られていた（要件1・4の受け入れ基準に及ぶ変更だったため）。
-
-この欠落は `inline-comment-readonly-restriction` というamend specで是正済み（2026-09-11起票・実装完了・本体へ折り込み済み。amend spec自体は`.claude/rules/spec-lifecycle.md`の手順により削除済み）。`create.ts`／`create-reply.ts`／`resolve.ts` の3ルートに同じミドルウェアを追加し（要件1.10・4.7）、対応するクライアント側の操作起点（`SelectionCapture`・`InlineCommentReplies`・`InlineCommentItem`・`InlineCommentPreviewPopover`）にも `NotAvailableIfReadOnlyUserNotAllowedToComment` ガードを追加した。現在は書き込み系7ルートすべてが同じ位置・同じミドルウェアでこの制限をサーバー側最終判定している。
+画面側では、操作の起点（`SelectionCapture`・`InlineCommentReplies`・`InlineCommentItem`・`InlineCommentPreviewPopover`・`InlineCommentPopoverEntry`）を `NotAvailableIfReadOnlyUserNotAllowedToComment` で包み、許可されていない読み取り専用利用者には操作の手段を無効にして見せる。
 
 ## 見た目の刷新（amend spec `inline-comment-visual-refresh` より統合）
 
@@ -330,11 +328,11 @@ Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.u
 
 ### ホバー表示のトリガーは「各カードの箱」でなければならない
 
-通常コメントでは、起点・返信それぞれが独立した `Comment.tsx` インスタンスで自前の `.page-comment > .page-comment-main` を持つため、`.page-comment-main:hover > .page-comment-control` が自然に行単位で独立する。インラインコメント側は当初、起点と返信スレッド全体を包む外側のラッパーをトリガーにしていたため、アイテムのどこにマウスを乗せても起点と全返信のボタンが一斉に出てしまっていた。トリガーを `:global(.page-comment-main):hover`（各 `CommentCard` インスタンス自身の箱）に変更し、行ごとに独立させた。
+通常コメントでは、起点・返信それぞれが独立した `Comment.tsx` インスタンスで自前の `.page-comment > .page-comment-main` を持つため、`.page-comment-main:hover > .page-comment-control` が自然に行単位で独立する。インラインコメント側も、トリガーを `:global(.page-comment-main):hover`（各 `CommentCard` インスタンス自身の箱）にして、行ごとに独立させる。起点と返信スレッド全体を包む外側のラッパーをトリガーにすると、アイテムのどこにマウスを乗せても起点と全返信のボタンが一斉に出てしまう。
 
-### 通常コメント側の絶対配置は、親のパディングを無視する不具合だった
+### 編集・削除アイコンは絶対配置にせず、ヘッダー行の flex の流れに置く
 
-通常コメントの編集・削除アイコン（`CommentControl`）は当初 `position: absolute; top: 0; right: 0` でカード右上に配置されていたが、これはCSSの仕様上、包含ブロックの**パディング辺**を基準に配置され親自身のパディング（`padding: 1em`）を無視するため、カードの角にぴったり張り付いてしまっていた（実機での見た目の崩れとして発見）。インラインコメント一覧アイテムがすでに採用していた「ヘッダー行の `headerEnd` スロット内・`ms-auto` の通常のflexフロー」に統一し、両サーフェスの配置方式を揃えた。
+通常コメントの編集・削除アイコン（`CommentControl`）は、インラインコメントの一覧項目と同じく、ヘッダー行の `headerEnd` スロットの中に `ms-auto` を付けて通常の flex の流れで置く。`position: absolute; top: 0; right: 0` でカード右上に置くと、CSSの仕様上、包含ブロックの**パディング辺**を基準に配置されて親自身のパディング（`padding: 1em`）が効かず、カードの角にぴったり張り付いてしまう。
 
 ### `CommentEditor` の `onSubmit` は永続化を完全に差し替える
 
@@ -354,7 +352,7 @@ Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.u
 
 ### 返信の表示順は各利用側の責務
 
-共有のコメント一覧はサーバーの取得順（`createdAt: 'desc'`、新しい順）で届き、`groupInlineComments` もその順を保つだけで、表示順を整えない。一覧側（`InlineCommentReplies.tsx`）は自前で `reverse()` して古い順にしていたが、ポップオーバーにはそれが無かったため新しい順に表示されていた（一覧と逆）。ポップオーバー側にも同じ `reverse()` を足して揃えた。新しく返信を表示する画面を作るときは、サーバーの順序に依存せず必ず自分で表示順を決める必要がある。
+共有のコメント一覧はサーバーの取得順（`createdAt: 'desc'`、新しい順）で届き、`groupInlineComments` もその順を保つだけで、表示順を整えない。そのため、返信を表示する一覧（`InlineCommentReplies.tsx`）とポップオーバー（`InlineCommentPreviewPopover.tsx`）は、どちらも自分で `reverse()` して古い順に並べる。新しく返信を表示する画面を作るときは、サーバーの順序に依存せず必ず自分で表示順を決める必要がある。
 
 ### ポップオーバーは `CommentCard` を流用しなかった
 

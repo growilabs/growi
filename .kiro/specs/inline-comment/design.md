@@ -403,7 +403,7 @@ sequenceDiagram
 **Responsibilities & Constraints**
 - `comments` テーブルのうち `isInline: true` の行に対する唯一の書き込み経路。作成後は `anchorOriginRevisionId` を再アンカーの成否にかかわらず書き換えない（5.5）。編集で更新されるのは `comment` 本文フィールドのみで、アンカー関連フィールド・`resolvedAt`／`resolvedById` は編集・削除いずれの操作でも変更しない
 - 作成・返信作成それぞれで `Activity` レコードを発行してから `CommentService.prepareMentionNotifications` を呼び出す（`prepareMentionNotifications` が `activityId` を要求するため）
-- 解決トグルの認可は、ページへのコメント権限を持つログイン済みユーザーであれば作成者に限定しない（4.2, 4.3の文言通り）。解決トグルは起点コメントに対してのみ行える（返信のIDを渡された場合は400を返す）
+- 解決トグルの認可は、ページへのコメント権限を持つログイン済みユーザーであれば作成者に限定しない（4.2, 4.3の文言通り）。解決トグルは起点コメントに対してのみ行える（返信や通常コメントのIDを渡された場合は400を返す）
 - 一覧の取得は持たない。画面は、`useSWRxInlineComments` の取得部分（`comment` スペックが持つ）から、起点コメントと返信の親子の一覧を受け取る（取得と組み直しの規則は `comment` スペックの design.md を参照）。同じフックが返す書き込みの関数（作成・解決トグル・編集・削除）は本スペックが持つ（タスク 4.1）
 - `updateComment`／`updateReply` は形状（起点／返信）と `creatorId === actorId` を再検証してから `comment` を更新する（編集・削除の認可は投稿者本人限定。通常コメントの `comments.update`／`comments.remove` と同じ規律に従う）。`deleteComment` は形状・投稿者を検証したうえで `removeWithReplies(id)` を呼び返信も道連れに削除し、`deleteReply` は単純な単一行削除を行う
 
@@ -440,7 +440,7 @@ interface InlineCommentService {
 }
 ```
 - Preconditions: `create` は `anchor.quote` が空文字でないこと（1.7 はクライアント側でも防ぐが、サーバー側でも検証する）。`createReply` は `parentId` が指す行が `isInline: true` かつ `replyToId` が `null`（＝起点コメントである）こと。`updateComment`／`deleteComment` は `id` が起点コメントであること、`updateReply`／`deleteReply` は `id` が返信であることを要求し、いずれも `actorId` が対象行の `creatorId` と一致することを要求する
-- Postconditions: `createReply` はアンカー関連フィールドがすべて `null` の `InlineCommentReply` を返す。`setResolved(true)` は `resolvedBy`/`resolvedAt` を設定し、`setResolved(false)` は両方を `null` に戻す。`setResolved` の対象が返信（`replyToId` が非null）の場合はエラーとする。`updateComment`／`updateReply` は成功時に `comment` フィールドのみを更新した行を返す。`deleteComment` は対象行とその全返信を削除し、`deleteReply` は対象の返信のみを削除する
+- Postconditions: `createReply` はアンカー関連フィールドがすべて `null` の `InlineCommentReply` を返す。`setResolved(true)` は `resolvedBy`/`resolvedAt` を設定し、`setResolved(false)` は両方を `null` に戻す。`setResolved` の対象が起点コメントでない場合（存在しない、通常コメント、または返信）はエラーとする。`updateComment`／`updateReply` は成功時に `comment` フィールドのみを更新した行を返す。`deleteComment` は対象行とその全返信を削除し、`deleteReply` は対象の返信のみを削除する
 - Invariants: `anchorOriginRevisionId` は `create` 時にのみ設定され、以後変更されない。`anchor`／`anchorOriginRevisionId`／`resolvedAt`／`resolvedById` は `updateComment`／`updateReply`／`deleteComment`／`deleteReply` のいずれによっても一切変更されない
 
 ##### API Contract
@@ -448,17 +448,17 @@ interface InlineCommentService {
 |---|---|---|---|---|
 | POST | `/_api/v3/inline-comments` | `CreateInlineCommentInput` | `{ inlineComment: InlineComment }`（ステータス201） | 400（入力の検証エラー、サービスの失敗〔空クオートなど。コード `inline-comment-create-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 404（ページが存在しない、または閲覧権限がない。両者を区別しない一様な404。コード `notfound_or_forbidden`。`apps/app/.claude/rules/page-write-action-403-404.md`） |
 | POST | `/_api/v3/inline-comments/:id/replies` | `CreateInlineCommentReplyInput` | `{ inlineCommentReply: InlineCommentReply }`（ステータス201） | 400（入力の検証エラー、`:id`が起点コメントでない〔`inline-comment-not-origin`〕、サービスの失敗〔`inline-comment-reply-create-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 404（`:id`が存在しない〔`inline-comment-not-found`〕、または親ページの閲覧権限がない〔`notfound_or_forbidden`〕。一様な404） |
-| PUT | `/_api/v3/inline-comments/:id/resolve` | `{ resolved: boolean }` | `{ inlineComment: InlineComment }` | 400（入力の検証エラー、`:id`が返信〔`inline-comment-not-origin`〕、サービスの失敗〔`inline-comment-resolve-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 404（`:id`が存在しない〔`inline-comment-not-found`〕、または閲覧権限がない〔`notfound_or_forbidden`〕。一様な404） |
-| PUT | `/_api/v3/inline-comments/:id` | `{ comment: string }` | `{ inlineComment: InlineComment }` | 400（入力の検証エラー、`:id`が起点コメントでない〔`inline-comment-not-origin`〕、サービスの失敗〔`inline-comment-update-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕。閲覧権限がない場合も同じ404） |
-| PUT | `/_api/v3/inline-comments/replies/:id` | `{ comment: string }` | `{ inlineCommentReply: InlineCommentReply }` | 400（入力の検証エラー、`:id`が返信でない〔`inline-comment-not-reply`〕、サービスの失敗〔`inline-comment-update-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕。閲覧権限がない場合も同じ404） |
-| DELETE | `/_api/v3/inline-comments/:id` | — | `{}` | 400（入力の検証エラー、`:id`が起点コメントでない〔`inline-comment-not-origin`〕、サービスの失敗〔`inline-comment-delete-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕。閲覧権限がない場合も同じ404） |
-| DELETE | `/_api/v3/inline-comments/replies/:id` | — | `{}` | 400（入力の検証エラー、`:id`が返信でない〔`inline-comment-not-reply`〕、サービスの失敗〔`inline-comment-delete-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕。閲覧権限がない場合も同じ404） |
+| PUT | `/_api/v3/inline-comments/:id/resolve` | `{ resolved: boolean }` | `{ inlineComment: InlineComment }` | 400（入力の検証エラー、`:id`が起点コメントでない〔返信または通常コメント。`inline-comment-not-origin`〕、サービスの失敗〔`inline-comment-resolve-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 404（`:id`が存在しない〔`inline-comment-not-found`〕、または閲覧権限がない〔`notfound_or_forbidden`〕。一様な404） |
+| PUT | `/_api/v3/inline-comments/:id` | `{ comment: string }` | `{ inlineComment: InlineComment }` | 400（入力の検証エラー、`:id`が起点コメントでない〔`inline-comment-not-origin`〕、サービスの失敗〔`inline-comment-update-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕、または親ページの閲覧権限がない〔`notfound_or_forbidden`〕。一様な404） |
+| PUT | `/_api/v3/inline-comments/replies/:id` | `{ comment: string }` | `{ inlineCommentReply: InlineCommentReply }` | 400（入力の検証エラー、`:id`が返信でない〔`inline-comment-not-reply`〕、サービスの失敗〔`inline-comment-update-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕、または親ページの閲覧権限がない〔`notfound_or_forbidden`〕。一様な404） |
+| DELETE | `/_api/v3/inline-comments/:id` | — | `{}` | 400（入力の検証エラー、`:id`が起点コメントでない〔`inline-comment-not-origin`〕、サービスの失敗〔`inline-comment-delete-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕、または親ページの閲覧権限がない〔`notfound_or_forbidden`〕。一様な404） |
+| DELETE | `/_api/v3/inline-comments/replies/:id` | — | `{}` | 400（入力の検証エラー、`:id`が返信でない〔`inline-comment-not-reply`〕、サービスの失敗〔`inline-comment-delete-failed`〕、または読み取り専用利用者にコメントが許可されていない）, 403（投稿者でない。`inline-comment-forbidden`）, 404（`:id`が存在しない〔`inline-comment-not-found`〕、または親ページの閲覧権限がない〔`notfound_or_forbidden`〕。一様な404） |
 
 どのルートも500を明示的には返さない（サービスが投げた例外はすべて、上記の `*-failed` コードの400として返す）。
 
-すべてのルートで、ページ（または対象コメントが属するページ）が存在しない場合と、存在するが閲覧権限がない場合を区別せず、一様に404を返す（`apps/app/.claude/rules/page-write-action-403-404.md`——ページの存在をレスポンスから漏らさないための既存規則）。表中で403として残っているのは「対象は見つかったが投稿者本人でない」場合のみで、こちらは意図的に区別している。未ログインのアクセスには403を返す。この実装が使う `loginRequiredFactory` は、apiv3リクエストに対して常に403を返す（401ではない。タスク3.5／6.2のE2Eテストで確認済み）。
+すべてのルートで、ページ（または対象コメントが属するページ）が存在しない場合と、存在するが閲覧権限がない場合を区別せず、一様に404を返す（`apps/app/.claude/rules/page-write-action-403-404.md`——ページの存在をレスポンスから漏らさないための既存規則）。表中の403は「対象は見つかったが投稿者本人でない」場合だけで、こちらは意図的に区別している。未ログインのアクセスには403を返す。この実装が使う `loginRequiredFactory` は、未ログインの apiv3 リクエストに403を返す（401ではない。`routing.integ.ts` が7ルートすべてで確かめている）。
 
-すべてのエンドポイントは `accessTokenParser` → `loginRequired` → express-validator → `apiV3FormValidator` のチェーンを通す。**`certifySharedPage` ミドルウェアはこれらのルートに一切適用しない**（すべて書き込みのルートであり、共有リンク閲覧者には書き込みの手段を与えないため）。インラインコメントの読み取りはこの表に無い。`comment` スペックの `GET /_api/v3/comments` を使う。書き込み系の7ルート（`create.ts`／`create-reply.ts`／`resolve.ts`／`update.ts`／`update-reply.ts`／`delete.ts`／`delete-reply.ts`）はすべて、`loginRequired` の直後・express-validatorより前に `excludeReadOnlyUserIfCommentNotAllowed` を通す（apiv1の `/comments.add`／`/comments.update`／`/comments.remove` と同じ位置）。読み取り専用利用者にコメントが許可されていない場合、この時点で400を返す（要件1.4/1.5、18.4／18.8／18.9）。編集・削除ルートの投稿者本人チェックはルート側（`findUnique` で `creatorId` を取得するのと同じタイミング）とサービス側内部（多層防御としての再検証）の2回行う。
+すべてのエンドポイントは `accessTokenParser` → `loginRequired` → express-validator → `apiV3FormValidator` のチェーンを通す。**`certifySharedPage` ミドルウェアはこれらのルートに一切適用しない**（すべて書き込みのルートであり、共有リンク閲覧者には書き込みの手段を与えないため）。インラインコメントの読み取りはこの表に無い。`comment` スペックの `GET /_api/v3/comments` を使う。書き込み系の7ルート（`create.ts`／`create-reply.ts`／`resolve.ts`／`update.ts`／`update-reply.ts`／`delete.ts`／`delete-reply.ts`）はすべて、`loginRequired` の直後・express-validatorより前に `excludeReadOnlyUserIfCommentNotAllowed` を通す。apiv1の `/comments.add`／`/comments.update`／`/comments.remove` も、このミドルウェアをログイン確認（`loginRequiredStrictly`）の直後に置く点は同じである。ただし apiv1 の `/comments.add`／`/comments.update` は、入力の検証の定義（`comment.api.validators.add()`）をログイン確認より前に置いており、検証より前にこのミドルウェアを置く本スペックのルートとは順番が違う。読み取り専用利用者にコメントが許可されていない場合、この時点で400（`validation_failed`）を返す（サーバー側の最終判定。要件1.10、4.7、18.9。画面側で操作の手段を無効にするのは要件18.4／18.8）。編集・削除ルートの投稿者本人チェックはルート側（`findUnique` で `creatorId` を取得するのと同じタイミング）とサービス側内部（多層防御としての再検証）の2回行う。
 
 ## Client / ロジック層
 
@@ -719,7 +719,7 @@ model comments {
 
 ## Security Considerations
 
-- 認可はすべて既存の `apiv3` ミドルウェアチェーン（`accessTokenParser` → `loginRequired`）を再利用し、独自の認可ロジックを新設しない。書き込み系の7ルート（作成・返信作成・解決トグル・編集2・削除2）はすべて、これに加えて `excludeReadOnlyUserIfCommentNotAllowed` も既存ミドルウェアとして再利用し、読み取り専用利用者の制限をサーバー側で最終判定する（要件1.4/1.5、18.9）
+- 認可はすべて既存の `apiv3` ミドルウェアチェーン（`accessTokenParser` → `loginRequired`）を再利用し、独自の認可ロジックを新設しない。書き込み系の7ルート（作成・返信作成・解決トグル・編集2・削除2）はすべて、これに加えて `excludeReadOnlyUserIfCommentNotAllowed` も既存ミドルウェアとして再利用し、読み取り専用利用者の制限をサーバー側で最終判定する（要件1.10、4.7、18.9）
 - 新規の `inline-comment` ルートはすべて書き込みのルートで、`certifySharedPage` を一切経由しない。共有リンク経由でインラインコメントを作成・編集・削除・解決する経路は無い。共有リンク経由でインラインコメントを読めるかどうか（読める。読み取り専用）と、その根拠は `comment` スペック（要件 3.3、`research.md`）が持つ。共有リンク画面にインラインコメントを出さないこと（要件6.2）は、画面側の表示の範囲の決定であり、データを隠すための仕組みではない
 - 解決トグルはページへのコメント権限を持つ任意のログイン済みユーザーが行える（作成者限定ではない）。これは要件4.2/4.3の文言通りの決定であり、将来「作成者限定にすべきか」が論点になった場合は要件フェーズに立ち戻って明示的に決定する
 - 編集・削除は解決トグルとは異なり投稿者本人限定（`creatorId === actorId`）である。クライアント側の `creatorId === currentUser?._id` チェックはそれ自体では認可の境界にならず（クライアント側のstateは古い可能性・偽装される可能性がある）、`comments.update`／`comments.remove` とまったく同じく、サーバー側のルート・サービスが変更前に投稿者本人であることを独立に再検証する

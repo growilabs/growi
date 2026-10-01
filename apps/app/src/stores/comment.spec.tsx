@@ -48,6 +48,8 @@ const buildRow = (
 ): ICommentListItem => ({
   _id: id,
   id,
+  v: 0,
+  __v: 0,
   page: 'page-1',
   pageId: 'page-1',
   creator: null,

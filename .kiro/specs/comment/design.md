@@ -147,7 +147,7 @@ apps/app/src/migrations/
 - `apps/app/bin/openapi/generate-spec-apiv3.sh` — `src/features/comment/server/routes/*.ts` を OpenAPI の生成対象に含める
 - `apps/app/src/features/inline-comment/server/service/inline-comment-service.ts` — 依存に `updateCommentCount` を持ち、作成、返信の作成、削除、返信の削除のあとに呼ぶ。一覧を返す機能は持たない
 - `apps/app/src/features/inline-comment/server/routes/{create,create-reply,update,update-reply,delete,delete-reply,resolve}.ts` — サービスを作るときに `updateCommentCount` を渡す(依存は必須なので、7つのルートすべてが渡す)
-- `apps/app/src/features/inline-comment/server/routes/routing.integ.ts` — 一覧取得(`GET /inline-comments`)が JSON の 404 を返すことを確かめるテスト(8.3)を持つ
+- `apps/app/src/features/inline-comment/server/routes/routing.integ.ts` — 一覧取得(`GET /inline-comments`)の 404 について、2つのことを確かめるテスト(8.3)を持つ。1つ目は、テスト用の Express アプリに本番と同じ形の JSON の 404 を登録し、その応答が JSON の 404(`not_found`)になること。2つ目は、本物の `apiv3/index.js` のソースを文字列として読み、`GET /inline-comments` の 404 の登録があり、一覧を返すハンドラーが無いこと。本物のルーターを組み立てて `GET /inline-comments` を送るテストは無い
 - `apps/app/src/features/inline-comment/server/update-page-comment-count.ts` — `InlineCommentService` の `updateCommentCount` 依存として各ルートが渡す、Page モデルを取得して `Page.updateCommentCount` を呼ぶ薄い関数
 - `apps/app/src/server/models/obsolete-page.js` — `Page.updateCommentCount` は `await this.updateOne(…)` で書き込みの完了を待ち、その結果を返す
 - `apps/app/src/features/inline-comment/client/stores/inline-comment.ts` — `useSWRxCommentList` + `groupInlineComments` で取得する。作成、返信の作成、削除、返信の削除のあとに、一覧に加えてページ情報(`useSWRMUTxPageInfo`)も再取得する
@@ -281,7 +281,7 @@ export const listComments = (
   input: ListCommentsInput,
 ): Promise<ListCommentsResult>;
 ```
-- `CommentListRow`: `Prisma.commentsGetPayload<{ include: { creator: true } }>` 相当(`creator` を含む行)。型は `toCommentListItem` と同じファイルで定義して export し、サービスが import する(依存の向き「serializers → service」を守るため)
+- `CommentListRow`: `Prisma.Result<PrismaClient['comments'], { include: { creator: true } }, 'findMany'>[number]`(`creator` を含む1行)。`PrismaClient` は `~/utils/prisma` の拡張済みのクライアントの型なので、拡張が全モデルに足す `_id` と `__v` もこの型に入る(`Prisma.commentsGetPayload` では入らない)。型は `toCommentListItem` と同じファイルで定義して export し、サービスが import する(依存の向き「serializers → service」を守るため)
 - Preconditions: `pageId` の閲覧可否は呼び出し側が確認済み
 - Postconditions: `comments` は作成日時の新しい順。`revisionId` ありで次の版があれば、全件がその作成日時より前
 - Invariants: `isInline` で絞らない。返信も通常の行として含める
@@ -289,7 +289,7 @@ export const listComments = (
 **Implementation Notes**
 - Integration: `prisma.comments.findMany({ where: { pageId, createdAt?: { lt } }, include: { creator: true }, orderBy: { createdAt: 'desc' } })`。ページ ID の索引(`page_1`)が使われる
 - Validation: 版は `revisions.findUnique({ where: { id } })` で取り、`pageId` が一致しなければ `revision-not-found`
-- Risks: ページあたりのコメント数に上限は無い(旧 API、旧インライン一覧と同じ。ページネーションは範囲外)
+- Risks: ページあたりのコメント数に上限は無い(旧 API と同じ。ページネーションは範囲外)
 
 #### toCommentListItem / toLegacyCommentListItem
 
@@ -318,10 +318,10 @@ export const toLegacyCommentListItem: (
   row: CommentListRow,
 ) => CommentListItemWith<LegacyCommentCreator>;
 ```
-- 共通の出力: 行のすべての列 + `page`(= `pageId`)、`revision`(= `revisionId`)、`replyTo`(= `replyToId`)、`creator`。投稿者の行が無いときの `creator` は `creatorId`(投稿者の無いコメントでは `null`)
+- 共通の出力: 行のすべての列(文書の版の番号 `v` を含む)と、クライアント拡張が足す `__v`(`v` と同じ値)に加えて、`_id`(= `id`)、`page`(= `pageId`)、`revision`(= `revisionId`)、`replyTo`(= `replyToId`)、`creator`。投稿者の行が無いときの `creator` は `creatorId`(投稿者の無いコメントでは `null`)
 - `toCommentListItem` の投稿者の整形(`toCreatorSummary`)は、`_id`、`username`、`name`、`imageUrlCached` の4つだけを、項目を1つずつ指定して取り出す(行を展開してから項目を除く書き方はしない。ユーザーの列が増えても応答に漏れないようにするため)
 - `toLegacyCommentListItem` の投稿者の整形(`toLegacyCreator`)は、ユーザーの行からパスワード、API トークン、メールアドレスを除き、本人がメールアドレスを公開しているときだけ `email` を戻す(`null` でも戻す)。旧 API(`comment.js`)はこちらを使う(要件 5.1、5.4)
-- 4つの項目を残す理由は、画面がそれぞれを読むため。`username` は `Username`(ユーザーのページへのリンク)、`UserPicture`(リンクとツールチップ)、`Comment.tsx` の自分のコメントかどうかの判定が読む。`name` は `Username` と `UserPicture` が表示名として読む。`imageUrlCached` は `UserPicture` が画像の URL として読む。`_id` は画面が実行時には読まないが、`Username` が受ける型と `isPopulated` による型の絞り込みが `_id` を持つオブジェクトを前提にしており、API の利用者がユーザーを識別するのにも使う。画面はコメントの持ち主の判定に `creatorId` を使い、`creator` の他の項目(アカウントの状態、Gravatar の設定など)は読まない
+- 4つの項目を残す理由は、画面がそれぞれを読むため。`username` は `Username`(ユーザーのページへのリンク)、`UserPicture`(リンクとツールチップ)、`Comment.tsx` の自分のコメントかどうかの判定が読む。`name` は `Username` と `UserPicture` が表示名として読む。`imageUrlCached` は `UserPicture` が画像の URL として読む。`_id` は画面が実行時には読まないが、`Username` が受ける型と `isPopulated` による型の絞り込みが `_id` を持つオブジェクトを前提にしており、API の利用者がユーザーを識別するのにも使う。自分のコメントかどうかの判定は、通常コメントとインラインコメントで読む項目が違う。通常コメント(`Comment.tsx`)は `creator.username` とログイン中の利用者の `username` を比べる。インラインコメント(`InlineCommentItem.tsx`、`InlineCommentReplies.tsx`、`InlineCommentPreviewPopover.tsx`)は `creatorId` とログイン中の利用者の `_id` を比べ、`creator` を読まない。画面は `creator` のほかの項目(アカウントの状態、Gravatar の設定など)を読まない
 
 #### countCommentByPageId(モデルの拡張)
 - `where: { pageId }` にする(件数の集計は `isInline` で絞らない)。返信も1行として数える。解決済みも数える
@@ -396,13 +396,28 @@ export const groupInlineComments = (
 
 ### Data Contracts & Integration
 ```typescript
+export type ICommentCreatorSummary = Pick<
+  users,
+  'username' | 'name' | 'imageUrlCached'
+> & { _id: string };
+
 export interface ICommentListItem {
   _id: string;
   id: string;
+  v: number; // document version counter; not meaningful to clients
+  __v: number; // same value as v
+  page: string;
   pageId: string;
+  creator: ICommentCreatorSummary | string | null;
   creatorId: string | null;
+  revision: string | null;
   revisionId: string | null;
+  replyTo: string | null;
   replyToId: string | null;
+  comment: string;
+  commentPosition: number;
+  createdAt: Date;
+  updatedAt: Date;
   isInline: boolean;
   quote: string | null;
   prefix: string | null;
@@ -423,9 +438,10 @@ export interface ListCommentsResponseBody {
   comments: ICommentListItem[];
 }
 ```
-- `ICommentListItem` の旧 API 由来の項目(`page`、`revision`、`replyTo`、`commentPosition`、`_id`、`createdAt`、`updatedAt`、`comment`)は、旧 API の出力と同じ値を持つ。`creator` だけは、旧 API より項目が少ない(下記)。型は単独で定義する(`ICommentHasId` を継承しない)。`ICommentHasId` は画面の通常コメント部品の型で、`page` や `revision` を `Ref` で持ち、インライン用の項目を持たないため
+- `ICommentListItem` の旧 API 由来の項目(`page`、`revision`、`replyTo`、`commentPosition`、`_id`、`__v`、`createdAt`、`updatedAt`、`comment`)は、旧 API の出力と同じ値を持つ。`creator` だけは、旧 API より項目が少ない(下記)。型は単独で定義する(`ICommentHasId` を継承しない)。`ICommentHasId` は画面の通常コメント部品の型で、`page` や `revision` を `Ref` で持ち、インライン用の項目を持たないため
 - 型の食い違いは `as` で隠さない。`ICommentHasId` は実データに合わせて、`revision` と `replyTo` に null を許し、`creator` を `Ref<IUser> | ICommentCreatorSummary | null` にしてある。これにより `ICommentListItem` を `as` なしで通常コメントの部品に渡せる
 - 通常コメントでは、インライン用の項目は `null`(`isInline` は `false`)
+- `v` と `__v` は文書の版の番号(Prisma の列 `v` と、拡張が足す同じ値の `__v`)。整形は行を展開して作るので応答に入る。画面は読まない。旧 API と共通の整形の出力を変えないため、取り除かずに型と OpenAPI に載せている
 - `creator` の型は `ICommentCreatorSummary | string | null`。`ICommentCreatorSummary` は `{ _id: string; username: string; name: string | null; imageUrlCached: string | null }` で、`features/comment/interfaces` に置く。画面のコメント部品(`CommentCard`、`IInlineComment` と返信の `creator`、`ICommentHasId.creator`)はこの型を受ける。旧 API の投稿者の型(`LegacyCommentCreator`)は整形のファイルの中だけで使い、公開しない
 - スキーマ(`comments`、`revisions`)に変更は無い。`pages.commentCount` の値の意味が変わる
 

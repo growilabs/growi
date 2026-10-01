@@ -8,6 +8,8 @@ import { groupInlineComments } from './group-inline-comments';
 const baseItem = (id: string): ICommentListItem => ({
   _id: id,
   id,
+  v: 0,
+  __v: 0,
   page: 'page1',
   pageId: 'page1',
   creator: null,

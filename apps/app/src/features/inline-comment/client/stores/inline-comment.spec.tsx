@@ -36,6 +36,8 @@ const listItem = (
 ): ICommentListItem => ({
   _id: 'comment1',
   id: 'comment1',
+  v: 0,
+  __v: 0,
   page: 'page1',
   pageId: 'page1',
   creator: null,

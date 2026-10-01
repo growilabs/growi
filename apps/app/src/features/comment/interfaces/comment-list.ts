@@ -12,6 +12,10 @@ export type ICommentCreatorSummary = Pick<
 export interface ICommentListItem {
   _id: string;
   id: string;
+  /** Document version counter; not meaningful to clients. */
+  v: number;
+  /** Same value as `v`, added by the Prisma client extension. */
+  __v: number;
   page: string;
   pageId: string;
   creator: ICommentCreatorSummary | string | null;

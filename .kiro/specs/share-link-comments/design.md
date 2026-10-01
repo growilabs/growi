@@ -320,7 +320,7 @@ res.json(ApiResponse.success({ comments: comments.map(toLegacyCommentListItem) }
 
 **Implementation Notes**
 - Integration: viewer バイパス分岐は `revisions.js` と同形。加えて共有文脈の `revision_id` 抑止を追加。入力検証は `apiV1FormValidator` がルート段で短絡するため、ハンドラ内に重複した `validationResult` チェックは置かない。
-- Risks: `isSharedPage` は `certify-shared-page.js` のみが設定するため、他経路で誤って真にならない。非共有（通常ログイン）経路の `revision_id` 取得は従来どおり維持される（5.2）。
+- Risks: `req.isSharedPage = true` を設定するミドルウェアは2つある。`certify-shared-page.js` と、添付ファイル用の `certify-shared-page-attachment.ts` である。`/comments.get` のミドルウェアの並び（`routes/index.js` の `accessTokenParser` → 入力の検証 → `apiV1FormValidator` → `certifySharedPage` → `loginRequired` → `comment.api.get`）には添付ファイル用のミドルウェアが入っていないので、この並びの中でフラグを立てるのは `certify-shared-page.js` だけである。そのため、共有リンクの検証を通らずにフラグが真になることは無い。非共有（通常ログイン）経路の `revision_id` 取得は従来どおり維持される（5.2）。
 
 ## Error Handling
 
@@ -368,4 +368,4 @@ res.json(ApiResponse.success({ comments: comments.map(toLegacyCommentListItem) }
 - **情報露出の限定**: コメント取得許可は `certify-shared-page.js` が `{ id: shareLinkId, relatedPageId: page_id }` に一致する共有リンクを見つけ、それが `isExpired()` でない場合のみ。共有リンクの対象ページ以外のコメントは取得できない（4.2）。
 - **書き込みの非開放**: `comments.add/update/remove` は `loginRequiredStrictly` のまま。本機能は読み取りのみを開放する（2.2–2.5）。
 - **投稿者個人情報**: 旧式の `/comments.get` は `comment` スペックの `toLegacyCommentListItem` で、パスワード・API トークン・非公開のメールアドレスを除いた形で返す。画面が使う `GET /_api/v3/comments` は `toCommentListItem` で、ID・ユーザー名・表示名・プロフィール画像の URL の4項目だけを返す（3.3。`comment` 要件 1.9、5.4）。
-- **`isSharedPage` の単一供給源**: `certify-shared-page.js` 以外がこのフラグを設定しないことを前提に、ハンドラのバイパスは安全。`certify-shared-page.js` は検証対象 ID を `pageId` と `page_id` の両方から読むが、検証の中身（`relatedPageId` の一致 ＋ `isExpired()`）はどちらでも同じ。
+- **`isSharedPage` を立てる場所**: このフラグは `certify-shared-page.js` のほかに、添付ファイル用の `certify-shared-page-attachment.ts` も設定する。ただし添付ファイル用のミドルウェアは添付ファイルのルートだけに付いていて、`/comments.get`（`routes/index.js`）と `GET /_api/v3/comments` のミドルウェアの並びには入っていない。これらの並びの中でフラグを立てるのは `certify-shared-page.js` だけなので、ハンドラのバイパスは安全である。`certify-shared-page.js` は検証対象 ID を `pageId` と `page_id` の両方から読むが、検証の中身（`relatedPageId` の一致 ＋ `isExpired()`）はどちらでも同じ。

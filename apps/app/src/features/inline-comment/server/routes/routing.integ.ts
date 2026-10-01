@@ -1,7 +1,6 @@
 /**
  * Routing / real-auth-chain integration tests for the inline-comment feature
- * (task 3.5's observable completion condition: "no login" and "no page
- * permission" are both rejected).
+ * ("no login" and "no page permission" are both rejected).
  *
  * Unlike the other `*.integ.ts` files in this directory, `accessTokenParser`
  * and `loginRequired` are NOT mocked here — this file exercises the real
@@ -9,19 +8,12 @@
  * (`/_api/v3/inline-comments`), to prove what actually happens when nobody is
  * logged in.
  *
- * Verified real behavior (not the task text's literal "401"): GROWI's
- * `loginRequiredFactory` branches on `req.baseUrl` — when it matches
- * `/^\/_api\/.+$/` (true for every apiv3 route, mounted here exactly as
- * production mounts it) an unauthenticated caller gets `res.sendStatus(403)`,
- * not a 401 and not a redirect. This is not specific to this feature: see
- * `apps/app/src/server/routes/apiv3/g2g-transfer-preflight.integ.ts`
- * ("refuses a caller who never logged in with 403") and
- * `apps/app/src/server/middlewares/login-required.ts`. No apiv3 route in this
- * codebase manually returns 401 for a missing/absent login — `accessTokenParser`
- * itself never rejects (an absent/invalid token is a silent no-op, falling
- * through to `loginRequired`). So "no login -> 401" from the task text does
- * not hold for this codebase's actual middleware; "no login -> 403" does, and
- * that is what this suite asserts.
+ * An unauthenticated caller gets 403, not 401 and not a redirect:
+ * `loginRequiredFactory` answers `res.sendStatus(403)` when `req.baseUrl` matches
+ * `/^\/_api\/.+$/` (every apiv3 route), and `accessTokenParser` never rejects on
+ * its own (an absent or invalid token falls through to `loginRequired`). See
+ * `apps/app/src/server/middlewares/login-required.ts` and
+ * `apps/app/src/server/routes/apiv3/g2g-transfer-preflight.integ.ts`.
  *
  * The "no page permission" case (authenticated, but lacking view permission
  * on the target page) is covered per-route in create.integ.ts /
