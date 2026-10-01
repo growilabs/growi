@@ -846,7 +846,7 @@ describe('InlineCommentService.listByPageId', () => {
     // Secured fields must not leak through.
     expect(result[0].creator).not.toHaveProperty('password');
     expect(result[0].creator).not.toHaveProperty('apiToken');
-    expect(result[0].creator?.email).toBeUndefined();
+    expect(result[0].creator).not.toHaveProperty('email');
     // creatorId must still be present alongside the new creator field.
     expect(result[0].creatorId).toBe(originRow.creatorId);
   });

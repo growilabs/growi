@@ -113,7 +113,7 @@
   - _Depends: 2.4_
   - _Boundary: useSWRxCommentList_
 
-- [ ] 4.2 (P) 平らな一覧を、インラインコメントの親子にまとめる関数を作る
+- [x] 4.2 (P) 平らな一覧を、インラインコメントの親子にまとめる関数を作る
   - 起点(インラインで返信でないもの)と、その返信を親子にまとめる。入力の順を保つ
   - アンカーの項目が欠けた壊れた起点と、親が結果に無い返信は除く。通常コメントの行は無視する
   - 投稿者がオブジェクトならそのまま、ID の文字列なら無いものとして扱う。日付は変換しない
@@ -209,3 +209,5 @@
 - 2.3: `certifySharedPage` は `shareLinkId` を `req.query || req.body` から読む(route の検証は query のみ)。照会は `relatedPageId` に検証済みの query の `pageId` を結び付けるため悪用はできない。2.4 で登録するときは `router.get` のみ(3.8 の読み取り専用)にする。
 - 2.4: 応答の各項目には Prisma の行由来の `v`(`__v`)も含まれるが、旧 API の出力を変えない方針(1.2)と揃えており、公開仕様には載せていない(`additionalProperties` は閉じていない)。
 - 4.1: `normalizeShareLinkId` は新フック内に非公開で複製してある。4.4 で `useSWRxPageComment` を切り替えるときに、`apps/app/src/stores/comment.tsx` の旧 `normalizeShareLinkId` / `buildCommentGetParams` が使われなくなったら削除する。
+- 4.2: 投稿者の型を整えた。`ICommentCreator` は `_id` / `__v` を持ち、画面が読む 4 項目だけの `ICommentCreatorSummary`(`_id` / `username` / `name` / `imageUrlCached`)を `IInlineComment` と返信の `creator`、`CommentCard`、`Username`、`@growi/ui` の `UserPicture` が受ける。4.3 で通常コメントの型を広げるときは `creator: Ref<IUser> | ICommentCreatorSummary | null` にすれば、4.4 で `ICommentListItem` を `as` なしで渡せる。
+- 4.2: `apps/app` の型検査は `@growi/ui` の `dist` を読むため、新しい checkout では先に `turbo run build --filter @growi/ui` が要る。

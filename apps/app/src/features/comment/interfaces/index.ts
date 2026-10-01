@@ -1,5 +1,6 @@
 export type {
   ICommentCreator,
+  ICommentCreatorSummary,
   ICommentListItem,
   ListCommentsRequestQuery,
   ListCommentsResponseBody,

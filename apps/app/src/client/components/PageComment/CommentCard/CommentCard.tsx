@@ -5,6 +5,7 @@ import type { IUserSerializedSecurely } from '@growi/core/dist/models/serializer
 import { UserPicture } from '@growi/ui/dist/components';
 
 import { Username } from '~/components/User/Username';
+import type { ICommentCreatorSummary } from '~/features/comment/interfaces';
 
 import { FormattedDistanceDate } from '../../FormattedDistanceDate';
 
@@ -24,6 +25,7 @@ export type CommentCardProps = {
     | IUserHasId
     | Ref<IUser>
     | IUserSerializedSecurely<IUserHasId>
+    | ICommentCreatorSummary
     | null
     | undefined;
   /**

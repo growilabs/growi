@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { type CommentListRow, toCommentListItem } from './to-comment-list-item';
 
 const createdAt = new Date('2026-01-01T00:00:00.000Z');
 
 const creatorRow: NonNullable<CommentListRow['creator']> = {
+  _id: 'user-1',
   id: 'user-1',
+  __v: 0,
   v: 0,
   userId: null,
   image: null,
@@ -30,10 +32,14 @@ const creatorRow: NonNullable<CommentListRow['creator']> = {
   isInvitationEmailSended: false,
   createdAt,
   updatedAt: createdAt,
+  serializeSecurely: vi.fn(),
+  updateLastLoginAt: vi.fn(),
 };
 
 const baseRow: CommentListRow = {
+  _id: 'comment-1',
   id: 'comment-1',
+  __v: 0,
   v: 0,
   pageId: 'page-1',
   creatorId: 'user-1',

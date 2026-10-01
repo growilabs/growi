@@ -1,9 +1,24 @@
 import type { users } from '~/generated/prisma/client';
 
-/** A user row without credentials; `email` is present only when the user publishes it. */
+/**
+ * A user row without credentials; `email` is present only when the user
+ * publishes it. `_id` / `__v` are the aliases the prisma client extension
+ * adds to every row.
+ */
 export type ICommentCreator = Omit<users, 'password' | 'apiToken' | 'email'> & {
+  _id: string;
+  __v: number;
   email?: string | null;
 };
+
+/**
+ * The creator fields the comment UI reads. Both an `ICommentCreator` and a
+ * mongoose-era serialized user satisfy it.
+ */
+export type ICommentCreatorSummary = Pick<
+  ICommentCreator,
+  '_id' | 'username' | 'name' | 'imageUrlCached'
+>;
 
 export interface ICommentListItem {
   _id: string;

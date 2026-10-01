@@ -1,10 +1,13 @@
 import type { Prisma } from '~/generated/prisma/client';
+import type { PrismaClient } from '~/utils/prisma';
 
 import type { ICommentCreator, ICommentListItem } from '../../interfaces';
 
-export type CommentListRow = Prisma.commentsGetPayload<{
-  include: { creator: true };
-}>;
+export type CommentListRow = Prisma.Result<
+  PrismaClient['comments'],
+  { include: { creator: true } },
+  'findMany'
+>[number];
 
 // serializeUserSecurely() is typed for the mongoose-era IUser, which a Prisma
 // user row does not satisfy (nullable `name`); this applies the same omission.

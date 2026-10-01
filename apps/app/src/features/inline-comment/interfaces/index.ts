@@ -7,8 +7,7 @@
  * either changes.
  */
 
-import type { IUserHasId } from '@growi/core';
-import type { IUserSerializedSecurely } from '@growi/core/dist/models/serializers';
+import type { ICommentCreatorSummary } from '~/features/comment/interfaces';
 
 /**
  * The stored anchor of an inline comment: the exact quote as it was
@@ -41,7 +40,7 @@ export interface IInlineComment {
    * the user could not be resolved, or when produced by
    * `create()`/`setResolved()` (neither fetches the creator relation).
    */
-  creator: IUserSerializedSecurely<IUserHasId> | null;
+  creator: ICommentCreatorSummary | null;
   comment: string;
   /** The revision the anchor was computed against. Set once at creation and never rewritten. */
   anchorOriginRevisionId: string;
@@ -63,7 +62,7 @@ export interface InlineCommentReply {
   pageId: string;
   creatorId: string;
   /** Populated only by `listByPageId()`, mirroring `IInlineComment.creator` above. */
-  creator: IUserSerializedSecurely<IUserHasId> | null;
+  creator: ICommentCreatorSummary | null;
   comment: string;
   /** The origin inline comment this reply belongs to. */
   replyToId: string;
