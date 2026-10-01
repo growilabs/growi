@@ -85,8 +85,8 @@
   }
 
   :global(.inline-comment-quote) {
-    margin-block: 0.35rem 0;
     padding: 0.25rem 0.5rem;
+    margin-block: 0.35rem 0;
   }
 
   :global(.inline-comment-quote-clamped) {
@@ -101,8 +101,8 @@
 .inline-comment-collapsed-peek {
   max-height: 3rem;
   overflow: hidden;
-  mask-image: linear-gradient(to bottom, #000 45%, transparent);
-  -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, black 45%, transparent);
+  mask-image: linear-gradient(to bottom, black 45%, transparent);
 }
 
 // Bootstrap has no min-width utility for a rem size; keep only that here
