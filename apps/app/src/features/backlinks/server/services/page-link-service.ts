@@ -80,9 +80,7 @@ export class PageLinkService {
     const ids = pages.map((page) => page._id).filter((id) => id != null);
     this.upsertQueue.abandon(ids.map((id) => id.toString()));
 
-    handlePagesDelete(ids).catch((err) => {
-      logger.error({ err, pageIds: ids }, 'backlinks delete reconcile failed');
-    });
+    handlePagesDelete(ids);
   }
 
   findBacklinks(
