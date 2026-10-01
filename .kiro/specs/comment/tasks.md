@@ -104,7 +104,7 @@
   - _Boundary: recount migration_
 
 - [ ] 4. Core: 画面の取得の切り替え
-- [ ] 4.1 (P) 画面の一覧取得を共有するフックを作る
+- [x] 4.1 (P) 画面の一覧取得を共有するフックを作る
   - ページの ID が無いときは取得しない。あるときは、キー `['/comments', ページ, 共有リンク]` で、新 API から一覧を取得する
   - 共有リンクの ID は前後の空白を除き、空なら無いものとして扱う。ページの識別子は `pageId` だけを送る(`page_id` は送らない)
   - 先に、取得の引数と、共有リンクの有無によるキーと引数の違いを確かめるテストを書く
@@ -208,3 +208,4 @@
 - 1.1: 投稿者の安全化は `serializeUserSecurely` を使わず `toCreator` で自前実装(Prisma の行は `IUser` に合わない)。`isEmailPublished` が真なら `email`(null 含む)を残す、旧 API と同じ挙動。
 - 2.3: `certifySharedPage` は `shareLinkId` を `req.query || req.body` から読む(route の検証は query のみ)。照会は `relatedPageId` に検証済みの query の `pageId` を結び付けるため悪用はできない。2.4 で登録するときは `router.get` のみ(3.8 の読み取り専用)にする。
 - 2.4: 応答の各項目には Prisma の行由来の `v`(`__v`)も含まれるが、旧 API の出力を変えない方針(1.2)と揃えており、公開仕様には載せていない(`additionalProperties` は閉じていない)。
+- 4.1: `normalizeShareLinkId` は新フック内に非公開で複製してある。4.4 で `useSWRxPageComment` を切り替えるときに、`apps/app/src/stores/comment.tsx` の旧 `normalizeShareLinkId` / `buildCommentGetParams` が使われなくなったら削除する。
