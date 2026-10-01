@@ -79,7 +79,7 @@ export const CommentCard = (props: CommentCardProps): JSX.Element => {
   return (
     <div id={id} className={className}>
       <div className="page-comment-main bg-comment rounded mb-2">
-        <div className="d-flex align-items-center">
+        <div className="d-flex flex-wrap align-items-center">
           <UserPicture user={creator} size="md" className="me-2" />
           <div className="small fw-bold me-3">
             {/*
