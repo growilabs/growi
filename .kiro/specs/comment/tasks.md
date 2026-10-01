@@ -4,7 +4,7 @@
 > 対象は `apps/app` 配下。コマンドは `apps/app` で実行する。
 
 - [ ] 1. Foundation: 共有の型、整形、件数の集計
-- [ ] 1.1 コメント1件の応答の型と、行から応答への整形を作る
+- [x] 1.1 コメント1件の応答の型と、行から応答への整形を作る
   - 応答の型は、旧 API の項目(別名の `page` / `revision` / `replyTo`、安全化した `creator`、`commentPosition` など)の上位集合に、インライン用の項目(`isInline`、引用文字列、前後の文脈、おおよその位置、アンカー起点の版、解決の状態)を足したものにする。型は単独で定義し、`as` で食い違いを隠さない
   - リクエストのクエリ(ページ、版、共有リンク)と、応答の本体(`comments` の配列)の型も同じ場所に置く
   - 整形は、行を受け取って応答の1件を返す純粋関数にする。投稿者があれば安全化(メールなどを除く)し、なければ投稿者の ID を入れる
@@ -201,3 +201,8 @@
   - 完了の状態: `share-link-comments` の本文が、新 API と新しいキーを前提にした記述になっている
   - _Requirements: 3.3_
   - _Depends: 6.2_
+
+## Implementation Notes
+
+- 1.1: `ICommentCreator`(整形後の投稿者の型)には実行時にある `_id` / `__v` が無く、`name` が null を許す。`Ref<IUser>`(`_id` 必須)や `IInlineComment.creator` にはそのまま代入できないため、4.3 / 4.4 / 4.5 で投稿者の型も合わせて広げる。`_id` を `as` なしで載せるには `CommentListRow` を拡張済み prisma クライアントの結果型から作る方法がある。
+- 1.1: 投稿者の安全化は `serializeUserSecurely` を使わず `toCreator` で自前実装(Prisma の行は `IUser` に合わない)。`isEmailPublished` が真なら `email`(null 含む)を残す、旧 API と同じ挙動。
