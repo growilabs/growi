@@ -38,6 +38,13 @@ $codemirror-default-height: 300px;
     backdrop-filter: blur(10px);
     border: 1px solid bs.$gray-200;
   }
+
+  // Date link (`CommentCard`) and history icon (`CommentRevisionLink`) —
+  // both carry `.page-comment-revision`. Kept here so normal and inline
+  // comment modules extend the same value (see research.md on CommentCard).
+  %page-comment-revision {
+    color: bs.$gray-500;
+  }
 }
 
 // // Dark mode color
@@ -46,5 +53,9 @@ $codemirror-default-height: 300px;
     background-color: rgba( bs.$gray-800, 0.3 );
     backdrop-filter: blur(10px);
     border: 1px solid bs.$gray-700;
+  }
+
+  %page-comment-revision {
+    color: bs.$gray-600;
   }
 }

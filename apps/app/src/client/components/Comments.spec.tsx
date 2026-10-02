@@ -131,8 +131,8 @@ describe('Comments.tsx', () => {
     renderComments();
     await screen.findByTestId('page-comment');
 
-    expect(pageCommentPropsCalls).toHaveLength(1);
-    expect(pageCommentPropsCalls[0].inlineComments).toBeUndefined();
+    // The list-menu slot's callback ref triggers a second render once it mounts.
+    expect(pageCommentPropsCalls.at(-1)?.inlineComments).toBeUndefined();
   });
 
   it('forwards a supplied inlineComments object to PageComment unchanged', async () => {
@@ -150,8 +150,8 @@ describe('Comments.tsx', () => {
     renderComments(false, inlineComments);
     await screen.findByTestId('page-comment');
 
-    expect(pageCommentPropsCalls).toHaveLength(1);
-    expect(pageCommentPropsCalls[0].inlineComments).toBe(inlineComments);
+    // The list-menu slot's callback ref triggers a second render once it mounts.
+    expect(pageCommentPropsCalls.at(-1)?.inlineComments).toBe(inlineComments);
   });
 
   it('forwards scrollToRange within the inlineComments bundle to PageComment unchanged (task 4.2, Requirement 3.1)', async () => {
@@ -170,8 +170,8 @@ describe('Comments.tsx', () => {
     renderComments(false, inlineComments);
     await screen.findByTestId('page-comment');
 
-    expect(pageCommentPropsCalls).toHaveLength(1);
-    const forwarded = pageCommentPropsCalls[0].inlineComments as
+    // The list-menu slot's callback ref triggers a second render once it mounts.
+    const forwarded = pageCommentPropsCalls.at(-1)?.inlineComments as
       | typeof inlineComments
       | undefined;
     expect(forwarded?.scrollToRange).toBe(scrollToRange);

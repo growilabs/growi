@@ -28,12 +28,15 @@
 - 解決/未解決を管理できる（4.1–4.5）
 - 共有リンク画面にインラインコメントのUIを出さない（6.2）
 - 起点コメント・返信の投稿者本人が、通常コメントと同じ権限モデルで編集・削除できる。解決済みのインラインコメントは本文中から見えなくなる（一覧には残る）（18.1–18.9, 2.7–2.8, 15.5, 15.12）
+- 作成の起点と入力フォームを、選択範囲の上側・カーソルがある側の端に出す。フォームは上方向に伸び、幅は内容と画面幅に合わせる（19.1–19.7, 23.1–23.5）
+- 画面最下部の一覧で、解決済みのインラインコメントを既定で折りたたみ、1件ずつ、または一覧右端のメニューからまとめて展開できる（20.1–22.7）
 
 ### Non-Goals
 - エディタ（Yjs共同編集セッション）内でのインラインコメント作成・表示
 - 共有リンク画面でのインラインコメントの表示・作成
 - コメントの取得（一覧）とページのコメント件数の数え方（`comment` スペックが持つ）
 - @メンション機能自体の変更
+- 一覧での折りたたみ・展開の状態の保存（サーバー・ブラウザとも保存しない。ページを開き直すと既定に戻る）
 
 ## Boundary Commitments
 
@@ -43,6 +46,7 @@
 - クライアント側のテキスト選択キャプチャ、アンカー計算（quote/prefix/suffix/おおよそのオフセット）、表示時の再アンカー（完全一致→あいまい一致→ハイライトなし）、ハイライト描画
 - 解決/未解決状態とその操作者・日時の記録（起点コメントのみが状態を持つ）
 - 通常コメントとの共通部品（`apps/app/src/client/components/PageComment/DeleteConfirmAlert.tsx`／`CommentEditDeleteButtons.tsx`／`CommentRevisionLink.tsx`）の新設と、それに伴う `Comment.tsx`／`CommentControl.tsx`／`Comment.module.scss`／`ReplyComments.tsx`／`PageComment.tsx` の見た目・マークアップの変更（削除確認方式のモーダルからインライン警告帯への変更、編集・削除アイコンの共通化、`.page-comment-control` の配置をヘッダー行の`ms-auto`flowへ）
+- 画面最下部の一覧での、解決済みインラインコメントの折りたたみ状態（画面上だけの状態で保存しない）とその表示の切り替え、および一覧右端のメニュー（`PageComment.tsx` への組み込みを含む）。通常コメント（`Comment`）の表示は折りたたみの対象にしない
 
 ### Out of Boundary
 - 既存コメント（`isInline` が `true` でない行）の投稿・編集・削除・通知に関する**機能・データフロー**の変更 — 既存の呼び出し元から見た振る舞い・API契約は変わらない（見た目・マークアップの共通化は上記This Spec Ownsの対象）
@@ -83,6 +87,10 @@
 - `removeWithReplies` の挙動（例えば `isInline` によるフィルタが追加される等）が変わった場合、起点コメント削除時の返信道連れ削除が引き続き機能するか再確認する必要がある
 - `IInlineComment`／`InlineCommentReply` の形（フィールドの追加・削除）が変わった場合、更新用DTOとサービス側の行形状チェック（起点／返信の判別）を再確認する必要がある
 - `packages/editor` の `useCodeMirrorEditorIsolated`（共有atomのライフサイクル）が変わる場合、`MentionAwareCommentInput` の一度きりの`initialValue`適用（マウント時1回だけ`initDoc`）が引き続き成立するか再確認する必要がある。前提にしている2つの性質（初期化が終わっていないエディタをatomに入れない／エディタを持つ側のアンマウント時にatomを空に戻す）は`packages/editor`側の一般的な振る舞いであり、他の`CodeMirrorEditorComment`利用箇所（通常コメントの返信・編集）も同じ振る舞いの上で動いている
+- `InlineCommentItem` は折りたたみの状態を自分で持たず、`collapsed`／`onExpand`／`onCollapse` を親から受け取る。`InlineCommentItem` を使う呼び出し元（現在は `PageComment` のみ）が増えたときは、その呼び出し元でも `use-resolved-collapse` を通して状態を渡しているか再確認する
+- 「解決済みは既定で折りたたむ」という表示規則があるため、一覧で解決済みコメントの本文・返信が見えている前提の機能（一覧からハイライトへのスクロール、E2E）を足すときは、折りたたみ中でも成り立つか再確認する。折りたたみ中も引用文は押せてスクロールできる
+- `SelectionPopover` は `cursorEdge` を渡すと選択範囲の上側・その端に、渡さないと選択範囲全体の下側・中央に配置する。`SelectionPopover` の呼び出し元を足すときは、どちらの配置にするかを決める
+- `PageComment` の途中で描画を終える分岐（コメント0件などの早期 return）を動かすときは、`useResolvedCollapse` の呼び出しがその分岐より前に残っているか確認する（Rules of Hooks）
 
 ## Architecture
 
@@ -156,6 +164,40 @@
 
 起点コメント・返信の編集・削除は、通常コメント（`comments.update`／`comments.remove`）とまったく同じ権限モデルに従う：可否は最終的にサーバー側が判定し、判定基準は「投稿者本人であること（`creatorId` 比較）」と「リードオンリー利用者の制限」の2つだけである。クライアント側の表示切り替え（`NotAvailableIfReadOnlyUserNotAllowedToComment` によるガード、`creatorId === currentUser?._id` による編集・削除ボタンの表示可否）は利便性のためのものであり、認可の境界そのものはサーバー側の `InlineCommentService` とそのルートの内側だけで完結させる。投稿者本人チェックは意図的に2回行う——ルート側（`findUnique` で `creatorId` を取得するのと同じタイミングで確認する）と、サービス側内部（`setResolved()` が行の形（起点か返信か）を確かめ直すのと同じ、多層防御としての再検証）。`creatorId`（持ち主）の不一致に限っては、両者は必ず一致する。コメントの更新処理（通常コメントの `comments.update`、インラインコメントの起点・返信の更新）はどれも `comment` 本文などだけを書き、`creatorId` を書き換えないので、食い違えばそれはレースではなくバグである。ルートの確認を通ったあとにサービスが失敗する他の場合（その間に行が削除された、など）はレースでありうるもので、`*-failed` のコードの400として返る。起点コメントの削除は `prisma.comments.removeWithReplies(id)`（通常コメントの削除がすでに使っているカスケード削除）をそのまま流用し、返信も道連れに削除する。返信の削除は単純な単一行削除で、道連れ削除は不要である。編集で変わるのは `comment` 本文フィールドだけであり、アンカー関連フィールド（`quote`/`prefix`/`suffix`/`approxOffset`/`anchorOriginRevisionId`）・`resolvedAt`／`resolvedById` はいずれの操作でも変更されない——対象範囲（アンカー）自体の再選択・変更は提供しない。
 
+### 作成の起点と入力フォームは、選択範囲の上側・カーソル側の端に置く
+
+作成の起点（`SelectionActionButton`）と入力フォーム（`InlineCommentForm`）は、どちらも `SelectionPopover` に `cursorEdge` を渡して配置する（Requirement 19）。
+
+- **カーソルがある側の端**は、`Selection` の anchor と focus の前後関係から求める（`cursorEdgeOf`）。`Range` は常に始点が終点より前にあり、選択した方向を持たないため。左から右（上から下）へ選択したら終わり側（`end`）、右から左（下から上）へ選択したら始まり側（`start`）になる。`SelectionCapture` は、作成の起点を選んで入力フォームへ切り替えるときも同じ `cursorEdge` を引き継ぐ（Requirement 19.5）
+- **基準にする矩形**は、その端の x 座標にある幅0の矩形で、高さは選択範囲全体と同じ（`rangeToEdgeVirtualElement`）。端の位置は、端に縮めた `Range` のキャレットの矩形から取る。ただしその矩形が選択範囲の縦の範囲から外れているとき（選択が次の段落の先頭で終わっていると、キャレットが1行下に来る）は、選択範囲の一番外側の行の矩形の端を使う
+- **配置**は Popper の `top` で、基準の矩形の上に、端の x 座標を中心として置く。上に余白がなければ Popper 標準の `flip` が下側へ切り替える（Requirement 19.4・19.7）。`use-popper-position` はポップオーバー要素のサイズ変化を `ResizeObserver` で拾って位置を計算し直すので、入力フォームの行数が増えても下端が選択範囲の上に固定されたまま上へ伸びる（Requirement 19.6）
+- **入力フォームの幅**は `max-content`（内容に合わせる）を、最小幅 `min(24rem, calc(100vw - 2rem))`・最大幅 `min(40rem, calc(100vw - 2rem))` で挟む（Requirement 23.1–23.4）。どちらも画面幅から左右の余白を引いた値で頭打ちにするのは、Popper の `preventOverflow` は箱をずらすだけで縮めないため。幅が変わったときの位置の再計算は、上の `ResizeObserver` がそのまま受け持つ（Requirement 23.5）
+- `cursorEdge` を渡さない場合、`SelectionPopover` は選択範囲全体の矩形の下側・中央に置く（`bottom`）。`SelectionCapture` は作成の起点・入力フォームのどちらの段階でも `cursorEdge` を渡す
+
+### 解決済みインラインコメントは、一覧で既定で折りたたむ
+
+画面最下部の一覧では、解決済みのインラインコメントを既定で折りたたみ、1件ずつ、または一覧右端の三点メニューからまとめて展開できる（Requirement 20〜22）。折りたたみは画面の上だけの状態で、API・DB・共有の型は変わらない。
+
+- **状態は `PageComment` が持つ。** 一括展開は全件に同時に効くため、各行が自分で状態を持つと親から操作できない。`PageComment` が `use-resolved-collapse` を呼び、その結果を各 `InlineCommentItem` に `collapsed`／`onExpand`／`onCollapse` として渡す。`InlineCommentItem` 自身は状態を持たない
+- **状態は「展開済みのコメント id の集合」**（`ReadonlySet<string>`。更新のたびに新しい集合を作って差し替える）とし、折りたたみ中かどうかは「解決済み かつ 集合にない」で導く（`isCollapsed`。hook と同じファイルで export する純粋関数）。未解決のコメントは集合の中身に関係なく常に展開して見えるので、未解決に戻したときの展開（Requirement 20.4）に追加の処理は要らない。集合は React の state だけにあり、保存しない（Requirement 20.5）
+- **解決／未解決の切り替えが成功するたびに、そのコメントの展開済みの記録を消す。** `use-resolved-collapse` は渡された `resolve` を包んで返し、成功したら（どちら向きの切り替えでも）集合からその id を消す。失敗したときは消さない。渡される `resolve` はデータの再取得を待ってから返るので、記録を消す時点では新しいデータが届いている。これで、展開して未解決に戻したコメントを再び解決済みにすると、折りたたみに戻る
+- **折りたたみ中の表示は別の部品（`CollapsedInlineCommentItem`）にする。** 出すのは投稿者・投稿日時・解決済みの札・引用文・本文の覗き見（展開時と同じ `RevisionRenderer` で markdown を描き、`max-height` で高さ切り＋下端フェード）・展開ボタンだけで、返信の一覧・返信フォーム・編集／削除・解決の切り替え・履歴リンクは出さない（Requirement 20.2）。折りたたみ中はコンパクトな行（余白を詰め、引用文は1行で省略）にし、展開／折りたたみ操作はラベルではなく Material Symbols の `expand_more`／`expand_less`（`aria-label` に翻訳キー）とする。引用文の省略（`-webkit-line-clamp`）は余白付きの `blockquote` の内側の要素（`.inline-comment-quote-clamped`）に掛ける——余白のある `blockquote` 自体に掛けると、余白の部分に次の行の上端がのぞくため。このクラスは `.inline-comment-quote` と同じく CSS モジュールの `:global` の中にあるので、素の文字列で参照する。折りたたみ中も引用文は押せて、本文中の該当箇所へスクロールする（Requirement 16.1。アンカー解決は解決済みも含む全件に対して行っているため）
+- **`InlineCommentItem` は、hook を呼び終えた直後に、`collapsed` なら `CollapsedInlineCommentItem` を返す分岐を1回だけ置く。** 分岐がフックの後にあるため、折りたたみ中も `InlineCommentItem` は画面から外れず（アンマウントされず）、編集中・削除の確認中といった自分の state を持ち続ける。そのため、削除の確認（`isDeleteConfirmOpen`）を開いている間は、解決／未解決の切り替えボタンと折りたたむボタンを出さない。解決すると折りたたまれ、残った削除の確認が次に展開したときに再び現れてしまうため
+- **展開中の解決済みコメント**は、未解決と同じ内容・操作をそのまま出し（Requirement 21.4）、見出し行の札の左隣に折りたたむボタンを置く。折りたたみ中の展開ボタンも同じ位置に置く（Requirement 21.3）。未解決のコメントにはどちらのボタンも出さない
+- **引用文と札は小さな共有部品（`InlineCommentQuote`・`InlineCommentStatusBadge`）にして、展開中と折りたたみ中の2つの表示から使う。** 2つの表示で見た目が食い違わないようにするため。共有するのは一覧の2つの表示の間だけで、本文中のポップオーバーは自分のマークアップを持つ
+- **一覧右端のメニュー（`InlineCommentListMenu`）は、項目の配列を受け取って描くだけで、個々の項目の中身を知らない**（Requirement 22.6）。項目（`InlineCommentListMenuItem`。名前の翻訳キー・無効かどうか・選んだときの処理）の配列は、処理を持つ `use-resolved-collapse` が組み立てて返す（`listMenuItems`）。現状は「全ての解決済みのコメントを展開する」の1項目で、解決済みが1件もないときは無効にする（Requirement 22.3–22.5）。項目を足すときはこの配列に要素を足すだけで、メニュー部品と `PageComment` は変わらない
+- **メニューは、インラインコメントが1件以上あるときだけ、見出し「Comments」と同じ行の右端に置く。** `Comments.tsx` が見出し行にスロットを用意し、`PageComment` が `createPortal` でメニューを差し込む（Requirement 22.1）。見出しを持たない呼び出し元（単体テスト・検索結果プレビュー）では、一覧の先頭に右寄せの1行として置く。三点ボタンは reactstrap の `Dropdown` を `MentionPickerButton` と同じく `color="link"` で使い（テーマに追従させるため）、メニューは右端に合わせて開く（`end`）。このメニューは表示の状態を変えるだけでデータに触れないため、`NotAvailableIfReadOnlyUserNotAllowedToComment` などの権限判定で包まない（Requirement 22.7）。折りたたみ中の展開ボタン・展開中の折りたたむボタンも同じ理由で包まない
+- `PageComment` は `useResolvedCollapse` を、途中で描画を終える分岐（コメント0件などの早期 return）より前で常に呼ぶ。インラインコメントを渡されない呼び出し元（共有リンク画面）でも、モジュールに置いた固定の空配列と何もしない `resolve` を渡すので、描画のたびに引数が変わらない
+
+### 狭い画面では起点コメントの操作を三点メニューにまとめる
+
+タッチ端末ではホバー開示が使えず、編集／削除／解決／履歴を横並びにするとヘッダーが折り返す（Requirement 24）。
+
+- **分岐は `useDeviceLargerThanMd`（本文ヒット判定と同じ `md`）。** `md` 以上は従来どおり（履歴は日付の直後、編集／削除／解決はホバー開示、折りたたみと札は常時）。`md` 未満は編集・削除・解決／未解決・履歴を三点メニューにまとめ、折りたたみと札だけをメニューの外に常時出す
+- **メニュー部品は一覧右端と同じ `InlineCommentListMenu`。** `ariaLabelKey` だけ起点用（`inline_comment.item_menu`）に差し替える。項目配列は `InlineCommentItem` が組み立てる（本人以外は編集・削除を載せない、リードオンリー制限時は解決を `disabled`、履歴は `router.push` で `CommentRevisionLink` と同じ URL へ）
+- **削除確認中はメニューごと出さない**（広い画面で解決／折りたたみを隠すのと同じ理由）
+- 返信行・本文ポップオーバーはこの Requirement の対象外（起点コメントの一覧ヘッダーのみ）
+
 ### Architecture Pattern & Boundary Map
 
 ```mermaid
@@ -173,6 +215,10 @@ graph TB
         MentionAwareInput[MentionAwareCommentInput]
         FetchMentionUsers[fetchMentionUsers]
         InlineCommentItem[InlineCommentItem]
+        CollapsedInlineCommentItem[CollapsedInlineCommentItem]
+        PageComment[PageComment]
+        ResolvedCollapse[use-resolved-collapse]
+        InlineCommentListMenu[InlineCommentListMenu]
         InlineCommentStore[inline-comment SWR store]
         GroupInline[comment spec groupInlineComments]
         SharedCommentList[comment spec useSWRxCommentList]
@@ -211,6 +257,12 @@ graph TB
     AnchorResolver --> QuoteMatcher
     AnchorResolver --> HighlightOverlay
     AnchorResolver --> InlineCommentItem
+
+    PageComment --> ResolvedCollapse
+    PageComment --> InlineCommentListMenu
+    PageComment --> InlineCommentItem
+    ResolvedCollapse -->|listMenuItems| InlineCommentListMenu
+    InlineCommentItem -->|collapsed| CollapsedInlineCommentItem
 ```
 
 **Architecture Integration**:
@@ -227,7 +279,7 @@ graph TB
 
 `apps/app/src/features/inline-comment/` を新設し、既存の `revision-diff` フィーチャーモジュールと同じ構成規約（`interfaces/` + `server/{routes,service}/` + `client/{components,services,stores}/`）に従う。永続化・認可・通知連携（サーバー側）とアンカー計算アルゴリズム（クライアント側）を同一フィーチャー内の層で分離する、というドメイン境界の判断はArchitecture節の通り。ファイル単位の内訳は現在のディレクトリ構成を参照。
 
-既存ファイルへの変更は、通常コメント（`apps/app/src/client/components/PageComment/`）との見た目・部品共有（`CommentCard`／`DeleteConfirmAlert`／`CommentEditDeleteButtons`／`CommentRevisionLink`。理由は research.md の「`CommentCard`は自分のCSSモジュールを持たない」および「見た目の刷新」参照）、本文レンダリング側への最小限の変更（`RevisionRenderer.tsx`へのref転送、`Header.tsx`等3ファイルへの`aria-hidden="true"`付与。理由はArchitecture節「本文テキストの抽出範囲」参照）、データモデル変更（`comment.ts`／`schema.prisma`。理由はData Models節参照）に集約される。個別ファイルの変更内容はコードの差分そのものから読み取れるため、ここには列挙しない。
+既存ファイルへの変更は、通常コメント（`apps/app/src/client/components/PageComment/`）との見た目・部品共有（`CommentCard`／`DeleteConfirmAlert`／`CommentEditDeleteButtons`／`CommentRevisionLink`。理由は research.md の「`CommentCard`は自分のCSSモジュールを持たない」および「見た目の刷新」参照）、本文レンダリング側への最小限の変更（`RevisionRenderer.tsx`へのref転送、`Header.tsx`等3ファイルへの`aria-hidden="true"`付与。理由はArchitecture節「本文テキストの抽出範囲」参照）、データモデル変更（`comment.ts`／`schema.prisma`。理由はData Models節参照）、一覧への折りたたみ状態と一覧メニューの組み込み（`PageComment.tsx`、見出し行にメニューの置き場所を用意する`Comments.tsx`。理由はArchitecture節「解決済みインラインコメントは、一覧で既定で折りたたむ」参照）に集約される。個別ファイルの変更内容はコードの差分そのものから読み取れるため、ここには列挙しない。
 
 非自明な1件のみ記録する: `apps/app/turbo.json` の `test:components` タスクの `dependsOn` に `dev:pre:styles-commons`／`dev:pre:styles-components` を追加している。ベンダースタイルの事前生成が揃わないまま `test:components` が走ると失敗するためである。
 
@@ -235,7 +287,7 @@ graph TB
 
 ### 作成フロー（起点コメント）
 
-選択してから送信するまでは二段階になっている：選択直後は`SelectionActionButton`（軽量な作成の起点）だけが選択範囲近傍に表示され、これを選んで初めて`InlineCommentForm`へ展開する。両方の表示位置は`SelectionPopover`が担う。
+選択してから送信するまでは二段階になっている：選択直後は`SelectionActionButton`（軽量な作成の起点）だけが選択範囲の上側・カーソル側の端に表示され、これを選んで初めて`InlineCommentForm`へ展開する。両方の表示位置は`SelectionPopover`が担い、どちらの段階でも同じ`cursorEdge`（選択したときにカーソルがあった側の端）を基準にする（配置と幅の決め方はArchitecture節「作成の起点と入力フォームは、選択範囲の上側・カーソル側の端に置く」を参照）。
 
 ```mermaid
 sequenceDiagram
@@ -251,13 +303,14 @@ sequenceDiagram
     participant DB as comments (isInline true)
 
     User->>SelectionCapture: 本文中のテキストを選択
-    SelectionCapture->>SelectionPopover: selecting段階。range=選択中のRange、子にSelectionActionButton
-    SelectionPopover->>SelectionActionButton: 選択範囲近傍に配置して表示
+    SelectionCapture->>SelectionCapture: Selectionのanchor/focusからcursorEdgeを求める
+    SelectionCapture->>SelectionPopover: selecting段階。range=選択中のRange、cursorEdge、子にSelectionActionButton
+    SelectionPopover->>SelectionActionButton: 選択範囲の上側・cursorEdgeの端に配置して表示（上に余白がなければ下側）
     User->>SelectionActionButton: 作成の起点を選ぶ
     SelectionActionButton->>SelectionCapture: onCommit()
     SelectionCapture->>SelectionCapture: range.cloneRange()をcommittedRangeとして保持
-    SelectionCapture->>SelectionPopover: composing段階。range=committedRange、子にInlineCommentForm（SelectionCaptureがanchorを渡す）
-    SelectionPopover->>InlineCommentForm: 選択範囲近傍に配置して表示
+    SelectionCapture->>SelectionPopover: composing段階。range=committedRange、同じcursorEdge、子にInlineCommentForm（SelectionCaptureがcommittedAnchor（quote/prefix/suffix/approxOffset）を渡す）
+    SelectionPopover->>InlineCommentForm: 同じ基準で配置して表示。行数が増えたら下端を固定して上へ伸ばす
     User->>InlineCommentForm: コメント本文を入力し送信
     InlineCommentForm->>Store: create({ pageId, anchorOriginRevisionId, comment, anchor })
     Store->>Route: POST /inline-comments
@@ -357,6 +410,21 @@ sequenceDiagram
     end
 ```
 
+### 一覧での解決済みコメントの折りたたみ
+
+```mermaid
+stateDiagram-v2
+  [*] --> Collapsed: 解決済みで一覧を表示
+  Collapsed --> Expanded: 個別展開 / 一括展開
+  Expanded --> Collapsed: 折りたたむ操作
+  Expanded --> Unresolved: 自分で「未解決に戻す」（展開済みの記録を消す）
+  Collapsed --> Unresolved: 他の利用者が未解決に戻した（再取得で反映）
+  Unresolved --> Collapsed: 解決済みにした
+```
+
+- 解決済みにした直後は折りたたまれる。自分の操作で解決／未解決を切り替えると、成功するたびにそのコメントの展開済みの記録が消えるので、未解決に戻したあとで再び解決済みにしても、展開されたままにはならない
+- 展開済みの集合は `PageComment` の中の state なので、ページを開き直すと空に戻り、解決済みはすべて折りたたまれる（Requirement 20.5）
+
 ### 更新・削除フロー上の決定事項
 
 更新・削除の実際の呼び出し順（route → findUnique → service → prisma → mutate）はルートファイル・サービスファイル自体から読み取れるため、シーケンス図としては持たない。ここにはコードだけからは読み取れない決定だけを残す：
@@ -374,19 +442,23 @@ sequenceDiagram
 | AnchorResolver (`useAnchorResolver`) | Client / ロジック | 静定シグナル、またはanchors内容の変化（描画中でないことを確認したうえで）のたびに全起点アンカーを再計算しResolvedRangeを供給 | 2.1-2.4, 5.1-5.3 | rendered-text(P0), quote-matcher(P0), use-container-settle(P0) | State |
 | use-container-settle | Client / ロジック | レンダリング状態属性プロトコルでコンテナを監視し、描画中の要素が残っていないことを確認するたびに静定シグナルを出す。判定自体（`hasRenderingElements`）も公開する | 2.1-2.4, 5.1-5.3 | `GROWI_IS_CONTENT_RENDERING_ATTR`(P0) | State |
 | use-text-selection | Client / ロジック | Selectionからアンカー候補（quote/prefix/suffix/offset）を構築。本文テキストと位置は`renderedTextOf`を通して求める | 1.1-1.4, 1.7 | rendered-text(P0), `Intl.Segmenter`(P1) | State |
-| SelectionCapture | Client / State | 選択監視から入力フォームのクローズまでの状態機械（`idle`/`selecting`/`composing`の3段階）を管理する | 1.1-1.2, 1.7, 7.1-7.4, 8.1, 8.3-8.4, 10.2 | use-text-selection(P0), SelectionPopover(P0), SelectionActionButton(P0), InlineCommentForm(P0) | State |
+| SelectionCapture | Client / State | 選択監視から入力フォームのクローズまでの状態機械（`idle`/`selecting`/`composing`の3段階）を管理する。選択方向から求めた`cursorEdge`（`cursorEdgeOf`）を両方の段階で`SelectionPopover`に渡す | 1.1-1.2, 1.7, 7.1-7.4, 8.1, 8.3-8.4, 10.2, 19.2-19.3, 19.5 | use-text-selection(P0), SelectionPopover(P0), SelectionActionButton(P0), InlineCommentForm(P0) | State |
 | SelectionActionButton | Client / UI | 選択直後に現れる軽量な作成の起点（提示専用、`onCommit`のみを受け取る） | 7.1, 8.1 | SelectionCapture(P0) | — |
-| SelectionPopover | Client / UI | 与えられた`Range`の近傍へ`children`を浮動配置する汎用コンポーネント。`@popperjs/core`の仮想要素パターンで位置計算し、ゼロ矩形時は直前の有効な位置を保持するフォールバックを持つ | 7.3, 10.1 | `@popperjs/core`(P0) | State |
-| InlineCommentForm | Client / UI | コメント入力・送信。エディタ組み立て・送信・エラー表示は`MentionAwareCommentInput`に委譲し、`MentionPickerButton`を組み込む | 1.1-1.2, 1.8, 3.1, 8.2, 8.4, 9.1, 9.3-9.4 | useSWRxInlineComments(P0), MentionAwareCommentInput(P0), MentionPickerButton(P1) | Service |
+| SelectionPopover | Client / UI | 与えられた`Range`の近傍へ`children`を浮動配置する汎用コンポーネント。`@popperjs/core`の仮想要素パターンで位置計算し、ゼロ矩形時は直前の有効な位置を保持するフォールバックを持つ。`cursorEdge`を渡すと、その端のx座標にある幅0の矩形（`rangeToEdgeVirtualElement`）を基準に`top`で配置し、上に余白がなければ`flip`で下側に置く。サイズ変化は`use-popper-position`の`ResizeObserver`で拾って配置し直す | 7.3, 10.1, 19.1-19.7, 23.5 | `@popperjs/core`(P0) | State |
+| InlineCommentForm | Client / UI | コメント入力・送信。エディタ組み立て・送信・エラー表示は`MentionAwareCommentInput`に委譲し、`MentionPickerButton`を組み込む。幅は`max-content`を最小24rem・最大40rem（どちらも画面幅から左右の余白を引いた値で頭打ち）で挟む | 1.1-1.2, 1.8, 3.1, 8.2, 8.4, 9.1, 9.3-9.4, 23.1-23.4 | useSWRxInlineComments(P0), MentionAwareCommentInput(P0), MentionPickerButton(P1) | Service |
 | MentionPickerButton | Client / UI | メンション相手をボタン操作で選び、選ばれたユーザー名を `onInsert` で呼び出し側に渡す（一覧内の絞り込み検索はしない）。エディタへの挿入（`codeMirrorEditor.insertText`）は、呼び出し側が `MentionAwareCommentInput` から受け取った `insertMention` が行う | 9.1-9.3 | fetchMentionUsers(P0), `onInsert` prop(P0) | Service |
 | fetchMentionUsers | Client / Service | `/users/`検索APIの呼び出し（`@`タイプ補完・メンションボタン一覧の双方から利用。`CommentEditor.tsx`側の同種実装とは共有しない） | 9.2 | `apiv3Get`(P0) | Service |
-| InlineCommentItem / InlineCommentReplies / InlineCommentHighlight | Client / UI | 一覧の起点コメント・返信ネスト表示（読み取り表示でのメンションハイライト含む）・保存済みハイライト描画（提示層）。`InlineCommentItem`のアンカー引用文クリックが`scrollToRange`を呼ぶ。投稿者本人限定の編集・削除操作（`CommentEditor`への切り替え、`DeleteConfirmAlert`による削除確認）とリビジョン履歴リンク（`CommentRevisionLink`）を持つ。ヘッダー行`headerEnd`の`ms-auto`グループは 編集/削除アイコン→解決トグル→状態バッジ（カードの角）の順で、編集/削除アイコンと解決トグルはホバーでのみ表示する | 1.8, 18.1-18.9, 2.5-2.6, 3.1, 4.4, 13.11, 14.1, 14.3-14.4, 16.1 | 上記ロジック層, resolved-range(P0), CommentEditor(P0), DeleteConfirmAlert(P0), CommentEditDeleteButtons(P0), CommentRevisionLink(P0), useCurrentUser(P0), NotAvailableIfReadOnlyUserNotAllowedToComment(P0) | State |
+| InlineCommentItem / InlineCommentReplies / InlineCommentHighlight | Client / UI | 一覧の起点コメント・返信ネスト表示（読み取り表示でのメンションハイライト含む）・保存済みハイライト描画（提示層）。`InlineCommentItem`のアンカー引用文クリックが`scrollToRange`を呼ぶ。投稿者本人限定の編集・削除操作（`CommentEditor`への切り替え、`DeleteConfirmAlert`による削除確認）とリビジョン履歴リンク（`CommentRevisionLink`）を持つ。ヘッダー行`headerEnd`は画面幅で切り替える：`md`以上は編集/削除アイコン→解決トグル→折りたたむボタン（展開中の解決済みのみ）→状態バッジ（カードの角）の順で、編集/削除と解決はホバーでのみ表示；`md`未満は編集・削除・解決・履歴を三点メニューにまとめ、折りたたみと札だけを常時出す（Requirement 24）。削除の確認を開いている間は解決トグル・折りたたむボタン・狭い画面のメニューを出さない。折りたたみの状態は持たず`collapsed`/`onExpand`/`onCollapse`を親から受け取り、フックを呼んだ直後に`collapsed`なら`CollapsedInlineCommentItem`を返す | 1.8, 18.1-18.9, 2.5-2.6, 3.1, 4.4, 13.11, 14.1, 14.3-14.4, 16.1, 20.3, 21.3-21.4, 24.1-24.5 | 上記ロジック層, resolved-range(P0), CommentEditor(P0), DeleteConfirmAlert(P0), CommentEditDeleteButtons(P0), CommentRevisionLink(P0), InlineCommentListMenu(P0), useDeviceLargerThanMd(P0), useCurrentUser(P0), NotAvailableIfReadOnlyUserNotAllowedToComment(P0) | State |
+| use-resolved-collapse (`useResolvedCollapse`, `isCollapsed`) | Client / State | 一覧の折りたたみ状態（展開済みのコメント id の集合）を持つ。折りたたみ中かの判定（解決済み かつ 集合にない）、1件の展開・折りたたみ、`resolve`の包み（成功したらそのidの記録を消す）、一覧メニューの項目の配列（`listMenuItems`）を返す。`PageComment`が呼ぶ | 20.1, 20.3-20.5, 21.2, 22.3-22.5 | React state(P0) | State |
+| CollapsedInlineCommentItem | Client / UI | 折りたたみ中の解決済みインラインコメントの表示。投稿者・投稿日時・札・引用文（1行で省略、押すとスクロール）・本文の覗き見（展開時と同じ `RevisionRenderer`。`max-height` で高さ切り＋下端フェード）・展開アイコン（`expand_more`）を出し、返信・各操作は出さない。カードはコンパクト余白 | 20.2, 21.1, 21.3 | CommentCard(P0), InlineCommentQuote(P0), InlineCommentStatusBadge(P0), RevisionRenderer(P0) | — |
+| InlineCommentQuote / InlineCommentStatusBadge | Client / UI | 引用文（押せるボタン。`clamped`で省略表示）と解決済み／未解決の札。`InlineCommentItem`と`CollapsedInlineCommentItem`の両方から使い、2つの表示の見た目を揃える | 20.2 | — | — |
+| InlineCommentListMenu | Client / UI | 三点ボタンとドロップダウン。項目の配列（`InlineCommentListMenuItem`）を受け取って描くだけで、個々の項目の中身を知らない。一覧右端（一括展開）と、狭い画面の起点コメント操作の両方から使う。`ariaLabelKey`でボタンのaccessible nameを差し替える（既定は一覧用）。権限判定では包まない | 22.1-22.2, 22.6-22.7, 24.1 | reactstrap `Dropdown`(P0) | — |
 | resolved-range (`rangeForResolved`, `rangesById`) | Client / ロジック | 解決済みオフセット（`ResolvedRange`）からDOM `Range`を再構築する共有ユーティリティ。`InlineCommentHighlight`・`InlineCommentBodyInteraction`・`PageView.scrollToRange`の3箇所から使われる | 14.2, 15.1-15.2, 15.6, 16.1 | rendered-text(P0) | State |
 | PendingSelectionHighlight | Client / UI | 作成中（選択中・入力中）の範囲を、保存済みとは別のテーマ対応トークン（半透明）で描画する | 14.1, 14.2, 14.3, 14.4 | `--grw-inline-comment-marker-bg-pending`(P0) | — |
 | use-highlight-hit-test (`useHighlightHitTest`) | Client / ロジック | document上のpointermove/clickの座標を、引数で受け取った各`Range`の`getClientRects()`と比較し、当たったコメントidと発生源（hover/click）を返す | 15.1, 15.2, 15.6 | `useDeviceLargerThanMd`(P0)。判定対象の`Range`は呼び出し側（`InlineCommentBodyInteraction`が`rangesById`で作る）から引数で受け取る | State |
-| InlineCommentBodyInteraction / InlineCommentPreviewPopover / InlineCommentPopoverEntry | Client / UI | 当たり判定結果に応じてポップオーバーの開閉・対象コメントを決定する（`InlineCommentBodyInteraction`）。クリックは即座にピン留めし、hoverは出現(150ms)・消失(250ms)双方に遅延を設けたうえで、ポインタがポップオーバー自体に到達した時点で同じピン留め状態へ昇格させる（以後は明示的な閉じる操作まで維持）。ポップオーバーは`CommentCard`を使わず独自のフラットなマークアップで描き、起点コメント・返信の1件ごとの表示は共通の`InlineCommentPopoverEntry`が受け持つ（違いは引用ブロックと解決トグル・閉じるボタンの有無のみ）。内容確認＋簡易返信欄に加え、起点コメント・返信双方の投稿者本人限定の編集・削除手段（起点の削除は返信も道連れに削除する）、解決する切り替えボタン（起点コメントのみ。一覧側`InlineCommentItem`と同じ判定・マークアップを個別に実装。ただし一覧側はホバーでのみ表示し、ポップオーバー側は常に表示する——解決トグルのUIは一覧とポップオーバーで共有コンポーネント化していない。状態バッジは持たない——未解決のコメントに対してしか開かれないため）、引用の帯を表示する。返信は投稿日時の古い順に並べ直して表示する。対象コメントが解決済み（または削除済み）になり`inlineComments`から消えた時点で`pinnedId`/`hoverPreviewId`をクリアしポップオーバーを閉じる | 15.1-15.17, 4.6, 2.7, 9.5 | use-highlight-hit-test(P0), resolved-range(P0), createReply(P0), resolve(P0), update(P0), updateReply(P0), remove(P0), removeReply(P0), MentionAwareCommentInput(P0) | Service, State |
+| InlineCommentBodyInteraction / InlineCommentPreviewPopover / InlineCommentPopoverEntry | Client / UI | 当たり判定結果に応じてポップオーバーの開閉・対象コメントを決定する（`InlineCommentBodyInteraction`）。クリックは即座にピン留めし、hoverは出現(150ms)・消失(250ms)双方に遅延を設けたうえで、ポインタがポップオーバー自体に到達した時点で同じピン留め状態へ昇格させる（以後は明示的な閉じる操作まで維持）。ポップオーバーは`CommentCard`を使わず独自のフラットなマークアップで描き、起点コメント・返信の1件ごとの表示は共通の`InlineCommentPopoverEntry`が受け持つ（違いは引用ブロックと解決トグル・閉じるボタンの有無のみ）。内容確認＋簡易返信欄に加え、起点コメント・返信双方の投稿者本人限定の編集・削除手段（起点の削除は返信も道連れに削除する）、解決する切り替えボタン（起点コメントのみ。一覧側`InlineCommentItem`と同じ判定・マークアップを個別に実装。ただし一覧側は広い画面ではホバーでのみ表示し（狭い画面では三点メニューに入る）、ポップオーバー側は常に表示する——解決トグルのUIは一覧とポップオーバーで共有コンポーネント化していない。状態バッジは持たない——未解決のコメントに対してしか開かれないため）、引用の帯を表示する。返信は投稿日時の古い順に並べ直して表示する。対象コメントが解決済み（または削除済み）になり`inlineComments`から消えた時点で`pinnedId`/`hoverPreviewId`をクリアしポップオーバーを閉じる | 15.1-15.17, 4.6, 2.7, 9.5 | use-highlight-hit-test(P0), resolved-range(P0), createReply(P0), resolve(P0), update(P0), updateReply(P0), remove(P0), removeReply(P0), MentionAwareCommentInput(P0) | Service, State |
 | MentionAwareCommentInput | Client / UI | メンション対応コメント入力の共有部品（CodeMirrorエディタ組み立て・メンション補完・送信・エラー表示）。永続化は持たず`onSubmit`で注入される。`InlineCommentForm`・`InlineCommentPopoverEntry`・`InlineCommentPreviewPopover`の3つから使われる。一覧側の返信・編集（`InlineCommentReplies`、`InlineCommentItem`）は`CommentEditor`を使い、この部品は使わない | 17.2, 17.5 | `CodeMirrorEditorComment`(P0), `createMentionCompletionExtension`(P0), fetchMentionUsers(P0) | Service |
-| CommentCard | Client / UI | コメント1件の箱（投稿者アイコン・名前・投稿日時・本文の入れ物）だけを持つ共有コンポーネント。自分のCSSモジュールを持たず、使う側のモジュールが`_comment-inheritance.scss`の`%bg-comment`／`%comment-section`／`%user-picture`を`@extend`する。通常コメント（`Comment.tsx`）と一覧側のインラインコメント（起点の`InlineCommentItem.tsx`、返信の`InlineCommentReplies.tsx`）の3つから使われ（ポップオーバーは使わない）、見出し行の右側（`headerEnd`）・本文前（`beforeBody`）・本文後（`footer`）を差し込みで受け取る | 13.3, 13.4, 13.9 | `UserPicture`(P0), `Username`(P0), `FormattedDistanceDate`(P0) | — |
+| CommentCard | Client / UI | コメント1件の箱（投稿者アイコン・名前・投稿日時・本文の入れ物）だけを持つ共有コンポーネント。自分のCSSモジュールを持たず、使う側のモジュールが`_comment-inheritance.scss`の`%bg-comment`／`%comment-section`／`%user-picture`を`@extend`する。通常コメント（`Comment.tsx`）と一覧側のインラインコメント（起点の`InlineCommentItem.tsx`、返信の`InlineCommentReplies.tsx`、折りたたみ中の`CollapsedInlineCommentItem.tsx`）の4つから使われ（ポップオーバーは使わない）、見出し行の右側（`headerEnd`）・本文前（`beforeBody`）・本文後（`footer`）を差し込みで受け取る。見出し行は幅が足りないとき折り返す（狭い画面で解決済みの札が箱からはみ出さないため。通常コメントにも効く） | 13.3, 13.4, 13.9 | `UserPicture`(P0), `Username`(P0), `FormattedDistanceDate`(P0) | — |
 | DeleteConfirmAlert（`PageComment/`） | Client / UI | 削除確認のインライン警告帯（モーダルは使わない）。通常コメント（`Comment.tsx`）・一覧側インラインコメント（起点の`InlineCommentItem`、返信の`InlineCommentReplies`）・ポップオーバー（`InlineCommentPopoverEntry`）の4つで共用する。呼び出し元ごとに`testIdPrefix`で`data-testid`を切り替える。ボタンの並びはCancel→Delete | 18.5, 18.8, 15.15, 15.16 | — | — |
 | CommentEditDeleteButtons（`PageComment/`） | Client / UI | 編集・削除アイコンボタンの組（32px四方、`opacity: 0.5`／ホバーで`0.75`）。通常コメント（`CommentControl.tsx`が薄くラップする）・一覧側インラインコメントで共用する。ホバーで出す仕組み（`visibility`切り替えのトリガーとなるラッパー）は各呼び出し元が持ち、この部品自体は持たない | 18.1, 18.5 | — | — |
 | CommentRevisionLink（`PageComment/`） | Client / UI | リビジョン履歴へのリンク。通常コメント・一覧側インラインコメントで共用する。投稿日時の直後、`ms-2`で配置する | 13.11 | — | — |
@@ -717,6 +789,8 @@ model comments {
 - 数式を含み、かつ同一文字列が複数回登場するページで、数式より後ろの重複文字列のうち、実際にコメントを付けた出現箇所にのみハイライトが表示されること（作成時と解決時の位置の数え方が一致していることの検証）
 - 見出し直後にコメントを作成し、**共同編集データの読み込みを人為的に遅らせた**状態でページを表示しても、読み込み完了後に正しい位置にハイライトが復元されること
 - ハイライト表示後、監視期間（マウント時点から10秒）の内側で、目印を持たない画面要素（見出しの編集ボタン等）が現れる・消える状況を作っても、ハイライトへのマウスオーバー・クリックで引き続きポップオーバーが開くこと（監視期間を過ぎてからの変化は静定シグナルが届かないため、このテストの対象外）
+- 一覧の解決済みコメントの折りたたみは、自動テストで確かめにくい見た目を手動で確認する：長い引用文を1行で省略したときに次の行がのぞかないこと、本文の覗き見が markdown として描かれ高さで切れて下端がフェードすること、狭い画面で三点メニューが見切れないこと、ダークテーマで三点ボタンが背景に溶けないこと
+- 旧式の `/_api/comments.get` が `isInline: true` の行を一切返さないこと（`comment` スペックの要件 5.2）は、通常文脈・共有リンク文脈の**両方**で検証する。`isSharedPage` の値にかかわらず同じ結果になることを両方のケースで確かめ、無条件の除外が効いていることをテストで固定する（`apps/app/src/server/routes/comment.integ.ts`）
 
 ## Security Considerations
 
@@ -732,7 +806,10 @@ model comments {
 - **送信ボタン（2rem四方）の寸法指定は箇所によって書き方が違う。** `InlineCommentForm.tsx`（起点コメント作成フォーム）はtsx内のインラインstyle、ポップオーバーの返信フォームはCSS Modulesの規則。いずれも他の場所と共有されていない単発の指定であるため、単一の情報源が割れているわけではなく、統一の優先度は低い
 - **二重送信のガードが無い。** `MentionAwareCommentInput` を使う4箇所（本文側の作成フォームと、ポップオーバーの起点編集・返信編集・返信フォーム）のいずれも、送信中の再クリックを防いでいない
 - **編集モードの入力欄（CodeMirror）はダークモードでも背景が白い。** インラインコメント固有ではなく、GROWIのコメント入力欄全体（通常のページコメントも同じ）の既存の挙動。文字は白地に濃い文字（コントラスト比約13）で読める
-- **削除に失敗した後、確認帯を開き直しても `deleteError` がリセットされない。** 削除の失敗時に `deleteError` を設定して確認帯を閉じ、確認帯を開く操作では `deleteError` を消さない。同じ作りが `Comment.tsx`・`InlineCommentItem.tsx`・`InlineCommentReplies.tsx`・`InlineCommentPopoverEntry.tsx` の4つにある
+- **削除に失敗した後、確認帯を開き直しても `deleteError` がリセットされない。** 削除の失敗時に `deleteError` を設定して確認帯を閉じ、確認帯を開く操作では `deleteError` を消さない。同じ作りが `Comment.tsx`・`InlineCommentItem.tsx`・`InlineCommentReplies.tsx`・`InlineCommentPopoverEntry.tsx` の4つにある（`CollapsedInlineCommentItem.tsx` は削除の操作を持たない）
+- **他の利用者による解決／未解決の切り替えでは、展開済みの記録は消えない。** 記録を消すのは自分の操作で包んだ `resolve` が成功したときだけで、他の利用者の切り替えは再取得されたときに「解決済み かつ 集合にない なら折りたたみ」の規則どおりに表示される。そのため、自分が展開していたコメントを他の利用者が未解決に戻し、さらに解決済みにした場合は、展開されたまま残る
+- **折りたたみ中は編集・削除・解決の切り替えができない。** 一度展開する必要がある（折りたたみの目的は一覧を短くすることで、操作を並べると高さも情報量も減らないため）
+- **展開済みの集合には、削除されたコメントの id が残ることがある。** 集合はページを開いている間だけの小さなもので、実害はない
 
 ## Supporting References
 
