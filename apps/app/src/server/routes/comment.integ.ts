@@ -677,6 +677,55 @@ describe('/comments.get share-link authorization (integration)', () => {
     });
   });
 
+  describe('POST /comments.remove — authorized creator', () => {
+    const creatorId = new ObjectId();
+    let removableCommentId: string;
+
+    beforeEach(async () => {
+      const seeded = await prisma.comments.add(
+        pageAId.toString(),
+        creatorId.toString(),
+        revAId.toString(),
+        'comment to remove',
+        -1,
+      );
+      removableCommentId = seeded.id;
+
+      currentUser = { _id: creatorId };
+      accessSpy.mockResolvedValue(true);
+    });
+
+    afterEach(async () => {
+      await prisma.comments.deleteMany({ where: { id: removableCommentId } });
+    });
+
+    it('responds with success and deletes the comment', async () => {
+      const res = await request(app)
+        .post('/comments.remove')
+        .send({ comment_id: removableCommentId });
+
+      expect(res.body.ok).toBe(true);
+      expect(
+        await prisma.comments.findUnique({ where: { id: removableCommentId } }),
+      ).toBeNull();
+    });
+
+    it('still responds with success when the comment count refresh fails', async () => {
+      vi.spyOn(Page, 'updateCommentCount').mockRejectedValue(
+        new Error('count refresh failed'),
+      );
+
+      const res = await request(app)
+        .post('/comments.remove')
+        .send({ comment_id: removableCommentId });
+
+      expect(res.body.ok).toBe(true);
+      expect(
+        await prisma.comments.findUnique({ where: { id: removableCommentId } }),
+      ).toBeNull();
+    });
+  });
+
   describe('GET /comments.get — creator output is the full sanitized user row (5.1, 5.4)', () => {
     const workerId = process.env.VITEST_WORKER_ID ?? '1';
     const pageCId = new ObjectId();

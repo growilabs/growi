@@ -623,7 +623,12 @@ export const setup = (crowi, _app) => {
       }
 
       await prisma.comments.removeWithReplies(comment.id);
-      await Page.updateCommentCount(comment.pageId);
+      // The comment is already deleted; a failed count refresh must not turn that into an error response.
+      try {
+        await Page.updateCommentCount(comment.pageId);
+      } catch (err) {
+        logger.error('Failed to update the comment count', err);
+      }
       commentEvent.emit(CommentEvent.DELETE, comment);
     } catch (err) {
       return res.json(ApiResponse.error(err));
