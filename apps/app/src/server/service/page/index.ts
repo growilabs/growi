@@ -725,36 +725,80 @@ class PageService implements IPageService {
     }
 
     // 1. Take target off from tree
+    // No session makes this atomic with steps 2-3: if they throw, the catch below
+    // must reattach the page or it is stranded off the tree.
+    // See https://github.com/growilabs/growi/issues/9755
+    const exParentId = page.parent;
     await Page.takeOffFromTree(page._id);
 
-    // 2. Find new parent
     let newParent: PageDocument | undefined;
-    // If renaming to under target, run getParentAndforceCreateEmptyTree to fill new ancestors
-    if (this.isRenamingToUnderTarget(page.path, newPagePathSanitized)) {
-      newParent = await this.getParentAndforceCreateEmptyTree(
-        page,
-        newPagePathSanitized,
-      );
-    } else {
-      newParent = await this.getParentAndFillAncestorsByUser(
-        user,
-        newPagePathSanitized,
-      );
-    }
+    let insertedEmptyPageIds: PageDocument['_id'][] = [];
+    let renamedPage: PageDocument | null = null;
+    try {
+      // 2. Find new parent
+      // If renaming to under target, run getParentAndforceCreateEmptyTree to fill new ancestors
+      if (this.isRenamingToUnderTarget(page.path, newPagePathSanitized)) {
+        ({ newParent, insertedPageIds: insertedEmptyPageIds } =
+          await this.getParentAndforceCreateEmptyTree(
+            page,
+            newPagePathSanitized,
+          ));
+      } else {
+        newParent = await this.getParentAndFillAncestorsByUser(
+          user,
+          newPagePathSanitized,
+        );
+      }
 
-    // 3. Put back target page to tree (also update the other attrs)
-    const update: Partial<IPage> = {};
-    update.path = newPagePathSanitized;
-    update.parent = newParent?._id;
-    if (updateMetadata) {
-      update.lastUpdateUser = user;
-      update.updatedAt = new Date();
+      // 3. Put back target page to tree (also update the other attrs)
+      const update: Partial<IPage> = {};
+      update.path = newPagePathSanitized;
+      update.parent = newParent?._id;
+      if (updateMetadata) {
+        update.lastUpdateUser = user;
+        update.updatedAt = new Date();
+      }
+      renamedPage = await Page.findByIdAndUpdate(
+        page._id,
+        { $set: update },
+        { new: true },
+      );
+    } catch (err) {
+      // Undo steps 1-2, but only while the page is still in the state it left behind.
+      // The driver can report an error for a write the server applied (lost ack,
+      // writeConcernError), so neither `renamedPage` nor a flag proves that step 3
+      // did not commit.
+      try {
+        // `path` alone catches a committed step 3; `parent: null` guards against a
+        // writer that bypasses the PageOperation lock
+        const { matchedCount } = await Page.updateOne(
+          { _id: page._id, parent: null, path: page.path },
+          { $set: { parent: exParentId } },
+        );
+        if (matchedCount === 0) {
+          logger.warn(
+            `Skipped reattaching "${page.path}" to its original parent after a failed rename: ` +
+              'the page is no longer detached at its original path.',
+          );
+        } else {
+          // Drop the empty pages step 2 inserted: one sits at the page's own path
+          // and would duplicate it. Only after a matched rollback, since if step 3
+          // committed they are the page's new ancestors.
+          await Page.deleteMany({
+            _id: { $in: insertedEmptyPageIds },
+            isEmpty: true,
+          });
+        }
+      } catch (rollbackErr) {
+        // Propagate the original error, not this one
+        logger.error(
+          `Failed to roll back the failed rename of "${page.path}". ` +
+            'The page may be off-tree or duplicated by an empty page until it is normalized.',
+          rollbackErr,
+        );
+      }
+      throw err;
     }
-    const renamedPage = await Page.findByIdAndUpdate(
-      page._id,
-      { $set: update },
-      { new: true },
-    );
 
     // 5.increase parent's descendantCount.
     // see: https://dev.growi.org/62149d019311629d4ecd91cf#Handling%20of%20descendantCount%20in%20case%20of%20unexpected%20process%20interruption
@@ -991,6 +1035,7 @@ class PageService implements IPageService {
       }),
     );
 
+    const insertedPageIds = insertedPages.map((p) => p._id);
     const pages = [...insertedPages, originalParent];
 
     const ancestorsMap = new Map<string, PageDocument & { _id: any }>(
@@ -1016,10 +1061,15 @@ class PageService implements IPageService {
 
       return op;
     });
-    await Page.bulkWrite(operations);
+    try {
+      await Page.bulkWrite(operations);
+    } catch (err) {
+      await Page.deleteMany({ _id: { $in: insertedPageIds } });
+      throw err;
+    }
 
     const newParent = ancestorsMap.get(newParentPath);
-    return newParent;
+    return { newParent, insertedPageIds };
   }
 
   private async renamePageV4(page, newPagePath, user, options) {
