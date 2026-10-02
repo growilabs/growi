@@ -202,6 +202,28 @@ describe('POST /_api/v3/inline-comments', () => {
     expect(row?.isInline).toBe(true);
   });
 
+  it('updates the stored page commentCount to the total after creating (requirement 7.4)', async () => {
+    // A stale stored value, so only the post-write refresh can make it match.
+    await crowi.models.Page.updateOne(
+      { _id: publicPage._id },
+      { commentCount: 999 },
+    );
+
+    const res = await request(app)
+      .post('/_api/v3/inline-comments')
+      .send(validBody());
+
+    expect(res.status).toBe(201);
+
+    const total = await prisma.comments.count({
+      where: { pageId: String(publicPage._id) },
+    });
+    const stored = await crowi.models.Page.findById(publicPage._id).select(
+      'commentCount',
+    );
+    expect(stored?.commentCount).toBe(total);
+  });
+
   it('notifies a user mentioned by @username in the comment body (requirement 3.2)', async () => {
     const res = await request(app)
       .post('/_api/v3/inline-comments')

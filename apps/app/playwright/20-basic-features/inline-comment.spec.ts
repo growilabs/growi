@@ -3349,10 +3349,8 @@ test.describe('Inline comment - a heading-adjacent comment restores onto the sam
     // is searched in were counted in the same state), and it is what variant
     // A has to agree with. Requirement 2.2 is the PAIR -- "same result either
     // way" -- so neither test alone states the contract.
-    const releaseCommentList = await gateRoute(
-      page,
-      '**/_api/v3/inline-comments**',
-    );
+    // The anchors arrive through the page's shared comment list.
+    const releaseCommentList = await gateRoute(page, '**/_api/v3/comments**');
 
     await page.goto(headingAdjacentPagePath(testInfo.retry));
 
