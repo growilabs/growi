@@ -2,7 +2,7 @@
 
 ## 設計の前提として確かめた既存の仕組み
 
-- **メンション通知**: `crowi.commentService.prepareMentionNotifications`（`apps/app/src/server/service/comment.ts`）は `comment_id`・`actionUserId`・`activityId`・`page` だけを受ける。内部の `getMentionedUsers` は `prisma.comments.findUnique(...)` でコメントを読むため、インラインコメントを同じ `comments` モデルに置けばそのまま使える。`activityId` が要るので、インラインコメントの作成でも `Activity` を記録する（専用の `SupportedAction` を使う）。
+- **メンション通知**: `crowi.commentService.prepareMentionNotifications`（`apps/app/src/server/service/comment.ts`）は `commentId`・`actionUserId`・`activityId`・`page` だけを受ける。内部の `getMentionedUsers` は `prisma.comments.findUnique(...)` でコメントを読むため、インラインコメントを同じ `comments` モデルに置けばそのまま使える。`activityId` が要るので、インラインコメントの作成でも `Activity` を記録する（専用の `SupportedAction` を使う）。
 - **メンションのハイライト**: 本文テキストに対する remark プラグインなので、保存の方式に依存しない。
 - **スキーマ**: `comments` は Prisma モデルで、コレクションとインデックスを作るための Mongoose スキーマも残っている。フィールドを足すときは両方をそろえる（`.claude/rules/model.md`）。
 - **共有リンク画面**: 共有リンクのページは `ShareLinkPageView.tsx` が描画し、通常ページの `PageView.tsx` とは別のコンポーネントである。
@@ -97,7 +97,7 @@ v1の実装後、ユーザー提供の実装UIモックアップ（テキスト�
 | reactstrap `Popover`（`target`にrefを渡す） | 既存UIライブラリのポップオーバーをそのまま使う | 不採用（`target`は永続的なDOM要素/refを要求し、テキスト選択という「実体を持たない対象」を直接指定できない） |
 | `@popperjs/core`＋仮想要素 | `getBoundingClientRect()`のみを実装したオブジェクトを`createPopper`の参照要素として渡す | **採用** |
 
-`@popperjs/core`はモノレポに既存の依存であり（`apps/app`では`dependencies`、`packages/editor`と`apps/slackbot-proxy`では`devDependencies`）、`flip`/`preventOverflow`/`offset`の標準modifierだけでビューポート境界処理が完結する。DOM `Range`を`cloneRange()`して保持するだけでスクロール追随も自然に実現できる（クローンはドキュメントにアタッチされたまま位置を追跡し続けるため）。`apps/app`で`dependencies`に置くのは、`SelectionPopover`がレンダーツリーに入るとビルドの依存関係に含まれ、`.next/node_modules/`にシンボリックリンクが生成されるため（`apps/app/.claude/rules/package-dependencies.md`）。
+`@popperjs/core`はモノレポに既存の依存であり（`apps/app`では`dependencies`、`packages/editor`と`apps/slackbot-proxy`では`devDependencies`、`packages/core-styles`と`packages/preset-themes`では`peerDependencies`）、`flip`/`preventOverflow`/`offset`の標準modifierだけでビューポート境界処理が完結する。DOM `Range`を`cloneRange()`して保持するだけでスクロール追随も自然に実現できる（クローンはドキュメントにアタッチされたまま位置を追跡し続けるため）。`apps/app`で`dependencies`に置くのは、`SelectionPopover`がレンダーツリーに入るとビルドの依存関係に含まれ、`.next/node_modules/`にシンボリックリンクが生成されるため（`apps/app/.claude/rules/package-dependencies.md`）。
 
 ### 選択のライフサイクルを二段階に分割: `idle`/`selecting`/`composing`
 
@@ -111,7 +111,7 @@ v1の実装後、ユーザー提供の実装UIモックアップ（テキスト�
 
 jsdomにはレイアウト・ペイントエンジインが無いため、ユニットテストでは検出できない種類の不具合が実ブラウザでの検証（統合タスク・E2Eタスク）で2件見つかった。
 
-- **`mousedown`の既定動作によるボタンの取りこぼし**: `SelectionActionButton`はポータル経由で本文コンテナの外（`document.body`直下）に描画される。`mousedown`の既定動作（文書選択の解除）を止めないと、`mousedown`と`click`の間に選択が消えて状態が`idle`に落ち、ボタンが外れて`onCommit`が発火しない。`SelectionActionButton`側のみ`preventDefault`でラップして対処した（`InlineCommentForm`側には適用せず、テキストエリアへのカーソル配置を妨げないようにしている）。
+- **`mousedown`の既定動作によるボタンの取りこぼし**: `SelectionActionButton`はポータル経由で本文コンテナの外（`document.body`直下）に描画される。`mousedown`の既定動作（文書選択の解除）を止めないと、`mousedown`と`click`の間に選択が消えて状態が`idle`に落ち、ボタンが外れて`onCommit`が発火しない。`SelectionCapture`が`SelectionActionButton`だけを包む要素を置き、その`onMouseDown`で`preventDefault`して対処した（`InlineCommentForm`側には適用せず、入力欄へのカーソル配置を妨げないようにしている）。
 - **スタッキングコンテキストの脱出によるクリック不能**: `SelectionPopover`のポータルは`document.body`直下に描画されるが、`.wiki`ページレイアウトの祖先要素（Bootstrapの`.z-1`クラスを持つflexアイテム。`position: static`でもflexアイテムとしてスタッキングコンテキストを形成する）の背後に回り込み、見た目は前面にあるのに実際にはクリック不能になっていた（`elementFromPoint`が背後の要素を指す）。ポータルの直下要素に`zIndex: 1070`（Bootstrapの`$zindex-popover`相当）を明示指定して解決した。
 
 ### Visual Verification（モックアップとの目視比較）は自動ゲート化しない
@@ -124,7 +124,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 ### ハイライト色トークンを1段の間接参照にした理由
 
-`--grw-inline-comment-marker-bg`を検索マーカー色`--grw-marker-bg`に直接束縛せず、`var(--grw-marker-bg, var(--grw-marker-bg-yellow))`という1段の間接参照にした。テーマは検索マーカーの色を目的に`--grw-marker-bg`を上書きしていることがあり（16テーマ中12テーマがcyan/red/blue/greenに変更）、インラインコメントのハイライトを直接そこに縛ると「検索マーカーは変えたいが、インラインコメントは既定の黄色のままにしたい」という指定ができなくなる。1段挟むことで、既定では要望どおり検索マーカーと同じ色になり、必要なテーマだけ個別に上書きできる。
+`--grw-inline-comment-marker-bg`を検索マーカー色`--grw-marker-bg`に直接束縛せず、`var(--grw-marker-bg, var(--grw-marker-bg-yellow))`という1段の間接参照にした。テーマは検索マーカーの色を目的に`--grw-marker-bg`を上書きしていることがあり（`packages/preset-themes/src/styles/` の16テーマ中11テーマがcyan/red/blue/greenに変更）、インラインコメントのハイライトを直接そこに縛ると「検索マーカーは変えたいが、インラインコメントは既定の黄色のままにしたい」という指定ができなくなる。1段挟むことで、既定では要望どおり検索マーカーと同じ色になり、必要なテーマだけ個別に上書きできる。
 
 作成中用の`--grw-inline-comment-marker-bg-pending`も同じ理由で1段挟み、既定値は保存済み側と別系統の色（`--grw-marker-bg-blue`）にして、テーマがどちらも上書きしていない場合でも両者が見分けられるようにした（2つのトークンと半透明化の詳細は「操作性の改善」節を参照。あちらは、この2つのトークンを土台にして、選択中・入力中・保存後の3つの状態を1つの仕組みで扱う）。
 
@@ -132,7 +132,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 ### `CommentCard`は自分のCSSモジュールを持たない
 
-通常コメントの箱の見た目はすでに`_comment-inheritance.scss`の`%bg-comment`／`%comment-section`／`%user-picture`というプレースホルダに1か所で置かれており、`Comment.module.scss`と`CommentEditor.module.scss`の2つのCSSモジュールが`@use`して`@extend`していた（プレースホルダ自身はCSSを出力しないため、3つ目のモジュールが加わっても規則は重複しない）。この既存の形をそのまま踏襲し、箱と見出し行だけを持つ`CommentCard`を切り出して`InlineCommentItem`用の3つ目のモジュールから同じプレースホルダを`@extend`する形にした。
+通常コメントの箱の見た目はすでに`_comment-inheritance.scss`の`%bg-comment`／`%comment-section`／`%user-picture`というプレースホルダに1か所で置かれており、通常コメント側では`Comment.module.scss`（3つすべて）と`CommentEditor.module.scss`（`%bg-comment`と`%user-picture`）が`@use`して`@extend`している（プレースホルダ自身はCSSを出力しないため、使うモジュールが増えても規則は重複しない）。この既存の形をそのまま踏襲し、箱と見出し行だけを持つ`CommentCard`を切り出して、`InlineCommentItem.module.scss`から同じ3つのプレースホルダを`@extend`する形にした（`InlineCommentReplies.tsx`も同じモジュールを読み込む）。ほかに`InlineCommentPreviewPopover.module.scss`も`_comment-inheritance.scss`を`@use`しているが、`@extend`するのは`%user-picture`だけで、ポップオーバーは`CommentCard`を使わない（後述「ポップオーバーは`CommentCard`を流用しなかった」）。
 
 `CommentCard`が自分のモジュールクラスを最も外側に持つ案は採らなかった。`Comment.module.scss`の規則はすべて`.comment-styles { :global(.page-comment) { … } }`という入れ子で書かれており、`CommentCard`が独自の外枠を持つとその入れ子が崩れ、`page-comment-newer`の不透明度・`page-comment-revision`の色・`page-comment-meta`の色・`page-comment-body .wiki`の段落余白のどれも一致しなくなる。`CommentCard`は`.page-comment`から下のDOMだけを描き、外側のモジュールの入れ物（と、そこから`_comment-inheritance.scss`のプレースホルダを`@extend`する責務）は使う側がそれぞれ持つ。
 
@@ -155,7 +155,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 ### 既知の限界（実装時に軽微・許容と判断し先送り）
 
 - **`InlineCommentItem.module.scss`の`.inline-comment-quote`は`:global`宣言の中にある。** `styles['inline-comment-quote']`のようにCSSモジュール経由で参照すると`undefined`になる（クラス名は素の文字列`inline-comment-quote`のまま使う必要がある）。この規則を将来リファクタリングする際に踏みやすい罠なので明記しておく。
-- **`playwright.config.ts`の`devices[\`Desktop ${browser}\`]`は`browser`が小文字（`'firefox'`/`'webkit'`）のため、実際のPlaywright `devices`辞書のキー（`'Desktop Firefox'`/`'Desktop Webkit'`）と一致しない既存バグがある。** firefox/webkitプロジェクトは実質Chromiumにフォールバックしており、このスペックのE2Eによるテーマ切り替え・ハイライト色の検証はすべてChromiumでのみ実証されている（修正はこのスペックの範囲外）。
+- **`apps/app/playwright.config.ts` の `chromium`／`firefox`／`webkit` の3プロジェクト（とそれぞれのゲストモード版）は、どれも実際には Playwright の既定の Chromium で動く。** 設定は `devices[\`Desktop ${browser}\`]` でデバイス設定を引くが、`browser` は `'chromium'`／`'firefox'`／`'webkit'` という小文字の名前で、Playwright の `devices` のキー（`'Desktop Chrome'`／`'Desktop Firefox'`／`'Desktop Safari'` など）のどれとも一致しない。そのため3プロジェクトともデバイス設定（`browserName` を含む）を受け取らず、`browserName` を別に指定する箇所も無いので、既定の Chromium になる（正しいキー `'Desktop Chrome'` を使っているのは `chromium/installer` だけ）。このスペックのE2Eによるテーマ切り替え・ハイライト色の検証は、Chromiumでしか確かめられていない（設定の修正はこのスペックの範囲外）。
 - `Comments.tsx`と`PageComment.tsx`の両方が`id="page-comments-list"`を持つ（このスペックの範囲外の既存の重複。E2Eでこの id を使うと2つの要素に一致するので注意する）。
 - 未解決・解決済みの札の配色（未解決は`bg-warning-subtle text-warning-emphasis`、解決済みは`bg-success-subtle text-success-emphasis`）はテーマごとに再生成されない Bootstrap の`--bs-warning-*`／`--bs-success-*`系の値をそのまま使っており、Requirement 11の「テーマに追随する」の対象外として意図的に据え置いた（この配色を変える受け入れ基準を立てていないため）。
 
@@ -177,7 +177,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 ### 一覧・本文双方が使う「オフセット→現在のRange」再構築ロジックを共有ユーティリティ化
 
-`useAnchorResolver`が返すのはオフセットのみで、`Range`オブジェクト自体は`InlineCommentHighlight.tsx`の非公開関数`rangeFor()`が都度組み立てていた。本文中の当たり判定（新規）と一覧からのスクロール（新規）の両方がこのロジックを必要としたため、`resolved-range.ts`という共有モジュールに切り出し、`rangeForResolved`（単体変換）と`rangesById`（idキー付きの一括変換、未解決分は除外）の2関数として公開した。「解決済みオフセットの永続キャッシュは持たず都度再計算する」という既存方針は変えていない。
+`useAnchorResolver`が返すのはオフセットのみで、`Range`オブジェクトは別に組み立てる必要がある。保存済みハイライトの描画・本文中の当たり判定・一覧からのスクロールの3つがこのロジックを必要とするため、`resolved-range.ts`という共有モジュールに置き、`rangeForResolved`（単体変換）と`rangesById`（idキー付きの一括変換、未解決分は除外）の2関数として公開した。3つの利用側（`InlineCommentHighlight`・`InlineCommentBodyInteraction`・`PageView.tsx`）はどれも`rangesById`を呼び、`rangeForResolved`は`rangesById`の内部から使われる。「解決済みオフセットの永続キャッシュは持たず都度再計算する」という既存方針は変えていない。
 
 一覧からのスクロールは`PageView.tsx`の`scrollToRange(commentId)`が担う。対象の`Range`が見つかれば`scrollIntoView({block: 'center'})`した上で、既存の`growi-inline-comment`（保存済み）・`growi-inline-comment-pending`（作成中）とは別の3つ目のハイライト名（`growi-inline-comment-emphasis`）を2秒間だけ登録して一時的に強調し、見つからなければ`toastError()`で通知して`false`を返す（スクロールはしない）。
 
@@ -252,7 +252,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 ### ポップオーバーの解決トグルを、一覧側（`InlineCommentItem`）と共通コンポーネント化しなかった理由
 
-`InlineCommentItem.tsx` とポップオーバーの解決バッジ＋ボタンは、クラス名・翻訳キー・判定（`resolvedAt != null`）まで完全に同じ見た目になる。それでも共有コンポーネントへ切り出さなかったのは、この改修のスコープが一覧側のロジックを触らないことを前提にしていたためで、共有化すると一覧側のファイルにも手が入ってしまう。加えて2箇所の周囲のレイアウト（一覧の`headerEnd`とポップオーバー本文内）が異なり、エラー表示の置き場所の要件も違うため、抽象化してもパラメータ化のコストに見合う再利用が今のところない。同じ見た目のマークアップが2箇所に存在する状態は許容し、3箇所目の利用が現れた時点で切り出しを検討する。
+一覧（`InlineCommentItem.tsx`）とポップオーバー（`InlineCommentPreviewPopover.tsx`）は、解決する切り替えボタンをそれぞれ持っている。2つのボタンは、クラス名・翻訳キー・判定（`resolvedAt != null`）が同じで、違うのは `data-testid` と、一覧側だけが外側を `icon-button-container` で包んでいる点である（このため一覧側のボタンはカードにホバーしたときだけ表示され、ポップオーバー側は常に表示される）。状態バッジは一覧側にしかなく、ポップオーバーには無い。それでも共有コンポーネントへ切り出さなかったのは、この改修のスコープが一覧側のロジックを触らないことを前提にしていたためで、共有化すると一覧側のファイルにも手が入ってしまう。加えて2箇所の周囲のレイアウト（一覧の`headerEnd`とポップオーバー本文内）が異なり、エラー表示の置き場所の要件も違うため、抽象化してもパラメータ化のコストに見合う再利用が今のところない。同じ見た目のマークアップが2箇所に存在する状態は許容し、3箇所目の利用が現れた時点で切り出しを検討する。
 
 ## 起点コメント・返信の編集・削除（amend spec `inline-comment-edit-delete` より統合）
 
@@ -290,7 +290,7 @@ Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.u
 
 **Rationale**: `MentionAwareCommentInput` はもともと永続化への依存を持たず（`onSubmit` は呼び出し側が注入する）——これはまさに「作成か編集か」の分岐が本来あるべき継ぎ目である（コンポーネント内部ではなく呼び出し側が決める）。これを再利用することで、作成時と編集時のメンション対応の編集体験（CodeMirror、メンション補完）が完全に一致し、見た目をあわせて保守すべき新規コンポーネントも増えない。
 
-**Trade-offs**: 編集モード用の新しい `editorKey` は、コメントidごとに区別できる値（例: `inline_comment_edit_${commentId}`）にする必要がある。そうしないと、あるコメントの編集がページの「新規コメント」用エディタや、別のコメントの編集セッションとCodeMirrorのstateを共有してしまう。
+**Trade-offs**: 編集モード用の `editorKey` は、コメントidごとに区別できる値にする必要がある（実際の値は `InlineCommentPopoverEntry` が組み立てる `${editorKeyPrefix}_${id}` で、接頭辞は起点の編集が `inline_comment_preview_popover_edit`、返信の編集が `inline_comment_preview_popover_reply_edit`）。そうしないと、あるコメントの編集がページの「新規コメント」用エディタや、別のコメントの編集セッションとCodeMirrorのstateを共有してしまう。
 
 ### 削除確認は、モーダルではなく共有の `DeleteConfirmAlert` を使う
 
@@ -340,11 +340,11 @@ Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.u
 
 ### `useCodeMirrorEditorIsolated` の初期値が復元されない2つの原因
 
-編集モードに入っても入力欄に既存の本文が入らない不具合の原因は `packages/editor/src/client/stores/codemirror-editor.ts` にあり、2つあった。(1) `shouldUpdate` の判定が、そのフックインスタンスからの最初の発行のときだけ `isValid(newData)` のチェックを素通りしていた——CodeMirrorの `view`／`state` は非同期に初期化されるため、コンテナが着いた直後の再レンダーでは `newData` が無効なことがあり、その無効な値が共有atomに入ってしまう。`MentionAwareCommentInput` 側は「非nullになったら一度だけ `initDoc` を呼ぶ」設計なので、この空振りが唯一のチャンスを使い切る。(2) 原因1を直しても「キャンセル→再度開く」で再発した——`editorKey` ごとのJotai atomがアンマウント時に消えないため、再マウント直後の最初のレンダーが「前回の、すでに破棄されたエディタ」を見てしまう。発行側インスタンスのアンマウント時にatomをリセットすることで直した。この種の「初期化タイミング」の不具合は2回目までの確認では取り切れないため、最低3回開き直して確認する必要がある。
+`MentionAwareCommentInput` は「エディタが非nullになったら一度だけ `initDoc(initialValue)` を呼ぶ」作りなので、`packages/editor/src/client/stores/codemirror-editor.ts` の `useCodeMirrorEditorIsolated` が次の2点を守らないと、編集モードを開いても入力欄に既存の本文が入らない。(1) `shouldUpdate` は最初の発行のときも `isValid(newData)` を確かめる。CodeMirrorの `view`／`state` は非同期に初期化されるため、コンテナが着いた直後の再レンダーでは `newData` が無効なことがあり、それが共有atomに入ると、一度きりの `initDoc` が中身の無いエディタに対して空振りする。(2) エディタを持つ側（`container` を渡したインスタンス）のアンマウント時に、その `editorKey` のatomを `null` に戻す。戻さないと「キャンセル→再度開く」で、再マウント直後の最初のレンダーが前回の破棄済みエディタを見て、同じく一度きりの `initDoc` を使い切る。この種の初期化タイミングの不具合は1〜2回の開き直しでは再現しないことがあるため、確認するときは最低3回開き直す。
 
 ### 同じ長さの本文修正は `characterData` の変更しか起こさない
 
-インラインコメントを付けた範囲の近くをエディタで少し直して保存し、リロードせずに閲覧モードへ戻るとハイライトが外れる不具合があった。タイプミスの修正など「文字数が変わらない範囲の本文修正」は、Reactが既存のテキストノードの `data` をその場で書き換えるだけで要素の追加・削除を伴わないため `characterData` 型の `MutationRecord` になり `childList` 型にはならない。`use-container-settle.ts` は `characterData: true` を指定しておらず監視が発火していなかった。`observer.observe(...)` に `characterData: true` を足して解決した。
+インラインコメントを付けた範囲の近くをエディタで少し直して保存し、リロードせずに閲覧モードへ戻る場合を考える。タイプミスの修正など「文字数が変わらない範囲の本文修正」は、Reactが既存のテキストノードの `data` をその場で書き換えるだけで要素の追加・削除を伴わないため、`characterData` 型の `MutationRecord` になり `childList` 型にはならない。そのため `use-container-settle.ts` は `observer.observe(...)` に `characterData: true` を指定している。指定しないと、この変化で静定シグナルが出ず、ハイライトが外れる。
 
 ### happy-dom の `querySelector` は改行区切りのクラス属性を解釈しない
 
@@ -364,7 +364,7 @@ Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.u
 
 ### 通常コメントとインラインコメントのコンポーネントは統合しなかった
 
-`InlineCommentItem.tsx` と `Comment.tsx` を1つのコンポーネントにまとめる案を検討したが、ヘッダー行の中身が本質的に異なる（解決トグル＋状態バッジ vs リビジョン履歴リンク）ため、無理に1つにまとめると「インラインかどうかで分岐する巨大コンポーネント」になる。重複していた**部品**（削除確認の警告帯、編集・削除アイコンの組、編集モードのエディタ、リビジョン履歴リンク）だけを共通コンポーネントに切り出した。トレードオフとして、2つのコンポーネントが残るため片方だけを変更して挙動がずれる余地は残る——実際、この作業中に不透明度・寸法・ホバーの出方・編集モードのDOM構造が別々のタイミングでずれているのが見つかっている。
+`InlineCommentItem.tsx` と `Comment.tsx` を1つのコンポーネントにまとめる案を検討したが、ヘッダー行の中身が本質的に異なる（解決トグル＋状態バッジ vs リビジョン履歴リンク）ため、無理に1つにまとめると「インラインかどうかで分岐する巨大コンポーネント」になる。重複していた**部品**（削除確認の警告帯、編集・削除アイコンの組、編集モードのエディタ、リビジョン履歴リンク）だけを共通コンポーネントに切り出した。トレードオフとして、2つのコンポーネントが残るため、片方だけを変更して挙動がずれる余地は残る。ずれやすいのは、共通部品に寄せていない不透明度・寸法・ホバーの出方・編集モードのDOM構造である。
 
 ### ポップオーバーの編集・削除アイコンはホバー表示にしなかった
 
@@ -373,5 +373,5 @@ Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.u
 ### Risks & Mitigations
 
 - Risk: ホバー表示への変更で、タッチデバイスでの編集・削除操作の発見しやすさが下がる — Mitigation: これは通常コメント（`CommentControl.tsx`）にすでに存在する制約であり、この改修が新しく持ち込むものではない。別途改善するなら通常コメント側も含めた横断的な課題として扱う
-- Risk: 「完了したと報告されたが実際は見た目が違った」という過去の失敗の再発 — Mitigation: 実ブラウザでのスクリーンショット照合を必須の完了条件とし、独立したレビューをゲートにした。タスク単位のレビューは「そのタスクが引用した設計箇条書きの部分集合」しか見ないため実装漏れが素通りしたことがあり、最終レビューにはコンポーネントごとの責務・制約の一覧全体を渡す必要がある
+- Risk: 見た目の作業は、テストが通っていても実際の見た目がモックアップと違うことがある — Mitigation: 実ブラウザでのスクリーンショット照合を完了条件とし、独立したレビューを通す。タスク単位のレビューは「そのタスクが引用した設計箇条書きの一部」しか見ないため実装漏れを見逃しうる。最終レビューにはコンポーネントごとの責務・制約の一覧全体を渡す
 - Risk: 通常コメントとインラインコメントが2つのコンポーネントのまま残るため、片方だけ変更して挙動がずれる — Mitigation: 重複していた部品を共通コンポーネントに寄せ、残った差（ホバー表示の仕組み、ヘッダー行の中身）は各ファイルのコメントで「意図的な差である」と明記する

@@ -11,7 +11,7 @@
 - [x] 1.2 `comments` Mongooseスキーマを同じ形に同期させる
   - `apps/app/src/features/comment/server/models/comment.ts` に1.1と同じフィールド（`isInline`/アンカー4項目/`anchorOriginRevisionId`/`resolvedById`/`resolvedAt`）を追加する
   - `@@index([pageId, isInline])` に対応するインデックスをMongooseスキーマ側で宣言する（`.claude/rules/model.md` の通り、インデックス作成は引き続きMongooseが担う）
-  - 観測できる完了条件：新規デプロイ環境でコレクション作成・インデックス作成が完走する（結合テストまたはローカルの `mongosh`/Nodeスクリプトでインデックス一覧に `pageId_1_isInline_1` 相当が存在することを確認する）
+  - 観測できる完了条件：新規デプロイ環境でコレクション作成・インデックス作成が完走する（結合テストまたはローカルの `mongosh`/Nodeスクリプトでインデックス一覧に `{ page: 1, isInline: 1 }`（名前は `page_1_isInline_1`）が存在することを確認する）
   - _Requirements: 1.2, 1.4, 4.1, 4.5, 5.4, 5.5_
 
 - [x] 1.3 旧式の取得メソッドにインラインコメント除外フィルタを追加する
@@ -30,14 +30,14 @@
 - [x] 2. クライアント側アンカー計算ロジック（サーバー非依存の純粋関数・フック群）
 - [x] 2.1 (P) レンダリング状態属性を使った静定検知フックを実装する
   - `GROWI_IS_CONTENT_RENDERING_SELECTOR`（`@growi/core/dist/consts`）でコンテナ内の描画中要素の有無を判定し、ゼロになった時点で「静定」を発火するフックを実装する
-  - `watch-rendering-and-rescroll.ts` と同じMutationObserver監視設定（`childList/subtree/attributes` + `attributeFilter`）を使う。初回マウント時にも1回判定する
+  - `watch-rendering-and-rescroll.ts` と同じMutationObserver監視設定（`childList/subtree/attributes` + `attributeFilter`）に `characterData` を加えたものを使う。初回マウント時にも1回判定する
   - 描画中要素が10秒（`WATCH_TIMEOUT_MS` 相当）経っても消えない場合は監視を打ち切り、その時点で1回だけ発火するタイムアウトフォールバックを実装する
   - 観測できる完了条件：描画中要素が存在する間は発火せず、要素が消えた時点・タイムアウト時点でそれぞれ1回だけ発火することをユニットテスト（MutationObserverモック）で確認できる
   - _Requirements: 2.1, 5.1_
   - _Boundary: use-container-settle_
 
 - [x] 2.2 (P) レンダリング済みプレーンテキストの抽出関数を実装する
-  - コンテナDOMから `.katex` サブツリーのみを除いたプレーンテキストと、テキストオフセット→DOM位置の逆引き関数を構築する純粋関数を実装する
+  - コンテナDOMから `.katex` サブツリーと `aria-hidden="true"` を持つ要素のサブツリーを除いたプレーンテキストと、テキストオフセット→DOM位置の逆引き関数を構築する純粋関数を実装する
   - 観測できる完了条件：`.katex` を含むサンプルDOMに対するユニットテストで、数式部分がテキストに含まれず、コードブロック・`lsx`/`drawio` 相当のダミー要素のテキストは含まれることを確認できる
   - _Requirements: 2.1, 2.2, 2.3, 5.1, 5.2_
   - _Boundary: rendered-text_
@@ -76,14 +76,14 @@
 
 - [x] 3.2 インラインコメントへの返信作成ロジックを実装する
   - 指定された親IDが `isInline: true` かつ `replyToId` が `null`（起点コメント）であることを検証し、そうでなければエラーとする
-  - `isInline: true, replyToId: <親id>` の行を、アンカー関連フィールドをすべて `null` のまま挿入する。`Activity`（`ACTION_INLINE_COMMENT_REPLY`）発行後に `prepareMentionNotifications` を呼び出す
+  - `isInline: true, replyToId: <親id>` の行を、アンカー関連フィールドを書き込まずに挿入する。`Activity`（`ACTION_INLINE_COMMENT_REPLY`）発行後に `prepareMentionNotifications` を呼び出す
   - 観測できる完了条件：返信でないコメントIDを親に指定した場合にエラーが返ることをユニットテストで確認できる
   - _Requirements: 1.8, 1.9, 3.2_
   - _Depends: 3.1_
 
 - [x] 3.3 ページ単位の一覧取得は `comment` スペックの取得を使う
   - 一覧の取得（`GET /_api/v3/comments`）と、平らな一覧を起点コメントと返信の親子に組み直す処理（`groupInlineComments`）は `comment` スペックが持つ。このスペックはサーバー側に一覧取得のロジックを持たない
-  - 観測できる完了条件：返信を持つ起点コメントが、親子の形で作成日時順に得られる（テストは `comment` スペック側の `group-inline-comments.spec.ts`）
+  - 観測できる完了条件：返信を持つ起点コメントが、親子の形で、受け取った一覧の順（サーバーが返す作成日時の新しい順）のまま得られる（テストは `comment` スペックが持つ `group-inline-comments.spec.ts`。ファイルは `features/inline-comment/client/services/` にある）
   - _Requirements: 2.5, 2.6_
   - _Depends: 3.2_
 
@@ -133,7 +133,7 @@
   - 観測できる完了条件：解決済み/未解決が視覚的に区別され、返信が起点コメントの下にネストして表示され、`@ユーザー名` を含む本文がハイライト表示されることをブラウザ操作で確認できる
   - _Requirements: 1.8, 2.5, 2.6, 3.1, 4.4_
   - _Depends: 4.1_
-  - _Boundary: InlineCommentList, InlineCommentReplies_
+  - _Boundary: InlineCommentItem, InlineCommentReplies_
 
 - [x] 5. 統合：既存ページビューへの配線
 - [x] 5.1 `RevisionRenderer.tsx` にコンテナrefを転送する
@@ -142,8 +142,8 @@
   - _Requirements: 2.1, 5.1_
 
 - [x] 5.2 `PageView.tsx` にインラインコメント機能一式を配線する
-  - 5.1のrefを4.2（SelectionCapture/Form）・4.3（AnchorResolver/Highlight）・4.4（InlineCommentList）に配線し、既存の `Comments`（通常コメント）と並置する
-  - 共有リンク経由のページ表示（既存の `isSharedPage` 相当のクライアント側判定）では、SelectionCapture/InlineCommentForm/AnchorResolver/InlineCommentListのいずれもマウントしない
+  - 本文コンテナへの参照を4.2（SelectionCapture/Form）・4.3（AnchorResolver/Highlight）に配線し、4.4の一覧は既存の `Comments`（通常コメント）に `inlineComments` prop として渡して同じ一覧に並べる
+  - 共有リンク経由のページ表示（既存の `isSharedPage` 相当のクライアント側判定）では、SelectionCapture/InlineCommentHighlight/InlineCommentBodyInteraction をマウントせず、`useSWRxInlineComments` に `null` を渡す（一覧にもインラインコメントを渡さない）
   - 観測できる完了条件：通常のページ表示では、本文選択→コメント作成→再読み込み後のハイライト復元が一連の操作として動作する。共有リンク経由のページ表示では、インラインコメントの作成・表示に関するUIが一切描画されない
   - _Requirements: 1.1, 2.1, 2.5, 6.2_
   - _Depends: 4.2, 4.3, 4.4, 5.1_
@@ -183,7 +183,7 @@
 - 3.4：`comments` テーブルは通常コメントとインラインコメントの共有テーブルであり、通常コメント行も `replyToId: null` を持つ。起点コメントかどうかの事前条件チェックは `replyToId === null` だけでなく **`isInline === true` も必ず確認する**（`setResolved`/`createReply` とも同じ理由でこのチェックが必要）。
 - 3.5：`create()`（3.1）は `data` に `replyToId: null` を明示的に入れる。Prisma の Mongo コネクタの `null` フィルタ（`where: { replyToId: null }`）は明示的な `null` にだけ一致し、フィールドが無い行には一致しないため（生ドライバの `null` フィルタはフィールドが無い行にも一致する点が違う）。400/404 の使い分けは、`create-reply.ts`／`resolve.ts` がルート側で対象行を `findUnique` で先に取得して行う（サービス層では行わない）。ページ権限の確認は `findPageAndMetaDataByViewer` を使い、`apps/app/.claude/rules/page-write-action-403-404.md` に従って、ページが無い場合と見えない場合を同じ404にする。未ログインのアクセスには、このリポジトリの `loginRequiredFactory` が apiv3 全体で返す403を返す（401ではない）。
 - 4.2（未着手のフォローアップ、ブロッキングではない）：`SelectionCapture.tsx` はフォーム表示中に別のテキストを選択し直しても、既にロックされたアンカーを更新しない（フォームを閉じる/送信するまで新しい選択を無視する）。ブラウザのネイティブ選択ハイライトは新しい選択に移動するが、フォームの引用文・送信内容は古いアンカーのままになりうる。要件1.1/1.2/1.7やタスクの完了条件そのものは満たしているため4.2はブロックしていないが、UXとして改善の余地があり、別タスク化を検討。
-- 5.2：`PageContentRenderer.tsx`（`PageView.tsx` と `RevisionRenderer.tsx` の間にある薄い `next/dynamic` ラッパー）は design.md の File Structure Plan（既存ファイルへの変更範囲）に含まれていないため変更していない。代わりに `PageView.tsx` 側で `PageContentRenderer`/`SlideRenderer` の出力を無名の `<div ref={pageBodyContainerRef}>` で包み、その ref を `SelectionCapture`/`useAnchorResolver`/`InlineCommentHighlight` に渡している（この div は他に何も内包しないため、`RevisionRenderer.tsx` 自身の ref を取るのと同じテキストが得られる。`.flex-expand-vert` に子要素セレクタ依存のCSSがないことを確認済み）。スライド表示（`isSlide`）時もこの div が使われるため、Marp出力に対して `useAnchorResolver`/`renderedTextOf` が走る（一致しなければ `not_found` にフォールバックするだけで実害はないが、スライドページでのインラインコメント運用は未検討）。
-- 5.2：共有リンク閲覧者向けのUI非表示（要件6.2）は、`PageView.tsx` が通常ページルート（`pages/[[...path]]/index.page.tsx`）専用であり、共有リンクルート（`pages/share/[[...path]]/index.page.tsx`）は別コンポーネント `ShareLinkPageView.tsx`（本タスクでは変更していない）を描画するという、ルート分離そのものによって既に構造的に満たされている。その上で `useShareLinkId()`（`shareLinkIdAtom` を読む。`pages/share/[[...path]]` の `useHydratePageAtoms(..., { shareLinkId })` でのみセットされ、通常ルートでは常に `undefined`）を明示的な追加ガードとして `SelectionCapture`/`InlineCommentHighlight`/`InlineCommentList` のマウント条件と `useSWRxInlineComments` の呼び出し引数（共有リンク時は `null` を渡し、fetch自体を発生させない）の両方に効かせている。現状のルート構成では発火しない防御だが、`PageView.tsx` が将来共有リンク文脈で再利用された場合にも構造ではなくこのガードで止まるようにする意図。
-- 5.2：`apps/app/.claude/rules` の `noRestrictedImports`（`components/**` から `**/client/**` を静的import禁止）に合わせ、コンポーネント3点（`SelectionCapture`/`InlineCommentHighlight`/`InlineCommentList`）は既存の `Comments` 等と同じ `next/dynamic(..., { ssr: false })` 経由にした。フックの `useAnchorResolver`/`useSWRxInlineComments` はレンダーのたび無条件に呼ぶ必要があるため dynamic化できず、既存の `use-content-auto-scroll` の前例（現在は削除済みだが履歴に残る）に倣い `// biome-ignore lint/style/noRestrictedImports` を付けて直接importしている。
-- 5.2で判明・修正済み（重要）：`PageView.tsx` はページ本文サブツリーを `const Contents = useCallback(..., deps)` と定義し `<Contents />` と要素**型**としてレンダーしていた。`useCallback` は依存が変わるたびに新しい関数の同一性を返し、Reactは要素の型が変わると別コンポーネントとみなしてサブツリー全体を**アンマウント→再マウント**する。このサブツリーには `SelectionCapture`（`lockedAnchor` state、＝入力中のインラインコメントフォーム）が含まれていたため、依存配列の中の `resolvedInlineCommentRanges`（`useAnchorResolver` が再計算のたび新しい `Map` を返す）が変わるたびに、入力中のフォームが無警告で消えるバグになっていた（master にも同型の潜在バグはあったが、このサブツリー配下に状態を持つコンポーネントが無かったため顕在化していなかった）。タスク6.2のE2Eテストで発覚し、`useCallback`→`useMemo`（同じ依存配列・同じ本文、`{contents}` として値をレンダー）に修正済み（`PageView.spec.tsx` に恒久的な回帰テストを追加）。副次的に、`useContainerSettle` の監視対象divがこの再マウントで差し替わっていた分（静定による自己修復が効かなくなる経路）も、再マウント自体が起きなくなったことで解消。同型の `useCallback`-as-component-type パターンは `ShareLinkPageView.tsx`／`SearchResultContent.tsx`／`PagePathHierarchicalLink.tsx`／`packages/remark-lsx` の一部コンポーネントにも存在するが、いずれも現時点では配下に状態を持つコンポーネントが無く無害。将来これらのサブツリーに状態を持つコンポーネントを追加する場合は同じ罠に注意。
+- 5.2：`PageContentRenderer.tsx`（`PageView.tsx` と `RevisionRenderer.tsx` の間にある薄い `next/dynamic` ラッパー）は design.md の File Structure Plan（既存ファイルへの変更範囲）に含まれていないため変更していない。代わりに `PageView.tsx` 側で `PageContentRenderer`/`SlideRenderer` の出力を無名の `<div ref={pageBodyContainerRef}>` で包み、その ref を `SelectionCapture`/`useAnchorResolver`/`InlineCommentHighlight`/`InlineCommentBodyInteraction` に渡している（この div は他に何も内包しないため、`RevisionRenderer.tsx` 自身の ref を取るのと同じテキストが得られる。`.flex-expand-vert` に子要素セレクタ依存のCSSがないことを確認済み）。スライド表示（`isSlide`）時もこの div が使われるため、Marp出力に対して `useAnchorResolver`/`renderedTextOf` が走る（一致しなければ `not_found` にフォールバックするだけで実害はないが、スライドページでのインラインコメント運用は未検討）。
+- 5.2：共有リンク閲覧者向けのUI非表示（要件6.2）は、`PageView.tsx` が通常ページルート（`pages/[[...path]]/index.page.tsx`）専用であり、共有リンクルート（`pages/share/[[...path]]/index.page.tsx`）は別コンポーネント `ShareLinkPageView.tsx`（本タスクでは変更していない）を描画するという、ルート分離そのものによって既に構造的に満たされている。その上で `useShareLinkId()`（`shareLinkIdAtom` を読む。`pages/share/[[...path]]` の `useHydratePageAtoms(..., { shareLinkId })` でのみセットされ、通常ルートでは常に `undefined`）を明示的な追加ガードとして `SelectionCapture`/`InlineCommentHighlight`/`InlineCommentBodyInteraction` のマウント条件と `useSWRxInlineComments` の呼び出し引数（共有リンク時は `null` を渡し、fetch自体を発生させない）の両方に効かせている。現状のルート構成では発火しない防御だが、`PageView.tsx` が将来共有リンク文脈で再利用された場合にも構造ではなくこのガードで止まるようにする意図。
+- 5.2：ルートの `biome.json` の `noRestrictedImports`（`components/**` から `**/client/**` を静的import禁止）に合わせ、コンポーネント3点（`SelectionCapture`/`InlineCommentHighlight`/`InlineCommentBodyInteraction`）は既存の `Comments` 等と同じ `next/dynamic(..., { ssr: false })` 経由にした。フックの `useAnchorResolver`/`useSWRxInlineComments` はレンダーのたび無条件に呼ぶ必要があるため dynamic化できず、既存の `use-content-auto-scroll` の前例（現在は削除済みだが履歴に残る）に倣い `// biome-ignore lint/style/noRestrictedImports` を付けて直接importしている。
+- 5.2で判明・修正済み（重要）：`PageView.tsx` はページ本文サブツリーを `const Contents = useCallback(..., deps)` と定義し `<Contents />` と要素**型**としてレンダーしていた。`useCallback` は依存が変わるたびに新しい関数の同一性を返し、Reactは要素の型が変わると別コンポーネントとみなしてサブツリー全体を**アンマウント→再マウント**する。このサブツリーには `SelectionCapture`（選択のロック状態 `committedAnchor`、＝入力中のインラインコメントフォーム）が含まれていたため、依存配列の中の `resolvedInlineCommentRanges`（`useAnchorResolver` が再計算のたび新しい `Map` を返す）が変わるたびに、入力中のフォームが無警告で消えるバグになっていた（master にも同型の潜在バグはあったが、このサブツリー配下に状態を持つコンポーネントが無かったため顕在化していなかった）。タスク6.2のE2Eテストで発覚し、`useCallback`→`useMemo`（同じ依存配列・同じ本文、`{contents}` として値をレンダー）に修正済み（`PageView.spec.tsx` に恒久的な回帰テストを追加）。副次的に、`useContainerSettle` の監視対象divがこの再マウントで差し替わっていた分（静定による自己修復が効かなくなる経路）も、再マウント自体が起きなくなったことで解消。同型の `useCallback`-as-component-type パターンは `ShareLinkPageView.tsx`／`SearchResultContent.tsx`／`PagePathHierarchicalLink.tsx`／`packages/remark-lsx` の一部コンポーネントにも存在するが、いずれも現時点では配下に状態を持つコンポーネントが無く無害。将来これらのサブツリーに状態を持つコンポーネントを追加する場合は同じ罠に注意。
