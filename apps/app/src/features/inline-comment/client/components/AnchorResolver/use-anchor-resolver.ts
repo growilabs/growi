@@ -55,10 +55,11 @@ const resolveAll = (
  * `value`'s content is deep-equal to the previous render's, and only takes on
  * a new identity when the content genuinely changed.
  *
- * `anchors` comes from `useSWRxInlineComments`, which hands back a new array
- * reference on every revalidation even when the underlying comment list is
- * unchanged. Depending on `anchors` itself in a `useEffect` would therefore
- * re-run the effect (and re-`setResolved`, a new `Map` each time) on every
+ * `anchors` comes from `useSWRxInlineComments`, which derives it from the
+ * shared comment list and hands back a new array whenever that list changes
+ * (including a revalidation that returned identical content). Depending on
+ * `anchors` itself in a `useEffect` would therefore re-run the effect (and
+ * re-`setResolved`, a new `Map` each time) on every
  * revalidation tick forever. Comparing content and reusing the previous
  * reference when it matches turns that into a dependency that only changes
  * when there is something new to recompute against.
@@ -77,7 +78,7 @@ const useStableByContent = <T extends object>(value: T): T => {
  *
  * Recomputation has two independent triggers. `useContainerSettle` alone is
  * not enough: a plain markdown page settles exactly once, at mount, before
- * `useSWRxInlineComments`'s list fetch resolves, so `anchors` is still `[]`
+ * the shared comment list fetch resolves, so `anchors` is still `[]`
  * at that point and the container never settles again. Without a second
  * trigger, anchors that arrive later would never get matched against the
  * DOM — so an effect also recomputes whenever `anchors`' own content changes,

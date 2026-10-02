@@ -97,10 +97,10 @@ export const InlineCommentPreviewPopover: FC<
   const currentUser = useCurrentUser();
   const isOwnComment = currentUser?._id === comment.creatorId;
 
-  // `comment.replies` arrives in the server's `createdAt: 'desc'` fetch order
-  // (newest first) -- InlineCommentService.listByPageId() never reorders for
-  // display. Reversed here to oldest-first (newest at the bottom), matching
-  // both InlineCommentReplies.tsx's own `repliesFromOldest` and a normal
+  // `comment.replies` arrives in the order GET /comments returns them
+  // (newest first), which groupInlineComments keeps as-is. Reversed here to
+  // oldest-first (newest at the bottom), matching both
+  // InlineCommentReplies.tsx's own `repliesFromOldest` and a normal
   // comment thread's reading order (2026-09-11, user report: replies were
   // rendering newest-first, oldest-last).
   const repliesFromOldest = useMemo(

@@ -131,10 +131,7 @@ export const extension = Prisma.defineExtension((client) => {
         countCommentByPageId(pageId: string) {
           const context =
             Prisma.getExtensionContext<typeof prisma.comments>(this);
-          return context.count({
-            // Keeps inline comments out of the page-footer comment count badge.
-            where: { pageId, isInline: { not: true } },
-          });
+          return context.count({ where: { pageId } });
         },
 
         async removeWithReplies(commentId: string) {

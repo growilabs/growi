@@ -202,9 +202,9 @@ describe('InlineCommentReplies', () => {
   });
 
   it("renders replies oldest-first even though the `replies` prop arrives newest-first (matches a normal comment thread's display order)", () => {
-    // `replies` arrives in the server's `createdAt: 'desc'` fetch order
-    // (newest first) -- InlineCommentService.listByPageId() never
-    // reorders for display, display order is this component's own
+    // `replies` arrives in the order GET /comments returns them
+    // (newest first) and the server never reorders for display, so display
+    // order is this component's own
     // concern. Mirrors PageComment.tsx's `commentsFromOldest` reversal.
     renderReplies({
       replies: [
