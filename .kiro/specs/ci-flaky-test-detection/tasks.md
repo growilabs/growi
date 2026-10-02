@@ -1,10 +1,17 @@
 # Implementation Plan
 
-このspecはRequirement 1〜4を既存実装の事後spec化として扱うため、実装タスク
-は主に新規要件であるRequirement 5（常設ダッシュボード）に発生する。
-Requirement 1〜4は「既存実装の確認」タスク（1.2）でrequirements.mdとの対応
-を確認する。ただし1.2の実施中にAC 2.6が未実装であることが判明したため、
-例外的にタスク1.3でコード修正を行う（詳細は1.2の実施結果を参照）。
+このspecはRequirement 1〜11を対象とする。以下のタスク一覧が記録しているのは
+そのうちRequirement 1〜5の構築で、Requirement 6〜11（再現用ワークフロー、
+人の判断待ち状態、集約と除外、再発しないissueの自動クローズ、起動間隔）は
+別specで起票した是正タスク群として実装し、その内容はこのspecに取り込み済み
+である。現在の仕様はdesign.mdとrequirements.mdを、判断の経緯はresearch.mdを
+参照すること。
+
+Requirement 1〜4は既存実装の事後spec化なので、実装タスクは主に新規要件で
+あるRequirement 5（常設ダッシュボード）に発生する。Requirement 1〜4は
+「既存実装の確認」タスク（1.2）でrequirements.mdとの対応を確認する。ただし
+1.2の実施中にAC 2.6が未実装であることが判明したため、例外的にタスク1.3で
+コード修正を行う（詳細は1.2の実施結果を参照）。
 
 - [x] 1. Foundation: 前提条件の整備
 - [x] 1.1 GitHubラベル `flaky/dashboard` を作成する

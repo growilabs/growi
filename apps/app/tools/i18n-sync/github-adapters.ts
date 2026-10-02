@@ -225,6 +225,8 @@ export interface PrPublisherOptions {
   readonly runCommand?: RunCommand;
   readonly gitAuthorName?: string;
   readonly gitAuthorEmail?: string;
+  /** Labels applied to a newly-created pull request. Never re-applied on `updatePr`. */
+  readonly labels?: readonly string[];
 }
 
 interface PullRequestApiItem {
@@ -250,6 +252,7 @@ const createPrPublisher = (options: PrPublisherOptions) => {
     runCommand = defaultRunCommand,
     gitAuthorName = DEFAULT_GIT_AUTHOR_NAME,
     gitAuthorEmail = DEFAULT_GIT_AUTHOR_EMAIL,
+    labels = [],
   } = options;
 
   const owner = repository.split('/')[0];
@@ -356,6 +359,14 @@ const createPrPublisher = (options: PrPublisherOptions) => {
           base: baseBranch,
         },
       })) as PullRequestApiItem;
+      if (labels.length > 0) {
+        // Labels live on the issue, not the pull request, in GitHub's REST
+        // API -- `/issues/{number}/labels` is the correct path even though
+        // this object is a pull request.
+        await request('POST', `/issues/${created.number}/labels`, {
+          body: { labels },
+        });
+      }
       return { number: created.number };
     },
 

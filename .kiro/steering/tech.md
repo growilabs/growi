@@ -104,6 +104,48 @@ The monorepo uses **pino** (via `@growi/logger`) as the standard logging library
 - **No static `import … from 'node:*'` that a browser code path can reach.** Builtins like `node:module` have no browser polyfill and break the Turbopack client build. Acquire them at runtime inside a server-only branch via `process.getBuiltinModule('node:module')` (not an import statement → never enters the browser graph).
 - **pino transport targets must be ABSOLUTE PATHS, not bare specifiers,** because pino loads transports in a worker thread that resolves a bare specifier relative to the caller — and when the logger is **bundled** (Next.js SSR via Turbopack) that resolution fails with `unable to determine transport target for "pino-pretty"`, 500-ing every SSR page when `FORMAT_NODE_LOG` is truthy. `transport-factory.ts` resolves both the dev (`bunyan-format`) and prod (`pino-pretty`) targets to absolute paths for this reason.
 
+### i18n (i18next, self-hosted constraints)
+
+`apps/app` uses **i18next + next-i18next + react-i18next** for UI translation (5 locales:
+`en_US`/`ja_JP`/`zh_CN`/`fr_FR`/`ko_KR`, 3 namespaces: `translation`/`admin`/`commons`,
+under `apps/app/public/static/locales/`). `i18next-cli` is used **only for CI auditing**
+(`pnpm run lint:i18n` → `apps/app/tools/i18n-audit/`, wired into the `ci-app-lint`
+required check) — it does not extract or sync keys at build time.
+
+- **Locale resolution is not URL-based.** It comes from the MongoDB user record
+  (`user.lang` → `app:globalLang` config → `Accept-Language` header,
+  `apps/app/src/server/util/locale-utils.ts`). An i18n approach that assumes
+  locale-in-URL does not fit this app without extra plumbing.
+- **Missing `ns:` silently falls back to the default `translation` namespace**, which
+  is why `translation.json` has accumulated hundreds of generic English-literal keys
+  (`"Help"`, `"Edit"`, …) over time. Always pass the namespace explicitly
+  (`useTranslation('admin')`, or `t('key', { ns: 'commons' })`) rather than relying on
+  the default — a missing namespace can render a raw key on production while working
+  in dev (dev preloads all namespaces; production does not).
+- **Two separate locale trees exist; don't conflate them.** `apps/app/public/static/locales/`
+  is the i18next-managed one. `apps/app/resource/locales/` holds onboarding markdown
+  (`welcome.md`, `sandbox*.md`) and email templates — it is **not** read by i18next and
+  has its own per-language files.
+- **`packages/editor` has no locale files of its own** — its `toolbar.*` keys live in
+  `apps/app`'s `translation.json`. Any reorganization of `apps/app` locale files must
+  account for this cross-package read.
+- **Never fetch translations at runtime from an external service.** GROWI is
+  self-hosted/on-premise, so translation JSON is always committed to git and read
+  from disk; POEditor (the community-translation TMS) is used only for **authoring and
+  sync** (`apps/app/tools/i18n-sync/`, `.github/workflows/i18n-sync-{push,pull}.yml`),
+  never for runtime delivery.
+- **Avoid `preloadAllLang: true`** (`apps/app/src/pages/common-props/i18n.ts`) except
+  where a page needs to call `i18n.changeLanguage()` for a language whose resources
+  aren't otherwise loaded (production has no client-side i18next backend, so an
+  unloaded language it tries to switch to silently falls back to `en_US`). It was
+  removed from 3 of 5 flagged pages (`admin/ai`, `admin/vault`, `admin/app`) because
+  SSR payload bloat (up to 513 KB) from it was otherwise unnecessary.
+- **How the JSON namespace files should be reorganized long-term (namespace
+  redesign vs. migrating to a compiler-based i18n library such as Paraglide) is still
+  an open decision**, tracked in the `i18n` umbrella spec
+  (`.kiro/specs/i18n/roadmap.md`) rather than settled here — don't treat either
+  direction as decided.
+
 ### External Plugin Distribution Contract (orthogonal to the internal module system)
 
 Third-party plugins published at **https://growi.org/plugins** reach a running GROWI by a

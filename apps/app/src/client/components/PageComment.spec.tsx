@@ -20,7 +20,7 @@
  */
 
 import type { ReactNode } from 'react';
-import { render } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -73,6 +73,10 @@ vi.mock('~/stores/renderer', () => ({
   useCommentForCurrentPageOptions: () => ({ data: undefined }),
 }));
 vi.mock('next-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+// The real list menu translates its own labels through react-i18next.
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 vi.mock('@growi/ui/dist/components', () => ({
@@ -137,8 +141,42 @@ vi.mock('./NotAvailableForReadOnlyUser', () => ({
 vi.mock(
   '~/features/inline-comment/client/components/InlineCommentItem/InlineCommentItem',
   () => ({
-    InlineCommentItem: ({ comment }: { comment: InlineCommentWithReplies }) => (
-      <div data-testid="inline-comment" data-comment-id={comment.id} />
+    InlineCommentItem: ({
+      comment,
+      collapsed,
+      onExpand,
+      onCollapse,
+      resolve,
+    }: {
+      comment: InlineCommentWithReplies;
+      collapsed: boolean;
+      onExpand: () => void;
+      onCollapse: () => void;
+      resolve: (id: string, resolved: boolean) => Promise<unknown>;
+    }) => (
+      <div
+        data-testid="inline-comment"
+        data-comment-id={comment.id}
+        data-collapsed={String(collapsed)}
+      >
+        <button type="button" onClick={onExpand}>
+          {`expand ${comment.id}`}
+        </button>
+        <button type="button" onClick={onCollapse}>
+          {`collapse ${comment.id}`}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            // Flip the resolved state, as the real item's toggle does.
+            resolve(comment.id, comment.resolvedAt == null).catch(
+              () => undefined,
+            );
+          }}
+        >
+          {`toggle-resolved ${comment.id}`}
+        </button>
+      </div>
     ),
   }),
 );
@@ -173,6 +211,7 @@ const normalComment = (
 const inlineComment = (
   id: string,
   createdAt: string,
+  resolvedAt: string | null = null,
 ): InlineCommentWithReplies =>
   ({
     id,
@@ -182,8 +221,8 @@ const inlineComment = (
     comment: `body of ${id}`,
     anchorOriginRevisionId: 'revision1',
     anchor: { quote: 'q', prefix: '', suffix: '', approxOffset: 0 },
-    resolvedById: null,
-    resolvedAt: null,
+    resolvedById: resolvedAt == null ? null : 'user1',
+    resolvedAt,
     createdAt,
     updatedAt: createdAt,
     replies: [],
@@ -196,28 +235,49 @@ const removeInlineComment = vi.fn(async () => undefined);
 const updateInlineCommentReply = vi.fn(async () => undefined);
 const removeInlineCommentReply = vi.fn(async () => undefined);
 
-const renderPageComment = (inlineComments: InlineCommentWithReplies[] = []) =>
-  render(
-    <PageComment
-      // biome-ignore lint/suspicious/noExplicitAny: RevisionRenderer is not exercised here
-      rendererOptions={{} as any}
-      pageId="page1"
-      pagePath="/path/to/page"
-      revision="revision1"
-      currentUser={{ username: 'alice' }}
-      isReadOnly={true}
-      inlineComments={{
-        comments: inlineComments,
-        resolve: resolveInlineComment,
-        createReply: createInlineCommentReply,
-        update: updateInlineComment,
-        remove: removeInlineComment,
-        updateReply: updateInlineCommentReply,
-        removeReply: removeInlineCommentReply,
-        scrollToRange: vi.fn(() => true),
-      }}
-    />,
-  );
+const pageCommentElement = (
+  inlineComments: InlineCommentWithReplies[] = [],
+  isReadOnly = true,
+) => (
+  <PageComment
+    // biome-ignore lint/suspicious/noExplicitAny: RevisionRenderer is not exercised here
+    rendererOptions={{} as any}
+    pageId="page1"
+    pagePath="/path/to/page"
+    revision="revision1"
+    currentUser={{ username: 'alice' }}
+    isReadOnly={isReadOnly}
+    inlineComments={{
+      comments: inlineComments,
+      resolve: resolveInlineComment,
+      createReply: createInlineCommentReply,
+      update: updateInlineComment,
+      remove: removeInlineComment,
+      updateReply: updateInlineCommentReply,
+      removeReply: removeInlineCommentReply,
+      scrollToRange: vi.fn(() => true),
+    }}
+  />
+);
+
+const renderPageComment = (
+  inlineComments: InlineCommentWithReplies[] = [],
+  isReadOnly = true,
+) => render(pageCommentElement(inlineComments, isReadOnly));
+
+const LIST_MENU_LABEL = 'inline_comment.list_menu';
+const EXPAND_ALL_LABEL = 'inline_comment.expand_all_resolved';
+
+const collapsedStateOf = (container: HTMLElement, id: string): string | null =>
+  container
+    .querySelector<HTMLElement>(
+      `[data-testid="inline-comment"][data-comment-id="${id}"]`,
+    )
+    ?.getAttribute('data-collapsed') ?? null;
+
+const openListMenu = async (): Promise<void> => {
+  await userEvent.click(screen.getByRole('button', { name: LIST_MENU_LABEL }));
+};
 
 /** The ids of every list item, in DOM order, regardless of its kind. */
 const renderedItemIds = (container: HTMLElement): string[] =>
@@ -237,7 +297,7 @@ describe('PageComment — one list holding both kinds of comment', () => {
   });
 
   it('orders normal and inline comments by posting date, not by insertion or kind', () => {
-    // `/comments.get` answers newest-first.
+    // `useSWRxPageComment` answers newest-first, as the list API does.
     commentStore.data = [
       normalComment('normal-late', '2024-01-03T00:00:00.000Z'),
       normalComment('normal-early', '2024-01-01T00:00:00.000Z'),
@@ -385,5 +445,209 @@ describe('PageComment — onDeleteConfirmed', () => {
 
     await expect(deleteResults[0]).rejects.toThrow('deletion refused');
     expect(toastErrorMock).toHaveBeenCalledWith('deletion refused');
+  });
+});
+
+/**
+ * Resolved inline comments start folded, and the list-level menu can unfold
+ * them all (Requirement 20, 21.2, 22). Normal comments are never folded. The
+ * item is stubbed, so what is pinned here is what the list hands each item
+ * (`collapsed`, `onExpand`, `onCollapse`, the wrapped `resolve`) and what the
+ * menu does, observed through the item stub's `data-collapsed`.
+ */
+describe('PageComment — folding resolved inline comments', () => {
+  const resolvedAt = '2024-02-01T00:00:00.000Z';
+
+  beforeEach(() => {
+    commentStore.data = [];
+    resolveInlineComment.mockReset();
+    resolveInlineComment.mockResolvedValue(undefined);
+  });
+
+  it('folds resolved inline comments by default and leaves unresolved and normal comments open (Requirement 20.1, 20.3)', () => {
+    commentStore.data = [normalComment('normal-1', '2024-01-01T00:00:00.000Z')];
+
+    const { container } = renderPageComment([
+      inlineComment('resolved-1', '2024-01-02T00:00:00.000Z', resolvedAt),
+      inlineComment('open-1', '2024-01-03T00:00:00.000Z'),
+    ]);
+
+    expect(collapsedStateOf(container, 'resolved-1')).toBe('true');
+    expect(collapsedStateOf(container, 'open-1')).toBe('false');
+    expect(
+      container
+        .querySelector('[data-testid="normal-comment"]')
+        ?.hasAttribute('data-collapsed'),
+    ).toBe(false);
+  });
+
+  it('expands only the comment whose expand operation was used, and folds it again on collapse (Requirement 21.2)', async () => {
+    const { container } = renderPageComment([
+      inlineComment('resolved-1', '2024-01-01T00:00:00.000Z', resolvedAt),
+      inlineComment('resolved-2', '2024-01-02T00:00:00.000Z', resolvedAt),
+    ]);
+
+    await userEvent.click(screen.getByText('expand resolved-1'));
+
+    expect(collapsedStateOf(container, 'resolved-1')).toBe('false');
+    expect(collapsedStateOf(container, 'resolved-2')).toBe('true');
+
+    await userEvent.click(screen.getByText('collapse resolved-1'));
+
+    expect(collapsedStateOf(container, 'resolved-1')).toBe('true');
+    expect(collapsedStateOf(container, 'resolved-2')).toBe('true');
+  });
+
+  it('unfolds every resolved inline comment from the list menu and nothing else (Requirement 22.3, 22.4)', async () => {
+    const { container } = renderPageComment([
+      inlineComment('resolved-1', '2024-01-01T00:00:00.000Z', resolvedAt),
+      inlineComment('open-1', '2024-01-02T00:00:00.000Z'),
+      inlineComment('resolved-2', '2024-01-03T00:00:00.000Z', resolvedAt),
+    ]);
+
+    await openListMenu();
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: EXPAND_ALL_LABEL }),
+    );
+
+    expect(collapsedStateOf(container, 'resolved-1')).toBe('false');
+    expect(collapsedStateOf(container, 'resolved-2')).toBe('false');
+    expect(collapsedStateOf(container, 'open-1')).toBe('false');
+    expect(resolveInlineComment).not.toHaveBeenCalled();
+  });
+
+  it('disables the unfold-all item while no inline comment is resolved (Requirement 22.5)', async () => {
+    renderPageComment([inlineComment('open-1', '2024-01-01T00:00:00.000Z')]);
+
+    await openListMenu();
+
+    expect(screen.getByText(EXPAND_ALL_LABEL).closest('button')).toBeDisabled();
+  });
+
+  it('shows the menu to a read-only user as well, and it still works (Requirement 22.1, 22.7)', async () => {
+    const { container } = renderPageComment(
+      [inlineComment('resolved-1', '2024-01-01T00:00:00.000Z', resolvedAt)],
+      true,
+    );
+
+    await openListMenu();
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: EXPAND_ALL_LABEL }),
+    );
+
+    expect(collapsedStateOf(container, 'resolved-1')).toBe('false');
+  });
+
+  it('shows the menu to a user who can write, too (Requirement 22.1)', () => {
+    renderPageComment(
+      [inlineComment('open-1', '2024-01-01T00:00:00.000Z')],
+      false,
+    );
+
+    expect(
+      screen.getByRole('button', { name: LIST_MENU_LABEL }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows no menu when the page has normal comments only (Requirement 22.1)', () => {
+    commentStore.data = [normalComment('normal-1', '2024-01-01T00:00:00.000Z')];
+
+    const { container } = renderPageComment([]);
+
+    expect(
+      within(container).queryByRole('button', { name: LIST_MENU_LABEL }),
+    ).toBeNull();
+    expect(renderedItemIds(container)).toEqual(['normal-1']);
+  });
+
+  it('portals the list menu into the supplied slot so it can share a row with the Comments heading (Requirement 22.1)', () => {
+    const slot = document.createElement('div');
+    document.body.appendChild(slot);
+
+    const { container } = render(
+      <PageComment
+        // biome-ignore lint/suspicious/noExplicitAny: RevisionRenderer is not exercised here
+        rendererOptions={{} as any}
+        pageId="page1"
+        pagePath="/path/to/page"
+        revision="revision1"
+        currentUser={{ username: 'alice' }}
+        isReadOnly
+        listMenuSlot={slot}
+        inlineComments={{
+          comments: [inlineComment('open-1', '2024-01-01T00:00:00.000Z')],
+          resolve: resolveInlineComment,
+          createReply: createInlineCommentReply,
+          update: updateInlineComment,
+          remove: removeInlineComment,
+          updateReply: updateInlineCommentReply,
+          removeReply: removeInlineCommentReply,
+          scrollToRange: vi.fn(() => true),
+        }}
+      />,
+    );
+
+    expect(
+      within(container).queryByRole('button', { name: LIST_MENU_LABEL }),
+    ).toBeNull();
+    expect(
+      within(slot).getByRole('button', { name: LIST_MENU_LABEL }),
+    ).toBeInTheDocument();
+
+    slot.remove();
+  });
+
+  it('shows an expanded comment as expanded after it is set back to unresolved, and folds it again once it is resolved again (Requirement 20.4)', async () => {
+    commentStore.data = [];
+    const open = inlineComment('c-1', '2024-01-01T00:00:00.000Z');
+    const resolved = inlineComment(
+      'c-1',
+      '2024-01-01T00:00:00.000Z',
+      resolvedAt,
+    );
+    const { container, rerender } = renderPageComment([resolved]);
+
+    await userEvent.click(screen.getByText('expand c-1'));
+    expect(collapsedStateOf(container, 'c-1')).toBe('false');
+
+    // The reader sets it back to unresolved; the revalidated data then arrives.
+    await userEvent.click(screen.getByText('toggle-resolved c-1'));
+    expect(resolveInlineComment).toHaveBeenCalledWith('c-1', false);
+    rerender(pageCommentElement([open]));
+    expect(collapsedStateOf(container, 'c-1')).toBe('false');
+
+    // Resolving it again must not leave it expanded.
+    rerender(pageCommentElement([resolved]));
+    expect(collapsedStateOf(container, 'c-1')).toBe('true');
+  });
+
+  it('keeps a comment expanded when the resolve request fails (Requirement 21.2)', async () => {
+    const resolved = inlineComment(
+      'c-1',
+      '2024-01-01T00:00:00.000Z',
+      resolvedAt,
+    );
+    const { container, rerender } = renderPageComment([resolved]);
+    resolveInlineComment.mockRejectedValueOnce(new Error('boom'));
+
+    await userEvent.click(screen.getByText('expand c-1'));
+    await userEvent.click(screen.getByText('toggle-resolved c-1'));
+    rerender(pageCommentElement([resolved]));
+
+    expect(collapsedStateOf(container, 'c-1')).toBe('false');
+  });
+
+  it('renders without error when the list goes from empty to non-empty (the folding state is set up before the early return)', () => {
+    commentStore.data = [];
+    const { container, rerender } = renderPageComment([]);
+    expect(container.querySelector('.page-comments-list')).toBeNull();
+
+    rerender(
+      pageCommentElement([
+        inlineComment('resolved-1', '2024-01-01T00:00:00.000Z', resolvedAt),
+      ]),
+    );
+
+    expect(collapsedStateOf(container, 'resolved-1')).toBe('true');
   });
 });
