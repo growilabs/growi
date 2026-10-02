@@ -321,12 +321,12 @@ export const toLegacyCommentListItem: (
 - 共通の出力: 行のすべての列(文書の版の番号 `v` を含む)と、クライアント拡張が足す `__v`(`v` と同じ値)に加えて、`_id`(= `id`)、`page`(= `pageId`)、`revision`(= `revisionId`)、`replyTo`(= `replyToId`)、`creator`。投稿者の行が無いときの `creator` は `creatorId`(投稿者の無いコメントでは `null`)
 - `toCommentListItem` の投稿者の整形(`toCreatorSummary`)は、`_id`、`username`、`name`、`imageUrlCached` の4つだけを、項目を1つずつ指定して取り出す(行を展開してから項目を除く書き方はしない。ユーザーの列が増えても応答に漏れないようにするため)
 - `toLegacyCommentListItem` の投稿者の整形(`toLegacyCreator`)は、ユーザーの行からパスワード、API トークン、メールアドレスを除き、本人がメールアドレスを公開しているときだけ `email` を戻す(`null` でも戻す)。旧 API(`comment.js`)はこちらを使う(要件 5.1、5.4)
-- 4つの項目を残す理由は、画面がそれぞれを読むため。`username` は `Username`(ユーザーのページへのリンク)、`UserPicture`(リンクとツールチップ)、`Comment.tsx` の自分のコメントかどうかの判定が読む。`name` は `Username` と `UserPicture` が表示名として読む。`imageUrlCached` は `UserPicture` が画像の URL として読む。`_id` は画面が実行時には読まないが、`Username` が受ける型と `isPopulated` による型の絞り込みが `_id` を持つオブジェクトを前提にしており、API の利用者がユーザーを識別するのにも使う。自分のコメントかどうかの判定は、通常コメントとインラインコメントで読む項目が違う。通常コメント(`Comment.tsx`)は `creator.username` とログイン中の利用者の `username` を比べる。インラインコメント(`InlineCommentItem.tsx`、`InlineCommentReplies.tsx`、`InlineCommentPreviewPopover.tsx`)は `creatorId` とログイン中の利用者の `_id` を比べ、`creator` を読まない。画面は `creator` のほかの項目(アカウントの状態、Gravatar の設定など)を読まない
+- 4つの項目を残す理由は、画面がそれぞれを読むため。`username` は `Username`(ユーザーのページへのリンク)、`UserPicture`(リンクとツールチップ)、`Comment.tsx` の自分のコメントかどうかの判定が読む。`name` は `Username` と `UserPicture` が表示名として読む。`imageUrlCached` は `UserPicture` が画像の URL として読む。`_id` は画面が実行時には読まないが、`Username` が受ける型と `isPopulated` による型の絞り込みが `_id` を持つオブジェクトを前提にしており、API の利用者がユーザーを識別するのにも使う。自分のコメントかどうかの判定は、通常コメントとインラインコメントで読む項目が違う。通常コメント(`Comment.tsx`)は `creator.username` とログイン中の利用者の `username` を比べる。インラインコメント(`InlineCommentItem.tsx`、`InlineCommentReplies.tsx`、`InlineCommentPreviewPopover.tsx`)は `creatorId` とログイン中の利用者の `_id` を比べ、判定には `creator` を読まない(表示では読む)。画面は `creator` のほかの項目(アカウントの状態、Gravatar の設定など)を読まない
 
 #### countCommentByPageId(モデルの拡張)
 - `where: { pageId }` にする(件数の集計は `isInline` で絞らない)。返信も1行として数える。解決済みも数える
 - `findCommentsByPageId` / `findCommentsByRevisionId` の除外は変えない(旧 API の固定の保証を守る)
-- 呼び出し元は `Page.updateCommentCount` だけ
+- 呼び出し元は `Page.updateCommentCount` と、件数を数え直す移行(`apps/app/src/migrations/20261001120000-recount-comment-count-including-inline.js`)の2つ
 
 #### InlineCommentService の拡張
 ```typescript

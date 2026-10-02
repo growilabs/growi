@@ -11,7 +11,7 @@
   - 整形の入力となる行の型(投稿者を含む行。`CommentListRow`)は、整形と同じ場所で定義して export する。2.1 の取得サービスがこれを import する(依存の向きは「整形 → サービス」)
   - 先に、通常コメントの行とインラインコメントの行で、別名の項目、安全化された投稿者、投稿者が無いときの ID を確かめるテストを書く
   - 完了の状態: 整形の単体テストが通り、型検査が通る
-  - _Requirements: 1.2, 1.3, 1.7_
+  - _Requirements: 1.2, 1.3, 1.7, 1.9_
   - _Boundary: ICommentListItem, toCommentListItem, CommentListRow_
 
 - [x] 1.2 旧 API の応答の整形を共有の整形に置き換え、非推奨を明示する
@@ -20,7 +20,7 @@
   - 旧 API がインラインコメントを返さないこと(取得メソッドの固定の除外)には触れない
   - 既存の旧 API の結合テスト(共有リンクの認可、インラインコメントを返さないこと)が変更なしで通ることを確かめる
   - 完了の状態: 旧 API の既存の結合テストがすべて通り、旧 API の公開仕様の生成と検証が通って `deprecated` が付いている
-  - _Requirements: 5.1, 5.2, 5.3_
+  - _Requirements: 5.1, 5.2, 5.3, 5.4_
   - _Depends: 1.1_
   - _Boundary: comments.get(apiv1)_
 
@@ -213,6 +213,6 @@
 - 4.2: `apps/app` の型検査は `@growi/ui` の `dist` を読むため、新しい checkout では先に `turbo run build --filter @growi/ui` が要る。
 - 4.5: `features/inline-comment/client/components/AnchorResolver/use-anchor-resolver.ts` の `useStableByContent` の説明は、`anchors` が「共有の一覧が変わったときに新しい配列になる」ことを前提に書いてある。`IInlineComment.creator` の JSDoc は、共有の一覧(`GET /comments`)から投稿者が埋まることを書いている。インラインコメント専用の一覧の取得と、その応答の型は残っていない。
 - 5.1: apiv3 のルーターには「見つからない」の受け皿がなく、登録を消しただけでは未登録の GET が Next のページ処理へ流れる(ログインなしと PAT は 302、ログインセッションは 200 の HTML になる)。インラインコメントの一覧の URL `GET /_api/v3/inline-comments` は、index.js の明示的な JSON 404 で受ける。
-- 6.1: 画面の通しの確認は、開発サーバーで E2E `apps/app/playwright/20-basic-features/comment-list-integration.spec.ts`(8 件、chromium と firefox の2つのプロジェクトで通過。ただし `playwright.config.ts` の既存の不具合で、firefox のプロジェクトも実際には Chromium で動く。inline-comment スペックの research.md「既知の限界」参照)を実行して行った。確かめた内容は、インラインコメントの作成と解決でハイライト・末尾のスレッド・ページ側面の件数が一緒に変わること(1→2→3、解決後も 3)、共有リンクの画面と検索結果のプレビューにインラインコメントが出ないこと。共有リンク経由の API はインラインの行も返す(要件 3.3)ので、隠しているのは `useSWRxPageComment` の `isInline` の除外。ページ側面ではなく「最近の更新」の件数は API でのみ確認した。
-- 6.2: HEAD a18a47a4fe で `pnpm run lint`(apiv1 と apiv3 の公開仕様の検証を含む)と `pnpm run build` が成功し、全体テストは 6828 件が通った。失敗した 2 ファイル(`growi-vault` の `clone-e2e.integ.ts` と `vault-gateway.integ.ts`)は、このフィーチャーが触れていない範囲の既存の失敗。
+- 6.1: 画面の通しの確認は、開発サーバーで E2E `apps/app/playwright/20-basic-features/comment-list-integration.spec.ts`(6 件、chromium と firefox の2つのプロジェクトで通過。ただし `playwright.config.ts` の既存の不具合で、firefox のプロジェクトも実際には Chromium で動く。inline-comment スペックの research.md「既知の限界」参照)を実行して行った。確かめた内容は、インラインコメントの作成と解決でハイライト・末尾のスレッド・ページ側面の件数が一緒に変わること(1→2→3、解決後も 3)、共有リンクの画面と検索結果のプレビューにインラインコメントが出ないこと。共有リンク経由の API はインラインの行も返す(要件 3.3)ので、隠しているのは `useSWRxPageComment` の `isInline` の除外。ページ側面ではなく「最近の更新」の件数は API でのみ確認した。
+- 6.2: 全体の確認は `pnpm run lint`(apiv1 と apiv3 の公開仕様の検証を含む)、`pnpm run build`、全体テストで行う。
 - 1.1 / 1.2 の補足(要件 1.9、5.4): 新 API の `creator` は `toCommentListItem` の `toCreatorSummary` が 4 項目(`_id` / `username` / `name` / `imageUrlCached`)だけを返し、旧 API は `toLegacyCommentListItem`(投稿者の整形は上の `toLegacyCreator`、型は整形のファイル内の非公開の型 `LegacyCommentCreator`)を使う。両者は `createCommentListItemMapper` に投稿者の整形を渡して作るので、共通の項目の整形は 1 か所にある。

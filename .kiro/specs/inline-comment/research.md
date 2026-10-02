@@ -80,7 +80,7 @@
 ### 静定検知: 新規ヒューリスティックではなく既存の `GROWI_IS_CONTENT_RENDERING_ATTR` プロトコルを再利用
 
 設計初期には「MutationObserverで一定フレーム変異が無ければ静定」という自前のヒューリスティックを想定していたが、コードベース調査で `GROWI_IS_CONTENT_RENDERING_ATTR`/`GROWI_IS_CONTENT_RENDERING_SELECTOR`（`@growi/core/dist/consts`）という既存の共通プロトコルが見つかった。drawio・mermaid・plantUML・lsxは既にこのプロトコルに参加しており（[auto-scroll](../auto-scroll/) スペックで確立・整理済み）、`apps/app/src/client/util/watch-rendering-and-rescroll.ts` が同じ監視パターンを実装済み。この発見により：
-- `renderedTextOf` の「除外対象サブツリー一覧」を自作する必要がなくなった（`lsx`/`drawio`/`mermaid` は静定を待てば安全に本文として扱える）。除外対象は `.katex`（KaTeXの二重DOM構造）のみに縮小した
+- `renderedTextOf` の「除外対象サブツリー一覧」を自作する必要がなくなった（`lsx`/`drawio`/`mermaid` は静定を待てば安全に本文として扱える）。除外対象は `.katex`（KaTeXの二重DOM構造）または `aria-hidden="true"` を持つ要素だけになる
 - ただし、添付ファイル埋め込み（Ref/Refs/RefImg/RefsImg/Gallery、RichAttachment）はauto-scrollスペックの時点でこのプロトコルへの参加が見送られており、これらを含むページでは静定が実際より早く発火しうる残存リスクとして `design.md` の Revalidation Triggers に記録した
 
 ## 選択→作成フローのUX見直し（amend spec `inline-comment-selection-ux` より統合）
@@ -136,7 +136,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 `CommentCard`が自分のモジュールクラスを最も外側に持つ案は採らなかった。`Comment.module.scss`の規則はすべて`.comment-styles { :global(.page-comment) { … } }`という入れ子で書かれており、`CommentCard`が独自の外枠を持つとその入れ子が崩れ、`page-comment-newer`の不透明度・`page-comment-revision`の色・`page-comment-meta`の色・`page-comment-body .wiki`の段落余白のどれも一致しなくなる。`CommentCard`は`.page-comment`から下のDOMだけを描き、外側のモジュールの入れ物（と、そこから`_comment-inheritance.scss`のプレースホルダを`@extend`する責務）は使う側がそれぞれ持つ。
 
-`Comment.tsx`自体を共有部品として使わず、枠だけを切り出したのは、`Comment.tsx`が本文の編集・削除・リビジョンへのリンク・返信の扱いを一緒に抱えているため。インラインコメントは`revision: Ref<IRevision>`を持たず（持つのは`anchorOriginRevisionId: string`）、v1では編集・削除の対象外なので、`Comment.tsx`をそのまま使うと使わない分岐を通すことになる。一方でクラス名だけを写し取る並行実装にすると、`_comment-inheritance.scss`を直したときに片方だけ変わる状態が起きても、型でもテストでも結びついていないため気付けない。差が出るのは見出し行の右端と本文の前後の中身だけで、箱そのものは同一なので、差し込み口付きの共有コンポーネントを1つ持つ形が最小だった。
+`Comment.tsx`自体を共有部品として使わず、枠だけを切り出したのは、`Comment.tsx`が本文の編集・削除・リビジョンへのリンク・返信の扱いを一緒に抱えているため。インラインコメントは`revision: Ref<IRevision>`を持たず（持つのは`anchorOriginRevisionId: string`）、編集・削除・解決の通信もインラインコメント自身の apiv3 のルートを通すので、`Comment.tsx`をそのまま使うと使わない分岐を通すことになる。一方でクラス名だけを写し取る並行実装にすると、`_comment-inheritance.scss`を直したときに片方だけ変わる状態が起きても、型でもテストでも結びついていないため気付けない。差が出るのは見出し行の右端と本文の前後の中身だけで、箱そのものは同一なので、差し込み口付きの共有コンポーネントを1つ持つ形が最小だった。
 
 `CommentCard` の作りで守る2つの点:
 - `creator`が`null`／未populateでも`UserPicture`／`Username`を無条件に描く。既存の`Comment.tsx`は「投稿者情報が無い場合に何も表示しない」のではなく、`UserPicture`は既定アイコン、`Username`は"(anyone)"という代替表示をする作りに既になっている。`CommentCard`側で`creator != null`条件を追加して丸ごと隠すと、投稿者が未populateの既存コメントの見た目が変わり、Requirement 13.9（通常コメントの見た目を変えない）に違反する。
@@ -157,7 +157,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 - **`InlineCommentItem.module.scss`の`.inline-comment-quote`は`:global`宣言の中にある。** `styles['inline-comment-quote']`のようにCSSモジュール経由で参照すると`undefined`になる（クラス名は素の文字列`inline-comment-quote`のまま使う必要がある）。この規則を将来リファクタリングする際に踏みやすい罠なので明記しておく。
 - **`playwright.config.ts`の`devices[\`Desktop ${browser}\`]`は`browser`が小文字（`'firefox'`/`'webkit'`）のため、実際のPlaywright `devices`辞書のキー（`'Desktop Firefox'`/`'Desktop Webkit'`）と一致しない既存バグがある。** firefox/webkitプロジェクトは実質Chromiumにフォールバックしており、このスペックのE2Eによるテーマ切り替え・ハイライト色の検証はすべてChromiumでのみ実証されている（修正はこのスペックの範囲外）。
 - `Comments.tsx`と`PageComment.tsx`の両方が`id="page-comments-list"`を持つ（このスペックの範囲外の既存の重複。E2Eでこの id を使うと2つの要素に一致するので注意する）。
-- 未解決・解決済みの札の配色（`bg-warning text-dark`）はテーマごとに再生成されない`--bs-warning-*`をそのまま使っており、Requirement 11の「テーマに追随する」の対象外として意図的に据え置いた（この配色を変える受け入れ基準を立てていないため）。
+- 未解決・解決済みの札の配色（未解決は`bg-warning-subtle text-warning-emphasis`、解決済みは`bg-success-subtle text-success-emphasis`）はテーマごとに再生成されない Bootstrap の`--bs-warning-*`／`--bs-success-*`系の値をそのまま使っており、Requirement 11の「テーマに追随する」の対象外として意図的に据え置いた（この配色を変える受け入れ基準を立てていないため）。
 
 ## 操作性の改善（amend spec `inline-comment-interaction-ux` より統合）
 
@@ -165,15 +165,15 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 ### ハイライト色の2トークン化と半透明化
 
-作成中（選択中・入力中）と保存済みのハイライトに別々のカスタムプロパティ（`--grw-inline-comment-marker-bg-pending` / `--grw-inline-comment-marker-bg`）を与え、それぞれ独立にテーマから上書きできるようにした（旧`inline-comment-visual-consistency`のRequirement 12.8「同じ色を使う」という決定を撤回）。両者が重なったときにどちらも見えなくならないよう、境界線（`::highlight()`は`border`/`outline`に対応しない）ではなく、作成中側の適用色を`color-mix(in srgb, ... 70%, transparent)`で半透明にする方式を選んだ。トークン自体は不透明な値のまま定義し、半透明化は`PendingSelectionHighlight`が適用する箇所（`::selection`と`::highlight(growi-inline-comment-pending)`）だけに限定することで、トークンの再利用性を保ちながら影響範囲を最小化している。`color-mix()`非対応の古いブラウザでは透明度が効かないが、CSS Custom Highlight API自体がその種の環境では動作しないため、既存の`supportsCustomHighlightApi()`フォールバックと同じ範囲に収まる。
+作成中（選択中・入力中）と保存済みのハイライトに別々のカスタムプロパティ（`--grw-inline-comment-marker-bg-pending` / `--grw-inline-comment-marker-bg`）を与え、それぞれ独立にテーマから上書きできるようにした（作成中と保存済みに同じ色を使うと、2つを見分けられないため）。両者が重なったときにどちらも見えなくならないよう、境界線（`::highlight()`は`border`/`outline`に対応しない）ではなく、作成中側の適用色を`color-mix(in srgb, ... 70%, transparent)`で半透明にする方式を選んだ。トークン自体は不透明な値のまま定義し、半透明化は`PendingSelectionHighlight`が適用する箇所（`::selection`と`::highlight(growi-inline-comment-pending)`）だけに限定することで、トークンの再利用性を保ちながら影響範囲を最小化している。`color-mix()`非対応の古いブラウザでは透明度が効かないが、CSS Custom Highlight API自体がその種の環境では動作しないため、既存の`supportsCustomHighlightApi()`フォールバックと同じ範囲に収まる。
 
 ### 保存済みハイライトの当たり判定は新規実装（DOM要素を持たないため）
 
-保存済みハイライトは`Range`オブジェクトの`CSS.highlights`登録のみで、対応するDOM要素・idを持たない。そのため素朴な`onMouseEnter`/`onClick`が使えず、本文コンテナに`pointermove`（`requestAnimationFrame`でスロットリング）／`click`を委譲し、解決済みの各`Range`の`getClientRects()`に対してポインタ座標を比較する新規フック（`use-highlight-hit-test.ts`）を実装した。デスクトップ幅ではhoverとclick両方、タブレット以下ではclick（タップ）のみを検出する（`useDeviceLargerThanMd()`で分岐）。
+保存済みハイライトは`Range`オブジェクトの`CSS.highlights`登録のみで、対応するDOM要素・idを持たない。そのため素朴な`onMouseEnter`/`onClick`が使えず、`document`に`pointermove`（`requestAnimationFrame`でスロットリング）／`click`のリスナーを置き、イベントの発生元が本文コンテナの内側か（`contains()`）で絞り込んだうえで、解決済みの各`Range`の`getClientRects()`に対してポインタ座標を比較する新規フック（`use-highlight-hit-test.ts`）を実装した。デスクトップ幅ではhoverとclick両方、タブレット以下ではclick（タップ）のみを検出する（`useDeviceLargerThanMd()`で分岐）。
 
 **このフックは「現在の当たり」だけを都度報告し、クリックで選ばれた状態を自分では保持しない**（ポインタがハイライトから離れると次の`pointermove`で`null`に戻る。戻り値の`source: 'hover' | 'click'`でどちらの操作由来かを呼び出し側に伝える）。クリックで開いたポップオーバーをホバーが外れても開いたままにする「固定」状態は、消費側（`InlineCommentBodyInteraction`）が持つ設計になっている。
 
-閉じた直後にポップオーバーを即座に開き直さないための「再表示の抑制」は、`(commentId, source)`の組をキーに行っている。そのため、クリックで開いたポップオーバーを閉じた直後、閉じるボタンがハイライト上に重なっていてポインタが実際には動いていない場合、次の`pointermove`が`hover`扱いとなり抑制が効かず即座に開き直ることがある（AC 2.4の「外側クリックまたは閉じる操作で閉じる」自体には違反しないが、体感の使いにくさとして報告されたら、キーを`commentId`単独にし、フックが別のidまたは`null`を報告した時点で解除する形に直すとよい）。
+閉じた直後にポップオーバーを即座に開き直さないための「再表示の抑制」は、`(commentId, source)`の組をキーに行っている。そのため、クリックで開いたポップオーバーを閉じた直後、閉じるボタンがハイライト上に重なっていてポインタが実際には動いていない場合、次の`pointermove`が`hover`扱いとなり抑制が効かず即座に開き直ることがある（AC 15.4の「外側クリックまたは閉じる操作で閉じる」自体には違反しないが、体感の使いにくさとして報告されたら、キーを`commentId`単独にし、フックが別のidまたは`null`を報告した時点で解除する形に直すとよい）。
 
 ### 一覧・本文双方が使う「オフセット→現在のRange」再構築ロジックを共有ユーティリティ化
 
@@ -183,11 +183,11 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 **既知の限界（2件、実装時に軽微・許容と判断し先送り）**:
 - `InlineCommentHighlight.tsx`の副作用は`resolvedRanges`が新しい参照になるたびに保存済みハイライトを再登録する。これが強調表示の2秒の窓の最中に起きると、`CSS.highlights`の「後から登録した名前が上に描かれる」性質により、保存済み（黄）が強調（赤）の上に再度乗り、色が一瞬もとに戻ることがある。スクロール自体は影響を受けない、色のちらつきに留まる限界。
-- `supportsCustomHighlightApi()`（`CSS.highlights`が使えるかの判定）が`InlineCommentHighlight.tsx`と`PageView.tsx`の2箇所に重複している（各タスクの担当範囲がそれぞれのファイルの外に出なかったため）。直すなら`resolved-range.ts`の隣に共有関数として切り出し、両方から呼ぶ形にするのが素直。
+- `supportsCustomHighlightApi()`（`CSS.highlights`が使えるかの判定）が`PendingSelectionHighlight.tsx`・`InlineCommentHighlight.tsx`・`PageView.tsx`の3箇所に重複している。直すなら`resolved-range.ts`の隣に共有関数として切り出し、3箇所から呼ぶ形にするのが素直。
 
-### 一覧内の返信UIは通常コメントの開閉パターンを踏襲し、エディタ組み立てを共有部品化
+### 一覧内の返信UIは通常コメントの開閉パターンと `CommentEditor` を使い、本文側の入力は共有部品にまとめる
 
-通常コメントの「Reply...」ボタン⇄入力欄の開閉（`PageComment.tsx`の`showEditorIds`パターン）と同じ見た目・状態管理を、インラインコメント側の返信トグル（`InlineCommentReplies.tsx`）にも採用した。`CommentEditor.tsx`自体は`useSWRxPageComment`に直結しており汎用化の影響範囲が大きいため再利用せず、代わりに`InlineCommentForm.tsx`が既に持っていたエディタ組み立て部分（`CodeMirrorEditorComment`＋メンション補完拡張＋送信/取り消しボタン）を`MentionAwareCommentInput`という共有部品に切り出し、起点フォーム（`InlineCommentForm`）と返信トグル（`InlineCommentReplies`）の両方から使う形にした。`CommentEditor.tsx`（通常コメント側）は無変更。
+通常コメントの「Reply...」ボタン⇄入力欄の開閉と同じ見た目・状態管理を、インラインコメント側の返信トグル（`InlineCommentReplies.tsx`）にも採用した。一覧側の返信の入力と、起点・返信の編集（`InlineCommentReplies`、`InlineCommentItem`）は、通常コメントと同じ`CommentEditor`（`client/components/PageComment/CommentEditor.tsx`）を使う。`CommentEditor`は`onSubmit` propを受け取ると、既定の`useSWRxPageComment`による投稿・更新の代わりにそれを呼ぶので、インラインコメントの`createReply`／`update`／`updateReply`へ配線できる。一方、本文側の入力（起点フォームの`InlineCommentForm`、ポップオーバーの`InlineCommentPopoverEntry`と`InlineCommentPreviewPopover`）は、エディタ組み立て部分（`CodeMirrorEditorComment`＋メンション補完拡張＋送信/取り消しの操作）を`MentionAwareCommentInput`という共有部品にまとめて使う。
 
 ### i18nキーの新規追加とbaselineの整合
 
@@ -203,7 +203,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 そこで `renderedTextOf` を「このコンテナに今どんな文字が存在するか」を答える唯一の関数とし、作成時・解決時の両方がそれを通る形にした（`.claude/rules/coding-style.md` の「単一の情報源」）。この形を成り立たせるために、テキストオフセットからDOM位置を求める向き（`resolveDomPosition`）だけでは足りず、DOM境界点からテキストオフセットを求める逆向き（`textOffsetOf`）を足す必要があった。代わりに、選択が変わるたびにコストが増える——`textOffsetOf` は境界点までの部分木を `Range.cloneContents()` で複製したうえで走査するため、単なる走査よりも重く、`captureSelection` は開始・終了の2回分これを呼ぶ。長いページでのドラッグ選択で体感の重さが報告された場合は、まずここを疑うとよい。解決側も毎回走査しており（永続キャッシュを持たない方針）、走査そのものは受け入れているコストだが、複製を伴う点は選択側だけにある負担である。
 
-除外条件を変える改修を入れる際に、それ以前に保存された `approxOffset` を再計算するマイグレーションは行わない（design.md の「フロー上の決定事項」で方針として明記済み）。この判断が安全なのは、`approxOffset` の用途が「同じクオートがページ内に複数回出てくるときにどれを選ぶか」だけに限られているためである。したがって影響が残るのは「クオートがページ内で一意でなく、かつページ冒頭からそのクオートまでの間に除外対象の要素がある」という狭い組み合わせだけで、それも「ハイライトなし」より軽い劣化にとどまる。
+除外条件を変える改修を入れる際に、それ以前に保存された `approxOffset` を再計算するマイグレーションは行わない（design.md の System Flows にある「フロー上の決定事項」で方針として明記済み）。この判断が安全なのは、`approxOffset` の用途が「同じクオートがページ内に複数回出てくるときにどれを選ぶか」だけに限られているためである。したがって影響が残るのは「クオートがページ内で一意でなく、かつページ冒頭からそのクオートまでの間に除外対象の要素がある」という狭い組み合わせだけで、それも「ハイライトなし」より軽い劣化にとどまる。
 
 ### 除外条件を `aria-hidden="true"` の宣言に委ねた理由（クラス名を列挙する案は不採用）
 
@@ -231,7 +231,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 ### 既知の限界（2件、いずれも直さない判断をした）
 
-- **`quote` だけは選択時の原文のまま**（`Range.toString()` 由来）で、本文テキスト（`renderedTextOf` の `text`）とは別の座標系に乗っている。そのため、除外対象のサブツリー（`.katex` や `aria-hidden="true"`）の内側にある、またはそれを跨ぐ範囲を選択すると、`quote` に本文テキストには存在しない文字が混ざり、完全一致・あいまい一致のどちらも当たらず「ハイライトなし」に落ちる（design.md の「フロー上の決定事項」参照）。直さなかったのは、誤った位置にハイライトを出すのではなく素直に「ハイライトなし」へ落ちる壊れ方であり、要件2.4/5.3のフォールバックで吸収できるためである。将来これを直す場合は、アンカーのデータ構造（`quote` も `renderedTextOf` ベースの文字列にする——ただし保存済みの全 `quote` が一致しなくなる）か、一致判定の側（マッチャーが除外対象由来の文字を吸収する）のどちらを動かすかを先に決める必要があり、どちらもこの機能の中心的な契約に触れる。
+- **`quote` だけは選択時の原文のまま**（`Range.toString()` 由来）で、本文テキスト（`renderedTextOf` の `text`）とは別の座標系に乗っている。そのため、除外対象のサブツリー（`.katex` や `aria-hidden="true"`）の内側にある、またはそれを跨ぐ範囲を選択すると、`quote` に本文テキストには存在しない文字が混ざり、完全一致・あいまい一致のどちらも当たらず「ハイライトなし」に落ちる（design.md の System Flows にある「フロー上の決定事項」参照）。直さなかったのは、誤った位置にハイライトを出すのではなく素直に「ハイライトなし」へ落ちる壊れ方であり、要件2.4/5.3のフォールバックで吸収できるためである。将来これを直す場合は、アンカーのデータ構造（`quote` も `renderedTextOf` ベースの文字列にする——ただし保存済みの全 `quote` が一致しなくなる）か、一致判定の側（マッチャーが除外対象由来の文字を吸収する）のどちらを動かすかを先に決める必要があり、どちらもこの機能の中心的な契約に触れる。
 - **監視期間の打ち切りと、2つ目のトリガーの描画中ガードが重なる隙間**。`use-container-settle` は監視期間（10秒）を過ぎると監視をやめ、フォールバックの静定シグナルを1回出して終わる。その後に「描画中」の目印付き要素が残ったまま `anchors` が変化すると、ガードは再計算を見送るが、それを引き受ける静定シグナルはもう来ない——このとき、新しく投稿されたコメントはページを開き直すまでハイライトされない。「見送った再計算は静定シグナルが引き受ける」という設計どおりの帰結であり、10秒以上「描画中」の目印を出しっぱなしにする上流側の不具合が前提になるため、頻度は低いと判断して直さなかった。もし実際に起きるようになった場合は、ガードで見送ったことを記録して打ち切り時に一度だけ拾う、という形が素直な直し方になる。
 
 ### Risks & Mitigations
@@ -260,7 +260,7 @@ jsdomにはレイアウト・ペイントエンジインが無いため、ユニ
 
 ### 通常コメントの編集・削除の仕組みは「権限のルールとカスケード削除の部品」だけを持ってきて、「通信の作法」は持ってこない
 
-Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.update`／`comments.remove`）とまったく同じ権限モデルにすることを求めている。通常コメント側の実装（`Comment.tsx`／`CommentControl.tsx`／`DeleteCommentModal`／`apps/app/src/server/routes/comment.js`）を調査した結果、編集は `Comment.tsx` の `isReEdit` state が `CommentCard` を `CommentEditor` に切り替える形、削除は `CommentControl` → `PageComment.tsx` のモーダルstate → `DeleteCommentModal`／`DeleteCommentModalSubstance` という形で実装されており、どちらも apiv1 のプレーンな `Error` ベースのレスポンス（`ApiResponse.error`）を使っている。サーバー側はどちらも `prisma.comments.findUnique` → 未発見チェック → `Page.isAccessiblePageByViewer` → **投稿者本人チェック**（`creatorId` 比較）という順で処理し、削除は `removeWithReplies(commentId)`（トランザクション内で返信をすべて削除してから本体を削除）を呼ぶ。
+Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.update`／`comments.remove`）とまったく同じ権限モデルにすることを求めている。通常コメント側の実装（`Comment.tsx`／`CommentControl.tsx`／`DeleteConfirmAlert.tsx`／`apps/app/src/server/routes/comment.js`）では、編集は `Comment.tsx` の `isReEdit` state が `CommentCard` を `CommentEditor` に切り替える形、削除は `Comment.tsx` の `isDeleteConfirmOpen` state が削除確認の警告帯 `DeleteConfirmAlert` を開き、確定で `onDeleteConfirmed` を呼ぶ形で実装されている。サーバーはどちらも apiv1 のプレーンな `Error` ベースのレスポンス（`ApiResponse.error`）を使う。サーバー側はどちらも `prisma.comments.findUnique` → 未発見チェック → `Page.isAccessiblePageByViewer` → **投稿者本人チェック**（`creatorId` 比較）という順で処理し、削除は `removeWithReplies(commentId)`（トランザクション内で返信をすべて削除してから本体を削除）を呼ぶ。
 
 *権限のルール*（投稿者本人限定、`creatorId` 比較、サーバー側が最終判断）と*カスケード削除の部品*（`removeWithReplies`）はそのまま持ってきたが、*通信の作法*は持ってこなかった——インラインコメント自身の既存ルート（`create.ts`／`create-reply.ts`／`resolve.ts`）はすべて apiv3 なので、新しい更新・削除ルートも apiv1 風のペアを別に持ち込むのではなく、この既存の apiv3 の作法（ファクトリ関数、`ErrorV3`、`res.apiv3Err`／`res.apiv3`）に従っている。`creatorId`（ただの文字列）はどのエンドポイントが生成したオブジェクトであっても必ず入っている投稿者特定フィールドだが、`creator`（populatedなユーザーオブジェクト）は共有のコメント一覧（`comment` スペック）の応答から作った値以外では `null` になる。権限判定（クライアント側の表示切り替えであれ、サーバー側の認可であれ）は必ず `creatorId` で比較し、`creator` では比較しない。
 
@@ -280,7 +280,7 @@ Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.u
 
 ### 編集モードには、新しい編集専用コンポーネントではなく、任意の初期値propを足した `MentionAwareCommentInput` を再利用する
 
-**Context**: 一覧側の編集フローとポップオーバー側の編集フローの両方で、現在の本文をあらかじめ入力欄に入れておく必要がある（Requirement 18.1, 15.5）。
+**Context**: ポップオーバー側の編集フローでは、現在の本文をあらかじめ入力欄に入れておく必要がある（Requirement 15.5）。一覧側の編集フロー（Requirement 18.1）は`CommentEditor`の`commentBody`で現在の本文を入れるので、この決定の対象外である。
 
 **Alternatives Considered**:
 1. 編集専用の新しい入力コンポーネントを作る。
@@ -292,13 +292,13 @@ Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.u
 
 **Trade-offs**: 編集モード用の新しい `editorKey` は、コメントidごとに区別できる値（例: `inline_comment_edit_${commentId}`）にする必要がある。そうしないと、あるコメントの編集がページの「新規コメント」用エディタや、別のコメントの編集セッションとCodeMirrorのstateを共有してしまう。
 
-### 一覧側の削除確認に `DeleteCommentModal` を再利用しなかった理由
+### 削除確認は、モーダルではなく共有の `DeleteConfirmAlert` を使う
 
-`DeleteCommentModal`／`DeleteCommentModalSubstance` を再利用する代わりに、インラインコメント専用の新しい削除確認UIを使うことにした。`DeleteCommentModal` は通常コメント自身のstore・型（`ICommentHasId`）に強く結びついており、この機能の既存の方針（`inline-comment-popover-refinement` の「解決トグルのマークアップを共有化しない」判断と同じ）は、小さく型の異なるUIは無理に共有コンポーネント化しないというものである。
+削除の確認は、`client/components/PageComment/DeleteConfirmAlert.tsx` のインライン警告帯（モーダルを使わない）で行う。通常コメント（`Comment.tsx`）、一覧側の起点コメント（`InlineCommentItem`）と返信（`InlineCommentReplies`）、ポップオーバー（`InlineCommentPopoverEntry`）の4つがこの部品を使う。`DeleteConfirmAlert` は状態を持たず通信もしない（確認を開いているかどうかと、確定したときに何をするかは呼び出し元が持つ）ので、通常コメントの store や型（`ICommentHasId`）に結び付かず、型の違うインラインコメントとも共有できる。同じ問いを同じ見た目で出せる。
 
-### 解決済みインラインコメントの本文中非表示を `inlineCommentAnchors` 1箇所でフィルタする理由
+### 解決済みインラインコメントの本文中非表示は、`PageView.tsx` で2段に分けて絞り込む
 
-「解決済みコメントにはハイライトを付けない」（Requirement 2.7）をどこで実装するかについて、(1) 各消費者（`InlineCommentHighlight`、`InlineCommentBodyInteraction`）がそれぞれ独立にフィルタする案と、(2) `PageView.tsx` の `inlineCommentAnchors`（すべての消費者が `resolvedRanges` を介して間接的に読み取っている唯一の起点）で一度だけフィルタする案を検討し、(2) を選んだ。`resolvedRanges`（`useAnchorResolver` の出力）はすでに `InlineCommentHighlight` と `InlineCommentBodyInteraction` の両方が消費している唯一の絞り込みポイントであり、解決済みコメントはそもそも `Range` が計算されないだけなので、両方の消費者は解決状態を自分で意識する必要が一切なくなる（`.claude/rules/coding-style.md` の「単一の情報源を持ち、消費者ごとに個別分岐しない」原則）。
+「解決済みコメントにはハイライトを付けない」（Requirement 2.7）をどこで実装するかについて、(1) 各消費者（`InlineCommentHighlight`、`InlineCommentBodyInteraction`）がそれぞれ独立にフィルタする案と、(2) `PageView.tsx` で一度だけ絞り込み、絞り込んだ結果を消費者に渡す案を検討し、(2) を選んだ。絞り込みは2段に分かれる。アンカーの解決（`useAnchorResolver`）の入力 `inlineCommentAnchors` は、解決済みも含む全件のまま渡す。一覧から解決済みコメントの位置へスクロールする（`scrollToRange`）には、解決済みコメントの `Range` も要るためである。そのうえで、未解決のコメントだけを集めた `bodyInlineComments` を作り、解決結果をその id に絞った `visibleResolvedRanges` を作る。`InlineCommentHighlight` と `InlineCommentBodyInteraction` は `visibleResolvedRanges`（とポップオーバー用の `bodyInlineComments`）だけを受け取るので、両方の消費者は解決状態を自分で意識する必要がない（`.claude/rules/coding-style.md` の「Single source of truth」）。2つの消費者が同じ絞り込み済みの一覧から作った値を受け取ることが要点で、片方にだけ絞り込み前の一覧を渡すと、開いていたポップオーバーの対象を解決したときに `pinnedId` が残る。
 
 ポップオーバーを開いたまま対象が解決済みに変わった場合（Requirement 15.12）についても、`InlineCommentBodyInteraction` に `comment?.resolvedAt` を監視する新しい `useEffect` を追加する案と、すでにある「`comment == null` ならなにも描画しない」というガード（再アンカリング失敗のケース、Requirement 15.6ですでに使われている）に任せる案を検討し、後者を選んだ。`InlineCommentBodyInteraction` はidで `inlineComments` を検索しているため、フィルタ後は解決済みコメントもこのガードに引っかかって自然に対象外になる——新しい監視effectを足す必要がない。ただし、表示中のidに対応するコメントが `inlineComments` から消えて `comment` が `null` になった時点で、`pinnedId`／`hoverPreviewId` もあわせてクリアする小さなeffectを追加している。そうしないと、消えたidを指したままのstateが残ってしまう（同じidが二度と現れなくなる以上実害はないが、`handleClose` がすでに保っている「`pinnedId` は表示中のコメントが存在することを含意する」という不変条件を、この経路でも保つため）。コメントがこの経路で単に消えた場合、ポップオーバー自身の `onClose`／`suppressedHit` の後始末は走らない（`handleClose` を経由したときだけ走る）——解決済みである限り当たり判定がそのidを二度と報告しないため、抑制すべきものが残らず問題ない。
 
@@ -306,7 +306,7 @@ Requirement 18.9・15.5 が、編集・削除を通常コメント（`comments.u
 
 - Risk: クライアント側の `creatorId === currentUser._id` チェックはそれ自体では認可の境界にならない（クライアント側のstateは古い可能性・偽装される可能性がある）。— Mitigation: `comments.update`／`comments.remove` とまったく同じく、サーバー側のルート・サービスが変更前に投稿者本人であることを独立に再検証する。クライアント側のチェックはどのボタンを表示するかだけを決める。
 - Risk: 返信を持つ起点コメントを削除したときに、返信行が孤立して残ってしまう。— Mitigation: すでにトランザクション化され、通常コメントの削除で実績のある `removeWithReplies` をそのまま再利用する。
-- Risk: `MentionAwareCommentInput` に新しい `initialValue` prop を足すことが、既存の「新規コメント」呼び出し元に対して純粋な追加にならず退行を生む可能性。— Mitigation: 既定値を `undefined`／空にし、既存の呼び出し元（`InlineCommentForm`、`InlineCommentReplies` の返信入力欄）に影響が出ないようにする。「`initialValue` を渡さない場合は現状と変わらない」ことを確認する退行テストでカバーする。
+- Risk: `MentionAwareCommentInput` に新しい `initialValue` prop を足すことが、既存の「新規コメント」呼び出し元に対して純粋な追加にならず退行を生む可能性。— Mitigation: 既定値を `undefined`／空にし、既存の呼び出し元（`InlineCommentForm`、`InlineCommentPreviewPopover` の返信入力欄）に影響が出ないようにする。「`initialValue` を渡さない場合は現状と変わらない」ことを確認する退行テストでカバーする。
 
 ### 読み取り専用利用者の制限は書き込み系7ルートすべてにサーバー側で適用する
 

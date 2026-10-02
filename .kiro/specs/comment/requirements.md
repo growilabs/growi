@@ -130,4 +130,4 @@
 
 1. The GROWI shall インラインコメント専用の一覧取得 API(`GET /_api/v3/inline-comments`)を提供しない
 2. The GROWI shall インラインコメントの作成、返信の作成、編集、削除、解決の各 API を従来どおり提供する
-3. When 廃止した一覧取得 API が呼ばれた, the GROWI shall 見つからない旨の応答を返す
+3. When インラインコメント専用の一覧取得の URL(`GET /_api/v3/inline-comments`)が呼ばれた, the GROWI shall 見つからない旨の応答を返す
