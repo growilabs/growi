@@ -1,4 +1,4 @@
-import type { Extension } from '@codemirror/state';
+import { type Extension, Prec } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 
 import type { EditorTheme } from '../../../consts/index.js';
@@ -11,11 +11,16 @@ export const getEditorTheme = async (
       return (await import('./eclipse.js')).eclipse;
     case 'basic': {
       const { basicLight } = await import('cm6-theme-basic-light');
-      const basicLightOverride = EditorView.theme({
-        '.cm-tooltip.cm-tooltip-autocomplete': {
-          backgroundColor: '#ffffff',
-        },
-      });
+      // basicLight is a light theme but gives the completion tooltip a dark background,
+      // which makes the dark completion text unreadable.
+      // Editor themes are applied with Prec.high, so use Prec.highest to override it.
+      const basicLightOverride = Prec.highest(
+        EditorView.theme({
+          '.cm-tooltip-autocomplete': {
+            backgroundColor: 'var(--bs-white)',
+          },
+        }),
+      );
       return [basicLight, basicLightOverride];
     }
     case 'ayu':
