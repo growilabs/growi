@@ -45,13 +45,28 @@ const markdownHighlighting = HighlightStyle.define([
 ]);
 
 const completionMenuTheme = EditorView.baseTheme({
-  '.cm-tooltip-autocomplete .cm-completionLabel': {
+  '&light .cm-tooltip-autocomplete .cm-completionLabel': {
     color: 'var(--bs-gray-800)',
   },
-  '.cm-tooltip-autocomplete .cm-completionDetail': {
+  '&light .cm-tooltip-autocomplete .cm-completionDetail': {
     color: 'var(--bs-gray-600)',
   },
 });
+
+// Unify the selected completion item style across all editor themes.
+// Editor themes are applied with Prec.high (see useThemeExtension),
+// so use Prec.highest to override them without relying on a more specific selector.
+const completionSelectedItemTheme = Prec.highest(
+  EditorView.theme({
+    '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+      backgroundColor: 'var(--bs-gray-300)',
+      color: 'var(--bs-gray-800)',
+    },
+    '.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail': {
+      color: 'var(--bs-gray-600)',
+    },
+  }),
+);
 
 // The defaults MINUS feature-specific extensions (emoji) — keeps the shared facility.
 // Exported so a regression test can prove mention works on this base without emoji.
@@ -71,6 +86,7 @@ export const baseExtensions: Extension[] = [
   // autocompletion() call; CodeMirror dedups the core and merges the configs.
   autocompletion({ icons: false }),
   completionMenuTheme,
+  completionSelectedItemTheme,
 ];
 
 const defaultExtensions: Extension[] = [
