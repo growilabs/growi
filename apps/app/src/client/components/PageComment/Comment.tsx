@@ -54,7 +54,10 @@ export const Comment = (props: CommentProps): JSX.Element => {
   const [deleteError, setDeleteError] = useState<string>();
 
   const commentId = comment._id;
-  const creator = isPopulated(comment.creator) ? comment.creator : undefined;
+  const creator =
+    comment.creator != null && isPopulated(comment.creator)
+      ? comment.creator
+      : undefined;
   const createdAt = new Date(comment.createdAt);
   const updatedAt = new Date(comment.updatedAt);
   const isEdited = createdAt < updatedAt;
